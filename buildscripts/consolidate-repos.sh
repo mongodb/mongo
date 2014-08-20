@@ -70,9 +70,9 @@ do
   gpg -r "$gpg_recip" --no-secmem-warning -abs --output Release.gpg  Release
 done
 
-for redhat_dir in "$repodir"/redhat/os/*
+for rpm_dir in "$repodir"/redhat/os/* "$repodir"/suse/os/*
 do
-  echo "Generating redhat repo metadata under $redhat_dir"
-  cd "$redhat_dir"
+  echo "Generating rpm repo metadata under $redhat_dir"
+  cd "$rpm_dir"
   createrepo .
 done
