@@ -72,7 +72,7 @@ start()
 stop()
 {
   echo -n $"Stopping mongod: "
-  mongo_killproc $mongod
+  mongo_killproc "$PIDFILEPATH" $mongod
   RETVAL=$?
   echo
   [ $RETVAL -eq 0 ] && rm -f /var/lock/subsys/mongod
@@ -90,10 +90,11 @@ restart () {
 # the initial TERM signal.
 mongo_killproc()
 {
-  local procname=$1
+  local pid_file=$1
+  local procname=$2
   local -i delay=300
   local -i duration=10
-  local pid=`pidofproc -p "$PIDFILEPATH" $procname`
+  local pid=`pidofproc -p "${pid_file}" ${procname}`
 
   kill -TERM $pid >/dev/null 2>&1
   usleep 100000
@@ -106,7 +107,7 @@ mongo_killproc()
   kill -KILL $pid >/dev/null 2>&1
   usleep 100000
 
-  rm -f "$PIDFILEPATH"
+  rm -f "${pid_file}"
 
   checkpid $pid
   local RC=$?
