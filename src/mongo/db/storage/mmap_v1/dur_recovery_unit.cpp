@@ -35,6 +35,8 @@
 
 #include "mongo/db/operation_context.h"
 #include "mongo/db/storage/mmap_v1/dur.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/log.h"
 
 // Remove once we are ready to enable
 #define ROLLBACK_ENABLED 0
@@ -118,9 +120,16 @@ namespace mongo {
     }
 
     void DurRecoveryUnit::rollbackInnermostChanges() {
+        // TODO SERVER-15043 reduce logging at default verbosity after a burn-in period
         invariant(_changes.size() <= size_t(std::numeric_limits<int>::max()));
         const int rollbackTo = _startOfUncommittedChangesForLevel.back();
+        log() << "   ***** ROLLING BACK " << (_changes.size() - rollbackTo) << " changes";
         for (int i = _changes.size() - 1; i >= rollbackTo; i--) {
+            const type_info& type = typeid(*_changes[i]);
+            if (type != typeid(MemoryWrite)) {
+                log() << "CUSTOM ROLLBACK " << demangleName(type);
+            }
+
             _changes[i]->rollback();
         }
         _changes.erase(_changes.begin() + rollbackTo, _changes.end());
