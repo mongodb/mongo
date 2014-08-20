@@ -964,15 +964,15 @@ delete_b:	/*
 		 * After page and overflow reconciliation, one (and only one)
 		 * page can reference an overflow record.  But, if we split a
 		 * page into multiple chunks, any of the chunks might own any
-		 * of the backing overflow records, so overflow records cannot
-		 * be discarded until after the merge phase completes.  (The
-		 * merge phase is where the final pages are written, and we
-		 * figure out which referenced overflow records are actually
-		 * used.) If freeing page blocks and the page is not involved
-		 * in a merge, the overflow records are known to be useless,
-		 * discard them to keep the final file size small.
+		 * of the backing overflow records, so overflow records won't
+		 * normally be discarded until after the merge phase completes.
+		 * (The merge phase is where the final pages are written, and
+		 * we figure out which overflow records are actually used.)
+		 * If freeing a chunk and there are no other references to the
+		 * underlying shared information, the overflow records must be
+		 * useless, discard them to keep the final file size small.
 		 */
-		if (!F_ISSET(b_trk, WT_TRACK_MERGE))
+		if (b_trk->shared->ref == 1)
 			for (i = 0; i < b_trk->trk_ovfl_cnt; ++i)
 				WT_RET(__slvg_trk_free(session,
 				    &ss->ovfl[b_trk->trk_ovfl_slot[i]], 1));
@@ -1563,15 +1563,15 @@ delete_b:	/*
 		 * After page and overflow reconciliation, one (and only one)
 		 * page can reference an overflow record.  But, if we split a
 		 * page into multiple chunks, any of the chunks might own any
-		 * of the backing overflow records, so overflow records cannot
-		 * be discarded until after the merge phase completes.  (The
-		 * merge phase is where the final pages are written, and we
-		 * figure out which referenced overflow records are actually
-		 * used.) If freeing page blocks and the page is not involved
-		 * in a merge, the overflow records are known to be useless,
-		 * discard them to keep the final file size small.
+		 * of the backing overflow records, so overflow records won't
+		 * normally be discarded until after the merge phase completes.
+		 * (The merge phase is where the final pages are written, and
+		 * we figure out which overflow records are actually used.)
+		 * If freeing a chunk and there are no other references to the
+		 * underlying shared information, the overflow records must be
+		 * useless, discard them to keep the final file size small.
 		 */
-		if (!F_ISSET(b_trk, WT_TRACK_MERGE))
+		if (b_trk->shared->ref == 1)
 			for (i = 0; i < b_trk->trk_ovfl_cnt; ++i)
 				WT_RET(__slvg_trk_free(session,
 				    &ss->ovfl[b_trk->trk_ovfl_slot[i]], 1));
