@@ -35,6 +35,7 @@ namespace mongo {
     class BSONObj;
     class OID;
     class OperationContext;
+    class Status;
     struct HostAndPort;
     template <typename T> class StatusWith;
 
@@ -95,6 +96,11 @@ namespace repl {
          * Gets the replica set config document from local storage, or returns an error.
          */
         virtual StatusWith<BSONObj> loadLocalConfigDocument(OperationContext* txn) = 0;
+
+        /**
+         * Stores the replica set config document in local storage, or returns an error.
+         */
+        virtual Status storeLocalConfigDocument(OperationContext* txn, const BSONObj& config) = 0;
 
         /**
          * Returns the HostAndPort of the remote client connected to us that initiated the operation

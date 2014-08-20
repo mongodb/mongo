@@ -75,6 +75,13 @@ namespace repl {
         return _localRsConfigDocument;
     }
 
+    Status ReplicationCoordinatorExternalStateMock::storeLocalConfigDocument(
+            OperationContext* txn,
+            const BSONObj& config) {
+        setLocalConfigDocument(StatusWith<BSONObj>(config));
+        return Status::OK();
+    }
+
     void ReplicationCoordinatorExternalStateMock::setLocalConfigDocument(
             const StatusWith<BSONObj>& localConfigDocument) {
 
