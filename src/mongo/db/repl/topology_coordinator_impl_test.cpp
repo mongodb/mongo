@@ -608,7 +608,7 @@ namespace {
         topocoord.updateConfig(cbData, config, 0, now++, OpTime(0,0));
 
         OpTime ourOpTime(10, 10);
-        OpTime staleOpTime = (1, 1);
+        OpTime staleOpTime(1, 1);
 
         Status internalErrorStatus(ErrorCodes::InternalError, "didn't set status");
 
