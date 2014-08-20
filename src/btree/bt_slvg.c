@@ -1164,19 +1164,20 @@ __slvg_col_build_internal(
 		/*
 		 * If the page's key range is unmodified from when we read it
 		 * (in other words, we didn't merge part of this page with
-		 * another page), we can use the page without change.  If we
-		 * did merge with another page, we must build a page reflecting
-		 * the updated key range, and that requires an additional pass
-		 * to free its backing blocks.
+		 * another page), we can use the page without change, and the
+		 * only thing we need to do is mark all overflow records the
+		 * page references as in-use.
+		 *
+		 * If we did merge with another page, we have to build a page
+		 * reflecting the updated key range.  Note, that requires an
+		 * additional pass to free the merge page's backing blocks.
 		 */
 		if (F_ISSET(trk, WT_TRACK_MERGE)) {
 			ss->merge_free = 1;
 
 			WT_ERR(__slvg_col_build_leaf(session, trk, ref));
-		} else {
-			/* All overflow items referenced by this page used. */
+		} else
 			WT_ERR(__slvg_ovfl_ref_all(session, trk));
-		}
 		++ref;
 	}
 
@@ -1775,10 +1776,13 @@ __slvg_row_build_internal(
 		/*
 		 * If the page's key range is unmodified from when we read it
 		 * (in other words, we didn't merge part of this page with
-		 * another page), we can use the page without change.  If we
-		 * did merge with another page, we must build a page reflecting
-		 * the updated key range, and that requires an additional pass
-		 * to free its backing blocks.
+		 * another page), we can use the page without change, and the
+		 * only thing we need to do is mark all overflow records the
+		 * page references as in-use.
+		 *
+		 * If we did merge with another page, we have to build a page
+		 * reflecting the updated key range.  Note, that requires an
+		 * additional pass to free the merge page's backing blocks.
 		 */
 		if (F_ISSET(trk, WT_TRACK_MERGE)) {
 			ss->merge_free = 1;
@@ -1789,7 +1793,6 @@ __slvg_row_build_internal(
 			    trk->row_start.data, trk->row_start.size,
 			    &ref->key.ikey));
 
-			/* All overflow items referenced by this page used. */
 			WT_ERR(__slvg_ovfl_ref_all(session, trk));
 		}
 		++ref;
