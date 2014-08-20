@@ -218,7 +218,7 @@ namespace {
                                   .setSources(moe::SourceAllLegacy);
 
         options->addOptionChaining("systemLog.syslogFacility", "syslogFacility", moe::String,
-                "syslog facility used for monogdb syslog message");
+                "syslog facility used for mongodb syslog message");
 
 #endif // _WIN32
         options->addOptionChaining("systemLog.logAppend", "logappend", moe::Switch,
