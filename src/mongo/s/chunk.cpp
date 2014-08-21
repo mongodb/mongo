@@ -410,6 +410,7 @@ namespace mongo {
         cmd.append( "splitKeys" , m );
         cmd.append( "shardId" , genID() );
         cmd.append( "configdb" , configServer.modelServer() );
+        cmd.append("epoch", _manager->getVersion().epoch());
         BSONObj cmdObj = cmd.obj();
 
         BSONObj dummy;
@@ -481,6 +482,7 @@ namespace mongo {
 
         builder.append("waitForDelete", waitForDelete);
         builder.append(LiteParsedQuery::cmdOptionMaxTimeMS, maxTimeMS);
+        builder.append("epoch", _manager->getVersion().epoch());
 
         bool worked = fromconn->runCommand("admin", builder.done(), res);
         fromconn.done();

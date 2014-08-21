@@ -627,6 +627,23 @@ namespace mongo {
                 return false;
             }
 
+            // From mongos >= v2.8.
+            BSONElement epochElem(cmdObj["epoch"]);
+            if (epochElem.type() == jstOID) {
+                OID cmdEpoch = epochElem.OID();
+
+                if (cmdEpoch != shardVersion.epoch()) {
+                    errmsg = str::stream() << "splitChunk cannot split chunk "
+                                           << "[" << minKey << ","
+                                           << maxKey << "), "
+                                           << "collection may have been dropped. "
+                                           << "current epoch: " << shardVersion.epoch()
+                                           << ", cmd epoch: " << cmdEpoch;
+                    warning() << errmsg;
+                    return false;
+                }
+            }
+
             // Get collection metadata
             const CollectionMetadataPtr collMetadata(shardingState.getCollectionMetadata(ns));
             // With nonzero shard version, we must have metadata
