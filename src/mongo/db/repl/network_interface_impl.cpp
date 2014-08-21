@@ -48,11 +48,10 @@ namespace repl {
 
     namespace {
         // Duplicated in mock impl
-        StatusWith<int> getTimeoutMillis(Date_t expDate) {
+        StatusWith<int> getTimeoutMillis(Date_t expDate, Date_t nowDate) {
             // check for timeout
             int timeout = 0;
             if (expDate != ReplicationExecutor::kNoExpirationDate) {
-                Date_t nowDate = curTimeMillis64();
                 timeout = expDate >= nowDate ? expDate - nowDate :
                                                ReplicationExecutor::kNoTimeout.total_milliseconds();
                 if (timeout < 0 ) {
@@ -72,7 +71,7 @@ namespace repl {
         try {
             BSONObj output;
 
-            StatusWith<int> timeoutStatus = getTimeoutMillis(request.expirationDate);
+            StatusWith<int> timeoutStatus = getTimeoutMillis(request.expirationDate, now());
             if (!timeoutStatus.isOK())
                 return ResponseStatus(timeoutStatus.getStatus());
 

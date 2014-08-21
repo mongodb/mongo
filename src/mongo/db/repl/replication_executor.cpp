@@ -51,9 +51,14 @@ namespace {
         _inShutdown(false),
         _networkWorkers(threadpool::ThreadPool::DoNotStartThreadsTag()),
         _nextId(0) {
+        _networkInterface->setExecutor(this);
     }
 
     ReplicationExecutor::~ReplicationExecutor() {}
+
+    Date_t ReplicationExecutor::now() {
+        return _networkInterface->now();
+    }
 
     void ReplicationExecutor::run() {
         _networkWorkers.startThreads();
@@ -269,19 +274,26 @@ namespace {
     StatusWith<ReplicationExecutor::CallbackHandle> ReplicationExecutor::scheduleRemoteCommand(
             const RemoteCommandRequest& request,
             const RemoteCommandCallbackFn& cb) {
-
+        RemoteCommandRequest scheduledRequest = request;
+        if (request.timeout == kNoTimeout) {
+            scheduledRequest.expirationDate = kNoExpirationDate;
+        }
+        else {
+            scheduledRequest.expirationDate =
+                _networkInterface->now() + scheduledRequest.timeout.total_milliseconds();
+        }
         boost::lock_guard<boost::mutex> lk(_mutex);
         StatusWith<CallbackHandle> handle = enqueueWork_inlock(
                 &_networkInProgressQueue,
                 stdx::bind(remoteCommandFailedEarly,
                            stdx::placeholders::_1,
                            cb,
-                           request));
+                           scheduledRequest));
         if (handle.isOK()) {
             _networkWorkers.schedule(makeNoExcept(stdx::bind(&ReplicationExecutor::doRemoteCommand,
                                                              this,
                                                              handle.getValue(),
-                                                             request,
+                                                             scheduledRequest,
                                                              cb)));
         }
         return handle;
@@ -391,6 +403,11 @@ namespace {
         return std::make_pair(work, cbHandle);
     }
 
+    void ReplicationExecutor::signalWorkForTest() {
+        boost::lock_guard<boost::mutex> lk(_mutex);
+        _workAvailable.notify_all();
+    }
+
     ReplicationExecutor::Milliseconds ReplicationExecutor::scheduleReadySleepers_inlock() {
         const Date_t now = _networkInterface->now();
         WorkQueue::iterator iter = _sleepersQueue.begin();
@@ -446,7 +463,11 @@ namespace {
         status(theStatus) {
     }
 
-    ReplicationExecutor::RemoteCommandRequest::RemoteCommandRequest() {}
+    ReplicationExecutor::RemoteCommandRequest::RemoteCommandRequest() :
+        timeout(kNoTimeout),
+        expirationDate(kNoExpirationDate) {
+    }
+
     ReplicationExecutor::RemoteCommandRequest::RemoteCommandRequest(
             const HostAndPort& theTarget,
             const std::string& theDbName,
@@ -454,10 +475,11 @@ namespace {
             const Milliseconds timeoutMillis) :
         target(theTarget),
         dbname(theDbName),
-        cmdObj(theCmdObj) {
-        expirationDate = timeoutMillis == kNoTimeout ? kNoExpirationDate :
-                                                       Date_t(curTimeMillis64() +
-                                                              timeoutMillis.total_milliseconds());
+        cmdObj(theCmdObj),
+        timeout(timeoutMillis) {
+        if (timeoutMillis == kNoTimeout) {
+            expirationDate = kNoExpirationDate;
+        }
     }
 
     std::string ReplicationExecutor::RemoteCommandRequest::toString() const {
@@ -492,6 +514,7 @@ namespace {
 
     ReplicationExecutor::NetworkInterface::NetworkInterface() {}
     ReplicationExecutor::NetworkInterface::~NetworkInterface() {}
+    void ReplicationExecutor::NetworkInterface::setExecutor(ReplicationExecutor*) {}
 
 namespace {
 

@@ -33,6 +33,7 @@
 #include <map>
 
 #include "mongo/db/repl/replication_executor.h"
+#include "mongo/util/time_support.h"
 
 namespace mongo {
 namespace repl {
@@ -48,7 +49,8 @@ namespace repl {
                                                                                 CommandProcessorFn;
         NetworkInterfaceMock();
         explicit NetworkInterfaceMock(CommandProcessorFn fn);
-        virtual ~NetworkInterfaceMock() {}
+        virtual ~NetworkInterfaceMock();
+        virtual void setExecutor(ReplicationExecutor* executor);
         virtual Date_t now();
         virtual ResponseStatus runCommand(const ReplicationExecutor::RemoteCommandRequest& request);
         virtual void runCallbackWithGlobalExclusiveLock(const stdx::function<void ()>& callback);
@@ -58,10 +60,41 @@ namespace repl {
          */
         void simulatedNetworkLatency(int millis);
 
-    protected:
+        /**
+         * Sets the current time to "newNow".  It is a fatal error for "newNow"
+         * to be less than or equal to "now()".
+         */
+        void setNow(Date_t newNow);
 
-        int _simulatedNetworkLatencyMillis;
-        const CommandProcessorFn _helper;
+        /**
+         * Increments the current time by "inc".  It is a fatal error for "inc"
+         * to be negative or 0.
+         */
+        void incrementNow(Milliseconds inc);
+
+    protected:
+        // Mutex that synchronizes access to mutable data in this class and its subclasses.
+        // Fields guarded by the mutex are labled (M), below, and those that are read-only
+        // in multi-threaded execution, and so unsynchronized, are labeled (R).
+        boost::mutex _mutex;
+
+    private:
+        // Condition signaled when _now is updated.
+        boost::condition_variable _timeElapsed;  // (M)
+
+        // The current time reported by this instance of NetworkInterfaceMock.
+        Date_t _now;                             // (M)
+
+        // The amount of simulated network delay to introduce on all runCommand
+        // operations.
+        int _simulatedNetworkLatencyMillis;      // (M)
+
+        // Function that generates the response from a request in runCommand.
+        const CommandProcessorFn _helper;        // (R)
+
+        // Pointer to the executor into which this mock is installed.  Used to signal the executor
+        // when the clock changes.
+        ReplicationExecutor* _executor;          // (R)
     };
 
     /**
@@ -114,9 +147,11 @@ namespace repl {
         ResponseStatus _getResponseFromMap(
                                          const ReplicationExecutor::RemoteCommandRequest& request);
 
-        boost::mutex _mutex;
-        boost::condition_variable _someResponseUnblocked;
-        RequestResponseMap _responses;
+        // Condition signaled whenever any response is unblocked.
+        boost::condition_variable _someResponseUnblocked;  // (M)
+
+        // Map from requests to responses.
+        RequestResponseMap _responses;                     // (M)
     };
 
 }  // namespace repl

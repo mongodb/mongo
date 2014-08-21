@@ -147,6 +147,11 @@ namespace repl {
         ~ReplicationExecutor();
 
         /**
+         * Gets the current time as reported by the network interface.
+         */
+        Date_t now();
+
+        /**
          * Executes the run loop.  May be called up to one time.
          *
          * Returns after the executor has been shutdown and is safe to delete.
@@ -266,6 +271,14 @@ namespace repl {
          * NOTE: Do not call from a callback running in the executor.
          */
         void wait(const CallbackHandle& cbHandle);
+
+        /**
+         * Wakes up ReplicationExecutor::run() if it is blocked in getWork().
+         *
+         * Only useful for testing.  Do not call except from mock implementations
+         * of NetworkInterface.
+         */
+        void signalWorkForTest();
 
     private:
         struct Event;
@@ -443,7 +456,8 @@ namespace repl {
         HostAndPort target;
         std::string dbname;
         BSONObj cmdObj;
-        Date_t expirationDate;
+        Milliseconds timeout;
+        Date_t expirationDate;  // Set by scheduleRemoteCommand.
     };
 
     /**
@@ -462,6 +476,12 @@ namespace repl {
         };
 
         virtual ~NetworkInterface();
+
+        /**
+         * Called by the ReplicationExecutor when it takes ownership of a
+         * NetworkInterface; useful for testing.
+         */
+        virtual void setExecutor(ReplicationExecutor* executor);
 
         /**
          * Returns the current time.

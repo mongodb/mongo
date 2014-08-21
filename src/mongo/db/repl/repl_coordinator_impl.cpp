@@ -108,7 +108,7 @@ namespace repl {
 
         // this is ok but micros or combo with some rand() and/or 64 bits might be better --
         // imagine a restart and a clock correction simultaneously (very unlikely but possible...)
-        _rbid = static_cast<int>(curTimeMillis64());
+        _rbid = static_cast<int>(_replExecutor.now().asInt64());
 
         _topCoord->registerStateChangeCallback(
                 stdx::bind(&ReplicationCoordinatorImpl::_onSelfStateChange,
@@ -673,7 +673,7 @@ namespace repl {
             stdx::bind(&TopologyCoordinator::prepareStatusResponse,
                        _topCoord.get(),
                        stdx::placeholders::_1,
-                       Date_t(curTimeMillis64()),
+                       _replExecutor.now(),
                        time(0) - serverGlobalParams.started,
                        _getLastOpApplied(),
                        response,
@@ -728,7 +728,7 @@ namespace repl {
             stdx::bind(&TopologyCoordinator::prepareFreezeResponse,
                        _topCoord.get(),
                        stdx::placeholders::_1,
-                       Date_t(curTimeMillis64()),
+                       _replExecutor.now(),
                        secs,
                        resultObj,
                        &result));
@@ -755,7 +755,7 @@ namespace repl {
             stdx::bind(&TopologyCoordinator::prepareHeartbeatResponse,
                        _topCoord.get(),
                        stdx::placeholders::_1,
-                       Date_t(curTimeMillis64()),
+                       _replExecutor.now(),
                        args,
                        _settings.ourSetName(),
                        _getLastOpApplied(),
@@ -842,7 +842,7 @@ namespace repl {
                  cbData,
                  newConfig,
                  myIndex,
-                 Date_t(curTimeMillis64()),
+                 _replExecutor.now(),
                  _getLastOpApplied_inlock());
          _startHeartbeats();
      }

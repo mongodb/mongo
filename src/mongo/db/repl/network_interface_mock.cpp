@@ -37,6 +37,7 @@
 #include "mongo/util/map_util.h"
 #include "mongo/util/mongoutils/str.h"
 #include "mongo/util/log.h"
+#include "mongo/util/time_support.h"
 
 namespace mongo {
 namespace repl {
@@ -54,17 +55,12 @@ namespace repl {
         return lhs.cmdObj < rhs.cmdObj;
     }
 
-    Date_t NetworkInterfaceMock::now() {
-        return curTimeMillis64();
-    }
-
     namespace {
         // Duplicated in real impl
-        StatusWith<int> getTimeoutMillis(Date_t expDate) {
+        StatusWith<int> getTimeoutMillis(Date_t expDate, Date_t nowDate) {
             // check for timeout
             int timeout = 0;
             if (expDate != ReplicationExecutor::kNoExpirationDate) {
-                Date_t nowDate = curTimeMillis64();
                 timeout = expDate >= nowDate ? expDate - nowDate :
                                                ReplicationExecutor::kNoTimeout.total_milliseconds();
                 if (timeout < 0 ) {
@@ -86,26 +82,65 @@ namespace repl {
 
     NetworkInterfaceMock::NetworkInterfaceMock()  :
                     _simulatedNetworkLatencyMillis(0),
-                    _helper(returnErrorCommmandProcessor) {}
+                    _helper(returnErrorCommmandProcessor) {
+        StatusWith<Date_t> initialNow = dateFromISOString("2014-08-01T00:00:00Z");
+        fassert(18653, initialNow.getStatus());
+        _now = initialNow.getValue();
+    }
 
     NetworkInterfaceMock::NetworkInterfaceMock(CommandProcessorFn fn)  :
                     _simulatedNetworkLatencyMillis(0),
-                    _helper(fn) {}
+                    _helper(fn) {
+        StatusWith<Date_t> initialNow = dateFromISOString("2014-08-01T00:00:00Z");
+        fassert(18655, initialNow.getStatus());
+        _now = initialNow.getValue();
+    }
+
+    NetworkInterfaceMock::~NetworkInterfaceMock() {}
+
+    void NetworkInterfaceMock::setExecutor(ReplicationExecutor* executor) {
+        _executor = executor;
+    }
+
+    Date_t NetworkInterfaceMock::now() {
+        boost::lock_guard<boost::mutex> lk(_mutex);
+        return _now;
+    }
+
+    void NetworkInterfaceMock::setNow(Date_t newNow) {
+        boost::lock_guard<boost::mutex> lk(_mutex);
+        invariant(newNow.asInt64() > _now.asInt64());
+        _now = newNow;
+        _executor->signalWorkForTest();
+        _timeElapsed.notify_all();
+    }
+
+    void NetworkInterfaceMock::incrementNow(Milliseconds inc) {
+        boost::lock_guard<boost::mutex> lk(_mutex);
+        invariant(inc.total_milliseconds() > 0);
+        _now += inc.total_milliseconds();
+        _executor->signalWorkForTest();
+        _timeElapsed.notify_all();
+    }
 
     ResponseStatus NetworkInterfaceMock::runCommand(
             const ReplicationExecutor::RemoteCommandRequest& request) {
-        if (_simulatedNetworkLatencyMillis) {
-            sleepmillis(_simulatedNetworkLatencyMillis);
+        boost::unique_lock<boost::mutex> lk(_mutex);
+        Date_t wakeupTime = _now + _simulatedNetworkLatencyMillis;
+        while (wakeupTime < _now) {
+            _timeElapsed.wait(lk);
         }
 
-        StatusWith<int> toStatus = getTimeoutMillis(request.expirationDate);
+        StatusWith<int> toStatus = getTimeoutMillis(request.expirationDate, _now);
         if (!toStatus.isOK())
             return ResponseStatus(toStatus.getStatus());
 
+        lk.unlock();
         return _helper(request);
     }
 
     void NetworkInterfaceMock::simulatedNetworkLatency(int millis) {
+        boost::lock_guard<boost::mutex> lk(_mutex);
         _simulatedNetworkLatencyMillis = millis;
     }
 
@@ -177,7 +212,6 @@ namespace repl {
             }
             _someResponseUnblocked.wait(lk);
         }
-
     }
 
     NetworkInterfaceMockWithMap::BlockableResponseStatus::BlockableResponseStatus(
