@@ -53,53 +53,48 @@ class Benchmark(object):
             raise Exception("Cannot get result of a suite that hasn't ran")
         return self._result
 
-class FileAllocatorBenchmark(Benchmark):
-    def __init__(self, variant, report_dir=None, ntrials=None,
-                 megabytes=None, work_dir=None, quiet=False):
-        opts = []
-        if report_dir:
-            opts.append("--jsonReport=%s.json" % os.path.join(report_dir, variant))
-        if ntrials:
-            opts.append("--ntrials=%s" % ntrials)
-        if megabytes:
-            opts.append("--megabytes=%i" % megabytes)
-        if work_dir:
-            opts.append("--path=%s" % work_dir)
-        if quiet:
-            opts.append("--quiet")
 
-        super(FileAllocatorBenchmark, self).__init__("FileAllocatorBenchmark-%s" % variant,
-                                                     "file_allocator_bench",
-                                                     opts)
+def file_allocator_bench(variant, ntrials, megabytes, path, report_dir):
+    executable = os.path.join("build", "file_allocator_bench")
+    suitename = "FileAllocatorBenchmark-%s" % variant
+    opts = []
+    opts.append("--ntrials=%s" % ntrials)
+    opts.append("--megabytes=%i" % megabytes)
+    opts.append("--path=%s" % path)
+    opts.append("--jsonReport=%s.json" % os.path.join(report_dir, variant))
+    return Benchmark(suitename, executable, opts)
+
 
 def configure_parser():
     parser = OptionParser()
     parser.add_option("-r", "--reportDir", type=str,
-                      help="Where to write the report, defaults to the current directory",
+                      help="Where to write the report [default: %default]",
                       default=os.getcwd())
     parser.add_option("-w", "--workDir", type=str,
-                      help="Where to allocate temporary files at runtime," +
-                      " defaults to the system temporary directory")
+                      help="scratch space used by tests [default: %default]",
+                      default=tempfile.gettempdir())
     return parser
+
 
 # at some point this should read from a config file, but at this point
 # its not worth overengineering
-def make_suites(report_dir, work_dir):
+def make_suites(work_dir, report_dir):
     return [
-        FileAllocatorBenchmark("16GB", ntrials=8, megabytes=1024*16,
-                                report_dir=report_dir, work_dir=work_dir),
-        FileAllocatorBenchmark("1GB", ntrials=16, megabytes=1024,
-                               report_dir=report_dir, work_dir=work_dir),
-        FileAllocatorBenchmark("128MB", ntrials=32, megabytes=128,
-                               report_dir=report_dir, work_dir=work_dir),
+        file_allocator_bench("16GB", ntrials=8, megabytes=1024*16,
+                             path=work_dir, report_dir=report_dir),
+        file_allocator_bench("1GB", ntrials=16, megabytes=1024,
+                             path=work_dir, report_dir=report_dir),
+        file_allocator_bench("128MB", ntrials=32, megabytes=128,
+                             path=work_dir, report_dir=report_dir)
     ]
+
 
 def main():
     parser = configure_parser()
     (options, args) = parser.parse_args()
 
     report_dir = options.reportDir
-    work_dir = options.workDir # work_dir can be None as default is set by suite
+    work_dir = options.workDir
 
     # unique dir for this report
     unique_dir = os.path.join(report_dir, "perfsuite-run@%s" % time.time())
@@ -107,7 +102,7 @@ def main():
     print "Writing results to %s" % unique_dir
     print
 
-    for suite in make_suites(unique_dir, work_dir):
+    for suite in make_suites(work_dir, unique_dir):
 
         print("Running suite - %s ..." % suite.name())
         start = time.time()

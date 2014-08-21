@@ -1133,7 +1133,7 @@ env.Install( '#/', env.Program( "perftest", [ "dbtests/perf/perftest.cpp" ],
                                      "signal_handlers_synchronous",
                                  ] ) )
 
-env.Install('#/', env.Program('file_allocator_bench',
+env.Install('$BUILD_ROOT/', env.Program('file_allocator_bench',
             'util/file_allocator_bench.cpp',
             LIBDEPS=[
                 'mongocommon',
@@ -1144,7 +1144,7 @@ env.Install('#/', env.Program('file_allocator_bench',
                 'coreserver',
             ]))
 
-env.Alias('file_allocator_bench', "#/" + add_exe("file_allocator_bench"))
+env.Alias('file_allocator_bench', "$BUILD_ROOT/" + add_exe("file_allocator_bench"))
 
 # --- sniffer ---
 mongosniff_built = False
