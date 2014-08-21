@@ -676,7 +676,8 @@ namespace mongo {
             if (!parseLegacyPoint(center.Obj(), &out->circle.center)) { return false; }
             BSONElement radius = objIt.next();
             out->circle.radius = radius.number();
-            if (out->circle.radius < 0)
+            // radius >= 0 and is not NaN
+            if (!(out->circle.radius >= 0))
                 return false;
             out->crs = FLAT;
         } else {
@@ -693,7 +694,8 @@ namespace mongo {
             centerPoint = coordToPoint(x.Number(), y.Number());
             BSONElement radiusElt = objIt.next();
             double radius = radiusElt.number();
-            if (radius < 0)
+            // radius >= 0 and is not NaN
+            if (!(radius >= 0))
                 return false;
             out->cap = S2Cap::FromAxisAngle(centerPoint, S1Angle::Radians(radius));
             out->circle.radius = radius;
