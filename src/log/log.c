@@ -42,7 +42,6 @@ __wt_log_written_reset(WT_SESSION_IMPL *session)
 		return;
 	log = conn->log;
 	log->log_written = 0;
-	log->log_ckpt_signalled = 0;
 	return;
 }
 
@@ -474,17 +473,9 @@ __log_acquire(WT_SESSION_IMPL *session, uint64_t recsize, WT_LOGSLOT *slot)
 	 * here checking the connection ckpt field and using its
 	 * condition.
 	 */
-	if (conn->ckpt_logsize != 0) {
+	if (WT_CKPT_LOGSIZE(conn)) {
 		log->log_written += recsize;
-		/*
-		 * It is okay if two or more threads signal, but we
-		 * don't want to be signalling the entire time a
-		 * checkpoint is in progress.  So try to signal only
-		 * once, but we don't want to take a lock.
-		 */
-		if (log->log_written >= conn->ckpt_logsize &&
-		    !log->log_ckpt_signalled++)
-			WT_RET(__wt_cond_signal(session, conn->ckpt_cond));
+		WT_RET(__wt_checkpoint_signal(session, log->log_written));
 	}
 
 	/*

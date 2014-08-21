@@ -84,7 +84,6 @@ typedef struct {
 typedef struct {
 	uint32_t	allocsize;	/* Allocation alignment size */
 	off_t		log_written;	/* Amount of log written this period */
-	uint32_t	log_ckpt_signalled;	/* Signalled ckpt */
 	/*
 	 * Log file information
 	 */

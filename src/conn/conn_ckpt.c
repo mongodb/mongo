@@ -77,8 +77,10 @@ __ckpt_server(void *arg)
 		WT_ERR(wt_session->checkpoint(wt_session, conn->ckpt_config));
 
 		/* Reset. */
-		if (conn->ckpt_logsize)
+		if (conn->ckpt_logsize) {
 			__wt_log_written_reset(session);
+			conn->ckpt_signalled = 0;
+		}
 		/*
 		 * Wait...
 		 * NOTE: If the user only configured logsize, then usecs
@@ -194,4 +196,23 @@ __wt_checkpoint_server_destroy(WT_CONNECTION_IMPL *conn)
 	conn->ckpt_usecs = 0;
 
 	return (ret);
+}
+
+/*
+ * __wt_checkpoint_signal --
+ *	Signal the checkpoint thread if sufficient log has been written.
+ *	Return 1 if this signals the checkpoint thread, 0 otherwise.
+ */
+int
+__wt_checkpoint_signal(WT_SESSION_IMPL *session, off_t logsize)
+{
+	WT_CONNECTION_IMPL *conn;
+
+	conn = S2C(session);
+	WT_ASSERT(session, WT_CKPT_LOGSIZE(conn));
+	if (logsize >= conn->ckpt_logsize && !conn->ckpt_signalled) {
+		WT_RET(__wt_cond_signal(session, conn->ckpt_cond));
+		conn->ckpt_signalled = 1;
+	}
+	return (0);
 }
