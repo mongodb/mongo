@@ -90,6 +90,8 @@ scratch
 /loadgen
 /docgen
 
+/file_allocator_bench
+
 *.tgz
 *.zip
 *.tar.gz
