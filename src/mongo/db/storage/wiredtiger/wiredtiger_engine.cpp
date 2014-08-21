@@ -32,6 +32,7 @@
 
 #include <boost/filesystem/operations.hpp>
 #include <boost/filesystem/path.hpp>
+#include <boost/regex.hpp>
 
 #include "mongo/db/storage/wiredtiger/wiredtiger_database_catalog_entry.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_recovery_unit.h"
@@ -39,6 +40,12 @@
 #include "mongo/db/storage_options.h"
 
 namespace mongo {
+
+    WiredTigerEngine::WiredTigerEngine( const std::string &path) : _path( path ) {
+            int ret = wiredtiger_open(path.c_str(), NULL,
+                 "create,extensions=[local=(entry=index_collator_extension)]", &_wt_conn);
+            invariant(ret == 0);
+    }
 
     RecoveryUnit* WiredTigerEngine::newRecoveryUnit( OperationContext* opCtx ) {
         return new WiredTigerRecoveryUnit();
@@ -48,22 +55,16 @@ namespace mongo {
         for ( DBMap::const_iterator i = _dbs.begin(); i != _dbs.end(); ++i) {
             delete i->second;
         } 
+        int ret = _wt_conn->close(_wt_conn, NULL);
+        invariant ( ret == 0 );
     }
 
     void WiredTigerEngine::listDatabases( std::vector<std::string>* out ) const {
         // TODO: invariant(storageGlobalParams.directoryperdb);
 
-        // TODO: Save this information into a map, don't keep hitting disk.
-        boost::filesystem::path path( storageGlobalParams.dbpath );
-        for ( boost::filesystem::directory_iterator i( path );
-            i != boost::filesystem::directory_iterator();
-            ++i) {
-            boost::filesystem::path p = *i;
-            string dbName = p.leaf().string();
-            p /= "WiredTiger.wt";
-            if ( exists ( p ) )
-                    out->push_back( dbName );
-        }
+        for ( DBMap::const_iterator i = _dbs.begin(); i != _dbs.end(); ++i) {
+            out->push_back( i->first );
+        } 
     }
 
     Status WiredTigerEngine::closeDatabase(OperationContext*, const StringData& db ) {
@@ -75,17 +76,13 @@ namespace mongo {
     }
 
     Status WiredTigerEngine::dropDatabase(OperationContext* txn, const StringData& db) {
-        // TODO: invariant(storageGlobalParams.directoryperdb);
-        Status status = closeDatabase( txn, db );
-        if ( !status.isOK() )
-            return status;
-
-        // Remove the database files. Code borrowed from mmap deleteDataFiles method.
-        MONGO_ASSERT_ON_EXCEPTION_WITH_MSG(
-            boost::filesystem::remove_all(
-                boost::filesystem::path(storageGlobalParams.dbpath) / db.toString()),
-                    "delete database files");
-
+        boost::mutex::scoped_lock lk( _dbLock );
+        WiredTigerDatabaseCatalogEntry *entry = _dbs[db.toString()];
+        if (entry == NULL)
+            return Status::OK();
+        entry->dropAllCollections(txn);
+        delete entry;
+        _dbs.erase( db.toString() );
         return Status::OK();
     }
 
@@ -95,18 +92,10 @@ namespace mongo {
 
         WiredTigerDatabaseCatalogEntry*& db = _dbs[dbName.toString()];
         if ( !db ) {
-            boost::filesystem::path dbpath =
-                boost::filesystem::path(storageGlobalParams.dbpath) / dbName.toString();
-            // Ensure that the database directory exists
-            if ( !exists( dbpath ) )
-                MONGO_ASSERT_ON_EXCEPTION(boost::filesystem::create_directory(dbpath));
-            WT_CONNECTION *conn;
-            int ret = wiredtiger_open(dbpath.string().c_str(), NULL, "create,extensions=[local=(entry=index_collator_extension)]", &conn);
-            invariant(ret == 0);
             // The WiredTigerDatabase lifespan is currently tied to a
             // WiredTigerDatabaseCatalogEntry. In future we may want to split
             // that out
-            WiredTigerDatabase *database = new WiredTigerDatabase(conn);
+            WiredTigerDatabase *database = new WiredTigerDatabase(_wt_conn);
             db = new WiredTigerDatabaseCatalogEntry( dbName, *database );
             _dbs[dbName.toString()] = db;
         }

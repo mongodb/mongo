@@ -57,7 +57,7 @@ namespace mongo {
         : DatabaseCatalogEntry( name ), _db(db) {
             // If the catalog hasn't been created, nothing to do.
             boost::filesystem::path dbpath =
-                boost::filesystem::path(storageGlobalParams.dbpath) / name.toString();
+                boost::filesystem::path(storageGlobalParams.dbpath) / (name.toString() + ".wt");
             if ( !boost::filesystem::exists( dbpath ) )
                 return;
 
@@ -114,12 +114,13 @@ namespace mongo {
         WT_CURSOR *c;
         ret = session->open_cursor(session, "metadata:", NULL, NULL, &c);
         invariant(ret == 0);
+        std::string table_prefix = "table:" + name();
         while ((ret = c->next(c)) == 0) {
             ret = c->get_key(c, &key);
             invariant(ret == 0);
             if (strcmp("metadata:", key) == 0)
                 continue;
-            if (strncmp("table:", key, 6) != 0)
+            if (strncmp(table_prefix.c_str(), key, table_prefix.length()) != 0)
                 continue;
             if (strstr(key, ".$") != NULL)
                 continue;
@@ -153,7 +154,19 @@ namespace mongo {
                 if ((pos = uri.find('$')) != std::string::npos && pos < uri.size() - 1) {
                     std::string idx_name = uri.substr(pos + 1);
                     // Skip to the start of the index name
-                    fprintf(stderr, "Found index: %s\n", idx_name.c_str());
+                    const char *idx_meta;
+                    ret = c->get_value(c, &idx_meta);
+                    invariant( ret == 0 );
+                    fprintf(stderr, "Found index: %s (%s)\n",
+                        idx_name.c_str(), idx_meta);
+                    WT_CONFIG_PARSER *cp;
+                    ret = wiredtiger_config_parser_open(
+                            NULL, idx_meta, strlen(idx_meta), &cp);
+                    invariant ( ret == 0 );
+                    WT_CONFIG_ITEM cval;
+                    ret = cp->get(cp, "app_metadata", &cval);
+                    invariant ( ret == 0 );
+                    fprintf(stderr, "Index metadata: %.*s\n", (int)cval.len, cval.str);
                 }
 
                 ret = c->next(c);
@@ -202,6 +215,20 @@ namespace mongo {
         }
         _entryMap[ns.toString()] = entry;
 
+        return Status::OK();
+    }
+
+    Status WiredTigerDatabaseCatalogEntry::dropAllCollections( OperationContext* opCtx ) {
+        // Ensure our namespace map is populated.
+        initCollectionNamespaces();
+        // Keep setting the iterator to the beginning since drop is removing entries
+        // as it goes along
+        for ( EntryMap::const_iterator i = _entryMap.begin();
+            i != _entryMap.end(); i = _entryMap.begin() ) {
+            Status status = dropCollection(opCtx, i->first);
+            if (!status.isOK()) 
+                return status;
+        }
         return Status::OK();
     }
 

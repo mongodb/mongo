@@ -8,12 +8,7 @@ namespace mongo {
     class WiredTigerDatabase {
     public:
         WiredTigerDatabase(WT_CONNECTION *conn) : _conn(conn) {}
-        ~WiredTigerDatabase() {
-            if (_conn) {
-                int ret = _conn->close(_conn, NULL);
-                invariant(ret == 0);
-            }
-        }
+        ~WiredTigerDatabase() {}
 
         WT_SESSION *GetSession(bool acquire = false) {
             // TODO thread-local check / open / cache

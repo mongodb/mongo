@@ -93,6 +93,9 @@ namespace mongo {
         virtual Status dropCollection( OperationContext* opCtx,
                                        const StringData& ns );
 
+        // Called by the engine when dropping a database.
+        Status dropAllCollections( OperationContext* opCtx );
+
     private:
 
         void initCollectionNamespaces();

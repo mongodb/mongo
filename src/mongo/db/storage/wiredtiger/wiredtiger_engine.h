@@ -45,7 +45,7 @@ namespace mongo {
 
     class WiredTigerEngine : public StorageEngine {
     public:
-        WiredTigerEngine(const std::string &) {}
+        WiredTigerEngine(const std::string &);
 
         virtual ~WiredTigerEngine() {}
 
@@ -74,7 +74,7 @@ namespace mongo {
 
     private:
         std::string _path;
-        WiredTigerDatabase *_db;
+        WT_CONNECTION *_wt_conn;
 
         mutable boost::mutex _dbLock;
         typedef std::map<std::string, WiredTigerDatabaseCatalogEntry *> DBMap;
