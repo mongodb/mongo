@@ -14,46 +14,10 @@ import (
 // stateR is the state after reading `R`.
 func stateR(s *scanner, c int) int {
 	if c == 'e' {
-		s.step = stateRe
+		s.step = generateState("RegExp", []byte("gExp"), stateConstructor)
 		return scanContinue
 	}
 	return s.error(c, "in literal RegExp (expecting 'e')")
-}
-
-// stateRe is the state after reading `Re`.
-func stateRe(s *scanner, c int) int {
-	if c == 'g' {
-		s.step = stateReg
-		return scanContinue
-	}
-	return s.error(c, "in literal RegExp (expecting 'g')")
-}
-
-// stateReg is the state after reading `Reg`.
-func stateReg(s *scanner, c int) int {
-	if c == 'E' {
-		s.step = stateRegE
-		return scanContinue
-	}
-	return s.error(c, "in literal RegExp (expecting 'E')")
-}
-
-// stateRegE is the state after reading `RegE`.
-func stateRegE(s *scanner, c int) int {
-	if c == 'x' {
-		s.step = stateRegEx
-		return scanContinue
-	}
-	return s.error(c, "in literal RegExp (expecting 'x')")
-}
-
-// stateRegEx is the state after reading `RegEx`.
-func stateRegEx(s *scanner, c int) int {
-	if c == 'p' {
-		s.step = stateConstructor
-		return scanContinue
-	}
-	return s.error(c, "in literal RegExp (expecting 'p')")
 }
 
 // stateInRegexpPattern is the state after reading `/`.

@@ -11,55 +11,10 @@ import (
 // stateB is the state after reading `B`.
 func stateB(s *scanner, c int) int {
 	if c == 'i' {
-		s.step = stateBi
+		s.step = generateState("BinData", []byte("nData"), stateConstructor)
 		return scanContinue
 	}
 	return s.error(c, "in literal BinData (expecting 'i')")
-}
-
-// stateBi is the state after reading `Bi`.
-func stateBi(s *scanner, c int) int {
-	if c == 'n' {
-		s.step = stateBin
-		return scanContinue
-	}
-	return s.error(c, "in literal BinData (expecting 'n')")
-}
-
-// stateBin is the state after reading `Bin`.
-func stateBin(s *scanner, c int) int {
-	if c == 'D' {
-		s.step = stateBinD
-		return scanContinue
-	}
-	return s.error(c, "in literal BinData (expecting 'D')")
-}
-
-// stateBinD is the state after reading `BinD`.
-func stateBinD(s *scanner, c int) int {
-	if c == 'a' {
-		s.step = stateBinDa
-		return scanContinue
-	}
-	return s.error(c, "in literal BinData (expecting 'a')")
-}
-
-// stateBinDa is the state after reading `BinDa`.
-func stateBinDa(s *scanner, c int) int {
-	if c == 't' {
-		s.step = stateBinDat
-		return scanContinue
-	}
-	return s.error(c, "in literal BinData (expecting 't')")
-}
-
-// stateBinDat is the state after reading `BinDat`.
-func stateBinDat(s *scanner, c int) int {
-	if c == 'a' {
-		s.step = stateConstructor
-		return scanContinue
-	}
-	return s.error(c, "in literal BinData (expecting 'a')")
 }
 
 // Decodes a BinData literal stored in the underlying byte data into v.

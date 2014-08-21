@@ -11,95 +11,23 @@ import (
 // stateUpperNu is the state after reading `Nu`.
 func stateUpperNu(s *scanner, c int) int {
 	if c == 'm' {
-		s.step = stateUpperNum
+		s.step = generateState("Number", []byte("ber"), stateUpperNumber)
 		return scanContinue
 	}
 	return s.error(c, "in literal Number (expecting 'm')")
 }
 
-// stateUpperNum is the state after reading `Num`.
-func stateUpperNum(s *scanner, c int) int {
-	if c == 'b' {
-		s.step = stateUpperNumb
-		return scanContinue
-	}
-	return s.error(c, "in literal Number (expecting 'b')")
-}
-
-// stateUpperNumb is the state after reading `Numb`.
-func stateUpperNumb(s *scanner, c int) int {
-	if c == 'e' {
-		s.step = stateUpperNumbe
-		return scanContinue
-	}
-	return s.error(c, "in literal Number (expecting 'e')")
-}
-
-// stateUpperNumbe is the state after reading `Numbe`.
-func stateUpperNumbe(s *scanner, c int) int {
-	if c == 'r' {
-		s.step = stateUpperNumber
-		return scanContinue
-	}
-	return s.error(c, "in literal Number (expecting 'r')")
-}
-
 // stateUpperNumber is the state after reading `Number`.
 func stateUpperNumber(s *scanner, c int) int {
 	if c == 'I' {
-		s.step = stateNumberI
+		s.step = generateState("NumberInt", []byte("nt"), stateConstructor)
 		return scanContinue
 	}
 	if c == 'L' {
-		s.step = stateNumberL
+		s.step = generateState("NumberLong", []byte("ong"), stateConstructor)
 		return scanContinue
 	}
 	return s.error(c, "in literal NumberInt or NumberLong (expecting 'I' or 'L')")
-}
-
-// stateNumberI is the state after reading `NumberI`.
-func stateNumberI(s *scanner, c int) int {
-	if c == 'n' {
-		s.step = stateNumberIn
-		return scanContinue
-	}
-	return s.error(c, "in literal NumberInt (expecting 'n')")
-}
-
-// stateNumberIn is the state after reading `NumberIn`.
-func stateNumberIn(s *scanner, c int) int {
-	if c == 't' {
-		s.step = stateConstructor
-		return scanContinue
-	}
-	return s.error(c, "in literal NumberInt (expecting 't')")
-}
-
-// stateNumberL is the state after reading `NumberL`.
-func stateNumberL(s *scanner, c int) int {
-	if c == 'o' {
-		s.step = stateNumberLo
-		return scanContinue
-	}
-	return s.error(c, "in literal NumberLong (expecting 'o')")
-}
-
-// stateNumberLo is the state after reading `NumberLo`.
-func stateNumberLo(s *scanner, c int) int {
-	if c == 'n' {
-		s.step = stateNumberLon
-		return scanContinue
-	}
-	return s.error(c, "in literal NumberLong (expecting 'n')")
-}
-
-// stateNumberLon is the state after reading `NumberLon`.
-func stateNumberLon(s *scanner, c int) int {
-	if c == 'g' {
-		s.step = stateConstructor
-		return scanContinue
-	}
-	return s.error(c, "in literal NumberLong (expecting 'g')")
 }
 
 // Decodes a NumberInt literal stored in the underlying byte data into v.

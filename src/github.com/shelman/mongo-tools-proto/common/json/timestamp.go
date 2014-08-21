@@ -11,73 +11,10 @@ import (
 // stateUpperT is the state after reading `T`.
 func stateUpperT(s *scanner, c int) int {
 	if c == 'i' {
-		s.step = stateUpperTi
+		s.step = generateState("Timestamp", []byte("mestamp"), stateConstructor)
 		return scanContinue
 	}
 	return s.error(c, "in literal Timestamp (expecting 'i')")
-}
-
-// stateUpperTi is the state after reading `Ti`.
-func stateUpperTi(s *scanner, c int) int {
-	if c == 'm' {
-		s.step = stateUpperTim
-		return scanContinue
-	}
-	return s.error(c, "in literal Timestamp (expecting 'm')")
-}
-
-// stateUpperTim is the state after reading `Tim`.
-func stateUpperTim(s *scanner, c int) int {
-	if c == 'e' {
-		s.step = stateUpperTime
-		return scanContinue
-	}
-	return s.error(c, "in literal Timestamp (expecting 'e')")
-}
-
-// stateUpperTime is the state after reading `Time`.
-func stateUpperTime(s *scanner, c int) int {
-	if c == 's' {
-		s.step = stateUpperTimes
-		return scanContinue
-	}
-	return s.error(c, "in literal Timestamp (expecting 's')")
-}
-
-// stateUpperTimes is the state after reading `Times`.
-func stateUpperTimes(s *scanner, c int) int {
-	if c == 't' {
-		s.step = stateUpperTimest
-		return scanContinue
-	}
-	return s.error(c, "in literal Timestamp (expecting 't')")
-}
-
-// stateUpperTimest is the state after reading `Timest`.
-func stateUpperTimest(s *scanner, c int) int {
-	if c == 'a' {
-		s.step = stateUpperTimesta
-		return scanContinue
-	}
-	return s.error(c, "in literal Timestamp (expecting 'a')")
-}
-
-// stateUpperTimesta is the state after reading `Timesta`.
-func stateUpperTimesta(s *scanner, c int) int {
-	if c == 'm' {
-		s.step = stateUpperTimestam
-		return scanContinue
-	}
-	return s.error(c, "in literal Timestamp (expecting 'm')")
-}
-
-// stateUpperTimestam is the state after reading `Timestam`.
-func stateUpperTimestam(s *scanner, c int) int {
-	if c == 'p' {
-		s.step = stateConstructor
-		return scanContinue
-	}
-	return s.error(c, "in literal Timestamp (expecting 'p')")
 }
 
 // Decodes a Timestamp literal stored in the underlying byte data into v.

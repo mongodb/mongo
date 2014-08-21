@@ -11,55 +11,19 @@ import (
 // stateDB is the state after reading `DB`.
 func stateDB(s *scanner, c int) int {
 	if c == 'R' {
-		s.step = stateDBR
+		s.step = generateState("DBRef", []byte("ef"), stateConstructor)
 		return scanContinue
 	}
 	return s.error(c, "in literal DBRef (expecting 'R')")
 }
 
-// stateDBR is the state after reading `DBR`.
-func stateDBR(s *scanner, c int) int {
-	if c == 'e' {
-		s.step = stateDBRe
-		return scanContinue
-	}
-	return s.error(c, "in literal DBRef (expecting 'e')")
-}
-
-// stateDBRe is the state after reading `DBRe`.
-func stateDBRe(s *scanner, c int) int {
-	if c == 'f' {
-		s.step = stateConstructor
-		return scanContinue
-	}
-	return s.error(c, "in literal DBRef (expecting 'f')")
-}
-
 // stateDb is the state after reading `Db`.
 func stateDb(s *scanner, c int) int {
 	if c == 'r' {
-		s.step = stateDbr
+		s.step = generateState("Dbref", []byte("ef"), stateConstructor)
 		return scanContinue
 	}
 	return s.error(c, "in literal Dbref (expecting 'r')")
-}
-
-// stateDbr is the state after reading `Dbr`.
-func stateDbr(s *scanner, c int) int {
-	if c == 'e' {
-		s.step = stateDBRe
-		return scanContinue
-	}
-	return s.error(c, "in literal Dbref (expecting 'e')")
-}
-
-// stateDbre is the state after reading `Dbre`.
-func stateDbre(s *scanner, c int) int {
-	if c == 'f' {
-		s.step = stateConstructor
-		return scanContinue
-	}
-	return s.error(c, "in literal Dbref (expecting 'f')")
 }
 
 // Decodes a DBRef literal stored in the underlying byte data into v.
