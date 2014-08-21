@@ -451,7 +451,6 @@ namespace DocumentSourceTests {
                         DocumentSourceGroup::createFromBson( specElement, ctx() );
                 ASSERT_EQUALS( spec, toBson( generated ) );
             }
-            OperationContextImpl _opCtx;
             intrusive_ptr<DocumentSource> _group;
         };
 

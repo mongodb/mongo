@@ -254,9 +254,6 @@ namespace QueryTests {
             ASSERT( cursor->more() );
             ASSERT_EQUALS( 3, cursor->next().getIntField( "a" ) );
         }
-
-    protected:
-        OperationContextImpl _txn;
     };
 
     /**
