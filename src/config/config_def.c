@@ -45,7 +45,7 @@ static const WT_CONFIG_CHECK confchk_async_subconfigs[] = {
 };
 
 static const WT_CONFIG_CHECK confchk_checkpoint_subconfigs[] = {
-	{ "log_size", "int", "min=100KB,max=2GB", NULL },
+	{ "log_size", "int", "min=0,max=2GB", NULL },
 	{ "name", "string", NULL, NULL },
 	{ "wait", "int", "min=0,max=100000", NULL },
 	{ NULL, NULL, NULL, NULL }
