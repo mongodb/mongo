@@ -1658,7 +1658,7 @@ struct __wt_connection {
 	 * @param connection the connection handle
 	 * @param path the filename of the extension module, or \c "local" to
 	 * search the current application binary for the initialization
-	 * function
+	 * function, see @ref extensions for more details.
 	 * @configstart{connection.load_extension, see dist/api_data.py}
 	 * @config{config, configuration string passed to the entry point of the
 	 * extension as its WT_CONFIG_ARG argument., a string; default empty.}
