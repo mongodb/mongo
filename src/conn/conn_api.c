@@ -180,9 +180,11 @@ __conn_load_extension(
 	WT_SESSION_IMPL *session;
 	int (*load)(WT_CONNECTION *, WT_CONFIG_ARG *);
 	const char *init_name, *terminate_name;
+	int is_local;
 
 	dlh = NULL;
 	init_name = terminate_name = NULL;
+	is_local = (strcmp(path, "local") == 0);
 
 	conn = (WT_CONNECTION_IMPL *)wt_conn;
 	CONNECTION_API_CALL(conn, session, load_extension, config, cfg);
@@ -194,7 +196,7 @@ __conn_load_extension(
 	 * close discards the reference entirely -- in other words, we do not
 	 * check to see if we've already opened this shared library.
 	 */
-	WT_ERR(__wt_dlopen(session, path, &dlh));
+	WT_ERR(__wt_dlopen(session, is_local ? NULL : path, &dlh));
 
 	/*
 	 * Find the load function, remember the unload function for when we
