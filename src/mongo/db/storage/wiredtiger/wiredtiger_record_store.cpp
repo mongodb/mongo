@@ -39,7 +39,7 @@ namespace mongo {
 
     int WiredTigerRecordStore::Create(WiredTigerDatabase &db,
             const StringData &ns, const CollectionOptions &options, bool allocateDefaultSpace) {
-        WiredTigerSession swrap(db.GetSession(), db);
+        WiredTigerSession swrap(db);
         WT_SESSION *s = swrap.Get();
         return s->create(s, _getURI(ns).c_str(), "type=file,key_format=u,value_format=u");
     }
@@ -194,7 +194,6 @@ namespace mongo {
         DiskLoc loc = _nextId();
         c->set_key(c, _makeKey(loc).Get());
         c->set_value(c, WiredTigerItem(data, len).Get());
-	fprintf(stderr, "inserting into record store, loc %s\n", loc.toString().c_str());
         int ret = c->insert(c);
         invariant(ret == 0);
 
@@ -225,7 +224,6 @@ namespace mongo {
         DiskLoc loc = _nextId();
         c->set_key(c, _makeKey(loc).Get());
         c->set_value(c, WiredTigerItem(buf.get(), len).Get());
-	fprintf(stderr, "inserting into record store, loc %s\n", loc.toString().c_str());
         int ret = c->insert(c);
         invariant(ret == 0);
 
@@ -311,7 +309,10 @@ namespace mongo {
         invariant( start == DiskLoc() );
         invariant( !tailable );
 
-        WiredTigerSession &swrap = WiredTigerRecoveryUnit::Get(txn).GetSession();
+        // XXX iterators own their sessions
+        // this is done because WiredTiger resets cursors on commit, which causes problems
+        // e.g., when building indexes
+        WiredTigerSession &swrap = *new WiredTigerSession(_db);
         return new Iterator(*this, swrap, dir);
     }
 
@@ -438,7 +439,7 @@ namespace mongo {
         : _rs( rs ),
           _session( session ),
           _dir( dir ),
-          _cursor(rs.GetCursor(session), session),
+          _cursor(rs.GetCursor(session), session, true), // XXX cursor owns the session
           _eof( true ) {
         (void)getNext();
     }
@@ -476,7 +477,6 @@ namespace mongo {
         int ret = c->reset(c);
         invariant(ret == 0);
         _eof = true;
-	printf("invalidated!\n");
     }
 
     void WiredTigerRecordStore::Iterator::saveState() {

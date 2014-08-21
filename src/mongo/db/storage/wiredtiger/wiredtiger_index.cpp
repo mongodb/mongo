@@ -142,7 +142,7 @@ namespace mongo {
 
     int WiredTigerIndex::Create(WiredTigerDatabase &db,
             const std::string &ns, const std::string &idxName, IndexCatalogEntry& info) {
-        WiredTigerSession swrap(db.GetSession(), db);
+        WiredTigerSession swrap(db);
         WT_SESSION *s(swrap.Get());
         std::string config = "type=file,key_format=uu,value_format=u,collator=mongo_index,app_metadata=";
         config += info.descriptor()->infoObj().jsonString();
@@ -356,7 +356,10 @@ namespace mongo {
             OperationContext* txn, int direction) const {
         invariant((direction == 1) || (direction == -1));
 
-        WiredTigerSession &swrap = WiredTigerRecoveryUnit::Get(txn).GetSession();
+        // XXX iterators own their sessions
+        // this is done because WiredTiger resets cursors on commit, which causes problems
+        // e.g., when building indexes
+        WiredTigerSession &swrap = *new WiredTigerSession(_db);
         return new IndexCursor(GetCursor(swrap, true), swrap, txn, direction == 1);
     }
 
