@@ -83,6 +83,10 @@ namespace mongo {
         return cc().curop();
     }
 
+    unsigned int OperationContextImpl::getOpID() const {
+        return getCurOp()->opNum();
+    }
+
     // Enabling the checkForInterruptFail fail point will start a game of random chance on the
     // connection specified in the fail point data, generating an interrupt with a given fixed
     // probability.  Example invocation:
@@ -153,11 +157,12 @@ namespace mongo {
         }
 
         if (c.curop()->killPending()) {
-            uasserted(11601, "operation was interrupted");
+            uasserted(ErrorCodes::Interrupted, "operation was interrupted");
         }
     }
 
     Status OperationContextImpl::checkForInterruptNoAssert() const {
+        // TODO(spencer): Unify error codes and implementation with checkForInterrupt()
         Client& c = cc();
 
         if (getGlobalEnvironment()->getKillAllOperations()) {

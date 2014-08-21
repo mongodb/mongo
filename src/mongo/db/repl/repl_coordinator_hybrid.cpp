@@ -32,6 +32,7 @@
 
 #include "mongo/db/repl/repl_coordinator_hybrid.h"
 
+#include "mongo/db/global_environment_experiment.h"
 #include "mongo/db/repl/isself.h"
 #include "mongo/db/repl/network_interface_impl.h"
 #include "mongo/db/repl/repl_coordinator_external_state_impl.h"
@@ -50,6 +51,7 @@ namespace repl {
               new ReplicationCoordinatorExternalStateImpl,
               new NetworkInterfaceImpl,
               new TopologyCoordinatorImpl(Seconds(maxSyncSourceLagSecs))) {
+        getGlobalEnvironment()->registerKillOpListener(&_impl);
     }
 
     HybridReplicationCoordinator::~HybridReplicationCoordinator() {}

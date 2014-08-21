@@ -564,10 +564,11 @@ namespace {
             return _result;
         }
 
-        void start() {
+        void start(OperationContext* txn) {
             ASSERT(!_finished);
             _thread.reset(new boost::thread(stdx::bind(&ReplicationAwaiter::_awaitReplication,
-                                                       this)));
+                                                       this,
+                                                       txn)));
         }
 
         void reset() {
@@ -579,9 +580,8 @@ namespace {
 
     private:
 
-        void _awaitReplication() {
-            OperationContextNoop txn;
-            _result = _replCoord->awaitReplication(&txn, _optime, _writeConcern);
+        void _awaitReplication(OperationContext* txn) {
+            _result = _replCoord->awaitReplication(txn, _optime, _writeConcern);
             _finished = true;
         }
 
@@ -616,7 +616,7 @@ namespace {
         // 2 nodes waiting for time1
         awaiter.setOpTime(time1);
         awaiter.setWriteConcern(writeConcern);
-        awaiter.start();
+        awaiter.start(&txn);
         ASSERT_OK(getReplCoord()->setLastOptime(&txn, client1, time1));
         ASSERT_OK(getReplCoord()->setLastOptime(&txn, client2, time1));
         ReplicationCoordinator::StatusAndDuration statusAndDur = awaiter.getResult();
@@ -625,7 +625,7 @@ namespace {
 
         // 2 nodes waiting for time2
         awaiter.setOpTime(time2);
-        awaiter.start();
+        awaiter.start(&txn);
         ASSERT_OK(getReplCoord()->setLastOptime(&txn, client2, time2));
         ASSERT_OK(getReplCoord()->setLastOptime(&txn, client3, time2));
         statusAndDur = awaiter.getResult();
@@ -635,7 +635,7 @@ namespace {
         // 3 nodes waiting for time2
         writeConcern.wNumNodes = 3;
         awaiter.setWriteConcern(writeConcern);
-        awaiter.start();
+        awaiter.start(&txn);
         ASSERT_OK(getReplCoord()->setLastOptime(&txn, client1, time2));
         statusAndDur = awaiter.getResult();
         ASSERT_OK(statusAndDur.status);
@@ -663,7 +663,7 @@ namespace {
         // 2 nodes waiting for time2
         awaiter.setOpTime(time2);
         awaiter.setWriteConcern(writeConcern);
-        awaiter.start();
+        awaiter.start(&txn);
         ASSERT_OK(getReplCoord()->setLastOptime(&txn, client1, time1));
         ASSERT_OK(getReplCoord()->setLastOptime(&txn, client2, time1));
         ReplicationCoordinator::StatusAndDuration statusAndDur = awaiter.getResult();
@@ -692,12 +692,91 @@ namespace {
         // 2 nodes waiting for time2
         awaiter.setOpTime(time2);
         awaiter.setWriteConcern(writeConcern);
-        awaiter.start();
+        awaiter.start(&txn);
         ASSERT_OK(getReplCoord()->setLastOptime(&txn, client1, time1));
         ASSERT_OK(getReplCoord()->setLastOptime(&txn, client2, time1));
         shutdown();
         ReplicationCoordinator::StatusAndDuration statusAndDur = awaiter.getResult();
         ASSERT_EQUALS(ErrorCodes::ShutdownInProgress, statusAndDur.status);
+        awaiter.reset();
+    }
+
+    class OperationContextNoopWithInterrupt : public OperationContextNoop {
+    public:
+
+        OperationContextNoopWithInterrupt() : _opID(0), _interruptOp(false) {}
+
+        virtual unsigned int getOpID() const {
+            return _opID;
+        }
+
+        /**
+         * Can only be called before any multi-threaded access to this object has begun.
+         */
+        void setOpID(unsigned int opID) {
+            _opID = opID;
+        }
+
+        virtual void checkForInterrupt(bool heedMutex = true) const {
+            if (_interruptOp) {
+                uasserted(ErrorCodes::Interrupted, "operation was interrupted");
+            }
+        }
+
+        /**
+         * Can only be called before any multi-threaded access to this object has begun.
+         */
+        void setInterruptOp(bool interrupt) {
+            _interruptOp = interrupt;
+        }
+
+    private:
+        unsigned int _opID;
+        bool _interruptOp;
+    };
+
+    TEST_F(ReplCoordTest, AwaitReplicationInterrupt) {
+        // Tests that a thread blocked in awaitReplication can be killed by a killOp operation
+        assertStartSuccess(
+                BSON("_id" << "mySet" <<
+                     "version" << 2 <<
+                     "members" << BSON_ARRAY(BSON("_id" << 0 << "host" << "node1") <<
+                                             BSON("_id" << 1 << "host" << "node2") <<
+                                             BSON("_id" << 2 << "host" << "node3"))),
+                HostAndPort("node1"));
+        OperationContextNoopWithInterrupt txn;
+        ReplicationAwaiter awaiter(getReplCoord(), &txn);
+
+        OID client1 = OID::gen();
+        OID client2 = OID::gen();
+        OpTime time1(1, 1);
+        OpTime time2(1, 2);
+
+        HandshakeArgs handshake1;
+        ASSERT_OK(handshake1.initialize(BSON("handshake" << client1 << "member" << 1)));
+        ASSERT_OK(getReplCoord()->processHandshake(&txn, handshake1));
+        HandshakeArgs handshake2;
+        ASSERT_OK(handshake2.initialize(BSON("handshake" << client2 << "member" << 2)));
+        ASSERT_OK(getReplCoord()->processHandshake(&txn, handshake2));
+
+        WriteConcernOptions writeConcern;
+        writeConcern.wTimeout = WriteConcernOptions::kNoTimeout;
+        writeConcern.wNumNodes = 2;
+
+        unsigned int opID = 100;
+        txn.setOpID(opID);
+
+        // 2 nodes waiting for time2
+        awaiter.setOpTime(time2);
+        awaiter.setWriteConcern(writeConcern);
+        awaiter.start(&txn);
+        ASSERT_OK(getReplCoord()->setLastOptime(&txn, client1, time1));
+        ASSERT_OK(getReplCoord()->setLastOptime(&txn, client2, time1));
+
+        txn.setInterruptOp(true);
+        getReplCoord()->interrupt(opID);
+        ReplicationCoordinator::StatusAndDuration statusAndDur = awaiter.getResult();
+        ASSERT_EQUALS(ErrorCodes::Interrupted, statusAndDur.status);
         awaiter.reset();
     }
 

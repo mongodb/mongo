@@ -78,9 +78,11 @@ namespace {
          * in the destructor.
          */
         WaiterInfo(std::vector<WaiterInfo*>* _list,
+                   unsigned int _opID,
                    const OpTime* _opTime,
                    const WriteConcernOptions* _writeConcern,
                    boost::condition_variable* _condVar) : list(_list),
+                                                          opID(_opID),
                                                           opTime(_opTime),
                                                           writeConcern(_writeConcern),
                                                           condVar(_condVar) {
@@ -92,6 +94,7 @@ namespace {
         }
 
         std::vector<WaiterInfo*>* list;
+        const unsigned int opID;
         const OpTime* opTime;
         const WriteConcernOptions* writeConcern;
         boost::condition_variable* condVar;
@@ -397,9 +400,30 @@ namespace {
         return false;
     }
 
+    void ReplicationCoordinatorImpl::interrupt(unsigned opId) {
+        boost::lock_guard<boost::mutex> lk(_mutex);
+        for (std::vector<WaiterInfo*>::iterator it = _replicationWaiterList.begin();
+                it != _replicationWaiterList.end(); ++it) {
+            WaiterInfo* info = *it;
+            if (info->opID == opId) {
+                info->condVar->notify_all();
+                return;
+            }
+        }
+    }
+
+    void ReplicationCoordinatorImpl::interruptAll() {
+        boost::lock_guard<boost::mutex> lk(_mutex);
+        for (std::vector<WaiterInfo*>::iterator it = _replicationWaiterList.begin();
+                it != _replicationWaiterList.end(); ++it) {
+            WaiterInfo* info = *it;
+            info->condVar->notify_all();
+        }
+    }
+
     ReplicationCoordinator::StatusAndDuration ReplicationCoordinatorImpl::awaitReplication(
             const OperationContext* txn,
-            const OpTime& opId,
+            const OpTime& opTime,
             const WriteConcernOptions& writeConcern) {
         // TODO(spencer): handle killop
 
@@ -425,10 +449,18 @@ namespace {
         }
 
         // Must hold _mutex before constructing waitInfo as it will modify _replicationWaiterList
-        WaiterInfo waitInfo(&_replicationWaiterList, &opId, &writeConcern, &condVar);
+        WaiterInfo waitInfo(
+                &_replicationWaiterList, txn->getOpID(), &opTime, &writeConcern, &condVar);
 
-        while (!_opReplicatedEnough_inlock(opId, writeConcern)) {
+        while (!_opReplicatedEnough_inlock(opTime, writeConcern)) {
             const int elapsed = timer.millis();
+
+            try {
+                txn->checkForInterrupt();
+            } catch (const DBException& e) {
+                return StatusAndDuration(e.toStatus(), Milliseconds(elapsed));
+            }
+
             if (writeConcern.wTimeout != WriteConcernOptions::kNoTimeout &&
                     elapsed > writeConcern.wTimeout) {
                 return StatusAndDuration(Status(ErrorCodes::ExceededTimeLimit,

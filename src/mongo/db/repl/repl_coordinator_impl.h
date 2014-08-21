@@ -36,6 +36,7 @@
 
 #include "mongo/base/status.h"
 #include "mongo/bson/optime.h"
+#include "mongo/db/global_environment_experiment.h"
 #include "mongo/db/repl/member_state.h"
 #include "mongo/db/repl/repl_coordinator.h"
 #include "mongo/db/repl/repl_coordinator_external_state.h"
@@ -50,7 +51,8 @@ namespace repl {
     class SyncSourceFeedback;
     class TopologyCoordinator;
 
-    class ReplicationCoordinatorImpl : public ReplicationCoordinator {
+    class ReplicationCoordinatorImpl : public ReplicationCoordinator,
+                                       public KillOpListenerInterface {
         MONGO_DISALLOW_COPYING(ReplicationCoordinatorImpl);
 
     public:
@@ -73,6 +75,18 @@ namespace repl {
         virtual Mode getReplicationMode() const;
 
         virtual MemberState getCurrentMemberState() const;
+
+        /*
+         * Implementation of the KillOpListenerInterface interrupt method so that we can wake up
+         * threads blocked in awaitReplication() when a killOp command comes in.
+         */
+        virtual void interrupt(unsigned opId);
+
+        /*
+         * Implementation of the KillOpListenerInterface interruptAll method so that we can wake up
+         * threads blocked in awaitReplication() when we kill all operations.
+         */
+        virtual void interruptAll();
 
         virtual ReplicationCoordinator::StatusAndDuration awaitReplication(
                 const OperationContext* txn,
