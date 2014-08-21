@@ -52,6 +52,8 @@ const char *uri = "table:logtest";
 	printf(" key size %" PRIu64, (uint64_t)logrec_key.size);	\
     if (logrec_value.size != 0)						\
 	printf(" value size %" PRIu64, (uint64_t)logrec_value.size);	\
+    if (rectype == WT_LOGREC_MESSAGE)					\
+	printf("\n Application Record: %s", (char *)logrec_value.data);	\
     printf("\n");
 
 static int
@@ -219,7 +221,7 @@ int main(void)
 	WT_CONNECTION *wt_conn;
 	WT_CURSOR *cursor;
 	WT_SESSION *session;
-	int i, ret;
+	int i, record_count, ret;
 	char cmd_buf[256], k[16], v[16];
 
 	snprintf(cmd_buf, sizeof(cmd_buf), "rm -rf %s %s && mkdir %s %s",
@@ -243,7 +245,7 @@ int main(void)
 	/*
 	 * Perform some operations with individual auto-commit transactions.
 	 */
-	for (i = 0; i < MAX_KEYS; i++) {
+	for (record_count = 0, i = 0; i < MAX_KEYS; i++, record_count++) {
 		snprintf(k, sizeof(k), "key%d", i);
 		snprintf(v, sizeof(v), "value%d", i);
 		cursor->set_key(cursor, k);
@@ -254,7 +256,7 @@ int main(void)
 	/*
 	 * Perform some operations within a single transaction.
 	 */
-	for (i = MAX_KEYS; i < MAX_KEYS+5; i++) {
+	for (i = MAX_KEYS; i < MAX_KEYS+5; i++, record_count++) {
 		snprintf(k, sizeof(k), "key%d", i);
 		snprintf(v, sizeof(v), "value%d", i);
 		cursor->set_key(cursor, k);
@@ -263,6 +265,7 @@ int main(void)
 	}
 	ret = session->commit_transaction(session, NULL);
 	cursor->close(cursor);
+	session->log_printf(session, "Wrote %d records", record_count);
 
 	/*
 	 * Close and reopen the connection so that the log ends up with
