@@ -124,19 +124,13 @@ namespace mongo {
         // Look at the cells we cover and all cells that are within our covering and finer.
         // Anything with our cover as a strict prefix is contained within the cover and should
         // be intersection tested.
-        bool considerCoarser = false;
-        std::set<std::string> intervalSet;
+        std::set<string> intervalSet;
+        std::set<string> exactSet;
         for (size_t i = 0; i < cover.size(); ++i) {
-            intervalSet.insert(cover[i].toString());
-            // If any of our covers could be covered by something in the index, we have
-            // to look at things coarser.
-            if (cover[i].level() > coarsestIndexedLevel) {
-                considerCoarser = true;
-            }
-        }
 
-        std::set<std::string> exactSet;
-        if (considerCoarser) {
+            S2CellId coveredCell = cover[i];
+            intervalSet.insert(coveredCell.toString());
+
             // Look at the cells that cover us.  We want to look at every cell that contains the
             // covering we would index on if we were to insert the query geometry.  We generate
             // the would-index-with-this-covering and find all the cells strictly containing the
@@ -150,11 +144,16 @@ namespace mongo {
             // And we've already looked at points with the cell id 211111 from the regex search
             // created above, so we only want things where the value of the last digit is not
             // stored (and therefore could be 1).
-            for (size_t i = 0; i < cover.size(); ++i) {
-                for (S2CellId id = cover[i].parent(); id.level() >= coarsestIndexedLevel;
-                        id = id.parent()) {
-                    exactSet.insert(id.toString());
-                }
+
+            while (coveredCell.level() > coarsestIndexedLevel) {
+
+                // Add the parent cell of the currently covered cell since we aren't at the
+                // coarsest level yet
+                // NOTE: Be careful not to generate cells strictly less than the
+                // coarsestIndexedLevel - this can result in S2 failures when level < 0.
+
+                coveredCell = coveredCell.parent();
+                exactSet.insert(coveredCell.toString());
             }
         }
 
