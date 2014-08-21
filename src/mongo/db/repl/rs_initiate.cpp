@@ -33,6 +33,7 @@
 
 #include "mongo/db/repl/rs_initiate.h"
 
+#include <cstring>
 #include <vector>
 
 #include "mongo/db/auth/action_set.h"
@@ -44,7 +45,9 @@
 #include "mongo/db/repl/heartbeat.h"
 #include "mongo/db/repl/isself.h"
 #include "mongo/db/repl/oplog.h"
+#include "mongo/db/repl/repl_coordinator_external_state_impl.h"
 #include "mongo/db/repl/repl_coordinator_global.h"
+#include "mongo/db/repl/repl_set_seed_list.h"
 #include "mongo/db/repl/repl_settings.h"  // replSettings
 #include "mongo/db/repl/replset_commands.h"
 #include "mongo/db/repl/rs.h"
@@ -53,8 +56,6 @@
 #include "mongo/util/log.h"
 #include "mongo/util/mmap.h"
 #include "mongo/util/mongoutils/str.h"
-
-using namespace mongoutils;
 
 namespace mongo {
 namespace repl {
@@ -164,6 +165,31 @@ namespace repl {
         }
     }
 
+    static HostAndPort someHostAndPortForMe() {
+        const char* ips = serverGlobalParams.bind_ip.c_str();
+        while (*ips) {
+            std::string ip;
+            const char* comma = strchr(ips, ',');
+            if (comma) {
+                ip = std::string(ips, comma - ips);
+                ips = comma + 1;
+            }
+            else {
+                ip = std::string(ips);
+                ips = "";
+            }
+            HostAndPort h = HostAndPort(ip, serverGlobalParams.port);
+            if (!h.isLocalHost()) {
+                return h;
+            }
+        }
+
+        std::string h = getHostName();
+        verify(!h.empty());
+        verify(h != "localhost");
+        return HostAndPort(h, serverGlobalParams.port);
+    }
+
     class CmdReplSetInitiate : public ReplSetCommand {
     public:
         virtual bool isWriteCommandForConfigServer() const { return false; }
@@ -189,6 +215,38 @@ namespace repl {
             BSONObj configObj;
             if( cmdObj["replSetInitiate"].type() == Object ) {
                 configObj = cmdObj["replSetInitiate"].Obj();
+            }
+
+            if (configObj.isEmpty()) {
+                result.append("info2", "no configuration explicitly specified -- making one");
+                log() << "replSet info initiate : no configuration specified.  "
+                    "Using a default configuration for the set" << rsLog;
+
+                ReplicationCoordinatorExternalStateImpl externalState;
+                std::string name;
+                std::vector<HostAndPort> seeds;
+                std::set<HostAndPort> seedSet;
+                parseReplSetSeedList(
+                        &externalState,
+                        getGlobalReplicationCoordinator()->getSettings().replSet,
+                        name,
+                        seeds,
+                        seedSet); // may throw...
+
+                BSONObjBuilder b;
+                b.append("_id", name);
+                BSONObjBuilder members;
+                HostAndPort me = someHostAndPortForMe();
+                members.append("0", BSON( "_id" << 0 << "host" << me.toString() ));
+                result.append("me", me.toString());
+                for( unsigned i = 0; i < seeds.size(); i++ ) {
+                    members.append(BSONObjBuilder::numStr(i+1),
+                                   BSON( "_id" << i+1 << "host" << seeds[i].toString()));
+                }
+                b.appendArray("members", members.obj());
+                configObj = b.obj();
+                log() << "replSet created this configuration for initiation : " <<
+                        configObj.toString() << rsLog;
             }
 
             Status status = getGlobalReplicationCoordinator()->processReplSetInitiate(txn,
