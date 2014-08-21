@@ -318,12 +318,6 @@ namespace mongo {
             for ( CursorMap::const_iterator i = _cursors.begin(); i != _cursors.end(); ++i ) {
                 ClientCursor* cc = i->second;
 
-                if (cc->isAggCursor) {
-                    // Aggregation cursors don't have their lifetime bound to the underlying collection.
-                    newMap[i->first] = i->second;
-                    continue;
-                }
-
                 // Note that a valid ClientCursor state is "no cursor no executor."  This is because
                 // the set of active cursor IDs in ClientCursor is used as representation of query
                 // state.  See sharding_block.h.  TODO(greg,hk): Move this out.
@@ -332,16 +326,18 @@ namespace mongo {
                     continue;
                 }
 
-                if (cc->pinValue() < 100) {
-                    cc->kill();
-                    delete cc;
-                }
-                else {
-                    // this is pinned, so still alive, so we leave around
-                    // we kill the PlanExecutor to signal
+                if (cc->pinValue() >= 100 || cc->isAggCursor) {
+                    // Pinned cursors need to stay alive, so we leave them around.  Aggregation
+                    // cursors also can stay alive (since they don't have their lifetime bound to
+                    // the underlying collection).  However, if they have an associated executor, we
+                    // need to kill it, because it's now invalid.
                     if ( cc->getExecutor() )
                         cc->getExecutor()->kill();
                     newMap.insert( *i );
+                }
+                else {
+                    cc->kill();
+                    delete cc;
                 }
 
             }
