@@ -118,7 +118,6 @@ namespace mongo {
     };
 
     extern "C" int index_collator_customize(WT_COLLATOR *coll, WT_SESSION *s, const char *uri, WT_CONFIG_ITEM *metadata, WT_COLLATOR **collp) {
-            fprintf(stderr, "custom collator for %s\n", uri);
             IndexDescriptor desc(0, "unknown", fromjson(std::string(metadata->str, metadata->len)));
             *collp = new WiredTigerIndexCollator(Ordering::make(desc.keyPattern()));
             return 0;
@@ -146,7 +145,6 @@ namespace mongo {
         WT_SESSION *s(swrap.Get());
         std::string config = "type=file,key_format=uu,value_format=u,collator=mongo_index,app_metadata=";
         config += info.descriptor()->infoObj().jsonString();
-        fprintf(stderr, "Creating index: %s (%s)\n", idxName.c_str(), config.c_str());
         return s->create(s, _getURI(ns, idxName).c_str(), config.c_str());
     }
 
@@ -228,7 +226,7 @@ namespace mongo {
         boost::scoped_ptr<SortedDataInterface::Cursor> cursor( newCursor( txn, 1 ) );
         cursor->locate(key, DiskLoc());
 
-        return !cursor->isEOF() && cursor->getDiskLoc() == loc;
+        return !cursor->isEOF() && cursor->getDiskLoc() != loc;
     }
 
     /* Cursor implementation */
@@ -237,8 +235,7 @@ namespace mongo {
     bool WiredTigerIndex::IndexCursor::isEOF() const { return _eof; }
 
     bool WiredTigerIndex::IndexCursor::pointsToSamePlaceAs(
-            const SortedDataInterface::Cursor &genother) const
-    {
+            const SortedDataInterface::Cursor &genother) const {
         const WiredTigerIndex::IndexCursor &other =
             dynamic_cast<const WiredTigerIndex::IndexCursor &>(genother);
         WT_CURSOR *c = _cursor.Get(), *otherc = other._cursor.Get();
@@ -260,20 +257,17 @@ namespace mongo {
         // Make sure we land on a matching key
         if (ret == 0 && (_forward ? cmp < 0 : cmp > 0))
             ret = _forward ? c->next(c) : c->prev(c);
-        if (ret == 0) {
-            WT_ITEM keyItem, locItem;
-            ret = c->get_key(c, &keyItem, &locItem);
-            invariant(ret == 0);
-            if (key != BSONObj(static_cast<const char *>(keyItem.data)))
-                ret = WT_NOTFOUND;
-        }
         if (ret == WT_NOTFOUND) {
             _eof = true;
             return false;
         }
         invariant(ret == 0);
         _eof = false;
-        return true;
+
+        WT_ITEM keyItem, locItem;
+        ret = c->get_key(c, &keyItem, &locItem);
+        invariant(ret == 0);
+        return key == BSONObj(static_cast<const char *>(keyItem.data));
     }
 
     bool WiredTigerIndex::IndexCursor::locate(const BSONObj &key, const DiskLoc& loc) {

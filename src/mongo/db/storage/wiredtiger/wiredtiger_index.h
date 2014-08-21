@@ -96,7 +96,6 @@ namespace mongo {
                      _txn(txn),
                      _forward(forward),
                      _eof(true) {
-                        advance();
                 }
 
                 virtual ~IndexCursor() {
