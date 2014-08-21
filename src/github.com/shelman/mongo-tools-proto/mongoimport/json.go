@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/shelman/mongo-tools-proto/common/bson_ext"
+	"github.com/shelman/mongo-tools-proto/common/bsonutil"
 	"gopkg.in/mgo.v2/bson"
 	"io"
 	"strings"
@@ -175,7 +175,7 @@ func (jsonImporter *JSONImportInput) ImportDocument() (bson.M, error) {
 	// ObjectId("53cefc71b14ed89d84856287")
 	//
 	// This applies for all the other extended JSON types MongoDB supports
-	if err := bson_ext.ConvertSubdocsFromJSON(document); err != nil {
+	if err := bsonutil.ConvertJSONDocumentToBSON(document); err != nil {
 		return nil, err
 	}
 	jsonImporter.NumImported++

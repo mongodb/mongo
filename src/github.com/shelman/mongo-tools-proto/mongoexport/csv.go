@@ -3,7 +3,7 @@ package mongoexport
 import (
 	"encoding/csv"
 	"fmt"
-	"github.com/shelman/mongo-tools-proto/common/bson_ext"
+	"github.com/shelman/mongo-tools-proto/common/bsonutil"
 	"gopkg.in/mgo.v2/bson"
 	"io"
 	"reflect"
@@ -51,7 +51,10 @@ func (csvExporter *CSVExportOutput) Flush() error {
 //ExportDocument writes a line to output with the CSV representation of a doc.
 func (csvExporter *CSVExportOutput) ExportDocument(document bson.M) error {
 	rowOut := make([]string, 0, len(csvExporter.Fields))
-	extendedDoc := bson_ext.GetExtendedBSON(document)
+	extendedDoc, err := bsonutil.ConvertBSONValueToJSON(document)
+	if err != nil {
+		return err
+	}
 	for _, fieldName := range csvExporter.Fields {
 		fieldVal, err := extractFieldByName(fieldName, extendedDoc)
 		if err != nil {
@@ -59,7 +62,7 @@ func (csvExporter *CSVExportOutput) ExportDocument(document bson.M) error {
 		}
 		rowOut = append(rowOut, fmt.Sprintf("%s", fieldVal))
 	}
-	err := csvExporter.csvWriter.Write(rowOut)
+	err = csvExporter.csvWriter.Write(rowOut)
 	if err != nil {
 		return err
 	}

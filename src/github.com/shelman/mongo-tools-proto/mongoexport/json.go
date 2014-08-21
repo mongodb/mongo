@@ -2,7 +2,8 @@ package mongoexport
 
 import (
 	"encoding/json"
-	"github.com/shelman/mongo-tools-proto/common/bson_ext"
+	"fmt"
+	"github.com/shelman/mongo-tools-proto/common/bsonutil"
 	"gopkg.in/mgo.v2/bson"
 	"io"
 )
@@ -66,13 +67,21 @@ func (jsonExporter *JSONExportOutput) ExportDocument(document bson.M) error {
 		if jsonExporter.NumExported >= 1 {
 			jsonExporter.Out.Write([]byte(","))
 		}
-		jsonOut, err := json.Marshal(bson_ext.GetExtendedBSON(document))
+		extendedDoc, err := bsonutil.ConvertBSONValueToJSON(document)
 		if err != nil {
-			return nil
+			return err
+		}
+		jsonOut, err := json.Marshal(extendedDoc)
+		if err != nil {
+			return fmt.Errorf("Error converting BSON to extended JSON: %v", err)
 		}
 		jsonExporter.Out.Write(jsonOut)
 	} else {
-		err := jsonExporter.Encoder.Encode(bson_ext.GetExtendedBSON(document))
+		extendedDoc, err := bsonutil.ConvertBSONValueToJSON(document)
+		if err != nil {
+			return err
+		}
+		err = jsonExporter.Encoder.Encode(extendedDoc)
 		if err != nil {
 			return err
 		}

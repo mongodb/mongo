@@ -44,7 +44,7 @@ func (d *decodeState) storeDBRef(v reflect.Value) {
 			d.error(fmt.Errorf("expected first argument to DBRef to be of type string"))
 		}
 		arg1 := args[1]
-		v.Set(reflect.ValueOf(DBRef{arg0, arg1}))
+		v.Set(reflect.ValueOf(DBRef{arg0, arg1, ""}))
 	default:
 		d.error(fmt.Errorf("cannot store %v value into %v type", dbRefType, kind))
 	}
@@ -65,5 +65,5 @@ func (d *decodeState) getDBRef() interface{} {
 	if !ok {
 		d.error(fmt.Errorf("expected string for first argument of DBRef constructor"))
 	}
-	return DBRef{arg0, args[1]}
+	return DBRef{arg0, args[1], ""}
 }

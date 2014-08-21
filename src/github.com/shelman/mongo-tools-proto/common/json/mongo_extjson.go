@@ -16,8 +16,9 @@ type Date int64
 
 // Represents a reference to another document.
 type DBRef struct {
-	Name string // of the collection
-	Id   interface{}
+	Collection string
+	Id         interface{}
+	Database   string // optional
 }
 
 // Represents the literal MinKey.

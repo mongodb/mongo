@@ -102,8 +102,9 @@ func TestSingleQuotedValues(t *testing.T) {
 
 			jsonValue, ok := jsonMap[key].(DBRef)
 			So(ok, ShouldBeTrue)
-			So(jsonValue.Name, ShouldEqual, "examples")
+			So(jsonValue.Collection, ShouldEqual, "examples")
 			So(jsonValue.Id, ShouldEqual, "xyz")
+			So(jsonValue.Database, ShouldBeEmpty)
 		})
 
 		Convey("can be used within ObjectId constructor", func() {

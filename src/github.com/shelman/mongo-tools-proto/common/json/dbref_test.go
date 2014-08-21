@@ -23,7 +23,7 @@ func TestDBRefValue(t *testing.T) {
 
 			jsonValue, ok := jsonMap[key].(DBRef)
 			So(ok, ShouldBeTrue)
-			So(jsonValue, ShouldResemble, DBRef{"ref", "123"})
+			So(jsonValue, ShouldResemble, DBRef{"ref", "123", ""})
 		})
 
 		Convey("works for multiple keys", func() {
@@ -40,15 +40,15 @@ func TestDBRefValue(t *testing.T) {
 
 			jsonValue1, ok := jsonMap[key1].(DBRef)
 			So(ok, ShouldBeTrue)
-			So(jsonValue1, ShouldResemble, DBRef{"ref1", "123"})
+			So(jsonValue1, ShouldResemble, DBRef{"ref1", "123", ""})
 
 			jsonValue2, ok := jsonMap[key2].(DBRef)
 			So(ok, ShouldBeTrue)
-			So(jsonValue2, ShouldResemble, DBRef{"ref2", "456"})
+			So(jsonValue2, ShouldResemble, DBRef{"ref2", "456", ""})
 
 			jsonValue3, ok := jsonMap[key3].(DBRef)
 			So(ok, ShouldBeTrue)
-			So(jsonValue3, ShouldResemble, DBRef{"ref3", "789"})
+			So(jsonValue3, ShouldResemble, DBRef{"ref3", "789", ""})
 		})
 
 		Convey("works in an array", func() {
@@ -68,7 +68,7 @@ func TestDBRefValue(t *testing.T) {
 			for _, _jsonValue := range jsonArray {
 				jsonValue, ok := _jsonValue.(DBRef)
 				So(ok, ShouldBeTrue)
-				So(jsonValue, ShouldResemble, DBRef{"ref", "42"})
+				So(jsonValue, ShouldResemble, DBRef{"ref", "42", ""})
 			}
 		})
 
@@ -84,7 +84,7 @@ func TestDBRefValue(t *testing.T) {
 
 			jsonValue, ok := jsonMap[key].(DBRef)
 			So(ok, ShouldBeTrue)
-			So(jsonValue, ShouldResemble, DBRef{"ref", "123"})
+			So(jsonValue, ShouldResemble, DBRef{"ref", "123", ""})
 		})
 
 		Convey("can have any extended JSON value for id parameter", func() {
@@ -101,7 +101,7 @@ func TestDBRefValue(t *testing.T) {
 
 				jsonValue, ok := jsonMap[key].(DBRef)
 				So(ok, ShouldBeTrue)
-				So(jsonValue, ShouldResemble, DBRef{"ref", nil})
+				So(jsonValue, ShouldResemble, DBRef{"ref", nil, ""})
 			})
 
 			Convey("a true literal", func() {
@@ -116,7 +116,7 @@ func TestDBRefValue(t *testing.T) {
 
 				jsonValue, ok := jsonMap[key].(DBRef)
 				So(ok, ShouldBeTrue)
-				So(jsonValue, ShouldResemble, DBRef{"ref", true})
+				So(jsonValue, ShouldResemble, DBRef{"ref", true, ""})
 			})
 
 			Convey("a false literal", func() {
@@ -131,7 +131,7 @@ func TestDBRefValue(t *testing.T) {
 
 				jsonValue, ok := jsonMap[key].(DBRef)
 				So(ok, ShouldBeTrue)
-				So(jsonValue, ShouldResemble, DBRef{"ref", false})
+				So(jsonValue, ShouldResemble, DBRef{"ref", false, ""})
 			})
 
 			Convey("an undefined literal", func() {
@@ -146,7 +146,7 @@ func TestDBRefValue(t *testing.T) {
 
 				jsonValue, ok := jsonMap[key].(DBRef)
 				So(ok, ShouldBeTrue)
-				So(jsonValue, ShouldResemble, DBRef{"ref", Undefined{}})
+				So(jsonValue, ShouldResemble, DBRef{"ref", Undefined{}, ""})
 			})
 
 			Convey("a NaN literal", func() {
@@ -161,7 +161,7 @@ func TestDBRefValue(t *testing.T) {
 
 				jsonValue, ok := jsonMap[key].(DBRef)
 				So(ok, ShouldBeTrue)
-				So(jsonValue.Name, ShouldEqual, "ref")
+				So(jsonValue.Collection, ShouldEqual, "ref")
 
 				id, ok := jsonValue.Id.(float64)
 				So(ok, ShouldBeTrue)
@@ -181,7 +181,7 @@ func TestDBRefValue(t *testing.T) {
 
 				jsonValue, ok := jsonMap[key].(DBRef)
 				So(ok, ShouldBeTrue)
-				So(jsonValue.Name, ShouldEqual, "ref")
+				So(jsonValue.Collection, ShouldEqual, "ref")
 
 				id, ok := jsonValue.Id.(float64)
 				So(ok, ShouldBeTrue)
@@ -201,7 +201,7 @@ func TestDBRefValue(t *testing.T) {
 
 				jsonValue, ok := jsonMap[key].(DBRef)
 				So(ok, ShouldBeTrue)
-				So(jsonValue, ShouldResemble, DBRef{"ref", MinKey{}})
+				So(jsonValue, ShouldResemble, DBRef{"ref", MinKey{}, ""})
 			})
 
 			Convey("a MaxKey literal", func() {
@@ -216,7 +216,7 @@ func TestDBRefValue(t *testing.T) {
 
 				jsonValue, ok := jsonMap[key].(DBRef)
 				So(ok, ShouldBeTrue)
-				So(jsonValue, ShouldResemble, DBRef{"ref", MaxKey{}})
+				So(jsonValue, ShouldResemble, DBRef{"ref", MaxKey{}, ""})
 			})
 
 			Convey("an ObjectId object", func() {
@@ -231,7 +231,7 @@ func TestDBRefValue(t *testing.T) {
 
 				jsonValue, ok := jsonMap[key].(DBRef)
 				So(ok, ShouldBeTrue)
-				So(jsonValue, ShouldResemble, DBRef{"ref", ObjectId("123")})
+				So(jsonValue, ShouldResemble, DBRef{"ref", ObjectId("123"), ""})
 			})
 
 			Convey("a NumberInt object", func() {
@@ -246,7 +246,7 @@ func TestDBRefValue(t *testing.T) {
 
 				jsonValue, ok := jsonMap[key].(DBRef)
 				So(ok, ShouldBeTrue)
-				So(jsonValue, ShouldResemble, DBRef{"ref", NumberInt(123)})
+				So(jsonValue, ShouldResemble, DBRef{"ref", NumberInt(123), ""})
 			})
 
 			Convey("a NumberLong object", func() {
@@ -261,7 +261,7 @@ func TestDBRefValue(t *testing.T) {
 
 				jsonValue, ok := jsonMap[key].(DBRef)
 				So(ok, ShouldBeTrue)
-				So(jsonValue, ShouldResemble, DBRef{"ref", NumberLong(123)})
+				So(jsonValue, ShouldResemble, DBRef{"ref", NumberLong(123), ""})
 			})
 
 			Convey("a RegExp object", func() {
@@ -276,7 +276,7 @@ func TestDBRefValue(t *testing.T) {
 
 				jsonValue, ok := jsonMap[key].(DBRef)
 				So(ok, ShouldBeTrue)
-				So(jsonValue, ShouldResemble, DBRef{"ref", RegExp{"xyz", "i"}})
+				So(jsonValue, ShouldResemble, DBRef{"ref", RegExp{"xyz", "i"}, ""})
 			})
 
 			Convey("a regular expression literal", func() {
@@ -291,7 +291,7 @@ func TestDBRefValue(t *testing.T) {
 
 				jsonValue, ok := jsonMap[key].(DBRef)
 				So(ok, ShouldBeTrue)
-				So(jsonValue, ShouldResemble, DBRef{"ref", RegExp{"xyz", "i"}})
+				So(jsonValue, ShouldResemble, DBRef{"ref", RegExp{"xyz", "i"}, ""})
 			})
 
 			Convey("a Timestamp object", func() {
@@ -306,7 +306,7 @@ func TestDBRefValue(t *testing.T) {
 
 				jsonValue, ok := jsonMap[key].(DBRef)
 				So(ok, ShouldBeTrue)
-				So(jsonValue, ShouldResemble, DBRef{"ref", Timestamp{123, 321}})
+				So(jsonValue, ShouldResemble, DBRef{"ref", Timestamp{123, 321}, ""})
 			})
 
 			Convey("a string literal", func() {
@@ -321,7 +321,7 @@ func TestDBRefValue(t *testing.T) {
 
 				jsonValue, ok := jsonMap[key].(DBRef)
 				So(ok, ShouldBeTrue)
-				So(jsonValue, ShouldResemble, DBRef{"ref", "xyz"})
+				So(jsonValue, ShouldResemble, DBRef{"ref", "xyz", ""})
 			})
 
 			Convey("a numeric literal", func() {
@@ -336,7 +336,7 @@ func TestDBRefValue(t *testing.T) {
 
 				jsonValue, ok := jsonMap[key].(DBRef)
 				So(ok, ShouldBeTrue)
-				So(jsonValue.Name, ShouldEqual, "ref")
+				So(jsonValue.Collection, ShouldEqual, "ref")
 
 				id, ok := jsonValue.Id.(float64)
 				So(ok, ShouldBeTrue)

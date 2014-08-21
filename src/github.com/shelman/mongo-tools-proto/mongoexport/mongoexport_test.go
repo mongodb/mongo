@@ -2,7 +2,7 @@ package mongoexport
 
 import (
 	"encoding/json"
-	"github.com/shelman/mongo-tools-proto/common/bson_ext"
+	"github.com/shelman/mongo-tools-proto/common/bsonutil"
 	. "github.com/smartystreets/goconvey/convey"
 	"gopkg.in/mgo.v2/bson"
 	"os"
@@ -22,7 +22,9 @@ func TestExtendedJSON(t *testing.T) {
 				bson.Undefined,
 			},
 		}
-		out := bson_ext.GetExtendedBSON(x)
+		out, err := bsonutil.ConvertBSONValueToJSON(x)
+		So(err, ShouldBeNil)
+
 		jsonEncoder := json.NewEncoder(os.Stdout)
 		jsonEncoder.Encode(out)
 	})

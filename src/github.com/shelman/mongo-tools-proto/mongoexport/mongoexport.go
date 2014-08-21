@@ -3,7 +3,7 @@ package mongoexport
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/shelman/mongo-tools-proto/common/bson_ext"
+	"github.com/shelman/mongo-tools-proto/common/bsonutil"
 	"github.com/shelman/mongo-tools-proto/common/db"
 	commonopts "github.com/shelman/mongo-tools-proto/common/options"
 	"github.com/shelman/mongo-tools-proto/common/util"
@@ -188,7 +188,7 @@ func getQueryFromArg(queryRaw string) (map[string]interface{}, error) {
 
 	for key, val := range parsedJSON {
 		if valSubDoc, ok := val.(map[string]interface{}); ok {
-			newVal, err := bson_ext.ParseExtendedJSON(valSubDoc)
+			newVal, err := bsonutil.ParseSpecialKeys(valSubDoc)
 			if err != nil {
 				return nil, fmt.Errorf("Error in query: %v", err)
 			}
