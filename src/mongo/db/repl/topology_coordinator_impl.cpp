@@ -562,7 +562,9 @@ namespace repl {
         }
 
         if (args.getProtocolVersion() != 1) {
-            *result = Status(ErrorCodes::BadValue, "incompatible replset protocol version");
+            *result = Status(ErrorCodes::BadValue,
+                             str::stream() << "replset: incompatible replset protocol version: "
+                                           << args.getProtocolVersion());
             return;
         }
 
@@ -601,6 +603,7 @@ namespace repl {
 
         // Are we electable
         response->setElectable(None == _getMyUnelectableReason(now, lastOpApplied));
+
         // Heartbeat status message
         response->setHbMsg(_getHbmsg());
         response->setTime(now);
@@ -695,7 +698,12 @@ namespace repl {
                       << " and "
                       << (_latestKnownOpTime().getSecs() - highestPriorityMemberOptime.getSecs())
                       << " seconds behind";
-                return ReplSetHeartbeatResponse::StepDown;
+                if (_memberState == MemberState::RS_PRIMARY) {
+                    return ReplSetHeartbeatResponse::StepDownSelf;
+                }
+                else {
+                    return ReplSetHeartbeatResponse::StepDownRemotePrimary;
+                }
             }
         }
 
@@ -725,10 +733,7 @@ namespace repl {
 
                 if (_memberState.primary()) {
                     log() << "auth problems, relinquishing primary";
-                    // XXX Eric: schedule relinquish
-                    //rs->relinquish();
-
-                    return ReplSetHeartbeatResponse::StepDown;
+                    return ReplSetHeartbeatResponse::StepDownSelf;
                 }
 
                 _blockSync = true;
@@ -779,6 +784,7 @@ namespace repl {
                 // Clear last heartbeat message on ourselves (why?)
                 _sethbmsg("");
 
+                // TODO: Move this into startup code?
                 // insanity: this is what actually puts arbiters into ARBITER state
                 if (_selfConfig().isArbiter()) {
                     _changeMemberState(MemberState::RS_ARBITER);
@@ -794,16 +800,12 @@ namespace repl {
                     // Step down whomever has the older election time.
                     if (remoteElectionTime > _electionTime) {
                         log() << "stepping down; another primary was elected more recently";
-                        // XXX Eric: schedule a relinquish
-                        //rs->relinquish();
-                        // after completion, set currentprimary to remotePrimaryIndex.
-                        return ReplSetHeartbeatResponse::StepDown;
+                        return ReplSetHeartbeatResponse::StepDownSelf;
                     }
                     else {
-                        // else, stick around
-                        log() << "another PRIMARY detected but it should step down"
-                            " since it was elected earlier than me";
-                        return ReplSetHeartbeatResponse::NoAction;
+                        log() << "another PRIMARY detected and it should step down"
+                                 " since it was elected earlier than me";
+                        return ReplSetHeartbeatResponse::StepDownRemotePrimary;
                     }
 
                 }
@@ -822,7 +824,7 @@ namespace repl {
 
             if (CannotSeeMajority == myUnelectableReason) {
                 log() << "can't see a majority of the set, relinquishing primary";
-                return ReplSetHeartbeatResponse::StepDown;
+                return ReplSetHeartbeatResponse::StepDownSelf;
 
             }
 
@@ -858,8 +860,8 @@ namespace repl {
 
     bool TopologyCoordinatorImpl::_isOpTimeCloseEnoughToLatestToElect(const OpTime lastApplied)
                                                                                             const {
-        const unsigned int latestOp = _latestKnownOpTime().getSecs();
-        return latestOp == 0 || lastApplied.getSecs() >= (latestOp - 10);
+        const unsigned int latestKnownOpTimeSecs = _latestKnownOpTime().getSecs();
+        return latestKnownOpTimeSecs != 0 && lastApplied.getSecs() >= (latestKnownOpTimeSecs - 10);
     }
 
     int TopologyCoordinatorImpl::_totalVotes() const {
@@ -1216,10 +1218,6 @@ namespace repl {
         }
     }
 
-    void TopologyCoordinatorImpl::recordPing(const HostAndPort& host, const int elapsedMillis) {
-        _pings[host].hit(elapsedMillis);
-    }
-
     std::string TopologyCoordinatorImpl::_getUnelectableReasonString(UnelectableReason ur) const {
         switch (ur) {
             case CannotSeeMajority: return "I cannot see a majority";
@@ -1236,6 +1234,11 @@ namespace repl {
         }
     }
 
+
+    void TopologyCoordinatorImpl::recordPing(const HostAndPort& host,
+                                             const Milliseconds elapsedMillis) {
+        _pings[host].hit(elapsedMillis.total_milliseconds());
+    }
     int TopologyCoordinatorImpl::_getPing(const HostAndPort& host) {
         return _pings[host].getMillis();
     }

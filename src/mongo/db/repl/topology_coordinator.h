@@ -149,7 +149,7 @@ namespace repl {
                                   const OpTime& lastOpApplied) = 0;
 
         // Record a "ping" based on the round-trip time of the heartbeat for the member
-        virtual void recordPing(const HostAndPort& host, const int elapsedMillis) = 0;
+        virtual void recordPing(const HostAndPort& host, const Milliseconds elapsedMillis) = 0;
 
     protected:
         TopologyCoordinator() {}

@@ -153,7 +153,7 @@ namespace repl {
                                   const OpTime& lastOpApplied);
 
         // Record a ping in millis based on the round-trip time of the heartbeat for the member
-        virtual void recordPing(const HostAndPort& host, const int elapsedMillis);
+        virtual void recordPing(const HostAndPort& host, const Milliseconds elapsedMillis);
 
         // Changes _memberState to newMemberState, then calls all registered callbacks
         // for state changes.

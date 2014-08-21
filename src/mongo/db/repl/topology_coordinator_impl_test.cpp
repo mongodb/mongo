@@ -90,10 +90,10 @@ namespace {
         ASSERT(topocoord.getSyncSourceAddress().empty());
 
         // Record 2N pings to allow choosing a new sync source; all members equidistant
-        topocoord.recordPing(HostAndPort("h2"), 300);
-        topocoord.recordPing(HostAndPort("h2"), 300);
-        topocoord.recordPing(HostAndPort("h3"), 300);
-        topocoord.recordPing(HostAndPort("h3"), 300);
+        topocoord.recordPing(HostAndPort("h2"), Milliseconds(300));
+        topocoord.recordPing(HostAndPort("h2"), Milliseconds(300));
+        topocoord.recordPing(HostAndPort("h3"), Milliseconds(300));
+        topocoord.recordPing(HostAndPort("h3"), Milliseconds(300));
 
         // Should choose h2, since it is furthest ahead
         topocoord.chooseNewSyncSource(now++, OpTime(0,0));
@@ -192,27 +192,27 @@ namespace {
         topocoord.updateHeartbeatData(now++, hprimaryInfo, 70, lastOpTimeWeApplied);
 
         // Record 2(N-1) pings to allow choosing a new sync source
-        topocoord.recordPing(HostAndPort("h1"), 700);
-        topocoord.recordPing(HostAndPort("h1"), 700);
-        topocoord.recordPing(HostAndPort("h2"), 600);
-        topocoord.recordPing(HostAndPort("h2"), 600);
-        topocoord.recordPing(HostAndPort("h3"), 500);
-        topocoord.recordPing(HostAndPort("h3"), 500);
-        topocoord.recordPing(HostAndPort("h4"), 400);
-        topocoord.recordPing(HostAndPort("h4"), 400);
-        topocoord.recordPing(HostAndPort("h5"), 300);
-        topocoord.recordPing(HostAndPort("h5"), 300);
-        topocoord.recordPing(HostAndPort("h6"), 200);
-        topocoord.recordPing(HostAndPort("h6"), 200);
-        topocoord.recordPing(HostAndPort("hprimary"), 100);
-        topocoord.recordPing(HostAndPort("hprimary"), 100);
+        topocoord.recordPing(HostAndPort("h1"), Milliseconds(700));
+        topocoord.recordPing(HostAndPort("h1"), Milliseconds(700));
+        topocoord.recordPing(HostAndPort("h2"), Milliseconds(600));
+        topocoord.recordPing(HostAndPort("h2"), Milliseconds(600));
+        topocoord.recordPing(HostAndPort("h3"), Milliseconds(500));
+        topocoord.recordPing(HostAndPort("h3"), Milliseconds(500));
+        topocoord.recordPing(HostAndPort("h4"), Milliseconds(400));
+        topocoord.recordPing(HostAndPort("h4"), Milliseconds(400));
+        topocoord.recordPing(HostAndPort("h5"), Milliseconds(300));
+        topocoord.recordPing(HostAndPort("h5"), Milliseconds(300));
+        topocoord.recordPing(HostAndPort("h6"), Milliseconds(200));
+        topocoord.recordPing(HostAndPort("h6"), Milliseconds(200));
+        topocoord.recordPing(HostAndPort("hprimary"), Milliseconds(100));
+        topocoord.recordPing(HostAndPort("hprimary"), Milliseconds(100));
 
         // Should choose primary first; it's closest
         topocoord.chooseNewSyncSource(now++, lastOpTimeWeApplied);
         ASSERT_EQUALS(topocoord.getSyncSourceAddress(), HostAndPort("hprimary"));
 
         // Primary goes far far away
-        topocoord.recordPing(HostAndPort("hprimary"), 10000000);
+        topocoord.recordPing(HostAndPort("hprimary"), Milliseconds(10000000));
 
         // Should choose h4.  (if an arbiter has an oplog, it's a valid sync source)
         // h6 is not considered because it is outside the maxSyncLagSeconds window,
@@ -286,10 +286,10 @@ namespace {
         topocoord.updateHeartbeatData(now++, h2Info, 30, OpTime(0,0));
 
         // Record 2(N-1) pings to allow choosing a new sync source; h2 is the closest.
-        topocoord.recordPing(HostAndPort("h2"), 100);
-        topocoord.recordPing(HostAndPort("h2"), 100);
-        topocoord.recordPing(HostAndPort("h3"), 300);
-        topocoord.recordPing(HostAndPort("h3"), 300);
+        topocoord.recordPing(HostAndPort("h2"), Milliseconds(100));
+        topocoord.recordPing(HostAndPort("h2"), Milliseconds(100));
+        topocoord.recordPing(HostAndPort("h3"), Milliseconds(300));
+        topocoord.recordPing(HostAndPort("h3"), Milliseconds(300));
 
         // No primary situation: should choose no sync source.
         topocoord.chooseNewSyncSource(now++, OpTime(0,0));
@@ -336,10 +336,10 @@ namespace {
         topocoord.updateHeartbeatData(now++, h2Info, 30, OpTime(0,0));
 
         // Record 2(N-1) pings to allow choosing a new sync source; h3 is the closest.
-        topocoord.recordPing(HostAndPort("h2"), 300);
-        topocoord.recordPing(HostAndPort("h2"), 300);
-        topocoord.recordPing(HostAndPort("h3"), 100);
-        topocoord.recordPing(HostAndPort("h3"), 100);
+        topocoord.recordPing(HostAndPort("h2"), Milliseconds(300));
+        topocoord.recordPing(HostAndPort("h2"), Milliseconds(300));
+        topocoord.recordPing(HostAndPort("h3"), Milliseconds(100));
+        topocoord.recordPing(HostAndPort("h3"), Milliseconds(100));
 
         topocoord.chooseNewSyncSource(now++, OpTime(0,0));
         ASSERT_EQUALS(topocoord.getSyncSourceAddress(),HostAndPort("h3"));
@@ -379,10 +379,10 @@ namespace {
         topocoord.updateHeartbeatData(now++, h2Info, 30, OpTime(0,0));
 
         // Record 2(N-1) pings to allow choosing a new sync source; h3 is the closest.
-        topocoord.recordPing(HostAndPort("h2"), 300);
-        topocoord.recordPing(HostAndPort("h2"), 300);
-        topocoord.recordPing(HostAndPort("h3"), 100);
-        topocoord.recordPing(HostAndPort("h3"), 100);
+        topocoord.recordPing(HostAndPort("h2"), Milliseconds(300));
+        topocoord.recordPing(HostAndPort("h2"), Milliseconds(300));
+        topocoord.recordPing(HostAndPort("h3"), Milliseconds(100));
+        topocoord.recordPing(HostAndPort("h3"), Milliseconds(100));
 
         topocoord.chooseNewSyncSource(now++, OpTime(0,0));
         ASSERT_EQUALS(topocoord.getSyncSourceAddress(),HostAndPort("h3"));
@@ -825,6 +825,88 @@ namespace {
         ASSERT_FALSE(response6["veto"].Bool()) << response6.toString();
         ASSERT_FALSE(response6.hasField("errmsg")) << response6.toString();
     }
+
+    class TopoCoordTest : public mongo::unittest::Test {
+    public:
+        virtual void setUp() {
+            _topo = new TopologyCoordinatorImpl(Seconds(100));
+            _now = 0;
+        }
+
+        virtual void tearDown() {
+            delete _topo;
+        }
+
+    protected:
+        TopologyCoordinatorImpl& getTopoCoord() {return *_topo;}
+        Date_t& now() {return _now;}
+
+        // Update config and set selfIndex
+        void updateConfig(BSONObj cfg, int selfIndex) {
+            ReplicationExecutor::CallbackHandle cbh;
+            ReplicationExecutor::CallbackData cbData(NULL,
+                                                     cbh,
+                                                     Status::OK());
+            ReplicaSetConfig config;
+            ASSERT_OK(config.initialize(cfg));
+            ASSERT_OK(config.validate());
+
+            getTopoCoord().updateConfig(cbData, config, selfIndex, ++_now, OpTime(0,0));
+        }
+
+        // set the lastApplied OpTime for this test
+        void setLastApplied(const OpTime lastApplied) {
+            _lastApplied = lastApplied;
+        }
+
+        // Record a new heartbeat and increment now()
+        ReplSetHeartbeatResponse::HeartbeatResultAction
+                            recordNewHeartbeat(const MemberHeartbeatData newData, int memberIndex) {
+            return getTopoCoord().updateHeartbeatData(now()++, newData, memberIndex, _lastApplied);
+        }
+
+    private:
+        TopologyCoordinatorImpl* _topo;
+        Date_t _now;
+        OpTime _lastApplied;
+    };
+
+    TEST_F(TopoCoordTest, UpdateHeartbeatDataOlderConfigVersionNoMajority) {
+        updateConfig(BSON("_id" << "rs0" <<
+                          "version" << 5 <<
+                          "members" << BSON_ARRAY(
+                              BSON("_id" << 0 << "host" << "host1:27017") <<
+                              BSON("_id" << 1 << "host" << "host2:27017"))),
+                     0);
+
+        OpTime staleOpTime = OpTime(1,0);
+        OpTime election = OpTime(5,0);
+
+        setLastApplied(OpTime(3,0));
+
+        MemberHeartbeatData h1Info(1);
+        ReplSetHeartbeatResponse::HeartbeatResultAction nextAction = recordNewHeartbeat(
+                h1Info.setUpValues(now(), MemberState::RS_SECONDARY, election, staleOpTime, "", ""),
+                1);
+        ASSERT_EQUALS(nextAction, ReplSetHeartbeatResponse::NoAction);
+    }
+
+    TEST_F(TopoCoordTest, UpdateHeartbeatDataNewPrimary) {}
+
+    TEST_F(TopoCoordTest, UpdateHeartbeatDataTwoPrimariesNewOneOlder) {}
+    TEST_F(TopoCoordTest, UpdateHeartbeatDataTwoPrimariesNewOneNewer) {}
+
+    TEST_F(TopoCoordTest, UpdateHeartbeatDataTwoPrimariesIncludingMeNewOneOlder) {}
+    TEST_F(TopoCoordTest, UpdateHeartbeatDataTwoPrimariesIncludingMeNewOneNewer) {}
+
+    TEST_F(TopoCoordTest, UpdateHeartbeatDataPrimaryDownMajorityButIAmStarting) {}
+    TEST_F(TopoCoordTest, UpdateHeartbeatDataPrimaryDownMajorityButIAmRecovering) {}
+    TEST_F(TopoCoordTest, UpdateHeartbeatDataPrimaryDownMajorityButIHaveStepdownWait) {}
+    TEST_F(TopoCoordTest, UpdateHeartbeatDataPrimaryDownMajorityButIArbiter) {}
+
+    TEST_F(TopoCoordTest, UpdateHeartbeatDataPrimaryDownMajority) {}
+    TEST_F(TopoCoordTest, UpdateHeartbeatDataPrimaryDownNoMajority) {}
+
 }  // namespace
 }  // namespace repl
 }  // namespace mongo
