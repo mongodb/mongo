@@ -549,8 +549,7 @@ __evict_clear_walks(WT_SESSION_IMPL *session)
 			 * current eviction walk point).
 			 */
 			btree->evict_ref = NULL;
-			WT_TRET(
-			    __wt_page_release(session, ref, WT_READ_NO_GEN));
+			WT_TRET(__wt_page_release(session, ref, 0));
 		}
 		session->dhandle = NULL;
 	}
