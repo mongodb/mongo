@@ -100,7 +100,7 @@ namespace mongo {
         return dataSize(); // todo: this isn't very good
     }
 
-    RecordData WiredTigerRecordStore::dataFor( const DiskLoc& loc) const {
+    RecordData WiredTigerRecordStore::dataFor(const DiskLoc& loc) const {
         // ownership passes to the shared_array created below
         WiredTigerSession swrap(_db);
         WiredTigerCursor curwrap(GetCursor(swrap), swrap);
@@ -153,6 +153,9 @@ namespace mongo {
     }
 
     void WiredTigerRecordStore::cappedDeleteAsNeeded(OperationContext* txn) {
+        if (!cappedAndNeedDelete())
+            return;
+
         WiredTigerSession swrap(_db);
         WiredTigerCursor curwrap(GetCursor(swrap), swrap);
         WT_CURSOR *c = curwrap.Get();
