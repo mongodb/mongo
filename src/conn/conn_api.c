@@ -86,12 +86,11 @@ __wt_collator_config(WT_SESSION_IMPL *session, const char **cfg,
 			    "unknown collator '%.*s'", (int)cval.len, cval.str);
 
 		if (ncoll->collator->customize != NULL) {
-			WT_CONFIG_ITEM app_config;
 			WT_RET(__wt_config_gets(session,
-			    session->dhandle->cfg, "app_config", &app_config));
+			    session->dhandle->cfg, "app_metadata", &cval));
 			WT_RET(ncoll->collator->customize(
 			    ncoll->collator, &session->iface,
-			    session->dhandle->name, &app_config, collatorp));
+			    session->dhandle->name, &cval, collatorp));
 		}
 		if (*collatorp == NULL)
 			*collatorp = ncoll->collator;
