@@ -92,9 +92,16 @@ namespace mongo {
                 public:
                 IndexCursor(WT_CURSOR *cursor,
                         WiredTigerSession &session, OperationContext *txn, bool forward)
-                   : _cursor(cursor, session), _txn(txn), _forward(forward), _eof() {
+                   : _cursor(cursor, session, true), // XXX cursor owns session
+                     _txn(txn),
+                     _forward(forward),
+                     _eof(true) {
                         advance();
-                 }
+                }
+
+                virtual ~IndexCursor() {
+                    
+                }
 
                 virtual int getDirection() const;
 

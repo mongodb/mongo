@@ -65,9 +65,14 @@ namespace mongo {
 
     class WiredTigerCursor {
     public:
-        WiredTigerCursor(WT_CURSOR *cursor, WiredTigerSession &session)
-            : _cursor(cursor), _session(session) {}
-        ~WiredTigerCursor() { _session.ReleaseCursor(_cursor); }
+        WiredTigerCursor(WT_CURSOR *cursor, WiredTigerSession &session, bool own_session=false)
+            : _cursor(cursor), _session(session), _own_session(own_session) {}
+        ~WiredTigerCursor() {
+            _session.ReleaseCursor(_cursor);
+            // XXX avoid leaks
+            if (_own_session)
+                delete &_session;
+        }
 
         WiredTigerSession &GetSession(void) { return _session; }
         WT_CURSOR *Get() const { return _cursor; }
@@ -75,6 +80,7 @@ namespace mongo {
     private:
         WT_CURSOR *_cursor;
         WiredTigerSession &_session;
+        bool _own_session;
     };
 
     struct WiredTigerItem : public WT_ITEM {

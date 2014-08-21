@@ -71,9 +71,9 @@ namespace mongo {
      * by the bytes of a DiskLoc
      */
     static IndexKeyEntry makeIndexKeyEntry(WT_SESSION *s, const WT_ITEM *keyCols) {
-	WT_ITEM keyItem, locItem;
-	int ret = wiredtiger_struct_unpack(s, keyCols->data, keyCols->size, "uu", &keyItem, &locItem);
-	invariant(ret == 0);
+        WT_ITEM keyItem, locItem;
+        int ret = wiredtiger_struct_unpack(s, keyCols->data, keyCols->size, "uu", &keyItem, &locItem);
+        invariant(ret == 0);
         BSONObj key = BSONObj( static_cast<const char *>( keyItem.data ) ).getOwned();
         DiskLoc loc = *reinterpret_cast<const DiskLoc*>( locItem.data );
         return IndexKeyEntry( key, loc );
@@ -83,52 +83,52 @@ namespace mongo {
      * Custom comparator used to compare Index Entries by BSONObj and DiskLoc
      */
     struct WiredTigerIndexCollator : public WT_COLLATOR {
-	public:
-	    WiredTigerIndexCollator(const Ordering& order): _indexComparator( order ) {
-		    compare = _compare;
-		    terminate = _terminate;
-	    }
+        public:
+            WiredTigerIndexCollator(const Ordering& order): _indexComparator( order ) {
+                    compare = _compare;
+                    terminate = _terminate;
+            }
 
-	    int Compare(WT_SESSION *s, const WT_ITEM *a, const WT_ITEM *b) const {
-		const IndexKeyEntry lhs = makeIndexKeyEntry(s, a);
-		const IndexKeyEntry rhs = makeIndexKeyEntry(s, b);
-		int cmp = _indexComparator.compare( lhs, rhs );
-		if (cmp < 0)
-			cmp = -1;
-		else if (cmp > 0)
-			cmp = 1;
-		fprintf(stderr, "index cmp: %s (%s) vs %s (%s) => %d\n", lhs.key.jsonString().c_str(), lhs.loc.toString().c_str(), rhs.key.jsonString().c_str(), rhs.loc.toString().c_str(), cmp);
-		return cmp;
-	    }
+            int Compare(WT_SESSION *s, const WT_ITEM *a, const WT_ITEM *b) const {
+                const IndexKeyEntry lhs = makeIndexKeyEntry(s, a);
+                const IndexKeyEntry rhs = makeIndexKeyEntry(s, b);
+                int cmp = _indexComparator.compare( lhs, rhs );
+                if (cmp < 0)
+                        cmp = -1;
+                else if (cmp > 0)
+                        cmp = 1;
+                fprintf(stderr, "index cmp: %s (%s) vs %s (%s) => %d\n", lhs.key.jsonString().c_str(), lhs.loc.toString().c_str(), rhs.key.jsonString().c_str(), rhs.loc.toString().c_str(), cmp);
+                return cmp;
+            }
 
-	    static int _compare(WT_COLLATOR *coll, WT_SESSION *s, const WT_ITEM *a, const WT_ITEM *b, int *cmp) {
-		    WiredTigerIndexCollator *c = static_cast<WiredTigerIndexCollator *>(coll);
-		    *cmp = c->Compare(s, a, b);
-		    return 0;
-	    }
+            static int _compare(WT_COLLATOR *coll, WT_SESSION *s, const WT_ITEM *a, const WT_ITEM *b, int *cmp) {
+                    WiredTigerIndexCollator *c = static_cast<WiredTigerIndexCollator *>(coll);
+                    *cmp = c->Compare(s, a, b);
+                    return 0;
+            }
 
-	    static int _terminate(WT_COLLATOR *coll, WT_SESSION *s) {
-		    WiredTigerIndexCollator *c = static_cast<WiredTigerIndexCollator *>(coll);
-		    delete c;
-		    return 0;
-	    }
+            static int _terminate(WT_COLLATOR *coll, WT_SESSION *s) {
+                    WiredTigerIndexCollator *c = static_cast<WiredTigerIndexCollator *>(coll);
+                    delete c;
+                    return 0;
+            }
 
-	private:
-	    const IndexEntryComparison _indexComparator;
+        private:
+            const IndexEntryComparison _indexComparator;
     };
 
     extern "C" int index_collator_customize(WT_COLLATOR *coll, WT_SESSION *s, const char *uri, WT_CONFIG_ITEM *metadata, WT_COLLATOR **collp) {
-	    fprintf(stderr, "custom collator for %s\n", uri);
-	    *collp = new WiredTigerIndexCollator(Ordering::make(BSONObj()));
-	    return 0;
+            fprintf(stderr, "custom collator for %s\n", uri);
+            *collp = new WiredTigerIndexCollator(Ordering::make(BSONObj()));
+            return 0;
     }
 
     extern "C" int index_collator_extension(WT_CONNECTION *conn, WT_CONFIG_ARG *cfg) {
-	    static WT_COLLATOR idx_static;
+            static WT_COLLATOR idx_static;
 
-	    fprintf(stderr, "index_collator_extension running\n");
-	    idx_static.customize = index_collator_customize;
-	    return conn->add_collator(conn, "mongo_index", &idx_static, NULL);
+            fprintf(stderr, "index_collator_extension running\n");
+            idx_static.customize = index_collator_customize;
+            return conn->add_collator(conn, "mongo_index", &idx_static, NULL);
     }
 
     // taken from btree_logic.cpp
@@ -153,24 +153,24 @@ namespace mongo {
               const BSONObj& key,
               const DiskLoc& loc,
               bool dupsAllowed) {
-    invariant(!loc.isNull());
-    invariant(loc.isValid());
-    invariant(!hasFieldNames(key));
+        invariant(!loc.isNull());
+        invariant(loc.isValid());
+        invariant(!hasFieldNames(key));
 
-    // TODO optimization: save the iterator from the dup-check to speed up insert
-    if (!dupsAllowed && isDup(txn, key, loc))
-        return dupKeyError(key);
+        // TODO optimization: save the iterator from the dup-check to speed up insert
+        if (!dupsAllowed && isDup(txn, key, loc))
+            return dupKeyError(key);
 
-    WiredTigerSession swrap(_db);
-    WiredTigerCursor curwrap(GetCursor(swrap), swrap);
-    WT_CURSOR *c = curwrap.Get();
-    const BSONObj& finalKey = stripFieldNames( key );
-    fprintf(stderr, "inserting into index %s: %s (%s)\n", c->uri, finalKey.jsonString().c_str(), loc.toString().c_str());
-    c->set_key(c, _toItem(finalKey).Get(), _toItem(loc).Get());
-    c->set_value(c, &emptyItem);
-    int ret = c->insert(c);
-    invariant(ret == 0);
-    return Status::OK();
+        WiredTigerSession swrap(_db);
+        WiredTigerCursor curwrap(GetCursor(swrap), swrap);
+        WT_CURSOR *c = curwrap.Get();
+        const BSONObj& finalKey = stripFieldNames( key );
+        fprintf(stderr, "inserting into index %s: %s (%s)\n", c->uri, finalKey.jsonString().c_str(), loc.toString().c_str());
+        c->set_key(c, _toItem(finalKey).Get(), _toItem(loc).Get());
+        c->set_value(c, &emptyItem);
+        int ret = c->insert(c);
+        invariant(ret == 0);
+        return Status::OK();
     }
 
     bool WiredTigerIndex::unindex(OperationContext* txn, const BSONObj& key, const DiskLoc& loc) {
@@ -266,7 +266,7 @@ namespace mongo {
             ret = c->get_key(c, &keyItem, &locItem);
             invariant(ret == 0);
             if (key != BSONObj(static_cast<const char *>(keyItem.data)))
-		ret = WT_NOTFOUND;
+                ret = WT_NOTFOUND;
         }
         if (ret == WT_NOTFOUND) {
             _eof = true;
@@ -280,17 +280,17 @@ namespace mongo {
     bool WiredTigerIndex::IndexCursor::locate(const BSONObj &key, const DiskLoc& loc) {
         int ret;
 
-	// Empty keys mean go to the beginning
+        // Empty keys mean go to the beginning
         if (key.isEmpty()) {
-	    WT_CURSOR *c = _cursor.Get();
+            WT_CURSOR *c = _cursor.Get();
             ret = c->reset(c);
-	    invariant(ret == 0);
+            invariant(ret == 0);
             advance();
             return !isEOF();
         }
 
         const BSONObj& finalKey = stripFieldNames( key );
-	return _locate(finalKey, loc);
+        return _locate(finalKey, loc);
    }
 
     void WiredTigerIndex::IndexCursor::advanceTo(const BSONObj &keyBegin,
@@ -301,8 +301,8 @@ namespace mongo {
         // XXX I think these do the same thing????
 
         BSONObj key = IndexEntryComparison::makeQueryObject(
-			 keyBegin, keyBeginLen,
-			 afterKey, keyEnd, keyEndInclusive, getDirection() );
+                         keyBegin, keyBeginLen,
+                         afterKey, keyEnd, keyEndInclusive, getDirection() );
 
         _locate(key, DiskLoc());
     }
@@ -361,7 +361,7 @@ namespace mongo {
     SortedDataInterface::Cursor* WiredTigerIndex::newCursor(
             OperationContext* txn, int direction) const {
         invariant((direction == 1) || (direction == -1));
-        // XXX leak -- we need a session associated with the txn.
+        // XXX the cursor owns the session
         WiredTigerSession *session = new WiredTigerSession(_db.GetSession(), _db);
         return new IndexCursor(GetCursor(*session, true), *session, txn, direction == 1);
     }
@@ -392,9 +392,9 @@ namespace mongo {
         ~WiredTigerBuilderImpl() { }
 
         Status addKey(const BSONObj& key, const DiskLoc& loc) {
-	    Status s = _idx.insert(_txn, key, loc, _dupsAllowed);
-	    if (s.isOK())
-		_count++;
+            Status s = _idx.insert(_txn, key, loc, _dupsAllowed);
+            if (s.isOK())
+                _count++;
             return s;
         }
 

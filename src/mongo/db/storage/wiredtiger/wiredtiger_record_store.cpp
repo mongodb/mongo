@@ -309,8 +309,7 @@ namespace mongo {
                                                    ) const {
         invariant( start == DiskLoc() );
         invariant( !tailable );
-        //
-        // XXX leak -- we need a session associated with the txn.
+        // XXX the iterator owns the session
         WiredTigerSession *session = new WiredTigerSession(_db.GetSession(), _db);
         return new Iterator(*this, *session, dir);
     }
@@ -438,8 +437,8 @@ namespace mongo {
         : _rs( rs ),
           _session( session ),
           _dir( dir ),
-          // XXX not using a snapshot here
-          _cursor(rs.GetCursor(session), session),
+          // XXX not using a snapshot here, cursor owns the session
+          _cursor(rs.GetCursor(session), session, true),
           _eof( true ) {
         (void)getNext();
     }
