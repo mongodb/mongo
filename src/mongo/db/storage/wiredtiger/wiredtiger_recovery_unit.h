@@ -30,23 +30,59 @@
 
 #pragma once
 
+#include "mongo/db/operation_context.h"
 #include "mongo/db/storage/recovery_unit.h"
 
 namespace mongo {
 
     class WiredTigerRecoveryUnit : public RecoveryUnit {
         public:
-        WiredTigerRecoveryUnit() {
-            rollbackPossible = true;
+        WiredTigerRecoveryUnit(WiredTigerDatabase &db, bool defaultCommit) :
+                _session(db),
+                _defaultCommit(defaultCommit),
+                _depth(0),
+                _begun(false) {}
+
+        virtual ~WiredTigerRecoveryUnit() {
+            if (_defaultCommit) {
+                commitUnitOfWork();
+            } else if (_depth > 0) {
+                WT_SESSION *s = _session.Get();
+                int ret = s->rollback_transaction(s, NULL);
+                invariant(ret == 0);
+            }
         }
 
-        virtual void beginUnitOfWork() {}
-        virtual void commitUnitOfWork() {}
+        virtual void beginUnitOfWork() {
+            if (_depth++ > 0)
+                return;
+            WT_SESSION *s = _session.Get();
+            int ret = s->begin_transaction(s, NULL);
+            invariant(ret == 0);
+            _begun = true;
+        }
 
-        virtual void endUnitOfWork() {}
+        virtual void commitUnitOfWork() {
+            WT_SESSION *s = _session.Get();
+            if (_begun) {
+                int ret = s->commit_transaction(s, NULL);
+                invariant(ret == 0);
+                _begun = false;
+            }
+        }
+
+        virtual void endUnitOfWork() {
+            invariant(_depth > 0);
+            if (--_depth > 0)
+                return;
+            commitUnitOfWork();
+        }
 
         virtual bool commitIfNeeded(bool force = false) {
-            return false;
+            if (!isCommitNeeded())
+                return false;
+            commitUnitOfWork();
+            return true;
         }
 
         virtual bool awaitCommit() {
@@ -65,7 +101,17 @@ namespace mongo {
 
         virtual void syncDataAndTruncateJournal() {}
 
-        bool rollbackPossible;
+        WiredTigerSession& GetSession() { return _session; }
+
+        static WiredTigerRecoveryUnit& Get(OperationContext *txn) {
+            return *dynamic_cast<WiredTigerRecoveryUnit*>(txn->recoveryUnit());
+        }
+
+    private:
+        WiredTigerSession _session;
+        bool _defaultCommit;
+        int _depth;
+        bool _begun;
     };
 
 }

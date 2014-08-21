@@ -41,22 +41,21 @@
 
 namespace mongo {
 
-    WiredTigerEngine::WiredTigerEngine( const std::string &path) : _path( path ) {
-            int ret = wiredtiger_open(path.c_str(), NULL,
-                 "create,extensions=[local=(entry=index_collator_extension)]", &_wt_conn);
-            invariant(ret == 0);
-    }
+    WiredTigerEngine::WiredTigerEngine( const std::string &path) : _path( path ), _db(0) {
+        WT_CONNECTION *conn;
 
-    RecoveryUnit* WiredTigerEngine::newRecoveryUnit( OperationContext* opCtx ) {
-        return new WiredTigerRecoveryUnit();
+        int ret = wiredtiger_open(path.c_str(), NULL,
+            "create,extensions=[local=(entry=index_collator_extension)]", &conn);
+        invariant(ret == 0);
+        _db = new WiredTigerDatabase(conn);
     }
 
     void WiredTigerEngine::cleanShutdown( OperationContext* opCtx) {
         for ( DBMap::const_iterator i = _dbs.begin(); i != _dbs.end(); ++i) {
             delete i->second;
         } 
-        int ret = _wt_conn->close(_wt_conn, NULL);
-        invariant ( ret == 0 );
+        delete _db;
+        _db = 0;
     }
 
     void WiredTigerEngine::listDatabases( std::vector<std::string>* out ) const {
@@ -90,16 +89,18 @@ namespace mongo {
                                                                 const StringData& dbName ) {
         boost::mutex::scoped_lock lk( _dbLock );
 
-        WiredTigerDatabaseCatalogEntry*& db = _dbs[dbName.toString()];
-        if ( !db ) {
-            // The WiredTigerDatabase lifespan is currently tied to a
-            // WiredTigerDatabaseCatalogEntry. In future we may want to split
-            // that out
-            WiredTigerDatabase *database = new WiredTigerDatabase(_wt_conn);
-            db = new WiredTigerDatabaseCatalogEntry( dbName, *database );
-            _dbs[dbName.toString()] = db;
+        WiredTigerDatabaseCatalogEntry*& dbentry = _dbs[dbName.toString()];
+        if ( !dbentry ) {
+            dbentry = new WiredTigerDatabaseCatalogEntry( dbName, *_db );
+            _dbs[dbName.toString()] = dbentry;
         }
-        return db;
+        return dbentry;
     }
 
+    RecoveryUnit* WiredTigerEngine::newRecoveryUnit( OperationContext* opCtx ) {
+        // Sometimes we're called before the database is open: don't even try.
+        if (!_db)
+            return 0;
+        return new WiredTigerRecoveryUnit(*_db, true);
+    }
 }

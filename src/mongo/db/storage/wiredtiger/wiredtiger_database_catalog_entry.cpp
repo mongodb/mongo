@@ -69,7 +69,6 @@ namespace mongo {
             delete i->second;
         }
         _entryMap.clear();
-        delete &_db;
     }
 
     bool WiredTigerDatabaseCatalogEntry::isEmpty() const {
@@ -190,7 +189,6 @@ namespace mongo {
                                                         const CollectionOptions& options,
                                                         bool allocateDefaultSpace ) {
         initCollectionNamespaces();
-        dynamic_cast<WiredTigerRecoveryUnit*>( opCtx->recoveryUnit() )->rollbackPossible = false;
         boost::mutex::scoped_lock lk( _entryMapLock );
         Entry*& entry = _entryMap[ ns.toString() ];
         if ( entry )
@@ -236,7 +234,6 @@ namespace mongo {
                                                       const StringData& ns ) {
         //TODO: invariant( opCtx->lockState()->isWriteLocked( ns ) );
 
-        dynamic_cast<WiredTigerRecoveryUnit*>( opCtx->recoveryUnit() )->rollbackPossible = false;
         boost::mutex::scoped_lock lk( _entryMapLock );
         EntryMap::iterator i = _entryMap.find( ns.toString() );
 

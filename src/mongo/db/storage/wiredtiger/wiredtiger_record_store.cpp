@@ -40,7 +40,7 @@ namespace mongo {
     int WiredTigerRecordStore::Create(WiredTigerDatabase &db,
             const StringData &ns, const CollectionOptions &options, bool allocateDefaultSpace) {
         WiredTigerSession swrap(db.GetSession(), db);
-        WT_SESSION *s(swrap.Get());
+        WT_SESSION *s = swrap.Get();
         return s->create(s, _getURI(ns).c_str(), "type=file,key_format=u,value_format=u");
     }
 
@@ -119,7 +119,7 @@ namespace mongo {
     }
 
     void WiredTigerRecordStore::deleteRecord( OperationContext* txn, const DiskLoc& loc ) {
-        WiredTigerSession swrap(_db);
+        WiredTigerSession &swrap = WiredTigerRecoveryUnit::Get(txn).GetSession();
         WiredTigerCursor curwrap(GetCursor(swrap), swrap);
         WT_CURSOR *c = curwrap.Get();
         c->set_key(c, _makeKey(loc).Get());
@@ -156,7 +156,7 @@ namespace mongo {
         if (!cappedAndNeedDelete())
             return;
 
-        WiredTigerSession swrap(_db);
+        WiredTigerSession &swrap = WiredTigerRecoveryUnit::Get(txn).GetSession();
         WiredTigerCursor curwrap(GetCursor(swrap), swrap);
         WT_CURSOR *c = curwrap.Get();
         int ret = c->next(c);
@@ -188,7 +188,7 @@ namespace mongo {
                                        "object to insert exceeds cappedMaxSize" );
         }
 
-        WiredTigerSession swrap(_db);
+        WiredTigerSession &swrap = WiredTigerRecoveryUnit::Get(txn).GetSession();
         WiredTigerCursor curwrap(GetCursor(swrap), swrap);
         WT_CURSOR *c = curwrap.Get();
         DiskLoc loc = _nextId();
@@ -219,7 +219,7 @@ namespace mongo {
         boost::shared_array<char> buf( new char[len] );
         doc->writeDocument( buf.get() );
 
-        WiredTigerSession swrap(_db);
+        WiredTigerSession &swrap = WiredTigerRecoveryUnit::Get(txn).GetSession();
         WiredTigerCursor curwrap(GetCursor(swrap), swrap);
         WT_CURSOR *c = curwrap.Get();
         DiskLoc loc = _nextId();
@@ -243,7 +243,7 @@ namespace mongo {
                                                         int len,
                                                         bool enforceQuota,
                                                         UpdateMoveNotifier* notifier ) {
-        WiredTigerSession swrap(_db);
+        WiredTigerSession &swrap = WiredTigerRecoveryUnit::Get(txn).GetSession();
         WiredTigerCursor curwrap(GetCursor(swrap), swrap);
         WT_CURSOR *c = curwrap.Get();
         c->set_key(c, _makeKey(loc).Get());
@@ -256,6 +256,7 @@ namespace mongo {
 
         int old_length = old_value.size;
 
+        c->set_key(c, _makeKey(loc).Get());
         c->set_value(c, WiredTigerItem(data, len).Get());
         ret = c->insert(c);
         invariant(ret == 0);
@@ -272,7 +273,7 @@ namespace mongo {
                                                 const char* damangeSource,
                                                 const mutablebson::DamageVector& damages ) {
         // get original value
-        WiredTigerSession swrap(_db);
+        WiredTigerSession &swrap = WiredTigerRecoveryUnit::Get(txn).GetSession();
         WiredTigerCursor curwrap(GetCursor(swrap), swrap);
         WT_CURSOR *c = curwrap.Get();
         c->set_key(c, _makeKey(loc).Get());
@@ -309,9 +310,9 @@ namespace mongo {
                                                    ) const {
         invariant( start == DiskLoc() );
         invariant( !tailable );
-        // XXX the iterator owns the session
-        WiredTigerSession *session = new WiredTigerSession(_db.GetSession(), _db);
-        return new Iterator(*this, *session, dir);
+
+        WiredTigerSession &swrap = WiredTigerRecoveryUnit::Get(txn).GetSession();
+        return new Iterator(*this, swrap, dir);
     }
 
 
@@ -345,8 +346,8 @@ namespace mongo {
                                       RecordStoreCompactAdaptor* adaptor,
                                       const CompactOptions* options,
                                       CompactStats* stats ) {
-        WiredTigerSession swrap(_db.GetSession(), _db);
-        WT_SESSION *s(swrap.Get());
+        WiredTigerSession &swrap = WiredTigerRecoveryUnit::Get(txn).GetSession();
+        WT_SESSION *s = swrap.Get();
         int ret = s->compact(s, GetURI().c_str(), NULL);
         invariant(ret == 0);
         return Status::OK();
@@ -437,8 +438,7 @@ namespace mongo {
         : _rs( rs ),
           _session( session ),
           _dir( dir ),
-          // XXX not using a snapshot here, cursor owns the session
-          _cursor(rs.GetCursor(session), session, true),
+          _cursor(rs.GetCursor(session), session),
           _eof( true ) {
         (void)getNext();
     }

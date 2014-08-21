@@ -36,6 +36,7 @@
 
 #include "mongo/db/storage/wiredtiger/wiredtiger_engine.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_index.h"
+#include "mongo/db/storage/wiredtiger/wiredtiger_recovery_unit.h"
 
 namespace mongo {
     static const WiredTigerItem emptyItem(NULL, 0);
@@ -160,7 +161,7 @@ namespace mongo {
         if (!dupsAllowed && isDup(txn, key, loc))
             return dupKeyError(key);
 
-        WiredTigerSession swrap(_db);
+        WiredTigerSession &swrap = WiredTigerRecoveryUnit::Get(txn).GetSession();
         WiredTigerCursor curwrap(GetCursor(swrap), swrap);
         WT_CURSOR *c = curwrap.Get();
         const BSONObj& finalKey = stripFieldNames( key );
@@ -176,7 +177,7 @@ namespace mongo {
         invariant(loc.isValid());
         invariant(!hasFieldNames(key));
 
-        WiredTigerSession swrap(_db);
+        WiredTigerSession &swrap = WiredTigerRecoveryUnit::Get(txn).GetSession();
         WiredTigerCursor curwrap(GetCursor(swrap), swrap);
         WT_CURSOR *c = curwrap.Get();
         const BSONObj& finalKey = stripFieldNames( key );
@@ -354,9 +355,9 @@ namespace mongo {
     SortedDataInterface::Cursor* WiredTigerIndex::newCursor(
             OperationContext* txn, int direction) const {
         invariant((direction == 1) || (direction == -1));
-        // XXX the cursor owns the session
-        WiredTigerSession *session = new WiredTigerSession(_db.GetSession(), _db);
-        return new IndexCursor(GetCursor(*session, true), *session, txn, direction == 1);
+
+        WiredTigerSession &swrap = WiredTigerRecoveryUnit::Get(txn).GetSession();
+        return new IndexCursor(GetCursor(swrap, true), swrap, txn, direction == 1);
     }
 
     Status WiredTigerIndex::initAsEmpty(OperationContext* txn) {

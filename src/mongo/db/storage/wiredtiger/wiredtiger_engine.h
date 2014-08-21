@@ -74,7 +74,7 @@ namespace mongo {
 
     private:
         std::string _path;
-        WT_CONNECTION *_wt_conn;
+        WiredTigerDatabase *_db;
 
         mutable boost::mutex _dbLock;
         typedef std::map<std::string, WiredTigerDatabaseCatalogEntry *> DBMap;
