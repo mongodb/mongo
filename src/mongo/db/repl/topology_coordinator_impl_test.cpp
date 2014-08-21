@@ -781,7 +781,8 @@ namespace {
         ASSERT_EQUALS(ourOpTime, OpTime(response4["opTime"].timestampValue()));
         ASSERT_FALSE(response4["fresher"].Bool());
         ASSERT_TRUE(response4["veto"].Bool());
-        ASSERT_EQUALS("h1:27017 has lower priority than hself:27017", response4["errmsg"].String());
+        ASSERT_EQUALS("h1:27017 has lower priority of 1 than h3:27017 which has a priority of 10",
+                      response4["errmsg"].String());
 
 
         // Test trying to elect a node that isn't electable
@@ -800,12 +801,14 @@ namespace {
         ASSERT_EQUALS(ourOpTime, OpTime(response5["opTime"].timestampValue()));
         ASSERT_FALSE(response5["fresher"].Bool());
         ASSERT_TRUE(response5["veto"].Bool());
-        ASSERT_EQUALS("I don't think h3:27017 is electable", response5["errmsg"].String());
+        ASSERT_EQUALS(
+            "I don't think h3:27017 is electable because the member is not currently a secondary",
+            response5["errmsg"].String());
 
 
         // Finally, test trying to elect a valid node
-        args.id = 10;
-        args.who = HostAndPort("hself");
+        args.id = 40;
+        args.who = HostAndPort("h3");
 
         h3Info.setUpValues(now, MemberState::RS_SECONDARY, OpTime(0, 0), ourOpTime, "", "");
         topocoord.updateHeartbeatData(now++, h3Info, 40, ourOpTime);
@@ -816,11 +819,11 @@ namespace {
         ASSERT_OK(status6);
         BSONObj response6 = responseBuilder6.obj();
         cout << response6.jsonString(TenGen, 1);
-        ASSERT_FALSE(response6.hasField("info"));
+        ASSERT_FALSE(response6.hasField("info")) << response6.toString();
         ASSERT_EQUALS(ourOpTime, OpTime(response6["opTime"].timestampValue()));
-        ASSERT_FALSE(response6["fresher"].Bool());
-        ASSERT_FALSE(response6["veto"].Bool());
-        ASSERT_FALSE(response6.hasField("errmsg"));
+        ASSERT_FALSE(response6["fresher"].Bool()) << response6.toString();
+        ASSERT_FALSE(response6["veto"].Bool()) << response6.toString();
+        ASSERT_FALSE(response6.hasField("errmsg")) << response6.toString();
     }
 }  // namespace
 }  // namespace repl
