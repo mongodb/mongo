@@ -30,6 +30,7 @@
 
 #include <set>
 
+#include "mongo/db/json.h"
 #include "mongo/db/catalog/index_catalog_entry.h"
 #include "mongo/db/index/index_descriptor.h"
 
@@ -97,7 +98,6 @@ namespace mongo {
                         cmp = -1;
                 else if (cmp > 0)
                         cmp = 1;
-                fprintf(stderr, "index cmp: %s (%s) vs %s (%s) => %d\n", lhs.key.jsonString().c_str(), lhs.loc.toString().c_str(), rhs.key.jsonString().c_str(), rhs.loc.toString().c_str(), cmp);
                 return cmp;
             }
 
@@ -119,14 +119,14 @@ namespace mongo {
 
     extern "C" int index_collator_customize(WT_COLLATOR *coll, WT_SESSION *s, const char *uri, WT_CONFIG_ITEM *metadata, WT_COLLATOR **collp) {
             fprintf(stderr, "custom collator for %s\n", uri);
-            *collp = new WiredTigerIndexCollator(Ordering::make(BSONObj()));
+            IndexDescriptor desc(0, "unknown", fromjson(std::string(metadata->str, metadata->len)));
+            *collp = new WiredTigerIndexCollator(Ordering::make(desc.keyPattern()));
             return 0;
     }
 
     extern "C" int index_collator_extension(WT_CONNECTION *conn, WT_CONFIG_ARG *cfg) {
             static WT_COLLATOR idx_static;
 
-            fprintf(stderr, "index_collator_extension running\n");
             idx_static.customize = index_collator_customize;
             return conn->add_collator(conn, "mongo_index", &idx_static, NULL);
     }
@@ -144,9 +144,10 @@ namespace mongo {
             const std::string &ns, const std::string &idxName, IndexCatalogEntry& info) {
         WiredTigerSession swrap(db.GetSession(), db);
         WT_SESSION *s(swrap.Get());
-        fprintf(stderr, "Creating index: %s (%s)\n", idxName.c_str(), info.descriptor()->infoObj().jsonString().c_str());
-        return s->create(s, _getURI(ns, idxName).c_str(),
-            "type=file,key_format=uu,value_format=u,collator=mongo_index");
+        std::string config = "type=file,key_format=uu,value_format=u,collator=mongo_index,app_metadata=";
+        config += info.descriptor()->infoObj().jsonString();
+        fprintf(stderr, "Creating index: %s (%s)\n", idxName.c_str(), config.c_str());
+        return s->create(s, _getURI(ns, idxName).c_str(), config.c_str());
     }
 
     Status WiredTigerIndex::insert(OperationContext* txn,
@@ -165,7 +166,6 @@ namespace mongo {
         WiredTigerCursor curwrap(GetCursor(swrap), swrap);
         WT_CURSOR *c = curwrap.Get();
         const BSONObj& finalKey = stripFieldNames( key );
-        fprintf(stderr, "inserting into index %s: %s (%s)\n", c->uri, finalKey.jsonString().c_str(), loc.toString().c_str());
         c->set_key(c, _toItem(finalKey).Get(), _toItem(loc).Get());
         c->set_value(c, &emptyItem);
         int ret = c->insert(c);
@@ -256,7 +256,6 @@ namespace mongo {
         int cmp = -1, ret;
         c->set_key(c, _toItem(key).Get(), _toItem(loc).Get());
         ret = c->search_near(c, &cmp);
-        fprintf(stderr, "searching index, search_near returned (%d, %d)\n", ret, cmp);
 
         // Make sure we land on a matching key
         if (ret == 0 && (_forward ? cmp < 0 : cmp > 0))
