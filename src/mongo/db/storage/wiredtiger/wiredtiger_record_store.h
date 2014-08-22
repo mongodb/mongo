@@ -172,7 +172,7 @@ namespace mongo {
             bool _eof;
         };
 
-        static WiredTigerRecoveryUnit* _getRecoveryUnit( OperationContext* opCtx );
+        static WiredTigerRecoveryUnit* _getRecoveryUnit( OperationContext* txn );
         static WiredTigerItem _makeKey(const DiskLoc &loc);
         static std::string _getURI(const StringData &ns) {
             return "table:" + ns.toString();

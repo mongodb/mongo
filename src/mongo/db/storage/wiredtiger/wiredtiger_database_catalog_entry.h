@@ -44,26 +44,26 @@ namespace mongo {
 
     class WiredTigerDatabaseCatalogEntry : public DatabaseCatalogEntry {
     public:
-        WiredTigerDatabaseCatalogEntry( const StringData& name, WiredTigerDatabase &_db );
+        WiredTigerDatabaseCatalogEntry( WiredTigerDatabase &db, OperationContext* txn, const StringData& name );
 
         virtual ~WiredTigerDatabaseCatalogEntry();
 
         virtual bool exists() const { return true; }
         virtual bool isEmpty() const;
 
-        virtual void appendExtraStats( OperationContext* opCtx,
+        virtual void appendExtraStats( OperationContext* txn,
                                        BSONObjBuilder* out,
                                        double scale ) const;
 
         // these are hacks :(
-        virtual bool isOlderThan24( OperationContext* opCtx ) const { return false; }
-        virtual void markIndexSafe24AndUp( OperationContext* opCtx ) { }
+        virtual bool isOlderThan24( OperationContext* txn ) const { return false; }
+        virtual void markIndexSafe24AndUp( OperationContext* txn ) { }
 
         /**
          * @return true if current files on disk are compatibile with the current version.
          *              if we return false, then an upgrade will be required
          */
-        virtual bool currentFilesCompatible( OperationContext* opCtx ) const { return true; }
+        virtual bool currentFilesCompatible( OperationContext* txn ) const { return true; }
 
         // ----
 
@@ -90,15 +90,15 @@ namespace mongo {
                                          const StringData& toNS,
                                          bool stayTemp );
 
-        virtual Status dropCollection( OperationContext* opCtx,
+        virtual Status dropCollection( OperationContext* txn,
                                        const StringData& ns );
 
         // Called by the engine when dropping a database.
-        Status dropAllCollections( OperationContext* opCtx );
+        Status dropAllCollections( OperationContext* txn );
 
     private:
 
-        void initCollectionNamespaces();
+        void initCollectionNamespaces( OperationContext *txn );
         struct IndexEntry {
             std::string name;
             BSONObj spec;

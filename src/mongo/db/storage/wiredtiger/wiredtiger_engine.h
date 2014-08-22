@@ -49,9 +49,9 @@ namespace mongo {
 
         virtual ~WiredTigerEngine() {}
 
-        virtual void cleanShutdown( OperationContext* opCtx );
+        virtual void cleanShutdown( OperationContext* txn );
 
-        virtual RecoveryUnit* newRecoveryUnit( OperationContext* opCtx );
+        virtual RecoveryUnit* newRecoveryUnit( OperationContext* txn );
 
         virtual void listDatabases( std::vector<std::string>* out ) const;
 
@@ -59,7 +59,7 @@ namespace mongo {
 
         virtual Status dropDatabase(OperationContext*, const StringData&);
 
-        virtual DatabaseCatalogEntry* getDatabaseCatalogEntry( OperationContext* opCtx,
+        virtual DatabaseCatalogEntry* getDatabaseCatalogEntry( OperationContext* txn,
                                                                const StringData& db );
 
         /**

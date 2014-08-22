@@ -50,7 +50,7 @@ namespace mongo {
         _db = new WiredTigerDatabase(conn);
     }
 
-    void WiredTigerEngine::cleanShutdown( OperationContext* opCtx) {
+    void WiredTigerEngine::cleanShutdown( OperationContext* txn ) {
         for ( DBMap::const_iterator i = _dbs.begin(); i != _dbs.end(); ++i) {
             delete i->second;
         } 
@@ -85,22 +85,20 @@ namespace mongo {
         return Status::OK();
     }
 
-    DatabaseCatalogEntry* WiredTigerEngine::getDatabaseCatalogEntry( OperationContext* opCtx,
+    DatabaseCatalogEntry* WiredTigerEngine::getDatabaseCatalogEntry( OperationContext* txn,
                                                                 const StringData& dbName ) {
         boost::mutex::scoped_lock lk( _dbLock );
 
         WiredTigerDatabaseCatalogEntry*& dbentry = _dbs[dbName.toString()];
         if ( !dbentry ) {
-            dbentry = new WiredTigerDatabaseCatalogEntry( dbName, *_db );
+            dbentry = new WiredTigerDatabaseCatalogEntry( *_db, txn, dbName );
             _dbs[dbName.toString()] = dbentry;
         }
         return dbentry;
     }
 
-    RecoveryUnit* WiredTigerEngine::newRecoveryUnit( OperationContext* opCtx ) {
-        // Sometimes we're called before the database is open: don't even try.
-        if (!_db)
-            return 0;
+    RecoveryUnit* WiredTigerEngine::newRecoveryUnit( OperationContext* txn ) {
+        invariant(_db);
         return new WiredTigerRecoveryUnit(*_db, true);
     }
 }

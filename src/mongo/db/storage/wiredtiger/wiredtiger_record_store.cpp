@@ -409,8 +409,8 @@ namespace mongo {
         return loc;
     }
 
-    WiredTigerRecoveryUnit* WiredTigerRecordStore::_getRecoveryUnit( OperationContext* opCtx ) {
-        return dynamic_cast<WiredTigerRecoveryUnit*>( opCtx->recoveryUnit() );
+    WiredTigerRecoveryUnit* WiredTigerRecordStore::_getRecoveryUnit( OperationContext* txn ) {
+        return dynamic_cast<WiredTigerRecoveryUnit*>( txn->recoveryUnit() );
     }
 
     void WiredTigerRecordStore::_changeNumRecords( OperationContext* txn, bool insert ) {

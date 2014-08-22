@@ -53,7 +53,8 @@
 namespace mongo {
 
     WiredTigerDatabaseCatalogEntry::WiredTigerDatabaseCatalogEntry(
-                const StringData& name, WiredTigerDatabase &db )
+                WiredTigerDatabase &db, OperationContext *txn,
+                const StringData& name )
         : DatabaseCatalogEntry( name ), _db(db) {
             // If the catalog hasn't been created, nothing to do.
             boost::filesystem::path dbpath =
@@ -61,7 +62,7 @@ namespace mongo {
             if ( !boost::filesystem::exists( dbpath ) )
                 return;
 
-            initCollectionNamespaces();
+            initCollectionNamespaces(txn);
     }
 
     WiredTigerDatabaseCatalogEntry::~WiredTigerDatabaseCatalogEntry() {
@@ -76,13 +77,13 @@ namespace mongo {
         return _entryMap.empty();
     }
 
-    void WiredTigerDatabaseCatalogEntry::appendExtraStats( OperationContext* opCtx,
+    void WiredTigerDatabaseCatalogEntry::appendExtraStats( OperationContext* txn,
                                                       BSONObjBuilder* out,
                                                       double scale ) const {
     }
 
     CollectionCatalogEntry* WiredTigerDatabaseCatalogEntry::getCollectionCatalogEntry(
-            OperationContext* opCtx,
+            OperationContext* txn,
             const StringData& ns ) const {
         boost::mutex::scoped_lock lk( _entryMapLock );
         EntryMap::const_iterator i = _entryMap.find( ns.toString() );
@@ -91,7 +92,7 @@ namespace mongo {
         return i->second;
     }
 
-    RecordStore* WiredTigerDatabaseCatalogEntry::getRecordStore( OperationContext* opCtx,
+    RecordStore* WiredTigerDatabaseCatalogEntry::getRecordStore( OperationContext* txn,
                                                             const StringData& ns ) {
         boost::mutex::scoped_lock lk( _entryMapLock );
         EntryMap::iterator i = _entryMap.find( ns.toString() );
@@ -100,18 +101,19 @@ namespace mongo {
         return i->second->rs.get();
     }
 
-    void WiredTigerDatabaseCatalogEntry::initCollectionNamespaces() {
-        int ret;
-        const char *key;
-        WT_SESSION *session = _db.GetSession();
+    void WiredTigerDatabaseCatalogEntry::initCollectionNamespaces( OperationContext* txn ) {
         boost::mutex::scoped_lock lk( _entryMapLock );
 
         /* Only do this once. */
         if (!_entryMap.empty())
             return;
 
+        WiredTigerSession &swrap = WiredTigerRecoveryUnit::Get(txn).GetSession();
+        WT_SESSION *session = swrap.Get();
+
         WT_CURSOR *c;
-        ret = session->open_cursor(session, "metadata:", NULL, NULL, &c);
+        const char *key;
+        int ret = session->open_cursor(session, "metadata:", NULL, NULL, &c);
         invariant(ret == 0);
         std::string table_prefix = "table:" + name();
         while ((ret = c->next(c)) == 0) {
@@ -172,7 +174,6 @@ namespace mongo {
             }
         }
         invariant(ret == WT_NOTFOUND || ret == 0);
-        _db.ReleaseSession(session);
         name();
     }
 
@@ -184,11 +185,11 @@ namespace mongo {
         }
     }
 
-    Status WiredTigerDatabaseCatalogEntry::createCollection( OperationContext* opCtx,
+    Status WiredTigerDatabaseCatalogEntry::createCollection( OperationContext* txn,
                                                         const StringData& ns,
                                                         const CollectionOptions& options,
                                                         bool allocateDefaultSpace ) {
-        initCollectionNamespaces();
+        initCollectionNamespaces(txn);
         boost::mutex::scoped_lock lk( _entryMapLock );
         Entry*& entry = _entryMap[ ns.toString() ];
         if ( entry )
@@ -216,46 +217,49 @@ namespace mongo {
         return Status::OK();
     }
 
-    Status WiredTigerDatabaseCatalogEntry::dropAllCollections( OperationContext* opCtx ) {
+    Status WiredTigerDatabaseCatalogEntry::dropAllCollections( OperationContext* txn ) {
         // Ensure our namespace map is populated.
-        initCollectionNamespaces();
+        initCollectionNamespaces(txn);
         // Keep setting the iterator to the beginning since drop is removing entries
         // as it goes along
         for ( EntryMap::const_iterator i = _entryMap.begin();
             i != _entryMap.end(); i = _entryMap.begin() ) {
-            Status status = dropCollection(opCtx, i->first);
+            Status status = dropCollection(txn, i->first);
             if (!status.isOK()) 
                 return status;
         }
         return Status::OK();
     }
 
-    Status WiredTigerDatabaseCatalogEntry::dropCollection( OperationContext* opCtx,
+    Status WiredTigerDatabaseCatalogEntry::dropCollection( OperationContext* txn,
                                                       const StringData& ns ) {
-        //TODO: invariant( opCtx->lockState()->isWriteLocked( ns ) );
+        //TODO: invariant( txn->lockState()->isWriteLocked( ns ) );
 
         boost::mutex::scoped_lock lk( _entryMapLock );
         EntryMap::iterator i = _entryMap.find( ns.toString() );
 
-        if ( i == _entryMap.end() )
+        if ( i == _entryMap.end() ) {
+            fprintf(stderr, "dropCollection: entry not found for %s\n", ns.toString().c_str());
             return Status( ErrorCodes::NamespaceNotFound, "namespace not found" );
+        }
 
         Entry *entry = i->second;
         // Remove the underlying table from WiredTiger
-        WT_SESSION *session = _db.GetSession();
+        WiredTigerSession &swrap = WiredTigerRecoveryUnit::Get(txn).GetSession();
+        WT_SESSION *session = swrap.Get();
         int ret;
         std::string uri = "table:" + ns.toString();
         ret = session->drop(session, uri.c_str(), NULL);
-        // Find and drop any indexes.
-        _db.ReleaseSession(session);
         if (ret != 0)
             return Status( ErrorCodes::OperationFailed, "Collection drop failed" );
 
         std::vector<std::string> names;
         entry->getAllIndexes( &names );
-        std::vector<std::string>::const_iterator indexes;
-        for (indexes = names.begin(); indexes != names.end(); ++indexes) {
-            fprintf(stderr, "Index name: %s\n", (*indexes).c_str());
+        std::vector<std::string>::const_iterator idx;
+        for (idx = names.begin(); idx != names.end(); ++idx) {
+            fprintf(stderr, "dropping index %s\n", (*idx).c_str());
+            Status s = entry->removeIndex(txn, StringData(*idx));
+            invariant(s.isOK());
         }
         delete entry;
         _entryMap.erase( i );
@@ -393,6 +397,10 @@ namespace mongo {
 
     Status WiredTigerDatabaseCatalogEntry::Entry::removeIndex( OperationContext* txn,
                                                           const StringData& idxName ) {
+        WiredTigerSession &swrap = WiredTigerRecoveryUnit::Get(txn).GetSession();
+        WT_SESSION *session = swrap.Get();
+        int ret = session->drop(session, WiredTigerIndex::_getURI(ns().toString(), idxName.toString()).c_str(), "force");
+        invariant(ret == 0);
         indexes.erase( idxName.toString() );
         return Status::OK();
     }
