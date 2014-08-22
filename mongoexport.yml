@@ -54,8 +54,9 @@ functions:
         rm -rf mongodb
         mkdir mongodb
         cd mongodb
-        curl --silent ${mongo_url} --output mongodb.tgz
-        tar xvf mongodb.tgz --strip-components=1
+        curl -s ${mongo_url} --output mongodb.tgz
+        ${decompress} mongodb.tgz
+        mv ./mongodb-*/* .
 
   "start mongod":
     command: shell.exec
@@ -166,3 +167,12 @@ buildvariants:
   - name: dist
   - name: unit
 
+- name: solaris
+  display_name: Solaris
+  run_on:
+  - solaris
+  expansions:
+    mongo_url: https://fastdl.mongodb.org/sunos5/mongodb-sunos5-x86_64-2.6.4.tgz
+  tasks:
+  - name: dist
+  - name: unit

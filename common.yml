@@ -55,7 +55,8 @@ functions:
         mkdir mongodb
         cd mongodb
         curl -s ${mongo_url} --output mongodb.tgz
-        tar xvf mongodb.tgz --strip-components=1
+        ${decompress} mongodb.tgz
+        mv ./mongodb-*/* .
 
   "start mongod":
     command: shell.exec
@@ -224,7 +225,7 @@ buildvariants:
   run_on:
   - ubuntu1404-test
   expansions:
-    mongo_url: http://fastdl.mongodb.org/linux/mongodb-linux-x86_64-2.6.1.tgz
+    mongo_url: http://fastdl.mongodb.org/linux/mongodb-linux-x86_64-2.6.4.tgz
   tasks:
   - name: lint
   - name: db
@@ -255,7 +256,17 @@ buildvariants:
   run_on:
   - osx-108
   expansions:
-    mongo_url: https://fastdl.mongodb.org/osx/mongodb-osx-x86_64-latest.tgz
+    mongo_url: https://fastdl.mongodb.org/osx/mongodb-osx-x86_64-2.6.4.tgz
+  tasks:
+  - name: db
+  - name: util
+
+- name: solaris
+  display_name: Solaris
+  run_on:
+  - solaris
+  expansions:
+    mongo_url: https://fastdl.mongodb.org/sunos5/mongodb-sunos5-x86_64-2.6.4.tgz
   tasks:
   - name: db
   - name: util
