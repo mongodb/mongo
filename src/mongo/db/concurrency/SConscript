@@ -5,16 +5,32 @@ Import("env")
 env.Library(
     target='lock_mgr',
     source=[
-        'lock_mgr.cpp',
         'd_concurrency.cpp',
+        'lock_mgr.cpp',
+        'lock_mgr_new.cpp',
         'lock_stat.cpp',
         'lock_state.cpp'
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base/base',
-        '$BUILD_DIR/third_party/shim_boost',
         '$BUILD_DIR/mongo/foundation',
-        '$BUILD_DIR/mongo/server_parameters'
+        '$BUILD_DIR/mongo/global_environment_experiment',
+        '$BUILD_DIR/mongo/server_parameters',
+        '$BUILD_DIR/third_party/shim_boost',
     ],
 )
 
+env.CppUnitTest(
+    target='lock_mgr_test',
+    source=['lock_mgr_new_test.cpp',
+            'lock_state_test.cpp'
+    ],
+    LIBDEPS=[
+        'lock_mgr',
+        "$BUILD_DIR/mongo/coredb",
+        "$BUILD_DIR/mongo/coreserver",
+        '$BUILD_DIR/mongo/mongocommon',
+        '$BUILD_DIR/mongo/serveronly'
+    ],
+    NO_CRUTCH = True
+)

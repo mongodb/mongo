@@ -28,18 +28,165 @@
 *    it in the license file.
 */
 
-
 #pragma once
 
 #include "mongo/db/concurrency/d_concurrency.h"
+#include "mongo/db/concurrency/lock_mgr_new.h"
 
 
 namespace mongo {
 
     class Acquiring;
 
+
+namespace newlm {
+    
+    /**
+     * Notfication callback, which stores the last notification result and signals a condition
+     * variable, which can be waited on.
+     */
+    class CondVarLockGrantNotification : public LockGrantNotification {
+        MONGO_DISALLOW_COPYING(CondVarLockGrantNotification);
+    public:
+        CondVarLockGrantNotification();
+
+        /**
+         * Clears the object so it can be reused.
+         */
+        void clear();
+
+        /**
+         * Uninterruptible blocking method, which waits for the notification to fire.
+         */
+        LockResult wait();
+
+    private:
+
+        virtual void notify(const ResourceId& resId, LockResult result);
+
+        // These two go together to implement the conditional variable pattern.
+        boost::mutex _mutex;
+        boost::condition_variable _cond;
+
+        // Result from the last call to notify
+        LockResult _result;
+    };
+
+
+    /**
+     * Interface for acquiring locks. One of those objects will have to be instantiated for each
+     * request (transaction).
+     *
+     * Lock/unlock methods must always be called from a single thread.
+     *
+     * All instances reference a single global lock manager.
+     *
+     * TODO: At some point, this will have to be renamed to LockState.
+     */
+    class Locker {
+        MONGO_DISALLOW_COPYING(Locker);
+    public:
+
+        /**
+         * Instantiates a new lock space with the specified unique identifier used for
+         * disambiguation.
+         */
+        explicit Locker(uint64_t id);
+        ~Locker();
+
+        inline uint64_t getId() const { return _id; }
+
+        /**
+         * Shortcut for lockExtended, which blocks until a request is granted or deadlocked. Refer
+         * to the comments for lockExtended.
+         *
+         * @return All LockResults except for LOCK_WAITING, because it blocks.
+         */
+        LockResult lock(const ResourceId& resId, LockMode mode);
+
+        /**
+         * Acquires lock on the specified resource in the specified mode and returns the outcome
+         * of the operation. See the details for LockResult for more information on what the
+         * different results mean.
+         *
+         * Acquiring the same resource twice increments the reference count of the lock so each
+         * call to lock must be matched with a call to unlock.
+         *
+         * @param resId Id of the resource to be locked.
+         * @param mode Mode in which the resource should be locked. Lock upgrades are allowed.
+         * @param notify This value cannot be NULL. If the return value is not LOCK_WAITING, this
+         *               pointer can be freed and will not be used any more.
+         *
+         *               If the return value is LOCK_WAITING, the notification method will be
+         *               called at some point into the future, when the lock either becomes granted
+         *               or a deadlock is discovered. If unlock is called before the lock becomes
+         *               granted, the notification will not be invoked.
+         *
+         *               If the return value is LOCK_WAITING, the notification object *must* live
+         *               at least until the notfy method has been invoked or unlock has been called
+         *               for the resource it was assigned to. Failure to do so will cause the lock
+         *               manager to call into an invalid memory location.
+         */
+        LockResult lockExtended(const ResourceId& resId,
+                                LockMode mode,
+                                LockGrantNotification* notify);
+
+        /**
+         * Releases a lock previously acquired through a lock call. It is an error to try to
+         * release lock which has not been previously acquired (invariant violation).
+         */
+        void unlock(const ResourceId& resId);
+
+        /**
+         * Checks whether the lock held for a particular resource covers the specified mode.
+         *
+         * For example MODE_X covers MODE_S.
+         */
+        bool isLockHeldForMode(const ResourceId& resId, LockMode mode) const;
+
+        /**
+         * Dumps all locks, on the global lock manager to the log for debugging purposes.
+         */
+        static void dumpGlobalLockManager();
+
+
+        //
+        // Methods used for unit-testing only
+        //
+
+        /**
+         * Used for testing purposes only - changes the global lock manager. Doesn't delete the
+         * previous instance, so make sure that it doesn't leak.
+         */
+        static void changeGlobalLockManagerForTestingOnly(LockManager* newLockMgr);
+
+    private:
+
+        // Shortcut to do the lookup in _requests. Must be called with the spinlock acquired.
+        LockRequest* _find(const ResourceId& resId) const;
+
+
+        typedef std::map<const ResourceId, LockRequest*> LockRequestsMap;
+        typedef std::pair<const ResourceId, LockRequest*> LockRequestsPair;
+
+        const uint64_t _id;
+
+        // The only reason we have this spin lock here is for the diagnostic tools, which could
+        // iterate through the LockRequestsMap on a separate thread and need it to be stable.
+        // Apart from that, all accesses to the Locker are always from a single thread.
+        //
+        // This has to be locked inside const methods, hence the mutable.
+        mutable SpinLock _lock;
+        LockRequestsMap _requests;
+
+        CondVarLockGrantNotification _notify;
+    };
+    
+} // namespace newlm
+
+
     // per thread
-    class LockState {
+    class LockState : public newlm::Locker {
     public:
         LockState();
 
@@ -174,5 +321,4 @@ namespace mongo {
         LockState& _ls;
     };
 
-
-}
+} // namespace mongo

@@ -28,6 +28,8 @@
 *    it in the license file.
 */
 
+#include "mongo/platform/basic.h"
+
 #include "mongo/db/concurrency/lock_state.h"
 
 #include "mongo/db/namespace_string.h"
@@ -37,8 +39,11 @@
 
 namespace mongo {
 
+    static AtomicUInt64 idCounter(0);
+
     LockState::LockState() 
-        : _batchWriter(false),
+        : Locker(idCounter.addAndFetch(1)),
+          _batchWriter(false),
           _recursive(0),
           _threadState(0),
           _whichNestable( Lock::notnestable ),
@@ -308,4 +313,143 @@ namespace mongo {
         _ls._lockPendingParallelWriter = false;
     }
 
-}
+    
+namespace newlm {
+
+    /**
+     * Global lock manager instance.
+     */
+    static LockManager* globalLockManager = new LockManager();
+
+
+    //
+    // CondVarLockGrantNotification
+    //
+
+    CondVarLockGrantNotification::CondVarLockGrantNotification() {
+        clear();
+    }
+
+    void CondVarLockGrantNotification::clear() {
+        _result = LOCK_INVALID;
+    }
+
+    LockResult CondVarLockGrantNotification::wait() {
+        boost::unique_lock<boost::mutex> lock(_mutex);
+        while (_result == LOCK_INVALID) {
+            _cond.wait(lock);
+        }
+
+        return _result;
+    }
+
+    void CondVarLockGrantNotification::notify(const ResourceId& resId, LockResult result) {
+        boost::unique_lock<boost::mutex> lock(_mutex);
+        invariant(_result == LOCK_INVALID);
+        _result = result;
+
+        _cond.notify_all();
+    }
+
+
+    //
+    // Locker
+    //
+
+    Locker::Locker(uint64_t id) : _id(id) {
+
+    }
+
+    Locker::~Locker() {
+        // Cannot delete the Locker while there are still outstanding requests, because the
+        // LockManager may attempt to access deleted memory. Besides it is probably incorrect
+        // to delete with unaccounted locks anyways.
+        invariant(_requests.empty());
+    }
+
+    LockResult Locker::lock(const ResourceId& resId, LockMode mode) {
+        _notify.clear();
+
+        LockResult res = lockExtended(resId, mode, &_notify);
+        if (res == LOCK_WAITING) {
+            return _notify.wait();
+        }
+
+        return res;
+    }
+
+    LockResult Locker::lockExtended(const ResourceId& resId,
+                                    LockMode mode,
+                                    LockGrantNotification* notify) {
+        _lock.lock();
+
+        LockRequest* request = _find(resId);
+        if (request == NULL) {
+            request = new LockRequest();
+            request->initNew(resId, this, notify);
+
+            _requests.insert(LockRequestsPair(resId, request));
+        }
+        else {
+            request->notify = notify;
+        }
+
+        _lock.unlock();
+
+        return globalLockManager->lock(resId, request, mode);
+    }
+
+    void Locker::unlock(const ResourceId& resId) {
+        _lock.lock();
+        LockRequest* request = _find(resId);
+        invariant(request != NULL);
+        _lock.unlock();
+
+        // Lock and unlock are always called single-threadly, so it is safe to release the spin 
+        // lock, which protects the Locker here. The only thing which could alter the state of the
+        // request is deadlock detection, which however would synchronize on the 
+        // LockManager::unlock call.
+
+        globalLockManager->unlock(request);
+
+        _lock.lock();
+        if (request->recursiveCount == 0) {
+            const int numErased = _requests.erase(resId);
+            invariant(numErased == 1);
+
+            // TODO: At some point we might want to cache a couple of these at lease for the locks
+            // which are acquired frequently (Global/Flush/DB) in order to reduce the number of
+            // memory allocations.
+            delete request;
+        }
+        _lock.unlock();
+    }
+
+    bool Locker::isLockHeldForMode(const ResourceId& resId, LockMode mode) const {
+        scoped_spinlock scopedLock(_lock);
+
+        const LockRequest* request = _find(resId);
+        if (request == NULL) return false;
+
+        return request->mode >= mode;
+    }
+
+    // Static
+    void Locker::dumpGlobalLockManager() {
+        globalLockManager->dump();
+    }
+
+    LockRequest* Locker::_find(const ResourceId& resId) const {
+        LockRequestsMap::const_iterator it = _requests.find(resId);
+
+        if (it == _requests.end()) return NULL;
+        return it->second;
+    }
+
+    // Static
+    void Locker::changeGlobalLockManagerForTestingOnly(LockManager* newLockMgr) {
+        globalLockManager = newLockMgr;
+    }
+    
+} // namespace newlm
+} // namespace mongo
