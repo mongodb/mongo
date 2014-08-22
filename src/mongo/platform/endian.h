@@ -171,8 +171,6 @@ namespace endian {
                ((v & 0xFF00000000000000ULL) >> 56);
     }
 
-} // namespace endian
-
     template<typename T>
     struct ByteOrderConverter;
 
@@ -452,6 +450,7 @@ namespace endian {
         return ByteOrderConverter<T>::littleToNative(t);
     }
 
+} // namespace endian
 } // namespace mongo
 
 #undef MONGO_UINT16_SWAB

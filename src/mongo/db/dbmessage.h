@@ -155,15 +155,15 @@ namespace mongo {
             }
 
             void setCursorId(int64_t value) {
-                return storage().writeLE(value, offsetof(Layout, cursorId));
+                storage().writeLE(value, offsetof(Layout, cursorId));
             }
 
             void setStartingFrom(int32_t value) {
-                return storage().writeLE(value, offsetof(Layout, startingFrom));
+                storage().writeLE(value, offsetof(Layout, startingFrom));
             }
 
             void setNReturned(int32_t value) {
-                return storage().writeLE(value, offsetof(Layout, nReturned));
+                storage().writeLE(value, offsetof(Layout, nReturned));
             }
 
             int32_t getResultFlags() {
@@ -171,7 +171,7 @@ namespace mongo {
             }
 
             void setResultFlags(int32_t value) {
-                return DataView(msgdata().data()).writeLE(value);
+                DataView(msgdata().data()).writeLE(value);
             }
 
             void setResultFlagsToOk() {
