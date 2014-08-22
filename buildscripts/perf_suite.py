@@ -80,10 +80,15 @@ def configure_parser():
 # its not worth overengineering
 def make_suites(work_dir, report_dir):
     return [
-        file_allocator_bench("16GB", ntrials=8, megabytes=1024*16,
-                             path=work_dir, report_dir=report_dir),
+        # requires 128GB free in work_dir
+        # file_allocator_bench("16GB", ntrials=8, megabytes=1024*16,
+        #                      path=work_dir, report_dir=report_dir),
+
+        # requires 16GB free in work_dir
         file_allocator_bench("1GB", ntrials=16, megabytes=1024,
                              path=work_dir, report_dir=report_dir),
+
+        # requires 4GB free in work_dir
         file_allocator_bench("128MB", ntrials=32, megabytes=128,
                              path=work_dir, report_dir=report_dir)
     ]
