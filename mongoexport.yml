@@ -6,6 +6,7 @@ functions:
       script: |
         set -o verbose
         export GOPATH=`pwd`
+        ${preproc_gpm|echo} ./gpm
         ./gpm install
 
   "generate coverage html + text":
@@ -173,6 +174,17 @@ buildvariants:
   - solaris
   expansions:
     mongo_url: https://fastdl.mongodb.org/sunos5/mongodb-sunos5-x86_64-2.6.4.tgz
+  tasks:
+  - name: dist
+  - name: unit
+
+- name: windows-64
+  display_name: Windows-64
+  run_on:
+  - windows-64-vs2013-test
+  expansions:
+    mongo_url: https://fastdl.mongodb.org/win32/mongodb-win32-x86_64-2008plus-2.6.4.zip
+    preproc_gpm: "perl -pi -e 's/\r\n/\n/g' "
   tasks:
   - name: dist
   - name: unit
