@@ -72,7 +72,7 @@ echo
 for debian_dir in "$repodir"/apt/ubuntu "$repodir"/apt/debian
 do
   cd "$debian_dir"
-  for section_dir in $(find dists -type d -name multiverse -o name main)
+  for section_dir in $(find dists -type d -name multiverse -o -name main)
   do
     for arch_dir in "$section_dir"/{binary-i386,binary-amd64}
     do
