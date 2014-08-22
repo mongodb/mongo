@@ -42,6 +42,7 @@
 #include <sys/file.h>
 #endif
 
+#include "mongo/db/global_environment_d.h"   // XXX: for globalStorageEngine
 #include "mongo/db/mongod_options.h"
 #include "mongo/db/storage/mmap_v1/dur.h"
 #include "mongo/db/storage/mmap_v1/dur_commitjob.h"

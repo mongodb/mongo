@@ -41,8 +41,9 @@
 #include "mongo/base/status.h"
 #include "mongo/db/client.h"
 #include "mongo/db/concurrency/lock_state.h"
+#include "mongo/db/global_environment_d.h"
+#include "mongo/db/global_environment_experiment.h"
 #include "mongo/db/ops/update.h"
-#include "mongo/db/storage/storage_engine.h"
 #include "mongo/dbtests/dbtests.h"
 #include "mongo/dbtests/framework_options.h"
 #include "mongo/util/background.h"
@@ -113,7 +114,7 @@ namespace mongo {
             printOpenSSLVersion();
             printSysInfo();
 
-            initGlobalStorageEngine();
+            getGlobalEnvironment()->setGlobalStorageEngine(storageGlobalParams.engine);
 
             TestWatchDog twd;
             twd.go();

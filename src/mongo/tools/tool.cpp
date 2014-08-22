@@ -79,8 +79,6 @@ namespace mongo {
                 new AuthzManagerExternalStateMock()));
         repl::ReplSettings replSettings;
         repl::setGlobalReplicationCoordinator(new repl::ReplicationCoordinatorMock(replSettings));
-        // We don't use the noop environment here since we actually need the storage engine...
-        setGlobalEnvironment(new GlobalEnvironmentMongoD());
         return Status::OK();
     }
 
@@ -134,7 +132,7 @@ namespace mongo {
             Client::initThread("tools");
             storageGlobalParams.dbpath = toolGlobalParams.dbpath;
             try {
-                initGlobalStorageEngine();
+                getGlobalEnvironment()->setGlobalStorageEngine(storageGlobalParams.engine);
             }
             catch (const DBException& ex) {
                 if (ex.getCode() == ErrorCodes::DBPathInUse) {

@@ -45,6 +45,11 @@ namespace mongo {
 
         StorageEngine* getGlobalStorageEngine();
 
+        void setGlobalStorageEngine(const std::string& name);
+
+        void registerStorageEngine(const std::string& name,
+                                   const StorageEngine::Factory* factory);
+
         void setKillAllOperations();
 
         void unsetKillAllOperations();
@@ -73,6 +78,13 @@ namespace mongo {
 
         // protected by Client::clientsMutex
         std::vector<KillOpListenerInterface*> _killOpListeners;
+
+        // All possible storage engines are registered here through MONGO_INIT.
+        std::map<std::string, const StorageEngine::Factory*> _storageFactories;
     };
+
+    // TODO: This shouldn't be public.  Currently, the mmapv1 dur::startup() code relies on
+    // being able to access this as it (possibly) begins recovery immediately upon start-up.
+    extern StorageEngine* globalStorageEngine;
 
 }  // namespace mongo

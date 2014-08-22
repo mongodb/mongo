@@ -227,7 +227,7 @@ namespace mongo {
         }
 
         void RecoveryJob::_close() {
-            globalStorageEngine->flushAllFiles(true);
+            MongoFile::flushAll(true);
             _mmfs.clear();
         }
 

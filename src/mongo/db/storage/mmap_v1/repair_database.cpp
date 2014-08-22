@@ -240,8 +240,8 @@ namespace mongo {
 
             try {
                 _txn->recoveryUnit()->syncDataAndTruncateJournal();
-
-                globalStorageEngine->flushAllFiles(true); // need both in case journaling is disabled
+                // need both in case journaling is disabled
+                MongoFile::flushAll(true);
 
                 MONGO_ASSERT_ON_EXCEPTION( boost::filesystem::remove_all( _path ) );
             }
@@ -434,7 +434,8 @@ namespace mongo {
             }
 
             txn->recoveryUnit()->syncDataAndTruncateJournal();
-            globalStorageEngine->flushAllFiles(true); // need both in case journaling is disabled
+            // need both in case journaling is disabled
+            MongoFile::flushAll(true);
 
             txn->checkForInterrupt(false);
         }

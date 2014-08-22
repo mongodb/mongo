@@ -903,7 +903,7 @@ namespace mongo {
             }
 
             commitNow(txn);
-            globalStorageEngine->flushAllFiles(true);
+            MongoFile::flushAll(true);
             journalCleanup();
 
             verify(!haveJournalFiles()); // Double check post-conditions

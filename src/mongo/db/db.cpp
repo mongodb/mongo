@@ -586,7 +586,7 @@ namespace mongo {
             snmpInit();
         }
 
-        initGlobalStorageEngine();
+        getGlobalEnvironment()->setGlobalStorageEngine(storageGlobalParams.engine);
 
         boost::filesystem::remove_all(storageGlobalParams.dbpath + "/_tmp/");
 
@@ -832,11 +832,6 @@ MONGO_INITIALIZER_GENERAL(CreateAuthorizationManager,
     return Status::OK();
 }
 
-MONGO_INITIALIZER(SetGlobalConfigExperiment)(InitializerContext* context) {
-    setGlobalEnvironment(new GlobalEnvironmentMongoD());
-    return Status::OK();
-}
-
 namespace {
     repl::ReplSettings replSettings;
 } // namespace
@@ -847,7 +842,7 @@ namespace mongo {
     }
 } // namespace mongo
 
-MONGO_INITIALIZER_WITH_PREREQUISITES(CreateReplicationManager, ("SetGlobalConfigExperiment"))
+MONGO_INITIALIZER_WITH_PREREQUISITES(CreateReplicationManager, ("SetGlobalEnvironment"))
         (InitializerContext* context) {
     repl::setGlobalReplicationCoordinator(new repl::HybridReplicationCoordinator(replSettings));
     return Status::OK();

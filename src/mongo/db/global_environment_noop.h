@@ -34,6 +34,11 @@ namespace mongo {
     public:
         StorageEngine* getGlobalStorageEngine();
 
+        void setGlobalStorageEngine(const std::string& name);
+
+        void registerStorageEngine(const std::string& name,
+                                   const StorageEngine::Factory* factory);
+
         bool killOperation(unsigned int opId);
 
         void setKillAllOperations();

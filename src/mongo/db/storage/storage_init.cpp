@@ -28,45 +28,14 @@
 *    it in the license file.
 */
 
-#include "mongo/db/storage/storage_engine.h"
-
 #include "mongo/db/commands/server_status.h"
 #include "mongo/db/storage_options.h"
-#include "mongo/db/storage/heap1/heap1_engine.h"
-#include "mongo/db/storage/mmap_v1/mmap_v1_engine.h"
-#include "mongo/util/log.h"
 
 namespace mongo {
 
-    StorageEngine* globalStorageEngine = 0;
-
+    // TODO: Does this belong here?
     namespace {
-        std::map<std::string,const StorageEngine::Factory*> factorys;
-    } // namespace
 
-    void StorageEngine::registerFactory( const std::string& name,
-                                         const StorageEngine::Factory* factory ) {
-        invariant( factorys.count(name) == 0 );
-        factorys[name] = factory;
-    }
-
-    void initGlobalStorageEngine() {
-        // TODO these should use the StorageEngine::Factory system
-        if ( storageGlobalParams.engine == "mmapv1" ) {
-            globalStorageEngine = new MMAPV1Engine();
-        }
-        else if ( storageGlobalParams.engine == "heap1" ) {
-            globalStorageEngine = new Heap1Engine();
-        }
-        else {
-            const StorageEngine::Factory* factory = factorys[storageGlobalParams.engine];
-            uassert(18525, "unknown storage engine: " + storageGlobalParams.engine,
-                    factory);
-            globalStorageEngine = factory->create( storageGlobalParams );
-        }
-    }
-
-    namespace {
         class StorageSSS : public ServerStatusSection {
         public:
             StorageSSS() : ServerStatusSection( "storageEngine" ) {
@@ -81,6 +50,7 @@ namespace mongo {
             }
 
         } storageSSS;
-    }
-}
 
+    }  // namespace
+
+}  // namespace mongo

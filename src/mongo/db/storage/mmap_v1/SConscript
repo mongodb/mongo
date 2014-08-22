@@ -22,6 +22,7 @@ env.Library(
                "mmap_v1_database_catalog_entry.cpp",
                "mmap_v1_engine.cpp",
                "mmap_v1_extent_manager.cpp",
+               "mmap_v1_init.cpp",
                "repair_database.cpp",
              ],
     LIBDEPS = [

@@ -29,11 +29,11 @@
 #pragma once
 
 #include "mongo/base/disallow_copying.h"
+#include "mongo/db/storage/storage_engine.h"
 
 namespace mongo {
 
     class OperationContext;
-    class StorageEngine;
 
     /**
      * Classes that implement this interface can receive notification on killOp.
@@ -59,6 +59,22 @@ namespace mongo {
         MONGO_DISALLOW_COPYING(GlobalEnvironmentExperiment);
     public:
         virtual ~GlobalEnvironmentExperiment() { }
+
+        //
+        // Storage
+        //
+
+        /**
+         * Register a storage engine.  Called from a MONGO_INIT that depends on initializiation of
+         * the global environment.
+         */
+        virtual void registerStorageEngine(const std::string& name,
+                                           const StorageEngine::Factory* factory) = 0;
+
+        /**
+         * Set the storage engine.  The engine must have been registered via registerStorageEngine.
+         */
+        virtual void setGlobalStorageEngine(const std::string& name) = 0;
 
         /**
          * Return the storage engine instance we're using.
@@ -141,10 +157,6 @@ namespace mongo {
          * ProcessOperationContext::processOpContext for each.
          */
         virtual void forEachOperationContext(ProcessOperationContext* procOpCtx) = 0;
-
-        //
-        // Factories for storage interfaces
-        //
 
         /**
          * Returns a new OperationContext.  Caller owns pointer.

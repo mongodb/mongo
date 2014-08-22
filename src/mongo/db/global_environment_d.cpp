@@ -30,6 +30,8 @@
 
 #include <set>
 
+#include "mongo/base/init.h"
+#include "mongo/base/initializer.h"
 #include "mongo/db/client.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/operation_context_impl.h"
@@ -39,11 +41,16 @@
 
 namespace mongo {
 
+    StorageEngine* globalStorageEngine = 0;
+
+    MONGO_INITIALIZER(SetGlobalEnvironment)(InitializerContext* context) {
+        setGlobalEnvironment(new GlobalEnvironmentMongoD());
+        return Status::OK();
+    }
+
     GlobalEnvironmentMongoD::GlobalEnvironmentMongoD()
         : _globalKill(false),
-          _registeredOpContextsMutex("RegisteredOpContextsMutex") {
-
-    }
+          _registeredOpContextsMutex("RegisteredOpContextsMutex") { }
 
     GlobalEnvironmentMongoD::~GlobalEnvironmentMongoD() {
         if (!_registeredOpContexts.empty()) {
@@ -52,7 +59,32 @@ namespace mongo {
     }
 
     StorageEngine* GlobalEnvironmentMongoD::getGlobalStorageEngine() {
+        invariant(globalStorageEngine);
         return globalStorageEngine;
+    }
+
+    void GlobalEnvironmentMongoD::setGlobalStorageEngine(const std::string& name) {
+        // This should be set once.
+        invariant(!globalStorageEngine);
+
+        const StorageEngine::Factory* factory = _storageFactories[name];
+
+        uassert(18530, "cannot start database with an unknown storage engine: " + name, factory);
+        globalStorageEngine = factory->create(storageGlobalParams);
+    }
+
+    void GlobalEnvironmentMongoD::registerStorageEngine(const std::string& name,
+                                                        const StorageEngine::Factory* factory) {
+        // No double-registering.
+        invariant(0 == _storageFactories.count(name));
+
+        // Some sanity checks: the factory must exist,
+        invariant(factory);
+
+        // and all factories should be added before we pick a storage engine.
+        invariant(NULL == globalStorageEngine);
+
+        _storageFactories[name] = factory;
     }
 
     void GlobalEnvironmentMongoD::setKillAllOperations() {

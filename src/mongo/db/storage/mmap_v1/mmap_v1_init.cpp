@@ -5,6 +5,7 @@
  *    it under the terms of the GNU Affero General Public License, version 3,
  *    as published by the Free Software Foundation.
  *
+ *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
  *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
@@ -26,51 +27,31 @@
  *    it in the license file.
  */
 
-#include "mongo/db/global_environment_noop.h"
-
-#include "mongo/db/operation_context_noop.h"
+#include "mongo/base/init.h"
+#include "mongo/db/global_environment_experiment.h"
+#include "mongo/db/storage/mmap_v1/mmap_v1_engine.h"
+#include "mongo/db/storage_options.h"
 
 namespace mongo {
 
-    StorageEngine* GlobalEnvironmentNoop::getGlobalStorageEngine() {
-        return NULL;
-    }
+    namespace {
 
-    void GlobalEnvironmentNoop::setGlobalStorageEngine(const std::string& name) {
-    }
+        class MMAPV1Factory : public StorageEngine::Factory {
+        public:
+            virtual ~MMAPV1Factory() { }
+            virtual StorageEngine* create(const StorageGlobalParams& params) const {
+                return new MMAPV1Engine();
+            }
+        };
 
-    void GlobalEnvironmentNoop::registerStorageEngine(const std::string& name,
-                                                      const StorageEngine::Factory* factory) { }
+    } // namespace
 
-    void GlobalEnvironmentNoop::setKillAllOperations() { }
+    MONGO_INITIALIZER_WITH_PREREQUISITES(MMAPV1EngineInit,
+                                         ("SetGlobalEnvironment"))
+                                         (InitializerContext* context) {
 
-    void GlobalEnvironmentNoop::unsetKillAllOperations() { }
-
-    bool GlobalEnvironmentNoop::getKillAllOperations() {
-        return false;
-    }
-
-    bool GlobalEnvironmentNoop::killOperation(unsigned int opId) {
-        return false;
-    }
-
-    void GlobalEnvironmentNoop::registerKillOpListener(KillOpListenerInterface* listener) {
-    }
-
-    void GlobalEnvironmentNoop::registerOperationContext(OperationContext* txn) {
-
-    }
-
-    void GlobalEnvironmentNoop::unregisterOperationContext(OperationContext* txn) {
-
-    }
-
-    void GlobalEnvironmentNoop::forEachOperationContext(ProcessOperationContext* procOpCtx) {
-
-    }
-
-    OperationContext* GlobalEnvironmentNoop::newOpCtx() {
-        return new OperationContextNoop();
+        getGlobalEnvironment()->registerStorageEngine("mmapv1", new MMAPV1Factory());
+        return Status::OK();
     }
 
 }  // namespace mongo
