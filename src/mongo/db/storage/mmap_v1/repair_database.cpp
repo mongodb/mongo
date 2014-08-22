@@ -48,6 +48,7 @@
 #include "mongo/util/file_allocator.h"
 #include "mongo/util/log.h"
 #include "mongo/util/mmap.h"
+#include "mongo/util/scopeguard.h"
 
 namespace mongo {
 
@@ -313,6 +314,11 @@ namespace mongo {
 
             scoped_ptr<MMAPV1DatabaseCatalogEntry> dbEntry;
             scoped_ptr<Database> tempDatabase;
+
+            // Must syncDataAndTruncateJournal before closing files as done by
+            // MMAPV1DatabaseCatalogEntry's destructor.
+            ON_BLOCK_EXIT(&RecoveryUnit::syncDataAndTruncateJournal, txn->recoveryUnit());
+
             {
                 WriteUnitOfWork wunit(txn);
                 dbEntry.reset(new MMAPV1DatabaseCatalogEntry(txn,
