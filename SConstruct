@@ -729,7 +729,7 @@ elif linux:
 
 elif solaris:
      env.Append( CPPDEFINES=[ "__sunos__" ] )
-     env.Append( LIBS=["socket","resolv"] )
+     env.Append( LIBS=["socket","resolv","lgrp"] )
 
 elif freebsd:
     env.Append( LIBS=[ "kvm" ] )
