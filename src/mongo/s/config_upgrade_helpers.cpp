@@ -338,7 +338,6 @@ namespace mongo {
 
         BSONObjBuilder setObj;
         setObj << VersionType::minCompatibleVersion(minCompatibleVersion);
-        setObj << VersionType::version_DEPRECATED(minCompatibleVersion);
         setObj << VersionType::currentVersion(newVersion);
 
         BSONObjBuilder unsetObj;

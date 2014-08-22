@@ -161,28 +161,6 @@ namespace mongo {
         ASSERT_EQUALS(oldVersion.getCurrentVersion(), 0);
     }
 
-    TEST_F(ConfigUpgradeTests, LegacyVersion) {
-
-        //
-        // Tests detection of legacy config versions
-        //
-
-        for (int i = 1; i <= 3; i++) {
-
-            clearVersion();
-            clearShards(); // B/C version 1 is weird, needs other collections
-            storeLegacyConfigVersion(i);
-
-            // Legacy versions 2->3
-            VersionType oldVersion;
-            Status status = getConfigVersion(configSvr(), &oldVersion);
-            ASSERT(status.isOK());
-
-            ASSERT_EQUALS(oldVersion.getMinCompatibleVersion(), i);
-            ASSERT_EQUALS(oldVersion.getCurrentVersion(), i);
-        }
-    }
-
     TEST_F(ConfigUpgradeTests, ClusterIDVersion) {
 
         //
