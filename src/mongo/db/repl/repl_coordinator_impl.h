@@ -289,10 +289,25 @@ namespace repl {
         OpTime _getLastOpApplied_inlock();
 
         /*
-         * Returns true if the given writeConcern is satisfied up to "optime".
+         * Returns true if the given writeConcern is satisfied up to "optime" or is unsatisfiable.
          */
-        bool _opReplicatedEnough_inlock(const OpTime& opTime,
-                                        const WriteConcernOptions& writeConcern);
+        bool _doneWaitingForReplication_inlock(const OpTime& opTime,
+                                               const WriteConcernOptions& writeConcern);
+
+        /**
+         * Helper for _doneWaitingForReplication_inlock that takes an integer write concern.
+         */
+        bool _doneWaitingForReplication_numNodes_inlock(const OpTime& opTime, int numNodes);
+
+        /**
+         * Helper for _doneWaitingForReplication_inlock that takes a tag pattern representing a
+         * named write concern mode.
+         */
+        bool _doneWaitingForReplication_gleMode_inlock(const OpTime& opTime,
+                                                       const ReplicaSetTagPattern& tagPattern);
+
+        Status _checkIfWriteConcernCanBeSatisfied_inlock(
+                const WriteConcernOptions& writeConcern) const;
 
         /**
          * Processes each heartbeat response.

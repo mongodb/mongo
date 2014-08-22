@@ -346,7 +346,7 @@ namespace {
                 for (std::vector<WaiterInfo*>::iterator it = _replicationWaiterList.begin();
                         it != _replicationWaiterList.end(); ++it) {
                     WaiterInfo* info = *it;
-                    if (_opReplicatedEnough_inlock(*info->opTime, *info->writeConcern)) {
+                    if (_doneWaitingForReplication_inlock(*info->opTime, *info->writeConcern)) {
                         info->condVar->notify_all();
                     }
                 }
@@ -374,32 +374,6 @@ namespace {
         return _slaveInfoMap[getMyRID(&txn)].opTime;
     }
 
-    bool ReplicationCoordinatorImpl::_opReplicatedEnough_inlock(
-            const OpTime& opId, const WriteConcernOptions& writeConcern) {
-        int numNodes;
-        if (!writeConcern.wMode.empty()) {
-            if (writeConcern.wMode != "majority") {
-                return true; // TODO(spencer): Handle tags
-            }
-            numNodes = _rsConfig.getMajorityNumber();
-        }
-        else {
-            numNodes = writeConcern.wNumNodes;
-        }
-
-        for (SlaveInfoMap::iterator it = _slaveInfoMap.begin();
-                it != _slaveInfoMap.end(); ++it) {
-            const OpTime& slaveTime = it->second.opTime;
-            if (slaveTime >= opId) {
-                --numNodes;
-            }
-            if (numNodes <= 0) {
-                return true;
-            }
-        }
-        return false;
-    }
-
     void ReplicationCoordinatorImpl::interrupt(unsigned opId) {
         boost::lock_guard<boost::mutex> lk(_mutex);
         for (std::vector<WaiterInfo*>::iterator it = _replicationWaiterList.begin();
@@ -419,6 +393,70 @@ namespace {
             WaiterInfo* info = *it;
             info->condVar->notify_all();
         }
+    }
+
+    bool ReplicationCoordinatorImpl::_doneWaitingForReplication_inlock(
+            const OpTime& opTime, const WriteConcernOptions& writeConcern) {
+        if (!writeConcern.wMode.empty()) {
+            if (writeConcern.wMode == "majority") {
+                return _doneWaitingForReplication_numNodes_inlock(opTime,
+                                                                  _rsConfig.getMajorityNumber());
+            } else {
+                StatusWith<ReplicaSetTagPattern> tagPattern =
+                        _rsConfig.findCustomWriteMode(writeConcern.wMode);
+                if (!tagPattern.isOK()) {
+                    return true;
+                }
+                return _doneWaitingForReplication_gleMode_inlock(opTime, tagPattern.getValue());
+            }
+        }
+        else {
+            return _doneWaitingForReplication_numNodes_inlock(opTime, writeConcern.wNumNodes);
+        }
+    }
+
+    bool ReplicationCoordinatorImpl::_doneWaitingForReplication_numNodes_inlock(
+            const OpTime& opTime, int numNodes) {
+        for (SlaveInfoMap::iterator it = _slaveInfoMap.begin();
+                it != _slaveInfoMap.end(); ++it) {
+            const OpTime& slaveTime = it->second.opTime;
+            if (slaveTime >= opTime) {
+                --numNodes;
+            }
+            if (numNodes <= 0) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    bool ReplicationCoordinatorImpl::_doneWaitingForReplication_gleMode_inlock(
+            const OpTime& opTime, const ReplicaSetTagPattern& tagPattern) {
+        ReplicaSetTagMatch matcher(tagPattern);
+        for (SlaveInfoMap::iterator it = _slaveInfoMap.begin();
+                it != _slaveInfoMap.end(); ++it) {
+            const OpTime& slaveTime = it->second.opTime;
+            if (slaveTime >= opTime) {
+                // This node has reached the desired optime, now we need to check if it is a part
+                // of the tagPattern.
+                const MemberConfig* memberConfig = NULL;
+                if (it->first == getMyRID(NULL)) {
+                    memberConfig = &_rsConfig.getMemberAt(_thisMembersConfigIndex);
+                }
+                else {
+                    memberConfig = _rsConfig.findMemberByID(it->second.memberID);
+                }
+                invariant(memberConfig);
+                for (MemberConfig::TagIterator it = memberConfig->tagsBegin();
+                        it != memberConfig->tagsEnd(); ++it) {
+                    matcher.update(*it);
+                }
+            }
+            if (matcher.isSatisfied()) {
+                return true;
+            }
+        }
+        return false;
     }
 
     ReplicationCoordinator::StatusAndDuration ReplicationCoordinatorImpl::awaitReplication(
@@ -451,8 +489,7 @@ namespace {
         // Must hold _mutex before constructing waitInfo as it will modify _replicationWaiterList
         WaiterInfo waitInfo(
                 &_replicationWaiterList, txn->getOpID(), &opTime, &writeConcern, &condVar);
-
-        while (!_opReplicatedEnough_inlock(opTime, writeConcern)) {
+        while (!_doneWaitingForReplication_inlock(opTime, writeConcern)) {
             const int elapsed = timer.millis();
 
             try {
@@ -482,6 +519,11 @@ namespace {
                     condVar.timed_wait(lk, Milliseconds(writeConcern.wTimeout - elapsed));
                 }
             } catch (const boost::thread_interrupted&) {}
+        }
+
+        Status status = _checkIfWriteConcernCanBeSatisfied_inlock(writeConcern);
+        if (!status.isOK()) {
+            return StatusAndDuration(status, Milliseconds(timer.millis()));
         }
 
         return StatusAndDuration(Status::OK(), Milliseconds(timer.millis()));
@@ -1077,7 +1119,21 @@ namespace {
 
     Status ReplicationCoordinatorImpl::checkIfWriteConcernCanBeSatisfied(
             const WriteConcernOptions& writeConcern) const {
-        // TODO
+        boost::lock_guard<boost::mutex> lock(_mutex);
+        return _checkIfWriteConcernCanBeSatisfied_inlock(writeConcern);
+    }
+
+    Status ReplicationCoordinatorImpl::_checkIfWriteConcernCanBeSatisfied_inlock(
+                const WriteConcernOptions& writeConcern) const {
+        // TODO Finish implementing this
+
+        if (!writeConcern.wMode.empty() && writeConcern.wMode != "majority") {
+            StatusWith<ReplicaSetTagPattern> tagPatternStatus =
+                    _rsConfig.findCustomWriteMode(writeConcern.wMode);
+            if (!tagPatternStatus.isOK()) {
+                return tagPatternStatus.getStatus();
+            }
+        }
         return Status::OK();
     }
 

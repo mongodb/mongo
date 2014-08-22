@@ -387,40 +387,6 @@ namespace {
         ASSERT_EQUALS(ReplicationCoordinator::modeNone, getReplCoord()->getReplicationMode());
     }
 
-    TEST_F(ReplCoordTest, AwaitReplicationNumberBaseCases) {
-        init("");
-        OperationContextNoop txn;
-        OpTime time(1, 1);
-
-        WriteConcernOptions writeConcern;
-        writeConcern.wTimeout = WriteConcernOptions::kNoWaiting;
-        writeConcern.wNumNodes = 2;
-
-        // Because we didn't set ReplSettings.replSet, it will think we're a standalone so
-        // awaitReplication will always work.
-        ReplicationCoordinator::StatusAndDuration statusAndDur =
-                                        getReplCoord()->awaitReplication(&txn, time, writeConcern);
-        ASSERT_OK(statusAndDur.status);
-
-        // Now make us a master in master/slave
-        getReplCoord()->getSettings().master = true;
-
-        writeConcern.wNumNodes = 0;
-        writeConcern.wMode = "majority";
-        // w:majority always works on master/slave
-        statusAndDur = getReplCoord()->awaitReplication(&txn, time, writeConcern);
-        ASSERT_OK(statusAndDur.status);
-
-        // Now make us a replica set
-        getReplCoord()->getSettings().replSet = "mySet/node1:12345,node2:54321";
-
-        // Waiting for 1 nodes always works
-        writeConcern.wNumNodes = 1;
-        writeConcern.wMode = "";
-        statusAndDur = getReplCoord()->awaitReplication(&txn, time, writeConcern);
-        ASSERT_OK(statusAndDur.status);
-    }
-
     TEST_F(ReplCoordTest, CheckReplEnabledForCommandNotRepl) {
         // pass in settings to avoid having a replSet
         ReplSettings settings;
@@ -485,6 +451,40 @@ namespace {
         ASSERT_EQUALS(incrementedValue, initialValue + 1);
     }
 
+    TEST_F(ReplCoordTest, AwaitReplicationNumberBaseCases) {
+        init("");
+        OperationContextNoop txn;
+        OpTime time(1, 1);
+
+        WriteConcernOptions writeConcern;
+        writeConcern.wTimeout = WriteConcernOptions::kNoWaiting;
+        writeConcern.wNumNodes = 2;
+
+        // Because we didn't set ReplSettings.replSet, it will think we're a standalone so
+        // awaitReplication will always work.
+        ReplicationCoordinator::StatusAndDuration statusAndDur =
+                                        getReplCoord()->awaitReplication(&txn, time, writeConcern);
+        ASSERT_OK(statusAndDur.status);
+
+        // Now make us a master in master/slave
+        getReplCoord()->getSettings().master = true;
+
+        writeConcern.wNumNodes = 0;
+        writeConcern.wMode = "majority";
+        // w:majority always works on master/slave
+        statusAndDur = getReplCoord()->awaitReplication(&txn, time, writeConcern);
+        ASSERT_OK(statusAndDur.status);
+
+        // Now make us a replica set
+        getReplCoord()->getSettings().replSet = "mySet/node1:12345,node2:54321";
+
+        // Waiting for 1 nodes always works
+        writeConcern.wNumNodes = 1;
+        writeConcern.wMode = "";
+        statusAndDur = getReplCoord()->awaitReplication(&txn, time, writeConcern);
+        ASSERT_OK(statusAndDur.status);
+    }
+
     TEST_F(ReplCoordTest, AwaitReplicationNumberOfNodesNonBlocking) {
         assertStartSuccess(
                 BSON("_id" << "mySet" <<
@@ -531,6 +531,123 @@ namespace {
         ASSERT_OK(getReplCoord()->setLastOptime(&txn, client1, time2));
         statusAndDur = getReplCoord()->awaitReplication(&txn, time2, writeConcern);
         ASSERT_OK(statusAndDur.status);
+    }
+
+    TEST_F(ReplCoordTest, AwaitReplicationNamedModesNonBlocking) {
+        assertStartSuccess(
+                BSON("_id" << "mySet" <<
+                     "version" << 2 <<
+                     "members" << BSON_ARRAY(BSON("_id" << 0 <<
+                                                  "host" << "node0" <<
+                                                  "tags" << BSON("dc" << "NA" <<
+                                                                 "rack" << "rackNA1")) <<
+                                             BSON("_id" << 1 <<
+                                                  "host" << "node1" <<
+                                                  "tags" << BSON("dc" << "NA" <<
+                                                                 "rack" << "rackNA2")) <<
+                                             BSON("_id" << 2 <<
+                                                  "host" << "node2" <<
+                                                  "tags" << BSON("dc" << "NA" <<
+                                                                 "rack" << "rackNA3")) <<
+                                             BSON("_id" << 3 <<
+                                                  "host" << "node3" <<
+                                                  "tags" << BSON("dc" << "EU" <<
+                                                                 "rack" << "rackEU1")) <<
+                                             BSON("_id" << 4 <<
+                                                  "host" << "node4" <<
+                                                  "tags" << BSON("dc" << "EU" <<
+                                                                 "rack" << "rackEU2"))) <<
+                     "settings" << BSON("getLastErrorModes" <<
+                                        BSON("multiDC" << BSON("dc" << 2) <<
+                                             "multiDCAndRack" << BSON("dc" << 2 << "rack" << 3)))),
+                HostAndPort("node0"));
+
+        OperationContextNoop txn;
+        OID selfRID = getReplCoord()->getMyRID(&txn);
+        OID clientRID1 = OID::gen();
+        OID clientRID2 = OID::gen();
+        OID clientRID3 = OID::gen();
+        OID clientRID4 = OID::gen();
+        OpTime time1(1, 1);
+        OpTime time2(1, 2);
+
+        HandshakeArgs handshake1;
+        ASSERT_OK(handshake1.initialize(BSON("handshake" << clientRID1 << "member" << 1)));
+        getReplCoord()->processHandshake(&txn, handshake1);
+        HandshakeArgs handshake2;
+        ASSERT_OK(handshake2.initialize(BSON("handshake" << clientRID2 << "member" << 2)));
+        getReplCoord()->processHandshake(&txn, handshake2);
+        HandshakeArgs handshake3;
+        ASSERT_OK(handshake3.initialize(BSON("handshake" << clientRID3 << "member" << 3)));
+        getReplCoord()->processHandshake(&txn, handshake3);
+        HandshakeArgs handshake4;
+        ASSERT_OK(handshake4.initialize(BSON("handshake" << clientRID4 << "member" << 4)));
+        getReplCoord()->processHandshake(&txn, handshake4);
+
+        // Test invalid write concern
+        WriteConcernOptions invalidWriteConcern;
+        invalidWriteConcern.wTimeout = WriteConcernOptions::kNoWaiting;
+        invalidWriteConcern.wMode = "fakemode";
+
+        ReplicationCoordinator::StatusAndDuration statusAndDur =
+                getReplCoord()->awaitReplication(&txn, time1, invalidWriteConcern);
+        ASSERT_EQUALS(ErrorCodes::UnknownReplWriteConcern, statusAndDur.status);
+
+
+        // Set up valid write concerns for the rest of the test
+        WriteConcernOptions majorityWriteConcern;
+        majorityWriteConcern.wTimeout = WriteConcernOptions::kNoWaiting;
+        majorityWriteConcern.wMode = "majority";
+
+        WriteConcernOptions multiDCWriteConcern;
+        multiDCWriteConcern.wTimeout = WriteConcernOptions::kNoWaiting;
+        multiDCWriteConcern.wMode = "multiDC";
+
+        WriteConcernOptions multiRackWriteConcern;
+        multiRackWriteConcern.wTimeout = WriteConcernOptions::kNoWaiting;
+        multiRackWriteConcern.wMode = "multiDCAndRack";
+
+
+        // Nothing satisfied
+        getReplCoord()->setLastOptime(&txn, selfRID, time1);
+        statusAndDur = getReplCoord()->awaitReplication(&txn, time1, majorityWriteConcern);
+        ASSERT_EQUALS(ErrorCodes::ExceededTimeLimit, statusAndDur.status);
+        statusAndDur = getReplCoord()->awaitReplication(&txn, time1, multiDCWriteConcern);
+        ASSERT_EQUALS(ErrorCodes::ExceededTimeLimit, statusAndDur.status);
+        statusAndDur = getReplCoord()->awaitReplication(&txn, time1, multiRackWriteConcern);
+        ASSERT_EQUALS(ErrorCodes::ExceededTimeLimit, statusAndDur.status);
+
+        // Majority satisfied but not either custom mode
+        getReplCoord()->setLastOptime(&txn, clientRID1, time1);
+        getReplCoord()->setLastOptime(&txn, clientRID2, time1);
+
+        statusAndDur = getReplCoord()->awaitReplication(&txn, time1, majorityWriteConcern);
+        ASSERT_OK(statusAndDur.status);
+        statusAndDur = getReplCoord()->awaitReplication(&txn, time1, multiDCWriteConcern);
+        ASSERT_EQUALS(ErrorCodes::ExceededTimeLimit, statusAndDur.status);
+        statusAndDur = getReplCoord()->awaitReplication(&txn, time1, multiRackWriteConcern);
+        ASSERT_EQUALS(ErrorCodes::ExceededTimeLimit, statusAndDur.status);
+
+        // All modes satisfied
+        getReplCoord()->setLastOptime(&txn, clientRID3, time1);
+
+        statusAndDur = getReplCoord()->awaitReplication(&txn, time1, majorityWriteConcern);
+        ASSERT_OK(statusAndDur.status);
+        statusAndDur = getReplCoord()->awaitReplication(&txn, time1, multiDCWriteConcern);
+        ASSERT_OK(statusAndDur.status);
+        statusAndDur = getReplCoord()->awaitReplication(&txn, time1, multiRackWriteConcern);
+        ASSERT_OK(statusAndDur.status);
+
+        // multiDC satisfied but not majority or multiRack
+        getReplCoord()->setLastOptime(&txn, selfRID, time2);
+        getReplCoord()->setLastOptime(&txn, clientRID3, time2);
+
+        statusAndDur = getReplCoord()->awaitReplication(&txn, time2, majorityWriteConcern);
+        ASSERT_EQUALS(ErrorCodes::ExceededTimeLimit, statusAndDur.status);
+        statusAndDur = getReplCoord()->awaitReplication(&txn, time2, multiDCWriteConcern);
+        ASSERT_OK(statusAndDur.status);
+        statusAndDur = getReplCoord()->awaitReplication(&txn, time2, multiRackWriteConcern);
+        ASSERT_EQUALS(ErrorCodes::ExceededTimeLimit, statusAndDur.status);
     }
 
     /**
@@ -778,11 +895,6 @@ namespace {
         ReplicationCoordinator::StatusAndDuration statusAndDur = awaiter.getResult();
         ASSERT_EQUALS(ErrorCodes::Interrupted, statusAndDur.status);
         awaiter.reset();
-    }
-
-    TEST_F(ReplCoordTest, AwaitReplicationNamedModes) {
-        // TODO(spencer): Test awaitReplication with w:majority and tag groups
-        warning() << "Test ReplCoordTest.AwaitReplicationNamedModes needs to be written.";
     }
 
     TEST_F(ReplCoordTest, GetReplicationModeNone) {
