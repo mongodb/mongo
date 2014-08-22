@@ -2,23 +2,45 @@
 
 Import("env use_system_version_of_library windows darwin usev8 v8suffix solaris boostSuffix")
 
-thirdPartyIncludePathMap = {
-    'boost'      : '#/src/third_party/boost' + boostSuffix,
-    'gperftools' : '#/src/third_party/gperftools-2.2',
-    'pcre'       : '#/src/third_party/pcre-${PCRE_VERSION}',
-    's2'         : '#/src/third_party/s2',
-    'snappy'     : '#/src/third_party/snappy',
-    'stemmer'    : '#/src/third_party/libstemmer_c/include',
-    'tz'         : '#/src/third_party/tz',
-    'v8'         : '#/src/third_party/v8' + v8suffix + '/include',
-    'yaml'       : '#/src/third_party/yaml-cpp-0.5.1/include',
-}
+thirdPartyIncludePathList = [
+    ('s2', '#/src/third_party/s2'),
+    ('tz', '#/src/third_party/tz'),
+]
+
+if not use_system_version_of_library('tcmalloc'):
+    thirdPartyIncludePathList.append(
+        ('gperftools', '#/src/third_party/gperftools-2.2'))
+
+if not use_system_version_of_library('pcre'):
+    thirdPartyIncludePathList.append(
+        ('pcre', '#/src/third_party/pcre-${PCRE_VERSION}'))
+
+if not use_system_version_of_library('boost'):
+    thirdPartyIncludePathList.append(
+        ('boost', '#/src/third_party/boost' + boostSuffix))
+
+if not use_system_version_of_library('snappy'):
+    thirdPartyIncludePathList.append(
+        ('snappy', '#/src/third_party/snappy'))
+
+if not use_system_version_of_library('v8'):
+    thirdPartyIncludePathList.append(
+        ('v8', '#/src/third_party/v8' + v8suffix + '/include'))
+
+if not use_system_version_of_library('stemmer'):
+    thirdPartyIncludePathList.append(
+        ('stemmer', '#/src/third_party/libstemmer_c/include'))
+
+if not use_system_version_of_library('yaml'):
+    thirdPartyIncludePathList.append(
+        ('yaml', '#/src/third_party/yaml-cpp-0.5.1/include'))
 
 def injectAllThirdPartyIncludePaths(thisEnv):
-    thisEnv.AppendUnique(CPPPATH=thirdPartyIncludePathMap.values())
+    thisEnv.AppendUnique(CPPPATH=[entry[1] for entry in thirdPartyIncludePathList])
 
 def injectThirdPartyIncludePaths(thisEnv, libraries):
-    thisEnv.AppendUnique(CPPPATH=[thirdPartyIncludePathMap[lib] for lib in libraries])
+    thisEnv.AppendUnique(CPPPATH=[
+        entry[1] for entry in thirdPartyIncludePathList if entry[0] in libraries])
 
 env.AddMethod(injectAllThirdPartyIncludePaths, 'InjectAllThirdPartyIncludePaths')
 env.AddMethod(injectThirdPartyIncludePaths, 'InjectThirdPartyIncludePaths')
