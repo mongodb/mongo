@@ -55,7 +55,7 @@ namespace mongo {
         };
 
         // parseFrom() must be called before getGeometry() to ensure initialization of geoContainer
-        bool parseFrom(const BSONObj &obj);
+        Status parseFrom(const BSONObj &obj);
 
         std::string getField() const { return field; }
         Predicate getPred() const { return predicate; }

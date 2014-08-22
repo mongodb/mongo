@@ -61,3 +61,11 @@ var polyWithBiggerHole = {"type" : "Polygon", "coordinates": [
     ]
 };
 assert.writeError(t.insert({geo: polyWithBiggerHole}));
+
+// Test 6: Holes cannot share more than one vertex with exterior loop
+var polySharedVertices =  {"type" : "Polygon", "coordinates": [
+        [[0,0], [0,1], [1, 1], [1, 0], [0, 0]],
+        [[0,0], [0.1,0.9], [1, 1], [0.9, 0.1], [0, 0]]
+    ]
+};
+assert.writeError(t.insert({geo: polySharedVertices}));

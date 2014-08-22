@@ -93,11 +93,10 @@ namespace mongo {
         return Status::OK();
     }
 
-    bool GeoExpression::parseFrom(const BSONObj &obj) {
+    Status GeoExpression::parseFrom(const BSONObj &obj) {
         // Initialize geoContainer and parse BSON object
-        if (!parseQuery(obj).isOK()) {
-            return false;
-        }
+        Status status = parseQuery(obj);
+        if (!status.isOK()) return status;
 
         // Why do we only deal with $within {polygon}?
         // 1. Finding things within a point is silly and only valid
@@ -110,27 +109,34 @@ namespace mongo {
         // allow (a,b),(c,d) to be within (c,d),(a,b).  Anyway, punt on
         // this for now.
         if (GeoExpression::WITHIN == predicate && !geoContainer->supportsContains()) {
-            return false;
+            return Status(ErrorCodes::BadValue,
+                          str::stream() << "$within not supported with provided geometry: " << obj);
         }
 
         // Big polygon with strict winding order is represented as an S2Loop in SPHERE CRS.
         // So converting the query to SPHERE CRS makes things easier than projecting all the data
         // into STRICT_SPHERE CRS.
         if (STRICT_SPHERE == geoContainer->getNativeCRS()) {
-            if (!geoContainer->supportsProject(SPHERE))
-                return false;
+            if (!geoContainer->supportsProject(SPHERE)) {
+                return Status(ErrorCodes::BadValue,
+                              "only polygon supported with strict winding order");
+            }
             geoContainer->projectInto(SPHERE);
         }
 
         // $geoIntersect queries are hardcoded to *always* be in SPHERE CRS
         // TODO: This is probably bad semantics, should not do this
         if (GeoExpression::INTERSECT == predicate) {
-            if (!geoContainer->supportsProject(SPHERE))
-                return false;
+            if (!geoContainer->supportsProject(SPHERE)) {
+                return Status(ErrorCodes::BadValue,
+                              str::stream()
+                                      << "$geoIntersect not supported with provided geometry: "
+                                      << obj);
+            }
             geoContainer->projectInto(SPHERE);
         }
 
-        return true;
+        return Status::OK();
     }
 
     //

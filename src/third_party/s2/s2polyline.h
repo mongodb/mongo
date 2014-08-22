@@ -39,7 +39,8 @@ class S2Polyline : public S2Region {
   ~S2Polyline();
 
   // Return true if the given vertices form a valid polyline.
-  static bool IsValid(vector<S2Point> const& vertices);
+  // Output errors to "err" if it's not NULL.
+  static bool IsValid(vector<S2Point> const& vertices, string* err = NULL);
 
   int num_vertices() const { return num_vertices_; }
   S2Point const& vertex(int k) const {

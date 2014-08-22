@@ -76,12 +76,14 @@ class S2Polygon : public S2Region {
 
   // Return true if the given loops form a valid polygon.  Assumes that
   // all of the given loops have already been validated.
-  static bool IsValid(const vector<S2Loop*>& loops);
+  // Output errors to "err" if it's not NULL.
+  static bool IsValid(const vector<S2Loop*>& loops, string* err = NULL);
 
   // Return true if this is a valid polygon.  Note that in debug mode,
   // validity is checked at polygon creation time, so IsValid() should always
   // return true.
-  bool IsValid() const;
+  // If err is not NULL, output errors to it.
+  bool IsValid(string* err = NULL) const;
 
   // DEPRECATED.
   bool IsValid(bool check_loops, int max_adjacent) const;
@@ -222,7 +224,8 @@ class S2Polygon : public S2Region {
   // its parent loop.  Every polygon has a unique normalized form.  Normalized
   // polygons are useful for testing since it is easy to compare whether two
   // polygons represent the same region.
-  bool IsNormalized() const;
+  // Output errors into "err" if it's not NULL.
+  bool IsNormalized(string* err = NULL) const;
 
   // Return true if two polygons have the same boundary.  More precisely, this
   // method requires that both polygons have loops with the same cyclic vertex

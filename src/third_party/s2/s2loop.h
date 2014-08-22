@@ -79,7 +79,8 @@ class S2Loop : public S2Region {
   // Check whether this loop is valid.  Note that in debug mode, validity
   // is checked at loop creation time, so IsValid()
   // should always return true.
-  bool IsValid() const;
+  // If err is not NULL, output errors into it.
+  bool IsValid(string* err = NULL) const;
 
 
   // These two versions are deprecated and ignore max_adjacent.
