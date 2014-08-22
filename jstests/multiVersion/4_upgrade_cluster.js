@@ -6,8 +6,8 @@ load( './jstests/multiVersion/libs/multi_rs.js' )
 load( './jstests/multiVersion/libs/multi_cluster.js' )
 load( './jstests/libs/test_background_ops.js' )
 
-var oldVersion = "2.0"
-var newVersion = "2.2"
+var oldVersion = "last-stable";
+var newVersion = "latest";
 
 // BIG OUTER LOOP, RS CLUSTER OR NOT!
 for( var test = 0; test < 1; test++ ){

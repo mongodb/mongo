@@ -3,7 +3,7 @@
 load( './jstests/multiVersion/libs/multi_rs.js' );
 load( './jstests/multiVersion/libs/multi_cluster.js' );
 
-var oldVersion = "2.4";
+var oldVersion = "2.6";
 var newVersion = "latest";
 
 var options = {

@@ -1,7 +1,7 @@
 // Ensure the upgradeCheck() functions report errors where appropriate by running a 2.0 mongod
 // and connecting 2.0 mongo shell which creates a variety of documents and indexes some of which
-// are intentionally malformed by 2.6 standards. Then the latest (2.6) shell runs the upgradeCheck()
-// and asserts that problems are detected when and only when they exist.
+// are intentionally malformed by the latest standards. Then the latest shell runs the
+// upgradeCheck() and asserts that problems are detected when and only when they exist.
 
 var port = allocatePorts(1)[0];
 var mongodSource = MongoRunner.runMongod({binVersion : "2.0", port: port});
