@@ -489,7 +489,10 @@ namespace {
         assertStartSuccess(
                 BSON("_id" << "mySet" <<
                      "version" << 2 <<
-                     "members" << BSON_ARRAY(BSON("host" << "node1:12345" << "_id" << 0 ))),
+                     "members" << BSON_ARRAY(BSON("host" << "node1:12345" << "_id" << 0) <<
+                                             BSON("host" << "node2:12345" << "_id" << 1) <<
+                                             BSON("host" << "node3:12345" << "_id" << 2) <<
+                                             BSON("host" << "node4:12345" << "_id" << 3))),
                 HostAndPort("node1", 12345));
         OperationContextNoop txn;
 
@@ -498,6 +501,16 @@ namespace {
         OID client3 = OID::gen();
         OpTime time1(1, 1);
         OpTime time2(1, 2);
+
+        HandshakeArgs handshake1;
+        ASSERT_OK(handshake1.initialize(BSON("handshake" << client1 << "member" << 1)));
+        ASSERT_OK(getReplCoord()->processHandshake(&txn, handshake1));
+        HandshakeArgs handshake2;
+        ASSERT_OK(handshake2.initialize(BSON("handshake" << client2 << "member" << 2)));
+        ASSERT_OK(getReplCoord()->processHandshake(&txn, handshake2));
+        HandshakeArgs handshake3;
+        ASSERT_OK(handshake3.initialize(BSON("handshake" << client3 << "member" << 3)));
+        ASSERT_OK(getReplCoord()->processHandshake(&txn, handshake3));
 
         WriteConcernOptions writeConcern;
         writeConcern.wTimeout = WriteConcernOptions::kNoWaiting;
@@ -573,16 +586,16 @@ namespace {
 
         HandshakeArgs handshake1;
         ASSERT_OK(handshake1.initialize(BSON("handshake" << clientRID1 << "member" << 1)));
-        getReplCoord()->processHandshake(&txn, handshake1);
+        ASSERT_OK(getReplCoord()->processHandshake(&txn, handshake1));
         HandshakeArgs handshake2;
         ASSERT_OK(handshake2.initialize(BSON("handshake" << clientRID2 << "member" << 2)));
-        getReplCoord()->processHandshake(&txn, handshake2);
+        ASSERT_OK(getReplCoord()->processHandshake(&txn, handshake2));
         HandshakeArgs handshake3;
         ASSERT_OK(handshake3.initialize(BSON("handshake" << clientRID3 << "member" << 3)));
-        getReplCoord()->processHandshake(&txn, handshake3);
+        ASSERT_OK(getReplCoord()->processHandshake(&txn, handshake3));
         HandshakeArgs handshake4;
         ASSERT_OK(handshake4.initialize(BSON("handshake" << clientRID4 << "member" << 4)));
-        getReplCoord()->processHandshake(&txn, handshake4);
+        ASSERT_OK(getReplCoord()->processHandshake(&txn, handshake4));
 
         // Test invalid write concern
         WriteConcernOptions invalidWriteConcern;
@@ -714,7 +727,10 @@ namespace {
         assertStartSuccess(
                 BSON("_id" << "mySet" <<
                      "version" << 2 <<
-                     "members" << BSON_ARRAY(BSON("host" << "node1:12345" << "_id" << 0 ))),
+                     "members" << BSON_ARRAY(BSON("host" << "node1:12345" << "_id" << 0) <<
+                                             BSON("host" << "node2:12345" << "_id" << 1) <<
+                                             BSON("host" << "node3:12345" << "_id" << 2) <<
+                                             BSON("host" << "node4:12345" << "_id" << 3))),
                 HostAndPort("node1", 12345));
 
         OperationContextNoop txn;
@@ -725,6 +741,16 @@ namespace {
         OID client3 = OID::gen();
         OpTime time1(1, 1);
         OpTime time2(1, 2);
+
+        HandshakeArgs handshake1;
+        ASSERT_OK(handshake1.initialize(BSON("handshake" << client1 << "member" << 1)));
+        ASSERT_OK(getReplCoord()->processHandshake(&txn, handshake1));
+        HandshakeArgs handshake2;
+        ASSERT_OK(handshake2.initialize(BSON("handshake" << client2 << "member" << 2)));
+        ASSERT_OK(getReplCoord()->processHandshake(&txn, handshake2));
+        HandshakeArgs handshake3;
+        ASSERT_OK(handshake3.initialize(BSON("handshake" << client3 << "member" << 3)));
+        ASSERT_OK(getReplCoord()->processHandshake(&txn, handshake3));
 
         WriteConcernOptions writeConcern;
         writeConcern.wTimeout = WriteConcernOptions::kNoTimeout;
@@ -763,7 +789,9 @@ namespace {
         assertStartSuccess(
                 BSON("_id" << "mySet" <<
                      "version" << 2 <<
-                     "members" << BSON_ARRAY(BSON("host" << "node1:12345" << "_id" << 0 ))),
+                     "members" << BSON_ARRAY(BSON("host" << "node1:12345" << "_id" << 0) <<
+                                             BSON("host" << "node2:12345" << "_id" << 1) <<
+                                             BSON("host" << "node3:12345" << "_id" << 2))),
                 HostAndPort("node1", 12345));
         OperationContextNoop txn;
         ReplicationAwaiter awaiter(getReplCoord(), &txn);
@@ -772,6 +800,13 @@ namespace {
         OID client2 = OID::gen();
         OpTime time1(1, 1);
         OpTime time2(1, 2);
+
+        HandshakeArgs handshake1;
+        ASSERT_OK(handshake1.initialize(BSON("handshake" << client1 << "member" << 1)));
+        ASSERT_OK(getReplCoord()->processHandshake(&txn, handshake1));
+        HandshakeArgs handshake2;
+        ASSERT_OK(handshake2.initialize(BSON("handshake" << client2 << "member" << 2)));
+        ASSERT_OK(getReplCoord()->processHandshake(&txn, handshake2));
 
         WriteConcernOptions writeConcern;
         writeConcern.wTimeout = 50;
@@ -792,7 +827,9 @@ namespace {
         assertStartSuccess(
                 BSON("_id" << "mySet" <<
                      "version" << 2 <<
-                     "members" << BSON_ARRAY(BSON("host" << "node1:12345" << "_id" << 0 ))),
+                     "members" << BSON_ARRAY(BSON("host" << "node1:12345" << "_id" << 0) <<
+                                             BSON("host" << "node2:12345" << "_id" << 1) <<
+                                             BSON("host" << "node3:12345" << "_id" << 2))),
                 HostAndPort("node1", 12345));
         OperationContextNoop txn;
         ReplicationAwaiter awaiter(getReplCoord(), &txn);
@@ -801,6 +838,13 @@ namespace {
         OID client2 = OID::gen();
         OpTime time1(1, 1);
         OpTime time2(1, 2);
+
+        HandshakeArgs handshake1;
+        ASSERT_OK(handshake1.initialize(BSON("handshake" << client1 << "member" << 1)));
+        ASSERT_OK(getReplCoord()->processHandshake(&txn, handshake1));
+        HandshakeArgs handshake2;
+        ASSERT_OK(handshake2.initialize(BSON("handshake" << client2 << "member" << 2)));
+        ASSERT_OK(getReplCoord()->processHandshake(&txn, handshake2));
 
         WriteConcernOptions writeConcern;
         writeConcern.wTimeout = WriteConcernOptions::kNoTimeout;

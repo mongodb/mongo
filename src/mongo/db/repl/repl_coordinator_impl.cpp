@@ -332,14 +332,13 @@ namespace {
         {
             boost::lock_guard<boost::mutex> lk(_mutex);
 
-            // TODO(spencer): Assert that we've received a handshake for this node once the unit
-            // test is doing that correctly
-            OpTime& slaveOpTime = _slaveInfoMap[rid].opTime;
-            LOG(3) << "Node with RID " << rid << " currently has optime " << slaveOpTime <<
+            SlaveInfo& slaveInfo = _slaveInfoMap[rid];
+            invariant(slaveInfo.memberID >= 0 || _getReplicationMode_inlock() == modeMasterSlave);
+
+            LOG(3) << "Node with RID " << rid << " currently has optime " << slaveInfo.opTime <<
                     "; updating to " << ts;
-            if (slaveOpTime < ts) {
-                slaveOpTime = ts;
-                // TODO(spencer): update write concern tags if we're a replSet
+            if (slaveInfo.opTime < ts) {
+                slaveInfo.opTime = ts;
 
                 // Wake up any threads waiting for replication that now have their replication
                 // check satisfied
@@ -439,13 +438,7 @@ namespace {
             if (slaveTime >= opTime) {
                 // This node has reached the desired optime, now we need to check if it is a part
                 // of the tagPattern.
-                const MemberConfig* memberConfig = NULL;
-                if (it->first == getMyRID(NULL)) {
-                    memberConfig = &_rsConfig.getMemberAt(_thisMembersConfigIndex);
-                }
-                else {
-                    memberConfig = _rsConfig.findMemberByID(it->second.memberID);
-                }
+                const MemberConfig* memberConfig = _rsConfig.findMemberByID(it->second.memberID);
                 invariant(memberConfig);
                 for (MemberConfig::TagIterator it = memberConfig->tagsBegin();
                         it != memberConfig->tagsEnd(); ++it) {
@@ -693,16 +686,9 @@ namespace {
                 // SERVER-14550 Even though the "config" field isn't used on the other end in 2.8,
                 // we need to keep sending it for 2.6 compatibility.
                 // TODO(spencer): Remove this after 2.8 is released.
-                if (rid == getMyRID(txn)) {
-                    entry.append("config",
-                                 _rsConfig.getMemberAt(_thisMembersConfigIndex).toBSON(
-                                         _rsConfig.getTagConfig()));
-                }
-                else {
-                    const MemberConfig* member = _rsConfig.findMemberByID(info.memberID);
-                    fassert(18651, member); // We ensured the member existed in processHandshake.
-                    entry.append("config", member->toBSON(_rsConfig.getTagConfig()));
-                }
+                const MemberConfig* member = _rsConfig.findMemberByID(info.memberID);
+                fassert(18651, member); // We ensured the member existed in processHandshake.
+                entry.append("config", member->toBSON(_rsConfig.getTagConfig()));
             }
         }
     }
@@ -711,28 +697,10 @@ namespace {
             OperationContext* txn,
             std::vector<BSONObj>* handshakes) {
         boost::lock_guard<boost::mutex> lock(_mutex);
-        // handshake obj for us
-        BSONObjBuilder cmd;
-        cmd.append("replSetUpdatePosition", 1);
-        {
-            BSONObjBuilder sub (cmd.subobjStart("handshake"));
-            sub.append("handshake", getMyRID(txn));
-            sub.append("member", _thisMembersConfigIndex);
-            // SERVER-14550 Even though the "config" field isn't used on the other end in 2.8,
-            // we need to keep sending it for 2.6 compatibility.
-            // TODO(spencer): Remove this after 2.8 is released.
-            sub.append("config", _rsConfig.getMemberAt(_thisMembersConfigIndex).toBSON(
-                    _rsConfig.getTagConfig()));
-        }
-        handshakes->push_back(cmd.obj());
-
-        // handshake objs for all chained members
+        // handshake objs for ourself and all chained members
         for (SlaveInfoMap::const_iterator itr = _slaveInfoMap.begin();
              itr != _slaveInfoMap.end(); ++itr) {
             const OID& oid = itr->first;
-            if (oid == getMyRID(txn)) { // Already generated handshake for ourself
-                continue;
-            }
             BSONObjBuilder cmd;
             cmd.append("replSetUpdatePosition", 1);
             {
@@ -1027,6 +995,11 @@ namespace {
                  myIndex,
                  _replExecutor.now(),
                  _getLastOpApplied_inlock());
+
+         // Ensure that there's an entry in the _slaveInfoMap for ourself
+         _slaveInfoMap[getMyRID(NULL)].memberID = _rsConfig.getMemberAt(myIndex).getId();
+         _slaveInfoMap[getMyRID(NULL)].hostAndPort =
+                 _rsConfig.getMemberAt(myIndex).getHostAndPort();
          _startHeartbeats();
      }
 
