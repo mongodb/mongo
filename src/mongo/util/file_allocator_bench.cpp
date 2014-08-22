@@ -116,7 +116,13 @@ public:
             bytes_t size_allocated = _params.bytes;
             const ptime::ptime start = ptime::microsec_clock::universal_time();
 
-            _fa->allocateAsap(filePath.string(), size_allocated);
+            try {
+                _fa->allocateAsap(filePath.string(), size_allocated);
+            } catch (const DBException& ex) {
+                std::cerr << "Exception thrown while allocating file:"  << std::endl;
+                std::cerr << ex.what() << std::endl;
+                throw; // rethrow so that destructor is called
+            }
 
             if (size_allocated != static_cast<bytes_t>(_params.bytes)) {
                 std::cerr << "Allocated " << size_allocated << " bytes but expected "
@@ -291,8 +297,15 @@ Status storeFileAllocatorBenchOptions(const moe::Environment& env) {
 int main(int argc, char** argv, char** envp) {
     ::mongo::setupSynchronousSignalHandlers();
     ::mongo::runGlobalInitializersOrDie(argc, argv, envp);
-
-    FileAllocatorBenchmark(benchParams).run();
+    try {
+        // this try/catch block needs to exist so that
+        // std::terminate is not called and the FileAllocatorBenchmark
+        // destructor actually gets called...
+        FileAllocatorBenchmark(benchParams).run();
+    } catch (...) {
+        std::cerr << "Benchmark ended in failure." << std::endl;
+        ::_exit(EXIT_FAILURE);
+    }
     ::_exit(EXIT_SUCCESS);
 }
 
