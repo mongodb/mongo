@@ -48,7 +48,8 @@ namespace mongo {
 namespace repl {
 
 namespace {
-    const char configCollectionName[] = "local.system.replset";
+    // TODO: Change this to local.system.replset when we remove disable the hybrid coordinator.
+    const char configCollectionName[] = "local.new.replset";
     const char meCollectionName[] = "local.me";
 }  // namespace
 

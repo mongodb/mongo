@@ -86,6 +86,7 @@ namespace {
         }
 
     protected:
+        NetworkInterfaceMockWithMap* getNet() { return _net; }
         ReplicationCoordinatorImpl* getReplCoord() {return _repl.get();}
         TopologyCoordinatorImpl& getTopoCoord() {return *_topo;}
 
@@ -93,7 +94,7 @@ namespace {
             invariant(!_repl);
             invariant(!_callShutdown);
             _topo = new TopologyCoordinatorImpl(zeroSecs);
-            _net = new NetworkInterfaceMock;
+            _net = new NetworkInterfaceMockWithMap;
             _externalState = new ReplicationCoordinatorExternalStateMock;
             _repl.reset(new ReplicationCoordinatorImpl(_settings,
                                                        _externalState,
@@ -120,7 +121,7 @@ namespace {
 
             OperationContextNoop txn;
             _repl->startReplication(&txn);
-            _repl->waitForStartUp();
+            _repl->waitForStartUpComplete();
             _callShutdown = true;
         }
 
@@ -129,6 +130,14 @@ namespace {
                 init();
             }
             _externalState->setLocalConfigDocument(StatusWith<BSONObj>(configDoc));
+            _externalState->addSelf(selfHost);
+            start();
+        }
+
+        void start(const HostAndPort& selfHost) {
+            if (!_repl) {
+                init();
+            }
             _externalState->addSelf(selfHost);
             start();
         }
@@ -163,7 +172,7 @@ namespace {
         // Owned by ReplicationCoordinatorImpl
         TopologyCoordinatorImpl* _topo;
         // Owned by ReplicationCoordinatorImpl
-        NetworkInterfaceMock* _net;
+        NetworkInterfaceMockWithMap* _net;
         // Owned by ReplicationCoordinatorImpl
         ReplicationCoordinatorExternalStateMock* _externalState;
         ReplSettings _settings;
@@ -220,6 +229,164 @@ namespace {
         ASSERT_EQUALS(ReplicationCoordinator::modeNone, getReplCoord()->getReplicationMode());
     }
 
+    TEST_F(ReplCoordTest, InitiateFailsWithEmptyConfig) {
+        OperationContextNoop txn;
+        init("mySet");
+        start(HostAndPort("node1", 12345));
+        BSONObjBuilder result;
+        ASSERT_EQUALS(ErrorCodes::NoSuchKey,
+                      getReplCoord()->processReplSetInitiate(&txn, BSONObj(), &result));
+        ASSERT_EQUALS(ReplicationCoordinator::modeNone, getReplCoord()->getReplicationMode());
+    }
+
+    TEST_F(ReplCoordTest, InitiateSucceedsWithOneNodeConfig) {
+        OperationContextNoop txn;
+        init("mySet");
+        start(HostAndPort("node1", 12345));
+        ASSERT_EQUALS(ReplicationCoordinator::modeNone, getReplCoord()->getReplicationMode());
+
+        // Starting uninitialized, show that we can perform the initiate behavior.
+        BSONObjBuilder result1;
+        ASSERT_OK(getReplCoord()->processReplSetInitiate(
+                          &txn,
+                          BSON("_id" << "mySet" <<
+                               "version" << 1 <<
+                               "members" << BSON_ARRAY(
+                                       BSON("_id" << 0 << "host" << "node1:12345"))),
+                          &result1));
+        ASSERT_EQUALS(ReplicationCoordinator::modeReplSet, getReplCoord()->getReplicationMode());
+
+        // Show that initiate fails after it has already succeeded.
+        BSONObjBuilder result2;
+        ASSERT_EQUALS(ErrorCodes::AlreadyInitialized,
+                      getReplCoord()->processReplSetInitiate(
+                              &txn,
+                              BSON("_id" << "mySet" <<
+                                   "version" << 1 <<
+                                   "members" << BSON_ARRAY(
+                                           BSON("_id" << 0 << "host" << "node1:12345"))),
+                              &result2));
+
+        // Still in repl set mode, even after failed reinitiate.
+        ASSERT_EQUALS(ReplicationCoordinator::modeReplSet, getReplCoord()->getReplicationMode());
+    }
+
+    TEST_F(ReplCoordTest, InitiateSucceedsAfterFailing) {
+        OperationContextNoop txn;
+        init("mySet");
+        start(HostAndPort("node1", 12345));
+        BSONObjBuilder result;
+        ASSERT_EQUALS(ErrorCodes::NoSuchKey,
+                      getReplCoord()->processReplSetInitiate(&txn, BSONObj(), &result));
+        ASSERT_EQUALS(ReplicationCoordinator::modeNone, getReplCoord()->getReplicationMode());
+
+        // Having failed to initiate once, show that we can now initiate.
+        BSONObjBuilder result1;
+        ASSERT_OK(getReplCoord()->processReplSetInitiate(
+                          &txn,
+                          BSON("_id" << "mySet" <<
+                               "version" << 1 <<
+                               "members" << BSON_ARRAY(
+                                       BSON("_id" << 0 << "host" << "node1:12345"))),
+                          &result1));
+        ASSERT_EQUALS(ReplicationCoordinator::modeReplSet, getReplCoord()->getReplicationMode());
+    }
+
+    TEST_F(ReplCoordTest, InitiateFailsIfAlreadyInitialized) {
+        OperationContextNoop txn;
+        assertStart(
+                ReplicationCoordinator::modeReplSet,
+                BSON("_id" << "mySet" <<
+                     "version" << 2 <<
+                     "members" << BSON_ARRAY(BSON("_id" << 1 << "host" << "node1:12345"))),
+                HostAndPort("node1", 12345));
+        BSONObjBuilder result;
+        ASSERT_EQUALS(ErrorCodes::AlreadyInitialized,
+                      getReplCoord()->processReplSetInitiate(
+                              &txn,
+                              BSON("_id" << "mySet" <<
+                                   "version" << 2 <<
+                                   "members" << BSON_ARRAY(BSON("_id" << 1 <<
+                                                                "host" << "node1:12345"))),
+                              &result));
+    }
+
+    TEST_F(ReplCoordTest, InitiateFailsIfSelfMissing) {
+        OperationContextNoop txn;
+        BSONObjBuilder result;
+        init("mySet");
+        start(HostAndPort("node1", 12345));
+        ASSERT_EQUALS(ErrorCodes::NodeNotFound,
+                      getReplCoord()->processReplSetInitiate(
+                              &txn,
+                              BSON("_id" << "mySet" <<
+                                   "version" << 1 <<
+                                   "members" << BSON_ARRAY(
+                                           BSON("_id" << 0 << "host" << "node4"))),
+                              &result));
+    }
+
+    TEST_F(ReplCoordTest, InitiateFailsIfQuorumNotMet) {
+        OperationContextNoop txn;
+        init("mySet");
+        start(HostAndPort("node1", 12345));
+        ASSERT_EQUALS(ReplicationCoordinator::modeNone, getReplCoord()->getReplicationMode());
+
+        BSONObjBuilder result1;
+        ASSERT_EQUALS(
+                ErrorCodes::NodeNotFound,
+                getReplCoord()->processReplSetInitiate(
+                        &txn,
+                        BSON("_id" << "mySet" <<
+                             "version" << 1 <<
+                             "members" << BSON_ARRAY(
+                                     BSON("_id" << 0 << "host" << "node1:12345") <<
+                                     BSON("_id" << 1 << "host" << "node2:54321"))),
+                        &result1));
+        ASSERT_EQUALS(ReplicationCoordinator::modeNone, getReplCoord()->getReplicationMode());
+        getNet()->addResponse(
+                ReplicationExecutor::RemoteCommandRequest(
+                        HostAndPort("node2", 54321),
+                        "admin",
+                        BSON("replSetHeartbeat" << "mySet" <<
+                             "v" << 1 <<
+                             "pv" << 1 <<
+                             "checkEmpty" << true <<
+                             "from" << "node1:12345" <<
+                             "fromId" << 0)),
+                StatusWith<BSONObj>(BSON("ok" << 1)));
+
+        ASSERT_OK(
+                getReplCoord()->processReplSetInitiate(
+                        &txn,
+                        BSON("_id" << "mySet" <<
+                             "version" << 1 <<
+                             "members" << BSON_ARRAY(
+                                     BSON("_id" << 0 << "host" << "node1:12345") <<
+                                     BSON("_id" << 1 << "host" << "node2:54321"))),
+                        &result1));
+        ASSERT_EQUALS(ReplicationCoordinator::modeReplSet, getReplCoord()->getReplicationMode());
+    }
+
+    TEST_F(ReplCoordTest, InitiateFailsWithSetNameMismatch) {
+        OperationContextNoop txn;
+        init("mySet");
+        start(HostAndPort("node1", 12345));
+        ASSERT_EQUALS(ReplicationCoordinator::modeNone, getReplCoord()->getReplicationMode());
+
+        BSONObjBuilder result1;
+        ASSERT_EQUALS(
+                ErrorCodes::BadValue,
+                getReplCoord()->processReplSetInitiate(
+                        &txn,
+                        BSON("_id" << "wrongSet" <<
+                             "version" << 1 <<
+                             "members" << BSON_ARRAY(
+                                     BSON("_id" << 0 << "host" << "node1:12345"))),
+                        &result1));
+        ASSERT_EQUALS(ReplicationCoordinator::modeNone, getReplCoord()->getReplicationMode());
+    }
+
     TEST_F(ReplCoordTest, AwaitReplicationNumberBaseCases) {
         init("");
         OperationContextNoop txn;
@@ -254,7 +421,7 @@ namespace {
         ASSERT_OK(statusAndDur.status);
     }
 
-    TEST_F(ReplCoordTest, checkReplEnabledForCommandNotRepl) {
+    TEST_F(ReplCoordTest, CheckReplEnabledForCommandNotRepl) {
         // pass in settings to avoid having a replSet
         ReplSettings settings;
         init(settings);

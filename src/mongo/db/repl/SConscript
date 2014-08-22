@@ -59,7 +59,8 @@ env.Library('repl_coordinator_impl',
                      '$BUILD_DIR/mongo/server_options_core',
                      'repl_coordinator_interface',
                      'replica_set_messages',
-                     'replication_executor'
+                     'replication_executor',
+                     'rslog',
                  ])
 
 env.CppUnitTest('repl_coordinator_impl_test',

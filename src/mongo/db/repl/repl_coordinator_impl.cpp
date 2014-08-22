@@ -41,11 +41,11 @@
 #include "mongo/db/repl/master_slave.h"
 #include "mongo/db/repl/repl_set_heartbeat_args.h"
 #include "mongo/db/repl/repl_set_heartbeat_response.h"
-#include "mongo/db/repl/repl_set_seed_list.h"
 #include "mongo/db/repl/repl_settings.h"
 #include "mongo/db/repl/replica_set_config_checks.h"
 #include "mongo/db/repl/replication_executor.h"
 #include "mongo/db/repl/rs.h"
+#include "mongo/db/repl/rslog.h"
 #include "mongo/db/repl/topology_coordinator.h"
 #include "mongo/db/repl/update_position_args.h"
 #include "mongo/db/server_options.h"
@@ -53,15 +53,23 @@
 #include "mongo/stdx/functional.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/log.h"
+#include "mongo/util/scopeguard.h"
 #include "mongo/util/time_support.h"
 #include "mongo/util/timer.h"
 
 namespace mongo {
 namespace repl {
 
-    namespace {
-        typedef StatusWith<ReplicationExecutor::CallbackHandle> CBHStatus;
-    } //namespace
+namespace {
+    typedef StatusWith<ReplicationExecutor::CallbackHandle> CBHStatus;
+
+    void lockAndCall(boost::unique_lock<boost::mutex>* lk, const stdx::function<void ()>& fn) {
+        if (!lk->owns_lock()) {
+            lk->lock();
+        }
+        fn();
+    }
+} //namespace
 
     struct ReplicationCoordinatorImpl::WaiterInfo {
 
@@ -99,7 +107,7 @@ namespace repl {
         _replExecutor(network),
         _externalState(externalState),
         _inShutdown(false),
-        _isStartupComplete(false),
+        _rsConfigState(kConfigStartingUp),
         _thisMembersConfigIndex(-1) {
 
         if (!isReplEnabled()) {
@@ -118,9 +126,10 @@ namespace repl {
 
     ReplicationCoordinatorImpl::~ReplicationCoordinatorImpl() {}
 
-    void ReplicationCoordinatorImpl::waitForStartUp() {
-        if (_startUpFinishedHandle.isValid()) {
-            _replExecutor.wait(_startUpFinishedHandle);
+    void ReplicationCoordinatorImpl::waitForStartUpComplete() {
+        boost::unique_lock<boost::mutex> lk(_mutex);
+        while (_rsConfigState == kConfigStartingUp) {
+            _rsConfigStateChange.wait(lk);
         }
     }
 
@@ -143,21 +152,18 @@ namespace repl {
         if (localConfig.getReplSetName() != _settings.ourSetName()) {
             warning() << "Local replica set configuration document reports set name of " <<
                 localConfig.getReplSetName() << ", but command line reports " <<
-                _settings.ourSetName() << "; ignoring local configuration document.";
+                _settings.ourSetName() << "; ignoring local configuration document";
             return true;
         }
 
         // Use a callback here, because _finishLoadLocalConfig calls isself() which requires
         // that the server's networking layer be up and running and accepting connections, which
         // doesn't happen until startReplication finishes.
-        StatusWith<ReplicationExecutor::CallbackHandle> cbh = _replExecutor.scheduleWork(
+        _replExecutor.scheduleWork(
                 stdx::bind(&ReplicationCoordinatorImpl::_finishLoadLocalConfig,
                            this,
                            stdx::placeholders::_1,
                            localConfig));
-        if (cbh.isOK()) {
-            _startUpFinishedHandle = cbh.getValue();
-        }
         return false;
     }
 
@@ -172,10 +178,16 @@ namespace repl {
 
         // Make sure that no matter how _finishLoadLocalConfig_helper terminates (short of
         // throwing an exception, which it shouldn't do and would cause the process to terminate),
-        // we always set _isStartupComplete to true.
+        // we always set _rsConfigState to either kConfigSteady or kConfigUninitialized.
         boost::lock_guard<boost::mutex> lk(_mutex);
-        _isStartupComplete = true;
-        _startupCompleteCondition.notify_all();
+        if (_rsConfigState != kConfigStartingUp) {
+            invariant(_rsConfigState == kConfigSteady);
+            invariant(_rsConfig.isInitialized());
+        }
+        else {
+            invariant(!_rsConfig.isInitialized());
+            _setConfigState_inlock(kConfigUninitialized);
+        }
     }
 
     void ReplicationCoordinatorImpl::_finishLoadLocalConfig_helper(
@@ -183,6 +195,7 @@ namespace repl {
             const ReplicaSetConfig& localConfig) {
 
         boost::unique_lock<boost::mutex> lk(_mutex);
+        invariant(_rsConfigState == kConfigStartingUp);
         ReplicaSetConfig oldConfig = _rsConfig;
         lk.unlock();
 
@@ -190,8 +203,7 @@ namespace repl {
         // holding _mutex, as validateConfigForStartUp calls isSelf, which might lead to network
         // traffic.  For this to work, we are depending on _rsConfig not changing between now
         // and when we re-acquire the lock further down.  We ensure that by not processing any
-        // heartbeats or reconfigs until after this method finishes.
-        // TODO(spencer): Block in replSetReconfig until _isStartupComplete is true.
+        // heartbeats, initiates or reconfigs while _rsConfigState == kConfigStartingUp.
         StatusWith<int> myIndex = validateConfigForStartUp(_externalState.get(),
                                                            oldConfig,
                                                            localConfig);
@@ -203,16 +215,14 @@ namespace repl {
         }
 
         lk.lock();
-        // Assert that the config didn't change while we were unlocked.  This isn't a perfect
-        // check as they could be different configs with the same version number, but at least
-        // it's something.
-        invariant(_rsConfig.getConfigVersion() == oldConfig.getConfigVersion());
-
+        invariant(_rsConfigState == kConfigStartingUp);
         _setCurrentRSConfig_inlock(cbData, localConfig, myIndex.getValue());
     }
 
     void ReplicationCoordinatorImpl::startReplication(OperationContext* txn) {
         if (!isReplEnabled()) {
+            boost::lock_guard<boost::mutex> lk(_mutex);
+            _setConfigState_inlock(kConfigReplicationDisabled);
             return;
         }
 
@@ -233,11 +243,11 @@ namespace repl {
 
         bool doneLoadingConfig = _startLoadLocalConfig(txn);
         if (doneLoadingConfig) {
-            // If we're not done loading the config, then _localConfigLoaded will be set by
+            // If we're not done loading the config, then the config state will be set by
             // _finishLoadLocalConfig.
             boost::lock_guard<boost::mutex> lk(_mutex);
-            _isStartupComplete = true;
-            _startupCompleteCondition.notify_all();
+            invariant(!_rsConfig.isInitialized());
+            _setConfigState_inlock(kConfigUninitialized);
         }
     }
 
@@ -744,7 +754,7 @@ namespace repl {
                                                         ReplSetHeartbeatResponse* response) {
         {
             boost::lock_guard<boost::mutex> lock(_mutex);
-            if (!_isStartupComplete) {
+            if (_rsConfigState == kConfigStartingUp) {
                 return Status(ErrorCodes::NotYetInitialized,
                               "Received heartbeat while still initializing replication system");
             }
@@ -779,8 +789,106 @@ namespace repl {
     Status ReplicationCoordinatorImpl::processReplSetInitiate(OperationContext* txn,
                                                               const BSONObj& configObj,
                                                               BSONObjBuilder* resultObj) {
-        // TODO
-        return Status::OK();
+        log() << "replSet replSetInitiate admin command received from client" << rsLog;
+
+        boost::unique_lock<boost::mutex> lk(_mutex);
+
+        if (!_settings.usingReplSets()) {
+            return Status(ErrorCodes::NoReplicationEnabled,
+                          "server is not running with --replSet");
+        }
+
+        while (_rsConfigState == kConfigStartingUp) {
+            _rsConfigStateChange.wait(lk);
+        }
+
+        if (_rsConfigState != kConfigUninitialized) {
+            resultObj->append("info",
+                              "try querying local.system.replset to see current configuration");
+            return Status(ErrorCodes::AlreadyInitialized, "already initialized");
+        }
+        invariant(!_rsConfig.isInitialized());
+        _setConfigState_inlock(kConfigInitiating);
+        ScopeGuard configStateGuard = MakeGuard(
+                lockAndCall,
+                &lk,
+                stdx::bind(&ReplicationCoordinatorImpl::_setConfigState_inlock,
+                           this,
+                           kConfigUninitialized));
+        lk.unlock();
+
+        ReplicaSetConfig newConfig;
+        Status status = newConfig.initialize(configObj);
+        if (!status.isOK()) {
+            error() << "replSet initiate got " << status << " while parsing " << configObj << rsLog;
+            return status;
+        }
+        StatusWith<int> myIndex = validateConfigForInitiate(_externalState.get(), newConfig);
+        if (!myIndex.isOK()) {
+            error() << "replSet initiate got " << myIndex.getStatus() << " while validating " <<
+                configObj << rsLog;
+            return myIndex.getStatus();
+        }
+
+        if (newConfig.getReplSetName() != _settings.ourSetName()) {
+            str::stream errmsg;
+            errmsg << "Attempting to initiate a replica set with name " <<
+                newConfig.getReplSetName() << ", but command line reports " <<
+                _settings.ourSetName() << "; rejecting";
+            error() << std::string(errmsg);
+            return Status(ErrorCodes::BadValue, errmsg);
+        }
+
+        log() << "replSet replSetInitiate config object with " << newConfig.getNumMembers() <<
+            " members parses ok" << rsLog;
+
+        status = checkQuorumForInitiate(
+                &_replExecutor,
+                newConfig,
+                myIndex.getValue());
+
+        if (!status.isOK()) {
+            error() << "replSet replSetInitiate failed; " << status;
+            return status;
+        }
+
+        status = _externalState->storeLocalConfigDocument(txn, configObj);
+        if (!status.isOK()) {
+            error() << "replSet replSetInitiate failed to store config document; " << status;
+            return status;
+        }
+
+        CBHStatus cbh = _replExecutor.scheduleWork(
+                stdx::bind(&ReplicationCoordinatorImpl::_finishReplSetInitiate,
+                           this,
+                           stdx::placeholders::_1,
+                           newConfig,
+                           myIndex.getValue()));
+        if (cbh.getStatus() == ErrorCodes::ShutdownInProgress) {
+            return status;
+        }
+        configStateGuard.Dismiss();
+        fassert(18654, cbh.getStatus());
+        _replExecutor.wait(cbh.getValue());
+        return status;
+    }
+
+    void ReplicationCoordinatorImpl::_finishReplSetInitiate(
+            const ReplicationExecutor::CallbackData& cbData,
+            const ReplicaSetConfig& newConfig,
+            int myIndex) {
+
+        boost::lock_guard<boost::mutex> lk(_mutex);
+        invariant(_rsConfigState == kConfigInitiating);
+        invariant(!_rsConfig.isInitialized());
+        _setCurrentRSConfig_inlock(cbData, newConfig, myIndex);
+    }
+
+    void ReplicationCoordinatorImpl::_setConfigState_inlock(ConfigState newState) {
+        if (newState != _rsConfigState) {
+            _rsConfigState = newState;
+            _rsConfigStateChange.notify_all();
+        }
     }
 
     Status ReplicationCoordinatorImpl::processReplSetGetRBID(BSONObjBuilder* resultObj) {
@@ -836,6 +944,7 @@ namespace repl {
          if (_rsConfig.isInitialized()) {
              cancelHeartbeats();
          }
+         _setConfigState_inlock(kConfigSteady);
          _rsConfig = newConfig;
          _thisMembersConfigIndex = myIndex;
          _topCoord->updateConfig(
@@ -857,8 +966,8 @@ namespace repl {
 
         // Wait until we're done loading our local config
         boost::unique_lock<boost::mutex> lock(_mutex);
-        while (!_isStartupComplete) {
-            _startupCompleteCondition.wait(lock);
+        while (_rsConfigState == kConfigStartingUp) {
+            _rsConfigStateChange.wait(lock);
         }
         lock.unlock();
 

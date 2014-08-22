@@ -63,7 +63,7 @@ namespace {
             return StatusWith<int>(ErrorCodes::NodeNotFound, str::stream() <<
                                    "No host described in new configuration " <<
                                    newConfig.getConfigVersion() << " for replica set " <<
-                                   newConfig.getReplSetName() << " maps to this node.");
+                                   newConfig.getReplSetName() << " maps to this node");
         }
         if (meConfigs.size() > 1) {
             str::stream message;
@@ -212,7 +212,7 @@ namespace {
                                   "New and old configurations differ in the setting of the "
                                   "buildIndexes field for member " <<
                                   mOld->getHostAndPort().toString() <<
-                                  "; to make this change, remove then re-add the member.");
+                                  "; to make this change, remove then re-add the member");
                 }
                 const bool arbiterFlagsEqual = mOld->isArbiter() == mNew->isArbiter();
                 if (!arbiterFlagsEqual) {
@@ -221,7 +221,7 @@ namespace {
                                   "New and old configurations differ in the setting of the "
                                   "arbiterOnly field for member " <<
                                   mOld->getHostAndPort().toString() <<
-                                  "; to make this change, remove then re-add the member.");
+                                  "; to make this change, remove then re-add the member");
 
                 }
             }
