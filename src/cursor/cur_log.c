@@ -344,7 +344,7 @@ __wt_curlog_open(WT_SESSION_IMPL *session,
 
 	WT_ERR(__wt_cursor_init(cursor, uri, NULL, cfg, cursorp));
 
-	/* Log cursors default to read only. */
+	/* Log cursors are read only. */
 	WT_ERR(__wt_cursor_config_readonly(cursor, cfg, 1));
 
 	if (0) {
