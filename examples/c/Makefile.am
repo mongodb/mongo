@@ -29,4 +29,4 @@ AM_TESTS_ENVIRONMENT = WIREDTIGER_HOME=`mktemp -d WT_TEST.XXXX` ; export WIREDTI
 TESTS_ENVIRONMENT = $(AM_TESTS_ENVIRONMENT)
 
 clean-local:
-	rm -rf WT_TEST* *.core WiredTiger* *.wt
+	rm -rf WIREDTIGER_HOME *.core WiredTiger* *.wt

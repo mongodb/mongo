@@ -34,8 +34,6 @@
 
 #include <wiredtiger.h>
 
-const char *home = NULL;
-
 int main(void)
 {
 	int ret;
@@ -149,18 +147,18 @@ int main(void)
 				    "Error creating nested configuration "
 				    "parser: %s\n",
 				    wiredtiger_strerror(ret));
-				parser->close(parser);
+				ret = parser->close(parser);
 				return (ret);
 			}
 			while ((ret = sub_parser->next(
 			    sub_parser, &k, &v)) == 0)
 				printf("\t%.*s\n", (int)k.len, k.str);
-			sub_parser->close(sub_parser);
+			ret = sub_parser->close(sub_parser);
 		}
 	}
 	/*! [nested traverse] */
-	parser->close(parser);
+	ret = parser->close(parser);
 	}
 
-	return (0);
+	return (ret);
 }
