@@ -17,8 +17,8 @@ static int __conn_statistics_config(WT_SESSION_IMPL *, const char *[]);
  *	Call the collation function (external API version).
  */
 static int
-ext_collate(WT_EXTENSION_API *wt_api,
-    WT_SESSION *wt_session, WT_ITEM *first, WT_ITEM *second, int *cmpp)
+ext_collate(WT_EXTENSION_API *wt_api, WT_SESSION *wt_session,
+    WT_COLLATOR *collator, WT_ITEM *first, WT_ITEM *second, int *cmpp)
 {
 	WT_CONNECTION_IMPL *conn;
 	WT_SESSION_IMPL *session;
@@ -27,7 +27,7 @@ ext_collate(WT_EXTENSION_API *wt_api,
 	if ((session = (WT_SESSION_IMPL *)wt_session) == NULL)
 		session = conn->default_session;
 
-	WT_RET(WT_LEX_CMP(session, wt_api->collator, first, second, *cmpp));
+	WT_RET(__wt_compare(session, collator, first, second, cmpp));
 
 	return (0);
 }
@@ -37,8 +37,8 @@ ext_collate(WT_EXTENSION_API *wt_api,
  *	Given a configuration, configure the collator (external API version).
  */
 static int
-ext_collator_config(
-    WT_EXTENSION_API *wt_api, WT_SESSION *wt_session, WT_CONFIG_ARG *cfg_arg)
+ext_collator_config(WT_EXTENSION_API *wt_api, WT_SESSION *wt_session,
+    WT_CONFIG_ARG *cfg_arg, WT_COLLATOR **collatorp, int *ownp)
 {
 	WT_CONNECTION_IMPL *conn;
 	WT_SESSION_IMPL *session;
@@ -52,7 +52,7 @@ ext_collator_config(
 	if ((cfg = (const char **)cfg_arg) == NULL)
 		return (0);
 
-	return (__wt_collator_config(session, cfg, &wt_api->collator));
+	return (__wt_collator_config(session, cfg, collatorp, ownp));
 }
 
 /*
@@ -60,8 +60,8 @@ ext_collator_config(
  *	Given a configuration, configure the collator.
  */
 int
-__wt_collator_config(
-    WT_SESSION_IMPL *session, const char **cfg, WT_COLLATOR **collatorp)
+__wt_collator_config(WT_SESSION_IMPL *session, const char **cfg,
+    WT_COLLATOR **collatorp, int *ownp)
 {
 	WT_CONNECTION_IMPL *conn;
 	WT_CONFIG_ITEM cval;
@@ -69,6 +69,7 @@ __wt_collator_config(
 	WT_NAMED_COLLATOR *ncoll;
 
 	*collatorp = NULL;
+	*ownp = 0;
 
 	conn = S2C(session);
 
@@ -77,14 +78,26 @@ __wt_collator_config(
 
 	if (cval.len > 0) {
 		TAILQ_FOREACH(ncoll, &conn->collqh, q)
-			if (WT_STRING_MATCH(ncoll->name, cval.str, cval.len)) {
-				*collatorp = ncoll->collator;
-				return (0);
-			}
+			if (WT_STRING_MATCH(ncoll->name, cval.str, cval.len))
+				break;
 
-		WT_RET_MSG(session, EINVAL,
-		    "unknown collator '%.*s'", (int)cval.len, cval.str);
+		if (ncoll == NULL)
+			WT_RET_MSG(session, EINVAL,
+			    "unknown collator '%.*s'", (int)cval.len, cval.str);
+
+		if (ncoll->collator->customize != NULL) {
+			WT_RET(__wt_config_gets(session,
+			    session->dhandle->cfg, "app_metadata", &cval));
+			WT_RET(ncoll->collator->customize(
+			    ncoll->collator, &session->iface,
+			    session->dhandle->name, &cval, collatorp));
+		}
+		if (*collatorp == NULL)
+			*collatorp = ncoll->collator;
+		else
+			*ownp = 1;
 	}
+
 	return (0);
 }
 
@@ -166,9 +179,11 @@ __conn_load_extension(
 	WT_SESSION_IMPL *session;
 	int (*load)(WT_CONNECTION *, WT_CONFIG_ARG *);
 	const char *init_name, *terminate_name;
+	int is_local;
 
 	dlh = NULL;
 	init_name = terminate_name = NULL;
+	is_local = (strcmp(path, "local") == 0);
 
 	conn = (WT_CONNECTION_IMPL *)wt_conn;
 	CONNECTION_API_CALL(conn, session, load_extension, config, cfg);
@@ -180,7 +195,7 @@ __conn_load_extension(
 	 * close discards the reference entirely -- in other words, we do not
 	 * check to see if we've already opened this shared library.
 	 */
-	WT_ERR(__wt_dlopen(session, path, &dlh));
+	WT_ERR(__wt_dlopen(session, is_local ? NULL : path, &dlh));
 
 	/*
 	 * Find the load function, remember the unload function for when we
@@ -1275,6 +1290,9 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
 
 	/*
 	 * Configuration ...
+	 *
+	 * We can't open sessions yet, so any configurations that cause
+	 * sessions to be opened must be handled inside __wt_connection_open.
 	 */
 	WT_ERR(__wt_config_gets(session, cfg, "hazard_max", &cval));
 	conn->hazard_max = (uint32_t)cval.val;
@@ -1291,8 +1309,6 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
 		F_SET(conn, WT_CONN_CKPT_SYNC);
 
 	WT_ERR(__wt_conn_verbose_config(session, cfg));
-
-	WT_ERR(__wt_conn_cache_pool_config(session, cfg));
 
 	WT_ERR(__wt_config_gets(session, cfg, "buffer_alignment", &cval));
 	if (cval.val == -1)

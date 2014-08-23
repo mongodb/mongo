@@ -363,8 +363,9 @@ __split_verify_intl_key_order(WT_SESSION_IMPL *session, WT_PAGE *page)
 				if (first)
 					first = 0;
 				else {
-					(void)WT_LEX_CMP(session,
-					    btree->collator, last, next, cmp);
+					WT_ASSERT(session, __wt_compare(
+					    session, btree->collator, last,
+					    next, &cmp) == 0);
 					WT_ASSERT(session, cmp < 0);
 				}
 			}
@@ -881,7 +882,7 @@ __wt_split_evict(WT_SESSION_IMPL *session, WT_REF *ref, int exclusive)
 	 * now, so that we can safely access it after updating the index.
 	 */
 	if (!__wt_ref_is_root(parent_ref = parent->pg_intl_parent_ref)) {
-		WT_ERR(__wt_page_in(session, parent_ref, WT_READ_NO_GEN));
+		WT_ERR(__wt_page_in(session, parent_ref, WT_READ_NO_EVICT));
 		hazard = 1;
 	}
 

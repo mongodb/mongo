@@ -386,6 +386,7 @@ cnt
 colcheck
 colgroup
 colgroups
+collatorp
 comparator
 comparep
 concat
@@ -395,6 +396,7 @@ config
 conn
 connectionp
 const
+copydoc
 copyin
 copyout
 cp
@@ -499,6 +501,7 @@ fflush
 ffs
 fgetln
 fh
+fileID
 filefrag
 fileid
 filename
@@ -728,6 +731,7 @@ opsq
 optype
 os
 ovfl
+ownp
 packv
 parserp
 patchp
@@ -780,6 +784,7 @@ recnos
 reconfig
 reconfiguring
 recsize
+rectype
 recurse
 refp
 reinitialization
@@ -813,6 +818,7 @@ scr
 sd
 searchable
 sed
+seqno
 serializable
 sessionp
 setstr

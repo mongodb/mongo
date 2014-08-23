@@ -221,6 +221,7 @@ static int my_cursor_insert(WT_CURSOR *wtcursor)
 	{
 	const char *key1 = NULL, *key2 = NULL;
 	uint32_t key1_len = 0, key2_len = 0;
+	WT_COLLATOR *collator = NULL;
 	/*! [WT_EXTENSION collate] */
 	WT_ITEM first, second;
 	int cmp;
@@ -230,7 +231,7 @@ static int my_cursor_insert(WT_CURSOR *wtcursor)
 	second.data = key2;
 	second.size = key2_len;
 
-	ret = wt_api->collate(wt_api, session, &first, &second, &cmp);
+	ret = wt_api->collate(wt_api, session, collator, &first, &second, &cmp);
 	if (cmp == 0)
 		printf("key1 collates identically to key2\n");
 	else if (cmp < 0)
@@ -369,10 +370,13 @@ my_open_cursor(WT_DATA_SOURCE *dsrc, WT_SESSION *session,
 
 	{
 	/*! [WT_EXTENSION collator config] */
+	WT_COLLATOR *collator;
+	int collator_owned;
 	/*
 	 * Configure the appropriate collator.
 	 */
-	if ((ret = wt_api->collator_config(wt_api, session, config)) != 0) {
+	if ((ret = wt_api->collator_config(
+	    wt_api, session, config, &collator, &collator_owned)) != 0) {
 		(void)wt_api->err_printf(wt_api, session,
 		    "collator configuration: %s", wiredtiger_strerror(ret));
 		return (ret);

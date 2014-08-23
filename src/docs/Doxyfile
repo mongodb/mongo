@@ -768,14 +768,16 @@ EXCLUDE_PATTERNS       =
 # wildcard * is used, a substring. Examples: ANamespace, AClass, 
 # AClass::ANamespace, ANamespace::*Test
 
-EXCLUDE_SYMBOLS        = __F
+EXCLUDE_SYMBOLS        = __F \
+			 doc_*
 
 # The EXAMPLE_PATH tag can be used to specify one or more files or 
 # directories that contain example code fragments that are included (see 
 # the \include command).
 
 EXAMPLE_PATH           = ../../examples/c \
-			 ../../ext/compressors/nop
+			 ../../ext/compressors/nop \
+			 ./examples
 
 # If the value of the EXAMPLE_PATH tag contains directories, you can use the 
 # EXAMPLE_PATTERNS tag to specify one or more wildcard pattern (like *.cpp 
@@ -1563,6 +1565,7 @@ PREDEFINED             = DOXYGEN \
                          __wt_extension_api:=WT_EXTENSION_API \
                          __wt_extractor:=WT_EXTRACTOR \
                          __wt_item:=WT_ITEM \
+                         __wt_lsn:=WT_LSN \
                          __wt_session:=WT_SESSION \
                          __wt_txn_notify:=WT_TXN_NOTIFY \
                          WT_HANDLE_CLOSED(x):=x \

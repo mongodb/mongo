@@ -216,10 +216,11 @@ __wt_block_write_off(WT_SESSION_IMPL *session, WT_BLOCK *block,
 #ifdef HAVE_SYNC_FILE_RANGE
 	/*
 	 * Optionally schedule writes for dirty pages in the system buffer
-	 * cache.
+	 * cache, but only if the current session can wait.
 	 */
 	if (block->os_cache_dirty_max != 0 &&
-	    (block->os_cache_dirty += align_size) > block->os_cache_dirty_max) {
+	    (block->os_cache_dirty += align_size) > block->os_cache_dirty_max &&
+	    __wt_session_can_wait(session)) {
 		block->os_cache_dirty = 0;
 		WT_RET(__wt_fsync_async(session, fh));
 	}

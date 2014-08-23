@@ -762,7 +762,7 @@ add_collator(WT_CONNECTION *conn)
 	int ret;
 
 	/*! [WT_COLLATOR register] */
-	static WT_COLLATOR my_collator = { my_compare, NULL };
+	static WT_COLLATOR my_collator = { my_compare, NULL, NULL };
 	ret = conn->add_collator(conn, "my_collator", &my_collator, NULL);
 	/*! [WT_COLLATOR register] */
 
@@ -1019,9 +1019,9 @@ main(void)
 		(void)conn->close(conn, NULL);
 
 	/*! [Eviction worker configuration] */
-	/* Configure an additional 4 eviction support threads. */
+	/* Configure up to four eviction threads */
 	ret = wiredtiger_open(home, NULL,
-	    "create,eviction_trigger=90,eviction_workers=4", &conn);
+	    "create,eviction_trigger=90,eviction=(threads_max=4)", &conn);
 	/*! [Eviction worker configuration] */
 	if (ret == 0)
 		(void)conn->close(conn, NULL);

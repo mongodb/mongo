@@ -34,6 +34,7 @@ flags = {
 		'READ_CACHE',
 		'READ_COMPACT',
 		'READ_NO_GEN',
+		'READ_NO_EVICT',
 		'READ_NO_WAIT',
 		'READ_PREV',
 		'READ_SKIP_INTL',
@@ -97,6 +98,7 @@ flags = {
 		'CONN_WAS_BACKUP',
 	],
 	'session' : [
+		'SESSION_CAN_WAIT',
 		'SESSION_INTERNAL',
 		'SESSION_LOGGING_INMEM',
 		'SESSION_NO_CACHE',

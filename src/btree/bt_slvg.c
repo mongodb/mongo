@@ -16,7 +16,6 @@ struct __wt_track; 		typedef struct __wt_track WT_TRACK;
  */
 struct __wt_stuff {
 	WT_SESSION_IMPL *session;		/* Salvage session */
-	WT_BTREE  *btree;			/* Enclosing Btree */
 
 	WT_TRACK **pages;			/* Pages */
 	uint32_t   pages_next;			/* Next empty slot */
@@ -151,7 +150,6 @@ __wt_bt_salvage(WT_SESSION_IMPL *session, WT_CKPT *ckptbase, const char *cfg[])
 	WT_CLEAR(stuff);
 	ss = &stuff;
 	ss->session = session;
-	ss->btree = btree;
 	ss->page_type = WT_PAGE_INVALID;
 
 	/* Allocate temporary buffers. */
@@ -830,13 +828,17 @@ __slvg_col_range_overlap(
 	 * #10			AAAAAA			A is middle of B
 	 * #11			AAAAAAAAAA		A is a suffix of B
 	 *
-	 * Because the leaf page array was sorted by record number and a_trk
-	 * appears earlier in that array than b_trk, cases #2/8, #10 and #11
-	 * are impossible.
+	 * Note the leaf page array was sorted by key and a_trk appears earlier
+	 * in the array than b_trk, so cases #2/8, #10 and #11 are impossible.
 	 *
 	 * Finally, there's one additional complicating factor -- final ranges
 	 * are assigned based on the page's LSN.
 	 */
+						/* Case #2/8, #10, #11 */
+	if (a_trk->col_start > b_trk->col_start)
+		WT_PANIC_RET(
+		    session, EINVAL, "unexpected merge array sort order");
+
 	if (a_trk->col_start == b_trk->col_start) {	/* Case #1, #4 and #9 */
 		/*
 		 * The secondary sort of the leaf page array was the page's LSN,
@@ -884,7 +886,7 @@ __slvg_col_range_overlap(
 	if  (a_trk->col_stop < b_trk->col_stop) {	/* Case #3/7 */
 		if (a_trk->gen > b_trk->gen) {
 			/*
-			 * Case #3/8: a_trk is more desirable, delete a_trk's
+			 * Case #3/7: a_trk is more desirable, delete a_trk's
 			 * key range from b_trk;
 			 */
 			b_trk->col_start = a_trk->col_stop + 1;
@@ -892,7 +894,7 @@ __slvg_col_range_overlap(
 			F_SET(b_trk, WT_TRACK_MERGE);
 		} else {
 			/*
-			 * Case #3/8: b_trk is more desirable, delete b_trk's
+			 * Case #3/7: b_trk is more desirable, delete b_trk's
 			 * key range from a_trk;
 			 */
 			a_trk->col_stop = b_trk->col_start - 1;
@@ -906,9 +908,8 @@ __slvg_col_range_overlap(
 	 * discard b_trk.
 	 */
 	if (a_trk->gen > b_trk->gen) {
-delete:		WT_RET(__slvg_trk_free(session,
+delete:		return (__slvg_trk_free(session,
 		    &ss->pages[b_slot], WT_TRK_FREE_BLOCKS | WT_TRK_FREE_OVFL));
-		return (0);
 	}
 
 	/*
@@ -947,17 +948,19 @@ delete:		WT_RET(__slvg_trk_free(session,
 	__slvg_col_trk_update_start(a_slot + 1, ss);
 
 	/*
-	 * Fourth, the new WT_TRACK information doesn't reference any file
-	 * blocks (let the original a_trk structure reference file blocks).
-	 */
-	F_SET(new, WT_TRACK_MERGE | WT_TRACK_NO_FILE_BLOCKS);
-
-	/*
-	 * Finally, set the original WT_TRACK information to reference only
+	 * Fourth, set the original WT_TRACK information to reference only
 	 * the initial key space in the page, that is, everything up to the
 	 * starting key of the middle chunk (that's b_trk).
 	 */
 	a_trk->col_stop = b_trk->col_start - 1;
+
+	/*
+	 * Fifth, the new WT_TRACK information doesn't reference any file
+	 * blocks (let the original a_trk structure reference file blocks).
+	 */
+	F_SET(new, WT_TRACK_NO_FILE_BLOCKS);
+
+	F_SET(new, WT_TRACK_MERGE);
 	F_SET(a_trk, WT_TRACK_MERGE);
 
 merge:	WT_RET(__wt_verbose(session, WT_VERB_SALVAGE,
@@ -1216,12 +1219,12 @@ __slvg_col_build_leaf(WT_SESSION_IMPL *session, WT_TRACK *trk, WT_REF *ref)
 	page->pg_var_d = save_col_var;
 	*entriesp = save_entries;
 
-	ret = __wt_page_release(session, ref);
+	ret = __wt_page_release(session, ref, 0);
 	if (ret == 0)
 		ret = __wt_rec_evict(session, ref, 1);
 
 	if (0) {
-err:		WT_TRET(__wt_page_release(session, ref));
+err:		WT_TRET(__wt_page_release(session, ref, 0));
 	}
 
 	return (ret);
@@ -1310,9 +1313,9 @@ __slvg_row_range(WT_SESSION_IMPL *session, WT_STUFF *ss)
 			 * We're done if this page starts after our stop, no
 			 * subsequent pages can overlap our page.
 			 */
-			WT_RET(WT_LEX_CMP(session, btree->collator,
-			    &ss->pages[j]->row_start,
-			    &ss->pages[i]->row_stop, cmp));
+			WT_RET(__wt_compare(session, btree->collator,
+			    &ss->pages[j]->row_start, &ss->pages[i]->row_stop,
+			    &cmp));
 			if (cmp > 0)
 				break;
 
@@ -1345,7 +1348,7 @@ __slvg_row_range_overlap(
 {
 	WT_BTREE *btree;
 	WT_TRACK *a_trk, *b_trk, *new;
-	int cmp;
+	int start_cmp, stop_cmp;
 
 	/*
 	 * DO NOT MODIFY THIS CODE WITHOUT REVIEWING THE CORRESPONDING ROW- OR
@@ -1387,9 +1390,8 @@ __slvg_row_range_overlap(
 	 * #10			AAAAAA			A is middle of B
 	 * #11			AAAAAAAAAA		A is a suffix of B
 	 *
-	 * Because the leaf page array was sorted by record number and a_trk
-	 * appears earlier in that array than b_trk, cases #2/8, #10 and #11
-	 * are impossible.
+	 * Note the leaf page array was sorted by key and a_trk appears earlier
+	 * in the array than b_trk, so cases #2/8, #10 and #11 are impossible.
 	 *
 	 * Finally, there's one additional complicating factor -- final ranges
 	 * are assigned based on the page's LSN.
@@ -1402,9 +1404,16 @@ __slvg_row_range_overlap(
 #define	__slvg_key_copy(session, dst, src)				\
 	__wt_buf_set(session, dst, (src)->data, (src)->size)
 
-	WT_RET(WT_LEX_CMP(
-	    session, btree->collator, A_TRK_START, B_TRK_START, cmp));
-	if (cmp == 0) {					/* Case #1, #4, #9 */
+	WT_RET(__wt_compare(
+	    session, btree->collator, A_TRK_START, B_TRK_START, &start_cmp));
+	WT_RET(__wt_compare(
+	    session, btree->collator, A_TRK_STOP, B_TRK_STOP, &stop_cmp));
+
+	if (start_cmp > 0)			/* Case #2/8, #10, #11 */
+		WT_PANIC_RET(
+		    session, EINVAL, "unexpected merge array sort order");
+
+	if (start_cmp == 0) {				/* Case #1, #4, #9 */
 		/*
 		 * The secondary sort of the leaf page array was the page's LSN,
 		 * in high-to-low order, which means a_trk has a higher LSN, and
@@ -1413,9 +1422,7 @@ __slvg_row_range_overlap(
 		 * this simplifies things, it guarantees a_trk has a higher LSN
 		 * than b_trk.
 		 */
-		WT_RET(WT_LEX_CMP(
-		    session, btree->collator, A_TRK_STOP, B_TRK_STOP, cmp));
-		if (cmp >= 0)
+		if (stop_cmp >= 0)
 			/*
 			 * Case #1, #4: a_trk is a superset of b_trk, and a_trk
 			 * is more desirable -- discard b_trk.
@@ -1433,9 +1440,7 @@ __slvg_row_range_overlap(
 		goto merge;
 	}
 
-	WT_RET(WT_LEX_CMP(
-	    session, btree->collator, A_TRK_STOP, B_TRK_STOP, cmp));
-	if (cmp == 0) {					/* Case #6 */
+	if (stop_cmp == 0) {				/* Case #6 */
 		if (a_trk->gen > b_trk->gen)
 			/*
 			 * Case #6: a_trk is a superset of b_trk and a_trk is
@@ -1452,12 +1457,10 @@ __slvg_row_range_overlap(
 		goto merge;
 	}
 
-	WT_RET(WT_LEX_CMP(
-	    session, btree->collator, A_TRK_STOP, B_TRK_STOP, cmp));
-	if (cmp < 0) {					/* Case #3/7 */
+	if (stop_cmp < 0) {				/* Case #3/7 */
 		if (a_trk->gen > b_trk->gen) {
 			/*
-			 * Case #3/8: a_trk is more desirable, delete a_trk's
+			 * Case #3/7: a_trk is more desirable, delete a_trk's
 			 * key range from b_trk;
 			 */
 			WT_RET(__slvg_row_trk_update_start(
@@ -1465,7 +1468,7 @@ __slvg_row_range_overlap(
 			F_SET(b_trk, WT_TRACK_CHECK_START | WT_TRACK_MERGE);
 		} else {
 			/*
-			 * Case #3/8: b_trk is more desirable, delete b_trk's
+			 * Case #3/7: b_trk is more desirable, delete b_trk's
 			 * key range from a_trk;
 			 */
 			WT_RET(__slvg_key_copy(
@@ -1480,9 +1483,8 @@ __slvg_row_range_overlap(
 	 * discard b_trk.
 	 */
 	if (a_trk->gen > b_trk->gen) {
-delete:		WT_RET(__slvg_trk_free(session,
+delete:		return (__slvg_trk_free(session,
 		    &ss->pages[b_slot], WT_TRK_FREE_BLOCKS | WT_TRK_FREE_OVFL));
-		return (0);
 	}
 
 	/*
@@ -1521,19 +1523,22 @@ delete:		WT_RET(__slvg_trk_free(session,
 	    __slvg_row_trk_update_start(session, B_TRK_STOP, a_slot + 1, ss));
 
 	/*
-	 * Fourth, the new WT_TRACK information doesn't reference any file
-	 * blocks (let the original a_trk structure reference file blocks).
-	 */
-	F_SET(new,
-	    WT_TRACK_CHECK_START | WT_TRACK_MERGE | WT_TRACK_NO_FILE_BLOCKS);
-
-	/*
-	 * Finally, set the original WT_TRACK information to reference only
+	 * Fourth, set the original WT_TRACK information to reference only
 	 * the initial key space in the page, that is, everything up to the
 	 * starting key of the middle chunk (that's b_trk).
 	 */
 	WT_RET(__slvg_key_copy(session, A_TRK_STOP, B_TRK_START));
-	F_SET(a_trk, WT_TRACK_CHECK_STOP | WT_TRACK_MERGE);
+	F_SET(new, WT_TRACK_CHECK_START);
+	F_SET(a_trk, WT_TRACK_CHECK_STOP);
+
+	/*
+	 * Fifth, the new WT_TRACK information doesn't reference any file
+	 * blocks (let the original a_trk structure reference file blocks).
+	 */
+	F_SET(new, WT_TRACK_NO_FILE_BLOCKS);
+
+	F_SET(new, WT_TRACK_MERGE);
+	F_SET(a_trk, WT_TRACK_MERGE);
 
 merge:	WT_RET(__wt_verbose(session, WT_VERB_SALVAGE,
 	    "%s and %s require merge",
@@ -1599,7 +1604,7 @@ __slvg_row_trk_update_start(
 	WT_ERR(__wt_scr_alloc(session, 0, &key));
 	WT_ROW_FOREACH(page, rip, i) {
 		WT_ERR(__wt_row_leaf_key(session, page, rip, key, 0));
-		WT_ERR(WT_LEX_CMP(session, btree->collator, key, stop, cmp));
+		WT_ERR(__wt_compare(session, btree->collator, key, stop, &cmp));
 		if (cmp > 0) {
 			found = 1;
 			break;
@@ -1624,8 +1629,8 @@ __slvg_row_trk_update_start(
 	for (i = slot + 1; i < ss->pages_next; ++i) {
 		if (ss->pages[i] == NULL)
 			continue;
-		WT_ERR(WT_LEX_CMP(session, btree->collator,
-		    SLOT_START(i), &trk->row_stop, cmp));
+		WT_ERR(__wt_compare(session,
+		    btree->collator, SLOT_START(i), &trk->row_stop, &cmp));
 		if (cmp > 0)
 			break;
 	}
@@ -1769,8 +1774,8 @@ __slvg_row_build_leaf(
 			/*
 			 * >= is correct: see the comment above.
 			 */
-			WT_ERR(WT_LEX_CMP(session,
-			    btree->collator, key, &trk->row_start, cmp));
+			WT_ERR(__wt_compare(session,
+			    btree->collator, key, &trk->row_start, &cmp));
 			if (cmp >= 0)
 				break;
 			if (WT_VERBOSE_ISSET(session, WT_VERB_SALVAGE)) {
@@ -1792,8 +1797,8 @@ __slvg_row_build_leaf(
 			/*
 			 * < is correct: see the comment above.
 			 */
-			WT_ERR(WT_LEX_CMP(session,
-			    btree->collator, key, &trk->row_stop, cmp));
+			WT_ERR(__wt_compare(session,
+			    btree->collator, key, &trk->row_stop, &cmp));
 			if (cmp < 0)
 				break;
 			if (WT_VERBOSE_ISSET(session, WT_VERB_SALVAGE)) {
@@ -1833,56 +1838,43 @@ __slvg_row_build_leaf(
 	    page->pg_row_entries - skip_stop, page->pg_row_entries));
 
 	/*
-	 * If we take all of the keys, we don't write the page and we clear the
-	 * merge flags so that the underlying blocks are not later freed (for
-	 * merge pages re-written into the file, the underlying blocks have to
-	 * be freed, but if this page never gets written, we shouldn't free the
-	 * blocks).
+	 * Change the page to reflect the correct record count: there is no
+	 * need to copy anything on the page itself, the entries value limits
+	 * the number of page items.
 	 */
-	if (skip_start == 0 && skip_stop == 0)
-		F_CLR(trk, WT_TRACK_MERGE);
-	else {
-		/*
-		 * Change the page to reflect the correct record count: there
-		 * is no need to copy anything on the page itself, the entries
-		 * value limits the number of page items.
-		 */
-		page->pg_row_entries -= skip_stop;
-		cookie->skip = skip_start;
+	page->pg_row_entries -= skip_stop;
+	cookie->skip = skip_start;
 
-		/*
-		 * We can't discard the original blocks associated with the page
-		 * now.  (The problem is we don't want to overwrite any original
-		 * information until the salvage run succeeds -- if we free the
-		 * blocks now, the next merge page we write might allocate those
-		 * blocks and overwrite them, and should the salvage run fail,
-		 * the original information would have been lost to subsequent
-		 * salvage runs.)  Clear the reference addr so eviction doesn't
-		 * free the underlying blocks.
-		 */
-		__wt_free(session, ((WT_ADDR *)ref->addr)->addr);
-		__wt_free(session, ref->addr);
-		ref->addr = NULL;
+	/*
+	 * We can't discard the original blocks associated with this page now.
+	 * (The problem is we don't want to overwrite any original information
+	 * until the salvage run succeeds -- if we free the blocks now, the next
+	 * merge page we write might allocate those blocks and overwrite them,
+	 * and should the salvage run eventually fail, the original information
+	 * would have been lost.)  Clear the reference addr so eviction doesn't
+	 * free the underlying blocks.
+	 */
+	__wt_free(session, ((WT_ADDR *)ref->addr)->addr);
+	__wt_free(session, ref->addr);
+	ref->addr = NULL;
 
-		/* Write the new version of the leaf page to disk. */
-		WT_ERR(__slvg_modify_init(session, page));
-		WT_ERR(__wt_rec_write(
-		    session, ref, cookie, WT_SKIP_UPDATE_ERR));
+	/* Write the new version of the leaf page to disk. */
+	WT_ERR(__slvg_modify_init(session, page));
+	WT_ERR(__wt_rec_write(session, ref, cookie, WT_SKIP_UPDATE_ERR));
 
-		/* Reset the page. */
-		page->pg_row_entries += skip_stop;
-	}
+	/* Reset the page. */
+	page->pg_row_entries += skip_stop;
 
 	/*
 	 * Discard our hazard pointer and evict the page, updating the
 	 * parent's reference.
 	 */
-	ret = __wt_page_release(session, ref);
+	ret = __wt_page_release(session, ref, 0);
 	if (ret == 0)
 		ret = __wt_rec_evict(session, ref, 1);
 
 	if (0) {
-err:		WT_TRET(__wt_page_release(session, ref));
+err:		WT_TRET(__wt_page_release(session, ref, 0));
 	}
 	__wt_scr_free(&key);
 
@@ -1907,7 +1899,7 @@ __slvg_row_merge_ovfl(WT_SESSION_IMPL *session,
 	bm = S2BT(session)->bm;
 	unpack = &_unpack;
 
-	for (rip = page->pg_row_d + start; start < stop; ++start) {
+	for (rip = page->pg_row_d + start; start < stop; ++start, ++rip) {
 		copy = WT_ROW_KEY_COPY(rip);
 		(void)__wt_row_leaf_key_info(
 		    page, copy, NULL, &cell, NULL, NULL);
@@ -2092,7 +2084,7 @@ __slvg_ovfl_reconcile(WT_SESSION_IMPL *session, WT_STUFF *ss)
 static int
 __slvg_trk_compare_key(const void *a, const void *b)
 {
-	WT_BTREE *btree;
+	WT_SESSION_IMPL *session;
 	WT_TRACK *a_trk, *b_trk;
 	uint64_t a_gen, a_recno, b_gen, b_recno;
 	int cmp;
@@ -2118,15 +2110,15 @@ __slvg_trk_compare_key(const void *a, const void *b)
 			return (-1);
 		break;
 	case WT_PAGE_ROW_LEAF:
-		btree = a_trk->ss->btree;
 		/*
 		 * XXX
-		 * WT_LEX_CMP can potentially fail, and we're ignoring that
+		 * __wt_compare can potentially fail, and we're ignoring that
 		 * error because this routine is called as an underlying qsort
 		 * routine.
 		 */
-		(void)WT_LEX_CMP(a_trk->ss->session,
-		    btree->collator, &a_trk->row_start, &b_trk->row_start, cmp);
+		session = a_trk->ss->session;
+		(void)__wt_compare(session, S2BT(session)->collator,
+		    &a_trk->row_start, &b_trk->row_start, &cmp);
 		if (cmp != 0)
 			return (cmp);
 		break;
@@ -2183,8 +2175,7 @@ __slvg_merge_block_free(WT_SESSION_IMPL *session, WT_STUFF *ss)
 	for (i = 0; i < ss->pages_next; ++i) {
 		if ((trk = ss->pages[i]) == NULL)
 			continue;
-		if (F_ISSET(trk, WT_TRACK_MERGE) &&
-		    !F_ISSET(trk, WT_TRACK_NO_FILE_BLOCKS))
+		if (F_ISSET(trk, WT_TRACK_MERGE))
 			WT_RET(__slvg_trk_free(
 			    session, &ss->pages[i], WT_TRK_FREE_BLOCKS));
 	}
@@ -2264,7 +2255,8 @@ __slvg_trk_free(WT_SESSION_IMPL *session, WT_TRACK **trkp, uint32_t flags)
 	 * we were tracking but eventually decided not to use.  That merits a
 	 * verbose description.
 	 */
-	if (LF_ISSET(WT_TRK_FREE_BLOCKS)) {
+	if (LF_ISSET(WT_TRK_FREE_BLOCKS) &&
+	    !F_ISSET(trk, WT_TRACK_NO_FILE_BLOCKS)) {
 		WT_RET(__wt_verbose(session, WT_VERB_SALVAGE,
 		    "%s page discarded: discard freed file bytes %" PRIu32,
 		    __wt_addr_string(

@@ -72,6 +72,7 @@ WiredTigerCheckpoint
 WiredTigerTestCase
 Za
 aR
+abstime
 ack'ed
 alloc
 allocator
@@ -111,6 +112,7 @@ changelog
 checksum
 checksums
 ckp
+clickable
 colgroup
 colgroups
 combinatorial
@@ -122,6 +124,7 @@ configurign
 conn
 const
 control's
+copydoc
 cpp
 crashless
 cursortype
@@ -170,6 +173,7 @@ fadvise
 failchk
 fd's
 fieldname
+fileID
 fileformats
 fileid
 filename
@@ -195,6 +199,7 @@ href
 hrow
 hsearch
 html
+htmlinclude
 huffman
 hugepage
 hyperleveldb
@@ -290,10 +295,12 @@ nowait
 nul
 num
 numa
+nvd
 objectsin
 ol
 oltp
 oob
+optype
 os
 ovfl
 pareto
@@ -328,6 +335,7 @@ recnoN
 recnum
 reconf
 recs
+rectype
 rerequests
 ret
 rf
@@ -345,6 +353,7 @@ scanf
 schemas
 selectable
 seqname
+seqno
 serializable
 sess
 skiplist
@@ -383,6 +392,7 @@ transactional
 transactionally
 tt
 txn
+txnid
 txns
 typedef
 uint

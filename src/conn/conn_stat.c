@@ -409,7 +409,6 @@ __statlog_start(WT_CONNECTION_IMPL *conn)
 	/* The statistics log server gets its own session. */
 	WT_RET(__wt_open_internal_session(
 	    conn, "statlog-server", 1, 1, &conn->stat_session));
-
 	session = conn->stat_session;
 
 	WT_RET(__wt_cond_alloc(
@@ -426,7 +425,7 @@ __statlog_start(WT_CONNECTION_IMPL *conn)
 	 * to figure out the scheduling.
 	 */
 	WT_RET(__wt_thread_create(
-	    session, &conn->stat_tid, __statlog_server, conn->stat_session));
+	    session, &conn->stat_tid, __statlog_server, session));
 	conn->stat_tid_set = 1;
 
 	return (0);

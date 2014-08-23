@@ -47,8 +47,10 @@ class Config:
 	def __cmp__(self, other):
 		return cmp(self.name, other.name)
 
-# All schema objects can have column names (optional for simple tables).
-column_meta = [
+# Metadata shared by all schema objects
+common_meta = [
+	Config('app_metadata', '', r'''
+	    application-owned metadata for this object'''),
 	Config('columns', '', r'''
 	    list of the column names.  Comma-separated list of the form
 	    <code>(column[,...])</code>.  For tables, the number of entries
@@ -73,7 +75,7 @@ source_meta = [
 	    configured by the application'''),
 ]
 
-format_meta = column_meta + [
+format_meta = common_meta + [
 	Config('key_format', 'u', r'''
 	    the format of the data packed into key items.  See @ref
 	    schema_format_types for details.  By default, the key_format is
@@ -289,7 +291,7 @@ table_only_meta = [
 	    WT_SESSION::create''', type='list'),
 ]
 
-colgroup_meta = column_meta + source_meta
+colgroup_meta = common_meta + source_meta
 
 index_meta = format_meta + source_meta
 
@@ -340,9 +342,20 @@ connection_runtime_config = [
 	Config('eviction_trigger', '95', r'''
 	    trigger eviction when the cache is using this much memory, as a
 	    percentage of the total cache size''', min=10, max=99),
-	Config('eviction_workers', '0', r'''
-	    additional threads to help evict pages from cache''',
-	    min=0, max=20),
+	Config('eviction', '', r'''
+	    eviction configuration options.''',
+	    type='category', subconfig=[
+            Config('threads_max', '1', r'''
+		maximum number of threads WiredTiger will start to help evict
+		pages from cache. The number of threads started will vary
+		depending on the current eviction load''',
+                min=1, max=20),
+            Config('threads_min', '1', r'''
+                minimum number of threads WiredTiger will start to help evict
+                pages from cache. The number of threads currently running will
+                vary depending on the current eviction load''',
+                min=1, max=20),
+            ]),
 	Config('shared_cache', '', r'''
 	    shared cache configuration options. A database should configure
 	    either a cache_size or a shared_cache not both''',

@@ -1,5 +1,31 @@
 /*! @page upgrading Upgrading WiredTiger applications
 
+@section version_232 Upgrading to Version 2.3.2
+
+<dl>
+<dt>WT_COLLATOR interface changes</dt>
+<dd>
+Add a new WT_COLLATOR::customize callback that WiredTiger will call (if set)
+for each data source configured to use the collator.  Applications using the
+existing WT_COLLATOR interface that do not require the new functionality should
+set this callback to \c NULL.
+</dd>
+</dl>
+
+@section version_231 Upgrading to Version 2.3.1
+
+<dl>
+<dt>::wiredtiger_open eviction_workers configuration changed</dt>
+<dd>
+The \c eviction_workers configuration setting has been replaced by
+\c eviction=(threads_min) and \c eviction=(threads_max) settings.
+
+There is also a semantic change because \c eviction_workers used to
+configure additional threads whereas the new settings configure the total
+number of threads involved with eviction.
+</dd>
+</dl>
+
 @section version_230 Upgrading to Version 2.3.0
 
 There are no special upgrade steps required.
