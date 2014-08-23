@@ -34,7 +34,7 @@
 
 #include <wiredtiger.h>
 
-const char * const home = NULL;
+const char *home;
 
 int
 main(void)
@@ -42,6 +42,16 @@ main(void)
 	WT_CONNECTION *conn;
 	WT_SESSION *session;
 	int ret;
+
+	/*
+	 * Create a clean test directory for this run of the test program if the
+	 * environment variable isn't already set (as is done by make check).
+	 */
+	if (getenv("WIREDTIGER_HOME") == NULL) {
+		home = "WIREDTIGER_HOME";
+		(void)system("rm -rf WIREDTIGER_HOME && mkdir WIREDTIGER_HOME");
+	} else
+		home = NULL;
 
 	if ((ret = wiredtiger_open(home, NULL, "create", &conn)) != 0 ||
 	    (ret = conn->open_session(conn, NULL, NULL, &session)) != 0) {

@@ -56,7 +56,7 @@ int session_ops(WT_SESSION *session);
 int transaction_ops(WT_CONNECTION *conn, WT_SESSION *session);
 
 const char * const progname = "ex_all";
-const char * const home = NULL;
+const char *home;
 
 int
 cursor_ops(WT_SESSION *session)
@@ -946,6 +946,16 @@ main(void)
 {
 	WT_CONNECTION *conn;
 	int ret;
+
+	/*
+	 * Create a clean test directory for this run of the test program if the
+	 * environment variable isn't already set (as is done by make check).
+	 */
+	if (getenv("WIREDTIGER_HOME") == NULL) {
+		home = "WIREDTIGER_HOME";
+		(void)system("rm -rf WIREDTIGER_HOME && mkdir WIREDTIGER_HOME");
+	} else
+		home = NULL;
 
 	/*! [Open a connection] */
 	ret = wiredtiger_open(home, NULL, "create,cache_size=500M", &conn);

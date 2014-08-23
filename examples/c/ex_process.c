@@ -30,17 +30,28 @@
  */
 
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
 #include <wiredtiger.h>
 
-const char * const home = NULL;
+const char *home;
 
 int main(void)
 {
 	int ret;
 	WT_CONNECTION *conn;
 	WT_SESSION *session;
+
+	/*
+	 * Create a clean test directory for this run of the test program if the
+	 * environment variable isn't already set (as is done by make check).
+	 */
+	if (getenv("WIREDTIGER_HOME") == NULL) {
+		home = "WIREDTIGER_HOME";
+		(void)system("rm -rf WIREDTIGER_HOME && mkdir WIREDTIGER_HOME");
+	} else
+		home = NULL;
 
 	/*! [processes] */
 	/* Open a connection to the database, creating it if necessary. */

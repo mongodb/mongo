@@ -29,15 +29,17 @@
  *	table from multiple threads.
  */
 
-#include <stdio.h>
-#include <string.h>
 #include <pthread.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
 
 #include <wiredtiger.h>
 
+const char *home;
+
 void *scan_thread(void *arg);
 
-const char * const home = NULL;
 #define	NUM_THREADS	10
 
 /*! [thread scan] */
@@ -79,6 +81,16 @@ main(void)
 	WT_CURSOR *cursor;
 	pthread_t threads[NUM_THREADS];
 	int i, ret;
+
+	/*
+	 * Create a clean test directory for this run of the test program if the
+	 * environment variable isn't already set (as is done by make check).
+	 */
+	if (getenv("WIREDTIGER_HOME") == NULL) {
+		home = "WIREDTIGER_HOME";
+		(void)system("rm -rf WIREDTIGER_HOME && mkdir WIREDTIGER_HOME");
+	} else
+		home = NULL;
 
 	if ((ret = wiredtiger_open(home, NULL,
 	    "create", &conn)) != 0)

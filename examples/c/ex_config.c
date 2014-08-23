@@ -30,11 +30,12 @@
  */
 
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
 #include <wiredtiger.h>
 
-const char * const home = NULL;
+const char *home;
 
 int main(void)
 {
@@ -43,6 +44,16 @@ int main(void)
 	WT_SESSION *session;
 	WT_CURSOR *cursor;
 	const char *key, *value;
+
+	/*
+	 * Create a clean test directory for this run of the test program if the
+	 * environment variable isn't already set (as is done by make check).
+	 */
+	if (getenv("WIREDTIGER_HOME") == NULL) {
+		home = "WIREDTIGER_HOME";
+		(void)system("rm -rf WIREDTIGER_HOME && mkdir WIREDTIGER_HOME");
+	} else
+		home = NULL;
 
 	/*! [configure cache size] */
 	if ((ret = wiredtiger_open(home, NULL,

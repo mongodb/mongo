@@ -41,7 +41,7 @@ int print_overflow_pages(WT_SESSION *);
 int get_stat(WT_CURSOR *cursor, int stat_field, uint64_t *valuep);
 int print_derived_stats(WT_SESSION *);
 
-const char * const home = NULL;
+const char *home;
 
 /*! [statistics display function] */
 int
@@ -186,6 +186,16 @@ main(void)
 	WT_CURSOR *cursor;
 	WT_SESSION *session;
 	int ret;
+
+	/*
+	 * Create a clean test directory for this run of the test program if the
+	 * environment variable isn't already set (as is done by make check).
+	 */
+	if (getenv("WIREDTIGER_HOME") == NULL) {
+		home = "WIREDTIGER_HOME";
+		(void)system("rm -rf WIREDTIGER_HOME && mkdir WIREDTIGER_HOME");
+	} else
+		home = NULL;
 
 	ret = wiredtiger_open(home, NULL, "create,statistics=(all)", &conn);
 	ret = conn->open_session(conn, NULL, NULL, &session);
