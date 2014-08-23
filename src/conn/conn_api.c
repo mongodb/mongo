@@ -86,12 +86,11 @@ __wt_collator_config(WT_SESSION_IMPL *session, const char **cfg,
 			    "unknown collator '%.*s'", (int)cval.len, cval.str);
 
 		if (ncoll->collator->customize != NULL) {
-			WT_CONFIG_ITEM app_config;
 			WT_RET(__wt_config_gets(session,
-			    session->dhandle->cfg, "app_config", &app_config));
+			    session->dhandle->cfg, "app_metadata", &cval));
 			WT_RET(ncoll->collator->customize(
 			    ncoll->collator, &session->iface,
-			    session->dhandle->name, &app_config, collatorp));
+			    session->dhandle->name, &cval, collatorp));
 		}
 		if (*collatorp == NULL)
 			*collatorp = ncoll->collator;
@@ -180,9 +179,11 @@ __conn_load_extension(
 	WT_SESSION_IMPL *session;
 	int (*load)(WT_CONNECTION *, WT_CONFIG_ARG *);
 	const char *init_name, *terminate_name;
+	int is_local;
 
 	dlh = NULL;
 	init_name = terminate_name = NULL;
+	is_local = (strcmp(path, "local") == 0);
 
 	conn = (WT_CONNECTION_IMPL *)wt_conn;
 	CONNECTION_API_CALL(conn, session, load_extension, config, cfg);
@@ -194,7 +195,7 @@ __conn_load_extension(
 	 * close discards the reference entirely -- in other words, we do not
 	 * check to see if we've already opened this shared library.
 	 */
-	WT_ERR(__wt_dlopen(session, path, &dlh));
+	WT_ERR(__wt_dlopen(session, is_local ? NULL : path, &dlh));
 
 	/*
 	 * Find the load function, remember the unload function for when we
