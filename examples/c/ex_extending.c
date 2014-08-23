@@ -34,7 +34,7 @@
 
 #include <wiredtiger.h>
 
-const char *home = NULL;
+const char * const home = NULL;
 
 /*! [case insensitive comparator] */
 /* A simple case insensitive comparator. */

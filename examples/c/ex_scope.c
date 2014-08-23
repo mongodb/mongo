@@ -33,7 +33,7 @@
 
 #include <wiredtiger.h>
 
-const char *home = NULL;
+const char * const home = NULL;
 
 static int
 cursor_scope_ops(WT_CURSOR *cursor)

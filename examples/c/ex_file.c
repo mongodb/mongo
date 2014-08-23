@@ -28,14 +28,13 @@
  *	This is an example demonstrating how to configure an individual file.
  */
 
-#include <errno.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
 #include <wiredtiger.h>
 
-const char *home = NULL;
+const char * const home = NULL;
 
 int
 main(void)

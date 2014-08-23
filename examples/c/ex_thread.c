@@ -37,23 +37,23 @@
 
 void *scan_thread(void *arg);
 
-const char *home = NULL;
+const char * const home = NULL;
 #define	NUM_THREADS	10
-
-WT_CONNECTION *conn;
 
 /*! [thread scan] */
 void *
-scan_thread(void *arg)
+scan_thread(void *conn_arg)
 {
+	WT_CONNECTION *conn;
 	WT_SESSION *session;
 	WT_CURSOR *cursor;
 	const char *key, *value;
 	int ret;
 
+	conn = conn_arg;
 	ret = conn->open_session(conn, NULL, NULL, &session);
-	ret = session->open_cursor(session, "table:access",
-	    NULL, NULL, &cursor);
+	ret = session->open_cursor(
+	    session, "table:access", NULL, NULL, &cursor);
 
 	/* Show all records. */
 	while ((ret = cursor->next(cursor)) == 0) {
@@ -62,8 +62,11 @@ scan_thread(void *arg)
 
 		printf("Got record: %s : %s\n", key, value);
 	}
+	if (ret != WT_NOTFOUND)
+		fprintf(stderr,
+		    "WT_CURSOR.next: %s\n", wiredtiger_strerror(ret));
 
-	return (arg);
+	return (NULL);
 }
 /*! [thread scan] */
 
@@ -71,6 +74,7 @@ scan_thread(void *arg)
 int
 main(void)
 {
+	WT_CONNECTION *conn;
 	WT_SESSION *session;
 	WT_CURSOR *cursor;
 	pthread_t threads[NUM_THREADS];
@@ -93,7 +97,7 @@ main(void)
 	ret = session->close(session, NULL);
 
 	for (i = 0; i < NUM_THREADS; i++)
-		ret = pthread_create(&threads[i], NULL, scan_thread, NULL);
+		ret = pthread_create(&threads[i], NULL, scan_thread, conn);
 
 	for (i = 0; i < NUM_THREADS; i++)
 		ret = pthread_join(threads[i], NULL);

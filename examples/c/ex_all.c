@@ -55,8 +55,8 @@ int pack_ops(WT_SESSION *session);
 int session_ops(WT_SESSION *session);
 int transaction_ops(WT_CONNECTION *conn, WT_SESSION *session);
 
-const char *progname;
-const char *home = NULL;
+const char * const progname = "ex_all";
+const char * const home = NULL;
 
 int
 cursor_ops(WT_SESSION *session)
@@ -166,7 +166,7 @@ cursor_ops(WT_SESSION *session)
 	const char *first;
 	int32_t second;
 	uint16_t third;
-	cursor->get_key(cursor, &first, &second, &third);
+	ret = cursor->get_key(cursor, &first, &second, &third);
 	/*! [Get the cursor's composite key] */
 	}
 
@@ -243,7 +243,7 @@ cursor_ops(WT_SESSION *session)
 	/*! [Search for an exact match] */
 	}
 
-	cursor_search_near(cursor);
+	ret = cursor_search_near(cursor);
 
 	{
 	/*! [Insert a new record or overwrite an existing record] */
@@ -629,7 +629,7 @@ session_ops(WT_SESSION *session)
 	cursor->set_key(cursor, "June30");
 	cursor->set_value(cursor, "value");
 	ret = cursor->update(cursor);
-	cursor->close(cursor);
+	ret = cursor->close(cursor);
 
 	{
 	/*! [Truncate a range] */
@@ -814,8 +814,8 @@ connection_ops(WT_CONNECTION *conn)
 	/*! [Load an extension] */
 #endif
 
-	add_collator(conn);
-	add_extractor(conn);
+	ret = add_collator(conn);
+	ret = add_extractor(conn);
 
 	/*! [Reconfigure a connection] */
 	ret = conn->reconfigure(conn, "eviction_target=75");
@@ -837,7 +837,7 @@ connection_ops(WT_CONNECTION *conn)
 	ret = conn->open_session(conn, NULL, NULL, &session);
 	/*! [Open a session] */
 
-	session_ops(session);
+	ret = session_ops(session);
 	}
 
 	/*! [Configure method configuration] */
@@ -938,7 +938,7 @@ hot_backup(WT_SESSION *session)
 	ret = session->checkpoint(session, "drop=(from=June01),name=June01");
 	/*! [Hot backup of a checkpoint]*/
 
-	return (0);
+	return (ret);
 }
 
 int
@@ -952,7 +952,7 @@ main(void)
 	/*! [Open a connection] */
 
 	if (ret == 0)
-		connection_ops(conn);
+		ret = connection_ops(conn);
 	/*
 	 * The connection has been closed.
 	 */
@@ -1086,10 +1086,10 @@ main(void)
 
 	{
 	/*! [Get the WiredTiger library version #2] */
-	int major, minor, patch;
-	(void)wiredtiger_version(&major, &minor, &patch);
+	int major_v, minor_v, patch;
+	(void)wiredtiger_version(&major_v, &minor_v, &patch);
 	printf("WiredTiger version is %d, %d (patch %d)\n",
-	    major, minor, patch);
+	    major_v, minor_v, patch);
 	/*! [Get the WiredTiger library version #2] */
 	}
 

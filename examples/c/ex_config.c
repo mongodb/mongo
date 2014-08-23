@@ -34,7 +34,7 @@
 
 #include <wiredtiger.h>
 
-const char *home = NULL;
+const char * const home = NULL;
 
 int main(void)
 {
@@ -64,8 +64,8 @@ int main(void)
 	ret = session->open_cursor(session, "config:", NULL, NULL, &cursor);
 
 	while ((ret = cursor->next(cursor)) == 0) {
-		cursor->get_key(cursor, &key);
-		cursor->get_value(cursor, &value);
+		ret = cursor->get_key(cursor, &key);
+		ret = cursor->get_value(cursor, &value);
 		printf("configuration value: %s = %s\n", key, value);
 	}
 

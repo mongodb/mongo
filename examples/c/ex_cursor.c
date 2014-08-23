@@ -42,7 +42,7 @@ int cursor_insert(WT_CURSOR *cursor);
 int cursor_update(WT_CURSOR *cursor);
 int cursor_remove(WT_CURSOR *cursor);
 
-const char *home = NULL;
+const char * const home = NULL;
 
 /*! [cursor next] */
 int

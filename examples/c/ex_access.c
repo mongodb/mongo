@@ -32,7 +32,7 @@
 
 #include <wiredtiger.h>
 
-const char *home = NULL;
+const char * const home = NULL;
 
 int main(void)
 {
