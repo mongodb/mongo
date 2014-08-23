@@ -35,8 +35,9 @@
 
 #include <wiredtiger.h>
 
-const char * const home = "./WT_EXLOG";
-const char * const home2 = "./WT_EXLOG2";
+const char *home1 = "WIREDTIGER_HOME_LOG_1";
+const char *home2 = "WIREDTIGER_HOME_LOG_2";
+
 const char * const uri = "table:logtest";
 
 #define	CONN_CONFIG "create,cache_size=100MB,log=(archive=false,enabled=true)"
@@ -50,7 +51,7 @@ setup_copy(WT_CONNECTION **wt_connp, WT_SESSION **sessionp)
 	if ((ret = wiredtiger_open(home2, NULL,
 	    CONN_CONFIG, wt_connp)) != 0) {
 		fprintf(stderr, "Error connecting to %s: %s\n",
-		    home, wiredtiger_strerror(ret));
+		    home1, wiredtiger_strerror(ret));
 		return (ret);
 	}
 
@@ -274,15 +275,15 @@ main(void)
 	char cmd_buf[256], k[16], v[16];
 
 	snprintf(cmd_buf, sizeof(cmd_buf), "rm -rf %s %s && mkdir %s %s",
-	    home, home2, home, home2);
+	    home1, home2, home1, home2);
 	if ((ret = system(cmd_buf)) != 0) {
 		fprintf(stderr, "%s: failed ret %d\n", cmd_buf, ret);
 		return (ret);
 	}
-	if ((ret = wiredtiger_open(home, NULL,
+	if ((ret = wiredtiger_open(home1, NULL,
 	    CONN_CONFIG, &wt_conn)) != 0) {
 		fprintf(stderr, "Error connecting to %s: %s\n",
-		    home, wiredtiger_strerror(ret));
+		    home1, wiredtiger_strerror(ret));
 		return (ret);
 	}
 
@@ -324,10 +325,10 @@ main(void)
 	 * have archiving turned off.
 	 */
 	ret = wt_conn->close(wt_conn, NULL);
-	if ((ret = wiredtiger_open(home, NULL,
+	if ((ret = wiredtiger_open(home1, NULL,
 	    CONN_CONFIG, &wt_conn)) != 0) {
 		fprintf(stderr, "Error connecting to %s: %s\n",
-		    home, wiredtiger_strerror(ret));
+		    home1, wiredtiger_strerror(ret));
 		return (ret);
 	}
 
