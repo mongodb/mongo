@@ -1143,10 +1143,9 @@ struct __wt_session {
 	    const char *name, const char *config);
 
 	/*!
-	 * Print something to the log file
-	 *
-	 * The database must be configured for logging when this
-	 * method is called.
+	 * Insert a ::WT_LOGREC_MESSAGE type record in the database log files
+	 * (the database must be configured for logging when this method is
+	 * called).
 	 *
 	 * @param session the session handle
 	 * @param fmt a printf format specifier

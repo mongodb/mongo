@@ -18,7 +18,7 @@ See the following for more details:
 
 - @subpage data_sources
 - @ref metadata
-- @subpage cursor_log
+- @ref cursor_log
 
 @section cursor_projections Projections
 
