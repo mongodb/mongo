@@ -1,138 +1,79 @@
-/*! @page durability Durability
+/*! @page durability Commit-level durability
 
-WiredTiger makes data durable by writing to files on disk.  These files
-include data files and, optionally, log files.  Transactions define the
-groups of updates that are made durable together: WiredTiger guarantees
-transactional atomicity.  See @ref transactions for more details.
+WiredTiger supports checkpoint durability by default, and optionally
+commit-level durability. In most applications, commit-level durability
+impacts performance more than checkpoint durability; checkpoints offer
+basic operation durability across application or system failure without
+impacting performance, (although the creation of each checkpoint is a
+relatively heavy-weight operation).  See @ref checkpoint for information
+on checkpoint durability.
 
-@section durability_checkpoint Checkpoint-level durability
+Commit-level durability is implemented using a write-ahead log and
+enabled using the \c log=(enabled) configuration to ::wiredtiger_open.
+When logging is enabled, WiredTiger writes records to the log for each
+transaction.
 
-Transactional updates are made durable by WT_SESSION::checkpoint
-operations.  All transactional updates that committed before the checkpoint
-started are made durable by the checkpoint.
+Transactions define which updates are made durable together see @ref
+transactions for details.  By default, log records are flushed to disk
+by WT_SESSION::commit_transaction, ensuring that, once
+WT_SESSION::commit_transaction returns successfully, updates performed
+by the transaction will be included in the database state regardless of
+application or system failure.
 
-Recovery is run automatically if required when a data source is opened.
-Any changes since the last checkpoint are discarded, and the application
-restarts from the transactional snapshot that was used to create the
-checkpoint
+When the transactional log is enabled, calling ::wiredtiger_open
+automatically performs a recovery step when opening the database that
+applies whatever changes from the log are required to bring the database
+up to date with the most recent transactional state.  This recovery step
+may require extensions be available when it runs (for example, collators
+and compression), which means applications doing recovery must configure
+extensions with the \c extensions keyword to ::wiredtiger_open.
 
-See @ref checkpoints for more information.
+@section durability_checkpoint Checkpoints
 
-@section durability_commit Commit-level durability
+Checkpoints of the database should still be performed periodically when
+commit-level durability is configured, either explicitly from the
+application or periodically based on elapsed time or data size with the
+\c checkpoint configuration to ::wiredtiger_open.
 
-WiredTiger can also be configured to provide durability at transaction
-commit.  That is, once WT_SESSION::commit_transaction completes
-successfully, the updates performed by the transaction will be included in
-the database state regardless of whether the application or system crashes
-and is restarted.
-
-Commit-level durability is implemented using a Write-Ahead Log and
-configured with the <code>log=(enabled)</code> key to ::wiredtiger_open.
-
-If the log is enabled WiredTiger will write records to the log for each
-update transaction, and optionally flush those records to stable storage
-during WT_SESSION::commit_transaction, controlled by the
-<code>transaction_sync=(enabled)</code> setting to ::wiredtiger_open.
-
-This demonstrates the importance of regular checkpoints: they limit the
-volume of commits that may be lost in a crash.  See
-WT_SESSION::checkpoint and @ref checkpoints for further information.
-
-@section durability_recovery Recovery
-
-When the commit log is enabled, calling ::wiredtiger_open will perform a
-recovery step when opening a database that applies any changes in the log
-that are required to bring the database up to date with the last committed
-change.
-
-@section durability_commit_modes Transaction sync methods
-
-There are two interfaces that are a concern when considering WiredTiger
-recoverability:
-
-1. The interface between WiredTiger and the operating system/filesystem.
-2. The interface between the operating system/filesystem and the underlying
-   stable storage hardware.
-
-WiredTiger uses the operating system interfaces and its underlying
-filesystem when writing its files.  This means that WiredTiger durability
-depends on the durability of the underlying filesystem.
-
-Otherwise, the interface requirements here are simple: the system call that
-WiredTiger uses to flush data to disk (normally fsync or fdatasync) must
-guarantee that all the information necessary for a file's recoverability
-has been written to stable storage before it returns to WiredTiger, and
-that no possible application or system crash can cause the flushed data to
-be lost.
-
-If <code>transaction_sync=(enabled=false)</code>, log records will be
-buffered in memory, and are only guaranteed to be flushed to disk be
-checkpoints, or calls to WT_SESSION::commit_transaction with \c sync=true.
-
-If <code>transaction_sync=(enabled=true)</code>, the
-<code>transaction_sync=(method)</code> configures the method used to
-flush log records to stable storage.  By default, it is set to \c fsync,
-which will call \c fsync (or \c fdatasync, when detected) before each
-commit completes.  It can also be set to \c dsync to use the \c O_SYNC
-or \c O_DSYNC flag to the <code>open(2)</code> system call, which is
-usually slower than \c fsync.  Lastly, if set to \c none, WiredTiger will
-call \c write before the commit completes, but will not force the write
-to be flushed.
-
-@section durability_archiving Removal of old log files
-
-By default, WiredTiger will automatically archive (i.e., remove) log files
-that are no longer required for recovery.  This can be disabled by setting
-<code>log=(archive=false)</code> to ::wiredtiger_open.  Old log files can
-only be removed after a checkpoint has completed and no hot backup is in
-progress.
-
-@section durability_group_commit Group commit
-
-WiredTiger will attempt to group together threads that commit concurrently
-and call the transaction sync method once for the group.  This usually
-means that multi-threaded workloads can achieve higher throughput than
-single-threaded workloads because the filesystem can data more efficiently
-to stable storage.  No application-level configuration is required for this
-feature.
-
-@section durability_performance Performance of durability modes
-
-Here is the expected performance of durability modes, from fastest to slowest:
-
-<table>
-@hrow{Durability Mode, Notes}
-@row{<code>log=(enabled=false)</code>, checkpoint-level durability}
-@row{<code>log=(enabled\,transaction_sync=false)</code>,
-	durable when \c sync is set in WT_SESSION::commit_transaction}
-@row{<code>log=(enabled\,transaction_method=none)</code>,
-	durable against process crashes but not system crashes}
-@row{<code>log=(enabled\,transaction_method=fsync)</code>,
-	fully durable with group commit}
-@row{<code>log=(enabled\,transaction_method=dsync)</code>,
-	fully durable\, flushed on every write}
-</table>
+Database checkpoints are necessary for two reasons: First, log files can
+only be archived after a checkpoint completes, and so the frequency of
+checkpoints determines the disk space required by log files.  Second,
+checkpoints bound the time required for recovery to complete after
+application or system failure by limiting the log records that need to
+be processed.
 
 @section durability_hotbackup Hot backup with logging
 
-With logging enabled, partial backups will result in error messages during
-recovery because data files referenced in the logs are not found.
+With logging enabled, partial backups will result in error messages
+during recovery because data files referenced in the logs are not found.
 Applications should do full backups if commit-level durability of the
 backup is required, or skip backing up log files and fall back to
 checkpoint durability for partial hot backups.
 
-@section durability_limitations Durability limits
+@section durability_archiving Log file archival
 
-- uncommitted changes must fit in memory: for efficiency, WiredTiger does
-  not write anything to the log until transactions commit
+WiredTiger log files are named "WiredTigerLog.[number]" where "[number]"
+is a 10-digit value, for example, WiredTigerLog.0000000001".  The log
+file with the largest number in its name is the most recent log file
+written.  The log file size can be set using the \c log configuration
+to ::wiredtiger_open.
 
-- log files can only be archived after a checkpoint completes.  The
-  frequency of checkpoints determines the disk space required by log files
-  and bounds the time required for recovery to complete after a crash.
+By default, WiredTiger automatically removes log files no longer
+required for recovery.  Applications wanting to archive log files
+instead can disable log file removal using the \c log=(archive=false)
+configuration to ::wiredtiger_open.
 
-- recovery needs collators and compression to be available when it runs,
-  which means that they must be configured with the \c extensions keyword
-  to ::wiredtiger_open: waiting until ::wiredtiger_open
-  returns is too late.
+Log files may only be removed or archived after a checkpoint has
+completed and when no hot backup is in progress.  After a checkpoint has
+completed, only the most recent log file is needed for recovery, and all
+other log files can be removed or archived.
 
- */
+@section durability_tuning Tuning commit-level durability
+
+@subsection durability_group_commit Group commit
+@copydoc doc_tune_durability_group_commit
+
+@subsection durability_flush_config Flush call configuration
+@copydoc doc_tune_durability_flush_config
+
+*/

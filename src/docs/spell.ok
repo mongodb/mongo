@@ -69,6 +69,7 @@ Vv
 WiredTiger
 WiredTiger's
 WiredTigerCheckpoint
+WiredTigerLog
 WiredTigerTestCase
 Za
 aR

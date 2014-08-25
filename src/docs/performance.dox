@@ -10,6 +10,7 @@ investigate performance and tune their WiredTiger applications.
 - @subpage tune_bulk_load
 - @subpage tune_cursor_persist
 - @subpage tune_read_only_objects
+- @subpage tune_durability
 - @subpage tune_checksum
 - @subpage tune_compression
 - @subpage tune_file_alloc
