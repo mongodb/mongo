@@ -789,7 +789,8 @@ methods = {
 		WT_SESSION::begin_transaction''',
 	        type='boolean'),
 	    Config('method', 'fsync', r'''
-	        the method used to ensure log records are stable on disk''',
+	        the method used to ensure log records are stable on disk,
+		see @ref tune_durability for more information''',
 	        choices=['dsync', 'fsync', 'none']),
 	    ]),
 	Config('use_environment_priv', 'false', r'''

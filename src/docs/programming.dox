@@ -28,11 +28,12 @@ each of which is ordered by one or more columns.
 - @subpage signals
 
 <h2>Advanced features</h2>
-- @subpage checkpoints
+- @subpage checkpoint
+- @subpage durability
+- @subpage async
 - @subpage compaction
 - @subpage hot_backup
 - @subpage statistics
-- @subpage async
 - @subpage shared_cache
 - @subpage cursor_log
 
