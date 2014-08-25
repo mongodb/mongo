@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"github.com/shelman/mongo-tools-proto/common/db/command"
 	"github.com/shelman/mongo-tools-proto/common/db/kerberos"
-	"github.com/shelman/mongo-tools-proto/common/db/ssl"
+	"github.com/shelman/mongo-tools-proto/common/db/openssl"
 	"github.com/shelman/mongo-tools-proto/common/options"
 	"gopkg.in/mgo.v2"
 	"sync"
@@ -91,10 +91,12 @@ func InitSessionProvider(opts options.ToolOptions) (*SessionProvider,
 	provider.connector = getConnector(opts)
 
 	// configure the connector
-	provider.connector.Configure(opts)
+	err := provider.connector.Configure(opts)
+	if err != nil {
+		return nil, fmt.Errorf("error configuring the connector: %v", err)
+	}
 
 	// initialize the provider's master session
-	var err error
 	provider.masterSession, err = provider.connector.GetNewSession()
 	if err != nil {
 		return nil, fmt.Errorf("error connecting to db server: %v", err)
@@ -110,7 +112,7 @@ func getConnector(opts options.ToolOptions) DBConnector {
 	}
 
 	if opts.SSL.UseSSL {
-		return &ssl.SSLDBConnector{}
+		return &openssl.SSLDBConnector{}
 	}
 
 	return &VanillaDBConnector{}

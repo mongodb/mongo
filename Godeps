@@ -3,3 +3,4 @@ github.com/jacobsa/oglematchers         4fc24f97b5b74022c2a3f4ca7eed57ca29083d3e
 github.com/smartystreets/goconvey       75bc4a2dad71e5c5b51c5009b33eba766ec57051
 github.com/jessevdk/go-flags            8ec9564882e7923e632f012761c81c46dcf5bec1
 github.com/3rf/mongo-lint               3550fdcf1f43b89aaeabaa4559eaae6dc4407e42
+github.com/spacemonkeygo/openssl        master                                      github.com/gabrielrussell/openssl
