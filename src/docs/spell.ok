@@ -84,6 +84,7 @@ ar
 archiver
 arg
 async
+atomicity
 autoconf
 automake
 basecfg
@@ -172,6 +173,7 @@ errno
 fadvise
 failchk
 fd's
+fdatasync
 fieldname
 fileID
 fileformats
@@ -334,6 +336,7 @@ recno
 recnoN
 recnum
 reconf
+recoverability
 recs
 rectype
 rerequests
