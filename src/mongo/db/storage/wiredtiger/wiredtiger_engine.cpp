@@ -48,6 +48,7 @@ namespace mongo {
             "create,extensions=[local=(entry=index_collator_extension)]", &conn);
         invariant(ret == 0);
         _db = new WiredTigerDatabase(conn);
+        loadExistingDatabases();
     }
 
     void WiredTigerEngine::cleanShutdown( OperationContext* txn ) {
@@ -58,9 +59,44 @@ namespace mongo {
         _db = 0;
     }
 
-    void WiredTigerEngine::listDatabases( std::vector<std::string>* out ) const {
-        // TODO: invariant(storageGlobalParams.directoryperdb);
+    // We can't do this in the constructor, since the rest of MongoDB isn't
+    // initialized enough to create CatalogEntry objects.
+    void WiredTigerEngine::loadExistingDatabases() {
+        boost::mutex::scoped_lock lk( _dbLock );
+        WT_SESSION *session = _db->GetSession();
 
+        WT_CURSOR *c;
+        int ret = session->open_cursor(session, "metadata:", NULL, NULL, &c);
+        invariant ( ret == 0 );
+
+        const char *uri;
+        size_t end;
+        // Find all tables with unique prefixes.
+        while ((ret = c->next(c)) == 0) {
+            c->get_key(c, &uri);
+            StringData uri_str(uri);
+            // Only look at tables that, skip indexes. All URIs should have a 
+            // period character, but check to be sure.
+            if (!uri_str.startsWith("table:") ||
+                uri_str.find('$') != std::string::npos ||
+                (end = uri_str.find('.')) == std::string::npos)
+                continue;
+
+            // Extract the database name.
+            std::string dbName = uri_str.toString().substr(6, end - 6);
+
+            // We've seen it already.
+            if (_dbs[dbName])
+                continue;
+
+            _dbs[dbName] = new WiredTigerDatabaseCatalogEntry( *_db, dbName );
+        }
+        invariant ( ret == WT_NOTFOUND );
+        _db->ReleaseSession(session);
+        
+    }
+
+    void WiredTigerEngine::listDatabases( std::vector<std::string>* out ) const {
         for ( DBMap::const_iterator i = _dbs.begin(); i != _dbs.end(); ++i) {
             out->push_back( i->first );
         } 
@@ -91,7 +127,7 @@ namespace mongo {
 
         WiredTigerDatabaseCatalogEntry*& dbentry = _dbs[dbName.toString()];
         if ( !dbentry ) {
-            dbentry = new WiredTigerDatabaseCatalogEntry( *_db, txn, dbName );
+            dbentry = new WiredTigerDatabaseCatalogEntry( *_db, dbName );
             _dbs[dbName.toString()] = dbentry;
         }
         return dbentry;

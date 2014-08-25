@@ -44,7 +44,7 @@ namespace mongo {
 
     class WiredTigerDatabaseCatalogEntry : public DatabaseCatalogEntry {
     public:
-        WiredTigerDatabaseCatalogEntry( WiredTigerDatabase &db, OperationContext* txn, const StringData& name );
+        WiredTigerDatabaseCatalogEntry( WiredTigerDatabase &db, const StringData& name );
 
         virtual ~WiredTigerDatabaseCatalogEntry();
 
@@ -98,7 +98,7 @@ namespace mongo {
 
     private:
 
-        void initCollectionNamespaces( OperationContext *txn );
+        void initCollectionNamespaces( );
         struct IndexEntry {
             std::string name;
             BSONObj spec;

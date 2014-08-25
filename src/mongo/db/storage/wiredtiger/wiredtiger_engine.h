@@ -73,6 +73,8 @@ namespace mongo {
                                        bool backupOriginalFiles = false ) { return Status::OK(); }
 
     private:
+        void loadExistingDatabases();
+
         std::string _path;
         WiredTigerDatabase *_db;
 
