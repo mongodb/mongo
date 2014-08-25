@@ -234,8 +234,10 @@ namespace repl {
                                                                 const BSONObj& givenConfig,
                                                                 BSONObjBuilder* resultObj) {
         Status legacyStatus = _legacy.processReplSetInitiate(txn, givenConfig, resultObj);
-        BSONObjBuilder implResult;
-        Status implStatus = _impl.processReplSetInitiate(txn, givenConfig, &implResult);
+        // TODO(spencer): Enable this once all config modifying paths are hooked up and we no
+        // longer use forceCurrentRSConfigHack.
+        //BSONObjBuilder implResult;
+        //Status implStatus = _impl.processReplSetInitiate(txn, givenConfig, &implResult);
         return legacyStatus;
     }
 
