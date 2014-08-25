@@ -67,17 +67,15 @@ namespace mongo {
             invariant(_cappedMaxDocs == -1);
         }
 
-#if 0
-        iter->SeekToLast();
-        if (iter->Valid()) {
-            rocksdb::Slice lastSlice = iter->key();
-            DiskLoc lastLoc = _makeDiskLoc( lastSlice );
-            _nextIdNum.store( lastLoc.getOfs() + ( uint64_t( lastLoc.a() ) << 32 ) + 1) ;
-        }
-        else {
-#endif
-        // Need to start at 1 so we are always higher than minDiskLoc
-        _nextIdNum.store( 1 );
+        WiredTigerSession &swrap = *new WiredTigerSession(_db);
+        Iterator *iter = new Iterator(*this, swrap, CollectionScanParams::Direction::BACKWARD);
+        if (!iter->isEOF()) {
+            _setId(iter->curr());
+            (void)_nextId();
+        } else
+            // Need to start at 1 so we are always higher than minDiskLoc
+            _nextIdNum.store( 1 );
+        delete iter;
     }
 
     WiredTigerRecordStore::~WiredTigerRecordStore() { }
@@ -398,6 +396,13 @@ namespace mongo {
             return Status( ErrorCodes::BadValue, "Invalid Option" );
 
         return Status::OK();
+    }
+
+    void WiredTigerRecordStore::_setId(DiskLoc loc) {
+        uint32_t a = loc.a();
+        uint32_t ofs = loc.getOfs();
+        uint64_t id = (uint64_t)a << 32 | ofs;
+        _nextIdNum.store(id);
     }
 
     DiskLoc WiredTigerRecordStore::_nextId() {

@@ -179,6 +179,7 @@ namespace mongo {
         }
 
         DiskLoc _nextId();
+        void _setId(DiskLoc loc);
         bool cappedAndNeedDelete() const;
         void cappedDeleteAsNeeded(OperationContext* txn);
         void _changeNumRecords(OperationContext* txn, bool insert);
