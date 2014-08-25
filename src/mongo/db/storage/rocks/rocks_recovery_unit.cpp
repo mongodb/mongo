@@ -58,15 +58,10 @@ namespace mongo {
     }
 
     void RocksRecoveryUnit::beginUnitOfWork() {
-        // TODO no need to initialize _writeBatch here so long as it is lazily initialized
         _depth++;
     }
-    void RocksRecoveryUnit::commitUnitOfWork() {
-        if ( _snapshot ) {
-            _db->ReleaseSnapshot( _snapshot );
-            _snapshot = _db->GetSnapshot();
-        }
 
+    void RocksRecoveryUnit::commitUnitOfWork() {
         if ( !_writeBatch ) {
             // nothing to be committed
             return;
@@ -78,8 +73,12 @@ namespace mongo {
             invariant( !"rocks write batch commit failed" );
         }
 
-        _writeBatch.reset( new rocksdb::WriteBatch() );
+        _writeBatch->Clear();
 
+        if ( _snapshot ) {
+            _db->ReleaseSnapshot( _snapshot );
+            _snapshot = _db->GetSnapshot();
+        }
     }
 
     void RocksRecoveryUnit::endUnitOfWork() {
@@ -121,11 +120,16 @@ namespace mongo {
     // which does not require write batches
     rocksdb::WriteBatch* RocksRecoveryUnit::writeBatch() {
         if ( !_writeBatch ) {
-            // XXX change to _writeBatch->Clear() everywhere
             _writeBatch.reset( new rocksdb::WriteBatch() );
         }
 
         return _writeBatch.get();
+    }
+
+    void RocksRecoveryUnit::registerChange(Change* change) {
+        // without rollbacks enabled, this is fine.
+        change->commit();
+        delete change;
     }
 
     // XXX lazily initialized for now

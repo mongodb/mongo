@@ -92,7 +92,7 @@ namespace mongo {
             {
                 MyOperationContext opCtx( db.get() );
                 {
-                    WriteUnitOfWork uow( opCtx.recoveryUnit() );
+                    WriteUnitOfWork uow( &opCtx );
                     ASSERT( !sortedData.unindex( &opCtx, key, loc ) );
                     uow.commit();
                 }
@@ -101,7 +101,7 @@ namespace mongo {
             {
                 MyOperationContext opCtx( db.get() );
                 {
-                    WriteUnitOfWork uow( opCtx.recoveryUnit() );
+                    WriteUnitOfWork uow( &opCtx );
                     Status res = sortedData.insert( &opCtx, key, loc, true );
                     ASSERT_OK( res );
                     uow.commit();
@@ -111,7 +111,7 @@ namespace mongo {
             {
                 MyOperationContext opCtx( db.get() );
                 {
-                    WriteUnitOfWork uow( opCtx.recoveryUnit() );
+                    WriteUnitOfWork uow( &opCtx );
                     ASSERT( sortedData.unindex( &opCtx, key, loc ) );
                     uow.commit();
                 }
@@ -120,7 +120,7 @@ namespace mongo {
             {
                 MyOperationContext opCtx( db.get() );
                 {
-                    WriteUnitOfWork uow( opCtx.recoveryUnit() );
+                    WriteUnitOfWork uow( &opCtx );
                     sortedData.unindex( &opCtx, key, loc );
                     uow.commit();
                 }
@@ -149,7 +149,7 @@ namespace mongo {
             {
                 MyOperationContext opCtx( db.get() );
                 {
-                    WriteUnitOfWork uow( opCtx.recoveryUnit() );
+                    WriteUnitOfWork uow( &opCtx );
                     Status res = sortedData.insert( &opCtx, key, loc, true );
                     ASSERT_OK( res );
                     uow.commit();
@@ -176,7 +176,7 @@ namespace mongo {
             {
                 MyOperationContext opCtx( db.get() );
                 {
-                    WriteUnitOfWork uow( opCtx.recoveryUnit() );
+                    WriteUnitOfWork uow( &opCtx );
 
                     ASSERT_OK( sortedData.insert( &opCtx, BSON( "" << 1 ), DiskLoc(1,1), true ) );
                     ASSERT_OK( sortedData.insert( &opCtx, BSON( "" << 2 ), DiskLoc(1,2), true ) );
@@ -226,7 +226,7 @@ namespace mongo {
             {
                 MyOperationContext opCtx( db.get() );
                 {
-                    WriteUnitOfWork uow( opCtx.recoveryUnit() );
+                    WriteUnitOfWork uow( &opCtx );
 
                     ASSERT_OK( sortedData.insert( &opCtx, BSON( "" << 1 ), DiskLoc(1,1), true ) );
                     ASSERT_OK( sortedData.insert( &opCtx, BSON( "" << 3 ), DiskLoc(1,3), true ) );
@@ -255,7 +255,7 @@ namespace mongo {
             {
                 MyOperationContext opCtx( db.get() );
                 {
-                    WriteUnitOfWork uow( opCtx.recoveryUnit() );
+                    WriteUnitOfWork uow( &opCtx );
 
                     ASSERT_OK( sortedData.insert( &opCtx, BSON( "" << 2 ), DiskLoc(1,2), true ) );
                     uow.commit();
@@ -270,7 +270,7 @@ namespace mongo {
 
                 // insert some more stuff
                 {
-                    WriteUnitOfWork uow( opCtx.recoveryUnit() );
+                    WriteUnitOfWork uow( &opCtx );
 
                     ASSERT_OK( sortedData.insert( &opCtx, BSON( "" << 1 ), DiskLoc(1,1), true ) );
                     ASSERT_OK( sortedData.insert( &opCtx, BSON( "" << 3 ), DiskLoc(1,3), true ) );
@@ -299,7 +299,7 @@ namespace mongo {
             {
                 MyOperationContext opCtx( db.get() );
                 {
-                    WriteUnitOfWork uow( opCtx.recoveryUnit() );
+                    WriteUnitOfWork uow( &opCtx );
 
                     ASSERT_OK( sortedData.insert( &opCtx, BSON( "" << 1 ), DiskLoc(1,1), true ) );
                     ASSERT_OK( sortedData.insert( &opCtx, BSON( "" << 2 ), DiskLoc(1,2), true ) );
@@ -353,7 +353,7 @@ namespace mongo {
             {
                 MyOperationContext opCtx( db.get() );
                 {
-                    WriteUnitOfWork uow( opCtx.recoveryUnit() );
+                    WriteUnitOfWork uow( &opCtx );
 
                     ASSERT_OK( sortedData.insert( &opCtx, BSON( "" << 1 ), DiskLoc(1,1), true ) );
                     ASSERT_OK( sortedData.insert( &opCtx, BSON( "" << 2 ), DiskLoc(1,2), true ) );
@@ -397,7 +397,7 @@ namespace mongo {
             {
                 MyOperationContext opCtx( db.get() );
                 {
-                    WriteUnitOfWork uow( opCtx.recoveryUnit() );
+                    WriteUnitOfWork uow( &opCtx );
 
                     ASSERT_OK( sortedData.insert( &opCtx, BSON( "" << 1 ), DiskLoc(1,1), true ) );
                     ASSERT_OK( sortedData.insert( &opCtx, BSON( "" << 2 ), DiskLoc(1,2), true ) );
@@ -420,7 +420,7 @@ namespace mongo {
                 {
                     MyOperationContext opCtx( db.get() );
                     {
-                        WriteUnitOfWork uow( opCtx.recoveryUnit() );
+                        WriteUnitOfWork uow( &opCtx );
                         ASSERT_OK(
                                 sortedData.insert( &opCtx, BSON( "" << 4 ), DiskLoc(1,4), true ) );
                         uow.commit();
@@ -449,7 +449,7 @@ namespace mongo {
             {
                 MyOperationContext opCtx( db.get() );
                 {
-                    WriteUnitOfWork uow( opCtx.recoveryUnit() );
+                    WriteUnitOfWork uow( &opCtx );
 
                     ASSERT_OK( sortedData.insert( &opCtx, BSON( "" << 1 ), DiskLoc(1,1), true ) );
                     ASSERT_OK( sortedData.insert( &opCtx, BSON( "" << 2 ), DiskLoc(1,2), true ) );
@@ -472,7 +472,7 @@ namespace mongo {
                 {
                     MyOperationContext opCtx( db.get() );
                     {
-                        WriteUnitOfWork uow( opCtx.recoveryUnit() );
+                        WriteUnitOfWork uow( &opCtx );
                         ASSERT( sortedData.unindex( &opCtx, BSON( "" << 1 ), DiskLoc(1,1) ) );
                         uow.commit();
                     }
@@ -497,7 +497,7 @@ namespace mongo {
             {
                 MyOperationContext opCtx( db.get() );
                 {
-                    WriteUnitOfWork uow( opCtx.recoveryUnit() );
+                    WriteUnitOfWork uow( &opCtx );
 
                     ASSERT_OK( sortedData.insert( &opCtx, BSON( "" << 1 ), DiskLoc(1,1), true ) );
                     ASSERT_OK( sortedData.insert( &opCtx, BSON( "" << 2 ), DiskLoc(1,2), true ) );
@@ -520,7 +520,7 @@ namespace mongo {
                 {
                     MyOperationContext opCtx( db.get() );
                     {
-                        WriteUnitOfWork uow( opCtx.recoveryUnit() );
+                        WriteUnitOfWork uow( &opCtx );
                         ASSERT( sortedData.unindex( &opCtx, BSON( "" << 3 ), DiskLoc(1,3) ) );
                         uow.commit();
                     }
@@ -564,7 +564,7 @@ namespace mongo {
             {
                 MyOperationContext opCtx( db.get() );
                 {
-                    WriteUnitOfWork uow( opCtx.recoveryUnit() );
+                    WriteUnitOfWork uow( &opCtx );
                     Status res = sortedData.insert( &opCtx, key, loc, true );
                     ASSERT_OK( res );
                     uow.commit();
@@ -593,7 +593,7 @@ namespace mongo {
             {
                 MyOperationContext opCtx( db.get() );
                 {
-                    WriteUnitOfWork uow( opCtx.recoveryUnit() );
+                    WriteUnitOfWork uow( &opCtx );
 
                     ASSERT_OK( sortedData.insert( &opCtx, BSON( "a" << 1 ), DiskLoc(1,1), true ) );
                     ASSERT_OK( sortedData.insert( &opCtx, BSON( "a" << 3 ), DiskLoc(1,1), true ) );
@@ -622,7 +622,7 @@ namespace mongo {
             {
                 MyOperationContext opCtx( db.get() );
                 {
-                    WriteUnitOfWork uow( opCtx.recoveryUnit() );
+                    WriteUnitOfWork uow( &opCtx );
 
                     ASSERT_OK( sortedData.insert( &opCtx, BSON( "" << 1 ), DiskLoc(1,1), true ) );
                     ASSERT_OK( sortedData.insert( &opCtx, BSON( "" << 2 ), DiskLoc(1,2), true ) );
@@ -676,7 +676,7 @@ namespace mongo {
             {
                 MyOperationContext opCtx( db.get() );
                 {
-                    WriteUnitOfWork uow( opCtx.recoveryUnit() );
+                    WriteUnitOfWork uow( &opCtx );
 
                     ASSERT_OK( sortedData.insert( &opCtx, BSON( "" << 1 ), DiskLoc(1,1), true ) );
                     ASSERT_OK( sortedData.insert( &opCtx, BSON( "" << 3 ), DiskLoc(1,3), true ) );
@@ -720,7 +720,7 @@ namespace mongo {
             {
                 MyOperationContext opCtx( db.get() );
                 {
-                    WriteUnitOfWork uow( opCtx.recoveryUnit() );
+                    WriteUnitOfWork uow( &opCtx );
 
                     ASSERT_OK( sortedData.insert( &opCtx, BSON( "" << 1 ), DiskLoc(1,1), true ) );
                     ASSERT_OK( sortedData.insert( &opCtx, BSON( "" << 3 ), DiskLoc(1,3), true ) );
@@ -743,7 +743,7 @@ namespace mongo {
                 {
                     MyOperationContext opCtx( db.get() );
                     {
-                        WriteUnitOfWork uow( opCtx.recoveryUnit() );
+                        WriteUnitOfWork uow( &opCtx );
                         ASSERT_OK(
                                 sortedData.insert( &opCtx, BSON( "" << 2 ), DiskLoc(1,2), true ) );
                         uow.commit();
@@ -777,7 +777,7 @@ namespace mongo {
             {
                 MyOperationContext opCtx( db.get() );
                 {
-                    WriteUnitOfWork uow( opCtx.recoveryUnit() );
+                    WriteUnitOfWork uow( &opCtx );
 
                     ASSERT_OK( sortedData.insert( &opCtx, BSON( "" << 1 ), DiskLoc(1,1), true ) );
                     ASSERT_OK( sortedData.insert( &opCtx, BSON( "" << 2 ), DiskLoc(1,2), true ) );
@@ -801,7 +801,7 @@ namespace mongo {
                 {
                     MyOperationContext opCtx( db.get() );
                     {
-                        WriteUnitOfWork uow( opCtx.recoveryUnit() );
+                        WriteUnitOfWork uow( &opCtx );
                         ASSERT( sortedData.unindex( &opCtx, BSON( "" << 3 ), DiskLoc(1,3) ) );
                         uow.commit();
                     }
@@ -827,7 +827,7 @@ namespace mongo {
             {
                 MyOperationContext opCtx( db.get() );
                 {
-                    WriteUnitOfWork uow( opCtx.recoveryUnit() );
+                    WriteUnitOfWork uow( &opCtx );
 
                     ASSERT_OK( sortedData.insert( &opCtx, BSON( "" << 1 ), DiskLoc(1,1), true ) );
                     ASSERT_OK( sortedData.insert( &opCtx, BSON( "" << 2 ), DiskLoc(1,2), true ) );
@@ -851,7 +851,7 @@ namespace mongo {
                 {
                     MyOperationContext opCtx( db.get() );
                     {
-                        WriteUnitOfWork uow( opCtx.recoveryUnit() );
+                        WriteUnitOfWork uow( &opCtx );
                         ASSERT( sortedData.unindex( &opCtx, BSON( "" << 1 ), DiskLoc(1,1) ) );
                         uow.commit();
                     }
@@ -876,7 +876,7 @@ namespace mongo {
             {
                 MyOperationContext opCtx( db.get() );
                 {
-                    WriteUnitOfWork uow( opCtx.recoveryUnit() );
+                    WriteUnitOfWork uow( &opCtx );
 
                     ASSERT_OK( sortedData.insert( &opCtx, BSON( "" << 1 ), DiskLoc(1,1), true ) );
                     ASSERT_OK( sortedData.insert( &opCtx, BSON( "" << 2 ), DiskLoc(1,2), true ) );
@@ -900,7 +900,7 @@ namespace mongo {
                 {
                     MyOperationContext opCtx( db.get() );
                     {
-                        WriteUnitOfWork uow( opCtx.recoveryUnit() );
+                        WriteUnitOfWork uow( &opCtx );
                         ASSERT( sortedData.unindex( &opCtx, BSON( "" << 1 ), DiskLoc(1,1) ) );
                         uow.commit();
                     }

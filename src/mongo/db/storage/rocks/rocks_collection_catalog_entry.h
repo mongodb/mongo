@@ -32,6 +32,10 @@
 
 #include "mongo/db/catalog/collection_catalog_entry.h"
 
+namespace rocksdb {
+    class DB;
+}
+
 namespace mongo {
 
     class RocksEngine;
@@ -89,6 +93,8 @@ namespace mongo {
 
         // ------ internal api
 
+        BSONObj getIndexSpec( const StringData& idxName, rocksdb::DB* db ) const;
+
         // called once when collection is created.
         void createMetaData();
 
@@ -127,8 +133,10 @@ namespace mongo {
 
     private:
         MetaData _getMetaData() const;
+        MetaData _getMetaData( rocksdb::DB* db ) const;
 
         MetaData _getMetaData_inlock() const;
+        MetaData _getMetaData_inlock( rocksdb::DB* db ) const;
 
         void _putMetaData_inlock( const MetaData& in );
 

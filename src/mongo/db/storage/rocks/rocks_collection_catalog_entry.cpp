@@ -93,7 +93,12 @@ namespace mongo {
     }
 
     BSONObj RocksCollectionCatalogEntry::getIndexSpec( const StringData& indexName ) const {
-        MetaData md = _getMetaData();
+        return getIndexSpec( indexName, _engine->getDB() );
+    }
+
+    BSONObj RocksCollectionCatalogEntry::getIndexSpec( const StringData& indexName,
+                                                       rocksdb::DB* db ) const {
+        MetaData md = _getMetaData( db );
 
         int offset = md.findIndexOffset( indexName );
         invariant( offset >= 0 );
@@ -229,18 +234,27 @@ namespace mongo {
     }
 
     RocksCollectionCatalogEntry::MetaData RocksCollectionCatalogEntry::_getMetaData() const {
+        return _getMetaData( _engine->getDB() );
+    }
+
+    RocksCollectionCatalogEntry::MetaData RocksCollectionCatalogEntry::_getMetaData(
+            rocksdb::DB* db ) const {
+        invariant( db );
         boost::mutex::scoped_lock lk( _metaDataMutex );
-        return _getMetaData_inlock();
+        return _getMetaData_inlock( db );
+    }
+
+    RocksCollectionCatalogEntry::MetaData RocksCollectionCatalogEntry::_getMetaData_inlock() const {
+        return _getMetaData_inlock( _engine->getDB() );
     }
 
     // The metadata in a column family with a specific name. This method reads from that column
     // family
-    RocksCollectionCatalogEntry::MetaData RocksCollectionCatalogEntry::_getMetaData_inlock() const {
+    RocksCollectionCatalogEntry::MetaData RocksCollectionCatalogEntry::_getMetaData_inlock(
+            rocksdb::DB* db ) const {
         string result;
         // XXX not using a snapshot here
-        rocksdb::Status status = _engine->getDB()->Get( rocksdb::ReadOptions(),
-                                                        _metaDataKey,
-                                                        &result );
+        rocksdb::Status status = db->Get( rocksdb::ReadOptions(), _metaDataKey, &result );
         invariant( !status.IsNotFound() );
         invariant( status.ok() );
 

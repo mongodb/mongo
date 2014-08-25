@@ -145,6 +145,11 @@ namespace mongo {
         bool cappedMaxDocs() const { invariant(_isCapped); return _cappedMaxDocs; }
         bool cappedMaxSize() const { invariant(_isCapped); return _cappedMaxSize; }
 
+        /**
+         * Drops metadata held by the record store
+         */
+        void dropRsMetaData( OperationContext* opCtx );
+
         static rocksdb::Comparator* newRocksCollectionComparator();
     private:
 
@@ -179,12 +184,15 @@ namespace mongo {
 
         static RocksRecoveryUnit* _getRecoveryUnit( OperationContext* opCtx );
 
-        DiskLoc _makeDiskLoc( const rocksdb::Slice& slice );
+        static DiskLoc _makeDiskLoc( const rocksdb::Slice& slice );
 
         DiskLoc _nextId();
         bool cappedAndNeedDelete() const;
         void cappedDeleteAsNeeded(OperationContext* txn);
-        rocksdb::Slice _makeKey( const DiskLoc& loc ) const;
+
+        // The use of this function requires that the passed in DiskLoc outlives the returned Slice
+        // TODO possibly make this safer in the future
+        static rocksdb::Slice _makeKey( const DiskLoc& loc );
         void _changeNumRecords(OperationContext* txn, bool insert);
         void _increaseDataSize(OperationContext* txn, int amount);
 
@@ -200,9 +208,14 @@ namespace mongo {
         AtomicUInt64 _nextIdNum;
         long long _dataSize;
         long long _numRecords;
-        rocksdb::ReadOptions _defaultReadOptions;
-        mutable boost::mutex _idLock;
-        mutable boost::mutex _numRecordsLock;
-        mutable boost::mutex _dataSizeLock;
+
+        const string _dataSizeKey;
+        const string _numRecordsKey;
+
+        // locks
+        // TODO I think that when you get one of these, you generally need to acquire the other.
+        // These could probably be moved into a single lock.
+        boost::mutex _numRecordsLock;
+        boost::mutex _dataSizeLock;
     };
 }

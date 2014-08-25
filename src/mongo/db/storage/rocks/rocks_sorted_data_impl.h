@@ -49,7 +49,6 @@ namespace mongo {
     class RocksSortedDataBuilderImpl : public SortedDataBuilderInterface {
     public:
         virtual Status addKey(const BSONObj& key, const DiskLoc& loc) = 0;
-        virtual unsigned long long commit(bool mayInterrupt) = 0;
     };
 
     /**
@@ -85,6 +84,8 @@ namespace mongo {
         virtual Cursor* newCursor(OperationContext* txn, int direction) const;
 
         virtual Status initAsEmpty(OperationContext* txn);
+
+        virtual long long getSpaceUsedBytes( OperationContext* txn ) const;
 
         //rocks specific
 

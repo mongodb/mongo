@@ -127,7 +127,7 @@ namespace mongo {
             }
 
             void aboutToDeleteBucket(const DiskLoc& bucket) {
-                // don't know if I need this or not
+                invariant( !"aboutToDeleteBucket should never be called from RocksSortedDataImpl" );
             }
 
             bool locate(const BSONObj& key, const DiskLoc& loc) {
@@ -178,10 +178,6 @@ namespace mongo {
                 advanceTo( keyBegin, keyBeginLen, afterVersion, keyEnd, keyEndInclusive );
             }
 
-            /**
-             * Return OK if it's not
-             * Otherwise return a status that can be displayed
-             */
             BSONObj getKey() const {
                 _load();
                 return _cachedKey;
@@ -491,6 +487,26 @@ namespace mongo {
     Status RocksSortedDataImpl::initAsEmpty(OperationContext* txn) {
         // no-op
         return Status::OK();
+    }
+
+    long long RocksSortedDataImpl::getSpaceUsedBytes( OperationContext* txn ) const {
+        boost::scoped_ptr<rocksdb::Iterator> iter( _db->NewIterator( rocksdb::ReadOptions(),
+                                                                     _columnFamily ) );
+        iter->SeekToFirst();
+        const rocksdb::Slice rangeStart = iter->key();
+        iter->SeekToLast();
+        // This is exclusive when we would prefer it be inclusive.
+        // AFB best way to get approximate size for a whole column family.
+        const rocksdb::Slice rangeEnd = iter->key();
+
+        rocksdb::Range fullIndexRange( rangeStart, rangeEnd );
+        uint64_t spacedUsedBytes = 0;
+
+        // TODO Rocks specifies that this may not include recently written data. Figure out if
+        // that's okay
+        _db->GetApproximateSizes( _columnFamily, &fullIndexRange, 1, &spacedUsedBytes );
+
+        return spacedUsedBytes;
     }
 
     // ownership passes to caller

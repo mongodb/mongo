@@ -40,6 +40,7 @@
 #include <boost/shared_ptr.hpp>
 #include <boost/thread/mutex.hpp>
 
+#include <rocksdb/status.h>
 
 #include "mongo/base/disallow_copying.h"
 #include "mongo/bson/ordering.h"
@@ -51,7 +52,6 @@ namespace rocksdb {
     struct ColumnFamilyDescriptor;
     struct ColumnFamilyOptions;
     class DB;
-    class Status;
     class Comparator;
     struct Options;
     struct ReadOptions;
@@ -60,6 +60,7 @@ namespace rocksdb {
 namespace mongo {
 
     class RocksCollectionCatalogEntry;
+    class RocksDatabaseCatalogEntry;
     class RocksRecordStore;
 
     struct CollectionOptions;
@@ -91,11 +92,11 @@ namespace mongo {
                                        bool preserveClonedFilesOnFailure = false,
                                        bool backupOriginalFiles = false );
 
-        /**
-         * This executes a shutdown in rocks, so this rocksdb must not be used after this call
-         * MongoDB will not call into the storage subsystem after calling this function
-         */
         virtual void cleanShutdown(OperationContext* txn);
+
+        virtual Status closeDatabase( OperationContext* txn, const StringData& db );
+
+        virtual Status dropDatabase( OperationContext* txn, const StringData& db );
 
         // rocks specific api
 
@@ -134,7 +135,6 @@ namespace mongo {
 
         struct Entry {
             boost::scoped_ptr<rocksdb::ColumnFamilyHandle> cfHandle;
-            boost::scoped_ptr<rocksdb::ColumnFamilyHandle> metaCfHandle;
             boost::scoped_ptr<RocksCollectionCatalogEntry> collectionEntry;
             boost::scoped_ptr<RocksRecordStore> recordStore;
             // These ColumnFamilyHandles must be deleted by removeIndex
@@ -145,28 +145,31 @@ namespace mongo {
         Entry* getEntry( const StringData& ns );
         const Entry* getEntry( const StringData& ns ) const;
 
-        typedef std::vector<boost::shared_ptr<Entry> > EntryVector;
         typedef std::vector<rocksdb::ColumnFamilyDescriptor> CfdVector;
 
         static rocksdb::Options dbOptions();
 
     private:
+        Status _dropCollection_inlock( OperationContext* opCtx, const StringData& ns );
+
         rocksdb::ColumnFamilyOptions _collectionOptions() const;
         rocksdb::ColumnFamilyOptions _indexOptions() const;
-
-        /**
-         * Does nothing if s.ok() is true, and blows up otherwise
-         */
-        void _rock_status_ok( rocksdb::Status s );
 
         std::string _path;
         boost::scoped_ptr<rocksdb::DB> _db;
         boost::scoped_ptr<rocksdb::Comparator> _collectionComparator;
 
-        // TODO rename
+        // Default column family is owned by the rocksdb::DB instance.
+        rocksdb::ColumnFamilyHandle* _defaultHandle;
+
         typedef StringMap< boost::shared_ptr<Entry> > EntryMap;
-        mutable boost::mutex _mapLock;
+        mutable boost::mutex _entryMapMutex;
         EntryMap _entryMap;
+
+        typedef StringMap<boost::shared_ptr<RocksDatabaseCatalogEntry> > DbCatalogMap;
+        // illegal to hold at the same time as _entryMapMutex
+        boost::mutex _dbCatalogMapMutex;
+        DbCatalogMap _dbCatalogMap;
 
         // private methods that should usually only be called from the RocksEngine constructor
 
@@ -175,7 +178,7 @@ namespace mongo {
         bool _isDefaultFamily( const string& name );
 
         // See larger comment in .cpp for why this is necessary
-        EntryVector _createNonIndexCatalogEntries( const std::vector<std::string>& families );
+        void _createNonIndexCatalogEntries( const std::vector<std::string>& families );
 
         /**
          * Return a vector containing the name of every column family in the database
@@ -198,9 +201,9 @@ namespace mongo {
                                 const std::map<std::string, Ordering>& indexOrderings );
 
         /**
-         * Create a complete Entry object in _entryMap for every ColumnFamilyDescriptor. Assumes that, if
-         * the collectionEntry field should be initialized, that is already has been prior to this
-         * function call.
+         * Create a complete Entry object in _entryMap for every ColumnFamilyDescriptor. Assumes
+         * that if the collectionEntry field should be initialized, that is already has been prior
+         * to this function call.
          *
          * @param families A vector of column family descriptors for every column family in the
          * database
@@ -210,4 +213,6 @@ namespace mongo {
         void _createEntries( const CfdVector& families,
                              const std::vector<rocksdb::ColumnFamilyHandle*> handles );
     };
+
+    Status toMongoStatus( rocksdb::Status s );
 }
