@@ -52,9 +52,9 @@ const char *uri = "table:logtest";
 	printf(" key size %" PRIu64, (uint64_t)logrec_key.size);	\
     if (logrec_value.size != 0)						\
 	printf(" value size %" PRIu64, (uint64_t)logrec_value.size);	\
+    printf("\n");							\
     if (rectype == WT_LOGREC_MESSAGE)					\
-	printf("\n Application Record: %s", (char *)logrec_value.data);	\
-    printf("\n");
+	printf("Application Record: %s\n", (char *)logrec_value.data);
 
 static int
 setup_copy(WT_CONNECTION **wt_connp, WT_SESSION **sessionp)

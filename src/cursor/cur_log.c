@@ -35,21 +35,22 @@ __curlog_logrec(
 	WT_RET(__wt_logrec_read(session, &cl->stepp, cl->stepp_end,
 	    &cl->rectype));
 
+	/* A step count of 0 means the entire record. */
+	cl->step_count = 0;
+
 	/*
 	 * Unpack the txnid so that we can return each
 	 * individual operation for this txnid.
 	 */
-	if (cl->rectype == WT_LOGREC_COMMIT) {
-		cl->step_count = 1;
+	if (cl->rectype == WT_LOGREC_COMMIT)
 		WT_RET(__wt_vunpack_uint(&cl->stepp,
 		    WT_PTRDIFF(cl->stepp_end, cl->stepp), &cl->txnid));
-	} else {
+	else {
 		/*
-		 * Step over anything else.  A step count of 0 means the
-		 * entire record.  Setting stepp to NULL causes the next()
-		 * method to read a new record.
+		 * Step over anything else.
+		 * Setting stepp to NULL causes the next()
+		 * method to read a new record on the next call.
 		 */
-		cl->step_count = 0;
 		cl->stepp = NULL;
 		cl->txnid = 0;
 	}
