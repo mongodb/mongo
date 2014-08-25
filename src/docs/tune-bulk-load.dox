@@ -30,4 +30,12 @@ records in the bitmap (as specified by the object's \c value_format
 configuration). Bulk-loaded bitmap values must end on a byte boundary
 relative to the bit count (except for the last set of values loaded).
 
+Bulk-loads are not commit-level durable, that is, the creation and
+subsequent bulk-load of an object will not appear in the database log
+files.  For this reason, applications doing incremental log archival
+after a hot backup should create a new copy of the data files after a
+bulk-load to make the bulk-load durable.  (Note that incremental log
+archival after a bulk-load can cause recovery to fail if there are log
+records modifying data files that don't appear in the backup copy.)
+
  */
