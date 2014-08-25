@@ -260,13 +260,8 @@ namespace mongo {
 
         txn->recoveryUnit()->writingInt( _details->indexBuildsInProgress ) += 1;
 
-        // 3) indexes entry in .ns file
-        NamespaceIndex& nsi = _db->_namespaceIndex;
-        invariant( nsi.details( desc->indexNamespace() ) == NULL );
-        nsi.add_ns( txn, desc->indexNamespace(), DiskLoc(), false );
-
-        // 4) system.namespaces entry index ns
-        _db->_addNamespaceToNamespaceCollection( txn, desc->indexNamespace(), NULL);
+        // 3) indexes entry in .ns file and system.namespaces
+        _db->createNamespaceForIndex(txn, desc->indexNamespace());
 
         return Status::OK();
     }
