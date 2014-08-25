@@ -50,11 +50,13 @@ be processed.
 
 @section durability_hotbackup Hot backup with logging
 
-With logging enabled, partial backups will result in error messages
-during recovery because data files referenced in the logs are not found.
-Applications should do full backups if commit-level durability of the
-backup is required, or skip backing up log files and fall back to
-checkpoint durability for partial hot backups.
+With logging enabled, backups where not all database objects are copied
+may result in error messages during recovery, because data files
+referenced in the logs might not be found.  Applications should either
+copy all objects and log files if commit-level durability of the copied
+database is required, or alternatively, copy only selected objects when
+backing up and not copy log files at all, then fall back to checkpoint
+durability when using the hot backup.
 
 @section durability_archiving Log file archival
 
