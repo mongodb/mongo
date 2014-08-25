@@ -74,7 +74,7 @@ If <code>transaction_sync=(enabled=true)</code>, the
 flush log records to stable storage.  By default, it is set to \c fsync,
 which will call \c fsync (or \c fdatasync, when detected) before each
 commit completes.  It can also be set to \c dsync to use the \c O_SYNC
-or \c O_DSYNC flag to the <code>open(2)</code> system call, which is 
+or \c O_DSYNC flag to the <code>open(2)</code> system call, which is
 usually slower than \c fsync.  Lastly, if set to \c none, WiredTiger will
 call \c write before the commit completes, but will not force the write
 to be flushed.
