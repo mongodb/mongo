@@ -471,7 +471,7 @@ namespace mongo {
          * MongoDB expects "natural" ordering - which is the order that items are inserted.
          * So a forward iteration in WiredTiger starts at the end of a collection.
          */
-        int ret = _forward() ? c->prev(c) : c->next(c);
+        int ret = _forward() ? c->next(c) : c->prev(c);
         invariant(ret == 0 || ret == WT_NOTFOUND);
         _eof = (ret == WT_NOTFOUND);
         return toReturn;
