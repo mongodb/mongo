@@ -1,4 +1,4 @@
-/*! @page performance Performance and Tuning WiredTiger applications
+/*! @page performance Performance tuning WiredTiger applications
 
 This section covers topics of interest for programmers wishing to
 investigate performance and tune their WiredTiger applications.
@@ -19,7 +19,7 @@ investigate performance and tune their WiredTiger applications.
 - @subpage tune_statistics
 - @subpage tune_close
 
-<h2>Simulating workloads in Wiredtiger</h2>
+<h2>Simulating workloads</h2>
 - @subpage wtperf
 
  */
