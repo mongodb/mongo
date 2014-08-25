@@ -36,6 +36,7 @@
 
 #include "mongo/db/storage/wiredtiger/wiredtiger_engine.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_index.h"
+#include "mongo/db/storage/wiredtiger/wiredtiger_record_store.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_recovery_unit.h"
 
 namespace mongo {
@@ -64,20 +65,17 @@ namespace mongo {
         return WiredTigerItem( key.objdata(), key.objsize() );
     }
 
-    WiredTigerItem _toItem( const DiskLoc& loc ) {
-        return WiredTigerItem( reinterpret_cast<const char*>( &loc ), sizeof( loc ) );
-    }
-
     /**
      * Constructs an IndexKeyEntry from a slice containing the bytes of a BSONObject followed
      * by the bytes of a DiskLoc
      */
     static IndexKeyEntry makeIndexKeyEntry(WT_SESSION *s, const WT_ITEM *keyCols) {
-        WT_ITEM keyItem, locItem;
-        int ret = wiredtiger_struct_unpack(s, keyCols->data, keyCols->size, "uu", &keyItem, &locItem);
+        WT_ITEM keyItem;
+        uint64_t locVal;
+        int ret = wiredtiger_struct_unpack(s, keyCols->data, keyCols->size, "uq", &keyItem, &locVal);
         invariant(ret == 0);
         BSONObj key = BSONObj( static_cast<const char *>( keyItem.data ) ).getOwned();
-        DiskLoc loc = *reinterpret_cast<const DiskLoc*>( locItem.data );
+        DiskLoc loc = WiredTigerRecordStore::_fromKey(locVal);
         return IndexKeyEntry( key, loc );
     }
 
@@ -144,7 +142,7 @@ namespace mongo {
             const std::string &ns, const std::string &idxName, IndexCatalogEntry& info) {
         WiredTigerSession swrap(db);
         WT_SESSION *s(swrap.Get());
-        std::string config = "type=file,key_format=uu,value_format=u,collator=mongo_index,app_metadata=";
+        std::string config = "type=file,key_format=uq,value_format=u,collator=mongo_index,app_metadata=";
         config += info.descriptor()->infoObj().jsonString();
         return s->create(s, _getURI(ns, idxName).c_str(), config.c_str());
     }
@@ -165,7 +163,7 @@ namespace mongo {
         WiredTigerCursor curwrap(GetCursor(swrap), swrap);
         WT_CURSOR *c = curwrap.Get();
         const BSONObj& finalKey = stripFieldNames( key );
-        c->set_key(c, _toItem(finalKey).Get(), _toItem(loc).Get());
+        c->set_key(c, _toItem(finalKey).Get(), WiredTigerRecordStore::_makeKey(loc));
         c->set_value(c, &emptyItem);
         int ret = c->insert(c);
         invariant(ret == 0);
@@ -181,12 +179,12 @@ namespace mongo {
         WiredTigerCursor curwrap(GetCursor(swrap), swrap);
         WT_CURSOR *c = curwrap.Get();
         const BSONObj& finalKey = stripFieldNames( key );
-        c->set_key(c, _toItem(finalKey).Get(), _toItem(loc).Get());
+        c->set_key(c, _toItem(finalKey).Get(), WiredTigerRecordStore::_makeKey(loc));
         int ret = c->search(c);
         if (ret == WT_NOTFOUND)
             return false;
         invariant(ret == 0);
-        c->set_key(c, _toItem(finalKey).Get(), _toItem(loc).Get());
+        c->set_key(c, _toItem(finalKey).Get(), WiredTigerRecordStore::_makeKey(loc));
         ret = c->remove(c);
         invariant(ret == 0);
         // TODO: can we avoid a search?
@@ -261,15 +259,16 @@ namespace mongo {
         /* Reverse cursors should start on the last matching key. */
         if (loc.isNull())
             searchLoc = _forward ? DiskLoc(0, 0) : DiskLoc(INT_MAX, INT_MAX);
-        c->set_key(c, _toItem(key).Get(), _toItem(searchLoc).Get());
+        c->set_key(c, _toItem(key).Get(), WiredTigerRecordStore::_makeKey(searchLoc));
         ret = c->search_near(c, &cmp);
 
 #if 0
         if (ret == 0) {
-            WT_ITEM keyItem, locItem;
-            ret = c->get_key(c, &keyItem, &locItem);
+            WT_ITEM keyItem;
+            uint64_t locVal;
+            ret = c->get_key(c, &keyItem, &locVal);
             BSONObj foundKey(static_cast<const char *>(keyItem.data));
-            DiskLoc foundLoc = *reinterpret_cast<const DiskLoc *>(locItem.data);
+            DiskLoc foundLoc = WiredTigerRecordStore::_fromKey(locVal);
             fprintf(stderr, "_locate search_near(%s:%s) -> %s:%s, cmp == %d, forward = %d\n", key.toString().c_str(), searchLoc.toString().c_str(), foundKey.toString().c_str(), foundLoc.toString().c_str(), cmp, _forward);
         } else {
             fprintf(stderr, "_locate search_near(%s:%s) returned == %d, forward = %d\n", key.toString().c_str(), searchLoc.toString().c_str(), ret, _forward);
@@ -286,8 +285,9 @@ namespace mongo {
         invariant(ret == 0);
         _eof = false;
 
-        WT_ITEM keyItem, locItem;
-        ret = c->get_key(c, &keyItem, &locItem);
+        WT_ITEM keyItem;
+        uint64_t locVal;
+        ret = c->get_key(c, &keyItem, &locVal);
         invariant(ret == 0);
         return key == BSONObj(static_cast<const char *>(keyItem.data));
     }
@@ -332,18 +332,20 @@ namespace mongo {
 
     BSONObj WiredTigerIndex::IndexCursor::getKey() const {
         WT_CURSOR *c = _cursor.Get();
-        WT_ITEM keyItem, locItem;
-        int ret = c->get_key(c, &keyItem, &locItem);
+        WT_ITEM keyItem;
+        uint64_t locVal;
+        int ret = c->get_key(c, &keyItem, &locVal);
         invariant(ret == 0);
         return BSONObj(static_cast<const char *>(keyItem.data));
     }
 
     DiskLoc WiredTigerIndex::IndexCursor::getDiskLoc() const {
         WT_CURSOR *c = _cursor.Get();
-        WT_ITEM keyItem, locItem;
-        int ret = c->get_key(c, &keyItem, &locItem);
+        WT_ITEM keyItem;
+        uint64_t locVal;
+        int ret = c->get_key(c, &keyItem, &locVal);
         invariant(ret == 0);
-        return reinterpret_cast<const DiskLoc *>(locItem.data)[0];
+        return WiredTigerRecordStore::_fromKey(locVal);
     }
 
     void WiredTigerIndex::IndexCursor::advance() {

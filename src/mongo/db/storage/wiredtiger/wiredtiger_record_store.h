@@ -47,6 +47,9 @@ namespace mongo {
         static int Create(WiredTigerDatabase &db,
             const StringData &ns, const CollectionOptions &options, bool allocateDefaultSpace);
 
+        static uint64_t _makeKey(const DiskLoc &loc);
+        static DiskLoc _fromKey(uint64_t k);
+
         WiredTigerRecordStore(const StringData& ns,
                           WiredTigerDatabase &db,
                           bool isCapped = false,
@@ -173,7 +176,7 @@ namespace mongo {
         };
 
         static WiredTigerRecoveryUnit* _getRecoveryUnit( OperationContext* txn );
-        static WiredTigerItem _makeKey(const DiskLoc &loc);
+
         static std::string _getURI(const StringData &ns) {
             return "table:" + ns.toString();
         }

@@ -41,7 +41,7 @@ namespace mongo {
             const StringData &ns, const CollectionOptions &options, bool allocateDefaultSpace) {
         WiredTigerSession swrap(db);
         WT_SESSION *s = swrap.Get();
-        return s->create(s, _getURI(ns).c_str(), "type=file,key_format=u,value_format=u");
+        return s->create(s, _getURI(ns).c_str(), "type=file,key_format=q,value_format=u");
     }
 
     WiredTigerRecordStore::WiredTigerRecordStore( const StringData& ns,
@@ -70,8 +70,8 @@ namespace mongo {
         WiredTigerSession &swrap = *new WiredTigerSession(_db);
         Iterator *iter = new Iterator(*this, swrap, CollectionScanParams::Direction::BACKWARD);
         if (!iter->isEOF()) {
-            _setId(iter->curr());
-            (void)_nextId();
+            DiskLoc loc = iter->curr();
+            _nextIdNum.store(((uint64_t)loc.a() << 32 | loc.getOfs()) + 1);
         } else
             // Need to start at 1 so we are always higher than minDiskLoc
             _nextIdNum.store( 1 );
@@ -103,7 +103,7 @@ namespace mongo {
         WiredTigerSession swrap(_db);
         WiredTigerCursor curwrap(GetCursor(swrap), swrap);
         WT_CURSOR *c = curwrap.Get();
-        c->set_key(c, _makeKey(loc).Get());
+        c->set_key(c, _makeKey(loc));
         int ret = c->search(c);
         invariant(ret == 0);
 
@@ -120,7 +120,7 @@ namespace mongo {
         WiredTigerSession &swrap = WiredTigerRecoveryUnit::Get(txn).GetSession();
         WiredTigerCursor curwrap(GetCursor(swrap), swrap);
         WT_CURSOR *c = curwrap.Get();
-        c->set_key(c, _makeKey(loc).Get());
+        c->set_key(c, _makeKey(loc));
         int ret = c->search(c);
         invariant(ret == 0);
 
@@ -161,10 +161,10 @@ namespace mongo {
         while ( ret == 0 && cappedAndNeedDelete() ) {
             invariant(_numRecords > 0);
 
-            WT_ITEM key;
+            uint64_t key;
             ret = c->get_key(c, &key);
             invariant(ret == 0);
-            DiskLoc oldest = reinterpret_cast<const DiskLoc*>(key.data)[0];
+            DiskLoc oldest = _fromKey(key);
 
             if ( _cappedDeleteCallback )
                 uassertStatusOK(_cappedDeleteCallback->aboutToDeleteCapped(txn, oldest));
@@ -190,7 +190,7 @@ namespace mongo {
         WiredTigerCursor curwrap(GetCursor(swrap), swrap);
         WT_CURSOR *c = curwrap.Get();
         DiskLoc loc = _nextId();
-        c->set_key(c, _makeKey(loc).Get());
+        c->set_key(c, _makeKey(loc));
         c->set_value(c, WiredTigerItem(data, len).Get());
         int ret = c->insert(c);
         invariant(ret == 0);
@@ -220,7 +220,7 @@ namespace mongo {
         WiredTigerCursor curwrap(GetCursor(swrap), swrap);
         WT_CURSOR *c = curwrap.Get();
         DiskLoc loc = _nextId();
-        c->set_key(c, _makeKey(loc).Get());
+        c->set_key(c, _makeKey(loc));
         c->set_value(c, WiredTigerItem(buf.get(), len).Get());
         int ret = c->insert(c);
         invariant(ret == 0);
@@ -242,7 +242,7 @@ namespace mongo {
         WiredTigerSession &swrap = WiredTigerRecoveryUnit::Get(txn).GetSession();
         WiredTigerCursor curwrap(GetCursor(swrap), swrap);
         WT_CURSOR *c = curwrap.Get();
-        c->set_key(c, _makeKey(loc).Get());
+        c->set_key(c, _makeKey(loc));
         int ret = c->search(c);
         invariant(ret == 0);
 
@@ -252,7 +252,7 @@ namespace mongo {
 
         int old_length = old_value.size;
 
-        c->set_key(c, _makeKey(loc).Get());
+        c->set_key(c, _makeKey(loc));
         c->set_value(c, WiredTigerItem(data, len).Get());
         ret = c->insert(c);
         invariant(ret == 0);
@@ -272,7 +272,7 @@ namespace mongo {
         WiredTigerSession &swrap = WiredTigerRecoveryUnit::Get(txn).GetSession();
         WiredTigerCursor curwrap(GetCursor(swrap), swrap);
         WT_CURSOR *c = curwrap.Get();
-        c->set_key(c, _makeKey(loc).Get());
+        c->set_key(c, _makeKey(loc));
         int ret = c->search(c);
         invariant(ret == 0);
 
@@ -398,13 +398,6 @@ namespace mongo {
         return Status::OK();
     }
 
-    void WiredTigerRecordStore::_setId(DiskLoc loc) {
-        uint32_t a = loc.a();
-        uint32_t ofs = loc.getOfs();
-        uint64_t id = (uint64_t)a << 32 | ofs;
-        _nextIdNum.store(id);
-    }
-
     DiskLoc WiredTigerRecordStore::_nextId() {
         const uint64_t myId = _nextIdNum.fetchAndAdd(1);
         int a = myId >> 32;
@@ -433,8 +426,13 @@ namespace mongo {
         // TODO make this persistent
     }
 
-    WiredTigerItem WiredTigerRecordStore::_makeKey( const DiskLoc& loc ) {
-        return WiredTigerItem( reinterpret_cast<const char*>( &loc ), sizeof( loc ) );
+    uint64_t WiredTigerRecordStore::_makeKey( const DiskLoc& loc ) {
+        return ((uint64_t)loc.a() << 32 | loc.getOfs());
+    }
+    DiskLoc WiredTigerRecordStore::_fromKey( uint64_t key ) {
+        uint32_t a = key >> 32;
+        uint32_t ofs = (uint32_t)key;
+        return DiskLoc(a, ofs);
     }
 
     // --------
@@ -458,10 +456,10 @@ namespace mongo {
             return DiskLoc();
 
         WT_CURSOR *c = _cursor.Get();
-        WT_ITEM key;
+        uint64_t key;
         int ret = c->get_key(c, &key);
         invariant(ret == 0);
-        return reinterpret_cast<const DiskLoc*>( key.data )[0];
+        return _fromKey(key);
     }
 
     DiskLoc WiredTigerRecordStore::Iterator::getNext() {
@@ -495,10 +493,10 @@ namespace mongo {
 
     RecordData WiredTigerRecordStore::Iterator::dataFor( const DiskLoc& loc ) const {
         WT_CURSOR *c = _cursor.Get();
-        WT_ITEM key;
+        uint64_t key;
         int ret = c->get_key(c, &key);
         invariant(ret == 0);
-        DiskLoc curr = reinterpret_cast<const DiskLoc*>( key.data )[0];
+        DiskLoc curr = _fromKey(key);
         if (curr == loc) {
             WT_ITEM value;
             int ret = c->get_value(c, &value);
