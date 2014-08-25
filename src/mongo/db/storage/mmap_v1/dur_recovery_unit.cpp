@@ -58,7 +58,7 @@ namespace mongo {
 
     DurRecoveryUnit::DurRecoveryUnit(OperationContext* txn)
         : _txn(txn),
-          _state(NORMAL)
+          _mustRollback(false)
     {}
 
     void DurRecoveryUnit::beginUnitOfWork() {
@@ -70,6 +70,7 @@ namespace mongo {
     void DurRecoveryUnit::commitUnitOfWork() {
 #if ROLLBACK_ENABLED
         invariant(inAUnitOfWork());
+        invariant(!_mustRollback);
 
         if (!inOutermostUnitOfWork()) {
             // If we are nested, make all changes for this level part of the containing UnitOfWork.
@@ -77,7 +78,6 @@ namespace mongo {
             // which it must now do.
             if (haveUncommitedChangesAtCurrentLevel()) {
                 _startOfUncommittedChangesForLevel.back() = _changes.size();
-                _state = MUST_COMMIT;
             }
             return;
         }
@@ -94,41 +94,47 @@ namespace mongo {
         invariant(inAUnitOfWork());
 
         if (haveUncommitedChangesAtCurrentLevel()) {
-            invariant(_state != MUST_COMMIT);
             rollbackInnermostChanges();
         }
-
-        // If outermost, we return to "normal" state after rolling back.
-        if (inOutermostUnitOfWork())
-            _state = NORMAL;
 
         _startOfUncommittedChangesForLevel.pop_back();
 #endif
     }
 
     void DurRecoveryUnit::publishChanges() {
+        if (!inAUnitOfWork())
+            return;
+
+        invariant(!_mustRollback);
+        invariant(inOutermostUnitOfWork());
+
         for (Changes::iterator it = _changes.begin(), end = _changes.end(); it != end; ++it) {
             (*it)->commit();
         }
 
-        // We now reset to a "clean" state without any uncommited changes, while keeping the same
-        // nesting level. Eventually this should only be called from the outermost UnitOfWork.
-        _state = NORMAL;
+        // We now reset to a "clean" state without any uncommited changes.
         _changes.clear();
-        std::fill(_startOfUncommittedChangesForLevel.begin(),
-                  _startOfUncommittedChangesForLevel.end(),
-                  0);
+        invariant(_startOfUncommittedChangesForLevel.front() == 0);
     }
 
     void DurRecoveryUnit::rollbackInnermostChanges() {
-        invariant(_state != MUST_COMMIT);
-
         invariant(_changes.size() <= size_t(std::numeric_limits<int>::max()));
         const int rollbackTo = _startOfUncommittedChangesForLevel.back();
         for (int i = _changes.size() - 1; i >= rollbackTo; i--) {
             _changes[i]->rollback();
         }
         _changes.erase(_changes.begin() + rollbackTo, _changes.end());
+
+        if (inOutermostUnitOfWork()) {
+            // We just rolled back so we are now "clean" and don't need to roll back anymore.
+            invariant(_changes.empty());
+            _mustRollback = false;
+        }
+        else {
+            // Inner UOW rolled back, so outer must not commit. We can loosen this in the future,
+            // but that would require all StorageEngines to support rollback of nested transactions.
+            _mustRollback = true;
+        }
     }
 
     void DurRecoveryUnit::recordPreimage(char* data, size_t len) {
@@ -139,16 +145,14 @@ namespace mongo {
 
     bool DurRecoveryUnit::awaitCommit() {
 #if ROLLBACK_ENABLED
-        // TODO this is currently only called outside of WriteLocks and UnitsOfWork.
-        // Consider enforcing with an invariant rather than correctly handling uncommitted changes.
-        publishChanges();
-        _state = NORMAL;
+        invariant(!inAUnitOfWork());
 #endif
         return getDur().awaitCommit();
     }
 
     bool DurRecoveryUnit::commitIfNeeded(bool force) {
-        // TODO see if we can ban this inside of nested UnitsOfWork.
+        // TODO this method will be going away completely soon. There is only one remaining caller.
+        invariant(force);
 #if ROLLBACK_ENABLED
         publishChanges();
 #endif
@@ -159,7 +163,10 @@ namespace mongo {
         invariant(len > 0);
 #if ROLLBACK_ENABLED
         invariant(inAUnitOfWork());
-        // TODO need to call MemoryMappedFile::makeWritable()
+
+        // Windows requires us to adjust the address space *before* we write to anything.
+        MemoryMappedFile::makeWritable(data, len);
+
         registerChange(new MemoryWrite(static_cast<char*>(data), len));
         return data;
 #else
