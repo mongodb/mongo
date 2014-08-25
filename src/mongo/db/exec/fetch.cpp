@@ -39,11 +39,13 @@ namespace mongo {
     // static
     const char* FetchStage::kStageType = "FETCH";
 
-    FetchStage::FetchStage(WorkingSet* ws,
+    FetchStage::FetchStage(OperationContext* txn,
+                           WorkingSet* ws,
                            PlanStage* child,
                            const MatchExpression* filter,
                            const Collection* collection)
-        : _collection(collection),
+        : _txn(txn),
+          _collection(collection),
           _ws(ws),
           _child(child),
           _filter(filter),
@@ -82,7 +84,7 @@ namespace mongo {
 
                 // Don't need index data anymore as we have an obj.
                 member->keyData.clear();
-                member->obj = _collection->docFor(member->loc);
+                member->obj = _collection->docFor(_txn, member->loc);
                 member->state = WorkingSetMember::LOC_AND_UNOWNED_OBJ;
             }
 

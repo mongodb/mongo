@@ -150,7 +150,7 @@ namespace mongo {
                 wunit.commit();
             }
 
-            result.append( "numIndexesBefore", collection->getIndexCatalog()->numIndexesTotal() );
+            result.append( "numIndexesBefore", collection->getIndexCatalog()->numIndexesTotal(txn) );
 
             MultiIndexBlock indexer(txn, collection);
             indexer.allowBackgroundBuilding();
@@ -198,7 +198,7 @@ namespace mongo {
                 wunit.commit();
             }
 
-            result.append( "numIndexesAfter", collection->getIndexCatalog()->numIndexesTotal() );
+            result.append( "numIndexesAfter", collection->getIndexCatalog()->numIndexesTotal(txn) );
 
             return true;
         }

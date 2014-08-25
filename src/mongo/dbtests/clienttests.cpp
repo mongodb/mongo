@@ -145,7 +145,7 @@ namespace ClientTests {
             ASSERT( collection );
             IndexCatalog* indexCatalog = collection->getIndexCatalog();
 
-            ASSERT_EQUALS(1, indexCatalog->numIndexesReady());
+            ASSERT_EQUALS(1, indexCatalog->numIndexesReady(&txn));
             // _id index
             ASSERT_EQUALS(1U, db.count("test.system.indexes"));
             // test.buildindex
@@ -155,14 +155,14 @@ namespace ClientTests {
 
             db.ensureIndex(ns(), BSON("y" << 1), true);
 
-            ASSERT_EQUALS(1, indexCatalog->numIndexesReady());
+            ASSERT_EQUALS(1, indexCatalog->numIndexesReady(&txn));
             ASSERT_EQUALS(1U, db.count("test.system.indexes"));
             ASSERT_EQUALS(3U, db.count("test.system.namespaces"));
 
             db.ensureIndex(ns(), BSON("x" << 1), true);
             ctx.commit();
 
-            ASSERT_EQUALS(2, indexCatalog->numIndexesReady());
+            ASSERT_EQUALS(2, indexCatalog->numIndexesReady(&txn));
             ASSERT_EQUALS(2U, db.count("test.system.indexes"));
             ASSERT_EQUALS(4U, db.count("test.system.namespaces"));
         }

@@ -86,7 +86,7 @@ namespace mongo {
             std::max( static_cast<long long>(size * 2),
                       static_cast<long long>(toCollection->getRecordStore()->storageSize(txn) * 2));
 
-        long long excessSize = fromCollection->dataSize() - allocatedSpaceGuess;
+        long long excessSize = fromCollection->dataSize(txn) - allocatedSpaceGuess;
 
         scoped_ptr<PlanExecutor> exec( InternalPlanner::collectionScan(txn,
                                                                        fromNs,

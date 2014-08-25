@@ -42,7 +42,7 @@ namespace mongo {
     public:
         virtual ~HeadManager() { }
 
-        virtual const DiskLoc getHead() const = 0;
+        virtual const DiskLoc getHead(OperationContext* txn) const = 0;
 
         virtual void setHead(OperationContext* txn, const DiskLoc newHead) = 0;
     };

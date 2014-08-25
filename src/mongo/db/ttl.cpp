@@ -133,7 +133,7 @@ namespace mongo {
                         break;
                     }
 
-                    if ( collection->getIndexCatalog()->findIndexByKeyPattern( key ) == NULL ) {
+                    if ( collection->getIndexCatalog()->findIndexByKeyPattern( txn, key ) == NULL ) {
                         // index not finished yet
                         LOG(1) << " skipping index because not finished";
                         continue;

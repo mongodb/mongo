@@ -142,7 +142,10 @@ namespace mongo {
      */
     class SortStage : public PlanStage {
     public:
-        SortStage(const SortStageParams& params, WorkingSet* ws, PlanStage* child);
+        SortStage(OperationContext* txn,
+                  const SortStageParams& params,
+                  WorkingSet* ws,
+                  PlanStage* child);
 
         virtual ~SortStage();
 
@@ -172,6 +175,7 @@ namespace mongo {
         //
 
         // Not owned by us.
+        OperationContext* _txn;
         const Collection* _collection;
 
         // Not owned by us.

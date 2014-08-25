@@ -89,7 +89,7 @@ namespace QueryMultiPlanRunner {
 
         IndexDescriptor* getIndex(OperationContext* txn, Database* db, const BSONObj& obj) {
             const Collection* collection = db->getCollection( txn, ns() );
-            return collection->getIndexCatalog()->findIndexByKeyPattern(obj);
+            return collection->getIndexCatalog()->findIndexByKeyPattern(txn, obj);
         }
 
         void insert(const BSONObj& obj) {
@@ -140,7 +140,7 @@ namespace QueryMultiPlanRunner {
 
             auto_ptr<WorkingSet> sharedWs(new WorkingSet());
             IndexScan* ix = new IndexScan(&_txn, ixparams, sharedWs.get(), NULL);
-            auto_ptr<PlanStage> firstRoot(new FetchStage(sharedWs.get(), ix, NULL, coll));
+            auto_ptr<PlanStage> firstRoot(new FetchStage(&_txn, sharedWs.get(), ix, NULL, coll));
 
             // Plan 1: CollScan with matcher.
             CollectionScanParams csparams;
@@ -161,7 +161,9 @@ namespace QueryMultiPlanRunner {
             verify(CanonicalQuery::canonicalize(ns(), BSON("foo" << 7), &cq).isOK());
             verify(NULL != cq);
 
-            MultiPlanStage* mps = new MultiPlanStage(ctx.ctx().db()->getCollection(&_txn, ns()),cq);
+            MultiPlanStage* mps = new MultiPlanStage(&_txn,
+                                                     ctx.ctx().db()->getCollection(&_txn, ns()),
+                                                     cq);
             mps->addPlan(createQuerySolution(), firstRoot.release(), sharedWs.get());
             mps->addPlan(createQuerySolution(), secondRoot.release(), sharedWs.get());
 
@@ -216,7 +218,7 @@ namespace QueryMultiPlanRunner {
 
             // Get planner params.
             QueryPlannerParams plannerParams;
-            fillOutPlannerParams(collection, cq, &plannerParams);
+            fillOutPlannerParams(&_txn, collection, cq, &plannerParams);
             // Turn this off otherwise it pops up in some plans.
             plannerParams.options &= ~QueryPlannerParams::KEEP_MUTATIONS;
 
@@ -230,7 +232,7 @@ namespace QueryMultiPlanRunner {
             ASSERT_EQUALS(solutions.size(), 3U);
 
             // Fill out the MultiPlanStage.
-            scoped_ptr<MultiPlanStage> mps(new MultiPlanStage(collection, cq));
+            scoped_ptr<MultiPlanStage> mps(new MultiPlanStage(&_txn, collection, cq));
             scoped_ptr<WorkingSet> ws(new WorkingSet());
             // Put each solution from the planner into the MPR.
             for (size_t i = 0; i < solutions.size(); ++i) {

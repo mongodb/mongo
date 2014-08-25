@@ -65,7 +65,7 @@ namespace QueryStageAnd {
         }
 
         IndexDescriptor* getIndex(const BSONObj& obj, Collection* coll) {
-            IndexDescriptor* descriptor = coll->getIndexCatalog()->findIndexByKeyPattern( obj );
+            IndexDescriptor* descriptor = coll->getIndexCatalog()->findIndexByKeyPattern( &_txn, obj );
             if (NULL == descriptor) {
                 FAIL(mongoutils::str::stream() << "Unable to find index with key pattern " << obj);
             }
@@ -171,7 +171,7 @@ namespace QueryStageAnd {
             addIndex(BSON("bar" << 1));
 
             WorkingSet ws;
-            scoped_ptr<AndHashStage> ah(new AndHashStage(&ws, NULL, coll));
+            scoped_ptr<AndHashStage> ah(new AndHashStage(&_txn, &ws, NULL, coll));
 
             // Foo <= 20
             IndexScanParams params;
@@ -207,9 +207,9 @@ namespace QueryStageAnd {
             getLocs(&data, coll);
             size_t memUsageBefore = ah->getMemUsage();
             for (set<DiskLoc>::const_iterator it = data.begin(); it != data.end(); ++it) {
-                if (coll->docFor(*it)["foo"].numberInt() == 15) {
+                if (coll->docFor(&_txn, *it)["foo"].numberInt() == 15) {
                     ah->invalidate(*it, INVALIDATION_DELETION);
-                    remove(coll->docFor(*it));
+                    remove(coll->docFor(&_txn, *it));
                     break;
                 }
             }
@@ -274,7 +274,7 @@ namespace QueryStageAnd {
             addIndex(BSON("baz" << 1));
 
             WorkingSet ws;
-            scoped_ptr<AndHashStage> ah(new AndHashStage(&ws, NULL, coll));
+            scoped_ptr<AndHashStage> ah(new AndHashStage(&_txn, &ws, NULL, coll));
 
             // Foo <= 20 (descending)
             IndexScanParams params;
@@ -309,7 +309,7 @@ namespace QueryStageAnd {
 
             size_t memUsageBefore = ah->getMemUsage();
             for (set<DiskLoc>::const_iterator it = data.begin(); it != data.end(); ++it) {
-                if (0 == deletedObj.woCompare(coll->docFor(*it))) {
+                if (0 == deletedObj.woCompare(coll->docFor(&_txn, *it))) {
                     ah->invalidate(*it, INVALIDATION_DELETION);
                     break;
                 }
@@ -331,7 +331,7 @@ namespace QueryStageAnd {
                 PlanStage::StageState status = ah->work(&id);
                 if (PlanStage::ADVANCED != status) { continue; }
                 WorkingSetMember* wsm = ws.get(id);
-                ASSERT_NOT_EQUALS(0, deletedObj.woCompare(coll->docFor(wsm->loc)));
+                ASSERT_NOT_EQUALS(0, deletedObj.woCompare(coll->docFor(&_txn, wsm->loc)));
                 ++count;
             }
 
@@ -359,7 +359,7 @@ namespace QueryStageAnd {
             addIndex(BSON("bar" << 1));
 
             WorkingSet ws;
-            scoped_ptr<AndHashStage> ah(new AndHashStage(&ws, NULL, coll));
+            scoped_ptr<AndHashStage> ah(new AndHashStage(&_txn, &ws, NULL, coll));
 
             // Foo <= 20
             IndexScanParams params;
@@ -413,7 +413,7 @@ namespace QueryStageAnd {
             // before hashed AND is done reading the first child (stage has to
             // hold 21 keys in buffer for Foo <= 20).
             WorkingSet ws;
-            scoped_ptr<AndHashStage> ah(new AndHashStage(&ws, NULL, coll, 20 * big.size()));
+            scoped_ptr<AndHashStage> ah(new AndHashStage(&_txn, &ws, NULL, coll, 20 * big.size()));
 
             // Foo <= 20
             IndexScanParams params;
@@ -465,7 +465,7 @@ namespace QueryStageAnd {
             // keys in last child's index are not buffered. There are 6 keys
             // that satisfy the criteria Foo <= 20 and Bar >= 10 and 5 <= baz <= 15.
             WorkingSet ws;
-            scoped_ptr<AndHashStage> ah(new AndHashStage(&ws, NULL, coll, 5 * big.size()));
+            scoped_ptr<AndHashStage> ah(new AndHashStage(&_txn, &ws, NULL, coll, 5 * big.size()));
 
             // Foo <= 20
             IndexScanParams params;
@@ -512,7 +512,7 @@ namespace QueryStageAnd {
             addIndex(BSON("baz" << 1));
 
             WorkingSet ws;
-            scoped_ptr<AndHashStage> ah(new AndHashStage(&ws, NULL, coll));
+            scoped_ptr<AndHashStage> ah(new AndHashStage(&_txn, &ws, NULL, coll));
 
             // Foo <= 20
             IndexScanParams params;
@@ -578,7 +578,7 @@ namespace QueryStageAnd {
             // before hashed AND is done reading the second child (stage has to
             // hold 11 keys in buffer for Foo <= 20 and Bar >= 10).
             WorkingSet ws;
-            scoped_ptr<AndHashStage> ah(new AndHashStage(&ws, NULL, coll, 10 * big.size()));
+            scoped_ptr<AndHashStage> ah(new AndHashStage(&_txn, &ws, NULL, coll, 10 * big.size()));
 
             // Foo <= 20
             IndexScanParams params;
@@ -631,7 +631,7 @@ namespace QueryStageAnd {
             addIndex(BSON("bar" << 1));
 
             WorkingSet ws;
-            scoped_ptr<AndHashStage> ah(new AndHashStage(&ws, NULL, coll));
+            scoped_ptr<AndHashStage> ah(new AndHashStage(&_txn, &ws, NULL, coll));
 
             // Foo <= 20
             IndexScanParams params;
@@ -691,7 +691,7 @@ namespace QueryStageAnd {
             addIndex(BSON("bar" << 1));
 
             WorkingSet ws;
-            scoped_ptr<AndHashStage> ah(new AndHashStage(&ws, NULL, coll));
+            scoped_ptr<AndHashStage> ah(new AndHashStage(&_txn, &ws, NULL, coll));
 
             // Foo >= 100
             IndexScanParams params;
@@ -742,7 +742,7 @@ namespace QueryStageAnd {
             StatusWithMatchExpression swme = MatchExpressionParser::parse(filter);
             verify(swme.isOK());
             auto_ptr<MatchExpression> filterExpr(swme.getValue());
-            scoped_ptr<AndHashStage> ah(new AndHashStage(&ws, filterExpr.get(), coll));
+            scoped_ptr<AndHashStage> ah(new AndHashStage(&_txn, &ws, filterExpr.get(), coll));
 
             // Foo <= 20
             IndexScanParams params;
@@ -790,7 +790,7 @@ namespace QueryStageAnd {
             addIndex(BSON("bar" << 1));
 
             WorkingSet ws;
-            scoped_ptr<AndHashStage> ah(new AndHashStage(&ws, NULL, coll));
+            scoped_ptr<AndHashStage> ah(new AndHashStage(&_txn, &ws, NULL, coll));
 
             // Foo <= 20
             IndexScanParams params;
@@ -804,7 +804,7 @@ namespace QueryStageAnd {
 
             // First child of the AND_HASH stage is a Fetch. The NULL in the
             // constructor means there is no filter.
-            FetchStage* fetch = new FetchStage(&ws, firstScan, NULL, coll);
+            FetchStage* fetch = new FetchStage(&_txn, &ws, firstScan, NULL, coll);
             ah->addChild(fetch);
 
             // Bar >= 10
@@ -848,7 +848,7 @@ namespace QueryStageAnd {
             addIndex(BSON("bar" << 1));
 
             WorkingSet ws;
-            scoped_ptr<AndHashStage> ah(new AndHashStage(&ws, NULL, coll));
+            scoped_ptr<AndHashStage> ah(new AndHashStage(&_txn, &ws, NULL, coll));
 
             // Foo <= 20
             IndexScanParams params;
@@ -870,7 +870,7 @@ namespace QueryStageAnd {
 
             // Second child of the AND_HASH stage is a Fetch. The NULL in the
             // constructor means there is no filter.
-            FetchStage* fetch = new FetchStage(&ws, secondScan, NULL, coll);
+            FetchStage* fetch = new FetchStage(&_txn, &ws, secondScan, NULL, coll);
             ah->addChild(fetch);
             ctx.commit();
 
@@ -911,7 +911,7 @@ namespace QueryStageAnd {
             addIndex(BSON("bar" << 1));
 
             WorkingSet ws;
-            scoped_ptr<AndSortedStage> ah(new AndSortedStage(&ws, NULL, coll));
+            scoped_ptr<AndSortedStage> ah(new AndSortedStage(&_txn, &ws, NULL, coll));
 
             // Scan over foo == 1
             IndexScanParams params;
@@ -944,7 +944,7 @@ namespace QueryStageAnd {
             // and make sure it shows up in the flagged results.
             ah->saveState();
             ah->invalidate(*data.begin(), INVALIDATION_DELETION);
-            remove(coll->docFor(*data.begin()));
+            remove(coll->docFor(&_txn, *data.begin()));
             ah->restoreState(&_txn);
 
             // Make sure the nuked obj is actually in the flagged data.
@@ -983,7 +983,7 @@ namespace QueryStageAnd {
             // not flagged.
             ah->saveState();
             ah->invalidate(*it, INVALIDATION_DELETION);
-            remove(coll->docFor(*it));
+            remove(coll->docFor(&_txn, *it));
             ah->restoreState(&_txn);
 
             // Get all results aside from the two we killed.
@@ -1037,7 +1037,7 @@ namespace QueryStageAnd {
             addIndex(BSON("baz" << 1));
 
             WorkingSet ws;
-            scoped_ptr<AndSortedStage> ah(new AndSortedStage(&ws, NULL, coll));
+            scoped_ptr<AndSortedStage> ah(new AndSortedStage(&_txn, &ws, NULL, coll));
 
             // Scan over foo == 1
             IndexScanParams params;
@@ -1082,7 +1082,7 @@ namespace QueryStageAnd {
             addIndex(BSON("bar" << 1));
 
             WorkingSet ws;
-            scoped_ptr<AndSortedStage> ah(new AndSortedStage(&ws, NULL, coll));
+            scoped_ptr<AndSortedStage> ah(new AndSortedStage(&_txn, &ws, NULL, coll));
 
             // Foo == 7.  Should be EOF.
             IndexScanParams params;
@@ -1130,7 +1130,7 @@ namespace QueryStageAnd {
             addIndex(BSON("bar" << 1));
 
             WorkingSet ws;
-            scoped_ptr<AndSortedStage> ah(new AndSortedStage(&ws, NULL, coll));
+            scoped_ptr<AndSortedStage> ah(new AndSortedStage(&_txn, &ws, NULL, coll));
 
             // foo == 7.
             IndexScanParams params;
@@ -1178,7 +1178,7 @@ namespace QueryStageAnd {
             StatusWithMatchExpression swme = MatchExpressionParser::parse(filterObj);
             verify(swme.isOK());
             auto_ptr<MatchExpression> filterExpr(swme.getValue());
-            scoped_ptr<AndSortedStage> ah(new AndSortedStage(&ws, filterExpr.get(), coll));
+            scoped_ptr<AndSortedStage> ah(new AndSortedStage(&_txn, &ws, filterExpr.get(), coll));
 
             // Scan over foo == 1
             IndexScanParams params;
@@ -1219,7 +1219,7 @@ namespace QueryStageAnd {
             addIndex(BSON("bar" << 1));
 
             WorkingSet ws;
-            scoped_ptr<AndHashStage> ah(new AndHashStage(&ws, NULL, coll));
+            scoped_ptr<AndHashStage> ah(new AndHashStage(&_txn, &ws, NULL, coll));
 
             // Scan over foo == 1
             IndexScanParams params;
@@ -1244,11 +1244,11 @@ namespace QueryStageAnd {
                 WorkingSetID id = WorkingSet::INVALID_ID;
                 PlanStage::StageState status = ah->work(&id);
                 if (PlanStage::ADVANCED != status) { continue; }
-                BSONObj thisObj = coll->docFor(ws.get(id)->loc);
+                BSONObj thisObj = coll->docFor(&_txn, ws.get(id)->loc);
                 ASSERT_EQUALS(7 + count, thisObj["bar"].numberInt());
                 ++count;
                 if (WorkingSet::INVALID_ID != lastId) {
-                    BSONObj lastObj = coll->docFor(ws.get(lastId)->loc);
+                    BSONObj lastObj = coll->docFor(&_txn, ws.get(lastId)->loc);
                     ASSERT_LESS_THAN(lastObj["bar"].woCompare(thisObj["bar"]), 0);
                 }
                 lastId = id;
@@ -1282,7 +1282,7 @@ namespace QueryStageAnd {
             addIndex(BSON("bar" << 1));
 
             WorkingSet ws;
-            scoped_ptr<AndSortedStage> as(new AndSortedStage(&ws, NULL, coll));
+            scoped_ptr<AndSortedStage> as(new AndSortedStage(&_txn, &ws, NULL, coll));
 
             // Scan over foo == 1
             IndexScanParams params;
@@ -1296,7 +1296,7 @@ namespace QueryStageAnd {
 
             // First child of the AND_SORTED stage is a Fetch. The NULL in the
             // constructor means there is no filter.
-            FetchStage* fetch = new FetchStage(&ws, firstScan, NULL, coll);
+            FetchStage* fetch = new FetchStage(&_txn, &ws, firstScan, NULL, coll);
             as->addChild(fetch);
 
             // bar == 1
@@ -1335,7 +1335,7 @@ namespace QueryStageAnd {
             addIndex(BSON("bar" << 1));
 
             WorkingSet ws;
-            scoped_ptr<AndSortedStage> as(new AndSortedStage(&ws, NULL, coll));
+            scoped_ptr<AndSortedStage> as(new AndSortedStage(&_txn, &ws, NULL, coll));
 
             // Scan over foo == 1
             IndexScanParams params;
@@ -1353,7 +1353,7 @@ namespace QueryStageAnd {
 
             // Second child of the AND_SORTED stage is a Fetch. The NULL in the
             // constructor means there is no filter.
-            FetchStage* fetch = new FetchStage(&ws, secondScan, NULL, coll);
+            FetchStage* fetch = new FetchStage(&_txn, &ws, secondScan, NULL, coll);
             as->addChild(fetch);
             ctx.commit();
 

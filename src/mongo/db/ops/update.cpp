@@ -99,7 +99,7 @@ namespace mongo {
 
         if (lifecycle) {
             lifecycle->setCollection(collection);
-            driver->refreshIndexKeys(lifecycle->getIndexKeys());
+            driver->refreshIndexKeys(lifecycle->getIndexKeys(request.getOpCtx()));
         }
 
         PlanExecutor* rawExec;

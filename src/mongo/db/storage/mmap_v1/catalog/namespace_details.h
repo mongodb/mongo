@@ -201,7 +201,8 @@ namespace mongo {
          *
          * @return > 0 if index name was found, -1 otherwise.
          */
-        int _catalogFindIndexByName(const Collection* coll,
+        int _catalogFindIndexByName(OperationContext* txn,
+                                    const Collection* coll,
                                     const StringData& name, 
                                     bool includeBackgroundInProgress) const;
 

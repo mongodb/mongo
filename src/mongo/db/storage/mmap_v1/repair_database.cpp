@@ -339,7 +339,7 @@ namespace mongo {
                                                                       CollectionScanParams::FORWARD ) );
                     while ( !it->isEOF() ) {
                         DiskLoc loc = it->getNext();
-                        BSONObj obj = coll->docFor( loc );
+                        BSONObj obj = coll->docFor( txn, loc );
 
                         string ns = obj["name"].String();
 
@@ -389,7 +389,7 @@ namespace mongo {
                 {
                     vector<BSONObj> indexes;
                     IndexCatalog::IndexIterator ii =
-                        originalCollection->getIndexCatalog()->getIndexIterator( false );
+                        originalCollection->getIndexCatalog()->getIndexIterator( txn, false );
                     while ( ii.more() ) {
                         IndexDescriptor* desc = ii.next();
                         indexes.push_back( desc->infoObj() );
@@ -407,7 +407,7 @@ namespace mongo {
                     DiskLoc loc = iterator->getNext();
                     invariant( !loc.isNull() );
 
-                    BSONObj doc = originalCollection->docFor( loc );
+                    BSONObj doc = originalCollection->docFor( txn, loc );
 
                     WriteUnitOfWork wunit(txn);
                     StatusWith<DiskLoc> result = tempCollection->insertDocument(txn,

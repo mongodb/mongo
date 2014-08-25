@@ -62,44 +62,50 @@ namespace mongo {
 
         // ---- accessors -----
 
-        int numIndexesTotal() const;
-        int numIndexesReady() const;
-        int numIndexesInProgress() const { return numIndexesTotal() - numIndexesReady(); }
+        int numIndexesTotal( OperationContext* txn ) const;
+        int numIndexesReady( OperationContext* txn ) const;
+        int numIndexesInProgress( OperationContext* txn  ) const {
+            return numIndexesTotal(txn) - numIndexesReady(txn);
+        }
 
         /**
          * this is in "alive" until the Collection goes away
          * in which case everything from this tree has to go away
          */
 
-        bool haveIdIndex() const;
+        bool haveIdIndex( OperationContext* txn ) const;
 
         /**
          * Returns the spec for the id index to create by default for this collection.
          */
         BSONObj getDefaultIdIndexSpec() const;
 
-        IndexDescriptor* findIdIndex() const;
+        IndexDescriptor* findIdIndex( OperationContext* txn ) const;
 
         /**
          * @return null if cannot find
          */
-        IndexDescriptor* findIndexByName( const StringData& name,
+        IndexDescriptor* findIndexByName( OperationContext* txn,
+                                          const StringData& name,
                                           bool includeUnfinishedIndexes = false ) const;
 
         /**
          * @return null if cannot find
          */
-        IndexDescriptor* findIndexByKeyPattern( const BSONObj& key,
+        IndexDescriptor* findIndexByKeyPattern( OperationContext* txn,
+                                                const BSONObj& key,
                                                 bool includeUnfinishedIndexes = false ) const;
 
         /* Returns the index entry for the first index whose prefix contains
          * 'keyPattern'. If 'requireSingleKey' is true, skip indices that contain
          * array attributes. Otherwise, returns NULL.
          */
-        IndexDescriptor* findIndexByPrefix( const BSONObj &keyPattern,
+        IndexDescriptor* findIndexByPrefix( OperationContext* txn,
+                                            const BSONObj &keyPattern,
                                             bool requireSingleKey ) const;
 
-        void findIndexByType( const std::string& type,
+        void findIndexByType( OperationContext* txn,
+                              const std::string& type,
                               std::vector<IndexDescriptor*>& matches,
                               bool includeUnfinishedIndexes = false ) const;
 
@@ -123,11 +129,15 @@ namespace mongo {
             // returns the access method for the last return IndexDescriptor
             IndexAccessMethod* accessMethod( IndexDescriptor* desc );
         private:
-            IndexIterator( const IndexCatalog* cat, bool includeUnfinishedIndexes );
+            IndexIterator( OperationContext* txn,
+                           const IndexCatalog* cat,
+                           bool includeUnfinishedIndexes );
 
             void _advance();
 
             bool _includeUnfinishedIndexes;
+
+            OperationContext* _txn;
             const IndexCatalog* _catalog;
             IndexCatalogEntryContainer::const_iterator _iterator;
 
@@ -139,8 +149,9 @@ namespace mongo {
             friend class IndexCatalog;
         };
 
-        IndexIterator getIndexIterator( bool includeUnfinishedIndexes ) const {
-            return IndexIterator( this, includeUnfinishedIndexes );
+        IndexIterator getIndexIterator( OperationContext* txn,
+                                        bool includeUnfinishedIndexes ) const {
+            return IndexIterator( txn, this, includeUnfinishedIndexes );
         };
 
         // ---- index set modifiers ------
@@ -182,7 +193,7 @@ namespace mongo {
 
         // ---- modify single index
 
-        bool isMultikey( const IndexDescriptor* idex );
+        bool isMultikey( OperationContext* txn, const IndexDescriptor* idex );
 
         // --- these probably become private?
 

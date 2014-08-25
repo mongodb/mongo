@@ -50,7 +50,7 @@ namespace mongo {
     class MultiPlanStage : public PlanStage {
     public:
         /** Takes no ownership */
-        MultiPlanStage(const Collection* collection, CanonicalQuery* cq);
+        MultiPlanStage(OperationContext* txn, const Collection* collection, CanonicalQuery* cq);
 
         virtual ~MultiPlanStage();
 
@@ -148,6 +148,7 @@ namespace mongo {
         static const int kNoSuchPlan = -1;
 
         // not owned here
+        OperationContext* _txn;
         const Collection* _collection;
 
         // The query that we're trying to figure out the best solution to.

@@ -125,9 +125,9 @@ namespace mongo {
 
         virtual const std::string& ns() const { return _ns; }
 
-        virtual long long dataSize() const = 0;
+        virtual long long dataSize( OperationContext* txn ) const = 0;
 
-        virtual long long numRecords() const = 0;
+        virtual long long numRecords( OperationContext* txn ) const = 0;
 
         virtual bool isCapped() const = 0;
 
@@ -143,7 +143,7 @@ namespace mongo {
 
         // CRUD related
 
-        virtual RecordData dataFor( const DiskLoc& loc) const = 0;
+        virtual RecordData dataFor( OperationContext* txn, const DiskLoc& loc) const = 0;
 
         virtual void deleteRecord( OperationContext* txn, const DiskLoc& dl ) = 0;
 

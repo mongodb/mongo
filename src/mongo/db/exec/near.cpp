@@ -294,7 +294,7 @@ namespace mongo {
 
             WorkingSetMember* member = _workingSet->get(seenIt->second);
             verify(member->hasLoc());
-            WorkingSetCommon::fetchAndInvalidateLoc(member, _collection);
+            WorkingSetCommon::fetchAndInvalidateLoc(_txn, member, _collection);
             verify(!member->hasLoc());
 
             // Don't keep it around in the seen map since there's no valid DiskLoc anymore

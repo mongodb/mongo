@@ -130,7 +130,8 @@ namespace mongo {
             }
 
             IndexDescriptor *idx =
-                collection->getIndexCatalog()->findIndexByPrefix( keyPattern,
+                collection->getIndexCatalog()->findIndexByPrefix( txn,
+                                                                  keyPattern,
                                                                   true );  /* require single key */
             if ( idx == NULL ) {
                 errmsg = "couldn't find valid index for shard key";
@@ -181,7 +182,7 @@ namespace mongo {
 
                     // This is a fetch, but it's OK.  The underlying code won't throw a page fault
                     // exception.
-                    BSONObj obj = collection->docFor(loc);
+                    BSONObj obj = collection->docFor(txn, loc);
                     BSONObjIterator j( keyPattern );
                     BSONElement real;
                     for ( int x=0; x <= k; x++ )
@@ -290,7 +291,8 @@ namespace mongo {
                 // Therefore, any multi-key index prefixed by shard key cannot be multikey over
                 // the shard key fields.
                 IndexDescriptor *idx =
-                    collection->getIndexCatalog()->findIndexByPrefix( keyPattern,
+                    collection->getIndexCatalog()->findIndexByPrefix( txn,
+                                                                      keyPattern,
                                                                       false );
                 if ( idx == NULL ) {
                     errmsg = (string)"couldn't find index over splitting key " +
@@ -308,8 +310,8 @@ namespace mongo {
                     max = Helpers::toKeyFormat( kp.extendRangeBound( max, false ) );
                 }
 
-                const long long recCount = collection->numRecords();
-                const long long dataSize = collection->dataSize();
+                const long long recCount = collection->numRecords(txn);
+                const long long dataSize = collection->dataSize(txn);
 
                 //
                 // 1.b Now that we have the size estimate, go over the remaining parameters and apply any maximum size
@@ -812,13 +814,13 @@ namespace mongo {
             {
                 Client::ReadContext ctx(txn, ns);
                 Collection* collection = ctx.ctx().db()->getCollection(txn, ns);
-                verify(collection);
+                invariant(collection);
 
                 // Allow multiKey based on the invariant that shard keys must be
                 // single-valued. Therefore, any multi-key index prefixed by shard
                 // key cannot be multikey over the shard key fields.
                 IndexDescriptor *idx =
-                        collection->getIndexCatalog()->findIndexByPrefix(keyPattern, false);
+                    collection->getIndexCatalog()->findIndexByPrefix(txn, keyPattern, false);
 
                 if (idx == NULL) {
                     return true;

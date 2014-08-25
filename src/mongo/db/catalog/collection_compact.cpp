@@ -104,7 +104,7 @@ namespace mongo {
                                              "cannot compact collection with record store: " <<
                                              _recordStore->name() );
 
-        if ( _indexCatalog.numIndexesInProgress() )
+        if ( _indexCatalog.numIndexesInProgress( txn ) )
             return StatusWith<CompactStats>( ErrorCodes::BadValue,
                                              "cannot compact when indexes in progress" );
 
@@ -114,7 +114,7 @@ namespace mongo {
 
         vector<BSONObj> indexSpecs;
         {
-            IndexCatalog::IndexIterator ii( _indexCatalog.getIndexIterator( false ) );
+            IndexCatalog::IndexIterator ii( _indexCatalog.getIndexIterator( txn, false ) );
             while ( ii.more() ) {
                 IndexDescriptor* descriptor = ii.next();
 

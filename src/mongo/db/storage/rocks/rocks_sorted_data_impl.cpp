@@ -462,7 +462,7 @@ namespace mongo {
         }
     }
 
-    bool RocksSortedDataImpl::isEmpty() {
+    bool RocksSortedDataImpl::isEmpty( OperationContext* txn ) {
         // XXX doesn't use snapshot
         boost::scoped_ptr<rocksdb::Iterator> it( _db->NewIterator( rocksdb::ReadOptions(),
                                                                    _columnFamily ) );

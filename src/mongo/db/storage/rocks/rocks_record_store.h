@@ -64,9 +64,9 @@ namespace mongo {
         // name of the RecordStore implementation
         virtual const char* name() const { return "rocks"; }
 
-        virtual long long dataSize() const { return _dataSize; }
+        virtual long long dataSize( OperationContext* txn ) const { return _dataSize; }
 
-        virtual long long numRecords() const { return _numRecords; }
+        virtual long long numRecords( OperationContext* txn ) const { return _numRecords; }
 
         virtual bool isCapped() const { return _isCapped; }
 
@@ -76,7 +76,7 @@ namespace mongo {
 
         // CRUD related
 
-        virtual RecordData dataFor( const DiskLoc& loc ) const;
+        virtual RecordData dataFor( OperationContext* txn, const DiskLoc& loc ) const;
 
         virtual void deleteRecord( OperationContext* txn, const DiskLoc& dl );
 
@@ -155,7 +155,8 @@ namespace mongo {
 
         class Iterator : public RecordIterator {
         public:
-            Iterator( const RocksRecordStore* rs,
+            Iterator( OperationContext* txn,
+                      const RocksRecordStore* rs,
                       const CollectionScanParams::Direction& dir,
                       const DiskLoc& start );
 
@@ -171,6 +172,7 @@ namespace mongo {
             bool _forward() const;
             void _checkStatus();
 
+            OperationContext* _txn;
             const RocksRecordStore* _rs;
             CollectionScanParams::Direction _dir;
             boost::scoped_ptr<rocksdb::Iterator> _iterator;

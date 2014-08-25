@@ -83,7 +83,7 @@ namespace ReplTests {
                 c = ctx.ctx().db()->createCollection(&_txn, ns());
             }
 
-            ASSERT(c->getIndexCatalog()->haveIdIndex());
+            ASSERT(c->getIndexCatalog()->haveIdIndex(&_txn));
             ctx.commit();
         }
         ~Base() {
@@ -183,7 +183,7 @@ namespace ReplTests {
                                                         CollectionScanParams::FORWARD );
                 while ( !it->isEOF() ) {
                     DiskLoc currLoc = it->getNext();
-                    ops.push_back(coll->docFor(currLoc));
+                    ops.push_back(coll->docFor(&_txn, currLoc));
                 }
                 delete it;
             }
@@ -219,7 +219,7 @@ namespace ReplTests {
             ::mongo::log() << "all for " << ns << endl;
             while ( !it->isEOF() ) {
                 DiskLoc currLoc = it->getNext();
-                ::mongo::log() << coll->docFor(currLoc).toString() << endl;
+                ::mongo::log() << coll->docFor(&txn, currLoc).toString() << endl;
             }
             delete it;
             wunit.commit();

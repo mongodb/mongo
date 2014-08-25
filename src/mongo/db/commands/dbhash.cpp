@@ -81,7 +81,7 @@ namespace mongo {
         if ( !collection )
             return "";
 
-        IndexDescriptor* desc = collection->getIndexCatalog()->findIdIndex();
+        IndexDescriptor* desc = collection->getIndexCatalog()->findIdIndex( opCtx );
 
         auto_ptr<PlanExecutor> exec;
         if ( desc ) {

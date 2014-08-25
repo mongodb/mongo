@@ -439,7 +439,8 @@ namespace mongo {
             // Therefore, any multi-key index prefixed by shard key cannot be multikey over
             // the shard key fields.
             IndexDescriptor *idx =
-                collection->getIndexCatalog()->findIndexByPrefix( _shardKeyPattern ,
+                collection->getIndexCatalog()->findIndexByPrefix( txn,
+                                                                  _shardKeyPattern ,
                                                                   false );  /* allow multi key */
 
             if ( idx == NULL ) {
@@ -459,9 +460,9 @@ namespace mongo {
             // there's a fair amount of slack before we determine a chunk is too large because object sizes will vary
             unsigned long long maxRecsWhenFull;
             long long avgRecSize;
-            const long long totalRecs = collection->numRecords();
+            const long long totalRecs = collection->numRecords(txn);
             if ( totalRecs > 0 ) {
-                avgRecSize = collection->dataSize() / totalRecs;
+                avgRecSize = collection->dataSize(txn) / totalRecs;
                 maxRecsWhenFull = maxChunkSize / avgRecSize;
                 maxRecsWhenFull = std::min( (unsigned long long)(Chunk::MaxObjectPerChunk + 1) , 130 * maxRecsWhenFull / 100 /* slack */ );
             }
@@ -522,7 +523,7 @@ namespace mongo {
                 scoped_spinlock lk( _trackerLocks );
                 allocSize =
                     std::min(BSONObjMaxUserSize,
-                             (int)((12 + collection->averageObjectSize()) * _cloneLocs.size()));
+                             (int)((12 + collection->averageObjectSize(txn)) * _cloneLocs.size()));
             }
             BSONArrayBuilder a (allocSize);
             
@@ -541,7 +542,7 @@ namespace mongo {
                     invariant( collection );
 
                     DiskLoc dl = *i;
-                    BSONObj o = collection->docFor( dl );
+                    BSONObj o = collection->docFor( txn, dl );
 
                     // use the builder size instead of accumulating 'o's size so that we take into consideration
                     // the overhead of BSONArray indices, and *always* append one doc
@@ -1727,7 +1728,7 @@ namespace mongo {
 
                 if (!indexSpecs.empty()) {
                     // Only copy indexes if the collection does not have any documents.
-                    if (collection->numRecords() > 0) {
+                    if (collection->numRecords(txn) > 0) {
                         errmsg = str::stream() << "aborting migration, shard is missing "
                                                << indexSpecs.size() << " indexes and "
                                                << "collection is not empty. Non-trivial "

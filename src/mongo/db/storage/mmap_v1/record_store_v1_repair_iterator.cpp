@@ -187,7 +187,7 @@ namespace mongo {
     }
 
     RecordData RecordStoreV1RepairIterator::dataFor(const DiskLoc& loc) const {
-        return _recordStore->dataFor( loc );
+        return _recordStore->dataFor( _txn, loc );
     }
 
 }  // namespace mongo

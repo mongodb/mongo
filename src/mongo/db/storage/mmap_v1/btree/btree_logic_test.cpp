@@ -106,15 +106,16 @@ namespace mongo {
 
             verify(!diskLoc.isNull());
 
-            return _helper.btree.getBucket(diskLoc);
+            return _helper.btree.getBucket(NULL, diskLoc);
         }
 
         BucketType* head() const {
-            return _helper.btree.getBucket(_helper.headManager.getHead());
+            OperationContextNoop txn;
+            return _helper.btree.getBucket(&txn, _helper.headManager.getHead(&txn));
         }
 
         void forcePackBucket(const DiskLoc bucketLoc) {
-            BucketType* bucket = _helper.btree.getBucket(bucketLoc);
+            BucketType* bucket = _helper.btree.getBucket(NULL, bucketLoc);
 
             bucket->topSize += bucket->emptySize;
             bucket->emptySize = 0;
@@ -130,18 +131,18 @@ namespace mongo {
         }
 
         int bucketRebalancedSeparatorPos(const DiskLoc bucketLoc, int leftIndex) {
-            BucketType* bucket = _helper.btree.getBucket(bucketLoc);
+            BucketType* bucket = _helper.btree.getBucket(NULL, bucketLoc);
             OperationContextNoop txn;
             return _helper.btree._rebalancedSeparatorPos(&txn, bucket, leftIndex);
         }
 
         FullKey getKey(const DiskLoc bucketLoc, int pos) const {
-            const BucketType* bucket = _helper.btree.getBucket(bucketLoc);
+            const BucketType* bucket = _helper.btree.getBucket(NULL, bucketLoc);
             return BtreeLogic<BtreeLayoutType>::getFullKey(bucket, pos);
         }
 
         void markKeyUnused(const DiskLoc bucketLoc, int keyPos) {
-            BucketType* bucket = _helper.btree.getBucket(bucketLoc);
+            BucketType* bucket = _helper.btree.getBucket(NULL, bucketLoc);
             invariant(keyPos >= 0 && keyPos < bucket->n);
 
             _helper.btree.getKeyHeader(bucket, keyPos).setUnused();
@@ -158,7 +159,7 @@ namespace mongo {
         void setBucketNextChild(const DiskLoc bucketLoc, const DiskLoc nextChild) {
             OperationContextNoop txn;
 
-            BucketType* bucket = _helper.btree.getBucket(bucketLoc);
+            BucketType* bucket = _helper.btree.getBucket(&txn, bucketLoc);
             bucket->nextChild = nextChild;
 
             _helper.btree.fixParentPtrs(&txn, bucket, bucketLoc);
@@ -194,7 +195,7 @@ namespace mongo {
             this->insert(key, this->_helper.dummyDiskLoc);
 
             this->checkValidNumKeys(1);
-            this->locate(key, 0, true, this->_helper.headManager.getHead(), 1);
+            this->locate(key, 0, true, this->_helper.headManager.getHead(&txn), 1);
 
             this->unindex(key);
 
@@ -279,9 +280,9 @@ namespace mongo {
                 this->insert(k, this->_helper.dummyDiskLoc);
             }
 
-            locateExtended(1, 'a', 'b', this->_helper.headManager.getHead());
-            locateExtended(1, 'c', 'd', this->_helper.headManager.getHead());
-            locateExtended(1, 'e', 'f', this->_helper.headManager.getHead());
+            locateExtended(1, 'a', 'b', this->_helper.headManager.getHead(&txn));
+            locateExtended(1, 'c', 'd', this->_helper.headManager.getHead(&txn));
+            locateExtended(1, 'e', 'f', this->_helper.headManager.getHead(&txn));
             locateExtended(1, 'g', 'g' + 1, DiskLoc()); // of course, 'h' isn't in the index.
 
             // old behavior
@@ -291,9 +292,9 @@ namespace mongo {
             //       locateExtended( -1, 'g', 'f', dl() );
 
             locateExtended(-1, 'a', 'a' - 1, DiskLoc()); // of course, 'a' - 1 isn't in the index
-            locateExtended(-1, 'c', 'b', this->_helper.headManager.getHead());
-            locateExtended(-1, 'e', 'd', this->_helper.headManager.getHead());
-            locateExtended(-1, 'g', 'f', this->_helper.headManager.getHead());
+            locateExtended(-1, 'c', 'b', this->_helper.headManager.getHead(&txn));
+            locateExtended(-1, 'e', 'd', this->_helper.headManager.getHead(&txn));
+            locateExtended(-1, 'g', 'f', this->_helper.headManager.getHead(&txn));
         }
 
     private:
@@ -332,7 +333,7 @@ namespace mongo {
             // 'E' is the split point and should be in the head the rest should be ~50/50
             const BSONObj splitPoint = simpleKey('E', 800);
             this->_helper.btree.locate(&txn, splitPoint, this->_helper.dummyDiskLoc, 1, &pos, &loc);
-            ASSERT_EQUALS(this->_helper.headManager.getHead(), loc);
+            ASSERT_EQUALS(this->_helper.headManager.getHead(&txn), loc);
             ASSERT_EQUALS(0, pos);
 
             // Find the one before 'E'
@@ -382,7 +383,7 @@ namespace mongo {
             // 'H' is the maximum 'large' interval key, 90% should be < 'H' and 10% larger
             const BSONObj splitPoint = simpleKey('H', 800);
             this->_helper.btree.locate(&txn, splitPoint, this->_helper.dummyDiskLoc, 1, &pos, &loc);
-            ASSERT_EQUALS(this->_helper.headManager.getHead(), loc);
+            ASSERT_EQUALS(this->_helper.headManager.getHead(&txn), loc);
             ASSERT_EQUALS(0, pos);
 
             // Find the one before 'H'
@@ -438,10 +439,10 @@ namespace mongo {
             }
             
             // numRecords() - 1, because this->_helper.dummyDiskLoc is actually in the record store too
-            ASSERT_EQUALS(3, this->_helper.recordStore.numRecords() - 1);
+            ASSERT_EQUALS(3, this->_helper.recordStore.numRecords(NULL) - 1);
 
             long long expectedCount = 10 - unindexKeys();
-            ASSERT_EQUALS(1, this->_helper.recordStore.numRecords() - 1);
+            ASSERT_EQUALS(1, this->_helper.recordStore.numRecords(NULL) - 1);
 
             long long unusedCount = 0;
             ASSERT_EQUALS(expectedCount, this->_helper.btree.fullValidate(&txn, &unusedCount, true, true, 0));
@@ -492,12 +493,12 @@ namespace mongo {
                 this->insert(k, this->_helper.dummyDiskLoc);
             }
 
-            // numRecords() - 1, because fixedDiskLoc is actually in the record store too
-            ASSERT_EQUALS(4, this->_helper.recordStore.numRecords() - 1);
+            // numRecords(NULL) - 1, because fixedDiskLoc is actually in the record store too
+            ASSERT_EQUALS(4, this->_helper.recordStore.numRecords(NULL) - 1);
 
             const BSONObj k = simpleKey('a' + 17, 800);
             this->unindex(k);
-            ASSERT_EQUALS(3, this->_helper.recordStore.numRecords() - 1);
+            ASSERT_EQUALS(3, this->_helper.recordStore.numRecords(NULL) - 1);
 
             long long unusedCount = 0;
             ASSERT_EQUALS(17, this->_helper.btree.fullValidate(&txn, &unusedCount, true, true, 0));
@@ -516,7 +517,7 @@ namespace mongo {
             ASSERT_EQUALS(8, this->_helper.btree.fullValidate(&txn, NULL, true, true, 0));
 
             // The tree has 7 buckets + 1 for the this->_helper.dummyDiskLoc
-            ASSERT_EQUALS(8, this->_helper.recordStore.numRecords());
+            ASSERT_EQUALS(8, this->_helper.recordStore.numRecords(NULL));
 
             const BSONObj k = BSON("" << "bb");
             verify(this->unindex(k));
@@ -524,7 +525,7 @@ namespace mongo {
             ASSERT_EQUALS(7, this->_helper.btree.fullValidate(&txn, NULL, true, true, 0));
 
             // The tree has 5 buckets + 1 for the this->_helper.dummyDiskLoc
-            ASSERT_EQUALS(6, this->_helper.recordStore.numRecords());
+            ASSERT_EQUALS(6, this->_helper.recordStore.numRecords(NULL));
 
             builder.checkStructure("{b:{a:null},d:{c:null},f:{e:null},_:{g:null}}");
         }
@@ -541,7 +542,7 @@ namespace mongo {
             ASSERT_EQUALS(10, this->_helper.btree.fullValidate(&txn, NULL, true, true, 0));
 
             // The tree has 7 buckets + 1 for the this->_helper.dummyDiskLoc
-            ASSERT_EQUALS(8, this->_helper.recordStore.numRecords());
+            ASSERT_EQUALS(8, this->_helper.recordStore.numRecords(NULL));
 
             const BSONObj k = BSON("" << "bb");
             verify(this->unindex(k));
@@ -549,7 +550,7 @@ namespace mongo {
             ASSERT_EQUALS(9, this->_helper.btree.fullValidate(&txn, NULL, true, true, 0));
 
             // The tree has 5 buckets + 1 for the this->_helper.dummyDiskLoc
-            ASSERT_EQUALS(6, this->_helper.recordStore.numRecords());
+            ASSERT_EQUALS(6, this->_helper.recordStore.numRecords(NULL));
 
             builder.checkStructure("{b:{a:null},cc:{c:null},d:null,f:{e:null},h:{g:null}}");
         }
@@ -570,7 +571,7 @@ namespace mongo {
             ASSERT_EQUALS(4, this->_helper.btree.fullValidate(&txn, NULL, true, true, 0));
 
             // The tree has 3 buckets + 1 for the this->_helper.dummyDiskLoc
-            ASSERT_EQUALS(4, this->_helper.recordStore.numRecords());
+            ASSERT_EQUALS(4, this->_helper.recordStore.numRecords(NULL));
 
             const BSONObj k = BSON("" << "c");
             verify(this->unindex(k));
@@ -578,7 +579,7 @@ namespace mongo {
             ASSERT_EQUALS(3, this->_helper.btree.fullValidate(&txn, NULL, true, true, 0));
 
             // The tree has 3 buckets + 1 for the this->_helper.dummyDiskLoc
-            ASSERT_EQUALS(4, this->_helper.recordStore.numRecords());
+            ASSERT_EQUALS(4, this->_helper.recordStore.numRecords(NULL));
 
             builder.checkStructure("{d:{b:{a:null}}}");
         }
@@ -596,7 +597,7 @@ namespace mongo {
             ASSERT_EQUALS(11, this->_helper.btree.fullValidate(&txn, NULL, true, true, 0));
 
             // The tree has 7 buckets + 1 for the this->_helper.dummyDiskLoc
-            ASSERT_EQUALS(8, this->_helper.recordStore.numRecords());
+            ASSERT_EQUALS(8, this->_helper.recordStore.numRecords(NULL));
 
             const BSONObj k = BSON("" << "bb");
             verify(this->unindex(k));
@@ -605,7 +606,7 @@ namespace mongo {
 
             // Child does not currently replace parent in this case. Also, the tree 
             // has 6 buckets + 1 for the this->_helper.dummyDiskLoc.
-            ASSERT_EQUALS(7, this->_helper.recordStore.numRecords());
+            ASSERT_EQUALS(7, this->_helper.recordStore.numRecords(NULL));
 
             builder.checkStructure("{i:{b:{a:null},cc:{c:null},d:null,f:{e:null},h:{g:null}}}");
         }
@@ -623,7 +624,7 @@ namespace mongo {
             ASSERT_EQUALS(11, this->_helper.btree.fullValidate(&txn, NULL, true, true, 0));
 
             // The tree has 7 buckets + 1 for the this->_helper.dummyDiskLoc
-            ASSERT_EQUALS(8, this->_helper.recordStore.numRecords());
+            ASSERT_EQUALS(8, this->_helper.recordStore.numRecords(NULL));
 
             const BSONObj k = BSON("" << "ff");
             verify(this->unindex(k));
@@ -632,7 +633,7 @@ namespace mongo {
 
             // Child does not currently replace parent in this case. Also, the tree 
             // has 6 buckets + 1 for the this->_helper.dummyDiskLoc.
-            ASSERT_EQUALS(7, this->_helper.recordStore.numRecords());
+            ASSERT_EQUALS(7, this->_helper.recordStore.numRecords(NULL));
 
             builder.checkStructure("{i:{b:{a:null},cc:{c:null},d:null,f:{e:null},h:{g:null}}}");
         }
@@ -652,7 +653,7 @@ namespace mongo {
             ASSERT_EQUALS(11, this->_helper.btree.fullValidate(&txn, NULL, true, true, 0));
 
             // The tree has 7 buckets + 1 for the this->_helper.dummyDiskLoc
-            ASSERT_EQUALS(8, this->_helper.recordStore.numRecords());
+            ASSERT_EQUALS(8, this->_helper.recordStore.numRecords(NULL));
 
             const BSONObj k = BSON("" << "bb");
             verify(this->unindex(k));
@@ -660,7 +661,7 @@ namespace mongo {
             ASSERT_EQUALS(10, this->_helper.btree.fullValidate(&txn, NULL, true, true, 0));
 
             // The tree has 7 buckets + 1 for the this->_helper.dummyDiskLoc
-            ASSERT_EQUALS(8, this->_helper.recordStore.numRecords());
+            ASSERT_EQUALS(8, this->_helper.recordStore.numRecords(NULL));
 
             builder.checkStructure("{d:{b:{a:null},cc:{c:null}},"
                                    "dd:null,"
@@ -680,7 +681,7 @@ namespace mongo {
             ASSERT_EQUALS(7, this->_helper.btree.fullValidate(&txn, NULL, true, true, 0));
 
             // The tree has 5 buckets + 1 for the this->_helper.dummyDiskLoc
-            ASSERT_EQUALS(6, this->_helper.recordStore.numRecords());
+            ASSERT_EQUALS(6, this->_helper.recordStore.numRecords(NULL));
 
             const BSONObj k = BSON("" << "g");
             verify(this->unindex(k));
@@ -688,7 +689,7 @@ namespace mongo {
             ASSERT_EQUALS(6, this->_helper.btree.fullValidate(&txn, NULL, true, true, 0));
 
             // The tree has 5 buckets + 1 for the this->_helper.dummyDiskLoc
-            ASSERT_EQUALS(6, this->_helper.recordStore.numRecords());
+            ASSERT_EQUALS(6, this->_helper.recordStore.numRecords(NULL));
 
             builder.checkStructure("{c:{b:{a:null}},d:null,_:{f:{e:null}}}");
         }
@@ -706,7 +707,7 @@ namespace mongo {
             ASSERT_EQUALS(9, this->_helper.btree.fullValidate(&txn, NULL, true, true, 0));
 
             // The tree has 7 buckets + 1 for the this->_helper.dummyDiskLoc
-            ASSERT_EQUALS(8, this->_helper.recordStore.numRecords());
+            ASSERT_EQUALS(8, this->_helper.recordStore.numRecords(NULL));
 
             const BSONObj k = BSON("" << "ee");
             verify(this->unindex(k));
@@ -714,7 +715,7 @@ namespace mongo {
             ASSERT_EQUALS(8, this->_helper.btree.fullValidate(&txn, NULL, true, true, 0));
 
             // The tree has 6 buckets + 1 for the this->_helper.dummyDiskLoc
-            ASSERT_EQUALS(7, this->_helper.recordStore.numRecords());
+            ASSERT_EQUALS(7, this->_helper.recordStore.numRecords(NULL));
 
             builder.checkStructure("{c:{b:{a:null}},_:{e:{d:null},f:null,h:{g:null}}}");
         }
@@ -732,7 +733,7 @@ namespace mongo {
             ASSERT_EQUALS(10, this->_helper.btree.fullValidate(&txn, NULL, true, true, 0));
 
             // The tree has 7 buckets + 1 for the this->_helper.dummyDiskLoc
-            ASSERT_EQUALS(8, this->_helper.recordStore.numRecords());
+            ASSERT_EQUALS(8, this->_helper.recordStore.numRecords(NULL));
 
             const BSONObj k = BSON("" << "ee");
             verify(this->unindex(k));
@@ -740,7 +741,7 @@ namespace mongo {
             ASSERT_EQUALS(9, this->_helper.btree.fullValidate(&txn, NULL, true, true, 0));
 
             // The tree has 6 buckets + 1 for the this->_helper.dummyDiskLoc
-            ASSERT_EQUALS(7, this->_helper.recordStore.numRecords());
+            ASSERT_EQUALS(7, this->_helper.recordStore.numRecords(NULL));
 
             builder.checkStructure("{f:{b:{a:null},c:null,e:{d:null}},ff:null,_:{h:{g:null}}}");
         }
@@ -758,7 +759,7 @@ namespace mongo {
             ASSERT_EQUALS(10, this->_helper.btree.fullValidate(&txn, NULL, true, true, 0));
 
             // The tree has 7 buckets + 1 for the this->_helper.dummyDiskLoc
-            ASSERT_EQUALS(8, this->_helper.recordStore.numRecords());
+            ASSERT_EQUALS(8, this->_helper.recordStore.numRecords(NULL));
 
             const BSONObj k = BSON("" << "ee");
             verify(this->unindex(k));
@@ -766,7 +767,7 @@ namespace mongo {
             ASSERT_EQUALS(9, this->_helper.btree.fullValidate(&txn, NULL, true, true, 0));
 
             // The tree has 6 buckets + 1 for the this->_helper.dummyDiskLoc
-            ASSERT_EQUALS(7, this->_helper.recordStore.numRecords());
+            ASSERT_EQUALS(7, this->_helper.recordStore.numRecords(NULL));
 
             builder.checkStructure("{c:{b:{a:null}},cc:null,_:{e:{d:null},f:null,h:{g:null}}}");
         }
@@ -784,7 +785,7 @@ namespace mongo {
             ASSERT_EQUALS(10, this->_helper.btree.fullValidate(&txn, NULL, true, true, 0));
 
             // The tree has 6 buckets + 1 for the this->_helper.dummyDiskLoc
-            ASSERT_EQUALS(7, this->_helper.recordStore.numRecords());
+            ASSERT_EQUALS(7, this->_helper.recordStore.numRecords(NULL));
 
             const BSONObj k = BSON("" << "c");
             verify(this->unindex(k));
@@ -792,7 +793,7 @@ namespace mongo {
             ASSERT_EQUALS(9, this->_helper.btree.fullValidate(&txn, NULL, true, true, 0));
 
             // The tree has 4 buckets + 1 for the this->_helper.dummyDiskLoc
-            ASSERT_EQUALS(5, this->_helper.recordStore.numRecords());
+            ASSERT_EQUALS(5, this->_helper.recordStore.numRecords(NULL));
 
             // Height is not currently reduced in this case
             builder.checkStructure("{j:{g:{b:{a:null},d:null,e:null,f:null},h:null,i:null}}");
@@ -811,7 +812,7 @@ namespace mongo {
             ASSERT_EQUALS(9, this->_helper.btree.fullValidate(&txn, NULL, true, true, 0));
 
             // The tree has 6 buckets + 1 for the this->_helper.dummyDiskLoc
-            ASSERT_EQUALS(7, this->_helper.recordStore.numRecords());
+            ASSERT_EQUALS(7, this->_helper.recordStore.numRecords(NULL));
 
             const BSONObj k = BSON("" << "c");
             verify(this->unindex(k));
@@ -819,7 +820,7 @@ namespace mongo {
             ASSERT_EQUALS(8, this->_helper.btree.fullValidate(&txn, NULL, true, true, 0));
 
             // The tree has 3 buckets + 1 for the this->_helper.dummyDiskLoc
-            ASSERT_EQUALS(4, this->_helper.recordStore.numRecords());
+            ASSERT_EQUALS(4, this->_helper.recordStore.numRecords(NULL));
 
             builder.checkStructure("{g:{b:{a:null},d:null,e:null,f:null},h:null,i:null}");
         }
@@ -837,7 +838,7 @@ namespace mongo {
             ASSERT_EQUALS(8, this->_helper.btree.fullValidate(&txn, NULL, true, true, 0));
 
             // The tree has 6 buckets + 1 for the this->_helper.dummyDiskLoc
-            ASSERT_EQUALS(7, this->_helper.recordStore.numRecords());
+            ASSERT_EQUALS(7, this->_helper.recordStore.numRecords(NULL));
 
             const BSONObj k = BSON("" << "c");
             verify(this->unindex(k));
@@ -845,7 +846,7 @@ namespace mongo {
             ASSERT_EQUALS(7, this->_helper.btree.fullValidate(&txn, NULL, true, true, 0));
 
             // The tree has 4 buckets + 1 for the this->_helper.dummyDiskLoc
-            ASSERT_EQUALS(5, this->_helper.recordStore.numRecords());
+            ASSERT_EQUALS(5, this->_helper.recordStore.numRecords(NULL));
 
             // no recursion currently in this case
             builder.checkStructure("{h:{b:{a:null},d:null,e:null,f:null},_:{i:null}}");
@@ -868,11 +869,11 @@ namespace mongo {
             const BSONObj& topKey = biggestKey('m');
 
             DiskLoc leftChild = this->newBucket();
-            builder.push(this->_helper.headManager.getHead(), topKey, leftChild);
+            builder.push(this->_helper.headManager.getHead(&txn), topKey, leftChild);
             _count++;
 
             DiskLoc rightChild = this->newBucket();
-            this->setBucketNextChild(this->_helper.headManager.getHead(), rightChild);
+            this->setBucketNextChild(this->_helper.headManager.getHead(&txn), rightChild);
 
             _count += builder.fillBucketToExactSize(leftChild, leftSize(), 'a');
             _count += builder.fillBucketToExactSize(rightChild, rightSize(), 'n');
@@ -904,7 +905,7 @@ namespace mongo {
                 ASSERT_EQUALS(0, unused);
 
                 // The tree has 3 buckets + 1 for the this->_helper.dummyDiskLoc
-                ASSERT_EQUALS(4, this->_helper.recordStore.numRecords());
+                ASSERT_EQUALS(4, this->_helper.recordStore.numRecords(NULL));
 
                 const BSONObj k = bigKey(*i);
                 this->unindex(k);
@@ -920,11 +921,11 @@ namespace mongo {
 
             if (!merge()) {
                 // The tree has 3 buckets + 1 for the this->_helper.dummyDiskLoc
-                ASSERT_EQUALS(4, this->_helper.recordStore.numRecords());
+                ASSERT_EQUALS(4, this->_helper.recordStore.numRecords(NULL));
             }
             else {
                 // The tree has 1 bucket + 1 for the this->_helper.dummyDiskLoc
-                ASSERT_EQUALS(2, this->_helper.recordStore.numRecords());
+                ASSERT_EQUALS(2, this->_helper.recordStore.numRecords(NULL));
             }
         }
 
@@ -1094,11 +1095,14 @@ namespace mongo {
         virtual bool merge() const { return false; }
 
         virtual void initCheck() {
-            _oldTop = this->getKey(this->_helper.headManager.getHead(), 0).data.toBson();
+            OperationContextNoop txn;
+            _oldTop = this->getKey(this->_helper.headManager.getHead(&txn), 0).data.toBson();
         }
 
         virtual void validate() {
-            ASSERT_NOT_EQUALS(_oldTop, this->getKey(this->_helper.headManager.getHead(), 0).data.toBson());
+            OperationContextNoop txn;
+            ASSERT_NOT_EQUALS(_oldTop,
+                              this->getKey(this->_helper.headManager.getHead(&txn), 0).data.toBson());
         }
 
     private:
@@ -1117,11 +1121,13 @@ namespace mongo {
         virtual bool merge() const { return false; }
 
         virtual void initCheck() {
-            _oldTop = this->getKey(this->_helper.headManager.getHead(), 0).data.toBson();
+            OperationContextNoop txn;
+            _oldTop = this->getKey(this->_helper.headManager.getHead(&txn), 0).data.toBson();
         }
 
-        virtual void validate() { 
-            ASSERT_TRUE(_oldTop != this->getKey(this->_helper.headManager.getHead(), 0).data.toBson());
+        virtual void validate() {
+            OperationContextNoop txn;
+            ASSERT_TRUE(_oldTop != this->getKey(this->_helper.headManager.getHead(&txn), 0).data.toBson());
         }
 
     private:
@@ -1142,7 +1148,7 @@ namespace mongo {
             ASSERT_EQUALS(14, this->_helper.btree.fullValidate(&txn, NULL, true, true, 0));
 
             // The tree has 4 buckets + 1 for the this->_helper.dummyDiskLoc
-            ASSERT_EQUALS(5, this->_helper.recordStore.numRecords());
+            ASSERT_EQUALS(5, this->_helper.recordStore.numRecords(NULL));
 
             const BSONObj k = BSON("" << bigNumString(0x40, 800));
             ASSERT(this->unindex(k));
@@ -1150,7 +1156,7 @@ namespace mongo {
             ASSERT_EQUALS(13, this->_helper.btree.fullValidate(&txn, NULL, true, true, 0));
 
             // The tree has 4 buckets + 1 for the this->_helper.dummyDiskLoc
-            ASSERT_EQUALS(5, this->_helper.recordStore.numRecords());
+            ASSERT_EQUALS(5, this->_helper.recordStore.numRecords(NULL));
 
             builder.checkStructure("{$6:{$1:null,$2:null,$3:null,$4:null,$5:null},"
                                      "b:{$10:null,$20:null,$30:null,$50:null,a:null},"
@@ -1172,7 +1178,7 @@ namespace mongo {
             ASSERT_EQUALS(13, this->_helper.btree.fullValidate(&txn, NULL, true, true, 0));
 
             // The tree has 4 buckets + 1 for the this->_helper.dummyDiskLoc
-            ASSERT_EQUALS(5, this->_helper.recordStore.numRecords());
+            ASSERT_EQUALS(5, this->_helper.recordStore.numRecords(NULL));
 
             const BSONObj k = BSON("" << bigNumString(0x3, 800));
             ASSERT(this->unindex(k));
@@ -1180,7 +1186,7 @@ namespace mongo {
             ASSERT_EQUALS(12, this->_helper.btree.fullValidate(&txn, NULL, true, true, 0));
 
             // The tree has 4 buckets + 1 for the this->_helper.dummyDiskLoc
-            ASSERT_EQUALS(5, this->_helper.recordStore.numRecords());
+            ASSERT_EQUALS(5, this->_helper.recordStore.numRecords(NULL));
 
             builder.checkStructure("{$20:{$1:null,$2:null,$4:null,$10:null},"
                                       "b:{$30:null,$40:null,$50:null,$60:null,$70:null},"
@@ -1203,7 +1209,7 @@ namespace mongo {
             ASSERT_EQUALS(23, this->_helper.btree.fullValidate(&txn, NULL, true, true, 0));
 
             // The tree has 14 buckets + 1 for the this->_helper.dummyDiskLoc
-            ASSERT_EQUALS(15, this->_helper.recordStore.numRecords());
+            ASSERT_EQUALS(15, this->_helper.recordStore.numRecords(NULL));
 
             const BSONObj k = BSON("" << bigNumString(0x30, 800));
             ASSERT(this->unindex(k));
@@ -1211,7 +1217,7 @@ namespace mongo {
             ASSERT_EQUALS(22, this->_helper.btree.fullValidate(&txn, NULL, true, true, 0));
 
             // The tree has 14 buckets + 1 for the this->_helper.dummyDiskLoc
-            ASSERT_EQUALS(15, this->_helper.recordStore.numRecords());
+            ASSERT_EQUALS(15, this->_helper.recordStore.numRecords(NULL));
 
             builder.checkStructure("{$9:{$1:{$0:null},$3:{$2:null},"
                                             "$5:{$4:null},$7:{$6:null},_:{$8:null}},"
@@ -1237,7 +1243,7 @@ namespace mongo {
             ASSERT_EQUALS(25, this->_helper.btree.fullValidate(&txn, NULL, true, true, 0));
 
             // The tree has 15 buckets + 1 for the this->_helper.dummyDiskLoc
-            ASSERT_EQUALS(16, this->_helper.recordStore.numRecords());
+            ASSERT_EQUALS(16, this->_helper.recordStore.numRecords(NULL));
 
             const BSONObj k = BSON("" << bigNumString(0x5, 800));
             ASSERT(this->unindex(k));
@@ -1245,7 +1251,7 @@ namespace mongo {
             ASSERT_EQUALS(24, this->_helper.btree.fullValidate(&txn, NULL, true, true, 0));
 
             // The tree has 15 buckets + 1 for the this->_helper.dummyDiskLoc
-            ASSERT_EQUALS(16, this->_helper.recordStore.numRecords());
+            ASSERT_EQUALS(16, this->_helper.recordStore.numRecords(NULL));
 
             builder.checkStructure("{$50:{$1:{$0:null},$3:{$2:null},$20:{$14:null},"
                                             "$30:{$25:null},$40:{$35:null},_:{$45:null}},"
@@ -1268,7 +1274,7 @@ namespace mongo {
             ASSERT_EQUALS(12, this->_helper.btree.fullValidate(&txn, NULL, true, true, 0));
 
             // The tree has 3 buckets + 1 for the this->_helper.dummyDiskLoc
-            ASSERT_EQUALS(4, this->_helper.recordStore.numRecords());
+            ASSERT_EQUALS(4, this->_helper.recordStore.numRecords(NULL));
 
             const BSONObj k = BSON("" << bigNumString(0x40, 800));
             ASSERT(this->unindex(k));
@@ -1276,7 +1282,7 @@ namespace mongo {
             ASSERT_EQUALS(11, this->_helper.btree.fullValidate(&txn, NULL, true, true, 0));
 
             // The tree has 3 buckets + 1 for the this->_helper.dummyDiskLoc
-            ASSERT_EQUALS(4, this->_helper.recordStore.numRecords());
+            ASSERT_EQUALS(4, this->_helper.recordStore.numRecords(NULL));
 
             builder.checkStructure("{$6:{$1:null,$2:null,$3:null,$4:null,$5:null},"
                                      "_:{$10:null,$20:null,$30:null,$50:null,a:null}}");
@@ -1295,7 +1301,7 @@ namespace mongo {
             const BSONObj k = BSON("" << "a");
             ASSERT(this->unindex(k));
 
-            this->forcePackBucket(this->_helper.headManager.getHead());
+            this->forcePackBucket(this->_helper.headManager.getHead(&txn));
 
             typename BtreeLogicTestBase<OnDiskFormat>::BucketType* headBucket = this->head();
 
@@ -1324,7 +1330,7 @@ namespace mongo {
             const BSONObj k = BSON("" << "a");
             ASSERT(this->unindex(k));
 
-            this->forcePackBucket(this->_helper.headManager.getHead());
+            this->forcePackBucket(this->_helper.headManager.getHead(&txn));
 
             typename BtreeLogicTestBase<OnDiskFormat>::BucketType* headBucket = this->head();
 
@@ -1348,10 +1354,10 @@ namespace mongo {
             ASSERT_EQUALS(12, this->_helper.btree.fullValidate(&txn, NULL, true, true, 0));
 
             // The tree has 3 buckets + 1 for the this->_helper.dummyDiskLoc
-            ASSERT_EQUALS(4, this->_helper.recordStore.numRecords());
+            ASSERT_EQUALS(4, this->_helper.recordStore.numRecords(NULL));
 
             // force parent pack
-            this->forcePackBucket(this->_helper.headManager.getHead());
+            this->forcePackBucket(this->_helper.headManager.getHead(&txn));
 
             const BSONObj k = BSON("" << bigNumString(0x40, 800));
             ASSERT(this->unindex(k));
@@ -1359,7 +1365,7 @@ namespace mongo {
             ASSERT_EQUALS(11, this->_helper.btree.fullValidate(&txn, NULL, true, true, 0));
 
             // The tree has 3 buckets + 1 for the this->_helper.dummyDiskLoc
-            ASSERT_EQUALS(4, this->_helper.recordStore.numRecords());
+            ASSERT_EQUALS(4, this->_helper.recordStore.numRecords(NULL));
 
             builder.checkStructure("{$6:{$1:null,$2:null,$3:null,$4:null,$5:null},"
                                      "_:{$10:null,$20:null,$30:null,$50:null,a:null}}");
@@ -1382,7 +1388,7 @@ namespace mongo {
             ASSERT_EQUALS(22, this->_helper.btree.fullValidate(&txn, NULL, true, true, 0));
 
             // The tree has 4 buckets + 1 for the this->_helper.dummyDiskLoc
-            ASSERT_EQUALS(5, this->_helper.recordStore.numRecords());
+            ASSERT_EQUALS(5, this->_helper.recordStore.numRecords(NULL));
 
             const BSONObj k = BSON("" << bigNumString(0x3, 800));
             ASSERT(this->unindex(k));
@@ -1390,7 +1396,7 @@ namespace mongo {
             ASSERT_EQUALS(21, this->_helper.btree.fullValidate(&txn, NULL, true, true, 0));
 
             // The tree has 6 buckets + 1 for the this->_helper.dummyDiskLoc
-            ASSERT_EQUALS(7, this->_helper.recordStore.numRecords());
+            ASSERT_EQUALS(7, this->_helper.recordStore.numRecords(NULL));
 
             builder.checkStructure("{$500:{  $30:{$1:null,$2:null,$4:null,$10$10:null,$20:null},"
                                            "$100:{$40:null,$50:null,$60:null,$70:null,$80:null},"
@@ -1411,7 +1417,7 @@ namespace mongo {
 
             ASSERT_EQUALS(expectedSeparator(),
                           this->bucketRebalancedSeparatorPos(
-                                    this->_helper.headManager.getHead(), 0));
+                                    this->_helper.headManager.getHead(&txn), 0));
         }
 
         virtual string treeSpec() const = 0;
@@ -1497,11 +1503,13 @@ namespace mongo {
         virtual int rightSize() const { return MergeSizeJustRightRight<OnDiskFormat>::rightSize() + 1; }
 
         virtual void initCheck() {
-            _oldTop = this->getKey(this->_helper.headManager.getHead(), 0).data.toBson();
+            OperationContextNoop txn;
+            _oldTop = this->getKey(this->_helper.headManager.getHead(&txn), 0).data.toBson();
         }
 
         virtual void validate() {
-            ASSERT_EQUALS(_oldTop, this->getKey(this->_helper.headManager.getHead(), 0).data.toBson());
+            OperationContextNoop txn;
+            ASSERT_EQUALS(_oldTop, this->getKey(this->_helper.headManager.getHead(&txn), 0).data.toBson());
         }
 
         virtual bool merge() const { return false; }
@@ -1516,9 +1524,10 @@ namespace mongo {
         virtual int leftSize() const { return MergeSizeJustRightRight<OnDiskFormat>::leftSize() + 1; }
 
         virtual void validate() {
+            OperationContextNoop txn;
             // Different top means we rebalanced
-            ASSERT_NOT_EQUALS(this->_oldTop, 
-                              this->getKey(this->_helper.headManager.getHead(), 0).data.toBson());
+            ASSERT_NOT_EQUALS(this->_oldTop,
+                              this->getKey(this->_helper.headManager.getHead(&txn), 0).data.toBson());
         }
     };
 
@@ -1526,12 +1535,14 @@ namespace mongo {
     class NoMoveAtLowWaterMarkLeft : public MergeSizeJustRightLeft<OnDiskFormat> {
         virtual int leftSize() const { return MergeSizeJustRightLeft<OnDiskFormat>::leftSize() + 1; }
         virtual void initCheck() {
-            this->_oldTop = this->getKey(this->_helper.headManager.getHead(), 0).data.toBson();
+            OperationContextNoop txn;
+            this->_oldTop = this->getKey(this->_helper.headManager.getHead(&txn), 0).data.toBson();
         }
 
         virtual void validate() {
+            OperationContextNoop txn;
             ASSERT_EQUALS(this->_oldTop,
-                          this->getKey(this->_helper.headManager.getHead(), 0).data.toBson());
+                          this->getKey(this->_helper.headManager.getHead(&txn), 0).data.toBson());
         }
         virtual bool merge() const { return false; }
 
@@ -1545,9 +1556,10 @@ namespace mongo {
         virtual int rightSize() const { return MergeSizeJustRightLeft<OnDiskFormat>::rightSize() + 1; }
 
         virtual void validate() {
+            OperationContextNoop txn;
             // Different top means we rebalanced
             ASSERT_NOT_EQUALS(this->_oldTop,
-                              this->getKey(this->_helper.headManager.getHead(), 0).data.toBson());
+                              this->getKey(this->_helper.headManager.getHead(&txn), 0).data.toBson());
         }
     };
 
@@ -1565,7 +1577,7 @@ namespace mongo {
             ASSERT_EQUALS(13, this->_helper.btree.fullValidate(&txn, NULL, true, true, 0));
 
             // The tree has 4 buckets + 1 for the this->_helper.dummyDiskLoc
-            ASSERT_EQUALS(5, this->_helper.recordStore.numRecords());
+            ASSERT_EQUALS(5, this->_helper.recordStore.numRecords(NULL));
 
             const BSONObj k = BSON("" << bigNumString(0x12, 800));
             ASSERT(this->unindex(k));
@@ -1573,7 +1585,7 @@ namespace mongo {
             ASSERT_EQUALS(12, this->_helper.btree.fullValidate(&txn, NULL, true, true, 0));
 
             // The tree has 4 buckets + 1 for the this->_helper.dummyDiskLoc
-            ASSERT_EQUALS(5, this->_helper.recordStore.numRecords());
+            ASSERT_EQUALS(5, this->_helper.recordStore.numRecords(NULL));
 
             builder.checkStructure("{$5:{$1:null,$2:null,$3:null,$4:null},"
                                    "$20:{$6:null,$10:null,$11:null,$13:null,$14:null},"
@@ -1595,7 +1607,7 @@ namespace mongo {
             ASSERT_EQUALS(13, this->_helper.btree.fullValidate(&txn, NULL, true, true, 0));
 
             // The tree has 4 buckets + 1 for the this->_helper.dummyDiskLoc
-            ASSERT_EQUALS(5, this->_helper.recordStore.numRecords());
+            ASSERT_EQUALS(5, this->_helper.recordStore.numRecords(NULL));
 
             const BSONObj k = BSON("" << bigNumString(0x12, 800));
             ASSERT(this->unindex(k));
@@ -1603,7 +1615,7 @@ namespace mongo {
             ASSERT_EQUALS(12, this->_helper.btree.fullValidate(&txn, NULL, true, true, 0));
 
             // The tree has 4 buckets + 1 for the this->_helper.dummyDiskLoc
-            ASSERT_EQUALS(5, this->_helper.recordStore.numRecords());
+            ASSERT_EQUALS(5, this->_helper.recordStore.numRecords(NULL));
 
             builder.checkStructure("{$10:{$1:null},"
                                     "$31:{$11:null,$13:null,$14:null,$20:null},"
@@ -1625,7 +1637,7 @@ namespace mongo {
             ASSERT_EQUALS(15, this->_helper.btree.fullValidate(&txn, NULL, true, true, 0));
 
             // The tree has 5 buckets + 1 for the this->_helper.dummyDiskLoc
-            ASSERT_EQUALS(6, this->_helper.recordStore.numRecords());
+            ASSERT_EQUALS(6, this->_helper.recordStore.numRecords(NULL));
 
             const BSONObj k = BSON("" << bigNumString(0x7, 800));
             ASSERT(this->unindex(k));
@@ -1633,7 +1645,7 @@ namespace mongo {
             ASSERT_EQUALS(14, this->_helper.btree.fullValidate(&txn, NULL, true, true, 0));
 
             // The tree has 4 buckets + 1 for the this->_helper.dummyDiskLoc
-            ASSERT_EQUALS(5, this->_helper.recordStore.numRecords());
+            ASSERT_EQUALS(5, this->_helper.recordStore.numRecords(NULL));
 
             builder.checkStructure(
                 "{$40:{$8:{$1:null,$2:null,$5:null,$6:null},$10:null,$20:null,$30:null},"
@@ -1653,7 +1665,7 @@ namespace mongo {
             ASSERT_EQUALS(2, this->_helper.btree.fullValidate(&txn, NULL, true, true, 0));
 
             // The tree has 2 buckets + 1 for the this->_helper.dummyDiskLoc
-            ASSERT_EQUALS(3, this->_helper.recordStore.numRecords());
+            ASSERT_EQUALS(3, this->_helper.recordStore.numRecords(NULL));
 
             const BSONObj k = BSON("" << "a");
             ASSERT(this->unindex(k));
@@ -1661,7 +1673,7 @@ namespace mongo {
             ASSERT_EQUALS(1, this->_helper.btree.fullValidate(&txn, NULL, true, true, 0));
 
             // The tree has 1 bucket + 1 for the this->_helper.dummyDiskLoc
-            ASSERT_EQUALS(2, this->_helper.recordStore.numRecords());
+            ASSERT_EQUALS(2, this->_helper.recordStore.numRecords(NULL));
 
             builder.checkStructure("{b:null}");
         }
@@ -1679,7 +1691,7 @@ namespace mongo {
             ASSERT_EQUALS(4, this->_helper.btree.fullValidate(&txn, NULL, true, true, 0));
 
             // The tree has 2 buckets + 1 for the this->_helper.dummyDiskLoc
-            ASSERT_EQUALS(3, this->_helper.recordStore.numRecords());
+            ASSERT_EQUALS(3, this->_helper.recordStore.numRecords(NULL));
 
             const BSONObj k = BSON("" << "b");
             ASSERT(this->unindex(k));
@@ -1687,7 +1699,7 @@ namespace mongo {
             ASSERT_EQUALS(3, this->_helper.btree.fullValidate(&txn, NULL, true, true, 0));
 
             // The tree has 1 bucket + 1 for the this->_helper.dummyDiskLoc
-            ASSERT_EQUALS(2, this->_helper.recordStore.numRecords());
+            ASSERT_EQUALS(2, this->_helper.recordStore.numRecords(NULL));
 
             builder.checkStructure("{a:null,c:null,d:null}");
         }
@@ -1706,7 +1718,7 @@ namespace mongo {
             ASSERT_EQUALS(4, this->_helper.btree.fullValidate(&txn, &unused, true, true, 0));
 
             // The tree has 2 buckets + 1 for the this->_helper.dummyDiskLoc
-            ASSERT_EQUALS(3, this->_helper.recordStore.numRecords());
+            ASSERT_EQUALS(3, this->_helper.recordStore.numRecords(NULL));
             ASSERT_EQUALS(0, unused);
 
             const BSONObj k = BSON("" << "c");
@@ -1715,7 +1727,7 @@ namespace mongo {
             ASSERT_EQUALS(3, this->_helper.btree.fullValidate(&txn, &unused, true, true, 0));
 
             // The tree has 1 bucket + 1 for the this->_helper.dummyDiskLoc
-            ASSERT_EQUALS(2, this->_helper.recordStore.numRecords());
+            ASSERT_EQUALS(2, this->_helper.recordStore.numRecords(NULL));
             ASSERT_EQUALS(0, unused);
 
             builder.checkStructure("{a:null,b:null,d:null}");
@@ -1732,14 +1744,14 @@ namespace mongo {
             builder.makeTree("{a:null,c:{b:null},d:null}");
 
             const DiskLoc prevChildBucket = 
-                            this->getKey(this->_helper.headManager.getHead(), 1).prevChildBucket;
+                            this->getKey(this->_helper.headManager.getHead(&txn), 1).prevChildBucket;
             this->markKeyUnused(prevChildBucket, 0);
 
             long long unused = 0;
             ASSERT_EQUALS(3, this->_helper.btree.fullValidate(&txn, &unused, true, true, 0));
 
             // The tree has 2 buckets + 1 for the this->_helper.dummyDiskLoc
-            ASSERT_EQUALS(3, this->_helper.recordStore.numRecords());
+            ASSERT_EQUALS(3, this->_helper.recordStore.numRecords(NULL));
             ASSERT_EQUALS(1, unused);
 
             const BSONObj k = BSON("" << "c");
@@ -1749,7 +1761,7 @@ namespace mongo {
             ASSERT_EQUALS(2, this->_helper.btree.fullValidate(&txn, &unused, true, true, 0));
 
             // The tree has 1 bucket + 1 for the this->_helper.dummyDiskLoc
-            ASSERT_EQUALS(2, this->_helper.recordStore.numRecords());
+            ASSERT_EQUALS(2, this->_helper.recordStore.numRecords(NULL));
             ASSERT_EQUALS(1, unused);
 
             // doesn't discriminate between used and unused
@@ -1770,7 +1782,7 @@ namespace mongo {
             ASSERT_EQUALS(2, this->_helper.btree.fullValidate(&txn, &unused, true, true, 0));
 
             // The tree has 2 buckets + 1 for the this->_helper.dummyDiskLoc
-            ASSERT_EQUALS(3, this->_helper.recordStore.numRecords());
+            ASSERT_EQUALS(3, this->_helper.recordStore.numRecords(NULL));
             ASSERT_EQUALS(0, unused);
 
             const BSONObj k = BSON("" << "a");
@@ -1780,7 +1792,7 @@ namespace mongo {
             ASSERT_EQUALS(1, this->_helper.btree.fullValidate(&txn, &unused, true, true, 0));
 
             // The tree has 1 bucket + 1 for the this->_helper.dummyDiskLoc
-            ASSERT_EQUALS(2, this->_helper.recordStore.numRecords());
+            ASSERT_EQUALS(2, this->_helper.recordStore.numRecords(NULL));
             ASSERT_EQUALS(0, unused);
 
             builder.checkStructure("{b:null}");
@@ -1800,7 +1812,7 @@ namespace mongo {
             ASSERT_EQUALS(7, this->_helper.btree.fullValidate(&txn, &unused, true, true, 0));
 
             // The tree has 5 buckets + 1 for the this->_helper.dummyDiskLoc
-            ASSERT_EQUALS(6, this->_helper.recordStore.numRecords());
+            ASSERT_EQUALS(6, this->_helper.recordStore.numRecords(NULL));
             ASSERT_EQUALS(0, unused);
 
             const BSONObj k = BSON("" << "y");
@@ -1810,7 +1822,7 @@ namespace mongo {
             ASSERT_EQUALS(6, this->_helper.btree.fullValidate(&txn, &unused, true, true, 0));
 
             // The tree has 3 buckets + 1 for the this->_helper.dummyDiskLoc
-            ASSERT_EQUALS(4, this->_helper.recordStore.numRecords());
+            ASSERT_EQUALS(4, this->_helper.recordStore.numRecords(NULL));
             ASSERT_EQUALS(0, unused);
 
             builder.checkStructure("{a:null,e:{c:{b:null},d:null},z:null}");
@@ -1830,7 +1842,7 @@ namespace mongo {
             ASSERT_EQUALS(4, this->_helper.btree.fullValidate(&txn, &unused, true, true, 0));
 
             // The tree has 4 buckets + 1 for the this->_helper.dummyDiskLoc
-            ASSERT_EQUALS(5, this->_helper.recordStore.numRecords());
+            ASSERT_EQUALS(5, this->_helper.recordStore.numRecords(NULL));
             ASSERT_EQUALS(0, unused);
 
             const BSONObj k = BSON("" << "a");
@@ -1840,7 +1852,7 @@ namespace mongo {
             ASSERT_EQUALS(3, this->_helper.btree.fullValidate(&txn, &unused, true, true, 0));
 
             // The tree has 2 buckets + 1 for the this->_helper.dummyDiskLoc
-            ASSERT_EQUALS(3, this->_helper.recordStore.numRecords());
+            ASSERT_EQUALS(3, this->_helper.recordStore.numRecords(NULL));
             ASSERT_EQUALS(0, unused);
 
             builder.checkStructure("{c:null,_:{e:null,f:null}}");
@@ -1860,7 +1872,7 @@ namespace mongo {
             ASSERT_EQUALS(5, this->_helper.btree.fullValidate(&txn, &unused, true, true, 0));
 
             // The tree has 3 buckets + 1 for the this->_helper.dummyDiskLoc
-            ASSERT_EQUALS(4, this->_helper.recordStore.numRecords());
+            ASSERT_EQUALS(4, this->_helper.recordStore.numRecords(NULL));
             ASSERT_EQUALS(0, unused);
 
             const BSONObj k = BSON("" << "d");
@@ -1869,13 +1881,13 @@ namespace mongo {
             ASSERT_EQUALS(4, this->_helper.btree.fullValidate(&txn, &unused, true, true, 0));
 
             // The tree has 3 buckets + 1 for the this->_helper.dummyDiskLoc
-            ASSERT_EQUALS(4, this->_helper.recordStore.numRecords());
+            ASSERT_EQUALS(4, this->_helper.recordStore.numRecords(NULL));
             ASSERT_EQUALS(1, unused);
 
             builder.checkStructure("{a:null,d:{c:{b:null}},e:null}");
 
             // Check 'unused' key
-            ASSERT(this->getKey(this->_helper.headManager.getHead(), 1).recordLoc.getOfs() & 1);
+            ASSERT(this->getKey(this->_helper.headManager.getHead(&txn), 1).recordLoc.getOfs() & 1);
         }
     };
 
@@ -1892,7 +1904,7 @@ namespace mongo {
             ASSERT_EQUALS(3, this->_helper.btree.fullValidate(&txn, &unused, true, true, 0));
 
             // The tree has 3 buckets + 1 for the this->_helper.dummyDiskLoc
-            ASSERT_EQUALS(4, this->_helper.recordStore.numRecords());
+            ASSERT_EQUALS(4, this->_helper.recordStore.numRecords(NULL));
             ASSERT_EQUALS(0, unused);
 
             const BSONObj k = BSON("" << "a");
@@ -1901,13 +1913,13 @@ namespace mongo {
             ASSERT_EQUALS(2, this->_helper.btree.fullValidate(&txn, &unused, true, true, 0));
 
             // The tree has 3 buckets + 1 for the this->_helper.dummyDiskLoc
-            ASSERT_EQUALS(4, this->_helper.recordStore.numRecords());
+            ASSERT_EQUALS(4, this->_helper.recordStore.numRecords(NULL));
             ASSERT_EQUALS(1, unused);
 
             builder.checkStructure("{a:null,_:{c:null,_:{d:null}}}");
 
             // Check 'unused' key
-            ASSERT(this->getKey(this->_helper.headManager.getHead(), 0).recordLoc.getOfs() & 1);
+            ASSERT(this->getKey(this->_helper.headManager.getHead(&txn), 0).recordLoc.getOfs() & 1);
         }
     };
 
@@ -1925,7 +1937,7 @@ namespace mongo {
             ASSERT_EQUALS(13, this->_helper.btree.fullValidate(&txn, &unused, true, true, 0));
 
             // The tree has 4 buckets + 1 for the this->_helper.dummyDiskLoc
-            ASSERT_EQUALS(5, this->_helper.recordStore.numRecords());
+            ASSERT_EQUALS(5, this->_helper.recordStore.numRecords(NULL));
             ASSERT_EQUALS(0, unused);
             
             const BSONObj k = BSON("" << bigNumString(0x30, 0x10));
@@ -1934,7 +1946,7 @@ namespace mongo {
             ASSERT_EQUALS(12, this->_helper.btree.fullValidate(&txn, &unused, true, true, 0));
 
             // The tree has 4 buckets + 1 for the this->_helper.dummyDiskLoc
-            ASSERT_EQUALS(5, this->_helper.recordStore.numRecords());
+            ASSERT_EQUALS(5, this->_helper.recordStore.numRecords(NULL));
             ASSERT_EQUALS(0, unused);
 
             builder.checkStructure("{$60:{$10:null,$20:null,"
@@ -1957,7 +1969,7 @@ namespace mongo {
             ASSERT_EQUALS(13, this->_helper.btree.fullValidate(&txn, &unused, true, true, 0));
 
             // The tree has 4 buckets + 1 for the this->_helper.dummyDiskLoc
-            ASSERT_EQUALS(5, this->_helper.recordStore.numRecords());
+            ASSERT_EQUALS(5, this->_helper.recordStore.numRecords(NULL));
             ASSERT_EQUALS(0, unused);
 
             const BSONObj k = BSON("" << bigNumString(0x100, 0x10));
@@ -1966,7 +1978,7 @@ namespace mongo {
             ASSERT_EQUALS(12, this->_helper.btree.fullValidate(&txn, &unused, true, true, 0));
 
             // The tree has 4 buckets + 1 for the this->_helper.dummyDiskLoc
-            ASSERT_EQUALS(5, this->_helper.recordStore.numRecords());
+            ASSERT_EQUALS(5, this->_helper.recordStore.numRecords(NULL));
             ASSERT_EQUALS(0, unused);
 
             builder.checkStructure(
@@ -1990,7 +2002,7 @@ namespace mongo {
             this->insert(key3, this->_helper.dummyDiskLoc);
 
             this->checkValidNumKeys(3);
-            this->locate(BSONObj(), 0, false, this->_helper.headManager.getHead(), 1);
+            this->locate(BSONObj(), 0, false, this->_helper.headManager.getHead(&txn), 1);
         }
     };
 

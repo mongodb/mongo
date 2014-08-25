@@ -37,10 +37,12 @@ namespace mongo {
     // static
     const char* MergeSortStage::kStageType = "SORT_MERGE";
 
-    MergeSortStage::MergeSortStage(const MergeSortStageParams& params,
+    MergeSortStage::MergeSortStage(OperationContext* txn,
+                                   const MergeSortStageParams& params,
                                    WorkingSet* ws,
                                    const Collection* collection)
-        : _collection(collection),
+        : _txn(txn),
+          _collection(collection),
           _ws(ws),
           _pattern(params.pattern),
           _dedup(params.dedup),
@@ -207,7 +209,7 @@ namespace mongo {
             WorkingSetMember* member = _ws->get(valueIt->id);
             if (member->hasLoc() && (dl == member->loc)) {
                 // Force a fetch and flag.  We could possibly merge this result back in later.
-                WorkingSetCommon::fetchAndInvalidateLoc(member, _collection);
+                WorkingSetCommon::fetchAndInvalidateLoc(_txn, member, _collection);
                 _ws->flagForReview(valueIt->id);
                 ++_specificStats.forcedFetches;
             }

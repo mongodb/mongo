@@ -130,7 +130,7 @@ namespace QueryPlanExecutor {
 
             auto_ptr<WorkingSet> ws(new WorkingSet());
             IndexScan* ix = new IndexScan(&_txn, ixparams, ws.get(), NULL);
-            auto_ptr<PlanStage> root(new FetchStage(ws.get(), ix, NULL, coll));
+            auto_ptr<PlanStage> root(new FetchStage(&_txn, ws.get(), ix, NULL, coll));
 
             CanonicalQuery* cq;
             verify(CanonicalQuery::canonicalize(ns(), BSONObj(), &cq).isOK());
@@ -168,7 +168,7 @@ namespace QueryPlanExecutor {
     private:
         IndexDescriptor* getIndex(Database* db, const BSONObj& obj) {
             Collection* collection = db->getCollection( &_txn, ns() );
-            return collection->getIndexCatalog()->findIndexByKeyPattern(obj);
+            return collection->getIndexCatalog()->findIndexByKeyPattern(&_txn, obj);
         }
 
         DBDirectClient _client;

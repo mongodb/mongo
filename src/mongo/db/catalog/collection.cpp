@@ -149,7 +149,7 @@ namespace mongo {
         int64_t count = 0;
         while ( !iterator->isEOF() ) {
             DiskLoc loc = iterator->getNext();
-            BSONObj obj = docFor( loc );
+            BSONObj obj = docFor( txn, loc );
             if ( expression->matchesBSON( obj ) )
                 count++;
         }
@@ -157,14 +157,14 @@ namespace mongo {
         return count;
     }
 
-    BSONObj Collection::docFor(const DiskLoc& loc) const {
-        return  _recordStore->dataFor( loc ).toBson();
+    BSONObj Collection::docFor(OperationContext* txn, const DiskLoc& loc) const {
+        return  _recordStore->dataFor( txn, loc ).toBson();
     }
 
     StatusWith<DiskLoc> Collection::insertDocument( OperationContext* txn,
                                                     const DocWriter* doc,
                                                     bool enforceQuota ) {
-        verify( _indexCatalog.numIndexesTotal() == 0 ); // eventually can implement, just not done
+        verify( _indexCatalog.numIndexesTotal( txn ) == 0 ); // eventually can implement, just not done
 
         StatusWith<DiskLoc> loc = _recordStore->insertRecord( txn,
                                                               doc,
@@ -178,7 +178,7 @@ namespace mongo {
     StatusWith<DiskLoc> Collection::insertDocument( OperationContext* txn,
                                                     const BSONObj& docToInsert,
                                                     bool enforceQuota ) {
-        if ( _indexCatalog.findIdIndex() ) {
+        if ( _indexCatalog.findIdIndex( txn ) ) {
             if ( docToInsert["_id"].eoo() ) {
                 return StatusWith<DiskLoc>( ErrorCodes::InternalError,
                                             str::stream() << "Collection::insertDocument got "
@@ -255,7 +255,7 @@ namespace mongo {
 
     Status Collection::aboutToDeleteCapped( OperationContext* txn, const DiskLoc& loc ) {
 
-        BSONObj doc = docFor( loc );
+        BSONObj doc = docFor( txn, loc );
 
         /* check if any cursors point to us.  if so, advance them. */
         _cursorCache.invalidateDocument(loc, INVALIDATION_DELETION);
@@ -276,7 +276,7 @@ namespace mongo {
             return;
         }
 
-        BSONObj doc = docFor( loc );
+        BSONObj doc = docFor( txn, loc );
 
         if ( deletedId ) {
             BSONElement e = doc["_id"];
@@ -304,7 +304,7 @@ namespace mongo {
                                                     bool enforceQuota,
                                                     OpDebug* debug ) {
 
-        BSONObj objOld = _recordStore->dataFor( oldLocation ).toBson();
+        BSONObj objOld = _recordStore->dataFor( txn, oldLocation ).toBson();
 
         if ( objOld.hasElement( "_id" ) ) {
             BSONElement oldId = objOld["_id"];
@@ -327,7 +327,7 @@ namespace mongo {
            below.  that is suboptimal, but it's pretty complicated to do it the other way without rollbacks...
         */
         OwnedPointerMap<IndexDescriptor*,UpdateTicket> updateTickets;
-        IndexCatalog::IndexIterator ii = _indexCatalog.getIndexIterator( true );
+        IndexCatalog::IndexIterator ii = _indexCatalog.getIndexIterator( txn, true );
         while ( ii.more() ) {
             IndexDescriptor* descriptor = ii.next();
             IndexAccessMethod* iam = _indexCatalog.getIndex( descriptor );
@@ -376,7 +376,7 @@ namespace mongo {
         if ( debug )
             debug->keyUpdates = 0;
 
-        ii = _indexCatalog.getIndexIterator( true );
+        ii = _indexCatalog.getIndexIterator( txn, true );
         while ( ii.more() ) {
             IndexDescriptor* descriptor = ii.next();
             IndexAccessMethod* iam = _indexCatalog.getIndex( descriptor );
@@ -438,12 +438,12 @@ namespace mongo {
         return _recordStore->isCapped();
     }
 
-    uint64_t Collection::numRecords() const {
-        return _recordStore->numRecords();
+    uint64_t Collection::numRecords( OperationContext* txn ) const {
+        return _recordStore->numRecords( txn );
     }
 
-    uint64_t Collection::dataSize() const {
-        return _recordStore->dataSize();
+    uint64_t Collection::dataSize( OperationContext* txn ) const {
+        return _recordStore->dataSize( txn );
     }
 
     /**
@@ -454,12 +454,12 @@ namespace mongo {
      * 4) re-write indexes
      */
     Status Collection::truncate(OperationContext* txn) {
-        massert( 17445, "index build in progress", _indexCatalog.numIndexesInProgress() == 0 );
+        massert( 17445, "index build in progress", _indexCatalog.numIndexesInProgress( txn ) == 0 );
 
         // 1) store index specs
         vector<BSONObj> indexSpecs;
         {
-            IndexCatalog::IndexIterator ii = _indexCatalog.getIndexIterator( false );
+            IndexCatalog::IndexIterator ii = _indexCatalog.getIndexIterator( txn, false );
             while ( ii.more() ) {
                 const IndexDescriptor* idx = ii.next();
                 indexSpecs.push_back( idx->infoObj().getOwned() );
@@ -522,11 +522,11 @@ namespace mongo {
             return status;
 
         { // indexes
-            output->append("nIndexes", _indexCatalog.numIndexesReady() );
+            output->append("nIndexes", _indexCatalog.numIndexesReady( txn ) );
             int idxn = 0;
             try  {
                 BSONObjBuilder indexes; // not using subObjStart to be exception safe
-                IndexCatalog::IndexIterator i = _indexCatalog.getIndexIterator(false);
+                IndexCatalog::IndexIterator i = _indexCatalog.getIndexIterator(txn, false);
                 while( i.more() ) {
                     const IndexDescriptor* descriptor = i.next();
                     log(LogComponent::kIndexing) << "validating index " << descriptor->indexNamespace() << endl;
@@ -567,7 +567,7 @@ namespace mongo {
 
         if ( touchIndexes ) {
             Timer t;
-            IndexCatalog::IndexIterator ii = _indexCatalog.getIndexIterator( false );
+            IndexCatalog::IndexIterator ii = _indexCatalog.getIndexIterator( txn, false );
             while ( ii.more() ) {
                 const IndexDescriptor* desc = ii.next();
                 const IndexAccessMethod* iam = _indexCatalog.getIndex( desc );
@@ -576,7 +576,7 @@ namespace mongo {
                     return status;
             }
 
-            output->append( "indexes", BSON( "num" << _indexCatalog.numIndexesTotal() <<
+            output->append( "indexes", BSON( "num" << _indexCatalog.numIndexesTotal( txn ) <<
                                              "millis" << t.millis() ) );
         }
 

@@ -127,7 +127,10 @@ namespace mongo {
         bool isSparse() const { return _sparse; }
 
         // Is this index multikey?
-        bool isMultikey() const { _checkOk(); return _collection->getIndexCatalog()->isMultikey( this ); }
+        bool isMultikey( OperationContext* txn ) const {
+            _checkOk();
+            return _collection->getIndexCatalog()->isMultikey( txn, this );
+        }
 
         bool isIdIndex() const { _checkOk(); return _isIdIndex; }
 

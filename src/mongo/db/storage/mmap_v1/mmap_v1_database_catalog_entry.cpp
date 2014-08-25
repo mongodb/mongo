@@ -273,7 +273,7 @@ namespace mongo {
                                                            details,
                                                            systemIndexRecordStore,
                                                            this );
-                int indexI = ce._findIndexNumber( indexName );
+                int indexI = ce._findIndexNumber( txn, indexName );
 
                 IndexDetails& indexDetails = details->idx(indexI);
                 *txn->recoveryUnit()->writing(&indexDetails.info) = newIndexSpecLoc.getValue(); // XXX: dur

@@ -53,29 +53,34 @@ namespace mongo {
 
         virtual CollectionOptions getCollectionOptions( OperationContext* txn ) const = 0;
 
-        virtual int getTotalIndexCount() const = 0;
+        virtual int getTotalIndexCount( OperationContext* txn ) const = 0;
 
-        virtual int getCompletedIndexCount() const = 0;
+        virtual int getCompletedIndexCount( OperationContext* txn ) const = 0;
 
         virtual int getMaxAllowedIndexes() const = 0;
 
-        virtual void getAllIndexes( std::vector<std::string>* names ) const = 0;
+        virtual void getAllIndexes( OperationContext* txn,
+                                    std::vector<std::string>* names ) const = 0;
 
-        virtual BSONObj getIndexSpec( const StringData& idxName ) const = 0;
+        virtual BSONObj getIndexSpec( OperationContext* txn,
+                                      const StringData& idxName ) const = 0;
 
-        virtual bool isIndexMultikey( const StringData& indexName) const = 0;
+        virtual bool isIndexMultikey( OperationContext* txn,
+                                      const StringData& indexName) const = 0;
 
         virtual bool setIndexIsMultikey(OperationContext* txn,
                                         const StringData& indexName,
                                         bool multikey = true) = 0;
 
-        virtual DiskLoc getIndexHead( const StringData& indexName ) const = 0;
+        virtual DiskLoc getIndexHead( OperationContext* txn,
+                                      const StringData& indexName ) const = 0;
 
         virtual void setIndexHead( OperationContext* txn,
                                    const StringData& indexName,
                                    const DiskLoc& newHead ) = 0;
 
-        virtual bool isIndexReady( const StringData& indexName ) const = 0;
+        virtual bool isIndexReady( OperationContext* txn,
+                                   const StringData& indexName ) const = 0;
 
         virtual Status removeIndex( OperationContext* txn,
                                     const StringData& indexName ) = 0;

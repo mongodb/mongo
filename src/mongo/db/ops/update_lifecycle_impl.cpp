@@ -61,9 +61,9 @@ namespace mongo {
         return _collection;
     }
 
-    const UpdateIndexData* UpdateLifecycleImpl::getIndexKeys() const {
+    const UpdateIndexData* UpdateLifecycleImpl::getIndexKeys(OperationContext* opCtx) const {
         if (_collection)
-            return &_collection->infoCache()->indexKeys();
+            return &_collection->infoCache()->indexKeys(opCtx);
         return NULL;
     }
 

@@ -49,8 +49,8 @@ namespace mongo {
         HeadManagerImpl(IndexCatalogEntry* ice) : _catalogEntry(ice) { }
         virtual ~HeadManagerImpl() { }
 
-        const DiskLoc getHead() const {
-            return _catalogEntry->head();
+        const DiskLoc getHead(OperationContext* txn) const {
+            return _catalogEntry->head(txn);
         }
 
         void setHead(OperationContext* txn, const DiskLoc newHead) {
@@ -85,27 +85,28 @@ namespace mongo {
         delete _descriptor;
     }
 
-    void IndexCatalogEntry::init( IndexAccessMethod* accessMethod ) {
+    void IndexCatalogEntry::init( OperationContext* txn,
+                                  IndexAccessMethod* accessMethod ) {
         verify( _accessMethod == NULL );
         _accessMethod = accessMethod;
 
-        _isReady = _catalogIsReady();
-        _head = _catalogHead();
-        _isMultikey = _catalogIsMultikey();
+        _isReady = _catalogIsReady( txn );
+        _head = _catalogHead( txn );
+        _isMultikey = _catalogIsMultikey( txn );
     }
 
-    const DiskLoc& IndexCatalogEntry::head() const {
-        DEV verify( _head == _catalogHead() );
+    const DiskLoc& IndexCatalogEntry::head( OperationContext* txn ) const {
+        DEV invariant( _head == _catalogHead( txn ) );
         return _head;
     }
 
-    bool IndexCatalogEntry::isReady() const {
-        DEV verify( _isReady == _catalogIsReady() );
+    bool IndexCatalogEntry::isReady( OperationContext* txn ) const {
+        DEV invariant( _isReady == _catalogIsReady( txn ) );
         return _isReady;
     }
 
-    bool IndexCatalogEntry::isMultikey() const {
-        DEV verify( _isMultikey == _catalogIsMultikey() );
+    bool IndexCatalogEntry::isMultikey( OperationContext* txn ) const {
+        DEV invariant( _isMultikey == _catalogIsMultikey( txn ) );
         return _isMultikey;
     }
 
@@ -113,7 +114,6 @@ namespace mongo {
 
     void IndexCatalogEntry::setIsReady( bool newIsReady ) {
         _isReady = newIsReady;
-        verify( isReady() == newIsReady );
     }
 
     void IndexCatalogEntry::setHead( OperationContext* txn, DiskLoc newHead ) {
@@ -124,7 +124,7 @@ namespace mongo {
     }
 
     void IndexCatalogEntry::setMultikey( OperationContext* txn ) {
-        if ( isMultikey() )
+        if ( isMultikey( txn ) )
             return;
         if ( _collection->setIndexIsMultikey( txn,
                                               _descriptor->indexName(),
@@ -140,16 +140,16 @@ namespace mongo {
 
     // ----
 
-    bool IndexCatalogEntry::_catalogIsReady() const {
-        return _collection->isIndexReady( _descriptor->indexName() );
+    bool IndexCatalogEntry::_catalogIsReady( OperationContext* txn ) const {
+        return _collection->isIndexReady( txn, _descriptor->indexName() );
     }
 
-    DiskLoc IndexCatalogEntry::_catalogHead() const {
-        return _collection->getIndexHead( _descriptor->indexName() );
+    DiskLoc IndexCatalogEntry::_catalogHead( OperationContext* txn ) const {
+        return _collection->getIndexHead( txn, _descriptor->indexName() );
     }
 
-    bool IndexCatalogEntry::_catalogIsMultikey() const {
-        return _collection->isIndexMultikey( _descriptor->indexName() );
+    bool IndexCatalogEntry::_catalogIsMultikey( OperationContext* txn ) const {
+        return _collection->isIndexMultikey( txn, _descriptor->indexName() );
     }
 
     // ------------------

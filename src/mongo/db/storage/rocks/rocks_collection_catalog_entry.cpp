@@ -51,82 +51,21 @@ namespace mongo {
 
     RocksCollectionCatalogEntry::RocksCollectionCatalogEntry( RocksEngine* engine,
                                                               const StringData& ns )
-        : CollectionCatalogEntry( ns ),
+        : BSONCollectionCatalogEntry( ns ),
         _engine( engine ),
         _metaDataKey( string( "metadata-" ) + ns.toString() ) { }
-
-    CollectionOptions RocksCollectionCatalogEntry::getCollectionOptions(
-            OperationContext* txn ) const {
-        // TODO: put more options in here?
-        return CollectionOptions();
-    }
-
-    // ------- indexes ----------
-
-    int RocksCollectionCatalogEntry::getTotalIndexCount() const {
-        MetaData md = _getMetaData();
-
-        return static_cast<int>( md.indexes.size() );
-    }
-
-    int RocksCollectionCatalogEntry::getCompletedIndexCount() const {
-        MetaData md = _getMetaData();
-
-        int num = 0;
-        for ( unsigned i = 0; i < md.indexes.size(); i++ ) {
-            if ( md.indexes[i].ready )
-                num++;
-        }
-        return num;
-    }
 
     int RocksCollectionCatalogEntry::getMaxAllowedIndexes() const {
         return _maxAllowedIndexes;
     }
 
-    void RocksCollectionCatalogEntry::getAllIndexes( std::vector<std::string>* names ) const {
-        MetaData md = _getMetaData();
-
-        for ( unsigned i = 0; i < md.indexes.size(); i++ ) {
-            names->push_back( md.indexes[i].spec["name"].String() );
-        }
-    }
-
-    BSONObj RocksCollectionCatalogEntry::getIndexSpec( const StringData& indexName ) const {
-        return getIndexSpec( indexName, _engine->getDB() );
-    }
-
-    BSONObj RocksCollectionCatalogEntry::getIndexSpec( const StringData& indexName,
-                                                       rocksdb::DB* db ) const {
+    BSONObj RocksCollectionCatalogEntry::getOtherIndexSpec( const StringData& indexName,
+                                                            rocksdb::DB* db ) const {
         MetaData md = _getMetaData( db );
 
         int offset = md.findIndexOffset( indexName );
         invariant( offset >= 0 );
         return md.indexes[offset].spec.getOwned();
-    }
-
-    bool RocksCollectionCatalogEntry::isIndexMultikey( const StringData& indexName) const {
-        MetaData md = _getMetaData();
-
-        int offset = md.findIndexOffset( indexName );
-        invariant( offset >= 0 );
-        return md.indexes[offset].multikey;
-    }
-
-    DiskLoc RocksCollectionCatalogEntry::getIndexHead( const StringData& indexName ) const {
-        MetaData md = _getMetaData();
-
-        int offset = md.findIndexOffset( indexName );
-        invariant( offset >= 0 );
-        return md.indexes[offset].head;
-    }
-
-    bool RocksCollectionCatalogEntry::isIndexReady( const StringData& indexName ) const {
-        MetaData md = _getMetaData();
-
-        int offset = md.findIndexOffset( indexName );
-        invariant( offset >= 0 );
-        return md.indexes[offset].ready;
     }
 
     bool RocksCollectionCatalogEntry::setIndexIsMultikey(OperationContext* txn,
@@ -233,7 +172,7 @@ namespace mongo {
         invariant( status.ok() );
     }
 
-    RocksCollectionCatalogEntry::MetaData RocksCollectionCatalogEntry::_getMetaData() const {
+    RocksCollectionCatalogEntry::MetaData RocksCollectionCatalogEntry::_getMetaData( OperationContext* txn ) const {
         return _getMetaData( _engine->getDB() );
     }
 
@@ -274,59 +213,4 @@ namespace mongo {
         invariant( status.ok() );
     }
 
-    int RocksCollectionCatalogEntry::MetaData::findIndexOffset( const StringData& name ) const {
-        for ( unsigned i = 0; i < indexes.size(); i++ )
-            if ( indexes[i].spec["name"].String() == name )
-                return i;
-        return -1;
-    }
-
-    bool RocksCollectionCatalogEntry::MetaData::eraseIndex( const StringData& name ) {
-        int indexOffset = findIndexOffset( name );
-
-        if ( indexOffset < 0 ) {
-            return false;
-        }
-
-        indexes.erase( indexes.begin() + indexOffset );
-        return true;
-    }
-
-    BSONObj RocksCollectionCatalogEntry::MetaData::toBSON() const {
-        BSONObjBuilder b;
-        b.append( "ns", ns );
-        {
-            BSONArrayBuilder arr( b.subarrayStart( "indexes" ) );
-            for ( unsigned i = 0; i < indexes.size(); i++ ) {
-                BSONObjBuilder sub( arr.subobjStart() );
-                sub.append( "spec", indexes[i].spec );
-                sub.appendBool( "ready", indexes[i].ready );
-                sub.appendBool( "multikey", indexes[i].multikey );
-                sub.append( "head_a", indexes[i].head.a() );
-                sub.append( "head_b", indexes[i].head.getOfs() );
-                sub.done();
-            }
-            arr.done();
-        }
-        return b.obj();
-    }
-
-    void RocksCollectionCatalogEntry::MetaData::parse( const BSONObj& obj ) {
-        ns = obj["ns"].valuestrsafe();
-
-        BSONElement e = obj["indexes"];
-        if ( e.isABSONObj() ) {
-            std::vector<BSONElement> entries = e.Array();
-            for ( unsigned i = 0; i < entries.size(); i++ ) {
-                BSONObj idx = entries[i].Obj();
-                IndexMetaData imd;
-                imd.spec = idx["spec"].Obj().getOwned();
-                imd.ready = idx["ready"].trueValue();
-                imd.head = DiskLoc( idx["head_a"].Int(),
-                                    idx["head_b"].Int() );
-                imd.multikey = idx["multikey"].trueValue();
-                indexes.push_back( imd );
-            }
-        }
-    }
 }

@@ -86,12 +86,12 @@ namespace mongo {
         const DiskLoc loc = _subIterators.back()->getNext();
         _subIterators.popAndDeleteBack();
 
-        if (!loc.isNull() && !_filter->matchesBSON(_collection->docFor(loc))) {
+        if (!loc.isNull() && !_filter->matchesBSON(_collection->docFor(_txn, loc))) {
             _done = true;
             WorkingSetID id = _workingSet->allocate();
             WorkingSetMember* member = _workingSet->get(id);
             member->loc = loc;
-            member->obj = _collection->docFor(member->loc);
+            member->obj = _collection->docFor(_txn, member->loc);
             member->state = WorkingSetMember::LOC_AND_UNOWNED_OBJ;
             *out = id;
             return PlanStage::ADVANCED;

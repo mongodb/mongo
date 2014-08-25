@@ -530,7 +530,7 @@ namespace mongo {
                         db);
 
                 Collection* c = db->getCollection( txn, to_name );
-                if ( c && !c->getIndexCatalog()->haveIdIndex() ) {
+                if ( c && !c->getIndexCatalog()->haveIdIndex( txn ) ) {
                     // We need to drop objects with duplicate _ids because we didn't do a true
                     // snapshot and this is before applying oplog operations that occur during the
                     // initial sync.

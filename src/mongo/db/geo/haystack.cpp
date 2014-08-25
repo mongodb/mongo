@@ -85,7 +85,7 @@ namespace mongo {
             }
 
             vector<IndexDescriptor*> idxs;
-            collection->getIndexCatalog()->findIndexByType(IndexNames::GEO_HAYSTACK, idxs);
+            collection->getIndexCatalog()->findIndexByType(txn, IndexNames::GEO_HAYSTACK, idxs);
             if (idxs.size() == 0) {
                 errmsg = "no geoSearch index";
                 return false;

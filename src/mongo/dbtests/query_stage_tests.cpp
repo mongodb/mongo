@@ -108,7 +108,7 @@ namespace QueryStageTests {
         IndexDescriptor* getIndex(const BSONObj& obj) {
             Client::ReadContext ctx(&_txn, ns());
             Collection* collection = ctx.ctx().db()->getCollection( &_txn, ns() );
-            return collection->getIndexCatalog()->findIndexByKeyPattern( obj );
+            return collection->getIndexCatalog()->findIndexByKeyPattern( &_txn, obj );
         }
 
         static int numObj() { return 50; }

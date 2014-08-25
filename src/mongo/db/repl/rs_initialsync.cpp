@@ -141,7 +141,7 @@ namespace repl {
         Collection* collection = ctx.ctx().db()->getCollection(txn, rsoplog);
 
         // temp
-        if( collection->numRecords() == 0 )
+        if( collection->numRecords(txn) == 0 )
             return; // already empty, ok.
 
         LOG(1) << "replSet empty oplog" << rsLog;

@@ -635,7 +635,7 @@ namespace repl {
                     // but keep it just in case
                     RARELY if ( indexCatalog
                                  && !collection->isCapped()
-                                 && !indexCatalog->haveIdIndex() ) {
+                                 && !indexCatalog->haveIdIndex(txn) ) {
                         try {
                             Helpers::ensureIndex(txn, collection, BSON("_id" << 1), true, "_id_");
                         }
@@ -670,7 +670,7 @@ namespace repl {
 
             // probably don't need this since all replicated colls have _id indexes now
             // but keep it just in case
-            RARELY if ( indexCatalog && !collection->isCapped() && !indexCatalog->haveIdIndex() ) {
+            RARELY if ( indexCatalog && !collection->isCapped() && !indexCatalog->haveIdIndex(txn) ) {
                 try {
                     Helpers::ensureIndex(txn, collection, BSON("_id" << 1), true, "_id_");
                 }
@@ -710,9 +710,9 @@ namespace repl {
                     // thus this is not ideal.
                     else {
                         if (collection == NULL ||
-                            (indexCatalog->haveIdIndex() && Helpers::findById(txn, collection, updateCriteria).isNull()) ||
+                            (indexCatalog->haveIdIndex(txn) && Helpers::findById(txn, collection, updateCriteria).isNull()) ||
                             // capped collections won't have an _id index
-                            (!indexCatalog->haveIdIndex() && Helpers::findOne(txn, collection, updateCriteria, false).isNull())) {
+                            (!indexCatalog->haveIdIndex(txn) && Helpers::findOne(txn, collection, updateCriteria, false).isNull())) {
                             failedUpdate = true;
                             log() << "replication couldn't find doc: " << op.toString() << endl;
                         }

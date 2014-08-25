@@ -97,7 +97,7 @@ namespace PlanRankingTests {
             Collection* collection = ctx.ctx().db()->getCollection(&_txn, ns);
 
             QueryPlannerParams plannerParams;
-            fillOutPlannerParams(collection, cq, &plannerParams);
+            fillOutPlannerParams(&_txn, collection, cq, &plannerParams);
             // Turn this off otherwise it pops up in some plans.
             plannerParams.options &= ~QueryPlannerParams::KEEP_MUTATIONS;
 
@@ -109,7 +109,7 @@ namespace PlanRankingTests {
             ASSERT_GREATER_THAN_OR_EQUALS(solutions.size(), 1U);
 
             // Fill out the MPR.
-            _mps.reset(new MultiPlanStage(collection, cq));
+            _mps.reset(new MultiPlanStage(&_txn, collection, cq));
             WorkingSet* ws = new WorkingSet();
             // Put each solution from the planner into the MPR.
             for (size_t i = 0; i < solutions.size(); ++i) {

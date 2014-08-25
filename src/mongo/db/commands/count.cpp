@@ -89,7 +89,7 @@ namespace mongo {
 
         // count of all objects
         if (query.isEmpty()) {
-            return applySkipLimit(collection->numRecords(), cmd);
+            return applySkipLimit(collection->numRecords(txn), cmd);
         }
 
         long long skip = cmd["skip"].numberLong();

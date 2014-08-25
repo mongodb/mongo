@@ -54,17 +54,20 @@ namespace mongo {
 
         virtual CollectionOptions getCollectionOptions(OperationContext* txn) const;
 
-        virtual int getTotalIndexCount() const;
+        virtual int getTotalIndexCount(OperationContext* txn) const;
 
-        virtual int getCompletedIndexCount() const;
+        virtual int getCompletedIndexCount(OperationContext* txn) const;
 
         virtual int getMaxAllowedIndexes() const;
 
-        virtual void getAllIndexes( std::vector<std::string>* names ) const;
+        virtual void getAllIndexes( OperationContext* txn,
+                                    std::vector<std::string>* names ) const;
 
-        virtual BSONObj getIndexSpec( const StringData& idxName ) const;
+        virtual BSONObj getIndexSpec( OperationContext* txn,
+                                      const StringData& idxName ) const;
 
-        virtual bool isIndexMultikey(const StringData& indexName) const;
+        virtual bool isIndexMultikey(OperationContext* txn,
+                                     const StringData& indexName) const;
         virtual bool isIndexMultikey(int idxNo) const;
 
         virtual bool setIndexIsMultikey(OperationContext* txn,
@@ -74,13 +77,15 @@ namespace mongo {
                                         const StringData& indexName,
                                         bool multikey = true);
 
-        virtual DiskLoc getIndexHead( const StringData& indexName ) const;
+        virtual DiskLoc getIndexHead( OperationContext* txn,
+                                      const StringData& indexName ) const;
 
         virtual void setIndexHead( OperationContext* txn,
                                    const StringData& indexName,
                                    const DiskLoc& newHead );
 
-        virtual bool isIndexReady( const StringData& indexName ) const;
+        virtual bool isIndexReady( OperationContext* txn,
+                                   const StringData& indexName ) const;
 
         virtual Status removeIndex( OperationContext* txn,
                                     const StringData& indexName );
@@ -97,7 +102,7 @@ namespace mongo {
 
         // not part of interface, but available to my storage engine
 
-        int _findIndexNumber( const StringData& indexName) const;
+        int _findIndexNumber( OperationContext* txn, const StringData& indexName) const;
 
     private:
         NamespaceDetails* _details;

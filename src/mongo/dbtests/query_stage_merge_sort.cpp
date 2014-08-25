@@ -62,7 +62,7 @@ namespace QueryStageMergeSortTests {
         }
 
         IndexDescriptor* getIndex(const BSONObj& obj, Collection* coll) {
-            return coll->getIndexCatalog()->findIndexByKeyPattern( obj );
+            return coll->getIndexCatalog()->findIndexByKeyPattern( &_txn, obj );
         }
 
         void insert(const BSONObj& obj) {
@@ -137,7 +137,7 @@ namespace QueryStageMergeSortTests {
             // Sort by c:1
             MergeSortStageParams msparams;
             msparams.pattern = BSON("c" << 1);
-            MergeSortStage* ms = new MergeSortStage(msparams, ws, coll);
+            MergeSortStage* ms = new MergeSortStage(&_txn, msparams, ws, coll);
 
             // a:1
             IndexScanParams params;
@@ -155,7 +155,7 @@ namespace QueryStageMergeSortTests {
             ctx.commit();
 
             // Must fetch if we want to easily pull out an obj.
-            PlanExecutor runner(ws, new FetchStage(ws, ms, NULL, coll), coll);
+            PlanExecutor runner(ws, new FetchStage(&_txn, ws, ms, NULL, coll), coll);
 
             for (int i = 0; i < N; ++i) {
                 BSONObj first, second;
@@ -201,7 +201,7 @@ namespace QueryStageMergeSortTests {
             // Sort by c:1
             MergeSortStageParams msparams;
             msparams.pattern = BSON("c" << 1);
-            MergeSortStage* ms = new MergeSortStage(msparams, ws, coll);
+            MergeSortStage* ms = new MergeSortStage(&_txn, msparams, ws, coll);
 
             // a:1
             IndexScanParams params;
@@ -218,7 +218,7 @@ namespace QueryStageMergeSortTests {
             ms->addChild(new IndexScan(&_txn, params, ws, NULL));
             ctx.commit();
 
-            PlanExecutor runner(ws, new FetchStage(ws, ms, NULL, coll), coll);
+            PlanExecutor runner(ws, new FetchStage(&_txn, ws, ms, NULL, coll), coll);
 
             for (int i = 0; i < N; ++i) {
                 BSONObj first, second;
@@ -264,7 +264,7 @@ namespace QueryStageMergeSortTests {
             MergeSortStageParams msparams;
             msparams.dedup = false;
             msparams.pattern = BSON("c" << 1);
-            MergeSortStage* ms = new MergeSortStage(msparams, ws, coll);
+            MergeSortStage* ms = new MergeSortStage(&_txn, msparams, ws, coll);
 
             // a:1
             IndexScanParams params;
@@ -281,7 +281,7 @@ namespace QueryStageMergeSortTests {
             ms->addChild(new IndexScan(&_txn, params, ws, NULL));
             ctx.commit();
 
-            PlanExecutor runner(ws, new FetchStage(ws, ms, NULL, coll), coll);
+            PlanExecutor runner(ws, new FetchStage(&_txn, ws, ms, NULL, coll), coll);
 
             for (int i = 0; i < N; ++i) {
                 BSONObj first, second;
@@ -329,7 +329,7 @@ namespace QueryStageMergeSortTests {
             // Sort by c:-1
             MergeSortStageParams msparams;
             msparams.pattern = BSON("c" << -1);
-            MergeSortStage* ms = new MergeSortStage(msparams, ws, coll);
+            MergeSortStage* ms = new MergeSortStage(&_txn, msparams, ws, coll);
 
             // a:1
             IndexScanParams params;
@@ -347,7 +347,7 @@ namespace QueryStageMergeSortTests {
             ms->addChild(new IndexScan(&_txn, params, ws, NULL));
             ctx.commit();
 
-            PlanExecutor runner(ws, new FetchStage(ws, ms, NULL, coll), coll);
+            PlanExecutor runner(ws, new FetchStage(&_txn, ws, ms, NULL, coll), coll);
 
             for (int i = 0; i < N; ++i) {
                 BSONObj first, second;
@@ -393,7 +393,7 @@ namespace QueryStageMergeSortTests {
             // Sort by c:1
             MergeSortStageParams msparams;
             msparams.pattern = BSON("c" << 1);
-            MergeSortStage* ms = new MergeSortStage(msparams, ws, coll);
+            MergeSortStage* ms = new MergeSortStage(&_txn, msparams, ws, coll);
 
             // a:1
             IndexScanParams params;
@@ -412,7 +412,7 @@ namespace QueryStageMergeSortTests {
             ms->addChild(new IndexScan(&_txn, params, ws, NULL));
             ctx.commit();
 
-            PlanExecutor runner(ws, new FetchStage(ws, ms, NULL, coll), coll);
+            PlanExecutor runner(ws, new FetchStage(&_txn, ws, ms, NULL, coll), coll);
 
             // Only getting results from the a:1 index scan.
             for (int i = 0; i < N; ++i) {
@@ -443,7 +443,7 @@ namespace QueryStageMergeSortTests {
             // Sort by foo:1
             MergeSortStageParams msparams;
             msparams.pattern = BSON("foo" << 1);
-            MergeSortStage* ms = new MergeSortStage(msparams, ws, coll);
+            MergeSortStage* ms = new MergeSortStage(&_txn, msparams, ws, coll);
 
             IndexScanParams params;
             params.bounds.isSimpleRange = true;
@@ -465,7 +465,7 @@ namespace QueryStageMergeSortTests {
             }
             ctx.commit();
 
-            PlanExecutor runner(ws, new FetchStage(ws, ms, NULL, coll), coll);
+            PlanExecutor runner(ws, new FetchStage(&_txn, ws, ms, NULL, coll), coll);
 
             for (int i = 0; i < numIndices; ++i) {
                 BSONObj obj;
@@ -496,7 +496,7 @@ namespace QueryStageMergeSortTests {
             // Sort by foo:1
             MergeSortStageParams msparams;
             msparams.pattern = BSON("foo" << 1);
-            auto_ptr<MergeSortStage> ms(new MergeSortStage(msparams, &ws, coll));
+            auto_ptr<MergeSortStage> ms(new MergeSortStage(&_txn, msparams, &ws, coll));
 
             IndexScanParams params;
             params.bounds.isSimpleRange = true;

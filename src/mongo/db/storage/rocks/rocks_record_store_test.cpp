@@ -197,13 +197,13 @@ namespace mongo {
                 loc = res.getValue();
             }
 
-            ASSERT_EQUALS( s, rs.dataFor( loc ).data() );
+            ASSERT_EQUALS( s, rs.dataFor( NULL,  loc ).data() );
         }
 
         {
             RocksRecordStore rs( "foo.bar", db.get(), cfh.get(), db->DefaultColumnFamily() );
-            ASSERT_EQUALS( 1, rs.numRecords() );
-            ASSERT_EQUALS( size, rs.dataSize() );
+            ASSERT_EQUALS( 1, rs.numRecords( NULL ) );
+            ASSERT_EQUALS( size, rs.dataSize( NULL ) );
         }
     }
 
@@ -229,20 +229,20 @@ namespace mongo {
                     loc = res.getValue();
                 }
 
-                ASSERT_EQUALS( s, rs.dataFor( loc ).data() );
-                ASSERT_EQUALS( 1, rs.numRecords() );
-                ASSERT_EQUALS( static_cast<long long> ( s.length() + 1 ), rs.dataSize() );
+                ASSERT_EQUALS( s, rs.dataFor( NULL,  loc ).data() );
+                ASSERT_EQUALS( 1, rs.numRecords( NULL ) );
+                ASSERT_EQUALS( static_cast<long long> ( s.length() + 1 ), rs.dataSize( NULL ) );
             }
 
-            ASSERT( rs.dataFor( loc ).data() != NULL );
+            ASSERT( rs.dataFor( NULL,  loc ).data() != NULL );
 
             {
                 MyOperationContext opCtx( db.get() );
                 WriteUnitOfWork uow( &opCtx );
                 rs.deleteRecord( &opCtx, loc );
 
-                ASSERT_EQUALS( 0, rs.numRecords() );
-                ASSERT_EQUALS( 0, rs.dataSize() );
+                ASSERT_EQUALS( 0, rs.numRecords( NULL ) );
+                ASSERT_EQUALS( 0, rs.dataSize( NULL ) );
             }
         }
     }
@@ -270,7 +270,7 @@ namespace mongo {
                     loc = res.getValue();
                 }
 
-                ASSERT_EQUALS( s1, rs.dataFor( loc ).data() );
+                ASSERT_EQUALS( s1, rs.dataFor( NULL,  loc ).data() );
             }
 
             {
@@ -287,7 +287,7 @@ namespace mongo {
                     ASSERT( loc == res.getValue() );
                 }
 
-                ASSERT_EQUALS( s2, rs.dataFor( loc ).data() );
+                ASSERT_EQUALS( s2, rs.dataFor( NULL,  loc ).data() );
             }
 
         }
@@ -316,7 +316,7 @@ namespace mongo {
                     loc = res.getValue();
                 }
 
-                ASSERT_EQUALS( s1, rs.dataFor( loc ).data() );
+                ASSERT_EQUALS( s1, rs.dataFor( NULL,  loc ).data() );
             }
 
             {
@@ -335,7 +335,7 @@ namespace mongo {
                                                        dv );
                     ASSERT_OK( res );
                 }
-                ASSERT_EQUALS( s2, rs.dataFor( loc ).data() );
+                ASSERT_EQUALS( s2, rs.dataFor( NULL,  loc ).data() );
             }
 
         }
@@ -383,8 +383,8 @@ namespace mongo {
 
         ASSERT_EQUALS( a, b );
 
-        ASSERT_EQUALS( string("a"), rs1.dataFor( a ).data() );
-        ASSERT_EQUALS( string("b"), rs2.dataFor( b ).data() );
+        ASSERT_EQUALS( string("a"), rs1.dataFor( NULL,  a ).data() );
+        ASSERT_EQUALS( string("b"), rs2.dataFor( NULL,  b ).data() );
 
         delete cf2;
         delete cf1;
@@ -408,7 +408,7 @@ namespace mongo {
                 loc = res.getValue();
             }
 
-            ASSERT_EQUALS( s, rs.dataFor( loc ).data() );
+            ASSERT_EQUALS( s, rs.dataFor( NULL,  loc ).data() );
         }
 
         {
@@ -442,7 +442,7 @@ namespace mongo {
                     loc = res.getValue();
                 }
 
-                ASSERT_EQUALS( origStr, rs.dataFor( loc ).data() );
+                ASSERT_EQUALS( origStr, rs.dataFor( NULL,  loc ).data() );
             }
         }
 
@@ -455,8 +455,8 @@ namespace mongo {
                                  dbAndCfh.second.get(),
                                  db->DefaultColumnFamily() );
 
-            ASSERT_EQUALS( static_cast<long long> ( origStr.size() + 1 ), rs.dataSize() );
-            ASSERT_EQUALS( 1, rs.numRecords() );
+            ASSERT_EQUALS( static_cast<long long> ( origStr.size() + 1 ), rs.dataSize( NULL ) );
+            ASSERT_EQUALS( 1, rs.numRecords( NULL ) );
 
             {
                 MyOperationContext opCtx( db.get() );
@@ -467,7 +467,7 @@ namespace mongo {
                     ASSERT_OK( res.getStatus() );
                 }
 
-                ASSERT_EQUALS( newStr, rs.dataFor( loc ).data() );
+                ASSERT_EQUALS( newStr, rs.dataFor( NULL,  loc ).data() );
             }
         }
 
@@ -480,8 +480,8 @@ namespace mongo {
                                  dbAndCfh.second.get(),
                                  db->DefaultColumnFamily() );
 
-            ASSERT_EQUALS( static_cast<long long>( newStr.size() + 1 ), rs.dataSize() );
-            ASSERT_EQUALS( 1, rs.numRecords() );
+            ASSERT_EQUALS( static_cast<long long>( newStr.size() + 1 ), rs.dataSize( NULL ) );
+            ASSERT_EQUALS( 1, rs.numRecords( NULL ) );
 
             {
                 MyOperationContext opCtx( db.get() );
@@ -491,8 +491,8 @@ namespace mongo {
                 }
             }
 
-            ASSERT_EQUALS( 0, rs.dataSize() );
-            ASSERT_EQUALS( 0, rs.numRecords() );
+            ASSERT_EQUALS( 0, rs.dataSize( NULL ) );
+            ASSERT_EQUALS( 0, rs.numRecords( NULL ) );
         }
     }
 
@@ -648,8 +648,8 @@ namespace mongo {
                 Status stat = rs.truncate( &opCtx );
                 ASSERT_OK( stat );
 
-                ASSERT_EQUALS( 0, rs.numRecords() );
-                ASSERT_EQUALS( 0, rs.dataSize() );
+                ASSERT_EQUALS( 0, rs.numRecords( NULL ) );
+                ASSERT_EQUALS( 0, rs.dataSize( NULL ) );
             }
 
             // Test that truncate does not fail on an empty collection
@@ -659,8 +659,8 @@ namespace mongo {
                 Status stat = rs.truncate( &opCtx );
                 ASSERT_OK( stat );
 
-                ASSERT_EQUALS( 0, rs.numRecords() );
-                ASSERT_EQUALS( 0, rs.dataSize() );
+                ASSERT_EQUALS( 0, rs.numRecords( NULL ) );
+                ASSERT_EQUALS( 0, rs.dataSize( NULL ) );
             }
         }
     }
@@ -695,13 +695,13 @@ namespace mongo {
 
             rs.deleteRecord( &opCtx, loc );
 
-            RecordData recData = rs.dataFor( loc/*, &opCtx */ );
+            RecordData recData = rs.dataFor( NULL,  loc/*, &opCtx */ );
             ASSERT( !recData.data() && recData.size() == 0 );
 
             // XXX this test doesn't yet work, but there should be some notion of snapshots,
             // and the op context that doesn't see the deletion shouldn't know that this data
             // has been deleted
-            RecordData recData2 = rs.dataFor( loc/*, &opCtx2 */ );
+            RecordData recData2 = rs.dataFor( NULL,  loc/*, &opCtx2 */ );
             ASSERT( recData.data() && recData.size() == size );
         }
     }

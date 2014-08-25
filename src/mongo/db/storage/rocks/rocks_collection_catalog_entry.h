@@ -31,6 +31,7 @@
 #pragma once
 
 #include "mongo/db/catalog/collection_catalog_entry.h"
+#include "mongo/db/storage/bson_collection_catalog_entry.h"
 
 namespace rocksdb {
     class DB;
@@ -40,39 +41,23 @@ namespace mongo {
 
     class RocksEngine;
 
-    class RocksCollectionCatalogEntry : public CollectionCatalogEntry {
+    class RocksCollectionCatalogEntry : public BSONCollectionCatalogEntry {
     public:
         RocksCollectionCatalogEntry( RocksEngine* engine, const StringData& ns );
 
         virtual ~RocksCollectionCatalogEntry(){}
 
-        virtual CollectionOptions getCollectionOptions(OperationContext* txn) const;
-
         // ------- indexes ----------
 
-        virtual int getTotalIndexCount() const;
-
-        virtual int getCompletedIndexCount() const;
-
         virtual int getMaxAllowedIndexes() const;
-
-        virtual void getAllIndexes( std::vector<std::string>* names ) const;
-
-        virtual BSONObj getIndexSpec( const StringData& idxName ) const;
-
-        virtual bool isIndexMultikey( const StringData& indexName) const;
 
         virtual bool setIndexIsMultikey(OperationContext* txn,
                                         const StringData& indexName,
                                         bool multikey = true);
 
-        virtual DiskLoc getIndexHead( const StringData& indexName ) const;
-
         virtual void setIndexHead( OperationContext* txn,
                                    const StringData& indexName,
                                    const DiskLoc& newHead );
-
-        virtual bool isIndexReady( const StringData& indexName ) const;
 
         virtual Status removeIndex( OperationContext* txn,
                                     const StringData& indexName );
@@ -93,7 +78,7 @@ namespace mongo {
 
         // ------ internal api
 
-        BSONObj getIndexSpec( const StringData& idxName, rocksdb::DB* db ) const;
+        BSONObj getOtherIndexSpec( const StringData& idxName, rocksdb::DB* db ) const;
 
         // called once when collection is created.
         void createMetaData();
@@ -104,35 +89,10 @@ namespace mongo {
 
         const string metaDataKey() { return _metaDataKey; }
 
-        struct IndexMetaData {
-            IndexMetaData() {}
-            IndexMetaData( BSONObj s, bool r, DiskLoc h, bool m )
-                : spec( s ), ready( r ), head( h ), multikey( m ) {}
-
-            BSONObj spec;
-            bool ready;
-            DiskLoc head;
-            bool multikey;
-        };
-
-        struct MetaData {
-            void parse( const BSONObj& obj );
-            BSONObj toBSON() const;
-
-            int findIndexOffset( const StringData& name ) const;
-
-            /**
-             * Removes information about an index from the MetaData. Returns true if an index
-             * called name existed and was deleted, and false otherwise.
-             */
-            bool eraseIndex( const StringData& name );
-
-            std::string ns;
-            std::vector<IndexMetaData> indexes;
-        };
+    protected:
+        virtual MetaData _getMetaData( OperationContext* txn ) const;
 
     private:
-        MetaData _getMetaData() const;
         MetaData _getMetaData( rocksdb::DB* db ) const;
 
         MetaData _getMetaData_inlock() const;

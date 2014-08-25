@@ -77,7 +77,7 @@ namespace mongo {
         }
         int scale = static_cast<int>(ceil(maxDistance / _bucketSize));
 
-        GeoHaystackSearchHopper hopper(nearObj, maxDistance, limit, _geoField, collection);
+        GeoHaystackSearchHopper hopper(txn, nearObj, maxDistance, limit, _geoField, collection);
 
         long long btreeMatches = 0;
 

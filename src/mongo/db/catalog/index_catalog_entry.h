@@ -57,7 +57,8 @@ namespace mongo {
 
         const string& ns() const { return _ns; }
 
-        void init( IndexAccessMethod* accessMethod );
+        void init( OperationContext* txn,
+                   IndexAccessMethod* accessMethod );
 
         IndexDescriptor* descriptor() { return _descriptor; }
         const IndexDescriptor* descriptor() const { return _descriptor; }
@@ -69,7 +70,7 @@ namespace mongo {
 
         /// ---------------------
 
-        const DiskLoc& head() const;
+        const DiskLoc& head( OperationContext* txn ) const;
 
         void setHead( OperationContext* txn, DiskLoc newHead );
 
@@ -79,18 +80,18 @@ namespace mongo {
 
         // --
 
-        bool isMultikey() const;
+        bool isMultikey( OperationContext* txn ) const;
 
         void setMultikey( OperationContext* txn );
 
         // if this ready is ready for queries
-        bool isReady() const;
+        bool isReady( OperationContext* txn ) const;
 
     private:
 
-        bool _catalogIsReady() const;
-        DiskLoc _catalogHead() const;
-        bool _catalogIsMultikey() const;
+        bool _catalogIsReady( OperationContext* txn ) const;
+        DiskLoc _catalogHead( OperationContext* txn ) const;
+        bool _catalogIsMultikey( OperationContext* txn ) const;
 
         // -----
 

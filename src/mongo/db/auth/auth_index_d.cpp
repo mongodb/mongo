@@ -92,7 +92,7 @@ namespace {
             }
             IndexCatalog* indexCatalog = collection->getIndexCatalog();
             IndexDescriptor* oldIndex = NULL;
-            while ((oldIndex = indexCatalog->findIndexByKeyPattern(v1SystemUsersKeyPattern))) {
+            while ((oldIndex = indexCatalog->findIndexByKeyPattern(txn, v1SystemUsersKeyPattern))) {
                 indexCatalog->dropIndex(txn, oldIndex);
             }
             wctx.commit();

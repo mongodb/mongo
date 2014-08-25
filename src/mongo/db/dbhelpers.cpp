@@ -103,7 +103,7 @@ namespace mongo {
         DiskLoc loc = findOne( txn, collection, query, requireIndex );
         if ( loc.isNull() )
             return false;
-        result = collection->docFor(loc);
+        result = collection->docFor(txn, loc);
         return true;
     }
 
@@ -156,7 +156,7 @@ namespace mongo {
             *nsFound = true;
 
         IndexCatalog* catalog = collection->getIndexCatalog();
-        const IndexDescriptor* desc = catalog->findIdIndex();
+        const IndexDescriptor* desc = catalog->findIdIndex( txn );
 
         if ( !desc )
             return false;
@@ -171,7 +171,7 @@ namespace mongo {
         DiskLoc loc = accessMethod->findSingle( txn, query["_id"].wrap() );
         if ( loc.isNull() )
             return false;
-        result = collection->docFor( loc );
+        result = collection->docFor( txn, loc );
         return true;
     }
 
@@ -180,7 +180,7 @@ namespace mongo {
                               const BSONObj& idquery) {
         verify(collection);
         IndexCatalog* catalog = collection->getIndexCatalog();
-        const IndexDescriptor* desc = catalog->findIdIndex();
+        const IndexDescriptor* desc = catalog->findIdIndex( txn );
         uassert(13430, "no _id index", desc);
         // See SERVER-12397.  This may not always be true.
         BtreeBasedAccessMethod* accessMethod =
@@ -304,7 +304,8 @@ namespace mongo {
         // Therefore, any multi-key index prefixed by shard key cannot be multikey over
         // the shard key fields.
         const IndexDescriptor* idx =
-            collection->getIndexCatalog()->findIndexByPrefix(shardKeyPattern,
+            collection->getIndexCatalog()->findIndexByPrefix(txn,
+                                                             shardKeyPattern,
                                                              false /* allow multi key */);
 
         if ( idx == NULL )
@@ -369,7 +370,8 @@ namespace mongo {
                     break;
 
                 IndexDescriptor* desc =
-                    collection->getIndexCatalog()->findIndexByKeyPattern( indexKeyPattern.toBSON() );
+                    collection->getIndexCatalog()->findIndexByKeyPattern( txn,
+                                                                          indexKeyPattern.toBSON() );
 
                 auto_ptr<PlanExecutor> exec(InternalPlanner::indexScan(txn, collection, desc,
                                                                        min, max,
@@ -498,7 +500,7 @@ namespace mongo {
 
         // Require single key
         IndexDescriptor *idx =
-            collection->getIndexCatalog()->findIndexByPrefix( range.keyPattern, true );
+            collection->getIndexCatalog()->findIndexByPrefix( txn, range.keyPattern, true );
 
         if ( idx == NULL ) {
             return Status( ErrorCodes::IndexNotFound, range.keyPattern.toString() );
@@ -510,10 +512,10 @@ namespace mongo {
         // sizes will vary
         long long avgDocsWhenFull;
         long long avgDocSizeBytes;
-        const long long totalDocsInNS = collection->numRecords();
+        const long long totalDocsInNS = collection->numRecords( txn );
         if ( totalDocsInNS > 0 ) {
             // TODO: Figure out what's up here
-            avgDocSizeBytes = collection->dataSize() / totalDocsInNS;
+            avgDocSizeBytes = collection->dataSize( txn ) / totalDocsInNS;
             avgDocsWhenFull = maxChunkSizeBytes / avgDocSizeBytes;
             avgDocsWhenFull = std::min( kMaxDocsPerChunk + 1,
                                         130 * avgDocsWhenFull / 100 /* slack */);

@@ -437,11 +437,12 @@ namespace mongo {
         class FetchStageWithMatch : public FetchStage {
         public:
 
-            FetchStageWithMatch(WorkingSet* ws,
+            FetchStageWithMatch(OperationContext* txn,
+                                WorkingSet* ws,
                                 PlanStage* child,
                                 MatchExpression* filter,
                                 const Collection* collection)
-                : FetchStage(ws, child, filter, collection), _matcher(filter) {
+                : FetchStage(txn, ws, child, filter, collection), _matcher(filter) {
             }
 
             virtual ~FetchStageWithMatch() {
@@ -647,7 +648,8 @@ namespace mongo {
         }
         
         // FetchStage owns index scan
-        FetchStage* fetcher(new FetchStageWithMatch(workingSet, 
+        FetchStage* fetcher(new FetchStageWithMatch(txn,
+                                                    workingSet, 
                                                     scan, 
                                                     docMatcher, 
                                                     collection));
@@ -881,7 +883,7 @@ namespace mongo {
         IndexScan* scan = new IndexScanWithMatch(txn, scanParams, workingSet, keyMatcher);
 
         // FetchStage owns index scan
-        FetchStage* fetcher(new FetchStage(workingSet, scan, _nearParams.filter, collection));
+        FetchStage* fetcher(new FetchStage(txn, workingSet, scan, _nearParams.filter, collection));
 
         return StatusWith<CoveredInterval*>(new CoveredInterval(fetcher,
                                                                 true,

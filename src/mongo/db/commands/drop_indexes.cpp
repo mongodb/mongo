@@ -138,7 +138,7 @@ namespace mongo {
             stopIndexBuilds(txn, db, jsobj);
 
             IndexCatalog* indexCatalog = collection->getIndexCatalog();
-            anObjBuilder.appendNumber("nIndexesWas", indexCatalog->numIndexesTotal() );
+            anObjBuilder.appendNumber("nIndexesWas", indexCatalog->numIndexesTotal(txn) );
 
 
             BSONElement f = jsobj.getField("index");
@@ -156,7 +156,8 @@ namespace mongo {
                     return true;
                 }
 
-                IndexDescriptor* desc = collection->getIndexCatalog()->findIndexByName( indexToDelete );
+                IndexDescriptor* desc = collection->getIndexCatalog()->findIndexByName( txn,
+                                                                                        indexToDelete );
                 if ( desc == NULL ) {
                     errmsg = str::stream() << "index not found with name [" << indexToDelete << "]";
                     return false;
@@ -177,7 +178,8 @@ namespace mongo {
             }
 
             if ( f.type() == Object ) {
-                IndexDescriptor* desc = collection->getIndexCatalog()->findIndexByKeyPattern( f.embeddedObject() );
+                IndexDescriptor* desc =
+                    collection->getIndexCatalog()->findIndexByKeyPattern( txn, f.embeddedObject() );
                 if ( desc == NULL ) {
                     errmsg = "can't find index with key:";
                     errmsg += f.embeddedObject().toString();
@@ -254,10 +256,10 @@ namespace mongo {
             vector<BSONObj> all;
             {
                 vector<string> indexNames;
-                collection->getCatalogEntry()->getAllIndexes( &indexNames );
+                collection->getCatalogEntry()->getAllIndexes( txn, &indexNames );
                 for ( size_t i = 0; i < indexNames.size(); i++ ) {
                     const string& name = indexNames[i];
-                    BSONObj spec = collection->getCatalogEntry()->getIndexSpec( name );
+                    BSONObj spec = collection->getCatalogEntry()->getIndexSpec( txn, name );
                     all.push_back(spec.removeField("v").getOwned());
 
                     const BSONObj key = spec.getObjectField("key");

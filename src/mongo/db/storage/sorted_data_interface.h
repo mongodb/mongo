@@ -98,7 +98,7 @@ namespace mongo {
          */
         virtual long long getSpaceUsedBytes( OperationContext* txn ) const = 0;
 
-        virtual bool isEmpty() = 0;
+        virtual bool isEmpty(OperationContext* txn) = 0;
         
         /**
          * Attempt to bring whole index into memory. No-op is ok if not supported.

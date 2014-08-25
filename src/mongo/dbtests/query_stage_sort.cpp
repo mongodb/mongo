@@ -91,7 +91,7 @@ namespace QueryStageSortTests {
                 WorkingSetMember member;
                 member.loc = *it;
                 member.state = WorkingSetMember::LOC_AND_UNOWNED_OBJ;
-                member.obj = coll->docFor(*it);
+                member.obj = coll->docFor(&_txn, *it);
                 ASSERT_FALSE(member.obj.isOwned());
                 ms->pushBack(member);
             }
@@ -124,8 +124,10 @@ namespace QueryStageSortTests {
             params.limit = limit();
 
             // Must fetch so we can look at the doc as a BSONObj.
-            PlanExecutor runner(
-                    ws, new FetchStage(ws, new SortStage(params, ws, ms), NULL, coll), coll);
+            PlanExecutor runner(ws,
+                                new FetchStage(&_txn, ws,
+                                               new SortStage(&_txn, params, ws, ms), NULL, coll),
+                                coll);
 
             // Look at pairs of objects to make sure that the sort order is pairwise (and therefore
             // totally) correct.
@@ -274,7 +276,7 @@ namespace QueryStageSortTests {
             params.collection = coll;
             params.pattern = BSON("foo" << 1);
             params.limit = limit();
-            auto_ptr<SortStage> ss(new SortStage(params, &ws, ms.get()));
+            auto_ptr<SortStage> ss(new SortStage(&_txn, params, &ws, ms.get()));
 
             const int firstRead = 10;
 
@@ -371,8 +373,11 @@ namespace QueryStageSortTests {
             params.limit = 0;
 
             // We don't get results back since we're sorting some parallel arrays.
-            PlanExecutor runner(
-                    ws, new FetchStage(ws, new SortStage(params, ws, ms), NULL, coll), coll);
+            PlanExecutor runner(ws,
+                                new FetchStage(&_txn,
+                                               ws,
+                                               new SortStage(&_txn, params, ws, ms), NULL, coll),
+                                coll);
             PlanExecutor::ExecState runnerState = runner.getNext(NULL, NULL);
             ASSERT_EQUALS(PlanExecutor::EXEC_ERROR, runnerState);
             ctx.commit();

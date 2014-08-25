@@ -303,7 +303,7 @@ public:
 
             BSONObj obj;
             try {
-                obj = coll->docFor(currLoc);
+                obj = coll->docFor(opCtx, currLoc);
 
                 // If this is a corrupted object, just skip it, but do not abort the scan
                 //
@@ -343,8 +343,8 @@ public:
                  string ns,
                  boost::filesystem::path outfile) {
         Collection* collection = db->getCollection(opCtx, ns);
-        toolInfoLog() << "nrecords: " << collection->numRecords()
-                      << " datasize: " << collection->dataSize()
+        toolInfoLog() << "nrecords: " << collection->numRecords(opCtx)
+                      << " datasize: " << collection->dataSize(opCtx)
                       << std::endl;
 
         outfile /= ( ns.substr( ns.find( "." ) + 1 ) + ".bson" );
@@ -353,7 +353,7 @@ public:
         FilePtr f (fopen(outfile.string().c_str(), "wb"));
 
         // init with double the docs count because we make two passes 
-        ProgressMeter m( collection->numRecords() * 2 );
+        ProgressMeter m( collection->numRecords(opCtx) * 2 );
         m.setName("Repair Progress");
         m.setUnits("documents");
 

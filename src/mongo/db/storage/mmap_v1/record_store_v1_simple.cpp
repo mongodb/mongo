@@ -413,7 +413,7 @@ namespace mongo {
                         uassertStatusOK( status.getStatus() );
                         datasize += recordFor( status.getValue() )->netLength();
 
-                        adaptor->inserted( dataFor( status.getValue() ), status.getValue() );
+                        adaptor->inserted( dataFor( txn, status.getValue() ), status.getValue() );
                     }
 
                     if( L.isNull() ) {

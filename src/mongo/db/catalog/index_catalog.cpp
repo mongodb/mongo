@@ -88,24 +88,26 @@ namespace mongo {
 
     Status IndexCatalog::init(OperationContext* txn) {
         vector<string> indexNames;
-        _collection->getCatalogEntry()->getAllIndexes( &indexNames );
+        _collection->getCatalogEntry()->getAllIndexes( txn, &indexNames );
 
         for ( size_t i = 0; i < indexNames.size(); i++ ) {
             const string& indexName = indexNames[i];
-            BSONObj spec = _collection->getCatalogEntry()->getIndexSpec( indexName ).getOwned();
+            BSONObj spec = _collection->getCatalogEntry()->getIndexSpec( txn,
+                                                                         indexName ).getOwned();
 
-            if ( !_collection->getCatalogEntry()->isIndexReady( indexName ) ) {
+            if ( !_collection->getCatalogEntry()->isIndexReady( txn, indexName ) ) {
                 _unfinishedIndexes.push_back( spec );
                 continue;
             }
 
             BSONObj keyPattern = spec.getObjectField("key");
             IndexDescriptor* descriptor = new IndexDescriptor( _collection,
-                                                               _getAccessMethodName(txn, keyPattern),
+                                                               _getAccessMethodName(txn,
+                                                                                    keyPattern),
                                                                spec );
             IndexCatalogEntry* entry = _setupInMemoryStructures( txn, descriptor );
 
-            fassert( 17340, entry->isReady()  );
+            fassert( 17340, entry->isReady( txn )  );
         }
 
         if ( _unfinishedIndexes.size() ) {
@@ -128,9 +130,9 @@ namespace mongo {
                                                                   descriptorCleanup.release(),
                                                                   _collection->infoCache() ) );
 
-        entry->init( _collection->_database->_dbEntry->getIndex( txn,
-                                                                 _collection->getCatalogEntry(),
-                                                                 entry.get() ) );
+        entry->init( txn, _collection->_database->_dbEntry->getIndex( txn,
+                                                                      _collection->getCatalogEntry(),
+                                                                      entry.get() ) );
 
         IndexCatalogEntry* save = entry.get();
         _entries.add( entry.release() );
@@ -302,7 +304,7 @@ namespace {
 
     Status IndexCatalog::createIndexOnEmptyCollection(OperationContext* txn, BSONObj spec) {
         txn->lockState()->assertWriteLocked( _collection->_database->name() );
-        invariant(_collection->numRecords() == 0);
+        invariant(_collection->numRecords(txn) == 0);
 
         _checkMagic();
         Status status = checkUnfinished();
@@ -345,7 +347,7 @@ namespace {
         indexBuildBlock.success();
 
         // sanity check
-        invariant(_collection->getCatalogEntry()->isIndexReady(descriptor->indexName()));
+        invariant(_collection->getCatalogEntry()->isIndexReady(txn, descriptor->indexName()));
 
         return Status::OK();
     }
@@ -449,7 +451,7 @@ namespace {
 
         _catalog->_collection->infoCache()->addedIndex();
 
-        IndexDescriptor* desc = _catalog->findIndexByName( _indexName, true );
+        IndexDescriptor* desc = _catalog->findIndexByName( _txn, _indexName, true );
         fassert( 17330, desc );
         IndexCatalogEntry* entry = _catalog->_entries.find( desc );
         fassert( 17331, entry && entry == _entry );
@@ -548,7 +550,7 @@ namespace {
 
         {
             // Check both existing and in-progress indexes (2nd param = true)
-            const IndexDescriptor* desc = findIndexByName( name, true );
+            const IndexDescriptor* desc = findIndexByName( txn, name, true );
             if ( desc ) {
                 // index already exists with same name
 
@@ -575,7 +577,7 @@ namespace {
 
         {
             // Check both existing and in-progress indexes (2nd param = true)
-            const IndexDescriptor* desc = findIndexByKeyPattern(key, true);
+            const IndexDescriptor* desc = findIndexByKeyPattern(txn, key, true);
             if (desc) {
                 LOG(2) << "index already exists with diff name " << name
                         << ' ' << key << endl;
@@ -592,7 +594,7 @@ namespace {
             }
         }
 
-        if ( _collection->getCatalogEntry()->getTotalIndexCount() >=
+        if ( _collection->getCatalogEntry()->getTotalIndexCount( txn ) >=
              _collection->getCatalogEntry()->getMaxAllowedIndexes() ) {
             string s = str::stream() << "add index fails, too many indexes for "
                                      << _collection->ns().ns() << " key:" << key.toString();
@@ -606,7 +608,7 @@ namespace {
         if ( pluginName == IndexNames::TEXT ) {
             vector<IndexDescriptor*> textIndexes;
             const bool includeUnfinishedIndexes = true;
-            findIndexByType( IndexNames::TEXT, textIndexes, includeUnfinishedIndexes );
+            findIndexByType( txn, IndexNames::TEXT, textIndexes, includeUnfinishedIndexes );
             if ( textIndexes.size() > 0 ) {
                 return Status( ErrorCodes::CannotCreateIndex,
                                str::stream() << "only one text index per collection allowed, "
@@ -641,14 +643,14 @@ namespace {
         // make sure nothing in progress
         massert( 17348,
                  "cannot dropAllIndexes when index builds in progress",
-                 numIndexesTotal() == numIndexesReady() );
+                 numIndexesTotal(txn) == numIndexesReady(txn) );
 
         bool haveIdIndex = false;
 
         vector<string> indexNamesToDrop;
         {
             int seen = 0;
-            IndexIterator ii = getIndexIterator( true );
+            IndexIterator ii = getIndexIterator( txn, true );
             while ( ii.more() ) {
                 seen++;
                 IndexDescriptor* desc = ii.next();
@@ -658,12 +660,12 @@ namespace {
                 }
                 indexNamesToDrop.push_back( desc->indexName() );
             }
-            invariant( seen == numIndexesTotal() );
+            invariant( seen == numIndexesTotal(txn) );
         }
 
         for ( size_t i = 0; i < indexNamesToDrop.size(); i++ ) {
             string indexName = indexNamesToDrop[i];
-            IndexDescriptor* desc = findIndexByName( indexName, true );
+            IndexDescriptor* desc = findIndexByName( txn, indexName, true );
             invariant( desc );
             LOG(1) << "\t dropAllIndexes dropping: " << desc->toString();
             IndexCatalogEntry* entry = _entries.find( desc );
@@ -674,24 +676,24 @@ namespace {
         // verify state is sane post cleaning
 
         long long numIndexesInCollectionCatalogEntry =
-            _collection->getCatalogEntry()->getTotalIndexCount();
+            _collection->getCatalogEntry()->getTotalIndexCount( txn );
 
         if ( haveIdIndex ) {
-            fassert( 17324, numIndexesTotal() == 1 );
-            fassert( 17325, numIndexesReady() == 1 );
+            fassert( 17324, numIndexesTotal(txn) == 1 );
+            fassert( 17325, numIndexesReady(txn) == 1 );
             fassert( 17326, numIndexesInCollectionCatalogEntry == 1 );
             fassert( 17336, _entries.size() == 1 );
         }
         else {
-            if ( numIndexesTotal() || numIndexesInCollectionCatalogEntry || _entries.size() ) {
+            if ( numIndexesTotal(txn) || numIndexesInCollectionCatalogEntry || _entries.size() ) {
                 error() << "About to fassert - "
-                        << " numIndexesTotal(): " << numIndexesTotal()
+                        << " numIndexesTotal(): " << numIndexesTotal(txn)
                         << " numSystemIndexesEntries: " << numIndexesInCollectionCatalogEntry
                         << " _entries.size(): " << _entries.size()
                         << " indexNamesToDrop: " << indexNamesToDrop.size()
                         << " haveIdIndex: " << haveIdIndex;
             }
-            fassert( 17327, numIndexesTotal() == 0 );
+            fassert( 17327, numIndexesTotal(txn) == 0 );
             fassert( 17328, numIndexesInCollectionCatalogEntry == 0 );
             fassert( 17337, _entries.size() == 0 );
         }
@@ -708,7 +710,7 @@ namespace {
         if ( !entry )
             return Status( ErrorCodes::InternalError, "cannot find index to delete" );
 
-        if ( !entry->isReady() )
+        if ( !entry->isReady( txn ) )
             return Status( ErrorCodes::InternalError, "cannot delete not ready index" );
 
         BackgroundOperation::assertNoBgOpInProgForNs( _collection->ns().ns() );
@@ -808,30 +810,32 @@ namespace {
         return toReturn;
     }
 
-    bool IndexCatalog::isMultikey( const IndexDescriptor* idx ) {
+    bool IndexCatalog::isMultikey( OperationContext* txn, const IndexDescriptor* idx ) {
         IndexCatalogEntry* entry = _entries.find( idx );
         invariant( entry );
-        return entry->isMultikey();
+        return entry->isMultikey( txn );
     }
 
 
     // ---------------------------
 
-    int IndexCatalog::numIndexesTotal() const {
-        return _collection->getCatalogEntry()->getTotalIndexCount();
+    int IndexCatalog::numIndexesTotal( OperationContext* txn ) const {
+        return _collection->getCatalogEntry()->getTotalIndexCount( txn );
     }
 
-    int IndexCatalog::numIndexesReady() const {
-        return _collection->getCatalogEntry()->getCompletedIndexCount();
+    int IndexCatalog::numIndexesReady( OperationContext* txn ) const {
+        return _collection->getCatalogEntry()->getCompletedIndexCount( txn );
     }
 
-    bool IndexCatalog::haveIdIndex() const {
-        return findIdIndex() != NULL;
+    bool IndexCatalog::haveIdIndex( OperationContext* txn ) const {
+        return findIdIndex( txn ) != NULL;
     }
 
-    IndexCatalog::IndexIterator::IndexIterator( const IndexCatalog* cat,
+    IndexCatalog::IndexIterator::IndexIterator( OperationContext* txn,
+                                                const IndexCatalog* cat,
                                                 bool includeUnfinishedIndexes )
         : _includeUnfinishedIndexes( includeUnfinishedIndexes ),
+          _txn( txn ),
           _catalog( cat ),
           _iterator( cat->_entries.begin() ),
           _start( true ),
@@ -868,7 +872,7 @@ namespace {
             ++_iterator;
 
             if ( _includeUnfinishedIndexes ||
-                 entry->isReady() ) {
+                 entry->isReady(_txn) ) {
                 _next = entry;
                 return;
             }
@@ -877,8 +881,8 @@ namespace {
     }
 
 
-    IndexDescriptor* IndexCatalog::findIdIndex() const {
-        IndexIterator ii = getIndexIterator( false );
+    IndexDescriptor* IndexCatalog::findIdIndex( OperationContext* txn ) const {
+        IndexIterator ii = getIndexIterator( txn, false );
         while ( ii.more() ) {
             IndexDescriptor* desc = ii.next();
             if ( desc->isIdIndex() )
@@ -887,9 +891,10 @@ namespace {
         return NULL;
     }
 
-    IndexDescriptor* IndexCatalog::findIndexByName( const StringData& name,
+    IndexDescriptor* IndexCatalog::findIndexByName( OperationContext* txn,
+                                                    const StringData& name,
                                                     bool includeUnfinishedIndexes ) const {
-        IndexIterator ii = getIndexIterator( includeUnfinishedIndexes );
+        IndexIterator ii = getIndexIterator( txn, includeUnfinishedIndexes );
         while ( ii.more() ) {
             IndexDescriptor* desc = ii.next();
             if ( desc->indexName() == name )
@@ -898,9 +903,10 @@ namespace {
         return NULL;
     }
 
-    IndexDescriptor* IndexCatalog::findIndexByKeyPattern( const BSONObj& key,
+    IndexDescriptor* IndexCatalog::findIndexByKeyPattern( OperationContext* txn,
+                                                          const BSONObj& key,
                                                           bool includeUnfinishedIndexes ) const {
-        IndexIterator ii = getIndexIterator( includeUnfinishedIndexes );
+        IndexIterator ii = getIndexIterator( txn, includeUnfinishedIndexes );
         while ( ii.more() ) {
             IndexDescriptor* desc = ii.next();
             if ( desc->keyPattern() == key )
@@ -909,18 +915,19 @@ namespace {
         return NULL;
     }
 
-    IndexDescriptor* IndexCatalog::findIndexByPrefix( const BSONObj &keyPattern,
+    IndexDescriptor* IndexCatalog::findIndexByPrefix( OperationContext* txn,
+                                                      const BSONObj &keyPattern,
                                                       bool requireSingleKey ) const {
         IndexDescriptor* best = NULL;
 
-        IndexIterator ii = getIndexIterator( false );
+        IndexIterator ii = getIndexIterator( txn, false );
         while ( ii.more() ) {
             IndexDescriptor* desc = ii.next();
 
             if ( !keyPattern.isPrefixOf( desc->keyPattern() ) )
                 continue;
 
-            if( !desc->isMultikey() )
+            if( !desc->isMultikey( txn ) )
                 return desc;
 
             if ( !requireSingleKey )
@@ -930,9 +937,10 @@ namespace {
         return best;
     }
 
-    void IndexCatalog::findIndexByType( const string& type , vector<IndexDescriptor*>& matches,
+    void IndexCatalog::findIndexByType( OperationContext* txn,
+                                        const string& type, vector<IndexDescriptor*>& matches,
                                         bool includeUnfinishedIndexes ) const {
-        IndexIterator ii = getIndexIterator( includeUnfinishedIndexes );
+        IndexIterator ii = getIndexIterator( txn, includeUnfinishedIndexes );
         while ( ii.more() ) {
             IndexDescriptor* desc = ii.next();
             if ( IndexNames::findPluginName( desc->keyPattern() ) == type ) {
@@ -1051,13 +1059,13 @@ namespace {
             IndexCatalogEntry* entry = *i;
 
             // If it's a background index, we DO NOT want to log anything.
-            bool logIfError = entry->isReady() ? !noWarn : false;
+            bool logIfError = entry->isReady(txn) ? !noWarn : false;
             _unindexRecord(txn, entry, obj, loc, logIfError);
         }
     }
 
     Status IndexCatalog::checkNoIndexConflicts( OperationContext* txn, const BSONObj &obj ) {
-        IndexIterator ii = getIndexIterator( true );
+        IndexIterator ii = getIndexIterator( txn, true );
         while ( ii.more() ) {
             IndexDescriptor* descriptor = ii.next();
 

@@ -667,7 +667,7 @@ namespace mongo {
         RARELY {
             std::stringstream buf;
             buf << "couldn't make room for record len: " << len << " in capped ns " << _ns << '\n';
-            buf << "numRecords: " << numRecords() << '\n';
+            buf << "numRecords: " << numRecords(txn) << '\n';
             int i = 0;
             for ( DiskLoc e = _details->firstExtent(txn);
                   !e.isNull();

@@ -54,7 +54,7 @@ namespace mongo {
      */
     class TestHeadManager : public HeadManager {
     public:
-        virtual const DiskLoc getHead() const {
+        virtual const DiskLoc getHead( OperationContext* txn ) const {
             return _head;
         }
 

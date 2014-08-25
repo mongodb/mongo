@@ -7,3 +7,11 @@ env.Library(
         ],
     LIBDEPS=[]
     )
+
+env.Library(
+    target='bson_collection_catalog_entry',
+    source=[
+        'bson_collection_catalog_entry.cpp',
+        ],
+    LIBDEPS=[]
+    )

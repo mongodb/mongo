@@ -313,7 +313,7 @@ namespace mongo {
             if ( !coll )
                 continue;
 
-            if ( coll->getIndexCatalog()->findIdIndex() )
+            if ( coll->getIndexCatalog()->findIdIndex( txn ) )
                 continue;
 
             log() << "WARNING: the collection '" << *i

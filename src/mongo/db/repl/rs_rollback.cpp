@@ -620,7 +620,7 @@ namespace repl {
                         }
                         // did we just empty the collection?  if so let's check if it even
                         // exists on the source.
-                        if (collection->numRecords() == 0) {
+                        if (collection->numRecords(txn) == 0) {
                             try {
                                 string sys = ctx.db()->name() + ".system.namespaces";
                                 BSONObj nsResult = them->findOne(sys, QUERY("name" << doc.ns));

@@ -376,7 +376,7 @@ namespace mongo {
                     finalCtx.ctx().db()->getCollection(_txn, _config.outputOptions.finalNamespace);
                 if ( finalColl ) {
                     IndexCatalog::IndexIterator ii =
-                        finalColl->getIndexCatalog()->getIndexIterator( true );
+                        finalColl->getIndexCatalog()->getIndexIterator( _txn, true );
                     // Iterate over finalColl's indexes.
                     while ( ii.more() ) {
                         IndexDescriptor* currIndex = ii.next();
@@ -961,7 +961,7 @@ namespace mongo {
 
                 bool foundIndex = false;
                 IndexCatalog::IndexIterator ii =
-                    incColl->getIndexCatalog()->getIndexIterator( true );
+                    incColl->getIndexCatalog()->getIndexIterator( _txn, true );
                 // Iterate over incColl's indexes.
                 while ( ii.more() ) {
                     IndexDescriptor* currIndex = ii.next();

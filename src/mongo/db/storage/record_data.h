@@ -60,7 +60,7 @@ namespace mongo {
     private:
         const char* _data;
         int _size;
-        const boost::shared_array<char> _dataPtr;
+        boost::shared_array<char> _dataPtr;
     };
 
 } // namespace mongo

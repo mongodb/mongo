@@ -127,7 +127,7 @@ namespace mongo {
         return static_cast<int64_t>( storageSize );
     }
 
-    RecordData RocksRecordStore::dataFor( const DiskLoc& loc) const {
+    RecordData RocksRecordStore::dataFor( OperationContext* txn, const DiskLoc& loc) const {
         // TODO investigate using cursor API to get a Slice and avoid double copying.
         std::string value;
 
@@ -307,7 +307,7 @@ namespace mongo {
                                                    ) const {
         invariant( !tailable );
 
-        return new Iterator( this, dir, start );
+        return new Iterator( txn, this, dir, start );
     }
 
 
@@ -357,7 +357,7 @@ namespace mongo {
             bool invalidObject = false;
             boost::scoped_ptr<RecordIterator> iter( getIterator( txn ) );
             while( !iter->isEOF() ) {
-                RecordData data = dataFor( iter->curr() );
+                RecordData data = dataFor( txn, iter->curr() );
                 size_t dataSize;
                 const Status status = adaptor->validate( data, &dataSize );
                 if (!status.isOK()) {
@@ -524,10 +524,12 @@ namespace mongo {
 
     // --------
 
-    RocksRecordStore::Iterator::Iterator( const RocksRecordStore* rs,
+    RocksRecordStore::Iterator::Iterator( OperationContext* txn,
+                                          const RocksRecordStore* rs,
                                           const CollectionScanParams::Direction& dir,
                                           const DiskLoc& start )
-        : _rs( rs ),
+        : _txn( txn ),
+          _rs( rs ),
           _dir( dir ),
           // XXX not using a snapshot here
           _iterator( _rs->_db->NewIterator( rs->_readOptions(), rs->_columnFamily ) ) {
@@ -597,7 +599,7 @@ namespace mongo {
     }
 
     RecordData RocksRecordStore::Iterator::dataFor( const DiskLoc& loc ) const {
-        return _rs->dataFor( loc );
+        return _rs->dataFor( _txn, loc );
     }
 
     bool RocksRecordStore::Iterator::_forward() const {

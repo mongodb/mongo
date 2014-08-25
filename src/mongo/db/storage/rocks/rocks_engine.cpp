@@ -474,7 +474,7 @@ namespace mongo {
             // Generate the Ordering object for each index, allowing the column families
             // representing these indexes to eventually be opened
             const string indexName = ns.substr( sepPos + 1 );
-            const BSONObj spec = entry->collectionEntry->getIndexSpec( indexName, db );
+            const BSONObj spec = entry->collectionEntry->getOtherIndexSpec( indexName, db );
             const Ordering order = Ordering::make( spec["key"].Obj() );
 
             indexOrderings.insert( std::make_pair( indexName, order ) );

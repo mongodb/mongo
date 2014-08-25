@@ -77,13 +77,13 @@ namespace mongo {
             _shouldDedup = false;
         }
         else {
-            _shouldDedup = _params.descriptor->isMultikey();
+            _shouldDedup = _params.descriptor->isMultikey(_txn);
         }
 
         // We can't always access the descriptor in the call to getStats() so we pull
         // the status-only information we need out here.
         _specificStats.indexName = _params.descriptor->infoObj()["name"].String();
-        _specificStats.isMultiKey = _params.descriptor->isMultikey();
+        _specificStats.isMultiKey = _params.descriptor->isMultikey(_txn);
 
         // Set up the index cursor.
         CursorOptions cursorOptions;

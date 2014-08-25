@@ -462,7 +462,7 @@ namespace IndexUpdateTests {
             // only want to interrupt the index build
             getGlobalEnvironment()->unsetKillAllOperations();
             // The new index is not listed in the index catalog because the index build failed.
-            ASSERT( !coll->getIndexCatalog()->findIndexByName( "a_1" ) );
+            ASSERT( !coll->getIndexCatalog()->findIndexByName( &_txn, "a_1" ) );
         }
     };
 
@@ -490,7 +490,7 @@ namespace IndexUpdateTests {
             // only want to interrupt the index build
             getGlobalEnvironment()->unsetKillAllOperations();
             // The new index is listed in the index catalog because the index build completed.
-            ASSERT( coll->getIndexCatalog()->findIndexByName( "a_1" ) );
+            ASSERT( coll->getIndexCatalog()->findIndexByName( &_txn, "a_1" ) );
         }
     };
 
@@ -523,7 +523,7 @@ namespace IndexUpdateTests {
             // only want to interrupt the index build
             getGlobalEnvironment()->unsetKillAllOperations();
             // The new index is not listed in the index catalog because the index build failed.
-            ASSERT( !coll->getIndexCatalog()->findIndexByName( "_id_" ) );
+            ASSERT( !coll->getIndexCatalog()->findIndexByName( &_txn, "_id_" ) );
         }
     };
 
@@ -556,7 +556,7 @@ namespace IndexUpdateTests {
             // only want to interrupt the index build
             getGlobalEnvironment()->unsetKillAllOperations();
             // The new index is listed in the index catalog because the index build succeeded.
-            ASSERT( coll->getIndexCatalog()->findIndexByName( "_id_" ) );
+            ASSERT( coll->getIndexCatalog()->findIndexByName( &_txn, "_id_" ) );
         }
     };
 

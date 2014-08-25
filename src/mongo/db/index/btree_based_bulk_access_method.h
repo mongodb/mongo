@@ -129,6 +129,8 @@ namespace mongo {
             return NULL;
         }
 
+        OperationContext* getOperationContext() { return _txn; }
+
     private:
         typedef Sorter<BSONObj, DiskLoc> BSONObjExternalSorter;
 
