@@ -628,6 +628,7 @@ lognum
 logput
 logread
 logrec
+logsize
 logtest
 lookup
 lookups
@@ -971,6 +972,7 @@ update's
 upg
 uri
 uri's
+usecs
 usedp
 usr
 utf

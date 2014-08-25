@@ -10,6 +10,10 @@ are first opened, and impacts the performance of every operation;
 checkpoints offer durability without recovery or impacting performance,
 but the creation of a checkpoint is a relatively heavy-weight operation.)
 
+Checkpoints with transactional logging enabled allow logging to archive
+older log files (if configured to do so) while still retaining
+fine-grained durability and the ability to run recovery.
+
 A checkpoint is automatically created whenever a modified data source
 is closed.
 
@@ -24,6 +28,17 @@ method and read using the WT_SESSION::open_cursor method.  Additionally,
 the \c -c option to the \c wt command line utility \c list command will
 list a data source's checkpoints, with time stamp, in a human-readable
 format.
+
+WiredTiger will optionally checkpoint the entire database periodically 
+automatically when the \c checkpoint configuration parameter to
+::wiredtiger_open is set.  When this configuration is used, an internal
+server thread is created.  The period between checkpoints can be defined
+either in seconds via \c wait, or, if logging is enabled, as the
+number of bytes written to the log since the last checkpoint via \c log_size,
+or both.  If both periods are defined then the checkpoint occurs as soon as
+either threshold has occurred and both are reset once the checkpoint
+is complete.  If using \c log_size, we recommend that the size selected
+be a multiple of the log file size for archiving purposes.
 
 Cursors are opened in the most recent version of a data source unless a
 checkpoint configuration string is provided to WT_SESSION::open_cursor.
