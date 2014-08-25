@@ -30,7 +30,6 @@
 #pragma once
 
 #include <cfloat>
-#include <inttypes.h>
 #include <iostream>
 #include <sstream>
 #include <stdio.h>
@@ -270,14 +269,12 @@ namespace mongo {
     template <typename Allocator>
     class StringBuilderImpl {
     public:
-        // Sizes are determined based on the number of characters in 64-bit + the trailing '\0'
-        static const size_t MONGO_DBL_SIZE = 3 + DBL_MANT_DIG - DBL_MIN_EXP + 1;
+        static const size_t MONGO_DBL_SIZE = 3 + DBL_MANT_DIG - DBL_MIN_EXP;
         static const size_t MONGO_S32_SIZE = 12;
         static const size_t MONGO_U32_SIZE = 11;
         static const size_t MONGO_S64_SIZE = 23;
         static const size_t MONGO_U64_SIZE = 22;
         static const size_t MONGO_S16_SIZE = 7;
-        static const size_t MONGO_PTR_SIZE = 17;    // FFFFFFFFFFFFFFFF has 16 characters
 
         StringBuilderImpl() { }
 
@@ -305,18 +302,8 @@ namespace mongo {
         StringBuilderImpl& operator<<( short x ) {
             return SBNUM( x , MONGO_S16_SIZE , "%hd" );
         }
-        StringBuilderImpl& operator<<(const void* x) {
-            return SBNUM(x, MONGO_PTR_SIZE, "0x%"PRIXPTR"");
-        }
         StringBuilderImpl& operator<<( char c ) {
             _buf.grow( 1 )[0] = c;
-            return *this;
-        }
-        StringBuilderImpl& operator<<(const char* str) {
-            return *this << StringData(str);
-        }
-        StringBuilderImpl& operator<<(const StringData& str) {
-            append(str);
             return *this;
         }
 
@@ -336,6 +323,11 @@ namespace mongo {
         void write( const char* buf, int len) { memcpy( _buf.grow( len ) , buf , len ); }
 
         void append( const StringData& str ) { str.copyTo( _buf.grow( str.size() ), false ); }
+
+        StringBuilderImpl& operator<<( const StringData& str ) {
+            append( str );
+            return *this;
+        }
 
         void reset( int maxSize = 0 ) { _buf.reset( maxSize ); }
 

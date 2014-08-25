@@ -43,28 +43,4 @@ namespace mongo {
         ASSERT_EQUALS( 0, strcmp( bb.buf(), "eliot" ) );
         ASSERT_EQUALS( 0, strcmp( "eliot", bb.buf() ) );
     }
-
-    TEST(Builder, StringBuilderAddress) {
-        const void* longPtr = reinterpret_cast<const void*>(-1);
-        const void* shortPtr = reinterpret_cast<const void*>(0xDEADBEEF);
-        const void* nullPtr = NULL;
-
-        StringBuilder sb;
-        sb << longPtr;
-
-        if (sizeof(longPtr) == 8) {
-            ASSERT_EQUALS("0xFFFFFFFFFFFFFFFF", sb.str());
-        }
-        else {
-            ASSERT_EQUALS("0xFFFFFFFF", sb.str());
-        }
-
-        sb.reset();
-        sb << shortPtr;
-        ASSERT_EQUALS("0xDEADBEEF", sb.str());
-
-        sb.reset();
-        sb << nullPtr;
-        ASSERT_EQUALS("0x0", sb.str());
-    }
 }
