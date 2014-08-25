@@ -35,8 +35,8 @@
 
 #include <wiredtiger.h>
 
-const char *home1 = "WIREDTIGER_HOME_LOG_1";
-const char *home2 = "WIREDTIGER_HOME_LOG_2";
+const char *home1 = "WT_HOME_LOG_1";
+const char *home2 = "WT_HOME_LOG_2";
 
 const char * const uri = "table:logtest";
 
