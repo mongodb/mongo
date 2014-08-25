@@ -384,6 +384,42 @@ namespace PlanRankingTests {
     };
 
     /**
+     * Same as PlanRankingPreferImmediateEOF, but substitute a range predicate on "a" for the
+     * equality predicate on "a".  The presence of the range predicate has an impact on the
+     * intersection plan that is raced against the single-index plans: since "a" no longer generates
+     * point interval bounds, the results of the index scan aren't guaranteed to be returned in
+     * DiskLoc order, and so the intersection plan uses the AND_HASHED stage instead of the
+     * AND_SORTED stage.  It is still the case that the query should pick the plan that uses index
+     * "b", instead of the plan that uses index "a" or the (hashed) intersection plan.
+     */
+    class PlanRankingPreferImmediateEOFAgainstHashed : public PlanRankingTestBase {
+    public:
+        void run() {
+            // 'a' is very selective, 'b' is not.
+            for (int i = 0; i < N; ++i) {
+                insert(BSON("a" << i << "b" << 1));
+            }
+
+            // Add indices on 'a' and 'b'.
+            addIndex(BSON("a" << 1));
+            addIndex(BSON("b" << 1));
+
+            // Run the query {a:N+1, b:1}.  (No such document.)
+            CanonicalQuery* cq;
+            verify(CanonicalQuery::canonicalize(ns, BSON("a" << BSON("$gte" << N + 1)
+                                                             << "b" << 1), &cq).isOK());
+            ASSERT(NULL != cq);
+
+            // {a: 100} is super selective so choose that.
+            // Takes ownership of cq.
+            QuerySolution* soln = pickBestPlan(cq);
+            ASSERT(QueryPlannerTestLib::solutionMatches(
+                        "{fetch: {filter: {b:1}, node: {ixscan: {pattern: {a: 1}}}}}",
+                        soln->root.get()));
+        }
+    };
+
+    /**
      * We have an index on _id and a query over _id with a sort.  Ensure that we don't pick a
      * collscan as the best plan even though the _id-scanning solution doesn't produce any results.
      */
@@ -766,6 +802,7 @@ namespace PlanRankingTests {
             add<PlanRankingAvoidIntersectIfNoResults>();
             add<PlanRankingPreferCoveredEvenIfNoResults>();
             add<PlanRankingPreferImmediateEOF>();
+            add<PlanRankingPreferImmediateEOFAgainstHashed>();
             add<PlanRankingNoCollscan>();
             add<PlanRankingCollscan>();
             // TODO: These don't work without counting FETCH and FETCH is now gone.

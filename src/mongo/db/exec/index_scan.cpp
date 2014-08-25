@@ -140,21 +140,10 @@ namespace mongo {
         // Adds the amount of time taken by work() to executionTimeMillis.
         ScopedTimer timer(&_commonStats.executionTimeMillis);
 
-        // If we examined multiple keys in a prior work cycle, make up for it here by returning
-        // NEED_TIME. This is done for plan ranking. Refer to the comment for '_checkEndKeys'
-        // in the .h for details.
-        if (_checkEndKeys > 0) {
-            --_checkEndKeys;
-            ++_commonStats.needTime;
-            return PlanStage::NEED_TIME;
-        }
-
         if (NULL == _indexCursor.get()) {
             // First call to work().  Perform possibly heavy init.
             initIndexScan();
             checkEnd();
-            ++_commonStats.needTime;
-            return PlanStage::NEED_TIME;
         }
         else if (_yieldMovedCursor) {
             _yieldMovedCursor = false;
@@ -163,6 +152,15 @@ namespace mongo {
         }
 
         if (isEOF()) { return PlanStage::IS_EOF; }
+
+        // If we examined multiple keys in a prior work cycle, make up for it here by returning
+        // NEED_TIME. This is done for plan ranking. Refer to the comment for '_checkEndKeys'
+        // in the .h for details.
+        if (_checkEndKeys > 0) {
+            --_checkEndKeys;
+            ++_commonStats.needTime;
+            return PlanStage::NEED_TIME;
+        }
 
         // Grab the next (key, value) from the index.
         BSONObj keyObj = _indexCursor->getKey();
