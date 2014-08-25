@@ -102,35 +102,39 @@ namespace mongo {
         } 
     }
 
-    Status WiredTigerEngine::closeDatabase(OperationContext*, const StringData& db ) {
+    Status WiredTigerEngine::closeDatabase(OperationContext*, const StringData& dbName) {
         boost::mutex::scoped_lock lk( _dbLock );
-        WiredTigerDatabaseCatalogEntry *entry = _dbs[db.toString()];
+        DBMap::const_iterator i = _dbs.find(dbName.toString());
+        if (i == _dbs.end())
+            return Status::OK();
+        WiredTigerDatabaseCatalogEntry *entry = i->second;
         delete entry;
-        _dbs.erase( db.toString() );
+        _dbs.erase( i );
         return Status::OK();
     }
 
-    Status WiredTigerEngine::dropDatabase(OperationContext* txn, const StringData& db) {
+    Status WiredTigerEngine::dropDatabase(OperationContext* txn, const StringData& dbName) {
         boost::mutex::scoped_lock lk( _dbLock );
-        WiredTigerDatabaseCatalogEntry *entry = _dbs[db.toString()];
-        if (entry == NULL)
+        DBMap::const_iterator i = _dbs.find(dbName.toString());
+        if (i == _dbs.end())
             return Status::OK();
-        entry->dropAllCollections(txn);
+        WiredTigerDatabaseCatalogEntry *entry = i->second;
+        Status s = entry->dropAllCollections(txn);
         delete entry;
-        _dbs.erase( db.toString() );
-        return Status::OK();
+        _dbs.erase( i );
+        return s;
     }
 
     DatabaseCatalogEntry* WiredTigerEngine::getDatabaseCatalogEntry( OperationContext* txn,
                                                                 const StringData& dbName ) {
         boost::mutex::scoped_lock lk( _dbLock );
 
-        WiredTigerDatabaseCatalogEntry*& dbentry = _dbs[dbName.toString()];
-        if ( !dbentry ) {
-            dbentry = new WiredTigerDatabaseCatalogEntry( *_db, dbName );
-            _dbs[dbName.toString()] = dbentry;
-        }
-        return dbentry;
+        DBMap::const_iterator i = _dbs.find(dbName.toString());
+        if (i != _dbs.end())
+            return i->second;
+        WiredTigerDatabaseCatalogEntry *entry = new WiredTigerDatabaseCatalogEntry( *_db, dbName );
+        _dbs[dbName.toString()] = entry;
+        return entry;
     }
 
     RecoveryUnit* WiredTigerEngine::newRecoveryUnit( OperationContext* txn ) {
