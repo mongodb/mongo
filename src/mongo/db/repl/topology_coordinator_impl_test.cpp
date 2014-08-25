@@ -51,6 +51,10 @@ namespace mongo {
 namespace repl {
 namespace {
 
+    bool stringContains(const std::string &haystack, const std::string& needle) {
+        return haystack.find(needle) != std::string::npos;
+    }
+
     TEST(TopologyCoordinator, ChooseSyncSourceBasic) {
         ReplicaSetConfig config;
 
@@ -636,7 +640,7 @@ namespace {
         // TODO(spencer): Test electionTime and pingMs are set properly
     }
 
-    TEST(TopologyCoordinator, PrepareRequestVoteResponse) {
+    TEST(TopologyCoordinator, PrepareFreshResponse) {
         ReplicationExecutor::CallbackHandle cbh;
         ReplicationExecutor::CallbackData cbData(NULL,
                                                  cbh,
@@ -821,6 +825,14 @@ namespace {
         TopologyCoordinatorImpl& getTopoCoord() {return *_topo;}
         Date_t& now() {return _now;}
 
+        int64_t countLogLinesContaining(const std::string& needle) {
+            return std::count_if(getCapturedLogMessages().begin(),
+                                 getCapturedLogMessages().end(),
+                                 stdx::bind(stringContains,
+                                            stdx::placeholders::_1,
+                                            needle));
+        }
+
         // Update config and set selfIndex
         void updateConfig(BSONObj cfg, int selfIndex) {
             ReplicaSetConfig config;
@@ -882,6 +894,213 @@ namespace {
 
     TEST_F(TopoCoordTest, UpdateHeartbeatDataPrimaryDownMajority) {}
     TEST_F(TopoCoordTest, UpdateHeartbeatDataPrimaryDownNoMajority) {}
+
+    class PrepareElectResponseTest : public TopoCoordTest {
+    public:
+
+        PrepareElectResponseTest() :
+            now(0),
+            round(OID::gen()),
+            cbData(NULL, ReplicationExecutor::CallbackHandle(), Status::OK()) {}
+
+        virtual void setUp() {
+            TopoCoordTest::setUp();
+            updateConfig(BSON("_id" << "rs0" <<
+                              "version" << 10 <<
+                              "members" << BSON_ARRAY(
+                                  BSON("_id" << 0 << "host" << "hself") <<
+                                  BSON("_id" << 1 << "host" << "h1") <<
+                                  BSON("_id" << 2 <<
+                                       "host" << "h2" <<
+                                       "priority" << 10) <<
+                                  BSON("_id" << 3 <<
+                                       "host" << "h3" <<
+                                       "priority" << 10))),
+                         0);
+        }
+
+    protected:
+        Date_t now;
+        OID round;
+        ReplicationExecutor::CallbackData cbData;
+    };
+
+    TEST_F(PrepareElectResponseTest, IncorrectReplSetName) {
+        // Test with incorrect replset name
+        ReplicationCoordinator::ReplSetElectArgs args;
+        args.set = "fakeset";
+        args.round = round;
+
+        BSONObjBuilder responseBuilder;
+        startCapturingLogMessages();
+        getTopoCoord().prepareElectResponse(cbData, args, now++, &responseBuilder);
+        stopCapturingLogMessages();
+        BSONObj response = responseBuilder.obj();
+        ASSERT_EQUALS(0, response["vote"].Int());
+        ASSERT_EQUALS(round, response["round"].OID());
+        ASSERT_EQUALS(1,
+                      countLogLinesContaining("received an elect request for 'fakeset' but our "
+                              "set name is 'rs0'"));
+    }
+
+    TEST_F(PrepareElectResponseTest, OurConfigStale) {
+        // Test with us having a stale config version
+        ReplicationCoordinator::ReplSetElectArgs args;
+        args.set = "rs0";
+        args.round = round;
+        args.cfgver = 20;
+
+        BSONObjBuilder responseBuilder;
+        startCapturingLogMessages();
+        getTopoCoord().prepareElectResponse(cbData, args, now++, &responseBuilder);
+        stopCapturingLogMessages();
+        BSONObj response = responseBuilder.obj();
+        ASSERT_EQUALS(0, response["vote"].Int());
+        ASSERT_EQUALS(round, response["round"].OID());
+        ASSERT_EQUALS(1,
+                      countLogLinesContaining("not voting because our config version is stale"));
+    }
+
+    TEST_F(PrepareElectResponseTest, TheirConfigStale) {
+        // Test with them having a stale config version
+        ReplicationCoordinator::ReplSetElectArgs args;
+        args.set = "rs0";
+        args.round = round;
+        args.cfgver = 5;
+
+        BSONObjBuilder responseBuilder;
+        startCapturingLogMessages();
+        getTopoCoord().prepareElectResponse(cbData, args, now++, &responseBuilder);
+        stopCapturingLogMessages();
+        BSONObj response = responseBuilder.obj();
+        ASSERT_EQUALS(-10000, response["vote"].Int());
+        ASSERT_EQUALS(round, response["round"].OID());
+        ASSERT_EQUALS(1,
+                      countLogLinesContaining("received stale config version # during election"));
+    }
+
+    TEST_F(PrepareElectResponseTest, NonExistentNode) {
+        // Test with a non-existent node
+        ReplicationCoordinator::ReplSetElectArgs args;
+        args.set = "rs0";
+        args.round = round;
+        args.cfgver = 10;
+        args.whoid = 99;
+
+        BSONObjBuilder responseBuilder;
+        startCapturingLogMessages();
+        getTopoCoord().prepareElectResponse(cbData, args, now++, &responseBuilder);
+        stopCapturingLogMessages();
+        BSONObj response = responseBuilder.obj();
+        ASSERT_EQUALS(-10000, response["vote"].Int());
+        ASSERT_EQUALS(round, response["round"].OID());
+        ASSERT_EQUALS(1, countLogLinesContaining("couldn't find member with id 99"));
+    }
+
+    TEST_F(PrepareElectResponseTest, WeArePrimary) {
+        // Test when we are already primary
+        ReplicationCoordinator::ReplSetElectArgs args;
+        args.set = "rs0";
+        args.round = round;
+        args.cfgver = 10;
+        args.whoid = 1;
+
+        getTopoCoord()._setCurrentPrimaryForTest(0);
+
+        BSONObjBuilder responseBuilder;
+        startCapturingLogMessages();
+        getTopoCoord().prepareElectResponse(cbData, args, now++, &responseBuilder);
+        stopCapturingLogMessages();
+        BSONObj response = responseBuilder.obj();
+        ASSERT_EQUALS(-10000, response["vote"].Int());
+        ASSERT_EQUALS(round, response["round"].OID());
+        ASSERT_EQUALS(1, countLogLinesContaining("I am already primary"));
+    }
+
+    TEST_F(PrepareElectResponseTest, SomeoneElseIsPrimary) {
+        // Test when someone else is already primary
+        ReplicationCoordinator::ReplSetElectArgs args;
+        args.set = "rs0";
+        args.round = round;
+        args.cfgver = 10;
+        args.whoid = 1;
+        getTopoCoord()._setCurrentPrimaryForTest(2);
+
+        BSONObjBuilder responseBuilder;
+        startCapturingLogMessages();
+        getTopoCoord().prepareElectResponse(cbData, args, now++, &responseBuilder);
+        stopCapturingLogMessages();
+        BSONObj response = responseBuilder.obj();
+        ASSERT_EQUALS(-10000, response["vote"].Int());
+        ASSERT_EQUALS(round, response["round"].OID());
+        ASSERT_EQUALS(1, countLogLinesContaining("h2:27017 is already primary"));
+    }
+
+    TEST_F(PrepareElectResponseTest, NotHighestPriority) {
+        // Test trying to elect someone who isn't the highest priority node
+        ReplicationCoordinator::ReplSetElectArgs args;
+        args.set = "rs0";
+        args.round = round;
+        args.cfgver = 10;
+        args.whoid = 1;
+
+        MemberHeartbeatData h3Info(3);
+        h3Info.setUpValues(now, MemberState::RS_SECONDARY, OpTime(0, 0), jsTime(), "", "");
+        getTopoCoord().updateHeartbeatData(now++, h3Info, 3, OpTime(0, 0));
+
+        BSONObjBuilder responseBuilder;
+        startCapturingLogMessages();
+        getTopoCoord().prepareElectResponse(cbData, args, now++, &responseBuilder);
+        stopCapturingLogMessages();
+        BSONObj response = responseBuilder.obj();
+        ASSERT_EQUALS(-10000, response["vote"].Int());
+        ASSERT_EQUALS(round, response["round"].OID());
+        ASSERT_EQUALS(1, countLogLinesContaining("h1:27017 has lower priority than h3:27017"));
+    }
+
+    TEST_F(PrepareElectResponseTest, ValidVotes) {
+        // Test a valid vote
+        ReplicationCoordinator::ReplSetElectArgs args;
+        args.set = "rs0";
+        args.round = round;
+        args.cfgver = 10;
+        args.whoid = 2;
+        now = 100;
+
+        BSONObjBuilder responseBuilder1;
+        startCapturingLogMessages();
+        getTopoCoord().prepareElectResponse(cbData, args, now++, &responseBuilder1);
+        stopCapturingLogMessages();
+        BSONObj response1 = responseBuilder1.obj();
+        ASSERT_EQUALS(1, response1["vote"].Int());
+        ASSERT_EQUALS(round, response1["round"].OID());
+        ASSERT_EQUALS(1, countLogLinesContaining("voting yea for h2:27017 (2)"));
+
+        // Test what would be a valid vote except that we already voted too recently
+        args.whoid = 3;
+
+        BSONObjBuilder responseBuilder2;
+        startCapturingLogMessages();
+        getTopoCoord().prepareElectResponse(cbData, args, now++, &responseBuilder2);
+        stopCapturingLogMessages();
+        BSONObj response2 = responseBuilder2.obj();
+        ASSERT_EQUALS(0, response2["vote"].Int());
+        ASSERT_EQUALS(round, response2["round"].OID());
+        ASSERT_EQUALS(1, countLogLinesContaining("voting no for h3:27017; "
+                "voted for h2:27017 0 secs ago"));
+
+        // Test that after enough time passes the same vote can proceed
+        now = Date_t(now.millis + 3 * 1000); // 3 seconds later
+
+        BSONObjBuilder responseBuilder3;
+        startCapturingLogMessages();
+        getTopoCoord().prepareElectResponse(cbData, args, now++, &responseBuilder3);
+        stopCapturingLogMessages();
+        BSONObj response3 = responseBuilder3.obj();
+        ASSERT_EQUALS(1, response3["vote"].Int());
+        ASSERT_EQUALS(round, response3["round"].OID());
+        ASSERT_EQUALS(1, countLogLinesContaining("voting yea for h3:27017 (3)"));
+    }
 
 }  // namespace
 }  // namespace repl

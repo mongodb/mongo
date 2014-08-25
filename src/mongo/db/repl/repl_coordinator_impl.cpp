@@ -968,7 +968,18 @@ namespace {
 
     Status ReplicationCoordinatorImpl::processReplSetElect(const ReplSetElectArgs& args,
                                                            BSONObjBuilder* resultObj) {
-        // TODO
+        CBHStatus cbh = _replExecutor.scheduleWork(
+                stdx::bind(&TopologyCoordinator::prepareElectResponse,
+                           _topCoord.get(),
+                           stdx::placeholders::_1,
+                           args,
+                           _replExecutor.now(),
+                           resultObj));
+        if (cbh.getStatus() == ErrorCodes::ShutdownInProgress) {
+            return Status(ErrorCodes::ShutdownInProgress, "replication shutdown in progress");
+        }
+        fassert(18657, cbh.getStatus());
+        _replExecutor.wait(cbh.getValue());
         return Status::OK();
     }
 

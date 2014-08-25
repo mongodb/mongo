@@ -415,8 +415,7 @@ namespace repl {
             return true;
         }
 
-        if ((_currentPrimaryIndex == _selfIndex) &&
-            (lastOpApplied >= _hbdata[hopefulIndex].getOpTime())) {
+        if (_iAmPrimary() && lastOpApplied >= _hbdata[hopefulIndex].getOpTime()) {
             // hbinfo is not updated for ourself, so if we are primary we have to check the
             // primary's last optime separately
             *errmsg = str::stream() << "I am already primary, " <<
@@ -465,86 +464,81 @@ namespace repl {
     }
 
     namespace {
-        const size_t LeaseTime = 3;
+        const Seconds LeaseTime(3);
     } // namespace
 
     // produce a reply to a received electCmd
-    void TopologyCoordinatorImpl::prepareElectCmdResponse(const Date_t now,
-                                                          const BSONObj& cmdObj,
-                                                          BSONObjBuilder& result) {
+    void TopologyCoordinatorImpl::prepareElectResponse(
+            const ReplicationExecutor::CallbackData& data,
+            const ReplicationCoordinator::ReplSetElectArgs& args,
+            const Date_t now,
+            BSONObjBuilder* response) {
 
-        //TODO: after eric's checkin, add executer stuff and error if cancelled
-        DEV log() << "replSet received elect msg " << cmdObj.toString();
-        else LOG(2) << "replSet received elect msg " << cmdObj.toString();
-
-        std::string setName = cmdObj["setName"].String();
-        int whoid = cmdObj["whoid"].Int();
-        long long cfgver = cmdObj["cfgver"].Int();
-        OID round = cmdObj["round"].OID();
-        long long myver = _currentConfig.getConfigVersion();
-
-        const int hopefulIndex = _getMemberIndex(whoid);
+        const long long myver = _currentConfig.getConfigVersion();
         const int highestPriorityIndex = _getHighestPriorityElectableIndex();
 
+        const MemberConfig* primary = _currentPrimaryMember();
+        const MemberConfig* hopeful = _currentConfig.findMemberByID(args.whoid);
+        const MemberConfig* highestPriority = highestPriorityIndex == -1 ? NULL :
+                &_currentConfig.getMemberAt(highestPriorityIndex);
+
         int vote = 0;
-        if ( setName != _currentConfig.getReplSetName() ) {
-            log() << "replSet error received an elect request for '" << setName
-                  << "' but our setName name is '" << 
+        if (args.set != _currentConfig.getReplSetName()) {
+            log() << "replSet error received an elect request for '" << args.set
+                  << "' but our set name is '" <<
                 _currentConfig.getReplSetName() << "'";
         }
-        else if ( myver < cfgver ) {
+        else if ( myver < args.cfgver ) {
             // we are stale.  don't vote
+            log() << "replSetElect not voting because our config version is stale. Our version: " <<
+                    myver << ", their version: " << args.cfgver;
         }
-        else if ( myver > cfgver ) {
+        else if ( myver > args.cfgver ) {
             // they are stale!
-            log() << "replSet electCmdReceived info got stale version # during election";
+            log() << "replSetElect command received stale config version # during election. "
+                    "Our version: " << myver << ", their version: " << args.cfgver;
             vote = -10000;
         }
-        else if ( hopefulIndex == -1 ) {
-            log() << "replSet electCmdReceived couldn't find member with id " << whoid;
+        else if (!hopeful) {
+            log() << "replSetElect couldn't find member with id " << args.whoid;
             vote = -10000;
         }
-        else if ( _currentPrimaryIndex != -1 && _memberState == MemberState::RS_PRIMARY ) {
-            log() << "I am already primary, " 
-                  << _currentConfig.getMemberAt(hopefulIndex).getHostAndPort().toString()
+        else if (_iAmPrimary()) {
+            log() << "I am already primary, "  << hopeful->getHostAndPort().toString()
                   << " can try again once I've stepped down";
             vote = -10000;
         }
-        else if (_currentPrimaryIndex != -1) {
-            log() << _currentConfig.getMemberAt(hopefulIndex).getHostAndPort().toString() 
-                  << " is trying to elect itself but " <<
-                _currentConfig.getMemberAt(_currentPrimaryIndex).getHostAndPort().toString() 
-                  << " is already primary";
+        else if (primary) {
+            log() << hopeful->getHostAndPort().toString() << " is trying to elect itself but "
+                  << primary->getHostAndPort().toString() << " is already primary";
             vote = -10000;
         }
-        else if ((highestPriorityIndex != -1) &&
-                 _currentConfig.getMemberAt(highestPriorityIndex).getPriority() > 
-                 _currentConfig.getMemberAt(hopefulIndex).getPriority()) {
-            log() << _currentConfig.getMemberAt(hopefulIndex).getHostAndPort().toString()
-                  << " has lower priority than "
-                  << _currentConfig.getMemberAt(highestPriorityIndex).getHostAndPort().toString();
+        else if (highestPriority && highestPriority->getPriority() > hopeful->getPriority()) {
+            // TODO(spencer): What if the lower-priority member is more up-to-date?
+            log() << hopeful->getHostAndPort().toString() << " has lower priority than "
+                  << highestPriority->getHostAndPort().toString();
             vote = -10000;
+        }
+        else if (_lastVote.when > 0 &&
+                _lastVote.when.millis + LeaseTime.total_milliseconds() >= now.millis &&
+                _lastVote.whoID != args.whoid) {
+            log() << "replSetElect voting no for "
+                  <<  hopeful->getHostAndPort().toString()
+                  << "; voted for " << _lastVote.whoHostAndPort.toString() << ' '
+                  << (now.millis - _lastVote.when.millis) / 1000 << " secs ago";
         }
         else {
-            if (_lastVote.when + LeaseTime >= now && static_cast<int>(_lastVote.who) != whoid) {
-                log() << "replSet voting no for " 
-                      <<  _currentConfig.getMemberAt(hopefulIndex).getHostAndPort().toString() 
-                      << " voted for " << _lastVote.who << ' ' << now-_lastVote.when
-                      << " secs ago";
-            }
-            else {
-                _lastVote.when = now;
-                _lastVote.who = whoid;
-                vote = _selfConfig().getNumVotes();
-                invariant( _currentConfig.getMemberAt(hopefulIndex).getId() == whoid );
-                log() << "replSet info voting yea for " << 
-                    _currentConfig.getMemberAt(hopefulIndex).getHostAndPort().toString()
-                      << " (" << whoid << ')';
-            }
+            _lastVote.when = now;
+            _lastVote.whoID = args.whoid;
+            _lastVote.whoHostAndPort = hopeful->getHostAndPort();
+            vote = _selfConfig().getNumVotes();
+            invariant(hopeful->getId() == static_cast<int>(args.whoid));
+            log() << "replSetElect voting yea for " << hopeful->getHostAndPort().toString()
+                  << " (" << args.whoid << ')';
         }
 
-        result.append("vote", vote);
-        result.append("round", round);
+        response->append("vote", vote);
+        response->append("round", args.round);
     }
 
     // produce a reply to a heartbeat
@@ -864,6 +858,14 @@ namespace repl {
         return latestKnownOpTimeSecs != 0 && lastApplied.getSecs() >= (latestKnownOpTimeSecs - 10);
     }
 
+    bool TopologyCoordinatorImpl::_iAmPrimary() const {
+        if (_currentPrimaryIndex == _selfIndex) {
+            invariant(_memberState.primary());
+            return true;
+        }
+        return false;
+    }
+
     int TopologyCoordinatorImpl::_totalVotes() const {
         static int complain = 0;
         int vTot = 0;
@@ -937,6 +939,12 @@ namespace repl {
 
     void TopologyCoordinatorImpl::_setCurrentPrimaryForTest(int primaryIndex) {
         _currentPrimaryIndex = primaryIndex;
+        if (primaryIndex == _selfIndex) {
+            _changeMemberState(MemberState::RS_PRIMARY);
+        }
+        else if (_memberState.primary()) {
+            _changeMemberState(MemberState::RS_SECONDARY);
+        }
     }
 
     const MemberConfig* TopologyCoordinatorImpl::_currentPrimaryMember() const {
