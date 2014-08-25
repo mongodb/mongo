@@ -21,6 +21,11 @@ type JSONImportInput struct {
 	// Reader is used to advance the underlying io.Reader implementation to skip
 	// things like array start/end and commas
 	Reader io.Reader
+
+	//readerPtr is used to store the original reader which can be used to
+	//construct a MultiReader without nesting
+	readerPtr io.Reader
+
 	// NumImported indicates the number of JSON objects successfully parsed from
 	// the JSON input source
 	NumImported int64
@@ -61,6 +66,7 @@ func NewJSONImportInput(isArray bool, in io.Reader) *JSONImportInput {
 		IsArray:            isArray,
 		Decoder:            json.NewDecoder(in),
 		Reader:             in,
+		readerPtr:          in,
 		NumImported:        0,
 		readOpeningBracket: false,
 		bytesFromReader:    make([]byte, 1),
@@ -155,11 +161,8 @@ func (jsonImporter *JSONImportInput) ImportDocument() (bson.M, error) {
 
 	// reinitialize the reader with data left in the decoder's buffer and the
 	// handle to the underlying reader
-	//
-	// TODO: this builds a massive tree - depending on the size of the input
-	// source; probably some room for optimization here?
 	jsonImporter.Reader = io.MultiReader(jsonImporter.Decoder.Buffered(),
-		jsonImporter.Reader)
+		jsonImporter.readerPtr)
 
 	// convert any data produced by mongoexport to the appropriate underlying
 	// extended BSON type. NOTE: this assumes specially formated JSON values
