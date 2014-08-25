@@ -35,6 +35,8 @@ env.CppUnitTest('replication_executor_test',
 
 env.Library('topology_coordinator_impl',
             ['topology_coordinator_impl.cpp',
+             'topology_freshness_checker.cpp',
+             'topology_elect_cmd_runner.cpp',
              'member_heartbeat_data.cpp'],
             LIBDEPS=['replication_executor',
                      'repl_settings',
@@ -44,6 +46,19 @@ env.CppUnitTest('topology_coordinator_impl_test',
                 'topology_coordinator_impl_test.cpp',
                 LIBDEPS=['topology_coordinator_impl',
                          'replica_set_messages'])
+
+env.CppUnitTest('topology_freshness_checker_test',
+                'topology_freshness_checker_test.cpp',
+                LIBDEPS=['topology_coordinator_impl',
+                         'replica_set_messages',
+                         'replmocks'])
+
+env.CppUnitTest('topology_elect_cmd_runner_test',
+                'topology_elect_cmd_runner_test.cpp',
+                LIBDEPS=['topology_coordinator_impl',
+                         'replica_set_messages',
+                         'replmocks'])
+
 
 env.Library('repl_coordinator_impl',
             [
