@@ -613,6 +613,7 @@ extern void *__wt_cache_pool_server(void *arg);
 extern int __wt_checkpoint_server_create(WT_CONNECTION_IMPL *conn,
     const char *cfg[]);
 extern int __wt_checkpoint_server_destroy(WT_CONNECTION_IMPL *conn);
+extern int __wt_checkpoint_signal(WT_SESSION_IMPL *session, off_t logsize);
 extern int __wt_conn_btree_sync_and_close(WT_SESSION_IMPL *session);
 extern int __wt_conn_btree_get(WT_SESSION_IMPL *session,
     const char *name,
@@ -762,6 +763,7 @@ extern int __wt_curtable_open(WT_SESSION_IMPL *session,
     const char *cfg[],
     WT_CURSOR **cursorp);
 extern int __wt_log_ckpt(WT_SESSION_IMPL *session, WT_LSN *ckp_lsn);
+extern void __wt_log_written_reset(WT_SESSION_IMPL *session);
 extern int __wt_log_get_files(WT_SESSION_IMPL *session,
     char ***filesp,
     u_int *countp);

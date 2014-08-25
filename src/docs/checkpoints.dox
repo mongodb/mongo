@@ -8,12 +8,16 @@ impacting performance, (although the creation of each checkpoint is a
 relatively heavy-weight operation).  See @ref durability for information
 on commit-level durability.
 
+Checkpoints with transactional logging enabled allow logging to archive
+older log files (if configured to do so) while still retaining
+fine-grained durability and the ability to run recovery.
+
 A checkpoint is automatically created whenever a modified data source
 is closed.  Additionally, checkpoints of one or more data sources, or
 the entire database, can be explicitly created using the
-WT_SESSION::checkpoint method.  Checkpoints of the entire database can
-also be scheduled periodically based on elapsed time or data size with
-the \c checkpoint configuration to ::wiredtiger_open.
+WT_SESSION::checkpoint method.  Checkpoints can also be scheduled
+periodically based on elapsed time or data size with the \c checkpoint
+configuration to ::wiredtiger_open.
 
 All transactional updates committed before a checkpoint are made durable
 by the checkpoint, therefore the frequency of checkpoints limits the
@@ -24,6 +28,20 @@ state of the most recent checkpoint taken on the file, in other words,
 updates after the most recent checkpoint will not appear in the data
 source.  If no checkpoint is found when the data source is opened, the
 data source will appear empty.
+
+@section checkpoint_server Automatic checkpoints
+
+WiredTiger will automatically checkpoint the entire database when the
+\c checkpoint configuration parameter to ::wiredtiger_open is set.  When
+this configuration is used, an internal server thread is created.
+
+The period between checkpoints can be defined either in seconds via \c
+wait, or, if logging is enabled, as the number of bytes written to the log
+since the last checkpoint via \c log_size, or both.  If both periods are
+defined then the checkpoint occurs as soon as either threshold has occurred
+and both are reset once the checkpoint is complete.  If using \c log_size,
+we recommend that the size selected be a multiple of the log file size for
+archiving purposes.
 
 @section checkpoint_cursors Checkpoint cursors
 

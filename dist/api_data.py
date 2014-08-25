@@ -322,6 +322,12 @@ connection_runtime_config = [
 	    type='category', subconfig=[
 	    Config('name', '"WiredTigerCheckpoint"', r'''
 	        the checkpoint name'''),
+	    Config('log_size', '0', r'''
+	        wait for this amount of log record bytes to be written to
+                the log between each checkpoint.  A database can configure
+                both log_size and wait to set an upper bound for checkpoints;
+                setting this value above 0 configures periodic checkpoints''',
+	        min='0', max='2GB'),
 	    Config('wait', '0', r'''
 	        seconds to wait between each checkpoint; setting this value
 	        above 0 configures periodic checkpoints''',

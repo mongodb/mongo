@@ -142,6 +142,7 @@ Kounavis
 LEX
 LF
 LNO
+LOGREC
 LOGSCAN
 LRU
 LSB
@@ -627,6 +628,7 @@ lognum
 logput
 logread
 logrec
+logsize
 logtest
 lookup
 lookups
@@ -853,6 +855,7 @@ stdout
 stepinit
 stepkv
 stepnext
+stepp
 steprec
 str
 strcmp
@@ -969,6 +972,7 @@ update's
 upg
 uri
 uri's
+usecs
 usedp
 usr
 utf

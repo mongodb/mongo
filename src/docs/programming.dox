@@ -35,6 +35,7 @@ each of which is ordered by one or more columns.
 - @subpage hot_backup
 - @subpage statistics
 - @subpage shared_cache
+- @subpage cursor_log
 
 <h2>Extending WiredTiger</h2>
 - @subpage extensions

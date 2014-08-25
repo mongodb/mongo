@@ -398,7 +398,7 @@ err:	API_END_RET(session, ret);
  * table, except that the metadata for the metadata table (which is stored
  * in the turtle file) can also be queried.
  *
- * Metadata cursors are read-only default.
+ * Metadata cursors are read-only by default.
  */
 int
 __wt_curmetadata_open(WT_SESSION_IMPL *session,
