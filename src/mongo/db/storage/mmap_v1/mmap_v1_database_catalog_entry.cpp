@@ -390,6 +390,7 @@ namespace mongo {
         boost::mutex::scoped_lock lk( _collectionsLock );
         Entry*& entry = _collections[toNS.toString()];
         invariant( entry == NULL );
+        txn->recoveryUnit()->registerChange(new EntryInsertion(toNS, this));
         entry = new Entry();
         _insertInCache_inlock(txn, toNS, entry);
 
@@ -508,11 +509,18 @@ namespace mongo {
 
         boost::mutex::scoped_lock lk( _collectionsLock );
 
+        bool isSystemNamespacesGoingToBeNew = _namespaceIndex.details( nsn.toString() ) == NULL;
         bool isSystemIndexesGoingToBeNew = _namespaceIndex.details( nsi.toString() ) == NULL;
 
         _ensureSystemCollection_inlock( txn, nsn.toString() );
         _ensureSystemCollection_inlock( txn, nsi.toString() );
 
+        if ( isSystemNamespacesGoingToBeNew ) {
+            txn->recoveryUnit()->registerChange(new EntryInsertion(nsn.toString(), this));
+        }
+        if ( isSystemIndexesGoingToBeNew ) {
+            txn->recoveryUnit()->registerChange(new EntryInsertion(nsi.toString(), this));
+        }
         Entry*& indexEntry = _collections[nsi.toString()];
         Entry*& nsEntry = _collections[nsn.toString()];
 
@@ -611,6 +619,7 @@ namespace mongo {
             boost::mutex::scoped_lock lk( _collectionsLock );
             Entry*& entry = _collections[ns.toString()];
             invariant( !entry );
+            txn->recoveryUnit()->registerChange(new EntryInsertion(ns, this));
             entry = new Entry();
             _insertInCache_inlock(txn, ns, entry);
         }
@@ -661,6 +670,7 @@ namespace mongo {
         boost::mutex::scoped_lock lk( _collectionsLock );
         Entry*& entry = _collections[name.toString()];
         invariant( !entry );
+        txn->recoveryUnit()->registerChange(new EntryInsertion(name, this));
         entry = new Entry();
         _insertInCache_inlock(txn, name, entry);
     }
@@ -679,7 +689,6 @@ namespace mongo {
     void MMAPV1DatabaseCatalogEntry::_insertInCache_inlock(OperationContext* txn,
                                                          const StringData& ns,
                                                          Entry* entry) {
-        txn->recoveryUnit()->registerChange(new EntryInsertion(ns, this));
         NamespaceDetails* details = _namespaceIndex.details(ns);
         invariant(details);
 
