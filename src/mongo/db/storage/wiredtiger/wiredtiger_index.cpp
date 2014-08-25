@@ -95,10 +95,16 @@ namespace mongo {
                 const IndexKeyEntry lhs = makeIndexKeyEntry(s, a);
                 const IndexKeyEntry rhs = makeIndexKeyEntry(s, b);
                 int cmp = _indexComparator.compare( lhs, rhs );
+                /* WiredTiger always wants the smallest matching key. */
                 if (cmp < 0)
+                    cmp = -1;
+                else if (cmp == 0) {
+                    if (lhs.loc.isNull() && !rhs.loc.isNull())
                         cmp = -1;
-                else if (cmp > 0)
+                    if (!lhs.loc.isNull() && rhs.loc.isNull())
                         cmp = 1;
+                } else if (cmp > 0)
+                    cmp = 1;
                 return cmp;
             }
 
@@ -398,9 +404,9 @@ namespace mongo {
         void commit(bool mayInterrupt) { }
 
     private:
-    WiredTigerIndex &_idx;
-    OperationContext *_txn;
-    bool _dupsAllowed;
+        WiredTigerIndex &_idx;
+        OperationContext *_txn;
+        bool _dupsAllowed;
         unsigned long long _count;
     };
 
