@@ -56,17 +56,21 @@ namespace {
     }
 
     TEST(TopologyCoordinator, ChooseSyncSourceBasic) {
+        TopologyCoordinatorImpl topocoord((Seconds(999)));
+        Date_t now = 0;
+        ReplicationExecutor::CallbackHandle cbh;
+        ReplicationExecutor::CallbackData cbData(NULL,
+                                                 cbh,
+                                                 Status::OK());
         ReplicaSetConfig config;
-
         ASSERT_OK(config.initialize(BSON("_id" << "rs0" <<
                                          "version" << 1 <<
                                          "members" << BSON_ARRAY(
                                              BSON("_id" << 10 << "host" << "hself") <<
                                              BSON("_id" << 20 << "host" << "h2") <<
                                              BSON("_id" << 30 << "host" << "h3")))));
+        ASSERT_OK(config.validate());
 
-        TopologyCoordinatorImpl topocoord((Seconds(999)));
-        Date_t now = 0;
         topocoord.updateConfig(config, 0, now++, OpTime(0,0));
 
         MemberHeartbeatData h0Info(0);
@@ -383,15 +387,9 @@ namespace {
     }
 
     TEST(TopologyCoordinator, PrepareSyncFromResponse) {
-        ReplicationExecutor::CallbackHandle cbh;
-        ReplicationExecutor::CallbackData cbData(NULL,
-                                                 cbh,
-                                                 Status::OK());
         TopologyCoordinatorImpl topocoord((Seconds(999)));
         Date_t now = 0;
-        OpTime staleOpTime(1, 1);
-        OpTime ourOpTime(staleOpTime.getSecs() + 11, 1);
-
+        
         // Test trying to sync from another node when we are an arbiter
         ReplicaSetConfig config1;
         ASSERT_OK(config1.initialize(BSON("_id" << "rs0" <<
@@ -404,8 +402,15 @@ namespace {
         ASSERT_OK(config1.validate());
         topocoord.updateConfig(config1, 0, now++, OpTime(0,0));
 
+        OpTime staleOpTime(1, 1);
+        OpTime ourOpTime(staleOpTime.getSecs() + 11, 1);
+         
         Status result = Status::OK();
         BSONObjBuilder response;
+        ReplicationExecutor::CallbackHandle cbh;
+        ReplicationExecutor::CallbackData cbData(NULL,
+                                                 cbh,
+                                                 Status::OK());
         topocoord.prepareSyncFromResponse(cbData, HostAndPort("h1"), ourOpTime, &response, &result);
         ASSERT_EQUALS(ErrorCodes::NotSecondary, result);
         ASSERT_EQUALS("arbiters don't sync", result.reason());
@@ -537,10 +542,6 @@ namespace {
         Date_t curTime = heartbeatTime + uptimeSecs.total_milliseconds();
         OpTime electionTime(1, 2);
         OpTime oplogProgress(3, 4);
-        ReplicationExecutor::CallbackHandle cbh;
-        ReplicationExecutor::CallbackData cbData(NULL,
-                                                 cbh,
-                                                 Status::OK());
         TopologyCoordinatorImpl topocoord((Seconds(999)));
 
         ReplicaSetConfig config;
@@ -565,6 +566,10 @@ namespace {
 
         // Now node 0 is down, node 1 is up, and for node 2 we have no heartbeat data yet.
         BSONObjBuilder statusBuilder;
+        ReplicationExecutor::CallbackHandle cbh;
+        ReplicationExecutor::CallbackData cbData(NULL,
+                                                 cbh,
+                                                 Status::OK());
         Status resultStatus(ErrorCodes::InternalError, "prepareStatusResponse didn't set result");
         topocoord.prepareStatusResponse(cbData,
                                         curTime,
@@ -842,21 +847,9 @@ namespace {
             getTopoCoord().updateConfig(config, selfIndex, ++_now, OpTime(0,0));
         }
 
-        // set the lastApplied OpTime for this test
-        void setLastApplied(const OpTime lastApplied) {
-            _lastApplied = lastApplied;
-        }
-
-        // Record a new heartbeat and increment now()
-        ReplSetHeartbeatResponse::HeartbeatResultAction
-                            recordNewHeartbeat(const MemberHeartbeatData newData, int memberIndex) {
-            return getTopoCoord().updateHeartbeatData(now()++, newData, memberIndex, _lastApplied);
-        }
-
     private:
         TopologyCoordinatorImpl* _topo;
         Date_t _now;
-        OpTime _lastApplied;
     };
 
     TEST_F(TopoCoordTest, UpdateHeartbeatDataOlderConfigVersionNoMajority) {
@@ -869,31 +862,30 @@ namespace {
 
         OpTime staleOpTime = OpTime(1,0);
         OpTime election = OpTime(5,0);
-
-        setLastApplied(OpTime(3,0));
+        OpTime lastOpTimeApplied = OpTime(3,0);
 
         MemberHeartbeatData h1Info(1);
-        ReplSetHeartbeatResponse::HeartbeatResultAction nextAction = recordNewHeartbeat(
-                h1Info.setUpValues(now(), MemberState::RS_SECONDARY, election, staleOpTime, "", ""),
-                1);
+        h1Info.setUpValues(now(), MemberState::RS_SECONDARY, election, staleOpTime, "", "");
+        ReplSetHeartbeatResponse::HeartbeatResultAction nextAction = 
+                getTopoCoord().updateHeartbeatData(now()++, h1Info, 1, lastOpTimeApplied);
         ASSERT_EQUALS(nextAction, ReplSetHeartbeatResponse::NoAction);
     }
 
-    TEST_F(TopoCoordTest, UpdateHeartbeatDataNewPrimary) {}
+    TEST(TopologyCoordinator, UpdateHeartbeatDataNewPrimary) {}
 
-    TEST_F(TopoCoordTest, UpdateHeartbeatDataTwoPrimariesNewOneOlder) {}
-    TEST_F(TopoCoordTest, UpdateHeartbeatDataTwoPrimariesNewOneNewer) {}
+    TEST(TopologyCoordinator, UpdateHeartbeatDataTwoPrimariesNewOneOlder) {}
+    TEST(TopologyCoordinator, UpdateHeartbeatDataTwoPrimariesNewOneNewer) {}
 
-    TEST_F(TopoCoordTest, UpdateHeartbeatDataTwoPrimariesIncludingMeNewOneOlder) {}
-    TEST_F(TopoCoordTest, UpdateHeartbeatDataTwoPrimariesIncludingMeNewOneNewer) {}
+    TEST(TopologyCoordinator, UpdateHeartbeatDataTwoPrimariesIncludingMeNewOneOlder) {}
+    TEST(TopologyCoordinator, UpdateHeartbeatDataTwoPrimariesIncludingMeNewOneNewer) {}
 
-    TEST_F(TopoCoordTest, UpdateHeartbeatDataPrimaryDownMajorityButIAmStarting) {}
-    TEST_F(TopoCoordTest, UpdateHeartbeatDataPrimaryDownMajorityButIAmRecovering) {}
-    TEST_F(TopoCoordTest, UpdateHeartbeatDataPrimaryDownMajorityButIHaveStepdownWait) {}
-    TEST_F(TopoCoordTest, UpdateHeartbeatDataPrimaryDownMajorityButIArbiter) {}
+    TEST(TopologyCoordinator, UpdateHeartbeatDataPrimaryDownMajorityButIAmStarting) {}
+    TEST(TopologyCoordinator, UpdateHeartbeatDataPrimaryDownMajorityButIAmRecovering) {}
+    TEST(TopologyCoordinator, UpdateHeartbeatDataPrimaryDownMajorityButIHaveStepdownWait) {}
+    TEST(TopologyCoordinator, UpdateHeartbeatDataPrimaryDownMajorityButIArbiter) {}
 
-    TEST_F(TopoCoordTest, UpdateHeartbeatDataPrimaryDownMajority) {}
-    TEST_F(TopoCoordTest, UpdateHeartbeatDataPrimaryDownNoMajority) {}
+    TEST(TopologyCoordinator, UpdateHeartbeatDataPrimaryDownMajority) {}
+    TEST(TopologyCoordinator, UpdateHeartbeatDataPrimaryDownNoMajority) {}
 
     class PrepareElectResponseTest : public TopoCoordTest {
     public:
