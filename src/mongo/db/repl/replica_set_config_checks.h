@@ -74,5 +74,16 @@ namespace repl {
             const ReplicaSetConfig& oldConfig,
             const ReplicaSetConfig& newConfig);
 
+    /**
+     * Validates that "newConfig" is an acceptable configuration when received in a heartbeat
+     * reasponse.
+     *
+     * If the new configuration omits the current node, but is otherwise valid, returns
+     * ErrorCodes::NodeNotFound.  If the configuration is wholly valid, returns Status::OK().
+     * Otherwise, returns some other error status.
+     */
+    StatusWith<int> validateConfigForHeartbeatReconfig(
+            ReplicationCoordinatorExternalState* externalState,
+            const ReplicaSetConfig& newConfig);
 }  // namespace repl
 }  // namespace mongo
