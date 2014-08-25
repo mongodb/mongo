@@ -474,7 +474,7 @@ __log_acquire(WT_SESSION_IMPL *session, uint64_t recsize, WT_LOGSLOT *slot)
 	 * condition.
 	 */
 	if (WT_CKPT_LOGSIZE(conn)) {
-		log->log_written += recsize;
+		log->log_written += (off_t)recsize;
 		WT_RET(__wt_checkpoint_signal(session, log->log_written));
 	}
 
