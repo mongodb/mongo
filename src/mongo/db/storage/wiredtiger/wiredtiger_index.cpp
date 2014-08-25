@@ -182,7 +182,12 @@ namespace mongo {
         WT_CURSOR *c = curwrap.Get();
         const BSONObj& finalKey = stripFieldNames( key );
         c->set_key(c, _toItem(finalKey).Get(), _toItem(loc).Get());
-        int ret = c->remove(c);
+        int ret = c->search(c);
+        if (ret == WT_NOTFOUND)
+            return false;
+        invariant(ret == 0);
+        c->set_key(c, _toItem(finalKey).Get(), _toItem(loc).Get());
+        ret = c->remove(c);
         invariant(ret == 0);
         // TODO: can we avoid a search?
         const size_t numDeleted = 1;
@@ -353,9 +358,7 @@ namespace mongo {
     }
 
     void WiredTigerIndex::IndexCursor::savePosition() {
-        if (isEOF())
-            _savedAtEnd = true;
-        else {
+        if ((_savedAtEnd = isEOF()) == false) {
             _savedKey = getKey();
             _savedLoc = getDiskLoc();
         }
@@ -365,7 +368,7 @@ namespace mongo {
         if (_savedAtEnd)
             _eof = true;
         else
-            locate(_savedKey, _savedLoc);
+            (void)_locate(_savedKey, _savedLoc);
     }
 
     SortedDataInterface::Cursor* WiredTigerIndex::newCursor(
