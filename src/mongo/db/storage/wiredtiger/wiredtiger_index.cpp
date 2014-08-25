@@ -95,15 +95,9 @@ namespace mongo {
                 const IndexKeyEntry lhs = makeIndexKeyEntry(s, a);
                 const IndexKeyEntry rhs = makeIndexKeyEntry(s, b);
                 int cmp = _indexComparator.compare( lhs, rhs );
-                /* WiredTiger always wants the smallest matching key. */
                 if (cmp < 0)
                     cmp = -1;
-                else if (cmp == 0) {
-                    if (lhs.loc.isNull() && !rhs.loc.isNull())
-                        cmp = -1;
-                    if (!lhs.loc.isNull() && rhs.loc.isNull())
-                        cmp = 1;
-                } else if (cmp > 0)
+                else if (cmp > 0)
                     cmp = 1;
                 return cmp;
             }
@@ -257,9 +251,25 @@ namespace mongo {
 
     bool WiredTigerIndex::IndexCursor::_locate(const BSONObj &key, const DiskLoc& loc) {
         WT_CURSOR *c = _cursor.Get();
+        DiskLoc searchLoc = loc;
         int cmp = -1, ret;
-        c->set_key(c, _toItem(key).Get(), _toItem(loc).Get());
+        /* Reverse cursors should start on the last matching key. */
+        if (loc.isNull())
+            searchLoc = _forward ? DiskLoc(0, 0) : DiskLoc(INT_MAX, INT_MAX);
+        c->set_key(c, _toItem(key).Get(), _toItem(searchLoc).Get());
         ret = c->search_near(c, &cmp);
+
+#if 0
+        if (ret == 0) {
+            WT_ITEM keyItem, locItem;
+            ret = c->get_key(c, &keyItem, &locItem);
+            BSONObj foundKey(static_cast<const char *>(keyItem.data));
+            DiskLoc foundLoc = *reinterpret_cast<const DiskLoc *>(locItem.data);
+            fprintf(stderr, "_locate search_near(%s:%s) -> %s:%s, cmp == %d, forward = %d\n", key.toString().c_str(), searchLoc.toString().c_str(), foundKey.toString().c_str(), foundLoc.toString().c_str(), cmp, _forward);
+        } else {
+            fprintf(stderr, "_locate search_near(%s:%s) returned == %d, forward = %d\n", key.toString().c_str(), searchLoc.toString().c_str(), ret, _forward);
+        }
+#endif
 
         // Make sure we land on a matching key
         if (ret == 0 && (_forward ? cmp < 0 : cmp > 0))
