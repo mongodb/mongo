@@ -221,8 +221,8 @@ namespace {
         boost::thread t(startSyncThread);
 
         boost::thread producer(stdx::bind(&BackgroundSync::producerThread, sync));
-        boost::thread feedback(stdx::bind(&SyncSourceFeedback::run,
-                                          &theReplSet->syncSourceFeedback));
+        //boost::thread feedback(stdx::bind(&SyncSourceFeedback::run,
+        //                                  &theReplSet->syncSourceFeedback));
 
         // member heartbeats are started in ReplSetImpl::initFromConfig
     }

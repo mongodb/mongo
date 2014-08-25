@@ -414,8 +414,9 @@ namespace {
                 if (!updateSlaveTracking(BSON("_id" << rid), config, ts)) {
                     return Status(ErrorCodes::NodeNotFound,
                                   str::stream() << "could not update node with _id: "
-                                          << config["_id"].Int()
-                                          << " because it cannot be found in current ReplSetConfig");
+                                          << config["_id"].Int() << " and RID " << rid
+                                          << " because it cannot be found in current ReplSetConfig "
+                                          << theReplSet->getConfig().toString());
                 }
             }
 
@@ -936,7 +937,10 @@ namespace {
         if (!member) {
             return Status(ErrorCodes::NodeNotFound,
                           str::stream() << "Node with replica set member ID " << memberID <<
-                                  " could not be found in replica set config during handshake");
+                                  " could not be found in replica set config while attempting to "
+                                  "associate it with RID " << handshake.getRid() <<
+                                  " in replication handshake. ReplSet config: " <<
+                                  theReplSet->getConfig().toString());
         }
 
         _ridMemberMap[handshake.getRid()] = member;
