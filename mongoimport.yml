@@ -16,30 +16,23 @@ functions:
       script: |
         set -o verbose
         export GOPATH=`pwd`
-        go tool cover -html=coverage.out -o coverage.html
-        go tool cover -func=coverage.out -o coverage.txt
+        if [ '${coverage|false}' = 'true' ]
+        then
+            go tool cover -html=coverage.out -o coverage.html
+            go tool cover -func=coverage.out -o coverage.txt
+        fi
 
-  "upload coverage html report":
+  "upload coverage report":
     command: s3.put
     params:
       aws_key: ${aws_key}
       aws_secret: ${aws_secret}
-      local_file: src/coverage.html
-      remote_file: mongo-tools-proto/coverage/${task_id}.html
+      local_file: src/coverage.${format|txt}
+      remote_file: mongo-tools-proto/coverage/${task_id}.${format|txt}
       bucket: mciuploads
       permissions: public-read
-      content_type: text/html
-
-  "upload coverage txt report":
-    command: s3.put
-    params:
-      aws_key: ${aws_key}
-      aws_secret: ${aws_secret}
-      local_file: src/coverage.txt
-      remote_file: mongo-tools-proto/coverage/${task_id}.txt
-      bucket: mciuploads
-      permissions: public-read
-      content_type: text/plain
+      content_type: ${content_type|text/plain}
+      build_variants: ["ubuntu"]
 
   "attach coverage reports" :
     command: attach.task_files
@@ -81,7 +74,7 @@ functions:
       working_dir: src
       tests:
         - dir: src/github.com/shelman/mongo-tools-proto/mongoimport
-          args: -coverprofile=coverage.out
+          args: ${coverage_args}
 
   "move coverage data":
     command: shell.exec
@@ -89,7 +82,10 @@ functions:
       working_dir: src
       script: |
         set -o verbose
-        mv src/github.com/shelman/mongo-tools-proto/mongoimport/coverage.out $GOPATH
+        if [ '${coverage|false}' = 'true' ]
+        then
+            mv src/github.com/shelman/mongo-tools-proto/mongoimport/coverage.out $GOPATH
+        fi
 
 pre:
   - command: expansions.fetch
@@ -114,8 +110,11 @@ tasks:
     - func: "run tests"
     - func: "move coverage data"
     - func: "generate coverage html + text"
-    - func: "upload coverage html report"
-    - func: "upload coverage txt report"
+    - func: "upload coverage report"
+    - func: "upload coverage report"
+      vars:
+        format: "html"
+        content_type: "text/html"
     - func: "attach coverage reports"
 
 - name: dist
@@ -154,6 +153,8 @@ buildvariants:
   - ubuntu1404-test
   expansions:
     mongo_url: http://fastdl.mongodb.org/linux/mongodb-linux-x86_64-2.6.4.tgz
+    coverage_args: "-coverprofile=coverage.out"
+    coverage: true
   tasks:
   - name: dist
   - name: unit
