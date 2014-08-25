@@ -474,11 +474,38 @@ namespace mongo {
 
         CollectionMetadataPtr beforeMetadata;
         string shardName;
+        string configServer;
+
         {
             scoped_lock lk( _mutex );
+
+            // We can't reload if sharding is not enabled - i.e. without a config server location
+            if (!_enabled) {
+
+                string errMsg = str::stream() << "cannot refresh metadata for " << ns
+                                              << " before sharding has been enabled";
+
+                warning() << errMsg;
+                return Status(ErrorCodes::NotYetInitialized, errMsg);
+            }
+            // Checked when enabling sharding
+            dassert(!_configServer.empty());
+
+            // We also can't reload if a shard name has not yet been set.
+            if (_shardName.empty()) {
+
+                string errMsg = str::stream() << "cannot refresh metadata for " << ns
+                                              << " before shard name has been set";
+
+                warning() << errMsg;
+                return Status(ErrorCodes::NotYetInitialized, errMsg);
+            }
+
+            shardName = _shardName;
+            configServer = _configServer;
+
             CollectionMetadataMap::iterator it = _collMetadata.find( ns );
             if ( it != _collMetadata.end() ) beforeMetadata = it->second;
-            shardName = _shardName;
         }
 
         ChunkVersion beforeShardVersion;
@@ -489,17 +516,6 @@ namespace mongo {
         }
 
         *latestShardVersion = beforeShardVersion;
-
-        // We can't reload without a shard name.  Must check here before loading, since shard name
-        // may have changed if we checked it earlier and released the _mutex.
-        if ( shardName.empty() ) {
-
-            string errMsg = str::stream() << "cannot refresh metadata for " << ns
-                                          << " before shard name has been set";
-
-            LOG( 0 ) << errMsg << endl;
-            return Status( ErrorCodes::IllegalOperation, errMsg );
-        }
 
         //
         // Determine whether we need to diff or fully reload
@@ -528,7 +544,7 @@ namespace mongo {
                  << ", current metadata version is " << beforeCollVersion << endl;
 
         string errMsg;
-        ConnectionString configServerLoc = ConnectionString::parse( _configServer, errMsg );
+        ConnectionString configServerLoc = ConnectionString::parse( configServer, errMsg );
         MetadataLoader mdLoader( configServerLoc );
         CollectionMetadata* remoteMetadataRaw = new CollectionMetadata();
         CollectionMetadataPtr remoteMetadata( remoteMetadataRaw );
@@ -585,6 +601,38 @@ namespace mongo {
             //
 
             scoped_lock lk( _mutex );
+
+            // Don't reload if our config server has changed or sharding is no longer enabled
+            if (!_enabled) {
+
+                string errMsg = str::stream() << "could not refresh metadata for " << ns
+                                              << ", sharding is no longer enabled";
+
+                warning() << errMsg;
+                return Status(ErrorCodes::NotYetInitialized, errMsg);
+            }
+
+            if (_configServer != configServer) {
+
+                string errMsg = str::stream() << "could not refresh metadata for " << ns
+                                              << ", server is now attached to cluster "
+                                              << _configServer << " instead of " << configServer;
+
+                warning() << errMsg;
+                return Status(ErrorCodes::IncompatibleShardingMetadata, errMsg);
+            }
+
+            // Don't reload if our shard name has changed
+            if (_shardName != shardName) {
+
+                string errMsg = str::stream() << "could not refresh metadata for " << ns
+                                              << ", shard name changed during reload from "
+                                              << _shardName << " to " << shardName;
+
+                warning() << errMsg;
+                return Status(ErrorCodes::IncompatibleShardingMetadata, errMsg);
+            }
+
             CollectionMetadataMap::iterator it = _collMetadata.find( ns );
             if ( it != _collMetadata.end() ) afterMetadata = it->second;
 
@@ -680,7 +728,7 @@ namespace mongo {
                 << ", stored shard versions : " << localShardVersionMsg
                 << ", took " << refreshMillis << "ms)";
 
-            warning() << errMsg << endl;
+            warning() << errMsg;
             return Status( ErrorCodes::RemoteChangeDetected, errMsg );
         }
 
@@ -727,26 +775,24 @@ namespace mongo {
         return Status::OK();
     }
 
-    void ShardingState::appendInfo( BSONObjBuilder& b ) {
-        b.appendBool( "enabled" , _enabled );
-        if ( ! _enabled )
+    void ShardingState::appendInfo(BSONObjBuilder& builder) {
+
+        scoped_lock lk(_mutex);
+
+        builder.appendBool("enabled", _enabled);
+        if (!_enabled)
             return;
 
-        b.append( "configServer" , _configServer );
-        b.append( "shardName" , _shardName );
+        builder.append("configServer", _configServer);
+        builder.append("shardName", _shardName);
 
-        {
-            BSONObjBuilder bb( b.subobjStart( "versions" ) );
-
-            scoped_lock lk(_mutex);
-
-            for ( CollectionMetadataMap::iterator it = _collMetadata.begin(); it != _collMetadata.end(); ++it ) {
-                CollectionMetadataPtr p = it->second;
-                bb.appendTimestamp( it->first , p->getShardVersion().toLong() );
-            }
-            bb.done();
+        BSONObjBuilder versionB(builder.subobjStart("versions"));
+        for (CollectionMetadataMap::iterator it = _collMetadata.begin(); it != _collMetadata.end();
+            ++it) {
+            CollectionMetadataPtr metadata = it->second;
+            versionB.appendTimestamp(it->first, metadata->getShardVersion().toLong());
         }
-
+        versionB.done();
     }
 
     bool ShardingState::needCollectionMetadata( const string& ns ) const {

@@ -2345,14 +2345,30 @@ namespace mongo {
             // subrange.
             const size_t numDeletes = getDeleter()->getTotalDeletes();
             if (numDeletes > 0) {
+
                 errmsg = str::stream() << "can't accept new chunks because "
                         << " there are still " << numDeletes
                         << " deletes from previous migration";
+
+                warning() << errmsg;
                 return false;
             }
 
-            if ( ! configServer.ok() )
-                ShardingState::initialize(cmdObj["configServer"].String());
+            if (!shardingState.enabled()) {
+                if (!cmdObj["configServer"].eoo()) {
+                    dassert(cmdObj["configServer"].type() == String);
+                    ShardingState::initialize(cmdObj["configServer"].String());
+                }
+                else {
+
+                    errmsg = str::stream()
+                        << "cannot start recv'ing chunk, "
+                        << "sharding is not enabled and no config server was provided";
+
+                    warning() << errmsg;
+                    return false;
+                }
+            }
 
             if ( !cmdObj["toShardName"].eoo() ) {
                 dassert( cmdObj["toShardName"].type() == String );

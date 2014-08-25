@@ -663,9 +663,9 @@ ReplSetTest.prototype.start = function( n , options , restart , wait ){
     
     options = Object.merge( defaults, options )
     options = Object.merge( options, this.nodeOptions[ "n" + n ] )
-    
-    options.restart = restart
-            
+
+    options.restart = options.restart || restart
+
     var pathOpts = { node : n, set : this.name }
     options.pathOpts = Object.merge( options.pathOpts || {}, pathOpts )
     
