@@ -26,6 +26,11 @@
 #define	LOGC_KEY_FORMAT		WT_UNCHECKED_STRING(IqI)
 #define	LOGC_VALUE_FORMAT	WT_UNCHECKED_STRING(qIIIuu)
 
+#define	LOG_SKIP_HEADER(data, skip_rec)					\
+    (((const uint8_t *)(data)) + offsetof(WT_LOG_RECORD, record) + (skip_rec));
+#define	LOG_REC_SIZE(size)						\
+    ((size) - offsetof(WT_LOG_RECORD, record))
+
 #define	MAX_LSN(l)	do {						\
 	(l)->file = UINT32_MAX;						\
 	(l)->offset = INT64_MAX;					\
