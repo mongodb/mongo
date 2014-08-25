@@ -48,8 +48,8 @@ int main(void)
 	 * environment variable isn't already set (as is done by make check).
 	 */
 	if (getenv("WIREDTIGER_HOME") == NULL) {
-		home = "WIREDTIGER_HOME";
-		(void)system("rm -rf WIREDTIGER_HOME && mkdir WIREDTIGER_HOME");
+		home = "WT_HOME";
+		ret = system("rm -rf WT_HOME && mkdir WT_HOME");
 	} else
 		home = NULL;
 
