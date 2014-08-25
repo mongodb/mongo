@@ -132,7 +132,7 @@ buildvariants:
   - windows-64-vs2013-test
   expansions:
     mongo_url: https://fastdl.mongodb.org/win32/mongodb-win32-x86_64-2008plus-2.6.4.zip
-    preproc_gpm: "perl -pi -e 's/\r\n/\n/g' "
+    preproc_gpm: "perl -pi -e 's/\\r\\n/\\n/g' "
   tasks:
   - name: dist
   - name: smoke
