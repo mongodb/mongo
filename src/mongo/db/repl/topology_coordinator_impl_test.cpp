@@ -1468,6 +1468,94 @@ namespace {
                 "replSet info received freeze command but we are primary"));
     }
 
+    class ShutdownInProgressTest : public TopoCoordTest {
+    public:
+
+        ShutdownInProgressTest() :
+            ourCbData(NULL,
+                      ReplicationExecutor::CallbackHandle(),
+                      Status(ErrorCodes::CallbackCanceled, "")) {}
+
+        virtual ReplicationExecutor::CallbackData cbData() { return ourCbData; }
+
+    private:
+        ReplicationExecutor::CallbackData ourCbData;
+    };
+
+    TEST_F(ShutdownInProgressTest, ShutdownInProgressWhenCallbackCanceledSyncFrom) {
+        Status result = Status::OK();
+        BSONObjBuilder response;
+        getTopoCoord().prepareSyncFromResponse(cbData(),
+                                               HostAndPort("host2:27017"),
+                                               OpTime(0,0),
+                                               &response,
+                                               &result);
+        ASSERT_EQUALS(ErrorCodes::ShutdownInProgress, result);
+        ASSERT_TRUE(response.obj().isEmpty());
+
+    }
+
+    TEST_F(ShutdownInProgressTest, ShutDownInProgressWhenCallbackCanceledFresh) {
+        Status result = Status::OK();
+        BSONObjBuilder response;
+        getTopoCoord().prepareFreshResponse(cbData(),
+                                            ReplicationCoordinator::ReplSetFreshArgs(),
+                                            OpTime(0,0),
+                                            &response,
+                                            &result);
+        ASSERT_EQUALS(ErrorCodes::ShutdownInProgress, result);
+        ASSERT_TRUE(response.obj().isEmpty());
+    }
+
+    TEST_F(ShutdownInProgressTest, ShutDownInProgressWhenCallbackCanceledElectCmd) {
+        Status result = Status::OK();
+        BSONObjBuilder response;
+        getTopoCoord().prepareFreshResponse(cbData(),
+                                            ReplicationCoordinator::ReplSetFreshArgs(),
+                                            OpTime(0,0),
+                                            &response,
+                                            &result);
+        ASSERT_EQUALS(ErrorCodes::ShutdownInProgress, result);
+        ASSERT_TRUE(response.obj().isEmpty());
+    }
+
+    TEST_F(ShutdownInProgressTest, ShutDownInProgressWhenCallbackCanceledHeartbeat) {
+        Status result = Status::OK();
+        BSONObjBuilder response;
+        getTopoCoord().prepareFreshResponse(cbData(),
+                                            ReplicationCoordinator::ReplSetFreshArgs(),
+                                            OpTime(0,0),
+                                            &response,
+                                            &result);
+        ASSERT_EQUALS(ErrorCodes::ShutdownInProgress, result);
+        ASSERT_TRUE(response.obj().isEmpty());
+    }
+
+    TEST_F(ShutdownInProgressTest, ShutDownInProgressWhenCallbackCanceledStatus) {
+        Status result = Status::OK();
+        BSONObjBuilder response;
+        getTopoCoord().prepareFreshResponse(cbData(),
+                                            ReplicationCoordinator::ReplSetFreshArgs(),
+                                            OpTime(0,0),
+                                            &response,
+                                            &result);
+        ASSERT_EQUALS(ErrorCodes::ShutdownInProgress, result);
+        ASSERT_TRUE(response.obj().isEmpty());
+    }
+
+    TEST_F(ShutdownInProgressTest, ShutDownInProgressWhenCallbackCanceledFreeze) {
+        Status result = Status::OK();
+        BSONObjBuilder response;
+        getTopoCoord().prepareFreshResponse(cbData(),
+                                            ReplicationCoordinator::ReplSetFreshArgs(),
+                                            OpTime(0,0),
+                                            &response,
+                                            &result);
+        ASSERT_EQUALS(ErrorCodes::ShutdownInProgress, result);
+        ASSERT_TRUE(response.obj().isEmpty());
+
+    }
+
 }  // namespace
 }  // namespace repl
 }  // namespace mongo
