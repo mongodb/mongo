@@ -58,7 +58,7 @@ namespace mongo {
                 const StringData& name )
         : DatabaseCatalogEntry( name ), _db(db) {
 
-            initCollectionNamespaces();
+            _initCollectionsFromDisk();
     }
 
     WiredTigerDatabaseCatalogEntry::~WiredTigerDatabaseCatalogEntry() {
@@ -97,7 +97,7 @@ namespace mongo {
         return i->second->rs.get();
     }
 
-    void WiredTigerDatabaseCatalogEntry::initCollectionNamespaces( ) {
+    void WiredTigerDatabaseCatalogEntry::_initCollectionsFromDisk( ) {
         boost::mutex::scoped_lock lk( _entryMapLock );
 
         /* Only do this once. */
@@ -121,65 +121,74 @@ namespace mongo {
             if (strstr(key, ".$") != NULL)
                 continue;
 
-            // Move the pointer past table:NAME.
-            key = key + 6;
-            CollectionOptions *options = new CollectionOptions();
-            Entry *entry = new Entry(mongo::StringData(key), *options);
-            entry->rs.reset(new WiredTigerRecordStore(key, _db));
-
-            _entryMap[key] = entry;
-        }
-        for ( EntryMap::const_iterator i = _entryMap.begin(); i != _entryMap.end(); ++i ) {
-            Entry *entry = i->second;
-            std::string tbl_uri = std::string("table:" + i->first);
-            c->set_key(c, tbl_uri.c_str());
-            int cmp;
-            ret = c->search_near(c, &cmp);
-            if (cmp == -1)
-                ret = c->next(c);
-            const char *uri_str;
-            while (ret == 0) {
-                ret = c->get_key(c, &uri_str);
-                invariant ( ret == 0);
-                std::string uri(uri_str);
-                // No more indexes for this table
-                if (uri.substr(0, tbl_uri.size()) != tbl_uri)
-                    break;
-
-                size_t pos;
-                if ((pos = uri.find('$')) != std::string::npos && pos < uri.size() - 1) {
-                    std::string idx_name = uri.substr(pos + 1);
-                    // Skip to the start of the index name
-                    const char *idx_meta;
-                    ret = c->get_value(c, &idx_meta);
-                    invariant( ret == 0 );
-                    WT_CONFIG_PARSER *cp;
-                    ret = wiredtiger_config_parser_open(
-                            NULL, idx_meta, strlen(idx_meta), &cp);
-                    invariant ( ret == 0 );
-                    WT_CONFIG_ITEM cval;
-                    ret = cp->get(cp, "app_metadata", &cval);
-                    invariant ( ret == 0 );
-
-                    BSONObj b( fromjson(std::string(cval.str, cval.len)));
-                    std::string name(b.getStringField("name"));
-                    IndexDescriptor desc(0, "unknown", b);
-                    auto_ptr<IndexEntry> newEntry( new IndexEntry() );
-                    newEntry->name = name;
-                    newEntry->spec = desc.infoObj();
-                    // TODO: How can we track these and set them up properly?
-                    newEntry->ready = true;
-                    newEntry->isMultikey = false;
-
-                    entry->indexes[name] = newEntry.release();
-                }
-
-                ret = c->next(c);
-            }
+            // Initialize the namespace we found - skip the table: prefix.
+            _initCollectionFromDisk(session, std::string(key + 6));
         }
         _db.ReleaseSession(session);
         invariant(ret == WT_NOTFOUND || ret == 0);
         name();
+    }
+
+    void WiredTigerDatabaseCatalogEntry::_initCollectionFromDisk(
+        WT_SESSION *session, std::string name) {
+
+        // Create the collection
+        CollectionOptions *options = new CollectionOptions();
+        Entry *entry = new Entry(mongo::StringData(name), *options);
+        entry->rs.reset(new WiredTigerRecordStore(name, _db));
+
+        _entryMap[name.c_str()] = entry;
+
+        // Open any existing indexes
+        WT_CURSOR *c;
+        int ret = session->open_cursor(session, "metadata:", NULL, NULL, &c);
+        invariant(ret == 0);
+
+        std::string tbl_uri = std::string("table:" + name);
+        c->set_key(c, tbl_uri.c_str());
+        int cmp;
+        ret = c->search_near(c, &cmp);
+        if (cmp == -1)
+            ret = c->next(c);
+        const char *uri_str;
+        while (ret == 0) {
+            ret = c->get_key(c, &uri_str);
+            invariant ( ret == 0);
+            std::string uri(uri_str);
+            // No more indexes for this table
+            if (uri.substr(0, tbl_uri.size()) != tbl_uri)
+                break;
+
+            size_t pos;
+            if ((pos = uri.find('$')) != std::string::npos && pos < uri.size() - 1) {
+                std::string idx_name = uri.substr(pos + 1);
+                // Skip to the start of the index name
+                const char *idx_meta;
+                ret = c->get_value(c, &idx_meta);
+                invariant( ret == 0 );
+                WT_CONFIG_PARSER *cp;
+                ret = wiredtiger_config_parser_open(
+                        NULL, idx_meta, strlen(idx_meta), &cp);
+                invariant ( ret == 0 );
+                WT_CONFIG_ITEM cval;
+                ret = cp->get(cp, "app_metadata", &cval);
+                invariant ( ret == 0 );
+
+                BSONObj b( fromjson(std::string(cval.str, cval.len)));
+                std::string name(b.getStringField("name"));
+                IndexDescriptor desc(0, "unknown", b);
+                auto_ptr<IndexEntry> newEntry( new IndexEntry() );
+                newEntry->name = name;
+                newEntry->spec = desc.infoObj();
+                // TODO: How can we track these and set them up properly?
+                newEntry->ready = true;
+                newEntry->isMultikey = false;
+
+                entry->indexes[name] = newEntry.release();
+            }
+
+            ret = c->next(c);
+        }
     }
 
     void WiredTigerDatabaseCatalogEntry::getCollectionNamespaces(
@@ -315,7 +324,51 @@ namespace mongo {
                                                         const StringData& fromNS,
                                                         const StringData& toNS,
                                                         bool stayTemp ) {
-        invariant( false );
+        int ret;
+        boost::mutex::scoped_lock lk( _entryMapLock );
+        EntryMap::iterator i = _entryMap.find( toNS.toString() );
+        if ( i != _entryMap.end() )
+            return Status( ErrorCodes::NamespaceNotFound, "to namespace already exists for rename" );
+
+        i = _entryMap.find( fromNS.toString() );
+        if ( i == _entryMap.end() )
+            return Status( ErrorCodes::NamespaceNotFound, "namespace not found for rename" );
+
+        Entry *entry = i->second;
+
+        // Remove the entry from the entryMap
+        _entryMap.erase( i );
+
+        WiredTigerSession &swrap = WiredTigerRecoveryUnit::Get(txn).GetSession();
+        WT_SESSION *session = swrap.Get();
+
+        // Rename all indexes in the entry
+        std::vector<std::string> names;
+        entry->getAllIndexes( &names );
+        std::vector<std::string>::const_iterator idx;
+        for (idx = names.begin(); idx != names.end(); ++idx) {
+            //std::string fromName = *idx;
+            //std::string toName(toNS.toString() + fromName.substr(fromNS.toString().length()));
+            ret = session->rename(session,
+                    WiredTigerIndex::_getURI(fromNS.toString(), *idx).c_str(),
+                    WiredTigerIndex::_getURI(toNS.toString(), *idx).c_str(),
+                    "force");
+            invariant(ret == 0);
+        }
+
+        // Rename the primary WiredTiger table
+        std::string fromUri = "table:" + fromNS.toString();
+        std::string toUri = "table:" + toNS.toString();
+        ret = session->rename(session, fromUri.c_str(), toUri.c_str(), NULL);
+        if (ret != 0)
+            return Status( ErrorCodes::OperationFailed, "Collection rename failed" );
+
+        // Now delete the old entry.
+        delete entry;
+
+        // Load the newly renamed collection into memory
+        _initCollectionFromDisk(session, toNS.toString());
+        return Status::OK();
     }
 
     // ------------------
