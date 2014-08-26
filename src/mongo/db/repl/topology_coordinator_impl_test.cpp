@@ -845,7 +845,7 @@ namespace {
                                             needle));
         }
 
-        void makeSelfPrimary(const OpTime& electionOpTime) {
+        void makeSelfPrimary(const OpTime& electionOpTime = OpTime(0,0)) {
             setSelfMemberState(MemberState::RS_PRIMARY);
             getTopoCoord()._setElectionTime(electionOpTime);
         }
@@ -1386,6 +1386,86 @@ namespace {
         ASSERT_EQUALS(1, response3["vote"].Int());
         ASSERT_EQUALS(round, response3["round"].OID());
         ASSERT_EQUALS(1, countLogLinesContaining("voting yea for h3:27017 (3)"));
+    }
+
+    class PrepareFreezeResponseTest : public TopoCoordTest {
+    public:
+
+        virtual void setUp() {
+            TopoCoordTest::setUp();
+            updateConfig(BSON("_id" << "rs0" <<
+                              "version" << 5 <<
+                              "members" << BSON_ARRAY(
+                                  BSON("_id" << 0 << "host" << "host1:27017") <<
+                                  BSON("_id" << 1 << "host" << "host2:27017"))),
+                         0);
+        }
+
+        BSONObj prepareFreezeResponse(int duration,
+                                      Status& result) {
+            BSONObjBuilder response;
+            startCapturingLogMessages();
+            getTopoCoord().prepareFreezeResponse(cbData(), now()++, duration, &response, &result);
+            stopCapturingLogMessages();
+            return response.obj();
+        }
+    };
+
+    TEST_F(PrepareFreezeResponseTest, UnfreezeEvenWhenNotFrozen) {
+        Status result = Status(ErrorCodes::InternalError, "");
+        BSONObj response = prepareFreezeResponse(0, result);
+        ASSERT_EQUALS(Status::OK(), result);
+        ASSERT_EQUALS("unfreezing", response["info"].String());
+        ASSERT_EQUALS(1, countLogLinesContaining("replSet info 'unfreezing'"));
+    }
+
+    TEST_F(PrepareFreezeResponseTest, FreezeForOneSecond) {
+        Status result = Status(ErrorCodes::InternalError, "");
+        BSONObj response = prepareFreezeResponse(1, result);
+        ASSERT_EQUALS(Status::OK(), result);
+        ASSERT_EQUALS("you really want to freeze for only 1 second?",
+                      response["warning"].String());
+        ASSERT_EQUALS(1, countLogLinesContaining("replSet info 'freezing' for 1 seconds"));
+    }
+
+    TEST_F(PrepareFreezeResponseTest, FreezeForManySeconds) {
+        Status result = Status(ErrorCodes::InternalError, "");
+        BSONObj response = prepareFreezeResponse(20, result);
+        ASSERT_EQUALS(Status::OK(), result);
+        ASSERT_TRUE(response.isEmpty());
+        ASSERT_EQUALS(1, countLogLinesContaining("replSet info 'freezing' for 20 seconds"));
+    }
+
+    TEST_F(PrepareFreezeResponseTest, UnfreezeEvenWhenNotFrozenWhilePrimary) {
+        makeSelfPrimary();
+        Status result = Status(ErrorCodes::InternalError, "");
+        BSONObj response = prepareFreezeResponse(0, result);
+        ASSERT_EQUALS(Status::OK(), result);
+        ASSERT_EQUALS("unfreezing", response["info"].String());
+        // doesn't mention being primary in this case for some reason
+        ASSERT_EQUALS(0, countLogLinesContaining(
+                "replSet info received freeze command but we are primary"));
+    }
+
+    TEST_F(PrepareFreezeResponseTest, FreezeForOneSecondWhilePrimary) {
+        makeSelfPrimary();
+        Status result = Status(ErrorCodes::InternalError, "");
+        BSONObj response = prepareFreezeResponse(1, result);
+        ASSERT_EQUALS(Status::OK(), result);
+        ASSERT_EQUALS("you really want to freeze for only 1 second?",
+                      response["warning"].String());
+        ASSERT_EQUALS(1, countLogLinesContaining(
+                "replSet info received freeze command but we are primary"));
+    }
+
+    TEST_F(PrepareFreezeResponseTest, FreezeForManySecondsWhilePrimary) {
+        makeSelfPrimary();
+        Status result = Status(ErrorCodes::InternalError, "");
+        BSONObj response = prepareFreezeResponse(20, result);
+        ASSERT_EQUALS(Status::OK(), result);
+        ASSERT_TRUE(response.isEmpty());
+        ASSERT_EQUALS(1, countLogLinesContaining(
+                "replSet info received freeze command but we are primary"));
     }
 
 }  // namespace
