@@ -161,6 +161,11 @@ namespace repl {
         // call this method from outside of TopologyCoordinatorImpl or a unit test.
         void _changeMemberState(const MemberState& newMemberState);
 
+        // Sets "_electionTime" to "newElectionTime".
+        // NOTE: The only reason this method exists is for testing.  Do not call this method from
+        //       outside of TopologyCoordinatorImpl or a unit test.
+        void _setElectionTime(const OpTime& newElectionTime);
+
         // Sets _currentPrimaryIndex to the given index.  Should only be used in unit tests!
         // TODO(spencer): Remove this once we can easily call for an election in unit tests to
         // set the current primary.
@@ -240,7 +245,7 @@ namespace repl {
         // This is a unique id that is generated and set each time we transition to PRIMARY, as the
         // result of an election.
         OID _electionId;
-        // PRIMARY server's time when the election to primary occurred
+        // The time at which the current PRIMARY was elected.
         OpTime _electionTime;
 
         // the member we currently believe is primary, if one exists

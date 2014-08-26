@@ -1255,6 +1255,10 @@ namespace repl {
         return _pings[host].getMillis();
     }
 
+    void TopologyCoordinatorImpl::_setElectionTime(const OpTime& newElectionTime) {
+        _electionTime = newElectionTime;
+    }
+
     int TopologyCoordinatorImpl::_getTotalPings() {
         PingMap::iterator it = _pings.begin();
         PingMap::iterator end = _pings.end();

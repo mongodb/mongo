@@ -35,6 +35,8 @@
 #include "mongo/util/net/hostandport.h"
 #include "mongo/util/time_support.h"
 
+#define ASSERT_NO_ACTION(EXPRESSION) ASSERT_EQUALS(ReplSetHeartbeatResponse::NoAction, (EXPRESSION))
+
 namespace mongo {
 
     // So that you can ASSERT_EQUALS two OpTimes
@@ -101,31 +103,31 @@ namespace {
 
         // Should choose h2, since it is furthest ahead
         topocoord.chooseNewSyncSource(now++, OpTime(0,0));
-        ASSERT_EQUALS(topocoord.getSyncSourceAddress(), HostAndPort("h2"));
+        ASSERT_EQUALS(HostAndPort("h2"), topocoord.getSyncSourceAddress());
         
         // h3 becomes further ahead, so it should be chosen
         h2Info.setUpValues(now, MemberState::RS_SECONDARY, OpTime(0,0), OpTime(3,0), "", ""); 
         topocoord.updateHeartbeatData(now++, h2Info, 30, OpTime(0,0));
         topocoord.chooseNewSyncSource(now++, OpTime(0,0));
-        ASSERT_EQUALS(topocoord.getSyncSourceAddress(), HostAndPort("h3"));
+        ASSERT_EQUALS(HostAndPort("h3"), topocoord.getSyncSourceAddress());
 
         // h3 becomes an invalid candidate for sync source; should choose h2 again
         h2Info.setUpValues(now, MemberState::RS_RECOVERING, OpTime(0,0), OpTime(4,0), "", ""); 
         topocoord.updateHeartbeatData(now++, h2Info, 30, OpTime(0,0));
         topocoord.chooseNewSyncSource(now++, OpTime(0,0));
-        ASSERT_EQUALS(topocoord.getSyncSourceAddress(), HostAndPort("h2"));
+        ASSERT_EQUALS(HostAndPort("h2"), topocoord.getSyncSourceAddress());
 
         // h3 goes down
         h2Info.setDownValues(now, ""); 
         topocoord.updateHeartbeatData(now++, h2Info, 30, OpTime(0,0));
         topocoord.chooseNewSyncSource(now++, OpTime(0,0));
-        ASSERT_EQUALS(topocoord.getSyncSourceAddress(), HostAndPort("h2"));
+        ASSERT_EQUALS(HostAndPort("h2"), topocoord.getSyncSourceAddress());
 
         // h3 back up and ahead
         h2Info.setUpValues(now, MemberState::RS_SECONDARY, OpTime(0,0), OpTime(5,0), "", ""); 
         topocoord.updateHeartbeatData(now++, h2Info, 30, OpTime(0,0));
         topocoord.chooseNewSyncSource(now++, OpTime(0,0));
-        ASSERT_EQUALS(topocoord.getSyncSourceAddress(), HostAndPort("h3"));
+        ASSERT_EQUALS(HostAndPort("h3"), topocoord.getSyncSourceAddress());
 
     }
 
@@ -209,7 +211,7 @@ namespace {
 
         // Should choose primary first; it's closest
         topocoord.chooseNewSyncSource(now++, lastOpTimeWeApplied);
-        ASSERT_EQUALS(topocoord.getSyncSourceAddress(), HostAndPort("hprimary"));
+        ASSERT_EQUALS(HostAndPort("hprimary"), topocoord.getSyncSourceAddress());
 
         // Primary goes far far away
         topocoord.recordPing(HostAndPort("hprimary"), Milliseconds(10000000));
@@ -217,13 +219,13 @@ namespace {
         // Should choose h4.  (if an arbiter has an oplog, it's a valid sync source)
         // h6 is not considered because it is outside the maxSyncLagSeconds window,
         topocoord.chooseNewSyncSource(now++, lastOpTimeWeApplied);
-        ASSERT_EQUALS(topocoord.getSyncSourceAddress(), HostAndPort("h4"));
+        ASSERT_EQUALS(HostAndPort("h4"), topocoord.getSyncSourceAddress());
         
         // h4 goes down; should choose h1
         h4Info.setDownValues(now, ""); 
         topocoord.updateHeartbeatData(now++, h4Info, 40, lastOpTimeWeApplied);
         topocoord.chooseNewSyncSource(now++, lastOpTimeWeApplied);
-        ASSERT_EQUALS(topocoord.getSyncSourceAddress(), HostAndPort("h1"));
+        ASSERT_EQUALS(HostAndPort("h1"), topocoord.getSyncSourceAddress());
 
         // Primary and h1 go down; should choose h6 
         h1Info.setDownValues(now, "");
@@ -231,19 +233,19 @@ namespace {
         hprimaryInfo.setDownValues(now, "");
         topocoord.updateHeartbeatData(now++, hprimaryInfo, 70, lastOpTimeWeApplied);
         topocoord.chooseNewSyncSource(now++, lastOpTimeWeApplied);
-        ASSERT_EQUALS(topocoord.getSyncSourceAddress(), HostAndPort("h6"));
+        ASSERT_EQUALS(HostAndPort("h6"), topocoord.getSyncSourceAddress());
 
         // h6 goes down; should choose h5
         h6Info.setDownValues(now, "");
         topocoord.updateHeartbeatData(now++, h6Info, 60, lastOpTimeWeApplied);
         topocoord.chooseNewSyncSource(now++, lastOpTimeWeApplied);
-        ASSERT_EQUALS(topocoord.getSyncSourceAddress(), HostAndPort("h5"));
+        ASSERT_EQUALS(HostAndPort("h5"), topocoord.getSyncSourceAddress());
 
         // h5 goes down; should choose h3
         h5Info.setDownValues(now, "");
         topocoord.updateHeartbeatData(now++, h5Info, 50, lastOpTimeWeApplied);
         topocoord.chooseNewSyncSource(now++, lastOpTimeWeApplied);
-        ASSERT_EQUALS(topocoord.getSyncSourceAddress(), HostAndPort("h3"));
+        ASSERT_EQUALS(HostAndPort("h3"), topocoord.getSyncSourceAddress());
 
         // h3 goes down; no sync source candidates remain
         h3Info.setDownValues(now, "");
@@ -297,7 +299,7 @@ namespace {
 
         // h3 is primary and should be chosen as sync source, despite being further away than h2.
         topocoord.chooseNewSyncSource(now++, OpTime(0,0));
-        ASSERT_EQUALS(topocoord.getSyncSourceAddress(),HostAndPort("h3"));
+        ASSERT_EQUALS(HostAndPort("h3"), topocoord.getSyncSourceAddress());
 
     }
 
@@ -334,10 +336,10 @@ namespace {
         topocoord.recordPing(HostAndPort("h3"), Milliseconds(100));
 
         topocoord.chooseNewSyncSource(now++, OpTime(0,0));
-        ASSERT_EQUALS(topocoord.getSyncSourceAddress(),HostAndPort("h3"));
+        ASSERT_EQUALS(HostAndPort("h3"), topocoord.getSyncSourceAddress());
         topocoord.setForceSyncSourceIndex(1);
         topocoord.chooseNewSyncSource(now++, OpTime(0,0));
-        ASSERT_EQUALS(topocoord.getSyncSourceAddress(),HostAndPort("h2"));
+        ASSERT_EQUALS(HostAndPort("h2"), topocoord.getSyncSourceAddress());
     }
 
     TEST(TopologyCoordinator, BlacklistSyncSource) {
@@ -373,17 +375,17 @@ namespace {
         topocoord.recordPing(HostAndPort("h3"), Milliseconds(100));
 
         topocoord.chooseNewSyncSource(now++, OpTime(0,0));
-        ASSERT_EQUALS(topocoord.getSyncSourceAddress(),HostAndPort("h3"));
+        ASSERT_EQUALS(HostAndPort("h3"), topocoord.getSyncSourceAddress());
         
         Date_t expireTime = 100;
         topocoord.blacklistSyncSource(HostAndPort("h3"), expireTime);
         topocoord.chooseNewSyncSource(now++, OpTime(0,0));
         // Should choose second best choice now that h3 is blacklisted.
-        ASSERT_EQUALS(topocoord.getSyncSourceAddress(),HostAndPort("h2"));
+        ASSERT_EQUALS(HostAndPort("h2"), topocoord.getSyncSourceAddress());
 
         // After time has passed, should go back to original sync source
         topocoord.chooseNewSyncSource(expireTime, OpTime(0,0));
-        ASSERT_EQUALS(topocoord.getSyncSourceAddress(),HostAndPort("h3"));
+        ASSERT_EQUALS(HostAndPort("h3"), topocoord.getSyncSourceAddress());
     }
 
     TEST(TopologyCoordinator, PrepareSyncFromResponse) {
@@ -508,7 +510,7 @@ namespace {
         ASSERT_EQUALS("requested member \"h5:27017\" is more than 10 seconds behind us",
                       response8.obj()["warning"].String());
         topocoord.chooseNewSyncSource(now++, ourOpTime);
-        ASSERT_EQUALS(topocoord.getSyncSourceAddress(), HostAndPort("h5"));
+        ASSERT_EQUALS(HostAndPort("h5"), topocoord.getSyncSourceAddress());
 
         // Sync successfully from an up-to-date member
         MemberHeartbeatData h6Info(2);
@@ -523,7 +525,7 @@ namespace {
         ASSERT_FALSE(response9Obj.hasField("warning"));
         ASSERT_EQUALS(HostAndPort("h5").toString(), response9Obj["prevSyncTarget"].String());
         topocoord.chooseNewSyncSource(now++, ourOpTime);
-        ASSERT_EQUALS(topocoord.getSyncSourceAddress(), HostAndPort("h6"));
+        ASSERT_EQUALS(HostAndPort("h6"), topocoord.getSyncSourceAddress());
     }
 
     TEST(TopologyCoordinator, ReplSetGetStatus) {
@@ -820,14 +822,19 @@ namespace {
         virtual void setUp() {
             _topo = new TopologyCoordinatorImpl(Seconds(100));
             _now = 0;
+            _cbData = new ReplicationExecutor::CallbackData(NULL,
+                                                            ReplicationExecutor::CallbackHandle(),
+                                                            Status::OK());
         }
 
         virtual void tearDown() {
             delete _topo;
+            delete _cbData;
         }
 
     protected:
         TopologyCoordinatorImpl& getTopoCoord() {return *_topo;}
+        ReplicationExecutor::CallbackData cbData() {return *_cbData;}
         Date_t& now() {return _now;}
 
         int64_t countLogLinesContaining(const std::string& needle) {
@@ -836,6 +843,15 @@ namespace {
                                  stdx::bind(stringContains,
                                             stdx::placeholders::_1,
                                             needle));
+        }
+
+        void makeSelfPrimary(const OpTime& electionOpTime) {
+            setSelfMemberState(MemberState::RS_PRIMARY);
+            getTopoCoord()._setElectionTime(electionOpTime);
+        }
+
+        void setSelfMemberState(const MemberState& newState) {
+            getTopoCoord()._changeMemberState(newState);
         }
 
         // Update config and set selfIndex
@@ -849,43 +865,321 @@ namespace {
 
     private:
         TopologyCoordinatorImpl* _topo;
+        ReplicationExecutor::CallbackData* _cbData;
         Date_t _now;
     };
 
-    TEST_F(TopoCoordTest, UpdateHeartbeatDataOlderConfigVersionNoMajority) {
-        updateConfig(BSON("_id" << "rs0" <<
-                          "version" << 5 <<
-                          "members" << BSON_ARRAY(
-                              BSON("_id" << 0 << "host" << "host1:27017") <<
-                              BSON("_id" << 1 << "host" << "host2:27017"))),
-                     0);
+    class UpdateHeartbeatDataTest : public TopoCoordTest {
+    public:
 
+        virtual void setUp() {
+            TopoCoordTest::setUp();
+            updateConfig(BSON("_id" << "rs0" <<
+                              "version" << 5 <<
+                              "members" << BSON_ARRAY(
+                                  BSON("_id" << 0 << "host" << "host1:27017") <<
+                                  BSON("_id" << 1 << "host" << "host2:27017") <<
+                                  BSON("_id" << 2 << "host" << "host3:27017"))),
+                         0);
+        }
+
+        ReplSetHeartbeatResponse::HeartbeatResultAction updateHeartbeatUpData(
+                int memberIndex,
+                const MemberState& memberState,
+                const OpTime& election,
+                const OpTime& lastOpTimeSender,
+                const OpTime& lastOpTimeReceiver) {
+            MemberHeartbeatData hInfo(memberIndex);
+            hInfo.setUpValues(now(), memberState, election, lastOpTimeSender, "", "");
+            return getTopoCoord().updateHeartbeatData(now()++,
+                                                      hInfo,
+                                                      memberIndex,
+                                                      lastOpTimeReceiver);
+        }
+
+        ReplSetHeartbeatResponse::HeartbeatResultAction updateHeartbeatDownData(
+                int memberIndex,
+                const OpTime& lastOpTimeReceiver) {
+            MemberHeartbeatData hInfo(memberIndex);
+            hInfo.setDownValues(now(), "");
+            return getTopoCoord().updateHeartbeatData(now()++,
+                                                      hInfo,
+                                                      memberIndex,
+                                                      lastOpTimeReceiver);
+        }
+    };
+
+    TEST_F(UpdateHeartbeatDataTest, UpdateHeartbeatDataOlderConfigVersionNoMajority) {
         OpTime staleOpTime = OpTime(1,0);
         OpTime election = OpTime(5,0);
         OpTime lastOpTimeApplied = OpTime(3,0);
 
-        MemberHeartbeatData h1Info(1);
-        h1Info.setUpValues(now(), MemberState::RS_SECONDARY, election, staleOpTime, "", "");
         ReplSetHeartbeatResponse::HeartbeatResultAction nextAction = 
-                getTopoCoord().updateHeartbeatData(now()++, h1Info, 1, lastOpTimeApplied);
-        ASSERT_EQUALS(nextAction, ReplSetHeartbeatResponse::NoAction);
+                updateHeartbeatUpData(1,
+                                      MemberState::RS_SECONDARY,
+                                      election,
+                                      staleOpTime,
+                                      lastOpTimeApplied);
+        ASSERT_NO_ACTION(nextAction);
     }
 
-    TEST(TopologyCoordinator, UpdateHeartbeatDataNewPrimary) {}
+    TEST_F(UpdateHeartbeatDataTest, UpdateHeartbeatDataNewPrimary) {
+        OpTime election = OpTime(5,0);
+        OpTime lastOpTimeApplied = OpTime(3,0);
 
-    TEST(TopologyCoordinator, UpdateHeartbeatDataTwoPrimariesNewOneOlder) {}
-    TEST(TopologyCoordinator, UpdateHeartbeatDataTwoPrimariesNewOneNewer) {}
+        ReplSetHeartbeatResponse::HeartbeatResultAction nextAction = 
+                updateHeartbeatUpData(1,
+                                      MemberState::RS_SECONDARY,
+                                      election,
+                                      election,
+                                      lastOpTimeApplied);
+        ASSERT_NO_ACTION(nextAction);
+    }
 
-    TEST(TopologyCoordinator, UpdateHeartbeatDataTwoPrimariesIncludingMeNewOneOlder) {}
-    TEST(TopologyCoordinator, UpdateHeartbeatDataTwoPrimariesIncludingMeNewOneNewer) {}
+    TEST_F(UpdateHeartbeatDataTest, UpdateHeartbeatDataTwoPrimariesNewOneOlder) {
+        OpTime election = OpTime(5,0);
+        OpTime election2 = OpTime(4,0);
+        OpTime lastOpTimeApplied = OpTime(3,0);
 
-    TEST(TopologyCoordinator, UpdateHeartbeatDataPrimaryDownMajorityButIAmStarting) {}
-    TEST(TopologyCoordinator, UpdateHeartbeatDataPrimaryDownMajorityButIAmRecovering) {}
-    TEST(TopologyCoordinator, UpdateHeartbeatDataPrimaryDownMajorityButIHaveStepdownWait) {}
-    TEST(TopologyCoordinator, UpdateHeartbeatDataPrimaryDownMajorityButIArbiter) {}
+        ReplSetHeartbeatResponse::HeartbeatResultAction nextAction = 
+                updateHeartbeatUpData(1,
+                                      MemberState::RS_PRIMARY,
+                                      election,
+                                      election,
+                                      lastOpTimeApplied);
+        ASSERT_NO_ACTION(nextAction);
 
-    TEST(TopologyCoordinator, UpdateHeartbeatDataPrimaryDownMajority) {}
-    TEST(TopologyCoordinator, UpdateHeartbeatDataPrimaryDownNoMajority) {}
+        nextAction = updateHeartbeatUpData(2,
+                                           MemberState::RS_PRIMARY,
+                                           election2,
+                                           election,
+                                           lastOpTimeApplied);
+        ASSERT_NO_ACTION(nextAction);
+    }
+
+    TEST_F(UpdateHeartbeatDataTest, UpdateHeartbeatDataTwoPrimariesNewOneNewer) {
+        OpTime election = OpTime(4,0);
+        OpTime election2 = OpTime(5,0);
+        OpTime lastOpTimeApplied = OpTime(3,0);
+
+        ReplSetHeartbeatResponse::HeartbeatResultAction nextAction = 
+                updateHeartbeatUpData(1,
+                                      MemberState::RS_PRIMARY,
+                                      election,
+                                      election,
+                                      lastOpTimeApplied);
+        ASSERT_NO_ACTION(nextAction);
+
+        nextAction = updateHeartbeatUpData(2,
+                                           MemberState::RS_PRIMARY,
+                                           election2,
+                                           election,
+                                           lastOpTimeApplied);
+        ASSERT_NO_ACTION(nextAction);
+    }
+
+    TEST_F(UpdateHeartbeatDataTest, UpdateHeartbeatDataTwoPrimariesIncludingMeNewOneOlder) {
+        makeSelfPrimary(OpTime(5,0));
+
+        OpTime election = OpTime(4,0);
+        OpTime lastOpTimeApplied = OpTime(3,0);
+
+        ReplSetHeartbeatResponse::HeartbeatResultAction nextAction = 
+                updateHeartbeatUpData(1,
+                                      MemberState::RS_PRIMARY,
+                                      election,
+                                      election,
+                                      lastOpTimeApplied);
+        ASSERT_EQUALS(ReplSetHeartbeatResponse::StepDownRemotePrimary, nextAction);
+    }
+
+    TEST_F(UpdateHeartbeatDataTest, UpdateHeartbeatDataTwoPrimariesIncludingMeNewOneNewer) {
+        makeSelfPrimary(OpTime(2,0));
+
+        OpTime election = OpTime(4,0);
+        OpTime lastOpTimeApplied = OpTime(3,0);
+
+        ReplSetHeartbeatResponse::HeartbeatResultAction nextAction = 
+                updateHeartbeatUpData(1,
+                                      MemberState::RS_PRIMARY,
+                                      election,
+                                      election,
+                                      lastOpTimeApplied);
+        ASSERT_EQUALS(ReplSetHeartbeatResponse::StepDownSelf, nextAction);
+    }
+
+    TEST_F(UpdateHeartbeatDataTest, UpdateHeartbeatDataPrimaryDownNoMajority) {
+        setSelfMemberState(MemberState::RS_SECONDARY);
+
+        OpTime election = OpTime(4,0);
+        OpTime lastOpTimeApplied = OpTime(3,0);
+
+        ReplSetHeartbeatResponse::HeartbeatResultAction nextAction = 
+                updateHeartbeatUpData(1,
+                                      MemberState::RS_PRIMARY,
+                                      election,
+                                      election,
+                                      lastOpTimeApplied);
+        ASSERT_NO_ACTION(nextAction);
+
+        nextAction = updateHeartbeatDownData(1, lastOpTimeApplied);
+        ASSERT_NO_ACTION(nextAction);
+    }
+
+    TEST_F(UpdateHeartbeatDataTest, UpdateHeartbeatDataPrimaryDownMajorityButNoPriority) {
+        setSelfMemberState(MemberState::RS_SECONDARY);
+
+        updateConfig(BSON("_id" << "rs0" <<
+                          "version" << 5 <<
+                          "members" << BSON_ARRAY(
+                              BSON("_id" << 0 << "host" << "host1:27017" << "priority" << 0) <<
+                              BSON("_id" << 1 << "host" << "host2:27017") <<
+                              BSON("_id" << 2 << "host" << "host3:27017"))),
+                     0);
+
+        OpTime election = OpTime(4,0);
+        OpTime lastOpTimeApplied = OpTime(3,0);
+
+        ReplSetHeartbeatResponse::HeartbeatResultAction nextAction = 
+                updateHeartbeatUpData(1,
+                                      MemberState::RS_PRIMARY,
+                                      election,
+                                      election,
+                                      lastOpTimeApplied);
+        ASSERT_NO_ACTION(nextAction);
+
+        nextAction = updateHeartbeatUpData(2,
+                                           MemberState::RS_SECONDARY,
+                                           election,
+                                           election,
+                                           lastOpTimeApplied);
+        ASSERT_NO_ACTION(nextAction);
+
+        nextAction = updateHeartbeatDownData(1, lastOpTimeApplied);
+        ASSERT_NO_ACTION(nextAction);
+    }
+
+    TEST_F(UpdateHeartbeatDataTest, UpdateHeartbeatDataPrimaryDownMajorityButIAmStarting) {
+        setSelfMemberState(MemberState::RS_STARTUP);
+
+        OpTime election = OpTime(4,0);
+        OpTime lastOpTimeApplied = OpTime(3,0);
+
+        ReplSetHeartbeatResponse::HeartbeatResultAction nextAction = 
+                updateHeartbeatUpData(1,
+                                      MemberState::RS_PRIMARY,
+                                      election,
+                                      election,
+                                      lastOpTimeApplied);
+        ASSERT_NO_ACTION(nextAction);
+
+        nextAction = updateHeartbeatUpData(2,
+                                           MemberState::RS_SECONDARY,
+                                           election,
+                                           election,
+                                           lastOpTimeApplied);
+        ASSERT_NO_ACTION(nextAction);
+
+        nextAction = updateHeartbeatDownData(1, lastOpTimeApplied);
+        ASSERT_NO_ACTION(nextAction);
+    }
+
+    TEST_F(UpdateHeartbeatDataTest, UpdateHeartbeatDataPrimaryDownMajorityButIAmRecovering) {
+        setSelfMemberState(MemberState::RS_RECOVERING);
+
+        OpTime election = OpTime(4,0);
+        OpTime lastOpTimeApplied = OpTime(3,0);
+
+        ReplSetHeartbeatResponse::HeartbeatResultAction nextAction = 
+                updateHeartbeatUpData(1,
+                                      MemberState::RS_PRIMARY,
+                                      election,
+                                      election,
+                                      lastOpTimeApplied);
+        ASSERT_NO_ACTION(nextAction);
+
+        nextAction = updateHeartbeatDownData(1, lastOpTimeApplied);
+        ASSERT_NO_ACTION(nextAction);
+    }
+
+    TEST_F(UpdateHeartbeatDataTest, UpdateHeartbeatDataPrimaryDownMajorityButIHaveStepdownWait) {
+        setSelfMemberState(MemberState::RS_SECONDARY);
+
+        OpTime election = OpTime(4,0);
+        OpTime lastOpTimeApplied = OpTime(3,0);
+
+        ReplSetHeartbeatResponse::HeartbeatResultAction nextAction = 
+                updateHeartbeatUpData(1,
+                                      MemberState::RS_PRIMARY,
+                                      election,
+                                      election,
+                                      lastOpTimeApplied);
+        ASSERT_NO_ACTION(nextAction);
+
+        nextAction = updateHeartbeatUpData(2,
+                                           MemberState::RS_SECONDARY,
+                                           election,
+                                           election,
+                                           lastOpTimeApplied);
+        ASSERT_NO_ACTION(nextAction);
+
+        // freeze node to set stepdown wait
+        Status result = Status::OK();
+        BSONObjBuilder response;
+        getTopoCoord().prepareFreezeResponse(cbData(), now()++, 20, &response, &result);
+
+        nextAction = updateHeartbeatDownData(1, lastOpTimeApplied);
+        ASSERT_NO_ACTION(nextAction);
+    }
+
+    TEST_F(UpdateHeartbeatDataTest, UpdateHeartbeatDataPrimaryDownMajorityButIArbiter) {
+        updateConfig(BSON("_id" << "rs0" <<
+                          "version" << 5 <<
+                          "members" << BSON_ARRAY(
+                              BSON("_id" << 0 << "host" << "host1:27017" <<
+                                   "arbiterOnly" << true) <<
+                              BSON("_id" << 1 << "host" << "host2:27017"))),
+                     0);
+
+        OpTime election = OpTime(4,0);
+        OpTime lastOpTimeApplied = OpTime(3,0);
+
+        ReplSetHeartbeatResponse::HeartbeatResultAction nextAction = 
+                updateHeartbeatUpData(1,
+                                      MemberState::RS_PRIMARY,
+                                      election,
+                                      election,
+                                      lastOpTimeApplied);
+        ASSERT_NO_ACTION(nextAction);
+
+        nextAction = updateHeartbeatDownData(1, lastOpTimeApplied);
+        ASSERT_NO_ACTION(nextAction);
+    }
+
+    TEST_F(UpdateHeartbeatDataTest, UpdateHeartbeatDataPrimaryDownMajority) {
+        setSelfMemberState(MemberState::RS_SECONDARY);
+
+        OpTime election = OpTime(4,0);
+        OpTime lastOpTimeApplied = OpTime(3,0);
+
+        ReplSetHeartbeatResponse::HeartbeatResultAction nextAction = 
+                updateHeartbeatUpData(1,
+                                      MemberState::RS_PRIMARY,
+                                      election,
+                                      election,
+                                      lastOpTimeApplied);
+        ASSERT_NO_ACTION(nextAction);
+
+        nextAction = updateHeartbeatUpData(2,
+                                           MemberState::RS_SECONDARY,
+                                           election,
+                                           election,
+                                           lastOpTimeApplied);
+        ASSERT_NO_ACTION(nextAction);
+
+        nextAction = updateHeartbeatDownData(1, lastOpTimeApplied);
+        ASSERT_EQUALS(ReplSetHeartbeatResponse::StartElection, nextAction);
+    }
 
     class PrepareElectResponseTest : public TopoCoordTest {
     public:
