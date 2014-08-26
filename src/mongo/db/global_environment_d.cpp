@@ -69,7 +69,7 @@ namespace mongo {
 
         const StorageEngine::Factory* factory = _storageFactories[name];
 
-        uassert(18530, "cannot start database with an unknown storage engine: " + name, factory);
+        uassert(18656, "cannot start database with an unknown storage engine: " + name, factory);
         globalStorageEngine = factory->create(storageGlobalParams);
     }
 
