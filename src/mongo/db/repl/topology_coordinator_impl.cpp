@@ -1130,7 +1130,15 @@ namespace repl {
              it != _currentConfig.membersEnd();
              ++it, ++index) {
             // C++11: use emplace_back()
-            _hbdata.push_back(MemberHeartbeatData(index));
+            if (index == selfIndex) {
+                // special case for ourself since we need to be "up" (health > 0) for vote counting
+                MemberHeartbeatData self = MemberHeartbeatData(index);
+                self.setUpValues(now, _memberState, OpTime(0,0), OpTime(0,0), "", "");
+                _hbdata.push_back(self);
+            }
+            else {
+                _hbdata.push_back(MemberHeartbeatData(index));
+            }
         }
 
         chooseNewSyncSource(now, lastOpApplied);
