@@ -222,23 +222,32 @@ namespace mongo {
     // ClientCursorMonitor
     //
 
-    void ClientCursorMonitor::run() {
-        Client::initThread("clientcursormon");
-        Client& client = cc();
-        Timer t;
-        const int Secs = 4;
-        while (!inShutdown()) {
-            OperationContextImpl txn;
-            cursorStatsTimedOut.increment(
-                        CollectionCursorCache::timeoutCursorsGlobal(&txn, t.millisReset()));
-            sleepsecs(Secs);
+    /**
+     * Thread for timing out old cursors
+     */
+    class ClientCursorMonitor : public BackgroundJob {
+    public:
+        std::string name() const { return "ClientCursorMonitor"; }
+
+        void run() {
+            Client::initThread("clientcursormon");
+            Client& client = cc();
+            Timer t;
+            const int Secs = 4;
+            while (!inShutdown()) {
+                OperationContextImpl txn;
+                cursorStatsTimedOut.increment(
+                    CollectionCursorCache::timeoutCursorsGlobal(&txn, t.millisReset()));
+                sleepsecs(Secs);
+            }
+            client.shutdown();
         }
-        client.shutdown();
-    }
+    };
 
     namespace {
-        ClientCursorMonitor clientCursorMonitor;
-        
+        // Only one instance of the ClientCursorMonitor exists
+        ClientCursorMonitor clientCursorMonitor = ClientCursorMonitor();
+
         void _appendCursorStats( BSONObjBuilder& b ) {
             b.append( "note" , "deprecated, use server status metrics" );
             b.appendNumber("clientCursors_size", cursorStatsOpen.get() );
@@ -247,6 +256,10 @@ namespace mongo {
             b.appendNumber("totalNoTimeout", cursorStatsOpenNoTimeout.get() );
             b.appendNumber("timedOut" , cursorStatsTimedOut.get());
         }
+    }
+
+    void startClientCursorMonitor() {
+        clientCursorMonitor.go();
     }
 
     // QUESTION: Restrict to the namespace from which this command was issued?

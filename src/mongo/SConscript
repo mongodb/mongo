@@ -560,7 +560,6 @@ env.Library('global_environment_experiment',
 # libs.
 serverOnlyFiles = [ "db/curop.cpp",
                     "db/global_environment_d.cpp",
-                    "db/d_globals.cpp",
                     "util/compress.cpp",
                     "db/ttl.cpp",
                     "util/logfile.cpp",
