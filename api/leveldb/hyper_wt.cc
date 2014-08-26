@@ -64,7 +64,7 @@ class ReplayIteratorImpl : public ReplayIterator {
 
   // An iterator is either positioned at a deleted key, present key/value pair,
   // or not valid.  This method returns true iff the iterator is valid.
-  virtual bool Valid() { return valid_; }
+  virtual bool Valid();
 
   // Moves to the next entry in the source.  After this call, Valid() is
   // true iff the iterator was not positioned at the last entry in the source.
@@ -157,6 +157,14 @@ class ReplayIteratorImpl : public ReplayIterator {
   uint32_t fileid, opcount, optype, rectype;
 };
 
+bool
+ReplayIteratorImpl::Valid() {
+	// If we're invalid and at the end, try again.
+	if (valid_ == false && cursor_ != NULL && status_.IsNotFound())
+		Next();
+	return valid_;
+}
+
 void
 ReplayIteratorImpl::Next() {
 	int ret = 0;
@@ -181,7 +189,10 @@ ReplayIteratorImpl::Next() {
 		status_ = WiredTigerErrorToStatus(ret);
 		if (ret != 0) {
 			valid_ = false;
-			ret = Close();
+			if (ret != WT_NOTFOUND)
+				ret = Close();
+			else
+				ret = 0;
 			assert(ret == 0);
 		}
 	}

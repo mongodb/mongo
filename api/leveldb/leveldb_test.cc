@@ -93,6 +93,12 @@ extern "C" int main() {
     cout << replay_start->key().ToString() << ": " << replay_start->value().ToString() << endl;
     replay_start->Next();
   }
+  // We reached the end of log, iterator should still not be valid.
+  // But if we write something, the iterator should find it and become
+  // valid again.
+  assert(!replay_start->Valid());
+  s = db->Put(leveldb::WriteOptions(), "key6", "value6");
+  assert(replay_start->Valid());
   db->ReleaseReplayIterator(replay_start);
   db->ReleaseReplayIterator(replay_ts);
   db->ReleaseReplayIterator(replay_now);
