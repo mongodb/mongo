@@ -104,14 +104,16 @@ namespace {
             const ReplSettings& settings,
             ReplicationCoordinatorExternalState* externalState,
             ReplicationExecutor::NetworkInterface* network,
-            TopologyCoordinator* topCoord) :
+            TopologyCoordinator* topCoord,
+            int64_t prngSeed) :
         _settings(settings),
         _topCoord(topCoord),
         _replExecutor(network),
         _externalState(externalState),
         _inShutdown(false),
         _rsConfigState(kConfigStartingUp),
-        _thisMembersConfigIndex(-1) {
+        _thisMembersConfigIndex(-1),
+        _random(prngSeed) {
 
         if (!isReplEnabled()) {
             return;

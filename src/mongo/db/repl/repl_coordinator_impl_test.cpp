@@ -93,13 +93,18 @@ namespace {
         void init() {
             invariant(!_repl);
             invariant(!_callShutdown);
+
+            // PRNG seed for tests.
+            const int64_t seed = 0;
+
             _topo = new TopologyCoordinatorImpl(zeroSecs);
             _net = new NetworkInterfaceMockWithMap;
             _externalState = new ReplicationCoordinatorExternalStateMock;
             _repl.reset(new ReplicationCoordinatorImpl(_settings,
                                                        _externalState,
                                                        _net,
-                                                       _topo));
+                                                       _topo,
+                                                       seed));
         }
 
         void init(ReplSettings settings) {

@@ -42,6 +42,7 @@
 #include "mongo/db/repl/repl_coordinator_external_state.h"
 #include "mongo/db/repl/replica_set_config.h"
 #include "mongo/db/repl/replication_executor.h"
+#include "mongo/platform/random.h"
 #include "mongo/platform/unordered_map.h"
 #include "mongo/util/net/hostandport.h"
 
@@ -61,7 +62,8 @@ namespace repl {
         ReplicationCoordinatorImpl(const ReplSettings& settings,
                                    ReplicationCoordinatorExternalState* externalState,
                                    ReplicationExecutor::NetworkInterface* network,
-                                   TopologyCoordinator* topoCoord);
+                                   TopologyCoordinator* topoCoord,
+                                   int64_t prngSeed);
         virtual ~ReplicationCoordinatorImpl();
 
         // ================== Members of public ReplicationCoordinator API ===================
@@ -448,6 +450,10 @@ namespace repl {
 
         // This member's index position in the current config.
         int _thisMembersConfigIndex;
+
+        // PRNG; seeded at class construction time.
+        PseudoRandom _random;
+
     };
 
 } // namespace repl

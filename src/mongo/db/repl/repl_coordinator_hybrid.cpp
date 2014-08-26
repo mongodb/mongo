@@ -50,7 +50,8 @@ namespace repl {
         _impl(settings,
               new ReplicationCoordinatorExternalStateImpl,
               new NetworkInterfaceImpl,
-              new TopologyCoordinatorImpl(Seconds(maxSyncSourceLagSecs))) {
+              new TopologyCoordinatorImpl(Seconds(maxSyncSourceLagSecs)),
+              static_cast<int64_t>(curTimeMillis64())) {
         getGlobalEnvironment()->registerKillOpListener(&_impl);
     }
 
