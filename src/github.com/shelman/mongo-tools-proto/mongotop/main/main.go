@@ -64,6 +64,7 @@ func main() {
 		Outputter:       &output.TerminalOutputter{},
 		SessionProvider: sessionProvider,
 		Sleeptime:       time.Duration(sleeptime) * time.Second,
+		Once:            outputOpts.Once,
 	}
 
 	// kick it off

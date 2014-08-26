@@ -29,6 +29,9 @@ type MongoTop struct {
 
 	// the sleep time
 	Sleeptime time.Duration
+
+	// just run once and finish
+	Once bool
 }
 
 // Connect to the database and spin, running the top command and outputting
@@ -93,6 +96,10 @@ func (self *MongoTop) Run() error {
 
 		// update the previous results
 		previousResults = topResults
+
+		if self.Once {
+			return nil
+		}
 
 	}
 
