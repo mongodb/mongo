@@ -479,16 +479,28 @@ namespace mongo {
         WT_CURSOR *c = _cursor.Get();
         int ret = c->reset(c);
         invariant(ret == 0);
-        _eof = true;
+        _eof = _savedAtEnd = true;
     }
 
     void WiredTigerRecordStore::Iterator::saveState() {
-        // TODO delete iterator, store information
+        if ((_savedAtEnd = isEOF()) == false)
+            _savedLoc = curr();
     }
 
     bool WiredTigerRecordStore::Iterator::restoreState() {
         // TODO set iterator to same place as before, but with new snapshot
-        return true;
+        if (_savedAtEnd)
+            _eof = true;
+        else {
+            WT_CURSOR *c = _cursor.Get();
+            c->set_key(c, _makeKey(_savedLoc));
+            int cmp, ret = c->search_near(c, &cmp);
+            if (ret == 0 && cmp < 0)
+                ret = c->next(c);
+            invariant(ret == 0 || ret == WT_NOTFOUND);
+            _eof = (ret == WT_NOTFOUND);
+        }
+        return _eof;
     }
 
     RecordData WiredTigerRecordStore::Iterator::dataFor( const DiskLoc& loc ) const {

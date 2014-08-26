@@ -173,6 +173,10 @@ namespace mongo {
             CollectionScanParams::Direction _dir;
             WiredTigerCursor _cursor;
             bool _eof;
+
+            // Position for save/restore
+            DiskLoc _savedLoc;
+            bool _savedAtEnd;
         };
 
         static WiredTigerRecoveryUnit* _getRecoveryUnit( OperationContext* txn );
