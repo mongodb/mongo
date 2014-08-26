@@ -57,8 +57,8 @@ be given names by the application.  Checkpoints named by the application
 persist until explicitly discarded or the application creates a new
 checkpoint with the same name (which replaces the previous checkpoint
 of that name). If the previous checkpoint cannot be replaced, either
-because a cursor is reading from the previous checkpoint, or hot backups
-are in progress, the checkpoint will fail.  Because named checkpoints
+because a cursor is reading from the previous checkpoint, or backups are
+in progress, the checkpoint will fail.  Because named checkpoints
 persist until discarded or replaced, they can be used to periodically
 snapshot data for later use.
 

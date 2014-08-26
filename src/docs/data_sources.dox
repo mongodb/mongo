@@ -19,8 +19,8 @@ cursor types that give access to data managed by WiredTiger:
 <table>
 @hrow{URI, Type, Notes}
 @row{<tt>backup:</tt>,
-	hot backup cursor,
-	key=<code>string</code>\, see @ref hot_backup for details}
+	backup cursor,
+	key=<code>string</code>\, see @ref backup for details}
 @row{<code>log:</code>,
 	log cursor,
 	key=<code>(long fileID\, long offset\, int seqno)</code>\,<br>

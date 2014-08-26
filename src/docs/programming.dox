@@ -30,9 +30,9 @@ each of which is ordered by one or more columns.
 <h2>Advanced features</h2>
 - @subpage checkpoint
 - @subpage durability
+- @subpage backup
 - @subpage async
 - @subpage compaction
-- @subpage hot_backup
 - @subpage statistics
 - @subpage shared_cache
 - @subpage cursor_log

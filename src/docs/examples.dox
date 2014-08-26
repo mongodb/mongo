@@ -3,7 +3,7 @@
 Create, insert and access a simple table.
 
 @example ex_async.c
-Show hot to configure and use asynchronous operations.
+Show how to configure and use asynchronous operations.
 
 @example ex_call_center.c
 A more complex schema based on a call center example, showing how to map

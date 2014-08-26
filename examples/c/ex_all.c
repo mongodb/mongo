@@ -45,12 +45,12 @@
 
 int add_collator(WT_CONNECTION *conn);
 int add_extractor(WT_CONNECTION *conn);
+int backup(WT_SESSION *session);
 int checkpoint_ops(WT_SESSION *session);
 int connection_ops(WT_CONNECTION *conn);
 int cursor_ops(WT_SESSION *session);
 int cursor_search_near(WT_CURSOR *cursor);
 int cursor_statistics(WT_SESSION *session);
-int hot_backup(WT_SESSION *session);
 int pack_ops(WT_SESSION *session);
 int session_ops(WT_SESSION *session);
 int transaction_ops(WT_CONNECTION *conn, WT_SESSION *session);
@@ -901,11 +901,11 @@ pack_ops(WT_SESSION *session)
 }
 
 int
-hot_backup(WT_SESSION *session)
+backup(WT_SESSION *session)
 {
 	char buf[1024];
 
-	/*! [Hot backup]*/
+	/*! [backup]*/
 	WT_CURSOR *cursor;
 	const char *filename;
 	int ret;
@@ -913,7 +913,7 @@ hot_backup(WT_SESSION *session)
 	/* Create the backup directory. */
 	ret = mkdir("/path/database.backup", 077);
 
-	/* Open the hot backup data source. */
+	/* Open the backup data source. */
 	ret = session->open_cursor(session, "backup:", NULL, NULL, &cursor);
 
 	/* Copy the list of files. */
@@ -932,11 +932,11 @@ hot_backup(WT_SESSION *session)
 		    progname, wiredtiger_strerror(ret));
 
 	ret = cursor->close(cursor);
-	/*! [Hot backup]*/
+	/*! [backup]*/
 
-	/*! [Hot backup of a checkpoint]*/
+	/*! [backup of a checkpoint]*/
 	ret = session->checkpoint(session, "drop=(from=June01),name=June01");
-	/*! [Hot backup of a checkpoint]*/
+	/*! [backup of a checkpoint]*/
 
 	return (ret);
 }

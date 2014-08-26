@@ -48,15 +48,27 @@ checkpoints bound the time required for recovery to complete after
 application or system failure by limiting the log records that need to
 be processed.
 
-@section durability_hotbackup Hot backup with logging
+@section durability_backup Backups
 
-With logging enabled, backups where not all database objects are copied
-may result in error messages during recovery, because data files
-referenced in the logs might not be found.  Applications should either
-copy all objects and log files if commit-level durability of the copied
-database is required, or alternatively, copy only selected objects when
-backing up and not copy log files at all, then fall back to checkpoint
-durability when using the hot backup.
+With logging enabled, partial backups (backups where not all of the
+database objects are copied), may result in error messages during
+recovery, because data files referenced in the logs might not be found.
+Applications should either copy all objects and log files if
+commit-level durability of the copied database is required, or
+alternatively, copy only selected objects when backing up and not copy
+log files at all, then fall back to checkpoint durability when switching
+to the backup.
+
+@section durability_bulk Bulk loads
+
+Bulk-loads are not commit-level durable, that is, the creation and
+subsequent bulk-load of an object will not appear in the database log
+files.  For this reason, applications doing incremental log archival
+after a backup should create a new copy of the data files after a
+bulk-load to make the bulk-load durable. In addition, incremental log
+archival after a bulk-load can cause recovery to report errors because
+there are log records that apply to data files which don't appear in the
+backup.
 
 @section durability_archiving Log file archival
 
@@ -68,11 +80,11 @@ to ::wiredtiger_open.
 
 By default, WiredTiger automatically removes log files no longer
 required for recovery.  Applications wanting to archive log files
-instead can disable log file removal using the \c log=(archive=false)
+instead must disable log file removal using the \c log=(archive=false)
 configuration to ::wiredtiger_open.
 
 Log files may be removed or archived after a checkpoint has completed,
-as long as no hot backup is in progress.  After the checkpoint has
+as long as there's not a backup in progress.  After the checkpoint has
 completed, only the most recent log file is needed for recovery, and all
 other log files can be removed or archived.  Note that there must always
 be at least one log file for the database.
@@ -85,4 +97,4 @@ be at least one log file for the database.
 @subsection durability_flush_config Flush call configuration
 @copydoc doc_tune_durability_flush_config
 
-*/
+ */
