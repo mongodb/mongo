@@ -70,7 +70,12 @@ namespace repl {
 
     class TopologyCoordinatorImpl : public TopologyCoordinator {
     public:
-        explicit TopologyCoordinatorImpl(Seconds maxSyncSourceLagSecs);
+        /**
+         * Constructs a Topology Coordinator object.
+         * @param maxSyncSourceLagSecs a sync source is re-evaluated after it lags behind further
+         *                             than this amount.
+         **/
+        TopologyCoordinatorImpl(Seconds maxSyncSourceLagSecs);
 
         // TODO(spencer): Can this be made private?
         virtual void setForceSyncSourceIndex(int index);
@@ -170,6 +175,17 @@ namespace repl {
         // TODO(spencer): Remove this once we can easily call for an election in unit tests to
         // set the current primary.
         void _setCurrentPrimaryForTest(int primaryIndex);
+        
+        // Retrieves a vector of HostAndPorts containing only nodes that are not DOWN
+        // and are not ourselves.
+        virtual std::vector<HostAndPort> getMaybeUpHostAndPorts() const;
+
+        // If the lastVote tracker allows the current node to vote for itself, updates the 
+        // lastVote tracker and returns true.  Otherwise, returns false.
+        virtual bool voteForMyself(Date_t now);
+
+        // Sets _stepDownTime to newTime.  newTime must be strictly later than _stepDownTime.
+        virtual void setStepDownTime(Date_t newTime);
 
     private:
 
@@ -224,12 +240,9 @@ namespace repl {
         // Scans through all members that are 'up' and return the latest known optime
         OpTime _latestKnownOpTime() const;
 
-        // Begins election proceedings
-        void _electSelf(Date_t now);
-
         // Scans the electable set and returns the highest priority member index
         int _getHighestPriorityElectableIndex() const;
-
+        
         // Returns true if "one" member is higher priority than "two" member
         bool _isMemberHigherPriority(int memberOneIndex, int memberTwoIndex) const;
 
@@ -273,9 +286,6 @@ namespace repl {
             if ( time(0)-_hbmsgTime > 120 ) return "";
             return _hbmsg;
         }
-
-        // Flag to prevent re-entering election code
-        bool _busyWithElectSelf;
 
         int _selfIndex; // this node's index in _members and _currentConfig
 
@@ -330,12 +340,14 @@ namespace repl {
 
         // Last vote info from the election
         struct LastVote {
-            LastVote() : when(0), whoID(0xffffffff) { }
+
+            static const Seconds leaseTime;
+
+            LastVote() : when(0), whoId(-1) { }
             Date_t when;
-            unsigned whoID;
+            int whoId;
             HostAndPort whoHostAndPort;
         } _lastVote;
-
 
     };
 

@@ -30,7 +30,7 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/db/repl/topology_elect_cmd_runner.h"
+#include "mongo/db/repl/elect_cmd_runner.h"
 
 #include "mongo/base/status.h"
 #include "mongo/db/repl/member_heartbeat_data.h"
@@ -50,7 +50,7 @@ namespace repl {
         const ReplicationExecutor::EventHandle& evh,
         const ReplicaSetConfig& currentConfig,
         int selfIndex,
-        const std::vector<MemberHeartbeatData>& hbdata) {
+        const std::vector<HostAndPort>& hosts) {
 
         _sufficientResponsesReceived = evh;
         
@@ -66,28 +66,24 @@ namespace repl {
                                        "round" << OID::gen());
 
         // Schedule a RemoteCommandRequest for each non-DOWN node
-        for (std::vector<MemberHeartbeatData>::const_iterator it = hbdata.begin(); 
-             it != hbdata.end(); 
+        for (std::vector<HostAndPort>::const_iterator it = hosts.begin(); 
+             it != hosts.end(); 
              ++it) {
-            if (it->getConfigIndex() == selfIndex) {
-                continue;    // skip ourselves
-            }
-            if (!it->maybeUp()) {
-                continue;    // skip DOWN nodes
-            }
             const StatusWith<ReplicationExecutor::CallbackHandle> cbh =
                 executor->scheduleRemoteCommand(
                     ReplicationExecutor::RemoteCommandRequest(
-                        currentConfig.getMemberAt(it->getConfigIndex()).getHostAndPort(),
+                        *it,
                         "admin",
                         replSetElectCmd,
                         Milliseconds(30*1000)),   // trying to match current Socket timeout
                     stdx::bind(&ElectCmdRunner::_onReplSetElectResponse,
                                this,
                                stdx::placeholders::_1));
-            if (!cbh.isOK()) {
+            if (cbh.getStatus() == ErrorCodes::ShutdownInProgress) {
                 return cbh.getStatus();
             }
+            fassert(18683, cbh.getStatus());
+
             _responseCallbacks.push_back(cbh.getValue());
         }
         

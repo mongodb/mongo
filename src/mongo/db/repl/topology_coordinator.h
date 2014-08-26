@@ -151,6 +151,17 @@ namespace repl {
         // Record a "ping" based on the round-trip time of the heartbeat for the member
         virtual void recordPing(const HostAndPort& host, const Milliseconds elapsedMillis) = 0;
 
+        // Retrieves a vector of HostAndPorts containing only nodes that are not DOWN
+        // and are not ourselves.
+        virtual std::vector<HostAndPort> getMaybeUpHostAndPorts() const = 0;
+
+        // If we can vote for ourselves, updates the lastVote tracker and returns true.
+        // If we cannot vote for ourselves (because we already voted too recently), returns false.
+        virtual bool voteForMyself(Date_t now) = 0;
+
+        // Sets _stepDownTime to newTime.
+        virtual void setStepDownTime(Date_t newTime) = 0;
+
     protected:
         TopologyCoordinator() {}
     };

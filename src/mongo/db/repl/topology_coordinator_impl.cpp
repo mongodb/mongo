@@ -43,10 +43,13 @@
 #include "mongo/db/server_parameters.h"
 #include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
+#include "mongo/util/scopeguard.h"
 
 namespace mongo {
 
 namespace repl {
+
+    const Seconds TopologyCoordinatorImpl::LastVote::leaseTime = Seconds(3);
 
     PingStats::PingStats() : count(0), value(std::numeric_limits<unsigned int>::max()) {
     }
@@ -63,7 +66,6 @@ namespace repl {
         _syncSourceIndex(-1),
         _forceSyncSourceIndex(-1),
         _maxSyncSourceLagSecs(maxSyncSourceLagSecs),
-        _busyWithElectSelf(false),
         _selfIndex(0),
         _blockSync(false),
         _maintenanceModeCalls(0)
@@ -252,29 +254,6 @@ namespace repl {
         // XXX Eric: what to do here?
     }
 
-    // election entry point
-    void TopologyCoordinatorImpl::_electSelf(Date_t now) {
-        verify( !_selfConfig().isArbiter() );
-        verify( _selfConfig().getSlaveDelay() == Seconds(0) );
-/*
-        try {
-            // XXX Eric
-            //            _electSelf(now);
-        }
-        catch (RetryAfterSleepException&) {
-            throw;
-        }
-        catch (VoteException& ) { // Eric: XXX
-            log() << "replSet not trying to elect self as responded yea to someone else recently";
-        }
-        catch (const DBException& e) {
-            log() << "replSet warning caught unexpected exception in electSelf() " << e.toString();
-        }
-        catch (...) {
-            log() << "replSet warning caught unexpected exception in electSelf()";
-        }
-*/
-    }
 
     void TopologyCoordinatorImpl::prepareSyncFromResponse(
             const ReplicationExecutor::CallbackData& data,
@@ -463,10 +442,6 @@ namespace repl {
         return false;
     }
 
-    namespace {
-        const Seconds LeaseTime(3);
-    } // namespace
-
     // produce a reply to a received electCmd
     void TopologyCoordinatorImpl::prepareElectResponse(
             const ReplicationExecutor::CallbackData& data,
@@ -519,20 +494,20 @@ namespace repl {
                   << highestPriority->getHostAndPort().toString();
             vote = -10000;
         }
-        else if (_lastVote.when > 0 &&
-                _lastVote.when.millis + LeaseTime.total_milliseconds() >= now.millis &&
-                _lastVote.whoID != args.whoid) {
-            log() << "replSetElect voting no for "
+        else if (_lastVote.when.millis > 0 &&
+                 _lastVote.when.millis + LastVote::leaseTime.total_milliseconds() >= now.millis &&
+                 _lastVote.whoId != args.whoid) {
+            log() << "replSet voting no for "
                   <<  hopeful->getHostAndPort().toString()
                   << "; voted for " << _lastVote.whoHostAndPort.toString() << ' '
                   << (now.millis - _lastVote.when.millis) / 1000 << " secs ago";
         }
         else {
             _lastVote.when = now;
-            _lastVote.whoID = args.whoid;
+            _lastVote.whoId = args.whoid;
             _lastVote.whoHostAndPort = hopeful->getHostAndPort();
             vote = _selfConfig().getNumVotes();
-            invariant(hopeful->getId() == static_cast<int>(args.whoid));
+            invariant(hopeful->getId() == args.whoid);
             log() << "replSetElect voting yea for " << hopeful->getHostAndPort().toString()
                   << " (" << args.whoid << ')';
         }
@@ -661,9 +636,6 @@ namespace repl {
                 break;
             }
         }
-
-        // Don't bother to make any changes if we are an election candidate
-        if (_busyWithElectSelf) return ReplSetHeartbeatResponse::NoAction;
 
         // check if we should ask the primary (possibly ourselves) to step down
         int highestPriorityIndex = _getHighestPriorityElectableIndex();
@@ -830,9 +802,6 @@ namespace repl {
         switch (myUnelectableReason){
             case None:
                 // All checks passed, become a candidate and start election proceedings.
-
-                // don't try to do further elections & such while we are already working on one.
-                _busyWithElectSelf = true;
                 return ReplSetHeartbeatResponse::StartElection;
             default:
                 return ReplSetHeartbeatResponse::NoAction;
@@ -1082,6 +1051,7 @@ namespace repl {
         */
         *result = Status::OK();
     }
+
     void TopologyCoordinatorImpl::prepareFreezeResponse(
             const ReplicationExecutor::CallbackData& data,
             Date_t now,
@@ -1103,7 +1073,7 @@ namespace repl {
                 response->append("warning", "you really want to freeze for only 1 second?");
 
             if (_memberState != MemberState::RS_PRIMARY) {
-                _stepDownUntil = now + secs;
+                setStepDownTime(now + (secs * 1000));
                 log() << "replSet info 'freezing' for " << secs << " seconds";
             }
             else {
@@ -1111,6 +1081,11 @@ namespace repl {
             }
         }
         *result = Status::OK();
+    }
+
+    void TopologyCoordinatorImpl::setStepDownTime(Date_t newTime) {
+        invariant(newTime > _stepDownUntil);
+        _stepDownUntil = newTime;
     }
 
     // This function installs a new config object and recreates MemberHeartbeatData objects
@@ -1268,6 +1243,37 @@ namespace repl {
             it++;
         }
         return totalPings;
+    }
+
+    std::vector<HostAndPort> TopologyCoordinatorImpl::getMaybeUpHostAndPorts() const {
+        std::vector<HostAndPort> upHosts;
+        for (std::vector<MemberHeartbeatData>::const_iterator it = _hbdata.begin(); 
+             it != _hbdata.end(); 
+             ++it) {
+            if (it->getConfigIndex() == _selfIndex) {
+                continue;    // skip ourselves
+            }
+            if (!it->maybeUp()) {
+                continue;    // skip DOWN nodes
+            }
+
+            upHosts.push_back(_currentConfig.getMemberAt(it->getConfigIndex()).getHostAndPort());
+        }
+        return upHosts;
+    }
+
+    bool TopologyCoordinatorImpl::voteForMyself(Date_t now) {
+        int selfId = _currentConfig.getMemberAt(_selfIndex).getId();
+        if ((_lastVote.when + LastVote::leaseTime.total_milliseconds() >= now) 
+            && (_lastVote.whoId != selfId)) {
+            log() << "replSet not voting yea for " << selfId <<
+                " voted for " << _lastVote.whoHostAndPort.toString() << ' ' << 
+                (now - _lastVote.when) / 1000 << " secs ago";
+            return false;
+        }
+        _lastVote.when = now;
+        _lastVote.whoId = selfId;
+        return true;
     }
 
 } // namespace repl

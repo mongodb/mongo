@@ -37,7 +37,7 @@
 #include "mongo/db/repl/network_interface_mock.h"
 #include "mongo/db/repl/replica_set_config.h"
 #include "mongo/db/repl/replication_executor.h"
-#include "mongo/db/repl/topology_elect_cmd_runner.h"
+#include "mongo/db/repl/freshness_checker.h"
 #include "mongo/stdx/functional.h"
 #include "mongo/unittest/unittest.h"
 
@@ -47,15 +47,16 @@ namespace {
 
     typedef ReplicationExecutor::RemoteCommandRequest RemoteCommandRequest;
 
-    class ElectCmdRunnerTest : public mongo::unittest::Test {
+    class FreshnessCheckerTest : public mongo::unittest::Test {
     public:
-        ElectCmdRunnerTest();
-        void electCmdRunnerRunner(const ReplicationExecutor::CallbackData& data,
-                                  ElectCmdRunner* electCmdRunner,
-                                  const ReplicationExecutor::EventHandle& evh,
-                                  const ReplicaSetConfig& currentConfig,
-                                  int selfIndex,
-                                  const std::vector<MemberHeartbeatData>& hbData);
+        FreshnessCheckerTest();
+        void freshnessCheckerRunner(const ReplicationExecutor::CallbackData& data,
+                                    FreshnessChecker* checker,
+                                    const ReplicationExecutor::EventHandle& evh,
+                                    const OpTime& lastOpTimeApplied, 
+                                    const ReplicaSetConfig& currentConfig,
+                                    int selfIndex,
+                                    const std::vector<HostAndPort>& hosts);
     protected:
         NetworkInterfaceMockWithMap* _net;
         boost::scoped_ptr<ReplicationExecutor> _executor;
@@ -67,16 +68,16 @@ namespace {
         void tearDown();
     };
 
-    ElectCmdRunnerTest::ElectCmdRunnerTest() : _lastStatus(Status::OK()) {}
+    FreshnessCheckerTest::FreshnessCheckerTest() : _lastStatus(Status::OK()) {}
 
-    void ElectCmdRunnerTest::setUp() {
+    void FreshnessCheckerTest::setUp() {
         _net = new NetworkInterfaceMockWithMap;
         _executor.reset(new ReplicationExecutor(_net));
         _executorThread.reset(new boost::thread(stdx::bind(&ReplicationExecutor::run,
                                                            _executor.get())));
     }
 
-    void ElectCmdRunnerTest::tearDown() {
+    void FreshnessCheckerTest::tearDown() {
         _net->unblockAll();
         _executor->shutdown();
         _executorThread->join();
@@ -89,63 +90,65 @@ namespace {
         return config;
     }
 
-    const BSONObj makeElectRequest(const ReplicaSetConfig& rsConfig, 
+    const BSONObj makeFreshRequest(const ReplicaSetConfig& rsConfig, 
+                                   OpTime lastOpTimeApplied, 
                                    int selfIndex) {
         const MemberConfig& myConfig = rsConfig.getMemberAt(selfIndex);
-        return BSON("replSetElect" << 1 <<
+        return BSON("replSetFresh" << 1 <<
                     "set" << rsConfig.getReplSetName() <<
+                    "opTime" << Date_t(lastOpTimeApplied.asDate()) <<
                     "who" << myConfig.getHostAndPort().toString() <<
-                    "whoid" << myConfig.getId() <<
                     "cfgver" << rsConfig.getConfigVersion() <<
-                    "round" << 0);
+                    "id" << myConfig.getId());
     }
 
     // This is necessary because the run method must be scheduled in the Replication Executor
     // for correct concurrency operation.
-    void ElectCmdRunnerTest::electCmdRunnerRunner(
+    void FreshnessCheckerTest::freshnessCheckerRunner(
         const ReplicationExecutor::CallbackData& data,
-        ElectCmdRunner* electCmdRunner,
+        FreshnessChecker* checker,
         const ReplicationExecutor::EventHandle& evh,
+        const OpTime& lastOpTimeApplied, 
         const ReplicaSetConfig& currentConfig,
         int selfIndex,
-        const std::vector<MemberHeartbeatData>& hbData) {
+        const std::vector<HostAndPort>& hosts) {
         invariant(data.status.isOK());
-        _lastStatus = electCmdRunner->start(data.executor, 
-                                            evh, 
-                                            currentConfig, 
-                                            selfIndex, 
-                                            hbData);
+        _lastStatus = checker->start(data.executor, 
+                                     evh, 
+                                     lastOpTimeApplied, 
+                                     currentConfig, 
+                                     selfIndex, 
+                                     hosts);
     }
 
-    TEST_F(ElectCmdRunnerTest, OneNode) {
-        // Only one node in the config.
+    TEST_F(FreshnessCheckerTest, OneNode) {
+        // Only one node in the config.  We are freshest and not tied.
         ReplicaSetConfig config = assertMakeRSConfig(
-            BSON("_id" << "rs0" <<
-                 "version" << 1 <<
-                 "members" << BSON_ARRAY(
-                     BSON("_id" << 1 << "host" << "h1"))));
+                BSON("_id" << "rs0" <<
+                     "version" << 1 <<
+                     "members" << BSON_ARRAY(
+                             BSON("_id" << 1 << "host" << "h1"))));
         
         StatusWith<ReplicationExecutor::EventHandle> evh = _executor->makeEvent();
         ASSERT_OK(evh.getStatus());
 
         Date_t now(0);
-        std::vector<MemberHeartbeatData> hbData;
-        MemberHeartbeatData h1Info(0);
-        h1Info.setUpValues(now, MemberState::RS_SECONDARY, OpTime(0,0), OpTime(0,0), "", ""); 
-        hbData.push_back(h1Info);
+        std::vector<HostAndPort> hosts;
+        hosts.push_back(config.getMemberAt(0).getHostAndPort());
 
-        ElectCmdRunner electCmdRunner;
+        FreshnessChecker checker;
         
         StatusWith<ReplicationExecutor::CallbackHandle> cbh = 
             _executor->scheduleWork(
-                stdx::bind(&ElectCmdRunnerTest::electCmdRunnerRunner,
+                stdx::bind(&FreshnessCheckerTest::freshnessCheckerRunner,
                            this,
                            stdx::placeholders::_1,
-                           &electCmdRunner,
+                           &checker,
                            evh.getValue(),
+                           OpTime(0,0),
                            config,
                            0,
-                           hbData));
+                           hosts));
         ASSERT_OK(cbh.getStatus());
         _executor->wait(cbh.getValue());
 
@@ -153,104 +156,112 @@ namespace {
 
         _executor->waitForEvent(evh.getValue());
 
-        ASSERT_EQUALS(electCmdRunner.getReceivedVotes(), 1);        
+        bool weAreFreshest(false);
+        bool tied(false);
+        checker.getResults(&weAreFreshest, &tied);
+        ASSERT_TRUE(weAreFreshest);
+        ASSERT_FALSE(tied);
+        
     }
 
-    TEST_F(ElectCmdRunnerTest, TwoNodes) {
-        // Two nodes, we are node h1.
+    TEST_F(FreshnessCheckerTest, TwoNodes) {
+        // Two nodes, we are node h1.  We are freshest, but we tie with h2.
         ReplicaSetConfig config = assertMakeRSConfig(
-            BSON("_id" << "rs0" <<
-                 "version" << 1 <<
-                 "members" << BSON_ARRAY(
-                     BSON("_id" << 1 << "host" << "h0") <<
-                     BSON("_id" << 2 << "host" << "h1"))));
+                BSON("_id" << "rs0" <<
+                     "version" << 1 <<
+                     "members" << BSON_ARRAY(
+                         BSON("_id" << 1 << "host" << "h0") <<
+                         BSON("_id" << 2 << "host" << "h1"))));
         
         StatusWith<ReplicationExecutor::EventHandle> evh = _executor->makeEvent();
         ASSERT_OK(evh.getStatus());
 
         Date_t now(0);
-        std::vector<MemberHeartbeatData> hbData;
-        MemberHeartbeatData h0Info(0);
-        h0Info.setUpValues(now, MemberState::RS_SECONDARY, OpTime(0,0), OpTime(0,0), "", ""); 
-        hbData.push_back(h0Info);
-        MemberHeartbeatData h1Info(1);
-        h1Info.setUpValues(now, MemberState::RS_SECONDARY, OpTime(0,0), OpTime(0,0), "", ""); 
-        hbData.push_back(h1Info);
+        std::vector<HostAndPort> hosts;
+        hosts.push_back(config.getMemberAt(0).getHostAndPort());
+        hosts.push_back(config.getMemberAt(1).getHostAndPort());
 
-        const BSONObj electRequest = makeElectRequest(config, 0);
+        const BSONObj freshRequest = makeFreshRequest(config, OpTime(0,0), 0);
 
         _net->addResponse(RemoteCommandRequest(HostAndPort("h1"),
                                                "admin",
-                                               electRequest),
+                                               freshRequest),
                           StatusWith<BSONObj>(BSON("ok" << 1 <<
-                                                   "vote" << 1 <<
-                                                   "round" << 0)));
+                                                   "id" << 2 <<
+                                                   "set" << "rs0" <<
+                                                   "who" << "h1" <<
+                                                   "cfgver" << 1 <<
+                                                   "opTime" << Date_t(OpTime(0,0).asDate()))));
 
-        ElectCmdRunner electCmdRunner;
+        FreshnessChecker checker;
         StatusWith<ReplicationExecutor::CallbackHandle> cbh = 
             _executor->scheduleWork(
-                stdx::bind(&ElectCmdRunnerTest::electCmdRunnerRunner,
+                stdx::bind(&FreshnessCheckerTest::freshnessCheckerRunner,
                            this,
                            stdx::placeholders::_1,
-                           &electCmdRunner,
+                           &checker,
                            evh.getValue(),
+                           OpTime(0,0),
                            config,
                            0,
-                           hbData));
+                           hosts));
         ASSERT_OK(cbh.getStatus());
         _executor->wait(cbh.getValue());
 
         ASSERT_OK(_lastStatus);
 
         _executor->waitForEvent(evh.getValue());
-        // TODO: this ought to pass once elect cmd is implemented.
-        //ASSERT_EQUALS(electCmdRunner.getReceivedVotes(), 2);
-        ASSERT_EQUALS(electCmdRunner.getReceivedVotes(), 1);
+
+        bool weAreFreshest(false);
+        bool tied(false);
+        checker.getResults(&weAreFreshest, &tied);
+        ASSERT_TRUE(weAreFreshest);
+        ASSERT_TRUE(tied);
         
     }
 
 
-    TEST_F(ElectCmdRunnerTest, ShuttingDown) {
+    TEST_F(FreshnessCheckerTest, ShuttingDown) {
         // Two nodes, we are node h1.  Shutdown happens while we're scheduling remote commands.
         ReplicaSetConfig config = assertMakeRSConfig(
-            BSON("_id" << "rs0" <<
-                 "version" << 1 <<
-                 "members" << BSON_ARRAY(
-                     BSON("_id" << 1 << "host" << "h0") <<
-                     BSON("_id" << 2 << "host" << "h1"))));
+                BSON("_id" << "rs0" <<
+                     "version" << 1 <<
+                     "members" << BSON_ARRAY(
+                         BSON("_id" << 1 << "host" << "h0") <<
+                         BSON("_id" << 2 << "host" << "h1"))));
         
         StatusWith<ReplicationExecutor::EventHandle> evh = _executor->makeEvent();
         ASSERT_OK(evh.getStatus());
 
         Date_t now(0);
-        std::vector<MemberHeartbeatData> hbData;
-        MemberHeartbeatData h0Info(0);
-        h0Info.setUpValues(now, MemberState::RS_SECONDARY, OpTime(0,0), OpTime(0,0), "", ""); 
-        hbData.push_back(h0Info);
-        MemberHeartbeatData h1Info(1);
-        h1Info.setUpValues(now, MemberState::RS_SECONDARY, OpTime(0,0), OpTime(0,0), "", ""); 
-        hbData.push_back(h1Info);
+        std::vector<HostAndPort> hosts;
+        hosts.push_back(config.getMemberAt(0).getHostAndPort());
+        hosts.push_back(config.getMemberAt(1).getHostAndPort());
 
-        const BSONObj electRequest = makeElectRequest(config, 0);
+        const BSONObj freshRequest = makeFreshRequest(config, OpTime(0,0), 0);
         _net->addResponse(RemoteCommandRequest(HostAndPort("h1"),
                                                "admin",
-                                               electRequest),
+                                               freshRequest),
                           StatusWith<BSONObj>(BSON("ok" << 1 <<
-                                                   "vote" << 1 <<
-                                                   "round" << 0)),
+                                                   "id" << 2 <<
+                                                   "set" << "rs0" <<
+                                                   "who" << "h1" <<
+                                                   "cfgver" << 1 <<
+                                                   "opTime" << Date_t(OpTime(0,0).asDate()))),
                           true /* isBlocked */);
 
-        ElectCmdRunner electCmdRunner;
+        FreshnessChecker checker;
         StatusWith<ReplicationExecutor::CallbackHandle> cbh = 
             _executor->scheduleWork(
-                stdx::bind(&ElectCmdRunnerTest::electCmdRunnerRunner,
+                stdx::bind(&FreshnessCheckerTest::freshnessCheckerRunner,
                            this,
                            stdx::placeholders::_1,
-                           &electCmdRunner,
+                           &checker,
                            evh.getValue(),
+                           OpTime(0,0),
                            config,
                            0,
-                           hbData));
+                           hosts));
         ASSERT_OK(cbh.getStatus());
 
         _executor->wait(cbh.getValue());
@@ -260,8 +271,13 @@ namespace {
         _net->unblockAll();
         _executor->waitForEvent(evh.getValue());
 
-        ASSERT_EQUALS(electCmdRunner.getReceivedVotes(), 1);
-
+        bool weAreFreshest(false);
+        bool tied(false);
+        checker.getResults(&weAreFreshest, &tied);
+        // This seems less than ideal, but if we are shutting down, the next phase of election
+        // cannot proceed anyway.
+        ASSERT_TRUE(weAreFreshest);
+        ASSERT_FALSE(tied); 
     }
 
 

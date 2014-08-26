@@ -30,7 +30,7 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/db/repl/topology_freshness_checker.h"
+#include "mongo/db/repl/freshness_checker.h"
 
 #include "mongo/base/status.h"
 #include "mongo/bson/optime.h"
@@ -57,7 +57,7 @@ namespace repl {
         const OpTime& lastOpTimeApplied,
         const ReplicaSetConfig& currentConfig,
         int selfIndex,
-        const std::vector<MemberHeartbeatData>& hbdata) {
+        const std::vector<HostAndPort>& hosts) {
 
         _lastOpTimeApplied = lastOpTimeApplied;
         _freshest = true;
@@ -73,28 +73,22 @@ namespace repl {
                                        .getHostAndPort().toString() <<
                                        "cfgver" << currentConfig.getConfigVersion() <<
                                        "id" << currentConfig.getMemberAt(selfIndex).getId());
-        for (std::vector<MemberHeartbeatData>::const_iterator it = hbdata.begin(); 
-             it != hbdata.end(); 
-             ++it) {
-            if (it->getConfigIndex() == selfIndex) {
-                continue;    // skip ourselves
-            }
-            if (!it->maybeUp()) {
-                continue;    // skip DOWN nodes
-            }
+        for (std::vector<HostAndPort>::const_iterator it = hosts.begin(); it != hosts.end(); ++it) {
             const StatusWith<ReplicationExecutor::CallbackHandle> cbh =
                 executor->scheduleRemoteCommand(
                     ReplicationExecutor::RemoteCommandRequest(
-                        currentConfig.getMemberAt(it->getConfigIndex()).getHostAndPort(),
+                        *it,
                         "admin",
                         replSetFreshCmd,
                         Milliseconds(30*1000)),   // trying to match current Socket timeout
                     stdx::bind(&FreshnessChecker::_onReplSetFreshResponse,
                                this,
                                stdx::placeholders::_1));
-            if (!cbh.isOK()) {
+            if (cbh.getStatus() == ErrorCodes::ShutdownInProgress) {
                 return cbh.getStatus();
             }
+            fassert(18682, cbh.getStatus());
+
             _responseCallbacks.push_back(cbh.getValue());
         }
         

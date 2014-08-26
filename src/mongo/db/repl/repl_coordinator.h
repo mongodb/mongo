@@ -387,7 +387,7 @@ namespace repl {
          */
         struct ReplSetElectArgs {
             StringData set;  // Name of the replset
-            unsigned whoid;  // replSet id of the member that sent the replSetFresh command
+            int whoid;  // replSet id of the member that sent the replSetFresh command
             int cfgver;  // replSet config version that the member who sent the command thinks it has
             OID round;  // unique ID for this election
         };

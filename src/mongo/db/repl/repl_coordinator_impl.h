@@ -37,6 +37,8 @@
 #include "mongo/base/status.h"
 #include "mongo/bson/optime.h"
 #include "mongo/db/global_environment_experiment.h"
+#include "mongo/db/repl/freshness_checker.h"
+#include "mongo/db/repl/elect_cmd_runner.h"
 #include "mongo/db/repl/member_state.h"
 #include "mongo/db/repl/repl_coordinator.h"
 #include "mongo/db/repl/repl_coordinator_external_state.h"
@@ -222,6 +224,12 @@ namespace repl {
          */
         void waitForStartUpComplete();
 
+        /**
+         * Used by testing code to run election proceedings, in leiu of a better
+         * method to acheive this.
+         */
+        void testElection();
+
     private:
 
         /**
@@ -386,6 +394,32 @@ namespace repl {
          */
         void _setConfigState_inlock(ConfigState newState);
 
+        /**
+         * Begins an attempt to elect this node.
+         * Called after an incoming heartbeat changes this node's view of the set such that it
+         * believes it can be elected PRIMARY.
+         * For proper concurrency, must be called via a ReplicationExecutor callback.
+         * finishEvh is an event that is signaled when election is done, regardless of success.
+         **/
+        void _startElectSelf(const ReplicationExecutor::CallbackData& cbData,
+                             const ReplicationExecutor::EventHandle& finishEvh);
+
+        /**
+         * Callback called when the FreshnessChecker has completed; checks the results and
+         * decides whether to continue election proceedings.
+         * finishEvh is an event that is signaled when election is complete.
+         **/
+        void _onFreshnessCheckComplete(const ReplicationExecutor::CallbackData& cbData,
+                                       const ReplicationExecutor::EventHandle& finishEvh);
+
+        /** 
+         * Callback called when the ElectCmdRunner has completed; checks the results and
+         * decides whether to complete the election and change state to primary.
+         * finishEvh is an event that is signaled when election is complete.
+         **/
+        void _onElectCmdRunnerComplete(const ReplicationExecutor::CallbackData& cbData,
+                                       const ReplicationExecutor::EventHandle& finishEvh);
+
         // Handles to actively queued heartbeats.
         // Only accessed serially in ReplicationExecutor callbacks, which makes it safe to access
         // outside of _mutex.
@@ -461,6 +495,14 @@ namespace repl {
         // PRNG; seeded at class construction time.
         PseudoRandom _random;
 
+        // Used for conducting an election of this node;
+        // the presence of a non-null _freshnessChecker pointer indicates that an election is
+        // currently in progress.  Only one election is allowed at once.
+        boost::scoped_ptr<FreshnessChecker> _freshnessChecker;
+        boost::scoped_ptr<ElectCmdRunner> _electCmdRunner;
+
+        // Whether we slept last time we attempted an election but possibly tied with other nodes.
+        bool _sleptLastElection;
     };
 
 } // namespace repl
