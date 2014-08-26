@@ -75,6 +75,7 @@ function abortDuringIndexBuild(options) {
 abortDuringIndexBuild();
 
 conn = mongod.start(/* reuseData */ true);
+test = conn.getDB("test");
 
 
 
@@ -84,6 +85,9 @@ assert.soon(
             printjson(conn.getDB("test").getCollection(name).find({a:42}).hint({a:1}).next());
         } catch (e) {
             print(e);
+            var inprog = test.currentOp().inprog;
+            print("Index build not yet complete:");
+            debug(inprog);
             return false;
         }
         return true;
