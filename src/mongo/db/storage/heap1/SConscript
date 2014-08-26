@@ -17,6 +17,7 @@ env.Library(
         'heap1_btree_impl.cpp',
         'heap1_database_catalog_entry.cpp',
         'heap1_engine.cpp',
+        'heap1_init.cpp',
         ],
     LIBDEPS= [
         'heap_record_store',
