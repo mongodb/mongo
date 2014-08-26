@@ -345,11 +345,15 @@ namespace repl {
     }
 
     void TopologyCoordinatorImpl::prepareFreshResponse(
-            const ReplicationExecutor::CallbackData& data,
+            const ReplicationExecutor::CallbackData& cbData,
             const ReplicationCoordinator::ReplSetFreshArgs& args,
             const OpTime& lastOpApplied,
             BSONObjBuilder* response,
             Status* result) {
+        if (cbData.status == ErrorCodes::CallbackCanceled) {
+            *result = Status(ErrorCodes::ShutdownInProgress, "replication system is shutting down");
+            return;
+        }
 
         if (args.setName != _currentConfig.getReplSetName()) {
             *result = Status(ErrorCodes::ReplicaSetNotFound,
