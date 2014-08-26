@@ -52,10 +52,6 @@ namespace repl {
 namespace {
 
     TEST(TopologyCoordinator, ChooseSyncSourceBasic) {
-        ReplicationExecutor::CallbackHandle cbh;
-        ReplicationExecutor::CallbackData cbData(NULL, 
-                                                 cbh,
-                                                 Status::OK());
         ReplicaSetConfig config;
 
         ASSERT_OK(config.initialize(BSON("_id" << "rs0" <<
@@ -67,7 +63,7 @@ namespace {
 
         TopologyCoordinatorImpl topocoord((Seconds(999)));
         Date_t now = 0;
-        topocoord.updateConfig(cbData, config, 0, now++, OpTime(0,0));
+        topocoord.updateConfig(config, 0, now++, OpTime(0,0));
 
         MemberHeartbeatData h0Info(0);
         h0Info.setUpValues(now, MemberState::RS_SECONDARY, OpTime(0,0), OpTime(0,0), "", ""); 
@@ -126,10 +122,6 @@ namespace {
     }
 
     TEST(TopologyCoordinator, ChooseSyncSourceCandidates) {
-        ReplicationExecutor::CallbackHandle cbh;
-        ReplicationExecutor::CallbackData cbData(NULL, 
-                                                 cbh,
-                                                 Status::OK());
         ReplicaSetConfig config;
 
         ASSERT_OK(config.initialize(
@@ -148,7 +140,7 @@ namespace {
         TopologyCoordinatorImpl topocoord((Seconds(100 /*maxSyncSourceLagSeconds*/)));
         Date_t now = 0;
         OpTime lastOpTimeWeApplied(100,0);
-        topocoord.updateConfig(cbData, config, 0, now++, lastOpTimeWeApplied);
+        topocoord.updateConfig(config, 0, now++, lastOpTimeWeApplied);
 
         MemberHeartbeatData hselfInfo(0);
         hselfInfo.setUpValues(now, MemberState::RS_SECONDARY, lastOpTimeWeApplied, 
@@ -255,10 +247,6 @@ namespace {
 
 
     TEST(TopologyCoordinator, ChooseSyncSourceChainingNotAllowed) {
-        ReplicationExecutor::CallbackHandle cbh;
-        ReplicationExecutor::CallbackData cbData(NULL, 
-                                                 cbh,
-                                                 Status::OK());
         ReplicaSetConfig config;
 
         ASSERT_OK(config.initialize(BSON("_id" << "rs0" <<
@@ -271,7 +259,7 @@ namespace {
 
         TopologyCoordinatorImpl topocoord((Seconds(999)));
         Date_t now = 0;
-        topocoord.updateConfig(cbData, config, 0, now++, OpTime(0,0));
+        topocoord.updateConfig(config, 0, now++, OpTime(0,0));
 
         MemberHeartbeatData h0Info(0);
         h0Info.setUpValues(now, MemberState::RS_SECONDARY, OpTime(0,0), OpTime(0,0), "", ""); 
@@ -306,10 +294,6 @@ namespace {
     }
 
     TEST(TopologyCoordinator, ForceSyncSource) {
-        ReplicationExecutor::CallbackHandle cbh;
-        ReplicationExecutor::CallbackData cbData(NULL, 
-                                                 cbh,
-                                                 Status::OK());
         ReplicaSetConfig config;
 
         ASSERT_OK(config.initialize(BSON("_id" << "rs0" <<
@@ -321,7 +305,7 @@ namespace {
 
         TopologyCoordinatorImpl topocoord((Seconds(999)));
         Date_t now = 0;
-        topocoord.updateConfig(cbData, config, 0, now++, OpTime(0,0));
+        topocoord.updateConfig(config, 0, now++, OpTime(0,0));
 
         MemberHeartbeatData h0Info(0);
         h0Info.setUpValues(now, MemberState::RS_SECONDARY, OpTime(0,0), OpTime(0,0), "", ""); 
@@ -349,10 +333,6 @@ namespace {
     }
 
     TEST(TopologyCoordinator, BlacklistSyncSource) {
-        ReplicationExecutor::CallbackHandle cbh;
-        ReplicationExecutor::CallbackData cbData(NULL, 
-                                                 cbh,
-                                                 Status::OK());
         ReplicaSetConfig config;
 
         ASSERT_OK(config.initialize(BSON("_id" << "rs0" <<
@@ -364,7 +344,7 @@ namespace {
 
         TopologyCoordinatorImpl topocoord((Seconds(999)));
         Date_t now = 0;
-        topocoord.updateConfig(cbData, config, 0, now++, OpTime(0,0));
+        topocoord.updateConfig(config, 0, now++, OpTime(0,0));
 
         MemberHeartbeatData h0Info(0);
         h0Info.setUpValues(now, MemberState::RS_SECONDARY, OpTime(0,0), OpTime(0,0), "", ""); 
@@ -418,7 +398,7 @@ namespace {
                                                                  BSON("_id" << 1 <<
                                                                       "host" << "h1")))));
         ASSERT_OK(config1.validate());
-        topocoord.updateConfig(cbData, config1, 0, now++, OpTime(0,0));
+        topocoord.updateConfig(config1, 0, now++, OpTime(0,0));
 
         Status result = Status::OK();
         BSONObjBuilder response;
@@ -444,7 +424,7 @@ namespace {
                                                  BSON("_id" << 5 << "host" << "h5") <<
                                                  BSON("_id" << 6 << "host" << "h6")))));
         ASSERT_OK(config2.validate());
-        topocoord.updateConfig(cbData, config2, 0, now++, OpTime(0,0));
+        topocoord.updateConfig(config2, 0, now++, OpTime(0,0));
 
         // Try to sync while PRIMARY
         topocoord._setCurrentPrimaryForTest(0);
@@ -567,7 +547,7 @@ namespace {
                                              BSON("_id" << 1 << "host" << "test1:1234") <<
                                              BSON("_id" << 2 << "host" << "test2:1234") <<
                                              BSON("_id" << 3 << "host" << "test3:1234")))));
-        topocoord.updateConfig(cbData, config, 3, startupTime + 1, OpTime(0,0));
+        topocoord.updateConfig(config, 3, startupTime + 1, OpTime(0,0));
 
         // Now that the replica set is setup, put the members into the states we want them in.
         MemberHeartbeatData member0hb(0);
@@ -678,7 +658,7 @@ namespace {
 
         TopologyCoordinatorImpl topocoord((Seconds(999)));
         Date_t now = 0;
-        topocoord.updateConfig(cbData, config, 0, now++, OpTime(0,0));
+        topocoord.updateConfig(config, 0, now++, OpTime(0,0));
 
         OpTime ourOpTime(10, 10);
         OpTime staleOpTime(1, 1);
@@ -843,15 +823,11 @@ namespace {
 
         // Update config and set selfIndex
         void updateConfig(BSONObj cfg, int selfIndex) {
-            ReplicationExecutor::CallbackHandle cbh;
-            ReplicationExecutor::CallbackData cbData(NULL,
-                                                     cbh,
-                                                     Status::OK());
             ReplicaSetConfig config;
             ASSERT_OK(config.initialize(cfg));
             ASSERT_OK(config.validate());
 
-            getTopoCoord().updateConfig(cbData, config, selfIndex, ++_now, OpTime(0,0));
+            getTopoCoord().updateConfig(config, selfIndex, ++_now, OpTime(0,0));
         }
 
         // set the lastApplied OpTime for this test

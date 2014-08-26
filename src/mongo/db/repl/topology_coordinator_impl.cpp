@@ -1105,16 +1105,12 @@ namespace repl {
         *result = Status::OK();
     }
 
-    // This function installs a new config object and recreates MemberHeartbeatData objects 
+    // This function installs a new config object and recreates MemberHeartbeatData objects
     // that reflect the new config.
-    void TopologyCoordinatorImpl::updateConfig(const ReplicationExecutor::CallbackData& cbData,
-                                               const ReplicaSetConfig& newConfig,
+    void TopologyCoordinatorImpl::updateConfig(const ReplicaSetConfig& newConfig,
                                                int selfIndex,
                                                Date_t now,
                                                const OpTime& lastOpApplied) {
-
-        if (cbData.status == ErrorCodes::CallbackCanceled)
-            return;
 
         invariant(selfIndex < newConfig.getNumMembers());
         _currentConfig = newConfig;        

@@ -221,7 +221,7 @@ namespace {
 
         lk.lock();
         invariant(_rsConfigState == kConfigStartingUp);
-        _setCurrentRSConfig_inlock(cbData, localConfig, myIndex.getValue());
+        _setCurrentRSConfig_inlock(localConfig, myIndex.getValue());
     }
 
     void ReplicationCoordinatorImpl::startReplication(OperationContext* txn) {
@@ -925,7 +925,7 @@ namespace {
         boost::lock_guard<boost::mutex> lk(_mutex);
         invariant(_rsConfigState == kConfigInitiating);
         invariant(!_rsConfig.isInitialized());
-        _setCurrentRSConfig_inlock(cbData, newConfig, myIndex);
+        _setCurrentRSConfig_inlock(newConfig, myIndex);
     }
 
     void ReplicationCoordinatorImpl::_setConfigState_inlock(ConfigState newState) {
@@ -976,12 +976,15 @@ namespace {
             const ReplicationExecutor::CallbackData& cbData,
             const ReplicaSetConfig& newConfig,
             int myIndex) {
+        if (cbData.status == ErrorCodes::CallbackCanceled) {
+            return;
+        }
+
         boost::lock_guard<boost::mutex> lk(_mutex);
-        _setCurrentRSConfig_inlock(cbData, newConfig, myIndex);
+        _setCurrentRSConfig_inlock(newConfig, myIndex);
     }
 
     void ReplicationCoordinatorImpl::_setCurrentRSConfig_inlock(
-            const ReplicationExecutor::CallbackData& cbData,
             const ReplicaSetConfig& newConfig,
             int myIndex) {
          invariant(_settings.usingReplSets());
@@ -992,7 +995,6 @@ namespace {
          _rsConfig = newConfig;
          _thisMembersConfigIndex = myIndex;
          _topCoord->updateConfig(
-                 cbData,
                  newConfig,
                  myIndex,
                  _replExecutor.now(),

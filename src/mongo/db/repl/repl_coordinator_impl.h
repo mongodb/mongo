@@ -280,7 +280,6 @@ namespace repl {
                 const ReplicaSetConfig& newConfig,
                 int myIndex);
         void _setCurrentRSConfig_inlock(
-                const ReplicationExecutor::CallbackData& cbData,
                 const ReplicaSetConfig& newConfig,
                 int myIndex);
 

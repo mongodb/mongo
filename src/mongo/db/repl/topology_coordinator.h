@@ -141,9 +141,8 @@ namespace repl {
         // transition PRIMARY to SECONDARY; caller must already be holding an appropriate dblock
         virtual void relinquishPrimary(OperationContext* txn) = 0;
 
-        // called with new config; notifies all on change
-        virtual void updateConfig(const ReplicationExecutor::CallbackData& cbData,
-                                  const ReplicaSetConfig& newConfig,
+        // Updates the topology coordinator's notion of the new configuration.
+        virtual void updateConfig(const ReplicaSetConfig& newConfig,
                                   int selfIndex,
                                   Date_t now,
                                   const OpTime& lastOpApplied) = 0;
