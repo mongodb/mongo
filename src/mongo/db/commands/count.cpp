@@ -104,12 +104,10 @@ namespace mongo {
         scoped_ptr<PlanExecutor> exec(rawExec);
 
         // Store the plan summary string in CurOp.
-        Client& client = cc();
-        CurOp* currentOp = client.curop();
-        if (NULL != currentOp) {
+        if (NULL != txn->getCurOp()) {
             PlanSummaryStats stats;
             Explain::getSummaryStats(exec.get(), &stats);
-            currentOp->debug().planSummary = stats.summaryStr.c_str();
+            txn->getCurOp()->debug().planSummary = stats.summaryStr.c_str();
         }
 
         try {

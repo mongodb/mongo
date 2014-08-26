@@ -355,8 +355,6 @@ namespace mongo {
                << "begin removal of " << min << " to " << max << " in " << ns
                << " with write concern: " << writeConcern.toBSON() << endl;
 
-        Client& c = cc();
-
         long long numDeleted = 0;
         
         long long millisWaitingForReplication = 0;
@@ -452,7 +450,7 @@ namespace mongo {
             if (writeConcern.shouldWaitForOtherNodes() && numDeleted > 0) {
                 repl::ReplicationCoordinator::StatusAndDuration replStatus =
                         repl::getGlobalReplicationCoordinator()->awaitReplication(txn,
-                                                                                  c.getLastOp(),
+                                                                                  txn->getClient()->getLastOp(),
                                                                                   writeConcern);
                 if (replStatus.status.code() == ErrorCodes::ExceededTimeLimit) {
                     warning(LogComponent::kSharding)

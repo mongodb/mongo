@@ -183,7 +183,7 @@ namespace repl {
             LegacyReplicationCoordinator::awaitReplicationOfLastOp(
                     const OperationContext* txn,
                     const WriteConcernOptions& writeConcern) {
-        return awaitReplication(txn, cc().getLastOp(), writeConcern);
+        return awaitReplication(txn, txn->getClient()->getLastOp(), writeConcern);
     }
 
     Status LegacyReplicationCoordinator::stepDown(OperationContext* txn, 

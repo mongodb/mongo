@@ -98,12 +98,10 @@ namespace mongo {
 
     WriteBatchExecutor::WriteBatchExecutor( OperationContext* txn,
                                             const BSONObj& wc,
-                                            Client* client,
                                             OpCounters* opCounters,
                                             LastError* le ) :
         _txn(txn),
         _defaultWriteConcern( wc ),
-        _client( client ),
         _opCounters( opCounters ),
         _le( le ),
         _stats( new WriteBatchStats ) {
@@ -262,10 +260,10 @@ namespace mongo {
 
         if ( needToEnforceWC ) {
 
-            _client->curop()->setMessage( "waiting for write concern" );
+            _txn->getCurOp()->setMessage( "waiting for write concern" );
 
             WriteConcernResult res;
-            Status status = waitForWriteConcern( _txn, writeConcern, _client->getLastOp(), &res );
+            Status status = waitForWriteConcern( _txn, writeConcern, _txn->getClient()->getLastOp(), &res );
 
             if ( !status.isOK() ) {
                 wcError.reset( toWriteConcernError( status, res ) );
@@ -364,7 +362,7 @@ namespace mongo {
             repl::ReplicationCoordinator* replCoord = repl::getGlobalReplicationCoordinator();
             const repl::ReplicationCoordinator::Mode replMode = replCoord->getReplicationMode();
             if (replMode != repl::ReplicationCoordinator::modeNone) {
-                response->setLastOp( _client->getLastOp() );
+                response->setLastOp( _txn->getClient()->getLastOp() );
                 if (replMode == repl::ReplicationCoordinator::modeReplSet) {
                     response->setElectionId(replCoord->getElectionId());
                 }
@@ -593,7 +591,6 @@ namespace mongo {
     }
 
     static void finishCurrentOp( OperationContext* txn,
-                                 Client* client,
                                  CurOp* currentOp,
                                  WriteErrorDetail* opError ) {
 
@@ -618,7 +615,7 @@ namespace mongo {
         }
 
         if ( currentOp->shouldDBProfile( executionTime ) ) {
-            profile( txn, *client, currentOp->getOp(), *currentOp );
+            profile( txn, *txn->getClient(), currentOp->getOp(), *currentOp );
         }
     }
 
@@ -853,7 +850,7 @@ namespace mongo {
                                          WriteErrorDetail** error ) {
 
         // BEGIN CURRENT OP
-        scoped_ptr<CurOp> currentOp( beginCurrentOp( _client, updateItem ) );
+        scoped_ptr<CurOp> currentOp( beginCurrentOp( _txn->getClient(), updateItem ) );
         incOpStats( updateItem );
 
         WriteOpResult result;
@@ -865,7 +862,7 @@ namespace mongo {
         }
         // END CURRENT OP
         incWriteStats( updateItem, result.getStats(), result.getError(), currentOp.get() );
-        finishCurrentOp( _txn, _client, currentOp.get(), result.getError() );
+        finishCurrentOp( _txn, currentOp.get(), result.getError() );
 
         if ( result.getError() ) {
             result.getError()->setIndex( updateItem.getItemIndex() );
@@ -879,7 +876,7 @@ namespace mongo {
         // Removes are similar to updates, but page faults are handled externally
 
         // BEGIN CURRENT OP
-        scoped_ptr<CurOp> currentOp( beginCurrentOp( _client, removeItem ) );
+        scoped_ptr<CurOp> currentOp( beginCurrentOp( _txn->getClient(), removeItem ) );
         incOpStats( removeItem );
 
         WriteOpResult result;
@@ -888,7 +885,7 @@ namespace mongo {
 
         // END CURRENT OP
         incWriteStats( removeItem, result.getStats(), result.getError(), currentOp.get() );
-        finishCurrentOp( _txn, _client, currentOp.get(), result.getError() );
+        finishCurrentOp( _txn, currentOp.get(), result.getError() );
 
         if ( result.getError() ) {
             result.getError()->setIndex( removeItem.getItemIndex() );
@@ -1001,7 +998,7 @@ namespace mongo {
 
     void WriteBatchExecutor::execOneInsert(ExecInsertsState* state, WriteErrorDetail** error) {
         BatchItemRef currInsertItem(state->request, state->currIndex);
-        scoped_ptr<CurOp> currentOp(beginCurrentOp(_client, currInsertItem));
+        scoped_ptr<CurOp> currentOp(beginCurrentOp(_txn->getClient(), currInsertItem));
         incOpStats(currInsertItem);
 
         WriteOpResult result;
@@ -1021,7 +1018,7 @@ namespace mongo {
                       result.getStats(),
                       result.getError(),
                       currentOp.get());
-        finishCurrentOp(_txn, _client, currentOp.get(), result.getError());
+        finishCurrentOp(_txn, currentOp.get(), result.getError());
 
         if (result.getError()) {
             *error = result.releaseError();

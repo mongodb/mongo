@@ -129,7 +129,6 @@ namespace mongo {
 
         WriteBatchExecutor writeBatchExecutor(txn,
                                               defaultWriteConcern,
-                                              &cc(),
                                               &globalOpCounters,
                                               lastError.get());
 

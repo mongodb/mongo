@@ -116,7 +116,7 @@ namespace mongo {
                     warning() << *errMsg << endl;
 
                     if (!initiallyHaveClient) {
-                        cc().shutdown();
+                        txn->getClient()->shutdown();
                     }
 
                     return false;
@@ -136,7 +136,7 @@ namespace mongo {
                                         << ", cause by:" << causedBy(ex);
 
                 if (!initiallyHaveClient) {
-                    cc().shutdown();
+                    txn->getClient()->shutdown();
                 }
 
                 return false;
@@ -144,7 +144,7 @@ namespace mongo {
         }
 
         if (!initiallyHaveClient) {
-            cc().shutdown();
+            txn->getClient()->shutdown();
         }
 
         return true;

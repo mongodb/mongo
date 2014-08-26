@@ -1242,7 +1242,6 @@ namespace mongo {
     */
     void Command::execCommand(OperationContext* txn,
                               Command * c ,
-                              Client& client,
                               int queryOptions,
                               const char *cmdns,
                               BSONObj& cmdObj,
@@ -1252,7 +1251,7 @@ namespace mongo {
         scoped_ptr<MaintenanceModeSetter> mmSetter;
 
         if ( cmdObj["help"].trueValue() ) {
-            client.curop()->ensureStarted();
+            txn->getCurOp()->ensureStarted();
             stringstream ss;
             ss << "help for: " << c->name << " ";
             c->help( ss );
@@ -1267,7 +1266,7 @@ namespace mongo {
         // in that code path that must not see the impersonated user and roles array elements.
         std::vector<UserName> parsedUserNames;
         std::vector<RoleName> parsedRoleNames;
-        AuthorizationSession* authSession = client.getAuthorizationSession();
+        AuthorizationSession* authSession = txn->getClient()->getAuthorizationSession();
         bool rolesFieldIsPresent = false;
         bool usersFieldIsPresent = false;
         audit::parseAndRemoveImpersonatedRolesField(cmdObj,
@@ -1291,7 +1290,7 @@ namespace mongo {
                                                        parsedUserNames,
                                                        parsedRoleNames);
 
-        Status status = _checkAuthorization(c, &client, dbname, cmdObj, fromRepl);
+        Status status = _checkAuthorization(c, txn->getClient(), dbname, cmdObj, fromRepl);
         if (!status.isOK()) {
             appendCommandStatus(result, status);
             return;
@@ -1323,7 +1322,7 @@ namespace mongo {
             LOG( 2 ) << "command: " << cmdObj << endl;
         }
 
-        client.curop()->setCommand(c);
+        txn->getCurOp()->setCommand(c);
 
         if (c->maintenanceMode() &&
                 repl::getGlobalReplicationCoordinator()->getReplicationMode() ==
@@ -1351,8 +1350,8 @@ namespace mongo {
             return;
         }
 
-        client.curop()->setMaxTimeMicros(static_cast<unsigned long long>(maxTimeMS.getValue())
-                                         * 1000);
+        txn->getCurOp()->setMaxTimeMicros(static_cast<unsigned long long>(maxTimeMS.getValue())
+                                          * 1000);
         try {
             txn->checkForInterrupt(); // May trigger maxTimeAlwaysTimeOut fail point.
         }
@@ -1364,7 +1363,7 @@ namespace mongo {
         std::string errmsg;
         bool retval = false;
 
-        client.curop()->ensureStarted();
+        txn->getCurOp()->ensureStarted();
 
         retval = _execCommand(txn, c, dbname, cmdObj, queryOptions, errmsg, result, fromRepl);
 
@@ -1375,7 +1374,7 @@ namespace mongo {
             // Detect mongos connections by looking for setShardVersion to have been run previously
             // on this connection.
             if (shardingState.needCollectionMetadata(dbname)) {
-                appendGLEHelperData(result, client.getLastOp(), replCoord->getElectionId());
+                appendGLEHelperData(result, txn->getClient()->getLastOp(), replCoord->getElectionId());
             }
         }
         return;
@@ -1433,14 +1432,12 @@ namespace mongo {
             queryOptions |= QueryOption_SlaveOk;
         }
 
-        Client& client = cc();
-
         BSONElement e = jsobj.firstElement();
 
         Command * c = e.type() ? Command::findCommand( e.fieldName() ) : 0;
 
         if ( c ) {
-            Command::execCommand(txn, c, client, queryOptions, ns, jsobj, anObjBuilder, fromRepl);
+            Command::execCommand(txn, c, queryOptions, ns, jsobj, anObjBuilder, fromRepl);
         }
         else {
             Command::appendCommandStatus(anObjBuilder,

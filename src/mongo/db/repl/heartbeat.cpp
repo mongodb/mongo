@@ -120,7 +120,7 @@ namespace {
             /* we want to keep heartbeat connections open when relinquishing primary.  
                tag them here. */
             {
-                AbstractMessagingPort *mp = cc().port();
+                AbstractMessagingPort *mp = txn->getClient()->port();
                 if( mp )
                     mp->tag |= ScopedConn::keepOpen;
             }

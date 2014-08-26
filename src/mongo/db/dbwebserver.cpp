@@ -552,10 +552,9 @@ namespace mongo {
             verify( c );
 
             BSONObj cmdObj = BSON( cmd << 1 );
-            Client& client = cc();
 
             BSONObjBuilder result;
-            Command::execCommand(txn, c, client, 0, "admin.", cmdObj , result, false);
+            Command::execCommand(txn, c, 0, "admin.", cmdObj , result, false);
 
             responseCode = 200;
 

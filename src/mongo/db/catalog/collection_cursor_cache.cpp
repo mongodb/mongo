@@ -176,7 +176,7 @@ namespace mongo {
         NamespaceString nss( ns );
 
         if ( checkAuth ) {
-            AuthorizationSession* as = cc().getAuthorizationSession();
+            AuthorizationSession* as = txn->getClient()->getAuthorizationSession();
             bool isAuthorized = as->isAuthorizedForActionsOnNamespace(
                                                 nss, ActionType::killCursors);
             if ( !isAuthorized ) {
