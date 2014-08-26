@@ -1204,7 +1204,7 @@ namespace repl {
         else if (_selfConfig().getPriority() <= 0) {
             return NoPriority;
         }
-        else if (_stepDownUntil <= now) {
+        else if (_stepDownUntil > now) {
             return StepDownPeriodActive;
         }
         else if (_memberState != MemberState::RS_SECONDARY) {
