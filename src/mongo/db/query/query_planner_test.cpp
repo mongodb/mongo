@@ -1097,6 +1097,67 @@ namespace {
         assertSolutionExists("{fetch: {node: {ixscan: {filter: null, dir: -1, pattern: {a: 1}}}}}");
     }
 
+    TEST_F(QueryPlannerTest, MaxMinReverseIndexDir) {
+        addIndex(BSON("a" << -1));
+
+        // Because the index is descending, the min is numerically larger than the max.
+        runQueryFull(BSONObj(), fromjson("{a: -1}"), BSONObj(), 0, 0, BSONObj(),
+                     fromjson("{a: 8}"), fromjson("{a: 2}"), false);
+
+        assertNumSolutions(1);
+        assertSolutionExists("{fetch: {node: {ixscan: {filter: null, dir: 1, pattern: {a: -1}}}}}");
+    }
+
+    TEST_F(QueryPlannerTest, MaxMinReverseIndexDirSort) {
+        addIndex(BSON("a" << -1));
+
+        // Min/max specifies a forward scan with bounds [{a: 8}, {a: 2}]. Asking for
+        // an ascending sort reverses the direction of the scan to [{a: 2}, {a: 8}].
+        runQueryFull(BSONObj(), fromjson("{a: 1}"), BSONObj(), 0, 0, BSONObj(),
+                     fromjson("{a: 8}"), fromjson("{a: 2}"), false);
+
+        assertNumSolutions(1);
+        assertSolutionExists("{fetch: {node: {ixscan: {filter: null, dir: -1,"
+                                "pattern: {a: -1}}}}}");
+    }
+
+    TEST_F(QueryPlannerTest, MaxMinNoMatchingIndexDir) {
+        addIndex(BSON("a" << -1));
+        runInvalidQueryHintMinMax(BSONObj(), fromjson("{a: 2}"), BSONObj(), fromjson("{a: 8}"));
+    }
+
+    TEST_F(QueryPlannerTest, MaxMinSelectCorrectlyOrderedIndex) {
+        // There are both ascending and descending indices on 'a'.
+        addIndex(BSON("a" << 1));
+        addIndex(BSON("a" << -1));
+
+        // The ordering of min and max means that we *must* use the descending index.
+        runQueryFull(BSONObj(), BSONObj(), BSONObj(), 0, 0, BSONObj(),
+                     fromjson("{a: 8}"), fromjson("{a: 2}"), false);
+
+        assertNumSolutions(1);
+        assertSolutionExists("{fetch: {node: {ixscan: {filter: null, dir: 1, pattern: {a: -1}}}}}");
+
+        // If we switch the ordering, then we use the ascending index.
+        // The ordering of min and max means that we *must* use the descending index.
+        runQueryFull(BSONObj(), BSONObj(), BSONObj(), 0, 0, BSONObj(),
+                     fromjson("{a: 2}"), fromjson("{a: 8}"), false);
+
+        assertNumSolutions(1);
+        assertSolutionExists("{fetch: {node: {ixscan: {filter: null, dir: 1, pattern: {a: 1}}}}}");
+    }
+
+    TEST_F(QueryPlannerTest, MaxMinBadHintSelectsReverseIndex) {
+        // There are both ascending and descending indices on 'a'.
+        addIndex(BSON("a" << 1));
+        addIndex(BSON("a" << -1));
+
+        // A query hinting on {a: 1} is bad if min is {a: 8} and {a: 2} because this
+        // min/max pairing requires a descending index.
+        runInvalidQueryFull(BSONObj(), BSONObj(), BSONObj(), 0, 0, fromjson("{a: 1}"),
+                            fromjson("{a: 8}"), fromjson("{a: 2}"), false);
+    }
+
 
     //
     // $snapshot

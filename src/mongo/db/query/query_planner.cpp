@@ -140,6 +140,80 @@ namespace mongo {
         return bob.obj();
     }
 
+    /**
+     * "Finishes" the min object for the $min query option by filling in an empty object with
+     * MinKey/MaxKey and stripping field names.
+     *
+     * In the case that 'minObj' is empty, we "finish" it by filling in either MinKey or MaxKey
+     * instead. Choosing whether to use MinKey or MaxKey is done by comparing against 'maxObj'.
+     * For instance, suppose 'minObj' is empty, 'maxObj' is { a: 3 }, and the key pattern is
+     * { a: -1 }. According to the key pattern ordering, { a: 3 } < MinKey. This means that the
+     * proper resulting bounds are
+     *
+     *   start: { '': MaxKey }, end: { '': 3 }
+     *
+     * as opposed to
+     *
+     *   start: { '': MinKey }, end: { '': 3 }
+     *
+     * Suppose instead that the key pattern is { a: 1 }, with the same 'minObj' and 'maxObj'
+     * (that is, an empty object and { a: 3 } respectively). In this case, { a: 3 } > MinKey,
+     * which means that we use range [{'': MinKey}, {'': 3}]. The proper 'minObj' in this case is
+     * MinKey, whereas in the previous example it was MaxKey.
+     *
+     * If 'minObj' is non-empty, then all we do is strip its field names (because index keys always
+     * have empty field names).
+     */
+    static BSONObj finishMinObj(const BSONObj& kp, const BSONObj& minObj, const BSONObj& maxObj) {
+        BSONObjBuilder bob;
+        bob.appendMinKey("");
+        BSONObj minKey = bob.obj();
+
+        if (minObj.isEmpty()) {
+            if (0 > minKey.woCompare(maxObj, kp, false)) {
+                BSONObjBuilder minKeyBuilder;
+                minKeyBuilder.appendMinKey("");
+                return minKeyBuilder.obj();
+            }
+            else {
+                BSONObjBuilder maxKeyBuilder;
+                maxKeyBuilder.appendMaxKey("");
+                return maxKeyBuilder.obj();
+            }
+        }
+        else {
+            return stripFieldNames(minObj);
+        }
+    }
+
+    /**
+     * "Finishes" the max object for the $max query option by filling in an empty object with
+     * MinKey/MaxKey and stripping field names.
+     *
+     * See comment for finishMinObj() for why we need both 'minObj' and 'maxObj'.
+     */
+    static BSONObj finishMaxObj(const BSONObj& kp, const BSONObj& minObj, const BSONObj& maxObj) {
+        BSONObjBuilder bob;
+        bob.appendMaxKey("");
+        BSONObj maxKey = bob.obj();
+
+        if (maxObj.isEmpty()) {
+            if (0 < maxKey.woCompare(minObj, kp, false)) {
+                BSONObjBuilder maxKeyBuilder;
+                maxKeyBuilder.appendMaxKey("");
+                return maxKeyBuilder.obj();
+            }
+            else {
+                BSONObjBuilder minKeyBuilder;
+                minKeyBuilder.appendMinKey("");
+                return minKeyBuilder.obj();
+            }
+        }
+        else {
+            return stripFieldNames(maxObj);
+        }
+    }
+
     QuerySolution* buildCollscanSoln(const CanonicalQuery& query,
                                      bool tailable,
                                      const QueryPlannerParams& params) {
@@ -526,6 +600,13 @@ namespace mongo {
             BSONObj minObj = query.getParsed().getMin();
             BSONObj maxObj = query.getParsed().getMax();
 
+            // The unfinished siblings of these objects may not be proper index keys because they
+            // may be empty objects or have field names. When an index is picked to use for the
+            // min/max query, these "finished" objects will always be valid index keys for the
+            // index's key pattern.
+            BSONObj finishedMinObj;
+            BSONObj finishedMaxObj;
+
             // This is the index into params.indices[...] that we use.
             size_t idxNo = numeric_limits<size_t>::max();
 
@@ -543,6 +624,17 @@ namespace mongo {
                                   "hint provided does not work with max query");
                 }
 
+                const BSONObj& kp = params.indices[hintIndexNumber].keyPattern;
+                finishedMinObj = finishMinObj(kp, minObj, maxObj);
+                finishedMaxObj = finishMaxObj(kp, minObj, maxObj);
+
+                // The min must be less than the max for the hinted index ordering.
+                if (0 <= finishedMinObj.woCompare(finishedMaxObj, kp, false)) {
+                    QLOG() << "Minobj/Maxobj don't work with hint";
+                    return Status(ErrorCodes::BadValue,
+                                  "hint provided does not work with min/max query");
+                }
+
                 idxNo = hintIndexNumber;
             }
             else {
@@ -553,8 +645,22 @@ namespace mongo {
 
                     BSONObj toUse = minObj.isEmpty() ? maxObj : minObj;
                     if (indexCompatibleMaxMin(toUse, kp)) {
-                        idxNo = i;
-                        break;
+                        // In order to be fully compatible, the min has to be less than the max
+                        // according to the index key pattern ordering. The first step in verifying
+                        // this is "finish" the min and max by replacing empty objects and stripping
+                        // field names.
+                        finishedMinObj = finishMinObj(kp, minObj, maxObj);
+                        finishedMaxObj = finishMaxObj(kp, minObj, maxObj);
+
+                        // Now we have the final min and max. This index is only relevant for
+                        // the min/max query if min < max.
+                        if (0 > finishedMinObj.woCompare(finishedMaxObj, kp, false)) {
+                            // Found a relevant index.
+                            idxNo = i;
+                            break;
+                        }
+
+                        // This index is not relevant; move on to the next.
                     }
                 }
             }
@@ -566,31 +672,14 @@ namespace mongo {
                               "unable to find relevant index for max/min query");
             }
 
-            // maxObj can be empty; the index scan just goes until the end.  minObj can't be empty
-            // though, so if it is, we make a minKey object.
-            if (minObj.isEmpty()) {
-                BSONObjBuilder bob;
-                bob.appendMinKey("");
-                minObj = bob.obj();
-            }
-            else {
-                // Must strip off the field names to make an index key.
-                minObj = stripFieldNames(minObj);
-            }
-
-            if (!maxObj.isEmpty()) {
-                // Must strip off the field names to make an index key.
-                maxObj = stripFieldNames(maxObj);
-            }
-
             QLOG() << "Max/min query using index " << params.indices[idxNo].toString() << endl;
 
             // Make our scan and output.
             QuerySolutionNode* solnRoot = QueryPlannerAccess::makeIndexScan(params.indices[idxNo],
                                                                             query,
                                                                             params,
-                                                                            minObj,
-                                                                            maxObj);
+                                                                            finishedMinObj,
+                                                                            finishedMaxObj);
 
             QuerySolution* soln = QueryPlannerAnalysis::analyzeDataAccess(query, params, solnRoot);
             if (NULL != soln) {
