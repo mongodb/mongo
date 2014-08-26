@@ -426,7 +426,7 @@ __txn_printlog(
 
 	out = cookie;
 
-	p = LOG_SKIP_HEADER(logrec->data, 0);
+	p = LOG_SKIP_HEADER(logrec->data);
 	end = (const uint8_t *)logrec->data + logrec->size;
 
 	/* First, peek at the log record type. */

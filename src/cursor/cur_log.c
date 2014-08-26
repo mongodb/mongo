@@ -30,7 +30,7 @@ __curlog_logrec(
 	 * Read the log header.  Set up the step pointers to walk the
 	 * operations inside the record.  Get the record type.
 	 */
-	cl->stepp = LOG_SKIP_HEADER(cl->logrec->data, 0);
+	cl->stepp = LOG_SKIP_HEADER(cl->logrec->data);
 	cl->stepp_end = (uint8_t *)cl->logrec->data + logrec->size;
 	WT_RET(__wt_logrec_read(session, &cl->stepp, cl->stepp_end,
 	    &cl->rectype));
@@ -172,8 +172,8 @@ __curlog_kv(WT_SESSION_IMPL *session, WT_CURSOR *cursor)
 		 * header and the adjusted size.  Add one to skip over the type
 		 * which is normally consumed by __wt_logrec_read.
 		 */
-		cl->opvalue->data = LOG_SKIP_HEADER(cl->logrec->data, 1);
-		cl->opvalue->size = LOG_REC_SIZE(cl->logrec->size);
+		cl->opvalue->data = LOG_SKIP_HEADER(cl->logrec->data) + 1;
+		cl->opvalue->size = LOG_REC_SIZE(cl->logrec->size) - 1;
 	}
 	/*
 	 * The log cursor sets the LSN and step count as the cursor key and
