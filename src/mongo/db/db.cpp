@@ -847,7 +847,8 @@ namespace mongo {
     }
 } // namespace mongo
 
-MONGO_INITIALIZER(CreateReplicationManager)(InitializerContext* context) {
+MONGO_INITIALIZER_WITH_PREREQUISITES(CreateReplicationManager, ("SetGlobalConfigExperiment"))
+        (InitializerContext* context) {
     repl::setGlobalReplicationCoordinator(new repl::HybridReplicationCoordinator(replSettings));
     return Status::OK();
 }
