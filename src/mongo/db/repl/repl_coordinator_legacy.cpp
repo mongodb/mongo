@@ -515,8 +515,16 @@ namespace {
         result->append("config", theReplSet->config().asBson());
     }
 
-    bool LegacyReplicationCoordinator::setMaintenanceMode(OperationContext* txn, bool activate) {
-        return theReplSet->setMaintenanceMode(txn, activate);
+    Status LegacyReplicationCoordinator::setMaintenanceMode(OperationContext* txn, bool activate) {
+        if (!theReplSet->setMaintenanceMode(txn, activate)) {
+            if (theReplSet->isPrimary()) {
+                return Status(ErrorCodes::NotSecondary, "primaries can't modify maintenance mode");
+            }
+            else {
+                return Status(ErrorCodes::OperationFailed, "already out of maintenance mode");
+            }
+        }
+        return Status::OK();
     }
 
     Status LegacyReplicationCoordinator::processHeartbeat(const ReplSetHeartbeatArgs& args,
@@ -880,21 +888,6 @@ namespace {
         if (secs == 1) {
             resultObj->append("warning", "you really want to freeze for only 1 second?");
         }
-        return Status::OK();
-    }
-
-    Status LegacyReplicationCoordinator::processReplSetMaintenance(OperationContext* txn,
-                                                                   bool activate,
-                                                                   BSONObjBuilder* resultObj) {
-        if (!setMaintenanceMode(txn, activate)) {
-            if (theReplSet->isPrimary()) {
-                return Status(ErrorCodes::NotSecondary, "primaries can't modify maintenance mode");
-            }
-            else {
-                return Status(ErrorCodes::OperationFailed, "already out of maintenance mode");
-            }
-        }
-
         return Status::OK();
     }
 

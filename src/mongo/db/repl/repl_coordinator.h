@@ -292,9 +292,10 @@ namespace repl {
 
         /**
          * Toggles maintenanceMode to the value expressed by 'activate'
-         * return true, if the change worked and false otherwise
+         * return Status::OK if the change worked, NotSecondary if it failed because we are
+         * PRIMARY, and OperationFailed if we are not currently in maintenance mode
          */
-        virtual bool setMaintenanceMode(OperationContext* txn, bool activate) = 0;
+        virtual Status setMaintenanceMode(OperationContext* txn, bool activate) = 0;
 
         /**
          * Handles an incoming replSetSyncFrom command. Adds BSON to 'result'
@@ -303,16 +304,6 @@ namespace repl {
          */
         virtual Status processReplSetSyncFrom(const HostAndPort& target,
                                               BSONObjBuilder* resultObj) = 0;
-
-        /**
-         * Handles an incoming replSetMaintenance command. 'activate' indicates whether to activate
-         * or deactivate maintenanceMode.
-         * returns Status::OK() if maintenanceMode is successfully changed, otherwise returns a
-         * Status containing an error message about the failure
-         */
-        virtual Status processReplSetMaintenance(OperationContext* txn,
-                                                 bool activate,
-                                                 BSONObjBuilder* resultObj) = 0;
 
         /**
          * Handles an incoming replSetFreeze command. Adds BSON to 'resultObj' 

@@ -109,11 +109,7 @@ namespace repl {
 
         virtual void processReplSetGetConfig(BSONObjBuilder* result);
 
-        virtual bool setMaintenanceMode(OperationContext* txn, bool activate);
-
-        virtual Status processReplSetMaintenance(OperationContext* txn,
-                                                 bool activate,
-                                                 BSONObjBuilder* resultObj);
+        virtual Status setMaintenanceMode(OperationContext* txn, bool activate);
 
         virtual Status processReplSetSyncFrom(const HostAndPort& target,
                                               BSONObjBuilder* resultObj);

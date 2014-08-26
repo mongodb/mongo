@@ -207,6 +207,10 @@ namespace repl {
                                   Date_t now,
                                   const OpTime& lastOpApplied);
 
+        virtual void adjustMaintenanceModeCallsBy(int value);
+
+        virtual int getMaintenanceModeCalls();
+
         // Record a ping in millis based on the round-trip time of the heartbeat for the member
         virtual void recordPing(const HostAndPort& host, const Milliseconds elapsedMillis);
 

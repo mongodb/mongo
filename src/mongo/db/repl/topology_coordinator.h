@@ -250,6 +250,17 @@ namespace repl {
                                   Date_t now,
                                   const OpTime& lastOpApplied) = 0;
 
+        /**
+         * Adds "value" to the number of currently active calls to maintenance mode.  Currently
+         * 1 and -1 are the only valid inputs.
+         */
+        virtual void adjustMaintenanceModeCallsBy(int value) = 0;
+
+        /**
+         * Returns the number of current calls into maintenance mode.
+         */
+        virtual int getMaintenanceModeCalls() = 0;
+
         // Record a "ping" based on the round-trip time of the heartbeat for the member
         virtual void recordPing(const HostAndPort& host, const Milliseconds elapsedMillis) = 0;
 

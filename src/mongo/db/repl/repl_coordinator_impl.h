@@ -142,11 +142,7 @@ namespace repl {
 
         virtual void processReplSetGetConfig(BSONObjBuilder* result);
 
-        virtual bool setMaintenanceMode(OperationContext* txn, bool activate);
-
-        virtual Status processReplSetMaintenance(OperationContext* txn,
-                                                 bool activate,
-                                                 BSONObjBuilder* resultObj);
+        virtual Status setMaintenanceMode(OperationContext* txn, bool activate);
 
         virtual Status processReplSetSyncFrom(const HostAndPort& target,
                                               BSONObjBuilder* resultObj);
@@ -229,6 +225,12 @@ namespace repl {
          */
         void testElection();
 
+        /**
+         * Used to set the current member state of this node.
+         * Should only be used in unit tests.
+         */
+        void _setCurrentMemberState_forTest(const MemberState& newState);
+
     private:
 
         /**
@@ -288,6 +290,14 @@ namespace repl {
         void _setCurrentRSConfig_inlock(
                 const ReplicaSetConfig& newConfig,
                 int myIndex);
+
+        /**
+         * Helper method for setting/unsetting maintenance mode.  Scheduled by setMaintenanceMode()
+         * to run in a global write lock in the replication executor thread.
+         */
+        void _setMaintenanceMode_helper(const ReplicationExecutor::CallbackData& cbData,
+                                        bool activate,
+                                        Status* result);
 
         /*
          * Returns the OpTime of the last applied operation on this node.

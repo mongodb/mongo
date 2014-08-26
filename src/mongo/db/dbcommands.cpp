@@ -1172,15 +1172,15 @@ namespace mongo {
     }
 
     /* Sometimes we cannot set maintenance mode, in which case the call to setMaintenanceMode will
-       return false.  This class does not treat that case as an error which means that anybody 
-       using it is assuming it is ok to continue execution without maintenance mode.  This 
+       return a non-OK status.  This class does not treat that case as an error which means that
+       anybody using it is assuming it is ok to continue execution without maintenance mode.  This
        assumption needs to be audited and documented. */
     class MaintenanceModeSetter {
     public:
         MaintenanceModeSetter(OperationContext* txn) :
             _txn(txn),
             maintenanceModeSet(
-                    repl::getGlobalReplicationCoordinator()->setMaintenanceMode(txn, true))
+                    repl::getGlobalReplicationCoordinator()->setMaintenanceMode(txn, true).isOK())
             {}
         ~MaintenanceModeSetter() {
             if (maintenanceModeSet)

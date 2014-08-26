@@ -1042,6 +1042,15 @@ namespace {
         }
     }
 
+    void TopologyCoordinatorImpl::adjustMaintenanceModeCallsBy(int value) {
+        invariant(value == 1 || value == -1);
+        _maintenanceModeCalls += value;
+    }
+
+    int TopologyCoordinatorImpl::getMaintenanceModeCalls() {
+        return _maintenanceModeCalls;
+    }
+
     void TopologyCoordinatorImpl::_setCurrentPrimaryForTest(int primaryIndex) {
         _currentPrimaryIndex = primaryIndex;
         if (primaryIndex == _selfIndex) {

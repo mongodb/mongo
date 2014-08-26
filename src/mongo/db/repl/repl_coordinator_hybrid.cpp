@@ -239,8 +239,8 @@ namespace repl {
         _impl.processReplSetGetConfig(&implResult);
     }
 
-    bool HybridReplicationCoordinator::setMaintenanceMode(OperationContext* txn, bool activate) {
-        bool legacyResponse = _legacy.setMaintenanceMode(txn, activate);
+    Status HybridReplicationCoordinator::setMaintenanceMode(OperationContext* txn, bool activate) {
+        Status legacyResponse = _legacy.setMaintenanceMode(txn, activate);
         _impl.setMaintenanceMode(txn, activate);
         return legacyResponse;
     }
@@ -305,15 +305,6 @@ namespace repl {
         Status legacyStatus = _legacy.processReplSetFreeze(secs, resultObj);
         BSONObjBuilder implResult;
         Status implStatus = _impl.processReplSetFreeze(secs, &implResult);
-        return legacyStatus;
-    }
-
-    Status HybridReplicationCoordinator::processReplSetMaintenance(OperationContext* txn,
-                                                                   bool activate,
-                                                                   BSONObjBuilder* resultObj) {
-        Status legacyStatus = _legacy.processReplSetMaintenance(txn, activate, resultObj);
-        BSONObjBuilder implResult;
-        Status implStatus = _impl.processReplSetMaintenance(txn, activate, &implResult);
         return legacyStatus;
     }
 

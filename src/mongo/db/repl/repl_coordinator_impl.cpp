@@ -295,6 +295,11 @@ namespace {
         return _currentState;
     }
 
+    void ReplicationCoordinatorImpl::_setCurrentMemberState_forTest(const MemberState& newState) {
+        boost::lock_guard<boost::mutex> lk(_mutex);
+        _currentState = newState;
+    }
+
     Status ReplicationCoordinatorImpl::setMyLastOptime(OperationContext* txn, const OpTime& ts) {
         boost::unique_lock<boost::mutex> lock(_mutex);
         return _setLastOptime_inlock(&lock, _getMyRID_inlock(), ts);
@@ -730,9 +735,61 @@ namespace {
         result->append("config", _rsConfig.toBSON());
     }
 
-    bool ReplicationCoordinatorImpl::setMaintenanceMode(OperationContext* txn, bool activate) {
-        // TODO
-        return false;
+    Status ReplicationCoordinatorImpl::setMaintenanceMode(OperationContext* txn, bool activate) {
+        Status result(ErrorCodes::InternalError, "didn't set status in _setMaintenanceMode_helper");
+        CBHStatus cbh = _replExecutor.scheduleWorkWithGlobalExclusiveLock(
+            stdx::bind(&ReplicationCoordinatorImpl::_setMaintenanceMode_helper,
+                       this,
+                       stdx::placeholders::_1,
+                       activate,
+                       &result));
+        if (cbh.getStatus() == ErrorCodes::ShutdownInProgress) {
+            return cbh.getStatus();
+        }
+        fassert(18689, cbh.getStatus());
+        _replExecutor.wait(cbh.getValue());
+        return result;
+    }
+
+    void ReplicationCoordinatorImpl::_setMaintenanceMode_helper(
+            const ReplicationExecutor::CallbackData& cbData,
+            bool activate,
+            Status* result) {
+        if (cbData.status == ErrorCodes::CallbackCanceled) {
+            *result = Status(ErrorCodes::ShutdownInProgress, "replication system is shutting down");
+            return;
+        }
+
+        boost::lock_guard<boost::mutex> lk(_mutex);
+        if (_getCurrentMemberState_inlock().primary()) {
+            *result = Status(ErrorCodes::NotSecondary, "primaries can't modify maintenance mode");
+            return;
+        }
+
+        int curMaintenanceCalls = _topCoord->getMaintenanceModeCalls();
+        if (activate) {
+            log() << "replSet going into maintenance mode with " << curMaintenanceCalls
+                  << " other maintenance mode tasks in progress" << rsLog;
+            _topCoord->adjustMaintenanceModeCallsBy(1);
+        }
+        else if (curMaintenanceCalls > 0) {
+            invariant(_currentState.recovering());
+
+            _topCoord->adjustMaintenanceModeCallsBy(-1);
+            // no need to change state, syncTail will try to go live as a secondary soon
+
+            log() << "leaving maintenance mode (" << curMaintenanceCalls-1 << " other maintenance "
+                    "mode tasks ongoing)" << rsLog;
+            *result = Status::OK();
+            return;
+        } else {
+            warning() << "Attempted to leave maintenance mode but it is not currently active";
+            *result = Status(ErrorCodes::OperationFailed, "already out of maintenance mode");
+            return;
+        }
+
+        _currentState = MemberState::RS_RECOVERING;
+        *result = Status::OK();
     }
 
     Status ReplicationCoordinatorImpl::processReplSetSyncFrom(const HostAndPort& target,
@@ -752,13 +809,6 @@ namespace {
         fassert(18649, cbh.getStatus());
         _replExecutor.wait(cbh.getValue());
         return result;
-    }
-
-    Status ReplicationCoordinatorImpl::processReplSetMaintenance(OperationContext* txn,
-                                                                 bool activate,
-                                                                 BSONObjBuilder* resultObj) {
-        // TODO
-        return Status::OK();
     }
 
     Status ReplicationCoordinatorImpl::processReplSetFreeze(int secs, BSONObjBuilder* resultObj) {

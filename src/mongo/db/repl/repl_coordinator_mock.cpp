@@ -152,20 +152,12 @@ namespace repl {
         return Status::OK();
     }
 
-    bool ReplicationCoordinatorMock::setMaintenanceMode(OperationContext* txn, bool activate) {
-        // TODO
-        return false;
+    Status ReplicationCoordinatorMock::setMaintenanceMode(OperationContext* txn, bool activate) {
+        return Status::OK();
     }
 
     Status ReplicationCoordinatorMock::processReplSetSyncFrom(const HostAndPort& target,
                                                               BSONObjBuilder* resultObj) {
-        // TODO
-        return Status::OK();
-    }
-
-    Status ReplicationCoordinatorMock::processReplSetMaintenance(OperationContext* txn,
-                                                                 bool activate,
-                                                                 BSONObjBuilder* resultObj) {
         // TODO
         return Status::OK();
     }

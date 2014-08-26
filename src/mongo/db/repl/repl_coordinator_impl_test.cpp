@@ -982,6 +982,64 @@ namespace {
         ASSERT_EQUALS(3U, rids.size()); // Make sure we saw all 3 nodes
     }
 
+    TEST_F(ReplCoordTest, SetMaintenanceMode) {
+        init("mySet/test1:1234,test2:1234,test3:1234");
+        assertStartSuccess(
+                BSON("_id" << "mySet" <<
+                     "version" << 1 <<
+                     "members" << BSON_ARRAY(BSON("_id" << 0 << "host" << "test1:1234") <<
+                                             BSON("_id" << 1 << "host" << "test2:1234") <<
+                                             BSON("_id" << 2 << "host" << "test3:1234"))),
+                HostAndPort("test2", 1234));
+        OperationContextNoop txn;
+
+        getReplCoord()->_setCurrentMemberState_forTest(MemberState::RS_SECONDARY);
+
+        // Can't unset maintenance mode if it was never set to begin with.
+        Status status = getReplCoord()->setMaintenanceMode(&txn, false);
+        ASSERT_EQUALS(ErrorCodes::OperationFailed, status);
+        ASSERT_TRUE(getReplCoord()->getCurrentMemberState().secondary());
+
+        // valid set
+        ASSERT_OK(getReplCoord()->setMaintenanceMode(&txn, true));
+        ASSERT_TRUE(getReplCoord()->getCurrentMemberState().recovering());
+
+        // Can set multiple times
+        ASSERT_OK(getReplCoord()->setMaintenanceMode(&txn, true));
+        ASSERT_OK(getReplCoord()->setMaintenanceMode(&txn, true));
+
+        // Need to unset the number of times you set
+        ASSERT_OK(getReplCoord()->setMaintenanceMode(&txn, false));
+        ASSERT_OK(getReplCoord()->setMaintenanceMode(&txn, false));
+        ASSERT_OK(getReplCoord()->setMaintenanceMode(&txn, false));
+        status = getReplCoord()->setMaintenanceMode(&txn, false);
+        // fourth one fails b/c we only set three times
+        ASSERT_EQUALS(ErrorCodes::OperationFailed, status);
+        // Unsetting maintenance mode doesn't actually change our state.
+        ASSERT_TRUE(getReplCoord()->getCurrentMemberState().recovering());
+
+        // Can't modify maintenance mode when PRIMARY
+        getReplCoord()->_setCurrentMemberState_forTest(MemberState::RS_PRIMARY);
+        status = getReplCoord()->setMaintenanceMode(&txn, true);
+        ASSERT_EQUALS(ErrorCodes::NotSecondary, status);
+        ASSERT_TRUE(getReplCoord()->getCurrentMemberState().primary());
+        getReplCoord()->_setCurrentMemberState_forTest(MemberState::RS_SECONDARY);
+        status = getReplCoord()->setMaintenanceMode(&txn, false);
+        ASSERT_EQUALS(ErrorCodes::OperationFailed, status);
+        ASSERT_OK(getReplCoord()->setMaintenanceMode(&txn, true));
+        ASSERT_OK(getReplCoord()->setMaintenanceMode(&txn, false));
+
+        // Setting maintenance mode from any RS state other than primary brings us to RECOVERING
+        // TODO(spencer): Is this actually the desired behavior?
+        getReplCoord()->_setCurrentMemberState_forTest(MemberState::RS_ROLLBACK);
+        ASSERT_TRUE(getReplCoord()->getCurrentMemberState().rollback());
+        ASSERT_OK(getReplCoord()->setMaintenanceMode(&txn, true));
+        ASSERT_TRUE(getReplCoord()->getCurrentMemberState().recovering());
+
+        // TODO(spencer): test that the applier won't put us into secondary state when maintenance
+        // mode is set, then does again once it is unset.
+    }
+
     // TODO(spencer): Unit test replSetFreeze
     // TODO(schwerin): Unit test election id updating
 
