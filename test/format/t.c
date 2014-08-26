@@ -149,13 +149,13 @@ main(int argc, char *argv[])
 	(void)setvbuf(stdout, NULL, _IOLBF, 0);
 
 	/*
-	 * Initialize locks to single-thread named checkpoints and hot backups
-	 * and to single-thread last-record updates.
+	 * Initialize locks to single-thread named checkpoints and backups, and
+	 * to single-thread last-record updates.
 	 */
 	if ((ret = pthread_rwlock_init(&g.append_lock, NULL)) != 0)
 		die(ret, "pthread_rwlock_init: append lock");
 	if ((ret = pthread_rwlock_init(&g.backup_lock, NULL)) != 0)
-		die(ret, "pthread_rwlock_init: hot-backup lock");
+		die(ret, "pthread_rwlock_init: backup lock");
 
 	/* Seed the random number generator. */
 	srand((u_int)(0xdeadbeef ^ (u_int)time(NULL)));
@@ -253,7 +253,7 @@ main(int argc, char *argv[])
 	if ((ret = pthread_rwlock_destroy(&g.append_lock)) != 0)
 		die(ret, "pthread_rwlock_destroy: append lock");
 	if ((ret = pthread_rwlock_destroy(&g.backup_lock)) != 0)
-		die(ret, "pthread_rwlock_destroy: hot-backup lock");
+		die(ret, "pthread_rwlock_destroy: backup lock");
 
 	config_clear();
 

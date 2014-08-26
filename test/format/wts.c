@@ -115,14 +115,13 @@ wts_open(const char *home, int set_api, WT_CONNECTION **connp)
 		die(ENOMEM, "configuration buffer too small");
 
 	/*
-	 * Direct I/O may not work with hot-backups, doing copies through the
-	 * buffer cache after configuring direct I/O in Linux won't work.  If
-	 * direct I/O is configured, turn off hot backups.   This isn't a great
-	 * place to do this check, but it's only here we have the configuration
-	 * string.
+	 * Direct I/O may not work with backups, doing copies through the buffer
+	 * cache after configuring direct I/O in Linux won't work.  If direct
+	 * I/O is configured, turn off backups.   This isn't a great place to do
+	 * this check, but it's only here we have the configuration string.
 	 */
 	if (strstr(config, "direct_io") != NULL)
-		g.c_hot_backups = 0;
+		g.c_backups = 0;
 
 	if ((ret = wiredtiger_open(home, &event_handler, config, &conn)) != 0)
 		die(ret, "wiredtiger_open: %s", home);
