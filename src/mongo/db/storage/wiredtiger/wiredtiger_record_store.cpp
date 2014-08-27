@@ -56,8 +56,7 @@ namespace mongo {
           _isCapped( isCapped ),
           _cappedMaxSize( cappedMaxSize ),
           _cappedMaxDocs( cappedMaxDocs ),
-          _cappedDeleteCallback( cappedDeleteCallback ),
-          _numRecords( 0 ) {
+          _cappedDeleteCallback( cappedDeleteCallback ) {
         if (_isCapped) {
             invariant(_cappedMaxSize > 0);
             invariant(_cappedMaxDocs == -1 || _cappedMaxDocs > 0);
@@ -68,10 +67,10 @@ namespace mongo {
         }
 
         /*
-         * Find the largest DiskLoc currently in use.  We don't have an operation context, so we
-         * can't use an Iterator.
+         * Find the largest DiskLoc currently in use and estimate the number of records.  We don't
+         * have an operation context, so we can't use an Iterator.
          */
-        WiredTigerSession &swrap = *new WiredTigerSession(_db);
+        WiredTigerSession swrap(_db);
         WiredTigerCursor curwrap(GetCursor(swrap), swrap);
         WT_CURSOR *c = curwrap.Get();
         int ret = c->prev(c);
@@ -80,7 +79,10 @@ namespace mongo {
         if (ret == 0) {
             ret = c->get_key(c, &key);
             invariant(ret == 0);
-        }
+            _numRecords = key;
+        } else
+            _numRecords = 0;
+
         // Need to start at 1 so we are always higher than minDiskLoc
         _nextIdNum.store(key + 1);
     }
