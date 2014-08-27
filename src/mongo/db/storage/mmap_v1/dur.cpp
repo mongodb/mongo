@@ -74,6 +74,7 @@
 #include "mongo/platform/basic.h"
 
 #include <boost/thread/thread.hpp>
+#include <iomanip>
 
 #include "mongo/db/client.h"
 #include "mongo/db/commands/fsync.h"

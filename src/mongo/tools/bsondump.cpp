@@ -26,9 +26,10 @@
 *    then also delete it in the license file.
 */
 
-#include "mongo/pch.h"
+#include "mongo/platform/basic.h"
 
 #include <fcntl.h>
+#include <iomanip>
 
 #include "mongo/client/dbclientcursor.h"
 #include "mongo/tools/bsondump_options.h"

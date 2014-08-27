@@ -29,7 +29,9 @@
 
 #if defined(_WIN32)
 
-#include "mongo/pch.h"
+#include "mongo/platform/basic.h"
+
+#include <boost/range/size.hpp>
 
 #include "mongo/util/ntservice.h"
 

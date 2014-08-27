@@ -34,10 +34,11 @@
  *    then also delete it in the license file.
  */
 
-#include "mongo/pch.h"
+#include "mongo/platform/basic.h"
 
 #include <boost/filesystem/operations.hpp>
 #include <boost/thread/thread.hpp>
+#include <iomanip>
 #include <fstream>
 
 #include "mongo/db/db.h"

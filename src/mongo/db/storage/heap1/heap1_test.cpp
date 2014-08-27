@@ -33,6 +33,7 @@
 #include "mongo/db/operation_context_noop.h"
 #include "mongo/db/storage/heap1/heap1_database_catalog_entry.h"
 #include "mongo/db/storage/heap1/heap1_recovery_unit.h"
+#include "mongo/db/storage/record_store.h"
 
 #include "mongo/unittest/unittest.h"
 
@@ -78,7 +79,7 @@ namespace {
         {
             MyOperationContext op;
             RecordStore* rs = db.getRecordStore( &op, "foo.bar" );
-            StatusWith<DiskLoc> loc = rs->insertRecord( &op, "abc", 4, -1 );
+            StatusWith<DiskLoc> loc = rs->insertRecord(&op, "abc", 4, false);
             ASSERT_OK( loc.getStatus() );
             ASSERT_EQUALS( 1, rs->numRecords( &op ) );
             ASSERT_EQUALS( std::string( "abc" ), rs->dataFor( &op, loc.getValue() ).data() );

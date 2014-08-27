@@ -30,12 +30,13 @@
 
 #define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kJournaling
 
-#include "mongo/pch.h"
+#include "mongo/platform/basic.h"
 
 #include "mongo/db/storage/mmap_v1/dur_recover.h"
 
 #include <boost/filesystem/operations.hpp>
 #include <fcntl.h>
+#include <iomanip>
 #include <sys/stat.h>
 
 #include "mongo/db/curop.h"
