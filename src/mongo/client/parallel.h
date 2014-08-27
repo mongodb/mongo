@@ -109,6 +109,8 @@ namespace mongo {
         ParallelConnectionState() :
             count( 0 ), done( false ) { }
 
+        // Please do not reorder. cursor destructor can use conn.
+        // On a related note, never attempt to cleanup these pointers manually.
         ShardConnectionPtr conn;
         DBClientCursorPtr cursor;
 
