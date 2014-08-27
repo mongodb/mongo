@@ -47,9 +47,6 @@ flags = {
 		'SKIP_UPDATE_ERR',
 		'SKIP_UPDATE_RESTORE',
 	],
-	'shared_cache' : [
-		'CACHE_POOL_RUN',
-	],
 	'txn_log_checkpoint' : [
 		'TXN_LOG_CKPT_FAIL',
 		'TXN_LOG_CKPT_PREPARE',

@@ -2,7 +2,6 @@
  * DO NOT EDIT: automatically built by dist/flags.py.
  * flags section: BEGIN
  */
-#define	WT_CACHE_POOL_RUN				0x00000001
 #define	WT_CONN_CACHE_POOL				0x00000800
 #define	WT_CONN_CKPT_SYNC				0x00000400
 #define	WT_CONN_EVICTION_RUN				0x00000200

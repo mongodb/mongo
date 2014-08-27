@@ -19,9 +19,9 @@
 /* Balancing passes after a reduction before a connection is a candidate. */
 #define	WT_CACHE_POOL_REDUCE_SKIPS	5
 
-static int __cache_pool_adjust(uint64_t, uint64_t);
-static int __cache_pool_assess(uint64_t *);
-static int __cache_pool_balance(void);
+static int __cache_pool_adjust(WT_SESSION_IMPL *, uint64_t, uint64_t);
+static int __cache_pool_assess(WT_SESSION_IMPL *, uint64_t *);
+static int __cache_pool_balance(WT_SESSION_IMPL *);
 
 /*
  * __wt_conn_cache_pool_config --
@@ -186,12 +186,23 @@ err:	__wt_spin_unlock(session, &__wt_process.spinlock);
 int
 __wt_conn_cache_pool_open(WT_SESSION_IMPL *session)
 {
+	WT_CACHE *cache;
 	WT_CACHE_POOL *cp;
 	WT_CONNECTION_IMPL *conn;
-	int create_server;
+	WT_DECL_RET;
 
 	conn = S2C(session);
+	cache = conn->cache;
 	cp = __wt_process.cache_pool;
+
+	/*
+	 * Create a session that can be used by the cache pool thread, do
+	 * it in the main thread to avoid shutdown races
+	 */
+	if ((ret = __wt_open_internal_session(
+		conn, "cache-pool", 0, 0, &conn->cache->cp_session)) != 0)
+		WT_RET_MSG(NULL, ret,
+		    "Failed to create session for cache pool");
 
 	/*
 	 * Add this connection into the cache pool connection queue. Figure
@@ -199,19 +210,23 @@ __wt_conn_cache_pool_open(WT_SESSION_IMPL *session)
 	 * start the thread until we have released the lock.
 	 */
 	__wt_spin_lock(session, &cp->cache_pool_lock);
-	create_server = TAILQ_EMPTY(&cp->cache_pool_qh);
 	TAILQ_INSERT_TAIL(&cp->cache_pool_qh, conn, cpq);
 	__wt_spin_unlock(session, &cp->cache_pool_lock);
 
 	WT_RET(__wt_verbose(session, WT_VERB_SHARED_CACHE,
 	    "Added %s to cache pool %s", conn->home, cp->name));
 
-	/* Start the cache pool server if required. */
-	if (create_server) {
-		F_SET(cp, WT_CACHE_POOL_RUN);
-		WT_RET(__wt_thread_create(session,
-		    &cp->cache_pool_tid, __wt_cache_pool_server, NULL));
-	}
+	/*
+	 * Each connection participating in the cache pool starts a manager
+	 * thread. Only one manager is active at a time, but having a thread
+	 * in each connection saves having a complex election process when
+	 * the active connection shuts down.
+	 */
+	F_SET_ATOMIC(cp, WT_CACHE_POOL_ACTIVE);
+	F_SET(cache, WT_CACHE_POOL_RUN);
+	WT_RET(__wt_thread_create(session, &cache->cp_tid,
+	    __wt_cache_pool_server, cache->cp_session));
+
 	/* Wake up the cache pool server to get our initial chunk. */
 	WT_RET(__wt_cond_signal(session, cp->cache_pool_cond));
 
@@ -226,6 +241,7 @@ __wt_conn_cache_pool_open(WT_SESSION_IMPL *session)
 int
 __wt_conn_cache_pool_destroy(WT_CONNECTION_IMPL *conn)
 {
+	WT_CACHE *cache;
 	WT_CACHE_POOL *cp;
 	WT_CONNECTION_IMPL *entry;
 	WT_DECL_RET;
@@ -235,6 +251,7 @@ __wt_conn_cache_pool_destroy(WT_CONNECTION_IMPL *conn)
 
 	cp_locked = found = 0;
 	session = conn->default_session;
+	cache = conn->cache;
 
 	if (!F_ISSET(conn, WT_CONN_CACHE_POOL))
 		return (0);
@@ -260,6 +277,26 @@ __wt_conn_cache_pool_destroy(WT_CONNECTION_IMPL *conn)
 		/* Give the connection's resources back to the pool. */
 		WT_ASSERT(session, cp->currently_used >= conn->cache_size);
 		cp->currently_used -= conn->cache_size;
+
+		/*
+		 * Stop our manager thread - release the cache pool lock while
+		 * joining the thread to allow it to complete any balance
+		 * operation.
+		 */
+		__wt_spin_unlock(session, &cp->cache_pool_lock);
+
+		F_CLR(cache, WT_CACHE_POOL_RUN);
+		WT_TRET(__wt_cond_signal(session, cp->cache_pool_cond));
+		WT_TRET(__wt_thread_join(session, cache->cp_tid));
+
+		wt_session = &cache->cp_session->iface;
+		wt_session->close(wt_session, NULL);
+		/*
+		 * Grab the lock again now to stop other threads joining the
+		 * pool while we are figuring out whether we were the last
+		 * participant.
+		 */
+		__wt_spin_lock(session, &cp->cache_pool_lock);
 	}
 
 	/*
@@ -273,22 +310,10 @@ __wt_conn_cache_pool_destroy(WT_CONNECTION_IMPL *conn)
 
 	if (--cp->refs == 0) {
 		WT_ASSERT(session, TAILQ_EMPTY(&cp->cache_pool_qh));
-		F_CLR(cp, WT_CACHE_POOL_RUN);
+		F_CLR_ATOMIC(cp, WT_CACHE_POOL_ACTIVE);
 	}
 
-	/*
-	 * Free the connection pool session if it was created by this
-	 * connection. A new one will be created by the next balance pass.
-	 */
-	if (cp->session != NULL && conn == S2C(cp->session)) {
-		WT_TRET(__wt_verbose(cp->session, WT_VERB_SHARED_CACHE,
-		    "Freeing a cache pool session due to connection close"));
-		wt_session = &cp->session->iface;
-		WT_TRET(wt_session->close(wt_session, NULL));
-		cp->session = NULL;
-	}
-
-	if (!F_ISSET(cp, WT_CACHE_POOL_RUN)) {
+	if (!F_ISSET_ATOMIC(cp, WT_CACHE_POOL_ACTIVE)) {
 		WT_TRET(__wt_verbose(
 		    session, WT_VERB_SHARED_CACHE, "Destroying cache pool"));
 		__wt_spin_lock(session, &__wt_process.spinlock);
@@ -304,12 +329,6 @@ __wt_conn_cache_pool_destroy(WT_CONNECTION_IMPL *conn)
 		__wt_spin_unlock(session, &cp->cache_pool_lock);
 		cp_locked = 0;
 
-		if (found) {
-			/* Shut down the cache pool worker. */
-			WT_TRET(__wt_cond_signal(session, cp->cache_pool_cond));
-			WT_TRET(__wt_thread_join(session, cp->cache_pool_tid));
-		}
-
 		/* Now free the pool. */
 		__wt_free(session, cp->name);
 
@@ -318,8 +337,16 @@ __wt_conn_cache_pool_destroy(WT_CONNECTION_IMPL *conn)
 		__wt_free(session, cp);
 	}
 
-	if (cp_locked)
+	if (cp_locked) {
 		__wt_spin_unlock(session, &cp->cache_pool_lock);
+
+		/* Notify other participants if we were managing */
+		if (F_ISSET(cache, WT_CACHE_POOL_MANAGER)) {
+			F_CLR_ATOMIC(cp, WT_CACHE_POOL_MANAGED);
+			WT_TRET(__wt_verbose(session, WT_VERB_SHARED_CACHE,
+			    "Shutting down shared cache manager connection"));
+		}
+	}
 
 	return (ret);
 }
@@ -330,7 +357,7 @@ __wt_conn_cache_pool_destroy(WT_CONNECTION_IMPL *conn)
  *	effectively used.
  */
 static int
-__cache_pool_balance(void)
+__cache_pool_balance(WT_SESSION_IMPL *session)
 {
 	WT_CACHE_POOL *cp;
 	WT_CONNECTION_IMPL *entry;
@@ -345,18 +372,7 @@ __cache_pool_balance(void)
 	if ((entry = TAILQ_FIRST(&cp->cache_pool_qh)) == NULL)
 		goto err;
 
-	/*
-	 * The cache pool session handle may be NULL if this is the first
-	 * balance pass, or the connection that created the session handle
-	 * has closed. If it's NULL create a new one.
-	 */
-	if (cp->session == NULL &&
-	    (ret = __wt_open_internal_session(
-		entry, "cache-pool", 0, 0, &cp->session)) != 0)
-		WT_ERR_MSG(NULL, ret,
-		    "Failed to create session for cache pool");
-
-	WT_ERR(__cache_pool_assess(&highest));
+	WT_ERR(__cache_pool_assess(session, &highest));
 	last_used = cp->currently_used;
 	bump_threshold = WT_CACHE_POOL_BUMP_THRESHOLD;
 	/*
@@ -365,7 +381,7 @@ __cache_pool_balance(void)
 	 * - Increase the amount used if there is capacity and any pressure.
 	 */
 	do {
-		WT_ERR(__cache_pool_adjust(highest, --bump_threshold));
+		WT_ERR(__cache_pool_adjust(session, highest, --bump_threshold));
 	} while (cp->currently_used > cp->size ||
 	    (cp->currently_used == last_used && bump_threshold > 0 &&
 	    cp->currently_used < cp->size));
@@ -379,7 +395,7 @@ err:	__wt_spin_unlock(NULL, &cp->cache_pool_lock);
  *	Assess the usage of the cache pool.
  */
 static int
-__cache_pool_assess(uint64_t *phighest)
+__cache_pool_assess(WT_SESSION_IMPL *session, uint64_t *phighest)
 {
 	WT_CACHE_POOL *cp;
 	WT_CACHE *cache;
@@ -406,7 +422,7 @@ __cache_pool_assess(uint64_t *phighest)
 		if (cache->cp_current_evict > highest)
 			highest = cache->cp_current_evict;
 	}
-	WT_RET(__wt_verbose(cp->session, WT_VERB_SHARED_CACHE,
+	WT_RET(__wt_verbose(session, WT_VERB_SHARED_CACHE,
 	    "Highest eviction count: %" PRIu64 ", entries: %" PRIu64,
 	    highest, entries));
 	/* Normalize eviction information across connections. */
@@ -424,7 +440,8 @@ __cache_pool_assess(uint64_t *phighest)
  *	connection allocated more than their reserved size.
  */
 static int
-__cache_pool_adjust(uint64_t highest, uint64_t bump_threshold)
+__cache_pool_adjust(
+    WT_SESSION_IMPL *session, uint64_t highest, uint64_t bump_threshold)
 {
 	WT_CACHE_POOL *cp;
 	WT_CACHE *cache;
@@ -435,10 +452,10 @@ __cache_pool_adjust(uint64_t highest, uint64_t bump_threshold)
 	cp = __wt_process.cache_pool;
 	force = (cp->currently_used > cp->size);
 	grew = 0;
-	if (WT_VERBOSE_ISSET(cp->session, WT_VERB_SHARED_CACHE)) {
-		WT_RET(__wt_verbose(cp->session,
+	if (WT_VERBOSE_ISSET(session, WT_VERB_SHARED_CACHE)) {
+		WT_RET(__wt_verbose(session,
 		    WT_VERB_SHARED_CACHE, "Cache pool distribution: "));
-		WT_RET(__wt_verbose(cp->session, WT_VERB_SHARED_CACHE,
+		WT_RET(__wt_verbose(session, WT_VERB_SHARED_CACHE,
 		    "\t" "cache_size, read_pressure, skips: "));
 	}
 
@@ -448,7 +465,7 @@ __cache_pool_adjust(uint64_t highest, uint64_t bump_threshold)
 		adjusted = 0;
 
 		read_pressure = cache->cp_current_evict / highest;
-		WT_RET(__wt_verbose(cp->session, WT_VERB_SHARED_CACHE,
+		WT_RET(__wt_verbose(session, WT_VERB_SHARED_CACHE,
 		    "\t%" PRIu64 ", %" PRIu64 ", %" PRIu32,
 		    entry->cache_size, read_pressure, cache->cp_skip_count));
 
@@ -497,7 +514,7 @@ __cache_pool_adjust(uint64_t highest, uint64_t bump_threshold)
 				entry->cache_size -= adjusted;
 				cp->currently_used -= adjusted;
 			}
-			WT_RET(__wt_verbose(cp->session, WT_VERB_SHARED_CACHE,
+			WT_RET(__wt_verbose(session, WT_VERB_SHARED_CACHE,
 			    "Allocated %s%" PRId64 " to %s",
 			    grew ? "" : "-", adjusted, entry->home));
 			/*
@@ -516,30 +533,44 @@ __cache_pool_adjust(uint64_t highest, uint64_t bump_threshold)
 void *
 __wt_cache_pool_server(void *arg)
 {
+	WT_CACHE *cache;
 	WT_CACHE_POOL *cp;
 	WT_DECL_RET;
 	WT_SESSION_IMPL *session;
 
-	WT_UNUSED(arg);
+	session = (WT_SESSION_IMPL *)arg;
 
 	cp = __wt_process.cache_pool;
-	session = cp->session;
+	cache = S2C(session)->cache;
 
-	while (F_ISSET(cp, WT_CACHE_POOL_RUN)) {
+	while (F_ISSET_ATOMIC(cp, WT_CACHE_POOL_ACTIVE) &&
+	    F_ISSET(cache, WT_CACHE_POOL_RUN)) {
 		if (cp->currently_used <= cp->size)
 			WT_ERR_TIMEDOUT_OK(__wt_cond_wait(
 			    session, cp->cache_pool_cond, 1000000));
+
 		/*
 		 * Re-check pool run flag - since we want to avoid getting the
 		 * lock on shutdown.
 		 */
-		if (!F_ISSET(cp, WT_CACHE_POOL_RUN))
+		if (!F_ISSET_ATOMIC(cp, WT_CACHE_POOL_ACTIVE) &&
+		    F_ISSET(cache, WT_CACHE_POOL_RUN))
 			break;
+
+		/* Try to become the managing thread */
+		F_CAS_ATOMIC(cp, WT_CACHE_POOL_MANAGED, ret);
+		if (ret == 0) {
+			F_SET(cache, WT_CACHE_POOL_MANAGER);
+			WT_ERR(__wt_verbose(session, WT_VERB_SHARED_CACHE,
+			    "Cache pool switched manager thread"));
+		}
+
 		/*
 		 * Continue even if there was an error. Details of errors are
 		 * reported in the balance function.
 		 */
-		(void)__cache_pool_balance();
+		if (F_ISSET(cache, WT_CACHE_POOL_MANAGER))
+			(void)__cache_pool_balance(session);
 	}
 
 	if (0) {
