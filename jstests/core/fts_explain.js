@@ -11,9 +11,9 @@ res = coll.insert({content: "some data"});
 assert.writeOK(res);
 
 var explain = coll.find({$text:{$search: "\"a\" -b -\"c\""}}).explain(true);
-assert.eq(explain.cursor, "TextCursor");
-assert.eq(explain.stats.stage, "TEXT");
-assert.eq(explain.stats.parsedTextQuery.terms, ["a"]);
-assert.eq(explain.stats.parsedTextQuery.negatedTerms, ["b"]);
-assert.eq(explain.stats.parsedTextQuery.phrases, ["a"]);
-assert.eq(explain.stats.parsedTextQuery.negatedPhrases, ["c"]);
+var stage = explain.executionStats.executionStages;
+assert.eq(stage.stage, "TEXT");
+assert.eq(stage.parsedTextQuery.terms, ["a"]);
+assert.eq(stage.parsedTextQuery.negatedTerms, ["b"]);
+assert.eq(stage.parsedTextQuery.phrases, ["a"]);
+assert.eq(stage.parsedTextQuery.negatedPhrases, ["c"]);

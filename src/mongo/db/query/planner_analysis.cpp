@@ -448,6 +448,11 @@ namespace mongo {
             // We have no idea what the client intended. One way to handle the ambiguity
             // of a limited OR stage is to use the SPLIT_LIMITED_SORT hack.
             //
+            // If wantMore is false (meaning that 'ntoreturn' was initially passed to
+            // the server as a negative value), then we treat numToReturn as a limit.
+            // Since there is no limit-batchSize ambiguity in this case, we do not use the
+            // SPLIT_LIMITED_SORT hack.
+            //
             // If numToReturn is really a limit, then we want to add a limit to this
             // SORT stage, and hence perform a topK.
             //
@@ -458,7 +463,8 @@ namespace mongo {
             // with the topK first. If the client wants a limit, they'll get the efficiency
             // of topK. If they want a batchSize, the other OR branch will deliver the missing
             // results. The OR stage handles deduping.
-            if (params.options & QueryPlannerParams::SPLIT_LIMITED_SORT
+            if (query.getParsed().wantMore()
+                && params.options & QueryPlannerParams::SPLIT_LIMITED_SORT
                 && !QueryPlannerCommon::hasNode(query.root(), MatchExpression::TEXT)
                 && !QueryPlannerCommon::hasNode(query.root(), MatchExpression::GEO)
                 && !QueryPlannerCommon::hasNode(query.root(), MatchExpression::GEO_NEAR)) {

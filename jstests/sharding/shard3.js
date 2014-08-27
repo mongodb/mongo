@@ -1,5 +1,8 @@
 // shard3.js
 
+// Include helpers for analyzing explain output.
+load("jstests/libs/analyze_plan.js");
+
 s = new ShardingTest( "shard3" , 2 , 1 , 2 , { enableBalancer : 1 } );
 
 s2 = s._mongos[1];
@@ -64,10 +67,16 @@ var total = doCounts( "before wrong save" )
 assert.writeOK(secondary.insert( { _id : 111 , num : -3 } ));
 doCounts( "after wrong save" , total , true )
 e = a.find().explain();
-assert.eq( 3 , e.n , "ex1" )
-assert.eq( 4 , e.nscanned , "ex2" )
-assert.eq( 4 , e.nscannedObjects , "ex3" )
-assert.eq( 1 , e.nChunkSkips , "ex4" )
+assert.eq( 3 , e.nReturned , "ex1" )
+assert.eq( 0 , e.totalKeysExamined , "ex2" )
+assert.eq( 4 , e.totalDocsExamined , "ex3" )
+
+var chunkSkips = 0;
+for (var shard in e.shards) {
+    var theShard = e.shards[shard][0];
+    chunkSkips += getChunkSkips(theShard.executionStats.executionStages);
+}
+assert.eq( 1 , chunkSkips , "ex4" )
 
 // SERVER-4612 
 // make sure idhack obeys chunks

@@ -171,7 +171,7 @@ namespace mongo {
             if ( qSpec.isExplain() ) {
                 BSONObjBuilder explain_builder;
                 cursor->explain( explain_builder );
-                explain_builder.appendNumber( "millis",
+                explain_builder.appendNumber( "executionTimeMillis",
                                               static_cast<long long>(queryTimer.millis()) );
                 BSONObj b = explain_builder.obj();
 

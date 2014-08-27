@@ -34,13 +34,11 @@ env.Library(
     target='query',
     source=[
         "explain.cpp",
-        "explain_plan.cpp",
         "get_executor.cpp",
         "new_find.cpp",
         "plan_executor.cpp",
         "plan_ranker.cpp",
         "stage_builder.cpp",
-        "type_explain.cpp",
     ],
     LIBDEPS=[
         "query_planner",

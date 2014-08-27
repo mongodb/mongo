@@ -40,7 +40,7 @@ assert.eq( 1, simpleQueryWithLimit( -1 ).skip( 1 )[ 0 ].b );
 
 // No limit is applied.
 assert.eq( 6, simpleQueryWithLimit( 0 ).itcount() );
-assert.eq( 6, simpleQueryWithLimit( 0 ).explain().nscanned );
+assert.eq( 6, simpleQueryWithLimit( 0 ).explain().executionStats.totalKeysExamined );
 assert.eq( 5, simpleQueryWithLimit( 0 ).skip( 1 ).itcount() );
 
 // The query has additional constriants, preventing limit optimization.
@@ -55,7 +55,7 @@ assert.eq( 0, simpleQuery( {}, { a:-1, b:1 } ).limit( -1 )[ 0 ].b );
 // Without a hint, multiple cursors are attempted.
 assert.eq( 0, t.find( { a:{ $in:[ 1, 2 ] } } ).sort( { b:1 } ).limit( -1 )[ 0 ].b );
 explain = t.find( { a:{ $in:[ 1, 2 ] } } ).sort( { b:1 } ).limit( -1 ).explain( true );
-assert.eq( 1, explain.n );
+assert.eq( 1, explain.executionStats.nReturned );
 
 // The expected first result now comes from the first interval.
 t.remove( { b:0 } );

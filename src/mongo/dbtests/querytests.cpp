@@ -632,8 +632,9 @@ namespace QueryTests {
             // Check number of results and filterSet flag in explain.
             // filterSet is not available in oplog replay mode.
             BSONObj explainObj = c->next();
-            ASSERT_EQUALS( 1, explainObj.getIntField( "n" ) );
-            ASSERT_FALSE( explainObj.hasField( "filterSet" ) );
+            ASSERT( explainObj.hasField("executionStats") );
+            BSONObj execStats = explainObj["executionStats"].Obj();
+            ASSERT_EQUALS( 1, execStats.getIntField( "nReturned" ) );
 
             ASSERT( !c->more() );
         }
@@ -973,26 +974,6 @@ namespace QueryTests {
             checkMatch();
             _client.ensureIndex( _ns, BSON( "a" << 1 ) );
             checkMatch();
-            // Use explain queries to check index bounds.
-            {
-                BSONObj explain = _client.findOne( _ns, QUERY( "a" << BSON( "$type" << (int)Code ) ).explain() );
-                BSONObjBuilder lower;
-                lower.appendCode( "", "" );
-                BSONObjBuilder upper;
-                upper.appendCodeWScope( "", "", BSONObj() );
-                ASSERT( lower.done().firstElement().valuesEqual( explain[ "indexBounds" ].Obj()[ "a" ].Array()[ 0 ].Array()[ 0 ] ) );
-                ASSERT( upper.done().firstElement().valuesEqual( explain[ "indexBounds" ].Obj()[ "a" ].Array()[ 0 ].Array()[ 1 ] ) );
-            }
-            {
-                BSONObj explain = _client.findOne( _ns, QUERY( "a" << BSON( "$type" << (int)CodeWScope ) ).explain() );
-                BSONObjBuilder lower;
-                lower.appendCodeWScope( "", "", BSONObj() );
-                // This upper bound may change if a new bson type is added.
-                BSONObjBuilder upper;
-                upper << "" << BSON( "$maxElement" << 1 );
-                ASSERT( lower.done().firstElement().valuesEqual( explain[ "indexBounds" ].Obj()[ "a" ].Array()[ 0 ].Array()[ 0 ] ) );
-                ASSERT( upper.done().firstElement().valuesEqual( explain[ "indexBounds" ].Obj()[ "a" ].Array()[ 0 ].Array()[ 1 ] ) );
-            }
         }
     private:
         void checkMatch() {

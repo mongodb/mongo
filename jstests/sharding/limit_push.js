@@ -42,7 +42,8 @@ assert.eq("ParallelSort", exp.clusteredType, "Not a ParallelSort");
 
 var k = 0;
 for (var j in exp.shards) {
-    assert.eq( 1 , exp.shards[j][0].n, "'n' is not 1 from shard000" + k.toString());
+    assert.eq( 1 , exp.shards[j][0].executionStats.nReturned,
+               "'n' is not 1 from shard000" + k.toString());
     k++
 }
 

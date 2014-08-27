@@ -35,8 +35,8 @@ function runTest(index) {
     iterations = 10;
     for (var x = 0; x < iterations; ++x) {
         res = t.find({nongeo: needle, geo: {$within: {$centerSphere: [[0,0], Math.PI/180.0]}}})
-        if (res.explain().millis < mintime) {
-            mintime = res.explain().millis
+        if (res.explain().executionStats.executionTimeMillis < mintime) {
+            mintime = res.explain().executionStats.executionTimeMillis;
             resultcount = res.itcount()
         }
     }

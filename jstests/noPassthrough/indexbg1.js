@@ -61,8 +61,8 @@ while( 1 ) { // if indexing finishes before we can run checks, try indexing w/ m
         }
         var ex = t.find( {i:100} ).limit(-1).explain()
         printjson(ex)
-        assert.eq( "BasicCursor", ex.cursor, "used btree cursor" );
-        assert( ex.nscanned < 1000 , "took too long to find 100: " + tojson( ex ) );
+        assert( ex.executionStats.totalKeysExamined < 1000 ,
+                "took too long to find 100: " + tojson( ex ) );
 
 
         assert.writeOK(t.remove({ i: 40 }, true )); // table scan
@@ -101,7 +101,6 @@ print("our tests done, waiting for parallel to finish");
 waitParallel();
 print("finished");
 
-assert.eq( "BtreeCursor i_1", t.find( {i:100} ).explain().cursor );
 assert.eq( 1, t.count( {i:-10} ) );
 assert.eq( 1, t.count( {i:-2} ) );
 assert.eq( 1, t.count( {i:-50} ) );

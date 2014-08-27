@@ -42,9 +42,13 @@ function semiRigorousTime(func) {
 
 function timeWithoutAndWithAnIndex(index, query) {
     t.dropIndex(index);
-    var withoutTime = semiRigorousTime(function() { return t.find(query).explain().millis; });
+    var withoutTime = semiRigorousTime(function() {
+        return t.find(query).explain().executionStats.executionTimeMillis;
+    });
     t.ensureIndex(index);
-    var withTime = semiRigorousTime(function() { return t.find(query).explain().millis; });
+    var withTime = semiRigorousTime(function() {
+        return t.find(query).explain().executionStats.executionTimeMillis;
+    });
     t.dropIndex(index);
     return [withoutTime, withTime];
 }

@@ -23,8 +23,11 @@ function run( n , atomic ){
     var end = null;
     try {
         start = new Date()
-        ex = t.find(function () { num = 2; for (var x = 0; x < 1000; x++) num += 2; return num > 0; }).sort({ _id: -1 }).explain()
-        num = ex.n
+        num = t.find(function () {
+            num = 2;
+            for (var x = 0; x < 1000; x++) num += 2;
+            return num > 0;
+        }).sort({ _id: -1 }).itcount();
         end = new Date()
     }
     catch (e) {
@@ -32,7 +35,7 @@ function run( n , atomic ){
         join();
         throw e;
     }
-    
+
     join()
 
     //print( "cursora.js num: " + num + " time:" + ( end.getTime() - start.getTime() ) )

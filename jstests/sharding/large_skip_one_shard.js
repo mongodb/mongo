@@ -42,7 +42,7 @@ function testSelectWithSkip(coll){
     }
 
     // What we're actually testing
-    assert.lt(explain.n, 90);
+    assert.lt(explain.executionStats.nReturned, 90);
 }
 
 testSelectWithSkip(collSharded);

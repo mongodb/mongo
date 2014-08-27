@@ -34,8 +34,8 @@ function nscannedForCursor( explain, cursor ) {
     return -1;
 }
 
-assert.eq( t.find(q).itcount(),
-           nscannedForCursor( t.find(q).explain(true), 'BtreeCursor arr.x_1_a_1' ), "A5" );
+var explain = t.find(q).hint( { "arr.x" : 1 , a : 1 } ).explain();
+assert.eq( t.find(q).itcount(), explain.executionStats.totalKeysExamined );
 
 printjson(t.find(q).explain());
 print("Num results:");

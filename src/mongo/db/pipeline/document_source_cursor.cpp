@@ -35,7 +35,6 @@
 #include "mongo/db/pipeline/document.h"
 #include "mongo/db/query/explain.h"
 #include "mongo/db/query/find_constants.h"
-#include "mongo/db/query/type_explain.h"
 #include "mongo/db/storage_options.h"
 #include "mongo/s/d_state.h"
 #include "mongo/s/stale_exception.h" // for SendStaleConfigException

@@ -19,8 +19,3 @@ function checkElemMatchMatches() {
 checkElemMatchMatches();
 t.ensureIndex( { 'a.b':1 } );
 checkElemMatchMatches();
-
-// We currently never use an index for negations of
-// ELEM_MATCH_OBJECT expressions.
-var explain = t.find( { a:{ $not:{ $elemMatch:{ b:{ $ne:2 }, c:3 } } } } ).explain();
-assert.eq( "BasicCursor", explain.cursor );

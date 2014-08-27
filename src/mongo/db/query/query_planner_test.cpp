@@ -535,6 +535,68 @@ namespace {
         assertSolutionExists("{fetch: {node: {ixscan: {pattern: {x: 1}}}}}");
     }
 
+    TEST_F(QueryPlannerTest, ExistsBounds) {
+        addIndex(BSON("b" << 1));
+
+        runQuery(fromjson("{b: {$exists: true}}"));
+        assertNumSolutions(2U);
+        assertSolutionExists("{cscan: {dir: 1}}");
+        assertSolutionExists("{fetch: {filter: {b: {$exists: true}}, node: "
+                                "{ixscan: {pattern: {b: 1}, bounds: "
+                                "{b: [['MinKey', 'MaxKey', true, true]]}}}}}");
+
+        // This ends up being a double negation, which we currently don't index.
+        runQuery(fromjson("{b: {$not: {$exists: false}}}"));
+        assertNumSolutions(1U);
+        assertSolutionExists("{cscan: {dir: 1}}");
+
+        runQuery(fromjson("{b: {$exists: false}}"));
+        assertNumSolutions(2U);
+        assertSolutionExists("{cscan: {dir: 1}}");
+        assertSolutionExists("{fetch: {filter: {b: {$exists: false}}, node: "
+                                "{ixscan: {pattern: {b: 1}, bounds: "
+                                "{b: [[null, null, true, true]]}}}}}");
+
+        runQuery(fromjson("{b: {$not: {$exists: true}}}"));
+        assertNumSolutions(2U);
+        assertSolutionExists("{cscan: {dir: 1}}");
+        assertSolutionExists("{fetch: {filter: {b: {$exists: false}}, node: "
+                                "{ixscan: {pattern: {b: 1}, bounds: "
+                                "{b: [[null, null, true, true]]}}}}}");
+    }
+
+    TEST_F(QueryPlannerTest, ExistsBoundsCompound) {
+        addIndex(BSON("a" << 1 << "b" << 1));
+
+        runQuery(fromjson("{a: 1, b: {$exists: true}}"));
+        assertNumSolutions(2U);
+        assertSolutionExists("{cscan: {dir: 1}}");
+        assertSolutionExists("{fetch: {filter: {b: {$exists: true}}, node: "
+                                "{ixscan: {pattern: {a: 1, b: 1}, bounds: "
+                                "{a: [[1,1,true,true]], b: [['MinKey','MaxKey',true,true]]}}}}}");
+
+        // This ends up being a double negation, which we currently don't index.
+        runQuery(fromjson("{a: 1, b: {$not: {$exists: false}}}"));
+        assertNumSolutions(2U);
+        assertSolutionExists("{cscan: {dir: 1}}");
+        assertSolutionExists("{fetch: {node: {ixscan: {pattern: {a: 1, b: 1}, bounds: "
+                                "{a: [[1,1,true,true]], b: [['MinKey','MaxKey',true,true]]}}}}}");
+
+        runQuery(fromjson("{a: 1, b: {$exists: false}}"));
+        assertNumSolutions(2U);
+        assertSolutionExists("{cscan: {dir: 1}}");
+        assertSolutionExists("{fetch: {filter: {b: {$exists: false}}, node: "
+                                "{ixscan: {pattern: {a: 1, b: 1}, bounds: "
+                                "{a: [[1,1,true,true]], b: [[null,null,true,true]]}}}}}");
+
+        runQuery(fromjson("{a: 1, b: {$not: {$exists: true}}}"));
+        assertNumSolutions(2U);
+        assertSolutionExists("{cscan: {dir: 1}}");
+        assertSolutionExists("{fetch: {filter: {b: {$exists: false}}, node: "
+                                "{ixscan: {pattern: {a: 1, b: 1}, bounds: "
+                                "{a: [[1,1,true,true]], b: [[null,null,true,true]]}}}}}");
+    }
+
     //
     // skip and limit
     //
@@ -1523,6 +1585,19 @@ namespace {
                                 "node: {ixscan: {filter: null, pattern: {'foo.b': 1}}}}}");
         assertSolutionExists("{fetch: {filter: {foo:{$all:[{$elemMatch:{b:2,a:2}},{$elemMatch:{a:1,b:1}}]}}, "
                                 "node: {ixscan: {filter: null, pattern: {'foo.b': 1}}}}}");*/
+    }
+
+    TEST_F(QueryPlannerTest, BasicAllElemMatch2) {
+        // true means multikey
+        addIndex(BSON("a.x" << 1), true);
+
+        runQuery(fromjson("{a: {$all: [{$elemMatch: {x: 3}}, {$elemMatch: {y: 5}}]}}"));
+
+        assertNumSolutions(2U);
+        assertSolutionExists("{cscan: {dir: 1}}");
+        assertSolutionExists("{fetch: {filter: {a:{$all:[{$elemMatch:{x:3}},{$elemMatch:{y:5}}]}},"
+                                "node: {ixscan: {pattern: {'a.x': 1},"
+                                    "bounds: {'a.x': [[3,3,true,true]]}}}}}");
     }
 
     // SERVER-13677
@@ -3533,6 +3608,21 @@ namespace {
         assertSolutionExists("{cscan: {dir: 1}}");
         assertSolutionExists("{fetch: {filter: null, node: {ixscan: {pattern: {a:1}, "
                                 "bounds: {a: [['MinKey','MaxKey',true,true]]}}}}}");
+    }
+
+    TEST_F(QueryPlannerTest, BoundsTypeMinKeyMaxKey) {
+        params.options = QueryPlannerParams::NO_TABLE_SCAN;
+        addIndex(BSON("a" << 1));
+
+        runQuery(fromjson("{a: {$type: -1}}"));
+        assertNumSolutions(1U);
+        assertSolutionExists("{fetch: {node: {ixscan: {pattern: {a: 1}, bounds:"
+                                "{a: [['MinKey','MinKey',true,true]]}}}}}");
+
+        runQuery(fromjson("{a: {$type: 127}}"));
+        assertNumSolutions(1U);
+        assertSolutionExists("{fetch: {node: {ixscan: {pattern: {a: 1}, bounds:"
+                                "{a: [['MaxKey','MaxKey',true,true]]}}}}}");
     }
 
     //

@@ -50,7 +50,7 @@ rsTest.getSecondaries().forEach(function(sec) {
 // a couple of times.
 for (var x = 0; x < 20; x++) {
     var explain = fooDB0.user.find().readPref('secondary').explain();
-    assert.eq(1, explain.n);
+    assert.eq(1, explain.executionStats.nReturned);
 
     assert.throws(function() {
         explain = barDB0.user.find().readPref('secondary').explain();
@@ -61,7 +61,7 @@ for (var x = 0; x < 20; x++) {
     });
 
     explain = barDB1.user.find().readPref('secondary').explain();
-    assert.eq(1, explain.n);
+    assert.eq(1, explain.executionStats.nReturned);
 }
 
 rsTest.stopSet();

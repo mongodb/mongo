@@ -2,6 +2,11 @@
 t = db.index_check6;
 t.drop();
 
+function keysExamined(query, hint) {
+    var explain = t.find(query).hint(hint).explain();
+    return explain.executionStats.totalKeysExamined;
+}
+
 t.ensureIndex( { age : 1 , rating : 1 } );
 
 for ( var age=10; age<50; age++ ){
@@ -10,16 +15,22 @@ for ( var age=10; age<50; age++ ){
     }
 }
 
-assert.eq( 10 , t.find( { age : 30 } ).explain().nscanned , "A" );
-assert.eq( 20 , t.find( { age : { $gte : 29 , $lte : 30 } } ).explain().nscanned , "B" );
-assert.eq( 18 , t.find( { age : { $gte : 25 , $lte : 30 }, rating: {$in: [0,9] } } ).hint( {age:1,rating:1} ).explain().nscanned , "C1" );
-assert.eq( 23 , t.find( { age : { $gte : 25 , $lte : 30 }, rating: {$in: [0,8] } } ).hint( {age:1,rating:1} ).explain().nscanned , "C2" );
-assert.eq( 28 , t.find( { age : { $gte : 25 , $lte : 30 }, rating: {$in: [1,8] } } ).hint( {age:1,rating:1} ).explain().nscanned , "C3" );
+assert.eq( 10 , keysExamined( { age : 30 }, {} ) , "A" );
+assert.eq( 20 , keysExamined( { age : { $gte : 29 , $lte : 30 } }, {} ) , "B" );
+assert.eq( 18 , keysExamined( { age : { $gte : 25 , $lte : 30 }, rating: {$in: [0,9] } },
+                              {age:1,rating:1} ) , "C1" );
+assert.eq( 23 , keysExamined( { age : { $gte : 25 , $lte : 30 }, rating: {$in: [0,8] } },
+                              {age:1,rating:1} ) , "C2" );
+assert.eq( 28 , keysExamined( { age : { $gte : 25 , $lte : 30 }, rating: {$in: [1,8] } },
+                              {age:1,rating:1} ) , "C3" );
 
-assert.eq( 4 , t.find( { age : { $gte : 29 , $lte : 30 } , rating : 5 } ).hint( {age:1,rating:1} ).explain().nscanned , "C" ); // SERVER-371
-assert.eq( 6 , t.find( { age : { $gte : 29 , $lte : 30 } , rating : { $gte : 4 , $lte : 5 } } ).hint( {age:1,rating:1} ).explain().nscanned , "D" ); // SERVER-371
+assert.eq( 4 , keysExamined( { age : { $gte : 29 , $lte : 30 } , rating : 5 },
+                             {age:1,rating:1} ) , "C" ); // SERVER-371
+assert.eq( 6 , keysExamined( { age : { $gte : 29 , $lte : 30 } , rating : { $gte : 4 , $lte : 5 } },
+                             {age:1,rating:1} ) , "D" ); // SERVER-371
 
-assert.eq.automsg( "2", "t.find( { age:30, rating:{ $gte:4, $lte:5} } ).explain().nscanned" );
+assert.eq.automsg( "2", "t.find( { age:30, rating:{ $gte:4, $lte:5} } ).explain()" +
+    ".executionStats.totalKeysExamined" );
 
 t.drop();
 
@@ -32,7 +43,8 @@ for ( var a=1; a<10; a++ ){
 }
 
 function doQuery( count, query, sort, index ) {
-    var nscanned = t.find( query ).hint( index ).sort( sort ).explain().nscanned;
+    var explain = t.find( query ).hint( index ).sort( sort ).explain();
+    var nscanned = explain.executionStats.totalKeysExamined;
     assert(Math.abs(count - nscanned) <= 2);
 }
 

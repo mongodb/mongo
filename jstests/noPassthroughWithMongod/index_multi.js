@@ -119,7 +119,7 @@ print("Make sure we end up with 64 indexes");
 for (var i in specs) {
     print("trying to hint on "+tojson(specs[i]));
     var explain = coll.find().hint(specs[i]).explain();
-    assert.eq(multikey[i], explain.isMultiKey, tojson(explain));
+    assert("queryPlanner" in explain, tojson(explain));
 }
 
 print("SUCCESS!");

@@ -34,16 +34,11 @@
 #include "mongo/db/query/plan_executor.h"
 #include "mongo/db/query/query_planner_params.h"
 #include "mongo/db/query/query_solution.h"
-#include "mongo/db/query/type_explain.h"
 
 namespace mongo {
 
     class Collection;
     class OperationContext;
-
-    // Temporarily hide the new explain implementation behind a setParameter.
-    // TODO: take this out, and make the new implementation the default.
-    extern bool enableNewExplain;
 
     /**
      * A container for the summary statistics that the profiler, slow query log, and
@@ -180,16 +175,6 @@ namespace mongo {
          * are no stages, this requires a special explain format.
          */
         static void explainCountEmptyQuery(BSONObjBuilder* out);
-
-        /**
-         * Generate the legacy explain format from a PlanExecutor.
-         *
-         * On success, the caller owns 'explain'.
-         *
-         * TODO: THIS IS TEMPORARY. Once the legacy explain code is deleted, we won't
-         * need this anymore.
-         */
-        static Status legacyExplain(PlanExecutor* exec, TypeExplain** explain);
 
     private:
         /**
