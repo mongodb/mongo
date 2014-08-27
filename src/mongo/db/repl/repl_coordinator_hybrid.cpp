@@ -170,6 +170,12 @@ namespace repl {
         return legacyStatus;
     }
 
+    Status HybridReplicationCoordinator::setMyLastOptime(OperationContext* txn, const OpTime& ts) {
+        Status legacyStatus = _legacy.setMyLastOptime(txn, ts);
+        Status implStatus = _impl.setMyLastOptime(txn, ts);
+        return legacyStatus;
+    }
+
     OID HybridReplicationCoordinator::getElectionId() {
         OID legacyOID = _legacy.getElectionId();
         _impl.getElectionId();

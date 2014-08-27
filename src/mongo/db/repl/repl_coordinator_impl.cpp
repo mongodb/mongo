@@ -307,48 +307,56 @@ namespace {
         return _currentState;
     }
 
+    Status ReplicationCoordinatorImpl::setMyLastOptime(OperationContext* txn, const OpTime& ts) {
+        boost::unique_lock<boost::mutex> lock(_mutex);
+        return _setLastOptime_inlock(&lock, _getMyRID_inlock(), ts);
+    }
+
     Status ReplicationCoordinatorImpl::setLastOptime(OperationContext* txn,
                                                      const OID& rid,
                                                      const OpTime& ts) {
+        boost::unique_lock<boost::mutex> lock(_mutex);
+        return _setLastOptime_inlock(&lock, rid, ts);
+    }
+
+    Status ReplicationCoordinatorImpl::_setLastOptime_inlock(boost::unique_lock<boost::mutex>* lock,
+                                                             const OID& rid,
+                                                             const OpTime& ts) {
+        invariant(lock->owns_lock());
+
         LOG(2) << "received notification that node with RID " << rid <<
                 " has reached optime: " << ts;
-        bool forwardProgress = false;
-        {
-            boost::lock_guard<boost::mutex> lk(_mutex);
 
-            SlaveInfo& slaveInfo = _slaveInfoMap[rid];
-            if (slaveInfo.memberID < 0 && _getReplicationMode_inlock() == modeReplSet) {
-                warning() << "Received replSetUpdatePosition for node with RID" << rid
-                          << ", but we haven't yet received a handshake for that node. Stored "
-                          << "member ID: " << slaveInfo.memberID << ", stored member hostAndPort: "
-                          << slaveInfo.hostAndPort.toString() << ".  Our RID: " << getMyRID(NULL);
-            }
-            invariant(slaveInfo.memberID >= 0 || _getReplicationMode_inlock() == modeMasterSlave);
-
-            LOG(3) << "Node with RID " << rid << " currently has optime " << slaveInfo.opTime <<
-                    "; updating to " << ts;
-            if (slaveInfo.opTime < ts) {
-                slaveInfo.opTime = ts;
-
-                // Wake up any threads waiting for replication that now have their replication
-                // check satisfied
-                for (std::vector<WaiterInfo*>::iterator it = _replicationWaiterList.begin();
-                        it != _replicationWaiterList.end(); ++it) {
-                    WaiterInfo* info = *it;
-                    if (_doneWaitingForReplication_inlock(*info->opTime, *info->writeConcern)) {
-                        info->condVar->notify_all();
-                    }
-                }
-
-                if (_getReplicationMode_inlock() == modeReplSet &&
-                        !_getCurrentMemberState_inlock().primary()) {
-                    // pass along if we are not primary
-                    forwardProgress = true;
-                }
-            }
+        SlaveInfo& slaveInfo = _slaveInfoMap[rid];
+        if (slaveInfo.memberID < 0 && _getReplicationMode_inlock() == modeReplSet) {
+            warning() << "Received replSetUpdatePosition for node with RID" << rid
+                      << ", but we haven't yet received a handshake for that node. Stored "
+                      << "member ID: " << slaveInfo.memberID << ", stored member hostAndPort: "
+                      << slaveInfo.hostAndPort.toString() << ".  Our RID: " << getMyRID();
         }
-        if (forwardProgress) {
-            _externalState->forwardSlaveProgress(); // Must do this outside _mutex
+        invariant(slaveInfo.memberID >= 0 || _getReplicationMode_inlock() == modeMasterSlave);
+
+        LOG(3) << "Node with RID " << rid << " currently has optime " << slaveInfo.opTime <<
+                "; updating to " << ts;
+        if (slaveInfo.opTime < ts) {
+            slaveInfo.opTime = ts;
+
+            // Wake up any threads waiting for replication that now have their replication
+            // check satisfied
+            for (std::vector<WaiterInfo*>::iterator it = _replicationWaiterList.begin();
+                    it != _replicationWaiterList.end(); ++it) {
+                WaiterInfo* info = *it;
+                if (_doneWaitingForReplication_inlock(*info->opTime, *info->writeConcern)) {
+                    info->condVar->notify_all();
+                }
+            }
+
+            if (_getReplicationMode_inlock() == modeReplSet &&
+                    !_getCurrentMemberState_inlock().primary()) {
+                // pass along if we are not primary
+                lock->unlock();
+                _externalState->forwardSlaveProgress(); // Must do this outside _mutex
+            }
         }
         return Status::OK();
     }

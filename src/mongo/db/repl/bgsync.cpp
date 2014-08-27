@@ -114,11 +114,6 @@ namespace repl {
     }
 
     void BackgroundSync::notify() {
-        OperationContextImpl txn;
-
-        ReplicationCoordinator* replCoord = getGlobalReplicationCoordinator();
-        replCoord->setLastOptime(&txn, replCoord->getMyRID(&txn), theReplSet->lastOpTimeWritten);
-
         {
             boost::unique_lock<boost::mutex> lock(s_instance->_mutex);
 

@@ -162,6 +162,8 @@ namespace repl {
                 theReplSet->lastH = h;
                 ctx.getClient()->setLastOp( ts );
 
+                ReplicationCoordinator* replCoord = getGlobalReplicationCoordinator();
+                replCoord->setMyLastOptime(txn, ts);
                 BackgroundSync::notify();
             }
         }
@@ -322,6 +324,9 @@ namespace repl {
             theReplSet->lastOpTimeWritten = ts;
             theReplSet->lastH = hashNew;
             ctx.getClient()->setLastOp( ts );
+
+            ReplicationCoordinator* replCoord = getGlobalReplicationCoordinator();
+            replCoord->setMyLastOptime(txn, ts);
         }
         wunit.commit();
 
@@ -385,6 +390,9 @@ namespace repl {
         checkOplogInsert( localOplogMainCollection->insertDocument( txn, &writer, false ) );
 
         ctx.getClient()->setLastOp( ts );
+
+        ReplicationCoordinator* replCoord = getGlobalReplicationCoordinator();
+        replCoord->setMyLastOptime(txn, ts);
         wunit.commit();
     }
 

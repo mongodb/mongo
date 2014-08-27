@@ -120,10 +120,13 @@ namespace repl {
     Status ReplicationCoordinatorMock::setLastOptime(OperationContext* txn,
                                                      const OID& rid,
                                                      const OpTime& ts) {
-        // TODO
         return Status::OK();
     }
     
+    Status ReplicationCoordinatorMock::setMyLastOptime(OperationContext* txn, const OpTime& ts) {
+        return Status::OK();
+    }
+
     OID ReplicationCoordinatorMock::getElectionId() {
         // TODO
         return OID();

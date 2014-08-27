@@ -92,6 +92,8 @@ namespace repl {
 
         virtual Status setLastOptime(OperationContext* txn, const OID& rid, const OpTime& ts);
 
+        virtual Status setMyLastOptime(OperationContext* txn, const OpTime& ts);
+
         virtual OID getElectionId();
 
         virtual OID getMyRID();

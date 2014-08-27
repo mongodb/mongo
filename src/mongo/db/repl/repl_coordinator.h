@@ -241,8 +241,14 @@ namespace repl {
          *
          * @returns ErrorCodes::NodeNotFound if the member cannot be found in sync progress tracking
          * @returns Status::OK() otherwise
+         * TODO(spencer): Remove txn argument and make into a void function when legacy is gone.
          */
         virtual Status setLastOptime(OperationContext* txn, const OID& rid, const OpTime& ts) = 0;
+
+        /**
+         * Delegates to setLastOptime using our RID as the rid argument.
+         */
+        virtual Status setMyLastOptime(OperationContext* txn, const OpTime& ts) = 0;
 
         /**
          * Retrieves and returns the current election id, which is a unique id that is local to

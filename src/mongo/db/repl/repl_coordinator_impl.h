@@ -124,6 +124,8 @@ namespace repl {
 
         virtual Status setLastOptime(OperationContext* txn, const OID& rid, const OpTime& ts);
 
+        virtual Status setMyLastOptime(OperationContext* txn, const OpTime& ts);
+
         virtual OID getElectionId();
 
         virtual OID getMyRID();
@@ -308,6 +310,15 @@ namespace repl {
                 const WriteConcernOptions& writeConcern) const;
 
         OID _getMyRID_inlock();
+
+        /**
+         * Helper method for setLastOptime and setMyLastOptime that takes in a unique lock on
+         * _mutex.  The passed in lock must already be locked.  It is unknown what state the lock
+         * will be in after this method finishes.
+         */
+        Status _setLastOptime_inlock(boost::unique_lock<boost::mutex>* lock,
+                                     const OID& rid,
+                                     const OpTime& ts);
 
         /**
          * Processes each heartbeat response.

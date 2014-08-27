@@ -380,6 +380,10 @@ namespace {
         return true;
     }
 
+    Status LegacyReplicationCoordinator::setMyLastOptime(OperationContext* txn, const OpTime& ts) {
+        return setLastOptime(txn, getMyRID(), ts);
+    }
+
     Status LegacyReplicationCoordinator::setLastOptime(OperationContext* txn,
                                                        const OID& rid,
                                                        const OpTime& ts) {
