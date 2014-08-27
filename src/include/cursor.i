@@ -123,7 +123,7 @@ __curfile_leave(WT_CURSOR_BTREE *cbt)
 	 * eviction (e.g., forced eviction of big pages), so it is important to
 	 * do it after releasing our snapshot above.
 	 */
-	WT_RET(__wt_page_release(session, cbt->ref));
+	WT_RET(__wt_page_release(session, cbt->ref, 0));
 	cbt->ref = NULL;
 	return (0);
 }

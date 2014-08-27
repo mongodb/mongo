@@ -138,7 +138,7 @@ struct __wt_item {
 #endif
 };
 
-/*!
+/*
  * We rely on this structure being aligned at 64 bits by the compiler,
  * if we were paranoid we could add an unused field to ensure the padding
  * is correct.
@@ -146,9 +146,12 @@ struct __wt_item {
  * NOTE:  If you change the contents of this structure you must also update
  * the macros in log.h.
  */
+/*!
+ * A log sequence number, representing a position in the transaction log.
+ */
 struct __wt_lsn {
-	uint32_t        file;           /* Log file number */
-	off_t           offset;         /* Log file offset */
+	uint32_t        file;           /*!< Log file number */
+	off_t           offset;         /*!< Log file offset */
 };
 
 /*!
@@ -829,41 +832,7 @@ struct __wt_session {
 	 *  (for example, they may be read-only or not support transactional
 	 *  updates).  See @ref data_sources for more information.
 	 *  <br>
-	 *  The following are the builtin cursor types:
-	 *  <table>
-	 *  @hrow{URI, Type, Key/Value types}
-	 *  @row{<tt>backup:</tt>,
-	 *	hot backup cursor,
-	 *	key=<code>string</code>\, see @ref hot_backup for details}
-	 *  @row{<tt>colgroup:\<table name\>:\<column group name\></tt>,
-	 *	column group cursor,
-	 *	table key\, column group value(s)}
-	 *  @row{<tt>index:\<table name\>:\<index name\>[\<projection\>]</tt>,
-	 *	index cursor,
-	 *	key=index key\, value=table value(s) with optional projection
-	 *	of columns}
-	 *  @row{<tt>statistics:[\<data source URI\>]</tt>,
-	 *	database or data source statistics cursor,
-	 *	key=<code>int id</code>\, value=(<code>string description\,
-	 *	string value\, uint64_t value</code>)\,
-	 *	see @ref data_statistics for details}
-	 *  @row{<tt>table:\<table name\>[\<projection\>]</tt>,
-	 *	table cursor,
-	 *	table key\, table value(s) with optional projection of columns}
-	 *  </table>
-	 *  Advanced applications may also choose to open the following
-	 *  additional cursor types:
-	 *  <table>
-	 *  @row{<tt>file:\<file name\></tt>,
-	 *	file cursor,
-	 *	file key\, file value}
-	 *  @row{<tt>lsm:\<name\></tt>,
-	 *	LSM cursor,
-	 *	LSM key\, LSM value: see @ref lsm}
-	 *  @row{<tt>metadata:</tt>,
-	 *	metadata cursor,
-	 *	metadata key\, metadata value: see @ref metadata}
-	 *  </table>
+	 *  @copydoc doc_cursor_types
 	 * @param to_dup a cursor to duplicate
 	 * @configstart{session.open_cursor, see dist/api_data.py}
 	 * @config{append, append the value as a new record\, creating a new
@@ -961,6 +930,8 @@ struct __wt_session {
 	 * by overflow items\, and the default value of 4KB is a good choice
 	 * absent requirements from the operating system or storage device., an
 	 * integer between 512B and 128MB; default \c 4KB.}
+	 * @config{app_metadata, application-owned metadata for this object., a
+	 * string; default empty.}
 	 * @config{block_allocation, configure block allocation.  Permitted
 	 * values are \c "first" or \c "best"; the \c "first" configuration uses
 	 * a first-available algorithm during block allocation\, the \c "best"
@@ -1172,10 +1143,9 @@ struct __wt_session {
 	    const char *name, const char *config);
 
 	/*!
-	 * Print something to the log file
-	 *
-	 * The database must be configured for logging when this
-	 * method is called.
+	 * Insert a ::WT_LOGREC_MESSAGE type record in the database log files
+	 * (the database must be configured for logging when this method is
+	 * called).
 	 *
 	 * @param session the session handle
 	 * @param fmt a printf format specifier
@@ -1510,6 +1480,11 @@ struct __wt_connection {
 	 * both., an integer between 1MB and 10TB; default \c 100MB.}
 	 * @config{checkpoint = (, periodically checkpoint the database., a set
 	 * of related configuration options defined below.}
+	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;log_size, wait for this amount of log
+	 * record bytes to be written to the log between each checkpoint.  A
+	 * database can configure both log_size and wait to set an upper bound
+	 * for checkpoints; setting this value above 0 configures periodic
+	 * checkpoints., an integer between 0 and 2GB; default \c 0.}
 	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;name, the checkpoint name., a string;
 	 * default \c "WiredTigerCheckpoint".}
 	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;wait, seconds to wait between each
@@ -1518,6 +1493,17 @@ struct __wt_connection {
 	 * @config{ ),,}
 	 * @config{error_prefix, prefix string for error messages., a string;
 	 * default empty.}
+	 * @config{eviction = (, eviction configuration options., a set of
+	 * related configuration options defined below.}
+	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;threads_max, maximum number of
+	 * threads WiredTiger will start to help evict pages from cache.  The
+	 * number of threads started will vary depending on the current eviction
+	 * load., an integer between 1 and 20; default \c 1.}
+	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;threads_min, minimum number of
+	 * threads WiredTiger will start to help evict pages from cache.  The
+	 * number of threads currently running will vary depending on the
+	 * current eviction load., an integer between 1 and 20; default \c 1.}
+	 * @config{ ),,}
 	 * @config{eviction_dirty_target, continue evicting until the cache has
 	 * less dirty memory than the value\, as a percentage of the total cache
 	 * size.  Dirty pages will only be evicted if the cache is full enough
@@ -1529,8 +1515,6 @@ struct __wt_connection {
 	 * @config{eviction_trigger, trigger eviction when the cache is using
 	 * this much memory\, as a percentage of the total cache size., an
 	 * integer between 10 and 99; default \c 95.}
-	 * @config{eviction_workers, additional threads to help evict pages from
-	 * cache., an integer between 0 and 20; default \c 0.}
 	 * @config{lsm_manager = (, configure database wide options for LSM tree
 	 * management., a set of related configuration options defined below.}
 	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;merge, merge LSM chunks where
@@ -1684,7 +1668,9 @@ struct __wt_connection {
 	 * @snippet ex_all.c Load an extension
 	 *
 	 * @param connection the connection handle
-	 * @param path the filename of the extension module
+	 * @param path the filename of the extension module, or \c "local" to
+	 * search the current application binary for the initialization
+	 * function, see @ref extensions for more details.
 	 * @configstart{connection.load_extension, see dist/api_data.py}
 	 * @config{config, configuration string passed to the entry point of the
 	 * extension as its WT_CONFIG_ARG argument., a string; default empty.}
@@ -1820,11 +1806,16 @@ struct __wt_connection {
  * integer between 1MB and 10TB; default \c 100MB.}
  * @config{checkpoint = (, periodically checkpoint the database., a set of
  * related configuration options defined below.}
- * @config{&nbsp;&nbsp;&nbsp;&nbsp;name, the checkpoint name., a string; default
- * \c "WiredTigerCheckpoint".}
- * @config{&nbsp;&nbsp;&nbsp;&nbsp;wait, seconds to
- * wait between each checkpoint; setting this value above 0 configures periodic
- * checkpoints., an integer between 0 and 100000; default \c 0.}
+ * @config{&nbsp;&nbsp;&nbsp;&nbsp;log_size, wait for this amount of log record
+ * bytes to be written to the log between each checkpoint.  A database can
+ * configure both log_size and wait to set an upper bound for checkpoints;
+ * setting this value above 0 configures periodic checkpoints., an integer
+ * between 0 and 2GB; default \c 0.}
+ * @config{&nbsp;&nbsp;&nbsp;&nbsp;name, the
+ * checkpoint name., a string; default \c "WiredTigerCheckpoint".}
+ * @config{&nbsp;&nbsp;&nbsp;&nbsp;wait, seconds to wait between each
+ * checkpoint; setting this value above 0 configures periodic checkpoints., an
+ * integer between 0 and 100000; default \c 0.}
  * @config{ ),,}
  * @config{checkpoint_sync, flush files to stable storage when closing or
  * writing checkpoints., a boolean flag; default \c true.}
@@ -1841,6 +1832,17 @@ struct __wt_connection {
  * "log"; default empty.}
  * @config{error_prefix, prefix string for error messages., a string; default
  * empty.}
+ * @config{eviction = (, eviction configuration options., a set of related
+ * configuration options defined below.}
+ * @config{&nbsp;&nbsp;&nbsp;&nbsp;threads_max, maximum number of threads
+ * WiredTiger will start to help evict pages from cache.  The number of threads
+ * started will vary depending on the current eviction load., an integer between
+ * 1 and 20; default \c 1.}
+ * @config{&nbsp;&nbsp;&nbsp;&nbsp;threads_min, minimum
+ * number of threads WiredTiger will start to help evict pages from cache.  The
+ * number of threads currently running will vary depending on the current
+ * eviction load., an integer between 1 and 20; default \c 1.}
+ * @config{ ),,}
  * @config{eviction_dirty_target, continue evicting until the cache has less
  * dirty memory than the value\, as a percentage of the total cache size.  Dirty
  * pages will only be evicted if the cache is full enough to trigger eviction.,
@@ -1851,8 +1853,6 @@ struct __wt_connection {
  * @config{eviction_trigger, trigger eviction when the cache is using this much
  * memory\, as a percentage of the total cache size., an integer between 10 and
  * 99; default \c 95.}
- * @config{eviction_workers, additional threads to help evict pages from cache.,
- * an integer between 0 and 20; default \c 0.}
  * @config{exclusive, fail if the database already exists\, generally used with
  * the \c create option., a boolean flag; default \c false.}
  * @config{extensions, list of shared library extensions to load (using dlopen).
@@ -1951,8 +1951,9 @@ struct __wt_connection {
  * commit by default\, can be overridden by the \c sync setting to
  * WT_SESSION::begin_transaction., a boolean flag; default \c false.}
  * @config{&nbsp;&nbsp;&nbsp;&nbsp;method, the method used to ensure log records
- * are stable on disk., a string\, chosen from the following options: \c
- * "dsync"\, \c "fsync"\, \c "none"; default \c fsync.}
+ * are stable on disk\, see @ref tune_durability for more information., a
+ * string\, chosen from the following options: \c "dsync"\, \c "fsync"\, \c
+ * "none"; default \c fsync.}
  * @config{ ),,}
  * @config{use_environment_priv, use the \c WIREDTIGER_CONFIG and \c
  * WIREDTIGER_HOME environment variables regardless of whether or not the
@@ -2279,6 +2280,7 @@ int wiredtiger_unpack_str(WT_PACK_STREAM *ps, const char **sp);
  * @errors
  */
 int wiredtiger_unpack_uint(WT_PACK_STREAM *ps, uint64_t *up);
+/*! @} */
 
 /*!
  * @name Configuration string parsing
@@ -2428,9 +2430,7 @@ struct __wt_config_parser {
 };
 
 #endif /* !defined(SWIG) */
-/*!
- * @}
- */
+/*! @} */
 
 /*!
  * Get version information.
@@ -2552,6 +2552,15 @@ struct __wt_collator {
 	 */
 	int (*compare)(WT_COLLATOR *collator, WT_SESSION *session,
 	    const WT_ITEM *key1, const WT_ITEM *key2, int *cmp);
+
+	/*!
+	 * If non-NULL, this callback is called to customize the collator
+	 * for each data source.  If the callback returns a non-NULL
+	 * collator, that instance is used instead of this one for all
+	 * comparisons.
+	 */
+	int (*customize)(WT_COLLATOR *collator, WT_SESSION *session,
+	    const char *uri, WT_CONFIG_ITEM *appcfg, WT_COLLATOR **customp);
 
 	/*!
 	 * If non-NULL, a callback performed when the database is closed.
@@ -3388,6 +3397,11 @@ extern int wiredtiger_extension_terminate(WT_CONNECTION *connection);
 /*
  * Statistics section: END
  * DO NOT EDIT: automatically built by dist/api_stat.py.
+ */
+/*!
+ * @name Log record and operation types
+ * @anchor log_types
+ * @{
  */
 /*
  * DO NOT EDIT: automatically built by dist/log.py.

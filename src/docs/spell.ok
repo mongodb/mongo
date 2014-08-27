@@ -40,6 +40,7 @@ LD
 LDFLAGS
 LIBS
 LLVM
+LOGREC
 LSB
 LSM
 Lameter
@@ -69,9 +70,11 @@ Vv
 WiredTiger
 WiredTiger's
 WiredTigerCheckpoint
+WiredTigerLog
 WiredTigerTestCase
 Za
 aR
+abstime
 ack'ed
 alloc
 allocator
@@ -83,6 +86,7 @@ ar
 archiver
 arg
 async
+atomicity
 autoconf
 automake
 basecfg
@@ -111,6 +115,7 @@ changelog
 checksum
 checksums
 ckp
+clickable
 colgroup
 colgroups
 combinatorial
@@ -122,6 +127,7 @@ configurign
 conn
 const
 control's
+copydoc
 cpp
 crashless
 cursortype
@@ -169,7 +175,9 @@ errno
 fadvise
 failchk
 fd's
+fdatasync
 fieldname
+fileID
 fileformats
 fileid
 filename
@@ -195,6 +203,7 @@ href
 hrow
 hsearch
 html
+htmlinclude
 huffman
 hugepage
 hyperleveldb
@@ -290,10 +299,12 @@ nowait
 nul
 num
 numa
+nvd
 objectsin
 ol
 oltp
 oob
+optype
 os
 ovfl
 pareto
@@ -327,7 +338,9 @@ recno
 recnoN
 recnum
 reconf
+recoverability
 recs
+rectype
 rerequests
 ret
 rf
@@ -345,6 +358,7 @@ scanf
 schemas
 selectable
 seqname
+seqno
 serializable
 sess
 skiplist
@@ -383,6 +397,7 @@ transactional
 transactionally
 tt
 txn
+txnid
 txns
 typedef
 uint

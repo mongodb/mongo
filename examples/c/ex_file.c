@@ -28,14 +28,13 @@
  *	This is an example demonstrating how to configure an individual file.
  */
 
-#include <errno.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
 #include <wiredtiger.h>
 
-const char *home = NULL;
+const char *home;
 
 int
 main(void)
@@ -43,6 +42,16 @@ main(void)
 	WT_CONNECTION *conn;
 	WT_SESSION *session;
 	int ret;
+
+	/*
+	 * Create a clean test directory for this run of the test program if the
+	 * environment variable isn't already set (as is done by make check).
+	 */
+	if (getenv("WIREDTIGER_HOME") == NULL) {
+		home = "WT_HOME";
+		ret = system("rm -rf WT_HOME && mkdir WT_HOME");
+	} else
+		home = NULL;
 
 	if ((ret = wiredtiger_open(home, NULL, "create", &conn)) != 0 ||
 	    (ret = conn->open_session(conn, NULL, NULL, &session)) != 0) {

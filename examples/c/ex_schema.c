@@ -29,13 +29,14 @@
  *	tables using a schema.
  */
 
+#include <inttypes.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
-#include <inttypes.h>
 #include <wiredtiger.h>
 
-const char *home = NULL;
+const char *home;
 
 /*! [schema declaration] */
 /* The C struct for the data we are storing in a WiredTiger table. */
@@ -70,10 +71,21 @@ main(void)
 	uint16_t year;
 	int ret;
 
-	ret = wiredtiger_open(home, NULL, "create", &conn);
-	if (ret != 0)
+	/*
+	 * Create a clean test directory for this run of the test program if the
+	 * environment variable isn't already set (as is done by make check).
+	 */
+	if (getenv("WIREDTIGER_HOME") == NULL) {
+		home = "WT_HOME";
+		ret = system("rm -rf WT_HOME && mkdir WT_HOME");
+	} else
+		home = NULL;
+
+	if ((ret = wiredtiger_open(home, NULL, "create", &conn)) != 0) {
 		fprintf(stderr, "Error connecting to %s: %s\n",
 		    home, wiredtiger_strerror(ret));
+		return (ret);
+	}
 	/* Note: error checking omitted for clarity. */
 
 	ret = conn->open_session(conn, NULL, NULL, &session);

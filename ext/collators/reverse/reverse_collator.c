@@ -58,7 +58,7 @@ collate_reverse(WT_COLLATOR *collator,
 	return (0);
 }
 
-static WT_COLLATOR reverse_collator = { collate_reverse, NULL };
+static WT_COLLATOR reverse_collator = { collate_reverse, NULL, NULL };
 
 /*
  * wiredtiger_extension_init --

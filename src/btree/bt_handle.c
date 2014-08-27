@@ -164,6 +164,14 @@ __wt_btree_close(WT_SESSION_IMPL *session)
 	__wt_free(session, btree->key_format);
 	__wt_free(session, btree->value_format);
 
+	if (btree->collator_owned) {
+		if (btree->collator->terminate != NULL)
+			WT_TRET(btree->collator->terminate(
+			    btree->collator, &session->iface));
+		btree->collator_owned = 0;
+	}
+	btree->collator = NULL;
+
 	btree->bulk_load_ok = 0;
 
 	return (ret);
@@ -218,7 +226,8 @@ __btree_conf(WT_SESSION_IMPL *session, WT_CKPT *ckpt)
 
 	/* Row-store key comparison and key gap for prefix compression. */
 	if (btree->type == BTREE_ROW) {
-		WT_RET(__wt_collator_config(session, cfg, &btree->collator));
+		WT_RET(__wt_collator_config(
+		    session, cfg, &btree->collator, &btree->collator_owned));
 
 		WT_RET(__wt_config_gets(session, cfg, "key_gap", &cval));
 		btree->key_gap = (uint32_t)cval.val;
@@ -589,7 +598,7 @@ __btree_get_last_recno(WT_SESSION_IMPL *session)
 	btree->last_recno = page->type == WT_PAGE_COL_VAR ?
 	    __col_var_last_recno(page) : __col_fix_last_recno(page);
 
-	return (__wt_page_release(session, next_walk));
+	return (__wt_page_release(session, next_walk, 0));
 }
 
 /*

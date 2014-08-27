@@ -72,20 +72,28 @@ wts_open(const char *home, int set_api, WT_CONNECTION **connp)
 {
 	WT_CONNECTION *conn;
 	int ret;
-	char config[2048];
+	char config[2048], evict_config[64];
 
 	*connp = NULL;
+
+	/* Build the eviction worker thread config string, if needed. */
+	evict_config[0] = '\0';
+	if (g.c_evict_max != 0 &&
+	    snprintf(evict_config, sizeof(evict_config),
+	    "eviction=(threads_max=%" PRIu32 "),",
+	    g.c_evict_max) >= (int)sizeof(evict_config))
+		die(ENOMEM, "eviction configuration buffer too small");
 
 	/*
 	 * Put configuration file configuration options second to last. Put
 	 * command line configuration options at the end. Do this so they
 	 * override the standard configuration.
 	 */
-	(void)snprintf(config, sizeof(config),
+	if (snprintf(config, sizeof(config),
 	    "create,"
 	    "checkpoint_sync=false,cache_size=%" PRIu32 "MB,"
 	    "buffer_alignment=512,error_prefix=\"%s\","
-	    "%s,%s,%s,%s,"
+	    "%s,%s,%s,%s,%s"
 	    "extensions="
 	    "[\"%s\", \"%s\", \"%s\", \"%s\", \"%s\", \"%s\"],"
 	    "%s,%s",
@@ -95,6 +103,7 @@ wts_open(const char *home, int set_api, WT_CONNECTION **connp)
 	    g.c_logging ? "log=(enabled=true)" : "",
 	    g.c_mmap ? "mmap=true" : "mmap=false",
 	    g.c_statistics ? "statistics=(fast)" : "statistics=(none)",
+	    evict_config,
 	    g.c_reverse ? REVERSE_PATH : "",
 	    access(BZIP_PATH, R_OK) == 0 ? BZIP_PATH : "",
 	    access(LZO_PATH, R_OK) == 0 ? LZO_PATH : "",
@@ -102,17 +111,17 @@ wts_open(const char *home, int set_api, WT_CONNECTION **connp)
 	    access(ZLIB_PATH, R_OK) == 0 ? ZLIB_PATH : "",
 	    DATASOURCE("kvsbdb") ? KVS_BDB_PATH : "",
 	    g.c_config_open == NULL ? "" : g.c_config_open,
-	    g.config_open == NULL ? "" : g.config_open);
+	    g.config_open == NULL ? "" : g.config_open) >= (int)sizeof(config))
+		die(ENOMEM, "configuration buffer too small");
 
 	/*
-	 * Direct I/O may not work with hot-backups, doing copies through the
-	 * buffer cache after configuring direct I/O in Linux won't work.  If
-	 * direct I/O is configured, turn off hot backups.   This isn't a great
-	 * place to do this check, but it's only here we have the configuration
-	 * string.
+	 * Direct I/O may not work with backups, doing copies through the buffer
+	 * cache after configuring direct I/O in Linux won't work.  If direct
+	 * I/O is configured, turn off backups.   This isn't a great place to do
+	 * this check, but it's only here we have the configuration string.
 	 */
 	if (strstr(config, "direct_io") != NULL)
-		g.c_hot_backups = 0;
+		g.c_backups = 0;
 
 	if ((ret = wiredtiger_open(home, &event_handler, config, &conn)) != 0)
 		die(ret, "wiredtiger_open: %s", home);

@@ -29,6 +29,7 @@
  */
 
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
 #include <wiredtiger.h>
@@ -42,7 +43,7 @@ int cursor_insert(WT_CURSOR *cursor);
 int cursor_update(WT_CURSOR *cursor);
 int cursor_remove(WT_CURSOR *cursor);
 
-const char *home = NULL;
+const char *home;
 
 /*! [cursor next] */
 int
@@ -163,6 +164,16 @@ int main(void)
 	WT_CURSOR *cursor;
 	WT_SESSION *session;
 	int ret;
+
+	/*
+	 * Create a clean test directory for this run of the test program if the
+	 * environment variable isn't already set (as is done by make check).
+	 */
+	if (getenv("WIREDTIGER_HOME") == NULL) {
+		home = "WT_HOME";
+		ret = system("rm -rf WT_HOME && mkdir WT_HOME");
+	} else
+		home = NULL;
 
 	/* Open a connection to the database, creating it if necessary. */
 	if ((ret = wiredtiger_open(

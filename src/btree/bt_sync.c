@@ -27,6 +27,7 @@ __sync_file(WT_SESSION_IMPL *session, int syncop)
 
 	btree = S2BT(session);
 
+	flags = WT_READ_CACHE | WT_READ_NO_GEN;
 	walk = NULL;
 	txn = &session->txn;
 
@@ -52,8 +53,7 @@ __sync_file(WT_SESSION_IMPL *session, int syncop)
 			return (0);
 		}
 
-		flags = WT_READ_CACHE |
-		    WT_READ_NO_GEN | WT_READ_NO_WAIT | WT_READ_SKIP_INTL;
+		flags |= WT_READ_NO_WAIT | WT_READ_SKIP_INTL;
 		for (walk = NULL;;) {
 			WT_ERR(__wt_tree_walk(session, &walk, flags));
 			if (walk == NULL)
@@ -100,7 +100,7 @@ __sync_file(WT_SESSION_IMPL *session, int syncop)
 		}
 
 		/* Write all dirty in-cache pages. */
-		flags = WT_READ_CACHE | WT_READ_NO_GEN;
+		flags |= WT_READ_NO_EVICT;
 		for (walk = NULL;;) {
 			WT_ERR(__wt_tree_walk(session, &walk, flags));
 			if (walk == NULL)
@@ -155,7 +155,7 @@ __sync_file(WT_SESSION_IMPL *session, int syncop)
 
 err:	/* On error, clear any left-over tree walk. */
 	if (walk != NULL)
-		WT_TRET(__wt_page_release(session, walk));
+		WT_TRET(__wt_page_release(session, walk, flags));
 
 	if (txn->isolation == TXN_ISO_READ_COMMITTED && session->ncursors == 0)
 		__wt_txn_release_snapshot(session);
@@ -180,19 +180,13 @@ err:	/* On error, clear any left-over tree walk. */
 
 	__wt_spin_unlock(session, &btree->flush_lock);
 
-#if 0
 	/*
 	 * Leaves are written before a checkpoint (or as part of a file close,
 	 * before checkpointing the file).  Start a flush to stable storage,
 	 * but don't wait for it.
-	 *
-	 * XXX
-	 * This causes a performance drop on the wtperf ckpt-btree test; remove
-	 * the flush until we understand why; reference issue #1152.
 	 */
 	if (ret == 0 && syncop == WT_SYNC_WRITE_LEAVES)
 		WT_RET(btree->bm->sync(btree->bm, session, 1));
-#endif
 
 	return (ret);
 }
@@ -226,7 +220,7 @@ __evict_file(WT_SESSION_IMPL *session, int syncop)
 	/* Walk the tree, discarding pages. */
 	next_ref = NULL;
 	WT_ERR(__wt_tree_walk(
-	    session, &next_ref, WT_READ_CACHE | WT_READ_NO_GEN));
+	    session, &next_ref, WT_READ_CACHE | WT_READ_NO_EVICT));
 	while ((ref = next_ref) != NULL) {
 		page = ref->page;
 
@@ -263,7 +257,7 @@ __evict_file(WT_SESSION_IMPL *session, int syncop)
 		 * the tree.
 		 */
 		WT_ERR(__wt_tree_walk(
-		    session, &next_ref, WT_READ_CACHE | WT_READ_NO_GEN));
+		    session, &next_ref, WT_READ_CACHE | WT_READ_NO_EVICT));
 
 		switch (syncop) {
 		case WT_SYNC_CLOSE:
@@ -299,7 +293,8 @@ __evict_file(WT_SESSION_IMPL *session, int syncop)
 	if (0) {
 err:		/* On error, clear any left-over tree walk. */
 		if (next_ref != NULL)
-			WT_TRET(__wt_page_release(session, next_ref));
+			WT_TRET(__wt_page_release(
+			    session, next_ref, WT_READ_NO_EVICT));
 	}
 
 	if (eviction_enabled)

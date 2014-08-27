@@ -28,7 +28,6 @@
  *	This is an example demonstrating how to query database statistics.
  */
 
-#include <errno.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -42,7 +41,7 @@ int print_overflow_pages(WT_SESSION *);
 int get_stat(WT_CURSOR *cursor, int stat_field, uint64_t *valuep);
 int print_derived_stats(WT_SESSION *);
 
-const char *home = NULL;
+const char *home;
 
 /*! [statistics display function] */
 int
@@ -188,6 +187,16 @@ main(void)
 	WT_SESSION *session;
 	int ret;
 
+	/*
+	 * Create a clean test directory for this run of the test program if the
+	 * environment variable isn't already set (as is done by make check).
+	 */
+	if (getenv("WIREDTIGER_HOME") == NULL) {
+		home = "WT_HOME";
+		ret = system("rm -rf WT_HOME && mkdir WT_HOME");
+	} else
+		home = NULL;
+
 	ret = wiredtiger_open(home, NULL, "create,statistics=(all)", &conn);
 	ret = conn->open_session(conn, NULL, NULL, &session);
 	ret = session->create(
@@ -198,7 +207,7 @@ main(void)
 	cursor->set_key(cursor, "key");
 	cursor->set_value(cursor, "value");
 	ret = cursor->insert(cursor);
-	cursor->close(cursor);
+	ret = cursor->close(cursor);
 
 	ret = session->checkpoint(session, NULL);
 

@@ -1,3 +1,65 @@
+WiredTiger release 2.3.1, 2014-08-14
+------------------------------------
+
+The WiredTiger 2.3.1 release contains mainly performance enhancements and bug
+fixes.
+
+Changes to the WiredTiger API:
+
+* Fix a bug in WT_CURSOR::set_value that could lead to undefined behavior with
+  some value formats.
+
+* Make the asynchronous API generally available [#1139]
+
+* Add log cursors for replay and verification.  Make generated log record and
+  operation types public.  [#1106]
+
+* Allow eviction worker threads to be started and stopped dynamically.
+  Applications that use the `eviction_workers` configuration should see the
+  upgrading documentation on how to use this feature.
+  [#1116, #1143, #1158]
+
+Other significant changes:
+
+* Improve performance and reduce latency during checkpoints and LSM merges.
+  Remove uses of the checkpoint lock other than serializing checkpoints:
+  compact holds the schema lock, so it doesn't need to hold the checkpoint
+  lock, the new WT_BTREE handle close lock prevents checkpoints from colliding
+  with handle close, so LSM doesn't need the checkpoint lock either.
+
+* Some minor cleanups, setting the internal session's name in a few places.
+  [#1073]
+
+* Grab the live lock when loading a checkpoint in diagnostic mode: that could
+  race with a read.  [#1102]
+
+* Instead of keeping a list of file URIs for checkpoint to flush, open a handle
+  and stash it.  [#1114]
+
+* Add a new OS-layer function __wt_fsync_async to flush a file without waiting
+  for the results, call it from the Btree flush-leaves code so pages start
+  flushing while we're working the rest of the checkpoint.  [#1136, #1152]
+
+* Wait for the handle flush lock when writing the leaf pages instead of
+  returning EBUSY.  [#1136]
+
+* Add a wtperf page to the documentation, describe how to simulate workloads
+  and view statistics.  [#1147]
+
+* Flag new structures not listed in PREDEFINE.  [#1148]
+
+* Return EBUSY if no async handles available and fix ex_async to look for it.
+  [#1153]
+
+* Fix some problems with navigation in the reference guide.
+
+* Bump the number of slots for internal sessions: we have a lot more than 2
+  now.  Add a test for `session_max` settings, make sure we add enough to
+  account for at least the default internal sessions.
+
+* Remove tcbench: we're no longer maintaining it.
+
+
 WiredTiger release 2.3.0, 2014-07-29
 ------------------------------------
 

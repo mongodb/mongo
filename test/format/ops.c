@@ -96,7 +96,7 @@ wts_ops(void)
 				die(ret, "pthread_create");
 		}
 		if ((ret =
-		    pthread_create(&backup_tid, NULL, hot_backup, NULL)) != 0)
+		    pthread_create(&backup_tid, NULL, backup, NULL)) != 0)
 			die(ret, "pthread_create");
 		if (g.c_compact && (ret =
 		    pthread_create(&compact_tid, NULL, compact, NULL)) != 0)
@@ -287,11 +287,11 @@ ops(void *arg)
 				ckpt_config = config;
 			}
 
-			/* Named checkpoints lock out hot backups */
+			/* Named checkpoints lock out backups */
 			if (ckpt_config != NULL &&
 			    (ret = pthread_rwlock_wrlock(&g.backup_lock)) != 0)
 				die(ret,
-				    "pthread_rwlock_wrlock: hot-backup lock");
+				    "pthread_rwlock_wrlock: backup lock");
 
 			if ((ret =
 			    session->checkpoint(session, ckpt_config)) != 0)
@@ -302,7 +302,7 @@ ops(void *arg)
 			if (ckpt_config != NULL &&
 			    (ret = pthread_rwlock_unlock(&g.backup_lock)) != 0)
 				die(ret,
-				    "pthread_rwlock_wrlock: hot-backup lock");
+				    "pthread_rwlock_wrlock: backup lock");
 
 			/*
 			 * Pick the next checkpoint operation, try for roughly

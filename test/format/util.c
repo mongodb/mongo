@@ -253,7 +253,7 @@ path_setup(const char *home)
 		die(errno, "malloc");
 	snprintf(g.home_stats, len, "%s/%s", g.home, "stats");
 
-	/* Hot-backup directory. */
+	/* Backup directory. */
 	len = strlen(g.home) + strlen("BACKUP") + 2;
 	if ((g.home_backup = malloc(len)) == NULL)
 		die(errno, "malloc");
@@ -282,7 +282,7 @@ path_setup(const char *home)
 		die(errno, "malloc");
 	snprintf(g.home_init, len, CMD, g.home);
 
-	/* Hot backup directory initialize command, remove and re-create it. */
+	/* Backup directory initialize command, remove and re-create it. */
 #undef	CMD
 #define	CMD	"rm -rf %s && mkdir %s"
 	len = strlen(g.home_backup) * 2 + strlen(CMD) + 1;

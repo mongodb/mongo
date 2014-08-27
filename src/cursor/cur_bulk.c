@@ -94,8 +94,6 @@ __curbulk_insert_var(WT_CURSOR *cursor)
 	WT_STAT_FAST_DATA_INCR(session, cursor_insert_bulk);
 
 err:	API_END_RET(session, ret);
-
-	return (0);
 }
 
 /*
@@ -167,8 +165,8 @@ __curbulk_insert_row(WT_CURSOR *cursor)
 	 * it is only zero before the first row is inserted.
 	 */
 	if (cbulk->rle != 0) {
-		WT_ERR(WT_LEX_CMP(session,
-		    btree->collator, &cursor->key, &cbulk->last, cmp));
+		WT_ERR(__wt_compare(session,
+		    btree->collator, &cursor->key, &cbulk->last, &cmp));
 		if (cmp <= 0)
 			WT_ERR(__bulk_row_keycmp_err(cbulk));
 	}

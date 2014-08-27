@@ -108,7 +108,7 @@ ret = session->create(session, "table:dev1/access",
 
 @section helium_notes Helium notes
 
-- Helium volumes do not support hot backup.
+- Helium volumes do not support database backups.
 - Helium volumes do not support named checkpoints.
 - Helium volumes do not support compression of any kind.
 - Helium volumes do not support bulk load as a special case, and configuring

@@ -270,7 +270,7 @@ __txn_log_recover(
 	uint32_t rectype;
 
 	r = cookie;
-	p = (const uint8_t *)logrec->data + offsetof(WT_LOG_RECORD, record);
+	p = LOG_SKIP_HEADER(logrec->data);
 	end = (const uint8_t *)logrec->data + logrec->size;
 
 	/* First, peek at the log record type. */

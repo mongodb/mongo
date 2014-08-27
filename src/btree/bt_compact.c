@@ -165,7 +165,7 @@ __wt_compact(WT_SESSION_IMPL *session, const char *cfg[])
 	}
 
 err:	if (ref != NULL)
-		WT_TRET(__wt_page_release(session, ref));
+		WT_TRET(__wt_page_release(session, ref, 0));
 
 	if (block_manager_begin)
 		WT_TRET(bm->compact_end(bm, session));

@@ -29,7 +29,7 @@
 
 /*
  * check_copy --
- *	Confirm the hot backup worked.
+ *	Confirm the backup worked.
  */
 static void
 check_copy(void)
@@ -53,11 +53,11 @@ check_copy(void)
 }
 
 /*
- * hot_copy --
- *	Copy a single file into the hot backup directory.
+ * copy_file --
+ *	Copy a single file into the backup directory.
  */
 static void
-hot_copy(const char *name)
+copy_file(const char *name)
 {
 	size_t len;
 	char *cmd;
@@ -69,16 +69,16 @@ hot_copy(const char *name)
 	(void)snprintf(cmd, len,
 	    "cp %s/%s %s/%s", g.home, name, g.home_backup, name);
 	if ((ret = system(cmd)) != 0)
-		die(ret, "hot backup copy: %s", cmd);
+		die(ret, "backup copy: %s", cmd);
 	free(cmd);
 }
 
 /*
- * hot_backup --
- *	Periodically do a hot backup and verify it.
+ * backup --
+ *	Periodically do a backup and verify it.
  */
 void *
-hot_backup(void *arg)
+backup(void *arg)
 {
 	WT_CONNECTION *conn;
 	WT_CURSOR *backup_cursor;
@@ -91,11 +91,11 @@ hot_backup(void *arg)
 
 	conn = g.wts_conn;
 
-	/* If hot backups aren't configured, we're done. */
-	if (!g.c_hot_backups)
+	/* If backups aren't configured, we're done. */
+	if (!g.c_backups)
 		return (NULL);
 
-	/* Hot backups aren't supported for non-standard data sources. */
+	/* Backups aren't supported for non-standard data sources. */
 	if (DATASOURCE("helium") || DATASOURCE("kvsbdb"))
 		return (NULL);
 
@@ -104,7 +104,7 @@ hot_backup(void *arg)
 		die(ret, "connection.open_session");
 
 	/*
-	 * Perform a hot backup at somewhere under 10 seconds (so we get at
+	 * Perform a backup at somewhere under 10 seconds (so we get at
 	 * least one done), and then at 45 second intervals.
 	 */
 	for (period = MMRAND(1, 10);; period = 45) {
@@ -118,11 +118,11 @@ hot_backup(void *arg)
 
 		/* Lock out named checkpoints */
 		if ((ret = pthread_rwlock_wrlock(&g.backup_lock)) != 0)
-			die(ret, "pthread_rwlock_wrlock: hot-backup lock");
+			die(ret, "pthread_rwlock_wrlock: backup lock");
 
 		/* Re-create the backup directory. */
 		if ((ret = system(g.home_backup_init)) != 0)
-			die(ret, "hot-backup directory creation failed");
+			die(ret, "backup directory creation failed");
 
 		/*
 		 * open_cursor can return EBUSY if a metadata operation is
@@ -138,14 +138,14 @@ hot_backup(void *arg)
 			if ((ret =
 			    backup_cursor->get_key(backup_cursor, &key)) != 0)
 				die(ret, "cursor.get_key");
-			hot_copy(key);
+			copy_file(key);
 		}
 
 		if ((ret = backup_cursor->close(backup_cursor)) != 0)
 			die(ret, "cursor.close");
 
 		if ((ret = pthread_rwlock_unlock(&g.backup_lock)) != 0)
-			die(ret, "pthread_rwlock_unlock: hot-backup lock");
+			die(ret, "pthread_rwlock_unlock: backup lock");
 
 		check_copy();
 	}

@@ -26,6 +26,11 @@
 #define	LOGC_KEY_FORMAT		WT_UNCHECKED_STRING(IqI)
 #define	LOGC_VALUE_FORMAT	WT_UNCHECKED_STRING(qIIIuu)
 
+#define	LOG_SKIP_HEADER(data)						\
+    ((const uint8_t *)(data) + offsetof(WT_LOG_RECORD, record))
+#define	LOG_REC_SIZE(size)						\
+    ((size) - offsetof(WT_LOG_RECORD, record))
+
 #define	MAX_LSN(l)	do {						\
 	(l)->file = UINT32_MAX;						\
 	(l)->offset = INT64_MAX;					\
@@ -83,6 +88,7 @@ typedef struct {
 
 typedef struct {
 	uint32_t	allocsize;	/* Allocation alignment size */
+	off_t		log_written;	/* Amount of log written this period */
 	/*
 	 * Log file information
 	 */

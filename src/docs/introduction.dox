@@ -32,6 +32,7 @@ For more information about writing WiredTiger applications, see:
 
 - @subpage programming
 - @ref wt "WiredTiger API reference manual"
+- @subpage performance
 
 For more information about administrating WiredTiger databases, see:
 

@@ -454,7 +454,8 @@ __wt_conn_btree_apply(WT_SESSION_IMPL *session,
 
 /*
  * __wt_conn_btree_apply_single --
- *	Apply a function to a single btree handle that's being bulk-loaded.
+ *	Apply a function to a single btree handle that couldn't be locked
+ * (attempting to get the handle returned EBUSY).
  */
 int
 __wt_conn_btree_apply_single(WT_SESSION_IMPL *session,
@@ -483,7 +484,6 @@ __wt_conn_btree_apply_single(WT_SESSION_IMPL *session,
 			 * confirm the handle is still open.
 			 */
 			__wt_spin_lock(session, &dhandle->close_lock);
-			ret = 0;
 			if (F_ISSET(dhandle, WT_DHANDLE_OPEN)) {
 				session->dhandle = dhandle;
 				ret = func(session, cfg);

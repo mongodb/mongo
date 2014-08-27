@@ -28,13 +28,12 @@ The \c wt tool supports several commands.
 
 <hr>
 @section util_backup wt backup
-Perform a hot backup of a database or set of data sources.
+Perform a backup of a database or set of data sources.
 
-The \c backup command performs a hot backup of the database, copying the
+The \c backup command performs a backup of the database, copying the
 database files to a \c specified directory, which can be subsequently
-opened as a WiredTiger database.  See @ref hot_backup for more
-information, and @ref file_permissions for specifics on the copied file
-permissions.
+opened as a WiredTiger database.  See @ref backup for more information,
+and @ref file_permissions for specifics on the copied file permissions.
 
 @subsection util_backup_synopsis Synopsis
 <code>wt [-Vv] [-C config] [-h directory] backup [-t uri] directory</code>
@@ -43,9 +42,9 @@ permissions.
 The following are command-specific options for the \c backup command:
 
 @par <code>-t uri</code>
-By default, the \c backup command does a hot backup of the entire
-database; the \c -t option changes the \c backup command to do a hot
-backup of only the named data sources.
+By default, the \c backup command does a backup of the entire database;
+the \c -t option changes the \c backup command to do a backup of only
+the named data sources.
 
 <hr>
 @section util_compact wt compact

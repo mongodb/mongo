@@ -30,11 +30,12 @@
  */
 
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
 #include <wiredtiger.h>
 
-const char *home = NULL;
+const char *home;
 
 /*! [case insensitive comparator] */
 /* A simple case insensitive comparator. */
@@ -52,7 +53,7 @@ __compare_nocase(WT_COLLATOR *collator, WT_SESSION *session,
 	return (0);
 }
 
-static WT_COLLATOR nocasecoll = { __compare_nocase, NULL };
+static WT_COLLATOR nocasecoll = { __compare_nocase, NULL, NULL };
 /*! [case insensitive comparator] */
 
 /*! [n character comparator] */
@@ -79,7 +80,7 @@ __compare_prefixes(WT_COLLATOR *collator, WT_SESSION *session,
 	return (0);
 }
 
-static PREFIX_COLLATOR pcoll10 = { {__compare_prefixes, NULL}, 10 };
+static PREFIX_COLLATOR pcoll10 = { {__compare_prefixes, NULL, NULL}, 10 };
 /*! [n character comparator] */
 
 int main(void)
@@ -87,6 +88,16 @@ int main(void)
 	int ret;
 	WT_CONNECTION *conn;
 	WT_SESSION *session;
+
+	/*
+	 * Create a clean test directory for this run of the test program if the
+	 * environment variable isn't already set (as is done by make check).
+	 */
+	if (getenv("WIREDTIGER_HOME") == NULL) {
+		home = "WT_HOME";
+		ret = system("rm -rf WT_HOME && mkdir WT_HOME");
+	} else
+		home = NULL;
 
 	/* Open a connection to the database, creating it if necessary. */
 	if ((ret = wiredtiger_open(home, NULL, "create", &conn)) != 0)

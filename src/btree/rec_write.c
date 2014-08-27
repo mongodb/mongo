@@ -956,7 +956,8 @@ __rec_txn_read(WT_SESSION_IMPL *session, WT_RECONCILE *r,
 #define	CHILD_RELEASE(session, hazard, ref) do {			\
 	if (hazard) {							\
 		hazard = 0;						\
-		WT_TRET(__wt_page_release(session, ref));		\
+		WT_TRET(						\
+		    __wt_page_release(session, ref, WT_READ_NO_EVICT));	\
 	}								\
 } while (0)
 #undef	CHILD_RELEASE_ERR
@@ -1070,7 +1071,7 @@ __rec_child_modify(WT_SESSION_IMPL *session,
 			 * for checkpoint.
 			 */
 			if ((ret = __wt_page_in(session, ref,
-			    WT_READ_CACHE |
+			    WT_READ_CACHE | WT_READ_NO_EVICT |
 			    WT_READ_NO_GEN | WT_READ_NO_WAIT)) == WT_NOTFOUND) {
 				ret = 0;
 				break;
@@ -1654,14 +1655,14 @@ __rec_split_row_promote(
 		}
 
 		/* Compare against the current key, it must be less. */
-		WT_ERR(WT_LEX_CMP(
-		    session, btree->collator, update, r->cur, cmp));
+		WT_ERR(__wt_compare(
+		    session, btree->collator, update, r->cur, &cmp));
 		if (cmp >= 0)
 			continue;
 
 		/* Compare against the last key, it must be greater. */
-		WT_ERR(WT_LEX_CMP(
-		    session, btree->collator, update, r->last, cmp));
+		WT_ERR(__wt_compare(
+		    session, btree->collator, update, r->last, &cmp));
 		if (cmp >= 0)
 			max = update;
 
@@ -2564,8 +2565,8 @@ __rec_split_write(WT_SESSION_IMPL *session,
 				key->data = WT_INSERT_KEY(skip->ins);
 				key->size = WT_INSERT_KEY_SIZE(skip->ins);
 			}
-			WT_ERR(WT_LEX_CMP(session,
-			    btree->collator, key, &(bnd + 1)->key, cmp));
+			WT_ERR(__wt_compare(session,
+			    btree->collator, key, &(bnd + 1)->key, &cmp));
 			if (cmp >= 0)
 				goto skip_check_complete;
 			break;

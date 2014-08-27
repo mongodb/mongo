@@ -24,15 +24,20 @@ __ckpt_server_config(WT_SESSION_IMPL *session, const char **cfg, int *startp)
 	conn = S2C(session);
 
 	/*
-	 * The checkpoint configuration requires a wait time -- if it's not set,
-	 * we're not running at all.
+	 * The checkpoint configuration requires a wait time and/or a log
+	 * size -- if one is not set, we're not running at all.
+	 * Checkpoints based on log size also require logging be enabled.
 	 */
 	WT_RET(__wt_config_gets(session, cfg, "checkpoint.wait", &cval));
-	if (cval.val == 0) {
+	conn->ckpt_usecs = (long)cval.val * 1000000;
+	WT_RET(__wt_config_gets(session, cfg, "checkpoint.log_size", &cval));
+	conn->ckpt_logsize = (off_t)cval.val;
+	__wt_log_written_reset(session);
+	if ((conn->ckpt_usecs == 0 && conn->ckpt_logsize == 0) ||
+	    (conn->ckpt_logsize && !conn->logging && conn->ckpt_usecs == 0)) {
 		*startp = 0;
 		return (0);
 	}
-	conn->ckpt_usecs = (long)cval.val * 1000000;
 	*startp = 1;
 
 	WT_RET(__wt_config_gets(session, cfg, "checkpoint.name", &cval));
@@ -71,7 +76,16 @@ __ckpt_server(void *arg)
 		/* Checkpoint the database. */
 		WT_ERR(wt_session->checkpoint(wt_session, conn->ckpt_config));
 
-		/* Wait... */
+		/* Reset. */
+		if (conn->ckpt_logsize) {
+			__wt_log_written_reset(session);
+			conn->ckpt_signalled = 0;
+		}
+		/*
+		 * Wait...
+		 * NOTE: If the user only configured logsize, then usecs
+		 * will be 0 and this wait won't return until signalled.
+		 */
 		WT_ERR_TIMEDOUT_OK(
 		    __wt_cond_wait(session, conn->ckpt_cond, conn->ckpt_usecs));
 	}
@@ -91,8 +105,6 @@ __ckpt_server_start(WT_CONNECTION_IMPL *conn)
 {
 	WT_SESSION_IMPL *session;
 
-	session = conn->default_session;
-
 	/* Nothing to do if the server is already running. */
 	if (conn->ckpt_session != NULL)
 		return (0);
@@ -101,6 +113,13 @@ __ckpt_server_start(WT_CONNECTION_IMPL *conn)
 	/* The checkpoint server gets its own session. */
 	WT_RET(__wt_open_internal_session(
 	    conn, "checkpoint-server", 1, 1, &conn->ckpt_session));
+	session = conn->ckpt_session;
+
+	/*
+	 * Checkpoint does enough I/O it may be called upon to perform slow
+	 * operations for the block manager.
+	 */
+	F_SET(session, WT_SESSION_CAN_WAIT);
 
 	WT_RET(
 	    __wt_cond_alloc(session, "checkpoint server", 0, &conn->ckpt_cond));
@@ -109,7 +128,7 @@ __ckpt_server_start(WT_CONNECTION_IMPL *conn)
 	 * Start the thread.
 	 */
 	WT_RET(__wt_thread_create(
-	    session, &conn->ckpt_tid, __ckpt_server, conn->ckpt_session));
+	    session, &conn->ckpt_tid, __ckpt_server, session));
 	conn->ckpt_tid_set = 1;
 
 	return (0);
@@ -177,4 +196,23 @@ __wt_checkpoint_server_destroy(WT_CONNECTION_IMPL *conn)
 	conn->ckpt_usecs = 0;
 
 	return (ret);
+}
+
+/*
+ * __wt_checkpoint_signal --
+ *	Signal the checkpoint thread if sufficient log has been written.
+ *	Return 1 if this signals the checkpoint thread, 0 otherwise.
+ */
+int
+__wt_checkpoint_signal(WT_SESSION_IMPL *session, off_t logsize)
+{
+	WT_CONNECTION_IMPL *conn;
+
+	conn = S2C(session);
+	WT_ASSERT(session, WT_CKPT_LOGSIZE(conn));
+	if (logsize >= conn->ckpt_logsize && !conn->ckpt_signalled) {
+		WT_RET(__wt_cond_signal(session, conn->ckpt_cond));
+		conn->ckpt_signalled = 1;
+	}
+	return (0);
 }
