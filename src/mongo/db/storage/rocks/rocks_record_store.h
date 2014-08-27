@@ -175,6 +175,8 @@ namespace mongo {
             OperationContext* _txn;
             const RocksRecordStore* _rs;
             CollectionScanParams::Direction _dir;
+            bool _reseekKeyValid;
+            std::string _reseekKey;
             boost::scoped_ptr<rocksdb::Iterator> _iterator;
         };
 
