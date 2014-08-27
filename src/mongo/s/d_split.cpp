@@ -696,7 +696,7 @@ namespace mongo {
                     return false;
                 }
 
-                if (!isShardDocSizeValid(collMetadata->getKeyPattern(), endKey, &errmsg)) {
+                if (!isShardKeySizeValid(endKey, &errmsg)) {
                     warning() << errmsg << endl;
                     return false;
                 }

@@ -35,6 +35,7 @@
 #include "mongo/platform/unordered_set.h"
 #include "mongo/util/mongoutils/str.h"
 #include "mongo/db/query/index_bounds.h"
+#include "mongo/db/matcher/matchable.h"
 
 namespace mongo {
 
@@ -134,7 +135,8 @@ namespace mongo {
 
         std::string toString() const{ return toBSON().toString(); }
 
-        /* Given a document, extracts the index key corresponding to this KeyPattern
+        /**
+         * Given a document, extracts the shard key corresponding to the key pattern.
          * Warning: assumes that there is a *single* key to be extracted!
          *
          * Examples:
@@ -143,11 +145,33 @@ namespace mongo {
          *   { c : 4 , a : 2 } -->  returns { a : 2 }
          *   { b : 2 }  (bad input, don't call with this)
          *   { a : [1,2] }  (bad input, don't call with this)
-         *
          *  If 'this' KeyPattern is { a  : "hashed" }
          *   { a: 1 } --> returns { a : NumberLong("5902408780260971510")  }
+         *  If 'this' KeyPattern is { 'a.b' : 1 }
+         *   { a : { b : "hi" } } --> returns { a : "hi" }
          */
-        BSONObj extractSingleKey( const BSONObj& doc ) const;
+        BSONObj extractShardKeyFromDoc(const BSONObj& doc) const;
+
+        /**
+         * Given a MatchableDocument, extracts the shard key corresponding to the key pattern.
+         * See above.
+         */
+        BSONObj extractShardKeyFromMatchable(const MatchableDocument& matchable) const;
+
+        /**
+         * Given a query expression, extracts the shard key corresponding to the key pattern.
+         *
+         * NOTE: This generally is similar to the above, however "a.b" fields in the query (which
+         * are invalid document fields) may match "a.b" fields in the shard key pattern.
+         *
+         * Examples:
+         *  If the key pattern is { a : 1 }
+         *   { a : "hi", b : 4 } --> returns { a : "hi" }
+         *  If the key pattern is { 'a.b' : 1 }
+         *   { a : { b : "hi" } } --> returns { 'a.b' : "hi" }
+         *   { 'a.b' : "hi" } --> returns { 'a.b' : "hi" }
+         */
+        BSONObj extractShardKeyFromQuery(const BSONObj& query) const;
 
         /**
          * Return an ordered list of bounds generated using this KeyPattern and the
