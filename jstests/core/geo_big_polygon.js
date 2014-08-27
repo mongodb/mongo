@@ -93,3 +93,14 @@ assert.commandWorked(coll.ensureIndex({ loc : "2dsphere" }));
 
 // 4. With index, insert fails.
 assert.writeError(coll.insert({ _id: "bigPoly10", loc: bigPoly10}));
+
+// Query geometries that don't support big CRS should error out.
+var bigPoint = { type: "Point", coordinates: [0, 0], crs: bigCRS };
+var bigLine = { type : "LineString", coordinates : [[-20, 0], [20, 0]], crs: bigCRS };
+
+assert.throws(function() {
+  coll.find( { loc : { $geoIntersects : { $geometry : bigPoint }}}).itcount();
+});
+assert.throws(function() {
+  coll.find( { loc : { $geoIntersects : { $geometry : bigLine }}}).itcount();
+});
