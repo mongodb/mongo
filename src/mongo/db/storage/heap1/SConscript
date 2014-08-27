@@ -32,6 +32,7 @@ env.Library(
     target= 'storage_heap1',
     source= [
         'heap1_database_catalog_entry_index_real.cpp',
+        'heap1_init.cpp',
         ],
     LIBDEPS= [
         'storage_heap1_core',

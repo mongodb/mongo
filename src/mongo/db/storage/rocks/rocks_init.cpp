@@ -32,6 +32,7 @@
 #include "mongo/db/storage/rocks/rocks_engine.h"
 
 #include "mongo/base/init.h"
+#include "mongo/db/global_environment_experiment.h"
 #include "mongo/db/storage_options.h"
 
 namespace mongo {
@@ -46,8 +47,11 @@ namespace mongo {
         };
     } // namespace
 
-    MONGO_INITIALIZER(RocksEngineInit)(InitializerContext* context ) {
-        StorageEngine::registerFactory( "rocksExperiment", new RocksFactory() );
+    MONGO_INITIALIZER_WITH_PREREQUISITES(RocksEngineInit,
+                                         ("SetGlobalEnvironment"))
+                                         (InitializerContext* context) {
+
+        getGlobalEnvironment()->registerStorageEngine("rocksExperiment", new RocksFactory());
         return Status::OK();
     }
 
