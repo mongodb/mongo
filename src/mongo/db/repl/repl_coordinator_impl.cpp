@@ -227,11 +227,10 @@ namespace {
             return;
         }
 
-        // Must set _myRID before any network traffic, because network traffic leads to concurrent
-        // access to _myRID, which is not mutex guarded.  This is OK because startReplication()
-        // executes before the server starts listening for connections, and replication starts no
-        // threads of its own until later in this function.
-        _myRID = _externalState->ensureMe(txn);
+        {
+            boost::lock_guard<boost::mutex> lk(_mutex);
+            _myRID = _externalState->ensureMe(txn);
+        }
 
         _topCoordDriverThread.reset(new boost::thread(stdx::bind(&ReplicationExecutor::run,
                                                                  &_replExecutor)));
@@ -360,7 +359,7 @@ namespace {
     }
 
     OpTime ReplicationCoordinatorImpl::_getLastOpApplied_inlock() {
-        return _slaveInfoMap[getMyRID()].opTime;
+        return _slaveInfoMap[_getMyRID_inlock()].opTime;
     }
 
     void ReplicationCoordinatorImpl::interrupt(unsigned opId) {
@@ -655,6 +654,11 @@ namespace {
     }
 
     OID ReplicationCoordinatorImpl::getMyRID() {
+        boost::lock_guard<boost::mutex> lock(_mutex);
+        return _getMyRID_inlock();
+    }
+
+    OID ReplicationCoordinatorImpl::_getMyRID_inlock() {
         return _myRID;
     }
 
@@ -1000,8 +1004,8 @@ namespace {
                  _getLastOpApplied_inlock());
 
          // Ensure that there's an entry in the _slaveInfoMap for ourself
-         _slaveInfoMap[getMyRID()].memberID = _rsConfig.getMemberAt(myIndex).getId();
-         _slaveInfoMap[getMyRID()].hostAndPort =
+         _slaveInfoMap[_getMyRID_inlock()].memberID = _rsConfig.getMemberAt(myIndex).getId();
+         _slaveInfoMap[_getMyRID_inlock()].hostAndPort =
                  _rsConfig.getMemberAt(myIndex).getHostAndPort();
          _startHeartbeats();
      }

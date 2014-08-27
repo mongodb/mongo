@@ -307,6 +307,8 @@ namespace repl {
         Status _checkIfWriteConcernCanBeSatisfied_inlock(
                 const WriteConcernOptions& writeConcern) const;
 
+        OID _getMyRID_inlock();
+
         /**
          * Processes each heartbeat response.
          * Also responsible for scheduling additional heartbeats within the timeout if they error,
@@ -385,12 +387,6 @@ namespace repl {
         // coordinator is gone. At that point we can make this const.
         ReplSettings _settings;
 
-        // Our RID, used to identify us to our sync source when sending replication progress
-        // updates upstream.  Set once at startup and then never modified again, which makes it
-        // safe to read outside of _mutex.
-        // TODO(spencer): put behind _mutex
-        OID _myRID;
-
         // Pointer to the TopologyCoordinator owned by this ReplicationCoordinator.
         boost::scoped_ptr<TopologyCoordinator> _topCoord;
 
@@ -410,6 +406,10 @@ namespace repl {
         mutable boost::mutex _mutex;
 
         /// ============= All members below this line are guarded by _mutex ==================== ///
+
+        // Our RID, used to identify us to our sync source when sending replication progress
+        // updates upstream.  Set once at startup and then never modified again.
+        OID _myRID;
 
         // Rollback ID. Used to check if a rollback happened during some interval of time
         // TODO: ideally this should only change on rollbacks NOT on mongod restarts also.
