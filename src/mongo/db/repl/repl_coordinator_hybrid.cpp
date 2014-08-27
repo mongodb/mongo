@@ -176,9 +176,9 @@ namespace repl {
         return legacyOID;
     }
 
-    OID HybridReplicationCoordinator::getMyRID(OperationContext* txn) {
-        OID legacyRID = _legacy.getMyRID(txn);
-        _impl.getMyRID(txn);
+    OID HybridReplicationCoordinator::getMyRID() {
+        OID legacyRID = _legacy.getMyRID();
+        _impl.getMyRID();
         return legacyRID;
     }
 

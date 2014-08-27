@@ -61,10 +61,6 @@ namespace repl {
         /// replication progress.
         void forwardSlaveProgress();
 
-        /// Returns the RID for this process.  ensureMe() must have been called before this can be.
-        /// TODO(spencer): Remove this function once the LegacyReplicationCoordinator is gone.
-        OID getMyRID() const { return _me["_id"].OID(); }
-
         /// Loops continuously until shutdown() is called, passing updates when they are present.
         /// TODO(spencer): Currently also can terminate when the global inShutdown() function
         /// returns true.  Remove that once the legacy repl coordinator is gone.

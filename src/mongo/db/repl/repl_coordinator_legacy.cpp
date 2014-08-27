@@ -75,6 +75,9 @@ namespace repl {
     LegacyReplicationCoordinator::~LegacyReplicationCoordinator() {}
 
     void LegacyReplicationCoordinator::startReplication(OperationContext* txn) {
+        ReplicationCoordinatorExternalStateImpl externalState;
+        _myRID = externalState.ensureMe(txn);
+
         // if we are going to be a replica set, we aren't doing other forms of replication.
         if (!_settings.replSet.empty()) {
             if (_settings.slave || _settings.master) {
@@ -83,7 +86,6 @@ namespace repl {
                 log() << "***" << endl;
             }
 
-            ReplicationCoordinatorExternalStateImpl externalState;
             ReplSetSeedList *replSetSeedList = new ReplSetSeedList(&externalState,
                                                                    _settings.replSet);
             boost::thread t(stdx::bind(&startReplSets, replSetSeedList));
@@ -388,7 +390,7 @@ namespace {
                 return Status::OK();
             }
 
-            if (rid != getMyRID(txn)) {
+            if (rid != getMyRID()) {
                 BSONObj config;
                 if (getReplicationMode() == modeReplSet) {
                     invariant(_ridMemberMap.count(rid));
@@ -428,15 +430,8 @@ namespace {
     }
 
 
-    OID LegacyReplicationCoordinator::getMyRID(OperationContext* txn) {
-        Mode mode = getReplicationMode();
-        if (mode == modeReplSet) {
-            return theReplSet->syncSourceFeedback.getMyRID();
-        } else if (mode == modeMasterSlave) {
-            ReplSource source(txn);
-            return source.getMyRID();
-        }
-        invariant(false); // Don't have an RID if no replication is enabled
+    OID LegacyReplicationCoordinator::getMyRID() {
+        return _myRID;
     }
 
     void LegacyReplicationCoordinator::prepareReplSetUpdatePositionCommand(
@@ -447,7 +442,7 @@ namespace {
         cmdBuilder->append("replSetUpdatePosition", 1);
         // create an array containing objects each member connected to us and for ourself
         BSONArrayBuilder arrayBuilder(cmdBuilder->subarrayStart("optimes"));
-        OID myID = getMyRID(txn);
+        OID myID = getMyRID();
         {
             for (SlaveOpTimeMap::const_iterator itr = _slaveOpTimeMap.begin();
                     itr != _slaveOpTimeMap.end(); ++itr) {
@@ -480,7 +475,7 @@ namespace {
         BSONObjBuilder cmd;
         cmd.append("replSetUpdatePosition", 1);
         BSONObjBuilder sub (cmd.subobjStart("handshake"));
-        sub.append("handshake", getMyRID(txn));
+        sub.append("handshake", getMyRID());
         sub.append("member", theReplSet->selfId());
         sub.append("config", theReplSet->myConfig().asBson());
         sub.doneFast();

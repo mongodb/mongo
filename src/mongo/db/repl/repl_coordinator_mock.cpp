@@ -129,7 +129,7 @@ namespace repl {
         return OID();
     }
 
-    OID ReplicationCoordinatorMock::getMyRID(OperationContext* txn) {
+    OID ReplicationCoordinatorMock::getMyRID() {
         return OID();
     }
 

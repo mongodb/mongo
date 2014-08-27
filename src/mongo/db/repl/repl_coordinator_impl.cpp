@@ -360,8 +360,7 @@ namespace {
     }
 
     OpTime ReplicationCoordinatorImpl::_getLastOpApplied_inlock() {
-        OperationContextNoop txn;
-        return _slaveInfoMap[getMyRID(&txn)].opTime;
+        return _slaveInfoMap[getMyRID()].opTime;
     }
 
     void ReplicationCoordinatorImpl::interrupt(unsigned opId) {
@@ -655,7 +654,7 @@ namespace {
         return _electionID;
     }
 
-    OID ReplicationCoordinatorImpl::getMyRID(OperationContext* txn) {
+    OID ReplicationCoordinatorImpl::getMyRID() {
         return _myRID;
     }
 
@@ -1001,8 +1000,8 @@ namespace {
                  _getLastOpApplied_inlock());
 
          // Ensure that there's an entry in the _slaveInfoMap for ourself
-         _slaveInfoMap[getMyRID(NULL)].memberID = _rsConfig.getMemberAt(myIndex).getId();
-         _slaveInfoMap[getMyRID(NULL)].hostAndPort =
+         _slaveInfoMap[getMyRID()].memberID = _rsConfig.getMemberAt(myIndex).getId();
+         _slaveInfoMap[getMyRID()].hostAndPort =
                  _rsConfig.getMemberAt(myIndex).getHostAndPort();
          _startHeartbeats();
      }

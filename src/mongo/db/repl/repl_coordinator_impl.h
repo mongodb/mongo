@@ -126,7 +126,7 @@ namespace repl {
 
         virtual OID getElectionId();
 
-        virtual OID getMyRID(OperationContext* txn);
+        virtual OID getMyRID();
 
         virtual void prepareReplSetUpdatePositionCommand(OperationContext* txn,
                                                          BSONObjBuilder* cmdBuilder);
