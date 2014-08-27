@@ -192,7 +192,7 @@ __wt_logmgr_create(WT_CONNECTION_IMPL *conn, const char *cfg[])
 	WT_RET(__wt_spin_init(session, &log->log_slot_lock, "log slot"));
 	WT_RET(__wt_spin_init(session, &log->log_sync_lock, "log sync"));
 	WT_RET(__wt_rwlock_alloc(session,
-	    "log archive lock", &log->log_archive_lock));
+	    &log->log_archive_lock, "log archive lock"));
 	if (FLD_ISSET(conn->direct_io, WT_FILE_TYPE_LOG))
 		log->allocsize =
 		    WT_MAX((uint32_t)conn->buffer_alignment, LOG_ALIGN);
