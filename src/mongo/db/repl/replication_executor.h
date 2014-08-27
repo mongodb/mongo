@@ -47,6 +47,9 @@
 #include "mongo/util/time_support.h"
 
 namespace mongo {
+
+    class OperationContext;
+
 namespace repl {
 
     /**
@@ -352,11 +355,13 @@ namespace repl {
 
         /**
          * Executes the callback referenced by "cbHandle", and moves the underlying
-         * WorkQueue::iterator into the _freeQueue.
+         * WorkQueue::iterator into the _freeQueue.  "txn" is a pointer to the OperationContext
+         * owning the global exclusive lock.
          *
          * Serializes execution of "cbHandle" with the execution of other callbacks.
          */
-        void doOperationWithGlobalExclusiveLock(const CallbackHandle& cbHandle);
+        void doOperationWithGlobalExclusiveLock(OperationContext* txn,
+                                                const CallbackHandle& cbHandle);
 
         boost::scoped_ptr<NetworkInterface> _networkInterface;
         boost::mutex _mutex;
@@ -434,11 +439,13 @@ namespace repl {
     struct ReplicationExecutor::CallbackData {
         CallbackData(ReplicationExecutor* theExecutor,
                      const CallbackHandle& theHandle,
-                     const Status& theStatus);
+                     const Status& theStatus,
+                     OperationContext* txn = NULL);
 
         ReplicationExecutor* executor;
         CallbackHandle myHandle;
         Status status;
+        OperationContext* txn;
     };
 
     /**
@@ -498,7 +505,7 @@ namespace repl {
          * Runs the given callback while holding the global exclusive lock.
          */
         virtual void runCallbackWithGlobalExclusiveLock(
-                const stdx::function<void ()>& callback) = 0;
+                const stdx::function<void (OperationContext*)>& callback) = 0;
 
     protected:
         NetworkInterface();

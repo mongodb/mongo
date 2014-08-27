@@ -323,7 +323,9 @@ namespace {
         return cbHandle;
     }
 
-    void ReplicationExecutor::doOperationWithGlobalExclusiveLock(const CallbackHandle& cbHandle) {
+    void ReplicationExecutor::doOperationWithGlobalExclusiveLock(
+            OperationContext* txn,
+            const CallbackHandle& cbHandle) {
         boost::unique_lock<boost::mutex> lk(_mutex);
         if (_inShutdown)
             return;
@@ -340,7 +342,8 @@ namespace {
                                        cbHandle,
                                        (work.isCanceled ?
                                         Status(ErrorCodes::CallbackCanceled, "Callback canceled") :
-                                        Status::OK())));
+                                        Status::OK()),
+                                       txn));
         }
         lk.lock();
         signalEvent_inlock(work.finishedEvent);
@@ -354,9 +357,10 @@ namespace {
         StatusWith<CallbackHandle> handle = enqueueWork_inlock(&_exclusiveLockInProgressQueue,
                                                                work);
         if (handle.isOK()) {
-            const stdx::function<void ()> doOp = stdx::bind(
+            const stdx::function<void (OperationContext*)> doOp = stdx::bind(
                     &ReplicationExecutor::doOperationWithGlobalExclusiveLock,
                     this,
+                    stdx::placeholders::_1,
                     handle.getValue());
             _networkWorkers.schedule(
                     makeNoExcept(stdx::bind(
@@ -457,10 +461,12 @@ namespace {
 
     ReplicationExecutor::CallbackData::CallbackData(ReplicationExecutor* theExecutor,
                                                     const CallbackHandle& theHandle,
-                                                    const Status& theStatus) :
+                                                    const Status& theStatus,
+                                                    OperationContext* theTxn) :
         executor(theExecutor),
         myHandle(theHandle),
-        status(theStatus) {
+        status(theStatus),
+        txn(theTxn) {
     }
 
     ReplicationExecutor::RemoteCommandRequest::RemoteCommandRequest() :

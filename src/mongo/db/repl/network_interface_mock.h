@@ -53,7 +53,8 @@ namespace repl {
         virtual void setExecutor(ReplicationExecutor* executor);
         virtual Date_t now();
         virtual ResponseStatus runCommand(const ReplicationExecutor::RemoteCommandRequest& request);
-        virtual void runCallbackWithGlobalExclusiveLock(const stdx::function<void ()>& callback);
+        virtual void runCallbackWithGlobalExclusiveLock(
+                const stdx::function<void (OperationContext*)>& callback);
 
         /**
          * Network latency added for each remote command, defaults to 0.
