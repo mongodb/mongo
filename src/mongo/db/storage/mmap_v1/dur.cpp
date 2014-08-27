@@ -838,7 +838,6 @@ namespace mongo {
             cc().shutdown();
         }
 
-        void recover(OperationContext* txn);
         void preallocateFiles();
 
         /** at startup, recover, and then start the journal threads */
@@ -863,9 +862,8 @@ namespace mongo {
 
             journalMakeDir();
 
-            OperationContextImpl txn;
             try {
-                recover(&txn);
+                replayJournalFilesAtStartup();
             }
             catch(DBException& e) {
                 log() << "dbexception during recovery: " << e.toString() << endl;

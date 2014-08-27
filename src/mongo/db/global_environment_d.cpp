@@ -41,8 +41,6 @@
 
 namespace mongo {
 
-    StorageEngine* globalStorageEngine = 0;
-
     MONGO_INITIALIZER(SetGlobalEnvironment)(InitializerContext* context) {
         setGlobalEnvironment(new GlobalEnvironmentMongoD());
         return Status::OK();
@@ -50,7 +48,8 @@ namespace mongo {
 
     GlobalEnvironmentMongoD::GlobalEnvironmentMongoD()
         : _globalKill(false),
-          _registeredOpContextsMutex("RegisteredOpContextsMutex") { }
+          _registeredOpContextsMutex("RegisteredOpContextsMutex"),
+          _storageEngine(NULL) { }
 
     GlobalEnvironmentMongoD::~GlobalEnvironmentMongoD() {
         if (!_registeredOpContexts.empty()) {
@@ -62,17 +61,18 @@ namespace mongo {
         // We don't check that globalStorageEngine is not-NULL here intentionally.  We can encounter
         // an error before it's initialized and proceed to exitCleanly which is equipped to deal
         // with a NULL storage engine.
-        return globalStorageEngine;
+        return _storageEngine;
     }
 
     void GlobalEnvironmentMongoD::setGlobalStorageEngine(const std::string& name) {
         // This should be set once.
-        invariant(!globalStorageEngine);
+        invariant(!_storageEngine);
 
         const StorageEngine::Factory* factory = _storageFactories[name];
 
         uassert(18656, "cannot start database with an unknown storage engine: " + name, factory);
-        globalStorageEngine = factory->create(storageGlobalParams);
+        _storageEngine = factory->create(storageGlobalParams);
+        _storageEngine->finishInit();
     }
 
     void GlobalEnvironmentMongoD::registerStorageEngine(const std::string& name,
@@ -84,7 +84,7 @@ namespace mongo {
         invariant(factory);
 
         // and all factories should be added before we pick a storage engine.
-        invariant(NULL == globalStorageEngine);
+        invariant(NULL == _storageEngine);
 
         _storageFactories[name] = factory;
     }

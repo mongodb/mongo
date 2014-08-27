@@ -45,6 +45,8 @@ namespace mongo {
         MMAPV1Engine();
         virtual ~MMAPV1Engine();
 
+        void finishInit();
+
         RecoveryUnit* newRecoveryUnit( OperationContext* opCtx );
         void listDatabases( std::vector<std::string>* out ) const;
         int flushAllFiles( bool sync );

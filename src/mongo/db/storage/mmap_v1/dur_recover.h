@@ -87,5 +87,7 @@ namespace mongo {
 
             static RecoveryJob &_instance;
         };
+
+        void replayJournalFilesAtStartup();
     }
 }

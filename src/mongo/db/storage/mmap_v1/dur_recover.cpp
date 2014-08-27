@@ -42,6 +42,7 @@
 #include "mongo/db/curop.h"
 #include "mongo/db/catalog/database.h"
 #include "mongo/db/db.h"
+#include "mongo/db/operation_context_impl.h"
 #include "mongo/db/storage/storage_engine.h"
 #include "mongo/db/storage/mmap_v1/catalog/namespace.h"
 #include "mongo/db/storage/mmap_v1/dur.h"
@@ -580,10 +581,11 @@ namespace mongo {
             called during startup
             throws on error
         */
-        void recover(OperationContext* txn) {
+        void replayJournalFilesAtStartup() {
             // we use a lock so that exitCleanly will wait for us
             // to finish (or at least to notice what is up and stop)
-            Lock::GlobalWrite lk(txn->lockState());
+            OperationContextImpl txn;
+            Lock::GlobalWrite lk(txn.lockState());
 
             // can't lock groupCommitMutex here as
             //   DurableMappedFile::close()->closingFileNotication()->groupCommit() will lock it

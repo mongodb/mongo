@@ -42,7 +42,6 @@
 #include <sys/file.h>
 #endif
 
-#include "mongo/db/global_environment_d.h"   // XXX: for globalStorageEngine
 #include "mongo/db/mongod_options.h"
 #include "mongo/db/storage/mmap_v1/dur.h"
 #include "mongo/db/storage/mmap_v1/dur_commitjob.h"
@@ -295,12 +294,11 @@ namespace {
         FileAllocator::get()->start();
 
         MONGO_ASSERT_ON_EXCEPTION_WITH_MSG( clearTmpFiles(), "clear tmp files" );
+    }
 
-        // dur::startup() depends on globalStorageEngine being set before calling.
-        // TODO clean up dur::startup() so this isn't needed.
-        invariant(!globalStorageEngine);
-        globalStorageEngine = this;
-
+    void MMAPV1Engine::finishInit() {
+        // Replays the journal (if needed) and starts the background thread. This requires the
+        // ability to create OperationContexts.
         dur::startup();
     }
 
