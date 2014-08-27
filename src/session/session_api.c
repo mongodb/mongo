@@ -20,8 +20,12 @@ __wt_session_reset_cursors(WT_SESSION_IMPL *session)
 	WT_CURSOR *cursor;
 	WT_DECL_RET;
 
-	TAILQ_FOREACH(cursor, &session->cursors, q)
+	TAILQ_FOREACH(cursor, &session->cursors, q) {
+		/* Stop when there are no positioned cursors. */
+		if (session->ncursors == 0)
+			break;
 		WT_TRET(cursor->reset(cursor));
+	}
 	return (ret);
 }
 
@@ -606,8 +610,6 @@ __session_begin_transaction(WT_SESSION *wt_session, const char *config)
 	if (F_ISSET(&session->txn, TXN_RUNNING))
 		WT_ERR_MSG(session, EINVAL, "Transaction already running");
 
-	WT_ERR(__wt_session_reset_cursors(session));
-
 	/*
 	 * Now there are no cursors open and no transaction active in this
 	 * thread.  Check if the cache is full: if we have to block for
@@ -641,12 +643,12 @@ __session_commit_transaction(WT_SESSION *wt_session, const char *config)
 		ret = EINVAL;
 	}
 
-	WT_TRET(__wt_session_reset_cursors(session));
-
 	if (ret == 0)
 		ret = __wt_txn_commit(session, cfg);
-	else
+	else {
+		WT_TRET(__wt_session_reset_cursors(session));
 		WT_TRET(__wt_txn_rollback(session, cfg));
+	}
 
 err:	API_END_RET(session, ret);
 }

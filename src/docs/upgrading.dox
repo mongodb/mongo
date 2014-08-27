@@ -3,6 +3,21 @@
 @section version_232 Upgrading to Version 2.3.2
 
 <dl>
+<dt>Cursors no longer reset on transaction begin or commit</dt>
+<dd>
+In previous versions of WiredTiger, all cursors in a session were reset at
+transaction boundaries (WT_SESSION::begin_transaction,
+WT_SESSION::commit_transaction and WT_SESSION::rollback_transaction).
+Now they are only reset by WT_SESSION::rollback_transaction.
+
+This change means that a cursor can be used to iterate through a table and
+perform transactional updates based on the visited records without the cursor
+losing its position.
+
+Applications that relied on this behavior should reset cursors explicitly when
+the position is no longer required.
+</dd>
+
 <dt>WT_COLLATOR interface changes</dt>
 <dd>
 Add a new WT_COLLATOR::customize callback that WiredTiger will call (if set)

@@ -1569,9 +1569,9 @@ extern void __wt_stat_refresh_connection_stats(void *stats_arg);
 extern int __wt_txnid_cmp(const void *v1, const void *v2);
 extern void __wt_txn_release_snapshot(WT_SESSION_IMPL *session);
 extern void __wt_txn_update_oldest(WT_SESSION_IMPL *session);
-extern void __wt_txn_refresh(WT_SESSION_IMPL *session,
-    uint64_t max_id,
-    int get_snapshot);
+extern void __wt_txn_refresh( WT_SESSION_IMPL *session,
+    int get_snapshot,
+    int pin_reads);
 extern int __wt_txn_begin(WT_SESSION_IMPL *session, const char *cfg[]);
 extern void __wt_txn_release(WT_SESSION_IMPL *session);
 extern int __wt_txn_commit(WT_SESSION_IMPL *session, const char *cfg[]);

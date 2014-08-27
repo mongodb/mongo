@@ -816,8 +816,8 @@ struct __wt_session {
 	 * Cursor handles should be discarded by calling WT_CURSOR::close.
 	 *
 	 * Cursors capable of supporting transactional operations operate in the
-	 * context of the current transaction, if any.  Ending a transaction
-	 * implicitly resets all open cursors.
+	 * context of the current transaction, if any.
+	 * WT_SESSION::rollback_transaction implicitly resets all open cursors.
 	 *
 	 * Cursors are relatively light-weight objects but may hold references
 	 * to heavier-weight objects; applications should re-use cursors when
@@ -1285,8 +1285,6 @@ struct __wt_session {
 	 * before the transaction ends, will operate in the context of the
 	 * transaction.
 	 *
-	 * All open cursors are reset.
-	 *
 	 * WT_SESSION::begin_transaction will fail if a transaction is already
 	 * in progress in the session.
 	 *
@@ -1315,8 +1313,6 @@ struct __wt_session {
 	 * Commit the current transaction.
 	 *
 	 * A transaction must be in progress when this method is called.
-	 *
-	 * All open cursors are reset.
 	 *
 	 * If WT_SESSION::commit_transaction returns an error, the transaction
 	 * was rolled-back, not committed.

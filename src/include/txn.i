@@ -321,7 +321,7 @@ __wt_txn_read_first(WT_SESSION_IMPL *session)
 	if (txn->isolation == TXN_ISO_READ_COMMITTED ||
 	    (!F_ISSET(txn, TXN_RUNNING) &&
 	    txn->isolation == TXN_ISO_SNAPSHOT))
-		__wt_txn_refresh(session, WT_TXN_NONE, 1);
+		__wt_txn_refresh(session, 1, 0);
 }
 
 /*
