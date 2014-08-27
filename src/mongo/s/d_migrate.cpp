@@ -75,7 +75,7 @@
 #include "mongo/s/chunk.h"
 #include "mongo/s/chunk_version.h"
 #include "mongo/s/config.h"
-#include "mongo/s/d_logic.h"
+#include "mongo/s/d_state.h"
 #include "mongo/s/distlock.h"
 #include "mongo/s/shard.h"
 #include "mongo/s/type_chunk.h"

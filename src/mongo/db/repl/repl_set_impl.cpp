@@ -48,7 +48,7 @@
 #include "mongo/db/repl/repl_coordinator_hybrid.h"
 #include "mongo/db/repl/rslog.h"
 #include "mongo/db/storage/storage_engine.h"
-#include "mongo/s/d_logic.h"
+#include "mongo/s/d_state.h"
 #include "mongo/util/background.h"
 #include "mongo/util/exit.h"
 #include "mongo/util/log.h"

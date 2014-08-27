@@ -38,7 +38,7 @@
 #include "mongo/db/pipeline/pipeline.h"
 #include "mongo/db/query/get_executor.h"
 #include "mongo/db/query/query_planner.h"
-#include "mongo/s/d_logic.h"
+#include "mongo/s/d_state.h"
 
 namespace mongo {
 

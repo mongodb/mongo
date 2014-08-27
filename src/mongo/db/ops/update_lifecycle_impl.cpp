@@ -33,7 +33,7 @@
 #include "mongo/db/field_ref.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/s/chunk_version.h"
-#include "mongo/s/d_logic.h"
+#include "mongo/s/d_state.h"
 
 namespace mongo {
     namespace {

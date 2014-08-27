@@ -1,4 +1,3 @@
-// @file d_logic.h
 /*
  *    Copyright (C) 2010 10gen Inc.
  *
@@ -352,9 +351,6 @@ namespace mongo {
     // --- core ---
     // -----------------
 
-    unsigned long long extractVersion( BSONElement e , std::string& errmsg );
-
-
     /**
      * @return true if we have any shard info for the ns
      */
@@ -384,6 +380,8 @@ namespace mongo {
     /**
      * Returns true if the version of this thread is compatible with the global
      * version of this shard.
+     *
+     * Note: Last use of this function are for queries.
      */
     inline bool checkShardVersion(Message &m, DbResponse* dbresponse) {
         if( !shardingState.enabled() ) 

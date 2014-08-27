@@ -821,8 +821,7 @@ env.CppUnitTest('config_server_tests', [ 's/config_server_tests.cpp' ],
 env.CppUnitTest("fail_point_test", [ "util/fail_point_test.cpp" ],
                 LIBDEPS=["fail_point"])
 
-serverOnlyFiles += [ "s/d_logic.cpp",
-                     "s/d_migrate.cpp",
+serverOnlyFiles += [ "s/d_migrate.cpp",
                      "s/d_state.cpp",
                      "s/d_split.cpp",
                      "s/d_merge.cpp",

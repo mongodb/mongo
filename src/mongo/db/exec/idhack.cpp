@@ -34,7 +34,7 @@
 #include "mongo/db/exec/projection.h"
 #include "mongo/db/exec/working_set_computed_data.h"
 #include "mongo/db/index/btree_access_method.h"
-#include "mongo/s/d_logic.h"
+#include "mongo/s/d_state.h"
 
 namespace mongo {
 
