@@ -46,6 +46,7 @@
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/auth/privilege.h"
 #include "mongo/db/client.h"
+#include "mongo/db/get_status_from_command_result.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/server_parameters.h"
@@ -237,28 +238,7 @@ namespace mongo {
     }
 
     Status Command::getStatusFromCommandResult(const BSONObj& result) {
-        BSONElement okElement = result["ok"];
-        BSONElement codeElement = result["code"];
-        BSONElement errmsgElement = result["errmsg"];
-        if (okElement.eoo()) {
-            return Status(ErrorCodes::CommandResultSchemaViolation,
-                          mongoutils::str::stream() << "No \"ok\" field in command result " <<
-                          result);
-        }
-        if (okElement.trueValue()) {
-            return Status::OK();
-        }
-        int code = codeElement.numberInt();
-        if (0 == code)
-            code = ErrorCodes::UnknownError;
-        std::string errmsg;
-        if (errmsgElement.type() == String) {
-            errmsg = errmsgElement.String();
-        }
-        else if (!errmsgElement.eoo()) {
-            errmsg = errmsgElement.toString();
-        }
-        return Status(ErrorCodes::Error(code), errmsg);
+        return mongo::getStatusFromCommandResult(result);
     }
 
     Status Command::checkAuthForCommand(ClientBasic* client,
