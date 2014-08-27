@@ -112,11 +112,9 @@ print_record(WT_LSN *lsn, uint32_t opcount,
 	    " txnid %" PRIu64 " fileid %" PRIu32,
 	    lsn->file, (uint64_t)lsn->offset, opcount,
 	    rectype, optype, txnid, fileid);
-	printf(" key size %zu", key->size);
-	printf(" value size %zu", value->size);
+	printf(" key size %zu value size %zu\n", key->size, value->size);
 	if (rectype == WT_LOGREC_MESSAGE)
-		printf("\n Application Record: %s", (char *)value->data);
-	printf("\n");
+		printf("Application Record: %s\n", (char *)value->data);
 }
 
 /*
@@ -151,6 +149,7 @@ simple_walk_log(WT_SESSION *session)
 	}
 	if (ret == WT_NOTFOUND)
 		ret = 0;
+	ret = cursor->close(cursor);
 	return (ret);
 }
 /*! [log cursor walk] */
