@@ -246,7 +246,7 @@ namespace mongo {
 
     namespace {
         // Only one instance of the ClientCursorMonitor exists
-        ClientCursorMonitor clientCursorMonitor = ClientCursorMonitor();
+        ClientCursorMonitor clientCursorMonitor;
 
         void _appendCursorStats( BSONObjBuilder& b ) {
             b.append( "note" , "deprecated, use server status metrics" );
