@@ -64,6 +64,9 @@ most durability guarantees).
 
 /*! @page tune_durability Commit-level durability
 
+There are some considerations when configuring commit-level durability
+that can affect performance.
+
 @section durability_group_commit Group commit
 @copydoc doc_tune_durability_group_commit
 
