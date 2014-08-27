@@ -135,6 +135,7 @@ class op_thread(threading.Thread):
                         next_cur.set_key(key)
                         next_cur.set_value(value)
                         next_cur.update()
+                        next_cur.reset()
                     sess.commit_transaction()
                 if op == 'i': # Insert an item
                     c.set_key(key)
