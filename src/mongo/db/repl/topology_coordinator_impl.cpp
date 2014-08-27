@@ -600,7 +600,7 @@ namespace repl {
 
         // Heartbeat status message
         response->setHbMsg(_getHbmsg());
-        response->setTime(now);
+        response->setTime(Seconds(Milliseconds(now.asInt64()).total_seconds()));
         response->setOpTime(lastOpApplied.asDate());
 
         if (_syncSourceIndex != -1) {

@@ -554,7 +554,7 @@ namespace {
 
         response->setElectable(theReplSet->iAmElectable());
         response->setHbMsg(theReplSet->hbmsg());
-        response->setTime((long long) time(0));
+        response->setTime(Seconds(time(0)));
         response->setOpTime(theReplSet->lastOpTimeWritten.asDate());
         const Member *syncTarget = BackgroundSync::get()->getSyncTarget();
         if (syncTarget) {

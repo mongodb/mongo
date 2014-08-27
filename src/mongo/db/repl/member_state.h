@@ -43,6 +43,9 @@ namespace repl {
         RS_RECOVERING recovering/resyncing; after recovery usually auto-transitions to secondary
         RS_FATAL      something bad has occurred and server is not completely offline with regard to the replica set.  fatal error.
         RS_STARTUP2   loaded config, still determining who is primary
+
+        State -> integer mappings are reserved forever.  Do not change them or delete them, except
+        to update RS_MAX when introducing new states.
     */
     struct MemberState {
         enum MS {
@@ -57,6 +60,7 @@ namespace repl {
             RS_DOWN = 8, /* node not reachable for a report */
             RS_ROLLBACK = 9,
             RS_REMOVED = 10, /* node removed from replica set */
+            RS_MAX = 10
         } s;
 
         MemberState(MS ms = RS_UNKNOWN) : s(ms) { }
