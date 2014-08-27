@@ -174,7 +174,7 @@ __wt_cond_destroy(WT_SESSION_IMPL *session, WT_CONDVAR **condp)
  */
 int
 __wt_rwlock_alloc(
-    WT_SESSION_IMPL *session, const char *name, WT_RWLOCK **rwlockp)
+    WT_SESSION_IMPL *session, WT_RWLOCK **rwlockp, const char *name)
 {
 	WT_DECL_RET;
 	WT_RWLOCK *rwlock;
