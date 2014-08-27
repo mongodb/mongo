@@ -1,16 +1,16 @@
 /*! @page checkpoint Checkpoint durability
 
 WiredTiger supports checkpoint durability by default, and optionally
-commit-level durability.  In most applications, commit-level durability
-impacts performance more than checkpoint durability; checkpoints offer
-basic operation durability across application or system failure without
-impacting performance, (although the creation of each checkpoint is a
-relatively heavy-weight operation).  See @ref durability for information
+commit-level durability when logging is enabled.  In most applications,\
+commit-level durability impacts performance more than checkpoint durability;
+checkpoints offer basic operation durability across application or system
+failure without impacting performance, (although the creation of each checkpoint
+is a relatively heavy-weight operation).  See @ref durability for information
 on commit-level durability.
 
 Checkpoints with transactional logging enabled allow logging to archive
 older log files (if configured to do so) while still retaining
-fine-grained durability and the ability to run recovery.
+commit-level durability and the ability to run recovery.
 
 A checkpoint is automatically created whenever a modified data source
 is closed.  Additionally, checkpoints of one or more data sources, or
@@ -52,6 +52,8 @@ source.  This provides a limited form of time-travel, as the static view
 is not changed by subsequent checkpoints, and will persist until the
 checkpoint cursor is closed.
 
+@section checkpoint_naming Checkpoint naming
+
 Additionally, checkpoints that do not include LSM trees may optionally
 be given names by the application.  Checkpoints named by the application
 persist until explicitly discarded or the application creates a new
@@ -81,9 +83,8 @@ format.
 Checkpoints share file blocks, and dropping a checkpoint may or may not
 make file blocks available for re-use, depending on whether the dropped
 checkpoint contained the last reference to a file block.
-
 Because checkpoints named by the application are not discarded until
 explicitly discarded or replaced, they may prevent WT_SESSION::compact
-from accomplishing anything.
+from accomplishing anything due to shared file blocks.
 
  */
