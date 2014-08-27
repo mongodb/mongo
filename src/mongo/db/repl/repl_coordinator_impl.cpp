@@ -123,11 +123,6 @@ namespace {
         // this is ok but micros or combo with some rand() and/or 64 bits might be better --
         // imagine a restart and a clock correction simultaneously (very unlikely but possible...)
         _rbid = static_cast<int>(_replExecutor.now().asInt64());
-
-        _topCoord->registerStateChangeCallback(
-                stdx::bind(&ReplicationCoordinatorImpl::_onSelfStateChange,
-                           this,
-                           stdx::placeholders::_1));
     }
 
     ReplicationCoordinatorImpl::~ReplicationCoordinatorImpl() {}
@@ -301,19 +296,6 @@ namespace {
             return modeMasterSlave;
         }
         return modeNone;
-    }
-
-    void ReplicationCoordinatorImpl::_onSelfStateChange(const MemberState& newState) {
-        boost::lock_guard<boost::mutex> lk(_mutex);
-        invariant(_settings.usingReplSets());
-        invariant(_getReplicationMode_inlock() == modeReplSet);
-        _currentState = newState;
-        if (newState.primary()) {
-            _electionID = OID::gen();
-        }
-        else {
-            _electionID.clear();
-        }
     }
 
     MemberState ReplicationCoordinatorImpl::getCurrentMemberState() const {

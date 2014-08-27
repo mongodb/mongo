@@ -267,9 +267,6 @@ namespace repl {
 
         typedef std::vector<ReplicationExecutor::CallbackHandle> HeartbeatHandles;
 
-        // Called by the TopologyCoordinator whenever this node's replica set state transitions.
-        void _onSelfStateChange(const MemberState& newState);
-
         /**
          * Helpers to update our saved config, cancel any pending heartbeats, and kick off sending
          * new heartbeats based on the new config.  Must *only* be called from within the

@@ -982,20 +982,8 @@ namespace {
         ASSERT_EQUALS(3U, rids.size()); // Make sure we saw all 3 nodes
     }
 
-    TEST_F(ReplCoordTest, TestGetElectionId) {
-        init("mySet/test1:1234,test2:1234,test3:1234");
-        assertStartSuccess(
-                BSON("_id" << "mySet" <<
-                     "version" << 2 <<
-                     "members" << BSON_ARRAY(BSON("_id" << 1 << "host" << "test1:1234"))),
-                HostAndPort("test1", 1234));
-        OID electionID1 = getReplCoord()->getElectionId();
-        getTopoCoord()._changeMemberState(MemberState::RS_PRIMARY);
-        OID electionID2 = getReplCoord()->getElectionId();
-        ASSERT_NOT_EQUALS(electionID1, electionID2);
-    }
-
     // TODO(spencer): Unit test replSetFreeze
+    // TODO(schwerin): Unit test election id updating
 
 }  // namespace
 }  // namespace repl
