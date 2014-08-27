@@ -71,7 +71,7 @@ namespace QueryStageDistinct {
         IndexDescriptor* getIndex(const BSONObj& obj) {
             Client::ReadContext ctx(&_txn, ns());
             Collection* collection = ctx.ctx().db()->getCollection( &_txn, ns() );
-            return collection->getIndexCatalog()->findIndexByKeyPattern( obj );
+            return collection->getIndexCatalog()->findIndexByKeyPattern( &_txn, obj );
         }
 
         /**
@@ -197,7 +197,7 @@ namespace QueryStageDistinct {
             // Set up the distinct stage.
             DistinctParams params;
             params.descriptor = getIndex(BSON("a" << 1));
-            ASSERT_TRUE(params.descriptor->isMultikey());
+            ASSERT_TRUE(params.descriptor->isMultikey(&_txn));
 
             verify(params.descriptor);
             params.direction = 1;

@@ -70,14 +70,6 @@ namespace repl {
     {
     }
 
-    void TopologyCoordinatorImpl::setCommitOkayThrough(const OpTime& optime) {
-        _commitOkayThrough = optime;
-    }
-
-    void TopologyCoordinatorImpl::setLastReceived(const OpTime& optime) {
-        _lastReceived = optime;
-    }
-
     void TopologyCoordinatorImpl::setForceSyncSourceIndex(int index) {
         invariant(_forceSyncSourceIndex < _currentConfig.getNumMembers());
         _forceSyncSourceIndex = index;
@@ -286,7 +278,7 @@ namespace repl {
 
     void TopologyCoordinatorImpl::prepareSyncFromResponse(
             const ReplicationExecutor::CallbackData& data,
-            int targetIndex,
+            const HostAndPort& target,
             const OpTime& lastOpApplied,
             BSONObjBuilder* response,
             Status* result) {
@@ -295,28 +287,72 @@ namespace repl {
             return;
         }
 
-        const MemberConfig& targetConfig = _currentConfig.getMemberAt(targetIndex);
+        response->append("syncFromRequested", target.toString());
+
+        const MemberConfig& selfConfig = _selfConfig();
+        if (selfConfig.isArbiter()) {
+            *result = Status(ErrorCodes::NotSecondary, "arbiters don't sync");
+            return;
+        }
+        if (_selfIndex == _currentPrimaryIndex) {
+            *result = Status(ErrorCodes::NotSecondary, "primaries don't sync");
+            return;
+        }
+
+        ReplicaSetConfig::MemberIterator targetConfig = _currentConfig.membersEnd();
+        int targetIndex = 0;
+        for (ReplicaSetConfig::MemberIterator it = _currentConfig.membersBegin();
+                it != _currentConfig.membersEnd(); ++it) {
+            if (it->getHostAndPort() == target) {
+                targetConfig = it;
+                break;
+            }
+            ++targetIndex;
+        }
+        if (targetConfig == _currentConfig.membersEnd()) {
+            *result = Status(ErrorCodes::NodeNotFound,
+                             str::stream() << "Could not find member \"" << target.toString() <<
+                                     "\" in replica set");
+            return;
+        }
+        if (targetIndex == _selfIndex) {
+            *result = Status(ErrorCodes::InvalidOptions, "I cannot sync from myself");
+            return;
+        }
+        if (targetConfig->isArbiter()) {
+            *result = Status(ErrorCodes::InvalidOptions,
+                             str::stream() << "Cannot sync from \"" << target.toString() <<
+                                     "\" because it is an arbiter");
+            return;
+        }
+        if (!targetConfig->shouldBuildIndexes() && selfConfig.shouldBuildIndexes()) {
+            *result = Status(ErrorCodes::InvalidOptions,
+                             str::stream() << "Cannot sync from \"" << target.toString() <<
+                                     "\" because it does not build indexes");
+            return;
+        }
+
         const MemberHeartbeatData& hbdata = _hbdata[targetIndex];
-        const std::string targetHostAndPort = targetConfig.getHostAndPort().toString();
         if (hbdata.hasAuthIssue()) {
             *result = Status(ErrorCodes::Unauthorized,
-                             "not authorized to communicate with " + targetHostAndPort);
+                             str::stream() << "not authorized to communicate with " <<
+                                     target.toString());
             return;
         }
         if (hbdata.getHealth() == 0) {
             *result = Status(ErrorCodes::HostUnreachable,
-                             str::stream() << "I cannot reach the requested member: \"" <<
-                                     targetHostAndPort << "\"");
+                             str::stream() << "I cannot reach the requested member: " <<
+                                     target.toString());
             return;
         }
         if (hbdata.getOpTime().getSecs()+10 < lastOpApplied.getSecs()) {
-            warning() << "attempting to sync from " << targetHostAndPort
+            warning() << "attempting to sync from " << target
                       << ", but its latest opTime is " << hbdata.getOpTime().getSecs()
                       << " and ours is " << lastOpApplied.getSecs() << " so this may not work"
                       << rsLog;
             response->append("warning",
-                             "requested member \"" + targetHostAndPort + "\" is more than 10 "
-                                     "seconds behind us");
+                             str::stream() << "requested member \"" << target.toString() <<
+                                     "\" is more than 10 seconds behind us");
             // not returning bad Status, just warning
         }
 
@@ -329,72 +365,72 @@ namespace repl {
         *result = Status::OK();
     }
 
-    // Produce a reply to a RAFT-style RequestVote RPC; this is MongoDB ReplSetFresh command
-    // The caller should validate that the message is for the correct set, and has the required data
-    void TopologyCoordinatorImpl::prepareRequestVoteResponse(const Date_t now,
-                                                             const BSONObj& cmdObj,
-                                                             const OpTime& lastOpApplied,
-                                                             std::string& errmsg,
-                                                             BSONObjBuilder& result) {
+    void TopologyCoordinatorImpl::prepareFreshResponse(
+            const ReplicationExecutor::CallbackData& data,
+            const ReplicationCoordinator::ReplSetFreshArgs& args,
+            const OpTime& lastOpApplied,
+            BSONObjBuilder* response,
+            Status* result) {
 
-        string who = cmdObj["who"].String();
-        int cfgver = cmdObj["cfgver"].Int();
-        OpTime opTime(cmdObj["opTime"].Date());
+        if (args.setName != _currentConfig.getReplSetName()) {
+            *result = Status(ErrorCodes::ReplicaSetNotFound,
+                             str::stream() << "Wrong repl set name. Expected: " <<
+                                     _currentConfig.getReplSetName() <<
+                                     ", received: " << args.setName);
+            return;
+        }
 
         bool weAreFresher = false;
-        if( _currentConfig.getConfigVersion() > cfgver ) {
-            log() << "replSet member " << who << " is not yet aware its cfg version "
-                  << cfgver << " is stale";
-            result.append("info", "config version stale");
+        if( _currentConfig.getConfigVersion() > args.cfgver ) {
+            log() << "replSet member " << args.who << " is not yet aware its cfg version "
+                  << args.cfgver << " is stale";
+            response->append("info", "config version stale");
             weAreFresher = true;
         }
         // check not only our own optime, but any other member we can reach
-        else if( opTime < _commitOkayThrough ||
-                 opTime < _latestKnownOpTime())  {
+        else if( args.opTime < lastOpApplied ||
+                 args.opTime < _latestKnownOpTime())  {
             weAreFresher = true;
         }
-        result.appendDate("opTime", lastOpApplied.asDate());
-        result.append("fresher", weAreFresher);
+        response->appendDate("opTime", lastOpApplied.asDate());
+        response->append("fresher", weAreFresher);
 
-        bool doVeto = _shouldVeto(cmdObj, errmsg);
-        result.append("veto",doVeto);
+        std::string errmsg;
+        bool doVeto = _shouldVetoMember(args.id, lastOpApplied, &errmsg);
+        response->append("veto", doVeto);
         if (doVeto) {
-            result.append("errmsg", errmsg);
+            response->append("errmsg", errmsg);
         }
+        *result = Status::OK();
     }
 
-    bool TopologyCoordinatorImpl::_shouldVeto(const BSONObj& cmdObj, string& errmsg) const {
-        // don't veto older versions
-        if (cmdObj["id"].eoo()) {
-            // they won't be looking for the veto field
-            return false;
-        }
-
-        const int id = cmdObj["id"].Int();
-        const int hopefulIndex = _getMemberIndex(id);
+    bool TopologyCoordinatorImpl::_shouldVetoMember(unsigned int memberID,
+                                                    const OpTime& lastOpApplied,
+                                                    std::string* errmsg) const {
+        const int hopefulIndex = _getMemberIndex(memberID);
         const int highestPriorityIndex = _getHighestPriorityElectableIndex();
 
         if (hopefulIndex == -1) {
-            errmsg = str::stream() << "replSet couldn't find member with id " << id;
+            *errmsg = str::stream() << "replSet couldn't find member with id " << memberID;
             return true;
         }
 
-        if ((_currentPrimaryIndex != -1) && 
-            (_commitOkayThrough >= _hbdata[hopefulIndex].getOpTime())) {
-            // hbinfo is not updated, so we have to check the primary's last optime separately
-            errmsg = str::stream() << "I am already primary, " << 
+        if ((_currentPrimaryIndex == _selfIndex) &&
+            (lastOpApplied >= _hbdata[hopefulIndex].getOpTime())) {
+            // hbinfo is not updated for ourself, so if we are primary we have to check the
+            // primary's last optime separately
+            *errmsg = str::stream() << "I am already primary, " <<
                 _currentConfig.getMemberAt(hopefulIndex).getHostAndPort().toString() << 
                 " can try again once I've stepped down";
             return true;
         }
 
         if (_currentPrimaryIndex != -1 &&
-            (_currentConfig.getMemberAt(hopefulIndex).getId() != 
-             _currentConfig.getMemberAt(_currentPrimaryIndex).getId()) &&
-            (_hbdata[_currentPrimaryIndex].getOpTime() >= 
-             _hbdata[hopefulIndex].getOpTime())) {
+                (hopefulIndex != _currentPrimaryIndex) &&
+                (_hbdata[_currentPrimaryIndex].getOpTime() >=
+                        _hbdata[hopefulIndex].getOpTime())) {
             // other members might be aware of more up-to-date nodes
-            errmsg = str::stream() << 
+            *errmsg = str::stream() <<
                 _currentConfig.getMemberAt(hopefulIndex).getHostAndPort().toString() <<
                 " is trying to elect itself but " << 
                 _currentConfig.getMemberAt(_currentPrimaryIndex).getHostAndPort().toString() <<
@@ -402,20 +438,26 @@ namespace repl {
             return true;
         }
 
-        if ((highestPriorityIndex != -1) &&
-            _currentConfig.getMemberAt(highestPriorityIndex).getPriority() > 
-            _currentConfig.getMemberAt(hopefulIndex).getPriority()) {
-            errmsg = str::stream() << 
-                _currentConfig.getMemberAt(hopefulIndex).getHostAndPort().toString() << 
-                " has lower priority than " << 
-                _currentConfig.getMemberAt(highestPriorityIndex).getHostAndPort().toString();
-            return true;
+        if ((highestPriorityIndex != -1)) {
+            const MemberConfig& hopefulMember = _currentConfig.getMemberAt(hopefulIndex);
+            const MemberConfig& priorityMember = _currentConfig.getMemberAt(highestPriorityIndex);
+
+            if (priorityMember.getPriority() > hopefulMember.getPriority()) {
+                *errmsg = str::stream()
+                            << hopefulMember.getHostAndPort().toString()
+                            << " has lower priority of " << hopefulMember.getPriority() << " than "
+                            << priorityMember.getHostAndPort().toString()
+                            << " which has a priority of " << priorityMember.getPriority();
+                return true;
+            }
         }
 
-        if (!_electableSet.count(id)) {
-            errmsg = str::stream() << "I don't think "
-                << _currentConfig.getMemberAt(hopefulIndex).getHostAndPort().toString() <<
-                " is electable";
+        UnelectableReason reason = _getUnelectableReason(hopefulIndex);
+        if (None != reason) {
+            *errmsg = str::stream()
+                         << "I don't think "
+                         << _currentConfig.getMemberAt(hopefulIndex).getHostAndPort().toString()
+                         << " is electable because the " << _getUnelectableReasonString(reason);
             return true;
         }
 
@@ -520,7 +562,9 @@ namespace repl {
         }
 
         if (args.getProtocolVersion() != 1) {
-            *result = Status(ErrorCodes::BadValue, "incompatible replset protocol version");
+            *result = Status(ErrorCodes::BadValue,
+                             str::stream() << "replset: incompatible replset protocol version: "
+                                           << args.getProtocolVersion());
             return;
         }
 
@@ -558,7 +602,8 @@ namespace repl {
         }
 
         // Are we electable
-        response->setElectable(_electableSet.find(_selfConfig().getId()) != _electableSet.end());
+        response->setElectable(None == _getMyUnelectableReason(now, lastOpApplied));
+
         // Heartbeat status message
         response->setHbMsg(_getHbmsg());
         response->setTime(now);
@@ -626,77 +671,41 @@ namespace repl {
         // Don't bother to make any changes if we are an election candidate
         if (_busyWithElectSelf) return ReplSetHeartbeatResponse::NoAction;
 
-        // ex-checkelectableset begins here
-        unsigned int latestOp = _latestKnownOpTime().getSecs();
-        
-        // make sure the electable set is up-to-date
-        if (_aMajoritySeemsToBeUp()
-            && _selfConfig().isElectable()    // not an arbiter and not priority 0
-            && (_stepDownUntil <= now)        // stepDown timer has expired
-            && (_memberState == MemberState::RS_SECONDARY)
-            // we are within 10 seconds of primary
-            && (latestOp == 0 || lastOpApplied.getSecs() >= latestOp - 10)) {
-            _electableSet.insert(_selfConfig().getId());
-        }
-        else {
-            _electableSet.erase(_selfConfig().getId());
-        }
-
         // check if we should ask the primary (possibly ourselves) to step down
         int highestPriorityIndex = _getHighestPriorityElectableIndex();
         
-        if (_currentPrimaryIndex != -1) {
-            if ((highestPriorityIndex != -1) &&
-                (_currentConfig.getMemberAt(highestPriorityIndex).getPriority() > 
-                 _currentConfig.getMemberAt(_currentPrimaryIndex).getPriority()) &&
-                // if we're stepping down to allow another member to become primary, we
-                // better have another member (latestOp), and it should be up-to-date
-                (latestOp != 0) && 
-                _hbdata[highestPriorityIndex].getOpTime().getSecs() >= latestOp - 10) {
+        // Get a reason why we cannot be elected. Used below in a few places, potentially.
+        // We may already be PRIMARY in which case the reason may be ignored or cause for stepdown
+        const UnelectableReason myUnelectableReason = _getMyUnelectableReason(now, lastOpApplied);
+
+        // If the current primary is not highest priority and up to date (within 10s),
+        // have them/me stepdown.
+        if ( (_currentPrimaryIndex != -1) && (highestPriorityIndex != -1)) {
+            const MemberConfig& currentPrimaryMember =
+                                                _currentConfig.getMemberAt(_currentPrimaryIndex);
+            const MemberConfig& highestPriorityMember =
+                                                _currentConfig.getMemberAt(highestPriorityIndex);
+            const OpTime highestPriorityMemberOptime = _hbdata[highestPriorityIndex].getOpTime();
+
+            if (highestPriorityMember.getPriority() > currentPrimaryMember.getPriority() &&
+                _isOpTimeCloseEnoughToLatestToElect(highestPriorityMemberOptime)) {
+
                 log() << "stepping down "
-                      << _currentConfig.getMemberAt(_currentPrimaryIndex)
-                    .getHostAndPort().toString() << " (priority " 
-                      << _currentConfig.getMemberAt(_currentPrimaryIndex).getPriority() << "), " 
-                      << _currentConfig.getMemberAt(highestPriorityIndex)
-                    .getHostAndPort().toString() 
-                      << " is priority " 
-                      << _currentConfig.getMemberAt(highestPriorityIndex).getPriority() 
-                      << " and " 
-                      << (latestOp - _hbdata[highestPriorityIndex].getOpTime().getSecs()) 
+                      << currentPrimaryMember.getHostAndPort().toString()
+                      << " (priority " << currentPrimaryMember.getPriority() << "), "
+                      << highestPriorityMember.getHostAndPort().toString()
+                      << " is priority " << highestPriorityMember.getPriority()
+                      << " and "
+                      << (_latestKnownOpTime().getSecs() - highestPriorityMemberOptime.getSecs())
                       << " seconds behind";
-/*  logic -- 
-                // Are we primary?
-                if (isSelf(_currentConfig.getMemberAt(_currentPrimaryIndex).getHostAndPort())) {
-                    // replSetStepDown tries to acquire the same lock
-                    // msgCheckNewState takes, so we can't call replSetStepDown on
-                    // ourselves.
-                    // XXX Eric: schedule relinquish
-                    //rs->relinquish();
+                if (_memberState == MemberState::RS_PRIMARY) {
+                    return ReplSetHeartbeatResponse::StepDownSelf;
                 }
                 else {
-                    // We are not primary.  Step down the remote node.
-                    BSONObj cmd = BSON( "replSetStepDown" << 1 );
-                    ScopedConn conn(primary->fullName());
-                    BSONObj result;
-                    // XXX Eric: schedule stepdown command
-
-                    try {
-                        if (!conn.runCommand("admin", cmd, result, 0)) {
-                            log() << "stepping down " << primary->fullName()
-                                  << " failed: " << result << endl;
-                        }
-                    }
-                    catch (DBException &e) {
-                        log() << "stepping down " << primary->fullName() << " threw exception: "
-                              << e.toString() << endl;
-                    }
-                  
-*/
-                    return ReplSetHeartbeatResponse::StepDown;
-                
+                    return ReplSetHeartbeatResponse::StepDownRemotePrimary;
+                }
             }
         }
-
 
         // ex-checkauth begins here
         {
@@ -722,12 +731,9 @@ namespace repl {
             if (authIssue > 0 && down == total) {
                 log() << "replset error could not reach/authenticate against any members";
 
-                if (_currentPrimaryIndex == _selfIndex) {
+                if (_memberState.primary()) {
                     log() << "auth problems, relinquishing primary";
-                    // XXX Eric: schedule relinquish
-                    //rs->relinquish();
-
-                    return ReplSetHeartbeatResponse::StepDown;
+                    return ReplSetHeartbeatResponse::StepDownSelf;
                 }
 
                 _blockSync = true;
@@ -741,9 +747,9 @@ namespace repl {
         }
 
         // If a remote is primary, check that it is still up.
-        if (_currentPrimaryIndex != -1 && _currentPrimaryIndex != _selfIndex) {
-            if (!_hbdata[_currentPrimaryIndex].up() || 
-                !_hbdata[_currentPrimaryIndex].getState().primary()) {
+        if (_currentPrimaryIndex != -1 && !_memberState.primary()) {
+            const MemberHeartbeatData& primaryHBData = _hbdata[_currentPrimaryIndex];
+            if (!primaryHBData.up() || !primaryHBData.getState().primary()) {
                 _currentPrimaryIndex = -1;
             }
         }
@@ -763,7 +769,7 @@ namespace repl {
                     if (remotePrimaryIndex != -1) {
                         // two other nodes think they are primary (asynchronously polled) 
                         // -- wait for things to settle down.
-                        log() << "replSet info two primaries (transiently)";
+                        error() << "replSet info two primaries (transiently)";
                         return ReplSetHeartbeatResponse::NoAction;
                     }
                     remotePrimaryIndex = it->getConfigIndex();
@@ -778,6 +784,7 @@ namespace repl {
                 // Clear last heartbeat message on ourselves (why?)
                 _sethbmsg("");
 
+                // TODO: Move this into startup code?
                 // insanity: this is what actually puts arbiters into ARBITER state
                 if (_selfConfig().isArbiter()) {
                     _changeMemberState(MemberState::RS_ARBITER);
@@ -785,24 +792,22 @@ namespace repl {
                 }
 
                 // If we are also primary, this is a problem.  Determine who should step down.
-                if (_memberState == MemberState::RS_PRIMARY) {
+                if (_memberState.primary()) {
                     OpTime remoteElectionTime = _hbdata[remotePrimaryIndex].getElectionTime();
                     log() << "replset: another primary seen with election time " 
-                          << remoteElectionTime; 
-                    // Step down whoever has the older election time.
+                          << remoteElectionTime << " my elction time is " << _electionTime;
+
+                    // Step down whomever has the older election time.
                     if (remoteElectionTime > _electionTime) {
                         log() << "stepping down; another primary was elected more recently";
-                        // XXX Eric: schedule a relinquish
-                        //rs->relinquish();
-                        // after completion, set currentprimary to remotePrimaryIndex.
-                        return ReplSetHeartbeatResponse::StepDown;
+                        return ReplSetHeartbeatResponse::StepDownSelf;
                     }
                     else {
-                        // else, stick around
-                        log() << "another PRIMARY detected but it should step down"
-                            " since it was elected earlier than me";
-                        return ReplSetHeartbeatResponse::NoAction;
+                        log() << "another PRIMARY detected and it should step down"
+                                 " since it was elected earlier than me";
+                        return ReplSetHeartbeatResponse::StepDownRemotePrimary;
                     }
+
                 }
 
                 _currentPrimaryIndex = remotePrimaryIndex;
@@ -815,13 +820,11 @@ namespace repl {
         // stepdown if we can't.
         if (_currentPrimaryIndex != -1) {
             /* we must be primary */
-            fassert(18505, _currentPrimaryIndex == _selfIndex);
+            fassert(18505, _memberState.primary());
 
-            if (_shouldRelinquish()) {
+            if (CannotSeeMajority == myUnelectableReason) {
                 log() << "can't see a majority of the set, relinquishing primary";
-                // XXX Eric: schedule a relinquish
-                //rs->relinquish();
-                return ReplSetHeartbeatResponse::StepDown;
+                return ReplSetHeartbeatResponse::StepDownSelf;
 
             }
 
@@ -830,62 +833,16 @@ namespace repl {
 
         // At this point, there is no primary anywhere.  Check to see if we should become an
         // election candidate.
+        switch (myUnelectableReason){
+            case None:
+                // All checks passed, become a candidate and start election proceedings.
 
-        // If we can't elect ourselves due to config, can't become a candidate.
-        if (_selfConfig().isElectable()       // not an arbiter and not priority 0
-            && (_stepDownUntil <= now)        // stepDown timer has expired
-            && (_memberState == MemberState::RS_SECONDARY)) {
-            OCCASIONALLY log() << "replSet I don't see a primary and I can't elect myself";
-            return ReplSetHeartbeatResponse::NoAction;
+                // don't try to do further elections & such while we are already working on one.
+                _busyWithElectSelf = true;
+                return ReplSetHeartbeatResponse::StartElection;
+            default:
+                return ReplSetHeartbeatResponse::NoAction;
         }
-
-        // If we can't see a majority, can't become a candidate.
-        if (!_aMajoritySeemsToBeUp()) {
-            static Date_t last;
-            static int n = 0;
-            int ll = 0;
-            if( ++n > 5 ) ll++;
-            if( last + 60 > now ) ll++;
-            LOG(ll) << "replSet can't see a majority, will not try to elect self";
-            last = now;
-            return ReplSetHeartbeatResponse::NoAction;
-        }
-
-        // If we can't elect ourselves due to the current electable set;
-        // we are in the set if we are within 10 seconds of the latest known op (via heartbeats)
-        if (!(_electableSet.find(_selfConfig().getId()) != _electableSet.end())) {
-            // we are too far behind to become primary
-            return ReplSetHeartbeatResponse::NoAction;
-        }
-
-        // All checks passed, become a candidate and start election proceedings.
-
-        // don't try to do further elections & such while we are already working on one.
-        _busyWithElectSelf = true; 
-        return ReplSetHeartbeatResponse::StartElection;
-
-    // XXX: schedule an election
-/*
-        try {
-            rs->elect.electSelf();
-        }
-        catch(RetryAfterSleepException&) {
-            // we want to process new inbounds before trying this again.  so we just put a checkNewstate in the queue for eval later. 
-            requeue();
-        }
-        catch(...) {
-            log() << "replSet error unexpected assertion in rs manager";
-        }
-        
-    }
-
-*/
-        _busyWithElectSelf = false;
-        return ReplSetHeartbeatResponse::NoAction;
-    }
-
-    bool TopologyCoordinatorImpl::_shouldRelinquish() const {
-        return !_aMajoritySeemsToBeUp();
     }
 
     bool TopologyCoordinatorImpl::_aMajoritySeemsToBeUp() const {
@@ -899,6 +856,12 @@ namespace repl {
         }
 
         return vUp * 2 > _totalVotes();
+    }
+
+    bool TopologyCoordinatorImpl::_isOpTimeCloseEnoughToLatestToElect(const OpTime lastApplied)
+                                                                                            const {
+        const unsigned int latestKnownOpTimeSecs = _latestKnownOpTime().getSecs();
+        return latestKnownOpTimeSecs != 0 && lastApplied.getSecs() >= (latestKnownOpTimeSecs - 10);
     }
 
     int TopologyCoordinatorImpl::_totalVotes() const {
@@ -934,22 +897,25 @@ namespace repl {
         return latest;
     }
 
+    bool TopologyCoordinatorImpl::_isMemberHigherPriority(int memberOneIndex,
+                                                          int memberTwoIndex) const {
+        if (memberOneIndex == -1)
+            return false;
+
+        if (memberTwoIndex == -1)
+            return true;
+
+        return _currentConfig.getMemberAt(memberOneIndex).getPriority() >
+                _currentConfig.getMemberAt(memberTwoIndex).getPriority();
+    }
+
     int TopologyCoordinatorImpl::_getHighestPriorityElectableIndex() const {
         int maxIndex = -1;
-        std::set<unsigned int>::iterator it = _electableSet.begin();
-        while (it != _electableSet.end()) {
-            int candidateIndex = _getMemberIndex(*it);
-            if (candidateIndex == -1) {
-                log() << "couldn't find member: " << *it << endl;
-                it++;
-                continue;
+        for (int currentIndex = 0; currentIndex < _currentConfig.getNumMembers(); currentIndex++) {
+            if (None == _getUnelectableReason(currentIndex) &&
+                                                 _isMemberHigherPriority(currentIndex, maxIndex)) {
+                maxIndex = currentIndex;
             }
-            if ((maxIndex == -1) || 
-                _currentConfig.getMemberAt(maxIndex).getPriority() < 
-                _currentConfig.getMemberAt(candidateIndex).getPriority()) {
-                maxIndex = candidateIndex;
-            }
-            it++;
         }
 
         return maxIndex;
@@ -967,6 +933,17 @@ namespace repl {
              it != _stateChangeCallbacks.end(); ++it) {
             (*it)(_memberState);
         }
+    }
+
+    void TopologyCoordinatorImpl::_setCurrentPrimaryForTest(int primaryIndex) {
+        _currentPrimaryIndex = primaryIndex;
+    }
+
+    const MemberConfig* TopologyCoordinatorImpl::_currentPrimaryMember() const {
+        if (_currentPrimaryIndex == -1)
+            return NULL;
+
+        return &(_currentConfig.getMemberAt(_currentPrimaryIndex));
     }
 
     void TopologyCoordinatorImpl::prepareStatusResponse(
@@ -1192,14 +1169,76 @@ namespace repl {
         }
     }
     
-    const MemberConfig& TopologyCoordinatorImpl::_selfConfig() {
+    const MemberConfig& TopologyCoordinatorImpl::_selfConfig() const {
         return _currentConfig.getMemberAt(_selfIndex);
     }
 
-    void TopologyCoordinatorImpl::recordPing(const HostAndPort& host, const int elapsedMillis) {
-        _pings[host].hit(elapsedMillis);
+    TopologyCoordinatorImpl::UnelectableReason TopologyCoordinatorImpl::_getUnelectableReason(
+                                                                                int index) const {
+        if (_currentConfig.getMemberAt(index).isArbiter()) {
+            return ArbiterIAm;
+        }
+        else if (_currentConfig.getMemberAt(index).getPriority() <= 0) {
+            return NoPriority;
+        }
+        else if (_hbdata[index].getState() != MemberState::RS_SECONDARY) {
+            return NotSecondary;
+        }
+        else if (!_isOpTimeCloseEnoughToLatestToElect(_hbdata[index].getOpTime())) {
+            return NotCloseEnoughToLatestOptime;
+        }
+        else {
+            return None;
+        }
     }
 
+    TopologyCoordinatorImpl::UnelectableReason TopologyCoordinatorImpl::_getMyUnelectableReason(
+                                                                const Date_t now,
+                                                                const OpTime lastApplied) const {
+        if (!_aMajoritySeemsToBeUp()) {
+            return CannotSeeMajority;
+        }
+        else if (_selfConfig().isArbiter()) {
+            return ArbiterIAm;
+        }
+        else if (_selfConfig().getPriority() <= 0) {
+            return NoPriority;
+        }
+        else if (_stepDownUntil <= now) {
+            return StepDownPeriodActive;
+        }
+        else if (_memberState != MemberState::RS_SECONDARY) {
+            return NotSecondary;
+        }
+        else if (_isOpTimeCloseEnoughToLatestToElect(lastApplied)) {
+            return NotCloseEnoughToLatestOptime;
+        }
+        else {
+            return None;
+        }
+    }
+
+    std::string TopologyCoordinatorImpl::_getUnelectableReasonString(UnelectableReason ur) const {
+        switch (ur) {
+            case CannotSeeMajority: return "I cannot see a majority";
+            case ArbiterIAm: return "member is an arbiter";
+            case NoPriority: return "member has zero priority";
+            case StepDownPeriodActive:
+                return str::stream() << "I am still waiting for stepdown period to end at "
+                                     << _stepDownUntil;
+            case NotSecondary: return "member is not currently a secondary";
+            case NotCloseEnoughToLatestOptime:
+                return "member is more than 10 seconds behind the most up-to-date member";
+            default:
+                return "The MEMBER is electable! -- This should never be used! --";
+        }
+    }
+
+
+    void TopologyCoordinatorImpl::recordPing(const HostAndPort& host,
+                                             const Milliseconds elapsedMillis) {
+        _pings[host].hit(elapsedMillis.total_milliseconds());
+    }
     int TopologyCoordinatorImpl::_getPing(const HostAndPort& host) {
         return _pings[host].getMillis();
     }

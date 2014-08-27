@@ -35,6 +35,8 @@ env.CppUnitTest('replication_executor_test',
 
 env.Library('topology_coordinator_impl',
             ['topology_coordinator_impl.cpp',
+             'topology_freshness_checker.cpp',
+             'topology_elect_cmd_runner.cpp',
              'member_heartbeat_data.cpp'],
             LIBDEPS=['replication_executor',
                      'repl_settings',
@@ -45,6 +47,19 @@ env.CppUnitTest('topology_coordinator_impl_test',
                 LIBDEPS=['topology_coordinator_impl',
                          'replica_set_messages'])
 
+env.CppUnitTest('topology_freshness_checker_test',
+                'topology_freshness_checker_test.cpp',
+                LIBDEPS=['topology_coordinator_impl',
+                         'replica_set_messages',
+                         'replmocks'])
+
+env.CppUnitTest('topology_elect_cmd_runner_test',
+                'topology_elect_cmd_runner_test.cpp',
+                LIBDEPS=['topology_coordinator_impl',
+                         'replica_set_messages',
+                         'replmocks'])
+
+
 env.Library('repl_coordinator_impl',
             [
                 'check_quorum_for_config_change.cpp',
@@ -53,13 +68,15 @@ env.Library('repl_coordinator_impl',
                 'replica_set_config_checks.cpp',
             ],
             LIBDEPS=['$BUILD_DIR/mongo/db/common',
+                     '$BUILD_DIR/mongo/db/index/index_descriptor',
                      '$BUILD_DIR/mongo/fail_point',
                      '$BUILD_DIR/mongo/foundation',
-                     '$BUILD_DIR/mongo/db/index/index_descriptor',
+                     '$BUILD_DIR/mongo/global_environment_experiment',
                      '$BUILD_DIR/mongo/server_options_core',
                      'repl_coordinator_interface',
                      'replica_set_messages',
-                     'replication_executor'
+                     'replication_executor',
+                     'rslog',
                  ])
 
 env.CppUnitTest('repl_coordinator_impl_test',
@@ -94,6 +111,10 @@ env.Library('repl_coordinator_interface',
 env.Library('repl_coordinator_global',
             'repl_coordinator_global.cpp',
             LIBDEPS=['repl_coordinator_interface'])
+            
+env.CppUnitTest('network_interface_mock_test',
+                'network_interface_mock_test.cpp',
+                LIBDEPS=['replmocks'])
 
 env.Library('replmocks',
             ['repl_coordinator_mock.cpp',

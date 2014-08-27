@@ -280,8 +280,12 @@ namespace mongo {
         return lhs.loc < rhs.loc;
     }
 
-    SortStage::SortStage(const SortStageParams& params, WorkingSet* ws, PlanStage* child)
-        : _collection(params.collection),
+    SortStage::SortStage(OperationContext* txn,
+                         const SortStageParams& params,
+                         WorkingSet* ws,
+                         PlanStage* child)
+        : _txn(txn),
+          _collection(params.collection),
           _ws(ws),
           _child(child),
           _pattern(params.pattern),
@@ -444,7 +448,7 @@ namespace mongo {
             WorkingSetMember* member = _ws->get(it->second);
             verify(member->loc == dl);
 
-            WorkingSetCommon::fetchAndInvalidateLoc(member, _collection);
+            WorkingSetCommon::fetchAndInvalidateLoc(_txn, member, _collection);
 
             // Remove the DiskLoc from our set of active DLs.
             _wsidByDiskLoc.erase(it);

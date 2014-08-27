@@ -45,10 +45,11 @@ namespace mongo {
      */
     class FetchStage : public PlanStage {
     public:
-        FetchStage(WorkingSet* ws, 
-                    PlanStage* child, 
-                    const MatchExpression* filter, 
-                    const Collection* collection);
+        FetchStage(OperationContext* txn,
+                   WorkingSet* ws,
+                   PlanStage* child,
+                   const MatchExpression* filter,
+                   const Collection* collection);
 
         virtual ~FetchStage();
 
@@ -79,6 +80,8 @@ namespace mongo {
          */
         StageState returnIfMatches(WorkingSetMember* member, WorkingSetID memberID,
                                    WorkingSetID* out);
+
+        OperationContext* _txn;
 
         // Collection which is used by this stage. Used to resolve record ids retrieved by child
         // stages. The lifetime of the collection must supersede that of the stage.

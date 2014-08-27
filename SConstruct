@@ -286,9 +286,9 @@ add_option( "use-system-tcmalloc", "use system version of tcmalloc library", 0, 
 add_option( "use-system-pcre", "use system version of pcre library", 0, True )
 
 # library choices
-boost_choices = ['1.49', '1.55']
+boost_choices = ['1.49', '1.56']
 add_option( "internal-boost", "Specify internal boost version to use", 1, True,
-           type='choice', default=boost_choices[0], choices=boost_choices)
+           type='choice', default=boost_choices[1], choices=boost_choices)
 
 add_option( "use-system-boost", "use system version of boost libraries", 0, True )
 
@@ -730,7 +730,7 @@ elif linux:
 
 elif solaris:
      env.Append( CPPDEFINES=[ "__sunos__" ] )
-     env.Append( LIBS=["socket","resolv"] )
+     env.Append( LIBS=["socket","resolv","lgrp"] )
 
 elif freebsd:
     env.Append( LIBS=[ "kvm" ] )
@@ -978,7 +978,7 @@ if not windows:
 boostSuffix = "";
 if not use_system_version_of_library("boost"):
     if get_option( "internal-boost") != "1.49":
-        boostSuffix = "-1.55.0"
+        boostSuffix = "-1.56.0"
     env.Prepend(CPPDEFINES=['BOOST_ALL_NO_LIB'])
 
 env.Append( CPPPATH=['$EXTRACPPPATH'],
@@ -1552,8 +1552,34 @@ def doConfigure(myenv):
             if using_asan:
                 myenv['ENV']['ASAN_SYMBOLIZER_PATH'] = llvm_symbolizer
 
-    # When using msvc, check for VS 2013 Update 2+ so we can use new compiler flags
+    # When using msvc,
+    # check for min version of VS2013 for fixes in std::list::splice
+    # check for VS 2013 Update 2+ so we can use new compiler flags
     if using_msvc():
+        haveVS2013OrLater = False
+        def CheckVS2013(context):
+            test_body = """
+            #if _MSC_VER < 1800
+            #error Old Version
+            #endif
+            int main(int argc, char* argv[]) {
+            return 0;
+            }
+            """
+            context.Message('Checking for VS 2013 or Later... ')
+            ret = context.TryCompile(textwrap.dedent(test_body), ".cpp")
+            context.Result(ret)
+            return ret
+        conf = Configure(myenv, help=False, custom_tests = {
+            'CheckVS2013' : CheckVS2013,
+        })
+        haveVS2013 = conf.CheckVS2013()
+        conf.Finish()
+
+        if not haveVS2013:
+            print("Visual Studio 2013 RTM or later is required to compile MongoDB.")
+            Exit(1)
+
         haveVS2013Update2OrLater = False
         def CheckVS2013Update2(context):
             test_body = """
@@ -1815,6 +1841,7 @@ def doConfigure(myenv):
     # requires ports devel/libexecinfo to be installed
     if freebsd or openbsd:
         if not conf.CheckLib("execinfo"):
+            print("Cannot find libexecinfo, please install devel/libexecinfo.")
             Exit(1)
 
     # 'tcmalloc' needs to be the last library linked. Please, add new libraries before this 
@@ -2090,4 +2117,4 @@ def clean_old_dist_builds(env, target, source):
 env.Alias("dist_clean", [], [clean_old_dist_builds])
 env.AlwaysBuild("dist_clean")
 
-env.Alias('all', ['core', 'tools', 'dbtest', 'unittests'])
+env.Alias('all', ['core', 'tools', 'dbtest', 'unittests', 'file_allocator_bench'])

@@ -271,7 +271,7 @@ namespace QueryStageCollectionScan {
                 PlanStage::StageState state = scan->work(&id);
                 if (PlanStage::ADVANCED == state) {
                     WorkingSetMember* member = ws.get(id);
-                    ASSERT_EQUALS(coll->docFor(locs[count])["foo"].numberInt(),
+                    ASSERT_EQUALS(coll->docFor(&_txn, locs[count])["foo"].numberInt(),
                                   member->obj["foo"].numberInt());
                     ++count;
                 }
@@ -280,7 +280,7 @@ namespace QueryStageCollectionScan {
             // Remove locs[count].
             scan->saveState();
             scan->invalidate(locs[count], INVALIDATION_DELETION);
-            remove(coll->docFor(locs[count]));
+            remove(coll->docFor(&_txn, locs[count]));
             scan->restoreState(&_txn);
 
             // Skip over locs[count].
@@ -292,7 +292,7 @@ namespace QueryStageCollectionScan {
                 PlanStage::StageState state = scan->work(&id);
                 if (PlanStage::ADVANCED == state) {
                     WorkingSetMember* member = ws.get(id);
-                    ASSERT_EQUALS(coll->docFor(locs[count])["foo"].numberInt(),
+                    ASSERT_EQUALS(coll->docFor(&_txn, locs[count])["foo"].numberInt(),
                                   member->obj["foo"].numberInt());
                     ++count;
                 }
@@ -333,7 +333,7 @@ namespace QueryStageCollectionScan {
                 PlanStage::StageState state = scan->work(&id);
                 if (PlanStage::ADVANCED == state) {
                     WorkingSetMember* member = ws.get(id);
-                    ASSERT_EQUALS(coll->docFor(locs[count])["foo"].numberInt(),
+                    ASSERT_EQUALS(coll->docFor(&_txn, locs[count])["foo"].numberInt(),
                                   member->obj["foo"].numberInt());
                     ++count;
                 }
@@ -342,7 +342,7 @@ namespace QueryStageCollectionScan {
             // Remove locs[count].
             scan->saveState();
             scan->invalidate(locs[count], INVALIDATION_DELETION);
-            remove(coll->docFor(locs[count]));
+            remove(coll->docFor(&_txn, locs[count]));
             scan->restoreState(&_txn);
 
             // Skip over locs[count].
@@ -354,7 +354,7 @@ namespace QueryStageCollectionScan {
                 PlanStage::StageState state = scan->work(&id);
                 if (PlanStage::ADVANCED == state) {
                     WorkingSetMember* member = ws.get(id);
-                    ASSERT_EQUALS(coll->docFor(locs[count])["foo"].numberInt(),
+                    ASSERT_EQUALS(coll->docFor(&_txn, locs[count])["foo"].numberInt(),
                                   member->obj["foo"].numberInt());
                     ++count;
                 }

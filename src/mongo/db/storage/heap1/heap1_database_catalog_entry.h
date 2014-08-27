@@ -113,29 +113,34 @@ namespace mongo {
             Entry( const StringData& ns, const CollectionOptions& options );
             virtual ~Entry();
 
-            int getTotalIndexCount() const;
+            int getTotalIndexCount( OperationContext* txn ) const;
 
-            int getCompletedIndexCount() const;
+            int getCompletedIndexCount( OperationContext* txn ) const;
 
             int getMaxAllowedIndexes() const { return 64; }
 
-            void getAllIndexes( std::vector<std::string>* names ) const;
+            void getAllIndexes( OperationContext* txn,
+                                std::vector<std::string>* names ) const;
 
-            BSONObj getIndexSpec( const StringData& idxName ) const;
+            BSONObj getIndexSpec( OperationContext* txn,
+                                  const StringData& idxName ) const;
 
-            bool isIndexMultikey( const StringData& indexName) const;
+            bool isIndexMultikey( OperationContext* txn,
+                                  const StringData& indexName) const;
 
             bool setIndexIsMultikey(OperationContext* txn,
                                     const StringData& indexName,
                                     bool multikey = true);
 
-            DiskLoc getIndexHead( const StringData& indexName ) const;
+            DiskLoc getIndexHead( OperationContext* txn,
+                                  const StringData& indexName ) const;
 
             void setIndexHead( OperationContext* txn,
                                const StringData& indexName,
                                const DiskLoc& newHead );
 
-            bool isIndexReady( const StringData& indexName ) const;
+            bool isIndexReady( OperationContext* txn,
+                               const StringData& indexName ) const;
 
             Status removeIndex( OperationContext* txn,
                                 const StringData& indexName );

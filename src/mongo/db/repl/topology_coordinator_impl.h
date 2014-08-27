@@ -72,8 +72,6 @@ namespace repl {
     public:
         explicit TopologyCoordinatorImpl(Seconds maxSyncSourceLagSecs);
 
-        virtual void setCommitOkayThrough(const OpTime& optime);
-        virtual void setLastReceived(const OpTime& optime);
         // TODO(spencer): Can this be made private?
         virtual void setForceSyncSourceIndex(int index);
 
@@ -97,17 +95,16 @@ namespace repl {
 
         // produces a reply to a replSetSyncFrom command
         virtual void prepareSyncFromResponse(const ReplicationExecutor::CallbackData& data,
-                                             int targetIndex,
+                                             const HostAndPort& target,
                                              const OpTime& lastOpApplied,
                                              BSONObjBuilder* response,
                                              Status* result);
 
-        // produces a reply to a RAFT-style RequestVote RPC
-        virtual void prepareRequestVoteResponse(const Date_t now,
-                                                const BSONObj& cmdObj,
-                                                const OpTime& lastOpApplied,
-                                                std::string& errmsg, 
-                                                BSONObjBuilder& result);
+        virtual void prepareFreshResponse(const ReplicationExecutor::CallbackData& data,
+                                          const ReplicationCoordinator::ReplSetFreshArgs& args,
+                                          const OpTime& lastOpApplied,
+                                          BSONObjBuilder* response,
+                                          Status* result);
 
         // produces a reply to a received electCmd
         virtual void prepareElectCmdResponse(const Date_t now,
@@ -156,7 +153,7 @@ namespace repl {
                                   const OpTime& lastOpApplied);
 
         // Record a ping in millis based on the round-trip time of the heartbeat for the member
-        virtual void recordPing(const HostAndPort& host, const int elapsedMillis);
+        virtual void recordPing(const HostAndPort& host, const Milliseconds elapsedMillis);
 
         // Changes _memberState to newMemberState, then calls all registered callbacks
         // for state changes.
@@ -164,7 +161,22 @@ namespace repl {
         // call this method from outside of TopologyCoordinatorImpl or a unit test.
         void _changeMemberState(const MemberState& newMemberState);
 
+        // Sets _currentPrimaryIndex to the given index.  Should only be used in unit tests!
+        // TODO(spencer): Remove this once we can easily call for an election in unit tests to
+        // set the current primary.
+        void _setCurrentPrimaryForTest(int primaryIndex);
+
     private:
+
+        enum UnelectableReason {
+            None,
+            CannotSeeMajority,
+            NotCloseEnoughToLatestOptime,
+            ArbiterIAm,
+            NotSecondary,
+            NoPriority,
+            StepDownPeriodActive
+        };
 
         // Returns the number of heartbeat pings which have occurred.
         virtual int _getTotalPings();
@@ -172,18 +184,31 @@ namespace repl {
         // Returns the current "ping" value for the given member by their address
         virtual int _getPing(const HostAndPort& host);
 
-        // Determines if we will veto the member in the "fresh" command response
+        // Determines if we will veto the member specified by "memberID", given that the last op
+        // we have applied locally is "lastOpApplied".
         // If we veto, the errmsg will be filled in with a reason
-        bool _shouldVeto(const BSONObj& cmdObj, string& errmsg) const;
+        bool _shouldVetoMember(unsigned int memberID,
+                               const OpTime& lastOpApplied,
+                               std::string* errmsg) const;
 
         // Returns the index of the member with the matching id, or -1 if none match.
         int _getMemberIndex(int id) const; 
 
-        // Logic to determine if we should step down as primary
-        bool _shouldRelinquish() const;
-
         // Sees if a majority number of votes are held by members who are currently "up"
         bool _aMajoritySeemsToBeUp() const;
+
+        // Is optime close enough to the latest known optime to qualify for an election
+        bool _isOpTimeCloseEnoughToLatestToElect(const OpTime lastApplied) const;
+
+        // Returns reason why "self" member is unelectable
+        UnelectableReason _getMyUnelectableReason(const Date_t now,
+                                                  const OpTime lastOpApplied) const;
+
+        // Returns reason why memberIndex is unelectable
+        UnelectableReason _getUnelectableReason(int memberIndex) const;
+
+        // Returns the nice text of why the node is unelectable
+        std::string _getUnelectableReasonString(UnelectableReason ur) const;
 
         // Returns the total number of votes in the current config
         int _totalVotes() const;
@@ -197,8 +222,14 @@ namespace repl {
         // Scans the electable set and returns the highest priority member index
         int _getHighestPriorityElectableIndex() const;
 
-        OpTime _commitOkayThrough; // the primary's latest op that won't get rolled back
-        OpTime _lastReceived; // the last op we have received from our sync source
+        // Returns true if "one" member is higher priority than "two" member
+        bool _isMemberHigherPriority(int memberOneIndex, int memberTwoIndex) const;
+
+        // Helper shortcut to self config
+        const MemberConfig& _selfConfig() const;
+
+        // Returns NULL if there is no primary, or the MemberConfig* for the current primary
+        const MemberConfig* _currentPrimaryMember() const;
 
         // Our current state (PRIMARY, SECONDARY, etc)
         MemberState _memberState;
@@ -208,10 +239,6 @@ namespace repl {
         OID _electionId;
         // PRIMARY server's time when the election to primary occurred
         OpTime _electionTime;
-
-        // set of electable members' _ids
-        // For implementation of priorities
-        std::set<unsigned int> _electableSet;
 
         // the member we currently believe is primary, if one exists
         int _currentPrimaryIndex;
@@ -243,7 +270,6 @@ namespace repl {
         bool _busyWithElectSelf;
 
         int _selfIndex; // this node's index in _members and _currentConfig
-        const MemberConfig& _selfConfig();  // Helper shortcut to self config
 
         ReplicaSetConfig _currentConfig; // The current config, including a vector of MemberConfigs
         // heartbeat data for each member.  It is guaranteed that this vector will be maintained

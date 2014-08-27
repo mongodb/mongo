@@ -34,6 +34,7 @@
 #include "mongo/scripting/engine_v8-3.25.h"
 
 #include "mongo/base/init.h"
+#include "mongo/db/global_environment_experiment.h"
 #include "mongo/platform/unordered_set.h"
 #include "mongo/scripting/v8-3.25_db.h"
 #include "mongo/scripting/v8-3.25_utils.h"
@@ -374,6 +375,10 @@ namespace mongo {
      void ScriptEngine::setup() {
          if (!globalScriptEngine) {
              globalScriptEngine = new V8ScriptEngine();
+
+             if (hasGlobalEnvironment()) {
+                 getGlobalEnvironment()->registerKillOpListener(globalScriptEngine);
+             }
          }
      }
 

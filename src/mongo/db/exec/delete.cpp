@@ -118,8 +118,6 @@ namespace mongo {
 
             wunit.commit();
 
-            _txn->recoveryUnit()->commitIfNeeded();
-
             ++_commonStats.needTime;
             return PlanStage::NEED_TIME;
         }

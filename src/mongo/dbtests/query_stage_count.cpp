@@ -90,7 +90,7 @@ namespace QueryStageCount {
 
         IndexDescriptor* getIndex(Database* db, const BSONObj& obj) {
             Collection* collection = db->getCollection(&_txn, ns());
-            return collection->getIndexCatalog()->findIndexByKeyPattern(obj);
+            return collection->getIndexCatalog()->findIndexByKeyPattern(&_txn, obj);
         }
 
         static const char* ns() { return "unittests.QueryStageCount"; }

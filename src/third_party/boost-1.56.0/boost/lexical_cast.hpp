@@ -39,6 +39,7 @@
 #include <boost/type_traits/ice.hpp>
 #include <boost/type_traits/is_pointer.hpp>
 #include <boost/static_assert.hpp>
+#include <boost/utility/value_init.hpp>
 #include <boost/detail/lcast_precision.hpp>
 #include <boost/detail/workaround.hpp>
 
@@ -2311,12 +2312,12 @@ namespace boost {
     template <typename Target, typename Source>
     inline Target lexical_cast(const Source &arg)
     {
-        Target result;
+        boost::value_initialized<Target> result;
 
-        if (!boost::conversion::detail::try_lexical_convert(arg, result))
+        if (!boost::conversion::detail::try_lexical_convert(arg, get(result)))
             BOOST_LCAST_THROW_BAD_CAST(Source, Target);
 
-        return result;
+        return get(result);
     }
 
     template <typename Target>

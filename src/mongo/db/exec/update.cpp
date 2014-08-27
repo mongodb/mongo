@@ -556,9 +556,6 @@ namespace mongo {
         if (docWasModified) {
             _specificStats.nModified++;
         }
-
-        // Opportunity for journaling to write during the update.
-        request->getOpCtx()->recoveryUnit()->commitIfNeeded();
     }
 
     void UpdateStage::doInsert() {

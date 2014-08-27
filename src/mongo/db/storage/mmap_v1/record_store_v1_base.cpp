@@ -104,7 +104,7 @@ namespace mongo {
         return total;
     }
 
-    RecordData RecordStoreV1Base::dataFor( const DiskLoc& loc ) const {
+    RecordData RecordStoreV1Base::dataFor( OperationContext* txn, const DiskLoc& loc ) const {
         return recordFor(loc)->toRecordData();
     }
 

@@ -122,7 +122,7 @@ namespace mongo {
             PlanStage* root = ix;
 
             if (IXSCAN_FETCH & options) {
-                root = new FetchStage(ws, root, NULL, collection);
+                root = new FetchStage(txn, ws, root, NULL, collection);
             }
 
             PlanExecutor* exec = new PlanExecutor(ws, root, collection);

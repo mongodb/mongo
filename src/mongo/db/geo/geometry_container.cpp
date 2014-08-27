@@ -29,7 +29,7 @@
 #include "mongo/db/geo/geometry_container.h"
 
 #include "mongo/db/geo/geoconstants.h"
-#include "mongo/db/geo/s2common.h"
+#include "mongo/db/geo/geoparser.h"
 #include "mongo/util/mongoutils/str.h"
 
 namespace mongo {

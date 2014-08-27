@@ -90,10 +90,10 @@ namespace {
         ASSERT(topocoord.getSyncSourceAddress().empty());
 
         // Record 2N pings to allow choosing a new sync source; all members equidistant
-        topocoord.recordPing(HostAndPort("h2"), 300);
-        topocoord.recordPing(HostAndPort("h2"), 300);
-        topocoord.recordPing(HostAndPort("h3"), 300);
-        topocoord.recordPing(HostAndPort("h3"), 300);
+        topocoord.recordPing(HostAndPort("h2"), Milliseconds(300));
+        topocoord.recordPing(HostAndPort("h2"), Milliseconds(300));
+        topocoord.recordPing(HostAndPort("h3"), Milliseconds(300));
+        topocoord.recordPing(HostAndPort("h3"), Milliseconds(300));
 
         // Should choose h2, since it is furthest ahead
         topocoord.chooseNewSyncSource(now++, OpTime(0,0));
@@ -192,27 +192,27 @@ namespace {
         topocoord.updateHeartbeatData(now++, hprimaryInfo, 70, lastOpTimeWeApplied);
 
         // Record 2(N-1) pings to allow choosing a new sync source
-        topocoord.recordPing(HostAndPort("h1"), 700);
-        topocoord.recordPing(HostAndPort("h1"), 700);
-        topocoord.recordPing(HostAndPort("h2"), 600);
-        topocoord.recordPing(HostAndPort("h2"), 600);
-        topocoord.recordPing(HostAndPort("h3"), 500);
-        topocoord.recordPing(HostAndPort("h3"), 500);
-        topocoord.recordPing(HostAndPort("h4"), 400);
-        topocoord.recordPing(HostAndPort("h4"), 400);
-        topocoord.recordPing(HostAndPort("h5"), 300);
-        topocoord.recordPing(HostAndPort("h5"), 300);
-        topocoord.recordPing(HostAndPort("h6"), 200);
-        topocoord.recordPing(HostAndPort("h6"), 200);
-        topocoord.recordPing(HostAndPort("hprimary"), 100);
-        topocoord.recordPing(HostAndPort("hprimary"), 100);
+        topocoord.recordPing(HostAndPort("h1"), Milliseconds(700));
+        topocoord.recordPing(HostAndPort("h1"), Milliseconds(700));
+        topocoord.recordPing(HostAndPort("h2"), Milliseconds(600));
+        topocoord.recordPing(HostAndPort("h2"), Milliseconds(600));
+        topocoord.recordPing(HostAndPort("h3"), Milliseconds(500));
+        topocoord.recordPing(HostAndPort("h3"), Milliseconds(500));
+        topocoord.recordPing(HostAndPort("h4"), Milliseconds(400));
+        topocoord.recordPing(HostAndPort("h4"), Milliseconds(400));
+        topocoord.recordPing(HostAndPort("h5"), Milliseconds(300));
+        topocoord.recordPing(HostAndPort("h5"), Milliseconds(300));
+        topocoord.recordPing(HostAndPort("h6"), Milliseconds(200));
+        topocoord.recordPing(HostAndPort("h6"), Milliseconds(200));
+        topocoord.recordPing(HostAndPort("hprimary"), Milliseconds(100));
+        topocoord.recordPing(HostAndPort("hprimary"), Milliseconds(100));
 
         // Should choose primary first; it's closest
         topocoord.chooseNewSyncSource(now++, lastOpTimeWeApplied);
         ASSERT_EQUALS(topocoord.getSyncSourceAddress(), HostAndPort("hprimary"));
 
         // Primary goes far far away
-        topocoord.recordPing(HostAndPort("hprimary"), 10000000);
+        topocoord.recordPing(HostAndPort("hprimary"), Milliseconds(10000000));
 
         // Should choose h4.  (if an arbiter has an oplog, it's a valid sync source)
         // h6 is not considered because it is outside the maxSyncLagSeconds window,
@@ -286,10 +286,10 @@ namespace {
         topocoord.updateHeartbeatData(now++, h2Info, 30, OpTime(0,0));
 
         // Record 2(N-1) pings to allow choosing a new sync source; h2 is the closest.
-        topocoord.recordPing(HostAndPort("h2"), 100);
-        topocoord.recordPing(HostAndPort("h2"), 100);
-        topocoord.recordPing(HostAndPort("h3"), 300);
-        topocoord.recordPing(HostAndPort("h3"), 300);
+        topocoord.recordPing(HostAndPort("h2"), Milliseconds(100));
+        topocoord.recordPing(HostAndPort("h2"), Milliseconds(100));
+        topocoord.recordPing(HostAndPort("h3"), Milliseconds(300));
+        topocoord.recordPing(HostAndPort("h3"), Milliseconds(300));
 
         // No primary situation: should choose no sync source.
         topocoord.chooseNewSyncSource(now++, OpTime(0,0));
@@ -336,10 +336,10 @@ namespace {
         topocoord.updateHeartbeatData(now++, h2Info, 30, OpTime(0,0));
 
         // Record 2(N-1) pings to allow choosing a new sync source; h3 is the closest.
-        topocoord.recordPing(HostAndPort("h2"), 300);
-        topocoord.recordPing(HostAndPort("h2"), 300);
-        topocoord.recordPing(HostAndPort("h3"), 100);
-        topocoord.recordPing(HostAndPort("h3"), 100);
+        topocoord.recordPing(HostAndPort("h2"), Milliseconds(300));
+        topocoord.recordPing(HostAndPort("h2"), Milliseconds(300));
+        topocoord.recordPing(HostAndPort("h3"), Milliseconds(100));
+        topocoord.recordPing(HostAndPort("h3"), Milliseconds(100));
 
         topocoord.chooseNewSyncSource(now++, OpTime(0,0));
         ASSERT_EQUALS(topocoord.getSyncSourceAddress(),HostAndPort("h3"));
@@ -379,10 +379,10 @@ namespace {
         topocoord.updateHeartbeatData(now++, h2Info, 30, OpTime(0,0));
 
         // Record 2(N-1) pings to allow choosing a new sync source; h3 is the closest.
-        topocoord.recordPing(HostAndPort("h2"), 300);
-        topocoord.recordPing(HostAndPort("h2"), 300);
-        topocoord.recordPing(HostAndPort("h3"), 100);
-        topocoord.recordPing(HostAndPort("h3"), 100);
+        topocoord.recordPing(HostAndPort("h2"), Milliseconds(300));
+        topocoord.recordPing(HostAndPort("h2"), Milliseconds(300));
+        topocoord.recordPing(HostAndPort("h3"), Milliseconds(100));
+        topocoord.recordPing(HostAndPort("h3"), Milliseconds(100));
 
         topocoord.chooseNewSyncSource(now++, OpTime(0,0));
         ASSERT_EQUALS(topocoord.getSyncSourceAddress(),HostAndPort("h3"));
@@ -403,65 +403,138 @@ namespace {
         ReplicationExecutor::CallbackData cbData(NULL,
                                                  cbh,
                                                  Status::OK());
-        ReplicaSetConfig config;
-
-        ASSERT_OK(config.initialize(BSON("_id" << "rs0" <<
-                                         "version" << 1 <<
-                                         "members" << BSON_ARRAY(
-                                             BSON("_id" << 10 << "host" << "hself") <<
-                                             BSON("_id" << 20 << "host" << "h1") <<
-                                             BSON("_id" << 30 << "host" << "h2") <<
-                                             BSON("_id" << 40 << "host" << "h3")))));
-
+        TopologyCoordinatorImpl topocoord((Seconds(999)));
+        Date_t now = 0;
         OpTime staleOpTime(1, 1);
         OpTime ourOpTime(staleOpTime.getSecs() + 11, 1);
 
-
-        TopologyCoordinatorImpl topocoord((Seconds(999)));
-        Date_t now = 0;
-        topocoord.updateConfig(cbData, config, 0, now++, OpTime(0,0));
-
-        MemberHeartbeatData hselfInfo(0);
-        hselfInfo.setAuthIssue();
-        topocoord.updateHeartbeatData(now++, hselfInfo, 10, OpTime(0,0));
-
-        MemberHeartbeatData h1Info(1);
-        h1Info.setDownValues(now, "");
-        topocoord.updateHeartbeatData(now++, h1Info, 20, OpTime(0,0));
-
-        MemberHeartbeatData h2Info(2);
-        h2Info.setUpValues(now, MemberState::RS_SECONDARY, OpTime(0,0), staleOpTime, "", "");
-        topocoord.updateHeartbeatData(now++, h2Info, 30, OpTime(0,0));
-
-        MemberHeartbeatData h3Info(2);
-        h3Info.setUpValues(now, MemberState::RS_SECONDARY, OpTime(0,0), ourOpTime, "", "");
-        topocoord.updateHeartbeatData(now++, h3Info, 40, OpTime(0,0));
+        // Test trying to sync from another node when we are an arbiter
+        ReplicaSetConfig config1;
+        ASSERT_OK(config1.initialize(BSON("_id" << "rs0" <<
+                                         "version" << 1 <<
+                                         "members" << BSON_ARRAY(BSON("_id" << 0 <<
+                                                                      "host" << "hself" <<
+                                                                      "arbiterOnly" << true) <<
+                                                                 BSON("_id" << 1 <<
+                                                                      "host" << "h1")))));
+        ASSERT_OK(config1.validate());
+        topocoord.updateConfig(cbData, config1, 0, now++, OpTime(0,0));
 
         Status result = Status::OK();
-        BSONObjBuilder response0;
-        topocoord.prepareSyncFromResponse(cbData, 0, ourOpTime, &response0, &result);
-        ASSERT_EQUALS(ErrorCodes::Unauthorized, result);
+        BSONObjBuilder response;
+        topocoord.prepareSyncFromResponse(cbData, HostAndPort("h1"), ourOpTime, &response, &result);
+        ASSERT_EQUALS(ErrorCodes::NotSecondary, result);
+        ASSERT_EQUALS("arbiters don't sync", result.reason());
 
+        // Set up config for the rest of the tests
+        ReplicaSetConfig config2;
+        ASSERT_OK(config2.initialize(BSON("_id" << "rs0" <<
+                                         "version" << 1 <<
+                                         "members" << BSON_ARRAY(
+                                                 BSON("_id" << 0 << "host" << "hself") <<
+                                                 BSON("_id" << 1 <<
+                                                      "host" << "h1" <<
+                                                      "arbiterOnly" << true) <<
+                                                 BSON("_id" << 2 <<
+                                                      "host" << "h2" <<
+                                                      "priority" << 0 <<
+                                                      "buildIndexes" << false) <<
+                                                 BSON("_id" << 3 << "host" << "h3") <<
+                                                 BSON("_id" << 4 << "host" << "h4") <<
+                                                 BSON("_id" << 5 << "host" << "h5") <<
+                                                 BSON("_id" << 6 << "host" << "h6")))));
+        ASSERT_OK(config2.validate());
+        topocoord.updateConfig(cbData, config2, 0, now++, OpTime(0,0));
+
+        // Try to sync while PRIMARY
+        topocoord._setCurrentPrimaryForTest(0);
         BSONObjBuilder response1;
-        topocoord.prepareSyncFromResponse(cbData, 1, ourOpTime, &response1, &result);
-        ASSERT_EQUALS(ErrorCodes::HostUnreachable, result);
+        topocoord.prepareSyncFromResponse(
+                cbData, HostAndPort("h3"), ourOpTime, &response1, &result);
+        ASSERT_EQUALS(ErrorCodes::NotSecondary, result);
+        ASSERT_EQUALS("primaries don't sync", result.reason());
+        ASSERT_EQUALS("h3:27017", response1.obj()["syncFromRequested"].String());
 
+        // Try to sync from non-existent member
+        topocoord._setCurrentPrimaryForTest(-1);
         BSONObjBuilder response2;
-        topocoord.prepareSyncFromResponse(cbData, 2, ourOpTime, &response2, &result);
-        ASSERT_OK(result);
-        topocoord.chooseNewSyncSource(now++, ourOpTime);
-        ASSERT_EQUALS(topocoord.getSyncSourceAddress(), HostAndPort("h2"));
-        ASSERT_EQUALS("requested member \"h2:27017\" is more than 10 seconds behind us",
-                      response2.obj()["warning"].String());
+        topocoord.prepareSyncFromResponse(
+                cbData, HostAndPort("fakemember"), ourOpTime, &response2, &result);
+        ASSERT_EQUALS(ErrorCodes::NodeNotFound, result);
+        ASSERT_EQUALS("Could not find member \"fakemember:27017\" in replica set", result.reason());
 
+        // Try to sync from self
         BSONObjBuilder response3;
-        topocoord.prepareSyncFromResponse(cbData, 3, ourOpTime, &response3, &result);
+        topocoord.prepareSyncFromResponse(
+                cbData, HostAndPort("hself"), ourOpTime, &response3, &result);
+        ASSERT_EQUALS(ErrorCodes::InvalidOptions, result);
+        ASSERT_EQUALS("I cannot sync from myself", result.reason());
+
+        // Try to sync from an arbiter
+        BSONObjBuilder response4;
+        topocoord.prepareSyncFromResponse(
+                cbData, HostAndPort("h1"), ourOpTime, &response4, &result);
+        ASSERT_EQUALS(ErrorCodes::InvalidOptions, result);
+        ASSERT_EQUALS("Cannot sync from \"h1:27017\" because it is an arbiter", result.reason());
+
+        // Try to sync from a node that doesn't build indexes
+        BSONObjBuilder response5;
+        topocoord.prepareSyncFromResponse(
+                cbData, HostAndPort("h2"), ourOpTime, &response5, &result);
+        ASSERT_EQUALS(ErrorCodes::InvalidOptions, result);
+        ASSERT_EQUALS("Cannot sync from \"h2:27017\" because it does not build indexes",
+                      result.reason());
+
+        // Try to sync from a node we can't authenticate to
+        MemberHeartbeatData h3Info(0);
+        h3Info.setAuthIssue();
+        topocoord.updateHeartbeatData(now++, h3Info, 3, OpTime(0,0));
+
+        BSONObjBuilder response6;
+        topocoord.prepareSyncFromResponse(
+                cbData, HostAndPort("h3"), ourOpTime, &response6, &result);
+        ASSERT_EQUALS(ErrorCodes::Unauthorized, result);
+        ASSERT_EQUALS("not authorized to communicate with h3:27017", result.reason());
+
+        // Try to sync from a member that is down
+        MemberHeartbeatData h4Info(1);
+        h4Info.setDownValues(now, "");
+        topocoord.updateHeartbeatData(now++, h4Info, 4, OpTime(0,0));
+
+        BSONObjBuilder response7;
+        topocoord.prepareSyncFromResponse(
+                cbData, HostAndPort("h4"), ourOpTime, &response7, &result);
+        ASSERT_EQUALS(ErrorCodes::HostUnreachable, result);
+        ASSERT_EQUALS("I cannot reach the requested member: h4:27017", result.reason());
+
+        // Sync successfully from a member that is stale
+        MemberHeartbeatData h5Info(2);
+        h5Info.setUpValues(now, MemberState::RS_SECONDARY, OpTime(0,0), staleOpTime, "", "");
+        topocoord.updateHeartbeatData(now++, h5Info, 5, OpTime(0,0));
+
+        BSONObjBuilder response8;
+        topocoord.prepareSyncFromResponse(
+                cbData, HostAndPort("h5"), ourOpTime, &response8, &result);
         ASSERT_OK(result);
+        ASSERT_EQUALS("requested member \"h5:27017\" is more than 10 seconds behind us",
+                      response8.obj()["warning"].String());
         topocoord.chooseNewSyncSource(now++, ourOpTime);
-        ASSERT_EQUALS(topocoord.getSyncSourceAddress(), HostAndPort("h3"));
-        BSONObj response3Obj = response3.obj();
-        ASSERT_FALSE(response3Obj.hasField("warning"));
-        ASSERT_EQUALS(HostAndPort("h2").toString(), response3Obj["prevSyncTarget"].String());
+        ASSERT_EQUALS(topocoord.getSyncSourceAddress(), HostAndPort("h5"));
+
+        // Sync successfully from an up-to-date member
+        MemberHeartbeatData h6Info(2);
+        h6Info.setUpValues(now, MemberState::RS_SECONDARY, OpTime(0,0), ourOpTime, "", "");
+        topocoord.updateHeartbeatData(now++, h6Info, 6, OpTime(0,0));
+
+        BSONObjBuilder response9;
+        topocoord.prepareSyncFromResponse(
+                cbData, HostAndPort("h6"), ourOpTime, &response9, &result);
+        ASSERT_OK(result);
+        BSONObj response9Obj = response9.obj();
+        ASSERT_FALSE(response9Obj.hasField("warning"));
+        ASSERT_EQUALS(HostAndPort("h5").toString(), response9Obj["prevSyncTarget"].String());
+        topocoord.chooseNewSyncSource(now++, ourOpTime);
+        ASSERT_EQUALS(topocoord.getSyncSourceAddress(), HostAndPort("h6"));
     }
 
     TEST(TopologyCoordinator, ReplSetGetStatus) {
@@ -582,6 +655,257 @@ namespace {
 
         // TODO(spencer): Test electionTime and pingMs are set properly
     }
+
+    TEST(TopologyCoordinator, PrepareRequestVoteResponse) {
+        ReplicationExecutor::CallbackHandle cbh;
+        ReplicationExecutor::CallbackData cbData(NULL,
+                                                 cbh,
+                                                 Status::OK());
+        ReplicaSetConfig config;
+
+        ASSERT_OK(config.initialize(BSON("_id" << "rs0" <<
+                                         "version" << 10 <<
+                                         "members" << BSON_ARRAY(
+                                             BSON("_id" << 10 <<
+                                                  "host" << "hself" <<
+                                                  "priority" << 10) <<
+                                             BSON("_id" << 20 << "host" << "h1") <<
+                                             BSON("_id" << 30 << "host" << "h2") <<
+                                             BSON("_id" << 40 <<
+                                                  "host" << "h3" <<
+                                                  "priority" << 10)))));
+        ASSERT_OK(config.validate());
+
+        TopologyCoordinatorImpl topocoord((Seconds(999)));
+        Date_t now = 0;
+        topocoord.updateConfig(cbData, config, 0, now++, OpTime(0,0));
+
+        OpTime ourOpTime(10, 10);
+        OpTime staleOpTime(1, 1);
+
+        Status internalErrorStatus(ErrorCodes::InternalError, "didn't set status");
+
+        // Test with incorrect replset name
+        ReplicationCoordinator::ReplSetFreshArgs args;
+        args.setName = "fakeset";
+
+        BSONObjBuilder responseBuilder0;
+        Status status0 = internalErrorStatus;
+        topocoord.prepareFreshResponse(cbData, args, ourOpTime, &responseBuilder0, &status0);
+        ASSERT_EQUALS(ErrorCodes::ReplicaSetNotFound, status0);
+        ASSERT_TRUE(responseBuilder0.obj().isEmpty());
+
+
+        // Test with non-existent node.
+        args.setName = "rs0";
+        args.cfgver = 5; // stale config
+        args.id = 0;
+        args.who = HostAndPort("fakenode");
+        args.opTime = staleOpTime;
+
+        BSONObjBuilder responseBuilder1;
+        Status status1 = internalErrorStatus;
+        topocoord.prepareFreshResponse(cbData, args, ourOpTime, &responseBuilder1, &status1);
+        ASSERT_OK(status1);
+        BSONObj response1 = responseBuilder1.obj();
+        ASSERT_EQUALS("config version stale", response1["info"].String());
+        ASSERT_EQUALS(ourOpTime, OpTime(response1["opTime"].timestampValue()));
+        ASSERT_TRUE(response1["fresher"].Bool());
+        ASSERT_TRUE(response1["veto"].Bool());
+        ASSERT_EQUALS("replSet couldn't find member with id 0", response1["errmsg"].String());
+
+
+        // Test when we are primary and target node is stale.
+        args.id = 20;
+        args.cfgver = 10;
+        args.who = HostAndPort("h1");
+        args.opTime = ourOpTime;
+
+        MemberHeartbeatData h1Info(1);
+        h1Info.setUpValues(now, MemberState::RS_SECONDARY, OpTime(0, 0), staleOpTime, "", "");
+        topocoord.updateHeartbeatData(now++, h1Info, 20, ourOpTime);
+
+        topocoord._setCurrentPrimaryForTest(0);
+
+        BSONObjBuilder responseBuilder2;
+        Status status2 = internalErrorStatus;
+        topocoord.prepareFreshResponse(cbData, args, ourOpTime, &responseBuilder2, &status2);
+        ASSERT_OK(status2);
+        BSONObj response2 = responseBuilder2.obj();
+        ASSERT_FALSE(response2.hasField("info"));
+        ASSERT_EQUALS(ourOpTime, OpTime(response2["opTime"].timestampValue()));
+        ASSERT_FALSE(response2["fresher"].Bool());
+        ASSERT_TRUE(response2["veto"].Bool());
+        ASSERT_EQUALS("I am already primary, h1:27017 can try again once I've stepped down",
+                      response2["errmsg"].String());
+
+
+        // Test when someone else is primary and target node is stale.
+        MemberHeartbeatData h2Info(2);
+        h2Info.setUpValues(now, MemberState::RS_SECONDARY, OpTime(0, 0), ourOpTime, "", "");
+        topocoord.updateHeartbeatData(now++, h2Info, 30, ourOpTime);
+
+        topocoord._changeMemberState(MemberState::RS_SECONDARY);
+        topocoord._setCurrentPrimaryForTest(2);
+
+        BSONObjBuilder responseBuilder3;
+        Status status3 = internalErrorStatus;
+        topocoord.prepareFreshResponse(cbData, args, ourOpTime, &responseBuilder3, &status3);
+        ASSERT_OK(status3);
+        BSONObj response3 = responseBuilder3.obj();
+        ASSERT_FALSE(response3.hasField("info"));
+        ASSERT_EQUALS(ourOpTime, OpTime(response3["opTime"].timestampValue()));
+        ASSERT_FALSE(response3["fresher"].Bool());
+        ASSERT_TRUE(response3["veto"].Bool());
+        ASSERT_EQUALS(
+                "h1:27017 is trying to elect itself but h2:27017 is already primary and more "
+                        "up-to-date",
+                response3["errmsg"].String());
+
+
+        // Test trying to elect a node that is caught up but isn't the highest priority node.
+        h1Info.setUpValues(now, MemberState::RS_SECONDARY, OpTime(0, 0), ourOpTime, "", "");
+        topocoord.updateHeartbeatData(now++, h1Info, 20, ourOpTime);
+        h2Info.setUpValues(now, MemberState::RS_SECONDARY, OpTime(0, 0), staleOpTime, "", "");
+        topocoord.updateHeartbeatData(now++, h2Info, 30, ourOpTime);
+        MemberHeartbeatData h3Info(3);
+        h3Info.setUpValues(now, MemberState::RS_SECONDARY, OpTime(0, 0), ourOpTime, "", "");
+        topocoord.updateHeartbeatData(now++, h3Info, 40, ourOpTime);
+
+        BSONObjBuilder responseBuilder4;
+        Status status4 = internalErrorStatus;
+        topocoord.prepareFreshResponse(cbData, args, ourOpTime, &responseBuilder4, &status4);
+        ASSERT_OK(status4);
+        BSONObj response4 = responseBuilder4.obj();
+        ASSERT_FALSE(response4.hasField("info"));
+        ASSERT_EQUALS(ourOpTime, OpTime(response4["opTime"].timestampValue()));
+        ASSERT_FALSE(response4["fresher"].Bool());
+        ASSERT_TRUE(response4["veto"].Bool());
+        ASSERT_EQUALS("h1:27017 has lower priority of 1 than h3:27017 which has a priority of 10",
+                      response4["errmsg"].String());
+
+
+        // Test trying to elect a node that isn't electable
+        args.id = 40;
+        args.who = HostAndPort("h3");
+
+        h3Info.setDownValues(now, "");
+        topocoord.updateHeartbeatData(now++, h3Info, 40, ourOpTime);
+
+        BSONObjBuilder responseBuilder5;
+        Status status5 = internalErrorStatus;
+        topocoord.prepareFreshResponse(cbData, args, ourOpTime, &responseBuilder5, &status5);
+        ASSERT_OK(status5);
+        BSONObj response5 = responseBuilder5.obj();
+        ASSERT_FALSE(response5.hasField("info"));
+        ASSERT_EQUALS(ourOpTime, OpTime(response5["opTime"].timestampValue()));
+        ASSERT_FALSE(response5["fresher"].Bool());
+        ASSERT_TRUE(response5["veto"].Bool());
+        ASSERT_EQUALS(
+            "I don't think h3:27017 is electable because the member is not currently a secondary",
+            response5["errmsg"].String());
+
+
+        // Finally, test trying to elect a valid node
+        args.id = 40;
+        args.who = HostAndPort("h3");
+
+        h3Info.setUpValues(now, MemberState::RS_SECONDARY, OpTime(0, 0), ourOpTime, "", "");
+        topocoord.updateHeartbeatData(now++, h3Info, 40, ourOpTime);
+
+        BSONObjBuilder responseBuilder6;
+        Status status6 = internalErrorStatus;
+        topocoord.prepareFreshResponse(cbData, args, ourOpTime, &responseBuilder6, &status6);
+        ASSERT_OK(status6);
+        BSONObj response6 = responseBuilder6.obj();
+        cout << response6.jsonString(TenGen, 1);
+        ASSERT_FALSE(response6.hasField("info")) << response6.toString();
+        ASSERT_EQUALS(ourOpTime, OpTime(response6["opTime"].timestampValue()));
+        ASSERT_FALSE(response6["fresher"].Bool()) << response6.toString();
+        ASSERT_FALSE(response6["veto"].Bool()) << response6.toString();
+        ASSERT_FALSE(response6.hasField("errmsg")) << response6.toString();
+    }
+
+    class TopoCoordTest : public mongo::unittest::Test {
+    public:
+        virtual void setUp() {
+            _topo = new TopologyCoordinatorImpl(Seconds(100));
+            _now = 0;
+        }
+
+        virtual void tearDown() {
+            delete _topo;
+        }
+
+    protected:
+        TopologyCoordinatorImpl& getTopoCoord() {return *_topo;}
+        Date_t& now() {return _now;}
+
+        // Update config and set selfIndex
+        void updateConfig(BSONObj cfg, int selfIndex) {
+            ReplicationExecutor::CallbackHandle cbh;
+            ReplicationExecutor::CallbackData cbData(NULL,
+                                                     cbh,
+                                                     Status::OK());
+            ReplicaSetConfig config;
+            ASSERT_OK(config.initialize(cfg));
+            ASSERT_OK(config.validate());
+
+            getTopoCoord().updateConfig(cbData, config, selfIndex, ++_now, OpTime(0,0));
+        }
+
+        // set the lastApplied OpTime for this test
+        void setLastApplied(const OpTime lastApplied) {
+            _lastApplied = lastApplied;
+        }
+
+        // Record a new heartbeat and increment now()
+        ReplSetHeartbeatResponse::HeartbeatResultAction
+                            recordNewHeartbeat(const MemberHeartbeatData newData, int memberIndex) {
+            return getTopoCoord().updateHeartbeatData(now()++, newData, memberIndex, _lastApplied);
+        }
+
+    private:
+        TopologyCoordinatorImpl* _topo;
+        Date_t _now;
+        OpTime _lastApplied;
+    };
+
+    TEST_F(TopoCoordTest, UpdateHeartbeatDataOlderConfigVersionNoMajority) {
+        updateConfig(BSON("_id" << "rs0" <<
+                          "version" << 5 <<
+                          "members" << BSON_ARRAY(
+                              BSON("_id" << 0 << "host" << "host1:27017") <<
+                              BSON("_id" << 1 << "host" << "host2:27017"))),
+                     0);
+
+        OpTime staleOpTime = OpTime(1,0);
+        OpTime election = OpTime(5,0);
+
+        setLastApplied(OpTime(3,0));
+
+        MemberHeartbeatData h1Info(1);
+        ReplSetHeartbeatResponse::HeartbeatResultAction nextAction = recordNewHeartbeat(
+                h1Info.setUpValues(now(), MemberState::RS_SECONDARY, election, staleOpTime, "", ""),
+                1);
+        ASSERT_EQUALS(nextAction, ReplSetHeartbeatResponse::NoAction);
+    }
+
+    TEST_F(TopoCoordTest, UpdateHeartbeatDataNewPrimary) {}
+
+    TEST_F(TopoCoordTest, UpdateHeartbeatDataTwoPrimariesNewOneOlder) {}
+    TEST_F(TopoCoordTest, UpdateHeartbeatDataTwoPrimariesNewOneNewer) {}
+
+    TEST_F(TopoCoordTest, UpdateHeartbeatDataTwoPrimariesIncludingMeNewOneOlder) {}
+    TEST_F(TopoCoordTest, UpdateHeartbeatDataTwoPrimariesIncludingMeNewOneNewer) {}
+
+    TEST_F(TopoCoordTest, UpdateHeartbeatDataPrimaryDownMajorityButIAmStarting) {}
+    TEST_F(TopoCoordTest, UpdateHeartbeatDataPrimaryDownMajorityButIAmRecovering) {}
+    TEST_F(TopoCoordTest, UpdateHeartbeatDataPrimaryDownMajorityButIHaveStepdownWait) {}
+    TEST_F(TopoCoordTest, UpdateHeartbeatDataPrimaryDownMajorityButIArbiter) {}
+
+    TEST_F(TopoCoordTest, UpdateHeartbeatDataPrimaryDownMajority) {}
+    TEST_F(TopoCoordTest, UpdateHeartbeatDataPrimaryDownNoMajority) {}
 
 }  // namespace
 }  // namespace repl

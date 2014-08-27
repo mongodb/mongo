@@ -29,9 +29,9 @@
  *    it in the license file.
  */
 
-#include "mongo/db/storage/wiredtiger/wiredtiger_engine.h"
-
 #include "mongo/base/init.h"
+#include "mongo/db/global_environment_experiment.h"
+#include "mongo/db/storage/wiredtiger/wiredtiger_engine.h"
 #include "mongo/db/storage_options.h"
 
 namespace mongo {
@@ -48,7 +48,7 @@ namespace mongo {
 
     MONGO_INITIALIZER_WITH_PREREQUISITES(WiredTigerEngineInit,
                               MONGO_DEFAULT_PREREQUISITES)(InitializerContext* context ) {
-        StorageEngine::registerFactory( "wiredtiger", new WiredTigerFactory() );
+        getGlobalEnvironment()->registerStorageEngine("wiredtiger", new WiredTigerFactory() );
         return Status::OK();
     }
 

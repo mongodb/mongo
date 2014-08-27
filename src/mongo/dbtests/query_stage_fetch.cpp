@@ -112,7 +112,7 @@ namespace QueryStageFetch {
                 WorkingSetMember mockMember;
                 mockMember.state = WorkingSetMember::LOC_AND_UNOWNED_OBJ;
                 mockMember.loc = *locs.begin();
-                mockMember.obj = coll->docFor(mockMember.loc);
+                mockMember.obj = coll->docFor(&_txn, mockMember.loc);
                 // Points into our DB.
                 ASSERT_FALSE(mockMember.obj.isOwned());
                 mockStage->pushBack(mockMember);
@@ -124,7 +124,8 @@ namespace QueryStageFetch {
                 mockStage->pushBack(mockMember);
             }
 
-            auto_ptr<FetchStage> fetchStage(new FetchStage(&ws, mockStage.release(), NULL, coll));
+            auto_ptr<FetchStage> fetchStage(new FetchStage(&_txn, &ws, mockStage.release(),
+                                                           NULL, coll));
 
             WorkingSetID id = WorkingSet::INVALID_ID;
             PlanStage::StageState state;
@@ -185,7 +186,7 @@ namespace QueryStageFetch {
 
             // Matcher requires that foo==6 but we only have data with foo==5.
             auto_ptr<FetchStage> fetchStage(
-                new FetchStage(&ws, mockStage.release(), filterExpr.get(), coll));
+                     new FetchStage(&_txn, &ws, mockStage.release(), filterExpr.get(), coll));
 
             // First call should return a fetch request as it's not in memory.
             WorkingSetID id = WorkingSet::INVALID_ID;

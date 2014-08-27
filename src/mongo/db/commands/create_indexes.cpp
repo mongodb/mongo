@@ -144,10 +144,13 @@ namespace mongo {
                 WriteUnitOfWork wunit(txn);
                 collection = db->createCollection( txn, ns.ns() );
                 invariant( collection );
+                if (!fromRepl) {
+                    repl::logOp(txn, "c", (dbname + ".$cmd").c_str(), BSON("create" << ns.coll()));
+                }
                 wunit.commit();
             }
 
-            result.append( "numIndexesBefore", collection->getIndexCatalog()->numIndexesTotal() );
+            result.append( "numIndexesBefore", collection->getIndexCatalog()->numIndexesTotal(txn) );
 
             MultiIndexBlock indexer(txn, collection);
             indexer.allowBackgroundBuilding();
@@ -195,7 +198,7 @@ namespace mongo {
                 wunit.commit();
             }
 
-            result.append( "numIndexesAfter", collection->getIndexCatalog()->numIndexesTotal() );
+            result.append( "numIndexesAfter", collection->getIndexCatalog()->numIndexesTotal(txn) );
 
             return true;
         }

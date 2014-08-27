@@ -121,10 +121,11 @@ namespace mongo {
             // TODO A write lock is currently taken here to accommodate stages that perform writes
             //      (e.g. DeleteStage).  This should be changed to use a read lock for read-only
             //      execution trees.
-            Client::WriteContext ctx(txn, dbname);
+            Lock::DBWrite lk(txn->lockState(), dbname);
+            Client::Context ctx(txn, dbname);
 
             // Make sure the collection is valid.
-            Database* db = ctx.ctx().db();
+            Database* db = ctx.db();
             Collection* collection = db->getCollection(txn, db->name() + '.' + collName);
             uassert(17446, "Couldn't find the collection " + collName, NULL != collection);
 
@@ -144,7 +145,7 @@ namespace mongo {
 
             // Add a fetch at the top for the user so we can get obj back for sure.
             // TODO: Do we want to do this for the user?  I think so.
-            PlanStage* rootFetch = new FetchStage(ws.get(), userRoot, NULL, collection);
+            PlanStage* rootFetch = new FetchStage(txn, ws.get(), userRoot, NULL, collection);
 
             PlanExecutor runner(ws.release(), rootFetch, collection);
 
@@ -206,7 +207,7 @@ namespace mongo {
                 BSONObj keyPatternObj = nodeArgs["keyPattern"].Obj();
 
                 IndexDescriptor* desc =
-                    collection->getIndexCatalog()->findIndexByKeyPattern(keyPatternObj);
+                    collection->getIndexCatalog()->findIndexByKeyPattern(txn, keyPatternObj);
                 uassert(16890, "Can't find index: " + keyPatternObj.toString(), desc);
 
                 IndexScanParams params;
@@ -223,7 +224,7 @@ namespace mongo {
                 uassert(16921, "Nodes argument must be provided to AND",
                         nodeArgs["nodes"].isABSONObj());
 
-                auto_ptr<AndHashStage> andStage(new AndHashStage(workingSet, matcher, collection));
+                auto_ptr<AndHashStage> andStage(new AndHashStage(txn, workingSet, matcher, collection));
 
                 int nodesAdded = 0;
                 BSONObjIterator it(nodeArgs["nodes"].Obj());
@@ -248,8 +249,8 @@ namespace mongo {
                 uassert(16924, "Nodes argument must be provided to AND",
                         nodeArgs["nodes"].isABSONObj());
 
-                auto_ptr<AndSortedStage> andStage(
-                                            new AndSortedStage(workingSet, matcher, collection));
+                auto_ptr<AndSortedStage> andStage(new AndSortedStage(txn, workingSet,
+                                                                     matcher, collection));
 
                 int nodesAdded = 0;
                 BSONObjIterator it(nodeArgs["nodes"].Obj());
@@ -298,7 +299,7 @@ namespace mongo {
                                                 nodeArgs["node"].Obj(),
                                                 workingSet,
                                                 exprs);
-                return new FetchStage(workingSet, subNode, matcher, collection);
+                return new FetchStage(txn, workingSet, subNode, matcher, collection);
             }
             else if ("limit" == nodeName) {
                 uassert(16937, "Limit stage doesn't have a filter (put it on the child)",
@@ -367,8 +368,8 @@ namespace mongo {
                 params.pattern = nodeArgs["pattern"].Obj();
                 // Dedup is true by default.
 
-                auto_ptr<MergeSortStage> mergeStage(
-                                            new MergeSortStage(params, workingSet, collection));
+                auto_ptr<MergeSortStage> mergeStage(new MergeSortStage(txn, params,
+                                                                       workingSet, collection));
 
                 BSONObjIterator it(nodeArgs["nodes"].Obj());
                 while (it.more()) {
@@ -388,7 +389,7 @@ namespace mongo {
                 string search = nodeArgs["search"].String();
 
                 vector<IndexDescriptor*> idxMatches;
-                collection->getIndexCatalog()->findIndexByType("text", idxMatches);
+                collection->getIndexCatalog()->findIndexByType(txn, "text", idxMatches);
                 uassert(17194, "Expected exactly one text index", idxMatches.size() == 1);
 
                 IndexDescriptor* index = idxMatches[0];

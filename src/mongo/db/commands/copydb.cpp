@@ -188,11 +188,9 @@ namespace mongo {
             scoped_ptr<Lock::ScopedLock> lk( fromSelf ?
                                              static_cast<Lock::ScopedLock*>(new Lock::GlobalWrite(txn->lockState())) :
                                              static_cast<Lock::ScopedLock*>(new Lock::DBWrite(txn->lockState(), todb)));
-            WriteUnitOfWork wunit(txn);
             if (!cloner.go(txn, todb, fromhost, cloneOptions, NULL, errmsg )) {
                 return false;
             }
-            wunit.commit();
             return true;
         }
 

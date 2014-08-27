@@ -34,6 +34,7 @@
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/operation_context_impl.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/timer.h"
 
 namespace mongo {
 namespace repl {
@@ -47,11 +48,10 @@ namespace repl {
 
     namespace {
         // Duplicated in mock impl
-        StatusWith<int> getTimeoutMillis(Date_t expDate) {
+        StatusWith<int> getTimeoutMillis(Date_t expDate, Date_t nowDate) {
             // check for timeout
             int timeout = 0;
             if (expDate != ReplicationExecutor::kNoExpirationDate) {
-                Date_t nowDate = curTimeMillis64();
                 timeout = expDate >= nowDate ? expDate - nowDate :
                                                ReplicationExecutor::kNoTimeout.total_milliseconds();
                 if (timeout < 0 ) {
@@ -65,27 +65,28 @@ namespace repl {
         }
     } //namespace
 
-    StatusWith<BSONObj> NetworkInterfaceImpl::runCommand(
+    ResponseStatus NetworkInterfaceImpl::runCommand(
             const ReplicationExecutor::RemoteCommandRequest& request) {
 
         try {
             BSONObj output;
 
-            StatusWith<int> timeoutStatus = getTimeoutMillis(request.expirationDate);
+            StatusWith<int> timeoutStatus = getTimeoutMillis(request.expirationDate, now());
             if (!timeoutStatus.isOK())
-                return StatusWith<BSONObj>(timeoutStatus.getStatus());
+                return ResponseStatus(timeoutStatus.getStatus());
 
             int timeout = timeoutStatus.getValue();
+            Timer timer;
             ScopedDbConnection conn(request.target.toString(), timeout);
             conn->runCommand(request.dbname, request.cmdObj, output);
             conn.done();
-            return StatusWith<BSONObj>(output);
+            return ResponseStatus(Response(output, Milliseconds(timer.millis())));
         }
         catch (const DBException& ex) {
-            return StatusWith<BSONObj>(ex.toStatus());
+            return ResponseStatus(ex.toStatus());
         }
         catch (const std::exception& ex) {
-            return StatusWith<BSONObj>(
+            return ResponseStatus(
                     ErrorCodes::UnknownError,
                     mongoutils::str::stream() <<
                     "Sending command " << request.cmdObj << " on database " << request.dbname <<

@@ -158,7 +158,7 @@ namespace mongo {
         std::string symbolAndOffset;
     };
 
-    static const int maxBackTraceFrames = 20;
+    static const int maxBackTraceFrames = 100;
 
     /**
      * Print a stack backtrace for the current thread to the specified ostream.

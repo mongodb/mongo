@@ -38,10 +38,12 @@ namespace mongo {
     // static
     const char* AndSortedStage::kStageType = "AND_SORTED";
 
-    AndSortedStage::AndSortedStage(WorkingSet* ws, 
+    AndSortedStage::AndSortedStage(OperationContext* txn,
+                                   WorkingSet* ws, 
                                    const MatchExpression* filter,
                                    const Collection* collection)
-        : _collection(collection), 
+        : _txn(txn),
+          _collection(collection), 
           _ws(ws),
           _filter(filter),
           _targetNode(numeric_limits<size_t>::max()),
@@ -290,7 +292,7 @@ namespace mongo {
             ++_specificStats.flagged;
 
             // The DiskLoc could still be a valid result so flag it and save it for later.
-            WorkingSetCommon::fetchAndInvalidateLoc(_ws->get(_targetId), _collection);
+            WorkingSetCommon::fetchAndInvalidateLoc(_txn, _ws->get(_targetId), _collection);
             _ws->flagForReview(_targetId);
 
             _targetId = WorkingSet::INVALID_ID;

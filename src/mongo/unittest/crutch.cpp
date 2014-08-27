@@ -57,7 +57,11 @@ namespace mongo {
     }
 
     void dbexit(ExitCode rc, const char *why) {
-        fassertFailed(17250);
+        invariant(!"unittests shouldn't call dbexit");
+    }
+
+    void exitCleanly( ExitCode code, OperationContext* txn ) {
+        invariant(!"unittests shouldn't call exitCleanly");
     }
 
 }  // namespace mongo

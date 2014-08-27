@@ -124,14 +124,14 @@ namespace mongo {
 
         virtual ~RecordStoreV1Base();
 
-        virtual long long dataSize() const { return _details->dataSize(); }
-        virtual long long numRecords() const { return _details->numRecords(); }
+        virtual long long dataSize( OperationContext* txn ) const { return _details->dataSize(); }
+        virtual long long numRecords( OperationContext* txn ) const { return _details->numRecords(); }
 
         virtual int64_t storageSize( OperationContext* txn,
                                      BSONObjBuilder* extraInfo = NULL,
                                      int level = 0 ) const;
 
-        virtual RecordData dataFor( const DiskLoc& loc ) const;
+        virtual RecordData dataFor( OperationContext* txn, const DiskLoc& loc ) const;
 
         void deleteRecord( OperationContext* txn,
                            const DiskLoc& dl );
@@ -290,7 +290,7 @@ namespace mongo {
 
         virtual bool restoreState() { return true; }
 
-        virtual RecordData dataFor( const DiskLoc& loc ) const { return _rs->dataFor(loc); }
+        virtual RecordData dataFor( const DiskLoc& loc ) const { return _rs->dataFor(_txn, loc); }
 
     private:
         virtual const Record* recordFor( const DiskLoc& loc ) const { return _rs->recordFor(loc); }

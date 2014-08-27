@@ -53,7 +53,8 @@ namespace mongo {
      */
     class AndSortedStage : public PlanStage {
     public:
-        AndSortedStage(WorkingSet* ws, const MatchExpression* filter, const Collection* collection);
+        AndSortedStage(OperationContext* txn,
+                       WorkingSet* ws, const MatchExpression* filter, const Collection* collection);
         virtual ~AndSortedStage();
 
         void addChild(PlanStage* child);
@@ -86,6 +87,7 @@ namespace mongo {
         PlanStage::StageState moveTowardTargetLoc(WorkingSetID* out);
 
         // Not owned by us.
+        OperationContext* _txn;
         const Collection* _collection;
 
         // Not owned by us.

@@ -152,7 +152,7 @@ namespace mongo {
                 // Ensure that index names do not push the length over the max.
                 // Iterator includes unfinished indexes.
                 IndexCatalog::IndexIterator sourceIndIt =
-                    sourceColl->getIndexCatalog()->getIndexIterator( true );
+                    sourceColl->getIndexCatalog()->getIndexIterator( txn, true );
                 int longestIndexNameLength = 0;
                 while ( sourceIndIt.more() ) {
                     int thisLength = sourceIndIt.next()->indexName().length();
@@ -257,7 +257,7 @@ namespace mongo {
             {
                 std::vector<BSONObj> indexesToCopy;
                 IndexCatalog::IndexIterator sourceIndIt =
-                    sourceColl->getIndexCatalog()->getIndexIterator( true );
+                    sourceColl->getIndexCatalog()->getIndexIterator( txn, true );
                 while (sourceIndIt.more()) {
                     const BSONObj currIndex = sourceIndIt.next()->infoObj();
 
@@ -275,7 +275,7 @@ namespace mongo {
             while (!sourceIt->isEOF()) {
                 txn->checkForInterrupt(false);
 
-                const BSONObj obj = sourceColl->docFor(sourceIt->getNext());
+                const BSONObj obj = sourceColl->docFor(txn, sourceIt->getNext());
 
                 WriteUnitOfWork wunit(txn);
                 // No logOp necessary because the entire renameCollection command is one logOp.

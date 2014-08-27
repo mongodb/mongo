@@ -195,7 +195,7 @@ namespace mongo {
         const char* curopMessage = _buildInBackground ? "Index Build (background)" : "Index Build";
         ProgressMeter* progress = _txn->setMessage(curopMessage,
                                                    curopMessage,
-                                                   _collection->numRecords());
+                                                   _collection->numRecords(_txn));
 
         Timer t;
 
@@ -233,7 +233,7 @@ namespace mongo {
             if (_allowInterruption)
                 _txn->checkForInterrupt();
 
-            progress->setTotalWhileRunning( _collection->numRecords() );
+            progress->setTotalWhileRunning( _collection->numRecords(_txn) );
         }
 
         progress->finished();

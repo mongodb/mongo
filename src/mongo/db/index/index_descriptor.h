@@ -67,7 +67,6 @@ namespace mongo {
               _parentNS(infoObj.getStringField("ns")),
               _isIdIndex(isIdIndexPattern( _keyPattern )),
               _sparse(infoObj["sparse"].trueValue()),
-              _dropDups(infoObj["dropDups"].trueValue()),
               _unique( _isIdIndex || infoObj["unique"].trueValue() ),
               _cachedEntry( NULL )
         {
@@ -124,14 +123,14 @@ namespace mongo {
         // May each key only occur once?
         bool unique() const { return _unique; }
 
-        // Is dropDups set on this index?
-        bool dropDups() const { return _dropDups; }
-
         // Is this index sparse?
         bool isSparse() const { return _sparse; }
 
         // Is this index multikey?
-        bool isMultikey() const { _checkOk(); return _collection->getIndexCatalog()->isMultikey( this ); }
+        bool isMultikey( OperationContext* txn ) const {
+            _checkOk();
+            return _collection->getIndexCatalog()->isMultikey( txn, this );
+        }
 
         bool isIdIndex() const { _checkOk(); return _isIdIndex; }
 
@@ -200,7 +199,6 @@ namespace mongo {
         std::string _indexNamespace;
         bool _isIdIndex;
         bool _sparse;
-        bool _dropDups;
         bool _unique;
         int _version;
 

@@ -100,16 +100,18 @@ namespace mongo {
     }  // namespace
 
 
-    void fillOutPlannerParams(Collection* collection,
+    void fillOutPlannerParams(OperationContext* txn,
+                              Collection* collection,
                               CanonicalQuery* canonicalQuery,
                               QueryPlannerParams* plannerParams) {
         // If it's not NULL, we may have indices.  Access the catalog and fill out IndexEntry(s)
-        IndexCatalog::IndexIterator ii = collection->getIndexCatalog()->getIndexIterator(false);
+        IndexCatalog::IndexIterator ii = collection->getIndexCatalog()->getIndexIterator(txn,
+                                                                                         false);
         while (ii.more()) {
             const IndexDescriptor* desc = ii.next();
             plannerParams->indices.push_back(IndexEntry(desc->keyPattern(),
                                                         desc->getAccessMethodName(),
-                                                        desc->isMultikey(),
+                                                        desc->isMultikey(txn),
                                                         desc->isSparse(),
                                                         desc->indexName(),
                                                         desc->infoObj()));
@@ -200,11 +202,11 @@ namespace mongo {
             // Fill out the planning params.  We use these for both cached solutions and non-cached.
             QueryPlannerParams plannerParams;
             plannerParams.options = plannerOptions;
-            fillOutPlannerParams(collection, canonicalQuery, &plannerParams);
+            fillOutPlannerParams(opCtx, collection, canonicalQuery, &plannerParams);
 
             // If we have an _id index we can use an idhack plan.
             if (IDHackStage::supportsQuery(*canonicalQuery) &&
-                collection->getIndexCatalog()->findIdIndex()) {
+                collection->getIndexCatalog()->findIdIndex(opCtx)) {
 
                 LOG(2) << "Using idhack: " << canonicalQuery->toStringShort();
 
@@ -366,7 +368,7 @@ namespace mongo {
             else {
                 // Many solutions. Create a MultiPlanStage to pick the best, update the cache,
                 // and so on. The working set will be shared by all candidate plans.
-                MultiPlanStage* multiPlanStage = new MultiPlanStage(collection, canonicalQuery);
+                MultiPlanStage* multiPlanStage = new MultiPlanStage(opCtx, collection, canonicalQuery);
 
                 for (size_t ix = 0; ix < solutions.size(); ++ix) {
                     if (solutions[ix]->cacheData.get()) {
@@ -431,7 +433,7 @@ namespace mongo {
         }
 
         if (!CanonicalQuery::isSimpleIdQuery(unparsedQuery) ||
-            !collection->getIndexCatalog()->findIdIndex()) {
+            !collection->getIndexCatalog()->findIdIndex(txn)) {
 
             const WhereCallbackReal whereCallback(txn, collection->ns().db());
             CanonicalQuery* cq;
@@ -515,7 +517,7 @@ namespace mongo {
         }
 
         if (CanonicalQuery::isSimpleIdQuery(unparsedQuery) &&
-            collection->getIndexCatalog()->findIdIndex()) {
+            collection->getIndexCatalog()->findIdIndex(txn)) {
             LOG(2) << "Using idhack: " << unparsedQuery.toString();
 
             PlanStage* idHackStage = new IDHackStage(txn, collection, unparsedQuery["_id"].wrap(),
@@ -595,7 +597,7 @@ namespace mongo {
         }
 
         if (CanonicalQuery::isSimpleIdQuery(unparsedQuery) &&
-            collection->getIndexCatalog()->findIdIndex()) {
+            collection->getIndexCatalog()->findIdIndex(txn)) {
             LOG(2) << "Using idhack: " << unparsedQuery.toString();
 
             PlanStage* idHackStage = new IDHackStage(txn, collection, unparsedQuery["_id"].wrap(),
@@ -891,7 +893,7 @@ namespace mongo {
         QueryPlannerParams plannerParams;
         plannerParams.options = QueryPlannerParams::NO_TABLE_SCAN;
 
-        IndexCatalog::IndexIterator ii = collection->getIndexCatalog()->getIndexIterator(false);
+        IndexCatalog::IndexIterator ii = collection->getIndexCatalog()->getIndexIterator(txn,false);
         while (ii.more()) {
             const IndexDescriptor* desc = ii.next();
             // The distinct hack can work if any field is in the index but it's not always clear
@@ -899,7 +901,7 @@ namespace mongo {
             if (desc->keyPattern().firstElement().fieldName() == field) {
                 plannerParams.indices.push_back(IndexEntry(desc->keyPattern(),
                                                            desc->getAccessMethodName(),
-                                                           desc->isMultikey(),
+                                                           desc->isMultikey(txn),
                                                            desc->isSparse(),
                                                            desc->indexName(),
                                                            desc->infoObj()));

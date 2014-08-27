@@ -26,7 +26,7 @@
  *    it in the license file.
  */
 
-#include "mongo/db/geo/s2common.h"
+#include "mongo/db/index/s2_common.h"
 #include "mongo/db/index_names.h"
 #include "mongo/db/index/2d_common.h"
 #include "mongo/db/jsobj.h"

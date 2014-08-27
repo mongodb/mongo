@@ -128,6 +128,12 @@ namespace mongo {
                 createdCollection = true;
                 collection = db->createCollection( txn, to_collection.ns() );
                 verify( collection );
+                if (logForRepl) {
+                    repl::logOp(txn,
+                                "c",
+                                (_dbName + ".$cmd").c_str(),
+                                BSON("create" << to_collection.coll()));
+                }
                 wunit.commit();
             }
 
@@ -167,7 +173,6 @@ namespace mongo {
                     repl::logOp(txn, "i", to_collection.ns().c_str(), js);
 
                 wunit.commit();
-                txn->recoveryUnit()->commitIfNeeded();
 
                 RARELY if ( time( 0 ) - saveLast > 60 ) {
                     log() << numSeen << " objects cloned so far from collection " << from_collection;
@@ -258,6 +263,12 @@ namespace mongo {
             WriteUnitOfWork wunit(txn);
             collection = db->createCollection( txn, to_collection.ns() );
             invariant(collection);
+            if (logForRepl) {
+                repl::logOp(txn,
+                            "c",
+                            (toDBName + ".$cmd").c_str(),
+                            BSON("create" << to_collection.coll()));
+            }
             wunit.commit();
         }
 
@@ -519,7 +530,7 @@ namespace mongo {
                         db);
 
                 Collection* c = db->getCollection( txn, to_name );
-                if ( c && !c->getIndexCatalog()->haveIdIndex() ) {
+                if ( c && !c->getIndexCatalog()->haveIdIndex( txn ) ) {
                     // We need to drop objects with duplicate _ids because we didn't do a true
                     // snapshot and this is before applying oplog operations that occur during the
                     // initial sync.

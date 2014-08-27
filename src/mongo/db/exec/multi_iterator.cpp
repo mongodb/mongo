@@ -47,7 +47,7 @@ namespace mongo {
         *out = _ws->allocate();
         WorkingSetMember* member = _ws->get(*out);
         member->loc = next;
-        member->obj = _collection->docFor(next);
+        member->obj = _collection->docFor(_txn, next);
         member->state = WorkingSetMember::LOC_AND_UNOWNED_OBJ;
         return PlanStage::ADVANCED;
     }

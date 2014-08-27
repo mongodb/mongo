@@ -85,6 +85,10 @@ namespace mongo {
         ::_exit(rc);
     }
 
+    void exitCleanly(ExitCode rc, OperationContext* txn) {
+        dbexit(rc, "");
+    }
+
     bool haveLocalShardingInfo(const string& ns) {
         return false;
     }

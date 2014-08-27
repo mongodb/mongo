@@ -53,6 +53,8 @@ namespace repl {
         virtual bool isSelf(const HostAndPort& host);
         virtual HostAndPort getClientHostAndPort(const OperationContext* txn);
         virtual StatusWith<BSONObj> loadLocalConfigDocument(OperationContext* txn);
+        virtual Status storeLocalConfigDocument(OperationContext* txn, const BSONObj& config);
+        virtual void closeClientConnections();
 
         /**
          * Adds "host" to the list of hosts that this mock will match when responding to "isSelf"
@@ -68,6 +70,7 @@ namespace repl {
     private:
         StatusWith<BSONObj> _localRsConfigDocument;
         std::vector<HostAndPort> _selfHosts;
+        bool _connectionsClosed;
     };
 
 } // namespace repl

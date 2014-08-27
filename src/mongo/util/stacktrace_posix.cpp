@@ -46,7 +46,7 @@ namespace mongo {
 
 namespace {
     /// Maximum number of stack frames to appear in a backtrace.
-    const int maxBackTraceFrames = 20;
+    const int maxBackTraceFrames = 100;
 
     /// Optional string containing extra unwinding information.  Should take the form of a
     /// JSON document.

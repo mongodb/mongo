@@ -166,7 +166,7 @@ namespace mongo {
                      const BSONObj& key,
                      const DiskLoc& recordLoc);
 
-        bool isEmpty() const;
+        bool isEmpty(OperationContext* txn) const;
 
         long long fullValidate(OperationContext*,
                                long long *unusedCount,
@@ -174,11 +174,15 @@ namespace mongo {
                                bool dumpBuckets,
                                unsigned depth);
 
-        DiskLoc getDiskLoc(const DiskLoc& bucketLoc, const int keyOffset) const;
+        DiskLoc getDiskLoc(OperationContext* txn,
+                           const DiskLoc& bucketLoc,
+                           const int keyOffset) const;
 
-        BSONObj getKey(const DiskLoc& bucketLoc, const int keyOffset) const;
+        BSONObj getKey(OperationContext* txn,
+                       const DiskLoc& bucketLoc,
+                       const int keyOffset) const;
 
-        DiskLoc getHead() const { return _headManager->getHead(); }
+        DiskLoc getHead(OperationContext* txn) const { return _headManager->getHead(txn); }
 
         Status touch(OperationContext* txn) const;
 
@@ -355,7 +359,8 @@ namespace mongo {
                      int* keyPositionOut,
                      bool* foundOut) const;
 
-        bool customFind(int low,
+        bool customFind(OperationContext* txn,
+                        int low,
                         int high,
                         const BSONObj& keyBegin,
                         int keyBeginLen,
@@ -382,7 +387,7 @@ namespace mongo {
                             const KeyDataType& key,
                             const DiskLoc self) const;
 
-        bool keyIsUsed(const DiskLoc& loc, const int& pos) const;
+        bool keyIsUsed(OperationContext* txn, const DiskLoc& loc, const int& pos) const;
 
         void skipUnusedKeys(OperationContext* txn,
                             DiskLoc* loc,
@@ -561,13 +566,13 @@ namespace mongo {
                       const DiskLoc prevChild);
 
 
-        BucketType* childForPos(BucketType* bucket, int pos) const;
+        BucketType* childForPos(OperationContext* txn, BucketType* bucket, int pos) const;
 
-        BucketType* getBucket(const DiskLoc dl) const;
+        BucketType* getBucket(OperationContext* txn, const DiskLoc dl) const;
 
-        BucketType* getRoot() const;
+        BucketType* getRoot(OperationContext* txn) const;
 
-        DiskLoc getRootLoc() const;
+        DiskLoc getRootLoc(OperationContext* txn) const;
 
         //
         // Data

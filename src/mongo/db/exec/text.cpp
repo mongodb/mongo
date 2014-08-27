@@ -273,7 +273,7 @@ namespace mongo {
 
         // Filter for phrases and negated terms
         if (_params.query.hasNonTermPieces()) {
-            if (!_ftsMatcher.matchesNonTerm(_params.index->getCollection()->docFor(loc))) {
+            if (!_ftsMatcher.matchesNonTerm(_params.index->getCollection()->docFor(_txn, loc))) {
                 return PlanStage::NEED_TIME;
             }
         }
@@ -281,7 +281,7 @@ namespace mongo {
         *out = _ws->allocate();
         WorkingSetMember* member = _ws->get(*out);
         member->loc = loc;
-        member->obj = _params.index->getCollection()->docFor(member->loc);
+        member->obj = _params.index->getCollection()->docFor(_txn, member->loc);
         member->state = WorkingSetMember::LOC_AND_UNOWNED_OBJ;
         member->addComputed(new TextScoreComputedData(score));
         return PlanStage::ADVANCED;
@@ -289,12 +289,14 @@ namespace mongo {
 
     class TextMatchableDocument : public MatchableDocument {
     public:
-        TextMatchableDocument(const BSONObj& keyPattern,
+        TextMatchableDocument(OperationContext* txn,
+                              const BSONObj& keyPattern,
                               const BSONObj& key,
                               DiskLoc loc,
                               const Collection* collection,
                               bool *fetched)
-            : _collection(collection),
+            : _txn(txn),
+              _collection(collection),
               _keyPattern(keyPattern),
               _key(key),
               _loc(loc),
@@ -302,7 +304,7 @@ namespace mongo {
 
         BSONObj toBSON() const {
             *_fetched = true;
-            return _collection->docFor(_loc);
+            return _collection->docFor(_txn, _loc);
         }
 
         virtual ElementIterator* allocateIterator(const ElementPath* path) const {
@@ -327,7 +329,7 @@ namespace mongo {
 
             // All else fails, fetch.
             *_fetched = true;
-            return new BSONElementIterator(path, _collection->docFor(_loc));
+            return new BSONElementIterator(path, _collection->docFor(_txn, _loc));
         }
 
         virtual void releaseIterator( ElementIterator* iterator ) const {
@@ -335,6 +337,7 @@ namespace mongo {
         }
 
     private:
+        OperationContext* _txn;
         const Collection* _collection;
         BSONObj _keyPattern;
         BSONObj _key;
@@ -368,7 +371,8 @@ namespace mongo {
             if (_filter) {
                 // We have not seen this document before and need to apply a filter.
                 bool fetched = false;
-                TextMatchableDocument tdoc(_params.index->keyPattern(), 
+                TextMatchableDocument tdoc(_txn,
+                                           _params.index->keyPattern(), 
                                            key, 
                                            loc, 
                                            _params.index->getCollection(), 

@@ -77,7 +77,7 @@ namespace mongo {
 
         virtual void fullValidate(OperationContext* txn, long long* numKeysOut);
 
-        virtual bool isEmpty();
+        virtual bool isEmpty(OperationContext* txn);
 
         virtual Status touch(OperationContext* txn) const;
 

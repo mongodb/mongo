@@ -73,7 +73,7 @@ namespace {
 
             IndexCatalog* indexCatalog = collection->getIndexCatalog();
 
-            if ( collection->ns().isOplog() && indexCatalog->numIndexesTotal() > 0 ) {
+            if ( collection->ns().isOplog() && indexCatalog->numIndexesTotal( txn ) > 0 ) {
                 warning() << ns << " had illegal indexes, removing";
                 indexCatalog->dropAllIndexes(txn, true);
                 continue;

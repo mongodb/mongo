@@ -102,7 +102,7 @@ namespace mongo {
         WorkingSetID id = _workingSet->allocate();
         WorkingSetMember* member = _workingSet->get(id);
         member->loc = nextLoc;
-        member->obj = _params.collection->docFor(member->loc);
+        member->obj = _params.collection->docFor(_txn, member->loc);
         member->state = WorkingSetMember::LOC_AND_UNOWNED_OBJ;
 
         ++_specificStats.docsTested;

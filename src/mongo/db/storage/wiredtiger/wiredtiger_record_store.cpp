@@ -67,24 +67,31 @@ namespace mongo {
             invariant(_cappedMaxDocs == -1);
         }
 
+        /*
+         * Find the largest DiskLoc currently in use.  We don't have an operation context, so we
+         * can't use an Iterator.
+         */
         WiredTigerSession &swrap = *new WiredTigerSession(_db);
-        Iterator *iter = new Iterator(*this, swrap, DiskLoc(), false, CollectionScanParams::Direction::BACKWARD);
-        if (!iter->isEOF()) {
-            DiskLoc loc = iter->curr();
-            _nextIdNum.store(((uint64_t)loc.a() << 32 | loc.getOfs()) + 1);
-        } else
-            // Need to start at 1 so we are always higher than minDiskLoc
-            _nextIdNum.store( 1 );
-        delete iter;
+        WiredTigerCursor curwrap(GetCursor(swrap), swrap);
+        WT_CURSOR *c = curwrap.Get();
+        int ret = c->prev(c);
+        invariant(ret == 0 || ret == WT_NOTFOUND);
+        uint64_t key = 0;
+        if (ret == 0) {
+            ret = c->get_key(c, &key);
+            invariant(ret == 0);
+        }
+        // Need to start at 1 so we are always higher than minDiskLoc
+        _nextIdNum.store(key + 1);
     }
 
     WiredTigerRecordStore::~WiredTigerRecordStore() { }
 
-    long long WiredTigerRecordStore::dataSize() const {
+    long long WiredTigerRecordStore::dataSize( OperationContext *txn ) const {
         return _dataSize;
     }
 
-    long long WiredTigerRecordStore::numRecords() const {
+    long long WiredTigerRecordStore::numRecords( OperationContext *txn ) const {
         return _numRecords;
     }
 
@@ -95,12 +102,12 @@ namespace mongo {
     int64_t WiredTigerRecordStore::storageSize( OperationContext* txn,
                                            BSONObjBuilder* extraInfo,
                                            int infoLevel ) const {
-        return dataSize(); // todo: this isn't very good
+        return dataSize(txn); // todo: this isn't very good
     }
 
-    RecordData WiredTigerRecordStore::dataFor(const DiskLoc& loc) const {
+    RecordData WiredTigerRecordStore::dataFor(OperationContext* txn, const DiskLoc& loc) const {
         // ownership passes to the shared_array created below
-        WiredTigerSession swrap(_db);
+        WiredTigerSession &swrap = WiredTigerRecoveryUnit::Get(txn).GetSession();
         WiredTigerCursor curwrap(GetCursor(swrap), swrap);
         WT_CURSOR *c = curwrap.Get();
         c->set_key(c, _makeKey(loc));
@@ -137,28 +144,28 @@ namespace mongo {
         _increaseDataSize(txn, -old_length);
     }
 
-    bool WiredTigerRecordStore::cappedAndNeedDelete() const {
+    bool WiredTigerRecordStore::cappedAndNeedDelete(OperationContext* txn) const {
         if (!_isCapped)
             return false;
 
         if (_dataSize > _cappedMaxSize)
             return true;
 
-        if ((_cappedMaxDocs != -1) && (numRecords() > _cappedMaxDocs))
+        if ((_cappedMaxDocs != -1) && (numRecords(txn) > _cappedMaxDocs))
             return true;
 
         return false;
     }
 
     void WiredTigerRecordStore::cappedDeleteAsNeeded(OperationContext* txn) {
-        if (!cappedAndNeedDelete())
+        if (!cappedAndNeedDelete(txn))
             return;
 
         WiredTigerSession &swrap = WiredTigerRecoveryUnit::Get(txn).GetSession();
         WiredTigerCursor curwrap(GetCursor(swrap), swrap);
         WT_CURSOR *c = curwrap.Get();
         int ret = c->next(c);
-        while ( ret == 0 && cappedAndNeedDelete() ) {
+        while ( ret == 0 && cappedAndNeedDelete(txn) ) {
             invariant(_numRecords > 0);
 
             uint64_t key;
@@ -311,7 +318,7 @@ namespace mongo {
         // this is done because WiredTiger resets cursors on commit, which causes problems
         // e.g., when building indexes
         WiredTigerSession &swrap = *new WiredTigerSession(_db);
-        return new Iterator(*this, swrap, start, tailable, dir);
+        return new Iterator(*this, txn, swrap, start, tailable, dir);
     }
 
 
@@ -359,7 +366,7 @@ namespace mongo {
                                        BSONObjBuilder* output ) const {
         boost::scoped_ptr<RecordIterator> iter( getIterator( txn ) );
         while( !iter->isEOF() ) {
-            RecordData data = dataFor( iter->curr() );
+            RecordData data = dataFor( txn, iter->curr() );
             if ( scanData ) {
                 BSONObj b( data.data() );
                 if ( !b.valid() ) {
@@ -439,11 +446,13 @@ namespace mongo {
 
     WiredTigerRecordStore::Iterator::Iterator(
             const WiredTigerRecordStore& rs,
+            OperationContext *txn,
             WiredTigerSession& session,
             const DiskLoc& start,
             bool tailable,
             const CollectionScanParams::Direction& dir )
         : _rs( rs ),
+          _txn( txn ),
           _session( session ),
           _tailable( tailable ),
           _dir( dir ),
@@ -518,7 +527,7 @@ namespace mongo {
     bool WiredTigerRecordStore::Iterator::restoreState() { return true; }
 
     RecordData WiredTigerRecordStore::Iterator::dataFor( const DiskLoc& loc ) const {
-        return _rs.dataFor( loc );
+        return _rs.dataFor( _txn, loc );
     }
 
     bool WiredTigerRecordStore::Iterator::_forward() const {

@@ -103,7 +103,7 @@ namespace mongo {
             OwnedPointerVector<PlanExecutor> execs;
             for ( size_t i = 0; i < numCursors; i++ ) {
                 WorkingSet* ws = new WorkingSet();
-                MultiIteratorStage* mis = new MultiIteratorStage(ws, collection);
+                MultiIteratorStage* mis = new MultiIteratorStage(txn, ws, collection);
                 // Takes ownership of 'ws' and 'mis'.
                 execs.push_back(new PlanExecutor(ws, mis, collection));
             }

@@ -285,6 +285,7 @@ namespace {
                                                     stdx::bind(setStatusAndShutdown,
                                                                stdx::placeholders::_1,
                                                                &status2)));
+        net->incrementNow(Milliseconds(200));
         executor.run();
         ASSERT_OK(status1);
         ASSERT_OK(status2);
@@ -385,7 +386,7 @@ namespace {
                                    stdx::placeholders::_1,
                                    request,
                                    &status)));
-        sleepmillis(2);
+        net->incrementNow(Milliseconds(2));
         boost::thread executorThread(stdx::bind(&ReplicationExecutor::run, &executor));
         executor.wait(cbHandle);
         executor.shutdown();

@@ -58,6 +58,8 @@ namespace mongo {
 
         virtual CurOp* getCurOp() const;
 
+        virtual unsigned int getOpID() const;
+
         virtual void checkForInterrupt(bool heedMutex = true) const;
 
         virtual Status checkForInterruptNoAssert() const;

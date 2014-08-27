@@ -63,7 +63,7 @@ namespace mongo {
 
     const char* HeapRecordStore::name() const { return "heap"; }
 
-    RecordData HeapRecordStore::dataFor( const DiskLoc& loc ) const {
+    RecordData HeapRecordStore::dataFor( OperationContext* txn, const DiskLoc& loc ) const {
         return recordFor(loc)->toRecordData();
     }
 
@@ -79,21 +79,21 @@ namespace mongo {
         invariant(_records.erase(loc) == 1);
     }
 
-    bool HeapRecordStore::cappedAndNeedDelete() const {
+    bool HeapRecordStore::cappedAndNeedDelete(OperationContext* txn) const {
         if (!_isCapped)
             return false;
 
         if (_dataSize > _cappedMaxSize)
             return true;
 
-        if ((_cappedMaxDocs != -1) && (numRecords() > _cappedMaxDocs))
+        if ((_cappedMaxDocs != -1) && (numRecords(txn) > _cappedMaxDocs))
             return true;
 
         return false;
     }
 
     void HeapRecordStore::cappedDeleteAsNeeded(OperationContext* txn) {
-        while (cappedAndNeedDelete()) {
+        while (cappedAndNeedDelete(txn)) {
             invariant(!_records.empty());
 
             DiskLoc oldest = _records.begin()->first;
@@ -340,7 +340,7 @@ namespace mongo {
                                          BSONObjBuilder* extraInfo,
                                          int infoLevel) const {
         // Note: not making use of extraInfo or infoLevel since we don't have extents
-        const int64_t recordOverhead = numRecords() * HeapRecord::HeaderSize;
+        const int64_t recordOverhead = numRecords(txn) * HeapRecord::HeaderSize;
         return _dataSize + recordOverhead;
     }
 
@@ -439,7 +439,7 @@ namespace mongo {
     }
 
     RecordData HeapRecordIterator::dataFor(const DiskLoc& loc) const {
-        return _rs.dataFor(loc);
+        return _rs.dataFor(_txn, loc);
     }
 
     //
@@ -504,7 +504,7 @@ namespace mongo {
     }
 
     RecordData HeapRecordReverseIterator::dataFor(const DiskLoc& loc) const {
-        return _rs.dataFor(loc);
+        return _rs.dataFor(_txn, loc);
     }
 
 } // namespace mongo

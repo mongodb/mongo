@@ -128,7 +128,7 @@ namespace mongo {
 
         bool requiresIdIndex() const;
 
-        BSONObj docFor(const DiskLoc& loc) const;
+        BSONObj docFor(OperationContext* txn, const DiskLoc& loc) const;
 
         // ---- things that should move to a CollectionAccessMethod like thing
         /**
@@ -246,15 +246,15 @@ namespace mongo {
 
         bool isCapped() const;
 
-        uint64_t numRecords() const;
+        uint64_t numRecords( OperationContext* txn ) const;
 
-        uint64_t dataSize() const;
+        uint64_t dataSize( OperationContext* txn ) const;
 
-        int averageObjectSize() const {
-            uint64_t n = numRecords();
+        int averageObjectSize( OperationContext* txn ) const {
+            uint64_t n = numRecords( txn );
             if ( n == 0 )
                 return 5;
-            return static_cast<int>( dataSize() / n );
+            return static_cast<int>( dataSize( txn ) / n );
         }
 
         // --- end suspect things

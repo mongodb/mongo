@@ -60,7 +60,7 @@ namespace {
 
     class CheckQuorumTest : public mongo::unittest::Test {
     protected:
-        NetworkInterfaceMock* _net;
+        NetworkInterfaceMockWithMap* _net;
         boost::scoped_ptr<ReplicationExecutor> _executor;
         boost::scoped_ptr<boost::thread> _executorThread;
 
@@ -73,7 +73,7 @@ namespace {
     class CheckQuorumForReconfig : public CheckQuorumTest {};
 
     void CheckQuorumTest::setUp() {
-        _net = new NetworkInterfaceMock;
+        _net = new NetworkInterfaceMockWithMap;
         _executor.reset(new ReplicationExecutor(_net));
         _executorThread.reset(new boost::thread(stdx::bind(&ReplicationExecutor::run,
                                                            _executor.get())));

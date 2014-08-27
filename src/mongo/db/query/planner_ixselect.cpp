@@ -239,14 +239,14 @@ namespace mongo {
             if (exprtype == MatchExpression::GEO) {
                 // within or intersect.
                 GeoMatchExpression* gme = static_cast<GeoMatchExpression*>(node);
-                const GeoQuery& gq = gme->getGeoQuery();
+                const GeoExpression& gq = gme->getGeoExpression();
                 const GeometryContainer& gc = gq.getGeometry();
                 return gc.hasS2Region();
             }
             else if (exprtype == MatchExpression::GEO_NEAR) {
                 GeoNearMatchExpression* gnme = static_cast<GeoNearMatchExpression*>(node);
                 // Make sure the near query is compatible with 2dsphere.
-                return gnme->getData().centroid.crs == SPHERE;
+                return gnme->getData().centroid->crs == SPHERE;
             }
             return false;
         }
@@ -254,13 +254,13 @@ namespace mongo {
             if (exprtype == MatchExpression::GEO_NEAR) {
                 GeoNearMatchExpression* gnme = static_cast<GeoNearMatchExpression*>(node);
                 // Make sure the near query is compatible with 2d index
-                return gnme->getData().centroid.crs == FLAT || !gnme->getData().isWrappingQuery;
+                return gnme->getData().centroid->crs == FLAT || !gnme->getData().isWrappingQuery;
             }
             else if (exprtype == MatchExpression::GEO) {
                 // 2d only supports within.
                 GeoMatchExpression* gme = static_cast<GeoMatchExpression*>(node);
-                const GeoQuery& gq = gme->getGeoQuery();
-                if (GeoQuery::WITHIN != gq.getPred()) {
+                const GeoExpression& gq = gme->getGeoExpression();
+                if (GeoExpression::WITHIN != gq.getPred()) {
                     return false;
                 }
 

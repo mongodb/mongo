@@ -176,8 +176,10 @@ assert.soon = function(f, msg, timeout /*ms*/, interval) {
         }
 
         diff = (new Date()).getTime() - start.getTime();
-        if (diff > timeout)
-            doassert("assert.soon failed: " + f + ", msg:" + msg);
+        if (diff > timeout) {
+            doassert(msg ? "assert.soon failed, msg:" + msg :
+                           "assert.soon failed: " + f);
+        }
         sleep(interval);
     }
 }

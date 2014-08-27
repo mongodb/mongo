@@ -603,7 +603,7 @@ namespace mongo {
         UpdateExecutor executor(&request, &op.debug());
         uassertStatusOK(executor.prepare());
 
-        Lock::DBWrite lk(txn->lockState(), ns.ns(), useExperimentalDocLocking);
+        Lock::DBWrite lk(txn->lockState(), ns.ns());
 
         // if this ever moves to outside of lock, need to adjust check
         // Client::Context::_finishInit
@@ -798,6 +798,10 @@ namespace mongo {
                 WriteUnitOfWork wunit(txn);
                 collection = ctx.db()->createCollection( txn, targetNS );
                 verify( collection );
+                repl::logOp(txn,
+                            "c",
+                            (ctx.db()->name() + ".$cmd").c_str(),
+                            BSON("create" << nsToCollectionSubstring(targetNS)));
                 wunit.commit();
             }
 
@@ -838,6 +842,10 @@ namespace mongo {
         if ( !collection ) {
             collection = ctx.db()->createCollection( txn, ns );
             verify( collection );
+            repl::logOp(txn,
+                        "c",
+                        (ctx.db()->name() + ".$cmd").c_str(),
+                        BSON("create" << nsToCollectionSubstring(ns)));
         }
 
         StatusWith<DiskLoc> status = collection->insertDocument( txn, js, true );
@@ -953,7 +961,6 @@ namespace {
         verify( dbResponse.response );
         dbResponse.response->concat(); // can get rid of this if we make response handling smarter
         response = *dbResponse.response;
-        _txn->recoveryUnit()->commitIfNeeded();
         return true;
     }
 
@@ -963,7 +970,6 @@ namespace {
             lastError.startRequest( toSend, lastError._get() );
         DbResponse dbResponse;
         assembleResponse( _txn, toSend, dbResponse , _clientHost );
-        _txn->recoveryUnit()->commitIfNeeded();
     }
 
     auto_ptr<DBClientCursor> DBDirectClient::query(const string &ns, Query query, int nToReturn , int nToSkip ,
@@ -1032,7 +1038,7 @@ namespace {
         storageEngine->cleanShutdown(txn);
     }
 
-    void exitCleanly( ExitCode code ) {
+    void exitCleanly( ExitCode code, OperationContext* txn ) {
         shutdownInProgress.store(1);
 
         // Global storage engine may not be started in all cases before we exit
@@ -1042,14 +1048,18 @@ namespace {
 
             repl::getGlobalReplicationCoordinator()->shutdown();
 
-            OperationContextImpl txn;
-            Lock::GlobalWrite lk(txn.lockState());
+            if (!txn) {
+                // leaked, but we are exiting so doesn't matter
+                txn = new OperationContextImpl();
+            }
+
+            Lock::GlobalWrite lk(txn->lockState());
             log() << "now exiting" << endl;
 
             // Execute the graceful shutdown tasks, such as flushing the outstanding journal 
             // and data files, close sockets, etc.
             try {
-                shutdownServer(&txn);
+                shutdownServer(txn);
             }
             catch (const DBException& ex) {
                 severe() << "shutdown failed with DBException " << ex;

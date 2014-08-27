@@ -184,7 +184,7 @@ namespace {
             return Status::OK();
         }
 
-        virtual bool isEmpty() {
+        virtual bool isEmpty(OperationContext* txn) {
             return _data->empty();
         }
 

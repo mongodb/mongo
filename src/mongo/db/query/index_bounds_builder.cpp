@@ -30,7 +30,6 @@
 
 #include <limits>
 #include "mongo/db/geo/geoconstants.h"
-#include "mongo/db/geo/s2common.h"
 #include "mongo/db/matcher/expression_geo.h"
 #include "mongo/db/query/expression_index.h"
 #include "mongo/db/query/expression_index_knobs.h"
@@ -570,14 +569,14 @@ namespace mongo {
             const GeoMatchExpression* gme = static_cast<const GeoMatchExpression*>(expr);
 
             if (mongoutils::str::equals("2dsphere", elt.valuestrsafe())) {
-                verify(gme->getGeoQuery().getGeometry().hasS2Region());
-                const S2Region& region = gme->getGeoQuery().getGeometry().getS2Region();
+                verify(gme->getGeoExpression().getGeometry().hasS2Region());
+                const S2Region& region = gme->getGeoExpression().getGeometry().getS2Region();
                 ExpressionMapping::cover2dsphere(region, index.infoObj, oilOut);
                 *tightnessOut = IndexBoundsBuilder::INEXACT_FETCH;
             }
             else if (mongoutils::str::equals("2d", elt.valuestrsafe())) {
-                verify(gme->getGeoQuery().getGeometry().hasR2Region());
-                const R2Region& region = gme->getGeoQuery().getGeometry().getR2Region();
+                verify(gme->getGeoExpression().getGeometry().hasR2Region());
+                const R2Region& region = gme->getGeoExpression().getGeometry().getR2Region();
 
                 ExpressionMapping::cover2d(region,
                                            index.infoObj,

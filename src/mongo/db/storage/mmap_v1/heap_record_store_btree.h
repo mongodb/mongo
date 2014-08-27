@@ -48,7 +48,7 @@ namespace mongo {
         // DiskLoc(0,0) isn't valid for records.
         explicit HeapRecordStoreBtree(const StringData& ns): RecordStore(ns), _nextId(1) { }
 
-        virtual RecordData dataFor(const DiskLoc& loc) const;
+        virtual RecordData dataFor(OperationContext* txn, const DiskLoc& loc) const;
 
         virtual void deleteRecord(OperationContext* txn, const DiskLoc& dl);
 
@@ -61,7 +61,7 @@ namespace mongo {
                                                  const DocWriter* doc,
                                                  bool enforceQuota);
 
-        virtual long long numRecords() const { return _records.size(); }
+        virtual long long numRecords( OperationContext* txn ) const { return _records.size(); }
 
         virtual Status touch(OperationContext* txn, BSONObjBuilder* output) const;
 
@@ -149,7 +149,7 @@ namespace mongo {
             invariant(false);
         }
 
-        virtual long long dataSize() const { invariant(false); }
+        virtual long long dataSize(OperationContext* txn) const { invariant(false); }
 
         virtual Record* recordFor(const DiskLoc& loc) const { invariant(false); }
 

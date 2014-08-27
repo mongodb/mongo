@@ -298,7 +298,7 @@ namespace repl {
          * returns Status::OK if the sync target could be set and an ErrorCode indicating why it
          * couldn't otherwise.
          */
-        virtual Status processReplSetSyncFrom(const std::string& target,
+        virtual Status processReplSetSyncFrom(const HostAndPort& target,
                                               BSONObjBuilder* resultObj) = 0;
 
         /**

@@ -162,7 +162,7 @@ namespace mongo {
 
             // Make sure all the disklocs actually correspond to the right info
             for ( set<DiskLoc>::const_iterator it = locs.begin(); it != locs.end(); ++it ) {
-                const BSONObj obj = collection->docFor(*it);
+                const BSONObj obj = collection->docFor(&txn, *it);
                 ASSERT_EQUALS(obj["tag"].OID(), tag);
             }
         }

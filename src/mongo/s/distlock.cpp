@@ -542,19 +542,19 @@ namespace mongo {
 
 
     bool DistributedLock::isLockHeld( double timeout, string* errMsg ) {
-        ScopedDbConnection conn(_conn.toString(), timeout );
 
         BSONObj lockObj;
         try {
+            ScopedDbConnection conn(_conn.toString(), timeout );
             lockObj = conn->findOne( LocksType::ConfigNS,
                                      BSON( LocksType::name(_name) ) ).getOwned();
+            conn.done();
         }
         catch ( DBException& e ) {
             *errMsg = str::stream() << "error checking whether lock " << _name << " is held "
                                     << causedBy( e );
             return false;
         }
-        conn.done();
 
         if ( lockObj.isEmpty() ) {
             *errMsg = str::stream() << "no lock for " << _name << " exists in the locks collection";
@@ -1149,9 +1149,15 @@ namespace mongo {
                   << " minutes timeout." << endl;
     }
 
-    ScopedDistributedLock::ScopedDistributedLock(const ConnectionString& conn, const string& name) :
-            _lock(conn, name), _why(""), _lockTryIntervalMillis(1000), _acquired(false)
-    {
+    const long long ScopedDistributedLock::kDefaultLockTryIntervalMillis = 1000;
+    const long long ScopedDistributedLock::kDefaultSocketTimeoutMillis = 30 * 1000;
+
+    ScopedDistributedLock::ScopedDistributedLock(const ConnectionString& conn, const string& name)
+        : _lock(conn, name),
+          _why(""),
+          _lockTryIntervalMillis(kDefaultLockTryIntervalMillis),
+          _socketTimeoutMillis(kDefaultSocketTimeoutMillis),
+          _acquired(false) {
     }
 
     ScopedDistributedLock::~ScopedDistributedLock() {
@@ -1162,7 +1168,10 @@ namespace mongo {
 
     bool ScopedDistributedLock::tryAcquire(string* errMsg) {
         try {
-            _acquired = _lock.lock_try(_why, false, &_other);
+            _acquired = _lock.lock_try(_why,
+                                       false,
+                                       &_other,
+                                       static_cast<double>(_socketTimeoutMillis / 1000));
         }
         catch (const DBException& e) {
 
@@ -1222,6 +1231,19 @@ namespace mongo {
                                 << "s, other lock may be held: " << _other << causedBy(errMsg);
 
         return false;
+    }
+
+    /**
+     * Returns false if the lock is known _not_ to be held, otherwise asks the underlying
+     * lock to issue a 'isLockHeld' call and returns whatever that calls does.
+     */
+    bool ScopedDistributedLock::verifyLockHeld(std::string* errMsg) {
+        if (!_acquired) {
+            *errMsg = "lock was never acquired";
+            return false;
+        }
+
+        return _lock.isLockHeld(static_cast<double>(_socketTimeoutMillis / 1000), errMsg);
     }
 
 }

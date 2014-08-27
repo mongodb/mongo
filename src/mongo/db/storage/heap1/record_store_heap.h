@@ -55,7 +55,7 @@ namespace mongo {
 
         virtual const char* name() const;
 
-        virtual RecordData dataFor( const DiskLoc& loc ) const;
+        virtual RecordData dataFor( OperationContext* txn, const DiskLoc& loc ) const;
 
         virtual void deleteRecord( OperationContext* txn, const DiskLoc& dl );
 
@@ -121,9 +121,9 @@ namespace mongo {
                                      BSONObjBuilder* extraInfo = NULL,
                                      int infoLevel = 0) const;
 
-        virtual long long dataSize() const { return _dataSize; }
+        virtual long long dataSize( OperationContext* txn ) const { return _dataSize; }
 
-        virtual long long numRecords() const { return _records.size(); }
+        virtual long long numRecords( OperationContext* txn ) const { return _records.size(); }
 
     protected:
         class HeapRecord {
@@ -161,7 +161,7 @@ namespace mongo {
 
     private:
         DiskLoc allocateLoc();
-        bool cappedAndNeedDelete() const;
+        bool cappedAndNeedDelete(OperationContext* txn) const;
         void cappedDeleteAsNeeded(OperationContext* txn);
 
         // TODO figure out a proper solution to metadata

@@ -55,7 +55,8 @@ namespace mongo {
      */
     class MergeSortStage : public PlanStage {
     public:
-        MergeSortStage(const MergeSortStageParams& params, 
+        MergeSortStage(OperationContext* txn,
+                       const MergeSortStageParams& params, 
                        WorkingSet* ws, 
                        const Collection* collection);
         virtual ~MergeSortStage();
@@ -83,6 +84,7 @@ namespace mongo {
 
     private:
         // Not owned by us.
+        OperationContext* _txn;
         const Collection* _collection;
 
         // Not owned by us.

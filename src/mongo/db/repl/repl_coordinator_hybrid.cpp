@@ -32,6 +32,7 @@
 
 #include "mongo/db/repl/repl_coordinator_hybrid.h"
 
+#include "mongo/db/global_environment_experiment.h"
 #include "mongo/db/repl/isself.h"
 #include "mongo/db/repl/network_interface_impl.h"
 #include "mongo/db/repl/repl_coordinator_external_state_impl.h"
@@ -49,7 +50,9 @@ namespace repl {
         _impl(settings,
               new ReplicationCoordinatorExternalStateImpl,
               new NetworkInterfaceImpl,
-              new TopologyCoordinatorImpl(Seconds(maxSyncSourceLagSecs))) {
+              new TopologyCoordinatorImpl(Seconds(maxSyncSourceLagSecs)),
+              static_cast<int64_t>(curTimeMillis64())) {
+        getGlobalEnvironment()->registerKillOpListener(&_impl);
     }
 
     HybridReplicationCoordinator::~HybridReplicationCoordinator() {}
@@ -234,8 +237,10 @@ namespace repl {
                                                                 const BSONObj& givenConfig,
                                                                 BSONObjBuilder* resultObj) {
         Status legacyStatus = _legacy.processReplSetInitiate(txn, givenConfig, resultObj);
-        BSONObjBuilder implResult;
-        Status implStatus = _impl.processReplSetInitiate(txn, givenConfig, &implResult);
+        // TODO(spencer): Enable this once all config modifying paths are hooked up and we no
+        // longer use forceCurrentRSConfigHack.
+        //BSONObjBuilder implResult;
+        //Status implStatus = _impl.processReplSetInitiate(txn, givenConfig, &implResult);
         return legacyStatus;
     }
 
@@ -283,7 +288,7 @@ namespace repl {
         return legacyStatus;
     }
 
-    Status HybridReplicationCoordinator::processReplSetSyncFrom(const std::string& target,
+    Status HybridReplicationCoordinator::processReplSetSyncFrom(const HostAndPort& target,
                                                                 BSONObjBuilder* resultObj) {
         Status legacyStatus = _legacy.processReplSetSyncFrom(target, resultObj);
         BSONObjBuilder implResult;

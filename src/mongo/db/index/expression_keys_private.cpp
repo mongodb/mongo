@@ -34,7 +34,7 @@
 #include "mongo/db/geo/geoconstants.h"
 #include "mongo/db/geo/geometry_container.h"
 #include "mongo/db/geo/geoparser.h"
-#include "mongo/db/geo/s2common.h"
+#include "mongo/db/index/s2_common.h"
 #include "mongo/db/geo/s2.h"
 #include "mongo/db/index_names.h"
 #include "mongo/db/index/2d_common.h"

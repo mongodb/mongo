@@ -219,7 +219,7 @@ namespace mongo {
     }
 
     RecordData CappedRecordStoreV1Iterator::dataFor( const DiskLoc& loc ) const {
-        return _recordStore->dataFor( loc );
+        return _recordStore->dataFor( _txn, loc );
     }
 
     Extent* CappedRecordStoreV1Iterator::_getExtent( const DiskLoc& loc ) {

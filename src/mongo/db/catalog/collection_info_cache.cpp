@@ -60,10 +60,10 @@ namespace mongo {
         // index filters should persist throughout life of collection
     }
 
-    void CollectionInfoCache::computeIndexKeys() {
+    void CollectionInfoCache::computeIndexKeys( OperationContext* txn ) {
         _indexedPaths.clear();
 
-        IndexCatalog::IndexIterator i = _collection->getIndexCatalog()->getIndexIterator(true);
+        IndexCatalog::IndexIterator i = _collection->getIndexCatalog()->getIndexIterator(txn, true);
         while (i.more()) {
             IndexDescriptor* descriptor = i.next();
 

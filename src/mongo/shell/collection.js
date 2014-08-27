@@ -40,7 +40,7 @@ DBCollection.prototype.help = function () {
     print("\tdb." + shortName + ".drop() drop the collection");
     print("\tdb." + shortName + ".dropIndex(index) - e.g. db." + shortName + ".dropIndex( \"indexName\" ) or db." + shortName + ".dropIndex( { \"indexKey\" : 1 } )");
     print("\tdb." + shortName + ".dropIndexes()");
-    print("\tdb." + shortName + ".ensureIndex(keypattern[,options]) - options is an object with these possible fields: name, unique, dropDups");
+    print("\tdb." + shortName + ".ensureIndex(keypattern[,options])");
     print("\tdb." + shortName + ".reIndex()");
     print("\tdb." + shortName + ".find([query],[fields]) - query is an optional query filter. fields is optional set of fields to return.");
     print("\t                                              e.g. db." + shortName + ".find( {x:77} , {name:1, x:1} )");
@@ -496,35 +496,7 @@ DBCollection.prototype._indexSpec = function( keys, options ) {
     else {
         throw Error( "can't handle: " + typeof( options ) );
     }
-    /*
-        return ret;
 
-    var name;
-    var nTrue = 0;
-    
-    if ( ! isObject( options ) ) {
-        options = [ options ];
-    }
-    
-    if ( options.length ){
-        for( var i = 0; i < options.length; ++i ) {
-            var o = options[ i ];
-            if ( isString( o ) ) {
-                ret.name = o;
-            } else if ( typeof( o ) == "boolean" ) {
-	        if ( o ) {
-		    ++nTrue;
-	        }
-            }
-        }
-        if ( nTrue > 0 ) {
-	    ret.unique = true;
-        }
-        if ( nTrue > 1 ) {
-	    ret.dropDups = true;
-        }
-    }
-*/
     return ret;
 }
 

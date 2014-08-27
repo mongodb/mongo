@@ -118,7 +118,7 @@ namespace mongo {
             if (indexIs2D) {
                 GeoNear2DNode* ret = new GeoNear2DNode();
                 ret->indexKeyPattern = index.keyPattern;
-                ret->nq = nearExpr->getData();
+                ret->nq = &nearExpr->getData();
                 ret->baseBounds.fields.resize(index.keyPattern.nFields());
                 if (NULL != query.getProj()) {
                     ret->addPointMeta = query.getProj()->wantGeoNearPoint();
@@ -130,7 +130,7 @@ namespace mongo {
             else {
                 GeoNear2DSphereNode* ret = new GeoNear2DSphereNode();
                 ret->indexKeyPattern = index.keyPattern;
-                ret->nq = nearExpr->getData();
+                ret->nq = &nearExpr->getData();
                 ret->baseBounds.fields.resize(index.keyPattern.nFields());
                 if (NULL != query.getProj()) {
                     ret->addPointMeta = query.getProj()->wantGeoNearPoint();

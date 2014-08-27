@@ -76,9 +76,6 @@ namespace mongo {
      *
      */
 
-    // everything provides this, but only header is instance.h
-    void exitCleanly(ExitCode exitCode);
-
 namespace {
 
 #ifdef _WIN32

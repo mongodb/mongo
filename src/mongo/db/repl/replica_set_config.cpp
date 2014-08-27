@@ -371,7 +371,7 @@ namespace {
                 patternName);
         if (iter == _customWriteConcernModes.end()) {
             return StatusWith<ReplicaSetTagPattern>(
-                    ErrorCodes::NoSuchKey,
+                    ErrorCodes::UnknownReplWriteConcern,
                     str::stream() <<
                     "No write concern mode named \"" << escape(patternName.toString()) <<
                     " found in replica set configuration");

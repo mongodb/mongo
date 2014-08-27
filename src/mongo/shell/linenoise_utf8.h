@@ -28,6 +28,7 @@
  */
 
 #include <boost/smart_ptr/scoped_array.hpp>
+#include <algorithm>
 #include <string.h>
 
 namespace linenoise_utf8 {

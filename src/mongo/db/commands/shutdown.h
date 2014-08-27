@@ -56,7 +56,7 @@ namespace mongo {
                  BSONObjBuilder& result,
                  bool fromRepl);
     private:
-        bool shutdownHelper();
+        static bool shutdownHelper(OperationContext* txn);
     };
 
 }  // namespace mongo

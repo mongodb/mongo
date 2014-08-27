@@ -33,26 +33,87 @@
 #include <map>
 
 #include "mongo/db/repl/replication_executor.h"
+#include "mongo/util/time_support.h"
 
 namespace mongo {
 namespace repl {
 
+    /**
+     * Mock (replication) network implementation which can do the following:
+     * -- Simulate latency (delay) on each request
+     * -- Allows replacing the helper function used to return a response
+     */
     class NetworkInterfaceMock : public ReplicationExecutor::NetworkInterface {
     public:
-        NetworkInterfaceMock() : _simulatedNetworkLatencyMillis(0) {}
-        virtual ~NetworkInterfaceMock() {}
+        typedef stdx::function< ResponseStatus (const ReplicationExecutor::RemoteCommandRequest&)>
+                                                                                CommandProcessorFn;
+        NetworkInterfaceMock();
+        explicit NetworkInterfaceMock(CommandProcessorFn fn);
+        virtual ~NetworkInterfaceMock();
+        virtual void setExecutor(ReplicationExecutor* executor);
         virtual Date_t now();
-        virtual StatusWith<BSONObj> runCommand(
-                const ReplicationExecutor::RemoteCommandRequest& request);
-        virtual void runCallbackWithGlobalExclusiveLock(
-                const stdx::function<void ()>& callback);
+        virtual ResponseStatus runCommand(const ReplicationExecutor::RemoteCommandRequest& request);
+        virtual void runCallbackWithGlobalExclusiveLock(const stdx::function<void ()>& callback);
+
+        /**
+         * Network latency added for each remote command, defaults to 0.
+         */
+        void simulatedNetworkLatency(int millis);
+
+        /**
+         * Sets the current time to "newNow".  It is a fatal error for "newNow"
+         * to be less than or equal to "now()".
+         */
+        void setNow(Date_t newNow);
+
+        /**
+         * Increments the current time by "inc".  It is a fatal error for "inc"
+         * to be negative or 0.
+         */
+        void incrementNow(Milliseconds inc);
+
+    protected:
+        // Mutex that synchronizes access to mutable data in this class and its subclasses.
+        // Fields guarded by the mutex are labled (M), below, and those that are read-only
+        // in multi-threaded execution, and so unsynchronized, are labeled (R).
+        boost::mutex _mutex;
+
+    private:
+        // Condition signaled when _now is updated.
+        boost::condition_variable _timeElapsed;  // (M)
+
+        // The current time reported by this instance of NetworkInterfaceMock.
+        Date_t _now;                             // (M)
+
+        // The amount of simulated network delay to introduce on all runCommand
+        // operations.
+        int _simulatedNetworkLatencyMillis;      // (M)
+
+        // Function that generates the response from a request in runCommand.
+        const CommandProcessorFn _helper;        // (R)
+
+        // Pointer to the executor into which this mock is installed.  Used to signal the executor
+        // when the clock changes.
+        ReplicationExecutor* _executor;          // (R)
+    };
+
+    /**
+     * Mock (replication) network implementation which can do the following:
+     * -- Holds a map from request -> response
+     * -- Block on each request, and unblock by request or all
+     */
+    class NetworkInterfaceMockWithMap : public NetworkInterfaceMock {
+    public:
+
+        NetworkInterfaceMockWithMap();
 
         /**
          * Adds a response (StatusWith<BSONObj>) for this mock to return for a given request.
          * For each request, the mock will return the corresponding response for all future calls.
          *
          * If "isBlocked" is set to true, the network will block in runCommand for the given
-         * request until unblockResponse is called with "request" as an argument.
+         * request until unblockResponse is called with "request" as an argument,
+         * or unblockAll is called.
          */
         bool addResponse(const ReplicationExecutor::RemoteCommandRequest& request,
                          const StatusWith<BSONObj>& response,
@@ -68,24 +129,29 @@ namespace repl {
          */
         void unblockAll();
 
-        /**
-         * Network latency added for each remote command, defaults to 0.
-         */
-        void simulatedNetworkLatency(int millis);
-
     private:
-        struct ResponseInfo {
-            ResponseInfo(const StatusWith<BSONObj>& r, bool block);
+        struct BlockableResponseStatus {
+            BlockableResponseStatus(const ResponseStatus& r,
+                                    bool blocked);
 
-            StatusWith<BSONObj> response;
+            ResponseStatus response;
             bool isBlocked;
+
+            std::string toString() const;
         };
-        typedef std::map<ReplicationExecutor::RemoteCommandRequest,
-                         ResponseInfo > RequestResponseMap;
-        boost::mutex _mutex;
-        boost::condition_variable _someResponseUnblocked;
-        RequestResponseMap _responses;
-        int _simulatedNetworkLatencyMillis;
+
+        typedef std::map<ReplicationExecutor::RemoteCommandRequest, BlockableResponseStatus>
+                                                                                RequestResponseMap;
+
+        // This helper will return a response from the mapped responses
+        ResponseStatus _getResponseFromMap(
+                                         const ReplicationExecutor::RemoteCommandRequest& request);
+
+        // Condition signaled whenever any response is unblocked.
+        boost::condition_variable _someResponseUnblocked;  // (M)
+
+        // Map from requests to responses.
+        RequestResponseMap _responses;                     // (M)
     };
 
 }  // namespace repl

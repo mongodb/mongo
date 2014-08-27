@@ -43,7 +43,7 @@ namespace repl {
         NetworkInterfaceImpl();
         virtual ~NetworkInterfaceImpl();
         virtual Date_t now();
-        virtual StatusWith<BSONObj> runCommand(
+        virtual ResponseStatus runCommand(
                 const ReplicationExecutor::RemoteCommandRequest& request);
         virtual void runCallbackWithGlobalExclusiveLock(
                 const stdx::function<void ()>& callback);

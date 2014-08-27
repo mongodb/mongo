@@ -31,10 +31,11 @@
 #include <queue>
 
 #include "mongo/db/geo/hash.h"
-#include "mongo/db/geo/shapes.h"
 
 
 namespace mongo {
+
+    class R2Region;
 
     class R2RegionCoverer : boost::noncopyable {
         // By default, the covering uses at most 8 cells at any level.

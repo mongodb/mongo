@@ -313,7 +313,7 @@ namespace mongo {
             if ( !coll )
                 continue;
 
-            if ( coll->getIndexCatalog()->findIdIndex() )
+            if ( coll->getIndexCatalog()->findIdIndex( txn ) )
                 continue;
 
             log() << "WARNING: the collection '" << *i
@@ -332,7 +332,6 @@ namespace mongo {
 
         OperationContextImpl txn;
         Lock::GlobalWrite lk(txn.lockState());
-        WriteUnitOfWork wunit(&txn);
 
         vector< string > dbNames;
 
@@ -405,7 +404,6 @@ namespace mongo {
                 dbHolder().close( &txn, dbName );
             }
         }
-        wunit.commit();
 
         LOG(1) << "done repairDatabases" << endl;
     }
@@ -588,7 +586,7 @@ namespace mongo {
             snmpInit();
         }
 
-        initGlobalStorageEngine();
+        getGlobalEnvironment()->setGlobalStorageEngine(storageGlobalParams.engine);
 
         boost::filesystem::remove_all(storageGlobalParams.dbpath + "/_tmp/");
 
@@ -834,11 +832,6 @@ MONGO_INITIALIZER_GENERAL(CreateAuthorizationManager,
     return Status::OK();
 }
 
-MONGO_INITIALIZER(SetGlobalConfigExperiment)(InitializerContext* context) {
-    setGlobalEnvironment(new GlobalEnvironmentMongoD());
-    return Status::OK();
-}
-
 namespace {
     repl::ReplSettings replSettings;
 } // namespace
@@ -849,7 +842,8 @@ namespace mongo {
     }
 } // namespace mongo
 
-MONGO_INITIALIZER(CreateReplicationManager)(InitializerContext* context) {
+MONGO_INITIALIZER_WITH_PREREQUISITES(CreateReplicationManager, ("SetGlobalEnvironment"))
+        (InitializerContext* context) {
     repl::setGlobalReplicationCoordinator(new repl::HybridReplicationCoordinator(replSettings));
     return Status::OK();
 }

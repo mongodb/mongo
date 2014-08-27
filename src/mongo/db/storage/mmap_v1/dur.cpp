@@ -266,10 +266,6 @@ namespace mongo {
             return p;
         }
 
-        bool DurableImpl::isCommitNeeded() const {
-            return commitJob.bytes() > UncommittedBytesLimit;
-        }
-
         bool NOINLINE_DECL DurableImpl::_aCommitIsNeeded(OperationContext* txn) {
             switch (txn->lockState()->threadState()) {
                 case '\0': {
@@ -903,7 +899,7 @@ namespace mongo {
             }
 
             commitNow(txn);
-            globalStorageEngine->flushAllFiles(true);
+            MongoFile::flushAll(true);
             journalCleanup();
 
             verify(!haveJournalFiles()); // Double check post-conditions

@@ -44,10 +44,10 @@ namespace mongo {
           _btreeCursor(NULL),
           _params(params),
           _hitEnd(false),
-          _shouldDedup(params.descriptor->isMultikey()),
+          _shouldDedup(params.descriptor->isMultikey(txn)),
           _commonStats(kStageType) {
         _specificStats.keyPattern = _params.descriptor->keyPattern();
-        _specificStats.isMultiKey = _params.descriptor->isMultikey();
+        _specificStats.isMultiKey = _params.descriptor->isMultikey(txn);
     }
 
     void Count::initIndexCursor() {
@@ -192,7 +192,7 @@ namespace mongo {
         _endCursor->seek(_params.endKey, _params.endKeyInclusive);
 
         // This can change during yielding.
-        _shouldDedup = _descriptor->isMultikey();
+        _shouldDedup = _descriptor->isMultikey(_txn);
 
         checkEnd();
     }

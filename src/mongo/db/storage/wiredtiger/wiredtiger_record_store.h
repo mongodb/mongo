@@ -62,9 +62,9 @@ namespace mongo {
         // name of the RecordStore implementation
         virtual const char* name() const { return "wiredtiger"; }
 
-        virtual long long dataSize() const;
+        virtual long long dataSize( OperationContext *txn ) const;
 
-        virtual long long numRecords() const;
+        virtual long long numRecords( OperationContext* txn ) const;
 
         virtual bool isCapped() const;
 
@@ -74,7 +74,7 @@ namespace mongo {
 
         // CRUD related
 
-        virtual RecordData dataFor( const DiskLoc& loc ) const;
+        virtual RecordData dataFor( OperationContext* txn, const DiskLoc& loc ) const;
 
         virtual void deleteRecord( OperationContext* txn, const DiskLoc& dl );
 
@@ -153,6 +153,7 @@ namespace mongo {
         class Iterator : public RecordIterator {
         public:
             Iterator( const WiredTigerRecordStore& rs,
+                      OperationContext* txn,
                       WiredTigerSession &session,
                       const DiskLoc& start,
                       bool tailable,
@@ -172,6 +173,7 @@ namespace mongo {
             void _checkStatus();
 
             const WiredTigerRecordStore& _rs;
+            OperationContext* _txn;
             WiredTigerSession &_session;
             bool _tailable;
             CollectionScanParams::Direction _dir;
@@ -192,7 +194,7 @@ namespace mongo {
 
         DiskLoc _nextId();
         void _setId(DiskLoc loc);
-        bool cappedAndNeedDelete() const;
+        bool cappedAndNeedDelete(OperationContext* txn) const;
         void cappedDeleteAsNeeded(OperationContext* txn);
         void _changeNumRecords(OperationContext* txn, bool insert);
         void _increaseDataSize(OperationContext* txn, int amount);

@@ -79,7 +79,7 @@ namespace mongo {
             IndexScanParams params;
 
             params.descriptor =
-                collection->getIndexCatalog()->findIndexByKeyPattern( ixn->indexKeyPattern );
+                collection->getIndexCatalog()->findIndexByKeyPattern( txn, ixn->indexKeyPattern );
             if ( params.descriptor == NULL ) {
                 warning() << "Can't find index " << ixn->indexKeyPattern.toString()
                           << "in namespace " << collection->ns() << endl;
@@ -96,7 +96,7 @@ namespace mongo {
             const FetchNode* fn = static_cast<const FetchNode*>(root);
             PlanStage* childStage = buildStages(txn, collection, qsol, fn->children[0], ws);
             if (NULL == childStage) { return NULL; }
-            return new FetchStage(ws, childStage, fn->filter.get(), collection);
+            return new FetchStage(txn, ws, childStage, fn->filter.get(), collection);
         }
         else if (STAGE_SORT == root->getType()) {
             const SortNode* sn = static_cast<const SortNode*>(root);
@@ -107,7 +107,7 @@ namespace mongo {
             params.pattern = sn->pattern;
             params.query = sn->query;
             params.limit = sn->limit;
-            return new SortStage(params, ws, childStage);
+            return new SortStage(txn, params, ws, childStage);
         }
         else if (STAGE_PROJECTION == root->getType()) {
             const ProjectionNode* pn = static_cast<const ProjectionNode*>(root);
@@ -148,7 +148,7 @@ namespace mongo {
         }
         else if (STAGE_AND_HASH == root->getType()) {
             const AndHashNode* ahn = static_cast<const AndHashNode*>(root);
-            auto_ptr<AndHashStage> ret(new AndHashStage(ws, ahn->filter.get(), collection));
+            auto_ptr<AndHashStage> ret(new AndHashStage(txn, ws, ahn->filter.get(), collection));
             for (size_t i = 0; i < ahn->children.size(); ++i) {
                 PlanStage* childStage = buildStages(txn, collection, qsol, ahn->children[i], ws);
                 if (NULL == childStage) { return NULL; }
@@ -168,7 +168,7 @@ namespace mongo {
         }
         else if (STAGE_AND_SORTED == root->getType()) {
             const AndSortedNode* asn = static_cast<const AndSortedNode*>(root);
-            auto_ptr<AndSortedStage> ret(new AndSortedStage(ws, asn->filter.get(), collection));
+            auto_ptr<AndSortedStage> ret(new AndSortedStage(txn, ws, asn->filter.get(), collection));
             for (size_t i = 0; i < asn->children.size(); ++i) {
                 PlanStage* childStage = buildStages(txn, collection, qsol, asn->children[i], ws);
                 if (NULL == childStage) { return NULL; }
@@ -181,7 +181,7 @@ namespace mongo {
             MergeSortStageParams params;
             params.dedup = msn->dedup;
             params.pattern = msn->sort;
-            auto_ptr<MergeSortStage> ret(new MergeSortStage(params, ws, collection));
+            auto_ptr<MergeSortStage> ret(new MergeSortStage(txn, params, ws, collection));
             for (size_t i = 0; i < msn->children.size(); ++i) {
                 PlanStage* childStage = buildStages(txn, collection, qsol, msn->children[i], ws);
                 if (NULL == childStage) { return NULL; }
@@ -199,8 +199,8 @@ namespace mongo {
             params.addPointMeta = node->addPointMeta;
             params.addDistMeta = node->addDistMeta;
 
-            IndexDescriptor* twoDIndex = collection->getIndexCatalog()->findIndexByKeyPattern(node
-                ->indexKeyPattern);
+            IndexDescriptor* twoDIndex = collection->getIndexCatalog()->findIndexByKeyPattern(txn,
+                                                                                              node->indexKeyPattern);
 
             if (twoDIndex == NULL) {
                 warning() << "Can't find 2D index " << node->indexKeyPattern.toString()
@@ -222,8 +222,8 @@ namespace mongo {
             params.addPointMeta = node->addPointMeta;
             params.addDistMeta = node->addDistMeta;
 
-            IndexDescriptor* s2Index = collection->getIndexCatalog()->findIndexByKeyPattern(node
-                ->indexKeyPattern);
+            IndexDescriptor* s2Index = collection->getIndexCatalog()->findIndexByKeyPattern(txn,
+                                                                                            node->indexKeyPattern);
 
             if (s2Index == NULL) {
                 warning() << "Can't find 2DSphere index " << node->indexKeyPattern.toString()
@@ -241,7 +241,7 @@ namespace mongo {
                 return NULL;
             }
             vector<IndexDescriptor*> idxMatches;
-            collection->getIndexCatalog()->findIndexByType("text", idxMatches);
+            collection->getIndexCatalog()->findIndexByType(txn, "text", idxMatches);
             if (1 != idxMatches.size()) {
                 warning() << "No text index, or more than one text index";
                 return NULL;
@@ -293,7 +293,7 @@ namespace mongo {
             DistinctParams params;
 
             params.descriptor =
-                collection->getIndexCatalog()->findIndexByKeyPattern(dn->indexKeyPattern);
+                collection->getIndexCatalog()->findIndexByKeyPattern(txn, dn->indexKeyPattern);
             params.direction = dn->direction;
             params.bounds = dn->bounds;
             params.fieldNo = dn->fieldNo;
@@ -310,7 +310,7 @@ namespace mongo {
             CountParams params;
 
             params.descriptor =
-                collection->getIndexCatalog()->findIndexByKeyPattern(cn->indexKeyPattern);
+                collection->getIndexCatalog()->findIndexByKeyPattern(txn, cn->indexKeyPattern);
             params.startKey = cn->startKey;
             params.startKeyInclusive = cn->startKeyInclusive;
             params.endKey = cn->endKey;

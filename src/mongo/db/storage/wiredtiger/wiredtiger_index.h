@@ -71,7 +71,7 @@ namespace mongo {
 
         virtual Status dupKeyCheck(OperationContext* txn, const BSONObj& key, const DiskLoc& loc);
 
-        virtual bool isEmpty();
+        virtual bool isEmpty(OperationContext* txn);
 
         virtual Status touch(OperationContext* txn) const;
         

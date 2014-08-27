@@ -96,8 +96,8 @@ namespace repl {
                                                 stdx::placeholders::_1,
                                                 hap);
             CBHStatus status = _replExecutor.scheduleWorkAt(
-                                        Date_t(curTimeMillis64() + heartbeatFrequencyMillis),
-                                        restartCB);
+                    Date_t(_replExecutor.now() + heartbeatFrequencyMillis),
+                    restartCB);
             if (!status.isOK()) {
                 log() << "replset: aborting heartbeats for " << hap << " due to scheduling error"
                        << " -- "<< status;
@@ -129,7 +129,7 @@ namespace repl {
                                        this,
                                        stdx::placeholders::_1,
                                        hap,
-                                       curTimeMillis64(),
+                                       _replExecutor.now(),
                                        heartbeatRetries);
 
 

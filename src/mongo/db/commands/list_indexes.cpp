@@ -84,11 +84,11 @@ namespace mongo {
             }
 
             vector<string> indexNames;
-            cce->getAllIndexes( &indexNames );
+            cce->getAllIndexes( txn, &indexNames );
 
             BSONArrayBuilder arr;
             for ( size_t i = 0; i < indexNames.size(); i++ ) {
-                arr.append( cce->getIndexSpec( indexNames[i] ) );
+                arr.append( cce->getIndexSpec( txn, indexNames[i] ) );
             }
 
             result.append( "indexes", arr.arr() );

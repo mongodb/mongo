@@ -32,6 +32,7 @@
 #include <procfs.h>
 #include <stdio.h>
 #include <string>
+#include <sys/lgrp_user.h>
 #include <sys/mman.h>
 #include <sys/systeminfo.h>
 #include <sys/utsname.h>
@@ -42,6 +43,7 @@
 #include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
 #include "mongo/util/processinfo.h"
+#include "mongo/util/scopeguard.h"
 
 namespace mongo {
 
@@ -152,7 +154,24 @@ namespace mongo {
     }
 
     bool ProcessInfo::checkNumaEnabled() {
-        return false;
+        lgrp_cookie_t cookie = lgrp_init(LGRP_VIEW_OS);
+
+        if (cookie == LGRP_COOKIE_NONE) {
+            warning() << "lgrp_init failed: " << errnoWithDescription();
+            return false;
+        }
+
+        ON_BLOCK_EXIT(lgrp_fini, cookie);
+
+        int groups = lgrp_nlgrps(cookie);
+
+        if (groups == -1) {
+            warning() << "lgrp_nlgrps failed: " << errnoWithDescription();
+            return false;
+        }
+
+        // NUMA machines have more then 1 locality group
+        return groups > 1;
     }
 
     bool ProcessInfo::blockCheckSupported() {

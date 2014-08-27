@@ -204,9 +204,9 @@ namespace mongo {
         return Status::OK();
     }
 
-    bool WiredTigerIndex::isEmpty() {
+    bool WiredTigerIndex::isEmpty(OperationContext* txn) {
         // XXX no context?
-        WiredTigerSession swrap(_db);
+        WiredTigerSession &swrap = WiredTigerRecoveryUnit::Get(txn).GetSession();
         WiredTigerCursor curwrap(GetCursor(swrap), swrap);
         WT_CURSOR *c = curwrap.Get();
         if (!c)

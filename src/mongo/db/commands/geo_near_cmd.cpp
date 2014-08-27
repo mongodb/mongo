@@ -35,8 +35,8 @@
 #include "mongo/db/commands.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/geo/geoconstants.h"
-#include "mongo/db/geo/geo_query.h"
-#include "mongo/db/geo/s2common.h"
+#include "mongo/db/matcher/expression_geo.h"
+#include "mongo/db/geo/geoparser.h"
 #include "mongo/db/index_names.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/jsobj.h"
@@ -97,7 +97,7 @@ namespace mongo {
             // We seek to populate this.
             string nearFieldName;
             bool using2DIndex = false;
-            if (!getFieldName(collection, indexCatalog, &nearFieldName, &errmsg, &using2DIndex)) {
+            if (!getFieldName(txn, collection, indexCatalog, &nearFieldName, &errmsg, &using2DIndex)) {
                 return false;
             }
 
@@ -261,12 +261,12 @@ namespace mongo {
         }
 
     private:
-        bool getFieldName(Collection* collection, IndexCatalog* indexCatalog, string* fieldOut,
-                          string* errOut, bool *isFrom2D) {
+        bool getFieldName(OperationContext* txn, Collection* collection, IndexCatalog* indexCatalog,
+                          string* fieldOut, string* errOut, bool *isFrom2D) {
             vector<IndexDescriptor*> idxs;
 
             // First, try 2d.
-            collection->getIndexCatalog()->findIndexByType(IndexNames::GEO_2D, idxs);
+            collection->getIndexCatalog()->findIndexByType(txn, IndexNames::GEO_2D, idxs);
             if (idxs.size() > 1) {
                 *errOut = "more than one 2d index, not sure which to run geoNear on";
                 return false;
@@ -287,7 +287,7 @@ namespace mongo {
 
             // Next, 2dsphere.
             idxs.clear();
-            collection->getIndexCatalog()->findIndexByType(IndexNames::GEO_2DSPHERE, idxs);
+            collection->getIndexCatalog()->findIndexByType(txn, IndexNames::GEO_2DSPHERE, idxs);
             if (0 == idxs.size()) {
                 *errOut = "no geo indices for geoNear";
                 return false;

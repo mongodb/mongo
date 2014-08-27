@@ -43,6 +43,7 @@
 #include "mongo/db/storage/mmap_v1/extent.h"
 #include "mongo/db/storage/mmap_v1/extent_manager.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/util/file.h"
 #include "mongo/util/log.h"
 
 namespace mongo {
@@ -87,21 +88,37 @@ namespace mongo {
 
             string fullNameString = fullName.string();
 
+            {
+                // If the file is uninitialized we exit the loop because it is just prealloced. We
+                // do this on a bare File object rather than using the DataFile because closing a
+                // DataFile triggers dur::closingFileNotification() which is fatal if there are any
+                // pending writes. Therefore we must only open files that we know we want to keep.
+                File preview;
+                preview.open(fullNameString.c_str(), /*readOnly*/ true);
+                invariant(preview.is_open());
+                if (preview.len() < sizeof(DataFileHeader))
+                    break; // can't be initialized if too small.
+
+                // This is the equivalent of DataFileHeader::uninitialized().
+                int version;
+                preview.read(0, reinterpret_cast<char*>(&version), sizeof(version));
+                invariant(!preview.bad());
+                if (version == 0)
+                    break;
+
+            }
+
             auto_ptr<DataFile> df( new DataFile(n) );
 
             Status s = df->openExisting( txn, fullNameString.c_str() );
-
-            // openExisting may upgrade the files, so make sure to commit its changes
-            txn->recoveryUnit()->commitIfNeeded(true);
-
             if ( !s.isOK() ) {
                 return s;
             }
 
-            if ( df->getHeader()->uninitialized() ) {
-                // pre-alloc only, so we're done
-                break;
-            }
+            invariant(!df->getHeader()->uninitialized());
+
+            // We only checkUpgrade on files that we are keeping, not preallocs.
+            df->getHeader()->checkUpgrade(txn);
 
             _files.push_back( df.release() );
         }

@@ -36,6 +36,12 @@ namespace mongo {
         return NULL;
     }
 
+    void GlobalEnvironmentNoop::setGlobalStorageEngine(const std::string& name) {
+    }
+
+    void GlobalEnvironmentNoop::registerStorageEngine(const std::string& name,
+                                                      const StorageEngine::Factory* factory) { }
+
     void GlobalEnvironmentNoop::setKillAllOperations() { }
 
     void GlobalEnvironmentNoop::unsetKillAllOperations() { }
@@ -46,6 +52,9 @@ namespace mongo {
 
     bool GlobalEnvironmentNoop::killOperation(unsigned int opId) {
         return false;
+    }
+
+    void GlobalEnvironmentNoop::registerKillOpListener(KillOpListenerInterface* listener) {
     }
 
     void GlobalEnvironmentNoop::registerOperationContext(OperationContext* txn) {

@@ -942,6 +942,10 @@ namespace mongo {
                                             request->getTargetingNS())));
                 return false;
             }
+            repl::logOp(txn,
+                        "c",
+                        (database->name() + ".$cmd").c_str(),
+                        BSON("create" << nsToCollectionSubstring(request->getTargetingNS())));
             wunit.commit();
         }
         return true;
@@ -1116,7 +1120,7 @@ namespace mongo {
         }
 
         ///////////////////////////////////////////
-        Lock::DBWrite writeLock(txn->lockState(), nsString.ns(), useExperimentalDocLocking);
+        Lock::DBWrite writeLock(txn->lockState(), nsString.ns());
         ///////////////////////////////////////////
 
         if (!checkShardVersion(txn, &shardingState, *updateItem.getRequest(), result))

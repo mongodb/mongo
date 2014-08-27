@@ -52,7 +52,8 @@ namespace mongo {
      * Fill out the provided 'plannerParams' for the 'canonicalQuery' operating on the collection
      * 'collection'.  Exposed for testing.
      */
-    void fillOutPlannerParams(Collection* collection,
+    void fillOutPlannerParams(OperationContext* txn,
+                              Collection* collection,
                               CanonicalQuery* canonicalQuery,
                               QueryPlannerParams* plannerParams);
 

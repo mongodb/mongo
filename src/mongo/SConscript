@@ -134,7 +134,6 @@ env.CppUnitTest('safe_num_test', ['util/safe_num_test.cpp'],
 env.CppUnitTest('string_map_test', ['util/string_map_test.cpp'],
                 LIBDEPS=['bson','foundation'])
 
-
 env.CppUnitTest('bson_field_test', ['bson/bson_field_test.cpp'],
                 LIBDEPS=['bson'])
 
@@ -181,8 +180,7 @@ env.Library('expressions',
 
 env.Library('expressions_geo',
             ['db/matcher/expression_geo.cpp',
-             'db/matcher/expression_parser_geo.cpp',
-             'db/geo/geo_query.cpp'],
+             'db/matcher/expression_parser_geo.cpp'],
             LIBDEPS=['expressions','db/geo/geometry','db/geo/geoparser'] )
 
 env.Library('expressions_text',
@@ -569,7 +567,6 @@ serverOnlyFiles = [ "db/curop.cpp",
                     "util/logfile.cpp",
                     "util/alignedbuilder.cpp",
                     "util/elapsed_tracker.cpp",
-                    "db/storage/storage_engine.cpp",
                     "db/operation_context_impl.cpp",
                     "db/introspect.cpp",
                     "db/clientcursor.cpp",
@@ -637,7 +634,6 @@ serverOnlyFiles = [ "db/curop.cpp",
                     "db/index_rebuilder.cpp",
                     "db/commands/geo_near_cmd.cpp",
                     "db/geo/haystack.cpp",
-                    "db/geo/s2common.cpp",
                     "db/ops/delete.cpp",
                     "db/ops/delete_executor.cpp",
                     "db/ops/insert.cpp",
@@ -649,6 +645,7 @@ serverOnlyFiles = [ "db/curop.cpp",
                     "db/write_concern.cpp",
                     "db/startup_warnings.cpp",
                     "db/storage_options.cpp",
+                    "db/storage/storage_init.cpp",
                     "db/ops/update_lifecycle_impl.cpp",
                     "db/matcher/expression_where.cpp",
 
@@ -1139,6 +1136,19 @@ env.Install( '#/', env.Program( "perftest", [ "dbtests/perf/perftest.cpp" ],
                                      "testframework",
                                      "signal_handlers_synchronous",
                                  ] ) )
+
+env.Install('$BUILD_ROOT/', env.Program('file_allocator_bench',
+            'util/file_allocator_bench.cpp',
+            LIBDEPS=[
+                'mongocommon',
+                'signal_handlers_synchronous',
+                '$BUILD_DIR/mongo/util/options_parser/options_parser_init',
+                'serveronly',
+                'coredb',
+                'coreserver',
+            ]))
+
+env.Alias('file_allocator_bench', "$BUILD_ROOT/" + add_exe("file_allocator_bench"))
 
 # --- sniffer ---
 mongosniff_built = False

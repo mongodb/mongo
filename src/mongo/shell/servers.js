@@ -284,8 +284,9 @@ MongoRunner.arrOptions = function( binaryName , args ){
         var o = isObject( args ) ? args : args[0]
                 
         // If we've specified a particular binary version, use that
-        if( o.binVersion && o.binVersion != "latest" && o.binVersion != "" ) 
-            binaryName += "-" + o.binVersion
+        if (o.binVersion && o.binVersion != "") {
+            binaryName += "-" + o.binVersion;
+        }
         
         // Manage legacy options
         var isValidOptionForBinary = function( option, value ){
@@ -713,6 +714,8 @@ MongoRunner.isStopped = function( port ){
 MongoRunner.runMongoTool = function( binaryName, opts ){
 
     var opts = opts || {}
+    // Normalize and get the binary version to use
+    opts.binVersion = MongoRunner.getBinVersionFor(opts.binVersion);
 
     var argsArray = MongoRunner.arrOptions(binaryName, opts)
 

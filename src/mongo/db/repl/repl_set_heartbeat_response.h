@@ -50,7 +50,8 @@ namespace repl {
          * Actions taken based on heartbeat responses
          */
         enum HeartbeatResultAction {
-            StepDown,
+            StepDownRemotePrimary,
+            StepDownSelf,
             StartElection,
             NoAction
         };

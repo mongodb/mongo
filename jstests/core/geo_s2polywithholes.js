@@ -44,3 +44,20 @@ var polyWithOverlappingHoles = {"type" : "Polygon", "coordinates": [
 };
 
 assert.writeError(t.insert({geo: polyWithOverlappingHoles}));
+
+// Test 4: Only one nesting is allowed by GeoJSON.
+var polyWithDeepHole = {"type" : "Polygon", "coordinates": [
+        [[0,0], [0,1], [1, 1], [1, 0], [0, 0]],
+        [[0.1,0.1], [0.1,0.9], [0.9, 0.9], [0.9, 0.1], [0.1, 0.1]],
+        [[0.2,0.2], [0.2,0.8], [0.8, 0.8], [0.8, 0.2], [0.2, 0.2]]
+    ]
+};
+assert.writeError(t.insert({geo: polyWithDeepHole}));
+
+// Test 5: The first ring must be the exterior ring.
+var polyWithBiggerHole = {"type" : "Polygon", "coordinates": [
+        [[0.1,0.1], [0.1,0.9], [0.9, 0.9], [0.9, 0.1], [0.1, 0.1]],
+        [[0,0], [0,1], [1, 1], [1, 0], [0, 0]]
+    ]
+};
+assert.writeError(t.insert({geo: polyWithBiggerHole}));

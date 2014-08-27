@@ -44,8 +44,9 @@ namespace mongo {
      */
     class MultiIteratorStage : public PlanStage {
     public:
-        MultiIteratorStage(WorkingSet* ws, Collection* collection)
-            : _collection(collection),
+        MultiIteratorStage(OperationContext* txn, WorkingSet* ws, Collection* collection)
+            : _txn(txn),
+              _collection(collection),
               _ws(ws) { }
 
         ~MultiIteratorStage() { }
@@ -85,6 +86,7 @@ namespace mongo {
          */
         DiskLoc _advance();
 
+        OperationContext* _txn;
         Collection* _collection;
         OwnedPointerVector<RecordIterator> _iterators;
 

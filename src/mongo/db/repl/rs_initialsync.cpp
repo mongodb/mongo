@@ -122,7 +122,6 @@ namespace repl {
 
             // Make database stable
             Lock::DBWrite dbWrite(txn->lockState(), db);
-            WriteUnitOfWork wunit(txn);
 
             if (!cloner.go(txn, db, master, options, NULL, err, &errCode)) {
                 sethbmsg(str::stream() << "initial sync: error while "
@@ -131,7 +130,6 @@ namespace repl {
                                        << "sleeping 5 minutes" ,0);
                 return false;
             }
-            wunit.commit();
         }
 
         return true;
@@ -143,7 +141,7 @@ namespace repl {
         Collection* collection = ctx.ctx().db()->getCollection(txn, rsoplog);
 
         // temp
-        if( collection->numRecords() == 0 )
+        if( collection->numRecords(txn) == 0 )
             return; // already empty, ok.
 
         LOG(1) << "replSet empty oplog" << rsLog;

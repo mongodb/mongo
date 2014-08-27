@@ -29,17 +29,20 @@
 #pragma once
 
 #include <boost/scoped_ptr.hpp>
+#include <boost/thread.hpp>
 #include <boost/thread/mutex.hpp>
 #include <boost/thread/condition_variable.hpp>
 #include <vector>
 
 #include "mongo/base/status.h"
 #include "mongo/bson/optime.h"
+#include "mongo/db/global_environment_experiment.h"
 #include "mongo/db/repl/member_state.h"
 #include "mongo/db/repl/repl_coordinator.h"
 #include "mongo/db/repl/repl_coordinator_external_state.h"
 #include "mongo/db/repl/replica_set_config.h"
 #include "mongo/db/repl/replication_executor.h"
+#include "mongo/platform/random.h"
 #include "mongo/platform/unordered_map.h"
 #include "mongo/util/net/hostandport.h"
 
@@ -49,7 +52,8 @@ namespace repl {
     class SyncSourceFeedback;
     class TopologyCoordinator;
 
-    class ReplicationCoordinatorImpl : public ReplicationCoordinator {
+    class ReplicationCoordinatorImpl : public ReplicationCoordinator,
+                                       public KillOpListenerInterface {
         MONGO_DISALLOW_COPYING(ReplicationCoordinatorImpl);
 
     public:
@@ -58,7 +62,8 @@ namespace repl {
         ReplicationCoordinatorImpl(const ReplSettings& settings,
                                    ReplicationCoordinatorExternalState* externalState,
                                    ReplicationExecutor::NetworkInterface* network,
-                                   TopologyCoordinator* topoCoord);
+                                   TopologyCoordinator* topoCoord,
+                                   int64_t prngSeed);
         virtual ~ReplicationCoordinatorImpl();
 
         // ================== Members of public ReplicationCoordinator API ===================
@@ -72,6 +77,18 @@ namespace repl {
         virtual Mode getReplicationMode() const;
 
         virtual MemberState getCurrentMemberState() const;
+
+        /*
+         * Implementation of the KillOpListenerInterface interrupt method so that we can wake up
+         * threads blocked in awaitReplication() when a killOp command comes in.
+         */
+        virtual void interrupt(unsigned opId);
+
+        /*
+         * Implementation of the KillOpListenerInterface interruptAll method so that we can wake up
+         * threads blocked in awaitReplication() when we kill all operations.
+         */
+        virtual void interruptAll();
 
         virtual ReplicationCoordinator::StatusAndDuration awaitReplication(
                 const OperationContext* txn,
@@ -128,7 +145,7 @@ namespace repl {
                                                  bool activate,
                                                  BSONObjBuilder* resultObj);
 
-        virtual Status processReplSetSyncFrom(const std::string& target,
+        virtual Status processReplSetSyncFrom(const HostAndPort& target,
                                               BSONObjBuilder* resultObj);
 
         virtual Status processReplSetFreeze(int secs, BSONObjBuilder* resultObj);
@@ -201,9 +218,37 @@ namespace repl {
          * If called after startReplication(), blocks until all asynchronous
          * activities associated with replication start-up complete.
          */
-        void waitForStartUp();
+        void waitForStartUpComplete();
 
     private:
+
+        /**
+         * Configuration states for a replica set node.
+         *
+         * Transition diagram:
+         *
+         * ReplicationDisabled   +----------> HBReconfig
+         *    ^                  |                     \
+         *    |                  v                      |
+         * StartingUp -> Uninitialized <-> Initiating   |
+         *          \                    /              |
+         *           \        __________/               /
+         *            v      v                         /
+         *             Steady <-----------------------
+         *               ^
+         *               |
+         *               v
+         *             Reconfig
+         */
+        enum ConfigState {
+            kConfigStartingUp,
+            kConfigReplicationDisabled,
+            kConfigUninitialized,
+            kConfigSteady,
+            kConfigInitiating,
+            kConfigReconfiguring,
+            kConfigHBReconfiguring
+        };
 
         // Struct that holds information about clients waiting for replication.
         struct WaiterInfo;
@@ -225,9 +270,19 @@ namespace repl {
         // Called by the TopologyCoordinator whenever this node's replica set state transitions.
         void _onSelfStateChange(const MemberState& newState);
 
-        // Helper to update our saved config, cancel any pending heartbeats, and kick off sending
-        // new heartbeats based on the new config.
-        void _setCurrentRSConfig_inlock(const ReplicaSetConfig& newConfig, int myIndex);
+        /**
+         * Helpers to update our saved config, cancel any pending heartbeats, and kick off sending
+         * new heartbeats based on the new config.  Must *only* be called from within the
+         * ReplicationExecutor context.
+         */
+        void _setCurrentRSConfig(
+                const ReplicationExecutor::CallbackData& cbData,
+                const ReplicaSetConfig& newConfig,
+                int myIndex);
+        void _setCurrentRSConfig_inlock(
+                const ReplicationExecutor::CallbackData& cbData,
+                const ReplicaSetConfig& newConfig,
+                int myIndex);
 
         /*
          * Returns the OpTime of the last applied operation on this node.
@@ -236,10 +291,25 @@ namespace repl {
         OpTime _getLastOpApplied_inlock();
 
         /*
-         * Returns true if the given writeConcern is satisfied up to "optime".
+         * Returns true if the given writeConcern is satisfied up to "optime" or is unsatisfiable.
          */
-        bool _opReplicatedEnough_inlock(const OpTime& opTime,
-                                        const WriteConcernOptions& writeConcern);
+        bool _doneWaitingForReplication_inlock(const OpTime& opTime,
+                                               const WriteConcernOptions& writeConcern);
+
+        /**
+         * Helper for _doneWaitingForReplication_inlock that takes an integer write concern.
+         */
+        bool _doneWaitingForReplication_numNodes_inlock(const OpTime& opTime, int numNodes);
+
+        /**
+         * Helper for _doneWaitingForReplication_inlock that takes a tag pattern representing a
+         * named write concern mode.
+         */
+        bool _doneWaitingForReplication_gleMode_inlock(const OpTime& opTime,
+                                                       const ReplicaSetTagPattern& tagPattern);
+
+        Status _checkIfWriteConcernCanBeSatisfied_inlock(
+                const WriteConcernOptions& writeConcern) const;
 
         /**
          * Processes each heartbeat response.
@@ -293,9 +363,19 @@ namespace repl {
         void _finishLoadLocalConfig_helper(const ReplicationExecutor::CallbackData& cbData,
                                            const ReplicaSetConfig& localConfig);
 
-        // Handle for the callback that marks the end of startReplication()'s asynchronous
-        // work.  Used for testing, set in startReplication() and never changed.
-        ReplicationExecutor::CallbackHandle _startUpFinishedHandle;
+        /**
+         * Callback that finishes the work of processReplSetInitiate() inside the replication
+         * executor context, in the event of a successful quorum check.
+         */
+        void _finishReplSetInitiate(
+                const ReplicationExecutor::CallbackData& cbData,
+                const ReplicaSetConfig& newConfig,
+                int myIndex);
+
+        /**
+         * Changes _rsConfigState to newState, and notify any waiters.
+         */
+        void _setConfigState_inlock(ConfigState newState);
 
         // Handles to actively queued heartbeats.
         // Only accessed serially in ReplicationExecutor callbacks, which makes it safe to access
@@ -346,13 +426,6 @@ namespace repl {
         // Set to true when we are in the process of shutting down replication.
         bool _inShutdown;
 
-        // Indicates whether the replication startup work has completed.  The coordinator will not
-        // process heartbeats or reconfig commands while this is false.
-        bool _isStartupComplete;
-
-        // Used to signal threads waiting for _isStartupComplete to become true.
-        boost::condition_variable _startupCompleteCondition;
-
         // Election ID of the last election that resulted in this node becoming primary.
         OID _electionID;
 
@@ -363,12 +436,24 @@ namespace repl {
         // Current ReplicaSet state.
         MemberState _currentState;
 
+        // Used to signal threads waiting for changes to _rsConfigState.
+        boost::condition_variable _rsConfigStateChange;
+
+        // Represents the configuration state of the coordinator, which controls how and when
+        // _rsConfig may change.  See the state transition diagram in the type definition of
+        // ConfigState for details.
+        ConfigState _rsConfigState;
+
         // The current ReplicaSet configuration object, including the information about tag groups
         // that is used to satisfy write concern requests with named gle modes.
         ReplicaSetConfig _rsConfig;
 
         // This member's index position in the current config.
         int _thisMembersConfigIndex;
+
+        // PRNG; seeded at class construction time.
+        PseudoRandom _random;
+
     };
 
 } // namespace repl

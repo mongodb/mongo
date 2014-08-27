@@ -141,6 +141,4 @@ namespace mongo {
 
     void maybeCreatePidFile();
 
-    void exitCleanly( ExitCode code );
-
 } // namespace mongo

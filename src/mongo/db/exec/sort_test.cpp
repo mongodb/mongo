@@ -47,7 +47,7 @@ namespace {
         // MockStage will be owned by SortStage.
         MockStage* ms = new MockStage(&ws);
         SortStageParams params;
-        SortStage sort(params, &ws, ms);
+        SortStage sort(NULL, params, &ws, ms);
 
         // Check initial EOF state.
         ASSERT_TRUE(ms->isEOF());
@@ -109,7 +109,7 @@ namespace {
         params.query = fromjson(queryStr);
         params.limit = limit;
 
-        SortStage sort(params, &ws, ms);
+        SortStage sort(NULL, params, &ws, ms);
 
         WorkingSetID id = WorkingSet::INVALID_ID;
         PlanStage::StageState state = PlanStage::NEED_TIME;

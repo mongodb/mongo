@@ -147,6 +147,11 @@ namespace repl {
         ~ReplicationExecutor();
 
         /**
+         * Gets the current time as reported by the network interface.
+         */
+        Date_t now();
+
+        /**
          * Executes the run loop.  May be called up to one time.
          *
          * Returns after the executor has been shutdown and is safe to delete.
@@ -266,6 +271,14 @@ namespace repl {
          * NOTE: Do not call from a callback running in the executor.
          */
         void wait(const CallbackHandle& cbHandle);
+
+        /**
+         * Wakes up ReplicationExecutor::run() if it is blocked in getWork().
+         *
+         * Only useful for testing.  Do not call except from mock implementations
+         * of NetworkInterface.
+         */
+        void signalWorkForTest();
 
     private:
         struct Event;
@@ -438,22 +451,13 @@ namespace repl {
                              const BSONObj& theCmdObj,
                              const Milliseconds timeoutMillis = kNoTimeout);
 
+        std::string toString() const;
+
         HostAndPort target;
         std::string dbname;
         BSONObj cmdObj;
-        Date_t expirationDate;
-    };
-
-    struct ReplicationExecutor::RemoteCommandCallbackData {
-        RemoteCommandCallbackData(ReplicationExecutor* theExecutor,
-                                  const CallbackHandle& theHandle,
-                                  const RemoteCommandRequest& theRequest,
-                                  const StatusWith<BSONObj>& theResponse);
-
-        ReplicationExecutor* executor;
-        CallbackHandle myHandle;
-        RemoteCommandRequest request;
-        StatusWith<BSONObj> response;
+        Milliseconds timeout;
+        Date_t expirationDate;  // Set by scheduleRemoteCommand.
     };
 
     /**
@@ -462,7 +466,22 @@ namespace repl {
     class ReplicationExecutor::NetworkInterface {
         MONGO_DISALLOW_COPYING(NetworkInterface);
     public:
+        struct Response {
+            Response() : data(), elapsedMillis(Milliseconds(0)) {}
+            Response(BSONObj obj, Milliseconds millis)
+                        : data(obj),
+                          elapsedMillis(millis) {}
+            BSONObj data;
+            Milliseconds elapsedMillis;
+        };
+
         virtual ~NetworkInterface();
+
+        /**
+         * Called by the ReplicationExecutor when it takes ownership of a
+         * NetworkInterface; useful for testing.
+         */
+        virtual void setExecutor(ReplicationExecutor* executor);
 
         /**
          * Returns the current time.
@@ -472,7 +491,7 @@ namespace repl {
         /**
          * Runs the command described by "request" synchronously.
          */
-        virtual StatusWith<BSONObj> runCommand(
+        virtual StatusWith<Response> runCommand(
                 const RemoteCommandRequest& request) = 0;
 
         /**
@@ -483,6 +502,21 @@ namespace repl {
 
     protected:
         NetworkInterface();
+    };
+
+    typedef StatusWith<ReplicationExecutor::NetworkInterface::Response> ResponseStatus;
+
+    // Must be after NetworkInterface class
+    struct ReplicationExecutor::RemoteCommandCallbackData {
+        RemoteCommandCallbackData(ReplicationExecutor* theExecutor,
+                                  const CallbackHandle& theHandle,
+                                  const RemoteCommandRequest& theRequest,
+                                  const ResponseStatus& theResponse);
+
+        ReplicationExecutor* executor;
+        CallbackHandle myHandle;
+        RemoteCommandRequest request;
+        ResponseStatus response;
     };
 
     /**

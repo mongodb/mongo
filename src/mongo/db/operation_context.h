@@ -114,6 +114,13 @@ namespace mongo {
         virtual CurOp* getCurOp() const = 0;
 
         /**
+         * Returns the operation ID associated with this operation.
+         * WARNING: Due to SERVER-14995, this OpID is not guaranteed to stay the same for the
+         * lifetime of this OperationContext.
+         */
+        virtual unsigned int getOpID() const = 0;
+
+        /**
          * @return true if this instance is primary for this namespace
          */
         virtual bool isPrimaryFor( const StringData& ns ) = 0;

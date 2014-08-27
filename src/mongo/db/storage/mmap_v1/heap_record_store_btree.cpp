@@ -36,7 +36,7 @@
 
 namespace mongo {
 
-    RecordData HeapRecordStoreBtree::dataFor(const DiskLoc& loc) const {
+    RecordData HeapRecordStoreBtree::dataFor(OperationContext* txn, const DiskLoc& loc) const {
         Records::const_iterator it = _records.find(loc);
         invariant(it != _records.end());
         const Record& rec = it->second;

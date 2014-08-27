@@ -268,7 +268,8 @@ namespace mongo {
 
                 _ws->clear();
 
-                auto_ptr<MultiPlanStage> multiPlanStage(new MultiPlanStage(_collection,
+                auto_ptr<MultiPlanStage> multiPlanStage(new MultiPlanStage(_txn,
+                                                                           _collection,
                                                                            orChildCQ.get()));
 
                 // Dump all the solutions into the MPR.
@@ -354,7 +355,7 @@ namespace mongo {
         // with stats obtained in the same fashion as a competitive ranking would have obtained
         // them.
         _ws->clear();
-        auto_ptr<MultiPlanStage> multiPlanStage(new MultiPlanStage(_collection, _query));
+        auto_ptr<MultiPlanStage> multiPlanStage(new MultiPlanStage(_txn, _collection, _query));
         PlanStage* root;
         verify(StageBuilder::build(_txn, _collection, *soln, _ws, &root));
         multiPlanStage->addPlan(soln, root, _ws); // Takes ownership first two arguments.

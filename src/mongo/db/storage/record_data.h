@@ -54,7 +54,7 @@ namespace mongo {
         /**
          * Returns true if this owns its own memory, and false otherwise
          */
-        bool isOwned() const { return _dataPtr; }
+        bool isOwned() const { return _dataPtr.get(); }
 
         // TODO eliminate double-copying
         BSONObj toBson() const { return isOwned() ? BSONObj(_data).getOwned() : BSONObj(_data); }
@@ -62,7 +62,7 @@ namespace mongo {
     private:
         const char* _data;
         int _size;
-        const boost::shared_array<char> _dataPtr;
+        boost::shared_array<char> _dataPtr;
     };
 
 } // namespace mongo

@@ -93,6 +93,10 @@ namespace mongo {
             return string();
         };
 
+        virtual unsigned int getOpID() const {
+            return 0;
+        }
+
         virtual Transaction* getTransaction() {
             return NULL;
         }

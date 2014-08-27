@@ -80,8 +80,8 @@ namespace {
             RecordStore* rs = db.getRecordStore( &op, "foo.bar" );
             StatusWith<DiskLoc> loc = rs->insertRecord( &op, "abc", 4, -1 );
             ASSERT_OK( loc.getStatus() );
-            ASSERT_EQUALS( 1, rs->numRecords() );
-            ASSERT_EQUALS( std::string( "abc" ), rs->dataFor( loc.getValue() ).data() );
+            ASSERT_EQUALS( 1, rs->numRecords( &op ) );
+            ASSERT_EQUALS( std::string( "abc" ), rs->dataFor( &op, loc.getValue() ).data() );
         }
 
     }

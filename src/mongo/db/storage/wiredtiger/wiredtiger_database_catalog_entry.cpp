@@ -264,7 +264,7 @@ namespace mongo {
             return Status( ErrorCodes::OperationFailed, "Collection drop failed" );
 
         std::vector<std::string> names;
-        entry->getAllIndexes( &names );
+        entry->getAllIndexes( txn, &names );
         std::vector<std::string>::const_iterator idx;
         for (idx = names.begin(); idx != names.end(); ++idx) {
             Status s = entry->removeIndex(txn, StringData(*idx));
@@ -344,7 +344,7 @@ namespace mongo {
 
         // Rename all indexes in the entry
         std::vector<std::string> names;
-        entry->getAllIndexes( &names );
+        entry->getAllIndexes( txn, &names );
         std::vector<std::string>::const_iterator idx;
         for (idx = names.begin(); idx != names.end(); ++idx) {
             //std::string fromName = *idx;
@@ -384,11 +384,11 @@ namespace mongo {
         indexes.clear();
     }
 
-    int WiredTigerDatabaseCatalogEntry::Entry::getTotalIndexCount() const {
+    int WiredTigerDatabaseCatalogEntry::Entry::getTotalIndexCount( OperationContext* txn ) const {
         return static_cast<int>( indexes.size() );
     }
 
-    int WiredTigerDatabaseCatalogEntry::Entry::getCompletedIndexCount() const {
+    int WiredTigerDatabaseCatalogEntry::Entry::getCompletedIndexCount( OperationContext* txn ) const {
         int ready = 0;
         for ( Indexes::const_iterator i = indexes.begin(); i != indexes.end(); ++i )
             if ( i->second->ready )
@@ -396,21 +396,18 @@ namespace mongo {
         return ready;
     }
 
-    void WiredTigerDatabaseCatalogEntry::Entry::getAllIndexes(
-            std::vector<std::string>* names ) const {
+    void WiredTigerDatabaseCatalogEntry::Entry::getAllIndexes( OperationContext* txn, std::vector<std::string>* names ) const {
         for ( Indexes::const_iterator i = indexes.begin(); i != indexes.end(); ++i )
             names->push_back( i->second->name );
     }
 
-    BSONObj WiredTigerDatabaseCatalogEntry::Entry::getIndexSpec(
-            const StringData& idxName ) const {
+    BSONObj WiredTigerDatabaseCatalogEntry::Entry::getIndexSpec( OperationContext *txn, const StringData& idxName ) const {
         Indexes::const_iterator i = indexes.find( idxName.toString() );
         invariant( i != indexes.end() );
         return i->second->spec; 
     }
 
-    bool WiredTigerDatabaseCatalogEntry::Entry::isIndexMultikey(
-            const StringData& idxName) const {
+    bool WiredTigerDatabaseCatalogEntry::Entry::isIndexMultikey( OperationContext* txn, const StringData& idxName) const {
         Indexes::const_iterator i = indexes.find( idxName.toString() );
         invariant( i != indexes.end() );
         return i->second->isMultikey;
@@ -428,7 +425,7 @@ namespace mongo {
         return true;
     }
 
-    DiskLoc WiredTigerDatabaseCatalogEntry::Entry::getIndexHead( const StringData& idxName ) const {
+    DiskLoc WiredTigerDatabaseCatalogEntry::Entry::getIndexHead( OperationContext* txn, const StringData& idxName ) const {
         Indexes::const_iterator i = indexes.find( idxName.toString() );
         invariant( i != indexes.end() );
         return i->second->head;
@@ -442,7 +439,7 @@ namespace mongo {
         i->second->head = newHead;
     }
 
-    bool WiredTigerDatabaseCatalogEntry::Entry::isIndexReady( const StringData& idxName ) const {
+    bool WiredTigerDatabaseCatalogEntry::Entry::isIndexReady( OperationContext* txn, const StringData& idxName ) const {
         Indexes::const_iterator i = indexes.find( idxName.toString() );
         invariant( i != indexes.end() );
         return i->second->ready;

@@ -33,8 +33,9 @@
 namespace mongo {
 
     // static
-    bool WorkingSetCommon::fetchAndInvalidateLoc(
-                WorkingSetMember* member, const Collection* collection) {
+    bool WorkingSetCommon::fetchAndInvalidateLoc(OperationContext* txn,
+                                                 WorkingSetMember* member,
+                                                 const Collection* collection) {
         // Already in our desired state.
         if (member->state == WorkingSetMember::OWNED_OBJ) { return true; }
 
@@ -42,7 +43,7 @@ namespace mongo {
         if (!member->hasLoc()) { return false; }
 
         // Do the fetch, invalidate the DL.
-        member->obj = collection->docFor(member->loc).getOwned();
+        member->obj = collection->docFor(txn, member->loc).getOwned();
 
         member->state = WorkingSetMember::OWNED_OBJ;
         member->loc = DiskLoc();
