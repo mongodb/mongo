@@ -238,7 +238,7 @@ namespace mongo {
         StatusWith<DiskLoc> systemIndexesEntry = _indexRecordStore->insertRecord( txn,
                                                                                   spec.objdata(),
                                                                                   spec.objsize(),
-                                                                                  -1 );
+                                                                                  false );
         if ( !systemIndexesEntry.isOK() )
             return systemIndexesEntry.getStatus();
 
