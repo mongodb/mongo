@@ -68,7 +68,7 @@ namespace mongo {
         }
 
         WiredTigerSession &swrap = *new WiredTigerSession(_db);
-        Iterator *iter = new Iterator(*this, swrap, CollectionScanParams::Direction::BACKWARD);
+        Iterator *iter = new Iterator(*this, swrap, DiskLoc(), false, CollectionScanParams::Direction::BACKWARD);
         if (!iter->isEOF()) {
             DiskLoc loc = iter->curr();
             _nextIdNum.store(((uint64_t)loc.a() << 32 | loc.getOfs()) + 1);
@@ -311,7 +311,7 @@ namespace mongo {
         // this is done because WiredTiger resets cursors on commit, which causes problems
         // e.g., when building indexes
         WiredTigerSession &swrap = *new WiredTigerSession(_db);
-        return new Iterator(*this, swrap, dir);
+        return new Iterator(*this, swrap, start, tailable, dir);
     }
 
 
@@ -437,14 +437,41 @@ namespace mongo {
 
     // --------
 
-    WiredTigerRecordStore::Iterator::Iterator(const WiredTigerRecordStore& rs,
-            WiredTigerSession &session, const CollectionScanParams::Direction& dir )
+    WiredTigerRecordStore::Iterator::Iterator(
+            const WiredTigerRecordStore& rs,
+            WiredTigerSession& session,
+            const DiskLoc& start,
+            bool tailable,
+            const CollectionScanParams::Direction& dir )
         : _rs( rs ),
           _session( session ),
+          _tailable( tailable ),
           _dir( dir ),
-          _cursor(rs.GetCursor(session), session, true), // XXX cursor owns the session
-          _eof( true ) {
-        (void)getNext();
+          _cursor(rs.GetCursor(session), session, true) { // XXX cursor owns the session
+            _locate(start, true);
+    }
+
+    void WiredTigerRecordStore::Iterator::_locate(const DiskLoc &loc, bool exact) {
+        WT_CURSOR *c = _cursor.Get();
+        int ret;
+        if (loc.isNull()) {
+            ret = _forward() ? c->next(c) : c->prev(c);
+            invariant(ret == 0 || ret == WT_NOTFOUND);
+            _eof = (ret == WT_NOTFOUND);
+            return;
+        }
+        c->set_key(c, _makeKey(loc));
+        if (exact) {
+            ret = c->search(c);
+        }
+        else {
+            int cmp;
+            ret = c->search_near(c, &cmp);
+            if (ret == 0 && cmp < 0)
+                ret = c->next(c);
+        }
+        invariant(ret == 0 || ret == WT_NOTFOUND);
+        _eof = (ret == WT_NOTFOUND);
     }
 
     bool WiredTigerRecordStore::Iterator::isEOF() {
@@ -463,62 +490,34 @@ namespace mongo {
     }
 
     DiskLoc WiredTigerRecordStore::Iterator::getNext() {
+        /* Take care not to restart a scan if we have hit the end */
+        if (isEOF()) {
+            return DiskLoc();
+        }
+
         DiskLoc toReturn = curr();
+        /* MongoDB expects "natural" ordering - which is the order that items are inserted. */
         WT_CURSOR *c = _cursor.Get();
-        /*
-         * MongoDB expects "natural" ordering - which is the order that items are inserted.
-         * So a forward iteration in WiredTiger starts at the end of a collection.
-         */
         int ret = _forward() ? c->next(c) : c->prev(c);
         invariant(ret == 0 || ret == WT_NOTFOUND);
         _eof = (ret == WT_NOTFOUND);
+        if (_tailable && _eof)
+            _lastLoc = toReturn;
         return toReturn;
     }
 
     void WiredTigerRecordStore::Iterator::invalidate( const DiskLoc& dl ) {
-        WT_CURSOR *c = _cursor.Get();
-        int ret = c->reset(c);
-        invariant(ret == 0);
-        _eof = _savedAtEnd = true;
-    }
-
-    void WiredTigerRecordStore::Iterator::saveState() {
-        if ((_savedAtEnd = isEOF()) == false)
-            _savedLoc = curr();
-    }
-
-    bool WiredTigerRecordStore::Iterator::restoreState() {
-        // TODO set iterator to same place as before, but with new snapshot
-        if (_savedAtEnd)
-            _eof = true;
-        else {
-            WT_CURSOR *c = _cursor.Get();
-            c->set_key(c, _makeKey(_savedLoc));
-            int cmp, ret = c->search_near(c, &cmp);
-            if (ret == 0 && cmp < 0)
-                ret = c->next(c);
-            invariant(ret == 0 || ret == WT_NOTFOUND);
-            _eof = (ret == WT_NOTFOUND);
+        // XXX capped iterators should die
+        if ( _savedLoc == dl ) {
+            (void)getNext();
         }
-        return _eof;
     }
+
+    void WiredTigerRecordStore::Iterator::saveState() { _savedLoc = curr(); }
+
+    bool WiredTigerRecordStore::Iterator::restoreState() { return true; }
 
     RecordData WiredTigerRecordStore::Iterator::dataFor( const DiskLoc& loc ) const {
-        WT_CURSOR *c = _cursor.Get();
-        uint64_t key;
-        int ret = c->get_key(c, &key);
-        invariant(ret == 0);
-        DiskLoc curr = _fromKey(key);
-        if (curr == loc) {
-            WT_ITEM value;
-            int ret = c->get_value(c, &value);
-            invariant(ret == 0);
-
-            boost::shared_array<char> data( new char[value.size] );
-            memcpy( data.get(), value.data, value.size );
-            return RecordData(reinterpret_cast<const char *>(data.get()), value.size, data );
-        }
-
         return _rs.dataFor( loc );
     }
 

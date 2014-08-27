@@ -179,17 +179,16 @@ namespace mongo {
         WiredTigerCursor curwrap(GetCursor(swrap), swrap);
         WT_CURSOR *c = curwrap.Get();
         const BSONObj& finalKey = stripFieldNames( key );
+        // TODO: can we avoid a search?
         c->set_key(c, _toItem(finalKey).Get(), WiredTigerRecordStore::_makeKey(loc));
         int ret = c->search(c);
-        if (ret == WT_NOTFOUND)
+        if (ret == WT_NOTFOUND) {
             return false;
+        }
         invariant(ret == 0);
-        c->set_key(c, _toItem(finalKey).Get(), WiredTigerRecordStore::_makeKey(loc));
         ret = c->remove(c);
         invariant(ret == 0);
-        // TODO: can we avoid a search?
-        const size_t numDeleted = 1;
-        return numDeleted == 1;
+        return true;
     }
 
     void WiredTigerIndex::fullValidate(OperationContext* txn, long long *numKeysOut) {
@@ -367,10 +366,12 @@ namespace mongo {
     }
 
     void WiredTigerIndex::IndexCursor::restorePosition() {
-        if (_savedAtEnd)
+        if (_savedAtEnd) {
             _eof = true;
+            return;
+        }
         else
-            (void)_locate(_savedKey, _savedLoc);
+            (void)locate(_savedKey, _savedLoc);
     }
 
     SortedDataInterface::Cursor* WiredTigerIndex::newCursor(

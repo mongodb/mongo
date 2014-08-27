@@ -154,6 +154,8 @@ namespace mongo {
         public:
             Iterator( const WiredTigerRecordStore& rs,
                       WiredTigerSession &session,
+                      const DiskLoc& start,
+                      bool tailable,
                       const CollectionScanParams::Direction& dir );
 
             virtual bool isEOF();
@@ -166,15 +168,18 @@ namespace mongo {
 
         private:
             bool _forward() const;
+            void _locate( const DiskLoc &loc, bool exact );
             void _checkStatus();
 
             const WiredTigerRecordStore& _rs;
             WiredTigerSession &_session;
+            bool _tailable;
             CollectionScanParams::Direction _dir;
             WiredTigerCursor _cursor;
             bool _eof;
 
             // Position for save/restore
+            DiskLoc _lastLoc;
             DiskLoc _savedLoc;
             bool _savedAtEnd;
         };
