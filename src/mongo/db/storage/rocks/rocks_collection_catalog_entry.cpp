@@ -106,25 +106,27 @@ namespace mongo {
         _putMetaData_inlock( md );
     }
 
-
     Status RocksCollectionCatalogEntry::removeIndex( OperationContext* txn,
                                                      const StringData& indexName ) {
         boost::mutex::scoped_lock lk( _metaDataMutex );
 
-        MetaData md = _getMetaData_inlock();
-
-        // remove info from meta data
-        invariant( md.eraseIndex( indexName ) );
-        _putMetaData_inlock( md );
+        _removeIndexFromMetaData_inlock( indexName );
 
         // drop the actual index in rocksdb
-        rocksdb::ColumnFamilyHandle* cfh = _engine->getIndexColumnFamily( ns().ns(), indexName );
+        rocksdb::ColumnFamilyHandle* cfh = _engine->getIndexColumnFamilyNoCreate( ns().ns(),
+                                                                                  indexName );
 
         // Note: this invalidates cfh. Do not use after this call
         _engine->removeColumnFamily( &cfh, indexName, ns().ns() );
         invariant( cfh == nullptr );
 
         return Status::OK();
+    }
+
+    void RocksCollectionCatalogEntry::removeIndexWithoutDroppingCF( OperationContext* txn,
+                                                                    const StringData& indexName ) {
+        boost::mutex::scoped_lock lk( _metaDataMutex );
+        _removeIndexFromMetaData_inlock( indexName );
     }
 
     Status RocksCollectionCatalogEntry::prepareForIndexBuild( OperationContext* txn,
@@ -200,6 +202,15 @@ namespace mongo {
         MetaData md;
         md.parse( BSONObj( result.c_str() ) );
         return md;
+    }
+
+    void RocksCollectionCatalogEntry::_removeIndexFromMetaData_inlock(
+              const StringData& indexName ) {
+        MetaData md = _getMetaData_inlock();
+
+        // remove info from meta data
+        invariant( md.eraseIndex( indexName ) );
+        _putMetaData_inlock( md );
     }
 
     void RocksCollectionCatalogEntry::_putMetaData_inlock( const MetaData& in ) {

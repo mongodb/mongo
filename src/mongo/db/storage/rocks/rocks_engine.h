@@ -117,10 +117,16 @@ namespace mongo {
          * column family does not exist, then ordering must be a non-empty optional, containing
          * the Ordering for the index.
          */
-        rocksdb::ColumnFamilyHandle* getIndexColumnFamily(
-                              const StringData& ns,
-                              const StringData& indexName,
-                              const boost::optional<Ordering> order = boost::none );
+        rocksdb::ColumnFamilyHandle* getIndexColumnFamily( const StringData& ns,
+                                                           const StringData& indexName,
+                                                           const Ordering& order );
+
+        /**
+         * Will return NULL if doesn't exist.
+         */
+        rocksdb::ColumnFamilyHandle* getIndexColumnFamilyNoCreate(const StringData& ns,
+                                                                   const StringData& indexName );
+
         /**
          * Completely removes a column family. Input pointer is invalid after calling
          */
@@ -150,6 +156,18 @@ namespace mongo {
         static rocksdb::Options dbOptions();
 
     private:
+        rocksdb::ColumnFamilyHandle* _getIndexColumnFamilyNoCreate_inlock(
+                                                                     const StringData& ns,
+                                                                     const StringData& indexName);
+
+        rocksdb::ColumnFamilyHandle* _createIndexColumnFamily_inlock( const StringData& ns,
+                                                                      const StringData& indexName,
+                                                                      const Ordering& order );
+
+        void _removeColumnFamily_inlock( rocksdb::ColumnFamilyHandle** cfh,
+                                         const StringData& indexName,
+                                         const StringData& ns );
+
         Status _dropCollection_inlock( OperationContext* opCtx, const StringData& ns );
 
         rocksdb::ColumnFamilyOptions _collectionOptions() const;

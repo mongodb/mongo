@@ -62,6 +62,9 @@ namespace mongo {
         virtual Status removeIndex( OperationContext* txn,
                                     const StringData& indexName );
 
+        void removeIndexWithoutDroppingCF( OperationContext* txn,
+                                           const StringData& indexName );
+
         virtual Status prepareForIndexBuild( OperationContext* txn,
                                              const IndexDescriptor* spec );
 
@@ -98,6 +101,8 @@ namespace mongo {
         MetaData _getMetaData_inlock() const;
         MetaData _getMetaData_inlock( rocksdb::DB* db ) const;
 
+        void _removeIndexFromMetaData_inlock( const StringData& indexName );
+
         void _putMetaData_inlock( const MetaData& in );
 
         RocksEngine* _engine; // not owned
@@ -107,6 +112,7 @@ namespace mongo {
 
         // lock which must be acquired before calling _getMetaData_inlock(). Protects the metadata
         // stored in the metadata column family.
+        // Locking order RocksEngine::_entryMapMutex before _metaDataMutex
         mutable boost::mutex _metaDataMutex;
     };
 
