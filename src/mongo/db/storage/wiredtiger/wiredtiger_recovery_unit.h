@@ -44,12 +44,12 @@ namespace mongo {
                 _begun(false) {}
 
         virtual ~WiredTigerRecoveryUnit() {
-            if (_defaultCommit) {
-                commitUnitOfWork();
-            } else if (_depth > 0) {
-                WT_SESSION *s = _session.Get();
-                int ret = s->rollback_transaction(s, NULL);
-                invariant(ret == 0);
+            if (_depth > 0) {
+                _depth = 1;
+                if ( _defaultCommit )
+                    commitUnitOfWork();
+                else
+                    endUnitOfWork();
             }
         }
 
@@ -75,7 +75,12 @@ namespace mongo {
             invariant(_depth > 0);
             if (--_depth > 0)
                 return;
-            commitUnitOfWork();
+            if (_begun) {
+                WT_SESSION *s = _session.Get();
+                int ret = s->rollback_transaction(s, NULL);
+                invariant(ret == 0);
+                _begun = false;
+            }
         }
 
         virtual bool commitIfNeeded(bool force = false) {
