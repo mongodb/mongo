@@ -147,7 +147,7 @@ __log_archive_server(void *arg)
 		 */
 		log->first_lsn = lsn;
 		log->first_lsn.offset = 0;
-		__wt_rwunlock(session, log->log_archive_lock);
+		WT_ERR(__wt_rwunlock(session, log->log_archive_lock));
 
 		/* Wait until the next event. */
 		WT_ERR_TIMEDOUT_OK(
@@ -276,7 +276,7 @@ __wt_logmgr_destroy(WT_CONNECTION_IMPL *conn)
 
 	WT_TRET(__wt_log_slot_destroy(session));
 	WT_TRET(__wt_cond_destroy(session, &conn->log->log_sync_cond));
-	__wt_rwlock_destroy(session, &conn->log->log_archive_lock);
+	WT_TRET(__wt_rwlock_destroy(session, &conn->log->log_archive_lock));
 	__wt_spin_destroy(session, &conn->log->log_lock);
 	__wt_spin_destroy(session, &conn->log->log_slot_lock);
 	__wt_spin_destroy(session, &conn->log->log_sync_lock);
