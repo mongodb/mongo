@@ -104,7 +104,7 @@ __wt_spin_unlock(WT_SESSION_IMPL *session, WT_SPINLOCK *t)
 static inline int
 __wt_spin_init(WT_SESSION_IMPL *session, WT_SPINLOCK *t, const char *name)
 {
-#ifdef SPINLOCK_PTHREAD_MUTEX_ADAPTIVE
+#if SPINLOCK_TYPE == SPINLOCK_PTHREAD_MUTEX_ADAPTIVE
 	pthread_mutexattr_t attr;
 
 	WT_RET(pthread_mutexattr_init(&attr));
