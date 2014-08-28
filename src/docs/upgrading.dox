@@ -14,8 +14,9 @@ This change means that a cursor can be used to iterate through a table and
 perform transactional updates based on the visited records without the cursor
 losing its position.
 
-Applications that relied on this behavior should reset cursors explicitly when
-the position is no longer required.
+Applications relying on this behavior (for example, to avoid pinning the
+underlying cursor resources), should reset cursors explicitly when the
+position is no longer required.
 </dd>
 
 <dt>WT_COLLATOR interface changes</dt>
