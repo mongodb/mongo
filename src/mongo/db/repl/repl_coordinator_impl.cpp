@@ -38,6 +38,7 @@
 #include "mongo/base/status.h"
 #include "mongo/db/operation_context_noop.h"
 #include "mongo/db/repl/check_quorum_for_config_change.h"
+#include "mongo/db/repl/handshake_args.h"
 #include "mongo/db/repl/master_slave.h"
 #include "mongo/db/repl/repl_set_heartbeat_args.h"
 #include "mongo/db/repl/repl_set_heartbeat_response.h"

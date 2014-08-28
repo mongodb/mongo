@@ -37,9 +37,11 @@
 #include <vector>
 
 #include "mongo/db/operation_context_noop.h"
+#include "mongo/db/repl/handshake_args.h"
 #include "mongo/db/repl/network_interface_mock.h"
 #include "mongo/db/repl/repl_coordinator_external_state_mock.h"
 #include "mongo/db/repl/repl_coordinator_impl.h"
+#include "mongo/db/repl/repl_coordinator_test_fixture.h"
 #include "mongo/db/repl/repl_settings.h"
 #include "mongo/db/repl/replica_set_config.h"
 #include "mongo/db/repl/topology_coordinator_impl.h"
@@ -64,125 +66,6 @@ namespace mongo {
 
 namespace repl {
 namespace {
-
-    bool stringContains(const std::string &haystack, const std::string& needle) {
-        return haystack.find(needle) != std::string::npos;
-    }
-
-    const Seconds zeroSecs(0);
-
-    class ReplCoordTest : public mongo::unittest::Test {
-    public:
-        ReplCoordTest() : _callShutdown(false) {}
-
-        virtual void setUp() {
-            _settings.replSet = "mySet/node1:12345,node2:54321";
-        }
-
-        virtual void tearDown() {
-            if (_callShutdown) {
-                shutdown();
-            }
-        }
-
-    protected:
-        NetworkInterfaceMockWithMap* getNet() { return _net; }
-        ReplicationCoordinatorImpl* getReplCoord() {return _repl.get();}
-        TopologyCoordinatorImpl& getTopoCoord() {return *_topo;}
-
-        void init() {
-            invariant(!_repl);
-            invariant(!_callShutdown);
-
-            // PRNG seed for tests.
-            const int64_t seed = 0;
-
-            _topo = new TopologyCoordinatorImpl(zeroSecs);
-            _net = new NetworkInterfaceMockWithMap;
-            _externalState = new ReplicationCoordinatorExternalStateMock;
-            _repl.reset(new ReplicationCoordinatorImpl(_settings,
-                                                       _externalState,
-                                                       _net,
-                                                       _topo,
-                                                       seed));
-        }
-
-        void init(ReplSettings settings) {
-            _settings = settings;
-            init();
-        }
-
-        void init(const std::string& replSet) {
-            _settings.replSet = replSet;
-            init();
-        }
-
-        void start() {
-            invariant(!_callShutdown);
-            // if we haven't initialized yet, do that first.
-            if (!_repl) {
-                init();
-            }
-
-            OperationContextNoop txn;
-            _repl->startReplication(&txn);
-            _repl->waitForStartUpComplete();
-            _callShutdown = true;
-        }
-
-        void start(const BSONObj& configDoc, const HostAndPort& selfHost) {
-            if (!_repl) {
-                init();
-            }
-            _externalState->setLocalConfigDocument(StatusWith<BSONObj>(configDoc));
-            _externalState->addSelf(selfHost);
-            start();
-        }
-
-        void start(const HostAndPort& selfHost) {
-            if (!_repl) {
-                init();
-            }
-            _externalState->addSelf(selfHost);
-            start();
-        }
-
-        void assertStart(ReplicationCoordinator::Mode expectedMode,
-                         const BSONObj& configDoc,
-                         const HostAndPort& selfHost) {
-            start(configDoc, selfHost);
-            ASSERT_EQUALS(expectedMode, getReplCoord()->getReplicationMode());
-        }
-
-        void assertStartSuccess(const BSONObj& configDoc, const HostAndPort& selfHost) {
-            assertStart(ReplicationCoordinator::modeReplSet, configDoc, selfHost);
-        }
-
-        void shutdown() {
-            invariant(_callShutdown);
-            _repl->shutdown();
-            _callShutdown = false;
-        }
-
-        int64_t countLogLinesContaining(const std::string& needle) {
-            return std::count_if(getCapturedLogMessages().begin(),
-                                 getCapturedLogMessages().end(),
-                                 stdx::bind(stringContains,
-                                            stdx::placeholders::_1,
-                                            needle));
-        }
-
-    private:
-        boost::scoped_ptr<ReplicationCoordinatorImpl> _repl;
-        // Owned by ReplicationCoordinatorImpl
-        TopologyCoordinatorImpl* _topo;
-        // Owned by ReplicationCoordinatorImpl
-        NetworkInterfaceMockWithMap* _net;
-        // Owned by ReplicationCoordinatorImpl
-        ReplicationCoordinatorExternalStateMock* _externalState;
-        ReplSettings _settings;
-        bool _callShutdown;
-    };
 
     TEST_F(ReplCoordTest, StartupWithValidLocalConfig) {
         assertStart(
@@ -349,7 +232,7 @@ namespace {
                                      BSON("_id" << 1 << "host" << "node2:54321"))),
                         &result1));
         ASSERT_EQUALS(ReplicationCoordinator::modeNone, getReplCoord()->getReplicationMode());
-        getNet()->addResponse(
+        getNetWithMap()->addResponse(
                 ReplicationExecutor::RemoteCommandRequest(
                         HostAndPort("node2", 54321),
                         "admin",
