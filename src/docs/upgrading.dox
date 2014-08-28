@@ -10,6 +10,14 @@ for each data source configured to use the collator.  Applications using the
 existing WT_COLLATOR interface that do not require the new functionality should
 set this callback to \c NULL.
 </dd>
+
+<dt>Java include path search changes</dt>
+<dd>
+We have updated the configure logic used to search for Java Native Interface
+files.  This fixes problems building WiredTiger's Java API, particularly on
+OS X, but may introduce problems if your build procedure relied on the old
+search behavior.
+</dd>
 </dl>
 
 @section version_231 Upgrading to Version 2.3.1
