@@ -252,7 +252,7 @@ namespace mongo {
 
         std::string decodedStoredKey = base64::decode(_creds.scram.storedKey);
         // ClientSignature := HMAC(StoredKey, AuthMessage)
-        fassert(18657, HMAC(EVP_sha1(),
+        fassert(18662, HMAC(EVP_sha1(),
                             reinterpret_cast<const unsigned char*>(decodedStoredKey.c_str()),
                             scramHashSize,
                             reinterpret_cast<const unsigned char*>(_authMessage.c_str()),
