@@ -20,6 +20,15 @@ search behavior.
 </dd>
 </dl>
 
+<dl>
+<dt>Default mutex implementation changed</dt>
+<dd>
+The default mutex implementation has been changed from adaptive pthread
+mutexes to non-adaptive pthread mutexes. Installations can explicitly
+select adaptive pthread mutexes by specifying
+\c --with-spinlock=pthread_adaptive at configuration time.
+</dd>
+
 @section version_231 Upgrading to Version 2.3.1
 
 <dl>
