@@ -63,14 +63,15 @@ namespace mongo {
     // initialized enough to create CatalogEntry objects.
     void WiredTigerEngine::loadExistingDatabases() {
         boost::mutex::scoped_lock lk( _dbLock );
-        WT_SESSION *session = _db->GetSession();
 
-        WT_CURSOR *c;
-        int ret = session->open_cursor(session, "metadata:", NULL, NULL, &c);
-        invariant ( ret == 0 );
+        WiredTigerSession swrap(*_db);
+        WiredTigerCursor cursor("metadata:", swrap);
+        WT_CURSOR *c = cursor.Get();
+        invariant(c != NULL);
 
         const char *uri;
         size_t end;
+        int ret;
         // Find all tables with unique prefixes.
         while ((ret = c->next(c)) == 0) {
             c->get_key(c, &uri);
@@ -92,7 +93,6 @@ namespace mongo {
             _dbs[dbName] = new WiredTigerDatabaseCatalogEntry( *_db, dbName );
         }
         invariant ( ret == WT_NOTFOUND );
-        _db->ReleaseSession(session);
         
     }
 

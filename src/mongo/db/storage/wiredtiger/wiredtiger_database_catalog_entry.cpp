@@ -58,7 +58,7 @@ namespace mongo {
                 const StringData& name )
         : DatabaseCatalogEntry( name ), _db(db) {
 
-            _initCollectionsFromDisk();
+            _loadAllCollections();
     }
 
     WiredTigerDatabaseCatalogEntry::~WiredTigerDatabaseCatalogEntry() {
@@ -97,19 +97,20 @@ namespace mongo {
         return i->second->rs.get();
     }
 
-    void WiredTigerDatabaseCatalogEntry::_initCollectionsFromDisk( ) {
+    void WiredTigerDatabaseCatalogEntry::_loadAllCollections( ) {
         boost::mutex::scoped_lock lk( _entryMapLock );
 
         /* Only do this once. */
         if (!_entryMap.empty())
             return;
 
-        WT_SESSION *session = _db.GetSession();
+        WiredTigerSession swrap(_db);
+        WiredTigerCursor cursor("metadata:", swrap);
+        WT_CURSOR *c = cursor.Get();
+        invariant(c != NULL);
 
-        WT_CURSOR *c;
+        int ret;
         const char *key;
-        int ret = session->open_cursor(session, "metadata:", NULL, NULL, &c);
-        invariant(ret == 0);
         std::string table_prefix = "table:" + name();
         while ((ret = c->next(c)) == 0) {
             ret = c->get_key(c, &key);
@@ -122,15 +123,14 @@ namespace mongo {
                 continue;
 
             // Initialize the namespace we found - skip the table: prefix.
-            _initCollectionFromDisk(session, std::string(key + 6));
+            _loadCollection(swrap, key + 6);
         }
-        _db.ReleaseSession(session);
         invariant(ret == WT_NOTFOUND || ret == 0);
         name();
     }
 
-    void WiredTigerDatabaseCatalogEntry::_initCollectionFromDisk(
-        WT_SESSION *session, std::string name) {
+    void WiredTigerDatabaseCatalogEntry::_loadCollection(
+        WiredTigerSession& swrap, const std::string &name) {
 
         // Create the collection
         CollectionOptions *options = new CollectionOptions();
@@ -140,18 +140,17 @@ namespace mongo {
         _entryMap[name.c_str()] = entry;
 
         // Open any existing indexes
-        WT_CURSOR *c;
-        int ret = session->open_cursor(session, "metadata:", NULL, NULL, &c);
-        invariant(ret == 0);
+        WiredTigerCursor cursor("metadata:", swrap);
+        WT_CURSOR *c = cursor.Get();
+        invariant(c != NULL);
 
         std::string tbl_uri = std::string("table:" + name);
         c->set_key(c, tbl_uri.c_str());
-        int cmp;
-        ret = c->search_near(c, &cmp);
-        if (cmp == -1)
+        int cmp, ret = c->search_near(c, &cmp);
+        if (cmp < 0)
             ret = c->next(c);
-        const char *uri_str;
         while (ret == 0) {
+            const char *uri_str;
             ret = c->get_key(c, &uri_str);
             invariant ( ret == 0);
             std::string uri(uri_str);
@@ -367,7 +366,7 @@ namespace mongo {
         delete entry;
 
         // Load the newly renamed collection into memory
-        _initCollectionFromDisk(session, toNS.toString());
+        _loadCollection(swrap, toNS.toString());
         return Status::OK();
     }
 
@@ -477,7 +476,7 @@ namespace mongo {
     void WiredTigerDatabaseCatalogEntry::Entry::updateTTLSetting( OperationContext* txn,
                                                              const StringData& idxName,
                                                              long long newExpireSeconds ) {
-        invariant( false );
+        // TODO figure out what this is supposed to do
     }
 
 }

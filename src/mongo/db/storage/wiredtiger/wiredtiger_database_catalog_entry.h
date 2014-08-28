@@ -98,8 +98,8 @@ namespace mongo {
 
     private:
 
-        void _initCollectionsFromDisk( );
-        void _initCollectionFromDisk( WT_SESSION *, std::string name );
+        void _loadAllCollections();
+        void _loadCollection( WiredTigerSession& swrap, const std::string &name );
         struct IndexEntry {
             std::string name;
             BSONObj spec;

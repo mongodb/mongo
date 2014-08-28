@@ -40,6 +40,8 @@
 #include "mongo/db/storage/wiredtiger/wiredtiger_recovery_unit.h"
 
 namespace mongo {
+    static const int TempKeyMaxSize = 1024; // this goes away with SERVER-3372
+
     static const WiredTigerItem emptyItem(NULL, 0);
     
     bool hasFieldNames(const BSONObj& obj) {
@@ -154,6 +156,13 @@ namespace mongo {
         invariant(!loc.isNull());
         invariant(loc.isValid());
         invariant(!hasFieldNames(key));
+
+        if ( key.objsize() >= TempKeyMaxSize ) {
+            string msg = mongoutils::str::stream()
+                << "WiredTigerIndex::insert: key too large to index, failing "
+                << ' ' << key.objsize() << ' ' << key;
+            return Status(ErrorCodes::KeyTooLong, msg);
+        }
 
         // TODO optimization: save the iterator from the dup-check to speed up insert
         if (!dupsAllowed && isDup(txn, key, loc))

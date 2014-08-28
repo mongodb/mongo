@@ -313,9 +313,6 @@ namespace mongo {
                                                    bool tailable,
                                                    const CollectionScanParams::Direction& dir
                                                    ) const {
-        invariant( start == DiskLoc() );
-        invariant( !tailable );
-
         WiredTigerSession &swrap = WiredTigerRecoveryUnit::Get(txn).GetSession();
         return new Iterator(*this, txn, swrap, start, tailable, dir);
     }
@@ -335,13 +332,13 @@ namespace mongo {
     }
 
     Status WiredTigerRecordStore::truncate( OperationContext* txn ) {
+        // TODO: use a WiredTiger fast truncate
         boost::scoped_ptr<RecordIterator> iter( getIterator( txn ) );
         while( !iter->isEOF() ) {
             DiskLoc loc = iter->getNext();
             deleteRecord( txn, loc );
         }
 
-        // TODO: clear current transaction
         // WiredTigerRecoveryUnit* ru = _getRecoveryUnit( txn );
 
         return Status::OK();
@@ -473,16 +470,19 @@ namespace mongo {
             ret = c->search(c);
         }
         else {
+            // Inexact matches should find the largest record less than or equal to the search key.
             int cmp;
             ret = c->search_near(c, &cmp);
-            if (ret == 0 && cmp < 0)
-                ret = c->next(c);
+            if (ret == 0 && cmp > 0)
+                ret = c->prev(c);
         }
         invariant(ret == 0 || ret == WT_NOTFOUND);
         _eof = (ret == WT_NOTFOUND);
     }
 
     bool WiredTigerRecordStore::Iterator::isEOF() {
+        if (_eof && _tailable)
+            (void)getNext();
         return _eof;
     }
 
@@ -499,9 +499,12 @@ namespace mongo {
 
     DiskLoc WiredTigerRecordStore::Iterator::getNext() {
         /* Take care not to restart a scan if we have hit the end */
-        if (isEOF()) {
-            return DiskLoc();
+        if (_eof && _tailable && !_lastLoc.isNull()) {
+            _locate(_lastLoc, false);
+            _lastLoc = DiskLoc();
         }
+        if (_eof)
+            return DiskLoc();
 
         DiskLoc toReturn = curr();
         /* MongoDB expects "natural" ordering - which is the order that items are inserted. */

@@ -60,8 +60,10 @@ namespace mongo {
 
     class WiredTigerCursor {
     public:
-        WiredTigerCursor(WT_CURSOR *cursor, WiredTigerSession &session, bool own_session=false)
+        WiredTigerCursor(WT_CURSOR *cursor, WiredTigerSession& session, bool own_session=false)
             : _cursor(cursor), _session(session), _own_session(own_session) {}
+        WiredTigerCursor(const std::string &uri, WiredTigerSession& session, bool own_session=false)
+            : _cursor(session.GetCursor(uri)), _session(session), _own_session(own_session) {}
         ~WiredTigerCursor() {
             _session.ReleaseCursor(_cursor);
             // XXX avoid leaks

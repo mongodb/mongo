@@ -111,7 +111,7 @@ namespace mongo {
 
                 virtual void aboutToDeleteBucket(const DiskLoc& bucket);
 
-		bool _locate(const BSONObj &key, const DiskLoc& loc);
+                bool _locate(const BSONObj &key, const DiskLoc& loc);
 
                 virtual bool locate(const BSONObj &key, const DiskLoc& loc);
 
