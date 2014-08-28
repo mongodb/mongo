@@ -30,6 +30,7 @@
 
 #include "mongo/db/clientcursor.h"
 #include "mongo/db/catalog/collection.h"
+#include "mongo/db/kill_current_op.h"
 #include "mongo/util/elapsed_tracker.h"
 
 namespace mongo {
@@ -79,6 +80,12 @@ namespace mongo {
 
             // Note that this call checks for interrupt, and thus can throw if interrupt flag is set
             staticYield(micros, record);
+
+            // staticYield does not check for interrupt after regaining the lock, but the
+            // bg index building interrupt code is depending on this behavior.  Otherwise, we may
+            // return an unexpected error when restoreState(), below, notices its cursor has been
+            // invalidated.
+            killCurrentOp.checkForInterrupt();
 
             if ( runner->collection() ) {
                 // if the runner was killed, runner->collection() will return NULL
