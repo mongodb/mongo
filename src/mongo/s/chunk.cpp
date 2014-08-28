@@ -49,6 +49,7 @@
 #include "mongo/s/config.h"
 #include "mongo/s/config_server_checker_service.h"
 #include "mongo/s/cursors.h"
+#include "mongo/s/distlock.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/strategy.h"
 #include "mongo/s/type_collection.h"
