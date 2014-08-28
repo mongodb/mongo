@@ -73,17 +73,6 @@ esac
 _AS_ECHO_LOG([_JTOPDIR=$_JTOPDIR])
 _AS_ECHO_LOG([_JINC=$_JINC])
 
-# On Mac OS X 10.6.4, jni.h is a symlink:
-# /System/Library/Frameworks/JavaVM.framework/Versions/Current/Headers/jni.h
-# -> ../../CurrentJDK/jeaders/jni.h.
-AC_CHECK_HEADER([$_JINC/jni.h],
-	[JNI_INCLUDE_DIRS="$JNI_INCLUDE_DIRS $_JINC"],
-	[_JTOPDIR=`echo "$_JTOPDIR" | sed -e 's:/[[^/]]*$::'`
-	 AC_CHECK_HEADER([$_JTOPDIR/include/jni.h],
-		[JNI_INCLUDE_DIRS="$JNI_INCLUDE_DIRS $_JTOPDIR/include"],
-                AC_MSG_ERROR([cannot find JDK header files]))
-	])
-
 # get the likely subdirectories for system specific java includes
 case "$host_os" in
 bsdi*)          _JNI_INC_SUBDIRS="bsdos";;
@@ -96,13 +85,26 @@ cygwin*)	_JNI_INC_SUBDIRS="win32";;
 *)              _JNI_INC_SUBDIRS="genunix";;
 esac
 
-# add any subdirectories that are present
-for JINCSUBDIR in $_JNI_INC_SUBDIRS
-do
-    if test -d "$_JTOPDIR/include/$JINCSUBDIR"; then
-         JNI_INCLUDE_DIRS="$JNI_INCLUDE_DIRS $_JTOPDIR/include/$JINCSUBDIR"
-    fi
+# search for jni.h in the paths
+found=no
+for dir in "$_JINC" "`echo "$_JTOPDIR" | sed -e 's:/[[^/]]*$::'`"/include ; do
+	# add any subdirectories that are present
+	saved_CPPFLAGS="$CPPFLAGS"
+	for JINCSUBDIR in $_JNI_INC_SUBDIRS ; do
+	    if test -d "$dir/$JINCSUBDIR" ; then
+		 JNI_INCLUDE_DIRS="$JNI_INCLUDE_DIRS $dir/$JINCSUBDIR"
+		 CPPFLAGS="$CPPFLAGS -I$dir/$JINCSUBDIR"
+	    fi
+	done
+
+	AC_CHECK_HEADER([$dir/jni.h],
+		[JNI_INCLUDE_DIRS="$JNI_INCLUDE_DIRS $dir" ; found=yes; break])
+	CPPFLAGS="$saved_CPPFLAGS"
 done
+
+if test $found = no ; then
+	AC_MSG_ERROR([cannot find JDK header files])
+fi
 ])
 
 # _ACJNI_FOLLOW_SYMLINKS <path>
