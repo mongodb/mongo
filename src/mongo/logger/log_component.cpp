@@ -134,7 +134,7 @@ std::string _dottedNames[LogComponent::kNumLogComponents+1];
 
     StringData LogComponent::getNameForLog() const {
         switch (_value) {
-        case kDefault:              return createStringData("        ");
+        case kDefault:              return createStringData("-       ");
         case kAccessControl:        return createStringData("ACCESS  ");
         case kCommands:             return createStringData("COMMANDS");
         case kIndexing:             return createStringData("INDEXING");
