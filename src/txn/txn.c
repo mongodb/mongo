@@ -91,8 +91,7 @@ __wt_txn_update_oldest(WT_SESSION_IMPL *session)
  *	Allocate a transaction ID and/or a snapshot.
  */
 void
-__wt_txn_refresh(
-    WT_SESSION_IMPL *session, int get_snapshot, int pin_reads)
+__wt_txn_refresh(WT_SESSION_IMPL *session, int get_snapshot, int pin_reads)
 {
 	WT_CONNECTION_IMPL *conn;
 	WT_TXN *txn;
