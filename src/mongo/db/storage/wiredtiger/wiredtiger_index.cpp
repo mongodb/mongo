@@ -205,7 +205,6 @@ namespace mongo {
     }
 
     bool WiredTigerIndex::isEmpty(OperationContext* txn) {
-        // XXX no context?
         WiredTigerSession &swrap = WiredTigerRecoveryUnit::Get(txn).GetSession();
         WiredTigerCursor curwrap(GetCursor(swrap), swrap);
         WT_CURSOR *c = curwrap.Get();
@@ -381,7 +380,7 @@ namespace mongo {
         // XXX iterators own their sessions
         // this is done because WiredTiger resets cursors on commit, which causes problems
         // e.g., when building indexes
-        WiredTigerSession &swrap = *new WiredTigerSession(_db);
+        WiredTigerSession &swrap = WiredTigerRecoveryUnit::Get(txn).GetSession();
         return new IndexCursor(GetCursor(swrap, true), swrap, txn, direction == 1);
     }
 

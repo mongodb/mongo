@@ -316,10 +316,7 @@ namespace mongo {
         invariant( start == DiskLoc() );
         invariant( !tailable );
 
-        // XXX iterators own their sessions
-        // this is done because WiredTiger resets cursors on commit, which causes problems
-        // e.g., when building indexes
-        WiredTigerSession &swrap = *new WiredTigerSession(_db);
+        WiredTigerSession &swrap = WiredTigerRecoveryUnit::Get(txn).GetSession();
         return new Iterator(*this, txn, swrap, start, tailable, dir);
     }
 
@@ -458,7 +455,7 @@ namespace mongo {
           _session( session ),
           _tailable( tailable ),
           _dir( dir ),
-          _cursor(rs.GetCursor(session), session, true) { // XXX cursor owns the session
+          _cursor(rs.GetCursor(session), session) {
             _locate(start, true);
     }
 

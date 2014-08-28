@@ -92,7 +92,7 @@ namespace mongo {
                 public:
                 IndexCursor(WT_CURSOR *cursor,
                         WiredTigerSession &session, OperationContext *txn, bool forward)
-                   : _cursor(cursor, session, true), // XXX cursor ownd the session
+                   : _cursor(cursor, session),
                      _txn(txn),
                      _forward(forward),
                      _eof(true) {
