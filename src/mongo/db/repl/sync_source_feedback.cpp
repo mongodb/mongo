@@ -239,6 +239,7 @@ namespace repl {
 
             MemberState state = replCoord->getCurrentMemberState();
             if (state.primary() || state.fatal() || state.startup()) {
+                _resetConnection();
                 continue;
             }
             const Member* target = BackgroundSync::get()->getSyncTarget();

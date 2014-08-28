@@ -318,6 +318,12 @@ namespace {
             boost::lock_guard<boost::mutex> lk(_mutex);
 
             SlaveInfo& slaveInfo = _slaveInfoMap[rid];
+            if (slaveInfo.memberID < 0 && _getReplicationMode_inlock() == modeReplSet) {
+                warning() << "Received replSetUpdatePosition for node with RID" << rid
+                          << ", but we haven't yet received a handshake for that node. Stored "
+                          << "member ID: " << slaveInfo.memberID << ", stored member hostAndPort: "
+                          << slaveInfo.hostAndPort.toString() << ".  Our RID: " << getMyRID(NULL);
+            }
             invariant(slaveInfo.memberID >= 0 || _getReplicationMode_inlock() == modeMasterSlave);
 
             LOG(3) << "Node with RID " << rid << " currently has optime " << slaveInfo.opTime <<
@@ -1047,7 +1053,6 @@ namespace {
         LOG(2) << "Received handshake " << handshake.toBSON();
 
         boost::lock_guard<boost::mutex> lock(_mutex);
-        SlaveInfo& slaveInfo = _slaveInfoMap[handshake.getRid()];
         if (_getReplicationMode_inlock() == modeReplSet) {
             int memberID = handshake.getMemberId();
             const MemberConfig* member = _rsConfig.findMemberByID(memberID);
@@ -1056,6 +1061,7 @@ namespace {
                               str::stream() << "Node with replica set member ID " << memberID <<
                                       " could not be found in replica set config during handshake");
             }
+            SlaveInfo& slaveInfo = _slaveInfoMap[handshake.getRid()];
             slaveInfo.memberID = memberID;
             slaveInfo.hostAndPort = member->getHostAndPort();
 
@@ -1066,6 +1072,7 @@ namespace {
         }
         else {
             // master/slave
+            SlaveInfo& slaveInfo = _slaveInfoMap[handshake.getRid()];
             slaveInfo.memberID = -1;
             slaveInfo.hostAndPort = _externalState->getClientHostAndPort(txn);
         }
