@@ -235,9 +235,8 @@ namespace mongo {
 
     bool WiredTigerIndex::isDup(OperationContext *txn, const BSONObj& key, DiskLoc loc) {
         boost::scoped_ptr<SortedDataInterface::Cursor> cursor( newCursor( txn, 1 ) );
-        cursor->locate(key, DiskLoc());
 
-        return !cursor->isEOF() && cursor->getDiskLoc() != loc;
+        return cursor->locate(key, DiskLoc()) && cursor->getDiskLoc() != loc;
     }
 
     /* Cursor implementation */
