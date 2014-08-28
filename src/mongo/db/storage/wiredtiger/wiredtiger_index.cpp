@@ -386,11 +386,8 @@ namespace mongo {
             OperationContext* txn, int direction) const {
         invariant((direction == 1) || (direction == -1));
 
-        // XXX iterators own their sessions
-        // this is done because WiredTiger resets cursors on commit, which causes problems
-        // e.g., when building indexes
         WiredTigerSession &swrap = WiredTigerRecoveryUnit::Get(txn).GetSession();
-        return new IndexCursor(GetCursor(swrap, true), swrap, txn, direction == 1);
+        return new IndexCursor(GetCursor(swrap, true), WiredTigerRecoveryUnit::Get(txn).GetSharedSession(), direction == 1);
     }
 
     Status WiredTigerIndex::initAsEmpty(OperationContext* txn) {

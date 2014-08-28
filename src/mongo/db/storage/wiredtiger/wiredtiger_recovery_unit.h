@@ -38,7 +38,7 @@ namespace mongo {
     class WiredTigerRecoveryUnit : public RecoveryUnit {
         public:
         WiredTigerRecoveryUnit(WiredTigerDatabase &db, bool defaultCommit) :
-                _session(db),
+                _session(new WiredTigerSession(db)),
                 _defaultCommit(defaultCommit),
                 _depth(0),
                 _begun(false) {}
@@ -56,14 +56,14 @@ namespace mongo {
         virtual void beginUnitOfWork() {
             if (_depth++ > 0)
                 return;
-            WT_SESSION *s = _session.Get();
+            WT_SESSION *s = _session->Get();
             int ret = s->begin_transaction(s, NULL);
             invariant(ret == 0);
             _begun = true;
         }
 
         virtual void commitUnitOfWork() {
-            WT_SESSION *s = _session.Get();
+            WT_SESSION *s = _session->Get();
             if (_begun) {
                 int ret = s->commit_transaction(s, NULL);
                 invariant(ret == 0);
@@ -76,7 +76,7 @@ namespace mongo {
             if (--_depth > 0)
                 return;
             if (_begun) {
-                WT_SESSION *s = _session.Get();
+                WT_SESSION *s = _session->Get();
                 int ret = s->rollback_transaction(s, NULL);
                 invariant(ret == 0);
                 _begun = false;
@@ -106,14 +106,17 @@ namespace mongo {
 
         virtual void syncDataAndTruncateJournal() {}
 
-        WiredTigerSession& GetSession() { return _session; }
+        WiredTigerSession& GetSession() { return *_session; }
+        shared_ptr<WiredTigerSession> GetSharedSession() { return _session; }
 
         static WiredTigerRecoveryUnit& Get(OperationContext *txn) {
             return *dynamic_cast<WiredTigerRecoveryUnit*>(txn->recoveryUnit());
         }
 
     private:
-        WiredTigerSession _session;
+        // MongoDB doesn't guarantee that iterators are destroyed before the recovery unit, so use a
+        // shared pointer here to get the order right.
+        shared_ptr<WiredTigerSession> _session;
         bool _defaultCommit;
         int _depth;
         bool _begun;

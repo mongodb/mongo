@@ -91,9 +91,9 @@ namespace mongo {
             class IndexCursor : public SortedDataInterface::Cursor {
                 public:
                 IndexCursor(WT_CURSOR *cursor,
-                        WiredTigerSession &session, OperationContext *txn, bool forward)
-                   : _cursor(cursor, session),
-                     _txn(txn),
+                        shared_ptr<WiredTigerSession> session, bool forward)
+                   : _session(session),
+                     _cursor(cursor, *session),
                      _forward(forward),
                      _eof(true) {
                 }
@@ -138,8 +138,8 @@ namespace mongo {
                 virtual void restorePosition();
 
             private:
+                shared_ptr<WiredTigerSession> _session;
                 WiredTigerCursor _cursor;
-                OperationContext *_txn;
                 bool _forward;
                 bool _eof;
 

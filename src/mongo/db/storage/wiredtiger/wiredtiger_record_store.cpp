@@ -313,8 +313,7 @@ namespace mongo {
                                                    bool tailable,
                                                    const CollectionScanParams::Direction& dir
                                                    ) const {
-        WiredTigerSession &swrap = WiredTigerRecoveryUnit::Get(txn).GetSession();
-        return new Iterator(*this, txn, swrap, start, tailable, dir);
+        return new Iterator(*this, txn, WiredTigerRecoveryUnit::Get(txn).GetSharedSession(), start, tailable, dir);
     }
 
 
@@ -443,7 +442,7 @@ namespace mongo {
     WiredTigerRecordStore::Iterator::Iterator(
             const WiredTigerRecordStore& rs,
             OperationContext *txn,
-            WiredTigerSession& session,
+            shared_ptr<WiredTigerSession> session,
             const DiskLoc& start,
             bool tailable,
             const CollectionScanParams::Direction& dir )
@@ -452,7 +451,7 @@ namespace mongo {
           _session( session ),
           _tailable( tailable ),
           _dir( dir ),
-          _cursor(rs.GetCursor(session), session) {
+          _cursor(rs.GetCursor(*session), *session) {
             _locate(start, true);
     }
 
