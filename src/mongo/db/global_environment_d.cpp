@@ -59,7 +59,9 @@ namespace mongo {
     }
 
     StorageEngine* GlobalEnvironmentMongoD::getGlobalStorageEngine() {
-        invariant(globalStorageEngine);
+        // We don't check that globalStorageEngine is not-NULL here intentionally.  We can encounter
+        // an error before it's initialized and proceed to exitCleanly which is equipped to deal
+        // with a NULL storage engine.
         return globalStorageEngine;
     }
 
