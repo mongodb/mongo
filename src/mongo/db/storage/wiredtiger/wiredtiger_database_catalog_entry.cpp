@@ -476,7 +476,20 @@ namespace mongo {
     void WiredTigerDatabaseCatalogEntry::Entry::updateTTLSetting( OperationContext* txn,
                                                              const StringData& idxName,
                                                              long long newExpireSeconds ) {
-        // TODO figure out what this is supposed to do
-    }
+        Indexes::const_iterator i = indexes.find( idxName.toString() );
+        invariant( i != indexes.end() );
 
+        BSONObjBuilder b;
+        for ( BSONObjIterator bi( i->second->spec ); bi.more(); ) {
+            BSONElement e = bi.next();
+            if ( e.fieldNameStringData() == "expireAfterSeconds" ) {
+                continue;
+            }
+            b.append( e );
+        }
+
+        b.append( "expireAfterSeconds", newExpireSeconds );
+
+        i->second->spec = b.obj();
+    }
 }
