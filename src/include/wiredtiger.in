@@ -777,7 +777,8 @@ struct __wt_session {
 	 *
 	 * WT_SESSION::reconfigure will fail if a transaction is in progress
 	 * in the session.
-	 * All open cursors are reset.
+	 *
+	 * All cursors are reset.
 	 *
 	 * @param session the session handle
 	 * @configstart{session.reconfigure, see dist/api_data.py}
@@ -817,7 +818,8 @@ struct __wt_session {
 	 *
 	 * Cursors capable of supporting transactional operations operate in the
 	 * context of the current transaction, if any.
-	 * WT_SESSION::rollback_transaction implicitly resets all open cursors.
+	 *
+	 * WT_SESSION::rollback_transaction implicitly resets all cursors.
 	 *
 	 * Cursors are relatively light-weight objects but may hold references
 	 * to heavier-weight objects; applications should re-use cursors when
@@ -1330,7 +1332,7 @@ struct __wt_session {
 	 *
 	 * A transaction must be in progress when this method is called.
 	 *
-	 * All open cursors are reset.
+	 * All cursors are reset.
 	 *
 	 * @snippet ex_all.c transaction commit/rollback
 	 *
