@@ -140,8 +140,9 @@ namespace mongo {
         void setCappedDeleteCallback(CappedDocumentDeleteCallback* cb) {
             _cappedDeleteCallback = cb;
         }
-        bool cappedMaxDocs() const { invariant(_isCapped); return _cappedMaxDocs; }
-        bool cappedMaxSize() const { invariant(_isCapped); return _cappedMaxSize; }
+        void setCapped(int64_t cappedMaxDocs, int64_t cappedMaxSize);
+        int64_t cappedMaxDocs() const;
+        int64_t cappedMaxSize() const;
 
         WT_CURSOR *GetCursor(WiredTigerSession &session, bool acquire=false) const {
                 return session.GetCursor(GetURI(), acquire);
@@ -201,9 +202,10 @@ namespace mongo {
 
         WiredTigerDatabase &_db;
         const std::string _uri;
-        const bool _isCapped;
-        const int64_t _cappedMaxSize;
-        const int64_t _cappedMaxDocs;
+        // The capped settings should not be updated once operations have started
+        bool _isCapped;
+        int64_t _cappedMaxSize;
+        int64_t _cappedMaxDocs;
         CappedDocumentDeleteCallback* _cappedDeleteCallback;
 
         AtomicUInt64 _nextIdNum;

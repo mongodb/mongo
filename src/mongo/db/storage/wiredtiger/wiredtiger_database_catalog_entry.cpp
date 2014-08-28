@@ -179,7 +179,8 @@ namespace mongo {
                 auto_ptr<IndexEntry> newEntry( new IndexEntry() );
                 newEntry->name = name;
                 newEntry->spec = desc.infoObj();
-                // TODO: How can we track these and set them up properly?
+                // TODO: We need to stash the options field on create and decode them
+                // here.
                 newEntry->ready = true;
                 newEntry->isMultikey = false;
 
@@ -213,17 +214,12 @@ namespace mongo {
 
         entry = new Entry( ns, options );
 
-        if ( options.capped ) {
-            entry->rs.reset(new WiredTigerRecordStore(ns,
-                            _db,
-                            true,
-                            options.cappedSize
-                                ? options.cappedSize : 4096, // default size
-                            options.cappedMaxDocs
-                                ? options.cappedMaxDocs : -1)); // no limit
-        } else {
-            entry->rs.reset( new WiredTigerRecordStore( ns, _db ) );
-        }
+        WiredTigerRecordStore *rs = new WiredTigerRecordStore( ns, _db );
+        if ( options.capped )
+            rs->setCapped(options.cappedSize ? options.cappedSize : 4096,
+                options.cappedMaxDocs ? options.cappedMaxDocs : -1);
+        entry->rs.reset( rs );
+
         _entryMap[ns.toString()] = entry;
 
         return Status::OK();
@@ -362,11 +358,25 @@ namespace mongo {
         if (ret != 0)
             return Status( ErrorCodes::OperationFailed, "Collection rename failed" );
 
+        bool was_capped = entry->rs->isCapped();
+        int64_t maxDocs, maxSize;
+        if (was_capped) {
+            maxSize = entry->rs->cappedMaxSize();
+            maxDocs = entry->rs->cappedMaxDocs();
+        }
         // Now delete the old entry.
         delete entry;
 
         // Load the newly renamed collection into memory
         _loadCollection(swrap, toNS.toString());
+
+        // Setup the capped configuration - ideally this would be done by the load,
+        // but we don't currently persist enough information to do that.
+        i = _entryMap.find( toNS.toString() );
+        invariant( i != _entryMap.end() );
+        if (was_capped) {
+            i->second->rs->setCapped(maxSize, maxDocs);
+        }
         return Status::OK();
     }
 

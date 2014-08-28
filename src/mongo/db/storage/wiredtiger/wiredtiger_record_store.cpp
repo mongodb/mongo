@@ -104,6 +104,22 @@ namespace mongo {
         return _isCapped;
     }
 
+    void WiredTigerRecordStore::setCapped(int64_t cappedMaxSize, int64_t cappedMaxDocs) {
+        _isCapped = true;
+        _cappedMaxSize = cappedMaxSize;
+        _cappedMaxDocs = cappedMaxDocs;
+    }
+
+    int64_t WiredTigerRecordStore::cappedMaxDocs() const {
+        invariant(_isCapped);
+        return _cappedMaxDocs;
+    }
+
+    int64_t WiredTigerRecordStore::cappedMaxSize() const {
+        invariant(_isCapped);
+        return _cappedMaxSize;
+    }
+
     int64_t WiredTigerRecordStore::storageSize( OperationContext* txn,
                                            BSONObjBuilder* extraInfo,
                                            int infoLevel ) const {
