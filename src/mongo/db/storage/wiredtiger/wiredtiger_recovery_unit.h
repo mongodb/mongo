@@ -54,17 +54,12 @@ namespace mongo {
         }
 
         virtual void beginUnitOfWork() {
-            if (_depth++ > 0)
-                return;
-            WT_SESSION *s = _session->Get();
-            int ret = s->begin_transaction(s, NULL);
-            invariant(ret == 0);
-            _begun = true;
+            ++_depth;
         }
 
         virtual void commitUnitOfWork() {
-            WT_SESSION *s = _session->Get();
             if (_begun) {
+                WT_SESSION *s = _session->Get();
                 int ret = s->commit_transaction(s, NULL);
                 invariant(ret == 0);
                 _begun = false;
@@ -106,8 +101,18 @@ namespace mongo {
 
         virtual void syncDataAndTruncateJournal() {}
 
-        WiredTigerSession& GetSession() { return *_session; }
-        shared_ptr<WiredTigerSession> GetSharedSession() { return _session; }
+        shared_ptr<WiredTigerSession>& GetSharedSession() {
+            if (!_begun) {
+                WT_SESSION *s = _session->Get();
+                int ret = s->begin_transaction(s, NULL);
+                invariant(ret == 0);
+                _begun = true;
+            }
+            return _session;
+        }
+        WiredTigerSession& GetSession() {
+            return *GetSharedSession();
+        }
 
         static WiredTigerRecoveryUnit& Get(OperationContext *txn) {
             return *dynamic_cast<WiredTigerRecoveryUnit*>(txn->recoveryUnit());
