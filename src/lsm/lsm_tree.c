@@ -75,10 +75,9 @@ __lsm_tree_close(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 	F_CLR(lsm_tree, WT_LSM_TREE_ACTIVE);
 
 	/*
-	 * If we are holding the schema lock, drop it so that any LSM
-	 * operations that grab the schema lock won't block.
+	 * Wait for all LSM operations and work units that were in flight to
+	 * finish.
 	 */
-	/* Wait for all LSM operations that were in flight to finish. */
 	for (i = 0; lsm_tree->refcnt > 1 || lsm_tree->queue_ref > 0; ++i) {
 		/*
 		 * Remove any work units from the manager queues. Do this step
@@ -88,8 +87,9 @@ __lsm_tree_close(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 		 * we don't block any operations that require the schema
 		 * lock to complete. This is safe because any operation that
 		 * is closing the tree should first have gotten exclusive
-		 * access, so other schema level operations will return
-		 * EBUSY, even though we're dropping the schema lock here.
+		 * access to the LSM tree via __wt_lsm_tree_get, so other
+		 * schema level operations will return EBUSY, even though
+		 * we're dropping the schema lock here.
 		 */
 		if (i % 1000 == 0) {
 			WT_WITHOUT_SCHEMA_LOCK(session, ret =
@@ -113,8 +113,11 @@ __wt_lsm_tree_close_all(WT_SESSION_IMPL *session)
 
 	while ((lsm_tree = TAILQ_FIRST(&S2C(session)->lsmqh)) != NULL) {
 		/*
-		 * Setup the reference count so we wait for any entries on
-		 * the LSM managers queues to drain.
+		 * Tree close assumes that we have a reference to the tree
+		 * so it can tell when it's safe to do the close. We could
+		 * got through tree get here, but short circuit instead. There
+		 * is no need to decrement the reference count since destroy
+		 * is unconditional.
 		 */
 		(void)WT_ATOMIC_ADD(lsm_tree->refcnt, 1);
 		WT_TRET(__lsm_tree_close(session, lsm_tree));
@@ -482,7 +485,10 @@ err:		WT_TRET(__lsm_tree_discard(session, lsm_tree));
 
 /*
  * __wt_lsm_tree_get --
- *	Get an LSM tree structure for the given name.
+ *	Get an LSM tree structure for the given name. Optionally get exclusive
+ *	access to the handle. Exclusive access works separately to the LSM
+ *	tree lock - since operations that need exclusive access may also need
+ *	to take the LSM tree lock for example outstanding work unit operations.
  */
 int
 __wt_lsm_tree_get(WT_SESSION_IMPL *session,
@@ -493,10 +499,34 @@ __wt_lsm_tree_get(WT_SESSION_IMPL *session,
 	/* See if the tree is already open. */
 	TAILQ_FOREACH(lsm_tree, &S2C(session)->lsmqh, q)
 		if (strcmp(uri, lsm_tree->name) == 0) {
-			if (exclusive && lsm_tree->refcnt)
-				return (EBUSY);
+			/*
+			 * Short circuit if the handle is already held
+			 * exclusively or exclusive access is requested and
+			 * there are references held.
+			 */
+			if ((exclusive && lsm_tree->refcnt > 0) ||
+			    F_ISSET_ATOMIC(lsm_tree, WT_LSM_TREE_EXCLUSIVE))
+			    return (EBUSY);
 
+			if (exclusive) {
+				F_SET_ATOMIC(lsm_tree, WT_LSM_TREE_EXCLUSIVE);
+				if (!WT_ATOMIC_CAS(lsm_tree->refcnt, 0, 1)) {
+					F_CLR(lsm_tree, WT_LSM_TREE_EXCLUSIVE);
+					return (EBUSY);
+				}
+			}
+			    
 			(void)WT_ATOMIC_ADD(lsm_tree->refcnt, 1);
+
+			/*
+			 * If we got a reference, but an exclusive reference
+			 * beat us to it, give our reference up.
+			 */
+			if (!exclusive &&
+			    F_ISSET_ATOMIC(lsm_tree, WT_LSM_TREE_EXCLUSIVE)) {
+				WT_ATOMIC_SUB(lsm_tree->refcnt, 1);
+				return (EBUSY);
+			}
 			*treep = lsm_tree;
 			return (0);
 		}
@@ -514,6 +544,7 @@ __wt_lsm_tree_release(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 {
 	WT_ASSERT(session, lsm_tree->refcnt > 0);
 	(void)WT_ATOMIC_SUB(lsm_tree->refcnt, 1);
+	F_CLR_ATOMIC(lsm_tree, WT_LSM_TREE_EXCLUSIVE);
 }
 
 /* How aggressively to ramp up or down throttle due to level 0 merging */

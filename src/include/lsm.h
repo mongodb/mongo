@@ -196,6 +196,9 @@ struct __wt_lsm_tree {
 #define	WT_LSM_TREE_OPEN	0x08	/* The tree is open */
 #define	WT_LSM_TREE_THROTTLE	0x10	/* Throttle updates */
 	uint32_t flags;
+
+#define	WT_LSM_TREE_EXCLUSIVE	0x01	/* Tree is opened exclusively */
+	uint32_t flags_atomic;
 };
 
 /*
