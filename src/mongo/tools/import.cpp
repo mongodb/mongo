@@ -53,7 +53,7 @@ class Import : public Tool {
     const char * _sep;
     static const int BUF_SIZE;
 
-    void csvTokenizeRow(const string& row, vector<string>& tokens) {
+    void delimitedTokenizeRow(const string& row, vector<string>& tokens) {
         bool inQuotes = false;
         bool prevWasQuote = false;
         bool tokenQuoted = false;
@@ -80,7 +80,7 @@ class Import : public Tool {
                     tokens.push_back(curtoken);
                 }
 
-                if (element == ',' && !inQuotes) {
+                if (element == *_sep && !inQuotes) {
                     if (!tokenQuoted) { // If token was quoted, it's already been added
                         boost::trim(curtoken);
                         tokens.push_back(curtoken);
@@ -216,7 +216,7 @@ class Import : public Tool {
         }
 
         vector<string> tokens;
-        if (_type == CSV) {
+        if (_type == CSV || _type == TSV) {
             string row;
             bool inside_quotes = false;
             size_t last_quote = 0;
@@ -245,14 +245,7 @@ class Import : public Tool {
             }
             // now 'row' is string corresponding to one row of the CSV file
             // (which may span multiple lines) and represents one BSONObj
-            csvTokenizeRow(row, tokens);
-        }
-        else {  // _type == TSV
-            while (line[0] != '\t' && isspace(line[0])) { // Strip leading whitespace, but not tabs
-                line++;
-            }
-
-            boost::split(tokens, line, boost::is_any_of(_sep));
+            delimitedTokenizeRow(row, tokens);
         }
 
         // Now that the row is tokenized, create a BSONObj out of it.
