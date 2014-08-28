@@ -83,6 +83,9 @@ namespace mongo {
         } else
             _numRecords = 0;
 
+        // More-or-less random value
+        _dataSize = _numRecords * 10;
+
         // Need to start at 1 so we are always higher than minDiskLoc
         _nextIdNum.store(key + 1);
     }
