@@ -290,7 +290,8 @@ __wt_conn_cache_pool_destroy(WT_CONNECTION_IMPL *conn)
 		WT_TRET(__wt_thread_join(session, cache->cp_tid));
 
 		wt_session = &cache->cp_session->iface;
-		wt_session->close(wt_session, NULL);
+		WT_TRET(wt_session->close(wt_session, NULL));
+
 		/*
 		 * Grab the lock again now to stop other threads joining the
 		 * pool while we are figuring out whether we were the last
@@ -360,7 +361,6 @@ static int
 __cache_pool_balance(WT_SESSION_IMPL *session)
 {
 	WT_CACHE_POOL *cp;
-	WT_CONNECTION_IMPL *entry;
 	WT_DECL_RET;
 	uint64_t bump_threshold, highest, last_used;
 
@@ -368,8 +368,9 @@ __cache_pool_balance(WT_SESSION_IMPL *session)
 	highest = 0;
 
 	__wt_spin_lock(NULL, &cp->cache_pool_lock);
+
 	/* If the queue is empty there is nothing to do. */
-	if ((entry = TAILQ_FIRST(&cp->cache_pool_qh)) == NULL)
+	if (TAILQ_FIRST(&cp->cache_pool_qh) == NULL)
 		goto err;
 
 	WT_ERR(__cache_pool_assess(session, &highest));

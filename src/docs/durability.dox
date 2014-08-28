@@ -62,14 +62,7 @@ to the backup.
 
 @section durability_bulk Bulk loads
 
-Bulk-loads are not commit-level durable, that is, the creation and
-subsequent bulk-load of an object will not appear in the database log
-files.  For this reason, applications doing incremental log archival
-after a backup should create a new copy of the data files after a
-bulk-load to make the bulk-load durable. In addition, incremental log
-archival after a bulk-load can cause recovery to report errors because
-there are log records that apply to data files which don't appear in the
-backup.
+@copydoc doc_bulk_durability
 
 @section durability_archiving Log file archival
 
