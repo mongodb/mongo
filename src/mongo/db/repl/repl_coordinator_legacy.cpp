@@ -40,6 +40,7 @@
 #include "mongo/db/instance.h"
 #include "mongo/db/repl/bgsync.h"
 #include "mongo/db/repl/connections.h"
+#include "mongo/db/repl/handshake_args.h"
 #include "mongo/db/repl/master_slave.h"
 #include "mongo/db/repl/member.h"
 #include "mongo/db/repl/oplog.h" // for newRepl()
