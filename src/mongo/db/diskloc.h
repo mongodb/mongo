@@ -34,6 +34,8 @@
 
 #pragma once
 
+#include <boost/functional/hash.hpp>
+
 #include "mongo/db/jsobj.h"
 #include "mongo/platform/cstdint.h"
 #include "mongo/platform/unordered_set.h"
@@ -160,11 +162,10 @@ namespace mongo {
 #pragma pack()
 
     inline size_t DiskLoc::Hasher::operator()( DiskLoc loc ) const {
-        // Older tr1 implementations do not support hashing 64 bit integers.  This implementation
-        // delegates to hashing 32 bit integers.
-        return
-            unordered_set<uint32_t>::hasher()( loc.a() ) ^
-            unordered_set<uint32_t>::hasher()( loc.getOfs() );
+        size_t hash = 0;
+        boost::hash_combine(hash, loc.a());
+        boost::hash_combine(hash, loc.getOfs());
+        return hash;
     }
 
     inline std::ostream& operator<<( std::ostream &stream, const DiskLoc &loc ) {
