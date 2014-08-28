@@ -611,9 +611,9 @@ __session_begin_transaction(WT_SESSION *wt_session, const char *config)
 		WT_ERR_MSG(session, EINVAL, "Transaction already running");
 
 	/*
-	 * Now there are no cursors open and no transaction active in this
-	 * thread.  Check if the cache is full: if we have to block for
-	 * eviction, this is the best time to do it.
+	 * There is no transaction active in this thread; check if the cache is
+	 * full, if we have to block for eviction, this is the best time to do
+	 * it.
 	 */
 	WT_ERR(__wt_cache_full_check(session));
 
