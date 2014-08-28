@@ -457,10 +457,9 @@ __wt_btcur_next(WT_CURSOR_BTREE *cbt, int truncating)
 
 		WT_ERR(__wt_tree_walk(session, &cbt->ref, flags));
 		WT_ERR_TEST(cbt->ref == NULL, WT_NOTFOUND);
+
 		page = cbt->ref->page;
-		WT_ASSERT(session,
-		    page->type != WT_PAGE_COL_INT &&
-		    page->type != WT_PAGE_ROW_INT);
+		WT_ASSERT(session, !WT_PAGE_IS_INTERNAL(page));
 	}
 
 err:	if (ret != 0)
