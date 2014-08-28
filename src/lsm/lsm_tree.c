@@ -514,9 +514,8 @@ __wt_lsm_tree_get(WT_SESSION_IMPL *session,
 					F_CLR(lsm_tree, WT_LSM_TREE_EXCLUSIVE);
 					return (EBUSY);
 				}
-			}
-			    
-			(void)WT_ATOMIC_ADD(lsm_tree->refcnt, 1);
+			} else
+				(void)WT_ATOMIC_ADD(lsm_tree->refcnt, 1);
 
 			/*
 			 * If we got a reference, but an exclusive reference
