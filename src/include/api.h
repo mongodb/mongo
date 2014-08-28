@@ -34,6 +34,7 @@
 		(s)->name = __oldname;					\
 		if (F_ISSET(&(s)->txn, TXN_RUNNING) &&			\
 		    (ret) != 0 &&					\
+		    (ret) != ENOENT &&					\
 		    (ret) != WT_NOTFOUND &&				\
 		    (ret) != WT_DUPLICATE_KEY)				\
 			F_SET(&(s)->txn, TXN_ERROR);			\
