@@ -460,6 +460,7 @@ __cache_pool_adjust(WT_SESSION_IMPL *session,
 	uint64_t adjusted, reserved, read_pressure;
 	int force, grew;
 
+	*adjustedp = 0;
 	cp = __wt_process.cache_pool;
 	force = (cp->currently_used > cp->size);
 	grew = 0;
@@ -515,6 +516,7 @@ __cache_pool_adjust(WT_SESSION_IMPL *session,
 			    cp->size - cp->currently_used);
 		}
 		if (adjusted > 0) {
+			*adjustedp = 1;
 			if (grew > 0) {
 				cache->cp_skip_count = WT_CACHE_POOL_BUMP_SKIPS;
 				entry->cache_size += adjusted;
@@ -534,7 +536,6 @@ __cache_pool_adjust(WT_SESSION_IMPL *session,
 			 */
 		}
 	}
-	*adjustedp = (adjusted != 0);
 	return (0);
 }
 
