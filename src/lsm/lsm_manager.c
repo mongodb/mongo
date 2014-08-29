@@ -541,6 +541,7 @@ __wt_lsm_manager_push_entry(
 		TAILQ_INSERT_TAIL(&manager->managerqh, entry, q);
 		__wt_spin_unlock(session, &manager->manager_lock);
 		break;
+	WT_ILLEGAL_VALUE(session);
 	}
 
 	return (0);
