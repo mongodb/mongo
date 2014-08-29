@@ -67,10 +67,10 @@ most durability guarantees).
 There are some considerations when configuring commit-level durability
 that can affect performance.
 
-@section durability_group_commit Group commit
+@section tune_durability_group_commit Group commit
 @copydoc doc_tune_durability_group_commit
 
-@section durability_flush_config Flush call configuration
+@section tune_durability_flush_config Flush call configuration
 @copydoc doc_tune_durability_flush_config
 
  */

@@ -24,7 +24,7 @@ each of which is ordered by one or more columns.
 
 <h2>Programming notes</h2>
 - @subpage threads
-- @subpage name_space
+- @subpage namespace
 - @subpage signals
 
 <h2>Advanced features</h2>
@@ -32,7 +32,7 @@ each of which is ordered by one or more columns.
 - @subpage durability
 - @subpage backup
 - @subpage async
-- @subpage compaction
+- @subpage compact
 - @subpage statistics
 - @subpage shared_cache
 - @subpage cursor_log
