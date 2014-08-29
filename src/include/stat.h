@@ -207,6 +207,9 @@ struct __wt_connection_stats {
 	WT_STATS lsm_checkpoint_throttle;
 	WT_STATS lsm_merge_throttle;
 	WT_STATS lsm_rows_merged;
+	WT_STATS lsm_work_units_created;
+	WT_STATS lsm_work_units_discarded;
+	WT_STATS lsm_work_units_done;
 	WT_STATS memory_allocation;
 	WT_STATS memory_free;
 	WT_STATS memory_grow;

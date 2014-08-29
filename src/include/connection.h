@@ -202,6 +202,8 @@ struct __wt_connection_impl {
 	uint32_t	 async_size;	/* Async op array size */
 	uint32_t	 async_workers;	/* Number of async workers */
 
+	WT_LSM_MANAGER	lsm_manager;	/* LSM worker thread information */
+
 	WT_SESSION_IMPL *evict_session; /* Eviction server sessions */
 	pthread_t	 evict_tid;	/* Eviction server thread ID */
 	int		 evict_tid_set;	/* Eviction server thread ID set */

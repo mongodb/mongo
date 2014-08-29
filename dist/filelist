@@ -85,10 +85,12 @@ src/log/log.c
 src/log/log_auto.c
 src/log/log_slot.c
 src/lsm/lsm_cursor.c
+src/lsm/lsm_manager.c
 src/lsm/lsm_merge.c
 src/lsm/lsm_meta.c
 src/lsm/lsm_stat.c
 src/lsm/lsm_tree.c
+src/lsm/lsm_work_unit.c
 src/lsm/lsm_worker.c
 src/meta/meta_apply.c
 src/meta/meta_ckpt.c

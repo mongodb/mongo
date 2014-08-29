@@ -92,6 +92,8 @@ __clsm_enter_update(WT_CURSOR_LSM *clsm)
 			WT_RET(__wt_lsm_tree_lock(session, lsm_tree, 0));
 			if (clsm->dsk_gen == lsm_tree->dsk_gen &&
 			    !F_ISSET(lsm_tree, WT_LSM_TREE_NEED_SWITCH)) {
+				WT_RET(__wt_lsm_manager_push_entry(
+				    session, WT_LSM_WORK_SWITCH, lsm_tree));
 				F_SET(lsm_tree, WT_LSM_TREE_NEED_SWITCH);
 				need_signal = 1;
 			}
@@ -1504,10 +1506,11 @@ __wt_clsm_open(WT_SESSION_IMPL *session,
 	WT_ERR(__wt_cursor_init(cursor, cursor->uri, owner, cfg, cursorp));
 
 	if (0) {
-err:		if (lsm_tree != NULL)
-			__wt_lsm_tree_release(session, lsm_tree);
-		if (cursor != NULL)
+err:		__wt_lsm_tree_release(session, lsm_tree);
+		if (clsm != NULL) {
+			clsm->lsm_tree = NULL;
 			WT_TRET(__clsm_close(cursor));
+		}
 	}
 
 	return (ret);
