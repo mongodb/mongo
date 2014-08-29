@@ -56,7 +56,7 @@ public:
         repl::OplogReader r;
         r.setTailingQueryOptions( QueryOption_SlaveOk | QueryOption_AwaitData );
 
-        bool connected = r.connect(mongoOplogGlobalParams.from);
+        bool connected = r.connect(HostAndPort(mongoOplogGlobalParams.from));
 
         if (!connected)
         {

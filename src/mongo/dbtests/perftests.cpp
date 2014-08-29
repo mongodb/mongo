@@ -137,7 +137,7 @@ namespace PerfTests {
 
                 boost::shared_ptr<DBClientConnection> c(new DBClientConnection(false, 0, 60));
                 string err;
-                if( c->connect("perfdb.10gen.cc", err) ) {
+                if( c->connect(HostAndPort("perfdb.10gen.cc"), err) ) {
                     if( !c->auth("perf", "perf", pwd, err) ) {
                         cout << "info: authentication with stats db failed: " << err << endl;
                         verify(false);

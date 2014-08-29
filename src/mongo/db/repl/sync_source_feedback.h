@@ -94,7 +94,7 @@ namespace repl {
         }
 
         /// Connect to sync target.
-        bool _connect(OperationContext* txn, const std::string& hostName);
+        bool _connect(OperationContext* txn, const HostAndPort& host);
 
         // stores our OID to be passed along in commands
         /// TODO(spencer): Remove this once the LegacyReplicationCoordinator is gone.

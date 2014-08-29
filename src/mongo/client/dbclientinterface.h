@@ -1242,23 +1242,6 @@ namespace mongo {
            If autoReconnect is true, you can try to use the DBClientConnection even when
            false was returned -- it will try to connect again.
 
-           @param serverHostname host to connect to.  can include port number ( 127.0.0.1 , 127.0.0.1:5555 )
-                                 If you use IPv6 you must add a port number ( ::1:27017 )
-           @param errmsg any relevant error message will appended to the string
-           @deprecated please use HostAndPort
-           @return false if fails to connect.
-        */
-        virtual bool connect(const char * hostname, std::string& errmsg) {
-            // TODO: remove this method
-            HostAndPort t( hostname );
-            return connect( t , errmsg );
-        }
-
-        /** Connect to a Mongo database server.
-
-           If autoReconnect is true, you can try to use the DBClientConnection even when
-           false was returned -- it will try to connect again.
-
            @param server server to connect to.
            @param errmsg any relevant error message will appended to the string
            @return false if fails to connect.
