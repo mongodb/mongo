@@ -348,12 +348,7 @@ namespace mongo {
         if( full || errored ) retryNext = false;
 
         if( ! retryNext && pcState ){
-
-            if( errored && pcState->conn ){
-                // Connection will cleanup for itself. Do nothing.
-            }
-            else if( initialized ){
-
+            if (initialized && !errored) {
                 verify( pcState->cursor );
                 verify( pcState->conn );
 
