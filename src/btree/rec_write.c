@@ -2488,9 +2488,8 @@ __rec_split_write(WT_SESSION_IMPL *session,
 	WT_PAGE_HEADER *dsk;
 	WT_PAGE_MODIFY *mod;
 	WT_UPD_SKIPPED *skip;
-	ptrdiff_t bnd_slot;
 	size_t addr_size;
-	uint32_t i, j;
+	uint32_t bnd_slot, i, j;
 	int cmp;
 	uint8_t addr[WT_BTREE_MAX_ADDR_COOKIE];
 
@@ -2616,7 +2615,7 @@ skip_check_complete:
 	 * time, but that test won't calculate a checksum on the first block
 	 * the first time the page splits.
 	 */
-	bnd_slot = bnd - r->bnd;
+	bnd_slot = (uint32_t)(bnd - r->bnd);
 	if (bnd_slot > 1 ||
 	    (F_ISSET(mod, WT_PM_REC_MULTIBLOCK) && mod->mod_multi != NULL)) {
 		/*
