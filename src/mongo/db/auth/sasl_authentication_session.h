@@ -51,8 +51,8 @@ namespace mongo {
         MONGO_DISALLOW_COPYING(SaslAuthenticationSession);
     public:
         typedef stdx::function<SaslAuthenticationSession* (AuthorizationSession*)> 
-            SaslSessionFactoryFn;
-        static SaslSessionFactoryFn create; 
+            SaslAuthenticationSessionFactoryFn;
+        static SaslAuthenticationSessionFactoryFn create; 
 
         // Mechanism name constants.
         static const char mechanismCRAMMD5[];

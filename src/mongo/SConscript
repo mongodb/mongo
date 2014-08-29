@@ -286,8 +286,11 @@ env.Library('clientdriver', [
             "client/dbclient.cpp",
             "client/dbclient_rs.cpp",
             "client/dbclientcursor.cpp",
+            'client/native_sasl_client_session.cpp',
             "client/replica_set_monitor.cpp",
             'client/sasl_client_authenticate.cpp',
+            "client/sasl_client_authenticate_impl.cpp",
+            'client/sasl_client_session.cpp',
             "client/syncclusterconnection.cpp",
             "db/dbmessage.cpp"
             ],
@@ -336,16 +339,16 @@ if env['MONGO_BUILD_SASL_CLIENT']:
     if env['PYSYSPLATFORM'] == "win32":
         saslLibs.extend(["secur32"])
 
-    env.Library('sasl_client_session',
-                ['client/sasl_client_session.cpp',
+    env.Library('cyrus_sasl_client_session',
+                ['client/cyrus_sasl_client_session.cpp',
                  'client/sasl_sspi.cpp'],
                 LIBDEPS = [
+                    'clientdriver',
                     'foundation',
                     'signal_handlers_synchronous',
                 ],
                 SYSLIBDEPS=saslLibs)
-    commonFiles.extend(['client/sasl_client_authenticate_impl.cpp'])
-    extraCommonLibdeps.append('sasl_client_session')
+    extraCommonLibdeps.append('cyrus_sasl_client_session')
 
 # handle processinfo*
 processInfoFiles = [ "util/processinfo.cpp" ]
