@@ -1169,8 +1169,8 @@ extern int __wt_cond_wait(WT_SESSION_IMPL *session,
 extern int __wt_cond_signal(WT_SESSION_IMPL *session, WT_CONDVAR *cond);
 extern int __wt_cond_destroy(WT_SESSION_IMPL *session, WT_CONDVAR **condp);
 extern int __wt_rwlock_alloc( WT_SESSION_IMPL *session,
-    const char *name,
-    WT_RWLOCK **rwlockp);
+    WT_RWLOCK **rwlockp,
+    const char *name);
 extern int __wt_readlock(WT_SESSION_IMPL *session, WT_RWLOCK *rwlock);
 extern int __wt_try_writelock(WT_SESSION_IMPL *session, WT_RWLOCK *rwlock);
 extern int __wt_writelock(WT_SESSION_IMPL *session, WT_RWLOCK *rwlock);

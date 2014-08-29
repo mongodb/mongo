@@ -407,6 +407,7 @@ __log_filesize(WT_SESSION_IMPL *session, WT_FH *fh, off_t *eof)
 	uint64_t rec;
 	uint32_t allocsize;
 	off_t log_size, off;
+	int walkmb;
 
 	conn = S2C(session);
 	log = conn->log;
@@ -418,6 +419,19 @@ __log_filesize(WT_SESSION_IMPL *session, WT_FH *fh, off_t *eof)
 		allocsize = LOG_ALIGN;
 	else
 		allocsize = log->allocsize;
+
+	/*
+	 * It can be very slow looking for the last real record in the log
+	 * in very small chunks.  Walk backward by a megabyte at a time.  When
+	 * we find it a part of the log, then find the real end by walking
+	 * the true allocsize.
+	 */
+	walkmb = 0;
+	if (allocsize == LOG_ALIGN) {
+		allocsize = WT_MEGABYTE;
+		walkmb = 1;
+	}
+
 	/*
 	 * We know all log records are aligned at log->allocsize.  The first
 	 * item in a log record is always the length.  Look for any non-zero
@@ -432,6 +446,24 @@ __log_filesize(WT_SESSION_IMPL *session, WT_FH *fh, off_t *eof)
 		if (rec != 0)
 			break;
 	}
+
+	/*
+	 * If we're walking by large amounts, now walk by the real allocsize
+	 * to find the real end.
+	 */
+	if (off > 0 && walkmb) {
+		/* Move ahead to the last known zero area. */
+		off += allocsize;
+		allocsize = LOG_ALIGN;
+		/* Walk back within that area for the end. */
+		for (; off > 0; off -= (off_t)allocsize) {
+			WT_ERR(__wt_read(session,
+			    fh, off, sizeof(uint64_t), &rec));
+			if (rec != 0)
+				break;
+		}
+	}
+
 	/*
 	 * Set EOF to the last zero-filled record we saw.
 	 */

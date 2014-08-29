@@ -1,3 +1,15 @@
+/*! @class doc_bulk_durability
+
+Bulk-loads are not commit-level durable, that is, the creation and
+bulk-load of an object will not appear in the database log files.\  For
+this reason, applications doing incremental backups after a full backup
+should repeat the full backup step after doing a bulk-load to make the
+bulk-load durable.\ In addition, incremental backups after a bulk-load
+can cause recovery to report errors because there are log records that
+apply to data files which don't appear in the backup.
+
+*/
+
 /*! @page backup Backups
 
 WiredTiger cursors provide access to data from a variety of sources.
@@ -79,13 +91,7 @@ file with the largest number in its name is the most recent log file
 written.  To incrementally add log files to a backup, simply copy newly
 created log files from the database home to the backup copy.
 
-Bulk-loads are not commit-level durable, that is, the creation and
-subsequent bulk-load of an object will not appear in the database log
-files.  For this reason, applications doing incremental backup should
-create a new copy of the data files after a bulk-load to make the
-bulk-load durable.  In addition, incremental backup after a bulk-load
-can cause recovery to report errors because there are log records that
-apply to data files which don't appear in the backup.
+@copydoc doc_bulk_durability
 
 By default, WiredTiger automatically removes log files no longer
 required for recovery.  Applications wanting to use log files for
@@ -109,7 +115,7 @@ and removing log files from the original database home:
 
 3. Perform a checkpoint in the database.
 
-4. Discard log files in the database home that no longer needed.  The
+4. Discard log files in the database home that are no longer needed.  The
    log files that are no longer needed include the log files that were
    copied in step 2 except for the most recent log file in the database
    home at that time.  For example, if log files 10 through 12 were

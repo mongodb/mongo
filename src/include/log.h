@@ -113,6 +113,8 @@ typedef struct {
 	WT_SPINLOCK      log_slot_lock; /* Locked: Consolidation array */
 	WT_SPINLOCK      log_sync_lock; /* Locked: Single-thread fsync */
 
+	WT_RWLOCK	 *log_archive_lock; /* Archive and log cursors */
+
 	/* Notify any waiting threads when sync_lsn is updated. */
 	WT_CONDVAR	*log_sync_cond;
 

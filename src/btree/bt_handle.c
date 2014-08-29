@@ -317,7 +317,7 @@ __btree_conf(WT_SESSION_IMPL *session, WT_CKPT *ckpt)
 
 	/* Initialize locks. */
 	WT_RET(__wt_rwlock_alloc(
-	    session, "btree overflow lock", &btree->ovfl_lock));
+	    session, &btree->ovfl_lock, "btree overflow lock"));
 	WT_RET(__wt_spin_init(session, &btree->flush_lock, "btree flush lock"));
 
 	__wt_stat_init_dsrc_stats(&btree->dhandle->stats);

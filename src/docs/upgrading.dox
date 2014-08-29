@@ -16,6 +16,20 @@ The global lsm_merge configuration setting has been moved into
 the \c lsm_manager option group. To disable merges in all LSM
 trees pass \c lsm_manger=(merge=false) to ::wiredtiger_open.
 </dd>
+<dt>Java include path search changes</dt>
+<dd>
+We have updated the configure logic used to search for Java Native Interface
+files.  This fixes problems building WiredTiger's Java API, particularly on
+OS X, but may introduce problems if your build procedure relied on the old
+search behavior.
+</dd>
+<dt>Default mutex implementation changed</dt>
+<dd>
+The default mutex implementation has been changed from adaptive pthread
+mutexes to non-adaptive pthread mutexes. Installations can explicitly
+select adaptive pthread mutexes by specifying
+\c --with-spinlock=pthread_adaptive at configuration time.
+</dd>
 </dl>
 
 @section version_231 Upgrading to Version 2.3.1
@@ -31,7 +45,6 @@ configure additional threads whereas the new settings configure the total
 number of threads involved with eviction.
 </dd>
 </dl>
->>>>>>> develop
 
 @section version_230 Upgrading to Version 2.3.0
 

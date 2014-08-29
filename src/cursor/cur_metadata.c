@@ -202,11 +202,9 @@ __curmetadata_reset(WT_CURSOR *cursor)
 	CURSOR_API_CALL(cursor, session,
 	    reset, ((WT_CURSOR_BTREE *)file_cursor)->btree);
 
-	if (F_ISSET(mdc, WT_MDC_POSITIONED) &&
-	    !F_ISSET(mdc, WT_MDC_ONMETADATA))
-	    ret = file_cursor->reset(file_cursor);
-	F_CLR(mdc,
-	    WT_MDC_POSITIONED | WT_MDC_ONMETADATA);
+	if (F_ISSET(mdc, WT_MDC_POSITIONED) && !F_ISSET(mdc, WT_MDC_ONMETADATA))
+		ret = file_cursor->reset(file_cursor);
+	F_CLR(mdc, WT_MDC_POSITIONED | WT_MDC_ONMETADATA);
 	F_CLR(cursor, WT_CURSTD_KEY_SET | WT_CURSTD_VALUE_SET);
 
 err:	API_END_RET(session, ret);

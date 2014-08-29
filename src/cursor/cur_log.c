@@ -23,8 +23,7 @@ __curlog_logrec(
 	*cl->cur_lsn = *lsnp;
 	*cl->next_lsn = *lsnp;
 	cl->next_lsn->offset += (off_t)logrec->size;
-	WT_RET(__wt_buf_set(session,
-	    cl->logrec, logrec->data, logrec->size));
+	WT_RET(__wt_buf_set(session, cl->logrec, logrec->data, logrec->size));
 
 	/*
 	 * Read the log header.  Set up the step pointers to walk the
@@ -276,12 +275,18 @@ __curlog_reset(WT_CURSOR *cursor)
 static int
 __curlog_close(WT_CURSOR *cursor)
 {
+	WT_CONNECTION_IMPL *conn;
 	WT_CURSOR_LOG *cl;
 	WT_DECL_RET;
+	WT_LOG *log;
 	WT_SESSION_IMPL *session;
 
 	CURSOR_API_CALL(cursor, session, close, NULL);
 	cl = (WT_CURSOR_LOG *)cursor;
+	conn = S2C(session);
+	WT_ASSERT(session, conn->logging);
+	log = conn->log;
+	WT_ERR(__wt_rwunlock(session, log->log_archive_lock));
 	WT_ERR(__curlog_reset(cursor));
 	__wt_free(session, cl->cur_lsn);
 	__wt_free(session, cl->next_lsn);
@@ -320,6 +325,7 @@ __wt_curlog_open(WT_SESSION_IMPL *session,
 	WT_CURSOR *cursor;
 	WT_CURSOR_LOG *cl;
 	WT_DECL_RET;
+	WT_LOG *log;
 
 	STATIC_ASSERT(offsetof(WT_CURSOR_LOG, iface) == 0);
 	conn = S2C(session);
@@ -327,6 +333,7 @@ __wt_curlog_open(WT_SESSION_IMPL *session,
 		WT_RET_MSG(session, EINVAL,
 		    "Cannot open a log cursor without logging enabled");
 
+	log = conn->log;
 	cl = NULL;
 	WT_RET(__wt_calloc_def(session, 1, &cl));
 	cursor = &cl->iface;
@@ -347,6 +354,8 @@ __wt_curlog_open(WT_SESSION_IMPL *session,
 
 	/* Log cursors are read only. */
 	WT_ERR(__wt_cursor_config_readonly(cursor, cfg, 1));
+	/* Log cursors block archiving. */
+	WT_ERR(__wt_readlock(session, log->log_archive_lock));
 
 	if (0) {
 err:		if (F_ISSET(cursor, WT_CURSTD_OPEN))
@@ -357,6 +366,11 @@ err:		if (F_ISSET(cursor, WT_CURSTD_OPEN))
 			__wt_scr_free(&cl->logrec);
 			__wt_scr_free(&cl->opkey);
 			__wt_scr_free(&cl->opvalue);
+			/*
+			 * NOTE:  We cannot get on the error path with the
+			 * readlock held.  No need to unlock it unless that
+			 * changes above.
+			 */
 			__wt_free(session, cl);
 		}
 		*cursorp = NULL;
