@@ -29,6 +29,7 @@
 #pragma once
 
 #include "mongo/db/exec/working_set.h"
+#include "mongo/db/matcher/expression.h"
 #include "mongo/db/matcher/matchable.h"
 
 namespace mongo {

@@ -28,10 +28,9 @@
 
 #include "mongo/db/exec/shard_filter.h"
 
-#include "mongo/db/keypattern.h"
-#include "mongo/db/matcher/expression.h"
 #include "mongo/db/exec/filter.h"
 #include "mongo/db/exec/working_set_common.h"
+#include "mongo/db/keypattern.h"
 #include "mongo/util/log.h"
 
 namespace mongo {
