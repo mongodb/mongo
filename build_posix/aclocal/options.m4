@@ -172,13 +172,15 @@ AH_TEMPLATE(SPINLOCK_TYPE, [Spinlock type from mutex.h.])
 AC_MSG_CHECKING(if --with-spinlock option specified)
 AC_ARG_WITH(spinlock,
 	[AS_HELP_STRING([--with-spinlock],
-	    [Spinlock type (pthread, pthread_logging or gcc).])],
+	    [Spinlock type (pthread, pthread_adaptive or gcc).])],
 	    [],
 	    [with_spinlock=pthread])
 case "$with_spinlock" in
 gcc)	AC_DEFINE(SPINLOCK_TYPE, SPINLOCK_GCC);;
 pthread|pthreads)
 	AC_DEFINE(SPINLOCK_TYPE, SPINLOCK_PTHREAD_MUTEX);;
+pthread_adaptive|pthreads_adaptive)
+	AC_DEFINE(SPINLOCK_TYPE, SPINLOCK_PTHREAD_MUTEX_ADAPTIVE);;
 pthread_logging|pthreads_logging)
 	AC_DEFINE(SPINLOCK_TYPE, SPINLOCK_PTHREAD_MUTEX_LOGGING);;
 *)	AC_MSG_ERROR([Unknown spinlock type "$with_spinlock"]);;

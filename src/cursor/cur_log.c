@@ -23,8 +23,7 @@ __curlog_logrec(
 	*cl->cur_lsn = *lsnp;
 	*cl->next_lsn = *lsnp;
 	cl->next_lsn->offset += (off_t)logrec->size;
-	WT_RET(__wt_buf_set(session,
-	    cl->logrec, logrec->data, logrec->size));
+	WT_RET(__wt_buf_set(session, cl->logrec, logrec->data, logrec->size));
 
 	/*
 	 * Read the log header.  Set up the step pointers to walk the

@@ -21,12 +21,13 @@ def missing_comment():
 
 # Display lines that could be joined.
 def lines_could_join():
+    skip_re = re.compile(r'__asm__')
+    match_re = re.compile('(^[ \t].*\()\n^[ \t]*([^\n]*)', re.MULTILINE)
     for f in source_files():
-        skip_re = re.compile(r'__asm__')
-        match_re = re.compile('(^[ \t].*\()\n^[ \t]*([^\n]*)', re.MULTILINE)
         s = open(f, 'r').read()
         if skip_re.search(s):
             continue
+
         for m in match_re.finditer(s):
             if len(m.group(1).expandtabs()) + \
                 len(m.group(2).expandtabs()) < 80:

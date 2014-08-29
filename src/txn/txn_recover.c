@@ -234,8 +234,7 @@ __txn_op_apply(
 	r->modified = 1;
 
 err:	if (ret != 0)
-		__wt_err(session, ret,
-		    "Operation failed during recovery");
+		__wt_err(session, ret, "Operation failed during recovery");
 	return (ret);
 }
 

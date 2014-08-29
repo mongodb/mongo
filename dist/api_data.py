@@ -348,6 +348,17 @@ connection_runtime_config = [
 	Config('eviction_trigger', '95', r'''
 	    trigger eviction when the cache is using this much memory, as a
 	    percentage of the total cache size''', min=10, max=99),
+	Config('lsm_manager', '', r'''
+	    configure database wide options for LSM tree management''',
+	    type='category', subconfig=[
+	    Config('worker_thread_max', '4', r'''
+	        Configure a set of threads to manage merging LSM trees in
+			the database.''',
+	        min='3', max='20'),
+	    Config('merge', 'true', r'''
+	        merge LSM chunks where possible''',
+	        type='boolean')
+		]),
 	Config('eviction', '', r'''
 	    eviction configuration options.''',
 	    type='category', subconfig=[
@@ -765,9 +776,6 @@ methods = {
 	        If the value is not an absolute path name, the files are created
 	        relative to the database home'''),
 	    ]),
-	Config('lsm_merge', 'true', r'''
-	    merge LSM chunks where possible''',
-	    type='boolean'),
 	Config('mmap', 'true', r'''
 	    Use memory mapping to access files when possible''',
 	    type='boolean'),

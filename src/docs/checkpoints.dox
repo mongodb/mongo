@@ -1,12 +1,12 @@
 /*! @page checkpoint Checkpoint durability
 
 WiredTiger supports checkpoint durability by default, and optionally
-commit-level durability when logging is enabled.  In most applications,\
-commit-level durability impacts performance more than checkpoint durability;
-checkpoints offer basic operation durability across application or system
-failure without impacting performance, (although the creation of each checkpoint
-is a relatively heavy-weight operation).  See @ref durability for information
-on commit-level durability.
+commit-level durability when logging is enabled.  In most applications,
+commit-level durability impacts performance more than checkpoint
+durability; checkpoints offer basic operation durability across
+application or system failure without impacting performance (although
+the creation of each checkpoint is a relatively heavy-weight operation).
+See @ref durability for information on commit-level durability.
 
 Checkpoints with transactional logging enabled allow logging to archive
 older log files (if configured to do so) while still retaining

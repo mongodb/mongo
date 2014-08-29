@@ -237,6 +237,11 @@ __statlog_lsm_apply(WT_SESSION_IMPL *session)
 
 err:	if (locked)
 		__wt_spin_unlock(session, &S2C(session)->schema_lock);
+	/* Release any LSM trees on error. */
+	while (cnt > 0) {
+		--cnt;
+		__wt_lsm_tree_release(session, list[cnt]);
+	}
 	return (ret);
 }
 
