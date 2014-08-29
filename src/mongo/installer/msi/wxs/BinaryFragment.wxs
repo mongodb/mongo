@@ -71,22 +71,20 @@
           <File Id="f_saslPdb" Name="libsasl.pdb" Source="$(var.SaslSource)\libsasl.pdb"
                 DiskId="1" KeyPath="yes" />
         </Component>
-        <Component Id="c_snmp" Guid="F5E5A889-FC9F-4B9A-BEFD-C8ABC9A92D8D">
-          <File Id="f_ssnmp" Name="netsnmp.dll" Source="$(var.SnmpSource)\netsnmp.dll"
-                DiskId="1" KeyPath="yes" />
-        </Component>
-        <Component Id="c_snmpPdb" Guid="6AAB0ACE-C354-4D3A-B490-2AA235647AB3">
-          <File Id="f_snmpPdb" Name="netsnmp.pdb" Source="$(var.SnmpSource)\netsnmp.pdb"
-                DiskId="1" KeyPath="yes" />
-        </Component>
-      <?endif ?>
-      <?if $(var.Edition) = Enterprise Or $(var.Edition) = SSL ?>
         <Component Id="c_ssleay" Guid="8879033A-F4F7-4879-A7F8-4D81355A47E3">
           <File Id="f_ssleay" Name="ssleay32.dll" Source="$(var.SslSource)\ssleay32.dll"
                 DiskId="1" KeyPath="yes" />
         </Component>
         <Component Id="c_libeay" Guid="E6CC6AA5-AC71-45EC-803C-71F816E33135">
           <File Id="f_libeay" Name="libeay32.dll" Source="$(var.SslSource)\libeay32.dll"
+                DiskId="1" KeyPath="yes" />
+        </Component>
+        <Component Id="c_snmp" Guid="F5E5A889-FC9F-4B9A-BEFD-C8ABC9A92D8D">
+          <File Id="f_ssnmp" Name="netsnmp.dll" Source="$(var.SnmpSource)\netsnmp.dll"
+                DiskId="1" KeyPath="yes" />
+        </Component>
+        <Component Id="c_snmpPdb" Guid="6AAB0ACE-C354-4D3A-B490-2AA235647AB3">
+          <File Id="f_snmpPdb" Name="netsnmp.pdb" Source="$(var.SnmpSource)\netsnmp.pdb"
                 DiskId="1" KeyPath="yes" />
         </Component>
       <?endif ?>
@@ -116,14 +114,14 @@
       </DirectoryRef>
     <?endif ?>
 
-
-    <?if $(var.Edition) = Enterprise or $(var.Edition) = SSL ?>
+    <!--
+    Only use VC redistributable on builds with /MD - for now, just Enterprise 
+    -->
+    <?if $(var.Edition) = Enterprise ?>
       <DirectoryRef Id="TARGETDIR">
         <Merge Id="m_vcredist" SourceFile="$(var.MergeModulesBasePath)\Microsoft_VC120_CRT_x64.msm" DiskId="1" Language="0"/>
       </DirectoryRef>
-    <?endif ?>
 
-    <?if $(var.Edition) = Enterprise ?>
       <ComponentGroup Id="cg_EnterpriseBase">
         <ComponentRef Id="c_sasl" />
         <ComponentRef Id="c_saslPdb" />
@@ -139,13 +137,6 @@
         <ComponentRef Id="c_snmpConfSubagent" />
         <ComponentRef Id="c_snmpMongodMib" />
         <ComponentRef Id="c_snmpMongodbincMib" />
-      </ComponentGroup>
-    <?endif ?>
-
-    <?if $(var.Edition) = SSL ?>
-      <ComponentGroup Id="cg_SSLBase">
-        <ComponentRef Id="c_ssleay" />
-        <ComponentRef Id="c_libeay" />
       </ComponentGroup>
     <?endif ?>
   </Fragment>
