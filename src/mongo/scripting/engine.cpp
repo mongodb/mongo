@@ -44,7 +44,11 @@
 
 namespace mongo {
     long long Scope::_lastVersion = 1;
-    static const unsigned kMaxJsFileLength = std::numeric_limits<unsigned>::max() - 1;
+
+namespace {
+    // 2 GB is the largest support Javascript file size.
+    static const fileofs kMaxJsFileLength = fileofs(2) * 1024 * 1024 * 1024;
+}  // namespace
 
     ScriptEngine::ScriptEngine() : _scopeInitCallback() {
     }
