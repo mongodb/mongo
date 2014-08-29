@@ -655,7 +655,7 @@ __conn_reconfigure(WT_CONNECTION *wt_conn, const char *config)
 	WT_ERR(__wt_config_gets(
 	    session, cfg, "lsm_manager.worker_thread_max", &cval));
 	if (cval.val)
-		conn->lsm_manager.lsm_workers_max = cval.val;
+		conn->lsm_manager.lsm_workers_max = (uint32_t)cval.val;
 
 	/* Wake up the cache pool server so any changes are noticed. */
 	if (F_ISSET(conn, WT_CONN_CACHE_POOL))
@@ -1313,7 +1313,7 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
 	WT_ERR(__wt_config_gets(
 	    session, cfg, "lsm_manager.worker_thread_max", &cval));
 	if (cval.val)
-		conn->lsm_manager.lsm_workers_max = cval.val;
+		conn->lsm_manager.lsm_workers_max = (uint32_t)cval.val;
 
 	WT_ERR(__wt_config_gets(session, cfg, "checkpoint_sync", &cval));
 	if (cval.val)

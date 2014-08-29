@@ -163,7 +163,8 @@ static int
 __lsm_manager_aggressive_update(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 {
 	struct timespec now;
-	u_int chunk_wait, old_aggressive, stallms;
+	uint64_t chunk_wait, stallms;
+	u_int old_aggressive;
 
 	WT_RET(__wt_epoch(session, &now));
 	stallms = WT_TIMEDIFF(now, lsm_tree->last_flush_ts) / WT_MILLION;
