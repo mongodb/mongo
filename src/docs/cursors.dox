@@ -65,7 +65,7 @@ cursors in a session read from a stable snapshot while any cursor in the
 session remains positioned.
 
 Cursor positions survive transaction boundaries, unless a transaction
-is rolled-back. When a transaction is rolled-back either implicitly
+is rolled back. When a transaction is rolled-back either implicitly
 or explicitly, all cursors in the session are reset as if the
 WT_CURSOR::reset method was called, discarding any cursor position as
 well as any key and value.

@@ -39,7 +39,7 @@ WT_SESSION::commit_transaction, or discarded by calling
 WT_SESSION::rollback_transaction.
 
 If WT_SESSION::commit_transaction returns an error for any reason, the
-transaction was rolled-back, not committed.
+transaction was rolled back, not committed.
 
 When transactions are used, data operations can encounter a conflict and
 fail with the ::WT_DEADLOCK error.  If this error occurs, transactions

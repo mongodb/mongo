@@ -1317,7 +1317,7 @@ struct __wt_session {
 	 * A transaction must be in progress when this method is called.
 	 *
 	 * If WT_SESSION::commit_transaction returns an error, the transaction
-	 * was rolled-back, not committed.
+	 * was rolled back, not committed.
 	 *
 	 * @snippet ex_all.c transaction commit/rollback
 	 *
@@ -3187,7 +3187,7 @@ extern int wiredtiger_extension_terminate(WT_CONNECTION *connection);
 #define	WT_STAT_CONN_TXN_COMMIT				1095
 /*! transaction failures due to cache overflow */
 #define	WT_STAT_CONN_TXN_FAIL_CACHE			1096
-/*! transactions rolled-back */
+/*! transactions rolled back */
 #define	WT_STAT_CONN_TXN_ROLLBACK			1097
 /*! total write I/Os */
 #define	WT_STAT_CONN_WRITE_IO				1098

@@ -436,7 +436,7 @@ __wt_stat_init_connection_stats(WT_CONNECTION_STATS *stats)
 	stats->txn_commit.desc = "transactions committed";
 	stats->txn_fail_cache.desc =
 	    "transaction failures due to cache overflow";
-	stats->txn_rollback.desc = "transactions rolled-back";
+	stats->txn_rollback.desc = "transactions rolled back";
 	stats->write_io.desc = "total write I/Os";
 }
 
