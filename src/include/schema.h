@@ -93,8 +93,7 @@ struct __wt_table {
 	if (!F_ISSET(session, WT_SESSION_SCHEMA_LOCKED))		\
 		(op);							\
 	else {								\
-		__wt_spin_unlock(					\
-		    session, &S2C(session)->schema_lock);		\
+		__wt_spin_unlock(session, &S2C(session)->schema_lock);	\
 		F_CLR(session, WT_SESSION_SCHEMA_LOCKED);		\
 		(op);							\
 		while (!F_ISSET(session, WT_SESSION_SCHEMA_LOCKED)) {	\
