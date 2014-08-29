@@ -89,9 +89,11 @@ __lsm_worker(void *arg)
 					    chunk->refcnt, 1);
 				}
 			} else if (entry->flags == WT_LSM_WORK_DROP) {
-				__wt_lsm_free_chunks(session, entry->lsm_tree);
+				WT_ERR(__wt_lsm_free_chunks(
+				    session, entry->lsm_tree));
 			} else if (entry->flags == WT_LSM_WORK_BLOOM) {
-				__wt_lsm_bloom_work(session, entry->lsm_tree);
+				WT_ERR(__wt_lsm_bloom_work(
+				    session, entry->lsm_tree));
 				WT_ERR(__wt_lsm_manager_push_entry(session,
 				    WT_LSM_WORK_MERGE, entry->lsm_tree));
 			}
