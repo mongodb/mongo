@@ -74,11 +74,11 @@ namespace repl {
         static const int tcp_timeout = 30;
 
         /* ok to call if already connected */
-        bool connect(const std::string& hostname);
+        bool connect(const HostAndPort& host);
 
-        bool connect(const std::string& hostname, const OID& myRID);
+        bool connect(const HostAndPort& host, const OID& myRID);
 
-        bool connect(const mongo::OID& rid, const int from, const std::string& to);
+        bool connect(const mongo::OID& rid, const int from, const HostAndPort& to);
 
         void tailCheck();
 
@@ -156,7 +156,7 @@ namespace repl {
         
     private:
         /** @return true iff connection was successful */ 
-        bool commonConnect(const std::string& hostName);
+        bool commonConnect(const HostAndPort& host);
         bool passthroughHandshake(const mongo::OID& rid, const int f);
     };
 

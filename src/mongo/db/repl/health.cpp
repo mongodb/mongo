@@ -140,7 +140,7 @@ namespace repl {
         /** todo fix we might want an so timeout here */
         OplogReader reader;
 
-        if (reader.connect(m->fullName()) == false) {
+        if (reader.connect(m->h()) == false) {
             ss << "couldn't connect to " << m->fullName();
             return;
         }

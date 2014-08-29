@@ -344,7 +344,8 @@ namespace repl {
             invariant(txn->lockState()->isW());
             Lock::TempRelease tempRelease(txn->lockState());
 
-            if (!oplogReader.connect(hostName, getGlobalReplicationCoordinator()->getMyRID())) {
+            if (!oplogReader.connect(HostAndPort(hostName), 
+                                     getGlobalReplicationCoordinator()->getMyRID())) {
                 msgassertedNoTrace( 14051 , "unable to connect to resync");
             }
             /* todo use getDatabaseNames() method here */
@@ -1020,7 +1021,8 @@ namespace repl {
             return -1;
         }
 
-        if ( !oplogReader.connect(hostName, getGlobalReplicationCoordinator()->getMyRID()) ) {
+        if ( !oplogReader.connect(HostAndPort(hostName), 
+                                  getGlobalReplicationCoordinator()->getMyRID()) ) {
             LOG(4) << "repl:  can't connect to sync source" << endl;
             return -1;
         }

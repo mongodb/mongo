@@ -297,7 +297,7 @@ namespace repl {
             minValid = r->getLastOp(rsoplog);
         } catch ( SocketException & ) {
             log() << "connection lost to " << source->h().toString() << "; is your tcp keepalive interval set appropriately?";
-            if( !r->connect(source->h().toString()) ) {
+            if( !r->connect(source->h()) ) {
                 sethbmsg( str::stream() << "initial sync couldn't connect to " << source->h().toString() , 0);
                 throw;
             }
@@ -380,7 +380,7 @@ namespace repl {
         string sourceHostname = source->h().toString();
         init.setHostname(sourceHostname);
         OplogReader r;
-        if( !r.connect(sourceHostname) ) {
+        if( !r.connect(source->h()) ) {
             sethbmsg( str::stream() << "initial sync couldn't connect to " << source->h().toString() , 0);
             sleepsecs(15);
             return;

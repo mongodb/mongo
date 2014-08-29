@@ -393,7 +393,7 @@ namespace repl {
         while ((target = theReplSet->getMemberToSyncTo()) != NULL) {
             string current = target->fullName();
 
-            if (!r.connect(current)) {
+            if (!r.connect(target->h())) {
                 LOG(2) << "replSet can't connect to " << current << " to read operations" << rsLog;
                 r.resetConnection();
                 theReplSet->veto(current);
