@@ -55,11 +55,10 @@ static int config_update(WT_SESSION *, char **);
 static int format(void);
 static int insert(WT_CURSOR *, const char *);
 static int json_cgidx(WT_SESSION *, JSON_INPUT_STATE *, CONFIG_LIST *, int);
-static int json_config(WT_SESSION *, JSON_INPUT_STATE *, char **);
 static int json_data(WT_SESSION *, JSON_INPUT_STATE *, const char *);
 static int json_expect(WT_SESSION *, JSON_INPUT_STATE *, int);
 static int json_peek(WT_SESSION *, JSON_INPUT_STATE *);
-static int json_skip(WT_SESSION *, JSON_INPUT_STATE *, char *match);
+static int json_skip(WT_SESSION *, JSON_INPUT_STATE *, char **matches);
 static int json_kvraw_append(JSON_INPUT_STATE *, const char *, size_t);
 static int json_strdup(JSON_INPUT_STATE *, char **);
 static int json_top_level(WT_SESSION *, JSON_INPUT_STATE *);
@@ -293,87 +292,13 @@ config_list_add(CONFIG_LIST *clp, char *val)
 static void
 config_list_free(CONFIG_LIST *clp)
 {
-	free(clp->list);
-}
+	char **entry;
 
-/*
- * json_config --
- *	Parse a set of configuration entries from JSON, and create any
- *	table, column groups or indices mentioned.  The table/file URI
- *	seen in the JSON file is an input/output parameter, as it may
- *	be renamed via the 'r' option.
- */
-static int
-json_config(WT_SESSION *session, JSON_INPUT_STATE *ins, char **urip)
-{
-	CONFIG_LIST cl;
-	WT_DECL_RET;
-	char *config, **entry, *uri;
-
-	memset(&cl, 0, sizeof(cl));
-	uri = NULL;
-	while (json_peek(session, ins) == 's') {
-		JSON_EXPECT(session, ins, 's');
-		if (JSON_STRING_MATCH(ins, "config")) {
-			JSON_EXPECT(session, ins, ':');
-			JSON_EXPECT(session, ins, 's');
-			if ((ret = json_strdup(ins, &config)) != 0) {
-				ret = util_err(ret, NULL);
-				goto err;
-			}
-			if ((uri = strdup(*urip)) == NULL) {
-				ret = util_err(ret, NULL);
-				goto err;
-			}
-			config_list_add(&cl, uri);
-			config_list_add(&cl, config);
-		} else if (JSON_STRING_MATCH(ins, "colgroups")) {
-			JSON_EXPECT(session, ins, ':');
-			JSON_EXPECT(session, ins, '[');
-			if ((ret = json_cgidx(session, ins, &cl, 0)) != 0)
-				goto err;
-			JSON_EXPECT(session, ins, ']');
-		} else if (JSON_STRING_MATCH(ins, "indices")) {
-			JSON_EXPECT(session, ins, ':');
-			JSON_EXPECT(session, ins, '[');
-			if ((ret = json_cgidx(session, ins, &cl, 1)) != 0)
-				goto err;
-			JSON_EXPECT(session, ins, ']');
-		} else
-			goto err;
-		if (json_peek(session, ins) != ',')
-			break;
-		JSON_EXPECT(session, ins, ',');
-		if (json_peek(session, ins) != 's')
-			goto err;
-	}
-	/* Reorder and check the list. */
-	if ((ret = config_reorder(cl.list)) != 0)
-		return (ret);
-
-	/* Update the config based on any command-line configuration. */
-	if ((ret = config_update(session, cl.list)) != 0)
-		goto err;
-
-	for (entry = cl.list; *entry != NULL; entry += 2)
-		if ((ret = session->create(session, entry[0], entry[1])) != 0) {
-			ret = util_err(ret, "%s: session.create", entry[0]);
-			goto err;
-		}
-
-	*urip = cl.list[0];
-
-	if (0) {
-err:		if (ret == 0)
-			ret = EINVAL;
-	}
-	if (cl.list != NULL)
-		/* keep cl.list[0], that's returned as the new URI */
-		for (entry = &cl.list[1]; *entry != NULL; entry++)
+	if (clp->list != NULL)
+		for (entry = &clp->list[0]; *entry != NULL; entry++)
 			free(*entry);
-
-	config_list_free(&cl);
-	return (ret);
+	free(clp->list);
+	clp->list = NULL;
 }
 
 /*
@@ -494,7 +419,11 @@ static int
 json_top_level(WT_SESSION *session, JSON_INPUT_STATE *ins)
 {
 	WT_DECL_RET;
-	char *tableuri;
+	char *config, **entry, *tableuri;
+	int toktype;
+	CONFIG_LIST cl;
+	static char *json_markers[] = {
+	    "\"config\"", "\"colgroups\"", "\"indices\"", "\"data\"", NULL };
 
 	tableuri = NULL;
 	JSON_EXPECT(session, ins, '{');
@@ -504,34 +433,78 @@ json_top_level(WT_SESSION *session, JSON_INPUT_STATE *ins)
 		snprintf(tableuri, ins->toklen, "%.*s",
 		    (int)(ins->toklen - 2), ins->tokstart + 1);
 		JSON_EXPECT(session, ins, ':');
-		JSON_EXPECT(session, ins, '[');
-		JSON_EXPECT(session, ins, '{');
-		if ((ret = json_config(session, ins, &tableuri)) != 0)
-			goto err;
-		if (json_skip(session, ins, "\"data\"") != 0)
-			goto err;
-		JSON_EXPECT(session, ins, 's');
-		JSON_EXPECT(session, ins, ':');
-		JSON_EXPECT(session, ins, '[');
-		if ((ret = json_data(session, ins, tableuri)) != 0)
-			goto err;
-		JSON_EXPECT(session, ins, ']');
-		JSON_EXPECT(session, ins, '}');
-		JSON_EXPECT(session, ins, ']');
-		if (json_peek(session, ins) != ',')
+		while (1) {
+			if (json_skip(session, ins, json_markers) != 0)
+				goto err;
+			JSON_EXPECT(session, ins, 's');
+			if (JSON_STRING_MATCH(ins, "config")) {
+				JSON_EXPECT(session, ins, ':');
+				JSON_EXPECT(session, ins, 's');
+				if ((ret = json_strdup(ins, &config)) != 0) {
+					ret = util_err(ret, NULL);
+					goto err;
+				}
+				config_list_add(&cl, tableuri);
+				config_list_add(&cl, config);
+				tableuri = NULL;
+			} else if (JSON_STRING_MATCH(ins, "colgroups")) {
+				JSON_EXPECT(session, ins, ':');
+				JSON_EXPECT(session, ins, '[');
+				if ((ret = json_cgidx(session, ins, &cl, 0)) != 0)
+					goto err;
+				JSON_EXPECT(session, ins, ']');
+			} else if (JSON_STRING_MATCH(ins, "indices")) {
+				JSON_EXPECT(session, ins, ':');
+				JSON_EXPECT(session, ins, '[');
+				if ((ret = json_cgidx(session, ins, &cl, 1)) != 0)
+					goto err;
+				JSON_EXPECT(session, ins, ']');
+			} else if (JSON_STRING_MATCH(ins, "data")) {
+				/* Reorder and check the list. */
+				if ((ret = config_reorder(cl.list)) != 0)
+					return (ret);
+
+				/* Update the config based on any command-line configuration. */
+				if ((ret = config_update(session, cl.list)) != 0)
+					goto err;
+
+				for (entry = cl.list; *entry != NULL; entry += 2)
+					if ((ret = session->create(session, entry[0], entry[1])) != 0) {
+						ret = util_err(ret, "%s: session.create", entry[0]);
+						goto err;
+					}
+
+				JSON_EXPECT(session, ins, ':');
+				JSON_EXPECT(session, ins, '[');
+				if ((ret = json_data(session, ins, cl.list[0])) != 0)
+					goto err;
+				config_list_free(&cl);
+				break;
+			}
+			else
+				goto err;
+		}
+		while ((toktype = json_peek(session, ins)) == '}' ||
+		    toktype == ']')
+			JSON_EXPECT(session, ins, toktype);
+		if (toktype == 0) /* Check EOF. */
 			break;
-		JSON_EXPECT(session, ins, ',');
-		if (json_peek(session, ins) != 's')
-			goto err;
+		if (toktype == ',') {
+			JSON_EXPECT(session, ins, ',');
+			if (json_peek(session, ins) != 's')
+				goto err;
+			continue;
+		}
 	}
-	JSON_EXPECT(session, ins, '}');
 	JSON_EXPECT(session, ins, 0);
 
 	if (0) {
 err:		if (ret == 0)
 			ret = EINVAL;
 	}
-	free(tableuri);
+	config_list_free(&cl);
+	if (tableuri != NULL)
+		free(tableuri);
 	return (ret);
 }
 
@@ -619,17 +592,18 @@ json_expect(WT_SESSION *session, JSON_INPUT_STATE *ins, int wanttok)
  *	that string.
  */
 static int
-json_skip(WT_SESSION *session, JSON_INPUT_STATE *ins, char *match)
+json_skip(WT_SESSION *session, JSON_INPUT_STATE *ins, char **matches)
 {
-	char *hit;
+	char *hit, **match;
 
 	if (ins->kvraw != NULL)
 		return (1);
 
 	hit = NULL;
 	while (!ins->ateof) {
-		if ((hit = strstr(ins->p, match)) != NULL)
-			break;
+		for (match = matches; *match != NULL; match++)
+			if ((hit = strstr(ins->p, *match)) != NULL)
+				goto out;
 		if (util_read_line(&ins->line, 1, &ins->ateof)) {
 			ins->toktype = -1;
 			return (1);
@@ -637,11 +611,15 @@ json_skip(WT_SESSION *session, JSON_INPUT_STATE *ins, char *match)
 		ins->linenum++;
 		ins->p = (const char *)ins->line.mem;
 	}
+out:
 	if (hit == NULL)
 		return (1);
 
+	/* Set to this token. */
+	ins->p = hit;
 	ins->peeking = 0;
 	ins->toktype = 0;
+	(void)json_peek(session, ins);
 	return (0);
 }
 
