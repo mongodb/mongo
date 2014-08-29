@@ -176,7 +176,8 @@ __lsm_manager_aggressive_update(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 	chunk_wait = stallms / (lsm_tree->chunk_fill_ms == 0 ?
 	    10000 : lsm_tree->chunk_fill_ms);
 	old_aggressive = lsm_tree->merge_aggressiveness;
-	lsm_tree->merge_aggressiveness = chunk_wait / lsm_tree->merge_min;
+	lsm_tree->merge_aggressiveness =
+	    (u_int)(chunk_wait / lsm_tree->merge_min);
 
 	if (lsm_tree->merge_aggressiveness > old_aggressive)
 		WT_RET(__wt_verbose(session, WT_VERB_LSM,
@@ -282,7 +283,7 @@ __lsm_manager_run_server(WT_SESSION_IMPL *session)
 	WT_CONNECTION_IMPL *conn;
 	WT_LSM_TREE *lsm_tree;
 	struct timespec now;
-	u_int fillms, pushms;
+	uint64_t fillms, pushms;
 
 	conn = S2C(session);
 	while (F_ISSET(conn, WT_CONN_SERVER_RUN)) {

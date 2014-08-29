@@ -133,4 +133,3 @@ err:		__wt_lsm_manager_free_work_unit(session, entry);
 	}
 	return (NULL);
 }
-
