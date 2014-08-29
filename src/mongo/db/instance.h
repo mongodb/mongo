@@ -88,7 +88,6 @@ namespace mongo {
     public:
         static const HostAndPort dummyHost;
 
-        DBDirectClient(); // DEPRECATED
         DBDirectClient(OperationContext* txn);
 
         void setOpCtx(OperationContext* txn) { _txn = txn; };
@@ -136,8 +135,7 @@ namespace mongo {
         virtual QueryOptions _lookupAvailableOptions();
 
     private:
-        boost::scoped_ptr<OperationContext> _txnOwned;
-        OperationContext* _txn; // Points either to _txnOwned or a passed-in transaction.
+        OperationContext* _txn;
     };
 
     void maybeCreatePidFile();

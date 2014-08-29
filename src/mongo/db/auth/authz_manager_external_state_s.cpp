@@ -254,13 +254,15 @@ namespace mongo {
     }
 
     Status AuthzManagerExternalStateMongos::insert(
+            OperationContext* txn,
             const NamespaceString& collectionName,
             const BSONObj& document,
             const BSONObj& writeConcern) {
         return clusterInsert(collectionName, document, writeConcern, NULL);
     }
 
-    Status AuthzManagerExternalStateMongos::update(const NamespaceString& collectionName,
+    Status AuthzManagerExternalStateMongos::update(OperationContext* txn,
+                                                   const NamespaceString& collectionName,
                                                    const BSONObj& query,
                                                    const BSONObj& updatePattern,
                                                    bool upsert,
@@ -284,6 +286,7 @@ namespace mongo {
     }
 
     Status AuthzManagerExternalStateMongos::remove(
+            OperationContext* txn,
             const NamespaceString& collectionName,
             const BSONObj& query,
             const BSONObj& writeConcern,
@@ -299,6 +302,7 @@ namespace mongo {
     }
 
     Status AuthzManagerExternalStateMongos::createIndex(
+            OperationContext* txn,
             const NamespaceString& collectionName,
             const BSONObj& pattern,
             bool unique,
@@ -307,6 +311,7 @@ namespace mongo {
     }
 
     Status AuthzManagerExternalStateMongos::dropIndexes(
+            OperationContext* txn,
             const NamespaceString& collectionName,
             const BSONObj& writeConcern) {
 

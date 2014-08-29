@@ -29,6 +29,7 @@
 #pragma once
 
 #include "mongo/db/instance.h"
+#include "mongo/db/operation_context_impl.h"
 #include "mongo/db/wire_version.h"
 #include "mongo/client/dbclientinterface.h"
 #include "mongo/unittest/unittest.h"
@@ -40,7 +41,7 @@ namespace mongo {
 
     class CustomDirectClient: public DBDirectClient {
     public:
-        CustomDirectClient() {
+        CustomDirectClient() : DBDirectClient(&_txn) {
             setWireVersions(minWireVersion, maxWireVersion);
         }
 
@@ -70,6 +71,8 @@ namespace mongo {
 
             return true;
         }
+
+        OperationContextImpl _txn;
     };
 
     class CustomConnectHook: public ConnectionString::ConnectionHook {

@@ -57,9 +57,17 @@ namespace mongo {
      */
     class ClientCursor : private boost::noncopyable {
     public:
-        ClientCursor(const Collection* collection, PlanExecutor* exec,
-                     int qopts = 0, const BSONObj query = BSONObj());
+        /**
+         * This ClientCursor constructor creates a cursorid that can be getMore'd
+         */
+        ClientCursor(const Collection* collection,
+                     PlanExecutor* exec,
+                     int qopts = 0,
+                     const BSONObj query = BSONObj());
 
+        /**
+         * This ClientCursor is used to track sharding state.
+         */
         ClientCursor(const Collection* collection);
 
         ~ClientCursor();

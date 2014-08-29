@@ -766,7 +766,7 @@ namespace {
             try {
                 OwnedPointerVector<ReplSetConfig> configs;
                 try {
-                    configs.mutableVector().push_back(ReplSetConfig::makeDirect());
+                    configs.mutableVector().push_back(ReplSetConfig::makeDirect(txn));
                 }
                 catch (DBException& e) {
                     log() << "replSet exception loading our local replset configuration object : "
@@ -776,7 +776,7 @@ namespace {
                         i != _seeds->end();
                         i++) {
                     try {
-                        configs.mutableVector().push_back(ReplSetConfig::make(*i));
+                        configs.mutableVector().push_back(ReplSetConfig::make(txn, *i));
                     }
                     catch (DBException& e) {
                         log() << "replSet exception trying to load config from " << *i
@@ -792,7 +792,7 @@ namespace {
                              i++) {
                             try {
                                 configs.mutableVector().push_back(
-                                                            ReplSetConfig::make(HostAndPort(*i)));
+                                                            ReplSetConfig::make(txn, HostAndPort(*i)));
                             }
                             catch (DBException&) {
                                 LOG(1) << "replSet exception trying to load config from discovered "
@@ -805,7 +805,7 @@ namespace {
 
                 if (!replSettings.reconfig.isEmpty()) {
                     try {
-                        configs.mutableVector().push_back(ReplSetConfig::make(replSettings.reconfig,
+                        configs.mutableVector().push_back(ReplSetConfig::make(txn, replSettings.reconfig,
                                                                        true));
                     }
                     catch (DBException& re) {

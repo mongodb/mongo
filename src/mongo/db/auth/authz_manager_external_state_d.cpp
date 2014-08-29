@@ -133,11 +133,12 @@ namespace mongo {
     }
 
     Status AuthzManagerExternalStateMongod::insert(
+            OperationContext* txn,
             const NamespaceString& collectionName,
             const BSONObj& document,
             const BSONObj& writeConcern) {
         try {
-            DBDirectClient client;
+            DBDirectClient client(txn);
             client.insert(collectionName, document);
 
             // Handle write concern
@@ -159,7 +160,8 @@ namespace mongo {
         }
     }
 
-    Status AuthzManagerExternalStateMongod::update(const NamespaceString& collectionName,
+    Status AuthzManagerExternalStateMongod::update(OperationContext* txn,
+                                                   const NamespaceString& collectionName,
                                                    const BSONObj& query,
                                                    const BSONObj& updatePattern,
                                                    bool upsert,
@@ -167,7 +169,7 @@ namespace mongo {
                                                    const BSONObj& writeConcern,
                                                    int* nMatched) {
         try {
-            DBDirectClient client;
+            DBDirectClient client(txn);
             client.update(collectionName, query, updatePattern, upsert, multi);
 
             // Handle write concern
@@ -189,12 +191,13 @@ namespace mongo {
     }
 
     Status AuthzManagerExternalStateMongod::remove(
+            OperationContext* txn,
             const NamespaceString& collectionName,
             const BSONObj& query,
             const BSONObj& writeConcern,
             int* numRemoved) {
         try {
-            DBDirectClient client;
+            DBDirectClient client(txn);
             client.remove(collectionName, query);
 
             // Handle write concern
@@ -216,11 +219,12 @@ namespace mongo {
     }
 
     Status AuthzManagerExternalStateMongod::createIndex(
+            OperationContext* txn,
             const NamespaceString& collectionName,
             const BSONObj& pattern,
             bool unique,
             const BSONObj& writeConcern) {
-        DBDirectClient client;
+        DBDirectClient client(txn);
         try {
             if (client.ensureIndex(collectionName.ns(),
                                    pattern,
@@ -243,9 +247,10 @@ namespace mongo {
     }
 
     Status AuthzManagerExternalStateMongod::dropIndexes(
+            OperationContext* txn,
             const NamespaceString& collectionName,
             const BSONObj& writeConcern) {
-        DBDirectClient client;
+        DBDirectClient client(txn);
         try {
             client.dropIndexes(collectionName.ns());
             BSONObjBuilder gleBuilder;

@@ -135,7 +135,8 @@ namespace {
                       authzSession->addAndAuthorizeUser(&_txn, UserName("spencer", "test")));
 
         // Add a user with readWrite and dbAdmin on the test DB
-        ASSERT_OK(managerState->insertPrivilegeDocument("admin",
+        ASSERT_OK(managerState->insertPrivilegeDocument(&_txn,
+                "admin",
                 BSON("user" << "spencer" <<
                      "db" << "test" <<
                      "credentials" << BSON("MONGODB-CR" << "a") <<
@@ -154,7 +155,8 @@ namespace {
                              otherFooCollResource, ActionType::insert));
 
         // Add an admin user with readWriteAnyDatabase
-        ASSERT_OK(managerState->insertPrivilegeDocument("admin",
+        ASSERT_OK(managerState->insertPrivilegeDocument(&_txn,
+                "admin",
                 BSON("user" << "admin" <<
                      "db" << "admin" <<
                      "credentials" << BSON("MONGODB-CR" << "a") <<
@@ -195,7 +197,8 @@ namespace {
 
     TEST_F(AuthorizationSessionTest, DuplicateRolesOK) {
         // Add a user with doubled-up readWrite and single dbAdmin on the test DB
-        ASSERT_OK(managerState->insertPrivilegeDocument("admin",
+        ASSERT_OK(managerState->insertPrivilegeDocument(&_txn,
+                "admin",
                 BSON("user" << "spencer" <<
                      "db" << "test" <<
                      "credentials" << BSON("MONGODB-CR" << "a") <<
@@ -217,7 +220,8 @@ namespace {
     }
 
     TEST_F(AuthorizationSessionTest, SystemCollectionsAccessControl) {
-        ASSERT_OK(managerState->insertPrivilegeDocument("admin",
+        ASSERT_OK(managerState->insertPrivilegeDocument(&_txn,
+                "admin",
                 BSON("user" << "rw" <<
                      "db" << "test" <<
                      "credentials" << BSON("MONGODB-CR" << "a") <<
@@ -226,14 +230,16 @@ namespace {
                                            BSON("role" << "dbAdmin" <<
                                                 "db" << "test"))),
                 BSONObj()));
-        ASSERT_OK(managerState->insertPrivilegeDocument("admin",
+        ASSERT_OK(managerState->insertPrivilegeDocument(&_txn,
+                "admin",
                 BSON("user" << "useradmin" <<
                      "db" << "test" <<
                      "credentials" << BSON("MONGODB-CR" << "a") <<
                      "roles" << BSON_ARRAY(BSON("role" << "userAdmin" <<
                                                 "db" << "test"))),
                 BSONObj()));
-        ASSERT_OK(managerState->insertPrivilegeDocument("admin",
+        ASSERT_OK(managerState->insertPrivilegeDocument(&_txn,
+                "admin",
                 BSON("user" << "rwany" <<
                      "db" << "test" <<
                      "credentials" << BSON("MONGODB-CR" << "a") <<
@@ -242,7 +248,8 @@ namespace {
                                            BSON("role" << "dbAdminAnyDatabase" <<
                                                 "db" << "admin"))),
                 BSONObj()));
-        ASSERT_OK(managerState->insertPrivilegeDocument("admin",
+        ASSERT_OK(managerState->insertPrivilegeDocument(&_txn,
+                "admin",
                 BSON("user" << "useradminany" <<
                      "db" << "test" <<
                      "credentials" << BSON("MONGODB-CR" << "a") <<
@@ -331,7 +338,8 @@ namespace {
 
     TEST_F(AuthorizationSessionTest, InvalidateUser) {
         // Add a readWrite user
-        ASSERT_OK(managerState->insertPrivilegeDocument("admin",
+        ASSERT_OK(managerState->insertPrivilegeDocument(&_txn,
+                "admin",
                 BSON("user" << "spencer" <<
                      "db" << "test" <<
                      "credentials" << BSON("MONGODB-CR" << "a") <<
@@ -351,11 +359,13 @@ namespace {
         // Change the user to be read-only
         int ignored;
         managerState->remove(
+                &_txn,
                 AuthorizationManager::usersCollectionNamespace,
                 BSONObj(),
                 BSONObj(),
                 &ignored);
-        ASSERT_OK(managerState->insertPrivilegeDocument("admin",
+        ASSERT_OK(managerState->insertPrivilegeDocument(&_txn,
+                "admin",
                 BSON("user" << "spencer" <<
                      "db" << "test" <<
                      "credentials" << BSON("MONGODB-CR" << "a") <<
@@ -376,6 +386,7 @@ namespace {
 
         // Delete the user.
         managerState->remove(
+                &_txn,
                 AuthorizationManager::usersCollectionNamespace,
                 BSONObj(),
                 BSONObj(),
@@ -392,7 +403,8 @@ namespace {
 
     TEST_F(AuthorizationSessionTest, UseOldUserInfoInFaceOfConnectivityProblems) {
         // Add a readWrite user
-        ASSERT_OK(managerState->insertPrivilegeDocument("admin",
+        ASSERT_OK(managerState->insertPrivilegeDocument(&_txn,
+                "admin",
                 BSON("user" << "spencer" <<
                      "db" << "test" <<
                      "credentials" << BSON("MONGODB-CR" << "a") <<
@@ -413,11 +425,13 @@ namespace {
         int ignored;
         managerState->setFindsShouldFail(true);
         managerState->remove(
+                &_txn,
                 AuthorizationManager::usersCollectionNamespace,
                 BSONObj(),
                 BSONObj(),
                 &ignored);
-        ASSERT_OK(managerState->insertPrivilegeDocument("admin",
+        ASSERT_OK(managerState->insertPrivilegeDocument(&_txn,
+                "admin",
                 BSON("user" << "spencer" <<
                      "db" << "test" <<
                      "credentials" << BSON("MONGODB-CR" << "a") <<

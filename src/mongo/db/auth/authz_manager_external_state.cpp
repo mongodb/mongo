@@ -56,10 +56,11 @@ namespace mongo {
     }
 
 
-    Status AuthzManagerExternalState::insertPrivilegeDocument(const string& dbname,
+    Status AuthzManagerExternalState::insertPrivilegeDocument(OperationContext* txn,
+                                                              const string& dbname,
                                                               const BSONObj& userObj,
                                                               const BSONObj& writeConcern) {
-        Status status = insert(NamespaceString("admin.system.users"), userObj, writeConcern);
+        Status status = insert(txn, NamespaceString("admin.system.users"), userObj, writeConcern);
         if (status.isOK()) {
             return status;
         }
@@ -76,9 +77,12 @@ namespace mongo {
         return status;
     }
 
-    Status AuthzManagerExternalState::updatePrivilegeDocument(
-            const UserName& user, const BSONObj& updateObj, const BSONObj& writeConcern) {
+    Status AuthzManagerExternalState::updatePrivilegeDocument(OperationContext* txn,
+                                                              const UserName& user,
+                                                              const BSONObj& updateObj,
+                                                              const BSONObj& writeConcern) {
         Status status = updateOne(
+                txn,
                 NamespaceString("admin.system.users"),
                 BSON(AuthorizationManager::USER_NAME_FIELD_NAME << user.getUser() <<
                      AuthorizationManager::USER_DB_FIELD_NAME << user.getDB()),
@@ -99,10 +103,12 @@ namespace mongo {
         return status;
     }
 
-    Status AuthzManagerExternalState::removePrivilegeDocuments(const BSONObj& query,
+    Status AuthzManagerExternalState::removePrivilegeDocuments(OperationContext* txn,
+                                                               const BSONObj& query,
                                                                const BSONObj& writeConcern,
                                                                int* numRemoved) {
-        Status status = remove(NamespaceString("admin.system.users"),
+        Status status = remove(txn,
+                               NamespaceString("admin.system.users"),
                                query,
                                writeConcern,
                                numRemoved);
@@ -113,13 +119,15 @@ namespace mongo {
     }
 
     Status AuthzManagerExternalState::updateOne(
+            OperationContext* txn,
             const NamespaceString& collectionName,
             const BSONObj& query,
             const BSONObj& updatePattern,
             bool upsert,
             const BSONObj& writeConcern) {
         int nMatched;
-        Status status = update(collectionName,
+        Status status = update(txn,
+                               collectionName,
                                query,
                                updatePattern,
                                upsert,

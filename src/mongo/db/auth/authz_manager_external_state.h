@@ -124,14 +124,16 @@ namespace mongo {
          *
          * TODO(spencer): remove dbname argument once users are only written into the admin db
          */
-        Status insertPrivilegeDocument(const std::string& dbname,
+        Status insertPrivilegeDocument(OperationContext* txn,
+                                       const std::string& dbname,
                                        const BSONObj& userObj,
                                        const BSONObj& writeConcern);
 
         /**
          * Updates the given user object with the given update modifier.
          */
-        Status updatePrivilegeDocument(const UserName& user,
+        Status updatePrivilegeDocument(OperationContext* txn,
+                                       const UserName& user,
                                        const BSONObj& updateObj,
                                        const BSONObj& writeConcern);
 
@@ -139,7 +141,8 @@ namespace mongo {
          * Removes users for the given database matching the given query.
          * Writes into *numRemoved the number of user documents that were modified.
          */
-        Status removePrivilegeDocuments(const BSONObj& query,
+        Status removePrivilegeDocuments(OperationContext* txn,
+                                        const BSONObj& query,
                                         const BSONObj& writeConcern,
                                         int* numRemoved);
 
@@ -176,7 +179,8 @@ namespace mongo {
          * Inserts "document" into "collectionName".
          * If there is a duplicate key error, returns a Status with code DuplicateKey.
          */
-        virtual Status insert(const NamespaceString& collectionName,
+        virtual Status insert(OperationContext* txn,
+                              const NamespaceString& collectionName,
                               const BSONObj& document,
                               const BSONObj& writeConcern) = 0;
 
@@ -189,7 +193,8 @@ namespace mongo {
          * NoMatchingDocument.  The Status message in that case is not very descriptive and should
          * not be displayed to the end user.
          */
-        virtual Status updateOne(const NamespaceString& collectionName,
+        virtual Status updateOne(OperationContext* txn,
+                                 const NamespaceString& collectionName,
                                  const BSONObj& query,
                                  const BSONObj& updatePattern,
                                  bool upsert,
@@ -198,7 +203,8 @@ namespace mongo {
         /**
          * Updates documents matching "query" according to "updatePattern" in "collectionName".
          */
-        virtual Status update(const NamespaceString& collectionName,
+        virtual Status update(OperationContext* txn,
+                              const NamespaceString& collectionName,
                               const BSONObj& query,
                               const BSONObj& updatePattern,
                               bool upsert,
@@ -209,7 +215,8 @@ namespace mongo {
         /**
          * Removes all documents matching "query" from "collectionName".
          */
-        virtual Status remove(const NamespaceString& collectionName,
+        virtual Status remove(OperationContext* txn,
+                              const NamespaceString& collectionName,
                               const BSONObj& query,
                               const BSONObj& writeConcern,
                               int* numRemoved) = 0;
@@ -217,7 +224,8 @@ namespace mongo {
         /**
          * Creates an index with the given pattern on "collectionName".
          */
-        virtual Status createIndex(const NamespaceString& collectionName,
+        virtual Status createIndex(OperationContext* txn,
+                                   const NamespaceString& collectionName,
                                    const BSONObj& pattern,
                                    bool unique,
                                    const BSONObj& writeConcern) = 0;
@@ -225,7 +233,8 @@ namespace mongo {
         /**
          * Drops indexes other than the _id index on "collectionName".
          */
-        virtual Status dropIndexes(const NamespaceString& collectionName,
+        virtual Status dropIndexes(OperationContext* txn,
+                                   const NamespaceString& collectionName,
                                    const BSONObj& writeConcern) = 0;
 
         /**

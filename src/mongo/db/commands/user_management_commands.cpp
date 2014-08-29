@@ -285,7 +285,7 @@ namespace mongo {
                     "schema version " << AuthorizationManager::schemaVersion26Final <<
                     " but found " << foundSchemaVersion);
         }
-        return authzManager->writeAuthSchemaVersionIfNeeded();
+        return authzManager->writeAuthSchemaVersionIfNeeded(txn);
     }
 
     static Status requireAuthSchemaVersion26UpgradeOrFinal(OperationContext* txn,
@@ -481,7 +481,8 @@ namespace mongo {
                                  args.hasHashedPassword,
                                  args.hasCustomData? &args.customData : NULL,
                                  args.roles);
-            status = authzManager->insertPrivilegeDocument(dbname,
+            status = authzManager->insertPrivilegeDocument(txn,
+                                                           dbname,
                                                            userObj,
                                                            args.writeConcern);
             return appendCommandStatus(result, status);
@@ -637,7 +638,8 @@ namespace mongo {
                                  args.hasCustomData? &args.customData : NULL,
                                  args.hasRoles? &args.roles : NULL);
 
-            status = authzManager->updatePrivilegeDocument(args.userName,
+            status = authzManager->updatePrivilegeDocument(txn,
+                                                           args.userName,
                                                            BSON("$set" << updateSetBuilder.done()),
                                                            args.writeConcern);
             // Must invalidate even on bad status - what if the write succeeded but the GLE failed?
@@ -724,6 +726,7 @@ namespace mongo {
             audit::logDropUser(ClientBasic::getCurrent(), userName);
 
             status = authzManager->removePrivilegeDocuments(
+                    txn,
                     BSON(AuthorizationManager::USER_NAME_FIELD_NAME << userName.getUser() <<
                          AuthorizationManager::USER_DB_FIELD_NAME << userName.getDB()),
                     writeConcern,
@@ -807,6 +810,7 @@ namespace mongo {
             audit::logDropAllUsersFromDatabase(ClientBasic::getCurrent(), dbname);
 
             status = authzManager->removePrivilegeDocuments(
+                    txn,
                     BSON(AuthorizationManager::USER_DB_FIELD_NAME << dbname),
                     writeConcern,
                     &numRemoved);
@@ -912,7 +916,7 @@ namespace mongo {
                                        roles);
             BSONArray newRolesBSONArray = roleSetToBSONArray(userRoles);
             status = authzManager->updatePrivilegeDocument(
-                    userName, BSON("$set" << BSON("roles" << newRolesBSONArray)), writeConcern);
+                    txn, userName, BSON("$set" << BSON("roles" << newRolesBSONArray)), writeConcern);
             // Must invalidate even on bad status - what if the write succeeded but the GLE failed?
             authzManager->invalidateUserByName(userName);
             return appendCommandStatus(result, status);
@@ -1010,7 +1014,7 @@ namespace mongo {
                                           roles);
             BSONArray newRolesBSONArray = roleSetToBSONArray(userRoles);
             status = authzManager->updatePrivilegeDocument(
-                    userName, BSON("$set" << BSON("roles" << newRolesBSONArray)), writeConcern);
+                    txn, userName, BSON("$set" << BSON("roles" << newRolesBSONArray)), writeConcern);
             // Must invalidate even on bad status - what if the write succeeded but the GLE failed?
             authzManager->invalidateUserByName(userName);
             return appendCommandStatus(result, status);
@@ -1310,7 +1314,7 @@ namespace mongo {
                                  args.roles,
                                  args.privileges);
 
-            status = authzManager->insertRoleDocument(roleObjBuilder.done(), args.writeConcern);
+            status = authzManager->insertRoleDocument(txn, roleObjBuilder.done(), args.writeConcern);
             return appendCommandStatus(result, status);
         }
 
@@ -1437,7 +1441,8 @@ namespace mongo {
                                  args.hasRoles? &args.roles : NULL,
                                  args.hasPrivileges? &args.privileges : NULL);
 
-            status = authzManager->updateRoleDocument(args.roleName,
+            status = authzManager->updateRoleDocument(txn,
+                                                      args.roleName,
                                                       BSON("$set" << updateSetBuilder.done()),
                                                       args.writeConcern);
             // Must invalidate even on bad status - what if the write succeeded but the GLE failed?
@@ -1572,6 +1577,7 @@ namespace mongo {
                                             privilegesToAdd);
 
             status = authzManager->updateRoleDocument(
+                    txn,
                     roleName,
                     updateBSONBuilder.done(),
                     writeConcern);
@@ -1710,6 +1716,7 @@ namespace mongo {
             BSONObjBuilder updateBSONBuilder;
             updateObj.writeTo(&updateBSONBuilder);
             status = authzManager->updateRoleDocument(
+                    txn,
                     roleName,
                     updateBSONBuilder.done(),
                     writeConcern);
@@ -1829,6 +1836,7 @@ namespace mongo {
                                        rolesToAdd);
 
             status = authzManager->updateRoleDocument(
+                    txn,
                     roleName,
                     BSON("$set" << BSON("roles" << rolesVectorToBSONArray(directRoles))),
                     writeConcern);
@@ -1942,6 +1950,7 @@ namespace mongo {
                                           rolesToRemove);
 
             status = authzManager->updateRoleDocument(
+                    txn,
                     roleName,
                     BSON("$set" << BSON("roles" << rolesVectorToBSONArray(roles))),
                     writeConcern);
@@ -2039,6 +2048,7 @@ namespace mongo {
             // Remove this role from all users
             int nMatched;
             status = authzManager->updateAuthzDocuments(
+                    txn,
                     NamespaceString("admin.system.users"),
                     BSON("roles" << BSON("$elemMatch" <<
                                          BSON(AuthorizationManager::ROLE_NAME_FIELD_NAME <<
@@ -2068,6 +2078,7 @@ namespace mongo {
 
             // Remove this role from all other roles
             status = authzManager->updateAuthzDocuments(
+                    txn,
                     NamespaceString("admin.system.roles"),
                     BSON("roles" << BSON("$elemMatch" <<
                                          BSON(AuthorizationManager::ROLE_NAME_FIELD_NAME <<
@@ -2100,6 +2111,7 @@ namespace mongo {
                                roleName);
             // Finally, remove the actual role document
             status = authzManager->removeRoleDocuments(
+                    txn,
                     BSON(AuthorizationManager::ROLE_NAME_FIELD_NAME << roleName.getRole() <<
                          AuthorizationManager::ROLE_DB_FIELD_NAME << roleName.getDB()),
                     writeConcern,
@@ -2191,6 +2203,7 @@ namespace mongo {
             // Remove these roles from all users
             int nMatched;
             status = authzManager->updateAuthzDocuments(
+                    txn,
                     AuthorizationManager::usersCollectionNamespace,
                     BSON("roles" << BSON(AuthorizationManager::ROLE_DB_FIELD_NAME << dbname)),
                     BSON("$pull" << BSON("roles" <<
@@ -2216,6 +2229,7 @@ namespace mongo {
             std::string sourceFieldName =
                     str::stream() << "roles." << AuthorizationManager::ROLE_DB_FIELD_NAME;
             status = authzManager->updateAuthzDocuments(
+                    txn,
                     AuthorizationManager::rolesCollectionNamespace,
                     BSON(sourceFieldName << dbname),
                     BSON("$pull" << BSON("roles" <<
@@ -2240,6 +2254,7 @@ namespace mongo {
             audit::logDropAllRolesFromDatabase(ClientBasic::getCurrent(), dbname);
             // Finally, remove the actual role documents
             status = authzManager->removeRoleDocuments(
+                    txn,
                     BSON(AuthorizationManager::ROLE_DB_FIELD_NAME << dbname),
                     writeConcern,
                     &nMatched);
@@ -2638,7 +2653,8 @@ namespace mongo {
          * admin.system.users collection.
          * Also removes any users it encounters from the usersToDrop set.
          */
-        static void addUser(AuthorizationManager* authzManager,
+        static void addUser(OperationContext* txn,
+                            AuthorizationManager* authzManager,
                             const StringData& db,
                             bool update,
                             const BSONObj& writeConcern,
@@ -2651,7 +2667,8 @@ namespace mongo {
 
             if (update && usersToDrop->count(userName)) {
                 auditCreateOrUpdateUser(userObj, false);
-                Status status = authzManager->updatePrivilegeDocument(userName,
+                Status status = authzManager->updatePrivilegeDocument(txn,
+                                                                      userName,
                                                                       userObj,
                                                                       writeConcern);
                 if (!status.isOK()) {
@@ -2661,7 +2678,8 @@ namespace mongo {
                 }
             } else {
                 auditCreateOrUpdateUser(userObj, true);
-                Status status = authzManager->insertPrivilegeDocument(userName.getDB().toString(),
+                Status status = authzManager->insertPrivilegeDocument(txn,
+                                                                      userName.getDB().toString(),
                                                                       userObj,
                                                                       writeConcern);
                 if (!status.isOK()) {
@@ -2680,7 +2698,8 @@ namespace mongo {
          * admin.system.roles collection.
          * Also removes any roles it encounters from the rolesToDrop set.
          */
-        static void addRole(AuthorizationManager* authzManager,
+        static void addRole(OperationContext* txn,
+                            AuthorizationManager* authzManager,
                             const StringData& db,
                             bool update,
                             const BSONObj& writeConcern,
@@ -2693,7 +2712,8 @@ namespace mongo {
 
             if (update && rolesToDrop->count(roleName)) {
                 auditCreateOrUpdateRole(roleObj, false);
-                Status status = authzManager->updateRoleDocument(roleName,
+                Status status = authzManager->updateRoleDocument(txn,
+                                                                 roleName,
                                                                  roleObj,
                                                                  writeConcern);
                 if (!status.isOK()) {
@@ -2703,7 +2723,7 @@ namespace mongo {
                 }
             } else {
                 auditCreateOrUpdateRole(roleObj, true);
-                Status status = authzManager->insertRoleDocument(roleObj, writeConcern);
+                Status status = authzManager->insertRoleDocument(txn, roleObj, writeConcern);
                 if (!status.isOK()) {
                     // Match the behavior of mongorestore to continue on failure
                     warning() << "Could not insert role " << roleName <<
@@ -2760,6 +2780,7 @@ namespace mongo {
                     db.empty() ? BSONObj() : BSON(AuthorizationManager::USER_DB_FIELD_NAME << db),
                     BSONObj(),
                     stdx::bind(&CmdMergeAuthzCollections::addUser,
+                                txn,
                                 authzManager,
                                 db,
                                 drop,
@@ -2777,6 +2798,7 @@ namespace mongo {
                     const UserName& userName = *it;
                     audit::logDropUser(ClientBasic::getCurrent(), userName);
                     status = authzManager->removePrivilegeDocuments(
+                            txn,
                             BSON(AuthorizationManager::USER_NAME_FIELD_NAME <<
                                  userName.getUser().toString() <<
                                  AuthorizationManager::USER_DB_FIELD_NAME <<
@@ -2841,6 +2863,7 @@ namespace mongo {
                             BSONObj() : BSON(AuthorizationManager::ROLE_DB_FIELD_NAME << db),
                     BSONObj(),
                     stdx::bind(&CmdMergeAuthzCollections::addRole,
+                                txn,
                                 authzManager,
                                 db,
                                 drop,
@@ -2858,6 +2881,7 @@ namespace mongo {
                     const RoleName& roleName = *it;
                     audit::logDropRole(ClientBasic::getCurrent(), roleName);
                     status = authzManager->removeRoleDocuments(
+                            txn,
                             BSON(AuthorizationManager::ROLE_NAME_FIELD_NAME <<
                                  roleName.getRole().toString() <<
                                  AuthorizationManager::ROLE_DB_FIELD_NAME <<

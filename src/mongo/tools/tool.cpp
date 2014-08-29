@@ -46,6 +46,7 @@
 #include "mongo/db/global_environment_experiment.h"
 #include "mongo/db/global_environment_d.h"
 #include "mongo/db/json.h"
+#include "mongo/db/operation_context_impl.h"
 #include "mongo/db/repl/repl_coordinator_global.h"
 #include "mongo/db/repl/repl_coordinator_mock.h"
 #include "mongo/db/storage_options.h"
@@ -147,7 +148,8 @@ namespace mongo {
                 ::_exit(EXIT_FAILURE);
             }
 
-            _conn = new DBDirectClient();
+            _txn.reset(new OperationContextImpl());
+            _conn = new DBDirectClient(_txn.get());
         }
 
         int ret = -1;

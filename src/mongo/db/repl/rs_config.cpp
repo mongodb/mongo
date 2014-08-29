@@ -616,13 +616,13 @@ namespace {
         _heartbeatTimeout(DEFAULT_HB_TIMEOUT) {
     }
 
-    ReplSetConfig* ReplSetConfig::make(BSONObj cfg, bool force) {
+    ReplSetConfig* ReplSetConfig::make(OperationContext* txn, BSONObj cfg, bool force) {
         auto_ptr<ReplSetConfig> ret(new ReplSetConfig());
-        ret->init(cfg, force);
+        ret->init(txn, cfg, force);
         return ret.release();
     }
 
-    void ReplSetConfig::init(BSONObj cfg, bool force) {
+    void ReplSetConfig::init(OperationContext* txn, BSONObj cfg, bool force) {
         clear();
         from(cfg);
         if( force ) {
@@ -634,14 +634,14 @@ namespace {
         _ok = true;
     }
 
-    ReplSetConfig* ReplSetConfig::make(const HostAndPort& h) {
+    ReplSetConfig* ReplSetConfig::make(OperationContext* txn, const HostAndPort& h) {
         auto_ptr<ReplSetConfig> ret(new ReplSetConfig());
-        ret->init(h);
+        ret->init(txn, h);
         return ret.release();
     }
 
-    ReplSetConfig* ReplSetConfig::makeDirect() {
-        DBDirectClient cli;
+    ReplSetConfig* ReplSetConfig::makeDirect(OperationContext* txn) {
+        DBDirectClient cli(txn);
         BSONObj config = cli.findOne(rsConfigNs, Query()).getOwned();
 
         // Check for no local config
@@ -649,10 +649,10 @@ namespace {
             return new ReplSetConfig();
         }
 
-        return make(config, false);
+        return make(txn, config, false);
     }
 
-    void ReplSetConfig::init(const HostAndPort& h) {
+    void ReplSetConfig::init(OperationContext* txn, const HostAndPort& h) {
         LOG(2) << "ReplSetConfig load " << h.toString() << rsLog;
 
         clear();
@@ -706,7 +706,7 @@ namespace {
                 }
 
                 // on startup, socket is not listening yet
-                DBDirectClient cli;
+                DBDirectClient cli(txn);
                 cfg = cli.findOne( rsConfigNs, Query() ).getOwned();
                 count = cli.count(rsConfigNs);
             }

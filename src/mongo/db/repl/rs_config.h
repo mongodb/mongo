@@ -62,15 +62,15 @@ namespace repl {
          * reasons.) If something is misconfigured, throws an exception. If the
          * host couldn't be queried or is just blank, ok() will be false.
          */
-        static ReplSetConfig* make(const HostAndPort& h);
+        static ReplSetConfig* make(OperationContext* txn, const HostAndPort& h);
 
-        static ReplSetConfig* make(BSONObj cfg, bool force=false);
+        static ReplSetConfig* make(OperationContext* txn, BSONObj cfg, bool force=false);
 
         /**
          * This uses DBDirectClient to check itself for a config.  This way we don't need to connect
          * to ourselves over the network to fetch our own config.
          */
-        static ReplSetConfig* makeDirect();
+        static ReplSetConfig* makeDirect(OperationContext* txn);
 
         bool ok() const { return _ok; }
 
@@ -195,8 +195,8 @@ namespace repl {
 
     private:
         ReplSetConfig();
-        void init(const HostAndPort& h);
-        void init(BSONObj cfg, bool force);
+        void init(OperationContext* txn, const HostAndPort& h);
+        void init(OperationContext* txn, BSONObj cfg, bool force);
 
         /**
          * If replication can be chained. If chaining is disallowed, it can still be explicitly

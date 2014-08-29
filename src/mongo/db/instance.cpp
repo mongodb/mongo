@@ -921,11 +921,6 @@ namespace mongo {
         }
     }
 
-    DBDirectClient::DBDirectClient() 
-        : _txnOwned(new OperationContextImpl),
-          _txn(_txnOwned.get())
-    {}
-
     DBDirectClient::DBDirectClient(OperationContext* txn) 
         : _txn(txn)
     {}

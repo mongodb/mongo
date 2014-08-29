@@ -647,7 +647,7 @@ namespace {
             }
 
 
-            scoped_ptr<ReplSetConfig> newConfig(ReplSetConfig::make(args.newConfigObj, args.force));
+            scoped_ptr<ReplSetConfig> newConfig(ReplSetConfig::make(txn, args.newConfigObj, args.force));
 
             log() << "replSet replSetReconfig config object parses ok, " <<
                     newConfig->members.size() << " members specified" << rsLog;
@@ -727,7 +727,7 @@ namespace {
 
             scoped_ptr<ReplSetConfig> newConfig;
             try {
-                newConfig.reset(ReplSetConfig::make(configObj));
+                newConfig.reset(ReplSetConfig::make(txn, configObj));
             } catch (const DBException& e) {
                 log() << "replSet replSetInitiate exception: " << e.what() << rsLog;
                 return Status(ErrorCodes::InvalidReplicaSetConfig,
