@@ -83,7 +83,7 @@ __wt_txn_update_oldest(WT_SESSION_IMPL *session)
 	 * state wasn't refreshed after the last transaction committed.  Push
 	 * past the last committed transaction.
 	 */
-	__wt_txn_refresh(session, WT_TXN_NONE, 0);
+	__wt_txn_refresh(session, 0, 0);
 }
 
 /*
@@ -91,7 +91,7 @@ __wt_txn_update_oldest(WT_SESSION_IMPL *session)
  *	Allocate a transaction ID and/or a snapshot.
  */
 void
-__wt_txn_refresh(WT_SESSION_IMPL *session, uint64_t max_id, int get_snapshot)
+__wt_txn_refresh(WT_SESSION_IMPL *session, int get_snapshot, int pin_reads)
 {
 	WT_CONNECTION_IMPL *conn;
 	WT_TXN *txn;
@@ -135,27 +135,23 @@ __wt_txn_refresh(WT_SESSION_IMPL *session, uint64_t max_id, int get_snapshot)
 
 	/* The oldest ID cannot change until the scan count goes to zero. */
 	prev_oldest_id = txn_global->oldest_id;
-	current_id = snap_min = txn_global->current;
-
-	/* If the maximum ID is constrained, so is the oldest. */
-	oldest_id = (max_id != WT_TXN_NONE) ? max_id : snap_min;
+	current_id = oldest_id = snap_min = txn_global->current;
 
 	/* Walk the array of concurrent transactions. */
 	WT_ORDERED_READ(session_cnt, conn->session_cnt);
 	for (i = n = 0, s = txn_global->states; i < session_cnt; i++, s++) {
 		/*
-		 * Ignore the ID if we are committing (indicated by max_id
-		 * being set): it is about to be released.
+		 * Build our snapshot of any concurrent transaction IDs.
+		 *
+		 * Ignore our own ID: we always read our own updates.
 		 *
 		 * Also ignore the ID if it is older than the oldest ID we saw.
 		 * This can happen if we race with a thread that is allocating
 		 * an ID -- the ID will not be used because the thread will
 		 * keep spinning until it gets a valid one.
-		 *
-		 * Lastly, ignore the checkpoint transaction ID: checkpoints
-		 * never do application-visible updates.
 		 */
-		if ((id = s->id) != WT_TXN_NONE && id + 1 != max_id &&
+		if (s != txn_state &&
+		    (id = s->id) != WT_TXN_NONE &&
 		    TXNID_LE(prev_oldest_id, id)) {
 			if (get_snapshot)
 				txn->snapshot[n++] = id;
@@ -167,7 +163,7 @@ __wt_txn_refresh(WT_SESSION_IMPL *session, uint64_t max_id, int get_snapshot)
 		 * Ignore the session's own snap_min if we are in the process
 		 * of updating it.
 		 */
-		if (get_snapshot && s == txn_state)
+		if (get_snapshot && !pin_reads && s == txn_state)
 			continue;
 
 		/*
@@ -185,8 +181,17 @@ __wt_txn_refresh(WT_SESSION_IMPL *session, uint64_t max_id, int get_snapshot)
 
 	if (TXNID_LT(snap_min, oldest_id))
 		oldest_id = snap_min;
+	if (txn->id != WT_TXN_NONE && TXNID_LT(txn->id, oldest_id))
+		oldest_id = txn->id;
 
-	if (get_snapshot) {
+	/*
+	 * If we got a new snapshot, update the published snap_min for this
+	 * session.  Skip this if we are updating a snapshot because there are
+	 * positioned cursors during commit: the cursors may be pointing to
+	 * data older than the snapshot we've calculated.
+	 */
+	if (get_snapshot && !pin_reads &&
+	    (session->ncursors == 0 || txn_state->snap_min == WT_TXN_NONE)) {
 		WT_ASSERT(session, TXNID_LE(prev_oldest_id, snap_min));
 		WT_ASSERT(session, prev_oldest_id == txn_global->oldest_id);
 		txn_state->snap_min = snap_min;
@@ -205,9 +210,8 @@ __wt_txn_refresh(WT_SESSION_IMPL *session, uint64_t max_id, int get_snapshot)
 	 * much newer value.  Once we get exclusive access, do another pass to
 	 * make sure nobody else is using an earlier ID.
 	 */
-	if (max_id == WT_TXN_NONE &&
-	    (TXNID_LT(prev_oldest_id, oldest_id) &&
-	    (!get_snapshot || oldest_id - prev_oldest_id > 100)) &&
+	if (TXNID_LT(prev_oldest_id, oldest_id) &&
+	    (!get_snapshot || oldest_id - prev_oldest_id > 100) &&
 	    WT_ATOMIC_CAS(txn_global->scan_count, 1, -1)) {
 		WT_ORDERED_READ(session_cnt, conn->session_cnt);
 		for (i = 0, s = txn_global->states; i < session_cnt; i++, s++) {
@@ -264,7 +268,7 @@ __wt_txn_begin(WT_SESSION_IMPL *session, const char *cfg[])
 
 	F_SET(txn, TXN_RUNNING);
 	if (txn->isolation == TXN_ISO_SNAPSHOT)
-		__wt_txn_refresh(session, WT_TXN_NONE, 1);
+		__wt_txn_refresh(session, 1, session->ncursors > 0);
 	return (0);
 }
 
@@ -302,10 +306,8 @@ __wt_txn_release(WT_SESSION_IMPL *session)
 		__wt_split_stash_discard(session);
 
 	/*
-	 * Reset the transaction state to not running.
-	 *
-	 * Auto-commit transactions (identified by having active cursors)
-	 * handle this at a higher level.
+	 * Reset the transaction state to not running.  Release the snapshot
+	 * if no cursors are active.
 	 */
 	if (session->ncursors == 0)
 		__wt_txn_release_snapshot(session);
@@ -359,17 +361,18 @@ __wt_txn_commit(WT_SESSION_IMPL *session, const char *cfg[])
 	txn->mod_count = 0;
 
 	/*
-	 * Auto-commit transactions need a new transaction snapshot so that the
-	 * committed changes are visible to subsequent reads.  However, cursor
-	 * keys and values will point to the data that was just modified, so
-	 * the snapshot cannot be so new that updates could be freed underneath
-	 * the cursor.  Get the new snapshot before releasing the ID for the
-	 * commit.
+	 * Positioned cursors need a new transaction snapshot so that the
+	 * committed changes are visible to reads after this transaction clears
+	 * its ID.  However, cursor keys and values will point to the data that
+	 * was just modified, so the snapshot cannot be so new that updates
+	 * could be freed underneath the cursor.  Get the new snapshot before
+	 * releasing the ID for the commit.
 	 */
 	if (session->ncursors > 0 &&
 	    F_ISSET(txn, TXN_HAS_ID) &&
 	    txn->isolation != TXN_ISO_READ_UNCOMMITTED)
-		__wt_txn_refresh(session, txn->id + 1, 1);
+		__wt_txn_refresh(session, 1, 1);
+
 	__wt_txn_release(session);
 	return (0);
 }

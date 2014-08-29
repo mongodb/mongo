@@ -32,22 +32,23 @@ class.
 
 Applications call WT_SESSION::begin_transaction to start a new transaction.
 Operations subsequently performed using that WT_SESSION handle, including
-operations on any cursors open in that WT_SESSION handle, are part of the
+operations on any cursors open in that WT_SESSION handle (whether opened
+before or after the WT_SESSION::begin_transaction call), are part of the
 transaction and their effects committed by calling
 WT_SESSION::commit_transaction, or discarded by calling
 WT_SESSION::rollback_transaction.
 
-If WT_SESSION::commit_transaction returns an error for any reason,
-the transaction was rolled-back, not committed.
+If WT_SESSION::commit_transaction returns an error for any reason, the
+transaction was rolled back, not committed.
 
 When transactions are used, data operations can encounter a conflict and
 fail with the ::WT_DEADLOCK error.  If this error occurs, transactions
-should be rolled back with WT_SESSION::rollback_transaction and retried.
+should be rolled back with WT_SESSION::rollback_transaction and the
+operation retried.
 
-The WT_SESSION::begin_transaction, WT_SESSION::commit_transaction and
-WT_SESSION::rollback_transaction methods all implicitly reset all open
-cursors in the WT_SESSION, as if WT_CURSOR::reset were called, discarding
-any position or key/value information they may have.
+The WT_SESSION::rollback_transaction method implicitly resets all
+cursors in the session as if the WT_CURSOR::reset method was called,
+discarding any cursor position as well as any key and value.
 
 @snippet ex_all.c transaction commit/rollback
 
@@ -61,10 +62,10 @@ are automatically committed before the update operation returns.
 Any operation consisting of multiple related updates should be enclosed
 in an explicit transaction to ensure the updates are applied atomically.
 
-If an implicit transaction successfully commits, the open cursors in the
-WT_SESSION remain open and positioned.  If an implicit transaction fails,
-all open cursors in the WT_SESSION are reset, as if WT_CURSOR::reset were
-called, discarding any position or key/value information they may have.
+If an implicit transaction successfully commits, the cursors in the
+WT_SESSION remain positioned.  If an implicit transaction fails, all
+cursors in the WT_SESSION are reset, as if WT_CURSOR::reset were called,
+discarding any position or key/value information they may have.
 
 See @ref cursors_transactions for more information.
 

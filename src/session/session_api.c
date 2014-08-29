@@ -20,8 +20,12 @@ __wt_session_reset_cursors(WT_SESSION_IMPL *session)
 	WT_CURSOR *cursor;
 	WT_DECL_RET;
 
-	TAILQ_FOREACH(cursor, &session->cursors, q)
+	TAILQ_FOREACH(cursor, &session->cursors, q) {
+		/* Stop when there are no positioned cursors. */
+		if (session->ncursors == 0)
+			break;
 		WT_TRET(cursor->reset(cursor));
+	}
 	return (ret);
 }
 
@@ -266,6 +270,18 @@ __session_open_cursor(WT_SESSION *wt_session,
 err:		if (cursor != NULL)
 			WT_TRET(cursor->close(cursor));
 	}
+
+	/*
+	 * Opening a cursor on a non-existent data source will set ret to
+	 * either of ENOENT or WT_NOTFOUND at this point.  However,
+	 * applications may reasonably do this inside a transaction to check
+	 * for the existence of a table or index.
+	 *
+	 * Prefer WT_NOTFOUND here: that does not force running transactions to
+	 * roll back.  It will be mapped back to ENOENT.
+	 */
+	if (ret == ENOENT)
+		ret = WT_NOTFOUND;
 
 	API_END_RET_NOTFOUND_MAP(session, ret);
 }
@@ -606,12 +622,10 @@ __session_begin_transaction(WT_SESSION *wt_session, const char *config)
 	if (F_ISSET(&session->txn, TXN_RUNNING))
 		WT_ERR_MSG(session, EINVAL, "Transaction already running");
 
-	WT_ERR(__wt_session_reset_cursors(session));
-
 	/*
-	 * Now there are no cursors open and no transaction active in this
-	 * thread.  Check if the cache is full: if we have to block for
-	 * eviction, this is the best time to do it.
+	 * There is no transaction active in this thread; check if the cache is
+	 * full, if we have to block for eviction, this is the best time to do
+	 * it.
 	 */
 	WT_ERR(__wt_cache_full_check(session));
 
@@ -641,12 +655,12 @@ __session_commit_transaction(WT_SESSION *wt_session, const char *config)
 		ret = EINVAL;
 	}
 
-	WT_TRET(__wt_session_reset_cursors(session));
-
 	if (ret == 0)
 		ret = __wt_txn_commit(session, cfg);
-	else
+	else {
+		WT_TRET(__wt_session_reset_cursors(session));
 		WT_TRET(__wt_txn_rollback(session, cfg));
+	}
 
 err:	API_END_RET(session, ret);
 }
