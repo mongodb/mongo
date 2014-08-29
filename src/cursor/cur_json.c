@@ -457,7 +457,7 @@ __wt_json_token(WT_SESSION *wt_session, const char *src, int *toktype,
 	WT_SESSION_IMPL *session;
 	char ch;
 	const char *bad;
-	int backslash, i, isalph, isfloat, result;
+	int backslash, isalph, isfloat, result;
 
 	result = -1;
 	session = (WT_SESSION_IMPL *)wt_session;
@@ -486,17 +486,20 @@ __wt_json_token(WT_SESSION *wt_session, const char *src, int *toktype,
 				if (ch == '\\')
 					backslash = 1;
 			} else {
-				/* On this pass, we're not validating
-				 * the backslash sequence, just skipping
-				 * past it.
-				 */
-				if (ch == 'u')
-					for (i = 0; i < 4; i++)
-						if (*++src == '\0') {
-							__wt_errx(session,
-				    "incomplete Unicode within JSON string");
-							return (-1);
-						}
+				/* We validate Unicode on this pass. */
+				if (ch == 'u') {
+					u_char ignored;
+					const u_char *uc;
+
+					uc = (const u_char *)src;
+					if (__wt_hex2byte(&uc[1], &ignored) ||
+					    __wt_hex2byte(&uc[3], &ignored)) {
+						__wt_errx(session,
+				    "invalid Unicode within JSON string");
+						return (-1);
+					}
+					src += 5;
+				}
 				backslash = 0;
 			}
 			src++;
@@ -825,7 +828,7 @@ __wt_json_strlen(const char *src, size_t srclen)
 				if (__wt_hex2byte((const u_char *)++src, &hi))
 					return (-1);
 				src += 2;
-				if (__wt_hex2byte((const u_char *)++src, &lo))
+				if (__wt_hex2byte((const u_char *)src, &lo))
 					return (-1);
 				src += 2;
 				/* RFC 3629 */
@@ -870,7 +873,7 @@ __wt_json_strncpy(char **pdst, size_t dstlen, const char *src, size_t srclen)
 				if (__wt_hex2byte((const u_char *)++src, &hi))
 					return (EINVAL);
 				src += 2;
-				if (__wt_hex2byte((const u_char *)++src, &lo))
+				if (__wt_hex2byte((const u_char *)src, &lo))
 					return (EINVAL);
 				src += 2;
 				/* RFC 3629 */

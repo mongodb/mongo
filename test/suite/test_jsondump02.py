@@ -154,7 +154,7 @@ class test_jsondump02(wttest.WiredTigerTestCase):
         self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
             lambda: self.load_json(self.table_uri2, 
               (('"abc\u"', ''),)),
-            '/incomplete Unicode/')
+            '/invalid Unicode/')
 
         # bad tokens
         self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
@@ -192,6 +192,16 @@ class test_jsondump02(wttest.WiredTigerTestCase):
             lambda: self.load_json(self.table_uri2, 
               (('"key0" : "KEY002"', '"value1" : "str0",\n"value0" : 123'),)),
             '/expected value name.*\"value0\"/')
+
+        # various invalid unicode
+        invalid_unicode = (
+            '\\u', '\\ux', '\\u0', '\\u0F', '\\u0FA', '\\u0FAx',  '\\u0FA\\x')
+        for uni in invalid_unicode:
+            self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
+                lambda: self.load_json(self.table_uri2, 
+                  (('"key0" : "KEY002"', '"value0" : 123,\n"value1" : "'
+                    + uni + '"'),)),
+                '/invalid Unicode/')
 
         # this one should work
         self.load_json(self.table_uri2, 

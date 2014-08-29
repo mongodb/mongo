@@ -252,9 +252,15 @@ __pack_size(WT_SESSION_IMPL *session, WT_PACK_VALUE *pv)
 	case 'J':
 		if (pv->type == 'j' || pv->havesize)
 			s = pv->size;
-		else
-			s = __wt_json_strlen(pv->u.item.data,
-			    pv->u.item.size) + 1;
+		else {
+			ssize_t len;
+
+			/* The string was previously validated. */
+			len = __wt_json_strlen(pv->u.item.data,
+			    pv->u.item.size);
+			WT_ASSERT(session, len >= 0);
+			s = (size_t)len + 1;
+		}
 		return (s);
 	case 's':
 	case 'S':
