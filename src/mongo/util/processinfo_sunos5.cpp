@@ -164,10 +164,10 @@ namespace mongo {
                 Status minorStatus =
                     parseNumberFromString<unsigned>(versionComponents[1], &minorInt);
 
-                if (!majorStatus.Ok() || !minorStatus.Ok()) {
+                if (!majorStatus.isOK() || !minorStatus.isOK()) {
                     warning() << "Could not parse OS version numbers from uname: " << osVersion;
                 }
-                else if ((majorInt == 11 && minorInt >= 2) || major > 11) {
+                else if ((majorInt == 11 && minorInt >= 2) || majorInt > 11) {
                     preferMsyncOverFSync = true;
                 }
             }
