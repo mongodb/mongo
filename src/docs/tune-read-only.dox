@@ -1,4 +1,4 @@
-/*! @page tune_read_only_objects Read-only objects
+/*! @page tune_read_only Read-only objects
 
 Cursors opened on checkpoints (either named, or using the special "last
 checkpoint" name "WiredTigerCheckpoint") are read-only objects.  Unless
