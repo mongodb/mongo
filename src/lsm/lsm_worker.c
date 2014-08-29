@@ -16,10 +16,7 @@ static void * __lsm_worker(void *);
 int
 __wt_lsm_worker_start(WT_SESSION_IMPL *session, WT_LSM_WORKER_ARGS *args)
 {
-
-	WT_RET(__wt_thread_create(
-	    session, &args->tid, __lsm_worker, args));
-	return (0);
+	return (__wt_thread_create(session, &args->tid, __lsm_worker, args));
 }
 
 /*
@@ -83,10 +80,8 @@ __lsm_worker(void *arg)
 					WT_ERR(__wt_lsm_checkpoint_chunk(
 					    session, entry->lsm_tree,
 					    chunk, &flushed));
-					WT_ASSERT(
-					    session, chunk->refcnt > 0);
-					(void)WT_ATOMIC_SUB(
-					    chunk->refcnt, 1);
+					WT_ASSERT(session, chunk->refcnt > 0);
+					(void)WT_ATOMIC_SUB(chunk->refcnt, 1);
 				}
 			} else if (entry->flags == WT_LSM_WORK_DROP) {
 				WT_ERR(__wt_lsm_free_chunks(
