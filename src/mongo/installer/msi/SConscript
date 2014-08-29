@@ -40,8 +40,6 @@ enterprisebase = 'src\mongo\db\modules\enterprise'
 # msi_flavor - "2008R2Plus" or ""
 #
 
-
-
 # Enterprise
 if 'enterprise' in env['MONGO_MODULES']:
   msi_edition = 'Enterprise'
@@ -50,7 +48,10 @@ if 'enterprise' in env['MONGO_MODULES']:
   upgrade_code = 'F395569E-9DD4-49E6-AE8B-16B22BBFE915'
 # Community
 else:
-  msi_edition = 'Standard'
+  if 'MONGO_SSL' in env['CPPDEFINES']:
+    msi_edition = 'SSL'
+  else:
+    msi_edition = 'Standard'
   if env['PROCESSOR_ARCHITECTURE'] == 'i386':
     msi_platform = 'x86'
     msi_flavor = ''
@@ -59,10 +60,17 @@ else:
     msi_platform = 'x64'
     if env.get('WIN_VERSION_MIN') == 'ws08r2' or env.get('WIN_VERSION_MIN') == 'win7':
       msi_flavor = '2008R2Plus'
-      upgrade_code = 'B5D765D3-7A55-4BD3-9990-A0F85F5DBE2F'
+      if msi_edition == 'SSL':
+        upgrade_code = '3AEC188B-D63E-4344-88BA-23B8539C68D5'
+      else:
+        upgrade_code = 'B5D765D3-7A55-4BD3-9990-A0F85F5DBE2F'
     else:
       msi_flavor = 'Legacy'
       upgrade_code = '6A44D061-6FA9-438B-8D25-4AF1BBAC61D7'
+
+if msi_edition == 'SSL' and msi_flavor != '2008R2Plus':
+  print "Building the MongoDB SSL MSI is only supported on Windows 2008 R2+ or Windows 7+ platforms."
+  exit(1)
 
 if msi_platform == 'x64':
   sources.append("wxs/Installer_64.wxs")

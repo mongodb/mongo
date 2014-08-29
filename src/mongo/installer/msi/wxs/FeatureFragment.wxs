@@ -7,7 +7,7 @@
                Description="!(wix.ProductName)"
                Level="1"
                ConfigurableDirectory="INSTALLLOCATION">
-        <?if $(var.Edition) = Enterprise ?>
+        <?if $(var.Edition) = Enterprise or $(var.Edition) = SSL ?>
           <MergeRef Id="m_vcredist"/>
         <?endif?>
         <ComponentGroupRef Id="cg_License" />
@@ -20,6 +20,9 @@
           <?if $(var.Edition) = Enterprise ?>
             <ComponentGroupRef Id="cg_EnterpriseServer" />
           <?endif ?>
+          <?if $(var.Edition) = SSL ?>
+            <ComponentGroupRef Id="cg_SSLBase" />
+          <?endif ?>
         </Feature>
         <Feature Id="Client"
                  Title ="Client"
@@ -28,6 +31,9 @@
           <ComponentRef Id="c_mongo"/>
           <?if $(var.Edition) = Enterprise ?>
             <ComponentGroupRef Id="cg_EnterpriseBase" />
+          <?endif ?>
+          <?if $(var.Edition) = SSL ?>
+            <ComponentGroupRef Id="cg_SSLBase" />
           <?endif ?>
         </Feature>
         <Feature Id="MonitoringTools"
@@ -38,6 +44,9 @@
           <ComponentRef Id="c_mongotop"/>
           <?if $(var.Edition) = Enterprise ?>
             <ComponentGroupRef Id="cg_EnterpriseBase" />
+          <?endif ?>
+          <?if $(var.Edition) = SSL ?>
+            <ComponentGroupRef Id="cg_SSLBase" />
           <?endif ?>
         </Feature>
         <Feature Id="ImportExportTools"
@@ -51,6 +60,9 @@
           <?if $(var.Edition) = Enterprise ?>
             <ComponentGroupRef Id="cg_EnterpriseBase" />
           <?endif ?>
+          <?if $(var.Edition) = SSL ?>
+            <ComponentGroupRef Id="cg_SSLBase" />
+          <?endif ?>
         </Feature>
         <Feature Id="Router"
                  Title ="Router"
@@ -60,6 +72,9 @@
           <ComponentRef Id="c_mongosPdb"/>
           <?if $(var.Edition) = Enterprise ?>
             <ComponentGroupRef Id="cg_EnterpriseBase" />
+          <?endif ?>
+          <?if $(var.Edition) = SSL ?>
+            <ComponentGroupRef Id="cg_SSLBase" />
           <?endif ?>
         </Feature>     
         <Feature Id="MiscellaneousTools"
@@ -72,6 +87,9 @@
           <ComponentRef Id="c_mongoperf"/>
           <?if $(var.Edition) = Enterprise ?>
             <ComponentGroupRef Id="cg_EnterpriseBase" />
+          <?endif ?>
+          <?if $(var.Edition) = SSL ?>
+            <ComponentGroupRef Id="cg_SSLBase" />
           <?endif ?>
         </Feature>
       </Feature>
