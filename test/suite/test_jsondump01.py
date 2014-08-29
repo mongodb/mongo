@@ -108,7 +108,7 @@ class test_jsondump01(wttest.WiredTigerTestCase, suite_subprocess):
 
         # spot check
         configs = tables[uri][0]
-        data = tables[uri][1]
+        data = tables[uri][1]["data"]
         d = data[24]
         if 'column5' in d:
             self.assertEqual(d['column5'], '25: abcde')

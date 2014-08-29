@@ -59,6 +59,7 @@ static int json_config(WT_SESSION *, JSON_INPUT_STATE *, char **);
 static int json_data(WT_SESSION *, JSON_INPUT_STATE *, const char *);
 static int json_expect(WT_SESSION *, JSON_INPUT_STATE *, int);
 static int json_peek(WT_SESSION *, JSON_INPUT_STATE *);
+static int json_skip(WT_SESSION *, JSON_INPUT_STATE *, char *match);
 static int json_kvraw_append(JSON_INPUT_STATE *, const char *, size_t);
 static int json_strdup(JSON_INPUT_STATE *, char **);
 static int json_top_level(WT_SESSION *, JSON_INPUT_STATE *);
@@ -507,12 +508,15 @@ json_top_level(WT_SESSION *session, JSON_INPUT_STATE *ins)
 		JSON_EXPECT(session, ins, '{');
 		if ((ret = json_config(session, ins, &tableuri)) != 0)
 			goto err;
-		JSON_EXPECT(session, ins, '}');
-		JSON_EXPECT(session, ins, ',');
+		if (json_skip(session, ins, "\"data\"") != 0)
+			goto err;
+		JSON_EXPECT(session, ins, 's');
+		JSON_EXPECT(session, ins, ':');
 		JSON_EXPECT(session, ins, '[');
 		if ((ret = json_data(session, ins, tableuri)) != 0)
 			goto err;
 		JSON_EXPECT(session, ins, ']');
+		JSON_EXPECT(session, ins, '}');
 		JSON_EXPECT(session, ins, ']');
 		if (json_peek(session, ins) != ',')
 			break;
@@ -604,6 +608,40 @@ json_expect(WT_SESSION *session, JSON_INPUT_STATE *ins, int wanttok)
 		    __wt_json_tokname(ins->toktype));
 		return (1);
 	}
+	return (0);
+}
+
+
+/*
+ * json_skip --
+ *	Skip over JSON input until the specified string appears.
+ *	The tokenizer will be set to point to the beginning of
+ *	that string.
+ */
+static int
+json_skip(WT_SESSION *session, JSON_INPUT_STATE *ins, char *match)
+{
+	char *hit;
+
+	if (ins->kvraw != NULL)
+		return (1);
+
+	hit = NULL;
+	while (!ins->ateof) {
+		if ((hit = strstr(ins->p, match)) != NULL)
+			break;
+		if (util_read_line(&ins->line, 1, &ins->ateof)) {
+			ins->toktype = -1;
+			return (1);
+		}
+		ins->linenum++;
+		ins->p = (const char *)ins->line.mem;
+	}
+	if (hit == NULL)
+		return (1);
+
+	ins->peeking = 0;
+	ins->toktype = 0;
 	return (0);
 }
 
