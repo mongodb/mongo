@@ -47,7 +47,7 @@ namespace mongo {
 
 namespace {
     // 2 GB is the largest support Javascript file size.
-    static const fileofs kMaxJsFileLength = fileofs(2) * 1024 * 1024 * 1024;
+    const fileofs kMaxJsFileLength = fileofs(2) * 1024 * 1024 * 1024;
 }  // namespace
 
     ScriptEngine::ScriptEngine() : _scopeInitCallback() {
