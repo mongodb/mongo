@@ -87,10 +87,11 @@ tfile.close()
 compare_srcfile(tmp_file, '../src/conn/api_strerror.c')
 
 # Update the error documentation block.
+doc = '../src/docs/error-handling.dox'
 tmp_file = '__tmp'
 tfile = open(tmp_file, 'w')
 skip = 0
-for line in open('../src/docs/error.dox', 'r'):
+for line in open(doc, 'r'):
 	if not skip:
 		tfile.write(line)
 	if line.count('IGNORE_BUILT_BY_API_ERR_END'):
@@ -107,4 +108,4 @@ for line in open('../src/docs/error.dox', 'r'):
 			    '@par <code>' + err.name.upper() + '</code>\n' +
 			    " ".join(err.long_desc.split()) + '\n\n')
 tfile.close()
-compare_srcfile(tmp_file, '../src/docs/error.dox')
+compare_srcfile(tmp_file, doc)
