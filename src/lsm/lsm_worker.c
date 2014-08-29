@@ -38,6 +38,7 @@ __lsm_worker(void *arg)
 	session = cookie->session;
 	conn = S2C(session);
 
+	entry = NULL;
 	while (F_ISSET(conn, WT_CONN_SERVER_RUN)) {
 		/* Don't busy wait if there aren't any LSM trees. */
 		if (TAILQ_EMPTY(&conn->lsmqh)) {
