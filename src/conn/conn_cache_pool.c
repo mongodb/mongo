@@ -249,16 +249,16 @@ __wt_conn_cache_pool_destroy(WT_CONNECTION_IMPL *conn)
 	WT_SESSION_IMPL *session;
 	int cp_locked, found;
 
-	cp_locked = found = 0;
 	session = conn->default_session;
 	cache = conn->cache;
+	cp_locked = found = 0;
+	cp = __wt_process.cache_pool;
 
 	if (!F_ISSET(conn, WT_CONN_CACHE_POOL))
 		return (0);
 
-	__wt_spin_lock(session, &__wt_process.cache_pool->cache_pool_lock);
+	__wt_spin_lock(session, &cp->cache_pool_lock);
 	cp_locked = 1;
-	cp = __wt_process.cache_pool;
 	TAILQ_FOREACH(entry, &cp->cache_pool_qh, cpq)
 		if (entry == conn) {
 			found = 1;
@@ -284,6 +284,7 @@ __wt_conn_cache_pool_destroy(WT_CONNECTION_IMPL *conn)
 		 * operation.
 		 */
 		__wt_spin_unlock(session, &cp->cache_pool_lock);
+		cp_locked = 0;
 
 		F_CLR(cache, WT_CACHE_POOL_RUN);
 		WT_TRET(__wt_cond_signal(session, cp->cache_pool_cond));
@@ -298,6 +299,7 @@ __wt_conn_cache_pool_destroy(WT_CONNECTION_IMPL *conn)
 		 * participant.
 		 */
 		__wt_spin_lock(session, &cp->cache_pool_lock);
+		cp_locked = 1;
 	}
 
 	/*
@@ -305,7 +307,8 @@ __wt_conn_cache_pool_destroy(WT_CONNECTION_IMPL *conn)
 	 * wiredtiger_open, there is nothing further to do.
 	 */
 	if (cp->refs < 1) {
-		__wt_spin_unlock(session, &cp->cache_pool_lock);
+		if (cp_locked)
+			__wt_spin_unlock(session, &cp->cache_pool_lock);
 		return (0);
 	}
 
