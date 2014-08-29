@@ -125,8 +125,6 @@ __wt_lsm_bloom_work(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 	u_int i;
 
 	WT_CLEAR(cookie);
-	/* If no work is done, tell our caller by returning WT_NOTFOUND. */
-	ret = WT_NOTFOUND;
 
 	WT_RET(__lsm_copy_chunks(session, lsm_tree, &cookie, 0));
 
