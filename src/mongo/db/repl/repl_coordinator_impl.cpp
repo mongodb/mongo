@@ -432,11 +432,10 @@ namespace {
                 invariant(memberConfig);
                 for (MemberConfig::TagIterator it = memberConfig->tagsBegin();
                         it != memberConfig->tagsEnd(); ++it) {
-                    matcher.update(*it);
+                    if (matcher.update(*it)) {
+                        return true;
+                    }
                 }
-            }
-            if (matcher.isSatisfied()) {
-                return true;
             }
         }
         return false;
