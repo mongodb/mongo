@@ -19,7 +19,7 @@
 /* Balancing passes after a reduction before a connection is a candidate. */
 #define	WT_CACHE_POOL_REDUCE_SKIPS	5
 
-static int __cache_pool_adjust(WT_SESSION_IMPL *, uint64_t, uint64_t);
+static int __cache_pool_adjust(WT_SESSION_IMPL *, uint64_t, uint64_t, int *);
 static int __cache_pool_assess(WT_SESSION_IMPL *, uint64_t *);
 static int __cache_pool_balance(WT_SESSION_IMPL *);
 
@@ -200,7 +200,7 @@ __wt_conn_cache_pool_open(WT_SESSION_IMPL *session)
 	 * it in the main thread to avoid shutdown races
 	 */
 	if ((ret = __wt_open_internal_session(
-		conn, "cache-pool", 0, 0, &conn->cache->cp_session)) != 0)
+		conn, "cache-pool", 0, 0, &cache->cp_session)) != 0)
 		WT_RET_MSG(NULL, ret,
 		    "Failed to create session for cache pool");
 
@@ -362,9 +362,11 @@ __cache_pool_balance(WT_SESSION_IMPL *session)
 {
 	WT_CACHE_POOL *cp;
 	WT_DECL_RET;
-	uint64_t bump_threshold, highest, last_used;
+	int adjusted;
+	uint64_t bump_threshold, highest;
 
 	cp = __wt_process.cache_pool;
+	adjusted = 0;
 	highest = 0;
 
 	__wt_spin_lock(NULL, &cp->cache_pool_lock);
@@ -374,18 +376,26 @@ __cache_pool_balance(WT_SESSION_IMPL *session)
 		goto err;
 
 	WT_ERR(__cache_pool_assess(session, &highest));
-	last_used = cp->currently_used;
 	bump_threshold = WT_CACHE_POOL_BUMP_THRESHOLD;
 	/*
 	 * Actively attempt to:
 	 * - Reduce the amount allocated, if we are over the budget
 	 * - Increase the amount used if there is capacity and any pressure.
 	 */
-	do {
-		WT_ERR(__cache_pool_adjust(session, highest, --bump_threshold));
-	} while (cp->currently_used > cp->size ||
-	    (cp->currently_used == last_used && bump_threshold > 0 &&
-	    cp->currently_used < cp->size));
+	for (bump_threshold = WT_CACHE_POOL_BUMP_THRESHOLD;
+	    F_ISSET_ATOMIC(cp, WT_CACHE_POOL_ACTIVE) &&
+	    F_ISSET(S2C(session)->cache, WT_CACHE_POOL_RUN);) {
+		WT_ERR(__cache_pool_adjust(
+		    session, highest, bump_threshold, &adjusted));
+		/*
+		 * Stop if the amount of cache being used is stable, and we
+		 * aren't over capacity.
+		 */
+		if (cp->currently_used <= cp->size && !adjusted)
+			break;
+		if (bump_threshold > 0)
+			--bump_threshold;
+	}
 
 err:	__wt_spin_unlock(NULL, &cp->cache_pool_lock);
 	return (ret);
@@ -441,8 +451,8 @@ __cache_pool_assess(WT_SESSION_IMPL *session, uint64_t *phighest)
  *	connection allocated more than their reserved size.
  */
 static int
-__cache_pool_adjust(
-    WT_SESSION_IMPL *session, uint64_t highest, uint64_t bump_threshold)
+__cache_pool_adjust(WT_SESSION_IMPL *session,
+    uint64_t highest, uint64_t bump_threshold, int *adjustedp)
 {
 	WT_CACHE_POOL *cp;
 	WT_CACHE *cache;
@@ -524,6 +534,7 @@ __cache_pool_adjust(
 			 */
 		}
 	}
+	*adjustedp = (adjusted != 0);
 	return (0);
 }
 
