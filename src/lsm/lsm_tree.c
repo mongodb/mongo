@@ -524,7 +524,7 @@ __wt_lsm_tree_get(WT_SESSION_IMPL *session,
 			 */
 			if (!exclusive &&
 			    F_ISSET_ATOMIC(lsm_tree, WT_LSM_TREE_EXCLUSIVE)) {
-				WT_ATOMIC_SUB(lsm_tree->refcnt, 1);
+				(void)WT_ATOMIC_SUB(lsm_tree->refcnt, 1);
 				return (EBUSY);
 			}
 			*treep = lsm_tree;
