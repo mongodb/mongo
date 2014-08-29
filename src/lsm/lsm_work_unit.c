@@ -139,8 +139,7 @@ __wt_lsm_bloom_work(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 		 * isn't suitable.
 		 */
 		if (!F_ISSET(chunk, WT_LSM_CHUNK_ONDISK) ||
-		    F_ISSET(chunk,
-			WT_LSM_CHUNK_BLOOM | WT_LSM_CHUNK_MERGING) ||
+		    F_ISSET(chunk, WT_LSM_CHUNK_BLOOM | WT_LSM_CHUNK_MERGING) ||
 		    chunk->generation > 0 ||
 		    chunk->count == 0)
 			continue;
