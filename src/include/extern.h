@@ -929,7 +929,7 @@ extern int __wt_clsm_open(WT_SESSION_IMPL *session,
     const char *cfg[],
     WT_CURSOR **cursorp);
 extern int __wt_lsm_manager_start(WT_SESSION_IMPL *session);
-extern int __wt_lsm_manager_free_work_unit( 	WT_SESSION_IMPL *session,
+extern void __wt_lsm_manager_free_work_unit( WT_SESSION_IMPL *session,
     WT_LSM_WORK_UNIT *entry);
 extern int __wt_lsm_manager_destroy(WT_CONNECTION_IMPL *conn);
 extern int __wt_lsm_manager_clear_tree( WT_SESSION_IMPL *session,

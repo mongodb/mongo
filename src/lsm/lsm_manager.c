@@ -71,16 +71,16 @@ err:		for (i = 0;
  * __wt_lsm_manager_free_work_unit --
  *	Release an LSM tree work unit.
  */
-int
+void
 __wt_lsm_manager_free_work_unit(
-	WT_SESSION_IMPL *session, WT_LSM_WORK_UNIT *entry)
+    WT_SESSION_IMPL *session, WT_LSM_WORK_UNIT *entry)
 {
-	if (entry == NULL)
-		return (0);
-	WT_ASSERT(session, entry->lsm_tree->queue_ref > 0);
-	(void)WT_ATOMIC_SUB(entry->lsm_tree->queue_ref, 1);
-	__wt_free(session, entry);
-	return (0);
+	if (entry != NULL) {
+		WT_ASSERT(session, entry->lsm_tree->queue_ref > 0);
+
+		(void)WT_ATOMIC_SUB(entry->lsm_tree->queue_ref, 1);
+		__wt_free(session, entry);
+	}
 }
 
 /*
