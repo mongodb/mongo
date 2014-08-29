@@ -7,6 +7,8 @@
 
 #include "wt_internal.h"
 
+static int __lsm_worker_general_op(
+    WT_SESSION_IMPL *, WT_LSM_WORKER_ARGS *, int *);
 static void * __lsm_worker(void *);
 
 /*
@@ -20,6 +22,52 @@ __wt_lsm_worker_start(WT_SESSION_IMPL *session, WT_LSM_WORKER_ARGS *args)
 }
 
 /*
+ * __lsm_worker_general_op --
+ *	Execute a single bloom, drop or flush work unit
+ */
+static int
+__lsm_worker_general_op(
+    WT_SESSION_IMPL *session, WT_LSM_WORKER_ARGS *cookie, int *completed)
+{
+	WT_DECL_RET;
+	WT_LSM_CHUNK *chunk;
+	WT_LSM_WORK_UNIT *entry;
+
+	*completed = 0;
+	if (!F_ISSET(cookie, WT_LSM_WORK_FLUSH) &&
+	    !F_ISSET(cookie, WT_LSM_WORK_DROP) &&
+	    !F_ISSET(cookie, WT_LSM_WORK_BLOOM))
+	    return (WT_NOTFOUND);
+
+
+	if ((ret = __wt_lsm_manager_pop_entry(session,
+	    cookie->flags, &entry)) != 0 || entry == NULL)
+		return (ret);
+
+	if (entry->flags == WT_LSM_WORK_FLUSH) {
+		WT_ERR(__wt_lsm_get_chunk_to_flush(
+		    session, entry->lsm_tree, &chunk));
+		if (chunk != NULL) {
+			ret = __wt_lsm_checkpoint_chunk(
+			    session, entry->lsm_tree, chunk);
+			WT_ASSERT(session, chunk->refcnt > 0);
+			(void)WT_ATOMIC_SUB(chunk->refcnt, 1);
+			WT_ERR(ret);
+		}
+	} else if (entry->flags == WT_LSM_WORK_DROP)
+		WT_ERR(__wt_lsm_free_chunks(session, entry->lsm_tree));
+	else if (entry->flags == WT_LSM_WORK_BLOOM) {
+		WT_ERR(__wt_lsm_bloom_work(session, entry->lsm_tree));
+		WT_ERR(__wt_lsm_manager_push_entry(
+		    session, WT_LSM_WORK_MERGE, entry->lsm_tree));
+	}
+	*completed = 1;
+
+err:	__wt_lsm_manager_free_work_unit(session, entry);
+	return (ret);
+}
+
+/*
  * __lsm_worker --
  *	A thread that executes work units for all open LSM trees.
  */
@@ -28,11 +76,10 @@ __lsm_worker(void *arg)
 {
 	WT_CONNECTION_IMPL *conn;
 	WT_DECL_RET;
-	WT_LSM_CHUNK *chunk;
 	WT_LSM_WORK_UNIT *entry;
 	WT_LSM_WORKER_ARGS *cookie;
 	WT_SESSION_IMPL *session;
-	int flushed;
+	int ran;
 
 	cookie = (WT_LSM_WORKER_ARGS *)arg;
 	session = cookie->session;
@@ -58,50 +105,20 @@ __lsm_worker(void *arg)
 			 */
 			WT_WITH_SCHEMA_LOCK(session, ret =
 			    __wt_lsm_tree_switch(session, entry->lsm_tree));
-			if (ret != 0) {
-				__wt_err(session, ret, "Error in LSM switch");
-				ret = 0;
-			}
+
 			__wt_lsm_manager_free_work_unit(session, entry);
 			entry = NULL;
+
+			if (ret == EBUSY)
+				ret = 0;
+			WT_ERR(ret);
 		}
 		/* Flag an error if the pop failed. */
 		WT_ERR(ret);
 
-		if ((F_ISSET(cookie, WT_LSM_WORK_FLUSH) ||
-		    F_ISSET(cookie, WT_LSM_WORK_DROP) ||
-		    F_ISSET(cookie, WT_LSM_WORK_BLOOM)) &&
-		    (ret = __wt_lsm_manager_pop_entry(
-		    session, cookie->flags, &entry)) == 0 &&
-		    entry != NULL) {
-			if (entry->flags == WT_LSM_WORK_FLUSH) {
-				WT_ERR(__wt_lsm_get_chunk_to_flush(
-				    session, entry->lsm_tree, &chunk));
-				if (chunk != NULL) {
-					WT_ERR(__wt_lsm_checkpoint_chunk(
-					    session, entry->lsm_tree,
-					    chunk, &flushed));
-					WT_ASSERT(session, chunk->refcnt > 0);
-					(void)WT_ATOMIC_SUB(chunk->refcnt, 1);
-				}
-			} else if (entry->flags == WT_LSM_WORK_DROP) {
-				WT_ERR(__wt_lsm_free_chunks(
-				    session, entry->lsm_tree));
-			} else if (entry->flags == WT_LSM_WORK_BLOOM) {
-				WT_ERR(__wt_lsm_bloom_work(
-				    session, entry->lsm_tree));
-				WT_ERR(__wt_lsm_manager_push_entry(session,
-				    WT_LSM_WORK_MERGE, entry->lsm_tree));
-			}
-			/*
-			 * If we completed some work from the application
-			 * queue, go back and check on the switch queue.
-			 */
-			__wt_lsm_manager_free_work_unit(session, entry);
-			entry = NULL;
-			continue;
-		}
-		/* Flag an error if the pop failed. */
+		ret = __lsm_worker_general_op(session, cookie, &ran);
+		if (ret == EBUSY || ret == WT_NOTFOUND)
+			ret = 0;
 		WT_ERR(ret);
 
 		if (F_ISSET(cookie, WT_LSM_WORK_MERGE) &&
@@ -114,7 +131,8 @@ __lsm_worker(void *arg)
 			if (ret == WT_NOTFOUND) {
 				F_CLR(entry->lsm_tree, WT_LSM_TREE_COMPACTING);
 				ret = 0;
-			}
+			} else if (ret == EBUSY)
+				ret = 0;
 			/* Clear any state */
 			WT_CLEAR_BTREE_IN_SESSION(session);
 			__wt_lsm_manager_free_work_unit(session, entry);

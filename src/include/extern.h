@@ -1015,8 +1015,7 @@ extern int __wt_lsm_get_chunk_to_flush( WT_SESSION_IMPL *session,
 extern int __wt_lsm_bloom_work(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree);
 extern int __wt_lsm_checkpoint_chunk(WT_SESSION_IMPL *session,
     WT_LSM_TREE *lsm_tree,
-    WT_LSM_CHUNK *chunk,
-    int *flushed);
+    WT_LSM_CHUNK *chunk);
 extern int __wt_lsm_free_chunks(WT_SESSION_IMPL *session,
     WT_LSM_TREE *lsm_tree);
 extern int __wt_lsm_worker_start(WT_SESSION_IMPL *session,

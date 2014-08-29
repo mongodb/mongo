@@ -166,12 +166,11 @@ __wt_lsm_bloom_work(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
  */
 int
 __wt_lsm_checkpoint_chunk(WT_SESSION_IMPL *session,
-    WT_LSM_TREE *lsm_tree, WT_LSM_CHUNK *chunk, int *flushed)
+    WT_LSM_TREE *lsm_tree, WT_LSM_CHUNK *chunk)
 {
 	WT_DECL_RET;
 	WT_TXN_ISOLATION saved_isolation;
 
-	*flushed = 0;
 
 	/*
 	 * If the chunk is already checkpointed, make sure it is also evicted.
@@ -236,7 +235,6 @@ __wt_lsm_checkpoint_chunk(WT_SESSION_IMPL *session,
 	WT_RET(__wt_epoch(session, &lsm_tree->last_flush_ts));
 
 	/* Lock the tree, mark the chunk as on disk and update the metadata. */
-	*flushed = 1;
 	WT_RET(__wt_lsm_tree_lock(session, lsm_tree, 1));
 	F_SET(chunk, WT_LSM_CHUNK_ONDISK);
 	ret = __wt_lsm_meta_write(session, lsm_tree);
