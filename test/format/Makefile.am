@@ -6,7 +6,7 @@ noinst_PROGRAMS = t
 noinst_SCRIPTS = s_dumpcmp
 t_SOURCES =\
 	config.h format.h backup.c bdb.c bulk.c compact.c config.c ops.c \
-	t.c util.c wts.c
+	salvage.c t.c util.c wts.c
 
 t_LDADD = $(top_builddir)/libwiredtiger.la -L$(BERKELEY_DB_PATH)/lib -ldb
 t_LDFLAGS = -static

@@ -634,6 +634,7 @@ lookup
 lookups
 lr
 lru
+lseek
 lsm
 lsn
 lu

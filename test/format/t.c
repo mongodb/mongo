@@ -218,22 +218,9 @@ main(int argc, char *argv[])
 			wts_dump("standard", 1);
 
 		/*
-		 * Salvage, then verify the salvaged files.
-		 *
-		 * If no records were deleted, dump and compare against Berkeley
-		 * DB.  (The problem with deleting records is salvage restores
-		 * deleted records if a page splits leaving a deleted record on
-		 * one side of the split, so we cannot depend on correctness in
-		 * that case.)
-		 *
+		 * Salvage testing.
 		 */
-		wts_salvage_copy();
-		wts_open(g.home, 1, &g.wts_conn);
 		wts_salvage();
-		wts_verify("post-salvage verify");
-		wts_close();
-		if (g.c_delete_pct == 0)
-			wts_dump("salvage", SINGLETHREADED);
 
 		/* Overwrite the progress line with a completion line. */
 		if (g.track)
