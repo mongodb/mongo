@@ -58,8 +58,8 @@ corrupt(void)
 {
 	FILE *fp;
 	struct stat sb;
-	off_t len, offset;
-	size_t nw;
+	off_t offset;
+	size_t len, nw;
 	int fd;
 	char buf[2 * 1024];
 
@@ -75,13 +75,13 @@ corrupt(void)
 		die(errno, "salvage-corrupt: fstat");
 
 	offset = MMRAND(0, sb.st_size);
-	len = 20 + (sb.st_size / 100) * 2;
+	len = (size_t)(20 + (sb.st_size / 100) * 2);
 	(void)snprintf(buf, sizeof(buf), "%s/slvg.corrupt", g.home);
 	if ((fp = fopen(buf, "w")) == NULL)
 		die(errno, "salvage-corrupt: open: %s", buf);
 	(void)fprintf(fp,
-	    "salvage-corrupt: offset %" PRIuMAX ", length %" PRIuMAX "\n",
-	    (uintmax_t)offset, (uintmax_t)len);
+	    "salvage-corrupt: offset %" PRIuMAX ", length %zu\n",
+	    (uintmax_t)offset, len);
 	(void)fclose(fp);
 
 	if (lseek(fd, offset, SEEK_SET) == -1)
