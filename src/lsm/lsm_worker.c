@@ -39,7 +39,6 @@ __lsm_worker_general_op(
 	    !F_ISSET(cookie, WT_LSM_WORK_BLOOM))
 	    return (WT_NOTFOUND);
 
-
 	if ((ret = __wt_lsm_manager_pop_entry(session,
 	    cookie->flags, &entry)) != 0 || entry == NULL)
 		return (ret);

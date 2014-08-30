@@ -171,7 +171,6 @@ __wt_lsm_checkpoint_chunk(WT_SESSION_IMPL *session,
 	WT_DECL_RET;
 	WT_TXN_ISOLATION saved_isolation;
 
-
 	/*
 	 * If the chunk is already checkpointed, make sure it is also evicted.
 	 * Either way, there is no point trying to checkpoint it again.
