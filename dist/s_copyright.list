@@ -1,4 +1,3 @@
-skip	build_posix/wiredtiger_config.h
 skip	dist/api_config.py
 skip	dist/api_data.py
 skip	dist/api_err.py
@@ -35,3 +34,4 @@ skip	test/packing/intpack-test.c
 skip	test/packing/intpack-test2.c
 skip	test/packing/packing-test.c
 skip	tools/stat_data.py
+skip	wiredtiger_config.h
