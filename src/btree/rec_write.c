@@ -3212,7 +3212,6 @@ __rec_leaf_page_max(
     WT_SESSION_IMPL *session, WT_PAGE *page, WT_SALVAGE_COOKIE *salvage)
 {
 	WT_BTREE *btree;
-	WT_DECL_RET;
 	uint32_t page_size;
 
 	btree = S2BT(session);
