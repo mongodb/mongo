@@ -43,7 +43,7 @@ salvage(void)
 
 	if ((ret = conn->open_session(conn, NULL, NULL, &session)) != 0)
 		die(ret, "connection.open_session");
-	if ((ret = session->salvage(session, g.uri, NULL)) != 0)
+	if ((ret = session->salvage(session, g.uri, "force=true")) != 0)
 		die(ret, "session.salvage: %s", g.uri);
 	if ((ret = session->close(session, NULL)) != 0)
 		die(ret, "session.close");
