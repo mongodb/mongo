@@ -3361,18 +3361,32 @@ __rec_col_var(WT_SESSION_IMPL *session,
 
 	/*
 	 * The salvage code may be calling us to reconcile a page where there
-	 * were missing records in the column-store name space.  In this case
-	 * we write a single RLE element onto a new page, so we know it fits,
-	 * then update the starting record number.
-	 *
-	 * Note that we DO NOT pass the salvage cookie to our helper function
-	 * in this case, we're handling one of the salvage cookie fields on
-	 * our own, and don't need assistance from the helper function.
+	 * were missing records in the column-store name space.  If we're not
+	 * taking the first records from the page, then we write a single RLE
+	 * element onto a new page, so we know it fits.  (We don't pass the
+	 * salvage cookie to our helper function in this case, we're handling
+	 * one of the salvage cookie fields on our own, and don't need help
+	 * from the helper function.)  If we're taking the first records from
+	 * the page, it might be a deleted record, in which case we have to
+	 * give the RLE code a chance to figure that out.
 	 */
+	rle = 0;
+	last_deleted = 0;
 	slvg_missing = salvage == NULL ? 0 : salvage->missing;
-	if (slvg_missing)
-		WT_ERR(__rec_col_var_helper(
-		    session, r, NULL, NULL, 1, 0, slvg_missing));
+	if (slvg_missing) {
+		if (salvage->skip == 0) {
+			rle = salvage->missing;
+			last_deleted = 1;
+
+			/*
+			 * Correct the number of records we're going to take,
+			 * pretend the missing records were there all along.
+			 */
+			salvage->take += salvage->missing;
+		} else
+			WT_ERR(__rec_col_var_helper(
+			    session, r, NULL, NULL, 1, 0, slvg_missing));
+	}
 
 	/*
 	 * We track two data items through this loop: the previous (last) item
@@ -3385,11 +3399,9 @@ __rec_col_var(WT_SESSION_IMPL *session,
 	 * number of our source record, that is, the current item, is maintained
 	 * in src_recno.
 	 */
-	src_recno = r->recno;
+	src_recno = r->recno + rle;
 
 	/* For each entry in the in-memory page... */
-	rle = 0;
-	last_deleted = 0;
 	WT_COL_FOREACH(page, cip, i) {
 		ovfl_state = OVFL_IGNORE;
 		if ((cell = WT_COL_PTR(page, cip)) == NULL) {
