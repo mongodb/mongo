@@ -1336,13 +1336,13 @@ __slvg_col_merge_ovfl(WT_SESSION_IMPL *session,
 	WT_COL_FOREACH(page, cip, i) {
 		cell = WT_COL_PTR(page, cip);
 		__wt_cell_unpack(cell, &unpack);
-		recno += __wt_cell_rle(&unpack);
 
-		if (unpack.type != WT_CELL_VALUE_OVFL)
-			continue;
-		if (recno >= start && recno <= stop)
-			continue;
-		WT_RET(__slvg_col_merge_ovfl_single(session, trk, &unpack));
+		if (recno >= start && recno <= stop &&
+		    unpack.type == WT_CELL_VALUE_OVFL)
+			WT_RET(__slvg_col_merge_ovfl_single(
+			    session, trk, &unpack));
+
+		recno += __wt_cell_rle(&unpack);
 	}
 	return (0);
 }
