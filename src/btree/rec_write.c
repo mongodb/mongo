@@ -3342,7 +3342,7 @@ __rec_col_var(WT_SESSION_IMPL *session,
 	WT_INSERT *ins;
 	WT_ITEM *last;
 	WT_UPDATE *upd;
-	uint64_t n, nrepeat, repeat_count, rle, slvg_missing, src_recno;
+	uint64_t n, nrepeat, repeat_count, rle, src_recno;
 	uint32_t i, size;
 	int deleted, last_deleted, orig_deleted, update_no_copy;
 	const void *data;
@@ -3361,31 +3361,30 @@ __rec_col_var(WT_SESSION_IMPL *session,
 
 	/*
 	 * The salvage code may be calling us to reconcile a page where there
-	 * were missing records in the column-store name space.  If we're not
-	 * taking the first records from the page, then we write a single RLE
-	 * element onto a new page, so we know it fits.  (We don't pass the
+	 * were missing records in the column-store name space.  If taking the
+	 * first record from on the page, it might be a deleted record, so we
+	 * have to give the RLE code a chance to figure that out.  Else, if
+	 * not taking the first record from the page, write a single element
+	 * representing the missing records onto a new page.  (Don't pass the
 	 * salvage cookie to our helper function in this case, we're handling
-	 * one of the salvage cookie fields on our own, and don't need help
-	 * from the helper function.)  If we're taking the first records from
-	 * the page, it might be a deleted record, in which case we have to
-	 * give the RLE code a chance to figure that out.
+	 * one of the salvage cookie fields on our own, and we don't need the
+	 * helper function's assistance.)
 	 */
 	rle = 0;
 	last_deleted = 0;
-	slvg_missing = salvage == NULL ? 0 : salvage->missing;
-	if (slvg_missing) {
+	if (salvage != NULL && salvage->missing != 0) {
 		if (salvage->skip == 0) {
 			rle = salvage->missing;
 			last_deleted = 1;
 
 			/*
-			 * Correct the number of records we're going to take,
-			 * pretend the missing records were there all along.
+			 * Correct the number of records we're going to "take",
+			 * pretending the missing records were on the page.
 			 */
 			salvage->take += salvage->missing;
 		} else
 			WT_ERR(__rec_col_var_helper(
-			    session, r, NULL, NULL, 1, 0, slvg_missing));
+			    session, r, NULL, NULL, 1, 0, salvage->missing));
 	}
 
 	/*
