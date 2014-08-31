@@ -3249,12 +3249,12 @@ __rec_leaf_page_max(
 		 */
 		break;
 	case WT_PAGE_ROW_LEAF:
+	default:
 		/*
 		 * Row-store pages can't split, salvage never does anything
 		 * other than reduce the side of a page read from disk.
 		 */
 		break;
-	WT_ILLEGAL_VALUE_SET(session);
 	}
 
 	/*
