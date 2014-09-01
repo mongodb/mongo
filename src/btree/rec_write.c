@@ -3235,7 +3235,7 @@ __rec_leaf_page_max(
 		 * there's a big missing range, we could theoretically have to
 		 * write large numbers of missing objects.
 		 */
-		page_size = WT_ALIGN(WT_FIX_ENTRIES_TO_BYTES(
+		page_size = (uint32_t)WT_ALIGN(WT_FIX_ENTRIES_TO_BYTES(
 		    btree, salvage->take + salvage->missing), btree->allocsize);
 		break;
 	case WT_PAGE_COL_VAR:
