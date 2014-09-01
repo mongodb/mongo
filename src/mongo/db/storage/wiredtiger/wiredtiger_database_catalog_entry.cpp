@@ -270,12 +270,14 @@ namespace mongo {
         }
 
         Entry *entry = i->second;
-        // Remove the underlying table from WiredTiger
-        WiredTigerSession &swrap = WiredTigerRecoveryUnit::Get(txn).GetSession();
+        // Drop the underlying table from WiredTiger
+        // XXX use a temporary session for drops: WiredTiger doesn't allow transactional drops
+        // and can't deal with rolling back a drop.
+        WiredTigerSession &swrap_real = WiredTigerRecoveryUnit::Get(txn).GetSession();
+        WiredTigerSession swrap(swrap_real.GetDatabase());
         WT_SESSION *session = swrap.Get();
         int ret;
-        std::string uri = "table:" + ns.toString();
-        ret = session->drop(session, uri.c_str(), NULL);
+        ret = session->drop(session, WiredTigerRecordStore::_getURI(ns).c_str(), "force");
         if (ret != 0)
             return Status( ErrorCodes::OperationFailed, "Collection drop failed" );
 
@@ -355,7 +357,10 @@ namespace mongo {
         // Remove the entry from the entryMap
         _entryMap.erase( i );
 
-        WiredTigerSession &swrap = WiredTigerRecoveryUnit::Get(txn).GetSession();
+        // XXX use a temporary session for renames: WiredTiger doesn't allow transactional renames
+        // and can't deal with rolling back a rename.
+        WiredTigerSession &swrap_real = WiredTigerRecoveryUnit::Get(txn).GetSession();
+        WiredTigerSession swrap(swrap_real.GetDatabase());
         WT_SESSION *session = swrap.Get();
 
         // Rename all indexes in the entry
@@ -373,8 +378,8 @@ namespace mongo {
         }
 
         // Rename the primary WiredTiger table
-        std::string fromUri = "table:" + fromNS.toString();
-        std::string toUri = "table:" + toNS.toString();
+        std::string fromUri = WiredTigerRecordStore::_getURI(fromNS);
+        std::string toUri = WiredTigerRecordStore::_getURI(toNS);
         ret = session->rename(session, fromUri.c_str(), toUri.c_str(), NULL);
         if (ret != 0)
             return Status( ErrorCodes::OperationFailed, "Collection rename failed" );
@@ -470,7 +475,10 @@ namespace mongo {
 
     Status WiredTigerDatabaseCatalogEntry::Entry::removeIndex( OperationContext* txn,
                                                           const StringData& idxName ) {
-        WiredTigerSession &swrap = WiredTigerRecoveryUnit::Get(txn).GetSession();
+        // XXX use a temporary session for creates: WiredTiger doesn't allow transactional creates
+        // and can't deal with rolling back a creates.
+        WiredTigerSession &swrap_real = WiredTigerRecoveryUnit::Get(txn).GetSession();
+        WiredTigerSession swrap(swrap_real.GetDatabase());
         WT_SESSION *session = swrap.Get();
         int ret = session->drop(session, WiredTigerIndex::_getURI(ns().toString(), idxName.toString()).c_str(), "force");
         invariant(ret == 0);
