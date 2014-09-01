@@ -131,10 +131,12 @@ Configure WiredTiger to perform various run-time diagnostic tests.
 Build the WiredTiger Java API.
 
 @par \c --enable-leveldb[=basho, hyper, rocksdb]
-Build the Google, Inc. LevelDB API.  Optionally, specify \c basho to
-support Basho's version of LevelDB, specify \c hyper to support
-HyperLevelDB / HyperDex, and used \c rocksdb to build Facebook's RocksDB
-API.  See @ref leveldb for more information.
+Include a Google, Inc. compatible LevelDB API. Optionally, specify \c basho
+to build a version of the LevelDB API compatible with Basho's Riak
+product, specify \c hyper to build a version of the LevelDB API compatible
+with the HyperDex product, and specify \c rocksdb to build a version of the
+LevelDB API compatible with applications using Facebook's RocksDB
+engine. See @ref leveldb for more information.
 
 @par \c --enable-python
 Build the WiredTiger <a href="http://www.python.org">Python</a> API.
