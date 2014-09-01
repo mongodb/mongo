@@ -129,26 +129,58 @@ namespace mongo {
         name();
     }
 
+
+    // The cursor must be open on the metadata, and positioned on the table
+    // we are retrieving the data for.
+    BSONObj WiredTigerDatabaseCatalogEntry::getSavedMetadata(WiredTigerCursor &cursor)
+    {
+        WT_CURSOR *c;
+        c = cursor.Get();
+
+        const char *meta;
+        int ret = c->get_value(c, &meta);
+        invariant( ret == 0 );
+        WT_CONFIG_PARSER *cp;
+        ret = wiredtiger_config_parser_open(
+                NULL, meta, strlen(meta), &cp);
+        invariant ( ret == 0 );
+        WT_CONFIG_ITEM cval;
+        ret = cp->get(cp, "app_metadata", &cval);
+        invariant ( ret == 0 );
+
+        BSONObj b( fromjson(std::string(cval.str, cval.len)));
+        cp->close(cp);
+        return b;
+    }
+
     void WiredTigerDatabaseCatalogEntry::_loadCollection(
         WiredTigerSession& swrap, const std::string &name) {
 
+        // Open the WiredTiger metadata so we can retrieve saved options.
+        WiredTigerCursor cursor("metadata:", swrap);
+        WT_CURSOR *c = cursor.Get();
+        invariant(c != NULL);
+        std::string tbl_uri = std::string("table:" + name);
+        c->set_key(c, tbl_uri.c_str());
+        int ret = c->search(c);
+        // TODO: Could we reasonably fail with NOTFOUND here?
+        invariant (ret == 0);
+        BSONObj b = getSavedMetadata(cursor);
+
         // Create the collection
         CollectionOptions *options = new CollectionOptions();
+        options->parse(b);
         Entry *entry = new Entry(mongo::StringData(name), *options);
-        entry->rs.reset(new WiredTigerRecordStore(name, _db));
+        WiredTigerRecordStore *rs = new WiredTigerRecordStore( name, _db );
+        if ( options->capped )
+            rs->setCapped(options->cappedSize ? options->cappedSize : 4096,
+                options->cappedMaxDocs ? options->cappedMaxDocs : -1);
+        entry->rs.reset(rs);
 
         _entryMap[name.c_str()] = entry;
 
         // Open any existing indexes
-        WiredTigerCursor cursor("metadata:", swrap);
-        WT_CURSOR *c = cursor.Get();
-        invariant(c != NULL);
-
-        std::string tbl_uri = std::string("table:" + name);
-        c->set_key(c, tbl_uri.c_str());
-        int cmp, ret = c->search_near(c, &cmp);
-        if (cmp < 0)
-            ret = c->next(c);
+        ret = c->next(c);
         while (ret == 0) {
             const char *uri_str;
             ret = c->get_key(c, &uri_str);
@@ -161,25 +193,15 @@ namespace mongo {
             size_t pos;
             if ((pos = uri.find('$')) != std::string::npos && pos < uri.size() - 1) {
                 std::string idx_name = uri.substr(pos + 1);
-                // Skip to the start of the index name
-                const char *idx_meta;
-                ret = c->get_value(c, &idx_meta);
-                invariant( ret == 0 );
-                WT_CONFIG_PARSER *cp;
-                ret = wiredtiger_config_parser_open(
-                        NULL, idx_meta, strlen(idx_meta), &cp);
-                invariant ( ret == 0 );
-                WT_CONFIG_ITEM cval;
-                ret = cp->get(cp, "app_metadata", &cval);
-                invariant ( ret == 0 );
 
-                BSONObj b( fromjson(std::string(cval.str, cval.len)));
+                b = getSavedMetadata(cursor);
                 std::string name(b.getStringField("name"));
                 IndexDescriptor desc(0, "unknown", b);
                 auto_ptr<IndexEntry> newEntry( new IndexEntry() );
                 newEntry->name = name;
                 newEntry->spec = desc.infoObj();
-                // TODO: How can we track these and set them up properly?
+                // TODO: We need to stash the options field on create and decode them
+                // here.
                 newEntry->ready = true;
                 newEntry->isMultikey = false;
 
@@ -213,17 +235,12 @@ namespace mongo {
 
         entry = new Entry( ns, options );
 
-        if ( options.capped ) {
-            entry->rs.reset(new WiredTigerRecordStore(ns,
-                            _db,
-                            true,
-                            options.cappedSize
-                                ? options.cappedSize : 4096, // default size
-                            options.cappedMaxDocs
-                                ? options.cappedMaxDocs : -1)); // no limit
-        } else {
-            entry->rs.reset( new WiredTigerRecordStore( ns, _db ) );
-        }
+        WiredTigerRecordStore *rs = new WiredTigerRecordStore( ns, _db );
+        if ( options.capped )
+            rs->setCapped(options.cappedSize ? options.cappedSize : 4096,
+                options.cappedMaxDocs ? options.cappedMaxDocs : -1);
+        entry->rs.reset( rs );
+
         _entryMap[ns.toString()] = entry;
 
         return Status::OK();
@@ -362,11 +379,18 @@ namespace mongo {
         if (ret != 0)
             return Status( ErrorCodes::OperationFailed, "Collection rename failed" );
 
+        bool was_capped = entry->rs->isCapped();
+        int64_t maxDocs, maxSize;
+        if (was_capped) {
+            maxSize = entry->rs->cappedMaxSize();
+            maxDocs = entry->rs->cappedMaxDocs();
+        }
         // Now delete the old entry.
         delete entry;
 
         // Load the newly renamed collection into memory
         _loadCollection(swrap, toNS.toString());
+
         return Status::OK();
     }
 

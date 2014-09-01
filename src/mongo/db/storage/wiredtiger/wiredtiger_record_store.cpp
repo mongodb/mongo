@@ -41,7 +41,9 @@ namespace mongo {
             const StringData &ns, const CollectionOptions &options, bool allocateDefaultSpace) {
         WiredTigerSession swrap(db);
         WT_SESSION *s = swrap.Get();
-        return s->create(s, _getURI(ns).c_str(), "type=file,key_format=q,value_format=u");
+        std::string config = "type=file,key_format=q,value_format=u,app_metadata=";
+        config += options.toBSON().jsonString();
+        return s->create(s, _getURI(ns).c_str(), config.c_str());
     }
 
     WiredTigerRecordStore::WiredTigerRecordStore( const StringData& ns,
@@ -102,6 +104,22 @@ namespace mongo {
 
     bool WiredTigerRecordStore::isCapped() const {
         return _isCapped;
+    }
+
+    void WiredTigerRecordStore::setCapped(int64_t cappedMaxSize, int64_t cappedMaxDocs) {
+        _isCapped = true;
+        _cappedMaxSize = cappedMaxSize;
+        _cappedMaxDocs = cappedMaxDocs;
+    }
+
+    int64_t WiredTigerRecordStore::cappedMaxDocs() const {
+        invariant(_isCapped);
+        return _cappedMaxDocs;
+    }
+
+    int64_t WiredTigerRecordStore::cappedMaxSize() const {
+        invariant(_isCapped);
+        return _cappedMaxSize;
     }
 
     int64_t WiredTigerRecordStore::storageSize( OperationContext* txn,
