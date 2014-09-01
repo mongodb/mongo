@@ -202,7 +202,16 @@ namespace mongo {
 
     void WiredTigerIndex::fullValidate(OperationContext* txn, long long *numKeysOut) {
         // TODO check invariants?
-        *numKeysOut = 1;
+        WiredTigerSession &swrap = WiredTigerRecoveryUnit::Get(txn).GetSession();
+        WiredTigerCursor curwrap(GetCursor(swrap), swrap);
+        WT_CURSOR *c = curwrap.Get();
+        if (!c)
+            return;
+        int ret;
+        long long count = 0;
+        while ((ret = c->next(c)) == 0)
+            ++count;
+        *numKeysOut = count;
     }
 
     Status WiredTigerIndex::dupKeyCheck(
