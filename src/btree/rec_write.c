@@ -1998,6 +1998,7 @@ __rec_split_raw_worker(
 	 * don't bother calling the underlying compression function.
 	 */
 	if (slots == 0) {
+		result_len = 0;
 		result_slots = 0;
 		goto no_slots;
 	}
