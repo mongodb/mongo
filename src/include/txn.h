@@ -46,12 +46,12 @@ struct __wt_txn_global {
 	WT_TXN_STATE *states;		/* Per-session transaction states */
 };
 
-enum __wt_txn_isolation {
+typedef enum __wt_txn_isolation {
 	TXN_ISO_EVICTION,		/* Internal: eviction context */
 	TXN_ISO_READ_UNCOMMITTED,
 	TXN_ISO_READ_COMMITTED,
 	TXN_ISO_SNAPSHOT
-};
+} WT_TXN_ISOLATION;
 
 /*
  * WT_TXN_OP --

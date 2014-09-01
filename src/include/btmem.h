@@ -604,14 +604,14 @@ struct __wt_page {
  * to the readers.  If the evicting thread does not find a hazard pointer,
  * the page is evicted.
  */
-enum __wt_page_state {
+typedef enum __wt_page_state {
 	WT_REF_DISK=0,			/* Page is on disk */
 	WT_REF_DELETED,			/* Page is on disk, but deleted */
 	WT_REF_LOCKED,			/* Page locked for exclusive access */
 	WT_REF_MEM,			/* Page is in cache and valid */
 	WT_REF_READING,			/* Page being read */
 	WT_REF_SPLIT			/* Page was split */
-};
+} WT_PAGE_STATE;
 
 /*
  * WT_PAGE_DELETED --

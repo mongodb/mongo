@@ -47,8 +47,6 @@ extern "C" {
  * DO NOT EDIT: automatically built by dist/s_typedef.
  * Forward type declarations for internal types: BEGIN
  */
-typedef enum __wt_page_state WT_PAGE_STATE;
-typedef enum __wt_txn_isolation WT_TXN_ISOLATION;
 struct __wt_addr;
     typedef struct __wt_addr WT_ADDR;
 struct __wt_async;
