@@ -421,6 +421,9 @@ namespace mongo {
             return Status( ErrorCodes::BadValue, "Invalid Value" );
         }
         // TODO: expose some WiredTiger configurations
+        if ( optionName == "usePowerOf2Sizes" ) {
+            return Status::OK();
+        } else
         if ( optionName.compare( "verify_checksums" ) == 0 ) {
         }
         else
