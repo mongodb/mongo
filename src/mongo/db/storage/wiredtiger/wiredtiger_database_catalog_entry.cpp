@@ -154,7 +154,7 @@ namespace mongo {
     }
 
     void WiredTigerDatabaseCatalogEntry::_loadCollection(
-        WiredTigerSession& swrap, const std::string &name) {
+        WiredTigerSession& swrap, const std::string &name, bool stayTemp) {
 
         // Open the WiredTiger metadata so we can retrieve saved options.
         WiredTigerCursor cursor("metadata:", swrap);
@@ -170,6 +170,8 @@ namespace mongo {
         // Create the collection
         CollectionOptions *options = new CollectionOptions();
         options->parse(b);
+		if (!stayTemp)
+			options->temp = false;
         Entry *entry = new Entry(mongo::StringData(name), *options);
         WiredTigerRecordStore *rs = new WiredTigerRecordStore( name, _db );
         if ( options->capped )
@@ -394,7 +396,7 @@ namespace mongo {
         delete entry;
 
         // Load the newly renamed collection into memory
-        _loadCollection(swrap, toNS.toString());
+        _loadCollection(swrap, toNS.toString(), stayTemp);
 
         return Status::OK();
     }
