@@ -361,8 +361,10 @@ __slvg_read(WT_SESSION_IMPL *session, WT_STUFF *ss)
 		 * configured, else we may be relying on compression.  If the
 		 * read fails, simply move to the next potential block.
 		 */
-		if (__wt_bt_read(session, buf, addr, addr_size) != 0)
+		if (__wt_bt_read(session, buf, addr, addr_size) != 0) {
+			WT_ERR(bm->free(bm, session, addr, addr_size));
 			continue;
+		}
 
 		/* Tell the block manager we're taking this one. */
 		WT_ERR(bm->salvage_valid(bm, session, addr, addr_size));
