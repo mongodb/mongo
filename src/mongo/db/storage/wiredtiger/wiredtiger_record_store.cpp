@@ -379,8 +379,11 @@ namespace mongo {
                                        ValidateAdaptor* adaptor,
                                        ValidateResults* results,
                                        BSONObjBuilder* output ) const {
+
+        uint64_t nrecords = 0;
         boost::scoped_ptr<RecordIterator> iter( getIterator( txn ) );
         while( !iter->isEOF() ) {
+            ++nrecords;
             RecordData data = dataFor( txn, iter->curr() );
             if ( scanData ) {
                 BSONObj b( data.data() );
@@ -391,6 +394,8 @@ namespace mongo {
             }
             iter->getNext();
         }
+
+        output->appendNumber( "nrecords", nrecords );
         return Status::OK();
     }
 
