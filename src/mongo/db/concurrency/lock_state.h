@@ -1,7 +1,5 @@
-// lock_state.h
-
 /**
- *    Copyright (C) 2008 10gen Inc.
+ *    Copyright (C) 2014 MongoDB Inc.
  *
  *    This program is free software: you can redistribute it and/or  modify
  *    it under the terms of the GNU Affero General Public License, version 3,

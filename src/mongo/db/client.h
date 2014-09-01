@@ -39,10 +39,7 @@
 #include "mongo/db/client_basic.h"
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/lasterror.h"
-#include "mongo/db/repl/rs.h"
-#include "mongo/db/stats/top.h"
-#include "mongo/db/storage_options.h"
-#include "mongo/util/concurrency/rwlock.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/util/concurrency/threadlocal.h"
 #include "mongo/util/paths.h"
 

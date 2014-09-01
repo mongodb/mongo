@@ -75,7 +75,7 @@
 #include "mongo/s/chunk.h"
 #include "mongo/s/chunk_version.h"
 #include "mongo/s/config.h"
-#include "mongo/s/d_logic.h"
+#include "mongo/s/d_state.h"
 #include "mongo/s/distlock.h"
 #include "mongo/s/shard.h"
 #include "mongo/s/type_chunk.h"
@@ -1012,6 +1012,23 @@ namespace mongo {
 
                 warning() << errmsg;
                 return false;
+            }
+
+            // From mongos >= v2.8.
+            BSONElement epochElem(cmdObj["epoch"]);
+            if (epochElem.type() == jstOID) {
+                OID cmdEpoch = epochElem.OID();
+
+                if (cmdEpoch != origShardVersion.epoch()) {
+                    errmsg = str::stream() << "moveChunk cannot move chunk "
+                                           << "[" << minKey << ","
+                                           << maxKey << "), "
+                                           << "collection may have been dropped. "
+                                           << "current epoch: " << origShardVersion.epoch()
+                                           << ", cmd epoch: " << cmdEpoch;
+                    warning() << errmsg;
+                    return false;
+                }
             }
 
             // Get collection metadata

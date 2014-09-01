@@ -343,9 +343,7 @@ namespace mongo {
         if( ! retryNext && pcState ){
 
             if( errored && pcState->conn ){
-                // Don't return this conn to the pool if it's bad
-                pcState->conn->kill();
-                pcState->conn.reset();
+                // Connection will cleanup for itself. Do nothing.
             }
             else if( initialized ){
 

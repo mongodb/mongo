@@ -216,10 +216,6 @@ namespace mongo {
             return _mapped;
         }
 
-        bool hasOpsQueued() const {
-            return _hasOpsQueued;
-        }
-
         std::string mongoVersion() const {
             return _mongoVersion;
         }
@@ -227,7 +223,6 @@ namespace mongo {
     private:
         Shard _shard;
         long long _mapped;
-        bool _hasOpsQueued;  // true if 'writebacks' are pending
         double _writeLock;
         std::string _mongoVersion;
     };

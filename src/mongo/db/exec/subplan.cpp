@@ -296,6 +296,14 @@ namespace mongo {
                 QuerySolution* bestSoln = multiPlanStage->bestSolution();
                 _child.reset(multiPlanStage.release());
 
+                // Check that we have good cache data. For example, we don't cache things
+                // for 2d indices.
+                if (NULL == bestSoln->cacheData.get()) {
+                    mongoutils::str::stream ss;
+                    ss << "No cache data for subchild " << orChild->toString();
+                    return Status(ErrorCodes::BadValue, ss);
+                }
+
                 if (SolutionCacheData::USE_INDEX_TAGS_SOLN != bestSoln->cacheData->solnType) {
                     mongoutils::str::stream ss;
                     ss << "No indexed cache data for subchild "

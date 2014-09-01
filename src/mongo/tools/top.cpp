@@ -26,9 +26,10 @@
 *    then also delete it in the license file.
 */
 
-#include "mongo/pch.h"
+#include "mongo/platform/basic.h"
 
 #include <fstream>
+#include <iomanip>
 #include <iostream>
 
 #include "mongo/db/json.h"

@@ -38,6 +38,7 @@
 #include "mongo/base/status.h"
 #include "mongo/db/operation_context_noop.h"
 #include "mongo/db/repl/check_quorum_for_config_change.h"
+#include "mongo/db/repl/handshake_args.h"
 #include "mongo/db/repl/master_slave.h"
 #include "mongo/db/repl/repl_set_heartbeat_args.h"
 #include "mongo/db/repl/repl_set_heartbeat_response.h"
@@ -122,11 +123,6 @@ namespace {
         // this is ok but micros or combo with some rand() and/or 64 bits might be better --
         // imagine a restart and a clock correction simultaneously (very unlikely but possible...)
         _rbid = static_cast<int>(_replExecutor.now().asInt64());
-
-        _topCoord->registerStateChangeCallback(
-                stdx::bind(&ReplicationCoordinatorImpl::_onSelfStateChange,
-                           this,
-                           stdx::placeholders::_1));
     }
 
     ReplicationCoordinatorImpl::~ReplicationCoordinatorImpl() {}
@@ -221,7 +217,7 @@ namespace {
 
         lk.lock();
         invariant(_rsConfigState == kConfigStartingUp);
-        _setCurrentRSConfig_inlock(cbData, localConfig, myIndex.getValue());
+        _setCurrentRSConfig_inlock(localConfig, myIndex.getValue());
     }
 
     void ReplicationCoordinatorImpl::startReplication(OperationContext* txn) {
@@ -302,19 +298,6 @@ namespace {
         return modeNone;
     }
 
-    void ReplicationCoordinatorImpl::_onSelfStateChange(const MemberState& newState) {
-        boost::lock_guard<boost::mutex> lk(_mutex);
-        invariant(_settings.usingReplSets());
-        invariant(_getReplicationMode_inlock() == modeReplSet);
-        _currentState = newState;
-        if (newState.primary()) {
-            _electionID = OID::gen();
-        }
-        else {
-            _electionID.clear();
-        }
-    }
-
     MemberState ReplicationCoordinatorImpl::getCurrentMemberState() const {
         boost::lock_guard<boost::mutex> lk(_mutex);
         return _getCurrentMemberState_inlock();
@@ -335,6 +318,12 @@ namespace {
             boost::lock_guard<boost::mutex> lk(_mutex);
 
             SlaveInfo& slaveInfo = _slaveInfoMap[rid];
+            if (slaveInfo.memberID < 0 && _getReplicationMode_inlock() == modeReplSet) {
+                warning() << "Received replSetUpdatePosition for node with RID" << rid
+                          << ", but we haven't yet received a handshake for that node. Stored "
+                          << "member ID: " << slaveInfo.memberID << ", stored member hostAndPort: "
+                          << slaveInfo.hostAndPort.toString() << ".  Our RID: " << getMyRID(NULL);
+            }
             invariant(slaveInfo.memberID >= 0 || _getReplicationMode_inlock() == modeMasterSlave);
 
             LOG(3) << "Node with RID " << rid << " currently has optime " << slaveInfo.opTime <<
@@ -925,7 +914,7 @@ namespace {
         boost::lock_guard<boost::mutex> lk(_mutex);
         invariant(_rsConfigState == kConfigInitiating);
         invariant(!_rsConfig.isInitialized());
-        _setCurrentRSConfig_inlock(cbData, newConfig, myIndex);
+        _setCurrentRSConfig_inlock(newConfig, myIndex);
     }
 
     void ReplicationCoordinatorImpl::_setConfigState_inlock(ConfigState newState) {
@@ -968,7 +957,18 @@ namespace {
 
     Status ReplicationCoordinatorImpl::processReplSetElect(const ReplSetElectArgs& args,
                                                            BSONObjBuilder* resultObj) {
-        // TODO
+        CBHStatus cbh = _replExecutor.scheduleWork(
+                stdx::bind(&TopologyCoordinator::prepareElectResponse,
+                           _topCoord.get(),
+                           stdx::placeholders::_1,
+                           args,
+                           _replExecutor.now(),
+                           resultObj));
+        if (cbh.getStatus() == ErrorCodes::ShutdownInProgress) {
+            return Status(ErrorCodes::ShutdownInProgress, "replication shutdown in progress");
+        }
+        fassert(18657, cbh.getStatus());
+        _replExecutor.wait(cbh.getValue());
         return Status::OK();
     }
 
@@ -976,12 +976,15 @@ namespace {
             const ReplicationExecutor::CallbackData& cbData,
             const ReplicaSetConfig& newConfig,
             int myIndex) {
+        if (cbData.status == ErrorCodes::CallbackCanceled) {
+            return;
+        }
+
         boost::lock_guard<boost::mutex> lk(_mutex);
-        _setCurrentRSConfig_inlock(cbData, newConfig, myIndex);
+        _setCurrentRSConfig_inlock(newConfig, myIndex);
     }
 
     void ReplicationCoordinatorImpl::_setCurrentRSConfig_inlock(
-            const ReplicationExecutor::CallbackData& cbData,
             const ReplicaSetConfig& newConfig,
             int myIndex) {
          invariant(_settings.usingReplSets());
@@ -992,7 +995,6 @@ namespace {
          _rsConfig = newConfig;
          _thisMembersConfigIndex = myIndex;
          _topCoord->updateConfig(
-                 cbData,
                  newConfig,
                  myIndex,
                  _replExecutor.now(),
@@ -1051,7 +1053,6 @@ namespace {
         LOG(2) << "Received handshake " << handshake.toBSON();
 
         boost::lock_guard<boost::mutex> lock(_mutex);
-        SlaveInfo& slaveInfo = _slaveInfoMap[handshake.getRid()];
         if (_getReplicationMode_inlock() == modeReplSet) {
             int memberID = handshake.getMemberId();
             const MemberConfig* member = _rsConfig.findMemberByID(memberID);
@@ -1060,6 +1061,7 @@ namespace {
                               str::stream() << "Node with replica set member ID " << memberID <<
                                       " could not be found in replica set config during handshake");
             }
+            SlaveInfo& slaveInfo = _slaveInfoMap[handshake.getRid()];
             slaveInfo.memberID = memberID;
             slaveInfo.hostAndPort = member->getHostAndPort();
 
@@ -1070,6 +1072,7 @@ namespace {
         }
         else {
             // master/slave
+            SlaveInfo& slaveInfo = _slaveInfoMap[handshake.getRid()];
             slaveInfo.memberID = -1;
             slaveInfo.hostAndPort = _externalState->getClientHostAndPort(txn);
         }

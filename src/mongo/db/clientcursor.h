@@ -225,11 +225,6 @@ namespace mongo {
         ClientCursor* _cursor;
     };
 
-    /** thread for timing out old cursors */
-    class ClientCursorMonitor : public BackgroundJob {
-    public:
-        std::string name() const { return "ClientCursorMonitor"; }
-        void run();
-    };
+    void startClientCursorMonitor();
 
 } // namespace mongo

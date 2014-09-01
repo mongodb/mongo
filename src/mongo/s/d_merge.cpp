@@ -30,7 +30,7 @@
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
-#include "mongo/s/d_logic.h"
+#include "mongo/s/d_state.h"
 #include "mongo/s/distlock.h"
 #include "mongo/s/chunk.h"  // needed for genID
 #include "mongo/s/config.h" // needed for changelog write

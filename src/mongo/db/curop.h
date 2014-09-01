@@ -32,6 +32,7 @@
 #pragma once
 
 #include "mongo/db/client.h"
+#include "mongo/db/server_options.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/util/concurrency/spin_lock.h"
 #include "mongo/util/net/hostandport.h"
@@ -40,6 +41,7 @@
 
 namespace mongo {
 
+    class Command;
     class CurOp;
 
     /**

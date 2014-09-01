@@ -8,26 +8,26 @@ var admin = conn.getDB('admin');
 admin.createUser({user:'andy', pwd: 'a', roles: jsTest.adminUserRoles});
 admin.auth({user: 'andy', pwd: 'a'});
 
-// Find out if this build supports the authenticationMechanisms startup parameter.  If it does,
-// restart with MONGODB-CR and CRAM-MD5 mechanisms enabled.
-var cmdOut = conn.getDB('admin').runCommand({getParameter: 1, authenticationMechanisms: 1})
-if (cmdOut.ok) {
-    MongoRunner.stopMongod(conn);
-    conn = MongoRunner.runMongod({ restart: conn,
-                                   setParameter: "authenticationMechanisms=MONGODB-CR,CRAM-MD5" });
+// Attempt to start with CRAM-MD5 enabled
+// If this fails the build only supports default auth mechanisms
+MongoRunner.stopMongod(conn);
+var restartedConn = MongoRunner.runMongod({ restart: conn,
+                               setParameter: "authenticationMechanisms=MONGODB-CR,CRAM-MD5" });
+if (restartedConn != null) {
     mechanisms = [ "MONGODB-CR", "CRAM-MD5" ];
     hasMongoCR = true;
     hasCramMd5 = true;
     print("test info: Enabling non-default authentication mechanisms.");
 }
 else {
+    restartedConn = MongoRunner.runMongod({ restart: conn });
     mechanisms = [ "MONGODB-CR" ];
     hasMongoCR = true;
     hasCramMd5 = false;
     print("test info: Using only default authentication mechanism, MONGODB-CR.");
 }
 
-admin = conn.getDB('admin');
+admin = restartedConn.getDB('admin');
 var testedSomething = false;
 
 // If the server supports them MONGODB-CR, try all the ways to call db.auth that use MONGODB-CR.

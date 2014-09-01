@@ -68,6 +68,13 @@ namespace mongo {
         };
 
         /**
+         * Called after the globalStorageEngine pointer has been set up, before any other methods
+         * are called. Any initialization work that requires the ability to create OperationContexts
+         * should be done here rather than in the constructor.
+         */
+        virtual void finishInit() {}
+
+        /**
          * Returns a new interface to the storage engine's recovery unit.  The recovery
          * unit is the durability interface.  For details, see recovery_unit.h
          *

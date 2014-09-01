@@ -561,7 +561,6 @@ env.Library('global_environment_experiment',
 # libs.
 serverOnlyFiles = [ "db/curop.cpp",
                     "db/global_environment_d.cpp",
-                    "db/d_globals.cpp",
                     "util/compress.cpp",
                     "db/ttl.cpp",
                     "util/logfile.cpp",
@@ -823,9 +822,7 @@ env.CppUnitTest('config_server_tests', [ 's/config_server_tests.cpp' ],
 env.CppUnitTest("fail_point_test", [ "util/fail_point_test.cpp" ],
                 LIBDEPS=["fail_point"])
 
-serverOnlyFiles += [ "s/d_logic.cpp",
-                     "s/d_writeback.cpp",
-                     "s/d_migrate.cpp",
+serverOnlyFiles += [ "s/d_migrate.cpp",
                      "s/d_state.cpp",
                      "s/d_split.cpp",
                      "s/d_merge.cpp",

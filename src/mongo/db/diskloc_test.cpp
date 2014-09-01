@@ -49,9 +49,11 @@ namespace {
         DiskLoc diffFile( 10, 2 );
         DiskLoc diffOfs( 1, 20 );
         DiskLoc diffBoth( 10, 20 );
+        DiskLoc reversed( 2, 1 );
         ASSERT_NOT_EQUALS( original, diffFile );
         ASSERT_NOT_EQUALS( original, diffOfs );
         ASSERT_NOT_EQUALS( original, diffBoth );
+        ASSERT_NOT_EQUALS( original, reversed );
         
         // Unequal DiskLocs need not produce unequal hashes.  But unequal hashes are likely, and
         // assumed here for sanity checking of the custom hash implementation.
@@ -59,6 +61,7 @@ namespace {
         ASSERT_NOT_EQUALS( hasher( original ), hasher( diffFile ) );
         ASSERT_NOT_EQUALS( hasher( original ), hasher( diffOfs ) );
         ASSERT_NOT_EQUALS( hasher( original ), hasher( diffBoth ) );
+        ASSERT_NOT_EQUALS( hasher( original ), hasher( reversed ) );
     }
     
 } // namespace

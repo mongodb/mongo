@@ -54,6 +54,7 @@
 #include "mongo/db/repair_database.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/server_parameters.h"
+#include "mongo/db/stats/top.h"
 #include "mongo/db/storage_options.h"
 #include "mongo/db/storage/storage_engine.h"
 #include "mongo/db/storage/recovery_unit.h"

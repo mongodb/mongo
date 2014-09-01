@@ -51,7 +51,7 @@
 #include "mongo/db/storage_options.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/s/chunk_version.h"
-#include "mongo/s/d_logic.h"
+#include "mongo/s/d_state.h"
 #include "mongo/s/stale_exception.h"
 #include "mongo/util/fail_point_service.h"
 #include "mongo/util/log.h"

@@ -36,10 +36,12 @@
 #include "mongo/base/status.h"
 #include "mongo/db/auth/authz_manager_external_state.h"
 #include "mongo/db/auth/user_name.h"
-#include "mongo/s/distlock.h"
 #include "mongo/stdx/functional.h"
 
+
 namespace mongo {
+
+    class ScopedDistributedLock;
 
     /**
      * The implementation of AuthzManagerExternalState functionality for mongos.

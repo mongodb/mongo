@@ -26,12 +26,13 @@
 *    it in the license file.
 */
 
-#include "mongo/pch.h"
+#include "mongo/platform/basic.h"
 
 #include "mongo/base/counter.h"
 #include "mongo/db/commands/server_status_metric.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/catalog/database.h"
+#include "mongo/db/stats/top.h"
 #include "mongo/util/fail_point_service.h"
 
 

@@ -27,7 +27,7 @@
  *    then also delete it in the license file.
  */
 
-#include "mongo/pch.h"
+#include "mongo/platform/basic.h"
 
 #include <boost/filesystem/operations.hpp>
 #include <fstream>
@@ -42,6 +42,7 @@
 #include "mongo/client/sasl_client_authenticate.h"
 #include "mongo/db/client.h"
 #include "mongo/db/log_process_details.h"
+#include "mongo/db/server_options.h"
 #include "mongo/logger/console_appender.h"
 #include "mongo/logger/logger.h"
 #include "mongo/logger/message_event_utf8_encoder.h"

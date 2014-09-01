@@ -42,7 +42,7 @@
 #include "mongo/db/ops/insert.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/operation_context_impl.h"
-#include "mongo/s/d_logic.h"
+#include "mongo/s/d_state.h"
 #include "mongo/s/shard_key_pattern.h"
 
 namespace mongo {

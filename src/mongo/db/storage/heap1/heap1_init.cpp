@@ -28,6 +28,7 @@
  */
 
 #include "mongo/base/init.h"
+#include "mongo/db/global_environment_experiment.h"
 #include "mongo/db/storage/heap1/heap1_engine.h"
 #include "mongo/db/storage_options.h"
 
@@ -39,7 +40,7 @@ namespace mongo {
         public:
             virtual ~HeapFactory() { }
             virtual StorageEngine* create(const StorageGlobalParams& params) const {
-                return new HeapEngine();
+                return new Heap1Engine();
             }
         };
 

@@ -103,9 +103,10 @@ namespace repl {
                                           Status* result) = 0;
 
         // produce a reply to a received electCmd
-        virtual void prepareElectCmdResponse(const Date_t now,
-                                             const BSONObj& cmdObj,
-                                             BSONObjBuilder& result) = 0;
+        virtual void prepareElectResponse(const ReplicationExecutor::CallbackData& data,
+                                          const ReplicationCoordinator::ReplSetElectArgs& args,
+                                          const Date_t now,
+                                          BSONObjBuilder* response) = 0;
 
         // produce a reply to a heartbeat
         virtual void prepareHeartbeatResponse(const ReplicationExecutor::CallbackData& data,
@@ -141,9 +142,8 @@ namespace repl {
         // transition PRIMARY to SECONDARY; caller must already be holding an appropriate dblock
         virtual void relinquishPrimary(OperationContext* txn) = 0;
 
-        // called with new config; notifies all on change
-        virtual void updateConfig(const ReplicationExecutor::CallbackData& cbData,
-                                  const ReplicaSetConfig& newConfig,
+        // Updates the topology coordinator's notion of the new configuration.
+        virtual void updateConfig(const ReplicaSetConfig& newConfig,
                                   int selfIndex,
                                   Date_t now,
                                   const OpTime& lastOpApplied) = 0;

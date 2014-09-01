@@ -107,8 +107,18 @@ namespace mongo {
         CollectionOptions getCollectionOptions( OperationContext* txn,
                                                 const StringData& ns ) const;
 
-    private:
 
+        //
+        // Remaining methods are MMAPv1 specific
+        //
+
+        /**
+         * Creates a CollectionCatalogEntry in the for an index rather than a collection. MMAPv1
+         * puts both indexes and collections into CCEs. A namespace named 'name' must not exist.
+         */
+        void createNamespaceForIndex(OperationContext* txn, const StringData& name);
+
+    private:
         RecordStoreV1Base* _getIndexRecordStore_inlock();
         RecordStoreV1Base* _getIndexRecordStore();
         RecordStoreV1Base* _getNamespaceRecordStore_inlock() const;

@@ -96,13 +96,12 @@ namespace repl {
     }
 
     void NetworkInterfaceImpl::runCallbackWithGlobalExclusiveLock(
-            const stdx::function<void ()>& callback) {
+            const stdx::function<void (OperationContext*)>& callback) {
 
         OperationContextImpl txn;
         Lock::GlobalWrite lk(txn.lockState());
 
-        // TODO: OperationContext will have to be given to callback
-        callback();
+        callback(&txn);
     }
 
 }  // namespace repl

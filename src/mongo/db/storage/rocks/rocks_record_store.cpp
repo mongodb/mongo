@@ -355,8 +355,10 @@ namespace mongo {
         // TODO validate that _numRecords and _dataSize are correct in scanData mode
         if ( scanData ) {
             bool invalidObject = false;
+            size_t numRecords = 0;
             boost::scoped_ptr<RecordIterator> iter( getIterator( txn ) );
             while( !iter->isEOF() ) {
+                numRecords++;
                 RecordData data = dataFor( txn, iter->curr() );
                 size_t dataSize;
                 const Status status = adaptor->validate( data, &dataSize );
@@ -370,7 +372,11 @@ namespace mongo {
                 }
                 iter->getNext();
             }
+            output->appendNumber("nrecords", numRecords);
         }
+        else
+            output->appendNumber("nrecords", _numRecords);
+
         return Status::OK();
     }
 
@@ -531,6 +537,7 @@ namespace mongo {
         : _txn( txn ),
           _rs( rs ),
           _dir( dir ),
+          _reseekKeyValid( false ),
           // XXX not using a snapshot here
           _iterator( _rs->_db->NewIterator( rs->_readOptions(), rs->_columnFamily ) ) {
         if (start.isNull()) {
@@ -590,11 +597,27 @@ namespace mongo {
     }
 
     void RocksRecordStore::Iterator::saveState() {
-        // TODO delete iterator, store information
+        if ( !_iterator ) {
+            return;
+        }
+        if ( _iterator->Valid() ) {
+            _reseekKey = _iterator->key().ToString();
+            _reseekKeyValid = true;
+        }
     }
 
     bool RocksRecordStore::Iterator::restoreState() {
-        // TODO set iterator to same place as before, but with new snapshot
+        if ( !_reseekKeyValid ) {
+          _iterator.reset( NULL );
+          return true;
+        }
+        _iterator.reset( _rs->_db->NewIterator( _rs->_readOptions(),
+                                                _rs->_columnFamily ) );
+        _checkStatus();
+        _iterator->Seek( _reseekKey );
+        _checkStatus();
+        _reseekKeyValid = false;
+
         return true;
     }
 

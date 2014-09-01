@@ -81,14 +81,6 @@ namespace mongo {
         // past that of the DurRecoveryUnit
         OperationContext* _txn;
 
-        // State is only used for invariant checking today. It should be deleted once we get rid of
-        // nesting.
-        enum State {
-            NORMAL, // anything is allowed
-            MUST_COMMIT, // can't rollback (will go away once we have two-phase locking).
-        };
-        State _state;
-
         // Changes are ordered from oldest to newest. Overlapping and duplicate regions are allowed,
         // since rollback undoes changes in reverse order.
         // TODO compare performance against a data-structure that coalesces overlapping/adjacent
@@ -101,6 +93,10 @@ namespace mongo {
         // vector is always the outermost transaction and back() is always the innermost. The size()
         // is the current nesting level.
         std::vector<size_t> _startOfUncommittedChangesForLevel;
+
+        // If true, this RU is in a "failed" state and all changes must be rolled back. Once the
+        // outermost WUOW rolls back it reverts to false.
+        bool _mustRollback;
     };
 
 }  // namespace mongo

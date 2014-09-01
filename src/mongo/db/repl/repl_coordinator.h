@@ -33,8 +33,6 @@
 
 #include "mongo/base/disallow_copying.h"
 #include "mongo/base/status.h"
-#include "mongo/db/jsobj.h"
-#include "mongo/db/repl/handshake_args.h"
 #include "mongo/db/repl/member_state.h"
 #include "mongo/db/repl/repl_settings.h"
 #include "mongo/util/net/hostandport.h"
@@ -51,6 +49,7 @@ namespace mongo {
 
 namespace repl {
 
+    class HandshakeArgs;
     class ReplSetHeartbeatArgs;
     class ReplSetHeartbeatResponse;
     class UpdatePositionArgs;

@@ -1,5 +1,3 @@
-// @file distlock.h
-
 /*    Copyright 2009 10gen Inc.
  *
  *    This program is free software: you can redistribute it and/or  modify

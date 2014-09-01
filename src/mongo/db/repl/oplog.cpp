@@ -62,7 +62,7 @@
 #include "mongo/db/storage_options.h"
 #include "mongo/db/storage/storage_engine.h"
 #include "mongo/db/catalog/collection.h"
-#include "mongo/s/d_logic.h"
+#include "mongo/s/d_state.h"
 #include "mongo/scripting/engine.h"
 #include "mongo/util/elapsed_tracker.h"
 #include "mongo/util/file.h"

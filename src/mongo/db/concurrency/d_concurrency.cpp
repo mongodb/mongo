@@ -35,7 +35,6 @@
 #include "mongo/db/client.h"
 #include "mongo/db/commands/server_status.h"
 #include "mongo/db/curop.h"
-#include "mongo/db/d_globals.h"
 #include "mongo/db/global_environment_experiment.h"
 #include "mongo/db/concurrency/lock_stat.h"
 #include "mongo/db/server_parameters.h"

@@ -115,11 +115,6 @@ namespace mongo {
                 continue;
             }
 
-            if ( i->second.hasOpsQueued() ) {
-                LOG(1) << i->first << " has writebacks queued." << endl;
-                continue;
-            }
-
             if ( ! i->second.hasTag( tag ) ) {
                 LOG(1) << i->first << " doesn't have right tag" << endl;
                 continue;
@@ -143,12 +138,6 @@ namespace mongo {
         unsigned maxChunks = 0;
 
         for ( ShardInfoMap::const_iterator i = _shardInfo.begin(); i != _shardInfo.end(); ++i ) {
-
-            if ( i->second.hasOpsQueued() ) {
-                // we can't move stuff off anyway
-                continue;
-            }
-
             unsigned myChunks = numberOfChunksInShardWithTag( i->first, tag );
             if ( myChunks <= maxChunks )
                 continue;
@@ -253,7 +242,6 @@ namespace mongo {
                                         ShardInfo(shard.getMaxSize(),
                                                   status.mapped(),
                                                   shard.isDraining(),
-                                                  status.hasOpsQueued(),
                                                   shard.tags(),
                                                   status.mongoVersion())));
         }
@@ -348,12 +336,6 @@ namespace mongo {
 
                 // now we know we need to move to chunks off this shard
                 // we will if we are allowed
-
-                if ( info.hasOpsQueued() ) {
-                    warning() << "want to shed load from " << shard << " but can't because it has ops queued" << endl;
-                    continue;
-                }
-
                 const vector<ChunkType* >& chunks = distribution.getChunks( shard );
                 unsigned numJumboChunks = 0;
 
@@ -513,13 +495,12 @@ namespace mongo {
 
 
     ShardInfo::ShardInfo( long long maxSize, long long currSize,
-                          bool draining, bool opsQueued,
+                          bool draining,
                           const set<string>& tags, 
                           const string& mongoVersion )
         : _maxSize( maxSize ),
           _currSize( currSize ),
           _draining( draining ),
-          _hasOpsQueued( opsQueued ),
           _tags( tags ),
           _mongoVersion( mongoVersion ) {
     }
@@ -527,8 +508,7 @@ namespace mongo {
     ShardInfo::ShardInfo()
         : _maxSize( 0 ),
           _currSize( 0 ),
-          _draining( false ),
-          _hasOpsQueued( false ) {
+          _draining( false ) {
     }
 
     void ShardInfo::addTag( const string& tag ) {
@@ -554,7 +534,6 @@ namespace mongo {
         ss << " maxSize: " << _maxSize;
         ss << " currSize: " << _currSize;
         ss << " draining: " << _draining;
-        ss << " hasOpsQueued: " << _hasOpsQueued;
         if ( _tags.size() > 0 ) {
             ss << "tags : ";
             for ( set<string>::const_iterator i = _tags.begin(); i != _tags.end(); ++i )

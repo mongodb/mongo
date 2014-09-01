@@ -281,5 +281,17 @@ namespace {
         return findSelfInConfigIfElectable(externalState, newConfig);
     }
 
+    StatusWith<int> validateConfigForHeartbeatReconfig(
+            ReplicationCoordinatorExternalState* externalState,
+            const ReplicaSetConfig& newConfig) {
+
+        Status status = newConfig.validate();
+        if (!status.isOK()) {
+            return StatusWith<int>(status);
+        }
+
+        return findSelfInConfig(externalState, newConfig);
+    }
+
 }  // namespace repl
 }  // namespace mongo

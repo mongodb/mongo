@@ -60,7 +60,7 @@
 #include "mongo/db/repl/rs.h"
 #include "mongo/db/storage_options.h"
 #include "mongo/s/chunk_version.h"
-#include "mongo/s/d_logic.h"
+#include "mongo/s/d_state.h"
 #include "mongo/s/stale_exception.h" // for SendStaleConfigException
 #include "mongo/scripting/engine.h"
 #include "mongo/util/concurrency/thread_name.h"

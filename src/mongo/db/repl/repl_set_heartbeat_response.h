@@ -30,6 +30,7 @@
 
 #include <string>
 
+#include "mongo/db/repl/member_state.h"
 #include "mongo/db/repl/replica_set_config.h"
 #include "mongo/util/time_support.h"
 
@@ -59,9 +60,9 @@ namespace repl {
         ReplSetHeartbeatResponse();
 
         /**
-         * Initializes this ReplSetHeartbeatArgs from the contents of args.
+         * Initializes this ReplSetHeartbeatResponse from the contents of "doc".
          */
-        Status initialize(const BSONObj& argsObj);
+        Status initialize(const BSONObj& doc);
 
         /**
          * Appends all non-default values to "builder".
@@ -72,6 +73,26 @@ namespace repl {
          * Returns a BSONObj consisting of all non-default values to "builder".
          */
         BSONObj toBSON() const;
+
+        bool isMismatched() const { return _mismatch; }
+        bool isReplSet() const { return _isReplSet; }
+        bool isStateDisagreement() const { return _stateDisagreement; }
+        const std::string& getReplicaSetName() const { return _setName; }
+        bool hasState() const { return _stateSet; }
+        MemberState getState() const;
+        bool hasElectionTime() const { return _electionTimeSet; }
+        OpTime getElectionTime() const;
+        bool hasIsElectable() const { return _electableSet; }
+        bool isElectable() const;
+        const std::string& getHbMsg() const { return _hbmsg; }
+        bool hasTime() const { return _timeSet; }
+        Seconds getTime() const;
+        bool hasOpTime() const { return _opTimeSet; }
+        OpTime getOpTime() const;
+        const std::string& getSyncingTo() const { return _syncingTo; }
+        int getVersion() const { return _version; }
+        bool hasConfig() const { return _configSet; }
+        const ReplicaSetConfig& getConfig() const;
 
         /**
          * Sets _mismatch to true.
@@ -96,13 +117,12 @@ namespace repl {
         /**
          * Sets _state to "state".
          */
-        void setState(int state) { _state = state; }
+        void setState(MemberState state) { _stateSet = true; _state = state; }
 
         /**
-         * Sets _electionTime to "time" and sets _electionTimeSet to true to indicate
-         * that the value of _electionTime has been modified.
+         * Sets the optional "electionTime" field to the given OpTime.
          */
-        void setElectionTime(Date_t time) { _electionTimeSet = true; _electionTime = time; }
+        void setElectionTime(OpTime time) { _electionTimeSet = true; _electionTime = time; }
 
         /**
          * Sets _electable to "electable" and sets _electableSet to true to indicate
@@ -116,10 +136,10 @@ namespace repl {
         void setHbMsg(std::string hbmsg) { _hbmsg = hbmsg; }
 
         /**
-         * Sets _time to "time" and sets _timeSet to true to indicate that the value
-         * of _time has been modified.
+         * Sets the optional "time" field of the response to "theTime", which is 
+         * a count of seconds since the UNIX epoch.
          */
-        void setTime(Date_t time) { _timeSet = true; _time = time; }
+        void setTime(Seconds theTime) { _timeSet = true; _time = theTime; }
 
         /**
          * Sets _opTime to "time" and sets _opTimeSet to true to indicate that the value
@@ -140,25 +160,34 @@ namespace repl {
         /**
          * Initializes _config with "config".
          */
-        void setConfig(const ReplicaSetConfig& config) { _config = config; }
+        void setConfig(const ReplicaSetConfig& config) { _configSet = true; _config = config; }
 
     private:
-        Date_t _electionTime;
-        Date_t _time;
-        Date_t _opTime;
         bool _electionTimeSet;
+        OpTime _electionTime;
+
         bool _timeSet;
+        Seconds _time;  // Seconds since UNIX epoch.
+
         bool _opTimeSet;
+        OpTime _opTime;
+
         bool _electableSet;
         bool _electable;
+
         bool _mismatch;
         bool _isReplSet;
         bool _stateDisagreement;
-        int _state;
+
+        bool _stateSet;
+        MemberState _state;
+
         int _version;
         std::string _setName;
         std::string _hbmsg;
         std::string _syncingTo;
+
+        bool _configSet;
         ReplicaSetConfig _config;
     };
 

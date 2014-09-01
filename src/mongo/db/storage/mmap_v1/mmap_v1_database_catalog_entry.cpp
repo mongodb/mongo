@@ -140,16 +140,26 @@ namespace mongo {
 
                 _lazyInit( txn );
 
-                std::list<std::string> collections;
-                _namespaceIndex.getCollectionNamespaces( &collections );
-                for ( std::list<std::string>::const_iterator i = collections.begin();
-                      i != collections.end();
+                std::list<std::string> namespaces;
+                _namespaceIndex.getCollectionNamespaces( &namespaces );
+                for ( std::list<std::string>::const_iterator i = namespaces.begin();
+                      i != namespaces.end(); // we add to the list in the loop so can't cache end().
                       ++i ) {
-                    std::string ns = *i;
+                    const std::string& ns = *i;
                     Entry*& entry = _collections[ns];
-                    if ( !entry ) {
+                    // entry was already loaded for system.indexes and system.namespaces in
+                    // _lazyInit. That is ok, since they can't have indexes on them anyway.
+                    if (!entry) {
                         entry = new Entry();
                         _insertInCache_inlock(txn, ns, entry);
+
+                        // Add the indexes on this namespace to the list of namespaces to load.
+                        std::vector<std::string> indexNames;
+                        entry->catalogEntry->getAllIndexes(txn, &indexNames);
+                        for (size_t i = 0; i < indexNames.size(); i++) {
+                            namespaces.push_back(
+                                IndexDescriptor::makeIndexNamespace(ns, indexNames[i]));
+                        }
                     }
                 }
             }
@@ -380,6 +390,7 @@ namespace mongo {
         boost::mutex::scoped_lock lk( _collectionsLock );
         Entry*& entry = _collections[toNS.toString()];
         invariant( entry == NULL );
+        txn->recoveryUnit()->registerChange(new EntryInsertion(toNS, this));
         entry = new Entry();
         _insertInCache_inlock(txn, toNS, entry);
 
@@ -498,11 +509,18 @@ namespace mongo {
 
         boost::mutex::scoped_lock lk( _collectionsLock );
 
+        bool isSystemNamespacesGoingToBeNew = _namespaceIndex.details( nsn.toString() ) == NULL;
         bool isSystemIndexesGoingToBeNew = _namespaceIndex.details( nsi.toString() ) == NULL;
 
         _ensureSystemCollection_inlock( txn, nsn.toString() );
         _ensureSystemCollection_inlock( txn, nsi.toString() );
 
+        if ( isSystemNamespacesGoingToBeNew ) {
+            txn->recoveryUnit()->registerChange(new EntryInsertion(nsn.toString(), this));
+        }
+        if ( isSystemIndexesGoingToBeNew ) {
+            txn->recoveryUnit()->registerChange(new EntryInsertion(nsi.toString(), this));
+        }
         Entry*& indexEntry = _collections[nsi.toString()];
         Entry*& nsEntry = _collections[nsn.toString()];
 
@@ -601,6 +619,7 @@ namespace mongo {
             boost::mutex::scoped_lock lk( _collectionsLock );
             Entry*& entry = _collections[ns.toString()];
             invariant( !entry );
+            txn->recoveryUnit()->registerChange(new EntryInsertion(ns, this));
             entry = new Entry();
             _insertInCache_inlock(txn, ns, entry);
         }
@@ -639,6 +658,23 @@ namespace mongo {
         return Status::OK();
     }
 
+    void MMAPV1DatabaseCatalogEntry::createNamespaceForIndex(OperationContext* txn,
+                                                             const StringData& name) {
+        // This is a simplified form of createCollection.
+        _lazyInit(txn);
+        invariant(!_namespaceIndex.details(name));
+
+        _addNamespaceToNamespaceCollection(txn, name, NULL);
+        _namespaceIndex.add_ns(txn, name, DiskLoc(), false);
+
+        boost::mutex::scoped_lock lk( _collectionsLock );
+        Entry*& entry = _collections[name.toString()];
+        invariant( !entry );
+        txn->recoveryUnit()->registerChange(new EntryInsertion(name, this));
+        entry = new Entry();
+        _insertInCache_inlock(txn, name, entry);
+    }
+
     CollectionCatalogEntry* MMAPV1DatabaseCatalogEntry::getCollectionCatalogEntry( OperationContext* txn,
                                                                                   const StringData& ns ) const {
         boost::mutex::scoped_lock lk( _collectionsLock );
@@ -653,7 +689,6 @@ namespace mongo {
     void MMAPV1DatabaseCatalogEntry::_insertInCache_inlock(OperationContext* txn,
                                                          const StringData& ns,
                                                          Entry* entry) {
-        txn->recoveryUnit()->registerChange(new EntryInsertion(ns, this));
         NamespaceDetails* details = _namespaceIndex.details(ns);
         invariant(details);
 
@@ -716,17 +751,8 @@ namespace mongo {
             md.setUserFlag( txn, NamespaceDetails::Flag_UsePowerOf2Sizes );
         }
 
-        RecordStore* rs = NULL;
-        {
-            boost::mutex::scoped_lock lk( _collectionsLock );
-            string ns = entry->descriptor()->indexNamespace();
-            Entry*& entry = _collections[ns];
-            if ( !entry ) {
-                entry = new Entry();
-                _insertInCache_inlock(txn, ns, entry);
-            }
-            rs = entry->recordStore.get();
-        }
+        RecordStore* rs = _getRecordStore(txn, entry->descriptor()->indexNamespace());
+        invariant(rs);
 
         std::auto_ptr<SortedDataInterface> btree(
             getMMAPV1Interface(entry->headManager(),

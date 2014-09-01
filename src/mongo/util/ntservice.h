@@ -40,6 +40,7 @@
 #include <vector>
 
 #include "mongo/platform/compiler.h"
+#include "mongo/util/exit_code.h"
 
 namespace mongo {
 

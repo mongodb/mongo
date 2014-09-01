@@ -80,7 +80,10 @@ env.Library('repl_coordinator_impl',
                  ])
 
 env.CppUnitTest('repl_coordinator_impl_test',
-                'repl_coordinator_impl_test.cpp',
+                [
+                    'repl_coordinator_impl_test.cpp',
+                    'repl_coordinator_test_fixture.cpp',
+                ],
                 LIBDEPS=['repl_coordinator_impl',
                          'topology_coordinator_impl',
                          'replmocks'])

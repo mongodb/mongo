@@ -26,7 +26,7 @@
 *    it in the license file.
 */
 
-#include "mongo/pch.h"
+#include "mongo/platform/basic.h"
 
 #include "mongo/db/repl/write_concern.h"
 
@@ -37,6 +37,7 @@
 #include "mongo/db/dbhelpers.h"
 #include "mongo/db/instance.h"
 #include "mongo/db/repl/repl_coordinator_global.h"
+#include "mongo/db/repl/rs.h"
 #include "mongo/db/operation_context_impl.h"
 #include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"

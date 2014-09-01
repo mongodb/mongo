@@ -65,7 +65,7 @@ namespace {
         string myns = "test.simple1";
         CappedRecordStoreV1 rs( &txn, &cb, myns, md, &em, false );
 
-        rs.increaseStorageSize( &txn, 1024, -1 );
+        rs.increaseStorageSize( &txn, 1024, false );
 
         ASSERT_NOT_OK( rs.insertRecord( &txn, buf, 3, 1000 ).getStatus() );
 

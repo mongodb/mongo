@@ -57,6 +57,19 @@ assert.eq( 2, res2.was.verbosity );
 assert.eq( 3, res2.was.storage.verbosity );
 assert.eq( 5, res2.was.storage.journaling.verbosity );
 
+// Set accessControl verbosity using numerical level instead of
+// subdocument with 'verbosity' field.
+var res3 = assert.commandWorked( db.adminCommand( {
+    "setParameter" : 1,
+    logComponentVerbosity : {
+        accessControl : 5  } } ) );
+assert.eq( 0, res3.was.accessControl.verbosity );
+
+var res4 = assert.commandWorked( db.adminCommand( {
+    "getParameter" : 1,
+    logComponentVerbosity : 1 } ) );
+assert.eq( 5, res4.logComponentVerbosity.accessControl.verbosity );
+
 // Restore old verbosity values.
 assert.commandWorked( db.adminCommand( {
     "setParameter" : 1 ,

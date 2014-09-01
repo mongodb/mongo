@@ -72,7 +72,7 @@ namespace mongo {
     public:
         ShardInfo();
         ShardInfo( long long maxSize, long long currSize, 
-                   bool draining, bool opsQueued, 
+                   bool draining,
                    const std::set<std::string>& tags = std::set<std::string>(),
                    const std::string& _mongoVersion = std::string("") );
 
@@ -94,11 +94,6 @@ namespace mongo {
          */
         bool isDraining() const { return _draining; }
         
-        /**
-         * @return true if a shard currently has operations in any of its writeback queues
-         */
-        bool hasOpsQueued() const { return _hasOpsQueued; }
-        
         long long getMaxSize() const { return _maxSize; }
 
         long long getCurrSize() const { return _currSize; }
@@ -111,7 +106,6 @@ namespace mongo {
         long long _maxSize;
         long long _currSize;
         bool _draining;
-        bool _hasOpsQueued;
         std::set<std::string> _tags;
         std::string _mongoVersion;
     };

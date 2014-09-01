@@ -46,7 +46,7 @@ namespace repl {
         virtual ResponseStatus runCommand(
                 const ReplicationExecutor::RemoteCommandRequest& request);
         virtual void runCallbackWithGlobalExclusiveLock(
-                const stdx::function<void ()>& callback);
+                const stdx::function<void (OperationContext*)>& callback);
     };
 
 }  // namespace repl

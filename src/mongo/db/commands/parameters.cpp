@@ -317,8 +317,21 @@ namespace mongo {
              *             verbosity: -1, <-- clears componentA.componentC's log level so that
              *                                its final loglevel will be inherited from componentA.
              *         }
-             *     }
+             *     },
+             *     componentD : 3  <-- sets componentD's log level to 3 (alternative to
+             *                         subdocument with 'verbosity' field).
              * }
+             *
+             * For the default component, the log level is read from the top-level
+             * "verbosity" field.
+             * For non-default components, we look up the element using the component's
+             * dotted name. If the "<dotted component name>" field is a number, the log
+             * level will be read from the field's value.
+             * Otherwise, we assume that the "<dotted component name>" field is an
+             * object with a "verbosity" field that holds the log level for the component.
+             * The more verbose format with the "verbosity" field is intended to support
+             * setting of log levels of both parent and child log components in the same
+             * BSON document.
              *
              * Ignore elements in BSON object that do not map to a log component's dotted
              * name.
@@ -326,9 +339,16 @@ namespace mongo {
             Status _set(const BSONObj& obj) const {
                 for (int i = 0; i < int(logger::LogComponent::kNumLogComponents); ++i) {
                     logger::LogComponent component = static_cast<logger::LogComponent::Value>(i);
-                    const string fieldName = component == logger::LogComponent::kDefault ?
-                        "verbosity" : (component.getDottedName() + ".verbosity");
-                    BSONElement element = obj.getFieldDotted(fieldName);
+                    BSONElement element;
+                    if (component == logger::LogComponent::kDefault) {
+                        element = obj.getField("verbosity");
+                    }
+                    else {
+                        element = obj.getFieldDotted(component.getDottedName());
+                        if (!element.isNumber()) {
+                            element = obj.getFieldDotted(component.getDottedName() + ".verbosity");
+                        }
+                    }
                     if (element.eoo()) {
                         continue;
                     }

@@ -1,4 +1,3 @@
-// @file d_logic.h
 /*
  *    Copyright (C) 2010 10gen Inc.
  *
@@ -352,9 +351,6 @@ namespace mongo {
     // --- core ---
     // -----------------
 
-    unsigned long long extractVersion( BSONElement e , std::string& errmsg );
-
-
     /**
      * @return true if we have any shard info for the ns
      */
@@ -374,13 +370,23 @@ namespace mongo {
      */
     struct DbResponse;
 
-    bool _handlePossibleShardedMessage( Message &m, DbResponse * dbresponse );
+    /**
+     * Returns true if the version of this thread is compatible wit hthe global
+     * version of this shard. Also builds an error response if the version was
+     * not compatible.
+     */
+    bool _checkShardVersion(Message &m, DbResponse* dbresponse);
 
-    /** What does this do? document please? */
-    inline bool handlePossibleShardedMessage( Message &m, DbResponse * dbresponse ) {
+    /**
+     * Returns true if the version of this thread is compatible with the global
+     * version of this shard.
+     *
+     * Note: Last use of this function are for queries.
+     */
+    inline bool checkShardVersion(Message &m, DbResponse* dbresponse) {
         if( !shardingState.enabled() ) 
-            return false;
-        return _handlePossibleShardedMessage(m, dbresponse);
+            return true;
+        return _checkShardVersion(m, dbresponse);
     }
 
     /**

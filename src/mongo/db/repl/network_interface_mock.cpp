@@ -32,6 +32,7 @@
 
 #include <map>
 
+#include "mongo/db/operation_context_noop.h"
 #include "mongo/db/repl/replication_executor.h"
 #include "mongo/stdx/functional.h"
 #include "mongo/util/map_util.h"
@@ -145,9 +146,10 @@ namespace repl {
     }
 
     void NetworkInterfaceMock::runCallbackWithGlobalExclusiveLock(
-            const stdx::function<void ()>& callback) {
+            const stdx::function<void (OperationContext* txn)>& callback) {
 
-        callback();
+        OperationContextNoop txn;
+        callback(&txn);
     }
     NetworkInterfaceMockWithMap::NetworkInterfaceMockWithMap()
             : NetworkInterfaceMock(stdx::bind(&NetworkInterfaceMockWithMap::_getResponseFromMap,

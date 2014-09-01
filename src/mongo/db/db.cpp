@@ -52,7 +52,6 @@
 #include "mongo/db/commands/server_status.h"
 #include "mongo/db/commands/server_status_metric.h"
 #include "mongo/db/concurrency/d_concurrency.h"
-#include "mongo/db/d_globals.h"
 #include "mongo/db/db.h"
 #include "mongo/db/dbmessage.h"
 #include "mongo/db/dbwebserver.h"
@@ -85,7 +84,6 @@
 #include "mongo/db/storage_options.h"
 #include "mongo/db/ttl.h"
 #include "mongo/platform/process_id.h"
-#include "mongo/s/d_writeback.h"
 #include "mongo/scripting/engine.h"
 #include "mongo/util/background.h"
 #include "mongo/util/cmdline_utils/censor_cmdline.h"
@@ -641,7 +639,8 @@ namespace mongo {
         if (serverGlobalParams.isHttpInterfaceEnabled)
             snapshotThread.go();
 
-        d.clientCursorMonitor.go();
+        startClientCursorMonitor();
+
         PeriodicTask::startRunningPeriodicTasks();
         if (missingRepl) {
             // a warning was logged earlier

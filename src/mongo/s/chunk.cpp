@@ -49,6 +49,7 @@
 #include "mongo/s/config.h"
 #include "mongo/s/config_server_checker_service.h"
 #include "mongo/s/cursors.h"
+#include "mongo/s/distlock.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/strategy.h"
 #include "mongo/s/type_collection.h"
@@ -410,6 +411,7 @@ namespace mongo {
         cmd.append( "splitKeys" , m );
         cmd.append( "shardId" , genID() );
         cmd.append( "configdb" , configServer.modelServer() );
+        cmd.append("epoch", _manager->getVersion().epoch());
         BSONObj cmdObj = cmd.obj();
 
         BSONObj dummy;
@@ -481,6 +483,7 @@ namespace mongo {
 
         builder.append("waitForDelete", waitForDelete);
         builder.append(LiteParsedQuery::cmdOptionMaxTimeMS, maxTimeMS);
+        builder.append("epoch", _manager->getVersion().epoch());
 
         bool worked = fromconn->runCommand("admin", builder.done(), res);
         fromconn.done();

@@ -35,20 +35,26 @@
 #include "mongo/client/syncclusterconnection.h"
 #include "mongo/logger/labeled_level.h"
 
-#define LOCK_TIMEOUT (15 * 60 * 1000)
-#define LOCK_SKEW_FACTOR (30)
-#define LOCK_PING (LOCK_TIMEOUT / LOCK_SKEW_FACTOR)
-#define MAX_LOCK_NET_SKEW (LOCK_TIMEOUT / LOCK_SKEW_FACTOR)
-#define MAX_LOCK_CLOCK_SKEW (LOCK_TIMEOUT / LOCK_SKEW_FACTOR)
-#define NUM_LOCK_SKEW_CHECKS (3)
-
-// The maximum clock skew we need to handle between config servers is
-// 2 * MAX_LOCK_NET_SKEW + MAX_LOCK_CLOCK_SKEW.
-
-// Net effect of *this* clock being slow is effectively a multiplier on the max net skew
-// and a linear increase or decrease of the max clock skew.
 
 namespace mongo {
+
+    namespace {
+
+        enum TimeConstants {
+            LOCK_TIMEOUT = 15 * 60 * 1000,
+            LOCK_SKEW_FACTOR = 30,
+            LOCK_PING = LOCK_TIMEOUT / LOCK_SKEW_FACTOR,
+            MAX_LOCK_NET_SKEW = LOCK_TIMEOUT / LOCK_SKEW_FACTOR,
+            MAX_LOCK_CLOCK_SKEW = LOCK_TIMEOUT / LOCK_SKEW_FACTOR,
+            NUM_LOCK_SKEW_CHECKS = 3,
+        };
+
+        // The maximum clock skew we need to handle between config servers is
+        // 2 * MAX_LOCK_NET_SKEW + MAX_LOCK_CLOCK_SKEW.
+
+        // Net effect of *this* clock being slow is effectively a multiplier on the max net skew
+        // and a linear increase or decrease of the max clock skew.
+    }
 
     /**
      * Exception class to encapsulate exceptions while managing distributed locks

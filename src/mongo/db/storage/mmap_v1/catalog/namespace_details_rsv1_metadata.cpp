@@ -213,7 +213,7 @@ namespace mongo {
                                                                               loc,
                                                                               newEntry.objdata(),
                                                                               newEntry.objsize(),
-                                                                              -1,
+                                                                              false,
                                                                               NULL );
             fassert( 17486, result.isOK() );
             return;

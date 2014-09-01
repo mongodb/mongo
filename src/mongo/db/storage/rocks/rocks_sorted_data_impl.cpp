@@ -446,9 +446,9 @@ namespace mongo {
                                             const BSONObj& key,
                                             const DiskLoc& loc) {
         boost::scoped_ptr<SortedDataInterface::Cursor> cursor( newCursor( txn, 1 ) );
-        cursor->locate( key, DiskLoc() );
 
-        if ( cursor->isEOF() || cursor->getDiskLoc() == loc ) {
+        if ( !cursor->locate( key, DiskLoc() ) || cursor->isEOF() ||
+             cursor->getDiskLoc() == loc ) {
             return Status::OK();
         } else {
             return Status( ErrorCodes::DuplicateKey, dupKeyError( key ) );
