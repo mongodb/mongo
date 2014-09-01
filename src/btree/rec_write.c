@@ -3374,8 +3374,8 @@ __rec_col_var_helper(WT_SESSION_IMPL *session, WT_RECONCILE *r,
 				salvage->skip -= rle;
 				return (0);
 			}
-			salvage->skip = 0;
 			rle -= salvage->skip;
+			salvage->skip = 0;
 		}
 		if (salvage->take != 0) {
 			if (rle <= salvage->take)
