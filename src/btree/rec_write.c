@@ -1729,7 +1729,7 @@ __rec_split(WT_SESSION_IMPL *session, WT_RECONCILE *r)
 	 */
 	if (r->is_salvage)
 		WT_PANIC_RET(session, WT_PANIC,
-		    "%s leaf page too large, attempted split during salvage",
+		    "%s page too large, attempted split during salvage",
 		    __wt_page_type_string(r->page->type));
 
 	/*
