@@ -60,18 +60,34 @@ corrupt(void)
 	struct stat sb;
 	off_t offset;
 	size_t len, nw;
-	int fd;
-	char buf[2 * 1024];
+	int fd, ret;
+	char buf[8 * 1024], copycmd[2 * 1024];
 
 	/*
 	 * If it's a single Btree file (not LSM), open the file, and corrupt
 	 * roughly 2% of the file at a random spot, including the beginning
 	 * of the file and overlapping the end.
+	 *
+	 * It's a little tricky: if the data source is a file, we're looking
+	 * for "wt", if the data source is a table, we're looking for "wt.wt".
 	 */
 	(void)snprintf(buf, sizeof(buf), "%s/%s", g.home, WT_NAME);
-	if ((fd = open(buf, O_RDWR)) == -1)
-		return (0);
-	if (fstat(fd, &sb) == -1)
+	if ((fd = open(buf, O_RDWR)) != -1) {
+		(void)snprintf(copycmd, sizeof(copycmd),
+		    "cp %s/%s %s/slvg.copy/%s.corrupted",
+		    g.home, WT_NAME, g.home, WT_NAME);
+		goto found;
+	}
+	(void)snprintf(buf, sizeof(buf), "%s/%s.wt", g.home, WT_NAME);
+	if ((fd = open(buf, O_RDWR)) != -1) {
+		(void)snprintf(copycmd, sizeof(copycmd),
+		    "cp %s/%s.wt %s/slvg.copy/%s.wt.corrupted",
+		    g.home, WT_NAME, g.home, WT_NAME);
+		goto found;
+	}
+	return (0);
+
+found:	if (fstat(fd, &sb) == -1)
 		die(errno, "salvage-corrupt: fstat");
 
 	offset = MMRAND(0, sb.st_size);
@@ -96,6 +112,14 @@ corrupt(void)
 
 	if (close(fd) == -1)
 		die(errno, "salvage-corrupt: close");
+
+	/*
+	 * Save a copy of the corrupted file so we can replay the salvage step
+	 * as necessary.
+	 */
+	if ((ret = system(copycmd)) != 0)
+		die(ret, "salvage corrupt copy step failed");
+
 	return (1);
 }
 
@@ -116,7 +140,7 @@ wts_salvage(void)
 	 * Save a copy of the interesting files so we can replay the salvage
 	 * step as necessary.
 	 */
-	if ((ret = system(g.home_slvg_copy)) != 0)
+	if ((ret = system(g.home_salvage_copy)) != 0)
 		die(ret, "salvage copy step failed");
 
 	/* Salvage, then verify. */
@@ -136,13 +160,6 @@ wts_salvage(void)
 
 	/* Corrupt the file randomly, salvage, then verify. */
 	if (corrupt()) {
-		/*
-		 * Save a copy of the corrupted file so we can replay the
-		 * salvage step as necessary.
-		 */
-		if ((ret = system(g.home_slvg_corrupt)) != 0)
-			die(ret, "salvage corrupt copy step failed");
-
 		wts_open(g.home, 1, &g.wts_conn);
 		salvage();
 		wts_verify("post-corrupt-salvage verify");

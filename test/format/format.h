@@ -97,8 +97,7 @@ typedef struct {
 	char *home_kvs;				/* KVS directory */
 	char *home_log;				/* Operation log file path */
 	char *home_rand;			/* RNG log file path */
-	char *home_slvg_copy;			/* Salvage copy command #1 */
-	char *home_slvg_corrupt;		/* Salvage copy command #2 */
+	char *home_salvage_copy;		/* Salvage copy command */
 	char *home_stats;			/* Statistics file path */
 
 	char *helium_mount;			/* Helium volume */
