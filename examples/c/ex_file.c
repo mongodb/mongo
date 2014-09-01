@@ -34,7 +34,7 @@
 
 #include <wiredtiger.h>
 
-const char *home;
+static const char *home;
 
 int
 main(void)

@@ -165,6 +165,7 @@ cb_asyncop(WT_ASYNC_CALLBACK *cb, WT_ASYNC_OP *op, int ret, uint32_t flags)
 	(void)flags;
 
 	cfg = NULL;			/* -Wconditional-uninitialized */
+	thread = NULL;			/* -Wconditional-uninitialized */
 
 	type = op->get_type(op);
 	if (type != WT_AOP_COMPACT) {

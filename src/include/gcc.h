@@ -10,12 +10,6 @@
  * and unused function return values.
  */
 #define	WT_UNUSED(var)		(void)(var)
-#ifdef __GNUC__
-#define	WT_UNUSED_RET(var)						\
-	({ __typeof__(var) __ret = var; (void)sizeof __ret; })
-#else
-#define	WT_UNUSED_RET(var)	(void)(var)
-#endif
 
 /* Add GCC-specific attributes to types and function declarations. */
 #ifdef __GNUC__

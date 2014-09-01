@@ -35,9 +35,10 @@
 
 #include <wiredtiger.h>
 
-const char *home;
+static const char *home;
 
-int main(void)
+int
+main(void)
 {
 	int ret;
 	WT_CONNECTION *conn;

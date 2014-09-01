@@ -55,8 +55,8 @@ int pack_ops(WT_SESSION *session);
 int session_ops(WT_SESSION *session);
 int transaction_ops(WT_CONNECTION *conn, WT_SESSION *session);
 
-const char * const progname = "ex_all";
-const char *home;
+static const char * const progname = "ex_all";
+static const char *home;
 
 int
 cursor_ops(WT_SESSION *session)

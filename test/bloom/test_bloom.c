@@ -29,7 +29,7 @@
 
 #include <signal.h>
 
-typedef struct {
+static struct {
 	char *progname;				/* Program name */
 
 	WT_CONNECTION *wt_conn;			/* WT_CONNECTION handle */
@@ -46,8 +46,7 @@ typedef struct {
 	uint32_t c_srand;
 
 	uint8_t **entries;
-} GLOBAL;
-GLOBAL g;
+} g;
 
 static int cleanup(void);
 void die(int e, const char *fmt, ...);
@@ -114,7 +113,8 @@ setup(void)
 	int ret;
 	char config[512];
 
-	WT_UNUSED_RET(system("rm -f WiredTiger* *.bf"));
+	if ((ret = system("rm -f WiredTiger* *.bf")) != 0)
+		die(ret, "system cleanup call failed");
 
 	/*
 	 * This test doesn't test public Wired Tiger functionality, it still

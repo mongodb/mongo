@@ -41,7 +41,7 @@ int print_overflow_pages(WT_SESSION *);
 int get_stat(WT_CURSOR *cursor, int stat_field, uint64_t *valuep);
 int print_derived_stats(WT_SESSION *);
 
-const char *home;
+static const char *home;
 
 /*! [statistics display function] */
 int

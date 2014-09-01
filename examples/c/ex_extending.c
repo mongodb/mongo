@@ -35,7 +35,7 @@
 
 #include <wiredtiger.h>
 
-const char *home;
+static const char *home;
 
 /*! [case insensitive comparator] */
 /* A simple case insensitive comparator. */
@@ -83,7 +83,8 @@ __compare_prefixes(WT_COLLATOR *collator, WT_SESSION *session,
 static PREFIX_COLLATOR pcoll10 = { {__compare_prefixes, NULL, NULL}, 10 };
 /*! [n character comparator] */
 
-int main(void)
+int
+main(void)
 {
 	int ret;
 	WT_CONNECTION *conn;

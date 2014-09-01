@@ -35,10 +35,10 @@
 
 #include <wiredtiger.h>
 
-const char *home1 = "WT_HOME_LOG_1";
-const char *home2 = "WT_HOME_LOG_2";
+static const char *home1 = "WT_HOME_LOG_1";
+static const char *home2 = "WT_HOME_LOG_2";
 
-const char * const uri = "table:logtest";
+static const char * const uri = "table:logtest";
 
 #define	CONN_CONFIG "create,cache_size=100MB,log=(archive=false,enabled=true)"
 #define	MAX_KEYS	10

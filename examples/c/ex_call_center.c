@@ -36,7 +36,7 @@
 
 #include <wiredtiger.h>
 
-const char *home;
+static const char *home;
 
 /*! [call-center decl] */
 /*
@@ -74,7 +74,8 @@ typedef struct {
 } CALL;
 /*! [call-center decl] */
 
-int main(void)
+int
+main(void)
 {
 	int count, exact, ret;
 	WT_CONNECTION *conn;

@@ -36,7 +36,7 @@
 
 #include <wiredtiger.h>
 
-const char *home;
+static const char *home;
 
 /*! [schema declaration] */
 /* The C struct for the data we are storing in a WiredTiger table. */
@@ -46,7 +46,7 @@ typedef struct {
 	uint64_t population;
 } POP_RECORD;
 
-POP_RECORD pop_data[] = {
+static POP_RECORD pop_data[] = {
 	{ "AU",  1900,	  4000000 },
 	{ "AU",  2000,	 19053186 },
 	{ "CAN", 1900,	  5500000 },

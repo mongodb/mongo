@@ -34,7 +34,7 @@
 
 #include <wiredtiger.h>
 
-const char *home;
+static const char *home;
 
 static int
 cursor_scope_ops(WT_CURSOR *cursor)

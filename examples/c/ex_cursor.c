@@ -43,7 +43,7 @@ int cursor_insert(WT_CURSOR *cursor);
 int cursor_update(WT_CURSOR *cursor);
 int cursor_remove(WT_CURSOR *cursor);
 
-const char *home;
+static const char *home;
 
 /*! [cursor next] */
 int
@@ -158,7 +158,8 @@ cursor_remove(WT_CURSOR *cursor)
 }
 /*! [cursor remove] */
 
-int main(void)
+int
+main(void)
 {
 	WT_CONNECTION *conn;
 	WT_CURSOR *cursor;

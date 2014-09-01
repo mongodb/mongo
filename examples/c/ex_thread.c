@@ -36,7 +36,7 @@
 
 #include <wiredtiger.h>
 
-const char *home;
+static const char *home;
 
 void *scan_thread(void *arg);
 
