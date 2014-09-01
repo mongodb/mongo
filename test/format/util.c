@@ -298,11 +298,24 @@ path_setup(const char *home)
 #define	CMD								\
 	"cd %s && "							\
 	"rm -rf slvg.copy && mkdir slvg.copy && "			\
-	"cp WiredTiger* wt* slvg.copy/"
-	len = strlen(g.home) + strlen(CMD) + 1;
-	if ((g.home_salvage_copy = malloc(len)) == NULL)
+	"cp WiredTiger* %s slvg.copy/"
+	len = strlen(g.home) + strlen(WT_NAME) + strlen(CMD) + 1;
+	if ((g.home_slvg_copy = malloc(len)) == NULL)
 		die(errno, "malloc");
-	snprintf(g.home_salvage_copy, len, CMD, g.home);
+	snprintf(g.home_slvg_copy, len, CMD, g.home, WT_NAME);
+
+	/*
+	 * Salvage command, save the corrupted file so we can replay the
+	 * salvage command as necessary.
+	 */
+#undef	CMD
+#define	CMD								\
+	"cd %s && "							\
+	"cp %s slvg.copy/%s.corrupted"
+	len = strlen(g.home) + strlen(WT_NAME) * 2 + strlen(CMD) + 1;
+	if ((g.home_slvg_corrupt = malloc(len)) == NULL)
+		die(errno, "malloc");
+	snprintf(g.home_slvg_corrupt, len, CMD, g.home, WT_NAME, WT_NAME);
 }
 
 /*

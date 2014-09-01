@@ -116,7 +116,7 @@ wts_salvage(void)
 	 * Save a copy of the interesting files so we can replay the salvage
 	 * step as necessary.
 	 */
-	if ((ret = system(g.home_salvage_copy)) != 0)
+	if ((ret = system(g.home_slvg_copy)) != 0)
 		die(ret, "salvage copy step failed");
 
 	/* Salvage, then verify. */
@@ -136,6 +136,13 @@ wts_salvage(void)
 
 	/* Corrupt the file randomly, salvage, then verify. */
 	if (corrupt()) {
+		/*
+		 * Save a copy of the corrupted file so we can replay the
+		 * salvage step as necessary.
+		 */
+		if ((ret = system(g.home_slvg_corrupt)) != 0)
+			die(ret, "salvage corrupt copy step failed");
+
 		wts_open(g.home, 1, &g.wts_conn);
 		salvage();
 		wts_verify("post-corrupt-salvage verify");
