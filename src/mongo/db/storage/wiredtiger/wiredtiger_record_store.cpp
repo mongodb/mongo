@@ -41,7 +41,9 @@ namespace mongo {
             const StringData &ns, const CollectionOptions &options, bool allocateDefaultSpace) {
         WiredTigerSession swrap(db);
         WT_SESSION *s = swrap.Get();
-        return s->create(s, _getURI(ns).c_str(), "type=file,key_format=q,value_format=u");
+        std::string config = "type=file,key_format=q,value_format=u,app_metadata=";
+        config += options.toBSON().jsonString();
+        return s->create(s, _getURI(ns).c_str(), config.c_str());
     }
 
     WiredTigerRecordStore::WiredTigerRecordStore( const StringData& ns,
