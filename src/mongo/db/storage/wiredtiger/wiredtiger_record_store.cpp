@@ -199,8 +199,7 @@ namespace mongo {
             if ( _cappedDeleteCallback )
                 uassertStatusOK(_cappedDeleteCallback->aboutToDeleteCapped(txn, oldest));
 
-            ret = c->remove(c);
-            invariant(ret == 0);
+            deleteRecord(txn, oldest);
             ret = c->next(c);
         }
 
@@ -398,6 +397,11 @@ namespace mongo {
     void WiredTigerRecordStore::appendCustomStats( OperationContext* txn,
                                               BSONObjBuilder* result,
                                               double scale ) const {
+        result->appendBool( "capped", _isCapped );
+        if ( _isCapped ) {
+            result->appendIntOrLL( "max", _cappedMaxDocs );
+            result->appendIntOrLL( "maxSize", _cappedMaxSize );
+        }
     }
 
 
