@@ -43,6 +43,8 @@
 
 namespace mongo {
 
+    class Collection;
+    class Database;
     class OperationContext;
 
     namespace mr {
@@ -331,6 +333,8 @@ namespace mongo {
             bool jsMode() {return _jsMode;}
             void switchMode(bool jsMode);
             void bailFromJS();
+
+            Collection* getCollectionOrUassert(Database* db, const StringData& ns);
 
             const Config& _config;
             DBDirectClient _db;
