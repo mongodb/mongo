@@ -517,8 +517,10 @@ namespace mongo {
     }
 
     bool WiredTigerRecordStore::Iterator::isEOF() {
-        if (_eof && _tailable)
-            (void)getNext();
+        if (_eof && _tailable && !_lastLoc.isNull()) {
+            _locate(_lastLoc, false);
+            _getNext();
+        }
         return _eof;
     }
 
@@ -533,21 +535,21 @@ namespace mongo {
         return _fromKey(key);
     }
 
-    DiskLoc WiredTigerRecordStore::Iterator::getNext() {
-        /* Take care not to restart a scan if we have hit the end */
-        if (_eof && _tailable && !_lastLoc.isNull()) {
-            _locate(_lastLoc, false);
-            _lastLoc = DiskLoc();
-        }
-        if (_eof)
-            return DiskLoc();
-
-        DiskLoc toReturn = curr();
-        /* MongoDB expects "natural" ordering - which is the order that items are inserted. */
+    void WiredTigerRecordStore::Iterator::_getNext() {
         WT_CURSOR *c = _cursor.Get();
         int ret = _forward() ? c->next(c) : c->prev(c);
         invariant(ret == 0 || ret == WT_NOTFOUND);
         _eof = (ret == WT_NOTFOUND);
+    }
+
+    DiskLoc WiredTigerRecordStore::Iterator::getNext() {
+        /* Take care not to restart a scan if we have hit the end */
+        if (isEOF())
+            return DiskLoc();
+
+        /* MongoDB expects "natural" ordering - which is the order that items are inserted. */
+        DiskLoc toReturn = curr();
+        _getNext();
         if (_tailable && _eof)
             _lastLoc = toReturn;
         return toReturn;

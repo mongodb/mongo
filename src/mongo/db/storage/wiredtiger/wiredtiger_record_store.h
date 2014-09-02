@@ -174,6 +174,7 @@ namespace mongo {
 
         private:
             bool _forward() const;
+            void _getNext();
             void _locate( const DiskLoc &loc, bool exact );
             void _checkStatus();
 
