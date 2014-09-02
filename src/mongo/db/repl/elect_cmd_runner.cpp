@@ -63,7 +63,8 @@ namespace repl {
                                        "who" << selfConfig.getHostAndPort().toString() <<
                                        "whoid" << selfConfig.getId() <<
                                        "cfgver" << currentConfig.getConfigVersion() <<
-                                       "round" << OID::gen());
+                                       "round" << static_cast<long long>(executor->nextRandomInt64(
+                                               std::numeric_limits<int64_t>::max())));
 
         // Schedule a RemoteCommandRequest for each non-DOWN node
         for (std::vector<HostAndPort>::const_iterator it = hosts.begin(); 

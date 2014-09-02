@@ -88,7 +88,7 @@ namespace {
     }
 
     TEST(ReplicationExecutor, RunOne) {
-        ReplicationExecutor executor(new NetworkInterfaceMock);
+        ReplicationExecutor executor(new NetworkInterfaceMock, 1 /* prng seed */);
         Status status(ErrorCodes::InternalError, "Not mutated");
         ASSERT_OK(executor.scheduleWork(stdx::bind(setStatusAndShutdown,
                                                    stdx::placeholders::_1,
@@ -98,7 +98,7 @@ namespace {
     }
 
     TEST(ReplicationExecutor, Schedule1ButShutdown) {
-        ReplicationExecutor executor(new NetworkInterfaceMock);
+        ReplicationExecutor executor(new NetworkInterfaceMock, 1 /* prng seed */);
         Status status(ErrorCodes::InternalError, "Not mutated");
         ASSERT_OK(executor.scheduleWork(stdx::bind(setStatusAndShutdown,
                                                    stdx::placeholders::_1,
@@ -109,7 +109,7 @@ namespace {
     }
 
     TEST(ReplicationExecutor, Schedule2Cancel1) {
-        ReplicationExecutor executor(new NetworkInterfaceMock);
+        ReplicationExecutor executor(new NetworkInterfaceMock, 1 /* prng seed */);
         Status status1(ErrorCodes::InternalError, "Not mutated");
         Status status2(ErrorCodes::InternalError, "Not mutated");
         ReplicationExecutor::CallbackHandle cb = unittest::assertGet(
@@ -126,7 +126,7 @@ namespace {
     }
 
     TEST(ReplicationExecutor, OneSchedulesAnother) {
-        ReplicationExecutor executor(new NetworkInterfaceMock);
+        ReplicationExecutor executor(new NetworkInterfaceMock, 1 /* prng seed */);
         Status status1(ErrorCodes::InternalError, "Not mutated");
         Status status2(ErrorCodes::InternalError, "Not mutated");
         ASSERT_OK(executor.scheduleWork(stdx::bind(scheduleSetStatusAndShutdown,
@@ -167,7 +167,7 @@ namespace {
     }
 
     EventChainAndWaitingTest::EventChainAndWaitingTest() :
-        executor(new NetworkInterfaceMock),
+        executor(new NetworkInterfaceMock, 1 /* prng seed */),
         executorThread(stdx::bind(&ReplicationExecutor::run, &executor)),
         goEvent(unittest::assertGet(executor.makeEvent())),
         event2(unittest::assertGet(executor.makeEvent())),
@@ -268,7 +268,7 @@ namespace {
 
     TEST(ReplicationExecutor, ScheduleWorkAt) {
         NetworkInterfaceMock* net = new NetworkInterfaceMock;
-        ReplicationExecutor executor(net);
+        ReplicationExecutor executor(net, 1 /* prng seed */);
         Status status1(ErrorCodes::InternalError, "Not mutated");
         Status status2(ErrorCodes::InternalError, "Not mutated");
         Status status3(ErrorCodes::InternalError, "Not mutated");
@@ -315,7 +315,7 @@ namespace {
 
     TEST(ReplicationExecutor, ScheduleRemoteCommand) {
         NetworkInterfaceMock* net = new NetworkInterfaceMock;
-        ReplicationExecutor executor(net);
+        ReplicationExecutor executor(net, 1 /* prng seed */);
         Status status1(ErrorCodes::InternalError, "Not mutated");
         const ReplicationExecutor::RemoteCommandRequest request(
                 HostAndPort("localhost", 27017),
@@ -337,7 +337,7 @@ namespace {
 
     TEST(ReplicationExecutor, ScheduleAndCancelRemoteCommand) {
         NetworkInterfaceMock* net = new NetworkInterfaceMock;
-        ReplicationExecutor executor(net);
+        ReplicationExecutor executor(net, 1 /* prng seed */);
         Status status1(ErrorCodes::InternalError, "Not mutated");
         const ReplicationExecutor::RemoteCommandRequest request(
                 HostAndPort("localhost", 27017),
@@ -359,7 +359,7 @@ namespace {
     }
 
     TEST(ReplicationExecutor, ScheduleExclusiveLockOperation) {
-        ReplicationExecutor executor(new NetworkInterfaceMock);
+        ReplicationExecutor executor(new NetworkInterfaceMock, 1 /* prng seed */);
         Status status1(ErrorCodes::InternalError, "Not mutated");
         ASSERT_OK(executor.scheduleWorkWithGlobalExclusiveLock(
                           stdx::bind(setStatusAndShutdown,
@@ -372,7 +372,7 @@ namespace {
     TEST(ReplicationExecutor, RemoteCommandWithTimeout) {
         NetworkInterfaceMock* net = new NetworkInterfaceMock;
         net->simulatedNetworkLatency(5);
-        ReplicationExecutor executor(net);
+        ReplicationExecutor executor(net, 1 /* prng seed */);
         Status status(ErrorCodes::InternalError, "");
         const ReplicationExecutor::RemoteCommandRequest request(
                 HostAndPort("lazy", 27017),
@@ -397,7 +397,7 @@ namespace {
     TEST(ReplicationExecutor, CallbackHandleComparison) {
         NetworkInterfaceMock* net = new NetworkInterfaceMock;
         net->simulatedNetworkLatency(5);
-        ReplicationExecutor executor(net);
+        ReplicationExecutor executor(net, 1 /* prng seed */);
         Status status(ErrorCodes::InternalError, "");
         const ReplicationExecutor::RemoteCommandRequest request(
                 HostAndPort("lazy", 27017),

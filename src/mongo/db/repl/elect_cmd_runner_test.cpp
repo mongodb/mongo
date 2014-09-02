@@ -71,7 +71,7 @@ namespace {
 
     void ElectCmdRunnerTest::setUp() {
         _net = new NetworkInterfaceMockWithMap;
-        _executor.reset(new ReplicationExecutor(_net));
+        _executor.reset(new ReplicationExecutor(_net, 1 /* prng seed */));
         _executorThread.reset(new boost::thread(stdx::bind(&ReplicationExecutor::run,
                                                            _executor.get())));
     }
@@ -97,7 +97,7 @@ namespace {
                     "who" << myConfig.getHostAndPort().toString() <<
                     "whoid" << myConfig.getId() <<
                     "cfgver" << rsConfig.getConfigVersion() <<
-                    "round" << 0);
+                    "round" << 380865962699346850ll);
     }
 
     // This is necessary because the run method must be scheduled in the Replication Executor
@@ -178,7 +178,7 @@ namespace {
                                                electRequest),
                           StatusWith<BSONObj>(BSON("ok" << 1 <<
                                                    "vote" << 1 <<
-                                                   "round" << 0)));
+                                                   "round" << 380865962699346850ll)));
 
         ElectCmdRunner electCmdRunner;
         StatusWith<ReplicationExecutor::CallbackHandle> cbh = 
@@ -197,9 +197,7 @@ namespace {
         ASSERT_OK(_lastStatus);
 
         _executor->waitForEvent(evh.getValue());
-        // TODO: this ought to pass once elect cmd is implemented.
-        //ASSERT_EQUALS(electCmdRunner.getReceivedVotes(), 2);
-        ASSERT_EQUALS(electCmdRunner.getReceivedVotes(), 1);
+        ASSERT_EQUALS(electCmdRunner.getReceivedVotes(), 2);
         
     }
 
@@ -227,7 +225,7 @@ namespace {
                                                electRequest),
                           StatusWith<BSONObj>(BSON("ok" << 1 <<
                                                    "vote" << 1 <<
-                                                   "round" << 0)),
+                                                   "round" << 380865962699346850ll)),
                           true /* isBlocked */);
 
         ElectCmdRunner electCmdRunner;

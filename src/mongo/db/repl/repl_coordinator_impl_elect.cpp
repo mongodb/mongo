@@ -148,7 +148,7 @@ namespace repl {
         if (tied) {
             boost::unique_lock<boost::mutex> lk(_mutex);
             if ((_thisMembersConfigIndex != 0) && !_sleptLastElection) {
-                long long ms = _random.nextInt64(1000) + 50;
+                long long ms = _replExecutor.nextRandomInt64(1000) + 50;
                 log() << "replSet possible election tie; sleeping a little " << ms << "ms";
                 _topCoord->setStepDownTime(now + ms);
                 _sleptLastElection = true;

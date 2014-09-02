@@ -109,12 +109,11 @@ namespace {
             int64_t prngSeed) :
         _settings(settings),
         _topCoord(topCoord),
-        _replExecutor(network),
+        _replExecutor(network, prngSeed),
         _externalState(externalState),
         _inShutdown(false),
         _rsConfigState(kConfigStartingUp),
         _thisMembersConfigIndex(-1),
-        _random(prngSeed),
         _sleptLastElection(false) {
 
         if (!isReplEnabled()) {

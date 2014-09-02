@@ -44,7 +44,6 @@
 #include "mongo/db/repl/repl_coordinator_external_state.h"
 #include "mongo/db/repl/replica_set_config.h"
 #include "mongo/db/repl/replication_executor.h"
-#include "mongo/platform/random.h"
 #include "mongo/platform/unordered_map.h"
 #include "mongo/util/net/hostandport.h"
 
@@ -503,9 +502,6 @@ namespace repl {
 
         // This member's index position in the current config.
         int _thisMembersConfigIndex;                                                      // (MX)
-
-        // PRNG; seeded at class construction time.
-        PseudoRandom _random;                                                             // (M)
 
         // Used for conducting an election of this node;
         // the presence of a non-null _freshnessChecker pointer indicates that an election is

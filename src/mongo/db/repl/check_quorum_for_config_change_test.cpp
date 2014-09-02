@@ -74,7 +74,7 @@ namespace {
 
     void CheckQuorumTest::setUp() {
         _net = new NetworkInterfaceMockWithMap;
-        _executor.reset(new ReplicationExecutor(_net));
+        _executor.reset(new ReplicationExecutor(_net, 1 /* prng */ ));
         _executorThread.reset(new boost::thread(stdx::bind(&ReplicationExecutor::run,
                                                            _executor.get())));
     }
