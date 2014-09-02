@@ -623,11 +623,7 @@ namespace mongo {
 
             Client::WriteContext ctx( ns );
             uassert(10004, "no longer master", isMasterNs(ns.c_str()));
-            Collection* coll = ctx.ctx().db()->getCollection( ns );
-            if ( !coll )
-                uasserted(13630, str::stream() << "attempted to insert into nonexistent" <<
-                                                  " collection during a mr operation." <<
-                                                  " collection expected: " << ns );
+            Collection* coll = getCollectionOrUassert(ctx.ctx().db(), ns);
 
             class BSONObjBuilder b;
             if ( !o.hasField( "_id" ) ) {
@@ -649,12 +645,7 @@ namespace mongo {
             verify( _onDisk );
 
             Client::WriteContext ctx( _config.incLong );
-            Collection* coll = ctx.ctx().db()->getCollection( _config.incLong );
-            if ( !coll )
-                uasserted(13631, str::stream() << "attempted to insert into nonexistent"
-                                                  " collection during a mr operation." <<
-                                                  " collection expected: " << _config.incLong );
-
+            Collection* coll = getCollectionOrUassert(ctx.ctx().db(), _config.incLong);
             coll->insertDocument( o, true );
             getDur().commitIfNeeded();
         }
@@ -850,6 +841,13 @@ namespace mongo {
             _config.reducer->numReduces = _scope->getNumberInt("_redCt");
         }
 
+        Collection* State::getCollectionOrUassert(Database* db, const StringData& ns) {
+            Collection* out = db ? db->getCollection(ns) : NULL;
+            uassert(18697, "Collection unexpectedly disappeared: " + ns.toString(),
+                    out);
+            return out;
+        }
+
         /**
          * Applies last reduce and finalize on a list of tuples (key, val)
          * Inserts single result {_id: key, value: val} into temp collection
@@ -924,7 +922,7 @@ namespace mongo {
 
             {
                 Client::WriteContext incCtx( _config.incLong );
-                Collection* incColl = incCtx.ctx().db()->getCollection( _config.incLong );
+                Collection* incColl = getCollectionOrUassert(incCtx.ctx().db(), _config.incLong );
 
                 bool foundIndex = false;
                 IndexCatalog::IndexIterator ii =

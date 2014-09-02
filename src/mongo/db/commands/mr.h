@@ -42,6 +42,9 @@
 
 namespace mongo {
 
+    class Collection;
+    class Database;
+
     namespace mr {
 
         typedef vector<BSONObj> BSONList;
@@ -323,6 +326,8 @@ namespace mongo {
             bool jsMode() {return _jsMode;}
             void switchMode(bool jsMode);
             void bailFromJS();
+
+            Collection* getCollectionOrUassert(Database* db, const StringData& ns);
 
             const Config& _config;
             DBDirectClient _db;
