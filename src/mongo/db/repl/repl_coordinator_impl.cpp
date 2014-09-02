@@ -181,13 +181,13 @@ namespace {
         // Make sure that no matter how _finishLoadLocalConfig_helper terminates (short of
         // throwing an exception, which it shouldn't do and would cause the process to terminate),
         // we always set _rsConfigState to either kConfigSteady or kConfigUninitialized.
-        boost::lock_guard<boost::mutex> lk(_mutex);
         if (_rsConfigState != kConfigStartingUp) {
             invariant(_rsConfigState == kConfigSteady);
             invariant(_rsConfig.isInitialized());
         }
         else {
             invariant(!_rsConfig.isInitialized());
+            boost::lock_guard<boost::mutex> lk(_mutex);
             _setConfigState_inlock(kConfigUninitialized);
         }
     }
@@ -196,18 +196,10 @@ namespace {
             const ReplicationExecutor::CallbackData& cbData,
             const ReplicaSetConfig& localConfig) {
 
-        boost::unique_lock<boost::mutex> lk(_mutex);
         invariant(_rsConfigState == kConfigStartingUp);
-        ReplicaSetConfig oldConfig = _rsConfig;
-        lk.unlock();
 
-        // We copy _rsConfig to oldConfig so that we can call validateConfigForStartUp without
-        // holding _mutex, as validateConfigForStartUp calls isSelf, which might lead to network
-        // traffic.  For this to work, we are depending on _rsConfig not changing between now
-        // and when we re-acquire the lock further down.  We ensure that by not processing any
-        // heartbeats, initiates or reconfigs while _rsConfigState == kConfigStartingUp.
         StatusWith<int> myIndex = validateConfigForStartUp(_externalState.get(),
-                                                           oldConfig,
+                                                           _rsConfig,
                                                            localConfig);
         if (!myIndex.isOK()) {
             warning() << "Locally stored replica set configuration not valid for current node; "
@@ -216,7 +208,7 @@ namespace {
             return;
         }
 
-        lk.lock();
+        boost::lock_guard<boost::mutex> lk(_mutex);
         invariant(_rsConfigState == kConfigStartingUp);
         _setCurrentRSConfig_inlock(localConfig, myIndex.getValue());
     }
