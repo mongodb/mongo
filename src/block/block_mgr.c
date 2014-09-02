@@ -267,9 +267,10 @@ __bm_salvage_start(WT_BM *bm, WT_SESSION_IMPL *session)
  */
 static int
 __bm_salvage_valid(WT_BM *bm,
-    WT_SESSION_IMPL *session, uint8_t *addr, size_t addr_size)
+    WT_SESSION_IMPL *session, uint8_t *addr, size_t addr_size, int valid)
 {
-	return (__wt_block_salvage_valid(session, bm->block, addr, addr_size));
+	return (__wt_block_salvage_valid(
+	    session, bm->block, addr, addr_size, valid));
 }
 
 /*
@@ -362,7 +363,7 @@ __bm_method_set(WT_BM *bm, int readonly)
 		bm->salvage_start = (int (*)
 		    (WT_BM *, WT_SESSION_IMPL *))__bm_readonly;
 		bm->salvage_valid = (int (*)(WT_BM *,
-		    WT_SESSION_IMPL *, uint8_t *, size_t))__bm_readonly;
+		    WT_SESSION_IMPL *, uint8_t *, size_t, int))__bm_readonly;
 		bm->stat = __bm_stat;
 		bm->sync =
 		    (int (*)(WT_BM *, WT_SESSION_IMPL *, int))__bm_readonly;

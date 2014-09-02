@@ -203,7 +203,8 @@ extern int __wt_block_salvage_next(WT_SESSION_IMPL *session,
 extern int __wt_block_salvage_valid(WT_SESSION_IMPL *session,
     WT_BLOCK *block,
     uint8_t *addr,
-    size_t addr_size);
+    size_t addr_size,
+    int valid);
 extern int __wt_block_verify_start( WT_SESSION_IMPL *session,
     WT_BLOCK *block,
     WT_CKPT *ckptbase);

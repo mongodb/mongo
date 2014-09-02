@@ -339,7 +339,7 @@ __slvg_read(WT_SESSION_IMPL *session, WT_STUFF *ss)
 	const WT_PAGE_HEADER *dsk;
 	size_t addr_size;
 	uint8_t addr[WT_BTREE_MAX_ADDR_COOKIE];
-	int eof;
+	int eof, valid;
 
 	bm = S2BT(session)->bm;
 	WT_ERR(__wt_scr_alloc(session, 0, &as));
@@ -357,17 +357,23 @@ __slvg_read(WT_SESSION_IMPL *session, WT_STUFF *ss)
 
 		/*
 		 * Read (and potentially decompress) the block; the underlying
-		 * block manager might only return good blocks if checksums are
-		 * configured, else we may be relying on compression.  If the
-		 * read fails, simply move to the next potential block.
+		 * block manager might return only good blocks if checksums are
+		 * configured, or both good and bad blocks if we're relying on
+		 * compression.
+		 *
+		 * Report the block's status to the block manager.
 		 */
-		if (__wt_bt_read(session, buf, addr, addr_size) != 0) {
-			WT_ERR(bm->free(bm, session, addr, addr_size));
-			continue;
+		if ((ret = __wt_bt_read(session, buf, addr, addr_size)) == 0)
+			valid = 1;
+		else {
+			valid = 0;
+			if (ret == WT_ERROR)
+				ret = 0;
+			WT_ERR(ret);
 		}
-
-		/* Tell the block manager we're taking this one. */
-		WT_ERR(bm->salvage_valid(bm, session, addr, addr_size));
+		WT_ERR(bm->salvage_valid(bm, session, addr, addr_size, valid));
+		if (!valid)
+			continue;
 
 		/* Create a printable version of the address. */
 		WT_ERR(bm->addr_string(bm, session, as, addr, addr_size));
