@@ -324,7 +324,6 @@ json_data(WT_SESSION *session, JSON_INPUT_STATE *ins, CONFIG_LIST *clp)
 	/* Reorder and check the list. */
 	if ((ret = config_reorder(clp->list)) != 0)
 		goto err;
-	uri = clp->list[0];
 
 	/* Update config based on command-line configuration. */
 	if ((ret = config_update(session, clp->list)) != 0)
@@ -334,6 +333,7 @@ json_data(WT_SESSION *session, JSON_INPUT_STATE *ins, CONFIG_LIST *clp)
 	if ((ret = config_exec(session, clp->list)) != 0)
 		goto err;
 
+	uri = clp->list[0];
 	(void)snprintf(config, sizeof(config),
 	    "dump=json%s%s",
 	    append ? ",append" : "", no_overwrite ? ",overwrite=false" : "");
