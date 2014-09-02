@@ -33,12 +33,25 @@ env.CppUnitTest('replication_executor_test',
                 LIBDEPS=['replication_executor',
                          'replmocks'])
 
+env.Library('topology_coordinator',
+            [
+                'topology_coordinator.cpp',
+            ],
+            LIBDEPS=[
+                'repl_coordinator_interface',
+            ])
+
 env.Library('topology_coordinator_impl',
-            ['topology_coordinator_impl.cpp',
-             'member_heartbeat_data.cpp'],
-            LIBDEPS=['replication_executor',
-                     'repl_settings',
-                     'rslog'])
+            [
+                'member_heartbeat_data.cpp',
+                'topology_coordinator_impl.cpp',
+            ],
+            LIBDEPS=[
+                'replication_executor',
+                'repl_settings',
+                'rslog',
+                'topology_coordinator',
+            ])
 
 env.CppUnitTest('topology_coordinator_impl_test',
                 'topology_coordinator_impl_test.cpp',

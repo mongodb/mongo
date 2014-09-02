@@ -45,7 +45,6 @@ namespace mongo {
 
 namespace repl {
 
-    class MemberHeartbeatData;
     struct MemberState;
     class ReplicaSetConfig;
     class ReplSetHeartbeatArgs;
@@ -62,8 +61,91 @@ namespace repl {
         MONGO_DISALLOW_COPYING(TopologyCoordinator);
     public:
 
-        virtual ~TopologyCoordinator() {}
-        
+        /**
+         * Description of actions taken in response to a heartbeat.
+         *
+         * This includes when to schedule the next heartbeat to a target, and any other actions to
+         * take, such as scheduling an election or stepping down as primary.
+         */
+        class HeartbeatResponseAction {
+        public:
+            /**
+             * Actions taken based on heartbeat responses
+             */
+            enum Action {
+                NoAction,
+                Reconfig,
+                StartElection,
+                StepDownSelf,
+                StepDownRemotePrimary
+            };
+
+            /**
+             * Makes a new action representing doing nothing.
+             */
+            static HeartbeatResponseAction makeNoAction();
+
+            /**
+             * Makes a new action representing the instruction to reconfigure the current node.
+             */
+            static HeartbeatResponseAction makeReconfigAction();
+
+            /**
+             * Makes a new action telling the current node to attempt to elect itself primary.
+             */
+            static HeartbeatResponseAction makeElectAction();
+
+            /**
+             * Makes a new action telling the current node to step down as primary.
+             *
+             * It is an error to call this with primaryIndex != the index of the current node.
+             */
+            static HeartbeatResponseAction makeStepDownSelfAction(int primaryIndex);
+
+            /**
+             * Makes a new action telling the current node to ask the specified remote node to step
+             * down as primary.
+             *
+             * It is an error to call this with primaryIndex == the index of the current node.
+             */
+            static HeartbeatResponseAction makeStepDownRemoteAction(int primaryIndex);
+
+            /**
+             * Construct an action with unspecified action and a next heartbeat start date in the
+             * past.
+             */
+            HeartbeatResponseAction();
+
+            /**
+             * Sets the date at which the next heartbeat should be scheduled.
+             */
+            void setNextHeartbeatStartDate(Date_t when);
+
+            /**
+             * Gets the action type of this action.
+             */
+            Action getAction() const { return _action; }
+
+            /**
+             * Gets the time at which the next heartbeat should be scheduled.  If the
+             * time is not in the future, the next heartbeat should be scheduled immediately.
+             */
+            Date_t getNextHeartbeatStartDate() const { return _nextHeartbeatStartDate; }
+
+            /**
+             * If getAction() returns StepDownSelf or StepDownPrimary, this is the index
+             * in the current replica set config of the node that ought to step down.
+             */
+            int getPrimaryConfigIndex() const { return _primaryIndex; }
+
+        private:
+            Action _action;
+            int _primaryIndex;
+            Date_t _nextHeartbeatStartDate;
+        };
+
+        virtual ~TopologyCoordinator();
+
         // The index into the config used when we next choose a sync source
         virtual void setForceSyncSourceIndex(int index) = 0;
 
@@ -117,12 +199,32 @@ namespace repl {
                                               ReplSetHeartbeatResponse* response,
                                               Status* result) = 0;
 
-        // update internal state with heartbeat response corresponding to 'id'
-        virtual ReplSetHeartbeatResponse::HeartbeatResultAction 
-            updateHeartbeatData(Date_t now,
-                                const MemberHeartbeatData& newInfo,
-                                int id,
-                                const OpTime& lastOpApplied) = 0;
+        /**
+         * Prepares a heartbeat request appropriate for sending to "target", assuming the
+         * current time is "now".  "ourSetName" is used as the name for our replica set if
+         * the topology coordinator does not have a valid configuration installed.
+         *
+         * The returned pair contains proper arguments for a replSetHeartbeat command, and
+         * an amount of time to wait for the response.
+         */
+        virtual std::pair<ReplSetHeartbeatArgs, Milliseconds> prepareHeartbeatRequest(
+                Date_t now,
+                const std::string& ourSetName,
+                const HostAndPort& target) = 0;
+
+        /**
+         * Processes a heartbeat response from "target" that arrived around "now", having
+         * spent "networkRoundTripTime" millis on the network.
+         *
+         * Updates internal topology coordinator state, and returns instructions about what action
+         * to take next.
+         */
+        virtual HeartbeatResponseAction processHeartbeatResponse(
+                Date_t now,
+                Milliseconds networkRoundTripTime,
+                const HostAndPort& target,
+                const StatusWith<ReplSetHeartbeatResponse>& hbResponse,
+                OpTime myLastOpApplied) = 0;
 
         // produce a reply to a status request
         virtual void prepareStatusResponse(const ReplicationExecutor::CallbackData& data,
