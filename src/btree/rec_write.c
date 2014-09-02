@@ -530,6 +530,52 @@ err:	__wt_page_out(session, &next);
 }
 
 /*
+ * __rec_raw_compression_config --
+ *	Configure raw compression.
+ */
+static inline int
+__rec_raw_compression_config(
+    WT_SESSION_IMPL *session, WT_PAGE *page, WT_SALVAGE_COOKIE *salvage)
+{
+	WT_BTREE *btree;
+
+	btree = S2BT(session);
+
+	/* Check if raw compression configured. */
+	if (btree->compressor == NULL ||
+	    btree->compressor->compress_raw == NULL)
+		return (0);
+
+	/* Only for row-store and variable-length column-store objects. */
+	if (page->type == WT_PAGE_COL_FIX)
+		return (0);
+
+	/*
+	 * Raw compression cannot support dictionary compression. (Technically,
+	 * we could still use the raw callback on column-store variable length
+	 * internal pages with dictionary compression configured, because
+	 * dictionary compression only applies to column-store leaf pages, but
+	 * that seems an unlikely use case.)
+	 */
+	if (btree->dictionary != 0)
+		return (0);
+
+	/* Raw compression cannot support prefix compression. */
+	if (btree->prefix_compression != 0)
+		return (0);
+
+	/*
+	 * Raw compression is also turned off during salvage: we can't allow
+	 * pages to split during salvage, raw compression has no point if it
+	 * can't manipulate the page size.
+	 */
+	if (salvage != NULL)
+		return (0);
+
+	return (1);
+}
+
+/*
  * __rec_write_init --
  *	Initialize the reconciliation structure.
  */
@@ -566,27 +612,9 @@ __rec_write_init(WT_SESSION_IMPL *session,
 	/* Track if the page can be marked clean. */
 	r->leave_dirty = 0;
 
-	/*
-	 * Raw compression, the application builds disk images: applicable only
-	 * to row-and variable-length column-store objects.  Dictionary and
-	 * prefix compression must be turned off or we ignore raw-compression,
-	 * raw compression can't support either one.  (Technically, we could
-	 * still use the raw callback on column-store variable length internal
-	 * pages with dictionary compression configured, because dictionary
-	 * compression only applies to column-store leaf pages, but that seems
-	 * an unlikely use case.)
-	 *
-	 * Raw compression is also turned off during salvage: we can't allow
-	 * pages to split during salvage, raw compression has no point if it
-	 * can't manipulate the page size.
-	 */
+	/* Raw compression. */
 	r->raw_compression =
-	    btree->compressor != NULL &&
-	    btree->compressor->compress_raw != NULL &&
-	    page->type != WT_PAGE_COL_FIX &&
-	    btree->dictionary == 0 &&
-	    btree->prefix_compression == 0 &&
-	    salvage == NULL;
+	    __rec_raw_compression_config(session, page, salvage);
 	r->raw_destination.flags = WT_ITEM_ALIGNED;
 
 	/* Track overflow items. */
