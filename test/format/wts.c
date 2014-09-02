@@ -115,14 +115,13 @@ wts_open(const char *home, int set_api, WT_CONNECTION **connp)
 		die(ENOMEM, "configuration buffer too small");
 
 	/*
-	 * Direct I/O may not work with hot-backups, doing copies through the
-	 * buffer cache after configuring direct I/O in Linux won't work.  If
-	 * direct I/O is configured, turn off hot backups.   This isn't a great
-	 * place to do this check, but it's only here we have the configuration
-	 * string.
+	 * Direct I/O may not work with backups, doing copies through the buffer
+	 * cache after configuring direct I/O in Linux won't work.  If direct
+	 * I/O is configured, turn off backups.   This isn't a great place to do
+	 * this check, but it's only here we have the configuration string.
 	 */
 	if (strstr(config, "direct_io") != NULL)
-		g.c_hot_backups = 0;
+		g.c_backups = 0;
 
 	if ((ret = wiredtiger_open(home, &event_handler, config, &conn)) != 0)
 		die(ret, "wiredtiger_open: %s", home);
@@ -377,49 +376,6 @@ wts_dump(const char *tag, int dump_bdb)
 	if ((ret = system(cmd)) != 0)
 		die(ret, "%s: dump comparison failed", tag);
 	free(cmd);
-}
-
-void
-wts_salvage_copy(void)
-{
-	int ret;
-
-	/*
-	 * Some data-sources don't support salvage.
-	 */
-	if (DATASOURCE("helium") || DATASOURCE("kvsbdb"))
-		return;
-
-	/*
-	 * Save a copy of the interesting files so we can replay the salvage
-	 * step as necessary.
-	 */
-	if ((ret = system(g.home_salvage_copy)) != 0)
-		die(ret, "salvage copy step failed");
-}
-
-void
-wts_salvage(void)
-{
-	WT_CONNECTION *conn;
-	WT_SESSION *session;
-	int ret;
-
-	/*
-	 * Some data-sources don't support salvage.
-	 */
-	if (DATASOURCE("helium") || DATASOURCE("kvsbdb"))
-		return;
-
-	conn = g.wts_conn;
-	track("salvage", 0ULL, NULL);
-
-	if ((ret = conn->open_session(conn, NULL, NULL, &session)) != 0)
-		die(ret, "connection.open_session");
-	if ((ret = session->salvage(session, g.uri, NULL)) != 0)
-		die(ret, "session.salvage: %s", g.uri);
-	if ((ret = session->close(session, NULL)) != 0)
-		die(ret, "session.close");
 }
 
 void

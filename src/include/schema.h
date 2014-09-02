@@ -86,3 +86,22 @@ struct __wt_table {
 			    session, &S2C(session)->schema_lock);	\
 	}								\
 } while (0)
+
+/* Drop the schema lock, and re-acquire after operation. */
+#define	WT_WITHOUT_SCHEMA_LOCK(session, op) do {			\
+	WT_DECL_SPINLOCK_ID(__id);		/* Must appear last */	\
+	if (!F_ISSET(session, WT_SESSION_SCHEMA_LOCKED))		\
+		(op);							\
+	else {								\
+		__wt_spin_unlock(session, &S2C(session)->schema_lock);	\
+		F_CLR(session, WT_SESSION_SCHEMA_LOCKED);		\
+		(op);							\
+		while (!F_ISSET(session, WT_SESSION_SCHEMA_LOCKED)) {	\
+			if (__wt_spin_trylock(session,			\
+			    &S2C(session)->schema_lock, &__id) == 0)	\
+				F_SET(session, WT_SESSION_SCHEMA_LOCKED);\
+			else						\
+				__wt_yield();				\
+		}							\
+	}								\
+} while (0)

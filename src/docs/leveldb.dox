@@ -23,7 +23,12 @@ Here are the steps to build and run an existing application against WiredTiger's
    make install
    </code>
 
-   To include support for Basho's version of LevelDB, change the above to <code>--enable-leveldb=basho</code>.  To include support for HyperLevelDB / HyperDex, change the above to <code>--enable-leveldb=hyper</code>.  To include support for RocksDB, change the above to <code>--enable-leveldb=rocksdb</code>.
+   Change the above to \c --enable-leveldb=basho to build a version of
+   the LevelDB API compatible with Basho's Riak product, or
+   \c --enable-leveldb=hyper to build a version of the LevelDB API
+   compatible with the HyperDex product, or
+   \c --enable-leveldb=rocksdb to build a version of the LevelDB API
+   compatible with applications using Facebook's RocksDB engine.
 
 <li> compile and link the application against WiredTiger's LevelDB API:
 

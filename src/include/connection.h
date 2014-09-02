@@ -158,6 +158,9 @@ struct __wt_connection_impl {
 	int		 ckpt_tid_set;	/* Checkpoint thread set */
 	WT_CONDVAR	*ckpt_cond;	/* Checkpoint wait mutex */
 	const char	*ckpt_config;	/* Checkpoint configuration */
+#define	WT_CKPT_LOGSIZE(conn)	((conn)->ckpt_logsize != 0)
+	off_t		 ckpt_logsize;	/* Checkpoint log size period */
+	uint32_t	 ckpt_signalled; /* Checkpoint signalled */
 	long		 ckpt_usecs;	/* Checkpoint period */
 
 	int compact_in_memory_pass;	/* Compaction serialization */
@@ -198,6 +201,8 @@ struct __wt_connection_impl {
 	int		 async_cfg;	/* Global async configuration */
 	uint32_t	 async_size;	/* Async op array size */
 	uint32_t	 async_workers;	/* Number of async workers */
+
+	WT_LSM_MANAGER	lsm_manager;	/* LSM worker thread information */
 
 	WT_SESSION_IMPL *evict_session; /* Eviction server sessions */
 	pthread_t	 evict_tid;	/* Eviction server thread ID */

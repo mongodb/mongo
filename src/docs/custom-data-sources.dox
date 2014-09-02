@@ -126,7 +126,7 @@ fatal errors requiring the database restart should return WT_PANIC
 
 Otherwise, successful return from custom data source methods should be
 indicated by a return value of zero; error returns may be any value
-other than zero or an error in WiredTiger's @ref error.  A simple
+other than zero or an error in WiredTiger's @ref error_handling.  A simple
 approach is to always return either a system error value (that is, \c
 errno), or \c WT_ERROR.   Error messages can be displayed using the
 WT_SESSION::msg_printf method.  For example:

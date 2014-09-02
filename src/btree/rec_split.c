@@ -828,6 +828,7 @@ __wt_split_evict(WT_SESSION_IMPL *session, WT_REF *ref, int exclusive)
 	uint32_t i, j, parent_entries, result_entries, split_entries;
 	int complete, hazard, locked;
 
+	parent = NULL;			/* -Wconditional-uninitialized */
 	alloc_index = NULL;
 	parent_ref = NULL;
 	ref_tmp = NULL;

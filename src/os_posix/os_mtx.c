@@ -17,18 +17,6 @@ __wt_cond_alloc(WT_SESSION_IMPL *session,
 {
 	WT_CONDVAR *cond;
 	WT_DECL_RET;
-	pthread_mutexattr_t *attrp;
-
-	/* Initialize the mutex. */
-#ifdef HAVE_MUTEX_ADAPTIVE
-	pthread_mutexattr_t attr;
-
-	WT_RET(pthread_mutexattr_init(&attr));
-	WT_RET(pthread_mutexattr_settype(&attr, PTHREAD_MUTEX_ADAPTIVE_NP));
-	attrp = &attr;
-#else
-	attrp = NULL;
-#endif
 
 	/*
 	 * !!!
@@ -36,7 +24,7 @@ __wt_cond_alloc(WT_SESSION_IMPL *session,
 	 */
 	WT_RET(__wt_calloc(session, 1, sizeof(WT_CONDVAR), &cond));
 
-	WT_ERR(pthread_mutex_init(&cond->mtx, attrp));
+	WT_ERR(pthread_mutex_init(&cond->mtx, NULL));
 
 	/* Initialize the condition variable to permit self-blocking. */
 	WT_ERR(pthread_cond_init(&cond->cond, NULL));
@@ -174,7 +162,7 @@ __wt_cond_destroy(WT_SESSION_IMPL *session, WT_CONDVAR **condp)
  */
 int
 __wt_rwlock_alloc(
-    WT_SESSION_IMPL *session, const char *name, WT_RWLOCK **rwlockp)
+    WT_SESSION_IMPL *session, WT_RWLOCK **rwlockp, const char *name)
 {
 	WT_DECL_RET;
 	WT_RWLOCK *rwlock;

@@ -31,11 +31,12 @@
 
 #include <inttypes.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
 #include <wiredtiger.h>
 
-const char *home = NULL;
+static const char *home;
 
 /*! [call-center decl] */
 /*
@@ -73,7 +74,8 @@ typedef struct {
 } CALL;
 /*! [call-center decl] */
 
-int main(void)
+int
+main(void)
 {
 	int count, exact, ret;
 	WT_CONNECTION *conn;
@@ -92,8 +94,17 @@ int main(void)
 		{ 0, 0, 0, 0, NULL, NULL }
 	};
 
-	ret = wiredtiger_open(home, NULL, "create", &conn);
-	if (ret != 0) {
+	/*
+	 * Create a clean test directory for this run of the test program if the
+	 * environment variable isn't already set (as is done by make check).
+	 */
+	if (getenv("WIREDTIGER_HOME") == NULL) {
+		home = "WT_HOME";
+		ret = system("rm -rf WT_HOME && mkdir WT_HOME");
+	} else
+		home = NULL;
+
+	if ((ret = wiredtiger_open(home, NULL, "create", &conn)) != 0) {
 		fprintf(stderr, "Error connecting to %s: %s\n",
 		    home, wiredtiger_strerror(ret));
 		return (1);

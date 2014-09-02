@@ -94,6 +94,7 @@ __wt_spin_unlock(WT_SESSION_IMPL *session, WT_SPINLOCK *t)
 }
 
 #elif SPINLOCK_TYPE == SPINLOCK_PTHREAD_MUTEX ||\
+	SPINLOCK_TYPE == SPINLOCK_PTHREAD_MUTEX_ADAPTIVE ||\
 	SPINLOCK_TYPE == SPINLOCK_PTHREAD_MUTEX_LOGGING
 
 /*
@@ -103,7 +104,7 @@ __wt_spin_unlock(WT_SESSION_IMPL *session, WT_SPINLOCK *t)
 static inline int
 __wt_spin_init(WT_SESSION_IMPL *session, WT_SPINLOCK *t, const char *name)
 {
-#ifdef HAVE_MUTEX_ADAPTIVE
+#if SPINLOCK_TYPE == SPINLOCK_PTHREAD_MUTEX_ADAPTIVE
 	pthread_mutexattr_t attr;
 
 	WT_RET(pthread_mutexattr_init(&attr));
@@ -142,7 +143,8 @@ __wt_spin_destroy(WT_SESSION_IMPL *session, WT_SPINLOCK *t)
 	}
 }
 
-#if SPINLOCK_TYPE == SPINLOCK_PTHREAD_MUTEX
+#if SPINLOCK_TYPE == SPINLOCK_PTHREAD_MUTEX ||\
+	SPINLOCK_TYPE == SPINLOCK_PTHREAD_MUTEX_ADAPTIVE
 
 #define	WT_DECL_SPINLOCK_ID(i)
 #define	__wt_spin_trylock(session, lock, idp)				\

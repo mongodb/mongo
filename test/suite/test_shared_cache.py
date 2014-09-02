@@ -140,8 +140,8 @@ class test_shared_cache(wttest.WiredTigerTestCase):
             self.add_records(sess, 0, nops)
 
         self.openConnections(['WT_TEST3'], add=1)
+        self.sessions[-1].create(self.uri, "key_format=S,value_format=S")
         for sess in self.sessions:
-            sess.create(self.uri, "key_format=S,value_format=S")
             self.add_records(sess, 0, nops)
         self.closeConnections()
 

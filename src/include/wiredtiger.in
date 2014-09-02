@@ -777,7 +777,8 @@ struct __wt_session {
 	 *
 	 * WT_SESSION::reconfigure will fail if a transaction is in progress
 	 * in the session.
-	 * All open cursors are reset.
+	 *
+	 * All cursors are reset.
 	 *
 	 * @param session the session handle
 	 * @configstart{session.reconfigure, see dist/api_data.py}
@@ -816,8 +817,9 @@ struct __wt_session {
 	 * Cursor handles should be discarded by calling WT_CURSOR::close.
 	 *
 	 * Cursors capable of supporting transactional operations operate in the
-	 * context of the current transaction, if any.  Ending a transaction
-	 * implicitly resets all open cursors.
+	 * context of the current transaction, if any.
+	 *
+	 * WT_SESSION::rollback_transaction implicitly resets all cursors.
 	 *
 	 * Cursors are relatively light-weight objects but may hold references
 	 * to heavier-weight objects; applications should re-use cursors when
@@ -1142,10 +1144,9 @@ struct __wt_session {
 	    const char *name, const char *config);
 
 	/*!
-	 * Print something to the log file
-	 *
-	 * The database must be configured for logging when this
-	 * method is called.
+	 * Insert a ::WT_LOGREC_MESSAGE type record in the database log files
+	 * (the database must be configured for logging when this method is
+	 * called).
 	 *
 	 * @param session the session handle
 	 * @param fmt a printf format specifier
@@ -1285,8 +1286,6 @@ struct __wt_session {
 	 * before the transaction ends, will operate in the context of the
 	 * transaction.
 	 *
-	 * All open cursors are reset.
-	 *
 	 * WT_SESSION::begin_transaction will fail if a transaction is already
 	 * in progress in the session.
 	 *
@@ -1316,10 +1315,8 @@ struct __wt_session {
 	 *
 	 * A transaction must be in progress when this method is called.
 	 *
-	 * All open cursors are reset.
-	 *
 	 * If WT_SESSION::commit_transaction returns an error, the transaction
-	 * was rolled-back, not committed.
+	 * was rolled back, not committed.
 	 *
 	 * @snippet ex_all.c transaction commit/rollback
 	 *
@@ -1334,7 +1331,7 @@ struct __wt_session {
 	 *
 	 * A transaction must be in progress when this method is called.
 	 *
-	 * All open cursors are reset.
+	 * All cursors are reset.
 	 *
 	 * @snippet ex_all.c transaction commit/rollback
 	 *
@@ -1480,6 +1477,11 @@ struct __wt_connection {
 	 * both., an integer between 1MB and 10TB; default \c 100MB.}
 	 * @config{checkpoint = (, periodically checkpoint the database., a set
 	 * of related configuration options defined below.}
+	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;log_size, wait for this amount of log
+	 * record bytes to be written to the log between each checkpoint.  A
+	 * database can configure both log_size and wait to set an upper bound
+	 * for checkpoints; setting this value above 0 configures periodic
+	 * checkpoints., an integer between 0 and 2GB; default \c 0.}
 	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;name, the checkpoint name., a string;
 	 * default \c "WiredTigerCheckpoint".}
 	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;wait, seconds to wait between each
@@ -1510,6 +1512,14 @@ struct __wt_connection {
 	 * @config{eviction_trigger, trigger eviction when the cache is using
 	 * this much memory\, as a percentage of the total cache size., an
 	 * integer between 10 and 99; default \c 95.}
+	 * @config{lsm_manager = (, configure database wide options for LSM tree
+	 * management., a set of related configuration options defined below.}
+	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;merge, merge LSM chunks where
+	 * possible., a boolean flag; default \c true.}
+	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;worker_thread_max, Configure a set of
+	 * threads to manage merging LSM trees in the database., an integer
+	 * between 3 and 20; default \c 4.}
+	 * @config{ ),,}
 	 * @config{shared_cache = (, shared cache configuration options.  A
 	 * database should configure either a cache_size or a shared_cache not
 	 * both., a set of related configuration options defined below.}
@@ -1793,11 +1803,16 @@ struct __wt_connection {
  * integer between 1MB and 10TB; default \c 100MB.}
  * @config{checkpoint = (, periodically checkpoint the database., a set of
  * related configuration options defined below.}
- * @config{&nbsp;&nbsp;&nbsp;&nbsp;name, the checkpoint name., a string; default
- * \c "WiredTigerCheckpoint".}
- * @config{&nbsp;&nbsp;&nbsp;&nbsp;wait, seconds to
- * wait between each checkpoint; setting this value above 0 configures periodic
- * checkpoints., an integer between 0 and 100000; default \c 0.}
+ * @config{&nbsp;&nbsp;&nbsp;&nbsp;log_size, wait for this amount of log record
+ * bytes to be written to the log between each checkpoint.  A database can
+ * configure both log_size and wait to set an upper bound for checkpoints;
+ * setting this value above 0 configures periodic checkpoints., an integer
+ * between 0 and 2GB; default \c 0.}
+ * @config{&nbsp;&nbsp;&nbsp;&nbsp;name, the
+ * checkpoint name., a string; default \c "WiredTigerCheckpoint".}
+ * @config{&nbsp;&nbsp;&nbsp;&nbsp;wait, seconds to wait between each
+ * checkpoint; setting this value above 0 configures periodic checkpoints., an
+ * integer between 0 and 100000; default \c 0.}
  * @config{ ),,}
  * @config{checkpoint_sync, flush files to stable storage when closing or
  * writing checkpoints., a boolean flag; default \c true.}
@@ -1863,8 +1878,14 @@ struct __wt_connection {
  * the files are created relative to the database home., a string; default \c
  * "".}
  * @config{ ),,}
- * @config{lsm_merge, merge LSM chunks where possible., a boolean flag; default
- * \c true.}
+ * @config{lsm_manager = (, configure database wide options for LSM tree
+ * management., a set of related configuration options defined below.}
+ * @config{&nbsp;&nbsp;&nbsp;&nbsp;merge, merge LSM chunks where possible., a
+ * boolean flag; default \c true.}
+ * @config{&nbsp;&nbsp;&nbsp;&nbsp;worker_thread_max, Configure a set of threads
+ * to manage merging LSM trees in the database., an integer between 3 and 20;
+ * default \c 4.}
+ * @config{ ),,}
  * @config{mmap, Use memory mapping to access files when possible., a boolean
  * flag; default \c true.}
  * @config{multiprocess, permit sharing between processes (will automatically
@@ -1927,8 +1948,9 @@ struct __wt_connection {
  * commit by default\, can be overridden by the \c sync setting to
  * WT_SESSION::begin_transaction., a boolean flag; default \c false.}
  * @config{&nbsp;&nbsp;&nbsp;&nbsp;method, the method used to ensure log records
- * are stable on disk., a string\, chosen from the following options: \c
- * "dsync"\, \c "fsync"\, \c "none"; default \c fsync.}
+ * are stable on disk\, see @ref tune_durability for more information., a
+ * string\, chosen from the following options: \c "dsync"\, \c "fsync"\, \c
+ * "none"; default \c fsync.}
  * @config{ ),,}
  * @config{use_environment_priv, use the \c WIREDTIGER_CONFIG and \c
  * WIREDTIGER_HOME environment variables regardless of whether or not the
@@ -3144,44 +3166,50 @@ extern int wiredtiger_extension_terminate(WT_CONNECTION *connection);
 #define	WT_STAT_CONN_LSM_MERGE_THROTTLE			1078
 /*! rows merged in an LSM tree */
 #define	WT_STAT_CONN_LSM_ROWS_MERGED			1079
+/*! LSM tree maintenance operations scheduled */
+#define	WT_STAT_CONN_LSM_WORK_UNITS_CREATED		1080
+/*! LSM tree maintenance operations discarded */
+#define	WT_STAT_CONN_LSM_WORK_UNITS_DISCARDED		1081
+/*! LSM tree maintenance operations executed */
+#define	WT_STAT_CONN_LSM_WORK_UNITS_DONE		1082
 /*! memory allocations */
-#define	WT_STAT_CONN_MEMORY_ALLOCATION			1080
+#define	WT_STAT_CONN_MEMORY_ALLOCATION			1083
 /*! memory frees */
-#define	WT_STAT_CONN_MEMORY_FREE			1081
+#define	WT_STAT_CONN_MEMORY_FREE			1084
 /*! memory re-allocations */
-#define	WT_STAT_CONN_MEMORY_GROW			1082
+#define	WT_STAT_CONN_MEMORY_GROW			1085
 /*! total read I/Os */
-#define	WT_STAT_CONN_READ_IO				1083
+#define	WT_STAT_CONN_READ_IO				1086
 /*! page reconciliation calls */
-#define	WT_STAT_CONN_REC_PAGES				1084
+#define	WT_STAT_CONN_REC_PAGES				1087
 /*! page reconciliation calls for eviction */
-#define	WT_STAT_CONN_REC_PAGES_EVICTION			1085
+#define	WT_STAT_CONN_REC_PAGES_EVICTION			1088
 /*! reconciliation failed because an update could not be included */
-#define	WT_STAT_CONN_REC_SKIPPED_UPDATE			1086
+#define	WT_STAT_CONN_REC_SKIPPED_UPDATE			1089
 /*! split bytes currently awaiting free */
-#define	WT_STAT_CONN_REC_SPLIT_STASHED_BYTES		1087
+#define	WT_STAT_CONN_REC_SPLIT_STASHED_BYTES		1090
 /*! split objects currently awaiting free */
-#define	WT_STAT_CONN_REC_SPLIT_STASHED_OBJECTS		1088
+#define	WT_STAT_CONN_REC_SPLIT_STASHED_OBJECTS		1091
 /*! pthread mutex shared lock read-lock calls */
-#define	WT_STAT_CONN_RWLOCK_READ			1089
+#define	WT_STAT_CONN_RWLOCK_READ			1092
 /*! pthread mutex shared lock write-lock calls */
-#define	WT_STAT_CONN_RWLOCK_WRITE			1090
+#define	WT_STAT_CONN_RWLOCK_WRITE			1093
 /*! open cursor count */
-#define	WT_STAT_CONN_SESSION_CURSOR_OPEN		1091
+#define	WT_STAT_CONN_SESSION_CURSOR_OPEN		1094
 /*! transactions */
-#define	WT_STAT_CONN_TXN_BEGIN				1092
+#define	WT_STAT_CONN_TXN_BEGIN				1095
 /*! transaction checkpoints */
-#define	WT_STAT_CONN_TXN_CHECKPOINT			1093
+#define	WT_STAT_CONN_TXN_CHECKPOINT			1096
 /*! transaction checkpoint currently running */
-#define	WT_STAT_CONN_TXN_CHECKPOINT_RUNNING		1094
+#define	WT_STAT_CONN_TXN_CHECKPOINT_RUNNING		1097
 /*! transactions committed */
-#define	WT_STAT_CONN_TXN_COMMIT				1095
+#define	WT_STAT_CONN_TXN_COMMIT				1098
 /*! transaction failures due to cache overflow */
-#define	WT_STAT_CONN_TXN_FAIL_CACHE			1096
-/*! transactions rolled-back */
-#define	WT_STAT_CONN_TXN_ROLLBACK			1097
+#define	WT_STAT_CONN_TXN_FAIL_CACHE			1099
+/*! transactions rolled back */
+#define	WT_STAT_CONN_TXN_ROLLBACK			1100
 /*! total write I/Os */
-#define	WT_STAT_CONN_WRITE_IO				1098
+#define	WT_STAT_CONN_WRITE_IO				1101
 
 /*!
  * @}

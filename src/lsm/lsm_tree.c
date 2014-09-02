@@ -69,66 +69,41 @@ static int
 __lsm_tree_close(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 {
 	WT_DECL_RET;
-	WT_SESSION *wt_session;
-	WT_SESSION_IMPL *s;
-	uint32_t i;
+	int i;
 
-	if (F_ISSET(lsm_tree, WT_LSM_TREE_WORKING)) {
-		F_CLR(lsm_tree, WT_LSM_TREE_WORKING);
-
-		/*
-		 * Signal all threads to wake them up, then wait for them to
-		 * exit.
-		 *
-		 * !!!
-		 * If we have the schema lock, have the LSM worker sessions
-		 * inherit the flag before we do anything.  The thread may
-		 * already be waiting for the schema lock, but the loop in the
-		 * WT_WITH_SCHEMA_LOCK macro takes care of that.
-		 */
-		if (F_ISSET(S2C(session), WT_CONN_LSM_MERGE))
-			for (i = 0; i < lsm_tree->merge_threads; i++) {
-				if ((s = lsm_tree->worker_sessions[i]) == NULL)
-					continue;
-				if (F_ISSET(session, WT_SESSION_SCHEMA_LOCKED))
-					s->skip_schema_lock = 1;
-				WT_TRET(__wt_cond_signal(
-				    session, lsm_tree->work_cond));
-				WT_TRET(__wt_thread_join(
-				    session, lsm_tree->worker_tids[i]));
-			}
-		if (F_ISSET(session, WT_SESSION_SCHEMA_LOCKED))
-			lsm_tree->ckpt_session->skip_schema_lock = 1;
-		WT_TRET(__wt_cond_signal(session, lsm_tree->work_cond));
-		WT_TRET(__wt_thread_join(session, lsm_tree->ckpt_tid));
-	}
+	/* Stop any active merges. */
+	F_CLR(lsm_tree, WT_LSM_TREE_ACTIVE);
 
 	/*
-	 * Close the worker thread sessions.  Do this in the main thread to
-	 * avoid deadlocks.
+	 * Wait for all LSM operations and work units that were in flight to
+	 * finish.
 	 */
-	for (i = 0; i < lsm_tree->merge_threads; i++) {
-		if ((s = lsm_tree->worker_sessions[i]) == NULL)
-			continue;
-		lsm_tree->worker_sessions[i] = NULL;
-		wt_session = &s->iface;
-		WT_TRET(wt_session->close(wt_session, NULL));
+	for (i = 0; lsm_tree->refcnt > 1 || lsm_tree->queue_ref > 0; ++i) {
+		/*
+		 * Remove any work units from the manager queues. Do this step
+		 * repeatedly in case a work unit was in the process of being
+		 * created when we cleared the active flag.
+		 * !! Drop the schema lock whilst completing this step so that
+		 * we don't block any operations that require the schema
+		 * lock to complete. This is safe because any operation that
+		 * is closing the tree should first have gotten exclusive
+		 * access to the LSM tree via __wt_lsm_tree_get, so other
+		 * schema level operations will return EBUSY, even though
+		 * we're dropping the schema lock here.
+		 */
+		if (i % 1000 == 0) {
+			WT_WITHOUT_SCHEMA_LOCK(session, ret =
+			    __wt_lsm_manager_clear_tree(session, lsm_tree));
+			WT_RET(ret);
+		}
+		__wt_yield();
 	}
-
-	if (lsm_tree->ckpt_session != NULL) {
-		wt_session = &lsm_tree->ckpt_session->iface;
-		WT_TRET(wt_session->close(wt_session, NULL));
-	}
-	if (ret != 0)
-		WT_PANIC_RET(
-		    session, ret, "shutdown error while cleaning up LSM");
-
-	return (ret);
+	return (0);
 }
 
 /*
  * __wt_lsm_tree_close_all --
- *	Close an LSM tree structure.
+ *	Close all LSM tree structures.
  */
 int
 __wt_lsm_tree_close_all(WT_SESSION_IMPL *session)
@@ -137,6 +112,14 @@ __wt_lsm_tree_close_all(WT_SESSION_IMPL *session)
 	WT_LSM_TREE *lsm_tree;
 
 	while ((lsm_tree = TAILQ_FIRST(&S2C(session)->lsmqh)) != NULL) {
+		/*
+		 * Tree close assumes that we have a reference to the tree
+		 * so it can tell when it's safe to do the close. We could
+		 * got through tree get here, but short circuit instead. There
+		 * is no need to decrement the reference count since destroy
+		 * is unconditional.
+		 */
+		(void)WT_ATOMIC_ADD(lsm_tree->refcnt, 1);
 		WT_TRET(__lsm_tree_close(session, lsm_tree));
 		WT_TRET(__lsm_tree_discard(session, lsm_tree));
 	}
@@ -255,57 +238,6 @@ __wt_lsm_tree_setup_chunk(
 			WT_RET(__wt_schema_drop(session, chunk->uri, cfg));
 	}
 	return (__wt_schema_create(session, chunk->uri, lsm_tree->file_config));
-}
-
-/*
- * __lsm_tree_start_worker --
- *	Start the worker thread for an LSM tree.
- */
-static int
-__lsm_tree_start_worker(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
-{
-	WT_CONNECTION_IMPL *conn;
-	WT_LSM_WORKER_ARGS *wargs;
-	WT_SESSION_IMPL *s;
-	uint32_t i;
-
-	conn = S2C(session);
-
-	/*
-	 * Open internal sessions for LSM worker threads: they will be managed
-	 * along with the LSM tree structure, not with application sessions.
-	 * We can't open the metadata here: our session may hold the schema
-	 * lock, which would block the new session from open the handle.
-	 *
-	 * All the LSM worker threads do their operations on read-only files.
-	 * Use read-uncommitted isolation to avoid keeping updates in cache
-	 * unnecessarily.
-	 */
-	WT_RET(__wt_open_internal_session(
-	    conn, "lsm-worker", 1, 0, &lsm_tree->ckpt_session));
-	lsm_tree->ckpt_session->isolation = TXN_ISO_READ_UNCOMMITTED;
-
-	F_SET(lsm_tree, WT_LSM_TREE_WORKING);
-	/* The new thread will rely on the WORKING value being visible. */
-	WT_FULL_BARRIER();
-	if (F_ISSET(S2C(session), WT_CONN_LSM_MERGE))
-		for (i = 0; i < lsm_tree->merge_threads; i++) {
-			WT_RET(__wt_open_internal_session(
-			    conn, "lsm-merge", 1, 0, &s));
-			s->isolation = TXN_ISO_READ_UNCOMMITTED;
-			lsm_tree->worker_sessions[i] = s;
-
-			WT_RET(__wt_calloc_def(session, 1, &wargs));
-			wargs->lsm_tree = lsm_tree;
-			wargs->id = i;
-			WT_RET(__wt_thread_create(session,
-			    &lsm_tree->worker_tids[i],
-			    __wt_lsm_merge_worker, wargs));
-		}
-	WT_RET(__wt_thread_create(session,
-	    &lsm_tree->ckpt_tid, __wt_lsm_checkpoint_worker, lsm_tree));
-
-	return (0);
 }
 
 /*
@@ -486,10 +418,18 @@ static int
 __lsm_tree_open(
     WT_SESSION_IMPL *session, const char *uri, WT_LSM_TREE **treep)
 {
+	WT_CONNECTION_IMPL *conn;
 	WT_DECL_RET;
 	WT_LSM_TREE *lsm_tree;
 
+	conn = S2C(session);
+	lsm_tree = NULL;
+
 	WT_ASSERT(session, F_ISSET(session, WT_SESSION_SCHEMA_LOCKED));
+
+	/* Start the LSM manager thread if it isn't running. */
+	if (WT_ATOMIC_CAS(conn->lsm_manager.lsm_workers, 0, 1))
+		WT_RET(__wt_lsm_manager_start(session));
 
 	/* Make sure no one beat us to it. */
 	TAILQ_FOREACH(lsm_tree, &S2C(session)->lsmqh, q)
@@ -500,7 +440,8 @@ __lsm_tree_open(
 
 	/* Try to open the tree. */
 	WT_RET(__wt_calloc_def(session, 1, &lsm_tree));
-	WT_ERR(__wt_rwlock_alloc(session, "lsm tree", &lsm_tree->rwlock));
+	WT_ERR(__wt_rwlock_alloc(session, &lsm_tree->rwlock, "lsm tree"));
+
 	WT_ERR(__wt_cond_alloc(session, "lsm ckpt", 0, &lsm_tree->work_cond));
 	WT_ERR(__lsm_tree_set_name(session, lsm_tree, uri));
 
@@ -520,12 +461,21 @@ __lsm_tree_open(
 	/* Set the generation number so cursors are opened on first usage. */
 	lsm_tree->dsk_gen = 1;
 
-	/* Now the tree is setup, make it visible to others. */
+	/*
+	 * Setup reference counting. Use separate reference counts for tree
+	 * handles and queue entries, so that queue entries don't interfere
+	 * with getting handles exclusive.
+	 */
 	lsm_tree->refcnt = 1;
-	TAILQ_INSERT_HEAD(&S2C(session)->lsmqh, lsm_tree, q);
-	F_SET(lsm_tree, WT_LSM_TREE_OPEN);
+	lsm_tree->queue_ref = 0;
 
-	WT_ERR(__lsm_tree_start_worker(session, lsm_tree));
+	/* Set a flush timestamp as a baseline. */
+	WT_ERR(__wt_epoch(session, &lsm_tree->last_flush_ts));
+
+	/* Now the tree is setup, make it visible to others. */
+	TAILQ_INSERT_HEAD(&S2C(session)->lsmqh, lsm_tree, q);
+	F_SET(lsm_tree, WT_LSM_TREE_ACTIVE | WT_LSM_TREE_OPEN);
+
 	*treep = lsm_tree;
 
 	if (0) {
@@ -536,7 +486,10 @@ err:		WT_TRET(__lsm_tree_discard(session, lsm_tree));
 
 /*
  * __wt_lsm_tree_get --
- *	get an LSM tree structure for the given name.
+ *	Get an LSM tree structure for the given name. Optionally get exclusive
+ *	access to the handle. Exclusive access works separately to the LSM
+ *	tree lock - since operations that need exclusive access may also need
+ *	to take the LSM tree lock for example outstanding work unit operations.
  */
 int
 __wt_lsm_tree_get(WT_SESSION_IMPL *session,
@@ -547,10 +500,33 @@ __wt_lsm_tree_get(WT_SESSION_IMPL *session,
 	/* See if the tree is already open. */
 	TAILQ_FOREACH(lsm_tree, &S2C(session)->lsmqh, q)
 		if (strcmp(uri, lsm_tree->name) == 0) {
-			if (exclusive && lsm_tree->refcnt)
-				return (EBUSY);
+			/*
+			 * Short circuit if the handle is already held
+			 * exclusively or exclusive access is requested and
+			 * there are references held.
+			 */
+			if ((exclusive && lsm_tree->refcnt > 0) ||
+			    F_ISSET_ATOMIC(lsm_tree, WT_LSM_TREE_EXCLUSIVE))
+			    return (EBUSY);
 
-			(void)WT_ATOMIC_ADD(lsm_tree->refcnt, 1);
+			if (exclusive) {
+				F_SET_ATOMIC(lsm_tree, WT_LSM_TREE_EXCLUSIVE);
+				if (!WT_ATOMIC_CAS(lsm_tree->refcnt, 0, 1)) {
+					F_CLR(lsm_tree, WT_LSM_TREE_EXCLUSIVE);
+					return (EBUSY);
+				}
+			} else
+				(void)WT_ATOMIC_ADD(lsm_tree->refcnt, 1);
+
+			/*
+			 * If we got a reference, but an exclusive reference
+			 * beat us to it, give our reference up.
+			 */
+			if (!exclusive &&
+			    F_ISSET_ATOMIC(lsm_tree, WT_LSM_TREE_EXCLUSIVE)) {
+				(void)WT_ATOMIC_SUB(lsm_tree->refcnt, 1);
+				return (EBUSY);
+			}
 			*treep = lsm_tree;
 			return (0);
 		}
@@ -568,6 +544,7 @@ __wt_lsm_tree_release(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 {
 	WT_ASSERT(session, lsm_tree->refcnt > 0);
 	(void)WT_ATOMIC_SUB(lsm_tree->refcnt, 1);
+	F_CLR_ATOMIC(lsm_tree, WT_LSM_TREE_EXCLUSIVE);
 }
 
 /* How aggressively to ramp up or down throttle due to level 0 merging */
@@ -738,15 +715,19 @@ __wt_lsm_tree_switch(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 	WT_DECL_RET;
 	WT_LSM_CHUNK *chunk;
 	uint32_t nchunks, new_id;
+	int first_switch;
 
 	WT_RET(__wt_lsm_tree_lock(session, lsm_tree, 1));
 
+	nchunks = lsm_tree->nchunks;
+
+	first_switch = nchunks == 0 ? 1 : 0;
 	/*
 	 * Check if a switch is still needed: we may have raced while waiting
 	 * for a lock.
 	 */
 	chunk = NULL;
-	if ((nchunks = lsm_tree->nchunks) != 0 &&
+	if (!first_switch &&
 	    (chunk = lsm_tree->chunk[nchunks - 1]) != NULL &&
 	    !F_ISSET(chunk, WT_LSM_CHUNK_ONDISK) &&
 	    !F_ISSET(lsm_tree, WT_LSM_TREE_NEED_SWITCH))
@@ -788,6 +769,9 @@ err:	WT_TRET(__wt_lsm_tree_unlock(session, lsm_tree));
 	 */
 	if (ret != 0)
 		WT_PANIC_RET(session, ret, "Failed doing LSM switch");
+	else if (!first_switch)
+		WT_RET(__wt_lsm_manager_push_entry(
+		    session, WT_LSM_WORK_FLUSH, lsm_tree));
 	return (ret);
 }
 
@@ -955,7 +939,6 @@ __wt_lsm_tree_truncate(
 
 	WT_ERR(__wt_lsm_meta_write(session, lsm_tree));
 
-	WT_ERR(__lsm_tree_start_worker(session, lsm_tree));
 	locked = 0;
 	WT_ERR(__wt_lsm_tree_unlock(session, lsm_tree));
 	__wt_lsm_tree_release(session, lsm_tree);
@@ -1022,16 +1005,13 @@ __wt_lsm_tree_unlock(
 int
 __wt_lsm_compact(WT_SESSION_IMPL *session, const char *name, int *skip)
 {
+	WT_DECL_RET;
 	WT_LSM_CHUNK *chunk;
 	WT_LSM_TREE *lsm_tree;
 	time_t begin, end;
-	uint32_t *modep, modes[] = {
-	    WT_LSM_TREE_FLUSH_ALL,
-	    WT_LSM_TREE_MERGING,
-	    WT_LSM_TREE_COMPACTING,
-	    0
-	};
+	int i, compacting, locked;
 
+	compacting = locked = 0;
 	/*
 	 * This function is applied to all matching sources: ignore anything
 	 * that is not an LSM tree.
@@ -1044,24 +1024,26 @@ __wt_lsm_compact(WT_SESSION_IMPL *session, const char *name, int *skip)
 
 	WT_RET(__wt_lsm_tree_get(session, name, 0, &lsm_tree));
 
-	if (!F_ISSET(S2C(session), WT_CONN_LSM_MERGE) ||
-	    lsm_tree->merge_threads == 0)
-		WT_RET_MSG(session, EINVAL,
+	if (!F_ISSET(S2C(session), WT_CONN_LSM_MERGE))
+		WT_ERR_MSG(session, EINVAL,
 		    "LSM compaction requires active merge threads");
 
-	WT_RET(__wt_seconds(session, &begin));
+	WT_ERR(__wt_seconds(session, &begin));
 
 	/* Lock the tree: single-thread compaction. */
-	WT_RET(__wt_lsm_tree_lock(session, lsm_tree, 1));
+	WT_ERR(__wt_lsm_tree_lock(session, lsm_tree, 1));
+	locked = 1;
 
 	/* Clear any merge throttle: compact throws out that calculation. */
 	lsm_tree->merge_throttle = 0;
+	lsm_tree->merge_aggressiveness = 0;
 
 	/* If another thread started compacting this tree, we're done. */
-	if (F_ISSET(lsm_tree, WT_LSM_TREE_FLUSH_ALL | WT_LSM_TREE_COMPACTING)) {
-		WT_RET(__wt_lsm_tree_unlock(session, lsm_tree));
-		return (0);
-	}
+	if (F_ISSET(lsm_tree, WT_LSM_TREE_COMPACTING))
+		goto err;
+
+	compacting = 1;
+	F_SET(lsm_tree, WT_LSM_TREE_COMPACTING);
 
 	/*
 	 * Set the switch transaction on the current chunk, if it
@@ -1073,43 +1055,57 @@ __wt_lsm_compact(WT_SESSION_IMPL *session, const char *name, int *skip)
 	    chunk->switch_txn == WT_TXN_NONE)
 		chunk->switch_txn = __wt_txn_current_id(session);
 
-	/*
-	 * First set the "flush all" flag so that the checkpoint worker tries
-	 * to write all in-memory chunks to disk.
-	 *
-	 * Then set the merging flag to detect when ordinary merges have
-	 * completed.
-	 *
-	 * Then set the compacting flag so that all merge threads look for
-	 * merges at all levels of the tree.
-	 */
-	modep = modes;
-	F_SET(lsm_tree, *modep);
-	WT_RET(__wt_lsm_tree_unlock(session, lsm_tree));
+	locked = 0;
+	WT_ERR(__wt_lsm_tree_unlock(session, lsm_tree));
 
-	/* Wake up the merge threads. */
-	WT_RET(__wt_cond_signal(session, lsm_tree->work_cond));
+	/* Make sure the in-memory chunk gets flushed but not switched. */
+	WT_ERR(__wt_lsm_manager_push_entry(
+	    session, WT_LSM_WORK_FLUSH, lsm_tree));
 
-	/* Wait for flushing to stop. */
-	while (F_ISSET(lsm_tree, WT_LSM_TREE_WORKING)) {
-		if (!F_ISSET(lsm_tree, *modep)) {
-			/* Zero marks the end of the list. */
-			if (*++modep == 0)
+	/* Wait for the work unit queues to drain. */
+	while (F_ISSET(lsm_tree, WT_LSM_TREE_ACTIVE)) {
+		/*
+		 * The compacting flag is cleared when no merges can be done.
+		 * Ensure that we push through some aggressive merges before
+		 * stopping otherwise we might not do merges that would
+		 * span chunks with different generations.
+		 */
+		if (!F_ISSET(lsm_tree, WT_LSM_TREE_COMPACTING)) {
+			if (lsm_tree->merge_aggressiveness < 10) {
+				F_SET(lsm_tree, WT_LSM_TREE_COMPACTING);
+				lsm_tree->merge_aggressiveness = 10;
+			} else
 				break;
-			F_SET(lsm_tree, *modep);
-			WT_RET(__wt_cond_signal(session, lsm_tree->work_cond));
-			continue;
 		}
 		__wt_sleep(1, 0);
-		WT_RET(__wt_seconds(session, &end));
+		WT_ERR(__wt_seconds(session, &end));
 		if (session->compact->max_time > 0 &&
 		    session->compact->max_time < (uint64_t)(end - begin)) {
-			F_CLR(lsm_tree, WT_LSM_TREE_FLUSH_ALL);
-			return (ETIMEDOUT);
+			WT_ERR(ETIMEDOUT);
+		}
+		/*
+		 * Push merge operations while they are still getting work
+		 * done. If we are pushing merges, make sure they are
+		 * aggressive, to avoid duplicating effort.
+		 */
+#define	COMPACT_PARALLEL_MERGES	5
+		for (i = lsm_tree->queue_ref;
+		    i < COMPACT_PARALLEL_MERGES; i++) {
+			lsm_tree->merge_aggressiveness = 10;
+			WT_ERR(__wt_lsm_manager_push_entry(
+			    session, WT_LSM_WORK_MERGE, lsm_tree));
 		}
 	}
+err:	if (locked)
+		WT_ERR(__wt_lsm_tree_unlock(session, lsm_tree));
+	/* Ensure the compacting flag is cleared if we set it. */
+	if (compacting) {
+		F_CLR(lsm_tree, WT_LSM_TREE_COMPACTING);
+		lsm_tree->merge_aggressiveness = 0;
+	}
+	__wt_lsm_tree_release(session, lsm_tree);
+	return (ret);
 
-	return (0);
 }
 
 /*
@@ -1127,8 +1123,9 @@ __wt_lsm_tree_worker(WT_SESSION_IMPL *session,
 	WT_LSM_CHUNK *chunk;
 	WT_LSM_TREE *lsm_tree;
 	u_int i;
-	int exclusive;
+	int exclusive, locked;
 
+	locked = 0;
 	exclusive = FLD_ISSET(open_flags, WT_DHANDLE_EXCLUSIVE) ? 1 : 0;
 	WT_RET(__wt_lsm_tree_get(session, uri, exclusive, &lsm_tree));
 
@@ -1137,7 +1134,8 @@ __wt_lsm_tree_worker(WT_SESSION_IMPL *session,
 	 * with merges so that merging doesn't change the chunk
 	 * array out from underneath us.
 	 */
-	WT_RET(__wt_lsm_tree_lock(session, lsm_tree, exclusive));
+	WT_ERR(__wt_lsm_tree_lock(session, lsm_tree, exclusive));
+	locked = 1;
 	for (i = 0; i < lsm_tree->nchunks; i++) {
 		chunk = lsm_tree->chunk[i];
 		if (file_func == __wt_checkpoint &&
@@ -1150,7 +1148,8 @@ __wt_lsm_tree_worker(WT_SESSION_IMPL *session,
 			WT_ERR(__wt_schema_worker(session, chunk->bloom_uri,
 			    file_func, name_func, cfg, open_flags));
 	}
-err:	WT_TRET(__wt_lsm_tree_unlock(session, lsm_tree));
+err:	if (locked)
+		WT_TRET(__wt_lsm_tree_unlock(session, lsm_tree));
 	__wt_lsm_tree_release(session, lsm_tree);
 	return (ret);
 }

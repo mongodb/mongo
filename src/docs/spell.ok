@@ -23,6 +23,7 @@ ECMA
 EINVAL
 EmpId
 Facebook
+Facebook's
 FlexeLint
 FreeBSD
 FreeBSD's
@@ -40,6 +41,7 @@ LD
 LDFLAGS
 LIBS
 LLVM
+LOGREC
 LSB
 LSM
 Lameter
@@ -58,6 +60,7 @@ PRELOAD
 README
 RedHat
 RepMgr
+Riak
 RocksDB
 Roelofs
 Rrx
@@ -69,6 +72,7 @@ Vv
 WiredTiger
 WiredTiger's
 WiredTigerCheckpoint
+WiredTigerLog
 WiredTigerTestCase
 Za
 aR
@@ -84,6 +88,7 @@ ar
 archiver
 arg
 async
+atomicity
 autoconf
 automake
 basecfg
@@ -172,6 +177,7 @@ errno
 fadvise
 failchk
 fd's
+fdatasync
 fieldname
 fileID
 fileformats
@@ -334,6 +340,7 @@ recno
 recnoN
 recnum
 reconf
+recoverability
 recs
 rectype
 rerequests

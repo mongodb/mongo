@@ -100,12 +100,10 @@ __wt_connection_close(WT_CONNECTION_IMPL *conn)
 	 */
 	F_CLR(conn, WT_CONN_SERVER_RUN);
 	WT_TRET(__wt_async_destroy(conn));
+	WT_TRET(__wt_lsm_manager_destroy(conn));
 	WT_TRET(__wt_checkpoint_server_destroy(conn));
 	WT_TRET(__wt_statlog_destroy(conn, 1));
 	WT_TRET(__wt_sweep_destroy(conn));
-
-	/* Clean up open LSM handles. */
-	WT_TRET(__wt_lsm_tree_close_all(session));
 
 	/* Close open data handles. */
 	WT_TRET(__wt_conn_dhandle_discard(conn));
@@ -232,7 +230,11 @@ __wt_connection_workers(WT_SESSION_IMPL *session, const char *cfg[])
 	/* Start the optional async threads. */
 	WT_RET(__wt_async_create(conn, cfg));
 
-	/* Start the optional logging/archive thread. */
+	/*
+	 * Start the optional logging/archive thread.
+	 * NOTE: The log manager must be started before checkpoints so that the
+	 * checkpoint server knows if logging is enabled.
+	 */
 	WT_RET(__wt_logmgr_create(conn, cfg));
 
 	/* Start the optional checkpoint thread. */

@@ -47,8 +47,6 @@ extern "C" {
  * DO NOT EDIT: automatically built by dist/s_typedef.
  * Forward type declarations for internal types: BEGIN
  */
-typedef enum __wt_page_state WT_PAGE_STATE;
-typedef enum __wt_txn_isolation WT_TXN_ISOLATION;
 struct __wt_addr;
     typedef struct __wt_addr WT_ADDR;
 struct __wt_async;
@@ -177,8 +175,12 @@ struct __wt_lsm_chunk;
     typedef struct __wt_lsm_chunk WT_LSM_CHUNK;
 struct __wt_lsm_data_source;
     typedef struct __wt_lsm_data_source WT_LSM_DATA_SOURCE;
+struct __wt_lsm_manager;
+    typedef struct __wt_lsm_manager WT_LSM_MANAGER;
 struct __wt_lsm_tree;
     typedef struct __wt_lsm_tree WT_LSM_TREE;
+struct __wt_lsm_work_unit;
+    typedef struct __wt_lsm_work_unit WT_LSM_WORK_UNIT;
 struct __wt_lsm_worker_args;
     typedef struct __wt_lsm_worker_args WT_LSM_WORKER_ARGS;
 struct __wt_lsm_worker_cookie;

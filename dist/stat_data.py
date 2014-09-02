@@ -171,7 +171,7 @@ connection_stats = [
 	    'no_aggregate,no_clear,no_scale'),
 	Stat('txn_commit', 'transactions committed'),
 	Stat('txn_fail_cache', 'transaction failures due to cache overflow'),
-	Stat('txn_rollback', 'transactions rolled-back'),
+	Stat('txn_rollback', 'transactions rolled back'),
 
 	##########################################
 	# LSM statistics
@@ -180,6 +180,11 @@ connection_stats = [
 	    'sleep for LSM checkpoint throttle'),
 	Stat('lsm_merge_throttle', 'sleep for LSM merge throttle'),
 	Stat('lsm_rows_merged', 'rows merged in an LSM tree'),
+	Stat('lsm_work_units_created',
+	    'LSM tree maintenance operations scheduled'),
+	Stat('lsm_work_units_discarded',
+	    'LSM tree maintenance operations discarded'),
+	Stat('lsm_work_units_done', 'LSM tree maintenance operations executed'),
 
 	##########################################
 	# Session operations

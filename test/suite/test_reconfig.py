@@ -69,6 +69,8 @@ class test_reconfig(wttest.WiredTigerTestCase):
     def test_reconfig_checkpoints(self):
         self.conn.reconfigure("checkpoint=(wait=0)")
         self.conn.reconfigure("checkpoint=(wait=5)")
+        self.conn.reconfigure("checkpoint=(log_size=0)")
+        self.conn.reconfigure("checkpoint=(log_size=1M)")
         self.conn.reconfigure("checkpoint=(wait=0,name=hi)")
         self.conn.reconfigure("checkpoint=(wait=5,name=hi)")
 

@@ -45,6 +45,7 @@ static const WT_CONFIG_CHECK confchk_async_subconfigs[] = {
 };
 
 static const WT_CONFIG_CHECK confchk_checkpoint_subconfigs[] = {
+	{ "log_size", "int", "min=0,max=2GB", NULL },
 	{ "name", "string", NULL, NULL },
 	{ "wait", "int", "min=0,max=100000", NULL },
 	{ NULL, NULL, NULL, NULL }
@@ -53,6 +54,12 @@ static const WT_CONFIG_CHECK confchk_checkpoint_subconfigs[] = {
 static const WT_CONFIG_CHECK confchk_eviction_subconfigs[] = {
 	{ "threads_max", "int", "min=1,max=20", NULL },
 	{ "threads_min", "int", "min=1,max=20", NULL },
+	{ NULL, NULL, NULL, NULL }
+};
+
+static const WT_CONFIG_CHECK confchk_lsm_manager_subconfigs[] = {
+	{ "merge", "boolean", NULL, NULL },
+	{ "worker_thread_max", "int", "min=3,max=20", NULL },
 	{ NULL, NULL, NULL, NULL }
 };
 
@@ -83,6 +90,8 @@ static const WT_CONFIG_CHECK confchk_connection_reconfigure[] = {
 	{ "eviction_dirty_target", "int", "min=10,max=99", NULL },
 	{ "eviction_target", "int", "min=10,max=99", NULL },
 	{ "eviction_trigger", "int", "min=10,max=99", NULL },
+	{ "lsm_manager", "category", NULL,
+	     confchk_lsm_manager_subconfigs },
 	{ "shared_cache", "category", NULL,
 	     confchk_shared_cache_subconfigs },
 	{ "statistics", "list",
@@ -316,7 +325,8 @@ static const WT_CONFIG_CHECK confchk_wiredtiger_open[] = {
 	{ "file_extend", "list", "choices=[\"data\",\"log\"]", NULL },
 	{ "hazard_max", "int", "min=15", NULL },
 	{ "log", "category", NULL, confchk_log_subconfigs },
-	{ "lsm_merge", "boolean", NULL, NULL },
+	{ "lsm_manager", "category", NULL,
+	     confchk_lsm_manager_subconfigs },
 	{ "mmap", "boolean", NULL, NULL },
 	{ "multiprocess", "boolean", NULL, NULL },
 	{ "session_max", "int", "min=1", NULL },
@@ -380,12 +390,14 @@ static const WT_CONFIG_ENTRY config_entries[] = {
 	},
 	{ "connection.reconfigure",
 	  "async=(enabled=0,ops_max=1024,threads=2),cache_size=100MB,"
-	  "checkpoint=(name=\"WiredTigerCheckpoint\",wait=0),error_prefix=,"
-	  "eviction=(threads_max=1,threads_min=1),eviction_dirty_target=80,"
-	  "eviction_target=80,eviction_trigger=95,shared_cache=(chunk=10MB,"
-	  "name=,reserve=0,size=500MB),statistics=none,"
-	  "statistics_log=(on_close=0,path=\"WiredTigerStat.%d.%H\","
-	  "sources=,timestamp=\"%b %d %H:%M:%S\",wait=0),verbose=",
+	  "checkpoint=(log_size=0,name=\"WiredTigerCheckpoint\",wait=0),"
+	  "error_prefix=,eviction=(threads_max=1,threads_min=1),"
+	  "eviction_dirty_target=80,eviction_target=80,eviction_trigger=95,"
+	  "lsm_manager=(merge=,worker_thread_max=4),"
+	  "shared_cache=(chunk=10MB,name=,reserve=0,size=500MB),"
+	  "statistics=none,statistics_log=(on_close=0,"
+	  "path=\"WiredTigerStat.%d.%H\",sources=,"
+	  "timestamp=\"%b %d %H:%M:%S\",wait=0),verbose=",
 	  confchk_connection_reconfigure
 	},
 	{ "cursor.close",
@@ -491,12 +503,13 @@ static const WT_CONFIG_ENTRY config_entries[] = {
 	},
 	{ "wiredtiger_open",
 	  "async=(enabled=0,ops_max=1024,threads=2),buffer_alignment=-1,"
-	  "cache_size=100MB,checkpoint=(name=\"WiredTigerCheckpoint\","
-	  "wait=0),checkpoint_sync=,create=0,direct_io=,error_prefix=,"
-	  "eviction=(threads_max=1,threads_min=1),eviction_dirty_target=80,"
-	  "eviction_target=80,eviction_trigger=95,exclusive=0,extensions=,"
-	  "file_extend=,hazard_max=1000,log=(archive=,enabled=0,"
-	  "file_max=100MB,path=\"\"),lsm_merge=,mmap=,multiprocess=0,"
+	  "cache_size=100MB,checkpoint=(log_size=0,"
+	  "name=\"WiredTigerCheckpoint\",wait=0),checkpoint_sync=,create=0,"
+	  "direct_io=,error_prefix=,eviction=(threads_max=1,threads_min=1),"
+	  "eviction_dirty_target=80,eviction_target=80,eviction_trigger=95,"
+	  "exclusive=0,extensions=,file_extend=,hazard_max=1000,"
+	  "log=(archive=,enabled=0,file_max=100MB,path=\"\"),"
+	  "lsm_manager=(merge=,worker_thread_max=4),mmap=,multiprocess=0,"
 	  "session_max=100,shared_cache=(chunk=10MB,name=,reserve=0,"
 	  "size=500MB),statistics=none,statistics_log=(on_close=0,"
 	  "path=\"WiredTigerStat.%d.%H\",sources=,"

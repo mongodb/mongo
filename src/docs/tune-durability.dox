@@ -1,0 +1,76 @@
+/*! @class doc_tune_durability_group_commit
+
+WiredTiger automatically groups the flush operations for threads that
+commit concurrently into single calls.  This usually means
+multi-threaded workloads will achieve higher throughput than
+single-threaded workloads because the operating system can flush data
+more efficiently to the disk.  No application-level configuration is
+required for this feature.
+
+ */
+
+/*! @class doc_tune_durability_flush_config
+
+By default, log records are flushed to disk before
+WT_SESSION::commit_transaction returns, ensuring durability at the
+commit.  However, the durability guarantees can be relaxed to increase
+performance.
+
+If \c transaction_sync=(enabled=false) is configured to ::wiredtiger_open,
+log records will be buffered in memory, and only flushed to disk by
+checkpoints or calls to WT_SESSION::commit_transaction with \c sync=true.
+(Note that any call to WT_SESSION::commit_transaction with \c sync=true
+will flush the log records for all committed transactions, not just the
+transaction where the configuration is set.)  This provides the minimal
+guarantees, but will be significantly faster than other configurations.
+
+If \c transaction_sync=(enabled=true), \c transaction_sync=(method)
+further configures the method used to flush log records to disk.  By
+default, the configured value is \c fsync, which calls the operating
+system's \c fsync call (or \c fdatasync if available) as each commit
+completes.
+
+If the value is set to \c dsync instead, the \c O_DSYNC or \c O_SYNC
+flag to the operating system's \c open call will be specified when the
+file is opened.  (The durability guarantee of the \c fsync and \c dsync
+configurations are the same, and in our experience the \c open flags are
+slower, this configuration is only included for systems where that may
+not be the case.)
+
+Finally, if the value is set to \c none, commit will call the operating
+system's \c write call before returning, but will not flush the write.
+
+Here is the expected performance of durability modes, in order from the
+fastest to the slowest (and from the fewest durability guarantees to the
+most durability guarantees).
+
+<table>
+@hrow{Durability Mode, Notes}
+@row{<code>log=(enabled=false)</code>, checkpoint-level durability}
+@row{<code>log=(enabled)\,transaction_sync=(enabled=false)</code>,
+	in-memory buffered logging configured; updates durable after
+	checkpoint or after \c sync is set in WT_SESSION::commit_transaction}
+@row{<code>log=(enabled)\,transaction_sync=(enabled=true\,method=none)</code>,
+	logging configured; updates durable after application failure\,
+	but not after system failure}
+@row{<code>log=(enabled)\,transaction_sync=(enabled=true\,method=fsync)</code>,
+	logging configured; updates durable on application or system
+	failure}
+@row{<code>log=(enabled)\,transaction_sync=(enabled=true\,method=dsync)</code>,
+	logging configured; updates durable on application or system
+	failure}
+</table>
+ */
+
+/*! @page tune_durability Commit-level durability
+
+There are some considerations when configuring commit-level durability
+that can affect performance.
+
+@section tune_durability_group_commit Group commit
+@copydoc doc_tune_durability_group_commit
+
+@section tune_durability_flush_config Flush call configuration
+@copydoc doc_tune_durability_flush_config
+
+ */

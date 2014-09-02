@@ -140,6 +140,7 @@ typedef struct {
 	char *config_open;			/* Command-line configuration */
 
 	uint32_t c_auto_throttle;		/* Config values */
+	uint32_t c_backups;
 	uint32_t c_bitcnt;
 	uint32_t c_bloom;
 	uint32_t c_bloom_bit_count;
@@ -158,7 +159,6 @@ typedef struct {
 	uint32_t c_dictionary;
 	uint32_t c_evict_max;
 	uint32_t c_firstfit;
-	uint32_t c_hot_backups;
 	char	*c_file_type;
 	uint32_t c_huffman_key;
 	uint32_t c_huffman_value;
@@ -247,6 +247,7 @@ void	 bdb_read(uint64_t, void *, size_t *, int *);
 void	 bdb_remove(uint64_t, int *);
 void	 bdb_update(const void *, size_t, const void *, size_t, int *);
 
+void	*backup(void *);
 void	*compact(void *);
 void	 config_clear(void);
 void	 config_error(void);
@@ -255,7 +256,6 @@ void	 config_print(int);
 void	 config_setup(void);
 void	 config_single(const char *, int);
 void	 die(int, const char *, ...);
-void	*hot_backup(void *);
 void	 key_len_setup(void);
 void	 key_gen_setup(uint8_t **);
 void	 key_gen(uint8_t *, size_t *, uint64_t, int);
@@ -272,7 +272,6 @@ void	 wts_load(void);
 void	 wts_open(const char *, int, WT_CONNECTION **);
 void	 wts_ops(void);
 void	 wts_read_scan(void);
-void	 wts_salvage_copy(void);
 void	 wts_salvage(void);
 void	 wts_stats(void);
 void	 wts_verify(const char *);

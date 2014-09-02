@@ -322,6 +322,12 @@ connection_runtime_config = [
 	    type='category', subconfig=[
 	    Config('name', '"WiredTigerCheckpoint"', r'''
 	        the checkpoint name'''),
+	    Config('log_size', '0', r'''
+	        wait for this amount of log record bytes to be written to
+                the log between each checkpoint.  A database can configure
+                both log_size and wait to set an upper bound for checkpoints;
+                setting this value above 0 configures periodic checkpoints''',
+	        min='0', max='2GB'),
 	    Config('wait', '0', r'''
 	        seconds to wait between each checkpoint; setting this value
 	        above 0 configures periodic checkpoints''',
@@ -342,6 +348,17 @@ connection_runtime_config = [
 	Config('eviction_trigger', '95', r'''
 	    trigger eviction when the cache is using this much memory, as a
 	    percentage of the total cache size''', min=10, max=99),
+	Config('lsm_manager', '', r'''
+	    configure database wide options for LSM tree management''',
+	    type='category', subconfig=[
+	    Config('worker_thread_max', '4', r'''
+	        Configure a set of threads to manage merging LSM trees in
+			the database.''',
+	        min='3', max='20'),
+	    Config('merge', 'true', r'''
+	        merge LSM chunks where possible''',
+	        type='boolean')
+		]),
 	Config('eviction', '', r'''
 	    eviction configuration options.''',
 	    type='category', subconfig=[
@@ -759,9 +776,6 @@ methods = {
 	        If the value is not an absolute path name, the files are created
 	        relative to the database home'''),
 	    ]),
-	Config('lsm_merge', 'true', r'''
-	    merge LSM chunks where possible''',
-	    type='boolean'),
 	Config('mmap', 'true', r'''
 	    Use memory mapping to access files when possible''',
 	    type='boolean'),
@@ -783,7 +797,8 @@ methods = {
 		WT_SESSION::begin_transaction''',
 	        type='boolean'),
 	    Config('method', 'fsync', r'''
-	        the method used to ensure log records are stable on disk''',
+	        the method used to ensure log records are stable on disk,
+		see @ref tune_durability for more information''',
 	        choices=['dsync', 'fsync', 'none']),
 	    ]),
 	Config('use_environment_priv', 'false', r'''

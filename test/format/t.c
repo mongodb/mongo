@@ -149,13 +149,13 @@ main(int argc, char *argv[])
 	(void)setvbuf(stdout, NULL, _IOLBF, 0);
 
 	/*
-	 * Initialize locks to single-thread named checkpoints and hot backups
-	 * and to single-thread last-record updates.
+	 * Initialize locks to single-thread named checkpoints and backups, and
+	 * to single-thread last-record updates.
 	 */
 	if ((ret = pthread_rwlock_init(&g.append_lock, NULL)) != 0)
 		die(ret, "pthread_rwlock_init: append lock");
 	if ((ret = pthread_rwlock_init(&g.backup_lock, NULL)) != 0)
-		die(ret, "pthread_rwlock_init: hot-backup lock");
+		die(ret, "pthread_rwlock_init: backup lock");
 
 	/* Seed the random number generator. */
 	srand((u_int)(0xdeadbeef ^ (u_int)time(NULL)));
@@ -218,23 +218,9 @@ main(int argc, char *argv[])
 			wts_dump("standard", 1);
 
 		/*
-		 * If no records are deleted, we can salvage the file and test
-		 * the result.  (The problem with deleting records is salvage
-		 * restores deleted records if a page splits leaving a deleted
-		 * record on one side of the split.)
-		 *
-		 * Salvage, verify the salvaged files, then dump (comparing
-		 * against the Berkeley DB data set again, if possible).
+		 * Salvage testing.
 		 */
-		if (g.c_delete_pct == 0) {
-			wts_salvage_copy();
-			wts_open(g.home, 1, &g.wts_conn);
-			wts_salvage();
-			wts_verify("post-salvage verify");
-			wts_close();
-
-			wts_dump("salvage", SINGLETHREADED);
-		}
+		wts_salvage();
 
 		/* Overwrite the progress line with a completion line. */
 		if (g.track)
@@ -254,7 +240,7 @@ main(int argc, char *argv[])
 	if ((ret = pthread_rwlock_destroy(&g.append_lock)) != 0)
 		die(ret, "pthread_rwlock_destroy: append lock");
 	if ((ret = pthread_rwlock_destroy(&g.backup_lock)) != 0)
-		die(ret, "pthread_rwlock_destroy: hot-backup lock");
+		die(ret, "pthread_rwlock_destroy: backup lock");
 
 	config_clear();
 

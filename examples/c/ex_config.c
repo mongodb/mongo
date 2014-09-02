@@ -30,19 +30,31 @@
  */
 
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
 #include <wiredtiger.h>
 
-const char *home = NULL;
+static const char *home;
 
-int main(void)
+int
+main(void)
 {
 	int ret;
 	WT_CONNECTION *conn;
 	WT_SESSION *session;
 	WT_CURSOR *cursor;
 	const char *key, *value;
+
+	/*
+	 * Create a clean test directory for this run of the test program if the
+	 * environment variable isn't already set (as is done by make check).
+	 */
+	if (getenv("WIREDTIGER_HOME") == NULL) {
+		home = "WT_HOME";
+		ret = system("rm -rf WT_HOME && mkdir WT_HOME");
+	} else
+		home = NULL;
 
 	/*! [configure cache size] */
 	if ((ret = wiredtiger_open(home, NULL,
@@ -64,8 +76,8 @@ int main(void)
 	ret = session->open_cursor(session, "config:", NULL, NULL, &cursor);
 
 	while ((ret = cursor->next(cursor)) == 0) {
-		cursor->get_key(cursor, &key);
-		cursor->get_value(cursor, &value);
+		ret = cursor->get_key(cursor, &key);
+		ret = cursor->get_value(cursor, &value);
 		printf("configuration value: %s = %s\n", key, value);
 	}
 

@@ -34,8 +34,8 @@
 #include <wiredtiger.h>
 #include <gcc.h>				/* WiredTiger internal */
 
-const char *progname;				/* Program name */
-uint8_t *big;					/* Big key/value buffer */
+static const char *progname;			/* Program name */
+static uint8_t *big;				/* Big key/value buffer */
 
 #define	GIGABYTE	(1073741824)
 #define	MEGABYTE	(1048576)
@@ -119,7 +119,8 @@ run(CONFIG *cp, int bigkey, size_t bytes)
 	    bytes < MEGABYTE ? "B" : (bytes < GIGABYTE ? "MB" : "GB"),
 	    cp->uri, cp->config, bigkey ? "key" : "value");
 
-	WT_UNUSED_RET(system("rm -rf WT_TEST && mkdir WT_TEST"));
+	if ((ret = system("rm -rf WT_TEST && mkdir WT_TEST")) != 0)
+		die(ret, "system cleanup call failed");
 
 	/*
 	 * Open/create the database, connection, session and cursor; set the
@@ -175,7 +176,7 @@ main(int argc, char *argv[])
 {
 	CONFIG *cp;
 	size_t len, *lp;
-	int ch, small;
+	int ch, ret, small;
 
 	if ((progname = strrchr(argv[0], '/')) == NULL)
 		progname = argv[0];
@@ -210,7 +211,8 @@ main(int argc, char *argv[])
 	}
 	free(big);
 
-	WT_UNUSED_RET(system("rm -rf WT_TEST"));
+	if ((ret = system("rm -rf WT_TEST")) != 0)
+		die(ret, "system cleanup call failed");
 
 	return (EXIT_SUCCESS);
 }

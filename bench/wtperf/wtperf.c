@@ -163,41 +163,42 @@ cb_asyncop(WT_ASYNC_CALLBACK *cb, WT_ASYNC_OP *op, int ret, uint32_t flags)
 
 	(void)cb;
 	(void)flags;
+
+	cfg = NULL;			/* -Wconditional-uninitialized */
+	thread = NULL;			/* -Wconditional-uninitialized */
+
 	type = op->get_type(op);
 	if (type != WT_AOP_COMPACT) {
 		thread = (CONFIG_THREAD *)op->app_private;
 		cfg = thread->cfg;
 	}
+
 	trk = NULL;
 	switch (type) {
-		case WT_AOP_INSERT:
-			trk = &thread->insert;
-			break;
-		case WT_AOP_SEARCH:
-			trk = &thread->read;
-			if (ret == 0) {
-				if ((t_ret = op->get_value(
-				    op, &value)) != 0) {
-					ret = t_ret;
-					lprintf(cfg, ret, 0,
-					    "get_value in read.");
-					goto err;
-				}
-			}
-			break;
-		case WT_AOP_UPDATE:
-			trk = &thread->update;
-			break;
-		case WT_AOP_COMPACT:
-			tables = (uint32_t *)op->app_private;
-			ATOMIC_ADD(*tables, (uint32_t)-1);
-			break;
-		case WT_AOP_REMOVE:
-		case WT_AOP_NONE:
-			/* We never expect this type. */
-			lprintf(cfg, ret, 0, "No type in op %" PRIu64,
-			    op->get_id(op));
+	case WT_AOP_COMPACT:
+		tables = (uint32_t *)op->app_private;
+		ATOMIC_ADD(*tables, (uint32_t)-1);
+		break;
+	case WT_AOP_INSERT:
+		trk = &thread->insert;
+		break;
+	case WT_AOP_SEARCH:
+		trk = &thread->read;
+		if (ret == 0 &&
+		    (t_ret = op->get_value(op, &value)) != 0) {
+			ret = t_ret;
+			lprintf(cfg, ret, 0, "get_value in read.");
 			goto err;
+		}
+		break;
+	case WT_AOP_UPDATE:
+		trk = &thread->update;
+		break;
+	case WT_AOP_NONE:
+	case WT_AOP_REMOVE:
+		/* We never expect this type. */
+		lprintf(cfg, ret, 0, "No type in op %" PRIu64, op->get_id(op));
+		goto err;
 	}
 
 	/*

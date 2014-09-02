@@ -27,7 +27,6 @@
  * ex_log.c
  * 	demonstrates how to logging and log cursors.
  */
-#include <assert.h>
 #include <inttypes.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -36,23 +35,13 @@
 
 #include <wiredtiger.h>
 
-const char *home = "./WT_EXLOG";
-const char *home2 = "./WT_EXLOG2";
-const char *uri = "table:logtest";
+static const char *home1 = "WT_HOME_LOG_1";
+static const char *home2 = "WT_HOME_LOG_2";
+
+static const char * const uri = "table:logtest";
 
 #define	CONN_CONFIG "create,cache_size=100MB,log=(archive=false,enabled=true)"
 #define	MAX_KEYS	10
-
-#define	RECORD_PRINT							\
-    printf("LSN [%d][%" PRIu64 "].%d: "					\
-	" record type %d optype %d txnid %" PRIu64 " fileid %d",	\
-	lsn.file, lsn.offset, opcount, rectype,				\
-	optype, txnid, fileid);						\
-    if (logrec_key.size != 0)						\
-	printf(" key size %" PRIu64, (uint64_t)logrec_key.size);	\
-    if (logrec_value.size != 0)						\
-	printf(" value size %" PRIu64, (uint64_t)logrec_value.size);	\
-    printf("\n");
 
 static int
 setup_copy(WT_CONNECTION **wt_connp, WT_SESSION **sessionp)
@@ -62,7 +51,7 @@ setup_copy(WT_CONNECTION **wt_connp, WT_SESSION **sessionp)
 	if ((ret = wiredtiger_open(home2, NULL,
 	    CONN_CONFIG, wt_connp)) != 0) {
 		fprintf(stderr, "Error connecting to %s: %s\n",
-		    home, wiredtiger_strerror(ret));
+		    home1, wiredtiger_strerror(ret));
 		return (ret);
 	}
 
@@ -76,18 +65,18 @@ static int
 compare_tables(WT_SESSION *session, WT_SESSION *sess_copy)
 {
 	WT_CURSOR *cursor, *curs_copy;
-	int ret, ret_copy;
+	int ret;
 	const char *key, *key_copy, *value, *value_copy;
 
 	ret = session->open_cursor(session, uri, NULL, NULL, &cursor);
 	ret = sess_copy->open_cursor(sess_copy, uri, NULL, NULL, &curs_copy);
 
 	while ((ret = cursor->next(cursor)) == 0) {
-		ret_copy = curs_copy->next(curs_copy);
+		ret = curs_copy->next(curs_copy);
 		ret = cursor->get_key(cursor, &key);
 		ret = cursor->get_value(cursor, &value);
-		ret_copy = curs_copy->get_key(curs_copy, &key_copy);
-		ret_copy = curs_copy->get_value(curs_copy, &value_copy);
+		ret = curs_copy->get_key(curs_copy, &key_copy);
+		ret = curs_copy->get_value(curs_copy, &value_copy);
 		if (strcmp(key, key_copy) != 0 ||
 		    strcmp(value, value_copy) != 0) {
 			fprintf(stderr,
@@ -97,15 +86,73 @@ compare_tables(WT_SESSION *session, WT_SESSION *sess_copy)
 			return (1);
 		}
 	}
-	/*
-	 * When the first cursor is done, the copy better be done too.
-	 */
-	ret_copy = curs_copy->next(curs_copy);
-	assert(ret_copy != 0);
-	cursor->close(cursor);
-	curs_copy->close(curs_copy);
-	return (0);
+	if (ret != WT_NOTFOUND)
+		fprintf(stderr,
+		    "WT_CURSOR.next: %s\n", wiredtiger_strerror(ret));
+	ret = cursor->close(cursor);
+
+	ret = curs_copy->next(curs_copy);
+	if (ret != WT_NOTFOUND)
+		fprintf(stderr,
+		    "copy: WT_CURSOR.next: %s\n", wiredtiger_strerror(ret));
+	ret = curs_copy->close(curs_copy);
+
+	return (ret);
 }
+
+/*! [log cursor walk] */
+static void
+print_record(WT_LSN *lsn, uint32_t opcount,
+   uint32_t rectype, uint32_t optype, uint64_t txnid, uint32_t fileid,
+   WT_ITEM *key, WT_ITEM *value)
+{
+	printf(
+	    "LSN [%" PRIu32 "][%" PRIu64 "].%" PRIu32
+	    ": record type %" PRIu32 " optype %" PRIu32
+	    " txnid %" PRIu64 " fileid %" PRIu32,
+	    lsn->file, (uint64_t)lsn->offset, opcount,
+	    rectype, optype, txnid, fileid);
+	printf(" key size %zu value size %zu\n", key->size, value->size);
+	if (rectype == WT_LOGREC_MESSAGE)
+		printf("Application Record: %s\n", (char *)value->data);
+}
+
+/*
+ * simple_walk_log --
+ *	A simple walk of the log.
+ */
+static int
+simple_walk_log(WT_SESSION *session)
+{
+	WT_CURSOR *cursor;
+	WT_LSN lsn;
+	WT_ITEM logrec_key, logrec_value;
+	uint64_t txnid;
+	uint32_t fileid, opcount, optype, rectype;
+	int ret;
+
+	/*! [log cursor open] */
+	ret = session->open_cursor(session, "log:", NULL, NULL, &cursor);
+	/*! [log cursor open] */
+
+	while ((ret = cursor->next(cursor)) == 0) {
+		/*! [log cursor get_key] */
+		ret = cursor->get_key(cursor, &lsn.file, &lsn.offset, &opcount);
+		/*! [log cursor get_key] */
+		/*! [log cursor get_value] */
+		ret = cursor->get_value(cursor, &txnid,
+		    &rectype, &optype, &fileid, &logrec_key, &logrec_value);
+		/*! [log cursor get_value] */
+
+		print_record(&lsn, opcount,
+		    rectype, optype, txnid, fileid, &logrec_key, &logrec_value);
+	}
+	if (ret == WT_NOTFOUND)
+		ret = 0;
+	ret = cursor->close(cursor);
+	return (ret);
+}
+/*! [log cursor walk] */
 
 static int
 walk_log(WT_SESSION *session)
@@ -120,18 +167,14 @@ walk_log(WT_SESSION *session)
 	int first, i, in_txn, ret;
 
 	ret = setup_copy(&wt_conn2, &session2);
-	/*! [log cursor open] */
 	ret = session->open_cursor(session, "log:", NULL, NULL, &cursor);
-	/*! [log cursor open] */
 	ret = session2->open_cursor(session2, uri, NULL, "raw=true", &cursor2);
 	i = 0;
 	in_txn = 0;
 	txnid = 0;
 	memset(&lsnsave, 0, sizeof(lsnsave));
 	while ((ret = cursor->next(cursor)) == 0) {
-		/*! [log cursor get_key] */
 		ret = cursor->get_key(cursor, &lsn.file, &lsn.offset, &opcount);
-		/*! [log cursor get_key] */
 		/*
 		 * Save one of the LSNs we get back to search for it
 		 * later.  Pick a later one because we want to walk from
@@ -140,11 +183,12 @@ walk_log(WT_SESSION *session)
 		 */
 		if (++i == MAX_KEYS)
 			lsnsave = lsn;
-		/*! [log cursor get_value] */
 		ret = cursor->get_value(cursor, &txnid, &rectype,
 		    &optype, &fileid, &logrec_key, &logrec_value);
-		/*! [log cursor get_value] */
-		RECORD_PRINT;
+
+		print_record(&lsn, opcount,
+		    rectype, optype, txnid, fileid, &logrec_key, &logrec_value);
+
 		/*
 		 * If we are in a transaction and this is a new one, end
 		 * the previous one.
@@ -171,27 +215,26 @@ walk_log(WT_SESSION *session)
 			ret = cursor2->insert(cursor2);
 		}
 	}
-	if (in_txn) {
+	if (in_txn)
 		ret = session2->commit_transaction(session2, NULL);
-		in_txn = 0;
-	}
-	cursor2->close(cursor2);
+
+	ret = cursor2->close(cursor2);
 	/*
 	 * Compare the tables after replay.  They should be identical.
 	 */
 	if (compare_tables(session, session2))
 		printf("compare failed\n");
-	session2->close(session2, NULL);
-	wt_conn2->close(wt_conn2, NULL);
+	ret = session2->close(session2, NULL);
+	ret = wt_conn2->close(wt_conn2, NULL);
 
-	cursor->reset(cursor);
+	ret = cursor->reset(cursor);
 	/*! [log cursor set_key] */
 	cursor->set_key(cursor, lsnsave.file, lsnsave.offset, 0);
 	/*! [log cursor set_key] */
 	/*! [log cursor search] */
 	ret = cursor->search(cursor);
 	/*! [log cursor search] */
-	printf("Reset to saved ");
+	printf("Reset to saved...\n");
 	/*
 	 * Walk all records starting with this key.
 	 */
@@ -200,50 +243,57 @@ walk_log(WT_SESSION *session)
 	    &lsn.file, &lsn.offset, &opcount)) == 0) {
 		if (first) {
 			first = 0;
-			assert(lsnsave.file == lsn.file &&
-			    lsnsave.offset == lsn.offset);
+			if (lsnsave.file != lsn.file ||
+			    lsnsave.offset != lsn.offset) {
+				fprintf(stderr,
+				    "search returned the wrong LSN\n");
+				exit (1);
+			}
 		}
 		ret = cursor->get_value(cursor, &txnid, &rectype,
 		    &optype, &fileid, &logrec_key, &logrec_value);
-		RECORD_PRINT;
+
+		print_record(&lsn, opcount,
+		    rectype, optype, txnid, fileid, &logrec_key, &logrec_value);
+
 		ret = cursor->next(cursor);
 		if (ret != 0)
 			break;
 	}
-	cursor->close(cursor);
+	ret = cursor->close(cursor);
 	return (ret);
 }
 
-int main(void)
+int
+main(void)
 {
 	WT_CONNECTION *wt_conn;
 	WT_CURSOR *cursor;
 	WT_SESSION *session;
-	int i, ret;
+	int i, record_count, ret;
 	char cmd_buf[256], k[16], v[16];
 
 	snprintf(cmd_buf, sizeof(cmd_buf), "rm -rf %s %s && mkdir %s %s",
-	    home, home2, home, home2);
+	    home1, home2, home1, home2);
 	if ((ret = system(cmd_buf)) != 0) {
 		fprintf(stderr, "%s: failed ret %d\n", cmd_buf, ret);
 		return (ret);
 	}
-	if ((ret = wiredtiger_open(home, NULL,
+	if ((ret = wiredtiger_open(home1, NULL,
 	    CONN_CONFIG, &wt_conn)) != 0) {
 		fprintf(stderr, "Error connecting to %s: %s\n",
-		    home, wiredtiger_strerror(ret));
+		    home1, wiredtiger_strerror(ret));
 		return (ret);
 	}
 
 	ret = wt_conn->open_session(wt_conn, NULL, NULL, &session);
-	ret = session->create(session, uri,
-	    "key_format=S,value_format=S");
+	ret = session->create(session, uri, "key_format=S,value_format=S");
 
 	ret = session->open_cursor(session, uri, NULL, NULL, &cursor);
 	/*
 	 * Perform some operations with individual auto-commit transactions.
 	 */
-	for (i = 0; i < MAX_KEYS; i++) {
+	for (record_count = 0, i = 0; i < MAX_KEYS; i++, record_count++) {
 		snprintf(k, sizeof(k), "key%d", i);
 		snprintf(v, sizeof(v), "value%d", i);
 		cursor->set_key(cursor, k);
@@ -254,7 +304,7 @@ int main(void)
 	/*
 	 * Perform some operations within a single transaction.
 	 */
-	for (i = MAX_KEYS; i < MAX_KEYS+5; i++) {
+	for (i = MAX_KEYS; i < MAX_KEYS+5; i++, record_count++) {
 		snprintf(k, sizeof(k), "key%d", i);
 		snprintf(v, sizeof(v), "value%d", i);
 		cursor->set_key(cursor, k);
@@ -262,7 +312,11 @@ int main(void)
 		ret = cursor->insert(cursor);
 	}
 	ret = session->commit_transaction(session, NULL);
-	cursor->close(cursor);
+	ret = cursor->close(cursor);
+
+	/*! [log cursor printf] */
+	ret = session->log_printf(session, "Wrote %d records", record_count);
+	/*! [log cursor printf] */
 
 	/*
 	 * Close and reopen the connection so that the log ends up with
@@ -270,14 +324,15 @@ int main(void)
 	 * have archiving turned off.
 	 */
 	ret = wt_conn->close(wt_conn, NULL);
-	if ((ret = wiredtiger_open(home, NULL,
+	if ((ret = wiredtiger_open(home1, NULL,
 	    CONN_CONFIG, &wt_conn)) != 0) {
 		fprintf(stderr, "Error connecting to %s: %s\n",
-		    home, wiredtiger_strerror(ret));
+		    home1, wiredtiger_strerror(ret));
 		return (ret);
 	}
 
 	ret = wt_conn->open_session(wt_conn, NULL, NULL, &session);
+	ret = simple_walk_log(session);
 	ret = walk_log(session);
 	ret = wt_conn->close(wt_conn, NULL);
 	return (ret);

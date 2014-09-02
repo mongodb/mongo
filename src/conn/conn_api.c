@@ -626,6 +626,7 @@ err:	/*
 static int
 __conn_reconfigure(WT_CONNECTION *wt_conn, const char *config)
 {
+	WT_CONFIG_ITEM cval;
 	WT_CONNECTION_IMPL *conn;
 	WT_DECL_RET;
 	WT_SESSION_IMPL *session;
@@ -650,6 +651,11 @@ __conn_reconfigure(WT_CONNECTION *wt_conn, const char *config)
 	WT_ERR(__wt_conn_verbose_config(session, raw_cfg));
 	WT_ERR(__wt_checkpoint_server_create(conn, cfg));
 	WT_ERR(__wt_statlog_create(conn, cfg));
+
+	WT_ERR(__wt_config_gets(
+	    session, cfg, "lsm_manager.worker_thread_max", &cval));
+	if (cval.val)
+		conn->lsm_manager.lsm_workers_max = (uint32_t)cval.val;
 
 	/* Wake up the cache pool server so any changes are noticed. */
 	if (F_ISSET(conn, WT_CONN_CACHE_POOL))
@@ -1300,9 +1306,14 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
 	WT_ERR(__wt_config_gets(session, cfg, "session_max", &cval));
 	conn->session_size = (uint32_t)cval.val + WT_NUM_INTERNAL_SESSIONS;
 
-	WT_ERR(__wt_config_gets(session, cfg, "lsm_merge", &cval));
+	WT_ERR(__wt_config_gets(session, cfg, "lsm_manager.merge", &cval));
 	if (cval.val)
 		F_SET(conn, WT_CONN_LSM_MERGE);
+
+	WT_ERR(__wt_config_gets(
+	    session, cfg, "lsm_manager.worker_thread_max", &cval));
+	if (cval.val)
+		conn->lsm_manager.lsm_workers_max = (uint32_t)cval.val;
 
 	WT_ERR(__wt_config_gets(session, cfg, "checkpoint_sync", &cval));
 	if (cval.val)

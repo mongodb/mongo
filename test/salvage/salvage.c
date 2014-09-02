@@ -46,12 +46,12 @@ void run(int);
 void t(int, u_int, int);
 int  usage(void);
 
-FILE	*res_fp;				/* Results file */
-u_int	 page_type;				/* File types */
-int	 value_unique;				/* Values are unique */
-int	 verbose;				/* -v flag */
+static const char *progname;			/* Program name */
 
-const char *progname;				/* Program name */
+static FILE	*res_fp;			/* Results file */
+static u_int	 page_type;			/* File types */
+static int	 value_unique;			/* Values are unique */
+static int	 verbose;			/* -v flag */
 
 int
 main(int argc, char *argv[])
@@ -157,8 +157,7 @@ run(int r)
 
 	printf("\t%s: run %d\n", __wt_page_type_string(page_type), r);
 
-	WT_UNUSED_RET(system(
-	    "rm -f WiredTiger* __slvg.* __schema.*"));
+	assert(system("rm -f WiredTiger* __slvg.* __schema.*") == 0);
 	assert((res_fp = fopen(RSLT, "w")) != NULL);
 
 	/*

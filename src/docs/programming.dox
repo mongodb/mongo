@@ -24,16 +24,18 @@ each of which is ordered by one or more columns.
 
 <h2>Programming notes</h2>
 - @subpage threads
-- @subpage name_space
+- @subpage namespace
 - @subpage signals
 
 <h2>Advanced features</h2>
-- @subpage checkpoints
-- @subpage compaction
-- @subpage hot_backup
-- @subpage statistics
+- @subpage checkpoint
+- @subpage durability
+- @subpage backup
 - @subpage async
+- @subpage compact
+- @subpage statistics
 - @subpage shared_cache
+- @subpage cursor_log
 
 <h2>Extending WiredTiger</h2>
 - @subpage extensions

@@ -99,7 +99,13 @@ __log_archive_server(void *arg)
 		 * a notification gets lost during close, we want to find out
 		 * eventually.
 		 */
-		if (conn->archive == 0) {
+		if (conn->archive == 0 ||
+		    __wt_try_writelock(session, log->log_archive_lock) != 0) {
+			if (conn->archive != 0) {
+				WT_ERR(__wt_verbose(session, WT_VERB_LOG,
+				    "log_archive: Blocked due to open log "
+				    "cursor holding archive lock"));
+			}
 			WT_ERR_TIMEDOUT_OK(
 			    __wt_cond_wait(session, conn->arch_cond, 1000000));
 			continue;
@@ -141,6 +147,7 @@ __log_archive_server(void *arg)
 		 */
 		log->first_lsn = lsn;
 		log->first_lsn.offset = 0;
+		WT_ERR(__wt_rwunlock(session, log->log_archive_lock));
 
 		/* Wait until the next event. */
 		WT_ERR_TIMEDOUT_OK(
@@ -184,6 +191,8 @@ __wt_logmgr_create(WT_CONNECTION_IMPL *conn, const char *cfg[])
 	WT_RET(__wt_spin_init(session, &log->log_lock, "log"));
 	WT_RET(__wt_spin_init(session, &log->log_slot_lock, "log slot"));
 	WT_RET(__wt_spin_init(session, &log->log_sync_lock, "log sync"));
+	WT_RET(__wt_rwlock_alloc(session,
+	    &log->log_archive_lock, "log archive lock"));
 	if (FLD_ISSET(conn->direct_io, WT_FILE_TYPE_LOG))
 		log->allocsize =
 		    WT_MAX((uint32_t)conn->buffer_alignment, LOG_ALIGN);
@@ -196,8 +205,7 @@ __wt_logmgr_create(WT_CONNECTION_IMPL *conn, const char *cfg[])
 	INIT_LSN(&log->trunc_lsn);
 	INIT_LSN(&log->write_lsn);
 	log->fileid = 0;
-	WT_RET(__wt_cond_alloc(session,
-	    "log sync", 0, &log->log_sync_cond));
+	WT_RET(__wt_cond_alloc(session, "log sync", 0, &log->log_sync_cond));
 	WT_RET(__wt_log_open(session));
 	WT_RET(__wt_log_slot_init(session));
 
@@ -267,6 +275,7 @@ __wt_logmgr_destroy(WT_CONNECTION_IMPL *conn)
 
 	WT_TRET(__wt_log_slot_destroy(session));
 	WT_TRET(__wt_cond_destroy(session, &conn->log->log_sync_cond));
+	WT_TRET(__wt_rwlock_destroy(session, &conn->log->log_archive_lock));
 	__wt_spin_destroy(session, &conn->log->log_lock);
 	__wt_spin_destroy(session, &conn->log->log_slot_lock);
 	__wt_spin_destroy(session, &conn->log->log_sync_lock);

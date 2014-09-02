@@ -50,7 +50,7 @@ __wt_lsm_merge_update_tree(WT_SESSION_IMPL *session,
  */
 int
 __wt_lsm_merge(
-    WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree, u_int id, u_int aggressive)
+    WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree, u_int id)
 {
 	WT_BLOOM *bloom;
 	WT_CURSOR *dest, *src;
@@ -58,7 +58,7 @@ __wt_lsm_merge(
 	WT_DECL_RET;
 	WT_ITEM key, value;
 	WT_LSM_CHUNK *chunk, *previous, *youngest;
-	uint32_t generation, max_gap, max_gen, max_level, start_id;
+	uint32_t aggressive, generation, max_gap, max_gen, max_level, start_id;
 	uint64_t insert_count, record_count, chunk_size;
 	u_int dest_id, end_chunk, i, merge_max, merge_min, nchunks, start_chunk;
 	int create_bloom, locked, tret;
@@ -72,15 +72,16 @@ __wt_lsm_merge(
 	dest = src = NULL;
 	locked = 0;
 	start_id = 0;
+	aggressive = lsm_tree->merge_aggressiveness;
 
 	/*
-	 * If the tree is open read-only or we are compacting, be very
-	 * aggressive.  Otherwise, we can spend a long time waiting for merges
-	 * to start in read-only applications.
+	 * If the tree is open read-only be very aggressive. Otherwise, we can
+	 * spend a long time waiting for merges to start in read-only
+	 * applications.
 	 */
-	if (!lsm_tree->modified ||
-	    F_ISSET(lsm_tree, WT_LSM_TREE_COMPACTING))
-		aggressive = 10;
+	if (!lsm_tree->modified)
+		lsm_tree->merge_aggressiveness = 10;
+
 	merge_max = (aggressive > 5) ? 100 : lsm_tree->merge_min;
 	merge_min = (aggressive > 5) ? 2 : lsm_tree->merge_min;
 	max_gap = (aggressive + 4) / 5;
@@ -295,7 +296,7 @@ __wt_lsm_merge(
 #define	LSM_MERGE_CHECK_INTERVAL	1000
 	for (insert_count = 0; (ret = src->next(src)) == 0; insert_count++) {
 		if (insert_count % LSM_MERGE_CHECK_INTERVAL == 0) {
-			if (!F_ISSET(lsm_tree, WT_LSM_TREE_WORKING))
+			if (!F_ISSET(lsm_tree, WT_LSM_TREE_ACTIVE))
 				WT_ERR(EINTR);
 			/*
 			 * Help out with switching chunks in case the
@@ -415,6 +416,10 @@ __wt_lsm_merge(
 
 	/* Update the throttling while holding the tree lock. */
 	__wt_lsm_tree_throttle(session, lsm_tree, 1);
+
+	/* Schedule a pass to discard old chunks */
+	WT_ERR(__wt_lsm_manager_push_entry(
+	    session, WT_LSM_WORK_DROP, lsm_tree));
 
 err:	if (locked)
 		WT_TRET(__wt_lsm_tree_unlock(session, lsm_tree));

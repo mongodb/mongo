@@ -67,6 +67,7 @@ restart:
 	 * and the exit conditions to end up with the right values are
 	 * non-trivial.
 	 */
+	ins = NULL;			/* -Wconditional-uninitialized */
 	for (i = 0; i < WT_SKIP_MAXDEPTH - 1; i++)
 		if ((ins = PREV_INS(cbt, i + 1)) != current)
 			break;
@@ -539,10 +540,9 @@ __wt_btcur_prev(WT_CURSOR_BTREE *cbt, int truncating)
 
 		WT_ERR(__wt_tree_walk(session, &cbt->ref, flags));
 		WT_ERR_TEST(cbt->ref == NULL, WT_NOTFOUND);
+
 		page = cbt->ref->page;
-		WT_ASSERT(session,
-		    page->type != WT_PAGE_COL_INT &&
-		    page->type != WT_PAGE_ROW_INT);
+		WT_ASSERT(session, !WT_PAGE_IS_INTERNAL(page));
 
 		/*
 		 * The last page in a column-store has appended entries.

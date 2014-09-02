@@ -28,13 +28,15 @@
  * 	demonstrates how to create and access a simple table.
  */
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
 #include <wiredtiger.h>
 
-const char *home = NULL;
+static const char *home;
 
-int main(void)
+int
+main(void)
 {
 	/*! [access example connection] */
 	WT_CONNECTION *conn;
@@ -43,6 +45,17 @@ int main(void)
 	const char *key, *value;
 	int ret;
 
+	/*
+	 * Create a clean test directory for this run of the test program if the
+	 * environment variable isn't already set (as is done by make check).
+	 */
+	if (getenv("WIREDTIGER_HOME") == NULL) {
+		home = "WT_HOME";
+		ret = system("rm -rf WT_HOME && mkdir WT_HOME");
+	} else
+		home = NULL;
+
+	/* Open a connection to the database, creating it if necessary. */
 	if ((ret = wiredtiger_open(home, NULL, "create", &conn)) != 0 ||
 	    (ret = conn->open_session(conn, NULL, NULL, &session)) != 0) {
 		fprintf(stderr, "Error connecting to %s: %s\n",

@@ -18,7 +18,7 @@ See the following for more details:
 
 - @subpage data_sources
 - @ref metadata
-- @subpage cursor_log
+- @ref cursor_log
 
 @section cursor_projections Projections
 
@@ -64,18 +64,11 @@ cursor is positioned.  In other words, at these isolation levels, all
 cursors in a session read from a stable snapshot while any cursor in the
 session remains positioned.
 
-Cursor positions do not survive transaction boundaries.  When a
-transaction is started with the WT_SESSION::begin_transaction or ended
-with either WT_SESSION::commit_transaction or
-WT_SESSION::rollback_transaction, all open cursors are reset, as if the
-WT_CURSOR::reset method was called.  The cursor reset discards any
-cursor position as well as the key and value.
-
-Applications that need to continue an operation across a transaction
-boundary must make a copy of the cursor's key, and re-position the cursor
-with WT_CURSOR::search to continue the operation, dealing with cases
-where the record may no longer be available due to a WT_CURSOR::remove
-or WT_SESSION::rollback_transaction.
+Cursor positions survive transaction boundaries, unless a transaction
+is rolled back. When a transaction is rolled-back either implicitly
+or explicitly, all cursors in the session are reset as if the
+WT_CURSOR::reset method was called, discarding any cursor position as
+well as any key and value.
 
 See @ref transactions for more information.
 

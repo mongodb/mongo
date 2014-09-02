@@ -24,9 +24,9 @@ noinst_PROGRAMS = \
 # The examples can be run with no arguments as simple smoke tests
 TESTS = $(noinst_PROGRAMS)
 
-AM_TESTS_ENVIRONMENT = WIREDTIGER_HOME=`mktemp -d WT_TEST.XXXX` ; export WIREDTIGER_HOME ; rm -rf $$WIREDTIGER_HOME ; mkdir $$WIREDTIGER_HOME ;
+AM_TESTS_ENVIRONMENT = WIREDTIGER_HOME=`mktemp -d WT_HOME.XXXX` ; export WIREDTIGER_HOME ; rm -rf $$WIREDTIGER_HOME ; mkdir $$WIREDTIGER_HOME ;
 # automake 1.11 compatibility
 TESTS_ENVIRONMENT = $(AM_TESTS_ENVIRONMENT)
 
 clean-local:
-	rm -rf WT_TEST* *.core WiredTiger* *.wt
+	rm -rf WT_HOME* *.core WiredTiger* *.wt

@@ -178,7 +178,8 @@ struct __wt_bm {
 	int (*salvage_next)
 	    (WT_BM *, WT_SESSION_IMPL *, uint8_t *, size_t *, int *);
 	int (*salvage_start)(WT_BM *, WT_SESSION_IMPL *);
-	int (*salvage_valid)(WT_BM *, WT_SESSION_IMPL *, uint8_t *, size_t);
+	int (*salvage_valid)
+	    (WT_BM *, WT_SESSION_IMPL *, uint8_t *, size_t, int);
 	int (*stat)(WT_BM *, WT_SESSION_IMPL *, WT_DSRC_STATS *stats);
 	int (*sync)(WT_BM *, WT_SESSION_IMPL *, int);
 	int (*verify_addr)(WT_BM *, WT_SESSION_IMPL *, const uint8_t *, size_t);

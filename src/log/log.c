@@ -27,6 +27,25 @@ __wt_log_ckpt(WT_SESSION_IMPL *session, WT_LSN *ckp_lsn)
 }
 
 /*
+ * __wt_log_written_reset --
+ *	Interface to reset the amount of log written during this
+ *	during this checkpoint period.  Called from the checkpoint code.
+ */
+void
+__wt_log_written_reset(WT_SESSION_IMPL *session)
+{
+	WT_CONNECTION_IMPL *conn;
+	WT_LOG *log;
+
+	conn = S2C(session);
+	if (!conn->logging)
+		return;
+	log = conn->log;
+	log->log_written = 0;
+	return;
+}
+
+/*
  * __wt_log_get_files --
  *	Retrieve the list of all existing log files.
  */
@@ -386,38 +405,83 @@ __log_filesize(WT_SESSION_IMPL *session, WT_FH *fh, off_t *eof)
 	WT_DECL_RET;
 	WT_LOG *log;
 	uint64_t rec;
-	uint32_t allocsize;
-	off_t log_size, off;
+	uint32_t allocsize, bufsz;
+	off_t log_size, off, off1;
+	char *buf, *zerobuf;
 
 	conn = S2C(session);
 	log = conn->log;
 	if (eof == NULL)
 		return (0);
 	*eof = 0;
-	WT_ERR(__wt_filesize(session, fh, &log_size));
+	WT_RET(__wt_filesize(session, fh, &log_size));
 	if (log == NULL)
 		allocsize = LOG_ALIGN;
 	else
 		allocsize = log->allocsize;
+
 	/*
-	 * We know all log records are aligned at log->allocsize.  The first
-	 * item in a log record is always the length.  Look for any non-zero
-	 * at the allocsize boundary.  This may not be a true log record since
-	 * it could be the middle of a large record.  But we know no log record
-	 * starts after it.  Return an estimate of the log file size.
+	 * It can be very slow looking for the last real record in the log
+	 * in very small chunks.  Walk backward by a megabyte at a time.  When
+	 * we find a part of the log that is not just zeroes, walk to find
+	 * the last record.
 	 */
-	for (off = log_size - (off_t)allocsize;
-	    off > 0;
-	    off -= (off_t)allocsize) {
-		WT_ERR(__wt_read(session, fh, off, sizeof(uint64_t), &rec));
+	buf = zerobuf = NULL;
+	if (allocsize < WT_MEGABYTE && log_size > WT_MEGABYTE)
+		bufsz = WT_MEGABYTE;
+	else
+		bufsz = allocsize;
+	WT_RET(__wt_calloc_def(session, bufsz, &buf));
+	WT_ERR(__wt_calloc_def(session, bufsz, &zerobuf));
+
+	/*
+	 * Read in a chunk starting at the end of the file.  Keep going until
+	 * we reach the beginning or we find a chunk that contains any non-zero
+	 * bytes.  Compare against a known zero byte chunk.
+	 */
+	for (off = log_size - (off_t)bufsz;
+	    off >= 0;
+	    off -= (off_t)bufsz) {
+		WT_ERR(__wt_read(session, fh, off, bufsz, buf));
+		if (memcmp(buf, zerobuf, bufsz) != 0)
+			break;
+	}
+
+	/*
+	 * If we're walking by large amounts, now walk by the real allocsize
+	 * to find the real end, if we found something.  Otherwise we reached
+	 * the beginning of the file.  Offset can go negative if the log file
+	 * size is not a multiple of a megabyte.  The first chunk of the log
+	 * file will always be non-zero.
+	 */
+	if (off < 0)
+		off = 0;
+
+	/*
+	 * We know all log records are aligned at log->allocsize.  The
+	 * first item in a log record is always the length.  Look for
+	 * any non-zero at the allocsize boundary.  This may not be a
+	 * true log record since it could be the middle of a large
+	 * record.  But we know no log record starts after it.  Return
+	 * an estimate of the log file size.
+	 */
+	for (off1 = bufsz - allocsize;
+	    off1 > 0; off1 -= (off_t)allocsize) {
+		rec = (uint64_t)buf[off1];
 		if (rec != 0)
 			break;
 	}
+	off = off + off1;
+
 	/*
 	 * Set EOF to the last zero-filled record we saw.
 	 */
 	*eof = off + (off_t)allocsize;
 err:
+	if (buf != NULL)
+		__wt_free(session, buf);
+	if (zerobuf != NULL)
+		__wt_free(session, zerobuf);
 	return (ret);
 }
 
@@ -446,6 +510,19 @@ __log_acquire(WT_SESSION_IMPL *session, uint64_t recsize, WT_LOGSLOT *slot)
 		if (log->log_close_fh != NULL)
 			F_SET(slot, SLOT_CLOSEFH);
 	}
+	/*
+	 * Checkpoints can be configured based on amount of log written.
+	 * Add in this log record to the sum and if needed, signal the
+	 * checkpoint condition.  The logging subsystem manages the
+	 * accumulated field.  There is a bit of layering violation
+	 * here checking the connection ckpt field and using its
+	 * condition.
+	 */
+	if (WT_CKPT_LOGSIZE(conn)) {
+		log->log_written += (off_t)recsize;
+		WT_RET(__wt_checkpoint_signal(session, log->log_written));
+	}
+
 	/*
 	 * Need to minimally fill in slot info here.  Our slot start LSN
 	 * comes after any potential new log file creations.

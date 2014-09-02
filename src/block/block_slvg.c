@@ -125,30 +125,27 @@ __wt_block_salvage_next(WT_SESSION_IMPL *session,
 		WT_ERR(__wt_read(
 		    session, fh, offset, (size_t)allocsize, tmp->mem));
 		blk = WT_BLOCK_HEADER_REF(tmp->mem);
-		block->slvg_off += allocsize;
-
 		size = blk->disk_size;
 		cksum = blk->cksum;
-		if (__wt_block_offset_invalid(block, offset, size))
-			goto skip;
 
 		/*
-		 * The block size isn't insane, read the entire block.  Reading
-		 * the block validates the checksum; if reading the block fails,
-		 * ignore it.  If reading the block succeeds, return its address
-		 * as a possible page.
+		 * Check the block size: if it's not insane, read the block.
+		 * Reading the block validates any checksum; if reading the
+		 * block succeeds, return its address as a possible page,
+		 * otherwise, move past it.
 		 */
-		if (__wt_block_read_off(
+		if (!__wt_block_offset_invalid(block, offset, size) &&
+		    __wt_block_read_off(
 		    session, block, tmp, offset, size, cksum) == 0)
 			break;
 
-skip:		WT_ERR(__wt_verbose(session, WT_VERB_SALVAGE,
+		/* Free the allocation-size block. */
+		WT_ERR(__wt_verbose(session, WT_VERB_SALVAGE,
 		    "skipping %" PRIu32 "B at file offset %" PRIuMAX,
 		    allocsize, (uintmax_t)offset));
-
-		/* Free the allocation-size block. */
 		WT_ERR(__wt_block_off_free(
 		    session, block, offset, (off_t)allocsize));
+		block->slvg_off += allocsize;
 	}
 
 	/* Re-create the address cookie that should reference this block. */
@@ -163,11 +160,11 @@ err:	__wt_scr_free(&tmp);
 
 /*
  * __wt_block_salvage_valid --
- *	Inform salvage a block is valid.
+ *	Let salvage know if a block is valid.
  */
 int
 __wt_block_salvage_valid(WT_SESSION_IMPL *session,
-    WT_BLOCK *block, uint8_t *addr, size_t addr_size)
+    WT_BLOCK *block, uint8_t *addr, size_t addr_size, int valid)
 {
 	off_t offset;
 	uint32_t size, cksum;
@@ -176,12 +173,18 @@ __wt_block_salvage_valid(WT_SESSION_IMPL *session,
 	WT_UNUSED(addr_size);
 
 	/*
-	 * The upper layer accepted a block we gave it, move past it.
-	 *
 	 * Crack the cookie.
+	 * If the upper layer took the block, move past it; if the upper layer
+	 * rejected the block, move past an allocation size chunk and free it.
 	 */
 	WT_RET(__wt_block_buffer_to_addr(block, addr, &offset, &size, &cksum));
-	block->slvg_off = offset + size;
+	if (valid)
+		block->slvg_off = offset + size;
+	else {
+		WT_RET(__wt_block_off_free(
+		    session, block, offset, (off_t)block->allocsize));
+		block->slvg_off = offset + block->allocsize;
+	}
 
 	return (0);
 }

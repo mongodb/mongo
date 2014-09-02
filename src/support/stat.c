@@ -412,6 +412,12 @@ __wt_stat_init_connection_stats(WT_CONNECTION_STATS *stats)
 	    "sleep for LSM checkpoint throttle";
 	stats->lsm_merge_throttle.desc = "sleep for LSM merge throttle";
 	stats->lsm_rows_merged.desc = "rows merged in an LSM tree";
+	stats->lsm_work_units_created.desc =
+	    "LSM tree maintenance operations scheduled";
+	stats->lsm_work_units_discarded.desc =
+	    "LSM tree maintenance operations discarded";
+	stats->lsm_work_units_done.desc =
+	    "LSM tree maintenance operations executed";
 	stats->memory_allocation.desc = "memory allocations";
 	stats->memory_free.desc = "memory frees";
 	stats->memory_grow.desc = "memory re-allocations";
@@ -436,7 +442,7 @@ __wt_stat_init_connection_stats(WT_CONNECTION_STATS *stats)
 	stats->txn_commit.desc = "transactions committed";
 	stats->txn_fail_cache.desc =
 	    "transaction failures due to cache overflow";
-	stats->txn_rollback.desc = "transactions rolled-back";
+	stats->txn_rollback.desc = "transactions rolled back";
 	stats->write_io.desc = "total write I/Os";
 }
 
@@ -520,6 +526,9 @@ __wt_stat_refresh_connection_stats(void *stats_arg)
 	stats->lsm_checkpoint_throttle.v = 0;
 	stats->lsm_merge_throttle.v = 0;
 	stats->lsm_rows_merged.v = 0;
+	stats->lsm_work_units_created.v = 0;
+	stats->lsm_work_units_discarded.v = 0;
+	stats->lsm_work_units_done.v = 0;
 	stats->memory_allocation.v = 0;
 	stats->memory_free.v = 0;
 	stats->memory_grow.v = 0;

@@ -41,8 +41,8 @@
 #define	ATOMIC_ADD(v, val)      __sync_add_and_fetch(&(v), val)
 #endif
 
-const char *home = NULL;
-int global_error = 0;
+static const char * const home = NULL;
+static int global_error = 0;
 
 /*! [async example callback implementation] */
 typedef struct {
@@ -201,7 +201,7 @@ main(void)
 		 */
 		snprintf(k[i], sizeof(k), "key%d", i);
 		op->set_key(op, k[i]);
-		op->search(op);
+		ret = op->search(op);
 		/*! [async search] */
 	}
 

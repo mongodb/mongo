@@ -103,14 +103,18 @@ struct __wt_cache {
 	uint64_t cp_current_evict;	/* Evict count from current pass */
 	uint32_t cp_skip_count;		/* Post change stabilization */
 	uint64_t cp_reserved;		/* Base size for this cache */
+	WT_SESSION_IMPL *cp_session;	/* May be used for cache management */
+	pthread_t cp_tid;		/* Thread ID for cache pool manager */
 
 	/*
 	 * Flags.
 	 */
-#define	WT_EVICT_ACTIVE		0x01	/* Eviction server is active */
-#define	WT_EVICT_CLEAR_WALKS	0x02	/* Clear eviction walks */
-#define	WT_EVICT_NO_PROGRESS	0x04	/* Check if pages are being evicted */
-#define	WT_EVICT_STUCK		0x08	/* Eviction server is stuck */
+#define	WT_CACHE_POOL_MANAGER	0x01	/* The active cache pool manager */
+#define	WT_CACHE_POOL_RUN	0x02	/* Cache pool thread running */
+#define	WT_EVICT_ACTIVE		0x04	/* Eviction server is active */
+#define	WT_EVICT_CLEAR_WALKS	0x08	/* Clear eviction walks */
+#define	WT_EVICT_NO_PROGRESS	0x10	/* Check if pages are being evicted */
+#define	WT_EVICT_STUCK		0x20	/* Eviction server is stuck */
 	uint32_t flags;
 };
 
@@ -120,15 +124,16 @@ struct __wt_cache {
  */
 struct __wt_cache_pool {
 	WT_SPINLOCK cache_pool_lock;
-	pthread_t cache_pool_tid;
 	WT_CONDVAR *cache_pool_cond;
-	WT_SESSION_IMPL *session;
 	const char *name;
 	uint64_t size;
 	uint64_t chunk;
 	uint64_t currently_used;
-	uint32_t flags;
 	uint32_t refs;		/* Reference count for structure. */
 	/* Locked: List of connections participating in the cache pool. */
 	TAILQ_HEAD(__wt_cache_pool_qh, __wt_connection_impl) cache_pool_qh;
+
+#define	WT_CACHE_POOL_MANAGED	0x01	/* Cache pool has a manager thread */
+#define	WT_CACHE_POOL_ACTIVE	0x02	/* Cache pool is active */
+	uint32_t flags_atomic;
 };

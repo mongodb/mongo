@@ -3,12 +3,48 @@
 @section version_232 Upgrading to Version 2.3.2
 
 <dl>
+<dt>Cursors no longer reset on transaction begin or commit</dt>
+<dd>
+In previous versions of WiredTiger, all cursors in a session were reset at
+transaction boundaries (WT_SESSION::begin_transaction,
+WT_SESSION::commit_transaction and WT_SESSION::rollback_transaction).
+Now they are only reset by WT_SESSION::rollback_transaction.
+
+This change means that a cursor can be used to iterate through a table and
+perform transactional updates based on the visited records without the cursor
+losing its position.
+
+Applications relying on this behavior (for example, to avoid pinning the
+underlying cursor resources), should reset cursors explicitly when the
+position is no longer required.
+</dd>
+
 <dt>WT_COLLATOR interface changes</dt>
 <dd>
 Add a new WT_COLLATOR::customize callback that WiredTiger will call (if set)
 for each data source configured to use the collator.  Applications using the
 existing WT_COLLATOR interface that do not require the new functionality should
 set this callback to \c NULL.
+</dd>
+<dt>::wiredtiger_open lsm_merge option changed</dt>
+<dd>
+The global lsm_merge configuration setting has been moved into
+the \c lsm_manager option group. To disable merges in all LSM
+trees pass \c lsm_manger=(merge=false) to ::wiredtiger_open.
+</dd>
+<dt>Java include path search changes</dt>
+<dd>
+We have updated the configure logic used to search for Java Native Interface
+files.  This fixes problems building WiredTiger's Java API, particularly on
+OS X, but may introduce problems if your build procedure relied on the old
+search behavior.
+</dd>
+<dt>Default mutex implementation changed</dt>
+<dd>
+The default mutex implementation has been changed from adaptive pthread
+mutexes to non-adaptive pthread mutexes. Installations can explicitly
+select adaptive pthread mutexes by specifying
+\c --with-spinlock=pthread_adaptive at configuration time.
 </dd>
 </dl>
 

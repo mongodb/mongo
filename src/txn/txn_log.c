@@ -188,8 +188,7 @@ __wt_txn_log_commit(WT_SESSION_IMPL *session, const char *cfg[])
 	txn = &session->txn;
 
 	/* Write updates to the log. */
-	return (__wt_log_write(session,
-	    txn->logrec, NULL, txn->txn_logsync));
+	return (__wt_log_write(session, txn->logrec, NULL, txn->txn_logsync));
 }
 
 /*
@@ -426,7 +425,7 @@ __txn_printlog(
 
 	out = cookie;
 
-	p = (const uint8_t *)logrec->data + offsetof(WT_LOG_RECORD, record);
+	p = LOG_SKIP_HEADER(logrec->data);
 	end = (const uint8_t *)logrec->data + logrec->size;
 
 	/* First, peek at the log record type. */

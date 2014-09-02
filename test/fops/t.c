@@ -178,7 +178,10 @@ wt_shutdown(void)
 static void
 shutdown(void)
 {
-	WT_UNUSED_RET(system("rm -f WiredTiger* __wt*"));
+	int ret;
+
+	if ((ret = system("rm -f WiredTiger* __wt*")) != 0)
+		die("system cleanup call failed", ret);
 }
 
 static int
