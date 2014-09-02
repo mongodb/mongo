@@ -278,8 +278,7 @@ namespace mongo {
         WiredTigerSession &swrap_real = WiredTigerRecoveryUnit::Get(txn).GetSession();
         WiredTigerSession swrap(swrap_real.GetDatabase());
         WT_SESSION *session = swrap.Get();
-        int ret;
-        ret = session->drop(session, WiredTigerRecordStore::_getURI(ns).c_str(), "force");
+        int ret = session->drop(session, WiredTigerRecordStore::_getURI(ns).c_str(), "force");
         if (ret != 0)
             return Status( ErrorCodes::OperationFailed, "Collection drop failed" );
 

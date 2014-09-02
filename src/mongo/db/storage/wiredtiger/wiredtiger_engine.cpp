@@ -114,14 +114,18 @@ namespace mongo {
     }
 
     Status WiredTigerEngine::dropDatabase(OperationContext* txn, const StringData& dbName) {
+        WiredTigerDatabaseCatalogEntry *entry;
         boost::mutex::scoped_lock lk( _dbLock );
         DBMap::const_iterator i = _dbs.find(dbName.toString());
+        /* Open if not found: even closed databases need to be dropped. */
         if (i == _dbs.end())
-            return Status::OK();
-        WiredTigerDatabaseCatalogEntry *entry = i->second;
+            entry = new WiredTigerDatabaseCatalogEntry( *_db, dbName );
+        else {
+            entry = i->second;
+            _dbs.erase( i );
+        }
         Status s = entry->dropAllCollections(txn);
         delete entry;
-        _dbs.erase( i );
         return s;
     }
 
