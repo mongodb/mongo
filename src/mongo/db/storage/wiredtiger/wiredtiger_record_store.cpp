@@ -556,15 +556,29 @@ namespace mongo {
     }
 
     void WiredTigerRecordStore::Iterator::invalidate( const DiskLoc& dl ) {
-        // XXX capped iterators should die
-        if ( _savedLoc == dl ) {
-            (void)getNext();
-        }
+        if ( _savedLoc == dl )
+            _savedInvalidated = true;
     }
 
-    void WiredTigerRecordStore::Iterator::saveState() { _savedLoc = curr(); }
+    void WiredTigerRecordStore::Iterator::saveState() {
+        _savedLoc = curr();
+        _savedInvalidated = false;
 
-    bool WiredTigerRecordStore::Iterator::restoreState() { return true; }
+        // Reset the cursor so it doesn't keep any resources pinned.
+        WT_CURSOR *c = _cursor.Get();
+        int ret = c->reset(c);
+        invariant(ret == 0);
+    }
+
+    bool WiredTigerRecordStore::Iterator::restoreState() {
+        if (_savedLoc.isNull())
+            _eof = true;
+        else
+            _locate(_savedLoc, !_savedInvalidated);
+        if (_savedInvalidated)
+            _getNext();
+        return true;
+    }
 
     RecordData WiredTigerRecordStore::Iterator::dataFor( const DiskLoc& loc ) const {
         return _rs.dataFor( _txn, loc );

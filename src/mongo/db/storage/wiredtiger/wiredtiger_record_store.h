@@ -189,7 +189,7 @@ namespace mongo {
             // Position for save/restore
             DiskLoc _lastLoc;
             DiskLoc _savedLoc;
-            bool _savedAtEnd;
+            bool _savedAtEnd, _savedInvalidated;
         };
 
         static WiredTigerRecoveryUnit* _getRecoveryUnit( OperationContext* txn );
