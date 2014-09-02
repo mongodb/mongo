@@ -325,13 +325,20 @@ namespace mongo {
          * Clean up the temporary and incremental collections
          */
         void State::dropTempCollections() {
+            // Dropping the tempNamespace must be logged as that collection is replicated.
             _db.dropCollection(_config.tempNamespace);
             // Always forget about temporary namespaces, so we don't cache lots of them
             ShardConnection::forgetNS( _config.tempNamespace );
             if (_useIncremental) {
-                // NOTE: this will log the deletion of the inc collection which is unnecessary, but
-                // harmless.
-                _db.dropCollection(_config.incLong);
+                // We don't want to log the deletion of incLong as it isn't replicated. While
+                // harmless, this would lead to a scary looking warning on the secondaries.
+                Lock::DBWrite lk(_txn->lockState(), _config.incLong);
+                if (Database* db = dbHolder().get(_txn, _config.incLong)) {
+                    WriteUnitOfWork wunit(_txn);
+                    db->dropCollection(_txn, _config.incLong);
+                    wunit.commit();
+                }
+
                 ShardConnection::forgetNS( _config.incLong );
             }
 
