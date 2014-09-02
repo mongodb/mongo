@@ -111,7 +111,7 @@ namespace mongo {
 
         int ret;
         const char *key;
-        std::string table_prefix = "table:" + name();
+        std::string table_prefix = "table:" + name() + ".";
         while ((ret = c->next(c)) == 0) {
             ret = c->get_key(c, &key);
             invariant(ret == 0);
