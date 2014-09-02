@@ -607,7 +607,8 @@ json_expect(WT_SESSION *session, JSON_INPUT_STATE *ins, int wanttok)
 static int
 json_skip(WT_SESSION *session, JSON_INPUT_STATE *ins, const char **matches)
 {
-	char *hit, **match;
+	char *hit;
+	const char **match;
 
 	if (ins->kvraw != NULL)
 		return (1);
