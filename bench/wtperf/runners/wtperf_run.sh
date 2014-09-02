@@ -79,7 +79,7 @@ while test "$run" -le "$runmax"; do
 	if test "$?" -ne "0"; then
 		exit 1
 	fi
-	# Load is always using floating point, so handle separately
+	# Load uses different text.  Handle separately.
 	l=`grep "^Load time:" ./WT_TEST/test.stat`
 	if test "$?" -eq "0"; then
 		load=`echo $l | cut -d ' ' -f 3`
@@ -87,7 +87,7 @@ while test "$run" -le "$runmax"; do
 		load=0
 	fi
 	cur[$loadindex]=$load
-	sum[$loadindex]=`echo "${sum[$loadindex]} + $load" | bc`
+	sum[$loadindex]=`expr $load + ${sum[$loadindex]}`
 	echo "cur ${cur[$loadindex]} sum ${sum[$loadindex]}" >> $outfile
 	for i in ${!ops[*]}; do
 		l=`grep "Executed.*${ops[$i]} operations" ./WT_TEST/test.stat`
@@ -109,17 +109,8 @@ while test "$run" -le "$runmax"; do
 		done
 	else
 		for i in ${!cur[*]}; do
-			if test "$i" -eq "$loadindex"; then
-				if (($(bc <<< "${cur[$i]} < ${min[$i]}") )); then
-					min[$i]=${cur[$i]}
-				fi
-				if (($(bc <<< "${cur[$i]} > ${max[$i]}") )); then
-					max[$i]=${cur[$i]}
-				fi
-			else
-				min[$i]=$(getval $getmin ${cur[$i]} ${min[$i]})
-				max[$i]=$(getval $getmax ${cur[$i]} ${max[$i]})
-			fi
+			min[$i]=$(getval $getmin ${cur[$i]} ${min[$i]})
+			max[$i]=$(getval $getmax ${cur[$i]} ${max[$i]})
 		done
 	fi
 	#
@@ -154,13 +145,8 @@ fi
 # Average the remaining and write it out to the file.
 #
 for i in ${!min[*]}; do
-	if test "$i" -eq "$loadindex"; then
-		s=`echo "scale=3; ${sum[$i]} - ${min[$i]} - ${max[$i]}" | bc`
-		avg[$i]=`echo "scale=3; $s / $numruns" | bc`
-	else
-		s=`expr ${sum[$i]} - ${min[$i]} - ${max[$i]}`
-		avg[$i]=`expr $s / $numruns`
-	fi
+	s=`expr ${sum[$i]} - ${min[$i]} - ${max[$i]}`
+	avg[$i]=`expr $s / $numruns`
 done
 for i in ${!outp[*]}; do
 	echo "${outp[$i]} ${avg[$i]}" >> $outfile
