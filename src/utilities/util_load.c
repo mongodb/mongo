@@ -59,7 +59,7 @@ static int json_cgidx(WT_SESSION *, JSON_INPUT_STATE *, CONFIG_LIST *, int);
 static int json_data(WT_SESSION *, JSON_INPUT_STATE *, CONFIG_LIST *);
 static int json_expect(WT_SESSION *, JSON_INPUT_STATE *, int);
 static int json_peek(WT_SESSION *, JSON_INPUT_STATE *);
-static int json_skip(WT_SESSION *, JSON_INPUT_STATE *, char **);
+static int json_skip(WT_SESSION *, JSON_INPUT_STATE *, const char **);
 static int json_kvraw_append(JSON_INPUT_STATE *, const char *, size_t);
 static int json_strdup(JSON_INPUT_STATE *, char **);
 static int json_top_level(WT_SESSION *, JSON_INPUT_STATE *);
@@ -437,7 +437,7 @@ json_top_level(WT_SESSION *session, JSON_INPUT_STATE *ins)
 	WT_DECL_RET;
 	char *config, *tableuri;
 	int toktype;
-	static char *json_markers[] = {
+	static const char *json_markers[] = {
 	    "\"config\"", "\"colgroups\"", "\"indices\"", "\"data\"", NULL };
 
 	memset(&cl, 0, sizeof(cl));
@@ -605,7 +605,7 @@ json_expect(WT_SESSION *session, JSON_INPUT_STATE *ins, int wanttok)
  *	that string.
  */
 static int
-json_skip(WT_SESSION *session, JSON_INPUT_STATE *ins, char **matches)
+json_skip(WT_SESSION *session, JSON_INPUT_STATE *ins, const char **matches)
 {
 	char *hit, **match;
 
