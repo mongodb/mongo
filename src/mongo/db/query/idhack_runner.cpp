@@ -59,7 +59,9 @@ namespace mongo {
           _key(key),
           _query(NULL),
           _killed(false),
-          _done(false) { }
+          _done(false),
+          _nscanned(0),
+          _nscannedObjects(0) { }
 
     IDHackRunner::~IDHackRunner() { }
 
