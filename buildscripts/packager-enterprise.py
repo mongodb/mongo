@@ -138,6 +138,9 @@ class Distro(object):
         repo/apt/ubuntu/dists/precise/mongodb-enterprise/2.5/multiverse/binary-amd64
         repo/apt/ubuntu/dists/precise/mongodb-enterprise/2.5/multiverse/binary-i386
 
+        repo/apt/ubuntu/dists/trusty/mongodb-enterprise/2.5/multiverse/binary-amd64
+        repo/apt/ubuntu/dists/trusty/mongodb-enterprise/2.5/multiverse/binary-i386
+
         repo/apt/debian/dists/wheezy/mongodb-enterprise/2.5/main/binary-amd64
         repo/apt/debian/dists/wheezy/mongodb-enterprise/2.5/main/binary-i386
 
@@ -179,6 +182,8 @@ class Distro(object):
         elif self.n == 'ubuntu':
             if build_os == 'ubuntu1204':
                 return "precise"
+            elif build_os == 'ubuntu1404':
+                return "trusty"
             else:
                 raise Exception("unsupported build_os: %s" % build_os)
         elif self.n == 'debian':
@@ -199,14 +204,14 @@ class Distro(object):
 
     def build_os(self):
         """Return the build os label in the binary package to download ("rhel57", "rhel62" and "rhel70"
-        for redhat, "ubuntu1204" for Ubuntu, "debian71" for Debian, and "suse11" for SUSE)"""
+        for redhat, "ubuntu1204" and "ubuntu1404" for Ubuntu, "debian71" for Debian, and "suse11" for SUSE)"""
 
         if re.search("(suse)", self.n):
             return [ "suse11" ]
         if re.search("(redhat|fedora|centos)", self.n):
             return [ "rhel70", "rhel62", "rhel57" ]
         elif self.n == 'ubuntu':
-            return [ "ubuntu1204" ]
+            return [ "ubuntu1204", "ubuntu1404" ]
         elif self.n == 'debian':
             return [ "debian71" ]
         else:
