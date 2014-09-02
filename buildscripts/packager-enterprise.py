@@ -191,11 +191,11 @@ class Distro(object):
             raise Exception("BUG: unsupported platform?")
 
     def build_os(self):
-        """Return the build os label in the binary package to download ("rhel57" and "rhel62"
+        """Return the build os label in the binary package to download ("rhel57", "rhel62" and "rhel70"
         for redhat, "ubuntu1204" for Ubuntu and "debian71" for Debian)"""
 
         if re.search("(redhat|fedora|centos)", self.n):
-            return [ "rhel62", "rhel57" ]
+            return [ "rhel70", "rhel62", "rhel57" ]
         elif self.n == 'ubuntu':
             return [ "ubuntu1204" ]
         elif self.n == 'debian':
