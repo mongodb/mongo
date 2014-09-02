@@ -32,7 +32,6 @@
 
 #include "mongo/base/disallow_copying.h"
 #include "mongo/db/repl/replication_executor.h"
-#include "mongo/bson/optime.h"
 
 namespace mongo {
 
@@ -43,76 +42,55 @@ namespace repl {
     class ReplicaSetConfig;
     class MemberHeartbeatData;
 
-    class FreshnessChecker {
-        MONGO_DISALLOW_COPYING(FreshnessChecker);
+    class ElectCmdRunner {
+        MONGO_DISALLOW_COPYING(ElectCmdRunner);
     public:
-        FreshnessChecker();
+        ElectCmdRunner();
 
         /**
-         * Begins the process of sending replSetFresh commands to all non-DOWN nodes
-         * in currentConfig, with the intention of determining whether the current node
-         * is freshest.
+         * Begins the process of sending replSetElect commands to all non-DOWN nodes
+         * in currentConfig.
          * evh can be used to schedule a callback when the process is complete.
-         * This function must be run in the executor, as it must be synchronous with the command
-         * callbacks that it schedules.
-         * If this function returns Status::OK(), evh is then guaranteed to be signaled.
+         * evh is guaranteed to be signaled if and only if this function returns Status::OK().
          **/
         Status start(
             ReplicationExecutor* executor,
             const ReplicationExecutor::EventHandle& evh,
-            const OpTime& lastOpTimeApplied, 
             const ReplicaSetConfig& currentConfig,
             int selfIndex,
-            const std::vector<MemberHeartbeatData>& hbdata);
+            const std::vector<HostAndPort>& hosts);
 
         /**
-         * Returns whether this node is the freshest of all non-DOWN nodes in the set,
-         * and if any election attempts may be tying because our optime matches another's.
-         * Only valid to call after the event handle supplied to start() has been signaled, which 
-         * guarantees that the data members will no longer be touched by callbacks.
+         * Returns the number of received votes.  Only valid to call after
+         * the event handle supplied to start() has been signaled, which guarantees that
+         * _receivedVotes will no longer be touched by callbacks.
          */
-        void getResults(bool* freshest, bool* tied) const;
-
-        /**
-         * Returns the config version supplied in the config when start() was called.
-         * Useful for determining if the the config version has changed.
-         */
-        long long getOriginalConfigVersion() const;
+        int getReceivedVotes() const;
 
     private:
         /**
-         * Callback that runs after a replSetFresh command returns.
-         * Adjusts _tied and _freshest flags appropriately, and 
+         * Callback that runs after a replSetElect command returns.
+         * Increments the _receivedVotes counter appropriately, and 
          * signals completion if we have received the last expected response.
          */
-        void _onReplSetFreshResponse(const ReplicationExecutor::RemoteCommandCallbackData& cbData);
+        void _onReplSetElectResponse(const ReplicationExecutor::RemoteCommandCallbackData& cbData);
 
         /**
          * Signals _sufficientResponsesReceived event, if it hasn't been already.
          */
         void _signalSufficientResponsesReceived(ReplicationExecutor* executor);
 
-        // Event used to signal completion of the FreshnessChecker's commands.
+        // Event used to signal completion of the ElectCmdRunner's commands.
         ReplicationExecutor::EventHandle _sufficientResponsesReceived;
 
-        // Vector of command callbacks scheduled by start() and
-        // canceled by _onFreshnessCheckComplete().
+        // Vector of command callbacks scheduled by start().
         std::vector<ReplicationExecutor::CallbackHandle> _responseCallbacks;
 
-        // Last OpTime applied by the caller; used in the Fresh command 
-        OpTime _lastOpTimeApplied;
+        // Tally of the number of received votes for this election.
+        int _receivedVotes;
 
         // Number of responses received so far.
         size_t _actualResponses;
-
-        // Does this node have the latest applied optime of all queriable nodes in the set?
-        bool _freshest;
-
-        // Does this node have the same optime as another queriable node in the set?
-        bool _tied;
-
-        // The version of the config passed to start().
-        long long _originalConfigVersion;
     };
 
 }

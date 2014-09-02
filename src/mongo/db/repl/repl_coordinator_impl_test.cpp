@@ -464,7 +464,7 @@ namespace {
                 HostAndPort("node0"));
 
         OperationContextNoop txn;
-        OID selfRID = getReplCoord()->getMyRID(&txn);
+        OID selfRID = getReplCoord()->getMyRID();
         OID clientRID1 = OID::gen();
         OID clientRID2 = OID::gen();
         OID clientRID3 = OID::gen();
@@ -877,7 +877,7 @@ namespace {
                                              BSON("_id" << 1 << "host" << "test2:1234") <<
                                              BSON("_id" << 2 << "host" << "test3:1234"))),
                 HostAndPort("test1", 1234));
-        OID rid1 = getReplCoord()->getMyRID(&txn);
+        OID rid1 = getReplCoord()->getMyRID();
         OID rid2 = OID::gen();
         OID rid3 = OID::gen();
         HandshakeArgs handshake2;
@@ -940,7 +940,7 @@ namespace {
         ASSERT_EQUALS(2, handshakeCmd.nFields());
         ASSERT_EQUALS("replSetUpdatePosition", handshakeCmd.firstElement().fieldNameStringData());
         BSONObj handshake = handshakeCmd["handshake"].Obj();
-        ASSERT_EQUALS(getReplCoord()->getMyRID(&txn), handshake["handshake"].OID());
+        ASSERT_EQUALS(getReplCoord()->getMyRID(), handshake["handshake"].OID());
         ASSERT_EQUALS(1, handshake["member"].Int());
         handshakes.clear();
 
@@ -970,7 +970,7 @@ namespace {
             BSONObj handshake = handshakeCmd["handshake"].Obj();
             OID rid = handshake["handshake"].OID();
             rids.insert(rid);
-            if (rid == getReplCoord()->getMyRID(&txn)) {
+            if (rid == getReplCoord()->getMyRID()) {
                 ASSERT_EQUALS(1, handshake["member"].Int());
             } else if (rid == slave1RID) {
                 ASSERT_EQUALS(0, handshake["member"].Int());

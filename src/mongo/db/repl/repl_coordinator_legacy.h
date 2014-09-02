@@ -91,9 +91,11 @@ namespace repl {
 
         virtual Status setLastOptime(OperationContext* txn, const OID& rid, const OpTime& ts);
 
+        virtual Status setMyLastOptime(OperationContext* txn, const OpTime& ts);
+
         virtual OID getElectionId();
 
-        virtual OID getMyRID(OperationContext* txn);
+        virtual OID getMyRID();
 
         virtual void prepareReplSetUpdatePositionCommand(OperationContext* txn,
                                                          BSONObjBuilder* cmdBuilder);
@@ -178,6 +180,10 @@ namespace repl {
         // Rollback id. used to check if a rollback happened during some interval of time
         // TODO: ideally this should only change on rollbacks NOT on mongod restarts also.
         int _rbid;
+
+        // Our RID, used to identify us to our sync source when sending replication progress
+        // updates upstream.  Set once at startup and then never modified again.
+        OID _myRID;
 
         ReplSettings _settings;
     };

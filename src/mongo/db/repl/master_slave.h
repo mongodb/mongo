@@ -125,10 +125,6 @@ namespace repl {
     public:
         OplogReader oplogReader;
 
-        // Returns the RID for this process.  ensureMe() must have been called before this can be.
-        /// TODO(spencer): Remove this function once the LegacyReplicationCoordinator is gone.
-        OID getMyRID() const { return _me["_id"].OID(); }
-
         void applyOperation(OperationContext* txn, Database* db, const BSONObj& op);
         std::string hostName;    // ip addr or hostname plus optionally, ":<port>"
         std::string _sourceName;  // a logical source name.

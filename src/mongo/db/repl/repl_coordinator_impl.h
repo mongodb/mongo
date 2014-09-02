@@ -37,6 +37,8 @@
 #include "mongo/base/status.h"
 #include "mongo/bson/optime.h"
 #include "mongo/db/global_environment_experiment.h"
+#include "mongo/db/repl/freshness_checker.h"
+#include "mongo/db/repl/elect_cmd_runner.h"
 #include "mongo/db/repl/member_state.h"
 #include "mongo/db/repl/repl_coordinator.h"
 #include "mongo/db/repl/repl_coordinator_external_state.h"
@@ -124,9 +126,11 @@ namespace repl {
 
         virtual Status setLastOptime(OperationContext* txn, const OID& rid, const OpTime& ts);
 
+        virtual Status setMyLastOptime(OperationContext* txn, const OpTime& ts);
+
         virtual OID getElectionId();
 
-        virtual OID getMyRID(OperationContext* txn);
+        virtual OID getMyRID();
 
         virtual void prepareReplSetUpdatePositionCommand(OperationContext* txn,
                                                          BSONObjBuilder* cmdBuilder);
@@ -220,6 +224,12 @@ namespace repl {
          */
         void waitForStartUpComplete();
 
+        /**
+         * Used by testing code to run election proceedings, in leiu of a better
+         * method to acheive this.
+         */
+        void testElection();
+
     private:
 
         /**
@@ -307,6 +317,17 @@ namespace repl {
         Status _checkIfWriteConcernCanBeSatisfied_inlock(
                 const WriteConcernOptions& writeConcern) const;
 
+        OID _getMyRID_inlock();
+
+        /**
+         * Helper method for setLastOptime and setMyLastOptime that takes in a unique lock on
+         * _mutex.  The passed in lock must already be locked.  It is unknown what state the lock
+         * will be in after this method finishes.
+         */
+        Status _setLastOptime_inlock(boost::unique_lock<boost::mutex>* lock,
+                                     const OID& rid,
+                                     const OpTime& ts);
+
         /**
          * Processes each heartbeat response.
          * Also responsible for scheduling additional heartbeats within the timeout if they error,
@@ -373,6 +394,32 @@ namespace repl {
          */
         void _setConfigState_inlock(ConfigState newState);
 
+        /**
+         * Begins an attempt to elect this node.
+         * Called after an incoming heartbeat changes this node's view of the set such that it
+         * believes it can be elected PRIMARY.
+         * For proper concurrency, must be called via a ReplicationExecutor callback.
+         * finishEvh is an event that is signaled when election is done, regardless of success.
+         **/
+        void _startElectSelf(const ReplicationExecutor::CallbackData& cbData,
+                             const ReplicationExecutor::EventHandle& finishEvh);
+
+        /**
+         * Callback called when the FreshnessChecker has completed; checks the results and
+         * decides whether to continue election proceedings.
+         * finishEvh is an event that is signaled when election is complete.
+         **/
+        void _onFreshnessCheckComplete(const ReplicationExecutor::CallbackData& cbData,
+                                       const ReplicationExecutor::EventHandle& finishEvh);
+
+        /** 
+         * Callback called when the ElectCmdRunner has completed; checks the results and
+         * decides whether to complete the election and change state to primary.
+         * finishEvh is an event that is signaled when election is complete.
+         **/
+        void _onElectCmdRunnerComplete(const ReplicationExecutor::CallbackData& cbData,
+                                       const ReplicationExecutor::EventHandle& finishEvh);
+
         // Handles to actively queued heartbeats.
         // Only accessed serially in ReplicationExecutor callbacks, which makes it safe to access
         // outside of _mutex.
@@ -384,12 +431,6 @@ namespace repl {
         // in ReplSettings, but we should be able to get rid of that after the legacy repl
         // coordinator is gone. At that point we can make this const.
         ReplSettings _settings;
-
-        // Our RID, used to identify us to our sync source when sending replication progress
-        // updates upstream.  Set once at startup and then never modified again, which makes it
-        // safe to read outside of _mutex.
-        // TODO(spencer): put behind _mutex
-        OID _myRID;
 
         // Pointer to the TopologyCoordinator owned by this ReplicationCoordinator.
         boost::scoped_ptr<TopologyCoordinator> _topCoord;
@@ -410,6 +451,10 @@ namespace repl {
         mutable boost::mutex _mutex;
 
         /// ============= All members below this line are guarded by _mutex ==================== ///
+
+        // Our RID, used to identify us to our sync source when sending replication progress
+        // updates upstream.  Set once at startup and then never modified again.
+        OID _myRID;
 
         // Rollback ID. Used to check if a rollback happened during some interval of time
         // TODO: ideally this should only change on rollbacks NOT on mongod restarts also.
@@ -450,6 +495,14 @@ namespace repl {
         // PRNG; seeded at class construction time.
         PseudoRandom _random;
 
+        // Used for conducting an election of this node;
+        // the presence of a non-null _freshnessChecker pointer indicates that an election is
+        // currently in progress.  Only one election is allowed at once.
+        boost::scoped_ptr<FreshnessChecker> _freshnessChecker;
+        boost::scoped_ptr<ElectCmdRunner> _electCmdRunner;
+
+        // Whether we slept last time we attempted an election but possibly tied with other nodes.
+        bool _sleptLastElection;
     };
 
 } // namespace repl

@@ -69,7 +69,7 @@ namespace repl {
                 sleepsecs(retryCount * retryCount);
             }
             try {
-                bool ok = missingObjReader.connect(hn);
+                bool ok = missingObjReader.connect(HostAndPort(hn));
                 if (!ok) {
                     warning() << "network problem detected while connecting to the "
                               << "sync source, attempt " << retryCount << " of "

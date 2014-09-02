@@ -98,13 +98,13 @@ namespace repl {
         readersCreatedStats.increment();
     }
 
-    bool OplogReader::commonConnect(const string& hostName) {
+    bool OplogReader::commonConnect(const HostAndPort& host) {
         if( conn() == 0 ) {
             _conn = shared_ptr<DBClientConnection>(new DBClientConnection(false,
                                                                           0,
                                                                           tcp_timeout));
             string errmsg;
-            if ( !_conn->connect(hostName.c_str(), errmsg) ||
+            if ( !_conn->connect(host, errmsg) ||
                  (getGlobalAuthorizationManager()->isAuthEnabled() &&
                   !replAuthenticate(_conn.get())) ) {
 
@@ -116,24 +116,24 @@ namespace repl {
         return true;
     }
 
-    bool OplogReader::connect(const std::string& hostName) {
+    bool OplogReader::connect(const HostAndPort& host) {
         if (conn()) {
             return true;
         }
 
-        if (!commonConnect(hostName)) {
+        if (!commonConnect(host)) {
             return false;
         }
 
         return true;
     }
 
-    bool OplogReader::connect(const std::string& hostName, const OID& myRID) {
+    bool OplogReader::connect(const HostAndPort& host, const OID& myRID) {
         if (conn()) {
             return true;
         }
 
-        if (!commonConnect(hostName)) {
+        if (!commonConnect(host)) {
             return false;
         }
 
@@ -144,12 +144,12 @@ namespace repl {
         return true;
     }
 
-    bool OplogReader::connect(const mongo::OID& rid, const int from, const string& to) {
+    bool OplogReader::connect(const mongo::OID& rid, const int from, const HostAndPort& to) {
         if (conn() != 0) {
             return true;
         }
         if (commonConnect(to)) {
-            log() << "handshake between " << from << " and " << to << endl;
+            log() << "handshake between " << from << " and " << to.toString() << endl;
             return passthroughHandshake(rid, from);
         }
         return false;

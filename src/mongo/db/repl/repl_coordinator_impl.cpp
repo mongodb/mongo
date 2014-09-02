@@ -114,7 +114,8 @@ namespace {
         _inShutdown(false),
         _rsConfigState(kConfigStartingUp),
         _thisMembersConfigIndex(-1),
-        _random(prngSeed) {
+        _random(prngSeed),
+        _sleptLastElection(false) {
 
         if (!isReplEnabled()) {
             return;
@@ -227,11 +228,10 @@ namespace {
             return;
         }
 
-        // Must set _myRID before any network traffic, because network traffic leads to concurrent
-        // access to _myRID, which is not mutex guarded.  This is OK because startReplication()
-        // executes before the server starts listening for connections, and replication starts no
-        // threads of its own until later in this function.
-        _myRID = _externalState->ensureMe(txn);
+        {
+            boost::lock_guard<boost::mutex> lk(_mutex);
+            _myRID = _externalState->ensureMe(txn);
+        }
 
         _topCoordDriverThread.reset(new boost::thread(stdx::bind(&ReplicationExecutor::run,
                                                                  &_replExecutor)));
@@ -308,48 +308,56 @@ namespace {
         return _currentState;
     }
 
+    Status ReplicationCoordinatorImpl::setMyLastOptime(OperationContext* txn, const OpTime& ts) {
+        boost::unique_lock<boost::mutex> lock(_mutex);
+        return _setLastOptime_inlock(&lock, _getMyRID_inlock(), ts);
+    }
+
     Status ReplicationCoordinatorImpl::setLastOptime(OperationContext* txn,
                                                      const OID& rid,
                                                      const OpTime& ts) {
+        boost::unique_lock<boost::mutex> lock(_mutex);
+        return _setLastOptime_inlock(&lock, rid, ts);
+    }
+
+    Status ReplicationCoordinatorImpl::_setLastOptime_inlock(boost::unique_lock<boost::mutex>* lock,
+                                                             const OID& rid,
+                                                             const OpTime& ts) {
+        invariant(lock->owns_lock());
+
         LOG(2) << "received notification that node with RID " << rid <<
                 " has reached optime: " << ts;
-        bool forwardProgress = false;
-        {
-            boost::lock_guard<boost::mutex> lk(_mutex);
 
-            SlaveInfo& slaveInfo = _slaveInfoMap[rid];
-            if (slaveInfo.memberID < 0 && _getReplicationMode_inlock() == modeReplSet) {
-                warning() << "Received replSetUpdatePosition for node with RID" << rid
-                          << ", but we haven't yet received a handshake for that node. Stored "
-                          << "member ID: " << slaveInfo.memberID << ", stored member hostAndPort: "
-                          << slaveInfo.hostAndPort.toString() << ".  Our RID: " << getMyRID(NULL);
-            }
-            invariant(slaveInfo.memberID >= 0 || _getReplicationMode_inlock() == modeMasterSlave);
-
-            LOG(3) << "Node with RID " << rid << " currently has optime " << slaveInfo.opTime <<
-                    "; updating to " << ts;
-            if (slaveInfo.opTime < ts) {
-                slaveInfo.opTime = ts;
-
-                // Wake up any threads waiting for replication that now have their replication
-                // check satisfied
-                for (std::vector<WaiterInfo*>::iterator it = _replicationWaiterList.begin();
-                        it != _replicationWaiterList.end(); ++it) {
-                    WaiterInfo* info = *it;
-                    if (_doneWaitingForReplication_inlock(*info->opTime, *info->writeConcern)) {
-                        info->condVar->notify_all();
-                    }
-                }
-
-                if (_getReplicationMode_inlock() == modeReplSet &&
-                        !_getCurrentMemberState_inlock().primary()) {
-                    // pass along if we are not primary
-                    forwardProgress = true;
-                }
-            }
+        SlaveInfo& slaveInfo = _slaveInfoMap[rid];
+        if (slaveInfo.memberID < 0 && _getReplicationMode_inlock() == modeReplSet) {
+            warning() << "Received replSetUpdatePosition for node with RID" << rid
+                      << ", but we haven't yet received a handshake for that node. Stored "
+                      << "member ID: " << slaveInfo.memberID << ", stored member hostAndPort: "
+                      << slaveInfo.hostAndPort.toString() << ".  Our RID: " << getMyRID();
         }
-        if (forwardProgress) {
-            _externalState->forwardSlaveProgress(); // Must do this outside _mutex
+        invariant(slaveInfo.memberID >= 0 || _getReplicationMode_inlock() == modeMasterSlave);
+
+        LOG(3) << "Node with RID " << rid << " currently has optime " << slaveInfo.opTime <<
+                "; updating to " << ts;
+        if (slaveInfo.opTime < ts) {
+            slaveInfo.opTime = ts;
+
+            // Wake up any threads waiting for replication that now have their replication
+            // check satisfied
+            for (std::vector<WaiterInfo*>::iterator it = _replicationWaiterList.begin();
+                    it != _replicationWaiterList.end(); ++it) {
+                WaiterInfo* info = *it;
+                if (_doneWaitingForReplication_inlock(*info->opTime, *info->writeConcern)) {
+                    info->condVar->notify_all();
+                }
+            }
+
+            if (_getReplicationMode_inlock() == modeReplSet &&
+                    !_getCurrentMemberState_inlock().primary()) {
+                // pass along if we are not primary
+                lock->unlock();
+                _externalState->forwardSlaveProgress(); // Must do this outside _mutex
+            }
         }
         return Status::OK();
     }
@@ -360,8 +368,7 @@ namespace {
     }
 
     OpTime ReplicationCoordinatorImpl::_getLastOpApplied_inlock() {
-        OperationContextNoop txn;
-        return _slaveInfoMap[getMyRID(&txn)].opTime;
+        return _slaveInfoMap[_getMyRID_inlock()].opTime;
     }
 
     void ReplicationCoordinatorImpl::interrupt(unsigned opId) {
@@ -655,7 +662,12 @@ namespace {
         return _electionID;
     }
 
-    OID ReplicationCoordinatorImpl::getMyRID(OperationContext* txn) {
+    OID ReplicationCoordinatorImpl::getMyRID() {
+        boost::lock_guard<boost::mutex> lock(_mutex);
+        return _getMyRID_inlock();
+    }
+
+    OID ReplicationCoordinatorImpl::_getMyRID_inlock() {
         return _myRID;
     }
 
@@ -1001,8 +1013,8 @@ namespace {
                  _getLastOpApplied_inlock());
 
          // Ensure that there's an entry in the _slaveInfoMap for ourself
-         _slaveInfoMap[getMyRID(NULL)].memberID = _rsConfig.getMemberAt(myIndex).getId();
-         _slaveInfoMap[getMyRID(NULL)].hostAndPort =
+         _slaveInfoMap[_getMyRID_inlock()].memberID = _rsConfig.getMemberAt(myIndex).getId();
+         _slaveInfoMap[_getMyRID_inlock()].hostAndPort =
                  _rsConfig.getMemberAt(myIndex).getHostAndPort();
          _startHeartbeats();
      }

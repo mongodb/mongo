@@ -35,8 +35,6 @@ env.CppUnitTest('replication_executor_test',
 
 env.Library('topology_coordinator_impl',
             ['topology_coordinator_impl.cpp',
-             'topology_freshness_checker.cpp',
-             'topology_elect_cmd_runner.cpp',
              'member_heartbeat_data.cpp'],
             LIBDEPS=['replication_executor',
                      'repl_settings',
@@ -47,23 +45,13 @@ env.CppUnitTest('topology_coordinator_impl_test',
                 LIBDEPS=['topology_coordinator_impl',
                          'replica_set_messages'])
 
-env.CppUnitTest('topology_freshness_checker_test',
-                'topology_freshness_checker_test.cpp',
-                LIBDEPS=['topology_coordinator_impl',
-                         'replica_set_messages',
-                         'replmocks'])
-
-env.CppUnitTest('topology_elect_cmd_runner_test',
-                'topology_elect_cmd_runner_test.cpp',
-                LIBDEPS=['topology_coordinator_impl',
-                         'replica_set_messages',
-                         'replmocks'])
-
-
 env.Library('repl_coordinator_impl',
             [
                 'check_quorum_for_config_change.cpp',
+                'elect_cmd_runner.cpp',
+                'freshness_checker.cpp',
                 'repl_coordinator_impl.cpp',
+                'repl_coordinator_impl_elect.cpp',
                 'repl_coordinator_impl_heartbeat.cpp',
                 'replica_set_config_checks.cpp',
             ],
@@ -102,6 +90,24 @@ env.CppUnitTest('check_quorum_for_config_change_test',
                     'replication_executor',
                     'replmocks',
                 ])
+
+env.CppUnitTest('freshness_checker_test',
+                'freshness_checker_test.cpp',
+                LIBDEPS=['repl_coordinator_impl',
+                         'replica_set_messages',
+                         'replmocks'])
+
+env.CppUnitTest('elect_cmd_runner_test',
+                'elect_cmd_runner_test.cpp',
+                LIBDEPS=['repl_coordinator_impl',
+                         'replica_set_messages',
+                         'replmocks'])
+
+env.CppUnitTest('repl_coordinator_impl_elect_test',
+                'repl_coordinator_impl_elect_test.cpp',
+                LIBDEPS=['repl_coordinator_impl',
+                         'topology_coordinator_impl',
+                         'replmocks'])
 
 env.Library('repl_coordinator_interface',
             ['repl_coordinator.cpp',

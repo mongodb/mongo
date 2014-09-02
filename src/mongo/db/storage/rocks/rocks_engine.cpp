@@ -303,7 +303,7 @@ namespace mongo {
         ROCKS_STATUS_OK( s );
 
         const BSONObj optionsObj = options.toBSON();
-        const rocksdb::Slice key( ns.toString() + "-options" );
+        const std::string key = ns.toString() + "-options";
         const rocksdb::Slice value( optionsObj.objdata(), optionsObj.objsize() );
 
         dynamic_cast<RocksRecoveryUnit*>( txn->recoveryUnit() )->writeBatch()->Put(_defaultHandle,
@@ -551,7 +551,7 @@ namespace mongo {
                 invariant( families[i].options.comparator );
                 entry->indexNameToComparator[indexName].reset( families[i].options.comparator );
             } else {
-                rocksdb::Slice optionsKey( ns + "-options" );
+                std::string optionsKey = ns + "-options";
                 std::string value;
                 rocksdb::Status status = _db->Get(rocksdb::ReadOptions(), optionsKey, &value);
 

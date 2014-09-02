@@ -241,8 +241,14 @@ namespace repl {
          *
          * @returns ErrorCodes::NodeNotFound if the member cannot be found in sync progress tracking
          * @returns Status::OK() otherwise
+         * TODO(spencer): Remove txn argument and make into a void function when legacy is gone.
          */
         virtual Status setLastOptime(OperationContext* txn, const OID& rid, const OpTime& ts) = 0;
+
+        /**
+         * Delegates to setLastOptime using our RID as the rid argument.
+         */
+        virtual Status setMyLastOptime(OperationContext* txn, const OpTime& ts) = 0;
 
         /**
          * Retrieves and returns the current election id, which is a unique id that is local to
@@ -254,10 +260,8 @@ namespace repl {
         /**
          * Returns the RID for this node.  The RID is used to identify this node to our sync source
          * when sending updates about our replication progress.
-         *
-         * TODO(spencer): Remove txn argument once Legacy is gone
          */
-        virtual OID getMyRID(OperationContext* txn) = 0;
+        virtual OID getMyRID() = 0;
 
         /**
          * Prepares a BSONObj describing an invocation of the replSetUpdatePosition command that can
@@ -383,7 +387,7 @@ namespace repl {
          */
         struct ReplSetElectArgs {
             StringData set;  // Name of the replset
-            unsigned whoid;  // replSet id of the member that sent the replSetFresh command
+            int whoid;  // replSet id of the member that sent the replSetFresh command
             int cfgver;  // replSet config version that the member who sent the command thinks it has
             OID round;  // unique ID for this election
         };

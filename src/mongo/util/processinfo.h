@@ -103,6 +103,11 @@ namespace mongo {
         static bool isDataFileZeroingNeeded() { return systemInfo->fileZeroNeeded;  }
 
         /**
+         * Determine if we need to workaround slow msync performance on Illumos/Solaris
+         */
+        static bool preferMsyncOverFSync() { return systemInfo->preferMsyncOverFSync;  }
+
+        /**
          * Get extra system stats
          */
         void appendSystemDetails( BSONObjBuilder& details ) const {
@@ -162,13 +167,21 @@ namespace mongo {
             //
             bool fileZeroNeeded;
 
+            // On non-Solaris (ie, Linux, Darwin, *BSD) kernels, prefer msync.
+            // Illumos kernels do O(N) scans in memory of the page table during msync which
+            // causes high CPU, Oracle Solaris 11.2 and later modified ZFS to workaround mongodb
+            // Oracle Solaris Bug: 
+            //  18658199 Speed up msync() on ZFS by 90000x with this one weird trick
+            bool preferMsyncOverFSync;
+
             SystemInfo() :
                     addrSize( 0 ),
                     memSize( 0 ),
                     numCores( 0 ),
                     pageSize( 0 ),
                     hasNuma( false ),
-                    fileZeroNeeded (false) { 
+                    fileZeroNeeded (false), 
+                    preferMsyncOverFSync (true) { 
                 // populate SystemInfo during construction
                 collectSystemInfo();
             }
