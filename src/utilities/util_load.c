@@ -46,19 +46,20 @@ typedef struct {
 	int max_entry;		/* how many allocated in list */
 } CONFIG_LIST;
 
+static int config_exec(WT_SESSION *, char **);
 static int config_list_add(CONFIG_LIST *, char *);
 static int config_read(char ***, int *);
 static int config_rename(char **, const char *);
 static void config_remove(char *, const char *);
-static int config_reorder(char **list);
+static int config_reorder(char **);
 static int config_update(WT_SESSION *, char **);
 static int format(void);
 static int insert(WT_CURSOR *, const char *);
 static int json_cgidx(WT_SESSION *, JSON_INPUT_STATE *, CONFIG_LIST *, int);
-static int json_data(WT_SESSION *, JSON_INPUT_STATE *, const char *);
+static int json_data(WT_SESSION *, JSON_INPUT_STATE *, CONFIG_LIST *);
 static int json_expect(WT_SESSION *, JSON_INPUT_STATE *, int);
 static int json_peek(WT_SESSION *, JSON_INPUT_STATE *);
-static int json_skip(WT_SESSION *, JSON_INPUT_STATE *, char **matches);
+static int json_skip(WT_SESSION *, JSON_INPUT_STATE *, char **);
 static int json_kvraw_append(JSON_INPUT_STATE *, const char *, size_t);
 static int json_strdup(JSON_INPUT_STATE *, char **);
 static int json_top_level(WT_SESSION *, JSON_INPUT_STATE *);
@@ -307,17 +308,31 @@ config_list_free(CONFIG_LIST *clp)
  *	values.
  */
 static int
-json_data(WT_SESSION *session, JSON_INPUT_STATE *ins, const char *uri)
+json_data(WT_SESSION *session, JSON_INPUT_STATE *ins, CONFIG_LIST *clp)
 {
 	WT_CURSOR *cursor;
 	WT_DECL_RET;
-	char config[64], *endp;
+	char config[64], *endp, *uri;
 	const char *keyformat;
 	int isrec, nfield, nkeys, toktype, tret;
 	size_t gotnolen, keystrlen;
 	uint64_t gotno, recno;
 
 	cursor = NULL;
+
+	/* Reorder and check the list. */
+	if ((ret = config_reorder(clp->list)) != 0)
+		goto err;
+
+	/* Update config based on command-line configuration. */
+	if ((ret = config_update(session, clp->list)) != 0)
+		goto err;
+
+	/* Create the items collected. */
+	if ((ret = config_exec(session, clp->list)) != 0)
+		goto err;
+
+	uri = clp->list[0];
 	(void)snprintf(config, sizeof(config),
 	    "dump=json%s%s",
 	    append ? ",append" : "", no_overwrite ? ",overwrite=false" : "");
@@ -418,13 +433,14 @@ err:		if (ret == 0)
 static int
 json_top_level(WT_SESSION *session, JSON_INPUT_STATE *ins)
 {
-	WT_DECL_RET;
-	char *config, **entry, *tableuri;
-	int toktype;
 	CONFIG_LIST cl;
+	WT_DECL_RET;
+	char *config, *tableuri;
+	int toktype;
 	static char *json_markers[] = {
 	    "\"config\"", "\"colgroups\"", "\"indices\"", "\"data\"", NULL };
 
+	memset(&cl, 0, sizeof(cl));
 	tableuri = NULL;
 	JSON_EXPECT(session, ins, '{');
 	while (json_peek(session, ins) == 's') {
@@ -433,7 +449,15 @@ json_top_level(WT_SESSION *session, JSON_INPUT_STATE *ins)
 		snprintf(tableuri, ins->toklen, "%.*s",
 		    (int)(ins->toklen - 2), ins->tokstart + 1);
 		JSON_EXPECT(session, ins, ':');
-		while (1) {
+
+		/*
+		 * Allow any ordering of 'config', 'colgroups',
+		 * 'indices' before 'data', which must appear last.
+		 * The non-'data' items build up a list of entries
+		 * that created in our session before the data is
+		 * inserted.
+		 */
+		for (;;) {
 			if (json_skip(session, ins, json_markers) != 0)
 				goto err;
 			JSON_EXPECT(session, ins, 's');
@@ -450,33 +474,21 @@ json_top_level(WT_SESSION *session, JSON_INPUT_STATE *ins)
 			} else if (JSON_STRING_MATCH(ins, "colgroups")) {
 				JSON_EXPECT(session, ins, ':');
 				JSON_EXPECT(session, ins, '[');
-				if ((ret = json_cgidx(session, ins, &cl, 0)) != 0)
+				if ((ret = json_cgidx(session, ins, &cl, 0))
+				    != 0)
 					goto err;
 				JSON_EXPECT(session, ins, ']');
 			} else if (JSON_STRING_MATCH(ins, "indices")) {
 				JSON_EXPECT(session, ins, ':');
 				JSON_EXPECT(session, ins, '[');
-				if ((ret = json_cgidx(session, ins, &cl, 1)) != 0)
+				if ((ret = json_cgidx(session, ins, &cl, 1))
+				    != 0)
 					goto err;
 				JSON_EXPECT(session, ins, ']');
 			} else if (JSON_STRING_MATCH(ins, "data")) {
-				/* Reorder and check the list. */
-				if ((ret = config_reorder(cl.list)) != 0)
-					return (ret);
-
-				/* Update the config based on any command-line configuration. */
-				if ((ret = config_update(session, cl.list)) != 0)
-					goto err;
-
-				for (entry = cl.list; *entry != NULL; entry += 2)
-					if ((ret = session->create(session, entry[0], entry[1])) != 0) {
-						ret = util_err(ret, "%s: session.create", entry[0]);
-						goto err;
-					}
-
 				JSON_EXPECT(session, ins, ':');
 				JSON_EXPECT(session, ins, '[');
-				if ((ret = json_data(session, ins, cl.list[0])) != 0)
+				if ((ret = json_data(session, ins, &cl)) != 0)
 					goto err;
 				config_list_free(&cl);
 				break;
@@ -484,6 +496,7 @@ json_top_level(WT_SESSION *session, JSON_INPUT_STATE *ins)
 			else
 				goto err;
 		}
+
 		while ((toktype = json_peek(session, ins)) == '}' ||
 		    toktype == ']')
 			JSON_EXPECT(session, ins, toktype);
@@ -587,7 +600,7 @@ json_expect(WT_SESSION *session, JSON_INPUT_STATE *ins, int wanttok)
 
 /*
  * json_skip --
- *	Skip over JSON input until the specified string appears.
+ *	Skip over JSON input until one of the specified strings appears.
  *	The tokenizer will be set to point to the beginning of
  *	that string.
  */
@@ -661,7 +674,7 @@ load_dump(WT_SESSION *session)
 	WT_CURSOR *cursor;
 	WT_DECL_RET;
 	int hex, tret;
-	char **entry, **list, **tlist, *uri, config[64];
+	char **list, **tlist, *uri, config[64];
 
 	cursor = NULL;
 	list = NULL;		/* -Wuninitialized */
@@ -681,11 +694,9 @@ load_dump(WT_SESSION *session)
 		goto err;
 
 	uri = list[0];
-	for (entry = list; *entry != NULL; entry += 2)
-		if ((ret = session->create(session, entry[0], entry[1])) != 0) {
-			ret = util_err(ret, "%s: session.create", entry[0]);
-			goto err;
-		}
+	/* Create the items in the list. */
+	if ((ret = config_exec(session, list)) != 0)
+		goto err;
 
 	/* Open the insert cursor. */
 	(void)snprintf(config, sizeof(config),
@@ -729,6 +740,21 @@ err:	/*
 	free(list);
 
 	return (ret == 0 ? 0 : 1);
+}
+
+/*
+ * config_exec --
+ *	Create the tables/indices/colgroups implied by the list.
+ */
+static int
+config_exec(WT_SESSION *session, char **list)
+{
+	int ret;
+
+	for (; *list != NULL; list += 2)
+		if ((ret = session->create(session, list[0], list[1])) != 0)
+			return (util_err(ret, "%s: session.create", list[0]));
+	return (0);
 }
 
 /*
