@@ -15,6 +15,8 @@ import (
 // replaces any extended JSON value with its corresponding BSON type.
 func ConvertJSONValueToBSON(x interface{}) (interface{}, error) {
 	switch v := x.(type) {
+	case nil:
+		return nil, nil
 	case map[string]interface{}: // document
 		for key, jsonValue := range v {
 			bsonValue, err := parseJSONValue(jsonValue)
@@ -80,15 +82,18 @@ func ConvertJSONValueToBSON(x interface{}) (interface{}, error) {
 
 	case json.Undefined: // undefined
 		return bson.Undefined, nil
+	default:
+		return nil, fmt.Errorf("Conversion of JSON type '%v' unsupported", v)
 	}
 
-	return nil, fmt.Errorf("Conversion of JSON type '%v' not supported", reflect.TypeOf(x))
 }
 
 // ConvertBSONValueToJSON walks through a document or an array and
 // replaces any BSON value with its corresponding extended JSON type.
 func ConvertBSONValueToJSON(x interface{}) (interface{}, error) {
 	switch v := x.(type) {
+	case nil:
+		return nil, nil
 	case bson.M: // document
 		for key, value := range v {
 			jsonValue, err := ConvertBSONValueToJSON(value)
@@ -160,5 +165,5 @@ func ConvertBSONValueToJSON(x interface{}) (interface{}, error) {
 		}
 	}
 
-	return nil, fmt.Errorf("Conversion of BSON type '%v' not supported", reflect.TypeOf(x))
+	return nil, fmt.Errorf("Conversion of BSON type '%v' not supported %v", reflect.TypeOf(x), x)
 }

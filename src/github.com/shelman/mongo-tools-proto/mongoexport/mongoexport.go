@@ -1,10 +1,10 @@
 package mongoexport
 
 import (
-	"encoding/json"
 	"fmt"
 	"github.com/shelman/mongo-tools-proto/common/bsonutil"
 	"github.com/shelman/mongo-tools-proto/common/db"
+	sloppyjson "github.com/shelman/mongo-tools-proto/common/json"
 	commonopts "github.com/shelman/mongo-tools-proto/common/options"
 	"github.com/shelman/mongo-tools-proto/common/util"
 	"github.com/shelman/mongo-tools-proto/mongoexport/options"
@@ -119,7 +119,6 @@ func (exp *MongoExport) Export() (int64, error) {
 	for cursor.Next(&result) {
 		err := exportOutput.ExportDocument(result)
 		if err != nil {
-			fmt.Println(err)
 			return docsCount, err
 		}
 		docsCount++
@@ -181,7 +180,7 @@ type ExportOutput interface {
 //string is not valid JSON, or extended JSON.
 func getQueryFromArg(queryRaw string) (map[string]interface{}, error) {
 	parsedJSON := map[string]interface{}{}
-	err := json.Unmarshal([]byte(queryRaw), &parsedJSON)
+	err := sloppyjson.Unmarshal([]byte(queryRaw), &parsedJSON)
 	if err != nil {
 		return nil, fmt.Errorf("Query is not valid JSON: %v", err)
 	}
