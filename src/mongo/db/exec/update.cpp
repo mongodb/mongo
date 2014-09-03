@@ -499,7 +499,11 @@ namespace mongo {
                 // If a set of modifiers were all no-ops, we are still 'in place', but there
                 // is no work to do, in which case we want to consider the object unchanged.
                 if (!_damages.empty() ) {
-                    _collection->updateDocumentWithDamages(request->getOpCtx(), loc, source, _damages);
+                    // Don't actually do the write if this is an explain.
+                    if (!request->isExplain()) {
+                        _collection->updateDocumentWithDamages(request->getOpCtx(), loc, source,
+                                                               _damages);
+                    }
                     docWasModified = true;
                     _specificStats.fastmod = true;
                 }
@@ -518,27 +522,32 @@ namespace mongo {
                         str::stream() << "Resulting document after update is larger than "
                         << BSONObjMaxUserSize,
                         newObj.objsize() <= BSONObjMaxUserSize);
-                StatusWith<DiskLoc> res = _collection->updateDocument(request->getOpCtx(),
-                                                                      loc,
-                                                                      newObj,
-                                                                      true,
-                                                                      _params.opDebug);
-                uassertStatusOK(res.getStatus());
-                DiskLoc newLoc = res.getValue();
                 docWasModified = true;
 
-                // If the document moved, we might see it again in a collection scan (maybe it's
-                // a document after our current document).
-                //
-                // If the document is indexed and the mod changes an indexed value, we might see it
-                // again.  For an example, see the comment above near declaration of updatedLocs.
-                if (_updatedLocs && (newLoc != loc || driver->modsAffectIndices())) {
-                    _updatedLocs->insert(newLoc);
+                // Don't actually do the write if this is an explain.
+                if (!request->isExplain()) {
+                    StatusWith<DiskLoc> res = _collection->updateDocument(request->getOpCtx(),
+                                                                          loc,
+                                                                          newObj,
+                                                                          true,
+                                                                          _params.opDebug);
+                    uassertStatusOK(res.getStatus());
+                    DiskLoc newLoc = res.getValue();
+
+                    // If the document moved, we might see it again in a collection scan (maybe it's
+                    // a document after our current document).
+                    //
+                    // If the document is indexed and the mod changes an indexed value, we might see
+                    // it again.  For an example, see the comment above near declaration of
+                    // updatedLocs.
+                    if (_updatedLocs && (newLoc != loc || driver->modsAffectIndices())) {
+                        _updatedLocs->insert(newLoc);
+                    }
                 }
             }
 
-            // Call logOp if requested.
-            if (request->shouldCallLogOp() && !logObj.isEmpty()) {
+            // Call logOp if requested, and we're not an explain.
+            if (request->shouldCallLogOp() && !logObj.isEmpty() && !request->isExplain()) {
                 BSONObj idQuery = driver->makeOplogEntryQuery(newObj, request->isMulti());
                 repl::logOp(request->getOpCtx(),
                             "u",
@@ -559,7 +568,8 @@ namespace mongo {
 
         restoreState(request->getOpCtx());
 
-        // Only record doc modifications if they wrote (exclude no-ops)
+        // Only record doc modifications if they wrote (exclude no-ops). Explains get
+        // recorded as if they wrote.
         if (docWasModified) {
             _specificStats.nModified++;
         }
@@ -641,6 +651,13 @@ namespace mongo {
                 str::stream() << "Document to upsert is larger than " << BSONObjMaxUserSize,
                 newObj.objsize() <= BSONObjMaxUserSize);
 
+        _specificStats.objInserted = newObj;
+
+        // If this is an explain, bail out now without doing the insert.
+        if (request->isExplain()) {
+            return;
+        }
+
         WriteUnitOfWork wunit(request->getOpCtx());
         // Only create the collection if the doc will be inserted.
         if (!_collection) {
@@ -668,8 +685,6 @@ namespace mongo {
         }
 
         wunit.commit();
-
-        _specificStats.objInserted = newObj;
     }
 
     bool UpdateStage::doneUpdating() {

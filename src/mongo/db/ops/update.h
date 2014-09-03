@@ -51,20 +51,6 @@ namespace mongo {
                         OpDebug* opDebug);
 
     /**
-     * Execute the update described by "request", using the given already-parsed
-     * driver and canonical query.
-     *
-     * NOTE: This function is really a utility method for UpdateExecutor.
-     *
-     * TODO: Move this into a private method of UpdateExecutor.
-     */
-    UpdateResult update(Database* db,
-                        const UpdateRequest& request,
-                        OpDebug* opDebug,
-                        UpdateDriver* driver,
-                        CanonicalQuery* cq);
-
-    /**
      * takes the from document and returns a new document
      * after apply all the operators
      * e.g.

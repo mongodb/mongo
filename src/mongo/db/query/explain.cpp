@@ -401,6 +401,20 @@ namespace mongo {
             bob->append("indexPrefix", spec->indexPrefix);
             bob->append("parsedTextQuery", spec->parsedTextQuery);
         }
+        else if (STAGE_UPDATE == stats.stageType) {
+            UpdateStats* spec = static_cast<UpdateStats*>(stats.specific.get());
+
+            if (verbosity >= Explain::EXEC_STATS) {
+                bob->appendNumber("nMatched", spec->nMatched);
+                bob->appendNumber("nWouldModify", spec->nModified);
+                bob->appendBool("wouldInsert", spec->inserted);
+            }
+
+            if (verbosity == Explain::FULL) {
+                bob->appendBool("fastmod", spec->fastmod);
+                bob->appendBool("fastmodinsert", spec->fastmodinsert);
+            }
+        }
 
         // We're done if there are no children.
         if (stats.children.empty()) {

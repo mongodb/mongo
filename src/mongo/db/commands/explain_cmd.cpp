@@ -30,10 +30,12 @@
 
 #include "mongo/db/commands/explain_cmd.h"
 
+#include "mongo/client/dbclientinterface.h"
 #include "mongo/db/catalog/database.h"
 #include "mongo/db/client.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/query/explain.h"
+#include "mongo/db/repl/repl_coordinator_global.h"
 #include "mongo/util/mongoutils/str.h"
 
 namespace mongo {
@@ -65,6 +67,14 @@ namespace mongo {
                          string& errmsg,
                          BSONObjBuilder& result,
                          bool fromRepl) {
+        // Should never get explain commands issued from replication.
+        if (fromRepl) {
+            Status commandStat(ErrorCodes::IllegalOperation,
+                               "explain command should not be from repl");
+            appendCommandStatus(result, commandStat);
+            return false;
+        }
+
         // Get the verbosity.
         Explain::Verbosity verbosity = Explain::QUERY_PLANNER;
         if (!cmdObj["verbosity"].eoo()) {
@@ -79,14 +89,18 @@ namespace mongo {
                 verbosity = Explain::FULL;
             }
             else if (!mongoutils::str::equals(verbStr, "queryPlanner")) {
-               errmsg = "verbosity string must be one of "
-                        "{'queryPlanner', 'executionStats', 'allPlansExecution'}";
-               return false;
+                Status commandStat(ErrorCodes::BadValue,
+                                   "verbosity string must be one of "
+                                   "{'queryPlanner', 'executionStats', 'allPlansExecution'}");
+                appendCommandStatus(result, commandStat);
+                return false;
             }
         }
 
         if (Object != cmdObj.firstElement().type()) {
-            errmsg = "explain command requires a nested object";
+            Status commandStat(ErrorCodes::BadValue,
+                               "explain command requires a nested object");
+            appendCommandStatus(result, commandStat);
             return false;
         }
 
@@ -99,6 +113,23 @@ namespace mongo {
             ss << "unknown command: " << explainObj.firstElementFieldName();
             Status explainStatus(ErrorCodes::CommandNotFound, ss);
             return appendCommandStatus(result, explainStatus);
+        }
+
+        // Check whether the child command is allowed to run here. TODO: this logic is
+        // copied from Command::execCommand and should be abstracted. Until then, make
+        // sure to keep it up to date.
+        repl::ReplicationCoordinator* replCoord = repl::getGlobalReplicationCoordinator();
+        bool canRunHere =
+            replCoord->canAcceptWritesForDatabase(dbname) ||
+            commToExplain->slaveOk() ||
+            (commToExplain->slaveOverrideOk() && (options & QueryOption_SlaveOk));
+
+        if (!canRunHere) {
+            mongoutils::str::stream ss;
+            ss << "Explain's child command cannot run on this node. "
+               << "Are you explaining a write command on a secondary?";
+            appendCommandStatus(result, false, ss);
+            return false;
         }
 
         // Actually call the nested command's explain(...) method.

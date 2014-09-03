@@ -30,12 +30,37 @@
 
 #include "mongo/db/ops/update_executor.h"
 
+#include "mongo/db/catalog/database.h"
+#include "mongo/db/exec/update.h"
 #include "mongo/db/ops/update.h"
+#include "mongo/db/ops/update_driver.h"
+#include "mongo/db/ops/update_lifecycle.h"
 #include "mongo/db/ops/update_request.h"
 #include "mongo/db/query/canonical_query.h"
+#include "mongo/db/query/get_executor.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/log.h"
 
 namespace mongo {
+
+    namespace {
+
+        // TODO: Make this a function on NamespaceString, or make it cleaner.
+        inline void validateUpdate(const char* ns ,
+                                   const BSONObj& updateobj,
+                                   const BSONObj& patternOrig) {
+            uassert(10155 , "cannot update reserved $ collection", strchr(ns, '$') == 0);
+            if (strstr(ns, ".system.")) {
+                /* dm: it's very important that system.indexes is never updated as IndexDetails
+                   has pointers into it */
+                uassert(10156,
+                         str::stream() << "cannot update system collection: "
+                         << ns << " q: " << patternOrig << " u: " << updateobj,
+                         legalClientSystemNS(ns , true));
+            }
+        }
+
+    } // namespace
 
     UpdateExecutor::UpdateExecutor(const UpdateRequest* request, OpDebug* opDebug) :
         _request(request),
@@ -62,13 +87,105 @@ namespace mongo {
         return Status::OK();
     }
 
+    PlanExecutor* UpdateExecutor::getPlanExecutor() {
+        return _exec.get();
+    }
+
+    Status UpdateExecutor::prepareInLock(Database* db) {
+        // If we have a non-NULL PlanExecutor, then we've already done the in-lock preparation.
+        if (_exec.get()) {
+            return Status::OK();
+        }
+
+        const NamespaceString& nsString = _request->getNamespaceString();
+        UpdateLifecycle* lifecycle = _request->getLifecycle();
+
+        Collection* collection = db->getCollection(_request->getOpCtx(), nsString.ns());
+
+        validateUpdate(nsString.ns().c_str(), _request->getUpdates(), _request->getQuery());
+
+        // TODO: This seems a bit circuitious.
+        _opDebug->updateobj = _request->getUpdates();
+
+        if (lifecycle) {
+            lifecycle->setCollection(collection);
+            _driver.refreshIndexKeys(lifecycle->getIndexKeys(_request->getOpCtx()));
+        }
+
+        PlanExecutor* rawExec = NULL;
+        Status getExecStatus = Status::OK();
+        if (_canonicalQuery.get()) {
+            // This is the regular path for when we have a CanonicalQuery.
+            getExecStatus = getExecutorUpdate(_request->getOpCtx(), db, _canonicalQuery.release(),
+                                              _request, &_driver, _opDebug, &rawExec);
+        }
+        else {
+            // This is the idhack fast-path for getting a PlanExecutor without doing the work
+            // to create a CanonicalQuery.
+            getExecStatus = getExecutorUpdate(_request->getOpCtx(), db, nsString.ns(), _request,
+                                              &_driver, _opDebug, &rawExec);
+        }
+
+        if (getExecStatus.isOK()) {
+            invariant(rawExec);
+            _exec.reset(rawExec);
+        }
+
+        return getExecStatus;
+    }
+
     UpdateResult UpdateExecutor::execute(Database* db) {
         uassertStatusOK(prepare());
-        return update(db,
-                      *_request,
-                      _opDebug,
-                      &_driver,
-                      _canonicalQuery.release());
+
+        LOG(3) << "processing update : " << *_request;
+
+        // If we've already done the in-lock preparation, this is a no-op.
+        Status status = prepareInLock(db);
+        uassert(17243,
+                "could not get executor " + _request->getQuery().toString()
+                                         + "; " + causedBy(status),
+                status.isOK());
+
+        // Register executor with the collection cursor cache.
+        const ScopedExecutorRegistration safety(_exec.get());
+
+        // Run the plan (don't need to collect results because UpdateStage always returns
+        // NEED_TIME).
+        uassertStatusOK(_exec->executePlan());
+
+        // Get stats from the root stage.
+        invariant(_exec->getRootStage()->stageType() == STAGE_UPDATE);
+        UpdateStage* updateStage = static_cast<UpdateStage*>(_exec->getRootStage());
+        const UpdateStats* updateStats =
+            static_cast<const UpdateStats*>(updateStage->getSpecificStats());
+
+        // Use stats from the root stage to fill out opDebug.
+        _opDebug->nMatched = updateStats->nMatched;
+        _opDebug->nModified = updateStats->nModified;
+        _opDebug->upsert = updateStats->inserted;
+        _opDebug->fastmodinsert = updateStats->fastmodinsert;
+        _opDebug->fastmod = updateStats->fastmod;
+
+        // Historically, 'opDebug' considers 'nMatched' and 'nModified' to be 1 (rather than 0) if
+        // there is an upsert that inserts a document. The UpdateStage does not participate in this
+        // madness in order to have saner stats reporting for explain. This means that we have to
+        // set these values "manually" in the case of an insert.
+        if (updateStats->inserted) {
+            _opDebug->nMatched = 1;
+            _opDebug->nModified = 1;
+        }
+
+        // Get summary information about the plan.
+        PlanSummaryStats stats;
+        Explain::getSummaryStats(_exec.get(), &stats);
+        _opDebug->nscanned = stats.totalKeysExamined;
+        _opDebug->nscannedObjects = stats.totalDocsExamined;
+
+        return UpdateResult(updateStats->nMatched > 0 /* Did we update at least one obj? */,
+                            !_driver.isDocReplacement() /* $mod or obj replacement */,
+                            _opDebug->nModified /* number of modified docs, no no-ops */,
+                            _opDebug->nMatched /* # of docs matched/updated, even no-ops */,
+                            updateStats->objInserted);
     }
 
     Status UpdateExecutor::parseQuery() {
