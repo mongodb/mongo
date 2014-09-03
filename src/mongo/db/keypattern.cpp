@@ -62,19 +62,61 @@ namespace mongo {
                && i.next().eoo();
     }
 
-    BSONObj KeyPattern::extractSingleKey(const BSONObj& doc ) const {
+    BSONObj KeyPattern::extractShardKeyFromQuery(const BSONObj& query) const {
+        if (_pattern.isEmpty())
+            return BSONObj();
+
+        if (mongoutils::str::equals(_pattern.firstElement().valuestrsafe(), "hashed")) {
+            BSONElement fieldVal = query.getFieldDotted(_pattern.firstElementFieldName());
+            return BSON(_pattern.firstElementFieldName() <<
+                        BSONElementHasher::hash64(fieldVal , BSONElementHasher::DEFAULT_HASH_SEED));
+        }
+
+        return query.extractFields(_pattern);
+    }
+
+    BSONObj KeyPattern::extractShardKeyFromDoc(const BSONObj& doc) const {
+        BSONMatchableDocument matchable(doc);
+        return extractShardKeyFromMatchable(matchable);
+    }
+
+    BSONObj KeyPattern::extractShardKeyFromMatchable(const MatchableDocument& matchable) const {
+
         if ( _pattern.isEmpty() )
             return BSONObj();
 
-        if ( mongoutils::str::equals( _pattern.firstElement().valuestrsafe() , "hashed" ) ){
-            BSONElement fieldVal = doc.getFieldDotted( _pattern.firstElementFieldName() );
-            return BSON( _pattern.firstElementFieldName() <<
-                         BSONElementHasher::hash64( fieldVal ,
-                                                    BSONElementHasher::DEFAULT_HASH_SEED ) );
+        BSONObjBuilder keyBuilder;
+
+        BSONObjIterator patternIt(_pattern);
+        while (patternIt.more()) {
+
+            BSONElement patternEl = patternIt.next();
+            ElementPath path;
+            path.init(patternEl.fieldName());
+
+            MatchableDocument::IteratorHolder matchIt(&matchable, &path);
+            if (!matchIt->more())
+                return BSONObj();
+            BSONElement matchEl = matchIt->next().element();
+            // We sometimes get eoo(), apparently
+            if (matchEl.eoo() || matchIt->more())
+                return BSONObj();
+
+            if (mongoutils::str::equals(patternEl.valuestrsafe(), "hashed")) {
+                keyBuilder.append(patternEl.fieldName(),
+                                  BSONElementHasher::hash64(matchEl,
+                                                            BSONElementHasher::DEFAULT_HASH_SEED));
+            }
+            else {
+                // NOTE: The matched element may *not* have the same field name as the path -
+                // index keys don't contain field names, for example
+                keyBuilder.appendAs(matchEl, patternEl.fieldName());
+            }
         }
 
-        return doc.extractFields( _pattern );
+        return keyBuilder.obj();
     }
+
 
     bool KeyPattern::isSpecial() const {
         BSONForEach(e, _pattern) {

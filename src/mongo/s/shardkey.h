@@ -99,7 +99,12 @@ namespace mongo {
 
         std::string toString() const;
 
-        BSONObj extractKey(const BSONObj& from) const;
+        /**
+         * DEPRECATED function to return a shard key from either a document or a query expression.
+         * Always prefer the more specific keypattern.h extractKeyFromXXX functions instead.
+         * TODO: Eliminate completely.
+         */
+        BSONObj extractKeyFromQueryOrDoc(const BSONObj& from) const;
 
         bool partOfShardKey(const StringData& key ) const {
             return pattern.hasField(key);
@@ -155,8 +160,9 @@ namespace mongo {
         std::set<std::string> patternfields;
     };
 
-    inline BSONObj ShardKeyPattern::extractKey(const BSONObj& from) const {
-        BSONObj k = pattern.extractSingleKey( from );
+    // See note above - do not use in new code
+    inline BSONObj ShardKeyPattern::extractKeyFromQueryOrDoc(const BSONObj& from) const {
+        BSONObj k = pattern.extractShardKeyFromQuery( from );
         uassert(13334, "Shard Key must be less than 512 bytes", k.objsize() < kMaxShardKeySize);
         return k;
     }

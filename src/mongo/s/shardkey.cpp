@@ -217,8 +217,8 @@ namespace mongo {
             ShardKeyPattern k( fromjson("{a:1,'sub.b':-1,'sub.c':1}") );
 
             BSONObj x = fromjson("{a:1,'sub.b':2,'sub.c':3}");
-            verify( k.extractKey( fromjson("{a:1,sub:{b:2,c:3}}") ).binaryEqual(x) );
-            verify( k.extractKey( fromjson("{sub:{b:2,c:3},a:1}") ).binaryEqual(x) );
+            verify( k.extractKeyFromQueryOrDoc( fromjson("{a:1,sub:{b:2,c:3}}") ).binaryEqual(x) );
+            verify( k.extractKeyFromQueryOrDoc( fromjson("{sub:{b:2,c:3},a:1}") ).binaryEqual(x) );
         }
 
         void isSpecialTest() {
@@ -298,7 +298,7 @@ namespace mongo {
             BSONObj k1 = BSON( "key" << 5 );
 
             verify( min < max );
-            verify( min < k.extractKey( k1 ) );
+            verify( min < k.extractKeyFromQueryOrDoc( k1 ) );
             verify( max > min );
 
             hasshardkeytest();
@@ -308,7 +308,7 @@ namespace mongo {
             BSONObj a = k1;
             BSONObj b = BSON( "key" << 999 );
 
-            verify( k.extractKey( a ) <  k.extractKey( b ) );
+            verify( k.extractKeyFromQueryOrDoc( a ) <  k.extractKeyFromQueryOrDoc( b ) );
 
             isSpecialTest();
 

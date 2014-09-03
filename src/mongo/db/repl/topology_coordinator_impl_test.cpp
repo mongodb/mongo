@@ -29,13 +29,16 @@
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/repl/member_heartbeat_data.h"
+#include "mongo/db/repl/repl_set_heartbeat_args.h"
+#include "mongo/db/repl/repl_set_heartbeat_response.h"
 #include "mongo/db/repl/topology_coordinator_impl.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/net/hostandport.h"
 #include "mongo/util/time_support.h"
 
-#define ASSERT_NO_ACTION(EXPRESSION) ASSERT_EQUALS(ReplSetHeartbeatResponse::NoAction, (EXPRESSION))
+#define ASSERT_NO_ACTION(EXPRESSION) \
+    ASSERT_EQUALS(mongo::repl::TopologyCoordinator::HeartbeatResponseAction::NoAction, (EXPRESSION))
 
 namespace mongo {
 
@@ -52,6 +55,8 @@ namespace mongo {
 
 namespace repl {
 namespace {
+
+    typedef TopologyCoordinator::HeartbeatResponseAction HeartbeatResponseAction;
 
     bool stringContains(const std::string &haystack, const std::string& needle) {
         return haystack.find(needle) != std::string::npos;
@@ -477,7 +482,7 @@ namespace {
                       result.reason());
 
         // Try to sync from a node we can't authenticate to
-        MemberHeartbeatData h3Info(0);
+        MemberHeartbeatData h3Info(3);
         h3Info.setAuthIssue();
         topocoord.updateHeartbeatData(now++, h3Info, 3, OpTime(0,0));
 
@@ -488,7 +493,7 @@ namespace {
         ASSERT_EQUALS("not authorized to communicate with h3:27017", result.reason());
 
         // Try to sync from a member that is down
-        MemberHeartbeatData h4Info(1);
+        MemberHeartbeatData h4Info(4);
         h4Info.setDownValues(now, "");
         topocoord.updateHeartbeatData(now++, h4Info, 4, OpTime(0,0));
 
@@ -499,7 +504,7 @@ namespace {
         ASSERT_EQUALS("I cannot reach the requested member: h4:27017", result.reason());
 
         // Sync successfully from a member that is stale
-        MemberHeartbeatData h5Info(2);
+        MemberHeartbeatData h5Info(5);
         h5Info.setUpValues(now, MemberState::RS_SECONDARY, OpTime(0,0), staleOpTime, "", "");
         topocoord.updateHeartbeatData(now++, h5Info, 5, OpTime(0,0));
 
@@ -513,7 +518,7 @@ namespace {
         ASSERT_EQUALS(HostAndPort("h5"), topocoord.getSyncSourceAddress());
 
         // Sync successfully from an up-to-date member
-        MemberHeartbeatData h6Info(2);
+        MemberHeartbeatData h6Info(6);
         h6Info.setUpValues(now, MemberState::RS_SECONDARY, OpTime(0,0), ourOpTime, "", "");
         topocoord.updateHeartbeatData(now++, h6Info, 6, OpTime(0,0));
 
@@ -845,7 +850,7 @@ namespace {
                                             needle));
         }
 
-        void makeSelfPrimary(const OpTime& electionOpTime) {
+        void makeSelfPrimary(const OpTime& electionOpTime = OpTime(0,0)) {
             setSelfMemberState(MemberState::RS_PRIMARY);
             getTopoCoord()._setElectionTime(electionOpTime);
         }
@@ -879,11 +884,12 @@ namespace {
                               "members" << BSON_ARRAY(
                                   BSON("_id" << 0 << "host" << "host1:27017") <<
                                   BSON("_id" << 1 << "host" << "host2:27017") <<
-                                  BSON("_id" << 2 << "host" << "host3:27017"))),
+                                  BSON("_id" << 2 << "host" << "host3:27017")) <<
+                              "settings" << BSON("heartbeatTimeoutSecs" << 5)),
                          0);
         }
 
-        ReplSetHeartbeatResponse::HeartbeatResultAction updateHeartbeatUpData(
+        HeartbeatResponseAction::Action updateHeartbeatUpData(
                 int memberIndex,
                 const MemberState& memberState,
                 const OpTime& election,
@@ -897,7 +903,7 @@ namespace {
                                                       lastOpTimeReceiver);
         }
 
-        ReplSetHeartbeatResponse::HeartbeatResultAction updateHeartbeatDownData(
+        HeartbeatResponseAction::Action updateHeartbeatDownData(
                 int memberIndex,
                 const OpTime& lastOpTimeReceiver) {
             MemberHeartbeatData hInfo(memberIndex);
@@ -909,12 +915,247 @@ namespace {
         }
     };
 
+    TEST_F(UpdateHeartbeatDataTest, HeartbeatRetriesAtMostTwice) {
+        // Confirm that the topology coordinator attempts to retry a failed heartbeat two times
+        // after initial failure, assuming that the heartbeat timeout (set to 5 seconds in the
+        // fixture) has not expired.
+        //
+        // Failed heartbeats propose taking no action, other than scheduling the next heartbeat.  We
+        // can detect a retry vs the next regularly scheduled heartbeat because retries are
+        // scheduled immediately, while subsequent heartbeats are scheduled after the hard-coded
+        // heartbeat interval of 2 seconds.
+        HostAndPort target("host2", 27017);
+        Date_t firstRequestDate = unittest::assertGet(dateFromISOString("2014-08-29T13:00Z"));
+
+        // Initial heartbeat request prepared, at t + 0.
+        std::pair<ReplSetHeartbeatArgs, Milliseconds> request =
+            getTopoCoord().prepareHeartbeatRequest(firstRequestDate,
+                                                   "rs0",
+                                                   target);
+        // 5 seconds to successfully complete the heartbeat before the timeout expires.
+        ASSERT_EQUALS(5000, request.second.total_milliseconds());
+
+        // Initial heartbeat request fails at t + 4000ms
+        TopologyCoordinatorImpl::HeartbeatResponseAction action =
+            getTopoCoord().processHeartbeatResponse(
+                    firstRequestDate + 4000, // 4 of the 5 seconds elapsed; could still retry.
+                    Milliseconds(3990), // Spent 3.99 of the 4 seconds in the network.
+                    target,
+                    StatusWith<ReplSetHeartbeatResponse>(ErrorCodes::NodeNotFound, "Bad DNS?"),
+                    OpTime(0, 0));  // We've never applied anything.
+
+        ASSERT_EQUALS(TopologyCoordinatorImpl::HeartbeatResponseAction::NoAction,
+                      action.getAction());
+        // Because the heartbeat failed without timing out, we expect to retry immediately.
+        ASSERT_EQUALS(Date_t(firstRequestDate + 4000), action.getNextHeartbeatStartDate());
+
+        // First heartbeat retry prepared, at t + 4000ms.
+        request =
+            getTopoCoord().prepareHeartbeatRequest(
+                    firstRequestDate + 4000,
+                    "rs0",
+                    target);
+        // One second left to complete the heartbeat.
+        ASSERT_EQUALS(1000, request.second.total_milliseconds());
+
+        // First retry fails at t + 4500ms
+        action =
+            getTopoCoord().processHeartbeatResponse(
+                    firstRequestDate + 4500, // 4.5 of the 5 seconds elapsed; could still retry.
+                    Milliseconds(400), // Spent 0.4 of the 0.5 seconds in the network.
+                    target,
+                    StatusWith<ReplSetHeartbeatResponse>(ErrorCodes::NodeNotFound, "Bad DNS?"),
+                    OpTime(0, 0));  // We've never applied anything.
+        ASSERT_EQUALS(TopologyCoordinatorImpl::HeartbeatResponseAction::NoAction,
+                      action.getAction());
+        // Because the first retry failed without timing out, we expect to retry immediately.
+        ASSERT_EQUALS(Date_t(firstRequestDate + 4500), action.getNextHeartbeatStartDate());
+
+        // Second retry prepared at t + 4500ms.
+        request =
+            getTopoCoord().prepareHeartbeatRequest(
+                    firstRequestDate + 4500,
+                    "rs0",
+                    target);
+        // 500ms left to complete the heartbeat.
+        ASSERT_EQUALS(500, request.second.total_milliseconds());
+
+        // Second retry fails at t + 4800ms
+        action =
+            getTopoCoord().processHeartbeatResponse(
+                    firstRequestDate + 4800, // 4.8 of the 5 seconds elapsed; could still retry.
+                    Milliseconds(100), // Spent 0.1 of the 0.3 seconds in the network.
+                    target,
+                    StatusWith<ReplSetHeartbeatResponse>(ErrorCodes::NodeNotFound, "Bad DNS?"),
+                    OpTime(0, 0));  // We've never applied anything.
+        ASSERT_EQUALS(TopologyCoordinatorImpl::HeartbeatResponseAction::NoAction,
+                      action.getAction());
+        // Because this is the second retry, rather than retry again, we expect to wait for the
+        // heartbeat interval of 2 seconds to elapse.
+        ASSERT_EQUALS(Date_t(firstRequestDate + 6800), action.getNextHeartbeatStartDate());
+    }
+
+    TEST_F(UpdateHeartbeatDataTest, HeartbeatTimeoutSuppressesFirstRetry) {
+        // Confirm that the topology coordinator does not schedule an immediate heartbeat retry if
+        // the heartbeat timeout period expired before the initial request completed.
+
+        HostAndPort target("host2", 27017);
+        Date_t firstRequestDate = unittest::assertGet(dateFromISOString("2014-08-29T13:00Z"));
+
+        // Initial heartbeat request prepared, at t + 0.
+        std::pair<ReplSetHeartbeatArgs, Milliseconds> request =
+            getTopoCoord().prepareHeartbeatRequest(firstRequestDate,
+                                                   "rs0",
+                                                   target);
+        // 5 seconds to successfully complete the heartbeat before the timeout expires.
+        ASSERT_EQUALS(5000, request.second.total_milliseconds());
+
+        // Initial heartbeat request fails at t + 5000ms
+        TopologyCoordinatorImpl::HeartbeatResponseAction action =
+            getTopoCoord().processHeartbeatResponse(
+                    firstRequestDate + 5000, // Entire heartbeat period elapsed; no retry allowed.
+                    Milliseconds(4990), // Spent 4.99 of the 4 seconds in the network.
+                    target,
+                    StatusWith<ReplSetHeartbeatResponse>(ErrorCodes::ExceededTimeLimit,
+                                                         "Took too long"),
+                    OpTime(0, 0));  // We've never applied anything.
+
+        ASSERT_EQUALS(TopologyCoordinatorImpl::HeartbeatResponseAction::NoAction,
+                      action.getAction());
+        // Because the heartbeat timed out, we'll retry in 2 seconds.
+        ASSERT_EQUALS(Date_t(firstRequestDate + 7000), action.getNextHeartbeatStartDate());
+    }
+
+    TEST_F(UpdateHeartbeatDataTest, HeartbeatTimeoutSuppressesSecondRetry) {
+        // Confirm that the topology coordinator does not schedule an second heartbeat retry if
+        // the heartbeat timeout period expired before the first retry completed.
+
+        HostAndPort target("host2", 27017);
+        Date_t firstRequestDate = unittest::assertGet(dateFromISOString("2014-08-29T13:00Z"));
+
+        // Initial heartbeat request prepared, at t + 0.
+        std::pair<ReplSetHeartbeatArgs, Milliseconds> request =
+            getTopoCoord().prepareHeartbeatRequest(firstRequestDate,
+                                                   "rs0",
+                                                   target);
+        // 5 seconds to successfully complete the heartbeat before the timeout expires.
+        ASSERT_EQUALS(5000, request.second.total_milliseconds());
+
+        // Initial heartbeat request fails at t + 5000ms
+        TopologyCoordinatorImpl::HeartbeatResponseAction action =
+            getTopoCoord().processHeartbeatResponse(
+                    firstRequestDate + 4000, // 4 seconds elapsed, retry allowed.
+                    Milliseconds(3990), // Spent 3.99 of the 4 seconds in the network.
+                    target,
+                    StatusWith<ReplSetHeartbeatResponse>(ErrorCodes::ExceededTimeLimit,
+                                                         "Took too long"),
+                    OpTime(0, 0));  // We've never applied anything.
+
+        ASSERT_EQUALS(TopologyCoordinatorImpl::HeartbeatResponseAction::NoAction,
+                      action.getAction());
+        // Because the heartbeat failed without timing out, we expect to retry immediately.
+        ASSERT_EQUALS(Date_t(firstRequestDate + 4000), action.getNextHeartbeatStartDate());
+
+        // First heartbeat retry prepared, at t + 4000ms.
+        request =
+            getTopoCoord().prepareHeartbeatRequest(
+                    firstRequestDate + 4000,
+                    "rs0",
+                    target);
+        // One second left to complete the heartbeat.
+        ASSERT_EQUALS(1000, request.second.total_milliseconds());
+
+        action =
+            getTopoCoord().processHeartbeatResponse(
+                    firstRequestDate + 5010, // Entire heartbeat period elapsed; no retry allowed.
+                    Milliseconds(1000), // Spent 1 of the 1.01 seconds in the network.
+                    target,
+                    StatusWith<ReplSetHeartbeatResponse>(ErrorCodes::ExceededTimeLimit,
+                                                         "Took too long"),
+                    OpTime(0, 0));  // We've never applied anything.
+
+        ASSERT_EQUALS(TopologyCoordinatorImpl::HeartbeatResponseAction::NoAction,
+                      action.getAction());
+        // Because the heartbeat timed out, we'll retry in 2 seconds.
+        ASSERT_EQUALS(Date_t(firstRequestDate + 7010), action.getNextHeartbeatStartDate());
+    }
+
+    TEST_F(UpdateHeartbeatDataTest, DecideToReconfigAfterFirstRetry) {
+        // Confirm that action responses can come back from retries; in this, expect a Reconfig
+        // action.
+
+        HostAndPort target("host2", 27017);
+        Date_t firstRequestDate = unittest::assertGet(dateFromISOString("2014-08-29T13:00Z"));
+
+        // Initial heartbeat request prepared, at t + 0.
+        std::pair<ReplSetHeartbeatArgs, Milliseconds> request =
+            getTopoCoord().prepareHeartbeatRequest(firstRequestDate,
+                                                   "rs0",
+                                                   target);
+        // 5 seconds to successfully complete the heartbeat before the timeout expires.
+        ASSERT_EQUALS(5000, request.second.total_milliseconds());
+
+        // Initial heartbeat request fails at t + 5000ms
+        TopologyCoordinatorImpl::HeartbeatResponseAction action =
+            getTopoCoord().processHeartbeatResponse(
+                    firstRequestDate + 4000, // 4 seconds elapsed, retry allowed.
+                    Milliseconds(3990), // Spent 3.99 of the 4 seconds in the network.
+                    target,
+                    StatusWith<ReplSetHeartbeatResponse>(ErrorCodes::ExceededTimeLimit,
+                                                         "Took too long"),
+                    OpTime(0, 0));  // We've never applied anything.
+
+        ASSERT_EQUALS(TopologyCoordinatorImpl::HeartbeatResponseAction::NoAction,
+                      action.getAction());
+        // Because the heartbeat failed without timing out, we expect to retry immediately.
+        ASSERT_EQUALS(Date_t(firstRequestDate + 4000), action.getNextHeartbeatStartDate());
+
+        // First heartbeat retry prepared, at t + 4000ms.
+        request =
+            getTopoCoord().prepareHeartbeatRequest(
+                    firstRequestDate + 4000,
+                    "rs0",
+                    target);
+        // One second left to complete the heartbeat.
+        ASSERT_EQUALS(1000, request.second.total_milliseconds());
+
+        ReplicaSetConfig newConfig;
+        ASSERT_OK(newConfig.initialize(
+                          BSON("_id" << "rs0" <<
+                               "version" << 7 <<
+                               "members" << BSON_ARRAY(
+                                       BSON("_id" << 0 << "host" << "host1:27017") <<
+                                       BSON("_id" << 1 << "host" << "host2:27017") <<
+                                       BSON("_id" << 2 << "host" << "host3:27017") <<
+                                       BSON("_id" << 3 << "host" << "host4:27017")) <<
+                               "settings" << BSON("heartbeatTimeoutSecs" << 5))));
+        ASSERT_OK(newConfig.validate());
+
+        ReplSetHeartbeatResponse reconfigResponse;
+        reconfigResponse.noteReplSet();
+        reconfigResponse.setSetName("rs0");
+        reconfigResponse.setState(MemberState::RS_SECONDARY);
+        reconfigResponse.setElectable(true);
+        reconfigResponse.setVersion(7);
+        reconfigResponse.setConfig(newConfig);
+        action =
+            getTopoCoord().processHeartbeatResponse(
+                    firstRequestDate + 4500, // Time is left.
+                    Milliseconds(400), // Spent 0.4 of the 0.5 second in the network.
+                    target,
+                    StatusWith<ReplSetHeartbeatResponse>(reconfigResponse),
+                    OpTime(0, 0));  // We've never applied anything.
+        ASSERT_EQUALS(TopologyCoordinatorImpl::HeartbeatResponseAction::Reconfig,
+                      action.getAction());
+        ASSERT_EQUALS(Date_t(firstRequestDate + 6500), action.getNextHeartbeatStartDate());
+    }
+
     TEST_F(UpdateHeartbeatDataTest, UpdateHeartbeatDataOlderConfigVersionNoMajority) {
         OpTime staleOpTime = OpTime(1,0);
         OpTime election = OpTime(5,0);
         OpTime lastOpTimeApplied = OpTime(3,0);
 
-        ReplSetHeartbeatResponse::HeartbeatResultAction nextAction = 
+        HeartbeatResponseAction::Action nextAction =
                 updateHeartbeatUpData(1,
                                       MemberState::RS_SECONDARY,
                                       election,
@@ -927,7 +1168,7 @@ namespace {
         OpTime election = OpTime(5,0);
         OpTime lastOpTimeApplied = OpTime(3,0);
 
-        ReplSetHeartbeatResponse::HeartbeatResultAction nextAction = 
+        HeartbeatResponseAction::Action nextAction = 
                 updateHeartbeatUpData(1,
                                       MemberState::RS_SECONDARY,
                                       election,
@@ -941,7 +1182,7 @@ namespace {
         OpTime election2 = OpTime(4,0);
         OpTime lastOpTimeApplied = OpTime(3,0);
 
-        ReplSetHeartbeatResponse::HeartbeatResultAction nextAction = 
+        HeartbeatResponseAction::Action nextAction = 
                 updateHeartbeatUpData(1,
                                       MemberState::RS_PRIMARY,
                                       election,
@@ -962,7 +1203,7 @@ namespace {
         OpTime election2 = OpTime(5,0);
         OpTime lastOpTimeApplied = OpTime(3,0);
 
-        ReplSetHeartbeatResponse::HeartbeatResultAction nextAction = 
+        HeartbeatResponseAction::Action nextAction = 
                 updateHeartbeatUpData(1,
                                       MemberState::RS_PRIMARY,
                                       election,
@@ -984,13 +1225,13 @@ namespace {
         OpTime election = OpTime(4,0);
         OpTime lastOpTimeApplied = OpTime(3,0);
 
-        ReplSetHeartbeatResponse::HeartbeatResultAction nextAction = 
+        HeartbeatResponseAction::Action nextAction = 
                 updateHeartbeatUpData(1,
                                       MemberState::RS_PRIMARY,
                                       election,
                                       election,
                                       lastOpTimeApplied);
-        ASSERT_EQUALS(ReplSetHeartbeatResponse::StepDownRemotePrimary, nextAction);
+        ASSERT_EQUALS(HeartbeatResponseAction::StepDownRemotePrimary, nextAction);
     }
 
     TEST_F(UpdateHeartbeatDataTest, UpdateHeartbeatDataTwoPrimariesIncludingMeNewOneNewer) {
@@ -999,13 +1240,13 @@ namespace {
         OpTime election = OpTime(4,0);
         OpTime lastOpTimeApplied = OpTime(3,0);
 
-        ReplSetHeartbeatResponse::HeartbeatResultAction nextAction = 
+        HeartbeatResponseAction::Action nextAction = 
                 updateHeartbeatUpData(1,
                                       MemberState::RS_PRIMARY,
                                       election,
                                       election,
                                       lastOpTimeApplied);
-        ASSERT_EQUALS(ReplSetHeartbeatResponse::StepDownSelf, nextAction);
+        ASSERT_EQUALS(HeartbeatResponseAction::StepDownSelf, nextAction);
     }
 
     TEST_F(UpdateHeartbeatDataTest, UpdateHeartbeatDataPrimaryDownNoMajority) {
@@ -1014,7 +1255,7 @@ namespace {
         OpTime election = OpTime(4,0);
         OpTime lastOpTimeApplied = OpTime(3,0);
 
-        ReplSetHeartbeatResponse::HeartbeatResultAction nextAction = 
+        HeartbeatResponseAction::Action nextAction = 
                 updateHeartbeatUpData(1,
                                       MemberState::RS_PRIMARY,
                                       election,
@@ -1040,7 +1281,7 @@ namespace {
         OpTime election = OpTime(4,0);
         OpTime lastOpTimeApplied = OpTime(3,0);
 
-        ReplSetHeartbeatResponse::HeartbeatResultAction nextAction = 
+        HeartbeatResponseAction::Action nextAction = 
                 updateHeartbeatUpData(1,
                                       MemberState::RS_PRIMARY,
                                       election,
@@ -1065,7 +1306,7 @@ namespace {
         OpTime election = OpTime(4,0);
         OpTime lastOpTimeApplied = OpTime(3,0);
 
-        ReplSetHeartbeatResponse::HeartbeatResultAction nextAction = 
+        HeartbeatResponseAction::Action nextAction = 
                 updateHeartbeatUpData(1,
                                       MemberState::RS_PRIMARY,
                                       election,
@@ -1090,7 +1331,7 @@ namespace {
         OpTime election = OpTime(4,0);
         OpTime lastOpTimeApplied = OpTime(3,0);
 
-        ReplSetHeartbeatResponse::HeartbeatResultAction nextAction = 
+        HeartbeatResponseAction::Action nextAction = 
                 updateHeartbeatUpData(1,
                                       MemberState::RS_PRIMARY,
                                       election,
@@ -1108,7 +1349,7 @@ namespace {
         OpTime election = OpTime(4,0);
         OpTime lastOpTimeApplied = OpTime(3,0);
 
-        ReplSetHeartbeatResponse::HeartbeatResultAction nextAction = 
+        HeartbeatResponseAction::Action nextAction = 
                 updateHeartbeatUpData(1,
                                       MemberState::RS_PRIMARY,
                                       election,
@@ -1144,7 +1385,7 @@ namespace {
         OpTime election = OpTime(4,0);
         OpTime lastOpTimeApplied = OpTime(3,0);
 
-        ReplSetHeartbeatResponse::HeartbeatResultAction nextAction = 
+        HeartbeatResponseAction::Action nextAction = 
                 updateHeartbeatUpData(1,
                                       MemberState::RS_PRIMARY,
                                       election,
@@ -1162,7 +1403,7 @@ namespace {
         OpTime election = OpTime(4,0);
         OpTime lastOpTimeApplied = OpTime(3,0);
 
-        ReplSetHeartbeatResponse::HeartbeatResultAction nextAction = 
+        HeartbeatResponseAction::Action nextAction = 
                 updateHeartbeatUpData(1,
                                       MemberState::RS_PRIMARY,
                                       election,
@@ -1178,7 +1419,7 @@ namespace {
         ASSERT_NO_ACTION(nextAction);
 
         nextAction = updateHeartbeatDownData(1, lastOpTimeApplied);
-        ASSERT_EQUALS(ReplSetHeartbeatResponse::StartElection, nextAction);
+        ASSERT_EQUALS(HeartbeatResponseAction::StartElection, nextAction);
     }
 
     class PrepareElectResponseTest : public TopoCoordTest {
@@ -1386,6 +1627,174 @@ namespace {
         ASSERT_EQUALS(1, response3["vote"].Int());
         ASSERT_EQUALS(round, response3["round"].OID());
         ASSERT_EQUALS(1, countLogLinesContaining("voting yea for h3:27017 (3)"));
+    }
+
+    class PrepareFreezeResponseTest : public TopoCoordTest {
+    public:
+
+        virtual void setUp() {
+            TopoCoordTest::setUp();
+            updateConfig(BSON("_id" << "rs0" <<
+                              "version" << 5 <<
+                              "members" << BSON_ARRAY(
+                                  BSON("_id" << 0 << "host" << "host1:27017") <<
+                                  BSON("_id" << 1 << "host" << "host2:27017"))),
+                         0);
+        }
+
+        BSONObj prepareFreezeResponse(int duration,
+                                      Status& result) {
+            BSONObjBuilder response;
+            startCapturingLogMessages();
+            getTopoCoord().prepareFreezeResponse(cbData(), now()++, duration, &response, &result);
+            stopCapturingLogMessages();
+            return response.obj();
+        }
+    };
+
+    TEST_F(PrepareFreezeResponseTest, UnfreezeEvenWhenNotFrozen) {
+        Status result = Status(ErrorCodes::InternalError, "");
+        BSONObj response = prepareFreezeResponse(0, result);
+        ASSERT_EQUALS(Status::OK(), result);
+        ASSERT_EQUALS("unfreezing", response["info"].String());
+        ASSERT_EQUALS(1, countLogLinesContaining("replSet info 'unfreezing'"));
+    }
+
+    TEST_F(PrepareFreezeResponseTest, FreezeForOneSecond) {
+        Status result = Status(ErrorCodes::InternalError, "");
+        BSONObj response = prepareFreezeResponse(1, result);
+        ASSERT_EQUALS(Status::OK(), result);
+        ASSERT_EQUALS("you really want to freeze for only 1 second?",
+                      response["warning"].String());
+        ASSERT_EQUALS(1, countLogLinesContaining("replSet info 'freezing' for 1 seconds"));
+    }
+
+    TEST_F(PrepareFreezeResponseTest, FreezeForManySeconds) {
+        Status result = Status(ErrorCodes::InternalError, "");
+        BSONObj response = prepareFreezeResponse(20, result);
+        ASSERT_EQUALS(Status::OK(), result);
+        ASSERT_TRUE(response.isEmpty());
+        ASSERT_EQUALS(1, countLogLinesContaining("replSet info 'freezing' for 20 seconds"));
+    }
+
+    TEST_F(PrepareFreezeResponseTest, UnfreezeEvenWhenNotFrozenWhilePrimary) {
+        makeSelfPrimary();
+        Status result = Status(ErrorCodes::InternalError, "");
+        BSONObj response = prepareFreezeResponse(0, result);
+        ASSERT_EQUALS(Status::OK(), result);
+        ASSERT_EQUALS("unfreezing", response["info"].String());
+        // doesn't mention being primary in this case for some reason
+        ASSERT_EQUALS(0, countLogLinesContaining(
+                "replSet info received freeze command but we are primary"));
+    }
+
+    TEST_F(PrepareFreezeResponseTest, FreezeForOneSecondWhilePrimary) {
+        makeSelfPrimary();
+        Status result = Status(ErrorCodes::InternalError, "");
+        BSONObj response = prepareFreezeResponse(1, result);
+        ASSERT_EQUALS(Status::OK(), result);
+        ASSERT_EQUALS("you really want to freeze for only 1 second?",
+                      response["warning"].String());
+        ASSERT_EQUALS(1, countLogLinesContaining(
+                "replSet info received freeze command but we are primary"));
+    }
+
+    TEST_F(PrepareFreezeResponseTest, FreezeForManySecondsWhilePrimary) {
+        makeSelfPrimary();
+        Status result = Status(ErrorCodes::InternalError, "");
+        BSONObj response = prepareFreezeResponse(20, result);
+        ASSERT_EQUALS(Status::OK(), result);
+        ASSERT_TRUE(response.isEmpty());
+        ASSERT_EQUALS(1, countLogLinesContaining(
+                "replSet info received freeze command but we are primary"));
+    }
+
+    class ShutdownInProgressTest : public TopoCoordTest {
+    public:
+
+        ShutdownInProgressTest() :
+            ourCbData(NULL,
+                      ReplicationExecutor::CallbackHandle(),
+                      Status(ErrorCodes::CallbackCanceled, "")) {}
+
+        virtual ReplicationExecutor::CallbackData cbData() { return ourCbData; }
+
+    private:
+        ReplicationExecutor::CallbackData ourCbData;
+    };
+
+    TEST_F(ShutdownInProgressTest, ShutdownInProgressWhenCallbackCanceledSyncFrom) {
+        Status result = Status::OK();
+        BSONObjBuilder response;
+        getTopoCoord().prepareSyncFromResponse(cbData(),
+                                               HostAndPort("host2:27017"),
+                                               OpTime(0,0),
+                                               &response,
+                                               &result);
+        ASSERT_EQUALS(ErrorCodes::ShutdownInProgress, result);
+        ASSERT_TRUE(response.obj().isEmpty());
+
+    }
+
+    TEST_F(ShutdownInProgressTest, ShutDownInProgressWhenCallbackCanceledFresh) {
+        Status result = Status::OK();
+        BSONObjBuilder response;
+        getTopoCoord().prepareFreshResponse(cbData(),
+                                            ReplicationCoordinator::ReplSetFreshArgs(),
+                                            OpTime(0,0),
+                                            &response,
+                                            &result);
+        ASSERT_EQUALS(ErrorCodes::ShutdownInProgress, result);
+        ASSERT_TRUE(response.obj().isEmpty());
+    }
+
+    TEST_F(ShutdownInProgressTest, ShutDownInProgressWhenCallbackCanceledElectCmd) {
+        Status result = Status::OK();
+        BSONObjBuilder response;
+        getTopoCoord().prepareFreshResponse(cbData(),
+                                            ReplicationCoordinator::ReplSetFreshArgs(),
+                                            OpTime(0,0),
+                                            &response,
+                                            &result);
+        ASSERT_EQUALS(ErrorCodes::ShutdownInProgress, result);
+        ASSERT_TRUE(response.obj().isEmpty());
+    }
+
+    TEST_F(ShutdownInProgressTest, ShutDownInProgressWhenCallbackCanceledHeartbeat) {
+        Status result = Status::OK();
+        BSONObjBuilder response;
+        getTopoCoord().prepareFreshResponse(cbData(),
+                                            ReplicationCoordinator::ReplSetFreshArgs(),
+                                            OpTime(0,0),
+                                            &response,
+                                            &result);
+        ASSERT_EQUALS(ErrorCodes::ShutdownInProgress, result);
+        ASSERT_TRUE(response.obj().isEmpty());
+    }
+
+    TEST_F(ShutdownInProgressTest, ShutDownInProgressWhenCallbackCanceledStatus) {
+        Status result = Status::OK();
+        BSONObjBuilder response;
+        getTopoCoord().prepareFreshResponse(cbData(),
+                                            ReplicationCoordinator::ReplSetFreshArgs(),
+                                            OpTime(0,0),
+                                            &response,
+                                            &result);
+        ASSERT_EQUALS(ErrorCodes::ShutdownInProgress, result);
+        ASSERT_TRUE(response.obj().isEmpty());
+    }
+
+    TEST_F(ShutdownInProgressTest, ShutDownInProgressWhenCallbackCanceledFreeze) {
+        Status result = Status::OK();
+        BSONObjBuilder response;
+        getTopoCoord().prepareFreshResponse(cbData(),
+                                            ReplicationCoordinator::ReplSetFreshArgs(),
+                                            OpTime(0,0),
+                                            &response,
+                                            &result);
+        ASSERT_EQUALS(ErrorCodes::ShutdownInProgress, result);
+        ASSERT_TRUE(response.obj().isEmpty());
+
     }
 
 }  // namespace

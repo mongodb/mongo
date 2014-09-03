@@ -501,12 +501,29 @@ namespace mongo {
         // If we're answering a query on a sharded system, we need to drop documents that aren't
         // logically part of our shard.
         if (params.options & QueryPlannerParams::INCLUDE_SHARD_FILTER) {
-            // TODO: We could use params.shardKey to do fetch analysis instead of always fetching.
+
             if (!solnRoot->fetched()) {
-                FetchNode* fetch = new FetchNode();
-                fetch->children.push_back(solnRoot);
-                solnRoot = fetch;
+
+                // See if we need to fetch information for our shard key.
+                // NOTE: Solution nodes only list ordinary, non-transformed index keys for now
+
+                bool fetch = false;
+                BSONObjIterator it(params.shardKey);
+                while (it.more()) {
+                    BSONElement nextEl = it.next();
+                    if (!solnRoot->hasField(nextEl.fieldName())) {
+                        fetch = true;
+                        break;
+                    }
+                }
+
+                if (fetch) {
+                    FetchNode* fetch = new FetchNode();
+                    fetch->children.push_back(solnRoot);
+                    solnRoot = fetch;
+                }
             }
+
             ShardingFilterNode* sfn = new ShardingFilterNode();
             sfn->children.push_back(solnRoot);
             solnRoot = sfn;

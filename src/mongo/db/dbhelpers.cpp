@@ -419,7 +419,7 @@ namespace mongo {
                     bool docIsOrphan;
                     if ( metadataNow ) {
                         KeyPattern kp( metadataNow->getKeyPattern() );
-                        BSONObj key = kp.extractSingleKey( obj );
+                        BSONObj key = kp.extractShardKeyFromDoc(obj);
                         docIsOrphan = !metadataNow->keyBelongsToMe( key )
                             && !metadataNow->keyIsPending( key );
                     }

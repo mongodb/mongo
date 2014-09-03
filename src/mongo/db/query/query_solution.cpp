@@ -26,6 +26,7 @@
  *    it in the license file.
  */
 
+#include "mongo/db/index_names.h"
 #include "mongo/db/query/query_solution.h"
 #include "mongo/db/query/lite_parsed_query.h"
 #include "mongo/db/matcher/expression_geo.h"
@@ -411,6 +412,10 @@ namespace mongo {
         // There is no covering in a multikey index because you don't know whether or not the field
         // in the key was extracted from an array in the original document.
         if (indexIsMultiKey) { return false; }
+
+        // Custom index access methods may return non-exact key data - this function is currently
+        // used for covering exact key data only.
+        if (IndexNames::BTREE != IndexNames::findPluginName(indexKeyPattern)) { return false; }
 
         BSONObjIterator it(indexKeyPattern);
         while (it.more()) {

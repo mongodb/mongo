@@ -43,5 +43,5 @@ namespace mongo {
 
     bool isUniqueIndexCompatible(const BSONObj& shardKeyPattern, const BSONObj& uIndexKeyPattern);
 
-    bool isShardDocSizeValid(const BSONObj& shardKey, const BSONObj& doc, std::string* errMsg);
+    bool isShardKeySizeValid(const BSONObj& shardKey, std::string* errMsg);
 }

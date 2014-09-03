@@ -412,7 +412,7 @@ namespace repl {
         void _onFreshnessCheckComplete(const ReplicationExecutor::CallbackData& cbData,
                                        const ReplicationExecutor::EventHandle& finishEvh);
 
-        /** 
+        /**
          * Callback called when the ElectCmdRunner has completed; checks the results and
          * decides whether to complete the election and change state to primary.
          * finishEvh is an event that is signaled when election is complete.
@@ -420,89 +420,101 @@ namespace repl {
         void _onElectCmdRunnerComplete(const ReplicationExecutor::CallbackData& cbData,
                                        const ReplicationExecutor::EventHandle& finishEvh);
 
-        // Handles to actively queued heartbeats.
-        // Only accessed serially in ReplicationExecutor callbacks, which makes it safe to access
-        // outside of _mutex.
-        HeartbeatHandles _heartbeatHandles;
 
-        // Parsed command line arguments related to replication.  Set once at startup and then
-        // never modified again, which makes it safe to read outside of _mutex.
-        // TODO(spencer): Currently this actually is not true, there is global mutable state
-        // in ReplSettings, but we should be able to get rid of that after the legacy repl
-        // coordinator is gone. At that point we can make this const.
-        ReplSettings _settings;
-
-        // Pointer to the TopologyCoordinator owned by this ReplicationCoordinator.
-        boost::scoped_ptr<TopologyCoordinator> _topCoord;
-
-        // Executor that drives the topology coordinator.
-        ReplicationExecutor _replExecutor;
-
-        // Pointer to the ReplicationCoordinatorExternalState owned by this ReplicationCoordinator.
-        boost::scoped_ptr<ReplicationCoordinatorExternalState> _externalState;
-
-        // Thread that _syncSourceFeedback runs in to send replSetUpdatePosition commands upstream.
-        boost::scoped_ptr<boost::thread> _syncSourceFeedbackThread;
-
-        // Thread that drives actions in the topology coordinator
-        boost::scoped_ptr<boost::thread> _topCoordDriverThread;
+        //
+        // All member variables are labeled with one of the following codes indicating the
+        // synchronization rules for accessing them.
+        //
+        // (R)  Read-only in concurrent operation; no synchronization required.
+        // (S)  Self-synchronizing; access in any way from any context.
+        // (PS) Pointer is read-only in concurrent operation, item pointed to is self-synchronizing;
+        //      Access in any context.
+        // (M)  Reads and writes guarded by _mutex
+        // (X)  Reads and writes must be performed in a callback in _replExecutor
+        // (MX) Must hold _mutex and be in a callback in _replExecutor to write; must either hold
+        //      _mutex or be in a callback in _replExecutor to read.
+        // (I)  Independently synchronized, see member variable comment.
 
         // Protects member data of this ReplicationCoordinator.
-        mutable boost::mutex _mutex;
+        mutable boost::mutex _mutex;                                                      // (S)
 
-        /// ============= All members below this line are guarded by _mutex ==================== ///
+        // Handles to actively queued heartbeats.
+        HeartbeatHandles _heartbeatHandles;                                               // (X)
+
+        // Parsed command line arguments related to replication.
+        // TODO(spencer): Currently there is global mutable state
+        // in ReplSettings, but we should be able to get rid of that after the legacy repl
+        // coordinator is gone. At that point we can make this const.
+        ReplSettings _settings;                                                           // (R)
+
+        // Pointer to the TopologyCoordinator owned by this ReplicationCoordinator.
+        boost::scoped_ptr<TopologyCoordinator> _topCoord;                                 // (X)
+
+        // Executor that drives the topology coordinator.
+        ReplicationExecutor _replExecutor;                                                // (S)
+
+        // Pointer to the ReplicationCoordinatorExternalState owned by this ReplicationCoordinator.
+        boost::scoped_ptr<ReplicationCoordinatorExternalState> _externalState;            // (PS)
+
+        // Thread that _syncSourceFeedback runs in to send replSetUpdatePosition commands upstream.
+        // Set in startReplication() and thereafter accessed in shutdown.
+        boost::scoped_ptr<boost::thread> _syncSourceFeedbackThread;                       // (I)
+
+        // Thread that drives actions in the topology coordinator
+        // Set in startReplication() and thereafter accessed in shutdown.
+        boost::scoped_ptr<boost::thread> _topCoordDriverThread;                           // (I)
 
         // Our RID, used to identify us to our sync source when sending replication progress
-        // updates upstream.  Set once at startup and then never modified again.
-        OID _myRID;
+        // updates upstream.  Set once in startReplication() and then never modified again.
+        OID _myRID;                                                                       // (M)
 
         // Rollback ID. Used to check if a rollback happened during some interval of time
         // TODO: ideally this should only change on rollbacks NOT on mongod restarts also.
-        int _rbid;
+        int _rbid;                                                                        // (M)
 
         // list of information about clients waiting on replication.  Does *not* own the
         // WaiterInfos.
-        std::vector<WaiterInfo*> _replicationWaiterList;
+        std::vector<WaiterInfo*> _replicationWaiterList;                                  // (M)
 
         // Set to true when we are in the process of shutting down replication.
-        bool _inShutdown;
+        bool _inShutdown;                                                                 // (M)
 
         // Election ID of the last election that resulted in this node becoming primary.
-        OID _electionID;
+        OID _electionID;                                                                  // (M)
 
         // Maps nodes in this replication group to information known about it such as its
         // replication progress and its ID in the replica set config.
-        SlaveInfoMap _slaveInfoMap;
+        SlaveInfoMap _slaveInfoMap;                                                       // (M)
 
         // Current ReplicaSet state.
-        MemberState _currentState;
+        MemberState _currentState;                                                        // (M)
 
         // Used to signal threads waiting for changes to _rsConfigState.
-        boost::condition_variable _rsConfigStateChange;
+        boost::condition_variable _rsConfigStateChange;                                   // (M)
 
         // Represents the configuration state of the coordinator, which controls how and when
         // _rsConfig may change.  See the state transition diagram in the type definition of
         // ConfigState for details.
-        ConfigState _rsConfigState;
+        ConfigState _rsConfigState;                                                       // (MX)
 
         // The current ReplicaSet configuration object, including the information about tag groups
         // that is used to satisfy write concern requests with named gle modes.
-        ReplicaSetConfig _rsConfig;
+        ReplicaSetConfig _rsConfig;                                                       // (MX)
 
         // This member's index position in the current config.
-        int _thisMembersConfigIndex;
+        int _thisMembersConfigIndex;                                                      // (MX)
 
         // PRNG; seeded at class construction time.
-        PseudoRandom _random;
+        PseudoRandom _random;                                                             // (M)
 
         // Used for conducting an election of this node;
         // the presence of a non-null _freshnessChecker pointer indicates that an election is
         // currently in progress.  Only one election is allowed at once.
-        boost::scoped_ptr<FreshnessChecker> _freshnessChecker;
-        boost::scoped_ptr<ElectCmdRunner> _electCmdRunner;
+        boost::scoped_ptr<FreshnessChecker> _freshnessChecker;                            // (X)
+        boost::scoped_ptr<ElectCmdRunner> _electCmdRunner;                                // (X)
 
         // Whether we slept last time we attempted an election but possibly tied with other nodes.
-        bool _sleptLastElection;
+        bool _sleptLastElection;                                                          // (X)
     };
 
 } // namespace repl

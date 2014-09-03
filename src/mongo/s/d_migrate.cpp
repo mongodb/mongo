@@ -216,7 +216,7 @@ namespace mongo {
                     const BSONObj& max ,
                     const BSONObj& shardKeyPattern ) {
         ShardKeyPattern shardKey( shardKeyPattern );
-        BSONObj k = shardKey.extractKey( obj );
+        BSONObj k = shardKey.extractKeyFromQueryOrDoc( obj );
         return k.woCompare( min ) >= 0 && k.woCompare( max ) < 0;
     }
 

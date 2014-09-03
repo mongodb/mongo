@@ -125,8 +125,6 @@ namespace repl {
 
     void ElectCmdRunner::_signalSufficientResponsesReceived(ReplicationExecutor* executor) {
         if (_sufficientResponsesReceived.isValid()) {
-            executor->signalEvent(_sufficientResponsesReceived);
-            _sufficientResponsesReceived = ReplicationExecutor::EventHandle();
 
             // Cancel any remaining command callbacks.
             std::for_each(_responseCallbacks.begin(),
@@ -134,6 +132,9 @@ namespace repl {
                           stdx::bind(&ReplicationExecutor::cancel,
                                      executor,
                                      stdx::placeholders::_1));   
+
+            executor->signalEvent(_sufficientResponsesReceived);
+            _sufficientResponsesReceived = ReplicationExecutor::EventHandle();
         }
     }
 

@@ -240,7 +240,7 @@ namespace mongo {
         conn.done();
         if ( end.isEmpty() )
             return BSONObj();
-        return _manager->getShardKey().extractKey( end );
+        return _manager->getShardKey().extractKeyFromQueryOrDoc( end );
     }
 
     void Chunk::pickMedianKey( BSONObj& medianKey ) const {
@@ -1228,7 +1228,7 @@ namespace mongo {
     }
 
     ChunkPtr ChunkManager::findChunkForDoc( const BSONObj& doc ) const {
-        BSONObj key = _key.extractKey( doc );
+        BSONObj key = _key.extractKeyFromQueryOrDoc( doc );
         return findIntersectingChunk( key );
     }
 

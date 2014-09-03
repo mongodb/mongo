@@ -1369,7 +1369,7 @@ namespace mongo {
                             // because of a chunk migration
                             if ( collMetadata ) {
                                 KeyPattern kp( collMetadata->getKeyPattern() );
-                                if ( !collMetadata->keyBelongsToMe( kp.extractSingleKey( o ) ) ) {
+                                if (!collMetadata->keyBelongsToMe(kp.extractShardKeyFromDoc(o))) {
                                     continue;
                                 }
                             }

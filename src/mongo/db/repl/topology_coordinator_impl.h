@@ -49,23 +49,61 @@ namespace repl {
     /**
      * Represents a latency measurement for each replica set member based on heartbeat requests.
      * The measurement is an average weighted 80% to the old value, and 20% to the new value.
+     *
+     * Also stores information about heartbeat progress and retries.
      */
     class PingStats {
     public:
         PingStats();
 
+        /**
+         * Records that a new heartbeat request started at "now".
+         *
+         * This resets the failure count used in determining whether the next request to a target
+         * should be a retry or a regularly scheduled heartbeat message.
+         */
+        void start(Date_t now);
+
+        /**
+         * Records that a heartbeat request completed successfully, and that "millis" milliseconds
+         * were spent for a single network roundtrip plus remote processing time.
+         */
         void hit(int millis);
 
-        unsigned int getCount() {
-            return count;
-        }
+        /**
+         * Records that a heartbeat request failed.
+         */
+        void miss();
 
-        unsigned int getMillis() {
-            return value;
-        }
+        /**
+         * Gets the number of hit() calls.
+         */
+        unsigned int getCount() const { return count; }
+
+        /**
+         * Gets the weighted average round trip time for heartbeat messages to the target.
+         */
+        unsigned int getMillis() const { return value; }
+
+        /**
+         * Gets the date at which start() was last called, which is used to determine if
+         * a heartbeat should be retried or if the time limit has expired.
+         */
+        Date_t getLastHeartbeatStartDate() const { return _lastHeartbeatStartDate; }
+
+        /**
+         * Gets the number of failures since start() was last called.
+         *
+         * This value is incremented by calls to miss(), cleared by calls to start() and
+         * set to the maximum possible value by calls to hit().
+         */
+        int getNumFailuresSinceLastStart() const { return _numFailuresSinceLastStart; }
+
     private:
         unsigned int count;
         unsigned int value;
+        Date_t _lastHeartbeatStartDate;
+        int _numFailuresSinceLastStart;
     };
 
     class TopologyCoordinatorImpl : public TopologyCoordinator {
@@ -94,7 +132,7 @@ namespace repl {
         virtual void registerConfigChangeCallback(const ConfigChangeCallbackFn& fn);
         // ReplCoord needs to know the state to implement certain public functions
         virtual void registerStateChangeCallback(const StateChangeCallbackFn& fn);
-        
+
         // Applier calls this to notify that it's now safe to transition from SECONDARY to PRIMARY
         virtual void signalDrainComplete();
 
@@ -126,12 +164,24 @@ namespace repl {
                                               ReplSetHeartbeatResponse* response,
                                               Status* result);
 
+        virtual std::pair<ReplSetHeartbeatArgs, Milliseconds> prepareHeartbeatRequest(
+                Date_t now,
+                const std::string& ourSetName,
+                const HostAndPort& target);
+
+        virtual HeartbeatResponseAction processHeartbeatResponse(
+                Date_t now,
+                Milliseconds networkRoundTripTime,
+                const HostAndPort& target,
+                const StatusWith<ReplSetHeartbeatResponse>& hbResponse,
+                OpTime myLastOpApplied);
+
         // updates internal state with heartbeat response
-        ReplSetHeartbeatResponse::HeartbeatResultAction 
-            updateHeartbeatData(Date_t now,
-                                const MemberHeartbeatData& newInfo,
-                                int id,
-                                const OpTime& lastOpApplied);
+        HeartbeatResponseAction::Action updateHeartbeatData(
+                Date_t now,
+                const MemberHeartbeatData& newInfo,
+                int id,
+                const OpTime& lastOpApplied);
 
         // produces a reply to a status request
         virtual void prepareStatusResponse(const ReplicationExecutor::CallbackData& data,
@@ -213,7 +263,7 @@ namespace repl {
                                std::string* errmsg) const;
 
         // Returns the index of the member with the matching id, or -1 if none match.
-        int _getMemberIndex(int id) const; 
+        int _getMemberIndex(int id) const;
 
         // Sees if a majority number of votes are held by members who are currently "up"
         bool _aMajoritySeemsToBeUp() const;
@@ -252,9 +302,18 @@ namespace repl {
         // Returns NULL if there is no primary, or the MemberConfig* for the current primary
         const MemberConfig* _currentPrimaryMember() const;
 
+        /**
+         * Performs data updating common to updateHeartbeatData() and processHeartbeatResponse().
+         */
+        TopologyCoordinatorImpl::HeartbeatResponseAction _updateHeartbeatDataImpl(
+                int updatedConfigIndex,
+                Date_t now,
+                const OpTime& lastOpApplied);
+
+
         // Our current state (PRIMARY, SECONDARY, etc)
         MemberState _memberState;
-        
+
         // This is a unique id that is generated and set each time we transition to PRIMARY, as the
         // result of an election.
         OID _electionId;

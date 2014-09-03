@@ -44,18 +44,15 @@ namespace mongo {
         return shardKeyPattern.isFieldNamePrefixOf( uIndexKeyPattern );
     }
 
-    bool isShardDocSizeValid(const BSONObj& shardKey, const BSONObj& doc, string* errMsg) {
+    bool isShardKeySizeValid(const BSONObj& shardKey, string* errMsg) {
         string dummy;
         if (errMsg == NULL) {
             errMsg = &dummy;
         }
 
-        const KeyPattern shardKeyPattern(shardKey);
-        BSONObj key = shardKeyPattern.extractSingleKey(doc);
-
-        if (key.objsize() > kMaxShardKeySize) {
-            *errMsg = str::stream() << "shard key is larger than " << kMaxShardKeySize
-                                    << " bytes: " << key.objsize();
+        if (shardKey.objsize() > kMaxShardKeySize) {
+            *errMsg = str::stream() << "shard key is larger than " << kMaxShardKeySize << " bytes: "
+                                    << shardKey.objsize();
             return false;
         }
 

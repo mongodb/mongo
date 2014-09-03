@@ -4588,6 +4588,132 @@ namespace {
     }
 
     //
+    // Test shard filter query planning
+    //
+
+    TEST_F(QueryPlannerTest, ShardFilterCollScan) {
+        params.options = QueryPlannerParams::INCLUDE_SHARD_FILTER;
+        params.shardKey = BSON("a" << 1);
+        addIndex(BSON("a" << 1));
+
+        runQuery(fromjson("{b: 1}"));
+
+        assertNumSolutions(1U);
+        assertSolutionExists("{sharding_filter: {node: "
+                               "{cscan: {dir: 1}}}}}}}");
+    }
+
+    TEST_F(QueryPlannerTest, ShardFilterBasicIndex) {
+        params.options = QueryPlannerParams::INCLUDE_SHARD_FILTER;
+        params.shardKey = BSON("a" << 1);
+        addIndex(BSON("a" << 1));
+        addIndex(BSON("b" << 1));
+
+        runQuery(fromjson("{b: 1}"));
+
+        assertNumSolutions(1U);
+        assertSolutionExists("{sharding_filter: {node: "
+                               "{fetch: {node: "
+                                 "{ixscan: {pattern: {b: 1}}}}}}}");
+    }
+
+    TEST_F(QueryPlannerTest, ShardFilterBasicCovered) {
+        params.options = QueryPlannerParams::INCLUDE_SHARD_FILTER;
+        params.shardKey = BSON("a" << 1);
+        addIndex(BSON("a" << 1));
+
+        runQuery(fromjson("{a: 1}"));
+
+        assertNumSolutions(1U);
+        assertSolutionExists("{fetch: {node: "
+                               "{sharding_filter: {node: "
+                                 "{ixscan: {pattern: {a: 1}}}}}}}");
+    }
+
+    TEST_F(QueryPlannerTest, ShardFilterBasicProjCovered) {
+        params.options = QueryPlannerParams::INCLUDE_SHARD_FILTER;
+        params.shardKey = BSON("a" << 1);
+        addIndex(BSON("a" << 1));
+
+        runQuerySortProj(fromjson("{a: 1}"), BSONObj(), fromjson("{_id : 0, a : 1}"));
+
+        assertNumSolutions(1U);
+        assertSolutionExists("{proj: {spec: {_id: 0, a: 1}, type: 'coveredIndex', node: "
+                               "{sharding_filter: {node: "
+                                 "{ixscan: {pattern: {a: 1}}}}}}}");
+    }
+
+    TEST_F(QueryPlannerTest, ShardFilterCompoundProjCovered) {
+        params.options = QueryPlannerParams::INCLUDE_SHARD_FILTER;
+        params.shardKey = BSON("a" << 1 << "b" << 1);
+        addIndex(BSON("a" << 1 << "b" << 1));
+
+        runQuerySortProj(fromjson("{a: 1}"), BSONObj(), fromjson("{_id: 0, a: 1, b: 1}"));
+
+        assertNumSolutions(1U);
+        assertSolutionExists("{proj: {spec: {_id: 0, a: 1, b: 1 }, type: 'coveredIndex', node: "
+                               "{sharding_filter: {node: "
+                                 "{ixscan: {pattern: {a: 1, b: 1}}}}}}}");
+    }
+
+    TEST_F(QueryPlannerTest, ShardFilterNestedProjNotCovered) {
+        // Nested projections can't be covered currently, though the shard key filter shouldn't need
+        // to fetch.
+        params.options = QueryPlannerParams::INCLUDE_SHARD_FILTER;
+        params.shardKey = BSON("a" << 1 << "b.c" << 1);
+        addIndex(BSON("a" << 1 << "b.c" << 1));
+
+        runQuerySortProj(fromjson("{a: 1}"), BSONObj(), fromjson("{_id: 0, a: 1, 'b.c': 1}"));
+
+        assertNumSolutions(1U);
+        assertSolutionExists("{proj: {spec: {_id: 0, a: 1, 'b.c': 1 }, type: 'default', node: "
+                               "{fetch: {node: "
+                                 "{sharding_filter: {node: "
+                                   "{ixscan: {pattern: {a: 1, 'b.c': 1}}}}}}}}}");
+    }
+
+    TEST_F(QueryPlannerTest, ShardFilterHashProjNotCovered) {
+        params.options = QueryPlannerParams::INCLUDE_SHARD_FILTER;
+        params.shardKey = BSON("a" << "hashed");
+        addIndex(BSON("a" << "hashed"));
+
+        runQuerySortProj(fromjson("{a: 1}"), BSONObj(), fromjson("{_id : 0, a : 1}"));
+
+        assertNumSolutions(1U);
+        assertSolutionExists("{proj: {spec: {_id: 0,a: 1}, type: 'simple', node: "
+                               "{sharding_filter : {node: "
+                                 "{fetch: {node: "
+                                   "{ixscan: {pattern: {a: 'hashed'}}}}}}}}}");
+    }
+
+    TEST_F(QueryPlannerTest, ShardFilterKeyPrefixIndexCovered) {
+        params.options = QueryPlannerParams::INCLUDE_SHARD_FILTER;
+        params.shardKey = BSON("a" << 1);
+        addIndex(BSON("a" << 1 << "b" << 1 << "_id" << 1));
+
+        runQuerySortProj(fromjson("{a: 1}"), BSONObj(), fromjson("{a : 1}"));
+
+        assertNumSolutions(1U);
+        assertSolutionExists("{proj: {spec: {a: 1}, type: 'coveredIndex', node: "
+                               "{sharding_filter : {node: "
+                                 "{ixscan: {pattern: {a: 1, b: 1, _id: 1}}}}}}}");
+    }
+
+    TEST_F(QueryPlannerTest, ShardFilterNoIndexNotCovered) {
+        params.options = QueryPlannerParams::INCLUDE_SHARD_FILTER;
+        params.shardKey = BSON("a" << "hashed");
+        addIndex(BSON("b" << 1));
+
+        runQuerySortProj(fromjson("{b: 1}"), BSONObj(), fromjson("{_id : 0, a : 1}"));
+
+        assertNumSolutions(1U);
+        assertSolutionExists("{proj: {spec: {_id: 0,a: 1}, type: 'simple', node: "
+                               "{sharding_filter : {node: "
+                                 "{fetch: {node: "
+                                   "{ixscan: {pattern: {b: 1}}}}}}}}}");
+    }
+
+    //
     // Test bad input to query planner helpers.
     //
 

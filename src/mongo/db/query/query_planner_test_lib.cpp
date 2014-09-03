@@ -393,6 +393,17 @@ namespace mongo {
             if (el.eoo() || !el.isABSONObj()) { return false; }
             BSONObj projObj = el.Obj();
 
+            BSONElement projType = projObj["type"];
+            if (!projType.eoo()) {
+                string projTypeStr = projType.str();
+                if (!((pn->projType == ProjectionNode::DEFAULT && projTypeStr == "default") ||
+                      (pn->projType == ProjectionNode::SIMPLE_DOC && projTypeStr == "simple") ||
+                      (pn->projType == ProjectionNode::COVERED_ONE_INDEX &&
+                           projTypeStr == "coveredIndex"))) {
+                    return false;
+                }
+            }
+
             BSONElement spec = projObj["spec"];
             if (spec.eoo() || !spec.isABSONObj()) { return false; }
             BSONElement child = projObj["node"];
@@ -466,6 +477,18 @@ namespace mongo {
             if (child.eoo() || !child.isABSONObj()) { return false; }
 
             return solutionMatches(child.Obj(), kn->children[0]);
+        }
+        else if (STAGE_SHARDING_FILTER == trueSoln->getType()) {
+            const ShardingFilterNode* fn = static_cast<const ShardingFilterNode*>(trueSoln);
+
+            BSONElement el = testSoln["sharding_filter"];
+            if (el.eoo() || !el.isABSONObj()) { return false; }
+            BSONObj keepObj = el.Obj();
+
+            BSONElement child = keepObj["node"];
+            if (child.eoo() || !child.isABSONObj()) { return false; }
+
+            return solutionMatches(child.Obj(), fn->children[0]);
         }
 
         return false;
