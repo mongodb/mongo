@@ -8,6 +8,4 @@ t.ensureIndex( {a:1} );
 
 t.save( {a:new Timestamp()} );
 
-if ( 0 ) { // SERVER-3304
 assert.eq( 1, t.find( {a:{$gt:new Date(0)}} ).itcount() );
-}
