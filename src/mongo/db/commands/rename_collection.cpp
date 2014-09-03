@@ -270,19 +270,21 @@ namespace mongo {
                 indexer.init(indexesToCopy);
             }
 
-            // Copy over all the data from source collection to target collection.
-            boost::scoped_ptr<RecordIterator> sourceIt(sourceColl->getIterator(txn));
-            while (!sourceIt->isEOF()) {
-                txn->checkForInterrupt(false);
+            {
+                // Copy over all the data from source collection to target collection.
+                boost::scoped_ptr<RecordIterator> sourceIt(sourceColl->getIterator(txn));
+                while (!sourceIt->isEOF()) {
+                    txn->checkForInterrupt(false);
 
-                const BSONObj obj = sourceColl->docFor(txn, sourceIt->getNext());
+                    const BSONObj obj = sourceColl->docFor(txn, sourceIt->getNext());
 
-                WriteUnitOfWork wunit(txn);
-                // No logOp necessary because the entire renameCollection command is one logOp.
-                Status status = targetColl->insertDocument(txn, obj, &indexer, true).getStatus();
-                if (!status.isOK())
-                    return appendCommandStatus(result, status);
-                wunit.commit();
+                    WriteUnitOfWork wunit(txn);
+                    // No logOp necessary because the entire renameCollection command is one logOp.
+                    Status status = targetColl->insertDocument(txn, obj, &indexer, true).getStatus();
+                    if (!status.isOK())
+                        return appendCommandStatus(result, status);
+                    wunit.commit();
+                }
             }
 
             Status status = indexer.doneInserting();
