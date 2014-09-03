@@ -125,6 +125,8 @@ struct __wt_lsm_manager {
 	uint32_t	lsm_workers;	/* Current number of LSM workers */
 	uint32_t	lsm_workers_max;
 	WT_LSM_WORKER_ARGS *lsm_worker_cookies;
+#define	LSM_MANAGER_RUNNING	0x01
+	uint32_t	flags;
 };
 
 /*

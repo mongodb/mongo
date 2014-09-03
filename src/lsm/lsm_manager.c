@@ -54,6 +54,8 @@ __wt_lsm_manager_start(WT_SESSION_IMPL *session)
 	WT_ERR(__wt_thread_create(
 	    session, &cookies[0].tid, __lsm_worker_manager, &cookies[0]));
 
+	while (!F_ISSET(manager, LSM_MANAGER_RUNNING))
+		__wt_yield();
 	F_SET(S2C(session), WT_CONN_SERVER_LSM);
 
 	if (0) {
@@ -250,6 +252,12 @@ __lsm_manager_worker_setup(WT_SESSION_IMPL *session)
 			F_SET(worker_args, WT_LSM_WORK_MERGE);
 		WT_RET(__wt_lsm_worker_start(session, worker_args));
 	}
+	/*
+	 * Yield to give new threads a chance to get started.  Indicate that
+	 * we have allocated resources and are running now.
+	 */
+	__wt_yield();
+	F_SET(manager, LSM_MANAGER_RUNNING);
 	return (0);
 }
 
