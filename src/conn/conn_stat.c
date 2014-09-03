@@ -385,7 +385,7 @@ __statlog_server(void *arg)
 			WT_ERR(__statlog_log_one(session, &path, &tmp));
 
 		/* Wait until the next event. */
-		WT_ERR_TIMEDOUT_OK(
+		WT_ERR(
 		    __wt_cond_wait(session, conn->stat_cond, conn->stat_usecs));
 	}
 

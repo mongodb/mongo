@@ -523,8 +523,7 @@ retry:
 	async->flush_op.state = WT_ASYNCOP_READY;
 	WT_ERR(__wt_async_op_enqueue(conn, &async->flush_op));
 	while (async->flush_state != WT_ASYNC_FLUSH_COMPLETE)
-		WT_ERR_TIMEDOUT_OK(
-		    __wt_cond_wait(NULL, async->flush_cond, 100000));
+		WT_ERR(__wt_cond_wait(NULL, async->flush_cond, 100000));
 	/*
 	 * Flush is done.  Clear the flags.
 	 */

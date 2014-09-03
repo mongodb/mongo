@@ -106,7 +106,7 @@ __log_archive_server(void *arg)
 				    "log_archive: Blocked due to open log "
 				    "cursor holding archive lock"));
 			}
-			WT_ERR_TIMEDOUT_OK(
+			WT_ERR(
 			    __wt_cond_wait(session, conn->arch_cond, 1000000));
 			continue;
 		}
@@ -150,8 +150,7 @@ __log_archive_server(void *arg)
 		WT_ERR(__wt_rwunlock(session, log->log_archive_lock));
 
 		/* Wait until the next event. */
-		WT_ERR_TIMEDOUT_OK(
-		    __wt_cond_wait(session, conn->arch_cond, 1000000));
+		WT_ERR(__wt_cond_wait(session, conn->arch_cond, 1000000));
 	}
 
 	if (0) {

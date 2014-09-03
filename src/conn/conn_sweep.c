@@ -109,7 +109,7 @@ __sweep_server(void *arg)
 	    F_ISSET(conn, WT_CONN_SERVER_SWEEP)) {
 
 		/* Wait until the next event. */
-		WT_ERR_TIMEDOUT_OK(
+		WT_ERR(
 		    __wt_cond_wait(session, conn->sweep_cond, 30 * WT_MILLION));
 
 		/* Sweep the handles. */

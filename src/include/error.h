@@ -35,14 +35,6 @@
 			goto err;					\
 	}								\
 } while (0)
-#define	WT_ERR_TIMEDOUT_OK(a) do {					\
-	if ((ret = (a)) != 0) {						\
-		if (ret == ETIMEDOUT)					\
-			ret = 0;					\
-		else							\
-			goto err;					\
-	}								\
-} while (0)
 #define	WT_ERR_TEST(a, v) do {						\
 	if (a) {							\
 		ret = (v);						\
@@ -70,12 +62,6 @@
 	if ((__ret = (a)) != 0 && __ret != WT_NOTFOUND)			\
 		return (__ret);						\
 } while (0)
-#define	WT_RET_TIMEDOUT_OK(a) do {					\
-	int __ret;							\
-	if ((__ret = (a)) != 0 && __ret != ETIMEDOUT)			\
-		return (__ret);						\
-} while (0)
-
 /* Set "ret" if not already set. */
 #define	WT_TRET(a) do {							\
 	int __ret;							\

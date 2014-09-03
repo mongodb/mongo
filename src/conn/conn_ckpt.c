@@ -86,7 +86,7 @@ __ckpt_server(void *arg)
 		 * NOTE: If the user only configured logsize, then usecs
 		 * will be 0 and this wait won't return until signalled.
 		 */
-		WT_ERR_TIMEDOUT_OK(
+		WT_ERR(
 		    __wt_cond_wait(session, conn->ckpt_cond, conn->ckpt_usecs));
 	}
 
