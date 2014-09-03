@@ -219,7 +219,7 @@ __lsm_manager_worker_setup(WT_SESSION_IMPL *session)
 	worker_args = &manager->lsm_worker_cookies[1];
 	worker_args->work_cond = manager->work_cond;
 	worker_args->id = manager->lsm_workers++;
-	worker_args->flags = WT_LSM_WORK_SWITCH;
+	worker_args->flags = WT_LSM_WORK_SWITCH | WT_LSM_WORK_DROP;
 	/* Start the switch thread. */
 	WT_RET(__wt_lsm_worker_start(session, worker_args));
 
@@ -332,16 +332,13 @@ __lsm_manager_run_server(WT_SESSION_IMPL *session)
 				WT_RET(__wt_lsm_manager_push_entry(
 				    session, WT_LSM_WORK_SWITCH, lsm_tree));
 				WT_RET(__wt_lsm_manager_push_entry(
+				    session, WT_LSM_WORK_DROP, lsm_tree));
+				WT_RET(__wt_lsm_manager_push_entry(
 				    session, WT_LSM_WORK_FLUSH, lsm_tree));
 				WT_RET(__wt_lsm_manager_push_entry(
 				    session, WT_LSM_WORK_BLOOM, lsm_tree));
 				WT_RET(__wt_lsm_manager_push_entry(
 				    session, WT_LSM_WORK_MERGE, lsm_tree));
-			}
-			if (lsm_tree->queue_ref == 0 &&
-			    lsm_tree->nold_chunks != 0) {
-				WT_RET(__wt_lsm_manager_push_entry(
-				    session, WT_LSM_WORK_DROP, lsm_tree));
 			}
 		}
 	}
@@ -491,13 +488,17 @@ __wt_lsm_manager_pop_entry(
 			return (0);
 
 		__wt_spin_lock(session, &manager->app_lock);
-		if (!TAILQ_EMPTY(&manager->appqh)) {
-			entry = TAILQ_FIRST(&manager->appqh);
-			WT_ASSERT(session, entry != NULL);
-			if (FLD_ISSET(type, entry->flags))
+		/*
+		 * Find and remove the first entry in the queue that matches the
+		 * request.
+		 */
+		for (entry = TAILQ_FIRST(&manager->appqh);
+		    entry != NULL;
+		    entry = TAILQ_NEXT(entry, q)) {
+			if (FLD_ISSET(type, entry->flags)) {
 				TAILQ_REMOVE(&manager->appqh, entry, q);
-			else
-				entry = NULL;
+				break;
+			}
 		}
 		__wt_spin_unlock(session, &manager->app_lock);
 		break;
