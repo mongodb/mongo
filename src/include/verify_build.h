@@ -53,12 +53,10 @@ __wt_verify_build(void)
 	SIZE_CHECK(WT_REF, WT_REF_SIZE);
 
 	/*
-	 * We mix-and-match 32-bit unsigned values and size_t's, mostly because
-	 * we allocate and handle 32-bit objects, and lots of the underlying C
-	 * library expects size_t values for the length of memory objects.  We
-	 * check, just to be sure.
+	 * The btree code encodes key/value pairs in size_t's, and requires at
+	 * least 8B size_t's.
 	 */
-	STATIC_ASSERT(sizeof(size_t) >= sizeof(uint32_t));
+	STATIC_ASSERT(sizeof(size_t) >= sizeof(int64_t));
 
 	/*
 	 * We require an off_t fit into an 8B chunk because 8B is the largest
