@@ -132,7 +132,7 @@ func (jsonImporter *JSONImportInput) readJSONArraySeparator() error {
 		// this will catch any invalid inter JSON object byte that occurs in the
 		// input source
 		if !(readByte == JSON_ARRAY_SEP ||
-			readByte == ' ' ||
+			strings.TrimSpace(string(readByte)) == "" ||
 			readByte == JSON_ARRAY_START ||
 			readByte == JSON_ARRAY_END) {
 			if jsonImporter.expectedByte == JSON_ARRAY_START {
