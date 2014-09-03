@@ -54,7 +54,7 @@ __wt_lsm_manager_start(WT_SESSION_IMPL *session)
 	WT_ERR(__wt_thread_create(
 	    session, &cookies[0].tid, __lsm_worker_manager, &cookies[0]));
 
-	while (!F_ISSET(manager, LSM_MANAGER_RUNNING))
+	while (!F_ISSET(manager, WT_LSM_MANAGER_RUNNING))
 		__wt_yield();
 	F_SET(S2C(session), WT_CONN_SERVER_LSM);
 
@@ -257,7 +257,7 @@ __lsm_manager_worker_setup(WT_SESSION_IMPL *session)
 	 * we have allocated resources and are running now.
 	 */
 	__wt_yield();
-	F_SET(manager, LSM_MANAGER_RUNNING);
+	F_SET(manager, WT_LSM_MANAGER_RUNNING);
 	return (0);
 }
 
