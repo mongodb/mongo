@@ -1020,6 +1020,7 @@ namespace mongo {
             BSONObj o;
             PlanExecutor::ExecState state;
             while (PlanExecutor::ADVANCED == (state = exec->getNext(&o, NULL))) {
+                o = o.getOwned(); // we will be accessing outside of the lock
                 pm.hit();
 
                 if ( o.woSortOrder( prev , sortKey ) == 0 ) {
