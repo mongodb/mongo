@@ -146,8 +146,11 @@ namespace mongo {
                                                        &fromIdxFound,
                                                        &_preparedState->fromElemFound);
 
+        const bool sourceExists = (_preparedState->fromElemFound.ok() &&
+                                   fromIdxFound == (_fromFieldRef.numParts() - 1));
+
         // If we can't find the full element in the from field then we can't do anything.
-        if (!status.isOK()) {
+        if (!status.isOK() || !sourceExists) {
             execInfo->noOp = true;
             _preparedState->fromElemFound = root.getDocument().end();
 
