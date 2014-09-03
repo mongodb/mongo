@@ -569,12 +569,11 @@ namespace mongo {
         friend class Consensus;
 
     private:
-        bool _syncDoInitialSync_clone(Cloner &cloner, const char *master,
-                                      const list<string>& dbs, bool dataPass);
-        bool _syncDoInitialSync_applyToHead( replset::SyncTail& syncer, OplogReader* r ,
-                                             const Member* source, const BSONObj& lastOp,
-                                             BSONObj& minValidOut);
-        void _syncDoInitialSync();
+        bool _initialSyncClone(Cloner &cloner, const std::string& master,
+                               const list<string>& dbs, bool dataPass);
+        bool _initialSyncApplyOplog(replset::SyncTail& syncer, OplogReader* r ,
+                                    const Member* source);
+        void _initialSync();
         void syncDoInitialSync();
         void _syncThread();
         void syncTail();
@@ -626,6 +625,7 @@ namespace mongo {
          * applied.
          */
         static void setMinValid(BSONObj obj);
+        static void setMinValid(OpTime ts);
         static OpTime getMinValid();
         static void clearInitialSyncFlag();
         static bool getInitialSyncFlag();

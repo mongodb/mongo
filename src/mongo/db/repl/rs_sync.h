@@ -49,32 +49,15 @@ namespace replset {
         typedef void (*MultiSyncApplyFunc)(const std::vector<BSONObj>& ops, SyncTail* st);
     public:
         SyncTail(BackgroundSyncInterface *q);
+        SyncTail(BackgroundSyncInterface *q, MultiSyncApplyFunc func);
+
         virtual ~SyncTail();
         virtual bool syncApply(const BSONObj &o, bool convertUpdateToUpsert = false);
 
         /**
-         * Apply ops from applyGTEObj's ts to at least minValidObj's ts.  Note that, due to
-         * batching, this may end up applying ops beyond minValidObj's ts.
-         *
-         * @param applyGTEObj the op to start replicating at.  This is actually not used except in
-         *                    comparison to minValidObj: the background sync thread keeps its own
-         *                    record of where we're synced to and starts providing ops from that
-         *                    point.
-         * @param minValidObj the op to finish syncing at.  This function cannot return (other than
-         *                    fatally erroring out) without applying at least this op.
-         * @param func        whether this should use initial sync logic (recloning docs) or
-         *                    "normal" logic.
-         * @return BSONObj    the op that was synced to.  This may be greater than minValidObj, as a
-         *                    single batch might blow right by minvalid. If applyGTEObj is the same
-         *                    op as minValidObj, this will be applyGTEObj.
+         * Runs _applyOplogUntil(stopOpTime)
          */
-        BSONObj oplogApplySegment(const BSONObj& applyGTEObj, const BSONObj& minValidObj,
-                               MultiSyncApplyFunc func);
-
-        /**
-         * Runs oplogApplySegment without allowing recloning documents.
-         */
-        virtual BSONObj oplogApplication(const BSONObj& applyGTEObj, const BSONObj& minValidObj);
+        virtual void oplogApplication(const OpTime& stopOpTime);
 
         void oplogApplication();
         bool peek(BSONObj* obj);
@@ -91,6 +74,11 @@ namespace replset {
             bool empty() {
                 return _deque.empty();
             }
+            BSONObj back(){
+                verify(!_deque.empty());
+                return _deque.back();
+            }
+
         private:
             std::deque<BSONObj> _deque;
             size_t _size;
@@ -113,9 +101,18 @@ namespace replset {
         static const int replBatchLimitSeconds = 1;
         static const unsigned int replBatchLimitOperations = 5000;
 
-        // Prefetch and write a deque of operations, using the supplied function.
-        // Initial Sync and Sync Tail each use a different function.
-        void multiApply(std::deque<BSONObj>& ops, MultiSyncApplyFunc applyFunc);
+        // Prefetch and write a deque of operations.
+        void multiApply(std::deque<BSONObj>& ops);
+
+        /**
+         * Applies oplog entries until reaching "endOpTime".
+         *
+         * Returns the OpTime from the last doc applied
+         *
+         * NOTE:Will not transition or check states
+         */
+        void _applyOplogUntil(const OpTime& endOpTime);
+
 
         // The version of the last op to be read
         int oplogVersion;
@@ -123,14 +120,16 @@ namespace replset {
     private:
         BackgroundSyncInterface* _networkQueue;
 
+        // Function to use during applyOps
+        MultiSyncApplyFunc _applyFunc;
+
         // Doles out all the work to the reader pool threads and waits for them to complete
         void prefetchOps(const std::deque<BSONObj>& ops);
         // Used by the thread pool readers to prefetch an op
         static void prefetchOp(const BSONObj& op);
 
         // Doles out all the work to the writer pool threads and waits for them to complete
-        void applyOps(const std::vector< std::vector<BSONObj> >& writerVectors, 
-                      MultiSyncApplyFunc applyFunc);
+        void applyOps(const std::vector< std::vector<BSONObj> >& writerVectors);
 
         void fillWriterVectors(const std::deque<BSONObj>& ops, 
                                std::vector< std::vector<BSONObj> >* writerVectors);
@@ -145,12 +144,8 @@ namespace replset {
     public:
         virtual ~InitialSync();
         InitialSync(BackgroundSyncInterface *q);
+        virtual void oplogApplication(const OpTime& stopOpTime);
 
-        /**
-         * Creates the initial oplog entry: applies applyGTEObj and writes it to the oplog.  Then
-         * this runs oplogApplySegment allowing recloning documents.
-         */
-        BSONObj oplogApplication(const BSONObj& applyGTEObj, const BSONObj& minValidObj);
     };
 
     // TODO: move hbmsg into an error-keeping class (SERVER-4444)

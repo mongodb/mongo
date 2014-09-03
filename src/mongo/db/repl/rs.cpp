@@ -1010,14 +1010,13 @@ namespace {
         }
         return false;
     }
+    void ReplSetImpl::setMinValid(OpTime ts) {
+        Lock::DBWrite lk( "local" );
+        Helpers::putSingleton("local.replset.minvalid", BSON("$set" << BSON("ts" << ts)));
+    }
 
     void ReplSetImpl::setMinValid(BSONObj obj) {
-        BSONObjBuilder builder;
-        BSONObjBuilder subobj(builder.subobjStart("$set"));
-        subobj.appendTimestamp("ts", obj["ts"].date());
-        subobj.done();
-        Lock::DBWrite lk( "local" );
-        Helpers::putSingleton("local.replset.minvalid", builder.obj());
+        setMinValid(obj["ts"]._opTime());
     }
 
     OpTime ReplSetImpl::getMinValid() {

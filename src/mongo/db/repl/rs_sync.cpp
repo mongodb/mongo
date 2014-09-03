@@ -87,8 +87,10 @@ namespace replset {
 
 
     SyncTail::SyncTail(BackgroundSyncInterface *q) :
-        Sync(""), oplogVersion(0), _networkQueue(q)
-    {}
+        Sync(""), oplogVersion(0), _networkQueue(q), _applyFunc(multiSyncApply) {}
+
+    SyncTail::SyncTail(BackgroundSyncInterface *q, MultiSyncApplyFunc func) :
+        Sync(""), oplogVersion(0), _networkQueue(q), _applyFunc(func) {}
 
     SyncTail::~SyncTail() {}
 
@@ -244,23 +246,21 @@ namespace replset {
     }
     
     // Doles out all the work to the writer pool threads and waits for them to complete
-    void SyncTail::applyOps(const std::vector< std::vector<BSONObj> >& writerVectors, 
-                                     MultiSyncApplyFunc applyFunc) {
+    void SyncTail::applyOps(const std::vector< std::vector<BSONObj> >& writerVectors) {
         ThreadPool& writerPool = theReplSet->getWriterPool();
         TimerHolder timer(&applyBatchStats);
         for (std::vector< std::vector<BSONObj> >::const_iterator it = writerVectors.begin();
              it != writerVectors.end();
              ++it) {
             if (!it->empty()) {
-                writerPool.schedule(applyFunc, boost::cref(*it), this);
+                writerPool.schedule(_applyFunc, boost::cref(*it), this);
             }
         }
         writerPool.join();
     }
 
     // Doles out all the work to the writer pool threads and waits for them to complete
-    void SyncTail::multiApply( std::deque<BSONObj>& ops, MultiSyncApplyFunc applyFunc ) {
-
+    void SyncTail::multiApply( std::deque<BSONObj>& ops) {
         // Use a ThreadPool to prefetch all the operations in a batch.
         prefetchOps(ops);
         
@@ -275,7 +275,7 @@ namespace replset {
         // stop all readers until we're done
         Lock::ParallelBatchWriterMode pbwm;
 
-        applyOps(writerVectors, applyFunc);
+        applyOps(writerVectors);
     }
 
 
@@ -297,88 +297,24 @@ namespace replset {
 
 
     InitialSync::InitialSync(BackgroundSyncInterface *q) : 
-        SyncTail(q) {}
+        SyncTail(q, multiInitialSyncApply) {}
 
     InitialSync::~InitialSync() {}
 
-    BSONObj SyncTail::oplogApplySegment(const BSONObj& applyGTEObj, const BSONObj& minValidObj,
-                                     MultiSyncApplyFunc func) {
-        OpTime applyGTE = applyGTEObj["ts"]._opTime();
-        OpTime minValid = minValidObj["ts"]._opTime();
-
-        // We have to keep track of the last op applied to the data, because there's no other easy
-        // way of getting this data synchronously.  Batches may go past minValidObj, so we need to
-        // know to bump minValid past minValidObj.
-        BSONObj lastOp = applyGTEObj;
-        OpTime ts = applyGTE;
-
-        time_t start = time(0);
-        time_t now = start;
-
-        unsigned long long n = 0, lastN = 0;
-
-        while( ts < minValid ) {
-            OpQueue ops;
-
-            while (ops.getSize() < replBatchLimitBytes) {
-                if (tryPopAndWaitForMore(&ops)) {
-                    break;
-                }
-
-                // apply replication batch limits
-                now = time(0);
-                if (!ops.empty()) {
-                    if (now > replBatchLimitSeconds)
-                        break;
-                    if (ops.getDeque().size() > replBatchLimitOperations)
-                        break;
-                }
-            }
-            setOplogVersion(ops.getDeque().front());
-            
-            multiApply(ops.getDeque(), func);
-
-            n += ops.getDeque().size();
-
-            if ( n > lastN + 1000 ) {
-                if (now - start > 10) {
-                    // simple progress metering
-                    log() << "replSet initialSyncOplogApplication applied " << n << " operations, synced to "
-                          << ts.toStringPretty() << rsLog;
-                    start = now;
-                    lastN = n;
-                }
-            }
-
-            // we want to keep a record of the last op applied, to compare with minvalid
-            lastOp = ops.getDeque().back();
-            OpTime tempTs = lastOp["ts"]._opTime();
-            applyOpsToOplog(&ops.getDeque());
-
-            ts = tempTs;
-        }
-
-        return lastOp;
-    }
-
     /* initial oplog application, during initial sync, after cloning.
     */
-    BSONObj InitialSync::oplogApplication(const BSONObj& applyGTEObj, const BSONObj& minValidObj) {
+    void InitialSync::oplogApplication(const OpTime& endOpTime) {
         if (replSetForceInitialSyncFailure > 0) {
-            log() << "replSet test code invoked, forced InitialSync failure: " << replSetForceInitialSyncFailure << rsLog;
+            log() << "replSet test code invoked, forced InitialSync failure: "
+                  << replSetForceInitialSyncFailure << rsLog;
             replSetForceInitialSyncFailure--;
             throw DBException("forced error",0);
         }
-
-        // create the initial oplog entry
-        syncApply(applyGTEObj);
-        _logOpObjRS(applyGTEObj);
-
-        return oplogApplySegment(applyGTEObj, minValidObj, multiInitialSyncApply);
+        _applyOplogUntil(endOpTime);
     }
 
-    BSONObj SyncTail::oplogApplication(const BSONObj& applyGTEObj, const BSONObj& minValidObj) {
-        return oplogApplySegment(applyGTEObj, minValidObj, multiSyncApply);
+    void SyncTail::oplogApplication(const OpTime& endOpTime) {
+        _applyOplogUntil(endOpTime);
     }
 
     void SyncTail::setOplogVersion(const BSONObj& op) {
@@ -392,6 +328,56 @@ namespace replset {
         } else {
             theReplSet->oplogVersion = version.Int();
         }
+    }
+
+    void SyncTail::_applyOplogUntil(const OpTime& endOpTime) {
+        while (true) {
+            OpQueue ops;
+
+            verify( !Lock::isLocked() );
+
+            while (!tryPopAndWaitForMore(&ops)) {
+                // nothing came back last time, so go again
+                if (ops.empty()) continue;
+
+                // Check if we reached the end
+                const BSONObj currentOp = ops.back();
+                const OpTime currentOpTime = currentOp["ts"]._opTime();
+
+                // When we reach the end return this batch
+                if (currentOpTime == endOpTime) {
+                    break;
+                }
+                else if (currentOpTime > endOpTime) {
+                    severe() << "Applied past expected end " << endOpTime << " to " << currentOpTime
+                            << " without seeing it. Rollback?" << rsLog;
+                    fassertFailedNoTrace(0);
+                }
+
+                // apply replication batch limits
+                if (ops.getSize() > replBatchLimitBytes)
+                    break;
+                if (ops.getDeque().size() > replBatchLimitOperations)
+                    break;
+            };
+
+            if (ops.empty()) {
+                severe() << "got no ops for batch...";
+                fassertFailedNoTrace(0);
+            }
+
+            const BSONObj lastOp = ops.back().getOwned();
+
+            multiApply(ops.getDeque());
+            applyOpsToOplog(&ops.getDeque());
+
+            setOplogVersion(lastOp);
+
+            // if the last op applied was our end, return
+            if (theReplSet->lastOpTimeWritten == endOpTime) {
+                return;
+            }
+        } // end of while (true)
     }
 
     /* tail an oplog.  ok to return, will be re-called. */
@@ -458,7 +444,7 @@ namespace replset {
 
                 const int slaveDelaySecs = theReplSet->myConfig().slaveDelay;
                 if (!ops.empty() && slaveDelaySecs > 0) {
-                    const BSONObj& lastOp = ops.getDeque().back();
+                    const BSONObj& lastOp = ops.back();
                     const unsigned int opTimestampSecs = lastOp["ts"]._opTime().getSecs();
 
                     // Stop the batch as the lastOp is too new to be applied. If we continue
@@ -479,7 +465,7 @@ namespace replset {
                 sleepmillis(0);
             }
 
-            const BSONObj& lastOp = ops.getDeque().back();
+            const BSONObj& lastOp = ops.back();
             setOplogVersion(lastOp);
             handleSlaveDelay(lastOp);
 
@@ -488,7 +474,7 @@ namespace replset {
             // if we should crash and restart before updating the oplog
             theReplSet->setMinValid(lastOp);
 
-            multiApply(ops.getDeque(), multiSyncApply);
+            multiApply(ops.getDeque());
 
             applyOpsToOplog(&ops.getDeque());
 
@@ -526,7 +512,7 @@ namespace replset {
             return true;
         }
 
-	const char* ns = op["ns"].valuestrsafe();
+        const char* ns = op["ns"].valuestrsafe();
 
         // check for commands
         if ((op["op"].valuestrsafe()[0] == 'c') ||
