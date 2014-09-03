@@ -86,9 +86,10 @@ __lsm_worker(void *arg)
 
 	entry = NULL;
 	while (F_ISSET(conn, WT_CONN_SERVER_RUN)) {
-		/* Don't busy wait if there aren't any LSM trees. */
-		if (TAILQ_EMPTY(&conn->lsmqh)) {
-			__wt_sleep(0, 10000);
+		/* Don't busy wait if there isn't any work to do. */
+		if (cookie->flags == 0) {
+			WT_ERR(
+			    __wt_cond_wait(session, cookie->work_cond, 10000));
 			continue;
 		}
 

@@ -48,6 +48,7 @@ __wt_lsm_manager_start(WT_SESSION_IMPL *session)
 		    S2C(session), "lsm-worker", 1, 0, &worker_session));
 		worker_session->isolation = TXN_ISO_READ_UNCOMMITTED;
 		cookies[i].session = worker_session;
+		cookies[i].work_cond = manager->work_cond;
 	}
 
 	/* Start the LSM manager thread. */
@@ -149,6 +150,7 @@ __wt_lsm_manager_destroy(WT_CONNECTION_IMPL *conn)
 	__wt_spin_destroy(session, &manager->switch_lock);
 	__wt_spin_destroy(session, &manager->app_lock);
 	__wt_spin_destroy(session, &manager->manager_lock);
+	WT_TRET(__wt_cond_destroy(session, &manager->work_cond));
 
 	__wt_free(session, manager->lsm_worker_cookies);
 
@@ -212,6 +214,8 @@ __lsm_manager_worker_setup(WT_SESSION_IMPL *session)
 	    session, &manager->manager_lock, "LSM manager queue lock"));
 	WT_RET(__wt_spin_init(
 	    session, &manager->switch_lock, "LSM switch queue lock"));
+	WT_RET(__wt_cond_alloc(
+	    session, "LSM worker cond", 0, &manager->work_cond));
 
 	worker_args = &manager->lsm_worker_cookies[1];
 	worker_args->id = manager->lsm_workers++;
@@ -267,6 +271,7 @@ __lsm_manager_worker_shutdown(WT_SESSION_IMPL *session)
 	 */
 	for (i = 1; i < manager->lsm_workers; i++) {
 		WT_ASSERT(session, manager->lsm_worker_cookies[i].tid != 0);
+		WT_TRET(__wt_cond_signal(session, manager->work_cond));
 		WT_TRET(__wt_thread_join(
 		    session, manager->lsm_worker_cookies[i].tid));
 	}
@@ -543,6 +548,8 @@ __wt_lsm_manager_push_entry(
 		break;
 	WT_ILLEGAL_VALUE(session);
 	}
+
+	WT_RET(__wt_cond_signal(session, manager->work_cond));
 
 	return (0);
 }
