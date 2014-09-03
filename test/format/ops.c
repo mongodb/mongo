@@ -219,9 +219,10 @@ ops(void *arg)
 
 		/*
 		 * We can't checkpoint or swap sessions/cursors while in a
-		 * transaction, resolve any running transaction.  Otherwise,
-		 * reset the cursor: we may block waiting for a lock and there
-		 * is no reason to keep pages pinned.
+		 * transaction, resolve any running transaction.
+		 *
+		 * Reset the cursor regardless: we may block waiting for a lock
+		 * and there is no reason to keep pages pinned.
 		 */
 		if (cnt == ckpt_op || cnt == session_op) {
 			if (intxn) {
@@ -231,7 +232,7 @@ ops(void *arg)
 				++tinfo->commit;
 				intxn = 0;
 			}
-			else if (cursor != NULL &&
+			if (cursor != NULL &&
 			    (ret = cursor->reset(cursor)) != 0)
 				die(ret, "cursor.reset");
 		}
@@ -313,7 +314,7 @@ ops(void *arg)
 
 		/*
 		 * If we're not single-threaded and we're not in a transaction,
-		 * start a transaction 80% of the time.
+		 * start a transaction 20% of the time.
 		 */
 		if (!SINGLETHREADED && !intxn && MMRAND(1, 10) >= 8) {
 			if ((ret =
@@ -449,7 +450,8 @@ deadlock:				++tinfo->deadlock;
 				}
 				if ((ret = session->rollback_transaction(
 				    session, NULL)) != 0)
-					die(ret, "session.commit_transaction");
+					die(ret,
+					    "session.rollback_transaction");
 				++tinfo->rollback;
 				intxn = 0;
 				break;
