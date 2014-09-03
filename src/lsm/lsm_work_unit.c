@@ -334,7 +334,15 @@ __lsm_bloom_create(WT_SESSION_IMPL *session,
 
 	F_CLR(session, WT_SESSION_NO_CACHE);
 
-	/* Load the new Bloom filter into cache. */
+	/*
+	 * Load the new Bloom filter into cache.
+	 *
+	 * We're doing advisory reads to fault the new trees into cache.
+	 * Don't block if the cache is full: our next unit of work may be to
+	 * discard some trees to free space.
+	 */
+	F_SET(session, WT_SESSION_NO_CACHE_CHECK);
+
 	WT_CLEAR(key);
 	WT_ERR_NOTFOUND_OK(__wt_bloom_get(bloom, &key));
 
@@ -355,7 +363,7 @@ __lsm_bloom_create(WT_SESSION_IMPL *session,
 
 err:	if (bloom != NULL)
 		WT_TRET(__wt_bloom_close(bloom));
-	F_CLR(session, WT_SESSION_NO_CACHE);
+	F_CLR(session, WT_SESSION_NO_CACHE | WT_SESSION_NO_CACHE_CHECK);
 	return (ret);
 }
 

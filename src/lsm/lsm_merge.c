@@ -341,6 +341,13 @@ __wt_lsm_merge(
 
 	F_CLR(session, WT_SESSION_NO_CACHE);
 
+	/*
+	 * We're doing advisory reads to fault the new trees into cache.
+	 * Don't block if the cache is full: our next unit of work may be to
+	 * discard some trees to free space.
+	 */
+	F_SET(session, WT_SESSION_NO_CACHE_CHECK);
+
 	if (create_bloom) {
 		if (ret == 0)
 			WT_TRET(__wt_bloom_finalize(bloom));
@@ -450,7 +457,7 @@ err:	if (locked)
 		else
 			WT_TRET(__wt_verbose(session, WT_VERB_LSM,
 			    "Merge failed with %s", wiredtiger_strerror(ret)));
-		F_CLR(session, WT_SESSION_NO_CACHE);
 	}
+	F_CLR(session, WT_SESSION_NO_CACHE | WT_SESSION_NO_CACHE_CHECK);
 	return (ret);
 }
