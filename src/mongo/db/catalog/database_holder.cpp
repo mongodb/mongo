@@ -159,8 +159,6 @@ namespace mongo {
                                   bool force) {
         invariant(txn->lockState()->isW());
 
-        getDur().commitNow(txn); // bad things happen if we close a DB with outstanding writes
-
         SimpleMutex::scoped_lock lk(_m);
 
         set< string > dbs;

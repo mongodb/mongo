@@ -159,15 +159,6 @@ namespace mongo {
         return getDur().awaitCommit();
     }
 
-    bool DurRecoveryUnit::commitIfNeeded(bool force) {
-        // TODO this method will be going away completely soon. There is only one remaining caller.
-        invariant(force);
-#if ROLLBACK_ENABLED
-        publishChanges();
-#endif
-        return getDur().commitIfNeeded(_txn, force);
-    }
-
     void* DurRecoveryUnit::writingPtr(void* data, size_t len) {
         invariant(len > 0);
 #if ROLLBACK_ENABLED

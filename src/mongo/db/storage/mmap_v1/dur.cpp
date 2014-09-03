@@ -197,7 +197,7 @@ namespace mongo {
             return false;
         }
 
-        bool NonDurableImpl::commitIfNeeded(OperationContext* txn, bool force) {
+        bool NonDurableImpl::commitIfNeeded(OperationContext* txn) {
             cc().checkpointHappened();   // XXX: remove when all dur goes through DurRecoveryUnit
             return false;
         }
@@ -328,12 +328,12 @@ namespace mongo {
 
             perf note: this function is called a lot, on every lock_w() ... and usually returns right away
         */
-        bool DurableImpl::commitIfNeeded(OperationContext* txn, bool force) {
+        bool DurableImpl::commitIfNeeded(OperationContext* txn) {
             // this is safe since since conceptually if you call commitIfNeeded, we're at a valid
             // spot in an operation to be terminated.
             cc().checkpointHappened();
 
-            if( likely( commitJob.bytes() < UncommittedBytesLimit && !force ) ) {
+            if (likely(commitJob.bytes() < UncommittedBytesLimit)) {
                 return false;
             }
             return _aCommitIsNeeded(txn);

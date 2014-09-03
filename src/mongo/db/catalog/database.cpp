@@ -95,11 +95,6 @@ namespace mongo {
         if ( BackgroundOperation::inProgForDb( _name ) ) {
             log() << "warning: bg op in prog during close db? " << _name << endl;
         }
-
-        // Before the files are closed, flush any potentially outstanding changes, which might
-        // reference this database. Otherwise we will assert when subsequent commit if needed
-        // is called and it happens to have write intents for the removed files.
-        txn->recoveryUnit()->commitIfNeeded(true);
     }
 
     Status Database::validateDBName( const StringData& dbname ) {

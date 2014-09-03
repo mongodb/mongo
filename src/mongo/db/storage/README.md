@@ -137,9 +137,8 @@ acts on that information.
 
 RecoveryUnit
 ------------
-**Q**: Should RecoveryUnit::syncDataAndTruncateJournal, RecoveryUnit::commitIfNeeded
-and RecoveryUnit::isCommitNeeded be static or in a different class? I am not
-sure why they need to effect the instance of RecoveryUnit?  
+**Q**: Should RecoveryUnit::syncDataAndTruncateJournal be static or in a different class? I am not
+sure why they need to effect the instance of RecoveryUnit?
 **A**: These methods are effectively static in that they will only modify global
 state. However, these methods are virtual, which is why we aren’t declaring them
 as static. That being said, we will likely remove this methods from the public
@@ -151,17 +150,6 @@ take a long time, is this expected to block until that is done?
 **A**: Yes. Note that this is only called externally when we drop a database or when
 the user explicitly requests a sync via the fsync command.  We may rename this
 method as part of a naming sweep. 
-
-**Q**: I didn't see where RecoveryUnit::isCommitNeeded() is called and couldn't
-figure out how it is supposed to be used. What other handling we can possibly do
-other than issuing RecoveryUnit::commitIfNeeded()?  
-**A**: This will soon be removed from the API.
-
-**Q**: RecoveryUnit::commitIfNeeded, RecoveryUnit::isCommitNeeded - I assume this
-could be used to implement the InnoDB feature to force the log once per second  
-**A**: It’s used internally by the record store in mmapv1. We’ll soon make it
-private to DurRecoveryUnit and then remove it from the API. Ditto for various
-writingPtr methods.
 
 **Q**: As documented I don’t understand the point of the RecoverUnit::endUnitOfWork
 nesting behavior. Can you explain where it is used or will be used?  
@@ -181,22 +169,12 @@ and probably retry the operation. The interfaces are rather fluid right now and
 will probably return a Status (or throw an exception) at some point. However,
 rollback should never fail.
 
-**Q**: RecoveryUnit::commitIfNeeded() has a return value, but I didn't find codes
-where return value is used. What does false suppose to mean?  Does it mean I/O
-failure, wait to succeed, or wait to retry?  In general, in my understanding,
-RecoveryUnit::commitIfNeeded() is supposed to write out some partial data to
-transactional logs. If that's the case, maybe in
-RocksRecoveryUnit::commitIfNeeded(), we should call the write option that
-doesn't force fsync when writing to WAL, while in the final commit, force the
-WAL sync.  
-**A**: We’ll be removing commitIfNeeded from the public API.  It’s used by mmapv1
-internally.
 
 RocksDB
 -------
 **Q**: I think RocksRecoveryUnit::awaitCommit should remain in RecoveryUnit but be
 renamed to ::awaitLogSync. If force log once per second is done, then this
-blocks until the next commitIfNeededCall. But I think we [should] be explicit
+blocks until the next time log is forced to disk. But I think we [should] be explicit
 about "commit" vs "forcing redo log to storage" given that many engines
 including InnoDB, RocksDB & MongoDB let commit get done without a log force.  
 **A**: We agree that these should be two separately defined pieces of functionality.

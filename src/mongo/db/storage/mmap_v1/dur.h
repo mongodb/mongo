@@ -131,7 +131,7 @@ namespace mongo {
                 from growing too large.
                 @return true if commited
             */
-            virtual bool commitIfNeeded(OperationContext* txn, bool force=false) = 0;
+            virtual bool commitIfNeeded(OperationContext* txn) = 0;
 
             /** Declare write intent for an int */
             inline int& writingInt(int& d) { return *static_cast<int*>(writingPtr( &d, sizeof(d))); }
@@ -187,7 +187,7 @@ namespace mongo {
             void createdFile(const std::string& filename, unsigned long long len) { }
             bool awaitCommit() { return false; }
             bool commitNow(OperationContext* txn);
-            bool commitIfNeeded(OperationContext* txn, bool force);
+            bool commitIfNeeded(OperationContext* txn);
             void syncDataAndTruncateJournal(OperationContext* txn) {}
             bool isDurable() const { return false; }
         };
@@ -201,7 +201,7 @@ namespace mongo {
             void createdFile(const std::string& filename, unsigned long long len);
             bool awaitCommit();
             bool commitNow(OperationContext* txn);
-            bool commitIfNeeded(OperationContext* txn, bool force);
+            bool commitIfNeeded(OperationContext* txn);
             void syncDataAndTruncateJournal(OperationContext* txn);
             bool isDurable() const { return true; }
         };
