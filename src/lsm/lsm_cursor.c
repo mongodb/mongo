@@ -50,7 +50,7 @@ __clsm_enter_update(WT_CURSOR_LSM *clsm)
 	WT_LSM_CHUNK *primary_chunk;
 	WT_LSM_TREE *lsm_tree;
 	WT_SESSION_IMPL *session;
-	int have_primary, need_signal, ovfl;
+	int have_primary, ovfl;
 
 	lsm_tree = clsm->lsm_tree;
 	if (clsm->nchunks == 0 ||
@@ -88,19 +88,14 @@ __clsm_enter_update(WT_CURSOR_LSM *clsm)
 			 * when only one switch is required, creating very
 			 * small chunks.
 			 */
-			need_signal = 0;
 			WT_RET(__wt_lsm_tree_lock(session, lsm_tree, 0));
 			if (clsm->dsk_gen == lsm_tree->dsk_gen &&
 			    !F_ISSET(lsm_tree, WT_LSM_TREE_NEED_SWITCH)) {
 				WT_RET(__wt_lsm_manager_push_entry(
 				    session, WT_LSM_WORK_SWITCH, lsm_tree));
 				F_SET(lsm_tree, WT_LSM_TREE_NEED_SWITCH);
-				need_signal = 1;
 			}
 			WT_RET(__wt_lsm_tree_unlock(session, lsm_tree));
-			if (need_signal)
-				WT_RET(__wt_cond_signal(
-				    session, lsm_tree->work_cond));
 			ovfl = 0;
 		}
 	} else if (have_primary)
@@ -422,7 +417,6 @@ __clsm_open_cursors(
 		F_SET(lsm_tree, WT_LSM_TREE_NEED_SWITCH);
 		locked = 0;
 		WT_ERR(__wt_lsm_tree_unlock(session, lsm_tree));
-		WT_ERR(__wt_cond_signal(session, lsm_tree->work_cond));
 
 		/*
 		 * Give the worker thread a chance to run before locking the

@@ -121,6 +121,7 @@ struct __wt_lsm_manager {
 	WT_SPINLOCK	switch_lock;	/* Lock for switch queue */
 	WT_SPINLOCK	app_lock;	/* Lock for application queue */
 	WT_SPINLOCK	manager_lock;	/* Lock for manager queue */
+	WT_CONDVAR     *work_cond;	/* Used to notify worker of activity */
 	uint32_t	lsm_workers;	/* Current number of LSM workers */
 	uint32_t	lsm_workers_max;
 	WT_LSM_WORKER_ARGS *lsm_worker_cookies;
@@ -141,7 +142,6 @@ struct __wt_lsm_tree {
 	int refcnt;			/* Number of users of the tree */
 	int queue_ref;
 	WT_RWLOCK *rwlock;
-	WT_CONDVAR *work_cond;		/* Used to notify worker of activity */
 	TAILQ_ENTRY(__wt_lsm_tree) q;
 
 	WT_DSRC_STATS stats;		/* LSM-level statistics */
@@ -227,7 +227,8 @@ struct __wt_lsm_worker_cookie {
  */
 struct __wt_lsm_worker_args {
 	WT_SESSION_IMPL *session;
-	pthread_t	tid;
+	WT_CONDVAR *work_cond;		/* Owned by the manager */
+	pthread_t tid;
 	u_int id;
 	uint32_t flags;
 };
