@@ -181,13 +181,13 @@ namespace {
         // Make sure that no matter how _finishLoadLocalConfig_helper terminates (short of
         // throwing an exception, which it shouldn't do and would cause the process to terminate),
         // we always set _rsConfigState to either kConfigSteady or kConfigUninitialized.
+        boost::lock_guard<boost::mutex> lk(_mutex);
         if (_rsConfigState != kConfigStartingUp) {
             invariant(_rsConfigState == kConfigSteady);
             invariant(_rsConfig.isInitialized());
         }
         else {
             invariant(!_rsConfig.isInitialized());
-            boost::lock_guard<boost::mutex> lk(_mutex);
             _setConfigState_inlock(kConfigUninitialized);
         }
     }
@@ -195,8 +195,6 @@ namespace {
     void ReplicationCoordinatorImpl::_finishLoadLocalConfig_helper(
             const ReplicationExecutor::CallbackData& cbData,
             const ReplicaSetConfig& localConfig) {
-
-        invariant(_rsConfigState == kConfigStartingUp);
 
         StatusWith<int> myIndex = validateConfigForStartUp(_externalState.get(),
                                                            _rsConfig,

@@ -495,7 +495,7 @@ namespace repl {
         // Represents the configuration state of the coordinator, which controls how and when
         // _rsConfig may change.  See the state transition diagram in the type definition of
         // ConfigState for details.
-        ConfigState _rsConfigState;                                                       // (MX)
+        ConfigState _rsConfigState;                                                       // (M)
 
         // The current ReplicaSet configuration object, including the information about tag groups
         // that is used to satisfy write concern requests with named gle modes.
