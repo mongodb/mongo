@@ -831,14 +831,10 @@ namespace mongo {
         case Bool:
             return *l.value() - *r.value();
         case Timestamp:
-            // unsigned compare for timestamps - note they are not really dates but (ordinal + time_t)
-            if ( l.date() < r.date() )
-                return -1;
-            return l.date() == r.date() ? 0 : 1;
         case Date:
             {
-                long long a = (long long) l.Date().millis;
-                long long b = (long long) r.Date().millis;
+                long long a = (long long) l.date().millis;
+                long long b = (long long) r.date().millis;
                 if( a < b ) 
                     return -1;
                 return a == b ? 0 : 1;

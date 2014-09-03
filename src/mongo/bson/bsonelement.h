@@ -193,6 +193,9 @@ namespace mongo {
             @see Bool(), trueValue()
         */
         Date_t date() const {
+            // SERVER-3304
+            if (type() == mongo::Timestamp )
+                return timestampTime();
             return *reinterpret_cast< const Date_t* >( value() );
         }
 
@@ -502,7 +505,12 @@ namespace mongo {
         friend class BSONObjIterator;
         friend class BSONObj;
         const BSONElement& chk(int t) const {
-            if ( t != type() ) {
+            // SERVER-3304
+            int mytype = type();
+            if ( (t == mongo::Timestamp && mytype == mongo::Date) ||
+                 (t == mongo::Date && mytype == mongo::Timestamp) )
+                t = mytype;
+            if ( t != mytype ) {
                 StringBuilder ss;
                 if( eoo() )
                     ss << "field not found, expected type " << t;

@@ -45,16 +45,12 @@ assert.eq( [[{$maxElement:1},{$maxElement:1}]], t.find( {a:{$type:127}} ).hint( 
 t.remove({});
 t.save( {a:new Timestamp()} );
 assert.eq( 1, t.find( {a:{$type:17}} ).itcount() );
-if ( 0 ) { // SERVER-3304
 assert.eq( 0, t.find( {a:{$type:9}} ).itcount() );
-}
 
 // Type Date
 t.remove({});
 t.save( {a:new Date()} );
-if ( 0 ) { // SERVER-3304
 assert.eq( 0, t.find( {a:{$type:17}} ).itcount() );
-}
 assert.eq( 1, t.find( {a:{$type:9}} ).itcount() );
 
 // Type Code
