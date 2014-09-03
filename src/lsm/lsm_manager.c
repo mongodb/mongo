@@ -48,7 +48,6 @@ __wt_lsm_manager_start(WT_SESSION_IMPL *session)
 		    S2C(session), "lsm-worker", 1, 0, &worker_session));
 		worker_session->isolation = TXN_ISO_READ_UNCOMMITTED;
 		cookies[i].session = worker_session;
-		cookies[i].work_cond = manager->work_cond;
 	}
 
 	/* Start the LSM manager thread. */
@@ -218,6 +217,7 @@ __lsm_manager_worker_setup(WT_SESSION_IMPL *session)
 	    session, "LSM worker cond", 0, &manager->work_cond));
 
 	worker_args = &manager->lsm_worker_cookies[1];
+	worker_args->work_cond = manager->work_cond;
 	worker_args->id = manager->lsm_workers++;
 	worker_args->flags = WT_LSM_WORK_SWITCH;
 	/* Start the switch thread. */
@@ -233,6 +233,7 @@ __lsm_manager_worker_setup(WT_SESSION_IMPL *session)
 		/* Freed by the worker thread when it shuts down */
 		worker_args =
 		    &manager->lsm_worker_cookies[manager->lsm_workers];
+		worker_args->work_cond = manager->work_cond;
 		worker_args->id = manager->lsm_workers;
 		worker_args->flags =
 		    WT_LSM_WORK_BLOOM |
