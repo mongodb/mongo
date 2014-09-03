@@ -227,7 +227,7 @@ struct __wt_lsm_worker_cookie {
  */
 struct __wt_lsm_worker_args {
 	WT_SESSION_IMPL *session;
-	WT_CONDVAR *work_cond;
+	WT_CONDVAR *work_cond;		/* Owned by the manager */
 	pthread_t tid;
 	u_int id;
 	uint32_t flags;
