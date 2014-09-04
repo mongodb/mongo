@@ -107,13 +107,25 @@ namespace mongo {
                 timeoutSecs = cmdObj["timeoutSecs"].numberLong();
             }
 
-            Status status = repl::getGlobalReplicationCoordinator()->stepDownAndWaitForSecondary(
+            Status status = repl::getGlobalReplicationCoordinator()->stepDown(
                     txn,
+                    false,
                     repl::ReplicationCoordinator::Milliseconds(timeoutSecs * 1000),
-                    repl::ReplicationCoordinator::Milliseconds(120 * 1000),
-                    repl::ReplicationCoordinator::Milliseconds(60 * 1000));
+                    repl::ReplicationCoordinator::Milliseconds(120 * 1000));
             if (!status.isOK() && status.code() != ErrorCodes::NotMaster) { // ignore not master
                 return appendCommandStatus(result, status);
+            }
+
+            // TODO(spencer): This block can be removed once stepDown() guarantees that a secondary
+            // is fully caught up instead of just within 10 seconds of the primary.
+            if (status.code() != ErrorCodes::NotMaster) {
+                WriteConcernOptions writeConcern;
+                writeConcern.wNumNodes = 2;
+                writeConcern.wTimeout = 60 * 1000; // 1 minute
+                // Note that return value is ignored - we shut down after 1 minute even if we're not
+                // done replicating.
+                repl::getGlobalReplicationCoordinator()->awaitReplicationOfLastOpApplied(
+                        txn, writeConcern);
             }
         }
 

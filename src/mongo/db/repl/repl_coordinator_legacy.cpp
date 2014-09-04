@@ -179,26 +179,18 @@ namespace repl {
         }
     }
 
-    ReplicationCoordinator::StatusAndDuration 
-            LegacyReplicationCoordinator::awaitReplicationOfLastOp(
+    ReplicationCoordinator::StatusAndDuration
+            LegacyReplicationCoordinator::awaitReplicationOfLastOpForClient(
                     const OperationContext* txn,
                     const WriteConcernOptions& writeConcern) {
         return awaitReplication(txn, txn->getClient()->getLastOp(), writeConcern);
     }
 
-    Status LegacyReplicationCoordinator::stepDown(OperationContext* txn, 
-                                                  bool force,
-                                                  const Milliseconds& waitTime,
-                                                  const Milliseconds& stepdownTime) {
-        return _stepDownHelper(txn, force, waitTime, stepdownTime, Milliseconds(0));
-    }
-
-    Status LegacyReplicationCoordinator::stepDownAndWaitForSecondary(
-            OperationContext* txn,
-            const Milliseconds& initialWaitTime,
-            const Milliseconds& stepdownTime,
-            const Milliseconds& postStepdownWaitTime) {
-        return _stepDownHelper(txn, false, initialWaitTime, stepdownTime, postStepdownWaitTime);
+    ReplicationCoordinator::StatusAndDuration
+            LegacyReplicationCoordinator::awaitReplicationOfLastOpApplied(
+                    const OperationContext* txn,
+                    const WriteConcernOptions& writeConcern) {
+        return awaitReplication(txn, theReplSet->lastOpTimeWritten, writeConcern);
     }
 
 namespace {
@@ -244,18 +236,17 @@ namespace {
     }
 } // namespace
 
-    Status LegacyReplicationCoordinator::_stepDownHelper(OperationContext* txn,
-                                                         bool force,
-                                                         const Milliseconds& initialWaitTime,
-                                                         const Milliseconds& stepdownTime,
-                                                         const Milliseconds& postStepdownWaitTime) {
+    Status LegacyReplicationCoordinator::stepDown(OperationContext* txn,
+                                                  bool force,
+                                                  const Milliseconds& waitTime,
+                                                  const Milliseconds& stepdownTime) {
         invariant(getReplicationMode() == modeReplSet);
         if (!getCurrentMemberState().primary()) {
             return Status(ErrorCodes::NotMaster, "not primary so can't step down");
         }
 
         if (!force) {
-            Status status = _waitForSecondary(initialWaitTime, Milliseconds(10 * 1000));
+            Status status = _waitForSecondary(waitTime, Milliseconds(10 * 1000));
             if (!status.isOK()) {
                 return status;
             }
@@ -265,16 +256,6 @@ namespace {
         bool worked = repl::theReplSet->stepDown(txn, stepdownTime.total_seconds());
         if (!worked) {
             return Status(ErrorCodes::NotMaster, "not primary so can't step down");
-        }
-
-        if (postStepdownWaitTime.total_milliseconds() > 0) {
-            log() << "waiting for secondaries to catch up" << endl;
-
-            // The only caller of this with a non-zero postStepdownWaitTime is
-            // stepDownAndWaitForSecondary, and the only caller of that is the shutdown command
-            // which doesn't actually care if secondaries failed to catch up here, so we ignore the
-            // return status of _waitForSecondary
-            _waitForSecondary(postStepdownWaitTime, Milliseconds(0));
         }
         return Status::OK();
     }

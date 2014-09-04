@@ -104,16 +104,31 @@ namespace repl {
     }
 
     ReplicationCoordinator::StatusAndDuration 
-            HybridReplicationCoordinator::awaitReplicationOfLastOp(
+            HybridReplicationCoordinator::awaitReplicationOfLastOpForClient(
                     const OperationContext* txn,
                     const WriteConcernOptions& writeConcern) {
-        StatusAndDuration implStatus = _impl.awaitReplicationOfLastOp(txn, writeConcern);
+        StatusAndDuration implStatus = _impl.awaitReplicationOfLastOpForClient(txn, writeConcern);
         if (implStatus.status.isOK()) {
             WriteConcernOptions legacyWriteConcern = writeConcern;
             legacyWriteConcern.wTimeout = WriteConcernOptions::kNoWaiting;
-            StatusAndDuration legacyStatus = _legacy.awaitReplicationOfLastOp(txn,
-                                                                              legacyWriteConcern);
+            StatusAndDuration legacyStatus = _legacy.awaitReplicationOfLastOpForClient(
+                    txn, legacyWriteConcern);
             fassert(18669, legacyStatus.status);
+        }
+        return implStatus;
+    }
+
+    ReplicationCoordinator::StatusAndDuration
+            HybridReplicationCoordinator::awaitReplicationOfLastOpApplied(
+                    const OperationContext* txn,
+                    const WriteConcernOptions& writeConcern) {
+        StatusAndDuration implStatus = _impl.awaitReplicationOfLastOpApplied(txn, writeConcern);
+        if (implStatus.status.isOK()) {
+            WriteConcernOptions legacyWriteConcern = writeConcern;
+            legacyWriteConcern.wTimeout = WriteConcernOptions::kNoWaiting;
+            StatusAndDuration legacyStatus = _legacy.awaitReplicationOfLastOpApplied(
+                    txn, legacyWriteConcern);
+            fassert(18694, legacyStatus.status);
         }
         return implStatus;
     }
@@ -124,22 +139,6 @@ namespace repl {
                                                   const Milliseconds& stepdownTime) {
         Status legacyStatus = _legacy.stepDown(txn, force, waitTime, stepdownTime);
         Status implStatus = _impl.stepDown(txn, force, waitTime, stepdownTime);
-        return legacyStatus;
-    }
-
-    Status HybridReplicationCoordinator::stepDownAndWaitForSecondary(
-            OperationContext* txn,
-            const Milliseconds& initialWaitTime,
-            const Milliseconds& stepdownTime,
-            const Milliseconds& postStepdownWaitTime) {
-        Status legacyStatus = _legacy.stepDownAndWaitForSecondary(txn,
-                                                                  initialWaitTime,
-                                                                  stepdownTime,
-                                                                  postStepdownWaitTime);
-        Status implStatus = _impl.stepDownAndWaitForSecondary(txn,
-                                                              initialWaitTime,
-                                                              stepdownTime,
-                                                              postStepdownWaitTime);
         return legacyStatus;
     }
 

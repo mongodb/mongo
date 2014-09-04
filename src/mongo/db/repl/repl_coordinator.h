@@ -151,7 +151,15 @@ namespace repl {
          * Like awaitReplication(), above, but waits for the replication of the last operation
          * performed on the client associated with "txn".
          */
-        virtual StatusAndDuration awaitReplicationOfLastOp(
+        virtual StatusAndDuration awaitReplicationOfLastOpForClient(
+                const OperationContext* txn,
+                const WriteConcernOptions& writeConcern) = 0;
+
+        /**
+         * Like awaitReplication(), above, but waits for the replication of the last operation
+         * applied to this node.
+         */
+        virtual StatusAndDuration awaitReplicationOfLastOpApplied(
                 const OperationContext* txn,
                 const WriteConcernOptions& writeConcern) = 0;
 
@@ -171,17 +179,6 @@ namespace repl {
                                 bool force,
                                 const Milliseconds& waitTime,
                                 const Milliseconds& stepdownTime) = 0;
-
-        /**
-         * Behaves similarly to stepDown except that after stepping down as primary it waits for
-         * up to 'postStepdownWaitTime' for one other node to match this node's optime exactly.
-         * TODO(spencer): This method should be removed and all callers should use shutDown, after
-         * shutdown has been fixed to block new writes while waiting for secondaries to catch up.
-         */
-        virtual Status stepDownAndWaitForSecondary(OperationContext* txn,
-                                                   const Milliseconds& initialWaitTime,
-                                                   const Milliseconds& stepdownTime,
-                                                   const Milliseconds& postStepdownWaitTime) = 0;
 
         /**
          * TODO a way to trigger an action on replication of a given operation

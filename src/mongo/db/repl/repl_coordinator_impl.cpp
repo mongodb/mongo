@@ -445,6 +445,7 @@ namespace {
             const OperationContext* txn,
             const OpTime& opTime,
             const WriteConcernOptions& writeConcern) {
+
         if (writeConcern.wNumNodes <= 1 && writeConcern.wMode.empty()) {
             // TODO(spencer): is this right?  The map does contain entries for ourself, so it seems
             // like checking the map even for w:1 writes makes some sense...
@@ -510,9 +511,18 @@ namespace {
         return StatusAndDuration(Status::OK(), Milliseconds(timer.millis()));
     }
 
-    ReplicationCoordinator::StatusAndDuration ReplicationCoordinatorImpl::awaitReplicationOfLastOp(
-            const OperationContext* txn,
-            const WriteConcernOptions& writeConcern) {
+    ReplicationCoordinator::StatusAndDuration
+            ReplicationCoordinatorImpl::awaitReplicationOfLastOpForClient(
+                    const OperationContext* txn,
+                    const WriteConcernOptions& writeConcern) {
+        return awaitReplication(txn, txn->getClient()->getLastOp(), writeConcern);
+    }
+
+    ReplicationCoordinator::StatusAndDuration
+            ReplicationCoordinatorImpl::awaitReplicationOfLastOpApplied(
+                    const OperationContext* txn,
+                    const WriteConcernOptions& writeConcern) {
+        // TODO(spencer): Fix double locking of _mutex from _getLastOpApplied and awaitReplication
         return awaitReplication(txn, _getLastOpApplied(), writeConcern);
     }
 
@@ -520,15 +530,6 @@ namespace {
                                                 bool force,
                                                 const Milliseconds& waitTime,
                                                 const Milliseconds& stepdownTime) {
-        // TODO
-        return Status::OK();
-    }
-
-    Status ReplicationCoordinatorImpl::stepDownAndWaitForSecondary(
-            OperationContext* txn,
-            const Milliseconds& initialWaitTime,
-            const Milliseconds& stepdownTime,
-            const Milliseconds& postStepdownWaitTime) {
         // TODO
         return Status::OK();
     }

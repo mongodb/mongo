@@ -62,7 +62,11 @@ namespace repl {
                 const OpTime& ts,
                 const WriteConcernOptions& writeConcern);
 
-        virtual ReplicationCoordinator::StatusAndDuration awaitReplicationOfLastOp(
+        virtual ReplicationCoordinator::StatusAndDuration awaitReplicationOfLastOpForClient(
+                const OperationContext* txn,
+                const WriteConcernOptions& writeConcern);
+
+        virtual ReplicationCoordinator::StatusAndDuration awaitReplicationOfLastOpApplied(
                 const OperationContext* txn,
                 const WriteConcernOptions& writeConcern);
 
@@ -70,11 +74,6 @@ namespace repl {
                                 bool force,
                                 const Milliseconds& waitTime,
                                 const Milliseconds& stepdownTime);
-
-        virtual Status stepDownAndWaitForSecondary(OperationContext* txn,
-                                                   const Milliseconds& initialWaitTime,
-                                                   const Milliseconds& stepdownTime,
-                                                   const Milliseconds& postStepdownWaitTime);
 
         virtual bool isMasterForReportingPurposes();
 
@@ -155,11 +154,6 @@ namespace repl {
         virtual bool isReplEnabled() const;
 
     private:
-        Status _stepDownHelper(OperationContext* txn,
-                               bool force,
-                               const Milliseconds& initialWaitTime,
-                               const Milliseconds& stepdownTime,
-                               const Milliseconds& postStepdownWaitTime);
 
         // Mutex that protects the _slaveOpTimeMap
         boost::mutex _mutex;
