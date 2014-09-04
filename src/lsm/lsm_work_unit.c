@@ -120,7 +120,6 @@ __wt_lsm_work_switch(
     WT_SESSION_IMPL *session, WT_LSM_WORK_UNIT **entryp, int *ran)
 {
 	WT_DECL_RET;
-	WT_LSM_CHUNK *chunk;
 	WT_LSM_WORK_UNIT *entry;
 
 	/* We've become responsible for freeing the work unit. */
@@ -138,7 +137,7 @@ __wt_lsm_work_switch(
 			*ran = 1;
 	}
 
-err:	__wt_lsm_manager_free_work_unit(session, entry);
+	__wt_lsm_manager_free_work_unit(session, entry);
 
 	return (ret);
 }
