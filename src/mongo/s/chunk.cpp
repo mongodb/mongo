@@ -38,6 +38,7 @@
 #include "mongo/client/connpool.h"
 #include "mongo/client/dbclientcursor.h"
 #include "mongo/db/query/lite_parsed_query.h"
+#include "mongo/db/index_names.h"
 #include "mongo/db/lasterror.h"
 #include "mongo/db/write_concern.h"
 #include "mongo/platform/random.h"
@@ -328,9 +329,7 @@ namespace mongo {
         // the very first (or last) key as a split point.
         // This heuristic is skipped for "special" shard key patterns that are not likely to
         // produce monotonically increasing or decreasing values (e.g. hashed shard keys).
-        // TODO: need better way to detect when shard keys vals are increasing/decreasing, and
-        // use that better method to determine whether to apply heuristic here.
-        if ( ! skey().isSpecial() ){
+        if (KeyPattern::isOrderedKeyPattern(skey().key())) {
             if ( minIsInf() ) {
                 BSONObj key = _getExtremeKey( 1 );
                 if ( ! key.isEmpty() ) {
@@ -1272,7 +1271,7 @@ namespace mongo {
         //   Key { a : 1, b : 1 }
         //   Bounds { a : [1, 2), b : [3, 4) }
         //   => Ranges { a : 1, b : 3 } => { a : 2, b : 4 }
-        BoundList ranges = KeyPattern::keyBounds(_key.key(), bounds);
+        BoundList ranges = KeyPattern::flattenBounds(_key.key(), bounds);
 
         for ( BoundList::const_iterator it=ranges.begin(); it != ranges.end(); ++it ){
             getShardsForRange( shards, it->first /*min*/, it->second /*max*/ );
@@ -1325,10 +1324,8 @@ namespace mongo {
         }
 
         // Consider shard key as an index
-        string accessMethod = IndexNames::BTREE;
-        if (KeyPattern::isHashed(key.firstElement())) {
-            accessMethod = IndexNames::HASHED;
-        }
+        string accessMethod = IndexNames::findPluginName(key);
+        dassert(accessMethod == IndexNames::BTREE || accessMethod == IndexNames::HASHED);
 
         // Use query framework to generate index bounds
         QueryPlannerParams plannerParams;

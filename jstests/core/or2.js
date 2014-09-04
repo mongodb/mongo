@@ -1,6 +1,9 @@
 t = db.jstests_or2;
 t.drop();
 
+// Include helpers for analyzing explain output.
+load("jstests/libs/analyze_plan.js");
+
 checkArrs = function( a, b, m ) {
     assert.eq( a.length, b.length, m );
     aStr = [];
@@ -16,7 +19,7 @@ doTest = function( index ) {
     if ( index == null ) {
         index = true;
     }
-    
+
     t.save( {_id:0,x:0,a:1} );
     t.save( {_id:1,x:0,a:2} );
     t.save( {_id:2,x:0,b:1} );
@@ -25,23 +28,25 @@ doTest = function( index ) {
     t.save( {_id:5,x:1,a:1,b:2} );
     t.save( {_id:6,x:1,a:2,b:1} );
     t.save( {_id:7,x:1,a:2,b:2} );
-    
+
     assert.throws( function() { t.find( { x:0,$or:"a" } ).toArray(); } );
     assert.throws( function() { t.find( { x:0,$or:[] } ).toArray(); } );
     assert.throws( function() { t.find( { x:0,$or:[ "a" ] } ).toArray(); } );
-    
+
     a1 = t.find( { x:0, $or: [ { a : 1 } ] } ).toArray();
     checkArrs( [ { _id:0, x:0, a:1 } ], a1 );
     if ( index ) {
-        assert( t.find( { x:0,$or: [ { a : 1 } ] } ).explain().cursor.match( /Btree/ ) );
+        var explain = t.find( { x:0,$or: [ { a : 1 } ] } ).explain();
+        assert( isIxscan(explain.queryPlanner.winningPlan) );
     }
-    
+
     a1b2 = t.find( { x:1, $or: [ { a : 1 }, { b : 2 } ] } ).toArray();
     checkArrs( [ { _id:4, x:1, a:1, b:1 }, { _id:5, x:1, a:1, b:2 }, { _id:7, x:1, a:2, b:2 } ], a1b2 );
     if ( index ) {
-        assert( t.find( { x:0,$or: [ { a : 1 } ] } ).explain().cursor.match( /Btree/ ) );
+        var explain = t.find( { x:0,$or: [ { a : 1 } ] } ).explain();
+        assert( isIxscan(explain.queryPlanner.winningPlan) );
     }
-        
+
     /*
     t.drop();
     obj = {_id:0,x:10,a:[1,2,3]};

@@ -114,20 +114,23 @@ var doTest = function(useDollarQuerySyntax) {
 
     // Read pref should work without slaveOk
     var explain = getExplain("secondary");
-    assert.neq( primaryNode.name, explain.server );
+    var explainServer = explain.serverInfo.host + ":" + explain.serverInfo.port.toString();
+    assert.neq( primaryNode.name, explainServer );
 
     conn.setSlaveOk();
 
     // It should also work with slaveOk
     explain = getExplain("secondary");
-    assert.neq( primaryNode.name, explain.server );
+    explainServer = explain.serverInfo.host + ":" + explain.serverInfo.port.toString();
+    assert.neq( primaryNode.name, explainServer );
 
     // Check that $readPreference does not influence the actual query
-    assert.eq( 1, explain.n );
+    assert.eq( 1, explain.executionStats.nReturned );
 
     explain = getExplain("secondaryPreferred", [{ s: "2" }]);
-    checkTag( explain.server, { s: "2" });
-    assert.eq( 1, explain.n );
+    explainServer = explain.serverInfo.host + ":" + explain.serverInfo.port.toString();
+    checkTag( explainServer, { s: "2" });
+    assert.eq( 1, explain.executionStats.nReturned );
 
     // Cannot use tags with primaryOnly
     assert.throws( function() {
@@ -136,21 +139,25 @@ var doTest = function(useDollarQuerySyntax) {
 
     // Ok to use empty tags on primaryOnly
     explain = coll.find().readPref("primary", [{}]).explain();
-    assert.eq(primaryNode.name, explain.server);
+    explainServer = explain.serverInfo.host + ":" + explain.serverInfo.port.toString();
+    assert.eq(primaryNode.name, explainServer);
 
     explain = coll.find().readPref("primary", []).explain();
-    assert.eq(primaryNode.name, explain.server);
+    explainServer = explain.serverInfo.host + ":" + explain.serverInfo.port.toString();
+    assert.eq(primaryNode.name, explainServer);
 
     // Check that mongos will try the next tag if nothing matches the first
     explain = getExplain("secondary", [{ z: "3" }, { dc: "jp" }]);
-    checkTag( explain.server, { dc: "jp" });
-    assert.eq( 1, explain.n );
+    explainServer = explain.serverInfo.host + ":" + explain.serverInfo.port.toString();
+    checkTag( explainServer, { dc: "jp" });
+    assert.eq( 1, explain.executionStats.nReturned );
 
     // Check that mongos will fallback to primary if none of tags given matches
     explain = getExplain("secondaryPreferred", [{ z: "3" }, { dc: "ph" }]);
+    explainServer = explain.serverInfo.host + ":" + explain.serverInfo.port.toString();
     // Call getPrimary again since the primary could have changed after the restart.
-    assert.eq(replTest.getPrimary().name, explain.server);
-    assert.eq( 1, explain.n );
+    assert.eq(replTest.getPrimary().name, explainServer);
+    assert.eq( 1, explain.executionStats.nReturned );
 
     // Kill all members except one
     var stoppedNodes = [];
@@ -171,8 +178,9 @@ var doTest = function(useDollarQuerySyntax) {
 
     // Test to make sure that connection is ok, in prep for priOnly test
     explain = getExplain("nearest");
-    assert.eq( explain.server, replTest.nodes[NODES - 1].name );
-    assert.eq( 1, explain.n );
+    explainServer = explain.serverInfo.host + ":" + explain.serverInfo.port.toString();
+    assert.eq( explainServer, replTest.nodes[NODES - 1].name );
+    assert.eq( 1, explain.executionStats.nReturned );
 
     // Should assert if request with priOnly but no primary
     assert.throws( function(){

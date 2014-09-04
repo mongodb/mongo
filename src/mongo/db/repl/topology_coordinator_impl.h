@@ -374,29 +374,6 @@ namespace repl {
         // Ping stats for each member by HostAndPort;
         PingMap _pings;
 
-        // do these need settors?  the current code has no way to change these values.
-        struct HeartbeatOptions {
-        HeartbeatOptions() :  heartbeatSleepMillis(2000), 
-                heartbeatTimeoutMillis(10000),
-                heartbeatConnRetries(2) 
-            { }
-            
-            unsigned heartbeatSleepMillis;
-            unsigned heartbeatTimeoutMillis;
-            unsigned heartbeatConnRetries ;
-
-            void check() {
-                uassert(17490, "bad replset heartbeat option", heartbeatSleepMillis >= 10);
-                uassert(17491, "bad replset heartbeat option", heartbeatTimeoutMillis >= 10);
-            }
-
-            bool operator==(const HeartbeatOptions& r) const {
-                return (heartbeatSleepMillis==r.heartbeatSleepMillis && 
-                        heartbeatTimeoutMillis==r.heartbeatTimeoutMillis &&
-                        heartbeatConnRetries==r.heartbeatConnRetries);
-            }
-        } _heartbeatOptions;
-
         // Last vote info from the election
         struct LastVote {
 

@@ -535,6 +535,68 @@ namespace {
         assertSolutionExists("{fetch: {node: {ixscan: {pattern: {x: 1}}}}}");
     }
 
+    TEST_F(QueryPlannerTest, ExistsBounds) {
+        addIndex(BSON("b" << 1));
+
+        runQuery(fromjson("{b: {$exists: true}}"));
+        assertNumSolutions(2U);
+        assertSolutionExists("{cscan: {dir: 1}}");
+        assertSolutionExists("{fetch: {filter: {b: {$exists: true}}, node: "
+                                "{ixscan: {pattern: {b: 1}, bounds: "
+                                "{b: [['MinKey', 'MaxKey', true, true]]}}}}}");
+
+        // This ends up being a double negation, which we currently don't index.
+        runQuery(fromjson("{b: {$not: {$exists: false}}}"));
+        assertNumSolutions(1U);
+        assertSolutionExists("{cscan: {dir: 1}}");
+
+        runQuery(fromjson("{b: {$exists: false}}"));
+        assertNumSolutions(2U);
+        assertSolutionExists("{cscan: {dir: 1}}");
+        assertSolutionExists("{fetch: {filter: {b: {$exists: false}}, node: "
+                                "{ixscan: {pattern: {b: 1}, bounds: "
+                                "{b: [[null, null, true, true]]}}}}}");
+
+        runQuery(fromjson("{b: {$not: {$exists: true}}}"));
+        assertNumSolutions(2U);
+        assertSolutionExists("{cscan: {dir: 1}}");
+        assertSolutionExists("{fetch: {filter: {b: {$exists: false}}, node: "
+                                "{ixscan: {pattern: {b: 1}, bounds: "
+                                "{b: [[null, null, true, true]]}}}}}");
+    }
+
+    TEST_F(QueryPlannerTest, ExistsBoundsCompound) {
+        addIndex(BSON("a" << 1 << "b" << 1));
+
+        runQuery(fromjson("{a: 1, b: {$exists: true}}"));
+        assertNumSolutions(2U);
+        assertSolutionExists("{cscan: {dir: 1}}");
+        assertSolutionExists("{fetch: {filter: {b: {$exists: true}}, node: "
+                                "{ixscan: {pattern: {a: 1, b: 1}, bounds: "
+                                "{a: [[1,1,true,true]], b: [['MinKey','MaxKey',true,true]]}}}}}");
+
+        // This ends up being a double negation, which we currently don't index.
+        runQuery(fromjson("{a: 1, b: {$not: {$exists: false}}}"));
+        assertNumSolutions(2U);
+        assertSolutionExists("{cscan: {dir: 1}}");
+        assertSolutionExists("{fetch: {node: {ixscan: {pattern: {a: 1, b: 1}, bounds: "
+                                "{a: [[1,1,true,true]], b: [['MinKey','MaxKey',true,true]]}}}}}");
+
+        runQuery(fromjson("{a: 1, b: {$exists: false}}"));
+        assertNumSolutions(2U);
+        assertSolutionExists("{cscan: {dir: 1}}");
+        assertSolutionExists("{fetch: {filter: {b: {$exists: false}}, node: "
+                                "{ixscan: {pattern: {a: 1, b: 1}, bounds: "
+                                "{a: [[1,1,true,true]], b: [[null,null,true,true]]}}}}}");
+
+        runQuery(fromjson("{a: 1, b: {$not: {$exists: true}}}"));
+        assertNumSolutions(2U);
+        assertSolutionExists("{cscan: {dir: 1}}");
+        assertSolutionExists("{fetch: {filter: {b: {$exists: false}}, node: "
+                                "{ixscan: {pattern: {a: 1, b: 1}, bounds: "
+                                "{a: [[1,1,true,true]], b: [[null,null,true,true]]}}}}}");
+    }
+
     //
     // skip and limit
     //
@@ -1523,6 +1585,19 @@ namespace {
                                 "node: {ixscan: {filter: null, pattern: {'foo.b': 1}}}}}");
         assertSolutionExists("{fetch: {filter: {foo:{$all:[{$elemMatch:{b:2,a:2}},{$elemMatch:{a:1,b:1}}]}}, "
                                 "node: {ixscan: {filter: null, pattern: {'foo.b': 1}}}}}");*/
+    }
+
+    TEST_F(QueryPlannerTest, BasicAllElemMatch2) {
+        // true means multikey
+        addIndex(BSON("a.x" << 1), true);
+
+        runQuery(fromjson("{a: {$all: [{$elemMatch: {x: 3}}, {$elemMatch: {y: 5}}]}}"));
+
+        assertNumSolutions(2U);
+        assertSolutionExists("{cscan: {dir: 1}}");
+        assertSolutionExists("{fetch: {filter: {a:{$all:[{$elemMatch:{x:3}},{$elemMatch:{y:5}}]}},"
+                                "node: {ixscan: {pattern: {'a.x': 1},"
+                                    "bounds: {'a.x': [[3,3,true,true]]}}}}}");
     }
 
     // SERVER-13677
@@ -3535,6 +3610,21 @@ namespace {
                                 "bounds: {a: [['MinKey','MaxKey',true,true]]}}}}}");
     }
 
+    TEST_F(QueryPlannerTest, BoundsTypeMinKeyMaxKey) {
+        params.options = QueryPlannerParams::NO_TABLE_SCAN;
+        addIndex(BSON("a" << 1));
+
+        runQuery(fromjson("{a: {$type: -1}}"));
+        assertNumSolutions(1U);
+        assertSolutionExists("{fetch: {node: {ixscan: {pattern: {a: 1}, bounds:"
+                                "{a: [['MinKey','MinKey',true,true]]}}}}}");
+
+        runQuery(fromjson("{a: {$type: 127}}"));
+        assertNumSolutions(1U);
+        assertSolutionExists("{fetch: {node: {ixscan: {pattern: {a: 1}, bounds:"
+                                "{a: [['MaxKey','MaxKey',true,true]]}}}}}");
+    }
+
     //
     // Tests related to building index bounds for multikey
     // indices, combined with compound and $elemMatch
@@ -4559,6 +4649,61 @@ namespace {
                                  "{a: 3, b: 3, c: 3, d: 3}]}"));
 
         assertNumSolutions(internalQueryEnumerationMaxOrSolutions);
+    }
+
+    // SERVER-13104: test that we properly enumerate all solutions for nested $or.
+    TEST_F(QueryPlannerTest, EnumerateNestedOr) {
+        params.options = QueryPlannerParams::NO_TABLE_SCAN;
+        addIndex(BSON("a" << 1));
+        addIndex(BSON("b" << 1));
+        addIndex(BSON("c" << 1));
+
+        runQuery(fromjson("{d: 1, $or: [{a: 1, b: 1}, {c: 1}]}"));
+
+        assertNumSolutions(2U);
+        assertSolutionExists("{fetch: {filter: {d: 1}, node: {or: {nodes: ["
+                                "{fetch: {filter: {b: 1}, node: {ixscan: {pattern: {a: 1}}}}},"
+                                "{ixscan: {pattern: {c: 1}}}]}}}}");
+        assertSolutionExists("{fetch: {filter: {d: 1}, node: {or: {nodes: ["
+                                "{fetch: {filter: {a: 1}, node: {ixscan: {pattern: {b: 1}}}}},"
+                                "{ixscan: {pattern: {c: 1}}}]}}}}");
+    }
+
+    // SERVER-13104: test that we properly enumerate all solutions for nested $or.
+    TEST_F(QueryPlannerTest, EnumerateNestedOr2) {
+        params.options = QueryPlannerParams::NO_TABLE_SCAN;
+        addIndex(BSON("a" << 1));
+        addIndex(BSON("b" << 1));
+        addIndex(BSON("c" << 1));
+        addIndex(BSON("d" << 1));
+        addIndex(BSON("e" << 1));
+        addIndex(BSON("f" << 1));
+
+        runQuery(fromjson("{a: 1, b: 1, $or: [{c: 1, d: 1}, {e: 1, f: 1}]}"));
+
+        assertNumSolutions(6U);
+
+        // Four possibilities from indexing the $or.
+        assertSolutionExists("{fetch: {filter: {a: 1, b: 1}, node: {or: {nodes: ["
+                                "{fetch: {filter: {d: 1}, node: {ixscan: {pattern: {c: 1}}}}},"
+                                "{fetch: {filter: {f: 1}, node: {ixscan: {pattern: {e: 1}}}}}"
+                             "]}}}}");
+        assertSolutionExists("{fetch: {filter: {a: 1, b: 1}, node: {or: {nodes: ["
+                                "{fetch: {filter: {c: 1}, node: {ixscan: {pattern: {d: 1}}}}},"
+                                "{fetch: {filter: {f: 1}, node: {ixscan: {pattern: {e: 1}}}}}"
+                             "]}}}}");
+        assertSolutionExists("{fetch: {filter: {a: 1, b: 1}, node: {or: {nodes: ["
+                                "{fetch: {filter: {d: 1}, node: {ixscan: {pattern: {c: 1}}}}},"
+                                "{fetch: {filter: {e: 1}, node: {ixscan: {pattern: {f: 1}}}}}"
+                             "]}}}}");
+        assertSolutionExists("{fetch: {filter: {a: 1, b: 1}, node: {or: {nodes: ["
+                                "{fetch: {filter: {c: 1}, node: {ixscan: {pattern: {d: 1}}}}},"
+                                "{fetch: {filter: {e: 1}, node: {ixscan: {pattern: {f: 1}}}}}"
+                             "]}}}}");
+
+        // Two possibilties from outside the $or.
+        assertSolutionExists("{fetch: {node: {ixscan: {pattern: {a: 1}}}}}");
+        assertSolutionExists("{fetch: {node: {ixscan: {pattern: {b: 1}}}}}");
     }
 
     //

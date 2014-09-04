@@ -121,11 +121,13 @@ namespace mongo {
         string cursorType;
         BSONObj indexBounds;
         BSONObj oldPlan;
-        
+
         long long millis = 0;
         double numExplains = 0;
 
-        map<string,long long> counters;
+        long long nReturned = 0;
+        long long keysExamined = 0;
+        long long docsExamined = 0;
 
         map<string,list<BSONObj> > out;
         {
@@ -151,31 +153,34 @@ namespace mongo {
 
                     y.append( temp );
 
-                    BSONObjIterator k( temp );
-                    while ( k.more() ) {
-                        BSONElement z = k.next();
-                        if ( z.fieldName()[0] != 'n' )
-                            continue;
-                        long long& c = counters[z.fieldName()];
-                        c += z.numberLong();
+                    if (temp.hasField("executionStats")) {
+                        // Here we assume that the shard gave us back explain 2.0 style output.
+                        BSONObj execStats = temp["executionStats"].Obj();
+                        if (execStats.hasField("nReturned")) {
+                            nReturned += execStats["nReturned"].numberLong();
+                        }
+                        if (execStats.hasField("totalKeysExamined")) {
+                            keysExamined += execStats["totalKeysExamined"].numberLong();
+                        }
+                        if (execStats.hasField("totalDocsExamined")) {
+                            docsExamined += execStats["totalDocsExamined"].numberLong();
+                        }
+                    }
+                    else {
+                        // Here we assume that the shard gave us back explain 1.0 style output.
+                        if (temp.hasField("n")) {
+                            nReturned += temp["n"].numberLong();
+                        }
+                        if (temp.hasField("nscanned")) {
+                            keysExamined += temp["nscanned"].numberLong();
+                        }
+                        if (temp.hasField("nscannedObjects")) {
+                            docsExamined += temp["nscannedObjects"].numberLong();
+                        }
                     }
 
-                    millis += temp["millis"].numberLong();
+                    millis += temp["executionStats"]["executionTimeMillis"].numberLong();
                     numExplains++;
-
-                    if ( temp["cursor"].type() == String ) { 
-                        if ( cursorType.size() == 0 )
-                            cursorType = temp["cursor"].String();
-                        else if ( cursorType != temp["cursor"].String() )
-                            cursorType = "multiple";
-                    }
-
-                    if ( temp["indexBounds"].type() == Object )
-                        indexBounds = temp["indexBounds"].Obj();
-
-                    if ( temp["oldPlan"].type() == Object )
-                        oldPlan = temp["oldPlan"].Obj();
-
                 }
                 y.done();
             }
@@ -183,8 +188,10 @@ namespace mongo {
         }
 
         b.append( "cursor" , cursorType );
-        for ( map<string,long long>::iterator i=counters.begin(); i!=counters.end(); ++i )
-            b.appendNumber( i->first , i->second );
+
+        b.appendNumber( "nReturned" , nReturned );
+        b.appendNumber( "totalKeysExamined" , keysExamined );
+        b.appendNumber( "totalDocsExamined" , docsExamined );
 
         b.appendNumber( "millisShardTotal" , millis );
         b.append( "millisShardAvg" , 

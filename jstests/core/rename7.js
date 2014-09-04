@@ -27,7 +27,6 @@ assert( db_a.getCollectionNames().indexOf( "rename7" ) < 0 );
 
 assert.eq( 3, b.find().count() );
 assert( db_b.getCollectionNames().indexOf( "rename7" ) >= 0 );
-assert( b.find( {a: 1} ).explain().cursor.match( /^BtreeCursor/ ) );
 
 a.drop();
 b.drop();

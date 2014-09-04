@@ -63,18 +63,6 @@ namespace mongo {
          */
         BSONObj globalMax() const { return gMax; }
 
-        bool isGlobalMin( const BSONObj& k ) const {
-            return k.woCompare( globalMin() ) == 0;
-        }
-
-        bool isGlobalMax( const BSONObj& k ) const {
-            return k.woCompare( globalMax() ) == 0;
-        }
-
-        bool isGlobal( const BSONObj& k ) const {
-            return isGlobalMin( k ) || isGlobalMax( k );
-        }
-
         /**
            @return whether or not obj has all fields in this shard key pattern
            e.g.
@@ -106,10 +94,6 @@ namespace mongo {
          */
         BSONObj extractKeyFromQueryOrDoc(const BSONObj& from) const;
 
-        bool partOfShardKey(const StringData& key ) const {
-            return pattern.hasField(key);
-        }
-
         BSONObj extendRangeBound( const BSONObj& bound , bool makeUpperInclusive ) const {
             return pattern.extendRangeBound( bound , makeUpperInclusive );
         }
@@ -136,20 +120,6 @@ namespace mongo {
          *        for the 'uniqueIndexPattern' argument.
          */
         bool isUniqueIndexCompatible( const KeyPattern& uniqueIndexPattern ) const;
-
-        /**
-         * @return
-         * true if keyPattern contains any computed values, (e.g. {a : "hashed"})
-         * false if keyPattern consists of only ascending/descending fields (e.g. {a : 1, b : -1})
-         *       With our current index expression language, "special" shard keys are any keys
-         *       that are not a simple list of field names and 1/-1 values.
-         */
-        bool isSpecial() const { return pattern.isSpecial(); }
-
-        /**
-         * @return BSONObj with _id and shardkey at front. May return original object.
-         */
-        BSONObj moveToFront(const BSONObj& obj) const;
 
     private:
         KeyPattern pattern;

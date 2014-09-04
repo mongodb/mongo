@@ -29,10 +29,10 @@ for ( var i=0; i<100; i++ ){
 
 t.ensureIndex( { foo : 1 } );
 
-//printjson( t.find( { foo : { $lt : 50 } } ).explain() );
-assert.gt( 30 , t.find( { foo : { $lt : 50 } } ).explain().nscanned , "lt" );
-//printjson( t.find( { foo : { $gt : 50 } } ).explain() );
-assert.gt( 30 , t.find( { foo : { $gt : 50 } } ).explain().nscanned , "gt" );
+var explain = t.find( { foo : { $lt : 50 } } ).explain();
+assert.gt( 30 , explain.executionStats.totalKeysExamined , "lt" );
+var explain = t.find( { foo : { $gt : 50 } } ).explain();
+assert.gt( 30 , explain.executionStats.totalKeysExamined , "gt" );
 
 
 t.drop();
@@ -43,11 +43,12 @@ for( var i=0; i < 10; ++i ) {
 
 t.ensureIndex( { i : 1 } );
 
-//printjson( t.find( { i : { $lte : 'a' } } ).explain() );
-assert.gt( 3 , t.find( { i : { $lte : 'a' } } ).explain().nscanned , "lte" );
+var explain = t.find( { i : { $lte : 'a' } } ).explain();
+assert.gt( 3 , explain.executionStats.totalKeysExamined , "lte" );
 //printjson( t.find( { i : { $gte : 'a' } } ).explain() );
 // bug SERVER-99
-assert.gt( 3 , t.find( { i : { $gte : 'a' } } ).explain().nscanned , "gte" );
+var explain = t.find( { i : { $gte : 'a' } } ).explain();
+assert.gt( 3 , explain.executionStats.totalKeysExamined , "gte" );
 assert.eq( 1 , t.find( { i : { $gte : 'a' } } ).count() , "gte a" );
 assert.eq( 1 , t.find( { i : { $gte : 'a' } } ).itcount() , "gte b" );
 assert.eq( 1 , t.find( { i : { $gte : 'a' } } ).sort( { i : 1 } ).count() , "gte c" );
@@ -55,7 +56,8 @@ assert.eq( 1 , t.find( { i : { $gte : 'a' } } ).sort( { i : 1 } ).itcount() , "g
 
 t.save( { i : "b" } );
 
-assert.gt( 3 , t.find( { i : { $gte : 'a' } } ).explain().nscanned , "gte" );
+var explain = t.find( { i : { $gte : 'a' } } ).explain();
+assert.gt( 3 , explain.executionStats.totalKeysExamined , "gte" );
 assert.eq( 2 , t.find( { i : { $gte : 'a' } } ).count() , "gte a2" );
 assert.eq( 2 , t.find( { i : { $gte : 'a' } } ).itcount() , "gte b2" );
 assert.eq( 2 , t.find( { i : { $gte : 'a' , $lt : MaxKey } } ).itcount() , "gte c2" );

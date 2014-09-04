@@ -7,13 +7,13 @@
 t = db.explain_batch_size;
 t.drop();
 
-n = 3
+var n = 3
 for (i=0; i<n; i++) {
     t.save( { x : i } );
 }
 
-q = {};
+var q = {};
 
 assert.eq( n , t.find( q ).count() , "A" );
 assert.eq( n , t.find( q ).itcount() , "B" );
-assert.eq( n , t.find( q ).batchSize(1).explain().n , "C" );
+assert.eq( n , t.find( q ).batchSize(1).explain().executionStats.nReturned , "C" );

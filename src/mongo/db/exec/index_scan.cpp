@@ -33,7 +33,6 @@
 #include "mongo/db/index/index_access_method.h"
 #include "mongo/db/index/index_cursor.h"
 #include "mongo/db/index/index_descriptor.h"
-#include "mongo/db/query/explain.h"
 #include "mongo/util/log.h"
 
 namespace {
@@ -381,14 +380,7 @@ namespace mongo {
         if (_specificStats.indexType.empty()) {
             _specificStats.indexType = "BtreeCursor"; // TODO amName;
 
-            // TODO this can be simplified once the new explain format is
-            // the default. Probably won't need to include explain.h here either.
-            if (enableNewExplain) {
-                _specificStats.indexBounds = _params.bounds.toBSON();
-            }
-            else {
-                _specificStats.indexBounds = _params.bounds.toLegacyBSON();
-            }
+            _specificStats.indexBounds = _params.bounds.toBSON();
 
             _specificStats.indexBoundsVerbose = _params.bounds.toString();
             _specificStats.direction = _params.direction;

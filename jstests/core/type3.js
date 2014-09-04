@@ -21,25 +21,17 @@ assert.eq( 1, t.find( {a:{$type:11}} ).hint( {a:1} ).itcount() );
 
 // Type jstNULL
 t.remove({});
-assert.eq( [[null,null]], t.find( {a:{$type:10}} ).hint( {a:1} ).explain().indexBounds.a );
+t.save( {a:null} );
+assert.eq( 1, t.find( {a:{$type:10}} ).hint( {a:1} ).itcount() );
 
 // Type Undefined
 t.remove({});
-// 'null' is the client friendly version of undefined.
-assert.eq( [[null,null]], t.find( {a:{$type:6}} ).hint( {a:1} ).explain().indexBounds.a );
-
 t.save( {a:undefined} );
 assert.eq( 1, t.find( {a:{$type:6}} ).hint( {a:1} ).itcount() );
 
 // This one won't be returned.
 t.save( {a:null} );
 assert.eq( 1, t.find( {a:{$type:6}} ).hint( {a:1} ).itcount() );
-
-t.remove({});
-// Type MinKey
-assert.eq( [[{$minElement:1},{$minElement:1}]], t.find( {a:{$type:-1}} ).hint( {a:1} ).explain().indexBounds.a );
-// Type MaxKey
-assert.eq( [[{$maxElement:1},{$maxElement:1}]], t.find( {a:{$type:127}} ).hint( {a:1} ).explain().indexBounds.a );
 
 // Type Timestamp
 t.remove({});

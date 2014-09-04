@@ -874,21 +874,21 @@ ShardingTest.prototype.getShard = function( coll, query, includeEmpty ){
 ShardingTest.prototype.getShards = function( coll, query, includeEmpty ){
     if( ! coll.getDB )
         coll = this.s.getCollection( coll )
-    
+
     var explain = coll.find( query ).explain()
     var shards = []
-        
+
     if( explain.shards ){
-        
-        for( var shardName in explain.shards ){           
+        for( var shardName in explain.shards ){
             for( var i = 0; i < explain.shards[shardName].length; i++ ){
-                if( includeEmpty || ( explain.shards[shardName][i].n && explain.shards[shardName][i].n > 0 ) )
+                var hasResults = explain.shards[shardName][i].executionStats.nReturned &&
+                                 explain.shards[shardName][i].executionStats.nReturned > 0;
+                if( includeEmpty || hasResults )
                     shards.push( shardName )
             }
         }
-        
     }
-    
+
     for( var i = 0; i < shards.length; i++ ){
         for( var j = 0; j < this._connections.length; j++ ){
             if ( connectionURLTheSame(  this._connections[j] , shards[i] ) ){
@@ -897,7 +897,7 @@ ShardingTest.prototype.getShards = function( coll, query, includeEmpty ){
             }
         }
     }
-    
+
     return shards
 }
 

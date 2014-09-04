@@ -1,11 +1,23 @@
-t = db.jstests_in3;
+// SERVER-2829 Test arrays matching themselves within a $in expression.
 
-t.drop();
-t.ensureIndex( {i:1} );
-assert.eq( {i:[[3,3]]}, t.find( {i:{$in:[3]}} ).explain().indexBounds , "A1" );
-assert.eq( {i:[[3,3],[6,6]]}, t.find( {i:{$in:[3,6]}} ).explain().indexBounds , "A2" );
+t = db.jstests_in8;
+t.drop(); 
 
-for ( var i=0; i<20; i++ )
-    t.insert( { i : i } );
+t.save( {key: [1]} );
+t.save( {key: ['1']} );
+t.save( {key: [[2]]} );
 
-assert.eq( 3 , t.find( {i:{$in:[3,6]}} ).explain().nscanned , "B1" )
+function doTest() { 
+    assert.eq( 1, t.count( {key:[1]} ) );
+    assert.eq( 1, t.count( {key:{$in:[[1]]}} ) );
+    assert.eq( 1, t.count( {key:{$in:[[1]],$ne:[2]}} ) );
+    assert.eq( 1, t.count( {key:{$in:[['1']],$type:2}} ) );
+    assert.eq( 1, t.count( {key:['1']} ) );
+    assert.eq( 1, t.count( {key:{$in:[['1']]}} ) );
+    assert.eq( 1, t.count( {key:[2]} ) );
+    assert.eq( 1, t.count( {key:{$in:[[2]]}} ) );
+} 
+
+doTest(); 
+t.ensureIndex( {key:1} ); 
+doTest();

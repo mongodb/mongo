@@ -148,6 +148,10 @@ namespace mongo {
     }
 
     Status SubplanStage::planSubqueries() {
+        // Adds the amount of time taken by planSubqueries() to executionTimeMillis. There's lots of
+        // work that happens here, so this is needed for the time accounting to make sense.
+        ScopedTimer timer(&_commonStats.executionTimeMillis);
+
         MatchExpression* theOr = _query->root();
 
         for (size_t i = 0; i < _plannerParams.indices.size(); ++i) {
@@ -209,6 +213,10 @@ namespace mongo {
     }
 
     Status SubplanStage::pickBestPlan() {
+        // Adds the amount of time taken by pickBestPlan() to executionTimeMillis. There's lots of
+        // work that happens here, so this is needed for the time accounting to make sense.
+        ScopedTimer timer(&_commonStats.executionTimeMillis);
+
         // This is what we annotate with the index selections and then turn into a solution.
         auto_ptr<OrMatchExpression> theOr(
             static_cast<OrMatchExpression*>(_query->root()->shallowClone()));

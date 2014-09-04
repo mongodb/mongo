@@ -75,6 +75,10 @@ namespace repl {
     LegacyReplicationCoordinator::~LegacyReplicationCoordinator() {}
 
     void LegacyReplicationCoordinator::startReplication(OperationContext* txn) {
+        if (!isReplEnabled()) {
+            return;
+        }
+
         ReplicationCoordinatorExternalStateImpl externalState;
         _myRID = externalState.ensureMe(txn);
 

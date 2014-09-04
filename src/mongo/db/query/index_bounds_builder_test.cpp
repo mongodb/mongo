@@ -1119,4 +1119,54 @@ namespace {
         ASSERT_EQUALS(tightness, IndexBoundsBuilder::EXACT);
     }
 
+    // Test $type bounds for Code BSON type.
+    TEST(IndexBoundsBuilderTest, CodeTypeBounds) {
+        IndexEntry testIndex = IndexEntry(BSONObj());
+        BSONObj obj = fromjson("{a: {$type: 13}}");
+        auto_ptr<MatchExpression> expr(parseMatchExpression(obj));
+        BSONElement elt = obj.firstElement();
+
+        OrderedIntervalList oil;
+        IndexBoundsBuilder::BoundsTightness tightness;
+        IndexBoundsBuilder::translate(expr.get(), elt, testIndex, &oil, &tightness);
+
+        // Build the expected interval.
+        BSONObjBuilder bob;
+        bob.appendCode("", "");
+        bob.appendCodeWScope("", "", BSONObj());
+        BSONObj expectedInterval = bob.obj();
+
+        // Check the output of translate().
+        ASSERT_EQUALS(oil.name, "a");
+        ASSERT_EQUALS(oil.intervals.size(), 1U);
+        ASSERT_EQUALS(Interval::INTERVAL_EQUALS, oil.intervals[0].compare(
+            Interval(expectedInterval, true, true)));
+        ASSERT(tightness == IndexBoundsBuilder::INEXACT_FETCH);
+    }
+
+    // Test $type bounds for Code With Scoped BSON type.
+    TEST(IndexBoundsBuilderTest, CodeWithScopeTypeBounds) {
+        IndexEntry testIndex = IndexEntry(BSONObj());
+        BSONObj obj = fromjson("{a: {$type: 15}}");
+        auto_ptr<MatchExpression> expr(parseMatchExpression(obj));
+        BSONElement elt = obj.firstElement();
+
+        OrderedIntervalList oil;
+        IndexBoundsBuilder::BoundsTightness tightness;
+        IndexBoundsBuilder::translate(expr.get(), elt, testIndex, &oil, &tightness);
+
+        // Build the expected interval.
+        BSONObjBuilder bob;
+        bob.appendCodeWScope("", "", BSONObj());
+        bob.appendMaxKey("");
+        BSONObj expectedInterval = bob.obj();
+
+        // Check the output of translate().
+        ASSERT_EQUALS(oil.name, "a");
+        ASSERT_EQUALS(oil.intervals.size(), 1U);
+        ASSERT_EQUALS(Interval::INTERVAL_EQUALS, oil.intervals[0].compare(
+            Interval(expectedInterval, true, true)));
+        ASSERT(tightness == IndexBoundsBuilder::INEXACT_FETCH);
+    }
+
 }  // namespace

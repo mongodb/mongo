@@ -75,7 +75,7 @@ try {
     t.find().skip( 1 ).limit( 4 ).itcount();
     checkLastOp( [ [ "ntoreturn", 4 ],
                   [ "ntoskip", 1 ],
-                  [ "nscanned", 3 ],
+                  [ "nscannedObjects", 3 ],
                   [ "nreturned", 2 ] ] );
 
     t.find().batchSize( 2 ).next();

@@ -141,12 +141,14 @@ placeCheck( 7 );
 db.foo.find().sort( { _id : 1 } ).forEach( function(z){ print( z._id ); } )
 
 zzz = db.foo.find().explain();
-assert.eq( 6 , zzz.nscanned , "EX1a" )
-assert.eq( 6 , zzz.n , "EX1b" )
+assert.eq( 0 , zzz.totalKeysExamined , "EX1a" )
+assert.eq( 6 , zzz.nReturned , "EX1b" )
+assert.eq( 6 , zzz.totalDocsExamined , "EX1c" )
 
-zzz = db.foo.find().sort( { _id : 1 } ).explain();
-assert.eq( 6 , zzz.nscanned , "EX2a" )
-assert.eq( 6 , zzz.n , "EX2a" )
+zzz = db.foo.find().hint( { _id : 1 } ).sort( { _id : 1 } ).explain();
+assert.eq( 6 , zzz.totalKeysExamined , "EX2a" )
+assert.eq( 6 , zzz.nReturned , "EX2b" )
+assert.eq( 6 , zzz.totalDocsExamined , "EX2c" )
 
 // getMore
 assert.eq( 4 , db.foo.find().limit(-4).toArray().length , "getMore 1" );

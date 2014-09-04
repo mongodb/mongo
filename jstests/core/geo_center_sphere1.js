@@ -89,7 +89,7 @@ function test(index) {
             print( 'explain for ' + tojson( q , '' , true ) + ' = ' + tojson( explain ) );
             // The index should be at least minimally effective in preventing the full collection
             // scan.
-            assert.gt( t.find().count(), explain.nscanned ,
+            assert.gt( t.find().count(), explain.executionStats.totalKeysExamined ,
                        "nscanned : " + tojson( searches[i] ) )
         }
     }

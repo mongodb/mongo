@@ -8,10 +8,10 @@ t.save( {a:'foo'} );
 
 t.ensureIndex( {a:1} );
 
-function checkScanMatch( query, nscannedObjects, n ) {
+function checkScanMatch( query, docsExamined, n ) {
  	var e = t.find( query ).hint( {a:1} ).explain();
-    assert.eq( nscannedObjects, e.nscannedObjects );
-    assert.eq( n, e.n );
+    assert.eq( docsExamined, e.executionStats.totalDocsExamined );
+    assert.eq( n, e.executionStats.nReturned );
 }
 
 checkScanMatch( {a:/o/}, 1, 1 );
@@ -51,17 +51,5 @@ checkScanMatch( {$and:[{a:1},{$where:'this.a==1'}]}, 1, 1 );
 checkScanMatch( {$and:[{a:1,$where:'this.a==1'}]}, 1, 1 );
 checkScanMatch( {a:1,$and:[{a:1},{a:1,$where:'this.a==1'}]}, 1, 1 );
 
-function checkImpossibleMatch( query ) {
-    var e = t.find( query ).explain();
-    assert.eq( 0, e.n );
-    // The explain output should include the indexBounds field.
-    // The presence of the indexBounds field indicates that the
-    // query can make use of an index.
-    assert('indexBounds' in e, 'index bounds are missing');
-}
-
-// With a single key index, all bounds are utilized.
-assert.eq( [[1,1]], t.find( {$and:[{a:1}]} ).explain().indexBounds.a );
-assert.eq( [[1,1]], t.find( {a:1,$and:[{a:1}]} ).explain().indexBounds.a );
-checkImpossibleMatch( {a:1,$and:[{a:2}]} );
-checkImpossibleMatch( {$and:[{a:1},{a:2}]} );
+assert.eq( 0, t.find({a:1,$and:[{a:2}]}).itcount() );
+assert.eq( 0, t.find({$and:[{a:1},{a:2}]}).itcount() );

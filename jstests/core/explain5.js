@@ -1,44 +1,29 @@
-// Check that the explain result count does proper deduping.
+// Check explain results for a plan that uses an index to obtain the requested sort order.
 
 t = db.jstests_explain5;
 t.drop();
 
-t.ensureIndex( {a:1} );
-t.ensureIndex( {b:1} );
+t.ensureIndex( { a:1 } );
+t.ensureIndex( { b:1 } );
 
-t.save( {a:[1,2,3],b:[4,5,6]} );
-for( i = 0; i < 10; ++i ) {
-    t.save( {} );
+for( i = 0; i < 1000; ++i ) {
+    t.save( { a:i, b:i%3 } );
 }
 
-// Check with a single in order plan.
+// Query with an initial set of documents.
+var explain1 = t.find( { a:{ $gte:0 }, b:2 } ).sort( { a:1 } ).hint( { a:1 } ).explain();
+printjson(explain1);
+var stats1 = explain1.executionStats;
+assert.eq( 333, stats1.nReturned, 'wrong nReturned for explain1' );
+assert.eq( 1000, stats1.totalKeysExamined, 'wrong totalKeysExamined for explain1' );
 
-explain = t.find( {a:{$gt:0}} ).explain( true );
-assert.eq( 1, explain.n );
-assert.eq( 1, explain.allPlans[ 0 ].n );
-
-// Check with a single out of order plan.
-
-explain = t.find( {a:{$gt:0}} ).sort( {z:1} ).hint( {a:1} ).explain( true );
-assert.eq( 1, explain.n );
-assert.eq( 1, explain.allPlans[ 0 ].n );
-
-// Check with multiple plans.
-
-/* STAGE_MIGRATION:
-// As part of 2.7 we plan to rework explain (see SERVER-10448 for details)
-// so didn't carry over old behavior from multi_plan_runner into multi_plan stage
-// Specifically, missing call to explainMultiPlan, so can't explain.allPlans[1].n below
-
-explain = t.find( {a:{$gt:0},b:{$gt:0}} ).explain( true );
-assert.eq( 1, explain.n );
-assert.eq( 1, explain.allPlans[ 0 ].n );
-assert.eq( 1, explain.allPlans[ 1 ].n );
-
-explain = t.find( {$or:[{a:{$gt:0},b:{$gt:0}},{a:{$gt:-1},b:{$gt:-1}}]} ).explain( true );
-assert.eq( 1, explain.n );
-// Check 'n' for every alternative query plan.
-for (var i = 0; i < explain.allPlans.length; ++i) {
-    assert.eq( 1, explain.allPlans[i].n );
+for( i = 1000; i < 2000; ++i ) {
+    t.save( { a:i, b:i%3 } );
 }
-*/
+
+// Query with some additional documents.
+var explain2 = t.find( { a:{ $gte:0 }, b:2 } ).sort( { a:1 } ).hint ( { a:1 } ).explain();
+printjson(explain2);
+var stats2 = explain2.executionStats;
+assert.eq( 666, stats2.nReturned, 'wrong nReturned for explain2' );
+assert.eq( 2000, stats2.totalKeysExamined, 'wrong totalKeysExamined for explain2' );

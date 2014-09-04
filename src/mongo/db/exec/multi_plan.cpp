@@ -110,6 +110,7 @@ namespace mongo {
         if (!bestPlan.results.empty()) {
             *out = bestPlan.results.front();
             bestPlan.results.pop_front();
+            _commonStats.advanced++;
             return PlanStage::ADVANCED;
         }
 
@@ -140,10 +141,23 @@ namespace mongo {
             _backupPlanIdx = kNoSuchPlan;
         }
 
+        // Increment stats.
+        if (PlanStage::ADVANCED == state) {
+            _commonStats.advanced++;
+        }
+        else if (PlanStage::NEED_TIME == state) {
+            _commonStats.needTime++;
+        }
+
         return state;
     }
 
     void MultiPlanStage::pickBestPlan() {
+        // Adds the amount of time taken by pickBestPlan() to executionTimeMillis. There's lots of
+        // execution work that happens here, so this is needed for the time accounting to
+        // make sense.
+        ScopedTimer timer(&_commonStats.executionTimeMillis);
+
         // Run each plan some number of times. This number is at least as great as
         // 'internalQueryPlanEvaluationWorks', but may be larger for big collections.
         size_t numWorks = internalQueryPlanEvaluationWorks;

@@ -1,25 +1,35 @@
-// Test explain result count when a skip parameter is used.
+// Basic test which checks the number of documents returned, keys examined, and documents
+// examined as reported by explain.
 
 t = db.jstests_explain6;
 t.drop();
 
-t.save( {} );
-explain = t.find().skip( 1 ).explain( true );
-assert.eq( 0, explain.n );
-// With only one plan, the skip information is known for the plan.  This is an arbitrary
-// implementation detail, but it changes the way n is calculated.
-assert.eq( 0, explain.allPlans[ 0 ].n );
+t.ensureIndex( { a:1, b:1 } );
+t.ensureIndex( { b:1, a:1 } );
 
-t.ensureIndex( {a:1} );
-explain = t.find( {a:null,b:null} ).skip( 1 ).explain( true );
-assert.eq( 0, explain.n );
+t.save( { a:0, b:1 } );
+t.save( { a:1, b:0 } );
 
-printjson( explain );
-assert.eq( 0, explain.allPlans[ 0 ].n );
+explain = t.find( { a:{ $gte:0 }, b:{ $gte:0 } } ).explain( true );
 
-t.dropIndexes();
-explain = t.find().skip( 1 ).sort({a:1}).explain( true );
-// Skip is applied for an in memory sort.
-assert.eq( 0, explain.n );
-printjson(explain);
-assert.eq( 0, explain.allPlans[ 0 ].n );
+assert.eq( 2, explain.executionStats.nReturned );
+assert.eq( 2, explain.executionStats.totalKeysExamined );
+assert.eq( 2, explain.executionStats.totalDocsExamined );
+
+// A limit of 2.
+explain = t.find( { a:{ $gte:0 }, b:{ $gte:0 } } ).limit( -2 ).explain( true );
+assert.eq( 2, explain.executionStats.nReturned );
+
+// A $or query.
+explain = t.find( { $or:[ { a:{ $gte:0 }, b:{ $gte:1 } },
+                          { a:{ $gte:1 }, b:{ $gte:0 } } ] } ).explain( true );
+assert.eq( 2, explain.executionStats.nReturned );
+
+// A non $or case where totalKeysExamined != number of results
+t.remove({});
+
+t.save( { a:'0', b:'1' } );
+t.save( { a:'1', b:'0' } );
+explain = t.find( { a:/0/, b:/1/ } ).explain( true );
+assert.eq( 1, explain.executionStats.nReturned );
+assert.eq( 2, explain.executionStats.totalKeysExamined );

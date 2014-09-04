@@ -31,25 +31,12 @@
 #include "mongo/db/keypattern.h"
 
 #include "mongo/db/hasher.h"
+#include "mongo/db/index_names.h"
 #include "mongo/util/mongoutils/str.h"
-
-using namespace mongoutils;
 
 namespace mongo {
 
-    KeyPattern::KeyPattern( const BSONObj& pattern ): _pattern( pattern ) {
-
-        // Extract all prefixes of each field in pattern.
-        BSONForEach( field, _pattern ) {
-            StringData fieldName = field.fieldName();
-            size_t pos = fieldName.find( '.' );
-            while ( pos != string::npos ) {
-                _prefixes.insert( StringData( field.fieldName(), pos ) );
-                pos = fieldName.find( '.', pos+1 );
-            }
-            _prefixes.insert( fieldName );
-        }
-    }
+    KeyPattern::KeyPattern( const BSONObj& pattern ): _pattern( pattern ) {}
 
     bool KeyPattern::isIdKeyPattern(const BSONObj& pattern) {
         BSONObjIterator i(pattern);
@@ -63,6 +50,7 @@ namespace mongo {
     }
 
     BSONObj KeyPattern::extractShardKeyFromQuery(const BSONObj& query) const {
+
         if (_pattern.isEmpty())
             return BSONObj();
 
@@ -73,6 +61,10 @@ namespace mongo {
         }
 
         return query.extractFields(_pattern);
+    }
+
+    bool KeyPattern::isOrderedKeyPattern(const BSONObj& pattern) {
+        return IndexNames::BTREE == IndexNames::findPluginName(pattern);
     }
 
     BSONObj KeyPattern::extractShardKeyFromDoc(const BSONObj& doc) const {
@@ -117,31 +109,6 @@ namespace mongo {
         return keyBuilder.obj();
     }
 
-
-    bool KeyPattern::isSpecial() const {
-        BSONForEach(e, _pattern) {
-            int fieldVal = e.numberInt();
-            if ( fieldVal != 1 && fieldVal != -1 ){
-                return true;
-            }
-        }
-        return false;
-    }
-
-    bool KeyPattern::isCoveredBy( const KeyPattern& other ) const {
-        BSONForEach( e, _pattern ) {
-            BSONElement otherfield = other.getField( e.fieldName() );
-            if ( otherfield.eoo() ){
-                return false;
-            }
-
-            if ( otherfield.numberInt() != 1 && otherfield.numberInt() != -1 && otherfield != e ){
-                return false;
-            }
-        }
-        return true;
-    }
-
     BSONObj KeyPattern::extendRangeBound( const BSONObj& bound , bool makeUpperInclusive ) const {
         BSONObjBuilder newBound( bound.objsize() );
 
@@ -177,7 +144,7 @@ namespace mongo {
         return newBound.obj();
     }
 
-    BoundList KeyPattern::keyBounds( const BSONObj& keyPattern, const IndexBounds& indexBounds ) {
+    BoundList KeyPattern::flattenBounds( const BSONObj& keyPattern, const IndexBounds& indexBounds ) {
         invariant(indexBounds.fields.size() == (size_t)keyPattern.nFields());
 
         // If any field is unsatisfied, return empty bound list.

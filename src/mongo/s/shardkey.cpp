@@ -97,69 +97,6 @@ namespace mongo {
         return pattern.toString();
     }
 
-    BSONObj ShardKeyPattern::moveToFront(const BSONObj& obj) const {
-        vector<const char*> keysToMove;
-        keysToMove.push_back("_id");
-        BSONForEach(e, pattern.toBSON()) {
-            if (strchr(e.fieldName(), '.') == NULL && strcmp(e.fieldName(), "_id") != 0)
-                keysToMove.push_back(e.fieldName());
-        }
-
-        if (keysToMove.size() == 1) {
-            return obj;
-
-        }
-        else {
-            BufBuilder buf (sizeof(BSONObj::Holder) + obj.objsize());
-            buf.skip(sizeof(BSONObj::Holder));
-            buf.appendNum(obj.objsize());
-
-            vector<pair<const char*, size_t> > copies;
-            pair<const char*, size_t> toCopy ((const char*)NULL, 0); // C++ NULL isn't a pointer type yet
-
-            BSONForEach(e, obj) {
-                bool moveToFront = false;
-                for (vector<const char*>::const_iterator it(keysToMove.begin()), end(keysToMove.end()); it!=end; ++it) {
-                    if (strcmp(e.fieldName(), *it) == 0) {
-                        moveToFront = true;
-                        break;
-                    }
-                }
-
-                if (moveToFront) {
-                    buf.appendBuf(e.fieldName()-1, e.size());
-                    if (toCopy.first) {
-                        copies.push_back(toCopy);
-                        toCopy.first = NULL;
-                    }
-                }
-                else {
-                    if (!toCopy.first) {
-                        toCopy.first = e.fieldName()-1;
-                        toCopy.second = e.size();
-                    }
-                    else {
-                        toCopy.second += e.size();
-                    }
-                }
-            }
-
-            for (vector<pair<const char*, size_t> >::const_iterator it(copies.begin()), end(copies.end()); it!=end; ++it) {
-                buf.appendBuf(it->first, it->second);
-            }
-
-            if (toCopy.first) {
-                buf.appendBuf(toCopy.first, toCopy.second);
-            }
-
-            buf.appendChar('\0');
-
-            char* const bufData = buf.buf();
-            buf.decouple();
-            return BSONObj::takeOwnership(bufData);
-        }
-    }
-
     /* things to test for compound :
        \ middle (deprecating?)
     */
@@ -221,36 +158,6 @@ namespace mongo {
             verify( k.extractKeyFromQueryOrDoc( fromjson("{sub:{b:2,c:3},a:1}") ).binaryEqual(x) );
         }
 
-        void isSpecialTest() {
-            ShardKeyPattern k1( BSON( "a" << 1) );
-            verify( ! k1.isSpecial() );
-
-            ShardKeyPattern k2( BSON( "a" << -1 << "b" << 1 ) );
-            verify( ! k2.isSpecial() );
-
-            ShardKeyPattern k3( BSON( "a" << "hashed") );
-            verify( k3.isSpecial() );
-
-            ShardKeyPattern k4( BSON( "a" << 1 << "b" << "hashed") );
-            verify( k4.isSpecial() );
-        }
-
-        void moveToFrontTest() {
-            ShardKeyPattern sk (BSON("a" << 1 << "b" << 1));
-
-            BSONObj ret;
-
-            ret = sk.moveToFront(BSON("z" << 1 << "_id" << 1 << "y" << 1 << "a" << 1 << "x" << 1 << "b" << 1 << "w" << 1));
-            verify(ret.binaryEqual(BSON("_id" << 1 << "a" << 1 << "b" << 1 << "z" << 1 << "y" << 1 << "x" << 1 << "w" << 1)));
-
-            ret = sk.moveToFront(BSON("_id" << 1 << "a" << 1 << "b" << 1 << "z" << 1 << "y" << 1 << "x" << 1 << "w" << 1));
-            verify(ret.binaryEqual(BSON("_id" << 1 << "a" << 1 << "b" << 1 << "z" << 1 << "y" << 1 << "x" << 1 << "w" << 1)));
-
-            ret = sk.moveToFront(BSON("z" << 1 << "y" << 1 << "a" << 1 << "b" << 1 << "Z" << 1 << "Y" << 1));
-            verify(ret.binaryEqual(BSON("a" << 1 << "b" << 1 << "z" << 1 << "y" << 1 << "Z" << 1 << "Y" << 1)));
-
-        }
-
         void uniqueIndexCompatibleTest() {
             ShardKeyPattern k1( BSON( "a" << 1 ) );
             verify( k1.isUniqueIndexCompatible( BSON( "_id" << 1 ) ) );
@@ -263,27 +170,6 @@ namespace mongo {
             verify( ! k2.isUniqueIndexCompatible( BSON( "b" << 1 ) ) );
         }
 
-        void moveToFrontBenchmark(int numFields) {
-            BSONObjBuilder bb;
-            bb.append("_id", 1);
-            for (int i=0; i < numFields; i++)
-                bb.append(BSONObjBuilder::numStr(i), 1);
-            bb.append("key", 1);
-            BSONObj o = bb.obj();
-
-            ShardKeyPattern sk (BSON("key" << 1));
-
-            Timer t;
-            const int iterations = 100*1000;
-            for (int i=0; i< iterations; i++) {
-                sk.moveToFront(o);
-            }
-
-            const double secs = t.micros() / 1000000.0;
-            const double ops_per_sec = iterations / secs;
-
-            cout << "moveToFront (" << numFields << " fields) secs: " << secs << " ops_per_sec: " << ops_per_sec << endl;
-        }
         void run() {
             extractkeytest();
 
@@ -310,19 +196,9 @@ namespace mongo {
 
             verify( k.extractKeyFromQueryOrDoc( a ) <  k.extractKeyFromQueryOrDoc( b ) );
 
-            isSpecialTest();
-
             // add middle multitype tests
 
-            moveToFrontTest();
-
             uniqueIndexCompatibleTest();
-
-            if (0) { // toggle to run benchmark
-                moveToFrontBenchmark(0);
-                moveToFrontBenchmark(10);
-                moveToFrontBenchmark(100);
-            }
 
             LOG(1) << "shardKeyTest passed" << endl;
         }
