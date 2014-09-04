@@ -1,59 +1,39 @@
 /**
-*    Copyright (C) 2014 MongoDB Inc.
-*
-*    This program is free software: you can redistribute it and/or  modify
-*    it under the terms of the GNU Affero General Public License, version 3,
-*    as published by the Free Software Foundation.
-*
-*    This program is distributed in the hope that it will be useful,
-*    but WITHOUT ANY WARRANTY; without even the implied warranty of
-*    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-*    GNU Affero General Public License for more details.
-*
-*    You should have received a copy of the GNU Affero General Public License
-*    along with this program.  If not, see <http://www.gnu.org/licenses/>.
-*
-*    As a special exception, the copyright holders give permission to link the
-*    code of portions of this program with the OpenSSL library under certain
-*    conditions as described in each individual source file and distribute
-*    linked combinations including the program with the OpenSSL library. You
-*    must comply with the GNU Affero General Public License in all respects for
-*    all of the code used other than as permitted herein. If you modify file(s)
-*    with this exception, you may extend this exception to your version of the
-*    file(s), but you are not obligated to do so. If you do not wish to do so,
-*    delete this exception statement from your version. If you delete this
-*    exception statement from all source files in the program, then also delete
-*    it in the license file.
-*/
+ *    Copyright (C) 2014 MongoDB Inc.
+ *
+ *    This program is free software: you can redistribute it and/or  modify
+ *    it under the terms of the GNU Affero General Public License, version 3,
+ *    as published by the Free Software Foundation.
+ *
+ *    This program is distributed in the hope that it will be useful,
+ *    but WITHOUT ANY WARRANTY; without even the implied warranty of
+ *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ *    GNU Affero General Public License for more details.
+ *
+ *    You should have received a copy of the GNU Affero General Public License
+ *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ *    As a special exception, the copyright holders give permission to link the
+ *    code of portions of this program with the OpenSSL library under certain
+ *    conditions as described in each individual source file and distribute
+ *    linked combinations including the program with the OpenSSL library. You
+ *    must comply with the GNU Affero General Public License in all respects for
+ *    all of the code used other than as permitted herein. If you modify file(s)
+ *    with this exception, you may extend this exception to your version of the
+ *    file(s), but you are not obligated to do so. If you do not wish to do so,
+ *    delete this exception statement from your version. If you delete this
+ *    exception statement from all source files in the program, then also delete
+ *    it in the license file.
+ */
 
 #include "mongo/unittest/unittest.h"
 #include "mongo/db/concurrency/lock_mgr_new.h"
+#include "mongo/db/concurrency/lock_mgr_test_help.h"
 #include "mongo/db/concurrency/lock_state.h"
 
 
 namespace mongo {
 namespace newlm {
-
-    class TrackingLockGrantNotification : public LockGrantNotification {
-    public:
-        TrackingLockGrantNotification() : numNotifies(0), lastResult(LOCK_INVALID) {
-
-        }
-
-        virtual void notify(const ResourceId& resId, LockResult result) {
-            numNotifies++;
-            lastResId = resId;
-            lastResult = result;
-        }
-
-    public:
-        int numNotifies;
-
-        ResourceId lastResId;
-        LockResult lastResult;
-    };
-
-
 
     TEST(ResourceId, Semantics) {
         ResourceId resIdDb(RESOURCE_DATABASE, 324334234);
@@ -550,6 +530,34 @@ namespace newlm {
         // Request 1 should be unlocked twice
         lockMgr.unlock(&request[1]);
         lockMgr.unlock(&request[1]);
+    }
+
+    TEST(LockManager, Downgrade) {
+        LockManager lockMgr;
+        const ResourceId resId(RESOURCE_COLLECTION, std::string("TestDB.collection"));
+
+        LockState locker1;
+        TrackingLockGrantNotification notify1;
+        LockRequest request1;
+        request1.initNew(resId, &locker1, &notify1);
+        ASSERT(LOCK_OK == lockMgr.lock(resId, &request1, MODE_X));
+
+        LockState locker2;
+        TrackingLockGrantNotification notify2;
+        LockRequest request2;
+        request2.initNew(resId, &locker2, &notify2);
+        ASSERT(LOCK_WAITING == lockMgr.lock(resId, &request2, MODE_S));
+        ASSERT(request2.recursiveCount == 1);
+
+        lockMgr.downgrade(&request1, MODE_S);
+        ASSERT(notify2.numNotifies == 1);
+        ASSERT(request2.recursiveCount == 1);
+
+        lockMgr.unlock(&request1);
+        ASSERT(request1.recursiveCount == 0);
+
+        lockMgr.unlock(&request2);
+        ASSERT(request2.recursiveCount == 0);
     }
 
 

@@ -51,8 +51,10 @@ namespace newlm {
 
         /**
          * Uninterruptible blocking method, which waits for the notification to fire.
+         *
+         * @param timeoutMs How many milliseconds to wait before returning LOCK_TIMEOUT.
          */
-        LockResult wait();
+        LockResult wait(unsigned timeoutMs);
 
     private:
 
@@ -91,51 +93,41 @@ namespace newlm {
         inline uint64_t getId() const { return _id; }
 
         /**
-         * Shortcut for lockExtended, which blocks until a request is granted or deadlocked. Refer
-         * to the comments for lockExtended.
-         *
-         * @return All LockResults except for LOCK_WAITING, because it blocks.
-         */
-        LockResult lock(const ResourceId& resId, LockMode mode);
-
-        /**
          * Acquires lock on the specified resource in the specified mode and returns the outcome
          * of the operation. See the details for LockResult for more information on what the
          * different results mean.
          *
          * Acquiring the same resource twice increments the reference count of the lock so each
-         * call to lock must be matched with a call to unlock.
+         * call to lock, which doesn't time out (return value LOCK_TIMEOUT) must be matched with a
+         * corresponding call to unlock.
          *
          * @param resId Id of the resource to be locked.
          * @param mode Mode in which the resource should be locked. Lock upgrades are allowed.
-         * @param notify This value cannot be NULL. If the return value is not LOCK_WAITING, this
-         *               pointer can be freed and will not be used any more.
+         * @param timeoutMs How many milliseconds to wait for the lock to be granted, before
+         *              returning LOCK_TIMEOUT. This parameter defaults to UINT_MAX, which means
+         *              wait infinitely. If 0 is passed, the request will return immediately, if
+         *              the request could not be granted right away.
          *
-         *               If the return value is LOCK_WAITING, the notification method will be
-         *               called at some point into the future, when the lock either becomes granted
-         *               or a deadlock is discovered. If unlock is called before the lock becomes
-         *               granted, the notification will not be invoked.
-         *
-         *               If the return value is LOCK_WAITING, the notification object *must* live
-         *               at least until the notfy method has been invoked or unlock has been called
-         *               for the resource it was assigned to. Failure to do so will cause the lock
-         *               manager to call into an invalid memory location.
+         * @return All LockResults except for LOCK_WAITING, because it blocks.
          */
-        LockResult lockExtended(const ResourceId& resId,
-                                LockMode mode,
-                                LockGrantNotification* notify);
+        LockResult lock(const ResourceId& resId, LockMode mode, unsigned timeoutMs = UINT_MAX);
 
         /**
          * Releases a lock previously acquired through a lock call. It is an error to try to
          * release lock which has not been previously acquired (invariant violation).
+         *
+         * @return true if the lock was actually released; false if only the reference count was 
+         *              decremented, but the lock is still held.
          */
-        void unlock(const ResourceId& resId);
+        bool unlock(const ResourceId& resId);
 
         /**
-         * Checks whether the lock held for a particular resource covers the specified mode.
+         * Retrieves the mode in which a lock is held or checks whether the lock held for a
+         * particular resource covers the specified mode.
          *
          * For example MODE_X covers MODE_S.
          */
+        LockMode getLockMode(const ResourceId& resId) const;
         bool isLockHeldForMode(const ResourceId& resId, LockMode mode) const;
 
         /**
@@ -151,13 +143,22 @@ namespace newlm {
         /**
          * Used for testing purposes only - changes the global lock manager. Doesn't delete the
          * previous instance, so make sure that it doesn't leak.
+         *
+         * @param newLockMgr New lock manager to be used. If NULL is passed, the original lock
+         *                      manager is restored.
          */
         static void changeGlobalLockManagerForTestingOnly(LockManager* newLockMgr);
 
     private:
 
-        // Shortcut to do the lookup in _requests. Must be called with the spinlock acquired.
+        /**
+         * Shortcut to do the lookup in _requests. Must be called with the spinlock acquired.
+         */
         LockRequest* _find(const ResourceId& resId) const;
+
+        LockResult _lockImpl(const ResourceId& resId, LockMode mode, unsigned timeoutMs);
+
+        bool _unlockAndUpdateRequestsList(const ResourceId& resId, LockRequest* request);
 
 
         typedef std::map<const ResourceId, LockRequest*> LockRequestsMap;

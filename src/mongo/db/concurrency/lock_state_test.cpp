@@ -28,50 +28,56 @@
 
 #include "mongo/platform/basic.h"
 
-#include <boost/scoped_ptr.hpp>
-#include <boost/thread/thread.hpp>
-
 #include "mongo/unittest/unittest.h"
 #include "mongo/db/concurrency/lock_mgr.h"
+#include "mongo/db/concurrency/lock_mgr_test_help.h"
 #include "mongo/db/concurrency/lock_state.h"
 
 
 namespace mongo {
 namespace newlm {
-
-    class TrackingLockGrantNotification : public LockGrantNotification {
-    public:
-        TrackingLockGrantNotification() : numNotifies(0), lastResult(LOCK_INVALID) {
-
-        }
-
-        virtual void notify(const ResourceId& resId, LockResult result) {
-            numNotifies++;
-            lastResId = resId;
-            lastResult = result;
-        }
-
-    public:
-        int numNotifies;
-
-        ResourceId lastResId;
-        LockResult lastResult;
-    };
-
     
-    TEST(Locker, BasicLockNoConflict) {
-        Locker locker(1);
-        TrackingLockGrantNotification notify;
-
+    TEST(Locker, LockNoConflict) {
         const ResourceId resId(RESOURCE_COLLECTION, std::string("TestDB.collection"));
 
-        ASSERT(LOCK_OK == locker.lockExtended(resId, MODE_X, &notify));
+        Locker locker(1);
+
+        ASSERT(LOCK_OK == locker.lock(resId, MODE_X));
+
         ASSERT(locker.isLockHeldForMode(resId, MODE_X));
         ASSERT(locker.isLockHeldForMode(resId, MODE_S));
 
-        locker.unlock(resId);
+        ASSERT(locker.unlock(resId));
 
-        ASSERT(!locker.isLockHeldForMode(resId, MODE_NONE));
+        ASSERT(locker.isLockHeldForMode(resId, MODE_NONE));
+    }
+
+    TEST(Locker, ReLockNoConflict) {
+        const ResourceId resId(RESOURCE_COLLECTION, std::string("TestDB.collection"));
+
+        Locker locker(1);
+
+        ASSERT(LOCK_OK == locker.lock(resId, MODE_S));
+        ASSERT(LOCK_OK == locker.lock(resId, MODE_X));
+
+        ASSERT(!locker.unlock(resId));
+        ASSERT(locker.isLockHeldForMode(resId, MODE_X));
+
+        ASSERT(locker.unlock(resId));
+        ASSERT(locker.isLockHeldForMode(resId, MODE_NONE));
+    }
+
+    TEST(Locker, ConflictWithTimeout) {
+        const ResourceId resId(RESOURCE_COLLECTION, std::string("TestDB.collection"));
+
+        Locker locker1(1);
+        ASSERT(LOCK_OK == locker1.lock(resId, MODE_X));
+
+        Locker locker2(2);
+        ASSERT(LOCK_TIMEOUT == locker2.lock(resId, MODE_S, 0));
+        ASSERT(locker2.isLockHeldForMode(resId, MODE_NONE));
+
+        ASSERT(locker1.unlock(resId));
     }
 
     // Randomly acquires and releases locks, just to make sure that no assertions pop-up

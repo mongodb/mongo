@@ -46,7 +46,7 @@ namespace newlm {
      * Map of conflicts. 'LockConflictsTable[newMode] & existingMode != 0' means that a new request
      * with the given 'newMode' conflicts with an existing request with mode 'existingMode'.
      */
-    static const int LockConflictsTable[MODE_COUNT] = {
+    static const int LockConflictsTable[] = {
         // MODE_NONE
         0,
 
@@ -66,7 +66,7 @@ namespace newlm {
     /**
      * Maps the mode id to a string.
      */
-    static const char* LockNames[MODE_COUNT] = {
+    static const char* LockNames[] = {
         "NONE", "IS", "IX", "S", "X"
     };
 
@@ -227,7 +227,9 @@ namespace newlm {
         invariant(it != bucket->data.end());
 
         LockHead* lock = it->second;
-        invariant((lock->grantedModes != 0) && (lock->grantedQueue != NULL));
+
+        invariant(lock->grantedQueue != NULL);
+        invariant(lock->grantedModes != 0);
 
         request->recursiveCount--;
 
@@ -276,16 +278,45 @@ namespace newlm {
         }
     }
 
+    void LockManager::downgrade(LockRequest* request, LockMode newMode) {
+        invariant(request->status == LockRequest::STATUS_GRANTED);
+        invariant(request->recursiveCount > 0);
+
+        // The conflict set of the newMode should be a subset of the conflict set of the old mode.
+        // Can't downgrade from S -> IX for example.
+        invariant((LockConflictsTable[request->mode] | LockConflictsTable[newMode]) 
+                                == LockConflictsTable[request->mode]);
+
+        LockBucket* bucket = _getBucket(request->resourceId);
+        scoped_spinlock scopedLock(bucket->mutex);
+
+        LockHeadMap::iterator it = bucket->data.find(request->resourceId);
+
+        // We should not have empty locks in the LockManager and should never try to unlock a lock
+        // that's not been acquired previously
+        invariant(it != bucket->data.end());
+
+        LockHead* lock = it->second;
+
+        invariant(lock->grantedQueue != NULL);
+        invariant(lock->grantedModes != 0);
+
+        request->mode = newMode;
+
+        _recalcAndGrant(it->second, NULL, NULL);
+    }
+
     void LockManager::setNoCheckForLeakedLocksTestOnly(bool newValue) {
         _noCheckForLeakedLocksTestOnly = newValue;
     }
 
     void LockManager::_recalcAndGrant(LockHead* lock,
                                       LockRequest* unlocked,
-                                      LockRequest* changed) {
-        // Either unlocked or changed must be specified, but not both. There are fixed callers of
-        // this method, so dassert.
-        dassert(!unlocked ^ !changed);
+                                      LockRequest* converting) {
+
+        // Either unlocked or converting must be specified, but not both. There are fixed callers
+        // of this method, so dassert.
+        dassert(!unlocked || !converting);
 
         // Resets the granted modes mask
         lock->grantedModes = 0;
@@ -361,7 +392,7 @@ namespace newlm {
 
                     // The caller can infer that the lock was granted from the new mode and from
                     // the status changing to granted.
-                    if (iter != changed) {
+                    if (iter != converting) {
                         iter->notify->notify(lock->resourceId, LOCK_OK);
                     }
                 }
@@ -376,7 +407,7 @@ namespace newlm {
         LockRequest* iterNext = NULL;
 
         for (LockRequest* iter = lock->conflictQueueBegin; iter != NULL; iter = iterNext) {
-            invariant(iter != changed);
+            invariant(iter != converting);
             invariant(iter->status == LockRequest::STATUS_WAITING);
 
             // Store the actual next pointer, because we muck with the iter below and move it to
@@ -447,14 +478,14 @@ namespace newlm {
         while (it != bucket->data.end()) {
             const LockHead* lock = it->second;
             StringBuilder sb;
-            sb << '\n' << "Lock: " << lock->resourceId.toString() << '\n';
+            sb << '\n' << "Lock " << lock << ": " << lock->resourceId.toString() << '\n';
 
             sb << "GRANTED:\n";
             for (const LockRequest* iter = lock->grantedQueue; iter != NULL; iter = iter->next) {
                 sb << '\t'
-                    << iter->locker
-                    << ", "
-                    << modeName(iter->mode)
+                    << iter->locker->getId() << " @ " << iter->locker << ": "
+                    << "Mode = " << modeName(iter->mode) << "; "
+                    << "ConvertMode = " << modeName(iter->convertMode) << "; "
                     << '\n';
             }
 
@@ -466,9 +497,9 @@ namespace newlm {
                  iter = iter->next) {
 
                 sb << '\t'
-                    << iter->locker
-                    << ", "
-                    << modeName(iter->mode)
+                    << iter->locker->getId() << " @ " << iter->locker << ": "
+                    << "Mode = " << modeName(iter->mode) << "; "
+                    << "ConvertMode = " << modeName(iter->convertMode) << "; "
                     << '\n';
             }
 
