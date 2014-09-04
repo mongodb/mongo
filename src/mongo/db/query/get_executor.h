@@ -38,6 +38,7 @@ namespace mongo {
 
     class Collection;
     class Database;
+    struct CountRequest;
 
     struct GroupRequest;
 
@@ -123,8 +124,7 @@ namespace mongo {
      */
     Status getExecutorCount(OperationContext* txn,
                             Collection* collection,
-                            const BSONObj& query,
-                            const BSONObj& hintObj,
+                            const CountRequest& request,
                             PlanExecutor** execOut);
 
     //

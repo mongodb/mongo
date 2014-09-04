@@ -40,6 +40,7 @@ env.Library(
         "cached_plan.cpp",
         "collection_scan.cpp",
         "count.cpp",
+        "count_scan.cpp",
         "delete.cpp",
         "distinct_scan.cpp",
         "eof.cpp",

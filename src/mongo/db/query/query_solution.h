@@ -704,7 +704,7 @@ namespace mongo {
         CountNode() { }
         virtual ~CountNode() { }
 
-        virtual StageType getType() const { return STAGE_COUNT; }
+        virtual StageType getType() const { return STAGE_COUNT_SCAN; }
         virtual void appendToString(mongoutils::str::stream* ss, int indent) const;
 
         bool fetched() const { return true; }

@@ -244,13 +244,32 @@ namespace mongo {
     };
 
     struct CountStats : public SpecificStats {
-        CountStats() : isMultiKey(false),
-                       keysExamined(0) { }
-
-        virtual ~CountStats() { }
+        CountStats() : nCounted(0), nSkipped(0), trivialCount(false) { }
 
         virtual SpecificStats* clone() const {
             CountStats* specific = new CountStats(*this);
+            return specific;
+        }
+
+        // The result of the count.
+        long long nCounted;
+
+        // The number of results we skipped over.
+        long long nSkipped;
+
+        // A "trivial count" is one that we can answer by calling numRecords() on the
+        // collection, without actually going through any query logic.
+        bool trivialCount;
+    };
+
+    struct CountScanStats : public SpecificStats {
+        CountScanStats() : isMultiKey(false),
+                           keysExamined(0) { }
+
+        virtual ~CountScanStats() { }
+
+        virtual SpecificStats* clone() const {
+            CountScanStats* specific = new CountScanStats(*this);
             // BSON objects have to be explicitly copied.
             specific->keyPattern = keyPattern.getOwned();
             return specific;

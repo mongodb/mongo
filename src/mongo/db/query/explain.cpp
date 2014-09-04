@@ -110,8 +110,8 @@ namespace {
             const TextStats* spec = static_cast<const TextStats*>(specific);
             return spec->keysExamined;
         }
-        else if (STAGE_COUNT == type) {
-            const CountStats* spec = static_cast<const CountStats*>(specific);
+        else if (STAGE_COUNT_SCAN == type) {
+            const CountScanStats* spec = static_cast<const CountScanStats*>(specific);
             return spec->keysExamined;
         }
         else if (STAGE_DISTINCT == type) {
@@ -162,8 +162,8 @@ namespace {
 
         // Some leaf nodes also provide info about the index they used.
         const SpecificStats* specific = stage->getSpecificStats();
-        if (STAGE_COUNT == stage->stageType()) {
-            const CountStats* spec = static_cast<const CountStats*>(specific);
+        if (STAGE_COUNT_SCAN == stage->stageType()) {
+            const CountScanStats* spec = static_cast<const CountScanStats*>(specific);
             ss << " " << spec->keyPattern;
         }
         else if (STAGE_DISTINCT == stage->stageType()) {
@@ -272,6 +272,14 @@ namespace mongo {
         }
         else if (STAGE_COUNT == stats.stageType) {
             CountStats* spec = static_cast<CountStats*>(stats.specific.get());
+
+            if (verbosity >= Explain::EXEC_STATS) {
+                bob->appendNumber("nCounted", spec->nCounted);
+                bob->appendNumber("nSkipped", spec->nSkipped);
+            }
+        }
+        else if (STAGE_COUNT_SCAN == stats.stageType) {
+            CountScanStats* spec = static_cast<CountScanStats*>(stats.specific.get());
 
             if (verbosity >= Explain::EXEC_STATS) {
                 bob->appendNumber("keysExamined", spec->keysExamined);
@@ -517,23 +525,6 @@ namespace mongo {
         serverBob.append(StringData("os"), bOs.obj());
 
         serverBob.doneFast();
-    }
-
-    // static
-    void Explain::explainCountEmptyQuery(BSONObjBuilder* out) {
-        BSONObjBuilder plannerBob(out->subobjStart("queryPlanner"));
-
-        plannerBob.append("plannerVersion", QueryPlanner::kPlannerVersion);
-
-        plannerBob.append("winningPlan", "TRIVIAL_COUNT");
-
-        // Empty array of rejected plans.
-        BSONArrayBuilder allPlansBob(plannerBob.subarrayStart("rejectedPlans"));
-        allPlansBob.doneFast();
-
-        plannerBob.doneFast();
-
-        generateServerInfo(out);
     }
 
     // static

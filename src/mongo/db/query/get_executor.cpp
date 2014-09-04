@@ -37,6 +37,7 @@
 #include "mongo/base/parse_number.h"
 #include "mongo/client/dbclientinterface.h"
 #include "mongo/db/exec/cached_plan.h"
+#include "mongo/db/exec/count.h"
 #include "mongo/db/exec/delete.h"
 #include "mongo/db/exec/eof.h"
 #include "mongo/db/exec/group.h"
@@ -859,26 +860,63 @@ namespace mongo {
 
     Status getExecutorCount(OperationContext* txn,
                             Collection* collection,
-                            const BSONObj& query,
-                            const BSONObj& hintObj,
+                            const CountRequest& request,
                             PlanExecutor** execOut) {
-        invariant(collection);
+        auto_ptr<WorkingSet> ws(new WorkingSet());
+        PlanStage* root;
+        QuerySolution* querySolution;
+
+        if (!collection) {
+            // Treat collections that do not exist as empty collections. Note that the explain
+            // reporting machinery always assumes that the root stage for a count operation is
+            // a CountStage, so in this case we put a CountStage on top of an EOFStage.
+            root = new CountStage(txn, collection, request, ws.get(), new EOFStage());
+            *execOut = new PlanExecutor(ws.release(), root, request.ns);
+            return Status::OK();
+        }
+
+        if (request.query.isEmpty()) {
+            // If the query is empty, then we can determine the count by just asking the collection
+            // for its number of records. This is implemented by the CountStage, and we don't need
+            // to create a child for the count stage in this case.
+            root = new CountStage(txn, collection, request, ws.get(), NULL);
+            *execOut = new PlanExecutor(ws.release(), root, request.ns);
+            return Status::OK();
+        }
 
         const WhereCallbackReal whereCallback(txn, collection->ns().db());
 
-        CanonicalQuery* cq;
-        uassertStatusOK(CanonicalQuery::canonicalize(collection->ns().ns(),
-                                                     query,
-                                                     BSONObj(),
-                                                     BSONObj(),
-                                                     0,
-                                                     0,
-                                                     hintObj,
-                                                     &cq,
-                                                     whereCallback));
+        CanonicalQuery* rawCq;
+        Status canonStatus = CanonicalQuery::canonicalize(collection->ns().ns(),
+                                                          request.query,
+                                                          BSONObj(),
+                                                          BSONObj(),
+                                                          0,
+                                                          0,
+                                                          request.hint,
+                                                          &rawCq,
+                                                          whereCallback);
+        if (!canonStatus.isOK()) {
+            return canonStatus;
+        }
 
-        // Takes ownership of 'cq'.
-        return getExecutor(txn, collection, cq, execOut, QueryPlannerParams::PRIVATE_IS_COUNT);
+        auto_ptr<CanonicalQuery> cq(rawCq);
+
+        const size_t plannerOptions = QueryPlannerParams::PRIVATE_IS_COUNT;
+        Status prepStatus = prepareExecution(txn, collection, ws.get(), cq.get(), plannerOptions,
+                                             &root, &querySolution);
+        if (!prepStatus.isOK()) {
+            return prepStatus;
+        }
+        invariant(root);
+
+        // Make a CountStage to be the new root.
+        root = new CountStage(txn, collection, request, ws.get(), root);
+        // We must have a tree of stages in order to have a valid plan executor, but the query
+        // solution may be NULL. Takes ownership of all args other than 'collection'.
+        *execOut = new PlanExecutor(ws.release(), root, querySolution, cq.release(), collection);
+
+        return Status::OK();
     }
 
     //
