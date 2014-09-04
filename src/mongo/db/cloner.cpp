@@ -374,16 +374,9 @@ namespace mongo {
         for (std::vector<HostAndPort>::const_iterator iter = csServers.begin();
              iter != csServers.end(); ++iter) {
 
-#if !defined(_WIN32) && !defined(__sunos__)
-            // isSelf() only does the necessary comparisons on os x and linux (SERVER-14165)
             if (!repl::isSelf(*iter))
                 continue;
-#else
-            if (iter->port() != serverGlobalParams.port)
-                continue;
-            if (iter->host() != "localhost" && iter->host() != "127.0.0.1")
-                continue;
-#endif
+
             masterSameProcess = true;
             break;
         }
