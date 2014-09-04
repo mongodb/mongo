@@ -38,9 +38,8 @@
 namespace mongo {
 
     /**
-     * This represents a single item in an index. This is intended to (possibly) be used by
-     * implementations of the SortedDataInterface interface. An index item simply consists of a key
-     * and a disk location, but this could be subclassed to perform more complex tasks.
+     * Represents a single item in an index. An index item simply consists of a key
+     * and a disk location.
      */
     struct IndexKeyEntry {
         IndexKeyEntry(const BSONObj& key, DiskLoc loc) :key(key), loc(loc) {}
@@ -63,57 +62,43 @@ namespace mongo {
         bool operator() (const IndexKeyEntry& lhs, const IndexKeyEntry& rhs) const;
 
         /**
-         * Returns -1 if lhs < rhs, 1 if lhs > rhs, and 0 otherwise.
+         * Compares two IndexKeyEntries and returns -1 if lhs < rhs, 1 if lhs > rhs, and 0
+         * otherwise.
          *
-         * This function compares two IndexKeyEntry objects which have been stripped of their field
-         * names. Either lhs or rhs can represent the lower bound of a query, meaning that either
-         * lhs or rhs can be the result of a call to makeQueryObject(). At most one can be a query
-         * object. The comparison function compares the BSONObjects in each IndexKeyEntry, and uses
-         * the DiskLoc's as a tiebreaker.
-         *
-         * Ex: {"": 5, "": "foo"} > {"": 4, "": "foo"}
-         *     {"": 5, "": "foo"} < {"": 5, "": "zzz"}
-         *
-         * It may be necessary to specify the first element of a query object as an inclusive range,
-         * the second one as an exclusive range, etc. Always returning 0 when the two BSONObjects
-         * have identical values would only allow inclusive ranges across all elements of the query
-         * object.
-         *
-         * To get around this, a query object uses its field names to describe what a given
-         * field's behavior should be if it is being compared to a field with an equal value. An 'l'
-         * indicates that the query should be considered less than the other object, a 'g' indicates
-         * that the query should be considered greater than the other object,and a null byte
-         * indicates that the query should be considered equal to the other object.
-         *
-         * Ex: {"": 5, "": "foo"} == {"": 5, "": "foo"}
-         *     {"g": 5, "": "foo"} > {"": 5, "": "foo"}
-         *     {"": 5, "l": "foo"} < {"": 5, "": "foo"}
+         * IndexKeyEntries are compared lexicographically field by field in the BSONObj, followed by
+         * the DiskLoc. Either lhs or rhs (but not both) can be a query object returned by
+         * makeQueryObject(). See makeQueryObject() for a description of how its arguments affect
+         * the outcome of the comparison.
          */
         int compare(const IndexKeyEntry& lhs, const IndexKeyEntry& rhs) const;
 
         /**
-         * See the comment above comparison() for some important details.
-         * Preps a query for compare(). Strips fieldNames if there are any.
+         * Encodes the arguments into a query object suitable to pass in to compare().
          *
-         * @param keyPrefix a BSONObj representing the beginning of a query
+         * A query object is used for seeking an iterator to a position in a sorted index.  The
+         * difference between a query object and the keys inserted into indexes is that query
+         * objects can be exclusive. This means that the first matching entry in the index is the
+         * first key in the index after the query. The meaning of "after" depends on
+         * cursorDirection.
          *
-         * @param prefixLen the number of fields, beginning with the first and ending with the
-         * prefixLen'th, in keyPrefix to use as part of the query. Must be >= 0 and < the number of
-         * elements in keyPrefix.
+         * The fields of the key are the combination of keyPrefix and keySuffix. The first prefixLen
+         * keys of keyPrefix are used, as well as the keys starting at the prefixLen index of
+         * keySuffix.  The first prefixLen elements of keySuffix are ignored.
          *
-         * @param prefixExclusive true if the first prefixLen elements in the query are exclusive,
-         * and false otherwise
+         * If a field is marked as exclusive, then comparisons stop after that field and return
+         * either higher or lower, even if that field compares equal. If prefixExclusive is true and
+         * prefixLen is greater than 0, then the last field in the prefix is marked as exclusive. It
+         * is illegal to specify prefixExclusive as true with a prefixLen of 0. Each bool in
+         * suffixInclusive, starting at index prefixLen, indicates whether the corresponding element
+         * in keySuffix is inclusive or exclusive.
          *
-         * @param keySuffix a vector of BSONElements. The first prefixLen elements in keySuffix are
-         * ignored, while the remaining elements make up the remainder of the query (following the
-         * first prefixLen elements of keyPrefix).
+         * Returned objects are for use in lookups only and should never be inserted into the
+         * database, as their format may change. The only reason this is the same type as the
+         * entries in an index is to support storage engines that require comparators that take
+         * arguments of the same type.
          *
-         * @param suffixInclusive a vector of booleans, of the same length as keySuffix. Elements
-         * less than prefixLen are ignored, while for all other indexes i, suffixInclusive[i] is
-         * true iff keySuffix[i] is an inclusive part of the range.
-         *
-         * @param cursorDirection an int which indicates the cursor direction. 1 indicates a forward
-         * cursor, and -1 indicates a reverse cursor.
+         * A cursurDirection of 1 indicates a forward cursor, and -1 indicates a reverse cursor.
+         * This effects the result when the exclusive field compares equal.
          */
         static BSONObj makeQueryObject(const BSONObj& keyPrefix,
                                        int prefixLen,
