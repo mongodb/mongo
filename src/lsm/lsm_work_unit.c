@@ -112,12 +112,43 @@ __lsm_unpin_chunks(WT_SESSION_IMPL *session, WT_LSM_WORKER_COOKIE *cookie)
 }
 
 /*
- * __wt_lsm_bloom_work --
+ * __wt_lsm_work_switch --
+ *	Do a switch if the LSM tree needs one.
+ */
+int
+__wt_lsm_work_switch(
+    WT_SESSION_IMPL *session, WT_LSM_WORK_UNIT **entryp, int *ran)
+{
+	WT_DECL_RET;
+	WT_LSM_CHUNK *chunk;
+	WT_LSM_WORK_UNIT *entry;
+
+	/* We've become responsible for freeing the work unit. */
+	entry = *entryp;
+	*ran = 0;
+	*entryp = NULL;
+
+	if (F_ISSET(entry->lsm_tree, WT_LSM_TREE_NEED_SWITCH)) {
+		WT_WITH_SCHEMA_LOCK(session, ret =
+		    __wt_lsm_tree_switch(session, entry->lsm_tree));
+		/* Failing to complete the switch is fine */
+		if (ret == EBUSY)
+			ret = 0;
+		else
+			*ran = 1;
+	}
+
+err:	__wt_lsm_manager_free_work_unit(session, entry);
+
+	return (ret);
+}
+/*
+ * __wt_lsm_work_bloom --
  *	Try to create a Bloom filter for the newest on-disk chunk that doesn't
  *	have one.
  */
 int
-__wt_lsm_bloom_work(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
+__wt_lsm_work_bloom(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 {
 	WT_DECL_RET;
 	WT_LSM_CHUNK *chunk;
