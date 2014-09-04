@@ -19,6 +19,6 @@ install-exec-local:
 
 clean-local:
 	$(PYTHON) $(PYSRC)/setup.py clean
-	rm -rf _wiredtiger.so WT_TEST build
+	rm -rf _wiredtiger.so wiredtiger_wrap.o WT_TEST build
 
 TESTS = run-ex_access
