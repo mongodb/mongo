@@ -93,7 +93,8 @@ __lsm_worker(void *arg)
 		    (ret = __wt_lsm_manager_pop_entry(
 		    session, WT_LSM_WORK_SWITCH, &entry)) == 0 &&
 		    entry != NULL)
-			WT_ERR(__wt_lsm_work_switch(session, &entry, &progress));
+			WT_ERR(
+			    __wt_lsm_work_switch(session, &entry, &progress));
 		/* Flag an error if the pop failed. */
 		WT_ERR(ret);
 

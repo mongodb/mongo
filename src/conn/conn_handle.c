@@ -52,10 +52,10 @@ __wt_connection_init(WT_CONNECTION_IMPL *conn)
 		    __wt_spin_init(session, &conn->page_lock[i], "btree page"));
 
 	/* Setup the spin locks for the LSM manager queues. */
-	WT_RET(__wt_spin_init(
-	    session, &conn->lsm_manager.app_lock, "LSM application queue lock"));
-	WT_RET(__wt_spin_init(
-	    session, &conn->lsm_manager.manager_lock, "LSM manager queue lock"));
+	WT_RET(__wt_spin_init(session,
+	    &conn->lsm_manager.app_lock, "LSM application queue lock"));
+	WT_RET(__wt_spin_init(session,
+	    &conn->lsm_manager.manager_lock, "LSM manager queue lock"));
 	WT_RET(__wt_spin_init(
 	    session, &conn->lsm_manager.switch_lock, "LSM switch queue lock"));
 	WT_RET(__wt_cond_alloc(

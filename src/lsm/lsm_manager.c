@@ -16,7 +16,7 @@ static void * __lsm_worker_manager(void *);
 /*
  * __wt_lsm_manager_start --
  *	Start the LSM management infrastructure. Our queues and locks were
- *	initialized when the connection was intialized.
+ *	initialized when the connection was initialized.
  */
 int
 __wt_lsm_manager_start(WT_SESSION_IMPL *session)
@@ -155,7 +155,6 @@ __wt_lsm_manager_destroy(WT_CONNECTION_IMPL *conn)
 	__wt_spin_destroy(session, &manager->app_lock);
 	__wt_spin_destroy(session, &manager->manager_lock);
 	WT_TRET(__wt_cond_destroy(session, &manager->work_cond));
-
 
 	return (ret);
 }
