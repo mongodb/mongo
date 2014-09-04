@@ -22,9 +22,11 @@ func (self *OutputFormatOptions) Name() string {
 }
 
 type InputOptions struct {
-	Query string `long:"query" short:"q" description:"query filter, as a JSON string, e.g., '{x:{$gt:1}}'"`
-	//SlaveOk
-	//ForceTableScan
+	Query          string `long:"query" short:"q" description:"query filter, as a JSON string, e.g., '{x:{$gt:1}}'"`
+	SlaveOk        bool   `long:"slaveOk" short:"k" description:"use secondaries for export if available, default true" default:"true"`
+	ForceTableScan bool   `long:"forceTableScan" description:"force a table scan (do not use $snapshot"`
+	Skip           int    `long:"skip" description:"documents to skip, default 0"`
+	Limit          int    `long:"limit" default:"-1" description:"limit the number of documents to export, default all"`
 }
 
 func (self *InputOptions) Name() string {

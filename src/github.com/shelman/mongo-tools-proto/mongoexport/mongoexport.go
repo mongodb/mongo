@@ -53,11 +53,12 @@ func (exp *MongoExport) ValidateSettings() error {
 	}
 
 	if exp.InputOpts != nil && exp.InputOpts.Query != "" {
-		_, err := getQueryFromArg(exp.InputOpts.Query)
+		_, err := getObjectFromArg(exp.InputOpts.Query)
 		if err != nil {
 			return err
 		}
 	}
+
 	return nil
 }
 
@@ -97,13 +98,26 @@ func (exp *MongoExport) Export() (int64, error) {
 	query := map[string]interface{}{}
 	if exp.InputOpts != nil && exp.InputOpts.Query != "" {
 		var err error
-		query, err = getQueryFromArg(exp.InputOpts.Query)
+		query, err = getObjectFromArg(exp.InputOpts.Query)
 		if err != nil {
 			return 0, err
 		}
 	}
 
-	cursor := collection.Find(query).Iter()
+	q := collection.Find(query)
+
+	if exp.InputOpts != nil && exp.InputOpts.Skip > 0 {
+		q = q.Skip(exp.InputOpts.Skip)
+	}
+	if exp.InputOpts != nil && exp.InputOpts.Limit > 0 {
+		q = q.Limit(exp.InputOpts.Limit)
+	}
+
+	if len(query) == 0 && exp.InputOpts != nil && exp.InputOpts.ForceTableScan != true {
+		q = q.Snapshot()
+	}
+
+	cursor := q.Iter()
 	defer cursor.Close()
 
 	//Write headers
@@ -175,10 +189,10 @@ type ExportOutput interface {
 	Flush() error
 }
 
-//getQueryFromArg takes a query in extended JSON, and convert is to an object that
-//can be passed straight to db.collection.find(...). Returns an error if the
-//string is not valid JSON, or extended JSON.
-func getQueryFromArg(queryRaw string) (map[string]interface{}, error) {
+//getObjectFromArg takes an object in extended JSON, and converts it to an object that
+//can be passed straight to db.collection.find(...) as a query or sort critera.
+//Returns an error if the string is not valid JSON, or extended JSON.
+func getObjectFromArg(queryRaw string) (map[string]interface{}, error) {
 	parsedJSON := map[string]interface{}{}
 	err := sloppyjson.Unmarshal([]byte(queryRaw), &parsedJSON)
 	if err != nil {
