@@ -105,10 +105,14 @@ namespace mongo {
          */
         virtual Status touch(OperationContext* txn) const = 0;
 
-        //
-        // Navigation
-        //
-
+        /**
+         * Navigation
+         *
+         * A cursor is tied to a transaction, such as the OperationContext or a WriteUnitOfWork
+         * inside that context. Any cursor acquired inside a transaction is invalid outside
+         * of that transaction, instead use the savePosition() and restorePosition() methods
+         * reestablish the cursor.
+         */
         class Cursor {
         public:
             virtual ~Cursor() {}
