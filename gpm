@@ -20,6 +20,8 @@ SYNOPSIS
     github.com/nu7hatch/gotrail         v0.0.2
     github.com/replicon/fast-archiver   v1.02   #This is another comment!
     github.com/nu7hatch/gotrail         2eb79d1f03ab24bacbc32b15b75769880629a865
+    # pull in gopkg.in/mgo.v2 from an alternate location
+    gopkg.in/mgo.v2                     c9fd3712fbf3e92924c974dce16da2d322508fe2          github.com/go-mgo/mgo
 
     gpm has a companion tool, called [gvp](https://github.com/pote/gvp) which
     provides vendoring functionalities, it alters your GOPATH so every project
@@ -45,6 +47,11 @@ set_dependencies() {
       line=($line)
       local package=${line[0]}
       local version=${line[1]}
+      local dest=""
+      if [[ -n ${line[2]:-} ]]; then
+        dest=$package
+        package=${line[2]}
+      fi
 
       if [[ "$OSTYPE" == "cygwin" || "$OSTYPE" == "msys" ]]
       then
@@ -69,6 +76,18 @@ set_dependencies() {
       { echo ">> Failed to set $package to version $version"; exit 1; }
 
       echo ">> Set $package to version $version"
+      if [[ -n "$dest" ]] ; then
+        if [[ "$OSTYPE" == "cygwin" || "$OSTYPE" == "msys" ]]
+        then
+          local dest_path="${GOPATH%%;*}/src/${dest%%/...}"
+        else
+          local dest_path="${GOPATH%%:*}/src/${dest%%/...}"
+        fi
+        mkdir -p "$(dirname "$dest_path")"
+        rm -rf $dest_path
+        mv $install_path $dest_path
+        echo ">> moved $install_path to $dest_path"
+      fi
     ) &
     pids=(${pids[@]-} $!)
   done < $1
