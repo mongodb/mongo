@@ -2,7 +2,12 @@
 
 Import("env")
 
-env.Library("unittest", ['unittest.cpp', 'temp_dir.cpp'],
+env.Library(target="unittest",
+            source=[
+                'unittest.cpp',
+                'temp_dir.cpp',
+                'unittest_helpers.cpp',
+            ],
             LIBDEPS=['$BUILD_DIR/mongo/foundation',
                      '$BUILD_DIR/mongo/util/options_parser/options_parser',
             ])
