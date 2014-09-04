@@ -1871,7 +1871,7 @@ err:		if (ret == 0)
 
 	if (cfg->conn != NULL &&
 	    (t_ret = cfg->conn->close(cfg->conn, NULL)) != 0) {
-		lprintf(cfg, ret, 0,
+		lprintf(cfg, t_ret, 0,
 		    "Error closing connection to %s", cfg->home);
 		if (ret == 0)
 			ret = t_ret;
