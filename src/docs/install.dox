@@ -21,15 +21,14 @@ First, clone the repository:
 git clone git://github.com/wiredtiger/wiredtiger.git
 @endcode
 
-Second, run the \c build_posix/reconf script:
+Second, run \c autogen.sh to create the \c configure script:
 
 @code
 cd wiredtiger
-sh build_posix/reconf
+sh autogen.sh
 @endcode
 
-This creates the \c configure script, and you can now proceed with @ref
-building.
+Now proceed with @ref building.
 
 @section building Building WiredTiger
 
