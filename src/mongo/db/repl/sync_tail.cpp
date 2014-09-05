@@ -73,8 +73,10 @@ namespace repl {
     }
 
     SyncTail::SyncTail(BackgroundSyncInterface *q) :
-        Sync(""), oplogVersion(0), _networkQueue(q)
-    {}
+        Sync(""), oplogVersion(0), _networkQueue(q), _applyFunc(multiSyncApply) {}
+
+    SyncTail::SyncTail(BackgroundSyncInterface *q, MultiSyncApplyFunc func) :
+        Sync(""), oplogVersion(0), _networkQueue(q), _applyFunc(func) {}
 
     SyncTail::~SyncTail() {}
 
@@ -160,22 +162,21 @@ namespace repl {
     }
     
     // Doles out all the work to the writer pool threads and waits for them to complete
-    void SyncTail::applyOps(const std::vector< std::vector<BSONObj> >& writerVectors, 
-                                     MultiSyncApplyFunc applyFunc) {
+    void SyncTail::applyOps(const std::vector< std::vector<BSONObj> >& writerVectors) {
         ThreadPool& writerPool = theReplSet->getWriterPool();
         TimerHolder timer(&applyBatchStats);
         for (std::vector< std::vector<BSONObj> >::const_iterator it = writerVectors.begin();
              it != writerVectors.end();
              ++it) {
             if (!it->empty()) {
-                writerPool.schedule(applyFunc, boost::cref(*it), this);
+                writerPool.schedule(_applyFunc, boost::cref(*it), this);
             }
         }
         writerPool.join();
     }
 
     // Doles out all the work to the writer pool threads and waits for them to complete
-    void SyncTail::multiApply( std::deque<BSONObj>& ops, MultiSyncApplyFunc applyFunc ) {
+    void SyncTail::multiApply( std::deque<BSONObj>& ops) {
 
         // Use a ThreadPool to prefetch all the operations in a batch.
         prefetchOps(ops);
@@ -191,7 +192,7 @@ namespace repl {
         // stop all readers until we're done
         Lock::ParallelBatchWriterMode pbwm;
 
-        applyOps(writerVectors, applyFunc);
+        applyOps(writerVectors);
     }
 
 
@@ -210,73 +211,8 @@ namespace repl {
             (*writerVectors)[hash % writerVectors->size()].push_back(*it);
         }
     }
-
-
-    BSONObj SyncTail::oplogApplySegment(const BSONObj& applyGTEObj, const BSONObj& minValidObj,
-                                     MultiSyncApplyFunc func) {
-        OpTime applyGTE = applyGTEObj["ts"]._opTime();
-        OpTime minValid = minValidObj["ts"]._opTime();
-
-        // We have to keep track of the last op applied to the data, because there's no other easy
-        // way of getting this data synchronously.  Batches may go past minValidObj, so we need to
-        // know to bump minValid past minValidObj.
-        BSONObj lastOp = applyGTEObj;
-        OpTime ts = applyGTE;
-
-        time_t start = time(0);
-        time_t now = start;
-
-        unsigned long long n = 0, lastN = 0;
-
-        while( ts < minValid ) {
-            OpQueue ops;
-
-            while (ops.getSize() < replBatchLimitBytes) {
-                if (tryPopAndWaitForMore(&ops)) {
-                    break;
-                }
-
-                // apply replication batch limits
-                now = time(0);
-                if (!ops.empty()) {
-                    if (now > replBatchLimitSeconds)
-                        break;
-                    if (ops.getDeque().size() > replBatchLimitOperations)
-                        break;
-                }
-            }
-            setOplogVersion(ops.getDeque().front());
-
-            multiApply(ops.getDeque(), func);
-
-            n += ops.getDeque().size();
-
-            if ( n > lastN + 1000 ) {
-                if (now - start > 10) {
-                    // simple progress metering
-                    log() << "replSet initialSyncOplogApplication applied "
-                          << n << " operations, synced to "
-                          << ts.toStringPretty() << rsLog;
-                    start = now;
-                    lastN = n;
-                }
-            }
-
-            // we want to keep a record of the last op applied, to compare with minvalid
-            lastOp = ops.getDeque().back();
-            OpTime tempTs = lastOp["ts"]._opTime();
-            applyOpsToOplog(&ops.getDeque());
-
-            ts = tempTs;
-        }
-
-        return lastOp;
-    }
-
-    BSONObj SyncTail::oplogApplication(OperationContext* txn,
-                                       const BSONObj& applyGTEObj,
-                                       const BSONObj& minValidObj) {
-        return oplogApplySegment(applyGTEObj, minValidObj, multiSyncApply);
+    void SyncTail::oplogApplication(OperationContext* txn, const OpTime& endOpTime) {
+        _applyOplogUntil(txn, endOpTime);
     }
 
     void SyncTail::setOplogVersion(const BSONObj& op) {
@@ -291,6 +227,56 @@ namespace repl {
         } else {
             theReplSet->oplogVersion = version.Int();
         }
+    }
+
+    /* applies oplog from "now" until endOpTime using the applier threads for initial sync*/
+    void SyncTail::_applyOplogUntil(OperationContext* txn, const OpTime& endOpTime) {
+        while (true) {
+            OpQueue ops;
+            OperationContextImpl ctx;
+
+            while (!tryPopAndWaitForMore(&ops)) {
+                // nothing came back last time, so go again
+                if (ops.empty()) continue;
+
+                // Check if we reached the end
+                const BSONObj currentOp = ops.back();
+                const OpTime currentOpTime = currentOp["ts"]._opTime();
+
+                // When we reach the end return this batch
+                if (currentOpTime == endOpTime) {
+                    break;
+                }
+                else if (currentOpTime > endOpTime) {
+                    severe() << "Applied past expected end " << endOpTime << " to " << currentOpTime
+                            << " without seeing it. Rollback?" << rsLog;
+                    fassertFailedNoTrace(18689);
+                }
+
+                // apply replication batch limits
+                if (ops.getSize() > replBatchLimitBytes)
+                    break;
+                if (ops.getDeque().size() > replBatchLimitOperations)
+                    break;
+            };
+
+            if (ops.empty()) {
+                severe() << "got no ops for batch...";
+                fassertFailedNoTrace(18690);
+            }
+
+            const BSONObj lastOp = ops.back().getOwned();
+
+            multiApply(ops.getDeque());
+            applyOpsToOplog(&ops.getDeque());
+
+            setOplogVersion(lastOp);
+
+            // if the last op applied was our end, return
+            if (theReplSet->lastOpTimeWritten == endOpTime) {
+                return;
+            }
+        } // end of while (true)
     }
 
     /* tail an oplog.  ok to return, will be re-called. */
@@ -392,7 +378,7 @@ namespace repl {
                        << ops.getDeque().back()["ts"]._opTime().toStringPretty();
             }
             
-            multiApply(ops.getDeque(), multiSyncApply);
+            multiApply(ops.getDeque());
 
             if (BackgroundSync::get()->isAssumingPrimary()) {
                 LOG(1) << "about to update oplog to optime: "

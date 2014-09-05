@@ -76,7 +76,7 @@ namespace repl {
         int failedAttempts = 0;
         while ( failedAttempts < maxFailedAttempts ) {
             try {
-                _syncDoInitialSync();
+                _initialSync();
                 break;
             }
             catch(DBException& e) {
@@ -91,11 +91,11 @@ namespace repl {
         fassert( 16233, failedAttempts < maxFailedAttempts);
     }
 
-    bool ReplSetImpl::_syncDoInitialSync_clone(OperationContext* txn,
-                                               Cloner& cloner,
-                                               const char *master,
-                                               const list<string>& dbs,
-                                               bool dataPass) {
+    bool ReplSetImpl::_initialSyncClone(OperationContext* txn,
+                                        Cloner& cloner,
+                                        const std::string& host,
+                                        const list<string>& dbs,
+                                        bool dataPass) {
 
         for( list<string>::const_iterator i = dbs.begin(); i != dbs.end(); i++ ) {
             const string db = *i;
@@ -123,7 +123,7 @@ namespace repl {
             // Make database stable
             Lock::DBWrite dbWrite(txn->lockState(), db);
 
-            if (!cloner.go(txn, db, master, options, NULL, err, &errCode)) {
+            if (!cloner.go(txn, db, host, options, NULL, err, &errCode)) {
                 sethbmsg(str::stream() << "initial sync: error while "
                                        << (dataPass ? "cloning " : "indexing ") << db
                                        << ".  " << (err.empty() ? "" : err + ".  ")
@@ -275,26 +275,21 @@ namespace repl {
      * @param syncer either initial sync (can reclone missing docs) or "normal" sync (no recloning)
      * @param r      the oplog reader
      * @param source the sync target
-     * @param lastOp the op to start syncing at.  repl::InitialSync writes this and then moves to
-     *               the queue.  repl::SyncTail does not write this, it moves directly to the
-     *               queue.
-     * @param minValid populated by this function. The most recent op on the sync target's oplog,
-     *                 this function syncs to this value (inclusive)
      * @return if applying the oplog succeeded
      */
-    bool ReplSetImpl::_syncDoInitialSync_applyToHead( OperationContext* txn, SyncTail& syncer, OplogReader* r,
-                                                      const Member* source, const BSONObj& lastOp ,
-                                                      BSONObj& minValid ) {
-        /* our cloned copy will be strange until we apply oplog events that occurred
-           through the process.  we note that time point here. */
-
+    bool ReplSetImpl::_initialSyncApplyOplog( OperationContext* ctx,
+                                              repl::SyncTail& syncer,
+                                              OplogReader* r,
+                                              const Member* source) {
+        const OpTime startOpTime = lastOpTimeWritten;
+        BSONObj lastOp;
         try {
             // It may have been a long time since we last used this connection to
             // query the oplog, depending on the size of the databases we needed to clone.
             // A common problem is that TCP keepalives are set too infrequent, and thus
             // our connection here is terminated by a firewall due to inactivity.
             // Solution is to increase the TCP keepalive frequency.
-            minValid = r->getLastOp(rsoplog);
+            lastOp = r->getLastOp(rsoplog);
         } catch ( SocketException & ) {
             log() << "connection lost to " << source->h().toString() << "; is your tcp keepalive interval set appropriately?";
             if( !r->connect(source->h()) ) {
@@ -302,37 +297,33 @@ namespace repl {
                 throw;
             }
             // retry
-            minValid = r->getLastOp(rsoplog);
+            lastOp = r->getLastOp(rsoplog);
         }
 
-        isyncassert( "getLastOp is empty ", !minValid.isEmpty() );
+        isyncassert( "lastOp is empty ", !lastOp.isEmpty() );
 
-        OpTime mvoptime = minValid["ts"]._opTime();
-        verify( !mvoptime.isNull() );
+        OpTime stopOpTime = lastOp["ts"]._opTime();
 
-        OpTime startingTS = lastOp["ts"]._opTime();
-        verify( mvoptime >= startingTS );
+        // If we already have what we need then return.
+        if (stopOpTime == startOpTime)
+            return true;
 
-        // apply startingTS..mvoptime portion of the oplog
-        {
-            try {
-                minValid = syncer.oplogApplication(txn, lastOp, minValid);
-            }
-            catch (const DBException&) {
-                log() << "replSet initial sync failed during oplog application phase" << rsLog;
+        verify( !stopOpTime.isNull() );
+        verify( stopOpTime > startOpTime );
 
-                emptyOplog(txn); // otherwise we'll be up!
+        // apply till stopOpTime
+        try {
+            syncer.oplogApplication(ctx, stopOpTime);
+        }
+        catch (const DBException&) {
+            log() << "replSet initial sync failed during oplog application phase, and will retry"
+                  << rsLog;
 
-                lastOpTimeWritten = OpTime();
-                lastH = 0;
+            lastOpTimeWritten = OpTime();
+            lastH = 0;
 
-                log() << "replSet cleaning up [1]" << rsLog;
-
-                log() << "replSet initial sync failed will try again" << endl;
-
-                sleepsecs(5);
-                return false;
-            }
+            sleepsecs(5);
+            return false;
         }
         
         return true;
@@ -341,7 +332,7 @@ namespace repl {
     /**
      * Do the initial sync for this member.  There are several steps to this process:
      *
-     *     0. Add _initialSyncFlag to minValid to tell us to restart initial sync if we
+     *     0. Add _initialSyncFlag to minValid collection to tell us to restart initial sync if we
      *        crash in the middle of this procedure
      *     1. Record start time.
      *     2. Clone.
@@ -352,14 +343,14 @@ namespace repl {
      *     7. Build indexes.
      *     8. Set minValid3 to sync target's latest op time.
      *     9. Apply ops from minValid2 to minValid3.
-          10. Clean up minValid and remove _initialSyncFlag field
+          10. Cleanup minValid collection: remove _initialSyncFlag field, set ts to minValid3 OpTime
      *
      * At that point, initial sync is finished.  Note that the oplog from the sync target is applied
      * three times: step 4, 6, and 8.  4 may involve refetching, 6 should not.  By the end of 6,
      * this member should have consistent data.  8 is "cosmetic," it is only to get this member
-     * closer to the latest op time before it can transition to secondary state.
+     * closer to the latest op time before it can transition out of startup state
      */
-    void ReplSetImpl::_syncDoInitialSync() {
+    void ReplSetImpl::_initialSync() {
         InitialSync init(BackgroundSync::get());
         SyncTail tail(BackgroundSync::get());
         sethbmsg("initial sync pending",0);
@@ -395,14 +386,12 @@ namespace repl {
 
         OperationContextImpl txn;
 
-        // written by applyToHead calls
-        BSONObj minValid;
-
         if (getGlobalReplicationCoordinator()->getSettings().fastsync) {
             log() << "fastsync: skipping database clone" << rsLog;
 
             // prime oplog
-            init.oplogApplication(&txn, lastOp, lastOp);
+            init.syncApply(&txn, lastOp, false);
+            _logOpObjRS(&txn, lastOp);
             return;
         }
         else {
@@ -417,7 +406,7 @@ namespace repl {
             list<string> dbs = r.conn()->getDatabaseNames();
 
             Cloner cloner;
-            if (!_syncDoInitialSync_clone(&txn, cloner, sourceHostname.c_str(), dbs, true)) {
+            if (!_initialSyncClone(&txn, cloner, r.conn()->getServerAddress(), dbs, true)) {
                 veto(source->fullName(), 600);
                 sleepsecs(300);
                 return;
@@ -425,26 +414,26 @@ namespace repl {
 
             sethbmsg("initial sync data copy, starting syncup",0);
 
+            // prime oplog
+            init.syncApply(&txn, lastOp, false);
+            _logOpObjRS(&txn, lastOp);
+
             log() << "oplog sync 1 of 3" << endl;
-            if (!_syncDoInitialSync_applyToHead(&txn, init, &r, source, lastOp, minValid)) {
+            if (!_initialSyncApplyOplog(&txn, init, &r , source)) {
                 return;
             }
-
-            lastOp = minValid;
 
             // Now we sync to the latest op on the sync target _again_, as we may have recloned ops
             // that were "from the future" compared with minValid. During this second application,
             // nothing should need to be recloned.
             log() << "oplog sync 2 of 3" << endl;
-            if (!_syncDoInitialSync_applyToHead(&txn, tail, &r, source, lastOp, minValid)) {
+            if (!_initialSyncApplyOplog(&txn, init, &r , source)) {
                 return;
             }
             // data should now be consistent
 
-            lastOp = minValid;
-
             sethbmsg("initial sync building indexes",0);
-            if (!_syncDoInitialSync_clone(&txn, cloner, sourceHostname.c_str(), dbs, false)) {
+            if (!_initialSyncClone(&txn, cloner, r.conn()->getServerAddress(), dbs, false)) {
                 veto(source->fullName(), 600);
                 sleepsecs(300);
                 return;
@@ -452,7 +441,7 @@ namespace repl {
         }
 
         log() << "oplog sync 3 of 3" << endl;
-        if (!_syncDoInitialSync_applyToHead(&txn, tail, &r, source, lastOp, minValid)) {
+        if (!_initialSyncApplyOplog(&txn, tail, &r, source)) {
             return;
         }
         
@@ -472,13 +461,13 @@ namespace repl {
             Client::WriteContext cx(&txn, "local.");
 
             try {
-                log() << "replSet set minValid=" << minValid["ts"]._opTime().toString() << rsLog;
+                log() << "replSet set minValid=" << lastOpTimeWritten << rsLog;
             }
             catch(...) { }
 
             // Initial sync is now complete.  Flag this by setting minValid to the last thing
             // we synced.
-            theReplSet->setMinValid(&txn, minValid);
+            theReplSet->setMinValid(&txn, lastOpTimeWritten);
 
             // Clear the initial sync flag.
             theReplSet->clearInitialSyncFlag(&txn);

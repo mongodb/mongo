@@ -883,17 +883,21 @@ namespace {
     const char* ReplSetImpl::_initialSyncFlagString = "doingInitialSync";
     const BSONObj ReplSetImpl::_initialSyncFlag(BSON(_initialSyncFlagString << true));
 
+    namespace {
+        const char* minvalidNS = "local.replset.minvalid";
+    } // namespace
+
     void ReplSetImpl::clearInitialSyncFlag(OperationContext* txn) {
         Lock::DBWrite lk(txn->lockState(), "local");
         WriteUnitOfWork wunit(txn);
-        Helpers::putSingleton(txn, "local.replset.minvalid", BSON("$unset" << _initialSyncFlag));
+        Helpers::putSingleton(txn, minvalidNS, BSON("$unset" << _initialSyncFlag));
         wunit.commit();
     }
 
     void ReplSetImpl::setInitialSyncFlag(OperationContext* txn) {
         Lock::DBWrite lk(txn->lockState(), "local");
         WriteUnitOfWork wunit(txn);
-        Helpers::putSingleton(txn, "local.replset.minvalid", BSON("$set" << _initialSyncFlag));
+        Helpers::putSingleton(txn, minvalidNS, BSON("$set" << _initialSyncFlag));
         wunit.commit();
     }
 
@@ -901,28 +905,27 @@ namespace {
         OperationContextImpl txn; // XXX?
         Lock::DBRead lk (txn.lockState(), "local");
         BSONObj mv;
-        if (Helpers::getSingleton(&txn, "local.replset.minvalid", mv)) {
+        if (Helpers::getSingleton(&txn, minvalidNS, mv)) {
             return mv[_initialSyncFlagString].trueValue();
         }
         return false;
     }
 
-    void ReplSetImpl::setMinValid(OperationContext* txn, BSONObj obj) {
-        BSONObjBuilder builder;
-        BSONObjBuilder subobj(builder.subobjStart("$set"));
-        subobj.appendTimestamp("ts", obj["ts"].date());
-        subobj.done();
-
-        Lock::DBWrite lk(txn->lockState(), "local");
-        WriteUnitOfWork wunit(txn);
-        Helpers::putSingleton(txn, "local.replset.minvalid", builder.obj());
+    void ReplSetImpl::setMinValid(OperationContext* ctx, OpTime ts) {
+        Lock::DBWrite lk(ctx->lockState(), "local");
+        WriteUnitOfWork wunit(ctx);
+        Helpers::putSingleton(ctx, minvalidNS, BSON("$set" << BSON("ts" << ts)));
         wunit.commit();
+    }
+
+    void ReplSetImpl::setMinValid(OperationContext* ctx, BSONObj obj) {
+        setMinValid(ctx, obj["ts"]._opTime());
     }
 
     OpTime ReplSetImpl::getMinValid(OperationContext* txn) {
         Lock::DBRead lk(txn->lockState(), "local.replset.minvalid");
         BSONObj mv;
-        if (Helpers::getSingleton(txn, "local.replset.minvalid", mv)) {
+        if (Helpers::getSingleton(txn, minvalidNS, mv)) {
             return mv["ts"]._opTime();
         }
         return OpTime();

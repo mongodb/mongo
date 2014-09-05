@@ -278,12 +278,16 @@ namespace repl {
         friend class Consensus;
 
     private:
-        bool _syncDoInitialSync_clone(OperationContext* txn, Cloner &cloner, const char *master,
-                                      const list<string>& dbs, bool dataPass);
-        bool _syncDoInitialSync_applyToHead( OperationContext* txn, SyncTail& syncer, OplogReader* r ,
-                                             const Member* source, const BSONObj& lastOp,
-                                             BSONObj& minValidOut);
-        void _syncDoInitialSync();
+        bool _initialSyncClone(OperationContext* txn,
+                               Cloner &cloner,
+                               const std::string& host,
+                               const list<string>& dbs,
+                               bool dataPass);
+        bool _initialSyncApplyOplog(OperationContext* txn,
+                                    repl::SyncTail& syncer,
+                                    OplogReader* r,
+                                    const Member* source);
+        void _initialSync();
         void syncDoInitialSync();
         void _syncThread();
         void syncTail();
@@ -334,7 +338,8 @@ namespace repl {
          * minValid, to indicate that we are in a consistent state when the batch has been fully 
          * applied.
          */
-        static void setMinValid(OperationContext* txn, BSONObj obj);
+        static void setMinValid(OperationContext* ctx, BSONObj obj);
+        static void setMinValid(OperationContext* ctx, OpTime opTime);
         static OpTime getMinValid(OperationContext* txn);
         static void clearInitialSyncFlag(OperationContext* txn);
         static bool getInitialSyncFlag();

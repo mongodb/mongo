@@ -810,7 +810,90 @@ ReplSetTest.prototype.stopSet = function( signal , forRestart, opts ) {
     print('ReplSetTest stopSet *** Shut down repl set - test worked ****' )
 };
 
+/**
+ * Walks all oplogs and ensures matching entries.
+ */
+ReplSetTest.prototype.ensureOplogsMatch = function() {
+    "use strict";
+    var OplogReader = function(mongo) {
+            this.next = function() {
+                if (!this.cursor)
+                    throw Error("reader is not open!");
 
+                var nextDoc = this.cursor.next();
+                if (nextDoc)
+                    this.lastDoc = nextDoc;
+                return nextDoc;
+            };
+            
+            this.getLastDoc = function() {
+                if (this.lastDoc)
+                    return this.lastDoc;
+                return this.next();
+            };
+            
+            this.hasNext = function() {
+                if (!this.cursor)
+                    throw Error("reader is not open!");
+                return this.cursor.hasNext();
+            };
+            
+            this.query = function(ts) {
+                var coll = this.getOplogColl();
+                var query = {"ts": {"$gte": ts ? ts : new Timestamp()}};
+                this.cursor = coll.find(query).sort({$natural:1})
+                this.cursor.addOption(DBQuery.Option.oplogReplay);
+            };
+            
+            this.getFirstDoc = function(){
+                return this.getOplogColl().find().sort({$natural:1}).limit(-1).next();
+            };
+            
+            this.getOplogColl = function () {
+                return this.mongo.getDB("local")["oplog.rs"];
+            }
+            
+            this.lastDoc = null;
+            this.cursor = null;
+            this.mongo = mongo;
+    };
+    
+    if (this.nodes.length && this.nodes.length > 1) {
+        var readers = [];
+        var largestTS = null;
+        var nodes = this.nodes;
+        var rsSize = nodes.length;
+        for (var i = 0; i < rsSize; i++) {
+            readers[i] = new OplogReader(nodes[i]);
+            var currTS = readers[i].getFirstDoc()["ts"];
+            if (currTS.t > largestTS.t || (currTS.t == largestTS.t && currTS.i > largestTS.i) ) {
+                largestTS = currTS;
+            }
+        }
+        
+        // start all oplogReaders at the same place. 
+        for (var i = 0; i < rsSize; i++) {
+            readers[i].query(largestTS);
+        }
+
+        var firstReader = readers[0];
+        while (firstReader.hasNext()) {
+            var ts = firstReader.next()["ts"];
+            for(var i = 1; i < rsSize; i++) { 
+                assert.eq(ts, 
+                          readers[i].next()["ts"], 
+                          " non-matching ts for node: " + readers[i].mongo);
+            }
+        }
+        
+        // ensure no other node has more oplog
+        for (var i = 1; i < rsSize; i++) { 
+            assert.eq(false, 
+                      readers[i].hasNext(),
+                      "" + readers[i] + " shouldn't have more oplog.");
+        }
+    }
+}
 /**
  * Waits until there is a master node
  */
