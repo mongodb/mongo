@@ -46,6 +46,10 @@ namespace repl {
         _authIssue(false) {
     }
 
+    void MemberHeartbeatData::setState(MemberState newState) {
+        _state = newState;
+    }
+
     void MemberHeartbeatData::updateFrom(const MemberHeartbeatData& newInfo) {
         _state = newInfo.getState();
         _health = newInfo.getHealth();

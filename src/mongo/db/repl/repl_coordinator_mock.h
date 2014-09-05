@@ -99,6 +99,8 @@ namespace repl {
 
         virtual OID getMyRID() const;
 
+        virtual void setFollowerMode(const MemberState& newState);
+
         virtual void prepareReplSetUpdatePositionCommand(OperationContext* txn,
                                                          BSONObjBuilder* cmdBuilder);
 

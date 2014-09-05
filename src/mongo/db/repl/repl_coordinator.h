@@ -266,6 +266,22 @@ namespace repl {
         virtual OID getMyRID() const = 0;
 
         /**
+         * Sets this node into a specific follower mode.
+         *
+         * It is an error to call this method if the node's topology coordinator would not
+         * report that it is in the follower role.
+         *
+         * Follower modes are RS_STARTUP2 (initial sync), RS_SECONDARY, RS_ROLLBACK and
+         * RS_RECOVERING.  They are the valid states of a node whose topology coordinator has the
+         * follower role.
+         *
+         * This is essentially an interface that allows the applier to prevent the node from
+         * becoming a candidate or accepting reads, depending on circumstances in the oplog
+         * application process.
+         */
+        virtual void setFollowerMode(const MemberState& newState) = 0;
+
+        /**
          * Prepares a BSONObj describing an invocation of the replSetUpdatePosition command that can
          * be sent to this node's sync source to update it about our progress in replication.
          */

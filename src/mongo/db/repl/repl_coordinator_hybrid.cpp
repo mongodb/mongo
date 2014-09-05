@@ -216,6 +216,11 @@ namespace repl {
         return legacyRID;
     }
 
+    void HybridReplicationCoordinator::setFollowerMode(const MemberState& newState) {
+        _legacy.setFollowerMode(newState);
+        _impl.setFollowerMode(newState);
+    }
+
     void HybridReplicationCoordinator::prepareReplSetUpdatePositionCommand(OperationContext* txn,
                                                                            BSONObjBuilder* result) {
         _impl.prepareReplSetUpdatePositionCommand(txn, result);

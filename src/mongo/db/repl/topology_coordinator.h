@@ -60,6 +60,44 @@ namespace repl {
     class TopologyCoordinator {
         MONGO_DISALLOW_COPYING(TopologyCoordinator);
     public:
+        /**
+         * Type that denotes the role of a node in the replication protocol.
+         *
+         * The role is distinct from MemberState, in that it only deals with the
+         * roles a node plays in the basic protocol -- leader, follower and candidate.
+         * The mapping between MemberState and Role is complex -- several MemberStates
+         * map to the follower role, and MemberState::RS_SECONDARY maps to either
+         * follower or candidate roles, e.g.
+         */
+        class Role {
+        public:
+            /**
+             * Constant indicating leader role.
+             */
+            static const Role leader;
+
+            /**
+             * Constant indicating follower role.
+             */
+            static const Role follower;
+
+            /**
+             * Constant indicating candidate role
+             */
+            static const Role candidate;
+
+            Role() {}
+
+            bool operator==(Role other) const { return _value == other._value; }
+            bool operator!=(Role other) const { return _value != other._value; }
+
+            std::string toString() const;
+
+        private:
+            explicit Role(int value);
+
+            int _value;
+        };
 
         /**
          * Description of actions taken in response to a heartbeat.
@@ -146,29 +184,89 @@ namespace repl {
 
         virtual ~TopologyCoordinator();
 
-        // The index into the config used when we next choose a sync source
+        ////////////////////////////////////////////////////////////
+        //
+        // State inspection methods.
+        //
+        ////////////////////////////////////////////////////////////
+
+        /**
+         * Gets the role of this member in the replication protocol.
+         */
+        virtual Role getRole() const = 0;
+
+        /**
+         * Gets the MemberState of this member in the replica set.
+         */
+        virtual MemberState getMemberState() const = 0;
+
+        /**
+         * Returns the address of the current sync source, or an empty HostAndPort if there is no
+         * current sync source.
+         */
+        virtual HostAndPort getSyncSourceAddress() const = 0;
+
+        /**
+         * Retrieves a vector of HostAndPorts containing all nodes that are neither DOWN nor
+         * ourself.
+         */
+        virtual std::vector<HostAndPort> getMaybeUpHostAndPorts() const = 0;
+
+        /**
+         * Gets the current value of the maintenance mode counter.
+         */
+        virtual int getMaintenanceCount() const = 0;
+
+        ////////////////////////////////////////////////////////////
+        //
+        // Basic state manipulation methods.
+        //
+        ////////////////////////////////////////////////////////////
+
+        /**
+         * Sets the index into the config used when we next choose a sync source
+         */
         virtual void setForceSyncSourceIndex(int index) = 0;
 
-        // Looks up _syncSource's address and returns it, for use by the Applier
-        virtual HostAndPort getSyncSourceAddress() const = 0;
-        // Chooses and sets a new sync source, based on our current knowledge of the world.
+        /**
+         * Chooses and sets a new sync source, based on our current knowledge of the world.
+         */
         virtual void chooseNewSyncSource(Date_t now, const OpTime& lastOpApplied) = 0;
-        // Do not choose a member as a sync source until time given; 
-        // call this when we have reason to believe it's a bad choice
+
+        /**
+         * Suppresses selecting "host" as sync source until "until".
+         */
         virtual void blacklistSyncSource(const HostAndPort& host, Date_t until) = 0;
 
-        // Add function pointer to callback list; call function when config changes
-        // Applier needs to know when things like chainingAllowed or slaveDelay change. 
-        // ReplCoord needs to know when things like the tag sets change.
-        typedef stdx::function<void (const ReplicaSetConfig& config, int myIndex)>
-                ConfigChangeCallbackFn;
-        virtual void registerConfigChangeCallback(const ConfigChangeCallbackFn& fn) = 0;
-        // ReplCoord needs to know the state to implement certain public functions
-        typedef stdx::function<void (const MemberState& newMemberState)> StateChangeCallbackFn;
-        virtual void registerStateChangeCallback(const StateChangeCallbackFn& fn) = 0;
+        /**
+         * Sets the earliest time the the current node will stand for election to "newTime".
+         *
+         * Does not affect the node's state or the process of any elections in flight.
+         */
+        virtual void setStepDownTime(Date_t newTime) = 0;
 
-        // Applier calls this to notify that it's now safe to transition from SECONDARY to PRIMARY
-        virtual void signalDrainComplete() = 0;
+        /**
+         * Sets the reported mode of this node to one of RS_SECONDARY, RS_STARTUP2, RS_ROLLBACK or
+         * RS_RECOVERING, when getRole() == Role::follower.  This is the interface by which the
+         * applier changes the reported member state of the current node, and enables or suppresses
+         * electability of the current node.  All modes but RS_SECONDARY indicate an unelectable
+         * follower state (one that cannot transition to candidate).
+         */
+        virtual void setFollowerMode(MemberState::MS newMode) = 0;
+
+        /**
+         * Adjusts the maintenance mode count by "inc".
+         *
+         * It is an error to call this method if getRole() does not return Role::follower.
+         * It is an error to allow the maintenance count to go negative.
+         */
+        virtual void adjustMaintenanceCountBy(int inc) = 0;
+
+        ////////////////////////////////////////////////////////////
+        //
+        // Methods that prepare responses to command requests.
+        //
+        ////////////////////////////////////////////////////////////
 
         // produces a reply to a replSetSyncFrom command
         virtual void prepareSyncFromResponse(const ReplicationExecutor::CallbackData& data,
@@ -199,33 +297,6 @@ namespace repl {
                                               ReplSetHeartbeatResponse* response,
                                               Status* result) = 0;
 
-        /**
-         * Prepares a heartbeat request appropriate for sending to "target", assuming the
-         * current time is "now".  "ourSetName" is used as the name for our replica set if
-         * the topology coordinator does not have a valid configuration installed.
-         *
-         * The returned pair contains proper arguments for a replSetHeartbeat command, and
-         * an amount of time to wait for the response.
-         */
-        virtual std::pair<ReplSetHeartbeatArgs, Milliseconds> prepareHeartbeatRequest(
-                Date_t now,
-                const std::string& ourSetName,
-                const HostAndPort& target) = 0;
-
-        /**
-         * Processes a heartbeat response from "target" that arrived around "now", having
-         * spent "networkRoundTripTime" millis on the network.
-         *
-         * Updates internal topology coordinator state, and returns instructions about what action
-         * to take next.
-         */
-        virtual HeartbeatResponseAction processHeartbeatResponse(
-                Date_t now,
-                Milliseconds networkRoundTripTime,
-                const HostAndPort& target,
-                const StatusWith<ReplSetHeartbeatResponse>& hbResponse,
-                OpTime myLastOpApplied) = 0;
-
         // produce a reply to a status request
         virtual void prepareStatusResponse(const ReplicationExecutor::CallbackData& data,
                                            Date_t now,
@@ -241,36 +312,120 @@ namespace repl {
                                            BSONObjBuilder* response,
                                            Status* result) = 0;
 
-        // transition PRIMARY to SECONDARY; caller must already be holding an appropriate dblock
-        virtual void relinquishPrimary(OperationContext* txn) = 0;
+        ////////////////////////////////////////////////////////////
+        //
+        // Methods for sending and receiving heartbeats,
+        // reconfiguring and handling the results of standing for
+        // election.
+        //
+        ////////////////////////////////////////////////////////////
 
-        // Updates the topology coordinator's notion of the new configuration.
+        /**
+         * Updates the topology coordinator's notion of the replica set configuration.
+         *
+         * "newConfig" is the new configuration, and "selfIndex" is the index of this
+         * node's configuration information in "newConfig", or "selfIndex" is -1 to
+         * indicate that this node is not a member of "newConfig".
+         *
+         * newConfig.isInitialized() should be true, though implementations may accept
+         * configurations where this is not true, for testing purposes.
+         */
         virtual void updateConfig(const ReplicaSetConfig& newConfig,
                                   int selfIndex,
                                   Date_t now,
                                   const OpTime& lastOpApplied) = 0;
 
         /**
-         * Adds "value" to the number of currently active calls to maintenance mode.  Currently
-         * 1 and -1 are the only valid inputs.
+         * Prepares a heartbeat request appropriate for sending to "target", assuming the
+         * current time is "now".  "ourSetName" is used as the name for our replica set if
+         * the topology coordinator does not have a valid configuration installed.
+         *
+         * The returned pair contains proper arguments for a replSetHeartbeat command, and
+         * an amount of time to wait for the response.
+         *
+         * This call should be paired (with intervening network communication) with a call to
+         * processHeartbeatResponse for the same "target".
          */
-        virtual void adjustMaintenanceModeCallsBy(int value) = 0;
+        virtual std::pair<ReplSetHeartbeatArgs, Milliseconds> prepareHeartbeatRequest(
+                Date_t now,
+                const std::string& ourSetName,
+                const HostAndPort& target) = 0;
 
         /**
-         * Returns the number of current calls into maintenance mode.
+         * Processes a heartbeat response from "target" that arrived around "now", having
+         * spent "networkRoundTripTime" millis on the network.
+         *
+         * Updates internal topology coordinator state, and returns instructions about what action
+         * to take next.
+         *
+         * If the next action indicates StartElection, the topology coordinator has transitioned to
+         * the "candidate" role, and will remain there until processWinElection or
+         * processLoseElection are called.
+         *
+         * If the next action indicates "StepDownSelf", the topology coordinator has transitioned
+         * to the "follower" role from "leader", and the caller should take any necessary actions
+         * to become a follower.
+         *
+         * If the next action indicates "StepDownRemotePrimary", the caller should take steps to
+         * cause the specified remote host to step down from primary to secondary.
+         *
+         * If the next action indicates "Reconfig", the caller should verify the configuration in
+         * hbResponse is acceptable, perform any other reconfiguration actions it must, and call
+         * updateConfig with the new configuration and the appropriate value for "selfIndex".  It
+         * must also wrap up any outstanding elections (by calling processLoseElection or
+         * processWinElection) before calling updateConfig.
+         *
+         * This call should be paired (with intervening network communication) with a call to
+         * prepareHeartbeatRequest for the same "target".
          */
-        virtual int getMaintenanceModeCalls() = 0;
+        virtual HeartbeatResponseAction processHeartbeatResponse(
+                Date_t now,
+                Milliseconds networkRoundTripTime,
+                const HostAndPort& target,
+                const StatusWith<ReplSetHeartbeatResponse>& hbResponse,
+                OpTime myLastOpApplied) = 0;
 
-        // Retrieves a vector of HostAndPorts containing only nodes that are not DOWN
-        // and are not ourselves.
-        virtual std::vector<HostAndPort> getMaybeUpHostAndPorts() const = 0;
-
-        // If we can vote for ourselves, updates the lastVote tracker and returns true.
-        // If we cannot vote for ourselves (because we already voted too recently), returns false.
+        /**
+         * If getRole() == Role::candidate and this node has not voted too recently, updates the
+         * lastVote tracker and returns true.  Otherwise, returns false.
+         */
         virtual bool voteForMyself(Date_t now) = 0;
 
-        // Sets _stepDownTime to newTime.
-        virtual void setStepDownTime(Date_t newTime) = 0;
+        /**
+         * Performs state updates associated with winning an election.
+         *
+         * It is an error to call this if the topology coordinator is not in candidate mode.
+         *
+         * Exactly one of either processWinElection or processLoseElection must be called if
+         * processHeartbeatResponse returns StartElection, to exit candidate mode.
+         */
+        virtual void processWinElection(
+                Date_t now,
+                OID electionId,
+                OpTime myLastOpApplied,
+                OpTime electionOpTime) = 0;
+
+        /**
+         * Performs state updates associated with losing an election.
+         *
+         * It is an error to call this if the topology coordinator is not in candidate mode.
+         *
+         * Exactly one of either processWinElection or processLoseElection must be called if
+         * processHeartbeatResponse returns StartElection, to exit candidate mode.
+         */
+        virtual void processLoseElection(Date_t now, OpTime myLastOpApplied) = 0;
+
+        /**
+         * Changes the coordinator from the leader role to the follower role.
+         */
+        virtual void stepDown() = 0;
+
+        ////////////////////////////////////////////////////////////
+        //
+        // Testing interface
+        //
+        ////////////////////////////////////////////////////////////
+        virtual void changeMemberState_forTest(const MemberState& newState) = 0;
 
     protected:
         TopologyCoordinator() {}

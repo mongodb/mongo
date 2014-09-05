@@ -998,6 +998,14 @@ namespace {
         ASSERT_OK(getReplCoord()->setMaintenanceMode(&txn, true));
         ASSERT_TRUE(getReplCoord()->getCurrentMemberState().recovering());
 
+        // If we go into rollback while in maintenance mode, our state changes to RS_ROLLBACK.
+        getReplCoord()->setFollowerMode(MemberState::RS_ROLLBACK);
+        ASSERT_TRUE(getReplCoord()->getCurrentMemberState().rollback());
+
+        // When we go back to SECONDARY, we still observe RECOVERING because of maintenance mode.
+        getReplCoord()->setFollowerMode(MemberState::RS_SECONDARY);
+        ASSERT_TRUE(getReplCoord()->getCurrentMemberState().recovering());
+
         // Can set multiple times
         ASSERT_OK(getReplCoord()->setMaintenanceMode(&txn, true));
         ASSERT_OK(getReplCoord()->setMaintenanceMode(&txn, true));
@@ -1009,8 +1017,30 @@ namespace {
         status = getReplCoord()->setMaintenanceMode(&txn, false);
         // fourth one fails b/c we only set three times
         ASSERT_EQUALS(ErrorCodes::OperationFailed, status);
-        // Unsetting maintenance mode doesn't actually change our state.
+        // Unsetting maintenance mode changes our state to secondary if maintenance mode was
+        // the only thinking keeping us out of it.
+        ASSERT_TRUE(getReplCoord()->getCurrentMemberState().secondary());
+
+        // From rollback, entering and exiting maintenance mode doesn't change perceived
+        // state.
+        getReplCoord()->setFollowerMode(MemberState::RS_ROLLBACK);
+        ASSERT_TRUE(getReplCoord()->getCurrentMemberState().rollback());
+        ASSERT_OK(getReplCoord()->setMaintenanceMode(&txn, true));
+        ASSERT_TRUE(getReplCoord()->getCurrentMemberState().rollback());
+        ASSERT_OK(getReplCoord()->setMaintenanceMode(&txn, false));
+        ASSERT_TRUE(getReplCoord()->getCurrentMemberState().rollback());
+
+        // Rollback is sticky even if entered while in maintenance mode.
+        getReplCoord()->setFollowerMode(MemberState::RS_SECONDARY);
+        ASSERT_TRUE(getReplCoord()->getCurrentMemberState().secondary());
+        ASSERT_OK(getReplCoord()->setMaintenanceMode(&txn, true));
         ASSERT_TRUE(getReplCoord()->getCurrentMemberState().recovering());
+        getReplCoord()->setFollowerMode(MemberState::RS_ROLLBACK);
+        ASSERT_TRUE(getReplCoord()->getCurrentMemberState().rollback());
+        ASSERT_OK(getReplCoord()->setMaintenanceMode(&txn, false));
+        ASSERT_TRUE(getReplCoord()->getCurrentMemberState().rollback());
+        getReplCoord()->setFollowerMode(MemberState::RS_SECONDARY);
+        ASSERT_TRUE(getReplCoord()->getCurrentMemberState().secondary());
 
         // Can't modify maintenance mode when PRIMARY
         getReplCoord()->_setCurrentMemberState_forTest(MemberState::RS_PRIMARY);
@@ -1022,16 +1052,6 @@ namespace {
         ASSERT_EQUALS(ErrorCodes::OperationFailed, status);
         ASSERT_OK(getReplCoord()->setMaintenanceMode(&txn, true));
         ASSERT_OK(getReplCoord()->setMaintenanceMode(&txn, false));
-
-        // Setting maintenance mode from any RS state other than primary brings us to RECOVERING
-        // TODO(spencer): Is this actually the desired behavior?
-        getReplCoord()->_setCurrentMemberState_forTest(MemberState::RS_ROLLBACK);
-        ASSERT_TRUE(getReplCoord()->getCurrentMemberState().rollback());
-        ASSERT_OK(getReplCoord()->setMaintenanceMode(&txn, true));
-        ASSERT_TRUE(getReplCoord()->getCurrentMemberState().recovering());
-
-        // TODO(spencer): test that the applier won't put us into secondary state when maintenance
-        // mode is set, then does again once it is unset.
     }
 
     // TODO(spencer): Unit test replSetFreeze

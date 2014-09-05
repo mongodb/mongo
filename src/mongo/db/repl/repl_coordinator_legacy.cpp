@@ -439,6 +439,9 @@ namespace {
         return _myRID;
     }
 
+    void LegacyReplicationCoordinator::setFollowerMode(const MemberState& newState) {
+    }
+
     void LegacyReplicationCoordinator::prepareReplSetUpdatePositionCommand(
             OperationContext* txn,
             BSONObjBuilder* cmdBuilder) {

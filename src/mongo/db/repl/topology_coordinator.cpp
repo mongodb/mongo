@@ -32,8 +32,36 @@
 
 #include "mongo/db/repl/topology_coordinator.h"
 
+#include <string>
+
+#include "mongo/util/assert_util.h"
+
 namespace mongo {
 namespace repl {
+namespace {
+    static const int kLeaderValue = 0;
+    static const int kFollowerValue = 1;
+    static const int kCandidateValue = 2;
+}  // namespace
+
+    const TopologyCoordinator::Role TopologyCoordinator::Role::leader(kLeaderValue);
+    const TopologyCoordinator::Role TopologyCoordinator::Role::follower(kFollowerValue);
+    const TopologyCoordinator::Role TopologyCoordinator::Role::candidate(kCandidateValue);
+
+    TopologyCoordinator::Role::Role(int value) : _value(value) {}
+
+    std::string TopologyCoordinator::Role::toString() const {
+        switch(_value) {
+        case kLeaderValue:
+            return "leader";
+        case kFollowerValue:
+            return "follower";
+        case kCandidateValue:
+            return "candidate";
+        }
+        invariant(false);
+    }
+
     TopologyCoordinator::~TopologyCoordinator() {}
 
     TopologyCoordinator::HeartbeatResponseAction

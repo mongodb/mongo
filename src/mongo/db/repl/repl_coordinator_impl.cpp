@@ -112,6 +112,7 @@ namespace {
         _replExecutor(network, prngSeed),
         _externalState(externalState),
         _inShutdown(false),
+        _currentState(MemberState::RS_STARTUP),
         _rsConfigState(kConfigStartingUp),
         _thisMembersConfigIndex(-1),
         _sleptLastElection(false) {
@@ -296,8 +297,57 @@ namespace {
     }
 
     void ReplicationCoordinatorImpl::_setCurrentMemberState_forTest(const MemberState& newState) {
+        CBHStatus cbh = _replExecutor.scheduleWork(
+                stdx::bind(&ReplicationCoordinatorImpl::_setCurrentMemberState_forTestFinish,
+                           this,
+                           stdx::placeholders::_1,
+                           newState));
+        if (cbh.getStatus() == ErrorCodes::ShutdownInProgress) {
+            return;
+        }
+        fassert(18697, cbh.getStatus());
+        _replExecutor.wait(cbh.getValue());
+    }
+
+    void ReplicationCoordinatorImpl::_setCurrentMemberState_forTestFinish(
+            const ReplicationExecutor::CallbackData& cbData,
+            const MemberState& newState) {
+
+        if (cbData.status == ErrorCodes::CallbackCanceled)
+            return;
         boost::lock_guard<boost::mutex> lk(_mutex);
+        _topCoord->changeMemberState_forTest(newState);
+        invariant(newState == _topCoord->getMemberState());
         _currentState = newState;
+    }
+
+    void ReplicationCoordinatorImpl::setFollowerMode(const MemberState& newState) {
+        CBHStatus cbh = _replExecutor.scheduleWork(
+                stdx::bind(&ReplicationCoordinatorImpl::_setFollowerModeFinish,
+                           this,
+                           stdx::placeholders::_1,
+                           newState));
+        if (cbh.getStatus() == ErrorCodes::ShutdownInProgress) {
+            return;
+        }
+        fassert(18699, cbh.getStatus());
+        _replExecutor.wait(cbh.getValue());
+    }
+
+    void ReplicationCoordinatorImpl::_setFollowerModeFinish(
+            const ReplicationExecutor::CallbackData& cbData,
+            const MemberState& newState) {
+
+        if (cbData.status == ErrorCodes::CallbackCanceled)
+            return;
+        boost::lock_guard<boost::mutex> lk(_mutex);
+        // TODO(schwerin) If _topCoord->getRole() == Role::candidate, we need to cancel the election
+        // process and call loseElection before calling setFollowerMode.  It is a programming error
+        // to get here if we're in state primary, because we should not have called
+        // _topCoord->processWinElection() while the applier was still running, and only the applier
+        // should be calling this.
+        _topCoord->setFollowerMode(newState.s);
+        _currentState = _topCoord->getMemberState();
     }
 
     Status ReplicationCoordinatorImpl::setLastOptime(OperationContext* txn,
@@ -772,7 +822,7 @@ namespace {
         if (cbh.getStatus() == ErrorCodes::ShutdownInProgress) {
             return cbh.getStatus();
         }
-        fassert(18689, cbh.getStatus());
+        fassert(18698, cbh.getStatus());
         _replExecutor.wait(cbh.getValue());
         return result;
     }
@@ -792,29 +842,26 @@ namespace {
             return;
         }
 
-        int curMaintenanceCalls = _topCoord->getMaintenanceModeCalls();
+        int curMaintenanceCalls = _topCoord->getMaintenanceCount();
         if (activate) {
             log() << "replSet going into maintenance mode with " << curMaintenanceCalls
                   << " other maintenance mode tasks in progress" << rsLog;
-            _topCoord->adjustMaintenanceModeCallsBy(1);
+            _topCoord->adjustMaintenanceCountBy(1);
         }
         else if (curMaintenanceCalls > 0) {
-            invariant(_currentState.recovering());
+            invariant(_topCoord->getRole() == TopologyCoordinator::Role::follower);
 
-            _topCoord->adjustMaintenanceModeCallsBy(-1);
-            // no need to change state, syncTail will try to go live as a secondary soon
+            _topCoord->adjustMaintenanceCountBy(-1);
 
             log() << "leaving maintenance mode (" << curMaintenanceCalls-1 << " other maintenance "
                     "mode tasks ongoing)" << rsLog;
-            *result = Status::OK();
-            return;
         } else {
             warning() << "Attempted to leave maintenance mode but it is not currently active";
             *result = Status(ErrorCodes::OperationFailed, "already out of maintenance mode");
             return;
         }
 
-        _currentState = MemberState::RS_RECOVERING;
+        _currentState = _topCoord->getMemberState();
         *result = Status::OK();
     }
 
@@ -1071,6 +1118,7 @@ namespace {
                  myIndex,
                  _replExecutor.now(),
                  _getLastOpApplied_inlock());
+         _currentState = _topCoord->getMemberState();
 
          // Ensure that there's an entry in the _slaveInfoMap for ourself
          _slaveInfoMap[_getMyRID_inlock()].memberID = _rsConfig.getMemberAt(myIndex).getId();

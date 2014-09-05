@@ -85,7 +85,7 @@ namespace {
         }
 
         void setSelfMemberState(const MemberState& newState) {
-            getTopoCoord()._changeMemberState(newState);
+            getTopoCoord().changeMemberState_forTest(newState);
         }
 
         // Update config and set selfIndex
@@ -1066,27 +1066,13 @@ namespace {
         ASSERT_EQUALS(Date_t(firstRequestDate + 6500), action.getNextHeartbeatStartDate());
     }
 
-    TEST_F(HeartbeatResponseTest, UpdateHeartbeatDataOlderConfigVersionNoMajority) {
-        OpTime staleOpTime = OpTime(1,0);
-        OpTime election = OpTime(5,0);
-        OpTime lastOpTimeApplied = OpTime(3,0);
-
-        HeartbeatResponseAction nextAction = receiveUpHeartbeat(HostAndPort("host2"),
-                                                                "rs0",
-                                                                MemberState::RS_SECONDARY,
-                                                                election,
-                                                                staleOpTime,
-                                                                lastOpTimeApplied);
-        ASSERT_NO_ACTION(nextAction.getAction());
-    }
-
     TEST_F(HeartbeatResponseTest, UpdateHeartbeatDataNewPrimary) {
         OpTime election = OpTime(5,0);
         OpTime lastOpTimeApplied = OpTime(3,0);
 
         HeartbeatResponseAction nextAction = receiveUpHeartbeat(HostAndPort("host2"),
                                                                 "rs0",
-                                                                MemberState::RS_SECONDARY,
+                                                                MemberState::RS_PRIMARY,
                                                                 election,
                                                                 election,
                                                                 lastOpTimeApplied);

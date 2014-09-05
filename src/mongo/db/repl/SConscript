@@ -82,6 +82,7 @@ env.Library('repl_coordinator_impl',
                      'replica_set_messages',
                      'replication_executor',
                      'rslog',
+                     'topology_coordinator',
                  ])
 
 env.CppUnitTest('repl_coordinator_impl_test',

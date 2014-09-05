@@ -141,6 +141,9 @@ namespace repl {
         return OID();
     }
 
+    void ReplicationCoordinatorMock::setFollowerMode(const MemberState& newState) {
+    }
+
     void ReplicationCoordinatorMock::prepareReplSetUpdatePositionCommand(
             OperationContext* txn,
             BSONObjBuilder* cmdBuilder) {}

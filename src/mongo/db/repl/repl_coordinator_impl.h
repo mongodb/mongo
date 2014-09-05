@@ -135,6 +135,8 @@ namespace repl {
 
         virtual OID getMyRID() const;
 
+        virtual void setFollowerMode(const MemberState& newState);
+
         virtual void prepareReplSetUpdatePositionCommand(OperationContext* txn,
                                                          BSONObjBuilder* cmdBuilder);
 
@@ -303,6 +305,12 @@ namespace repl {
                                         bool activate,
                                         Status* result);
 
+        /**
+         * Bottom half of _setCurrentMemberState_forTest.
+         */
+        void _setCurrentMemberState_forTestFinish(const ReplicationExecutor::CallbackData& cbData,
+                                                  const MemberState& newState);
+
         /*
          * Returns the OpTime of the last applied operation on this node.
          */
@@ -343,6 +351,12 @@ namespace repl {
                 const WriteConcernOptions& writeConcern) const;
 
         OID _getMyRID_inlock() const;
+
+        /**
+         * Bottom half of setFollowerMode.
+         */
+        void _setFollowerModeFinish(const ReplicationExecutor::CallbackData& cbData,
+                                    const MemberState& newState);
 
         /**
          * Helper method for setLastOptime and setMyLastOptime that takes in a unique lock on
