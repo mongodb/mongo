@@ -2419,6 +2419,7 @@ int InputBuffer::getInputLine( PromptBase& pi ) {
                     buf32[len] = '\0';
                     if ( pi.promptIndentation + len < pi.promptScreenColumns ) {
                         if ( len > pi.promptPreviousInputLen )
+                            len = calculateColumnPosition( buf32, len );
                             pi.promptPreviousInputLen = len;
                         /* Avoid a full update of the line in the
                          * trivial case. */
