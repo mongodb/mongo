@@ -170,12 +170,12 @@ namespace replset {
              ++it) {
             try {
                 if (!st->syncApply(*it, convertUpdatesToUpserts)) {
-                    fassertFailedNoTrace(16359);
+                    fassertFailedNoTrace(18693);
                 }
             } catch (const DBException& e) {
                 error() << "writer worker caught exception: " << causedBy(e)
                         << " on: " << it->toString() << endl;
-                fassertFailedNoTrace(16360);
+                fassertFailedNoTrace(18692);
             }
         }
     }
