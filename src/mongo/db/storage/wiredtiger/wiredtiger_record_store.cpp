@@ -30,6 +30,8 @@
  */
 
 #include "mongo/db/operation_context.h"
+#include "mongo/db/storage_options.h"
+#include "mongo/util/log.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_record_store.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_recovery_unit.h"
 
@@ -41,9 +43,22 @@ namespace mongo {
             const StringData &ns, const CollectionOptions &options, bool allocateDefaultSpace) {
         WiredTigerSession swrap(db);
         WT_SESSION *s = swrap.Get();
-        std::string config = "type=file,key_format=q,value_format=u,app_metadata=";
-        config += options.toBSON().jsonString();
-        return s->create(s, _getURI(ns).c_str(), config.c_str());
+        // Separate out a prefix and suffix in the default string. User configuration will
+        // override values in the prefix, but not values in the suffix.
+        const char *default_config_pfx = "type=file,";
+        const char *default_config_sfx = ",key_format=q,value_format=u,app_metadata=";
+        std::string config = std::string(default_config_pfx +
+                storageGlobalParams.wiredTigerCollectionConfig + default_config_sfx +
+                options.toBSON().jsonString());
+        int ret = s->create(s, _getURI(ns).c_str(), config.c_str());
+        if (ret  != 0) {
+            log() << "Creating collection with custom options (" << config <<
+                     ") failed. Using default options instead." << endl;
+            config = std::string(default_config_pfx);
+            config += default_config_sfx + options.toBSON().jsonString();
+            ret = s->create(s, _getURI(ns).c_str(), config.c_str());
+        }
+        return (ret);
     }
 
     WiredTigerRecordStore::WiredTigerRecordStore( const StringData& ns,

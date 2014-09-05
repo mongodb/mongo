@@ -38,14 +38,22 @@
 #include "mongo/db/storage/wiredtiger/wiredtiger_recovery_unit.h"
 
 #include "mongo/db/storage_options.h"
+#include "mongo/util/log.h"
 
 namespace mongo {
 
     WiredTigerEngine::WiredTigerEngine( const std::string &path) : _path( path ), _db(0) {
         WT_CONNECTION *conn;
+        const char * default_config = ",create,extensions=[local=(entry=index_collator_extension)]";
 
-        int ret = wiredtiger_open(path.c_str(), NULL,
-            "create,extensions=[local=(entry=index_collator_extension)]", &conn);
+        std::string config = std::string(
+                storageGlobalParams.wiredTigerDatabaseConfig + default_config);
+        int ret = wiredtiger_open(path.c_str(), NULL, config.c_str(), &conn);
+        if (ret != 0) {
+            log() << "Starting engine with custom options ( " << config <<
+                     ") failed. Using default options instead." << endl;
+            ret = wiredtiger_open(path.c_str(), NULL, default_config, &conn);
+        }
         invariant(ret == 0);
         _db = new WiredTigerDatabase(conn);
         loadExistingDatabases();

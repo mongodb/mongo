@@ -33,6 +33,8 @@
 #include "mongo/db/json.h"
 #include "mongo/db/catalog/index_catalog_entry.h"
 #include "mongo/db/index/index_descriptor.h"
+#include "mongo/db/storage_options.h"
+#include "mongo/util/log.h"
 
 #include "mongo/db/storage/wiredtiger/wiredtiger_engine.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_index.h"
@@ -144,9 +146,24 @@ namespace mongo {
             const std::string &ns, const std::string &idxName, IndexCatalogEntry& info) {
         WiredTigerSession swrap(db);
         WT_SESSION *s(swrap.Get());
-        std::string config = "type=file,key_format=uq,value_format=u,collator=mongo_index,app_metadata=";
-        config += info.descriptor()->infoObj().jsonString();
-        return s->create(s, _getURI(ns, idxName).c_str(), config.c_str());
+
+        // Separate out a prefix and suffix in the default string. User configuration will
+        // override values in the prefix, but not values in the suffix.
+        const char *default_config_pfx = "type=file,";
+        const char *default_config_sfx =
+            ",key_format=uq,value_format=u,collator=mongo_index,app_metadata=";
+        std::string config = std::string(default_config_pfx +
+                storageGlobalParams.wiredTigerIndexConfig + default_config_sfx +
+                info.descriptor()->infoObj().jsonString());
+        int ret = s->create(s, _getURI(ns, idxName).c_str(), config.c_str());
+        if (ret != 0) {
+            log() << "Creating index with custom options (" << config <<
+                     ") failed. Using default options instead." << endl;
+            config = std::string(default_config_pfx);
+            config += default_config_sfx + info.descriptor()->infoObj().jsonString();
+            ret = s->create(s, _getURI(ns, idxName).c_str(), config.c_str());
+        }
+        return (ret);
     }
 
     Status WiredTigerIndex::insert(OperationContext* txn,

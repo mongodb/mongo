@@ -270,6 +270,14 @@ namespace mongo {
                 "journal diagnostic options")
                                          .incompatibleWith("durOptions");
 
+        // Add WiredTiger storage engine specific options.
+        general_options.addOptionChaining("storage.wiredtiger.databaseConfig",
+                "wiredTigerDatabaseConfig", moe::String, "WiredTiger database configuration settings");
+        general_options.addOptionChaining("storage.wiredtiger.collectionConfig",
+                "wiredTigerCollectionConfig", moe::String, "WiredTiger collection configuration settings");
+        general_options.addOptionChaining("storage.wiredtiger.indexConfig",
+                "wiredTigerIndexConfig", moe::String, "WiredTiger index configuration settings");
+
         general_options.addOptionChaining("durOptions", "durOptions", moe::Int,
                 "durability diagnostic options")
                                          .hidden()
@@ -885,6 +893,19 @@ namespace mongo {
                 storageGlobalParams.dbpath.erase(storageGlobalParams.dbpath.size()-1);
         }
 #endif
+
+        if (params.count("storage.wiredtiger.databaseConfig")) {
+            storageGlobalParams.wiredTigerDatabaseConfig =
+                         params["storage.wiredtiger.databaseConfig"].as<string>();
+        }
+        if (params.count("storage.wiredtiger.collectionConfig")) {
+            storageGlobalParams.wiredTigerCollectionConfig =
+                         params["storage.wiredtiger.collectionConfig"].as<string>();
+        }
+        if (params.count("storage.wiredtiger.indexConfig")) {
+            storageGlobalParams.wiredTigerIndexConfig =
+                         params["storage.wiredtiger.indexConfig"].as<string>();
+        }
 
         if (params.count("operationProfiling.mode")) {
             std::string profilingMode = params["operationProfiling.mode"].as<std::string>();
