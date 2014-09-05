@@ -47,7 +47,8 @@
 #include "mongo/util/mongoutils/str.h"
 
 namespace mongo {
-    SaslAuthenticationSession::SaslSessionFactoryFn SaslAuthenticationSession::create = NULL;
+    SaslAuthenticationSession::SaslAuthenticationSessionFactoryFn 
+        SaslAuthenticationSession::create = NULL;
 
     // Mechanism name constants.
     const char SaslAuthenticationSession::mechanismCRAMMD5[] = "CRAM-MD5";

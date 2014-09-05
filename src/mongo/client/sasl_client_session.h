@@ -26,19 +26,18 @@
  */
 
 #include <boost/scoped_array.hpp>
-#include <sasl/sasl.h>
 #include <string>
-#include <vector>
 
 #include "mongo/base/disallow_copying.h"
 #include "mongo/base/status.h"
 #include "mongo/base/string_data.h"
 #include "mongo/client/export_macros.h"
+#include "mongo/stdx/functional.h"
 
 namespace mongo {
 
     /**
-     * Implementation of the client side of a SASL authentication conversation.
+     * Base class for the client side of a SASL authentication conversation.
      *
      * To use, create an instance, then use setParameter() to configure the authentication
      * parameters.  Once all parameters are set, call initialize() to initialize the client state
@@ -53,6 +52,9 @@ namespace mongo {
     class MONGO_CLIENT_API SaslClientSession {
         MONGO_DISALLOW_COPYING(SaslClientSession);
     public:
+        typedef stdx::function<SaslClientSession* ()> SaslClientSessionFactoryFn;
+        static SaslClientSessionFactoryFn create;
+        
         /**
          * Identifiers of parameters used to configure a SaslClientSession.
          */
@@ -66,7 +68,7 @@ namespace mongo {
         };
 
         SaslClientSession();
-        ~SaslClientSession();
+        virtual ~SaslClientSession();
 
         /**
          * Sets the parameter identified by "id" to "value".
@@ -77,12 +79,12 @@ namespace mongo {
          *
          * The session object makes and owns a copy of the data in "value".
          */
-        void setParameter(Parameter id, const StringData& value);
+        virtual void setParameter(Parameter id, const StringData& value);
 
         /**
          * Returns true if "id" identifies a parameter previously set by a call to setParameter().
          */
-        bool hasParameter(Parameter id);
+        virtual bool hasParameter(Parameter id);
 
         /**
          * Returns the value of a previously set parameter.
@@ -94,22 +96,14 @@ namespace mongo {
          * valid until setParameter() is called with the same value of "id", or the session object
          * goes out of scope.
          */
-        StringData getParameter(Parameter id);
-
-        /**
-         * Returns the value of the parameterPassword parameter in the form of a sasl_secret_t, used
-         * by the Cyrus SASL library's SASL_CB_PASS callback.  The session object owns the storage
-         * referenced by the returned sasl_secret_t*, which will remain in scope according to the
-         * same rules as given for getParameter(), above.
-         */
-        sasl_secret_t* getPasswordAsSecret();
+        virtual StringData getParameter(Parameter id);
 
         /**
          * Initializes a session for use.
          *
          * Call exactly once, after setting any parameters you intend to set via setParameter().
          */
-        Status initialize();
+        virtual Status initialize() = 0;
 
         /**
          * Takes one step of the SASL protocol on behalf of the client.
@@ -126,12 +120,12 @@ namespace mongo {
          * determine if the conversation has completed.  When step() returns Status::OK() and
          * isDone() returns true, authentication has completed successfully.
          */
-        Status step(const StringData& inputData, std::string* outputData);
+        virtual Status step(const StringData& inputData, std::string* outputData) = 0;
 
         /**
          * Returns true if the authentication completed successfully.
          */
-        bool isDone() const { return _done; }
+        virtual bool isDone() const = 0;
 
     private:
         /**
@@ -142,24 +136,8 @@ namespace mongo {
             size_t size;
         };
 
-        /// Maximum number of Cyrus SASL callbacks stored in _callbacks.
-        static const int maxCallbacks = 4;
-
-        /// Underlying Cyrus SASL library connection object.
-        sasl_conn_t* _saslConnection;
-
-        /// Callbacks registered on _saslConnection for providing the Cyrus SASL library with
-        /// parameter values, etc.
-        sasl_callback_t _callbacks[maxCallbacks];
-
         /// Buffers for each of the settable parameters.
         DataBuffer _parameters[numParameters];
-
-        /// Number of successfully completed conversation steps.
-        int _step;
-
-        /// See isDone().
-        bool _done;
     };
 
 }  // namespace mongo

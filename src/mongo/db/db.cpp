@@ -526,18 +526,6 @@ namespace mongo {
         } memJournalServerStatusMetric;
     }
 
-
-#if 0 // TODO SERVER-14143 figure out something better. For now just disabling js interruption.
-    const char * jsInterruptCallback() {
-        // should be safe to interrupt in js code, even if we have a write lock
-        return killCurrentOp.checkForInterruptNoAssert();
-    }
-
-    unsigned jsGetCurrentOpIdCallback() {
-        return cc().curop()->opNum();
-    }
-#endif
-
     static void _initAndListen(int listenPort ) {
         Client::initThread("initandlisten");
 
@@ -605,10 +593,6 @@ namespace mongo {
 
         if (mongodGlobalParams.scriptingEnabled) {
             ScriptEngine::setup();
-#if 0 // TODO SERVER-14143 figure out something better. For now just disabling js interruption.
-            globalScriptEngine->setCheckInterruptCallback( jsInterruptCallback );
-            globalScriptEngine->setGetCurrentOpIdCallback( jsGetCurrentOpIdCallback );
-#endif
         }
 
         // On replica set members we only clear temp collections on DBs other than "local" during

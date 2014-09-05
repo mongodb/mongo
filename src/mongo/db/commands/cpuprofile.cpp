@@ -42,11 +42,9 @@
  * The commands defined here, and profiling, are only available when enabled at
  * build-time with the "--use-cpu-profiler" argument to scons.
  *
- * Example SCons command line, assuming you've installed google-perftools in
- * /usr/local:
+ * Example SCons command line: 
  *
- *     scons --release --use-cpu-profiler \
- *         --cpppath=/usr/local/include --libpath=/usr/local/lib
+ *     scons --release --use-cpu-profiler 
  */
 
 #include "third_party/gperftools-2.2/src/gperftools/profiler.h"

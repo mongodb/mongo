@@ -137,7 +137,7 @@ namespace {
     void restartInProgressIndexesFromLastShutdown() {
         OperationContextImpl txn;
 
-        cc().getAuthorizationSession()->grantInternalAuthorization();
+        txn.getClient()->getAuthorizationSession()->grantInternalAuthorization();
 
         std::vector<std::string> dbNames;
 

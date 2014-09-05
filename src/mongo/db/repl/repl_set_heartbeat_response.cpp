@@ -130,7 +130,7 @@ namespace {
             _electionTime = electionTimeElement._opTime();
         }
         else if (electionTimeElement.type() == Date) {
-            _electionTime = true;
+            _electionTimeSet = true;
             _electionTime = OpTime(electionTimeElement.date());
         }
         else {
@@ -150,7 +150,7 @@ namespace {
         }
         else {
             return Status(ErrorCodes::TypeMismatch, str::stream() << "Expected \"" <<
-                          kTimeFieldName << "\" field in reponse to replSetHeartbeat "
+                          kTimeFieldName << "\" field in response to replSetHeartbeat "
                           "command to have a numeric type, but found type " <<
                           typeName(timeElement.type()));
         }
@@ -194,7 +194,7 @@ namespace {
                  memberStateElement.type() != NumberLong) {
             return Status(ErrorCodes::TypeMismatch, str::stream() << "Expected \"" <<
                           kMemberStateFieldName << "\" field in response to replSetHeartbeat "
-                          " command to have type NumberInt or NumberLong, but found type " <<
+                          "command to have type NumberInt or NumberLong, but found type " <<
                           typeName(memberStateElement.type()));
         }
         else {
@@ -202,9 +202,10 @@ namespace {
             if (stateInt < 0 || stateInt > MemberState::RS_MAX) {
                 return Status(ErrorCodes::BadValue, str::stream() << "Value for \"" <<
                               kMemberStateFieldName << "\" in response to replSetHeartbeat is "
-                              " out of range; legal values are non-negative and no more than " <<
+                              "out of range; legal values are non-negative and no more than " <<
                               MemberState::RS_MAX);
             }
+            _stateSet = true;
             _state = MemberState(static_cast<int>(stateInt));
         }
 
@@ -214,7 +215,7 @@ namespace {
         if (versionElement.eoo()) {
             return Status(ErrorCodes::NoSuchKey, str::stream() <<
                           "Response to replSetHeartbeat missing required \"" <<
-                          kConfigVersionFieldName << " field");
+                          kConfigVersionFieldName << "\" field");
         }
         if (versionElement.type() != NumberInt) {
             return Status(ErrorCodes::TypeMismatch, str::stream() << "Expected \"" <<
@@ -226,16 +227,16 @@ namespace {
 
         const BSONElement replSetNameElement = doc[kReplSetFieldName];
         if (replSetNameElement.eoo()) {
-            return Status(ErrorCodes::NoSuchKey, str::stream() <<
-                          "Response to replSetHeartbeat missing required \"" <<
-                          kReplSetFieldName << "\" field");
+            _setName.clear();
         }
-        if (replSetNameElement.type() != String) {
+        else if (replSetNameElement.type() != String) {
             return Status(ErrorCodes::TypeMismatch, str::stream() << "Expected \"" <<
                           kReplSetFieldName << "\" field in response to replSetHeartbeat to have "
                           "type String, but found " << typeName(replSetNameElement.type()));
         }
-        _setName = replSetNameElement.String();
+        else {
+            _setName = replSetNameElement.String();
+        }
 
         const BSONElement hbMsgElement = doc[kHbMessageFieldName];
         if (hbMsgElement.eoo()) {
@@ -246,7 +247,9 @@ namespace {
                           kHbMessageFieldName << "\" field in response to replSetHeartbeat to have "
                           "type String, but found " << typeName(hbMsgElement.type()));
         }
-        _hbmsg = hbMsgElement.String();
+        else {
+            _hbmsg = hbMsgElement.String();
+        }
 
         const BSONElement syncingToElement = doc[kSyncSourceFieldName];
         if (syncingToElement.eoo()) {
@@ -257,12 +260,15 @@ namespace {
                           kSyncSourceFieldName << "\" field in response to replSetHeartbeat to "
                           "have type String, but found " << typeName(syncingToElement.type()));
         }
-        _syncingTo = syncingToElement.String();
+        else {
+            _syncingTo = syncingToElement.String();
+        }
 
         const BSONElement rsConfigElement = doc[kConfigFieldName];
         if (rsConfigElement.eoo()) {
             _configSet = false;
             _config = ReplicaSetConfig();
+            return Status::OK();
         }
         else if (rsConfigElement.type() != Object) {
             return Status(ErrorCodes::TypeMismatch, str::stream() << "Expected \"" <<

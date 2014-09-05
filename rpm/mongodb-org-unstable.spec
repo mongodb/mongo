@@ -151,9 +151,9 @@ mkdir -p $RPM_BUILD_ROOT/usr/share/man/man1
 cp debian/*.1 $RPM_BUILD_ROOT/usr/share/man/man1/
 # FIXME: remove this rm when mongosniff is back in the package
 rm -v $RPM_BUILD_ROOT/usr/share/man/man1/mongosniff.1*
-mkdir -p $RPM_BUILD_ROOT/etc/rc.d/init.d
-cp -v rpm/init.d-mongod $RPM_BUILD_ROOT/etc/rc.d/init.d/mongod
-chmod a+x $RPM_BUILD_ROOT/etc/rc.d/init.d/mongod
+mkdir -p $RPM_BUILD_ROOT/etc/init.d
+cp -v rpm/init.d-mongod $RPM_BUILD_ROOT/etc/init.d/mongod
+chmod a+x $RPM_BUILD_ROOT/etc/init.d/mongod
 mkdir -p $RPM_BUILD_ROOT/etc
 cp -v rpm/mongod.conf $RPM_BUILD_ROOT/etc/mongod.conf
 mkdir -p $RPM_BUILD_ROOT/etc/sysconfig
@@ -199,7 +199,7 @@ fi
 %config(noreplace) /etc/mongod.conf
 %{_bindir}/mongod
 %{_mandir}/man1/mongod.1*
-/etc/rc.d/init.d/mongod
+/etc/init.d/mongod
 /etc/sysconfig/mongod
 %attr(0755,mongod,mongod) %dir /var/lib/mongo
 %attr(0755,mongod,mongod) %dir /var/log/mongodb

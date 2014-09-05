@@ -68,7 +68,7 @@ namespace mongo {
 
         repl::replLocalAuth();
 
-        cc().curop()->reset(HostAndPort(), dbInsert);
+        txn.getCurOp()->reset(HostAndPort(), dbInsert);
         NamespaceString ns(_index["ns"].String());
         Client::WriteContext ctx(&txn, ns.getSystemIndexesCollection());
 
@@ -80,7 +80,7 @@ namespace mongo {
         }
         ctx.commit();
 
-        cc().shutdown();
+        txn.getClient()->shutdown();
     }
 
     Status IndexBuilder::buildInForeground(OperationContext* txn, Database* db) const {

@@ -492,7 +492,7 @@ namespace {
      */
     MONGO_INITIALIZER_WITH_PREREQUISITES(SaslSspiClientPlugin, 
                                          ("CyrusSaslAllocatorsAndMutexes", 
-                                          "SaslClientContext"))
+                                          "CyrusSaslClientContext"))
         (InitializerContext*) {
 
         int ret = sasl_client_add_plugin(sspiPluginName,
@@ -507,7 +507,7 @@ namespace {
     }
     MONGO_INITIALIZER_WITH_PREREQUISITES(SaslCramClientPlugin, 
                                          ("CyrusSaslAllocatorsAndMutexes", 
-                                          "SaslClientContext"))
+                                          "CyrusSaslClientContext"))
         (InitializerContext*) {
         int ret = sasl_client_add_plugin("CRAMMD5",
                                          crammd5_client_plug_init);
@@ -522,7 +522,7 @@ namespace {
 
     MONGO_INITIALIZER_WITH_PREREQUISITES(SaslPlainClientPlugin, 
                                          ("CyrusSaslAllocatorsAndMutexes", 
-                                          "SaslClientContext"))
+                                          "CyrusSaslClientContext"))
         (InitializerContext*) {
         int ret = sasl_client_add_plugin("PLAIN",
                                          plain_client_plug_init);

@@ -53,6 +53,10 @@ env.Library('topology_coordinator_impl',
                 'topology_coordinator',
             ])
 
+env.CppUnitTest('repl_set_heartbeat_response_test',
+                'repl_set_heartbeat_response_test.cpp',
+                LIBDEPS=['replica_set_messages'])
+
 env.CppUnitTest('topology_coordinator_impl_test',
                 'topology_coordinator_impl_test.cpp',
                 LIBDEPS=['topology_coordinator_impl',

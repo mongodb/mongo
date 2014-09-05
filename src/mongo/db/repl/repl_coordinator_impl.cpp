@@ -109,12 +109,11 @@ namespace {
             int64_t prngSeed) :
         _settings(settings),
         _topCoord(topCoord),
-        _replExecutor(network),
+        _replExecutor(network, prngSeed),
         _externalState(externalState),
         _inShutdown(false),
         _rsConfigState(kConfigStartingUp),
         _thisMembersConfigIndex(-1),
-        _random(prngSeed),
         _sleptLastElection(false) {
 
         if (!isReplEnabled()) {
@@ -226,11 +225,9 @@ namespace {
         _topCoordDriverThread.reset(new boost::thread(stdx::bind(&ReplicationExecutor::run,
                                                                  &_replExecutor)));
 
-        // TODO(spencer): Start this thread once we're no longer starting a SyncSourceFeedback
-        // thread in the Legacy coordinator
-        //_syncSourceFeedbackThread.reset(new boost::thread(
-        //        stdx::bind(&ReplicationCoordinatorExternalState::runSyncSourceFeedback,
-        //                   _externalState.get())));
+        _syncSourceFeedbackThread.reset(new boost::thread(
+                stdx::bind(&ReplicationCoordinatorExternalState::runSyncSourceFeedback,
+                           _externalState.get())));
 
         bool doneLoadingConfig = _startLoadLocalConfig(txn);
         if (doneLoadingConfig) {
@@ -266,7 +263,7 @@ namespace {
         _replExecutor.shutdown();
         _topCoordDriverThread->join(); // must happen outside _mutex
         _externalState->shutdown();
-        // _syncSourceFeedbackThread->join(); // TODO(spencer): put back once the thread is started
+        _syncSourceFeedbackThread->join();
     }
 
     ReplSettings& ReplicationCoordinatorImpl::getSettings() {
@@ -443,10 +440,9 @@ namespace {
             const OperationContext* txn,
             const OpTime& opTime,
             const WriteConcernOptions& writeConcern) {
-        // TODO(spencer): handle killop
-
-
         if (writeConcern.wNumNodes <= 1 && writeConcern.wMode.empty()) {
+            // TODO(spencer): is this right?  The map does contain entries for ourself, so it seems
+            // like checking the map even for w:1 writes makes some sense...
             // no desired replication check
             return StatusAndDuration(Status::OK(), Milliseconds(0));
         }
@@ -512,8 +508,7 @@ namespace {
     ReplicationCoordinator::StatusAndDuration ReplicationCoordinatorImpl::awaitReplicationOfLastOp(
             const OperationContext* txn,
             const WriteConcernOptions& writeConcern) {
-        // TODO
-        return StatusAndDuration(Status::OK(), Milliseconds(0));
+        return awaitReplication(txn, _getLastOpApplied(), writeConcern);
     }
 
     Status ReplicationCoordinatorImpl::stepDown(OperationContext* txn,
@@ -1060,7 +1055,10 @@ namespace {
             if (!member) {
                 return Status(ErrorCodes::NodeNotFound,
                               str::stream() << "Node with replica set member ID " << memberID <<
-                                      " could not be found in replica set config during handshake");
+                                      " could not be found in replica set config while attempting"
+                                      " to associate it with RID " << handshake.getRid() <<
+                                      " in replication handshake.  ReplSet Config: " <<
+                                      _rsConfig.toBSON().toString());
             }
             SlaveInfo& slaveInfo = _slaveInfoMap[handshake.getRid()];
             slaveInfo.memberID = memberID;

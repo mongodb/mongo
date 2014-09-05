@@ -72,7 +72,7 @@ namespace {
 
     void FreshnessCheckerTest::setUp() {
         _net = new NetworkInterfaceMockWithMap;
-        _executor.reset(new ReplicationExecutor(_net));
+        _executor.reset(new ReplicationExecutor(_net, 1 /* prng seed */));
         _executorThread.reset(new boost::thread(stdx::bind(&ReplicationExecutor::run,
                                                            _executor.get())));
     }

@@ -120,7 +120,7 @@ namespace {
             /* we want to keep heartbeat connections open when relinquishing primary.  
                tag them here. */
             {
-                AbstractMessagingPort *mp = cc().port();
+                AbstractMessagingPort *mp = txn->getClient()->port();
                 if( mp )
                     mp->tag |= ScopedConn::keepOpen;
             }
@@ -221,8 +221,8 @@ namespace {
         boost::thread t(startSyncThread);
 
         boost::thread producer(stdx::bind(&BackgroundSync::producerThread, sync));
-        boost::thread feedback(stdx::bind(&SyncSourceFeedback::run,
-                                          &theReplSet->syncSourceFeedback));
+        //boost::thread feedback(stdx::bind(&SyncSourceFeedback::run,
+        //                                  &theReplSet->syncSourceFeedback));
 
         // member heartbeats are started in ReplSetImpl::initFromConfig
     }

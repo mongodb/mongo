@@ -234,7 +234,6 @@ namespace mutablebson {
         // For mongod and webserver.
         static void execCommand(OperationContext* txn,
                                 Command* c,
-                                Client& client,
                                 int queryOptions,
                                 const char *ns,
                                 BSONObj& cmdObj,

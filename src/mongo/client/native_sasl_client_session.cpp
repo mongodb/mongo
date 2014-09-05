@@ -1,4 +1,4 @@
-/*    Copyright 2012 10gen Inc.
+/*    Copyright 2014 MongoDB Inc.
  *
  *    This program is free software: you can redistribute it and/or  modify
  *    it under the terms of the GNU Affero General Public License, version 3,
@@ -25,46 +25,42 @@
  *    then also delete it in the license file.
  */
 
-#include "mongo/client/sasl_client_session.h"
+#include "mongo/platform/basic.h"
+
+#include "mongo/client/native_sasl_client_session.h"
 
 #include "mongo/base/init.h"
-#include "mongo/util/allocator.h"
-#include "mongo/util/assert_util.h"
-#include "mongo/util/concurrency/mutex.h"
 #include "mongo/util/mongoutils/str.h"
-#include "mongo/util/signal_handlers_synchronous.h"
 
 namespace mongo {
-    SaslClientSession::SaslClientSessionFactoryFn SaslClientSession::create = NULL;
-    
-    SaslClientSession::SaslClientSession() {}
+namespace {
 
-    SaslClientSession::~SaslClientSession() {}
-
-    void SaslClientSession::setParameter(Parameter id, const StringData& value) {
-        fassert(16807, id >= 0 && id < numParameters);
-        DataBuffer& buffer = _parameters[id];
-        buffer.size = value.size();
-        buffer.data.reset(new char[buffer.size + 1]);
-        
-        // Note that we append a terminal NUL to buffer.data, so it may be treated as a C-style
-        // string.  This is required for parameterServiceName, parameterServiceHostname,
-        // parameterMechanism and parameterUser.
-        value.copyTo(buffer.data.get(), true);
+    SaslClientSession* createNativeSaslClientSession() {
+        return new NativeSaslClientSession();
+    }
+     
+    MONGO_INITIALIZER(NativeSaslClientContext)(InitializerContext* context) {
+        SaslClientSession::create = createNativeSaslClientSession;
+        return Status::OK();
     }
 
-    bool SaslClientSession::hasParameter(Parameter id) {
-        if (id < 0 || id >= numParameters)
-            return false;
-        return static_cast<bool>(_parameters[id].data);
+} // namespace
+
+    NativeSaslClientSession::NativeSaslClientSession() :
+            SaslClientSession(),
+            _step(0),
+            _done(false) {
     }
 
-    StringData SaslClientSession::getParameter(Parameter id) {
-        if (!hasParameter(id))
-            return StringData();
+    NativeSaslClientSession::~NativeSaslClientSession() {}
 
-        DataBuffer& buffer = _parameters[id];
-        return StringData(buffer.data.get(), buffer.size);
+    Status NativeSaslClientSession::initialize() {
+        return Status(ErrorCodes::BadValue,
+                      mongoutils::str::stream() << "SASL authentication not supported in client");
     }
 
-}  // namespace mongo
+    Status NativeSaslClientSession::step(const StringData& inputData, std::string* outputData) {
+        return Status(ErrorCodes::BadValue,
+                      mongoutils::str::stream() << "SASL authentication not supported in client");
+    }
+}  // namespace

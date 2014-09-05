@@ -52,6 +52,7 @@
 #include "mongo/util/background.h"
 #include "mongo/util/exit.h"
 #include "mongo/util/log.h"
+#include "mongo/util/scopeguard.h"
 
 namespace mongo {
 
@@ -599,6 +600,13 @@ namespace {
 
         _cfg = new ReplSetConfig(c);
 
+        // config() is same thing but const, so we use that when we can for clarity below
+        dassert(&config() == _cfg);
+        verify(config().ok());
+        verify(_name.empty() || _name == config()._id);
+        _name = config()._id;
+        verify(!_name.empty());
+
         {
             // Hack to force ReplicationCoordinatorImpl to have a config.
             // TODO(spencer): rm this once the ReplicationCoordinatorImpl can load its own config.
@@ -608,12 +616,6 @@ namespace {
             replCoord->setImplConfigHack(_cfg);
         }
 
-        // config() is same thing but const, so we use that when we can for clarity below
-        dassert(&config() == _cfg);
-        verify(config().ok());
-        verify(_name.empty() || _name == config()._id);
-        _name = config()._id;
-        verify(!_name.empty());
         // this is a shortcut for simple changes
         if (additive) {
             log() << "replSet info : additive change to configuration" << rsLog;

@@ -45,7 +45,8 @@ namespace {
     const ReplicationExecutor::Milliseconds ReplicationExecutor::kNoTimeout(-1);
     const Date_t ReplicationExecutor::kNoExpirationDate(-1);
 
-    ReplicationExecutor::ReplicationExecutor(NetworkInterface* netInterface) :
+    ReplicationExecutor::ReplicationExecutor(NetworkInterface* netInterface, int64_t prngSeed) :
+        _random(prngSeed),
         _networkInterface(netInterface),
         _totalEventWaiters(0),
         _inShutdown(false),
@@ -410,6 +411,10 @@ namespace {
     void ReplicationExecutor::signalWorkForTest() {
         boost::lock_guard<boost::mutex> lk(_mutex);
         _workAvailable.notify_all();
+    }
+
+    int64_t ReplicationExecutor::nextRandomInt64(int64_t limit) {
+        return _random.nextInt64(limit);
     }
 
     ReplicationExecutor::Milliseconds ReplicationExecutor::scheduleReadySleepers_inlock() {

@@ -91,32 +91,38 @@ namespace mongo {
 
             BSONObj deletedDoc;
 
-            WriteUnitOfWork wunit(_txn);
-
             // TODO: Do we want to buffer docs and delete them in a group rather than
             // saving/restoring state repeatedly?
             saveState();
-            const bool deleteCappedOK = false;
-            const bool deleteNoWarn = false;
-            _collection->deleteDocument(_txn, rloc, deleteCappedOK, deleteNoWarn,
-                                        _params.shouldCallLogOp ? &deletedDoc : NULL);
+
+            {
+                WriteUnitOfWork wunit(_txn);
+
+                const bool deleteCappedOK = false;
+                const bool deleteNoWarn = false;
+                _collection->deleteDocument(_txn, rloc, deleteCappedOK, deleteNoWarn,
+                                            _params.shouldCallLogOp ? &deletedDoc : NULL);
+
+                if (_params.shouldCallLogOp) {
+                    if (deletedDoc.isEmpty()) {
+                        log() << "Deleted object without id in collection " << _collection->ns()
+                        << ", not logging.";
+                    }
+                    else {
+                        bool replJustOne = true;
+                        repl::logOp(_txn, "d", _collection->ns().ns().c_str(), deletedDoc, 0,
+                                    &replJustOne, _params.fromMigrate);
+                    }
+                }
+                wunit.commit();
+            }
+
+            //  As restoreState may restore (recreate) cursors, cursors are tied to the
+            //  transaction in which they are created, and a WriteUnitOfWork is a
+            //  transaction, make sure to restore the state outside of the WritUnitOfWork.
             restoreState(_txn);
 
             ++_specificStats.docsDeleted;
-
-            if (_params.shouldCallLogOp) {
-                if (deletedDoc.isEmpty()) {
-                    log() << "Deleted object without id in collection " << _collection->ns()
-                          << ", not logging.";
-                }
-                else {
-                    bool replJustOne = true;
-                    repl::logOp(_txn, "d", _collection->ns().ns().c_str(), deletedDoc, 0,
-                                &replJustOne, _params.fromMigrate);
-                }
-            }
-
-            wunit.commit();
 
             ++_commonStats.needTime;
             return PlanStage::NEED_TIME;

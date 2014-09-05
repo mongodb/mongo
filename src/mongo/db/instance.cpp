@@ -120,11 +120,11 @@ namespace mongo {
         QueryMessage q(d);
         BSONObjBuilder b;
 
-        const bool isAuthorized = cc().getAuthorizationSession()->isAuthorizedForActionsOnResource(
+        const bool isAuthorized = txn->getClient()->getAuthorizationSession()->isAuthorizedForActionsOnResource(
                 ResourcePattern::forClusterResource(), ActionType::inprog);
 
         audit::logInProgAuthzCheck(
-                &cc(), q.query, isAuthorized ? ErrorCodes::OK : ErrorCodes::Unauthorized);
+                txn->getClient(), q.query, isAuthorized ? ErrorCodes::OK : ErrorCodes::Unauthorized);
 
         if (!isAuthorized) {
             b.append("err", "unauthorized");
@@ -148,7 +148,7 @@ namespace mongo {
 
                 const NamespaceString nss(d.getns());
 
-                Client& me = cc();
+                Client& me = *txn->getClient();
                 scoped_lock bl(Client::clientsMutex);
                 Matcher m(filter, WhereCallbackReal(txn, nss.db()));
                 for( set<Client*>::iterator i = Client::clients.begin(); i != Client::clients.end(); i++ ) {
@@ -182,14 +182,14 @@ namespace mongo {
         replyToQuery(0, m, dbresponse, b.obj());
     }
 
-    void killOp( Message &m, DbResponse &dbresponse ) {
+    void killOp( OperationContext* txn, Message &m, DbResponse &dbresponse ) {
         DbMessage d(m);
         QueryMessage q(d);
         BSONObj obj;
 
-        const bool isAuthorized = cc().getAuthorizationSession()->isAuthorizedForActionsOnResource(
+        const bool isAuthorized = txn->getClient()->getAuthorizationSession()->isAuthorizedForActionsOnResource(
                 ResourcePattern::forClusterResource(), ActionType::killop);
-        audit::logKillOpAuthzCheck(&cc(),
+        audit::logKillOpAuthzCheck(txn->getClient(),
                                    q.query,
                                    isAuthorized ? ErrorCodes::OK : ErrorCodes::Unauthorized);
         if (!isAuthorized) {
@@ -213,13 +213,13 @@ namespace mongo {
     }
 
     bool _unlockFsync();
-    static void unlockFsync(const char *ns, Message& m, DbResponse &dbresponse) {
+    static void unlockFsync(OperationContext* txn, const char *ns, Message& m, DbResponse &dbresponse) {
         BSONObj obj;
 
-        const bool isAuthorized = cc().getAuthorizationSession()->isAuthorizedForActionsOnResource(
+        const bool isAuthorized = txn->getClient()->getAuthorizationSession()->isAuthorizedForActionsOnResource(
                 ResourcePattern::forClusterResource(), ActionType::unlock);
         audit::logFsyncUnlockAuthzCheck(
-                &cc(), isAuthorized ? ErrorCodes::OK : ErrorCodes::Unauthorized);
+                txn->getClient(), isAuthorized ? ErrorCodes::OK : ErrorCodes::Unauthorized);
         if (!isAuthorized) {
             obj = fromjson("{\"err\":\"unauthorized\"}");
         }
@@ -254,7 +254,7 @@ namespace mongo {
             NamespaceString ns(d.getns());
             if (!ns.isCommand()) {
                 // Auth checking for Commands happens later.
-                Client* client = &cc();
+                Client* client = txn->getClient();
                 Status status = client->getAuthorizationSession()->checkAuthForQuery(ns, q.query);
                 audit::logQueryAuthzCheck(client, ns, q.query, status.code());
                 uassertStatusOK(status);
@@ -345,7 +345,7 @@ namespace mongo {
 
         DbMessage dbmsg(m);
 
-        Client& c = cc();
+        Client& c = *txn->getClient();
         if (!txn->isGod()) {
             c.getAuthorizationSession()->startRequest(txn);
 
@@ -365,11 +365,11 @@ namespace mongo {
                         return;
                     }
                     if( strstr(ns, "$cmd.sys.killop") ) {
-                        killOp(m, dbresponse);
+                        killOp(txn, m, dbresponse);
                         return;
                     }
                     if( strstr(ns, "$cmd.sys.unlock") ) {
-                        unlockFsync(ns, m, dbresponse);
+                        unlockFsync(txn, ns, m, dbresponse);
                         return;
                     }
                 }
@@ -591,11 +591,11 @@ namespace mongo {
         bool multi = flags & UpdateOption_Multi;
         bool broadcast = flags & UpdateOption_Broadcast;
 
-        Status status = cc().getAuthorizationSession()->checkAuthForUpdate(ns,
+        Status status = txn->getClient()->getAuthorizationSession()->checkAuthForUpdate(ns,
                                                                            query,
                                                                            toupdate,
                                                                            upsert);
-        audit::logUpdateAuthzCheck(&cc(), ns, query, toupdate, upsert, multi, status.code());
+        audit::logUpdateAuthzCheck(txn->getClient(), ns, query, toupdate, upsert, multi, status.code());
         uassertStatusOK(status);
 
         op.debug().query = query;
@@ -633,8 +633,8 @@ namespace mongo {
         verify( d.moreJSObjs() );
         BSONObj pattern = d.nextJsObj();
 
-        Status status = cc().getAuthorizationSession()->checkAuthForDelete(ns, pattern);
-        audit::logDeleteAuthzCheck(&cc(), ns, pattern, status.code());
+        Status status = txn->getClient()->getAuthorizationSession()->checkAuthForDelete(ns, pattern);
+        audit::logDeleteAuthzCheck(txn->getClient(), ns, pattern, status.code());
         uassertStatusOK(status);
 
         op.debug().query = pattern;
@@ -682,9 +682,9 @@ namespace mongo {
                 const NamespaceString nsString( ns );
                 uassert( 16258, str::stream() << "Invalid ns [" << ns << "]", nsString.isValid() );
 
-                Status status = cc().getAuthorizationSession()->checkAuthForGetMore(
+                Status status = txn->getClient()->getAuthorizationSession()->checkAuthForGetMore(
                         nsString, cursorid);
-                audit::logGetMoreAuthzCheck(&cc(), nsString, cursorid, status.code());
+                audit::logGetMoreAuthzCheck(txn->getClient(), nsString, cursorid, status.code());
                 uassertStatusOK(status);
 
                 if (str::startsWith(ns, "local.oplog.")){
@@ -897,8 +897,8 @@ namespace mongo {
 
             // Check auth for insert (also handles checking if this is an index build and checks
             // for the proper privileges in that case).
-            Status status = cc().getAuthorizationSession()->checkAuthForInsert(nsString, obj);
-            audit::logInsertAuthzCheck(&cc(), nsString, obj, status.code());
+            Status status = txn->getClient()->getAuthorizationSession()->checkAuthForInsert(nsString, obj);
+            audit::logInsertAuthzCheck(txn->getClient(), nsString, obj, status.code());
             uassertStatusOK(status);
         }
 
@@ -939,17 +939,18 @@ namespace {
     class GodScope {
         MONGO_DISALLOW_COPYING(GodScope);
     public:
-        GodScope() {
-            _prev = cc().setGod(true);
+        GodScope(OperationContext* txn) : _txn(txn) {
+            _prev = _txn->getClient()->setGod(true);
         }
-        ~GodScope() { cc().setGod(_prev); }
+        ~GodScope() { _txn->getClient()->setGod(_prev); }
     private:
         bool _prev;
+        OperationContext* _txn;
     };
 }  // namespace
 
     bool DBDirectClient::call( Message &toSend, Message &response, bool assertOk , string * actualServer ) {
-        GodScope gs;
+        GodScope gs(_txn);
         if ( lastError._get() )
             lastError.startRequest( toSend, lastError._get() );
         DbResponse dbResponse;
@@ -961,7 +962,7 @@ namespace {
     }
 
     void DBDirectClient::say( Message &toSend, bool isRetry, string * actualServer ) {
-        GodScope gs;
+        GodScope gs(_txn);
         if ( lastError._get() )
             lastError.startRequest( toSend, lastError._get() );
         DbResponse dbResponse;
