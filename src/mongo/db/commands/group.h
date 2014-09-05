@@ -69,6 +69,12 @@ namespace mongo {
                          BSONObjBuilder& result,
                          bool fromRepl);
 
+        virtual Status explain(OperationContext* txn,
+                               const std::string& dbname,
+                               const BSONObj& cmdObj,
+                               Explain::Verbosity verbosity,
+                               BSONObjBuilder* out) const;
+
         /**
          * Parse a group command object.
          *

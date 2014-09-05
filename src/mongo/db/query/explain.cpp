@@ -291,6 +291,12 @@ namespace mongo {
                 bob->appendNumber("alreadyHasObj", spec->alreadyHasObj);
             }
         }
+        else if (STAGE_GROUP == stats.stageType) {
+            GroupStats* spec = static_cast<GroupStats*>(stats.specific.get());
+            if (verbosity >= Explain::EXEC_STATS) {
+                bob->appendNumber("nGroups", spec->nGroups);
+            }
+        }
         else if (STAGE_IDHACK == stats.stageType) {
             IDHackStats* spec = static_cast<IDHackStats*>(stats.specific.get());
             if (verbosity >= Explain::EXEC_STATS) {

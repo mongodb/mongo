@@ -93,8 +93,6 @@ namespace mongo {
         // This is the nested command which we are explaining.
         BSONObj explainObj = cmdObj.firstElement().Obj();
 
-        const string ns = parseNs(dbname, explainObj);
-
         Command* commToExplain = Command::findCommand(explainObj.firstElementFieldName());
         if (NULL == commToExplain) {
             mongoutils::str::stream ss;

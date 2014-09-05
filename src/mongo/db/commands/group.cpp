@@ -169,4 +169,28 @@ namespace mongo {
         return true;
     }
 
+    Status GroupCommand::explain(OperationContext* txn,
+                                 const std::string& dbname,
+                                 const BSONObj& cmdObj,
+                                 Explain::Verbosity verbosity,
+                                 BSONObjBuilder* out) const {
+        GroupRequest groupRequest;
+        Status parseRequestStatus = parseRequest(dbname, cmdObj, &groupRequest);
+        if (!parseRequestStatus.isOK()) {
+            return parseRequestStatus;
+        }
+
+        Client::ReadContext ctx(txn, groupRequest.ns);
+        Database* db = ctx.ctx().db();
+
+        PlanExecutor *rawPlanExecutor;
+        Status getExecStatus = getExecutorGroup(txn, db, groupRequest, &rawPlanExecutor); 
+        if (!getExecStatus.isOK()) {
+            return getExecStatus;
+        }
+        scoped_ptr<PlanExecutor> planExecutor(rawPlanExecutor);
+
+        return Explain::explainStages(planExecutor.get(), verbosity, out);
+    }
+
 }  // namespace mongo
