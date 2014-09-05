@@ -489,7 +489,7 @@ namespace {
         bool meEnsured = false;
         while (!inShutdown() && !meEnsured) {
             try {
-                theReplSet->syncSourceFeedback.ensureMe(&txn);
+                syncSourceFeedback.ensureMe(&txn);
                 meEnsured = true;
             }
             catch (const DBException& e) {

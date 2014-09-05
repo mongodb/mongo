@@ -337,6 +337,36 @@ namespace repl {
         replAllDead = 0;
     }
 
+    bool replHandshake(DBClientConnection *conn, const OID& myRID) {
+        string myname = getHostName();
+
+        BSONObjBuilder cmd;
+        cmd.append("handshake", myRID);
+
+        BSONObj res;
+        bool ok = conn->runCommand( "admin" , cmd.obj() , res );
+        // ignoring for now on purpose for older versions
+        LOG( ok ? 1 : 0 ) << "replHandshake res not: " << ok << " res: " << res << endl;
+        return true;
+    }
+
+    bool ReplSource::_connect(OplogReader* reader, const HostAndPort& host, const OID& myRID) {
+        if (reader->conn()) {
+            return true;
+        }
+
+        if (!reader->connect(host)) {
+            return false;
+        }
+
+        if (!replHandshake(reader->conn(), myRID)) {
+            return false;
+        }
+
+        return true;
+    }
+
+
     void ReplSource::forceResync( OperationContext* txn, const char *requester ) {
         BSONObj info;
         {
@@ -344,8 +374,8 @@ namespace repl {
             invariant(txn->lockState()->isW());
             Lock::TempRelease tempRelease(txn->lockState());
 
-            if (!oplogReader.connect(HostAndPort(hostName), 
-                                     getGlobalReplicationCoordinator()->getMyRID())) {
+            if (!_connect(&oplogReader, HostAndPort(hostName), 
+                          getGlobalReplicationCoordinator()->getMyRID())) {
                 msgassertedNoTrace( 14051 , "unable to connect to resync");
             }
             /* todo use getDatabaseNames() method here */
@@ -829,8 +859,7 @@ namespace repl {
         if ( !oplogReader.more() ) {
             if ( tailing ) {
                 LOG(2) << "repl: tailing & no new activity\n";
-                if( oplogReader.awaitCapable() )
-                    okResultCode = 0; // don't sleep
+                okResultCode = 0; // don't sleep
 
             }
             else {
@@ -911,7 +940,7 @@ namespace repl {
                 if ( moreInitialSyncsPending || !oplogReader.more() ) {
                     Lock::GlobalWrite lk(txn->lockState());
                     
-                    if (oplogReader.awaitCapable() && tailing) {
+                    if (tailing) {
                         okResultCode = 0; // don't sleep
                     }
 
@@ -1021,8 +1050,9 @@ namespace repl {
             return -1;
         }
 
-        if ( !oplogReader.connect(HostAndPort(hostName), 
-                                  getGlobalReplicationCoordinator()->getMyRID()) ) {
+        if ( !_connect(&oplogReader, 
+                       HostAndPort(hostName), 
+                       getGlobalReplicationCoordinator()->getMyRID()) ) {
             LOG(4) << "repl:  can't connect to sync source" << endl;
             return -1;
         }

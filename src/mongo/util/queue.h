@@ -29,13 +29,11 @@
 
 #pragma once
 
-#include "mongo/pch.h"
-
+#include <boost/thread/condition.hpp>
 #include <limits>
 #include <queue>
 
-#include <boost/thread/condition.hpp>
-
+#include "mongo/util/concurrency/mutex.h"
 #include "mongo/util/timer.h"
 
 namespace mongo {
