@@ -48,6 +48,9 @@
 #include "mongo/util/net/hostandport.h"
 
 namespace mongo {
+
+    class Timer;
+
 namespace repl {
 
     class SyncSourceFeedback;
@@ -303,6 +306,18 @@ namespace repl {
          */
         OpTime _getLastOpApplied();
         OpTime _getLastOpApplied_inlock();
+
+        /**
+         * Helper method for _awaitReplication that takes an already locked unique_lock and a
+         * Timer for timing the operation which has been counting since before the lock was
+         * acquired.
+         */
+        ReplicationCoordinator::StatusAndDuration _awaitReplication_inlock(
+                const Timer* timer,
+                boost::unique_lock<boost::mutex>* lock,
+                const OperationContext* txn,
+                const OpTime& ts,
+                const WriteConcernOptions& writeConcern);
 
         /*
          * Returns true if the given writeConcern is satisfied up to "optime" or is unsatisfiable.

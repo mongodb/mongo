@@ -354,8 +354,8 @@ namespace {
         // Now make us a replica set
         getReplCoord()->getSettings().replSet = "mySet/node1:12345,node2:54321";
 
-        // Waiting for 1 nodes always works
-        writeConcern.wNumNodes = 1;
+        // Waiting for 0 nodes always works
+        writeConcern.wNumNodes = 0;
         writeConcern.wMode = "";
         statusAndDur = getReplCoord()->awaitReplication(&txn, time, writeConcern);
         ASSERT_OK(statusAndDur.status);
@@ -372,6 +372,7 @@ namespace {
                 HostAndPort("node1", 12345));
         OperationContextNoop txn;
 
+        OID myOID = getReplCoord()->getMyRID();
         OID client1 = OID::gen();
         OID client2 = OID::gen();
         OID client3 = OID::gen();
@@ -390,16 +391,21 @@ namespace {
 
         WriteConcernOptions writeConcern;
         writeConcern.wTimeout = WriteConcernOptions::kNoWaiting;
-        writeConcern.wNumNodes = 2;
+        writeConcern.wNumNodes = 1;
 
-        // 2 nodes waiting for time1
+        // 1 node waiting for time 1
         ReplicationCoordinator::StatusAndDuration statusAndDur =
                                         getReplCoord()->awaitReplication(&txn, time1, writeConcern);
         ASSERT_EQUALS(ErrorCodes::ExceededTimeLimit, statusAndDur.status);
-        ASSERT_OK(getReplCoord()->setLastOptime(&txn, client1, time1));
+        ASSERT_OK(getReplCoord()->setLastOptime(&txn, myOID, time1));
+        statusAndDur = getReplCoord()->awaitReplication(&txn, time1, writeConcern);
+        ASSERT_OK(statusAndDur.status);
+
+        // 2 nodes waiting for time1
+        writeConcern.wNumNodes = 2;
         statusAndDur = getReplCoord()->awaitReplication(&txn, time1, writeConcern);
         ASSERT_EQUALS(ErrorCodes::ExceededTimeLimit, statusAndDur.status);
-        ASSERT_OK(getReplCoord()->setLastOptime(&txn, client2, time1));
+        ASSERT_OK(getReplCoord()->setLastOptime(&txn, client1, time1));
         statusAndDur = getReplCoord()->awaitReplication(&txn, time1, writeConcern);
         ASSERT_OK(statusAndDur.status);
 

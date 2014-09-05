@@ -445,17 +445,45 @@ namespace {
             const OperationContext* txn,
             const OpTime& opTime,
             const WriteConcernOptions& writeConcern) {
-
-        if (writeConcern.wNumNodes <= 1 && writeConcern.wMode.empty()) {
-            // TODO(spencer): is this right?  The map does contain entries for ourself, so it seems
-            // like checking the map even for w:1 writes makes some sense...
-            // no desired replication check
-            return StatusAndDuration(Status::OK(), Milliseconds(0));
-        }
-
         Timer timer;
-        boost::condition_variable condVar;
-        boost::unique_lock<boost::mutex> lk(_mutex);
+        boost::unique_lock<boost::mutex> lock(_mutex);
+        return _awaitReplication_inlock(&timer, &lock, txn, opTime, writeConcern);
+    }
+
+    ReplicationCoordinator::StatusAndDuration
+            ReplicationCoordinatorImpl::awaitReplicationOfLastOpForClient(
+                    const OperationContext* txn,
+                    const WriteConcernOptions& writeConcern) {
+        Timer timer;
+        boost::unique_lock<boost::mutex> lock(_mutex);
+        return _awaitReplication_inlock(
+                &timer, &lock, txn, txn->getClient()->getLastOp(), writeConcern);
+    }
+
+    ReplicationCoordinator::StatusAndDuration
+            ReplicationCoordinatorImpl::awaitReplicationOfLastOpApplied(
+                    const OperationContext* txn,
+                    const WriteConcernOptions& writeConcern) {
+        Timer timer;
+        boost::unique_lock<boost::mutex> lock(_mutex);
+        return _awaitReplication_inlock(
+                &timer, &lock, txn, _getLastOpApplied_inlock(), writeConcern);
+    }
+
+    ReplicationCoordinator::StatusAndDuration ReplicationCoordinatorImpl::_awaitReplication_inlock(
+            const Timer* timer,
+            boost::unique_lock<boost::mutex>* lock,
+            const OperationContext* txn,
+            const OpTime& opTime,
+            const WriteConcernOptions& writeConcern) {
+        if (writeConcern.wMode.empty()) {
+            if (writeConcern.wNumNodes < 1) {
+                return StatusAndDuration(Status::OK(), Milliseconds(timer->millis()));
+            }
+            else if (writeConcern.wNumNodes == 1 && _getLastOpApplied_inlock() >= opTime) {
+                return StatusAndDuration(Status::OK(), Milliseconds(timer->millis()));
+            }
+        }
 
         const Mode replMode = _getReplicationMode_inlock();
         if (replMode == modeNone || serverGlobalParams.configsvr) {
@@ -469,10 +497,11 @@ namespace {
         }
 
         // Must hold _mutex before constructing waitInfo as it will modify _replicationWaiterList
+        boost::condition_variable condVar;
         WaiterInfo waitInfo(
                 &_replicationWaiterList, txn->getOpID(), &opTime, &writeConcern, &condVar);
         while (!_doneWaitingForReplication_inlock(opTime, writeConcern)) {
-            const int elapsed = timer.millis();
+            const int elapsed = timer->millis();
 
             try {
                 txn->checkForInterrupt();
@@ -495,35 +524,20 @@ namespace {
 
             try {
                 if (writeConcern.wTimeout == WriteConcernOptions::kNoTimeout) {
-                    condVar.wait(lk);
+                    condVar.wait(*lock);
                 }
                 else {
-                    condVar.timed_wait(lk, Milliseconds(writeConcern.wTimeout - elapsed));
+                    condVar.timed_wait(*lock, Milliseconds(writeConcern.wTimeout - elapsed));
                 }
             } catch (const boost::thread_interrupted&) {}
         }
 
         Status status = _checkIfWriteConcernCanBeSatisfied_inlock(writeConcern);
         if (!status.isOK()) {
-            return StatusAndDuration(status, Milliseconds(timer.millis()));
+            return StatusAndDuration(status, Milliseconds(timer->millis()));
         }
 
-        return StatusAndDuration(Status::OK(), Milliseconds(timer.millis()));
-    }
-
-    ReplicationCoordinator::StatusAndDuration
-            ReplicationCoordinatorImpl::awaitReplicationOfLastOpForClient(
-                    const OperationContext* txn,
-                    const WriteConcernOptions& writeConcern) {
-        return awaitReplication(txn, txn->getClient()->getLastOp(), writeConcern);
-    }
-
-    ReplicationCoordinator::StatusAndDuration
-            ReplicationCoordinatorImpl::awaitReplicationOfLastOpApplied(
-                    const OperationContext* txn,
-                    const WriteConcernOptions& writeConcern) {
-        // TODO(spencer): Fix double locking of _mutex from _getLastOpApplied and awaitReplication
-        return awaitReplication(txn, _getLastOpApplied(), writeConcern);
+        return StatusAndDuration(Status::OK(), Milliseconds(timer->millis()));
     }
 
     Status ReplicationCoordinatorImpl::stepDown(OperationContext* txn,
