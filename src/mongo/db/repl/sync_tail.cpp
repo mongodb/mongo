@@ -250,7 +250,7 @@ namespace repl {
                 else if (currentOpTime > endOpTime) {
                     severe() << "Applied past expected end " << endOpTime << " to " << currentOpTime
                             << " without seeing it. Rollback?" << rsLog;
-                    fassertFailedNoTrace(18689);
+                    fassertFailedNoTrace(18693);
                 }
 
                 // apply replication batch limits
@@ -262,7 +262,7 @@ namespace repl {
 
             if (ops.empty()) {
                 severe() << "got no ops for batch...";
-                fassertFailedNoTrace(18690);
+                fassertFailedNoTrace(18692);
             }
 
             const BSONObj lastOp = ops.back().getOwned();
