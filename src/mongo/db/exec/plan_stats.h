@@ -319,6 +319,20 @@ namespace mongo {
         size_t docsExamined;
     };
 
+    struct GroupStats : public SpecificStats {
+        GroupStats() : nGroups(0) { }
+
+        virtual ~GroupStats() { }
+
+        virtual SpecificStats* clone() const {
+            GroupStats* specific = new GroupStats(*this);
+            return specific;
+        }
+
+        // The total number of groups.
+        size_t nGroups;
+    };
+
     struct IDHackStats : public SpecificStats {
         IDHackStats() : keysExamined(0),
                         docsExamined(0) { }

@@ -65,6 +65,8 @@ namespace mongo {
         STAGE_GEO_NEAR_2D,
         STAGE_GEO_NEAR_2DSPHERE,
 
+        STAGE_GROUP,
+
         STAGE_IDHACK,
         STAGE_IXSCAN,
         STAGE_LIMIT,

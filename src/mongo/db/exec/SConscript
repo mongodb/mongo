@@ -45,6 +45,7 @@ env.Library(
         "eof.cpp",
         "fetch.cpp",
         "geo_near.cpp",
+        "group.cpp",
         "idhack.cpp",
         "index_scan.cpp",
         "keep_mutations.cpp",

@@ -39,6 +39,7 @@
 #include "mongo/db/exec/cached_plan.h"
 #include "mongo/db/exec/delete.h"
 #include "mongo/db/exec/eof.h"
+#include "mongo/db/exec/group.h"
 #include "mongo/db/exec/idhack.h"
 #include "mongo/db/exec/multi_plan.h"
 #include "mongo/db/exec/projection.h"
@@ -63,6 +64,7 @@
 #include "mongo/db/server_options.h"
 #include "mongo/db/server_parameters.h"
 #include "mongo/s/d_state.h"
+#include "mongo/scripting/engine.h"
 #include "mongo/util/log.h"
 
 namespace mongo {
@@ -476,8 +478,9 @@ namespace mongo {
         auto_ptr<WorkingSet> ws(new WorkingSet());
         PlanStage* root;
         QuerySolution* querySolution;
-        Status status = prepareExecution(txn, collection, ws.get(), canonicalQuery.get(), 0, &root,
-                                         &querySolution);
+        const size_t defaultPlannerOptions = 0;
+        Status status = prepareExecution(txn, collection, ws.get(), canonicalQuery.get(),
+                                         defaultPlannerOptions, &root, &querySolution);
         if (!status.isOK()) {
             return status;
         }
@@ -508,6 +511,9 @@ namespace mongo {
         deleteStageParams.shouldCallLogOp = shouldCallLogOp;
         deleteStageParams.fromMigrate = fromMigrate;
         if (!collection) {
+            // Treat collections that do not exist as empty collections.  Note that the explain
+            // reporting machinery always assumes that the root stage for a delete operation is a
+            // DeleteStage, so in this case we put a DeleteStage on top of an EOFStage.
             LOG(2) << "Collection " << ns << " does not exist."
                    << " Using EOF stage: " << unparsedQuery.toString();
             DeleteStage* deleteStage = new DeleteStage(txn, deleteStageParams, ws.get(), NULL,
@@ -558,8 +564,9 @@ namespace mongo {
 
         PlanStage* root;
         QuerySolution* querySolution;
-        Status status = prepareExecution(txn, collection, ws.get(), canonicalQuery.get(), 0, &root,
-                                         &querySolution);
+        const size_t defaultPlannerOptions = 0;
+        Status status = prepareExecution(txn, collection, ws.get(), canonicalQuery.get(),
+                                         defaultPlannerOptions, &root, &querySolution);
         if (!status.isOK()) {
             return status;
         }
@@ -588,6 +595,9 @@ namespace mongo {
 
         UpdateStageParams updateStageParams(request, driver, opDebug);
         if (!collection) {
+            // Treat collections that do not exist as empty collections.  Note that the explain
+            // reporting machinery always assumes that the root stage for an update operation is an
+            // UpdateStage, so in this case we put an UpdateStage on top of an EOFStage.
             LOG(2) << "Collection " << ns << " does not exist."
                    << " Using EOF stage: " << unparsedQuery.toString();
             UpdateStage* updateStage = new UpdateStage(updateStageParams, ws.get(), db,
@@ -616,6 +626,59 @@ namespace mongo {
 
         // Takes ownership of 'cq'.
         return getExecutorUpdate(txn, db, cq, request, driver, opDebug, execOut);
+    }
+
+    //
+    // Group
+    //
+
+    Status getExecutorGroup(OperationContext* txn,
+                            Database* db,
+                            const GroupRequest& request,
+                            PlanExecutor** execOut) {
+        if (!globalScriptEngine) {
+            return Status(ErrorCodes::BadValue, "server-side JavaScript execution is disabled");
+        }
+
+        auto_ptr<WorkingSet> ws(new WorkingSet());
+        PlanStage* root;
+        QuerySolution* querySolution;
+
+        Collection* collection = db->getCollection(txn, request.ns);
+
+        if (!collection) {
+            // Treat collections that do not exist as empty collections.  Note that the explain
+            // reporting machinery always assumes that the root stage for a group operation is a
+            // GroupStage, so in this case we put a GroupStage on top of an EOFStage.
+            root = new GroupStage(txn, db, request, ws.get(), new EOFStage());
+            *execOut = new PlanExecutor(ws.release(), root, request.ns);
+            return Status::OK();
+        }
+
+        const WhereCallbackReal whereCallback(txn, StringData(db->name()));
+        CanonicalQuery* rawCanonicalQuery;
+        Status canonicalizeStatus = CanonicalQuery::canonicalize(request.ns, request.query,
+                                                                 &rawCanonicalQuery,
+                                                                 whereCallback);
+        if (!canonicalizeStatus.isOK()) {
+            return canonicalizeStatus;
+        }
+        auto_ptr<CanonicalQuery> canonicalQuery(rawCanonicalQuery);
+
+        const size_t defaultPlannerOptions = 0;
+        Status status = prepareExecution(txn, collection, ws.get(), canonicalQuery.get(),
+                                         defaultPlannerOptions, &root, &querySolution);
+        if (!status.isOK()) {
+            return status;
+        }
+        invariant(root);
+
+        root = new GroupStage(txn, db, request, ws.get(), root);
+        // We must have a tree of stages in order to have a valid plan executor, but the query
+        // solution may be null. Takes ownership of all args other than 'collection'.
+        *execOut = new PlanExecutor(ws.release(), root, querySolution, canonicalQuery.release(),
+                                    collection);
+        return Status::OK();
     }
 
     //

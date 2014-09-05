@@ -39,6 +39,8 @@ namespace mongo {
     class Collection;
     class Database;
 
+    struct GroupRequest;
+
     /**
      * Filter indexes retrieved from index catalog by
      * allowed indices in query settings.
@@ -207,5 +209,25 @@ namespace mongo {
                              UpdateDriver* driver,
                              OpDebug* opDebug,
                              PlanExecutor** execOut);
+
+    //
+    // Group
+    //
+
+    /**
+     * Get a PlanExecutor for a group operation.  'rawCanonicalQuery' describes the predicate for
+     * the documents to be grouped.
+     *
+     * Takes ownership of 'rawCanonicalQuery'. Does not take ownership of other args.
+     *
+     * If the query is valid and an executor could be created, returns Status::OK() and populates
+     * *out with the PlanExecutor.
+     *
+     * If an executor could not be created, returns a Status indicating why.
+     */
+    Status getExecutorGroup(OperationContext* txn,
+                            Database* db,
+                            const GroupRequest& request,
+                            PlanExecutor** execOut);
 
 }  // namespace mongo
