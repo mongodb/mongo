@@ -552,5 +552,60 @@ namespace newlm {
         lockMgr.unlock(&request[1]);
     }
 
+
+
+    static void checkConflict(LockMode existingMode, LockMode newMode, bool hasConflict) {
+        LockManager lockMgr;
+        lockMgr.setNoCheckForLeakedLocksTestOnly(true);
+
+        const ResourceId resId(RESOURCE_COLLECTION, std::string("TestDB.collection"));
+
+        {
+            LockState locker;
+            TrackingLockGrantNotification notify;
+            LockRequest request;
+            request.initNew(resId, &locker, &notify);
+
+            ASSERT(LOCK_OK == lockMgr.lock(resId, &request, existingMode));
+        }
+
+        {
+            LockState locker;
+            TrackingLockGrantNotification notify;
+            LockRequest request;
+            request.initNew(resId, &locker, &notify);
+
+            LockResult result = lockMgr.lock(resId, &request, newMode);
+            if (hasConflict) {
+                ASSERT_EQUALS(LOCK_WAITING, result);
+            }
+            else {
+                ASSERT_EQUALS(LOCK_OK, result);
+            }
+        }
+    }
+
+    TEST(LockManager, ValidateConflictMatrix) {
+        checkConflict(MODE_IS, MODE_IS, false);
+        checkConflict(MODE_IS, MODE_IX, false);
+        checkConflict(MODE_IS, MODE_S, false);
+        checkConflict(MODE_IS, MODE_X, true);
+
+        checkConflict(MODE_IX, MODE_IS, false);
+        checkConflict(MODE_IX, MODE_IX, false);
+        checkConflict(MODE_IX, MODE_S, true);
+        checkConflict(MODE_IX, MODE_X, true);
+
+        checkConflict(MODE_S, MODE_IS, false);
+        checkConflict(MODE_S, MODE_IX, true);
+        checkConflict(MODE_S, MODE_S, false);
+        checkConflict(MODE_S, MODE_X, true);
+
+        checkConflict(MODE_X, MODE_IS, true);
+        checkConflict(MODE_X, MODE_IX, true);
+        checkConflict(MODE_X, MODE_S, true);
+        checkConflict(MODE_X, MODE_X, true);
+    }
+
 } // namespace newlm
 } // namespace mongo

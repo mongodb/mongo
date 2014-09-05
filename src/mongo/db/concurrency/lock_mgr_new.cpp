@@ -51,13 +51,13 @@ namespace newlm {
         0,
 
         // MODE_IS
-        1 << MODE_X,
+        (1 << MODE_X),
 
         // MODE_IX
-        1 << MODE_X,
+        (1 << MODE_S) | (1 << MODE_X),
 
         // MODE_S
-        1 << MODE_X,
+        (1 << MODE_IX) | (1 << MODE_X),
 
         // MODE_X
         (1 << MODE_S) | (1 << MODE_X) | (1 << MODE_IS) | (1 << MODE_IX),
@@ -88,7 +88,7 @@ namespace newlm {
     // LockManager
     //
 
-    LockManager::LockManager() {
+    LockManager::LockManager() : _noCheckForLeakedLocksTestOnly(false) {
         // TODO: Generate this based on the # of CPUs. For now, use 1 bucket to make debugging
         // easier.
         _numLockBuckets = 1;
@@ -100,7 +100,9 @@ namespace newlm {
             LockBucket* bucket = &_lockBuckets[i];
 
             // TODO: dump more information about the non-empty bucket to see what locks were leaked
-            invariant(bucket->data.empty());
+            if (!_noCheckForLeakedLocksTestOnly) {
+                invariant(bucket->data.empty());
+            }
         }
     }
 
@@ -272,6 +274,10 @@ namespace newlm {
             // TODO: As an optimization, we could keep a cache of pre-allocated LockHead objects
             delete lock;
         }
+    }
+
+    void LockManager::setNoCheckForLeakedLocksTestOnly(bool newValue) {
+        _noCheckForLeakedLocksTestOnly = newValue;
     }
 
     void LockManager::_recalcAndGrant(LockHead* lock,
