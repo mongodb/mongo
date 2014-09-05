@@ -85,6 +85,22 @@ functions:
             go test -v -test.types=${types} 
         fi
 
+  "run unit tests":
+    command: gotest.run
+    params:
+      working_dir: src
+      tests:
+        - dir: src/github.com/shelman/mongo-tools-proto/common/${package}
+          args: ${coverage_args}
+
+  "move coverage data":
+    command: shell.exec
+    params:
+      working_dir: src
+      script: |
+        set -o verbose
+        mv src/github.com/shelman/mongo-tools-proto/common/${package}/coverage.out $GOPATH
+
 pre:
   - command: expansions.fetch
     params:
@@ -99,6 +115,27 @@ post:
 
 tasks:
 
+- name: bsonutil
+  commands:
+    - command: git.get_project
+      params:
+        directory: src
+    - func: "setup go env"
+    - command: expansions.update
+      params:
+        updates:
+          - key: "package"
+            value: "bsonutil"
+    - func: "run unit tests"
+    - func: "move coverage data"
+    - func: "generate coverage html + text"
+    - func: "upload coverage report"
+    - func: "upload coverage report"
+      vars:
+        format: "html"
+        content_type: "text/html"
+    - func: "attach coverage reports"
+
 - name: db
   commands:
     - command: git.get_project
@@ -107,14 +144,52 @@ tasks:
     - func: "setup go env"
     - func: "download mongod"
     - func: "start mongod"
+    - func: "run tests"
+      vars:
+        package: "common/db"
+        types: "db"
+    - func: "generate coverage html + text"
+    - func: "upload coverage report"
+    - func: "upload coverage report"
+      vars:
+        format: "html"
+        content_type: "text/html"
+    - func: "attach coverage reports"
+
+- name: json
+  commands:
+    - command: git.get_project
+      params:
+        directory: src
+    - func: "setup go env"
     - command: expansions.update
       params:
         updates:
           - key: "package"
-            value: "common/db"
-          - key: "types"
-            value: "db"
-    - func: "run tests"
+            value: "json"
+    - func: "run unit tests"
+    - func: "move coverage data"
+    - func: "generate coverage html + text"
+    - func: "upload coverage report"
+    - func: "upload coverage report"
+      vars:
+        format: "html"
+        content_type: "text/html"
+    - func: "attach coverage reports"
+
+- name: log
+  commands:
+    - command: git.get_project
+      params:
+        directory: src
+    - func: "setup go env"
+    - command: expansions.update
+      params:
+        updates:
+          - key: "package"
+            value: "log"
+    - func: "run unit tests"
+    - func: "move coverage data"
     - func: "generate coverage html + text"
     - func: "upload coverage report"
     - func: "upload coverage report"
@@ -157,14 +232,10 @@ tasks:
       params:
         directory: src
     - func: "setup go env"
-    - command: expansions.update
-      params:
-        updates:
-          - key: "package"
-            value: "common/util"
-          - key: "types"
-            value: "unit"
     - func: "run tests"
+      vars:
+        package: "common/util"
+        types: "unit"
     - func: "generate coverage html + text"
     - func: "upload coverage report"
     - func: "upload coverage report"
@@ -209,15 +280,11 @@ tasks:
         directory: src
     - func: "setup go env"
     - func: "download mongod"
-    - command: expansions.update
-      params:
-        updates:
-          - key: "package"
-            value: "common/db"
-          - key: "types"
-            value: "auth"
     - func: "start mongod"
     - func: "run tests"
+      vars:
+        package: "common/db"
+        types: "auth"
     - func: "generate coverage html + text"
     - func: "upload coverage report"
     - func: "upload coverage report"
@@ -235,9 +302,12 @@ buildvariants:
   expansions:
     mongo_url: http://fastdl.mongodb.org/linux/mongodb-linux-x86_64-2.6.4.tgz
     coverage: 'true'
+    coverage_args: "-coverprofile=coverage.out"
   tasks:
-  - name: lint
+  - name: bsonutil
   - name: db
+  - name: json
+  - name: log
   - name: util
 
 - name: ubuntu-ssl
@@ -266,8 +336,12 @@ buildvariants:
   - osx-108
   expansions:
     mongo_url: https://fastdl.mongodb.org/osx/mongodb-osx-x86_64-2.6.4.tgz
+    coverage_args: "-coverprofile=coverage.out"
   tasks:
+  - name: bsonutil
   - name: db
+  - name: json
+  - name: log
   - name: util
 
 - name: solaris
