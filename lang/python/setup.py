@@ -35,9 +35,7 @@ if not 'ARCHFLAGS' in os.environ:
     os.environ['ARCHFLAGS'] = ''
 
 # Suppress warnings building SWIG generated code
-extra_cflags = [
-				'-w',
-]
+extra_cflags = [ '-w' ]
 
 dir = os.path.dirname(__file__)
 
@@ -50,12 +48,10 @@ wt_ver = '%d.%d' % (WIREDTIGER_VERSION_MAJOR, WIREDTIGER_VERSION_MINOR)
 
 setup(name='wiredtiger', version=wt_ver,
     ext_modules=[Extension('_wiredtiger',
-		[os.path.join(dir, 'wiredtiger_wrap.c')],
-        include_dirs=['../..'],
-        library_dirs=['../../.libs'],
+                [os.path.join(dir, 'wiredtiger_wrap.c')],
         libraries=['wiredtiger'],
         extra_compile_args=extra_cflags,
     )],
-	package_dir={'' : dir},
+    package_dir={'' : dir},
     packages=['wiredtiger'],
 )
