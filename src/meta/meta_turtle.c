@@ -29,7 +29,7 @@ __metadata_config(WT_SESSION_IMPL *session, const char **metaconfp)
 	    "key_format=S,value_format=S,id=0,version=(major=%d,minor=%d)",
 	    WT_BTREE_MAJOR_VERSION_MAX, WT_BTREE_MINOR_VERSION_MAX));
 	cfg[1] = buf->data;
-	WT_ERR(__wt_config_collapse(session, cfg, &metaconf));
+	WT_ERR(__wt_config_collapse(session, cfg, &metaconf, 1));
 
 	*metaconfp = metaconf;
 

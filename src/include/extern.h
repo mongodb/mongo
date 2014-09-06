@@ -572,9 +572,10 @@ extern int __wt_config_check(WT_SESSION_IMPL *session,
     const WT_CONFIG_ENTRY *entry,
     const char *config,
     size_t config_len);
-extern int __wt_config_collapse( WT_SESSION_IMPL *session,
+extern int __wt_config_collapse(WT_SESSION_IMPL *session,
     const char **cfg,
-    const char **config_ret);
+    const char **config_ret,
+    int nested_replace);
 extern int __wt_config_concat( WT_SESSION_IMPL *session,
     const char **cfg,
     const char **config_ret);

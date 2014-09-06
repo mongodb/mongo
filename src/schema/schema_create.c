@@ -102,7 +102,7 @@ __create_file(WT_SESSION_IMPL *session,
 		for (p = filecfg; *p != NULL; ++p)
 			;
 		*p = val->data;
-		WT_ERR(__wt_config_collapse(session, filecfg, &fileconf));
+		WT_ERR(__wt_config_collapse(session, filecfg, &fileconf, 1));
 		WT_ERR(__wt_metadata_insert(session, uri, fileconf));
 	}
 
@@ -248,7 +248,7 @@ __create_colgroup(WT_SESSION_IMPL *session,
 
 	WT_ERR(__wt_schema_create(session, source, sourceconf));
 
-	WT_ERR(__wt_config_collapse(session, cfg, &cgconf));
+	WT_ERR(__wt_config_collapse(session, cfg, &cgconf, 1));
 	if ((ret = __wt_metadata_insert(session, name, cgconf)) != 0) {
 		/*
 		 * If the entry already exists in the metadata, we're done.
@@ -416,7 +416,7 @@ __create_index(WT_SESSION_IMPL *session,
 
 	cfg[1] = sourceconf;
 	cfg[2] = confbuf.data;
-	WT_ERR(__wt_config_collapse(session, cfg, &idxconf));
+	WT_ERR(__wt_config_collapse(session, cfg, &idxconf, 1));
 	if ((ret = __wt_metadata_insert(session, name, idxconf)) != 0) {
 		/*
 		 * If the entry already exists in the metadata, we're done.
@@ -480,7 +480,7 @@ __create_table(WT_SESSION_IMPL *session,
 		;
 	WT_RET_NOTFOUND_OK(ret);
 
-	WT_RET(__wt_config_collapse(session, cfg, &tableconf));
+	WT_RET(__wt_config_collapse(session, cfg, &tableconf, 1));
 	if ((ret = __wt_metadata_insert(session, name, tableconf)) != 0) {
 		/*
 		 * If the entry already exists in the metadata, we're done.

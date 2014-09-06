@@ -300,7 +300,7 @@ __wt_session_create_strip(WT_SESSION *wt_session,
 	const char *cfg[] =
 	    { WT_CONFIG_BASE(session, session_create), v1, v2, NULL };
 
-	return (__wt_config_collapse(session, cfg, value_ret));
+	return (__wt_config_collapse(session, cfg, value_ret, 1));
 }
 
 /*
