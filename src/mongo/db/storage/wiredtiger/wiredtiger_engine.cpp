@@ -36,6 +36,7 @@
 
 #include "mongo/db/storage/wiredtiger/wiredtiger_database_catalog_entry.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_recovery_unit.h"
+#include "mongo/db/storage/wiredtiger/wiredtiger_global_options.h"
 
 #include "mongo/db/storage_options.h"
 #include "mongo/util/log.h"
@@ -47,7 +48,7 @@ namespace mongo {
         const char * default_config = ",create,extensions=[local=(entry=index_collator_extension)]";
 
         std::string config = std::string(
-                storageGlobalParams.wiredTigerDatabaseConfig + default_config);
+                wiredTigerGlobalOptions.databaseConfig + default_config);
         int ret = wiredtiger_open(path.c_str(), NULL, config.c_str(), &conn);
         if (ret != 0) {
             log() << "Starting engine with custom options ( " << config <<

@@ -32,6 +32,7 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/storage_options.h"
 #include "mongo/util/log.h"
+#include "mongo/db/storage/wiredtiger/wiredtiger_global_options.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_record_store.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_recovery_unit.h"
 
@@ -48,7 +49,7 @@ namespace mongo {
         const char *default_config_pfx = "type=file,";
         const char *default_config_sfx = ",key_format=q,value_format=u,app_metadata=";
         std::string config = std::string(default_config_pfx +
-                storageGlobalParams.wiredTigerCollectionConfig + default_config_sfx +
+                wiredTigerGlobalOptions.collectionConfig + default_config_sfx +
                 options.toBSON().jsonString());
         int ret = s->create(s, _getURI(ns).c_str(), config.c_str());
         if (ret  != 0) {

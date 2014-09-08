@@ -37,6 +37,7 @@
 #include "mongo/util/log.h"
 
 #include "mongo/db/storage/wiredtiger/wiredtiger_engine.h"
+#include "mongo/db/storage/wiredtiger/wiredtiger_global_options.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_index.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_record_store.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_recovery_unit.h"
@@ -153,7 +154,7 @@ namespace mongo {
         const char *default_config_sfx =
             ",key_format=uq,value_format=u,collator=mongo_index,app_metadata=";
         std::string config = std::string(default_config_pfx +
-                storageGlobalParams.wiredTigerIndexConfig + default_config_sfx +
+                wiredTigerGlobalOptions.indexConfig + default_config_sfx +
                 info.descriptor()->infoObj().jsonString());
         int ret = s->create(s, _getURI(ns, idxName).c_str(), config.c_str());
         if (ret != 0) {
