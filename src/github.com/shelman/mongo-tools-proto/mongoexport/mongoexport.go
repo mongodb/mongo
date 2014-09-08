@@ -76,23 +76,37 @@ func (exp *MongoExport) getOutputWriter() (io.WriteCloser, error) {
 	return os.Stdout, nil
 }
 
-//Export executes the entire export operation. It returns an integer of the count
-//of documents successfully exported, and a non-nil error if something went wrong
-//during the export operation.
-func (exp *MongoExport) Export() (int64, error) {
-	session := exp.SessionProvider.GetSession()
-	out, err := exp.getOutputWriter()
-	if err != nil {
-		return 0, err
+type DocSource interface {
+	Next(interface{}) bool
+	Close() error
+	Err() error
+}
+
+func getDocSource(exp MongoExport) (DocSource, error) {
+	if exp.ToolOptions.Namespace.DBPath != "" {
+		bsonTool := db.StorageShim{
+			DBPath:     exp.ToolOptions.Namespace.DBPath,
+			Database:   exp.ToolOptions.Namespace.DB,
+			Collection: exp.ToolOptions.Namespace.Collection,
+			Query:      exp.InputOpts.Query,
+			Skip:       exp.InputOpts.Skip,
+			Limit:      exp.InputOpts.Limit,
+			ShimPath:   "/Users/michaelobrien/other_projects/shim/build/darwin/normal/mongo/mongoshim",
+		}
+
+		iter, err := bsonTool.Open()
+		if err != nil {
+			return nil, err
+		}
+		return db.NewDecodedBSONStream(iter), nil
 	}
 
-	defer out.Close()
-
-	exportOutput, err := exp.getExportOutput(out)
+	//TODO make sure session gets closed!
+	sessionProvider, err := db.InitSessionProvider(exp.ToolOptions)
 	if err != nil {
-		return 0, err
+		return nil, err
 	}
-
+	session := sessionProvider.GetSession()
 	collection := session.DB(exp.ToolOptions.Namespace.DB).C(exp.ToolOptions.Namespace.Collection)
 
 	query := map[string]interface{}{}
@@ -100,7 +114,7 @@ func (exp *MongoExport) Export() (int64, error) {
 		var err error
 		query, err = getObjectFromArg(exp.InputOpts.Query)
 		if err != nil {
-			return 0, err
+			return nil, err
 		}
 	}
 
@@ -118,7 +132,31 @@ func (exp *MongoExport) Export() (int64, error) {
 	}
 
 	cursor := q.Iter()
-	defer cursor.Close()
+	return cursor, nil
+}
+
+//Export executes the entire export operation. It returns an integer of the count
+//of documents successfully exported, and a non-nil error if something went wrong
+//during the export operation.
+func (exp *MongoExport) Export() (int64, error) {
+	out, err := exp.getOutputWriter()
+	if err != nil {
+		return 0, err
+	}
+
+	defer out.Close()
+
+	exportOutput, err := exp.getExportOutput(out)
+	if err != nil {
+		return 0, err
+	}
+
+	docSource, err := getDocSource(*exp)
+	if err != nil {
+		return 0, err
+	}
+
+	defer docSource.Close()
 
 	//Write headers
 	err = exportOutput.WriteHeader()
@@ -130,9 +168,10 @@ func (exp *MongoExport) Export() (int64, error) {
 
 	docsCount := int64(0)
 	//Write document content
-	for cursor.Next(&result) {
+	for docSource.Next(&result) {
 		err := exportOutput.ExportDocument(result)
 		if err != nil {
+			fmt.Println(err)
 			return docsCount, err
 		}
 		docsCount++
