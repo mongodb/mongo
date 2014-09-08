@@ -8,18 +8,81 @@
 #include "wt_internal.h"
 
 /*
- * We need a character that can't appear in a key as a separator.
+ * __wt_config_collapse --
+ *	Collapse a set of configuration strings into newly allocated memory.
  *
- * XXX
- * I'm not using '.' although that seems like the natural one to use because
- * default checkpoints are named "WiredTiger.#" where dot is part of the key.
- * I think it's wrong, we should not have used a dot in that name, but that's
- * a format change.
+ * This function takes a NULL-terminated list of configuration strings (where
+ * the first one contains all the defaults and the values are in order from
+ * least to most preferred, that is, the default values are least preferred),
+ * and collapses them into newly allocated memory.  The algorithm is to walk
+ * the first of the configuration strings, and for each entry, search all of
+ * the configuration strings for a final value, keeping the last value found.
+ *
+ * Notes:
+ *	Any key not appearing in the first configuration string is discarded
+ *	from the final result, because we'll never search for it.
+ *
+ *	Nested structures aren't parsed.  For example, imagine a configuration
+ *	string contains "key=(k2=v2,k3=v3)", and a subsequent string has
+ *	"key=(k4=v4)", the result will be "key=(k4=v4)", as we search for and
+ *	use the final value of "key", regardless of field overlap or missing
+ *	fields in the nested value.
+ */
+int
+__wt_config_collapse(
+    WT_SESSION_IMPL *session, const char **cfg, const char **config_ret)
+{
+	WT_CONFIG cparser;
+	WT_CONFIG_ITEM k, v;
+	WT_DECL_ITEM(tmp);
+	WT_DECL_RET;
+
+	WT_RET(__wt_scr_alloc(session, 0, &tmp));
+
+	WT_ERR(__wt_config_init(session, &cparser, cfg[0]));
+	while ((ret = __wt_config_next(&cparser, &k, &v)) == 0) {
+		if (k.type != WT_CONFIG_ITEM_STRING &&
+		    k.type != WT_CONFIG_ITEM_ID)
+			WT_ERR_MSG(session, EINVAL,
+			    "Invalid configuration key found: '%s'\n", k.str);
+		WT_ERR(__wt_config_get(session, cfg, &k, &v));
+		/* Include the quotes around string keys/values. */
+		if (k.type == WT_CONFIG_ITEM_STRING) {
+			--k.str;
+			k.len += 2;
+		}
+		if (v.type == WT_CONFIG_ITEM_STRING) {
+			--v.str;
+			v.len += 2;
+		}
+		WT_ERR(__wt_buf_catfmt(session, tmp, "%.*s=%.*s,",
+		    (int)k.len, k.str, (int)v.len, v.str));
+	}
+	if (ret != WT_NOTFOUND)
+		goto err;
+
+	/*
+	 * If the caller passes us no valid configuration strings, we get here
+	 * with no bytes to copy -- that's OK, the underlying string copy can
+	 * handle empty strings.
+	 *
+	 * Strip any trailing comma.
+	 */
+	if (tmp->size != 0)
+		--tmp->size;
+	ret = __wt_strndup(session, tmp->data, tmp->size, config_ret);
+
+err:	__wt_scr_free(&tmp);
+	return (ret);
+}
+
+/*
+ * We need a character that can't appear in a key as a separator.
  */
 #undef	SEP					/* separator key, character */
-#define	SEP	","
+#define	SEP	"."
 #undef	SEPC
-#define	SEPC	','
+#define	SEPC	'.'
 
 /*
  * Individual configuration entries, including a generation number used to make
@@ -28,7 +91,7 @@
 typedef struct {
 	char  *k, *v;				/* key, value */
 	size_t gen;				/* generation */
-} WT_COLLAPSE_ENTRY;
+} WT_CONFIG_MERGE_ENTRY;
 
 /*
  * The array of configuration entries.
@@ -37,18 +100,16 @@ typedef struct {
 	size_t entries_allocated;		/* allocated */
 	size_t entries_next;			/* next slot */
 
-	int nested_replace;			/* replace nested values */
-
-	WT_COLLAPSE_ENTRY *entries;		/* array of entries */
-} WT_COLLAPSE;
+	WT_CONFIG_MERGE_ENTRY *entries;		/* array of entries */
+} WT_CONFIG_MERGE;
 
 /*
- * __collapse_scan --
- *	Walk a configuration string, inserting entries into the collapse array.
+ * __config_merge_scan --
+ *	Walk a configuration string, inserting entries into the merged array.
  */
 static int
-__collapse_scan(WT_SESSION_IMPL *session,
-    const char *key, const char *value, WT_COLLAPSE *cp)
+__config_merge_scan(WT_SESSION_IMPL *session,
+    const char *key, const char *value, WT_CONFIG_MERGE *cp)
 {
 	WT_CONFIG cparser;
 	WT_CONFIG_ITEM k, v;
@@ -86,27 +147,39 @@ __collapse_scan(WT_SESSION_IMPL *session,
 		    vb, "%.*s", (int)v.len, v.str));
 
 		/*
+		 * !!!
+		 * WiredTiger names its internal checkpoints with a trailing
+		 * dot and a number, for example, "WiredTigerCheckpoint.37".
+		 * We're using dot to separate names in nested structures,
+		 * and there's an obvious conflict. This works for now because
+		 * that's the only case of a dot in a key name, and we never
+		 * merge configuration strings that contain checkpoint names,
+		 * for historic reasons. For now, return an error if there's
+		 * ever a problem. (Note, it's probably safe if the dot is in
+		 * a quoted key, that is, a key of type WT_CONFIG_ITEM_STRING,
+		 * but since this isn't ever supposed to happen, I'm leaving
+		 * the test simple.)
+		 */
+		if (strchr(kb->data, SEPC) != NULL)
+			WT_RET_MSG(session, EINVAL,
+			    "key %s contains a separator character (%s)",
+			    kb->data, SEP);
+
+		/*
 		 * If the value is a structure, recursively parse it.
 		 *
-		 * XXX
-		 * Problem #1: we store "checkpoint_lsn=(1,0)" in the metadata
-		 * file, where the key is type WT_CONFIG_ITEM_ID, the value is
-		 * type WT_CONFIG_ITEM_STRUCT. Other nested structures have
-		 * field names, should this have been "(file=1,offset=0)"?
-		 *
-		 * Problem #2: the configuration collapse functions are used by
-		 * checkpoint to replace the previous entry in its entirety,
-		 * that is, the work we're doing to integrate nested changes
-		 * into previous values breaks it.
-		 *
-		 * We're currently turning off merging nested structures in most
-		 * places (including the checkpoint code).
+		 * !!!
+		 * Don't merge unless the structure has field names. WiredTiger
+		 * stores checkpoint LSNs in the metadata file using nested
+		 * structures without field names: "checkpoint_lsn=(1,0)", not
+		 * "checkpoint_lsn=(file=1,offset=0)". The value type is still
+		 * WT_CONFIG_ITEM_STRUCT, so we check for a field name in the
+		 * value.
 		 */
-		if (!cp->nested_replace &&
-		    v.type == WT_CONFIG_ITEM_STRUCT &&
+		if (v.type == WT_CONFIG_ITEM_STRUCT &&
 		    strchr(vb->data, '=') != NULL) {
-			WT_ERR(
-			    __collapse_scan(session, kb->data, vb->data, cp));
+			WT_ERR(__config_merge_scan(
+			    session, kb->data, vb->data, cp));
 			continue;
 		}
 
@@ -139,14 +212,14 @@ __strip_comma(WT_ITEM *buf)
 }
 
 /*
- * __collapse_format_next --
+ * __config_merge_format_next --
  *	Walk the array, building entries.
  */
 static int
-__collapse_format_next(WT_SESSION_IMPL *session, const char *prefix,
-    size_t plen, size_t *enp, WT_COLLAPSE *cp, WT_ITEM *build)
+__config_merge_format_next(WT_SESSION_IMPL *session, const char *prefix,
+    size_t plen, size_t *enp, WT_CONFIG_MERGE *cp, WT_ITEM *build)
 {
-	WT_COLLAPSE_ENTRY *ep;
+	WT_CONFIG_MERGE_ENTRY *ep;
 	size_t len1, len2, next;
 	char *p;
 
@@ -194,7 +267,7 @@ __collapse_format_next(WT_SESSION_IMPL *session, const char *prefix,
 			next = WT_PTRDIFF(p, ep->k);
 			WT_RET(__wt_buf_catfmt(session,
 			    build, "%.*s=(", (int)(next - plen), ep->k + plen));
-			WT_RET(__collapse_format_next(
+			WT_RET(__config_merge_format_next(
 			    session, ep->k, next + 1, enp, cp, build));
 			__strip_comma(build);
 			WT_RET(__wt_buf_catfmt(session, build, "),"));
@@ -210,12 +283,12 @@ __collapse_format_next(WT_SESSION_IMPL *session, const char *prefix,
 }
 
 /*
- * __collapse_format --
+ * __config_merge_format --
  *	Take the sorted array of entries, and format them into allocated memory.
  */
 static int
-__collapse_format(
-    WT_SESSION_IMPL *session, WT_COLLAPSE *cp, const char **config_ret)
+__config_merge_format(
+    WT_SESSION_IMPL *session, WT_CONFIG_MERGE *cp, const char **config_ret)
 {
 	WT_DECL_ITEM(build);
 	WT_DECL_RET;
@@ -224,7 +297,7 @@ __collapse_format(
 	WT_RET(__wt_scr_alloc(session, 4 * 1024, &build));
 
 	entries = 0;
-	WT_ERR(__collapse_format_next(session, "", 0, &entries, cp, build));
+	WT_ERR(__config_merge_format_next(session, "", 0, &entries, cp, build));
 
 	__strip_comma(build);
 
@@ -235,17 +308,17 @@ err:	__wt_scr_free(&build);
 }
 
 /*
- * __collapse_cmp --
- *	Qsort function: sort the collapse array.
+ * __config_merge_cmp --
+ *	Qsort function: sort the config merge array.
  */
 static int
-__collapse_cmp(const void *a, const void *b)
+__config_merge_cmp(const void *a, const void *b)
 {
-	WT_COLLAPSE_ENTRY *ae, *be;
+	WT_CONFIG_MERGE_ENTRY *ae, *be;
 	int cmp;
 
-	ae = (WT_COLLAPSE_ENTRY *)a;
-	be = (WT_COLLAPSE_ENTRY *)b;
+	ae = (WT_CONFIG_MERGE_ENTRY *)a;
+	be = (WT_CONFIG_MERGE_ENTRY *)b;
 
 	if ((cmp = strcmp(ae->k, be->k)) != 0)
 		return (cmp);
@@ -253,44 +326,53 @@ __collapse_cmp(const void *a, const void *b)
 }
 
 /*
- * __wt_config_collapse --
- *	Given a NULL-terminated list of configuration strings, in reverse order
- * of preference (the first set of strings are the least preferred), collapse
- * them into allocated memory.
+ * __wt_config_merge --
+ *	Merge a set of configuration strings into newly allocated memory.
+ *
+ * This function takes a NULL-terminated list of configuration strings (where
+ * the values are in order from least to most preferred), and merges them into
+ * newly allocated memory.  The algorithm is to walk the configuration strings
+ * and build a table of each key/value pair. The pairs are sorted based on the
+ * name and the configuration string in which they were found, and a final
+ * configuration string is built from the result.
+ *
+ * Note:
+ *	Nested structures are parsed and merge. For example, if configuration
+ *	strings "key=(k1=v1,k2=v2)" and "key=(k1=v2)" appear, the result will
+ *	be "key=(k1=v2,k2=v2)" because the nested values are merged.
  */
 int
-__wt_config_collapse(WT_SESSION_IMPL *session,
-    const char **cfg, const char **config_ret, int nested_replace)
+__wt_config_merge(
+    WT_SESSION_IMPL *session, const char **cfg, const char **config_ret)
 {
-	WT_COLLAPSE collapse;
+	WT_CONFIG_MERGE merge;
 	WT_DECL_RET;
 	size_t i;
 
 	/* Start out with a reasonable number of entries. */
-	WT_CLEAR(collapse);
-	collapse.nested_replace = nested_replace;
+	WT_CLEAR(merge);
 
 	WT_RET(__wt_realloc_def(
-	    session, &collapse.entries_allocated, 100, &collapse.entries));
+	    session, &merge.entries_allocated, 100, &merge.entries));
 
 	/* Scan the configuration strings, entering them into the array. */
 	for (; *cfg != NULL; ++cfg)
-		WT_ERR(__collapse_scan(session, NULL, *cfg, &collapse));
+		WT_ERR(__config_merge_scan(session, NULL, *cfg, &merge));
 
 	/*
 	 * Sort the array by key and, in the case of identical keys, by
 	 * generation.
 	 */
-	qsort(collapse.entries,
-	    collapse.entries_next, sizeof(WT_COLLAPSE_ENTRY), __collapse_cmp);
+	qsort(merge.entries, merge.entries_next,
+	    sizeof(WT_CONFIG_MERGE_ENTRY), __config_merge_cmp);
 
 	/* Convert the array of entries into a string. */
-	ret = __collapse_format(session, &collapse, config_ret);
+	ret = __config_merge_format(session, &merge, config_ret);
 
-err:	for (i = 0; i < collapse.entries_next; ++i) {
-		__wt_free(session, collapse.entries[i].k);
-		__wt_free(session, collapse.entries[i].v);
+err:	for (i = 0; i < merge.entries_next; ++i) {
+		__wt_free(session, merge.entries[i].k);
+		__wt_free(session, merge.entries[i].v);
 	}
-	__wt_free(session, collapse.entries);
+	__wt_free(session, merge.entries);
 	return (ret);
 }

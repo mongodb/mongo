@@ -117,7 +117,7 @@ __ckpt_set(WT_SESSION_IMPL *session, const char *fname, const char *v)
 	cfg[0] = config;
 	cfg[1] = v == NULL ? "checkpoint=()" : v;
 	cfg[2] = NULL;
-	WT_ERR(__wt_config_collapse(session, cfg, &newcfg, 1));
+	WT_ERR(__wt_config_collapse(session, cfg, &newcfg));
 	WT_ERR(__wt_metadata_update(session, fname, newcfg));
 
 err:	__wt_free(session, config);

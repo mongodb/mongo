@@ -668,7 +668,7 @@ __conn_reconfigure(WT_CONNECTION *wt_conn, const char *config)
 		WT_ERR(__wt_cond_signal(
 		    session, __wt_process.cache_pool->cache_pool_cond));
 
-	WT_ERR(__wt_config_collapse(session, config_cfg, &p, 0));
+	WT_ERR(__wt_config_merge(session, config_cfg, &p));
 	__wt_free(session, conn->cfg);
 	conn->cfg = p;
 
@@ -1410,7 +1410,7 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
 	WT_ERR(__wt_connection_workers(session, cfg));
 
 	/* Take a copy of the final configuration for later reconfiguration. */
-	WT_ERR(__wt_config_collapse(session, cfg, &conn->cfg, 0));
+	WT_ERR(__wt_config_collapse(session, cfg, &conn->cfg));
 
 	STATIC_ASSERT(offsetof(WT_CONNECTION_IMPL, iface) == 0);
 	*wt_connp = &conn->iface;
