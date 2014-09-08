@@ -523,7 +523,7 @@ __wt_lsm_manager_push_entry(
 	(void)WT_ATOMIC_ADD(lsm_tree->queue_ref, 1);
 	WT_STAT_FAST_CONN_INCR(session, lsm_work_units_created);
 
-	switch (type) {
+	switch (type & WT_LSM_WORK_MASK) {
 	case WT_LSM_WORK_SWITCH:
 		__wt_spin_lock(session, &manager->switch_lock);
 		TAILQ_INSERT_TAIL(&manager->switchqh, entry, q);

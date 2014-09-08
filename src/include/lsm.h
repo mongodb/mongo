@@ -88,6 +88,8 @@ struct __wt_lsm_chunk {
 #define	WT_LSM_WORK_FLUSH	0x04	/* Flush a chunk to disk */
 #define	WT_LSM_WORK_MERGE	0x08	/* Look for a tree merge */
 #define	WT_LSM_WORK_SWITCH	0x10	/* Switch to a new in memory chunk */
+#define	WT_LSM_WORK_FORCE	0x10000	/* Force last chunk flush */
+#define	WT_LSM_WORK_MASK	0xffff	/* Mask for work types */
 
 /*
  * WT_LSM_WORK_UNIT --

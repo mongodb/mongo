@@ -1058,7 +1058,7 @@ __wt_lsm_compact(WT_SESSION_IMPL *session, const char *name, int *skip)
 
 	/* Make sure the in-memory chunk gets flushed but not switched. */
 	WT_ERR(__wt_lsm_manager_push_entry(
-	    session, WT_LSM_WORK_FLUSH, lsm_tree));
+	    session, WT_LSM_WORK_FLUSH | WT_LSM_WORK_FORCE, lsm_tree));
 
 	/* Wait for the work unit queues to drain. */
 	while (F_ISSET(lsm_tree, WT_LSM_TREE_ACTIVE)) {
