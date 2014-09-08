@@ -117,7 +117,7 @@ __config_merge_scan(WT_SESSION_IMPL *session,
 	WT_DECL_ITEM(vb);
 	WT_DECL_RET;
 	size_t len;
-	char *str;
+	const char *str;
 
 	WT_ERR(__wt_scr_alloc(session, 0, &kb));
 	WT_ERR(__wt_scr_alloc(session, 0, &vb));
@@ -157,7 +157,7 @@ __config_merge_scan(WT_SESSION_IMPL *session,
 			if (*str == SEPC)
 				WT_RET_MSG(session, EINVAL,
 				    "key %s contains a separator character "
-				    "(%s)", kb->data, SEP);
+				    "(%s)", (char *)kb->data, SEP);
 
 		/* Build the key/value strings. */
 		WT_ERR(__wt_buf_fmt(session,
