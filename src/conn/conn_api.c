@@ -641,8 +641,8 @@ __conn_reconfigure(WT_CONNECTION *wt_conn, const char *config)
 	 * The configuration argument has been checked for validity, replace the
 	 * previous connection configuration.
 	 *
-	 * DO NOT collapse the configuration before the reconfigure calls.  Some
-	 * of the underlying reconfiguration functions do explicit checks for
+	 * DO NOT merge the configuration before the reconfigure calls.  Some
+	 * of the underlying reconfiguration functions do explicit checks with
 	 * the second element of the configuration array, knowing the defaults
 	 * are in slot #1 and the application's modifications are in slot #2.
 	 */

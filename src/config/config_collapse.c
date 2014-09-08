@@ -116,6 +116,8 @@ __config_merge_scan(WT_SESSION_IMPL *session,
 	WT_DECL_ITEM(kb);
 	WT_DECL_ITEM(vb);
 	WT_DECL_RET;
+	size_t len;
+	char *str;
 
 	WT_ERR(__wt_scr_alloc(session, 0, &kb));
 	WT_ERR(__wt_scr_alloc(session, 0, &vb));
@@ -137,15 +139,6 @@ __config_merge_scan(WT_SESSION_IMPL *session,
 			v.len += 2;
 		}
 
-		/* Build the key/value strings. */
-		WT_ERR(__wt_buf_fmt(session,
-		    kb, "%s%s%.*s",
-		    key == NULL ? "" : key,
-		    key == NULL ? "" : SEP,
-		    (int)k.len, k.str));
-		WT_ERR(__wt_buf_fmt(session,
-		    vb, "%.*s", (int)v.len, v.str));
-
 		/*
 		 * !!!
 		 * WiredTiger names its internal checkpoints with a trailing
@@ -160,10 +153,20 @@ __config_merge_scan(WT_SESSION_IMPL *session,
 		 * but since this isn't ever supposed to happen, I'm leaving
 		 * the test simple.)
 		 */
-		if (strchr(kb->data, SEPC) != NULL)
-			WT_RET_MSG(session, EINVAL,
-			    "key %s contains a separator character (%s)",
-			    kb->data, SEP);
+		for (str = k.str, len = k.len; len > 0; ++str, --len)
+			if (*str == SEPC)
+				WT_RET_MSG(session, EINVAL,
+				    "key %s contains a separator character "
+				    "(%s)", kb->data, SEP);
+
+		/* Build the key/value strings. */
+		WT_ERR(__wt_buf_fmt(session,
+		    kb, "%s%s%.*s",
+		    key == NULL ? "" : key,
+		    key == NULL ? "" : SEP,
+		    (int)k.len, k.str));
+		WT_ERR(__wt_buf_fmt(session,
+		    vb, "%.*s", (int)v.len, v.str));
 
 		/*
 		 * If the value is a structure, recursively parse it.
