@@ -71,6 +71,11 @@ namespace mongo {
                 "sslWeakCertificateValidation", moe::Switch, "allow client to connect without "
                 "presenting a certificate");
 
+        // Alias for --sslWeakCertificateValidation.
+        options->addOptionChaining("net.ssl.allowConnectionsWithoutCertificates",
+                "sslAllowConnectionsWithoutCertificates", moe::Switch,
+                "allow client to connect without presenting a certificate");
+
         options->addOptionChaining("net.ssl.allowInvalidHostnames", "sslAllowInvalidHostnames",
                 moe::Switch, "Allow server certificates to provide non-matching hostnames");
 
@@ -223,6 +228,10 @@ namespace mongo {
         if (params.count("net.ssl.weakCertificateValidation")) {
             sslGlobalParams.sslWeakCertificateValidation =
                 params["net.ssl.weakCertificateValidation"].as<bool>();
+        }
+        else if (params.count("net.ssl.allowConnectionsWithoutCertificates")) {
+            sslGlobalParams.sslWeakCertificateValidation =
+                params["net.ssl.allowConnectionsWithoutCertificates"].as<bool>();
         }
         if (params.count("net.ssl.allowInvalidHostnames")) {
             sslGlobalParams.sslAllowInvalidHostnames =
