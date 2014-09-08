@@ -176,13 +176,6 @@ namespace repl {
                 const StatusWith<ReplSetHeartbeatResponse>& hbResponse,
                 OpTime myLastOpApplied);
 
-        // updates internal state with heartbeat response
-        HeartbeatResponseAction::Action updateHeartbeatData(
-                Date_t now,
-                const MemberHeartbeatData& newInfo,
-                int id,
-                const OpTime& lastOpApplied);
-
         // produces a reply to a status request
         virtual void prepareStatusResponse(const ReplicationExecutor::CallbackData& data,
                                            Date_t now,
@@ -210,9 +203,6 @@ namespace repl {
         virtual void adjustMaintenanceModeCallsBy(int value);
 
         virtual int getMaintenanceModeCalls();
-
-        // Record a ping in millis based on the round-trip time of the heartbeat for the member
-        virtual void recordPing(const HostAndPort& host, const Milliseconds elapsedMillis);
 
         // Changes _memberState to newMemberState, then calls all registered callbacks
         // for state changes.
@@ -307,7 +297,7 @@ namespace repl {
         const MemberConfig* _currentPrimaryMember() const;
 
         /**
-         * Performs data updating common to updateHeartbeatData() and processHeartbeatResponse().
+         * Performs updating "_hbdata" and "_currentPrimaryIndex" for processHeartbeatResponse().
          */
         TopologyCoordinatorImpl::HeartbeatResponseAction _updateHeartbeatDataImpl(
                 int updatedConfigIndex,

@@ -792,19 +792,6 @@ namespace {
         return nextAction;
     }
 
-    // update internal state with heartbeat response, and run topology checks
-    TopologyCoordinatorImpl::HeartbeatResponseAction::Action
-    TopologyCoordinatorImpl::updateHeartbeatData(
-            Date_t now,
-            const MemberHeartbeatData& newInfo,
-            int id,
-            const OpTime& lastOpApplied) {
-
-        invariant(_currentConfig.getMemberAt(newInfo.getConfigIndex()).getId() == id);
-        _hbdata[newInfo.getConfigIndex()].updateFrom(newInfo);
-        return _updateHeartbeatDataImpl(newInfo.getConfigIndex(), now, lastOpApplied).getAction();
-    }
-
     TopologyCoordinatorImpl::HeartbeatResponseAction
     TopologyCoordinatorImpl::_updateHeartbeatDataImpl(
             int updatedConfigIndex,
@@ -1367,11 +1354,6 @@ namespace {
             default:
                 return "The MEMBER is electable! -- This should never be used! --";
         }
-    }
-
-    void TopologyCoordinatorImpl::recordPing(const HostAndPort& host,
-                                             const Milliseconds elapsedMillis) {
-        _pings[host].hit(elapsedMillis.total_milliseconds());
     }
 
     int TopologyCoordinatorImpl::_getPing(const HostAndPort& host) {

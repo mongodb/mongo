@@ -261,9 +261,6 @@ namespace repl {
          */
         virtual int getMaintenanceModeCalls() = 0;
 
-        // Record a "ping" based on the round-trip time of the heartbeat for the member
-        virtual void recordPing(const HostAndPort& host, const Milliseconds elapsedMillis) = 0;
-
         // Retrieves a vector of HostAndPorts containing only nodes that are not DOWN
         // and are not ourselves.
         virtual std::vector<HostAndPort> getMaybeUpHostAndPorts() const = 0;
