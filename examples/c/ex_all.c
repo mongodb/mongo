@@ -1055,7 +1055,7 @@ main(void)
 
 	/*! [Statistics logging with a table] */
 	ret = wiredtiger_open(home, NULL,
-	    "create,wait=5"
+	    "create,wait=5,"
 	    "statistics_log=(sources=(\"table:table1\",\"table:table2\"))",
 	    &conn);
 	/*! [Statistics logging with a table] */
