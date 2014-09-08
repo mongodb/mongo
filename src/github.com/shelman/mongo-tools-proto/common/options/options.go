@@ -52,6 +52,9 @@ type Namespace struct {
 	// Specified database and collection
 	DB         string `short:"d" long:"database" description:"database to use"`
 	Collection string `short:"c" long:"collection" description:"collection to use"`
+
+	// DBPath for direct-storage interface
+	DBPath string `long:"dbpath"`
 }
 
 // Struct holding generic options

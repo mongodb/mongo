@@ -2,7 +2,7 @@ package main
 
 import (
 	"fmt"
-	"github.com/shelman/mongo-tools-proto/common/db"
+	//"github.com/shelman/mongo-tools-proto/common/db"
 	commonopts "github.com/shelman/mongo-tools-proto/common/options"
 	"github.com/shelman/mongo-tools-proto/common/util"
 	"github.com/shelman/mongo-tools-proto/mongoexport"
@@ -34,17 +34,10 @@ func main() {
 		return
 	}
 
-	// create a session provider to connect to the db
-	sessionProvider, err := db.InitSessionProvider(opts)
-	if err != nil {
-		util.Panicf("error initializing database session: %v", err)
-	}
-
 	exporter := mongoexport.MongoExport{
-		ToolOptions:     opts,
-		OutputOpts:      outputOpts,
-		InputOpts:       inputOpts,
-		SessionProvider: sessionProvider,
+		ToolOptions: opts,
+		OutputOpts:  outputOpts,
+		InputOpts:   inputOpts,
 	}
 
 	err = exporter.ValidateSettings()
@@ -58,7 +51,7 @@ func main() {
 	if err != nil {
 		//TODO log to stderr for real
 		fmt.Printf("Error: %v\n", err)
-		os.Exit(1)
+		//os.Exit(1)
 	}
 
 	if !opts.Quiet {
