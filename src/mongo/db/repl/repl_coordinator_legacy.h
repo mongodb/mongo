@@ -157,6 +157,10 @@ namespace repl {
 
         virtual bool isReplEnabled() const;
 
+        virtual void connectOplogReader(OperationContext* txn, 
+                                        BackgroundSync* bgsync,
+                                        OplogReader* r);
+
     private:
 
         // Mutex that protects the _slaveOpTimeMap

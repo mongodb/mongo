@@ -127,7 +127,8 @@ namespace repl {
         virtual std::vector<HostAndPort> getMaybeUpHostAndPorts() const;
         virtual int getMaintenanceCount() const;
         virtual void setForceSyncSourceIndex(int index);
-        virtual void chooseNewSyncSource(Date_t now, const OpTime& lastOpApplied);
+        virtual HostAndPort chooseNewSyncSource(Date_t now, 
+                                                const OpTime& lastOpApplied);
         virtual void blacklistSyncSource(const HostAndPort& host, Date_t until);
         virtual void setStepDownTime(Date_t newTime);
         virtual void setFollowerMode(MemberState::MS newMode);
@@ -293,9 +294,9 @@ namespace repl {
 
         // the member we currently believe is primary, if one exists
         int _currentPrimaryIndex;
-        // the member we are currently syncing from
-        // -1 if no sync source (we are primary, or we cannot connect to anyone yet)
-        int _syncSourceIndex; 
+        // the hostandport we are currently syncing from
+        // empty if no sync source (we are primary, or we cannot connect to anyone yet)
+        HostAndPort _syncSource;
         // These members are not chosen as sync sources for a period of time, due to connection
         // issues with them
         std::map<HostAndPort, Date_t> _syncSourceBlacklist;

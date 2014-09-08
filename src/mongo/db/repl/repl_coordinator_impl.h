@@ -53,6 +53,7 @@ namespace mongo {
 
 namespace repl {
 
+    class OplogReader;
     class SyncSourceFeedback;
     class TopologyCoordinator;
 
@@ -194,6 +195,11 @@ namespace repl {
 
         virtual bool isReplEnabled() const;
 
+        virtual void connectOplogReader(OperationContext* txn,
+                                        BackgroundSync* bgsync,
+                                        OplogReader* r);
+
+        
         // ================== Members of replication code internal API ===================
 
         // This is a temporary hack to set the replset config to the config detected by the
@@ -216,6 +222,21 @@ namespace repl {
          * of calls via the executor.
          */
         void cancelHeartbeats();
+
+        /**
+         * Chooses a sync source.
+         * A wrapper that schedules _chooseNewSyncSource() through the Replication Executor and
+         * waits for its completion.
+         */
+        HostAndPort chooseNewSyncSource();
+
+        /**
+         * Blacklists 'host' until 'until'.
+         * A wrapper that schedules _blacklistSyncSource() through the Replication Executor and
+         * waits for its completion.
+         */
+        void blacklistSyncSource(const HostAndPort& host, Date_t until);
+
 
         // ================== Test support API ===================
 
@@ -458,6 +479,25 @@ namespace repl {
          **/
         void _onElectCmdRunnerComplete(const ReplicationExecutor::CallbackData& cbData,
                                        const ReplicationExecutor::EventHandle& finishEvh);
+
+        /**
+         * Chooses a new sync source.  Must be scheduled as a callback.
+         * 
+         * Calls into the Topology Coordinator, which uses its current view of the set to choose
+         * the most appropriate sync source.
+         */
+        void _chooseNewSyncSource(const ReplicationExecutor::CallbackData& cbData,
+                                  HostAndPort* newSyncSource);
+
+        /**
+         * Adds 'host' to the sync source blacklist until 'until'. A blacklisted source cannot
+         * be chosen as a sync source.
+         *
+         * Must be scheduled as a callback.
+         */
+        void _blacklistSyncSource(const ReplicationExecutor::CallbackData& cbData,
+                                  const HostAndPort& host,
+                                  Date_t until);
 
 
         //

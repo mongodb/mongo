@@ -49,7 +49,9 @@ namespace mongo {
 
 namespace repl {
 
+    class BackgroundSync;
     class HandshakeArgs;
+    class OplogReader;
     class ReplSetHeartbeatArgs;
     class ReplSetHeartbeatResponse;
     class UpdatePositionArgs;
@@ -459,6 +461,16 @@ namespace repl {
          * NotYetInitialized in the absence of a valid config. Also adds error info to "result".
          */
         virtual Status checkReplEnabledForCommand(BSONObjBuilder* result) = 0;
+
+        /**
+         * Connects an oplog reader to a viable sync source, using BackgroundSync object bgsync.
+         * When this function returns, reader is connected to a viable sync source or is left
+         * unconnected if no sync sources are currently available.  In legacy, bgsync's 
+         * _currentSyncTarget is also set appropriately.
+         **/
+        virtual void connectOplogReader(OperationContext* txn,
+                                        BackgroundSync* bgsync, 
+                                        OplogReader* reader) = 0;
 
     protected:
 

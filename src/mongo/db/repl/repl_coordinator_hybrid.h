@@ -161,6 +161,10 @@ namespace repl {
 
         virtual bool isReplEnabled() const;
 
+        virtual void connectOplogReader(OperationContext* txn,
+                                        BackgroundSync* bgsync,
+                                        OplogReader* r);
+
         /**
          * This is a temporary hack to force _impl to set its replset config to the one loaded by
          * _legacy.

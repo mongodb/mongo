@@ -164,7 +164,8 @@ namespace {
         ASSERT(getTopoCoord().getSyncSourceAddress().empty());
 
         // Fail due to insufficient number of pings
-        getTopoCoord().chooseNewSyncSource(now()++, OpTime(0,0));
+        HostAndPort newSyncSource = getTopoCoord().chooseNewSyncSource(now()++, OpTime(0,0));
+        ASSERT_EQUALS(getTopoCoord().getSyncSourceAddress(), newSyncSource);
         ASSERT(getTopoCoord().getSyncSourceAddress().empty());
 
         // Record 2nd round of pings to allow choosing a new sync source; all members equidistant
@@ -172,7 +173,8 @@ namespace {
         heartbeatFromMember(HostAndPort("h3"), "rs0", MemberState::RS_SECONDARY, OpTime(0,0));
 
         // Should choose h2, since it is furthest ahead
-        getTopoCoord().chooseNewSyncSource(now()++, OpTime(0,0));
+        newSyncSource = getTopoCoord().chooseNewSyncSource(now()++, OpTime(0,0));
+        ASSERT_EQUALS(getTopoCoord().getSyncSourceAddress(), newSyncSource);
         ASSERT_EQUALS(HostAndPort("h2"), getTopoCoord().getSyncSourceAddress());
         
         // h3 becomes further ahead, so it should be chosen

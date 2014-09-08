@@ -40,6 +40,7 @@
 #include "mongo/db/repl/check_quorum_for_config_change.h"
 #include "mongo/db/repl/handshake_args.h"
 #include "mongo/db/repl/master_slave.h"
+#include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/repl_set_heartbeat_args.h"
 #include "mongo/db/repl/repl_set_heartbeat_response.h"
 #include "mongo/db/repl/repl_settings.h"
@@ -1110,6 +1111,7 @@ namespace {
          if (_rsConfig.isInitialized()) {
              cancelHeartbeats();
          }
+         OpTime lastOpApplied(_getLastOpApplied_inlock());
          _setConfigState_inlock(kConfigSteady);
          _rsConfig = newConfig;
          _thisMembersConfigIndex = myIndex;
@@ -1117,7 +1119,7 @@ namespace {
                  newConfig,
                  myIndex,
                  _replExecutor.now(),
-                 _getLastOpApplied_inlock());
+                 lastOpApplied);
          _currentState = _topCoord->getMemberState();
 
          // Ensure that there's an entry in the _slaveInfoMap for ourself
@@ -1262,6 +1264,60 @@ namespace {
     bool ReplicationCoordinatorImpl::isReplEnabled() const {
         return _settings.usingReplSets() || _settings.master || _settings.slave;
     }
+
+    void ReplicationCoordinatorImpl::connectOplogReader(OperationContext* txn, 
+                                                        BackgroundSync* bgsync,
+                                                        OplogReader* r) {
+        invariant(false);
+    }
+
+    void ReplicationCoordinatorImpl::_chooseNewSyncSource(
+            const ReplicationExecutor::CallbackData& cbData,
+            HostAndPort* newSyncSource) {
+        if (cbData.status == ErrorCodes::CallbackCanceled) {
+            return;
+        }
+        *newSyncSource = _topCoord->chooseNewSyncSource(_replExecutor.now(), _getLastOpApplied());
+    }
+
+    HostAndPort ReplicationCoordinatorImpl::chooseNewSyncSource() {
+        HostAndPort newSyncSource;
+        CBHStatus cbh = _replExecutor.scheduleWork(
+            stdx::bind(&ReplicationCoordinatorImpl::_chooseNewSyncSource,
+                       this,
+                       stdx::placeholders::_1,
+                       &newSyncSource));
+        if (cbh.getStatus() == ErrorCodes::ShutdownInProgress) {
+            return newSyncSource; // empty
+        }
+        fassert(18740, cbh.getStatus());
+        _replExecutor.wait(cbh.getValue());
+        return newSyncSource;
+    }
+
+    void ReplicationCoordinatorImpl::_blacklistSyncSource(
+        const ReplicationExecutor::CallbackData& cbData,
+        const HostAndPort& host,
+        Date_t until) {
+        if (cbData.status == ErrorCodes::CallbackCanceled) {
+            return;
+        }
+        _topCoord->blacklistSyncSource(host, until);
+    }
+
+    void ReplicationCoordinatorImpl::blacklistSyncSource(const HostAndPort& host, Date_t until) {
+        CBHStatus cbh = _replExecutor.scheduleWork(
+            stdx::bind(&ReplicationCoordinatorImpl::_blacklistSyncSource,
+                       this,
+                       stdx::placeholders::_1,
+                       host,
+                       until));
+        if (cbh.getStatus() == ErrorCodes::ShutdownInProgress) {
+            return;
+        }
+        fassert(18741, cbh.getStatus());
+        _replExecutor.wait(cbh.getValue());
+    }        
 
 } // namespace repl
 } // namespace mongo

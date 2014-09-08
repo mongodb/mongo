@@ -112,7 +112,7 @@ namespace repl {
         /**
          * Chooses and sets a new sync source, based on our current knowledge of the world.
          */
-        virtual void chooseNewSyncSource(Date_t now, const OpTime& lastOpApplied) = 0;
+        virtual HostAndPort chooseNewSyncSource(Date_t now, const OpTime& lastOpApplied) = 0;
 
         /**
          * Suppresses selecting "host" as sync source until "until".

@@ -250,5 +250,11 @@ namespace repl {
         return Status::OK();
     }
 
+    void ReplicationCoordinatorMock::connectOplogReader(OperationContext* txn,
+                                                        BackgroundSync* bgsync, 
+                                                        OplogReader* r) {
+        invariant(false);
+    }
+
 } // namespace repl
 } // namespace mongo

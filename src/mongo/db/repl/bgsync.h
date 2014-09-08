@@ -32,11 +32,14 @@
 
 #include "mongo/util/queue.h"
 #include "mongo/db/repl/oplogreader.h"
-#include "mongo/db/repl/rs.h"
 #include "mongo/db/jsobj.h"
 
 namespace mongo {
 namespace repl {
+
+    class Member;
+    class ReplicationCoordinator;
+    class ReplicationCoordinatorImpl;
 
     // This interface exists to facilitate easier testing;
     // the test infrastructure implements these functions with stubs.
@@ -71,6 +74,7 @@ namespace repl {
      * 3. BackgroundSync::_mutex
      */
     class BackgroundSync : public BackgroundSyncInterface {
+    private:
         static BackgroundSync *s_instance;
         // protects creation of s_instance
         static boost::mutex s_mutex;
@@ -101,7 +105,7 @@ namespace repl {
         void produce(OperationContext* txn);
         // Check if rollback is necessary
         bool isRollbackRequired(OperationContext* txn, OplogReader& r);
-        void getOplogReader(OperationContext* txn, OplogReader& r);
+
         // Evaluate if the current sync target is still good
         bool shouldChangeSyncTarget();
         // check lastOpTimeWritten against the remote's earliest op, filling in remoteOldestOp.
@@ -110,6 +114,9 @@ namespace repl {
         void stop();
         // restart syncing
         void start();
+
+        // A pointer to the replication coordinator running the show.
+        ReplicationCoordinator* _replCoord;
 
     public:
         bool isAssumingPrimary();
@@ -138,6 +145,19 @@ namespace repl {
         // Wait for replication to finish and buffer to be applied so that the member can become
         // primary.
         void stopReplicationAndFlushBuffer();
+
+        /**
+         * Connects an oplog reader to a viable sync source.  Legacy uses getOplogReaderLegacy(),
+         * which sets _currentSyncTarget as a side effect.
+         * connectOplogReader() is used in new replication.
+         * Both functions can affect the TopoCoord's blacklist of sync sources, and may set
+         * our minValid value, durably, if we detect we haven fallen off the back of all sync
+         * sources' oplogs.
+         **/
+        void getOplogReaderLegacy(OperationContext* txn, OplogReader* reader);
+        void connectOplogReader(OperationContext* txn, 
+                                ReplicationCoordinatorImpl* replCoordImpl, 
+                                OplogReader* reader);
     };
 
 

@@ -981,5 +981,13 @@ namespace {
         return _settings.usingReplSets() || _settings.slave || _settings.master;
     }
 
+    void LegacyReplicationCoordinator::connectOplogReader(OperationContext* txn, 
+                                                          BackgroundSync* bgsync,
+                                                          OplogReader* r) {
+        bgsync->getOplogReaderLegacy(txn, r);
+    }
+
+    
+
 } // namespace repl
 } // namespace mongo

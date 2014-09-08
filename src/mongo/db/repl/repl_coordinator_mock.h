@@ -156,6 +156,10 @@ namespace repl {
 
         virtual Status checkReplEnabledForCommand(BSONObjBuilder* result);
 
+        virtual void connectOplogReader(OperationContext* txn,
+                                        BackgroundSync* bgsync, 
+                                        OplogReader* r);
+
     private:
 
         ReplSettings _settings;

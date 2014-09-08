@@ -33,6 +33,7 @@
 #include "mongo/db/repl/repl_coordinator_hybrid.h"
 
 #include "mongo/db/global_environment_experiment.h"
+#include "mongo/db/repl/bgsync.h"
 #include "mongo/db/repl/isself.h"
 #include "mongo/db/repl/network_interface_impl.h"
 #include "mongo/db/repl/repl_coordinator_external_state_impl.h"
@@ -405,6 +406,20 @@ namespace repl {
         bool implResponse = _impl.isReplEnabled();
         invariant(legacyResponse == implResponse);
         return legacyResponse;
+    }
+
+    void HybridReplicationCoordinator::connectOplogReader(OperationContext* txn,
+                                                          BackgroundSync* bgsync,
+                                                          OplogReader* r) {
+        _legacy.connectOplogReader(txn, bgsync, r);
+        HostAndPort legacySyncSource = r->getHost();
+        bgsync->connectOplogReader(txn, &_impl, r);
+        HostAndPort implSyncSource = r->getHost();
+        if (legacySyncSource != implSyncSource) {
+            severe() << "sync source mismatch between legacy and impl: " << 
+                legacySyncSource.toString() << " and " << implSyncSource.toString();
+            fassertFailed(18742);
+        }
     }
 
     void HybridReplicationCoordinator::setImplConfigHack(const ReplSetConfig* config) {
