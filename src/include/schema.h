@@ -73,8 +73,7 @@ struct __wt_table {
 	WT_ASSERT(session,						\
 	    F_ISSET(session, WT_SESSION_SCHEMA_LOCKED) ||		\
 	    !F_ISSET(session, WT_SESSION_NO_SCHEMA_LOCK));		\
-	if (F_ISSET(session, WT_SESSION_SCHEMA_LOCKED) ||		\
-	    session->skip_schema_lock) {				\
+	if (F_ISSET(session, WT_SESSION_SCHEMA_LOCKED)) {		\
 		(op);							\
 	} else {							\
 		__wt_spin_lock(session, &S2C(session)->schema_lock);	\
