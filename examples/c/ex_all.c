@@ -1055,8 +1055,8 @@ main(void)
 
 	/*! [Statistics logging with a table] */
 	ret = wiredtiger_open(home, NULL,
-	    "create,wait=5,"
-	    "statistics_log=(sources=(\"table:table1\",\"table:table2\"))",
+	    "create, statistics_log=("
+	    "sources=(\"lsm:table1\",\"lsm:table2\"), wait=5)",
 	    &conn);
 	/*! [Statistics logging with a table] */
 	if (ret == 0)
@@ -1064,7 +1064,7 @@ main(void)
 
 	/*! [Statistics logging with all tables] */
 	ret = wiredtiger_open(home, NULL,
-	    "create,wait=5,statistics_log=(sources=(\"table:\"))",
+	    "create, statistics_log=(sources=(\"lsm:\"), wait=5)",
 	    &conn);
 	/*! [Statistics logging with all tables] */
 	if (ret == 0)
