@@ -205,6 +205,8 @@ namespace repl {
         // set the current primary.
         void _setCurrentPrimaryForTest(int primaryIndex);
 
+        virtual Date_t getStepDownTime() const;
+
     private:
 
         enum UnelectableReason {

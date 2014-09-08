@@ -94,6 +94,11 @@ namespace repl {
         virtual std::vector<HostAndPort> getMaybeUpHostAndPorts() const = 0;
 
         /**
+         * Gets the earliest time the current node will stand for election.
+         */
+        virtual Date_t getStepDownTime() const = 0;
+
+        /**
          * Gets the current value of the maintenance mode counter.
          */
         virtual int getMaintenanceCount() const = 0;

@@ -1249,6 +1249,10 @@ namespace {
         _stepDownUntil = newTime;
     }
 
+    Date_t TopologyCoordinatorImpl::getStepDownTime() const {
+        return _stepDownUntil;
+    }
+
     // This function installs a new config object and recreates MemberHeartbeatData objects
     // that reflect the new config.
     void TopologyCoordinatorImpl::updateConfig(const ReplicaSetConfig& newConfig,

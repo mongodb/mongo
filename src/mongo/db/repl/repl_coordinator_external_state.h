@@ -28,7 +28,10 @@
 
 #pragma once
 
+#include <boost/scoped_ptr.hpp>
+
 #include "mongo/base/disallow_copying.h"
+#include "mongo/util/time_support.h"
 
 namespace mongo {
 
@@ -50,6 +53,10 @@ namespace repl {
     class ReplicationCoordinatorExternalState {
         MONGO_DISALLOW_COPYING(ReplicationCoordinatorExternalState);
     public:
+
+        class GlobalSharedLockAcquirer;
+        class ScopedLocker;
+
         ReplicationCoordinatorExternalState();
         virtual ~ReplicationCoordinatorExternalState();
 
@@ -113,6 +120,46 @@ namespace repl {
          * This is used during stepdown, and transition out of primary.
          */
         virtual void closeClientConnections() = 0;
+
+        /**
+         * Returns an instance of GlobalSharedLockAcquirer that can be used to acquire the global
+         * shared lock.
+         */
+        virtual GlobalSharedLockAcquirer* getGlobalSharedLockAcquirer() = 0;
+    };
+
+    /**
+     * Interface that encapsulates acquiring the global shared lock.
+     */
+    class ReplicationCoordinatorExternalState::GlobalSharedLockAcquirer {
+    public:
+
+        virtual ~GlobalSharedLockAcquirer();
+
+        virtual bool try_lock(OperationContext* txn, const Milliseconds& timeout) = 0;
+    };
+
+    /**
+     * Class used to acquire the global shared lock, using a given implementation of
+     * GlobalSharedLockAcquirer.
+     */
+    class ReplicationCoordinatorExternalState::ScopedLocker {
+    public:
+
+        /**
+         * Takes ownership of the passed in GlobalSharedLockAcquirer.
+         */
+        ScopedLocker(OperationContext* txn,
+                     GlobalSharedLockAcquirer* locker,
+                     const Milliseconds& timeout);
+        ~ScopedLocker();
+
+        bool gotLock() const;
+
+    private:
+
+        boost::scoped_ptr<ReplicationCoordinatorExternalState::GlobalSharedLockAcquirer> _locker;
+        bool _gotLock;
     };
 
 } // namespace repl

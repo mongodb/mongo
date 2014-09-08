@@ -43,6 +43,8 @@ namespace repl {
     class ReplicationCoordinatorExternalStateMock : public ReplicationCoordinatorExternalState {
         MONGO_DISALLOW_COPYING(ReplicationCoordinatorExternalStateMock);
     public:
+        class GlobalSharedLockAcquirer;
+
         ReplicationCoordinatorExternalStateMock();
         virtual ~ReplicationCoordinatorExternalStateMock();
         virtual void runSyncSourceFeedback();
@@ -55,6 +57,8 @@ namespace repl {
         virtual StatusWith<BSONObj> loadLocalConfigDocument(OperationContext* txn);
         virtual Status storeLocalConfigDocument(OperationContext* txn, const BSONObj& config);
         virtual void closeClientConnections();
+        virtual ReplicationCoordinatorExternalState::GlobalSharedLockAcquirer*
+                getGlobalSharedLockAcquirer();
 
         /**
          * Adds "host" to the list of hosts that this mock will match when responding to "isSelf"
@@ -72,12 +76,38 @@ namespace repl {
          */
         void setClientHostAndPort(const HostAndPort& clientHostAndPort);
 
+        /**
+         * Sets the value that will be passed to the constructor of any future
+         * GlobalSharedLockAcuirers created and returned by getGlobalSharedLockAcquirer().
+         */
+        void setCanAcquireGlobalSharedLock(bool canAcquire);
+
     private:
         StatusWith<BSONObj> _localRsConfigDocument;
         std::vector<HostAndPort> _selfHosts;
+        bool _canAcquireGlobalSharedLock;
         bool _connectionsClosed;
         HostAndPort _clientHostAndPort;
     };
+
+    class ReplicationCoordinatorExternalStateMock::GlobalSharedLockAcquirer :
+            public ReplicationCoordinatorExternalState::GlobalSharedLockAcquirer {
+    public:
+
+        /**
+         * The canAcquireLock argument determines what the return value of calls to try_lock will
+         * be.
+         */
+        GlobalSharedLockAcquirer(bool canAcquireLock);
+        virtual ~GlobalSharedLockAcquirer();
+
+        virtual bool try_lock(OperationContext* txn, const Milliseconds& timeout);
+
+    private:
+
+        const bool _canAcquireLock;
+    };
+
 
 } // namespace repl
 } // namespace mongo

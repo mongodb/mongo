@@ -204,6 +204,12 @@ namespace mongo {
         };
     };
 
+    class DBTryLockTimeoutException : public std::exception {
+    public:
+        DBTryLockTimeoutException();
+        virtual ~DBTryLockTimeoutException() throw();
+    };
+
     class readlocktry : boost::noncopyable {
         bool _got;
         boost::scoped_ptr<Lock::GlobalRead> _dbrlock;

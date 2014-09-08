@@ -36,5 +36,20 @@ namespace repl {
     ReplicationCoordinatorExternalState::ReplicationCoordinatorExternalState() {}
     ReplicationCoordinatorExternalState::~ReplicationCoordinatorExternalState() {}
 
+    ReplicationCoordinatorExternalState::ScopedLocker::ScopedLocker(
+            OperationContext* txn,
+            ReplicationCoordinatorExternalState::GlobalSharedLockAcquirer* locker,
+            const Milliseconds& timeout) : _locker(locker), _gotLock(false) {
+        _gotLock = _locker->try_lock(txn, timeout);
+    }
+
+    ReplicationCoordinatorExternalState::GlobalSharedLockAcquirer::~GlobalSharedLockAcquirer() {}
+
+    ReplicationCoordinatorExternalState::ScopedLocker::~ScopedLocker() {}
+
+    bool ReplicationCoordinatorExternalState::ScopedLocker::gotLock() const {
+        return _gotLock;
+    }
+
 } // namespace repl
 } // namespace mongo

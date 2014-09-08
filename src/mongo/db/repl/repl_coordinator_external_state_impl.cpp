@@ -144,5 +144,35 @@ namespace {
     void ReplicationCoordinatorExternalStateImpl::closeClientConnections() {
         MessagingPort::closeAllSockets(ScopedConn::keepOpen);
     }
+
+namespace {
+    class GlobalSharedLockAcquirerImpl :
+            public ReplicationCoordinatorExternalState::GlobalSharedLockAcquirer {
+    public:
+
+        GlobalSharedLockAcquirerImpl() {};
+        virtual ~GlobalSharedLockAcquirerImpl() {};
+
+        virtual bool try_lock(OperationContext* txn, const Milliseconds& timeout) {
+            try {
+                _rlock.reset(new Lock::GlobalRead(txn->lockState(), timeout.total_milliseconds()));
+            }
+            catch (const DBTryLockTimeoutException&) {
+                return false;
+            }
+            return true;
+        }
+
+    private:
+
+        boost::scoped_ptr<Lock::GlobalRead> _rlock;
+    };
+} // namespace
+
+    ReplicationCoordinatorExternalState::GlobalSharedLockAcquirer*
+            ReplicationCoordinatorExternalStateImpl::getGlobalSharedLockAcquirer() {
+        return new GlobalSharedLockAcquirerImpl();
+    }
+
 } // namespace repl
 } // namespace mongo

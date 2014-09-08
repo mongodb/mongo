@@ -369,6 +369,17 @@ namespace repl {
         Status _checkIfWriteConcernCanBeSatisfied_inlock(
                 const WriteConcernOptions& writeConcern) const;
 
+        /**
+         * Helper for stepDown run within a ReplicationExecutor callback.  This method assumes
+         * it is running within a global shared lock, and thus that no writes are going on at the
+         * same time.
+         */
+        void _stepDownFinish(const ReplicationExecutor::CallbackData& cbData,
+                             bool force,
+                             const Milliseconds& waitTime,
+                             const Date_t& stepdownUntil,
+                             Status* result);
+
         OID _getMyRID_inlock() const;
 
         /**

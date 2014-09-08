@@ -53,11 +53,8 @@
 
 namespace mongo {
 
-    class DBTryLockTimeoutException : public std::exception {
-    public:
-        DBTryLockTimeoutException() {}
-        virtual ~DBTryLockTimeoutException() throw() { }
-    };
+    DBTryLockTimeoutException::DBTryLockTimeoutException() {}
+    DBTryLockTimeoutException::~DBTryLockTimeoutException() throw() { }
 
     class WrapperForQLock { 
     public:
