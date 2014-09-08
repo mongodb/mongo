@@ -71,12 +71,22 @@ namespace mongo {
         ls.assertAtLeastReadLocked("db2");
     }
 
-    TEST(DConcurrency, MultipleDBLocks) {
+    TEST(DConcurrency, MultipleWriteDBLocksOnSameThread) {
+        LockState ls;
+
+        Lock::DBWrite r1(&ls, "db1");
+        Lock::DBWrite r2(&ls, "db1");
+
+        ASSERT(ls.isWriteLocked("db1"));
+    }
+
+    TEST(DConcurrency, MultipleConflictingDBLocksOnSameThread) {
         LockState ls;
 
         Lock::DBWrite r1(&ls, "db1");
         Lock::DBRead r2(&ls, "db1");
 
-        ls.assertWriteLocked("db1");
+        ASSERT(ls.isWriteLocked("db1"));
     }
+
 } // namespace mongo

@@ -532,6 +532,32 @@ namespace newlm {
         lockMgr.unlock(&request[1]);
     }
 
+    TEST(LockManager, Upgrade) {
+        LockManager lockMgr;
+        const ResourceId resId(RESOURCE_COLLECTION, std::string("TestDB.collection"));
+
+        LockState locker1;
+        TrackingLockGrantNotification notify1;
+        LockRequest request1;
+        request1.initNew(resId, &locker1, &notify1);
+        ASSERT(LOCK_OK == lockMgr.lock(resId, &request1, MODE_IS));
+
+        LockState locker2;
+        TrackingLockGrantNotification notify2;
+        LockRequest request2;
+        request2.initNew(resId, &locker2, &notify2);
+        ASSERT(LOCK_OK == lockMgr.lock(resId, &request2, MODE_S));
+        ASSERT(request2.recursiveCount == 1);
+
+        // Upgrade the IS lock to X
+        ASSERT(LOCK_WAITING == lockMgr.lock(resId, &request1, MODE_IX));
+
+        ASSERT(!lockMgr.unlock(&request1));
+        ASSERT(lockMgr.unlock(&request1));
+
+        ASSERT(lockMgr.unlock(&request2));
+    }
+
     TEST(LockManager, Downgrade) {
         LockManager lockMgr;
         const ResourceId resId(RESOURCE_COLLECTION, std::string("TestDB.collection"));

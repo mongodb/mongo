@@ -61,6 +61,14 @@ namespace newlm {
         MODE_X          = 4,
     };
 
+    enum {
+        // Counts the entries in the LockMode enumeration. Used for array size allocations, etc.
+        LockModesCount   = 5,
+    };
+
+    // To ensure lock modes are not added without updating the counts
+    BOOST_STATIC_ASSERT(LockModesCount == MODE_X + 1);
+
 
     /**
      * Return values for the locking functions of the lock manager.
@@ -283,22 +291,58 @@ namespace newlm {
      * Not thread-safe and should only be accessed under the LockManager's bucket lock.
      */
     struct LockHead {
+
         LockHead(const ResourceId& resId);
         ~LockHead();
 
+        // Increments the granted/requested counts and maintains the grantedModes/requestedModes
+        // masks respectively. The count argument can only be -1 or 1, because we always change the
+        // modes one at a time.
+        enum ChangeModeCountAction {
+            Increment = 1, Decrement = -1
+        };
+
+        void changeGrantedModeCount(LockMode mode, ChangeModeCountAction action);
+        void changeRequestedModeCount(LockMode mode, ChangeModeCountAction count);
+
+
+        // Id of the resource which this lock protects
         const ResourceId resourceId;
+
+
+        //
+        // Granted queue
+        //
 
         // The head of the doubly-linked list of granted or converting requests
         LockRequest* grantedQueue;
 
-        // Bit-mask of the maximum of the granted + converting modes on the granted queue.
+        // Counts the grants and coversion counts for each of the supported lock modes. These
+        // counts should exactly match the aggregated granted modes on the granted list.
+        uint32_t grantedCounts[LockModesCount];
+
+        // Bit-mask of the granted + converting modes on the granted queue. Maintained in lock-step
+        // with the grantedCounts array.
         uint32_t grantedModes;
+
+
+        //
+        // Conflict queue
+        //
 
         // Doubly-linked list of requests, which have not been granted yet because they conflict
         // with the set of granted modes. The reason to have both begin and end pointers is to make
         // the FIFO scheduling easier (queue at begin and take from the end).
         LockRequest* conflictQueueBegin;
         LockRequest* conflictQueueEnd;
+
+        // Counts the conflicting requests for each of the lock modes. These counts should exactly
+        // match the aggregated requested modes on the conflicts list.
+        uint32_t conflictCounts[LockModesCount];
+
+        // Bit-mask of the requested modes on the conflict queue. Maintained in lock-step with the
+        // conflictCounts array.
+        uint32_t conflictModes;
     };
 
 
@@ -347,9 +391,12 @@ namespace newlm {
          *
          * This method always succeeds and never blocks.
          *
-         * Calling unlock more times than lock was called for the same LockRequest is not valid.
+         * @param request A previously locked request. Calling unlock more times than lock was
+         *                  called for the same LockRequest is an error.
+         *
+         * @return true if this is the last reference for the request; false otherwise
          */
-        void unlock(LockRequest* request);
+        bool unlock(LockRequest* request);
 
         /**
          * Downgrades the mode in which an already granted request is held, without changing the
@@ -395,18 +442,13 @@ namespace newlm {
 
         /**
          * Should be invoked when the state of a lock changes in a way, which could potentially
-         * allow blocked requests to proceed.
+         * allow other blocked requests to proceed.
          *
          * MUST be called under the lock bucket's spin lock.
          *
-         * @param lock Lock whose grant state should be recalculated
-         * @param unlocked Which request from those on the lock was just unlocked
-         * @param converting Which request from those on the lock was just converted
-         *
-         * Only one of unlocked or converting parameters can be non-NULL (both can be left NULL
-         * though).
+         * @param lock Lock whose grant state should be recalculated.
          */
-        void _recalcAndGrant(LockHead* lock, LockRequest* unlocked, LockRequest* converting);
+        void _onLockModeChanged(LockHead* lock);
 
         unsigned _numLockBuckets;
         LockBucket* _lockBuckets;
