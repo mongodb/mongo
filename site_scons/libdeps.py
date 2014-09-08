@@ -78,7 +78,7 @@ class DependencyCycleError(SCons.Errors.UserError):
         self.cycle_nodes = [first_node]
 
     def __str__(self):
-        return " => ".join(str(n) for n in self.cycle_nodes)
+        return "Library dependency cycle detected: " + " => ".join(str(n) for n in self.cycle_nodes)
 
 def __get_libdeps(node):
     """Given a SCons Node, return its library dependencies.
@@ -111,8 +111,8 @@ def __compute_libdeps(node):
 
         except DependencyCycleError, e:
             if len(e.cycle_nodes) == 1 or e.cycle_nodes[0] != e.cycle_nodes[-1]:
-                e.cycle_nodes.append(node)
-                raise
+                e.cycle_nodes.insert(0, node)
+            raise
     finally:
         node.attributes.libdeps_exploring = False
 
