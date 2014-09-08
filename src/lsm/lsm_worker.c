@@ -32,6 +32,7 @@ __lsm_worker_general_op(
 	WT_DECL_RET;
 	WT_LSM_CHUNK *chunk;
 	WT_LSM_WORK_UNIT *entry;
+	int force;
 
 	*completed = 0;
 	if (!F_ISSET(cookie, WT_LSM_WORK_FLUSH) &&
@@ -43,9 +44,11 @@ __lsm_worker_general_op(
 	    cookie->flags, &entry)) != 0 || entry == NULL)
 		return (ret);
 
-	if (entry->flags == WT_LSM_WORK_FLUSH) {
+	if ((entry->flags & WT_LSM_WORK_MASK) == WT_LSM_WORK_FLUSH) {
+		force = F_ISSET(entry, WT_LSM_WORK_FORCE);
+		F_CLR(entry, WT_LSM_WORK_FORCE);
 		WT_ERR(__wt_lsm_get_chunk_to_flush(
-		    session, entry->lsm_tree, &chunk));
+		    session, entry->lsm_tree, force, &chunk));
 		if (chunk != NULL) {
 			ret = __wt_lsm_checkpoint_chunk(
 			    session, entry->lsm_tree, chunk);

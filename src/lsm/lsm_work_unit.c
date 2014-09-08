@@ -66,10 +66,10 @@ err:	WT_TRET(__wt_lsm_tree_unlock(session, lsm_tree));
  *	Find and pin a chunk in the LSM tree that is likely to need flushing.
  */
 int
-__wt_lsm_get_chunk_to_flush(
-    WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree, WT_LSM_CHUNK **chunkp)
+__wt_lsm_get_chunk_to_flush(WT_SESSION_IMPL *session,
+    WT_LSM_TREE *lsm_tree, int force, WT_LSM_CHUNK **chunkp)
 {
-	u_int i;
+	u_int i, end;
 
 	*chunkp = NULL;
 
@@ -78,7 +78,8 @@ __wt_lsm_get_chunk_to_flush(
 	if (!F_ISSET(lsm_tree, WT_LSM_TREE_ACTIVE))
 		return (__wt_lsm_tree_unlock(session, lsm_tree));
 
-	for (i = 0; i < lsm_tree->nchunks - 1; i++) {
+	end = force ? lsm_tree->nchunks : lsm_tree->nchunks - 1;
+	for (i = 0; i < end; i++) {
 		if (!F_ISSET(lsm_tree->chunk[i], WT_LSM_CHUNK_ONDISK)) {
 			(void)WT_ATOMIC_ADD(lsm_tree->chunk[i]->refcnt, 1);
 			*chunkp = lsm_tree->chunk[i];
