@@ -55,6 +55,7 @@
 #include "mongo/util/log.h"
 #include "mongo/util/mmap.h"
 
+
 namespace mongo {
 
 namespace {
@@ -388,7 +389,8 @@ namespace {
 
         if (storageGlobalParams.dur) {
             log() << "shutdown: final commit..." << endl;
-            getDur().commitNow(txn);
+
+            getDur().commitAndStopDurThread(txn);
 
             flushAllFiles(true);
         }

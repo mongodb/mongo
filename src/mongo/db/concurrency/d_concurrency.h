@@ -26,23 +26,25 @@
  *    it in the license file.
  */
 
-
 // only used by mongod, thus the name ('d')
 // (also used by dbtests test binary, which is running mongod test code)
 
 #pragma once
 
 #include <boost/scoped_ptr.hpp>
+#include <climits> // For UINT_MAX
 
 #include "mongo/base/string_data.h"
 #include "mongo/db/concurrency/lock_stat.h"
 #include "mongo/util/concurrency/mutex.h"
 #include "mongo/util/concurrency/rwlock.h"
+#include "mongo/util/timer.h"
 
 
 namespace mongo {
 
     class Locker;
+    class StringData;
 
     class Lock : boost::noncopyable { 
     public:
@@ -124,34 +126,27 @@ namespace mongo {
         // i.e. you could grab globalread after globalwrite.
         
         class GlobalWrite : public ScopedLock {
-            bool noop;
         protected:
             void _tempRelease();
             void _relock();
         public:
-            // stopGreed is removed and does NOT work
             // timeoutms is only for writelocktry -- deprecated -- do not use
-            GlobalWrite(Locker* lockState, int timeoutms = -1);
+            GlobalWrite(Locker* lockState, unsigned timeoutms = UINT_MAX);
             virtual ~GlobalWrite();
-            void downgrade(); // W -> R
-            void upgrade();   // caution see notes
         };
 
-        class GlobalRead : public ScopedLock { // recursive is ok
-        public:
-            bool noop;
+        class GlobalRead : public ScopedLock {
         protected:
             void _tempRelease();
             void _relock();
         public:
             // timeoutms is only for readlocktry -- deprecated -- do not use
-            GlobalRead(Locker* lockState, int timeoutms = -1);
+            GlobalRead(Locker* lockState, unsigned timeoutms = UINT_MAX);
             virtual ~GlobalRead();
         };
 
         // lock this database. do not shared_lock globally first, that is handledin herein. 
         class DBWrite : public ScopedLock {
-            void lockTop();
             void lockDB();
             void unlockDB();
 
@@ -164,13 +159,11 @@ namespace mongo {
             virtual ~DBWrite();
 
         private:
-            bool _lockAcquired;
             const std::string _ns;
         };
 
         // lock this database for reading. do not shared_lock globally first, that is handledin herein. 
         class DBRead : public ScopedLock {
-            void lockTop();
             void lockDB();
             void unlockDB();
 
@@ -183,24 +176,7 @@ namespace mongo {
             virtual ~DBRead();
 
         private:
-            bool _lockAcquired;
             const std::string _ns;
-        };
-
-        /**
-         * Acquires a previously acquired intent-X (lower-case 'w') GlobalWrite lock to upper-case
-         * 'W' lock. Effectively means "stop the world".
-         */
-        class UpgradeGlobalLockToExclusive : private boost::noncopyable {
-        public:
-            UpgradeGlobalLockToExclusive(Locker* lockState);
-            ~UpgradeGlobalLockToExclusive();
-
-            bool gotUpgrade() const { return _gotUpgrade; }
-
-        private:
-            Locker* _lockState;
-            bool _gotUpgrade;
         };
     };
 

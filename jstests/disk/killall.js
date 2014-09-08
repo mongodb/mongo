@@ -1,3 +1,6 @@
+// Test is disabled because of SERVER-15269
+
+if (0) {
 /*
  * Verify that killing an instance of mongod while it is in a long running computation or infinite
  * loop still leads to clean shutdown, and that said shutdown is prompt.
@@ -54,3 +57,4 @@ assert( collection.stats().ok );
 assert( collection.drop() );
 
 stopMongod( port );
+}

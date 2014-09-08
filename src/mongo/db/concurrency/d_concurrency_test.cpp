@@ -38,7 +38,102 @@
 
 namespace mongo {
 
-    // These two tests ensure that we have preserved the behaviour of TempRelease
+    TEST(DConcurrency, GlobalRead) {
+        LockState ls;
+        Lock::GlobalRead globalRead(&ls);
+        ASSERT(ls.isR());
+    }
+
+    TEST(DConcurrency, GlobalWrite) {
+        LockState ls;
+        Lock::GlobalWrite globalWrite(&ls);
+        ASSERT(ls.isW());
+    }
+
+    TEST(DConcurrency, GlobalWriteAndGlobalRead) {
+        LockState ls;
+
+        Lock::GlobalWrite globalWrite(&ls);
+        ASSERT(ls.isW());
+
+        {
+            Lock::GlobalRead globalRead(&ls);
+            ASSERT(ls.isW());
+        }
+
+        ASSERT(ls.isW());
+    }
+
+    TEST(DConcurrency, readlocktryTimeout) {
+        LockState ls;
+        writelocktry globalWrite(&ls, 0);
+        ASSERT(globalWrite.got());
+
+        {
+            LockState lsTry;
+            readlocktry lockTry(&lsTry, 1);
+            ASSERT(!lockTry.got());
+        }
+    }
+
+    TEST(DConcurrency, writelocktryTimeout) {
+        LockState ls;
+        writelocktry globalWrite(&ls, 0);
+        ASSERT(globalWrite.got());
+
+        {
+            LockState lsTry;
+            writelocktry lockTry(&lsTry, 1);
+            ASSERT(!lockTry.got());
+        }
+    }
+
+    TEST(DConcurrency, readlocktryTimeoutDueToFlushLock) {
+        LockState ls;
+        newlm::AutoAcquireFlushLockForMMAPV1Commit autoFlushLock(&ls);
+
+        {
+            LockState lsTry;
+            readlocktry lockTry(&lsTry, 1);
+            ASSERT(!lockTry.got());
+        }
+    }
+
+    TEST(DConcurrency, writelocktryTimeoutDueToFlushLock) {
+        LockState ls;
+        newlm::AutoAcquireFlushLockForMMAPV1Commit autoFlushLock(&ls);
+
+        {
+            LockState lsTry;
+            writelocktry lockTry(&lsTry, 1);
+            ASSERT(!lockTry.got());
+        }
+    }
+
+    TEST(DConcurrency, TempReleaseGlobalRead) {
+        LockState ls;
+        Lock::GlobalRead globalRead(&ls);
+
+        {
+            Lock::TempRelease tempRelease(&ls);
+            ASSERT(!ls.isLocked());
+        }
+
+        ASSERT(ls.isR());
+    }
+
+    TEST(DConcurrency, TempReleaseGlobalWrite) {
+        LockState ls;
+        Lock::GlobalWrite globalWrite(&ls);
+
+        {
+            Lock::TempRelease tempRelease(&ls);
+            ASSERT(!ls.isLocked());
+        }
+
+        ASSERT(ls.isW());
+    }
+
     TEST(DConcurrency, TempReleaseOneDB) {
         LockState ls;
 
@@ -46,6 +141,7 @@ namespace mongo {
 
         {
             Lock::TempRelease tempRelease(&ls);
+            ASSERT(!ls.isLocked());
         }
 
         ls.assertAtLeastReadLocked("db1");

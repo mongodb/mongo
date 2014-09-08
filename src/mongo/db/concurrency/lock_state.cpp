@@ -40,25 +40,43 @@ namespace mongo {
 namespace newlm {
 
     namespace {
-        // Counts the Locker instance identifiers
-        static AtomicUInt64 idCounter(0);
 
-        // Global lock manager instance
-        static LockManager globalLockManagerInstance;
-        static LockManager* globalLockManagerPtr = &globalLockManagerInstance;
+        // Dispenses unique Locker instance identifiers
+        AtomicUInt64 idCounter(0);
+
+        // Global lock manager instance. We have a pointer an an instance so that they can be
+        // changed and restored for unit-tests.
+        LockManager globalLockManagerInstance;
+        LockManager* globalLockManagerPtr = &globalLockManagerInstance;
+
+        // Global lock. Every server operation, which uses the Locker must acquire this lock at
+        // least once. See comments in the header file (begin/endTransaction) for more information
+        // on its use.
+        const ResourceId resourceIdGlobal = ResourceId(RESOURCE_GLOBAL, string("GlobalLock"));
+
+        // Flush lock. This is only used for the MMAP V1 storage engine and synchronizes the
+        // application of journal writes to the shared view and remaps. See the comments in the
+        // header for _acquireFlushLockForMMAPV1/_releaseFlushLockForMMAPV1 for more information
+        // on its use.
+        const ResourceId resourceIdMMAPV1Flush =
+                                ResourceId(RESOURCE_MMAPV1_FLUSH, string("FlushLock"));
+
+        const ResourceId resourceIdLocalDB =
+                                ResourceId(RESOURCE_DATABASE, string("local"));
     }
 
 
-    bool LockerImpl::isRW() const { 
-        return _threadState == 'R' || _threadState == 'W'; 
+
+    bool LockerImpl::isW() const {
+        return threadState() == 'W';
     }
 
-    bool LockerImpl::isW() const { 
-        return _threadState == 'W'; 
+    bool LockerImpl::isR() const {
+        return threadState() == 'R';
     }
 
-    bool LockerImpl::hasAnyReadLock() const { 
-        return _threadState == 'r' || _threadState == 'R';
+    bool LockerImpl::hasAnyReadLock() const {
+        return threadState() == 'r' || threadState() == 'R';
     }
 
     bool LockerImpl::isLocked() const {
@@ -117,19 +135,6 @@ namespace newlm {
         }
     }
 
-    void LockerImpl::lockedStart( char newState ) {
-        _threadState = newState;
-    }
-
-    void LockerImpl::unlocked() {
-        _threadState = 0;
-    }
-
-    void LockerImpl::changeLockState( char newState ) {
-        fassert( 16169 , _threadState != 0 );
-        _threadState = newState;
-    }
-
     BSONObj LockerImpl::reportState() {
         BSONObjBuilder b;
         reportState(&b);
@@ -143,9 +148,9 @@ namespace newlm {
     */
     void LockerImpl::reportState(BSONObjBuilder* res) {
         BSONObjBuilder b;
-        if( _threadState ) {
+        if (threadState()) {
             char buf[2];
-            buf[0] = _threadState; 
+            buf[0] = threadState(); 
             buf[1] = 0;
             b.append("^", buf);
         }
@@ -157,6 +162,23 @@ namespace newlm {
             res->append("locks", o);
         }
         res->append("waitingForLock", _lockPending);
+    }
+
+    char LockerImpl::threadState() const {
+        switch (getLockMode(resourceIdGlobal)) {
+        case MODE_IS:
+            return 'r';
+        case MODE_IX:
+            return 'w';
+        case MODE_S:
+            return 'R';
+        case MODE_X:
+            return 'W';
+        case MODE_NONE:
+            return '\0';
+        }
+
+        invariant(false);
     }
 
     void LockerImpl::dump() const {
@@ -234,10 +256,10 @@ namespace newlm {
 
     LockerImpl::LockerImpl(uint64_t id) 
         : _id(id),
+          _wuowNestingLevel(0),
           _batchWriter(false),
           _lockPendingParallelWriter(false),
           _recursive(0),
-          _threadState(0),
           _scopedLk(NULL),
           _lockPending(false) {
 
@@ -245,10 +267,10 @@ namespace newlm {
 
     LockerImpl::LockerImpl() 
         : _id(idCounter.addAndFetch(1)),
+          _wuowNestingLevel(0),
           _batchWriter(false),
           _lockPendingParallelWriter(false),
           _recursive(0),
-          _threadState(0),
           _scopedLk(NULL),
           _lockPending(false) {
 
@@ -258,24 +280,207 @@ namespace newlm {
         // Cannot delete the Locker while there are still outstanding requests, because the
         // LockManager may attempt to access deleted memory. Besides it is probably incorrect
         // to delete with unaccounted locks anyways.
+        invariant(!inAWriteUnitOfWork());
+        invariant(_resourcesToUnlockAtEndOfUnitOfWork.empty());
         invariant(_requests.empty());
     }
 
-    LockResult LockerImpl::lock(const ResourceId& resId, LockMode mode, unsigned timeoutMs) {
-        return _lockImpl(resId, mode, timeoutMs);
+    LockResult LockerImpl::lockGlobal(LockMode mode, unsigned timeoutMs) {
+        LockRequest* request = _find(resourceIdGlobal);
+        if (request != NULL) {
+            // No upgrades on the GlobalLock are allowed until we can handle deadlocks.
+            invariant(request->mode >= mode);
+        }
+        else {
+            // Global lock should be the first lock on the operation
+            invariant(_requests.empty());
+        }
+
+        Timer timer;
+
+        LockResult globalLockResult = lock(resourceIdGlobal, mode, timeoutMs);
+        if (globalLockResult != LOCK_OK) {
+            invariant(globalLockResult == LOCK_TIMEOUT);
+
+            return globalLockResult;
+        }
+
+        // Obey the requested timeout
+        const unsigned elapsedTimeMs = timer.millis();
+        const unsigned remainingTimeMs =
+            elapsedTimeMs < timeoutMs ? (timeoutMs - elapsedTimeMs) : 0;
+
+        if (request == NULL) {
+            // Special-handling for MMAP V1.
+            LockResult flushLockResult =
+                lock(resourceIdMMAPV1Flush, getLockMode(resourceIdGlobal), remainingTimeMs);
+
+            if (flushLockResult != LOCK_OK) {
+                invariant(flushLockResult == LOCK_TIMEOUT);
+                invariant(unlock(resourceIdGlobal));
+
+                return flushLockResult;
+            }
+        }
+
+        return LOCK_OK;
     }
 
-    bool LockerImpl::unlock(const ResourceId& resId) {
+    void LockerImpl::downgradeGlobalXtoSForMMAPV1() {
+        invariant(!inAWriteUnitOfWork());
+
+        // Only Global and Flush lock could be held at this point.
+        invariant(_requests.size() == 2);
+
+        LockRequest* globalLockRequest = _find(resourceIdGlobal);
+        LockRequest* flushLockRequest = _find(resourceIdMMAPV1Flush);
+
+        invariant(globalLockRequest->mode == MODE_X);
+        invariant(globalLockRequest->recursiveCount == 1);
+        invariant(flushLockRequest->mode == MODE_X);
+        invariant(flushLockRequest->recursiveCount == 1);
+
+        globalLockManagerPtr->downgrade(globalLockRequest, MODE_S);
+        globalLockManagerPtr->downgrade(flushLockRequest, MODE_S);
+    }
+
+    bool LockerImpl::unlockGlobal() {
+        if (!unlock(resourceIdGlobal)) {
+            return false;
+        }
+
+        // Need to unlock the MMAPV1 flush lock, which should be the last lock held
+        invariant(unlock(resourceIdMMAPV1Flush));
+        invariant(_requests.empty());
+
+        return true;
+    }
+
+    void LockerImpl::beginWriteUnitOfWork() {
+        _wuowNestingLevel++;
+    }
+
+    void LockerImpl::endWriteUnitOfWork() {
+        _wuowNestingLevel--;
+        if (_wuowNestingLevel > 0) {
+            // Don't do anything unless leaving outermost WUOW.
+            return;
+        }
+
+        invariant(_wuowNestingLevel == 0);
+
+        while (!_resourcesToUnlockAtEndOfUnitOfWork.empty()) {
+            unlock(_resourcesToUnlockAtEndOfUnitOfWork.front());
+            _resourcesToUnlockAtEndOfUnitOfWork.pop();
+        }
+
+        _yieldFlushLockForMMAPV1();
+    }
+
+    LockResult LockerImpl::lock(const ResourceId& resId, LockMode mode, unsigned timeoutMs) {
+        _notify.clear();
+
         _lock.lock();
         LockRequest* request = _find(resId);
-        invariant(request != NULL);
-        invariant(request->mode != MODE_NONE);
+        if (request == NULL) {
+            request = new LockRequest();
+            request->initNew(resId, this, &_notify);
+
+            _requests.insert(LockRequestsPair(resId, request));
+        }
+        else {
+            invariant(request->recursiveCount > 0);
+            request->notify = &_notify;
+        }
         _lock.unlock();
 
         // Methods on the Locker class are always called single-threadly, so it is safe to release
         // the spin lock, which protects the Locker here. The only thing which could alter the
         // state of the request is deadlock detection, which however would synchronize on the
         // LockManager calls.
+
+        LockResult result = globalLockManagerPtr->lock(resId, request, mode);
+        if (result == LOCK_WAITING) {
+            // Under MMAP V1 engine a deadlock can occur if a thread goes to sleep waiting on DB
+            // lock, while holding the flush lock, so it has to be released. This is only correct
+            // to do if not in a write unit of work.
+            bool unlockedFlushLock = false;
+
+            if (!inAWriteUnitOfWork() && 
+                (resId != resourceIdGlobal) &&
+                (resId != resourceIdMMAPV1Flush) &&
+                (resId != resourceIdLocalDB)) {
+
+                invariant(unlock(resourceIdMMAPV1Flush));
+                unlockedFlushLock = true;
+            }
+
+            // Do the blocking outside of the flush lock (if not in a write unit of work)
+            result = _notify.wait(timeoutMs);
+
+            if (unlockedFlushLock) {
+                // We cannot obey the timeout here, because it is not correct to return from the
+                // lock request with the flush lock released.
+                invariant(LOCK_OK ==
+                    lock(resourceIdMMAPV1Flush, getLockMode(resourceIdGlobal), UINT_MAX));
+            }
+        }
+
+        if (result != LOCK_OK) {
+            // Can only be LOCK_TIMEOUT, because the lock manager does not return any other errors
+            // at this point. Could be LOCK_DEADLOCK, when deadlock detection is implemented.
+            invariant(result == LOCK_TIMEOUT);
+            invariant(_unlockAndUpdateRequestsList(resId, request));
+        }
+
+        return result;
+    }
+
+namespace {
+    bool shouldDelayUnlock(const ResourceId& resId, LockMode mode) {
+        // Global and flush lock are not used to protect transactional resources and as such, they
+        // need to be acquired and released when requested.
+        if (resId == resourceIdGlobal) {
+            return false;
+        }
+
+        if (resId == resourceIdMMAPV1Flush) {
+            return false;
+        }
+
+        switch (mode) {
+        // unlocks of exclusive locks are delayed to the end of the WUOW
+        case MODE_X:
+        case MODE_IX:
+            return true;
+
+        // nothing else should be
+        case MODE_IS:
+        case MODE_S:
+            return false;
+
+        // these should never be passed in
+        case MODE_NONE:
+            invariant(false);
+        }
+
+        invariant(false);
+    }
+} // namespace
+
+    bool LockerImpl::unlock(const ResourceId& resId) {
+        LockRequest* request = _find(resId);
+        invariant(request->mode != MODE_NONE);
+
+        // Methods on the Locker class are always called single-threadly, so it is safe to release
+        // the spin lock, which protects the Locker here. The only thing which could alter the
+        // state of the request is deadlock detection, which however would synchronize on the
+        // LockManager calls.
+
+        if (inAWriteUnitOfWork() && shouldDelayUnlock(resId, request->mode)) {
+            _resourcesToUnlockAtEndOfUnitOfWork.push(resId);
+            return false;
+        }
 
         return _unlockAndUpdateRequestsList(resId, request);
     }
@@ -305,43 +510,6 @@ namespace newlm {
         return it->second;
     }
 
-    LockResult LockerImpl::_lockImpl(const ResourceId& resId, LockMode mode, unsigned timeoutMs) {
-        _notify.clear();
-
-        _lock.lock();
-        LockRequest* request = _find(resId);
-        if (request == NULL) {
-            request = new LockRequest();
-            request->initNew(resId, this, &_notify);
-
-            _requests.insert(LockRequestsPair(resId, request));
-        }
-        else {
-            invariant(request->recursiveCount > 0);
-            request->notify = &_notify;
-        }
-        _lock.unlock();
-
-        // Methods on the Locker class are always called single-threadly, so it is safe to release
-        // the spin lock, which protects the Locker here. The only thing which could alter the
-        // state of the request is deadlock detection, which however would synchronize on the
-        // LockManager calls.
-
-        LockResult result = globalLockManagerPtr->lock(resId, request, mode);
-        if (result == LOCK_WAITING) {
-            result = _notify.wait(timeoutMs);
-        }
-
-        if (result != LOCK_OK) {
-            // Can only be LOCK_TIMEOUT, because the lock manager does not return any other errors
-            // at this point. Could be LOCK_DEADLOCK, when deadlock detection is implemented.
-            invariant(result == LOCK_TIMEOUT);
-            invariant(_unlockAndUpdateRequestsList(resId, request));
-        }
-
-        return result;
-    }
-
     bool LockerImpl::_unlockAndUpdateRequestsList(const ResourceId& resId, LockRequest* request) {
         globalLockManagerPtr->unlock(request);
 
@@ -364,6 +532,14 @@ namespace newlm {
         return recursiveCount == 0;
     }
 
+    void LockerImpl::_yieldFlushLockForMMAPV1() {
+        if (!inAWriteUnitOfWork()) {
+            invariant(unlock(resourceIdMMAPV1Flush));
+            invariant(LOCK_OK ==
+                lock(resourceIdMMAPV1Flush, getLockMode(resourceIdGlobal), UINT_MAX));
+        }
+    }
+
     // Static
     void LockerImpl::changeGlobalLockManagerForTestingOnly(LockManager* newLockMgr) {
         if (newLockMgr != NULL) {
@@ -373,6 +549,34 @@ namespace newlm {
             globalLockManagerPtr = &globalLockManagerInstance;
         }
     }
-    
+
+
+    //
+    // Auto classes
+    //
+
+    AutoYieldFlushLockForMMAPV1Commit::AutoYieldFlushLockForMMAPV1Commit(Locker* locker)
+        : _locker(locker) {
+
+        invariant(_locker->unlock(resourceIdMMAPV1Flush));
+    }
+
+    AutoYieldFlushLockForMMAPV1Commit::~AutoYieldFlushLockForMMAPV1Commit() {
+        invariant(LOCK_OK == _locker->lock(resourceIdMMAPV1Flush,
+                                           _locker->getLockMode(resourceIdGlobal),
+                                           UINT_MAX));
+    }
+
+
+    AutoAcquireFlushLockForMMAPV1Commit::AutoAcquireFlushLockForMMAPV1Commit(Locker* locker)
+        : _locker(locker) {
+
+        invariant(LOCK_OK == _locker->lock(resourceIdMMAPV1Flush, MODE_X, UINT_MAX));
+    }
+
+    AutoAcquireFlushLockForMMAPV1Commit::~AutoAcquireFlushLockForMMAPV1Commit() {
+        invariant(_locker->unlock(resourceIdMMAPV1Flush));
+    }
+
 } // namespace newlm
 } // namespace mongo
