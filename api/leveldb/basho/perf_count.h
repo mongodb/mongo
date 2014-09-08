@@ -23,7 +23,7 @@
 #ifndef STORAGE_LEVELDB_INCLUDE_PERF_COUNT_H_
 #define STORAGE_LEVELDB_INCLUDE_PERF_COUNT_H_
 
-#include "wiredtiger_config.h"
+#include "leveldb_wt_config.h"
 
 #include <stdint.h>
 #include <string>

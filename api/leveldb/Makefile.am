@@ -16,7 +16,7 @@ leveldbincludedir = $(includedir)/wiredtiger/leveldb
 endif
 endif
 leveldbinclude_HEADERS = \
-	wiredtiger_config.h \
+	leveldb_wt_config.h \
 	leveldb/include/leveldb/cache.h \
 	leveldb/include/leveldb/comparator.h\
 	leveldb/include/leveldb/db.h \
