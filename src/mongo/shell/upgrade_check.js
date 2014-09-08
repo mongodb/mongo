@@ -39,10 +39,11 @@ var collUpgradeCheck = function(collObj) {
     var goodSoFar = true;
 
     // check for _id index if and only if it should be present
-    // no $, not oplog, not system
+    // no $, not oplog, not system, not config db
     var indexColl = dbObj.getSiblingDB(dbName).system.indexes;
     if (collName.indexOf('$') === -1 && 
         collName.indexOf("system.") !== 0 &&
+        dbName !== "config" &&
         (dbName !== "local" || (collName.indexOf("oplog.") !== 0 && collName !== "startup_log"))) {
         var idIdx = indexColl.find({ns: fullName, name:"_id_"}).addOption(DBQuery.Option.noTimeout);
         if (!idIdx.hasNext()) {
