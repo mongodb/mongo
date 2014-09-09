@@ -350,11 +350,16 @@ namespace {
         heartbeatFromMember(HostAndPort("h3"), "rs0", MemberState::RS_SECONDARY,
                             OpTime(2, 0), Milliseconds(100));
 
+        // force should overrule other defaults
         getTopoCoord().chooseNewSyncSource(now()++, OpTime(0,0));
         ASSERT_EQUALS(HostAndPort("h3"), getTopoCoord().getSyncSourceAddress());
         getTopoCoord().setForceSyncSourceIndex(1);
         getTopoCoord().chooseNewSyncSource(now()++, OpTime(0,0));
         ASSERT_EQUALS(HostAndPort("h2"), getTopoCoord().getSyncSourceAddress());
+
+        // force should only work for one call to chooseNewSyncSource
+        getTopoCoord().chooseNewSyncSource(now()++, OpTime(0,0));
+        ASSERT_EQUALS(HostAndPort("h3"), getTopoCoord().getSyncSourceAddress());
     }
 
     TEST_F(TopoCoordTest, BlacklistSyncSource) {
@@ -501,6 +506,17 @@ namespace {
         ASSERT_FALSE(response9Obj.hasField("warning"));
         ASSERT_EQUALS(HostAndPort("h5").toString(), response9Obj["prevSyncTarget"].String());
         getTopoCoord().chooseNewSyncSource(now()++, ourOpTime);
+        ASSERT_EQUALS(HostAndPort("h6"), getTopoCoord().getSyncSourceAddress());
+
+        // node goes down between forceSync and chooseNewSyncSource
+        BSONObjBuilder response10;
+        getTopoCoord().prepareSyncFromResponse(
+                cbData(), HostAndPort("h6"), ourOpTime, &response10, &result);
+        BSONObj response10Obj = response10.obj();
+        ASSERT_FALSE(response10Obj.hasField("warning"));
+        ASSERT_EQUALS(HostAndPort("h6").toString(), response10Obj["prevSyncTarget"].String());
+        downMember(HostAndPort("h6"), "rs0");
+        getTopoCoord().chooseNewSyncSource(now()++, OpTime(0,0));
         ASSERT_EQUALS(HostAndPort("h6"), getTopoCoord().getSyncSourceAddress());
     }
 
