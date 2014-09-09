@@ -630,30 +630,36 @@ __conn_reconfigure(WT_CONNECTION *wt_conn, const char *config)
 	WT_CONNECTION_IMPL *conn;
 	WT_DECL_RET;
 	WT_SESSION_IMPL *session;
-
-	/*
-	 * Special version of cfg that doesn't include the default config: used
-	 * to limit changes to values that the application sets explicitly.
-	 * Note that any function using this value has to be prepared to handle
-	 * not-found as a valid option return.
-	 */
-	const char *raw_cfg[] = { config, NULL };
+	const char *p, *config_cfg[] = { NULL, NULL, NULL };
 
 	conn = (WT_CONNECTION_IMPL *)wt_conn;
 
 	CONNECTION_API_CALL(conn, session, reconfigure, config, cfg);
+	WT_UNUSED(cfg);
 
-	WT_ERR(__wt_conn_cache_pool_config(session, cfg));
-	WT_ERR(__wt_cache_config(conn, raw_cfg));
+	/*
+	 * The configuration argument has been checked for validity, replace the
+	 * previous connection configuration.
+	 *
+	 * DO NOT merge the configuration before the reconfigure calls.  Some
+	 * of the underlying reconfiguration functions do explicit checks with
+	 * the second element of the configuration array, knowing the defaults
+	 * are in slot #1 and the application's modifications are in slot #2.
+	 */
+	config_cfg[0] = conn->cfg;
+	config_cfg[1] = config;
 
-	WT_ERR(__wt_async_reconfig(conn, raw_cfg));
-	WT_ERR(__conn_statistics_config(session, raw_cfg));
-	WT_ERR(__wt_conn_verbose_config(session, raw_cfg));
-	WT_ERR(__wt_checkpoint_server_create(conn, cfg));
-	WT_ERR(__wt_statlog_create(conn, cfg));
+	WT_ERR(__wt_conn_cache_pool_config(session, config_cfg));
+	WT_ERR(__wt_cache_config(conn, config_cfg));
+
+	WT_ERR(__wt_async_reconfig(conn, config_cfg));
+	WT_ERR(__conn_statistics_config(session, config_cfg));
+	WT_ERR(__wt_conn_verbose_config(session, config_cfg));
+	WT_ERR(__wt_checkpoint_server_create(conn, config_cfg));
+	WT_ERR(__wt_statlog_create(conn, config_cfg));
 
 	WT_ERR(__wt_config_gets(
-	    session, cfg, "lsm_manager.worker_thread_max", &cval));
+	    session, config_cfg, "lsm_manager.worker_thread_max", &cval));
 	if (cval.val)
 		conn->lsm_manager.lsm_workers_max = (uint32_t)cval.val;
 
@@ -661,6 +667,10 @@ __conn_reconfigure(WT_CONNECTION *wt_conn, const char *config)
 	if (F_ISSET(conn, WT_CONN_CACHE_POOL))
 		WT_ERR(__wt_cond_signal(
 		    session, __wt_process.cache_pool->cache_pool_cond));
+
+	WT_ERR(__wt_config_merge(session, config_cfg, &p));
+	__wt_free(session, conn->cfg);
+	conn->cfg = p;
 
 err:	API_END_RET(session, ret);
 }
@@ -1399,18 +1409,17 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
 	 */
 	WT_ERR(__wt_connection_workers(session, cfg));
 
+	/* Merge the final configuration for later reconfiguration. */
+	WT_ERR(__wt_config_merge(session, cfg, &conn->cfg));
+
 	STATIC_ASSERT(offsetof(WT_CONNECTION_IMPL, iface) == 0);
 	*wt_connp = &conn->iface;
 
-	/*
-	 * Destroying the connection on error will destroy our session handle,
-	 * cleanup using the session handle first, then discard the connection.
-	 */
-err:	__wt_buf_free(session, &cbbuf);
-	__wt_buf_free(session, &cubuf);
-
-	if (ret != 0 && conn != NULL)
+err:	if (ret != 0 && conn != NULL)
 		WT_TRET(__wt_connection_close(conn));
+
+	__wt_buf_free(session, &cbbuf);
+	__wt_buf_free(session, &cubuf);
 
 	return (ret);
 }

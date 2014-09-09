@@ -130,6 +130,7 @@ __wt_connection_destroy(WT_CONNECTION_IMPL *conn)
 	__wt_free(session, conn->page_lock);
 
 	/* Free allocated memory. */
+	__wt_free(session, conn->cfg);
 	__wt_free(session, conn->home);
 	__wt_free(session, conn->error_prefix);
 	__wt_free(session, conn->sessions);
