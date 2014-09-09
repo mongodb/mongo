@@ -228,13 +228,13 @@ __config_merge_format_next(WT_SESSION_IMPL *session, const char *prefix,
 
 	for (; *enp < cp->entries_next; ++*enp) {
 		ep = &cp->entries[*enp];
+		len1 = strlen(ep->k);
 
 		/*
 		 * The entries are in sorted order, take the last entry for any
 		 * key.
 		 */
 		if (*enp < (cp->entries_next - 1)) {
-			len1 = strlen(ep->k);
 			len2 = strlen((ep + 1)->k);
 
 			/* Choose the last of identical keys. */
@@ -257,7 +257,8 @@ __config_merge_format_next(WT_SESSION_IMPL *session, const char *prefix,
 		 * If we're skipping a prefix and this entry doesn't match it,
 		 * back off one entry and pop up a level.
 		 */
-		if (plen != 0 && memcmp(ep->k, prefix, plen) != 0) {
+		if (plen != 0 &&
+		    (plen < len1 || memcmp(ep->k, prefix, plen) != 0)) {
 			--*enp;
 			break;
 		}
