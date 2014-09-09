@@ -1,3 +1,5 @@
+// heap1_btree_impl_test.cpp
+
 /**
  *    Copyright (C) 2014 MongoDB Inc.
  *
@@ -26,21 +28,34 @@
  *    it in the license file.
  */
 
-#include <boost/shared_ptr.hpp>
-
-#include "mongo/db/storage/sorted_data_interface.h"
-
-#pragma once
+#include "mongo/db/storage/heap1/heap1_btree_impl.h"
+#include "mongo/db/storage/heap1/heap1_recovery_unit.h"
+#include "mongo/db/storage/sorted_data_interface_test_harness.h"
+#include "mongo/unittest/unittest.h"
 
 namespace mongo {
 
-    class IndexCatalogEntry;
+    class MyHarnessHelper : public HarnessHelper {
+    public:
+        MyHarnessHelper()
+            : _order( Ordering::make( BSONObj() ) ) {
+        }
 
-    /**
-     * Caller takes ownership.
-     * All permanent data will be stored and fetch from dataInOut.
-     */
-    SortedDataInterface* getHeap1BtreeImpl(const Ordering& ordering,
-                                           boost::shared_ptr<void>* dataInOut);
+        virtual SortedDataInterface* newSortedDataInterface() {
+            return getHeap1BtreeImpl(_order, &_data);
+        }
 
-}  // namespace mongo
+        virtual RecoveryUnit* newRecoveryUnit() {
+            return new Heap1RecoveryUnit();
+        }
+
+    private:
+        shared_ptr<void> _data; // used by Heap1BtreeImpl
+        Ordering _order;
+    };
+
+    HarnessHelper* newHarnessHelper() {
+        return new MyHarnessHelper();
+    }
+
+}

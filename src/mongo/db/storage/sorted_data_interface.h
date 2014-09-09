@@ -91,7 +91,7 @@ namespace mongo {
         //
 
         // TODO: expose full set of args for testing?
-        virtual void fullValidate(OperationContext* txn, long long* numKeysOut) = 0;
+        virtual void fullValidate(OperationContext* txn, long long* numKeysOut) const = 0;
 
         /**
          * @see IndexAccessMethod::getSpaceUsedBytes
@@ -104,6 +104,16 @@ namespace mongo {
          * Attempt to bring whole index into memory. No-op is ok if not supported.
          */
         virtual Status touch(OperationContext* txn) const = 0;
+
+        /**
+         * Implementors SHOULD override this with an efficient representation if at all possible.
+         * @return the number of entries in the index.
+         */
+        virtual long long numEntries( OperationContext* txn ) const {
+            long long x = -1;
+            fullValidate( txn, &x );
+            return x;
+        }
 
         /**
          * Navigation

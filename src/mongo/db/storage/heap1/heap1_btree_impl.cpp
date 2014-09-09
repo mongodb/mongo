@@ -120,9 +120,8 @@ namespace {
 
     class Heap1BtreeImpl : public SortedDataInterface {
     public:
-        Heap1BtreeImpl(const IndexCatalogEntry& info, IndexSet* data)
-            : _info(info),
-              _data(data) {
+        Heap1BtreeImpl(IndexSet* data)
+            : _data(data) {
             _currentKeySize = 0;
         }
 
@@ -168,7 +167,7 @@ namespace {
             return numDeleted == 1;
         }
 
-        virtual void fullValidate(OperationContext* txn, long long *numKeysOut) {
+        virtual void fullValidate(OperationContext* txn, long long *numKeysOut) const {
             // TODO check invariants?
             *numKeysOut = _data->size();
         }
@@ -328,7 +327,7 @@ namespace {
                 // An empty key means we should seek to the seek to the end, 
                 // i.e. one past the lowest key in the iterator
                 if (keyRaw.isEmpty()) {
-                    _it = _data.rend();
+                    _it = _data.rbegin();
                     return false;
                 }
 
@@ -435,7 +434,6 @@ namespace {
         }
 
     private:
-        const IndexCatalogEntry& _info;
         IndexSet* _data;
         long long _currentKeySize;
     };
@@ -443,13 +441,13 @@ namespace {
 
     // IndexCatalogEntry argument taken by non-const pointer for consistency with other Btree
     // factories. We don't actually modify it.
-    SortedDataInterface* getHeap1BtreeImpl(IndexCatalogEntry* info, boost::shared_ptr<void>* dataInOut) {
-        invariant(info);
+    SortedDataInterface* getHeap1BtreeImpl(const Ordering& ordering,
+                                           boost::shared_ptr<void>* dataInOut) {
         invariant(dataInOut);
         if (!*dataInOut) {
-            *dataInOut = boost::make_shared<IndexSet>(IndexEntryComparison(info->ordering()));
+            *dataInOut = boost::make_shared<IndexSet>(IndexEntryComparison(ordering));
         }
-        return new Heap1BtreeImpl(*info, static_cast<IndexSet*>(dataInOut->get()));
+        return new Heap1BtreeImpl(static_cast<IndexSet*>(dataInOut->get()));
     }
 
 }  // namespace mongo

@@ -172,7 +172,7 @@ namespace mongo {
                                long long *unusedCount,
                                bool strict,
                                bool dumpBuckets,
-                               unsigned depth);
+                               unsigned depth) const;
 
         DiskLoc getDiskLoc(OperationContext* txn,
                            const DiskLoc& bucketLoc,
@@ -412,7 +412,7 @@ namespace mongo {
                                 long long *unusedCount,
                                 bool strict,
                                 bool dumpBuckets,
-                                unsigned depth);
+                                unsigned depth) const ;
 
         DiskLoc _addBucket(OperationContext* txn);
 

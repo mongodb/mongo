@@ -59,7 +59,8 @@ namespace mongo {
         index->headManager()->setHead(txn, DiskLoc(0xDEAD, 0xBEAF));
 
         // When is a btree not a Btree? When it is a Heap1BtreeImpl!
-        std::auto_ptr<SortedDataInterface> btree(getHeap1BtreeImpl(index, &i->second->data));
+        std::auto_ptr<SortedDataInterface> btree(getHeap1BtreeImpl(index->ordering(),
+                                                                   &i->second->data));
 #else
 
         if (!i->second->rs)

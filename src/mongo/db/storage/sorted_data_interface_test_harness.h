@@ -1,3 +1,5 @@
+// sorted_data_interface_test_harness.h
+
 /**
  *    Copyright (C) 2014 MongoDB Inc.
  *
@@ -26,21 +28,27 @@
  *    it in the license file.
  */
 
-#include <boost/shared_ptr.hpp>
-
-#include "mongo/db/storage/sorted_data_interface.h"
-
 #pragma once
+
+#include "mongo/db/operation_context_noop.h"
 
 namespace mongo {
 
-    class IndexCatalogEntry;
+    class RecoveryUnit;
+    class SortedDataInterface;
 
-    /**
-     * Caller takes ownership.
-     * All permanent data will be stored and fetch from dataInOut.
-     */
-    SortedDataInterface* getHeap1BtreeImpl(const Ordering& ordering,
-                                           boost::shared_ptr<void>* dataInOut);
+    class HarnessHelper {
+    public:
+        HarnessHelper(){}
+        virtual ~HarnessHelper(){}
 
-}  // namespace mongo
+        virtual SortedDataInterface* newSortedDataInterface() = 0;
+        virtual RecoveryUnit* newRecoveryUnit() = 0;
+
+        virtual OperationContext* newOperationContext() {
+            return new OperationContextNoop( newRecoveryUnit() );
+        }
+    };
+
+    HarnessHelper* newHarnessHelper();
+}
