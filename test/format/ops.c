@@ -415,7 +415,7 @@ skip_insert:			if (col_update(cursor, &key, &value, keyno))
 		++tinfo->search;
 		if (read_row(cursor, &key, keyno))
 			goto deadlock;
-		
+
 		/* Reset the cursor: there is no reason to keep pages pinned. */
 		if (cursor != NULL && (ret = cursor->reset(cursor)) != 0)
 			die(ret, "cursor.reset");
