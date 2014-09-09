@@ -129,9 +129,11 @@ namespace repl {
 
         virtual Status setMyLastOptime(OperationContext* txn, const OpTime& ts);
 
+        virtual OpTime getMyLastOptime() const;
+
         virtual OID getElectionId();
 
-        virtual OID getMyRID();
+        virtual OID getMyRID() const;
 
         virtual void prepareReplSetUpdatePositionCommand(OperationContext* txn,
                                                          BSONObjBuilder* cmdBuilder);
@@ -340,7 +342,7 @@ namespace repl {
         Status _checkIfWriteConcernCanBeSatisfied_inlock(
                 const WriteConcernOptions& writeConcern) const;
 
-        OID _getMyRID_inlock();
+        OID _getMyRID_inlock() const;
 
         /**
          * Helper method for setLastOptime and setMyLastOptime that takes in a unique lock on

@@ -300,16 +300,24 @@ namespace {
         _currentState = newState;
     }
 
-    Status ReplicationCoordinatorImpl::setMyLastOptime(OperationContext* txn, const OpTime& ts) {
-        boost::unique_lock<boost::mutex> lock(_mutex);
-        return _setLastOptime_inlock(&lock, _getMyRID_inlock(), ts);
-    }
-
     Status ReplicationCoordinatorImpl::setLastOptime(OperationContext* txn,
                                                      const OID& rid,
                                                      const OpTime& ts) {
         boost::unique_lock<boost::mutex> lock(_mutex);
         return _setLastOptime_inlock(&lock, rid, ts);
+    }
+
+    Status ReplicationCoordinatorImpl::setMyLastOptime(OperationContext* txn, const OpTime& ts) {
+        boost::unique_lock<boost::mutex> lock(_mutex);
+        return _setLastOptime_inlock(&lock, _getMyRID_inlock(), ts);
+    }
+
+    OpTime ReplicationCoordinatorImpl::getMyLastOptime() const {
+        boost::unique_lock<boost::mutex> lock(_mutex);
+
+        SlaveInfoMap::const_iterator it(_slaveInfoMap.find(_getMyRID_inlock()));
+        invariant(it != _slaveInfoMap.end());
+        return it->second.opTime;
     }
 
     Status ReplicationCoordinatorImpl::_setLastOptime_inlock(boost::unique_lock<boost::mutex>* lock,
@@ -331,7 +339,10 @@ namespace {
 
         LOG(3) << "Node with RID " << rid << " currently has optime " << slaveInfo.opTime <<
                 "; updating to " << ts;
-        if (slaveInfo.opTime < ts) {
+
+        // Only update optimes if they increase.  Exception: this own node's last applied optime,
+        // which may rewind if we roll back.
+        if ((slaveInfo.opTime < ts) || (rid == _myRID)) {
             slaveInfo.opTime = ts;
 
             // Wake up any threads waiting for replication that now have their replication
@@ -666,12 +677,12 @@ namespace {
         return _electionID;
     }
 
-    OID ReplicationCoordinatorImpl::getMyRID() {
+    OID ReplicationCoordinatorImpl::getMyRID() const {
         boost::lock_guard<boost::mutex> lock(_mutex);
         return _getMyRID_inlock();
     }
 
-    OID ReplicationCoordinatorImpl::_getMyRID_inlock() {
+    OID ReplicationCoordinatorImpl::_getMyRID_inlock() const {
         return _myRID;
     }
 

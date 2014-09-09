@@ -92,9 +92,11 @@ namespace repl {
 
         virtual Status setMyLastOptime(OperationContext* txn, const OpTime& ts);
 
+        virtual OpTime getMyLastOptime() const;
+
         virtual OID getElectionId();
 
-        virtual OID getMyRID();
+        virtual OID getMyRID() const;
 
         virtual void prepareReplSetUpdatePositionCommand(OperationContext* txn,
                                                          BSONObjBuilder* cmdBuilder);
@@ -156,7 +158,7 @@ namespace repl {
     private:
 
         // Mutex that protects the _slaveOpTimeMap
-        boost::mutex _mutex;
+        mutable boost::mutex _mutex;
 
         // Map from RID to Member pointer for replica set nodes
         typedef std::map<OID, Member*> OIDMemberMap;

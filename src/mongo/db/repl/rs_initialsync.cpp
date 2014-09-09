@@ -319,7 +319,7 @@ namespace repl {
             log() << "replSet initial sync failed during oplog application phase, and will retry"
                   << rsLog;
 
-            lastOpTimeWritten = OpTime();
+            getGlobalReplicationCoordinator()->setMyLastOptime(ctx, OpTime());
             lastH = 0;
 
             sleepsecs(5);

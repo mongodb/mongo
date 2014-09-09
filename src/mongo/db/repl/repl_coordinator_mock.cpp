@@ -126,12 +126,18 @@ namespace repl {
         return Status::OK();
     }
 
+    OpTime ReplicationCoordinatorMock::getMyLastOptime() const {
+        // TODO
+        return OpTime();
+    }
+
+
     OID ReplicationCoordinatorMock::getElectionId() {
         // TODO
         return OID();
     }
 
-    OID ReplicationCoordinatorMock::getMyRID() {
+    OID ReplicationCoordinatorMock::getMyRID() const {
         return OID();
     }
 

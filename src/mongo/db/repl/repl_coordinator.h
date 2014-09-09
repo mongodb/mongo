@@ -248,6 +248,11 @@ namespace repl {
         virtual Status setMyLastOptime(OperationContext* txn, const OpTime& ts) = 0;
 
         /**
+         * Returns the last optime recorded by setMyLastOptime.
+         */
+        virtual OpTime getMyLastOptime() const = 0;
+
+        /**
          * Retrieves and returns the current election id, which is a unique id that is local to
          * this node and changes every time we become primary.
          * TODO(spencer): Use term instead.
@@ -258,7 +263,7 @@ namespace repl {
          * Returns the RID for this node.  The RID is used to identify this node to our sync source
          * when sending updates about our replication progress.
          */
-        virtual OID getMyRID() = 0;
+        virtual OID getMyRID() const = 0;
 
         /**
          * Prepares a BSONObj describing an invocation of the replSetUpdatePosition command that can

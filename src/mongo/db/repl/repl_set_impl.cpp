@@ -455,8 +455,12 @@ namespace {
         BSONObj o;
         if (Helpers::getLast(txn, rsoplog, o)) {
             lastH = o["h"].numberLong();
-            lastOpTimeWritten = o["ts"]._opTime();
-            uassert(13290, "bad replSet oplog entry?", quiet || !lastOpTimeWritten.isNull());
+            OpTime lastOpTime = o["ts"]._opTime();
+            uassert(13290, "bad replSet oplog entry?", quiet || !lastOpTime.isNull());
+            getGlobalReplicationCoordinator()->setMyLastOptime(txn, lastOpTime);
+        }
+        else {
+            getGlobalReplicationCoordinator()->setMyLastOptime(txn, OpTime());
         }
     }
 

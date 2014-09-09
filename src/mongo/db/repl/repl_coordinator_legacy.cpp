@@ -60,7 +60,6 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/fail_point_service.h"
 #include "mongo/util/log.h"
-#include "mongo/util/map_util.h"
 
 namespace mongo {
 
@@ -365,21 +364,19 @@ namespace {
         return true;
     }
 
-    Status LegacyReplicationCoordinator::setMyLastOptime(OperationContext* txn, const OpTime& ts) {
-        return setLastOptime(txn, getMyRID(), ts);
-    }
-
     Status LegacyReplicationCoordinator::setLastOptime(OperationContext* txn,
                                                        const OID& rid,
                                                        const OpTime& ts) {
         {
             boost::lock_guard<boost::mutex> lock(_mutex);
-            if (ts <= mapFindWithDefault(_slaveOpTimeMap, rid, OpTime())) {
-                // Only update if ts is newer than what we have already
-                return Status::OK();
-            }
+            SlaveOpTimeMap::const_iterator it(_slaveOpTimeMap.find(rid));
 
             if (rid != getMyRID()) {
+                if ((it != _slaveOpTimeMap.end()) && (ts <= it->second)) {
+                    // Only update if ts is newer than what we have already
+                    return Status::OK();
+                }
+
                 BSONObj config;
                 if (getReplicationMode() == modeReplSet) {
                     invariant(_ridMemberMap.count(rid));
@@ -414,13 +411,31 @@ namespace {
         }
         return Status::OK();
     }
+
+    Status LegacyReplicationCoordinator::setMyLastOptime(OperationContext* txn, const OpTime& ts) {
+        if (getReplicationMode() == modeReplSet) {
+            theReplSet->lastOpTimeWritten = ts;
+        }
+        return setLastOptime(txn, _myRID, ts);
+    }
+
+    OpTime LegacyReplicationCoordinator::getMyLastOptime() const {
+        boost::lock_guard<boost::mutex> lock(_mutex);
+
+        SlaveOpTimeMap::const_iterator it(_slaveOpTimeMap.find(_myRID));
+        invariant(it != _slaveOpTimeMap.end());
+        OpTime legacyMapOpTime = it->second;
+        OpTime legacyOpTime = theReplSet->lastOpTimeWritten;
+        fassert(18695, legacyOpTime == legacyMapOpTime);
+        return legacyOpTime;
+    }
     
     OID LegacyReplicationCoordinator::getElectionId() {
         return theReplSet->getElectionId();
     }
 
 
-    OID LegacyReplicationCoordinator::getMyRID() {
+    OID LegacyReplicationCoordinator::getMyRID() const {
         return _myRID;
     }
 

@@ -145,24 +145,23 @@ namespace repl {
             /* todo: now() has code to handle clock skew.  but if the skew server to server is large it will get unhappy.
                      this code (or code in now() maybe) should be improved.
                      */
-            if( theReplSet ) {
-                if( !(theReplSet->lastOpTimeWritten<ts) ) {
-                    log() << "replication oplog stream went back in time. previous timestamp: "
-                          << theReplSet->lastOpTimeWritten << " newest timestamp: " << ts
-                          << ". attempting to sync directly from primary." << endl;
+            ReplicationCoordinator* replCoord = getGlobalReplicationCoordinator();
+            if (replCoord->getReplicationMode() == ReplicationCoordinator::modeReplSet) {
+                OpTime myLastOptime = replCoord->getMyLastOptime();
+                if (!(myLastOptime < ts)) {
+                    warning() << "replication oplog stream went back in time. previous timestamp: "
+                              << myLastOptime << " newest timestamp: " << ts
+                              << ". attempting to sync directly from primary." << endl;
                     BSONObjBuilder result;
-                    Status status =
-                            theReplSet->forceSyncFrom(theReplSet->box.getPrimary()->fullName(),
-                                                      &result);
+                    HostAndPort targetHostAndPort = theReplSet->box.getPrimary()->h();
+                    Status status = replCoord->processReplSetSyncFrom(targetHostAndPort, &result);
                     if (!status.isOK()) {
-                        log() << "Can't sync from primary: " << status;
+                        error() << "Can't sync from primary: " << status;
                     }
                 }
-                theReplSet->lastOpTimeWritten = ts;
                 theReplSet->lastH = h;
                 ctx.getClient()->setLastOp( ts );
 
-                ReplicationCoordinator* replCoord = getGlobalReplicationCoordinator();
                 replCoord->setMyLastOptime(txn, ts);
                 BackgroundSync::notify();
             }
@@ -306,26 +305,10 @@ namespace repl {
         OplogDocWriter writer( partial, obj );
         checkOplogInsert( localOplogRSCollection->insertDocument( txn, &writer, false ) );
 
-        /* todo: now() has code to handle clock skew.  but if the skew server to server is large it will get unhappy.
-           this code (or code in now() maybe) should be improved.
-        */
-        if( theReplSet ) {
-            if( !(theReplSet->lastOpTimeWritten<ts) ) {
-                log() << "replication oplog stream went back in time. previous timestamp: "
-                      << theReplSet->lastOpTimeWritten << " newest timestamp: " << ts
-                      << ". attempting to sync directly from primary." << endl;
-                BSONObjBuilder result;
-                Status status = theReplSet->forceSyncFrom(theReplSet->box.getPrimary()->fullName(),
-                                                          &result);
-                if (!status.isOK()) {
-                    log() << "Can't sync from primary: " << status;
-                }
-            }
-            theReplSet->lastOpTimeWritten = ts;
+        ReplicationCoordinator* replCoord = getGlobalReplicationCoordinator();
+        if (replCoord->getReplicationMode() == repl::ReplicationCoordinator::modeReplSet) {
             theReplSet->lastH = hashNew;
             ctx.getClient()->setLastOp( ts );
-
-            ReplicationCoordinator* replCoord = getGlobalReplicationCoordinator();
             replCoord->setMyLastOptime(txn, ts);
         }
         wunit.commit();

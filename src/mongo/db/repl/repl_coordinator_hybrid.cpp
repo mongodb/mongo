@@ -198,15 +198,21 @@ namespace repl {
         return legacyStatus;
     }
 
+    OpTime HybridReplicationCoordinator::getMyLastOptime() const {
+        _legacy.getMyLastOptime();
+        OpTime implOpTime = _impl.getMyLastOptime();
+        return implOpTime;
+    }
+
     OID HybridReplicationCoordinator::getElectionId() {
         OID legacyOID = _legacy.getElectionId();
         _impl.getElectionId();
         return legacyOID;
     }
 
-    OID HybridReplicationCoordinator::getMyRID() {
+    OID HybridReplicationCoordinator::getMyRID() const {
         OID legacyRID = _legacy.getMyRID();
-        _impl.getMyRID();
+        fassert(18696, legacyRID == _impl.getMyRID());
         return legacyRID;
     }
 
