@@ -8,11 +8,11 @@
 #include "wt_internal.h"
 
 /*
- * __checkpoint_name_ok --
+ * __wt_checkpoint_name_ok --
  *	Complain if the checkpoint name isn't acceptable.
  */
-static int
-__checkpoint_name_ok(WT_SESSION_IMPL *session, const char *name, size_t len)
+int
+__wt_checkpoint_name_ok(WT_SESSION_IMPL *session, const char *name, size_t len)
 {
 	/* Check for characters we don't want to see in a metadata file. */
 	WT_RET(__wt_name_check(session, name, len));
@@ -103,7 +103,7 @@ __checkpoint_apply(WT_SESSION_IMPL *session, const char *cfg[],
 	WT_RET(__wt_config_gets(session, cfg, "name", &cval));
 	named = cval.len != 0;
 	if (named)
-		WT_RET(__checkpoint_name_ok(session, cval.str, cval.len));
+		WT_RET(__wt_checkpoint_name_ok(session, cval.str, cval.len));
 
 	/* Step through the targets and optionally operate on each one. */
 	WT_ERR(__wt_config_gets(session, cfg, "target", &cval));
@@ -580,7 +580,7 @@ __checkpoint_worker(
 	if (cval.len == 0)
 		name = WT_CHECKPOINT;
 	else {
-		WT_ERR(__checkpoint_name_ok(session, cval.str, cval.len));
+		WT_ERR(__wt_checkpoint_name_ok(session, cval.str, cval.len));
 		WT_ERR(__wt_strndup(session, cval.str, cval.len, &name_alloc));
 		name = name_alloc;
 	}
@@ -595,10 +595,10 @@ __checkpoint_worker(
 			    __wt_config_next(&dropconf, &k, &v)) == 0) {
 				/* Disallow unsafe checkpoint names. */
 				if (v.len == 0)
-					WT_ERR(__checkpoint_name_ok(
+					WT_ERR(__wt_checkpoint_name_ok(
 					    session, k.str, k.len));
 				else
-					WT_ERR(__checkpoint_name_ok(
+					WT_ERR(__wt_checkpoint_name_ok(
 					    session, v.str, v.len));
 
 				if (v.len == 0)

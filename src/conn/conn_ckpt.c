@@ -20,6 +20,7 @@ __ckpt_server_config(WT_SESSION_IMPL *session, const char **cfg, int *startp)
 	WT_CONNECTION_IMPL *conn;
 	WT_DECL_ITEM(tmp);
 	WT_DECL_RET;
+	char *p;
 
 	conn = S2C(session);
 
@@ -40,19 +41,26 @@ __ckpt_server_config(WT_SESSION_IMPL *session, const char **cfg, int *startp)
 	}
 	*startp = 1;
 
+	/*
+	 * The application can specify a checkpoint name, which we ignore if
+	 * it's our default.
+	 */
 	WT_RET(__wt_config_gets(session, cfg, "checkpoint.name", &cval));
+	if (cval.len != 0 &&
+	    !WT_STRING_MATCH(WT_CHECKPOINT, cval.str, cval.len)) {
+		WT_RET(__wt_checkpoint_name_ok(session, cval.str, cval.len));
 
-	if (!WT_STRING_MATCH(WT_CHECKPOINT, cval.str, cval.len)) {
 		WT_RET(__wt_scr_alloc(session, cval.len + 20, &tmp));
-		strcpy((char *)tmp->data, "name=");
-		strncat((char *)tmp->data, cval.str, cval.len);
-		ret = __wt_strndup(session,
-		    tmp->data, strlen("name=") + cval.len, &conn->ckpt_config);
-		__wt_scr_free(&tmp);
-		WT_RET(ret);
+		WT_ERR(__wt_buf_fmt(
+		    session, tmp, "name=%.*s", (int)cval.len, cval.str));
+		WT_ERR(__wt_strdup(session, tmp->data, &p));
+
+		__wt_free(session, conn->ckpt_config);
+		conn->ckpt_config = p;
 	}
 
-	return (0);
+err:	__wt_scr_free(&tmp);
+	return (ret);
 }
 
 /*

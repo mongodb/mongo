@@ -1611,6 +1611,9 @@ extern int __wt_txn_init(WT_SESSION_IMPL *session);
 extern void __wt_txn_destroy(WT_SESSION_IMPL *session);
 extern int __wt_txn_global_init(WT_CONNECTION_IMPL *conn, const char *cfg[]);
 extern void __wt_txn_global_destroy(WT_CONNECTION_IMPL *conn);
+extern int __wt_checkpoint_name_ok(WT_SESSION_IMPL *session,
+    const char *name,
+    size_t len);
 extern int __wt_checkpoint_list(WT_SESSION_IMPL *session, const char *cfg[]);
 extern int __wt_txn_checkpoint(WT_SESSION_IMPL *session, const char *cfg[]);
 extern int __wt_checkpoint(WT_SESSION_IMPL *session, const char *cfg[]);
