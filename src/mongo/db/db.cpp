@@ -646,6 +646,28 @@ namespace mongo {
             }
 
             authindex::configureSystemIndexes(&txn, "admin");
+
+            // SERVER-14090: Verify that auth schema version is schemaVersion26Final.
+            int foundSchemaVersion;
+            Status status = getGlobalAuthorizationManager()->getAuthorizationVersion(
+                    &txn, &foundSchemaVersion);
+            if (!status.isOK()) {
+                log() << "Auth schema version is incompatible: "
+                      << "User and role management commands require auth data to have "
+                      << "schema version " << AuthorizationManager::schemaVersion26Final
+                      << " but startup could not verify schema version: " << status.toString()
+                      << endl;
+                exitCleanly(EXIT_NEED_UPGRADE);
+            }
+            if (foundSchemaVersion != AuthorizationManager::schemaVersion26Final) {
+                log() << "Auth schema version is incompatible: "
+                      << "User and role management commands require auth data to have "
+                      << "schema version " << AuthorizationManager::schemaVersion26Final
+                      << " but found " << foundSchemaVersion << ". In order to upgrade "
+                      << "the auth schema, first downgrade MongoDB binaries to version "
+                      << "2.6 and then run the authSchemaUpgrade command." << endl;
+                exitCleanly(EXIT_NEED_UPGRADE);
+            }
         }
 
         getDeleter()->startWorkers();
