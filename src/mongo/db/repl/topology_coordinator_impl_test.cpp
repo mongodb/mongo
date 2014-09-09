@@ -28,6 +28,7 @@
 
 #include "mongo/platform/basic.h"
 
+#include "mongo/db/repl/heartbeat_response_action.h"
 #include "mongo/db/repl/member_heartbeat_data.h"
 #include "mongo/db/repl/repl_set_heartbeat_args.h"
 #include "mongo/db/repl/repl_set_heartbeat_response.h"
@@ -38,13 +39,11 @@
 #include "mongo/util/time_support.h"
 
 #define ASSERT_NO_ACTION(EXPRESSION) \
-    ASSERT_EQUALS(mongo::repl::TopologyCoordinator::HeartbeatResponseAction::NoAction, (EXPRESSION))
+    ASSERT_EQUALS(mongo::repl::HeartbeatResponseAction::NoAction, (EXPRESSION))
 
 namespace mongo {
 namespace repl {
 namespace {
-
-    typedef TopologyCoordinator::HeartbeatResponseAction HeartbeatResponseAction;
 
     bool stringContains(const std::string &haystack, const std::string& needle) {
         return haystack.find(needle) != std::string::npos;
@@ -852,7 +851,7 @@ namespace {
         ASSERT_EQUALS(5000, request.second.total_milliseconds());
 
         // Initial heartbeat request fails at t + 4000ms
-        TopologyCoordinatorImpl::HeartbeatResponseAction action =
+        HeartbeatResponseAction action =
             getTopoCoord().processHeartbeatResponse(
                     firstRequestDate + 4000, // 4 of the 5 seconds elapsed; could still retry.
                     Milliseconds(3990), // Spent 3.99 of the 4 seconds in the network.
@@ -860,8 +859,7 @@ namespace {
                     StatusWith<ReplSetHeartbeatResponse>(ErrorCodes::NodeNotFound, "Bad DNS?"),
                     OpTime(0, 0));  // We've never applied anything.
 
-        ASSERT_EQUALS(TopologyCoordinatorImpl::HeartbeatResponseAction::NoAction,
-                      action.getAction());
+        ASSERT_EQUALS(HeartbeatResponseAction::NoAction, action.getAction());
         // Because the heartbeat failed without timing out, we expect to retry immediately.
         ASSERT_EQUALS(Date_t(firstRequestDate + 4000), action.getNextHeartbeatStartDate());
 
@@ -882,8 +880,7 @@ namespace {
                     target,
                     StatusWith<ReplSetHeartbeatResponse>(ErrorCodes::NodeNotFound, "Bad DNS?"),
                     OpTime(0, 0));  // We've never applied anything.
-        ASSERT_EQUALS(TopologyCoordinatorImpl::HeartbeatResponseAction::NoAction,
-                      action.getAction());
+        ASSERT_EQUALS(HeartbeatResponseAction::NoAction, action.getAction());
         // Because the first retry failed without timing out, we expect to retry immediately.
         ASSERT_EQUALS(Date_t(firstRequestDate + 4500), action.getNextHeartbeatStartDate());
 
@@ -904,8 +901,7 @@ namespace {
                     target,
                     StatusWith<ReplSetHeartbeatResponse>(ErrorCodes::NodeNotFound, "Bad DNS?"),
                     OpTime(0, 0));  // We've never applied anything.
-        ASSERT_EQUALS(TopologyCoordinatorImpl::HeartbeatResponseAction::NoAction,
-                      action.getAction());
+        ASSERT_EQUALS(HeartbeatResponseAction::NoAction, action.getAction());
         // Because this is the second retry, rather than retry again, we expect to wait for the
         // heartbeat interval of 2 seconds to elapse.
         ASSERT_EQUALS(Date_t(firstRequestDate + 6800), action.getNextHeartbeatStartDate());
@@ -927,7 +923,7 @@ namespace {
         ASSERT_EQUALS(5000, request.second.total_milliseconds());
 
         // Initial heartbeat request fails at t + 5000ms
-        TopologyCoordinatorImpl::HeartbeatResponseAction action =
+        HeartbeatResponseAction action =
             getTopoCoord().processHeartbeatResponse(
                     firstRequestDate + 5000, // Entire heartbeat period elapsed; no retry allowed.
                     Milliseconds(4990), // Spent 4.99 of the 4 seconds in the network.
@@ -936,8 +932,7 @@ namespace {
                                                          "Took too long"),
                     OpTime(0, 0));  // We've never applied anything.
 
-        ASSERT_EQUALS(TopologyCoordinatorImpl::HeartbeatResponseAction::NoAction,
-                      action.getAction());
+        ASSERT_EQUALS(HeartbeatResponseAction::NoAction, action.getAction());
         // Because the heartbeat timed out, we'll retry in 2 seconds.
         ASSERT_EQUALS(Date_t(firstRequestDate + 7000), action.getNextHeartbeatStartDate());
     }
@@ -958,7 +953,7 @@ namespace {
         ASSERT_EQUALS(5000, request.second.total_milliseconds());
 
         // Initial heartbeat request fails at t + 5000ms
-        TopologyCoordinatorImpl::HeartbeatResponseAction action =
+        HeartbeatResponseAction action =
             getTopoCoord().processHeartbeatResponse(
                     firstRequestDate + 4000, // 4 seconds elapsed, retry allowed.
                     Milliseconds(3990), // Spent 3.99 of the 4 seconds in the network.
@@ -967,8 +962,7 @@ namespace {
                                                          "Took too long"),
                     OpTime(0, 0));  // We've never applied anything.
 
-        ASSERT_EQUALS(TopologyCoordinatorImpl::HeartbeatResponseAction::NoAction,
-                      action.getAction());
+        ASSERT_EQUALS(HeartbeatResponseAction::NoAction, action.getAction());
         // Because the heartbeat failed without timing out, we expect to retry immediately.
         ASSERT_EQUALS(Date_t(firstRequestDate + 4000), action.getNextHeartbeatStartDate());
 
@@ -990,8 +984,7 @@ namespace {
                                                          "Took too long"),
                     OpTime(0, 0));  // We've never applied anything.
 
-        ASSERT_EQUALS(TopologyCoordinatorImpl::HeartbeatResponseAction::NoAction,
-                      action.getAction());
+        ASSERT_EQUALS(HeartbeatResponseAction::NoAction, action.getAction());
         // Because the heartbeat timed out, we'll retry in 2 seconds.
         ASSERT_EQUALS(Date_t(firstRequestDate + 7010), action.getNextHeartbeatStartDate());
     }
@@ -1012,7 +1005,7 @@ namespace {
         ASSERT_EQUALS(5000, request.second.total_milliseconds());
 
         // Initial heartbeat request fails at t + 5000ms
-        TopologyCoordinatorImpl::HeartbeatResponseAction action =
+        HeartbeatResponseAction action =
             getTopoCoord().processHeartbeatResponse(
                     firstRequestDate + 4000, // 4 seconds elapsed, retry allowed.
                     Milliseconds(3990), // Spent 3.99 of the 4 seconds in the network.
@@ -1021,8 +1014,7 @@ namespace {
                                                          "Took too long"),
                     OpTime(0, 0));  // We've never applied anything.
 
-        ASSERT_EQUALS(TopologyCoordinatorImpl::HeartbeatResponseAction::NoAction,
-                      action.getAction());
+        ASSERT_EQUALS(HeartbeatResponseAction::NoAction, action.getAction());
         // Because the heartbeat failed without timing out, we expect to retry immediately.
         ASSERT_EQUALS(Date_t(firstRequestDate + 4000), action.getNextHeartbeatStartDate());
 
@@ -1061,8 +1053,7 @@ namespace {
                     target,
                     StatusWith<ReplSetHeartbeatResponse>(reconfigResponse),
                     OpTime(0, 0));  // We've never applied anything.
-        ASSERT_EQUALS(TopologyCoordinatorImpl::HeartbeatResponseAction::Reconfig,
-                      action.getAction());
+        ASSERT_EQUALS(HeartbeatResponseAction::Reconfig, action.getAction());
         ASSERT_EQUALS(Date_t(firstRequestDate + 6500), action.getNextHeartbeatStartDate());
     }
 

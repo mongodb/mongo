@@ -45,10 +45,11 @@ namespace mongo {
 
 namespace repl {
 
-    struct MemberState;
-    class ReplicaSetConfig;
+    class HeartbeatResponseAction;
     class ReplSetHeartbeatArgs;
+    class ReplicaSetConfig;
     class TagSubgroup;
+    struct MemberState;
 
     /**
      * Replication Topology Coordinator interface.
@@ -60,127 +61,7 @@ namespace repl {
     class TopologyCoordinator {
         MONGO_DISALLOW_COPYING(TopologyCoordinator);
     public:
-        /**
-         * Type that denotes the role of a node in the replication protocol.
-         *
-         * The role is distinct from MemberState, in that it only deals with the
-         * roles a node plays in the basic protocol -- leader, follower and candidate.
-         * The mapping between MemberState and Role is complex -- several MemberStates
-         * map to the follower role, and MemberState::RS_SECONDARY maps to either
-         * follower or candidate roles, e.g.
-         */
-        class Role {
-        public:
-            /**
-             * Constant indicating leader role.
-             */
-            static const Role leader;
-
-            /**
-             * Constant indicating follower role.
-             */
-            static const Role follower;
-
-            /**
-             * Constant indicating candidate role
-             */
-            static const Role candidate;
-
-            Role() {}
-
-            bool operator==(Role other) const { return _value == other._value; }
-            bool operator!=(Role other) const { return _value != other._value; }
-
-            std::string toString() const;
-
-        private:
-            explicit Role(int value);
-
-            int _value;
-        };
-
-        /**
-         * Description of actions taken in response to a heartbeat.
-         *
-         * This includes when to schedule the next heartbeat to a target, and any other actions to
-         * take, such as scheduling an election or stepping down as primary.
-         */
-        class HeartbeatResponseAction {
-        public:
-            /**
-             * Actions taken based on heartbeat responses
-             */
-            enum Action {
-                NoAction,
-                Reconfig,
-                StartElection,
-                StepDownSelf,
-                StepDownRemotePrimary
-            };
-
-            /**
-             * Makes a new action representing doing nothing.
-             */
-            static HeartbeatResponseAction makeNoAction();
-
-            /**
-             * Makes a new action representing the instruction to reconfigure the current node.
-             */
-            static HeartbeatResponseAction makeReconfigAction();
-
-            /**
-             * Makes a new action telling the current node to attempt to elect itself primary.
-             */
-            static HeartbeatResponseAction makeElectAction();
-
-            /**
-             * Makes a new action telling the current node to step down as primary.
-             *
-             * It is an error to call this with primaryIndex != the index of the current node.
-             */
-            static HeartbeatResponseAction makeStepDownSelfAction(int primaryIndex);
-
-            /**
-             * Makes a new action telling the current node to ask the specified remote node to step
-             * down as primary.
-             *
-             * It is an error to call this with primaryIndex == the index of the current node.
-             */
-            static HeartbeatResponseAction makeStepDownRemoteAction(int primaryIndex);
-
-            /**
-             * Construct an action with unspecified action and a next heartbeat start date in the
-             * past.
-             */
-            HeartbeatResponseAction();
-
-            /**
-             * Sets the date at which the next heartbeat should be scheduled.
-             */
-            void setNextHeartbeatStartDate(Date_t when);
-
-            /**
-             * Gets the action type of this action.
-             */
-            Action getAction() const { return _action; }
-
-            /**
-             * Gets the time at which the next heartbeat should be scheduled.  If the
-             * time is not in the future, the next heartbeat should be scheduled immediately.
-             */
-            Date_t getNextHeartbeatStartDate() const { return _nextHeartbeatStartDate; }
-
-            /**
-             * If getAction() returns StepDownSelf or StepDownPrimary, this is the index
-             * in the current replica set config of the node that ought to step down.
-             */
-            int getPrimaryConfigIndex() const { return _primaryIndex; }
-
-        private:
-            Action _action;
-            int _primaryIndex;
-            Date_t _nextHeartbeatStartDate;
-        };
+        class Role;
 
         virtual ~TopologyCoordinator();
 
@@ -430,5 +311,45 @@ namespace repl {
     protected:
         TopologyCoordinator() {}
     };
+
+    /**
+     * Type that denotes the role of a node in the replication protocol.
+     *
+     * The role is distinct from MemberState, in that it only deals with the
+     * roles a node plays in the basic protocol -- leader, follower and candidate.
+     * The mapping between MemberState and Role is complex -- several MemberStates
+     * map to the follower role, and MemberState::RS_SECONDARY maps to either
+     * follower or candidate roles, e.g.
+     */
+    class TopologyCoordinator::Role {
+    public:
+        /**
+         * Constant indicating leader role.
+         */
+        static const Role leader;
+
+        /**
+         * Constant indicating follower role.
+         */
+        static const Role follower;
+
+        /**
+         * Constant indicating candidate role
+         */
+        static const Role candidate;
+
+        Role() {}
+
+        bool operator==(Role other) const { return _value == other._value; }
+        bool operator!=(Role other) const { return _value != other._value; }
+
+        std::string toString() const;
+
+    private:
+        explicit Role(int value);
+
+        int _value;
+    };
+
 } // namespace repl
 } // namespace mongo

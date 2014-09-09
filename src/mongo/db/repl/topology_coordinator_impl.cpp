@@ -35,6 +35,7 @@
 #include <limits>
 
 #include "mongo/db/operation_context.h"
+#include "mongo/db/repl/heartbeat_response_action.h"
 #include "mongo/db/repl/isself.h"
 #include "mongo/db/repl/repl_set_heartbeat_args.h"
 #include "mongo/db/repl/repl_set_heartbeat_response.h"
@@ -678,7 +679,7 @@ namespace {
     }
 }  // namespace
 
-    TopologyCoordinator::HeartbeatResponseAction TopologyCoordinatorImpl::processHeartbeatResponse(
+    HeartbeatResponseAction TopologyCoordinatorImpl::processHeartbeatResponse(
             Date_t now,
             Milliseconds networkRoundTripTime,
             const HostAndPort& target,
@@ -771,8 +772,7 @@ namespace {
         return nextAction;
     }
 
-    TopologyCoordinatorImpl::HeartbeatResponseAction
-    TopologyCoordinatorImpl::_updateHeartbeatDataImpl(
+    HeartbeatResponseAction TopologyCoordinatorImpl::_updateHeartbeatDataImpl(
             int updatedConfigIndex,
             Date_t now,
             const OpTime& lastOpApplied) {
@@ -1511,12 +1511,11 @@ namespace {
         }
     }
 
-    TopologyCoordinator::HeartbeatResponseAction TopologyCoordinatorImpl::_stepDownSelf() {
+    HeartbeatResponseAction TopologyCoordinatorImpl::_stepDownSelf() {
         return _stepDownSelfAndReplaceWith(-1);
     }
 
-    TopologyCoordinator::HeartbeatResponseAction
-    TopologyCoordinatorImpl::_stepDownSelfAndReplaceWith(int newPrimary) {
+    HeartbeatResponseAction TopologyCoordinatorImpl::_stepDownSelfAndReplaceWith(int newPrimary) {
         invariant(_role == Role::leader);
         invariant(_selfIndex != -1);
         invariant(_selfIndex != newPrimary);

@@ -1,5 +1,5 @@
 /**
- *    Copyright 2014 MongoDB Inc.
+ *    Copyright (C) 2014 MongoDB Inc.
  *
  *    This program is free software: you can redistribute it and/or  modify
  *    it under the terms of the GNU Affero General Public License, version 3,
@@ -26,43 +26,52 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kReplication
-
 #include "mongo/platform/basic.h"
 
-#include "mongo/db/repl/topology_coordinator.h"
-
-#include <string>
-
-#include "mongo/util/assert_util.h"
+#include "mongo/db/repl/heartbeat_response_action.h"
 
 namespace mongo {
 namespace repl {
-namespace {
-    static const int kLeaderValue = 0;
-    static const int kFollowerValue = 1;
-    static const int kCandidateValue = 2;
-}  // namespace
 
-    const TopologyCoordinator::Role TopologyCoordinator::Role::leader(kLeaderValue);
-    const TopologyCoordinator::Role TopologyCoordinator::Role::follower(kFollowerValue);
-    const TopologyCoordinator::Role TopologyCoordinator::Role::candidate(kCandidateValue);
-
-    TopologyCoordinator::Role::Role(int value) : _value(value) {}
-
-    std::string TopologyCoordinator::Role::toString() const {
-        switch(_value) {
-        case kLeaderValue:
-            return "leader";
-        case kFollowerValue:
-            return "follower";
-        case kCandidateValue:
-            return "candidate";
-        }
-        invariant(false);
+    HeartbeatResponseAction HeartbeatResponseAction::makeNoAction() {
+        return HeartbeatResponseAction();
     }
 
-    TopologyCoordinator::~TopologyCoordinator() {}
+    HeartbeatResponseAction HeartbeatResponseAction::makeReconfigAction() {
+        HeartbeatResponseAction result;
+        result._action = Reconfig;
+        return result;
+    }
+
+    HeartbeatResponseAction HeartbeatResponseAction::makeElectAction() {
+        HeartbeatResponseAction result;
+        result._action = StartElection;
+        return result;
+    }
+
+    HeartbeatResponseAction HeartbeatResponseAction::makeStepDownSelfAction(int primaryIndex) {
+        HeartbeatResponseAction result;
+        result._action = StepDownSelf;
+        result._primaryIndex = primaryIndex;
+        return result;
+    }
+
+    HeartbeatResponseAction HeartbeatResponseAction::makeStepDownRemoteAction(int primaryIndex) {
+        HeartbeatResponseAction result;
+        result._action = StepDownRemotePrimary;
+        result._primaryIndex = primaryIndex;
+        return result;
+    }
+
+    HeartbeatResponseAction::HeartbeatResponseAction() :
+        _action(NoAction),
+        _primaryIndex(-1),
+        _nextHeartbeatStartDate(0) {
+    }
+
+    void HeartbeatResponseAction::setNextHeartbeatStartDate(Date_t when) {
+        _nextHeartbeatStartDate = when;
+    }
 
 }  // namespace repl
 }  // namespace mongo
