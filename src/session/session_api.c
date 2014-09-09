@@ -319,7 +319,7 @@ __session_create(WT_SESSION *wt_session, const char *uri, const char *config)
 	WT_UNUSED(cfg);
 
 	/* Disallow objects in the WiredTiger name space. */
-	WT_ERR(__wt_schema_name_check(session, uri));
+	WT_ERR(__wt_str_name_check(session, uri));
 
 	/*
 	 * Type configuration only applies to tables, column groups and indexes.
@@ -387,8 +387,8 @@ __session_rename(WT_SESSION *wt_session,
 	SESSION_API_CALL(session, rename, config, cfg);
 
 	/* Disallow objects in the WiredTiger name space. */
-	WT_ERR(__wt_schema_name_check(session, uri));
-	WT_ERR(__wt_schema_name_check(session, newuri));
+	WT_ERR(__wt_str_name_check(session, uri));
+	WT_ERR(__wt_str_name_check(session, newuri));
 
 	WT_WITH_SCHEMA_LOCK(session,
 	    ret = __wt_schema_rename(session, uri, newuri, cfg));
@@ -408,7 +408,7 @@ __session_compact(WT_SESSION *wt_session, const char *uri, const char *config)
 	session = (WT_SESSION_IMPL *)wt_session;
 
 	/* Disallow objects in the WiredTiger name space. */
-	WT_RET(__wt_schema_name_check(session, uri));
+	WT_RET(__wt_str_name_check(session, uri));
 
 	if (!WT_PREFIX_MATCH(uri, "colgroup:") &&
 	    !WT_PREFIX_MATCH(uri, "file:") &&
@@ -434,7 +434,7 @@ __session_drop(WT_SESSION *wt_session, const char *uri, const char *config)
 	SESSION_API_CALL(session, drop, config, cfg);
 
 	/* Disallow objects in the WiredTiger name space. */
-	WT_ERR(__wt_schema_name_check(session, uri));
+	WT_ERR(__wt_str_name_check(session, uri));
 
 	WT_WITH_SCHEMA_LOCK(session,
 	    ret = __wt_schema_drop(session, uri, cfg));
@@ -496,7 +496,7 @@ __session_truncate(WT_SESSION *wt_session,
 
 	if (uri != NULL) {
 		/* Disallow objects in the WiredTiger name space. */
-		WT_ERR(__wt_schema_name_check(session, uri));
+		WT_ERR(__wt_str_name_check(session, uri));
 
 		WT_WITH_SCHEMA_LOCK(session,
 		    ret = __wt_schema_truncate(session, uri, cfg));

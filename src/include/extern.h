@@ -1379,7 +1379,10 @@ extern int __wt_schema_range_truncate( WT_SESSION_IMPL *session,
     WT_CURSOR *stop);
 extern WT_DATA_SOURCE *__wt_schema_get_source(WT_SESSION_IMPL *session,
     const char *name);
-extern int __wt_schema_name_check(WT_SESSION_IMPL *session, const char *uri);
+extern int __wt_str_name_check(WT_SESSION_IMPL *session, const char *str);
+extern int __wt_name_check(WT_SESSION_IMPL *session,
+    const char *str,
+    size_t len);
 extern int __wt_schema_worker(WT_SESSION_IMPL *session,
     const char *uri,
     int (*file_func)(WT_SESSION_IMPL *,
