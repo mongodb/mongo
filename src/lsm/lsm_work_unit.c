@@ -78,10 +78,22 @@ __wt_lsm_get_chunk_to_flush(WT_SESSION_IMPL *session,
 	if (!F_ISSET(lsm_tree, WT_LSM_TREE_ACTIVE))
 		return (__wt_lsm_tree_unlock(session, lsm_tree));
 
-	end = force ? lsm_tree->nchunks : lsm_tree->nchunks - 1;
+	/*
+	 * Normally we don't want to force out the last chunk.  But if we're
+	 * doing a forced flush, likely from a compact call, then we do want
+	 * to include the final chunk.
+	 */
+	if (force) {
+		end = lsm_tree->nchunks;
+	} else
+		end = lsm_tree->nchunks - 1;
 	for (i = 0; i < end; i++) {
 		if (!F_ISSET(lsm_tree->chunk[i], WT_LSM_CHUNK_ONDISK)) {
 			(void)WT_ATOMIC_ADD(lsm_tree->chunk[i]->refcnt, 1);
+			WT_RET(__wt_verbose(session, WT_VERB_LSM,
+			    "Flush%s: return chunk %u of %u: %s",
+			    force ? " w/ force" : "", i, end - 1,
+			    lsm_tree->chunk[i]->uri));
 			*chunkp = lsm_tree->chunk[i];
 			break;
 		}
@@ -226,7 +238,8 @@ __wt_lsm_checkpoint_chunk(WT_SESSION_IMPL *session,
 	    !__wt_txn_visible_all(session, chunk->switch_txn))
 		return (0);
 
-	WT_RET(__wt_verbose(session, WT_VERB_LSM, "LSM worker flushing"));
+	WT_RET(__wt_verbose(session, WT_VERB_LSM, "LSM worker flushing %s",
+	    chunk->uri));
 
 	/*
 	 * Flush the file before checkpointing: this is the expensive part in
@@ -249,7 +262,8 @@ __wt_lsm_checkpoint_chunk(WT_SESSION_IMPL *session,
 	}
 	WT_RET(ret);
 
-	WT_RET(__wt_verbose(session, WT_VERB_LSM, "LSM worker checkpointing"));
+	WT_RET(__wt_verbose(session, WT_VERB_LSM, "LSM worker checkpointing %s",
+	    chunk->uri));
 
 	WT_WITH_SCHEMA_LOCK(session,
 	    ret = __wt_schema_worker(session, chunk->uri,
@@ -290,7 +304,8 @@ __wt_lsm_checkpoint_chunk(WT_SESSION_IMPL *session,
 	/* Make sure we aren't pinning a transaction ID. */
 	__wt_txn_release_snapshot(session);
 
-	WT_RET(__wt_verbose(session, WT_VERB_LSM, "LSM worker checkpointed"));
+	WT_RET(__wt_verbose(session, WT_VERB_LSM, "LSM worker checkpointed %s",
+	    chunk->uri));
 	/*
 	 * Schedule a bloom filter create for our newly flushed chunk */
 	if (!FLD_ISSET(lsm_tree->bloom, WT_LSM_BLOOM_OFF))

@@ -1057,6 +1057,7 @@ __wt_lsm_compact(WT_SESSION_IMPL *session, const char *name, int *skip)
 	WT_ERR(__wt_lsm_tree_unlock(session, lsm_tree));
 
 	/* Make sure the in-memory chunk gets flushed but not switched. */
+	WT_ERR(__wt_verbose(session, WT_VERB_LSM, "Compact force flush"));
 	WT_ERR(__wt_lsm_manager_push_entry(
 	    session, WT_LSM_WORK_FLUSH | WT_LSM_WORK_FORCE, lsm_tree));
 
