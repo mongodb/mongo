@@ -488,26 +488,46 @@ __cache_pool_adjust(WT_SESSION_IMPL *session,
 		if (cache->cp_skip_count > 0 && --cache->cp_skip_count > 0)
 			continue;
 		/*
-		 * TODO: Use __wt_cache_bytes_inuse instead of eviction_target
-		 * which doesn't do the right thing at the moment.
+		 * If the entry is currently allocated less than the reserved
+		 * size, increase it's allocation. This should only happen if:
+		 *  - It's the first time we've seen this member
+		 *  - The reserved size has been adjusted
 		 */
 		if (entry->cache_size < reserved) {
 			grew = 1;
 			adjusted = reserved - entry->cache_size;
+		/*
+		 * Conditions for reducing the amount of resources for an
+		 * entry:
+		 *  - If we are forcing and this entry has more than the
+		 *    minimum amount of space in use.
+		 *  - If the read pressure in this entry is below the
+		 *    threshold, other entries need more cache, the entry has
+		 *    more than the minimum space and there is no available
+		 *    space in the pool.
+		 */
 		} else if ((force && entry->cache_size > reserved) ||
 		    (read_pressure < WT_CACHE_POOL_REDUCE_THRESHOLD &&
 		     highest > 1 && entry->cache_size > reserved &&
 		     cp->currently_used >= cp->size)) {
-			/*
-			 * If a connection isn't actively using it's assigned
-			 * cache and is assigned a reasonable amount - reduce
-			 * it.
-			 */
 			grew = 0;
-			if (entry->cache_size - cp->chunk > reserved)
+			/*
+			 * Shrink by a chunk size if that doesn't drop us
+			 * below the reserved size.
+			 */
+			if (entry->cache_size > cp->chunk + reserved)
 				adjusted = cp->chunk;
 			else
 				adjusted = entry->cache_size - reserved;
+		/*
+		 * Conditions for increasing the amount of resources for an
+		 * entry:
+		 *  - There was some activity across the pool
+		 *  - This entry is using less than the entire cache pool
+		 *  - The connection is using enough cache to require eviction
+		 *  - There is space available in the pool
+		 *  - Additional cache would benefit the connection
+		 */
 		} else if (highest > 1 &&
 		    entry->cache_size < cp->size &&
 		     cache->bytes_inmem >=
@@ -527,6 +547,9 @@ __cache_pool_adjust(WT_SESSION_IMPL *session,
 			} else {
 				cache->cp_skip_count =
 				    WT_CACHE_POOL_REDUCE_SKIPS;
+				WT_ASSERT(session,
+				    entry->cache_size >= adjusted &&
+				    cp->currently_used >= adjusted);
 				entry->cache_size -= adjusted;
 				cp->currently_used -= adjusted;
 			}
