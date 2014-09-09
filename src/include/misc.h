@@ -186,6 +186,12 @@
 	((i)->mem != NULL && (i)->data >= (i)->mem &&			\
 	    WT_PTRDIFF((i)->data, (i)->mem) < (i)->memsize)
 
+/* Copy the data and size fields of an item. */
+#define	WT_ITEM_SET(dst, src) do {					\
+	(dst).data = (src).data;					\
+	(dst).size = (src).size;					\
+} while (0)
+
 /*
  * In diagnostic mode we track the locations from which hazard pointers and
  * scratch buffers were acquired.
