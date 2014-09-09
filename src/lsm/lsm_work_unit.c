@@ -84,10 +84,7 @@ __wt_lsm_get_chunk_to_flush(WT_SESSION_IMPL *session,
 	 * doing a forced flush, likely from a compact call, then we do want
 	 * to include the final chunk.
 	 */
-	if (force) {
-		end = lsm_tree->nchunks;
-	} else
-		end = lsm_tree->nchunks - 1;
+	end = force ? lsm_tree->nchunks : lsm_tree->nchunks - 1;
 	for (i = 0; i < end; i++) {
 		if (!F_ISSET(lsm_tree->chunk[i], WT_LSM_CHUNK_ONDISK)) {
 			(void)WT_ATOMIC_ADD(lsm_tree->chunk[i]->refcnt, 1);
