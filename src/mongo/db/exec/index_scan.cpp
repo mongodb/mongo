@@ -165,6 +165,13 @@ namespace mongo {
         BSONObj keyObj = _indexCursor->getKey();
         DiskLoc loc = _indexCursor->getValue();
 
+        bool filterPasses = Filter::passes(keyObj, _keyPattern, _filter);
+        if ( filterPasses ) {
+            // We must make a copy of the on-disk data since it can mutate during the execution of
+            // this query.
+            keyObj = keyObj.getOwned();
+        }
+
         // Move to the next result.
         // The underlying IndexCursor points at the *next* thing we want to return.  We do this so
         // that if we're scanning an index looking for docs to delete we don't continually clobber
@@ -184,25 +191,21 @@ namespace mongo {
             }
         }
 
-        if (Filter::passes(keyObj, _keyPattern, _filter)) {
+        if (filterPasses) {
             if (NULL != _filter) {
                 ++_specificStats.matchTested;
             }
-
-            // We must make a copy of the on-disk data since it can mutate during the execution of
-            // this query.
-            BSONObj ownedKeyObj = keyObj.getOwned();
 
             // Fill out the WSM.
             WorkingSetID id = _workingSet->allocate();
             WorkingSetMember* member = _workingSet->get(id);
             member->loc = loc;
-            member->keyData.push_back(IndexKeyDatum(_keyPattern, ownedKeyObj));
+            member->keyData.push_back(IndexKeyDatum(_keyPattern, keyObj));
             member->state = WorkingSetMember::LOC_AND_IDX;
 
             if (_params.addKeyMetadata) {
                 BSONObjBuilder bob;
-                bob.appendKeys(_keyPattern, ownedKeyObj);
+                bob.appendKeys(_keyPattern, keyObj);
                 member->addComputed(new IndexKeyComputedData(bob.obj()));
             }
 

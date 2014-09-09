@@ -488,69 +488,76 @@ namespace mongo {
             }
         }
 
-        WriteUnitOfWork wunit(request->getOpCtx());
 
         // Save state before making changes
         saveState();
 
-        if (inPlace && !driver->modsAffectIndices()) {
-            // If a set of modifiers were all no-ops, we are still 'in place', but there is
-            // no work to do, in which case we want to consider the object unchanged.
-            if (!_damages.empty() ) {
-                _collection->updateDocumentWithDamages(request->getOpCtx(), loc, source, _damages);
+        {
+            WriteUnitOfWork wunit(request->getOpCtx());
+
+            if (inPlace && !driver->modsAffectIndices()) {
+                // If a set of modifiers were all no-ops, we are still 'in place', but there
+                // is no work to do, in which case we want to consider the object unchanged.
+                if (!_damages.empty() ) {
+                    _collection->updateDocumentWithDamages(request->getOpCtx(), loc, source, _damages);
+                    docWasModified = true;
+                    _specificStats.fastmod = true;
+                }
+
+                newObj = oldObj;
+            }
+            else {
+                // The updates were not in place. Apply them through the file manager.
+
+                // XXX: With experimental document-level locking, we do not hold
+                // sufficient locks, so this would cause corruption.
+                fassert(18516, !useExperimentalDocLocking);
+
+                newObj = _doc.getObject();
+                uassert(17419,
+                        str::stream() << "Resulting document after update is larger than "
+                        << BSONObjMaxUserSize,
+                        newObj.objsize() <= BSONObjMaxUserSize);
+                StatusWith<DiskLoc> res = _collection->updateDocument(request->getOpCtx(),
+                                                                      loc,
+                                                                      newObj,
+                                                                      true,
+                                                                      _params.opDebug);
+                uassertStatusOK(res.getStatus());
+                DiskLoc newLoc = res.getValue();
                 docWasModified = true;
-                _specificStats.fastmod = true;
+
+                // If the document moved, we might see it again in a collection scan (maybe it's
+                // a document after our current document).
+                //
+                // If the document is indexed and the mod changes an indexed value, we might see it
+                // again.  For an example, see the comment above near declaration of updatedLocs.
+                if (_updatedLocs && (newLoc != loc || driver->modsAffectIndices())) {
+                    _updatedLocs->insert(newLoc);
+                }
             }
 
-            newObj = oldObj;
-        }
-        else {
-            // The updates were not in place. Apply them through the file manager.
-
-            // XXX: With experimental document-level locking, we do not hold the sufficient
-            // locks, so this would cause corruption.
-            fassert(18516, !useExperimentalDocLocking);
-
-            newObj = _doc.getObject();
-            uassert(17419,
-                    str::stream() << "Resulting document after update is larger than "
-                                  << BSONObjMaxUserSize,
-                    newObj.objsize() <= BSONObjMaxUserSize);
-            StatusWith<DiskLoc> res = _collection->updateDocument(request->getOpCtx(),
-                                                                  loc,
-                                                                  newObj,
-                                                                  true,
-                                                                  _params.opDebug);
-            uassertStatusOK(res.getStatus());
-            DiskLoc newLoc = res.getValue();
-            docWasModified = true;
-
-            // If the document moved, we might see it again in a collection scan (maybe it's
-            // a document after our current document).
-            //
-            // If the document is indexed and the mod changes an indexed value, we might see it
-            // again.  For an example, see the comment above near declaration of updatedLocs.
-            if (_updatedLocs && (newLoc != loc || driver->modsAffectIndices())) {
-                _updatedLocs->insert(newLoc);
+            // Call logOp if requested.
+            if (request->shouldCallLogOp() && !logObj.isEmpty()) {
+                BSONObj idQuery = driver->makeOplogEntryQuery(newObj, request->isMulti());
+                repl::logOp(request->getOpCtx(),
+                            "u",
+                            request->getNamespaceString().ns().c_str(),
+                            logObj,
+                            &idQuery,
+                            NULL,
+                            request->isFromMigration());
             }
+            wunit.commit();
         }
+
 
         // Restore state after modification
+
+        // As restoreState may restore (recreate) cursors, make sure to restore the
+        // state outside of the WritUnitOfWork.
+
         restoreState(request->getOpCtx());
-
-        // Call logOp if requested.
-        if (request->shouldCallLogOp() && !logObj.isEmpty()) {
-            BSONObj idQuery = driver->makeOplogEntryQuery(newObj, request->isMulti());
-            repl::logOp(request->getOpCtx(),
-                        "u",
-                        request->getNamespaceString().ns().c_str(),
-                        logObj,
-                        &idQuery,
-                        NULL,
-                        request->isFromMigration());
-        }
-
-        wunit.commit();
 
         // Only record doc modifications if they wrote (exclude no-ops)
         if (docWasModified) {
