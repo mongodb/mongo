@@ -44,9 +44,6 @@ namespace mongo {
         StorageGlobalParams() :
             engine("mmapv1"),
             dbpath(kDefaultDbPath),
-            wiredTigerDatabaseConfig(""),
-            wiredTigerCollectionConfig(""),
-            wiredTigerIndexConfig(""),
             directoryperdb(false),
             upgrade(false),
             repair(false),
@@ -72,11 +69,6 @@ namespace mongo {
         std::string dbpath;
         static const char* kDefaultDbPath;
         static const char* kDefaultConfigDbPath;
-
-        // WiredTiger specific options.
-        std::string wiredTigerDatabaseConfig;
-        std::string wiredTigerCollectionConfig;
-        std::string wiredTigerIndexConfig;
 
         bool directoryperdb;
         bool upgrade;
