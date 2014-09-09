@@ -340,6 +340,13 @@ namespace mongo {
 
                 QuerySolution* bestSoln = solutions[bestPlan];
 
+                // Check that we have good cache data. For example, we don't cache things for 2d
+                // indices.
+                if (NULL == bestSoln->cacheData.get()) {
+                    QLOG() << "Subplanner: No cache data for subchild: " << orChild->toString();
+                    return false;
+                }
+
                 if (SolutionCacheData::USE_INDEX_TAGS_SOLN != bestSoln->cacheData->solnType) {
                     QLOG() << "Subplanner: No indexed cache data for subchild "
                            << orChild->toString();
