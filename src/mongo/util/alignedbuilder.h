@@ -32,12 +32,6 @@
 
 #include "mongo/base/string_data.h"
 
-#ifndef __PPC64__
-#define _SYSTEM_BLK_SIZE 8192
-#else
-#define _SYSTEM_BLK_SIZE 65536
-#endif
-
 namespace mongo {
 
     /** a page-aligned BufBuilder. */
@@ -113,7 +107,11 @@ namespace mongo {
         unsigned len() const { return _len; }
 
     private:
-        static const unsigned Alignment = _SYSTEM_BLK_SIZE;
+#ifndef __PPC64__
+        static const unsigned Alignment = 8192;
+#else
+        static const unsigned Alignment = 65536;
+#endif
 
         /** returns the pre-grow write position */
         inline char* grow(unsigned by) {
