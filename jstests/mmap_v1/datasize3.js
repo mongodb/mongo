@@ -13,7 +13,7 @@ t.insert( { x : 1 } )
 
 a = run()
 b = run( { estimate : true } )
-
+printjson( t.stats() );
 assert.eq( a.size , b.size );
 
 
