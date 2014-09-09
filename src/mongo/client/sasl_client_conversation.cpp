@@ -1,5 +1,5 @@
 /*
- *    Copyright (C) 2014 MongoDB Inc.
+ *    Copyright (C) 2014 MongoDB Inc.  All Rights Reserved.
  *
  *    This program is free software: you can redistribute it and/or  modify
  *    it under the terms of the GNU Affero General Public License, version 3,
@@ -26,31 +26,10 @@
  *    it in the license file.
  */
 
-#pragma once
-
-#include <string>
-
-#include "mongo/base/disallow_copying.h"
-#include "mongo/base/status.h"
-#include "mongo/base/string_data.h"
-#include "mongo/db/auth/sasl_server_conversation.h"
+#include "mongo/client/sasl_client_conversation.h"
 
 namespace mongo {
-    /**
-     *  Server side authentication session for SASL PLAIN.
-     */
-    class SaslPLAINServerConversation : public SaslServerConversation {
-        MONGO_DISALLOW_COPYING(SaslPLAINServerConversation);
-    public:
-        /**
-         * Implements the server side of a SASL PLAIN mechanism session.
-         *
-         **/
-        explicit SaslPLAINServerConversation(SaslAuthenticationSession* saslAuthSession); 
-
-        virtual ~SaslPLAINServerConversation();
-
-        virtual StatusWith<bool> step(const StringData& inputData, std::string* outputData);
-    };
-
+    
+    SaslClientConversation::~SaslClientConversation() {};
+    
 }  // namespace mongo

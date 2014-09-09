@@ -30,6 +30,9 @@
 #include "mongo/client/native_sasl_client_session.h"
 
 #include "mongo/base/init.h"
+#include "mongo/client/sasl_client_conversation.h"
+#include "mongo/client/sasl_plain_client_conversation.h"
+#include "mongo/client/sasl_scramsha1_client_conversation.h"
 #include "mongo/util/mongoutils/str.h"
 
 namespace mongo {
@@ -49,18 +52,38 @@ namespace {
     NativeSaslClientSession::NativeSaslClientSession() :
             SaslClientSession(),
             _step(0),
-            _done(false) {
+            _done(false), 
+            _saslConversation(NULL) { 
     }
 
     NativeSaslClientSession::~NativeSaslClientSession() {}
 
     Status NativeSaslClientSession::initialize() {
-        return Status(ErrorCodes::BadValue,
-                      mongoutils::str::stream() << "SASL authentication not supported in client");
+        if (_saslConversation)
+            return Status(ErrorCodes::AlreadyInitialized, 
+                "Cannot reinitialize NativeSaslClientSession.");
+
+        std::string mechanism = getParameter(parameterMechanism).toString();
+        if (mechanism == "PLAIN") {
+            _saslConversation.reset(new SaslPLAINClientConversation(this));
+        }
+        else if (mechanism == "SCRAM-SHA-1") {
+            _saslConversation.reset(new SaslSCRAMSHA1ClientConversation(this));
+        }
+        else {
+            return Status(ErrorCodes::BadValue,
+                mongoutils::str::stream() << "SASL mechanism " << mechanism << 
+                                             "is not supported");
+        }
+
+        return Status::OK();
     }
 
     Status NativeSaslClientSession::step(const StringData& inputData, std::string* outputData) {
-        return Status(ErrorCodes::BadValue,
-                      mongoutils::str::stream() << "SASL authentication not supported in client");
+        StatusWith<bool> status = _saslConversation->step(inputData, outputData);
+        if (status.isOK()) {
+            _done = status.getValue();
+        }
+        return status.getStatus();
     }
 }  // namespace

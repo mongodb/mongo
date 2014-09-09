@@ -34,9 +34,37 @@
 #include "mongo/db/jsobj.h"
 
 namespace mongo {
+namespace scram { 
+    const int hashSize = 20;
+    const std::string serverKeyConst = "Server Key";
+    const std::string clientKeyConst = "Client Key";
+
     /* 
-     * Generate the user salt and the SCRAM secrets 
-     * storedKey and serverKey as defined in RFC5802 
+     * Computes the SaltedPassword from password, salt and iterationCount.
      */
-    BSONObj generateSCRAMCredentials(const std::string& hashedPassword);
+    void generateSaltedPassword(const StringData& password,
+                                const unsigned char* salt,
+                                const int saltLen,
+                                const int iterationCount,
+                                unsigned char saltedPassword[hashSize]); 
+
+    /* 
+     * Generates the user salt and the SCRAM secrets storedKey and serverKey as 
+     * defined in RFC5802 (server side).
+     */
+    BSONObj generateCredentials(const std::string& hashedPassword);
+
+    /* 
+     * Computes the ClientProof from SaltedPassword and authMessage (client side).
+     */
+    std::string generateClientProof(const unsigned char saltedPassword[hashSize],
+                                    const std::string& authMessage); 
+ 
+    /* 
+     * Verifies ServerSignature (client side).
+     */
+    bool verifyServerSignature(const unsigned char saltedPassword[hashSize],
+                               const std::string& authMessage,
+                               const std::string& serverSignature); 
+} // namespace scram
 } // namespace mongo

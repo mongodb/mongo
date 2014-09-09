@@ -26,17 +26,15 @@
  *    it in the license file.
  */
 
-#include "mongo/db/auth/sasl_conversation.h"
+#include "mongo/db/auth/sasl_server_conversation.h"
 
 #include <string>
 
-#include "mongo/util/log.h"
-
 namespace mongo {
     
-    SaslConversation::~SaslConversation() {};
+    SaslServerConversation::~SaslServerConversation() {};
     
-    std::string SaslConversation::getPrincipalId() {
+    std::string SaslServerConversation::getPrincipalId() {
         return _user;
     }
 

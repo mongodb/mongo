@@ -33,22 +33,22 @@
 #include "mongo/base/disallow_copying.h"
 #include "mongo/base/status.h"
 #include "mongo/base/string_data.h"
-#include "mongo/db/auth/sasl_server_conversation.h"
+#include "mongo/client/sasl_client_conversation.h"
 
 namespace mongo {
     /**
-     *  Server side authentication session for SASL PLAIN.
+     *  Client side authentication session for SASL PLAIN.
      */
-    class SaslPLAINServerConversation : public SaslServerConversation {
-        MONGO_DISALLOW_COPYING(SaslPLAINServerConversation);
+    class SaslPLAINClientConversation : public SaslClientConversation {
+        MONGO_DISALLOW_COPYING(SaslPLAINClientConversation);
     public:
         /**
-         * Implements the server side of a SASL PLAIN mechanism session.
+         * Implements the client side of a SASL PLAIN mechanism session.
          *
          **/
-        explicit SaslPLAINServerConversation(SaslAuthenticationSession* saslAuthSession); 
+        explicit SaslPLAINClientConversation(SaslClientSession* saslClientSession); 
 
-        virtual ~SaslPLAINServerConversation();
+        virtual ~SaslPLAINClientConversation();
 
         virtual StatusWith<bool> step(const StringData& inputData, std::string* outputData);
     };

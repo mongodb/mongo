@@ -26,31 +26,39 @@
  *    it in the license file.
  */
 
-#pragma once
+#include "mongo/platform/basic.h"
 
-#include <string>
+#include "mongo/client/sasl_plain_client_conversation.h"
 
-#include "mongo/base/disallow_copying.h"
-#include "mongo/base/status.h"
-#include "mongo/base/string_data.h"
-#include "mongo/db/auth/sasl_server_conversation.h"
+#include "mongo/base/status_with.h"
+#include "mongo/client/sasl_client_session.h"
+#include "mongo/util/log.h"
+#include "mongo/util/password_digest.h"
+#include "mongo/util/text.h"
 
 namespace mongo {
-    /**
-     *  Server side authentication session for SASL PLAIN.
-     */
-    class SaslPLAINServerConversation : public SaslServerConversation {
-        MONGO_DISALLOW_COPYING(SaslPLAINServerConversation);
-    public:
-        /**
-         * Implements the server side of a SASL PLAIN mechanism session.
-         *
-         **/
-        explicit SaslPLAINServerConversation(SaslAuthenticationSession* saslAuthSession); 
+   
+    SaslPLAINClientConversation::SaslPLAINClientConversation(
+                                                    SaslClientSession* saslClientSession) :
+        SaslClientConversation(saslClientSession) {
+    }
 
-        virtual ~SaslPLAINServerConversation();
+    SaslPLAINClientConversation::~SaslPLAINClientConversation() {};
+ 
+    StatusWith<bool> SaslPLAINClientConversation::step(const StringData& inputData, 
+                                                       std::string* outputData) {
+        // Create PLAIN message on the form: user\0user\0pwd
+        
+        StringBuilder sb;
+        sb << _saslClientSession->getParameter(SaslClientSession::parameterUser).toString() <<
+              '\0' <<
+              _saslClientSession->getParameter(SaslClientSession::parameterUser).toString() <<
+              '\0' <<
+              _saslClientSession->getParameter(SaslClientSession::parameterPassword).toString();
 
-        virtual StatusWith<bool> step(const StringData& inputData, std::string* outputData);
-    };
+        *outputData = sb.str();
 
+        return StatusWith<bool>(true);
+    }
+    
 }  // namespace mongo

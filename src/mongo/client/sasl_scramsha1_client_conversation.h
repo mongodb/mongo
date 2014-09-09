@@ -1,5 +1,5 @@
 /*
- *    Copyright (C) 2014 MongoDB Inc.  All Rights Reserved.
+ *    Copyright (C) 2014 MongoDB Inc.
  *
  *    This program is free software: you can redistribute it and/or  modify
  *    it under the terms of the GNU Affero General Public License, version 3,
@@ -34,56 +34,55 @@
 #include "mongo/base/disallow_copying.h"
 #include "mongo/base/status.h"
 #include "mongo/base/string_data.h"
-#include "mongo/db/auth/sasl_authentication_session.h"
+#include "mongo/client/sasl_client_conversation.h"
+#include "mongo/db/auth/mechanism_scram.h"
 #include "mongo/db/auth/user.h"
 
 namespace mongo {
-    
-    class SaslAuthenticationSession;
-    template <typename T> class StatusWith;
-    
     /**
-     * Abstract class for implementing the client or server-side
-     * of a SASL mechanism conversation.
+     *  Client side authentication session for SASL PLAIN.
      */
-    class SaslConversation {
-        MONGO_DISALLOW_COPYING(SaslConversation);
+    class SaslSCRAMSHA1ClientConversation : public SaslClientConversation {
+        MONGO_DISALLOW_COPYING(SaslSCRAMSHA1ClientConversation);
     public:
         /**
-         * Implements the server side of a SASL authentication mechanism.
-         *
-         * "saslAuthSession" is the corresponding SASLAuthenticationSession.
-         * "saslAuthSession" must stay in scope until the SaslConversation's 
-         *  destructor completes.
-         * 
+         * Implements the client side of a SASL PLAIN mechanism session.
          **/
-        explicit SaslConversation(SaslAuthenticationSession* saslAuthSession) :
-            _saslAuthSession(saslAuthSession),
-            _user("") {}
+        explicit SaslSCRAMSHA1ClientConversation(SaslClientSession* saslClientSession); 
 
-        virtual ~SaslConversation();
+        virtual ~SaslSCRAMSHA1ClientConversation();
 
         /**
-         * Performs one step of the server side of the authentication session,
-         * consuming "inputData" and producing "*outputData".
+         * Takes one step in a SCRAM-SHA-1 conversation.
          *
-         * A return of Status::OK() indicates successful progress towards authentication. 
-         * A return of !Status::OK() indicates failed authentication
+         * @return !Status::OK() for failure. The boolean part indicates if the
+         * authentication conversation is finished or not.
          *
-         * A return of true means that the authentication process has finished.
-         * A return of false means that the authentication process has more steps.
-         *
-         */
-        virtual StatusWith<bool> step(const StringData& inputData, std::string* outputData) = 0;
-
-        /**
-         * Gets the SASL principal id (user name) for the conversation
          **/
-        std::string getPrincipalId();
-    
-    protected:
-        SaslAuthenticationSession* _saslAuthSession;
-        std::string _user;
+        virtual StatusWith<bool> step(const StringData& inputData, std::string* outputData);
+
+    private:
+        /**
+         * Generates client-first-message.
+         **/
+        StatusWith<bool> _firstStep(std::string* outputData);
+        
+        /** 
+         * Parses server-first-message and generate client-final-message.
+         **/  
+        StatusWith<bool> _secondStep(const std::vector<string>& input, std::string* outputData);
+        
+        /**
+         * Generates client-first-message.
+         **/
+        StatusWith<bool> _thirdStep(const std::vector<string>& input, std::string* outputData);
+        
+        int _step;
+        std::string _authMessage;
+        unsigned char _saltedPassword[scram::hashSize];
+ 
+        // client and server nonce concatenated
+        std::string _clientNonce;
     };
 
 }  // namespace mongo

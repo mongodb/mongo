@@ -429,7 +429,8 @@ namespace mongo {
                 // At the moment we are ignoring the mechanism parameter and create
                 // both SCRAM-SHA-1 and MONGODB-CR credentials for all new users
                 BSONObjBuilder credentialsBuilder(userObjBuilder.subobjStart("credentials"));
-                BSONObj scramCred =  generateSCRAMCredentials(args.hashedPassword);
+                BSONObj scramCred = scram::generateCredentials(args.hashedPassword);
+        
                 if(!scramCred.isEmpty()) {
                     credentialsBuilder.append("SCRAM-SHA-1",scramCred);
                 }
@@ -593,7 +594,7 @@ namespace mongo {
             if (args.hasHashedPassword) {
                 // Create both SCRAM-SHA-1 and MONGODB-CR credentials for all new users
                 BSONObjBuilder credentialsBuilder(updateSetBuilder.subobjStart("credentials"));
-                BSONObj scramCred =  generateSCRAMCredentials(args.hashedPassword);
+                BSONObj scramCred =  scram::generateCredentials(args.hashedPassword);
                 if(!scramCred.isEmpty()) {
                     credentialsBuilder.append("SCRAM-SHA-1",scramCred);
                 }

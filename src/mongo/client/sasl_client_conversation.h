@@ -1,5 +1,5 @@
 /*
- *    Copyright (C) 2014 MongoDB Inc.
+ *    Copyright (C) 2014 MongoDB Inc.  All Rights Reserved.
  *
  *    This program is free software: you can redistribute it and/or  modify
  *    it under the terms of the GNU Affero General Public License, version 3,
@@ -31,26 +31,48 @@
 #include <string>
 
 #include "mongo/base/disallow_copying.h"
-#include "mongo/base/status.h"
 #include "mongo/base/string_data.h"
-#include "mongo/db/auth/sasl_server_conversation.h"
 
 namespace mongo {
+    
+    class SaslClientSession;
+    template <typename T> class StatusWith;
+    
     /**
-     *  Server side authentication session for SASL PLAIN.
+     * Abstract class for implementing the clent-side
+     * of a SASL mechanism conversation.
      */
-    class SaslPLAINServerConversation : public SaslServerConversation {
-        MONGO_DISALLOW_COPYING(SaslPLAINServerConversation);
+    class SaslClientConversation {
+        MONGO_DISALLOW_COPYING(SaslClientConversation);
     public:
         /**
-         * Implements the server side of a SASL PLAIN mechanism session.
+         * Implements the client side of a SASL authentication mechanism.
          *
+         * "saslClientSession" is the corresponding SASLClientSession.
+         * "saslClientSession" must stay in scope until the SaslClientConversation's 
+         *  destructor completes.
+         * 
          **/
-        explicit SaslPLAINServerConversation(SaslAuthenticationSession* saslAuthSession); 
+        explicit SaslClientConversation(SaslClientSession* saslClientSession) :
+            _saslClientSession(saslClientSession) {}
 
-        virtual ~SaslPLAINServerConversation();
+        virtual ~SaslClientConversation();
 
-        virtual StatusWith<bool> step(const StringData& inputData, std::string* outputData);
+        /**
+         * Performs one step of the client side of the authentication session,
+         * consuming "inputData" and producing "*outputData".
+         *
+         * A return of Status::OK() indicates successful progress towards authentication. 
+         * A return of !Status::OK() indicates failed authentication
+         *
+         * A return of true means that the authentication process has finished.
+         * A return of false means that the authentication process has more steps.
+         *
+         */
+        virtual StatusWith<bool> step(const StringData& inputData, std::string* outputData) = 0;
+
+    protected:
+        SaslClientSession* _saslClientSession;
     };
 
 }  // namespace mongo

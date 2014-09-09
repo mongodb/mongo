@@ -38,9 +38,9 @@
 #include <openssl/hmac.h>
 #endif
 
+#include "mongo/db/auth/mechanism_scram.h"
 #include "mongo/platform/random.h"
 #include "mongo/util/base64.h"
-#include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
 #include "mongo/util/password_digest.h"
 #include "mongo/util/text.h"
@@ -48,7 +48,7 @@
 namespace mongo {
     SaslSCRAMSHA1ServerConversation::SaslSCRAMSHA1ServerConversation(
                                                     SaslAuthenticationSession* saslAuthSession) :
-        SaslConversation(saslAuthSession),
+        SaslServerConversation(saslAuthSession),
         _step(0),
         _authMessage(""),
         _nonce("") {
@@ -240,62 +240,67 @@ namespace mongo {
        
         // Do server side computations, compare storedKeys and generate client-final-message
         // AuthMessage     := client-first-message-bare + "," +
-        //                   server-first-message + "," +
-        //                   client-final-message-without-proof
+        //                    server-first-message + "," +
+        //                    client-final-message-without-proof
         // ClientSignature := HMAC(StoredKey, AuthMessage)
         // ClientKey := ClientSignature XOR ClientProof
         // ServerSignature := HMAC(ServerKey, AuthMessage)
          
-        const unsigned int scramHashSize = 20;
         unsigned int hashLen = 0;
-        unsigned char clientSignature[scramHashSize];
+        unsigned char clientSignature[scram::hashSize];
 
         std::string decodedStoredKey = base64::decode(_creds.scram.storedKey);
         // ClientSignature := HMAC(StoredKey, AuthMessage)
         fassert(18662, HMAC(EVP_sha1(),
                             reinterpret_cast<const unsigned char*>(decodedStoredKey.c_str()),
-                            scramHashSize,
+                            scram::hashSize,
                             reinterpret_cast<const unsigned char*>(_authMessage.c_str()),
                             _authMessage.size(),
                             clientSignature,
                             &hashLen));
        
-        fassert(18658, hashLen == scramHashSize);
+        fassert(18658, hashLen == scram::hashSize);
 
+        try {
+            clientProof = base64::decode(clientProof);
+        }
+        catch (const DBException& ex) {
+            return StatusWith<bool>(ex.toStatus());
+        }
         const unsigned char *decodedClientProof = 
-            reinterpret_cast<const unsigned char*>(base64::decode(clientProof).c_str());
+            reinterpret_cast<const unsigned char*>(clientProof.c_str());
 
         // ClientKey := ClientSignature XOR ClientProof
-        unsigned char clientKey[scramHashSize];
-        for(size_t i=0; i<scramHashSize; i++) {
+        unsigned char clientKey[scram::hashSize];
+        for(size_t i=0; i<scram::hashSize; i++) {
             clientKey[i] = clientSignature[i]^decodedClientProof[i];
         }
 
         // StoredKey := H(ClientKey)
-        unsigned char computedStoredKey[scramHashSize];        
-        fassert(18659, SHA1(clientKey, scramHashSize, computedStoredKey));
+        unsigned char computedStoredKey[scram::hashSize];        
+        fassert(18659, SHA1(clientKey, scram::hashSize, computedStoredKey));
         
-        if (memcmp(decodedStoredKey.c_str(), computedStoredKey, scramHashSize) != 0) {
+        if (memcmp(decodedStoredKey.c_str(), computedStoredKey, scram::hashSize) != 0) {
             return StatusWith<bool>(ErrorCodes::AuthenticationFailed,
                 mongoutils::str::stream() << 
                     "SCRAM-SHA-1 auhentication failed, storedKey mismatch");
         }
  
         // ServerSignature := HMAC(ServerKey, AuthMessage)
-        unsigned char serverSignature[scramHashSize];
+        unsigned char serverSignature[scram::hashSize];
         std::string decodedServerKey = base64::decode(_creds.scram.serverKey);
         fassert(18660, HMAC(EVP_sha1(),
                             reinterpret_cast<const unsigned char*>(decodedServerKey.c_str()),
-                            scramHashSize,
+                            scram::hashSize,
                             reinterpret_cast<const unsigned char*>(_authMessage.c_str()),
                             _authMessage.size(),
                             serverSignature,
                             &hashLen));
         
-        fassert(18661, hashLen == scramHashSize);
+        fassert(18661, hashLen == scram::hashSize);
 
         StringBuilder sb;
-        sb << "v=" << base64::encode(reinterpret_cast<char*>(serverSignature), scramHashSize);
+        sb << "v=" << base64::encode(reinterpret_cast<char*>(serverSignature), scram::hashSize);
         *outputData = sb.str();
 
         return StatusWith<bool>(false);

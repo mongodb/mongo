@@ -290,11 +290,14 @@ env.Library('clientdriver', [
             "client/replica_set_monitor.cpp",
             'client/sasl_client_authenticate.cpp',
             "client/sasl_client_authenticate_impl.cpp",
+            'client/sasl_client_conversation.cpp',
             'client/sasl_client_session.cpp',
+            'client/sasl_plain_client_conversation.cpp',
+            'client/sasl_scramsha1_client_conversation.cpp',
             "client/syncclusterconnection.cpp",
             "db/dbmessage.cpp"
             ],
-            LIBDEPS=['network',
+            LIBDEPS=['$BUILD_DIR/mongo/db/auth/scramauth', 'network'
             ])
 
 env.CppUnitTest("replica_set_monitor_test",
