@@ -220,21 +220,13 @@ ops(void *arg)
 		/*
 		 * We can't checkpoint or swap sessions/cursors while in a
 		 * transaction, resolve any running transaction.
-		 *
-		 * Reset the cursor regardless: we may block waiting for a lock
-		 * and there is no reason to keep pages pinned.
 		 */
-		if (cnt == ckpt_op || cnt == session_op) {
-			if (intxn) {
-				if ((ret = session->commit_transaction(
-				    session, NULL)) != 0)
-					die(ret, "session.commit_transaction");
-				++tinfo->commit;
-				intxn = 0;
-			}
-			if (cursor != NULL &&
-			    (ret = cursor->reset(cursor)) != 0)
-				die(ret, "cursor.reset");
+		if (intxn && (cnt == ckpt_op || cnt == session_op)) {
+			if ((ret = session->commit_transaction(
+			    session, NULL)) != 0)
+				die(ret, "session.commit_transaction");
+			++tinfo->commit;
+			intxn = 0;
 		}
 
 		/* Open up a new session and cursors. */
@@ -372,13 +364,6 @@ ops(void *arg)
 				if (g.append_cnt >= g.append_max)
 					goto skip_insert;
 
-				/*
-				 * Reset the standard cursor so it doesn't keep
-				 * pages pinned.
-				 */
-				if ((ret = cursor->reset(cursor)) != 0)
-					die(ret, "cursor.reset");
-
 				/* Insert, then reset the insert cursor. */
 				if (col_insert(
 				    cursor_insert, &key, &value, &keyno))
@@ -430,6 +415,10 @@ skip_insert:			if (col_update(cursor, &key, &value, keyno))
 		++tinfo->search;
 		if (read_row(cursor, &key, keyno))
 			goto deadlock;
+		
+		/* Reset the cursor: there is no reason to keep pages pinned. */
+		if (cursor != NULL && (ret = cursor->reset(cursor)) != 0)
+			die(ret, "cursor.reset");
 
 		/*
 		 * If we're in the transaction, commit 40% of the time and
