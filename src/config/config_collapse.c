@@ -258,7 +258,7 @@ __config_merge_format_next(WT_SESSION_IMPL *session, const char *prefix,
 		 * back off one entry and pop up a level.
 		 */
 		if (plen != 0 &&
-		    (plen < len1 || memcmp(ep->k, prefix, plen) != 0)) {
+		    (plen > len1 || memcmp(ep->k, prefix, plen) != 0)) {
 			--*enp;
 			break;
 		}
