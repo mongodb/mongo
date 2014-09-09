@@ -174,7 +174,13 @@ namespace mongo {
                     }
                 }
 
+                // We currently always logOp the command regardless of whether the individial ops
+                // succeeded and rely on any failures to also happen on secondaries. This isn't
+                // perfect, but it's what the command has always done and is part of its "correct"
+                // behavior.
+                WriteUnitOfWork wunit(txn);
                 repl::logOp(txn, "c", tempNS.c_str(), cmdBuilder.done());
+                wunit.commit();
             }
 
             if (errors != 0) {
