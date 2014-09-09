@@ -151,15 +151,17 @@ namespace mongo {
             Collection* collection = ctx.ctx().db()->getCollection( txn, nss.ns() );
             massert( 13417, "captrunc collection not found or empty", collection);
 
-            boost::scoped_ptr<PlanExecutor> exec(
-                InternalPlanner::collectionScan(txn, nss.ns(), collection,
-                                                InternalPlanner::BACKWARD));
-
             DiskLoc end;
-            // We remove 'n' elements so the start is one past that
-            for( int i = 0; i < n + 1; ++i ) {
-                PlanExecutor::ExecState state = exec->getNext(NULL, &end);
-                massert( 13418, "captrunc invalid n", PlanExecutor::ADVANCED == state);
+            {
+                boost::scoped_ptr<PlanExecutor> exec(InternalPlanner::collectionScan(txn,
+                                                                                     nss.ns(),
+                                                                                     collection,
+                                                                                     InternalPlanner::BACKWARD));
+                // We remove 'n' elements so the start is one past that
+                for( int i = 0; i < n + 1; ++i ) {
+                    PlanExecutor::ExecState state = exec->getNext(NULL, &end);
+                    massert( 13418, "captrunc invalid n", PlanExecutor::ADVANCED == state);
+                }
             }
             collection->temp_cappedTruncateAfter( txn, end, inc );
             ctx.commit();
