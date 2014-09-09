@@ -257,7 +257,7 @@ namespace newlm {
         ASSERT(request.recursiveCount == 1);
         ASSERT(notify.numNotifies == 0);
 
-        // Acquire again, in *non-compatible*, but stricter mode
+        // Acquire again, in *non-compatible*, but less strict mode
         ASSERT(LOCK_OK == lockMgr.lock(resId, &request, MODE_S));
         ASSERT(request.mode == MODE_X);
         ASSERT(request.recursiveCount == 2);

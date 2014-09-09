@@ -137,7 +137,7 @@ namespace mongo {
         if ( !e ) {
             _entryMap.erase( fromNS.toString() );
             return Status( ErrorCodes::NamespaceNotFound,
-                           "cannot renameCollection missng collection" );
+                           "cannot renameCollection missing collection" );
         }
 
         if ( _entryMap[toNS.toString()] ) {
