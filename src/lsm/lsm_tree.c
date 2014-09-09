@@ -744,8 +744,8 @@ __wt_lsm_tree_switch(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 	    nchunks + 1, &lsm_tree->chunk));
 
 	WT_ERR(__wt_verbose(session, WT_VERB_LSM,
-	    "Tree switch to: %" PRIu32 ", checkpoint throttle %ld, "
-	    "merge throttle %ld",
+	    "Tree %s switch to: %" PRIu32 ", checkpoint throttle %ld, "
+	    "merge throttle %ld", lsm_tree->name,
 	    new_id, lsm_tree->ckpt_throttle, lsm_tree->merge_throttle));
 
 	WT_ERR(__wt_calloc_def(session, 1, &chunk));
@@ -1057,7 +1057,8 @@ __wt_lsm_compact(WT_SESSION_IMPL *session, const char *name, int *skip)
 	WT_ERR(__wt_lsm_tree_unlock(session, lsm_tree));
 
 	/* Make sure the in-memory chunk gets flushed but not switched. */
-	WT_ERR(__wt_verbose(session, WT_VERB_LSM, "Compact force flush"));
+	WT_ERR(__wt_verbose(session, WT_VERB_LSM, "Compact %s force flush",
+	    name));
 	WT_ERR(__wt_lsm_manager_push_entry(
 	    session, WT_LSM_WORK_FLUSH | WT_LSM_WORK_FORCE, lsm_tree));
 

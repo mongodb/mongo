@@ -73,7 +73,6 @@ __wt_lsm_merge(
 	dest = src = NULL;
 	locked = 0;
 	start_id = 0;
-	aggressive = lsm_tree->merge_aggressiveness;
 
 	/*
 	 * If the tree is open read-only be very aggressive. Otherwise, we can
@@ -83,6 +82,7 @@ __wt_lsm_merge(
 	if (!lsm_tree->modified)
 		lsm_tree->merge_aggressiveness = 10;
 
+	aggressive = lsm_tree->merge_aggressiveness;
 	merge_max = (aggressive > 5) ? 100 : lsm_tree->merge_min;
 	merge_min = (aggressive > 5) ? 2 : lsm_tree->merge_min;
 	max_gap = (aggressive + 4) / 5;
@@ -251,8 +251,9 @@ __wt_lsm_merge(
 	dest_id = WT_ATOMIC_ADD(lsm_tree->last, 1);
 
 	WT_RET(__wt_verbose(session, WT_VERB_LSM,
-	    "Merging chunks %u-%u into %u (%" PRIu64 " records)"
+	    "Merging %s chunks %u-%u into %u (%" PRIu64 " records)"
 	    ", generation %" PRIu32,
+	    lsm_tree->name,
 	    start_chunk, end_chunk, dest_id, record_count, generation));
 	if (WT_VERBOSE_ISSET(session, WT_VERB_LSM))
 		for (verb = start_chunk; verb <= end_chunk; verb++)

@@ -32,7 +32,7 @@ __lsm_worker_general_op(
 	WT_DECL_RET;
 	WT_LSM_CHUNK *chunk;
 	WT_LSM_WORK_UNIT *entry;
-	int force, count;
+	int force, last;
 
 	*completed = 0;
 	if (!F_ISSET(cookie, WT_LSM_WORK_FLUSH) &&
@@ -51,22 +51,23 @@ __lsm_worker_general_op(
 		 * If this is a force flush, we want to force out all
 		 * possible chunks, not just the first one we find.
 		 */
-		count = 0;
+		last = 0;
 		do {
-			WT_ERR(__wt_lsm_get_chunk_to_flush(
-			    session, entry->lsm_tree, force, &chunk));
+			WT_ERR(__wt_lsm_get_chunk_to_flush(session,
+			    entry->lsm_tree, force, &last, &chunk));
 			if (chunk != NULL) {
-				count++;
-				__wt_errx(session, "Got chunk %d", chunk->id);
+				WT_ERR(__wt_verbose(session, WT_VERB_LSM,
+				    "Flush%s%s chunk %d %s",
+				    force ? " w/ force" : "",
+				    last ? " last" : "",
+				    chunk->id, chunk->uri));
 				ret = __wt_lsm_checkpoint_chunk(
 				    session, entry->lsm_tree, chunk);
 				WT_ASSERT(session, chunk->refcnt > 0);
 				(void)WT_ATOMIC_SUB(chunk->refcnt, 1);
 				WT_ERR(ret);
 			}
-		} while (force &&chunk != NULL);
-		if (count > 1)
-			__wt_errx(session, "Processed %d chunks", count);
+		} while (force && chunk != NULL && !last);
 	} else if (entry->flags == WT_LSM_WORK_DROP)
 		WT_ERR(__wt_lsm_free_chunks(session, entry->lsm_tree));
 	else if (entry->flags == WT_LSM_WORK_BLOOM) {

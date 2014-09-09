@@ -1016,6 +1016,7 @@ extern int __wt_lsm_tree_worker(WT_SESSION_IMPL *session,
 extern int __wt_lsm_get_chunk_to_flush(WT_SESSION_IMPL *session,
     WT_LSM_TREE *lsm_tree,
     int force,
+    int *last,
     WT_LSM_CHUNK **chunkp);
 extern int __wt_lsm_work_switch( WT_SESSION_IMPL *session,
     WT_LSM_WORK_UNIT **entryp,
