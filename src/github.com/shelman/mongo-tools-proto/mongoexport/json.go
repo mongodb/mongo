@@ -1,9 +1,9 @@
 package mongoexport
 
 import (
-	"encoding/json"
 	"fmt"
 	"github.com/shelman/mongo-tools-proto/common/bsonutil"
+	"github.com/shelman/mongo-tools-proto/common/json"
 	"gopkg.in/mgo.v2/bson"
 	"io"
 )

@@ -509,8 +509,18 @@ type floatEncoder int // number of bits
 
 func (bits floatEncoder) encode(e *encodeState, v reflect.Value, quoted bool) {
 	f := v.Float()
-	if math.IsInf(f, 0) || math.IsNaN(f) {
-		e.error(&UnsupportedValueError{v, strconv.FormatFloat(f, 'g', -1, int(bits))})
+	if math.IsInf(f, 0) {
+		if math.IsInf(f, 1) { //positive inf
+			e.WriteString("+Infinity")
+		} else { //negative inf
+			e.WriteString("-Infinity")
+		}
+		return
+	}
+	if math.IsNaN(f) {
+		e.WriteString("NaN")
+		return
+		//e.error(&UnsupportedValueError{v, strconv.FormatFloat(f, 'g', -1, int(bits))})
 	}
 	b := strconv.AppendFloat(e.scratch[:0], f, 'g', -1, int(bits))
 	if quoted {
