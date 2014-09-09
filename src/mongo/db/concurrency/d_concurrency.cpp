@@ -143,6 +143,24 @@ namespace mongo {
     };
 
 
+    class AcquiringParallelWriter {
+    public:
+
+        AcquiringParallelWriter(LockState* ls)
+            : _ls(ls) {
+
+            _ls->_lockPendingParallelWriter = true;
+        }
+
+        ~AcquiringParallelWriter() {
+            _ls->_lockPendingParallelWriter = false;
+        }
+
+    private:
+        LockState* const _ls;
+    };
+
+
     RWLockRecursive &Lock::ParallelBatchWriterMode::_batchLock = *(new RWLockRecursive("special"));
     void Lock::ParallelBatchWriterMode::iAmABatchParticipant(LockState* lockState) {
         lockState->_batchWriter = true;
@@ -159,7 +177,7 @@ namespace mongo {
 
     void Lock::ScopedLock::ParallelBatchWriterSupport::relock() {
         if (!_lockState->_batchWriter) {
-            AcquiringParallelWriter a(*_lockState);
+            AcquiringParallelWriter a(_lockState);
             _lk.reset( new RWLockRecursive::Shared(ParallelBatchWriterMode::_batchLock) );
         }
     }

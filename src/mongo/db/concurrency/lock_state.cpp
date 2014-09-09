@@ -42,38 +42,33 @@ namespace mongo {
 
 
 
-    LockState::LockState() 
-        : Locker(idCounter.addAndFetch(1)),
-          _batchWriter(false),
-          _recursive(0),
-          _threadState(0),
-          _scopedLk(NULL),
-          _lockPending(false),
-          _lockPendingParallelWriter(false)
-    {
+    LockState::LockState() : Locker(idCounter.addAndFetch(1)) {
+
     }
 
-    bool LockState::isRW() const { 
+namespace newlm {
+
+    bool Locker::isRW() const { 
         return _threadState == 'R' || _threadState == 'W'; 
     }
 
-    bool LockState::isW() const { 
+    bool Locker::isW() const { 
         return _threadState == 'W'; 
     }
 
-    bool LockState::hasAnyReadLock() const { 
+    bool Locker::hasAnyReadLock() const { 
         return _threadState == 'r' || _threadState == 'R';
     }
 
-    bool LockState::isLocked() const {
+    bool Locker::isLocked() const {
         return threadState() != 0;
     }
 
-    bool LockState::isWriteLocked() const {
+    bool Locker::isWriteLocked() const {
         return (threadState() == 'W' || threadState() == 'w');
     }
 
-    bool LockState::isWriteLocked(const StringData& ns) const {
+    bool Locker::isWriteLocked(const StringData& ns) const {
         if (isWriteLocked()) {
             return true;
         }
@@ -84,7 +79,7 @@ namespace mongo {
         return isLockHeldForMode(resIdNs, newlm::MODE_X);
     }
 
-    bool LockState::isAtLeastReadLocked(const StringData& ns) const {
+    bool Locker::isAtLeastReadLocked(const StringData& ns) const {
         if (threadState() == 'R' || threadState() == 'W')
             return true; // global
         if (threadState() == 0)
@@ -96,15 +91,15 @@ namespace mongo {
         return isLockHeldForMode(resIdNs, newlm::MODE_S);
     }
 
-    bool LockState::isLockedForCommitting() const {
+    bool Locker::isLockedForCommitting() const {
         return threadState() == 'R' || threadState() == 'W';
     }
 
-    bool LockState::isRecursive() const {
+    bool Locker::isRecursive() const {
         return recursiveCount() > 1;
     }
 
-    void LockState::assertWriteLocked(const StringData& ns) const {
+    void Locker::assertWriteLocked(const StringData& ns) const {
         if (!isWriteLocked(ns)) {
             dump();
             msgasserted(
@@ -112,37 +107,29 @@ namespace mongo {
         }
     }
 
-    void LockState::assertAtLeastReadLocked(const StringData& ns) const {
+    void Locker::assertAtLeastReadLocked(const StringData& ns) const {
         if (!isAtLeastReadLocked(ns)) {
-            log() << "error expected " << ns << " to be locked " << endl;
+            log() << "error expected " << ns << " to be locked " << std::endl;
             dump();
             msgasserted(
                 16104, mongoutils::str::stream() << "expected to be read locked for " << ns);
         }
     }
 
-    void LockState::lockedStart( char newState ) {
+    void Locker::lockedStart( char newState ) {
         _threadState = newState;
     }
 
-    void LockState::unlocked() {
+    void Locker::unlocked() {
         _threadState = 0;
     }
 
-    void LockState::changeLockState( char newState ) {
+    void Locker::changeLockState( char newState ) {
         fassert( 16169 , _threadState != 0 );
         _threadState = newState;
     }
 
-    static string kind(int n) { 
-        if( n > 0 )
-            return "W";
-        if( n < 0 ) 
-            return "R";
-        return "?";
-    }
-
-    BSONObj LockState::reportState() {
+    BSONObj Locker::reportState() {
         BSONObjBuilder b;
         reportState(&b);
 
@@ -153,7 +140,7 @@ namespace mongo {
               thread. So be careful about thread safety here. For example reading 
               this->otherName would not be safe as-is!
     */
-    void LockState::reportState(BSONObjBuilder* res) {
+    void Locker::reportState(BSONObjBuilder* res) {
         BSONObjBuilder b;
         if( _threadState ) {
             char buf[2];
@@ -171,9 +158,9 @@ namespace mongo {
         res->append("waitingForLock", _lockPending);
     }
 
-    void LockState::dump() const {
-        char s = _threadState;
-        stringstream ss;
+    void Locker::dump() const {
+        char s = threadState();
+        StringBuilder ss;
         ss << "lock status: ";
         if( s == 0 ){
             ss << "unlocked"; 
@@ -181,10 +168,10 @@ namespace mongo {
         else {
             // SERVER-14978: Dump lock stats information
         }
-        log() << ss.str() << endl;
+        log() << ss.str() << std::endl;
     }
 
-    void LockState::enterScopedLock(Lock::ScopedLock* lock) {
+    void Locker::enterScopedLock(Lock::ScopedLock* lock) {
         _recursive++;
         if (_recursive == 1) {
             invariant(_scopedLk == NULL);
@@ -192,12 +179,12 @@ namespace mongo {
         }
     }
 
-    Lock::ScopedLock* LockState::getCurrentScopedLock() const {
+    Lock::ScopedLock* Locker::getCurrentScopedLock() const {
         invariant(_recursive == 1);
         return _scopedLk;
     }
 
-    void LockState::leaveScopedLock(Lock::ScopedLock* lock) {
+    void Locker::leaveScopedLock(Lock::ScopedLock* lock) {
         if (_recursive == 1) {
             // Sanity check we are releasing the same lock
             invariant(_scopedLk == lock);
@@ -206,18 +193,6 @@ namespace mongo {
         _recursive--;
     }
 
-    
-    AcquiringParallelWriter::AcquiringParallelWriter( LockState& ls )
-        : _ls( ls ) {
-        _ls._lockPendingParallelWriter = true;
-    }
-    
-    AcquiringParallelWriter::~AcquiringParallelWriter() {
-        _ls._lockPendingParallelWriter = false;
-    }
-
-    
-namespace newlm {
 
     /**
      * Global lock manager instance.
@@ -263,7 +238,14 @@ namespace newlm {
     // Locker
     //
 
-    Locker::Locker(uint64_t id) : _id(id) {
+    Locker::Locker(uint64_t id) 
+        : _id(id),
+          _batchWriter(false),
+          _lockPendingParallelWriter(false),
+          _recursive(0),
+          _threadState(0),
+          _scopedLk(NULL),
+          _lockPending(false) {
 
     }
 

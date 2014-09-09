@@ -175,6 +175,81 @@ namespace newlm {
         LockRequestsMap _requests;
 
         CondVarLockGrantNotification _notify;
+
+        //////////////////////////////////////////////////////////////////////////////////////////
+        //
+        // Methods merged from LockState, which should eventually be removed or changed to methods
+        // on the Locker interface.
+        //
+
+    public:
+
+        void dump() const;
+
+        BSONObj reportState();
+        void reportState(BSONObjBuilder* b);
+
+        unsigned recursiveCount() const { return _recursive; }
+
+        /**
+        * Indicates the mode of acquisition of the GlobalLock by this particular thread. The
+        * return values are '0' (no global lock is held), 'r', 'w', 'R', 'W'. See the commends of
+        * QLock for more information on what these modes mean.
+        */
+        char threadState() const { return _threadState; }
+
+        bool isRW() const; // RW
+        bool isW() const; // W
+        bool hasAnyReadLock() const; // explicitly rR
+
+        bool isLocked() const;
+        bool isWriteLocked() const;
+        bool isWriteLocked(const StringData& ns) const;
+        bool isAtLeastReadLocked(const StringData& ns) const;
+        bool isLockedForCommitting() const;
+        bool isRecursive() const;
+
+        void assertWriteLocked(const StringData& ns) const;
+        void assertAtLeastReadLocked(const StringData& ns) const;
+
+        /** pending means we are currently trying to get a lock */
+        bool hasLockPending() const { return _lockPending || _lockPendingParallelWriter; }
+
+        // ----
+
+
+        void lockedStart(char newState); // RWrw
+        void unlocked(); // _threadState = 0
+
+        /**
+        * you have to be locked already to call this
+        * this is mostly for W_to_R or R_to_W
+        */
+        void changeLockState(char newstate);
+
+        // Those are only used for TempRelease. Eventually they should be removed.
+        void enterScopedLock(Lock::ScopedLock* lock);
+        Lock::ScopedLock* getCurrentScopedLock() const;
+        void leaveScopedLock(Lock::ScopedLock* lock);
+
+        bool _batchWriter;
+        bool _lockPendingParallelWriter;
+
+        void recordLockTime() { _scopedLk->recordTime(); }
+        void resetLockTime() { _scopedLk->resetTime(); }
+
+    private:
+        unsigned _recursive;           // we allow recursively asking for a lock; we track that here
+
+        // global lock related
+        char _threadState;             // 0, 'r', 'w', 'R', 'W'
+
+        // for temprelease
+        // for the nonrecursive case. otherwise there would be many
+        // the first lock goes here, which is ok since we can't yield recursive locks
+        Lock::ScopedLock* _scopedLk;
+
+        bool _lockPending;
     };
     
 } // namespace newlm
@@ -192,84 +267,6 @@ namespace newlm {
     public:
         LockState();
 
-        void dump() const;
-
-        BSONObj reportState();
-        void reportState(BSONObjBuilder* b);
-        
-        unsigned recursiveCount() const { return _recursive; }
-
-        /**
-         * Indicates the mode of acquisition of the GlobalLock by this particular thread. The
-         * return values are '0' (no global lock is held), 'r', 'w', 'R', 'W'. See the commends of
-         * QLock for more information on what these modes mean.
-         */
-        char threadState() const { return _threadState; }
-        
-        bool isRW() const; // RW
-        bool isW() const; // W
-        bool hasAnyReadLock() const; // explicitly rR
-        
-        bool isLocked() const;
-        bool isWriteLocked() const;
-        bool isWriteLocked(const StringData& ns) const;
-        bool isAtLeastReadLocked(const StringData& ns) const;
-        bool isLockedForCommitting() const;
-        bool isRecursive() const;
-
-        void assertWriteLocked(const StringData& ns) const;
-        void assertAtLeastReadLocked(const StringData& ns) const;
-
-        /** pending means we are currently trying to get a lock */
-        bool hasLockPending() const { return _lockPending || _lockPendingParallelWriter; }
-
-        // ----
-
-
-        void lockedStart( char newState ); // RWrw
-        void unlocked(); // _threadState = 0
-        
-        /**
-         * you have to be locked already to call this
-         * this is mostly for W_to_R or R_to_W
-         */
-        void changeLockState( char newstate );
-        
-        // Those are only used for TempRelease. Eventually they should be removed.
-        void enterScopedLock(Lock::ScopedLock* lock);
-        Lock::ScopedLock* getCurrentScopedLock() const;
-        void leaveScopedLock(Lock::ScopedLock* lock);
-
-        bool _batchWriter;
-
-        void recordLockTime() { _scopedLk->recordTime(); }
-        void resetLockTime() { _scopedLk->resetTime(); }
-        
-    private:
-        unsigned _recursive;           // we allow recursively asking for a lock; we track that here
-
-        // global lock related
-        char _threadState;             // 0, 'r', 'w', 'R', 'W'
-
-        // for temprelease
-        // for the nonrecursive case. otherwise there would be many
-        // the first lock goes here, which is ok since we can't yield recursive locks
-        Lock::ScopedLock* _scopedLk;   
-        
-        bool _lockPending;
-        bool _lockPendingParallelWriter;
-
-        friend class AcquiringParallelWriter;
-    };
-
-        
-    class AcquiringParallelWriter {
-    public:
-        AcquiringParallelWriter( LockState& ls );
-        ~AcquiringParallelWriter();
-
-    private:
-        LockState& _ls;
     };
 
 } // namespace mongo
