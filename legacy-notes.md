@@ -56,3 +56,21 @@ Legacy mongoimport also accepts some strange/unsupported types, like `NumberLong
 To make the new mongoimport replicate the old behavior exactly, we would need to extend the JSON parser to handle these. However, this behavior seems odd because mongoexport does not produce these types, and the formats supported by mongoimport do not match those supported by the shell.
 
 According to the docs, it suggests that the legacy mongoimport has a limit of 16MB for the size of a json array that can be used when importing with --jsonArray. The docs are incorrect, the limit is simply that no single document in the array can exceed the 16MB limit.
+
+## Mongodump:
+#### Some features are missing from this prototype version of mongodump:
+* Auth spec 1 user dumping (this will likely not be supported!)
+* --dbpath support, and its relevant commands
+* There are certain discrepancies with the C++ version, such as how default hostnames are handled.
+  * For instance, specifying a port name without a host will error in this version,
+    while legacy mongodump will assume localhost (this might be a common pkg issue)
+* Need to get 1:1 with query flags like SlaveOK
+* This version is not tested against mongos and sharded collections, a pretty big TODO
+
+#### But on the bright side...
+* This version is 1 to 2% faster on my local test cases.
+* It will be very easy to add new features like parallel and compressed dumping
+* Currently fixes outstanding tools tickets:
+  * SERVER-12812, where an oplog rollover could result in silent data loss
+  * SERVER-14124, where writing to stdout hid most log messages
+  * SERVER-13736, where mongodump would crash on certain bad hostnames

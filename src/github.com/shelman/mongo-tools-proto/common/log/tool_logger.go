@@ -10,7 +10,7 @@ import (
 	"time"
 )
 
-//====== Tool Logger Definition ======
+//// Tool Logger Definition
 
 type ToolLogger struct {
 	mutex     *sync.Mutex
@@ -73,7 +73,27 @@ func NewToolLogger(verbosity *options.Verbosity) *ToolLogger {
 	return tl
 }
 
-//====== Global Logging ======
+//// Log Writer Interface
+
+// toolLogWriter is an io.Writer wrapping a tool logger. It is a private
+// type meant for creation with the ToolLogger.Writer(...) method.
+type toolLogWriter struct {
+	logger       *ToolLogger
+	minVerbosity int
+}
+
+func (tlw *toolLogWriter) Write(message []byte) (int, error) {
+	tlw.logger.Log(tlw.minVerbosity, string(message))
+	return len(message), nil
+}
+
+// Writer returns an io.Writer that writes to the logger with
+// the given verbosity
+func (tl *ToolLogger) Writer(minVerb int) io.Writer {
+	return &toolLogWriter{tl, minVerb}
+}
+
+//// Global Logging
 
 var globalToolLogger *ToolLogger
 
@@ -113,4 +133,9 @@ func SetWriter(writer io.Writer) {
 func SetDateFormat(dateFormat string) {
 	assertGlobalToolLoggerInitialized()
 	globalToolLogger.SetDateFormat(dateFormat)
+}
+
+func Writer(minVerb int) io.Writer {
+	assertGlobalToolLoggerInitialized()
+	return globalToolLogger.Writer(minVerb)
 }
