@@ -64,7 +64,7 @@ __lsm_worker_general_op(
 				(void)WT_ATOMIC_SUB(chunk->refcnt, 1);
 				WT_ERR(ret);
 			}
-		while (force &&chunk != NULL);
+		} while (force &&chunk != NULL);
 		if (count > 1)
 			__wt_errx(session, "Processed %d chunks", count);
 	} else if (entry->flags == WT_LSM_WORK_DROP)
