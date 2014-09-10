@@ -1009,7 +1009,7 @@ __wt_lsm_compact(WT_SESSION_IMPL *session, const char *name, int *skip)
 	time_t begin, end;
 	int i, compacting, flushing, locked, ref;
 
-	compacting = locked = 0;
+	compacting = flushing = locked = ref = 0;
 	/*
 	 * This function is applied to all matching sources: ignore anything
 	 * that is not an LSM tree.
@@ -1048,7 +1048,7 @@ __wt_lsm_compact(WT_SESSION_IMPL *session, const char *name, int *skip)
 	 * hasn't been set before.  This prevents further writes, so it
 	 * can be flushed by the checkpoint worker.
 	 */
-	ref = 0;
+	chunk = NULL;
 	if (lsm_tree->nchunks > 0 &&
 	    (chunk = lsm_tree->chunk[lsm_tree->nchunks - 1]) != NULL) {
 		if (chunk->switch_txn == WT_TXN_NONE)
@@ -1069,12 +1069,15 @@ __wt_lsm_compact(WT_SESSION_IMPL *session, const char *name, int *skip)
 
 	/* Wait for the work unit queues to drain. */
 	while (F_ISSET(lsm_tree, WT_LSM_TREE_ACTIVE)) {
-		if (flushing && !F_ISSET(lsm_tree, WT_LSM_TREE_COMPACT_FLUSH)) {
-			WT_ERR(__wt_verbose(session, WT_VERB_LSM,
-			    "Compact flush complete %s chunk %u",
-			    name, chunk->id));
+		if (flushing && ref &&
+		    !F_ISSET(lsm_tree, WT_LSM_TREE_COMPACT_FLUSH)) {
 			flushing = ref = 0;
-			(void)WT_ATOMIC_SUB(chunk->refcnt, 1);
+			if (chunk != NULL) {
+				WT_ERR(__wt_verbose(session, WT_VERB_LSM,
+				    "Compact flush complete %s chunk %u",
+				    name, chunk->id));
+				(void)WT_ATOMIC_SUB(chunk->refcnt, 1);
+			}
 		}
 		/*
 		 * The compacting flag is cleared when no merges can be done.
