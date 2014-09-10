@@ -603,8 +603,7 @@ extern int __wt_conn_remove_compressor( WT_CONNECTION_IMPL *conn,
     WT_NAMED_COMPRESSOR *ncomp);
 extern int __wt_conn_remove_data_source( WT_CONNECTION_IMPL *conn,
     WT_NAMED_DATA_SOURCE *ndsrc);
-extern int __wt_conn_verbose_config(WT_SESSION_IMPL *session,
-    const char *cfg[]);
+extern int __wt_verbose_config(WT_SESSION_IMPL *session, const char *cfg[]);
 extern int __wt_cache_config(WT_CONNECTION_IMPL *conn, const char *cfg[]);
 extern int __wt_cache_create(WT_CONNECTION_IMPL *conn, const char *cfg[]);
 extern void __wt_cache_stats_update(WT_SESSION_IMPL *session);
