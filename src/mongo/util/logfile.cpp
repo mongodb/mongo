@@ -192,9 +192,9 @@ namespace mongo {
             _fd = open(name.c_str(), options, S_IRUSR | S_IWUSR);
         }
 #ifdef __linux__
-        _blkSize = ioctl(_fd, BLKBSZGET);
-        if (_blkSize < 0) {
-            _blkSize = g_minOSPageSizeBytes;
+        ssize_t tmpBlkSize = ioctl(_fd, BLKBSZGET);
+        if (tmpBlkSize >= 0) {
+            _blkSize = (size_t)tmpBlkSize;
         }
 #endif
 #else
@@ -252,7 +252,7 @@ namespace mongo {
 
         fassert( 16144, charsToWrite >= 0 );
         fassert( 16142, _fd >= 0 );
-        fassert( 16143, reinterpret_cast<ssize_t>( buf ) % _blkSize == 0 );  // aligned
+        fassert( 16143, reinterpret_cast<size_t>( buf ) % _blkSize == 0 );  // aligned
 
 #ifdef POSIX_FADV_DONTNEED
         const off_t pos = lseek(_fd, 0, SEEK_CUR); // doesn't actually seek, just get current position
