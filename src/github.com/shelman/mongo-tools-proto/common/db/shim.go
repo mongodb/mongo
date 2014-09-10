@@ -23,7 +23,6 @@ type StorageShim struct {
 
 //BSONStream wraps a stream
 type BSONStream struct {
-	//a reusable buffer for holding the raw bytes of a BSON document
 	Stream io.ReadCloser
 	err    error
 }
@@ -48,8 +47,7 @@ func (decStrm *DecodedBSONStream) Next(into interface{}) bool {
 	if !hasDoc {
 		return false
 	}
-	err := bson.Unmarshal(decStrm.reusableBuf[0:docSize], into)
-	if err != nil {
+	if err := bson.Unmarshal(decStrm.reusableBuf[0:docSize], into); err != nil {
 		decStrm.err = err
 		return false
 	}
@@ -128,7 +126,6 @@ func (shim *BSONStream) LoadNextInto(into []byte) (bool, int32) {
 		return false, 0
 	}
 	_, err = io.ReadAtLeast(shim.Stream, into[4:int(bsonSize)], int(bsonSize-4))
-	//_, err = readBytes(shim.Stream, into, 4, int(bsonSize-4))
 	if err != nil {
 		if err != io.EOF {
 			shim.err = err
