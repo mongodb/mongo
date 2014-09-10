@@ -1376,6 +1376,7 @@ namespace {
         ReplicationCoordinator::ReplSetElectArgs args;
         args.set = "fakeset";
         args.round = round;
+        args.cfgver = 10;
 
         BSONObjBuilder responseBuilder;
         startCapturingLogMessages();
@@ -1387,6 +1388,14 @@ namespace {
         ASSERT_EQUALS(1,
                       countLogLinesContaining("received an elect request for 'fakeset' but our "
                               "set name is 'rs0'"));
+
+        // Make sure nay votes, do not prevent subsequent yeas (the way a yea vote would)
+        args.set = "rs0";
+        BSONObjBuilder responseBuilder2;
+        getTopoCoord().prepareElectResponse(cbData, args, now++, &responseBuilder2);
+        BSONObj response2 = responseBuilder2.obj();
+        ASSERT_EQUALS(1, response2["vote"].Int());
+        ASSERT_EQUALS(round, response2["round"].OID());
     }
 
     TEST_F(PrepareElectResponseTest, OurConfigStale) {
@@ -1405,6 +1414,14 @@ namespace {
         ASSERT_EQUALS(round, response["round"].OID());
         ASSERT_EQUALS(1,
                       countLogLinesContaining("not voting because our config version is stale"));
+
+        // Make sure nay votes, do not prevent subsequent yeas (the way a yea vote would)
+        args.cfgver = 10;
+        BSONObjBuilder responseBuilder2;
+        getTopoCoord().prepareElectResponse(cbData, args, now++, &responseBuilder2);
+        BSONObj response2 = responseBuilder2.obj();
+        ASSERT_EQUALS(1, response2["vote"].Int());
+        ASSERT_EQUALS(round, response2["round"].OID());
     }
 
     TEST_F(PrepareElectResponseTest, TheirConfigStale) {
@@ -1423,6 +1440,14 @@ namespace {
         ASSERT_EQUALS(round, response["round"].OID());
         ASSERT_EQUALS(1,
                       countLogLinesContaining("received stale config version # during election"));
+
+        // Make sure nay votes, do not prevent subsequent yeas (the way a yea vote would)
+        args.cfgver = 10;
+        BSONObjBuilder responseBuilder2;
+        getTopoCoord().prepareElectResponse(cbData, args, now++, &responseBuilder2);
+        BSONObj response2 = responseBuilder2.obj();
+        ASSERT_EQUALS(1, response2["vote"].Int());
+        ASSERT_EQUALS(round, response2["round"].OID());
     }
 
     TEST_F(PrepareElectResponseTest, NonExistentNode) {
@@ -1441,6 +1466,14 @@ namespace {
         ASSERT_EQUALS(-10000, response["vote"].Int());
         ASSERT_EQUALS(round, response["round"].OID());
         ASSERT_EQUALS(1, countLogLinesContaining("couldn't find member with id 99"));
+
+        // Make sure nay votes, do not prevent subsequent yeas (the way a yea vote would)
+        args.whoid = 1;
+        BSONObjBuilder responseBuilder2;
+        getTopoCoord().prepareElectResponse(cbData, args, now++, &responseBuilder2);
+        BSONObj response2 = responseBuilder2.obj();
+        ASSERT_EQUALS(1, response2["vote"].Int());
+        ASSERT_EQUALS(round, response2["round"].OID());
     }
 
     TEST_F(PrepareElectResponseTest, WeArePrimary) {
@@ -1461,6 +1494,14 @@ namespace {
         ASSERT_EQUALS(-10000, response["vote"].Int());
         ASSERT_EQUALS(round, response["round"].OID());
         ASSERT_EQUALS(1, countLogLinesContaining("I am already primary"));
+
+        // Make sure nay votes, do not prevent subsequent yeas (the way a yea vote would)
+        getTopoCoord()._setCurrentPrimaryForTest(-1);
+        BSONObjBuilder responseBuilder2;
+        getTopoCoord().prepareElectResponse(cbData, args, now++, &responseBuilder2);
+        BSONObj response2 = responseBuilder2.obj();
+        ASSERT_EQUALS(1, response2["vote"].Int());
+        ASSERT_EQUALS(round, response2["round"].OID());
     }
 
     TEST_F(PrepareElectResponseTest, SomeoneElseIsPrimary) {
@@ -1480,6 +1521,14 @@ namespace {
         ASSERT_EQUALS(-10000, response["vote"].Int());
         ASSERT_EQUALS(round, response["round"].OID());
         ASSERT_EQUALS(1, countLogLinesContaining("h2:27017 is already primary"));
+
+        // Make sure nay votes, do not prevent subsequent yeas (the way a yea vote would)
+        getTopoCoord()._setCurrentPrimaryForTest(-1);
+        BSONObjBuilder responseBuilder2;
+        getTopoCoord().prepareElectResponse(cbData, args, now++, &responseBuilder2);
+        BSONObj response2 = responseBuilder2.obj();
+        ASSERT_EQUALS(1, response2["vote"].Int());
+        ASSERT_EQUALS(round, response2["round"].OID());
     }
 
     TEST_F(PrepareElectResponseTest, NotHighestPriority) {
@@ -1500,6 +1549,14 @@ namespace {
         ASSERT_EQUALS(-10000, response["vote"].Int());
         ASSERT_EQUALS(round, response["round"].OID());
         ASSERT_EQUALS(1, countLogLinesContaining("h1:27017 has lower priority than h3:27017"));
+
+        // Make sure nay votes, do not prevent subsequent yeas (the way a yea vote would)
+        args.whoid = 3;
+        BSONObjBuilder responseBuilder2;
+        getTopoCoord().prepareElectResponse(cbData, args, now++, &responseBuilder2);
+        BSONObj response2 = responseBuilder2.obj();
+        ASSERT_EQUALS(1, response2["vote"].Int());
+        ASSERT_EQUALS(round, response2["round"].OID());
     }
 
     TEST_F(PrepareElectResponseTest, ValidVotes) {
