@@ -1018,46 +1018,48 @@ __conn_statistics_config(WT_SESSION_IMPL *session, const char *cfg[])
 	WT_CONFIG_ITEM cval, sval;
 	WT_CONNECTION_IMPL *conn;
 	WT_DECL_RET;
+	uint32_t flags;
 	int set;
 
 	conn = S2C(session);
 
-	if ((ret = __wt_config_gets(session, cfg, "statistics", &cval)) != 0)
-		return (ret == WT_NOTFOUND ? 0 : ret);
+	WT_RET(__wt_config_gets(session, cfg, "statistics", &cval));
 
-	/* Configuring statistics clears any existing values. */
-	conn->stat_flags = 0;
-
+	flags = 0;
 	set = 0;
 	if ((ret = __wt_config_subgets(
 	    session, &cval, "none", &sval)) == 0 && sval.val != 0) {
-		FLD_SET(conn->stat_flags, WT_CONN_STAT_NONE);
+		LF_SET(WT_CONN_STAT_NONE);
 		++set;
 	}
 	WT_RET_NOTFOUND_OK(ret);
 
 	if ((ret = __wt_config_subgets(
 	    session, &cval, "fast", &sval)) == 0 && sval.val != 0) {
-		FLD_SET(conn->stat_flags, WT_CONN_STAT_FAST);
+		LF_SET(WT_CONN_STAT_FAST);
 		++set;
 	}
 	WT_RET_NOTFOUND_OK(ret);
 
 	if ((ret = __wt_config_subgets(
 	    session, &cval, "all", &sval)) == 0 && sval.val != 0) {
-		FLD_SET(conn->stat_flags, WT_CONN_STAT_ALL | WT_CONN_STAT_FAST);
+		LF_SET(WT_CONN_STAT_ALL | WT_CONN_STAT_FAST);
 		++set;
 	}
 	WT_RET_NOTFOUND_OK(ret);
 
 	if ((ret = __wt_config_subgets(
 	    session, &cval, "clear", &sval)) == 0 && sval.val != 0)
-		FLD_SET(conn->stat_flags, WT_CONN_STAT_CLEAR);
+		LF_SET(WT_CONN_STAT_CLEAR);
 	WT_RET_NOTFOUND_OK(ret);
 
 	if (set > 1)
 		WT_RET_MSG(session, EINVAL,
 		    "only one statistics configuration value may be specified");
+
+	/* Configuring statistics clears any existing values. */
+	conn->stat_flags = flags;
+
 	return (0);
 }
 
