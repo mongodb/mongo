@@ -101,7 +101,7 @@ namespace mongo {
         BSONObj getSavedMetadata( WiredTigerCursor &cursor );
         void _loadAllCollections();
         void _loadCollection( WiredTigerSession& swrap,
-                              const std::string &name,
+                              const std::string &tbl_uri,
                               bool stayTemp = false );
         struct IndexEntry {
             std::string name;

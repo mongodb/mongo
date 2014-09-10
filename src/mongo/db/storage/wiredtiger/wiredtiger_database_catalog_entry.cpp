@@ -122,8 +122,8 @@ namespace mongo {
             if (strstr(key, ".$") != NULL)
                 continue;
 
-            // Initialize the namespace we found - skip the table: prefix.
-            _loadCollection(swrap, key + 6);
+            // Initialize the namespace we found
+            _loadCollection(swrap, key);
         }
         invariant(ret == WT_NOTFOUND || ret == 0);
         name();
@@ -154,13 +154,12 @@ namespace mongo {
     }
 
     void WiredTigerDatabaseCatalogEntry::_loadCollection(
-        WiredTigerSession& swrap, const std::string &name, bool stayTemp) {
+        WiredTigerSession& swrap, const std::string &tbl_uri, bool stayTemp) {
 
         // Open the WiredTiger metadata so we can retrieve saved options.
         WiredTigerCursor cursor("metadata:", swrap);
         WT_CURSOR *c = cursor.Get();
         invariant(c != NULL);
-        std::string tbl_uri = std::string("table:" + name);
         c->set_key(c, tbl_uri.c_str());
         int ret = c->search(c);
         // TODO: Could we reasonably fail with NOTFOUND here?
@@ -172,6 +171,7 @@ namespace mongo {
         options->parse(b);
 		if (!stayTemp)
 			options->temp = false;
+        std::string name = WiredTigerRecordStore::_fromURI(tbl_uri);
         Entry *entry = new Entry(mongo::StringData(name), *options);
         WiredTigerRecordStore *rs = new WiredTigerRecordStore( name, _db );
         if ( options->capped )
@@ -395,7 +395,7 @@ namespace mongo {
         delete entry;
 
         // Load the newly renamed collection into memory
-        _loadCollection(swrap, toNS.toString(), stayTemp);
+        _loadCollection(swrap, toUri, stayTemp);
 
         return Status::OK();
     }

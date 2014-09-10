@@ -93,7 +93,7 @@ namespace mongo {
                 continue;
 
             // Extract the database name.
-            std::string dbName = uri_str.toString().substr(6, end - 6);
+            std::string dbName = WiredTigerRecordStore::_fromURI(uri);
 
             // We've seen it already.
             if (_dbs[dbName])

@@ -51,6 +51,10 @@ namespace mongo {
             return "table:" + ns.toString();
         }
 
+        static std::string _fromURI(const std::string &uri) {
+            return uri.substr(strlen("table:"));
+        }
+
         static uint64_t _makeKey(const DiskLoc &loc);
         static DiskLoc _fromKey(uint64_t k);
 
