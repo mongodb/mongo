@@ -127,7 +127,8 @@ func (shim *BSONStream) LoadNextInto(into []byte) (bool, int32) {
 		shim.err = fmt.Errorf("Invalid BSONSize: %v bytes", bsonSize)
 		return false, 0
 	}
-	_, err = readBytes(shim.Stream, into, 4, int(bsonSize-4))
+	_, err = io.ReadAtLeast(shim.Stream, into[4:int(bsonSize)], int(bsonSize-4))
+	//_, err = readBytes(shim.Stream, into, 4, int(bsonSize-4))
 	if err != nil {
 		if err != io.EOF {
 			shim.err = err
