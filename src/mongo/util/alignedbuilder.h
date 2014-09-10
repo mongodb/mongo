@@ -108,7 +108,11 @@ namespace mongo {
         unsigned len() const { return _len; }
 
     private:
+#ifndef __PPC64__
         static const unsigned Alignment = 8192;
+#else
+        static const unsigned Alignment = 65536;
+#endif
 
         /** returns the pre-grow write position */
         inline char* grow(unsigned by) {

@@ -162,6 +162,11 @@ namespace mongo {
 #include <sys/stat.h>
 #include <fcntl.h>
 #include "paths.h"
+#include <sys/ioctl.h>
+
+#ifdef __linux__
+#include <linux/fs.h>
+#endif
 
 namespace mongo {
 
@@ -177,6 +182,7 @@ namespace mongo {
                     ;
 
         _fd = open(name.c_str(), options, S_IRUSR | S_IWUSR);
+        _blkSize = g_minOSPageSizeBytes;
 
 #if defined(O_DIRECT)
         _direct = true;
@@ -185,6 +191,12 @@ namespace mongo {
             options &= ~O_DIRECT;
             _fd = open(name.c_str(), options, S_IRUSR | S_IWUSR);
         }
+#ifdef __linux__
+        _blkSize = ioctl(_fd, BLKBSZGET);
+        if (_blkSize < 0) {
+            _blkSize = g_minOSPageSizeBytes;
+        }
+#endif
 #else
         _direct = false;
 #endif
@@ -240,10 +252,7 @@ namespace mongo {
 
         fassert( 16144, charsToWrite >= 0 );
         fassert( 16142, _fd >= 0 );
-// Linux on PowerPC 64 uses 64kB memory pages, so we need to disable this assert on this platform
-#ifndef __PPC64__
-        fassert( 16143, reinterpret_cast<ssize_t>( buf ) % g_minOSPageSizeBytes == 0 );  // aligned
-#endif
+        fassert( 16143, reinterpret_cast<ssize_t>( buf ) % _blkSize == 0 );  // aligned
 
 #ifdef POSIX_FADV_DONTNEED
         const off_t pos = lseek(_fd, 0, SEEK_CUR); // doesn't actually seek, just get current position
