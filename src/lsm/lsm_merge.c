@@ -75,11 +75,12 @@ __wt_lsm_merge(
 	start_id = 0;
 
 	/*
-	 * If the tree is open read-only be very aggressive. Otherwise, we can
-	 * spend a long time waiting for merges to start in read-only
-	 * applications.
+	 * If the tree is open read-only or we are compacting, be very
+	 * aggressive. Otherwise, we can spend a long time waiting for merges
+	 * to start in read-only applications.
 	 */
-	if (!lsm_tree->modified)
+	if (!lsm_tree->modified ||
+	    F_ISSET(lsm_tree, WT_LSM_TREE_COMPACTING))
 		lsm_tree->merge_aggressiveness = 10;
 
 	aggressive = lsm_tree->merge_aggressiveness;

@@ -52,22 +52,27 @@ __lsm_worker_general_op(
 		 * possible chunks, not just the first one we find.
 		 */
 		last = 0;
-		do {
-			WT_ERR(__wt_lsm_get_chunk_to_flush(session,
-			    entry->lsm_tree, force, &last, &chunk));
-			if (chunk != NULL) {
-				WT_ERR(__wt_verbose(session, WT_VERB_LSM,
-				    "Flush%s%s chunk %d %s",
-				    force ? " w/ force" : "",
-				    last ? " last" : "",
-				    chunk->id, chunk->uri));
-				ret = __wt_lsm_checkpoint_chunk(
-				    session, entry->lsm_tree, chunk);
-				WT_ASSERT(session, chunk->refcnt > 0);
-				(void)WT_ATOMIC_SUB(chunk->refcnt, 1);
-				WT_ERR(ret);
-			}
-		} while (force && chunk != NULL && !last);
+		WT_ERR(__wt_lsm_get_chunk_to_flush(session,
+		    entry->lsm_tree, force, &last, &chunk));
+		if (chunk != NULL) {
+			WT_ERR(__wt_verbose(session, WT_VERB_LSM,
+			    "Flush%s%s chunk %d %s",
+			    force ? " w/ force" : "",
+			    last ? " last" : "",
+			    chunk->id, chunk->uri));
+			ret = __wt_lsm_checkpoint_chunk(
+			    session, entry->lsm_tree, chunk);
+			WT_ASSERT(session, chunk->refcnt > 0);
+			(void)WT_ATOMIC_SUB(chunk->refcnt, 1);
+			WT_ERR(ret);
+		}
+		/*
+		 * If we flushed the last chunk for a compact, clear the
+		 * flag so compact knows that is complete.
+		 */
+		if (last && force &&
+		    F_ISSET(entry->lsm_tree, WT_LSM_TREE_COMPACT_FLUSH))
+			F_CLR(entry->lsm_tree, WT_LSM_TREE_COMPACT_FLUSH);
 	} else if (entry->flags == WT_LSM_WORK_DROP)
 		WT_ERR(__wt_lsm_free_chunks(session, entry->lsm_tree));
 	else if (entry->flags == WT_LSM_WORK_BLOOM) {

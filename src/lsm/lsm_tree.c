@@ -1007,7 +1007,7 @@ __wt_lsm_compact(WT_SESSION_IMPL *session, const char *name, int *skip)
 	WT_LSM_CHUNK *chunk;
 	WT_LSM_TREE *lsm_tree;
 	time_t begin, end;
-	int i, compacting, locked;
+	int i, compacting, flushing, locked, ref;
 
 	compacting = locked = 0;
 	/*
@@ -1040,30 +1040,42 @@ __wt_lsm_compact(WT_SESSION_IMPL *session, const char *name, int *skip)
 	if (F_ISSET(lsm_tree, WT_LSM_TREE_COMPACTING))
 		goto err;
 
-	compacting = 1;
-	F_SET(lsm_tree, WT_LSM_TREE_COMPACTING);
+	compacting = flushing = 1;
+	F_SET(lsm_tree, WT_LSM_TREE_COMPACT_FLUSH | WT_LSM_TREE_COMPACTING);
 
 	/*
 	 * Set the switch transaction on the current chunk, if it
 	 * hasn't been set before.  This prevents further writes, so it
 	 * can be flushed by the checkpoint worker.
 	 */
+	ref = 0;
 	if (lsm_tree->nchunks > 0 &&
-	    (chunk = lsm_tree->chunk[lsm_tree->nchunks - 1]) != NULL &&
-	    chunk->switch_txn == WT_TXN_NONE)
-		chunk->switch_txn = __wt_txn_current_id(session);
+	    (chunk = lsm_tree->chunk[lsm_tree->nchunks - 1]) != NULL) {
+		if (chunk->switch_txn == WT_TXN_NONE)
+			chunk->switch_txn = __wt_txn_current_id(session);
+		(void)WT_ATOMIC_ADD(chunk->refcnt, 1);
+		ref = 1;
+	}
 
 	locked = 0;
 	WT_ERR(__wt_lsm_tree_unlock(session, lsm_tree));
 
-	/* Make sure the in-memory chunk gets flushed but not switched. */
-	WT_ERR(__wt_verbose(session, WT_VERB_LSM, "Compact %s force flush",
-	    name));
-	WT_ERR(__wt_lsm_manager_push_entry(
-	    session, WT_LSM_WORK_FLUSH | WT_LSM_WORK_FORCE, lsm_tree));
+	WT_ERR(__wt_verbose(session, WT_VERB_LSM,
+	    "Compact force flush %s flags 0x%" PRIx32 " chunk %u flags 0x%"
+	    PRIx32, name, lsm_tree->flags, chunk->id, chunk->flags));
+	/* Make sure the in-memory chunk gets flushed but not switched.  */
+	WT_ERR(__wt_lsm_manager_push_entry(session,
+	    WT_LSM_WORK_FLUSH | WT_LSM_WORK_FORCE, lsm_tree));
 
 	/* Wait for the work unit queues to drain. */
 	while (F_ISSET(lsm_tree, WT_LSM_TREE_ACTIVE)) {
+		if (flushing && !F_ISSET(lsm_tree, WT_LSM_TREE_COMPACT_FLUSH)) {
+			WT_ERR(__wt_verbose(session, WT_VERB_LSM,
+			    "Compact flush complete %s chunk %u",
+			    name, chunk->id));
+			flushing = ref = 0;
+			(void)WT_ATOMIC_SUB(chunk->refcnt, 1);
+		}
 		/*
 		 * The compacting flag is cleared when no merges can be done.
 		 * Ensure that we push through some aggressive merges before
@@ -1074,7 +1086,7 @@ __wt_lsm_compact(WT_SESSION_IMPL *session, const char *name, int *skip)
 			if (lsm_tree->merge_aggressiveness < 10) {
 				F_SET(lsm_tree, WT_LSM_TREE_COMPACTING);
 				lsm_tree->merge_aggressiveness = 10;
-			} else
+			} else if (!flushing)
 				break;
 		}
 		__wt_sleep(1, 0);
@@ -1088,21 +1100,27 @@ __wt_lsm_compact(WT_SESSION_IMPL *session, const char *name, int *skip)
 		 * done. If we are pushing merges, make sure they are
 		 * aggressive, to avoid duplicating effort.
 		 */
+		if (!flushing)
 #define	COMPACT_PARALLEL_MERGES	5
-		for (i = lsm_tree->queue_ref;
-		    i < COMPACT_PARALLEL_MERGES; i++) {
-			lsm_tree->merge_aggressiveness = 10;
-			WT_ERR(__wt_lsm_manager_push_entry(
-			    session, WT_LSM_WORK_MERGE, lsm_tree));
-		}
+			for (i = lsm_tree->queue_ref;
+			    i < COMPACT_PARALLEL_MERGES; i++) {
+				lsm_tree->merge_aggressiveness = 10;
+				WT_ERR(__wt_lsm_manager_push_entry(
+				    session, WT_LSM_WORK_MERGE, lsm_tree));
+			}
 	}
 err:	if (locked)
 		WT_ERR(__wt_lsm_tree_unlock(session, lsm_tree));
 	/* Ensure the compacting flag is cleared if we set it. */
+	if (flushing)
+		F_CLR(lsm_tree, WT_LSM_TREE_COMPACT_FLUSH);
+	if (ref)
+		(void)WT_ATOMIC_SUB(chunk->refcnt, 1);
 	if (compacting) {
 		F_CLR(lsm_tree, WT_LSM_TREE_COMPACTING);
 		lsm_tree->merge_aggressiveness = 0;
 	}
+	WT_ERR(__wt_verbose(session, WT_VERB_LSM, "Compact complete %s", name));
 	__wt_lsm_tree_release(session, lsm_tree);
 	return (ret);
 
