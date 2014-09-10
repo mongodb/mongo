@@ -172,32 +172,24 @@ __async_config(WT_SESSION_IMPL *session,
     WT_CONNECTION_IMPL *conn, const char **cfg, int *runp)
 {
 	WT_CONFIG_ITEM cval;
-	WT_DECL_RET;
 
 	/*
 	 * The async configuration is off by default.
 	 */
-	if ((ret = __wt_config_gets(
-	    session, cfg, "async.enabled", &cval)) == 0)
-		*runp = cval.val != 0;
-	WT_RET_NOTFOUND_OK(ret);
+	WT_RET(__wt_config_gets(session, cfg, "async.enabled", &cval));
+	*runp = cval.val != 0;
 
 	/*
 	 * Even if async is turned off, we want to parse and store the
 	 * default values so that reconfigure can just enable them.
 	 */
-	if ((ret = __wt_config_gets(
-	    session, cfg, "async.ops_max", &cval)) == 0)
-		conn->async_size = (uint32_t)cval.val;
-	WT_RET_NOTFOUND_OK(ret);
+	WT_RET(__wt_config_gets(session, cfg, "async.ops_max", &cval));
+	conn->async_size = (uint32_t)cval.val;
 
-	if ((ret = __wt_config_gets(
-	    session, cfg, "async.threads", &cval)) == 0) {
-		conn->async_workers = (uint32_t)cval.val;
-		/* Sanity check that api_data.py is in sync with async.h */
-		WT_ASSERT(session, conn->async_workers <= WT_ASYNC_MAX_WORKERS);
-	}
-	WT_RET_NOTFOUND_OK(ret);
+	WT_RET(__wt_config_gets(session, cfg, "async.threads", &cval));
+	conn->async_workers = (uint32_t)cval.val;
+	/* Sanity check that api_data.py is in sync with async.h */
+	WT_ASSERT(session, conn->async_workers <= WT_ASYNC_MAX_WORKERS);
 
 	return (0);
 }
