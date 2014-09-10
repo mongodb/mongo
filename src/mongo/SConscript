@@ -490,6 +490,7 @@ coredbEnv.Library("coredb", [
         "db/pipeline/value.cpp",
         "db/projection.cpp",
         "db/stats/timer_stats.cpp",
+        "db/startup_warnings_common.cpp",
         "s/shardconnection.cpp",
         ]
         + tcmallocServerStatus
@@ -648,7 +649,7 @@ serverOnlyFiles = [ "db/curop.cpp",
                     "db/dbcommands.cpp",
                     "db/dbcommands_admin.cpp",
                     "db/write_concern.cpp",
-                    "db/startup_warnings.cpp",
+                    "db/startup_warnings_mongod.cpp",
                     "db/storage_options.cpp",
                     "db/storage/storage_init.cpp",
                     "db/ops/update_lifecycle_impl.cpp",

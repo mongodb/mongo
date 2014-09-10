@@ -78,7 +78,7 @@
 #include "mongo/db/repl/rs.h"
 #include "mongo/db/restapi.h"
 #include "mongo/db/server_parameters.h"
-#include "mongo/db/startup_warnings.h"
+#include "mongo/db/startup_warnings_mongod.h"
 #include "mongo/db/stats/counters.h"
 #include "mongo/db/stats/snapshots.h"
 #include "mongo/db/storage/storage_engine.h"
@@ -545,7 +545,7 @@ namespace mongo {
             l << ( is32bit ? " 32" : " 64" ) << "-bit host=" << getHostNameCached() << endl;
         }
         DEV log(LogComponent::kDefault) << "_DEBUG build (which is slower)" << endl;
-        logStartupWarnings();
+        logMongodStartupWarnings();
 #if defined(_WIN32)
         printTargetMinOS();
 #endif
