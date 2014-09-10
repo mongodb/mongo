@@ -166,8 +166,14 @@ namespace mongo {
             query = cmdObj.getObjectField("query");
         }
 
-        const std::string hint = cmdObj.getStringField("hint");
-        const BSONObj hintObj = hint.empty() ? BSONObj() : BSON("$hint" << hint);
+        BSONObj hintObj;
+        if (Object == cmdObj["hint"].type()) {
+            hintObj = cmdObj["hint"].Obj();
+        }
+        else if (String == cmdObj["hint"].type()) {
+            const std::string hint = cmdObj.getStringField("hint");
+            hintObj = BSON("$hint" << hint);
+        }
 
         // Parsed correctly. Fill out 'request' with the results.
         request->ns = ns;
