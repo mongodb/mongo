@@ -125,7 +125,7 @@ namespace repl {
         virtual void blacklistSyncSource(const HostAndPort& host, Date_t until) = 0;
 
         /**
-         * Sets the earliest time the the current node will stand for election to "newTime".
+         * Sets the earliest time the current node will stand for election to "newTime".
          *
          * Does not affect the node's state or the process of any elections in flight.
          */
