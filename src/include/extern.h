@@ -1,8 +1,8 @@
 /* DO NOT EDIT: automatically built by dist/s_prototypes. */
 
 extern void __wt_async_stats_update(WT_SESSION_IMPL *session);
-extern int __wt_async_create(WT_CONNECTION_IMPL *conn, const char *cfg[]);
-extern int __wt_async_reconfig(WT_CONNECTION_IMPL *conn, const char *cfg[]);
+extern int __wt_async_create(WT_SESSION_IMPL *session, const char *cfg[]);
+extern int __wt_async_reconfig(WT_SESSION_IMPL *session, const char *cfg[]);
 extern int __wt_async_destroy(WT_CONNECTION_IMPL *conn);
 extern int __wt_async_flush(WT_CONNECTION_IMPL *conn);
 extern int __wt_async_new_op(WT_CONNECTION_IMPL *conn,
@@ -604,15 +604,15 @@ extern int __wt_conn_remove_compressor( WT_CONNECTION_IMPL *conn,
 extern int __wt_conn_remove_data_source( WT_CONNECTION_IMPL *conn,
     WT_NAMED_DATA_SOURCE *ndsrc);
 extern int __wt_verbose_config(WT_SESSION_IMPL *session, const char *cfg[]);
-extern int __wt_cache_config(WT_CONNECTION_IMPL *conn, const char *cfg[]);
-extern int __wt_cache_create(WT_CONNECTION_IMPL *conn, const char *cfg[]);
+extern int __wt_cache_config(WT_SESSION_IMPL *session, const char *cfg[]);
+extern int __wt_cache_create(WT_SESSION_IMPL *session, const char *cfg[]);
 extern void __wt_cache_stats_update(WT_SESSION_IMPL *session);
 extern int __wt_cache_destroy(WT_CONNECTION_IMPL *conn);
 extern int __wt_cache_pool_config(WT_SESSION_IMPL *session, const char **cfg);
 extern int __wt_conn_cache_pool_open(WT_SESSION_IMPL *session);
 extern int __wt_conn_cache_pool_destroy(WT_CONNECTION_IMPL *conn);
 extern void *__wt_cache_pool_server(void *arg);
-extern int __wt_checkpoint_server_create(WT_CONNECTION_IMPL *conn,
+extern int __wt_checkpoint_server_create(WT_SESSION_IMPL *session,
     const char *cfg[]);
 extern int __wt_checkpoint_server_destroy(WT_CONNECTION_IMPL *conn);
 extern int __wt_checkpoint_signal(WT_SESSION_IMPL *session, off_t logsize);
@@ -642,14 +642,14 @@ extern int __wt_conn_dhandle_discard_single( WT_SESSION_IMPL *session,
 extern int __wt_conn_dhandle_discard(WT_CONNECTION_IMPL *conn);
 extern int __wt_connection_init(WT_CONNECTION_IMPL *conn);
 extern int __wt_connection_destroy(WT_CONNECTION_IMPL *conn);
-extern int __wt_logmgr_create(WT_CONNECTION_IMPL *conn, const char *cfg[]);
+extern int __wt_logmgr_create(WT_SESSION_IMPL *session, const char *cfg[]);
 extern int __wt_logmgr_destroy(WT_CONNECTION_IMPL *conn);
 extern int __wt_connection_open(WT_CONNECTION_IMPL *conn, const char *cfg[]);
 extern int __wt_connection_close(WT_CONNECTION_IMPL *conn);
 extern int __wt_connection_workers(WT_SESSION_IMPL *session, const char *cfg[]);
 extern void __wt_conn_stat_init(WT_SESSION_IMPL *session);
 extern int __wt_statlog_log_one(WT_SESSION_IMPL *session);
-extern int __wt_statlog_create(WT_CONNECTION_IMPL *conn, const char *cfg[]);
+extern int __wt_statlog_create(WT_SESSION_IMPL *session, const char *cfg[]);
 extern int __wt_statlog_destroy(WT_CONNECTION_IMPL *conn, int is_close);
 extern int __wt_sweep_create(WT_CONNECTION_IMPL *conn);
 extern int __wt_sweep_destroy(WT_CONNECTION_IMPL *conn);

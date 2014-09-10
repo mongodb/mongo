@@ -228,14 +228,14 @@ __wt_async_stats_update(WT_SESSION_IMPL *session)
  *	Start the async subsystem and worker threads.
  */
 int
-__wt_async_create(WT_CONNECTION_IMPL *conn, const char *cfg[])
+__wt_async_create(WT_SESSION_IMPL *session, const char *cfg[])
 {
 	WT_ASYNC *async;
-	WT_SESSION_IMPL *session;
+	WT_CONNECTION_IMPL *conn;
 	int run;
 	uint32_t i;
 
-	session = conn->default_session;
+	conn = S2C(session);
 
 	/* Handle configuration. */
 	run = 0;
@@ -288,17 +288,16 @@ __wt_async_create(WT_CONNECTION_IMPL *conn, const char *cfg[])
  *	Start the async subsystem and worker threads.
  */
 int
-__wt_async_reconfig(WT_CONNECTION_IMPL *conn, const char *cfg[])
+__wt_async_reconfig(WT_SESSION_IMPL *session, const char *cfg[])
 {
 	WT_ASYNC *async;
-	WT_CONNECTION_IMPL tmp_conn;
+	WT_CONNECTION_IMPL *conn, tmp_conn;
 	WT_DECL_RET;
 	WT_SESSION *wt_session;
-	WT_SESSION_IMPL *session;
 	int run;
 	uint32_t i;
 
-	session = conn->default_session;
+	conn = S2C(session);
 	async = conn->async;
 	memset(&tmp_conn, 0, sizeof(tmp_conn));
 	tmp_conn.async_cfg = conn->async_cfg;
@@ -338,7 +337,7 @@ __wt_async_reconfig(WT_CONNECTION_IMPL *conn, const char *cfg[])
 		return (ret);
 	} else if (conn->async_cfg == 0 && run)
 		/* Case 2 */
-		return (__wt_async_create(conn, cfg));
+		return (__wt_async_create(session, cfg));
 	else if (conn->async_cfg == 0)
 		/* Case 3 */
 		return (0);

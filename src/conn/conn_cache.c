@@ -12,14 +12,14 @@
  *	Configure the underlying cache.
  */
 int
-__wt_cache_config(WT_CONNECTION_IMPL *conn, const char *cfg[])
+__wt_cache_config(WT_SESSION_IMPL *session, const char *cfg[])
 {
 	WT_CACHE *cache;
 	WT_CONFIG_ITEM cval;
+	WT_CONNECTION_IMPL *conn;
 	WT_DECL_RET;
-	WT_SESSION_IMPL *session;
 
-	session = conn->default_session;
+	conn = S2C(session);
 	cache = conn->cache;
 
 	/*
@@ -85,13 +85,13 @@ __wt_cache_config(WT_CONNECTION_IMPL *conn, const char *cfg[])
  *	Create the underlying cache.
  */
 int
-__wt_cache_create(WT_CONNECTION_IMPL *conn, const char *cfg[])
+__wt_cache_create(WT_SESSION_IMPL *session, const char *cfg[])
 {
 	WT_CACHE *cache;
+	WT_CONNECTION_IMPL *conn;
 	WT_DECL_RET;
-	WT_SESSION_IMPL *session;
 
-	session = conn->default_session;
+	conn = S2C(session);
 
 	WT_ASSERT(session, conn->cache == NULL ||
 	    (F_ISSET(conn, WT_CONN_CACHE_POOL) && conn->cache != NULL));
@@ -101,7 +101,7 @@ __wt_cache_create(WT_CONNECTION_IMPL *conn, const char *cfg[])
 	cache = conn->cache;
 
 	/* Use a common routine for run-time configuration options. */
-	WT_RET(__wt_cache_config(conn, cfg));
+	WT_RET(__wt_cache_config(session, cfg));
 
 	/* Add the configured cache to the cache pool. */
 	if (F_ISSET(conn, WT_CONN_CACHE_POOL))

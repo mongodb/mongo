@@ -441,12 +441,12 @@ __statlog_start(WT_CONNECTION_IMPL *conn)
  *	Start the statistics server thread.
  */
 int
-__wt_statlog_create(WT_CONNECTION_IMPL *conn, const char *cfg[])
+__wt_statlog_create(WT_SESSION_IMPL *session, const char *cfg[])
 {
-	WT_SESSION_IMPL *session;
+	WT_CONNECTION_IMPL *conn;
 	int start;
 
-	session = conn->default_session;
+	conn = S2C(session);
 	start = 0;
 
 	/*
