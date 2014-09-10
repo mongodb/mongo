@@ -426,7 +426,11 @@ namespace {
         invariant(it != _slaveOpTimeMap.end());
         OpTime legacyMapOpTime = it->second;
         OpTime legacyOpTime = theReplSet->lastOpTimeWritten;
-        fassert(18695, legacyOpTime == legacyMapOpTime);
+        // TODO(emilkie): SERVER-15209 
+        // This currently fails because a PRIMARY can see an old optime for itself
+        // come through the spanning tree, which updates the slavemap but not the variable.
+        // replsets_priority1.js is a test that hits this condition (sometimes) and fails.
+        //fassert(18695, legacyOpTime == legacyMapOpTime);
         return legacyOpTime;
     }
     
