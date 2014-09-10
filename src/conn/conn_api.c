@@ -1073,6 +1073,7 @@ __wt_verbose_config(WT_SESSION_IMPL *session, const char *cfg[])
 	WT_CONFIG_ITEM cval, sval;
 	WT_CONNECTION_IMPL *conn;
 	WT_DECL_RET;
+	uint32_t flags;
 	static const struct {
 		const char *name;
 		uint32_t flag;
@@ -1103,14 +1104,14 @@ __wt_verbose_config(WT_SESSION_IMPL *session, const char *cfg[])
 
 	conn = S2C(session);
 
-	if ((ret = __wt_config_gets(session, cfg, "verbose", &cval)) != 0)
-		return (ret == WT_NOTFOUND ? 0 : ret);
+	WT_RET(__wt_config_gets(session, cfg, "verbose", &cval));
 
+	flags = 0;
 	for (ft = verbtypes; ft->name != NULL; ft++) {
 		if ((ret = __wt_config_subgets(
 		    session, &cval, ft->name, &sval)) == 0 && sval.val != 0) {
 #ifdef HAVE_VERBOSE
-			FLD_SET(conn->verbose, ft->flag);
+			LF_SET(ft->flag);
 #else
 			WT_RET_MSG(session, EINVAL,
 			    "Verbose option specified when WiredTiger built "
@@ -1118,11 +1119,11 @@ __wt_verbose_config(WT_SESSION_IMPL *session, const char *cfg[])
 			    "configure command and rebuild to include support "
 			    "for verbose messages");
 #endif
-		} else
-			FLD_CLR(conn->verbose, ft->flag);
-
+		}
 		WT_RET_NOTFOUND_OK(ret);
 	}
+
+	conn->verbose = flags;
 	return (0);
 }
 
