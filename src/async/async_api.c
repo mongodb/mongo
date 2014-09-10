@@ -201,8 +201,8 @@ __async_config(WT_SESSION_IMPL *session,
 void
 __wt_async_stats_update(WT_SESSION_IMPL *session)
 {
-	WT_CONNECTION_IMPL *conn;
 	WT_ASYNC *async;
+	WT_CONNECTION_IMPL *conn;
 	WT_CONNECTION_STATS *stats;
 
 	conn = S2C(session);
