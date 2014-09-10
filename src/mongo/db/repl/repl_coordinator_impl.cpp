@@ -305,7 +305,7 @@ namespace {
         if (cbh.getStatus() == ErrorCodes::ShutdownInProgress) {
             return;
         }
-        fassert(18697, cbh.getStatus());
+        fassert(18700, cbh.getStatus());
         _replExecutor.wait(cbh.getValue());
     }
 
