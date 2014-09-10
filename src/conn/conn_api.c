@@ -626,7 +626,6 @@ err:	/*
 static int
 __conn_reconfigure(WT_CONNECTION *wt_conn, const char *config)
 {
-	WT_CONFIG_ITEM cval;
 	WT_CONNECTION_IMPL *conn;
 	WT_DECL_RET;
 	WT_SESSION_IMPL *session;
@@ -654,13 +653,9 @@ __conn_reconfigure(WT_CONNECTION *wt_conn, const char *config)
 	WT_ERR(__wt_cache_config(session, config_cfg));
 	WT_ERR(__wt_cache_pool_config(session, config_cfg));
 	WT_ERR(__wt_checkpoint_server_create(session, config_cfg));
-	WT_ERR(__wt_verbose_config(session, config_cfg));
+	WT_ERR(__wt_lsm_manager_config(session, config_cfg));
 	WT_ERR(__wt_statlog_create(session, config_cfg));
-
-	WT_ERR(__wt_config_gets(
-	    session, config_cfg, "lsm_manager.worker_thread_max", &cval));
-	if (cval.val)
-		conn->lsm_manager.lsm_workers_max = (uint32_t)cval.val;
+	WT_ERR(__wt_verbose_config(session, config_cfg));
 
 	/* Wake up the cache pool server so any changes are noticed. */
 	if (F_ISSET(conn, WT_CONN_CACHE_POOL))

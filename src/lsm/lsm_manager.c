@@ -14,6 +14,25 @@ static int __lsm_manager_worker_setup(WT_SESSION_IMPL *);
 static void * __lsm_worker_manager(void *);
 
 /*
+ * __wt_lsm_manager_config --
+ *	Re-configure the LSM manager.
+ */
+int
+__wt_lsm_manager_config(WT_SESSION_IMPL *session, const char **cfg)
+{
+	WT_CONNECTION_IMPL *conn;
+	WT_CONFIG_ITEM cval;
+
+	conn = S2C(session);
+
+	WT_RET(__wt_config_gets(
+	    session, cfg, "lsm_manager.worker_thread_max", &cval));
+	if (cval.val)
+		conn->lsm_manager.lsm_workers_max = (uint32_t)cval.val;
+	return (0);
+}
+
+/*
  * __wt_lsm_manager_start --
  *	Start the LSM management infrastructure. Our queues and locks were
  *	initialized when the connection was initialized.
