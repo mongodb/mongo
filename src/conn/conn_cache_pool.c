@@ -24,11 +24,11 @@ static int __cache_pool_assess(WT_SESSION_IMPL *, uint64_t *);
 static int __cache_pool_balance(WT_SESSION_IMPL *);
 
 /*
- * __wt_conn_cache_pool_config --
+ * __wt_cache_pool_config --
  *	Parse and setup the cache pool options.
  */
 int
-__wt_conn_cache_pool_config(WT_SESSION_IMPL *session, const char **cfg)
+__wt_cache_pool_config(WT_SESSION_IMPL *session, const char **cfg)
 {
 	WT_CACHE_POOL *cp;
 	WT_CONFIG_ITEM cval;

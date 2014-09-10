@@ -649,9 +649,8 @@ __conn_reconfigure(WT_CONNECTION *wt_conn, const char *config)
 	config_cfg[0] = conn->cfg;
 	config_cfg[1] = config;
 
-	WT_ERR(__wt_conn_cache_pool_config(session, config_cfg));
+	WT_ERR(__wt_cache_pool_config(session, config_cfg));
 	WT_ERR(__wt_cache_config(conn, config_cfg));
-
 	WT_ERR(__wt_async_reconfig(conn, config_cfg));
 	WT_ERR(__conn_statistics_config(session, config_cfg));
 	WT_ERR(__wt_conn_verbose_config(session, config_cfg));
