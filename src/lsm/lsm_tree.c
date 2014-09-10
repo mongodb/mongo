@@ -1071,12 +1071,23 @@ __wt_lsm_compact(WT_SESSION_IMPL *session, const char *name, int *skip)
 	while (F_ISSET(lsm_tree, WT_LSM_TREE_ACTIVE)) {
 		if (flushing && ref &&
 		    !F_ISSET(lsm_tree, WT_LSM_TREE_COMPACT_FLUSH)) {
-			flushing = ref = 0;
-			if (chunk != NULL) {
+			if (chunk != NULL &&
+			    !F_ISSET(chunk, WT_LSM_CHUNK_ONDISK)) {
 				WT_ERR(__wt_verbose(session, WT_VERB_LSM,
-				    "Compact flush complete %s chunk %u",
+				    "Compact flush retry %s chunk %u",
 				    name, chunk->id));
-				(void)WT_ATOMIC_SUB(chunk->refcnt, 1);
+				WT_ERR(__wt_lsm_manager_push_entry(session,
+				    WT_LSM_WORK_FLUSH | WT_LSM_WORK_FORCE,
+				    lsm_tree));
+			} else {
+				flushing = ref = 0;
+				if (chunk != NULL) {
+					WT_ERR(__wt_verbose(session,
+					    WT_VERB_LSM,
+					    "Compact flush done %s chunk %u",
+					    name, chunk->id));
+					(void)WT_ATOMIC_SUB(chunk->refcnt, 1);
+				}
 			}
 		}
 		/*

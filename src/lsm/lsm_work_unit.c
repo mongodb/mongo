@@ -229,11 +229,20 @@ __wt_lsm_checkpoint_chunk(WT_SESSION_IMPL *session,
 		else
 			WT_RET_MSG(session, ret, "discard handle");
 	}
-	if (F_ISSET(chunk, WT_LSM_CHUNK_ONDISK))
+	if (F_ISSET(chunk, WT_LSM_CHUNK_ONDISK)) {
+		WT_RET(__wt_verbose(session, WT_VERB_LSM,
+		    "LSM worker %s already on disk",
+		    chunk->uri));
 		return (0);
+	}
 
 	/* Stop if a running transaction needs the chunk. */
 	__wt_txn_update_oldest(session);
+	if (chunk->switch_txn == WT_TXN_NONE)
+		WT_RET(__wt_verbose(session, WT_VERB_LSM,
+		    "LSM ckp txn needs chunk %s: switch %" PRIu64
+		    " oldest %" PRIu64, chunk->uri,
+		    chunk->switch_txn, S2C(session)->txn_global.oldest_id));
 	if (chunk->switch_txn == WT_TXN_NONE ||
 	    !__wt_txn_visible_all(session, chunk->switch_txn))
 		return (0);
