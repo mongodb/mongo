@@ -1341,6 +1341,55 @@ namespace {
         ASSERT_EQUALS(HeartbeatResponseAction::StartElection, nextAction.getAction());
     }
 
+    TEST_F(HeartbeatResponseTest, UpdateHeartbeatDataPrimaryDownMajorityOfVotersUp) {
+        updateConfig(BSON("_id" << "rs0" <<
+                          "version" << 5 <<
+                          "members" << BSON_ARRAY(
+                              BSON("_id" << 0 << "host" << "host1:27017") <<
+                              BSON("_id" << 1 << "host" << "host2:27017") <<
+                              BSON("_id" << 2 << "host" << "host3:27017" << "votes" << 0) <<
+                              BSON("_id" << 3 << "host" << "host4:27017" << "votes" << 0) <<
+                              BSON("_id" << 4 << "host" << "host5:27017" << "votes" << 0) <<
+                              BSON("_id" << 5 << "host" << "host6:27017" << "votes" << 0) <<
+                              BSON("_id" << 6 << "host" << "host7:27017")) <<
+                          "settings" << BSON("heartbeatTimeoutSecs" << 5)),
+                     0);
+
+        setSelfMemberState(MemberState::RS_SECONDARY);
+
+        OpTime election = OpTime(4,0);
+        OpTime lastOpTimeApplied = OpTime(3,0);
+
+        HeartbeatResponseAction nextAction = receiveUpHeartbeat(HostAndPort("host2"),
+                                                                "rs0",
+                                                                MemberState::RS_PRIMARY,
+                                                                election,
+                                                                election,
+                                                                lastOpTimeApplied);
+        ASSERT_NO_ACTION(nextAction.getAction());
+
+        // make sure all non-voting nodes are down, that way we do not have a majority of nodes
+        // but do have a majority of votes since one of two voting members is up and so are we
+        nextAction = receiveDownHeartbeat(HostAndPort("host3"), "rs0");
+        ASSERT_NO_ACTION(nextAction.getAction());
+        nextAction = receiveDownHeartbeat(HostAndPort("host4"), "rs0");
+        ASSERT_NO_ACTION(nextAction.getAction());
+        nextAction = receiveDownHeartbeat(HostAndPort("host5"), "rs0");
+        ASSERT_NO_ACTION(nextAction.getAction());
+        nextAction = receiveDownHeartbeat(HostAndPort("host6"), "rs0");
+        ASSERT_NO_ACTION(nextAction.getAction());
+        nextAction = receiveUpHeartbeat(HostAndPort("host7"),
+                                        "rs0",
+                                        MemberState::RS_SECONDARY,
+                                        election,
+                                        election,
+                                        lastOpTimeApplied);
+        ASSERT_NO_ACTION(nextAction.getAction());
+
+        nextAction = receiveDownHeartbeat(HostAndPort("host2"), "rs0");
+        ASSERT_EQUALS(HeartbeatResponseAction::StartElection, nextAction.getAction());
+    }
+
     class PrepareElectResponseTest : public TopoCoordTest {
     public:
 
