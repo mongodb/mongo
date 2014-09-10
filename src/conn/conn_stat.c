@@ -19,6 +19,22 @@
 #endif
 
 /*
+ * __stat_sources_free --
+ *	Free the array of statistics sources.
+ */
+static void
+__stat_sources_free(WT_SESSION_IMPL *session, char ***sources)
+{
+	char **p;
+
+	if ((p = (*sources)) != NULL) {
+		for (; *p != NULL; ++p)
+			__wt_free(session, *p);
+		__wt_free(session, *sources);
+	}
+}
+
+/*
  * __wt_conn_stat_init --
  *	Initialize the per-connection statistics.
  */
@@ -41,8 +57,10 @@ __statlog_config(WT_SESSION_IMPL *session, const char **cfg, int *runp)
 	WT_CONNECTION_IMPL *conn;
 	WT_DECL_RET;
 	int cnt;
+	char **sources;
 
 	conn = S2C(session);
+	sources = NULL;
 
 	WT_RET(__wt_config_gets(session, cfg, "statistics_log.wait", &cval));
 	/* Only start the server if wait time is non-zero */
@@ -67,7 +85,7 @@ __statlog_config(WT_SESSION_IMPL *session, const char **cfg, int *runp)
 		;
 	WT_RET_NOTFOUND_OK(ret);
 	if (cnt != 0) {
-		WT_RET(__wt_calloc_def(session, cnt + 1, &conn->stat_sources));
+		WT_RET(__wt_calloc_def(session, cnt + 1, &sources));
 		WT_RET(__wt_config_subinit(session, &objectconf, &cval));
 		for (cnt = 0;
 		    (ret = __wt_config_next(&objectconf, &k, &v)) == 0; ++cnt) {
@@ -80,24 +98,28 @@ __statlog_config(WT_SESSION_IMPL *session, const char **cfg, int *runp)
 			 */
 			if (!WT_PREFIX_MATCH(k.str, "file:") &&
 			    !WT_PREFIX_MATCH(k.str, "lsm:"))
-				WT_RET_MSG(session, EINVAL,
+				WT_ERR_MSG(session, EINVAL,
 				    "statistics_log sources configuration only "
 				    "supports objects of type \"file\" or "
 				    "\"lsm\"");
-			WT_RET(__wt_strndup(session,
-			    k.str, k.len, &conn->stat_sources[cnt]));
+			WT_ERR(
+			    __wt_strndup(session, k.str, k.len, &sources[cnt]));
 		}
-		WT_RET_NOTFOUND_OK(ret);
+		WT_ERR_NOTFOUND_OK(ret);
+
+		conn->stat_sources = sources;
+		sources = NULL;
 	}
 
-	WT_RET(__wt_config_gets(session, cfg, "statistics_log.path", &cval));
-	WT_RET(__wt_nfilename(session, cval.str, cval.len, &conn->stat_path));
+	WT_ERR(__wt_config_gets(session, cfg, "statistics_log.path", &cval));
+	WT_ERR(__wt_nfilename(session, cval.str, cval.len, &conn->stat_path));
 
-	WT_RET(__wt_config_gets(
+	WT_ERR(__wt_config_gets(
 	    session, cfg, "statistics_log.timestamp", &cval));
-	WT_RET(__wt_strndup(session, cval.str, cval.len, &conn->stat_format));
+	WT_ERR(__wt_strndup(session, cval.str, cval.len, &conn->stat_format));
 
-	return (0);
+err:	__stat_sources_free(session, &sources);
+	return (ret);
 }
 
 /*
@@ -455,9 +477,9 @@ __wt_statlog_create(WT_SESSION_IMPL *session, const char *cfg[])
 	 * configuration changes - but that makes our lives easier.
 	 */
 	if (conn->stat_session != NULL)
-		WT_RET(__wt_statlog_destroy(conn, 0));
+		WT_RET(__wt_statlog_destroy(session, 0));
 
-	WT_RET_NOTFOUND_OK(__statlog_config(session, cfg, &start));
+	WT_RET(__statlog_config(session, cfg, &start));
 	if (start)
 		WT_RET(__statlog_start(conn));
 
@@ -469,14 +491,13 @@ __wt_statlog_create(WT_SESSION_IMPL *session, const char *cfg[])
  *	Destroy the statistics server thread.
  */
 int
-__wt_statlog_destroy(WT_CONNECTION_IMPL *conn, int is_close)
+__wt_statlog_destroy(WT_SESSION_IMPL *session, int is_close)
 {
+	WT_CONNECTION_IMPL *conn;
 	WT_DECL_RET;
 	WT_SESSION *wt_session;
-	WT_SESSION_IMPL *session;
-	char **p;
 
-	session = conn->default_session;
+	conn = S2C(session);
 
 	F_CLR(conn, WT_CONN_SERVER_STATISTICS);
 	if (conn->stat_tid_set) {
@@ -491,11 +512,7 @@ __wt_statlog_destroy(WT_CONNECTION_IMPL *conn, int is_close)
 
 	WT_TRET(__wt_cond_destroy(session, &conn->stat_cond));
 
-	if ((p = conn->stat_sources) != NULL) {
-		for (; *p != NULL; ++p)
-			__wt_free(session, *p);
-		__wt_free(session, conn->stat_sources);
-	}
+	__stat_sources_free(session, &conn->stat_sources);
 	__wt_free(session, conn->stat_path);
 	__wt_free(session, conn->stat_format);
 
