@@ -4,6 +4,7 @@ table_config="allocation_size=4KB,key_gap=10,split_pct=75,internal_page_max=4KB,
 checkpoint_interval=100
 checkpoint_threads=1
 icount=50000
+random_range=500000
 report_interval=5
 run_time=600
 populate_threads=1
