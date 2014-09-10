@@ -42,10 +42,13 @@
 #include "mongo/db/storage/rocks/rocks_record_store.h"
 #include "mongo/db/storage/rocks/rocks_recovery_unit.h"
 #include "mongo/util/log.h"
+#include "mongo/util/mongoutils/str.h"
 
 namespace mongo {
 
     namespace {
+
+        const int kTempKeyMaxSize = 1024; // Do the same as the heap implementation
 
         rocksdb::Slice emptyByteSlice( "" );
         rocksdb::SliceParts emptyByteSliceParts( &emptyByteSlice, 1 );
@@ -88,6 +91,14 @@ namespace mongo {
             BSONObj key = BSONObj( slice.data() ).getOwned();
             DiskLoc loc = *reinterpret_cast<const DiskLoc*>( slice.data() + key.objsize() );
             return IndexKeyEntry( key, loc );
+        }
+
+        string dupKeyError(const BSONObj& key) {
+            stringstream ss;
+            ss << "E11000 duplicate key error ";
+            // TODO figure out how to include index name without dangerous casts
+            ss << "dup key: " << key.toString();
+            return ss.str();
         }
 
         /**
@@ -349,6 +360,102 @@ namespace mongo {
             private:
                 const IndexEntryComparison _indexComparator;
         };
+
+    class WriteBufferCopyIntoHandler : public rocksdb::WriteBatch::Handler {
+    public:
+        WriteBufferCopyIntoHandler(rocksdb::WriteBatch* outWriteBatch,
+                                   rocksdb::ColumnFamilyHandle* columnFamily) :
+                _OutWriteBatch(outWriteBatch),
+                _columnFamily(columnFamily) { }
+
+        rocksdb::Status PutCF(uint32_t columnFamilyId, const rocksdb::Slice& key,
+                              const rocksdb::Slice& value) {
+            invariant(_OutWriteBatch);
+            _OutWriteBatch->Put(_columnFamily, key, value);
+            return rocksdb::Status::OK();
+        }
+
+    private:
+        rocksdb::WriteBatch* _OutWriteBatch;
+        rocksdb::ColumnFamilyHandle* _columnFamily;
+    };
+
+    class RocksBulkSortedBuilderImpl : public SortedDataBuilderInterface {
+    public:
+        RocksBulkSortedBuilderImpl(RocksSortedDataImpl* data,
+                                   rocksdb::ColumnFamilyHandle* columnFamily,
+                                   const Ordering& order,
+                                   OperationContext* txn,
+                                   bool dupsAllowed)
+                : _comparator(order),
+                  _writeBatch(&_comparator),
+                  _data(data),
+                  _columnFamily(columnFamily),
+                  _txn(txn),
+                  _dupsAllowed(dupsAllowed) { }
+
+        Status addKey(const BSONObj& key, const DiskLoc& loc) {
+            // inserts should be in ascending order.
+
+            if (key.objsize() >= kTempKeyMaxSize) {
+                return Status(ErrorCodes::KeyTooLong, "key too big");
+            }
+
+            invariant(!loc.isNull());
+            invariant(loc.isValid());
+
+            // TODO: How to check "invariant(!hasFieldNames(key));" ?
+            if (!_dupsAllowed) {
+                // TODO need key locking to support unique indexes.
+                Status status = _data->dupKeyCheck(_txn, key, loc);
+                if (!status.isOK()) {
+                    return status;
+                }
+
+                // Check uniqueness with previous insert to the same bulk
+                boost::scoped_ptr<rocksdb::WBWIIterator> wbwi(
+                                                           _writeBatch.NewIterator(_columnFamily));
+                wbwi->Seek(makeString(key, DiskLoc()));
+                invariant(wbwi->status().ok());
+                bool isDup = false;
+                // TODO can I assume loc never decreases?
+                while (wbwi->Valid()) {
+                    IndexKeyEntry ike = makeIndexKeyEntry(wbwi->Entry().key);
+                    if (ike.key == key) {
+                        if (ike.loc != loc) {
+                            isDup = true;
+                        }
+                        wbwi->Next();
+                        invariant(wbwi->status().ok());
+                    }
+                    else
+                        break;
+                }
+
+                if (isDup)
+                    return Status(ErrorCodes::DuplicateKey, dupKeyError(key));
+            }
+
+            _writeBatch.Put(_columnFamily, makeString(key, loc), rocksdb::Slice());
+
+            return Status::OK();
+        }
+
+        void commit(bool mayInterrupt) {
+            RocksRecoveryUnit* ru = dynamic_cast<RocksRecoveryUnit*>(_txn->recoveryUnit());
+            WriteBufferCopyIntoHandler copy_handler(ru->writeBatch(), _columnFamily);
+            _writeBatch.GetWriteBatch()->Iterate(&copy_handler);
+        }
+
+    private:
+        RocksIndexEntryComparator _comparator;
+        rocksdb::WriteBatchWithIndex _writeBatch;
+        RocksSortedDataImpl* _data;
+        rocksdb::ColumnFamilyHandle* _columnFamily;
+        OperationContext* _txn;
+        bool _dupsAllowed;
+    };
+
     } // namespace
 
     // RocksSortedDataImpl***********
@@ -366,13 +473,20 @@ namespace mongo {
 
     SortedDataBuilderInterface* RocksSortedDataImpl::getBulkBuilder(OperationContext* txn,
                                                                     bool dupsAllowed) {
-        invariant( !"getBulkBuilder not yet implemented" );
+        return new RocksBulkSortedBuilderImpl(this, _columnFamily, _order, txn, dupsAllowed);
     }
 
     Status RocksSortedDataImpl::insert(OperationContext* txn,
                                        const BSONObj& key,
                                        const DiskLoc& loc,
                                        bool dupsAllowed) {
+
+        if (key.objsize() >= kTempKeyMaxSize) {
+            string msg = mongoutils::str::stream()
+                << "Heap1Btree::insert: key too large to index, failing "
+                << ' ' << key.objsize() << ' ' << key;
+                return Status(ErrorCodes::KeyTooLong, msg);
+        }
 
         RocksRecoveryUnit* ru = _getRecoveryUnit( txn );
 
@@ -406,14 +520,6 @@ namespace mongo {
         ru->registerChange(new ChangeNumEntries(&_numEntries, false));
         ru->writeBatch()->Delete( _columnFamily, keyData );
         return true;
-    }
-
-    string RocksSortedDataImpl::dupKeyError(const BSONObj& key) const {
-        stringstream ss;
-        ss << "E11000 duplicate key error ";
-        // TODO figure out how to include index name without dangerous casts
-        ss << "dup key: " << key.toString();
-        return ss.str();
     }
 
     Status RocksSortedDataImpl::dupKeyCheck(OperationContext* txn,
