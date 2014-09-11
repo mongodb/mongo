@@ -1415,11 +1415,11 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
 	STATIC_ASSERT(offsetof(WT_CONNECTION_IMPL, iface) == 0);
 	*wt_connp = &conn->iface;
 
-err:	if (ret != 0 && conn != NULL)
-		WT_TRET(__wt_connection_close(conn));
-
-	__wt_buf_free(session, &cbbuf);
+err:	__wt_buf_free(session, &cbbuf);
 	__wt_buf_free(session, &cubuf);
+
+	if (ret != 0 && conn != NULL)
+		WT_TRET(__wt_connection_close(conn));
 
 	return (ret);
 }

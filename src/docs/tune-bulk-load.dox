@@ -11,7 +11,9 @@ be used on newly created objects, and an object being bulk-loaded is not
 accessible from other cursors.
 
 Cursors configured for bulk-load only support the WT_CURSOR::insert and
-WT_CURSOR::close methods.
+WT_CURSOR::close methods.  Bulk load inserts are non-transactional: they
+cannot be rolled back and ignore the transactional state of the WT_SESSION
+in which they are opened.
 
 When bulk-loading row-store objects, keys must be loaded in sorted
 order.
