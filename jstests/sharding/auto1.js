@@ -26,7 +26,7 @@ counts = []
 
 s.printChunks();
 counts.push( s.config.chunks.count() );
-assert.eq( 100 , primary.foo.count() );
+assert.eq(100, db.foo.find().itcount());
 
 print( "datasize: " + tojson( s.getServer( "test" ).getDB( "admin" ).runCommand( { datasize : "test.foo" } ) ) );
 
