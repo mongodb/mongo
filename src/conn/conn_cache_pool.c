@@ -24,11 +24,11 @@ static int __cache_pool_assess(WT_SESSION_IMPL *, uint64_t *);
 static int __cache_pool_balance(WT_SESSION_IMPL *);
 
 /*
- * __wt_conn_cache_pool_config --
+ * __wt_cache_pool_config --
  *	Parse and setup the cache pool options.
  */
 int
-__wt_conn_cache_pool_config(WT_SESSION_IMPL *session, const char **cfg)
+__wt_cache_pool_config(WT_SESSION_IMPL *session, const char **cfg)
 {
 	WT_CACHE_POOL *cp;
 	WT_CONFIG_ITEM cval;
@@ -102,6 +102,7 @@ __wt_conn_cache_pool_config(WT_SESSION_IMPL *session, const char **cfg)
 		    pool_name);
 
 	cp = __wt_process.cache_pool;
+
 	/*
 	 * The cache pool requires a reference count to avoid a race between
 	 * configuration/open and destroy.
@@ -110,39 +111,54 @@ __wt_conn_cache_pool_config(WT_SESSION_IMPL *session, const char **cfg)
 		++cp->refs;
 
 	/*
-	 * Retrieve the pool configuration options. The values are optional if
-	 * we are re-configuring.
+	 * Cache pool configurations are optional when not creating. If
+	 * values aren't being changed, retrieve the current value so that
+	 * validation of settings works.
 	 */
-	ret = __wt_config_gets(session, cfg, "shared_cache.size", &cval);
-	if (reconfiguring && ret == WT_NOTFOUND)
-		/* Not being changed; use the old value. */
-		size = cp->size;
-	else {
-		WT_ERR(ret);
+	if (!created) {
+		if (__wt_config_gets(session, &cfg[1],
+		    "shared_cache.size", &cval) == 0 && cval.val != 0)
+			size = (uint64_t)cval.val;
+		 else
+			size = cp->size;
+		if (__wt_config_gets(session, &cfg[1],
+		    "shared_cache.chunk", &cval) == 0 && cval.val != 0)
+			chunk = (uint64_t)cval.val;
+		else
+			chunk = cp->chunk;
+	} else {
+		/*
+		 * The only time shared cache configuration uses default
+		 * values is when we are creating the pool.
+		 */
+		WT_ERR(__wt_config_gets(
+		    session, cfg, "shared_cache.size", &cval));
+		WT_ASSERT(session, cval.val != 0);
 		size = (uint64_t)cval.val;
-	}
-	ret = __wt_config_gets(session, cfg, "shared_cache.chunk", &cval);
-	if (reconfiguring && ret == WT_NOTFOUND)
-		/* Not being changed; use the old value. */
-		chunk = cp->chunk;
-	else {
-		WT_ERR(ret);
+		WT_ERR(__wt_config_gets(
+		    session, cfg, "shared_cache.chunk", &cval));
+		WT_ASSERT(session, cval.val != 0);
 		chunk = (uint64_t)cval.val;
 	}
+
 	/*
 	 * Retrieve the reserve size here for validation of configuration.
 	 * Don't save it yet since the connections cache is not created if
 	 * we are opening. Cache configuration is responsible for saving the
 	 * setting.
+	 * The different conditions when reserved size are set are:
+	 *  - It's part of the users configuration - use that value.
+	 *  - We are reconfiguring - keep the previous value.
+	 *  - We are joining a cache pool for the first time (including
+	 *  creating the pool) - use the chunk size; that's the default.
 	 */
-	ret = __wt_config_gets(session, cfg, "shared_cache.reserve", &cval);
-	if (reconfiguring && ret == WT_NOTFOUND)
-		/* It is safe to access the cache during reconfigure. */
-		reserve = conn->cache->cp_reserved;
-	else {
-		WT_ERR(ret);
+	if (__wt_config_gets(session, &cfg[1],
+	    "shared_cache.reserve", &cval) == 0 && cval.val != 0)
 		reserve = (uint64_t)cval.val;
-	}
+	else if (reconfiguring)
+		reserve = conn->cache->cp_reserved;
+	else
+		reserve = chunk;
 
 	/*
 	 * Validate that size and reserve values don't cause the cache
@@ -162,6 +178,11 @@ __wt_conn_cache_pool_config(WT_SESSION_IMPL *session, const char **cfg)
 	/* The configuration is verified - it's safe to update the pool. */
 	cp->size = size;
 	cp->chunk = chunk;
+
+	/* Wake up the cache pool server so any changes are noticed. */
+	if (reconfiguring)
+		WT_ERR(__wt_cond_signal(
+		    session, __wt_process.cache_pool->cache_pool_cond));
 
 	WT_ERR(__wt_verbose(session, WT_VERB_SHARED_CACHE,
 	    "Configured cache pool %s. Size: %" PRIu64

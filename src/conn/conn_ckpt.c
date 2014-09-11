@@ -147,17 +147,19 @@ __ckpt_server_start(WT_CONNECTION_IMPL *conn)
  *	Configure and start the checkpoint server.
  */
 int
-__wt_checkpoint_server_create(WT_CONNECTION_IMPL *conn, const char *cfg[])
+__wt_checkpoint_server_create(WT_SESSION_IMPL *session, const char *cfg[])
 {
+	WT_CONNECTION_IMPL *conn;
 	int start;
 
+	conn = S2C(session);
 	start = 0;
 
 	/* If there is already a server running, shut it down. */
 	if (conn->ckpt_session != NULL)
 		WT_RET(__wt_checkpoint_server_destroy(conn));
 
-	WT_RET(__ckpt_server_config(conn->default_session, cfg, &start));
+	WT_RET(__ckpt_server_config(session, cfg, &start));
 	if (start)
 		WT_RET(__ckpt_server_start(conn));
 

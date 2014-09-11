@@ -172,32 +172,24 @@ __async_config(WT_SESSION_IMPL *session,
     WT_CONNECTION_IMPL *conn, const char **cfg, int *runp)
 {
 	WT_CONFIG_ITEM cval;
-	WT_DECL_RET;
 
 	/*
 	 * The async configuration is off by default.
 	 */
-	if ((ret = __wt_config_gets(
-	    session, cfg, "async.enabled", &cval)) == 0)
-		*runp = cval.val != 0;
-	WT_RET_NOTFOUND_OK(ret);
+	WT_RET(__wt_config_gets(session, cfg, "async.enabled", &cval));
+	*runp = cval.val != 0;
 
 	/*
 	 * Even if async is turned off, we want to parse and store the
 	 * default values so that reconfigure can just enable them.
 	 */
-	if ((ret = __wt_config_gets(
-	    session, cfg, "async.ops_max", &cval)) == 0)
-		conn->async_size = (uint32_t)cval.val;
-	WT_RET_NOTFOUND_OK(ret);
+	WT_RET(__wt_config_gets(session, cfg, "async.ops_max", &cval));
+	conn->async_size = (uint32_t)cval.val;
 
-	if ((ret = __wt_config_gets(
-	    session, cfg, "async.threads", &cval)) == 0) {
-		conn->async_workers = (uint32_t)cval.val;
-		/* Sanity check that api_data.py is in sync with async.h */
-		WT_ASSERT(session, conn->async_workers <= WT_ASYNC_MAX_WORKERS);
-	}
-	WT_RET_NOTFOUND_OK(ret);
+	WT_RET(__wt_config_gets(session, cfg, "async.threads", &cval));
+	conn->async_workers = (uint32_t)cval.val;
+	/* Sanity check that api_data.py is in sync with async.h */
+	WT_ASSERT(session, conn->async_workers <= WT_ASYNC_MAX_WORKERS);
 
 	return (0);
 }
@@ -209,8 +201,8 @@ __async_config(WT_SESSION_IMPL *session,
 void
 __wt_async_stats_update(WT_SESSION_IMPL *session)
 {
-	WT_CONNECTION_IMPL *conn;
 	WT_ASYNC *async;
+	WT_CONNECTION_IMPL *conn;
 	WT_CONNECTION_STATS *stats;
 
 	conn = S2C(session);
@@ -224,27 +216,18 @@ __wt_async_stats_update(WT_SESSION_IMPL *session)
 }
 
 /*
- * __wt_async_create --
- *	Start the async subsystem and worker threads.
+ * __async_start --
+ *	Start the async subsystem.  All configuration processing has
+ *	already been done by the caller.
  */
-int
-__wt_async_create(WT_CONNECTION_IMPL *conn, const char *cfg[])
+static int
+__async_start(WT_SESSION_IMPL *session)
 {
 	WT_ASYNC *async;
-	WT_SESSION_IMPL *session;
-	int run;
+	WT_CONNECTION_IMPL *conn;
 	uint32_t i;
 
-	session = conn->default_session;
-
-	/* Handle configuration. */
-	run = 0;
-	WT_RET(__async_config(session, conn, cfg, &run));
-
-	/* If async is not configured, we're done. */
-	if (!run)
-		return (0);
-
+	conn = S2C(session);
 	conn->async_cfg = 1;
 	/*
 	 * Async is on, allocate the WT_ASYNC structure and initialize the ops.
@@ -284,21 +267,42 @@ __wt_async_create(WT_CONNECTION_IMPL *conn, const char *cfg[])
 }
 
 /*
+ * __wt_async_create --
+ *	Start the async subsystem and worker threads.
+ */
+int
+__wt_async_create(WT_SESSION_IMPL *session, const char *cfg[])
+{
+	WT_CONNECTION_IMPL *conn;
+	int run;
+
+	conn = S2C(session);
+
+	/* Handle configuration. */
+	run = 0;
+	WT_RET(__async_config(session, conn, cfg, &run));
+
+	/* If async is not configured, we're done. */
+	if (!run)
+		return (0);
+	return (__async_start(session));
+}
+
+/*
  * __wt_async_reconfig --
  *	Start the async subsystem and worker threads.
  */
 int
-__wt_async_reconfig(WT_CONNECTION_IMPL *conn, const char *cfg[])
+__wt_async_reconfig(WT_SESSION_IMPL *session, const char *cfg[])
 {
 	WT_ASYNC *async;
-	WT_CONNECTION_IMPL tmp_conn;
+	WT_CONNECTION_IMPL *conn, tmp_conn;
 	WT_DECL_RET;
 	WT_SESSION *wt_session;
-	WT_SESSION_IMPL *session;
 	int run;
 	uint32_t i;
 
-	session = conn->default_session;
+	conn = S2C(session);
 	async = conn->async;
 	memset(&tmp_conn, 0, sizeof(tmp_conn));
 	tmp_conn.async_cfg = conn->async_cfg;
@@ -338,7 +342,7 @@ __wt_async_reconfig(WT_CONNECTION_IMPL *conn, const char *cfg[])
 		return (ret);
 	} else if (conn->async_cfg == 0 && run)
 		/* Case 2 */
-		return (__wt_async_create(conn, cfg));
+		return (__async_start(session));
 	else if (conn->async_cfg == 0)
 		/* Case 3 */
 		return (0);
