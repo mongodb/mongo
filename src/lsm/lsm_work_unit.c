@@ -81,7 +81,7 @@ __wt_lsm_get_chunk_to_flush(WT_SESSION_IMPL *session,
 
 	/*
 	 * Normally we don't want to force out the last chunk.  But if we're
-	 * doing a forced flush, likely from a compact call, then we do want
+	 * doing a forced flush, likely from a compact call, then we want
 	 * to include the final chunk.
 	 */
 	end = force ? lsm_tree->nchunks : lsm_tree->nchunks - 1;
@@ -93,6 +93,10 @@ __wt_lsm_get_chunk_to_flush(WT_SESSION_IMPL *session,
 			    force ? " w/ force" : "", i, end - 1,
 			    lsm_tree->chunk[i]->uri));
 			*chunkp = lsm_tree->chunk[i];
+			/*
+			 * Let the caller know if this is the last chunk we
+			 * could have selected or an earlier one.
+			 */
 			if (i == end - 1)
 				*last = 1;
 			break;

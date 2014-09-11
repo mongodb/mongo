@@ -252,9 +252,9 @@ __wt_lsm_merge(
 	dest_id = WT_ATOMIC_ADD(lsm_tree->last, 1);
 
 	/*
-	 * We only want to do the chunk loop if we're running
-	 * with verbose, we wrap these statements in the conditional.
-	 * Avoid that in the normal path.
+	 * We only want to do the chunk loop if we're running with verbose,
+	 * so we wrap these statements in the conditional.  Avoid the loop
+	 * in the normal path.
 	 */
 	if (WT_VERBOSE_ISSET(session, WT_VERB_LSM)) {
 		WT_RET(__wt_verbose(session, WT_VERB_LSM,

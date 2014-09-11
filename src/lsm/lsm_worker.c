@@ -47,13 +47,12 @@ __lsm_worker_general_op(
 	if ((entry->flags & WT_LSM_WORK_MASK) == WT_LSM_WORK_FLUSH) {
 		force = F_ISSET(entry, WT_LSM_WORK_FORCE);
 		F_CLR(entry, WT_LSM_WORK_FORCE);
-		/*
-		 * If this is a force flush, we want to force out all
-		 * possible chunks, not just the first one we find.
-		 */
 		last = 0;
 		WT_ERR(__wt_lsm_get_chunk_to_flush(session,
 		    entry->lsm_tree, force, &last, &chunk));
+		/*
+		 * If we got a chunk to flush, checkpoint it.
+		 */
 		if (chunk != NULL) {
 			WT_ERR(__wt_verbose(session, WT_VERB_LSM,
 			    "Flush%s%s chunk %d %s",
