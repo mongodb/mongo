@@ -50,7 +50,8 @@ namespace mongo {
     class SaslAuthenticationSession : public AuthenticationSession {
         MONGO_DISALLOW_COPYING(SaslAuthenticationSession);
     public:
-        typedef stdx::function<SaslAuthenticationSession* (AuthorizationSession*)> 
+        typedef stdx::function<SaslAuthenticationSession* (AuthorizationSession*,
+                                                           const std::string&)> 
             SaslAuthenticationSessionFactoryFn;
         static SaslAuthenticationSessionFactoryFn create; 
 

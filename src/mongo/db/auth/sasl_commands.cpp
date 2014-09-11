@@ -268,8 +268,13 @@ namespace {
         ClientBasic* client = ClientBasic::getCurrent();
         client->resetAuthenticationSession(NULL);
 
+        std::string mechanism;
+        if (!extractMechanism(cmdObj, &mechanism).isOK()) {
+            return false;
+        }
+        
         SaslAuthenticationSession* session = 
-            SaslAuthenticationSession::create(client->getAuthorizationSession());
+            SaslAuthenticationSession::create(client->getAuthorizationSession(), mechanism);
         
         boost::scoped_ptr<AuthenticationSession> sessionGuard(session);
 

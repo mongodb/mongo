@@ -53,7 +53,8 @@
 namespace mongo {
 namespace {
     SaslAuthenticationSession* createNativeSaslAuthenticationSession(
-        AuthorizationSession* authzSession) {
+        AuthorizationSession* authzSession,
+        const std::string& mechanism) {
         return new NativeSaslAuthenticationSession(authzSession);
     }
 
@@ -82,7 +83,7 @@ namespace {
                 continue;
             }
             scoped_ptr<SaslAuthenticationSession> 
-                session(SaslAuthenticationSession::create(&authzSession));
+                session(SaslAuthenticationSession::create(&authzSession, mechanism));
             Status status = session->start("test",
                                            mechanism,
                                            saslGlobalParams.serviceName,
