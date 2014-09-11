@@ -272,6 +272,10 @@ wts_create(void)
 		p += snprintf(p, (size_t)(end - p),
 		    ",block_compressor=\"zlib\"");
 		break;
+	case COMPRESS_ZLIB_NO_RAW:
+		p += snprintf(p, (size_t)(end - p),
+		    ",block_compressor=\"zlib-noraw\"");
+		break;
 	}
 
 	/* Configure Btree internal key truncation. */

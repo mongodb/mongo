@@ -205,6 +205,7 @@ typedef struct {
 #define	COMPRESS_LZO			4
 #define	COMPRESS_SNAPPY			5
 #define	COMPRESS_ZLIB			6
+#define	COMPRESS_ZLIB_NO_RAW		7
 	u_int c_compression_flag;		/* Compression flag value */
 
 #define	ISOLATION_RANDOM		1

@@ -225,8 +225,15 @@ zlib_compress_raw(WT_COMPRESSOR *compressor, WT_SESSION *session,
 	 * Strategy: take the available output size and compress that much
 	 * input.  Continue until there is no input small enough or the
 	 * compression fails to fit.
+	 *
+	 * Don't let the compression ratio become insanely good (which can
+	 * happen with synthetic workloads).  Once we hit a limit, stop so that
+	 * the in-memory size of pages isn't totally different to the on-disk
+	 * size.  Otherwise we can get into trouble where every update to a
+	 * page results in forced eviction based on in-memory size, even though
+	 * the data fits into a single on-disk block.
 	 */
-	while (zs.avail_out > 0) {
+	while (zs.avail_out > 0 && zs.total_in <= zs.total_out * 20) {
 		/* Find the slot we will try to compress up to. */
 		if ((curr_slot = zlib_find_slot(
 		    zs.total_in + zs.avail_out, offsets, slots)) <= last_slot)
