@@ -637,7 +637,7 @@ __conn_reconfigure(WT_CONNECTION *wt_conn, const char *config)
 	WT_UNUSED(cfg);
 
 	/* Serialize reconfiguration. */
-	__wt_spin_lock(session, &conn->api_lock);
+	__wt_spin_lock(session, &conn->reconfig_lock);
 
 	/*
 	 * The configuration argument has been checked for validity, replace the
@@ -669,7 +669,7 @@ __conn_reconfigure(WT_CONNECTION *wt_conn, const char *config)
 	__wt_free(session, conn->cfg);
 	conn->cfg = p;
 
-err:	__wt_spin_unlock(session, &conn->api_lock);
+err:	__wt_spin_unlock(session, &conn->reconfig_lock);
 
 	API_END_RET(session, ret);
 }

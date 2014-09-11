@@ -44,6 +44,7 @@ __wt_connection_init(WT_CONNECTION_IMPL *conn)
 	WT_RET(__wt_spin_init(session, &conn->checkpoint_lock, "checkpoint"));
 	WT_RET(__wt_spin_init(session, &conn->dhandle_lock, "data handle"));
 	WT_RET(__wt_spin_init(session, &conn->fh_lock, "file list"));
+	WT_RET(__wt_spin_init(session, &conn->reconfig_lock, "reconfigure"));
 	WT_RET(__wt_spin_init(session, &conn->hot_backup_lock, "hot backup"));
 	WT_RET(__wt_spin_init(session, &conn->schema_lock, "schema"));
 	WT_RET(__wt_calloc_def(session, WT_PAGE_LOCKS(conn), &conn->page_lock));
