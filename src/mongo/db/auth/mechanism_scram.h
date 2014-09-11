@@ -35,7 +35,7 @@
 
 namespace mongo {
 namespace scram { 
-    const int hashSize = 20;
+    const unsigned int hashSize = 20;
     const std::string serverKeyConst = "Server Key";
     const std::string clientKeyConst = "Client Key";
 

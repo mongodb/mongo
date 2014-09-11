@@ -88,7 +88,7 @@ namespace scram {
                                 intermediateDigest,
                                 &hashLen));
 
-            for (int k = 0; k < hashSize; k++) {
+            for (size_t k = 0; k < hashSize; k++) {
                 output[k] ^= intermediateDigest[k];
             }
         }
@@ -227,7 +227,7 @@ namespace scram {
         
         // ClientProof   := ClientKey XOR ClientSignature
         unsigned char clientProof[hashSize];
-        for (int i = 0; i<hashSize; i++) {
+        for (size_t i = 0; i<hashSize; i++) {
             clientProof[i] = clientKey[i] ^ clientSignature[i];
         }
 
