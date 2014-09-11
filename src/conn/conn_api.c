@@ -636,6 +636,9 @@ __conn_reconfigure(WT_CONNECTION *wt_conn, const char *config)
 	CONNECTION_API_CALL(conn, session, reconfigure, config, cfg);
 	WT_UNUSED(cfg);
 
+	/* Serialize reconfiguration. */
+	__wt_spin_lock(session, &conn->api_lock);
+
 	/*
 	 * The configuration argument has been checked for validity, replace the
 	 * previous connection configuration.
@@ -666,7 +669,9 @@ __conn_reconfigure(WT_CONNECTION *wt_conn, const char *config)
 	__wt_free(session, conn->cfg);
 	conn->cfg = p;
 
-err:	API_END_RET(session, ret);
+err:	__wt_spin_unlock(session, &conn->api_lock);
+
+	API_END_RET(session, ret);
 }
 
 /*
