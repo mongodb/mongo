@@ -238,14 +238,13 @@ __wt_lsm_checkpoint_chunk(WT_SESSION_IMPL *session,
 
 	/* Stop if a running transaction needs the chunk. */
 	__wt_txn_update_oldest(session);
-	if (chunk->switch_txn == WT_TXN_NONE)
-		WT_RET(__wt_verbose(session, WT_VERB_LSM,
-		    "LSM ckp txn needs chunk %s: switch %" PRIu64
-		    " oldest %" PRIu64, chunk->uri,
-		    chunk->switch_txn, S2C(session)->txn_global.oldest_id));
 	if (chunk->switch_txn == WT_TXN_NONE ||
-	    !__wt_txn_visible_all(session, chunk->switch_txn))
+	    !__wt_txn_visible_all(session, chunk->switch_txn)) {
+		WT_RET(__wt_verbose(session, WT_VERB_LSM,
+		    "LSM worker %s: running transaction, return",
+		    chunk->uri));
 		return (0);
+	}
 
 	WT_RET(__wt_verbose(session, WT_VERB_LSM, "LSM worker flushing %s",
 	    chunk->uri));

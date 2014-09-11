@@ -251,16 +251,22 @@ __wt_lsm_merge(
 	/* Allocate an ID for the merge. */
 	dest_id = WT_ATOMIC_ADD(lsm_tree->last, 1);
 
-	WT_RET(__wt_verbose(session, WT_VERB_LSM,
-	    "Merging %s chunks %u-%u into %u (%" PRIu64 " records)"
-	    ", generation %" PRIu32,
-	    lsm_tree->name,
-	    start_chunk, end_chunk, dest_id, record_count, generation));
-	if (WT_VERBOSE_ISSET(session, WT_VERB_LSM))
+	/*
+	 * We only want to do the chunk loop if we're running
+	 * with verbose, we wrap these statements in the conditional.
+	 * Avoid that in the normal path.
+	 */
+	if (WT_VERBOSE_ISSET(session, WT_VERB_LSM)) {
+		WT_RET(__wt_verbose(session, WT_VERB_LSM,
+		    "Merging %s chunks %u-%u into %u (%" PRIu64 " records)"
+		    ", generation %" PRIu32,
+		    lsm_tree->name,
+		    start_chunk, end_chunk, dest_id, record_count, generation));
 		for (verb = start_chunk; verb <= end_chunk; verb++)
 			WT_RET(__wt_verbose(session, WT_VERB_LSM,
-			    "Chunk[%u] id %u",
-			    verb, lsm_tree->chunk[verb]->id));
+			    "%s: Chunk[%u] id %u",
+			    lsm_tree->name, verb, lsm_tree->chunk[verb]->id));
+	}
 
 	WT_RET(__wt_calloc_def(session, 1, &chunk));
 	chunk->id = dest_id;

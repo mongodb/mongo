@@ -1040,8 +1040,8 @@ __wt_lsm_compact(WT_SESSION_IMPL *session, const char *name, int *skip)
 	if (F_ISSET(lsm_tree, WT_LSM_TREE_COMPACTING))
 		goto err;
 
-	compacting = flushing = 1;
-	F_SET(lsm_tree, WT_LSM_TREE_COMPACT_FLUSH | WT_LSM_TREE_COMPACTING);
+	flushing = 1;
+	F_SET(lsm_tree, WT_LSM_TREE_COMPACT_FLUSH);
 
 	/*
 	 * Set the switch transaction on the current chunk, if it
@@ -1069,25 +1069,28 @@ __wt_lsm_compact(WT_SESSION_IMPL *session, const char *name, int *skip)
 
 	/* Wait for the work unit queues to drain. */
 	while (F_ISSET(lsm_tree, WT_LSM_TREE_ACTIVE)) {
-		if (flushing && ref &&
-		    !F_ISSET(lsm_tree, WT_LSM_TREE_COMPACT_FLUSH)) {
+		if (flushing && !F_ISSET(lsm_tree, WT_LSM_TREE_COMPACT_FLUSH)) {
 			if (chunk != NULL &&
 			    !F_ISSET(chunk, WT_LSM_CHUNK_ONDISK)) {
 				WT_ERR(__wt_verbose(session, WT_VERB_LSM,
 				    "Compact flush retry %s chunk %u",
 				    name, chunk->id));
+				F_SET(lsm_tree, WT_LSM_TREE_COMPACT_FLUSH);
 				WT_ERR(__wt_lsm_manager_push_entry(session,
 				    WT_LSM_WORK_FLUSH | WT_LSM_WORK_FORCE,
 				    lsm_tree));
 			} else {
-				flushing = ref = 0;
-				if (chunk != NULL) {
+				if (ref) {
+					WT_ASSERT(session, chunk != NULL);
 					WT_ERR(__wt_verbose(session,
 					    WT_VERB_LSM,
 					    "Compact flush done %s chunk %u",
 					    name, chunk->id));
 					(void)WT_ATOMIC_SUB(chunk->refcnt, 1);
 				}
+				flushing = ref = 0;
+				compacting = 1;
+				F_SET(lsm_tree, WT_LSM_TREE_COMPACTING);
 			}
 		}
 		/*
