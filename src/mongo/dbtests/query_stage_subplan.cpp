@@ -28,6 +28,7 @@
 
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/database.h"
+#include "mongo/db/dbdirectclient.h"
 #include "mongo/db/exec/subplan.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/json.h"

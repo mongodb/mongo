@@ -45,6 +45,7 @@
 #include "mongo/db/commands/fsync.h"
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/db.h"
+#include "mongo/db/dbdirectclient.h"
 #include "mongo/db/dbhelpers.h"
 #include "mongo/db/dbmessage.h"
 #include "mongo/db/storage/storage_engine.h"
@@ -920,91 +921,6 @@ namespace mongo {
             op.debug().ninserted = 1;
         }
     }
-
-    DBDirectClient::DBDirectClient(OperationContext* txn) 
-        : _txn(txn)
-    {}
-
-    QueryOptions DBDirectClient::_lookupAvailableOptions() {
-        // Exhaust mode is not available in DBDirectClient.
-        return QueryOptions(DBClientBase::_lookupAvailableOptions() & ~QueryOption_Exhaust);
-    }
-
-namespace {
-    class GodScope {
-        MONGO_DISALLOW_COPYING(GodScope);
-    public:
-        GodScope(OperationContext* txn) : _txn(txn) {
-            _prev = _txn->getClient()->setGod(true);
-        }
-        ~GodScope() { _txn->getClient()->setGod(_prev); }
-    private:
-        bool _prev;
-        OperationContext* _txn;
-    };
-}  // namespace
-
-    bool DBDirectClient::call( Message &toSend, Message &response, bool assertOk , string * actualServer ) {
-        GodScope gs(_txn);
-        if ( lastError._get() )
-            lastError.startRequest( toSend, lastError._get() );
-        DbResponse dbResponse;
-        assembleResponse(_txn, toSend, dbResponse, dummyHost);
-        verify( dbResponse.response );
-        dbResponse.response->concat(); // can get rid of this if we make response handling smarter
-        response = *dbResponse.response;
-        return true;
-    }
-
-    void DBDirectClient::say( Message &toSend, bool isRetry, string * actualServer ) {
-        GodScope gs(_txn);
-        if ( lastError._get() )
-            lastError.startRequest( toSend, lastError._get() );
-        DbResponse dbResponse;
-        assembleResponse(_txn, toSend, dbResponse, dummyHost);
-    }
-
-    auto_ptr<DBClientCursor> DBDirectClient::query(const string &ns, Query query, int nToReturn , int nToSkip ,
-            const BSONObj *fieldsToReturn , int queryOptions , int batchSize) {
-
-        //if ( ! query.obj.isEmpty() || nToReturn != 0 || nToSkip != 0 || fieldsToReturn || queryOptions )
-        return DBClientBase::query( ns , query , nToReturn , nToSkip , fieldsToReturn , queryOptions , batchSize );
-        //
-        //verify( query.obj.isEmpty() );
-        //throw UserException( (string)"yay:" + ns );
-    }
-
-    void DBDirectClient::killCursor( long long id ) {
-        // The killCursor command on the DB client is only used by sharding,
-        // so no need to have it for MongoD.
-        verify(!"killCursor should not be used in MongoD");
-    }
-
-    const HostAndPort DBDirectClient::dummyHost("0.0.0.0", 0);
-
-    unsigned long long DBDirectClient::count(const string &ns, const BSONObj& query, int options, int limit, int skip ) {
-        if ( skip < 0 ) {
-            warning() << "setting negative skip value: " << skip
-                << " to zero in query: " << query << endl;
-            skip = 0;
-        }
-
-        Lock::DBRead lk(_txn->lockState(), ns);
-        string errmsg;
-        int errCode;
-        long long res = runCount( _txn, ns, _countCmd( ns , query , options , limit , skip ) , errmsg, errCode );
-        if ( res == -1 ) {
-            // namespace doesn't exist
-            return 0;
-        }
-        massert( errCode , str::stream() << "count failed in DBDirectClient: " << errmsg , res >= 0 );
-        return (unsigned long long )res;
-    }
-
-    DBClientBase* createDirectClient(OperationContext* txn) {
-        return new DBDirectClient(txn);
-    }
-
 
     static AtomicUInt32 shutdownInProgress(0);
 

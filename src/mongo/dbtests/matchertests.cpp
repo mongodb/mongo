@@ -29,8 +29,6 @@
  *    then also delete it in the license file.
  */
 
-#include "mongo/pch.h"
-
 #include "mongo/db/json.h"
 #include "mongo/db/matcher/matcher.h"
 #include "mongo/db/operation_context_impl.h"
@@ -41,19 +39,9 @@ namespace MatcherTests {
 
     class CollectionBase {
     public:
-        CollectionBase() : _ns( "unittests.matchertests" ) {
+        CollectionBase() { }
 
-        }
-
-        virtual ~CollectionBase() {
-            OperationContextImpl txn;
-            DBDirectClient client(&txn);
-
-            client.dropCollection(_ns);
-        }
-
-    protected:
-        const char * const _ns;
+        virtual ~CollectionBase() { }
     };
 
     template <typename M>

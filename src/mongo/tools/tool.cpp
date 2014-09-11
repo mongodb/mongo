@@ -43,6 +43,7 @@
 #include "mongo/db/auth/authorization_manager_global.h"
 #include "mongo/db/auth/authz_manager_external_state_mock.h"
 #include "mongo/db/client.h"
+#include "mongo/db/dbdirectclient.h"
 #include "mongo/db/global_environment_experiment.h"
 #include "mongo/db/global_environment_d.h"
 #include "mongo/db/json.h"

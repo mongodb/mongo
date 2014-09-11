@@ -23,6 +23,7 @@
 #include "mongo/dbtests/dbtests.h"
 
 #include "mongo/db/db.h"
+#include "mongo/db/dbdirectclient.h"
 #include "mongo/db/exec/oplogstart.h"
 #include "mongo/db/exec/working_set.h"
 #include "mongo/db/query/canonical_query.h"

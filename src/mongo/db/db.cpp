@@ -53,6 +53,7 @@
 #include "mongo/db/commands/server_status_metric.h"
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/db.h"
+#include "mongo/db/dbdirectclient.h"
 #include "mongo/db/dbmessage.h"
 #include "mongo/db/dbwebserver.h"
 #include "mongo/db/global_environment_d.h"

@@ -34,13 +34,13 @@
 
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/database.h"
-#include "mongo/db/operation_context_noop.h"
+#include "mongo/db/dbdirectclient.h"
+#include "mongo/db/operation_context_impl.h"
 #include "mongo/db/pipeline/dependencies.h"
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/query/get_executor.h"
 #include "mongo/db/storage_options.h"
-#include "mongo/db/operation_context_impl.h"
 #include "mongo/dbtests/dbtests.h"
 
 namespace DocumentSourceTests {

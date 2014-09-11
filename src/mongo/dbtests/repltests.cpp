@@ -34,7 +34,7 @@
 #include "mongo/bson/mutable/document.h"
 #include "mongo/bson/mutable/mutable_bson_test_utils.h"
 #include "mongo/db/db.h"
-#include "mongo/db/instance.h"
+#include "mongo/db/dbdirectclient.h"
 #include "mongo/db/json.h"
 #include "mongo/db/repl/master_slave.h"
 #include "mongo/db/repl/oplog.h"

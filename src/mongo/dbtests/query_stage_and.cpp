@@ -35,12 +35,12 @@
 
 #include "mongo/client/dbclientcursor.h"
 #include "mongo/db/catalog/database.h"
+#include "mongo/db/dbdirectclient.h"
 #include "mongo/db/exec/and_hash.h"
 #include "mongo/db/exec/and_sorted.h"
 #include "mongo/db/exec/fetch.h"
 #include "mongo/db/exec/index_scan.h"
 #include "mongo/db/exec/plan_stage.h"
-#include "mongo/db/instance.h"
 #include "mongo/db/json.h"
 #include "mongo/db/matcher/expression_parser.h"
 #include "mongo/db/operation_context_impl.h"

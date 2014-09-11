@@ -36,7 +36,7 @@
 
 #include "mongo/db/auth/privilege.h"
 #include "mongo/db/curop.h"
-#include "mongo/db/instance.h"
+#include "mongo/db/dbdirectclient.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/scripting/engine.h"

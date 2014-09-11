@@ -33,7 +33,7 @@
 #include "mongo/client/dbclientinterface.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/database.h"
-#include "mongo/db/instance.h"
+#include "mongo/db/dbdirectclient.h"
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/pipeline.h"
 #include "mongo/db/query/get_executor.h"

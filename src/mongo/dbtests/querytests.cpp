@@ -32,11 +32,11 @@
 
 #include "mongo/client/dbclientcursor.h"
 #include "mongo/db/clientcursor.h"
+#include "mongo/db/dbdirectclient.h"
 #include "mongo/db/dbhelpers.h"
 #include "mongo/db/global_environment_d.h"
 #include "mongo/db/global_environment_experiment.h"
 #include "mongo/db/global_optime.h"
-#include "mongo/db/instance.h"
 #include "mongo/db/json.h"
 #include "mongo/db/lasterror.h"
 #include "mongo/db/query/new_find.h"

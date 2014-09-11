@@ -54,6 +54,7 @@
 #include "mongo/db/commands/server_status.h"
 #include "mongo/db/commands/shutdown.h"
 #include "mongo/db/db.h"
+#include "mongo/db/dbdirectclient.h"
 #include "mongo/db/dbhelpers.h"
 #include "mongo/db/global_environment_d.h"
 #include "mongo/db/index_builder.h"

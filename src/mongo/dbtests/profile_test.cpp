@@ -30,7 +30,7 @@
  * This file contains tests for the profile command
  */
 
-#include "mongo/db/instance.h"
+#include "mongo/db/dbdirectclient.h"
 #include "mongo/db/operation_context_impl.h"
 #include "mongo/unittest/unittest.h"
 

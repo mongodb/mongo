@@ -34,8 +34,8 @@
 
 #include <boost/algorithm/string.hpp>
 
+#include "mongo/db/dbdirectclient.h"
 #include "mongo/db/dbhelpers.h"
-#include "mongo/db/instance.h"
 #include "mongo/db/repl/connections.h"
 #include "mongo/db/repl/heartbeat.h"
 #include "mongo/db/repl/isself.h"

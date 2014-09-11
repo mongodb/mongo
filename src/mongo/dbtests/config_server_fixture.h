@@ -28,10 +28,10 @@
 
 #pragma once
 
-#include "mongo/db/instance.h"
+#include "mongo/client/dbclientinterface.h"
+#include "mongo/db/dbdirectclient.h"
 #include "mongo/db/operation_context_impl.h"
 #include "mongo/db/wire_version.h"
-#include "mongo/client/dbclientinterface.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 
