@@ -1010,6 +1010,7 @@ __wt_lsm_compact(WT_SESSION_IMPL *session, const char *name, int *skip)
 	int i, compacting, flushing, locked, ref;
 
 	compacting = flushing = locked = ref = 0;
+	chunk = NULL;
 	/*
 	 * This function is applied to all matching sources: ignore anything
 	 * that is not an LSM tree.
@@ -1062,7 +1063,6 @@ __wt_lsm_compact(WT_SESSION_IMPL *session, const char *name, int *skip)
 	 * hasn't been set before.  This prevents further writes, so it
 	 * can be flushed by the checkpoint worker.
 	 */
-	chunk = NULL;
 	if (lsm_tree->nchunks > 0 &&
 	    (chunk = lsm_tree->chunk[lsm_tree->nchunks - 1]) != NULL) {
 		if (chunk->switch_txn == WT_TXN_NONE)
