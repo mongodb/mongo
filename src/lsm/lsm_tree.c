@@ -733,7 +733,7 @@ __wt_lsm_tree_switch(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 
 	/* Set the switch transaction in the previous chunk, if necessary. */
 	if (chunk != NULL && chunk->switch_txn == WT_TXN_NONE)
-		chunk->switch_txn = __wt_txn_current_id(session);
+		chunk->switch_txn = __wt_txn_new_id(session);
 
 	/* Update the throttle time. */
 	__wt_lsm_tree_throttle(session, lsm_tree, 0);
@@ -1052,7 +1052,7 @@ __wt_lsm_compact(WT_SESSION_IMPL *session, const char *name, int *skip)
 	if (lsm_tree->nchunks > 0 &&
 	    (chunk = lsm_tree->chunk[lsm_tree->nchunks - 1]) != NULL) {
 		if (chunk->switch_txn == WT_TXN_NONE)
-			chunk->switch_txn = __wt_txn_current_id(session);
+			chunk->switch_txn = __wt_txn_new_id(session);
 		(void)WT_ATOMIC_ADD(chunk->refcnt, 1);
 		ref = 1;
 	}
