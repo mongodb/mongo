@@ -45,9 +45,10 @@
  */
 
 namespace mongo {
-namespace newlm {
 
     class Locker;
+
+namespace newlm {
 
     /**
      * Lock modes. Refer to the compatiblity matrix in the source file for information on how

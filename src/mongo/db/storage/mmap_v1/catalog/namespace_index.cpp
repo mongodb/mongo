@@ -35,7 +35,6 @@
 
 #include <boost/filesystem/operations.hpp>
 
-#include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/storage/mmap_v1/catalog/namespace_details.h"
 #include "mongo/util/exit.h"

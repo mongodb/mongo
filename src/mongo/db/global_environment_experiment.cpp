@@ -31,6 +31,7 @@
 #include "mongo/db/global_environment_experiment.h"
 
 #include "mongo/db/operation_context.h"
+#include "mongo/util/assert_util.h"
 
 
 namespace mongo {

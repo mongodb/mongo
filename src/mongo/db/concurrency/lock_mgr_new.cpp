@@ -30,9 +30,7 @@
 
 #include "mongo/db/concurrency/lock_mgr_new.h"
 
-#include <boost/thread/locks.hpp>
-
-#include "mongo/db/concurrency/lock_state.h"
+#include "mongo/db/concurrency/locker.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/log.h"
 #include "mongo/util/stringutils.h"

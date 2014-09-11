@@ -32,7 +32,6 @@
 
 #include "mongo/base/string_data.h"
 #include "mongo/db/catalog/database.h"
-#include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/util/string_map.h"
 

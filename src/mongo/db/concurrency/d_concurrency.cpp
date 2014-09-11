@@ -1,32 +1,30 @@
-// @file d_concurrency.cpp 
-
 /**
-*    Copyright (C) 2008-2014 MongoDB Inc.
-*
-*    This program is free software: you can redistribute it and/or  modify
-*    it under the terms of the GNU Affero General Public License, version 3,
-*    as published by the Free Software Foundation.
-*
-*    This program is distributed in the hope that it will be useful,
-*    but WITHOUT ANY WARRANTY; without even the implied warranty of
-*    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-*    GNU Affero General Public License for more details.
-*
-*    You should have received a copy of the GNU Affero General Public License
-*    along with this program.  If not, see <http://www.gnu.org/licenses/>.
-*
-*    As a special exception, the copyright holders give permission to link the
-*    code of portions of this program with the OpenSSL library under certain
-*    conditions as described in each individual source file and distribute
-*    linked combinations including the program with the OpenSSL library. You
-*    must comply with the GNU Affero General Public License in all respects for
-*    all of the code used other than as permitted herein. If you modify file(s)
-*    with this exception, you may extend this exception to your version of the
-*    file(s), but you are not obligated to do so. If you do not wish to do so,
-*    delete this exception statement from your version. If you delete this
-*    exception statement from all source files in the program, then also delete
-*    it in the license file.
-*/
+ *    Copyright (C) 2008-2014 MongoDB Inc.
+ *
+ *    This program is free software: you can redistribute it and/or  modify
+ *    it under the terms of the GNU Affero General Public License, version 3,
+ *    as published by the Free Software Foundation.
+ *
+ *    This program is distributed in the hope that it will be useful,
+ *    but WITHOUT ANY WARRANTY; without even the implied warranty of
+ *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ *    GNU Affero General Public License for more details.
+ *
+ *    You should have received a copy of the GNU Affero General Public License
+ *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ *    As a special exception, the copyright holders give permission to link the
+ *    code of portions of this program with the OpenSSL library under certain
+ *    conditions as described in each individual source file and distribute
+ *    linked combinations including the program with the OpenSSL library. You
+ *    must comply with the GNU Affero General Public License in all respects for
+ *    all of the code used other than as permitted herein. If you modify file(s)
+ *    with this exception, you may extend this exception to your version of the
+ *    file(s), but you are not obligated to do so. If you do not wish to do so,
+ *    delete this exception statement from your version. If you delete this
+ *    exception statement from all source files in the program, then also delete
+ *    it in the license file.
+ */
 
 #include "mongo/platform/basic.h"
 
@@ -36,7 +34,9 @@
 #include "mongo/db/commands/server_status.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/global_environment_experiment.h"
+#include "mongo/db/concurrency/locker.h"
 #include "mongo/db/concurrency/lock_stat.h"
+#include "mongo/db/concurrency/lock_state.h"
 #include "mongo/db/server_parameters.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/util/assert_util.h"
@@ -64,13 +64,13 @@ namespace mongo {
         QLock q;
         LockStat stats;
 
-        void lock_R(LockState* lockState) {
+        void lock_R(Locker* lockState) {
             invariant(lockState->threadState() == 0);
             lockState->lockedStart('R');
             q.lock_R(); 
         }
 
-        void lock_W(LockState* lockState) {
+        void lock_W(Locker* lockState) {
             if (lockState->threadState()) {
                 log() << "can't lock_W, threadState=" << (int)lockState->threadState() << endl;
                 fassert(16114,false);
@@ -81,7 +81,7 @@ namespace mongo {
         }
 
         // how to count try's that fail is an interesting question. we should get rid of try().
-        bool lock_R_try(LockState* lockState, int millis) {
+        bool lock_R_try(Locker* lockState, int millis) {
             verify(lockState->threadState() == 0);
             bool got = q.lock_R_try(millis); 
             if (got) {
@@ -90,7 +90,7 @@ namespace mongo {
             return got;
         }
         
-        bool lock_W_try(LockState* lockState, int millis) {
+        bool lock_W_try(Locker* lockState, int millis) {
             verify(lockState->threadState() == 0);
             bool got = q.lock_W_try(millis); 
             if( got ) {
@@ -99,13 +99,13 @@ namespace mongo {
             return got;
         }
 
-        void unlock_R(LockState* lockState) {
+        void unlock_R(Locker* lockState) {
             wassert(lockState->threadState() == 'R');
             lockState->unlocked();
             q.unlock_R();
         }
 
-        void unlock_W(LockState* lockState) {
+        void unlock_W(Locker* lockState) {
             wassert(lockState->threadState() == 'W');
             lockState->unlocked();
             q.unlock_W(); 
@@ -146,27 +146,27 @@ namespace mongo {
     class AcquiringParallelWriter {
     public:
 
-        AcquiringParallelWriter(LockState* ls)
+        AcquiringParallelWriter(Locker* ls)
             : _ls(ls) {
 
-            _ls->_lockPendingParallelWriter = true;
+            _ls->setLockPendingParallelWriter(true);
         }
 
         ~AcquiringParallelWriter() {
-            _ls->_lockPendingParallelWriter = false;
+            _ls->setLockPendingParallelWriter(false);
         }
 
     private:
-        LockState* const _ls;
+        Locker* const _ls;
     };
 
 
     RWLockRecursive &Lock::ParallelBatchWriterMode::_batchLock = *(new RWLockRecursive("special"));
-    void Lock::ParallelBatchWriterMode::iAmABatchParticipant(LockState* lockState) {
-        lockState->_batchWriter = true;
+    void Lock::ParallelBatchWriterMode::iAmABatchParticipant(Locker* lockState) {
+        lockState->setIsBatchWriter(true);
     }
 
-    Lock::ScopedLock::ParallelBatchWriterSupport::ParallelBatchWriterSupport(LockState* lockState)
+    Lock::ScopedLock::ParallelBatchWriterSupport::ParallelBatchWriterSupport(Locker* lockState)
         : _lockState(lockState) {
         relock();
     }
@@ -176,14 +176,14 @@ namespace mongo {
     }
 
     void Lock::ScopedLock::ParallelBatchWriterSupport::relock() {
-        if (!_lockState->_batchWriter) {
+        if (!_lockState->isBatchWriter()) {
             AcquiringParallelWriter a(_lockState);
             _lk.reset( new RWLockRecursive::Shared(ParallelBatchWriterMode::_batchLock) );
         }
     }
 
 
-    Lock::ScopedLock::ScopedLock(LockState* lockState, char type)
+    Lock::ScopedLock::ScopedLock(Locker* lockState, char type)
         : _lockState(lockState), _pbws_lk(lockState), _type(type) {
 
         _lockState->enterScopedLock(this);
@@ -213,7 +213,7 @@ namespace mongo {
         }
     }
 
-    Lock::TempRelease::TempRelease(LockState* lockState)
+    Lock::TempRelease::TempRelease(Locker* lockState)
         : cant(lockState->isRecursive()), _lockState(lockState) {
 
         if (cant) {
@@ -292,7 +292,7 @@ namespace mongo {
         lockDB();
     }
 
-    Lock::GlobalWrite::GlobalWrite(LockState* lockState, int timeoutms)
+    Lock::GlobalWrite::GlobalWrite(Locker* lockState, int timeoutms)
         : ScopedLock(lockState, 'W') {
 
         char ts = _lockState->threadState();
@@ -346,7 +346,7 @@ namespace mongo {
         _lockState->changeLockState('W');
     }
 
-    Lock::GlobalRead::GlobalRead(LockState* lockState, int timeoutms)
+    Lock::GlobalRead::GlobalRead(Locker* lockState, int timeoutms)
         : ScopedLock(lockState, 'R') {
 
         char ts = _lockState->threadState();
@@ -382,7 +382,7 @@ namespace mongo {
     }
 
 
-    Lock::DBWrite::DBWrite(LockState* lockState, const StringData& dbOrNs)
+    Lock::DBWrite::DBWrite(Locker* lockState, const StringData& dbOrNs)
         : ScopedLock(lockState, 'w'),
           _lockAcquired(false),
           _ns(dbOrNs.toString()) {
@@ -474,7 +474,7 @@ namespace mongo {
     }
 
 
-    Lock::DBRead::DBRead(LockState* lockState, const StringData& dbOrNs)
+    Lock::DBRead::DBRead(Locker* lockState, const StringData& dbOrNs)
         : ScopedLock(lockState, 'r'),
           _lockAcquired(false),
           _ns(dbOrNs.toString()) {
@@ -548,7 +548,7 @@ namespace mongo {
     }
 
 
-    Lock::UpgradeGlobalLockToExclusive::UpgradeGlobalLockToExclusive(LockState* lockState)
+    Lock::UpgradeGlobalLockToExclusive::UpgradeGlobalLockToExclusive(Locker* lockState)
             : _lockState(lockState) {
         fassert( 16187, _lockState->threadState() == 'w' );
 
@@ -577,7 +577,7 @@ namespace mongo {
         _lockState->resetLockTime();
     }
 
-    writelocktry::writelocktry(LockState* lockState, int tryms) :
+    writelocktry::writelocktry(Locker* lockState, int tryms) :
         _got( false ),
         _dbwlock( NULL )
     { 
@@ -595,7 +595,7 @@ namespace mongo {
     }
 
     // note: the 'already' concept here might be a bad idea as a temprelease wouldn't notice it is nested then
-    readlocktry::readlocktry(LockState* lockState, int tryms) :
+    readlocktry::readlocktry(Locker* lockState, int tryms) :
         _got( false ),
         _dbrlock( NULL )
     {
@@ -616,9 +616,9 @@ namespace mongo {
      * This is passed to the iterator for global environments and aggregates information about the
      * locks which are currently being held or waited on.
      */
-    class LockStateAggregator : public GlobalEnvironmentExperiment::ProcessOperationContext {
+    class LockerAggregator : public GlobalEnvironmentExperiment::ProcessOperationContext {
     public:
-        LockStateAggregator(bool blockedOnly) 
+        LockerAggregator(bool blockedOnly) 
             : numWriteLocked(0),
               numReadLocked(0),
               _blockedOnly(blockedOnly) {
@@ -664,7 +664,7 @@ namespace mongo {
             {
                 BSONObjBuilder ttt( t.subobjStart( "currentQueue" ) );
 
-                LockStateAggregator blocked(true);
+                LockerAggregator blocked(true);
                 getGlobalEnvironment()->forEachOperationContext(&blocked);
 
                 ttt.append("total", blocked.numReadLocked + blocked.numWriteLocked);
@@ -677,7 +677,7 @@ namespace mongo {
             {
                 BSONObjBuilder ttt( t.subobjStart( "activeClients" ) );
 
-                LockStateAggregator active(false);
+                LockerAggregator active(false);
                 getGlobalEnvironment()->forEachOperationContext(&active);
 
                 ttt.append("total", active.numReadLocked + active.numWriteLocked);

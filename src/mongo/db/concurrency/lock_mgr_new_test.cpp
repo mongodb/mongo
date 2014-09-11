@@ -26,10 +26,8 @@
  *    it in the license file.
  */
 
-#include "mongo/unittest/unittest.h"
-#include "mongo/db/concurrency/lock_mgr_new.h"
 #include "mongo/db/concurrency/lock_mgr_test_help.h"
-#include "mongo/db/concurrency/lock_state.h"
+#include "mongo/unittest/unittest.h"
 
 
 namespace mongo {

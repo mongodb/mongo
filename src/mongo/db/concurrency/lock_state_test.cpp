@@ -28,19 +28,17 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/unittest/unittest.h"
-#include "mongo/db/concurrency/lock_mgr.h"
 #include "mongo/db/concurrency/lock_mgr_test_help.h"
-#include "mongo/db/concurrency/lock_state.h"
+#include "mongo/unittest/unittest.h"
 
 
 namespace mongo {
 namespace newlm {
     
-    TEST(Locker, LockNoConflict) {
+    TEST(LockerImpl, LockNoConflict) {
         const ResourceId resId(RESOURCE_COLLECTION, std::string("TestDB.collection"));
 
-        Locker locker(1);
+        LockerImpl locker(1);
 
         ASSERT(LOCK_OK == locker.lock(resId, MODE_X));
 
@@ -52,10 +50,10 @@ namespace newlm {
         ASSERT(locker.isLockHeldForMode(resId, MODE_NONE));
     }
 
-    TEST(Locker, ReLockNoConflict) {
+    TEST(LockerImpl, ReLockNoConflict) {
         const ResourceId resId(RESOURCE_COLLECTION, std::string("TestDB.collection"));
 
-        Locker locker(1);
+        LockerImpl locker(1);
 
         ASSERT(LOCK_OK == locker.lock(resId, MODE_S));
         ASSERT(LOCK_OK == locker.lock(resId, MODE_X));
@@ -67,22 +65,17 @@ namespace newlm {
         ASSERT(locker.isLockHeldForMode(resId, MODE_NONE));
     }
 
-    TEST(Locker, ConflictWithTimeout) {
+    TEST(LockerImpl, ConflictWithTimeout) {
         const ResourceId resId(RESOURCE_COLLECTION, std::string("TestDB.collection"));
 
-        Locker locker1(1);
+        LockerImpl locker1(1);
         ASSERT(LOCK_OK == locker1.lock(resId, MODE_X));
 
-        Locker locker2(2);
+        LockerImpl locker2(2);
         ASSERT(LOCK_TIMEOUT == locker2.lock(resId, MODE_S, 0));
         ASSERT(locker2.isLockHeldForMode(resId, MODE_NONE));
 
         ASSERT(locker1.unlock(resId));
-    }
-
-    // Randomly acquires and releases locks, just to make sure that no assertions pop-up
-    TEST(Locker, RandomizedAcquireRelease) {
-        // TODO: Make sure to print the seed
     }
 
 } // namespace newlm

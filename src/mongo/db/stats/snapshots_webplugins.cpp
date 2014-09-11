@@ -28,7 +28,6 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/dbwebserver.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/stats/snapshots.h"

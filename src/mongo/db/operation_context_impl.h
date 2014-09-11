@@ -43,7 +43,7 @@ namespace mongo {
 
         virtual RecoveryUnit* recoveryUnit() const;
 
-        virtual LockState* lockState() const;
+        virtual Locker* lockState() const;
 
         virtual ProgressMeter* setMessage(const char* msg,
                                           const std::string& name,
@@ -71,7 +71,7 @@ namespace mongo {
     private:
         boost::scoped_ptr<RecoveryUnit> _recovery;
         Transaction _tx;
-        LockState _lockState;
+        boost::scoped_ptr<Locker> _locker;
     };
 
 }  // namespace mongo

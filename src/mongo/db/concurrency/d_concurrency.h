@@ -1,32 +1,30 @@
-// @file d_concurrency.h
-
 /**
-*    Copyright (C) 2008-2014 MongoDB Inc.
-*
-*    This program is free software: you can redistribute it and/or  modify
-*    it under the terms of the GNU Affero General Public License, version 3,
-*    as published by the Free Software Foundation.
-*
-*    This program is distributed in the hope that it will be useful,
-*    but WITHOUT ANY WARRANTY; without even the implied warranty of
-*    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-*    GNU Affero General Public License for more details.
-*
-*    You should have received a copy of the GNU Affero General Public License
-*    along with this program.  If not, see <http://www.gnu.org/licenses/>.
-*
-*    As a special exception, the copyright holders give permission to link the
-*    code of portions of this program with the OpenSSL library under certain
-*    conditions as described in each individual source file and distribute
-*    linked combinations including the program with the OpenSSL library. You
-*    must comply with the GNU Affero General Public License in all respects for
-*    all of the code used other than as permitted herein. If you modify file(s)
-*    with this exception, you may extend this exception to your version of the
-*    file(s), but you are not obligated to do so. If you do not wish to do so,
-*    delete this exception statement from your version. If you delete this
-*    exception statement from all source files in the program, then also delete
-*    it in the license file.
-*/
+ *    Copyright (C) 2008-2014 MongoDB Inc.
+ *
+ *    This program is free software: you can redistribute it and/or  modify
+ *    it under the terms of the GNU Affero General Public License, version 3,
+ *    as published by the Free Software Foundation.
+ *
+ *    This program is distributed in the hope that it will be useful,
+ *    but WITHOUT ANY WARRANTY; without even the implied warranty of
+ *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ *    GNU Affero General Public License for more details.
+ *
+ *    You should have received a copy of the GNU Affero General Public License
+ *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ *    As a special exception, the copyright holders give permission to link the
+ *    code of portions of this program with the OpenSSL library under certain
+ *    conditions as described in each individual source file and distribute
+ *    linked combinations including the program with the OpenSSL library. You
+ *    must comply with the GNU Affero General Public License in all respects for
+ *    all of the code used other than as permitted herein. If you modify file(s)
+ *    with this exception, you may extend this exception to your version of the
+ *    file(s), but you are not obligated to do so. If you do not wish to do so,
+ *    delete this exception statement from your version. If you delete this
+ *    exception statement from all source files in the program, then also delete
+ *    it in the license file.
+ */
 
 
 // only used by mongod, thus the name ('d')
@@ -34,15 +32,17 @@
 
 #pragma once
 
+#include <boost/scoped_ptr.hpp>
+
 #include "mongo/base/string_data.h"
-#include "mongo/db/jsobj.h"
 #include "mongo/db/concurrency/lock_stat.h"
 #include "mongo/util/concurrency/mutex.h"
 #include "mongo/util/concurrency/rwlock.h"
 
+
 namespace mongo {
 
-    class LockState;
+    class Locker;
 
     class Lock : boost::noncopyable { 
     public:
@@ -50,12 +50,12 @@ namespace mongo {
 
         // note: avoid TempRelease when possible. not a good thing.
         struct TempRelease {
-            TempRelease(LockState* lockState);
+            TempRelease(Locker* lockState);
             ~TempRelease();
             const bool cant; // true if couldn't because of recursive locking
 
             // Not owned
-            LockState* _lockState;
+            Locker* _lockState;
             ScopedLock *scopedLk;
         };
 
@@ -68,7 +68,7 @@ namespace mongo {
             RWLockRecursive::Exclusive _lk;
         public:
             ParallelBatchWriterMode() : _lk(_batchLock) {}
-            static void iAmABatchParticipant(LockState* lockState);
+            static void iAmABatchParticipant(Locker* lockState);
             static RWLockRecursive &_batchLock;
         };
 
@@ -85,7 +85,7 @@ namespace mongo {
             void recordTime();
 
         protected:
-            explicit ScopedLock(LockState* lockState, char type );
+            explicit ScopedLock(Locker* lockState, char type );
 
         private:
             friend struct TempRelease;
@@ -97,20 +97,20 @@ namespace mongo {
             virtual void _tempRelease() = 0;
             virtual void _relock() = 0;
 
-            LockState* _lockState;
+            Locker* _lockState;
 
         private:
 
             class ParallelBatchWriterSupport : boost::noncopyable {
             public:
-                ParallelBatchWriterSupport(LockState* lockState);
+                ParallelBatchWriterSupport(Locker* lockState);
 
             private:
                 void tempRelease();
                 void relock();
 
-                LockState* _lockState;
-                scoped_ptr<RWLockRecursive::Shared> _lk;
+                Locker* _lockState;
+                boost::scoped_ptr<RWLockRecursive::Shared> _lk;
                 friend class ScopedLock;
             };
 
@@ -131,7 +131,7 @@ namespace mongo {
         public:
             // stopGreed is removed and does NOT work
             // timeoutms is only for writelocktry -- deprecated -- do not use
-            GlobalWrite(LockState* lockState, int timeoutms = -1);
+            GlobalWrite(Locker* lockState, int timeoutms = -1);
             virtual ~GlobalWrite();
             void downgrade(); // W -> R
             void upgrade();   // caution see notes
@@ -145,7 +145,7 @@ namespace mongo {
             void _relock();
         public:
             // timeoutms is only for readlocktry -- deprecated -- do not use
-            GlobalRead(LockState* lockState, int timeoutms = -1);
+            GlobalRead(Locker* lockState, int timeoutms = -1);
             virtual ~GlobalRead();
         };
 
@@ -160,7 +160,7 @@ namespace mongo {
             void _relock();
 
         public:
-            DBWrite(LockState* lockState, const StringData& dbOrNs);
+            DBWrite(Locker* lockState, const StringData& dbOrNs);
             virtual ~DBWrite();
 
         private:
@@ -179,7 +179,7 @@ namespace mongo {
             void _relock();
 
         public:
-            DBRead(LockState* lockState, const StringData& dbOrNs);
+            DBRead(Locker* lockState, const StringData& dbOrNs);
             virtual ~DBRead();
 
         private:
@@ -193,31 +193,31 @@ namespace mongo {
          */
         class UpgradeGlobalLockToExclusive : private boost::noncopyable {
         public:
-            UpgradeGlobalLockToExclusive(LockState* lockState);
+            UpgradeGlobalLockToExclusive(Locker* lockState);
             ~UpgradeGlobalLockToExclusive();
 
             bool gotUpgrade() const { return _gotUpgrade; }
 
         private:
-            LockState* _lockState;
+            Locker* _lockState;
             bool _gotUpgrade;
         };
     };
 
     class readlocktry : boost::noncopyable {
         bool _got;
-        scoped_ptr<Lock::GlobalRead> _dbrlock;
+        boost::scoped_ptr<Lock::GlobalRead> _dbrlock;
     public:
-        readlocktry(LockState* lockState, int tryms);
+        readlocktry(Locker* lockState, int tryms);
         ~readlocktry();
         bool got() const { return _got; }
     };
 
     class writelocktry : boost::noncopyable {
         bool _got;
-        scoped_ptr<Lock::GlobalWrite> _dbwlock;
+        boost::scoped_ptr<Lock::GlobalWrite> _dbwlock;
     public:
-        writelocktry(LockState* lockState, int tryms);
+        writelocktry(Locker* lockState, int tryms);
         ~writelocktry();
         bool got() const { return _got; }
     };

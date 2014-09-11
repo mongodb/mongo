@@ -61,9 +61,8 @@ namespace mongo {
             return _recoveryUnit.get();
         }
 
-        virtual LockState* lockState() const {
-            // TODO: Eventually, this should return an actual LockState object. For now,
-            //       LockState depends on the whole world and is not necessary for testing.
+        virtual Locker* lockState() const {
+            // TODO: This should return an actual object if necessary for testing.
             return NULL;
         }
 
