@@ -87,8 +87,9 @@ namespace mongo {
          * For example isLockHeldForMode will return true for MODE_S, if MODE_X is already held,
          * because MODE_X covers MODE_S.
          */
-        virtual newlm::LockMode getLockMode(const newlm::ResourceId& resId) const;
-        virtual bool isLockHeldForMode(const newlm::ResourceId& resId, newlm::LockMode mode) const;
+        virtual newlm::LockMode getLockMode(const newlm::ResourceId& resId) const = 0;
+        virtual bool isLockHeldForMode(const newlm::ResourceId& resId,
+                                       newlm::LockMode mode) const = 0;
 
         //
         // These methods are legacy from LockState and will eventually go away or be converted to
