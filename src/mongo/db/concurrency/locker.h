@@ -28,6 +28,8 @@
 
 #pragma once
 
+#include <climits> // For UINT_MAX
+
 #include "mongo/base/disallow_copying.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/concurrency/d_concurrency.h"
