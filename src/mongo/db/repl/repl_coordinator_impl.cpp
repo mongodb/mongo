@@ -159,6 +159,17 @@ namespace {
             return true;
         }
 
+        StatusWith<ReplicationCoordinatorExternalState::OpTimeAndHash> lastOpTimeStatus =
+            _externalState->loadLastOpTimeAndHash(txn);
+        OpTime lastOpTime(0, 0);
+        if (!lastOpTimeStatus.isOK()) {
+            warning() << "Failed to load timestamp of most recently applied operation; " <<
+                lastOpTimeStatus.getStatus();
+        }
+        else {
+            lastOpTime = lastOpTimeStatus.getValue().opTime;
+        }
+
         // Use a callback here, because _finishLoadLocalConfig calls isself() which requires
         // that the server's networking layer be up and running and accepting connections, which
         // doesn't happen until startReplication finishes.
@@ -166,18 +177,20 @@ namespace {
                 stdx::bind(&ReplicationCoordinatorImpl::_finishLoadLocalConfig,
                            this,
                            stdx::placeholders::_1,
-                           localConfig));
+                           localConfig,
+                           lastOpTime));
         return false;
     }
 
     void ReplicationCoordinatorImpl::_finishLoadLocalConfig(
             const ReplicationExecutor::CallbackData& cbData,
-            const ReplicaSetConfig& localConfig) {
+            const ReplicaSetConfig& localConfig,
+            OpTime lastOpTime) {
         if (!cbData.status.isOK()) {
             LOG(1) << "Loading local replica set configuration failed due to " << cbData.status;
             return;
         }
-        _finishLoadLocalConfig_helper(cbData, localConfig);
+        _finishLoadLocalConfig_helper(cbData, localConfig, lastOpTime);
 
         // Make sure that no matter how _finishLoadLocalConfig_helper terminates (short of
         // throwing an exception, which it shouldn't do and would cause the process to terminate),
@@ -195,7 +208,8 @@ namespace {
 
     void ReplicationCoordinatorImpl::_finishLoadLocalConfig_helper(
             const ReplicationExecutor::CallbackData& cbData,
-            const ReplicaSetConfig& localConfig) {
+            const ReplicaSetConfig& localConfig,
+            OpTime lastOpTime) {
 
         StatusWith<int> myIndex = validateConfigForStartUp(_externalState.get(),
                                                            _rsConfig,
@@ -207,9 +221,10 @@ namespace {
             return;
         }
 
-        boost::lock_guard<boost::mutex> lk(_mutex);
+        boost::unique_lock<boost::mutex> lk(_mutex);
         invariant(_rsConfigState == kConfigStartingUp);
         _setCurrentRSConfig_inlock(localConfig, myIndex.getValue());
+        _setLastOptime_inlock(&lk, _getMyRID_inlock(), lastOpTime);
     }
 
     void ReplicationCoordinatorImpl::startReplication(OperationContext* txn) {

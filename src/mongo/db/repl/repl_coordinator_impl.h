@@ -440,14 +440,16 @@ namespace repl {
          * _isStartupComplete to true, so that we can begin processing heartbeats and reconfigs.
          */
         void _finishLoadLocalConfig(const ReplicationExecutor::CallbackData& cbData,
-                                    const ReplicaSetConfig& localConfig);
+                                    const ReplicaSetConfig& localConfig,
+                                    OpTime lastOpTime);
 
         /**
          * Helper method that does most of the work of _finishLoadLocalConfig, minus setting
          * _isStartupComplete to true.
          */
         void _finishLoadLocalConfig_helper(const ReplicationExecutor::CallbackData& cbData,
-                                           const ReplicaSetConfig& localConfig);
+                                           const ReplicaSetConfig& localConfig,
+                                           OpTime lastOpTime);
 
         /**
          * Callback that finishes the work of processReplSetInitiate() inside the replication
