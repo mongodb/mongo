@@ -33,6 +33,7 @@
 #include "mongo/base/disallow_copying.h"
 #include "mongo/base/status_with.h"
 #include "mongo/bson/oid.h"
+#include "mongo/bson/optime.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/repl/repl_coordinator_external_state.h"
 #include "mongo/util/net/hostandport.h"
@@ -56,6 +57,7 @@ namespace repl {
         virtual HostAndPort getClientHostAndPort(const OperationContext* txn);
         virtual StatusWith<BSONObj> loadLocalConfigDocument(OperationContext* txn);
         virtual Status storeLocalConfigDocument(OperationContext* txn, const BSONObj& config);
+        virtual StatusWith<OpTimeAndHash> loadLastOpTimeAndHash(OperationContext* txn);
         virtual void closeClientConnections();
         virtual ReplicationCoordinatorExternalState::GlobalSharedLockAcquirer*
                 getGlobalSharedLockAcquirer();
@@ -83,8 +85,14 @@ namespace repl {
          */
         void setCanAcquireGlobalSharedLock(bool canAcquire);
 
+        /**
+         * Sets the return value for subsequent calls to loadLastOpTimeApplied.
+         */
+        void setLastOpTimeAndHash(const StatusWith<OpTimeAndHash>& lastApplied);
+
     private:
         StatusWith<BSONObj> _localRsConfigDocument;
+        StatusWith<OpTimeAndHash>  _lastOpTimeAndHash;
         std::vector<HostAndPort> _selfHosts;
         bool _canAcquireGlobalSharedLock;
         bool _connectionsClosed;

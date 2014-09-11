@@ -43,6 +43,8 @@
 #include "mongo/db/operation_context_impl.h"
 #include "mongo/db/repl/connections.h"
 #include "mongo/db/repl/isself.h"
+#include "mongo/db/repl/oplog.h"
+#include "mongo/util/mongoutils/str.h"
 #include "mongo/util/net/hostandport.h"
 #include "mongo/util/net/message_port.h"
 #include "mongo/util/net/sock.h"
@@ -54,6 +56,8 @@ namespace {
     // TODO: Change this to local.system.replset when we remove disable the hybrid coordinator.
     const char configCollectionName[] = "local.new.replset";
     const char meCollectionName[] = "local.me";
+    const char tsFieldName[] = "ts";
+    const char hashFieldName[] = "h";
 }  // namespace
 
     ReplicationCoordinatorExternalStateImpl::ReplicationCoordinatorExternalStateImpl() {}
@@ -112,7 +116,8 @@ namespace {
             if (!Helpers::getSingleton(txn, configCollectionName, config)) {
                 return StatusWith<BSONObj>(
                         ErrorCodes::NoMatchingDocument,
-                        "Did not find replica set configuration document in local.system.replset");
+                        str::stream() << "Did not find replica set configuration document in " <<
+                        configCollectionName);
             }
             return StatusWith<BSONObj>(config);
         }
@@ -131,6 +136,40 @@ namespace {
         }
         catch (const DBException& ex) {
             return ex.toStatus();
+        }
+    }
+
+    StatusWith<ReplicationCoordinatorExternalState::OpTimeAndHash>
+    ReplicationCoordinatorExternalStateImpl::loadLastOpTimeAndHash(
+            OperationContext* txn) {
+
+        try {
+            Lock::DBRead lk(txn->lockState(), rsoplog);
+            BSONObj oplogEntry;
+            if (!Helpers::getLast(txn, rsoplog, oplogEntry)) {
+                return StatusWith<OpTimeAndHash>(
+                        ErrorCodes::NoMatchingDocument,
+                        str::stream() << "Did not find any entries in " << rsoplog);
+            }
+            BSONElement tsElement = oplogEntry[tsFieldName];
+            if (tsElement.eoo()) {
+                return StatusWith<OpTimeAndHash>(
+                        ErrorCodes::NoSuchKey,
+                        str::stream() << "Most recent entry in " << rsoplog << " missing \"" <<
+                        tsFieldName << "\" field");
+            }
+            if (tsElement.type() != Timestamp) {
+                return StatusWith<OpTimeAndHash>(
+                        ErrorCodes::TypeMismatch,
+                        str::stream() << "Expected type of \"" << tsFieldName <<
+                        "\" in most recent " << rsoplog <<
+                        " entry to have type Timestamp, but found " << typeName(tsElement.type()));
+            }
+            return StatusWith<OpTimeAndHash>(
+                    OpTimeAndHash(tsElement._opTime(), oplogEntry[hashFieldName].safeNumberLong()));
+        }
+        catch (const DBException& ex) {
+            return StatusWith<OpTimeAndHash>(ex.toStatus());
         }
     }
 

@@ -42,8 +42,8 @@ namespace mongo {
 namespace repl {
 
     ReplicationCoordinatorExternalStateMock::ReplicationCoordinatorExternalStateMock()
-        : _localRsConfigDocument(Status(ErrorCodes::NoMatchingDocument,
-                                        "No local config document")),
+        : _localRsConfigDocument(ErrorCodes::NoMatchingDocument, "No local config document"),
+          _lastOpTimeAndHash(ErrorCodes::NoMatchingDocument, "No last oplog entry"),
          _canAcquireGlobalSharedLock(true),
          _connectionsClosed(false) {
     }
@@ -93,6 +93,18 @@ namespace repl {
             const StatusWith<BSONObj>& localConfigDocument) {
 
         _localRsConfigDocument = localConfigDocument;
+    }
+
+    StatusWith<ReplicationCoordinatorExternalState::OpTimeAndHash>
+    ReplicationCoordinatorExternalStateMock::loadLastOpTimeAndHash(
+            OperationContext* txn) {
+        return _lastOpTimeAndHash;
+    }
+
+    void ReplicationCoordinatorExternalStateMock::setLastOpTimeAndHash(
+            const StatusWith<OpTimeAndHash>& lastApplied) {
+
+        _lastOpTimeAndHash = lastApplied;
     }
 
     void ReplicationCoordinatorExternalStateMock::closeClientConnections() {
