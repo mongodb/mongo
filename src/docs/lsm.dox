@@ -109,9 +109,8 @@ configuration key to ::wiredtiger_open.
 
 @subsection lsm_checkpoints Named checkpoints
 
-Named checkpoints are not supported on LSM trees, and cursors cannot be opened
-with a non-empty \c "checkpoint" configuration.
-
-We intend to address these limitations in future releases.
+Named checkpoints are not supported on LSM trees, and cursors cannot be
+opened with a non-empty \c "checkpoint" configuration (that is, only the
+most recent standard checkpoint can be read).
 
  */
