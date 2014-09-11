@@ -1282,7 +1282,7 @@ execute_populate(CONFIG *cfg)
 	lprintf(cfg, 0, 1,
 	    "Load time: %.2f\n" "load ops/sec: %" PRIu64,
 	    (double)msecs / (double)THOUSAND, 
-	    (cfg->icount / msecs) / THOUSAND);
+	    (uint64_t)((cfg->icount / msecs) / THOUSAND));
 
 	/*
 	 * If configured, compact to allow LSM merging to complete.  We
@@ -1324,7 +1324,7 @@ execute_populate(CONFIG *cfg)
 		}
 		lprintf(cfg, 0, 1,
 		    "Compact completed in %" PRIu64 " seconds",
-		    ns_to_sec(WT_TIMEDIFF(stop, start)));
+		    (uint64_t)(ns_to_sec(WT_TIMEDIFF(stop, start))));
 		assert(tables == 0);
 	}
 	return (0);
