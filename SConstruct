@@ -287,7 +287,7 @@ add_option( "use-system-pcre", "use system version of pcre library", 0, True )
 # library choices
 boost_choices = ['1.49', '1.56']
 add_option( "internal-boost", "Specify internal boost version to use", 1, True,
-           type='choice', default=boost_choices[1], choices=boost_choices)
+           type='choice', default=boost_choices[0], choices=boost_choices)
 
 add_option( "use-system-boost", "use system version of boost libraries", 0, True )
 
