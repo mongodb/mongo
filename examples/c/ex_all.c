@@ -777,14 +777,15 @@ add_collator(WT_CONNECTION *conn)
 static int
 my_extract(WT_EXTRACTOR *extractor, WT_SESSION *session,
     const WT_ITEM *key, const WT_ITEM *value,
-    WT_ITEM *result)
+    WT_CURSOR *result_cursor, WT_EXTRACTOR_MULTIPLE **emp)
 {
 	/* Unused parameters */
 	(void)extractor;
 	(void)session;
 	(void)key;
+	(void)emp;
 
-	*result = *value;
+	result_cursor->set_key(result_cursor, value);
 	return (0);
 }
 /*! [WT_EXTRACTOR] */
@@ -795,7 +796,7 @@ add_extractor(WT_CONNECTION *conn)
 	int ret;
 
 	/*! [WT_EXTRACTOR register] */
-	static WT_EXTRACTOR my_extractor = {my_extract};
+	static WT_EXTRACTOR my_extractor = {my_extract, NULL};
 
 	ret = conn->add_extractor(conn, "my_extractor", &my_extractor, NULL);
 	/*! [WT_EXTRACTOR register] */
