@@ -187,6 +187,11 @@ namespace {
         getTopoCoord().chooseNewSyncSource(now()++, OpTime(0,0));
         ASSERT_EQUALS(HostAndPort("h2"), getTopoCoord().getSyncSourceAddress());
 
+        // h3 back in SECONDARY and ahead
+        heartbeatFromMember(HostAndPort("h3"), "rs0", MemberState::RS_SECONDARY, OpTime(2,0));
+        getTopoCoord().chooseNewSyncSource(now()++, OpTime(0,0));
+        ASSERT_EQUALS(HostAndPort("h3"), getTopoCoord().getSyncSourceAddress());
+
         // h3 goes down
         downMember(HostAndPort("h3"), "rs0");
         getTopoCoord().chooseNewSyncSource(now()++, OpTime(0,0));
