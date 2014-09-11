@@ -94,7 +94,7 @@ namespace {
         _selfIndex(-1),
         _stepDownUntil(0),
         _maintenanceModeCalls(0),
-        _followerMode(MemberState::RS_SECONDARY)
+        _followerMode(MemberState::RS_STARTUP2)
     {
         invariant(getMemberState() == MemberState::RS_STARTUP);
     }
@@ -1286,6 +1286,14 @@ namespace {
             }
         }
 
+        if (_currentConfig.getNumMembers() == 1 &&
+            _selfIndex == 0 &&
+            _currentConfig.getMemberAt(_selfIndex).isElectable()) {
+
+            // If the new config describes a one-node replica set, we're the one member, and
+            // we're electable, we must be the leader.
+            _role = Role::leader;
+        }
         chooseNewSyncSource(now, lastOpApplied);
     }
 
