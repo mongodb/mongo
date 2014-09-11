@@ -1428,10 +1428,12 @@ namespace {
         args.cfgver = 10;
 
         BSONObjBuilder responseBuilder;
+        Status result = Status(ErrorCodes::InternalError, "status not set by prepareElectResponse");
         startCapturingLogMessages();
-        getTopoCoord().prepareElectResponse(cbData, args, now++, &responseBuilder);
+        getTopoCoord().prepareElectResponse(cbData, args, now++, &responseBuilder, &result);
         stopCapturingLogMessages();
         BSONObj response = responseBuilder.obj();
+        ASSERT_OK(result);
         ASSERT_EQUALS(0, response["vote"].Int());
         ASSERT_EQUALS(round, response["round"].OID());
         ASSERT_EQUALS(1,
@@ -1441,7 +1443,7 @@ namespace {
         // Make sure nay votes, do not prevent subsequent yeas (the way a yea vote would)
         args.set = "rs0";
         BSONObjBuilder responseBuilder2;
-        getTopoCoord().prepareElectResponse(cbData, args, now++, &responseBuilder2);
+        getTopoCoord().prepareElectResponse(cbData, args, now++, &responseBuilder2, &result);
         BSONObj response2 = responseBuilder2.obj();
         ASSERT_EQUALS(1, response2["vote"].Int());
         ASSERT_EQUALS(round, response2["round"].OID());
@@ -1455,10 +1457,12 @@ namespace {
         args.cfgver = 20;
 
         BSONObjBuilder responseBuilder;
+        Status result = Status(ErrorCodes::InternalError, "status not set by prepareElectResponse");
         startCapturingLogMessages();
-        getTopoCoord().prepareElectResponse(cbData, args, now++, &responseBuilder);
+        getTopoCoord().prepareElectResponse(cbData, args, now++, &responseBuilder, &result);
         stopCapturingLogMessages();
         BSONObj response = responseBuilder.obj();
+        ASSERT_OK(result);
         ASSERT_EQUALS(0, response["vote"].Int());
         ASSERT_EQUALS(round, response["round"].OID());
         ASSERT_EQUALS(1,
@@ -1467,7 +1471,7 @@ namespace {
         // Make sure nay votes, do not prevent subsequent yeas (the way a yea vote would)
         args.cfgver = 10;
         BSONObjBuilder responseBuilder2;
-        getTopoCoord().prepareElectResponse(cbData, args, now++, &responseBuilder2);
+        getTopoCoord().prepareElectResponse(cbData, args, now++, &responseBuilder2, &result);
         BSONObj response2 = responseBuilder2.obj();
         ASSERT_EQUALS(1, response2["vote"].Int());
         ASSERT_EQUALS(round, response2["round"].OID());
@@ -1481,10 +1485,12 @@ namespace {
         args.cfgver = 5;
 
         BSONObjBuilder responseBuilder;
+        Status result = Status(ErrorCodes::InternalError, "status not set by prepareElectResponse");
         startCapturingLogMessages();
-        getTopoCoord().prepareElectResponse(cbData, args, now++, &responseBuilder);
+        getTopoCoord().prepareElectResponse(cbData, args, now++, &responseBuilder, &result);
         stopCapturingLogMessages();
         BSONObj response = responseBuilder.obj();
+        ASSERT_OK(result);
         ASSERT_EQUALS(-10000, response["vote"].Int());
         ASSERT_EQUALS(round, response["round"].OID());
         ASSERT_EQUALS(1,
@@ -1493,7 +1499,7 @@ namespace {
         // Make sure nay votes, do not prevent subsequent yeas (the way a yea vote would)
         args.cfgver = 10;
         BSONObjBuilder responseBuilder2;
-        getTopoCoord().prepareElectResponse(cbData, args, now++, &responseBuilder2);
+        getTopoCoord().prepareElectResponse(cbData, args, now++, &responseBuilder2, &result);
         BSONObj response2 = responseBuilder2.obj();
         ASSERT_EQUALS(1, response2["vote"].Int());
         ASSERT_EQUALS(round, response2["round"].OID());
@@ -1508,10 +1514,12 @@ namespace {
         args.whoid = 99;
 
         BSONObjBuilder responseBuilder;
+        Status result = Status(ErrorCodes::InternalError, "status not set by prepareElectResponse");
         startCapturingLogMessages();
-        getTopoCoord().prepareElectResponse(cbData, args, now++, &responseBuilder);
+        getTopoCoord().prepareElectResponse(cbData, args, now++, &responseBuilder, &result);
         stopCapturingLogMessages();
         BSONObj response = responseBuilder.obj();
+        ASSERT_OK(result);
         ASSERT_EQUALS(-10000, response["vote"].Int());
         ASSERT_EQUALS(round, response["round"].OID());
         ASSERT_EQUALS(1, countLogLinesContaining("couldn't find member with id 99"));
@@ -1519,7 +1527,7 @@ namespace {
         // Make sure nay votes, do not prevent subsequent yeas (the way a yea vote would)
         args.whoid = 1;
         BSONObjBuilder responseBuilder2;
-        getTopoCoord().prepareElectResponse(cbData, args, now++, &responseBuilder2);
+        getTopoCoord().prepareElectResponse(cbData, args, now++, &responseBuilder2, &result);
         BSONObj response2 = responseBuilder2.obj();
         ASSERT_EQUALS(1, response2["vote"].Int());
         ASSERT_EQUALS(round, response2["round"].OID());
@@ -1536,10 +1544,12 @@ namespace {
         getTopoCoord()._setCurrentPrimaryForTest(0);
 
         BSONObjBuilder responseBuilder;
+        Status result = Status(ErrorCodes::InternalError, "status not set by prepareElectResponse");
         startCapturingLogMessages();
-        getTopoCoord().prepareElectResponse(cbData, args, now++, &responseBuilder);
+        getTopoCoord().prepareElectResponse(cbData, args, now++, &responseBuilder, &result);
         stopCapturingLogMessages();
         BSONObj response = responseBuilder.obj();
+        ASSERT_OK(result);
         ASSERT_EQUALS(-10000, response["vote"].Int());
         ASSERT_EQUALS(round, response["round"].OID());
         ASSERT_EQUALS(1, countLogLinesContaining("I am already primary"));
@@ -1547,7 +1557,7 @@ namespace {
         // Make sure nay votes, do not prevent subsequent yeas (the way a yea vote would)
         getTopoCoord()._setCurrentPrimaryForTest(-1);
         BSONObjBuilder responseBuilder2;
-        getTopoCoord().prepareElectResponse(cbData, args, now++, &responseBuilder2);
+        getTopoCoord().prepareElectResponse(cbData, args, now++, &responseBuilder2, &result);
         BSONObj response2 = responseBuilder2.obj();
         ASSERT_EQUALS(1, response2["vote"].Int());
         ASSERT_EQUALS(round, response2["round"].OID());
@@ -1563,10 +1573,12 @@ namespace {
         getTopoCoord()._setCurrentPrimaryForTest(2);
 
         BSONObjBuilder responseBuilder;
+        Status result = Status(ErrorCodes::InternalError, "status not set by prepareElectResponse");
         startCapturingLogMessages();
-        getTopoCoord().prepareElectResponse(cbData, args, now++, &responseBuilder);
+        getTopoCoord().prepareElectResponse(cbData, args, now++, &responseBuilder, &result);
         stopCapturingLogMessages();
         BSONObj response = responseBuilder.obj();
+        ASSERT_OK(result);
         ASSERT_EQUALS(-10000, response["vote"].Int());
         ASSERT_EQUALS(round, response["round"].OID());
         ASSERT_EQUALS(1, countLogLinesContaining("h2:27017 is already primary"));
@@ -1574,7 +1586,7 @@ namespace {
         // Make sure nay votes, do not prevent subsequent yeas (the way a yea vote would)
         getTopoCoord()._setCurrentPrimaryForTest(-1);
         BSONObjBuilder responseBuilder2;
-        getTopoCoord().prepareElectResponse(cbData, args, now++, &responseBuilder2);
+        getTopoCoord().prepareElectResponse(cbData, args, now++, &responseBuilder2, &result);
         BSONObj response2 = responseBuilder2.obj();
         ASSERT_EQUALS(1, response2["vote"].Int());
         ASSERT_EQUALS(round, response2["round"].OID());
@@ -1591,10 +1603,12 @@ namespace {
         heartbeatFromMember(HostAndPort("h3"), "rs0", MemberState::RS_SECONDARY, jsTime());
 
         BSONObjBuilder responseBuilder;
+        Status result = Status(ErrorCodes::InternalError, "status not set by prepareElectResponse");
         startCapturingLogMessages();
-        getTopoCoord().prepareElectResponse(cbData, args, now++, &responseBuilder);
+        getTopoCoord().prepareElectResponse(cbData, args, now++, &responseBuilder, &result);
         stopCapturingLogMessages();
         BSONObj response = responseBuilder.obj();
+        ASSERT_OK(result);
         ASSERT_EQUALS(-10000, response["vote"].Int());
         ASSERT_EQUALS(round, response["round"].OID());
         ASSERT_EQUALS(1, countLogLinesContaining("h1:27017 has lower priority than h3:27017"));
@@ -1602,7 +1616,7 @@ namespace {
         // Make sure nay votes, do not prevent subsequent yeas (the way a yea vote would)
         args.whoid = 3;
         BSONObjBuilder responseBuilder2;
-        getTopoCoord().prepareElectResponse(cbData, args, now++, &responseBuilder2);
+        getTopoCoord().prepareElectResponse(cbData, args, now++, &responseBuilder2, &result);
         BSONObj response2 = responseBuilder2.obj();
         ASSERT_EQUALS(1, response2["vote"].Int());
         ASSERT_EQUALS(round, response2["round"].OID());
@@ -1618,10 +1632,12 @@ namespace {
         now = 100;
 
         BSONObjBuilder responseBuilder1;
+        Status result = Status(ErrorCodes::InternalError, "status not set by prepareElectResponse");
         startCapturingLogMessages();
-        getTopoCoord().prepareElectResponse(cbData, args, now++, &responseBuilder1);
+        getTopoCoord().prepareElectResponse(cbData, args, now++, &responseBuilder1, &result);
         stopCapturingLogMessages();
         BSONObj response1 = responseBuilder1.obj();
+        ASSERT_OK(result);
         ASSERT_EQUALS(1, response1["vote"].Int());
         ASSERT_EQUALS(round, response1["round"].OID());
         ASSERT_EQUALS(1, countLogLinesContaining("voting yea for h2:27017 (2)"));
@@ -1631,9 +1647,10 @@ namespace {
 
         BSONObjBuilder responseBuilder2;
         startCapturingLogMessages();
-        getTopoCoord().prepareElectResponse(cbData, args, now++, &responseBuilder2);
+        getTopoCoord().prepareElectResponse(cbData, args, now++, &responseBuilder2, &result);
         stopCapturingLogMessages();
         BSONObj response2 = responseBuilder2.obj();
+        ASSERT_OK(result);
         ASSERT_EQUALS(0, response2["vote"].Int());
         ASSERT_EQUALS(round, response2["round"].OID());
         ASSERT_EQUALS(1, countLogLinesContaining("voting no for h3:27017; "
@@ -1644,9 +1661,10 @@ namespace {
 
         BSONObjBuilder responseBuilder3;
         startCapturingLogMessages();
-        getTopoCoord().prepareElectResponse(cbData, args, now++, &responseBuilder3);
+        getTopoCoord().prepareElectResponse(cbData, args, now++, &responseBuilder3, &result);
         stopCapturingLogMessages();
         BSONObj response3 = responseBuilder3.obj();
+        ASSERT_OK(result);
         ASSERT_EQUALS(1, response3["vote"].Int());
         ASSERT_EQUALS(round, response3["round"].OID());
         ASSERT_EQUALS(1, countLogLinesContaining("voting yea for h3:27017 (3)"));
@@ -1774,9 +1792,9 @@ namespace {
     TEST_F(ShutdownInProgressTest, ShutDownInProgressWhenCallbackCanceledElectCmd) {
         Status result = Status::OK();
         BSONObjBuilder response;
-        getTopoCoord().prepareFreshResponse(cbData(),
-                                            ReplicationCoordinator::ReplSetFreshArgs(),
-                                            OpTime(0,0),
+        getTopoCoord().prepareElectResponse(cbData(),
+                                            ReplicationCoordinator::ReplSetElectArgs(),
+                                            Date_t(0),
                                             &response,
                                             &result);
         ASSERT_EQUALS(ErrorCodes::ShutdownInProgress, result);
@@ -1785,24 +1803,28 @@ namespace {
 
     TEST_F(ShutdownInProgressTest, ShutDownInProgressWhenCallbackCanceledHeartbeat) {
         Status result = Status::OK();
-        BSONObjBuilder response;
-        getTopoCoord().prepareFreshResponse(cbData(),
-                                            ReplicationCoordinator::ReplSetFreshArgs(),
-                                            OpTime(0,0),
-                                            &response,
-                                            &result);
+        ReplSetHeartbeatResponse response;
+        getTopoCoord().prepareHeartbeatResponse(cbData(),
+                                                Date_t(0),
+                                                ReplSetHeartbeatArgs(),
+                                                "",
+                                                OpTime(0,0),
+                                                &response,
+                                                &result);
         ASSERT_EQUALS(ErrorCodes::ShutdownInProgress, result);
-        ASSERT_TRUE(response.obj().isEmpty());
+        // hbmsg is always present in ReplSetHeartbeatArgs, but nothing else should be populated
+        ASSERT_EQUALS(1, response.toBSON().nFields());
     }
 
     TEST_F(ShutdownInProgressTest, ShutDownInProgressWhenCallbackCanceledStatus) {
         Status result = Status::OK();
         BSONObjBuilder response;
-        getTopoCoord().prepareFreshResponse(cbData(),
-                                            ReplicationCoordinator::ReplSetFreshArgs(),
-                                            OpTime(0,0),
-                                            &response,
-                                            &result);
+        getTopoCoord().prepareStatusResponse(cbData(),
+                                             Date_t(0),
+                                             0,
+                                             OpTime(0,0),
+                                             &response,
+                                             &result);
         ASSERT_EQUALS(ErrorCodes::ShutdownInProgress, result);
         ASSERT_TRUE(response.obj().isEmpty());
     }
@@ -1810,14 +1832,13 @@ namespace {
     TEST_F(ShutdownInProgressTest, ShutDownInProgressWhenCallbackCanceledFreeze) {
         Status result = Status::OK();
         BSONObjBuilder response;
-        getTopoCoord().prepareFreshResponse(cbData(),
-                                            ReplicationCoordinator::ReplSetFreshArgs(),
-                                            OpTime(0,0),
-                                            &response,
-                                            &result);
+        getTopoCoord().prepareFreezeResponse(cbData(),
+                                             Date_t(0),
+                                             0,
+                                             &response,
+                                             &result);
         ASSERT_EQUALS(ErrorCodes::ShutdownInProgress, result);
         ASSERT_TRUE(response.obj().isEmpty());
-
     }
 
 }  // namespace

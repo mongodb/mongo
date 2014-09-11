@@ -458,7 +458,13 @@ namespace {
             const ReplicationExecutor::CallbackData& data,
             const ReplicationCoordinator::ReplSetElectArgs& args,
             const Date_t now,
-            BSONObjBuilder* response) {
+            BSONObjBuilder* response,
+            Status* result) {
+
+        if (data.status == ErrorCodes::CallbackCanceled) {
+            *result = Status(ErrorCodes::ShutdownInProgress, "replication system is shutting down");
+            return;
+        }
 
         const long long myver = _currentConfig.getConfigVersion();
         const int highestPriorityIndex = _getHighestPriorityElectableIndex();
@@ -525,6 +531,7 @@ namespace {
 
         response->append("vote", vote);
         response->append("round", args.round);
+        *result = Status::OK();
     }
 
     // produce a reply to a heartbeat

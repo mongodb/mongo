@@ -146,7 +146,8 @@ namespace repl {
         virtual void prepareElectResponse(const ReplicationExecutor::CallbackData& data,
                                           const ReplicationCoordinator::ReplSetElectArgs& args,
                                           const Date_t now,
-                                          BSONObjBuilder* response);
+                                          BSONObjBuilder* response,
+                                          Status* result);
         virtual void prepareHeartbeatResponse(const ReplicationExecutor::CallbackData& data,
                                               Date_t now,
                                               const ReplSetHeartbeatArgs& args,

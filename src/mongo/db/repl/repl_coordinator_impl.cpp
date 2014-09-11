@@ -1173,19 +1173,21 @@ namespace {
 
     Status ReplicationCoordinatorImpl::processReplSetElect(const ReplSetElectArgs& args,
                                                            BSONObjBuilder* resultObj) {
+        Status result = Status(ErrorCodes::InternalError, "status not set by callback");
         CBHStatus cbh = _replExecutor.scheduleWork(
                 stdx::bind(&TopologyCoordinator::prepareElectResponse,
                            _topCoord.get(),
                            stdx::placeholders::_1,
                            args,
                            _replExecutor.now(),
-                           resultObj));
+                           resultObj,
+                           &result));
         if (cbh.getStatus() == ErrorCodes::ShutdownInProgress) {
             return Status(ErrorCodes::ShutdownInProgress, "replication shutdown in progress");
         }
         fassert(18657, cbh.getStatus());
         _replExecutor.wait(cbh.getValue());
-        return Status::OK();
+        return result;
     }
 
     void ReplicationCoordinatorImpl::_setCurrentRSConfig(
