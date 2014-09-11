@@ -383,9 +383,7 @@ namespace repl {
 
     Status HybridReplicationCoordinator::checkIfWriteConcernCanBeSatisfied(
             const WriteConcernOptions& writeConcern) const {
-        Status legacyStatus = _legacy.checkIfWriteConcernCanBeSatisfied(writeConcern);
-        Status implStatus = _impl.checkIfWriteConcernCanBeSatisfied(writeConcern);
-        return legacyStatus;
+        return _impl.checkIfWriteConcernCanBeSatisfied(writeConcern);
     }
 
     BSONObj HybridReplicationCoordinator::getGetLastErrorDefault() {

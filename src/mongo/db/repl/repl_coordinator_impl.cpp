@@ -1251,16 +1251,22 @@ namespace {
 
     Status ReplicationCoordinatorImpl::_checkIfWriteConcernCanBeSatisfied_inlock(
                 const WriteConcernOptions& writeConcern) const {
-        // TODO Finish implementing this
-
-        if (!writeConcern.wMode.empty() && writeConcern.wMode != "majority") {
-            StatusWith<ReplicaSetTagPattern> tagPatternStatus =
-                    _rsConfig.findCustomWriteMode(writeConcern.wMode);
-            if (!tagPatternStatus.isOK()) {
-                return tagPatternStatus.getStatus();
-            }
+        if (_getReplicationMode_inlock() == modeNone) {
+            return Status(ErrorCodes::NoReplicationEnabled,
+                          "No replication enabled when checking if write concern can be satisfied");
         }
-        return Status::OK();
+
+        if (_getReplicationMode_inlock() == modeMasterSlave) {
+            if (!writeConcern.wMode.empty()) {
+                return Status(ErrorCodes::UnknownReplWriteConcern,
+                              "Cannot used named write concern modes in master-slave");
+            }
+            // No way to know how many slaves there are, so assume any numeric mode is possible.
+            return Status::OK();
+        }
+
+        invariant(_getReplicationMode_inlock() == modeReplSet);
+        return _rsConfig.checkIfWriteConcernCanBeSatisfied(writeConcern);
     }
 
     BSONObj ReplicationCoordinatorImpl::getGetLastErrorDefault() {

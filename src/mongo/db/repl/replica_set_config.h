@@ -80,6 +80,16 @@ namespace repl {
         Status validate() const;
 
         /**
+         * Checks if this configuration can satisfy the given write concern.
+         *
+         * Things that are taken into consideration include:
+         * 1. If the set has enough data-bearing members.
+         * 2. If the write concern mode exists.
+         * 3. If there are enough members for the write concern mode specified.
+         */
+        Status checkIfWriteConcernCanBeSatisfied(const WriteConcernOptions& writeConcern) const;
+
+        /**
          * Gets the version of this configuration.
          *
          * The version number sequences configurations of the replica set, so that

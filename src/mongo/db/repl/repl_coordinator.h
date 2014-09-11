@@ -208,9 +208,9 @@ namespace repl {
          * Checks if the current replica set configuration can satisfy the given write concern.
          *
          * Things that are taken into consideration include:
-         * 1. If the set has enough members.
-         * 2. If the tag exists.
-         * 3. If there are enough members for the tag specified.
+         * 1. If the set has enough data-bearing members.
+         * 2. If the write concern mode exists.
+         * 3. If there are enough members for the write concern mode specified.
          */
         virtual Status checkIfWriteConcernCanBeSatisfied(
                 const WriteConcernOptions& writeConcern) const = 0;

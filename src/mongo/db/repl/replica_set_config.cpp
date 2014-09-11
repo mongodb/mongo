@@ -345,6 +345,45 @@ namespace {
         return Status::OK();
     }
 
+    Status ReplicaSetConfig::checkIfWriteConcernCanBeSatisfied(
+            const WriteConcernOptions& writeConcern) const {
+        if (!writeConcern.wMode.empty() && writeConcern.wMode != "majority") {
+            StatusWith<ReplicaSetTagPattern> tagPatternStatus =
+                    findCustomWriteMode(writeConcern.wMode);
+            if (!tagPatternStatus.isOK()) {
+                return tagPatternStatus.getStatus();
+            }
+
+            ReplicaSetTagMatch matcher(tagPatternStatus.getValue());
+            for (size_t j = 0; j < _members.size(); ++j) {
+                const MemberConfig& memberConfig = _members[j];
+                for (MemberConfig::TagIterator it = memberConfig.tagsBegin();
+                        it != memberConfig.tagsEnd(); ++it) {
+                    if (matcher.update(*it)) {
+                        return Status::OK();
+                    }
+                }
+            }
+            // Even if all the nodes in the set had a given write it still would not satisfy this
+            // write concern mode.
+            return Status(ErrorCodes::CannotSatisfyWriteConcern,
+                          str::stream() << "Not enough nodes match write concern mode \""
+                                        << writeConcern.wMode << "\"");
+        }
+        else {
+            int nodesRemaining = writeConcern.wNumNodes;
+            for (size_t j = 0; j < _members.size(); ++j) {
+                if (!_members[j].isArbiter()) { // Only count data-bearing nodes
+                    --nodesRemaining;
+                    if (nodesRemaining <= 0) {
+                        return Status::OK();
+                    }
+                }
+            }
+            return Status(ErrorCodes::CannotSatisfyWriteConcern, "Not enough data-bearing nodes");
+        }
+    }
+
     const MemberConfig& ReplicaSetConfig::getMemberAt(size_t i) const { 
         invariant(i < _members.size());
         return _members[i]; 
