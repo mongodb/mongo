@@ -216,27 +216,18 @@ __wt_async_stats_update(WT_SESSION_IMPL *session)
 }
 
 /*
- * __wt_async_create --
- *	Start the async subsystem and worker threads.
+ * __async_start --
+ *	Start the async subsystem.  All configuration processing has
+ *	already been done by the caller.
  */
-int
-__wt_async_create(WT_SESSION_IMPL *session, const char *cfg[])
+static int
+__async_start(WT_SESSION_IMPL *session)
 {
 	WT_ASYNC *async;
 	WT_CONNECTION_IMPL *conn;
-	int run;
 	uint32_t i;
 
 	conn = S2C(session);
-
-	/* Handle configuration. */
-	run = 0;
-	WT_RET(__async_config(session, conn, cfg, &run));
-
-	/* If async is not configured, we're done. */
-	if (!run)
-		return (0);
-
 	conn->async_cfg = 1;
 	/*
 	 * Async is on, allocate the WT_ASYNC structure and initialize the ops.
@@ -273,6 +264,28 @@ __wt_async_create(WT_SESSION_IMPL *session, const char *cfg[])
 	}
 	__wt_async_stats_update(session);
 	return (0);
+}
+
+/*
+ * __wt_async_create --
+ *	Start the async subsystem and worker threads.
+ */
+int
+__wt_async_create(WT_SESSION_IMPL *session, const char *cfg[])
+{
+	WT_CONNECTION_IMPL *conn;
+	int run;
+
+	conn = S2C(session);
+
+	/* Handle configuration. */
+	run = 0;
+	WT_RET(__async_config(session, conn, cfg, &run));
+
+	/* If async is not configured, we're done. */
+	if (!run)
+		return (0);
+	return (__async_start(session));
 }
 
 /*
@@ -329,7 +342,7 @@ __wt_async_reconfig(WT_SESSION_IMPL *session, const char *cfg[])
 		return (ret);
 	} else if (conn->async_cfg == 0 && run)
 		/* Case 2 */
-		return (__wt_async_create(session, cfg));
+		return (__async_start(session));
 	else if (conn->async_cfg == 0)
 		/* Case 3 */
 		return (0);
