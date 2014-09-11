@@ -17,7 +17,6 @@ __wt_cache_config(WT_SESSION_IMPL *session, const char *cfg[])
 	WT_CACHE *cache;
 	WT_CONFIG_ITEM cval;
 	WT_CONNECTION_IMPL *conn;
-	WT_DECL_RET;
 
 	conn = S2C(session);
 	cache = conn->cache;
@@ -26,18 +25,17 @@ __wt_cache_config(WT_SESSION_IMPL *session, const char *cfg[])
 	 * If not using a shared cache configure the cache size, otherwise
 	 * check for a reserved size.
 	 */
-	if (!F_ISSET(conn, WT_CONN_CACHE_POOL) &&
-	    (ret = __wt_config_gets(session, cfg, "cache_size", &cval)) == 0)
+	if (!F_ISSET(conn, WT_CONN_CACHE_POOL)) {
+		WT_RET(__wt_config_gets(session, cfg, "cache_size", &cval));
 		conn->cache_size = (uint64_t)cval.val;
-
-	if (F_ISSET(conn, WT_CONN_CACHE_POOL) &&
-	    (ret = __wt_config_gets(session, cfg,
-	    "shared_cache.reserve", &cval)) == 0 && cval.val != 0)
+	} else {
+		WT_RET(__wt_config_gets(
+		    session, cfg, "shared_cache.reserve", &cval));
+		if (cval.val == 0)
+			WT_RET(__wt_config_gets(
+			    session, cfg, "shared_cache.chunk", &cval));
 		cache->cp_reserved = (uint64_t)cval.val;
-	else if ((ret = __wt_config_gets(session, cfg,
-	    "shared_cache.chunk", &cval)) == 0)
-		cache->cp_reserved = (uint64_t)cval.val;
-	WT_RET_NOTFOUND_OK(ret);
+	}
 
 	WT_RET(__wt_config_gets(session, cfg, "eviction_target", &cval));
 	cache->eviction_target = (u_int)cval.val;
