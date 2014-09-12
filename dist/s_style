@@ -16,10 +16,10 @@ for f in `find examples ext src test -name '*.[ci]'`; do
 	    -e 's/\n/ /g' \
 	    -e p \
 	    -e '{s/.*//;x;}' |
-	egrep '(WT_ERR|WT_ERR_MSG|WT_ERR_NOTFOUND_OK|WT_ERR_TEST|WT_ILLEGAL_VALUE_ERR|WT_VERBOSE_ERR)\(.*(WT_ASSERT_RET|WT_ILLEGAL_VALUE|WT_RET|WT_RET_MSG|WT_RET_NOTFOUND_OK|WT_RET_TEST|WT_VERBOSE_RET|WT_VERBOSE_RETVAL)\(.*err:' |
+	egrep '(WT_ERR|WT_ERR_MSG|WT_ERR_NOTFOUND_OK|WT_ERR_TEST|WT_ILLEGAL_VALUE_ERR)\(.*(WT_ASSERT_RET|WT_ILLEGAL_VALUE|WT_RET|WT_RET_MSG|WT_RET_NOTFOUND_OK|WT_RET_TEST|WT_VERBOSE_RET|WT_VERBOSE_RETVAL)\(.*err:|[^a-z_]err:.*(WT_ERR|WT_ERR_MSG|WT_ERR_NOTFOUND_OK|WT_ERR_TEST|WT_ILLEGAL_VALUE_ERR)\(' |
 	    sed 's/:.*//' > $t
 	test -s $t && {
-		echo "$f: function with return after a jump to an error label"
+		echo "$f: return after a jump to the error label or a jump to the error label after the error label"
 		sed 's/^/function @ line:/' < $t
 	}
 done
