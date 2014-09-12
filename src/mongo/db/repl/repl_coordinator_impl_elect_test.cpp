@@ -195,7 +195,7 @@ namespace {
     }
 
     TEST_F(ReplCoordElectTest, ElectNotEnoughVotes) {
-        // one responds with -10000 vote and we are not elected
+        // one responds with -10000 votes, and one doesn't respond, and we are not elected
         startCapturingLogMessages();
         BSONObj configObj = BSON("_id" << "mySet" <<
                                  "version" << 1 <<
@@ -219,17 +219,10 @@ namespace {
                                                        "vote" << -10000 <<
                                                        "round" << kFirstRound)));
 
-        getNet()->addResponse(RemoteCommandRequest(HostAndPort("node3:12345"),
-                                                   "admin",
-                                                   electRequest),
-                              StatusWith<BSONObj>(BSON("ok" << 1 <<
-                                                       "vote" << 1 <<
-                                                       "round" << kFirstRound)));
-
         getReplCoord()->testElection();
         stopCapturingLogMessages();
         ASSERT_EQUALS(1,
-                countLogLinesContaining("replSet couldn't elect self, only received -9998 votes"));
+                countLogLinesContaining("replSet couldn't elect self, only received -9999 votes"));
     }
 
     TEST_F(ReplCoordElectTest, ElectWrongTypeForVote) {

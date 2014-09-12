@@ -169,15 +169,18 @@ namespace repl {
             return;
         }
 
-        StatusWith<ReplicationExecutor::EventHandle> nextPhaseEvh = cbData.executor->makeEvent();
-        if (nextPhaseEvh.getStatus() == ErrorCodes::ShutdownInProgress) { 
+        _electCmdRunner.reset(new ElectCmdRunner);
+        StatusWith<ReplicationExecutor::EventHandle> nextPhaseEvh = _electCmdRunner->start(
+                cbData.executor,
+                _rsConfig,
+                _thisMembersConfigIndex,
+                _topCoord->getMaybeUpHostAndPorts());
+        if (nextPhaseEvh.getStatus() == ErrorCodes::ShutdownInProgress) {
             return;
-        } 
+        }
         fassert(18685, nextPhaseEvh.getStatus());
 
-
-        _electCmdRunner.reset(new ElectCmdRunner);
-        StatusWith<ReplicationExecutor::CallbackHandle> finishCheckCallback = 
+        StatusWith<ReplicationExecutor::CallbackHandle> finishCheckCallback =
             cbData.executor->onEvent(
                 nextPhaseEvh.getValue(),
                 stdx::bind(&ReplicationCoordinatorImpl::_onElectCmdRunnerComplete,
@@ -188,16 +191,6 @@ namespace repl {
             return;
         }
         fassert(18671, finishCheckCallback.getStatus());
-
-        Status electionCompleteStatus = _electCmdRunner->start(cbData.executor, 
-                                                               nextPhaseEvh.getValue(), 
-                                                               _rsConfig, 
-                                                               _thisMembersConfigIndex,
-                                                               _topCoord->getMaybeUpHostAndPorts());
-        if (electionCompleteStatus == ErrorCodes::ShutdownInProgress) { 
-            return;
-        } 
-        fassert(18686, electionCompleteStatus);
 
         freshnessCheckerDeleter.Dismiss();
         finishEvhGuard.Dismiss();
@@ -222,11 +215,12 @@ namespace repl {
 
         int receivedVotes = _electCmdRunner->getReceivedVotes();
 
-        if (receivedVotes * 2 <= _rsConfig.getMajorityVoteCount()) {
-            log() << "replSet couldn't elect self, only received " << receivedVotes << " votes";
+        if (receivedVotes < _rsConfig.getMajorityVoteCount()) {
+            log() << "replSet couldn't elect self, only received " << receivedVotes <<
+                " votes, but needed at least " << _rsConfig.getMajorityVoteCount();
             return;
         }
-        
+
         if (_rsConfig.getConfigVersion() != _freshnessChecker->getOriginalConfigVersion()) {
             log() << "replSet config version changed during our election, ignoring result";
             return;

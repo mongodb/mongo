@@ -28,10 +28,13 @@
 
 #pragma once
 
+#include <boost/scoped_ptr.hpp>
 #include <vector>
 
 #include "mongo/base/disallow_copying.h"
+#include "mongo/db/repl/replica_set_config.h"
 #include "mongo/db/repl/replication_executor.h"
+#include "mongo/db/repl/scatter_gather_algorithm.h"
 
 namespace mongo {
 
@@ -40,57 +43,67 @@ namespace mongo {
 namespace repl {
 
     class ReplicaSetConfig;
-    class MemberHeartbeatData;
+    class ScatterGatherRunner;
 
     class ElectCmdRunner {
         MONGO_DISALLOW_COPYING(ElectCmdRunner);
     public:
+        class Algorithm : public ScatterGatherAlgorithm {
+        public:
+            Algorithm(const ReplicaSetConfig& rsConfig,
+                      int selfIndex,
+                      const std::vector<HostAndPort>& targets,
+                      long long round);
+
+            virtual ~Algorithm();
+            virtual std::vector<ReplicationExecutor::RemoteCommandRequest> getRequests() const;
+            virtual void processResponse(
+                    const ReplicationExecutor::RemoteCommandRequest& request,
+                    const ResponseStatus& response);
+            virtual bool hasReceivedSufficientResponses() const;
+
+            int getReceivedVotes() const { return _receivedVotes; }
+
+        private:
+            // Tally of the number of received votes for this election.
+            int _receivedVotes;
+
+            // Number of responses received so far.
+            size_t _actualResponses;
+
+            bool _sufficientResponsesReceived;
+
+            const ReplicaSetConfig _rsConfig;
+            const int _selfIndex;
+            const std::vector<HostAndPort> _targets;
+            const long long _round;
+        };
+
         ElectCmdRunner();
+        ~ElectCmdRunner();
 
         /**
          * Begins the process of sending replSetElect commands to all non-DOWN nodes
          * in currentConfig.
-         * evh can be used to schedule a callback when the process is complete.
-         * evh is guaranteed to be signaled if and only if this function returns Status::OK().
-         **/
-        Status start(
+         *
+         * Returned handle can be used to schedule a callback when the process is complete.
+         */
+        StatusWith<ReplicationExecutor::EventHandle> start(
             ReplicationExecutor* executor,
-            const ReplicationExecutor::EventHandle& evh,
             const ReplicaSetConfig& currentConfig,
             int selfIndex,
-            const std::vector<HostAndPort>& hosts);
+            const std::vector<HostAndPort>& targets);
 
         /**
          * Returns the number of received votes.  Only valid to call after
-         * the event handle supplied to start() has been signaled, which guarantees that
-         * _receivedVotes will no longer be touched by callbacks.
+         * the event handle returned from start() has been signaled, which guarantees that
+         * the vote count will no longer be touched by callbacks.
          */
         int getReceivedVotes() const;
 
     private:
-        /**
-         * Callback that runs after a replSetElect command returns.
-         * Increments the _receivedVotes counter appropriately, and 
-         * signals completion if we have received the last expected response.
-         */
-        void _onReplSetElectResponse(const ReplicationExecutor::RemoteCommandCallbackData& cbData);
-
-        /**
-         * Signals _sufficientResponsesReceived event, if it hasn't been already.
-         */
-        void _signalSufficientResponsesReceived(ReplicationExecutor* executor);
-
-        // Event used to signal completion of the ElectCmdRunner's commands.
-        ReplicationExecutor::EventHandle _sufficientResponsesReceived;
-
-        // Vector of command callbacks scheduled by start().
-        std::vector<ReplicationExecutor::CallbackHandle> _responseCallbacks;
-
-        // Tally of the number of received votes for this election.
-        int _receivedVotes;
-
-        // Number of responses received so far.
-        size_t _actualResponses;
+        boost::scoped_ptr<Algorithm> _algorithm;
+        boost::scoped_ptr<ScatterGatherRunner> _runner;
     };
 
 }

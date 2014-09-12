@@ -49,25 +49,26 @@ namespace {
 
     class ElectCmdRunnerTest : public mongo::unittest::Test {
     public:
-        ElectCmdRunnerTest();
+        void doTest(ElectCmdRunner* electCmdRunner,
+                    const ReplicaSetConfig& currentConfig,
+                    int selfIndex,
+                    const std::vector<HostAndPort>& hosts);
+
         void electCmdRunnerRunner(const ReplicationExecutor::CallbackData& data,
                                   ElectCmdRunner* electCmdRunner,
-                                  const ReplicationExecutor::EventHandle& evh,
+                                  StatusWith<ReplicationExecutor::EventHandle>* evh,
                                   const ReplicaSetConfig& currentConfig,
                                   int selfIndex,
                                   const std::vector<HostAndPort>& hosts);
-    protected:
+
         NetworkInterfaceMockWithMap* _net;
         boost::scoped_ptr<ReplicationExecutor> _executor;
         boost::scoped_ptr<boost::thread> _executorThread;
-        Status _lastStatus;
 
     private:
         void setUp();
         void tearDown();
     };
-
-    ElectCmdRunnerTest::ElectCmdRunnerTest() : _lastStatus(Status::OK()) {}
 
     void ElectCmdRunnerTest::setUp() {
         _net = new NetworkInterfaceMockWithMap;
@@ -103,72 +104,67 @@ namespace {
     // This is necessary because the run method must be scheduled in the Replication Executor
     // for correct concurrency operation.
     void ElectCmdRunnerTest::electCmdRunnerRunner(
-        const ReplicationExecutor::CallbackData& data,
-        ElectCmdRunner* electCmdRunner,
-        const ReplicationExecutor::EventHandle& evh,
-        const ReplicaSetConfig& currentConfig,
-        int selfIndex,
-        const std::vector<HostAndPort>& hosts) {
+            const ReplicationExecutor::CallbackData& data,
+            ElectCmdRunner* electCmdRunner,
+            StatusWith<ReplicationExecutor::EventHandle>* evh,
+            const ReplicaSetConfig& currentConfig,
+            int selfIndex,
+            const std::vector<HostAndPort>& hosts) {
+
         invariant(data.status.isOK());
-        _lastStatus = electCmdRunner->start(data.executor, 
-                                            evh, 
-                                            currentConfig, 
-                                            selfIndex, 
-                                            hosts);
+        *evh = electCmdRunner->start(
+                data.executor,
+                currentConfig,
+                selfIndex,
+                hosts);
     }
 
-    TEST_F(ElectCmdRunnerTest, OneNode) {
-        // Only one node in the config.
-        ReplicaSetConfig config = assertMakeRSConfig(
-            BSON("_id" << "rs0" <<
-                 "version" << 1 <<
-                 "members" << BSON_ARRAY(
-                     BSON("_id" << 1 << "host" << "h1"))));
-        
-        StatusWith<ReplicationExecutor::EventHandle> evh = _executor->makeEvent();
-        ASSERT_OK(evh.getStatus());
+    void ElectCmdRunnerTest::doTest(ElectCmdRunner* electCmdRunner,
+                                    const ReplicaSetConfig& currentConfig,
+                                    int selfIndex,
+                                    const std::vector<HostAndPort>& hosts) {
 
-        Date_t now(0);
-        std::vector<HostAndPort> hosts;
-        hosts.push_back(config.getMemberAt(0).getHostAndPort());
-
-        ElectCmdRunner electCmdRunner;
-        
-        StatusWith<ReplicationExecutor::CallbackHandle> cbh = 
+        StatusWith<ReplicationExecutor::EventHandle> evh(ErrorCodes::InternalError, "Not set");
+        StatusWith<ReplicationExecutor::CallbackHandle> cbh =
             _executor->scheduleWork(
                 stdx::bind(&ElectCmdRunnerTest::electCmdRunnerRunner,
                            this,
                            stdx::placeholders::_1,
-                           &electCmdRunner,
-                           evh.getValue(),
-                           config,
-                           0,
+                           electCmdRunner,
+                           &evh,
+                           currentConfig,
+                           selfIndex,
                            hosts));
         ASSERT_OK(cbh.getStatus());
         _executor->wait(cbh.getValue());
-
-        ASSERT_OK(_lastStatus);
-
+        ASSERT_OK(evh.getStatus());
         _executor->waitForEvent(evh.getValue());
+    }
 
-        ASSERT_EQUALS(electCmdRunner.getReceivedVotes(), 1);        
+    TEST_F(ElectCmdRunnerTest, OneNode) {
+        // Only one node in the config.
+        const ReplicaSetConfig config = assertMakeRSConfig(
+            BSON("_id" << "rs0" <<
+                 "version" << 1 <<
+                 "members" << BSON_ARRAY(
+                     BSON("_id" << 1 << "host" << "h1"))));
+
+        std::vector<HostAndPort> hosts;
+        ElectCmdRunner electCmdRunner;
+        doTest(&electCmdRunner, config, 0, hosts);
+        ASSERT_EQUALS(electCmdRunner.getReceivedVotes(), 1);
     }
 
     TEST_F(ElectCmdRunnerTest, TwoNodes) {
         // Two nodes, we are node h1.
-        ReplicaSetConfig config = assertMakeRSConfig(
+        const ReplicaSetConfig config = assertMakeRSConfig(
             BSON("_id" << "rs0" <<
                  "version" << 1 <<
                  "members" << BSON_ARRAY(
                      BSON("_id" << 1 << "host" << "h0") <<
                      BSON("_id" << 2 << "host" << "h1"))));
-        
-        StatusWith<ReplicationExecutor::EventHandle> evh = _executor->makeEvent();
-        ASSERT_OK(evh.getStatus());
 
-        Date_t now(0);
         std::vector<HostAndPort> hosts;
-        hosts.push_back(config.getMemberAt(0).getHostAndPort());
         hosts.push_back(config.getMemberAt(1).getHostAndPort());
 
         const BSONObj electRequest = makeElectRequest(config, 0);
@@ -181,24 +177,8 @@ namespace {
                                                    "round" << 380865962699346850ll)));
 
         ElectCmdRunner electCmdRunner;
-        StatusWith<ReplicationExecutor::CallbackHandle> cbh = 
-            _executor->scheduleWork(
-                stdx::bind(&ElectCmdRunnerTest::electCmdRunnerRunner,
-                           this,
-                           stdx::placeholders::_1,
-                           &electCmdRunner,
-                           evh.getValue(),
-                           config,
-                           0,
-                           hosts));
-        ASSERT_OK(cbh.getStatus());
-        _executor->wait(cbh.getValue());
-
-        ASSERT_OK(_lastStatus);
-
-        _executor->waitForEvent(evh.getValue());
+        doTest(&electCmdRunner, config, 0, hosts);
         ASSERT_EQUALS(electCmdRunner.getReceivedVotes(), 2);
-        
     }
 
 
@@ -210,13 +190,8 @@ namespace {
                  "members" << BSON_ARRAY(
                      BSON("_id" << 1 << "host" << "h0") <<
                      BSON("_id" << 2 << "host" << "h1"))));
-        
-        StatusWith<ReplicationExecutor::EventHandle> evh = _executor->makeEvent();
-        ASSERT_OK(evh.getStatus());
 
-        Date_t now(0);
         std::vector<HostAndPort> hosts;
-        hosts.push_back(config.getMemberAt(0).getHostAndPort());
         hosts.push_back(config.getMemberAt(1).getHostAndPort());
 
         const BSONObj electRequest = makeElectRequest(config, 0);
@@ -229,29 +204,25 @@ namespace {
                           true /* isBlocked */);
 
         ElectCmdRunner electCmdRunner;
-        StatusWith<ReplicationExecutor::CallbackHandle> cbh = 
+        StatusWith<ReplicationExecutor::EventHandle> evh(ErrorCodes::InternalError, "Not set");
+        StatusWith<ReplicationExecutor::CallbackHandle> cbh =
             _executor->scheduleWork(
                 stdx::bind(&ElectCmdRunnerTest::electCmdRunnerRunner,
                            this,
                            stdx::placeholders::_1,
                            &electCmdRunner,
-                           evh.getValue(),
+                           &evh,
                            config,
                            0,
                            hosts));
         ASSERT_OK(cbh.getStatus());
-
         _executor->wait(cbh.getValue());
-        ASSERT_OK(_lastStatus);
-
+        ASSERT_OK(evh.getStatus());
         _executor->shutdown();
         _net->unblockAll();
         _executor->waitForEvent(evh.getValue());
-
         ASSERT_EQUALS(electCmdRunner.getReceivedVotes(), 1);
-
     }
-
 
 }  // namespace
 }  // namespace repl
