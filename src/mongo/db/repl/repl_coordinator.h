@@ -442,10 +442,9 @@ namespace repl {
         virtual bool buildsIndexes() = 0;
 
         /**
-         * Returns a vector containing BSONObjs describing each member that has applied operation
-         * at OpTime 'op'.
+         * Returns a vector of members that have applied the operation with OpTime 'op'.
          */
-        virtual std::vector<BSONObj> getHostsWrittenTo(const OpTime& op) = 0;
+        virtual std::vector<HostAndPort> getHostsWrittenTo(const OpTime& op) = 0;
 
         /**
          * Returns a BSONObj containing a representation of the current default write concern.

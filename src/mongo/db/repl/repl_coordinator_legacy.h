@@ -149,7 +149,7 @@ namespace repl {
 
         virtual bool buildsIndexes();
 
-        virtual std::vector<BSONObj> getHostsWrittenTo(const OpTime& op);
+        virtual std::vector<HostAndPort> getHostsWrittenTo(const OpTime& op);
 
         virtual BSONObj getGetLastErrorDefault();
 

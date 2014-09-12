@@ -105,10 +105,15 @@ namespace mongo {
         if ( wTimedOut )
             result->appendBool( "wtimeout", true );
 
-        if ( writtenTo.size() )
-            result->append( "writtenTo", writtenTo );
-        else
+        if (writtenTo.size()) {
+            BSONArrayBuilder hosts(result->subarrayStart("writtenTo"));
+            for (size_t i = 0; i < writtenTo.size(); ++i) {
+                hosts.append(writtenTo[i].toString());
+            }
+        }
+        else {
             result->appendNull( "writtenTo" );
+        }
 
         if ( err.empty() )
             result->appendNull( "err" );

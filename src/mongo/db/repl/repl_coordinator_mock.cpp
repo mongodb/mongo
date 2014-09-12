@@ -230,9 +230,8 @@ namespace repl {
         return false;
     }
 
-    std::vector<BSONObj> ReplicationCoordinatorMock::getHostsWrittenTo(const OpTime& op) {
-        // TODO
-        return std::vector<BSONObj>();
+    std::vector<HostAndPort> ReplicationCoordinatorMock::getHostsWrittenTo(const OpTime& op) {
+        return std::vector<HostAndPort>();
     }
 
     Status ReplicationCoordinatorMock::checkIfWriteConcernCanBeSatisfied(

@@ -376,10 +376,9 @@ namespace repl {
         return legacyResponse;
     }
 
-    vector<BSONObj> HybridReplicationCoordinator::getHostsWrittenTo(const OpTime& op) {
-        vector<BSONObj> legacyResponse = _legacy.getHostsWrittenTo(op);
-        vector<BSONObj> implResponse = _impl.getHostsWrittenTo(op);
-        return legacyResponse;
+    vector<HostAndPort> HybridReplicationCoordinator::getHostsWrittenTo(const OpTime& op) {
+        vector<HostAndPort> implResponse = _impl.getHostsWrittenTo(op);
+        return implResponse;
     }
 
     Status HybridReplicationCoordinator::checkIfWriteConcernCanBeSatisfied(

@@ -1215,9 +1215,32 @@ namespace {
         return self.shouldBuildIndexes();
     }
 
-    std::vector<BSONObj> ReplicationCoordinatorImpl::getHostsWrittenTo(const OpTime& op) {
-        // TODO
-        return std::vector<BSONObj>();
+    std::vector<HostAndPort> ReplicationCoordinatorImpl::getHostsWrittenTo(const OpTime& op) {
+        std::vector<HostAndPort> hosts;
+        boost::lock_guard<boost::mutex> lk(_mutex);
+        for (SlaveInfoMap::const_iterator it = _slaveInfoMap.begin();
+                it != _slaveInfoMap.end(); ++it) {
+            const SlaveInfo& slaveInfo = it->second;
+            if (slaveInfo.opTime < op) {
+                continue;
+            }
+            if (_getReplicationMode_inlock() == modeReplSet) {
+                const MemberConfig* memberConfig = _rsConfig.findMemberByID(slaveInfo.memberID);
+                if (!memberConfig) {
+                    // Node might have been removed in a reconfig
+                    continue;
+                }
+                hosts.push_back(memberConfig->getHostAndPort());
+            }
+            else {
+                if (it->first == _getMyRID_inlock()) {
+                    // Master-slave doesn't know the HostAndPort for itself at this point.
+                    continue;
+                }
+                hosts.push_back(slaveInfo.hostAndPort);
+            }
+        }
+        return hosts;
     }
 
     Status ReplicationCoordinatorImpl::checkIfWriteConcernCanBeSatisfied(

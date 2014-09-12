@@ -67,10 +67,16 @@ namespace repl {
          */
         void setLocalConfigDocument(const StatusWith<BSONObj>& localConfigDocument);
 
+        /**
+         * Sets the return value for subsequent calls to getClientHostAndPort().
+         */
+        void setClientHostAndPort(const HostAndPort& clientHostAndPort);
+
     private:
         StatusWith<BSONObj> _localRsConfigDocument;
         std::vector<HostAndPort> _selfHosts;
         bool _connectionsClosed;
+        HostAndPort _clientHostAndPort;
     };
 
 } // namespace repl

@@ -953,8 +953,13 @@ namespace {
         return theReplSet->buildIndexes();
     }
 
-    vector<BSONObj> LegacyReplicationCoordinator::getHostsWrittenTo(const OpTime& op) {
-        return repl::getHostsWrittenTo(op);
+    vector<HostAndPort> LegacyReplicationCoordinator::getHostsWrittenTo(const OpTime& op) {
+        vector<BSONObj> configs = repl::getHostsWrittenTo(op);
+        vector<HostAndPort> hosts;
+        for (size_t i = 0; i < configs.size(); ++i) {
+            hosts.push_back(HostAndPort(configs[i]["host"].String()));
+        }
+        return hosts;
     }
 
     Status LegacyReplicationCoordinator::checkIfWriteConcernCanBeSatisfied(

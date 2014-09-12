@@ -68,7 +68,12 @@ namespace repl {
 
     HostAndPort ReplicationCoordinatorExternalStateMock::getClientHostAndPort(
             const OperationContext* txn) {
-        return HostAndPort();
+        return _clientHostAndPort;
+    }
+
+    void ReplicationCoordinatorExternalStateMock::setClientHostAndPort(
+            const HostAndPort& clientHostAndPort) {
+        _clientHostAndPort = clientHostAndPort;
     }
 
     StatusWith<BSONObj> ReplicationCoordinatorExternalStateMock::loadLocalConfigDocument(

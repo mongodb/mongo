@@ -82,6 +82,11 @@ namespace repl {
         TopologyCoordinatorImpl& getTopoCoord() { return *_topo;}
 
         /**
+         * Gets the external state used by the replication coordinator under test.
+         */
+        ReplicationCoordinatorExternalStateMock* getExternalState() { return _externalState; }
+
+        /**
          * Initializes the objects under test; this behavior is optional, in case you need to call
          * any methods on the network or coordinator objects before calling start.
          */
