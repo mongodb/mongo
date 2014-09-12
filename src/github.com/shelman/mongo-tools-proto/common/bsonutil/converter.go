@@ -17,6 +17,8 @@ func ConvertJSONValueToBSON(x interface{}) (interface{}, error) {
 	switch v := x.(type) {
 	case nil:
 		return nil, nil
+	case bool:
+		return v, nil
 	case map[string]interface{}: // document
 		for key, jsonValue := range v {
 			bsonValue, err := parseJSONValue(jsonValue)
