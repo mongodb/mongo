@@ -124,6 +124,8 @@ namespace mongo {
 
     protected:
 
+        OperationContextImpl _txn;
+
         virtual void setUp() {
             ConfigServerFixture::setUp();
             shardingState.initialize( configSvr().toString() );
@@ -134,8 +136,6 @@ namespace mongo {
             shardingState.resetShardingState();
             ConfigServerFixture::tearDown();
         }
-
-        OperationContextImpl _txn;
     };
 
     //

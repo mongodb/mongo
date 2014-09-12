@@ -36,6 +36,10 @@
 #include "mongo/db/curop.h"
 #include "mongo/db/json.h"
 #include "mongo/db/lasterror.h"
+#include "mongo/db/ops/update_executor.h"
+#include "mongo/db/ops/update_lifecycle_impl.h"
+#include "mongo/db/query/explain.h"
+#include "mongo/db/query/get_executor.h"
 #include "mongo/db/repl/repl_coordinator_global.h"
 #include "mongo/db/server_parameters.h"
 #include "mongo/db/stats/counters.h"
@@ -136,6 +140,83 @@ namespace mongo {
 
         result.appendElements( response.toBSON() );
         return response.getOk();
+    }
+
+    Status WriteCmd::explain(OperationContext* txn,
+                             const std::string& dbname,
+                             const BSONObj& cmdObj,
+                             Explain::Verbosity verbosity,
+                             BSONObjBuilder* out) const {
+        // For now we only explain updates.
+        if ( BatchedCommandRequest::BatchType_Update != _writeType ) {
+            return Status( ErrorCodes::IllegalOperation,
+                           "Non-update write ops cannot yet be explained" );
+        }
+
+        // Parse the batch request.
+        BatchedCommandRequest request( _writeType );
+        std::string errMsg;
+        if ( !request.parseBSON( cmdObj, &errMsg ) || !request.isValid( &errMsg ) ) {
+            return Status( ErrorCodes::FailedToParse, errMsg );
+        }
+
+        // Note that this is a runCommmand, and therefore, the database and the collection name
+        // are in different parts of the grammar for the command. But it's more convenient to
+        // work with a NamespaceString. We built it here and replace it in the parsed command.
+        // Internally, everything work with the namespace string as opposed to just the
+        // collection name.
+        NamespaceString nsString(dbname, request.getNS());
+        request.setNS(nsString.ns());
+
+        // Do the validation of the batch that is shared with non-explained write batches.
+        Status isValid = WriteBatchExecutor::validateBatch( request );
+        if (!isValid.isOK()) {
+            return isValid;
+        }
+
+        // Explain must do one additional piece of validation: For now we only explain
+        // singleton batches.
+        if ( request.sizeWriteOps() != 1u ) {
+            return Status( ErrorCodes::InvalidLength,
+                           "explained write batches must be of size 1" );
+        }
+
+        // Get a reference to the singleton batch item (it's the 0th item in the batch).
+        BatchItemRef batchItem( &request, 0 );
+
+        // Create the update request.
+        UpdateRequest updateRequest( txn, nsString );
+        updateRequest.setQuery( batchItem.getUpdate()->getQuery() );
+        updateRequest.setUpdates( batchItem.getUpdate()->getUpdateExpr() );
+        updateRequest.setMulti( batchItem.getUpdate()->getMulti() );
+        updateRequest.setUpsert( batchItem.getUpdate()->getUpsert() );
+        updateRequest.setUpdateOpLog( true );
+        UpdateLifecycleImpl updateLifecycle( true, updateRequest.getNamespaceString() );
+        updateRequest.setLifecycle( &updateLifecycle );
+        updateRequest.setExplain();
+
+        // Use the request to create an UpdateExecutor, and from it extract the
+        // plan tree which will be used to execute this update.
+        UpdateExecutor updateExecutor( &updateRequest, &txn->getCurOp()->debug() );
+        Status prepStatus = updateExecutor.prepare();
+        if ( !prepStatus.isOK() ) {
+            return prepStatus;
+        }
+
+        // Explains of write commands are read-only, but we take a write lock so that timing info
+        // is more accurate.
+        Client::WriteContext ctx( txn, nsString );
+
+        Status prepInLockStatus = updateExecutor.prepareInLock( ctx.ctx().db() );
+        if ( !prepInLockStatus.isOK() ) {
+            return prepInLockStatus;
+        }
+
+        PlanExecutor* exec = updateExecutor.getPlanExecutor();
+        const ScopedExecutorRegistration safety( exec );
+
+        // Explain the plan tree.
+        return Explain::explainStages( exec, verbosity, out );
     }
 
     CmdInsert::CmdInsert() :

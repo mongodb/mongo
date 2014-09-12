@@ -28,8 +28,7 @@
 
 #pragma once
 
-#include "mongo/db/concurrency/d_concurrency.h"
-#include "mongo/db/concurrency/lock_mgr_new.h"
+#include "mongo/db/concurrency/locker.h"
 
 
 namespace mongo {
@@ -51,8 +50,10 @@ namespace newlm {
 
         /**
          * Uninterruptible blocking method, which waits for the notification to fire.
+         *
+         * @param timeoutMs How many milliseconds to wait before returning LOCK_TIMEOUT.
          */
-        LockResult wait();
+        LockResult wait(unsigned timeoutMs);
 
     private:
 
@@ -74,69 +75,29 @@ namespace newlm {
      * Lock/unlock methods must always be called from a single thread.
      *
      * All instances reference a single global lock manager.
-     *
-     * TODO: At some point, this will have to be renamed to LockState.
      */
-    class Locker {
-        MONGO_DISALLOW_COPYING(Locker);
+    class LockerImpl : public Locker {
     public:
 
         /**
          * Instantiates a new lock space with the specified unique identifier used for
          * disambiguation.
          */
-        explicit Locker(uint64_t id);
-        ~Locker();
+        LockerImpl(uint64_t id);
+        LockerImpl();
 
-        inline uint64_t getId() const { return _id; }
+        virtual ~LockerImpl();
 
-        /**
-         * Shortcut for lockExtended, which blocks until a request is granted or deadlocked. Refer
-         * to the comments for lockExtended.
-         *
-         * @return All LockResults except for LOCK_WAITING, because it blocks.
-         */
-        LockResult lock(const ResourceId& resId, LockMode mode);
+        virtual uint64_t getId() const { return _id; }
 
-        /**
-         * Acquires lock on the specified resource in the specified mode and returns the outcome
-         * of the operation. See the details for LockResult for more information on what the
-         * different results mean.
-         *
-         * Acquiring the same resource twice increments the reference count of the lock so each
-         * call to lock must be matched with a call to unlock.
-         *
-         * @param resId Id of the resource to be locked.
-         * @param mode Mode in which the resource should be locked. Lock upgrades are allowed.
-         * @param notify This value cannot be NULL. If the return value is not LOCK_WAITING, this
-         *               pointer can be freed and will not be used any more.
-         *
-         *               If the return value is LOCK_WAITING, the notification method will be
-         *               called at some point into the future, when the lock either becomes granted
-         *               or a deadlock is discovered. If unlock is called before the lock becomes
-         *               granted, the notification will not be invoked.
-         *
-         *               If the return value is LOCK_WAITING, the notification object *must* live
-         *               at least until the notfy method has been invoked or unlock has been called
-         *               for the resource it was assigned to. Failure to do so will cause the lock
-         *               manager to call into an invalid memory location.
-         */
-        LockResult lockExtended(const ResourceId& resId,
-                                LockMode mode,
-                                LockGrantNotification* notify);
+        virtual LockResult lock(const ResourceId& resId,
+                                LockMode mode, 
+                                unsigned timeoutMs = UINT_MAX);
 
-        /**
-         * Releases a lock previously acquired through a lock call. It is an error to try to
-         * release lock which has not been previously acquired (invariant violation).
-         */
-        void unlock(const ResourceId& resId);
+        virtual bool unlock(const ResourceId& resId);
 
-        /**
-         * Checks whether the lock held for a particular resource covers the specified mode.
-         *
-         * For example MODE_X covers MODE_S.
-         */
-        bool isLockHeldForMode(const ResourceId& resId, LockMode mode) const;
+        virtual LockMode getLockMode(const ResourceId& resId) const;
+        virtual bool isLockHeldForMode(const ResourceId& resId, LockMode mode) const;
 
         /**
          * Dumps all locks, on the global lock manager to the log for debugging purposes.
@@ -151,13 +112,22 @@ namespace newlm {
         /**
          * Used for testing purposes only - changes the global lock manager. Doesn't delete the
          * previous instance, so make sure that it doesn't leak.
+         *
+         * @param newLockMgr New lock manager to be used. If NULL is passed, the original lock
+         *                      manager is restored.
          */
         static void changeGlobalLockManagerForTestingOnly(LockManager* newLockMgr);
 
     private:
 
-        // Shortcut to do the lookup in _requests. Must be called with the spinlock acquired.
+        /**
+         * Shortcut to do the lookup in _requests. Must be called with the spinlock acquired.
+         */
         LockRequest* _find(const ResourceId& resId) const;
+
+        LockResult _lockImpl(const ResourceId& resId, LockMode mode, unsigned timeoutMs);
+
+        bool _unlockAndUpdateRequestsList(const ResourceId& resId, LockRequest* request);
 
 
         typedef std::map<const ResourceId, LockRequest*> LockRequestsMap;
@@ -167,84 +137,84 @@ namespace newlm {
 
         // The only reason we have this spin lock here is for the diagnostic tools, which could
         // iterate through the LockRequestsMap on a separate thread and need it to be stable.
-        // Apart from that, all accesses to the Locker are always from a single thread.
+        // Apart from that, all accesses to the LockerImpl are always from a single thread.
         //
         // This has to be locked inside const methods, hence the mutable.
         mutable SpinLock _lock;
         LockRequestsMap _requests;
 
         CondVarLockGrantNotification _notify;
-    };
-    
-} // namespace newlm
 
+        //////////////////////////////////////////////////////////////////////////////////////////
+        //
+        // Methods merged from LockState, which should eventually be removed or changed to methods
+        // on the LockerImpl interface.
+        //
 
-    /**
-     * One of these exists per OperationContext and serves as interface for acquiring locks and
-     * obtaining lock statistics for this particular operation.
-     *
-     * TODO: It is only temporary that this class inherits from Locker. Both will eventually be
-     * merged and most of the code in LockState will go away (i.e., once we move the GlobalLock to
-     * be its own lock resource under the lock manager).
-     */
-    class LockState : public newlm::Locker {
     public:
-        LockState();
 
-        void dump() const;
+        virtual void dump() const;
 
-        BSONObj reportState();
-        void reportState(BSONObjBuilder* b);
-        
-        unsigned recursiveCount() const { return _recursive; }
+        virtual BSONObj reportState();
+        virtual void reportState(BSONObjBuilder* b);
+
+        virtual unsigned recursiveCount() const { return _recursive; }
 
         /**
          * Indicates the mode of acquisition of the GlobalLock by this particular thread. The
          * return values are '0' (no global lock is held), 'r', 'w', 'R', 'W'. See the commends of
          * QLock for more information on what these modes mean.
          */
-        char threadState() const { return _threadState; }
-        
-        bool isRW() const; // RW
-        bool isW() const; // W
-        bool hasAnyReadLock() const; // explicitly rR
-        
-        bool isLocked() const;
-        bool isWriteLocked() const;
-        bool isWriteLocked(const StringData& ns) const;
-        bool isAtLeastReadLocked(const StringData& ns) const;
-        bool isLockedForCommitting() const;
-        bool isRecursive() const;
+        virtual char threadState() const { return _threadState; }
 
-        void assertWriteLocked(const StringData& ns) const;
-        void assertAtLeastReadLocked(const StringData& ns) const;
+        virtual bool isRW() const; // RW
+        virtual bool isW() const; // W
+        virtual bool hasAnyReadLock() const; // explicitly rR
 
-        /** pending means we are currently trying to get a lock */
-        bool hasLockPending() const { return _lockPending || _lockPendingParallelWriter; }
+        virtual bool isLocked() const;
+        virtual bool isWriteLocked() const;
+        virtual bool isWriteLocked(const StringData& ns) const;
+        virtual bool isAtLeastReadLocked(const StringData& ns) const;
+        virtual bool isLockedForCommitting() const;
+        virtual bool isRecursive() const;
+
+        virtual void assertWriteLocked(const StringData& ns) const;
+        virtual void assertAtLeastReadLocked(const StringData& ns) const;
+
+        /** 
+         * Pending means we are currently trying to get a lock.
+         */
+        virtual bool hasLockPending() const { return _lockPending || _lockPendingParallelWriter; }
 
         // ----
 
+        virtual void lockedStart(char newState); // RWrw
+        virtual void unlocked(); // _threadState = 0
 
-        void lockedStart( char newState ); // RWrw
-        void unlocked(); // _threadState = 0
-        
         /**
          * you have to be locked already to call this
          * this is mostly for W_to_R or R_to_W
          */
-        void changeLockState( char newstate );
-        
+        virtual void changeLockState(char newstate);
+
         // Those are only used for TempRelease. Eventually they should be removed.
-        void enterScopedLock(Lock::ScopedLock* lock);
-        Lock::ScopedLock* getCurrentScopedLock() const;
-        void leaveScopedLock(Lock::ScopedLock* lock);
+        virtual void enterScopedLock(Lock::ScopedLock* lock);
+        virtual Lock::ScopedLock* getCurrentScopedLock() const;
+        virtual void leaveScopedLock(Lock::ScopedLock* lock);
 
-        bool _batchWriter;
+        virtual void recordLockTime() { _scopedLk->recordTime(); }
+        virtual void resetLockTime() { _scopedLk->resetTime(); }
 
-        void recordLockTime() { _scopedLk->recordTime(); }
-        void resetLockTime() { _scopedLk->resetTime(); }
-        
+        virtual void setIsBatchWriter(bool newValue) { _batchWriter = newValue; }
+        virtual bool isBatchWriter() const { return _batchWriter; }
+        virtual void setLockPendingParallelWriter(bool newValue) { 
+            _lockPendingParallelWriter = newValue;
+        }
+
     private:
+        bool _batchWriter;
+        bool _lockPendingParallelWriter;
+
         unsigned _recursive;           // we allow recursively asking for a lock; we track that here
 
         // global lock related
@@ -253,22 +223,21 @@ namespace newlm {
         // for temprelease
         // for the nonrecursive case. otherwise there would be many
         // the first lock goes here, which is ok since we can't yield recursive locks
-        Lock::ScopedLock* _scopedLk;   
-        
+        Lock::ScopedLock* _scopedLk;
+
         bool _lockPending;
-        bool _lockPendingParallelWriter;
-
-        friend class AcquiringParallelWriter;
     };
+    
+} // namespace newlm
 
-        
-    class AcquiringParallelWriter {
+
+    /**
+     * This will go away as a separate step.
+     */
+    class LockState : public newlm::LockerImpl {
     public:
-        AcquiringParallelWriter( LockState& ls );
-        ~AcquiringParallelWriter();
+        LockState() { }
 
-    private:
-        LockState& _ls;
     };
 
 } // namespace mongo

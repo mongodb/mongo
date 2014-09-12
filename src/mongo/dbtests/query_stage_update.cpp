@@ -32,6 +32,7 @@
 
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/database.h"
+#include "mongo/db/dbdirectclient.h"
 #include "mongo/db/exec/collection_scan.h"
 #include "mongo/db/exec/eof.h"
 #include "mongo/db/exec/update.h"

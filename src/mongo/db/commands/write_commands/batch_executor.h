@@ -31,6 +31,7 @@
 #include <string>
 
 #include "mongo/base/disallow_copying.h"
+#include "mongo/db/ops/update_request.h"
 #include "mongo/s/write_ops/batched_command_request.h"
 #include "mongo/s/write_ops/batched_command_response.h"
 #include "mongo/s/write_ops/batched_delete_document.h"
@@ -70,6 +71,12 @@ namespace mongo {
         void executeBatch( const BatchedCommandRequest& request, BatchedCommandResponse* response );
 
         const WriteBatchStats& getStats() const;
+
+        /**
+         * Does basic validation of the batch request. Returns a non-OK status if
+         * any problems with the batch are found.
+         */
+        static Status validateBatch( const BatchedCommandRequest& request );
 
     private:
         /**

@@ -47,9 +47,23 @@
 #include "mongo/util/scopeguard.h"
 #include "mongo/util/log.h"
 
-#if defined(__linux__) || defined(__APPLE__)
+#if defined(__linux__) || defined(__APPLE__) || defined(__freebsd__) || defined(__sunos__)
+#define FASTPATH_UNIX 1
+#endif
+
+#if !defined(_WIN32) && !defined(FASTPATH_UNIX)
+#error isself needs to be implemented for this platform
+#endif
+
+
+#ifdef FASTPATH_UNIX
 #include <ifaddrs.h>
 #include <netdb.h>
+
+#ifdef __freebsd__
+#include <netinet/in.h>
+#endif
+
 #elif defined(_WIN32)
 #include <boost/asio/detail/socket_ops.hpp>
 #include <boost/scoped_array.hpp>
@@ -58,10 +72,6 @@
 #include <winsock2.h>
 #include <Ws2tcpip.h>
 #endif  // defined(_WIN32)
-
-#if defined(_WIN32) || defined(__linux__) || defined(__APPLE__)
-#define FASTPATH 1
-#endif
 
 namespace mongo {
 namespace repl {
@@ -73,8 +83,6 @@ namespace repl {
         return Status::OK();
     }
 
-#ifdef FASTPATH
-
 namespace {
 
     /**
@@ -83,7 +91,7 @@ namespace {
      * we need gai_strerror.
      */
     std::string stringifyError(int code) {
-#if defined(__linux__) || defined(__APPLE__)
+#if FASTPATH_UNIX
         return gai_strerror(code);
 #elif defined(_WIN32)
         // FormatMessage in errnoWithDescription works here on windows
@@ -147,12 +155,7 @@ namespace {
 
 }  // namespace
 
-#endif  // ifdef FASTPATH
-
-
     bool isSelf(const HostAndPort& hostAndPort) {
-
-#ifdef FASTPATH
 
         // Fastpath: check if the host&port in question is bound to one
         // of the interfaces on this machine.
@@ -180,8 +183,6 @@ namespace {
                 }
             }
         }
-
-#endif  // ifdef FASTPATH
 
         if (!Listener::getTimeTracker()) {
             // this ensures we are actually running a server
@@ -220,9 +221,8 @@ namespace {
      * addresses will be returned.
      */
     std::vector<std::string> getBoundAddrs(const bool ipv6enabled) {
-#ifdef FASTPATH
         std::vector<std::string> out;
-#if defined(__linux__) || defined(__APPLE__)
+#ifdef FASTPATH_UNIX
 
         ifaddrs* addrs;
 
@@ -338,6 +338,7 @@ namespace {
         }
 
 #endif  // defined(_WIN32)
+
         if (logger::globalLogDomain()->shouldLog(logger::LogSeverity::Debug(2))) {
             StringBuilder builder;
             builder << "getBoundAddrs():";
@@ -347,12 +348,7 @@ namespace {
             LOG(2) << builder.str();
         }
         return out;
-#else  // ifdef FASTPATH
-        invariant(false);
-#endif
     }
-
-#undef FASTPATH
 
 }  // namespace repl
 }  // namespace mongo

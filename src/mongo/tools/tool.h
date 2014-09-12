@@ -83,6 +83,8 @@ namespace mongo {
         mongo::DBClientBase * _conn;
         mongo::DBClientBase * _slaveConn;
 
+        scoped_ptr<OperationContext> _txn;
+
     private:
         void auth();
     };

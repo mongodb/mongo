@@ -105,6 +105,7 @@ files.forEach(function(x) {
     var notForShardingPattern = new RegExp('[\\/\\\\](' +
         'dbadmin|' +
         'error1|' +
+        'explain_count|' + // TODO: allow passthrough once explain is implemented on mongos
         'fsync|' +
         'fsync2|' +
         'geo.*|' +

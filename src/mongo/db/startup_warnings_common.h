@@ -1,5 +1,5 @@
 /**
-*    Copyright (C) 2013 10gen Inc.
+*    Copyright (C) 2014 MongoDB Inc.
 *
 *    This program is free software: you can redistribute it and/or  modify
 *    it under the terms of the GNU Affero General Public License, version 3,
@@ -27,6 +27,7 @@
 */
 
 namespace mongo {
-    // Checks various startup conditions and logs any necessary warnings
-    void logStartupWarnings();
+    // Checks various startup conditions and logs any necessary warnings that
+    // are common to both mongod and mongos processes.
+    void logCommonStartupWarnings();
 } // namespace mongo

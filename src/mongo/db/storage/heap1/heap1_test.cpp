@@ -33,6 +33,7 @@
 #include "mongo/db/operation_context_noop.h"
 #include "mongo/db/storage/heap1/heap1_database_catalog_entry.h"
 #include "mongo/db/storage/heap1/heap1_recovery_unit.h"
+#include "mongo/db/storage/heap1/record_store_heap.h"
 #include "mongo/db/storage/record_store.h"
 
 #include "mongo/unittest/unittest.h"
@@ -113,6 +114,49 @@ namespace {
         collections.clear();
         db.getCollectionNamespaces( &collections );
         ASSERT_EQUALS( 0U, collections.size() );
+
+    }
+
+    TEST( Heap1RecordStore, CappedTailable ) {
+        HeapRecordStore rs( "a.b", true, 1000, 3 );
+
+        rs.insertRecord( NULL, "0", 2, false );
+        rs.insertRecord( NULL, "1", 2, false );
+        rs.insertRecord( NULL, "2", 2, false );
+
+        ASSERT_EQUALS( 3, rs.numRecords( NULL ) );
+
+        scoped_ptr<RecordIterator> it( rs.getIterator( NULL,
+                                                       DiskLoc(),
+                                                       true,
+                                                       CollectionScanParams::FORWARD ) );
+
+        ASSERT( !it->isEOF() );
+        DiskLoc loc = it->getNext();
+        ASSERT_EQUALS( string("0"), it->dataFor( loc ).data() );
+
+        ASSERT( !it->isEOF() );
+        loc = it->getNext();
+        ASSERT_EQUALS( string("1"), it->dataFor( loc ).data() );
+
+        ASSERT( !it->isEOF() );
+        loc = it->getNext();
+        ASSERT_EQUALS( string("2"), it->dataFor( loc ).data() );
+
+        ASSERT( it->isEOF() );
+
+        rs.insertRecord( NULL, "3", 2, false );
+        rs.insertRecord( NULL, "4", 2, false );
+
+        //ASSERT( !it->isEOF() ); // todo: is this correct?
+        loc = it->getNext();
+        ASSERT_EQUALS( string("3"), it->dataFor( loc ).data() );
+
+        ASSERT( !it->isEOF() );
+        loc = it->getNext();
+        ASSERT_EQUALS( string("4"), it->dataFor( loc ).data() );
+
+        ASSERT( it->isEOF() );
 
     }
 

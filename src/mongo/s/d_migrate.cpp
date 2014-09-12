@@ -2238,13 +2238,13 @@ namespace mongo {
 
             if ( getState() != STEADY )
                 return false;
-            setState(COMMIT_START);
-            
+
             boost::xtime xt;
             boost::xtime_get(&xt, MONGO_BOOST_TIME_UTC);
             xt.sec += 30;
 
             scoped_lock lock(m_active);
+            setState(COMMIT_START);
             while ( active ) {
                 if ( ! isActiveCV.timed_wait( lock.boost(), xt ) ){
                     // TIMEOUT
@@ -2274,6 +2274,7 @@ namespace mongo {
             isActiveCV.notify_all(); 
         }
 
+        // Lock order: m_active -> stateMutex
         mutable mongo::mutex m_active;
         bool active;
         boost::condition isActiveCV;

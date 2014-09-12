@@ -151,7 +151,15 @@ namespace repl {
          * Like awaitReplication(), above, but waits for the replication of the last operation
          * performed on the client associated with "txn".
          */
-        virtual StatusAndDuration awaitReplicationOfLastOp(
+        virtual StatusAndDuration awaitReplicationOfLastOpForClient(
+                const OperationContext* txn,
+                const WriteConcernOptions& writeConcern) = 0;
+
+        /**
+         * Like awaitReplication(), above, but waits for the replication of the last operation
+         * applied to this node.
+         */
+        virtual StatusAndDuration awaitReplicationOfLastOpApplied(
                 const OperationContext* txn,
                 const WriteConcernOptions& writeConcern) = 0;
 
@@ -171,17 +179,6 @@ namespace repl {
                                 bool force,
                                 const Milliseconds& waitTime,
                                 const Milliseconds& stepdownTime) = 0;
-
-        /**
-         * Behaves similarly to stepDown except that after stepping down as primary it waits for
-         * up to 'postStepdownWaitTime' for one other node to match this node's optime exactly.
-         * TODO(spencer): This method should be removed and all callers should use shutDown, after
-         * shutdown has been fixed to block new writes while waiting for secondaries to catch up.
-         */
-        virtual Status stepDownAndWaitForSecondary(OperationContext* txn,
-                                                   const Milliseconds& initialWaitTime,
-                                                   const Milliseconds& stepdownTime,
-                                                   const Milliseconds& postStepdownWaitTime) = 0;
 
         /**
          * TODO a way to trigger an action on replication of a given operation
@@ -251,6 +248,11 @@ namespace repl {
         virtual Status setMyLastOptime(OperationContext* txn, const OpTime& ts) = 0;
 
         /**
+         * Returns the last optime recorded by setMyLastOptime.
+         */
+        virtual OpTime getMyLastOptime() const = 0;
+
+        /**
          * Retrieves and returns the current election id, which is a unique id that is local to
          * this node and changes every time we become primary.
          * TODO(spencer): Use term instead.
@@ -261,7 +263,23 @@ namespace repl {
          * Returns the RID for this node.  The RID is used to identify this node to our sync source
          * when sending updates about our replication progress.
          */
-        virtual OID getMyRID() = 0;
+        virtual OID getMyRID() const = 0;
+
+        /**
+         * Sets this node into a specific follower mode.
+         *
+         * It is an error to call this method if the node's topology coordinator would not
+         * report that it is in the follower role.
+         *
+         * Follower modes are RS_STARTUP2 (initial sync), RS_SECONDARY, RS_ROLLBACK and
+         * RS_RECOVERING.  They are the valid states of a node whose topology coordinator has the
+         * follower role.
+         *
+         * This is essentially an interface that allows the applier to prevent the node from
+         * becoming a candidate or accepting reads, depending on circumstances in the oplog
+         * application process.
+         */
+        virtual void setFollowerMode(const MemberState& newState) = 0;
 
         /**
          * Prepares a BSONObj describing an invocation of the replSetUpdatePosition command that can
@@ -292,9 +310,10 @@ namespace repl {
 
         /**
          * Toggles maintenanceMode to the value expressed by 'activate'
-         * return true, if the change worked and false otherwise
+         * return Status::OK if the change worked, NotSecondary if it failed because we are
+         * PRIMARY, and OperationFailed if we are not currently in maintenance mode
          */
-        virtual bool setMaintenanceMode(OperationContext* txn, bool activate) = 0;
+        virtual Status setMaintenanceMode(OperationContext* txn, bool activate) = 0;
 
         /**
          * Handles an incoming replSetSyncFrom command. Adds BSON to 'result'
@@ -303,16 +322,6 @@ namespace repl {
          */
         virtual Status processReplSetSyncFrom(const HostAndPort& target,
                                               BSONObjBuilder* resultObj) = 0;
-
-        /**
-         * Handles an incoming replSetMaintenance command. 'activate' indicates whether to activate
-         * or deactivate maintenanceMode.
-         * returns Status::OK() if maintenanceMode is successfully changed, otherwise returns a
-         * Status containing an error message about the failure
-         */
-        virtual Status processReplSetMaintenance(OperationContext* txn,
-                                                 bool activate,
-                                                 BSONObjBuilder* resultObj) = 0;
 
         /**
          * Handles an incoming replSetFreeze command. Adds BSON to 'resultObj' 

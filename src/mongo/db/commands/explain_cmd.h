@@ -51,9 +51,14 @@ namespace mongo {
 
         virtual bool isWriteCommandForConfigServer() const { return false; }
 
-        // TODO: make slave ok true, test explains on secondaries.
+        /**
+         * Running an explain on a secondary requires explicitly setting slaveOk.
+         */
         virtual bool slaveOk() const {
             return false;
+        }
+        virtual bool slaveOverrideOk() const {
+            return true;
         }
 
         virtual bool maintenanceOk() const { return false; }

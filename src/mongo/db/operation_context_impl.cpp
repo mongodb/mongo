@@ -26,9 +26,12 @@
  *    it in the license file.
  */
 
+#include "mongo/platform/basic.h"
+
 #include "mongo/db/operation_context_impl.h"
 
 #include "mongo/db/client.h"
+#include "mongo/db/concurrency/lock_state.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/global_environment_experiment.h"
 #include "mongo/db/namespace_string.h"
@@ -45,6 +48,8 @@ namespace mongo {
         invariant(storageEngine);
         _recovery.reset(storageEngine->newRecoveryUnit(this));
 
+        _locker.reset(new newlm::LockerImpl());
+
         getGlobalEnvironment()->registerOperationContext(this);
     }
 
@@ -56,8 +61,8 @@ namespace mongo {
         return _recovery.get();
     }
 
-    LockState* OperationContextImpl::lockState() const {
-        return const_cast<LockState*>(&_lockState);
+    Locker* OperationContextImpl::lockState() const {
+        return _locker.get();
     }
 
     ProgressMeter* OperationContextImpl::setMessage(const char * msg,

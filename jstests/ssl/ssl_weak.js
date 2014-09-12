@@ -6,20 +6,19 @@ ports = allocatePorts( 2 );
 var baseName = "jstests_ssl_ssl_weak";
 
 
-// Test that connecting with no client certificate and --sslWeakCertificateValidation connects
-// successfully.
+// Test that connecting with no client certificate and --sslAllowConnectionsWithoutCertificates
+// (an alias for sslWeakCertificateValidation) connects successfully.
 var md = startMongod( "--port", ports[0], "--dbpath", MongoRunner.dataPath + baseName + "1",
                       "--sslMode", "requireSSL",
                       "--sslPEMKeyFile", "jstests/libs/server.pem",
                       "--sslCAFile", "jstests/libs/ca.pem",
-                      "--sslWeakCertificateValidation");
+                      "--sslAllowConnectionsWithoutCertificates");
 
 var mongo = runMongoProgram("mongo", "--port", ports[0], "--ssl", 
                             "--eval", ";");
 
 // 0 is the exit code for success
 assert(mongo==0);
-
 
 // Test that connecting with a valid client certificate connects successfully.
 mongo = runMongoProgram("mongo", "--port", ports[0], "--ssl", 

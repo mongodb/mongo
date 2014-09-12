@@ -53,8 +53,6 @@ namespace mongo {
 
         virtual bool awaitCommit();
 
-        virtual bool commitIfNeeded(bool force = false);
-
         virtual void* writingPtr(void* data, size_t len);
 
         //  The recovery unit takes ownership of change.

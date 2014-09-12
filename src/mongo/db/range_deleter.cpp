@@ -274,8 +274,8 @@ namespace {
                                                kWTimeoutMillis);
 
         repl::ReplicationCoordinator::StatusAndDuration replStatus =
-                repl::getGlobalReplicationCoordinator()->awaitReplicationOfLastOp(txn,
-                                                                                  writeConcern);
+                repl::getGlobalReplicationCoordinator()->awaitReplicationOfLastOpForClient(
+                        txn, writeConcern);
         repl::ReplicationCoordinator::Milliseconds elapsedTime = replStatus.duration;
         if (replStatus.status.code() == ErrorCodes::ExceededTimeLimit) {
             *errMsg = str::stream() << "rangeDeleter timed out after "

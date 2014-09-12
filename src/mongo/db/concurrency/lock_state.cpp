@@ -1,78 +1,75 @@
-// lockstate.cpp
-
 /**
-*    Copyright (C) 2008 10gen Inc.
-*
-*    This program is free software: you can redistribute it and/or  modify
-*    it under the terms of the GNU Affero General Public License, version 3,
-*    as published by the Free Software Foundation.
-*
-*    This program is distributed in the hope that it will be useful,
-*    but WITHOUT ANY WARRANTY; without even the implied warranty of
-*    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-*    GNU Affero General Public License for more details.
-*
-*    You should have received a copy of the GNU Affero General Public License
-*    along with this program.  If not, see <http://www.gnu.org/licenses/>.
-*
-*    As a special exception, the copyright holders give permission to link the
-*    code of portions of this program with the OpenSSL library under certain
-*    conditions as described in each individual source file and distribute
-*    linked combinations including the program with the OpenSSL library. You
-*    must comply with the GNU Affero General Public License in all respects for
-*    all of the code used other than as permitted herein. If you modify file(s)
-*    with this exception, you may extend this exception to your version of the
-*    file(s), but you are not obligated to do so. If you do not wish to do so,
-*    delete this exception statement from your version. If you delete this
-*    exception statement from all source files in the program, then also delete
-*    it in the license file.
-*/
+ *    Copyright (C) 2014 MongoDB Inc.
+ *
+ *    This program is free software: you can redistribute it and/or  modify
+ *    it under the terms of the GNU Affero General Public License, version 3,
+ *    as published by the Free Software Foundation.
+ *
+ *    This program is distributed in the hope that it will be useful,
+ *    but WITHOUT ANY WARRANTY; without even the implied warranty of
+ *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ *    GNU Affero General Public License for more details.
+ *
+ *    You should have received a copy of the GNU Affero General Public License
+ *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ *    As a special exception, the copyright holders give permission to link the
+ *    code of portions of this program with the OpenSSL library under certain
+ *    conditions as described in each individual source file and distribute
+ *    linked combinations including the program with the OpenSSL library. You
+ *    must comply with the GNU Affero General Public License in all respects for
+ *    all of the code used other than as permitted herein. If you modify file(s)
+ *    with this exception, you may extend this exception to your version of the
+ *    file(s), but you are not obligated to do so. If you do not wish to do so,
+ *    delete this exception statement from your version. If you delete this
+ *    exception statement from all source files in the program, then also delete
+ *    it in the license file.
+ */
 
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/concurrency/lock_state.h"
 
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
 
 
 namespace mongo {
+namespace newlm {
 
-    static AtomicUInt64 idCounter(0);
+    namespace {
+        // Counts the Locker instance identifiers
+        static AtomicUInt64 idCounter(0);
 
-    LockState::LockState() 
-        : Locker(idCounter.addAndFetch(1)),
-          _batchWriter(false),
-          _recursive(0),
-          _threadState(0),
-          _scopedLk(NULL),
-          _lockPending(false),
-          _lockPendingParallelWriter(false)
-    {
+        // Global lock manager instance
+        static LockManager globalLockManagerInstance;
+        static LockManager* globalLockManagerPtr = &globalLockManagerInstance;
     }
 
-    bool LockState::isRW() const { 
+
+    bool LockerImpl::isRW() const { 
         return _threadState == 'R' || _threadState == 'W'; 
     }
 
-    bool LockState::isW() const { 
+    bool LockerImpl::isW() const { 
         return _threadState == 'W'; 
     }
 
-    bool LockState::hasAnyReadLock() const { 
+    bool LockerImpl::hasAnyReadLock() const { 
         return _threadState == 'r' || _threadState == 'R';
     }
 
-    bool LockState::isLocked() const {
+    bool LockerImpl::isLocked() const {
         return threadState() != 0;
     }
 
-    bool LockState::isWriteLocked() const {
+    bool LockerImpl::isWriteLocked() const {
         return (threadState() == 'W' || threadState() == 'w');
     }
 
-    bool LockState::isWriteLocked(const StringData& ns) const {
+    bool LockerImpl::isWriteLocked(const StringData& ns) const {
         if (isWriteLocked()) {
             return true;
         }
@@ -83,7 +80,7 @@ namespace mongo {
         return isLockHeldForMode(resIdNs, newlm::MODE_X);
     }
 
-    bool LockState::isAtLeastReadLocked(const StringData& ns) const {
+    bool LockerImpl::isAtLeastReadLocked(const StringData& ns) const {
         if (threadState() == 'R' || threadState() == 'W')
             return true; // global
         if (threadState() == 0)
@@ -95,15 +92,15 @@ namespace mongo {
         return isLockHeldForMode(resIdNs, newlm::MODE_S);
     }
 
-    bool LockState::isLockedForCommitting() const {
+    bool LockerImpl::isLockedForCommitting() const {
         return threadState() == 'R' || threadState() == 'W';
     }
 
-    bool LockState::isRecursive() const {
+    bool LockerImpl::isRecursive() const {
         return recursiveCount() > 1;
     }
 
-    void LockState::assertWriteLocked(const StringData& ns) const {
+    void LockerImpl::assertWriteLocked(const StringData& ns) const {
         if (!isWriteLocked(ns)) {
             dump();
             msgasserted(
@@ -111,37 +108,29 @@ namespace mongo {
         }
     }
 
-    void LockState::assertAtLeastReadLocked(const StringData& ns) const {
+    void LockerImpl::assertAtLeastReadLocked(const StringData& ns) const {
         if (!isAtLeastReadLocked(ns)) {
-            log() << "error expected " << ns << " to be locked " << endl;
+            log() << "error expected " << ns << " to be locked " << std::endl;
             dump();
             msgasserted(
                 16104, mongoutils::str::stream() << "expected to be read locked for " << ns);
         }
     }
 
-    void LockState::lockedStart( char newState ) {
+    void LockerImpl::lockedStart( char newState ) {
         _threadState = newState;
     }
 
-    void LockState::unlocked() {
+    void LockerImpl::unlocked() {
         _threadState = 0;
     }
 
-    void LockState::changeLockState( char newState ) {
+    void LockerImpl::changeLockState( char newState ) {
         fassert( 16169 , _threadState != 0 );
         _threadState = newState;
     }
 
-    static string kind(int n) { 
-        if( n > 0 )
-            return "W";
-        if( n < 0 ) 
-            return "R";
-        return "?";
-    }
-
-    BSONObj LockState::reportState() {
+    BSONObj LockerImpl::reportState() {
         BSONObjBuilder b;
         reportState(&b);
 
@@ -152,7 +141,7 @@ namespace mongo {
               thread. So be careful about thread safety here. For example reading 
               this->otherName would not be safe as-is!
     */
-    void LockState::reportState(BSONObjBuilder* res) {
+    void LockerImpl::reportState(BSONObjBuilder* res) {
         BSONObjBuilder b;
         if( _threadState ) {
             char buf[2];
@@ -170,9 +159,9 @@ namespace mongo {
         res->append("waitingForLock", _lockPending);
     }
 
-    void LockState::dump() const {
-        char s = _threadState;
-        stringstream ss;
+    void LockerImpl::dump() const {
+        char s = threadState();
+        StringBuilder ss;
         ss << "lock status: ";
         if( s == 0 ){
             ss << "unlocked"; 
@@ -180,10 +169,10 @@ namespace mongo {
         else {
             // SERVER-14978: Dump lock stats information
         }
-        log() << ss.str() << endl;
+        log() << ss.str() << std::endl;
     }
 
-    void LockState::enterScopedLock(Lock::ScopedLock* lock) {
+    void LockerImpl::enterScopedLock(Lock::ScopedLock* lock) {
         _recursive++;
         if (_recursive == 1) {
             invariant(_scopedLk == NULL);
@@ -191,12 +180,12 @@ namespace mongo {
         }
     }
 
-    Lock::ScopedLock* LockState::getCurrentScopedLock() const {
+    Lock::ScopedLock* LockerImpl::getCurrentScopedLock() const {
         invariant(_recursive == 1);
         return _scopedLk;
     }
 
-    void LockState::leaveScopedLock(Lock::ScopedLock* lock) {
+    void LockerImpl::leaveScopedLock(Lock::ScopedLock* lock) {
         if (_recursive == 1) {
             // Sanity check we are releasing the same lock
             invariant(_scopedLk == lock);
@@ -204,24 +193,6 @@ namespace mongo {
         }
         _recursive--;
     }
-
-    
-    AcquiringParallelWriter::AcquiringParallelWriter( LockState& ls )
-        : _ls( ls ) {
-        _ls._lockPendingParallelWriter = true;
-    }
-    
-    AcquiringParallelWriter::~AcquiringParallelWriter() {
-        _ls._lockPendingParallelWriter = false;
-    }
-
-    
-namespace newlm {
-
-    /**
-     * Global lock manager instance.
-     */
-    static LockManager* globalLockManager = new LockManager();
 
 
     //
@@ -236,10 +207,13 @@ namespace newlm {
         _result = LOCK_INVALID;
     }
 
-    LockResult CondVarLockGrantNotification::wait() {
+    LockResult CondVarLockGrantNotification::wait(unsigned timeoutMs) {
         boost::unique_lock<boost::mutex> lock(_mutex);
         while (_result == LOCK_INVALID) {
-            _cond.wait(lock);
+            if (!_cond.timed_wait(lock, Milliseconds(timeoutMs))) {
+                // Timeout
+                return LOCK_TIMEOUT;
+            }
         }
 
         return _result;
@@ -258,99 +232,146 @@ namespace newlm {
     // Locker
     //
 
-    Locker::Locker(uint64_t id) : _id(id) {
+    LockerImpl::LockerImpl(uint64_t id) 
+        : _id(id),
+          _batchWriter(false),
+          _lockPendingParallelWriter(false),
+          _recursive(0),
+          _threadState(0),
+          _scopedLk(NULL),
+          _lockPending(false) {
 
     }
 
-    Locker::~Locker() {
+    LockerImpl::LockerImpl() 
+        : _id(idCounter.addAndFetch(1)),
+          _batchWriter(false),
+          _lockPendingParallelWriter(false),
+          _recursive(0),
+          _threadState(0),
+          _scopedLk(NULL),
+          _lockPending(false) {
+
+    }
+
+    LockerImpl::~LockerImpl() {
         // Cannot delete the Locker while there are still outstanding requests, because the
         // LockManager may attempt to access deleted memory. Besides it is probably incorrect
         // to delete with unaccounted locks anyways.
         invariant(_requests.empty());
     }
 
-    LockResult Locker::lock(const ResourceId& resId, LockMode mode) {
-        _notify.clear();
-
-        LockResult res = lockExtended(resId, mode, &_notify);
-        if (res == LOCK_WAITING) {
-            return _notify.wait();
-        }
-
-        return res;
+    LockResult LockerImpl::lock(const ResourceId& resId, LockMode mode, unsigned timeoutMs) {
+        return _lockImpl(resId, mode, timeoutMs);
     }
 
-    LockResult Locker::lockExtended(const ResourceId& resId,
-                                    LockMode mode,
-                                    LockGrantNotification* notify) {
-        _lock.lock();
-
-        LockRequest* request = _find(resId);
-        if (request == NULL) {
-            request = new LockRequest();
-            request->initNew(resId, this, notify);
-
-            _requests.insert(LockRequestsPair(resId, request));
-        }
-        else {
-            request->notify = notify;
-        }
-
-        _lock.unlock();
-
-        return globalLockManager->lock(resId, request, mode);
-    }
-
-    void Locker::unlock(const ResourceId& resId) {
+    bool LockerImpl::unlock(const ResourceId& resId) {
         _lock.lock();
         LockRequest* request = _find(resId);
         invariant(request != NULL);
+        invariant(request->mode != MODE_NONE);
         _lock.unlock();
 
-        // Lock and unlock are always called single-threadly, so it is safe to release the spin 
-        // lock, which protects the Locker here. The only thing which could alter the state of the
-        // request is deadlock detection, which however would synchronize on the 
-        // LockManager::unlock call.
+        // Methods on the Locker class are always called single-threadly, so it is safe to release
+        // the spin lock, which protects the Locker here. The only thing which could alter the
+        // state of the request is deadlock detection, which however would synchronize on the
+        // LockManager calls.
 
-        globalLockManager->unlock(request);
-
-        _lock.lock();
-        if (request->recursiveCount == 0) {
-            const int numErased = _requests.erase(resId);
-            invariant(numErased == 1);
-
-            // TODO: At some point we might want to cache a couple of these at lease for the locks
-            // which are acquired frequently (Global/Flush/DB) in order to reduce the number of
-            // memory allocations.
-            delete request;
-        }
-        _lock.unlock();
+        return _unlockAndUpdateRequestsList(resId, request);
     }
 
-    bool Locker::isLockHeldForMode(const ResourceId& resId, LockMode mode) const {
+    LockMode LockerImpl::getLockMode(const ResourceId& resId) const {
         scoped_spinlock scopedLock(_lock);
 
         const LockRequest* request = _find(resId);
-        if (request == NULL) return false;
+        if (request == NULL) return MODE_NONE;
 
-        return request->mode >= mode;
+        return request->mode;
+    }
+
+    bool LockerImpl::isLockHeldForMode(const ResourceId& resId, LockMode mode) const {
+        return getLockMode(resId) >= mode;
     }
 
     // Static
-    void Locker::dumpGlobalLockManager() {
-        globalLockManager->dump();
+    void LockerImpl::dumpGlobalLockManager() {
+        globalLockManagerPtr->dump();
     }
 
-    LockRequest* Locker::_find(const ResourceId& resId) const {
+    LockRequest* LockerImpl::_find(const ResourceId& resId) const {
         LockRequestsMap::const_iterator it = _requests.find(resId);
 
         if (it == _requests.end()) return NULL;
         return it->second;
     }
 
+    LockResult LockerImpl::_lockImpl(const ResourceId& resId, LockMode mode, unsigned timeoutMs) {
+        _notify.clear();
+
+        _lock.lock();
+        LockRequest* request = _find(resId);
+        if (request == NULL) {
+            request = new LockRequest();
+            request->initNew(resId, this, &_notify);
+
+            _requests.insert(LockRequestsPair(resId, request));
+        }
+        else {
+            invariant(request->recursiveCount > 0);
+            request->notify = &_notify;
+        }
+        _lock.unlock();
+
+        // Methods on the Locker class are always called single-threadly, so it is safe to release
+        // the spin lock, which protects the Locker here. The only thing which could alter the
+        // state of the request is deadlock detection, which however would synchronize on the
+        // LockManager calls.
+
+        LockResult result = globalLockManagerPtr->lock(resId, request, mode);
+        if (result == LOCK_WAITING) {
+            result = _notify.wait(timeoutMs);
+        }
+
+        if (result != LOCK_OK) {
+            // Can only be LOCK_TIMEOUT, because the lock manager does not return any other errors
+            // at this point. Could be LOCK_DEADLOCK, when deadlock detection is implemented.
+            invariant(result == LOCK_TIMEOUT);
+            invariant(_unlockAndUpdateRequestsList(resId, request));
+        }
+
+        return result;
+    }
+
+    bool LockerImpl::_unlockAndUpdateRequestsList(const ResourceId& resId, LockRequest* request) {
+        globalLockManagerPtr->unlock(request);
+
+        const int recursiveCount = request->recursiveCount;
+
+        if (recursiveCount == 0) {
+            _lock.lock();
+
+            const int numErased = _requests.erase(resId);
+            invariant(numErased == 1);
+
+            _lock.unlock();
+
+            // TODO: At some point we might want to cache a couple of these at least for the locks
+            // which are acquired frequently (Global/Flush/DB) in order to reduce the number of
+            // memory allocations.
+            delete request;
+        }
+
+        return recursiveCount == 0;
+    }
+
     // Static
-    void Locker::changeGlobalLockManagerForTestingOnly(LockManager* newLockMgr) {
-        globalLockManager = newLockMgr;
+    void LockerImpl::changeGlobalLockManagerForTestingOnly(LockManager* newLockMgr) {
+        if (newLockMgr != NULL) {
+            globalLockManagerPtr = newLockMgr;
+        }
+        else {
+            globalLockManagerPtr = &globalLockManagerInstance;
+        }
     }
     
 } // namespace newlm

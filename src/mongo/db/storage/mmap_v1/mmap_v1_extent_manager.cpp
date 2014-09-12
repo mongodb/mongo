@@ -36,7 +36,6 @@
 
 #include "mongo/db/audit.h"
 #include "mongo/db/client.h"
-#include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/storage/mmap_v1/dur.h"
 #include "mongo/db/storage/mmap_v1/data_file.h"
 #include "mongo/db/storage/mmap_v1/record.h"

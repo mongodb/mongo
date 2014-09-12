@@ -45,10 +45,6 @@ namespace mongo {
 
         virtual void endUnitOfWork() {}
 
-        virtual bool commitIfNeeded(bool force = false) {
-            return false;
-        }
-
         virtual bool awaitCommit() {
             return true;
         }

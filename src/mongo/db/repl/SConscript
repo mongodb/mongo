@@ -35,6 +35,7 @@ env.CppUnitTest('replication_executor_test',
 
 env.Library('topology_coordinator',
             [
+                'heartbeat_response_action.cpp',
                 'topology_coordinator.cpp',
             ],
             LIBDEPS=[
@@ -82,6 +83,7 @@ env.Library('repl_coordinator_impl',
                      'replica_set_messages',
                      'replication_executor',
                      'rslog',
+                     'topology_coordinator',
                  ])
 
 env.CppUnitTest('repl_coordinator_impl_test',

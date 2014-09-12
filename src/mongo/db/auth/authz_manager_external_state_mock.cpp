@@ -38,6 +38,7 @@
 #include "mongo/db/jsobj.h"
 #include "mongo/db/matcher/expression_parser.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/operation_context_noop.h"
 #include "mongo/db/ops/update_driver.h"
 #include "mongo/platform/unordered_set.h"
 #include "mongo/util/map_util.h"
@@ -88,8 +89,10 @@ namespace {
     }
 
     void AuthzManagerExternalStateMock::setAuthzVersion(int version) {
+        OperationContextNoop opCtx;
         uassertStatusOK(
-                updateOne(AuthorizationManager::versionCollectionNamespace,
+                updateOne(&opCtx,
+                          AuthorizationManager::versionCollectionNamespace,
                           AuthorizationManager::versionDocumentQuery,
                           BSON("$set" << BSON(AuthorizationManager::schemaVersionFieldName <<
                                               version)),
@@ -179,6 +182,7 @@ namespace {
     }
 
     Status AuthzManagerExternalStateMock::insert(
+            OperationContext* txn,
             const NamespaceString& collectionName,
             const BSONObj& document,
             const BSONObj&) {
@@ -205,6 +209,7 @@ namespace {
     }
 
     Status AuthzManagerExternalStateMock::updateOne(
+            OperationContext* txn,
             const NamespaceString& collectionName,
             const BSONObj& query,
             const BSONObj& updatePattern,
@@ -252,14 +257,15 @@ namespace {
             if (!status.isOK()) {
                 return status;
             }
-            return insert(collectionName, document.getObject(), writeConcern);
+            return insert(txn, collectionName, document.getObject(), writeConcern);
         }
         else {
             return status;
         }
     }
 
-    Status AuthzManagerExternalStateMock::update(const NamespaceString& collectionName,
+    Status AuthzManagerExternalStateMock::update(OperationContext* txn,
+                                                 const NamespaceString& collectionName,
                                                  const BSONObj& query,
                                                  const BSONObj& updatePattern,
                                                  bool upsert,
@@ -271,6 +277,7 @@ namespace {
     }
 
     Status AuthzManagerExternalStateMock::remove(
+            OperationContext* txn,
             const NamespaceString& collectionName,
             const BSONObj& query,
             const BSONObj&,
@@ -295,6 +302,7 @@ namespace {
     }
 
     Status AuthzManagerExternalStateMock::createIndex(
+            OperationContext* txn,
             const NamespaceString& collectionName,
             const BSONObj& pattern,
             bool unique,
@@ -303,6 +311,7 @@ namespace {
     }
 
     Status AuthzManagerExternalStateMock::dropIndexes(
+            OperationContext* txn,
             const NamespaceString& collectionName,
             const BSONObj& writeConcern) {
         return Status::OK();

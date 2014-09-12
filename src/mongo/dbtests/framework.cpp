@@ -96,7 +96,7 @@ namespace mongo {
                         warning() << currentTestName << " has been running for more than " << minutesRunning-1 << " minutes." << endl;
                         
                         // See what is stuck
-                        newlm::Locker::dumpGlobalLockManager();
+                        newlm::LockerImpl::dumpGlobalLockManager();
                     }
                 }
             }

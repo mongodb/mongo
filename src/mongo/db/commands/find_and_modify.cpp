@@ -34,10 +34,11 @@
 
 #include "mongo/db/commands/find_and_modify.h"
 
+#include "mongo/db/client.h"
 #include "mongo/db/clientcursor.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/dbdirectclient.h"
 #include "mongo/db/dbhelpers.h"
-#include "mongo/db/instance.h"
 #include "mongo/db/projection.h"
 #include "mongo/db/ops/delete.h"
 #include "mongo/db/ops/update.h"

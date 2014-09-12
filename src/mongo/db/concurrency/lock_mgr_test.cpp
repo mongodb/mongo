@@ -27,7 +27,7 @@
 */
 
 /**
- * tests for util/concurrency/lock_mgr.* capabilities
+ * tests for db/concurrency/lock_mgr.* capabilities
  *
  * Testing concurrency requires multiple threads.  In this test, these are packaged as
  * instances of a ClientTransaction class.  The test's main thread creates instances
@@ -457,7 +457,7 @@ TEST(LockManagerTest, TxDeadlock) {
     t1.acquire(kExclusive, 2, BLOCKED);
     // a1's request would form a dependency cycle, so it should abort
     a1.acquire(kExclusive, 1, ABORTED);
-    t1.wakened(); // with t2's locks released, t1 should wake
+    t1.wakened(); // with a1's locks released, t1 should wake
     t1.release(kExclusive, 2);
     t1.release(kShared, 1);
 

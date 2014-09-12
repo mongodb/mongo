@@ -35,13 +35,14 @@
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/auth/privilege.h"
 #include "mongo/db/auth/resource_pattern.h"
-#include "mongo/db/jsobj.h"
+#include "mongo/db/client.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/dbhash.h"
-#include "mongo/db/instance.h"
+#include "mongo/db/dbdirectclient.h"
+#include "mongo/db/jsobj.h"
 #include "mongo/db/matcher/matcher.h"
-#include "mongo/db/repl/oplog.h"
 #include "mongo/db/operation_context_impl.h"
+#include "mongo/db/repl/oplog.h"
 
 namespace mongo {
     class ApplyOpsCmd : public Command {

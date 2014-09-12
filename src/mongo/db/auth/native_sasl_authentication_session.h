@@ -36,7 +36,7 @@
 #include "mongo/db/auth/authentication_session.h"
 #include "mongo/platform/cstdint.h"
 #include "mongo/db/auth/sasl_authentication_session.h"
-#include "mongo/db/auth/sasl_conversation.h"
+#include "mongo/db/auth/sasl_server_conversation.h"
 
 namespace mongo {
     
@@ -65,6 +65,6 @@ namespace mongo {
 
     private:
         std::string _mechanism;
-        boost::scoped_ptr<SaslConversation> _saslConversation;
+        boost::scoped_ptr<SaslServerConversation> _saslConversation;
     };
 }  // namespace mongo

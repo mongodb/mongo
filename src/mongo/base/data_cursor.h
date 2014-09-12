@@ -35,102 +35,180 @@
 
 namespace mongo {
 
-    template <class T>
-    struct CursorMethods : public T {
+    class ConstDataCursor : public ConstDataView {
+    public:
 
-        CursorMethods(typename T::bytes_type bytes) : T(bytes) {}
+        typedef ConstDataView view_type;
 
-        T operator+(std::size_t s) const {
-            return this->T::view() + s;
+        ConstDataCursor(ConstDataView::bytes_type bytes)
+            : ConstDataView(bytes) {
         }
 
-        T& operator+=(std::size_t s) {
-            *this = this->T::view() + s;
+        ConstDataCursor operator+(std::size_t s) const {
+            return view() + s;
+        }
+
+        ConstDataCursor& operator+=(std::size_t s) {
+            *this = view() + s;
             return *this;
         }
 
-        T operator-(std::size_t s) const {
-            return this->T::view() - s;
+        ConstDataCursor operator-(std::size_t s) const {
+            return view() - s;
         }
 
-        T& operator-=(std::size_t s) {
-            *this = this->T::view() - s;
+        ConstDataCursor& operator-=(std::size_t s) {
+            *this = view() - s;
             return *this;
         }
 
-        T& operator++() {
-            return this->operator+=(1);
+        ConstDataCursor& operator++() {
+            return operator+=(1);
         }
 
-        T operator++(int) {
-            T tmp = *this;
+        ConstDataCursor operator++(int) {
+            ConstDataCursor tmp = *this;
             operator++();
             return tmp;
         }
 
-        T& operator--() {
-            return this->operator-=(1);
+        ConstDataCursor& operator--() {
+            return operator-=(1);
         }
 
-        T operator--(int) {
-            T tmp = *this;
+        ConstDataCursor operator--(int) {
+            ConstDataCursor tmp = *this;
             operator--();
             return tmp;
         }
 
-        template <typename U>
-        void skip() {
-            *this = this->T::view() + sizeof(U);
+        template <typename T>
+        ConstDataCursor& skip() {
+            *this = view() + sizeof(T);
+            return *this;
         }
 
-        template <typename U>
-        U readNativeAndAdvance() {
-            U out = this->T::template readNative<U>();
-            this->skip<U>();
+        template <typename T>
+        ConstDataCursor& readNativeAndAdvance(T* t) {
+            readNative(t);
+            skip<T>();
+            return *this;
+        }
+
+        template <typename T>
+        T readNativeAndAdvance() {
+            T out;
+            readNativeAndAdvance(&out);
             return out;
         }
 
-        template <typename U>
-        U readLEAndAdvance() {
-            return littleToNative(readNativeAndAdvance<U>());
+        template <typename T>
+        T readLEAndAdvance() {
+            return endian::littleToNative(readNativeAndAdvance<T>());
         }
 
-        template <typename U>
-        U readBEAndAdvance() {
-            return bigToNative(readNativeAndAdvance<U>());
+        template <typename T>
+        T readBEAndAdvance() {
+            return endian::bigToNative(readNativeAndAdvance<T>());
         }
 
     };
 
-    class ConstDataCursor : public CursorMethods<ConstDataView> {
+    class DataCursor : public DataView {
     public:
 
-        ConstDataCursor(ConstDataView::bytes_type bytes) : CursorMethods<ConstDataView>(bytes) {}
-    };
+        typedef DataView view_type;
 
-    class DataCursor : public CursorMethods<DataView> {
-    public:
-
-        DataCursor(DataView::bytes_type bytes) : CursorMethods<DataView>(bytes) {}
-
-        template <typename T>
-        void writeNativeAndAdvance(const T& value) {
-            this->writeNative(value);
-            this->skip<T>();
-        }
-
-        template <typename T>
-        void writeLEAndAdvance(const T& value) {
-            return writeNativeAndAdvance(nativeToLittle(value));
-        }
-
-        template <typename T>
-        void writeBEAndAdvance(const T& value) {
-            return writeNativeAndAdvance(nativeToBig(value));
-        }
+        DataCursor(DataView::bytes_type bytes)
+            : DataView(bytes) {}
 
         operator ConstDataCursor() const {
             return view();
+        }
+
+        DataCursor operator+(std::size_t s) const {
+            return view() + s;
+        }
+
+        DataCursor& operator+=(std::size_t s) {
+            *this = view() + s;
+            return *this;
+        }
+
+        DataCursor operator-(std::size_t s) const {
+            return view() - s;
+        }
+
+        DataCursor& operator-=(std::size_t s) {
+            *this = view() - s;
+            return *this;
+        }
+
+        DataCursor& operator++() {
+            return operator+=(1);
+        }
+
+        DataCursor operator++(int) {
+            DataCursor tmp = *this;
+            operator++();
+            return tmp;
+        }
+
+        DataCursor& operator--() {
+            return operator-=(1);
+        }
+
+        DataCursor operator--(int) {
+            DataCursor tmp = *this;
+            operator--();
+            return tmp;
+        }
+
+        template <typename T>
+        DataCursor& skip() {
+            *this = view() + sizeof(T);
+            return *this;
+        }
+
+        template <typename T>
+        DataCursor& readNativeAndAdvance(T* t) {
+            readNative(t);
+            skip<T>();
+            return *this;
+        }
+
+        template <typename T>
+        T readNativeAndAdvance() {
+            T out;
+            readNativeAndAdvance(&out);
+            return out;
+        }
+
+        template <typename T>
+        T readLEAndAdvance() {
+            return endian::littleToNative(readNativeAndAdvance<T>());
+        }
+
+        template <typename T>
+        T readBEAndAdvance() {
+            return endian::bigToNative(readNativeAndAdvance<T>());
+        }
+
+        template <typename T>
+        DataCursor& writeNativeAndAdvance(const T& value) {
+            writeNative(value);
+            skip<T>();
+            return *this;
+        }
+
+        template <typename T>
+        DataCursor& writeLEAndAdvance(const T& value) {
+            return writeNativeAndAdvance(endian::nativeToLittle(value));
+        }
+
+        template <typename T>
+        DataCursor& writeBEAndAdvance(const T& value) {
+            return writeNativeAndAdvance(endian::nativeToBig(value));
         }
     };
 

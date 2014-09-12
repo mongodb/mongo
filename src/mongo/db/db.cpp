@@ -53,6 +53,7 @@
 #include "mongo/db/commands/server_status_metric.h"
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/db.h"
+#include "mongo/db/dbdirectclient.h"
 #include "mongo/db/dbmessage.h"
 #include "mongo/db/dbwebserver.h"
 #include "mongo/db/global_environment_d.h"
@@ -77,7 +78,7 @@
 #include "mongo/db/repl/rs.h"
 #include "mongo/db/restapi.h"
 #include "mongo/db/server_parameters.h"
-#include "mongo/db/startup_warnings.h"
+#include "mongo/db/startup_warnings_mongod.h"
 #include "mongo/db/stats/counters.h"
 #include "mongo/db/stats/snapshots.h"
 #include "mongo/db/storage/storage_engine.h"
@@ -544,7 +545,7 @@ namespace mongo {
             l << ( is32bit ? " 32" : " 64" ) << "-bit host=" << getHostNameCached() << endl;
         }
         DEV log(LogComponent::kDefault) << "_DEBUG build (which is slower)" << endl;
-        logStartupWarnings();
+        logMongodStartupWarnings();
 #if defined(_WIN32)
         printTargetMinOS();
 #endif
@@ -646,6 +647,28 @@ namespace mongo {
             }
 
             authindex::configureSystemIndexes(&txn, "admin");
+
+            // SERVER-14090: Verify that auth schema version is schemaVersion26Final.
+            int foundSchemaVersion;
+            Status status = getGlobalAuthorizationManager()->getAuthorizationVersion(
+                    &txn, &foundSchemaVersion);
+            if (!status.isOK()) {
+                log() << "Auth schema version is incompatible: "
+                      << "User and role management commands require auth data to have "
+                      << "schema version " << AuthorizationManager::schemaVersion26Final
+                      << " but startup could not verify schema version: " << status.toString()
+                      << endl;
+                exitCleanly(EXIT_NEED_UPGRADE);
+            }
+            if (foundSchemaVersion != AuthorizationManager::schemaVersion26Final) {
+                log() << "Auth schema version is incompatible: "
+                      << "User and role management commands require auth data to have "
+                      << "schema version " << AuthorizationManager::schemaVersion26Final
+                      << " but found " << foundSchemaVersion << ". In order to upgrade "
+                      << "the auth schema, first downgrade MongoDB binaries to version "
+                      << "2.6 and then run the authSchemaUpgrade command." << endl;
+                exitCleanly(EXIT_NEED_UPGRADE);
+            }
         }
 
         getDeleter()->startWorkers();

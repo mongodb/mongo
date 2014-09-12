@@ -38,9 +38,8 @@
 #include "mongo/db/clientcursor.h"
 #include "mongo/db/catalog/database_catalog_entry.h"
 #include "mongo/db/catalog/database_holder.h"
-#include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/global_environment_experiment.h"
-#include "mongo/db/operation_context_impl.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/db/storage/mmap_v1/dur.h"
 #include "mongo/db/storage/storage_engine.h"
 #include "mongo/util/file_allocator.h"
@@ -158,8 +157,6 @@ namespace mongo {
                                   BSONObjBuilder& result,
                                   bool force) {
         invariant(txn->lockState()->isW());
-
-        getDur().commitNow(txn); // bad things happen if we close a DB with outstanding writes
 
         SimpleMutex::scoped_lock lk(_m);
 

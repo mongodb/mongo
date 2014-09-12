@@ -42,11 +42,11 @@
 #include "mongo/db/commands/fsync.h"
 #include "mongo/db/commands/server_status_metric.h"
 #include "mongo/db/catalog/database_holder.h"
-#include "mongo/db/instance.h"
+#include "mongo/db/dbdirectclient.h"
+#include "mongo/db/operation_context_impl.h"
 #include "mongo/db/ops/delete.h"
 #include "mongo/db/repl/repl_coordinator_global.h"
 #include "mongo/db/server_parameters.h"
-#include "mongo/db/operation_context_impl.h"
 #include "mongo/util/background.h"
 #include "mongo/util/log.h"
 

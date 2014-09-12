@@ -38,8 +38,8 @@ namespace mongo {
     TEST(DataView, ConstDataView) {
         char buf[sizeof(uint32_t) * 3];
         uint32_t native = 1234;
-        uint32_t le = nativeToLittle(native);
-        uint32_t be = nativeToBig(native);
+        uint32_t le = endian::nativeToLittle(native);
+        uint32_t be = endian::nativeToBig(native);
 
         std::memcpy(buf, &native, sizeof(uint32_t));
         std::memcpy(buf + sizeof(uint32_t), &le, sizeof(uint32_t));

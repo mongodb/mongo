@@ -32,6 +32,7 @@
 
 #include <boost/filesystem/operations.hpp>
 
+#include "mongo/db/concurrency/lock_state.h"
 #include "mongo/db/storage/mmap_v1/durable_mapped_file.h"
 #include "mongo/util/timer.h"
 #include "mongo/dbtests/dbtests.h"

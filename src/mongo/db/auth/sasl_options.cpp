@@ -44,8 +44,7 @@ namespace mongo {
     SASLGlobalParams::SASLGlobalParams() {
         authenticationMechanisms.push_back("MONGODB-CR");
         authenticationMechanisms.push_back("MONGODB-X509");
-        // TODO: Enable SCRAM-SHA-1 as a default mech when all platforms support it
-        // authenticationMechanisms.push_back("SCRAM-SHA-1");
+        authenticationMechanisms.push_back("SCRAM-SHA-1");
     }
 
     Status addSASLOptions(moe::OptionSection* options) {

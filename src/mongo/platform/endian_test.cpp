@@ -33,6 +33,8 @@
 
 namespace mongo {
 
+    using namespace endian;
+
     TEST( EndianTest, TestSlow16 ) {
         uint8_t le_buf[] = { 0x01, 0x02 };
         uint8_t be_buf[] = { 0x02, 0x01 };

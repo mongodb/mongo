@@ -712,9 +712,13 @@ namespace mongo {
                                            shardingState.getVersion(pq.ns()));
         }
 
+        const logger::LogComponent queryLogComponent = logger::LogComponent::kQuery;
+        const logger::LogSeverity logLevelOne = logger::LogSeverity::Debug(1);
+
         // Set debug information for consumption by the profiler.
         if (ctx.ctx().db()->getProfilingLevel() > 0 ||
-            curop.elapsedMillis() > serverGlobalParams.slowMS) {
+            curop.elapsedMillis() > serverGlobalParams.slowMS ||
+            logger::globalLogDomain()->shouldLog(queryLogComponent, logLevelOne)) {
             PlanSummaryStats newStats;
             Explain::getSummaryStats(exec.get(), &newStats);
 

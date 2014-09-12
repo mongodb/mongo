@@ -310,10 +310,9 @@ namespace repl {
 
             return appendCommandStatus(
                     result,
-                    getGlobalReplicationCoordinator()->processReplSetMaintenance(
+                    getGlobalReplicationCoordinator()->setMaintenanceMode(
                             txn,
-                            cmdObj["replSetMaintenance"].trueValue(),
-                            &result));
+                            cmdObj["replSetMaintenance"].trueValue()));
         }
     } cmdReplSetMaintenance;
 

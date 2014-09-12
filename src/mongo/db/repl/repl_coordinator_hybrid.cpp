@@ -104,16 +104,31 @@ namespace repl {
     }
 
     ReplicationCoordinator::StatusAndDuration 
-            HybridReplicationCoordinator::awaitReplicationOfLastOp(
+            HybridReplicationCoordinator::awaitReplicationOfLastOpForClient(
                     const OperationContext* txn,
                     const WriteConcernOptions& writeConcern) {
-        StatusAndDuration implStatus = _impl.awaitReplicationOfLastOp(txn, writeConcern);
+        StatusAndDuration implStatus = _impl.awaitReplicationOfLastOpForClient(txn, writeConcern);
         if (implStatus.status.isOK()) {
             WriteConcernOptions legacyWriteConcern = writeConcern;
             legacyWriteConcern.wTimeout = WriteConcernOptions::kNoWaiting;
-            StatusAndDuration legacyStatus = _legacy.awaitReplicationOfLastOp(txn,
-                                                                              legacyWriteConcern);
+            StatusAndDuration legacyStatus = _legacy.awaitReplicationOfLastOpForClient(
+                    txn, legacyWriteConcern);
             fassert(18669, legacyStatus.status);
+        }
+        return implStatus;
+    }
+
+    ReplicationCoordinator::StatusAndDuration
+            HybridReplicationCoordinator::awaitReplicationOfLastOpApplied(
+                    const OperationContext* txn,
+                    const WriteConcernOptions& writeConcern) {
+        StatusAndDuration implStatus = _impl.awaitReplicationOfLastOpApplied(txn, writeConcern);
+        if (implStatus.status.isOK()) {
+            WriteConcernOptions legacyWriteConcern = writeConcern;
+            legacyWriteConcern.wTimeout = WriteConcernOptions::kNoWaiting;
+            StatusAndDuration legacyStatus = _legacy.awaitReplicationOfLastOpApplied(
+                    txn, legacyWriteConcern);
+            fassert(18694, legacyStatus.status);
         }
         return implStatus;
     }
@@ -124,22 +139,6 @@ namespace repl {
                                                   const Milliseconds& stepdownTime) {
         Status legacyStatus = _legacy.stepDown(txn, force, waitTime, stepdownTime);
         Status implStatus = _impl.stepDown(txn, force, waitTime, stepdownTime);
-        return legacyStatus;
-    }
-
-    Status HybridReplicationCoordinator::stepDownAndWaitForSecondary(
-            OperationContext* txn,
-            const Milliseconds& initialWaitTime,
-            const Milliseconds& stepdownTime,
-            const Milliseconds& postStepdownWaitTime) {
-        Status legacyStatus = _legacy.stepDownAndWaitForSecondary(txn,
-                                                                  initialWaitTime,
-                                                                  stepdownTime,
-                                                                  postStepdownWaitTime);
-        Status implStatus = _impl.stepDownAndWaitForSecondary(txn,
-                                                              initialWaitTime,
-                                                              stepdownTime,
-                                                              postStepdownWaitTime);
         return legacyStatus;
     }
 
@@ -199,16 +198,27 @@ namespace repl {
         return legacyStatus;
     }
 
+    OpTime HybridReplicationCoordinator::getMyLastOptime() const {
+        _legacy.getMyLastOptime();
+        OpTime implOpTime = _impl.getMyLastOptime();
+        return implOpTime;
+    }
+
     OID HybridReplicationCoordinator::getElectionId() {
         OID legacyOID = _legacy.getElectionId();
         _impl.getElectionId();
         return legacyOID;
     }
 
-    OID HybridReplicationCoordinator::getMyRID() {
+    OID HybridReplicationCoordinator::getMyRID() const {
         OID legacyRID = _legacy.getMyRID();
-        _impl.getMyRID();
+        fassert(18696, legacyRID == _impl.getMyRID());
         return legacyRID;
+    }
+
+    void HybridReplicationCoordinator::setFollowerMode(const MemberState& newState) {
+        _legacy.setFollowerMode(newState);
+        _impl.setFollowerMode(newState);
     }
 
     void HybridReplicationCoordinator::prepareReplSetUpdatePositionCommand(OperationContext* txn,
@@ -239,8 +249,8 @@ namespace repl {
         _impl.processReplSetGetConfig(&implResult);
     }
 
-    bool HybridReplicationCoordinator::setMaintenanceMode(OperationContext* txn, bool activate) {
-        bool legacyResponse = _legacy.setMaintenanceMode(txn, activate);
+    Status HybridReplicationCoordinator::setMaintenanceMode(OperationContext* txn, bool activate) {
+        Status legacyResponse = _legacy.setMaintenanceMode(txn, activate);
         _impl.setMaintenanceMode(txn, activate);
         return legacyResponse;
     }
@@ -305,15 +315,6 @@ namespace repl {
         Status legacyStatus = _legacy.processReplSetFreeze(secs, resultObj);
         BSONObjBuilder implResult;
         Status implStatus = _impl.processReplSetFreeze(secs, &implResult);
-        return legacyStatus;
-    }
-
-    Status HybridReplicationCoordinator::processReplSetMaintenance(OperationContext* txn,
-                                                                   bool activate,
-                                                                   BSONObjBuilder* resultObj) {
-        Status legacyStatus = _legacy.processReplSetMaintenance(txn, activate, resultObj);
-        BSONObjBuilder implResult;
-        Status implStatus = _impl.processReplSetMaintenance(txn, activate, &implResult);
         return legacyStatus;
     }
 

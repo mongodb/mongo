@@ -165,17 +165,6 @@ namespace mongo {
          */
         static void getSummaryStats(PlanExecutor* exec, PlanSummaryStats* statsOut);
 
-        //
-        // Helpers for special-case explains.
-        //
-
-        /**
-         * If you have an empty query with a count, then there are no execution stages.
-         * We just get the number of records and then apply skip/limit. Since there
-         * are no stages, this requires a special explain format.
-         */
-        static void explainCountEmptyQuery(BSONObjBuilder* out);
-
     private:
         /**
          * Private helper that does the heavy-lifting for the public statsToBSON(...) functions

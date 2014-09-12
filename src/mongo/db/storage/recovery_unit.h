@@ -80,13 +80,6 @@ namespace mongo {
         virtual bool awaitCommit() = 0;
 
         /**
-         * Commit if required.  May take a long time.  Returns true if committed.
-         *
-         * WARNING: Data *must* be in a crash-recoverable state when this is called.
-         */
-        virtual bool commitIfNeeded(bool force = false) = 0;
-
-        /**
          * A Change is an action that is registerChange()'d while a WriteUnitOfWork exists. The
          * change is either rollback()'d or commit()'d when the WriteUnitOfWork goes out of scope.
          *

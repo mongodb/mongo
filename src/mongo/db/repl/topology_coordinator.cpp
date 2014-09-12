@@ -32,54 +32,37 @@
 
 #include "mongo/db/repl/topology_coordinator.h"
 
+#include <string>
+
+#include "mongo/util/assert_util.h"
+
 namespace mongo {
 namespace repl {
+namespace {
+    static const int kLeaderValue = 0;
+    static const int kFollowerValue = 1;
+    static const int kCandidateValue = 2;
+}  // namespace
+
+    const TopologyCoordinator::Role TopologyCoordinator::Role::leader(kLeaderValue);
+    const TopologyCoordinator::Role TopologyCoordinator::Role::follower(kFollowerValue);
+    const TopologyCoordinator::Role TopologyCoordinator::Role::candidate(kCandidateValue);
+
+    TopologyCoordinator::Role::Role(int value) : _value(value) {}
+
+    std::string TopologyCoordinator::Role::toString() const {
+        switch(_value) {
+        case kLeaderValue:
+            return "leader";
+        case kFollowerValue:
+            return "follower";
+        case kCandidateValue:
+            return "candidate";
+        }
+        invariant(false);
+    }
+
     TopologyCoordinator::~TopologyCoordinator() {}
-
-    TopologyCoordinator::HeartbeatResponseAction
-    TopologyCoordinator::HeartbeatResponseAction::makeNoAction() {
-        return HeartbeatResponseAction();
-    }
-
-    TopologyCoordinator::HeartbeatResponseAction
-    TopologyCoordinator::HeartbeatResponseAction::makeReconfigAction() {
-        HeartbeatResponseAction result;
-        result._action = Reconfig;
-        return result;
-    }
-
-    TopologyCoordinator::HeartbeatResponseAction
-    TopologyCoordinator::HeartbeatResponseAction::makeElectAction() {
-        HeartbeatResponseAction result;
-        result._action = StartElection;
-        return result;
-    }
-
-    TopologyCoordinator::HeartbeatResponseAction
-    TopologyCoordinator::HeartbeatResponseAction::makeStepDownSelfAction(int primaryIndex) {
-        HeartbeatResponseAction result;
-        result._action = StepDownSelf;
-        result._primaryIndex = primaryIndex;
-        return result;
-    }
-
-    TopologyCoordinator::HeartbeatResponseAction
-    TopologyCoordinator::HeartbeatResponseAction::makeStepDownRemoteAction(int primaryIndex) {
-        HeartbeatResponseAction result;
-        result._action = StepDownRemotePrimary;
-        result._primaryIndex = primaryIndex;
-        return result;
-    }
-
-    TopologyCoordinator::HeartbeatResponseAction::HeartbeatResponseAction() :
-        _action(NoAction),
-        _primaryIndex(-1),
-        _nextHeartbeatStartDate(0) {
-    }
-
-    void TopologyCoordinator::HeartbeatResponseAction::setNextHeartbeatStartDate(Date_t when) {
-        _nextHeartbeatStartDate = when;
-    }
 
 }  // namespace repl
 }  // namespace mongo

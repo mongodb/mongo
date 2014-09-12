@@ -215,13 +215,33 @@ namespace mongo {
         return i->second.get();
     }
 
-    rocksdb::ColumnFamilyHandle* RocksEngine::getIndexColumnFamily(
-                                                           const StringData& ns,
-                                                           const StringData& indexName,
-                                                           const boost::optional<Ordering> order ) {
+    rocksdb::ColumnFamilyHandle* RocksEngine::getIndexColumnFamilyNoCreate(
+                                                                     const StringData& ns,
+                                                                     const StringData& indexName ) {
+        ROCKS_TRACE << "getIndexColumnFamilyWithoutCreate " << ns << "$" << indexName;
+
+        boost::mutex::scoped_lock lk( _entryMapMutex );
+        return _getIndexColumnFamilyNoCreate_inlock( ns, indexName );
+    }
+
+    rocksdb::ColumnFamilyHandle* RocksEngine::getIndexColumnFamily( const StringData& ns,
+                                                                    const StringData& indexName,
+                                                                    const Ordering& order ) {
         ROCKS_TRACE << "getIndexColumnFamily " << ns << "$" << indexName;
 
         boost::mutex::scoped_lock lk( _entryMapMutex );
+        rocksdb::ColumnFamilyHandle* existing_cf = _getIndexColumnFamilyNoCreate_inlock(
+                                                                                        ns,
+                                                                                        indexName );
+        if (existing_cf)
+            return existing_cf;
+         // if we get here, then the column family doesn't exist, so we need to create it
+        return _createIndexColumnFamily_inlock(ns, indexName, order);
+    }
+
+    rocksdb::ColumnFamilyHandle* RocksEngine::_getIndexColumnFamilyNoCreate_inlock(
+                                                                     const StringData& ns,
+                                                                     const StringData& indexName ) {
         EntryMap::const_iterator i = _entryMap.find( ns );
         if ( i == _entryMap.end() )
             return NULL;
@@ -232,10 +252,17 @@ namespace mongo {
             if ( handle )
                 return handle;
         }
+        return NULL;
+    }
 
-        // if we get here, then the column family doesn't exist, so we need to create it
-
-        invariant( order && "need an Ordering to create a comparator for the index" );
+    rocksdb::ColumnFamilyHandle* RocksEngine::_createIndexColumnFamily_inlock(
+                                                                        const StringData& ns,
+                                                                        const StringData& indexName,
+                                                                        const Ordering& order ) {
+        EntryMap::const_iterator i = _entryMap.find( ns );
+        if ( i == _entryMap.end() )
+            return NULL;
+        shared_ptr<Entry> entry = i->second;
 
         const string fullName = ns.toString() + string("$") + indexName.toString();
         rocksdb::ColumnFamilyHandle* cf = NULL;
@@ -243,7 +270,7 @@ namespace mongo {
         typedef boost::shared_ptr<const rocksdb::Comparator> SharedComparatorPtr;
         SharedComparatorPtr& comparator = entry->indexNameToComparator[indexName];
 
-        comparator.reset( RocksSortedDataImpl::newRocksComparator( order.get() ) );
+        comparator.reset( RocksSortedDataImpl::newRocksComparator( order ) );
         invariant( comparator );
 
         rocksdb::ColumnFamilyOptions options;
@@ -260,6 +287,12 @@ namespace mongo {
                                             const StringData& indexName,
                                             const StringData& ns ) {
         boost::mutex::scoped_lock lk( _entryMapMutex );
+        _removeColumnFamily_inlock( cfh, indexName, ns );
+    }
+
+    void RocksEngine::_removeColumnFamily_inlock( rocksdb::ColumnFamilyHandle** cfh,
+                                                   const StringData& indexName,
+                                                   const StringData& ns ) {
         EntryMap::const_iterator i = _entryMap.find( ns );
         const rocksdb::Status s = _db->DropColumnFamily( *cfh );
         invariant( s.ok() );
@@ -345,7 +378,15 @@ namespace mongo {
         Entry* entry = _entryMap[ns].get();
 
         for ( auto it = entry->indexNameToCF.begin(); it != entry->indexNameToCF.end(); ++it ) {
-            entry->collectionEntry->removeIndex( opCtx, it->first );
+            entry->collectionEntry->removeIndexWithoutDroppingCF( opCtx, it->first );
+
+            // drop the actual index in rocksdb
+            rocksdb::ColumnFamilyHandle* cfh = _getIndexColumnFamilyNoCreate_inlock( ns,
+                                                                                     it->first );
+
+            // Note: this invalidates cfh. Do not use after this call
+            _removeColumnFamily_inlock( &cfh, it->first, ns );
+            invariant( cfh == nullptr );
         }
 
         entry->recordStore->dropRsMetaData( opCtx );

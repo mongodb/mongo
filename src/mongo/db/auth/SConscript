@@ -45,14 +45,16 @@ env.Library('authservercommon',
             LIBDEPS=['authcore', 'authmocks', 'saslauth'])
 
 env.Library('saslauth',
-            ['mechanism_scram.cpp',
-             'native_sasl_authentication_session.cpp',
+             ['native_sasl_authentication_session.cpp',
              'sasl_authentication_session.cpp',
-             'sasl_conversation.cpp',
              'sasl_options.cpp',
              'sasl_plain_server_conversation.cpp',
-             'sasl_scramsha1_server_conversation.cpp'],
-             LIBDEPS=['authcore'])
+             'sasl_scramsha1_server_conversation.cpp',
+             'sasl_server_conversation.cpp'],
+             LIBDEPS=['authcore', 'scramauth'])
+
+env.Library('scramauth',
+            ['mechanism_scram.cpp'])
 
 env.Library('authmongod',
             ['authz_manager_external_state_d.cpp',

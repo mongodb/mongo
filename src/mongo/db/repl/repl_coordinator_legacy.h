@@ -62,7 +62,11 @@ namespace repl {
                 const OpTime& ts,
                 const WriteConcernOptions& writeConcern);
 
-        virtual ReplicationCoordinator::StatusAndDuration awaitReplicationOfLastOp(
+        virtual ReplicationCoordinator::StatusAndDuration awaitReplicationOfLastOpForClient(
+                const OperationContext* txn,
+                const WriteConcernOptions& writeConcern);
+
+        virtual ReplicationCoordinator::StatusAndDuration awaitReplicationOfLastOpApplied(
                 const OperationContext* txn,
                 const WriteConcernOptions& writeConcern);
 
@@ -70,11 +74,6 @@ namespace repl {
                                 bool force,
                                 const Milliseconds& waitTime,
                                 const Milliseconds& stepdownTime);
-
-        virtual Status stepDownAndWaitForSecondary(OperationContext* txn,
-                                                   const Milliseconds& initialWaitTime,
-                                                   const Milliseconds& stepdownTime,
-                                                   const Milliseconds& postStepdownWaitTime);
 
         virtual bool isMasterForReportingPurposes();
 
@@ -93,9 +92,13 @@ namespace repl {
 
         virtual Status setMyLastOptime(OperationContext* txn, const OpTime& ts);
 
+        virtual OpTime getMyLastOptime() const;
+
         virtual OID getElectionId();
 
-        virtual OID getMyRID();
+        virtual OID getMyRID() const;
+
+        virtual void setFollowerMode(const MemberState& newState);
 
         virtual void prepareReplSetUpdatePositionCommand(OperationContext* txn,
                                                          BSONObjBuilder* cmdBuilder);
@@ -108,11 +111,7 @@ namespace repl {
 
         virtual void processReplSetGetConfig(BSONObjBuilder* result);
 
-        virtual bool setMaintenanceMode(OperationContext* txn, bool activate);
-
-        virtual Status processReplSetMaintenance(OperationContext* txn,
-                                                 bool activate,
-                                                 BSONObjBuilder* resultObj);
+        virtual Status setMaintenanceMode(OperationContext* txn, bool activate);
 
         virtual Status processReplSetSyncFrom(const HostAndPort& target,
                                               BSONObjBuilder* resultObj);
@@ -159,14 +158,9 @@ namespace repl {
         virtual bool isReplEnabled() const;
 
     private:
-        Status _stepDownHelper(OperationContext* txn,
-                               bool force,
-                               const Milliseconds& initialWaitTime,
-                               const Milliseconds& stepdownTime,
-                               const Milliseconds& postStepdownWaitTime);
 
         // Mutex that protects the _slaveOpTimeMap
-        boost::mutex _mutex;
+        mutable boost::mutex _mutex;
 
         // Map from RID to Member pointer for replica set nodes
         typedef std::map<OID, Member*> OIDMemberMap;

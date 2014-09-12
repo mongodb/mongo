@@ -45,9 +45,10 @@
  */
 
 namespace mongo {
-namespace newlm {
 
     class Locker;
+
+namespace newlm {
 
     /**
      * Lock modes. Refer to the compatiblity matrix in the source file for information on how
@@ -59,9 +60,15 @@ namespace newlm {
         MODE_IX         = 2,
         MODE_S          = 3,
         MODE_X          = 4,
-
-        MODE_COUNT
     };
+
+    enum {
+        // Counts the entries in the LockMode enumeration. Used for array size allocations, etc.
+        LockModesCount   = 5,
+    };
+
+    // To ensure lock modes are not added without updating the counts
+    BOOST_STATIC_ASSERT(LockModesCount == MODE_X + 1);
 
 
     /**
@@ -81,6 +88,13 @@ namespace newlm {
          * was requested.
          */
         LOCK_WAITING,
+
+        /**
+         * The lock request waited, but timed out before it could be granted. This value is never
+         * returned by the LockManager methods here, but by the Locker class, which offers
+         * capability to block while waiting for locks.
+         */
+        LOCK_TIMEOUT,
 
         /**
          * The lock request was not granted because it would result in a deadlock. No changes to
@@ -112,6 +126,7 @@ namespace newlm {
         // Generic resources
         RESOURCE_DATABASE,
         RESOURCE_COLLECTION,
+        RESOURCE_DOCUMENT,
 
         // Must bound the max resource id
         RESOURCE_LAST
@@ -277,22 +292,58 @@ namespace newlm {
      * Not thread-safe and should only be accessed under the LockManager's bucket lock.
      */
     struct LockHead {
+
         LockHead(const ResourceId& resId);
         ~LockHead();
 
+        // Increments the granted/requested counts and maintains the grantedModes/requestedModes
+        // masks respectively. The count argument can only be -1 or 1, because we always change the
+        // modes one at a time.
+        enum ChangeModeCountAction {
+            Increment = 1, Decrement = -1
+        };
+
+        void changeGrantedModeCount(LockMode mode, ChangeModeCountAction action);
+        void changeRequestedModeCount(LockMode mode, ChangeModeCountAction count);
+
+
+        // Id of the resource which this lock protects
         const ResourceId resourceId;
+
+
+        //
+        // Granted queue
+        //
 
         // The head of the doubly-linked list of granted or converting requests
         LockRequest* grantedQueue;
 
-        // Bit-mask of the maximum of the granted + converting modes on the granted queue.
+        // Counts the grants and coversion counts for each of the supported lock modes. These
+        // counts should exactly match the aggregated granted modes on the granted list.
+        uint32_t grantedCounts[LockModesCount];
+
+        // Bit-mask of the granted + converting modes on the granted queue. Maintained in lock-step
+        // with the grantedCounts array.
         uint32_t grantedModes;
+
+
+        //
+        // Conflict queue
+        //
 
         // Doubly-linked list of requests, which have not been granted yet because they conflict
         // with the set of granted modes. The reason to have both begin and end pointers is to make
         // the FIFO scheduling easier (queue at begin and take from the end).
         LockRequest* conflictQueueBegin;
         LockRequest* conflictQueueEnd;
+
+        // Counts the conflicting requests for each of the lock modes. These counts should exactly
+        // match the aggregated requested modes on the conflicts list.
+        uint32_t conflictCounts[LockModesCount];
+
+        // Bit-mask of the requested modes on the conflict queue. Maintained in lock-step with the
+        // conflictCounts array.
+        uint32_t conflictModes;
     };
 
 
@@ -306,10 +357,68 @@ namespace newlm {
         LockManager();
         ~LockManager();
 
+        /**
+          * Acquires lock on the specified resource in the specified mode and returns the outcome
+          * of the operation. See the details for LockResult for more information on what the
+          * different results mean.
+          *
+          * Locking the same resource twice increments the reference count of the lock so each call
+          * to lock must be matched with a call to unlock with the same resource.
+          *
+          * @param resId Id of the resource to be locked.
+          * @param request LockRequest structure on which the state of the request will be tracked.
+          *                 This value cannot be NULL and the notify value must be set. If the
+          *                 return value is not LOCK_WAITING, this pointer can be freed and will
+          *                 not be used any more.
+          *
+          *                 If the return value is LOCK_WAITING, the notification method will be
+          *                 called at some point into the future, when the lock either becomes
+          *                 granted or a deadlock is discovered. If unlock is called before the
+          *                 lock becomes granted, the notification will not be invoked.
+          *
+          *                 If the return value is LOCK_WAITING, the notification object *must*
+          *                 live at least until the notfy method has been invoked or unlock has
+          *                 been called for the resource it was assigned to. Failure to do so will
+          *                 cause the lock manager to call into an invalid memory location.
+          * @param mode Mode in which the resource should be locked. Lock upgrades are allowed.
+          *
+          * @return See comments for LockResult.
+          */
         LockResult lock(const ResourceId& resId, LockRequest* request, LockMode mode);
-        void unlock(LockRequest* request);
+
+        /**
+         * Decrements the reference count of a previously locked request and if the reference count
+         * becomes zero, removes the request and proceeds to granting any conflicts.
+         *
+         * This method always succeeds and never blocks.
+         *
+         * @param request A previously locked request. Calling unlock more times than lock was
+         *                  called for the same LockRequest is an error.
+         *
+         * @return true if this is the last reference for the request; false otherwise
+         */
+        bool unlock(LockRequest* request);
+
+        /**
+         * Downgrades the mode in which an already granted request is held, without changing the
+         * reference count of the lock request. This call never blocks, will always succeed and may
+         * potentially allow other blocked lock requests to proceed.
+         * 
+         * @param request Request, already in granted mode through a previous call to lock.
+         * @param newMode Mode, which is less-restrictive than the mode in which the request is
+         *                  already held. I.e., the conflict set of newMode must be a sub-set of
+         *                  the conflict set of the request's current mode.
+         */
+        void downgrade(LockRequest* request, LockMode newMode);
 
         void dump() const;
+
+
+        //
+        // Test-only methods
+        //
+
+        void setNoCheckForLeakedLocksTestOnly(bool newValue);
 
     private:
 
@@ -333,22 +442,20 @@ namespace newlm {
         void _dumpBucket(const LockBucket* bucket) const;
 
         /**
-         * Should be invoked when the state of a lock changes (in particular during downgrades) in
-         * order to grant whatever locks could possibly be granted.
+         * Should be invoked when the state of a lock changes in a way, which could potentially
+         * allow other blocked requests to proceed.
          *
          * MUST be called under the lock bucket's spin lock.
          *
-         * @param lock Lock whose grant state should be recalculated
-         * @param requestUnlocked Which request on the lock state was just unlocked
-         * @param requestChanged Which request on the lock state caused the recalculation
-         *
-         * Only one of requestUnlocked or requestChanged can be non-NULL.
-         *
+         * @param lock Lock whose grant state should be recalculated.
          */
-        void _recalcAndGrant(LockHead* lock, LockRequest* unlocked, LockRequest* changed);
+        void _onLockModeChanged(LockHead* lock);
 
         unsigned _numLockBuckets;
         LockBucket* _lockBuckets;
+
+        // This is for tests only and removes the validation for leaked locks in the destructor
+        bool _noCheckForLeakedLocksTestOnly;
     };
 
 } // namespace newlm

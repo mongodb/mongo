@@ -48,7 +48,6 @@
 #include "mongo/db/ops/insert.h"
 #include "mongo/db/ops/update_executor.h"
 #include "mongo/db/ops/update_lifecycle_impl.h"
-#include "mongo/db/ops/update_request.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/repl_coordinator_global.h"
 #include "mongo/db/repl/repl_settings.h"
@@ -147,30 +146,39 @@ namespace mongo {
         staleError->setErrInfo( builder.obj() );
     }
 
-    void WriteBatchExecutor::executeBatch( const BatchedCommandRequest& request,
-                                           BatchedCommandResponse* response ) {
+    // static
+    Status WriteBatchExecutor::validateBatch( const BatchedCommandRequest& request ) {
 
         // Validate namespace
         const NamespaceString nss = NamespaceString( request.getNS() );
         if ( !nss.isValid() ) {
-            toBatchError( Status( ErrorCodes::InvalidNamespace,
-                                  nss.ns() + " is not a valid namespace" ),
-                          response );
-            return;
+            return Status( ErrorCodes::InvalidNamespace,
+                           nss.ns() + " is not a valid namespace" );
         }
 
         // Make sure we can write to the namespace
         Status allowedStatus = userAllowedWriteNS( nss );
         if ( !allowedStatus.isOK() ) {
-            toBatchError( allowedStatus, response );
-            return;
+            return allowedStatus;
         }
 
         // Validate insert index requests
         // TODO: Push insert index requests through createIndex once all upgrade paths support it
         string errMsg;
         if ( request.isInsertIndexRequest() && !request.isValidIndexRequest( &errMsg ) ) {
-            toBatchError( Status( ErrorCodes::InvalidOptions, errMsg ), response );
+            return Status( ErrorCodes::InvalidOptions, errMsg );
+        }
+
+        return Status::OK();
+    }
+
+    void WriteBatchExecutor::executeBatch( const BatchedCommandRequest& request,
+                                           BatchedCommandResponse* response ) {
+
+        // Validate namespace
+        Status isValid = validateBatch(request);
+        if (!isValid.isOK()) {
+            toBatchError( isValid, response );
             return;
         }
 

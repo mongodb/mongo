@@ -332,6 +332,11 @@ namespace {
     }
 
     Status MMAPV1Engine::closeDatabase( OperationContext* txn, const StringData& db ) {
+        // Before the files are closed, flush any potentially outstanding changes, which might
+        // reference this database. Otherwise we will assert when subsequent applications of the
+        // global journal entries occur, which happen to have write intents for the removed files.
+        getDur().commitNow(txn);
+
         boost::mutex::scoped_lock lk( _entryMapMutex );
         MMAPV1DatabaseCatalogEntry* entry = _entryMap[db.toString()];
         delete entry;

@@ -88,11 +88,6 @@ namespace mongo {
             commitUnitOfWork();
     }
 
-    bool RocksRecoveryUnit::commitIfNeeded(bool force ) {
-        commitUnitOfWork();
-        return true;
-    }
-
     bool RocksRecoveryUnit::awaitCommit() {
         // TODO
         return true;

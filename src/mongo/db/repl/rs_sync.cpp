@@ -47,6 +47,7 @@
 #include "mongo/db/repl/member.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/repl_settings.h"
+#include "mongo/db/repl/repl_coordinator_global.h"
 #include "mongo/db/repl/rs.h"
 #include "mongo/db/repl/rslog.h"
 #include "mongo/db/repl/sync_tail.h"
@@ -227,7 +228,7 @@ namespace repl {
             boost::unique_lock<boost::mutex> lock(theReplSet->initialSyncMutex);
             theReplSet->initialSyncRequested = true;
         }
-        lastOpTimeWritten = OpTime();
+        getGlobalReplicationCoordinator()->setMyLastOptime(txn, OpTime());
         _veto.clear();
         return true;
     }

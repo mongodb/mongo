@@ -231,6 +231,9 @@ namespace mongo {
         if ( !loc.isOK() )
             return loc;
 
+        invariant( minDiskLoc < loc.getValue() );
+        invariant( loc.getValue() < maxDiskLoc );
+
         _infoCache.notifyOfWriteOp();
 
         try {

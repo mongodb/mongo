@@ -29,18 +29,17 @@
 #pragma once
 
 #include <string>
-#include <vector>
 
 #include "mongo/base/disallow_copying.h"
 #include "mongo/base/status.h"
 #include "mongo/base/string_data.h"
-#include "mongo/db/auth/sasl_conversation.h"
+#include "mongo/db/auth/sasl_server_conversation.h"
 
 namespace mongo {
     /**
      *  Server side authentication session for SASL PLAIN.
      */
-    class SaslPLAINServerConversation : public SaslConversation {
+    class SaslPLAINServerConversation : public SaslServerConversation {
         MONGO_DISALLOW_COPYING(SaslPLAINServerConversation);
     public:
         /**

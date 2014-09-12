@@ -325,13 +325,20 @@ namespace mongo {
          * Clean up the temporary and incremental collections
          */
         void State::dropTempCollections() {
+            // Dropping the tempNamespace must be logged as that collection is replicated.
             _db.dropCollection(_config.tempNamespace);
             // Always forget about temporary namespaces, so we don't cache lots of them
             ShardConnection::forgetNS( _config.tempNamespace );
             if (_useIncremental) {
-                // NOTE: this will log the deletion of the inc collection which is unnecessary, but
-                // harmless.
-                _db.dropCollection(_config.incLong);
+                // We don't want to log the deletion of incLong as it isn't replicated. While
+                // harmless, this would lead to a scary looking warning on the secondaries.
+                Lock::DBWrite lk(_txn->lockState(), _config.incLong);
+                if (Database* db = dbHolder().get(_txn, _config.incLong)) {
+                    WriteUnitOfWork wunit(_txn);
+                    db->dropCollection(_txn, _config.incLong);
+                    wunit.commit();
+                }
+
                 ShardConnection::forgetNS( _config.incLong );
             }
 
@@ -655,11 +662,7 @@ namespace mongo {
             uassert(ErrorCodes::NotMaster, "no longer master", 
                     repl::getGlobalReplicationCoordinator()->
                     canAcceptWritesForDatabase(nsToDatabase(ns.c_str())));
-            Collection* coll = ctx.ctx().db()->getCollection( _txn, ns );
-            if ( !coll )
-                uasserted(13630, str::stream() << "attempted to insert into nonexistent" <<
-                                                  " collection during a mr operation." <<
-                                                  " collection expected: " << ns );
+            Collection* coll = getCollectionOrUassert(ctx.ctx().db(), ns);
 
             class BSONObjBuilder b;
             if ( !o.hasField( "_id" ) ) {
@@ -682,12 +685,7 @@ namespace mongo {
             verify( _onDisk );
 
             Client::WriteContext ctx(_txn,  _config.incLong );
-            Collection* coll = ctx.ctx().db()->getCollection( _txn, _config.incLong );
-            if ( !coll )
-                uasserted(13631, str::stream() << "attempted to insert into nonexistent"
-                                                  " collection during a mr operation." <<
-                                                  " collection expected: " << _config.incLong );
-
+            Collection* coll = getCollectionOrUassert(ctx.ctx().db(), _config.incLong);
             coll->insertDocument( _txn, o, true );
             ctx.commit();
         }
@@ -885,6 +883,13 @@ namespace mongo {
             _config.reducer->numReduces = _scope->getNumberInt("_redCt");
         }
 
+        Collection* State::getCollectionOrUassert(Database* db, const StringData& ns) {
+            Collection* out = db ? db->getCollection(_txn, ns) : NULL;
+            uassert(18697, "Collection unexpectedly disappeared: " + ns.toString(),
+                    out);
+            return out;
+        }
+
         /**
          * Applies last reduce and finalize on a list of tuples (key, val)
          * Inserts single result {_id: key, value: val} into temp collection
@@ -959,7 +964,7 @@ namespace mongo {
 
             {
                 Client::WriteContext incCtx(_txn, _config.incLong );
-                Collection* incColl = incCtx.ctx().db()->getCollection( _txn, _config.incLong );
+                Collection* incColl = getCollectionOrUassert(incCtx.ctx().db(), _config.incLong );
 
                 bool foundIndex = false;
                 IndexCatalog::IndexIterator ii =
@@ -999,7 +1004,7 @@ namespace mongo {
                                                 whereCallback).isOK());
 
             PlanExecutor* rawExec;
-            verify(getExecutor(_txn, ctx->ctx().db()->getCollection(_txn, _config.incLong),
+            verify(getExecutor(_txn, getCollectionOrUassert(ctx->ctx().db(), _config.incLong),
                                cq, &rawExec, QueryPlannerParams::NO_TABLE_SCAN).isOK());
 
             auto_ptr<PlanExecutor> exec(rawExec);
@@ -1015,6 +1020,7 @@ namespace mongo {
             BSONObj o;
             PlanExecutor::ExecState state;
             while (PlanExecutor::ADVANCED == (state = exec->getNext(&o, NULL))) {
+                o = o.getOwned(); // we will be accessing outside of the lock
                 pm.hit();
 
                 if ( o.woSortOrder( prev , sortKey ) == 0 ) {
@@ -1348,7 +1354,7 @@ namespace mongo {
                         }
 
                         PlanExecutor* rawExec;
-                        if (!getExecutor(txn, ctx->db()->getCollection(txn, config.ns),
+                        if (!getExecutor(txn, state.getCollectionOrUassert(ctx->db(), config.ns),
                                          cq, &rawExec).isOK()) {
                             uasserted(17239, "Can't get executor for query "
                                              + config.filter.toString());

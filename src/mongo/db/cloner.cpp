@@ -45,9 +45,9 @@
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/copydb.h"
 #include "mongo/db/commands/rename_collection.h"
+#include "mongo/db/dbdirectclient.h"
 #include "mongo/db/dbhelpers.h"
 #include "mongo/db/index_builder.h"
-#include "mongo/db/instance.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/repl/isself.h"
@@ -374,16 +374,9 @@ namespace mongo {
         for (std::vector<HostAndPort>::const_iterator iter = csServers.begin();
              iter != csServers.end(); ++iter) {
 
-#if !defined(_WIN32) && !defined(__sunos__)
-            // isSelf() only does the necessary comparisons on os x and linux (SERVER-14165)
             if (!repl::isSelf(*iter))
                 continue;
-#else
-            if (iter->port() != serverGlobalParams.port)
-                continue;
-            if (iter->host() != "localhost" && iter->host() != "127.0.0.1")
-                continue;
-#endif
+
             masterSameProcess = true;
             break;
         }

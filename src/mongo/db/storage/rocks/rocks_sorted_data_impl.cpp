@@ -246,7 +246,7 @@ namespace mongo {
                 _checkStatus();
 
                 if ( !_iterator->Valid() ) { // seeking outside the range of the index
-                    _iterator->SeekToFirst();
+                    _iterator->SeekToLast();
                     _checkStatus();
 
                     if ( _iterator->Valid() ) {

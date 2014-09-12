@@ -135,7 +135,7 @@ namespace repl {
          * Sets _opTime to "time" and sets _opTimeSet to true to indicate that the value
          * of _opTime has been modified.
          */
-        void setOpTime(Date_t time) { _opTimeSet = true; _opTime = time; }
+        void setOpTime(OpTime time) { _opTimeSet = true; _opTime = time; }
 
         /**
          * Sets _syncingTo to "syncingTo".

@@ -102,7 +102,7 @@ namespace repl {
         OperationContextImpl txn;
 
         log() << "replset msgReceivedNewConfig version: " << o["version"].toString() << rsLog;
-        scoped_ptr<ReplSetConfig> config(ReplSetConfig::make(o));
+        scoped_ptr<ReplSetConfig> config(ReplSetConfig::make(&txn, o));
         if( config->version > rs->config().version )
             theReplSet->haveNewConfig(&txn, *config, false);
         else {

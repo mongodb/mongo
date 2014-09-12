@@ -81,6 +81,13 @@ namespace mongo {
                  BSONObjBuilder& result,
                  bool fromRepl);
 
+        // Write commands can be explained.
+        virtual Status explain(OperationContext* txn,
+                               const std::string& dbname,
+                               const BSONObj& cmdObj,
+                               Explain::Verbosity verbosity,
+                               BSONObjBuilder* out) const;
+
         // Type of batch (e.g. insert).
         BatchedCommandRequest::BatchType _writeType;
     };

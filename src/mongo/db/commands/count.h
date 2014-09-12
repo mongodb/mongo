@@ -30,6 +30,7 @@
 
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/exec/count.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/repl/repl_coordinator_global.h"
 
@@ -44,6 +45,8 @@ namespace mongo {
      *
      * @return -1 on ns does not exist error and other errors, 0 on other errors, otherwise the
      * match count.
+     *
+     * TODO: This is currently used only by the db direct client. It should be removed.
      */
     long long runCount(OperationContext* txn,
                        const std::string& ns,
@@ -85,20 +88,15 @@ namespace mongo {
                          BSONObjBuilder& result, bool);
 
         /**
-         * Converts the command object 'cmdObj' for a count into a PlanExecutor capable
-         * of running the count and a CanonicalQuery.
+         * Parses a count command object, 'cmdObj'.
          *
-         * If successful, returns the executor through 'execOut'. The caller must delete
-         * 'execOut'.
+         * On success, fills in the out-parameter 'request' and returns an OK status.
          *
-         * On failure, returns a non-OK status, and the caller should not delete 'execOut'.
+         * Returns a failure status if 'cmdObj' is not well formed.
          */
-        static Status parseCountToExecutor(OperationContext* txn,
-                                           const BSONObj& cmdObj,
-                                           const std::string& dbname,
-                                           const std::string& ns,
-                                           Collection* collection,
-                                           PlanExecutor** execOut);
+        Status parseRequest(const std::string& dbname,
+                            const BSONObj& cmdObj,
+                            CountRequest* request) const;
 
     };
 

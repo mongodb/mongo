@@ -122,6 +122,7 @@ namespace repl {
 
         void forceResync(OperationContext* txn, const char *requester);
 
+        bool _connect(OplogReader* reader, const HostAndPort& host, const OID& myRID);
     public:
         OplogReader oplogReader;
 

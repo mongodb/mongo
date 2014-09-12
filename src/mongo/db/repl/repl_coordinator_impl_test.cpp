@@ -52,18 +52,6 @@
 #include "mongo/util/log.h"
 
 namespace mongo {
-
-    // So that you can ASSERT_EQUALS two OpTimes
-    std::ostream& operator<<( std::ostream &s, const OpTime &ot ) {
-        s << ot.toString();
-        return s;
-    }
-    // So that you can ASSERT_EQUALS two Date_ts
-    std::ostream& operator<<( std::ostream &s, const Date_t &t ) {
-        s << t.toString();
-        return s;
-    }
-
 namespace repl {
 namespace {
 
@@ -366,8 +354,8 @@ namespace {
         // Now make us a replica set
         getReplCoord()->getSettings().replSet = "mySet/node1:12345,node2:54321";
 
-        // Waiting for 1 nodes always works
-        writeConcern.wNumNodes = 1;
+        // Waiting for 0 nodes always works
+        writeConcern.wNumNodes = 0;
         writeConcern.wMode = "";
         statusAndDur = getReplCoord()->awaitReplication(&txn, time, writeConcern);
         ASSERT_OK(statusAndDur.status);
@@ -384,6 +372,7 @@ namespace {
                 HostAndPort("node1", 12345));
         OperationContextNoop txn;
 
+        OID myOID = getReplCoord()->getMyRID();
         OID client1 = OID::gen();
         OID client2 = OID::gen();
         OID client3 = OID::gen();
@@ -402,16 +391,21 @@ namespace {
 
         WriteConcernOptions writeConcern;
         writeConcern.wTimeout = WriteConcernOptions::kNoWaiting;
-        writeConcern.wNumNodes = 2;
+        writeConcern.wNumNodes = 1;
 
-        // 2 nodes waiting for time1
+        // 1 node waiting for time 1
         ReplicationCoordinator::StatusAndDuration statusAndDur =
                                         getReplCoord()->awaitReplication(&txn, time1, writeConcern);
         ASSERT_EQUALS(ErrorCodes::ExceededTimeLimit, statusAndDur.status);
-        ASSERT_OK(getReplCoord()->setLastOptime(&txn, client1, time1));
+        ASSERT_OK(getReplCoord()->setLastOptime(&txn, myOID, time1));
+        statusAndDur = getReplCoord()->awaitReplication(&txn, time1, writeConcern);
+        ASSERT_OK(statusAndDur.status);
+
+        // 2 nodes waiting for time1
+        writeConcern.wNumNodes = 2;
         statusAndDur = getReplCoord()->awaitReplication(&txn, time1, writeConcern);
         ASSERT_EQUALS(ErrorCodes::ExceededTimeLimit, statusAndDur.status);
-        ASSERT_OK(getReplCoord()->setLastOptime(&txn, client2, time1));
+        ASSERT_OK(getReplCoord()->setLastOptime(&txn, client1, time1));
         statusAndDur = getReplCoord()->awaitReplication(&txn, time1, writeConcern);
         ASSERT_OK(statusAndDur.status);
 
@@ -980,6 +974,84 @@ namespace {
             }
         }
         ASSERT_EQUALS(3U, rids.size()); // Make sure we saw all 3 nodes
+    }
+
+    TEST_F(ReplCoordTest, SetMaintenanceMode) {
+        init("mySet/test1:1234,test2:1234,test3:1234");
+        assertStartSuccess(
+                BSON("_id" << "mySet" <<
+                     "version" << 1 <<
+                     "members" << BSON_ARRAY(BSON("_id" << 0 << "host" << "test1:1234") <<
+                                             BSON("_id" << 1 << "host" << "test2:1234") <<
+                                             BSON("_id" << 2 << "host" << "test3:1234"))),
+                HostAndPort("test2", 1234));
+        OperationContextNoop txn;
+
+        getReplCoord()->_setCurrentMemberState_forTest(MemberState::RS_SECONDARY);
+
+        // Can't unset maintenance mode if it was never set to begin with.
+        Status status = getReplCoord()->setMaintenanceMode(&txn, false);
+        ASSERT_EQUALS(ErrorCodes::OperationFailed, status);
+        ASSERT_TRUE(getReplCoord()->getCurrentMemberState().secondary());
+
+        // valid set
+        ASSERT_OK(getReplCoord()->setMaintenanceMode(&txn, true));
+        ASSERT_TRUE(getReplCoord()->getCurrentMemberState().recovering());
+
+        // If we go into rollback while in maintenance mode, our state changes to RS_ROLLBACK.
+        getReplCoord()->setFollowerMode(MemberState::RS_ROLLBACK);
+        ASSERT_TRUE(getReplCoord()->getCurrentMemberState().rollback());
+
+        // When we go back to SECONDARY, we still observe RECOVERING because of maintenance mode.
+        getReplCoord()->setFollowerMode(MemberState::RS_SECONDARY);
+        ASSERT_TRUE(getReplCoord()->getCurrentMemberState().recovering());
+
+        // Can set multiple times
+        ASSERT_OK(getReplCoord()->setMaintenanceMode(&txn, true));
+        ASSERT_OK(getReplCoord()->setMaintenanceMode(&txn, true));
+
+        // Need to unset the number of times you set
+        ASSERT_OK(getReplCoord()->setMaintenanceMode(&txn, false));
+        ASSERT_OK(getReplCoord()->setMaintenanceMode(&txn, false));
+        ASSERT_OK(getReplCoord()->setMaintenanceMode(&txn, false));
+        status = getReplCoord()->setMaintenanceMode(&txn, false);
+        // fourth one fails b/c we only set three times
+        ASSERT_EQUALS(ErrorCodes::OperationFailed, status);
+        // Unsetting maintenance mode changes our state to secondary if maintenance mode was
+        // the only thinking keeping us out of it.
+        ASSERT_TRUE(getReplCoord()->getCurrentMemberState().secondary());
+
+        // From rollback, entering and exiting maintenance mode doesn't change perceived
+        // state.
+        getReplCoord()->setFollowerMode(MemberState::RS_ROLLBACK);
+        ASSERT_TRUE(getReplCoord()->getCurrentMemberState().rollback());
+        ASSERT_OK(getReplCoord()->setMaintenanceMode(&txn, true));
+        ASSERT_TRUE(getReplCoord()->getCurrentMemberState().rollback());
+        ASSERT_OK(getReplCoord()->setMaintenanceMode(&txn, false));
+        ASSERT_TRUE(getReplCoord()->getCurrentMemberState().rollback());
+
+        // Rollback is sticky even if entered while in maintenance mode.
+        getReplCoord()->setFollowerMode(MemberState::RS_SECONDARY);
+        ASSERT_TRUE(getReplCoord()->getCurrentMemberState().secondary());
+        ASSERT_OK(getReplCoord()->setMaintenanceMode(&txn, true));
+        ASSERT_TRUE(getReplCoord()->getCurrentMemberState().recovering());
+        getReplCoord()->setFollowerMode(MemberState::RS_ROLLBACK);
+        ASSERT_TRUE(getReplCoord()->getCurrentMemberState().rollback());
+        ASSERT_OK(getReplCoord()->setMaintenanceMode(&txn, false));
+        ASSERT_TRUE(getReplCoord()->getCurrentMemberState().rollback());
+        getReplCoord()->setFollowerMode(MemberState::RS_SECONDARY);
+        ASSERT_TRUE(getReplCoord()->getCurrentMemberState().secondary());
+
+        // Can't modify maintenance mode when PRIMARY
+        getReplCoord()->_setCurrentMemberState_forTest(MemberState::RS_PRIMARY);
+        status = getReplCoord()->setMaintenanceMode(&txn, true);
+        ASSERT_EQUALS(ErrorCodes::NotSecondary, status);
+        ASSERT_TRUE(getReplCoord()->getCurrentMemberState().primary());
+        getReplCoord()->_setCurrentMemberState_forTest(MemberState::RS_SECONDARY);
+        status = getReplCoord()->setMaintenanceMode(&txn, false);
+        ASSERT_EQUALS(ErrorCodes::OperationFailed, status);
+        ASSERT_OK(getReplCoord()->setMaintenanceMode(&txn, true));
+        ASSERT_OK(getReplCoord()->setMaintenanceMode(&txn, false));
     }
 
     // TODO(spencer): Unit test replSetFreeze

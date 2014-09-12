@@ -39,10 +39,14 @@ namespace mongo {
         STAGE_CACHED_PLAN,
         STAGE_COLLSCAN,
 
+        // This stage sits at the root of the query tree and counts up the number of results
+        // returned by its child.
+        STAGE_COUNT,
+
         // If we're running a .count(), the query is fully covered by one ixscan, and the ixscan is
         // from one key to another, we can just skip through the keys without bothering to examine
         // them.
-        STAGE_COUNT,
+        STAGE_COUNT_SCAN,
 
         STAGE_DELETE,
 
@@ -64,6 +68,8 @@ namespace mongo {
         // The two $geoNear impls imply a fetch+sort and must be stages.
         STAGE_GEO_NEAR_2D,
         STAGE_GEO_NEAR_2DSPHERE,
+
+        STAGE_GROUP,
 
         STAGE_IDHACK,
         STAGE_IXSCAN,

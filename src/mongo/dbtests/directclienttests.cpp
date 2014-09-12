@@ -32,7 +32,7 @@
 #include "mongo/pch.h"
 
 #include "mongo/db/db.h"
-#include "mongo/db/instance.h"
+#include "mongo/db/dbdirectclient.h"
 #include "mongo/db/json.h"
 #include "mongo/db/lasterror.h"
 #include "mongo/db/operation_context_impl.h"

@@ -73,6 +73,12 @@ namespace repl {
         void updateFrom(const MemberHeartbeatData& newInfo);
 
         /**
+         * Sets the member's state to "newState".  This is principally valuable when modeling
+         * step-down of the the local node.
+         */
+        void setState(MemberState newState);
+
+        /**
          * Sets values in this object from the results of a successful heartbeat command.
          * _authIssues is set to false, _health is set to 1, other values are set as specified.
          */

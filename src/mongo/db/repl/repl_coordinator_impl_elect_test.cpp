@@ -42,8 +42,32 @@ namespace mongo {
 namespace repl {
 namespace {
 
+    typedef ReplicationExecutor::RemoteCommandRequest RemoteCommandRequest;
+
     bool stringContains(const std::string &haystack, const std::string& needle) {
         return haystack.find(needle) != std::string::npos;
+    }
+
+    ReplicaSetConfig assertMakeRSConfig(const BSONObj& configBson) {
+        ReplicaSetConfig config;
+        ASSERT_OK(config.initialize(configBson));
+        ASSERT_OK(config.validate());
+        return config;
+    }
+
+    // Since the ReplicationExecutor has the same seed (1) in each test, the randomly generated
+    // "round" number is always the below.
+    static const long long kFirstRound = 380857196671097771LL;
+
+    const BSONObj makeElectRequest(const ReplicaSetConfig& rsConfig, 
+                                   int selfIndex) {
+        const MemberConfig& myConfig = rsConfig.getMemberAt(selfIndex);
+        return BSON("replSetElect" << 1 <<
+                    "set" << rsConfig.getReplSetName() <<
+                    "who" << myConfig.getHostAndPort().toString() <<
+                    "whoid" << myConfig.getId() <<
+                    "cfgver" << rsConfig.getConfigVersion() <<
+                    "round" << kFirstRound);
     }
 
     class ReplCoordElectTest : public mongo::unittest::Test {
@@ -134,12 +158,160 @@ namespace {
         ASSERT_EQUALS(1, countLogLinesContaining("election succeeded"));
     }
 
-/*
-    TEST_F(ReplCoordElectTest, ElectManyNodesSuccess) {}
-    TEST_F(ReplCoordElectTest, ShutdownExecutor) {}
+    TEST_F(ReplCoordElectTest, ElectManyNodesSuccess) {
+        startCapturingLogMessages();
+        BSONObj configObj = BSON("_id" << "mySet" <<
+                                 "version" << 1 <<
+                                 "members" << BSON_ARRAY(BSON("_id" << 1 << "host" << "node1:12345")
+                                                      << BSON("_id" << 2 << "host" << "node2:12345")
+                                                      << BSON("_id" << 3 << "host" << "node3:12345")
+                                ));
+        assertReplStart(configObj, HostAndPort("node1", 12345));
+        ReplicaSetConfig config = assertMakeRSConfig(configObj);
 
-    // Uses PRNG
-    TEST_F(ReplCoordElectTest, ElectTiedWithAnother) {}
+        OperationContextNoop txn;
+        OID selfRID = getReplCoord()->getMyRID();
+        OpTime time1(1, 1);
+        getReplCoord()->setLastOptime(&txn, selfRID, time1);
+
+        const BSONObj electRequest = makeElectRequest(config, 0);
+        getNet()->addResponse(RemoteCommandRequest(HostAndPort("node2:12345"),
+                                                   "admin",
+                                                   electRequest),
+                              StatusWith<BSONObj>(BSON("ok" << 1 <<
+                                                       "vote" << 1 <<
+                                                       "round" << kFirstRound)));
+
+        getNet()->addResponse(RemoteCommandRequest(HostAndPort("node3:12345"),
+                                                   "admin",
+                                                   electRequest),
+                              StatusWith<BSONObj>(BSON("ok" << 1 <<
+                                                       "vote" << 1 <<
+                                                       "round" << kFirstRound)));
+
+        getReplCoord()->testElection();
+        stopCapturingLogMessages();
+        ASSERT_EQUALS(1, countLogLinesContaining("election succeeded"));
+    }
+
+    TEST_F(ReplCoordElectTest, ElectNotEnoughVotes) {
+        // one responds with -10000 vote and we are not elected
+        startCapturingLogMessages();
+        BSONObj configObj = BSON("_id" << "mySet" <<
+                                 "version" << 1 <<
+                                 "members" << BSON_ARRAY(BSON("_id" << 1 << "host" << "node1:12345")
+                                                      << BSON("_id" << 2 << "host" << "node2:12345")
+                                                      << BSON("_id" << 3 << "host" << "node3:12345")
+                                ));
+        assertReplStart(configObj, HostAndPort("node1", 12345));
+        ReplicaSetConfig config = assertMakeRSConfig(configObj);
+
+        OperationContextNoop txn;
+        OID selfRID = getReplCoord()->getMyRID();
+        OpTime time1(1, 1);
+        getReplCoord()->setLastOptime(&txn, selfRID, time1);
+
+        const BSONObj electRequest = makeElectRequest(config, 0);
+        getNet()->addResponse(RemoteCommandRequest(HostAndPort("node2:12345"),
+                                                   "admin",
+                                                   electRequest),
+                              StatusWith<BSONObj>(BSON("ok" << 1 <<
+                                                       "vote" << -10000 <<
+                                                       "round" << kFirstRound)));
+
+        getNet()->addResponse(RemoteCommandRequest(HostAndPort("node3:12345"),
+                                                   "admin",
+                                                   electRequest),
+                              StatusWith<BSONObj>(BSON("ok" << 1 <<
+                                                       "vote" << 1 <<
+                                                       "round" << kFirstRound)));
+
+        getReplCoord()->testElection();
+        stopCapturingLogMessages();
+        ASSERT_EQUALS(1,
+                countLogLinesContaining("replSet couldn't elect self, only received -9998 votes"));
+    }
+
+    TEST_F(ReplCoordElectTest, ElectWrongTypeForVote) {
+        // one responds with String for votes
+        startCapturingLogMessages();
+        BSONObj configObj = BSON("_id" << "mySet" <<
+                                 "version" << 1 <<
+                                 "members" << BSON_ARRAY(BSON("_id" << 1 << "host" << "node1:12345")
+                                                      << BSON("_id" << 2 << "host" << "node2:12345")
+                                                      << BSON("_id" << 3 << "host" << "node3:12345")
+                                ));
+        assertReplStart(configObj, HostAndPort("node1", 12345));
+        ReplicaSetConfig config = assertMakeRSConfig(configObj);
+
+        OperationContextNoop txn;
+        OID selfRID = getReplCoord()->getMyRID();
+        OpTime time1(1, 1);
+        getReplCoord()->setLastOptime(&txn, selfRID, time1);
+
+        const BSONObj electRequest = makeElectRequest(config, 0);
+        getNet()->addResponse(RemoteCommandRequest(HostAndPort("node2:12345"),
+                                                   "admin",
+                                                   electRequest),
+                              StatusWith<BSONObj>(BSON("ok" << 1 <<
+                                                       "vote" << "yea" <<
+                                                       "round" << kFirstRound)));
+
+        getReplCoord()->testElection();
+        stopCapturingLogMessages();
+        ASSERT_EQUALS(1,
+                countLogLinesContaining(
+                    "wrong type for vote argument in replSetElect command: String"));
+        ASSERT_EQUALS(1,
+                countLogLinesContaining("replSet couldn't elect self, only received 1 votes"));
+    }
+
+    /*
+    TODO(dannenberg) reenable this test once we can ensure message ordering
+                     This test relies on the first message arriving prior to the second
+
+
+    TEST_F(ReplCoordElectTest, ElectWrongTypeForVoteButStillElected) {
+        // one responds with String for votes
+        startCapturingLogMessages();
+        BSONObj configObj = BSON("_id" << "mySet" <<
+                                 "version" << 1 <<
+                                 "members" << BSON_ARRAY(BSON("_id" << 1 << "host" << "node1:12345")
+                                                      << BSON("_id" << 2 << "host" << "node2:12345")
+                                                      << BSON("_id" << 3 << "host" << "node3:12345")
+                                ));
+        assertReplStart(configObj, HostAndPort("node1", 12345));
+        ReplicaSetConfig config = assertMakeRSConfig(configObj);
+
+        OperationContextNoop txn;
+        OID selfRID = getReplCoord()->getMyRID();
+        OpTime time1(1, 1);
+        getReplCoord()->setLastOptime(&txn, selfRID, time1);
+
+        const BSONObj electRequest = makeElectRequest(config, 0);
+
+        getNet()->addResponse(RemoteCommandRequest(HostAndPort("node2:12345"),
+                                                   "admin",
+                                                   electRequest),
+                              StatusWith<BSONObj>(BSON("ok" << 1 <<
+                                                       "vote" << 1 <<
+                                                       "round" << 380857196671097771ll)));
+        getNet()->addResponse(RemoteCommandRequest(HostAndPort("node3:12345"),
+                                                   "admin",
+                                                   electRequest),
+                              StatusWith<BSONObj>(BSON("ok" << 1 <<
+                                                       "vote" << "yea" <<
+                                                       "round" << 380857196671097771ll)));
+
+        getReplCoord()->testElection();
+        stopCapturingLogMessages();
+        ASSERT_EQUALS(1,
+                countLogLinesContaining(
+                    "wrong type for vote argument in replSetElect command: String"));
+        ASSERT_EQUALS(1,
+                countLogLinesContaining("replSet election succeeded, assuming primary role"));
+    }
+
 */
 
 }

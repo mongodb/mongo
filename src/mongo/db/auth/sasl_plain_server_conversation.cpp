@@ -36,7 +36,7 @@ namespace mongo {
    
     SaslPLAINServerConversation::SaslPLAINServerConversation(
                                                     SaslAuthenticationSession* saslAuthSession) :
-        SaslConversation(saslAuthSession) {
+        SaslServerConversation(saslAuthSession) {
     }
 
     SaslPLAINServerConversation::~SaslPLAINServerConversation() {};

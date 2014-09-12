@@ -1,5 +1,5 @@
 /**
-*    Copyright (C) 2013 10gen Inc.
+*    Copyright (C) 2014 MongoDB Inc.
 *
 *    This program is free software: you can redistribute it and/or  modify
 *    it under the terms of the GNU Affero General Public License, version 3,
@@ -28,11 +28,12 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/db/startup_warnings.h"
+#include "mongo/db/startup_warnings_mongod.h"
 
 #include <boost/filesystem/operations.hpp>
 #include <fstream>
 
+#include "mongo/db/startup_warnings_common.h"
 #include "mongo/db/storage_options.h"
 #include "mongo/util/log.h"
 #include "mongo/util/processinfo.h"
@@ -42,24 +43,10 @@ namespace mongo {
 
     extern bool useExperimentalDocLocking;
 
-    //
-    // system warnings
-    //
-    void logStartupWarnings() {
-        // each message adds a leading and a trailing newline
+    void logMongodStartupWarnings() {
+        logCommonStartupWarnings();
 
         bool warned = false;
-        {
-            const char * foo = strchr(versionString , '.') + 1;
-            int bar = atoi(foo);
-            if ((2 * (bar / 2)) != bar) {
-                log() << startupWarningsLog;
-                log() << "** NOTE: This is a development version (" << versionString
-                      << ") of MongoDB." << startupWarningsLog;
-                log() << "**       Not recommended for production." << startupWarningsLog;
-                warned = true;
-            }
-        }
 
         if (sizeof(int*) == 4) {
             log() << startupWarningsLog;
@@ -85,20 +72,6 @@ namespace mongo {
                   << startupWarningsLog;
             warned = true;
         }
-
-#if defined(_WIN32) && !defined(_WIN64)
-        // Warn user that they are running a 32-bit app on 64-bit Windows
-        BOOL wow64Process;
-        BOOL retWow64 = IsWow64Process(GetCurrentProcess(), &wow64Process);
-        if (retWow64 && wow64Process) {
-            log() << "** NOTE: This is a 32-bit MongoDB binary running on a 64-bit operating"
-                    << startupWarningsLog;
-            log() << "**      system. Switch to a 64-bit build of MongoDB to"
-                    << startupWarningsLog;
-            log() << "**      support larger databases." << startupWarningsLog;
-            warned = true;
-        }
-#endif
 
         if (!ProcessInfo::blockCheckSupported()) {
             log() << startupWarningsLog;

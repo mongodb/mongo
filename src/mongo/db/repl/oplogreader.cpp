@@ -71,23 +71,6 @@ namespace repl {
         return authenticateInternalUser(conn);
     }
 
-    bool replHandshake(DBClientConnection *conn, const OID& myRID) {
-        string myname = getHostName();
-
-        BSONObjBuilder cmd;
-        cmd.append("handshake", myRID);
-        if (theReplSet) {
-            cmd.append("member", theReplSet->selfId());
-            cmd.append("config", theReplSet->myConfig().asBson());
-        }
-
-        BSONObj res;
-        bool ok = conn->runCommand( "admin" , cmd.obj() , res );
-        // ignoring for now on purpose for older versions
-        LOG( ok ? 1 : 0 ) << "replHandshake res not: " << ok << " res: " << res << endl;
-        return true;
-    }
-
     OplogReader::OplogReader() {
         _tailingQueryOptions = QueryOption_SlaveOk;
         _tailingQueryOptions |= QueryOption_CursorTailable | QueryOption_OplogReplay;
@@ -98,8 +81,8 @@ namespace repl {
         readersCreatedStats.increment();
     }
 
-    bool OplogReader::commonConnect(const HostAndPort& host) {
-        if( conn() == 0 ) {
+    bool OplogReader::connect(const HostAndPort& host) {
+        if (conn() == NULL) {
             _conn = shared_ptr<DBClientConnection>(new DBClientConnection(false,
                                                                           0,
                                                                           tcp_timeout));
@@ -112,47 +95,9 @@ namespace repl {
                 log() << "repl: " << errmsg << endl;
                 return false;
             }
+            _host = host;
         }
         return true;
-    }
-
-    bool OplogReader::connect(const HostAndPort& host) {
-        if (conn()) {
-            return true;
-        }
-
-        if (!commonConnect(host)) {
-            return false;
-        }
-
-        return true;
-    }
-
-    bool OplogReader::connect(const HostAndPort& host, const OID& myRID) {
-        if (conn()) {
-            return true;
-        }
-
-        if (!commonConnect(host)) {
-            return false;
-        }
-
-        if (!replHandshake(_conn.get(), myRID)) {
-            return false;
-        }
-
-        return true;
-    }
-
-    bool OplogReader::connect(const mongo::OID& rid, const int from, const HostAndPort& to) {
-        if (conn() != 0) {
-            return true;
-        }
-        if (commonConnect(to)) {
-            log() << "handshake between " << from << " and " << to.toString() << endl;
-            return passthroughHandshake(rid, from);
-        }
-        return false;
     }
 
     void OplogReader::tailCheck() {
@@ -160,21 +105,6 @@ namespace repl {
             log() << "repl: old cursor isDead, will initiate a new one" << std::endl;
             resetCursor();
         }
-    }
-
-    bool OplogReader::passthroughHandshake(const mongo::OID& rid, const int nextOnChainId) {
-        BSONObjBuilder cmd;
-        cmd.append("handshake", rid);
-        if (theReplSet) {
-            const Member* chainedMember = theReplSet->findById(nextOnChainId);
-            if (chainedMember != NULL) {
-                cmd.append("config", chainedMember->config().asBson());
-            }
-        }
-        cmd.append("member", nextOnChainId);
-
-        BSONObj res;
-        return conn()->runCommand("admin", cmd.obj(), res);
     }
 
     void OplogReader::query(const char *ns,
@@ -199,6 +129,10 @@ namespace repl {
         BSONObjBuilder query;
         query.append("ts", gte.done());
         tailingQuery(ns, query.done(), fields);
+    }
+
+    HostAndPort OplogReader::getHost() const {
+        return _host;
     }
 
 } // namespace repl

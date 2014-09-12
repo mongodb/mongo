@@ -299,8 +299,9 @@ namespace mongo {
         return _externalState->hasAnyPrivilegeDocuments(txn);
     }
 
-    Status AuthorizationManager::writeAuthSchemaVersionIfNeeded() {
+    Status AuthorizationManager::writeAuthSchemaVersionIfNeeded(OperationContext* txn) {
         Status status =  _externalState->updateOne(
+                txn,
                 AuthorizationManager::versionCollectionNamespace,
                 AuthorizationManager::versionDocumentQuery,
                 BSON("$set" << BSON(AuthorizationManager::schemaVersionFieldName <<
@@ -313,28 +314,33 @@ namespace mongo {
         return status;
     }
 
-    Status AuthorizationManager::insertPrivilegeDocument(const std::string& dbname,
+    Status AuthorizationManager::insertPrivilegeDocument(OperationContext* txn,
+                                                         const std::string& dbname,
                                                          const BSONObj& userObj,
                                                          const BSONObj& writeConcern) const {
-        return _externalState->insertPrivilegeDocument(dbname, userObj, writeConcern);
+        return _externalState->insertPrivilegeDocument(txn, dbname, userObj, writeConcern);
     }
 
-    Status AuthorizationManager::updatePrivilegeDocument(const UserName& user,
+    Status AuthorizationManager::updatePrivilegeDocument(OperationContext* txn,
+                                                         const UserName& user,
                                                          const BSONObj& updateObj,
                                                          const BSONObj& writeConcern) const {
-        return _externalState->updatePrivilegeDocument(user, updateObj, writeConcern);
+        return _externalState->updatePrivilegeDocument(txn, user, updateObj, writeConcern);
     }
 
-    Status AuthorizationManager::removePrivilegeDocuments(const BSONObj& query,
+    Status AuthorizationManager::removePrivilegeDocuments(OperationContext* txn,
+                                                          const BSONObj& query,
                                                           const BSONObj& writeConcern,
                                                           int* numRemoved) const {
-        return _externalState->removePrivilegeDocuments(query, writeConcern, numRemoved);
+        return _externalState->removePrivilegeDocuments(txn, query, writeConcern, numRemoved);
     }
 
-    Status AuthorizationManager::removeRoleDocuments(const BSONObj& query,
+    Status AuthorizationManager::removeRoleDocuments(OperationContext* txn,
+                                                     const BSONObj& query,
                                                      const BSONObj& writeConcern,
                                                      int* numRemoved) const {
-        Status status = _externalState->remove(rolesCollectionNamespace,
+        Status status = _externalState->remove(txn,
+                                               rolesCollectionNamespace,
                                                query,
                                                writeConcern,
                                                numRemoved);
@@ -344,9 +350,11 @@ namespace mongo {
         return status;
     }
 
-    Status AuthorizationManager::insertRoleDocument(const BSONObj& roleObj,
+    Status AuthorizationManager::insertRoleDocument(OperationContext* txn,
+                                                    const BSONObj& roleObj,
                                                     const BSONObj& writeConcern) const {
-        Status status = _externalState->insert(rolesCollectionNamespace,
+        Status status = _externalState->insert(txn,
+                                               rolesCollectionNamespace,
                                                roleObj,
                                                writeConcern);
         if (status.isOK()) {
@@ -365,10 +373,12 @@ namespace mongo {
         return status;
     }
 
-    Status AuthorizationManager::updateRoleDocument(const RoleName& role,
+    Status AuthorizationManager::updateRoleDocument(OperationContext* txn,
+                                                    const RoleName& role,
                                                     const BSONObj& updateObj,
                                                     const BSONObj& writeConcern) const {
         Status status = _externalState->updateOne(
+                txn,
                 rolesCollectionNamespace,
                 BSON(AuthorizationManager::ROLE_NAME_FIELD_NAME << role.getRole() <<
                      AuthorizationManager::ROLE_DB_FIELD_NAME << role.getDB()),
@@ -398,14 +408,16 @@ namespace mongo {
         return _externalState->query(txn, collectionName, query, projection, resultProcessor);
     }
 
-    Status AuthorizationManager::updateAuthzDocuments(const NamespaceString& collectionName,
+    Status AuthorizationManager::updateAuthzDocuments(OperationContext* txn,
+                                                      const NamespaceString& collectionName,
                                                       const BSONObj& query,
                                                       const BSONObj& updatePattern,
                                                       bool upsert,
                                                       bool multi,
                                                       const BSONObj& writeConcern,
                                                       int* nMatched) const {
-        return _externalState->update(collectionName,
+        return _externalState->update(txn,
+                                      collectionName,
                                       query,
                                       updatePattern,
                                       upsert,
