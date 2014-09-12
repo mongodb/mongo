@@ -1745,6 +1745,8 @@ start_run(CONFIG *cfg)
 	char helium_buf[256];
 
 	monitor_created = ret = 0;
+					/* [-Wconditional-uninitialized] */
+	memset(&monitor_thread, 0, sizeof(monitor_thread));
 	
 	if ((ret = setup_log_file(cfg)) != 0)
 		goto err;
