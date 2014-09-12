@@ -63,6 +63,9 @@ namespace mongo {
     }
 
     void WiredTigerDatabase::ReleaseContext(WiredTigerOperationContext &ctx) {
+        // We can't safely keep cursors open across recovery units, so close them now
+        ctx.CloseAllCursors();
+
         boost::mutex::scoped_lock lk( _ctxLock );
         _ctxCache.push_back(&ctx);
     }

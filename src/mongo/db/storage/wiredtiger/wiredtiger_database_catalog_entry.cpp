@@ -279,9 +279,7 @@ namespace mongo {
         WiredTigerSession &swrap_real = WiredTigerRecoveryUnit::Get(txn).GetSession();
         WiredTigerSession swrap(swrap_real.GetDatabase());
 
-        // Close any cached sessions and cursors we can...
-        // XXX This doesn't protect against some thread having an active context with a cached cursor...
-        swrap.GetDatabase().ClearCache();
+        // Close any cached cursors.
         swrap_real.GetContext().CloseAllCursors();
         swrap.GetContext().CloseAllCursors();
 
@@ -372,8 +370,7 @@ namespace mongo {
         WiredTigerSession swrap(swrap_real.GetDatabase());
         WT_SESSION *session = swrap.Get();
 
-        // Close any cached sessions and cursors we can...
-        swrap.GetDatabase().ClearCache();
+        // Close any cached cursors we can...
         swrap_real.GetContext().CloseAllCursors();
         swrap.GetDatabase().ClearCache();
 
@@ -494,8 +491,7 @@ namespace mongo {
         WiredTigerSession &swrap_real = WiredTigerRecoveryUnit::Get(txn).GetSession();
         WiredTigerSession swrap(swrap_real.GetDatabase());
 
-        // TODO: flush the whole database cache
-        swrap.GetDatabase().ClearCache();
+        // Close and cached cursors
         swrap_real.GetContext().CloseAllCursors();
         swrap.GetContext().CloseAllCursors();
 
