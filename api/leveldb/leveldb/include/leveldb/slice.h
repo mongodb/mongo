@@ -15,7 +15,7 @@
 #ifndef STORAGE_LEVELDB_INCLUDE_SLICE_H_
 #define STORAGE_LEVELDB_INCLUDE_SLICE_H_
 
-#include "wiredtiger_config.h"
+#include "leveldb_wt_config.h"
 #if defined(HAVE_ROCKSDB) && !defined(leveldb)
 #define leveldb rocksdb
 #endif
@@ -82,7 +82,8 @@ class Slice {
             (memcmp(data_, x.data_, x.size_) == 0));
   }
 
- private:
+// The LevelDB JNI layer peeks in here
+// private:
   const char* data_;
   size_t size_;
 

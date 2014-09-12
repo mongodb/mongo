@@ -700,7 +700,7 @@ __clsm_get_current(
 	multiple = 0;
 
 	WT_FORALL_CURSORS(clsm, c, i) {
-		if (!F_ISSET(c, WT_CURSTD_KEY_SET))
+		if (!F_ISSET(c, WT_CURSTD_KEY_INT))
 			continue;
 		if (current == NULL) {
 			current = c;
@@ -823,7 +823,7 @@ retry:		/*
 		if (F_ISSET(clsm, WT_CLSM_MULTIPLE)) {
 			check = 0;
 			WT_FORALL_CURSORS(clsm, c, i) {
-				if (!F_ISSET(c, WT_CURSTD_KEY_SET))
+				if (!F_ISSET(c, WT_CURSTD_KEY_INT))
 					continue;
 				if (check) {
 					WT_ERR(WT_LSM_CURCMP(session,
@@ -906,7 +906,7 @@ retry:		/*
 		if (F_ISSET(clsm, WT_CLSM_MULTIPLE)) {
 			check = 0;
 			WT_FORALL_CURSORS(clsm, c, i) {
-				if (!F_ISSET(c, WT_CURSTD_KEY_SET))
+				if (!F_ISSET(c, WT_CURSTD_KEY_INT))
 					continue;
 				if (check) {
 					WT_ERR(WT_LSM_CURCMP(session,
@@ -958,7 +958,7 @@ __clsm_reset_cursors(WT_CURSOR_LSM *clsm, WT_CURSOR *skip)
 	WT_FORALL_CURSORS(clsm, c, i) {
 		if (c == skip)
 			continue;
-		if (F_ISSET(c, WT_CURSTD_KEY_SET))
+		if (F_ISSET(c, WT_CURSTD_KEY_INT))
 			WT_TRET(c->reset(c));
 	}
 

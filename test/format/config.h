@@ -115,7 +115,8 @@ static CONFIG c[] = {
 	  C_BOOL, 10, 0, 0, &g.c_compact, NULL },
 
 	{ "compression",
-	  "type of compression (none | bzip | bzip-raw | lzo | snappy | zlib)",
+	  "type of compression "
+	  "(none | bzip | bzip-raw | lzo | snappy | zlib | zlib-noraw)",
 	  C_IGNORE|C_STRING, 1, 5, 5, NULL, &g.c_compression },
 
 	{ "data_extend",

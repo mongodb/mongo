@@ -65,43 +65,37 @@ struct __wt_table {
  */
 #define	WT_COLGROUPS(t)	WT_MAX((t)->ncolgroups, 1)
 
+/*
+ * WT_WITH_SCHEMA_LOCK --
+ *	Acquire the schema lock, perform an operation, drop the lock.
+ */
 #define	WT_WITH_SCHEMA_LOCK(session, op) do {				\
-	int __schema_locked = 0;					\
-	WT_DECL_SPINLOCK_ID(__id);		/* Must appear last */	\
 	WT_ASSERT(session,						\
 	    F_ISSET(session, WT_SESSION_SCHEMA_LOCKED) ||		\
 	    !F_ISSET(session, WT_SESSION_NO_SCHEMA_LOCK));		\
-	while (!F_ISSET(session, WT_SESSION_SCHEMA_LOCKED))		\
-		if (session->skip_schema_lock || __wt_spin_trylock(	\
-		    session, &S2C(session)->schema_lock, &__id) == 0) {	\
-			F_SET(session, WT_SESSION_SCHEMA_LOCKED);	\
-			__schema_locked = 1;				\
-		} else							\
-			__wt_yield();					\
-	(op);								\
-	if (__schema_locked) {						\
+	if (F_ISSET(session, WT_SESSION_SCHEMA_LOCKED)) {		\
+		(op);							\
+	} else {							\
+		__wt_spin_lock(session, &S2C(session)->schema_lock);	\
+		F_SET(session, WT_SESSION_SCHEMA_LOCKED);		\
+		(op);							\
+		__wt_spin_unlock(session, &S2C(session)->schema_lock);	\
 		F_CLR(session, WT_SESSION_SCHEMA_LOCKED);		\
-		if (!session->skip_schema_lock)				\
-			__wt_spin_unlock(				\
-			    session, &S2C(session)->schema_lock);	\
 	}								\
 } while (0)
 
-/* Drop the schema lock, and re-acquire after operation. */
+/*
+ * WT_WITHOUT_SCHEMA_LOCK --
+ *	Drop the schema lock, perform an operation, re-acquire the lock.
+ */
 #define	WT_WITHOUT_SCHEMA_LOCK(session, op) do {			\
-	WT_DECL_SPINLOCK_ID(__id);		/* Must appear last */	\
-	if (!F_ISSET(session, WT_SESSION_SCHEMA_LOCKED))		\
-		(op);							\
-	else {								\
+	if (F_ISSET(session, WT_SESSION_SCHEMA_LOCKED)) {		\
 		__wt_spin_unlock(session, &S2C(session)->schema_lock);	\
 		F_CLR(session, WT_SESSION_SCHEMA_LOCKED);		\
 		(op);							\
-		while (!F_ISSET(session, WT_SESSION_SCHEMA_LOCKED)) {	\
-			if (__wt_spin_trylock(session,			\
-			    &S2C(session)->schema_lock, &__id) == 0)	\
-				F_SET(session, WT_SESSION_SCHEMA_LOCKED);\
-			else						\
-				__wt_yield();				\
-		}							\
+		__wt_spin_lock(session, &S2C(session)->schema_lock);	\
+		F_SET(session, WT_SESSION_SCHEMA_LOCKED);		\
+	} else {							\
+		(op);							\
 	}								\
 } while (0)

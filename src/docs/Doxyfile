@@ -268,7 +268,7 @@ OPTIMIZE_OUTPUT_VHDL   = NO
 # that for custom extensions you also need to set FILE_PATTERNS otherwise the 
 # files are not read by doxygen.
 
-EXTENSION_MAPPING      = 
+EXTENSION_MAPPING      = in=C
 
 # If MARKDOWN_SUPPORT is enabled (the default) then doxygen pre-processes all 
 # comments according to the Markdown format, which allows for more readable 

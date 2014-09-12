@@ -55,10 +55,10 @@ __wt_connection_open(WT_CONNECTION_IMPL *conn, const char *cfg[])
 	WT_WRITE_BARRIER();
 
 	/* Connect to a cache pool. */
-	WT_RET(__wt_conn_cache_pool_config(session, cfg));
+	WT_RET(__wt_cache_pool_config(session, cfg));
 
 	/* Create the cache. */
-	WT_RET(__wt_cache_create(conn, cfg));
+	WT_RET(__wt_cache_create(session, cfg));
 
 	/* Initialize transaction support. */
 	WT_RET(__wt_txn_global_init(conn, cfg));
@@ -102,7 +102,7 @@ __wt_connection_close(WT_CONNECTION_IMPL *conn)
 	WT_TRET(__wt_async_destroy(conn));
 	WT_TRET(__wt_lsm_manager_destroy(conn));
 	WT_TRET(__wt_checkpoint_server_destroy(conn));
-	WT_TRET(__wt_statlog_destroy(conn, 1));
+	WT_TRET(__wt_statlog_destroy(session, 1));
 	WT_TRET(__wt_sweep_destroy(conn));
 
 	/* Close open data handles. */
@@ -225,20 +225,20 @@ __wt_connection_workers(WT_SESSION_IMPL *session, const char *cfg[])
 	 * Start the optional statistics thread.  Start statistics first so that
 	 * other optional threads can know if statistics are enabled or not.
 	 */
-	WT_RET(__wt_statlog_create(conn, cfg));
+	WT_RET(__wt_statlog_create(session, cfg));
 
 	/* Start the optional async threads. */
-	WT_RET(__wt_async_create(conn, cfg));
+	WT_RET(__wt_async_create(session, cfg));
 
 	/*
 	 * Start the optional logging/archive thread.
 	 * NOTE: The log manager must be started before checkpoints so that the
 	 * checkpoint server knows if logging is enabled.
 	 */
-	WT_RET(__wt_logmgr_create(conn, cfg));
+	WT_RET(__wt_logmgr_create(session, cfg));
 
 	/* Start the optional checkpoint thread. */
-	WT_RET(__wt_checkpoint_server_create(conn, cfg));
+	WT_RET(__wt_checkpoint_server_create(session, cfg));
 
 	return (0);
 }

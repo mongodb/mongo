@@ -5,7 +5,7 @@
 #ifndef STORAGE_LEVELDB_INCLUDE_REPLAY_ITERATOR_H_
 #define STORAGE_LEVELDB_INCLUDE_REPLAY_ITERATOR_H_
 
-#include "wiredtiger_config.h"
+#include "leveldb_wt_config.h"
 
 #include "slice.h"
 #include "status.h"

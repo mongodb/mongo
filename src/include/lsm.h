@@ -88,6 +88,8 @@ struct __wt_lsm_chunk {
 #define	WT_LSM_WORK_FLUSH	0x04	/* Flush a chunk to disk */
 #define	WT_LSM_WORK_MERGE	0x08	/* Look for a tree merge */
 #define	WT_LSM_WORK_SWITCH	0x10	/* Switch to a new in memory chunk */
+#define	WT_LSM_WORK_FORCE	0x10000	/* Force last chunk flush */
+#define	WT_LSM_WORK_MASK	0xffff	/* Mask for work types */
 
 /*
  * WT_LSM_WORK_UNIT --
@@ -125,8 +127,6 @@ struct __wt_lsm_manager {
 	uint32_t	lsm_workers;	/* Current number of LSM workers */
 	uint32_t	lsm_workers_max;
 	WT_LSM_WORKER_ARGS *lsm_worker_cookies;
-#define	WT_LSM_MANAGER_RUNNING	0x01
-	uint32_t	flags;
 };
 
 /*
@@ -192,11 +192,12 @@ struct __wt_lsm_tree {
 	int freeing_old_chunks;		/* Whether chunks are being freed */
 	uint32_t merge_aggressiveness;	/* Increase amount of work per merge */
 
-#define	WT_LSM_TREE_ACTIVE	0x01	/* Workers are active */
-#define	WT_LSM_TREE_COMPACTING	0x02	/* Tree is being compacted */
-#define	WT_LSM_TREE_NEED_SWITCH	0x04	/* A new chunk should be created */
-#define	WT_LSM_TREE_OPEN	0x08	/* The tree is open */
-#define	WT_LSM_TREE_THROTTLE	0x10	/* Throttle updates */
+#define	WT_LSM_TREE_ACTIVE		0x01	/* Workers are active */
+#define	WT_LSM_TREE_COMPACT_FLUSH	0x02	/* Flushed for compact */
+#define	WT_LSM_TREE_COMPACTING		0x04	/* Tree being compacted */
+#define	WT_LSM_TREE_NEED_SWITCH		0x08	/* New chunk needs creating */
+#define	WT_LSM_TREE_OPEN		0x10	/* The tree is open */
+#define	WT_LSM_TREE_THROTTLE		0x20	/* Throttle updates */
 	uint32_t flags;
 
 #define	WT_LSM_TREE_EXCLUSIVE	0x01	/* Tree is opened exclusively */

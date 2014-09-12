@@ -166,13 +166,13 @@ err:		__wt_err(session, ret, "log archive server error");
  *	Start the log subsystem and archive server thread.
  */
 int
-__wt_logmgr_create(WT_CONNECTION_IMPL *conn, const char *cfg[])
+__wt_logmgr_create(WT_SESSION_IMPL *session, const char *cfg[])
 {
-	WT_SESSION_IMPL *session;
+	WT_CONNECTION_IMPL *conn;
 	WT_LOG *log;
 	int run;
 
-	session = conn->default_session;
+	conn = S2C(session);
 
 	/* Handle configuration. */
 	WT_RET(__logmgr_config(session, cfg, &run));

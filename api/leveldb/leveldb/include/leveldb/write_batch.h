@@ -21,7 +21,7 @@
 #ifndef STORAGE_LEVELDB_INCLUDE_WRITE_BATCH_H_
 #define STORAGE_LEVELDB_INCLUDE_WRITE_BATCH_H_
 
-#include "wiredtiger_config.h"
+#include "leveldb_wt_config.h"
 #if defined(HAVE_ROCKSDB) && !defined(leveldb)
 #define leveldb rocksdb
 #endif

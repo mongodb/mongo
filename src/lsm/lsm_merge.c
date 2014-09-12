@@ -61,6 +61,7 @@ __wt_lsm_merge(
 	uint32_t aggressive, generation, max_gap, max_gen, max_level, start_id;
 	uint64_t insert_count, record_count, chunk_size;
 	u_int dest_id, end_chunk, i, merge_max, merge_min, nchunks, start_chunk;
+	u_int verb;
 	int create_bloom, locked, tret;
 	const char *cfg[3];
 	const char *drop_cfg[] =
@@ -72,16 +73,17 @@ __wt_lsm_merge(
 	dest = src = NULL;
 	locked = 0;
 	start_id = 0;
-	aggressive = lsm_tree->merge_aggressiveness;
 
 	/*
-	 * If the tree is open read-only be very aggressive. Otherwise, we can
-	 * spend a long time waiting for merges to start in read-only
-	 * applications.
+	 * If the tree is open read-only or we are compacting, be very
+	 * aggressive. Otherwise, we can spend a long time waiting for merges
+	 * to start in read-only applications.
 	 */
-	if (!lsm_tree->modified)
+	if (!lsm_tree->modified ||
+	    F_ISSET(lsm_tree, WT_LSM_TREE_COMPACTING))
 		lsm_tree->merge_aggressiveness = 10;
 
+	aggressive = lsm_tree->merge_aggressiveness;
 	merge_max = (aggressive > 5) ? 100 : lsm_tree->merge_min;
 	merge_min = (aggressive > 5) ? 2 : lsm_tree->merge_min;
 	max_gap = (aggressive + 4) / 5;
@@ -249,10 +251,22 @@ __wt_lsm_merge(
 	/* Allocate an ID for the merge. */
 	dest_id = WT_ATOMIC_ADD(lsm_tree->last, 1);
 
-	WT_RET(__wt_verbose(session, WT_VERB_LSM,
-	    "Merging chunks %u-%u into %u (%" PRIu64 " records)"
-	    ", generation %" PRIu32,
-	    start_chunk, end_chunk, dest_id, record_count, generation));
+	/*
+	 * We only want to do the chunk loop if we're running with verbose,
+	 * so we wrap these statements in the conditional.  Avoid the loop
+	 * in the normal path.
+	 */
+	if (WT_VERBOSE_ISSET(session, WT_VERB_LSM)) {
+		WT_RET(__wt_verbose(session, WT_VERB_LSM,
+		    "Merging %s chunks %u-%u into %u (%" PRIu64 " records)"
+		    ", generation %" PRIu32,
+		    lsm_tree->name,
+		    start_chunk, end_chunk, dest_id, record_count, generation));
+		for (verb = start_chunk; verb <= end_chunk; verb++)
+			WT_RET(__wt_verbose(session, WT_VERB_LSM,
+			    "%s: Chunk[%u] id %u",
+			    lsm_tree->name, verb, lsm_tree->chunk[verb]->id));
+	}
 
 	WT_RET(__wt_calloc_def(session, 1, &chunk));
 	chunk->id = dest_id;

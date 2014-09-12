@@ -45,11 +45,22 @@ __wt_connection_init(WT_CONNECTION_IMPL *conn)
 	WT_RET(__wt_spin_init(session, &conn->dhandle_lock, "data handle"));
 	WT_RET(__wt_spin_init(session, &conn->fh_lock, "file list"));
 	WT_RET(__wt_spin_init(session, &conn->hot_backup_lock, "hot backup"));
+	WT_RET(__wt_spin_init(session, &conn->reconfig_lock, "reconfigure"));
 	WT_RET(__wt_spin_init(session, &conn->schema_lock, "schema"));
 	WT_RET(__wt_calloc_def(session, WT_PAGE_LOCKS(conn), &conn->page_lock));
 	for (i = 0; i < WT_PAGE_LOCKS(conn); ++i)
 		WT_RET(
 		    __wt_spin_init(session, &conn->page_lock[i], "btree page"));
+
+	/* Setup the spin locks for the LSM manager queues. */
+	WT_RET(__wt_spin_init(session,
+	    &conn->lsm_manager.app_lock, "LSM application queue lock"));
+	WT_RET(__wt_spin_init(session,
+	    &conn->lsm_manager.manager_lock, "LSM manager queue lock"));
+	WT_RET(__wt_spin_init(
+	    session, &conn->lsm_manager.switch_lock, "LSM switch queue lock"));
+	WT_RET(__wt_cond_alloc(
+	    session, "LSM worker cond", 0, &conn->lsm_manager.work_cond));
 
 	/*
 	 * Generation numbers.
@@ -114,12 +125,14 @@ __wt_connection_destroy(WT_CONNECTION_IMPL *conn)
 	__wt_spin_destroy(session, &conn->dhandle_lock);
 	__wt_spin_destroy(session, &conn->fh_lock);
 	__wt_spin_destroy(session, &conn->hot_backup_lock);
+	__wt_spin_destroy(session, &conn->reconfig_lock);
 	__wt_spin_destroy(session, &conn->schema_lock);
 	for (i = 0; i < WT_PAGE_LOCKS(conn); ++i)
 		__wt_spin_destroy(session, &conn->page_lock[i]);
 	__wt_free(session, conn->page_lock);
 
 	/* Free allocated memory. */
+	__wt_free(session, conn->cfg);
 	__wt_free(session, conn->home);
 	__wt_free(session, conn->error_prefix);
 	__wt_free(session, conn->sessions);

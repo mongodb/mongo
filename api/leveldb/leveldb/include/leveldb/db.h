@@ -5,7 +5,7 @@
 #ifndef STORAGE_LEVELDB_INCLUDE_DB_H_
 #define STORAGE_LEVELDB_INCLUDE_DB_H_
 
-#include "wiredtiger_config.h"
+#include "leveldb_wt_config.h"
 #if defined(HAVE_ROCKSDB) && !defined(leveldb)
 #define leveldb rocksdb
 #endif
@@ -291,6 +291,12 @@ class DB {
   // Therefore the following call will compact the entire database:
   //    db->CompactRange(NULL, NULL);
   virtual void CompactRange(const Slice* begin, const Slice* end) = 0;
+
+  // Suspends the background compaction thread.  This methods
+  // returns once suspended.
+  virtual void SuspendCompactions() = 0;
+  // Resumes a suspended background compation thread.
+  virtual void ResumeCompactions() = 0;
 
 #ifdef HAVE_HYPERLEVELDB
   // Create a live backup of a live LevelDB instance.

@@ -626,43 +626,47 @@ err:	/*
 static int
 __conn_reconfigure(WT_CONNECTION *wt_conn, const char *config)
 {
-	WT_CONFIG_ITEM cval;
 	WT_CONNECTION_IMPL *conn;
 	WT_DECL_RET;
 	WT_SESSION_IMPL *session;
-
-	/*
-	 * Special version of cfg that doesn't include the default config: used
-	 * to limit changes to values that the application sets explicitly.
-	 * Note that any function using this value has to be prepared to handle
-	 * not-found as a valid option return.
-	 */
-	const char *raw_cfg[] = { config, NULL };
+	const char *p, *config_cfg[] = { NULL, NULL, NULL };
 
 	conn = (WT_CONNECTION_IMPL *)wt_conn;
 
 	CONNECTION_API_CALL(conn, session, reconfigure, config, cfg);
+	WT_UNUSED(cfg);
 
-	WT_ERR(__wt_conn_cache_pool_config(session, cfg));
-	WT_ERR(__wt_cache_config(conn, raw_cfg));
+	/* Serialize reconfiguration. */
+	__wt_spin_lock(session, &conn->reconfig_lock);
 
-	WT_ERR(__wt_async_reconfig(conn, raw_cfg));
-	WT_ERR(__conn_statistics_config(session, raw_cfg));
-	WT_ERR(__wt_conn_verbose_config(session, raw_cfg));
-	WT_ERR(__wt_checkpoint_server_create(conn, cfg));
-	WT_ERR(__wt_statlog_create(conn, cfg));
+	/*
+	 * The configuration argument has been checked for validity, replace the
+	 * previous connection configuration.
+	 *
+	 * DO NOT merge the configuration before the reconfigure calls.  Some
+	 * of the underlying reconfiguration functions do explicit checks with
+	 * the second element of the configuration array, knowing the defaults
+	 * are in slot #1 and the application's modifications are in slot #2.
+	 */
+	config_cfg[0] = conn->cfg;
+	config_cfg[1] = config;
 
-	WT_ERR(__wt_config_gets(
-	    session, cfg, "lsm_manager.worker_thread_max", &cval));
-	if (cval.val)
-		conn->lsm_manager.lsm_workers_max = (uint32_t)cval.val;
+	WT_ERR(__conn_statistics_config(session, config_cfg));
+	WT_ERR(__wt_async_reconfig(session, config_cfg));
+	WT_ERR(__wt_cache_config(session, config_cfg));
+	WT_ERR(__wt_cache_pool_config(session, config_cfg));
+	WT_ERR(__wt_checkpoint_server_create(session, config_cfg));
+	WT_ERR(__wt_lsm_manager_config(session, config_cfg));
+	WT_ERR(__wt_statlog_create(session, config_cfg));
+	WT_ERR(__wt_verbose_config(session, config_cfg));
 
-	/* Wake up the cache pool server so any changes are noticed. */
-	if (F_ISSET(conn, WT_CONN_CACHE_POOL))
-		WT_ERR(__wt_cond_signal(
-		    session, __wt_process.cache_pool->cache_pool_cond));
+	WT_ERR(__wt_config_merge(session, config_cfg, &p));
+	__wt_free(session, conn->cfg);
+	conn->cfg = p;
 
-err:	API_END_RET(session, ret);
+err:	__wt_spin_unlock(session, &conn->reconfig_lock);
+
+	API_END_RET(session, ret);
 }
 
 /*
@@ -1009,59 +1013,62 @@ __conn_statistics_config(WT_SESSION_IMPL *session, const char *cfg[])
 	WT_CONFIG_ITEM cval, sval;
 	WT_CONNECTION_IMPL *conn;
 	WT_DECL_RET;
+	uint32_t flags;
 	int set;
 
 	conn = S2C(session);
 
-	if ((ret = __wt_config_gets(session, cfg, "statistics", &cval)) != 0)
-		return (ret == WT_NOTFOUND ? 0 : ret);
+	WT_RET(__wt_config_gets(session, cfg, "statistics", &cval));
 
-	/* Configuring statistics clears any existing values. */
-	conn->stat_flags = 0;
-
+	flags = 0;
 	set = 0;
 	if ((ret = __wt_config_subgets(
 	    session, &cval, "none", &sval)) == 0 && sval.val != 0) {
-		FLD_SET(conn->stat_flags, WT_CONN_STAT_NONE);
+		LF_SET(WT_CONN_STAT_NONE);
 		++set;
 	}
 	WT_RET_NOTFOUND_OK(ret);
 
 	if ((ret = __wt_config_subgets(
 	    session, &cval, "fast", &sval)) == 0 && sval.val != 0) {
-		FLD_SET(conn->stat_flags, WT_CONN_STAT_FAST);
+		LF_SET(WT_CONN_STAT_FAST);
 		++set;
 	}
 	WT_RET_NOTFOUND_OK(ret);
 
 	if ((ret = __wt_config_subgets(
 	    session, &cval, "all", &sval)) == 0 && sval.val != 0) {
-		FLD_SET(conn->stat_flags, WT_CONN_STAT_ALL | WT_CONN_STAT_FAST);
+		LF_SET(WT_CONN_STAT_ALL | WT_CONN_STAT_FAST);
 		++set;
 	}
 	WT_RET_NOTFOUND_OK(ret);
 
 	if ((ret = __wt_config_subgets(
 	    session, &cval, "clear", &sval)) == 0 && sval.val != 0)
-		FLD_SET(conn->stat_flags, WT_CONN_STAT_CLEAR);
+		LF_SET(WT_CONN_STAT_CLEAR);
 	WT_RET_NOTFOUND_OK(ret);
 
 	if (set > 1)
 		WT_RET_MSG(session, EINVAL,
 		    "only one statistics configuration value may be specified");
+
+	/* Configuring statistics clears any existing values. */
+	conn->stat_flags = flags;
+
 	return (0);
 }
 
 /*
- * __wt_conn_verbose_config --
+ * __wt_verbose_config --
  *	Set verbose configuration.
  */
 int
-__wt_conn_verbose_config(WT_SESSION_IMPL *session, const char *cfg[])
+__wt_verbose_config(WT_SESSION_IMPL *session, const char *cfg[])
 {
 	WT_CONFIG_ITEM cval, sval;
 	WT_CONNECTION_IMPL *conn;
 	WT_DECL_RET;
+	uint32_t flags;
 	static const struct {
 		const char *name;
 		uint32_t flag;
@@ -1092,14 +1099,14 @@ __wt_conn_verbose_config(WT_SESSION_IMPL *session, const char *cfg[])
 
 	conn = S2C(session);
 
-	if ((ret = __wt_config_gets(session, cfg, "verbose", &cval)) != 0)
-		return (ret == WT_NOTFOUND ? 0 : ret);
+	WT_RET(__wt_config_gets(session, cfg, "verbose", &cval));
 
+	flags = 0;
 	for (ft = verbtypes; ft->name != NULL; ft++) {
 		if ((ret = __wt_config_subgets(
 		    session, &cval, ft->name, &sval)) == 0 && sval.val != 0) {
 #ifdef HAVE_VERBOSE
-			FLD_SET(conn->verbose, ft->flag);
+			LF_SET(ft->flag);
 #else
 			WT_RET_MSG(session, EINVAL,
 			    "Verbose option specified when WiredTiger built "
@@ -1107,11 +1114,11 @@ __wt_conn_verbose_config(WT_SESSION_IMPL *session, const char *cfg[])
 			    "configure command and rebuild to include support "
 			    "for verbose messages");
 #endif
-		} else
-			FLD_CLR(conn->verbose, ft->flag);
-
+		}
 		WT_RET_NOTFOUND_OK(ret);
 	}
+
+	conn->verbose = flags;
 	return (0);
 }
 
@@ -1319,7 +1326,7 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
 	if (cval.val)
 		F_SET(conn, WT_CONN_CKPT_SYNC);
 
-	WT_ERR(__wt_conn_verbose_config(session, cfg));
+	WT_ERR(__wt_verbose_config(session, cfg));
 
 	WT_ERR(__wt_config_gets(session, cfg, "buffer_alignment", &cval));
 	if (cval.val == -1)
@@ -1399,13 +1406,12 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
 	 */
 	WT_ERR(__wt_connection_workers(session, cfg));
 
+	/* Merge the final configuration for later reconfiguration. */
+	WT_ERR(__wt_config_merge(session, cfg, &conn->cfg));
+
 	STATIC_ASSERT(offsetof(WT_CONNECTION_IMPL, iface) == 0);
 	*wt_connp = &conn->iface;
 
-	/*
-	 * Destroying the connection on error will destroy our session handle,
-	 * cleanup using the session handle first, then discard the connection.
-	 */
 err:	__wt_buf_free(session, &cbbuf);
 	__wt_buf_free(session, &cubuf);
 

@@ -107,17 +107,10 @@ there are chunks in the tree for each cursor that is open on the LSM tree.
 The number of hazard pointers is configured with the \c "hazard_max"
 configuration key to ::wiredtiger_open.
 
-@subsection lsm_tombstones Empty values
-
-Internally, WiredTiger's LSM trees use an empty value to represent a
-record that has been removed (also known as a "tombstone").  For this
-reason, applications cannot store records in LSM trees with empty values.
-
 @subsection lsm_checkpoints Named checkpoints
 
-Named checkpoints are not supported on LSM trees, and cursors cannot be opened
-with a non-empty \c "checkpoint" configuration.
-
-We intend to address these limitations in future releases.
+Named checkpoints are not supported on LSM trees, and cursors cannot be
+opened with a non-empty \c "checkpoint" configuration (that is, only the
+most recent standard checkpoint can be read).
 
  */
