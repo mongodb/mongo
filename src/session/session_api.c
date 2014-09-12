@@ -189,41 +189,83 @@ __wt_open_cursor(WT_SESSION_IMPL *session,
 	WT_COLGROUP *colgroup;
 	WT_DATA_SOURCE *dsrc;
 	WT_DECL_RET;
+	int handled = 0;
 
-	if (WT_PREFIX_MATCH(uri, "backup:"))
-		ret = __wt_curbackup_open(session, uri, cfg, cursorp);
-	else if (WT_PREFIX_MATCH(uri, "colgroup:")) {
-		/*
-		 * Column groups are a special case: open a cursor on the
-		 * underlying data source.
-		 */
-		WT_RET(__wt_schema_get_colgroup(session, uri, NULL, &colgroup));
-		ret = __wt_open_cursor(
-		    session, colgroup->source, owner, cfg, cursorp);
-	} else if (WT_PREFIX_MATCH(uri, "config:"))
-		ret = __wt_curconfig_open(session, uri, cfg, cursorp);
-	else if (WT_PREFIX_MATCH(uri, "file:"))
-		ret = __wt_curfile_open(session, uri, owner, cfg, cursorp);
-	else if (WT_PREFIX_MATCH(uri, "lsm:"))
-		ret = __wt_clsm_open(session, uri, owner, cfg, cursorp);
-	else if (WT_PREFIX_MATCH(uri, WT_METADATA_URI))
-		ret = __wt_curmetadata_open(session, uri, owner, cfg, cursorp);
-	else if (WT_PREFIX_MATCH(uri, "index:"))
-		ret = __wt_curindex_open(session, uri, owner, cfg, cursorp);
-	else if (WT_PREFIX_MATCH(uri, "log:"))
-		ret = __wt_curlog_open(session, uri, cfg, cursorp);
-	else if (WT_PREFIX_MATCH(uri, "statistics:"))
-		ret = __wt_curstat_open(session, uri, cfg, cursorp);
-	else if (WT_PREFIX_MATCH(uri, "table:"))
-		ret = __wt_curtable_open(session, uri, cfg, cursorp);
-	else if ((dsrc = __wt_schema_get_source(session, uri)) != NULL)
-		ret = dsrc->open_cursor == NULL ?
-		    __wt_object_unsupported(session, uri) :
-		    __wt_curds_open(session, uri, owner, cfg, dsrc, cursorp);
-	else
-		ret = __wt_bad_object_type(session, uri);
+	/*
+	 * Open specific cursor types we know about, or call the generic data source open
+	 * function. Unwind a set of string comparisons into a switch statement for performance.
+	 */
+	switch (uri[0]) {
+	case 'b':
+		if (WT_PREFIX_MATCH(uri, "backup:")) {
+			WT_RET(__wt_curbackup_open(session, uri, cfg, cursorp));
+			handled = 1;
+		}
+		break;
+	case 'c':
+		if (WT_PREFIX_MATCH(uri, "colgroup:")) {
+			/*
+			 * Column groups are a special case: open a cursor on the
+			 * underlying data source.
+			 */
+			WT_RET(__wt_schema_get_colgroup(session, uri, NULL, &colgroup));
+			WT_RET(__wt_open_cursor(
+			    session, colgroup->source, owner, cfg, cursorp));
+			handled = 1;
+		} else if (WT_PREFIX_MATCH(uri, "config:")) {
+			WT_RET(__wt_curconfig_open(session, uri, cfg, cursorp));
+			handled = 1;
+		}
+		break;
+	case 'f':
+		if (WT_PREFIX_MATCH(uri, "file:")) {
+			WT_RET(__wt_curfile_open(session, uri, owner, cfg, cursorp));
+			handled = 1;
+		}
+		break;
+	case 'i':
+		if (WT_PREFIX_MATCH(uri, "index:")) {
+			WT_RET(__wt_curindex_open(session, uri, owner, cfg, cursorp));
+			handled = 1;
+		}
+		break;
+	case 'l':
+		if (WT_PREFIX_MATCH(uri, "log:")) {
+			WT_RET(__wt_curlog_open(session, uri, cfg, cursorp));
+			handled = 1;
+		} else if (WT_PREFIX_MATCH(uri, "lsm:")) {
+			WT_RET(__wt_clsm_open(session, uri, owner, cfg, cursorp));
+			handled = 1;
+		}
+		break;
+	case 's':
+		if (WT_PREFIX_MATCH(uri, "statistics:")) {
+			WT_RET(__wt_curstat_open(session, uri, cfg, cursorp));
+			handled = 1;
+		}
+		break;
+	case 't':
+		if (WT_PREFIX_MATCH(uri, "table:")) {
+			WT_RET(__wt_curtable_open(session, uri, cfg, cursorp));
+			handled = 1;
+		}
+		break;
+	default:
+		/* Explicit default to make lint happy */
+		break;
 
-	return (ret);
+	}
+	if (!handled) {
+		if (WT_PREFIX_MATCH(uri, WT_METADATA_URI))
+			WT_RET(__wt_curmetadata_open(session, uri, owner, cfg, cursorp));
+		else if ((dsrc = __wt_schema_get_source(session, uri)) != NULL)
+			WT_RET(dsrc->open_cursor == NULL ?
+			    __wt_object_unsupported(session, uri) :
+			    __wt_curds_open(session, uri, owner, cfg, dsrc, cursorp));
+		else
+			WT_RET(__wt_bad_object_type(session, uri));
+	}
+	return (0);
 }
 
 /*
