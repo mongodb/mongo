@@ -149,8 +149,6 @@ namespace repl {
         virtual Status processHandshake(const OperationContext* txn,
                                         const HandshakeArgs& handshake);
 
-        virtual void waitUpToOneSecondForOptimeChange(const OpTime& ot);
-
         virtual bool buildsIndexes();
 
         virtual std::vector<HostAndPort> getHostsWrittenTo(const OpTime& op);

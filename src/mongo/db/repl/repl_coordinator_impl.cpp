@@ -452,7 +452,8 @@ namespace {
             if (writeConcern.wMode == "majority") {
                 return _doneWaitingForReplication_numNodes_inlock(opTime,
                                                                   _rsConfig.getMajorityNumber());
-            } else {
+            }
+            else {
                 StatusWith<ReplicaSetTagPattern> tagPattern =
                         _rsConfig.findCustomWriteMode(writeConcern.wMode);
                 if (!tagPattern.isOK()) {
@@ -473,6 +474,13 @@ namespace {
             const OpTime& slaveTime = it->second.opTime;
             if (slaveTime >= opTime) {
                 --numNodes;
+            }
+            else {
+                if (it->first == _getMyRID_inlock()) {
+                    // Secondaries that are for some reason ahead of us should not allow us to
+                    // satisfy a write concern if we aren't caught up ourself.
+                    return false;
+                }
             }
             if (numNodes <= 0) {
                 return true;
@@ -1203,10 +1211,6 @@ namespace {
         }
 
         return Status::OK();
-    }
-
-    void ReplicationCoordinatorImpl::waitUpToOneSecondForOptimeChange(const OpTime& ot) {
-        //TODO
     }
 
     bool ReplicationCoordinatorImpl::buildsIndexes() {

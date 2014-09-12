@@ -221,10 +221,6 @@ namespace repl {
         return Status::OK();
     }
 
-    void ReplicationCoordinatorMock::waitUpToOneSecondForOptimeChange(const OpTime& ot) {
-        // TODO
-    }
-
     bool ReplicationCoordinatorMock::buildsIndexes() {
         // TODO
         return false;

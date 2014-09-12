@@ -364,11 +364,6 @@ namespace repl {
         return implResponse;
     }
 
-    void HybridReplicationCoordinator::waitUpToOneSecondForOptimeChange(const OpTime& ot) {
-        _legacy.waitUpToOneSecondForOptimeChange(ot);
-        //TODO(spencer) switch to _impl.waitUpToOneSecondForOptimeChange(ot); once implemented
-    }
-
     bool HybridReplicationCoordinator::buildsIndexes() {
         bool legacyResponse = _legacy.buildsIndexes();
         bool implResponse = _impl.buildsIndexes();

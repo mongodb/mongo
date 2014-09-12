@@ -412,7 +412,7 @@ namespace {
         // 2 nodes waiting for time2
         statusAndDur = getReplCoord()->awaitReplication(&txn, time2, writeConcern);
         ASSERT_EQUALS(ErrorCodes::ExceededTimeLimit, statusAndDur.status);
-        ASSERT_OK(getReplCoord()->setLastOptime(&txn, client2, time2));
+        ASSERT_OK(getReplCoord()->setLastOptime(&txn, myOID, time2));
         statusAndDur = getReplCoord()->awaitReplication(&txn, time2, writeConcern);
         ASSERT_EQUALS(ErrorCodes::ExceededTimeLimit, statusAndDur.status);
         ASSERT_OK(getReplCoord()->setLastOptime(&txn, client3, time2));
@@ -423,7 +423,7 @@ namespace {
         writeConcern.wNumNodes = 3;
         statusAndDur = getReplCoord()->awaitReplication(&txn, time2, writeConcern);
         ASSERT_EQUALS(ErrorCodes::ExceededTimeLimit, statusAndDur.status);
-        ASSERT_OK(getReplCoord()->setLastOptime(&txn, client1, time2));
+        ASSERT_OK(getReplCoord()->setLastOptime(&txn, client2, time2));
         statusAndDur = getReplCoord()->awaitReplication(&txn, time2, writeConcern);
         ASSERT_OK(statusAndDur.status);
     }
@@ -611,16 +611,15 @@ namespace {
                      "version" << 2 <<
                      "members" << BSON_ARRAY(BSON("host" << "node1:12345" << "_id" << 0) <<
                                              BSON("host" << "node2:12345" << "_id" << 1) <<
-                                             BSON("host" << "node3:12345" << "_id" << 2) <<
-                                             BSON("host" << "node4:12345" << "_id" << 3))),
+                                             BSON("host" << "node3:12345" << "_id" << 2))),
                 HostAndPort("node1", 12345));
 
         OperationContextNoop txn;
         ReplicationAwaiter awaiter(getReplCoord(), &txn);
 
+        OID selfRID = getReplCoord()->getMyRID();
         OID client1 = OID::gen();
         OID client2 = OID::gen();
-        OID client3 = OID::gen();
         OpTime time1(1, 1);
         OpTime time2(1, 2);
 
@@ -630,9 +629,6 @@ namespace {
         HandshakeArgs handshake2;
         ASSERT_OK(handshake2.initialize(BSON("handshake" << client2 << "member" << 2)));
         ASSERT_OK(getReplCoord()->processHandshake(&txn, handshake2));
-        HandshakeArgs handshake3;
-        ASSERT_OK(handshake3.initialize(BSON("handshake" << client3 << "member" << 3)));
-        ASSERT_OK(getReplCoord()->processHandshake(&txn, handshake3));
 
         WriteConcernOptions writeConcern;
         writeConcern.wTimeout = WriteConcernOptions::kNoTimeout;
@@ -642,8 +638,8 @@ namespace {
         awaiter.setOpTime(time1);
         awaiter.setWriteConcern(writeConcern);
         awaiter.start(&txn);
+        ASSERT_OK(getReplCoord()->setLastOptime(&txn, selfRID, time1));
         ASSERT_OK(getReplCoord()->setLastOptime(&txn, client1, time1));
-        ASSERT_OK(getReplCoord()->setLastOptime(&txn, client2, time1));
         ReplicationCoordinator::StatusAndDuration statusAndDur = awaiter.getResult();
         ASSERT_OK(statusAndDur.status);
         awaiter.reset();
@@ -651,8 +647,8 @@ namespace {
         // 2 nodes waiting for time2
         awaiter.setOpTime(time2);
         awaiter.start(&txn);
-        ASSERT_OK(getReplCoord()->setLastOptime(&txn, client2, time2));
-        ASSERT_OK(getReplCoord()->setLastOptime(&txn, client3, time2));
+        ASSERT_OK(getReplCoord()->setLastOptime(&txn, selfRID, time2));
+        ASSERT_OK(getReplCoord()->setLastOptime(&txn, client1, time2));
         statusAndDur = awaiter.getResult();
         ASSERT_OK(statusAndDur.status);
         awaiter.reset();
@@ -661,7 +657,7 @@ namespace {
         writeConcern.wNumNodes = 3;
         awaiter.setWriteConcern(writeConcern);
         awaiter.start(&txn);
-        ASSERT_OK(getReplCoord()->setLastOptime(&txn, client1, time2));
+        ASSERT_OK(getReplCoord()->setLastOptime(&txn, client2, time2));
         statusAndDur = awaiter.getResult();
         ASSERT_OK(statusAndDur.status);
         awaiter.reset();
@@ -678,17 +674,14 @@ namespace {
         OperationContextNoop txn;
         ReplicationAwaiter awaiter(getReplCoord(), &txn);
 
-        OID client1 = OID::gen();
-        OID client2 = OID::gen();
+        OID selfRID = getReplCoord()->getMyRID();
+        OID client = OID::gen();
         OpTime time1(1, 1);
         OpTime time2(1, 2);
 
-        HandshakeArgs handshake1;
-        ASSERT_OK(handshake1.initialize(BSON("handshake" << client1 << "member" << 1)));
-        ASSERT_OK(getReplCoord()->processHandshake(&txn, handshake1));
-        HandshakeArgs handshake2;
-        ASSERT_OK(handshake2.initialize(BSON("handshake" << client2 << "member" << 2)));
-        ASSERT_OK(getReplCoord()->processHandshake(&txn, handshake2));
+        HandshakeArgs handshake;
+        ASSERT_OK(handshake.initialize(BSON("handshake" << client << "member" << 1)));
+        ASSERT_OK(getReplCoord()->processHandshake(&txn, handshake));
 
         WriteConcernOptions writeConcern;
         writeConcern.wTimeout = 50;
@@ -698,8 +691,8 @@ namespace {
         awaiter.setOpTime(time2);
         awaiter.setWriteConcern(writeConcern);
         awaiter.start(&txn);
-        ASSERT_OK(getReplCoord()->setLastOptime(&txn, client1, time1));
-        ASSERT_OK(getReplCoord()->setLastOptime(&txn, client2, time1));
+        ASSERT_OK(getReplCoord()->setLastOptime(&txn, selfRID, time2));
+        ASSERT_OK(getReplCoord()->setLastOptime(&txn, client, time1));
         ReplicationCoordinator::StatusAndDuration statusAndDur = awaiter.getResult();
         ASSERT_EQUALS(ErrorCodes::ExceededTimeLimit, statusAndDur.status);
         awaiter.reset();

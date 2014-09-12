@@ -945,10 +945,6 @@ namespace {
         return Status::OK();
     }
 
-    void LegacyReplicationCoordinator::waitUpToOneSecondForOptimeChange(const OpTime& ot) {
-        repl::waitUpToOneSecondForOptimeChange(ot);
-    }
-
     bool LegacyReplicationCoordinator::buildsIndexes() {
         return theReplSet->buildIndexes();
     }

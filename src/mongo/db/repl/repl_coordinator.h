@@ -139,15 +139,18 @@ namespace repl {
          * Blocks the calling thread for up to writeConcern.wTimeout millis, or until "ts" has been
          * replicated to at least a set of nodes that satisfies the writeConcern, whichever comes
          * first. A writeConcern.wTimeout of 0 indicates no timeout (block forever) and a
-         * writeConcern.wTimeout of -1 indicates return immediately after checking. Will return a
-         * Status with ErrorCodes::ExceededTimeLimit if the writeConcern.wTimeout is reached before
-         * the data has been sufficiently replicated, a Status with ErrorCodes::NotMaster if the
-         * node is not Primary/Master, or a Status with ErrorCodes::UnknownReplWriteConcern if
-         * the writeConcern.wMode contains a write concern mode that is not known.
+         * writeConcern.wTimeout of -1 indicates return immediately after checking. Return codes:
+         * ErrorCodes::ExceededTimeLimit if the writeConcern.wTimeout is reached before
+         *     the data has been sufficiently replicated
+         * ErrorCodes::NotMaster if the node is not Primary/Master
+         * ErrorCodes::UnknownReplWriteConcern if the writeConcern.wMode contains a write concern
+         *     mode that is not known
+         * ErrorCodes::ShutdownInProgress if we are mid-shutdown
+         * ErrorCodes::Interrupted if the operation was killed with killop()
          */
         virtual StatusAndDuration awaitReplication(const OperationContext* txn,
-                                                    const OpTime& ts,
-                                                    const WriteConcernOptions& writeConcern) = 0;
+                                                   const OpTime& ts,
+                                                   const WriteConcernOptions& writeConcern) = 0;
 
         /**
          * Like awaitReplication(), above, but waits for the replication of the last operation
@@ -429,12 +432,6 @@ namespace repl {
          */
         virtual Status processHandshake(const OperationContext* txn,
                                         const HandshakeArgs& handshake) = 0;
-
-        /**
-         * Returns once the oplog's most recent entry changes or after one second, whichever
-         * occurs first.
-         */
-        virtual void waitUpToOneSecondForOptimeChange(const OpTime& ot) = 0;
 
         /**
          * Returns a bool indicating whether or not this node builds indexes.

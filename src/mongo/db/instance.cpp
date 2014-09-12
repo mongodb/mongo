@@ -697,8 +697,7 @@ namespace mongo {
                         last = getLastSetOptime();
                     }
                     else {
-                        repl::getGlobalReplicationCoordinator()->waitUpToOneSecondForOptimeChange(
-                                last);
+                        repl::waitUpToOneSecondForOptimeChange(last);
                     }
                 }
 
