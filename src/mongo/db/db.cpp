@@ -184,7 +184,7 @@ namespace mongo {
         }
 
         virtual void process( Message& m , AbstractMessagingPort* port , LastError * le) {
-            OperationContextImpl txn;
+            boost::scoped_ptr<OperationContext> txn(new OperationContextImpl());
             while ( true ) {
                 if ( inShutdown() ) {
                     log() << "got request after shutdown()" << endl;
@@ -194,7 +194,7 @@ namespace mongo {
                 lastError.startRequest( m , le );
 
                 DbResponse dbresponse;
-                assembleResponse( &txn, m, dbresponse, port->remote() );
+                assembleResponse( txn.get(), m, dbresponse, port->remote() );
 
                 if ( dbresponse.response ) {
                     port->reply(m, *dbresponse.response, dbresponse.responseTo);
