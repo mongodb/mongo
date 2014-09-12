@@ -399,16 +399,14 @@ err:	if (r->nfiles > r->max_fileid)
  *	Run recovery.
  */
 int
-__wt_txn_recover(WT_SESSION_IMPL *default_session)
+__wt_txn_recover(WT_CONNECTION_IMPL *conn)
 {
-	WT_CONNECTION_IMPL *conn;
 	WT_DECL_RET;
 	WT_RECOVERY r;
 	WT_SESSION_IMPL *session;
 	const char *config;
 	int was_backup;
 
-	conn = S2C(default_session);
 	WT_CLEAR(r);
 	INIT_LSN(&r.ckpt_lsn);
 	was_backup = F_ISSET(conn, WT_CONN_WAS_BACKUP) ? 1 : 0;

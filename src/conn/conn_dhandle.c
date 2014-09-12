@@ -640,13 +640,13 @@ err:	session->dhandle = save_dhandle;
  *	Close/discard all data handles.
  */
 int
-__wt_conn_dhandle_discard(WT_CONNECTION_IMPL *conn)
+__wt_conn_dhandle_discard(WT_SESSION_IMPL *session)
 {
+	WT_CONNECTION_IMPL *conn;
 	WT_DATA_HANDLE *dhandle;
 	WT_DECL_RET;
-	WT_SESSION_IMPL *session;
 
-	session = conn->default_session;
+	conn = S2C(session);
 
 	/*
 	 * Close open data handles: first, everything but the metadata file

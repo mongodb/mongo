@@ -260,17 +260,16 @@ __wt_conn_cache_pool_open(WT_SESSION_IMPL *session)
  *	if we were the last connection.
  */
 int
-__wt_conn_cache_pool_destroy(WT_CONNECTION_IMPL *conn)
+__wt_conn_cache_pool_destroy(WT_SESSION_IMPL *session)
 {
 	WT_CACHE *cache;
 	WT_CACHE_POOL *cp;
-	WT_CONNECTION_IMPL *entry;
+	WT_CONNECTION_IMPL *conn, *entry;
 	WT_DECL_RET;
 	WT_SESSION *wt_session;
-	WT_SESSION_IMPL *session;
 	int cp_locked, found;
 
-	session = conn->default_session;
+	conn = S2C(session);
 	cache = conn->cache;
 	cp_locked = found = 0;
 	cp = __wt_process.cache_pool;

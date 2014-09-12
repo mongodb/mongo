@@ -108,17 +108,17 @@ __wt_lsm_manager_free_work_unit(
  *	Destroy the LSM manager threads and subsystem.
  */
 int
-__wt_lsm_manager_destroy(WT_CONNECTION_IMPL *conn)
+__wt_lsm_manager_destroy(WT_SESSION_IMPL *session)
 {
+	WT_CONNECTION_IMPL *conn;
 	WT_DECL_RET;
 	WT_LSM_MANAGER *manager;
 	WT_LSM_WORK_UNIT *current, *next;
 	WT_SESSION *wt_session;
-	WT_SESSION_IMPL *session;
 	uint32_t i;
 	uint64_t removed;
 
-	session = conn->default_session;
+	conn = S2C(session);
 	manager = &conn->lsm_manager;
 	removed = 0;
 
@@ -128,7 +128,7 @@ __wt_lsm_manager_destroy(WT_CONNECTION_IMPL *conn)
 			__wt_yield();
 
 		/* Clean up open LSM handles. */
-		ret = __wt_lsm_tree_close_all(conn->default_session);
+		ret = __wt_lsm_tree_close_all(session);
 
 		WT_TRET(__wt_thread_join(
 		    session, manager->lsm_worker_cookies[0].tid));

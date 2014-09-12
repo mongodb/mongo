@@ -61,7 +61,7 @@ __wt_connection_open(WT_CONNECTION_IMPL *conn, const char *cfg[])
 	WT_RET(__wt_cache_create(session, cfg));
 
 	/* Initialize transaction support. */
-	WT_RET(__wt_txn_global_init(conn, cfg));
+	WT_RET(__wt_txn_global_init(session, cfg));
 
 	return (0);
 }
@@ -90,7 +90,7 @@ __wt_connection_close(WT_CONNECTION_IMPL *conn)
 	__wt_txn_update_oldest(session);
 
 	/* Clear any pending async ops. */
-	WT_TRET(__wt_async_flush(conn));
+	WT_TRET(__wt_async_flush(session));
 
 	/*
 	 * Shut down server threads other than the eviction server, which is
@@ -99,14 +99,14 @@ __wt_connection_close(WT_CONNECTION_IMPL *conn)
 	 * exit before files are closed.
 	 */
 	F_CLR(conn, WT_CONN_SERVER_RUN);
-	WT_TRET(__wt_async_destroy(conn));
-	WT_TRET(__wt_lsm_manager_destroy(conn));
-	WT_TRET(__wt_checkpoint_server_destroy(conn));
+	WT_TRET(__wt_async_destroy(session));
+	WT_TRET(__wt_lsm_manager_destroy(session));
+	WT_TRET(__wt_checkpoint_server_destroy(session));
 	WT_TRET(__wt_statlog_destroy(session, 1));
-	WT_TRET(__wt_sweep_destroy(conn));
+	WT_TRET(__wt_sweep_destroy(session));
 
 	/* Close open data handles. */
-	WT_TRET(__wt_conn_dhandle_discard(conn));
+	WT_TRET(__wt_conn_dhandle_discard(session));
 
 	/*
 	 * Now that all data handles are closed, tell logging that a checkpoint
@@ -116,20 +116,20 @@ __wt_connection_close(WT_CONNECTION_IMPL *conn)
 	if (conn->logging) {
 		WT_TRET(__wt_txn_checkpoint_log(
 		    session, 1, WT_TXN_LOG_CKPT_STOP, NULL));
-		WT_TRET(__wt_logmgr_destroy(conn));
+		WT_TRET(__wt_logmgr_destroy(session));
 	}
 
 	/* Free memory for collators */
 	while ((ncoll = TAILQ_FIRST(&conn->collqh)) != NULL)
-		WT_TRET(__wt_conn_remove_collator(conn, ncoll));
+		WT_TRET(__wt_conn_remove_collator(session, ncoll));
 
 	/* Free memory for compressors */
 	while ((ncomp = TAILQ_FIRST(&conn->compqh)) != NULL)
-		WT_TRET(__wt_conn_remove_compressor(conn, ncomp));
+		WT_TRET(__wt_conn_remove_compressor(session, ncomp));
 
 	/* Free memory for data sources */
 	while ((ndsrc = TAILQ_FIRST(&conn->dsrcqh)) != NULL)
-		WT_TRET(__wt_conn_remove_data_source(conn, ndsrc));
+		WT_TRET(__wt_conn_remove_data_source(session, ndsrc));
 
 	/*
 	 * Complain if files weren't closed, ignoring the lock file, we'll
@@ -146,16 +146,16 @@ __wt_connection_close(WT_CONNECTION_IMPL *conn)
 	}
 
 	/* Shut down the eviction server thread. */
-	WT_TRET(__wt_evict_destroy(conn));
+	WT_TRET(__wt_evict_destroy(session));
 
 	/* Disconnect from shared cache - must be before cache destroy. */
-	WT_TRET(__wt_conn_cache_pool_destroy(conn));
+	WT_TRET(__wt_conn_cache_pool_destroy(session));
 
 	/* Discard the cache. */
-	WT_TRET(__wt_cache_destroy(conn));
+	WT_TRET(__wt_cache_destroy(session));
 
 	/* Discard transaction state. */
-	__wt_txn_global_destroy(conn);
+	__wt_txn_global_destroy(session);
 
 	/* Close extensions, first calling any unload entry point. */
 	while ((dlh = TAILQ_FIRST(&conn->dlhqh)) != NULL) {
@@ -207,19 +207,15 @@ __wt_connection_close(WT_CONNECTION_IMPL *conn)
 int
 __wt_connection_workers(WT_SESSION_IMPL *session, const char *cfg[])
 {
-	WT_CONNECTION_IMPL *conn;
-
-	conn = S2C(session);
-
 	/*
 	 * Start the eviction thread.
 	 */
-	WT_RET(__wt_evict_create(conn));
+	WT_RET(__wt_evict_create(session));
 
 	/*
 	 * Start the handle sweep thread.
 	 */
-	WT_RET(__wt_sweep_create(conn));
+	WT_RET(__wt_sweep_create(session));
 
 	/*
 	 * Start the optional statistics thread.  Start statistics first so that

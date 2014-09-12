@@ -474,15 +474,16 @@ __wt_txn_destroy(WT_SESSION_IMPL *session)
  *	Initialize the global transaction state.
  */
 int
-__wt_txn_global_init(WT_CONNECTION_IMPL *conn, const char *cfg[])
+__wt_txn_global_init(WT_SESSION_IMPL *session, const char *cfg[])
 {
-	WT_SESSION_IMPL *session;
+	WT_CONNECTION_IMPL *conn;
 	WT_TXN_GLOBAL *txn_global;
 	WT_TXN_STATE *s;
 	u_int i;
 
 	WT_UNUSED(cfg);
-	session = conn->default_session;
+	conn = S2C(session);
+
 	txn_global = &conn->txn_global;
 	txn_global->current = 1;
 	txn_global->oldest_id = 1;
@@ -501,12 +502,12 @@ __wt_txn_global_init(WT_CONNECTION_IMPL *conn, const char *cfg[])
  *	Destroy the global transaction state.
  */
 void
-__wt_txn_global_destroy(WT_CONNECTION_IMPL *conn)
+__wt_txn_global_destroy(WT_SESSION_IMPL *session)
 {
-	WT_SESSION_IMPL *session;
+	WT_CONNECTION_IMPL *conn;
 	WT_TXN_GLOBAL *txn_global;
 
-	session = conn->default_session;
+	conn = S2C(session);
 	txn_global = &conn->txn_global;
 
 	if (txn_global != NULL)

@@ -244,13 +244,13 @@ __wt_logmgr_create(WT_SESSION_IMPL *session, const char *cfg[])
  *	Destroy the log archiving server thread and logging subsystem.
  */
 int
-__wt_logmgr_destroy(WT_CONNECTION_IMPL *conn)
+__wt_logmgr_destroy(WT_SESSION_IMPL *session)
 {
+	WT_CONNECTION_IMPL *conn;
 	WT_DECL_RET;
 	WT_SESSION *wt_session;
-	WT_SESSION_IMPL *session;
 
-	session = conn->default_session;
+	conn = S2C(session);
 
 	if (!conn->logging)
 		return (0);
