@@ -145,6 +145,7 @@ namespace mongo {
         return dataSize(txn); // todo: this isn't very good
     }
 
+    // Retrieve the value from a positioned cursor.
     RecordData WiredTigerRecordStore::_getData(const WiredTigerCursor &curwrap) const {
         WT_CURSOR *c = curwrap.Get();
         WT_ITEM value;
@@ -608,6 +609,9 @@ namespace mongo {
     }
 
     RecordData WiredTigerRecordStore::Iterator::dataFor( const DiskLoc& loc ) const {
+        // Retrieve the data if the iterator is already positioned at loc, otherwise
+        // open a new cursor and find the data to avoid upsetting the iterators
+        // cursor position.
         if (loc == _curr())
             return (_rs._getData(_cursor));
         else
