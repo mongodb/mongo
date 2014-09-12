@@ -103,8 +103,8 @@ namespace repl {
         void _producerThread();
         // Adds elements to the list, up to maxSize.
         void produce(OperationContext* txn);
-        // Check if rollback is necessary
-        bool isRollbackRequired(OperationContext* txn, OplogReader& r);
+        // Checks the criteria for rolling back and executes a rollback if warranted.
+        bool _rollbackIfNeeded(OperationContext* txn, OplogReader& r);
 
         // Evaluate if the current sync target is still good
         bool shouldChangeSyncTarget();

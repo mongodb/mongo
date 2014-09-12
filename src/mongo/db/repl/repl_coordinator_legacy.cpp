@@ -444,6 +444,7 @@ namespace {
     }
 
     void LegacyReplicationCoordinator::setFollowerMode(const MemberState& newState) {
+        theReplSet->changeState(newState);
     }
 
     void LegacyReplicationCoordinator::prepareReplSetUpdatePositionCommand(

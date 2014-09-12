@@ -1,4 +1,4 @@
-// test that a rollback of an op more than 1800 secs newer than the new master causes FATAL
+// test that a rollback of an op more than 1800 secs newer than the new master causes fatal shutdown
 
 // set up a set and grab things for later
 var name = "rollback_too_new";
@@ -26,7 +26,7 @@ assert.writeOK(a_conn.getDB(name).foo.insert({x: 1}, options));
 // shut down master
 replTest.stop(AID);
 
-// add an entry with ts more than 1800s newer which should cause FATAL when rolled back
+// add an entry with ts more than 1800s newer which should cause fassert when rolled back
 master = replTest.getMaster();
 assert(b_conn.host === master.host, "b_conn assumed to be master");
 options = {writeConcern: {w: 1, wtimeout: 60000}, upsert: true};
@@ -46,16 +46,12 @@ assert(a_conn.host === master.host, "a_conn assumed to be master");
 // do a write so that B will have to roll back
 assert.writeOK(a_conn.getDB(name).foo.insert({x: 2}, options));
 
-// restart B, which should rollback and go FATAL
+// restart B, which should attempt to rollback but then fassert.
+clearRawMongoProgramOutput();
 replTest.restart(BID);
 assert.soon(function() {
-    try {
-        var res = b_conn.getDB("admin").runCommand({replSetGetStatus: 1});
-        return res.myState === 4; // 4 is FATAL
-    }
-    catch (e) {
-        return false;
-    }
-}, "B failed to go FATAL");
+    return rawMongoProgramOutput().match(
+        "rollback error: not willing to roll back more than 30 minutes of data");
+}, "B failed to fassert");
 
 replTest.stopSet();

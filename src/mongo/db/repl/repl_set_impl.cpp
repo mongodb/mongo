@@ -870,18 +870,13 @@ namespace {
                 log() << "replSet error loading configurations " << e.toString() << rsLog;
                 log() << "replSet error replication will not start" << rsLog;
                 sethbmsg("error loading set config");
-                _fatal();
+                fassertFailedNoTrace(18754);
                 throw;
             }
             break;
         }
         startupStatusMsg.set("? started");
         startupStatus = STARTED;
-    }
-
-    void ReplSetImpl::_fatal() {
-        box.set(MemberState::RS_FATAL, 0);
-        log() << "replSet error fatal, stopping replication" << rsLog;
     }
 
     const char* ReplSetImpl::_initialSyncFlagString = "doingInitialSync";
