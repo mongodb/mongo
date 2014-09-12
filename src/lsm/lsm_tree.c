@@ -1090,10 +1090,9 @@ __wt_lsm_compact(WT_SESSION_IMPL *session, const char *name, int *skip)
 	/* Wait for the work unit queues to drain. */
 	while (F_ISSET(lsm_tree, WT_LSM_TREE_ACTIVE)) {
 		/*
-		 * The flush flag is cleared when the the chunk has been
-		 * flushed.  Continue to push forced flushes until the
-		 * chunk is on disk.  Once it is on disk move to the compacting
-		 * phase.
+		 * The flush flag is cleared when the chunk has been flushed.
+		 * Continue to push forced flushes until the chunk is on disk.
+		 * Once it is on disk move to the compacting phase.
 		 */
 		if (flushing && !F_ISSET(lsm_tree, WT_LSM_TREE_COMPACT_FLUSH)) {
 			if (chunk != NULL &&
