@@ -143,6 +143,12 @@ namespace {
 
     Status NativeSaslAuthenticationSession::step(const StringData& inputData, 
                                                  std::string* outputData) {
+        if (!_saslConversation) {
+            return Status(ErrorCodes::BadValue,
+                mongoutils::str::stream() << 
+                "The authentication session has not been properly initialized");
+        }
+
         StatusWith<bool> status = _saslConversation->step(inputData, outputData);
         if (status.isOK()) {
             _done = status.getValue();

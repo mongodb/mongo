@@ -660,7 +660,7 @@ namespace mongo {
                       << endl;
                 exitCleanly(EXIT_NEED_UPGRADE);
             }
-            if (foundSchemaVersion != AuthorizationManager::schemaVersion26Final) {
+            if (foundSchemaVersion < AuthorizationManager::schemaVersion26Final) {
                 log() << "Auth schema version is incompatible: "
                       << "User and role management commands require auth data to have "
                       << "schema version " << AuthorizationManager::schemaVersion26Final

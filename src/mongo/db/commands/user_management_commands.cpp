@@ -278,11 +278,11 @@ namespace mongo {
             return status;
         }
 
-        if (foundSchemaVersion != AuthorizationManager::schemaVersion26Final) {
+        if (foundSchemaVersion < AuthorizationManager::schemaVersion26Final) {
             return Status(
                     ErrorCodes::AuthSchemaIncompatible,
                     str::stream() << "User and role management commands require auth data to have "
-                    "schema version " << AuthorizationManager::schemaVersion26Final <<
+                    "at least schema version " << AuthorizationManager::schemaVersion26Final <<
                     " but found " << foundSchemaVersion);
         }
         return authzManager->writeAuthSchemaVersionIfNeeded(txn);
@@ -296,13 +296,12 @@ namespace mongo {
             return status;
         }
 
-        if (foundSchemaVersion != AuthorizationManager::schemaVersion26Final &&
-            foundSchemaVersion != AuthorizationManager::schemaVersion26Upgrade) {
+        if (foundSchemaVersion < AuthorizationManager::schemaVersion26Upgrade) {
             return Status(
                     ErrorCodes::AuthSchemaIncompatible,
                     str::stream() << "The usersInfo and rolesInfo commands require auth data to "
-                    "have schema version " << AuthorizationManager::schemaVersion26Final <<
-                    " or " << AuthorizationManager::schemaVersion26Upgrade <<
+                    "have at least schema version " << 
+                    AuthorizationManager::schemaVersion26Upgrade <<
                     " but found " << foundSchemaVersion);
         }
         return Status::OK();
@@ -427,14 +426,26 @@ namespace mongo {
                      args.mechanism.empty()) {
                 
                 // At the moment we are ignoring the mechanism parameter and create
-                // both SCRAM-SHA-1 and MONGODB-CR credentials for all new users
+                // both SCRAM-SHA-1 and MONGODB-CR credentials for all new users.
                 BSONObjBuilder credentialsBuilder(userObjBuilder.subobjStart("credentials"));
-                BSONObj scramCred = scram::generateCredentials(args.hashedPassword);
-        
-                if(!scramCred.isEmpty()) {
-                    credentialsBuilder.append("SCRAM-SHA-1",scramCred);
+               
+                AuthorizationManager* authzManager = getGlobalAuthorizationManager();
+                int authzVersion;
+                Status status = authzManager->getAuthorizationVersion(txn, &authzVersion);
+                if (!status.isOK()) {
+                    return appendCommandStatus(result, status);
                 }
-                credentialsBuilder.append("MONGODB-CR", args.hashedPassword);
+
+                // Add SCRAM credentials for appropriate authSchemaVersions.
+                if (authzVersion > AuthorizationManager::schemaVersion26Final) {
+                    BSONObj scramCred = scram::generateCredentials(args.hashedPassword);
+                    if(!scramCred.isEmpty()) {
+                        credentialsBuilder.append("SCRAM-SHA-1", scramCred);
+                    }
+                }
+                else { // Otherwise default to MONGODB-CR.
+                    credentialsBuilder.append("MONGODB-CR", args.hashedPassword);
+                }
                 credentialsBuilder.done();
             }
             else {
@@ -594,11 +605,24 @@ namespace mongo {
             if (args.hasHashedPassword) {
                 // Create both SCRAM-SHA-1 and MONGODB-CR credentials for all new users
                 BSONObjBuilder credentialsBuilder(updateSetBuilder.subobjStart("credentials"));
-                BSONObj scramCred =  scram::generateCredentials(args.hashedPassword);
-                if(!scramCred.isEmpty()) {
-                    credentialsBuilder.append("SCRAM-SHA-1",scramCred);
+ 
+                AuthorizationManager* authzManager = getGlobalAuthorizationManager();
+                int authzVersion;
+                Status status = authzManager->getAuthorizationVersion(txn, &authzVersion);
+                if (!status.isOK()) {
+                    return appendCommandStatus(result, status);
                 }
-                credentialsBuilder.append("MONGODB-CR", args.hashedPassword);
+
+                // Add SCRAM credentials for appropriate authSchemaVersions
+                if (authzVersion > AuthorizationManager::schemaVersion26Final) {
+                    BSONObj scramCred = scram::generateCredentials(args.hashedPassword);
+                    if(!scramCred.isEmpty()) {
+                        credentialsBuilder.append("SCRAM-SHA-1",scramCred);
+                    }
+                }
+                else { // Otherwise default to MONGODB-CR
+                    credentialsBuilder.append("MONGODB-CR", args.hashedPassword);
+                }
                 credentialsBuilder.done();
             }
             if (args.hasCustomData) {

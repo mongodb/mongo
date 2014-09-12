@@ -30,6 +30,7 @@
 
 #include "mongo/db/auth/authorization_manager.h"
 
+#include <boost/bind.hpp>
 #include <boost/thread/mutex.hpp>
 #include <memory>
 #include <string>
@@ -44,6 +45,7 @@
 #include "mongo/db/auth/action_set.h"
 #include "mongo/db/auth/authz_documents_update_guard.h"
 #include "mongo/db/auth/authz_manager_external_state.h"
+#include "mongo/db/auth/mechanism_scram.h"
 #include "mongo/db/auth/privilege.h"
 #include "mongo/db/auth/role_graph.h"
 #include "mongo/db/auth/user.h"
@@ -721,6 +723,106 @@ namespace mongo {
         return _externalState->releaseAuthzUpdateLock();
     }
 
+namespace {
+    
+    /**
+     * Logs that the auth schema upgrade failed because of "status" and returns "status".
+     */
+    Status logUpgradeFailed(const Status& status) {
+        log() << "Auth schema upgrade failed with " << status;
+        return status;
+    }
+
+    /** 
+     * Updates a single user document from MONGODB-CR to SCRAM credentials.
+     *
+     * Throws a DBException on errors.
+     */
+    void updateUserCredentials(OperationContext* txn,
+                               AuthzManagerExternalState* externalState,
+                               const StringData& sourceDB,
+                               const BSONObj& userDoc,
+                               const BSONObj& writeConcern) {
+        BSONElement credentialsElement = userDoc["credentials"];
+        uassert(18743,
+                mongoutils::str::stream() << "While preparing to upgrade user doc from "
+                        "2.6/2.8 user data schema to the 2.8 SCRAM only schema, found a user doc "
+                        "with missing or incorrectly formatted credentials: "
+                        << userDoc.toString(),
+                        credentialsElement.type() == Object);
+
+        BSONObj credentialsObj = credentialsElement.Obj();
+        BSONElement mongoCRElement = credentialsObj["MONGODB-CR"];
+        BSONElement scramElement = credentialsObj["SCRAM-SHA-1"];
+        
+        // Ignore any user documents that already have SCRAM credentials. This should only
+        // occur if a previous authSchemaUpgrade was interrupted halfway.
+        if (!scramElement.eoo()) {
+            return;
+        }
+
+        uassert(18744,
+                mongoutils::str::stream() << "While preparing to upgrade user doc from "
+                        "2.6/2.8 user data schema to the 2.8 SCRAM only schema, found a user doc "
+                        "missing MONGODB-CR credentials :"
+                        << userDoc.toString(),
+                !mongoCRElement.eoo());
+
+        std::string hashedPassword = mongoCRElement.String();
+
+        BSONObj query = BSON("_id" <<  userDoc["_id"].String());
+        BSONObjBuilder updateBuilder;
+        {
+            BSONObjBuilder toSetBuilder(updateBuilder.subobjStart("$set"));
+            toSetBuilder << "credentials" << 
+                            BSON("SCRAM-SHA-1" << scram::generateCredentials(hashedPassword));
+        }
+        
+        uassertStatusOK(externalState->updateOne(txn,
+                                                 NamespaceString("admin", "system.users"),
+                                                 query,
+                                                 updateBuilder.obj(),
+                                                 true,
+                                                 writeConcern));
+    }
+
+    /** Loop through all the user documents in the admin.system.users collection.
+     *  For each user document:
+     *   1. Compute SCRAM credentials based on the MONGODB-CR hash
+     *   2. Remove the MONGODB-CR hash
+     *   3. Add SCRAM credentials to the user document credentials section
+     */
+    Status updateCredentials(
+            OperationContext* txn,
+            AuthzManagerExternalState* externalState,
+            const BSONObj& writeConcern) {
+
+        // Loop through and update the user documents in admin.system.users.
+        Status status = externalState->query(
+                txn,
+                NamespaceString("admin", "system.users"),
+                BSONObj(),
+                BSONObj(),
+                boost::bind(updateUserCredentials, txn, externalState, "admin", _1, writeConcern));
+        if (!status.isOK())
+            return logUpgradeFailed(status);
+        
+        // Update the schema version document.
+        status = externalState->updateOne(
+                txn,
+                AuthorizationManager::versionCollectionNamespace,
+                AuthorizationManager::versionDocumentQuery,
+                BSON("$set" << BSON(AuthorizationManager::schemaVersionFieldName <<
+                                    AuthorizationManager::schemaVersion28SCRAM)),
+                true,
+                writeConcern);
+        if (!status.isOK())
+            return logUpgradeFailed(status);
+ 
+        return Status::OK();
+    }
+} //namespace
+
     Status AuthorizationManager::upgradeSchemaStep(
                             OperationContext* txn, const BSONObj& writeConcern, bool* isDone) {
         int authzVersion;
@@ -728,9 +830,15 @@ namespace mongo {
         if (!status.isOK()) {
             return status;
         }
-
+        
         switch (authzVersion) {
-        case schemaVersion26Final:
+        case schemaVersion26Final: {
+            Status status = updateCredentials(txn, _externalState.get(), writeConcern);
+            if (status.isOK())
+                *isDone = true;
+            return status;
+        }
+        case schemaVersion28SCRAM:
             *isDone = true;
             return Status::OK();
         default:

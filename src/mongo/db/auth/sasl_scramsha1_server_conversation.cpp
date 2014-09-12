@@ -41,6 +41,7 @@
 #include "mongo/db/auth/mechanism_scram.h"
 #include "mongo/platform/random.h"
 #include "mongo/util/base64.h"
+#include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
 #include "mongo/util/password_digest.h"
 #include "mongo/util/text.h"
@@ -162,7 +163,16 @@ namespace mongo {
         _creds = userObj->getCredentials();
         _saslAuthSession->getAuthorizationSession()->getAuthorizationManager().
                 releaseUser(userObj);
-        
+      
+        // Generate SCRAM credentials on the fly for mixed MONGODB-CR/SCRAM mode.
+        if (_creds.scram.salt.empty() && !_creds.password.empty()) {
+            BSONObj scramCreds = scram::generateCredentials(_creds.password);
+            _creds.scram.iterationCount = scramCreds["iterationCount"].Int();
+            _creds.scram.salt = scramCreds["salt"].String();
+            _creds.scram.storedKey = scramCreds["storedKey"].String();
+            _creds.scram.serverKey = scramCreds["serverKey"].String();
+        }
+
         // Generate server-first-message
         // Create text-based nonce as base64 encoding of a binary blob of length multiple of 3
         const int nonceLenQWords = 3;
