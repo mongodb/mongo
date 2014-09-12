@@ -145,32 +145,27 @@ namespace mongo {
         return dataSize(txn); // todo: this isn't very good
     }
 
-    RecordData WiredTigerRecordStore::dataFor(OperationContext* txn, const DiskLoc& loc) const {
-        return dataForInternal(txn, loc, false);
-    }
-
-    RecordData WiredTigerRecordStore::dataForInternal(
-                                                OperationContext* txn,
-                                                const DiskLoc& loc,
-                                                bool skipSearch) const {
-        int ret;
-        // ownership passes to the shared_array created below
-        WiredTigerSession &swrap = WiredTigerRecoveryUnit::Get(txn).GetSession();
-        WiredTigerCursor curwrap(GetCursor(swrap), swrap);
+    RecordData WiredTigerRecordStore::_getData(const WiredTigerCursor &curwrap) const {
         WT_CURSOR *c = curwrap.Get();
-        if (!skipSearch) {
-            c->set_key(c, _makeKey(loc));
-            ret = c->search(c);
-            invariant(ret == 0);
-        }
-
         WT_ITEM value;
-        ret = c->get_value(c, &value);
+        int ret = c->get_value(c, &value);
         invariant(ret == 0);
 
         boost::shared_array<char> data( new char[value.size] );
         memcpy( data.get(), value.data, value.size );
         return RecordData(reinterpret_cast<const char *>(data.get()), value.size, data );
+    }
+
+    RecordData WiredTigerRecordStore::dataFor(OperationContext* txn, const DiskLoc& loc) const {
+        // ownership passes to the shared_array created below
+        WiredTigerSession &swrap = WiredTigerRecoveryUnit::Get(txn).GetSession();
+        WiredTigerCursor curwrap(GetCursor(swrap), swrap);
+        WT_CURSOR *c = curwrap.Get();
+        c->set_key(c, _makeKey(loc));
+        int ret = c->search(c);
+        invariant(ret == 0);
+
+        return _getData(curwrap);
     }
 
     void WiredTigerRecordStore::deleteRecord( OperationContext* txn, const DiskLoc& loc ) {
@@ -552,7 +547,7 @@ namespace mongo {
     }
 
     // Allow const functions to use curr to find current location.
-    DiskLoc WiredTigerRecordStore::Iterator::currConst() const {
+    DiskLoc WiredTigerRecordStore::Iterator::_curr() const {
         if (_eof)
             return DiskLoc();
 
@@ -564,7 +559,7 @@ namespace mongo {
     }
 
     DiskLoc WiredTigerRecordStore::Iterator::curr() {
-        return currConst();
+        return _curr();
     }
 
     void WiredTigerRecordStore::Iterator::_getNext() {
@@ -613,7 +608,10 @@ namespace mongo {
     }
 
     RecordData WiredTigerRecordStore::Iterator::dataFor( const DiskLoc& loc ) const {
-        return _rs.dataForInternal( _txn, loc, loc == currConst() ? true : false );
+        if (loc == _curr())
+            return (_rs._getData(_cursor));
+        else
+            return (_rs.dataFor( _txn, loc ));
     }
 
     bool WiredTigerRecordStore::Iterator::_forward() const {
