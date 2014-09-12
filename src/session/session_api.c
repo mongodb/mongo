@@ -188,21 +188,22 @@ __wt_open_cursor(WT_SESSION_IMPL *session,
 {
 	WT_COLGROUP *colgroup;
 	WT_DATA_SOURCE *dsrc;
-	int handled;
-
-	handled = 0;
 
 	/*
 	 * Open specific cursor types we know about, or call the generic data
-	 * source open function. Unwind a set of string comparisons into a
-	 * switch statement for performance.
+	 * source open function.
+	 *
+	 * Unwind a set of string comparisons into a switch statement hoping
+	 * the compiler can make it fast, but list the common choices first
+	 * instead of sorting so if/else patterns are still fast.
 	 */
 	switch (uri[0]) {
-	case 'b':
-		if (WT_PREFIX_MATCH(uri, "backup:")) {
-			WT_RET(__wt_curbackup_open(session, uri, cfg, cursorp));
-			handled = 1;
-		}
+	/*
+	 * Common cursor types.
+	 */
+	case 't':
+		if (WT_PREFIX_MATCH(uri, "table:"))
+			return (__wt_curtable_open(session, uri, cfg, cursorp));
 		break;
 	case 'c':
 		if (WT_PREFIX_MATCH(uri, "colgroup:")) {
@@ -212,68 +213,60 @@ __wt_open_cursor(WT_SESSION_IMPL *session,
 			 */
 			WT_RET(__wt_schema_get_colgroup(
 			    session, uri, NULL, &colgroup));
-			WT_RET(__wt_open_cursor(
+			return (__wt_open_cursor(
 			    session, colgroup->source, owner, cfg, cursorp));
-			handled = 1;
-		} else if (WT_PREFIX_MATCH(uri, "config:")) {
-			WT_RET(__wt_curconfig_open(session, uri, cfg, cursorp));
-			handled = 1;
 		}
-		break;
-	case 'f':
-		if (WT_PREFIX_MATCH(uri, "file:")) {
-			WT_RET(__wt_curfile_open(
-			    session, uri, owner, cfg, cursorp));
-			handled = 1;
-		}
+
+		if (WT_PREFIX_MATCH(uri, "config:"))
+			return (
+			    __wt_curconfig_open(session, uri, cfg, cursorp));
 		break;
 	case 'i':
-		if (WT_PREFIX_MATCH(uri, "index:")) {
-			WT_RET(__wt_curindex_open(
+		if (WT_PREFIX_MATCH(uri, "index:"))
+			return (__wt_curindex_open(
 			    session, uri, owner, cfg, cursorp));
-			handled = 1;
-		}
 		break;
 	case 'l':
-		if (WT_PREFIX_MATCH(uri, "log:")) {
-			WT_RET(__wt_curlog_open(session, uri, cfg, cursorp));
-			handled = 1;
-		} else if (WT_PREFIX_MATCH(uri, "lsm:")) {
-			WT_RET(__wt_clsm_open(
+		if (WT_PREFIX_MATCH(uri, "lsm:"))
+			return (__wt_clsm_open(
 			    session, uri, owner, cfg, cursorp));
-			handled = 1;
-		}
-		break;
-	case 's':
-		if (WT_PREFIX_MATCH(uri, "statistics:")) {
-			WT_RET(__wt_curstat_open(session, uri, cfg, cursorp));
-			handled = 1;
-		}
-		break;
-	case 't':
-		if (WT_PREFIX_MATCH(uri, "table:")) {
-			WT_RET(__wt_curtable_open(session, uri, cfg, cursorp));
-			handled = 1;
-		}
-		break;
-	default:
-		/* Explicit default to make lint happy */
+
+		if (WT_PREFIX_MATCH(uri, "log:"))
+			return (__wt_curlog_open(session, uri, cfg, cursorp));
 		break;
 
-	}
-	if (!handled) {
-		if (WT_PREFIX_MATCH(uri, WT_METADATA_URI))
-			WT_RET(__wt_curmetadata_open(
+	/*
+	 * Less common cursor types.
+	 */
+	case 'f':
+		if (WT_PREFIX_MATCH(uri, "file:"))
+			return (__wt_curfile_open(
 			    session, uri, owner, cfg, cursorp));
-		else if ((dsrc = __wt_schema_get_source(session, uri)) != NULL)
-			WT_RET(dsrc->open_cursor == NULL ?
-			    __wt_object_unsupported(session, uri) :
-			    __wt_curds_open(
-				session, uri, owner, cfg, dsrc, cursorp));
-		else
-			WT_RET(__wt_bad_object_type(session, uri));
+		break;
+	case 'm':
+		if (WT_PREFIX_MATCH(uri, WT_METADATA_URI))
+			return (__wt_curmetadata_open(
+			    session, uri, owner, cfg, cursorp));
+		break;
+	case 'b':
+		if (WT_PREFIX_MATCH(uri, "backup:"))
+			return (
+			    __wt_curbackup_open(session, uri, cfg, cursorp));
+		break;
+	case 's':
+		if (WT_PREFIX_MATCH(uri, "statistics:"))
+			return (__wt_curstat_open(session, uri, cfg, cursorp));
+		break;
+	default:
+		break;
 	}
-	return (0);
+
+	if ((dsrc = __wt_schema_get_source(session, uri)) != NULL)
+		return (dsrc->open_cursor == NULL ?
+		    __wt_object_unsupported(session, uri) :
+		    __wt_curds_open(session, uri, owner, cfg, dsrc, cursorp));
+
+	return (__wt_bad_object_type(session, uri));
 }
 
 /*
