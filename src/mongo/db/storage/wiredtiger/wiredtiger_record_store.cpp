@@ -37,8 +37,6 @@
 #include "mongo/db/storage/wiredtiger/wiredtiger_record_store.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_recovery_unit.h"
 
-#include <wiredtiger.h>
-
 namespace mongo {
 
     int WiredTigerRecordStore::Create(WiredTigerDatabase &db,
@@ -90,7 +88,7 @@ namespace mongo {
          * have an operation context, so we can't use an Iterator.
          */
         WiredTigerSession swrap(_db);
-        WiredTigerCursor curwrap(GetCursor(swrap), swrap);
+        WiredTigerCursor curwrap(GetURI(), swrap);
         WT_CURSOR *c = curwrap.Get();
         int ret = c->prev(c);
         invariant(ret == 0 || ret == WT_NOTFOUND);
@@ -148,7 +146,7 @@ namespace mongo {
     RecordData WiredTigerRecordStore::dataFor(OperationContext* txn, const DiskLoc& loc) const {
         // ownership passes to the shared_array created below
         WiredTigerSession &swrap = WiredTigerRecoveryUnit::Get(txn).GetSession();
-        WiredTigerCursor curwrap(GetCursor(swrap), swrap);
+        WiredTigerCursor curwrap(GetURI(), swrap);
         WT_CURSOR *c = curwrap.Get();
         c->set_key(c, _makeKey(loc));
         int ret = c->search(c);
@@ -165,7 +163,7 @@ namespace mongo {
 
     void WiredTigerRecordStore::deleteRecord( OperationContext* txn, const DiskLoc& loc ) {
         WiredTigerSession &swrap = WiredTigerRecoveryUnit::Get(txn).GetSession();
-        WiredTigerCursor curwrap(GetCursor(swrap), swrap);
+        WiredTigerCursor curwrap(GetURI(), swrap);
         WT_CURSOR *c = curwrap.Get();
         c->set_key(c, _makeKey(loc));
         int ret = c->search(c);
@@ -202,7 +200,7 @@ namespace mongo {
             return;
 
         WiredTigerSession &swrap = WiredTigerRecoveryUnit::Get(txn).GetSession();
-        WiredTigerCursor curwrap(GetCursor(swrap), swrap);
+        WiredTigerCursor curwrap(GetURI(), swrap);
         WT_CURSOR *c = curwrap.Get();
         int ret = c->next(c);
         while ( ret == 0 && cappedAndNeedDelete(txn) ) {
@@ -233,7 +231,7 @@ namespace mongo {
         }
 
         WiredTigerSession &swrap = WiredTigerRecoveryUnit::Get(txn).GetSession();
-        WiredTigerCursor curwrap(GetCursor(swrap), swrap);
+        WiredTigerCursor curwrap(GetURI(), swrap);
         WT_CURSOR *c = curwrap.Get();
         DiskLoc loc = _nextId();
         c->set_key(c, _makeKey(loc));
@@ -263,7 +261,7 @@ namespace mongo {
         doc->writeDocument( buf.get() );
 
         WiredTigerSession &swrap = WiredTigerRecoveryUnit::Get(txn).GetSession();
-        WiredTigerCursor curwrap(GetCursor(swrap), swrap);
+        WiredTigerCursor curwrap(GetURI(), swrap);
         WT_CURSOR *c = curwrap.Get();
         DiskLoc loc = _nextId();
         c->set_key(c, _makeKey(loc));
@@ -286,7 +284,7 @@ namespace mongo {
                                                         bool enforceQuota,
                                                         UpdateMoveNotifier* notifier ) {
         WiredTigerSession &swrap = WiredTigerRecoveryUnit::Get(txn).GetSession();
-        WiredTigerCursor curwrap(GetCursor(swrap), swrap);
+        WiredTigerCursor curwrap(GetURI(), swrap);
         WT_CURSOR *c = curwrap.Get();
         c->set_key(c, _makeKey(loc));
         int ret = c->search(c);
@@ -316,7 +314,7 @@ namespace mongo {
                                                 const mutablebson::DamageVector& damages ) {
         // get original value
         WiredTigerSession &swrap = WiredTigerRecoveryUnit::Get(txn).GetSession();
-        WiredTigerCursor curwrap(GetCursor(swrap), swrap);
+        WiredTigerCursor curwrap(GetURI(), swrap);
         WT_CURSOR *c = curwrap.Get();
         c->set_key(c, _makeKey(loc));
         int ret = c->search(c);
@@ -496,7 +494,7 @@ namespace mongo {
     WiredTigerRecordStore::Iterator::Iterator(
             const WiredTigerRecordStore& rs,
             OperationContext *txn,
-            shared_ptr<WiredTigerSession> session,
+            shared_ptr<WiredTigerSession> &session,
             const DiskLoc& start,
             bool tailable,
             const CollectionScanParams::Direction& dir )
@@ -505,7 +503,7 @@ namespace mongo {
           _session( session ),
           _tailable( tailable ),
           _dir( dir ),
-          _cursor(rs.GetCursor(*session), *session) {
+          _cursor(rs.GetURI(), *session) {
             _locate(start, true);
     }
 

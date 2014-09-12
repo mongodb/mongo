@@ -85,23 +85,19 @@ namespace mongo {
 
         virtual Status initAsEmpty(OperationContext* txn);
 
-        WT_CURSOR *GetCursor(WiredTigerSession &session, bool acquire=false) const;
         const std::string &GetURI() const;
 
         private:
             class IndexCursor : public SortedDataInterface::Cursor {
                 public:
-                IndexCursor(WT_CURSOR *cursor,
-                        shared_ptr<WiredTigerSession> session, bool forward)
+                IndexCursor(const WiredTigerIndex &idx, shared_ptr<WiredTigerSession> &session, bool forward)
                    : _session(session),
-                     _cursor(cursor, *session),
+                     _cursor(idx.GetURI(), *session),
                      _forward(forward),
                      _eof(true) {
                 }
 
-                virtual ~IndexCursor() {
-                    
-                }
+                virtual ~IndexCursor() { }
 
                 virtual int getDirection() const;
 

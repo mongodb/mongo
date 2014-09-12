@@ -28,3 +28,42 @@
  *    exception statement from all source files in the program, then also delete
  *    it in the license file.
  */
+
+#include "mongo/platform/basic.h"
+
+#include "mongo/db/storage/wiredtiger/wiredtiger_recovery_unit.h"
+
+namespace mongo {
+    WiredTigerDatabase::~WiredTigerDatabase() {
+        ClearCache();
+        if (_conn) {
+            int ret = _conn->close(_conn, NULL);
+            invariant(ret == 0);
+        }
+    }
+
+    void WiredTigerDatabase::ClearCache() {
+        boost::mutex::scoped_lock lk( _ctxLock );
+        for (ContextVector::iterator i = _ctxCache.begin(); i != _ctxCache.end(); i++)
+            delete (*i);
+        _ctxCache.clear();
+    }
+
+    WiredTigerOperationContext &WiredTigerDatabase::GetContext() {
+        {
+            boost::mutex::scoped_lock lk( _ctxLock );
+            if (!_ctxCache.empty()) {
+                WiredTigerOperationContext &ctx = *_ctxCache.back();
+                _ctxCache.pop_back();
+                return ctx;
+            }
+        }
+
+        return *new WiredTigerOperationContext(*this);
+    }
+
+    void WiredTigerDatabase::ReleaseContext(WiredTigerOperationContext &ctx) {
+        boost::mutex::scoped_lock lk( _ctxLock );
+        _ctxCache.push_back(&ctx);
+    }
+}

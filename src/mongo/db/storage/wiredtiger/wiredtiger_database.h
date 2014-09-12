@@ -5,71 +5,105 @@
 #include "mongo/util/assert_util.h"
 
 namespace mongo {
+    class WiredTigerOperationContext;
+
     class WiredTigerDatabase {
     public:
         WiredTigerDatabase(WT_CONNECTION *conn) : _conn(conn) {}
-        ~WiredTigerDatabase() {}
+        ~WiredTigerDatabase();
 
-        WT_SESSION *GetSession(bool acquire = false) {
-            // TODO thread-local check / open / cache
-            WT_SESSION *s = NULL;
-            int ret = _conn->open_session(_conn, NULL, NULL, &s);
-            invariant(ret == 0);
-            return s;
-        }
-
-        void ReleaseSession(WT_SESSION *session) {
-            if (session) {
-                int ret = session->close(session, NULL);
-                invariant(ret == 0);
-            }
-        }
-
+        WiredTigerOperationContext &GetContext();
+        void ReleaseContext(WiredTigerOperationContext &ctx);
         WT_CONNECTION *Get() const { return _conn; }
+
+        void ClearCache();
 
     private:
         WT_CONNECTION *_conn;
+        mutable boost::mutex _ctxLock;
+        typedef std::vector<WiredTigerOperationContext *> ContextVector;
+        ContextVector _ctxCache;
     };
 
-    struct WiredTigerSession {
-        WiredTigerSession(WT_SESSION *session, WiredTigerDatabase &db)
-          : _session(session), _db(db) {}
-        WiredTigerSession(WiredTigerDatabase &db) : _session(db.GetSession()), _db(db) {}
-        ~WiredTigerSession() { _db.ReleaseSession(_session); }
-
-        void ReleaseCursor(WT_CURSOR *c) {
-            if (c) {
-                int ret = c->close(c);
+    class WiredTigerOperationContext {
+    public:
+        WiredTigerOperationContext(WiredTigerDatabase &db) : _db(db), _session(0) {
+            WT_CONNECTION *conn = _db.Get();
+            int ret = conn->open_session(conn, NULL, NULL, &_session);
+            invariant(ret == 0);
+        }
+        ~WiredTigerOperationContext() {
+            if (_session) {
+                int ret = _session->close(_session, NULL);
                 invariant(ret == 0);
             }
         }
 
-        WT_SESSION *Get() const { return _session; }
-        WT_CURSOR *GetCursor(const std::string &uri, bool acquire = false) {
-            WT_CURSOR *c = NULL;
+        WiredTigerDatabase &GetDatabase(void) { return _db; }
+        WT_SESSION *GetSession() const { return _session; }
+        WT_CURSOR *GetCursor(const std::string &uri) {
+            WT_CURSOR *c = _curmap[uri];
+            if (c) {
+                _curmap.erase(uri);
+                return c;
+            }
             int ret = _session->open_cursor(_session, uri.c_str(), NULL, NULL, &c);
             invariant(ret == 0 || ret == ENOENT);
             return c;
         }
-        WiredTigerDatabase &GetDatabase(void) { return _db; }
+
+        void ReleaseCursor(WT_CURSOR *cursor) {
+            const std::string uri(cursor->uri);
+            if (_curmap[uri]) {
+                int ret = cursor->close(cursor);
+                invariant(ret == 0);
+            } else {
+                int ret = cursor->reset(cursor);
+                invariant(ret == 0);
+                _curmap[uri] = cursor;
+            }
+        }
+
+        void CloseAllCursors() {
+            for (CursorMap::iterator i = _curmap.begin(); i != _curmap.end(); i = _curmap.begin()) {
+                WT_CURSOR *cursor = i->second;
+                if (cursor) {
+                    int ret = cursor->close(cursor);
+                    invariant(ret == 0);
+                }
+                _curmap.erase(i);
+            }
+        }
     
     private:
-        WT_SESSION *_session;
         WiredTigerDatabase &_db;
+        WT_SESSION *_session;
+        typedef std::map<const std::string, WT_CURSOR *> CursorMap;
+        CursorMap _curmap;
+    };
+
+    class WiredTigerSession {
+    public:
+        WiredTigerSession(WiredTigerDatabase &db)
+            : _db(db), _ctx(db.GetContext()) {}
+        ~WiredTigerSession() { _db.ReleaseContext(_ctx); }
+
+        WiredTigerDatabase &GetDatabase(void) { return _ctx.GetDatabase(); }
+        WiredTigerOperationContext &GetContext(void) { return _ctx; }
+        WT_SESSION *Get() const { return _ctx.GetSession(); }
+        WT_CURSOR *GetCursor(const std::string &uri) { return _ctx.GetCursor(uri); }
+        void ReleaseCursor(WT_CURSOR *c) { _ctx.ReleaseCursor(c); }
+    
+    private:
+        WiredTigerDatabase &_db;
+        WiredTigerOperationContext &_ctx;
     };
 
     class WiredTigerCursor {
     public:
-        WiredTigerCursor(WT_CURSOR *cursor, WiredTigerSession& session, bool own_session=false)
-            : _cursor(cursor), _session(session), _own_session(own_session) {}
-        WiredTigerCursor(const std::string &uri, WiredTigerSession& session, bool own_session=false)
-            : _cursor(session.GetCursor(uri)), _session(session), _own_session(own_session) {}
-        ~WiredTigerCursor() {
-            _session.ReleaseCursor(_cursor);
-            // XXX avoid leaks
-            if (_own_session)
-                delete &_session;
-        }
+        WiredTigerCursor(const std::string &uri, WiredTigerSession& session)
+            : _cursor(session.GetCursor(uri)), _session(session) {}
+        ~WiredTigerCursor() { _session.ReleaseCursor(_cursor); }
 
         WiredTigerSession &GetSession(void) { return _session; }
         WT_CURSOR *Get() const { return _cursor; }
@@ -77,7 +111,6 @@ namespace mongo {
     private:
         WT_CURSOR *_cursor;
         WiredTigerSession &_session;
-        bool _own_session;
     };
 
     struct WiredTigerItem : public WT_ITEM {

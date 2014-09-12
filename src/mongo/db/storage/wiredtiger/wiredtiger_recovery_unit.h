@@ -31,13 +31,17 @@
  
 #pragma once
 
+#include <boost/shared_ptr.hpp>
+
 #include "mongo/db/operation_context.h"
 #include "mongo/db/storage/recovery_unit.h"
+
+#include "mongo/db/storage/wiredtiger/wiredtiger_engine.h"
 
 namespace mongo {
 
     class WiredTigerRecoveryUnit : public RecoveryUnit {
-        public:
+    public:
         WiredTigerRecoveryUnit(WiredTigerDatabase &db, bool defaultCommit) :
                 _session(new WiredTigerSession(db)),
                 _defaultCommit(defaultCommit),
@@ -45,7 +49,7 @@ namespace mongo {
                 _begun(false) {}
 
         virtual ~WiredTigerRecoveryUnit() {
-            if (_depth > 0) {
+            if (_begun) {
                 _depth = 1;
                 if ( _defaultCommit )
                     commitUnitOfWork();
@@ -102,7 +106,7 @@ namespace mongo {
 
         virtual void syncDataAndTruncateJournal() {}
 
-        shared_ptr<WiredTigerSession>& GetSharedSession() {
+        boost::shared_ptr<WiredTigerSession> &GetSharedSession() {
             if (!_begun) {
                 WT_SESSION *s = _session->Get();
                 int ret = s->begin_transaction(s, NULL);
@@ -111,7 +115,8 @@ namespace mongo {
             }
             return _session;
         }
-        WiredTigerSession& GetSession() {
+
+        WiredTigerSession &GetSession() {
             return *GetSharedSession();
         }
 
@@ -122,7 +127,7 @@ namespace mongo {
     private:
         // MongoDB doesn't guarantee that iterators are destroyed before the recovery unit, so use a
         // shared pointer here to get the order right.
-        shared_ptr<WiredTigerSession> _session;
+        boost::shared_ptr<WiredTigerSession> _session;
         bool _defaultCommit;
         int _depth;
         bool _begun;

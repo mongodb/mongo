@@ -190,7 +190,7 @@ namespace mongo {
             return dupKeyError(key);
 
         WiredTigerSession &swrap = WiredTigerRecoveryUnit::Get(txn).GetSession();
-        WiredTigerCursor curwrap(GetCursor(swrap), swrap);
+        WiredTigerCursor curwrap(GetURI(), swrap);
         WT_CURSOR *c = curwrap.Get();
         const BSONObj& finalKey = stripFieldNames( key );
         c->set_key(c, _toItem(finalKey).Get(), WiredTigerRecordStore::_makeKey(loc));
@@ -206,7 +206,7 @@ namespace mongo {
         invariant(!hasFieldNames(key));
 
         WiredTigerSession &swrap = WiredTigerRecoveryUnit::Get(txn).GetSession();
-        WiredTigerCursor curwrap(GetCursor(swrap), swrap);
+        WiredTigerCursor curwrap(GetURI(), swrap);
         WT_CURSOR *c = curwrap.Get();
         const BSONObj& finalKey = stripFieldNames( key );
         // TODO: can we avoid a search?
@@ -224,7 +224,7 @@ namespace mongo {
     void WiredTigerIndex::fullValidate(OperationContext* txn, long long *numKeysOut) {
         // TODO check invariants?
         WiredTigerSession &swrap = WiredTigerRecoveryUnit::Get(txn).GetSession();
-        WiredTigerCursor curwrap(GetCursor(swrap), swrap);
+        WiredTigerCursor curwrap(GetURI(), swrap);
         WT_CURSOR *c = curwrap.Get();
         if (!c)
             return;
@@ -245,7 +245,7 @@ namespace mongo {
 
     bool WiredTigerIndex::isEmpty(OperationContext* txn) {
         WiredTigerSession &swrap = WiredTigerRecoveryUnit::Get(txn).GetSession();
-        WiredTigerCursor curwrap(GetCursor(swrap), swrap);
+        WiredTigerCursor curwrap(GetURI(), swrap);
         WT_CURSOR *c = curwrap.Get();
         if (!c)
             return true;
@@ -415,8 +415,7 @@ namespace mongo {
             OperationContext* txn, int direction) const {
         invariant((direction == 1) || (direction == -1));
 
-        WiredTigerSession &swrap = WiredTigerRecoveryUnit::Get(txn).GetSession();
-        return new IndexCursor(GetCursor(swrap, true), WiredTigerRecoveryUnit::Get(txn).GetSharedSession(), direction == 1);
+        return new IndexCursor(*this, WiredTigerRecoveryUnit::Get(txn).GetSharedSession(), direction == 1);
     }
 
     Status WiredTigerIndex::initAsEmpty(OperationContext* txn) {
@@ -424,9 +423,6 @@ namespace mongo {
         return Status::OK();
     }
 
-    WT_CURSOR *WiredTigerIndex::GetCursor(WiredTigerSession &session, bool acquire) const {
-        return session.GetCursor(GetURI(), acquire);
-    }
     const std::string &WiredTigerIndex::GetURI() const { return _uri; }
 
     SortedDataInterface* getWiredTigerIndex(

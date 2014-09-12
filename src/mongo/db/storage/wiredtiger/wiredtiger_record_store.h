@@ -153,9 +153,6 @@ namespace mongo {
         int64_t cappedMaxDocs() const;
         int64_t cappedMaxSize() const;
 
-        WT_CURSOR *GetCursor(WiredTigerSession &session, bool acquire=false) const {
-                return session.GetCursor(GetURI(), acquire);
-        }
         const std::string &GetURI() const { return _uri; }
 
     private:
@@ -164,7 +161,7 @@ namespace mongo {
         public:
             Iterator( const WiredTigerRecordStore& rs,
                       OperationContext* txn,
-                      shared_ptr<WiredTigerSession> session,
+                      shared_ptr<WiredTigerSession> &session,
                       const DiskLoc& start,
                       bool tailable,
                       const CollectionScanParams::Direction& dir );

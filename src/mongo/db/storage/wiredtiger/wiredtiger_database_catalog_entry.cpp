@@ -278,6 +278,13 @@ namespace mongo {
         // and can't deal with rolling back a drop.
         WiredTigerSession &swrap_real = WiredTigerRecoveryUnit::Get(txn).GetSession();
         WiredTigerSession swrap(swrap_real.GetDatabase());
+
+        // Close any cached sessions and cursors we can...
+        // XXX This doesn't protect against some thread having an active context with a cached cursor...
+        swrap.GetDatabase().ClearCache();
+        swrap_real.GetContext().CloseAllCursors();
+        swrap.GetContext().CloseAllCursors();
+
         WT_SESSION *session = swrap.Get();
         int ret = session->drop(session, WiredTigerRecordStore::_getURI(ns).c_str(), "force");
         if (ret != 0)
@@ -364,6 +371,11 @@ namespace mongo {
         WiredTigerSession &swrap_real = WiredTigerRecoveryUnit::Get(txn).GetSession();
         WiredTigerSession swrap(swrap_real.GetDatabase());
         WT_SESSION *session = swrap.Get();
+
+        // Close any cached sessions and cursors we can...
+        swrap.GetDatabase().ClearCache();
+        swrap_real.GetContext().CloseAllCursors();
+        swrap.GetDatabase().ClearCache();
 
         // Rename all indexes in the entry
         std::vector<std::string> names;
@@ -481,6 +493,12 @@ namespace mongo {
         // and can't deal with rolling back a creates.
         WiredTigerSession &swrap_real = WiredTigerRecoveryUnit::Get(txn).GetSession();
         WiredTigerSession swrap(swrap_real.GetDatabase());
+
+        // TODO: flush the whole database cache
+        swrap.GetDatabase().ClearCache();
+        swrap_real.GetContext().CloseAllCursors();
+        swrap.GetContext().CloseAllCursors();
+
         WT_SESSION *session = swrap.Get();
         int ret = session->drop(session, WiredTigerIndex::_getURI(ns().toString(), idxName.toString()).c_str(), "force");
         invariant(ret == 0);
