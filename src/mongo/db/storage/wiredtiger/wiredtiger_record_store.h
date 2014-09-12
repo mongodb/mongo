@@ -182,6 +182,7 @@ namespace mongo {
             void _getNext();
             void _locate( const DiskLoc &loc, bool exact );
             void _checkStatus();
+            DiskLoc _curr() const; // const version of public curr method
 
             const WiredTigerRecordStore& _rs;
             OperationContext* _txn;
@@ -205,6 +206,7 @@ namespace mongo {
         void cappedDeleteAsNeeded(OperationContext* txn);
         void _changeNumRecords(OperationContext* txn, bool insert);
         void _increaseDataSize(OperationContext* txn, int amount);
+        RecordData _getData( const WiredTigerCursor &cursor) const;
 
         WiredTigerDatabase &_db;
         const std::string _uri;
