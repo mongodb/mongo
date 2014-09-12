@@ -1160,9 +1160,9 @@ err:
 	if (compacting) {
 		F_CLR(lsm_tree, WT_LSM_TREE_COMPACTING);
 		lsm_tree->merge_aggressiveness = 0;
+	}
 	if (locked)
 		WT_ERR(__wt_lsm_tree_unlock(session, lsm_tree));
-	}
 	WT_ERR(__wt_verbose(session, WT_VERB_LSM,
 	    "Compact %s complete, return %d", name, ret));
 	__wt_lsm_tree_release(session, lsm_tree);
