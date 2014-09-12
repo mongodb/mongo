@@ -36,7 +36,7 @@ functions:
       working_dir: src/src/github.com/shelman/mongo-tools-proto/mongotop
       script: |
         set -o verbose
-        curl -s https://s3.amazonaws.com/mciuploads/mcitools/binaries/${build_id}/mongotop --output mongotop
+        curl -s https://s3.amazonaws.com/mciuploads/mongo-tools/binaries/${build_id}/mongotop --output mongotop
         chmod 755 mongotop
         ./smoke.sh
 
@@ -76,13 +76,13 @@ tasks:
         aws_key: ${aws_key}
         aws_secret: ${aws_secret}
         local_file: src/mongotop
-        remote_file: mcitools/binaries/${build_id}/mongotop
+        remote_file: mongo-tools/binaries/${build_id}/mongotop
         bucket: mciuploads
         permissions: public-read
         content_type: application/octet-stream
     - command: attach.task_files
       params:
-        "mongotop": https://s3.amazonaws.com/mciuploads/mongo-tools-proto/binaries/${build_id}/mongotop
+        "mongotop": https://s3.amazonaws.com/mciuploads/mongo-tools/binaries/${build_id}/mongotop
 
 - name: smoke
   depends_on:

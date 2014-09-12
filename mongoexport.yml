@@ -28,7 +28,7 @@ functions:
       aws_key: ${aws_key}
       aws_secret: ${aws_secret}
       local_file: src/coverage.${format|txt}
-      remote_file: mongo-tools-proto/coverage/${task_id}.${format|txt}
+      remote_file: mongo-tools/coverage/${task_id}.${format|txt}
       bucket: mciuploads
       permissions: public-read
       content_type: ${content_type|text/plain}
@@ -37,8 +37,8 @@ functions:
   "attach coverage reports" :
     command: attach.task_files
     params:
-      "Coverage Report (HTML)": https://s3.amazonaws.com/mciuploads/mongo-tools-proto/coverage/${task_id}.html
-      "Coverage Report (TXT)": https://s3.amazonaws.com/mciuploads/mongo-tools-proto/coverage/${task_id}.txt
+      "Coverage Report (HTML)": https://s3.amazonaws.com/mciuploads/mongo-tools/coverage/${task_id}.html
+      "Coverage Report (TXT)": https://s3.amazonaws.com/mciuploads/mongo-tools/coverage/${task_id}.txt
 
   "download mongod":
     command: shell.exec
@@ -137,13 +137,13 @@ tasks:
         aws_key: ${aws_key}
         aws_secret: ${aws_secret}
         local_file: src/mongoexport
-        remote_file: mongo-tools-proto/binaries/${build_id}/mongoexport
+        remote_file: mongo-tools/binaries/${build_id}/mongoexport
         bucket: mciuploads
         permissions: public-read
         content_type: application/octet-stream
     - command: attach.task_files
       params:
-        "mongoexport": https://s3.amazonaws.com/mciuploads/mongo-tools-proto/binaries/${build_id}/mongoexport
+        "mongoexport": https://s3.amazonaws.com/mciuploads/mongo-tools/binaries/${build_id}/mongoexport
 
 
 buildvariants:
