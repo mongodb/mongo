@@ -1,4 +1,5 @@
 // Hash sharding with initial chunk count set.
+// @tags : [ hashed ]
 
 var s = new ShardingTest({ shards : 3, mongos : 1, verbose : 1 });
 var dbname = "test";

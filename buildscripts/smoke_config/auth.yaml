@@ -1,0 +1,27 @@
+# Options to set for authorization with a mongod host
+suite:
+  exclude_tags:
+  - ^auth_internal$
+
+executor:
+  fixtures:
+    mongodb_server:
+      mongod_options:
+        auth: ''
+        keyFile: ./jstests/libs/authTestsKey
+        set_parameters:
+          enableLocalhostAuthBypass: false
+    shell_globals:
+      TestData:
+        auth: true
+        authMechanism: MONGODB-CR
+        keyFile: ./jstests/lib/authTestsKey
+        keyFileData: Thiskeyisonlyforrunningthesuitewithauthenticationdontuseitinanytestsdirectly
+  testers:
+    js_test:
+      shell_options:
+        authenticationDatabase: local
+        authenticationMechanism: MONGODB-CR
+        password: Thiskeyisonlyforrunningthesuitewithauthenticationdontuseitinanytestsdirectly
+        username: __system
+

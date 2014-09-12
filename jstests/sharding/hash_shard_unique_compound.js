@@ -2,6 +2,7 @@
 // Does 2 things and checks for consistent error:
 //  1.) shard collection on hashed "a", ensure unique index {a:1, b:1}
 //  2.) reverse order
+// @tags : [ hashed ]
 
 var s = new ShardingTest( { name : jsTestName() , shards : 1 , mongos : 1, verbose : 1 } );
 var dbName = "test";
