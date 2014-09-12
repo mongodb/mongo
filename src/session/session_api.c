@@ -193,8 +193,9 @@ __wt_open_cursor(WT_SESSION_IMPL *session,
 	handled = 0;
 
 	/*
-	 * Open specific cursor types we know about, or call the generic data source open
-	 * function. Unwind a set of string comparisons into a switch statement for performance.
+	 * Open specific cursor types we know about, or call the generic data
+	 * source open function. Unwind a set of string comparisons into a
+	 * switch statement for performance.
 	 */
 	switch (uri[0]) {
 	case 'b':
@@ -206,10 +207,11 @@ __wt_open_cursor(WT_SESSION_IMPL *session,
 	case 'c':
 		if (WT_PREFIX_MATCH(uri, "colgroup:")) {
 			/*
-			 * Column groups are a special case: open a cursor on the
-			 * underlying data source.
+			 * Column groups are a special case: open a cursor on
+			 * the underlying data source.
 			 */
-			WT_RET(__wt_schema_get_colgroup(session, uri, NULL, &colgroup));
+			WT_RET(__wt_schema_get_colgroup(
+			    session, uri, NULL, &colgroup));
 			WT_RET(__wt_open_cursor(
 			    session, colgroup->source, owner, cfg, cursorp));
 			handled = 1;
@@ -220,13 +222,15 @@ __wt_open_cursor(WT_SESSION_IMPL *session,
 		break;
 	case 'f':
 		if (WT_PREFIX_MATCH(uri, "file:")) {
-			WT_RET(__wt_curfile_open(session, uri, owner, cfg, cursorp));
+			WT_RET(__wt_curfile_open(
+			    session, uri, owner, cfg, cursorp));
 			handled = 1;
 		}
 		break;
 	case 'i':
 		if (WT_PREFIX_MATCH(uri, "index:")) {
-			WT_RET(__wt_curindex_open(session, uri, owner, cfg, cursorp));
+			WT_RET(__wt_curindex_open(
+			    session, uri, owner, cfg, cursorp));
 			handled = 1;
 		}
 		break;
@@ -235,7 +239,8 @@ __wt_open_cursor(WT_SESSION_IMPL *session,
 			WT_RET(__wt_curlog_open(session, uri, cfg, cursorp));
 			handled = 1;
 		} else if (WT_PREFIX_MATCH(uri, "lsm:")) {
-			WT_RET(__wt_clsm_open(session, uri, owner, cfg, cursorp));
+			WT_RET(__wt_clsm_open(
+			    session, uri, owner, cfg, cursorp));
 			handled = 1;
 		}
 		break;
@@ -258,11 +263,13 @@ __wt_open_cursor(WT_SESSION_IMPL *session,
 	}
 	if (!handled) {
 		if (WT_PREFIX_MATCH(uri, WT_METADATA_URI))
-			WT_RET(__wt_curmetadata_open(session, uri, owner, cfg, cursorp));
+			WT_RET(__wt_curmetadata_open(
+			    session, uri, owner, cfg, cursorp));
 		else if ((dsrc = __wt_schema_get_source(session, uri)) != NULL)
 			WT_RET(dsrc->open_cursor == NULL ?
 			    __wt_object_unsupported(session, uri) :
-			    __wt_curds_open(session, uri, owner, cfg, dsrc, cursorp));
+			    __wt_curds_open(
+				session, uri, owner, cfg, dsrc, cursorp));
 		else
 			WT_RET(__wt_bad_object_type(session, uri));
 	}
