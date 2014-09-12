@@ -48,8 +48,8 @@ func ConvertJSONValueToBSON(x interface{}) (interface{}, error) {
 		return bson.ObjectIdHex(s), nil
 
 	case json.Date: // Date
-		nsec := int64(time.Duration(v) * time.Millisecond)
-		return time.Unix(0, nsec), nil
+		n := int64(v)
+		return time.Unix(n/1e3, n%1e3*1e6), nil
 
 	case json.NumberLong: // NumberLong
 		return int64(v), nil
@@ -124,8 +124,7 @@ func ConvertBSONValueToJSON(x interface{}) (interface{}, error) {
 		return json.ObjectId(v.Hex()), nil
 
 	case time.Time: // Date
-		millis := int64(time.Duration(v.UnixNano()) / time.Millisecond)
-		return json.Date(millis), nil
+		return json.Date(v.Unix()*1000 + int64(v.Nanosecond()/1e6)), nil
 
 	case int64: // NumberLong
 		return json.NumberLong(v), nil

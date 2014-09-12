@@ -127,21 +127,20 @@ func TestEncodeRenamedByteSlice(t *testing.T) {
 	}
 }
 
-var unsupportedValues = []interface{}{
-	math.NaN(),
-	math.Inf(-1),
-	math.Inf(1),
-}
+func TestFloatSpecialValues(t *testing.T) {
+	_, err := Marshal(math.NaN())
+	if err != nil {
+		t.Errorf("Got error for NaN: %v", err)
+	}
 
-func TestUnsupportedValues(t *testing.T) {
-	for _, v := range unsupportedValues {
-		if _, err := Marshal(v); err != nil {
-			if _, ok := err.(*UnsupportedValueError); !ok {
-				t.Errorf("for %v, got %T want UnsupportedValueError", v, err)
-			}
-		} else {
-			t.Errorf("for %v, expected error", v)
-		}
+	_, err = Marshal(math.Inf(-1))
+	if err != nil {
+		t.Errorf("Got error for -Inf: %v", err)
+	}
+
+	_, err = Marshal(math.Inf(1))
+	if err != nil {
+		t.Errorf("Got error for +Inf: %v", err)
 	}
 }
 

@@ -66,23 +66,20 @@ func ParseSpecialKeys(doc map[string]interface{}) (interface{}, error) {
 					if err != nil {
 						return nil, err
 					}
-					nsec := int64(time.Duration(n) * time.Millisecond)
-					return time.Unix(0, nsec), err
+					return time.Unix(n/1e3, n%1e3*1e6), err
 				}
 				return nil, errors.New("Expected $numberLong field in $date")
 
 			case json.Number:
 				n, err := v.Int64()
-				nsec := int64(time.Duration(n) * time.Millisecond)
-				return time.Unix(0, nsec), err
+				return time.Unix(n/1e3, n%1e3*1e6), err
 
 			case float64:
-				nsec := int64(time.Duration(v) * time.Millisecond)
-				return time.Unix(0, nsec), nil
+				n := int64(v)
+				return time.Unix(n/1e3, n%1e3*1e6), nil
 
 			case int64:
-				nsec := int64(time.Duration(v) * time.Millisecond)
-				return time.Unix(0, nsec), nil
+				return time.Unix(v/1e3, v%1e3*1e6), nil
 
 			default:
 				return nil, errors.New("Invalid type for $date field")

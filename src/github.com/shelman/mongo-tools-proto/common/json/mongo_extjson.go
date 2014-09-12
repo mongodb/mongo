@@ -70,6 +70,10 @@ var (
 	undefinedType  = reflect.TypeOf(Undefined{})
 )
 
+func (d Date) isFormatable() bool {
+	return int64(d) < int64(32535215999)
+}
+
 func stateBeginExtendedValue(s *scanner, c int) int {
 	switch c {
 	case 'u': // beginning of undefined

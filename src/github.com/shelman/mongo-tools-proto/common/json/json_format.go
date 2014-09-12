@@ -14,10 +14,15 @@ func (b BinData) MarshalJSON() ([]byte, error) {
 }
 
 func (d Date) MarshalJSON() ([]byte, error) {
-	nsec := int64(time.Duration(d) * time.Millisecond)
-	t := time.Unix(0, nsec)
+	var data string
+	n := int64(d)
+	if d.isFormatable() {
+		t := time.Unix(n/1e3, n%1e3*1e6)
+		data = fmt.Sprintf(`{ "$date": "%v" }`, t.UTC().Format(JSON_DATE_FORMAT))
+	} else {
+		data = fmt.Sprintf(`{ "$date": { "$numberLong" : "%v" }}`, n)
+	}
 
-	data := fmt.Sprintf(`{ "$date": "%v" }`, t.Format(JSON_DATE_FORMAT))
 	return []byte(data), nil
 }
 
