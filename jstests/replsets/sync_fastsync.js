@@ -1,5 +1,5 @@
 /*
- * Create a replia set where a member has the --fastsync option, 
+ * Create a replica set where a member has the --fastsync option, 
  * then write some docs and ensure they 
  * are on the newly restarted member (with --fastsync) but older writes aren't.
  */
