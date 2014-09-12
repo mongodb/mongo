@@ -188,8 +188,9 @@ __wt_open_cursor(WT_SESSION_IMPL *session,
 {
 	WT_COLGROUP *colgroup;
 	WT_DATA_SOURCE *dsrc;
-	WT_DECL_RET;
-	int handled = 0;
+	int handled;
+
+	handled = 0;
 
 	/*
 	 * Open specific cursor types we know about, or call the generic data source open
