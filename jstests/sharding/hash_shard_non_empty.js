@@ -1,4 +1,5 @@
 // Hash sharding on a non empty collection should not pre-split.
+// @tags : [ hashed ]
 
 var s = new ShardingTest({ name : jsTestName(), shards : 3, mongos : 1, verbose : 1 });
 var dbname = "test";
