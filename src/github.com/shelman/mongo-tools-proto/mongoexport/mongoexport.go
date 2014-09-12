@@ -76,14 +76,12 @@ func (exp *MongoExport) getOutputWriter() (io.WriteCloser, error) {
 	return os.Stdout, nil
 }
 
-type DocSource interface {
-	Next(interface{}) bool
-	Close() error
-	Err() error
-}
-
-func getDocSource(exp MongoExport) (DocSource, error) {
+func getDocSource(exp MongoExport) (db.DocSource, error) {
 	if exp.ToolOptions.Namespace.DBPath != "" {
+		shimPath, err := db.LocateShim()
+		if err != nil {
+			return nil, err
+		}
 		bsonTool := db.StorageShim{
 			DBPath:     exp.ToolOptions.Namespace.DBPath,
 			Database:   exp.ToolOptions.Namespace.DB,
@@ -91,7 +89,7 @@ func getDocSource(exp MongoExport) (DocSource, error) {
 			Query:      exp.InputOpts.Query,
 			Skip:       exp.InputOpts.Skip,
 			Limit:      exp.InputOpts.Limit,
-			ShimPath:   "/Users/michaelobrien/other_projects/shim/build/darwin/normal/mongo/mongoshim",
+			ShimPath:   shimPath,
 		}
 
 		iter, err := bsonTool.Open()
@@ -101,7 +99,6 @@ func getDocSource(exp MongoExport) (DocSource, error) {
 		return db.NewDecodedBSONStream(iter), nil
 	}
 
-	//TODO make sure session gets closed!
 	sessionProvider, err := db.InitSessionProvider(exp.ToolOptions)
 	if err != nil {
 		return nil, err
@@ -132,7 +129,7 @@ func getDocSource(exp MongoExport) (DocSource, error) {
 	}
 
 	cursor := q.Iter()
-	return cursor, nil
+	return &db.CursorDocSource{cursor, session}, nil
 }
 
 //Export executes the entire export operation. It returns an integer of the count
@@ -141,6 +138,7 @@ func getDocSource(exp MongoExport) (DocSource, error) {
 func (exp *MongoExport) Export() (int64, error) {
 	out, err := exp.getOutputWriter()
 	if err != nil {
+		fmt.Println(err)
 		return 0, err
 	}
 
@@ -148,11 +146,13 @@ func (exp *MongoExport) Export() (int64, error) {
 
 	exportOutput, err := exp.getExportOutput(out)
 	if err != nil {
+		fmt.Println(err)
 		return 0, err
 	}
 
 	docSource, err := getDocSource(*exp)
 	if err != nil {
+		fmt.Println(err)
 		return 0, err
 	}
 

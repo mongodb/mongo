@@ -1,11 +1,15 @@
 package db
 
 import (
+	"errors"
 	"fmt"
+	"gopkg.in/mgo.v2"
 	"gopkg.in/mgo.v2/bson"
 	"io"
 	"os"
 	"os/exec"
+	"path/filepath"
+	"runtime"
 )
 
 const MaxBSONSize = 16 * 1024 * 1024
@@ -71,6 +75,69 @@ func buildArgs(shim StorageShim) []string {
 		returnVal = append(returnVal, "--query", shim.Query)
 	}
 	return returnVal
+}
+
+type DocSource interface {
+	Next(interface{}) bool
+	Close() error
+	Err() error
+}
+
+type CursorDocSource struct {
+	Iter    *mgo.Iter
+	Session *mgo.Session
+}
+
+func (cds *CursorDocSource) Next(out interface{}) bool {
+	return cds.Iter.Next(out)
+}
+
+func (cds *CursorDocSource) Close() error {
+	defer cds.Session.Close()
+	return cds.Close()
+}
+
+func (cds *CursorDocSource) Err() error {
+	return cds.Iter.Err()
+}
+
+func checkExists(path string) (bool, error) {
+	if _, err := os.Stat(path); err != nil {
+		if os.IsNotExist(err) {
+			return false, nil
+		}
+		return false, err
+	}
+	return true, nil
+}
+
+var ShimNotFoundErr = errors.New("Shim not found")
+
+func LocateShim() (string, error) {
+	shimLoc := os.Getenv("MONGOSHIM")
+	if shimLoc == "" {
+		dir, err := filepath.Abs(filepath.Dir(os.Args[0]))
+		if err != nil {
+			return "", err
+		}
+		shimLoc = filepath.Join(dir, "mongoshim")
+		if runtime.GOOS == "windows" {
+			shimLoc += ".exe"
+		}
+	}
+
+	if shimLoc == "" {
+		return "", ShimNotFoundErr
+	}
+
+	exists, err := checkExists(shimLoc)
+	if err != nil {
+		return "", err
+	}
+	if !exists {
+		return "", ShimNotFoundErr
+	}
+	return shimLoc, nil
 }
 
 //Open() starts the external shim process and returns an instance of BSONStream
