@@ -20,9 +20,14 @@ func (b BinData) String() string {
 }
 
 func (d Date) String() string {
-	nsec := int64(time.Duration(d) * time.Millisecond)
-	t := time.Unix(0, nsec)
-	return t.Format(CSV_DATE_FORMAT)
+	if d.isFormatable() {
+		t := time.Unix(n/1e3, n%1e3*1e6)
+		return t.UTC().Format(JSON_DATE_FORMAT)
+	} else {
+		//date.MarshalJSON always returns a nil err.
+		data, _ := d.MarshalJSON()
+		return string(data)
+	}
 }
 
 func (d DBRef) String() string {
