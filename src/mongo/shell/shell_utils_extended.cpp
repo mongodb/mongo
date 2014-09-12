@@ -225,7 +225,7 @@ namespace mongo {
             const std::string source = it.next().str();
             const std::string destination = it.next().str();
 
-            boost::filesystem::copy(source, destination);
+            boost::filesystem::copy_file(source, destination);
 
             return undefinedReturn;
         }
