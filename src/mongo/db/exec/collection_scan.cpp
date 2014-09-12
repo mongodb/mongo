@@ -52,7 +52,10 @@ namespace mongo {
           _filter(filter),
           _params(params),
           _nsDropped(false),
-          _commonStats(kStageType) { }
+          _commonStats(kStageType) {
+        // Explain reports the direction of the collection scan.
+        _specificStats.direction = params.direction;
+    }
 
     PlanStage::StageState CollectionScan::work(WorkingSetID* out) {
         ++_commonStats.works;

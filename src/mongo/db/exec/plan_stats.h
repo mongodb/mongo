@@ -232,7 +232,7 @@ namespace mongo {
     };
 
     struct CollectionScanStats : public SpecificStats {
-        CollectionScanStats() : docsTested(0) { }
+        CollectionScanStats() : docsTested(0), direction(1) { }
 
         virtual SpecificStats* clone() const {
             CollectionScanStats* specific = new CollectionScanStats(*this);
@@ -241,6 +241,10 @@ namespace mongo {
 
         // How many documents did we check against our filter?
         size_t docsTested;
+
+        // >0 if we're traversing the collection forwards. <0 if we're traversing it
+        // backwards.
+        int direction;
     };
 
     struct CountStats : public SpecificStats {
