@@ -160,6 +160,10 @@ namespace mongo {
 
     private:
 
+        RecordData dataForInternal( OperationContext* txn,
+                                    const DiskLoc& loc,
+                                    bool skipSearch ) const;
+
         class Iterator : public RecordIterator {
         public:
             Iterator( const WiredTigerRecordStore& rs,
@@ -182,6 +186,7 @@ namespace mongo {
             void _getNext();
             void _locate( const DiskLoc &loc, bool exact );
             void _checkStatus();
+            DiskLoc currConst() const;
 
             const WiredTigerRecordStore& _rs;
             OperationContext* _txn;
