@@ -21,6 +21,7 @@ func (b BinData) String() string {
 
 func (d Date) String() string {
 	if d.isFormatable() {
+		n := int64(d)
 		t := time.Unix(n/1e3, n%1e3*1e6)
 		return t.UTC().Format(JSON_DATE_FORMAT)
 	} else {
