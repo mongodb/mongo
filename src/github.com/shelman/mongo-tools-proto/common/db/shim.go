@@ -36,6 +36,10 @@ type DecodedBSONStream struct {
 	*BSONStream
 }
 
+func NewBSONStream(in io.ReadCloser) *BSONStream {
+	return &BSONStream{in, nil}
+}
+
 func NewDecodedBSONStream(str *BSONStream) *DecodedBSONStream {
 	return &DecodedBSONStream{make([]byte, MaxBSONSize), str}
 }
