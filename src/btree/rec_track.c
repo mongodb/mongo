@@ -807,7 +807,7 @@ __wt_ovfl_txnc_add(WT_SESSION_IMPL *session, WT_PAGE *page,
 	txnc->value_offset = WT_PTRDIFF32(p, txnc);
 	txnc->value_size = WT_STORE_SIZE(value_size);
 	memcpy(p, value, value_size);
-	txnc->current = __wt_txn_current_id(session);
+	txnc->current = __wt_txn_new_id(session);
 
 	__wt_cache_page_inmem_incr(session, page,
 	    WT_OVFL_SIZE(WT_OVFL_TXNC) + addr_size + value_size);

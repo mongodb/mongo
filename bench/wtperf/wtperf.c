@@ -1200,7 +1200,7 @@ execute_populate(CONFIG *cfg)
 	CONFIG_THREAD *popth;
 	WT_ASYNC_OP *asyncop;
 	size_t i;
-	uint64_t last_ops, secs;
+	uint64_t last_ops, msecs;
 	uint32_t interval, tables;
 	int elapsed, ret;
 	void *(*pfunc)(void *);
@@ -1278,12 +1278,11 @@ execute_populate(CONFIG *cfg)
 	}
 
 	lprintf(cfg, 0, 1, "Finished load of %" PRIu32 " items", cfg->icount);
-	secs = WT_TIMEDIFF(stop, start) / BILLION;
-	if (secs == 0)
-		++secs;
+	msecs = ns_to_ms(WT_TIMEDIFF(stop, start));
 	lprintf(cfg, 0, 1,
-	    "Load time: %" PRIu64 "\n" "load ops/sec: %" PRIu64,
-	    secs, cfg->icount / secs);
+	    "Load time: %.2f\n" "load ops/sec: %" PRIu64,
+	    (double)msecs / (double)THOUSAND, 
+	    (uint64_t)((cfg->icount / msecs) / THOUSAND));
 
 	/*
 	 * If configured, compact to allow LSM merging to complete.  We
@@ -1323,9 +1322,9 @@ execute_populate(CONFIG *cfg)
 			lprintf(cfg, ret, 0, "Get time failed in populate.");
 			return (ret);
 		}
-		secs = WT_TIMEDIFF(stop, start) / BILLION;
 		lprintf(cfg, 0, 1,
-		    "Compact completed in %" PRIu64 " seconds", secs);
+		    "Compact completed in %" PRIu64 " seconds",
+		    (uint64_t)(ns_to_sec(WT_TIMEDIFF(stop, start))));
 		assert(tables == 0);
 	}
 	return (0);

@@ -179,7 +179,7 @@ __wt_txn_read(WT_SESSION_IMPL *session, WT_UPDATE *upd)
 
 /*
  * __wt_txn_autocommit_check --
- *  If an auto-commit transaction is required, start one.
+ *      If an auto-commit transaction is required, start one.
 */
 static inline int
 __wt_txn_autocommit_check(WT_SESSION_IMPL *session)
@@ -195,23 +195,20 @@ __wt_txn_autocommit_check(WT_SESSION_IMPL *session)
 }
 
 /*
- * __wt_txn_current_id --
- *	Get the current transaction ID.
- */
-static inline uint64_t
-__wt_txn_current_id(WT_SESSION_IMPL *session)
-{
-	return (S2C(session)->txn_global.current);
-}
-
-/*
  * __wt_txn_new_id --
  *	Allocate a new transaction ID.
  */
 static inline uint64_t
 __wt_txn_new_id(WT_SESSION_IMPL *session)
 {
-	return WT_ATOMIC_ADD(S2C(session)->txn_global.current, 1);
+	/*
+	 * We want the global value to lead the allocated values, so that any
+	 * allocated transaction ID eventually becomes globally visible.  When
+	 * there are no transactions running, the oldest_id will reach the
+	 * global current ID, so we want post-increment semantics.  Our atomic
+	 * add primitive does pre-increment, so adjust the result here.
+	 */
+	return WT_ATOMIC_ADD(S2C(session)->txn_global.current, 1) - 1;
 }
 
 /*

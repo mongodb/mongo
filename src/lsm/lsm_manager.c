@@ -204,10 +204,10 @@ __lsm_manager_aggressive_update(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 
 	if (lsm_tree->merge_aggressiveness > old_aggressive)
 		WT_RET(__wt_verbose(session, WT_VERB_LSM,
-		     "LSM merge got aggressive (%u), "
-		     "%u / %" PRIu64,
-		     lsm_tree->merge_aggressiveness, stallms,
-		     lsm_tree->chunk_fill_ms));
+		    "LSM merge %s got aggressive (%u), "
+		    "%u / %" PRIu64,
+		    lsm_tree->name, lsm_tree->merge_aggressiveness, stallms,
+		    lsm_tree->chunk_fill_ms));
 	return (0);
 }
 
