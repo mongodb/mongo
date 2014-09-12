@@ -271,4 +271,504 @@ namespace {
         testSortOrder(false, "{'': -1}", "{'': -1}");
     }
 
+    //
+    // Tests for parsing a lite parsed query from a command BSON object.
+    //
+
+    TEST(LiteParsedQueryTest, ParseFromCommandBasic) {
+        BSONObj cmdObj = fromjson("{find: 'testns',"
+                                   "query: {a: 3},"
+                                   "sort: {a: 1},"
+                                   "projection: {_id: 0, a: 1}}");
+
+        LiteParsedQuery* rawLpq;
+        Status status = LiteParsedQuery::make("testns", cmdObj, &rawLpq);
+        ASSERT_OK(status);
+        scoped_ptr<LiteParsedQuery> lpq(rawLpq);
+    }
+
+    TEST(LiteParsedQueryTest, ParseFromCommandWithOptions) {
+        BSONObj cmdObj = fromjson("{find: 'testns',"
+                                   "query: {a: 3},"
+                                   "sort: {a: 1},"
+                                   "projection: {_id: 0, a: 1},"
+                                   "options: {showDiskLoc: true, maxScan: 1000}}");
+
+        LiteParsedQuery* rawLpq;
+        Status status = LiteParsedQuery::make("testns", cmdObj, &rawLpq);
+        ASSERT_OK(status);
+        scoped_ptr<LiteParsedQuery> lpq(rawLpq);
+
+        // Make sure the values from the command BSON are reflected in the LPQ.
+        ASSERT(lpq->getOptions().showDiskLoc);
+        ASSERT_EQUALS(1000, lpq->getMaxScan());
+    }
+
+    TEST(LiteParsedQueryTest, ParseFromCommandHintAsString) {
+        BSONObj cmdObj = fromjson("{find: 'testns',"
+                                   "query:  {a: 1},"
+                                   "hint: 'foo_1'}");
+
+        LiteParsedQuery* rawLpq;
+        Status status = LiteParsedQuery::make("testns", cmdObj, &rawLpq);
+        ASSERT_OK(status);
+        scoped_ptr<LiteParsedQuery> lpq(rawLpq);
+
+        ASSERT_EQUALS("foo_1", lpq->getHint().firstElement().str());
+    }
+
+    TEST(LiteParsedQueryTest, ParseFromCommandValidSortProj) {
+        BSONObj cmdObj = fromjson("{find: 'testns',"
+                                   "projection: {a: 1},"
+                                   "sort: {a: 1}}");
+        LiteParsedQuery* rawLpq;
+        Status status = LiteParsedQuery::make("testns", cmdObj, &rawLpq);
+        ASSERT_OK(status);
+        scoped_ptr<LiteParsedQuery> lpq(rawLpq);
+    }
+
+    TEST(LiteParsedQueryTest, ParseFromCommandValidSortProjMeta) {
+        BSONObj cmdObj = fromjson("{find: 'testns',"
+                                   "projection: {a: {$meta: 'textScore'}},"
+                                   "sort: {a: {$meta: 'textScore'}}}");
+        LiteParsedQuery* rawLpq;
+        Status status = LiteParsedQuery::make("testns", cmdObj, &rawLpq);
+        ASSERT_OK(status);
+        scoped_ptr<LiteParsedQuery> lpq(rawLpq);
+    }
+
+    TEST(LiteParsedQueryTest, ParseFromCommandAllFlagsTrue) {
+        BSONObj cmdObj = fromjson("{find: 'testns',"
+                                   "options: {"
+                                       "tailable: true,"
+                                       "slaveOk: true,"
+                                       "oplogReplay: true,"
+                                       "noCursorTimeout: true,"
+                                       "awaitData: true,"
+                                       "exhaust: true,"
+                                       "partial: true"
+                                  "}}");
+
+        LiteParsedQuery* rawLpq;
+        Status status = LiteParsedQuery::make("testns", cmdObj, &rawLpq);
+        ASSERT_OK(status);
+        scoped_ptr<LiteParsedQuery> lpq(rawLpq);
+
+        // Test that all the flags got set to true.
+        ASSERT(lpq->getOptions().tailable);
+        ASSERT(lpq->getOptions().slaveOk);
+        ASSERT(lpq->getOptions().oplogReplay);
+        ASSERT(lpq->getOptions().noCursorTimeout);
+        ASSERT(lpq->getOptions().awaitData);
+        ASSERT(lpq->getOptions().exhaust);
+        ASSERT(lpq->getOptions().partial);
+    }
+
+    TEST(LiteParsedQueryTest, ParseFromCommandCommentWithValidMinMax) {
+        BSONObj cmdObj = fromjson("{find: 'testns',"
+                                   "options: {"
+                                       "comment: 'the comment',"
+                                       "min: {a: 1},"
+                                       "max: {a: 2}"
+                                  "}}");
+
+        LiteParsedQuery* rawLpq;
+        Status status = LiteParsedQuery::make("testns", cmdObj, &rawLpq);
+        ASSERT_OK(status);
+        scoped_ptr<LiteParsedQuery> lpq(rawLpq);
+
+        ASSERT_EQUALS("the comment", lpq->getOptions().comment);
+        BSONObj expectedMin = BSON("a" << 1);
+        ASSERT_EQUALS(0, expectedMin.woCompare(lpq->getMin()));
+        BSONObj expectedMax = BSON("a" << 2);
+        ASSERT_EQUALS(0, expectedMax.woCompare(lpq->getMax()));
+    }
+
+    TEST(LiteParsedQueryTest, ParseFromCommandAllNonOptionFields) {
+        BSONObj cmdObj = fromjson("{find: 'testns',"
+                                   "query: {a: 1},"
+                                   "sort: {b: 1},"
+                                   "projection: {c: 1},"
+                                   "hint: {d: 1},"
+                                   "limit: 3,"
+                                   "skip: 5,"
+                                   "batchSize: 90,"
+                                   "singleBatch: false}");
+
+        LiteParsedQuery* rawLpq;
+        Status status = LiteParsedQuery::make("testns", cmdObj, &rawLpq);
+        ASSERT_OK(status);
+        scoped_ptr<LiteParsedQuery> lpq(rawLpq);
+
+        // Check the values inside the LPQ.
+        BSONObj expectedQuery = BSON("a" << 1);
+        ASSERT_EQUALS(0, expectedQuery.woCompare(lpq->getFilter()));
+        BSONObj expectedSort = BSON("b" << 1);
+        ASSERT_EQUALS(0, expectedSort.woCompare(lpq->getSort()));
+        BSONObj expectedProj = BSON("c" << 1);
+        ASSERT_EQUALS(0, expectedProj.woCompare(lpq->getProj()));
+        BSONObj expectedHint = BSON("d" << 1);
+        ASSERT_EQUALS(0, expectedHint.woCompare(lpq->getHint()));
+        ASSERT_EQUALS(3, lpq->getLimit());
+        ASSERT_EQUALS(5, lpq->getSkip());
+        ASSERT_EQUALS(90, lpq->getBatchSize());
+        ASSERT(!lpq->wantMore());
+    }
+
+    //
+    // Parsing errors where a field has the wrong type.
+    //
+
+    TEST(LiteParsedQueryTest, ParseFromCommandQueryWrongType) {
+        BSONObj cmdObj = fromjson("{find: 'testns',"
+                                   "query:  3}");
+
+        LiteParsedQuery* rawLpq;
+        Status status = LiteParsedQuery::make("testns", cmdObj, &rawLpq);
+        ASSERT_NOT_OK(status);
+    }
+
+    TEST(LiteParsedQueryTest, ParseFromCommandSortWrongType) {
+        BSONObj cmdObj = fromjson("{find: 'testns',"
+                                   "query:  {a: 1},"
+                                   "sort: 3}");
+
+        LiteParsedQuery* rawLpq;
+        Status status = LiteParsedQuery::make("testns", cmdObj, &rawLpq);
+        ASSERT_NOT_OK(status);
+    }
+
+    TEST(LiteParsedQueryTest, ParseFromCommandProjWrongType) {
+        BSONObj cmdObj = fromjson("{find: 'testns',"
+                                   "query:  {a: 1},"
+                                   "projection: 'foo'}");
+
+        LiteParsedQuery* rawLpq;
+        Status status = LiteParsedQuery::make("testns", cmdObj, &rawLpq);
+        ASSERT_NOT_OK(status);
+    }
+
+    TEST(LiteParsedQueryTest, ParseFromCommandSkipWrongType) {
+        BSONObj cmdObj = fromjson("{find: 'testns',"
+                                   "query:  {a: 1},"
+                                   "skip: '5',"
+                                   "projection: {a: 1}}");
+
+        LiteParsedQuery* rawLpq;
+        Status status = LiteParsedQuery::make("testns", cmdObj, &rawLpq);
+        ASSERT_NOT_OK(status);
+    }
+
+    TEST(LiteParsedQueryTest, ParseFromCommandLimitWrongType) {
+        BSONObj cmdObj = fromjson("{find: 'testns',"
+                                   "query:  {a: 1},"
+                                   "limit: '5',"
+                                   "projection: {a: 1}}");
+
+        LiteParsedQuery* rawLpq;
+        Status status = LiteParsedQuery::make("testns", cmdObj, &rawLpq);
+        ASSERT_NOT_OK(status);
+    }
+
+    TEST(LiteParsedQueryTest, ParseFromCommandSingleBatchWrongType) {
+        BSONObj cmdObj = fromjson("{find: 'testns',"
+                                   "query:  {a: 1},"
+                                   "singleBatch: 'false',"
+                                   "projection: {a: 1}}");
+
+        LiteParsedQuery* rawLpq;
+        Status status = LiteParsedQuery::make("testns", cmdObj, &rawLpq);
+        ASSERT_NOT_OK(status);
+    }
+
+    TEST(LiteParsedQueryTest, ParseFromCommandOptionsWrongType) {
+        BSONObj cmdObj = fromjson("{find: 'testns',"
+                                   "query:  {a: 1},"
+                                   "options: [{snapshot: true}],"
+                                   "projection: {a: 1}}");
+
+        LiteParsedQuery* rawLpq;
+        Status status = LiteParsedQuery::make("testns", cmdObj, &rawLpq);
+        ASSERT_NOT_OK(status);
+    }
+
+    TEST(LiteParsedQueryTest, ParseFromCommandCommentWrongType) {
+        BSONObj cmdObj = fromjson("{find: 'testns',"
+                                   "query:  {a: 1},"
+                                   "options: {comment: 1}}");
+
+        LiteParsedQuery* rawLpq;
+        Status status = LiteParsedQuery::make("testns", cmdObj, &rawLpq);
+        ASSERT_NOT_OK(status);
+    }
+
+    TEST(LiteParsedQueryTest, ParseFromCommandMaxScanWrongType) {
+        BSONObj cmdObj = fromjson("{find: 'testns',"
+                                   "query:  {a: 1},"
+                                   "options: {maxScan: true, comment: 'foo'}}");
+
+        LiteParsedQuery* rawLpq;
+        Status status = LiteParsedQuery::make("testns", cmdObj, &rawLpq);
+        ASSERT_NOT_OK(status);
+    }
+
+    TEST(LiteParsedQueryTest, ParseFromCommandMaxTimeMSWrongType) {
+        BSONObj cmdObj = fromjson("{find: 'testns',"
+                                   "query:  {a: 1},"
+                                   "options: {maxTimeMS: true}}");
+
+        LiteParsedQuery* rawLpq;
+        Status status = LiteParsedQuery::make("testns", cmdObj, &rawLpq);
+        ASSERT_NOT_OK(status);
+    }
+
+    TEST(LiteParsedQueryTest, ParseFromCommandMaxWrongType) {
+        BSONObj cmdObj = fromjson("{find: 'testns',"
+                                   "query:  {a: 1},"
+                                   "options: {max: 3}}");
+
+        LiteParsedQuery* rawLpq;
+        Status status = LiteParsedQuery::make("testns", cmdObj, &rawLpq);
+        ASSERT_NOT_OK(status);
+    }
+
+    TEST(LiteParsedQueryTest, ParseFromCommandMinWrongType) {
+        BSONObj cmdObj = fromjson("{find: 'testns',"
+                                   "query:  {a: 1},"
+                                   "options: {min: 3}}");
+
+        LiteParsedQuery* rawLpq;
+        Status status = LiteParsedQuery::make("testns", cmdObj, &rawLpq);
+        ASSERT_NOT_OK(status);
+    }
+
+    TEST(LiteParsedQueryTest, ParseFromCommandReturnKeyWrongType) {
+        BSONObj cmdObj = fromjson("{find: 'testns',"
+                                   "query:  {a: 1},"
+                                   "options: {returnKey: 3}}");
+
+        LiteParsedQuery* rawLpq;
+        Status status = LiteParsedQuery::make("testns", cmdObj, &rawLpq);
+        ASSERT_NOT_OK(status);
+    }
+
+
+    TEST(LiteParsedQueryTest, ParseFromCommandShowDiskLocWrongType) {
+        BSONObj cmdObj = fromjson("{find: 'testns',"
+                                   "query:  {a: 1},"
+                                   "options: {showDiskLoc: 3}}");
+
+        LiteParsedQuery* rawLpq;
+        Status status = LiteParsedQuery::make("testns", cmdObj, &rawLpq);
+        ASSERT_NOT_OK(status);
+    }
+
+    TEST(LiteParsedQueryTest, ParseFromCommandSnapshotWrongType) {
+        BSONObj cmdObj = fromjson("{find: 'testns',"
+                                   "query:  {a: 1},"
+                                   "options: {snapshot: 3}}");
+
+        LiteParsedQuery* rawLpq;
+        Status status = LiteParsedQuery::make("testns", cmdObj, &rawLpq);
+        ASSERT_NOT_OK(status);
+    }
+
+    TEST(LiteParsedQueryTest, ParseFromCommandTailableWrongType) {
+        BSONObj cmdObj = fromjson("{find: 'testns',"
+                                   "query:  {a: 1},"
+                                   "options: {tailable: 3}}");
+
+        LiteParsedQuery* rawLpq;
+        Status status = LiteParsedQuery::make("testns", cmdObj, &rawLpq);
+        ASSERT_NOT_OK(status);
+    }
+
+    TEST(LiteParsedQueryTest, ParseFromCommandSlaveOkWrongType) {
+        BSONObj cmdObj = fromjson("{find: 'testns',"
+                                   "query:  {a: 1},"
+                                   "options: {slaveOk: 3}}");
+
+        LiteParsedQuery* rawLpq;
+        Status status = LiteParsedQuery::make("testns", cmdObj, &rawLpq);
+        ASSERT_NOT_OK(status);
+    }
+
+    TEST(LiteParsedQueryTest, ParseFromCommandOplogReplayWrongType) {
+        BSONObj cmdObj = fromjson("{find: 'testns',"
+                                   "query:  {a: 1},"
+                                   "options: {oplogReplay: 3}}");
+
+        LiteParsedQuery* rawLpq;
+        Status status = LiteParsedQuery::make("testns", cmdObj, &rawLpq);
+        ASSERT_NOT_OK(status);
+    }
+
+    TEST(LiteParsedQueryTest, ParseFromCommandNoCursorTimeoutWrongType) {
+        BSONObj cmdObj = fromjson("{find: 'testns',"
+                                   "query:  {a: 1},"
+                                   "options: {noCursorTimeout: 3}}");
+
+        LiteParsedQuery* rawLpq;
+        Status status = LiteParsedQuery::make("testns", cmdObj, &rawLpq);
+        ASSERT_NOT_OK(status);
+    }
+
+    TEST(LiteParsedQueryTest, ParseFromCommandAwaitDataWrongType) {
+        BSONObj cmdObj = fromjson("{find: 'testns',"
+                                   "query:  {a: 1},"
+                                   "options: {awaitData: 3}}");
+
+        LiteParsedQuery* rawLpq;
+        Status status = LiteParsedQuery::make("testns", cmdObj, &rawLpq);
+        ASSERT_NOT_OK(status);
+    }
+
+    TEST(LiteParsedQueryTest, ParseFromCommandExhaustWrongType) {
+        BSONObj cmdObj = fromjson("{find: 'testns',"
+                                   "query:  {a: 1},"
+                                   "options: {exhaust: 3}}");
+
+        LiteParsedQuery* rawLpq;
+        Status status = LiteParsedQuery::make("testns", cmdObj, &rawLpq);
+        ASSERT_NOT_OK(status);
+    }
+
+    TEST(LiteParsedQueryTest, ParseFromCommandPartialWrongType) {
+        BSONObj cmdObj = fromjson("{find: 'testns',"
+                                   "query:  {a: 1},"
+                                   "options: {exhaust: 3}}");
+
+        LiteParsedQuery* rawLpq;
+        Status status = LiteParsedQuery::make("testns", cmdObj, &rawLpq);
+        ASSERT_NOT_OK(status);
+    }
+
+    //
+    // Parsing errors where a field has the right type but a bad value.
+    //
+
+    TEST(LiteParsedQueryTest, ParseFromCommandNegativeSkipError) {
+        BSONObj cmdObj = fromjson("{find: 'testns',"
+                                   "skip: -3,"
+                                   "query: {a: 3}}");
+
+        LiteParsedQuery* rawLpq;
+        Status status = LiteParsedQuery::make("testns", cmdObj, &rawLpq);
+        ASSERT_NOT_OK(status);
+    }
+
+    TEST(LiteParsedQueryTest, ParseFromCommandNegativeLimitError) {
+        BSONObj cmdObj = fromjson("{find: 'testns',"
+                                   "limit: -3,"
+                                   "query: {a: 3}}");
+
+        LiteParsedQuery* rawLpq;
+        Status status = LiteParsedQuery::make("testns", cmdObj, &rawLpq);
+        ASSERT_NOT_OK(status);
+    }
+
+    TEST(LiteParsedQueryTest, ParseFromCommandNegativeBatchSizeError) {
+        BSONObj cmdObj = fromjson("{find: 'testns',"
+                                   "batchSize: -10,"
+                                   "query: {a: 3}}");
+
+        LiteParsedQuery* rawLpq;
+        Status status = LiteParsedQuery::make("testns", cmdObj, &rawLpq);
+        ASSERT_NOT_OK(status);
+    }
+
+    //
+    // Errors checked in LiteParsedQuery::validate().
+    //
+
+    TEST(LiteParsedQueryTest, ParseFromCommandMinMaxDifferentFieldsError) {
+        BSONObj cmdObj = fromjson("{find: 'testns',"
+                                   "options: {min: {a: 3}, max: {b: 4}}}");
+
+        LiteParsedQuery* rawLpq;
+        Status status = LiteParsedQuery::make("testns", cmdObj, &rawLpq);
+        ASSERT_NOT_OK(status);
+    }
+
+    TEST(LiteParsedQueryTest, ParseFromCommandSnapshotPlusSortError) {
+        BSONObj cmdObj = fromjson("{find: 'testns',"
+                                   "sort: {a: 3},"
+                                   "options: {snapshot: true}}");
+
+        LiteParsedQuery* rawLpq;
+        Status status = LiteParsedQuery::make("testns", cmdObj, &rawLpq);
+        ASSERT_NOT_OK(status);
+    }
+
+    TEST(LiteParsedQueryTest, ParseFromCommandSnapshotPlusHintError) {
+        BSONObj cmdObj = fromjson("{find: 'testns',"
+                                   "options: {snapshot: true},"
+                                   "hint: {a: 1}}");
+
+        LiteParsedQuery* rawLpq;
+        Status status = LiteParsedQuery::make("testns", cmdObj, &rawLpq);
+        ASSERT_NOT_OK(status);
+    }
+
+    TEST(LiteParsedQueryTest, ParseCommandForbidNonMetaSortOnFieldWithMetaProject) {
+        Status status = Status::OK();
+        BSONObj cmdObj;
+
+        cmdObj = fromjson("{find: 'testns',"
+                           "projection: {a: {$meta: 'textScore'}},"
+                           "sort: {a: 1}}");
+        LiteParsedQuery* rawLpq;
+        status = LiteParsedQuery::make("testns", cmdObj, &rawLpq);
+        ASSERT_NOT_OK(status);
+
+
+        cmdObj = fromjson("{find: 'testns',"
+                           "projection: {a: {$meta: 'textScore'}},"
+                           "sort: {b: 1}}");
+        status = LiteParsedQuery::make("testns", cmdObj, &rawLpq);
+        ASSERT_OK(status);
+        scoped_ptr<LiteParsedQuery> lpq(rawLpq);
+    }
+
+    TEST(LiteParsedQueryTest, ParseCommandForbidMetaSortOnFieldWithoutMetaProject) {
+        Status status = Status::OK();
+        BSONObj cmdObj;
+
+        cmdObj = fromjson("{find: 'testns',"
+                           "projection: {a: 1},"
+                           "sort: {a: {$meta: 'textScore'}}}");
+        LiteParsedQuery* rawLpq;
+        status = LiteParsedQuery::make("testns", cmdObj, &rawLpq);
+        ASSERT_NOT_OK(status);
+
+        cmdObj = fromjson("{find: 'testns',"
+                           "projection: {b: 1},"
+                           "sort: {a: {$meta: 'textScore'}}}");
+        status = LiteParsedQuery::make("testns", cmdObj, &rawLpq);
+        ASSERT_NOT_OK(status);
+    }
+
+    //
+    // Extra fields cause the parse to fail.
+    //
+
+    TEST(LiteParsedQueryTest, ParseFromCommandForbidExtraField) {
+        BSONObj cmdObj = fromjson("{find: 'testns',"
+                                   "options: {snapshot: true},"
+                                   "foo: {a: 1}}");
+
+        LiteParsedQuery* rawLpq;
+        Status status = LiteParsedQuery::make("testns", cmdObj, &rawLpq);
+        ASSERT_NOT_OK(status);
+    }
+
+    TEST(LiteParsedQueryTest, ParseFromCommandForbidExtraOption) {
+        BSONObj cmdObj = fromjson("{find: 'testns',"
+                                   "options: {snapshot: true, foo: true}}");
+
+        LiteParsedQuery* rawLpq;
+        Status status = LiteParsedQuery::make("testns", cmdObj, &rawLpq);
+        ASSERT_NOT_OK(status);
+    }
+
 }  // namespace

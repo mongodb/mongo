@@ -32,6 +32,7 @@
 
 #include "mongo/db/dbmessage.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/mongoutils/str.h"
 
 namespace mongo {
 
@@ -44,35 +45,241 @@ namespace mongo {
     const string LiteParsedQuery::metaDiskLoc("diskloc");
     const string LiteParsedQuery::metaIndexKey("indexKey");
 
-    // static
-    Status LiteParsedQuery::make(const QueryMessage& qm, LiteParsedQuery** out) {
-        auto_ptr<LiteParsedQuery> pq(new LiteParsedQuery());
+    namespace {
 
-        Status status = pq->init(qm.ns, qm.ntoskip, qm.ntoreturn, qm.queryOptions, qm.query,
-                                 qm.fields, true);
-        if (status.isOK()) { *out = pq.release(); }
-        return status;
-    }
+        Status checkFieldType(const BSONElement& el, BSONType type) {
+            if (type != el.type()) {
+                mongoutils::str::stream ss;
+                ss << "Failed to parse: " << el.toString() << ". "
+                   << "'" << el.fieldName() << "' field must be of BSON type "
+                   << typeName(type) << ".";
+                return Status(ErrorCodes::BadValue, ss);
+            }
+
+            return Status::OK();
+        }
+
+    } // namespace
 
     // static
-    Status LiteParsedQuery::make(const string& ns, int ntoskip, int ntoreturn, int queryOptions,
-                                 const BSONObj& query, const BSONObj& proj, const BSONObj& sort,
-                                 const BSONObj& hint,
-                                 const BSONObj& minObj, const BSONObj& maxObj,
-                                 bool snapshot,
-                                 bool explain,
+    Status LiteParsedQuery::make(const std::string& fullns,
+                                 const BSONObj& cmdObj,
                                  LiteParsedQuery** out) {
         auto_ptr<LiteParsedQuery> pq(new LiteParsedQuery());
-        pq->_sort = sort;
-        pq->_hint = hint;
-        pq->_min = minObj;
-        pq->_max = maxObj;
-        pq->_snapshot = snapshot;
-        pq->_explain = explain;
+        pq->_ns = fullns;
 
-        Status status = pq->init(ns, ntoskip, ntoreturn, queryOptions, query, proj, false);
-        if (status.isOK()) { *out = pq.release(); }
-        return status;
+        // Parse the command BSON by looping through one element at a time.
+        BSONObjIterator it(cmdObj);
+        while (it.more()) {
+            BSONElement el = it.next();
+            const char* fieldName = el.fieldName();
+            if (mongoutils::str::equals(fieldName, "find")) {
+                // We've already parsed the namespace information contained in the 'find'
+                // field, so just move on.
+                continue;
+            }
+            else if (mongoutils::str::equals(fieldName, "query")) {
+                Status status = checkFieldType(el, Object);
+                if (!status.isOK()) {
+                    return status;
+                }
+
+                pq->_filter = el.Obj().getOwned();
+            }
+            else if (mongoutils::str::equals(fieldName, "sort")) {
+                Status status = checkFieldType(el, Object);
+                if (!status.isOK()) {
+                    return status;
+                }
+
+                // Sort document normalization.
+                BSONObj sort = el.Obj().getOwned();
+                if (!sort.isEmpty()) {
+                    if (!isValidSortOrder(sort)) {
+                        return Status(ErrorCodes::BadValue, "bad sort specification");
+                    }
+                    sort = normalizeSortOrder(sort);
+                }
+
+                pq->_sort = sort;
+            }
+            else if (mongoutils::str::equals(fieldName, "projection")) {
+                Status status = checkFieldType(el, Object);
+                if (!status.isOK()) {
+                    return status;
+                }
+
+                pq->_proj = el.Obj().getOwned();
+            }
+            else if (mongoutils::str::equals(fieldName, "hint")) {
+                BSONObj hintObj;
+                if (Object == el.type()) {
+                    hintObj = cmdObj["hint"].Obj().getOwned();
+                }
+                else if (String == el.type()) {
+                    hintObj = el.wrap();
+                }
+                else {
+                    return Status(ErrorCodes::BadValue,
+                                  "hint must be either a string or nested object");
+                }
+
+                pq->_hint = hintObj;
+            }
+            else if (mongoutils::str::equals(fieldName, "skip")) {
+                if (!el.isNumber()) {
+                    mongoutils::str::stream ss;
+                    ss << "Failed to parse: " << cmdObj.toString() << ". "
+                       << "'skip' field must be numeric.";
+                    return Status(ErrorCodes::BadValue, ss);
+                }
+
+                int skip = el.numberInt();
+                if (skip < 0) {
+                    return Status(ErrorCodes::BadValue, "skip value must be non-negative");
+                }
+
+                pq->_skip = skip;
+            }
+            else if (mongoutils::str::equals(fieldName, "limit")) {
+                if (!el.isNumber()) {
+                    mongoutils::str::stream ss;
+                    ss << "Failed to parse: " << cmdObj.toString() << ". "
+                       << "'limit' field must be numeric.";
+                    return Status(ErrorCodes::BadValue, ss);
+                }
+
+                int limit = el.numberInt();
+                if (limit < 0) {
+                    return Status(ErrorCodes::BadValue, "limit value must be non-negative");
+                }
+
+                pq->_limit = limit;
+            }
+            else if (mongoutils::str::equals(fieldName, "batchSize")) {
+                if (!el.isNumber()) {
+                    mongoutils::str::stream ss;
+                    ss << "Failed to parse: " << cmdObj.toString() << ". "
+                       << "'batchSize' field must be numeric.";
+                    return Status(ErrorCodes::BadValue, ss);
+                }
+
+                int batchSize = el.numberInt();
+                if (batchSize <= 0) {
+                    return Status(ErrorCodes::BadValue, "batchSize value must be positive");
+                }
+
+                pq->_batchSize = batchSize;
+            }
+            else if (mongoutils::str::equals(fieldName, "singleBatch")) {
+                Status status = checkFieldType(el, Bool);
+                if (!status.isOK()) {
+                    return status;
+                }
+
+                pq->_wantMore = el.boolean();
+            }
+            else if (mongoutils::str::equals(fieldName, "options")) {
+                Status status = checkFieldType(el, Object);
+                if (!status.isOK()) {
+                    return status;
+                }
+
+                Status parseStatus = Options::parseFromBSON(el.Obj(), &pq->_options);
+                if (!parseStatus.isOK()) {
+                    return parseStatus;
+                }
+            }
+            else {
+                mongoutils::str::stream ss;
+                ss << "Failed to parse: " << cmdObj.toString() << ". "
+                   << "Unrecognized field '" << fieldName << "'.";
+                return Status(ErrorCodes::BadValue, ss);
+            }
+        }
+
+        // We might need to update the projection object with a $meta projection.
+        if (pq->getOptions().returnKey) {
+            pq->addReturnKeyMetaProj();
+        }
+        if (pq->getOptions().showDiskLoc) {
+            pq->addShowDiskLocMetaProj();
+        }
+
+        Status validateStatus = pq->validate();
+        if (!validateStatus.isOK()) {
+            return validateStatus;
+        }
+
+        *out = pq.release();
+        return Status::OK();
+    }
+
+    void LiteParsedQuery::addReturnKeyMetaProj() {
+        BSONObjBuilder projBob;
+        projBob.appendElements(_proj);
+        // We use $$ because it's never going to show up in a user's projection.
+        // The exact text doesn't matter.
+        BSONObj indexKey = BSON("$$" <<
+                                BSON("$meta" << LiteParsedQuery::metaIndexKey));
+        projBob.append(indexKey.firstElement());
+        _proj = projBob.obj();
+    }
+
+    void LiteParsedQuery::addShowDiskLocMetaProj() {
+        BSONObjBuilder projBob;
+        projBob.appendElements(_proj);
+        BSONObj metaDiskLoc = BSON("$diskLoc" <<
+                                   BSON("$meta" << LiteParsedQuery::metaDiskLoc));
+        projBob.append(metaDiskLoc.firstElement());
+        _proj = projBob.obj();
+    }
+
+    Status LiteParsedQuery::validate() const {
+        // Min and Max objects must have the same fields.
+        if (!_options.min.isEmpty() && !_options.max.isEmpty()) {
+            if (!_options.min.isFieldNamePrefixOf(_options.max) ||
+                (_options.min.nFields() != _options.max.nFields())) {
+                return Status(ErrorCodes::BadValue, "min and max must have the same field names");
+            }
+        }
+
+        // Can't combine a normal sort and a $meta projection on the same field.
+        BSONObjIterator projIt(_proj);
+        while (projIt.more()) {
+            BSONElement projElt = projIt.next();
+            if (isTextScoreMeta(projElt)) {
+                BSONElement sortElt = _sort[projElt.fieldName()];
+                if (!sortElt.eoo() && !isTextScoreMeta(sortElt)) {
+                    return Status(ErrorCodes::BadValue,
+                                  "can't have a non-$meta sort on a $meta projection");
+                }
+            }
+        }
+
+        // All fields with a $meta sort must have a corresponding $meta projection.
+        BSONObjIterator sortIt(_sort);
+        while (sortIt.more()) {
+            BSONElement sortElt = sortIt.next();
+            if (isTextScoreMeta(sortElt)) {
+                BSONElement projElt = _proj[sortElt.fieldName()];
+                if (projElt.eoo() || !isTextScoreMeta(projElt)) {
+                    return Status(ErrorCodes::BadValue,
+                                  "must have $meta projection for all $meta sort keys");
+                }
+            }
+        }
+
+        if (_options.snapshot) {
+            if (!_sort.isEmpty()) {
+                return Status(ErrorCodes::BadValue, "E12001 can't use sort with $snapshot");
+            }
+            if (!_hint.isEmpty()) {
+                return Status(ErrorCodes::BadValue, "E12002 can't use hint with $snapshot");
+            }
+        }
+
+        return Status::OK();
     }
 
     // static
@@ -220,34 +427,268 @@ namespace mongo {
         return b.obj();
     }
 
-    LiteParsedQuery::LiteParsedQuery() : _wantMore(true), _explain(false), _snapshot(false),
-                                         _returnKey(false), _showDiskLoc(false), _maxScan(0),
-                                         _maxTimeMS(0) { }
+    LiteParsedQuery::LiteParsedQuery() :
+        _skip(0),
+        _limit(0),
+        _batchSize(101),
+        _wantMore(true),
+        _explain(false) { }
+
+    //
+    // LiteParsedQuery::Options
+    //
+
+    LiteParsedQuery::Options::Options() {
+        clear();
+    }
+
+    void LiteParsedQuery::Options::clear() {
+        this->maxScan = 0;
+        this->maxTimeMS = 0,
+        this->returnKey = false;
+        this->showDiskLoc = false;
+        this->snapshot = false;
+        this->hasReadPref = false;
+        this->tailable = false;
+        this->slaveOk = false;
+        this->oplogReplay = false;
+        this->noCursorTimeout = false;
+        this->awaitData = false;
+        this->exhaust = false;
+        this->partial = false;
+    }
+
+    void LiteParsedQuery::Options::initFromInt(int options) {
+        this->tailable = (options & QueryOption_CursorTailable) != 0;
+        this->slaveOk = (options & QueryOption_SlaveOk) != 0;
+        this->oplogReplay = (options & QueryOption_OplogReplay) != 0;
+        this->noCursorTimeout = (options & QueryOption_NoCursorTimeout) != 0;
+        this->awaitData = (options & QueryOption_AwaitData) != 0;
+        this->exhaust = (options & QueryOption_Exhaust) != 0;
+        this->partial = (options & QueryOption_PartialResults) != 0;
+    }
+
+    int LiteParsedQuery::Options::toInt() const {
+        int options = 0;
+        if (this->tailable) { options |= QueryOption_CursorTailable; }
+        if (this->slaveOk) { options |= QueryOption_SlaveOk; }
+        if (this->oplogReplay) { options |= QueryOption_OplogReplay; }
+        if (this->noCursorTimeout) { options |= QueryOption_NoCursorTimeout; }
+        if (this->awaitData) { options |= QueryOption_AwaitData; }
+        if (this->exhaust) { options |= QueryOption_Exhaust; }
+        if (this->partial) { options |= QueryOption_PartialResults; }
+        return options;
+    }
+
+    // static
+    Status LiteParsedQuery::Options::parseFromBSON(const BSONObj& optionsObj,
+                                                   LiteParsedQuery::Options* out) {
+        BSONObjIterator it(optionsObj);
+        while (it.more()) {
+            BSONElement el = it.next();
+            const char* fieldName = el.fieldName();
+            if (mongoutils::str::equals(fieldName, "comment")) {
+                Status status = checkFieldType(el, String);
+                if (!status.isOK()) {
+                    return status;
+                }
+
+                out->comment = el.str();
+            }
+            else if (mongoutils::str::equals(fieldName, "maxScan")) {
+                if (!el.isNumber()) {
+                    mongoutils::str::stream ss;
+                    ss << "Failed to parse: " << optionsObj.toString() << ". "
+                       << "'maxScan' field must be numeric.";
+                    return Status(ErrorCodes::BadValue, ss);
+                }
+
+                int maxScan = el.numberInt();
+                if (maxScan < 0) {
+                    return Status(ErrorCodes::BadValue, "maxScan value must be non-negative");
+                }
+
+                out->maxScan = maxScan;
+            }
+            else if (mongoutils::str::equals(fieldName, cmdOptionMaxTimeMS.c_str())) {
+                StatusWith<int> maxTimeMS = parseMaxTimeMS(el);
+                if (!maxTimeMS.isOK()) {
+                    return maxTimeMS.getStatus();
+                }
+
+                out->maxTimeMS = maxTimeMS.getValue();
+            }
+            else if (mongoutils::str::equals(fieldName, "min")) {
+                Status status = checkFieldType(el, Object);
+                if (!status.isOK()) {
+                    return status;
+                }
+
+                out->min = el.Obj().getOwned();
+            }
+            else if (mongoutils::str::equals(fieldName, "max")) {
+                Status status = checkFieldType(el, Object);
+                if (!status.isOK()) {
+                    return status;
+                }
+
+                out->max = el.Obj().getOwned();
+            }
+            else if (mongoutils::str::equals(fieldName, "returnKey")) {
+                Status status = checkFieldType(el, Bool);
+                if (!status.isOK()) {
+                    return status;
+                }
+
+                out->returnKey = el.boolean();
+            }
+            else if (mongoutils::str::equals(fieldName, "showDiskLoc")) {
+                Status status = checkFieldType(el, Bool);
+                if (!status.isOK()) {
+                    return status;
+                }
+
+                out->showDiskLoc = el.boolean();
+            }
+            else if (mongoutils::str::equals(fieldName, "snapshot")) {
+                Status status = checkFieldType(el, Bool);
+                if (!status.isOK()) {
+                    return status;
+                }
+
+                out->snapshot = el.boolean();
+            }
+            else if (mongoutils::str::equals(fieldName, "tailable")) {
+                Status status = checkFieldType(el, Bool);
+                if (!status.isOK()) {
+                    return status;
+                }
+
+                out->tailable = el.boolean();
+            }
+            else if (mongoutils::str::equals(fieldName, "slaveOk")) {
+                Status status = checkFieldType(el, Bool);
+                if (!status.isOK()) {
+                    return status;
+                }
+
+                out->slaveOk = el.boolean();
+            }
+            else if (mongoutils::str::equals(fieldName, "oplogReplay")) {
+                Status status = checkFieldType(el, Bool);
+                if (!status.isOK()) {
+                    return status;
+                }
+
+                out->oplogReplay = el.boolean();
+            }
+            else if (mongoutils::str::equals(fieldName, "noCursorTimeout")) {
+                Status status = checkFieldType(el, Bool);
+                if (!status.isOK()) {
+                    return status;
+                }
+
+                out->noCursorTimeout = el.boolean();
+            }
+            else if (mongoutils::str::equals(fieldName, "awaitData")) {
+                Status status = checkFieldType(el, Bool);
+                if (!status.isOK()) {
+                    return status;
+                }
+
+                out->awaitData = el.boolean();
+            }
+            else if (mongoutils::str::equals(fieldName, "exhaust")) {
+                Status status = checkFieldType(el, Bool);
+                if (!status.isOK()) {
+                    return status;
+                }
+
+                out->exhaust = el.boolean();
+            }
+            else if (mongoutils::str::equals(fieldName, "partial")) {
+                Status status = checkFieldType(el, Bool);
+                if (!status.isOK()) {
+                    return status;
+                }
+
+                out->partial = el.boolean();
+            }
+            else {
+                mongoutils::str::stream ss;
+                ss << "Failed to parse query options: " << optionsObj.toString() << ". "
+                   << "Unrecognized option field '" << fieldName << "'.";
+                return Status(ErrorCodes::BadValue, ss);
+            }
+        }
+
+        return Status::OK();
+    }
+
+    //
+    // Old LiteParsedQuery parsing code: SOON TO BE DEPRECATED.
+    //
+
+    // static
+    Status LiteParsedQuery::make(const QueryMessage& qm, LiteParsedQuery** out) {
+        auto_ptr<LiteParsedQuery> pq(new LiteParsedQuery());
+
+        Status status = pq->init(qm.ns, qm.ntoskip, qm.ntoreturn, qm.queryOptions, qm.query,
+                                 qm.fields, true);
+        if (status.isOK()) { *out = pq.release(); }
+        return status;
+    }
+
+    // static
+    Status LiteParsedQuery::make(const string& ns, int ntoskip, int ntoreturn, int queryOptions,
+                                 const BSONObj& query, const BSONObj& proj, const BSONObj& sort,
+                                 const BSONObj& hint,
+                                 const BSONObj& minObj, const BSONObj& maxObj,
+                                 bool snapshot,
+                                 bool explain,
+                                 LiteParsedQuery** out) {
+        auto_ptr<LiteParsedQuery> pq(new LiteParsedQuery());
+        pq->_sort = sort;
+        pq->_hint = hint;
+        pq->_options.min = minObj;
+        pq->_options.max = maxObj;
+        pq->_options.snapshot = snapshot;
+        pq->_explain = explain;
+
+        Status status = pq->init(ns, ntoskip, ntoreturn, queryOptions, query, proj, false);
+        if (status.isOK()) { *out = pq.release(); }
+        return status;
+    }
 
     Status LiteParsedQuery::init(const string& ns, int ntoskip, int ntoreturn, int queryOptions,
                                  const BSONObj& queryObj, const BSONObj& proj,
                                  bool fromQueryMessage) {
         _ns = ns;
-        _ntoskip = ntoskip;
-        _ntoreturn = ntoreturn;
-        _options = queryOptions;
+        _skip = ntoskip;
+        _limit = ntoreturn;
+        _options.initFromInt(queryOptions);
         _proj = proj.getOwned();
 
-        if (_ntoskip < 0) {
+        if (_skip < 0) {
             return Status(ErrorCodes::BadValue, "bad skip value in query");
         }
 
-        if (_ntoreturn == std::numeric_limits<int>::min()) {
-            // _ntoreturn is negative but can't be negated.
+        if (_limit == std::numeric_limits<int>::min()) {
+            // _limit is negative but can't be negated.
             return Status(ErrorCodes::BadValue, "bad limit value in query");
         }
 
-        if (_ntoreturn < 0) {
-            // _ntoreturn greater than zero is simply a hint on how many objects to send back per
+        if (_limit < 0) {
+            // _limit greater than zero is simply a hint on how many objects to send back per
             // "cursor batch".  A negative number indicates a hard limit.
             _wantMore = false;
-            _ntoreturn = -_ntoreturn;
+            _limit = -_limit;
         }
+
+        // We are constructing this LiteParsedQuery from a legacy OP_QUERY message, and therefore
+        // cannot distinguish batchSize and limit. (They are a single field in OP_QUERY, but are
+        // passed separately for the find command.) Just set both values to be the same.
+        _batchSize = _limit;
 
         if (fromQueryMessage) {
             BSONElement queryField = queryObj["query"];
@@ -267,7 +708,7 @@ namespace mongo {
             _filter = queryObj.getOwned();
         }
 
-        _hasReadPref = queryObj.hasField("$readPreference");
+        _options.hasReadPref = queryObj.hasField("$readPreference");
 
         if (!_sort.isEmpty()) {
             if (!isValidSortOrder(_sort)) {
@@ -276,40 +717,7 @@ namespace mongo {
             _sort = normalizeSortOrder(_sort);
         }
 
-        // Min and Max objects must have the same fields.
-        if (!_min.isEmpty() && !_max.isEmpty()) {
-            if (!_min.isFieldNamePrefixOf(_max) || (_min.nFields() != _max.nFields())) {
-                return Status(ErrorCodes::BadValue, "min and max must have the same field names");
-            }
-        }
-
-        // Can't combine a normal sort and a $meta projection on the same field.
-        BSONObjIterator projIt(_proj);
-        while (projIt.more()) {
-            BSONElement projElt = projIt.next();
-            if (isTextScoreMeta(projElt)) {
-                BSONElement sortElt = _sort[projElt.fieldName()];
-                if (!sortElt.eoo() && !isTextScoreMeta(sortElt)) {
-                    return Status(ErrorCodes::BadValue,
-                                  "can't have a non-$meta sort on a $meta projection");
-                }
-            }
-        }
-
-        // All fields with a $meta sort must have a corresponding $meta projection.
-        BSONObjIterator sortIt(_sort);
-        while (sortIt.more()) {
-            BSONElement sortElt = sortIt.next();
-            if (isTextScoreMeta(sortElt)) {
-                BSONElement projElt = _proj[sortElt.fieldName()];
-                if (projElt.eoo() || !isTextScoreMeta(projElt)) {
-                    return Status(ErrorCodes::BadValue,
-                                  "must have $meta projection for all $meta sort keys");
-                }
-            }
-        }
-
-        return Status::OK();
+        return validate();
     }
 
     Status LiteParsedQuery::initFullQuery(const BSONObj& top) {
@@ -318,7 +726,7 @@ namespace mongo {
         while (i.more()) {
             BSONElement e = i.next();
             const char* name = e.fieldName();
-            
+
             if (0 == strcmp("$orderby", name) || 0 == strcmp("orderby", name)) {
                 if (Object == e.type()) {
                     _sort = e.embeddedObject();
@@ -366,19 +774,19 @@ namespace mongo {
                 }
                 else if (str::equals("snapshot", name)) {
                     // Won't throw.
-                    _snapshot = e.trueValue();
+                    _options.snapshot = e.trueValue();
                 }
                 else if (str::equals("min", name)) {
                     if (!e.isABSONObj()) {
                         return Status(ErrorCodes::BadValue, "$min must be a BSONObj");
                     }
-                    _min = e.embeddedObject();
+                    _options.min = e.embeddedObject();
                 }
                 else if (str::equals("max", name)) {
                     if (!e.isABSONObj()) {
                         return Status(ErrorCodes::BadValue, "$max must be a BSONObj");
                     }
-                    _max = e.embeddedObject();
+                    _options.max = e.embeddedObject();
                 }
                 else if (str::equals("hint", name)) {
                     if (e.isABSONObj()) {
@@ -393,32 +801,19 @@ namespace mongo {
                 else if (str::equals("returnKey", name)) {
                     // Won't throw.
                     if (e.trueValue()) {
-                        _returnKey = true;
-                        BSONObjBuilder projBob;
-                        projBob.appendElements(_proj);
-                        // We use $$ because it's never going to show up in a user's projection.
-                        // The exact text doesn't matter.
-                        BSONObj indexKey = BSON("$$" <<
-                                                BSON("$meta" << LiteParsedQuery::metaIndexKey));
-                        projBob.append(indexKey.firstElement());
-                        _proj = projBob.obj();
+                        _options.returnKey = true;
+                        addReturnKeyMetaProj();
                     }
                 }
                 else if (str::equals("maxScan", name)) {
                     // Won't throw.
-                    _maxScan = e.numberInt();
+                    _options.maxScan = e.numberInt();
                 }
                 else if (str::equals("showDiskLoc", name)) {
                     // Won't throw.
                     if (e.trueValue()) {
-                        _showDiskLoc = true;
-
-                        BSONObjBuilder projBob;
-                        projBob.appendElements(_proj);
-                        BSONObj metaDiskLoc = BSON("$diskLoc" <<
-                                                   BSON("$meta" << LiteParsedQuery::metaDiskLoc));
-                        projBob.append(metaDiskLoc.firstElement());
-                        _proj = projBob.obj();
+                        _options.showDiskLoc = true;
+                        addShowDiskLocMetaProj();
                     }
                 }
                 else if (str::equals("maxTimeMS", name)) {
@@ -426,17 +821,8 @@ namespace mongo {
                     if (!maxTimeMS.isOK()) {
                         return maxTimeMS.getStatus();
                     }
-                    _maxTimeMS = maxTimeMS.getValue();
+                    _options.maxTimeMS = maxTimeMS.getValue();
                 }
-            }
-        }
-        
-        if (_snapshot) {
-            if (!_sort.isEmpty()) {
-                return Status(ErrorCodes::BadValue, "E12001 can't use sort with $snapshot");
-            }
-            if (!_hint.isEmpty()) {
-                return Status(ErrorCodes::BadValue, "E12002 can't use hint with $snapshot");
             }
         }
 

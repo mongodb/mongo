@@ -421,7 +421,7 @@ namespace mongo {
         params.collection = collection;
         params.start = startLoc;
         params.direction = CollectionScanParams::FORWARD;
-        params.tailable = cq->getParsed().hasOption(QueryOption_CursorTailable);
+        params.tailable = cq->getParsed().getOptions().tailable;
 
         WorkingSet* ws = new WorkingSet();
         CollectionScan* cs = new CollectionScan(txn, params, ws, cq->root());
@@ -526,7 +526,7 @@ namespace mongo {
             // Takes ownership of 'cq'.
             rawExec = new PlanExecutor(ws, eofStage, cq, NULL);
         }
-        else if (pq.hasOption(QueryOption_OplogReplay)) {
+        else if (pq.getOptions().oplogReplay) {
             // Takes ownership of 'cq'.
             status = getOplogStartHack(txn, collection, cq, &rawExec);
         }
@@ -590,7 +590,7 @@ namespace mongo {
         txn->checkForInterrupt(); // May trigger maxTimeAlwaysTimeOut fail point.
 
         // uassert if we are not on a primary, and not a secondary with SlaveOk query parameter set.
-        bool slaveOK = pq.hasOption(QueryOption_SlaveOk) || pq.hasReadPref();
+        bool slaveOK = pq.getOptions().slaveOk || pq.hasReadPref();
         status = repl::getGlobalReplicationCoordinator()->checkCanServeReadsFor(
                 txn,
                 NamespaceString(cq->ns()),
@@ -645,7 +645,7 @@ namespace mongo {
             ++numResults;
 
             // Possibly note slave's position in the oplog.
-            if (pq.hasOption(QueryOption_OplogReplay)) {
+            if (pq.getOptions().oplogReplay) {
                 BSONElement e = obj["ts"];
                 if (Date == e.type() || Timestamp == e.type()) {
                     slaveReadTill = e._opTime();
@@ -693,7 +693,7 @@ namespace mongo {
         if (PlanExecutor::DEAD == state) {
             saveClientCursor = false;
         }
-        else if (pq.hasOption(QueryOption_CursorTailable)) {
+        else if (pq.getOptions().tailable) {
             // If we're tailing a capped collection, we don't bother saving the cursor if the
             // collection is empty. Otherwise, the semantics of the tailable cursor is that the
             // client will keep trying to read from it. So we'll keep it around.
@@ -751,7 +751,7 @@ namespace mongo {
             // Allocate a new ClientCursor.  We don't have to worry about leaking it as it's
             // inserted into a global map by its ctor.
             ClientCursor* cc = new ClientCursor(collection, exec.get(),
-                                                cq->getParsed().getOptions(),
+                                                cq->getParsed().getOptions().toInt(),
                                                 cq->getParsed().getFilter());
             ccId = cc->cursorid();
 
@@ -762,12 +762,12 @@ namespace mongo {
             exec.release();
 
             // TODO document
-            if (pq.hasOption(QueryOption_OplogReplay) && !slaveReadTill.isNull()) {
+            if (pq.getOptions().oplogReplay && !slaveReadTill.isNull()) {
                 cc->slaveReadTill(slaveReadTill);
             }
 
             // TODO document
-            if (pq.hasOption(QueryOption_Exhaust)) {
+            if (pq.getOptions().exhaust) {
                 curop.debug().exhaust = true;
             }
 

@@ -148,7 +148,7 @@ namespace mongo {
             && query.getParsed().getHint().isEmpty()
             && 0 == query.getParsed().getSkip()
             && CanonicalQuery::isSimpleIdQuery(query.getParsed().getFilter())
-            && !query.getParsed().hasOption(QueryOption_CursorTailable);
+            && !query.getParsed().getOptions().tailable;
     }
 
     vector<PlanStage*> IDHackStage::getChildren() const {

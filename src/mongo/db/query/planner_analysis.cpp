@@ -496,7 +496,6 @@ namespace mongo {
                                                            QuerySolutionNode* solnRoot) {
         auto_ptr<QuerySolution> soln(new QuerySolution());
         soln->filterData = query.getQueryObj();
-        verify(soln->filterData.isOwned());
         soln->indexFilterApplied = params.indexFiltersApplied;
 
         solnRoot->computeProperties();
