@@ -230,6 +230,7 @@ add_option( "mm", "use main memory instead of memory mapped files" , 0 , True )
 add_option( "ssl" , "Enable SSL" , 0 , True )
 add_option( "ssl-fips-capability", "Enable the ability to activate FIPS 140-2 mode", 0, True );
 add_option( "rocksdb" , "Enable RocksDB" , 0 , False )
+add_option( "wiredtiger" , "Enable WiredTiger" , 0 , False )
 
 # library choices
 js_engine_choices = ['v8-3.12', 'v8-3.25', 'none']
