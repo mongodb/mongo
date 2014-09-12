@@ -42,6 +42,7 @@
 #include "mongo/db/repl/repl_coordinator_external_state_mock.h"
 #include "mongo/db/repl/repl_coordinator_impl.h"
 #include "mongo/db/repl/repl_coordinator_test_fixture.h"
+#include "mongo/db/repl/repl_set_heartbeat_args.h"
 #include "mongo/db/repl/repl_settings.h"
 #include "mongo/db/repl/replica_set_config.h"
 #include "mongo/db/repl/topology_coordinator_impl.h"
@@ -220,16 +221,19 @@ namespace {
                                      BSON("_id" << 1 << "host" << "node2:54321"))),
                         &result1));
         ASSERT_EQUALS(ReplicationCoordinator::modeNone, getReplCoord()->getReplicationMode());
+
+        ReplSetHeartbeatArgs hbArgs;
+        hbArgs.setSetName("mySet");
+        hbArgs.setProtocolVersion(1);
+        hbArgs.setConfigVersion(1);
+        hbArgs.setCheckEmpty(true);
+        hbArgs.setSenderHost(HostAndPort("node1", 12345));
+        hbArgs.setSenderId(0);
         getNetWithMap()->addResponse(
                 ReplicationExecutor::RemoteCommandRequest(
                         HostAndPort("node2", 54321),
                         "admin",
-                        BSON("replSetHeartbeat" << "mySet" <<
-                             "v" << 1 <<
-                             "pv" << 1 <<
-                             "checkEmpty" << true <<
-                             "from" << "node1:12345" <<
-                             "fromId" << 0)),
+                        hbArgs.toBSON()),
                 StatusWith<BSONObj>(BSON("ok" << 1)));
 
         ASSERT_OK(

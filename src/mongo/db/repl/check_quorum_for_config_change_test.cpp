@@ -35,6 +35,7 @@
 #include "mongo/db/jsobj.h"
 #include "mongo/db/repl/check_quorum_for_config_change.h"
 #include "mongo/db/repl/network_interface_mock.h"
+#include "mongo/db/repl/repl_set_heartbeat_args.h"
 #include "mongo/db/repl/replica_set_config.h"
 #include "mongo/db/repl/replication_executor.h"
 #include "mongo/stdx/functional.h"
@@ -138,13 +139,14 @@ namespace {
 
     const BSONObj makeHeartbeatRequest(const ReplicaSetConfig& rsConfig, int myConfigIndex) {
         const MemberConfig& myConfig = rsConfig.getMemberAt(myConfigIndex);
-        return BSON(
-                "replSetHeartbeat" << rsConfig.getReplSetName() <<
-                "v" << rsConfig.getConfigVersion() <<
-                "pv" << 1 <<
-                "checkEmpty" << (rsConfig.getConfigVersion() == 1) <<
-                "from" << myConfig.getHostAndPort().toString() <<
-                "fromId" << myConfig.getId());
+        ReplSetHeartbeatArgs hbArgs;
+        hbArgs.setSetName(rsConfig.getReplSetName());
+        hbArgs.setProtocolVersion(1);
+        hbArgs.setConfigVersion(rsConfig.getConfigVersion());
+        hbArgs.setCheckEmpty(rsConfig.getConfigVersion() == 1);
+        hbArgs.setSenderHost(myConfig.getHostAndPort());
+        hbArgs.setSenderId(myConfig.getId());
+        return hbArgs.toBSON();
     }
 
     TEST_F(CheckQuorumForInitiate, QuorumCheckSuccessForFiveNodes) {
