@@ -143,6 +143,18 @@ namespace mongo {
         return dataSize(txn); // todo: this isn't very good
     }
 
+    // Retrieve the value from a positioned cursor.
+    RecordData WiredTigerRecordStore::_getData(const WiredTigerCursor &curwrap) const {
+        WT_CURSOR *c = curwrap.Get();
+        WT_ITEM value;
+        int ret = c->get_value(c, &value);
+        invariant(ret == 0);
+
+        boost::shared_array<char> data( new char[value.size] );
+        memcpy( data.get(), value.data, value.size );
+        return RecordData(reinterpret_cast<const char *>(data.get()), value.size, data );
+    }
+
     RecordData WiredTigerRecordStore::dataFor(OperationContext* txn, const DiskLoc& loc) const {
         // ownership passes to the shared_array created below
         WiredTigerSession &swrap = WiredTigerRecoveryUnit::Get(txn).GetSession();
@@ -152,13 +164,7 @@ namespace mongo {
         int ret = c->search(c);
         invariant(ret == 0);
 
-        WT_ITEM value;
-        ret = c->get_value(c, &value);
-        invariant(ret == 0);
-
-        boost::shared_array<char> data( new char[value.size] );
-        memcpy( data.get(), value.data, value.size );
-        return RecordData(reinterpret_cast<const char *>(data.get()), value.size, data );
+        return _getData(curwrap);
     }
 
     void WiredTigerRecordStore::deleteRecord( OperationContext* txn, const DiskLoc& loc ) {
@@ -539,7 +545,8 @@ namespace mongo {
         return _eof;
     }
 
-    DiskLoc WiredTigerRecordStore::Iterator::curr() {
+    // Allow const functions to use curr to find current location.
+    DiskLoc WiredTigerRecordStore::Iterator::_curr() const {
         if (_eof)
             return DiskLoc();
 
@@ -548,6 +555,10 @@ namespace mongo {
         int ret = c->get_key(c, &key);
         invariant(ret == 0);
         return _fromKey(key);
+    }
+
+    DiskLoc WiredTigerRecordStore::Iterator::curr() {
+        return _curr();
     }
 
     void WiredTigerRecordStore::Iterator::_getNext() {
@@ -596,7 +607,13 @@ namespace mongo {
     }
 
     RecordData WiredTigerRecordStore::Iterator::dataFor( const DiskLoc& loc ) const {
-        return _rs.dataFor( _txn, loc );
+        // Retrieve the data if the iterator is already positioned at loc, otherwise
+        // open a new cursor and find the data to avoid upsetting the iterators
+        // cursor position.
+        if (loc == _curr())
+            return (_rs._getData(_cursor));
+        else
+            return (_rs.dataFor( _txn, loc ));
     }
 
     bool WiredTigerRecordStore::Iterator::_forward() const {
