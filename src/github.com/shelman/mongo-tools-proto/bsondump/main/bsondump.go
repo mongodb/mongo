@@ -50,14 +50,20 @@ func main() {
 		}
 	}
 
-	dumper := bsondump.BSONDumper{
+	dumper := bsondump.BSONDump{
 		ToolOptions:     opts,
 		BSONDumpOptions: bsonDumpOpts,
 		FileName:        filename,
 		Out:             os.Stdout,
 	}
 
-	err = dumper.Dump()
+	if bsonDumpOpts.Type == "debug" {
+		err = dumper.Debug()
+	} else if bsonDumpOpts.Type == "json" || bsonDumpOpts.Type == "" {
+		err = dumper.Dump()
+	} else {
+		err = fmt.Errorf("Unsupported output type '%'. Must be either 'debug' or 'json'", bsonDumpOpts.Type)
+	}
 	if err != nil {
 		fmt.Println(err)
 		os.Exit(1)

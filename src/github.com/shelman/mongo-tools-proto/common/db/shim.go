@@ -40,6 +40,10 @@ func NewBSONStream(in io.ReadCloser) *BSONStream {
 	return &BSONStream{in, nil}
 }
 
+func (bsonStream *BSONStream) Close() error {
+	return bsonStream.Stream.Close()
+}
+
 func NewDecodedBSONStream(str *BSONStream) *DecodedBSONStream {
 	return &DecodedBSONStream{make([]byte, MaxBSONSize), str}
 }
