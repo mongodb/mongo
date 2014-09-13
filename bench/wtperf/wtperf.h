@@ -104,13 +104,13 @@ struct __config {			/* Configuration struction */
 	CONFIG_THREAD *ckptthreads, *popthreads;
 
 #define	WORKLOAD_MAX	50
-	CONFIG_THREAD	*workers;		/* Worker threads */
+	CONFIG_THREAD	*workers;	/* Worker threads */
 	u_int		 workers_cnt;
 
-	WORKLOAD	*workload;		/* Workloads */
+	WORKLOAD	*workload;	/* Workloads */
 	u_int		 workload_cnt;
 
-	uint32_t	 use_asyncops;		/* Use async operations */
+	uint32_t	 use_asyncops;	/* Use async operations */
 	/* State tracking variables. */
 
 	uint64_t ckpt_ops;		/* checkpoint operations */
