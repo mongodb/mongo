@@ -191,6 +191,8 @@ typedef struct {
 struct __config_thread {		/* Per-thread structure */
 	CONFIG *cfg;			/* Enclosing configuration */
 
+	uint32_t rnd[2];		/* Random number generation state */
+
 	pthread_t handle;		/* Handle */
 
 	char *key_buf, *value_buf;	/* Key/value memory */

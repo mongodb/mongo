@@ -5423,7 +5423,7 @@ __rec_dictionary_init(WT_SESSION_IMPL *session, WT_RECONCILE *r, u_int slots)
 	WT_RET(__wt_calloc(session,
 	    r->dictionary_slots, sizeof(WT_DICTIONARY *), &r->dictionary));
 	for (i = 0; i < r->dictionary_slots; ++i) {
-		depth = __wt_skip_choose_depth();
+		depth = __wt_skip_choose_depth(session);
 		WT_RET(__wt_calloc(session, 1,
 		    sizeof(WT_DICTIONARY) + depth * sizeof(WT_DICTIONARY *),
 		    &r->dictionary[i]));

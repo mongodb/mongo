@@ -919,6 +919,8 @@ __wt_open_session(WT_CONNECTION_IMPL *conn,
 
 	WT_ERR(__wt_cond_alloc(session, "session", 0, &session_ret->cond));
 
+	__wt_random_init(session_ret->rnd);
+
 	__wt_event_handler_set(session_ret,
 	    event_handler == NULL ? session->event_handler : event_handler);
 

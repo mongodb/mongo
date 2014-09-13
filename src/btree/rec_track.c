@@ -495,7 +495,7 @@ __wt_ovfl_reuse_add(WT_SESSION_IMPL *session, WT_PAGE *page,
 	head = page->modify->ovfl_track->ovfl_reuse;
 
 	/* Choose a skiplist depth for this insert. */
-	skipdepth = __wt_skip_choose_depth();
+	skipdepth = __wt_skip_choose_depth(session);
 
 	/*
 	 * Allocate the WT_OVFL_REUSE structure, next pointers for the skip
@@ -783,7 +783,7 @@ __wt_ovfl_txnc_add(WT_SESSION_IMPL *session, WT_PAGE *page,
 	head = page->modify->ovfl_track->ovfl_txnc;
 
 	/* Choose a skiplist depth for this insert. */
-	skipdepth = __wt_skip_choose_depth();
+	skipdepth = __wt_skip_choose_depth(session);
 
 	/*
 	 * Allocate the WT_OVFL_TXNC structure, next pointers for the skip

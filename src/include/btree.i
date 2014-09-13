@@ -1071,12 +1071,12 @@ __wt_page_hazard_check(WT_SESSION_IMPL *session, WT_PAGE *page)
  *	Randomly choose a depth for a skiplist insert.
  */
 static inline u_int
-__wt_skip_choose_depth(void)
+__wt_skip_choose_depth(WT_SESSION_IMPL *session)
 {
 	u_int d;
 
 	for (d = 1; d < WT_SKIP_MAXDEPTH &&
-	    __wt_random() < WT_SKIP_PROBABILITY; d++)
+	    __wt_random(session->rnd) < WT_SKIP_PROBABILITY; d++)
 		;
 	return (d);
 }
