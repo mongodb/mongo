@@ -20,7 +20,6 @@ func stateInUnquotedString(s *scanner, c int) int {
 
 // Decoder function that immediately returns an already unquoted string.
 // Adapted from encoding/json/decode.go.
-
 func maybeUnquoteBytes(s []byte) ([]byte, bool) {
 	if len(s) == 0 {
 		return nil, false
