@@ -79,67 +79,45 @@ namespace repl {
         if (_freshnessChecker) {
             // If an attempt to elect self is currently in progress, don't interrupt it.
             return;
-            // Note that the old code, in addition to prohibiting multiple in-flight election 
+            // Note that the old code, in addition to prohibiting multiple in-flight election
             // attempts, used to omit processing *any* incoming knowledge about
             // primaries in the cluster while an election was occurring.  This seemed like
             // overkill, so it has been removed.
         }
 
-        // Make an event for our internal use to help synchronize the next phase of election.
-        StatusWith<ReplicationExecutor::EventHandle> nextPhaseEvh = cbData.executor->makeEvent();
-        if (nextPhaseEvh.getStatus() == ErrorCodes::ShutdownInProgress) { 
-            return;
-        } 
-        fassert(18681, nextPhaseEvh.getStatus());
-
         _freshnessChecker.reset(new FreshnessChecker);
-        StatusWith<ReplicationExecutor::CallbackHandle> finishCheckCallback = 
-            cbData.executor->onEvent(
-                nextPhaseEvh.getValue(),
+        StatusWith<ReplicationExecutor::EventHandle> nextPhaseEvh = _freshnessChecker->start(
+                cbData.executor,
+                lastOpTimeApplied,
+                _rsConfig,
+                _thisMembersConfigIndex,
+                _topCoord->getMaybeUpHostAndPorts(),
                 stdx::bind(&ReplicationCoordinatorImpl::_onFreshnessCheckComplete,
-                           this, 
-                           stdx::placeholders::_1,
+                           this,
                            finishEvh));
-        if (finishCheckCallback.getStatus() == ErrorCodes::ShutdownInProgress) {
+        if (nextPhaseEvh.getStatus() == ErrorCodes::ShutdownInProgress) {
             return;
         }
-        fassert(18670, finishCheckCallback.getStatus());
-
-        Status status = _freshnessChecker->start(cbData.executor, 
-                                                 nextPhaseEvh.getValue(), 
-                                                 lastOpTimeApplied, 
-                                                 _rsConfig, 
-                                                 _thisMembersConfigIndex,
-                                                 _topCoord->getMaybeUpHostAndPorts());
-        if (status == ErrorCodes::ShutdownInProgress) { 
-            return;
-        } 
-        fassert(18688, status);
-
+        fassert(18681, nextPhaseEvh.getStatus());
         finishEvhGuard.Dismiss();
     }
 
 
     void ReplicationCoordinatorImpl::_onFreshnessCheckComplete(
-        const ReplicationExecutor::CallbackData& cbData,
         const ReplicationExecutor::EventHandle& finishEvh) {
 
         // Signal finish event upon early exit.
-        ScopeGuard finishEvhGuard(MakeGuard(&ReplicationExecutor::signalEvent, 
-                                            cbData.executor, 
+        ScopeGuard finishEvhGuard(MakeGuard(&ReplicationExecutor::signalEvent,
+                                            &_replExecutor,
                                             finishEvh));
 
         // Make sure to reset our state on all error exit paths
-        ScopeGuard freshnessCheckerDeleter = 
-            MakeObjGuard(_freshnessChecker, 
-                         &boost::scoped_ptr<FreshnessChecker>::reset, 
+        ScopeGuard freshnessCheckerDeleter =
+            MakeObjGuard(_freshnessChecker,
+                         &boost::scoped_ptr<FreshnessChecker>::reset,
                          static_cast<FreshnessChecker*>(NULL));
 
-        if (cbData.status == ErrorCodes::CallbackCanceled) {
-            return;
-        }
-
-        Date_t now(cbData.executor->now());
+        Date_t now(_replExecutor.now());
         bool weAreFreshest;
         bool tied;
         _freshnessChecker->getResults(&weAreFreshest, &tied);
@@ -171,47 +149,32 @@ namespace repl {
 
         _electCmdRunner.reset(new ElectCmdRunner);
         StatusWith<ReplicationExecutor::EventHandle> nextPhaseEvh = _electCmdRunner->start(
-                cbData.executor,
+                &_replExecutor,
                 _rsConfig,
                 _thisMembersConfigIndex,
-                _topCoord->getMaybeUpHostAndPorts());
+                _topCoord->getMaybeUpHostAndPorts(),
+                stdx::bind(&ReplicationCoordinatorImpl::_onElectCmdRunnerComplete,
+                           this,
+                           finishEvh));
         if (nextPhaseEvh.getStatus() == ErrorCodes::ShutdownInProgress) {
             return;
         }
         fassert(18685, nextPhaseEvh.getStatus());
-
-        StatusWith<ReplicationExecutor::CallbackHandle> finishCheckCallback =
-            cbData.executor->onEvent(
-                nextPhaseEvh.getValue(),
-                stdx::bind(&ReplicationCoordinatorImpl::_onElectCmdRunnerComplete,
-                           this,
-                           stdx::placeholders::_1,
-                           finishEvh));
-        if (finishCheckCallback.getStatus() == ErrorCodes::ShutdownInProgress) {
-            return;
-        }
-        fassert(18671, finishCheckCallback.getStatus());
-
         freshnessCheckerDeleter.Dismiss();
         finishEvhGuard.Dismiss();
     }
 
     void ReplicationCoordinatorImpl::_onElectCmdRunnerComplete(
-        const ReplicationExecutor::CallbackData& cbData,
         const ReplicationExecutor::EventHandle& finishEvh) {
 
         // Signal finish event and cleanup, upon function exit in all cases.
-        ON_BLOCK_EXIT(&ReplicationExecutor::signalEvent, cbData.executor, finishEvh);
-        ON_BLOCK_EXIT_OBJ(_freshnessChecker, 
-                          &boost::scoped_ptr<FreshnessChecker>::reset, 
+        ON_BLOCK_EXIT(&ReplicationExecutor::signalEvent, &_replExecutor, finishEvh);
+        ON_BLOCK_EXIT_OBJ(_freshnessChecker,
+                          &boost::scoped_ptr<FreshnessChecker>::reset,
                           static_cast<FreshnessChecker*>(NULL));
-        ON_BLOCK_EXIT_OBJ(_electCmdRunner, 
-                          &boost::scoped_ptr<ElectCmdRunner>::reset, 
+        ON_BLOCK_EXIT_OBJ(_electCmdRunner,
+                          &boost::scoped_ptr<ElectCmdRunner>::reset,
                           static_cast<ElectCmdRunner*>(NULL));
-
-        if (cbData.status == ErrorCodes::CallbackCanceled) {
-            return;
-        }
 
         int receivedVotes = _electCmdRunner->getReceivedVotes();
 
@@ -225,7 +188,7 @@ namespace repl {
             log() << "replSet config version changed during our election, ignoring result";
             return;
         }
-        
+
         log() << "replSet election succeeded, assuming primary role";
 
         //

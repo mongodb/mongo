@@ -31,8 +31,10 @@
 #include <vector>
 
 #include "mongo/base/disallow_copying.h"
-#include "mongo/db/repl/replication_executor.h"
 #include "mongo/bson/optime.h"
+#include "mongo/db/repl/replication_executor.h"
+#include "mongo/db/repl/replica_set_config.h"
+#include "mongo/db/repl/scatter_gather_algorithm.h"
 
 namespace mongo {
 
@@ -41,12 +43,49 @@ namespace mongo {
 namespace repl {
 
     class ReplicaSetConfig;
-    class MemberHeartbeatData;
+    class ScatterGatherRunner;
 
     class FreshnessChecker {
         MONGO_DISALLOW_COPYING(FreshnessChecker);
     public:
+        class Algorithm : public ScatterGatherAlgorithm {
+        public:
+            Algorithm(OpTime lastOpTimeApplied,
+                      const ReplicaSetConfig& rsConfig,
+                      int selfIndex,
+                      const std::vector<HostAndPort>& targets);
+            virtual ~Algorithm();
+            virtual std::vector<ReplicationExecutor::RemoteCommandRequest> getRequests() const;
+            virtual void processResponse(
+                    const ReplicationExecutor::RemoteCommandRequest& request,
+                    const ResponseStatus& response);
+            virtual bool hasReceivedSufficientResponses() const;
+
+            bool isFreshest() const { return _freshest; }
+            bool isTiedForFreshest() const { return _tied; }
+
+        private:
+            // Number of responses received so far.
+            size_t _actualResponses;
+
+            // Does this node have the latest applied optime of all queriable nodes in the set?
+            bool _freshest;
+
+            // Does this node have the same optime as another queriable node in the set?
+            bool _tied;
+
+            // Last OpTime applied by the caller; used in the Fresh command 
+            const OpTime _lastOpTimeApplied;
+
+            const ReplicaSetConfig _rsConfig;
+
+            const int _selfIndex;
+
+            const std::vector<HostAndPort> _targets;
+        };
+
         FreshnessChecker();
+        virtual ~FreshnessChecker();
 
         /**
          * Begins the process of sending replSetFresh commands to all non-DOWN nodes
@@ -57,13 +96,13 @@ namespace repl {
          * callbacks that it schedules.
          * If this function returns Status::OK(), evh is then guaranteed to be signaled.
          **/
-        Status start(
+        StatusWith<ReplicationExecutor::EventHandle> start(
             ReplicationExecutor* executor,
-            const ReplicationExecutor::EventHandle& evh,
-            const OpTime& lastOpTimeApplied, 
+            const OpTime& lastOpTimeApplied,
             const ReplicaSetConfig& currentConfig,
             int selfIndex,
-            const std::vector<HostAndPort>& hosts);
+            const std::vector<HostAndPort>& targets,
+            const stdx::function<void ()>& onCompletion = stdx::function<void ()>());
 
         /**
          * Returns whether this node is the freshest of all non-DOWN nodes in the set,
@@ -80,40 +119,10 @@ namespace repl {
         long long getOriginalConfigVersion() const;
 
     private:
-        /**
-         * Callback that runs after a replSetFresh command returns.
-         * Adjusts _tied and _freshest flags appropriately, and 
-         * signals completion if we have received the last expected response.
-         */
-        void _onReplSetFreshResponse(const ReplicationExecutor::RemoteCommandCallbackData& cbData);
-
-        /**
-         * Signals _sufficientResponsesReceived event, if it hasn't been already.
-         */
-        void _signalSufficientResponsesReceived(ReplicationExecutor* executor);
-
-        // Event used to signal completion of the FreshnessChecker's commands.
-        ReplicationExecutor::EventHandle _sufficientResponsesReceived;
-
-        // Vector of command callbacks scheduled by start() and
-        // canceled by _onFreshnessCheckComplete().
-        std::vector<ReplicationExecutor::CallbackHandle> _responseCallbacks;
-
-        // Last OpTime applied by the caller; used in the Fresh command 
-        OpTime _lastOpTimeApplied;
-
-        // Number of responses received so far.
-        size_t _actualResponses;
-
-        // Does this node have the latest applied optime of all queriable nodes in the set?
-        bool _freshest;
-
-        // Does this node have the same optime as another queriable node in the set?
-        bool _tied;
-
-        // The version of the config passed to start().
+        boost::scoped_ptr<Algorithm> _algorithm;
+        boost::scoped_ptr<ScatterGatherRunner> _runner;
         long long _originalConfigVersion;
     };
 
-}
-}
+}  // namespace repl
+}  // namespace mongo

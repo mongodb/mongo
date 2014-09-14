@@ -134,12 +134,13 @@ namespace repl {
             ReplicationExecutor* executor,
             const ReplicaSetConfig& currentConfig,
             int selfIndex,
-            const std::vector<HostAndPort>& targets) {
+            const std::vector<HostAndPort>& targets,
+            const stdx::function<void ()>& onCompletion) {
 
         const long long round(executor->nextRandomInt64(std::numeric_limits<int64_t>::max()));
         _algorithm.reset(new Algorithm(currentConfig, selfIndex, targets, round));
         _runner.reset(new ScatterGatherRunner(_algorithm.get()));
-        return _runner->start(executor);
+        return _runner->start(executor, onCompletion);
     }
 
     int ElectCmdRunner::getReceivedVotes() const {

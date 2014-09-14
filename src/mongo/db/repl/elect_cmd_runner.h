@@ -92,7 +92,8 @@ namespace repl {
             ReplicationExecutor* executor,
             const ReplicaSetConfig& currentConfig,
             int selfIndex,
-            const std::vector<HostAndPort>& targets);
+            const std::vector<HostAndPort>& targets,
+            const stdx::function<void ()>& onCompletion = stdx::function<void ()>());
 
         /**
          * Returns the number of received votes.  Only valid to call after

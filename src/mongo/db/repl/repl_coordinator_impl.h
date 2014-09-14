@@ -478,16 +478,14 @@ namespace repl {
          * decides whether to continue election proceedings.
          * finishEvh is an event that is signaled when election is complete.
          **/
-        void _onFreshnessCheckComplete(const ReplicationExecutor::CallbackData& cbData,
-                                       const ReplicationExecutor::EventHandle& finishEvh);
+        void _onFreshnessCheckComplete(const ReplicationExecutor::EventHandle& finishEvh);
 
         /**
          * Callback called when the ElectCmdRunner has completed; checks the results and
          * decides whether to complete the election and change state to primary.
          * finishEvh is an event that is signaled when election is complete.
          **/
-        void _onElectCmdRunnerComplete(const ReplicationExecutor::CallbackData& cbData,
-                                       const ReplicationExecutor::EventHandle& finishEvh);
+        void _onElectCmdRunnerComplete(const ReplicationExecutor::EventHandle& finishEvh);
 
         /**
          * Chooses a new sync source.  Must be scheduled as a callback.
