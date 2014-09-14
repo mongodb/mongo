@@ -195,6 +195,24 @@ __dmsg(WT_DBG *ds, const char *fmt, ...)
 }
 
 /*
+ * __wt_debug_addr_print --
+ *	Print out an address.
+ */
+int
+__wt_debug_addr_print(
+    WT_SESSION_IMPL *session, const uint8_t *addr, size_t addr_size)
+{
+	WT_DECL_ITEM(buf);
+
+	WT_RET(__wt_scr_alloc(session, 128, &buf));
+	fprintf(stderr, "%s\n",
+	    __wt_addr_string(session, addr, addr_size, buf));
+	__wt_scr_free(&buf);
+
+	return (0);
+}
+
+/*
  * __wt_debug_addr --
  *	Read and dump a disk page in debugging mode, using an addr/size pair.
  */
