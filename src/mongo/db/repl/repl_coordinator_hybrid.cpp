@@ -139,7 +139,7 @@ namespace repl {
                                                   const Milliseconds& waitTime,
                                                   const Milliseconds& stepdownTime) {
         Status legacyStatus = _legacy.stepDown(txn, force, waitTime, stepdownTime);
-        Status implStatus = _impl.stepDown(txn, force, waitTime, stepdownTime);
+        //        Status implStatus = _impl.stepDown(txn, force, waitTime, stepdownTime);
         return legacyStatus;
     }
 
