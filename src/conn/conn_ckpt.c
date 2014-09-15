@@ -157,7 +157,7 @@ __wt_checkpoint_server_create(WT_SESSION_IMPL *session, const char *cfg[])
 
 	/* If there is already a server running, shut it down. */
 	if (conn->ckpt_session != NULL)
-		WT_RET(__wt_checkpoint_server_destroy(conn));
+		WT_RET(__wt_checkpoint_server_destroy(session));
 
 	WT_RET(__ckpt_server_config(session, cfg, &start));
 	if (start)
@@ -171,13 +171,13 @@ __wt_checkpoint_server_create(WT_SESSION_IMPL *session, const char *cfg[])
  *	Destroy the checkpoint server thread.
  */
 int
-__wt_checkpoint_server_destroy(WT_CONNECTION_IMPL *conn)
+__wt_checkpoint_server_destroy(WT_SESSION_IMPL *session)
 {
+	WT_CONNECTION_IMPL *conn;
 	WT_DECL_RET;
 	WT_SESSION *wt_session;
-	WT_SESSION_IMPL *session;
 
-	session = conn->default_session;
+	conn = S2C(session);
 
 	F_CLR(conn, WT_CONN_SERVER_CHECKPOINT);
 	if (conn->ckpt_tid_set) {

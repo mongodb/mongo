@@ -306,16 +306,16 @@ err:	if (ncoll != NULL) {
 
 /*
  * __wt_conn_remove_collator --
- *	remove collator added by WT_CONNECTION->add_collator,
- *	only used internally.
+ *	Remove collator added by WT_CONNECTION->add_collator, only used
+ * internally.
  */
 int
-__wt_conn_remove_collator(WT_CONNECTION_IMPL *conn, WT_NAMED_COLLATOR *ncoll)
+__wt_conn_remove_collator(WT_SESSION_IMPL *session, WT_NAMED_COLLATOR *ncoll)
 {
-	WT_SESSION_IMPL *session;
+	WT_CONNECTION_IMPL *conn;
 	WT_DECL_RET;
 
-	session = conn->default_session;
+	conn = S2C(session);
 
 	/* Call any termination method. */
 	if (ncoll->collator->terminate != NULL)
@@ -370,17 +370,17 @@ err:	if (ncomp != NULL) {
 
 /*
  * __wt_conn_remove_compressor --
- *	remove compressor added by WT_CONNECTION->add_compressor,
- *	only used internally.
+ *	remove compressor added by WT_CONNECTION->add_compressor, only used
+ * internally.
  */
 int
 __wt_conn_remove_compressor(
-    WT_CONNECTION_IMPL *conn, WT_NAMED_COMPRESSOR *ncomp)
+    WT_SESSION_IMPL *session, WT_NAMED_COMPRESSOR *ncomp)
 {
-	WT_SESSION_IMPL *session;
+	WT_CONNECTION_IMPL *conn;
 	WT_DECL_RET;
 
-	session = conn->default_session;
+	conn = S2C(session);
 
 	/* Call any termination method. */
 	if (ncomp->compressor->terminate != NULL)
@@ -438,12 +438,12 @@ err:	if (ndsrc != NULL) {
  */
 int
 __wt_conn_remove_data_source(
-    WT_CONNECTION_IMPL *conn, WT_NAMED_DATA_SOURCE *ndsrc)
+    WT_SESSION_IMPL *session, WT_NAMED_DATA_SOURCE *ndsrc)
 {
 	WT_DECL_RET;
-	WT_SESSION_IMPL *session;
+	WT_CONNECTION_IMPL *conn;
 
-	session = conn->default_session;
+	conn = S2C(session);
 
 	/* Call any termination method. */
 	if (ndsrc->dsrc->terminate != NULL)
@@ -494,7 +494,7 @@ __conn_async_flush(WT_CONNECTION *wt_conn)
 
 	conn = (WT_CONNECTION_IMPL *)wt_conn;
 	CONNECTION_API_CALL_NOCONF(conn, session, async_flush);
-	WT_ERR(__wt_async_flush(conn));
+	WT_ERR(__wt_async_flush(session));
 
 err:	API_END_RET_NOTFOUND_MAP(session, ret);
 }
@@ -514,7 +514,7 @@ __conn_async_new_op(WT_CONNECTION *wt_conn, const char *uri, const char *config,
 
 	conn = (WT_CONNECTION_IMPL *)wt_conn;
 	CONNECTION_API_CALL(conn, session, async_new_op, config, cfg);
-	WT_ERR(__wt_async_new_op(conn, uri, config, cfg, callback, &op));
+	WT_ERR(__wt_async_new_op(session, uri, config, cfg, callback, &op));
 
 	*asyncopp = &op->iface;
 
