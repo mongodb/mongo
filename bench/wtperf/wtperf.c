@@ -2106,15 +2106,29 @@ err:	config_free(cfg);
 
 static int
 start_threads(CONFIG *cfg,
-    WORKLOAD *workp, CONFIG_THREAD *thread, u_int num, void *(*func)(void *))
+    WORKLOAD *workp, CONFIG_THREAD *base, u_int num, void *(*func)(void *))
 {
-	u_int i;
+	CONFIG_THREAD *thread;
+	u_int i, j;
 	int ret;
 
-	for (i = 0; i < num; ++i, ++thread) {
+	/* Initialize the threads. */
+	for (i = 0, thread = base; i < num; ++i, ++thread) {
 		thread->cfg = cfg;
-		__wt_random_init(thread->rnd);
 		thread->workload = workp;
+
+		/*
+		 * We don't want the threads executing in lock-step, move each
+		 * new RNG state further along in the sequence.
+		 */
+		if (i == 0)
+			__wt_random_init(thread->rnd);
+		else {
+			thread->rnd[0] = (thread - 1)->rnd[0];
+			thread->rnd[1] = (thread - 1)->rnd[1];
+		}
+		for (j = 0; j < 1000; ++j)
+			(void)__wt_random(thread->rnd);
 
 		/*
 		 * Every thread gets a key/data buffer because we don't bother
@@ -2142,13 +2156,16 @@ start_threads(CONFIG *cfg,
 		thread->update.min_latency = UINT32_MAX;
 		thread->ckpt.max_latency = thread->insert.max_latency =
 		thread->read.max_latency = thread->update.max_latency = 0;
+	}
 
+	/* Start the threads. */
+	for (i = 0, thread = base; i < num; ++i, ++thread)
 		if ((ret = pthread_create(
 		    &thread->handle, NULL, func, thread)) != 0) {
 			lprintf(cfg, ret, 0, "Error creating thread");
 			return (ret);
 		}
-	}
+
 	return (0);
 }
 
