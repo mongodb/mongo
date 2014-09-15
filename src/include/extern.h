@@ -1565,7 +1565,8 @@ extern uint32_t __wt_nlpo2(uint32_t v);
 extern uint32_t __wt_log2_int(uint32_t n);
 extern int __wt_ispo2(uint32_t v);
 extern uint32_t __wt_rduppo2(uint32_t n, uint32_t po2);
-extern uint32_t __wt_random(void);
+extern void __wt_random_init(uint32_t *rnd);
+extern uint32_t __wt_random(uint32_t *rnd);
 extern int __wt_buf_grow_worker(WT_SESSION_IMPL *session,
     WT_ITEM *buf,
     size_t size);

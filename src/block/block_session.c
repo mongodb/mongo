@@ -29,7 +29,7 @@ __block_ext_alloc(WT_SESSION_IMPL *session, WT_EXT **extp)
 
 	u_int skipdepth;
 
-	skipdepth = __wt_skip_choose_depth();
+	skipdepth = __wt_skip_choose_depth(session);
 	WT_RET(__wt_calloc(session, 1,
 	    sizeof(WT_EXT) + skipdepth * 2 * sizeof(WT_EXT *), &ext));
 	ext->depth = (uint8_t)skipdepth;

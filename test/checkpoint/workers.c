@@ -169,10 +169,13 @@ real_worker(void)
 {
 	WT_CURSOR **cursors;
 	WT_SESSION *session;
+	uint32_t rnd[2];
 	u_int i, keyno;
 	int j, ret, t_ret;
 
 	ret = t_ret = 0;
+
+	__wt_random_init(rnd);
 
 	if ((cursors = calloc(
 	    (size_t)(g.ntables), sizeof(WT_CURSOR *))) == NULL)
@@ -197,7 +200,7 @@ real_worker(void)
 			    "real_worker:begin_transaction", ret, 1);
 			goto err;
 		}
-		keyno = __wt_random() % g.nkeys + 1;
+		keyno = __wt_random(rnd) % g.nkeys + 1;
 		for (j = 0; j < g.ntables; j++) {
 			if ((ret = worker_op(cursors[j], keyno, i)) != 0)
 				break;
