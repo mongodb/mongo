@@ -185,15 +185,14 @@ namespace mongo {
             return Status(ErrorCodes::KeyTooLong, msg);
         }
 
-        // TODO optimization: save the iterator from the dup-check to speed up insert
-        if (!dupsAllowed && isDup(txn, key, loc))
-            return dupKeyError(key);
-
         WiredTigerSession &swrap = WiredTigerRecoveryUnit::Get(txn).GetSession();
         WiredTigerCursor curwrap(GetURI(), swrap);
         WT_CURSOR *c = curwrap.Get();
-        const BSONObj& finalKey = stripFieldNames( key );
-        c->set_key(c, _toItem(finalKey).Get(), WiredTigerRecordStore::_makeKey(loc));
+
+        if (!dupsAllowed && isDup(c, key, loc))
+            return dupKeyError(key);
+
+        c->set_key(c, _toItem(key).Get(), WiredTigerRecordStore::_makeKey(loc));
         c->set_value(c, &emptyItem);
         int ret = c->insert(c);
         invariant(ret == 0);
@@ -208,9 +207,8 @@ namespace mongo {
         WiredTigerSession &swrap = WiredTigerRecoveryUnit::Get(txn).GetSession();
         WiredTigerCursor curwrap(GetURI(), swrap);
         WT_CURSOR *c = curwrap.Get();
-        const BSONObj& finalKey = stripFieldNames( key );
         // TODO: can we avoid a search?
-        c->set_key(c, _toItem(finalKey).Get(), WiredTigerRecordStore::_makeKey(loc));
+        c->set_key(c, _toItem(key).Get(), WiredTigerRecordStore::_makeKey(loc));
         int ret = c->search(c);
         if (ret == WT_NOTFOUND) {
             return false;
@@ -238,7 +236,10 @@ namespace mongo {
     Status WiredTigerIndex::dupKeyCheck(
             OperationContext* txn, const BSONObj& key, const DiskLoc& loc) {
         invariant(!hasFieldNames(key));
-        if (isDup(txn, key, loc))
+        WiredTigerSession &swrap = WiredTigerRecoveryUnit::Get(txn).GetSession();
+        WiredTigerCursor curwrap(GetURI(), swrap);
+        WT_CURSOR *c = curwrap.Get();
+        if (isDup(c, key, loc))
             return dupKeyError(key);
         return Status::OK();
     }
@@ -263,10 +264,18 @@ namespace mongo {
     
     long long WiredTigerIndex::getSpaceUsedBytes( OperationContext* txn ) const { return 1; }
 
-    bool WiredTigerIndex::isDup(OperationContext *txn, const BSONObj& key, DiskLoc loc) {
-        boost::scoped_ptr<SortedDataInterface::Cursor> cursor( newCursor( txn, 1 ) );
+    bool WiredTigerIndex::isDup(WT_CURSOR *c, const BSONObj& key, DiskLoc loc) {
+        bool found = _search(c, key, DiskLoc(), true);
+        if (!found)
+            return false;
 
-        return cursor->locate(key, DiskLoc()) && cursor->getDiskLoc() != loc;
+        // Now check that we found a matching index key for a different record
+        WT_ITEM keyItem;
+        uint64_t locVal;
+        int ret = c->get_key(c, &keyItem, &locVal);
+        invariant(ret == 0);
+        return key == BSONObj(static_cast<const char *>(keyItem.data)) &&
+            loc != WiredTigerRecordStore::_fromKey(locVal);
     }
 
     /* Cursor implementation */
@@ -288,44 +297,28 @@ namespace mongo {
         invariant(!"aboutToDeleteBucket should not be called");
     }
 
-    bool WiredTigerIndex::IndexCursor::_locate(const BSONObj &key, const DiskLoc& loc) {
-        WT_CURSOR *c = _cursor.Get();
+    bool WiredTigerIndex::_search(WT_CURSOR *c, const BSONObj &key, const DiskLoc& loc, bool forward) {
         DiskLoc searchLoc = loc;
         int cmp = -1, ret;
         /* Reverse cursors should start on the last matching key. */
         if (loc.isNull())
-            searchLoc = _forward ? DiskLoc(0, 0) : DiskLoc(INT_MAX, INT_MAX);
+            searchLoc = forward ? DiskLoc(0, 0) : DiskLoc(INT_MAX, INT_MAX);
         c->set_key(c, _toItem(key).Get(), WiredTigerRecordStore::_makeKey(searchLoc));
         ret = c->search_near(c, &cmp);
 
-#if 0
-        if (ret == 0) {
-            WT_ITEM keyItem;
-            uint64_t locVal;
-            ret = c->get_key(c, &keyItem, &locVal);
-            BSONObj foundKey(static_cast<const char *>(keyItem.data));
-            DiskLoc foundLoc = WiredTigerRecordStore::_fromKey(locVal);
-            fprintf(stderr, "_locate search_near(%s:%s) -> %s:%s, cmp == %d, forward = %d\n", key.toString().c_str(), searchLoc.toString().c_str(), foundKey.toString().c_str(), foundLoc.toString().c_str(), cmp, _forward);
-        } else {
-            fprintf(stderr, "_locate search_near(%s:%s) returned == %d, forward = %d\n", key.toString().c_str(), searchLoc.toString().c_str(), ret, _forward);
-        }
-#endif
-
         // Make sure we land on a matching key
-        if (ret == 0 && (_forward ? cmp < 0 : cmp > 0))
-            ret = _forward ? c->next(c) : c->prev(c);
-        if (ret == WT_NOTFOUND) {
-            _eof = true;
-            return false;
-        }
-        invariant(ret == 0);
-        _eof = false;
+        if (ret == 0 && (forward ? cmp < 0 : cmp > 0))
+            ret = forward ? c->next(c) : c->prev(c);
+        invariant(ret == 0 || ret == WT_NOTFOUND);
+        return (ret == 0);
+    }
 
-        WT_ITEM keyItem;
-        uint64_t locVal;
-        ret = c->get_key(c, &keyItem, &locVal);
-        invariant(ret == 0);
-        return key == BSONObj(static_cast<const char *>(keyItem.data));
+    bool WiredTigerIndex::IndexCursor::_locate(const BSONObj &key, const DiskLoc& loc) {
+        WT_CURSOR *c = _cursor.Get();
+        _eof = !WiredTigerIndex::_search(c, key, loc, _forward);
+        if (_eof)
+            return false;
+        return key == getKey();
     }
 
     bool WiredTigerIndex::IndexCursor::locate(const BSONObj &key, const DiskLoc& loc) {
@@ -340,7 +333,7 @@ namespace mongo {
             return !isEOF();
         }
 
-        const BSONObj& finalKey = stripFieldNames( key );
+        const BSONObj finalKey = stripFieldNames(key);
         return _locate(finalKey, loc);
    }
 
