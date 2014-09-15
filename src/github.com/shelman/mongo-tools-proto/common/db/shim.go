@@ -94,7 +94,7 @@ func (cds *CursorDocSource) Next(out interface{}) bool {
 
 func (cds *CursorDocSource) Close() error {
 	defer cds.Session.Close()
-	return cds.Close()
+	return cds.Iter.Close()
 }
 
 func (cds *CursorDocSource) Err() error {
