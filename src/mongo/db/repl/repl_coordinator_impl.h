@@ -151,6 +151,8 @@ namespace repl {
 
         virtual Status setMaintenanceMode(OperationContext* txn, bool activate);
 
+        virtual bool getMaintenanceMode();
+
         virtual Status processReplSetSyncFrom(const HostAndPort& target,
                                               BSONObjBuilder* resultObj);
 
@@ -323,6 +325,13 @@ namespace repl {
         void _setMaintenanceMode_helper(const ReplicationExecutor::CallbackData& cbData,
                                         bool activate,
                                         Status* result);
+
+        /**
+         * Helper method for retrieving maintenance mode.  Scheduled by getMaintenanceMode() to run
+         * in the replication executor thread.
+         */
+        void _getMaintenanceMode_helper(const ReplicationExecutor::CallbackData& cbData,
+                                        bool* maintenanceMode);
 
         /**
          * Bottom half of _setCurrentMemberState_forTest.

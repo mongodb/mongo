@@ -256,6 +256,10 @@ namespace repl {
          * have called it again, passing in false.
          */
         bool setMaintenanceMode(OperationContext* txn, const bool inc);
+        bool getMaintenanceMode() {
+            lock rsLock( this );
+            return _maintenanceMode > 0;
+        }
 
     private:
         Member* head() const { return _members.head(); }
@@ -319,7 +323,7 @@ namespace repl {
         threadpool::ThreadPool& getWriterPool() { return _writerPool; }
 
         const ReplSetConfig::MemberCfg& myConfig() const { return _config; }
-        bool tryToGoLiveAsASecondary(OperationContext* txn, OpTime&); // readlocks
+        void tryToGoLiveAsASecondary(OperationContext* txn);
         void syncThread();
         const OpTime lastOtherOpTime() const;
         /**

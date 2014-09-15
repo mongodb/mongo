@@ -256,6 +256,17 @@ namespace repl {
         return legacyResponse;
     }
 
+    bool HybridReplicationCoordinator::getMaintenanceMode() {
+        bool legacyMode(_legacy.getMaintenanceMode());
+        bool implMode(_impl.getMaintenanceMode());
+        if (legacyMode != implMode) {
+            severe() << "maintenance mode mismatch between legacy and impl: " << 
+                legacyMode << " and " << implMode;
+            fassertFailed(18810);
+        }
+        return implMode;
+    }
+
     Status HybridReplicationCoordinator::processHeartbeat(const ReplSetHeartbeatArgs& args,
                                                           ReplSetHeartbeatResponse* response) {
         Status legacyStatus = _legacy.processHeartbeat(args, response);

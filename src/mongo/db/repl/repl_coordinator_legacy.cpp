@@ -531,6 +531,10 @@ namespace {
         return Status::OK();
     }
 
+    bool LegacyReplicationCoordinator::getMaintenanceMode() {
+        return theReplSet->getMaintenanceMode();
+    }
+
     Status LegacyReplicationCoordinator::processHeartbeat(const ReplSetHeartbeatArgs& args,
                                                           ReplSetHeartbeatResponse* response) {
         if (args.getProtocolVersion() != 1) {

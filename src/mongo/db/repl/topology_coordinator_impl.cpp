@@ -1309,8 +1309,8 @@ namespace {
             _currentConfig.getMemberAt(_selfIndex).isElectable()) {
 
             // If the new config describes a one-node replica set, we're the one member, and
-            // we're electable, we must be the leader.
-            _role = Role::leader;
+            // we're electable, we must transition to candidate, in leiu of heartbeats.
+            _role = Role::candidate;
         }
 
     }
@@ -1523,7 +1523,8 @@ namespace {
     }
 
     void TopologyCoordinatorImpl::setFollowerMode(MemberState::MS newMode) {
-        invariant(_role == Role::follower);
+        // TODO(emilkie): Uncomment once legacy StateBox is replaced with replcoord's MemberState.
+        //invariant(_role == Role::follower);
         switch (newMode) {
         case MemberState::RS_RECOVERING:
         case MemberState::RS_ROLLBACK:

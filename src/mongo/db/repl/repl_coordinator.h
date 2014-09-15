@@ -321,6 +321,11 @@ namespace repl {
         virtual Status setMaintenanceMode(OperationContext* txn, bool activate) = 0;
 
         /**
+         * Retrieves the current count of maintenanceMode and returns 'true' if greater than 0.
+         */
+        virtual bool getMaintenanceMode() = 0;
+
+        /**
          * Handles an incoming replSetSyncFrom command. Adds BSON to 'result'
          * returns Status::OK if the sync target could be set and an ErrorCode indicating why it
          * couldn't otherwise.

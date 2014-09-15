@@ -482,7 +482,6 @@ namespace repl {
         // we're up to
         BackgroundSync::notify();
 
-        changeState(MemberState::RS_RECOVERING);
         sethbmsg("initial sync done",0);
     }
 

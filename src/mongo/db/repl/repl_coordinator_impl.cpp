@@ -36,6 +36,7 @@
 #include <boost/thread.hpp>
 
 #include "mongo/base/status.h"
+#include "mongo/db/global_optime.h"
 #include "mongo/db/operation_context_noop.h"
 #include "mongo/db/repl/check_quorum_for_config_change.h"
 #include "mongo/db/repl/handshake_args.h"
@@ -923,6 +924,30 @@ namespace {
         result->append("config", _rsConfig.toBSON());
     }
 
+    bool ReplicationCoordinatorImpl::getMaintenanceMode() {
+        bool maintenanceMode(false);
+        CBHStatus cbh = _replExecutor.scheduleWork(
+            stdx::bind(&ReplicationCoordinatorImpl::_getMaintenanceMode_helper,
+                       this,
+                       stdx::placeholders::_1,
+                       &maintenanceMode));
+        if (cbh.getStatus() == ErrorCodes::ShutdownInProgress) {
+            return false;
+        }
+        fassert(18811, cbh.getStatus());
+        _replExecutor.wait(cbh.getValue());
+        return maintenanceMode;
+    }
+
+    void ReplicationCoordinatorImpl::_getMaintenanceMode_helper(
+            const ReplicationExecutor::CallbackData& cbData,
+            bool* maintenanceMode) {
+        if (cbData.status == ErrorCodes::CallbackCanceled) {
+            return;
+        }
+        *maintenanceMode = _topCoord->getMaintenanceCount() > 0;
+    }
+
     Status ReplicationCoordinatorImpl::setMaintenanceMode(OperationContext* txn, bool activate) {
         Status result(ErrorCodes::InternalError, "didn't set status in _setMaintenanceMode_helper");
         CBHStatus cbh = _replExecutor.scheduleWorkWithGlobalExclusiveLock(
@@ -1233,8 +1258,21 @@ namespace {
                  myIndex,
                  _replExecutor.now(),
                  lastOpApplied);
-         _currentState = _topCoord->getMemberState();
 
+         if (newConfig.getNumMembers() == 1 &&
+             myIndex == 0 &&
+             newConfig.getMemberAt(myIndex).isElectable()) {
+             // If the new config describes a one-node replica set, we're the one member, and
+             // we're electable, we must short-circuit the election.  Elections are normally
+             // triggered by incoming heartbeats, but with a one-node set there are no
+             // heartbeats.
+             _topCoord->processWinElection(_replExecutor.now(),
+                                           OID::gen(),
+                                           lastOpApplied,
+                                           getNextGlobalOptime());
+         }
+
+         _currentState = _topCoord->getMemberState();
          // Ensure that there's an entry in the _slaveInfoMap for ourself
          _slaveInfoMap[_getMyRID_inlock()].memberID = _rsConfig.getMemberAt(myIndex).getId();
          _slaveInfoMap[_getMyRID_inlock()].hostAndPort =

@@ -503,7 +503,7 @@ namespace {
             }
         }
 
-        changeState(MemberState::RS_STARTUP2);
+        getGlobalReplicationCoordinator()->setFollowerMode(MemberState::RS_STARTUP2);
         startThreads();
         newReplUp(); // oplog.cpp
     }
@@ -589,6 +589,11 @@ namespace {
                 return false; 
             }
             uassert(13302, "replSet error self appears twice in the repl set configuration", me<=1);
+
+            if (state().removed()) {
+                // If we were removed and have now been added back in, switch state.
+                changeState(MemberState::RS_RECOVERING);
+            }
 
             // if we found different members that the original config, reload everything
             if (reconf && config().members.size() != nfound)

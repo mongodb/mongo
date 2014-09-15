@@ -114,6 +114,8 @@ namespace repl {
 
         virtual Status setMaintenanceMode(OperationContext* txn, bool activate);
 
+        virtual bool getMaintenanceMode();
+
         virtual Status processReplSetSyncFrom(const HostAndPort& target,
                                               BSONObjBuilder* resultObj);
 

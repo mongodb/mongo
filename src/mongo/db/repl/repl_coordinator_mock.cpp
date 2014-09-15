@@ -164,6 +164,10 @@ namespace repl {
         return Status::OK();
     }
 
+    bool ReplicationCoordinatorMock::getMaintenanceMode() {
+        return false;
+    }
+
     Status ReplicationCoordinatorMock::processReplSetSyncFrom(const HostAndPort& target,
                                                               BSONObjBuilder* resultObj) {
         // TODO

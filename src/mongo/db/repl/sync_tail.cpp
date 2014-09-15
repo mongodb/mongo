@@ -318,11 +318,10 @@ namespace repl {
                     // can we become secondary?
                     // we have to check this before calling mgr, as we must be a secondary to
                     // become primary
-                    if (!theReplSet->isSecondary()) {
-                        OpTime minvalid;
-                        theReplSet->tryToGoLiveAsASecondary(&txn, minvalid);
-                    }
+                    theReplSet->tryToGoLiveAsASecondary(&txn);
 
+                    // TODO(emilkie): This can be removed once we switch over from legacy;
+                    // this code is what moves 1-node sets to PRIMARY state.
                     // normally msgCheckNewState gets called periodically, but in a single node
                     // replset there are no heartbeat threads, so we do it here to be sure.  this is
                     // relevant if the singleton member has done a stepDown() and needs to come back
