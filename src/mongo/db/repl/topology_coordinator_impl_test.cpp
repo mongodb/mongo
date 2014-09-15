@@ -1459,7 +1459,7 @@ namespace {
         ReplicationExecutor::CallbackData cbData;
     };
 
-    TEST_F(PrepareElectResponseTest, IncorrectReplSetName) {
+    TEST_F(PrepareElectResponseTest, ElectResponseIncorrectReplSetName) {
         // Test with incorrect replset name
         ReplicationCoordinator::ReplSetElectArgs args;
         args.set = "fakeset";
@@ -1488,7 +1488,7 @@ namespace {
         ASSERT_EQUALS(round, response2["round"].OID());
     }
 
-    TEST_F(PrepareElectResponseTest, OurConfigStale) {
+    TEST_F(PrepareElectResponseTest, ElectResponseOurConfigStale) {
         // Test with us having a stale config version
         ReplicationCoordinator::ReplSetElectArgs args;
         args.set = "rs0";
@@ -1516,7 +1516,7 @@ namespace {
         ASSERT_EQUALS(round, response2["round"].OID());
     }
 
-    TEST_F(PrepareElectResponseTest, TheirConfigStale) {
+    TEST_F(PrepareElectResponseTest, ElectResponseTheirConfigStale) {
         // Test with them having a stale config version
         ReplicationCoordinator::ReplSetElectArgs args;
         args.set = "rs0";
@@ -1544,7 +1544,7 @@ namespace {
         ASSERT_EQUALS(round, response2["round"].OID());
     }
 
-    TEST_F(PrepareElectResponseTest, NonExistentNode) {
+    TEST_F(PrepareElectResponseTest, ElectResponseNonExistentNode) {
         // Test with a non-existent node
         ReplicationCoordinator::ReplSetElectArgs args;
         args.set = "rs0";
@@ -1572,7 +1572,7 @@ namespace {
         ASSERT_EQUALS(round, response2["round"].OID());
     }
 
-    TEST_F(PrepareElectResponseTest, WeArePrimary) {
+    TEST_F(PrepareElectResponseTest, ElectResponseWeArePrimary) {
         // Test when we are already primary
         ReplicationCoordinator::ReplSetElectArgs args;
         args.set = "rs0";
@@ -1602,7 +1602,7 @@ namespace {
         ASSERT_EQUALS(round, response2["round"].OID());
     }
 
-    TEST_F(PrepareElectResponseTest, SomeoneElseIsPrimary) {
+    TEST_F(PrepareElectResponseTest, ElectResponseSomeoneElseIsPrimary) {
         // Test when someone else is already primary
         ReplicationCoordinator::ReplSetElectArgs args;
         args.set = "rs0";
@@ -1631,7 +1631,7 @@ namespace {
         ASSERT_EQUALS(round, response2["round"].OID());
     }
 
-    TEST_F(PrepareElectResponseTest, NotHighestPriority) {
+    TEST_F(PrepareElectResponseTest, ElectResponseNotHighestPriority) {
         // Test trying to elect someone who isn't the highest priority node
         ReplicationCoordinator::ReplSetElectArgs args;
         args.set = "rs0";
@@ -1661,7 +1661,7 @@ namespace {
         ASSERT_EQUALS(round, response2["round"].OID());
     }
 
-    TEST_F(PrepareElectResponseTest, ValidVotes) {
+    TEST_F(PrepareElectResponseTest, ElectResponseValidVotes) {
         // Test a valid vote
         ReplicationCoordinator::ReplSetElectArgs args;
         args.set = "rs0";
