@@ -268,6 +268,7 @@ namespace mongo {
     }
 
     void AndSortedStage::restoreState(OperationContext* opCtx) {
+        _txn = opCtx;
         ++_commonStats.unyields;
 
         for (size_t i = 0; i < _children.size(); ++i) {

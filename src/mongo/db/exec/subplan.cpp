@@ -438,6 +438,7 @@ namespace mongo {
     }
 
     void SubplanStage::restoreState(OperationContext* opCtx) {
+        _txn = opCtx;
         ++_commonStats.unyields;
         if (_killed) {
             return;

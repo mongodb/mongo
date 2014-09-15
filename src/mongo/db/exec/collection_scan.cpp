@@ -156,6 +156,7 @@ namespace mongo {
     }
 
     void CollectionScan::restoreState(OperationContext* opCtx) {
+        _txn = opCtx;
         ++_commonStats.unyields;
         if (NULL != _iter) {
             if (!_iter->restoreState(opCtx)) {
