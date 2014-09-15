@@ -102,7 +102,7 @@ namespace mongo {
         request->reduceCode = reduce._asCode();
 
         if (reduce.type() == CodeWScope) {
-            request->reduceScope = reduce.codeWScopeScopeDataUnsafe();
+            request->reduceScope = reduce.codeWScopeObject().getOwned();
         }
 
         if (p["initial"].type() != Object) {
