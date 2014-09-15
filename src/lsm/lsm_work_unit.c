@@ -67,12 +67,11 @@ err:	WT_TRET(__wt_lsm_tree_unlock(session, lsm_tree));
  */
 int
 __wt_lsm_get_chunk_to_flush(WT_SESSION_IMPL *session,
-    WT_LSM_TREE *lsm_tree, int force, int *last, WT_LSM_CHUNK **chunkp)
+    WT_LSM_TREE *lsm_tree, int force, WT_LSM_CHUNK **chunkp)
 {
 	u_int i, end;
 
 	*chunkp = NULL;
-	*last = 0;
 
 	WT_ASSERT(session, lsm_tree->queue_ref > 0);
 	WT_RET(__wt_lsm_tree_lock(session, lsm_tree, 0));
@@ -93,12 +92,6 @@ __wt_lsm_get_chunk_to_flush(WT_SESSION_IMPL *session,
 			    force ? " w/ force" : "", i, end - 1,
 			    lsm_tree->chunk[i]->uri));
 			*chunkp = lsm_tree->chunk[i];
-			/*
-			 * Let the caller know if this is the last chunk we
-			 * could have selected or an earlier one.
-			 */
-			if (i == end - 1)
-				*last = 1;
 			break;
 		}
 	}
