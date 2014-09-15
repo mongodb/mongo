@@ -1055,9 +1055,6 @@ __wt_lsm_compact(WT_SESSION_IMPL *session, const char *name, int *skip)
 	    WT_LSM_TREE_COMPACT_FLUSH | WT_LSM_TREE_COMPACTING))
 		goto err;
 
-	flushing = 1;
-	F_SET(lsm_tree, WT_LSM_TREE_COMPACT_FLUSH);
-
 	/*
 	 * Set the switch transaction on the current chunk, if it
 	 * hasn't been set before.  This prevents further writes, so it
@@ -1078,14 +1075,21 @@ __wt_lsm_compact(WT_SESSION_IMPL *session, const char *name, int *skip)
 	locked = 0;
 	WT_ERR(__wt_lsm_tree_unlock(session, lsm_tree));
 
-	if (chunk != NULL)
+	if (chunk != NULL) {
 		WT_ERR(__wt_verbose(session, WT_VERB_LSM,
 		    "Compact force flush %s flags 0x%" PRIx32
 		    " chunk %u flags 0x%"
 		    PRIx32, name, lsm_tree->flags, chunk->id, chunk->flags));
-	/* Make sure the in-memory chunk gets flushed but not switched.  */
-	WT_ERR(__wt_lsm_manager_push_entry(session,
-	    WT_LSM_WORK_FLUSH | WT_LSM_WORK_FORCE, lsm_tree));
+		flushing = 1;
+		F_SET(lsm_tree, WT_LSM_TREE_COMPACT_FLUSH);
+		/*
+		 * Make sure the in-memory chunk gets flushed do not push a
+		 * switch, because we don't want to create a new in-memory
+		 * chunk if the tree is being used read-only now.
+		 */
+		WT_ERR(__wt_lsm_manager_push_entry(session,
+		    WT_LSM_WORK_FLUSH | WT_LSM_WORK_FORCE, lsm_tree));
+	}
 
 	/* Wait for the work unit queues to drain. */
 	while (F_ISSET(lsm_tree, WT_LSM_TREE_ACTIVE)) {
@@ -1094,30 +1098,29 @@ __wt_lsm_compact(WT_SESSION_IMPL *session, const char *name, int *skip)
 		 * Continue to push forced flushes until the chunk is on disk.
 		 * Once it is on disk move to the compacting phase.
 		 */
-		if (flushing && !F_ISSET(lsm_tree, WT_LSM_TREE_COMPACT_FLUSH)) {
-			if (chunk != NULL &&
-			    !F_ISSET(chunk, WT_LSM_CHUNK_ONDISK)) {
-				WT_ERR(__wt_verbose(session, WT_VERB_LSM,
-				    "Compact flush retry %s chunk %u",
-				    name, chunk->id));
-				F_SET(lsm_tree, WT_LSM_TREE_COMPACT_FLUSH);
-				WT_ERR(__wt_lsm_manager_push_entry(session,
-				    WT_LSM_WORK_FLUSH | WT_LSM_WORK_FORCE,
-				    lsm_tree));
-			} else {
-				if (ref) {
-					WT_ASSERT(session, chunk != NULL);
-					WT_ERR(__wt_verbose(session,
-					    WT_VERB_LSM,
-					    "Compact flush done %s chunk %u",
-					    name, chunk->id));
-					(void)WT_ATOMIC_SUB(chunk->refcnt, 1);
-				}
-				flushing = ref = 0;
-				compacting = 1;
-				F_SET(lsm_tree, WT_LSM_TREE_COMPACTING);
-			}
+		if (flushing &&
+		    F_ISSET(lsm_tree, WT_LSM_TREE_COMPACT_FLUSH) &&
+		    !F_ISSET(chunk, WT_LSM_CHUNK_ONDISK)) {
+			WT_ERR(__wt_verbose(session, WT_VERB_LSM,
+			    "Compact flush retry %s chunk %u",
+			    name, chunk->id));
+			F_SET(lsm_tree, WT_LSM_TREE_COMPACT_FLUSH);
+			WT_ERR(__wt_lsm_manager_push_entry(session,
+			    WT_LSM_WORK_FLUSH | WT_LSM_WORK_FORCE, lsm_tree));
 		}
+		/* Start merges when the tree has cleared the flush flag */
+		if (flushing && !F_ISSET(lsm_tree, WT_LSM_TREE_COMPACT_FLUSH)) {
+			WT_ASSERT(session, chunk != NULL);
+			WT_ERR(__wt_verbose(session,
+			    WT_VERB_LSM,
+			    "Compact flush done %s chunk %u",
+			    name, chunk->id));
+			(void)WT_ATOMIC_SUB(chunk->refcnt, 1);
+			flushing = ref = 0;
+			compacting = 1;
+			F_SET(lsm_tree, WT_LSM_TREE_COMPACTING);
+		}
+
 		/*
 		 * The compacting flag is cleared when no merges can be done.
 		 * Ensure that we push through some aggressive merges before
