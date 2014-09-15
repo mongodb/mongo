@@ -273,6 +273,7 @@ namespace mongo {
     }
 
     void NearStage::restoreState(OperationContext* opCtx) {
+        _txn = opCtx;
         ++_stats->common.unyields;
         if (_nextInterval) {
             _nextInterval->covering->restoreState(opCtx);

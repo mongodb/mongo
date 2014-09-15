@@ -135,6 +135,7 @@ namespace mongo {
     }
 
     void IDHackStage::restoreState(OperationContext* opCtx) {
+        _txn = opCtx;
         ++_commonStats.unyields;
     }
 

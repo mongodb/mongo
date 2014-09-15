@@ -412,6 +412,7 @@ namespace mongo {
     }
 
     void MultiPlanStage::restoreState(OperationContext* opCtx) {
+        _txn = opCtx;
         if (_failure) return;
 
         // this logic is from multi_plan_runner

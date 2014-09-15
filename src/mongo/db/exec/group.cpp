@@ -230,6 +230,7 @@ namespace mongo {
     }
 
     void GroupStage::restoreState(OperationContext* opCtx) {
+        _txn = opCtx;
         ++_commonStats.unyields;
         _child->restoreState(opCtx);
         return;

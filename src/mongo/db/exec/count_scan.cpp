@@ -155,6 +155,7 @@ namespace mongo {
     }
 
     void CountScan::restoreState(OperationContext* opCtx) {
+        _txn = opCtx;
         ++_commonStats.unyields;
         if (_hitEnd || (NULL == _btreeCursor.get())) { return; }
 
