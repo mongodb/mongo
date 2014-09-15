@@ -1256,6 +1256,10 @@ namespace {
         _stepDownUntil = newTime;
     }
 
+    int TopologyCoordinatorImpl::getCurrentPrimaryIndex() const {
+        return _currentPrimaryIndex;
+    }
+
     Date_t TopologyCoordinatorImpl::getStepDownTime() const {
         return _stepDownUntil;
     }
