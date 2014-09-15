@@ -1592,6 +1592,7 @@ namespace {
         args.set = "fakeset";
         args.round = round;
         args.cfgver = 10;
+        args.whoid = 1;
 
         BSONObjBuilder responseBuilder;
         Status result = Status(ErrorCodes::InternalError, "status not set by prepareElectResponse");
@@ -1621,6 +1622,7 @@ namespace {
         args.set = "rs0";
         args.round = round;
         args.cfgver = 20;
+        args.whoid = 1;
 
         BSONObjBuilder responseBuilder;
         Status result = Status(ErrorCodes::InternalError, "status not set by prepareElectResponse");
@@ -1649,6 +1651,7 @@ namespace {
         args.set = "rs0";
         args.round = round;
         args.cfgver = 5;
+        args.whoid = 1;
 
         BSONObjBuilder responseBuilder;
         Status result = Status(ErrorCodes::InternalError, "status not set by prepareElectResponse");
