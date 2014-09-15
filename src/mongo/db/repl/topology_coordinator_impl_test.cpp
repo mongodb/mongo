@@ -688,13 +688,14 @@ namespace {
         ASSERT_EQUALS(ErrorCodes::ReplicaSetNotFound, status0);
         ASSERT_TRUE(responseBuilder0.obj().isEmpty());
 
+        heartbeatFromMember(HostAndPort("h1"), "rs0", MemberState::RS_SECONDARY, ourOpTime);
 
-        // Test with non-existent node.
+        // Test with old config version
         args.setName = "rs0";
-        args.cfgver = 5; // stale config
-        args.id = 0;
-        args.who = HostAndPort("fakenode");
-        args.opTime = staleOpTime;
+        args.cfgver = 5;
+        args.id = 20;
+        args.who = HostAndPort("h1");
+        args.opTime = ourOpTime;
 
         BSONObjBuilder responseBuilder1;
         Status status1 = internalErrorStatus;
@@ -704,36 +705,30 @@ namespace {
         ASSERT_EQUALS("config version stale", response1["info"].String());
         ASSERT_EQUALS(ourOpTime, OpTime(response1["opTime"].timestampValue()));
         ASSERT_TRUE(response1["fresher"].Bool());
-        ASSERT_TRUE(response1["veto"].Bool());
-        ASSERT_EQUALS("replSet couldn't find member with id 0", response1["errmsg"].String());
+        ASSERT_FALSE(response1["veto"].Bool());
+        ASSERT_FALSE(response1.hasField("errmsg"));
 
-
-        // Test when we are primary and target node is stale.
-        args.id = 20;
+        // Test with non-existent node.
         args.cfgver = 10;
-        args.who = HostAndPort("h1");
-        args.opTime = ourOpTime;
-
-        heartbeatFromMember(HostAndPort("h1"), "rs0", MemberState::RS_SECONDARY, staleOpTime);
-        makeSelfPrimary();
+        args.id = 0;
+        args.who = HostAndPort("fakenode");
 
         BSONObjBuilder responseBuilder2;
         Status status2 = internalErrorStatus;
         getTopoCoord().prepareFreshResponse(cbData(), args, ourOpTime, &responseBuilder2, &status2);
         ASSERT_OK(status2);
         BSONObj response2 = responseBuilder2.obj();
-        ASSERT_FALSE(response2.hasField("info"));
         ASSERT_EQUALS(ourOpTime, OpTime(response2["opTime"].timestampValue()));
         ASSERT_FALSE(response2["fresher"].Bool());
         ASSERT_TRUE(response2["veto"].Bool());
-        ASSERT_EQUALS("I am already primary, h1:27017 can try again once I've stepped down",
-                      response2["errmsg"].String());
+        ASSERT_EQUALS("replSet couldn't find member with id 0", response2["errmsg"].String());
 
 
-        // Test when someone else is primary and target node is stale.
-        heartbeatFromMember(HostAndPort("h2"), "rs0", MemberState::RS_SECONDARY, ourOpTime);
-        setSelfMemberState(MemberState::RS_SECONDARY);
-        getTopoCoord()._setCurrentPrimaryForTest(2);
+        // Test when we are primary.
+        args.id = 20;
+        args.who = HostAndPort("h1");
+
+        makeSelfPrimary();
 
         BSONObjBuilder responseBuilder3;
         Status status3 = internalErrorStatus;
@@ -744,16 +739,14 @@ namespace {
         ASSERT_EQUALS(ourOpTime, OpTime(response3["opTime"].timestampValue()));
         ASSERT_FALSE(response3["fresher"].Bool());
         ASSERT_TRUE(response3["veto"].Bool());
-        ASSERT_EQUALS(
-                "h1:27017 is trying to elect itself but h2:27017 is already primary and more "
-                        "up-to-date",
-                response3["errmsg"].String());
+        ASSERT_EQUALS("I am already primary, h1:27017 can try again once I've stepped down",
+                      response3["errmsg"].String());
 
 
-        // Test trying to elect a node that is caught up but isn't the highest priority node.
-        heartbeatFromMember(HostAndPort("h1"), "rs0", MemberState::RS_SECONDARY, ourOpTime);
-        heartbeatFromMember(HostAndPort("h2"), "rs0", MemberState::RS_SECONDARY, staleOpTime);
-        heartbeatFromMember(HostAndPort("h3"), "rs0", MemberState::RS_SECONDARY, ourOpTime);
+        // Test when someone else is primary.
+        heartbeatFromMember(HostAndPort("h2"), "rs0", MemberState::RS_SECONDARY, ourOpTime);
+        setSelfMemberState(MemberState::RS_SECONDARY);
+        getTopoCoord()._setCurrentPrimaryForTest(2);
 
         BSONObjBuilder responseBuilder4;
         Status status4 = internalErrorStatus;
@@ -764,15 +757,16 @@ namespace {
         ASSERT_EQUALS(ourOpTime, OpTime(response4["opTime"].timestampValue()));
         ASSERT_FALSE(response4["fresher"].Bool());
         ASSERT_TRUE(response4["veto"].Bool());
-        ASSERT_EQUALS("h1:27017 has lower priority of 1 than h3:27017 which has a priority of 10",
-                      response4["errmsg"].String());
+        ASSERT_EQUALS(
+                "h1:27017 is trying to elect itself but h2:27017 is already primary and more "
+                        "up-to-date",
+                response4["errmsg"].String());
 
 
-        // Test trying to elect a node that isn't electable
-        args.id = 40;
-        args.who = HostAndPort("h3");
-
-        downMember(HostAndPort("h3"), "rs0");
+        // Test trying to elect a node that is caught up but isn't the highest priority node.
+        heartbeatFromMember(HostAndPort("h1"), "rs0", MemberState::RS_SECONDARY, ourOpTime);
+        heartbeatFromMember(HostAndPort("h2"), "rs0", MemberState::RS_SECONDARY, staleOpTime);
+        heartbeatFromMember(HostAndPort("h3"), "rs0", MemberState::RS_SECONDARY, ourOpTime);
 
         BSONObjBuilder responseBuilder5;
         Status status5 = internalErrorStatus;
@@ -783,9 +777,28 @@ namespace {
         ASSERT_EQUALS(ourOpTime, OpTime(response5["opTime"].timestampValue()));
         ASSERT_FALSE(response5["fresher"].Bool());
         ASSERT_TRUE(response5["veto"].Bool());
+        ASSERT_EQUALS("h1:27017 has lower priority of 1 than h3:27017 which has a priority of 10",
+                      response5["errmsg"].String());
+
+
+        // Test trying to elect a node that isn't electable
+        args.id = 40;
+        args.who = HostAndPort("h3");
+
+        downMember(HostAndPort("h3"), "rs0");
+
+        BSONObjBuilder responseBuilder6;
+        Status status6 = internalErrorStatus;
+        getTopoCoord().prepareFreshResponse(cbData(), args, ourOpTime, &responseBuilder6, &status6);
+        ASSERT_OK(status6);
+        BSONObj response6 = responseBuilder6.obj();
+        ASSERT_FALSE(response6.hasField("info"));
+        ASSERT_EQUALS(ourOpTime, OpTime(response6["opTime"].timestampValue()));
+        ASSERT_FALSE(response6["fresher"].Bool());
+        ASSERT_TRUE(response6["veto"].Bool());
         ASSERT_EQUALS(
             "I don't think h3:27017 is electable because the member is not currently a secondary",
-            response5["errmsg"].String());
+            response6["errmsg"].String());
 
 
         // Finally, test trying to elect a valid node
@@ -794,17 +807,17 @@ namespace {
 
         heartbeatFromMember(HostAndPort("h3"), "rs0", MemberState::RS_SECONDARY, ourOpTime);
 
-        BSONObjBuilder responseBuilder6;
-        Status status6 = internalErrorStatus;
-        getTopoCoord().prepareFreshResponse(cbData(), args, ourOpTime, &responseBuilder6, &status6);
-        ASSERT_OK(status6);
-        BSONObj response6 = responseBuilder6.obj();
-        cout << response6.jsonString(TenGen, 1);
-        ASSERT_FALSE(response6.hasField("info")) << response6.toString();
-        ASSERT_EQUALS(ourOpTime, OpTime(response6["opTime"].timestampValue()));
-        ASSERT_FALSE(response6["fresher"].Bool()) << response6.toString();
-        ASSERT_FALSE(response6["veto"].Bool()) << response6.toString();
-        ASSERT_FALSE(response6.hasField("errmsg")) << response6.toString();
+        BSONObjBuilder responseBuilder7;
+        Status status7 = internalErrorStatus;
+        getTopoCoord().prepareFreshResponse(cbData(), args, ourOpTime, &responseBuilder7, &status7);
+        ASSERT_OK(status7);
+        BSONObj response7 = responseBuilder7.obj();
+        cout << response7.jsonString(TenGen, 1);
+        ASSERT_FALSE(response7.hasField("info")) << response7.toString();
+        ASSERT_EQUALS(ourOpTime, OpTime(response7["opTime"].timestampValue()));
+        ASSERT_FALSE(response7["fresher"].Bool()) << response7.toString();
+        ASSERT_FALSE(response7["veto"].Bool()) << response7.toString();
+        ASSERT_FALSE(response7.hasField("errmsg")) << response7.toString();
     }
 
     class HeartbeatResponseTest : public TopoCoordTest {
