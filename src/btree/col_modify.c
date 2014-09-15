@@ -121,7 +121,7 @@ __wt_col_modify(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt,
 		ins_head = *ins_headp;
 
 		/* Choose a skiplist depth for this insert. */
-		skipdepth = __wt_skip_choose_depth();
+		skipdepth = __wt_skip_choose_depth(session);
 
 		/*
 		 * Allocate a WT_INSERT/WT_UPDATE pair and transaction ID, and

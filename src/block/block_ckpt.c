@@ -142,7 +142,7 @@ err:		/*
 		 * allocated memory was in the service of verify, clean that up.
 		 */
 		if (block->verify)
-			WT_ERR(__wt_verify_ckpt_unload(session, block));
+			WT_TRET(__wt_verify_ckpt_unload(session, block));
 	}
 
 	/* Checkpoints don't need the original information, discard it. */

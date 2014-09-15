@@ -487,7 +487,8 @@ restart:
 			break;
 
 		pindex = WT_INTL_INDEX_COPY(page);
-		child = pindex->index[__wt_random() % pindex->entries];
+		child = pindex->index[
+		    __wt_random(session->rnd) % pindex->entries];
 
 		/*
 		 * Swap the parent page for the child page; return on error,
@@ -521,7 +522,7 @@ restart:
 		cbt->compare = 0;
 		pindex = WT_INTL_INDEX_COPY(btree->root.page);
 		cbt->slot = pindex->entries < 2 ?
-		    __wt_random() % page->pg_row_entries : 0;
+		    __wt_random(session->rnd) % page->pg_row_entries : 0;
 
 		return (__wt_row_leaf_key(session,
 		    page, page->pg_row_d + cbt->slot, &cbt->search_key, 0));

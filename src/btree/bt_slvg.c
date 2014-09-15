@@ -2318,8 +2318,8 @@ __slvg_ovfl_ref(WT_SESSION_IMPL *session, WT_TRACK *trk)
 {
 	if (F_ISSET(trk, WT_TRACK_OVFL_REFD))
 		WT_PANIC_RET(session, EINVAL,
-		    "overflow record at row-store page merge referenced "
-		    "multiple times");
+		    "overflow record referenced multiple times during leaf "
+		    "page merge");
 
 	F_SET(trk, WT_TRACK_OVFL_REFD);
 	return (0);
