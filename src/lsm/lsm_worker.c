@@ -35,16 +35,16 @@ __lsm_worker_general_op(
 	int force;
 
 	*completed = 0;
-	if (!F_ISSET(cookie, WT_LSM_WORK_FLUSH) &&
-	    !F_ISSET(cookie, WT_LSM_WORK_DROP) &&
-	    !F_ISSET(cookie, WT_LSM_WORK_BLOOM))
+	if (!FLD_ISSET(cookie->type, WT_LSM_WORK_FLUSH) &&
+	    !FLD_ISSET(cookie->type, WT_LSM_WORK_DROP) &&
+	    !FLD_ISSET(cookie->type, WT_LSM_WORK_BLOOM))
 	    return (WT_NOTFOUND);
 
 	if ((ret = __wt_lsm_manager_pop_entry(session,
-	    cookie->flags, &entry)) != 0 || entry == NULL)
+	    cookie->type, &entry)) != 0 || entry == NULL)
 		return (ret);
 
-	if ((entry->flags & WT_LSM_WORK_MASK) == WT_LSM_WORK_FLUSH) {
+	if (entry->type == WT_LSM_WORK_FLUSH) {
 		force = F_ISSET(entry, WT_LSM_WORK_FORCE);
 		F_CLR(entry, WT_LSM_WORK_FORCE);
 		WT_ERR(__wt_lsm_get_chunk_to_flush(session,
@@ -63,12 +63,12 @@ __lsm_worker_general_op(
 			(void)WT_ATOMIC_SUB(chunk->refcnt, 1);
 			WT_ERR(ret);
 		}
-	} else if (entry->flags == WT_LSM_WORK_DROP)
+	} else if (entry->type == WT_LSM_WORK_DROP)
 		WT_ERR(__wt_lsm_free_chunks(session, entry->lsm_tree));
-	else if (entry->flags == WT_LSM_WORK_BLOOM) {
+	else if (entry->type == WT_LSM_WORK_BLOOM) {
 		WT_ERR(__wt_lsm_work_bloom(session, entry->lsm_tree));
 		WT_ERR(__wt_lsm_manager_push_entry(
-		    session, WT_LSM_WORK_MERGE, entry->lsm_tree));
+		    session, WT_LSM_WORK_MERGE, 0, entry->lsm_tree));
 	}
 	*completed = 1;
 
@@ -99,7 +99,7 @@ __lsm_worker(void *arg)
 		progress = 0;
 
 		/* Switches are always a high priority */
-		while (F_ISSET(cookie, WT_LSM_WORK_SWITCH) &&
+		while (FLD_ISSET(cookie->type, WT_LSM_WORK_SWITCH) &&
 		    (ret = __wt_lsm_manager_pop_entry(
 		    session, WT_LSM_WORK_SWITCH, &entry)) == 0 &&
 		    entry != NULL)
@@ -114,11 +114,11 @@ __lsm_worker(void *arg)
 		WT_ERR(ret);
 		progress = progress || ran;
 
-		if (F_ISSET(cookie, WT_LSM_WORK_MERGE) &&
+		if (FLD_ISSET(cookie->type, WT_LSM_WORK_MERGE) &&
 		    (ret = __wt_lsm_manager_pop_entry(
 		    session, WT_LSM_WORK_MERGE, &entry)) == 0 &&
 		    entry != NULL) {
-			WT_ASSERT(session, entry->flags == WT_LSM_WORK_MERGE);
+			WT_ASSERT(session, entry->type == WT_LSM_WORK_MERGE);
 			ret = __wt_lsm_merge(session,
 			    entry->lsm_tree, cookie->id);
 			if (ret == WT_NOTFOUND) {

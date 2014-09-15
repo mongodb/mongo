@@ -92,7 +92,7 @@ __clsm_enter_update(WT_CURSOR_LSM *clsm)
 			if (clsm->dsk_gen == lsm_tree->dsk_gen &&
 			    !F_ISSET(lsm_tree, WT_LSM_TREE_NEED_SWITCH)) {
 				WT_RET(__wt_lsm_manager_push_entry(
-				    session, WT_LSM_WORK_SWITCH, lsm_tree));
+				    session, WT_LSM_WORK_SWITCH, 0, lsm_tree));
 				F_SET(lsm_tree, WT_LSM_TREE_NEED_SWITCH);
 			}
 			WT_RET(__wt_lsm_tree_unlock(session, lsm_tree));

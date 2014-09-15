@@ -315,10 +315,10 @@ __wt_lsm_checkpoint_chunk(WT_SESSION_IMPL *session,
 	 * Schedule a bloom filter create for our newly flushed chunk */
 	if (!FLD_ISSET(lsm_tree->bloom, WT_LSM_BLOOM_OFF))
 		WT_RET(__wt_lsm_manager_push_entry(
-		    session, WT_LSM_WORK_BLOOM, lsm_tree));
+		    session, WT_LSM_WORK_BLOOM, 0, lsm_tree));
 	else
 		WT_RET(__wt_lsm_manager_push_entry(
-		    session, WT_LSM_WORK_MERGE, lsm_tree));
+		    session, WT_LSM_WORK_MERGE, 0, lsm_tree));
 	return (0);
 }
 

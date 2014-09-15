@@ -231,7 +231,7 @@ __lsm_manager_worker_setup(WT_SESSION_IMPL *session)
 	worker_args = &manager->lsm_worker_cookies[1];
 	worker_args->work_cond = manager->work_cond;
 	worker_args->id = manager->lsm_workers++;
-	worker_args->flags = WT_LSM_WORK_SWITCH | WT_LSM_WORK_DROP;
+	worker_args->type = WT_LSM_WORK_SWITCH | WT_LSM_WORK_DROP;
 	/* Start the switch thread. */
 	WT_RET(__wt_lsm_worker_start(session, worker_args));
 
@@ -247,7 +247,7 @@ __lsm_manager_worker_setup(WT_SESSION_IMPL *session)
 		    &manager->lsm_worker_cookies[manager->lsm_workers];
 		worker_args->work_cond = manager->work_cond;
 		worker_args->id = manager->lsm_workers;
-		worker_args->flags =
+		worker_args->type =
 		    WT_LSM_WORK_BLOOM |
 		    WT_LSM_WORK_DROP |
 		    WT_LSM_WORK_FLUSH |
@@ -259,7 +259,7 @@ __lsm_manager_worker_setup(WT_SESSION_IMPL *session)
 		 * least one thread capable of running merges.
 		 */
 		if (manager->lsm_workers % 2 == 1)
-			F_SET(worker_args, WT_LSM_WORK_MERGE);
+			FLD_SET(worker_args->type, WT_LSM_WORK_MERGE);
 		WT_RET(__wt_lsm_worker_start(session, worker_args));
 	}
 	return (0);
@@ -342,15 +342,15 @@ __lsm_manager_run_server(WT_SESSION_IMPL *session)
 			    lsm_tree->nchunks > 1) ||
 			    pushms > fillms) {
 				WT_RET(__wt_lsm_manager_push_entry(
-				    session, WT_LSM_WORK_SWITCH, lsm_tree));
+				    session, WT_LSM_WORK_SWITCH, 0, lsm_tree));
 				WT_RET(__wt_lsm_manager_push_entry(
-				    session, WT_LSM_WORK_DROP, lsm_tree));
+				    session, WT_LSM_WORK_DROP, 0, lsm_tree));
 				WT_RET(__wt_lsm_manager_push_entry(
-				    session, WT_LSM_WORK_FLUSH, lsm_tree));
+				    session, WT_LSM_WORK_FLUSH, 0, lsm_tree));
 				WT_RET(__wt_lsm_manager_push_entry(
-				    session, WT_LSM_WORK_BLOOM, lsm_tree));
+				    session, WT_LSM_WORK_BLOOM, 0, lsm_tree));
 				WT_RET(__wt_lsm_manager_push_entry(
-				    session, WT_LSM_WORK_MERGE, lsm_tree));
+				    session, WT_LSM_WORK_MERGE, 0, lsm_tree));
 			}
 		}
 	}
@@ -480,7 +480,7 @@ __wt_lsm_manager_pop_entry(
 		if (!TAILQ_EMPTY(&manager->managerqh)) {
 			entry = TAILQ_FIRST(&manager->managerqh);
 			WT_ASSERT(session, entry != NULL);
-			if (F_ISSET(entry, type))
+			if (FLD_ISSET(entry->type, type))
 				TAILQ_REMOVE(&manager->managerqh, entry, q);
 			else
 				entry = NULL;
@@ -507,7 +507,7 @@ __wt_lsm_manager_pop_entry(
 		for (entry = TAILQ_FIRST(&manager->appqh);
 		    entry != NULL;
 		    entry = TAILQ_NEXT(entry, q)) {
-			if (FLD_ISSET(type, entry->flags)) {
+			if (FLD_ISSET(type, entry->type)) {
 				TAILQ_REMOVE(&manager->appqh, entry, q);
 				break;
 			}
@@ -526,8 +526,8 @@ __wt_lsm_manager_pop_entry(
  *	Add an entry to the end of the switch queue.
  */
 int
-__wt_lsm_manager_push_entry(
-    WT_SESSION_IMPL *session, uint32_t type, WT_LSM_TREE *lsm_tree)
+__wt_lsm_manager_push_entry(WT_SESSION_IMPL *session,
+    uint32_t type, uint32_t flags, WT_LSM_TREE *lsm_tree)
 {
 	WT_LSM_MANAGER *manager;
 	WT_LSM_WORK_UNIT *entry;
@@ -537,12 +537,13 @@ __wt_lsm_manager_push_entry(
 	WT_RET(__wt_epoch(session, &lsm_tree->work_push_ts));
 
 	WT_RET(__wt_calloc_def(session, 1, &entry));
-	entry->flags = type;
+	entry->type = type;
+	entry->flags = flags;
 	entry->lsm_tree = lsm_tree;
 	(void)WT_ATOMIC_ADD(lsm_tree->queue_ref, 1);
 	WT_STAT_FAST_CONN_INCR(session, lsm_work_units_created);
 
-	switch (type & WT_LSM_WORK_MASK) {
+	switch (type) {
 	case WT_LSM_WORK_SWITCH:
 		__wt_spin_lock(session, &manager->switch_lock);
 		TAILQ_INSERT_TAIL(&manager->switchqh, entry, q);
