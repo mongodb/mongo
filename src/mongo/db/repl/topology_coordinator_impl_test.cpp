@@ -1738,6 +1738,8 @@ namespace {
         ASSERT_EQUALS(Status::OK(), result);
         ASSERT_EQUALS("unfreezing", response["info"].String());
         ASSERT_EQUALS(1, countLogLinesContaining("replSet info 'unfreezing'"));
+        // 1 instead of 0 because it assigns to "now" in this case
+        ASSERT_EQUALS(1LL, getTopoCoord().getStepDownTime().asInt64());
     }
 
     TEST_F(PrepareFreezeResponseTest, FreezeForOneSecond) {
@@ -1747,6 +1749,8 @@ namespace {
         ASSERT_EQUALS("you really want to freeze for only 1 second?",
                       response["warning"].String());
         ASSERT_EQUALS(1, countLogLinesContaining("replSet info 'freezing' for 1 seconds"));
+        // 1001 because "now" was incremented once during initialization + 1000 ms wait
+        ASSERT_EQUALS(1001LL, getTopoCoord().getStepDownTime().asInt64());
     }
 
     TEST_F(PrepareFreezeResponseTest, FreezeForManySeconds) {
@@ -1755,6 +1759,8 @@ namespace {
         ASSERT_EQUALS(Status::OK(), result);
         ASSERT_TRUE(response.isEmpty());
         ASSERT_EQUALS(1, countLogLinesContaining("replSet info 'freezing' for 20 seconds"));
+        // 20001 because "now" was incremented once during initialization + 20000 ms wait
+        ASSERT_EQUALS(20001LL, getTopoCoord().getStepDownTime().asInt64());
     }
 
     TEST_F(PrepareFreezeResponseTest, UnfreezeEvenWhenNotFrozenWhilePrimary) {
@@ -1766,6 +1772,8 @@ namespace {
         // doesn't mention being primary in this case for some reason
         ASSERT_EQUALS(0, countLogLinesContaining(
                 "replSet info received freeze command but we are primary"));
+        // 1 instead of 0 because it assigns to "now" in this case
+        ASSERT_EQUALS(1LL, getTopoCoord().getStepDownTime().asInt64());
     }
 
     TEST_F(PrepareFreezeResponseTest, FreezeForOneSecondWhilePrimary) {
@@ -1777,6 +1785,7 @@ namespace {
                       response["warning"].String());
         ASSERT_EQUALS(1, countLogLinesContaining(
                 "replSet info received freeze command but we are primary"));
+        ASSERT_EQUALS(0LL, getTopoCoord().getStepDownTime().asInt64());
     }
 
     TEST_F(PrepareFreezeResponseTest, FreezeForManySecondsWhilePrimary) {
@@ -1787,6 +1796,7 @@ namespace {
         ASSERT_TRUE(response.isEmpty());
         ASSERT_EQUALS(1, countLogLinesContaining(
                 "replSet info received freeze command but we are primary"));
+        ASSERT_EQUALS(0LL, getTopoCoord().getStepDownTime().asInt64());
     }
 
     class ShutdownInProgressTest : public TopoCoordTest {
