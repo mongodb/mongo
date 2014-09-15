@@ -1,7 +1,3 @@
-/**
- * @tags : [ hashed ] 
- */
-
 // from server 2326 - make sure that sharding only works with unique indices
 
 s = new ShardingTest( "shard_index", 2, 0, 1 )

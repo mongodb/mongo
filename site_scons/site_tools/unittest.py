@@ -1,11 +1,6 @@
 """Pseudo-builders for building and registering unit tests.
 """
 
-import os
-import json
-
-from buildscripts import smoke
-
 def exists(env):
     return True
 
@@ -22,24 +17,8 @@ def unit_test_list_builder_action(env, target, source):
             ofile.write('%s\n' % s)
     finally:
         ofile.close()
-        
-    dir, filename = os.path.split(str(target[0]))
-    filebase, ext = os.path.splitext(filename)
-    
-    # Generate metadata file for unit tests
-    metadata_filename = os.path.join(dir, ".".join([filebase, "json"]))        
-    print "Generating metadata file %s" % metadata_filename
-    
-    tests = []
-    for s in source:
-        tests.append(smoke.tests.Test(filename=str(s), test_type="exe_test"))
-        print '\t' + str(s)
-    
-    # For now, write JSON to avoid YAML parsing dependency
-    smoke.tests.write_metadata(tests, metadata_filename, json_only=True)
 
 def build_cpp_unit_test(env, target, source, **kwargs):
-
     libdeps = kwargs.get('LIBDEPS', [])
     libdeps.append( '$BUILD_DIR/mongo/unittest/unittest_main' )
 

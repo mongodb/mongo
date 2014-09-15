@@ -1,8 +1,0 @@
-# Options for master/slave (small oplog) tests
-executor:
-  fixtures:
-    mongodb_server:
-      fixture_class: smoke.MasterSlaveFixture
-      master_options:
-        oplogSize: 100
-      slave_options: {}

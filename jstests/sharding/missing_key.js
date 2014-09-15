@@ -1,6 +1,5 @@
 // Test that the shardCollection command fails when a preexisting document lacks a shard key field.
 // SERVER-8772
-// @tags : [ hashed ]
 
 var st = new ShardingTest( { shards: 1 } );
 st.stopBalancer();

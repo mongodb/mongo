@@ -1,6 +1,3 @@
-/**
- * @tags : [ hashed ] 
- */
 var st = new ShardingTest({ shards: 2, other: { shardOptions: { verbose: 1 }} });
 st.stopBalancer();
 

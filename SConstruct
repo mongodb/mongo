@@ -463,7 +463,7 @@ envDict = dict(BUILD_ROOT=buildDir,
                ARCHIVE_ADDITIONS=[],
                PYTHON=utils.find_python(),
                SERVER_ARCHIVE='${SERVER_DIST_BASENAME}${DIST_ARCHIVE_SUFFIX}',
-               tools=["default", "gch", "jsheader", "mergelib", "mongo_unittest"],
+               tools=["default", "gch", "jsheader", "mergelib", "unittest"],
                UNITTEST_ALIAS='unittests',
                # TODO: Move unittests.txt to $BUILD_DIR, but that requires
                # changes to MCI.
