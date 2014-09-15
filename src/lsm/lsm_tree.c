@@ -1087,6 +1087,13 @@ __wt_lsm_compact(WT_SESSION_IMPL *session, const char *name, int *skip)
 		 */
 		WT_ERR(__wt_lsm_manager_push_entry(session,
 		    WT_LSM_WORK_FLUSH | WT_LSM_WORK_FORCE, lsm_tree));
+	} else {
+		/*
+		 * If there is no chunk to flush, go straight to the
+		 * compacting state.
+		 */
+		compacting = 1;
+		F_SET(lsm_tree, WT_LSM_TREE_COMPACTING);
 	}
 
 	/* Wait for the work unit queues to drain. */
