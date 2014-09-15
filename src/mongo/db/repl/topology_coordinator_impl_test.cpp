@@ -896,6 +896,7 @@ namespace {
                     OpTime(0, 0));  // We've never applied anything.
 
         ASSERT_EQUALS(HeartbeatResponseAction::NoAction, action.getAction());
+        ASSERT_TRUE(TopologyCoordinator::Role::follower == getTopoCoord().getRole());
         // Because the heartbeat failed without timing out, we expect to retry immediately.
         ASSERT_EQUALS(Date_t(firstRequestDate + 4000), action.getNextHeartbeatStartDate());
 
@@ -917,6 +918,7 @@ namespace {
                     StatusWith<ReplSetHeartbeatResponse>(ErrorCodes::NodeNotFound, "Bad DNS?"),
                     OpTime(0, 0));  // We've never applied anything.
         ASSERT_EQUALS(HeartbeatResponseAction::NoAction, action.getAction());
+        ASSERT_TRUE(TopologyCoordinator::Role::follower == getTopoCoord().getRole());
         // Because the first retry failed without timing out, we expect to retry immediately.
         ASSERT_EQUALS(Date_t(firstRequestDate + 4500), action.getNextHeartbeatStartDate());
 
@@ -938,6 +940,7 @@ namespace {
                     StatusWith<ReplSetHeartbeatResponse>(ErrorCodes::NodeNotFound, "Bad DNS?"),
                     OpTime(0, 0));  // We've never applied anything.
         ASSERT_EQUALS(HeartbeatResponseAction::NoAction, action.getAction());
+        ASSERT_TRUE(TopologyCoordinator::Role::follower == getTopoCoord().getRole());
         // Because this is the second retry, rather than retry again, we expect to wait for the
         // heartbeat interval of 2 seconds to elapse.
         ASSERT_EQUALS(Date_t(firstRequestDate + 6800), action.getNextHeartbeatStartDate());
@@ -969,6 +972,7 @@ namespace {
                     OpTime(0, 0));  // We've never applied anything.
 
         ASSERT_EQUALS(HeartbeatResponseAction::NoAction, action.getAction());
+        ASSERT_TRUE(TopologyCoordinator::Role::follower == getTopoCoord().getRole());
         // Because the heartbeat timed out, we'll retry in 2 seconds.
         ASSERT_EQUALS(Date_t(firstRequestDate + 7000), action.getNextHeartbeatStartDate());
     }
@@ -999,6 +1003,7 @@ namespace {
                     OpTime(0, 0));  // We've never applied anything.
 
         ASSERT_EQUALS(HeartbeatResponseAction::NoAction, action.getAction());
+        ASSERT_TRUE(TopologyCoordinator::Role::follower == getTopoCoord().getRole());
         // Because the heartbeat failed without timing out, we expect to retry immediately.
         ASSERT_EQUALS(Date_t(firstRequestDate + 4000), action.getNextHeartbeatStartDate());
 
@@ -1021,6 +1026,7 @@ namespace {
                     OpTime(0, 0));  // We've never applied anything.
 
         ASSERT_EQUALS(HeartbeatResponseAction::NoAction, action.getAction());
+        ASSERT_TRUE(TopologyCoordinator::Role::follower == getTopoCoord().getRole());
         // Because the heartbeat timed out, we'll retry in 2 seconds.
         ASSERT_EQUALS(Date_t(firstRequestDate + 7010), action.getNextHeartbeatStartDate());
     }
@@ -1051,6 +1057,7 @@ namespace {
                     OpTime(0, 0));  // We've never applied anything.
 
         ASSERT_EQUALS(HeartbeatResponseAction::NoAction, action.getAction());
+        ASSERT_TRUE(TopologyCoordinator::Role::follower == getTopoCoord().getRole());
         // Because the heartbeat failed without timing out, we expect to retry immediately.
         ASSERT_EQUALS(Date_t(firstRequestDate + 4000), action.getNextHeartbeatStartDate());
 
@@ -1090,6 +1097,7 @@ namespace {
                     StatusWith<ReplSetHeartbeatResponse>(reconfigResponse),
                     OpTime(0, 0));  // We've never applied anything.
         ASSERT_EQUALS(HeartbeatResponseAction::Reconfig, action.getAction());
+        ASSERT_TRUE(TopologyCoordinator::Role::follower == getTopoCoord().getRole());
         ASSERT_EQUALS(Date_t(firstRequestDate + 6500), action.getNextHeartbeatStartDate());
     }
 
@@ -1104,6 +1112,7 @@ namespace {
                                                                 election,
                                                                 lastOpTimeApplied);
         ASSERT_NO_ACTION(nextAction.getAction());
+        ASSERT_TRUE(TopologyCoordinator::Role::follower == getTopoCoord().getRole());
     }
 
     TEST_F(HeartbeatResponseTest, UpdateHeartbeatDataTwoPrimariesNewOneOlder) {
@@ -1126,6 +1135,7 @@ namespace {
                                         election,
                                         lastOpTimeApplied);
         ASSERT_NO_ACTION(nextAction.getAction());
+        ASSERT_TRUE(TopologyCoordinator::Role::follower == getTopoCoord().getRole());
     }
 
     TEST_F(HeartbeatResponseTest, UpdateHeartbeatDataTwoPrimariesNewOneNewer) {
@@ -1148,6 +1158,7 @@ namespace {
                                         election,
                                         lastOpTimeApplied);
         ASSERT_NO_ACTION(nextAction.getAction());
+        ASSERT_TRUE(TopologyCoordinator::Role::follower == getTopoCoord().getRole());
     }
 
     TEST_F(HeartbeatResponseTest, UpdateHeartbeatDataTwoPrimariesIncludingMeNewOneOlder) {
@@ -1164,6 +1175,7 @@ namespace {
                                                                 lastOpTimeApplied);
         ASSERT_EQUALS(HeartbeatResponseAction::StepDownRemotePrimary, nextAction.getAction());
         ASSERT_EQUALS(1, nextAction.getPrimaryConfigIndex());
+        ASSERT_TRUE(TopologyCoordinator::Role::leader == getTopoCoord().getRole());
     }
 
     TEST_F(HeartbeatResponseTest, UpdateHeartbeatDataTwoPrimariesIncludingMeNewOneNewer) {
@@ -1180,6 +1192,7 @@ namespace {
                                                                 lastOpTimeApplied);
         ASSERT_EQUALS(HeartbeatResponseAction::StepDownSelf, nextAction.getAction());
         ASSERT_EQUALS(0, nextAction.getPrimaryConfigIndex());
+        ASSERT_TRUE(TopologyCoordinator::Role::follower == getTopoCoord().getRole());
     }
 
     TEST_F(HeartbeatResponseTest, UpdateHeartbeatDataPrimaryDownNoMajority) {
@@ -1198,6 +1211,7 @@ namespace {
 
         nextAction = receiveDownHeartbeat(HostAndPort("host2"), "rs0");
         ASSERT_NO_ACTION(nextAction.getAction());
+        ASSERT_TRUE(TopologyCoordinator::Role::follower == getTopoCoord().getRole());
     }
 
     TEST_F(HeartbeatResponseTest, UpdateHeartbeatDataPrimaryDownMajorityButNoPriority) {
@@ -1232,6 +1246,7 @@ namespace {
 
         nextAction = receiveDownHeartbeat(HostAndPort("host2"), "rs0");
         ASSERT_NO_ACTION(nextAction.getAction());
+        ASSERT_TRUE(TopologyCoordinator::Role::follower == getTopoCoord().getRole());
     }
 
     TEST_F(HeartbeatResponseTest, UpdateHeartbeatDataPrimaryDownMajorityButIAmStarting) {
@@ -1258,6 +1273,7 @@ namespace {
 
         nextAction = receiveDownHeartbeat(HostAndPort("host2"), "rs0");
         ASSERT_NO_ACTION(nextAction.getAction());
+        ASSERT_TRUE(TopologyCoordinator::Role::follower == getTopoCoord().getRole());
     }
 
     TEST_F(HeartbeatResponseTest, UpdateHeartbeatDataPrimaryDownMajorityButIAmRecovering) {
@@ -1276,6 +1292,7 @@ namespace {
 
         nextAction = receiveDownHeartbeat(HostAndPort("host2"), "rs0");
         ASSERT_NO_ACTION(nextAction.getAction());
+        ASSERT_TRUE(TopologyCoordinator::Role::follower == getTopoCoord().getRole());
     }
 
     TEST_F(HeartbeatResponseTest, UpdateHeartbeatDataPrimaryDownMajorityButIHaveStepdownWait) {
@@ -1307,6 +1324,7 @@ namespace {
 
         nextAction = receiveDownHeartbeat(HostAndPort("host2"), "rs0");
         ASSERT_NO_ACTION(nextAction.getAction());
+        ASSERT_TRUE(TopologyCoordinator::Role::follower == getTopoCoord().getRole());
     }
 
     TEST_F(HeartbeatResponseTest, UpdateHeartbeatDataPrimaryDownMajorityButIAmArbiter) {
@@ -1331,6 +1349,7 @@ namespace {
 
         nextAction = receiveDownHeartbeat(HostAndPort("host2"), "rs0");
         ASSERT_NO_ACTION(nextAction.getAction());
+        ASSERT_TRUE(TopologyCoordinator::Role::follower == getTopoCoord().getRole());
     }
 
     TEST_F(HeartbeatResponseTest, UpdateHeartbeatDataPrimaryDownMajority) {
@@ -1357,6 +1376,7 @@ namespace {
 
         nextAction = receiveDownHeartbeat(HostAndPort("host2"), "rs0");
         ASSERT_EQUALS(HeartbeatResponseAction::StartElection, nextAction.getAction());
+        ASSERT_TRUE(TopologyCoordinator::Role::candidate == getTopoCoord().getRole());
     }
 
     TEST_F(HeartbeatResponseTest, UpdateHeartbeatDataPrimaryDownMajorityOfVotersUp) {
@@ -1406,6 +1426,7 @@ namespace {
 
         nextAction = receiveDownHeartbeat(HostAndPort("host2"), "rs0");
         ASSERT_EQUALS(HeartbeatResponseAction::StartElection, nextAction.getAction());
+        ASSERT_TRUE(TopologyCoordinator::Role::candidate == getTopoCoord().getRole());
     }
 
     class PrepareElectResponseTest : public TopoCoordTest {
