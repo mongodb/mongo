@@ -1309,7 +1309,7 @@ namespace {
         ASSERT_NO_ACTION(nextAction.getAction());
     }
 
-    TEST_F(HeartbeatResponseTest, UpdateHeartbeatDataPrimaryDownMajorityButIArbiter) {
+    TEST_F(HeartbeatResponseTest, UpdateHeartbeatDataPrimaryDownMajorityButIAmArbiter) {
         updateConfig(BSON("_id" << "rs0" <<
                           "version" << 5 <<
                           "members" << BSON_ARRAY(
