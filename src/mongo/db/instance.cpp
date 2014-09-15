@@ -783,13 +783,15 @@ namespace mongo {
     }
 
     void checkAndInsert(OperationContext* txn,
-                        Client::Context& ctx,
                         const char *ns,
                         /*modifies*/BSONObj& js) {
 
         if ( nsToCollectionSubstring( ns ) == "system.indexes" ) {
             string targetNS = js["ns"].String();
             uassertStatusOK( userAllowedWriteNS( targetNS ) );
+
+            Lock::DBWrite dbWrite(txn->lockState(), targetNS);
+            Client::Context ctx(txn, targetNS);
 
             Collection* collection = ctx.db()->getCollection( txn, targetNS );
             if ( !collection ) {
@@ -836,6 +838,9 @@ namespace mongo {
         if ( !fixed.getValue().isEmpty() )
             js = fixed.getValue();
 
+        Lock::DBWrite dbWrite(txn->lockState(), ns);
+        Client::Context ctx(txn, ns);
+
         WriteUnitOfWork wunit(txn);
         Collection* collection = ctx.db()->getCollection( txn, ns );
         if ( !collection ) {
@@ -854,7 +859,6 @@ namespace mongo {
     }
 
     NOINLINE_DECL void insertMulti(OperationContext* txn,
-                                   Client::Context& ctx,
                                    bool keepGoing,
                                    const char *ns,
                                    vector<BSONObj>& objs,
@@ -862,7 +866,7 @@ namespace mongo {
         size_t i;
         for (i=0; i<objs.size(); i++){
             try {
-                checkAndInsert(txn, ctx, ns, objs[i]);
+                checkAndInsert(txn, ns, objs[i]);
             } catch (const UserException& ex) {
                 if (!keepGoing || i == objs.size()-1){
                     globalOpCounters.incInsertInWriteLock(i);
@@ -902,20 +906,14 @@ namespace mongo {
             uassertStatusOK(status);
         }
 
-        Lock::DBWrite lk(txn->lockState(), ns);
-
-        // CONCURRENCY TODO: is being read locked in big log sufficient here?
-        // writelock is used to synchronize stepdowns w/ writes
         uassert(10058 , "not master",
                 repl::getGlobalReplicationCoordinator()->canAcceptWritesForDatabase(nsString.db()));
 
-        Client::Context ctx(txn, ns);
-
         if (multi.size() > 1) {
             const bool keepGoing = d.reservedField() & InsertOption_ContinueOnError;
-            insertMulti(txn, ctx, keepGoing, ns, multi, op);
+            insertMulti(txn, keepGoing, ns, multi, op);
         } else {
-            checkAndInsert(txn, ctx, ns, multi[0]);
+            checkAndInsert(txn, ns, multi[0]);
             globalOpCounters.incInsertInWriteLock(1);
             op.debug().ninserted = 1;
         }
