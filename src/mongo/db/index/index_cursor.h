@@ -111,7 +111,7 @@ namespace mongo {
          * Restore the saved position.  Errors if there is no saved position.
          * The cursor may be EOF after a restore.
          */
-        virtual Status restorePosition() = 0;
+        virtual Status restorePosition(OperationContext* txn) = 0;
 
         // Return a std::string describing the cursor.
         virtual std::string toString() = 0;

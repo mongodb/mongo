@@ -177,7 +177,7 @@ namespace mongo {
             //
             virtual void savePosition() = 0;
 
-            virtual void restorePosition() = 0;
+            virtual void restorePosition(OperationContext* txn) = 0;
         };
 
         /**

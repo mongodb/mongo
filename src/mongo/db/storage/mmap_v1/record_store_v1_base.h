@@ -288,7 +288,7 @@ namespace mongo {
 
         virtual void saveState() {}
 
-        virtual bool restoreState() { return true; }
+        virtual bool restoreState(OperationContext* txn) { return true; }
 
         virtual RecordData dataFor( const DiskLoc& loc ) const { return _rs->dataFor(_txn, loc); }
 

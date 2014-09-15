@@ -158,7 +158,7 @@ namespace mongo {
     void CollectionScan::restoreState(OperationContext* opCtx) {
         ++_commonStats.unyields;
         if (NULL != _iter) {
-            if (!_iter->restoreState()) {
+            if (!_iter->restoreState(opCtx)) {
                 warning() << "Collection dropped or state deleted during yield of CollectionScan";
                 _nsDropped = true;
             }

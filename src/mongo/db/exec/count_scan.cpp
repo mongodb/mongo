@@ -158,7 +158,7 @@ namespace mongo {
         ++_commonStats.unyields;
         if (_hitEnd || (NULL == _btreeCursor.get())) { return; }
 
-        if (!_btreeCursor->restorePosition().isOK()) {
+        if (!_btreeCursor->restorePosition( opCtx ).isOK()) {
             _hitEnd = true;
             return;
         }
@@ -176,7 +176,7 @@ namespace mongo {
             return;
         }
 
-        if (!_endCursor->restorePosition().isOK()) {
+        if (!_endCursor->restorePosition( opCtx ).isOK()) {
             _hitEnd = true;
             return;
         }

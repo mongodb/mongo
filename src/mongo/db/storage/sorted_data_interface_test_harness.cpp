@@ -299,7 +299,7 @@ namespace mongo {
                 n++;
                 cursor->advance();
                 cursor->savePosition();
-                cursor->restorePosition();
+                cursor->restorePosition( opCtx.get() );
             }
             ASSERT_EQUALS( N, n );
         }
@@ -332,7 +332,7 @@ namespace mongo {
                 n++;
                 cursor->advance();
                 cursor->savePosition();
-                cursor->restorePosition();
+                cursor->restorePosition( opCtx.get() );
             }
             ASSERT_EQUALS( N, n );
         }

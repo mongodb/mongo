@@ -434,7 +434,8 @@ namespace mongo {
     void HeapRecordIterator::saveState() {
     }
 
-    bool HeapRecordIterator::restoreState() {
+    bool HeapRecordIterator::restoreState(OperationContext* txn) {
+        _txn = txn;
         return !_killedByInvalidate;
     }
 
@@ -499,7 +500,7 @@ namespace mongo {
     void HeapRecordReverseIterator::saveState() {
     }
 
-    bool HeapRecordReverseIterator::restoreState() {
+    bool HeapRecordReverseIterator::restoreState(OperationContext* txn) {
         return !_killedByInvalidate;
     }
 

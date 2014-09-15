@@ -83,7 +83,7 @@ namespace mongo {
 
         virtual Status savePosition();
 
-        virtual Status restorePosition();
+        virtual Status restorePosition(OperationContext* txn);
 
         virtual std::string toString();
 

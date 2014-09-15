@@ -256,7 +256,7 @@ namespace mongo {
 
         // We can have a valid position before we check isEOF(), restore the position, and then be
         // EOF upon restore.
-        if (!_indexCursor->restorePosition().isOK() || _indexCursor->isEOF()) {
+        if (!_indexCursor->restorePosition( opCtx ).isOK() || _indexCursor->isEOF()) {
             _hitEnd = true;
             return;
         }

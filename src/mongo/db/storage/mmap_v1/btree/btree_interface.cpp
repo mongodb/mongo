@@ -203,7 +203,7 @@ namespace mongo {
                 }
             }
 
-            virtual void restorePosition() {
+            virtual void restorePosition(OperationContext* txn) {
                 if (!_bucket.isNull()) {
                     _btree->restorePosition(_txn,
                                             _savedKey,

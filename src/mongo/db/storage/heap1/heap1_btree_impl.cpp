@@ -277,7 +277,7 @@ namespace {
                 _savedLoc = _it->loc;
             }
 
-            virtual void restorePosition() {
+            virtual void restorePosition(OperationContext* txn) {
                 if (_savedAtEnd) {
                     _it = _data.end();
                 }
@@ -385,7 +385,7 @@ namespace {
                 _savedLoc = _it->loc;
             }
 
-            virtual void restorePosition() {
+            virtual void restorePosition(OperationContext* txn) {
                 if (_savedAtEnd) {
                     _it = _data.rend();
                 }
