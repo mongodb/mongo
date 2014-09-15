@@ -237,6 +237,9 @@ add_option( "js-engine", "JavaScript scripting engine implementation", 1, False,
            type='choice', default=js_engine_choices[0], choices=js_engine_choices)
 add_option( "libc++", "use libc++ (experimental, requires clang)", 0, True )
 
+add_option( "use-glibcxx-debug",
+            "Enable the glibc++ debug implementations of the C++ standard libary", 0, True )
+
 # mongo feature options
 add_option( "noshell", "don't build shell" , 0 , True )
 add_option( "safeshell", "don't let shell scripts run programs (still, don't run untrusted scripts)" , 0 , True )
@@ -1452,12 +1455,20 @@ def doConfigure(myenv):
             cxx11_mode = "on"
             myenv = cxx11Env
 
-    # If we are using a modern libstdc++ and this is a debug build and we control all C++
-    # dependencies, then turn on the debugging features in libstdc++.
-    if debugBuild and usingLibStdCxx and haveGoodLibStdCxx:
-        # We can't do this if we are using any system C++ libraries.
-        if (not using_system_version_of_cxx_libraries()):
-            myenv.Append(CPPDEFINES=["_GLIBCXX_DEBUG"]);
+    if has_option("use-glibcxx-debug"):
+        # If we are using a modern libstdc++ and this is a debug build and we control all C++
+        # dependencies, then turn on the debugging features in libstdc++.
+        if not debugBuild:
+            print("--use-glibcxx-debug requires --dbg=on")
+            Exit(1)
+        if not usingLibStdCxx or not haveGoodLibStdCxx:
+            print("--use-glibcxx-debug is only compatible with the GNU implementation of the "
+                  "C++ standard libary, and requires minimum version 4.6")
+            Exit(1)
+        if using_system_version_of_cxx_libraries():
+            print("--use-glibcxx-debug not compatible with system versions of C++ libraries.")
+            Exit(1)
+        myenv.Append(CPPDEFINES=["_GLIBCXX_DEBUG"]);
 
     # Check if we are on a POSIX system by testing if _POSIX_VERSION is defined.
     def CheckPosixSystem(context):
