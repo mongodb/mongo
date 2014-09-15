@@ -1733,6 +1733,28 @@ namespace {
         ASSERT_EQUALS(round, response2["round"].OID());
     }
 
+    TEST_F(PrepareElectResponseTest, ElectResponseHighestPriorityOfLiveNodes) {
+        // Test trying to elect someone who isn't the highest priority node, but all higher nodes
+        // are down
+        ReplicationCoordinator::ReplSetElectArgs args;
+        args.set = "rs0";
+        args.round = round;
+        args.cfgver = 10;
+        args.whoid = 1;
+
+        downMember(HostAndPort("h3"), "rs0");
+        downMember(HostAndPort("h2"), "rs0");
+
+        BSONObjBuilder responseBuilder;
+        Status result = Status::OK();
+        startCapturingLogMessages();
+        getTopoCoord().prepareElectResponse(cbData, args, now++, &responseBuilder, &result);
+        stopCapturingLogMessages();
+        BSONObj response = responseBuilder.obj();
+        ASSERT_EQUALS(1, response["vote"].Int());
+        ASSERT_EQUALS(round, response["round"].OID());
+    }
+
     TEST_F(PrepareElectResponseTest, ElectResponseValidVotes) {
         // Test a valid vote
         ReplicationCoordinator::ReplSetElectArgs args;
