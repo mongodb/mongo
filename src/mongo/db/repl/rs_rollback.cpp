@@ -776,7 +776,7 @@ namespace {
 } // namespace
 
     void syncRollback(OperationContext* txn,
-                      OpTime lastOpTimeWritten,
+                      OpTime lastOpTimeApplied,
                       OplogReader* oplogreader, 
                       ReplicationCoordinator* replCoord) {
         // check that we are at minvalid, otherwise we cannot rollback as we may be in an
@@ -786,10 +786,10 @@ namespace {
             BSONObj mv;
             if( Helpers::getSingleton(txn, "local.replset.minvalid", mv) ) {
                 OpTime minvalid = mv["ts"]._opTime();
-                if( minvalid > lastOpTimeWritten ) {
+                if( minvalid > lastOpTimeApplied ) {
                     severe() << "replSet need to rollback, but in inconsistent state" << endl;
                     log() << "minvalid: " << minvalid.toString() << " our last optime: "
-                          << lastOpTimeWritten.toString() << endl;
+                          << lastOpTimeApplied.toString() << endl;
                     fassertFailedNoTrace(18750);
                     return;
                 }

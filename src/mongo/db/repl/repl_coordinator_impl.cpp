@@ -383,7 +383,9 @@ namespace {
         boost::unique_lock<boost::mutex> lock(_mutex);
 
         SlaveInfoMap::const_iterator it(_slaveInfoMap.find(_getMyRID_inlock()));
-        invariant(it != _slaveInfoMap.end());
+        if (it == _slaveInfoMap.end()) {
+            return OpTime(0,0);
+        }
         return it->second.opTime;
     }
 

@@ -135,12 +135,6 @@ namespace repl {
         replLocalAuth();
 
         while (!inShutdown()) {
-            if (!theReplSet) {
-                log() << "replSet warning did not receive a valid config yet, sleeping 20 seconds " << rsLog;
-                sleepsecs(20);
-                continue;
-            }
-
             try {
                 _producerThread();
             }
@@ -171,12 +165,15 @@ namespace repl {
         }
 
         if (state.startup()) {
-            sleepsecs(5);
+            sleepsecs(1);
             return;
         }
 
         // if this member has an empty oplog, we cannot start syncing
-        if (theReplSet->lastOpTimeWritten.isNull()) {
+        // Note: This logic is insane, but I will keep it here because if we can't
+        // connect the oplogreader for initial sync, it will be unlikely that we can connect
+        // the BGSync oplogreader.
+        if (_replCoord->getMyLastOptime().isNull()) {
             sleepsecs(1);
             return;
         }
@@ -448,7 +445,7 @@ namespace repl {
             lastOpTimeFetched = _lastOpTimeFetched;
         }
         const OpTime sentinel(Milliseconds(curTimeMillis64()).total_seconds(), 0);
-        OpTime oldestOpTimeSeen= sentinel;
+        OpTime oldestOpTimeSeen = sentinel;
 
         while (true) {
             HostAndPort candidate = replCoordImpl->chooseNewSyncSource();
@@ -533,7 +530,7 @@ namespace repl {
                 if (theirTS < _lastOpTimeFetched) {
                     log() << "replSet we are ahead of the sync source, will try to roll back"
                           << rsLog;
-                    syncRollback(txn, theReplSet->lastOpTimeWritten, &r, _replCoord);
+                    syncRollback(txn, _replCoord->getMyLastOptime(), &r, _replCoord);
                     return true;
                 }
                 /* we're not ahead?  maybe our new query got fresher data.  best to come back and try again */
@@ -553,7 +550,7 @@ namespace repl {
         if( ts != _lastOpTimeFetched || h != _lastH ) {
             log() << "replSet our last op time fetched: " << _lastOpTimeFetched.toStringPretty() << rsLog;
             log() << "replset source's GTE: " << ts.toStringPretty() << rsLog;
-            syncRollback(txn, theReplSet->lastOpTimeWritten, &r, _replCoord);
+            syncRollback(txn, _replCoord->getMyLastOptime(), &r, _replCoord);
             return true;
         }
 
@@ -582,7 +579,7 @@ namespace repl {
         _pause = false;
 
         // reset _last fields with current data
-        _lastOpTimeFetched = theReplSet->lastOpTimeWritten;
+        _lastOpTimeFetched = _replCoord->getMyLastOptime();
         _lastH = theReplSet->lastH;
 
         LOG(1) << "replset bgsync fetch queue set to: " << _lastOpTimeFetched << " " << _lastH << rsLog;

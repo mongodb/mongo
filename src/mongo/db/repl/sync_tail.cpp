@@ -268,12 +268,12 @@ namespace repl {
             const BSONObj lastOp = ops.back().getOwned();
 
             multiApply(ops.getDeque());
-            applyOpsToOplog(&ops.getDeque());
+            OpTime lastOpTime = applyOpsToOplog(&ops.getDeque());
 
             setOplogVersion(lastOp);
 
             // if the last op applied was our end, return
-            if (theReplSet->lastOpTimeWritten == endOpTime) {
+            if (lastOpTime == endOpTime) {
                 return;
             }
         } // end of while (true)
@@ -468,7 +468,8 @@ namespace repl {
         return false;
     }
 
-    void SyncTail::applyOpsToOplog(std::deque<BSONObj>* ops) {
+    OpTime SyncTail::applyOpsToOplog(std::deque<BSONObj>* ops) {
+        OpTime lastOpTime;
         {
             OperationContextImpl txn; // XXX?
             Lock::DBWrite lk(txn.lockState(), "local");
@@ -476,8 +477,8 @@ namespace repl {
 
             while (!ops->empty()) {
                 const BSONObj& op = ops->front();
-                // this updates theReplSet->lastOpTimeWritten
-                _logOpObjRS(&txn, op);
+                // this updates lastOpTimeApplied
+                lastOpTime = _logOpObjRS(&txn, op);
                 ops->pop_front();
              }
             wunit.commit();
@@ -489,6 +490,7 @@ namespace repl {
             
         // Update write concern on primary
         BackgroundSync::notify();
+        return lastOpTime;
     }
 
     void SyncTail::handleSlaveDelay(const BSONObj& lastOp) {

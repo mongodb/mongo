@@ -789,8 +789,3 @@ namespace mongo {
 
     }
 }
-
-/* todo
-   test (and handle) disk full on journal append.  best quick thing to do is to terminate.
-   if we roll back operations, there are nuances such as is ReplSetImpl::lastOpTimeWritten too new in ram then?
-*/

@@ -93,7 +93,8 @@ namespace repl {
         // to update local oplog.rs, as well as notify the primary
         // that we have applied the ops.
         // Ops are removed from the deque.
-        void applyOpsToOplog(std::deque<BSONObj>* ops);
+        // Returns the optime of the last op applied.
+        OpTime applyOpsToOplog(std::deque<BSONObj>* ops);
 
     protected:
         // Cap the batches using the limit on journal commits.

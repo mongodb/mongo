@@ -77,6 +77,11 @@ namespace repl {
             return;
         }
 
+        // if we're fsync-and-locked, don't bother checking
+        if (lockedForWriting()) {
+            return;
+        }
+
         Lock::GlobalWrite writeLock(txn->lockState());
 
         // Only state RECOVERING can transition to SECONDARY.
@@ -86,7 +91,7 @@ namespace repl {
         }
 
         OpTime minvalid = getMinValid(txn);
-        if( minvalid > lastOpTimeWritten ) {
+        if (minvalid > getGlobalReplicationCoordinator()->getMyLastOptime()) {
             sethbmsg(str::stream() << "still syncing, not yet to minValid optime " <<
                      minvalid.toString());
             return;
@@ -196,7 +201,9 @@ namespace repl {
         // 1. If the oplog is empty, do an initial sync
         // 2. If minValid has _initialSyncFlag set, do an initial sync
         // 3. If initialSyncRequested is true
-        if (lastOpTimeWritten.isNull() || getInitialSyncFlag() || initialSyncRequested) {
+        if (getGlobalReplicationCoordinator()->getMyLastOptime().isNull() || 
+            getInitialSyncFlag() || 
+            initialSyncRequested) {
             syncDoInitialSync();
             return; // _syncThread will be recalled, starts from top again in case sync failed.
         }

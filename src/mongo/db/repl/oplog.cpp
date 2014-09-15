@@ -119,7 +119,7 @@ namespace repl {
     /** write an op to the oplog that is already built.
         todo : make _logOpRS() call this so we don't repeat ourself?
         */
-    void _logOpObjRS(OperationContext* txn, const BSONObj& op) {
+    OpTime _logOpObjRS(OperationContext* txn, const BSONObj& op) {
         Lock::DBWrite lk(txn->lockState(), "local");
         // XXX soon this needs to be part of an outer WUOW not its own.
         // We can't do this yet due to locking limitations.
@@ -169,6 +169,7 @@ namespace repl {
 
         setNewOptime(ts);
         wunit.commit();
+        return ts;
     }
 
     /**
