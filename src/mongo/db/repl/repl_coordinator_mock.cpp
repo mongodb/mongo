@@ -104,9 +104,9 @@ namespace repl {
         return true;
     }
 
-    Status ReplicationCoordinatorMock::canServeReadsFor(OperationContext* txn,
-                                                        const NamespaceString& ns,
-                                                        bool slaveOk) {
+    Status ReplicationCoordinatorMock::checkCanServeReadsFor(OperationContext* txn,
+                                                             const NamespaceString& ns,
+                                                             bool slaveOk) {
         // TODO
         return Status::OK();
     }

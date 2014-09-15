@@ -159,12 +159,12 @@ namespace repl {
         return legacyResponse;
     }
 
-    Status HybridReplicationCoordinator::canServeReadsFor(OperationContext* txn,
-                                                          const NamespaceString& ns,
-                                                          bool slaveOk) {
-        Status legacyStatus = _legacy.canServeReadsFor(txn, ns, slaveOk);
+    Status HybridReplicationCoordinator::checkCanServeReadsFor(OperationContext* txn,
+                                                               const NamespaceString& ns,
+                                                               bool slaveOk) {
+        Status legacyStatus = _legacy.checkCanServeReadsFor(txn, ns, slaveOk);
         // TODO(dannenberg) uncomment below once the impl state changes are full implemeneted
-        // Status implStatus = _impl.canServeReadsFor(txn, ns, slaveOk);
+        // Status implStatus = _impl.checkCanServeReadsFor(txn, ns, slaveOk);
         // invariant(legacyStatus == implStatus);
         return legacyStatus;
     }

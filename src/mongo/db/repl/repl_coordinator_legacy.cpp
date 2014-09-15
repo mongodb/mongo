@@ -310,9 +310,9 @@ namespace {
         return dbName == "local";
     }
 
-    Status LegacyReplicationCoordinator::canServeReadsFor(OperationContext* txn,
-                                                          const NamespaceString& ns,
-                                                          bool slaveOk) {
+    Status LegacyReplicationCoordinator::checkCanServeReadsFor(OperationContext* txn,
+                                                               const NamespaceString& ns,
+                                                               bool slaveOk) {
         if (txn->isGod()) {
             return Status::OK();
         }

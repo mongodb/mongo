@@ -222,9 +222,9 @@ namespace repl {
          * Returns Status::OK() if it is valid for this node to serve reads on the given collection
          * and an errorcode indicating why the node cannot if it cannot.
          */
-        virtual Status canServeReadsFor(OperationContext* txn,
-                                        const NamespaceString& ns,
-                                        bool slaveOk) = 0;
+        virtual Status checkCanServeReadsFor(OperationContext* txn,
+                                             const NamespaceString& ns,
+                                             bool slaveOk) = 0;
 
         /**
          * Returns true if this node should ignore unique index constraints on new documents.

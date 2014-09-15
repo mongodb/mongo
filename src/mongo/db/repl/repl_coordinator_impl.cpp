@@ -761,9 +761,9 @@ namespace {
         return dbName == "local";
     }
 
-    Status ReplicationCoordinatorImpl::canServeReadsFor(OperationContext* txn,
-                                                        const NamespaceString& ns,
-                                                        bool slaveOk) {
+    Status ReplicationCoordinatorImpl::checkCanServeReadsFor(OperationContext* txn,
+                                                             const NamespaceString& ns,
+                                                             bool slaveOk) {
         if (txn->isGod()) {
             return Status::OK();
         }
