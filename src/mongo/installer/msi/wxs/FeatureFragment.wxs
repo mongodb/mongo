@@ -67,7 +67,7 @@
         <Feature Id="Router"
                  Title ="Router"
                  Description="The MongoDB Router (mongos)"
-                 Level ="1000">
+                 Level ="1">
           <ComponentRef Id="c_mongos"/>
           <ComponentRef Id="c_mongosPdb"/>
           <?if $(var.Edition) = Enterprise ?>
@@ -80,7 +80,7 @@
         <Feature Id="MiscellaneousTools"
                 Title ="Miscellaneous Tools"
                 Description="Miscellaneous MongoDB tools (bsondump, mongofiles, mongooplog, mongoperf)"
-                Level ="1000">
+                Level ="1">
           <ComponentRef Id="c_bsondump"/>
           <ComponentRef Id="c_mongofiles"/>
           <ComponentRef Id="c_mongooplog"/>

@@ -20,14 +20,11 @@ if env['MERGEMODULESBASEPATH'] == None and os.environ.get('ProgramFiles(x86)') !
     env['MERGEMODULESBASEPATH'] = (os.environ.get('ProgramFiles(x86)') +
             r"\Common Files\Merge Modules")
 
-sources = [ "wxs/BinaryFragment.wxs",
-            "wxs/FeatureFragment.wxs",
-            "wxs/LicensingFragment.wxs"
+sourcesList = [ "BinaryFragment.wxs",
+            "FeatureFragment.wxs",
+            "LicensingFragment.wxs",
+            "UIFragment.wxs",
             ]
-objects = [ "$BUILD_DIR/msi/BinaryFragment.wixobj",
-            "$BUILD_DIR/msi/FeatureFragment.wixobj",
-            "$BUILD_DIR/msi/LicensingFragment.wixobj",
-           ]
 
 # Need to do this in order to get scons to translate path separators into native format
 buildDir = Dir(env["BUILD_DIR"]).path
@@ -79,11 +76,12 @@ if 'msi' in BUILD_TARGETS and msi_edition == 'SSL' and msi_flavor != '2008R2Plus
   exit(1)
 
 if msi_platform == 'x64':
-  sources.append("wxs/Installer_64.wxs")
-  objects.append("$BUILD_DIR/msi/Installer_64.wixobj")
+  sourcesList.append("Installer_64.wxs")
 else:
-  sources.append("wxs/Installer.wxs")
-  objects.append("$BUILD_DIR/msi/Installer.wixobj")
+  sourcesList.append("Installer.wxs")
+
+sources = ["wxs/" + file for file in sourcesList]
+objects = ["$BUILD_DIR/msi/" + file.replace(".wxs", ".wixobj") for file in sourcesList]
 
 full_version = mongoCodeVersion.partition('-')[0]
 
@@ -135,13 +133,17 @@ env.Command(objects,
             ' $SOURCES')
 
 #light: link .objs into an msi
-msi = "$BUILD_DIR/msi/${SERVER_DIST_BASENAME}.msi"
-env.Command(msi,
+pre_msi = "$BUILD_DIR/msi/${SERVER_DIST_BASENAME}.pre.msi"
+env.Command(pre_msi,
             objects,
             '"$WIXLIGHT" -out ${TARGET} -wx -cultures:null -sice:ICE82 '
             ' -ext "$WIXUIEXT"'
             ' ${SOURCES}')
 
+msi = "$BUILD_DIR/msi/${SERVER_DIST_BASENAME}.msi"
+env.Command(msi,
+            pre_msi,
+            r'$PYTHON buildscripts\msitrim.py ${SOURCES} ${TARGET}')
 env.AlwaysBuild(msi)
 
 env.Alias( "msi" , msi )

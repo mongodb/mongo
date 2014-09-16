@@ -21,7 +21,7 @@
         </Directory>
       </Directory>
     </Directory>
-    
+
     <Media Id="1" Cabinet="media1.cab" EmbedCab="yes" />
     <WixVariable Id="WixUIDialogBmp" Value="$(var.ProjectDir)Dialog.bmp" />
     <WixVariable Id="WixUIBannerBmp" Value="$(var.ProjectDir)Banner.bmp" />
@@ -40,8 +40,8 @@
     <Icon Id="MongoDBIcon" SourceFile="$(var.ProjectDir)Installer_Icon_32x32.ico" />
 
     <FeatureGroupRef Id="fg_MongoDBAll" />
-    
-    <UIRef Id="WixUI_Mondo" />
+
+    <UIRef Id="MongoWixUI" />
     <UIRef Id="WixUI_ErrorProgressText" />
     <Property Id="WIXUI_INSTALLDIR" Value="INSTALLLOCATION" />
   </Product>
