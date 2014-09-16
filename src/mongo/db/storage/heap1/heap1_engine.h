@@ -52,6 +52,8 @@ namespace mongo {
         virtual DatabaseCatalogEntry* getDatabaseCatalogEntry( OperationContext* opCtx,
                                                                const StringData& db );
 
+        virtual bool supportsDocLocking() const { return false; }
+
         virtual Status closeDatabase(OperationContext* txn, const StringData& db );
 
         virtual Status dropDatabase(OperationContext* txn, const StringData& db );

@@ -99,6 +99,15 @@ namespace mongo {
                                                                const StringData& db ) = 0;
 
         /**
+         * Returns whether the storage engine supports its own locking locking below the collection
+         * level. If the engine returns true, MongoDB will acquire intent locks down to the
+         * collection level and will assume that the engine will ensure consistency at the level of
+         * documents. If false, MongoDB will lock the entire collection in Shared/Exclusive mode
+         * for read/write operations respectively.
+         */
+        virtual bool supportsDocLocking() const = 0;
+
+        /**
          * Closes all file handles associated with a database.
          */
         virtual Status closeDatabase( OperationContext* txn, const StringData& db ) = 0;
