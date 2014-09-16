@@ -384,6 +384,11 @@ namespace mongo {
                                               BSONObjBuilder* result,
                                               double scale ) const {
         string statsString;
+        result->appendBool("capped", _isCapped);
+        if (_isCapped) {
+            result->appendIntOrLL("max", _cappedMaxDocs);
+            result->appendIntOrLL("maxSize", _cappedMaxSize);
+        }
         bool valid = _db->GetProperty( _columnFamily, "rocksdb.stats", &statsString );
         invariant( valid );
         result->append( "stats", statsString );
