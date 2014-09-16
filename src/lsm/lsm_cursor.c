@@ -1442,10 +1442,10 @@ __wt_clsm_open(WT_SESSION_IMPL *session,
 {
 	WT_CONFIG_ITEM cval;
 	WT_CURSOR_STATIC_INIT(iface,
-	    NULL,			/* get-key */
-	    NULL,			/* get-value */
-	    NULL,			/* set-key */
-	    NULL,			/* set-value */
+	    __wt_cursor_get_key,	/* get-key */
+	    __wt_cursor_get_value,	/* get-value */
+	    __wt_cursor_set_key,	/* set-key */
+	    __wt_cursor_set_value,	/* set-value */
 	    __clsm_compare,		/* compare */
 	    __clsm_next,		/* next */
 	    __clsm_prev,		/* prev */

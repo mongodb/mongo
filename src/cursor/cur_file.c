@@ -340,10 +340,10 @@ __wt_curfile_create(WT_SESSION_IMPL *session,
     WT_CURSOR **cursorp)
 {
 	WT_CURSOR_STATIC_INIT(iface,
-	    NULL,			/* get-key */
-	    NULL,			/* get-value */
-	    NULL,			/* set-key */
-	    NULL,			/* set-value */
+	    __wt_cursor_get_key,	/* get-key */
+	    __wt_cursor_get_value,	/* get-value */
+	    __wt_cursor_set_key,	/* set-key */
+	    __wt_cursor_set_value,	/* set-value */
 	    __curfile_compare,		/* compare */
 	    __curfile_next,		/* next */
 	    __curfile_prev,		/* prev */
