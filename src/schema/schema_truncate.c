@@ -88,7 +88,7 @@ __truncate_dsrc(WT_SESSION_IMPL *session, const char *uri)
 	WT_ERR_NOTFOUND_OK(ret);
 
 err:	WT_TRET(cursor->close(cursor));
-	return (0);
+	return (ret);
 }
 
 /*
