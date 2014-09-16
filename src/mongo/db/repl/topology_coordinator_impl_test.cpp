@@ -78,9 +78,8 @@ namespace {
         }
 
         void makeSelfPrimary(const OpTime& electionOpTime = OpTime(0,0)) {
-            setSelfMemberState(MemberState::RS_PRIMARY);
+            getTopoCoord().changeMemberState_forTest(MemberState::RS_PRIMARY, electionOpTime);
             getTopoCoord()._setCurrentPrimaryForTest(_selfIndex);
-            getTopoCoord()._setElectionTime(electionOpTime);
         }
 
         void setSelfMemberState(const MemberState& newState) {
@@ -2042,6 +2041,224 @@ namespace {
         ASSERT_TRUE(response.obj().isEmpty());
     }
 
+    class PrepareHeartbeatResponseTest : public TopoCoordTest {
+    public:
+
+        virtual void setUp() {
+            TopoCoordTest::setUp();
+            updateConfig(BSON("_id" << "rs0" <<
+                              "version" << 1 <<
+                              "members" << BSON_ARRAY(
+                                  BSON("_id" << 10 << "host" << "hself") <<
+                                  BSON("_id" << 20 << "host" << "h2") <<
+                                  BSON("_id" << 30 << "host" << "h3"))),
+                         0);
+            setSelfMemberState(MemberState::RS_SECONDARY);
+        }
+
+        void prepareHeartbeatResponse(const ReplSetHeartbeatArgs& args,
+                                      OpTime lastOpApplied,
+                                      ReplSetHeartbeatResponse* response,
+                                      Status* result) {
+            getTopoCoord().prepareHeartbeatResponse(cbData(),
+                                                    now()++,
+                                                    args,
+                                                    "rs0",
+                                                    lastOpApplied,
+                                                    response,
+                                                    result);
+        }
+
+    };
+
+    TEST_F(PrepareHeartbeatResponseTest, PrepareHeartbeatResponseBadProtocolVersion) {
+        // set up args with bad protocol version
+        ReplSetHeartbeatArgs args;
+        args.setProtocolVersion(3);
+        ReplSetHeartbeatResponse response;
+        Status result(ErrorCodes::InternalError, "prepareHeartbeatResponse didn't set result");
+
+        // prepare response and check the results
+        prepareHeartbeatResponse(args, OpTime(0,0), &response, &result);
+        ASSERT_EQUALS(ErrorCodes::BadValue, result);
+        ASSERT_EQUALS("replset: incompatible replset protocol version: 3", result.reason());
+        ASSERT_EQUALS("", response.getHbMsg());
+    }
+
+    TEST_F(PrepareHeartbeatResponseTest, PrepareHeartbeatResponseBadSetName) {
+        // set up args with incorrect replset name
+        ReplSetHeartbeatArgs args;
+        args.setProtocolVersion(1);
+        args.setSetName("rs1");
+        ReplSetHeartbeatResponse response;
+        Status result(ErrorCodes::InternalError, "prepareHeartbeatResponse didn't set result");
+
+        // prepare response and check the results, including log messages
+        startCapturingLogMessages();
+        prepareHeartbeatResponse(args, OpTime(0,0), &response, &result);
+        stopCapturingLogMessages();
+        ASSERT_EQUALS(ErrorCodes::BadValue, result);
+        ASSERT_EQUALS("repl set names do not match", result.reason());
+        ASSERT_EQUALS(1,
+                      countLogLinesContaining("replSet set names do not match, ours: rs0; remote "
+                            "node's: rs1"));
+        ASSERT_TRUE(response.isMismatched());
+        ASSERT_EQUALS("", response.getHbMsg());
+    }
+
+    TEST_F(PrepareHeartbeatResponseTest, PrepareHeartbeatResponseSenderIDMissing) {
+        // set up args without a senderID
+        ReplSetHeartbeatArgs args;
+        args.setProtocolVersion(1);
+        args.setSetName("rs0");
+        args.setConfigVersion(1);
+        ReplSetHeartbeatResponse response;
+        Status result(ErrorCodes::InternalError, "prepareHeartbeatResponse didn't set result");
+
+        // prepare response and check the results
+        prepareHeartbeatResponse(args, OpTime(0,0), &response, &result);
+        ASSERT_OK(result);
+        ASSERT_FALSE(response.isElectable());
+        ASSERT_TRUE(response.isReplSet());
+        ASSERT_EQUALS(MemberState::RS_SECONDARY, response.getState().s);
+        ASSERT_EQUALS(OpTime(0,0), response.getOpTime());
+        ASSERT_EQUALS(Seconds(0).total_milliseconds(), response.getTime().total_milliseconds());
+        ASSERT_EQUALS("", response.getHbMsg());
+        ASSERT_EQUALS("rs0", response.getReplicaSetName());
+        ASSERT_EQUALS(1, response.getVersion());
+    }
+
+    TEST_F(PrepareHeartbeatResponseTest, PrepareHeartbeatResponseConfigVersionLow) {
+        // set up args with a config version lower than ours
+        ReplSetHeartbeatArgs args;
+        args.setProtocolVersion(1);
+        args.setConfigVersion(0);
+        args.setSetName("rs0");
+        args.setSenderId(20);
+        ReplSetHeartbeatResponse response;
+        Status result(ErrorCodes::InternalError, "prepareHeartbeatResponse didn't set result");
+
+        // prepare response and check the results
+        prepareHeartbeatResponse(args, OpTime(0,0), &response, &result);
+        ASSERT_OK(result);
+        ASSERT_TRUE(response.hasConfig());
+        ASSERT_FALSE(response.isElectable());
+        ASSERT_TRUE(response.isReplSet());
+        ASSERT_EQUALS(MemberState::RS_SECONDARY, response.getState().s);
+        ASSERT_EQUALS(OpTime(0,0), response.getOpTime());
+        ASSERT_EQUALS(Seconds(0).total_milliseconds(), response.getTime().total_milliseconds());
+        ASSERT_EQUALS("", response.getHbMsg());
+        ASSERT_EQUALS("rs0", response.getReplicaSetName());
+        ASSERT_EQUALS(1, response.getVersion());
+    }
+
+    TEST_F(PrepareHeartbeatResponseTest, PrepareHeartbeatResponseSenderDown) {
+        // set up args with sender down from our perspective
+        ReplSetHeartbeatArgs args;
+        args.setProtocolVersion(1);
+        args.setConfigVersion(1);
+        args.setSetName("rs0");
+        args.setSenderId(20);
+        ReplSetHeartbeatResponse response;
+        Status result(ErrorCodes::InternalError, "prepareHeartbeatResponse didn't set result");
+
+        // prepare response and check the results
+        prepareHeartbeatResponse(args, OpTime(0,0), &response, &result);
+        ASSERT_OK(result);
+        ASSERT_FALSE(response.isElectable());
+        ASSERT_TRUE(response.isReplSet());
+        ASSERT_EQUALS(MemberState::RS_SECONDARY, response.getState().s);
+        ASSERT_EQUALS(OpTime(0,0), response.getOpTime());
+        ASSERT_EQUALS(Seconds(0).total_milliseconds(), response.getTime().total_milliseconds());
+        ASSERT_EQUALS("", response.getHbMsg());
+        ASSERT_EQUALS("rs0", response.getReplicaSetName());
+        ASSERT_EQUALS(1, response.getVersion());
+        ASSERT_TRUE(response.isStateDisagreement());
+    }
+
+    TEST_F(PrepareHeartbeatResponseTest, PrepareHeartbeatResponseSenderUp) {
+        // set up args and acknowledge sender
+        heartbeatFromMember(HostAndPort("h2"), "rs0", MemberState::RS_SECONDARY, OpTime(0,0));
+        ReplSetHeartbeatArgs args;
+        args.setProtocolVersion(1);
+        args.setConfigVersion(1);
+        args.setSetName("rs0");
+        args.setSenderId(20);
+        ReplSetHeartbeatResponse response;
+        Status result(ErrorCodes::InternalError, "prepareHeartbeatResponse didn't set result");
+
+        // prepare response and check the results
+        prepareHeartbeatResponse(args, OpTime(0,0), &response, &result);
+        ASSERT_OK(result);
+        // this change to true because we can now see a majority, unlike in the previous cases
+        ASSERT_TRUE(response.isElectable());
+        ASSERT_TRUE(response.isReplSet());
+        ASSERT_EQUALS(MemberState::RS_SECONDARY, response.getState().s);
+        ASSERT_EQUALS(OpTime(0,0), response.getOpTime());
+        ASSERT_EQUALS(Seconds(0).total_milliseconds(), response.getTime().total_milliseconds());
+        ASSERT_EQUALS("", response.getHbMsg());
+        ASSERT_EQUALS("rs0", response.getReplicaSetName());
+        ASSERT_EQUALS(1, response.getVersion());
+    }
+
+    TEST_F(PrepareHeartbeatResponseTest, PrepareHeartbeatResponseAsPrimary) {
+        makeSelfPrimary(OpTime(10,0));
+        heartbeatFromMember(HostAndPort("h2"), "rs0", MemberState::RS_SECONDARY, OpTime(0,0));
+
+        ReplSetHeartbeatArgs args;
+        args.setProtocolVersion(1);
+        args.setConfigVersion(1);
+        args.setSetName("rs0");
+        args.setSenderId(20);
+        ReplSetHeartbeatResponse response;
+        Status result(ErrorCodes::InternalError, "prepareHeartbeatResponse didn't set result");
+
+        // prepare response and check the results
+        prepareHeartbeatResponse(args, OpTime(11,0), &response, &result);
+        ASSERT_OK(result);
+        // cannot be elected because we are already primary
+        ASSERT_FALSE(response.isElectable());
+        ASSERT_TRUE(response.isReplSet());
+        ASSERT_EQUALS(MemberState::RS_PRIMARY, response.getState().s);
+        ASSERT_EQUALS(OpTime(11,0), response.getOpTime());
+        ASSERT_EQUALS(OpTime(10,0), response.getElectionTime());
+        ASSERT_EQUALS(Seconds(0).total_milliseconds(), response.getTime().total_milliseconds());
+        ASSERT_EQUALS("", response.getHbMsg());
+        ASSERT_EQUALS("rs0", response.getReplicaSetName());
+        ASSERT_EQUALS(1, response.getVersion());
+    }
+
+    TEST_F(PrepareHeartbeatResponseTest, PrepareHeartbeatResponseWithSyncSource) {
+        // get a sync source
+        heartbeatFromMember(HostAndPort("h3"), "rs0", MemberState::RS_SECONDARY, OpTime(0,0));
+        heartbeatFromMember(HostAndPort("h3"), "rs0", MemberState::RS_SECONDARY, OpTime(0,0));
+        heartbeatFromMember(HostAndPort("h2"), "rs0", MemberState::RS_SECONDARY, OpTime(1,0));
+        heartbeatFromMember(HostAndPort("h2"), "rs0", MemberState::RS_SECONDARY, OpTime(1,0));
+        getTopoCoord().chooseNewSyncSource(now()++, OpTime(0,0));
+
+        // set up args
+        ReplSetHeartbeatArgs args;
+        args.setProtocolVersion(1);
+        args.setConfigVersion(1);
+        args.setSetName("rs0");
+        args.setSenderId(20);
+        ReplSetHeartbeatResponse response;
+        Status result(ErrorCodes::InternalError, "prepareHeartbeatResponse didn't set result");
+
+        // prepare response and check the results
+        prepareHeartbeatResponse(args, OpTime(0,0), &response, &result);
+        ASSERT_OK(result);
+        ASSERT_TRUE(response.isElectable());
+        ASSERT_TRUE(response.isReplSet());
+        ASSERT_EQUALS(MemberState::RS_SECONDARY, response.getState().s);
+        ASSERT_EQUALS(OpTime(0,0), response.getOpTime());
+        ASSERT_EQUALS(Seconds(0).total_milliseconds(), response.getTime().total_milliseconds());
+        // changed to a syncing message because our sync source changed recently
+        ASSERT_EQUALS("syncing to: h2:27017", response.getHbMsg());
+        ASSERT_EQUALS("rs0", response.getReplicaSetName());
+        ASSERT_EQUALS(1, response.getVersion());
+        ASSERT_EQUALS(HostAndPort("h2").toString(), response.getSyncingTo());
+    }
 }  // namespace
 }  // namespace repl
 }  // namespace mongo

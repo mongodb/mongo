@@ -1022,7 +1022,8 @@ namespace {
         return maxIndex;
     }
 
-    void TopologyCoordinatorImpl::changeMemberState_forTest(const MemberState& newMemberState) {
+    void TopologyCoordinatorImpl::changeMemberState_forTest(const MemberState& newMemberState,
+                                                            OpTime electionTime) {
         invariant(_selfIndex != -1);
         if (newMemberState == getMemberState())
             return;
@@ -1034,7 +1035,7 @@ namespace {
                     hbData.getLastHeartbeat(),
                     OID(),
                     OpTime(0, 0),
-                    OpTime(0, 0));
+                    electionTime);
             invariant(_role == Role::leader);
             break;
         case MemberState::RS_SECONDARY:

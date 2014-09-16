@@ -197,7 +197,8 @@ namespace repl {
         ////////////////////////////////////////////////////////////
 
         // Changes _memberState to newMemberState.  Only for testing.
-        virtual void changeMemberState_forTest(const MemberState& newMemberState);
+        void changeMemberState_forTest(const MemberState& newMemberState,
+                                       OpTime electionTime = OpTime(0,0));
 
         // Sets "_electionTime" to "newElectionTime".  Only for testing.
         void _setElectionTime(const OpTime& newElectionTime);

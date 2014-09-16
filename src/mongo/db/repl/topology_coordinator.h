@@ -312,7 +312,8 @@ namespace repl {
         // Testing interface
         //
         ////////////////////////////////////////////////////////////
-        virtual void changeMemberState_forTest(const MemberState& newState) = 0;
+        virtual void changeMemberState_forTest(const MemberState& newState,
+                                               OpTime electionTime = OpTime(0,0)) = 0;
 
     protected:
         TopologyCoordinator() {}
