@@ -536,8 +536,8 @@ int
 __wt_cursor_init(WT_CURSOR *cursor,
     const char *uri, WT_CURSOR *owner, const char *cfg[], WT_CURSOR **cursorp)
 {
-	WT_CURSOR *cdump;
 	WT_CONFIG_ITEM cval;
+	WT_CURSOR *cdump;
 	WT_SESSION_IMPL *session;
 
 	session = (WT_SESSION_IMPL *)cursor->session;
