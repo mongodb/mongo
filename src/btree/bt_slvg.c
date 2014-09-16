@@ -115,7 +115,7 @@ struct __wt_track {
 static int  __slvg_cleanup(WT_SESSION_IMPL *, WT_STUFF *);
 static int  __slvg_col_build_internal(WT_SESSION_IMPL *, uint32_t, WT_STUFF *);
 static int  __slvg_col_build_leaf(WT_SESSION_IMPL *, WT_TRACK *, WT_REF *);
-static int  __slvg_col_merge_ovfl(
+static int  __slvg_col_ovfl(
 		WT_SESSION_IMPL *, WT_TRACK *, WT_PAGE *, uint64_t, uint64_t);
 static int  __slvg_col_range(WT_SESSION_IMPL *, WT_STUFF *);
 static int  __slvg_col_range_missing(WT_SESSION_IMPL *, WT_STUFF *);
@@ -126,13 +126,13 @@ static int  __slvg_merge_block_free(WT_SESSION_IMPL *, WT_STUFF *);
 static int  __slvg_ovfl_compare(const void *, const void *);
 static int  __slvg_ovfl_discard(WT_SESSION_IMPL *, WT_STUFF *);
 static int  __slvg_ovfl_reconcile(WT_SESSION_IMPL *, WT_STUFF *);
-static int  __slvg_ovfl_ref(WT_SESSION_IMPL *, WT_TRACK *);
+static int  __slvg_ovfl_ref(WT_SESSION_IMPL *, WT_TRACK *, int);
 static int  __slvg_ovfl_ref_all(WT_SESSION_IMPL *, WT_TRACK *);
 static int  __slvg_read(WT_SESSION_IMPL *, WT_STUFF *);
 static int  __slvg_row_build_internal(WT_SESSION_IMPL *, uint32_t, WT_STUFF *);
 static int  __slvg_row_build_leaf(
 		WT_SESSION_IMPL *, WT_TRACK *, WT_REF *, WT_STUFF *);
-static int  __slvg_row_merge_ovfl(
+static int  __slvg_row_ovfl(
 		WT_SESSION_IMPL *, WT_TRACK *, WT_PAGE *, uint32_t, uint32_t);
 static int  __slvg_row_range(WT_SESSION_IMPL *, WT_STUFF *);
 static int  __slvg_row_range_overlap(
@@ -203,10 +203,37 @@ __wt_bt_salvage(WT_SESSION_IMPL *session, WT_CKPT *ckptbase, const char *cfg[])
 
 	/*
 	 * Step 3:
-	 * Review the relationships between the pages and the overflow items.
+	 * Discard any page referencing a non-existent overflow page.  We do
+	 * this before checking overlapping key ranges on the grounds that a
+	 * bad key range we can use is better than a terrific key range that
+	 * references pages we don't have. On the other hand, we subsequently
+	 * discard key ranges where there are better overlapping ranges, and
+	 * it would be better if we let the availability of an overflow value
+	 * inform our choices as to the key ranges we select, ideally on a
+	 * per-key basis.
+	 *
+	 * A complicating problem is found in variable-length column-store
+	 * objects, where we potentially split key ranges within RLE units.
+	 * For example, if there's a page with rows 15-20 and we later find
+	 * row 17 with a larger LSN, the range splits into 3 chunks, 15-16,
+	 * 17, and 18-20.  If rows 15-20 were originally a single value (an
+	 * RLE of 6), and that record is an overflow record, we end up with
+	 * two chunks, both of which want to reference the same overflow value.
+	 *
+	 * Instead of the approach just described, we're first discarding any
+	 * pages referencing non-existent overflow pages, then we're reviewing
+	 * our key ranges and discarding any that overlap.  We're doing it that
+	 * way for a few reasons: absent corruption, missing overflow items are
+	 * strong arguments the page was replaced (on the other hand, some kind
+	 * of file corruption is probably why we're here); it's a significant
+	 * amount of additional complexity to simultaneously juggle overlapping
+	 * ranges and missing overflow items; finally, real-world applications
+	 * usually don't have a lot of overflow items, as WiredTiger supports
+	 * very large page sizes, overflow items shouldn't be common.
 	 *
 	 * Step 4:
-	 * Add unreferenced overflow page blocks to the free list.
+	 * Add unreferenced overflow page blocks to the free list so they are
+	 * reused immediately.
 	 */
 	if (ss->ovfl_next != 0) {
 		WT_ERR(__slvg_ovfl_reconcile(session, ss));
@@ -1239,7 +1266,7 @@ __slvg_col_build_leaf(WT_SESSION_IMPL *session, WT_TRACK *trk, WT_REF *ref)
 
 	/* Set the referenced flag on overflow pages we're using. */
 	if (page->type == WT_PAGE_COL_VAR && trk->trk_ovfl_cnt != 0)
-		WT_ERR(__slvg_col_merge_ovfl(session, trk, page, skip, take));
+		WT_ERR(__slvg_col_ovfl(session, trk, page, skip, take));
 
 	/*
 	 * If we're missing some part of the range, the real start range is in
@@ -1293,12 +1320,12 @@ err:		WT_TRET(__wt_page_release(session, ref, 0));
 }
 
 /*
- * __slvg_col_merge_ovfl_single --
+ * __slvg_col_ovfl_single --
  *	Find a single overflow record in the merge page's list, and mark it as
  * referenced.
  */
 static int
-__slvg_col_merge_ovfl_single(
+__slvg_col_ovfl_single(
     WT_SESSION_IMPL *session, WT_TRACK *trk, WT_CELL_UNPACK *unpack)
 {
 	WT_TRACK *ovfl;
@@ -1312,7 +1339,7 @@ __slvg_col_merge_ovfl_single(
 		ovfl = trk->ss->ovfl[trk->trk_ovfl_slot[i]];
 		if (unpack->size == ovfl->trk_addr_size &&
 		    memcmp(unpack->data, ovfl->trk_addr, unpack->size) == 0)
-			return (__slvg_ovfl_ref(session, ovfl));
+			return (__slvg_ovfl_ref(session, ovfl, 0));
 	}
 
 	WT_PANIC_RET(session,
@@ -1320,16 +1347,17 @@ __slvg_col_merge_ovfl_single(
 }
 
 /*
- * __slvg_col_merge_ovfl --
+ * __slvg_col_ovfl --
  *	Mark overflow items referenced by the merged page.
  */
 static int
-__slvg_col_merge_ovfl(WT_SESSION_IMPL *session,
+__slvg_col_ovfl(WT_SESSION_IMPL *session,
     WT_TRACK *trk, WT_PAGE *page, uint64_t skip, uint64_t take)
 {
 	WT_CELL_UNPACK unpack;
 	WT_CELL *cell;
 	WT_COL *cip;
+	WT_DECL_RET;
 	uint64_t recno, start, stop;
 	uint32_t i;
 
@@ -1359,9 +1387,28 @@ __slvg_col_merge_ovfl(WT_SESSION_IMPL *session,
 		 * because stop is the last record wanted, if the record number
 		 * equals stop, we want the next record.
 		 */
-		if (recno > start && unpack.type == WT_CELL_VALUE_OVFL)
-			WT_RET(__slvg_col_merge_ovfl_single(
-			    session, trk, &unpack));
+		if (recno > start && unpack.type == WT_CELL_VALUE_OVFL) {
+			ret = __slvg_col_ovfl_single(session, trk, &unpack);
+
+			/*
+			 * When handling overlapping ranges on variable-length
+			 * column-store leaf pages, we split ranges without
+			 * considering if we were splitting RLE units.  (See
+			 * note at the beginning of this file for explanation
+			 * of the overall process.) If the RLE unit was on-page,
+			 * we can simply write it again. If the RLE unit was an
+			 * overflow value that's already been used by another
+			 * row (from some other page created by a range split),
+			 * there's not much to do, this row can't reference an
+			 * overflow record we don't have: delete the row.
+			 */
+			if (ret == EBUSY) {
+				__wt_cell_type_reset(session,
+				    cell, WT_CELL_VALUE_OVFL, WT_CELL_DEL);
+				ret = 0;
+			}
+			WT_RET(ret);
+		}
 		if (recno > stop)
 			break;
 	}
@@ -1936,7 +1983,7 @@ __slvg_row_build_leaf(
 
 	/* Set the referenced flag on overflow pages we're using. */
 	if (trk->trk_ovfl_cnt != 0)
-		WT_ERR(__slvg_row_merge_ovfl(session,
+		WT_ERR(__slvg_row_ovfl(session,
 		    trk, page, skip_start, page->pg_row_entries - skip_stop));
 
 	/*
@@ -1984,13 +2031,12 @@ err:		WT_TRET(__wt_page_release(session, ref, 0));
 }
 
 /*
- * __slvg_row_merge_ovfl_single --
+ * __slvg_row_ovfl_single --
  *	Find a single overflow record in the merge page's list, and mark it as
  * referenced.
  */
 static int
-__slvg_row_merge_ovfl_single(
-    WT_SESSION_IMPL *session, WT_TRACK *trk, WT_CELL *cell)
+__slvg_row_ovfl_single(WT_SESSION_IMPL *session, WT_TRACK *trk, WT_CELL *cell)
 {
 	WT_CELL_UNPACK unpack;
 	WT_TRACK *ovfl;
@@ -2010,7 +2056,7 @@ __slvg_row_merge_ovfl_single(
 		ovfl = trk->ss->ovfl[trk->trk_ovfl_slot[i]];
 		if (unpack.size == ovfl->trk_addr_size &&
 		    memcmp(unpack.data, ovfl->trk_addr, unpack.size) == 0)
-			return (__slvg_ovfl_ref(session, ovfl));
+			return (__slvg_ovfl_ref(session, ovfl, 1));
 	}
 
 	WT_PANIC_RET(session,
@@ -2018,11 +2064,11 @@ __slvg_row_merge_ovfl_single(
 }
 
 /*
- * __slvg_row_merge_ovfl --
+ * __slvg_row_ovfl --
  *	Mark overflow items referenced by the merged page.
  */
 static int
-__slvg_row_merge_ovfl(WT_SESSION_IMPL *session,
+__slvg_row_ovfl(WT_SESSION_IMPL *session,
     WT_TRACK *trk, WT_PAGE *page, uint32_t start, uint32_t stop)
 {
 	WT_CELL *cell;
@@ -2038,12 +2084,10 @@ __slvg_row_merge_ovfl(WT_SESSION_IMPL *session,
 		(void)__wt_row_leaf_key_info(
 		    page, copy, NULL, &cell, NULL, NULL);
 		if (cell != NULL)
-			WT_RET(
-			    __slvg_row_merge_ovfl_single(session, trk, cell));
+			WT_RET(__slvg_row_ovfl_single(session, trk, cell));
 		cell = __wt_row_leaf_value_cell(page, rip, NULL);
 		if (cell != NULL)
-			WT_RET(
-			    __slvg_row_merge_ovfl_single(session, trk, cell));
+			WT_RET(__slvg_row_ovfl_single(session, trk, cell));
 	}
 	return (0);
 }
@@ -2113,18 +2157,6 @@ __slvg_ovfl_reconcile(WT_SESSION_IMPL *session, WT_STUFF *ss)
 	slot = NULL;
 
 	/*
-	 * Discard any page referencing a non-existent overflow page.  We do
-	 * this before checking overlapping key ranges on the grounds that a
-	 * bad key range we can use is better than a terrific key range that
-	 * references pages we don't have.
-	 *
-	 * An alternative would be to discard only the on-page item referencing
-	 * the missing overflow item.  We're not doing that because: (1) absent
-	 * corruption, a missing overflow item is a strong argument the page was
-	 * replaced (but admittedly, corruption is probably why we're here); (2)
-	 * it's a lot of work, and as WiredTiger supports very large page sizes,
-	 * overflow items simply shouldn't be common.
-	 *
 	 * If an overflow page is referenced more than once, discard leaf pages
 	 * with the lowest LSNs until overflow pages are only referenced once.
 	 *
@@ -2314,12 +2346,15 @@ __slvg_merge_block_free(WT_SESSION_IMPL *session, WT_STUFF *ss)
  *	Reference an overflow page, checking for multiple references.
  */
 static int
-__slvg_ovfl_ref(WT_SESSION_IMPL *session, WT_TRACK *trk)
+__slvg_ovfl_ref(WT_SESSION_IMPL *session, WT_TRACK *trk, int multi_panic)
 {
-	if (F_ISSET(trk, WT_TRACK_OVFL_REFD))
+	if (F_ISSET(trk, WT_TRACK_OVFL_REFD)) {
+		if (!multi_panic)
+			return (EBUSY);
 		WT_PANIC_RET(session, EINVAL,
-		    "overflow record referenced multiple times during leaf "
-		    "page merge");
+		    "overflow record unexpectedly referenced multiple times "
+		    "during leaf page merge");
+	}
 
 	F_SET(trk, WT_TRACK_OVFL_REFD);
 	return (0);
@@ -2336,7 +2371,7 @@ __slvg_ovfl_ref_all(WT_SESSION_IMPL *session, WT_TRACK *trk)
 
 	for (i = 0; i < trk->trk_ovfl_cnt; ++i)
 		WT_RET(__slvg_ovfl_ref(
-		    session, trk->ss->ovfl[trk->trk_ovfl_slot[i]]));
+		    session, trk->ss->ovfl[trk->trk_ovfl_slot[i]], 1));
 
 	return (0);
 }
