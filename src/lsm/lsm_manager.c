@@ -444,6 +444,24 @@ __wt_lsm_manager_clear_tree(
 }
 
 /*
+ * We assume this is only called from __wt_lsm_manager_pop_entry and we
+ * have session, entry and type available to use.  If the queue is empty
+ * we may return from the macro.
+ */
+#define	LSM_POP_ENTRY(qh, qlock) do {					\
+	if (TAILQ_EMPTY(qh))						\
+		return (0);						\
+	__wt_spin_lock(session, qlock);					\
+	TAILQ_FOREACH(entry, (qh), q) {					\
+		if (FLD_ISSET(type, entry->type)) {			\
+			TAILQ_REMOVE(qh, entry, q);			\
+			break;						\
+		}							\
+	}								\
+	__wt_spin_unlock(session, (qlock));				\
+} while (0)
+
+/*
  * __wt_lsm_manager_pop_entry --
  *	Retrieve the head of the queue, if it matches the requested work
  *	unit type.
@@ -459,67 +477,31 @@ __wt_lsm_manager_pop_entry(
 	*entryp = NULL;
 	entry = NULL;
 
-	switch (type) {
-	case WT_LSM_WORK_SWITCH:
-		if (TAILQ_EMPTY(&manager->switchqh))
-			return (0);
-
-		__wt_spin_lock(session, &manager->switch_lock);
-		if (!TAILQ_EMPTY(&manager->switchqh)) {
-			entry = TAILQ_FIRST(&manager->switchqh);
-			WT_ASSERT(session, entry != NULL);
-			TAILQ_REMOVE(&manager->switchqh, entry, q);
-		}
-		__wt_spin_unlock(session, &manager->switch_lock);
-		break;
-	case WT_LSM_WORK_MERGE:
-		if (TAILQ_EMPTY(&manager->managerqh))
-			return (0);
-
-		__wt_spin_lock(session, &manager->manager_lock);
-		if (!TAILQ_EMPTY(&manager->managerqh)) {
-			entry = TAILQ_FIRST(&manager->managerqh);
-			WT_ASSERT(session, entry != NULL);
-			if (FLD_ISSET(entry->type, type))
-				TAILQ_REMOVE(&manager->managerqh, entry, q);
-			else
-				entry = NULL;
-		}
-
-		__wt_spin_unlock(session, &manager->manager_lock);
-		break;
-	default:
-		/*
-		 * The app queue is the only one that has multiple different
-		 * work unit types, allow a request for a variety.
-		 */
-		WT_ASSERT(session, FLD_ISSET(type, WT_LSM_WORK_BLOOM) ||
-		    FLD_ISSET(type, WT_LSM_WORK_DROP) ||
-		    FLD_ISSET(type, WT_LSM_WORK_FLUSH));
-		if (TAILQ_EMPTY(&manager->appqh))
-			return (0);
-
-		__wt_spin_lock(session, &manager->app_lock);
-		/*
-		 * Find and remove the first entry in the queue that matches the
-		 * request.
-		 */
-		for (entry = TAILQ_FIRST(&manager->appqh);
-		    entry != NULL;
-		    entry = TAILQ_NEXT(entry, q)) {
-			if (FLD_ISSET(type, entry->type)) {
-				TAILQ_REMOVE(&manager->appqh, entry, q);
-				break;
-			}
-		}
-		__wt_spin_unlock(session, &manager->app_lock);
-		break;
-	}
+	/*
+	 * Pop the entry off the correct queue based on our work type.
+	 */
+	if (type == WT_LSM_WORK_SWITCH)
+		LSM_POP_ENTRY(&manager->switchqh, &manager->switch_lock);
+	else if (type == WT_LSM_WORK_MERGE)
+		LSM_POP_ENTRY(&manager->managerqh, &manager->manager_lock);
+	else
+		LSM_POP_ENTRY(&manager->appqh, &manager->app_lock);
 	if (entry != NULL)
 		WT_STAT_FAST_CONN_INCR(session, lsm_work_units_done);
 	*entryp = entry;
 	return (0);
 }
+
+/*
+ * Push a work unit onto the appropriate queue.  This macro assumes we are
+ * called from __wt_lsm_manager_push_entry and we have session and entry
+ * available for use.
+ */
+#define	LSM_PUSH_ENTRY(qh, qlock) do {					\
+	__wt_spin_lock(session, qlock);					\
+	TAILQ_INSERT_TAIL((qh), entry, q);				\
+	__wt_spin_unlock(session, qlock);				\
+} while (0)
 
 /*
  * __wt_lsm_manager_push_entry --
@@ -543,26 +525,12 @@ __wt_lsm_manager_push_entry(WT_SESSION_IMPL *session,
 	(void)WT_ATOMIC_ADD(lsm_tree->queue_ref, 1);
 	WT_STAT_FAST_CONN_INCR(session, lsm_work_units_created);
 
-	switch (type) {
-	case WT_LSM_WORK_SWITCH:
-		__wt_spin_lock(session, &manager->switch_lock);
-		TAILQ_INSERT_TAIL(&manager->switchqh, entry, q);
-		__wt_spin_unlock(session, &manager->switch_lock);
-		break;
-	case WT_LSM_WORK_BLOOM:
-	case WT_LSM_WORK_DROP:
-	case WT_LSM_WORK_FLUSH:
-		__wt_spin_lock(session, &manager->app_lock);
-		TAILQ_INSERT_TAIL(&manager->appqh, entry, q);
-		__wt_spin_unlock(session, &manager->app_lock);
-		break;
-	case WT_LSM_WORK_MERGE:
-		__wt_spin_lock(session, &manager->manager_lock);
-		TAILQ_INSERT_TAIL(&manager->managerqh, entry, q);
-		__wt_spin_unlock(session, &manager->manager_lock);
-		break;
-	WT_ILLEGAL_VALUE(session);
-	}
+	if (type == WT_LSM_WORK_SWITCH)
+		LSM_PUSH_ENTRY(&manager->switchqh, &manager->switch_lock);
+	else if (type == WT_LSM_WORK_MERGE)
+		LSM_PUSH_ENTRY(&manager->managerqh, &manager->manager_lock);
+	else
+		LSM_PUSH_ENTRY(&manager->appqh, &manager->app_lock);
 
 	WT_RET(__wt_cond_signal(session, manager->work_cond));
 
