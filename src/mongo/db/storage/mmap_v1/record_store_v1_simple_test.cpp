@@ -31,6 +31,7 @@
 #include "mongo/db/storage/mmap_v1/record_store_v1_simple.h"
 
 #include "mongo/db/operation_context_noop.h"
+#include "mongo/db/storage/mmap_v1/extent.h"
 #include "mongo/db/storage/mmap_v1/record.h"
 #include "mongo/db/storage/mmap_v1/record_store_v1_test_help.h"
 #include "mongo/unittest/unittest.h"
@@ -767,6 +768,49 @@ namespace {
                 {DiskLoc(0, 3800),  75},
                 {DiskLoc(0, 3900),  75},
                 {DiskLoc(0, 9000), 140},
+                {}
+            };
+            assertStateV1RS(&txn, recs, drecs, &em, md);
+        }
+    }
+
+    // -----------------
+
+    TEST( SimpleRecordStoreV1, Truncate ) {
+        OperationContextNoop txn;
+        DummyExtentManager em;
+        DummyRecordStoreV1MetaData* md = new DummyRecordStoreV1MetaData( false, 0 );
+        SimpleRecordStoreV1 rs( &txn, "test.foo", md, &em, false );
+
+        {
+            LocAndSize recs[] = {
+                {DiskLoc(0, 1000), 100},
+                {DiskLoc(0, 1100), 100},
+                {DiskLoc(0, 1300), 100},
+                {DiskLoc(2, 1100), 100},
+                {}
+            };
+            LocAndSize drecs[] = {
+                {DiskLoc(0, 1200), 100},
+                {DiskLoc(2, 1000), 100},
+                {DiskLoc(1, 1000), 1000},
+                {}
+            };
+
+            initializeV1RS(&txn, recs, drecs, &em, md);
+
+            ASSERT_EQUALS(em.getExtent(DiskLoc(0, 0))->length, em.minSize());
+        }
+
+        rs.truncate(&txn);
+
+        {
+            LocAndSize recs[] = {
+                {}
+            };
+            LocAndSize drecs[] = {
+                // One extent filled with a single deleted record.
+                {DiskLoc(0, Extent::HeaderSize()), em.minSize() - Extent::HeaderSize()},
                 {}
             };
             assertStateV1RS(&txn, recs, drecs, &em, md);
