@@ -23,3 +23,11 @@ env.Library(
         ],
     LIBDEPS=[]
     )
+
+env.Library(
+    target='record_store_test_harness',
+    source=[
+        'record_store_test_harness.cpp',
+        ],
+    LIBDEPS=[]
+    )
