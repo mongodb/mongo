@@ -156,8 +156,9 @@ __config_merge_scan(WT_SESSION_IMPL *session,
 		for (str = k.str, len = k.len; len > 0; ++str, --len)
 			if (*str == SEPC)
 				WT_ERR_MSG(session, EINVAL,
-				    "key %s contains a separator character "
-				    "(%s)", (char *)kb->data, SEP);
+				    "key %.*s contains a '%c' separator "
+				    "character",
+				    (int)k.len, (char *)k.str, SEPC);
 
 		/* Build the key/value strings. */
 		WT_ERR(__wt_buf_fmt(session,
