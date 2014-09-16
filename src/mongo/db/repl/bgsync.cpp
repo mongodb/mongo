@@ -447,14 +447,14 @@ namespace repl {
             boost::unique_lock<boost::mutex> lock(_mutex);
             lastOpTimeFetched = _lastOpTimeFetched;
         }
-        Date_t now(curTimeMillis64());
-        OpTime oldestOpTimeSeen(now,0);
+        const OpTime sentinel(Milliseconds(curTimeMillis64()).total_seconds(), 0);
+        OpTime oldestOpTimeSeen= sentinel;
 
         while (true) {
             HostAndPort candidate = replCoordImpl->chooseNewSyncSource();
 
             if (candidate.empty()) {
-                if (oldestOpTimeSeen == OpTime(now,0)) {
+                if (oldestOpTimeSeen == sentinel) {
                     // If, in this invocation of connectOplogReader(), we did not successfully 
                     // connect to any node ahead of us,
                     // we apparently have no sync sources to connect to.
