@@ -44,7 +44,7 @@ namespace mongo {
             scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
             {
                 WriteUnitOfWork uow( opCtx.get() );
-                sorted->insert( opCtx.get(), BSON( "" << 1 ), DiskLoc( 5, 1 ), true );
+                sorted->insert( opCtx.get(), BSON( "" << 1 ), DiskLoc( 5, 2 ), true );
                 uow.commit();
             }
         }
@@ -53,7 +53,7 @@ namespace mongo {
             scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
             {
                 WriteUnitOfWork uow( opCtx.get() );
-                sorted->insert( opCtx.get(), BSON( "" << 1 ), DiskLoc( 6, 1 ), true );
+                sorted->insert( opCtx.get(), BSON( "" << 1 ), DiskLoc( 6, 2 ), true );
                 uow.commit();
             }
         }
@@ -61,6 +61,10 @@ namespace mongo {
         {
             scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
             ASSERT_EQUALS( 2, sorted->numEntries( opCtx.get() ) );
+
+            long long x = 0;
+            sorted->fullValidate( opCtx.get(), &x );
+            ASSERT_EQUALS( 2, x );
         }
     }
 
@@ -72,7 +76,7 @@ namespace mongo {
             scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
             {
                 WriteUnitOfWork uow( opCtx.get() );
-                sorted->insert( opCtx.get(), BSON( "" << 1 ), DiskLoc( 5, 17 ), true );
+                sorted->insert( opCtx.get(), BSON( "" << 1 ), DiskLoc( 5, 18 ), true );
                 uow.commit();
             }
         }
@@ -81,7 +85,7 @@ namespace mongo {
             scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
             {
                 WriteUnitOfWork uow( opCtx.get() );
-                sorted->insert( opCtx.get(), BSON( "" << 1 ), DiskLoc( 5, 18 ), true );
+                sorted->insert( opCtx.get(), BSON( "" << 1 ), DiskLoc( 5, 20 ), true );
                 uow.commit();
             }
         }
@@ -92,7 +96,7 @@ namespace mongo {
         }
     }
 
-    TEST( SortedDataInterface, InsertWithDups3 ) {
+    TEST( SortedDataInterface, InsertWithDups3AndRollback ) {
         scoped_ptr<HarnessHelper> harnessHelper( newHarnessHelper() );
         scoped_ptr<SortedDataInterface> sorted( harnessHelper->newSortedDataInterface() );
 
@@ -100,7 +104,7 @@ namespace mongo {
             scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
             {
                 WriteUnitOfWork uow( opCtx.get() );
-                sorted->insert( opCtx.get(), BSON( "" << 1 ), DiskLoc( 5, 17 ), true );
+                sorted->insert( opCtx.get(), BSON( "" << 1 ), DiskLoc( 5, 18 ), true );
                 uow.commit();
             }
         }
@@ -109,7 +113,7 @@ namespace mongo {
             scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
             {
                 WriteUnitOfWork uow( opCtx.get() );
-                sorted->insert( opCtx.get(), BSON( "" << 1 ), DiskLoc( 5, 18 ), true );
+                sorted->insert( opCtx.get(), BSON( "" << 1 ), DiskLoc( 5, 20 ), true );
                 // no commit
             }
         }
@@ -128,7 +132,7 @@ namespace mongo {
             scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
             {
                 WriteUnitOfWork uow( opCtx.get() );
-                sorted->insert( opCtx.get(), BSON( "" << 1 ), DiskLoc( 5, 17 ), false );
+                sorted->insert( opCtx.get(), BSON( "" << 1 ), DiskLoc( 5, 18 ), false );
                 uow.commit();
             }
         }
@@ -137,7 +141,7 @@ namespace mongo {
             scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
             {
                 WriteUnitOfWork uow( opCtx.get() );
-                sorted->insert( opCtx.get(), BSON( "" << 2 ), DiskLoc( 5, 18 ), false );
+                sorted->insert( opCtx.get(), BSON( "" << 2 ), DiskLoc( 5, 20 ), false );
                 uow.commit();
             }
         }
@@ -157,7 +161,7 @@ namespace mongo {
             scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
             {
                 WriteUnitOfWork uow( opCtx.get() );
-                sorted->insert( opCtx.get(), BSON( "" << 1 ), DiskLoc( 5, 1 ), false );
+                sorted->insert( opCtx.get(), BSON( "" << 1 ), DiskLoc( 5, 2 ), false );
                 uow.commit();
             }
         }
@@ -166,7 +170,7 @@ namespace mongo {
             scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
             {
                 WriteUnitOfWork uow( opCtx.get() );
-                sorted->insert( opCtx.get(), BSON( "" << 1 ), DiskLoc( 5, 2 ), false );
+                sorted->insert( opCtx.get(), BSON( "" << 1 ), DiskLoc( 5, 4 ), false );
                 uow.commit();
             }
         }
@@ -186,7 +190,7 @@ namespace mongo {
             scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
             {
                 WriteUnitOfWork uow( opCtx.get() );
-                sorted->insert( opCtx.get(), BSON( "" << 1 ), DiskLoc( 5, 17 ), true );
+                sorted->insert( opCtx.get(), BSON( "" << 1 ), DiskLoc( 5, 18 ), true );
                 uow.commit();
             }
         }
@@ -200,7 +204,7 @@ namespace mongo {
             scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
             {
                 WriteUnitOfWork uow( opCtx.get() );
-                ASSERT( !sorted->unindex( opCtx.get(), BSON( "" << 1 ), DiskLoc( 5, 18 ) ) );
+                ASSERT( !sorted->unindex( opCtx.get(), BSON( "" << 1 ), DiskLoc( 5, 20 ) ) );
                 uow.commit();
             }
         }
@@ -214,7 +218,7 @@ namespace mongo {
             scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
             {
                 WriteUnitOfWork uow( opCtx.get() );
-                ASSERT( !sorted->unindex( opCtx.get(), BSON( "" << 2 ), DiskLoc( 5, 17 ) ) );
+                ASSERT( !sorted->unindex( opCtx.get(), BSON( "" << 2 ), DiskLoc( 5, 18 ) ) );
                 uow.commit();
             }
         }
@@ -229,7 +233,7 @@ namespace mongo {
             scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
             {
                 WriteUnitOfWork uow( opCtx.get() );
-                ASSERT( sorted->unindex( opCtx.get(), BSON( "" << 1 ), DiskLoc( 5, 17 ) ) );
+                ASSERT( sorted->unindex( opCtx.get(), BSON( "" << 1 ), DiskLoc( 5, 18 ) ) );
                 uow.commit();
             }
         }
@@ -241,7 +245,7 @@ namespace mongo {
 
     }
 
-    TEST( SortedDataInterface, Unindex2 ) {
+    TEST( SortedDataInterface, Unindex2Rollback ) {
         scoped_ptr<HarnessHelper> harnessHelper( newHarnessHelper() );
         scoped_ptr<SortedDataInterface> sorted( harnessHelper->newSortedDataInterface() );
 
@@ -249,7 +253,7 @@ namespace mongo {
             scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
             {
                 WriteUnitOfWork uow( opCtx.get() );
-                sorted->insert( opCtx.get(), BSON( "" << 1 ), DiskLoc( 5, 17 ), true );
+                sorted->insert( opCtx.get(), BSON( "" << 1 ), DiskLoc( 5, 18 ), true );
                 uow.commit();
             }
         }
@@ -263,7 +267,7 @@ namespace mongo {
             scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
             {
                 WriteUnitOfWork uow( opCtx.get() );
-                ASSERT( sorted->unindex( opCtx.get(), BSON( "" << 1 ), DiskLoc( 5, 17 ) ) );
+                ASSERT( sorted->unindex( opCtx.get(), BSON( "" << 1 ), DiskLoc( 5, 18 ) ) );
                 // no commit
             }
         }
@@ -285,7 +289,7 @@ namespace mongo {
             scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
             {
                 WriteUnitOfWork uow( opCtx.get() );
-                ASSERT_OK( sorted->insert( opCtx.get(), BSON( "" << i ), DiskLoc( 5, i ), true ) );
+                ASSERT_OK( sorted->insert( opCtx.get(), BSON( "" << i ), DiskLoc( 5, i * 2 ), true ) );
                 uow.commit();
             }
         }
@@ -297,7 +301,7 @@ namespace mongo {
             int n = 0;
             while ( !cursor->isEOF() ) {
                 DiskLoc loc = cursor->getDiskLoc();
-                ASSERT_EQUALS( n, loc.getOfs() );
+                ASSERT_EQUALS( n * 2, loc.getOfs() );
                 ASSERT_EQUALS( BSON( "" << n ), cursor->getKey() );
                 n++;
                 cursor->advance();
@@ -317,7 +321,7 @@ namespace mongo {
             scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
             {
                 WriteUnitOfWork uow( opCtx.get() );
-                sorted->insert( opCtx.get(), BSON( "" << i ), DiskLoc( 5, i ), true );
+                sorted->insert( opCtx.get(), BSON( "" << i ), DiskLoc( 5, i * 2 ), true );
                 uow.commit();
             }
         }
@@ -329,7 +333,7 @@ namespace mongo {
             int n = 0;
             while ( !cursor->isEOF() ) {
                 DiskLoc loc = cursor->getDiskLoc();
-                ASSERT_EQUALS( n, loc.getOfs() );
+                ASSERT_EQUALS( n * 2, loc.getOfs() );
                 ASSERT_EQUALS( BSON( "" << n ), cursor->getKey() );
                 n++;
                 cursor->advance();
@@ -351,7 +355,7 @@ namespace mongo {
             scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
             {
                 WriteUnitOfWork uow( opCtx.get() );
-                sorted->insert( opCtx.get(), BSON( "" << 5 ), DiskLoc( 5, i ), true );
+                sorted->insert( opCtx.get(), BSON( "" << 5 ), DiskLoc( 5, i * 2 ), true );
                 uow.commit();
             }
         }
@@ -363,7 +367,7 @@ namespace mongo {
             int n = 0;
             while ( !cursor->isEOF() ) {
                 DiskLoc loc = cursor->getDiskLoc();
-                ASSERT_EQUALS( n, loc.getOfs() );
+                ASSERT_EQUALS( n * 2, loc.getOfs() );
                 n++;
                 cursor->advance();
                 cursor->savePosition();
@@ -416,9 +420,9 @@ namespace mongo {
             {
                 WriteUnitOfWork uow( opCtx.get() );
 
-                ASSERT_OK( sorted->insert( opCtx.get(), BSON( "" << 1 ), DiskLoc(1,1), true ) );
-                ASSERT_OK( sorted->insert( opCtx.get(), BSON( "" << 2 ), DiskLoc(1,2), true ) );
-                ASSERT_OK( sorted->insert( opCtx.get(), BSON( "" << 3 ), DiskLoc(1,3), true ) );
+                ASSERT_OK( sorted->insert( opCtx.get(), BSON( "" << 1 ), DiskLoc(1,2), true ) );
+                ASSERT_OK( sorted->insert( opCtx.get(), BSON( "" << 2 ), DiskLoc(1,4), true ) );
+                ASSERT_OK( sorted->insert( opCtx.get(), BSON( "" << 3 ), DiskLoc(1,6), true ) );
                 uow.commit();
             }
         }
@@ -426,14 +430,14 @@ namespace mongo {
         {
             scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
             scoped_ptr<SortedDataInterface::Cursor> cursor( sorted->newCursor( opCtx.get(), 1 ) );
-            ASSERT( cursor->locate( BSON( "a" << 2 ), DiskLoc(0,0) ) );
+            ASSERT( !cursor->locate( BSON( "a" << 2 ), DiskLoc(0,0) ) );
             ASSERT( !cursor->isEOF()  );
             ASSERT_EQUALS( BSON( "" << 2 ), cursor->getKey() );
-            ASSERT_EQUALS( DiskLoc(1,2), cursor->getDiskLoc() );
+            ASSERT_EQUALS( DiskLoc(1,4), cursor->getDiskLoc() );
 
             cursor->advance();
             ASSERT_EQUALS( BSON( "" << 3 ), cursor->getKey() );
-            ASSERT_EQUALS( DiskLoc(1,3), cursor->getDiskLoc() );
+            ASSERT_EQUALS( DiskLoc(1,6), cursor->getDiskLoc() );
 
             cursor->advance();
             ASSERT( cursor->isEOF() );
@@ -449,9 +453,9 @@ namespace mongo {
             {
                 WriteUnitOfWork uow( opCtx.get() );
 
-                ASSERT_OK( sorted->insert( opCtx.get(), BSON( "" << 1 ), DiskLoc(1,1), true ) );
-                ASSERT_OK( sorted->insert( opCtx.get(), BSON( "" << 2 ), DiskLoc(1,2), true ) );
-                ASSERT_OK( sorted->insert( opCtx.get(), BSON( "" << 3 ), DiskLoc(1,3), true ) );
+                ASSERT_OK( sorted->insert( opCtx.get(), BSON( "" << 1 ), DiskLoc(1,2), true ) );
+                ASSERT_OK( sorted->insert( opCtx.get(), BSON( "" << 2 ), DiskLoc(1,4), true ) );
+                ASSERT_OK( sorted->insert( opCtx.get(), BSON( "" << 3 ), DiskLoc(1,6), true ) );
                 uow.commit();
             }
         }
@@ -462,16 +466,14 @@ namespace mongo {
             ASSERT( !cursor->locate( BSONObj(), DiskLoc(0,0) ) );
             ASSERT( !cursor->isEOF()  );
             ASSERT_EQUALS( BSON( "" << 1 ), cursor->getKey() );
-            ASSERT_EQUALS( DiskLoc(1,1), cursor->getDiskLoc() );
+            ASSERT_EQUALS( DiskLoc(1,2), cursor->getDiskLoc() );
         }
 
         {
             scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
             scoped_ptr<SortedDataInterface::Cursor> cursor( sorted->newCursor( opCtx.get(), -1 ) );
             ASSERT( !cursor->locate( BSONObj(), DiskLoc(0,0) ) );
-            ASSERT( !cursor->isEOF()  );
-            ASSERT_EQUALS( BSON( "" << 3 ), cursor->getKey() );
-            ASSERT_EQUALS( DiskLoc(1,3), cursor->getDiskLoc() );
+            ASSERT( cursor->isEOF()  );
         }
 
     }
@@ -481,14 +483,19 @@ namespace mongo {
         scoped_ptr<HarnessHelper> harnessHelper( newHarnessHelper() );
         scoped_ptr<SortedDataInterface> sorted( harnessHelper->newSortedDataInterface() );
 
-        for ( int i = 0; i < 10; i++ ) {
-            if ( i == 6 )
-                continue;
-            ASSERT_OK( sorted->insert( NULL, BSON( "" << i ), DiskLoc(1,i), true ) );
+        {
+            scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
+            for ( int i = 0; i < 10; i++ ) {
+                if ( i == 6 )
+                    continue;
+                WriteUnitOfWork uow( opCtx.get() );
+                ASSERT_OK( sorted->insert( opCtx.get(), BSON( "" << i ), DiskLoc(1,i*2), true ) );
+                uow.commit();
+            }
         }
 
         scoped_ptr<SortedDataInterface::Cursor> cursor( sorted->newCursor( NULL, 1 ) );
-        ASSERT( cursor->locate( BSON( "" << 5 ), DiskLoc(0,0) ) );
+        ASSERT( !cursor->locate( BSON( "" << 5 ), DiskLoc(0,0) ) );
         ASSERT( !cursor->isEOF()  );
         ASSERT_EQUALS( BSON( "" << 5 ), cursor->getKey() );
         cursor->advance();
@@ -500,21 +507,28 @@ namespace mongo {
         ASSERT_EQUALS( BSON( "" << 4 ), cursor->getKey() );
 
         cursor.reset( sorted->newCursor( NULL, -1 ) );
-        ASSERT( cursor->locate( BSON( "" << 5 ), DiskLoc() ) );
+        ASSERT( !cursor->locate( BSON( "" << 5 ), maxDiskLoc ) );
         ASSERT( !cursor->isEOF()  );
         ASSERT_EQUALS( BSON( "" << 5 ), cursor->getKey() );
         cursor->advance();
         ASSERT_EQUALS( BSON( "" << 4 ), cursor->getKey() );
 
         cursor.reset( sorted->newCursor( NULL, -1 ) );
-        cursor->locate( BSON( "" << 6 ), DiskLoc() );
+        ASSERT( !cursor->locate( BSON( "" << 5 ), minDiskLoc ) );
+        ASSERT( !cursor->isEOF()  );
+        ASSERT_EQUALS( BSON( "" << 4 ), cursor->getKey() );
+        cursor->advance();
+        ASSERT_EQUALS( BSON( "" << 3 ), cursor->getKey() );
+
+        cursor.reset( sorted->newCursor( NULL, -1 ) );
+        cursor->locate( BSON( "" << 6 ), maxDiskLoc );
         ASSERT( !cursor->isEOF()  );
         ASSERT_EQUALS( BSON( "" << 5 ), cursor->getKey() );
         cursor->advance();
         ASSERT_EQUALS( BSON( "" << 4 ), cursor->getKey() );
 
         cursor.reset( sorted->newCursor( NULL, -1 ) );
-        cursor->locate( BSON( "" << 500 ), DiskLoc() );
+        cursor->locate( BSON( "" << 500 ), maxDiskLoc );
         ASSERT( !cursor->isEOF()  );
         ASSERT_EQUALS( BSON( "" << 9 ), cursor->getKey() );
         cursor->advance();
@@ -531,10 +545,10 @@ namespace mongo {
             {
                 WriteUnitOfWork uow( opCtx.get() );
 
-                ASSERT_OK( sorted->insert( opCtx.get(), BSON( "" << 1 ), DiskLoc(1,1), true ) );
                 ASSERT_OK( sorted->insert( opCtx.get(), BSON( "" << 1 ), DiskLoc(1,2), true ) );
-                ASSERT_OK( sorted->insert( opCtx.get(), BSON( "" << 1 ), DiskLoc(1,3), true ) );
-                ASSERT_OK( sorted->insert( opCtx.get(), BSON( "" << 2 ), DiskLoc(1,4), true ) );
+                ASSERT_OK( sorted->insert( opCtx.get(), BSON( "" << 1 ), DiskLoc(1,4), true ) );
+                ASSERT_OK( sorted->insert( opCtx.get(), BSON( "" << 1 ), DiskLoc(1,6), true ) );
+                ASSERT_OK( sorted->insert( opCtx.get(), BSON( "" << 2 ), DiskLoc(1,8), true ) );
                 uow.commit();
             }
         }
@@ -542,18 +556,18 @@ namespace mongo {
         {
             scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
             scoped_ptr<SortedDataInterface::Cursor> cursor( sorted->newCursor( opCtx.get(), 1 ) );
-            ASSERT( cursor->locate( BSON( "a" << 1 ), minDiskLoc ) );
+            ASSERT( !cursor->locate( BSON( "a" << 1 ), minDiskLoc ) );
             ASSERT( !cursor->isEOF()  );
-            ASSERT_EQUALS( DiskLoc(1,1), cursor->getDiskLoc() );
-
-            cursor->advance();
             ASSERT_EQUALS( DiskLoc(1,2), cursor->getDiskLoc() );
 
             cursor->advance();
-            ASSERT_EQUALS( DiskLoc(1,3), cursor->getDiskLoc() );
+            ASSERT_EQUALS( DiskLoc(1,4), cursor->getDiskLoc() );
 
             cursor->advance();
-            ASSERT_EQUALS( DiskLoc(1,4), cursor->getDiskLoc() );
+            ASSERT_EQUALS( DiskLoc(1,6), cursor->getDiskLoc() );
+
+            cursor->advance();
+            ASSERT_EQUALS( DiskLoc(1,8), cursor->getDiskLoc() );
 
             cursor->advance();
             ASSERT( cursor->isEOF() );
@@ -562,16 +576,16 @@ namespace mongo {
         {
             scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
             scoped_ptr<SortedDataInterface::Cursor> cursor( sorted->newCursor( opCtx.get(), -1 ) );
-            ASSERT( cursor->locate( BSON( "a" << 1 ), maxDiskLoc ) );
+            ASSERT( !cursor->locate( BSON( "a" << 1 ), maxDiskLoc ) );
             ASSERT( !cursor->isEOF()  );
             ASSERT( cursor->getDirection() == -1 );
-            ASSERT_EQUALS( DiskLoc(1,3), cursor->getDiskLoc() );
+            ASSERT_EQUALS( DiskLoc(1,6), cursor->getDiskLoc() );
+
+            cursor->advance();
+            ASSERT_EQUALS( DiskLoc(1,4), cursor->getDiskLoc() );
 
             cursor->advance();
             ASSERT_EQUALS( DiskLoc(1,2), cursor->getDiskLoc() );
-
-            cursor->advance();
-            ASSERT_EQUALS( DiskLoc(1,1), cursor->getDiskLoc() );
 
             cursor->advance();
             ASSERT( cursor->isEOF() );

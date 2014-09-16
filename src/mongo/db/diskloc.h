@@ -179,7 +179,7 @@ namespace mongo {
     // Maximum allowed DiskLoc.  Note that only three bytes are used to represent the file number
     // for consistency with the v1 index DiskLoc storage format, which uses only 7 bytes total.
     // No Record may begin at this location because the minimum size of a Record is larger than one
-    // byte.
-    const DiskLoc maxDiskLoc(0x00ffffff, 0x7fffffff);
+    // byte.  Also, the last bit is not able to be used because mmapv1 uses that for "used".
+    const DiskLoc maxDiskLoc(0x00ffffff, 0x7ffffffe);
 
 } // namespace mongo

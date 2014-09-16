@@ -37,6 +37,7 @@ namespace mongo {
 
     void DiskLoc56Bit::operator=(const DiskLoc& loc) {
         ofs = loc.getOfs();
+        invariant( (ofs & 0x1) == 0 ); // we use the last bit for used
         int la = loc.a();
         invariant( la <= 0xffffff ); // must fit in 3 bytes
         if( la < 0 ) {

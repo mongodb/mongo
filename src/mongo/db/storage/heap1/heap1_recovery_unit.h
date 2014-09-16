@@ -42,7 +42,6 @@ namespace mongo {
     class Heap1RecoveryUnit : public RecoveryUnit {
     public:
         Heap1RecoveryUnit() {
-            _depth = 0;
             _rollbackPossible = true;
         }
 
@@ -69,25 +68,29 @@ namespace mongo {
 
         void rollbackImpossible() { _rollbackPossible = false; }
 
-        void notifyIndexInsert( SortedDataInterface* idx, const BSONObj& obj, const DiskLoc& loc );
+        void notifyIndexMod( SortedDataInterface* idx,
+                             const BSONObj& obj, const DiskLoc& loc, bool insert );
+
         static void notifyIndexInsert( OperationContext* ctx, SortedDataInterface* idx,
                                        const BSONObj& obj, const DiskLoc& loc );
-
-        void notifyIndexRemove( SortedDataInterface* idx, const BSONObj& obj, const DiskLoc& loc );
         static void notifyIndexRemove( OperationContext* ctx, SortedDataInterface* idx,
                                        const BSONObj& obj, const DiskLoc& loc );
 
     private:
-        int _depth;
         bool _rollbackPossible;
 
         struct IndexInfo {
             SortedDataInterface* idx;
             BSONObj obj;
             DiskLoc loc;
+            bool insert;
         };
-        std::vector<IndexInfo> _indexInserts;
-        std::vector<IndexInfo> _indexRemoves;
+
+        struct Frame {
+            std::vector<IndexInfo> indexMods;
+        };
+
+        std::vector<Frame> _frames;
     };
 
 }

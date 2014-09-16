@@ -31,6 +31,7 @@
 
 #include "mongo/db/storage/mmap_v1/heap_record_store_btree.h"
 
+#include "mongo/db/operation_context.h"
 #include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
 
@@ -58,6 +59,8 @@ namespace mongo {
         const DiskLoc loc = allocateLoc();
         _records[loc] = rec;
 
+        HeapRecordStoreBtreeRecoveryUnit::notifyInsert( txn, this, loc );
+
         return StatusWith<DiskLoc>(loc);
     }
 
@@ -69,6 +72,8 @@ namespace mongo {
 
         const DiskLoc loc = allocateLoc();
         _records[loc] = rec;
+
+        HeapRecordStoreBtreeRecoveryUnit::notifyInsert( txn, this, loc );
 
         return StatusWith<DiskLoc>(loc);
     }
@@ -85,5 +90,62 @@ namespace mongo {
         // not currently called from the tests, but called from btree_logic.h
         return Status::OK();
     }
+
+    // ---------------------------
+
+    HeapRecordStoreBtreeRecoveryUnit::~HeapRecordStoreBtreeRecoveryUnit() {
+        invariant( _depth == 0 );
+    }
+
+    void HeapRecordStoreBtreeRecoveryUnit::beginUnitOfWork() {
+        _depth++;
+    }
+
+    void HeapRecordStoreBtreeRecoveryUnit::commitUnitOfWork() {
+        invariant( _depth == 1 );
+        _insertions.clear();
+        _mods.clear();
+    }
+
+    void HeapRecordStoreBtreeRecoveryUnit::endUnitOfWork() {
+        invariant( _depth-- == 1 );
+
+        // reverse in case we write same area twice
+        for ( size_t i = _mods.size(); i > 0; i-- ) {
+            ModEntry& e = _mods[i-1];
+            memcpy( e.data, e.old.get(), e.len );
+        }
+
+        invariant( _insertions.size() == 0 ); // todo
+    }
+
+    void* HeapRecordStoreBtreeRecoveryUnit::writingPtr(void* data, size_t len) {
+        ModEntry e = { data, len, boost::shared_array<char>( new char[len] ) };
+        memcpy( e.old.get(), data, len );
+        _mods.push_back( e );
+        return data;
+    }
+
+    void HeapRecordStoreBtreeRecoveryUnit::notifyInsert( HeapRecordStoreBtree* rs,
+                                                         const DiskLoc& loc ) {
+        InsertEntry e = { rs, loc };
+        _insertions.push_back( e );
+    }
+
+    void HeapRecordStoreBtreeRecoveryUnit::notifyInsert( OperationContext* ctx,
+                                                         HeapRecordStoreBtree* rs,
+                                                         const DiskLoc& loc ) {
+        if ( !ctx )
+            return;
+
+        HeapRecordStoreBtreeRecoveryUnit* ru =
+            dynamic_cast<HeapRecordStoreBtreeRecoveryUnit*>( ctx->recoveryUnit() );
+
+        if ( !ru )
+            return;
+
+        ru->notifyInsert( rs, loc );
+    }
+
 
 } // namespace mongo

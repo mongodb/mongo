@@ -35,46 +35,48 @@
 namespace mongo {
 
     Heap1RecoveryUnit::~Heap1RecoveryUnit() {
-        invariant( _depth == 0 );
+        invariant( _frames.empty() );
     }
 
     void Heap1RecoveryUnit::beginUnitOfWork() {
-        _depth++;
+        _frames.push_back( Frame() );
     }
 
     void Heap1RecoveryUnit::commitUnitOfWork() {
-        if ( _depth == 1 ) {
+        if ( _frames.size() == 1 ) {
             _rollbackPossible = true;
-            _indexInserts.clear();
-            _indexRemoves.clear();
         }
+        else {
+            size_t last = _frames.size() - 1;
+            size_t next = last - 1;
+            _frames[next].indexMods.insert( _frames[next].indexMods.end(),
+                                            _frames[last].indexMods.begin(),
+                                            _frames[last].indexMods.end() );
+        }
+        _frames.back().indexMods.clear();
     }
 
     void Heap1RecoveryUnit::endUnitOfWork() {
-        _depth--;
 
-        // effectively do a rollback
+        // invariant( _rollbackPossible ); // todo
 
-        invariant( _rollbackPossible );
-
-        for ( size_t i = 0; i < _indexInserts.size(); i++ ) {
-            invariant( _depth == 0 ); // todo: fix me
-            SortedDataInterface* idx = _indexInserts[i].idx;
-            idx->unindex( NULL, _indexInserts[i].obj, _indexInserts[i].loc );
+        const Frame& frame = _frames.back();
+        for ( size_t i = frame.indexMods.size() ; i > 0; i-- ) {
+            const IndexInfo& ii = frame.indexMods[i-1];
+            SortedDataInterface* idx = ii.idx;
+            if ( ii.insert )
+                idx->unindex( NULL, ii.obj, ii.loc );
+            else
+                idx->insert( NULL, ii.obj, ii.loc, true );
         }
 
-        for ( size_t i = 0; i < _indexRemoves.size(); i++ ) {
-            invariant( _depth == 0 ); // todo: fix me
-            SortedDataInterface* idx = _indexRemoves[i].idx;
-            idx->insert( NULL, _indexRemoves[i].obj, _indexRemoves[i].loc, true );
-        }
-
+        _frames.pop_back();
     }
 
-    void Heap1RecoveryUnit::notifyIndexInsert( SortedDataInterface* idx,
-                                               const BSONObj& obj, const DiskLoc& loc ) {
-        IndexInfo ii = { idx, obj, loc };
-        _indexInserts.push_back( ii );
+    void Heap1RecoveryUnit::notifyIndexMod( SortedDataInterface* idx,
+                                            const BSONObj& obj, const DiskLoc& loc, bool insert ) {
+        IndexInfo ii = { idx, obj, loc, insert };
+        _frames.back().indexMods.push_back( ii );
     }
 
     // static
@@ -84,13 +86,7 @@ namespace mongo {
             return;
 
         Heap1RecoveryUnit* ru = dynamic_cast<Heap1RecoveryUnit*>( ctx->recoveryUnit() );
-        ru->notifyIndexInsert( idx, obj, loc );
-    }
-
-    void Heap1RecoveryUnit::notifyIndexRemove( SortedDataInterface* idx,
-                                               const BSONObj& obj, const DiskLoc& loc ) {
-        IndexInfo ii = { idx, obj, loc };
-        _indexRemoves.push_back( ii );
+        ru->notifyIndexMod( idx, obj, loc, true );
     }
 
     // static
@@ -100,7 +96,7 @@ namespace mongo {
             return;
 
         Heap1RecoveryUnit* ru = dynamic_cast<Heap1RecoveryUnit*>( ctx->recoveryUnit() );
-        ru->notifyIndexRemove( idx, obj, loc );
+        ru->notifyIndexMod( idx, obj, loc, false );
     }
 
 

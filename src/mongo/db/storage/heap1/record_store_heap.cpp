@@ -69,6 +69,9 @@ namespace mongo {
 
     HeapRecordStore::HeapRecord* HeapRecordStore::recordFor(const DiskLoc& loc) const {
         Records::const_iterator it = _records.find(loc);
+        if ( it == _records.end() ) {
+            error() << "HeapRecordStore::recordFor cannot find record for " << ns() << ":" << loc;
+        }
         invariant(it != _records.end());
         return reinterpret_cast<HeapRecord*>(it->second.get());
     }

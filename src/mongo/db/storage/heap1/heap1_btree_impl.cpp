@@ -224,15 +224,17 @@ namespace {
             }
 
             virtual bool locate(const BSONObj& keyRaw, const DiskLoc& loc) {
-                // An empty key means we should seek to the front
-                if (keyRaw.isEmpty()) {
-                    _it = _data.begin();
+                const BSONObj key = stripFieldNames(keyRaw);
+                _it = _data.lower_bound(IndexKeyEntry(key, loc)); // lower_bound is >= key
+                if ( _it == _data.end() ) {
                     return false;
                 }
 
-                const BSONObj key = stripFieldNames(keyRaw);
-                _it = _data.lower_bound(IndexKeyEntry(key, loc)); // lower_bound is >= key
-                return _it != _data.end() && (_it->key == key); // intentionally not comparing loc
+                if ( _it->key != key ) {
+                    return false;
+                }
+
+                return _it->loc == loc;
             }
 
             virtual void customLocate(const BSONObj& keyBegin,
@@ -331,16 +333,19 @@ namespace {
             }
 
             virtual bool locate(const BSONObj& keyRaw, const DiskLoc& loc) {
-                // An empty key means we should seek to the seek to the end, 
-                // i.e. one past the lowest key in the iterator
-                if (keyRaw.isEmpty()) {
-                    _it = _data.rbegin();
+                const BSONObj key = stripFieldNames(keyRaw);
+                _it = lower_bound(IndexKeyEntry(key, loc)); // lower_bound is <= query
+
+                if ( _it == _data.rend() ) {
                     return false;
                 }
 
-                const BSONObj key = stripFieldNames(keyRaw);
-                _it = lower_bound(IndexKeyEntry(key, loc)); // lower_bound is <= query
-                return _it != _data.rend() && (_it->key == key); // intentionally not comparing loc
+
+                if ( _it->key != key ) {
+                    return false;
+                }
+
+                return _it->loc == loc;
             }
 
             virtual void customLocate(const BSONObj& keyBegin,

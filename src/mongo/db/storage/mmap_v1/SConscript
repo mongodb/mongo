@@ -125,3 +125,13 @@ env.CppUnitTest(
         ]
     )
 
+env.CppUnitTest(
+    target='btree_interface_test',
+    source=['btree/btree_interface_test.cpp'
+            ],
+    LIBDEPS=[
+        'btree_test_help',
+        '$BUILD_DIR/mongo/db/storage/sorted_data_interface_test_harness'
+        ]
+    )
+
