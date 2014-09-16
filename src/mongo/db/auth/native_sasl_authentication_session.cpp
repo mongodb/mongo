@@ -130,12 +130,18 @@ namespace {
             _saslConversation.reset(new SaslPLAINServerConversation(this));
         }
         else if (mechanism == "SCRAM-SHA-1") {
+#ifdef MONGO_SSL
             _saslConversation.reset(new SaslSCRAMSHA1ServerConversation(this));
+#else
+            return Status(ErrorCodes::BadValue,
+                mongoutils::str::stream() << "SASL mechanism " << mechanism <<
+                                             " requires server compiled with SSL support");
+#endif
         }
         else {
             return Status(ErrorCodes::BadValue,
                 mongoutils::str::stream() << "SASL mechanism " << mechanism << 
-                                             "is not supported");
+                                             " is not supported");
         }
 
         return Status::OK();
