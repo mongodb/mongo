@@ -61,6 +61,14 @@ namespace mongo {
             return _recoveryUnit.get();
         }
 
+        virtual RecoveryUnit* releaseRecoveryUnit() {
+            return _recoveryUnit.release();
+        }
+
+        virtual void setRecoveryUnit(RecoveryUnit* unit) {
+            _recoveryUnit.reset(unit);
+        }
+
         virtual Locker* lockState() const {
             // TODO: This should return an actual object if necessary for testing.
             return NULL;
@@ -101,7 +109,7 @@ namespace mongo {
         }
 
     private:
-        boost::scoped_ptr<RecoveryUnit> _recoveryUnit;
+        std::auto_ptr<RecoveryUnit> _recoveryUnit;
     };
 
 }  // namespace mongo

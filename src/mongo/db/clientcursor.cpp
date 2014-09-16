@@ -72,7 +72,9 @@ namespace mongo {
     ClientCursor::ClientCursor(const Collection* collection, PlanExecutor* exec,
                                int qopts, const BSONObj query)
         : _collection( collection ),
-          _countedYet( false ) {
+          _countedYet( false ),
+          _unownedRU(NULL) {
+
         _exec.reset(exec);
         _ns = exec->ns();
         _query = query;
@@ -87,7 +89,8 @@ namespace mongo {
         : _ns(collection->ns().ns()),
           _collection(collection),
           _countedYet( false ),
-          _queryOptions(QueryOption_NoCursorTimeout) {
+          _queryOptions(QueryOption_NoCursorTimeout),
+          _unownedRU(NULL) {
         init();
     }
 
@@ -173,6 +176,30 @@ namespace mongo {
             return;
 
         repl::getGlobalReplicationCoordinator()->setLastOptime(txn, rid, _slaveReadTill);
+    }
+
+    //
+    // Storage engine state for getMore.
+    //
+
+    void ClientCursor::setUnownedRecoveryUnit(RecoveryUnit* ru) {
+        invariant(!_unownedRU);
+        invariant(!_ownedRU.get());
+        _unownedRU = ru;
+    }
+
+    RecoveryUnit* ClientCursor::getUnownedRecoveryUnit() const {
+        return _unownedRU;
+    }
+
+    void ClientCursor::setOwnedRecoveryUnit(RecoveryUnit* ru) {
+        invariant(!_unownedRU);
+        invariant(!_ownedRU.get());
+        _ownedRU.reset(ru);
+    }
+
+    RecoveryUnit* ClientCursor::releaseOwnedRecoveryUnit() {
+        return _ownedRU.release();
     }
 
     //
