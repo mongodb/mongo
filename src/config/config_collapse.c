@@ -197,10 +197,11 @@ __config_merge_scan(WT_SESSION_IMPL *session,
 		cp->entries[cp->entries_next].gen = cp->entries_next;
 		++cp->entries_next;
 	}
+	WT_ERR_NOTFOUND_OK(ret);
 
 err:	__wt_scr_free(&kb);
 	__wt_scr_free(&vb);
-	return (0);
+	return (ret);
 }
 
 /*
