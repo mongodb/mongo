@@ -241,6 +241,41 @@ namespace mongo {
 
     }
 
+    TEST( SortedDataInterface, Unindex2 ) {
+        scoped_ptr<HarnessHelper> harnessHelper( newHarnessHelper() );
+        scoped_ptr<SortedDataInterface> sorted( harnessHelper->newSortedDataInterface() );
+
+        {
+            scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
+            {
+                WriteUnitOfWork uow( opCtx.get() );
+                sorted->insert( opCtx.get(), BSON( "" << 1 ), DiskLoc( 5, 17 ), true );
+                uow.commit();
+            }
+        }
+
+        {
+            scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
+            ASSERT_EQUALS( 1, sorted->numEntries( opCtx.get() ) );
+        }
+
+        {
+            scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
+            {
+                WriteUnitOfWork uow( opCtx.get() );
+                ASSERT( sorted->unindex( opCtx.get(), BSON( "" << 1 ), DiskLoc( 5, 17 ) ) );
+                // no commit
+            }
+        }
+
+        {
+            scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
+            ASSERT_EQUALS( 1, sorted->numEntries( opCtx.get() ) );
+        }
+
+    }
+
+
     TEST( SortedDataInterface, CursorIterate1 ) {
         scoped_ptr<HarnessHelper> harnessHelper( newHarnessHelper() );
         scoped_ptr<SortedDataInterface> sorted( harnessHelper->newSortedDataInterface() );

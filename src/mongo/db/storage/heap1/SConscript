@@ -17,6 +17,7 @@ env.Library(
         'heap1_btree_impl.cpp',
         'heap1_database_catalog_entry.cpp',
         'heap1_engine.cpp',
+        'heap1_recovery_unit.cpp',
         ],
     LIBDEPS= [
         'heap_record_store',
@@ -60,13 +61,13 @@ env.CppUnitTest(
        ]
    )
 
-# env.CppUnitTest(
-#    target='storage_heap1_btree_test',
-#    source=['heap1_btree_impl_test.cpp'
-#            ],
-#    LIBDEPS=[
-#         'storage_heap1_fake',
-#         '$BUILD_DIR/mongo/db/storage/sorted_data_interface_test_harness'
-#         ]
-#    )
+env.CppUnitTest(
+   target='storage_heap1_btree_test',
+   source=['heap1_btree_impl_test.cpp'
+           ],
+   LIBDEPS=[
+        'storage_heap1_fake',
+        '$BUILD_DIR/mongo/db/storage/sorted_data_interface_test_harness'
+        ]
+   )
 
