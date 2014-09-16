@@ -448,13 +448,15 @@ __wt_lsm_manager_clear_tree(
  * have session, entry and type available to use.  If the queue is empty
  * we may return from the macro.
  */
-#define	LSM_POP_ENTRY(qh, qlock) do {					\
+#define	LSM_POP_ENTRY(qh, qlock, qlen) do {				\
 	if (TAILQ_EMPTY(qh))						\
 		return (0);						\
 	__wt_spin_lock(session, qlock);					\
 	TAILQ_FOREACH(entry, (qh), q) {					\
 		if (FLD_ISSET(type, entry->type)) {			\
 			TAILQ_REMOVE(qh, entry, q);			\
+			(qlen)--;					\
+			WT_ASSERT(session, (qlen) >= 0);		\
 			break;						\
 		}							\
 	}								\
@@ -481,11 +483,14 @@ __wt_lsm_manager_pop_entry(
 	 * Pop the entry off the correct queue based on our work type.
 	 */
 	if (type == WT_LSM_WORK_SWITCH)
-		LSM_POP_ENTRY(&manager->switchqh, &manager->switch_lock);
+		LSM_POP_ENTRY(&manager->switchqh,
+		    &manager->switch_lock, manager->switch_len);
 	else if (type == WT_LSM_WORK_MERGE)
-		LSM_POP_ENTRY(&manager->managerqh, &manager->manager_lock);
+		LSM_POP_ENTRY(&manager->managerqh,
+		    &manager->manager_lock, manager->manager_len);
 	else
-		LSM_POP_ENTRY(&manager->appqh, &manager->app_lock);
+		LSM_POP_ENTRY(&manager->appqh,
+		    &manager->app_lock, manager->app_len);
 	if (entry != NULL)
 		WT_STAT_FAST_CONN_INCR(session, lsm_work_units_done);
 	*entryp = entry;
@@ -497,9 +502,11 @@ __wt_lsm_manager_pop_entry(
  * called from __wt_lsm_manager_push_entry and we have session and entry
  * available for use.
  */
-#define	LSM_PUSH_ENTRY(qh, qlock) do {					\
+#define	LSM_PUSH_ENTRY(qh, qlock, qlen) do {				\
 	__wt_spin_lock(session, qlock);					\
 	TAILQ_INSERT_TAIL((qh), entry, q);				\
+	(qlen)++;							\
+	WT_ASSERT(session, (qlen) <= LSM_MAX_WORK_QUEUE_LEN);		\
 	__wt_spin_unlock(session, qlock);				\
 } while (0)
 
@@ -526,11 +533,14 @@ __wt_lsm_manager_push_entry(WT_SESSION_IMPL *session,
 	WT_STAT_FAST_CONN_INCR(session, lsm_work_units_created);
 
 	if (type == WT_LSM_WORK_SWITCH)
-		LSM_PUSH_ENTRY(&manager->switchqh, &manager->switch_lock);
+		LSM_PUSH_ENTRY(&manager->switchqh,
+		    &manager->switch_lock, manager->switch_len);
 	else if (type == WT_LSM_WORK_MERGE)
-		LSM_PUSH_ENTRY(&manager->managerqh, &manager->manager_lock);
+		LSM_PUSH_ENTRY(&manager->managerqh,
+		    &manager->manager_lock, manager->manager_len);
 	else
-		LSM_PUSH_ENTRY(&manager->appqh, &manager->app_lock);
+		LSM_PUSH_ENTRY(&manager->appqh,
+		    &manager->app_lock, manager->app_len);
 
 	WT_RET(__wt_cond_signal(session, manager->work_cond));
 
