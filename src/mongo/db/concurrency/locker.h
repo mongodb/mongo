@@ -160,13 +160,6 @@ namespace mongo {
 
         virtual unsigned recursiveCount() const = 0;
 
-        /**
-         * Indicates the mode of acquisition of the GlobalLock by this particular thread. The
-         * return values are '0' (no global lock is held), 'r', 'w', 'R', 'W'. See the commends of
-         * QLock for more information on what these modes mean.
-         */
-        virtual char threadState() const = 0;
-
         virtual bool isW() const = 0;
         virtual bool isR() const = 0;
         virtual bool hasAnyReadLock() const = 0; // explicitly r or R
@@ -175,7 +168,6 @@ namespace mongo {
         virtual bool isWriteLocked() const = 0;
         virtual bool isWriteLocked(const StringData& ns) const = 0;
         virtual bool isAtLeastReadLocked(const StringData& ns) const = 0;
-        virtual bool isLockedForCommitting() const = 0;
         virtual bool isRecursive() const = 0;
 
         virtual void assertWriteLocked(const StringData& ns) const = 0;

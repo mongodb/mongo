@@ -206,13 +206,6 @@ namespace newlm {
 
         virtual unsigned recursiveCount() const { return _recursive; }
 
-        /**
-         * Indicates the mode of acquisition of the GlobalLock by this particular thread. The
-         * return values are '0' (no global lock is held), 'r', 'w', 'R', 'W'. See the commends of
-         * QLock for more information on what these modes mean.
-         */
-        virtual char threadState() const;
-
         virtual bool isW() const;
         virtual bool isR() const;
         virtual bool hasAnyReadLock() const;
@@ -221,7 +214,6 @@ namespace newlm {
         virtual bool isWriteLocked() const;
         virtual bool isWriteLocked(const StringData& ns) const;
         virtual bool isAtLeastReadLocked(const StringData& ns) const;
-        virtual bool isLockedForCommitting() const;
         virtual bool isRecursive() const;
 
         virtual void assertWriteLocked(const StringData& ns) const;
@@ -249,6 +241,12 @@ namespace newlm {
         }
 
     private:
+        /**
+         * Indicates the mode of acquisition of the GlobalLock by this particular thread. The
+         * return values are '0' (no global lock is held), 'r', 'w', 'R', 'W'.
+         */
+        char threadState() const;
+
         bool _batchWriter;
         bool _lockPendingParallelWriter;
 

@@ -705,7 +705,7 @@ namespace {
     unsigned _syncRollback(OperationContext* txn,
                            OplogReader* oplogreader,
                            ReplicationCoordinator* replCoord) {
-        verify(txn->lockState()->threadState() == 0);
+        invariant(!txn->lockState()->isLocked());
 
         log() << "rollback 0";
 

@@ -270,7 +270,7 @@ namespace mongo {
                                          bool preserveClonedFilesOnFailure,
                                          bool backupOriginalFiles ) {
         // We must hold some form of lock here
-        invariant(txn->lockState()->threadState());
+        invariant(txn->lockState()->isLocked());
         invariant( dbName.find( '.' ) == string::npos );
 
         scoped_ptr<RepairFileDeleter> repairFileDeleter;

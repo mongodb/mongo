@@ -147,7 +147,6 @@ namespace ThreadedTests {
                 else if( i % 7 == 1 ) {
                     Lock::GlobalRead r(&lockState);
                     ASSERT(lockState.hasAnyReadLock());
-                    ASSERT(lockState.threadState() != 0);
                     if( sometimes ) {
                         Lock::TempRelease t(&lockState);
                     }
@@ -196,19 +195,18 @@ namespace ThreadedTests {
                     if( i > N/2 ) { 
                         int q = i % 11;
                         if( q == 0 ) { 
-                            char what = 'r';
                             Lock::DBRead r(&lockState, "foo");
-                            ASSERT(lockState.threadState() == what && lockState.isAtLeastReadLocked("foo"));
+                            ASSERT(lockState.isAtLeastReadLocked("foo"));
                             ASSERT(!lockState.isRecursive());
                             Lock::DBRead r2(&lockState, "foo");
                             ASSERT(lockState.isRecursive());
-                            ASSERT(lockState.threadState() == what && lockState.isAtLeastReadLocked("foo"));
+                            ASSERT(lockState.isAtLeastReadLocked("foo"));
                             Lock::DBRead r3(&lockState, "local");
                             if( sometimes ) {
                                 Lock::TempRelease t(&lockState);
                             }
-                            ASSERT(lockState.threadState() == what && lockState.isAtLeastReadLocked("foo"));
-                            ASSERT(lockState.threadState() == what && lockState.isAtLeastReadLocked("local"));
+                            ASSERT(lockState.isAtLeastReadLocked("foo"));
+                            ASSERT(lockState.isAtLeastReadLocked("local"));
                         }
                         else if( q == 1 ) {
                             // test locking local only -- with no preceding lock

@@ -134,36 +134,6 @@ namespace mongo {
         ASSERT(ls.isW());
     }
 
-    TEST(DConcurrency, TempReleaseOneDB) {
-        LockState ls;
-
-        Lock::DBRead r1(&ls, "db1");
-
-        {
-            Lock::TempRelease tempRelease(&ls);
-            ASSERT(!ls.isLocked());
-        }
-
-        ls.assertAtLeastReadLocked("db1");
-    }
-
-    TEST(DConcurrency, TempReleaseRecursive) {
-        LockState ls;
-
-        Lock::DBRead r1(&ls, "db1");
-        Lock::DBRead r2(&ls, "db2");
-
-        {
-            Lock::TempRelease tempRelease(&ls);
-
-            ls.assertAtLeastReadLocked("db1");
-            ls.assertAtLeastReadLocked("db2");
-        }
-
-        ls.assertAtLeastReadLocked("db1");
-        ls.assertAtLeastReadLocked("db2");
-    }
-
     TEST(DConcurrency, MultipleWriteDBLocksOnSameThread) {
         LockState ls;
 

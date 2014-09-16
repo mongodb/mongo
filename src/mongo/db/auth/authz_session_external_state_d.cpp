@@ -49,7 +49,7 @@ namespace mongo {
 
     void AuthzSessionExternalStateMongod::startRequest(OperationContext* txn) {
         // No locks should be held as this happens before any database accesses occur
-        fassert(17506, txn->lockState()->threadState() == 0);
+        fassert(17506, !txn->lockState()->isLocked());
 
         _checkShouldAllowLocalhost(txn);
     }

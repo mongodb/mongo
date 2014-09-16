@@ -68,23 +68,23 @@ namespace newlm {
 
 
     bool LockerImpl::isW() const {
-        return threadState() == 'W';
+        return getLockMode(resourceIdGlobal) == MODE_X;
     }
 
     bool LockerImpl::isR() const {
-        return threadState() == 'R';
+        return getLockMode(resourceIdGlobal) == MODE_S;
     }
 
     bool LockerImpl::hasAnyReadLock() const {
-        return threadState() == 'r' || threadState() == 'R';
+        return isLockHeldForMode(resourceIdGlobal, MODE_IS);
     }
 
     bool LockerImpl::isLocked() const {
-        return threadState() != 0;
+        return getLockMode(resourceIdGlobal) != MODE_NONE;
     }
 
     bool LockerImpl::isWriteLocked() const {
-        return (threadState() == 'W' || threadState() == 'w');
+        return isLockHeldForMode(resourceIdGlobal, MODE_IX);
     }
 
     bool LockerImpl::isWriteLocked(const StringData& ns) const {
@@ -101,17 +101,13 @@ namespace newlm {
     bool LockerImpl::isAtLeastReadLocked(const StringData& ns) const {
         if (threadState() == 'R' || threadState() == 'W')
             return true; // global
-        if (threadState() == 0)
+        if (!isLocked())
             return false;
 
         const StringData db = nsToDatabaseSubstring(ns);
         const newlm::ResourceId resIdNs(newlm::RESOURCE_DATABASE, db);
 
         return isLockHeldForMode(resIdNs, newlm::MODE_S);
-    }
-
-    bool LockerImpl::isLockedForCommitting() const {
-        return threadState() == 'R' || threadState() == 'W';
     }
 
     bool LockerImpl::isRecursive() const {
@@ -150,7 +146,7 @@ namespace newlm {
         BSONObjBuilder b;
         if (threadState()) {
             char buf[2];
-            buf[0] = threadState(); 
+            buf[0] = threadState();
             buf[1] = 0;
             b.append("^", buf);
         }
@@ -182,10 +178,9 @@ namespace newlm {
     }
 
     void LockerImpl::dump() const {
-        char s = threadState();
         StringBuilder ss;
         ss << "lock status: ";
-        if( s == 0 ){
+        if (!isLocked()) {
             ss << "unlocked"; 
         }
         else {

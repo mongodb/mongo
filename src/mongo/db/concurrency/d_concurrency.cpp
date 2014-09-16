@@ -148,6 +148,16 @@ namespace mongo {
         }
     }
 
+    void Lock::ScopedLock::_tempRelease() {
+        // TempRelease is only used for global locks
+        invariant(false);
+    }
+
+    void Lock::ScopedLock::_relock() {
+        // TempRelease is only used for global locks
+        invariant(false);
+    }
+
     Lock::TempRelease::TempRelease(Locker* lockState)
         : cant(lockState->isRecursive()), _lockState(lockState) {
 
@@ -207,16 +217,10 @@ namespace mongo {
         resetTime();
     }
 
-    void Lock::DBWrite::_tempRelease() { 
+    void Lock::DBWrite::_tempRelease() {
         unlockDB();
     }
-    void Lock::DBWrite::_relock() { 
-        lockDB();
-    }
-    void Lock::DBRead::_tempRelease() {
-        unlockDB();
-    }
-    void Lock::DBRead::_relock() { 
+    void Lock::DBWrite::_relock() {
         lockDB();
     }
 
