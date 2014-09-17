@@ -188,15 +188,6 @@ namespace mongo {
         return _maxCappedDocs;
     }
 
-    double DummyRecordStoreV1MetaData::paddingFactor() const {
-        return _paddingFactor;
-    }
-
-    void DummyRecordStoreV1MetaData::setPaddingFactor( OperationContext* txn,
-                                                       double paddingFactor ) {
-        _paddingFactor = paddingFactor;
-    }
-
     // -----------------------------------------
 
     DummyExtentManager::~DummyExtentManager() {

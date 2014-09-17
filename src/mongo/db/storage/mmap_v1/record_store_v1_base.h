@@ -91,10 +91,6 @@ namespace mongo {
 
         virtual long long maxCappedDocs() const = 0;
 
-        virtual double paddingFactor() const = 0;
-
-        virtual void setPaddingFactor( OperationContext* txn, double paddingFactor ) = 0;
-
     };
 
     class RecordStoreV1Base : public RecordStore {
@@ -177,13 +173,6 @@ namespace mongo {
 
         const RecordStoreV1MetaData* details() const { return _details.get(); }
 
-        /**
-         * @return the actual size to create
-         *         will be >= oldRecordSize
-         *         based on padding and any other flags
-         */
-        int getRecordAllocationSize( int minRecordSize ) const;
-
         DiskLoc getExtentLocForRecord( OperationContext* txn, const DiskLoc& loc ) const;
 
         DiskLoc getNextRecord( OperationContext* txn, const DiskLoc& loc ) const;
@@ -192,16 +181,10 @@ namespace mongo {
         DiskLoc getNextRecordInExtent( OperationContext* txn, const DiskLoc& loc ) const;
         DiskLoc getPrevRecordInExtent( OperationContext* txn, const DiskLoc& loc ) const;
 
-        /* @return the size for an allocated record quantized to 1/16th of the BucketSize.
-           @param allocSize    requested size to allocate
-           The returned size will be greater than or equal to 'allocSize'.
-        */
-        static int quantizeAllocationSpace(int allocSize);
-
         /**
-         * Quantize 'allocSize' to the nearest bucketSize (or nearest 1mb boundary for large sizes).
+         * Quantize 'minSize' to the nearest allocation size.
          */
-        static int quantizePowerOf2AllocationSpace(int allocSize);
+        static int quantizeAllocationSpace(int minSize);
 
         /* return which "deleted bucket" for this size object */
         static int bucket(int size);
@@ -248,9 +231,6 @@ namespace mongo {
             require: you must have already declared write intent for the record header.
         */
         void _addRecordToRecListInExtent(OperationContext* txn, Record* r, DiskLoc loc);
-
-        void _paddingTooSmall( OperationContext* txn );
-        void _paddingFits( OperationContext* txn );
 
         /**
          * internal

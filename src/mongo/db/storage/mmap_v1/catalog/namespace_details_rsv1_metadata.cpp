@@ -175,20 +175,6 @@ namespace mongo {
         return _details->maxDocsInCapped;
     }
 
-    double NamespaceDetailsRSV1MetaData::paddingFactor() const {
-        return _details->paddingFactor;
-    }
-
-    void NamespaceDetailsRSV1MetaData::setPaddingFactor( OperationContext* txn, double paddingFactor ) {
-        if ( paddingFactor == _details->paddingFactor )
-            return;
-
-        if ( _details->isCapped )
-            return;
-
-        *txn->recoveryUnit()->writing(&_details->paddingFactor) = paddingFactor;
-    }
-
     void NamespaceDetailsRSV1MetaData::_syncUserFlags( OperationContext* txn ) {
         if ( !_namespaceRecordStore )
             return;

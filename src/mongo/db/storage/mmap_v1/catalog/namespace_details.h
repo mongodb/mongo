@@ -92,7 +92,7 @@ namespace mongo {
 
         int maxDocsInCapped;                  // max # of objects for a capped table, -1 for inf.
 
-        double paddingFactor;                 // 1.0 = no padding.
+        double paddingFactorOldDoNotUse;
         // ofs 368 (16)
         int systemFlagsOldDoNotUse; // things that the system sets/cares about
 

@@ -54,6 +54,7 @@ namespace mongo {
     static Counter64 freelistBucketExhausted;
     static Counter64 freelistIterations;
 
+    // TODO figure out what to do about these.
     static ServerStatusMetricField<Counter64> dFreelist1( "storage.freelist.search.requests",
                                                           &freelistAllocs );
 
@@ -72,157 +73,59 @@ namespace mongo {
 
         invariant( !details->isCapped() );
         _normalCollection = NamespaceString::normal( ns );
-        if ( _details->paddingFactor() == 0 ) {
-            warning() << "implicit updgrade of paddingFactor of very old collection" << endl;
-            WriteUnitOfWork wunit(txn);
-            _details->setPaddingFactor(txn, 1.0);
-            wunit.commit();
-        }
-
     }
 
     SimpleRecordStoreV1::~SimpleRecordStoreV1() {
     }
 
     DiskLoc SimpleRecordStoreV1::_allocFromExistingExtents( OperationContext* txn,
-                                                            int lenToAlloc ) {
+                                                            int lenToAllocRaw ) {
         // align size up to a multiple of 4
-        lenToAlloc = (lenToAlloc + (4-1)) & ~(4-1);
+        const int lenToAlloc = (lenToAllocRaw + (4-1)) & ~(4-1);
 
         freelistAllocs.increment();
         DiskLoc loc;
+        DeletedRecord* dr = NULL;
         {
-            DiskLoc *prev = 0;
-            DiskLoc *bestprev = 0;
-            DiskLoc bestmatch;
-            int bestmatchlen = INT_MAX; // sentinel meaning we haven't found a record big enough
-            int b = bucket(lenToAlloc);
-            DiskLoc cur = _details->deletedListEntry(b);
-            
-            int extra = 5; // look for a better fit, a little.
-            int chain = 0;
-            while ( 1 ) {
-                { // defensive check
-                    int fileNumber = cur.a();
-                    int fileOffset = cur.getOfs();
-                    if (fileNumber < -1 || fileNumber >= 100000 || fileOffset < 0) {
-                        StringBuilder sb;
-                        sb << "Deleted record list corrupted in collection " << _ns
-                           << ", bucket " << b
-                           << ", link number " << chain
-                           << ", invalid link is " << cur.toString()
-                           << ", throwing Fatal Assertion";
-                        log() << sb.str() << endl;
-                        fassertFailed(16469);
-                    }
-                }
-                if ( cur.isNull() ) {
-                    // move to next bucket.  if we were doing "extra", just break
-                    if ( bestmatchlen < INT_MAX )
-                        break;
 
-                    if ( chain > 0 ) {
-                        // if we looked at things in the right bucket, but they were not suitable
-                        freelistBucketExhausted.increment();
-                    }
-
-                    b++;
-                    if ( b > MaxBucket ) {
-                        // out of space. alloc a new extent.
-                        freelistIterations.increment( 1 + chain );
-                        return DiskLoc();
-                    }
-                    cur = _details->deletedListEntry(b);
-                    prev = 0;
-                    continue;
-                }
-                DeletedRecord *r = drec(cur);
-                if ( r->lengthWithHeaders() >= lenToAlloc &&
-                     r->lengthWithHeaders() < bestmatchlen ) {
-                    bestmatchlen = r->lengthWithHeaders();
-                    bestmatch = cur;
-                    bestprev = prev;
-                    if (r->lengthWithHeaders() == lenToAlloc)
-                        // exact match, stop searching
-                        break;
-                }
-                if ( bestmatchlen < INT_MAX && --extra <= 0 )
+            int myBucket;
+            for (myBucket = bucket(lenToAlloc); myBucket < Buckets; myBucket++) {
+                // Only look at the first entry in each bucket. This works because we are either
+                // quantizing or allocating fixed-size blocks.
+                const DiskLoc head = _details->deletedListEntry(myBucket);
+                if (head.isNull()) continue;
+                DeletedRecord* const candidate = drec(head);
+                if (candidate->lengthWithHeaders() >= lenToAlloc) {
+                    loc = head;
+                    dr = candidate;
                     break;
-                if ( ++chain > 30 && b <= MaxBucket ) {
-                    // too slow, force move to next bucket to grab a big chunk
-                    //b++;
-                    freelistIterations.increment( chain );
-                    chain = 0;
-                    cur.Null();
-                }
-                else {
-                    cur = r->nextDeleted();
-                    prev = &r->nextDeleted();
                 }
             }
 
-            // unlink ourself from the deleted list
-            DeletedRecord *bmr = drec(bestmatch);
-            if ( bestprev ) {
-                *txn->recoveryUnit()->writing(bestprev) = bmr->nextDeleted();
-            }
-            else {
-                // should be the front of a free-list
-                int myBucket = bucket(bmr->lengthWithHeaders());
-                invariant( _details->deletedListEntry(myBucket) == bestmatch );
-                _details->setDeletedListEntry(txn, myBucket, bmr->nextDeleted());
-            }
-            *txn->recoveryUnit()->writing(&bmr->nextDeleted()) = DiskLoc().setInvalid(); // defensive.
-            invariant(bmr->extentOfs() < bestmatch.getOfs());
+            if (!dr)
+                return DiskLoc(); // no space
 
-            freelistIterations.increment( 1 + chain );
-            loc = bestmatch;
+            // Unlink ourself from the deleted list
+            _details->setDeletedListEntry(txn, myBucket, dr->nextDeleted());
+            *txn->recoveryUnit()->writing(&dr->nextDeleted()) = DiskLoc().setInvalid(); // defensive
         }
 
-        if ( loc.isNull() )
-            return loc;
+        invariant( dr->extentOfs() < loc.getOfs() );
 
-        // determine if we should chop up
+        // Split the deleted record if it has at least as much left over space as our smallest
+        // allocation size. Otherwise, just take the whole DeletedRecord.
+        const int remainingLength = dr->lengthWithHeaders() - lenToAlloc;
+        if (remainingLength >= bucketSizes[0]) {
+            txn->recoveryUnit()->writingInt(dr->lengthWithHeaders()) = lenToAlloc;
+            const DiskLoc newDelLoc = DiskLoc(loc.a(), loc.getOfs() + lenToAlloc);
+            DeletedRecord* newDel = txn->recoveryUnit()->writing(drec(newDelLoc));
+            newDel->extentOfs() = dr->extentOfs();
+            newDel->lengthWithHeaders() = remainingLength;
+            newDel->nextDeleted().Null();
 
-        DeletedRecord *r = drec(loc);
-
-        /* note we want to grab from the front so our next pointers on disk tend
-        to go in a forward direction which is important for performance. */
-        int regionlen = r->lengthWithHeaders();
-        invariant( r->extentOfs() < loc.getOfs() );
-
-        int left = regionlen - lenToAlloc;
-        if ( left < 24 || left < (lenToAlloc / 8) ) {
-            // you get the whole thing.
-            return loc;
+            addDeletedRec(txn, newDelLoc);
         }
 
-        // don't quantize:
-        //   - $ collections (indexes) as we already have those aligned the way we want SERVER-8425
-        if ( _normalCollection ) {
-            // we quantize here so that it only impacts newly sized records
-            // this prevents oddities with older records and space re-use SERVER-8435
-            lenToAlloc = std::min( r->lengthWithHeaders(),
-                                   quantizeAllocationSpace( lenToAlloc ) );
-            left = regionlen - lenToAlloc;
-
-            if ( left < 24 ) {
-                // you get the whole thing.
-                return loc;
-            }
-        }
-
-        /* split off some for further use. */
-        txn->recoveryUnit()->writingInt(r->lengthWithHeaders()) = lenToAlloc;
-        DiskLoc newDelLoc = loc;
-        newDelLoc.inc(lenToAlloc);
-        DeletedRecord* newDel = drec(newDelLoc);
-        DeletedRecord* newDelW = txn->recoveryUnit()->writing(newDel);
-        newDelW->extentOfs() = r->extentOfs();
-        newDelW->lengthWithHeaders() = left;
-        newDelW->nextDeleted().Null();
-
-        addDeletedRec( txn, newDelLoc );
         return loc;
     }
 
@@ -426,11 +329,8 @@ namespace mongo {
                     const unsigned minAllocationSize = rawDataSize + Record::HeaderSize;
                     unsigned allocationSize = minAllocationSize;
                     switch( compactOptions->paddingMode ) {
-                    case CompactOptions::NONE: // no padding, unless using powerOf2Sizes
-                        if ( _details->isUserFlagSet(Flag_UsePowerOf2Sizes) )
-                            allocationSize = quantizePowerOf2AllocationSpace(minAllocationSize);
-                        else
-                            allocationSize = minAllocationSize;
+                    case CompactOptions::NONE: // default padding
+                        allocationSize = quantizeAllocationSpace(minAllocationSize);
                         break;
 
                     case CompactOptions::PRESERVE: // keep original padding

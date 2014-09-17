@@ -85,10 +85,6 @@ namespace mongo {
 
         virtual long long maxCappedDocs() const;
 
-        virtual double paddingFactor() const;
-
-        virtual void setPaddingFactor( OperationContext* txn, double paddingFactor );
-
     protected:
 
         DiskLoc _capExtent;

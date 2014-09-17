@@ -229,7 +229,7 @@ namespace mongo {
         // nIndexes preserve 0
         // capped preserve true
         // max preserve
-        _details->setPaddingFactor( txn, 1.0 );
+        // paddingFactor is unused
         _details->setCapFirstNewRecord( txn, DiskLoc().setInvalid() );
         setLastDelRecLastExtent( txn, DiskLoc().setInvalid() );
         // dataFileVersion preserve

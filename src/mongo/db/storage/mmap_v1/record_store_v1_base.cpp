@@ -241,8 +241,8 @@ namespace mongo {
                                         "record has to be >= 4 bytes" );
         }
         int lenWHdr = docSize + Record::HeaderSize;
-        if ( doc->addPadding() )
-            lenWHdr = getRecordAllocationSize( lenWHdr );
+        if (doc->addPadding() && !isCapped())
+            lenWHdr = quantizeAllocationSpace( lenWHdr );
 
         StatusWith<DiskLoc> loc = allocRecord( txn, lenWHdr, enforceQuota );
         if ( !loc.isOK() )
@@ -258,8 +258,6 @@ namespace mongo {
 
         _details->incrementStats( txn, r->netLength(), 1 );
 
-        _paddingFits( txn );
-
         return loc;
     }
 
@@ -273,11 +271,7 @@ namespace mongo {
                                         "record has to be >= 4 bytes" );
         }
 
-        StatusWith<DiskLoc> status = _insertRecord( txn, data, len, enforceQuota );
-        if ( status.isOK() )
-            _paddingFits( txn );
-
-        return status;
+        return _insertRecord( txn, data, len, enforceQuota );
     }
 
     StatusWith<DiskLoc> RecordStoreV1Base::_insertRecord( OperationContext* txn,
@@ -285,7 +279,9 @@ namespace mongo {
                                                           int len,
                                                           bool enforceQuota ) {
 
-        int lenWHdr = getRecordAllocationSize( len + Record::HeaderSize );
+        int lenWHdr = len + Record::HeaderSize;
+        if (!isCapped())
+            lenWHdr = quantizeAllocationSpace( lenWHdr );
         fassert( 17208, lenWHdr >= ( len + Record::HeaderSize ) );
 
         StatusWith<DiskLoc> loc = allocRecord( txn, lenWHdr, enforceQuota );
@@ -315,7 +311,6 @@ namespace mongo {
         Record* oldRecord = recordFor( oldLocation );
         if ( oldRecord->netLength() >= dataSize ) {
             // we fit
-            _paddingFits( txn );
             memcpy( txn->recoveryUnit()->writingPtr( oldRecord->data(), dataSize ), data, dataSize );
             return StatusWith<DiskLoc>( oldLocation );
         }
@@ -326,8 +321,6 @@ namespace mongo {
                                         10003 );
 
         // we have to move
-
-        _paddingTooSmall( txn );
 
         StatusWith<DiskLoc> newLocation = _insertRecord( txn, data, dataSize, enforceQuota );
         if ( !newLocation.isOK() )
@@ -354,8 +347,6 @@ namespace mongo {
                                                  const RecordData& oldRec,
                                                  const char* damageSource,
                                                  const mutablebson::DamageVector& damages ) {
-        _paddingFits( txn );
-
         Record* rec = recordFor( loc );
         char* root = rec->data();
 
@@ -519,7 +510,6 @@ namespace mongo {
         output->appendNumber("datasize", _details->dataSize());
         output->appendNumber("nrecords", _details->numRecords());
         output->appendNumber("lastExtentSize", _details->lastExtentSize(txn));
-        output->appendNumber("padding", _details->paddingFactor());
 
         if ( _details->firstExtent(txn).isNull() )
             output->append( "firstExtent", "null" );
@@ -647,7 +637,6 @@ namespace mongo {
                 int n = 0;
                 int nInvalid = 0;
                 long long nQuantizedSize = 0;
-                long long nPowerOf2QuantizedSize = 0;
                 long long len = 0;
                 long long nlen = 0;
                 long long bsonLen = 0;
@@ -679,13 +668,6 @@ namespace mongo {
                         // Count the number of records having a size consistent with
                         // the quantizeAllocationSpace quantization implementation.
                         ++nQuantizedSize;
-                    }
-
-                    if ( r->lengthWithHeaders() ==
-                         quantizePowerOf2AllocationSpace( r->lengthWithHeaders() ) ) {
-                        // Count the number of records having a size consistent with the
-                        // quantizePowerOf2AllocationSpace quantization implementation.
-                        ++nPowerOf2QuantizedSize;
                     }
 
                     if (full){
@@ -720,7 +702,6 @@ namespace mongo {
                 }
 
                 output->appendNumber("nQuantizedSize", nQuantizedSize);
-                output->appendNumber("nPowerOf2QuantizedSize", nPowerOf2QuantizedSize);
                 output->appendNumber("bytesWithHeaders", len);
                 output->appendNumber("bytesWithoutHeaders", nlen);
 
@@ -804,7 +785,9 @@ namespace mongo {
                                                BSONObjBuilder* result,
                                                double scale ) const {
         result->append( "lastExtentSize", _details->lastExtentSize(txn) / scale );
-        result->append( "paddingFactor", _details->paddingFactor() );
+        result->append( "paddingFactor", 1.0 ); // hard coded
+        result->append( "paddingFactorNote", "paddingFactor is unused and unmaintained in 2.8. It "
+                                             "remains hard coded to 1.0 for compatibility only." );
         result->append( "userFlags", _details->userFlags() );
 
         if ( isCapped() ) {
@@ -863,22 +846,6 @@ namespace mongo {
         return Status::OK();
     }
 
-    int RecordStoreV1Base::getRecordAllocationSize( int minRecordSize ) const {
-
-        if ( isCapped() )
-            return minRecordSize;
-
-        invariant( _details->paddingFactor() >= 1 );
-
-        if ( _details->isUserFlagSet( Flag_UsePowerOf2Sizes ) ) {
-            // quantize to the nearest bucketSize (or nearest 1mb boundary for large sizes).
-            return quantizePowerOf2AllocationSpace(minRecordSize);
-        }
-
-        // adjust for padding factor
-        return static_cast<int>(minRecordSize * _details->paddingFactor());
-    }
-
     DiskLoc RecordStoreV1Base::IntraExtentIterator::getNext() {
         if (_curr.isNull())
             return DiskLoc();
@@ -896,71 +863,29 @@ namespace mongo {
         }
     }
 
-    /* @return the size for an allocated record quantized to 1/16th of the BucketSize
-       @param allocSize    requested size to allocate
-    */
     int RecordStoreV1Base::quantizeAllocationSpace(int allocSize) {
-        const int bucketIdx = bucket(allocSize);
-        int bucketSize = bucketSizes[bucketIdx];
-        int quantizeUnit = bucketSize / 16;
-        if (allocSize >= (1 << 22)) // 4mb
-            // all allocatons >= 4mb result in 4mb/16 quantization units, even if >= 8mb.  idea is
-            // to reduce quantization overhead of large records at the cost of increasing the
-            // DeletedRecord size distribution in the largest bucket by factor of 4.
-            quantizeUnit = (1 << 18); // 256k
-        if (allocSize % quantizeUnit == 0)
-            // size is already quantized
-            return allocSize;
-        const int quantizedSpace = (allocSize | (quantizeUnit - 1)) + 1;
-        fassert(16484, quantizedSpace >= allocSize);
-        return quantizedSpace;
-    }
-
-    int RecordStoreV1Base::quantizePowerOf2AllocationSpace(int allocSize) {
-        for ( int i = 0; i < MaxBucket; i++ ) { // skips the largest (16MB) bucket
+        for ( int i = 0; i < Buckets; i++ ) {
             if ( bucketSizes[i] >= allocSize ) {
                 // Return the size of the first bucket sized >= the requested size.
                 return bucketSizes[i];
             }
         }
 
-        // if we get here, it means we're allocating more than 4mb, so round up
-        // to the nearest megabyte >= allocSize
-        const int MB = 1024*1024;
-        invariant(allocSize > 4*MB);
-        return (allocSize + (MB - 1)) & ~(MB - 1); // round up to MB alignment
+        // TODO make a specific bucket large enough to hold all documents rather than doing this.
+        invariant(allocSize < bucketSizes[MaxBucket] + 1024*1024);
+        return bucketSizes[MaxBucket] + 1024*1024;
     }
 
     int RecordStoreV1Base::bucket(int size) {
         for ( int i = 0; i < Buckets; i++ ) {
             if ( bucketSizes[i] > size ) {
-                // Return the first bucket sized _larger_ than the requested size.
+                // Return the first bucket sized _larger_ than the requested size. This is important
+                // since we want all records in a bucket to be >= the quantized size, therefore the
+                // quantized size must be the smallest allowed record per bucket.
                 return i;
             }
         }
         return MaxBucket;
-    }
-
-    void RecordStoreV1Base::_paddingFits( OperationContext* txn ) {
-        MONGO_SOMETIMES(sometimes, 4) { // do this on a sampled basis to journal less
-            double x = max(1.0, _details->paddingFactor() - 0.001 );
-            _details->setPaddingFactor( txn, x );
-        }
-    }
-
-    void RecordStoreV1Base::_paddingTooSmall( OperationContext* txn ) {
-        MONGO_SOMETIMES(sometimes, 4) { // do this on a sampled basis to journal less
-            /* the more indexes we have, the higher the cost of a move.  so we take that into
-               account herein.  note on a move that insert() calls paddingFits(), thus
-               here for example with no inserts and nIndexes = 1 we have
-               .001*4-.001 or a 3:1 ratio to non moves -> 75% nonmoves.  insert heavy
-               can pushes this down considerably. further tweaking will be a good idea but
-               this should be an adequate starting point.
-            */
-            double N = 4; // magic
-            double x = min(2.0,_details->paddingFactor() + (0.001 * N));
-            _details->setPaddingFactor( txn, x );
-        }
     }
 
     Status RecordStoreV1Base::setCustomOption( OperationContext* txn,
