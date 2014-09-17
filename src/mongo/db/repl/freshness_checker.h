@@ -105,6 +105,19 @@ namespace repl {
             const stdx::function<void ()>& onCompletion = stdx::function<void ()>());
 
         /**
+         * Informs the freshness checker to cancel further processing.  The "executor"
+         * argument must point to the same executor passed to "start()".
+         *
+         * Like start(), this method must run in the executor context.
+         */
+        void cancel(ReplicationExecutor* executor);
+
+        /**
+         * Returns true if cancel() was called on this instance.
+         */
+        bool isCanceled() const { return _isCanceled; }
+
+        /**
          * Returns whether this node is the freshest of all non-DOWN nodes in the set,
          * and if any election attempts may be tying because our optime matches another's.
          * Only valid to call after the event handle supplied to start() has been signaled, which 
@@ -122,6 +135,7 @@ namespace repl {
         boost::scoped_ptr<Algorithm> _algorithm;
         boost::scoped_ptr<ScatterGatherRunner> _runner;
         long long _originalConfigVersion;
+        bool _isCanceled;
     };
 
 }  // namespace repl

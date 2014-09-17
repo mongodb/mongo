@@ -96,15 +96,29 @@ namespace repl {
             const stdx::function<void ()>& onCompletion = stdx::function<void ()>());
 
         /**
+         * Informs the ElectCmdRunner to cancel further processing.  The "executor"
+         * argument must point to the same executor passed to "start()".
+         *
+         * Like start(), this method must run in the executor context.
+         */
+        void cancel(ReplicationExecutor* executor);
+
+        /**
          * Returns the number of received votes.  Only valid to call after
          * the event handle returned from start() has been signaled, which guarantees that
          * the vote count will no longer be touched by callbacks.
          */
         int getReceivedVotes() const;
 
+        /**
+         * Returns true if cancel() was called on this instance.
+         */
+        bool isCanceled() const { return _isCanceled; }
+
     private:
         boost::scoped_ptr<Algorithm> _algorithm;
         boost::scoped_ptr<ScatterGatherRunner> _runner;
+        bool _isCanceled;
     };
 
 }

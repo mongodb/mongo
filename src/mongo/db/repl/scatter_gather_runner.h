@@ -90,6 +90,14 @@ namespace repl {
                 ReplicationExecutor* executor,
                 const stdx::function<void ()>& onCompletion = stdx::function<void ()>());
 
+        /**
+         * Informs the runner to cancel further processing.  The "executor" argument
+         * must point to the same executor passed to "start()".
+         *
+         * Like start, this method must be called from within the executor context.
+         */
+        void cancel(ReplicationExecutor* executor);
+
     private:
         /**
          * Callback invoked once for every response from the network.

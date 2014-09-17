@@ -127,7 +127,7 @@ namespace repl {
         }
     }
 
-    ElectCmdRunner::ElectCmdRunner() {}
+    ElectCmdRunner::ElectCmdRunner() : _isCanceled(false) {}
     ElectCmdRunner::~ElectCmdRunner() {}
 
     StatusWith<ReplicationExecutor::EventHandle> ElectCmdRunner::start(
@@ -141,6 +141,11 @@ namespace repl {
         _algorithm.reset(new Algorithm(currentConfig, selfIndex, targets, round));
         _runner.reset(new ScatterGatherRunner(_algorithm.get()));
         return _runner->start(executor, onCompletion);
+    }
+
+    void ElectCmdRunner::cancel(ReplicationExecutor* executor) {
+        _isCanceled = true;
+        _runner->cancel(executor);
     }
 
     int ElectCmdRunner::getReceivedVotes() const {
