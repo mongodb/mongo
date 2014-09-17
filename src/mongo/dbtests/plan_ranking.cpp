@@ -52,6 +52,8 @@ namespace mongo {
     // How we access the external setParameter testing bool.
     extern bool internalQueryForceIntersectionPlans;
 
+    extern bool internalQueryPlannerEnableHashIntersection;
+
 }  // namespace mongo
 
 namespace PlanRankingTests {
@@ -62,7 +64,11 @@ namespace PlanRankingTests {
     public:
         PlanRankingTestBase()
             : _internalQueryForceIntersectionPlans(internalQueryForceIntersectionPlans),
+              _enableHashIntersection(internalQueryPlannerEnableHashIntersection),
               _client(&_txn) {
+
+            // Run all tests with hash-based intersection enabled.
+            internalQueryPlannerEnableHashIntersection = true;
 
             Client::WriteContext ctx(&_txn, ns);
             _client.dropCollection(ns);
@@ -70,8 +76,9 @@ namespace PlanRankingTests {
         }
 
         virtual ~PlanRankingTestBase() {
-            // Restore external setParameter testing bool.
+            // Restore external setParameter testing bools.
             internalQueryForceIntersectionPlans = _internalQueryForceIntersectionPlans;
+            internalQueryPlannerEnableHashIntersection = _enableHashIntersection;
         }
 
         void insert(const BSONObj& obj) {
@@ -149,6 +156,10 @@ namespace PlanRankingTests {
         // Holds the value of global "internalQueryForceIntersectionPlans" setParameter flag.
         // Restored at end of test invocation regardless of test result.
         bool _internalQueryForceIntersectionPlans;
+
+        // Holds the value of the global set parameter so it can be restored at the end
+        // of the test.
+        bool _enableHashIntersection;
 
         scoped_ptr<MultiPlanStage> _mps;
 
