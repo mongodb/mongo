@@ -320,7 +320,7 @@ namespace mongo {
                 cursor->savePosition();
 
                 // restore position
-                cursor->restorePosition();
+                cursor->restorePosition( &opCtx );
                 ASSERT( !cursor->isEOF()  );
                 ASSERT_EQUALS( BSON( "" << 1 ), cursor->getKey() );
                 ASSERT_EQUALS( DiskLoc(1,1), cursor->getDiskLoc() );
@@ -335,7 +335,7 @@ namespace mongo {
                 cursor->savePosition();
 
                 // restore position
-                cursor->restorePosition();
+                cursor->restorePosition( &opCtx );
                 ASSERT( !cursor->isEOF()  );
                 ASSERT_EQUALS( BSON( "" << 2 ), cursor->getKey() );
                 ASSERT_EQUALS( DiskLoc(1,2), cursor->getDiskLoc() );
@@ -381,7 +381,7 @@ namespace mongo {
                 cursor->savePosition();
 
                 // restore position, make sure we're at the end
-                cursor->restorePosition();
+                cursor->restorePosition( &opCtx );
                 ASSERT( cursor->isEOF()  );
             }
         }
@@ -428,7 +428,7 @@ namespace mongo {
                 }
 
                 // restore position, make sure we don't see the newly inserted value
-                cursor->restorePosition();
+                cursor->restorePosition( &opCtx );
                 ASSERT( !cursor->isEOF() );
                 ASSERT_EQUALS( BSON( "" << 3 ), cursor->getKey() );
                 ASSERT_EQUALS( DiskLoc(1,3), cursor->getDiskLoc() );
@@ -479,7 +479,7 @@ namespace mongo {
                 }
 
                 // restore position
-                cursor->restorePosition();
+                cursor->restorePosition( &opCtx );
                 ASSERT( !cursor->isEOF() );
                 ASSERT_EQUALS( BSON( "" << 2 ), cursor->getKey() );
                 ASSERT_EQUALS( DiskLoc(1,2), cursor->getDiskLoc() );
@@ -527,7 +527,7 @@ namespace mongo {
                 }
 
                 // restore position
-                cursor->restorePosition();
+                cursor->restorePosition( &opCtx );
                 ASSERT( !cursor->isEOF() );
                 ASSERT_EQUALS( BSON( "" << 2 ), cursor->getKey() );
                 ASSERT_EQUALS( DiskLoc(1,2), cursor->getDiskLoc() );
@@ -643,7 +643,7 @@ namespace mongo {
                 cursor->savePosition();
 
                 // restore position
-                cursor->restorePosition();
+                cursor->restorePosition( &opCtx );
                 ASSERT( !cursor->isEOF()  );
                 ASSERT_EQUALS( BSON( "" << 1 ), cursor->getKey() );
                 ASSERT_EQUALS( DiskLoc(1,1), cursor->getDiskLoc() );
@@ -658,7 +658,7 @@ namespace mongo {
                 cursor->savePosition();
 
                 // restore position
-                cursor->restorePosition();
+                cursor->restorePosition( &opCtx );
                 ASSERT( !cursor->isEOF()  );
                 ASSERT_EQUALS( BSON( "" << 2 ), cursor->getKey() );
                 ASSERT_EQUALS( DiskLoc(1,2), cursor->getDiskLoc() );
@@ -704,7 +704,7 @@ namespace mongo {
                 cursor->savePosition();
 
                 // restore position, make sure we're at the end
-                cursor->restorePosition();
+                cursor->restorePosition( &opCtx );
                 ASSERT( cursor->isEOF() );
             }
         }
@@ -751,7 +751,7 @@ namespace mongo {
                 }
 
                 // restore position, make sure we don't see the newly inserted value
-                cursor->restorePosition();
+                cursor->restorePosition( &opCtx );
                 ASSERT( !cursor->isEOF() );
                 ASSERT_EQUALS( BSON( "" << 3 ), cursor->getKey() );
                 ASSERT_EQUALS( DiskLoc(1,3), cursor->getDiskLoc() );
@@ -809,7 +809,7 @@ namespace mongo {
 
                 // restore position, make sure we still see the deleted key and value, because
                 // we're using a snapshot
-                cursor->restorePosition();
+                cursor->restorePosition( &opCtx );
                 ASSERT( !cursor->isEOF() );
                 ASSERT_EQUALS( BSON( "" << 3 ), cursor->getKey() );
                 ASSERT_EQUALS( DiskLoc(1,3), cursor->getDiskLoc() );
@@ -858,7 +858,7 @@ namespace mongo {
                 }
 
                 // restore position
-                cursor->restorePosition();
+                cursor->restorePosition( &opCtx );
                 ASSERT( !cursor->isEOF() );
                 ASSERT_EQUALS( BSON( "" << 2 ), cursor->getKey() );
                 ASSERT_EQUALS( DiskLoc(1,2), cursor->getDiskLoc() );
@@ -907,7 +907,7 @@ namespace mongo {
                 }
 
                 // restore position
-                cursor->restorePosition();
+                cursor->restorePosition( &opCtx );
                 ASSERT( !cursor->isEOF() );
                 ASSERT_EQUALS( BSON( "" << 2 ), cursor->getKey() );
                 ASSERT_EQUALS( DiskLoc(1,2), cursor->getDiskLoc() );
