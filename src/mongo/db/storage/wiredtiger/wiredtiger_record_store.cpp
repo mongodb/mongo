@@ -45,7 +45,7 @@ namespace mongo {
         WT_SESSION *s = swrap.Get();
         // Separate out a prefix and suffix in the default string. User configuration will
         // override values in the prefix, but not values in the suffix.
-        const char *default_config_pfx = "type=file,";
+        const char *default_config_pfx = "type=file,leaf_page_max=512k,memory_page_max=10m,";
         const char *default_config_sfx = ",key_format=q,value_format=u,app_metadata=";
         std::string config = std::string(default_config_pfx +
                 wiredTigerGlobalOptions.collectionConfig + default_config_sfx +

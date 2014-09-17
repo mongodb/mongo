@@ -46,10 +46,10 @@ namespace mongo {
 
     WiredTigerEngine::WiredTigerEngine( const std::string &path) : _path( path ), _db(0) {
         WT_CONNECTION *conn;
-        const char * default_config = ",create,extensions=[local=(entry=index_collator_extension)]";
+        const char * default_config = "create,cache_size=1G,extensions=[local=(entry=index_collator_extension)],";
 
         std::string config = std::string(
-                wiredTigerGlobalOptions.databaseConfig + default_config);
+                default_config + wiredTigerGlobalOptions.databaseConfig);
         int ret = wiredtiger_open(path.c_str(), NULL, config.c_str(), &conn);
         if (ret != 0) {
             log() << "Starting engine with custom options ( " << config <<

@@ -153,7 +153,7 @@ namespace mongo {
 
         // Separate out a prefix and suffix in the default string. User configuration will
         // override values in the prefix, but not values in the suffix.
-        const char *default_config_pfx = "type=file,";
+        const char *default_config_pfx = "type=file,leaf_page_max=16k,";
         const char *default_config_sfx =
             ",key_format=uq,value_format=u,collator=mongo_index,app_metadata=";
         std::string config = std::string(default_config_pfx +
