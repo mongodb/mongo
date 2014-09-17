@@ -219,7 +219,7 @@ namespace mongo {
         return true;
     }
 
-    void WiredTigerIndex::fullValidate(OperationContext* txn, long long *numKeysOut) {
+    void WiredTigerIndex::fullValidate(OperationContext* txn, long long *numKeysOut) const {
         // TODO check invariants?
         WiredTigerSession &swrap = WiredTigerRecoveryUnit::Get(txn).GetSession();
         WiredTigerCursor curwrap(GetURI(), swrap);
@@ -395,7 +395,7 @@ namespace mongo {
         }
     }
 
-    void WiredTigerIndex::IndexCursor::restorePosition() {
+    void WiredTigerIndex::IndexCursor::restorePosition( OperationContext *txn ) {
         if (_savedAtEnd) {
             _eof = true;
             return;

@@ -596,7 +596,7 @@ namespace mongo {
         invariant(ret == 0);
     }
 
-    bool WiredTigerRecordStore::Iterator::restoreState() {
+    bool WiredTigerRecordStore::Iterator::restoreState( OperationContext *txn ) {
         if (_savedLoc.isNull())
             _eof = true;
         else

@@ -67,7 +67,7 @@ namespace mongo {
 
         virtual bool unindex(OperationContext* txn, const BSONObj& key, const DiskLoc& loc);
 
-        virtual void fullValidate(OperationContext* txn, long long *numKeysOut);
+        virtual void fullValidate(OperationContext* txn, long long *numKeysOut) const;
 
         virtual Status dupKeyCheck(OperationContext* txn, const BSONObj& key, const DiskLoc& loc);
 
@@ -131,7 +131,7 @@ namespace mongo {
 
                 virtual void savePosition();
 
-                virtual void restorePosition();
+                virtual void restorePosition( OperationContext *txn );
 
             private:
                 shared_ptr<WiredTigerSession> _session;
