@@ -118,7 +118,8 @@ namespace mongo {
     void SimpleRecordStoreV1Iterator::saveState() {
     }
 
-    bool SimpleRecordStoreV1Iterator::restoreState() {
+    bool SimpleRecordStoreV1Iterator::restoreState(OperationContext* txn) {
+        _txn = txn;
         // if the collection is dropped, then the cursor should be destroyed
         return true;
     }

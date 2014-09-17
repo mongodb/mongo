@@ -40,6 +40,7 @@ namespace mongo {
      * Caller takes ownership.
      * All permanent data will be stored and fetch from dataInOut.
      */
-    SortedDataInterface* getHeap1BtreeImpl(IndexCatalogEntry* info, boost::shared_ptr<void>* dataInOut);
+    SortedDataInterface* getHeap1BtreeImpl(const Ordering& ordering,
+                                           boost::shared_ptr<void>* dataInOut);
 
 }  // namespace mongo

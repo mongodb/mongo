@@ -24,7 +24,11 @@ env.Library(
         ])
 
 env.Library('replication_executor',
-            'replication_executor.cpp',
+            [
+                'replication_executor.cpp',
+                'scatter_gather_algorithm.cpp',
+                'scatter_gather_runner.cpp',
+            ],
             LIBDEPS=['$BUILD_DIR/mongo/foundation',
                      '$BUILD_DIR/mongo/hostandport'])
 

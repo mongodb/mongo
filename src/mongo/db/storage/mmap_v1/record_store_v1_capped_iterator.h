@@ -61,7 +61,7 @@ namespace mongo {
 
         virtual void invalidate(const DiskLoc& dl);
         virtual void saveState();
-        virtual bool restoreState();
+        virtual bool restoreState(OperationContext* txn);
 
         virtual RecordData dataFor( const DiskLoc& loc ) const;
     private:

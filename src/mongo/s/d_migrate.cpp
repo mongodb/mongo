@@ -864,7 +864,7 @@ namespace mongo {
                 repl::ReplicationCoordinator* replCoordinator =
                         repl::getGlobalReplicationCoordinator();
                 Status status = replCoordinator->checkIfWriteConcernCanBeSatisfied(writeConcern);
-                if (!status.isOK()) {
+                if (!status.isOK() && status != ErrorCodes::NoReplicationEnabled) {
                     warning() << status.toString() << endl;
                     return appendCommandStatus(result, status);
                 }
@@ -2435,7 +2435,7 @@ namespace mongo {
                 repl::ReplicationCoordinator* replCoordinator =
                         repl::getGlobalReplicationCoordinator();
                 Status status = replCoordinator->checkIfWriteConcernCanBeSatisfied(writeConcern);
-                if (!status.isOK()) {
+                if (!status.isOK() && status != ErrorCodes::NoReplicationEnabled) {
                     warning() << status.toString() << endl;
                     return appendCommandStatus(result, status);
                 }

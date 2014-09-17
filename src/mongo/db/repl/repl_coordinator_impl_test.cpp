@@ -42,6 +42,7 @@
 #include "mongo/db/repl/repl_coordinator_external_state_mock.h"
 #include "mongo/db/repl/repl_coordinator_impl.h"
 #include "mongo/db/repl/repl_coordinator_test_fixture.h"
+#include "mongo/db/repl/repl_set_heartbeat_args.h"
 #include "mongo/db/repl/repl_settings.h"
 #include "mongo/db/repl/replica_set_config.h"
 #include "mongo/db/repl/topology_coordinator_impl.h"
@@ -220,16 +221,19 @@ namespace {
                                      BSON("_id" << 1 << "host" << "node2:54321"))),
                         &result1));
         ASSERT_EQUALS(ReplicationCoordinator::modeNone, getReplCoord()->getReplicationMode());
+
+        ReplSetHeartbeatArgs hbArgs;
+        hbArgs.setSetName("mySet");
+        hbArgs.setProtocolVersion(1);
+        hbArgs.setConfigVersion(1);
+        hbArgs.setCheckEmpty(true);
+        hbArgs.setSenderHost(HostAndPort("node1", 12345));
+        hbArgs.setSenderId(0);
         getNetWithMap()->addResponse(
                 ReplicationExecutor::RemoteCommandRequest(
                         HostAndPort("node2", 54321),
                         "admin",
-                        BSON("replSetHeartbeat" << "mySet" <<
-                             "v" << 1 <<
-                             "pv" << 1 <<
-                             "checkEmpty" << true <<
-                             "from" << "node1:12345" <<
-                             "fromId" << 0)),
+                        hbArgs.toBSON()),
                 StatusWith<BSONObj>(BSON("ok" << 1)));
 
         ASSERT_OK(
@@ -412,7 +416,7 @@ namespace {
         // 2 nodes waiting for time2
         statusAndDur = getReplCoord()->awaitReplication(&txn, time2, writeConcern);
         ASSERT_EQUALS(ErrorCodes::ExceededTimeLimit, statusAndDur.status);
-        ASSERT_OK(getReplCoord()->setLastOptime(&txn, client2, time2));
+        ASSERT_OK(getReplCoord()->setLastOptime(&txn, myOID, time2));
         statusAndDur = getReplCoord()->awaitReplication(&txn, time2, writeConcern);
         ASSERT_EQUALS(ErrorCodes::ExceededTimeLimit, statusAndDur.status);
         ASSERT_OK(getReplCoord()->setLastOptime(&txn, client3, time2));
@@ -423,7 +427,7 @@ namespace {
         writeConcern.wNumNodes = 3;
         statusAndDur = getReplCoord()->awaitReplication(&txn, time2, writeConcern);
         ASSERT_EQUALS(ErrorCodes::ExceededTimeLimit, statusAndDur.status);
-        ASSERT_OK(getReplCoord()->setLastOptime(&txn, client1, time2));
+        ASSERT_OK(getReplCoord()->setLastOptime(&txn, client2, time2));
         statusAndDur = getReplCoord()->awaitReplication(&txn, time2, writeConcern);
         ASSERT_OK(statusAndDur.status);
     }
@@ -611,16 +615,15 @@ namespace {
                      "version" << 2 <<
                      "members" << BSON_ARRAY(BSON("host" << "node1:12345" << "_id" << 0) <<
                                              BSON("host" << "node2:12345" << "_id" << 1) <<
-                                             BSON("host" << "node3:12345" << "_id" << 2) <<
-                                             BSON("host" << "node4:12345" << "_id" << 3))),
+                                             BSON("host" << "node3:12345" << "_id" << 2))),
                 HostAndPort("node1", 12345));
 
         OperationContextNoop txn;
         ReplicationAwaiter awaiter(getReplCoord(), &txn);
 
+        OID selfRID = getReplCoord()->getMyRID();
         OID client1 = OID::gen();
         OID client2 = OID::gen();
-        OID client3 = OID::gen();
         OpTime time1(1, 1);
         OpTime time2(1, 2);
 
@@ -630,9 +633,6 @@ namespace {
         HandshakeArgs handshake2;
         ASSERT_OK(handshake2.initialize(BSON("handshake" << client2 << "member" << 2)));
         ASSERT_OK(getReplCoord()->processHandshake(&txn, handshake2));
-        HandshakeArgs handshake3;
-        ASSERT_OK(handshake3.initialize(BSON("handshake" << client3 << "member" << 3)));
-        ASSERT_OK(getReplCoord()->processHandshake(&txn, handshake3));
 
         WriteConcernOptions writeConcern;
         writeConcern.wTimeout = WriteConcernOptions::kNoTimeout;
@@ -642,8 +642,8 @@ namespace {
         awaiter.setOpTime(time1);
         awaiter.setWriteConcern(writeConcern);
         awaiter.start(&txn);
+        ASSERT_OK(getReplCoord()->setLastOptime(&txn, selfRID, time1));
         ASSERT_OK(getReplCoord()->setLastOptime(&txn, client1, time1));
-        ASSERT_OK(getReplCoord()->setLastOptime(&txn, client2, time1));
         ReplicationCoordinator::StatusAndDuration statusAndDur = awaiter.getResult();
         ASSERT_OK(statusAndDur.status);
         awaiter.reset();
@@ -651,8 +651,8 @@ namespace {
         // 2 nodes waiting for time2
         awaiter.setOpTime(time2);
         awaiter.start(&txn);
-        ASSERT_OK(getReplCoord()->setLastOptime(&txn, client2, time2));
-        ASSERT_OK(getReplCoord()->setLastOptime(&txn, client3, time2));
+        ASSERT_OK(getReplCoord()->setLastOptime(&txn, selfRID, time2));
+        ASSERT_OK(getReplCoord()->setLastOptime(&txn, client1, time2));
         statusAndDur = awaiter.getResult();
         ASSERT_OK(statusAndDur.status);
         awaiter.reset();
@@ -661,7 +661,7 @@ namespace {
         writeConcern.wNumNodes = 3;
         awaiter.setWriteConcern(writeConcern);
         awaiter.start(&txn);
-        ASSERT_OK(getReplCoord()->setLastOptime(&txn, client1, time2));
+        ASSERT_OK(getReplCoord()->setLastOptime(&txn, client2, time2));
         statusAndDur = awaiter.getResult();
         ASSERT_OK(statusAndDur.status);
         awaiter.reset();
@@ -678,17 +678,14 @@ namespace {
         OperationContextNoop txn;
         ReplicationAwaiter awaiter(getReplCoord(), &txn);
 
-        OID client1 = OID::gen();
-        OID client2 = OID::gen();
+        OID selfRID = getReplCoord()->getMyRID();
+        OID client = OID::gen();
         OpTime time1(1, 1);
         OpTime time2(1, 2);
 
-        HandshakeArgs handshake1;
-        ASSERT_OK(handshake1.initialize(BSON("handshake" << client1 << "member" << 1)));
-        ASSERT_OK(getReplCoord()->processHandshake(&txn, handshake1));
-        HandshakeArgs handshake2;
-        ASSERT_OK(handshake2.initialize(BSON("handshake" << client2 << "member" << 2)));
-        ASSERT_OK(getReplCoord()->processHandshake(&txn, handshake2));
+        HandshakeArgs handshake;
+        ASSERT_OK(handshake.initialize(BSON("handshake" << client << "member" << 1)));
+        ASSERT_OK(getReplCoord()->processHandshake(&txn, handshake));
 
         WriteConcernOptions writeConcern;
         writeConcern.wTimeout = 50;
@@ -698,8 +695,8 @@ namespace {
         awaiter.setOpTime(time2);
         awaiter.setWriteConcern(writeConcern);
         awaiter.start(&txn);
-        ASSERT_OK(getReplCoord()->setLastOptime(&txn, client1, time1));
-        ASSERT_OK(getReplCoord()->setLastOptime(&txn, client2, time1));
+        ASSERT_OK(getReplCoord()->setLastOptime(&txn, selfRID, time2));
+        ASSERT_OK(getReplCoord()->setLastOptime(&txn, client, time1));
         ReplicationCoordinator::StatusAndDuration statusAndDur = awaiter.getResult();
         ASSERT_EQUALS(ErrorCodes::ExceededTimeLimit, statusAndDur.status);
         awaiter.reset();
@@ -821,6 +818,208 @@ namespace {
         ReplicationCoordinator::StatusAndDuration statusAndDur = awaiter.getResult();
         ASSERT_EQUALS(ErrorCodes::Interrupted, statusAndDur.status);
         awaiter.reset();
+    }
+
+    class StepDownTest : public ReplCoordTest {
+
+        virtual void setUp() {
+            ReplCoordTest::setUp();
+            init("mySet/test1:1234,test2:1234,test3:1234");
+            assertStartSuccess(
+                    BSON("_id" << "mySet" <<
+                         "version" << 1 <<
+                         "members" << BSON_ARRAY(BSON("_id" << 0 << "host" << "test1:1234") <<
+                                                 BSON("_id" << 1 << "host" << "test2:1234") <<
+                                                 BSON("_id" << 2 << "host" << "test3:1234"))),
+                    HostAndPort("test1", 1234));
+            rid1 = getReplCoord()->getMyRID();
+            rid2 = OID::gen();
+            rid3 = OID::gen();
+            HandshakeArgs handshake2;
+            handshake2.initialize(BSON("handshake" << rid2 <<
+                                       "member" << 1 <<
+                                       "config" << BSON("_id" << 1 << "host" << "test2:1234")));
+            HandshakeArgs handshake3;
+            handshake3.initialize(BSON("handshake" << rid3 <<
+                                       "member" << 2 <<
+                                       "config" << BSON("_id" << 2 << "host" << "test3:1234")));
+            OperationContextNoop txn;
+            ASSERT_OK(getReplCoord()->processHandshake(&txn, handshake2));
+            ASSERT_OK(getReplCoord()->processHandshake(&txn, handshake3));
+
+            // Set state to SECONDARY so that later if we set it to PRIMARY then step down it
+            // goes back to SECONDARY and not STARTUP2.
+            getReplCoord()->_setCurrentMemberState_forTest(MemberState::RS_SECONDARY);
+        }
+
+    protected:
+        OID rid1;
+        OID rid2;
+        OID rid3;
+    };
+
+    TEST_F(StepDownTest, StepDownNotPrimary) {
+        OperationContextNoop txn;
+        OpTime optime1(1, 1);
+        // All nodes are caught up
+        ASSERT_OK(getReplCoord()->setLastOptime(&txn, rid1, optime1));
+        ASSERT_OK(getReplCoord()->setLastOptime(&txn, rid2, optime1));
+        ASSERT_OK(getReplCoord()->setLastOptime(&txn, rid3, optime1));
+
+        getReplCoord()->_setCurrentMemberState_forTest(MemberState::RS_SECONDARY);
+        Status status = getReplCoord()->stepDown(&txn, false, Milliseconds(0), Milliseconds(0));
+        ASSERT_EQUALS(ErrorCodes::NotMaster, status);
+        ASSERT_TRUE(getReplCoord()->getCurrentMemberState().secondary());
+    }
+
+    TEST_F(StepDownTest, StepDownTimeoutAcquiringGlobalLock) {
+        OperationContextNoop txn;
+        OpTime optime1(1, 1);
+        // All nodes are caught up
+        ASSERT_OK(getReplCoord()->setLastOptime(&txn, rid1, optime1));
+        ASSERT_OK(getReplCoord()->setLastOptime(&txn, rid2, optime1));
+        ASSERT_OK(getReplCoord()->setLastOptime(&txn, rid3, optime1));
+
+        getReplCoord()->_setCurrentMemberState_forTest(MemberState::RS_PRIMARY);
+        getExternalState()->setCanAcquireGlobalSharedLock(false);
+        Status status = getReplCoord()->stepDown(&txn, false, Milliseconds(0), Milliseconds(1000));
+        ASSERT_EQUALS(ErrorCodes::ExceededTimeLimit, status);
+        ASSERT_TRUE(getReplCoord()->getCurrentMemberState().primary());
+    }
+
+    TEST_F(StepDownTest, StepDownNoWaiting) {
+        OperationContextNoop txn;
+        OpTime optime1(1, 1);
+        // All nodes are caught up
+        ASSERT_OK(getReplCoord()->setLastOptime(&txn, rid1, optime1));
+        ASSERT_OK(getReplCoord()->setLastOptime(&txn, rid2, optime1));
+        ASSERT_OK(getReplCoord()->setLastOptime(&txn, rid3, optime1));
+
+        getReplCoord()->_setCurrentMemberState_forTest(MemberState::RS_PRIMARY);
+        ASSERT_TRUE(getTopoCoord().getMemberState().primary());
+        ASSERT_TRUE(getReplCoord()->getCurrentMemberState().primary());
+        ASSERT_OK(getReplCoord()->stepDown(&txn, false, Milliseconds(0), Milliseconds(1000)));
+        ASSERT_EQUALS(Date_t(getNet()->now().millis + 1000), getTopoCoord().getStepDownTime());
+        ASSERT_TRUE(getTopoCoord().getMemberState().secondary());
+        ASSERT_TRUE(getReplCoord()->getCurrentMemberState().secondary());
+    }
+
+    /**
+     * Used to run wait for stepDown() to finish in a separate thread without blocking execution of
+     * the test. To use, set the values of "force", "waitTime", and "stepDownTime", which will be
+     * used as the arguments passed to stepDown, and then call
+     * start(), which will spawn a thread that calls stepDown.  No calls may be made
+     * on the StepDownRunner instance between calling start and getResult().  After returning
+     * from getResult(), you can call reset() to allow the StepDownRunner to be reused for another
+     * stepDown call.
+     */
+    class StepDownRunner {
+    public:
+
+        StepDownRunner(ReplicationCoordinatorImpl* replCoord) :
+            _replCoord(replCoord), _finished(false), _result(Status::OK()), _force(false),
+            _waitTime(0), _stepDownTime(0) {}
+
+        // may block
+        Status getResult() {
+            _thread->join();
+            ASSERT(_finished);
+            return _result;
+        }
+
+        void start(OperationContext* txn) {
+            ASSERT(!_finished);
+            _thread.reset(new boost::thread(stdx::bind(&StepDownRunner::_stepDown,
+                                                       this,
+                                                       txn)));
+        }
+
+        void reset() {
+            ASSERT(_finished);
+            _finished = false;
+            _result = Status(ErrorCodes::InternalError, "Result Status never set");
+        }
+
+        void setForce(bool force) {
+            _force = force;
+        }
+
+        void setWaitTime(const Milliseconds& waitTime) {
+            _waitTime = waitTime;
+        }
+
+        void setStepDownTime(const Milliseconds& stepDownTime) {
+            _stepDownTime = stepDownTime;
+        }
+
+    private:
+
+        void _stepDown(OperationContext* txn) {
+            _result = _replCoord->stepDown(txn, _force, _waitTime, _stepDownTime);
+            _finished = true;
+        }
+
+        ReplicationCoordinatorImpl* _replCoord;
+        bool _finished;
+        Status _result;
+        boost::scoped_ptr<boost::thread> _thread;
+        bool _force;
+        Milliseconds _waitTime;
+        Milliseconds _stepDownTime;
+    };
+
+    TEST_F(StepDownTest, StepDownNotCaughtUp) {
+        OperationContextNoop txn;
+        OpTime optime1(1, 1);
+        OpTime optime2(1, 2);
+        // No secondary is caught up
+        ASSERT_OK(getReplCoord()->setLastOptime(&txn, rid1, optime2));
+        ASSERT_OK(getReplCoord()->setLastOptime(&txn, rid2, optime1));
+        ASSERT_OK(getReplCoord()->setLastOptime(&txn, rid3, optime1));
+
+        // Try to stepDown but time out because no secondaries are caught up
+        StepDownRunner runner(getReplCoord());
+        runner.setForce(false);
+        runner.setWaitTime(Milliseconds(0));
+        runner.setStepDownTime(Milliseconds(1000));
+        getReplCoord()->_setCurrentMemberState_forTest(MemberState::RS_PRIMARY);
+
+        runner.start(&txn);
+        Status status = runner.getResult();
+        ASSERT_EQUALS(ErrorCodes::ExceededTimeLimit, status);
+        ASSERT_TRUE(getReplCoord()->getCurrentMemberState().primary());
+
+        // Now use "force" to force it to step down even though no one is caught up
+        runner.reset();
+        getNet()->incrementNow(Milliseconds(1000));
+        runner.setForce(true);
+        runner.start(&txn);
+        status = runner.getResult();
+        ASSERT_OK(status);
+        ASSERT_TRUE(getReplCoord()->getCurrentMemberState().secondary());
+
+    }
+
+    TEST_F(StepDownTest, StepDownCatchUp) {
+        OperationContextNoop txn;
+        OpTime optime1(1, 1);
+        OpTime optime2(1, 2);
+        // No secondary is caught up
+        ASSERT_OK(getReplCoord()->setLastOptime(&txn, rid1, optime2));
+        ASSERT_OK(getReplCoord()->setLastOptime(&txn, rid2, optime1));
+        ASSERT_OK(getReplCoord()->setLastOptime(&txn, rid3, optime1));
+
+        // stepDown where the secondary actually has to catch up before the stepDown can succeed
+        StepDownRunner runner(getReplCoord());
+        runner.setForce(false);
+        runner.setWaitTime(Milliseconds(1000));
+        runner.setStepDownTime(Milliseconds(1000));
+        getReplCoord()->_setCurrentMemberState_forTest(MemberState::RS_PRIMARY);
+        runner.start(&txn);
+        // Make a secondary actually catch up
+        ASSERT_OK(getReplCoord()->setLastOptime(&txn, rid2, optime2));
+        ASSERT_OK(runner.getResult());
+        ASSERT_TRUE(getReplCoord()->getCurrentMemberState().secondary());
     }
 
     TEST_F(ReplCoordTest, GetReplicationModeNone) {
@@ -1054,7 +1253,80 @@ namespace {
         ASSERT_OK(getReplCoord()->setMaintenanceMode(&txn, false));
     }
 
-    // TODO(spencer): Unit test replSetFreeze
+    TEST_F(ReplCoordTest, GetHostsWrittenToReplSet) {
+        HostAndPort myHost("node1:12345");
+        HostAndPort client1Host("node2:12345");
+        HostAndPort client2Host("node3:12345") ;
+        assertStartSuccess(
+                BSON("_id" << "mySet" <<
+                     "version" << 2 <<
+                     "members" << BSON_ARRAY(BSON("_id" << 0 << "host" << myHost.toString()) <<
+                                             BSON("_id" << 1 << "host" << client1Host.toString()) <<
+                                             BSON("_id" << 2 << "host" << client2Host.toString()))),
+                HostAndPort("node1", 12345));
+        OperationContextNoop txn;
+
+        OID myRID = getReplCoord()->getMyRID();
+        OID client1 = OID::gen();
+        OID client2 = OID::gen();
+        OpTime time1(1, 1);
+        OpTime time2(1, 2);
+
+        HandshakeArgs handshake1;
+        ASSERT_OK(handshake1.initialize(BSON("handshake" << client1 << "member" << 1)));
+        ASSERT_OK(getReplCoord()->processHandshake(&txn, handshake1));
+        HandshakeArgs handshake2;
+        ASSERT_OK(handshake2.initialize(BSON("handshake" << client2 << "member" << 2)));
+        ASSERT_OK(getReplCoord()->processHandshake(&txn, handshake2));
+
+        ASSERT_OK(getReplCoord()->setLastOptime(&txn, myRID, time2));
+        ASSERT_OK(getReplCoord()->setLastOptime(&txn, client1, time1));
+
+        std::vector<HostAndPort> caughtUpHosts = getReplCoord()->getHostsWrittenTo(time2);
+        ASSERT_EQUALS(1U, caughtUpHosts.size());
+        ASSERT_EQUALS(myHost, caughtUpHosts[0]);
+
+        ASSERT_OK(getReplCoord()->setLastOptime(&txn, client2, time2));
+        caughtUpHosts = getReplCoord()->getHostsWrittenTo(time2);
+        ASSERT_EQUALS(2U, caughtUpHosts.size());
+        if (myHost == caughtUpHosts[0]) {
+            ASSERT_EQUALS(client2Host, caughtUpHosts[1]);
+        }
+        else {
+            ASSERT_EQUALS(client2Host, caughtUpHosts[0]);
+            ASSERT_EQUALS(myHost, caughtUpHosts[1]);
+        }
+    }
+
+    TEST_F(ReplCoordTest, GetHostsWrittenToMasterSlave) {
+        ReplSettings settings;
+        settings.master = true;
+        init(settings);
+        HostAndPort clientHost("node2:12345");
+        OperationContextNoop txn;
+
+        OID myRID = getReplCoord()->getMyRID();
+        OID client = OID::gen();
+        OpTime time1(1, 1);
+        OpTime time2(1, 2);
+
+        getExternalState()->setClientHostAndPort(clientHost);
+        HandshakeArgs handshake;
+        ASSERT_OK(handshake.initialize(BSON("handshake" << client)));
+        ASSERT_OK(getReplCoord()->processHandshake(&txn, handshake));
+
+        ASSERT_OK(getReplCoord()->setLastOptime(&txn, myRID, time2));
+        ASSERT_OK(getReplCoord()->setLastOptime(&txn, client, time1));
+
+        std::vector<HostAndPort> caughtUpHosts = getReplCoord()->getHostsWrittenTo(time2);
+        ASSERT_EQUALS(0U, caughtUpHosts.size()); // self doesn't get included in master-slave
+
+        ASSERT_OK(getReplCoord()->setLastOptime(&txn, client, time2));
+        caughtUpHosts = getReplCoord()->getHostsWrittenTo(time2);
+        ASSERT_EQUALS(1U, caughtUpHosts.size());
+        ASSERT_EQUALS(clientHost, caughtUpHosts[0]);
+    }
+
     // TODO(schwerin): Unit test election id updating
 
 }  // namespace

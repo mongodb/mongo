@@ -248,7 +248,7 @@ namespace mongo {
                 repl::ReplicationCoordinator* replCoordinator =
                         repl::getGlobalReplicationCoordinator();
                 Status status = replCoordinator->checkIfWriteConcernCanBeSatisfied(writeConcern);
-                if (!status.isOK()) {
+                if (!status.isOK() && status != ErrorCodes::NoReplicationEnabled) {
                     return appendCommandStatus(result, status);
                 }
             }

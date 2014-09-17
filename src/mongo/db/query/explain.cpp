@@ -266,6 +266,7 @@ namespace mongo {
         }
         else if (STAGE_COLLSCAN == stats.stageType) {
             CollectionScanStats* spec = static_cast<CollectionScanStats*>(stats.specific.get());
+            bob->append("direction", spec->direction > 0 ? "forward" : "backward");
             if (verbosity >= Explain::EXEC_STATS) {
                 bob->appendNumber("docsExamined", spec->docsTested);
             }
@@ -321,6 +322,7 @@ namespace mongo {
 
             bob->append("keyPattern", spec->keyPattern);
             bob->appendBool("isMultiKey", spec->isMultiKey);
+            bob->append("direction", spec->direction > 0 ? "forward" : "backward");
 
             // Bounds can get large. Truncate to 1 MB.
             static const int kMaxBoundsSize = 1024 * 1024;

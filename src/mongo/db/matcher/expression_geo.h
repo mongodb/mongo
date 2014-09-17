@@ -62,9 +62,10 @@ namespace mongo {
         const GeometryContainer& getGeometry() const { return *geoContainer; }
 
     private:
-        // Try to parse the provided object into the right place.
-        bool parseLegacyQuery(const BSONObj &obj);
-        bool parseNewQuery(const BSONObj &obj);
+        // Parse geospatial query
+        // e.g.
+        // { "$intersect" : { "$geometry" : { "type" : "Point", "coordinates": [ 40, 5 ] } } }
+        Status parseQuery(const BSONObj &obj);
 
         // Name of the field in the query.
         std::string field;

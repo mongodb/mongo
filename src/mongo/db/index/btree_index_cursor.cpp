@@ -128,8 +128,8 @@ namespace mongo {
         return Status::OK();
     }
 
-    Status BtreeIndexCursor::restorePosition() {
-        _cursor->restorePosition();
+    Status BtreeIndexCursor::restorePosition(OperationContext* txn) {
+        _cursor->restorePosition(txn);
         return Status::OK();
     }
 

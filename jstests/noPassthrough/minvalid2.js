@@ -55,16 +55,12 @@ mdb1 = master.getDB("foo");
 mdb1.foo.save({a:1002});
 
 print("8: start up 0");
+clearRawMongoProgramOutput();
 replTest.restart(0);
 
 print("9: check 0 does not rollback");
 assert.soon(function(){
-    var status = master.adminCommand({replSetGetStatus:1});
-    var stateStr = status.members[0].stateStr;
-    assert(stateStr != "ROLLBACK" &&
-           stateStr != "SECONDARY" &&
-           stateStr != "PRIMARY", tojson(status));
-    return stateStr == "FATAL";
+    return rawMongoProgramOutput().match("replSet need to rollback, but in inconsistent state");
 });
 
 replTest.stopSet(15);

@@ -52,7 +52,10 @@ namespace mongo {
           _filter(filter),
           _params(params),
           _nsDropped(false),
-          _commonStats(kStageType) { }
+          _commonStats(kStageType) {
+        // Explain reports the direction of the collection scan.
+        _specificStats.direction = params.direction;
+    }
 
     PlanStage::StageState CollectionScan::work(WorkingSetID* out) {
         ++_commonStats.works;
@@ -155,7 +158,7 @@ namespace mongo {
     void CollectionScan::restoreState(OperationContext* opCtx) {
         ++_commonStats.unyields;
         if (NULL != _iter) {
-            if (!_iter->restoreState()) {
+            if (!_iter->restoreState(opCtx)) {
                 warning() << "Collection dropped or state deleted during yield of CollectionScan";
                 _nsDropped = true;
             }

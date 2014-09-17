@@ -34,7 +34,6 @@
 #include "mongo/db/db.h"
 #include "mongo/db/operation_context_impl.h"
 #include "mongo/dbtests/dbtests.h"
-#include "mongo/util/array.h"
 #include "mongo/util/base64.h"
 #include "mongo/util/compress.h"
 #include "mongo/util/paths.h"
@@ -325,28 +324,6 @@ namespace BasicTests {
         }
     };
 
-    namespace ArrayTests {
-        class basic1 {
-        public:
-            void run() {
-                FastArray<int> a(100);
-                a.push_back( 5 );
-                a.push_back( 6 );
-
-                ASSERT_EQUALS( 2 , a.size() );
-
-                FastArray<int>::iterator i = a.begin();
-                ASSERT( i != a.end() );
-                ASSERT_EQUALS( 5 , *i );
-                ++i;
-                ASSERT( i != a.end() );
-                ASSERT_EQUALS( 6 , *i );
-                ++i;
-                ASSERT( i == a.end() );
-            }
-        };
-    };
-
     class ThreadSafeStringTest {
     public:
         void run() {
@@ -577,8 +554,6 @@ namespace BasicTests {
             add< sleeptest >();
             add< SleepBackoffTest >();
             add< AssertTests >();
-
-            add< ArrayTests::basic1 >();
 
             add< DatabaseOwnsNS >();
 

@@ -37,6 +37,7 @@
 #include "mongo/db/repl/member_heartbeat_data.h"
 #include "mongo/db/repl/replica_set_config.h"
 #include "mongo/db/repl/replication_executor.h"
+#include "mongo/db/repl/scatter_gather_runner.h"
 #include "mongo/util/log.h"
 #include "mongo/util/scopeguard.h"
 #include "mongo/util/time_support.h"
@@ -44,98 +45,74 @@
 namespace mongo {
 namespace repl {
 
-    FreshnessChecker::FreshnessChecker() : _actualResponses(0), 
-                                           _freshest(true), 
-                                           _tied(false), 
-                                           _originalConfigVersion(0) {
+    FreshnessChecker::Algorithm::Algorithm(
+            OpTime lastOpTimeApplied,
+            const ReplicaSetConfig& rsConfig,
+            int selfIndex,
+            const std::vector<HostAndPort>& targets) :
+        _actualResponses(0),
+        _freshest(true),
+        _tied(false),
+        _lastOpTimeApplied(lastOpTimeApplied),
+        _rsConfig(rsConfig),
+        _selfIndex(selfIndex),
+        _targets(targets) {
     }
 
+    FreshnessChecker::Algorithm::~Algorithm() {}
 
-    Status FreshnessChecker::start(
-        ReplicationExecutor* executor,
-        const ReplicationExecutor::EventHandle& evh,
-        const OpTime& lastOpTimeApplied,
-        const ReplicaSetConfig& currentConfig,
-        int selfIndex,
-        const std::vector<HostAndPort>& hosts) {
+    std::vector<ReplicationExecutor::RemoteCommandRequest>
+    FreshnessChecker::Algorithm::getRequests() const {
 
-        _lastOpTimeApplied = lastOpTimeApplied;
-        _freshest = true;
-        _originalConfigVersion = currentConfig.getConfigVersion();
-        _sufficientResponsesReceived = evh;
+        const MemberConfig& selfConfig = _rsConfig.getMemberAt(_selfIndex);
 
         // gather all not-down nodes, get their fullnames(or hostandport's)
         // schedule fresh command for each node
-        BSONObj replSetFreshCmd = BSON("replSetFresh" << 1 <<
-                                       "set" << currentConfig.getReplSetName() <<
-                                       "opTime" << Date_t(lastOpTimeApplied.asDate()) <<
-                                       "who" << currentConfig.getMemberAt(selfIndex)
-                                       .getHostAndPort().toString() <<
-                                       "cfgver" << currentConfig.getConfigVersion() <<
-                                       "id" << currentConfig.getMemberAt(selfIndex).getId());
-        for (std::vector<HostAndPort>::const_iterator it = hosts.begin(); it != hosts.end(); ++it) {
-            const StatusWith<ReplicationExecutor::CallbackHandle> cbh =
-                executor->scheduleRemoteCommand(
-                    ReplicationExecutor::RemoteCommandRequest(
+        const BSONObj replSetFreshCmd =
+            BSON("replSetFresh" << 1 <<
+                 "set" << _rsConfig.getReplSetName() <<
+                 "opTime" << Date_t(_lastOpTimeApplied.asDate()) <<
+                 "who" << selfConfig.getHostAndPort().toString() <<
+                 "cfgver" << _rsConfig.getConfigVersion() <<
+                 "id" << selfConfig.getId());
+
+        std::vector<ReplicationExecutor::RemoteCommandRequest> requests;
+        for (std::vector<HostAndPort>::const_iterator it = _targets.begin();
+             it != _targets.end();
+             ++it) {
+            invariant(*it != selfConfig.getHostAndPort());
+            requests.push_back(ReplicationExecutor::RemoteCommandRequest(
                         *it,
                         "admin",
                         replSetFreshCmd,
-                        Milliseconds(30*1000)),   // trying to match current Socket timeout
-                    stdx::bind(&FreshnessChecker::_onReplSetFreshResponse,
-                               this,
-                               stdx::placeholders::_1));
-            if (cbh.getStatus() == ErrorCodes::ShutdownInProgress) {
-                return cbh.getStatus();
-            }
-            fassert(18682, cbh.getStatus());
-
-            _responseCallbacks.push_back(cbh.getValue());
-        }
-        
-        if (_responseCallbacks.size() == 0) {
-            _signalSufficientResponsesReceived(executor);
+                        Milliseconds(30*1000)));   // trying to match current Socket timeout
         }
 
-        return Status::OK();
+        return requests;
     }
 
-    void FreshnessChecker::_onReplSetFreshResponse(
-        const ReplicationExecutor::RemoteCommandCallbackData& cbData) {
+    void FreshnessChecker::Algorithm::processResponse(
+                    const ReplicationExecutor::RemoteCommandRequest& request,
+                    const ResponseStatus& response) {
         ++_actualResponses;
 
-        if (cbData.response.getStatus() == ErrorCodes::CallbackCanceled) {
-            return;
-        }
-
-        if (!cbData.response.isOK()) {
+        if (!response.isOK()) {
             // command failed, so nothing further to do.
-            if (_actualResponses == _responseCallbacks.size()) {
-                _signalSufficientResponsesReceived(cbData.executor);
-            }
             return;
         }
 
-        ScopeGuard sufficientResponsesReceivedCaller =
-            MakeObjGuard(*this,
-                         &FreshnessChecker::_signalSufficientResponsesReceived,
-                         cbData.executor);
-
-        BSONObj res = cbData.response.getValue().data;
+        const BSONObj res = response.getValue().data;
 
         if (res["fresher"].trueValue()) {
             log() << "not electing self, we are not freshest";
             _freshest = false;
             return;
         }
-        
+
         if (res["opTime"].type() != mongo::Date) {
-            error() << "wrong type for opTime argument in replSetFresh response: " << 
+            error() << "wrong type for opTime argument in replSetFresh response: " <<
                 typeName(res["opTime"].type());
             _freshest = false;
-            if (_actualResponses != _responseCallbacks.size()) {
-                // More responses are still pending.
-                sufficientResponsesReceivedCaller.Dismiss();
-            }
             return;
         }
         OpTime remoteTime(res["opTime"].date());
@@ -147,54 +124,57 @@ namespace repl {
             _freshest = false;
             return;
         }
-        
+
         if (res["veto"].trueValue()) {
             BSONElement msg = res["errmsg"];
             if (!msg.eoo()) {
-                log() << "not electing self, " << cbData.request.target.toString() << 
+                log() << "not electing self, " << request.target.toString() <<
                     " would veto with '" << msg << "'";
             }
             else {
-                log() << "not electing self, " << cbData.request.target.toString() << 
+                log() << "not electing self, " << request.target.toString() <<
                     " would veto";
             }
             _freshest = false;
             return;
         }
-
-        if (_actualResponses != _responseCallbacks.size()) {
-            // More responses are still pending.
-            sufficientResponsesReceivedCaller.Dismiss();
-        }
     }
 
-    void FreshnessChecker::_signalSufficientResponsesReceived(ReplicationExecutor* executor) {
-        if (_sufficientResponsesReceived.isValid()) {
-
-            // Cancel all the command callbacks, 
-            // so that they do not attempt to access FreshnessChecker
-            // state after this callback completes.
-            std::for_each(_responseCallbacks.begin(),
-                          _responseCallbacks.end(),
-                          stdx::bind(&ReplicationExecutor::cancel,
-                                     executor,
-                                     stdx::placeholders::_1));
-
-            executor->signalEvent(_sufficientResponsesReceived);
-            _sufficientResponsesReceived = ReplicationExecutor::EventHandle();
-   
+    bool FreshnessChecker::Algorithm::hasReceivedSufficientResponses() const {
+        if (!_freshest) {
+            return true;
         }
+        if (_actualResponses == _targets.size()) {
+            return true;
+        }
+        return false;
     }
 
     void FreshnessChecker::getResults(bool* freshest, bool* tied) const {
-        *freshest = _freshest;
-        *tied = _tied;
+        *freshest = _algorithm->isFreshest();
+        *tied = _algorithm->isTiedForFreshest();
     }
 
     long long FreshnessChecker::getOriginalConfigVersion() const {
         return _originalConfigVersion;
     }
 
+    FreshnessChecker::FreshnessChecker() {}
+    FreshnessChecker::~FreshnessChecker() {}
+
+    StatusWith<ReplicationExecutor::EventHandle> FreshnessChecker::start(
+            ReplicationExecutor* executor,
+            const OpTime& lastOpTimeApplied,
+            const ReplicaSetConfig& currentConfig,
+            int selfIndex,
+            const std::vector<HostAndPort>& targets,
+            const stdx::function<void ()>& onCompletion) {
+
+        _originalConfigVersion = currentConfig.getConfigVersion();
+        _algorithm.reset(new Algorithm(lastOpTimeApplied, currentConfig, selfIndex, targets));
+        _runner.reset(new ScatterGatherRunner(_algorithm.get()));
+        return _runner->start(executor, onCompletion);
+    }
 
 } // namespace repl
 } // namespace mongo

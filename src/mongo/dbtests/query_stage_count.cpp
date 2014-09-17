@@ -386,6 +386,7 @@ namespace QueryStageCount {
 
             // Remove remaining objects
             remove(BSON("a" << GTE << 5));
+            ctx.commit();
 
             // Recover from yield
             count.restoreState(&_txn);
@@ -444,6 +445,7 @@ namespace QueryStageCount {
 
             // Insert one document after the end
             insert(BSON("a" << 6.5));
+            ctx.commit();
 
             // Recover from yield
             count.restoreState(&_txn);
@@ -499,6 +501,7 @@ namespace QueryStageCount {
 
             // Insert a document with two values for 'a'
             insert(BSON("a" << BSON_ARRAY(10 << 11)));
+            ctx.commit();
 
             // Recover from yield
             count.restoreState(&_txn);
@@ -525,12 +528,12 @@ namespace QueryStageCount {
                 insert(BSON("a" << 1 << "b" << i));
             }
             addIndex(BSON("a" << 1));
-            ctx.commit();
 
             // Mark several keys as 'unused'
             remove(BSON("a" << 1 << "b" << 0));
             remove(BSON("a" << 1 << "b" << 3));
             remove(BSON("a" << 1 << "b" << 4));
+            ctx.commit();
 
             // Ensure that count does not include unused keys
             CountScanParams params;
@@ -623,6 +626,7 @@ namespace QueryStageCount {
 
             // Mark the key at position 5 as 'unused'
             remove(BSON("a" << 1 << "b" << 5));
+            ctx.commit();
 
             // Recover from yield
             count.restoreState(&_txn);

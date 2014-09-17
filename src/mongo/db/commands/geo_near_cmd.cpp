@@ -101,9 +101,9 @@ namespace mongo {
                 return false;
             }
 
+            PointWithCRS point;
             uassert(17304, "'near' field must be point",
-                    !cmdObj["near"].eoo() && cmdObj["near"].isABSONObj()
-                    && GeoParser::isPoint(cmdObj["near"].Obj()));
+                    GeoParser::parseQueryPoint(cmdObj["near"], &point).isOK());
 
             bool isSpherical = cmdObj["spherical"].trueValue();
             if (!using2DIndex) {

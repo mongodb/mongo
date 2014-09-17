@@ -85,8 +85,8 @@ namespace mongo {
      * =2C and =3D respectively.
      */
     static void encodeSCRAMUsername(std::string& user) {
-        boost::replace_all(user, ",", "=2C");
         boost::replace_all(user, "=", "=3D");
+        boost::replace_all(user, ",", "=2C");
     }
 
     /*

@@ -242,11 +242,11 @@ namespace {
 
         // Format: { $center : [ [-74, 40.74], 10 ] }
         GeometryContainer* container = new GeometryContainer();
-        container->parseFrom(BSON("$center"
+        container->parseFromQuery(BSON("$center"
                 << BSON_ARRAY(
                         BSON_ARRAY(randDouble(radius, MAXBOUND - radius)
                                    << randDouble(radius, MAXBOUND - radius))
-                        << radius)));
+                        << radius)).firstElement());
         return container;
     }
 

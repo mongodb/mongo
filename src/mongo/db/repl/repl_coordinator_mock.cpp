@@ -104,9 +104,9 @@ namespace repl {
         return true;
     }
 
-    Status ReplicationCoordinatorMock::canServeReadsFor(OperationContext* txn,
-                                                        const NamespaceString& ns,
-                                                        bool slaveOk) {
+    Status ReplicationCoordinatorMock::checkCanServeReadsFor(OperationContext* txn,
+                                                             const NamespaceString& ns,
+                                                             bool slaveOk) {
         // TODO
         return Status::OK();
     }
@@ -221,18 +221,13 @@ namespace repl {
         return Status::OK();
     }
 
-    void ReplicationCoordinatorMock::waitUpToOneSecondForOptimeChange(const OpTime& ot) {
-        // TODO
-    }
-
     bool ReplicationCoordinatorMock::buildsIndexes() {
         // TODO
         return false;
     }
 
-    std::vector<BSONObj> ReplicationCoordinatorMock::getHostsWrittenTo(const OpTime& op) {
-        // TODO
-        return std::vector<BSONObj>();
+    std::vector<HostAndPort> ReplicationCoordinatorMock::getHostsWrittenTo(const OpTime& op) {
+        return std::vector<HostAndPort>();
     }
 
     Status ReplicationCoordinatorMock::checkIfWriteConcernCanBeSatisfied(
@@ -248,6 +243,12 @@ namespace repl {
     Status ReplicationCoordinatorMock::checkReplEnabledForCommand(BSONObjBuilder* result) {
         // TODO
         return Status::OK();
+    }
+
+    void ReplicationCoordinatorMock::connectOplogReader(OperationContext* txn,
+                                                        BackgroundSync* bgsync, 
+                                                        OplogReader* r) {
+        invariant(false);
     }
 
 } // namespace repl

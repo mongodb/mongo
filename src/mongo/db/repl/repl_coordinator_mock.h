@@ -83,9 +83,9 @@ namespace repl {
         virtual Status checkIfWriteConcernCanBeSatisfied(
                 const WriteConcernOptions& writeConcern) const;
 
-        virtual Status canServeReadsFor(OperationContext* txn,
-                                        const NamespaceString& ns,
-                                        bool slaveOk);
+        virtual Status checkCanServeReadsFor(OperationContext* txn,
+                                             const NamespaceString& ns,
+                                             bool slaveOk);
 
         virtual bool shouldIgnoreUniqueIndex(const IndexDescriptor* idx);
 
@@ -146,15 +146,17 @@ namespace repl {
         virtual Status processHandshake(const OperationContext* txn,
                                         const HandshakeArgs& handshake);
 
-        virtual void waitUpToOneSecondForOptimeChange(const OpTime& ot);
-
         virtual bool buildsIndexes();
 
-        virtual std::vector<BSONObj> getHostsWrittenTo(const OpTime& op);
+        virtual std::vector<HostAndPort> getHostsWrittenTo(const OpTime& op);
 
         virtual BSONObj getGetLastErrorDefault();
 
         virtual Status checkReplEnabledForCommand(BSONObjBuilder* result);
+
+        virtual void connectOplogReader(OperationContext* txn,
+                                        BackgroundSync* bgsync, 
+                                        OplogReader* r);
 
     private:
 

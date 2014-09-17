@@ -53,10 +53,23 @@ namespace {
 
     class FreshnessCheckerTest : public mongo::unittest::Test {
     public:
-        FreshnessCheckerTest();
+        StatusWith<ReplicationExecutor::EventHandle> startTest(
+                FreshnessChecker* checker,
+                const OpTime& lastOpTimeApplied,
+                const ReplicaSetConfig& currentConfig,
+                int selfIndex,
+                const std::vector<HostAndPort>& hosts);
+
+        void runTest(
+                FreshnessChecker* checker,
+                const OpTime& lastOpTimeApplied,
+                const ReplicaSetConfig& currentConfig,
+                int selfIndex,
+                const std::vector<HostAndPort>& hosts);
+
         void freshnessCheckerRunner(const ReplicationExecutor::CallbackData& data,
                                     FreshnessChecker* checker,
-                                    const ReplicationExecutor::EventHandle& evh,
+                                    StatusWith<ReplicationExecutor::EventHandle>* evh,
                                     const OpTime& lastOpTimeApplied, 
                                     const ReplicaSetConfig& currentConfig,
                                     int selfIndex,
@@ -73,14 +86,11 @@ namespace {
         NetworkInterfaceMockWithMap* _net;
         boost::scoped_ptr<ReplicationExecutor> _executor;
         boost::scoped_ptr<boost::thread> _executorThread;
-        Status _lastStatus;
 
     private:
         void setUp();
         void tearDown();
     };
-
-    FreshnessCheckerTest::FreshnessCheckerTest() : _lastStatus(Status::OK()) {}
 
     void FreshnessCheckerTest::setUp() {
         _net = new NetworkInterfaceMockWithMap;
@@ -117,63 +127,77 @@ namespace {
     // This is necessary because the run method must be scheduled in the Replication Executor
     // for correct concurrency operation.
     void FreshnessCheckerTest::freshnessCheckerRunner(
-        const ReplicationExecutor::CallbackData& data,
-        FreshnessChecker* checker,
-        const ReplicationExecutor::EventHandle& evh,
-        const OpTime& lastOpTimeApplied, 
-        const ReplicaSetConfig& currentConfig,
-        int selfIndex,
-        const std::vector<HostAndPort>& hosts) {
+            const ReplicationExecutor::CallbackData& data,
+            FreshnessChecker* checker,
+            StatusWith<ReplicationExecutor::EventHandle>* evh,
+            const OpTime& lastOpTimeApplied,
+            const ReplicaSetConfig& currentConfig,
+            int selfIndex,
+            const std::vector<HostAndPort>& hosts) {
+
         invariant(data.status.isOK());
-        _lastStatus = checker->start(data.executor, 
-                                     evh, 
-                                     lastOpTimeApplied, 
-                                     currentConfig, 
-                                     selfIndex, 
-                                     hosts);
+        *evh = checker->start(data.executor,
+                              lastOpTimeApplied,
+                              currentConfig,
+                              selfIndex,
+                              hosts);
+    }
+
+    StatusWith<ReplicationExecutor::EventHandle> FreshnessCheckerTest::startTest(
+            FreshnessChecker* checker,
+            const OpTime& lastOpTimeApplied,
+            const ReplicaSetConfig& currentConfig,
+            int selfIndex,
+            const std::vector<HostAndPort>& hosts) {
+
+        StatusWith<ReplicationExecutor::EventHandle> evh(ErrorCodes::InternalError, "Not set");
+        StatusWith<ReplicationExecutor::CallbackHandle> cbh =
+            _executor->scheduleWork(
+                    stdx::bind(&FreshnessCheckerTest::freshnessCheckerRunner,
+                               this,
+                               stdx::placeholders::_1,
+                               checker,
+                               &evh,
+                               lastOpTimeApplied,
+                               currentConfig,
+                               selfIndex,
+                               hosts));
+        ASSERT_OK(cbh.getStatus());
+        _executor->wait(cbh.getValue());
+        ASSERT_OK(evh.getStatus());
+        return evh;
+    }
+
+    void FreshnessCheckerTest::runTest(
+            FreshnessChecker* checker,
+            const OpTime& lastOpTimeApplied,
+            const ReplicaSetConfig& currentConfig,
+            int selfIndex,
+            const std::vector<HostAndPort>& hosts) {
+
+        _executor->waitForEvent(startTest(checker,
+                                          lastOpTimeApplied,
+                                          currentConfig,
+                                          selfIndex,
+                                          hosts).getValue());
     }
 
     TEST_F(FreshnessCheckerTest, OneNode) {
-        // Only one node in the config.  We are freshest and not tied.
+        // Only one node in the config.  We must be freshest and not tied.
         ReplicaSetConfig config = assertMakeRSConfig(
                 BSON("_id" << "rs0" <<
                      "version" << 1 <<
                      "members" << BSON_ARRAY(
                              BSON("_id" << 1 << "host" << "h1"))));
-        
-        StatusWith<ReplicationExecutor::EventHandle> evh = _executor->makeEvent();
-        ASSERT_OK(evh.getStatus());
-
-        Date_t now(0);
-        std::vector<HostAndPort> hosts;
-        hosts.push_back(config.getMemberAt(0).getHostAndPort());
 
         FreshnessChecker checker;
-        
-        StatusWith<ReplicationExecutor::CallbackHandle> cbh = 
-            _executor->scheduleWork(
-                stdx::bind(&FreshnessCheckerTest::freshnessCheckerRunner,
-                           this,
-                           stdx::placeholders::_1,
-                           &checker,
-                           evh.getValue(),
-                           OpTime(0,0),
-                           config,
-                           0,
-                           hosts));
-        ASSERT_OK(cbh.getStatus());
-        _executor->wait(cbh.getValue());
-
-        ASSERT_OK(_lastStatus);
-
-        _executor->waitForEvent(evh.getValue());
+        runTest(&checker, OpTime(0, 0), config, 0, std::vector<HostAndPort>());
 
         bool weAreFreshest(false);
         bool tied(false);
         checker.getResults(&weAreFreshest, &tied);
         ASSERT_TRUE(weAreFreshest);
         ASSERT_FALSE(tied);
-        
     }
 
     TEST_F(FreshnessCheckerTest, TwoNodes) {
@@ -184,15 +208,9 @@ namespace {
                      "members" << BSON_ARRAY(
                          BSON("_id" << 1 << "host" << "h0") <<
                          BSON("_id" << 2 << "host" << "h1"))));
-        
-        StatusWith<ReplicationExecutor::EventHandle> evh = _executor->makeEvent();
-        ASSERT_OK(evh.getStatus());
 
-        Date_t now(0);
         std::vector<HostAndPort> hosts;
-        hosts.push_back(config.getMemberAt(0).getHostAndPort());
         hosts.push_back(config.getMemberAt(1).getHostAndPort());
-
         const BSONObj freshRequest = makeFreshRequest(config, OpTime(0,0), 0);
 
         _net->addResponse(RemoteCommandRequest(HostAndPort("h1"),
@@ -206,30 +224,13 @@ namespace {
                                                    "opTime" << Date_t(OpTime(0,0).asDate()))));
 
         FreshnessChecker checker;
-        StatusWith<ReplicationExecutor::CallbackHandle> cbh = 
-            _executor->scheduleWork(
-                stdx::bind(&FreshnessCheckerTest::freshnessCheckerRunner,
-                           this,
-                           stdx::placeholders::_1,
-                           &checker,
-                           evh.getValue(),
-                           OpTime(0,0),
-                           config,
-                           0,
-                           hosts));
-        ASSERT_OK(cbh.getStatus());
-        _executor->wait(cbh.getValue());
-
-        ASSERT_OK(_lastStatus);
-
-        _executor->waitForEvent(evh.getValue());
+        runTest(&checker, OpTime(0, 0), config, 0, hosts);
 
         bool weAreFreshest(false);
         bool tied(false);
         checker.getResults(&weAreFreshest, &tied);
         ASSERT_TRUE(weAreFreshest);
         ASSERT_TRUE(tied);
-        
     }
 
 
@@ -241,13 +242,8 @@ namespace {
                      "members" << BSON_ARRAY(
                          BSON("_id" << 1 << "host" << "h0") <<
                          BSON("_id" << 2 << "host" << "h1"))));
-        
-        StatusWith<ReplicationExecutor::EventHandle> evh = _executor->makeEvent();
-        ASSERT_OK(evh.getStatus());
 
-        Date_t now(0);
         std::vector<HostAndPort> hosts;
-        hosts.push_back(config.getMemberAt(0).getHostAndPort());
         hosts.push_back(config.getMemberAt(1).getHostAndPort());
 
         const BSONObj freshRequest = makeFreshRequest(config, OpTime(0,0), 0);
@@ -263,22 +259,12 @@ namespace {
                           true /* isBlocked */);
 
         FreshnessChecker checker;
-        StatusWith<ReplicationExecutor::CallbackHandle> cbh = 
-            _executor->scheduleWork(
-                stdx::bind(&FreshnessCheckerTest::freshnessCheckerRunner,
-                           this,
-                           stdx::placeholders::_1,
-                           &checker,
-                           evh.getValue(),
-                           OpTime(0,0),
-                           config,
-                           0,
-                           hosts));
-        ASSERT_OK(cbh.getStatus());
-
-        _executor->wait(cbh.getValue());
-        ASSERT_OK(_lastStatus);
-
+        StatusWith<ReplicationExecutor::EventHandle> evh = startTest(
+                &checker,
+                OpTime(0, 0),
+                config,
+                0,
+                hosts);
         _executor->shutdown();
         _net->unblockAll();
         _executor->waitForEvent(evh.getValue());
@@ -289,7 +275,7 @@ namespace {
         // This seems less than ideal, but if we are shutting down, the next phase of election
         // cannot proceed anyway.
         ASSERT_TRUE(weAreFreshest);
-        ASSERT_FALSE(tied); 
+        ASSERT_FALSE(tied);
     }
 
     TEST_F(FreshnessCheckerTest, ElectNotElectingSelfWeAreNotFreshest) {
@@ -301,13 +287,8 @@ namespace {
                      "members" << BSON_ARRAY(
                          BSON("_id" << 1 << "host" << "h0") <<
                          BSON("_id" << 2 << "host" << "h1"))));
-        
-        StatusWith<ReplicationExecutor::EventHandle> evh = _executor->makeEvent();
-        ASSERT_OK(evh.getStatus());
 
-        Date_t now(0);
         std::vector<HostAndPort> hosts;
-        hosts.push_back(config.getMemberAt(0).getHostAndPort());
         hosts.push_back(config.getMemberAt(1).getHostAndPort());
 
         const BSONObj freshRequest = makeFreshRequest(config, OpTime(10,0), 0);
@@ -324,23 +305,7 @@ namespace {
                                                    "opTime" << Date_t(OpTime(0,0).asDate()))));
 
         FreshnessChecker checker;
-        StatusWith<ReplicationExecutor::CallbackHandle> cbh = 
-            _executor->scheduleWork(
-                stdx::bind(&FreshnessCheckerTest::freshnessCheckerRunner,
-                           this,
-                           stdx::placeholders::_1,
-                           &checker,
-                           evh.getValue(),
-                           OpTime(10,0),
-                           config,
-                           0,
-                           hosts));
-        ASSERT_OK(cbh.getStatus());
-        _executor->wait(cbh.getValue());
-
-        ASSERT_OK(_lastStatus);
-
-        _executor->waitForEvent(evh.getValue());
+        runTest(&checker, OpTime(10, 0), config, 0, hosts);
         stopCapturingLogMessages();
 
         bool weAreFreshest(true);
@@ -360,13 +325,8 @@ namespace {
                      "members" << BSON_ARRAY(
                          BSON("_id" << 1 << "host" << "h0") <<
                          BSON("_id" << 2 << "host" << "h1"))));
-        
-        StatusWith<ReplicationExecutor::EventHandle> evh = _executor->makeEvent();
-        ASSERT_OK(evh.getStatus());
 
-        Date_t now(0);
         std::vector<HostAndPort> hosts;
-        hosts.push_back(config.getMemberAt(0).getHostAndPort());
         hosts.push_back(config.getMemberAt(1).getHostAndPort());
 
         const BSONObj freshRequest = makeFreshRequest(config, OpTime(0,0), 0);
@@ -383,23 +343,7 @@ namespace {
                                                    "opTime" << Date_t(OpTime(10,0).asDate()))));
 
         FreshnessChecker checker;
-        StatusWith<ReplicationExecutor::CallbackHandle> cbh = 
-            _executor->scheduleWork(
-                stdx::bind(&FreshnessCheckerTest::freshnessCheckerRunner,
-                           this,
-                           stdx::placeholders::_1,
-                           &checker,
-                           evh.getValue(),
-                           OpTime(0,0),
-                           config,
-                           0,
-                           hosts));
-        ASSERT_OK(cbh.getStatus());
-        _executor->wait(cbh.getValue());
-
-        ASSERT_OK(_lastStatus);
-
-        _executor->waitForEvent(evh.getValue());
+        runTest(&checker, OpTime(0, 0), config, 0, hosts);
         stopCapturingLogMessages();
 
         bool weAreFreshest(true);
@@ -419,13 +363,8 @@ namespace {
                      "members" << BSON_ARRAY(
                          BSON("_id" << 1 << "host" << "h0") <<
                          BSON("_id" << 2 << "host" << "h1"))));
-        
-        StatusWith<ReplicationExecutor::EventHandle> evh = _executor->makeEvent();
-        ASSERT_OK(evh.getStatus());
 
-        Date_t now(0);
         std::vector<HostAndPort> hosts;
-        hosts.push_back(config.getMemberAt(0).getHostAndPort());
         hosts.push_back(config.getMemberAt(1).getHostAndPort());
 
         const BSONObj freshRequest = makeFreshRequest(config, OpTime(10,0), 0);
@@ -441,23 +380,7 @@ namespace {
                                                    "opTime" << 3)));
 
         FreshnessChecker checker;
-        StatusWith<ReplicationExecutor::CallbackHandle> cbh = 
-            _executor->scheduleWork(
-                stdx::bind(&FreshnessCheckerTest::freshnessCheckerRunner,
-                           this,
-                           stdx::placeholders::_1,
-                           &checker,
-                           evh.getValue(),
-                           OpTime(10,0),
-                           config,
-                           0,
-                           hosts));
-        ASSERT_OK(cbh.getStatus());
-        _executor->wait(cbh.getValue());
-
-        ASSERT_OK(_lastStatus);
-
-        _executor->waitForEvent(evh.getValue());
+        runTest(&checker, OpTime(10, 0), config, 0, hosts);
         stopCapturingLogMessages();
 
         bool weAreFreshest(true);
@@ -478,13 +401,8 @@ namespace {
                      "members" << BSON_ARRAY(
                          BSON("_id" << 1 << "host" << "h0") <<
                          BSON("_id" << 2 << "host" << "h1"))));
-        
-        StatusWith<ReplicationExecutor::EventHandle> evh = _executor->makeEvent();
-        ASSERT_OK(evh.getStatus());
 
-        Date_t now(0);
         std::vector<HostAndPort> hosts;
-        hosts.push_back(config.getMemberAt(0).getHostAndPort());
         hosts.push_back(config.getMemberAt(1).getHostAndPort());
 
         const BSONObj freshRequest = makeFreshRequest(config, OpTime(10,0), 0);
@@ -502,23 +420,7 @@ namespace {
                                                    "opTime" << Date_t(OpTime(0,0).asDate()))));
 
         FreshnessChecker checker;
-        StatusWith<ReplicationExecutor::CallbackHandle> cbh = 
-            _executor->scheduleWork(
-                stdx::bind(&FreshnessCheckerTest::freshnessCheckerRunner,
-                           this,
-                           stdx::placeholders::_1,
-                           &checker,
-                           evh.getValue(),
-                           OpTime(10,0),
-                           config,
-                           0,
-                           hosts));
-        ASSERT_OK(cbh.getStatus());
-        _executor->wait(cbh.getValue());
-
-        ASSERT_OK(_lastStatus);
-
-        _executor->waitForEvent(evh.getValue());
+        runTest(&checker, OpTime(10, 0), config, 0, hosts);
         stopCapturingLogMessages();
 
         bool weAreFreshest(true);
@@ -542,13 +444,9 @@ namespace {
                          BSON("_id" << 3 << "host" << "h2") <<
                          BSON("_id" << 4 << "host" << "h3") <<
                          BSON("_id" << 5 << "host" << "h4"))));
-        
-        StatusWith<ReplicationExecutor::EventHandle> evh = _executor->makeEvent();
-        ASSERT_OK(evh.getStatus());
 
-        Date_t now(0);
         std::vector<HostAndPort> hosts;
-        for (ReplicaSetConfig::MemberIterator mem = config.membersBegin();
+        for (ReplicaSetConfig::MemberIterator mem = ++config.membersBegin();
                 mem != config.membersEnd();
                 ++mem) {
             hosts.push_back(mem->getHostAndPort());
@@ -595,23 +493,7 @@ namespace {
                                                    "opTime" << Date_t(OpTime(0,0).asDate()))));
 
         FreshnessChecker checker;
-        StatusWith<ReplicationExecutor::CallbackHandle> cbh = 
-            _executor->scheduleWork(
-                stdx::bind(&FreshnessCheckerTest::freshnessCheckerRunner,
-                           this,
-                           stdx::placeholders::_1,
-                           &checker,
-                           evh.getValue(),
-                           OpTime(10,0),
-                           config,
-                           0,
-                           hosts));
-        ASSERT_OK(cbh.getStatus());
-        _executor->wait(cbh.getValue());
-
-        ASSERT_OK(_lastStatus);
-
-        _executor->waitForEvent(evh.getValue());
+        runTest(&checker, OpTime(10, 0), config, 0, hosts);
         stopCapturingLogMessages();
 
         bool weAreFreshest(true);
@@ -730,13 +612,9 @@ namespace {
                          BSON("_id" << 3 << "host" << "h2") <<
                          BSON("_id" << 4 << "host" << "h3") <<
                          BSON("_id" << 5 << "host" << "h4"))));
-        
-        StatusWith<ReplicationExecutor::EventHandle> evh = _executor->makeEvent();
-        ASSERT_OK(evh.getStatus());
 
-        Date_t now(0);
         std::vector<HostAndPort> hosts;
-        for (ReplicaSetConfig::MemberIterator mem = config.membersBegin();
+        for (ReplicaSetConfig::MemberIterator mem = ++config.membersBegin();
                 mem != config.membersEnd();
                 ++mem) {
             hosts.push_back(mem->getHostAndPort());
@@ -782,23 +660,7 @@ namespace {
                                                    "opTime" << Date_t(OpTime(0,0).asDate()))));
 
         FreshnessChecker checker;
-        StatusWith<ReplicationExecutor::CallbackHandle> cbh = 
-            _executor->scheduleWork(
-                stdx::bind(&FreshnessCheckerTest::freshnessCheckerRunner,
-                           this,
-                           stdx::placeholders::_1,
-                           &checker,
-                           evh.getValue(),
-                           OpTime(10,0),
-                           config,
-                           0,
-                           hosts));
-        ASSERT_OK(cbh.getStatus());
-        _executor->wait(cbh.getValue());
-
-        ASSERT_OK(_lastStatus);
-
-        _executor->waitForEvent(evh.getValue());
+        runTest(&checker, OpTime(10, 0), config, 0, hosts);
         stopCapturingLogMessages();
 
         bool weAreFreshest(true);
@@ -822,13 +684,9 @@ namespace {
                          BSON("_id" << 3 << "host" << "h2") <<
                          BSON("_id" << 4 << "host" << "h3") <<
                          BSON("_id" << 5 << "host" << "h4"))));
-        
-        StatusWith<ReplicationExecutor::EventHandle> evh = _executor->makeEvent();
-        ASSERT_OK(evh.getStatus());
 
-        Date_t now(0);
         std::vector<HostAndPort> hosts;
-        for (ReplicaSetConfig::MemberIterator mem = config.membersBegin();
+        for (ReplicaSetConfig::MemberIterator mem = ++config.membersBegin();
                 mem != config.membersEnd();
                 ++mem) {
             hosts.push_back(mem->getHostAndPort());
@@ -876,23 +734,7 @@ namespace {
                                                    "opTime" << Date_t(OpTime(0,0).asDate()))));
 
         FreshnessChecker checker;
-        StatusWith<ReplicationExecutor::CallbackHandle> cbh = 
-            _executor->scheduleWork(
-                stdx::bind(&FreshnessCheckerTest::freshnessCheckerRunner,
-                           this,
-                           stdx::placeholders::_1,
-                           &checker,
-                           evh.getValue(),
-                           OpTime(10,0),
-                           config,
-                           0,
-                           hosts));
-        ASSERT_OK(cbh.getStatus());
-        _executor->wait(cbh.getValue());
-
-        ASSERT_OK(_lastStatus);
-
-        _executor->waitForEvent(evh.getValue());
+        runTest(&checker, OpTime(10, 0), config, 0, hosts);
         stopCapturingLogMessages();
 
         bool weAreFreshest(true);
@@ -1013,13 +855,9 @@ namespace {
                          BSON("_id" << 3 << "host" << "h2") <<
                          BSON("_id" << 4 << "host" << "h3") <<
                          BSON("_id" << 5 << "host" << "h4"))));
-        
-        StatusWith<ReplicationExecutor::EventHandle> evh = _executor->makeEvent();
-        ASSERT_OK(evh.getStatus());
 
-        Date_t now(0);
         std::vector<HostAndPort> hosts;
-        for (ReplicaSetConfig::MemberIterator mem = config.membersBegin();
+        for (ReplicaSetConfig::MemberIterator mem = ++config.membersBegin();
                 mem != config.membersEnd();
                 ++mem) {
             hosts.push_back(mem->getHostAndPort());
@@ -1047,23 +885,7 @@ namespace {
                                                    "opTime" << Date_t(OpTime(0,0).asDate()))));
 
         FreshnessChecker checker;
-        StatusWith<ReplicationExecutor::CallbackHandle> cbh = 
-            _executor->scheduleWork(
-                stdx::bind(&FreshnessCheckerTest::freshnessCheckerRunner,
-                           this,
-                           stdx::placeholders::_1,
-                           &checker,
-                           evh.getValue(),
-                           OpTime(10,0),
-                           config,
-                           0,
-                           hosts));
-        ASSERT_OK(cbh.getStatus());
-        _executor->wait(cbh.getValue());
-
-        ASSERT_OK(_lastStatus);
-
-        _executor->waitForEvent(evh.getValue());
+        runTest(&checker, OpTime(0, 0), config, 0, hosts);
         stopCapturingLogMessages();
 
         bool weAreFreshest(false);

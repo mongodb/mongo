@@ -239,7 +239,7 @@ namespace repl {
             }
 
             MemberState state = replCoord->getCurrentMemberState();
-            if (state.primary() || state.fatal() || state.startup()) {
+            if (state.primary() || state.startup()) {
                 _resetConnection();
                 continue;
             }

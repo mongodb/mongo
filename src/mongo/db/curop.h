@@ -32,12 +32,14 @@
 #pragma once
 
 #include "mongo/db/client.h"
+#include "mongo/db/concurrency/lock_stat.h"
 #include "mongo/db/server_options.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/util/concurrency/spin_lock.h"
 #include "mongo/util/net/hostandport.h"
 #include "mongo/util/progress_meter.h"
 #include "mongo/util/time_support.h"
+
 
 namespace mongo {
 

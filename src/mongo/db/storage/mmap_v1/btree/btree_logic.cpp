@@ -2078,7 +2078,7 @@ namespace mongo {
                                                     long long *unusedCount,
                                                     bool strict,
                                                     bool dumpBuckets,
-                                                    unsigned depth) {
+                                                    unsigned depth) const {
         return _fullValidate(txn, getRootLoc(txn), unusedCount, strict, dumpBuckets, depth);
     }
 
@@ -2088,7 +2088,7 @@ namespace mongo {
                                                      long long *unusedCount,
                                                      bool strict,
                                                      bool dumpBuckets,
-                                                     unsigned depth) {
+                                                     unsigned depth) const {
         BucketType* bucket = getBucket(txn, bucketLoc);
         assertValid(_indexName, bucket, _ordering, true);
 

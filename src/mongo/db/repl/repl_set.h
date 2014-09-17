@@ -57,7 +57,6 @@ namespace repl {
         void go() { _go(); }
         void shutdown();
 
-        void fatal() { _fatal(); }
         virtual bool isPrimary() { return box.getState().primary(); }
         virtual bool isSecondary() {  return box.getState().secondary(); }
         MemberState state() const { return ReplSetImpl::state(); }

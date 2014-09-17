@@ -82,9 +82,9 @@ namespace repl {
 
         Lock::GlobalWrite writeLock(txn->lockState());
 
-        // make sure we're not primary, secondary, rollback, or fatal already
+        // make sure we're not primary, secondary, rollback already
         if (box.getState().primary() || box.getState().secondary() ||
-            box.getState().fatal()) {
+            box.getState().rollback()) {
             return false;
         }
 
@@ -194,7 +194,7 @@ namespace repl {
             sleepsecs(1);
             return;
         }
-        if( _blockSync || sp.state.fatal() || sp.state.startup() ) {
+        if( _blockSync || sp.state.startup() ) {
             sleepsecs(5);
             return;
         }

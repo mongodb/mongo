@@ -102,8 +102,8 @@ namespace mongo {
                                      ->getAuthenticatedUserNamesToken();
         auto_ptr<Scope> s = globalScriptEngine->getPooledScope(_txn, _db->name(),
                                                                "group" + userToken);
-        if (_request.reduceScope.size()) {
-            s->init(_request.reduceScope.c_str());
+        if (!_request.reduceScope.isEmpty()) {
+            s->init(&_request.reduceScope);
         }
         s->setObject("$initial", _request.initial, true);
         s->exec("$reduce = " + _request.reduceCode, "$group reduce setup", false, true, true, 100);

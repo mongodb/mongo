@@ -33,6 +33,7 @@
 #include "mongo/db/repl/repl_coordinator_hybrid.h"
 
 #include "mongo/db/global_environment_experiment.h"
+#include "mongo/db/repl/bgsync.h"
 #include "mongo/db/repl/isself.h"
 #include "mongo/db/repl/network_interface_impl.h"
 #include "mongo/db/repl/repl_coordinator_external_state_impl.h"
@@ -138,7 +139,7 @@ namespace repl {
                                                   const Milliseconds& waitTime,
                                                   const Milliseconds& stepdownTime) {
         Status legacyStatus = _legacy.stepDown(txn, force, waitTime, stepdownTime);
-        Status implStatus = _impl.stepDown(txn, force, waitTime, stepdownTime);
+        //        Status implStatus = _impl.stepDown(txn, force, waitTime, stepdownTime);
         return legacyStatus;
     }
 
@@ -158,12 +159,12 @@ namespace repl {
         return legacyResponse;
     }
 
-    Status HybridReplicationCoordinator::canServeReadsFor(OperationContext* txn,
-                                                          const NamespaceString& ns,
-                                                          bool slaveOk) {
-        Status legacyStatus = _legacy.canServeReadsFor(txn, ns, slaveOk);
+    Status HybridReplicationCoordinator::checkCanServeReadsFor(OperationContext* txn,
+                                                               const NamespaceString& ns,
+                                                               bool slaveOk) {
+        Status legacyStatus = _legacy.checkCanServeReadsFor(txn, ns, slaveOk);
         // TODO(dannenberg) uncomment below once the impl state changes are full implemeneted
-        // Status implStatus = _impl.canServeReadsFor(txn, ns, slaveOk);
+        // Status implStatus = _impl.checkCanServeReadsFor(txn, ns, slaveOk);
         // invariant(legacyStatus == implStatus);
         return legacyStatus;
     }
@@ -363,11 +364,6 @@ namespace repl {
         return implResponse;
     }
 
-    void HybridReplicationCoordinator::waitUpToOneSecondForOptimeChange(const OpTime& ot) {
-        _legacy.waitUpToOneSecondForOptimeChange(ot);
-        //TODO(spencer) switch to _impl.waitUpToOneSecondForOptimeChange(ot); once implemented
-    }
-
     bool HybridReplicationCoordinator::buildsIndexes() {
         bool legacyResponse = _legacy.buildsIndexes();
         bool implResponse = _impl.buildsIndexes();
@@ -375,17 +371,14 @@ namespace repl {
         return legacyResponse;
     }
 
-    vector<BSONObj> HybridReplicationCoordinator::getHostsWrittenTo(const OpTime& op) {
-        vector<BSONObj> legacyResponse = _legacy.getHostsWrittenTo(op);
-        vector<BSONObj> implResponse = _impl.getHostsWrittenTo(op);
-        return legacyResponse;
+    vector<HostAndPort> HybridReplicationCoordinator::getHostsWrittenTo(const OpTime& op) {
+        vector<HostAndPort> implResponse = _impl.getHostsWrittenTo(op);
+        return implResponse;
     }
 
     Status HybridReplicationCoordinator::checkIfWriteConcernCanBeSatisfied(
             const WriteConcernOptions& writeConcern) const {
-        Status legacyStatus = _legacy.checkIfWriteConcernCanBeSatisfied(writeConcern);
-        Status implStatus = _impl.checkIfWriteConcernCanBeSatisfied(writeConcern);
-        return legacyStatus;
+        return _impl.checkIfWriteConcernCanBeSatisfied(writeConcern);
     }
 
     BSONObj HybridReplicationCoordinator::getGetLastErrorDefault() {
@@ -405,6 +398,20 @@ namespace repl {
         bool implResponse = _impl.isReplEnabled();
         invariant(legacyResponse == implResponse);
         return legacyResponse;
+    }
+
+    void HybridReplicationCoordinator::connectOplogReader(OperationContext* txn,
+                                                          BackgroundSync* bgsync,
+                                                          OplogReader* r) {
+        _legacy.connectOplogReader(txn, bgsync, r);
+        HostAndPort legacySyncSource = r->getHost();
+        bgsync->connectOplogReader(txn, &_impl, r);
+        HostAndPort implSyncSource = r->getHost();
+        if (legacySyncSource != implSyncSource) {
+            severe() << "sync source mismatch between legacy and impl: " << 
+                legacySyncSource.toString() << " and " << implSyncSource.toString();
+            fassertFailed(18742);
+        }
     }
 
     void HybridReplicationCoordinator::setImplConfigHack(const ReplSetConfig* config) {

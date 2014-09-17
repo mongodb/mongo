@@ -53,6 +53,7 @@ namespace mongo {
 
 namespace repl {
 
+    class OplogReader;
     class SyncSourceFeedback;
     class TopologyCoordinator;
 
@@ -119,9 +120,9 @@ namespace repl {
         virtual Status checkIfWriteConcernCanBeSatisfied(
                 const WriteConcernOptions& writeConcern) const;
 
-        virtual Status canServeReadsFor(OperationContext* txn,
-                                        const NamespaceString& ns,
-                                        bool slaveOk);
+        virtual Status checkCanServeReadsFor(OperationContext* txn,
+                                             const NamespaceString& ns,
+                                             bool slaveOk);
 
         virtual bool shouldIgnoreUniqueIndex(const IndexDescriptor* idx);
 
@@ -182,11 +183,9 @@ namespace repl {
         virtual Status processHandshake(const OperationContext* txn,
                                         const HandshakeArgs& handshake);
 
-        virtual void waitUpToOneSecondForOptimeChange(const OpTime& ot);
-
         virtual bool buildsIndexes();
 
-        virtual std::vector<BSONObj> getHostsWrittenTo(const OpTime& op);
+        virtual std::vector<HostAndPort> getHostsWrittenTo(const OpTime& op);
 
         virtual BSONObj getGetLastErrorDefault();
 
@@ -194,6 +193,11 @@ namespace repl {
 
         virtual bool isReplEnabled() const;
 
+        virtual void connectOplogReader(OperationContext* txn,
+                                        BackgroundSync* bgsync,
+                                        OplogReader* r);
+
+        
         // ================== Members of replication code internal API ===================
 
         // This is a temporary hack to set the replset config to the config detected by the
@@ -216,6 +220,21 @@ namespace repl {
          * of calls via the executor.
          */
         void cancelHeartbeats();
+
+        /**
+         * Chooses a sync source.
+         * A wrapper that schedules _chooseNewSyncSource() through the Replication Executor and
+         * waits for its completion.
+         */
+        HostAndPort chooseNewSyncSource();
+
+        /**
+         * Blacklists 'host' until 'until'.
+         * A wrapper that schedules _blacklistSyncSource() through the Replication Executor and
+         * waits for its completion.
+         */
+        void blacklistSyncSource(const HostAndPort& host, Date_t until);
+
 
         // ================== Test support API ===================
 
@@ -350,6 +369,17 @@ namespace repl {
         Status _checkIfWriteConcernCanBeSatisfied_inlock(
                 const WriteConcernOptions& writeConcern) const;
 
+        /**
+         * Helper for stepDown run within a ReplicationExecutor callback.  This method assumes
+         * it is running within a global shared lock, and thus that no writes are going on at the
+         * same time.
+         */
+        void _stepDownFinish(const ReplicationExecutor::CallbackData& cbData,
+                             bool force,
+                             const Milliseconds& waitTime,
+                             const Date_t& stepdownUntil,
+                             Status* result);
+
         OID _getMyRID_inlock() const;
 
         /**
@@ -448,16 +478,33 @@ namespace repl {
          * decides whether to continue election proceedings.
          * finishEvh is an event that is signaled when election is complete.
          **/
-        void _onFreshnessCheckComplete(const ReplicationExecutor::CallbackData& cbData,
-                                       const ReplicationExecutor::EventHandle& finishEvh);
+        void _onFreshnessCheckComplete(const ReplicationExecutor::EventHandle& finishEvh);
 
         /**
          * Callback called when the ElectCmdRunner has completed; checks the results and
          * decides whether to complete the election and change state to primary.
          * finishEvh is an event that is signaled when election is complete.
          **/
-        void _onElectCmdRunnerComplete(const ReplicationExecutor::CallbackData& cbData,
-                                       const ReplicationExecutor::EventHandle& finishEvh);
+        void _onElectCmdRunnerComplete(const ReplicationExecutor::EventHandle& finishEvh);
+
+        /**
+         * Chooses a new sync source.  Must be scheduled as a callback.
+         * 
+         * Calls into the Topology Coordinator, which uses its current view of the set to choose
+         * the most appropriate sync source.
+         */
+        void _chooseNewSyncSource(const ReplicationExecutor::CallbackData& cbData,
+                                  HostAndPort* newSyncSource);
+
+        /**
+         * Adds 'host' to the sync source blacklist until 'until'. A blacklisted source cannot
+         * be chosen as a sync source.
+         *
+         * Must be scheduled as a callback.
+         */
+        void _blacklistSyncSource(const ReplicationExecutor::CallbackData& cbData,
+                                  const HostAndPort& host,
+                                  Date_t until);
 
 
         //

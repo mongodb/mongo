@@ -68,7 +68,7 @@ namespace mongo {
                     return NULL;
 
                 auto_ptr<StoredGeometry> stored(new StoredGeometry);
-                if (!stored->geometry.parseFrom(element.Obj()))
+                if (!stored->geometry.parseFromStorage(element).isOK())
                     return NULL;
                 stored->element = element;
                 return stored.release();
@@ -326,12 +326,8 @@ namespace mongo {
                 if (!e.isABSONObj())
                     return false;
 
-                if (!GeoParser::isIndexablePoint(e.Obj()))
-                    return false;
-
                 PointWithCRS point;
-                if (!GeoParser::parsePoint(e.Obj(), &point))
-                    return false;
+                if (!GeoParser::parseStoredPoint(e, &point).isOK()) return false;
 
                 return _annulus.contains(point.oldPoint);
             }

@@ -54,7 +54,6 @@
 #include "mongo/util/allocator.h"
 #include "mongo/util/checksum.h"
 #include "mongo/util/compress.h"
-#include "mongo/util/concurrency/qlock.h"
 #include "mongo/util/fail_point.h"
 #include "mongo/util/log.h"
 #include "mongo/util/mmap.h"
@@ -629,42 +628,6 @@ namespace PerfTests {
             lk.unlock();
         }
     };
-
-    QLock _qlock;
-
-    class qlock : public B {
-    public:
-        string name() { return "qlockr"; }
-        //virtual int howLongMillis() { return 500; }
-        virtual bool showDurStats() { return false; }
-        void timed() {
-            _qlock.lock_r();
-            _qlock.unlock_r();
-        }
-    };
-    class qlockw : public B {
-    public:
-        string name() { return "qlockw"; }
-        //virtual int howLongMillis() { return 500; }
-        virtual bool showDurStats() { return false; }
-        void timed() {
-            _qlock.lock_w();
-            _qlock.unlock_w();
-        }
-    };
-
-#if 0
-    class ulock : public B {
-    public:
-        string name() { return "ulock"; }
-        virtual int howLongMillis() { return 500; }
-        virtual bool showDurStats() { return false; }
-        void timed() {
-            lk.lockAsUpgradable();
-            lk.unlockFromUpgradable();
-        }
-    };
-#endif
 
     class CTM : public B {
     public:
@@ -1376,8 +1339,6 @@ namespace PerfTests {
 #endif
                 add< rlock >();
                 add< wlock >();
-                add< qlock >();
-                add< qlockw >();
                 add< NotifyOne >();
                 add< mutexspeed >();
                 add< simplemutexspeed >();

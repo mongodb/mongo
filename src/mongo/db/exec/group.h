@@ -57,7 +57,7 @@ namespace mongo {
         std::string reduceCode;
 
         // Scope for the reduce function.  Optional.
-        std::string reduceScope;
+        BSONObj reduceScope;
 
         // The initial value for the group result.
         BSONObj initial;

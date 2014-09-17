@@ -46,9 +46,14 @@ namespace mongo {
         GeometryContainer();
 
         /**
-         * Loads an empty GeometryContainer from BSON
+         * Loads an empty GeometryContainer from query.
          */
-        bool parseFrom(const BSONObj &obj);
+        Status parseFromQuery(const BSONElement& elem);
+
+        /**
+         * Loads an empty GeometryContainer from stored geometry.
+         */
+        Status parseFromStorage(const BSONElement& elem);
 
         /**
          * Is the geometry any of {Point, Line, Polygon}?
@@ -116,6 +121,8 @@ namespace mongo {
     private:
 
         class R2BoxRegion;
+
+        Status parseFromGeoJSON(const BSONObj& obj);
 
         // Does 'this' intersect with the provided type?
         bool intersects(const S2Cell& otherPoint) const;

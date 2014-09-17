@@ -170,7 +170,7 @@ namespace mongo {
         // passing in a query object (necessary to check SlaveOK query option), the only state where
         // reads are allowed is PRIMARY (or master in master/slave).  This function uasserts if
         // reads are not okay.
-        Status status = repl::getGlobalReplicationCoordinator()->canServeReadsFor(
+        Status status = repl::getGlobalReplicationCoordinator()->checkCanServeReadsFor(
                 txn,
                 NamespaceString(ns),
                 true);
@@ -591,7 +591,7 @@ namespace mongo {
 
         // uassert if we are not on a primary, and not a secondary with SlaveOk query parameter set.
         bool slaveOK = pq.hasOption(QueryOption_SlaveOk) || pq.hasReadPref();
-        status = repl::getGlobalReplicationCoordinator()->canServeReadsFor(
+        status = repl::getGlobalReplicationCoordinator()->checkCanServeReadsFor(
                 txn,
                 NamespaceString(cq->ns()),
                 slaveOK);

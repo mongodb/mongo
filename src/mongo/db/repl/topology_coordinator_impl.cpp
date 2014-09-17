@@ -88,13 +88,12 @@ namespace {
     TopologyCoordinatorImpl::TopologyCoordinatorImpl(Seconds maxSyncSourceLagSecs) :
         _role(Role::follower),
         _currentPrimaryIndex(-1),
-        _syncSourceIndex(-1),
         _forceSyncSourceIndex(-1),
         _maxSyncSourceLagSecs(maxSyncSourceLagSecs),
         _selfIndex(-1),
         _stepDownUntil(0),
         _maintenanceModeCalls(0),
-        _followerMode(MemberState::RS_SECONDARY)
+        _followerMode(MemberState::RS_STARTUP2)
     {
         invariant(getMemberState() == MemberState::RS_STARTUP);
     }
@@ -109,22 +108,20 @@ namespace {
     }
 
     HostAndPort TopologyCoordinatorImpl::getSyncSourceAddress() const {
-        if (_syncSourceIndex == -1) {
-            return HostAndPort();
-        }
-        return _currentConfig.getMemberAt(_syncSourceIndex).getHostAndPort();
+        return _syncSource;
     }
 
-    void TopologyCoordinatorImpl::chooseNewSyncSource(Date_t now, const OpTime& lastOpApplied) {
+    HostAndPort TopologyCoordinatorImpl::chooseNewSyncSource(Date_t now, 
+                                                             const OpTime& lastOpApplied) {
+
         // if we have a target we've requested to sync from, use it
         if (_forceSyncSourceIndex != -1) {
             invariant(_forceSyncSourceIndex < _currentConfig.getNumMembers());
-            _syncSourceIndex = _forceSyncSourceIndex;
+            _syncSource = _currentConfig.getMemberAt(_forceSyncSourceIndex).getHostAndPort();
             _forceSyncSourceIndex = -1;
-            _sethbmsg( str::stream() << "syncing from: "
-                       << _currentConfig.getMemberAt(_syncSourceIndex).getHostAndPort().toString()
-                       << " by request", 0);
-            return;
+            _sethbmsg(str::stream() << "syncing from: " << _syncSource.toString() << " by request",
+                      0);
+            return _syncSource;
         }
 
         // wait for 2N pings (not counting ourselves) before choosing a sync target
@@ -133,14 +130,20 @@ namespace {
         if (needMorePings > 0) {
             OCCASIONALLY log() << "waiting for " << needMorePings 
                                << " pings from other members before syncing";
-            return;
+            _syncSource = HostAndPort();
+            return _syncSource;
         }
 
         // If we are only allowed to sync from the primary, set that
         if (!_currentConfig.isChainingAllowed()) {
-            // Sets -1 if there is no current primary
-            _syncSourceIndex = _currentPrimaryIndex;
-            return;
+            if (_currentPrimaryIndex == -1) {
+                _syncSource = HostAndPort();
+                return _syncSource;
+            }
+            else {
+                _syncSource = _currentConfig.getMemberAt(_currentPrimaryIndex).getHostAndPort();
+                return _syncSource;
+            }
         }
 
         // find the member with the lowest ping time that is ahead of me
@@ -148,11 +151,13 @@ namespace {
         // Find primary's oplog time. Reject sync candidates that are more than
         // maxSyncSourceLagSecs seconds behind.
         OpTime primaryOpTime;
-        if (_currentPrimaryIndex != -1)
+        if (_currentPrimaryIndex != -1) {
             primaryOpTime = _hbdata[_currentPrimaryIndex].getOpTime();
-        else
+        }
+        else {
             // choose a time that will exclude no candidates, since we don't see a primary
             primaryOpTime = OpTime(_maxSyncSourceLagSecs.total_seconds(), 0);
+        }
 
         if (primaryOpTime.getSecs() < 
             static_cast<unsigned int>(_maxSyncSourceLagSecs.total_seconds())) {
@@ -243,14 +248,14 @@ namespace {
 
         if (closestIndex == -1) {
             // Did not find any members to sync from
-            _syncSourceIndex = -1;
-            return;
+            _syncSource = HostAndPort();
+            return _syncSource;
         }
-        std::string msg(str::stream() << "syncing to: " << 
-                        _currentConfig.getMemberAt(closestIndex).getHostAndPort().toString(), 0);
+        _syncSource = _currentConfig.getMemberAt(closestIndex).getHostAndPort();
+        std::string msg(str::stream() << "syncing to: " << _syncSource.toString(), 0);
         _sethbmsg(msg);
         log() << msg;
-        _syncSourceIndex = closestIndex;
+        return _syncSource;
     }
 
     void TopologyCoordinatorImpl::blacklistSyncSource(const HostAndPort& host, Date_t until) {
@@ -585,9 +590,8 @@ namespace {
         response->setTime(Seconds(Milliseconds(now.asInt64()).total_seconds()));
         response->setOpTime(lastOpApplied.asDate());
 
-        if (_syncSourceIndex != -1) {
-            response->setSyncingTo(
-                    _currentConfig.getMemberAt(_syncSourceIndex).getHostAndPort().toString());
+        if (!_syncSource.empty()) {
+            response->setSyncingTo(_syncSource.toString());
         }
 
         long long v = _currentConfig.getConfigVersion();
@@ -1196,9 +1200,8 @@ namespace {
         response->append("myState", myState.s);
 
         // Add sync source info
-        if ((_syncSourceIndex != -1) && !myState.primary() && !myState.removed()) {
-            response->append("syncingTo", _currentConfig.getMemberAt(_syncSourceIndex)
-                          .getHostAndPort().toString());
+        if (!_syncSource.empty() && !myState.primary() && !myState.removed()) {
+            response->append("syncingTo", _syncSource.toString());
         }
 
         response->append("members", membersOut);
@@ -1246,6 +1249,10 @@ namespace {
         _stepDownUntil = newTime;
     }
 
+    Date_t TopologyCoordinatorImpl::getStepDownTime() const {
+        return _stepDownUntil;
+    }
+
     // This function installs a new config object and recreates MemberHeartbeatData objects
     // that reflect the new config.
     void TopologyCoordinatorImpl::updateConfig(const ReplicaSetConfig& newConfig,
@@ -1260,7 +1267,6 @@ namespace {
         _hbdata.clear();
         _role = Role::follower;
         _currentPrimaryIndex = -1;
-        _syncSourceIndex = -1;
         _forceSyncSourceIndex = -1;
         _selfIndex = selfIndex;
 
@@ -1286,7 +1292,15 @@ namespace {
             }
         }
 
-        chooseNewSyncSource(now, lastOpApplied);
+        if (_currentConfig.getNumMembers() == 1 &&
+            _selfIndex == 0 &&
+            _currentConfig.getMemberAt(_selfIndex).isElectable()) {
+
+            // If the new config describes a one-node replica set, we're the one member, and
+            // we're electable, we must be the leader.
+            _role = Role::leader;
+        }
+
     }
 
     // TODO(emilkie): Better story for heartbeat message handling.
@@ -1464,7 +1478,6 @@ namespace {
             OpTime myLastOpApplied,
             OpTime electionOpTime) {
         invariant(_role == Role::candidate);
-        _syncSourceIndex = -1;
         _electionTime = electionOpTime;
         _electionId = electionId;
         _role = Role::leader;

@@ -83,14 +83,14 @@ namespace {
     }
 
 
-    bool S2GetKeysForObject(const BSONObj& obj,
+    bool S2GetKeysForObject(const BSONElement& element,
                             const S2IndexingParams& params,
                             vector<string>* out) {
         S2RegionCoverer coverer;
         params.configureCoverer(&coverer);
 
         GeometryContainer geoContainer;
-        if (!geoContainer.parseFrom(obj)) { return false; }
+        if (!geoContainer.parseFromStorage(element).isOK()) { return false; }
 
         // Don't index big polygon
         if (geoContainer.getNativeCRS() == STRICT_SPHERE) {
@@ -125,10 +125,9 @@ namespace {
         for (BSONElementSet::iterator i = elements.begin(); i != elements.end(); ++i) {
             uassert(16754, "Can't parse geometry from element: " + i->toString(),
                     i->isABSONObj());
-            const BSONObj &geoObj = i->Obj();
 
             vector<string> cells;
-            bool succeeded = S2GetKeysForObject(geoObj, params, &cells);
+            bool succeeded = S2GetKeysForObject(*i, params, &cells);
             uassert(16755, "Can't extract geo keys from object, malformed geometry?: "
                            + document.toString(), succeeded);
 

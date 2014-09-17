@@ -75,12 +75,12 @@ namespace mongo {
             return false;
         }
 
-        // Get the verbosity.
-        Explain::Verbosity verbosity = Explain::QUERY_PLANNER;
+        // Get the verbosity. We use the executionStats verbosity by default.
+        Explain::Verbosity verbosity = Explain::EXEC_STATS;
         if (!cmdObj["verbosity"].eoo()) {
             const char* verbStr = cmdObj["verbosity"].valuestrsafe();
-            if (mongoutils::str::equals(verbStr, "executionStats")) {
-                verbosity = Explain::EXEC_STATS;
+            if (mongoutils::str::equals(verbStr, "queryPlanner")) {
+                verbosity = Explain::QUERY_PLANNER;
             }
             else if (mongoutils::str::equals(verbStr, "allPlansExecution")) {
                 verbosity = Explain::EXEC_ALL_PLANS;
@@ -88,7 +88,7 @@ namespace mongo {
             else if (mongoutils::str::equals(verbStr, "full")) {
                 verbosity = Explain::FULL;
             }
-            else if (!mongoutils::str::equals(verbStr, "queryPlanner")) {
+            else if (!mongoutils::str::equals(verbStr, "executionStats")) {
                 Status commandStat(ErrorCodes::BadValue,
                                    "verbosity string must be one of "
                                    "{'queryPlanner', 'executionStats', 'allPlansExecution'}");

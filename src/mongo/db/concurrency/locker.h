@@ -52,6 +52,61 @@ namespace mongo {
         virtual uint64_t getId() const = 0;
 
         /**
+         * This should be the first method invoked for a particular Locker object. It acquires the
+         * Global lock in the specified mode and effectively indicates the mode of the operation.
+         * This is what the lock modes on the global lock mean:
+         *
+         * IX - Regular write operation
+         * IS - Regular read operation
+         * S  - Stops all *write* activity. Used for administrative operations (repl, etc).
+         * X  - Stops all activity. Used for administrative operations (repl state changes,
+         *          shutdown, etc).
+         *
+         * This method can be called recursively, but each call to beginTransaction must be
+         * accompanied by a call to endTransaction.
+         *
+         * @param mode Mode in which the global lock should be acquired. Also indicates the intent
+         *              of the operation.
+         * @param timeoutMs How long to wait for the global lock (and the flush lock, for the MMAP
+         *          V1 engine) to be acquired.
+         *
+         * @return LOCK_OK, if the global lock (and the flush lock, for the MMAP V1 engine) were
+         *          acquired within the specified time bound. Otherwise, the respective failure
+         *          code and neither lock will be acquired.
+         */
+        virtual newlm::LockResult lockGlobal(newlm::LockMode mode,
+                                             unsigned timeoutMs = UINT_MAX) = 0;
+
+        /**
+         * It decrements the references on the global lock. One of these calls should follow each
+         * beginTransaction call and it is an error not to do so.
+         *
+         * @return true if this is the last endTransaction call (i.e., the global lock was
+         *          released); false if there are still references on the global lock. This value
+         *          should not be relied on and is only used for assertion purposes.
+         */
+        virtual bool unlockGlobal() = 0;
+
+        /**
+         * This is only necessary for the MMAP V1 engine and in particular, the fsyncLock command
+         * which needs to first acquire the global lock in X-mode for truncating the journal and
+         * then downgrade to S before it blocks.
+         *
+         * The downgrade is necessary in order to be nice and not block readers while under
+         * fsyncLock.
+         */
+        virtual void downgradeGlobalXtoSForMMAPV1() = 0;
+
+        /**
+         * beginWriteUnitOfWork/endWriteUnitOfWork must only be called by WriteUnitOfWork. See
+         * comments there for the semantics of units of work.
+         */
+        virtual void beginWriteUnitOfWork() = 0;
+        virtual void endWriteUnitOfWork() = 0;
+
+        virtual bool inAWriteUnitOfWork() const = 0;
+
+        /**
          * Acquires lock on the specified resource in the specified mode and returns the outcome
          * of the operation. See the details for LockResult for more information on what the
          * different results mean.
@@ -112,9 +167,9 @@ namespace mongo {
          */
         virtual char threadState() const = 0;
 
-        virtual bool isRW() const = 0; // RW
-        virtual bool isW() const = 0; // W
-        virtual bool hasAnyReadLock() const = 0; // explicitly rR
+        virtual bool isW() const = 0;
+        virtual bool isR() const = 0;
+        virtual bool hasAnyReadLock() const = 0; // explicitly r or R
 
         virtual bool isLocked() const = 0;
         virtual bool isWriteLocked() const = 0;
@@ -130,15 +185,6 @@ namespace mongo {
         virtual bool hasLockPending() const = 0;
 
         // ----
-
-        virtual void lockedStart(char newState) = 0; // RWrw
-        virtual void unlocked() = 0; // _threadState = 0
-
-        /**
-         * you have to be locked already to call this
-         * this is mostly for W_to_R or R_to_W
-         */
-        virtual void changeLockState(char newstate) = 0;
 
         // Those are only used for TempRelease. Eventually they should be removed.
         virtual void enterScopedLock(Lock::ScopedLock* lock) = 0;

@@ -44,6 +44,7 @@ namespace repl {
     ReplicationCoordinatorExternalStateMock::ReplicationCoordinatorExternalStateMock()
         : _localRsConfigDocument(Status(ErrorCodes::NoMatchingDocument,
                                         "No local config document")),
+         _canAcquireGlobalSharedLock(true),
          _connectionsClosed(false) {
     }
 
@@ -68,7 +69,12 @@ namespace repl {
 
     HostAndPort ReplicationCoordinatorExternalStateMock::getClientHostAndPort(
             const OperationContext* txn) {
-        return HostAndPort();
+        return _clientHostAndPort;
+    }
+
+    void ReplicationCoordinatorExternalStateMock::setClientHostAndPort(
+            const HostAndPort& clientHostAndPort) {
+        _clientHostAndPort = clientHostAndPort;
     }
 
     StatusWith<BSONObj> ReplicationCoordinatorExternalStateMock::loadLocalConfigDocument(
@@ -93,5 +99,24 @@ namespace repl {
         _connectionsClosed = true;
     }
 
+    void ReplicationCoordinatorExternalStateMock::setCanAcquireGlobalSharedLock(bool canAcquire) {
+        _canAcquireGlobalSharedLock = canAcquire;
+    }
+
+    ReplicationCoordinatorExternalState::GlobalSharedLockAcquirer*
+            ReplicationCoordinatorExternalStateMock::getGlobalSharedLockAcquirer() {
+        return new ReplicationCoordinatorExternalStateMock::GlobalSharedLockAcquirer(
+                _canAcquireGlobalSharedLock);
+    }
+
+    ReplicationCoordinatorExternalStateMock::GlobalSharedLockAcquirer::GlobalSharedLockAcquirer(
+            bool canAcquireLock) : _canAcquireLock(canAcquireLock) {}
+
+    ReplicationCoordinatorExternalStateMock::GlobalSharedLockAcquirer::~GlobalSharedLockAcquirer() {}
+
+    bool ReplicationCoordinatorExternalStateMock::GlobalSharedLockAcquirer::try_lock(
+            OperationContext* txn, const Milliseconds& timeout) {
+        return _canAcquireLock;
+    }
 } // namespace repl
 } // namespace mongo

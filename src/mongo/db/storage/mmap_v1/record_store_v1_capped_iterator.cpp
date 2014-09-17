@@ -128,7 +128,8 @@ namespace mongo {
     void CappedRecordStoreV1Iterator::saveState() {
     }
 
-    bool CappedRecordStoreV1Iterator::restoreState() {
+    bool CappedRecordStoreV1Iterator::restoreState(OperationContext* txn) {
+        _txn = txn;
         // If invalidate invalidated the DiskLoc we relied on, give up now.
         if (_killedByInvalidate) {
             _recordStore = NULL;

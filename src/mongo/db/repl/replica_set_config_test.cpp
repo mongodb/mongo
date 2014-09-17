@@ -540,6 +540,72 @@ namespace {
         ASSERT_TRUE(configA == configB);
     }
 
+    TEST(ReplicaSetConfig, CheckIfWriteConcernCanBeSatisfied) {
+        ReplicaSetConfig configA;
+        ASSERT_OK(configA.initialize(
+                BSON("_id" << "rs0" <<
+                     "version" << 1 <<
+                     "members" << BSON_ARRAY(BSON("_id" << 0 <<
+                                                 "host" << "node0" <<
+                                                 "tags" << BSON("dc" << "NA" <<
+                                                                "rack" << "rackNA1")) <<
+                                             BSON("_id" << 1 <<
+                                                  "host" << "node1" <<
+                                                  "tags" << BSON("dc" << "NA" <<
+                                                                 "rack" << "rackNA2")) <<
+                                             BSON("_id" << 2 <<
+                                                  "host" << "node2" <<
+                                                  "tags" << BSON("dc" << "NA" <<
+                                                                 "rack" << "rackNA3")) <<
+                                             BSON("_id" << 3 <<
+                                                  "host" << "node3" <<
+                                                  "tags" << BSON("dc" << "EU" <<
+                                                                 "rack" << "rackEU1")) <<
+                                             BSON("_id" << 4 <<
+                                                  "host" << "node4" <<
+                                                  "tags" << BSON("dc" << "EU" <<
+                                                                 "rack" << "rackEU2")) <<
+                                             BSON("_id" << 5 <<
+                                                  "host" << "node5" <<
+                                                  "arbiterOnly" << true)) <<
+                     "settings" << BSON("getLastErrorModes" <<
+                             BSON("valid" << BSON("dc" << 2 << "rack" << 3) <<
+                                  "invalidNotEnoughValues" << BSON("dc" << 3) <<
+                                  "invalidNotEnoughNodes" << BSON("rack" << 6))))));
+
+        WriteConcernOptions validNumberWC;
+        validNumberWC.wNumNodes = 5;
+        ASSERT_OK(configA.checkIfWriteConcernCanBeSatisfied(validNumberWC));
+
+        WriteConcernOptions invalidNumberWC;
+        invalidNumberWC.wNumNodes = 6;
+        ASSERT_EQUALS(ErrorCodes::CannotSatisfyWriteConcern,
+                      configA.checkIfWriteConcernCanBeSatisfied(invalidNumberWC));
+
+        WriteConcernOptions majorityWC;
+        majorityWC.wMode = "majority";
+        ASSERT_OK(configA.checkIfWriteConcernCanBeSatisfied(majorityWC));
+
+        WriteConcernOptions validModeWC;
+        validModeWC.wMode = "valid";
+        ASSERT_OK(configA.checkIfWriteConcernCanBeSatisfied(validModeWC));
+
+        WriteConcernOptions fakeModeWC;
+        fakeModeWC.wMode = "fake";
+        ASSERT_EQUALS(ErrorCodes::UnknownReplWriteConcern,
+                      configA.checkIfWriteConcernCanBeSatisfied(fakeModeWC));
+
+        WriteConcernOptions invalidModeNotEnoughValuesWC;
+        invalidModeNotEnoughValuesWC.wMode = "invalidNotEnoughValues";
+        ASSERT_EQUALS(ErrorCodes::CannotSatisfyWriteConcern,
+                      configA.checkIfWriteConcernCanBeSatisfied(invalidModeNotEnoughValuesWC));
+
+        WriteConcernOptions invalidModeNotEnoughNodesWC;
+        invalidModeNotEnoughNodesWC.wMode = "invalidNotEnoughNodes";
+        ASSERT_EQUALS(ErrorCodes::CannotSatisfyWriteConcern,
+                      configA.checkIfWriteConcernCanBeSatisfied(invalidModeNotEnoughNodesWC));
+    }
+
 }  // namespace
 }  // namespace repl
 }  // namespace mongo

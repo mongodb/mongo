@@ -30,12 +30,12 @@
 
 #include <boost/thread/condition_variable.hpp>
 #include <boost/thread/mutex.hpp>
-#include <map>
-#include <string>
 
+#include "mongo/db/concurrency/resource_id.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/platform/compiler.h"
 #include "mongo/platform/cstdint.h"
+#include "mongo/platform/unordered_map.h"
 #include "mongo/util/concurrency/spin_lock.h"
 #include "mongo/util/timer.h"
 
@@ -110,79 +110,6 @@ namespace newlm {
          */
         LOCK_INVALID
     };
-
-
-    /**
-     * Hierarchy of resource types. The lock manager knows nothing about this hierarchy, it is
-     * purely logical. I.e., acquiring a RESOURCE_GLOBAL and then a RESOURCE_DATABASE won't block
-     * at the level of the lock manager.
-     */
-    enum ResourceType {
-        // Special (singleton) resources
-        RESOURCE_INVALID = 0,
-        RESOURCE_GLOBAL,
-        RESOURCE_POLICY,
-
-        // Generic resources
-        RESOURCE_DATABASE,
-        RESOURCE_COLLECTION,
-        RESOURCE_DOCUMENT,
-
-        // Must bound the max resource id
-        RESOURCE_LAST
-    };
-
-    // We only use 3 bits for the resource type in the ResourceId hash
-    BOOST_STATIC_ASSERT(RESOURCE_LAST < 8);
-
-
-    /**
-     * Uniquely identifies a lockable resource.
-     */
-    class ResourceId {
-    public:
-        ResourceId() : _fullHash(0) { }
-        ResourceId(ResourceType type, const StringData& ns);
-        ResourceId(ResourceType type, const std::string& ns);
-        ResourceId(ResourceType type, uint64_t hashId);
-
-        operator uint64_t() const {
-            return _fullHash;
-        }
-
-        ResourceType getType() const {
-            return static_cast<ResourceType>(_type);
-        }
-
-        uint64_t getHashId() const {
-            return _hashId;
-        }
-
-        std::string toString() const;
-
-    private:
-
-        /**
-         * 64-bit hash of the resource
-         */
-        union {
-            struct {
-                uint64_t     _type   : 3;
-                uint64_t     _hashId : 61;
-            };
-
-            uint64_t _fullHash;
-        };
-
-        // Keep the complete namespace name for debugging purposes (TODO: this will be removed once
-        // we are confident in the robustness of the lock manager).
-        std::string _nsCopy;
-    };
-
-    // Treat the resource ids as 64-bit integers. Commented out for now - we will keep the full
-    // resource content in there for debugging purposes.
-    //
-    // BOOST_STATIC_ASSERT(sizeof(ResourceId) == sizeof(uint64_t));
 
 
     /**
@@ -422,7 +349,7 @@ namespace newlm {
 
     private:
 
-        typedef std::map<const ResourceId, LockHead*> LockHeadMap;
+        typedef unordered_map<ResourceId, LockHead*> LockHeadMap;
         typedef LockHeadMap::value_type LockHeadPair;
 
         struct LockBucket {

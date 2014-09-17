@@ -40,6 +40,7 @@
 #include "mongo/db/repl/check_quorum_for_config_change.h"
 #include "mongo/db/repl/handshake_args.h"
 #include "mongo/db/repl/master_slave.h"
+#include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/repl_set_heartbeat_args.h"
 #include "mongo/db/repl/repl_set_heartbeat_response.h"
 #include "mongo/db/repl/repl_settings.h"
@@ -383,7 +384,7 @@ namespace {
             warning() << "Received replSetUpdatePosition for node with RID" << rid
                       << ", but we haven't yet received a handshake for that node. Stored "
                       << "member ID: " << slaveInfo.memberID << ", stored member hostAndPort: "
-                      << slaveInfo.hostAndPort.toString() << ".  Our RID: " << getMyRID();
+                      << slaveInfo.hostAndPort.toString() << ".  Our RID: " << _getMyRID_inlock();
         }
         invariant(slaveInfo.memberID >= 0 || _getReplicationMode_inlock() == modeMasterSlave);
 
@@ -451,7 +452,8 @@ namespace {
             if (writeConcern.wMode == "majority") {
                 return _doneWaitingForReplication_numNodes_inlock(opTime,
                                                                   _rsConfig.getMajorityNumber());
-            } else {
+            }
+            else {
                 StatusWith<ReplicaSetTagPattern> tagPattern =
                         _rsConfig.findCustomWriteMode(writeConcern.wMode);
                 if (!tagPattern.isOK()) {
@@ -472,6 +474,13 @@ namespace {
             const OpTime& slaveTime = it->second.opTime;
             if (slaveTime >= opTime) {
                 --numNodes;
+            }
+            else {
+                if (it->first == _getMyRID_inlock()) {
+                    // Secondaries that are for some reason ahead of us should not allow us to
+                    // satisfy a write concern if we aren't caught up ourself.
+                    return false;
+                }
             }
             if (numNodes <= 0) {
                 return true;
@@ -605,8 +614,96 @@ namespace {
                                                 bool force,
                                                 const Milliseconds& waitTime,
                                                 const Milliseconds& stepdownTime) {
-        // TODO
-        return Status::OK();
+        Date_t stepDownUntil(_replExecutor.now().millis + stepdownTime.total_milliseconds());
+
+        ReplicationCoordinatorExternalState::ScopedLocker lk(
+                txn, _externalState->getGlobalSharedLockAcquirer(), stepdownTime);
+        if (!lk.gotLock()) {
+            return Status(ErrorCodes::ExceededTimeLimit,
+                          "Could not acquire the global shared lock within the amount of time "
+                                  "specified that we should step down for");
+        }
+
+        boost::unique_lock<boost::mutex> lock(_mutex);
+        if (!_getCurrentMemberState_inlock().primary()) {
+            return Status(ErrorCodes::NotMaster, "not primary so can't step down");
+        }
+
+        WriteConcernOptions writeConcern;
+        writeConcern.wNumNodes = 2; // Make sure at least 1 other node is caught up
+        {
+            // Figure out how long to wait.  Take the specified wait time unless waiting that long
+            // would put us past the time we were supposed to step down until.
+            Date_t now = _replExecutor.now();
+            if (Date_t(now.millis + waitTime.total_milliseconds()) >= stepDownUntil) {
+                writeConcern.wTimeout = stepDownUntil.millis - now.millis;
+            }
+            else {
+                writeConcern.wTimeout = waitTime.total_milliseconds();
+            }
+        }
+        if (writeConcern.wTimeout == 0) {
+            writeConcern.wTimeout = WriteConcernOptions::kNoWaiting;
+        }
+        OpTime lastOp = _getLastOpApplied_inlock();
+        Timer timer;
+
+        StatusAndDuration statusAndDur = _awaitReplication_inlock(
+                &timer, &lock, txn, lastOp, writeConcern);
+        if (!statusAndDur.status.isOK()) {
+            if (statusAndDur.status != ErrorCodes::ExceededTimeLimit) {
+                return statusAndDur.status;
+            }
+            else if (!force) {
+                return Status(ErrorCodes::ExceededTimeLimit,
+                              str::stream() << "After "
+                                            << statusAndDur.duration.total_milliseconds()
+                                            << " milliseconds there were no secondaries "
+                                               "caught up in replication");
+            }
+            // Else we said "force" so we ignore ExceededTimeLimit
+        }
+
+        Status result(ErrorCodes::InternalError, "didn't set status in _stepDownFinish");
+        CBHStatus cbh = _replExecutor.scheduleWork(
+            stdx::bind(&ReplicationCoordinatorImpl::_stepDownFinish,
+                       this,
+                       stdx::placeholders::_1,
+                       force,
+                       waitTime,
+                       stepDownUntil,
+                       &result));
+        if (cbh.getStatus() == ErrorCodes::ShutdownInProgress) {
+            return cbh.getStatus();
+        }
+        fassert(18705, cbh.getStatus());
+        _replExecutor.wait(cbh.getValue());
+        return result;
+    }
+
+    void ReplicationCoordinatorImpl::_stepDownFinish(
+            const ReplicationExecutor::CallbackData& cbData,
+            bool force,
+            const Milliseconds& waitTime,
+            const Date_t& stepdownUntil,
+            Status* result) {
+        if (!cbData.status.isOK()) {
+            *result = cbData.status;
+            return;
+        }
+
+        if (_replExecutor.now() >= stepdownUntil) {
+            *result = Status(ErrorCodes::ExceededTimeLimit,
+                             "By the time we were ready to step down, we were already past the "
+                                     "time we were supposed to step down until");
+            return;
+        }
+
+        _topCoord->setStepDownTime(stepdownUntil);
+        _topCoord->stepDown();
+        _currentState = _topCoord->getMemberState();
+        _externalState->closeClientConnections();
+        *result = Status::OK();
     }
 
     bool ReplicationCoordinatorImpl::isMasterForReportingPurposes() {
@@ -664,9 +761,9 @@ namespace {
         return dbName == "local";
     }
 
-    Status ReplicationCoordinatorImpl::canServeReadsFor(OperationContext* txn,
-                                                        const NamespaceString& ns,
-                                                        bool slaveOk) {
+    Status ReplicationCoordinatorImpl::checkCanServeReadsFor(OperationContext* txn,
+                                                             const NamespaceString& ns,
+                                                             bool slaveOk) {
         if (txn->isGod()) {
             return Status::OK();
         }
@@ -1110,6 +1207,7 @@ namespace {
          if (_rsConfig.isInitialized()) {
              cancelHeartbeats();
          }
+         OpTime lastOpApplied(_getLastOpApplied_inlock());
          _setConfigState_inlock(kConfigSteady);
          _rsConfig = newConfig;
          _thisMembersConfigIndex = myIndex;
@@ -1117,7 +1215,7 @@ namespace {
                  newConfig,
                  myIndex,
                  _replExecutor.now(),
-                 _getLastOpApplied_inlock());
+                 lastOpApplied);
          _currentState = _topCoord->getMemberState();
 
          // Ensure that there's an entry in the _slaveInfoMap for ourself
@@ -1203,19 +1301,38 @@ namespace {
         return Status::OK();
     }
 
-    void ReplicationCoordinatorImpl::waitUpToOneSecondForOptimeChange(const OpTime& ot) {
-        //TODO
-    }
-
     bool ReplicationCoordinatorImpl::buildsIndexes() {
         boost::lock_guard<boost::mutex> lk(_mutex);
         const MemberConfig& self = _rsConfig.getMemberAt(_thisMembersConfigIndex);
         return self.shouldBuildIndexes();
     }
 
-    std::vector<BSONObj> ReplicationCoordinatorImpl::getHostsWrittenTo(const OpTime& op) {
-        // TODO
-        return std::vector<BSONObj>();
+    std::vector<HostAndPort> ReplicationCoordinatorImpl::getHostsWrittenTo(const OpTime& op) {
+        std::vector<HostAndPort> hosts;
+        boost::lock_guard<boost::mutex> lk(_mutex);
+        for (SlaveInfoMap::const_iterator it = _slaveInfoMap.begin();
+                it != _slaveInfoMap.end(); ++it) {
+            const SlaveInfo& slaveInfo = it->second;
+            if (slaveInfo.opTime < op) {
+                continue;
+            }
+            if (_getReplicationMode_inlock() == modeReplSet) {
+                const MemberConfig* memberConfig = _rsConfig.findMemberByID(slaveInfo.memberID);
+                if (!memberConfig) {
+                    // Node might have been removed in a reconfig
+                    continue;
+                }
+                hosts.push_back(memberConfig->getHostAndPort());
+            }
+            else {
+                if (it->first == _getMyRID_inlock()) {
+                    // Master-slave doesn't know the HostAndPort for itself at this point.
+                    continue;
+                }
+                hosts.push_back(slaveInfo.hostAndPort);
+            }
+        }
+        return hosts;
     }
 
     Status ReplicationCoordinatorImpl::checkIfWriteConcernCanBeSatisfied(
@@ -1226,16 +1343,22 @@ namespace {
 
     Status ReplicationCoordinatorImpl::_checkIfWriteConcernCanBeSatisfied_inlock(
                 const WriteConcernOptions& writeConcern) const {
-        // TODO Finish implementing this
-
-        if (!writeConcern.wMode.empty() && writeConcern.wMode != "majority") {
-            StatusWith<ReplicaSetTagPattern> tagPatternStatus =
-                    _rsConfig.findCustomWriteMode(writeConcern.wMode);
-            if (!tagPatternStatus.isOK()) {
-                return tagPatternStatus.getStatus();
-            }
+        if (_getReplicationMode_inlock() == modeNone) {
+            return Status(ErrorCodes::NoReplicationEnabled,
+                          "No replication enabled when checking if write concern can be satisfied");
         }
-        return Status::OK();
+
+        if (_getReplicationMode_inlock() == modeMasterSlave) {
+            if (!writeConcern.wMode.empty()) {
+                return Status(ErrorCodes::UnknownReplWriteConcern,
+                              "Cannot used named write concern modes in master-slave");
+            }
+            // No way to know how many slaves there are, so assume any numeric mode is possible.
+            return Status::OK();
+        }
+
+        invariant(_getReplicationMode_inlock() == modeReplSet);
+        return _rsConfig.checkIfWriteConcernCanBeSatisfied(writeConcern);
     }
 
     BSONObj ReplicationCoordinatorImpl::getGetLastErrorDefault() {
@@ -1262,6 +1385,60 @@ namespace {
     bool ReplicationCoordinatorImpl::isReplEnabled() const {
         return _settings.usingReplSets() || _settings.master || _settings.slave;
     }
+
+    void ReplicationCoordinatorImpl::connectOplogReader(OperationContext* txn, 
+                                                        BackgroundSync* bgsync,
+                                                        OplogReader* r) {
+        invariant(false);
+    }
+
+    void ReplicationCoordinatorImpl::_chooseNewSyncSource(
+            const ReplicationExecutor::CallbackData& cbData,
+            HostAndPort* newSyncSource) {
+        if (cbData.status == ErrorCodes::CallbackCanceled) {
+            return;
+        }
+        *newSyncSource = _topCoord->chooseNewSyncSource(_replExecutor.now(), _getLastOpApplied());
+    }
+
+    HostAndPort ReplicationCoordinatorImpl::chooseNewSyncSource() {
+        HostAndPort newSyncSource;
+        CBHStatus cbh = _replExecutor.scheduleWork(
+            stdx::bind(&ReplicationCoordinatorImpl::_chooseNewSyncSource,
+                       this,
+                       stdx::placeholders::_1,
+                       &newSyncSource));
+        if (cbh.getStatus() == ErrorCodes::ShutdownInProgress) {
+            return newSyncSource; // empty
+        }
+        fassert(18740, cbh.getStatus());
+        _replExecutor.wait(cbh.getValue());
+        return newSyncSource;
+    }
+
+    void ReplicationCoordinatorImpl::_blacklistSyncSource(
+        const ReplicationExecutor::CallbackData& cbData,
+        const HostAndPort& host,
+        Date_t until) {
+        if (cbData.status == ErrorCodes::CallbackCanceled) {
+            return;
+        }
+        _topCoord->blacklistSyncSource(host, until);
+    }
+
+    void ReplicationCoordinatorImpl::blacklistSyncSource(const HostAndPort& host, Date_t until) {
+        CBHStatus cbh = _replExecutor.scheduleWork(
+            stdx::bind(&ReplicationCoordinatorImpl::_blacklistSyncSource,
+                       this,
+                       stdx::placeholders::_1,
+                       host,
+                       until));
+        if (cbh.getStatus() == ErrorCodes::ShutdownInProgress) {
+            return;
+        }
+        fassert(18741, cbh.getStatus());
+        _replExecutor.wait(cbh.getValue());
+    }        
 
 } // namespace repl
 } // namespace mongo

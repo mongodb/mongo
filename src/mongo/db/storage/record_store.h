@@ -103,7 +103,9 @@ namespace mongo {
         virtual void saveState() = 0;
 
         // Returns true if collection still exists, false otherwise.
-        virtual bool restoreState() = 0;
+        // The state of the iterator may be restored into a different context
+        // than the one it was created in.
+        virtual bool restoreState(OperationContext* txn) = 0;
 
         // normally this will just go back to the RecordStore and convert
         // but this gives the iterator an oppurtnity to optimize

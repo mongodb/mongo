@@ -15,3 +15,11 @@ env.Library(
         ],
     LIBDEPS=[]
     )
+
+env.Library(
+    target='sorted_data_interface_test_harness',
+    source=[
+        'sorted_data_interface_test_harness.cpp',
+        ],
+    LIBDEPS=[]
+    )

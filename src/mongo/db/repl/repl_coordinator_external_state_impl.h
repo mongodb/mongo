@@ -29,6 +29,7 @@
 #pragma once
 
 #include "mongo/base/disallow_copying.h"
+#include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/repl/repl_coordinator_external_state.h"
 #include "mongo/db/repl/sync_source_feedback.h"
 
@@ -38,6 +39,7 @@ namespace repl {
     class ReplicationCoordinatorExternalStateImpl : public ReplicationCoordinatorExternalState {
         MONGO_DISALLOW_COPYING(ReplicationCoordinatorExternalStateImpl);
     public:
+
         ReplicationCoordinatorExternalStateImpl();
         virtual ~ReplicationCoordinatorExternalStateImpl();
         virtual void runSyncSourceFeedback();
@@ -50,6 +52,8 @@ namespace repl {
         virtual Status storeLocalConfigDocument(OperationContext* txn, const BSONObj& config);
         virtual HostAndPort getClientHostAndPort(const OperationContext* txn);
         virtual void closeClientConnections();
+        virtual ReplicationCoordinatorExternalState::GlobalSharedLockAcquirer*
+                getGlobalSharedLockAcquirer();
 
     private:
 

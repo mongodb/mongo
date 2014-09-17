@@ -28,7 +28,10 @@
 
 #pragma once
 
+#include <queue>
+
 #include "mongo/db/concurrency/locker.h"
+#include "mongo/platform/unordered_map.h"
 
 
 namespace mongo {
@@ -90,6 +93,15 @@ namespace newlm {
 
         virtual uint64_t getId() const { return _id; }
 
+        virtual LockResult lockGlobal(LockMode mode, unsigned timeoutMs = UINT_MAX);
+        virtual void downgradeGlobalXtoSForMMAPV1();
+        virtual bool unlockGlobal();
+
+        virtual void beginWriteUnitOfWork();
+        virtual void endWriteUnitOfWork();
+
+        virtual bool inAWriteUnitOfWork() const { return _wuowNestingLevel > 0; }
+
         virtual LockResult lock(const ResourceId& resId,
                                 LockMode mode, 
                                 unsigned timeoutMs = UINT_MAX);
@@ -125,13 +137,43 @@ namespace newlm {
          */
         LockRequest* _find(const ResourceId& resId) const;
 
-        LockResult _lockImpl(const ResourceId& resId, LockMode mode, unsigned timeoutMs);
-
         bool _unlockAndUpdateRequestsList(const ResourceId& resId, LockRequest* request);
 
+        // BEGIN MMAP V1 SPECIFIC
+        //
 
-        typedef std::map<const ResourceId, LockRequest*> LockRequestsMap;
-        typedef std::pair<const ResourceId, LockRequest*> LockRequestsPair;
+        // These methods, along with the resourceIdMMAPV1Flush lock, implement the MMAP V1 storage
+        // engine durability system synchronization. This is the way it works:
+        //
+        // Every operation, which starts calls lockGlobal, which acquires the global and flush
+        // locks in the appropriate mode (IS for read operations, IX for write operations). Having
+        // the flush lock in these modes indicates that there is an active reader/write
+        // respectively.
+        //
+        // Whenever the flush thread (dur.cpp) activates, it goes through the following steps:
+        // - Acquires the flush lock in X-mode (by creating a stack instance of
+        //      AutoAcquireFlushLockForMMAPV1Commit). This waits till all activity on the system
+        //      completes and does not allow new operations to start.
+        // 
+        // This works, because as long as an operation is not in a write transaction
+        // (beginWriteUnitOfWork has not been called), occasionally, on each lock acquisition
+        // point, the locker will yield the flush lock and then acquire it again, so that the flush
+        // thread can take turn. This is safe to do outside of a write transaction, because there
+        // are no partially written changes.
+
+        /**
+         * Temporarily yields the flush lock, if not in a write unit of work so that the commit
+         * thread can take turn. This is called automatically at each lock acquisition point, but
+         * can also be called more frequently than that if need be.
+         */
+        void _yieldFlushLockForMMAPV1();
+
+        //
+        // END MMAP V1 SPECIFIC
+
+
+        typedef unordered_map<ResourceId, LockRequest*> LockRequestsMap;
+        typedef LockRequestsMap::value_type LockRequestsPair;
 
         const uint64_t _id;
 
@@ -144,6 +186,10 @@ namespace newlm {
         LockRequestsMap _requests;
 
         CondVarLockGrantNotification _notify;
+
+        std::queue<ResourceId> _resourcesToUnlockAtEndOfUnitOfWork;
+        int _wuowNestingLevel; // if > 0 we are inside of a WriteUnitOfWork
+
 
         //////////////////////////////////////////////////////////////////////////////////////////
         //
@@ -165,11 +211,11 @@ namespace newlm {
          * return values are '0' (no global lock is held), 'r', 'w', 'R', 'W'. See the commends of
          * QLock for more information on what these modes mean.
          */
-        virtual char threadState() const { return _threadState; }
+        virtual char threadState() const;
 
-        virtual bool isRW() const; // RW
-        virtual bool isW() const; // W
-        virtual bool hasAnyReadLock() const; // explicitly rR
+        virtual bool isW() const;
+        virtual bool isR() const;
+        virtual bool hasAnyReadLock() const;
 
         virtual bool isLocked() const;
         virtual bool isWriteLocked() const;
@@ -187,15 +233,6 @@ namespace newlm {
         virtual bool hasLockPending() const { return _lockPending || _lockPendingParallelWriter; }
 
         // ----
-
-        virtual void lockedStart(char newState); // RWrw
-        virtual void unlocked(); // _threadState = 0
-
-        /**
-         * you have to be locked already to call this
-         * this is mostly for W_to_R or R_to_W
-         */
-        virtual void changeLockState(char newstate);
 
         // Those are only used for TempRelease. Eventually they should be removed.
         virtual void enterScopedLock(Lock::ScopedLock* lock);
@@ -217,15 +254,45 @@ namespace newlm {
 
         unsigned _recursive;           // we allow recursively asking for a lock; we track that here
 
-        // global lock related
-        char _threadState;             // 0, 'r', 'w', 'R', 'W'
-
         // for temprelease
         // for the nonrecursive case. otherwise there would be many
         // the first lock goes here, which is ok since we can't yield recursive locks
         Lock::ScopedLock* _scopedLk;
 
         bool _lockPending;
+    };
+
+
+    /**
+     * At the end of a write transaction, we cannot release any of the exclusive locks before the
+     * data which was written as part of the transaction is at least journaled. This is done by the
+     * flush thread (dur.cpp). However, the flush thread cannot take turn while we are holding the
+     * flush lock. This class releases *only* the flush lock, while in scope so that the flush
+     * thread can run. It then re-acquires the flush lock in the original mode in which it was
+     * acquired.
+     */
+    class AutoYieldFlushLockForMMAPV1Commit {
+    public:
+        AutoYieldFlushLockForMMAPV1Commit(Locker* locker);
+        ~AutoYieldFlushLockForMMAPV1Commit();
+
+    private:
+        Locker* _locker;
+    };
+
+
+    /**
+     * There should be only one instance of this class used anywhere (outside of unit-tests) and it
+     * should be in dur.cpp. See the comments above, in the MMAP V1 SPECIFIC section for more
+     * information on how this is used.
+     */
+    class AutoAcquireFlushLockForMMAPV1Commit {
+    public:
+        explicit AutoAcquireFlushLockForMMAPV1Commit(Locker* locker);
+        ~AutoAcquireFlushLockForMMAPV1Commit();
+
+    private:
+        Locker* _locker;
     };
     
 } // namespace newlm

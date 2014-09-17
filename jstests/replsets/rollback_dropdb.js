@@ -42,16 +42,11 @@ assert(a_conn.host === master.host, "a_conn assumed to be master");
 options = {writeConcern: {w: 1, wtimeout: 60000}, upsert: true};
 assert.writeOK(a_conn.getDB(name).foo.insert({x: 2}, options));
 
-// restart B, which should rollback and go FATAL
+// restart B, which should attempt rollback but then fassert
+clearRawMongoProgramOutput();
 replTest.restart(BID);
 assert.soon(function() {
-    try {
-        var res = b_conn.getDB("admin").runCommand({replSetGetStatus: 1});
-        return res.myState === 4; // 4 is FATAL
-    }
-    catch (e) {
-        return false;
-    }
-}, "B failed to go FATAL");
+    return rawMongoProgramOutput().match("replSet error rollback : can't rollback drop database full resync will be required");
+}, "B failed to fassert");
 
 replTest.stopSet();

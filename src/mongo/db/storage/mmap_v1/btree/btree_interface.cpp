@@ -94,7 +94,7 @@ namespace mongo {
             return _btree->unindex(txn, key, loc);
         }
 
-        virtual void fullValidate(OperationContext* txn, long long *numKeysOut) {
+        virtual void fullValidate(OperationContext* txn, long long *numKeysOut) const {
             *numKeysOut = _btree->fullValidate(txn, NULL, false, false, 0);
         }
 
@@ -203,7 +203,7 @@ namespace mongo {
                 }
             }
 
-            virtual void restorePosition() {
+            virtual void restorePosition(OperationContext* txn) {
                 if (!_bucket.isNull()) {
                     _btree->restorePosition(_txn,
                                             _savedKey,

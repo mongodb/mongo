@@ -73,13 +73,15 @@
 
 #include "mongo/platform/basic.h"
 
+#include <boost/thread/condition_variable.hpp>
+#include <boost/thread/mutex.hpp>
 #include <boost/thread/thread.hpp>
 #include <iomanip>
 
 #include "mongo/db/client.h"
 #include "mongo/db/commands/fsync.h"
 #include "mongo/db/commands/server_status.h"
-#include "mongo/db/concurrency/d_concurrency.h"
+#include "mongo/db/concurrency/lock_state.h"
 #include "mongo/db/operation_context_impl.h"
 #include "mongo/db/storage/storage_engine.h"
 #include "mongo/db/storage/mmap_v1/dur.h"
@@ -97,6 +99,7 @@
 using namespace mongoutils;
 
 namespace mongo {
+
     namespace dur {
 
         void PREPLOGBUFFER(JSectHeader& outParm, AlignedBuilder&);
@@ -106,7 +109,15 @@ namespace mongo {
         /** declared later in this file
             only used in this file -- use DurableInterface::commitNow() outside
         */
-        static void groupCommit(OperationContext* txn, Lock::GlobalWrite *lgw);
+        static void groupCommit();
+
+        // Used to activate the flush thread
+        static boost::mutex flushMutex;
+        static boost::condition_variable flushRequested;
+
+        // When set, the flush thread will exit
+        static AtomicUInt32 shutdownRequested(0);
+
 
         CommitJob& commitJob = *(new CommitJob()); // don't destroy
 
@@ -148,7 +159,6 @@ namespace mongo {
             return ss.str();
         }
 
-        //int getAgeOutJournalFiles();
         BSONObj Stats::S::_asObj() {
             BSONObjBuilder b;
             b << 
@@ -186,7 +196,8 @@ namespace mongo {
             }
         }
 
-        void* NonDurableImpl::writingPtr(void *x, unsigned len) { 
+        void* NonDurableImpl::writingPtr(void *x, unsigned len) {
+            dassert(shutdownRequested.load() == 0);
             return x; 
         }
 
@@ -214,15 +225,18 @@ namespace mongo {
             _impl = durableImpl;
         }
 
-        void DurableInterface::disableDurability() {
-            verify(_impl == durableImpl);
-            massert(13616, "can't disable durability with pending writes", !commitJob.hasWritten());
-            _impl = nonDurableImpl;
-        }
 
         bool DurableImpl::commitNow(OperationContext* txn) {
             stats.curr->_earlyCommits++;
-            groupCommit(txn, NULL);
+
+            NotifyAll::When when = commitJob._notify.now();
+
+            newlm::AutoYieldFlushLockForMMAPV1Commit flushLockYield(txn->lockState());
+
+            // There is always just one waiting anyways
+            flushRequested.notify_one();
+            commitJob._notify.waitFor(when);
+
             cc().checkpointHappened();
             return true;
         }
@@ -243,6 +257,7 @@ namespace mongo {
         }
 
         void* DurableImpl::writingPtr(void *x, unsigned len) {
+            dassert(shutdownRequested.load() == 0);
             void *p = x;
             declareWriteIntent(p, len);
             return p;
@@ -268,67 +283,6 @@ namespace mongo {
             return p;
         }
 
-        bool NOINLINE_DECL DurableImpl::_aCommitIsNeeded(OperationContext* txn) {
-            switch (txn->lockState()->threadState()) {
-                case '\0': {
-                    // lock_w() can call in this state at times if a commit is needed before attempting 
-                    // its lock.
-                    Lock::GlobalRead r(txn->lockState());
-                    if( commitJob.bytes() < UncommittedBytesLimit ) {
-                        // someone else beat us to it
-                        //
-                        // note before of 'R' state, many threads can pile-in to this point and 
-                        // still fall through to below, and they will exit without doing work later
-                        // once inside groupCommitMutex.  this is all likely inefficient.  maybe 
-                        // groupCommitMutex should be on top.
-                        return false;
-                    }
-                    commitNow(txn);
-                    return true;
-                }
-                case 'w': {
-                    if (txn->lockState()->isAtLeastReadLocked("local")) {
-                        LOG(2) << "can't commitNow from commitIfNeeded, as we are in local db lock";
-                        return false;
-                    }
-                    if (txn->lockState()->isAtLeastReadLocked("admin")) {
-                        LOG(2) << "can't commitNow from commitIfNeeded, as we are in admin db lock";
-                        return false;
-                    }
-
-                    LOG(1) << "commitIfNeeded upgrading from shared write to exclusive write state"
-                           << endl;
-                    Lock::UpgradeGlobalLockToExclusive ex(txn->lockState());
-                    if (ex.gotUpgrade()) {
-                        commitNow(txn);
-                    }
-                    return true;
-                }
-
-                case 'W':
-                case 'R':
-                    commitNow(txn);
-                    return true;
-
-                case 'r':
-                    return false;
-
-                default:
-                    fassertFailed(16434); // unknown lock type
-            }
-        }
-
-        /** we may need to commit earlier than normal if data are being written at 
-            very high rates. 
-
-            note you can call this unlocked, and that is a good idea as if you are in 
-            say, a 'w' lock state, we can't do the commit
-
-            @param force force a commit now even if seemingly not needed - ie the caller may 
-            know something we don't such as that files will be closed
-
-            perf note: this function is called a lot, on every lock_w() ... and usually returns right away
-        */
         bool DurableImpl::commitIfNeeded(OperationContext* txn) {
             // this is safe since since conceptually if you call commitIfNeeded, we're at a valid
             // spot in an operation to be terminated.
@@ -337,55 +291,21 @@ namespace mongo {
             if (likely(commitJob.bytes() < UncommittedBytesLimit)) {
                 return false;
             }
-            return _aCommitIsNeeded(txn);
+
+            // Just wake up the flush thread
+            flushRequested.notify_one();
+            return true;
         }
 
-        /** Used in _DEBUG builds to check that we didn't overwrite the last intent
-            that was declared.  called just before writelock release.  we check a few
-            bytes after the declared region to see if they changed.
+        void DurableImpl::commitAndStopDurThread(OperationContext* txn) {
+            // This is only called by clean shutdown and the global lock must be held to ensure
+            // there will not be any more writes.
+            invariant(txn->lockState()->isW());
 
-            @see MongoMutex::_releasedWriteLock
-
-            SLOW
-        */
-#if 0
-        void DurableImpl::debugCheckLastDeclaredWrite() {
-            static int n;
-            ++n;
-
-            verify(debug && storageGlobalParams.dur);
-            if (commitJob.writes().empty())
-                return;
-            const WriteIntent &i = commitJob.lastWrite();
-            size_t ofs;
-            DurableMappedFile *mmf = privateViews.find(i.start(), ofs);
-            if( mmf == 0 )
-                return;
-            size_t past = ofs + i.length();
-            if( mmf->length() < past + 8 )
-                return; // too close to end of view
-            char *priv = (char *) mmf->getView();
-            char *writ = (char *) mmf->view_write();
-            unsigned long long *a = (unsigned long long *) (priv+past);
-            unsigned long long *b = (unsigned long long *) (writ+past);
-            if( *a != *b ) {
-                for( set<WriteIntent>::iterator it(commitJob.writes().begin()), end((commitJob.writes().begin())); it != end; ++it ) {
-                    const WriteIntent& wi = *it;
-                    char *r1 = (char*) wi.start();
-                    char *r2 = (char*) wi.end();
-                    if( r1 <= (((char*)a)+8) && r2 > (char*)a ) {
-                        //log() << "it's ok " << wi.p << ' ' << wi.len << endl;
-                        return;
-                    }
-                }
-                log() << "journal data after write area " << i.start() << " does not agree" << endl;
-                log() << " was:  " << ((void*)b) << "  " << hexdump((char*)b, 8) << endl;
-                log() << " now:  " << ((void*)a) << "  " << hexdump((char*)a, 8) << endl;
-                log() << " n:    " << n << endl;
-                log() << endl;
-            }
+            commitNow(txn);
+            shutdownRequested.store(1);
         }
-#endif
+
 
         // Functor to be called over all MongoFiles
 
@@ -463,7 +383,7 @@ namespace mongo {
 
         extern size_t privateMapBytes;
 
-        static void _REMAPPRIVATEVIEW(OperationContext* txn) {
+        static void _REMAPPRIVATEVIEW() {
             // todo: Consider using ProcessInfo herein and watching for getResidentSize to drop.  that could be a way 
             //       to assure very good behavior here.
 
@@ -472,7 +392,6 @@ namespace mongo {
 
             LOG(4) << "journal REMAPPRIVATEVIEW" << endl;
 
-            invariant(txn->lockState()->isW());
             invariant(!commitJob.hasWritten());
 
             // we want to remap all private views about every 2 seconds.  there could be ~1000 views so
@@ -546,9 +465,9 @@ namespace mongo {
         /** We need to remap the private views periodically. otherwise they would become very large.
             Call within write lock.  See top of file for more commentary.
         */
-        static void REMAPPRIVATEVIEW(OperationContext* txn) {
+        static void REMAPPRIVATEVIEW() {
             Timer t;
-            _REMAPPRIVATEVIEW(txn);
+            _REMAPPRIVATEVIEW();
             stats.curr->_remapPrivateViewMicros += t.micros();
         }
 
@@ -557,95 +476,9 @@ namespace mongo {
         // reallocate, and more importantly regrow it, on every single commit.
         static AlignedBuilder __theBuilder(4 * 1024 * 1024);
 
-        static bool _groupCommitWithLimitedLocks(OperationContext* txn) {
-            AlignedBuilder &ab = __theBuilder;
 
-            invariant(!txn->lockState()->isLocked());
-
-            // do we need this to be greedy, so that it can start working fairly soon?
-            // probably: as this is a read lock, it wouldn't change anything if only reads anyway.
-            // also needs to stop greed. our time to work before clearing lk1 is not too bad, so 
-            // not super critical, but likely 'correct'.  todo.
-            scoped_ptr<Lock::GlobalRead> lk1(new Lock::GlobalRead(txn->lockState()));
-
-            SimpleMutex::scoped_lock lk2(commitJob.groupCommitMutex);
-
-            commitJob.commitingBegin(); // increments the commit epoch for getlasterror j:true
-
-            if( !commitJob.hasWritten() ) {
-                // getlasterror request could have came after the data was already committed
-                commitJob.committingNotifyCommitted();
-                return true;
-            }
-
-            JSectHeader h;
-            // need to be in readlock (writes excluded) for this as write intent stuctures point into 
-            // the private mmap for their actual data.  i suppose we could lock individual databases 
-            // and do them one at a time or in parallel (surely the latter would make sense if one went 
-            // that route...)
-            PREPLOGBUFFER(h,ab); 
-
-            LockMongoFilesShared lk3;
-
-            unsigned abLen = ab.len();
-            commitJob.committingReset(); // must be reset before allowing anyone to write
-            DEV verify( !commitJob.hasWritten() );
-
-            // release the readlock -- allowing others to now write while we are writing to the journal (etc.)
-            lk1.reset();
-
-            // ****** now other threads can do writes ******
-
-            WRITETOJOURNAL(h, ab);
-            verify( abLen == ab.len() ); // a check that no one touched the builder while we were doing work. if so, our locking is wrong.
-
-            // data is now in the journal, which is sufficient for acknowledging getLastError.
-            // (ok to crash after that)
-            commitJob.committingNotifyCommitted();
-
-            // note the higher-up-the-chain locking of filesLockedFsync is important here, 
-            // as we are not in Lock::GlobalRead anymore. private view readers won't see 
-            // anything as we do this, but external viewers of the datafiles will see them 
-            // mutating.
-            WRITETODATAFILES(h, ab);
-            verify( abLen == ab.len() ); // check again wasn't modded
-            ab.reset();
-
-            // can't : d.dbMutex._remapPrivateViewRequested = true;
-            // (writes have happened we released)
-
-            return true;
-        }
-
-        /** @return true if committed; false if lock acquisition timed out (we only try for a read lock herein and only wait for a certain duration). */
-        static bool groupCommitWithLimitedLocks(OperationContext* txn) {
-            try {
-                return _groupCommitWithLimitedLocks(txn);
-            }
-            catch(DBException& e ) {
-                log() << "dbexception in groupCommitLL causing immediate shutdown: " << e.toString() << endl;
-                mongoAbort("dur1");
-            }
-            catch(std::ios_base::failure& e) {
-                log() << "ios_base exception in groupCommitLL causing immediate shutdown: " << e.what() << endl;
-                mongoAbort("dur2");
-            }
-            catch(std::bad_alloc& e) {
-                log() << "bad_alloc exception in groupCommitLL causing immediate shutdown: " << e.what() << endl;
-                mongoAbort("dur3");
-            }
-            catch(std::exception& e) {
-                log() << "exception in dur::groupCommitLL causing immediate shutdown: " << e.what() << endl;
-                mongoAbort("dur4");
-            }
-            return false;
-        }
-
-        static void _groupCommit(OperationContext* txn, Lock::GlobalWrite *lgw) {
+        static void _groupCommit() {
             LOG(4) << "_groupCommit " << endl;
-
-            // We are 'R' or 'W'
-            invariant(txn->lockState()->isLockedForCommitting());
 
             {
                 AlignedBuilder &ab = __theBuilder;
@@ -681,40 +514,6 @@ namespace mongo {
                     ab.reset();
                 }
             }
-
-            // REMAPPRIVATEVIEW
-            //
-            // remapping private views must occur after WRITETODATAFILES otherwise
-            // we wouldn't see newly written data on reads.
-            //
-            DEV verify( !commitJob.hasWritten() );
-            if (!txn->lockState()->isW()) {
-                // todo: note we end up here i believe if our lock state is X -- and that might not be what we want.
-
-                // REMAPPRIVATEVIEW needs done in a write lock (as there is a short window during remapping when each view 
-                // might not exist) thus we do it later.
-                // 
-                // if commitIfNeeded() operations are not in a W lock, you could get too big of a private map 
-                // on a giant operation.  for now they will all be W.
-                // 
-                // If desired, perhaps this can be eliminated on posix as it may be that the remap is race-free there.
-                //
-                // For durthread, lgw is set, and we can upgrade to a W lock for the remap. we do this way as we don't want 
-                // to be in W the entire time we were committing about (in particular for WRITETOJOURNAL() which takes time).
-                if( lgw ) { 
-                    LOG(4) << "_groupCommit upgrade" << endl;
-                    lgw->upgrade();
-                    REMAPPRIVATEVIEW(txn);
-                }
-            }
-            else {
-                stats.curr->_commitsInWriteLock++;
-                // however, if we are already write locked, we must do it now -- up the call tree someone
-                // may do a write without a new lock acquisition.  this can happen when DurableMappedFile::close() calls
-                // this method when a file (and its views) is about to go away.
-                //
-                REMAPPRIVATEVIEW(txn);
-            }
         }
 
         /** locking: in at least 'R' when called
@@ -724,9 +523,9 @@ namespace mongo {
                    lgw != 0 as more than one thread upgrading would deadlock
             @see DurableMappedFile::close()
         */
-        static void groupCommit(OperationContext* txn, Lock::GlobalWrite *lgw) {
+        static void groupCommit() {
             try {
-                _groupCommit(txn, lgw);
+                _groupCommit();
             }
             catch(DBException& e ) { 
                 log() << "dbexception in groupCommit causing immediate shutdown: " << e.toString() << endl;
@@ -741,36 +540,53 @@ namespace mongo {
                 mongoAbort("gc3");
             }
             catch(std::exception& e) {
-                log() << "exception in dur::groupCommit causing immediate shutdown: " << e.what() << endl;
+                log() << "exception in groupCommit causing immediate shutdown: " << e.what() << endl;
                 mongoAbort("gc4");
             }
             LOG(4) << "groupCommit end" << endl;
         }
 
-        static void durThreadGroupCommit() {
-            OperationContextImpl txn;
-            SimpleMutex::scoped_lock flk(filesLockedFsync);
+        static void remapPrivateView() {
+            try {
+                // REMAPPRIVATEVIEW
+                //
+                // remapping private views must occur after WRITETODATAFILES otherwise
+                // we wouldn't see newly written data on reads.
+                //
+                invariant(!commitJob.hasWritten());
 
-            const int N = 10;
-            static int n;
-            if (privateMapBytes < UncommittedBytesLimit && ++n % N &&
-                (storageGlobalParams.durOptions &
-                 StorageGlobalParams::DurAlwaysRemap) == 0) {
-                // limited locks version doesn't do any remapprivateview at all, so only try this if privateMapBytes
-                // is in an acceptable range.  also every Nth commit, we do everything so we can do some remapping;
-                // remapping a lot all at once could cause jitter from a large amount of copy-on-writes all at once.
-                if( groupCommitWithLimitedLocks(&txn) )
-                    return;
+                stats.curr->_commitsInWriteLock++;
+
+                REMAPPRIVATEVIEW();
+            }
+            catch (DBException& e) {
+                log() << "dbexception in remapPrivateView causing immediate shutdown: "
+                      << e.toString() 
+                      << endl;
+                mongoAbort("gc1");
+            }
+            catch (std::ios_base::failure& e) {
+                log() << "ios_base exception in remapPrivateView causing immediate shutdown: "
+                      << e.what()
+                      << endl;
+                mongoAbort("gc2");
+            }
+            catch (std::bad_alloc& e) {
+                log() << "bad_alloc exception in remapPrivateView causing immediate shutdown: "
+                      << e.what()
+                      << endl;
+                mongoAbort("gc3");
+            }
+            catch (std::exception& e) {
+                log() << "exception in remapPrivateView causing immediate shutdown: "
+                      << e.what()
+                      << endl;
+                mongoAbort("gc4");
             }
 
-            // we get a write lock, downgrade, do work, upgrade, finish work.
-            // getting a write lock is helpful also as we need to be greedy and not be starved here
-            // note our "stopgreed" parm -- to stop greed by others while we are working. you can't write 
-            // anytime soon anyway if we are journaling for a while, that was the idea.
-            Lock::GlobalWrite w(txn.lockState());
-            w.downgrade();
-            groupCommit(&txn, &w);
+            LOG(4) << "remapPrivateView end" << endl;
         }
+
 
         /** called when a DurableMappedFile is closing -- we need to go ahead and group commit in that case before its
             views disappear
@@ -793,7 +609,7 @@ namespace mongo {
         extern int groupCommitIntervalMs;
         boost::filesystem::path getJournalDir();
 
-        void durThread() {
+        static void durThread() {
             Client::initThread("journal");
 
             bool samePartition = true;
@@ -803,12 +619,12 @@ namespace mongo {
                 samePartition = onSamePartition(getJournalDir().string(), dbpathDir);
             }
             catch(...) {
+
             }
 
-            while( !inShutdown() ) {
+            while (shutdownRequested.loadRelaxed() == 0) {
                 unsigned ms = storageGlobalParams.journalCommitInterval;
                 if( ms == 0 ) { 
-                    // use default
                     ms = samePartition ? 100 : 30;
                 }
 
@@ -817,25 +633,41 @@ namespace mongo {
                 try {
                     stats.rotate();
 
-                    // commit sooner if one or more getLastError j:true is pending
-                    sleepmillis(oneThird);
-                    for( unsigned i = 1; i <= 2; i++ ) {
-                        if( commitJob._notify.nWaiting() )
-                            break;
-                        if( commitJob.bytes() > UncommittedBytesLimit / 2  )
-                            break;
-                        sleepmillis(oneThird);
-                    }
-                                        
-                    //DEV log() << "privateMapBytes=" << privateMapBytes << endl;
+                    boost::mutex::scoped_lock lock(flushMutex);
 
-                    durThreadGroupCommit();
+                    // commit sooner if one or more getLastError j:true is pending
+                    for (unsigned i = 0; i <= 2; i++) {
+                        if (flushRequested.timed_wait(lock,
+                                                      Milliseconds(oneThird))) {
+                            // Someone forced a flush
+                            break;
+                        }
+
+                        if (commitJob._notify.nWaiting())
+                            break;
+                        if (commitJob.bytes() > UncommittedBytesLimit / 2)
+                            break;
+                    }
+
+                    OperationContextImpl txn;
+
+                    // Waits for all active operations to drain and won't let new ones start. This
+                    // should be optimized to allow readers in (see SERVER-15262).
+                    newlm::AutoAcquireFlushLockForMMAPV1Commit flushLock(txn.lockState());
+
+                    groupCommit();
+                    remapPrivateView();
                 }
                 catch(std::exception& e) {
                     log() << "exception in durThread causing immediate shutdown: " << e.what() << endl;
                     mongoAbort("exception in durThread");
                 }
+                catch (...) {
+                    log() << "unhandled exception in durThread causing immediate shutdown" << endl;
+                    mongoAbort("unhandled exception in durThread");
+                }
             }
+
             cc().shutdown();
         }
 
@@ -845,21 +677,6 @@ namespace mongo {
         void startup() {
             if (!storageGlobalParams.dur)
                 return;
-
-#if defined(_DURABLEDEFAULTON)
-            DEV { 
-                if( time(0) & 1 ) {
-                    storageGlobalParams.durOptions |= StorageGlobalParams::DurAlwaysCommit;
-                    log() << "_DEBUG _DURABLEDEFAULTON : forcing DurAlwaysCommit mode for this run" << endl;
-                }
-                if( time(0) & 2 ) {
-                    storageGlobalParams.durOptions |= StorageGlobalParams::DurAlwaysRemap;
-                    log() << "_DEBUG _DURABLEDEFAULTON : forcing DurAlwaysRemap mode for this run" << endl;
-                }
-            }
-#endif
-
-            DurableInterface::enableDurability();
 
             journalMakeDir();
 
@@ -881,6 +698,7 @@ namespace mongo {
 
             preallocateFiles();
 
+            DurableInterface::enableDurability();
             boost::thread t(durThread);
         }
 
@@ -902,7 +720,7 @@ namespace mongo {
             MongoFile::flushAll(true);
             journalCleanup();
 
-            verify(!haveJournalFiles()); // Double check post-conditions
+            invariant(!haveJournalFiles()); // Double check post-conditions
         }
         
         class DurSSS : public ServerStatusSection {

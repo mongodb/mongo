@@ -310,9 +310,9 @@ namespace {
         return dbName == "local";
     }
 
-    Status LegacyReplicationCoordinator::canServeReadsFor(OperationContext* txn,
-                                                          const NamespaceString& ns,
-                                                          bool slaveOk) {
+    Status LegacyReplicationCoordinator::checkCanServeReadsFor(OperationContext* txn,
+                                                               const NamespaceString& ns,
+                                                               bool slaveOk) {
         if (txn->isGod()) {
             return Status::OK();
         }
@@ -444,6 +444,7 @@ namespace {
     }
 
     void LegacyReplicationCoordinator::setFollowerMode(const MemberState& newState) {
+        theReplSet->changeState(newState);
     }
 
     void LegacyReplicationCoordinator::prepareReplSetUpdatePositionCommand(
@@ -944,16 +945,17 @@ namespace {
         return Status::OK();
     }
 
-    void LegacyReplicationCoordinator::waitUpToOneSecondForOptimeChange(const OpTime& ot) {
-        repl::waitUpToOneSecondForOptimeChange(ot);
-    }
-
     bool LegacyReplicationCoordinator::buildsIndexes() {
         return theReplSet->buildIndexes();
     }
 
-    vector<BSONObj> LegacyReplicationCoordinator::getHostsWrittenTo(const OpTime& op) {
-        return repl::getHostsWrittenTo(op);
+    vector<HostAndPort> LegacyReplicationCoordinator::getHostsWrittenTo(const OpTime& op) {
+        vector<BSONObj> configs = repl::getHostsWrittenTo(op);
+        vector<HostAndPort> hosts;
+        for (size_t i = 0; i < configs.size(); ++i) {
+            hosts.push_back(HostAndPort(configs[i]["host"].String()));
+        }
+        return hosts;
     }
 
     Status LegacyReplicationCoordinator::checkIfWriteConcernCanBeSatisfied(
@@ -980,6 +982,14 @@ namespace {
     bool LegacyReplicationCoordinator::isReplEnabled() const {
         return _settings.usingReplSets() || _settings.slave || _settings.master;
     }
+
+    void LegacyReplicationCoordinator::connectOplogReader(OperationContext* txn, 
+                                                          BackgroundSync* bgsync,
+                                                          OplogReader* r) {
+        bgsync->getOplogReaderLegacy(txn, r);
+    }
+
+    
 
 } // namespace repl
 } // namespace mongo

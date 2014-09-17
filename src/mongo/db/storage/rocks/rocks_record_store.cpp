@@ -606,7 +606,8 @@ namespace mongo {
         }
     }
 
-    bool RocksRecordStore::Iterator::restoreState() {
+    bool RocksRecordStore::Iterator::restoreState(OperationContext* txn) {
+        _txn = txn;
         if ( !_reseekKeyValid ) {
           _iterator.reset( NULL );
           return true;

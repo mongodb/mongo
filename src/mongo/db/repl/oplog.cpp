@@ -418,6 +418,16 @@ namespace repl {
                bool* b,
                bool fromMigrate) {
         try {
+            // TODO SERVER-15192 remove this once all listeners are rollback-safe.
+            class RollbackPreventer : public RecoveryUnit::Change {
+                virtual void commit() {}
+                virtual void rollback() {
+                    severe() << "Rollback of logOp not currently allowed (SERVER-15192)";
+                    fassertFailed(18805);
+                }
+            };
+            txn->recoveryUnit()->registerChange(new RollbackPreventer());
+
             if ( getGlobalReplicationCoordinator()->isReplEnabled() ) {
                 _logOp(txn, opstr, ns, 0, obj, patt, b, fromMigrate);
             }

@@ -289,6 +289,17 @@ function startParallelShell( jsCode, port, noConnect ){
 
     var args = ["mongo"];
 
+    // Convert function into call-string
+    if (typeof(jsCode) == "function") {
+        var id = Math.floor(Math.random() * 100000);
+        jsCode = "var f" + id + " = " + jsCode.toString() + ";f" + id + "();"; 
+    }
+    else if(typeof(jsCode) == "string") {}
+        // do nothing
+    else {
+        throw Error("bad first argument to startParallelShell");
+    }
+    
     if (noConnect) {
         args.push("--nodb");
     } else if (typeof(db) == "object") {

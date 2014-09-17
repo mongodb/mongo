@@ -88,13 +88,12 @@ namespace repl {
                 log() << "replSet replSetReconfig new config saved locally" << rsLog;
             }
         }
-        catch(DBException& e) {
+        catch (const DBException& e) {
             log() << "replSet error unexpected exception in haveNewConfig() : " << e.toString() << rsLog;
-            _fatal();
+            fassertFailedNoTrace(18755);
         }
-        catch(...) {
-            log() << "replSet error unexpected exception in haveNewConfig()" << rsLog;
-            _fatal();
+        catch (...) {
+            std::terminate();
         }
     }
 
@@ -131,7 +130,7 @@ namespace repl {
         catch(std::exception& e) {
             log() << "replSet caught exception in startReplSets thread: " << e.what() << rsLog;
             if( theReplSet )
-                theReplSet->fatal();
+                fassertFailedNoTrace(18756);
         }
         cc().shutdown();
     }

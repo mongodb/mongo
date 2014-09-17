@@ -59,16 +59,11 @@ options = {writeConcern: {w: 1, wtimeout: 60000}, upsert: true};
 assert.writeOK(a_conn.getDB(name).foo.insert({x: 2}, options));
 
 // restart B, which should rollback and log a message about not rolling back the nonexistent cmd
+clearRawMongoProgramOutput();
 replTest.restart(BID);
-var msg = RegExp("replSet warning rollback no suchcommand ");
+var msg = RegExp("replSet warning rollback no such command ");
 assert.soon(function() {
-    try {
-        var log = b_conn.getDB("admin").adminCommand({getLog: "global"}).log;
-        return doesEntryMatch(log, msg);
-    }
-    catch (e) {
-        return false;
-    }
+    return rawMongoProgramOutput().match(msg);
 }, "Did not see a log entry about skipping the nonexistent command during rollback");
 
 replTest.stopSet();

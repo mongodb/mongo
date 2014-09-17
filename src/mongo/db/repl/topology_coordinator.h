@@ -94,6 +94,11 @@ namespace repl {
         virtual std::vector<HostAndPort> getMaybeUpHostAndPorts() const = 0;
 
         /**
+         * Gets the earliest time the current node will stand for election.
+         */
+        virtual Date_t getStepDownTime() const = 0;
+
+        /**
          * Gets the current value of the maintenance mode counter.
          */
         virtual int getMaintenanceCount() const = 0;
@@ -112,7 +117,7 @@ namespace repl {
         /**
          * Chooses and sets a new sync source, based on our current knowledge of the world.
          */
-        virtual void chooseNewSyncSource(Date_t now, const OpTime& lastOpApplied) = 0;
+        virtual HostAndPort chooseNewSyncSource(Date_t now, const OpTime& lastOpApplied) = 0;
 
         /**
          * Suppresses selecting "host" as sync source until "until".

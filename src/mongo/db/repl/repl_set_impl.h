@@ -108,6 +108,8 @@ namespace repl {
 
         OID getElectionId() const { return elect.getElectionId(); }
         OpTime getElectionTime() const { return elect.getElectionTime(); }
+
+        void loadLastOpTimeWritten(OperationContext* txn, bool quiet = false);
     private:
         set<ReplSetHealthPollTask*> healthTasks;
         void endOldHealthTasks();
@@ -121,7 +123,6 @@ namespace repl {
         bool _freeze(int secs);
     private:
         void _assumePrimary();
-        void loadLastOpTimeWritten(OperationContext* txn, bool quiet = false);
         void changeState(MemberState s);
 
         Member* _forceSyncTarget;
@@ -198,7 +199,6 @@ namespace repl {
         string name() const { return _name; } /* @return replica set's logical name */
         int version() const { return _cfg->version; } /* @return replica set's config version */
         MemberState state() const { return box.getState(); }
-        void _fatal();
         void _getOplogDiagsAsHtml(unsigned server_id, stringstream& ss) const;
         void _summarizeAsHtml(OperationContext* txn, stringstream&) const;
         void _summarizeStatus(BSONObjBuilder&) const; // for replSetGetStatus command
@@ -291,7 +291,6 @@ namespace repl {
         void syncDoInitialSync();
         void _syncThread();
         void syncTail();
-        unsigned _syncRollback(OperationContext* txn, OplogReader& r);
         void syncFixUp(OperationContext* txn, FixUpInfo& h, OplogReader& r);
 
         // keep a list of hosts that we've tried recently that didn't work
@@ -321,7 +320,6 @@ namespace repl {
 
         const ReplSetConfig::MemberCfg& myConfig() const { return _config; }
         bool tryToGoLiveAsASecondary(OperationContext* txn, OpTime&); // readlocks
-        void syncRollback(OperationContext* txn, OplogReader& r);
         void syncThread();
         const OpTime lastOtherOpTime() const;
         /**
