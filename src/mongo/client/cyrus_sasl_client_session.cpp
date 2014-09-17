@@ -30,6 +30,7 @@
 #include "mongo/client/cyrus_sasl_client_session.h"
 
 #include "mongo/base/init.h"
+#include "mongo/client/native_sasl_client_session.h"
 #include "mongo/util/allocator.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/concurrency/mutex.h"
@@ -39,7 +40,10 @@
 namespace mongo {
 namespace {
 
-    SaslClientSession* createCyrusSaslClientSession() {
+    SaslClientSession* createCyrusSaslClientSession(const std::string& mech) {
+        if (mech == "SCRAM-SHA-1") {
+            return new NativeSaslClientSession();
+        }
         return new CyrusSaslClientSession();
     }
      

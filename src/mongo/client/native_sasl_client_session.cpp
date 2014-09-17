@@ -38,7 +38,7 @@
 namespace mongo {
 namespace {
 
-    SaslClientSession* createNativeSaslClientSession() {
+    SaslClientSession* createNativeSaslClientSession(const std::string mech) {
         return new NativeSaslClientSession();
     }
      
@@ -80,6 +80,12 @@ namespace {
     }
 
     Status NativeSaslClientSession::step(const StringData& inputData, std::string* outputData) {
+        if (!_saslConversation) {
+            return Status(ErrorCodes::BadValue,
+                mongoutils::str::stream() << 
+                "The client authentication session has not been properly initialized");
+        }
+
         StatusWith<bool> status = _saslConversation->step(inputData, outputData);
         if (status.isOK()) {
             _done = status.getValue();

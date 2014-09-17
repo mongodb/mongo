@@ -196,8 +196,16 @@ namespace {
             return ex.toStatus();
         }
 
-        boost::scoped_ptr<SaslClientSession> session(SaslClientSession::create());
-        Status status = configureSession(session.get(), client, targetDatabase, saslParameters);
+        std::string mechanism;
+        Status status = bsonExtractStringField(saslParameters, 
+                                               saslCommandMechanismFieldName,
+                                               &mechanism);
+        if(!status.isOK()) {
+            return status;
+        }
+
+        boost::scoped_ptr<SaslClientSession> session(SaslClientSession::create(mechanism));
+        status = configureSession(session.get(), client, targetDatabase, saslParameters);
        
         if (!status.isOK())
             return status;
