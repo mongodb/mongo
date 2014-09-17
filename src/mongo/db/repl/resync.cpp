@@ -30,7 +30,7 @@
 #include "mongo/db/repl/master_slave.h"  // replSettings
 #include "mongo/db/repl/repl_coordinator_global.h"
 #include "mongo/db/repl/rs.h" // replLocalAuth()
-#include "mongo/db/operation_context_impl.h"
+#include "mongo/db/operation_context.h"
 
 namespace mongo {
 namespace repl {
@@ -66,10 +66,8 @@ namespace repl {
                          BSONObjBuilder& result,
                          bool fromRepl) {
 
-            const std::string ns = parseNs(dbname, cmdObj);
             Lock::GlobalWrite globalWriteLock(txn->lockState());
-            WriteUnitOfWork wunit(txn);
-            Client::Context ctx(txn, ns);
+
             if (getGlobalReplicationCoordinator()->getSettings().usingReplSets()) {
                 if (!theReplSet) {
                     errmsg = "no replication yet active";
@@ -98,7 +96,7 @@ namespace repl {
 
             ReplSource::forceResyncDead( txn, "client" );
             result.append( "info", "triggered resync for all sources" );
-            wunit.commit();
+
             return true;
         }
 
