@@ -141,7 +141,7 @@ func getDocSource(exp MongoExport) (db.DocSource, error) {
 		if err != nil {
 			return nil, err
 		}
-		sortFields, err := makeSortString(sortD)
+		sortFields, err := bsonutil.MakeSortString(sortD)
 		if err != nil {
 			return nil, err
 		}
@@ -282,23 +282,4 @@ func getSortFromArg(queryRaw string) (bson.D, error) {
 		return nil, fmt.Errorf("Query is not valid JSON: %v", err)
 	}
 	return parsedJSON, nil
-}
-
-func makeSortString(sortObj bson.D) ([]string, error) {
-	sortStrs := make([]string, 0, len(sortObj))
-	for _, docElem := range sortObj {
-		valueAsNumber := float64(0)
-		switch v := docElem.Value.(type) {
-		case float64:
-			valueAsNumber = v
-		default:
-			return nil, fmt.Errorf("sort direction must be numeric type")
-		}
-		prefix := "+"
-		if valueAsNumber < 0 {
-			prefix = "-"
-		}
-		sortStrs = append(sortStrs, fmt.Sprintf("%v%v", prefix, docElem.Name))
-	}
-	return sortStrs, nil
 }
