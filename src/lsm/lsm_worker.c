@@ -65,11 +65,8 @@ __lsm_worker_general_op(
 		}
 	} else if (entry->type == WT_LSM_WORK_DROP)
 		WT_ERR(__wt_lsm_free_chunks(session, entry->lsm_tree));
-	else if (entry->type == WT_LSM_WORK_BLOOM) {
+	else if (entry->type == WT_LSM_WORK_BLOOM)
 		WT_ERR(__wt_lsm_work_bloom(session, entry->lsm_tree));
-		WT_ERR(__wt_lsm_manager_push_entry(
-		    session, WT_LSM_WORK_MERGE, 0, entry->lsm_tree));
-	}
 	*completed = 1;
 
 err:	__wt_lsm_manager_free_work_unit(session, entry);
@@ -98,7 +95,12 @@ __lsm_worker(void *arg)
 	while (F_ISSET(conn, WT_CONN_SERVER_RUN)) {
 		progress = 0;
 
-		/* Switches are always a high priority */
+		/*
+		 * Workers process the different LSM work queues.  Some workers
+		 * can handle several or all work unit types.  So they are
+		 * prioritized so important operations happen first.
+		 * Switches are the highest priority.
+		 */
 		while (FLD_ISSET(cookie->type, WT_LSM_WORK_SWITCH) &&
 		    (ret = __wt_lsm_manager_pop_entry(
 		    session, WT_LSM_WORK_SWITCH, &entry)) == 0 &&
@@ -108,12 +110,20 @@ __lsm_worker(void *arg)
 		/* Flag an error if the pop failed. */
 		WT_ERR(ret);
 
+		/*
+		 * Next the general operations.
+		 */
 		ret = __lsm_worker_general_op(session, cookie, &ran);
 		if (ret == EBUSY || ret == WT_NOTFOUND)
 			ret = 0;
 		WT_ERR(ret);
 		progress = progress || ran;
 
+		/*
+		 * Finally see if there is any merge work we can do.  This is
+		 * last because the earlier operations may result in adding
+		 * merge work to the queue.
+		 */
 		if (FLD_ISSET(cookie->type, WT_LSM_WORK_MERGE) &&
 		    (ret = __wt_lsm_manager_pop_entry(
 		    session, WT_LSM_WORK_MERGE, &entry)) == 0 &&
@@ -135,7 +145,7 @@ __lsm_worker(void *arg)
 		/* Flag an error if the pop failed. */
 		WT_ERR(ret);
 
-		/* Don't busy wait if there isn't any work to do. */
+		/* Don't busy wait if there was any work to do. */
 		if (!progress) {
 			WT_ERR(
 			    __wt_cond_wait(session, cookie->work_cond, 10000));

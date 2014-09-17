@@ -146,11 +146,10 @@ __wt_lsm_work_switch(
 		else
 			*ran = 1;
 	}
-
 	__wt_lsm_manager_free_work_unit(session, entry);
-
 	return (ret);
 }
+
 /*
  * __wt_lsm_work_bloom --
  *	Try to create a Bloom filter for the newest on-disk chunk that doesn't
@@ -187,14 +186,22 @@ __wt_lsm_work_bloom(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 		 * recheck that the chunk still needs a Bloom filter.
 		 */
 		if (WT_ATOMIC_CAS(chunk->bloom_busy, 0, 1)) {
-			if (!F_ISSET(chunk, WT_LSM_CHUNK_BLOOM))
+			if (!F_ISSET(chunk, WT_LSM_CHUNK_BLOOM)) {
 				ret = __lsm_bloom_create(
 				    session, lsm_tree, chunk, (u_int)i);
+				/*
+				 * Push a merge work unit if we created a
+				 * bloom filter.
+				 */
+				WT_ERR(__wt_lsm_manager_push_entry(session,
+				    WT_LSM_WORK_MERGE, 0, lsm_tree));
+			}
 			chunk->bloom_busy = 0;
 			break;
 		}
 	}
 
+err:
 	__lsm_unpin_chunks(session, &cookie);
 	__wt_free(session, cookie.chunk_array);
 	return (ret);

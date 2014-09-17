@@ -1094,6 +1094,8 @@ __wt_lsm_compact(WT_SESSION_IMPL *session, const char *name, int *skip)
 		 */
 		compacting = 1;
 		F_SET(lsm_tree, WT_LSM_TREE_COMPACTING);
+		WT_ERR(__wt_verbose(session, WT_VERB_LSM,
+		    "COMPACT: Start compacting %s", lsm_tree->name));
 	}
 
 	/* Wait for the work unit queues to drain. */
@@ -1108,7 +1110,8 @@ __wt_lsm_compact(WT_SESSION_IMPL *session, const char *name, int *skip)
 			if (F_ISSET(chunk, WT_LSM_CHUNK_ONDISK)) {
 				WT_ERR(__wt_verbose(session,
 				    WT_VERB_LSM,
-				    "Compact flush done %s chunk %u",
+				    "Compact flush done %s chunk %u.  "
+				    "Start compacting",
 				    name, chunk->id));
 				(void)WT_ATOMIC_SUB(chunk->refcnt, 1);
 				flushing = ref = 0;

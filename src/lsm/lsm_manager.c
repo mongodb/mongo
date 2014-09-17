@@ -187,7 +187,7 @@ __lsm_manager_aggressive_update(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 {
 	struct timespec now;
 	uint64_t chunk_wait, stallms;
-	u_int old_aggressive;
+	u_int new_aggressive;
 
 	WT_RET(__wt_epoch(session, &now));
 	stallms = WT_TIMEDIFF(now, lsm_tree->last_flush_ts) / WT_MILLION;
@@ -196,18 +196,22 @@ __lsm_manager_aggressive_update(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 	 * been created by now. Use 10 seconds as a default if we don't have an
 	 * estimate.
 	 */
-	chunk_wait = stallms / (lsm_tree->chunk_fill_ms == 0 ?
-	    10000 : lsm_tree->chunk_fill_ms);
-	old_aggressive = lsm_tree->merge_aggressiveness;
-	lsm_tree->merge_aggressiveness =
-	    (u_int)(chunk_wait / lsm_tree->merge_min);
+	if (lsm_tree->nchunks > lsm_tree->merge_min)
+		chunk_wait = stallms / (lsm_tree->chunk_fill_ms == 0 ?
+		    10000 : lsm_tree->chunk_fill_ms);
+	else
+		chunk_wait = 0;
+	new_aggressive = (u_int)(chunk_wait / lsm_tree->merge_min);
 
-	if (lsm_tree->merge_aggressiveness > old_aggressive)
+	if (new_aggressive > lsm_tree->merge_aggressiveness) {
 		WT_RET(__wt_verbose(session, WT_VERB_LSM,
-		    "LSM merge %s got aggressive (%u), "
-		    "%u / %" PRIu64,
-		    lsm_tree->name, lsm_tree->merge_aggressiveness, stallms,
+		    "LSM merge %s got aggressive (old %u new %u), "
+		    "merge_min %d, %u / %" PRIu64,
+		    lsm_tree->name, lsm_tree->merge_aggressiveness,
+		    new_aggressive, lsm_tree->merge_min, stallms,
 		    lsm_tree->chunk_fill_ms));
+		lsm_tree->merge_aggressiveness = new_aggressive;
+	}
 	return (0);
 }
 
@@ -336,11 +340,12 @@ __lsm_manager_run_server(WT_SESSION_IMPL *session)
 			 * to how often new chunks are being created add some
 			 * more.
 			 */
-			if ((!lsm_tree->modified && lsm_tree->nchunks > 1) ||
-			    lsm_tree->merge_aggressiveness > 3 ||
-			    (lsm_tree->queue_ref == 0 &&
-			    lsm_tree->nchunks > 1) ||
-			    pushms > fillms) {
+			if (lsm_tree->nchunks > 1 &&
+			    (!lsm_tree->modified ||
+			    lsm_tree->queue_ref == 0 ||
+			    (lsm_tree->merge_aggressiveness > 3 &&
+			     !F_ISSET(lsm_tree, WT_LSM_TREE_COMPACTING)) ||
+			    pushms > fillms)) {
 				WT_RET(__wt_lsm_manager_push_entry(
 				    session, WT_LSM_WORK_SWITCH, 0, lsm_tree));
 				WT_RET(__wt_lsm_manager_push_entry(
