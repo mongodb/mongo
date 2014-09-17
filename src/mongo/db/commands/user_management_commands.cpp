@@ -300,7 +300,7 @@ namespace mongo {
             return Status(
                     ErrorCodes::AuthSchemaIncompatible,
                     str::stream() << "The usersInfo and rolesInfo commands require auth data to "
-                    "have at least schema version " << 
+                    "have at least schema version " <<
                     AuthorizationManager::schemaVersion26Upgrade <<
                     " but found " << foundSchemaVersion);
         }
@@ -379,7 +379,7 @@ namespace mongo {
                                " with '$external' as the user's source db"));
             }
 
-            if ((args.hasHashedPassword) && 
+            if ((args.hasHashedPassword) &&
                  args.userName.getDB() == "$external") {
                 return appendCommandStatus(
                         result,
@@ -397,7 +397,7 @@ namespace mongo {
 
 #ifdef MONGO_SSL
             if (args.userName.getDB() == "$external" &&
-                getSSLManager() && 
+                getSSLManager() &&
                 getSSLManager()->getSSLConfiguration()
                     .serverSubjectName == args.userName.getUser()) {
                 return appendCommandStatus(
@@ -407,7 +407,7 @@ namespace mongo {
                                "subjectname as the server"));
             }
 #endif
- 
+
             BSONObjBuilder userObjBuilder;
             userObjBuilder.append("_id",
                                   str::stream() << args.userName.getDB() << "." <<
@@ -416,19 +416,19 @@ namespace mongo {
                                   args.userName.getUser());
             userObjBuilder.append(AuthorizationManager::USER_DB_FIELD_NAME,
                                   args.userName.getDB());
-            if (!args.hasHashedPassword) { 
+            if (!args.hasHashedPassword) {
                 // Must be an external user
                 userObjBuilder.append("credentials", BSON("external" << true));
             }
-            else if (args.mechanism == "SCRAM-SHA-1" || 
-                     args.mechanism == "MONGODB-CR" || 
-                     args.mechanism == "CRAM-MD5" || 
+            else if (args.mechanism == "SCRAM-SHA-1" ||
+                     args.mechanism == "MONGODB-CR" ||
+                     args.mechanism == "CRAM-MD5" ||
                      args.mechanism.empty()) {
-                
+
                 // At the moment we are ignoring the mechanism parameter and create
                 // both SCRAM-SHA-1 and MONGODB-CR credentials for all new users.
                 BSONObjBuilder credentialsBuilder(userObjBuilder.subobjStart("credentials"));
-               
+
                 AuthorizationManager* authzManager = getGlobalAuthorizationManager();
                 int authzVersion;
                 Status status = authzManager->getAuthorizationVersion(txn, &authzVersion);
@@ -451,7 +451,7 @@ namespace mongo {
             else {
                 return appendCommandStatus(
                         result,
-                        Status(ErrorCodes::BadValue, 
+                        Status(ErrorCodes::BadValue,
                                "Unsupported password authentication mechanism " + args.mechanism));
             }
             if (args.hasCustomData) {
@@ -605,7 +605,7 @@ namespace mongo {
             if (args.hasHashedPassword) {
                 // Create both SCRAM-SHA-1 and MONGODB-CR credentials for all new users
                 BSONObjBuilder credentialsBuilder(updateSetBuilder.subobjStart("credentials"));
- 
+
                 AuthorizationManager* authzManager = getGlobalAuthorizationManager();
                 int authzVersion;
                 Status status = authzManager->getAuthorizationVersion(txn, &authzVersion);

@@ -41,7 +41,7 @@ namespace {
     SaslClientSession* createNativeSaslClientSession(const std::string mech) {
         return new NativeSaslClientSession();
     }
-     
+
     MONGO_INITIALIZER(NativeSaslClientContext)(InitializerContext* context) {
         SaslClientSession::create = createNativeSaslClientSession;
         return Status::OK();
@@ -52,15 +52,15 @@ namespace {
     NativeSaslClientSession::NativeSaslClientSession() :
             SaslClientSession(),
             _step(0),
-            _done(false), 
-            _saslConversation(NULL) { 
+            _done(false),
+            _saslConversation(NULL) {
     }
 
     NativeSaslClientSession::~NativeSaslClientSession() {}
 
     Status NativeSaslClientSession::initialize() {
         if (_saslConversation)
-            return Status(ErrorCodes::AlreadyInitialized, 
+            return Status(ErrorCodes::AlreadyInitialized,
                 "Cannot reinitialize NativeSaslClientSession.");
 
         std::string mechanism = getParameter(parameterMechanism).toString();
@@ -72,7 +72,7 @@ namespace {
         }
         else {
             return Status(ErrorCodes::BadValue,
-                mongoutils::str::stream() << "SASL mechanism " << mechanism << 
+                mongoutils::str::stream() << "SASL mechanism " << mechanism <<
                                              "is not supported");
         }
 
@@ -82,7 +82,7 @@ namespace {
     Status NativeSaslClientSession::step(const StringData& inputData, std::string* outputData) {
         if (!_saslConversation) {
             return Status(ErrorCodes::BadValue,
-                mongoutils::str::stream() << 
+                mongoutils::str::stream() <<
                 "The client authentication session has not been properly initialized");
         }
 

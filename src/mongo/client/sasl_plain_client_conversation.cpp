@@ -37,18 +37,18 @@
 #include "mongo/util/text.h"
 
 namespace mongo {
-   
+
     SaslPLAINClientConversation::SaslPLAINClientConversation(
                                                     SaslClientSession* saslClientSession) :
         SaslClientConversation(saslClientSession) {
     }
 
     SaslPLAINClientConversation::~SaslPLAINClientConversation() {};
- 
-    StatusWith<bool> SaslPLAINClientConversation::step(const StringData& inputData, 
+
+    StatusWith<bool> SaslPLAINClientConversation::step(const StringData& inputData,
                                                        std::string* outputData) {
         // Create PLAIN message on the form: user\0user\0pwd
-        
+
         StringBuilder sb;
         sb << _saslClientSession->getParameter(SaslClientSession::parameterUser).toString() <<
               '\0' <<
@@ -60,5 +60,5 @@ namespace mongo {
 
         return StatusWith<bool>(true);
     }
-    
+
 }  // namespace mongo

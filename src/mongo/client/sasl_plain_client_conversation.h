@@ -46,7 +46,7 @@ namespace mongo {
          * Implements the client side of a SASL PLAIN mechanism session.
          *
          **/
-        explicit SaslPLAINClientConversation(SaslClientSession* saslClientSession); 
+        explicit SaslPLAINClientConversation(SaslClientSession* saslClientSession);
 
         virtual ~SaslPLAINClientConversation();
 

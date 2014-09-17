@@ -51,9 +51,9 @@ namespace mongo {
         MONGO_DISALLOW_COPYING(SaslAuthenticationSession);
     public:
         typedef stdx::function<SaslAuthenticationSession* (AuthorizationSession*,
-                                                           const std::string&)> 
+                                                           const std::string&)>
             SaslAuthenticationSessionFactoryFn;
-        static SaslAuthenticationSessionFactoryFn create; 
+        static SaslAuthenticationSessionFactoryFn create;
 
         // Mechanism name constants.
         static const char mechanismCRAMMD5[];
@@ -100,7 +100,7 @@ namespace mongo {
 
         /**
          * Returns the the operation context associated with the currently executing command.
-         * Authentication commands must set this on their associated 
+         * Authentication commands must set this on their associated
          * SaslAuthenticationSession.
          */
         OperationContext* getOpCtxt() const { return _txn; }

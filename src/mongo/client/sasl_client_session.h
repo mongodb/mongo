@@ -56,7 +56,7 @@ namespace mongo {
     public:
         typedef stdx::function<SaslClientSession* (const std::string&)> SaslClientSessionFactoryFn;
         static SaslClientSessionFactoryFn create;
-        
+
         /**
          * Identifiers of parameters used to configure a SaslClientSession.
          */

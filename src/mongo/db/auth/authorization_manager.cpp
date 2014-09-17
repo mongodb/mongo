@@ -724,7 +724,7 @@ namespace mongo {
     }
 
 namespace {
-    
+
     /**
      * Logs that the auth schema upgrade failed because of "status" and returns "status".
      */
@@ -744,7 +744,7 @@ namespace {
                                const BSONObj& userDoc,
                                const BSONObj& writeConcern) {
         BSONElement credentialsElement = userDoc["credentials"];
-        uassert(18743,
+        uassert(18806,
                 mongoutils::str::stream() << "While preparing to upgrade user doc from "
                         "2.6/2.8 user data schema to the 2.8 SCRAM only schema, found a user doc "
                         "with missing or incorrectly formatted credentials: "
@@ -754,7 +754,7 @@ namespace {
         BSONObj credentialsObj = credentialsElement.Obj();
         BSONElement mongoCRElement = credentialsObj["MONGODB-CR"];
         BSONElement scramElement = credentialsObj["SCRAM-SHA-1"];
-        
+
         // Ignore any user documents that already have SCRAM credentials. This should only
         // occur if a previous authSchemaUpgrade was interrupted halfway.
         if (!scramElement.eoo()) {
@@ -774,10 +774,10 @@ namespace {
         BSONObjBuilder updateBuilder;
         {
             BSONObjBuilder toSetBuilder(updateBuilder.subobjStart("$set"));
-            toSetBuilder << "credentials" << 
+            toSetBuilder << "credentials" <<
                             BSON("SCRAM-SHA-1" << scram::generateCredentials(hashedPassword));
         }
-        
+
         uassertStatusOK(externalState->updateOne(txn,
                                                  NamespaceString("admin", "system.users"),
                                                  query,
@@ -806,7 +806,7 @@ namespace {
                 boost::bind(updateUserCredentials, txn, externalState, "admin", _1, writeConcern));
         if (!status.isOK())
             return logUpgradeFailed(status);
-        
+
         // Update the schema version document.
         status = externalState->updateOne(
                 txn,
@@ -818,7 +818,7 @@ namespace {
                 writeConcern);
         if (!status.isOK())
             return logUpgradeFailed(status);
- 
+
         return Status::OK();
     }
 } //namespace
@@ -830,7 +830,7 @@ namespace {
         if (!status.isOK()) {
             return status;
         }
-        
+
         switch (authzVersion) {
         case schemaVersion26Final: {
             Status status = updateCredentials(txn, _externalState.get(), writeConcern);

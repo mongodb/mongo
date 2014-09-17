@@ -39,7 +39,7 @@
 #include "mongo/db/auth/sasl_server_conversation.h"
 
 namespace mongo {
-    
+
     /**
      * Authentication session data for the server side of SASL authentication.
      */
@@ -60,7 +60,7 @@ namespace mongo {
         virtual Status step(const StringData& inputData, std::string* outputData);
 
         virtual std::string getPrincipalId() const;
-    
+
         virtual const char* getMechanism() const;
 
     private:

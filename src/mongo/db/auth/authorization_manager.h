@@ -121,13 +121,13 @@ namespace mongo {
         static const int schemaVersion26Upgrade = 2;
 
         /**
-         * Auth schema version for MongoDB 2.6 and 2.8 MONGODB-CR/SCRAM mixed auth mode.  
+         * Auth schema version for MongoDB 2.6 and 2.8 MONGODB-CR/SCRAM mixed auth mode.
          * Users are stored in admin.system.users, roles in admin.system.roles.
          */
         static const int schemaVersion26Final = 3;
 
         /**
-         * Auth schema version for MongoDB 2.8 SCRAM only mode.  
+         * Auth schema version for MongoDB 2.8 SCRAM only mode.
          * Users are stored in admin.system.users, roles in admin.system.roles.
          * MONGODB-CR credentials have been replaced with SCRAM credentials in the user documents.
          */

@@ -65,16 +65,16 @@ namespace mongo {
          * Parse client-first-message and generate server-first-message
          **/
         StatusWith<bool> _firstStep(std::vector<std::string>& input, std::string* outputData);
-        
-        /** 
+
+        /**
          * Parse client-final-message and generate server-final-message
-         **/  
+         **/
         StatusWith<bool> _secondStep(const std::vector<string>& input, std::string* outputData);
-        
+
         int _step;
         std::string _authMessage;
         User::CredentialData _creds;
-        
+
         // client and server nonce concatenated
         std::string _nonce;
     };

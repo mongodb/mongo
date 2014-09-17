@@ -56,7 +56,7 @@ namespace mongo {
 
         /// See isDone().
         bool _done;
-   
+
         /// The client side of a SASL authentication conversation.
         boost::scoped_ptr<SaslClientConversation> _saslConversation;
     };
