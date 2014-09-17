@@ -72,11 +72,11 @@ namespace mongo {
             it != _deletes.end();
             ++it) {
             if ((*it)->getLimit() != 0 && (*it)->getLimit() != 1) {
-                *errMsg = stream() << "specify either a 0 to delete all matching documents or 1 to delete a single document";
+                *errMsg = stream() << "specify either a 0 to delete all"
+                    << "matching documents or 1 to delete a single document";
                 return false;
             }
         }
-
         return true;
     }
 
