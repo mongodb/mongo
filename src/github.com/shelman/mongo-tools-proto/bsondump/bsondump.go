@@ -25,12 +25,12 @@ func (bd *BSONDump) ValidateSettings() error {
 	return nil
 }
 
-func (bd *BSONDump) init() (*db.BSONStream, error) {
+func (bd *BSONDump) init() (*db.BSONSource, error) {
 	file, err := os.Open(bd.FileName)
 	if err != nil {
 		return nil, fmt.Errorf("Couldn't open BSON file: %v", err)
 	}
-	return db.NewBSONStream(file), nil
+	return db.NewBSONSource(file), nil
 }
 
 func dumpDoc(doc *bson.M, out io.Writer) error {
@@ -52,7 +52,7 @@ func (bd *BSONDump) Dump() error {
 		return err
 	}
 
-	decodedStream := db.NewDecodedBSONStream(stream)
+	decodedStream := db.NewDecodedBSONSource(stream)
 	defer decodedStream.Close()
 
 	var result bson.M
