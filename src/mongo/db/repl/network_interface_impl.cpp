@@ -30,7 +30,11 @@
 
 #include "mongo/db/repl/network_interface_impl.h"
 
+#include <boost/thread.hpp>
+#include <sstream>
+
 #include "mongo/client/connpool.h"
+#include "mongo/db/client.h"
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/operation_context_impl.h"
 #include "mongo/util/assert_util.h"
@@ -98,9 +102,11 @@ namespace repl {
     void NetworkInterfaceImpl::runCallbackWithGlobalExclusiveLock(
             const stdx::function<void (OperationContext*)>& callback) {
 
+        std::ostringstream sb;
+        sb << "repl" << boost::this_thread::get_id();
+        Client::initThreadIfNotAlready(sb.str().c_str());
         OperationContextImpl txn;
         Lock::GlobalWrite lk(txn.lockState());
-
         callback(&txn);
     }
 

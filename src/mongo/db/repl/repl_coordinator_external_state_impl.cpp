@@ -30,6 +30,8 @@
 
 #include "mongo/db/repl/repl_coordinator_external_state_impl.h"
 
+#include <boost/thread.hpp>
+#include <sstream>
 #include <string>
 
 #include "mongo/base/status_with.h"
@@ -38,6 +40,7 @@
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/dbhelpers.h"
 #include "mongo/db/jsobj.h"
+#include "mongo/db/operation_context_impl.h"
 #include "mongo/db/repl/connections.h"
 #include "mongo/db/repl/isself.h"
 #include "mongo/util/net/hostandport.h"
@@ -143,6 +146,13 @@ namespace {
 
     void ReplicationCoordinatorExternalStateImpl::closeClientConnections() {
         MessagingPort::closeAllSockets(ScopedConn::keepOpen);
+    }
+
+    OperationContext* ReplicationCoordinatorExternalStateImpl::createOperationContext() {
+        std::ostringstream sb;
+        sb << "repl" << boost::this_thread::get_id();
+        Client::initThreadIfNotAlready(sb.str().c_str());
+        return new OperationContextImpl;
     }
 
 namespace {

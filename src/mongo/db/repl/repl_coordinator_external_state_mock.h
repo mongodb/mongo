@@ -59,6 +59,7 @@ namespace repl {
         virtual void closeClientConnections();
         virtual ReplicationCoordinatorExternalState::GlobalSharedLockAcquirer*
                 getGlobalSharedLockAcquirer();
+        virtual OperationContext* createOperationContext();
 
         /**
          * Adds "host" to the list of hosts that this mock will match when responding to "isSelf"

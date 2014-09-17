@@ -126,6 +126,12 @@ namespace repl {
          * shared lock.
          */
         virtual GlobalSharedLockAcquirer* getGlobalSharedLockAcquirer() = 0;
+
+        /**
+         * Returns an OperationContext, owned by the caller, that may be used in methods of
+         * the same instance that require an OperationContext.
+         */
+        virtual OperationContext* createOperationContext() = 0;
     };
 
     /**

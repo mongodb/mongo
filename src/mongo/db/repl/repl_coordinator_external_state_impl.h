@@ -54,6 +54,7 @@ namespace repl {
         virtual void closeClientConnections();
         virtual ReplicationCoordinatorExternalState::GlobalSharedLockAcquirer*
                 getGlobalSharedLockAcquirer();
+        virtual OperationContext* createOperationContext();
 
     private:
 
