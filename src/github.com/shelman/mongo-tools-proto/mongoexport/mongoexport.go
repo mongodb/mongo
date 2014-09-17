@@ -92,11 +92,11 @@ func getDocSource(exp MongoExport) (db.DocSource, error) {
 			ShimPath:   shimPath,
 		}
 
-		iter, err := bsonTool.Open()
+		iter, _, err := bsonTool.Open()
 		if err != nil {
 			return nil, err
 		}
-		return db.NewDecodedBSONStream(iter), nil
+		return db.NewDecodedBSONSource(iter), nil
 	}
 
 	sessionProvider, err := db.InitSessionProvider(exp.ToolOptions)
