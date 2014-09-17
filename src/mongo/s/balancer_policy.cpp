@@ -401,7 +401,7 @@ namespace mongo {
 
                     string to = distribution.getBestReceieverShard( tag );
                     if ( to.size() == 0 ) {
-                        log() << "no where to put it :(" << endl;
+                        log() << "couldn't find a shard to move chunk " << chunk << " to" << endl;
                         continue;
                     }
                     verify( to != shard );
