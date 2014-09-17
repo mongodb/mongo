@@ -31,21 +31,16 @@ type ToolOptions struct {
 	*Namespace
 	*Kerberos
 
+	//Force direct connection to the server and disable the
+	//drivers automatic repl set discovery logic.
+	Direct bool
+
 	// Extra tool-specific options that can be specified by calling
 	// AddOptions
 	Extra []ExtraOptions
 
 	// for caching the parser
 	parser *flags.Parser
-
-	////////
-
-	// TODO below: kill this?
-
-	// Bookkeeping for filtering on database and collection
-	FilterNS       string // the full namespace for filtering
-	FilterOnlyColl bool   // filter only on collection
-	FilterBoth     bool   // filter on both db and collection
 }
 
 type Namespace struct {

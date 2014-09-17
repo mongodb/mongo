@@ -36,7 +36,10 @@ type MongoTop struct {
 func (self *MongoTop) Run() error {
 
 	// test the connection
-	session := self.SessionProvider.GetSession()
+	session, err := self.SessionProvider.GetSession()
+	if err != nil {
+		return err
+	}
 	session.Close()
 
 	connUrl := self.Options.Host
@@ -54,7 +57,7 @@ func (self *MongoTop) Run() error {
 	}
 
 	// populate the first run of the previous results
-	err := self.SessionProvider.RunCommand("admin", previousResults)
+	err = self.SessionProvider.RunCommand("admin", previousResults)
 	if err != nil {
 		return fmt.Errorf("error running top command: %v", err)
 	}

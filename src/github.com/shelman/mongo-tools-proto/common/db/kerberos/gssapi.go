@@ -18,7 +18,7 @@ type KerberosDBConnector struct {
 
 // Configure the db connector. Parses the connection string and sets up
 // the dial info with the default dial timeout.
-func (self *KerberosDBConnector) Configure(opts *options.ToolOptions) error {
+func (self *KerberosDBConnector) Configure(opts options.ToolOptions) error {
 
 	// create the addresses to be used to connect
 	connectionAddrs := util.CreateConnectionAddrs(opts.Host, opts.Port)
@@ -27,6 +27,7 @@ func (self *KerberosDBConnector) Configure(opts *options.ToolOptions) error {
 	self.dialInfo = &mgo.DialInfo{
 		Addrs:   connectionAddrs,
 		Timeout: KERBEROS_DIAL_TIMEOUT,
+		Direct:  opts.Direct,
 
 		Username: opts.Auth.Username,
 		// This should always be '$external', but legacy tools require this

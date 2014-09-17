@@ -28,7 +28,7 @@ var (
 // Wrapper for mongoexport functionality
 type MongoExport struct {
 	// generic mongo tool options
-	ToolOptions *commonopts.ToolOptions
+	ToolOptions commonopts.ToolOptions
 
 	//OutputOpts controls options for how the exported data should be formatted
 	OutputOpts *options.OutputFormatOptions
@@ -103,7 +103,10 @@ func getDocSource(exp MongoExport) (db.DocSource, error) {
 	if err != nil {
 		return nil, err
 	}
-	session := sessionProvider.GetSession()
+	session, err := sessionProvider.GetSession()
+	if err != nil {
+		return nil, err
+	}
 	collection := session.DB(exp.ToolOptions.Namespace.DB).C(exp.ToolOptions.Namespace.Collection)
 
 	query := map[string]interface{}{}

@@ -150,7 +150,10 @@ func (mongoImport *MongoImport) ImportDocuments() (int64, error) {
 // appropriate namespace
 func (mongoImport *MongoImport) importDocuments(importInput ImportInput) (
 	int64, error) {
-	session := mongoImport.SessionProvider.GetSession()
+	session, err := mongoImport.SessionProvider.GetSession()
+	if err != nil {
+		return 0, err
+	}
 	defer session.Close()
 	connUrl := mongoImport.ToolOptions.Host
 	if mongoImport.ToolOptions.Port != "" {

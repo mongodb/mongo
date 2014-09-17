@@ -52,7 +52,7 @@ func main() {
 	}
 
 	// create a session provider to connect to the db
-	sessionProvider, err := db.InitSessionProvider(opts)
+	sessionProvider, err := db.InitSessionProvider(*opts)
 	if err != nil {
 		util.Panicf("error initializing database session: %v", err)
 	}

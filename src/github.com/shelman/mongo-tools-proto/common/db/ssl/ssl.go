@@ -26,7 +26,7 @@ type SSLDBConnector struct {
 // Configure the connector to connect to the server over ssl. Parses the
 // connection string, and sets up the correct function to dial the server
 // based on the ssl options passed in.
-func (self *SSLDBConnector) Configure(opts *options.ToolOptions) error {
+func (self *SSLDBConnector) Configure(opts options.ToolOptions) error {
 
 	// create the addresses to be used to connect
 	connectionAddrs := util.CreateConnectionAddrs(opts.Host, opts.Port)
@@ -42,11 +42,11 @@ func (self *SSLDBConnector) Configure(opts *options.ToolOptions) error {
 		Addrs:      connectionAddrs,
 		Timeout:    DefaultSSLDialTimeout,
 		DialServer: dialer,
-
-		Username:  opts.Auth.Username,
-		Password:  opts.Auth.Password,
-		Source:    opts.Auth.Source,
-		Mechanism: opts.Auth.Mechanism,
+		Direct:     opts.Direct,
+		Username:   opts.Auth.Username,
+		Password:   opts.Auth.Password,
+		Source:     opts.Auth.Source,
+		Mechanism:  opts.Auth.Mechanism,
 	}
 
 	return nil
@@ -63,7 +63,7 @@ type dialerFunc func(addr *mgo.ServerAddr) (net.Conn, error)
 
 // Create the dialing function that will be passed into the DialInfo for
 // connecting to the server, based on the tool options specified.
-func createDialerFunc(opts *options.ToolOptions) (dialerFunc, error) {
+func createDialerFunc(opts options.ToolOptions) (dialerFunc, error) {
 
 	// the tls config
 	config := &tls.Config{}

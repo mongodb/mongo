@@ -28,7 +28,10 @@ type SessionProvider struct {
 func (self *SessionProvider) RunCommand(dbToUse string,
 	cmd command.Command) error {
 
-	session := self.GetSession()
+	session, err := self.GetSession()
+	if err != nil {
+		return err
+	}
 	defer session.Close()
 
 	return session.DB(dbToUse).Run(cmd.AsRunnable(), cmd)
@@ -36,21 +39,50 @@ func (self *SessionProvider) RunCommand(dbToUse string,
 
 // Returns a session connected to the database server for which the
 // session provider is configured.
-func (self *SessionProvider) GetSession() *mgo.Session {
+func (self *SessionProvider) GetSession() (*mgo.Session, error) {
+	//The master session is initialized
+	if self.masterSession != nil {
+		return self.masterSession.Copy(), nil
+	}
 
+	self.masterSessionLock.Lock()
+	defer self.masterSessionLock.Unlock()
+
+	if self.masterSession != nil {
+		return self.masterSession.Copy(), nil
+	}
+
+	// initialize the provider's master session
+	var err error
+	self.masterSession, err = self.connector.GetNewSession()
+	if err != nil {
+		return nil, fmt.Errorf("error connecting to db server: %v", err)
+	}
 	// copy the provider's master session, for connection pooling
-	return self.masterSession.Copy()
+	return self.masterSession.Copy(), nil
+}
+
+//NewSessionProvider constructs a session provider but does not attempt to
+//create the initial session.
+func NewSessionProvider(opts options.ToolOptions) *SessionProvider {
+	// create the provider
+	provider := &SessionProvider{}
+
+	// create the connector for dialing the database
+	provider.connector = getConnector(opts)
+
+	// configure the connector
+	provider.connector.Configure(opts)
+
+	return provider
+
 }
 
 // Initialize a session provider to connect to the database server, based on
 // the options passed in.  Connects to the db and returns a fully initialized
 // provider.
-func InitSessionProvider(opts *options.ToolOptions) (*SessionProvider,
+func InitSessionProvider(opts options.ToolOptions) (*SessionProvider,
 	error) {
-
-	if opts == nil {
-		return nil, fmt.Errorf("tool options cannot be nil")
-	}
 
 	// create the provider
 	provider := &SessionProvider{}
@@ -72,7 +104,7 @@ func InitSessionProvider(opts *options.ToolOptions) (*SessionProvider,
 }
 
 // Get the right type of connector, based on the options
-func getConnector(opts *options.ToolOptions) DBConnector {
+func getConnector(opts options.ToolOptions) DBConnector {
 	if opts.Auth.Mechanism == "GSSAPI" {
 		return &kerberos.KerberosDBConnector{}
 	}

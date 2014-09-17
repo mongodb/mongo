@@ -10,7 +10,7 @@ import (
 // Interface type for connecting to the database.
 type DBConnector interface {
 	// configure, based on the options passed in
-	Configure(*options.ToolOptions) error
+	Configure(options.ToolOptions) error
 
 	// dial the database and get a fresh new session
 	GetNewSession() (*mgo.Session, error)
@@ -27,7 +27,7 @@ type VanillaDBConnector struct {
 
 // Configure the db connector. Parses the connection string and sets up
 // the dial info with the default dial timeout.
-func (self *VanillaDBConnector) Configure(opts *options.ToolOptions) error {
+func (self *VanillaDBConnector) Configure(opts options.ToolOptions) error {
 
 	// create the addresses to be used to connect
 	connectionAddrs := util.CreateConnectionAddrs(opts.Host, opts.Port)
@@ -36,6 +36,7 @@ func (self *VanillaDBConnector) Configure(opts *options.ToolOptions) error {
 	self.dialInfo = &mgo.DialInfo{
 		Addrs:     connectionAddrs,
 		Timeout:   DefaultDialTimeout,
+		Direct:    true,
 		Username:  opts.Auth.Username,
 		Password:  opts.Auth.Password,
 		Source:    opts.Auth.Source,

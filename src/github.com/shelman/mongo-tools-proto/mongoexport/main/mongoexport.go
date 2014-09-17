@@ -35,7 +35,7 @@ func main() {
 	}
 
 	exporter := mongoexport.MongoExport{
-		ToolOptions: opts,
+		ToolOptions: *opts,
 		OutputOpts:  outputOpts,
 		InputOpts:   inputOpts,
 	}
