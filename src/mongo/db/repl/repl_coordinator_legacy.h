@@ -100,6 +100,10 @@ namespace repl {
 
         virtual void setFollowerMode(const MemberState& newState);
 
+        virtual bool isWaitingForApplierToDrain();
+
+        virtual void signalDrainComplete();
+
         virtual void prepareReplSetUpdatePositionCommand(OperationContext* txn,
                                                          BSONObjBuilder* cmdBuilder);
 

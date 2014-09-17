@@ -138,6 +138,10 @@ namespace repl {
 
         virtual void setFollowerMode(const MemberState& newState);
 
+        virtual bool isWaitingForApplierToDrain();
+
+        virtual void signalDrainComplete();
+
         virtual void prepareReplSetUpdatePositionCommand(OperationContext* txn,
                                                          BSONObjBuilder* cmdBuilder);
 
@@ -585,6 +589,9 @@ namespace repl {
 
         // Current ReplicaSet state.
         MemberState _currentState;                                                        // (M)
+
+        // True if we are waiting for the applier to finish draining.
+        bool _isWaitingForDrainToComplete;                                                // (M)
 
         // Used to signal threads waiting for changes to _rsConfigState.
         boost::condition_variable _rsConfigStateChange;                                   // (M)

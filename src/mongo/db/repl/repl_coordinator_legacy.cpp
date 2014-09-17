@@ -442,6 +442,14 @@ namespace {
         theReplSet->changeState(newState);
     }
 
+    bool LegacyReplicationCoordinator::isWaitingForApplierToDrain() {
+        // TODO
+        return false;
+    }
+
+    void LegacyReplicationCoordinator::signalDrainComplete() {
+    }
+
     void LegacyReplicationCoordinator::prepareReplSetUpdatePositionCommand(
             OperationContext* txn,
             BSONObjBuilder* cmdBuilder) {

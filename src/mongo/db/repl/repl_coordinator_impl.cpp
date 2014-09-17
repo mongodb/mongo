@@ -115,6 +115,7 @@ namespace {
         _externalState(externalState),
         _inShutdown(false),
         _currentState(MemberState::RS_STARTUP),
+        _isWaitingForDrainToComplete(false),
         _rsConfigState(kConfigStartingUp),
         _thisMembersConfigIndex(-1),
         _sleptLastElection(false) {
@@ -349,6 +350,17 @@ namespace {
         }
         fassert(18699, cbh.getStatus());
         _replExecutor.wait(cbh.getValue());
+    }
+
+    bool ReplicationCoordinatorImpl::isWaitingForApplierToDrain() {
+        boost::lock_guard<boost::mutex> lk(_mutex);
+        return _isWaitingForDrainToComplete;
+    }
+
+    void ReplicationCoordinatorImpl::signalDrainComplete() {
+        boost::lock_guard<boost::mutex> lk(_mutex);
+        invariant(_isWaitingForDrainToComplete);
+        _isWaitingForDrainToComplete = false;
     }
 
     void ReplicationCoordinatorImpl::_setFollowerModeFinish(
@@ -757,7 +769,8 @@ namespace {
         boost::lock_guard<boost::mutex> lk(_mutex);
         if (_settings.usingReplSets()) {
             if (_getReplicationMode_inlock() == modeReplSet &&
-                    _getCurrentMemberState_inlock().primary()) {
+                    _getCurrentMemberState_inlock().primary() &&
+                    !_isWaitingForDrainToComplete) {
                 return true;
             }
             return dbName == "local";

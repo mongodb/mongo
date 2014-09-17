@@ -222,6 +222,17 @@ namespace repl {
         _impl.setFollowerMode(newState);
     }
 
+    bool HybridReplicationCoordinator::isWaitingForApplierToDrain() {
+        bool legacyWaiting = _legacy.isWaitingForApplierToDrain();
+        // fassert(18813, legacyWaiting == _impl.isWaitingForApplierToDrain());
+        return legacyWaiting;
+    }
+
+    void HybridReplicationCoordinator::signalDrainComplete() {
+        _legacy.signalDrainComplete();
+        _impl.signalDrainComplete();
+    }
+
     void HybridReplicationCoordinator::prepareReplSetUpdatePositionCommand(OperationContext* txn,
                                                                            BSONObjBuilder* result) {
         _impl.prepareReplSetUpdatePositionCommand(txn, result);
