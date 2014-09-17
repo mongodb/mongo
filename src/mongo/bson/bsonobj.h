@@ -311,7 +311,7 @@ namespace mongo {
 
         /** @return total size of the BSON object in bytes */
         int objsize() const {
-            return ConstDataView(objdata()).readNative<int>();
+            return ConstDataView(objdata()).readLE<int>();
         }
 
         /** performs a cursory check on the object's size only. */

@@ -144,7 +144,7 @@ namespace mongo {
         BSONObjBuilder& appendObject(const StringData& fieldName, const char * objdata , int size = 0 ) {
             verify( objdata );
             if ( size == 0 ) {
-                size = ConstDataView(objdata).readNative<int>();
+                size = ConstDataView(objdata).readLE<int>();
             }
 
             verify( size > 4 && size < 100000000 );
@@ -706,7 +706,7 @@ namespace mongo {
             _b.appendNum((char) EOO);
             char *data = _b.buf() + _offset;
             int size = _b.len() - _offset;
-            DataView(data).writeNative(size);
+            DataView(data).writeLE(size);
             if ( _tracker )
                 _tracker->got( size );
             return data;

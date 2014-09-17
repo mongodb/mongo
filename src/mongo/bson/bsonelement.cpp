@@ -402,7 +402,7 @@ namespace mongo {
 
     BSONObj BSONElement::codeWScopeObject() const {
         verify( type() == CodeWScope );
-        int strSizeWNull = ConstDataView(value() + 4).readNative<int>();
+        int strSizeWNull = ConstDataView(value() + 4).readLE<int>();
         return BSONObj( value() + 4 + 4 + strSizeWNull );
     }
 

@@ -36,6 +36,8 @@
 #include <string>
 #include <string.h>
 
+#include <boost/static_assert.hpp>
+
 #include "mongo/base/data_view.h"
 #include "mongo/base/string_data.h"
 #include "mongo/bson/inline_decls.h"
@@ -161,6 +163,7 @@ namespace mongo {
         void decouple() { data = 0; }
 
         void appendUChar(unsigned char j) {
+            BOOST_STATIC_ASSERT(CHAR_BIT == 8);
             appendNumImpl(j);
         }
         void appendChar(char j) {
@@ -170,21 +173,32 @@ namespace mongo {
             appendNumImpl(j);
         }
         void appendNum(short j) {
+            BOOST_STATIC_ASSERT(sizeof(short) == 2);
             appendNumImpl(j);
         }
         void appendNum(int j) {
+            BOOST_STATIC_ASSERT(sizeof(int) == 4);
             appendNumImpl(j);
         }
         void appendNum(unsigned j) {
             appendNumImpl(j);
         }
+
+        // Bool does not have a well defined encoding.
+#if __cplusplus >= 201103L
+        void appendNum(bool j) = delete;
+#else
         void appendNum(bool j) {
-            appendNumImpl(j);
+            invariant(false);
         }
+#endif
+
         void appendNum(double j) {
+            BOOST_STATIC_ASSERT(sizeof(double) == 8);
             appendNumImpl(j);
         }
         void appendNum(long long j) {
+            BOOST_STATIC_ASSERT(sizeof(long long) == 8);
             appendNumImpl(j);
         }
         void appendNum(unsigned long long j) {
@@ -225,7 +239,11 @@ namespace mongo {
     private:
         template<typename T>
         void appendNumImpl(T t) {
-            DataView(grow(sizeof(t))).writeNative(t);
+            // NOTE: For now, we assume that all things written
+            // by a BufBuilder are intended for external use: either written to disk
+            // or to the wire. Since all of our encoding formats are little endian,
+            // we bake that assumption in here. This decision should be revisited soon.
+            DataView(grow(sizeof(t))).writeLE(t);
         }
 
 

@@ -121,7 +121,7 @@ namespace mongo {
 
         /** Returns the type of the element */
         BSONType type() const {
-            const signed char typeByte = ConstDataView(data).readNative<signed char>();
+            const signed char typeByte = ConstDataView(data).readLE<signed char>();
             return static_cast<BSONType>(typeByte);
         }
 
@@ -197,7 +197,7 @@ namespace mongo {
             @see Bool(), trueValue()
         */
         Date_t date() const {
-            return Date_t(ConstDataView(value()).readNative<unsigned long long>());
+            return Date_t(ConstDataView(value()).readLE<unsigned long long>());
         }
 
         /** Convert the value to boolean, regardless of its type, in a javascript-like fashion
@@ -213,17 +213,17 @@ namespace mongo {
 
         /** Return double value for this field. MUST be NumberDouble type. */
         double _numberDouble() const {
-            return ConstDataView(value()).readNative<double>();
+            return ConstDataView(value()).readLE<double>();
         }
 
         /** Return int value for this field. MUST be NumberInt type. */
         int _numberInt() const {
-            return ConstDataView(value()).readNative<int>();
+            return ConstDataView(value()).readLE<int>();
         }
 
         /** Return long long value for this field. MUST be NumberLong type. */
         long long _numberLong() const {
-            return ConstDataView(value()).readNative<long long>();
+            return ConstDataView(value()).readLE<long long>();
         }
 
         /** Retrieve int value for the element safely.  Zero returned if not a number. */
@@ -267,12 +267,12 @@ namespace mongo {
             @return std::string size including terminating null
         */
         int valuestrsize() const {
-            return ConstDataView(value()).readNative<int>();
+            return ConstDataView(value()).readLE<int>();
         }
 
         // for objects the size *includes* the size of the size field
         size_t objsize() const {
-            return ConstDataView(value()).readNative<uint32_t>();
+            return ConstDataView(value()).readLE<uint32_t>();
         }
 
         /** Get a string's value.  Also gives you start of the real data for an embedded object.
@@ -309,7 +309,7 @@ namespace mongo {
          *  This INCLUDES the null char at the end */
         int codeWScopeCodeLen() const {
             massert( 16178 , "not codeWScope" , type() == CodeWScope );
-            return ConstDataView(value() + 4).readNative<int>();
+            return ConstDataView(value() + 4).readLE<int>();
         }
 
         /** Get the scope SavedContext of a CodeWScope data element.
@@ -434,15 +434,15 @@ namespace mongo {
         }
 
         Date_t timestampTime() const {
-            unsigned long long t = ConstDataView(value() + 4).readNative<unsigned int>();
+            unsigned long long t = ConstDataView(value() + 4).readLE<unsigned int>();
             return t * 1000;
         }
         unsigned int timestampInc() const {
-            return ConstDataView(value()).readNative<unsigned int>();
+            return ConstDataView(value()).readLE<unsigned int>();
         }
 
         unsigned long long timestampValue() const {
-            return ConstDataView(value()).readNative<unsigned long long>();
+            return ConstDataView(value()).readLE<unsigned long long>();
         }
 
         const char * dbrefNS() const {
@@ -453,7 +453,7 @@ namespace mongo {
         const mongo::OID dbrefOID() const {
             uassert( 10064 ,  "not a dbref" , type() == DBRef );
             const char * start = value();
-            start += 4 + ConstDataView(start).readNative<int>();
+            start += 4 + ConstDataView(start).readLE<int>();
             class OID result;
             std::memcpy(&result, start, sizeof(result));
             return result;
