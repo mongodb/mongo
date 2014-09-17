@@ -99,15 +99,26 @@ namespace newlm {
     }
 
     bool LockerImpl::isAtLeastReadLocked(const StringData& ns) const {
-        if (threadState() == 'R' || threadState() == 'W')
+        if (threadState() == 'R' || threadState() == 'W') {
             return true; // global
-        if (!isLocked())
+        }
+        if (!isLocked()) {
             return false;
+        }
 
         const StringData db = nsToDatabaseSubstring(ns);
         const newlm::ResourceId resIdNs(newlm::RESOURCE_DATABASE, db);
 
-        return isLockHeldForMode(resIdNs, newlm::MODE_S);
+        if (!isLockHeldForMode(resIdNs, newlm::MODE_IS)) {
+            return false;
+        }
+
+        if (!nsIsFull(ns)) {
+            return true;
+        }
+
+        const newlm::ResourceId collId(newlm::RESOURCE_DATABASE, ns);
+        return isLockHeldForMode(collId, newlm::MODE_IS);
     }
 
     bool LockerImpl::isRecursive() const {
@@ -178,14 +189,21 @@ namespace newlm {
     }
 
     void LockerImpl::dump() const {
+        _lock.lock();
         StringBuilder ss;
         ss << "lock status: ";
         if (!isLocked()) {
-            ss << "unlocked"; 
+            ss << "unlocked";
         }
         else {
             // SERVER-14978: Dump lock stats information
         }
+
+        ss << " requests:";
+        for (LockRequestsMap::const_iterator it = _requests.begin(); it != _requests.end(); ++it) {
+            ss << " " << it->first.toString();
+        }
+        _lock.unlock();
         log() << ss.str() << std::endl;
     }
 

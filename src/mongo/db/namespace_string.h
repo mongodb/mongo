@@ -222,6 +222,20 @@ namespace mongo {
         return ns.substr( i + 1 );
     }
 
+    /**
+     * foo = false
+     * foo. = false
+     * foo.a = true
+     */
+    inline bool nsIsFull( const StringData& ns ) {
+        size_t i = ns.find( '.' );
+        if ( i == std::string::npos )
+            return false;
+        if ( i == ns.size() - 1 )
+            return false;
+        return true;
+    }
+
 
     /**
      * NamespaceDBHash and NamespaceDBEquals allow you to do something like

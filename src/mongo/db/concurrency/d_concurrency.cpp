@@ -306,9 +306,8 @@ namespace {
         if (supportsDocLocking()) {
             _lockState->lock(resIdDb, newlm::MODE_IX);
 
-            const StringData ns = nsToCollectionSubstring(_ns);
-            if (!ns.empty()) {
-                const newlm::ResourceId resIdCollection(newlm::RESOURCE_COLLECTION, db);
+            if (nsIsFull(_ns)) {
+                const newlm::ResourceId resIdCollection(newlm::RESOURCE_COLLECTION, _ns);
                 _lockState->lock(resIdCollection, newlm::MODE_IX);
             }
         }
@@ -320,9 +319,16 @@ namespace {
     }
 
     void Lock::DBWrite::unlockDB() {
+
+        if (supportsDocLocking()) {
+            if (nsIsFull(_ns)) {
+                const newlm::ResourceId resIdCollection(newlm::RESOURCE_COLLECTION, _ns);
+                _lockState->unlock(resIdCollection);
+            }
+        }
+
         const StringData db = nsToDatabaseSubstring(_ns);
         const newlm::ResourceId resIdDb(newlm::RESOURCE_DATABASE, db);
-
         _lockState->unlock(resIdDb);
 
         // The last release reports time the lock was held
@@ -355,9 +361,8 @@ namespace {
         if (supportsDocLocking()) {
             _lockState->lock(resIdDb, newlm::MODE_IS);
 
-            const StringData ns = nsToCollectionSubstring(_ns);
-            if (!ns.empty()) {
-                const newlm::ResourceId resIdCollection(newlm::RESOURCE_COLLECTION, db);
+            if (nsIsFull(_ns)) {
+                const newlm::ResourceId resIdCollection(newlm::RESOURCE_COLLECTION, _ns);
                 _lockState->lock(resIdCollection, newlm::MODE_IS);
             }
         }
@@ -369,9 +374,16 @@ namespace {
     }
 
     void Lock::DBRead::unlockDB() {
+
+        if (supportsDocLocking()) {
+            if (nsIsFull(_ns)) {
+                const newlm::ResourceId resIdCollection(newlm::RESOURCE_COLLECTION, _ns);
+                _lockState->unlock(resIdCollection);
+            }
+        }
+
         const StringData db = nsToDatabaseSubstring(_ns);
         const newlm::ResourceId resIdDb(newlm::RESOURCE_DATABASE, db);
-
         _lockState->unlock(resIdDb);
 
         // The last release reports time the lock was held
