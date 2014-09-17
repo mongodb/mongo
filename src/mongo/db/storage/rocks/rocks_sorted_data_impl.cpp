@@ -208,7 +208,7 @@ namespace mongo {
                 _savePositionLoc = getDiskLoc();
             }
 
-            void restorePosition() {
+            void restorePosition(OperationContext*) {
                 _isCached = false;
 
                 if ( _savedAtEnd ) {
