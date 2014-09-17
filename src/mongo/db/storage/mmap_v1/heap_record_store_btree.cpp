@@ -83,7 +83,9 @@ namespace mongo {
         // This is a hack, but both the high and low order bits of DiskLoc offset must be 0, and the
         // file must fit in 23 bits. This gives us a total of 30 + 23 == 53 bits.
         invariant(id < (1LL << 53));
-        return DiskLoc(int(id >> 30), int((id << 1) & ~(1<<31)));
+        DiskLoc dl(int(id >> 30), int((id << 1) & ~(1<<31)));
+        invariant( (dl.getOfs() & 0x1) == 0 );
+        return dl;
     }
 
     Status HeapRecordStoreBtree::touch(OperationContext* txn, BSONObjBuilder* output) const {
