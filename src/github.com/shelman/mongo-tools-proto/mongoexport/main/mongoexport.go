@@ -43,15 +43,14 @@ func main() {
 	err = exporter.ValidateSettings()
 	if err != nil {
 		//TODO log to stderr for real
-		fmt.Printf("Error: %v\n", err)
-		os.Exit(1)
+		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 	}
 
 	numDocs, err := exporter.Export()
 	if err != nil {
 		//TODO log to stderr for real
-		fmt.Printf("Error: %v\n", err)
-		//os.Exit(1)
+		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+		os.Exit(1)
 	}
 
 	if !opts.Quiet {
@@ -61,4 +60,5 @@ func main() {
 			fmt.Fprintf(os.Stderr, fmt.Sprintf("exported %v records\n", numDocs))
 		}
 	}
+
 }

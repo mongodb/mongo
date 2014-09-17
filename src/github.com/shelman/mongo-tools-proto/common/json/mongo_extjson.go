@@ -2,6 +2,7 @@ package json
 
 import (
 	"fmt"
+	"gopkg.in/mgo.v2/bson"
 	"reflect"
 )
 
@@ -57,17 +58,19 @@ var (
 	uint32Type = reflect.TypeOf(uint32(0))
 
 	// object types
-	binDataType    = reflect.TypeOf(BinData{})
-	dateType       = reflect.TypeOf(Date(0))
-	dbRefType      = reflect.TypeOf(DBRef{})
-	maxKeyType     = reflect.TypeOf(MaxKey{})
-	minKeyType     = reflect.TypeOf(MinKey{})
-	numberIntType  = reflect.TypeOf(NumberInt(0))
-	numberLongType = reflect.TypeOf(NumberLong(0))
-	objectIdType   = reflect.TypeOf(ObjectId(""))
-	regexpType     = reflect.TypeOf(RegExp{})
-	timestampType  = reflect.TypeOf(Timestamp{})
-	undefinedType  = reflect.TypeOf(Undefined{})
+	binDataType     = reflect.TypeOf(BinData{})
+	dateType        = reflect.TypeOf(Date(0))
+	dbRefType       = reflect.TypeOf(DBRef{})
+	maxKeyType      = reflect.TypeOf(MaxKey{})
+	minKeyType      = reflect.TypeOf(MinKey{})
+	numberIntType   = reflect.TypeOf(NumberInt(0))
+	numberLongType  = reflect.TypeOf(NumberLong(0))
+	objectIdType    = reflect.TypeOf(ObjectId(""))
+	regexpType      = reflect.TypeOf(RegExp{})
+	timestampType   = reflect.TypeOf(Timestamp{})
+	undefinedType   = reflect.TypeOf(Undefined{})
+	orderedBSONType = reflect.TypeOf(bson.D{})
+	interfaceType   = reflect.TypeOf((*interface{})(nil))
 )
 
 func (d Date) isFormatable() bool {

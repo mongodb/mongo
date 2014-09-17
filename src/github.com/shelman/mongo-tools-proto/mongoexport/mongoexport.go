@@ -11,6 +11,8 @@ import (
 	"gopkg.in/mgo.v2/bson"
 	"io"
 	"os"
+	// 	"reflect"
+	// 	"strconv"
 	"strings"
 )
 
@@ -54,6 +56,13 @@ func (exp *MongoExport) ValidateSettings() error {
 
 	if exp.InputOpts != nil && exp.InputOpts.Query != "" {
 		_, err := getObjectFromArg(exp.InputOpts.Query)
+		if err != nil {
+			return err
+		}
+	}
+
+	if exp.InputOpts != nil && exp.InputOpts.Sort != "" {
+		_, err := getSortFromArg(exp.InputOpts.Sort)
 		if err != nil {
 			return err
 		}
@@ -127,7 +136,19 @@ func getDocSource(exp MongoExport) (db.DocSource, error) {
 		q = q.Limit(exp.InputOpts.Limit)
 	}
 
-	if len(query) == 0 && exp.InputOpts != nil && exp.InputOpts.ForceTableScan != true {
+	if exp.InputOpts != nil && exp.InputOpts.Sort != "" {
+		sortD, err := getSortFromArg(exp.InputOpts.Sort)
+		if err != nil {
+			return nil, err
+		}
+		sortFields, err := bsonutil.MakeSortString(sortD)
+		if err != nil {
+			return nil, err
+		}
+		q = q.Sort(sortFields...)
+	}
+
+	if len(query) == 0 && exp.InputOpts != nil && exp.InputOpts.ForceTableScan != true && exp.InputOpts.Sort == "" {
 		q = q.Snapshot()
 	}
 
@@ -141,7 +162,6 @@ func getDocSource(exp MongoExport) (db.DocSource, error) {
 func (exp *MongoExport) Export() (int64, error) {
 	out, err := exp.getOutputWriter()
 	if err != nil {
-		fmt.Println(err)
 		return 0, err
 	}
 
@@ -149,13 +169,11 @@ func (exp *MongoExport) Export() (int64, error) {
 
 	exportOutput, err := exp.getExportOutput(out)
 	if err != nil {
-		fmt.Println(err)
 		return 0, err
 	}
 
 	docSource, err := getDocSource(*exp)
 	if err != nil {
-		fmt.Println(err)
 		return 0, err
 	}
 
@@ -174,10 +192,12 @@ func (exp *MongoExport) Export() (int64, error) {
 	for docSource.Next(&result) {
 		err := exportOutput.ExportDocument(result)
 		if err != nil {
-			fmt.Println(err)
 			return docsCount, err
 		}
 		docsCount++
+	}
+	if err := docSource.Err(); err != nil {
+		return docsCount, err
 	}
 
 	//Write footers
@@ -249,6 +269,17 @@ func getObjectFromArg(queryRaw string) (map[string]interface{}, error) {
 			}
 			parsedJSON[key] = newVal
 		}
+	}
+	return parsedJSON, nil
+}
+
+//getSortFromArg takes a sort specification in JSON and returns it as a bson.D
+//object which preserves the ordering of the keys as they appear in the input.
+func getSortFromArg(queryRaw string) (bson.D, error) {
+	parsedJSON := bson.D{}
+	err := sloppyjson.Unmarshal([]byte(queryRaw), &parsedJSON)
+	if err != nil {
+		return nil, fmt.Errorf("Query is not valid JSON: %v", err)
 	}
 	return parsedJSON, nil
 }

@@ -32,3 +32,26 @@ func (md MarshalD) MarshalJSON() ([]byte, error) {
 	buff.WriteString("}")
 	return buff.Bytes(), nil
 }
+
+// MakeSortString takes a bson.D object and converts it to a slice of strings
+// that can be used as the input args to mgo's .Sort(...) function.
+// For example:
+// {a:1, b:-1} -> ["+a", "-b"]
+func MakeSortString(sortObj bson.D) ([]string, error) {
+	sortStrs := make([]string, 0, len(sortObj))
+	for _, docElem := range sortObj {
+		valueAsNumber := float64(0)
+		switch v := docElem.Value.(type) {
+		case float64:
+			valueAsNumber = v
+		default:
+			return nil, fmt.Errorf("sort direction must be numeric type")
+		}
+		prefix := "+"
+		if valueAsNumber < 0 {
+			prefix = "-"
+		}
+		sortStrs = append(sortStrs, fmt.Sprintf("%v%v", prefix, docElem.Name))
+	}
+	return sortStrs, nil
+}

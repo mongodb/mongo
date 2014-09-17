@@ -13,6 +13,7 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
+	"gopkg.in/mgo.v2/bson"
 	"reflect"
 	"runtime"
 	"strconv"
@@ -478,6 +479,7 @@ func (d *decodeState) array(v reflect.Value) {
 // object consumes an object from d.data[d.off-1:], decoding into the value v.
 // the first byte of the object ('{') has been read already.
 func (d *decodeState) object(v reflect.Value) {
+
 	// Check for unmarshaler.
 	u, ut, pv := d.indirect(v, false)
 	if u != nil {
@@ -514,6 +516,13 @@ func (d *decodeState) object(v reflect.Value) {
 		if v.IsNil() {
 			v.Set(reflect.MakeMap(t))
 		}
+	case reflect.Slice:
+		// this is only a valid case if the output type is a bson.D
+		t := v.Type()
+		if t != orderedBSONType {
+			d.saveError(&UnmarshalTypeError{"object", v.Type()})
+			break
+		}
 	case reflect.Struct:
 
 	default:
@@ -525,6 +534,8 @@ func (d *decodeState) object(v reflect.Value) {
 
 	var mapElem reflect.Value
 
+	i := 0
+	bsonDMode := false
 	for {
 		// Read opening " of string key or closing }.
 		op := d.scanWhile(scanSkipSpace)
@@ -557,6 +568,14 @@ func (d *decodeState) object(v reflect.Value) {
 				mapElem.Set(reflect.Zero(elemType))
 			}
 			subv = mapElem
+		} else if v.Kind() == reflect.Slice {
+			bsonDMode = true
+			elemType := interfaceType.Elem()
+			if !mapElem.IsValid() {
+				subv = reflect.New(elemType).Elem()
+			} else {
+				mapElem.Set(reflect.Zero(elemType))
+			}
 		} else {
 			var f *field
 			fields := cachedTypeFields(v.Type())
@@ -592,14 +611,19 @@ func (d *decodeState) object(v reflect.Value) {
 		if op != scanObjectKey {
 			d.error(errPhase)
 		}
-
 		// Read value.
+		var docElemValue interface{}
 		if destring {
 			d.value(reflect.ValueOf(&d.tempstr))
 			d.literalStore([]byte(d.tempstr), subv, true)
 			d.tempstr = "" // Zero scratch space for successive values.
 		} else {
-			d.value(subv)
+			if bsonDMode {
+				docElemValue = d.valueInterface()
+				subv.Set(reflect.ValueOf(docElemValue))
+			} else {
+				d.value(subv)
+			}
 		}
 
 		// Write value back to map;
@@ -607,6 +631,24 @@ func (d *decodeState) object(v reflect.Value) {
 		if v.Kind() == reflect.Map {
 			kv := reflect.ValueOf(key).Convert(v.Type().Key())
 			v.SetMapIndex(kv, subv)
+		} else if v.Kind() == reflect.Slice {
+			kv := reflect.ValueOf(key).Convert(stringType)
+			newDocElem := &bson.DocElem{kv.String(), subv.Interface()}
+			//Slice construction/resizing code is from decodeState.array()
+			if i >= v.Cap() {
+				newcap := v.Cap() + v.Cap()/2
+				if newcap < 4 {
+					newcap = 4
+				}
+				newv := reflect.MakeSlice(v.Type(), v.Len(), newcap)
+				reflect.Copy(newv, v)
+				v.Set(newv)
+			}
+			if i >= v.Len() {
+				v.SetLen(i + 1)
+			}
+			v3 := v.Index(i)
+			v3.Set(reflect.ValueOf(newDocElem).Elem())
 		}
 
 		// Next token must be , or }.
@@ -617,6 +659,7 @@ func (d *decodeState) object(v reflect.Value) {
 		if op != scanObjectValue {
 			d.error(errPhase)
 		}
+		i++
 	}
 }
 
@@ -732,6 +775,7 @@ func (d *decodeState) literalStore(item []byte, v reflect.Value, fromQuoted bool
 		}
 
 	case c == '"', c == '\'': // string
+
 		s, ok := unquoteBytes(item)
 		if !ok {
 			if fromQuoted {
@@ -769,6 +813,7 @@ func (d *decodeState) literalStore(item []byte, v reflect.Value, fromQuoted bool
 		s := string(item)
 		switch v.Kind() {
 		default:
+
 			if v.Kind() == reflect.String && v.Type() == numberType {
 				v.SetString(s)
 				break
@@ -832,6 +877,7 @@ func (d *decodeState) literalStore(item []byte, v reflect.Value, fromQuoted bool
 			}
 		}
 	}
+
 }
 
 // The xxxInterface routines build up a value to be stored
@@ -899,7 +945,7 @@ func (d *decodeState) objectInterface() map[string]interface{} {
 		start := d.off - 1
 		op = d.scanWhile(scanContinue)
 		item := d.data[start : d.off-1]
-		key, ok := unquote(item)
+		key, ok := maybeUnquote(item)
 		if !ok {
 			d.error(errPhase)
 		}
@@ -985,6 +1031,14 @@ func getu4(s []byte) rune {
 // The rules are different than for Go, so cannot use strconv.Unquote.
 func unquote(s []byte) (t string, ok bool) {
 	s, ok = unquoteBytes(s)
+	t = string(s)
+	return
+}
+
+// unquote converts a quoted JSON string literal s into an actual string t.
+// The rules are different than for Go, so cannot use strconv.Unquote.
+func maybeUnquote(s []byte) (t string, ok bool) {
+	s, ok = maybeUnquoteBytes(s)
 	t = string(s)
 	return
 }

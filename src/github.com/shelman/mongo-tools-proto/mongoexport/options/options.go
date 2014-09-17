@@ -27,6 +27,7 @@ type InputOptions struct {
 	ForceTableScan bool   `long:"forceTableScan" description:"force a table scan (do not use $snapshot)"`
 	Skip           int    `long:"skip" description:"documents to skip, default 0"`
 	Limit          int    `long:"limit" default:"-1" description:"limit the number of documents to export, default all"`
+	Sort           string `long:"sort" description:"sort order, as a JSON string, e.g. '{x:1}'"`
 }
 
 func (self *InputOptions) Name() string {
