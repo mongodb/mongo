@@ -33,6 +33,7 @@
 #include <set>
 
 #include "mongo/db/catalog/index_catalog_entry.h"
+#include "mongo/db/storage/heap1/heap1_recovery_unit.h"
 #include "mongo/db/storage/index_entry_comparison.h"
 #include "mongo/util/mongoutils/str.h"
 
@@ -106,7 +107,8 @@ namespace {
             if (!_dupsAllowed && isDup(*_data, key, loc))
                 return dupKeyError(key);
 
-            _data->insert(_data->end(), IndexKeyEntry(key.getOwned(), loc));
+            BSONObj owned = key.getOwned();
+            _data->insert(_data->end(), IndexKeyEntry(owned, loc));
             *_currentKeySize += key.objsize();
 
             return Status::OK();
@@ -149,8 +151,11 @@ namespace {
             if (!dupsAllowed && isDup(*_data, key, loc))
                 return dupKeyError(key);
 
-            if ( _data->insert(IndexKeyEntry(key.getOwned(), loc)).second )
+            BSONObj owned = key.getOwned();
+            if ( _data->insert(IndexKeyEntry(owned, loc)).second ) {
                 _currentKeySize += key.objsize();
+                Heap1RecoveryUnit::notifyIndexInsert( txn, this, owned, loc );
+            }
             return Status::OK();
         }
 
@@ -161,8 +166,10 @@ namespace {
 
             const size_t numDeleted = _data->erase(IndexKeyEntry(key, loc));
             invariant(numDeleted <= 1);
-            if ( numDeleted == 1 )
+            if ( numDeleted == 1 ) {
                 _currentKeySize -= key.objsize();
+                Heap1RecoveryUnit::notifyIndexRemove( txn, this, key, loc );
+            }
 
             return numDeleted == 1;
         }
@@ -217,15 +224,17 @@ namespace {
             }
 
             virtual bool locate(const BSONObj& keyRaw, const DiskLoc& loc) {
-                // An empty key means we should seek to the front
-                if (keyRaw.isEmpty()) {
-                    _it = _data.begin();
+                const BSONObj key = stripFieldNames(keyRaw);
+                _it = _data.lower_bound(IndexKeyEntry(key, loc)); // lower_bound is >= key
+                if ( _it == _data.end() ) {
                     return false;
                 }
 
-                const BSONObj key = stripFieldNames(keyRaw);
-                _it = _data.lower_bound(IndexKeyEntry(key, loc)); // lower_bound is >= key
-                return _it != _data.end() && (_it->key == key); // intentionally not comparing loc
+                if ( _it->key != key ) {
+                    return false;
+                }
+
+                return _it->loc == loc;
             }
 
             virtual void customLocate(const BSONObj& keyBegin,
@@ -324,16 +333,19 @@ namespace {
             }
 
             virtual bool locate(const BSONObj& keyRaw, const DiskLoc& loc) {
-                // An empty key means we should seek to the seek to the end, 
-                // i.e. one past the lowest key in the iterator
-                if (keyRaw.isEmpty()) {
-                    _it = _data.rbegin();
+                const BSONObj key = stripFieldNames(keyRaw);
+                _it = lower_bound(IndexKeyEntry(key, loc)); // lower_bound is <= query
+
+                if ( _it == _data.rend() ) {
                     return false;
                 }
 
-                const BSONObj key = stripFieldNames(keyRaw);
-                _it = lower_bound(IndexKeyEntry(key, loc)); // lower_bound is <= query
-                return _it != _data.rend() && (_it->key == key); // intentionally not comparing loc
+
+                if ( _it->key != key ) {
+                    return false;
+                }
+
+                return _it->loc == loc;
             }
 
             virtual void customLocate(const BSONObj& keyBegin,

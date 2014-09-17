@@ -1130,7 +1130,7 @@ namespace mongo {
             // Track last result from TO shard for sanity check
             BSONObj res;
             for ( int i=0; i<86400; i++ ) { // don't want a single chunk move to take more than a day
-                invariant(!txn->lockState()->threadState());
+                invariant(!txn->lockState()->isLocked());
 
                 // Exponential sleep backoff, up to 1024ms. Don't sleep much on the first few
                 // iterations, since we want empty chunk migrations to be fast.

@@ -30,20 +30,26 @@
 
 #pragma once
 
+#include <vector>
+
+#include "mongo/db/diskloc.h"
 #include "mongo/db/storage/recovery_unit.h"
 
 namespace mongo {
 
+    class SortedDataInterface;
+
     class Heap1RecoveryUnit : public RecoveryUnit {
     public:
         Heap1RecoveryUnit() {
-            rollbackPossible = true;
+            _rollbackPossible = true;
         }
 
-        virtual void beginUnitOfWork() {}
-        virtual void commitUnitOfWork() {}
+        virtual ~Heap1RecoveryUnit();
 
-        virtual void endUnitOfWork() {}
+        virtual void beginUnitOfWork();
+        virtual void commitUnitOfWork();
+        virtual void endUnitOfWork();
 
         virtual bool awaitCommit() {
             return true;
@@ -58,7 +64,33 @@ namespace mongo {
 
         virtual void syncDataAndTruncateJournal() {}
 
-        bool rollbackPossible;
+        // -------------
+
+        void rollbackImpossible() { _rollbackPossible = false; }
+
+        void notifyIndexMod( SortedDataInterface* idx,
+                             const BSONObj& obj, const DiskLoc& loc, bool insert );
+
+        static void notifyIndexInsert( OperationContext* ctx, SortedDataInterface* idx,
+                                       const BSONObj& obj, const DiskLoc& loc );
+        static void notifyIndexRemove( OperationContext* ctx, SortedDataInterface* idx,
+                                       const BSONObj& obj, const DiskLoc& loc );
+
+    private:
+        bool _rollbackPossible;
+
+        struct IndexInfo {
+            SortedDataInterface* idx;
+            BSONObj obj;
+            DiskLoc loc;
+            bool insert;
+        };
+
+        struct Frame {
+            std::vector<IndexInfo> indexMods;
+        };
+
+        std::vector<Frame> _frames;
     };
 
 }

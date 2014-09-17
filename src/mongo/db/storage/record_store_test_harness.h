@@ -1,3 +1,5 @@
+// record_store_test_harness.h
+
 /**
  *    Copyright (C) 2014 MongoDB Inc.
  *
@@ -26,40 +28,27 @@
  *    it in the license file.
  */
 
-#include "mongo/db/query/query_knobs.h"
-#include "mongo/db/server_options.h"
-#include "mongo/db/server_parameters.h"
+#pragma once
+
+#include "mongo/db/operation_context_noop.h"
 
 namespace mongo {
 
-    MONGO_EXPORT_SERVER_PARAMETER(internalQueryPlanEvaluationWorks, int, 10000);
+    class RecordStore;
+    class RecoveryUnit;
 
-    MONGO_EXPORT_SERVER_PARAMETER(internalQueryPlanEvaluationCollFraction, double, 0.3);
+    class HarnessHelper {
+    public:
+        HarnessHelper(){}
+        virtual ~HarnessHelper(){}
 
-    MONGO_EXPORT_SERVER_PARAMETER(internalQueryPlanEvaluationMaxResults, int, 101);
+        virtual RecordStore* newNonCappedRecordStore() = 0;
+        virtual RecoveryUnit* newRecoveryUnit() = 0;
 
-    MONGO_EXPORT_SERVER_PARAMETER(internalQueryCacheSize, int, 5000);
+        virtual OperationContext* newOperationContext() {
+            return new OperationContextNoop( newRecoveryUnit() );
+        }
+    };
 
-    MONGO_EXPORT_SERVER_PARAMETER(internalQueryCacheFeedbacksStored, int, 20);
-
-    MONGO_EXPORT_SERVER_PARAMETER(internalQueryCacheStdDeviations, double, 2.0);
-
-    MONGO_EXPORT_SERVER_PARAMETER(internalQueryCacheWriteOpsBetweenFlush, int, 1000);
-
-    MONGO_EXPORT_SERVER_PARAMETER(internalQueryPlannerMaxIndexedSolutions, int, 64);
-
-    MONGO_EXPORT_SERVER_PARAMETER(internalQueryEnumerationMaxOrSolutions, int, 10);
-
-    MONGO_EXPORT_SERVER_PARAMETER(internalQueryEnumerationMaxIntersectPerAnd, int, 3);
-
-    MONGO_EXPORT_SERVER_PARAMETER(internalQueryForceIntersectionPlans, bool, false);
-
-    MONGO_EXPORT_SERVER_PARAMETER(internalQueryPlannerEnableIndexIntersection, bool, true);
-
-    MONGO_EXPORT_SERVER_PARAMETER(internalQueryPlannerEnableHashIntersection, bool, false);
-
-    MONGO_EXPORT_SERVER_PARAMETER(internalQueryPlanOrChildrenIndependently, bool, true);
-
-    MONGO_EXPORT_SERVER_PARAMETER(internalQueryMaxScansToExplode, int, 200);
-
-}  // namespace mongo
+    HarnessHelper* newHarnessHelper();
+}

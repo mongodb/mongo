@@ -92,12 +92,13 @@ namespace mongo {
         private:
             friend struct TempRelease;
 
-            void tempRelease(); // TempRelease class calls these
+            // TempRelease class calls these
+            void tempRelease();
             void relock();
 
         protected:
-            virtual void _tempRelease() = 0;
-            virtual void _relock() = 0;
+            virtual void _tempRelease();
+            virtual void _relock();
 
             Locker* _lockState;
 
@@ -145,7 +146,6 @@ namespace mongo {
             virtual ~GlobalRead();
         };
 
-        // lock this database. do not shared_lock globally first, that is handledin herein. 
         class DBWrite : public ScopedLock {
             void lockDB();
             void unlockDB();
@@ -162,14 +162,9 @@ namespace mongo {
             const std::string _ns;
         };
 
-        // lock this database for reading. do not shared_lock globally first, that is handledin herein. 
         class DBRead : public ScopedLock {
             void lockDB();
             void unlockDB();
-
-        protected:
-            void _tempRelease();
-            void _relock();
 
         public:
             DBRead(Locker* lockState, const StringData& dbOrNs);

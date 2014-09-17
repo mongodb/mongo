@@ -82,6 +82,8 @@ namespace mongo {
         virtual DatabaseCatalogEntry* getDatabaseCatalogEntry( OperationContext* opCtx,
                                                                const StringData& db );
 
+        virtual bool supportsDocLocking() const { return false; }
+
         /**
          * @return number of files flushed
          */

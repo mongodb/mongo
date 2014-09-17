@@ -37,6 +37,8 @@
 #include "mongo/db/concurrency/locker.h"
 #include "mongo/db/concurrency/lock_stat.h"
 #include "mongo/db/concurrency/lock_state.h"
+#include "mongo/db/global_environment_experiment.h"
+#include "mongo/db/namespace_string.h"
 #include "mongo/db/server_parameters.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/util/assert_util.h"
@@ -95,6 +97,23 @@ namespace mongo {
         Locker* const _ls;
     };
 
+namespace {
+    /**
+     * Shortcut for querying the storage engine if it supports document-level locking. If this
+     * call becomes too expensive, we could cache the value somewhere so we don't have to fetch
+     * the storage engine every time.
+     */
+    bool supportsDocLocking() {
+        if (hasGlobalEnvironment()) {
+            StorageEngine* globalStorageEngine = getGlobalEnvironment()->getGlobalStorageEngine();
+            if (globalStorageEngine != NULL) {
+                return globalStorageEngine->supportsDocLocking();
+            }
+        }
+
+        return false;
+    }
+}
 
     RWLockRecursive &Lock::ParallelBatchWriterMode::_batchLock = *(new RWLockRecursive("special"));
     void Lock::ParallelBatchWriterMode::iAmABatchParticipant(Locker* lockState) {
@@ -146,6 +165,16 @@ namespace mongo {
         if (haveClient()) {
             cc().curop()->lockStat().recordLockTimeMicros(_type, _timer.micros());
         }
+    }
+
+    void Lock::ScopedLock::_tempRelease() {
+        // TempRelease is only used for global locks
+        invariant(false);
+    }
+
+    void Lock::ScopedLock::_relock() {
+        // TempRelease is only used for global locks
+        invariant(false);
     }
 
     Lock::TempRelease::TempRelease(Locker* lockState)
@@ -207,16 +236,10 @@ namespace mongo {
         resetTime();
     }
 
-    void Lock::DBWrite::_tempRelease() { 
+    void Lock::DBWrite::_tempRelease() {
         unlockDB();
     }
-    void Lock::DBWrite::_relock() { 
-        lockDB();
-    }
-    void Lock::DBRead::_tempRelease() {
-        unlockDB();
-    }
-    void Lock::DBRead::_relock() { 
+    void Lock::DBWrite::_relock() {
         lockDB();
     }
 
@@ -279,15 +302,33 @@ namespace mongo {
         const newlm::ResourceId resIdDb(newlm::RESOURCE_DATABASE, db);
 
         _lockState->lockGlobal(newlm::MODE_IX);
-        _lockState->lock(resIdDb, newlm::MODE_X);
+
+        if (supportsDocLocking()) {
+            _lockState->lock(resIdDb, newlm::MODE_IX);
+
+            if (nsIsFull(_ns)) {
+                const newlm::ResourceId resIdCollection(newlm::RESOURCE_COLLECTION, _ns);
+                _lockState->lock(resIdCollection, newlm::MODE_IX);
+            }
+        }
+        else {
+            _lockState->lock(resIdDb, newlm::MODE_X);
+        }
 
         resetTime();
     }
 
     void Lock::DBWrite::unlockDB() {
+
+        if (supportsDocLocking()) {
+            if (nsIsFull(_ns)) {
+                const newlm::ResourceId resIdCollection(newlm::RESOURCE_COLLECTION, _ns);
+                _lockState->unlock(resIdCollection);
+            }
+        }
+
         const StringData db = nsToDatabaseSubstring(_ns);
         const newlm::ResourceId resIdDb(newlm::RESOURCE_DATABASE, db);
-
         _lockState->unlock(resIdDb);
 
         // The last release reports time the lock was held
@@ -316,15 +357,33 @@ namespace mongo {
         const newlm::ResourceId resIdDb(newlm::RESOURCE_DATABASE, db);
 
         _lockState->lockGlobal(newlm::MODE_IS);
-        _lockState->lock(resIdDb, newlm::MODE_S);
+
+        if (supportsDocLocking()) {
+            _lockState->lock(resIdDb, newlm::MODE_IS);
+
+            if (nsIsFull(_ns)) {
+                const newlm::ResourceId resIdCollection(newlm::RESOURCE_COLLECTION, _ns);
+                _lockState->lock(resIdCollection, newlm::MODE_IS);
+            }
+        }
+        else {
+            _lockState->lock(resIdDb, newlm::MODE_X);
+        }
 
         resetTime();
     }
 
     void Lock::DBRead::unlockDB() {
+
+        if (supportsDocLocking()) {
+            if (nsIsFull(_ns)) {
+                const newlm::ResourceId resIdCollection(newlm::RESOURCE_COLLECTION, _ns);
+                _lockState->unlock(resIdCollection);
+            }
+        }
+
         const StringData db = nsToDatabaseSubstring(_ns);
         const newlm::ResourceId resIdDb(newlm::RESOURCE_DATABASE, db);
-
         _lockState->unlock(resIdDb);
 
         // The last release reports time the lock was held

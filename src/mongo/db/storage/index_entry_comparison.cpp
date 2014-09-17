@@ -57,7 +57,8 @@ namespace mongo {
 
         // Iterate through both BSONObjects, comparing individual elements one by one
         for (unsigned mask = 1; lhsIt.more(); mask <<= 1) {
-             invariant(rhsIt.more());
+            if (!rhsIt.more())
+                return _order.descending(mask) ? -1 : 1;
 
             const BSONElement l = lhsIt.next();
             const BSONElement r = rhsIt.next();
@@ -90,7 +91,8 @@ namespace mongo {
 
         }
 
-        invariant(!rhsIt.more());
+        if(rhsIt.more())
+            return -1;
 
         // This means just look at the key, not the loc.
         if (lhs.loc.isNull() || rhs.loc.isNull())

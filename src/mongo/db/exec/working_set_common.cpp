@@ -120,7 +120,7 @@ namespace mongo {
     Status WorkingSetCommon::getMemberObjectStatus(const BSONObj& memberObj) {
         invariant(WorkingSetCommon::isValidStatusMemberObject(memberObj));
         return Status(static_cast<ErrorCodes::Error>(memberObj["code"].numberInt()),
-                      memberObj["errMsg"]);
+                      memberObj["errmsg"]);
     }
 
     // static

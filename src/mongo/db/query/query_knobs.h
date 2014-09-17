@@ -51,6 +51,9 @@ namespace mongo {
     // Do we have ixisect on at all?
     extern bool internalQueryPlannerEnableIndexIntersection;
 
+    // Do we use hash-based intersection for rooted $and queries?
+    extern bool internalQueryPlannerEnableHashIntersection;
+
     //
     // plan cache
     //

@@ -140,20 +140,25 @@ namespace mongo {
     public:
         WriteUnitOfWork(OperationContext* txn)
                  : _txn(txn) {
-            _txn->lockState()->beginWriteUnitOfWork();
+            if ( _txn->lockState() ) {
+                _txn->lockState()->beginWriteUnitOfWork();
+            }
             _txn->recoveryUnit()->beginUnitOfWork();
         }
 
         ~WriteUnitOfWork() {
             _txn->recoveryUnit()->endUnitOfWork();
-            _txn->lockState()->endWriteUnitOfWork();
+            if ( _txn->lockState() ) {
+                _txn->lockState()->endWriteUnitOfWork();
+            }
         }
 
         void commit() {
             _txn->recoveryUnit()->commitUnitOfWork();
-
-            _txn->lockState()->endWriteUnitOfWork();
-            _txn->lockState()->beginWriteUnitOfWork();
+            if ( _txn->lockState() ) {
+                _txn->lockState()->endWriteUnitOfWork();
+                _txn->lockState()->beginWriteUnitOfWork();
+            }
         }
 
     private:

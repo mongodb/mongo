@@ -75,7 +75,7 @@ namespace mongo {
 
         virtual Status dupKeyCheck(OperationContext* txn, const BSONObj& key, const DiskLoc& loc);
 
-        virtual void fullValidate(OperationContext* txn, long long* numKeysOut);
+        virtual void fullValidate(OperationContext* txn, long long* numKeysOut) const;
 
         virtual bool isEmpty(OperationContext* txn);
 

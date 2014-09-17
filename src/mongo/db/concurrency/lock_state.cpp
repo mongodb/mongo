@@ -68,23 +68,23 @@ namespace newlm {
 
 
     bool LockerImpl::isW() const {
-        return threadState() == 'W';
+        return getLockMode(resourceIdGlobal) == MODE_X;
     }
 
     bool LockerImpl::isR() const {
-        return threadState() == 'R';
+        return getLockMode(resourceIdGlobal) == MODE_S;
     }
 
     bool LockerImpl::hasAnyReadLock() const {
-        return threadState() == 'r' || threadState() == 'R';
+        return isLockHeldForMode(resourceIdGlobal, MODE_IS);
     }
 
     bool LockerImpl::isLocked() const {
-        return threadState() != 0;
+        return getLockMode(resourceIdGlobal) != MODE_NONE;
     }
 
     bool LockerImpl::isWriteLocked() const {
-        return (threadState() == 'W' || threadState() == 'w');
+        return isLockHeldForMode(resourceIdGlobal, MODE_IX);
     }
 
     bool LockerImpl::isWriteLocked(const StringData& ns) const {
@@ -99,19 +99,26 @@ namespace newlm {
     }
 
     bool LockerImpl::isAtLeastReadLocked(const StringData& ns) const {
-        if (threadState() == 'R' || threadState() == 'W')
+        if (threadState() == 'R' || threadState() == 'W') {
             return true; // global
-        if (threadState() == 0)
+        }
+        if (!isLocked()) {
             return false;
+        }
 
         const StringData db = nsToDatabaseSubstring(ns);
         const newlm::ResourceId resIdNs(newlm::RESOURCE_DATABASE, db);
 
-        return isLockHeldForMode(resIdNs, newlm::MODE_S);
-    }
+        if (!isLockHeldForMode(resIdNs, newlm::MODE_IS)) {
+            return false;
+        }
 
-    bool LockerImpl::isLockedForCommitting() const {
-        return threadState() == 'R' || threadState() == 'W';
+        if (!nsIsFull(ns)) {
+            return true;
+        }
+
+        const newlm::ResourceId collId(newlm::RESOURCE_DATABASE, ns);
+        return isLockHeldForMode(collId, newlm::MODE_IS);
     }
 
     bool LockerImpl::isRecursive() const {
@@ -150,7 +157,7 @@ namespace newlm {
         BSONObjBuilder b;
         if (threadState()) {
             char buf[2];
-            buf[0] = threadState(); 
+            buf[0] = threadState();
             buf[1] = 0;
             b.append("^", buf);
         }
@@ -182,15 +189,21 @@ namespace newlm {
     }
 
     void LockerImpl::dump() const {
-        char s = threadState();
+        _lock.lock();
         StringBuilder ss;
         ss << "lock status: ";
-        if( s == 0 ){
-            ss << "unlocked"; 
+        if (!isLocked()) {
+            ss << "unlocked";
         }
         else {
             // SERVER-14978: Dump lock stats information
         }
+
+        ss << " requests:";
+        for (LockRequestsMap::const_iterator it = _requests.begin(); it != _requests.end(); ++it) {
+            ss << " " << it->first.toString();
+        }
+        _lock.unlock();
         log() << ss.str() << std::endl;
     }
 

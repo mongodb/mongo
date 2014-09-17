@@ -56,10 +56,10 @@ namespace mongo {
     Database* DatabaseHolder::get(OperationContext* txn,
                                   const StringData& ns) const {
 
-        txn->lockState()->assertAtLeastReadLocked(ns);
+        const StringData db = _todb( ns );
+        txn->lockState()->assertAtLeastReadLocked(db);
 
         SimpleMutex::scoped_lock lk(_m);
-        const StringData db = _todb( ns );
         DBs::const_iterator it = _dbs.find(db);
         if ( it != _dbs.end() )
             return it->second;

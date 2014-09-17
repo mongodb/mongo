@@ -1,3 +1,5 @@
+// heap1_record_store_test.cpp
+
 /**
  *    Copyright (C) 2014 MongoDB Inc.
  *
@@ -26,40 +28,29 @@
  *    it in the license file.
  */
 
-#include "mongo/db/query/query_knobs.h"
-#include "mongo/db/server_options.h"
-#include "mongo/db/server_parameters.h"
+#include "mongo/db/storage/heap1/record_store_heap.h"
+#include "mongo/db/storage/heap1/heap1_recovery_unit.h"
+#include "mongo/db/storage/record_store_test_harness.h"
+#include "mongo/unittest/unittest.h"
 
 namespace mongo {
 
-    MONGO_EXPORT_SERVER_PARAMETER(internalQueryPlanEvaluationWorks, int, 10000);
+    class MyHarnessHelper : public HarnessHelper {
+    public:
+        MyHarnessHelper() {
+        }
 
-    MONGO_EXPORT_SERVER_PARAMETER(internalQueryPlanEvaluationCollFraction, double, 0.3);
+        virtual RecordStore* newNonCappedRecordStore() {
+            return new HeapRecordStore( "a.b" );
+        }
 
-    MONGO_EXPORT_SERVER_PARAMETER(internalQueryPlanEvaluationMaxResults, int, 101);
+        virtual RecoveryUnit* newRecoveryUnit() {
+            return new Heap1RecoveryUnit();
+        }
+    };
 
-    MONGO_EXPORT_SERVER_PARAMETER(internalQueryCacheSize, int, 5000);
+    HarnessHelper* newHarnessHelper() {
+        return new MyHarnessHelper();
+    }
 
-    MONGO_EXPORT_SERVER_PARAMETER(internalQueryCacheFeedbacksStored, int, 20);
-
-    MONGO_EXPORT_SERVER_PARAMETER(internalQueryCacheStdDeviations, double, 2.0);
-
-    MONGO_EXPORT_SERVER_PARAMETER(internalQueryCacheWriteOpsBetweenFlush, int, 1000);
-
-    MONGO_EXPORT_SERVER_PARAMETER(internalQueryPlannerMaxIndexedSolutions, int, 64);
-
-    MONGO_EXPORT_SERVER_PARAMETER(internalQueryEnumerationMaxOrSolutions, int, 10);
-
-    MONGO_EXPORT_SERVER_PARAMETER(internalQueryEnumerationMaxIntersectPerAnd, int, 3);
-
-    MONGO_EXPORT_SERVER_PARAMETER(internalQueryForceIntersectionPlans, bool, false);
-
-    MONGO_EXPORT_SERVER_PARAMETER(internalQueryPlannerEnableIndexIntersection, bool, true);
-
-    MONGO_EXPORT_SERVER_PARAMETER(internalQueryPlannerEnableHashIntersection, bool, false);
-
-    MONGO_EXPORT_SERVER_PARAMETER(internalQueryPlanOrChildrenIndependently, bool, true);
-
-    MONGO_EXPORT_SERVER_PARAMETER(internalQueryMaxScansToExplode, int, 200);
-
-}  // namespace mongo
+}

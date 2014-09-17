@@ -455,7 +455,7 @@ namespace mongo {
         }
     }
 
-    void RocksSortedDataImpl::fullValidate(OperationContext* txn, long long* numKeysOut) {
+    void RocksSortedDataImpl::fullValidate(OperationContext* txn, long long* numKeysOut) const {
         // XXX: no key counts
         if ( numKeysOut ) {
             *numKeysOut = -1;

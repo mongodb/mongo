@@ -112,7 +112,7 @@ namespace repl {
                 }
                 
                 if ( level > 1 ) {
-                    wassert(txn->lockState()->threadState() == 0);
+                    wassert(!txn->lockState()->isLocked());
                     // note: there is no so-style timeout on this connection; perhaps we should have one.
                     ScopedDbConnection conn(s["host"].valuestr());
                     

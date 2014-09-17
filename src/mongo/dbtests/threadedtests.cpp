@@ -147,7 +147,6 @@ namespace ThreadedTests {
                 else if( i % 7 == 1 ) {
                     Lock::GlobalRead r(&lockState);
                     ASSERT(lockState.hasAnyReadLock());
-                    ASSERT(lockState.threadState() != 0);
                     if( sometimes ) {
                         Lock::TempRelease t(&lockState);
                     }
@@ -184,9 +183,6 @@ namespace ThreadedTests {
                 else if( i % 7 == 5 ) {
                     {
                         Lock::DBRead r(&lockState, "foo");
-                        if( sometimes ) {
-                            Lock::TempRelease t(&lockState);
-                        }
                     }
                     {
                         Lock::DBRead r(&lockState, "bar");
@@ -196,28 +192,20 @@ namespace ThreadedTests {
                     if( i > N/2 ) { 
                         int q = i % 11;
                         if( q == 0 ) { 
-                            char what = 'r';
                             Lock::DBRead r(&lockState, "foo");
-                            ASSERT(lockState.threadState() == what && lockState.isAtLeastReadLocked("foo"));
+                            ASSERT(lockState.isAtLeastReadLocked("foo"));
                             ASSERT(!lockState.isRecursive());
                             Lock::DBRead r2(&lockState, "foo");
                             ASSERT(lockState.isRecursive());
-                            ASSERT(lockState.threadState() == what && lockState.isAtLeastReadLocked("foo"));
+                            ASSERT(lockState.isAtLeastReadLocked("foo"));
                             Lock::DBRead r3(&lockState, "local");
-                            if( sometimes ) {
-                                Lock::TempRelease t(&lockState);
-                            }
-                            ASSERT(lockState.threadState() == what && lockState.isAtLeastReadLocked("foo"));
-                            ASSERT(lockState.threadState() == what && lockState.isAtLeastReadLocked("local"));
+                            ASSERT(lockState.isAtLeastReadLocked("foo"));
+                            ASSERT(lockState.isAtLeastReadLocked("local"));
                         }
                         else if( q == 1 ) {
                             // test locking local only -- with no preceding lock
                             { 
                                 Lock::DBRead x(&lockState, "local");
-                                //Lock::DBRead y("q");
-                                if( sometimes ) {
-                                    Lock::TempRelease t(&lockState); // we don't temprelease (cant=true) here thus this is just a check that nothing weird happens...
-                                }
                             }
                             {
                                 Lock::DBWrite x(&lockState, "local");
@@ -227,24 +215,21 @@ namespace ThreadedTests {
                                 }
                             }
                         } else if( q == 1 ) {
-                                { Lock::DBRead  x(&lockState, "admin"); }
+                            {
+                                Lock::DBRead  x(&lockState, "admin");
+                            }
+
                             { 
                                 Lock::DBWrite x(&lockState, "admin"); 
                             }
-                        } else if( q == 2 ) { 
-                            /*Lock::DBWrite x("foo");
-                            Lock::DBWrite y("admin");
-                            { Lock::TempRelease t(&lockState); }*/
                         }
                         else if( q == 3 ) {
                             Lock::DBWrite x(&lockState, "foo");
                             Lock::DBRead y(&lockState, "admin");
-                            { Lock::TempRelease t(&lockState); }
                         }
                         else if( q == 4 ) { 
                             Lock::DBRead x(&lockState, "foo2");
                             Lock::DBRead y(&lockState, "admin");
-                            { Lock::TempRelease t(&lockState); }
                         }
                         else { 
                             Lock::DBWrite w(&lockState, "foo");
@@ -255,9 +240,6 @@ namespace ThreadedTests {
 
                             Lock::DBRead r2(&lockState, "foo");
                             Lock::DBRead r3(&lockState, "local");
-                            if( sometimes ) {
-                                Lock::TempRelease t(&lockState);
-                            }
                         }
                     }
                     else { 

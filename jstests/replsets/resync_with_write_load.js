@@ -6,14 +6,15 @@
  * assume that each individual phase will have data to work with, and therefore tested.
  */
 var testName = "resync_with_write_load"
-var replTest = new ReplSetTest({name: testName, nodes: 2, oplogSize: 100});
+var replTest = new ReplSetTest({name: testName, nodes: 3, oplogSize: 100});
 var nodes = replTest.nodeList();
 
 var conns = replTest.startSet();
 var config = { "_id": testName,
                "members": [
                             {"_id": 0, "host": nodes[0], priority:4},
-                            {"_id": 1, "host": nodes[1]}]
+                            {"_id": 1, "host": nodes[1]},
+                            {"_id": 2, "host": nodes[2]}]
               };
 var r = replTest.initiate(config);
 
@@ -38,7 +39,9 @@ print("******************** starting load for 30 secs *********************");
 var work = function() {
                 print("starting loadgen");
                 var start=new Date().getTime();
-                db.timeToStartTrigger.insert({_id:1});
+                
+                assert.writeOK(db.timeToStartTrigger.insert({_id:1}));
+
                 while (true) {
                     for (x=0; x < 100; x++) { 
                         db["a" + x].insert({a:x});

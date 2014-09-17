@@ -35,7 +35,7 @@ function test(userName) {
         assert.eq(roles[i].role, "root");
         matches++;
     }
-    assert.eq(matches, 1);
+    assert(matches >= 1);
 
     // Test roles/ privileges for a non-root user.
     myDB.createUser({user: "foo", pwd: "weak password", roles: [{db: "foo", role: "read"}]});
@@ -53,7 +53,7 @@ function test(userName) {
             matches++;
         }
     }
-    assert.eq(matches, 1);
+    assert(matches >= 1);
 
     myDB.logout();
 
