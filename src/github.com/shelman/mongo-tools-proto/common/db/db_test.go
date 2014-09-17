@@ -14,18 +14,9 @@ func TestInitSessionProvider(t *testing.T) {
 
 	Convey("When initializing a session provider", t, func() {
 
-		Convey("if nil options are passed in, an error should be"+
-			" returned", func() {
-
-			provider, err := InitSessionProvider(nil)
-			So(err, ShouldNotBeNil)
-			So(provider, ShouldBeNil)
-
-		})
-
 		Convey("with the standard options, a provider with a standard"+
 			" connector should be returned", func() {
-			opts := &options.ToolOptions{
+			opts := options.ToolOptions{
 				Connection: &options.Connection{},
 				SSL:        &options.SSL{},
 				Auth:       &options.Auth{},
@@ -39,7 +30,7 @@ func TestInitSessionProvider(t *testing.T) {
 
 		Convey("the master session should be successfully "+
 			" initialized", func() {
-			opts := &options.ToolOptions{
+			opts := options.ToolOptions{
 				Connection: &options.Connection{},
 				SSL:        &options.SSL{},
 				Auth:       &options.Auth{},
@@ -72,7 +63,7 @@ func TestRunCommand(t *testing.T) {
 		Convey("the specified command should be run and unmarshalled into the"+
 			" provided struct", func() {
 
-			opts := &options.ToolOptions{
+			opts := options.ToolOptions{
 				Connection: &options.Connection{},
 				SSL:        &options.SSL{},
 				Auth:       &options.Auth{},

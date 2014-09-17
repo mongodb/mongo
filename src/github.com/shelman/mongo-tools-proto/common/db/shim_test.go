@@ -7,7 +7,7 @@ import (
 )
 
 func TestShimRead(t *testing.T) {
-	Convey("Test shim process", t, func() {
+	Convey("Test shim process in read mode", t, func() {
 		var bsonTool StorageShim
 		resetFunc := func() {
 			//invokes a fake shim that just cat's a bson file
@@ -18,6 +18,7 @@ func TestShimRead(t *testing.T) {
 				Query:      "{}",
 				Skip:       0,
 				Limit:      0,
+				Mode:       Dump,
 				ShimPath:   "testdata/mock_shim.sh",
 			}
 		}
@@ -25,7 +26,7 @@ func TestShimRead(t *testing.T) {
 		resetFunc()
 
 		Convey("with raw byte stream", func() {
-			iter, err := bsonTool.Open()
+			iter, _, err := bsonTool.Open()
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -46,12 +47,12 @@ func TestShimRead(t *testing.T) {
 		})
 
 		Convey("with decoded byte stream", func() {
-			iter, err := bsonTool.Open()
+			iter, _, err := bsonTool.Open()
 			if err != nil {
 				t.Fatal(err)
 			}
 
-			decStrm := NewDecodedBSONStream(iter)
+			decStrm := NewDecodedBSONSource(iter)
 			docVal := bson.M{}
 			docCount := 0
 			for decStrm.Next(docVal) {
@@ -59,6 +60,37 @@ func TestShimRead(t *testing.T) {
 			}
 			So(iter.Err(), ShouldBeNil)
 			So(docCount, ShouldEqual, 100)
+		})
+	})
+
+	Convey("Test shim process in write mode", t, func() {
+		var bsonTool StorageShim
+		resetFunc := func() {
+			//invokes a fake shim that just cat's a bson file
+			bsonTool = StorageShim{
+				DBPath:     "/data/db",
+				Database:   "xxxxx",
+				Collection: "x",
+				Query:      "{}",
+				Skip:       0,
+				Limit:      0,
+				Mode:       Insert,
+				ShimPath:   "testdata/mock_shim_write.sh",
+			}
+		}
+		Reset(resetFunc)
+		resetFunc()
+
+		Convey("with raw byte stream", func() {
+			_, writer, err := bsonTool.Open()
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			encodedSink := &EncodedBSONSink{writer}
+			n, err := encodedSink.WriteDoc(bson.M{"hi": "there"})
+			So(err, ShouldBeNil)
+			So(n, ShouldBeGreaterThan, 0)
 		})
 	})
 }

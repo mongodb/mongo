@@ -21,7 +21,7 @@ func TestVanillaDBConnector(t *testing.T) {
 
 			connector = &VanillaDBConnector{}
 
-			opts := &options.ToolOptions{
+			opts := options.ToolOptions{
 				Connection: &options.Connection{
 					Host: "host1,host2",
 					Port: "20000",
@@ -40,7 +40,7 @@ func TestVanillaDBConnector(t *testing.T) {
 
 			connector = &VanillaDBConnector{}
 
-			opts := &options.ToolOptions{
+			opts := options.ToolOptions{
 				Connection: &options.Connection{
 					Host: "localhost",
 					Port: "27017",
@@ -84,7 +84,7 @@ func TestVanillaDBConnectorWithAuth(t *testing.T) {
 
 			connector = &VanillaDBConnector{}
 
-			opts := &options.ToolOptions{
+			opts := options.ToolOptions{
 				Connection: &options.Connection{
 					Host: "localhost",
 					Port: "27017",
@@ -107,7 +107,7 @@ func TestVanillaDBConnectorWithAuth(t *testing.T) {
 
 			connector = &VanillaDBConnector{}
 
-			opts := &options.ToolOptions{
+			opts := options.ToolOptions{
 				Connection: &options.Connection{
 					Host: "localhost",
 					Port: "27017",

@@ -6,7 +6,6 @@ import (
 	commonOpts "github.com/shelman/mongo-tools-proto/common/options"
 	"github.com/shelman/mongo-tools-proto/mongoimport/options"
 	. "github.com/smartystreets/goconvey/convey"
-	"gopkg.in/mgo.v2"
 	"gopkg.in/mgo.v2/bson"
 	"io"
 	"io/ioutil"
@@ -38,7 +37,7 @@ var (
 		Connection: connection,
 		Auth:       &commonOpts.Auth{},
 	}
-	sessionProvider, _ = db.InitSessionProvider(toolOptions)
+	sessionProvider, _ = db.InitSessionProvider(*toolOptions)
 )
 
 func TestMongoImportValidateSettings(t *testing.T) {
@@ -461,7 +460,7 @@ func TestImportDocuments(t *testing.T) {
 				Fields: "a,b,c",
 			}
 			ingestOptions := &options.IngestOptions{}
-			sessionProvider, err := db.InitSessionProvider(toolOptions)
+			sessionProvider, err := db.InitSessionProvider(*toolOptions)
 			So(err, ShouldBeNil)
 			mongoImport := MongoImport{
 				ToolOptions:     toolOptions,
@@ -485,7 +484,7 @@ func TestImportDocuments(t *testing.T) {
 				ingestOptions := &options.IngestOptions{
 					IgnoreBlanks: true,
 				}
-				sessionProvider, err := db.InitSessionProvider(toolOptions)
+				sessionProvider, err := db.InitSessionProvider(*toolOptions)
 				So(err, ShouldBeNil)
 				mongoImport := MongoImport{
 					ToolOptions:     toolOptions,
@@ -513,7 +512,7 @@ func TestImportDocuments(t *testing.T) {
 					Fields: "_id,b,c",
 				}
 				ingestOptions := &options.IngestOptions{}
-				sessionProvider, err := db.InitSessionProvider(toolOptions)
+				sessionProvider, err := db.InitSessionProvider(*toolOptions)
 				So(err, ShouldBeNil)
 				mongoImport := MongoImport{
 					ToolOptions:     toolOptions,
@@ -542,7 +541,7 @@ func TestImportDocuments(t *testing.T) {
 			ingestOptions := &options.IngestOptions{
 				Upsert: true,
 			}
-			sessionProvider, err := db.InitSessionProvider(toolOptions)
+			sessionProvider, err := db.InitSessionProvider(*toolOptions)
 			So(err, ShouldBeNil)
 			mongoImport := MongoImport{
 				ToolOptions:     toolOptions,
@@ -572,7 +571,7 @@ func TestImportDocuments(t *testing.T) {
 				ingestOptions := &options.IngestOptions{
 					StopOnError: true,
 				}
-				sessionProvider, err := db.InitSessionProvider(toolOptions)
+				sessionProvider, err := db.InitSessionProvider(*toolOptions)
 				So(err, ShouldBeNil)
 				mongoImport := MongoImport{
 					ToolOptions:     toolOptions,
@@ -599,7 +598,7 @@ func TestImportDocuments(t *testing.T) {
 				Fields: "_id,b,c",
 			}
 			ingestOptions := &options.IngestOptions{}
-			sessionProvider, err := db.InitSessionProvider(toolOptions)
+			sessionProvider, err := db.InitSessionProvider(*toolOptions)
 			So(err, ShouldBeNil)
 			mongoImport := MongoImport{
 				ToolOptions:     toolOptions,
@@ -629,7 +628,7 @@ func TestImportDocuments(t *testing.T) {
 			ingestOptions := &options.IngestOptions{
 				Drop: true,
 			}
-			sessionProvider, err := db.InitSessionProvider(toolOptions)
+			sessionProvider, err := db.InitSessionProvider(*toolOptions)
 			So(err, ShouldBeNil)
 			mongoImport := MongoImport{
 				ToolOptions:     toolOptions,
@@ -656,7 +655,7 @@ func TestImportDocuments(t *testing.T) {
 				HeaderLine: true,
 			}
 			ingestOptions := &options.IngestOptions{}
-			sessionProvider, err := db.InitSessionProvider(toolOptions)
+			sessionProvider, err := db.InitSessionProvider(*toolOptions)
 			So(err, ShouldBeNil)
 			mongoImport := MongoImport{
 				ToolOptions:     toolOptions,
@@ -680,7 +679,7 @@ func TestImportDocuments(t *testing.T) {
 				HeaderLine: true,
 			}
 			ingestOptions := &options.IngestOptions{}
-			sessionProvider, err := db.InitSessionProvider(toolOptions)
+			sessionProvider, err := db.InitSessionProvider(*toolOptions)
 			So(err, ShouldBeNil)
 			mongoImport := MongoImport{
 				ToolOptions:     toolOptions,
@@ -704,7 +703,7 @@ func TestImportDocuments(t *testing.T) {
 				Upsert:       true,
 				UpsertFields: "_id",
 			}
-			sessionProvider, err := db.InitSessionProvider(toolOptions)
+			sessionProvider, err := db.InitSessionProvider(*toolOptions)
 			So(err, ShouldBeNil)
 			mongoImport := MongoImport{
 				ToolOptions:     toolOptions,
@@ -735,7 +734,7 @@ func TestImportDocuments(t *testing.T) {
 				UpsertFields: "_id",
 			}
 			toolOptions := getBasicToolOptions()
-			sessionProvider, err := db.InitSessionProvider(toolOptions)
+			sessionProvider, err := db.InitSessionProvider(*toolOptions)
 			So(err, ShouldBeNil)
 			mongoImport := MongoImport{
 				ToolOptions:     toolOptions,
@@ -765,7 +764,7 @@ func TestImportDocuments(t *testing.T) {
 			ingestOptions := &options.IngestOptions{
 				StopOnError: true,
 			}
-			sessionProvider, err := db.InitSessionProvider(toolOptions)
+			sessionProvider, err := db.InitSessionProvider(*toolOptions)
 			So(err, ShouldBeNil)
 			mongoImport := MongoImport{
 				ToolOptions:     toolOptions,
@@ -792,7 +791,7 @@ func TestImportDocuments(t *testing.T) {
 				}
 				toolOptions := getBasicToolOptions()
 				ingestOptions := &options.IngestOptions{}
-				sessionProvider, err := db.InitSessionProvider(toolOptions)
+				sessionProvider, err := db.InitSessionProvider(*toolOptions)
 				So(err, ShouldBeNil)
 				mongoImport := MongoImport{
 					ToolOptions:     toolOptions,
@@ -809,7 +808,12 @@ func TestImportDocuments(t *testing.T) {
 				So(checkOnlyHasDocuments(expectedDocuments), ShouldBeNil)
 			})
 		Reset(func() {
-			getCollection().DropCollection()
+			session, err := sessionProvider.GetSession()
+			if err != nil {
+				t.Fatalf("Error doing cleanup: %v", err)
+			}
+			defer session.Close()
+			session.DB(testDB).C(testCollection).DropCollection()
 		})
 
 	})
@@ -818,9 +822,15 @@ func TestImportDocuments(t *testing.T) {
 // checkOnlyHasDocuments returns an error if the documents in the test
 // collection don't exactly match those that are passed in
 func checkOnlyHasDocuments(expectedDocuments []bson.M) error {
-	collection := getCollection()
+	session, err := sessionProvider.GetSession()
+	if err != nil {
+		return err
+	}
+	defer session.Close()
+
+	collection := session.DB(testDB).C(testCollection)
 	dbDocuments := []bson.M{}
-	err := collection.Find(nil).Sort("_id").All(&dbDocuments)
+	err = collection.Find(nil).Sort("_id").All(&dbDocuments)
 	if err != nil {
 		return err
 	}
@@ -835,21 +845,6 @@ func checkOnlyHasDocuments(expectedDocuments []bson.M) error {
 		}
 	}
 	return nil
-}
-
-// getSession returns a connection to the server from the connection pool
-func getSession() *mgo.Session {
-	return sessionProvider.GetSession()
-}
-
-// getSession returns a handle to the test collection on the server
-func getCollection() *mgo.Collection {
-	return getSession().DB(testDB).C(testCollection)
-}
-
-// closeSession closes the session for the global provider
-func closeSession() {
-	sessionProvider.GetSession().Close()
 }
 
 // getBasicToolOptions returns a test helper to instantiate the session provider
