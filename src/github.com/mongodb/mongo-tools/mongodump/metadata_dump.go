@@ -40,13 +40,21 @@ type IndexDocFromDB struct {
 // This helper gets the metadata for a collection and writes it
 // in readable JSON format
 func (dump *MongoDump) dumpMetadataToWriter(db, c string, writer io.Writer) error {
-	session := dump.SessionProvider.GetSession()
+	session, err := dump.SessionProvider.GetSession()
+	if err != nil {
+		return fmt.Errorf("error establishing database connection: %v", err)
+	}
 
 	// make a buffered writer for nicer disk i/o
 	w := bufio.NewWriter(writer)
 
 	nsID := fmt.Sprintf("%v.%v", db, c)
-	meta := Metadata{}
+	meta := Metadata{
+		// We have to initialize Indexes to an empty slice, not nil, so that an empty
+		// array is marshalled into json instead of null. That is, {indexes:[]} is okay
+		// but {indexes:null} will cause assertions in our legacy C++ mongotools
+		Indexes: []IndexDoc{},
+	}
 
 	// First, we get the options for the collection. These are pulled
 	// from the system.namespaces collection, which is the hidden internal
@@ -55,7 +63,7 @@ func (dump *MongoDump) dumpMetadataToWriter(db, c string, writer io.Writer) erro
 	log.Logf(3, "\treading options for `%v`", nsID)
 	collection := session.DB(db).C("system.namespaces")
 	namespaceDoc := bson.M{}
-	err := collection.Find(bson.M{"name": nsID}).One(&namespaceDoc)
+	err = collection.Find(bson.M{"name": nsID}).One(&namespaceDoc)
 	if err != nil {
 		return fmt.Errorf("error finding metadata for collection `%v`: %v", nsID, err)
 	}
