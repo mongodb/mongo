@@ -30,6 +30,8 @@
  *    it in the license file.
  */
  
+#pragma once
+
 #include <string>
 
 #include "mongo/db/catalog/collection_options.h"

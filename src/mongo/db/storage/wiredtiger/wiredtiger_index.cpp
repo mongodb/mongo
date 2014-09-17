@@ -420,7 +420,7 @@ namespace mongo {
 
     SortedDataInterface* getWiredTigerIndex(
             WiredTigerDatabase &db, const std::string &ns, const std::string &idxName,
-            IndexCatalogEntry& info, boost::shared_ptr<void>* dataInOut) {
+            IndexCatalogEntry& info) {
         int ret = WiredTigerIndex::Create(db, ns, idxName, info);
         invariant(ret == 0);
         return new WiredTigerIndex(db, info, ns, idxName);

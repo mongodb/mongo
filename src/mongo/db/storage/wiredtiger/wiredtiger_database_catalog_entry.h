@@ -39,6 +39,7 @@
 
 #include "mongo/db/catalog/collection_catalog_entry.h"
 #include "mongo/db/catalog/database_catalog_entry.h"
+#include "mongo/db/storage/wiredtiger/wiredtiger_collection_catalog_entry.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_record_store.h"
 
 namespace mongo {
@@ -99,78 +100,16 @@ namespace mongo {
 
     private:
 
-        BSONObj getSavedMetadata( WiredTigerCursor &cursor );
         void _loadAllCollections();
-        void _loadCollection( WiredTigerSession& swrap,
-                              const std::string &tbl_uri,
-                              bool stayTemp = false );
-        struct IndexEntry {
-            std::string name;
-            BSONObj spec;
-            DiskLoc head;
-            bool ready;
-            bool isMultikey;
-            
-            // Only one of these will be in use. See getIndex() implementation.
-            scoped_ptr<RecordStore> rs;
-            shared_ptr<void> data;
-        };
-
-        class Entry : public CollectionCatalogEntry {
-        public:
-            Entry( const StringData& ns, const CollectionOptions& options );
-            virtual ~Entry();
-
-            int getTotalIndexCount( OperationContext* txn ) const;
-
-            int getCompletedIndexCount( OperationContext* txn ) const;
-
-            int getMaxAllowedIndexes() const { return 64; }
-
-            void getAllIndexes( OperationContext* txn, std::vector<std::string>* names ) const;
-
-            BSONObj getIndexSpec( OperationContext* txn, const StringData& idxName ) const;
-
-            bool isIndexMultikey( OperationContext* txn, const StringData& indexName) const;
-
-            bool setIndexIsMultikey(OperationContext* txn,
-                                    const StringData& indexName,
-                                    bool multikey = true);
-
-            DiskLoc getIndexHead( OperationContext* txn, const StringData& indexName ) const;
-
-            void setIndexHead( OperationContext* txn,
-                               const StringData& indexName,
-                               const DiskLoc& newHead );
-
-            bool isIndexReady( OperationContext* txn, const StringData& indexName ) const;
-
-            Status removeIndex( OperationContext* txn,
-                                const StringData& indexName );
-
-            Status prepareForIndexBuild( OperationContext* txn,
-                                         const IndexDescriptor* spec );
-
-            void indexBuildSuccess( OperationContext* txn,
-                                    const StringData& indexName );
-
-            void updateTTLSetting( OperationContext* txn,
-                                   const StringData& idxName,
-                                   long long newExpireSeconds );
-
-            CollectionOptions getCollectionOptions(OperationContext* txn) const { return options; }
-
-            CollectionOptions options;
-            scoped_ptr<WiredTigerRecordStore> rs;
-
-            typedef std::map<std::string,IndexEntry*> Indexes;
-            Indexes indexes;
-        };
+        //BSONObj _getSavedMetadata( WiredTigerCursor &cursor );
+        //void _loadCollection( WiredTigerSession& swrap,
+        //                      const std::string &tbl_uri,
+        //                      bool stayTemp = false );
 
         WiredTigerDatabase &_db;
 
         mutable boost::mutex _entryMapLock;
-        typedef std::map<std::string, Entry *> EntryMap;
+        typedef std::map<std::string, WiredTigerCollectionCatalogEntry *> EntryMap;
         EntryMap _entryMap;
-    };
+	};
 }
