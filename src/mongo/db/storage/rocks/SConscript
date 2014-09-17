@@ -75,3 +75,13 @@ if has_option("rocksdb"):
             ]
         )
 
+
+    env.CppUnitTest(
+       target='storage_rocks_sorted_data_impl_harness_test',
+       source=['rocks_sorted_data_impl_harness_test.cpp'
+               ],
+       LIBDEPS=[
+            'storage_rocks_fake',
+            '$BUILD_DIR/mongo/db/storage/sorted_data_interface_test_harness'
+            ]
+       )

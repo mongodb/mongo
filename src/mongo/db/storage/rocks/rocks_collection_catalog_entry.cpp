@@ -42,6 +42,7 @@ namespace mongo {
     /**
      * bson schema
      * { ns: <name for sanity>,
+     *   options : <bson spec>,
      *   indexes : [ { spec : <bson spec>,
      *                 ready: <bool>,
      *                 head: DiskLoc,

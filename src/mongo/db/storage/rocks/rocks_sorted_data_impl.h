@@ -30,6 +30,8 @@
 
 #include "mongo/db/storage/sorted_data_interface.h"
 
+#include <atomic>
+
 #include <rocksdb/db.h>
 
 #include "mongo/bson/ordering.h"
@@ -81,6 +83,8 @@ namespace mongo {
 
         virtual Status touch(OperationContext* txn) const;
 
+        virtual long long numEntries(OperationContext* txn) const;
+
         virtual Cursor* newCursor(OperationContext* txn, int direction) const;
 
         virtual Status initAsEmpty(OperationContext* txn);
@@ -107,10 +111,33 @@ namespace mongo {
         // used to construct RocksCursors
         const Ordering _order;
 
+        std::atomic<long long> _numEntries;
+
+        class ChangeNumEntries : public RecoveryUnit::Change {
+        public:
+            ChangeNumEntries(std::atomic<long long>* numEntries, bool increase)
+                : _numEntries(numEntries), _increase(increase) {}
+
+            void commit() {
+                if (_increase) {
+                    _numEntries->fetch_add(1);
+                } else {
+                    _numEntries->fetch_sub(1);
+                }
+            }
+
+            void rollback() {}
+
+        private:
+            std::atomic<long long>* _numEntries;
+            bool _increase;
+        };
+
         /**
          * Creates an error code message out of a key
          */
-        std::string dupKeyError(const BSONObj& key) const;
+        std::string
+            dupKeyError(const BSONObj& key) const;
     };
 
 } // namespace mongo

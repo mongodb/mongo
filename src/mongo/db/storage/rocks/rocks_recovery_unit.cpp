@@ -30,50 +30,52 @@
 
 #include "mongo/db/storage/rocks/rocks_recovery_unit.h"
 
+#include <rocksdb/comparator.h>
 #include <rocksdb/db.h>
 #include <rocksdb/slice.h>
 #include <rocksdb/options.h>
 #include <rocksdb/write_batch.h>
+#include <rocksdb/utilities/write_batch_with_index.h>
 
 #include "mongo/util/log.h"
 
 namespace mongo {
 
-    RocksRecoveryUnit::RocksRecoveryUnit( rocksdb::DB* db, bool defaultCommit )
-                                       : _db( db ),
-                                       _defaultCommit( defaultCommit ),
-                                       _writeBatch(  ),
-                                       _depth( 0 ),
-                                       _snapshot( NULL ) { }
-
+    RocksRecoveryUnit::RocksRecoveryUnit(rocksdb::DB* db, bool defaultCommit)
+        : _db(db),
+          _defaultCommit(defaultCommit),
+          _writeBatch(),
+          _snapshot(NULL),
+          _destroyed(false) {}
 
     RocksRecoveryUnit::~RocksRecoveryUnit() {
-        if ( _defaultCommit ) {
-            commitUnitOfWork();
-        }
-
-        if ( _snapshot ) {
-            _db->ReleaseSnapshot( _snapshot );
+        if (!_destroyed) {
+            _destroyInternal();
         }
     }
 
-    void RocksRecoveryUnit::beginUnitOfWork() {
-        _depth++;
-    }
+    void RocksRecoveryUnit::beginUnitOfWork() {}
 
     void RocksRecoveryUnit::commitUnitOfWork() {
+        invariant(!_destroyed);
         if ( !_writeBatch ) {
             // nothing to be committed
             return;
         }
 
-        rocksdb::Status status = _db->Write( rocksdb::WriteOptions(), _writeBatch.get() );
+        rocksdb::Status status = _db->Write(rocksdb::WriteOptions(), _writeBatch->GetWriteBatch());
         if ( !status.ok() ) {
             log() << "uh oh: " << status.ToString();
             invariant( !"rocks write batch commit failed" );
         }
 
-        _writeBatch->Clear();
+        for (auto& change : _changes) {
+            change->commit();
+            delete change;
+        }
+        _changes.clear();
+
+        _writeBatch.reset();
 
         if ( _snapshot ) {
             _db->ReleaseSnapshot( _snapshot );
@@ -81,12 +83,7 @@ namespace mongo {
         }
     }
 
-    void RocksRecoveryUnit::endUnitOfWork() {
-        _depth--;
-        invariant( _depth >= 0 );
-        if ( _depth == 0 )
-            commitUnitOfWork();
-    }
+    void RocksRecoveryUnit::endUnitOfWork() {}
 
     bool RocksRecoveryUnit::awaitCommit() {
         // TODO
@@ -104,18 +101,21 @@ namespace mongo {
 
     // lazily initialized because Recovery Units are sometimes initialized just for reading,
     // which does not require write batches
-    rocksdb::WriteBatch* RocksRecoveryUnit::writeBatch() {
-        if ( !_writeBatch ) {
-            _writeBatch.reset( new rocksdb::WriteBatch() );
+    rocksdb::WriteBatchWithIndex* RocksRecoveryUnit::writeBatch() {
+        if (!_writeBatch) {
+            // this assumes that default column family uses default comparator. change this if you
+            // change default column family's comparator
+            _writeBatch.reset(new rocksdb::WriteBatchWithIndex(rocksdb::BytewiseComparator()));
         }
 
         return _writeBatch.get();
     }
 
-    void RocksRecoveryUnit::registerChange(Change* change) {
-        // without rollbacks enabled, this is fine.
-        change->commit();
-        delete change;
+    void RocksRecoveryUnit::registerChange(Change* change) { _changes.emplace_back(change); }
+
+    void RocksRecoveryUnit::destroy() {
+        _destroyed = true;
+        _destroyInternal();
     }
 
     // XXX lazily initialized for now
@@ -131,4 +131,18 @@ namespace mongo {
         return _snapshot;
     }
 
+    void RocksRecoveryUnit::_destroyInternal() {
+        if (_defaultCommit) {
+            commitUnitOfWork();
+        }
+
+        for (auto& change : _changes) {
+            change->rollback();
+            delete change;
+        }
+
+        if (_snapshot) {
+            _db->ReleaseSnapshot(_snapshot);
+        }
+    }
 }

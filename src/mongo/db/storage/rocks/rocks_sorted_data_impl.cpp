@@ -30,11 +30,13 @@
 
 #include "mongo/db/storage/rocks/rocks_sorted_data_impl.h"
 
+#include <cstdlib>
 #include <string>
 
 #include <rocksdb/comparator.h>
 #include <rocksdb/db.h>
 #include <rocksdb/iterator.h>
+#include <rocksdb/utilities/write_batch_with_index.h>
 
 #include "mongo/db/storage/rocks/rocks_engine.h"
 #include "mongo/db/storage/rocks/rocks_record_store.h"
@@ -131,18 +133,6 @@ namespace mongo {
             }
 
             bool locate(const BSONObj& key, const DiskLoc& loc) {
-                // if key is an empty BSONObj, the default behavior is to seek to the
-                // beginning of the iterator and return false.
-                if ( key == BSONObj() ) {
-                    if ( _forward ) {
-                        _iterator->SeekToFirst();
-                    } else {
-                        _iterator->SeekToLast();
-                    }
-
-                    return false;
-                }
-
                 return _locate( stripFieldNames( key ), loc );
             }
 
@@ -208,7 +198,7 @@ namespace mongo {
                 _savePositionLoc = getDiskLoc();
             }
 
-            void restorePosition(OperationContext*) {
+            void restorePosition(OperationContext* txn) {
                 _isCached = false;
 
                 if ( _savedAtEnd ) {
@@ -246,35 +236,14 @@ namespace mongo {
                 _checkStatus();
 
                 if ( !_iterator->Valid() ) { // seeking outside the range of the index
+                    // this will give lower bound behavior
                     _iterator->SeekToLast();
                     _checkStatus();
-
-                    if ( _iterator->Valid() ) {
-                        _load();
-                        IndexKeyEntry smallestEntry( _cachedKey, _cachedLoc );
-
-                        if ( _comparator.compare( keyEntry, smallestEntry ) < 0 ) {
-                            // a reverse iterator seeking lower than the lowest key is left in an
-                            // invalid position.
-                            advance();
-                            invariant( isEOF() );
-                        } else {
-                            // a reverse iterator seeking higher than highest key is positioned on
-                            // the highest key.
-                            _iterator->SeekToLast();
-                            _checkStatus();
-                            _load();
-                            IndexKeyEntry largestEntry( _cachedKey, _cachedLoc );
-                            invariant( _comparator.compare( keyEntry, largestEntry ) > 0 );
-                        }
-                    }
-
                     return false;
                 }
 
                 _load();
-                IndexKeyEntry foundEntry( _cachedKey, _cachedLoc );
-                if ( _comparator.compare( keyEntry, foundEntry ) == 0 ) {
+                if (loc == _cachedLoc && key == _cachedKey) {
                     return true;
                 }
 
@@ -306,8 +275,7 @@ namespace mongo {
                     return false;
 
                 _load();
-                return _comparator.compare( IndexKeyEntry( key, loc ),
-                                            IndexKeyEntry( _cachedKey, _cachedLoc ) ) == 0;
+                return loc == _cachedLoc && key == _cachedKey;
             }
 
             void _checkStatus() {
@@ -390,6 +358,10 @@ namespace mongo {
             Ordering order ) : _db( db ), _columnFamily( cf ), _order( order ) {
         invariant( _db );
         invariant( _columnFamily );
+        string value;
+        bool ok = _db->GetProperty(_columnFamily, "rocksdb.estimate-num-keys", &value);
+        invariant( ok );
+        _numEntries.store(std::atoll(value.c_str()));
     }
 
     SortedDataBuilderInterface* RocksSortedDataImpl::getBulkBuilder(OperationContext* txn,
@@ -412,6 +384,7 @@ namespace mongo {
             }
         }
 
+        ru->registerChange(new ChangeNumEntries(&_numEntries, true));
         ru->writeBatch()->Put( _columnFamily, makeString( key, loc ), emptyByteSlice );
 
         return Status::OK();
@@ -426,12 +399,13 @@ namespace mongo {
 
         string dummy;
         const rocksdb::ReadOptions options = RocksEngine::readOptionsWithSnapshot( txn );
-        if ( !_db->KeyMayExist( options,_columnFamily, keyData, &dummy ) ) {
+        if ( _db->Get( options,_columnFamily, keyData, &dummy ).IsNotFound() ) {
             return false;
         }
 
+        ru->registerChange(new ChangeNumEntries(&_numEntries, false));
         ru->writeBatch()->Delete( _columnFamily, keyData );
-        return true; // XXX: fix? does it matter since its so slow to check?
+        return true;
     }
 
     string RocksSortedDataImpl::dupKeyError(const BSONObj& key) const {
@@ -445,20 +419,25 @@ namespace mongo {
     Status RocksSortedDataImpl::dupKeyCheck(OperationContext* txn,
                                             const BSONObj& key,
                                             const DiskLoc& loc) {
-        boost::scoped_ptr<SortedDataInterface::Cursor> cursor( newCursor( txn, 1 ) );
+        boost::scoped_ptr<SortedDataInterface::Cursor> cursor(newCursor(txn, 1));
+        cursor->locate(key, DiskLoc(0, 0));
 
-        if ( !cursor->locate( key, DiskLoc() ) || cursor->isEOF() ||
-             cursor->getDiskLoc() == loc ) {
+        if (cursor->isEOF() || cursor->getKey() != key) {
             return Status::OK();
         } else {
-            return Status( ErrorCodes::DuplicateKey, dupKeyError( key ) );
+            return Status(ErrorCodes::DuplicateKey, dupKeyError(key));
         }
     }
 
     void RocksSortedDataImpl::fullValidate(OperationContext* txn, long long* numKeysOut) const {
-        // XXX: no key counts
-        if ( numKeysOut ) {
-            *numKeysOut = -1;
+        if (numKeysOut) {
+            *numKeysOut = 0;
+            const rocksdb::ReadOptions options = RocksEngine::readOptionsWithSnapshot(txn);
+            boost::scoped_ptr<rocksdb::Iterator> it(_db->NewIterator(options, _columnFamily));
+            it->SeekToFirst();
+            for (*numKeysOut = 0; it->Valid(); it->Next()) {
+                ++(*numKeysOut);
+            }
         }
     }
 
@@ -468,13 +447,15 @@ namespace mongo {
                                                                    _columnFamily ) );
 
         it->SeekToFirst();
-        return it->Valid();
+        return !it->Valid();
     }
 
     Status RocksSortedDataImpl::touch(OperationContext* txn) const {
         // no-op
         return Status::OK();
     }
+
+    long long RocksSortedDataImpl::numEntries(OperationContext* txn) const { return _numEntries.load(); }
 
     SortedDataInterface::Cursor* RocksSortedDataImpl::newCursor(OperationContext* txn,
                                                                 int direction) const {

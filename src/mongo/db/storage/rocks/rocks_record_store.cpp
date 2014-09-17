@@ -37,6 +37,7 @@
 #include <rocksdb/db.h>
 #include <rocksdb/options.h>
 #include <rocksdb/slice.h>
+#include <rocksdb/utilities/write_batch_with_index.h>
 
 #include "mongo/util/log.h"
 
@@ -128,21 +129,41 @@ namespace mongo {
     }
 
     RecordData RocksRecordStore::dataFor( OperationContext* txn, const DiskLoc& loc) const {
-        // TODO investigate using cursor API to get a Slice and avoid double copying.
-        std::string value;
+      rocksdb::Slice value;
 
-        // XXX not using a Snapshot here
-        rocksdb::Status status = _db->Get( _readOptions(), _columnFamily, _makeKey( loc ), &value );
+        RocksRecoveryUnit* ru = _getRecoveryUnit( txn );
+        auto key = _makeKey(loc);
+        boost::shared_array<char> data;
 
-        if ( !status.ok() ) {
-            log() << "rocks Get failed, blowing up: " << status.ToString();
-            invariant( false );
+        boost::scoped_ptr<rocksdb::WBWIIterator> wb_iterator(
+            ru->writeBatch()->NewIterator(_columnFamily));
+        wb_iterator->Seek(key);
+        if (wb_iterator->Valid() && wb_iterator->Entry().key == key) {
+            const auto& entry = wb_iterator->Entry();
+            if (entry.type == rocksdb::WriteType::kDeleteRecord) {
+                return RecordData(nullptr, 0);
+            }
+            data.reset(new char[entry.value.size()]);
+            memcpy(data.get(), entry.value.data(), entry.value.size());
+            value = rocksdb::Slice(data.get(), entry.value.size());
+        } else {
+            // TODO investigate using cursor API to get a Slice and avoid double copying.
+            std::string value_storage;
+            auto status = _db->Get(_readOptions(txn), _columnFamily, _makeKey(loc), &value_storage);
+            if (!status.ok()) {
+                if (status.IsNotFound()) {
+                    return RecordData(nullptr, 0);
+                } else {
+                    log() << "rocks Get failed, blowing up: " << status.ToString();
+                    invariant(false);
+                }
+            }
+            data.reset(new char[value_storage.size()]);
+            memcpy(data.get(), value_storage.data(), value_storage.size());
+            value = rocksdb::Slice(data.get(), value_storage.size());
         }
 
-        boost::shared_array<char> data( new char[value.size()] );
-        memcpy( data.get(), value.data(), value.size() );
-
-        return RecordData( data.get(), value.size(), data );
+        return RecordData(value.data(), value.size(), data);
     }
 
     void RocksRecordStore::deleteRecord( OperationContext* txn, const DiskLoc& dl ) {

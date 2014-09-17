@@ -50,9 +50,8 @@ namespace mongo {
 
     class MyOperationContext : public OperationContextNoop {
     public:
-        MyOperationContext( RocksEngine* engine )
-            : OperationContextNoop( new RocksRecoveryUnit( engine->getDB(), false ) ) {
-        }
+        MyOperationContext(RocksEngine* engine)
+            : OperationContextNoop(new RocksRecoveryUnit(engine->getDB(), false)) {}
     };
 
     TEST( RocksEngineTest, Start1 ) {
@@ -301,9 +300,10 @@ namespace mongo {
         }
 
         {
-            RocksEngine engine( path );
-            RocksRecordStore* rs = engine.getEntry( "test.foo" )->recordStore.get();
-            ASSERT_EQUALS( s, rs->dataFor( NULL, loc ).data() );
+            RocksEngine engine(path);
+            RocksRecordStore* rs = engine.getEntry("test.foo")->recordStore.get();
+            MyOperationContext opCtx(&engine);
+            ASSERT_EQUALS(s, rs->dataFor(&opCtx, loc).data());
         }
 
     }

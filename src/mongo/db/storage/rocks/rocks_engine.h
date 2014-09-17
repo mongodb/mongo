@@ -128,7 +128,6 @@ namespace mongo {
          */
         rocksdb::ColumnFamilyHandle* getIndexColumnFamilyNoCreate(const StringData& ns,
                                                                    const StringData& indexName );
-
         /**
          * Completely removes a column family. Input pointer is invalid after calling
          */
