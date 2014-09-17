@@ -73,7 +73,7 @@ functions:
     params:
       working_dir: src
       tests:
-        - dir: src/github.com/shelman/mongo-tools-proto/mongoimport
+        - dir: src/github.com/mongodb/mongo-tools/mongoimport
           args: ${coverage_args}
 
   "move coverage data":
@@ -84,7 +84,7 @@ functions:
         set -o verbose
         if [ '${coverage|false}' = 'true' ]
         then
-            mv src/github.com/shelman/mongo-tools-proto/mongoimport/coverage.out $GOPATH
+            mv src/github.com/mongodb/mongo-tools/mongoimport/coverage.out $GOPATH
         fi
 
 pre:
@@ -131,7 +131,7 @@ tasks:
         script: |
           set -o verbose
           export GOPATH=`pwd`
-          go build -o mongoimport github.com/shelman/mongo-tools-proto/mongoimport/main
+          go build -o mongoimport github.com/mongodb/mongo-tools/mongoimport/main
     - command: s3.put
       params:
         aws_key: ${aws_key}

@@ -75,7 +75,7 @@ functions:
       script: |
         set -o verbose
         export GOPATH=`pwd`
-        cd src/github.com/shelman/mongo-tools-proto/${package}
+        cd src/github.com/mongodb/mongo-tools/${package}
         go test -i
         if [ '${coverage|false}' = 'true' ]
         then
@@ -90,7 +90,7 @@ functions:
     params:
       working_dir: src
       tests:
-        - dir: src/github.com/shelman/mongo-tools-proto/common/${package}
+        - dir: src/github.com/mongodb/mongo-tools/common/${package}
           args: ${coverage_args}
 
   "move coverage data":
@@ -99,7 +99,7 @@ functions:
       working_dir: src
       script: |
         set -o verbose
-        mv src/github.com/shelman/mongo-tools-proto/common/${package}/coverage.out $GOPATH
+        mv src/github.com/mongodb/mongo-tools/common/${package}/coverage.out $GOPATH
 
 pre:
   - command: expansions.fetch
@@ -210,7 +210,7 @@ tasks:
         script: |
           set -o verbose
           export GOPATH=`pwd`
-          go run src/github.com/3rf/mongo-lint/golint/golint.go src/github.com/shelman/mongo-tools-proto
+          go run src/github.com/3rf/mongo-lint/golint/golint.go src/github.com/mongodb/mongo-tools
 
 - name: vet
   commands:
@@ -224,7 +224,7 @@ tasks:
         script: |
           set -o verbose
           export GOPATH=`pwd`
-          go tool vet src/github.com/shelman/mongo-tools-proto/
+          go tool vet src/github.com/mongodb/mongo-tools/
 
 - name: util
   commands:
@@ -269,7 +269,7 @@ tasks:
           - key: "types"
             value: "ssl_auth"
           - key: "mongod_extra_options"
-            value: "--sslMode requireSSL --sslCAFile src/src/github.com/shelman/mongo-tools-proto/common/db/ssl/testdata/ca.pem --sslPEMKeyFile src/src/github.com/shelman/mongo-tools-proto/common/db/ssl/testdata/server.pem --auth"
+            value: "--sslMode requireSSL --sslCAFile src/src/github.com/mongodb/mongo-tools/common/db/ssl/testdata/ca.pem --sslPEMKeyFile src/src/github.com/mongodb/mongo-tools/common/db/ssl/testdata/server.pem --auth"
     - func: "start mongod"
     - func: "run tests"
 
@@ -316,7 +316,7 @@ buildvariants:
   - ubuntu1404-test
   expansions:
     mongo_url: http://downloads.10gen.com/linux/mongodb-linux-x86_64-enterprise-ubuntu1404-latest.tgz
-    mongod_extra_options: --sslMode requireSSL --sslCAFile src/src/github.com/shelman/mongo-tools-proto/common/db/ssl/testdata/ca.pem --sslPEMKeyFile src/src/github.com/shelman/mongo-tools-proto/common/db/ssl/testdata/server.pem
+    mongod_extra_options: --sslMode requireSSL --sslCAFile src/src/github.com/mongodb/mongo-tools/common/db/ssl/testdata/ca.pem --sslPEMKeyFile src/src/github.com/mongodb/mongo-tools/common/db/ssl/testdata/server.pem
   tasks:
   - name: ssl
 

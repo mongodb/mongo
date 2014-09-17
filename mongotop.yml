@@ -33,7 +33,7 @@ functions:
   "run smoke tests":
     command: shell.exec
     params:
-      working_dir: src/src/github.com/shelman/mongo-tools-proto/mongotop
+      working_dir: src/src/github.com/mongodb/mongo-tools/mongotop
       script: |
         set -o verbose
         curl -s https://s3.amazonaws.com/mciuploads/mongo-tools/binaries/${build_id}/mongotop --output mongotop
@@ -70,7 +70,7 @@ tasks:
         script: |
           set -o verbose
           export GOPATH=`pwd`
-          go build -o mongotop github.com/shelman/mongo-tools-proto/mongotop/main
+          go build -o mongotop github.com/mongodb/mongo-tools/mongotop/main
     - command: s3.put
       params:
         aws_key: ${aws_key}
