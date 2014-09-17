@@ -41,6 +41,7 @@
 #include <rocksdb/db.h>
 #include <rocksdb/slice.h>
 #include <rocksdb/options.h>
+#include <rocksdb/utilities/write_batch_with_index.h>
 
 #include "mongo/db/catalog/collection_options.h"
 #include "mongo/db/operation_context.h"
@@ -113,7 +114,7 @@ namespace mongo {
 
     RecoveryUnit* RocksEngine::newRecoveryUnit( OperationContext* opCtx ) {
         /* TODO change to false when unit of work hooked up*/
-        return new RocksRecoveryUnit( _db.get(), true );
+        return new RocksRecoveryUnit(_db.get(), true);
     }
 
     void RocksEngine::listDatabases( std::vector<std::string>* out ) const {
@@ -159,6 +160,7 @@ namespace mongo {
 
     void RocksEngine::cleanShutdown(OperationContext* txn) {
         // no locking here because this is only called while single-threaded.
+        dynamic_cast<RocksRecoveryUnit*>(txn->recoveryUnit())->destroy();
         _entryMap = EntryMap();
         _dbCatalogMap = DbCatalogMap();
         _collectionComparator.reset();
