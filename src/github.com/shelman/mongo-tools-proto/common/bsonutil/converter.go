@@ -87,7 +87,17 @@ func ConvertJSONValueToBSON(x interface{}) (interface{}, error) {
 	default:
 		return nil, fmt.Errorf("Conversion of JSON type '%v' unsupported", v)
 	}
+}
 
+func convertKeys(v bson.M) (bson.M, error) {
+	for key, value := range v {
+		jsonValue, err := ConvertBSONValueToJSON(value)
+		if err != nil {
+			return nil, err
+		}
+		v[key] = jsonValue
+	}
+	return v, nil
 }
 
 // ConvertBSONValueToJSON walks through a document or an array and
@@ -99,25 +109,13 @@ func ConvertBSONValueToJSON(x interface{}) (interface{}, error) {
 	case bool:
 		return v, nil
 	case *bson.M: // document
-		v2 := *v
-		for key, value := range v2 {
-			jsonValue, err := ConvertBSONValueToJSON(value)
-			if err != nil {
-				return nil, err
-			}
-			v2[key] = jsonValue
+		doc, err := convertKeys(*v)
+		if err != nil {
+			return nil, err
 		}
-		return v, nil
+		return doc, err
 	case bson.M: // document
-		for key, value := range v {
-			jsonValue, err := ConvertBSONValueToJSON(value)
-			if err != nil {
-				return nil, err
-			}
-			v[key] = jsonValue
-		}
-		return v, nil
-
+		return convertKeys(v)
 	case []interface{}: // array
 		for i, value := range v {
 			jsonValue, err := ConvertBSONValueToJSON(value)

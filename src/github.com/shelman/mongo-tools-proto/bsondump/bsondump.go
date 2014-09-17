@@ -37,7 +37,6 @@ func dumpDoc(doc *bson.M, out io.Writer) error {
 	extendedDoc, err := bsonutil.ConvertBSONValueToJSON(doc)
 	if err != nil {
 		return fmt.Errorf("Error converting BSON to extended JSON: %v", err)
-		return err
 	}
 	jsonBytes, err := json.Marshal(extendedDoc)
 	if err != nil {
@@ -116,6 +115,7 @@ func DebugBSON(raw bson.Raw, indentLevel int, out io.Writer) error {
 		//TODO this could be improved.
 		fmt.Fprintf(out, "%v\t\t\ttype: %4v size: %v\n", indent, rawElem.Value.Kind,
 			len(rawElem.Value.Data)+len([]byte(rawElem.Name))-2)
+		//For nested objects or arrays, recurse.
 		if rawElem.Value.Kind == 0x03 || rawElem.Value.Kind == 0x04 {
 			return DebugBSON(rawElem.Value, indentLevel+3, out)
 		}
