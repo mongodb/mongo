@@ -107,18 +107,25 @@ namespace newlm {
         }
 
         const StringData db = nsToDatabaseSubstring(ns);
-        const newlm::ResourceId resIdNs(newlm::RESOURCE_DATABASE, db);
+        const newlm::ResourceId resIdDb(newlm::RESOURCE_DATABASE, db);
 
-        if (!isLockHeldForMode(resIdNs, newlm::MODE_IS)) {
-            return false;
-        }
-
-        if (!nsIsFull(ns)) {
+        // S on the database means we don't need to check further down the hierarchy
+        if (isLockHeldForMode(resIdDb, newlm::MODE_S)) {
             return true;
         }
 
-        const newlm::ResourceId collId(newlm::RESOURCE_DATABASE, ns);
-        return isLockHeldForMode(collId, newlm::MODE_IS);
+        if (!isLockHeldForMode(resIdDb, newlm::MODE_IS)) {
+            return false;
+        }
+
+        if (nsIsFull(ns)) {
+            const newlm::ResourceId resIdColl(newlm::RESOURCE_DATABASE, ns);
+            return isLockHeldForMode(resIdColl, newlm::MODE_IS);
+        }
+
+        // IS on the database is not sufficient to call the database read-locked, because it won't
+        // conflict with other IX operations.
+        return false;
     }
 
     bool LockerImpl::isRecursive() const {
