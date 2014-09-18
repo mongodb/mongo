@@ -318,14 +318,6 @@ namespace mongo {
                                             13596 );
         }
 
-        if ( ns().coll() == "system.users" ) {
-            // XXX - andy and spencer think this should go away now
-            V2UserDocumentParser parser;
-            Status s = parser.checkValidUserDocument(objNew);
-            if ( !s.isOK() )
-                return StatusWith<DiskLoc>( s );
-        }
-
         /* duplicate key check. we descend the btree twice - once for this check, and once for the actual inserts, further
            below.  that is suboptimal, but it's pretty complicated to do it the other way without rollbacks...
         */
