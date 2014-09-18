@@ -144,6 +144,11 @@ namespace repl {
             return StatusAndDuration(Status::OK(), Milliseconds(timeoutTimer.millis()));
         }
 
+        if (ts.isNull()) {
+            // If waiting for the empty optime, always say it's been replicated.
+            return StatusAndDuration(Status::OK(), Milliseconds(timeoutTimer.millis()));
+        }
+
         try {
             while (1) {
                 if (!writeConcern.wMode.empty()) {

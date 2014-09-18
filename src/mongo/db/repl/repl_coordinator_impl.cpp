@@ -588,12 +588,17 @@ namespace {
         const Mode replMode = _getReplicationMode_inlock();
         if (replMode == modeNone || serverGlobalParams.configsvr) {
             // no replication check needed (validated above)
-            return StatusAndDuration(Status::OK(), Milliseconds(0));
+            return StatusAndDuration(Status::OK(), Milliseconds(timer->millis()));
         }
 
         if (writeConcern.wMode == "majority" && replMode == modeMasterSlave) {
             // with master/slave, majority is equivalent to w=1
-            return StatusAndDuration(Status::OK(), Milliseconds(0));
+            return StatusAndDuration(Status::OK(), Milliseconds(timer->millis()));
+        }
+
+        if (opTime.isNull()) {
+            // If waiting for the empty optime, always say it's been replicated.
+            return StatusAndDuration(Status::OK(), Milliseconds(timer->millis()));
         }
 
         // Must hold _mutex before constructing waitInfo as it will modify _replicationWaiterList
