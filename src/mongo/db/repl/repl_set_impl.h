@@ -331,22 +331,6 @@ namespace repl {
          */
         const OpTime lastOtherElectableOpTime() const;
 
-        /**
-         * When a member reaches its minValid optime it is in a consistent state.  Thus, minValid is
-         * set as the last step in initial sync.  At the beginning of initial sync, _initialSyncFlag
-         * is appended onto minValid to indicate that initial sync was started but has not yet 
-         * completed.
-         * minValid is also used during "normal" sync: the last op in each batch is used to set 
-         * minValid, to indicate that we are in a consistent state when the batch has been fully 
-         * applied.
-         */
-        static void setMinValid(OperationContext* ctx, BSONObj obj);
-        static void setMinValid(OperationContext* ctx, OpTime opTime);
-        static OpTime getMinValid(OperationContext* txn);
-        static void clearInitialSyncFlag(OperationContext* txn);
-        static bool getInitialSyncFlag();
-        static void setInitialSyncFlag(OperationContext* txn);
-
         int oplogVersion;
 
         // bool for indicating resync need on this node and the mutex that protects it

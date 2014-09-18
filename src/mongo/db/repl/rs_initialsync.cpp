@@ -42,8 +42,8 @@
 #include "mongo/db/operation_context_impl.h"
 #include "mongo/db/repl/bgsync.h"
 #include "mongo/db/repl/initial_sync.h"
-#include "mongo/db/repl/initial_sync.h"
 #include "mongo/db/repl/member.h"
+#include "mongo/db/repl/minvalid.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/oplogreader.h"
 #include "mongo/db/repl/repl_coordinator_global.h"
@@ -396,7 +396,7 @@ namespace repl {
         }
         else {
             // Add field to minvalid document to tell us to restart initial sync if we crash
-            theReplSet->setInitialSyncFlag(&txn);
+            setInitialSyncFlag(&txn);
 
             sethbmsg("initial sync drop all databases", 0);
             dropAllDatabasesExceptLocal(&txn);
@@ -467,10 +467,10 @@ namespace repl {
 
             // Initial sync is now complete.  Flag this by setting minValid to the last thing
             // we synced.
-            theReplSet->setMinValid(&txn, lastOpTimeWritten);
+            setMinValid(&txn, lastOpTimeWritten);
 
             // Clear the initial sync flag.
-            theReplSet->clearInitialSyncFlag(&txn);
+            clearInitialSyncFlag(&txn);
             cx.commit();
         }
         {

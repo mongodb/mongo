@@ -26,7 +26,7 @@
 *    it in the license file.
 */
 
-#include "mongo/pch.h"
+#include "mongo/platform/basic.h"
 
 #include "mongo/db/repl/rs_sync.h"
 
@@ -45,6 +45,7 @@
 #include "mongo/db/prefetch.h"
 #include "mongo/db/repl/bgsync.h"
 #include "mongo/db/repl/member.h"
+#include "mongo/db/repl/minvalid.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/repl_settings.h"
 #include "mongo/db/repl/repl_coordinator_global.h"
@@ -62,7 +63,6 @@ namespace mongo {
 namespace repl {
 
     /* should be in RECOVERING state on arrival here.
-       readlocks
     */
     void ReplSetImpl::tryToGoLiveAsASecondary(OperationContext* txn) {
         if (getGlobalReplicationCoordinator()->getMaintenanceMode()) {

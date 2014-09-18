@@ -38,6 +38,7 @@
 #include "mongo/db/commands/server_status_metric.h"
 #include "mongo/db/dbhelpers.h"
 #include "mongo/db/operation_context_impl.h"
+#include "mongo/db/repl/minvalid.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/repl_coordinator_global.h"
 #include "mongo/db/repl/repl_coordinator_impl.h"
@@ -470,7 +471,7 @@ namespace repl {
                     "See http://dochub.mongodb.org/core/resyncingaverystalereplicasetmember" 
                       << rsLog;
                 sethbmsg("error RS102 too stale to catch up");
-                theReplSet->setMinValid(txn, oldestOpTimeSeen);
+                setMinValid(txn, oldestOpTimeSeen);
                 replCoordImpl->setFollowerMode(MemberState::RS_RECOVERING);
                 return;
             }

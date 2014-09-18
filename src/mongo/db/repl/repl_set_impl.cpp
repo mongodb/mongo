@@ -41,6 +41,7 @@
 #include "mongo/db/repl/bgsync.h"
 #include "mongo/db/repl/connections.h"
 #include "mongo/db/repl/isself.h"
+#include "mongo/db/repl/minvalid.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/oplogreader.h"
 #include "mongo/db/repl/repl_set_seed_list.h"
@@ -98,7 +99,7 @@ namespace repl {
               << rsLog;
 
         // reset minvalid so that we can't become primary prematurely
-        setMinValid(txn, oldest);
+        setMinValid(txn, oldest["ts"]._opTime());
 
         sethbmsg("error RS102 too stale to catch up");
         changeState(MemberState::RS_RECOVERING);

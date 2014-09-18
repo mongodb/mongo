@@ -45,6 +45,7 @@
 #include "mongo/db/ops/update_lifecycle_impl.h"
 #include "mongo/db/ops/update_request.h"
 #include "mongo/db/query/internal_plans.h"
+#include "mongo/db/repl/minvalid.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/oplogreader.h"
 #include "mongo/db/repl/repl_coordinator.h"
@@ -439,8 +440,9 @@ namespace {
 
         // we have items we are writing that aren't from a point-in-time.  thus best not to come
         // online until we get to that point in freshness.
-        log() << "replSet minvalid=" << newMinValid["ts"]._opTime().toStringLong() << rsLog;
-        theReplSet->setMinValid(txn, newMinValid);
+        OpTime minValid = newMinValid["ts"]._opTime();
+        log() << "replSet minvalid=" << minValid.toStringLong() << rsLog;
+        setMinValid(txn, minValid);
 
         // any full collection resyncs required?
         if (!fixUpInfo.collectionsToResync.empty()) {
@@ -489,9 +491,10 @@ namespace {
                     err = "can't get minvalid from sync source";
                 }
                 else {
-                    log() << "replSet minvalid=" << newMinValid["ts"]._opTime().toStringLong()
+                    OpTime minValid = newMinValid["ts"]._opTime();
+                    log() << "replSet minvalid=" << minValid.toStringLong()
                           << rsLog;
-                    theReplSet->setMinValid(txn, newMinValid);
+                    setMinValid(txn, minValid);
                 }
             }
             catch (DBException& e) {
@@ -782,17 +785,13 @@ namespace {
         // check that we are at minvalid, otherwise we cannot rollback as we may be in an
         // inconsistent state
         {
-            Lock::DBRead lk(txn->lockState(), "local.replset.minvalid");
-            BSONObj mv;
-            if( Helpers::getSingleton(txn, "local.replset.minvalid", mv) ) {
-                OpTime minvalid = mv["ts"]._opTime();
-                if( minvalid > lastOpTimeApplied ) {
-                    severe() << "replSet need to rollback, but in inconsistent state" << endl;
-                    log() << "minvalid: " << minvalid.toString() << " our last optime: "
-                          << lastOpTimeApplied.toString() << endl;
-                    fassertFailedNoTrace(18750);
-                    return;
-                }
+            OpTime minvalid = getMinValid(txn);
+            if( minvalid > lastOpTimeApplied ) {
+                severe() << "replSet need to rollback, but in inconsistent state" << endl;
+                log() << "minvalid: " << minvalid.toString() << " our last optime: "
+                      << lastOpTimeApplied.toString() << endl;
+                fassertFailedNoTrace(18750);
+                return;
             }
         }
 

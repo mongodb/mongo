@@ -40,7 +40,9 @@
 #include "mongo/db/curop.h"
 #include "mongo/db/prefetch.h"
 #include "mongo/db/repl/bgsync.h"
+#include "mongo/db/repl/minvalid.h"
 #include "mongo/db/repl/oplog.h"
+#include "mongo/db/repl/repl_coordinator_global.h"
 #include "mongo/db/repl/rs.h"
 #include "mongo/db/repl/rslog.h"
 #include "mongo/db/stats/timer_stats.h"
@@ -279,6 +281,30 @@ namespace repl {
         } // end of while (true)
     }
 
+namespace {
+    void tryToGoLiveAsASecondary(OperationContext* txn) {
+        if (getGlobalReplicationCoordinator()->getMaintenanceMode()) {
+            // we're not actually going live
+            return;
+        }
+
+        Lock::GlobalRead readLock(txn->lockState());
+
+        // Only state RECOVERING can transition to SECONDARY.
+        MemberState state(getGlobalReplicationCoordinator()->getCurrentMemberState());
+        if (!state.recovering()) {
+            return;
+        }
+
+        OpTime minvalid = getMinValid(txn);
+        if (minvalid > getGlobalReplicationCoordinator()->getMyLastOptime()) {
+            return;
+        }
+
+        getGlobalReplicationCoordinator()->setFollowerMode(MemberState::RS_SECONDARY);
+    }
+}
+
     /* tail an oplog.  ok to return, will be re-called. */
     void SyncTail::oplogApplication() {
         while( 1 ) {
@@ -318,7 +344,7 @@ namespace repl {
                     // can we become secondary?
                     // we have to check this before calling mgr, as we must be a secondary to
                     // become primary
-                    theReplSet->tryToGoLiveAsASecondary(&txn);
+                    tryToGoLiveAsASecondary(&txn);
 
                     // TODO(emilkie): This can be removed once we switch over from legacy;
                     // this code is what moves 1-node sets to PRIMARY state.
@@ -370,7 +396,8 @@ namespace repl {
             // Set minValid to the last op to be applied in this next batch.
             // This will cause this node to go into RECOVERING state
             // if we should crash and restart before updating the oplog
-            theReplSet->setMinValid(&txn, lastOp);
+            OpTime minValid = lastOp["ts"]._opTime();
+            setMinValid(&txn, minValid);
 
             if (BackgroundSync::get()->isAssumingPrimary()) {
                 LOG(1) << "about to apply batch up to optime: "
