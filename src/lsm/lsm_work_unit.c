@@ -146,11 +146,10 @@ __wt_lsm_work_switch(
 		else
 			*ran = 1;
 	}
-
 	__wt_lsm_manager_free_work_unit(session, entry);
-
 	return (ret);
 }
+
 /*
  * __wt_lsm_work_bloom --
  *	Try to create a Bloom filter for the newest on-disk chunk that doesn't
@@ -162,13 +161,14 @@ __wt_lsm_work_bloom(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 	WT_DECL_RET;
 	WT_LSM_CHUNK *chunk;
 	WT_LSM_WORKER_COOKIE cookie;
-	u_int i;
+	u_int i, merge;
 
 	WT_CLEAR(cookie);
 
 	WT_RET(__lsm_copy_chunks(session, lsm_tree, &cookie, 0));
 
 	/* Create bloom filters in all checkpointed chunks. */
+	merge = 0;
 	for (i = 0; i < cookie.nchunks; i++) {
 		chunk = cookie.chunk_array[i];
 
@@ -187,14 +187,28 @@ __wt_lsm_work_bloom(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 		 * recheck that the chunk still needs a Bloom filter.
 		 */
 		if (WT_ATOMIC_CAS(chunk->bloom_busy, 0, 1)) {
-			if (!F_ISSET(chunk, WT_LSM_CHUNK_BLOOM))
+			if (!F_ISSET(chunk, WT_LSM_CHUNK_BLOOM)) {
 				ret = __lsm_bloom_create(
 				    session, lsm_tree, chunk, (u_int)i);
+				/*
+				 * Record if we were successful so that we can
+				 * later push a merge work unit.
+				 */
+				if (ret == 0)
+					merge = 1;
+			}
 			chunk->bloom_busy = 0;
 			break;
 		}
 	}
+	/*
+	 * If we created any bloom filters, we push a merge work unit now.
+	 */
+	if (merge)
+		WT_ERR(__wt_lsm_manager_push_entry(
+		    session, WT_LSM_WORK_MERGE, 0, lsm_tree));
 
+err:
 	__lsm_unpin_chunks(session, &cookie);
 	__wt_free(session, cookie.chunk_array);
 	return (ret);
@@ -315,10 +329,10 @@ __wt_lsm_checkpoint_chunk(WT_SESSION_IMPL *session,
 	 * Schedule a bloom filter create for our newly flushed chunk */
 	if (!FLD_ISSET(lsm_tree->bloom, WT_LSM_BLOOM_OFF))
 		WT_RET(__wt_lsm_manager_push_entry(
-		    session, WT_LSM_WORK_BLOOM, lsm_tree));
+		    session, WT_LSM_WORK_BLOOM, 0, lsm_tree));
 	else
 		WT_RET(__wt_lsm_manager_push_entry(
-		    session, WT_LSM_WORK_MERGE, lsm_tree));
+		    session, WT_LSM_WORK_MERGE, 0, lsm_tree));
 	return (0);
 }
 

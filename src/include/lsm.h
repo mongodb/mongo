@@ -87,9 +87,7 @@ struct __wt_lsm_chunk {
 #define	WT_LSM_WORK_DROP	0x02	/* Drop unused chunks */
 #define	WT_LSM_WORK_FLUSH	0x04	/* Flush a chunk to disk */
 #define	WT_LSM_WORK_MERGE	0x08	/* Look for a tree merge */
-#define	WT_LSM_WORK_SWITCH	0x10	/* Switch to a new in memory chunk */
-#define	WT_LSM_WORK_FORCE	0x10000	/* Force last chunk flush */
-#define	WT_LSM_WORK_MASK	0xffff	/* Mask for work types */
+#define	WT_LSM_WORK_SWITCH	0x10	/* Switch to new in-memory chunk */
 
 /*
  * WT_LSM_WORK_UNIT --
@@ -97,7 +95,9 @@ struct __wt_lsm_chunk {
  */
 struct __wt_lsm_work_unit {
 	TAILQ_ENTRY(__wt_lsm_work_unit) q;	/* Worker unit queue */
-	uint32_t flags;				/* The type of operation */
+	uint32_t	type;			/* Type of operation */
+#define	WT_LSM_WORK_FORCE	0x0001		/* Force operation */
+	uint32_t	flags;			/* Flags for operation */
 	WT_LSM_TREE *lsm_tree;
 };
 
@@ -142,6 +142,7 @@ struct __wt_lsm_tree {
 	const char *collator_name;
 
 	int refcnt;			/* Number of users of the tree */
+#define	LSM_TREE_MAX_QUEUE	100
 	int queue_ref;
 	WT_RWLOCK *rwlock;
 	TAILQ_ENTRY(__wt_lsm_tree) q;
@@ -228,9 +229,9 @@ struct __wt_lsm_worker_cookie {
  *	State for an LSM worker thread.
  */
 struct __wt_lsm_worker_args {
-	WT_SESSION_IMPL *session;
-	WT_CONDVAR *work_cond;		/* Owned by the manager */
-	pthread_t tid;
-	u_int id;
-	uint32_t flags;
+	WT_SESSION_IMPL	*session;	/* Session */
+	WT_CONDVAR	*work_cond;	/* Owned by the manager */
+	pthread_t	tid;		/* Thread id */
+	u_int		id;		/* My manager slot id */
+	uint32_t	type;		/* Types of operations handled */
 };

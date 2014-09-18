@@ -440,7 +440,7 @@ __wt_lsm_merge(
 
 	/* Schedule a pass to discard old chunks */
 	WT_ERR(__wt_lsm_manager_push_entry(
-	    session, WT_LSM_WORK_DROP, lsm_tree));
+	    session, WT_LSM_WORK_DROP, 0, lsm_tree));
 
 err:	if (locked)
 		WT_TRET(__wt_lsm_tree_unlock(session, lsm_tree));
