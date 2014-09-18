@@ -255,7 +255,7 @@ tasks:
       params:
         updates:
           - key: "package"
-            value: "common/db/ssl"
+            value: "common/db/openssl"
           - key: "types"
             value: "ssl"
           - key: "port"
@@ -269,7 +269,7 @@ tasks:
           - key: "types"
             value: "ssl_auth"
           - key: "mongod_extra_options"
-            value: "--sslMode requireSSL --sslCAFile src/src/github.com/mongodb/mongo-tools/common/db/ssl/testdata/ca.pem --sslPEMKeyFile src/src/github.com/mongodb/mongo-tools/common/db/ssl/testdata/server.pem --auth"
+            value: "--sslMode requireSSL --sslCAFile src/src/github.com/mongodb/mongo-tools/common/db/openssl/testdata/ca.pem --sslPEMKeyFile src/src/github.com/mongodb/mongo-tools/common/db/openssl/testdata/server.pem --auth"
     - func: "start mongod"
     - func: "run tests"
 
