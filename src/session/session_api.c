@@ -278,7 +278,7 @@ __wt_open_cursor(WT_SESSION_IMPL *session,
 	if (0) {
 err:		(void)(*cursorp)->close(*cursorp);
 	}
-	return (0);
+	return (ret);
 }
 
 /*
