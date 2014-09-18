@@ -184,6 +184,7 @@ connection_stats = [
             'no_clear,no_scale'),
 	Stat('lsm_work_queue_manager', 'LSM Merge work units currently queued',
             'no_clear,no_scale'),
+	Stat('lsm_work_queue_max', 'LSM tree queue hit maximum'),
 	Stat('lsm_work_queue_switch', 'LSM Switch work units currently queued',
             'no_clear,no_scale'),
 	Stat('lsm_work_units_created',

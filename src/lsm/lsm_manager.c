@@ -217,7 +217,7 @@ __lsm_manager_aggressive_update(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 
 /*
  * __lsm_manager_worker_setup --
- *	Do setup owned by the LSM manager thread includes starting the worker
+ *	Do setup owned by the LSM manager thread including starting the worker
  *	threads.
  */
 static int
@@ -231,7 +231,10 @@ __lsm_manager_worker_setup(WT_SESSION_IMPL *session)
 	manager = &conn->lsm_manager;
 
 	WT_ASSERT(session, manager->lsm_workers == 1);
-
+	/*
+	 * The LSM manager is worker[0].  The switch thread is worker[1].
+	 * Setup and start the switch/drop worker explicitly.
+	 */
 	worker_args = &manager->lsm_worker_cookies[1];
 	worker_args->work_cond = manager->work_cond;
 	worker_args->id = manager->lsm_workers++;
@@ -340,13 +343,16 @@ __lsm_manager_run_server(WT_SESSION_IMPL *session)
 			 * to how often new chunks are being created add some
 			 * more.
 			 */
-			if (lsm_tree->queue_ref < LSM_TREE_MAX_QUEUE &&
-			    ((!lsm_tree->modified && lsm_tree->nchunks > 1) ||
+			if (lsm_tree->queue_ref >= LSM_TREE_MAX_QUEUE)
+				WT_STAT_FAST_CONN_INCR(session,
+				    lsm_work_queue_max);
+			else if ((!lsm_tree->modified &&
+			    lsm_tree->nchunks > 1) ||
 			    (lsm_tree->queue_ref == 0 &&
 			    lsm_tree->nchunks > 1) ||
 			    (lsm_tree->merge_aggressiveness > 3 &&
 			     !F_ISSET(lsm_tree, WT_LSM_TREE_COMPACTING)) ||
-			    pushms > fillms)) {
+			    pushms > fillms) {
 				WT_RET(__wt_lsm_manager_push_entry(
 				    session, WT_LSM_WORK_SWITCH, 0, lsm_tree));
 				WT_RET(__wt_lsm_manager_push_entry(
