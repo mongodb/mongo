@@ -2557,6 +2557,28 @@ namespace {
                                     "{ixscan: {pattern: {d: 1, c: 1}}}]}}}}}}");
     }
 
+    // SERVER-15286:  Make sure that at least the explodeForSort() path bails out
+    // when it finds that there are no union of point interval fields to explode.
+    // We could convert this into a MERGE_SORT plan, but we don't yet do this
+    // optimization.
+    TEST_F(QueryPlannerTest, CantExplodeOrForSort2) {
+        addIndex(BSON("a" << 1));
+
+        runQuerySortProj(fromjson("{$or: [{a: {$gt: 1, $lt: 3}}, {a: {$gt: 6, $lt: 10}}]}"),
+                         BSON("a" << -1),
+                         BSONObj());
+
+        assertNumSolutions(3U);
+        assertSolutionExists("{sort: {pattern: {a: -1}, limit: 0, node: {cscan: {dir: 1}}}}");
+        assertSolutionExists("{fetch: {node: {ixscan: {pattern: {a: 1}}}}}");
+        assertSolutionExists("{sort: {pattern: {a: -1}, limit: 0, node: "
+                                "{fetch: {filter: null, node: {or: {nodes: ["
+                                    "{ixscan: {pattern: {a: 1}, bounds: "
+                                        "{a: [[1,3,false,false]]}}},"
+                                    "{ixscan: {pattern: {a: 1}, bounds: "
+                                        "{a: [[6,10,false,false]]}}}]}}}}}}");
+    }
+
     // SERVER-13754: too many scans in an $or explosion.
     TEST_F(QueryPlannerTest, TooManyToExplodeOr) {
         addIndex(BSON("a" << 1 << "e" << 1));
