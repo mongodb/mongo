@@ -34,6 +34,7 @@
 
 #include <limits>
 
+#include "mongo/base/error_codes.h"
 #include "mongo/base/parse_number.h"
 #include "mongo/client/dbclientinterface.h"
 #include "mongo/db/exec/cached_plan.h"
@@ -872,7 +873,8 @@ namespace mongo {
             // a CountStage, so in this case we put a CountStage on top of an EOFStage.
             root = new CountStage(txn, collection, request, ws.get(), new EOFStage());
             *execOut = new PlanExecutor(ws.release(), root, request.ns);
-            return Status::OK();
+            Status status(ErrorCodes::NamespaceNotFound, "source collection does not exist");
+            return status;
         }
 
         if (request.query.isEmpty()) {
