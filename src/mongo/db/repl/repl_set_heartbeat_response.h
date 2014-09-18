@@ -43,7 +43,7 @@ namespace mongo {
 namespace repl {
 
     /**
-     * Repsonse structure for the replSetHeartbeat command.
+     * Response structure for the replSetHeartbeat command.
      */
     class ReplSetHeartbeatResponse {
     public:

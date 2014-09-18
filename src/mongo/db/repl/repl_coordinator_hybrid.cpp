@@ -255,6 +255,10 @@ namespace repl {
         return legacyStatus;
     }
 
+    void HybridReplicationCoordinator::fillIsMasterForReplSet(IsMasterResponse* result) {
+        _legacy.fillIsMasterForReplSet(result);
+    }
+
     void HybridReplicationCoordinator::processReplSetGetConfig(BSONObjBuilder* result) {
         _legacy.processReplSetGetConfig(result);
         BSONObjBuilder implResult;

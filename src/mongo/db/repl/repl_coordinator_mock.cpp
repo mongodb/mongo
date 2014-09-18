@@ -167,6 +167,8 @@ namespace repl {
         return Status::OK();
     }
 
+    void ReplicationCoordinatorMock::fillIsMasterForReplSet(IsMasterResponse* result) {}
+
     Status ReplicationCoordinatorMock::setMaintenanceMode(OperationContext* txn, bool activate) {
         return Status::OK();
     }

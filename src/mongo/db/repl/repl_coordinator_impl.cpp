@@ -40,6 +40,7 @@
 #include "mongo/db/operation_context_noop.h"
 #include "mongo/db/repl/check_quorum_for_config_change.h"
 #include "mongo/db/repl/handshake_args.h"
+#include "mongo/db/repl/is_master_response.h"
 #include "mongo/db/repl/master_slave.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/repl_set_heartbeat_args.h"
@@ -931,6 +932,28 @@ namespace {
         _replExecutor.wait(cbh.getValue());
         return result;
     }
+
+    void ReplicationCoordinatorImpl::fillIsMasterForReplSet(IsMasterResponse* response) {
+        invariant(getSettings().usingReplSets());
+
+        CBHStatus cbh = _replExecutor.scheduleWork(
+            stdx::bind(&ReplicationCoordinatorImpl::_fillIsMasterForReplSet_finish,
+                       this,
+                       stdx::placeholders::_1,
+                       response));
+        _replExecutor.wait(cbh.getValue());
+        // TODO(spencer): check if we are in drain mode and change master reporting to false if so.
+    }
+
+    void ReplicationCoordinatorImpl::_fillIsMasterForReplSet_finish(
+            const ReplicationExecutor::CallbackData& cbData, IsMasterResponse* response) {
+        if (cbData.status == ErrorCodes::CallbackCanceled) {
+            response->markAsShutdownInProgress();
+            return;
+        }
+        _topCoord->fillIsMasterForReplSet(response);
+    }
+
 
     void ReplicationCoordinatorImpl::processReplSetGetConfig(BSONObjBuilder* result) {
         boost::lock_guard<boost::mutex> lock(_mutex);

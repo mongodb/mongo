@@ -51,6 +51,7 @@ namespace repl {
 
     class BackgroundSync;
     class HandshakeArgs;
+    class IsMasterResponse;
     class OplogReader;
     class ReplSetHeartbeatArgs;
     class ReplSetHeartbeatResponse;
@@ -324,6 +325,12 @@ namespace repl {
          * Handles an incoming replSetGetStatus command. Adds BSON to 'result'.
          */
         virtual Status processReplSetGetStatus(BSONObjBuilder* result) = 0;
+
+        /**
+         * Handles an incoming isMaster command for a replica set node.  Should not be
+         * called on a master-slave or standalone node.
+         */
+        virtual void fillIsMasterForReplSet(IsMasterResponse* result) = 0;
 
         /**
          * Handles an incoming replSetGetConfig command. Adds BSON to 'result'.

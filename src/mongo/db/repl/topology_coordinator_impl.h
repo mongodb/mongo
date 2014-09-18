@@ -162,6 +162,7 @@ namespace repl {
                                            const OpTime& lastOpApplied,
                                            BSONObjBuilder* response,
                                            Status* result);
+        virtual void fillIsMasterForReplSet(IsMasterResponse* response);
         virtual void prepareFreezeResponse(const ReplicationExecutor::CallbackData& data,
                                            Date_t now,
                                            int secs,

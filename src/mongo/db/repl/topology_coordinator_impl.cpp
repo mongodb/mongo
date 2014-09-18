@@ -36,6 +36,7 @@
 
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/heartbeat_response_action.h"
+#include "mongo/db/repl/is_master_response.h"
 #include "mongo/db/repl/isself.h"
 #include "mongo/db/repl/repl_set_heartbeat_args.h"
 #include "mongo/db/repl/repl_set_heartbeat_response.h"
@@ -1219,6 +1220,69 @@ namespace {
                                          // normally never set except for testing.
         */
         *result = Status::OK();
+    }
+
+    void TopologyCoordinatorImpl::fillIsMasterForReplSet(IsMasterResponse* response) {
+
+        const MemberState myState = getMemberState();
+        if (!_currentConfig.isInitialized() || myState.removed()) {
+            response->markAsNoConfig();
+            return;
+        }
+
+        response->setReplSetName(_currentConfig.getReplSetName());
+        response->setReplSetVersion(_currentConfig.getConfigVersion());
+        response->setIsMaster(myState.primary());
+        response->setIsSecondary(myState.secondary());
+
+        {
+            for (ReplicaSetConfig::MemberIterator it = _currentConfig.membersBegin();
+                    it != _currentConfig.membersEnd(); ++it) {
+                if (it->isHidden() || it->getSlaveDelay().total_seconds() > 0) {
+                    continue;
+                }
+
+                if (it->isElectable()) {
+                    response->addHost(it->getHostAndPort());
+                }
+                else if (it->isArbiter()) {
+                    response->addArbiter(it->getHostAndPort());
+                }
+                else {
+                    response->addPassive(it->getHostAndPort());
+                }
+            }
+        }
+
+        const MemberConfig* curPrimary = _currentPrimaryMember();
+        if (curPrimary) {
+            response->setPrimary(curPrimary->getHostAndPort());
+        }
+
+        const MemberConfig& selfConfig = _currentConfig.getMemberAt(_selfIndex);
+        if (selfConfig.isArbiter()) {
+            response->setIsArbiterOnly(true);
+        }
+        else if (selfConfig.getPriority() == 0) {
+            response->setIsPassive(true);
+        }
+        if (selfConfig.getSlaveDelay().total_seconds()) {
+            response->setSlaveDelay(selfConfig.getSlaveDelay());
+        }
+        if (selfConfig.isHidden()) {
+            response->setIsHidden(true);
+        }
+        if (!selfConfig.shouldBuildIndexes()) {
+            response->setShouldBuildIndexes(false);
+        }
+        if (selfConfig.getNumTags()) {
+            const ReplicaSetTagConfig tagConfig = _currentConfig.getTagConfig();
+            for (MemberConfig::TagIterator tag = selfConfig.tagsBegin();
+                    tag != selfConfig.tagsEnd(); ++tag) {
+                response->addTag(tagConfig.getTagKey(*tag), tagConfig.getTagValue(*tag));
+            }
+        }
+        response->setMe(selfConfig.getHostAndPort());
     }
 
     void TopologyCoordinatorImpl::prepareFreezeResponse(

@@ -38,6 +38,7 @@
 
 #include "mongo/db/operation_context_noop.h"
 #include "mongo/db/repl/handshake_args.h"
+#include "mongo/db/repl/is_master_response.h"
 #include "mongo/db/repl/network_interface_mock.h"
 #include "mongo/db/repl/repl_coordinator_external_state_mock.h"
 #include "mongo/db/repl/repl_coordinator_impl.h"
@@ -1332,7 +1333,7 @@ namespace {
         ASSERT_EQUALS(0U, getReplCoord()->getOtherNodesInReplSet().size());
     }
 
-    TEST_F(ReplCoordTest, GetOtherNodesInRepl) {
+    TEST_F(ReplCoordTest, GetOtherNodesInReplSet) {
         assertStartSuccess(
                 BSON("_id" << "mySet" <<
                      "version" << 2 <<
@@ -1355,6 +1356,83 @@ namespace {
         }
     }
 
+    TEST_F(ReplCoordTest, IsMasterNoConfig) {
+        start();
+        IsMasterResponse response;
+
+        getReplCoord()->fillIsMasterForReplSet(&response);
+        ASSERT_FALSE(response.isConfigSet());
+        BSONObj responseObj = response.toBSON();
+        ASSERT_FALSE(responseObj["ismaster"].Bool());
+        ASSERT_FALSE(responseObj["secondary"].Bool());
+        ASSERT_TRUE(responseObj["isreplicaset"].Bool());
+        ASSERT_EQUALS("Does not have a valid replica set config", responseObj["info"].String());
+
+        IsMasterResponse roundTripped;
+        ASSERT_OK(roundTripped.initialize(response.toBSON()));
+    }
+
+    TEST_F(ReplCoordTest, IsMaster) {
+        HostAndPort h1("h1");
+        HostAndPort h2("h2");
+        HostAndPort h3("h3");
+        HostAndPort h4("h4");
+        assertStartSuccess(
+                BSON("_id" << "mySet" <<
+                     "version" << 2 <<
+                     "members" << BSON_ARRAY(BSON("_id" << 0 << "host" << h1.toString()) <<
+                                             BSON("_id" << 1 << "host" << h2.toString()) <<
+                                             BSON("_id" << 2 <<
+                                                  "host" << h3.toString() <<
+                                                  "arbiterOnly" << true) <<
+                                             BSON("_id" << 3 <<
+                                                  "host" << h4.toString() <<
+                                                  "priority" << 0 <<
+                                                  "tags" << BSON("key1" << "value1" <<
+                                                                 "key2" << "value2")))),
+                h4);
+        getReplCoord()->_setCurrentMemberState_forTest(MemberState::RS_SECONDARY);
+        ASSERT_TRUE(getReplCoord()->getCurrentMemberState().secondary());
+
+        IsMasterResponse response;
+        getReplCoord()->fillIsMasterForReplSet(&response);
+
+        ASSERT_EQUALS("mySet", response.getReplSetName());
+        ASSERT_EQUALS(2, response.getReplSetVersion());
+        ASSERT_FALSE(response.isMaster());
+        ASSERT_TRUE(response.isSecondary());
+        // TODO(spencer): test that response includes current primary when there is one.
+        ASSERT_FALSE(response.isArbiterOnly());
+        ASSERT_TRUE(response.isPassive());
+        ASSERT_FALSE(response.isHidden());
+        ASSERT_TRUE(response.shouldBuildIndexes());
+        ASSERT_EQUALS(0, response.getSlaveDelay().total_seconds());
+        ASSERT_EQUALS(h4, response.getMe());
+
+        std::vector<HostAndPort> hosts = response.getHosts();
+        ASSERT_EQUALS(2U, hosts.size());
+        if (hosts[0] == h1) {
+            ASSERT_EQUALS(h2, hosts[1]);
+        }
+        else {
+            ASSERT_EQUALS(h2, hosts[0]);
+            ASSERT_EQUALS(h1, hosts[1]);
+        }
+        std::vector<HostAndPort> passives = response.getPassives();
+        ASSERT_EQUALS(1U, passives.size());
+        ASSERT_EQUALS(h4, passives[0]);
+        std::vector<HostAndPort> arbiters = response.getArbiters();
+        ASSERT_EQUALS(1U, arbiters.size());
+        ASSERT_EQUALS(h3, arbiters[0]);
+
+        unordered_map<std::string, std::string> tags = response.getTags();
+        ASSERT_EQUALS(2U, tags.size());
+        ASSERT_EQUALS("value1", tags["key1"]);
+        ASSERT_EQUALS("value2", tags["key2"]);
+
+        IsMasterResponse roundTripped;
+        ASSERT_OK(roundTripped.initialize(response.toBSON()));
+    }
 
     // TODO(schwerin): Unit test election id updating
 

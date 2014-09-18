@@ -199,6 +199,10 @@ namespace repl {
                                            BSONObjBuilder* response,
                                            Status* result) = 0;
 
+        // produce a reply to an ismaster request.  It is only valid to call this if we are a
+        // replset.
+        virtual void fillIsMasterForReplSet(IsMasterResponse* response) = 0;
+
         // produce a reply to a freeze request
         virtual void prepareFreezeResponse(const ReplicationExecutor::CallbackData& data,
                                            Date_t now,

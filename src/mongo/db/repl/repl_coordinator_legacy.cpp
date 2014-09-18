@@ -41,6 +41,7 @@
 #include "mongo/db/repl/bgsync.h"
 #include "mongo/db/repl/connections.h"
 #include "mongo/db/repl/handshake_args.h"
+#include "mongo/db/repl/is_master_response.h"
 #include "mongo/db/repl/master_slave.h"
 #include "mongo/db/repl/member.h"
 #include "mongo/db/repl/oplog.h" // for newRepl()
@@ -521,6 +522,20 @@ namespace {
     Status LegacyReplicationCoordinator::processReplSetGetStatus(BSONObjBuilder* result) {
         theReplSet->summarizeStatus(*result);
         return Status::OK();
+    }
+
+    void LegacyReplicationCoordinator::fillIsMasterForReplSet(IsMasterResponse* result) {
+        invariant(getSettings().usingReplSets());
+        if (getReplicationMode() != ReplicationCoordinator::modeReplSet
+                || getCurrentMemberState().removed()) {
+            result->markAsNoConfig();
+        }
+        else {
+            BSONObjBuilder resultBuilder;
+            theReplSet->fillIsMaster(resultBuilder);
+            Status status = result->initialize(resultBuilder.done());
+            fassert(18821, status);
+        }
     }
 
     void LegacyReplicationCoordinator::processReplSetGetConfig(BSONObjBuilder* result) {
