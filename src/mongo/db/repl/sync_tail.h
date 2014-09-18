@@ -114,9 +114,6 @@ namespace repl {
          */
         void _applyOplogUntil(OperationContext* txn, const OpTime& endOpTime);
 
-        // The version of the last op to be read
-        int oplogVersion;
-
     private:
         BackgroundSyncInterface* _networkQueue;
 
@@ -134,7 +131,6 @@ namespace repl {
         void fillWriterVectors(const std::deque<BSONObj>& ops, 
                                std::vector< std::vector<BSONObj> >* writerVectors);
         void handleSlaveDelay(const BSONObj& op);
-        void setOplogVersion(const BSONObj& op);
 
         // persistent pool of worker threads for writing ops to the databases
         threadpool::ThreadPool _writerPool;

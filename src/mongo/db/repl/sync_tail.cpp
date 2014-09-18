@@ -83,7 +83,6 @@ namespace repl {
 
     SyncTail::SyncTail(BackgroundSyncInterface *q, MultiSyncApplyFunc func) :
         Sync(""), 
-        oplogVersion(0), 
         _networkQueue(q), 
         _applyFunc(func),
         _writerPool(replWriterThreadCount),
@@ -225,20 +224,6 @@ namespace repl {
         _applyOplogUntil(txn, endOpTime);
     }
 
-    void SyncTail::setOplogVersion(const BSONObj& op) {
-        BSONElement version = op["v"];
-        // old primaries do not get the unique index ignoring feature
-        // because some of their ops are not imdepotent, see
-        // SERVER-7186
-        if (version.eoo()) {
-            theReplSet->oplogVersion = 1;
-            RARELY log() << "warning replset primary is an older version than we are;"
-                         << " upgrade recommended";
-        } else {
-            theReplSet->oplogVersion = version.Int();
-        }
-    }
-
     /* applies oplog from "now" until endOpTime using the applier threads for initial sync*/
     void SyncTail::_applyOplogUntil(OperationContext* txn, const OpTime& endOpTime) {
         while (true) {
@@ -279,8 +264,6 @@ namespace repl {
 
             multiApply(ops.getDeque());
             OpTime lastOpTime = applyOpsToOplog(&ops.getDeque());
-
-            setOplogVersion(lastOp);
 
             // if the last op applied was our end, return
             if (lastOpTime == endOpTime) {
@@ -398,7 +381,6 @@ namespace {
             }
 
             const BSONObj& lastOp = ops.getDeque().back();
-            setOplogVersion(lastOp);
             handleSlaveDelay(lastOp);
 
             // Set minValid to the last op to be applied in this next batch.
@@ -481,18 +463,11 @@ namespace {
             curVersion = 1;
         else
             curVersion = elemVersion.Int();
-
-        if (curVersion != oplogVersion) {
-            // Version changes cause us to end a batch.
-            // If we are starting a new batch, reset version number
-            // and continue.
-            if (ops->empty()) {
-                oplogVersion = curVersion;
-            } 
-            else {
-                // End batch early
-                return true;
-            }
+        
+        if (curVersion != OPLOG_VERSION) {
+            severe() << "expected oplog version " << OPLOG_VERSION << " but found version " 
+                     << curVersion;
+            fassertFailedNoTrace(18820);
         }
     
         // Copy the op to the deque and remove it from the bgsync queue.
@@ -583,9 +558,7 @@ namespace {
         // allow us to get through the magic barrier
         Lock::ParallelBatchWriterMode::iAmABatchParticipant(txn.lockState());
 
-        // convert update operations only for 2.2.1 or greater, because we need guaranteed
-        // idempotent operations for this to work.  See SERVER-6825
-        bool convertUpdatesToUpserts = theReplSet->oplogVersion > 1 ? true : false;
+        bool convertUpdatesToUpserts = true;
 
         for (std::vector<BSONObj>::const_iterator it = ops.begin();
              it != ops.end();

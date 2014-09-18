@@ -826,13 +826,6 @@ namespace {
                (ms == MemberState::RS_ROLLBACK))) {
             return false;
         }
-        // TODO(spencer): SERVER-14233 Remove support for old oplog versions, or move oplogVersion
-        // into the repl coordinator
-        /* // 2 is the oldest oplog version where operations
-        // are fully idempotent.
-        if (theReplSet->oplogVersion < 2) {
-            return false;
-        }*/
 
         return true;
     }

@@ -437,7 +437,6 @@ namespace {
         _self(0),
         _maintenanceMode(0),
         mgr(0),
-        oplogVersion(0),
         initialSyncRequested(false), // only used for resync
         _indexPrefetchConfig(PREFETCH_ALL) {
     }

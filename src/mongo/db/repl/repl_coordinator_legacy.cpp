@@ -351,11 +351,6 @@ namespace {
                (ms == MemberState::RS_ROLLBACK))) {
             return false;
         }
-        // 2 is the oldest oplog version where operations
-        // are fully idempotent.
-        if (theReplSet->oplogVersion < 2) {
-            return false;
-        }
         // Never ignore _id index
         if (idx->isIdIndex()) {
             return false;

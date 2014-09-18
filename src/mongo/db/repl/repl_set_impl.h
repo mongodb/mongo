@@ -323,8 +323,6 @@ namespace repl {
          */
         const OpTime lastOtherElectableOpTime() const;
 
-        int oplogVersion;
-
         // bool for indicating resync need on this node and the mutex that protects it
         bool initialSyncRequested;
         boost::mutex initialSyncMutex;

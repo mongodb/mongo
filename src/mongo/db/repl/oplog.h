@@ -55,6 +55,7 @@ namespace repl {
     OpTime _logOpObjRS(OperationContext* txn, const BSONObj& op);
 
     const char rsoplog[] = "local.oplog.rs";
+    static const int OPLOG_VERSION = 2;
 
     /** Log an operation to the local oplog 
 

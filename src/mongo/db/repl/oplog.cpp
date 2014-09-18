@@ -236,7 +236,6 @@ namespace repl {
     // the compiler would use if inside the function.  the reason this is static is to avoid a malloc/free for this
     // on every logop call.
     static BufBuilder logopbufbuilder(8*1024);
-    static const int OPLOG_VERSION = 2;
     static void _logOpRS(OperationContext* txn,
                          const char *opstr,
                          const char *ns,
