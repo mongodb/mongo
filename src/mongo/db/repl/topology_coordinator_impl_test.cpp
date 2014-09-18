@@ -1833,6 +1833,43 @@ namespace {
         ASSERT_TRUE(TopologyCoordinator::Role::candidate == getTopoCoord().getRole());
     }
 
+    TEST_F(HeartbeatResponseTest, UpdateHeartbeatDataRelinquishPrimaryDueToNodeDisappearing) {
+        // become PRIMARY
+        ASSERT_EQUALS(-1, getCurrentPrimaryIndex());
+        makeSelfPrimary(OpTime(2,0));
+        ASSERT_EQUALS(0, getCurrentPrimaryIndex());
+
+        // become aware of other nodes
+        heartbeatFromMember(HostAndPort("host2"), "rs0", MemberState::RS_SECONDARY, OpTime(1,0));
+        heartbeatFromMember(HostAndPort("host2"), "rs0", MemberState::RS_SECONDARY, OpTime(1,0));
+        heartbeatFromMember(HostAndPort("host3"), "rs0", MemberState::RS_SECONDARY, OpTime(0,0));
+        heartbeatFromMember(HostAndPort("host3"), "rs0", MemberState::RS_SECONDARY, OpTime(0,0));
+
+        // lose that awareness and be sure we are going to stepdown
+        HeartbeatResponseAction nextAction = receiveDownHeartbeat(HostAndPort("host2"), "rs0");
+        ASSERT_NO_ACTION(nextAction.getAction());
+        nextAction = receiveDownHeartbeat(HostAndPort("host3"), "rs0");
+        ASSERT_EQUALS(HeartbeatResponseAction::StepDownSelf, nextAction.getAction());
+        ASSERT_EQUALS(0, nextAction.getPrimaryConfigIndex());
+        ASSERT_TRUE(TopologyCoordinator::Role::follower == getTopoCoord().getRole());
+    }
+
+    TEST_F(HeartbeatResponseTest, UpdateHeartbeatDataRemoteDoesNotExist) {
+        OpTime election = OpTime(5,0);
+        OpTime lastOpTimeApplied = OpTime(3,0);
+
+        ASSERT_EQUALS(-1, getCurrentPrimaryIndex());
+        HeartbeatResponseAction nextAction = receiveUpHeartbeat(HostAndPort("host9"),
+                                                                "rs0",
+                                                                MemberState::RS_PRIMARY,
+                                                                election,
+                                                                election,
+                                                                lastOpTimeApplied);
+        ASSERT_EQUALS(-1, getCurrentPrimaryIndex());
+        ASSERT_NO_ACTION(nextAction.getAction());
+        ASSERT_TRUE(TopologyCoordinator::Role::follower == getTopoCoord().getRole());
+    }
+
     class PrepareElectResponseTest : public TopoCoordTest {
     public:
 
@@ -2406,6 +2443,29 @@ namespace {
         ASSERT_EQUALS(1, response.getVersion());
     }
 
+    TEST_F(PrepareHeartbeatResponseTest, PrepareHeartbeatResponseSenderIDNotInConfig) {
+        // set up args with a senderID which is not present in our config
+        ReplSetHeartbeatArgs args;
+        args.setProtocolVersion(1);
+        args.setSetName("rs0");
+        args.setConfigVersion(1);
+        args.setSenderId(2);
+        ReplSetHeartbeatResponse response;
+        Status result(ErrorCodes::InternalError, "prepareHeartbeatResponse didn't set result");
+
+        // prepare response and check the results
+        prepareHeartbeatResponse(args, OpTime(0,0), &response, &result);
+        ASSERT_OK(result);
+        ASSERT_FALSE(response.isElectable());
+        ASSERT_TRUE(response.isReplSet());
+        ASSERT_EQUALS(MemberState::RS_SECONDARY, response.getState().s);
+        ASSERT_EQUALS(OpTime(0,0), response.getOpTime());
+        ASSERT_EQUALS(Seconds(0).total_milliseconds(), response.getTime().total_milliseconds());
+        ASSERT_EQUALS("", response.getHbMsg());
+        ASSERT_EQUALS("rs0", response.getReplicaSetName());
+        ASSERT_EQUALS(1, response.getVersion());
+    }
+
     TEST_F(PrepareHeartbeatResponseTest, PrepareHeartbeatResponseConfigVersionLow) {
         // set up args with a config version lower than ours
         ReplSetHeartbeatArgs args;
@@ -2420,6 +2480,30 @@ namespace {
         prepareHeartbeatResponse(args, OpTime(0,0), &response, &result);
         ASSERT_OK(result);
         ASSERT_TRUE(response.hasConfig());
+        ASSERT_FALSE(response.isElectable());
+        ASSERT_TRUE(response.isReplSet());
+        ASSERT_EQUALS(MemberState::RS_SECONDARY, response.getState().s);
+        ASSERT_EQUALS(OpTime(0,0), response.getOpTime());
+        ASSERT_EQUALS(Seconds(0).total_milliseconds(), response.getTime().total_milliseconds());
+        ASSERT_EQUALS("", response.getHbMsg());
+        ASSERT_EQUALS("rs0", response.getReplicaSetName());
+        ASSERT_EQUALS(1, response.getVersion());
+    }
+
+    TEST_F(PrepareHeartbeatResponseTest, PrepareHeartbeatResponseConfigVersionHigh) {
+        // set up args with a config version higher than ours
+        ReplSetHeartbeatArgs args;
+        args.setProtocolVersion(1);
+        args.setConfigVersion(10);
+        args.setSetName("rs0");
+        args.setSenderId(20);
+        ReplSetHeartbeatResponse response;
+        Status result(ErrorCodes::InternalError, "prepareHeartbeatResponse didn't set result");
+
+        // prepare response and check the results
+        prepareHeartbeatResponse(args, OpTime(0,0), &response, &result);
+        ASSERT_OK(result);
+        ASSERT_FALSE(response.hasConfig());
         ASSERT_FALSE(response.isElectable());
         ASSERT_TRUE(response.isReplSet());
         ASSERT_EQUALS(MemberState::RS_SECONDARY, response.getState().s);
