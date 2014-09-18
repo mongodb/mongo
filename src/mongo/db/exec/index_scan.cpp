@@ -56,12 +56,10 @@ namespace mongo {
                          WorkingSet* workingSet,
                          const MatchExpression* filter)
         : _txn(txn),
-          _checkEndKeys(0),
           _workingSet(workingSet),
-          _hitEnd(false),
-          _filter(filter), 
+          _scanState(INITIALIZING),
+          _filter(filter),
           _shouldDedup(true),
-          _yieldMovedCursor(false),
           _params(params),
           _btreeCursor(NULL),
           _commonStats(kStageType) {
@@ -71,6 +69,10 @@ namespace mongo {
     }
 
     void IndexScan::initIndexScan() {
+        // This function transitions from the initializing state to CHECKING_END. If
+        // the initialization fails, however, then the state transitions to HIT_END.
+        invariant(INITIALIZING == _scanState);
+
         // Perform the possibly heavy-duty initialization of the underlying index cursor.
         if (_params.doNotDedup) {
             _shouldDedup = false;
@@ -104,7 +106,7 @@ namespace mongo {
             Status status = _indexCursor->seek(_params.bounds.startKey);
             if (!status.isOK()) {
                 warning() << "IndexCursor seek failed: " << status.toString();
-                _hitEnd = true;
+                _scanState = HIT_END;
             }
             if (!isEOF()) {
                 _specificStats.keysExamined = 1;
@@ -128,8 +130,16 @@ namespace mongo {
                 _keyEltsInc.resize(nFields);
             }
             else {
-                _hitEnd = true;
+                _scanState = HIT_END;
             }
+        }
+
+        // This method may throw an execption while it's doing intialization. If we've gotten
+        // here, then we've done all the initialization without an exception being thrown. This
+        // means it is safe to transition to the CHECKING_END state. In error cases, we transition
+        // to HIT_END, so we should not change state again here.
+        if (HIT_END != _scanState) {
+            _scanState = CHECKING_END;
         }
     }
 
@@ -139,79 +149,73 @@ namespace mongo {
         // Adds the amount of time taken by work() to executionTimeMillis.
         ScopedTimer timer(&_commonStats.executionTimeMillis);
 
-        if (NULL == _indexCursor.get()) {
-            // First call to work().  Perform possibly heavy init.
+        if (INITIALIZING == _scanState) {
+            invariant(NULL == _indexCursor.get());
             initIndexScan();
+        }
+
+        if (CHECKING_END == _scanState) {
             checkEnd();
         }
-        else if (_yieldMovedCursor) {
-            _yieldMovedCursor = false;
-            // Note that we're not calling next() here.  We got the next thing when we recovered
-            // from yielding.
+
+        if (isEOF()) {
+            _commonStats.isEOF = true;
+            return PlanStage::IS_EOF;
         }
 
-        if (isEOF()) { return PlanStage::IS_EOF; }
+        if (GETTING_NEXT == _scanState) {
+            // Grab the next (key, value) from the index.
+            BSONObj keyObj = _indexCursor->getKey();
+            DiskLoc loc = _indexCursor->getValue();
 
-        // If we examined multiple keys in a prior work cycle, make up for it here by returning
-        // NEED_TIME. This is done for plan ranking. Refer to the comment for '_checkEndKeys'
-        // in the .h for details.
-        if (_checkEndKeys > 0) {
-            --_checkEndKeys;
-            ++_commonStats.needTime;
-            return PlanStage::NEED_TIME;
-        }
-
-        // Grab the next (key, value) from the index.
-        BSONObj keyObj = _indexCursor->getKey();
-        DiskLoc loc = _indexCursor->getValue();
-
-        bool filterPasses = Filter::passes(keyObj, _keyPattern, _filter);
-        if ( filterPasses ) {
-            // We must make a copy of the on-disk data since it can mutate during the execution of
-            // this query.
-            keyObj = keyObj.getOwned();
-        }
-
-        // Move to the next result.
-        // The underlying IndexCursor points at the *next* thing we want to return.  We do this so
-        // that if we're scanning an index looking for docs to delete we don't continually clobber
-        // the thing we're pointing at.
-        _indexCursor->next();
-        checkEnd();
-
-        if (_shouldDedup) {
-            ++_specificStats.dupsTested;
-            if (_returned.end() != _returned.find(loc)) {
-                ++_specificStats.dupsDropped;
-                ++_commonStats.needTime;
-                return PlanStage::NEED_TIME;
-            }
-            else {
-                _returned.insert(loc);
-            }
-        }
-
-        if (filterPasses) {
-            if (NULL != _filter) {
-                ++_specificStats.matchTested;
+            bool filterPasses = Filter::passes(keyObj, _keyPattern, _filter);
+            if ( filterPasses ) {
+                // We must make a copy of the on-disk data since it can mutate during the execution
+                // of this query.
+                keyObj = keyObj.getOwned();
             }
 
-            // Fill out the WSM.
-            WorkingSetID id = _workingSet->allocate();
-            WorkingSetMember* member = _workingSet->get(id);
-            member->loc = loc;
-            member->keyData.push_back(IndexKeyDatum(_keyPattern, keyObj));
-            member->state = WorkingSetMember::LOC_AND_IDX;
+            // Move to the next result.
+            // The underlying IndexCursor points at the *next* thing we want to return.  We do this
+            // so that if we're scanning an index looking for docs to delete we don't continually
+            // clobber the thing we're pointing at.
+            _indexCursor->next();
+            _scanState = CHECKING_END;
 
-            if (_params.addKeyMetadata) {
-                BSONObjBuilder bob;
-                bob.appendKeys(_keyPattern, keyObj);
-                member->addComputed(new IndexKeyComputedData(bob.obj()));
+            if (_shouldDedup) {
+                ++_specificStats.dupsTested;
+                if (_returned.end() != _returned.find(loc)) {
+                    ++_specificStats.dupsDropped;
+                    ++_commonStats.needTime;
+                    return PlanStage::NEED_TIME;
+                }
+                else {
+                    _returned.insert(loc);
+                }
             }
 
-            *out = id;
-            ++_commonStats.advanced;
-            return PlanStage::ADVANCED;
+            if (filterPasses) {
+                if (NULL != _filter) {
+                    ++_specificStats.matchTested;
+                }
+
+                // Fill out the WSM.
+                WorkingSetID id = _workingSet->allocate();
+                WorkingSetMember* member = _workingSet->get(id);
+                member->loc = loc;
+                member->keyData.push_back(IndexKeyDatum(_keyPattern, keyObj));
+                member->state = WorkingSetMember::LOC_AND_IDX;
+
+                if (_params.addKeyMetadata) {
+                    BSONObjBuilder bob;
+                    bob.appendKeys(_keyPattern, keyObj);
+                    member->addComputed(new IndexKeyComputedData(bob.obj()));
+                }
+
+                *out = id;
+                ++_commonStats.advanced;
+                return PlanStage::ADVANCED;
+            }
         }
 
         ++_commonStats.needTime;
@@ -219,7 +223,7 @@ namespace mongo {
     }
 
     bool IndexScan::isEOF() {
-        if (NULL == _indexCursor.get()) {
+        if (INITIALIZING == _scanState) {
             // Have to call work() at least once.
             return false;
         }
@@ -231,17 +235,13 @@ namespace mongo {
             }
         }
 
-        if (_checkEndKeys != 0) {
-            return false;
-        }
-
-        return _hitEnd || _indexCursor->isEOF();
+        return HIT_END == _scanState || _indexCursor->isEOF();
     }
 
     void IndexScan::saveState() {
         ++_commonStats.yields;
 
-        if (_hitEnd || (NULL == _indexCursor.get())) { return; }
+        if (HIT_END == _scanState || INITIALIZING == _scanState) { return; }
         if (!_indexCursor->isEOF()) {
             _savedKey = _indexCursor->getKey().getOwned();
             _savedLoc = _indexCursor->getValue();
@@ -253,12 +253,12 @@ namespace mongo {
         _txn = opCtx;
         ++_commonStats.unyields;
 
-        if (_hitEnd || (NULL == _indexCursor.get())) { return; }
+        if (HIT_END == _scanState || INITIALIZING == _scanState) { return; }
 
         // We can have a valid position before we check isEOF(), restore the position, and then be
         // EOF upon restore.
         if (!_indexCursor->restorePosition( opCtx ).isOK() || _indexCursor->isEOF()) {
-            _hitEnd = true;
+            _scanState = HIT_END;
             return;
         }
 
@@ -266,12 +266,10 @@ namespace mongo {
             || _savedLoc != _indexCursor->getValue()) {
             // Our restored position isn't the same as the saved position.  When we call work()
             // again we want to return where we currently point, not past it.
-            _yieldMovedCursor = true;
-
             ++_specificStats.yieldMovedCursor;
 
             // Our restored position might be past endKey, see if we've hit the end.
-            checkEnd();
+            _scanState = CHECKING_END;
         }
     }
 
@@ -300,6 +298,8 @@ namespace mongo {
         }
 
         if (_params.bounds.isSimpleRange) {
+            _scanState = GETTING_NEXT;
+
             // "Normal" start -> end scanning.
             verify(NULL == _btreeCursor);
             verify(NULL == _checker.get());
@@ -311,12 +311,9 @@ namespace mongo {
 
             if ((cmp != 0 && cmp != _params.direction)
                 || (cmp == 0 && !_params.bounds.endKeyInclusive)) {
-
-                _hitEnd = true;
-                _commonStats.isEOF = true;
+                _scanState = HIT_END;
             }
-
-            if (!isEOF() && _params.bounds.isSimpleRange) {
+            else {
                 ++_specificStats.keysExamined;
             }
         }
@@ -324,41 +321,34 @@ namespace mongo {
             verify(NULL != _btreeCursor);
             verify(NULL != _checker.get());
 
-            // Use _checker to see how things are.
-            for (;;) {
-                //cout << "current index key is " << _indexCursor->getKey().toString() << endl;
-                //cout << "keysExamined is " << _specificStats.keysExamined << endl;
-                IndexBoundsChecker::KeyState keyState;
-                keyState = _checker->checkKey(_indexCursor->getKey(),
-                                              &_keyEltsToUse,
-                                              &_movePastKeyElts,
-                                              &_keyElts,
-                                              &_keyEltsInc);
+            IndexBoundsChecker::KeyState keyState;
+            keyState = _checker->checkKey(_indexCursor->getKey(),
+                                          &_keyEltsToUse,
+                                          &_movePastKeyElts,
+                                          &_keyElts,
+                                          &_keyEltsInc);
 
-                if (IndexBoundsChecker::DONE == keyState) {
-                    _hitEnd = true;
-                    break;
-                }
+            if (IndexBoundsChecker::DONE == keyState) {
+                _scanState = HIT_END;
+                return;
+            }
 
-                // This seems weird but it's the old definition of nscanned.
-                ++_specificStats.keysExamined;
+            // This seems weird but it's the old definition of nscanned.
+            ++_specificStats.keysExamined;
 
-                if (IndexBoundsChecker::VALID == keyState) {
-                    break;
-                }
+            if (IndexBoundsChecker::VALID == keyState) {
+                _scanState = GETTING_NEXT;
+                return;
+            }
 
-                //cout << "skipping...\n";
-                verify(IndexBoundsChecker::MUST_ADVANCE == keyState);
-                _btreeCursor->skip(_indexCursor->getKey(), _keyEltsToUse, _movePastKeyElts,
-                                   _keyElts, _keyEltsInc);
+            verify(IndexBoundsChecker::MUST_ADVANCE == keyState);
+            _btreeCursor->skip(_indexCursor->getKey(), _keyEltsToUse, _movePastKeyElts,
+                               _keyElts, _keyEltsInc);
 
-                // Must check underlying cursor EOF after every cursor movement.
-                if (_btreeCursor->isEOF()) {
-                    _hitEnd = true;
-                    break;
-                }
-
-                ++_checkEndKeys;
+            // Must check underlying cursor EOF after every cursor movement.
+            if (_btreeCursor->isEOF()) {
+                _scanState = HIT_END;
+                return;
             }
         }
     }
