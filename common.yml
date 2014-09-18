@@ -316,7 +316,7 @@ buildvariants:
   - ubuntu1404-test
   expansions:
     mongo_url: http://downloads.10gen.com/linux/mongodb-linux-x86_64-enterprise-ubuntu1404-latest.tgz
-    mongod_extra_options: --sslMode requireSSL --sslCAFile src/src/github.com/mongodb/mongo-tools/common/db/ssl/testdata/ca.pem --sslPEMKeyFile src/src/github.com/mongodb/mongo-tools/common/db/ssl/testdata/server.pem
+    mongod_extra_options: --sslMode requireSSL --sslCAFile src/src/github.com/mongodb/mongo-tools/common/db/openssl/testdata/ca.pem --sslPEMKeyFile src/src/github.com/mongodb/mongo-tools/common/db/openssl/testdata/server.pem
   tasks:
   - name: ssl
 
