@@ -412,6 +412,11 @@ __wt_stat_init_connection_stats(WT_CONNECTION_STATS *stats)
 	    "sleep for LSM checkpoint throttle";
 	stats->lsm_merge_throttle.desc = "sleep for LSM merge throttle";
 	stats->lsm_rows_merged.desc = "rows merged in an LSM tree";
+	stats->lsm_work_queue_app.desc = "LSM App work units currently queued";
+	stats->lsm_work_queue_manager.desc =
+	    "LSM Merge work units currently queued";
+	stats->lsm_work_queue_switch.desc =
+	    "LSM Switch work units currently queued";
 	stats->lsm_work_units_created.desc =
 	    "LSM tree maintenance operations scheduled";
 	stats->lsm_work_units_discarded.desc =
