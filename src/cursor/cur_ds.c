@@ -139,7 +139,7 @@ __curds_compare(WT_CURSOR *a, WT_CURSOR *b, int *cmpp)
 	 * Confirm both cursors refer to the same source and have keys, then
 	 * compare them.
 	 */
-	if (strcmp(a->uri, b->uri) != 0)
+	if (strcmp(a->internal_uri, b->internal_uri) != 0)
 		WT_ERR_MSG(session, EINVAL,
 		    "Cursors must reference the same object");
 

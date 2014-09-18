@@ -289,7 +289,7 @@ __curindex_close(WT_CURSOR *cursor)
 
 	__wt_schema_release_table(session, cindex->table);
 	/* The URI is owned by the index. */
-	cursor->uri = NULL;
+	cursor->internal_uri = NULL;
 	WT_TRET(__wt_cursor_close(cursor));
 
 err:	API_END_RET(session, ret);
@@ -393,7 +393,7 @@ __wt_curindex_open(WT_SESSION_IMPL *session,
 	cindex->key_plan = idx->key_plan;
 	cindex->value_plan = idx->value_plan;
 
-	cursor->uri = idx->name;
+	cursor->internal_uri = idx->name;
 	cursor->key_format = idx->idxkey_format;
 	cursor->value_format = table->value_format;
 
@@ -430,7 +430,8 @@ __wt_curindex_open(WT_SESSION_IMPL *session,
 	/* Open the column groups needed for this index cursor. */
 	WT_ERR(__curindex_open_colgroups(session, cindex, cfg));
 
-	WT_ERR(__wt_cursor_init(cursor, cursor->uri, owner, cfg, cursorp));
+	WT_ERR(__wt_cursor_init(
+	    cursor, cursor->internal_uri, owner, cfg, cursorp));
 
 	if (F_ISSET(cursor, WT_CURSTD_DUMP_JSON))
 		WT_ERR(__wt_json_column_init(cursor, table->key_format,
