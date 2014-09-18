@@ -416,11 +416,10 @@ namespace mongo {
     void WiredTigerIndex::IndexCursor::restorePosition( OperationContext *txn ) {
         // Update the session handle with our new operation context.
         if (txn != _txn) {
-            fprintf(stderr, "Updating transaction in IndexCursor::restorePosition\n");
             _txn = txn;
             _session = WiredTigerRecoveryUnit::Get(txn).GetSharedSession();
         }
-         _cursor = new WiredTigerCursor(_idx.GetURI(), *_session);
+        _cursor = new WiredTigerCursor(_idx.GetURI(), *_session);
         if (_savedAtEnd) {
             _eof = true;
             return;

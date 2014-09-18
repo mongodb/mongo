@@ -604,8 +604,6 @@ namespace mongo {
         // OperationContext on restore - update the iterators context in that
         // case
         if (txn != _txn) {
-            fprintf(stderr, "Updating transaction in Iterator::restoreState\n");
-
             _txn = txn;
             _session = WiredTigerRecoveryUnit::Get(txn).GetSharedSession();
         }
