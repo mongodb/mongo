@@ -196,9 +196,10 @@ namespace newlm {
     }
 
     void LockerImpl::dump() const {
-        _lock.lock();
         StringBuilder ss;
         ss << "lock status: ";
+
+        //  isLocked() must be called without holding _lock
         if (!isLocked()) {
             ss << "unlocked";
         }
@@ -206,6 +207,7 @@ namespace newlm {
             // SERVER-14978: Dump lock stats information
         }
 
+        _lock.lock();
         ss << " requests:";
         for (LockRequestsMap::const_iterator it = _requests.begin(); it != _requests.end(); ++it) {
             ss << " " << it->first.toString();
