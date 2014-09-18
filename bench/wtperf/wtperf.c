@@ -83,7 +83,7 @@ static int	 execute_workload(CONFIG *);
 static int	 find_table_count(CONFIG *);
 static void	*monitor(void *);
 static void	*populate_thread(void *);
-static void	 randomize_value(CONFIG *, char *);
+static void	 randomize_value(CONFIG_THREAD *, char *);
 static int	 start_all_runs(CONFIG *);
 static int	 start_run(CONFIG *);
 static int	 start_threads(CONFIG *,
@@ -91,7 +91,7 @@ static int	 start_threads(CONFIG *,
 static int	 stop_threads(CONFIG *, u_int, CONFIG_THREAD *);
 static void	*thread_run_wtperf(void *);
 static void	*worker(void *);
-static uint64_t	 wtperf_rand(CONFIG *);
+static uint64_t	 wtperf_rand(CONFIG_THREAD *);
 static uint64_t	 wtperf_value_range(CONFIG *);
 
 #define	HELIUM_NAME	"dev1"
@@ -100,11 +100,12 @@ static uint64_t	 wtperf_value_range(CONFIG *);
 #define	HELIUM_CONFIG	",type=helium"
 
 /*
- * wtperf uses a couple of internal WiredTiger library routines for timing
- * and generating random numbers.
+ * wtperf uses internal WiredTiger library routines for timing and generating
+ * random numbers.
  */
 extern int	__wt_epoch(void *, struct timespec *);
-extern uint32_t	__wt_random(void);
+extern uint32_t	__wt_random(uint32_t *);
+extern void	__wt_random_init(uint32_t *);
 
 /* Retrieve an ID for the next insert operation. */
 static inline uint64_t
@@ -130,7 +131,7 @@ generate_key(CONFIG *cfg, char *key_buf, uint64_t keyno)
 }
 
 static void
-randomize_value(CONFIG *cfg, char *value_buf)
+randomize_value(CONFIG_THREAD *thread, char *value_buf)
 {
 	uint8_t *vb;
 	uint32_t i;
@@ -140,13 +141,13 @@ randomize_value(CONFIG *cfg, char *value_buf)
 	 * randomly chosen byte (other than the trailing NUL).
 	 * Make sure we don't write a NUL: keep the value the same length.
 	 */
-	i = __wt_random() % (cfg->value_sz - 1);
+	i = __wt_random(thread->rnd) % (thread->cfg->value_sz - 1);
 	while (value_buf[i] == '\0' && i > 0)
 		--i;
 	if (i > 0) {
 		vb = (uint8_t *)value_buf;
-		vb[0] = (__wt_random() % 255) + 1;
-		vb[i] = (__wt_random() % 255) + 1;
+		vb[0] = (__wt_random(thread->rnd) % 255) + 1;
+		vb[i] = (__wt_random(thread->rnd) % 255) + 1;
 	}
 }
 
@@ -317,13 +318,13 @@ worker_async(void *arg)
 		case WORKER_INSERT:
 		case WORKER_INSERT_RMW:
 			if (cfg->random_range)
-				next_val = wtperf_rand(cfg);
+				next_val = wtperf_rand(thread);
 			else
 				next_val = cfg->icount + get_next_incr(cfg);
 			break;
 		case WORKER_READ:
 		case WORKER_UPDATE:
-			next_val = wtperf_rand(cfg);
+			next_val = wtperf_rand(thread);
 
 			/*
 			 * If the workload is started without a populate phase
@@ -361,14 +362,14 @@ worker_async(void *arg)
 			goto op_err;
 		case WORKER_INSERT:
 			if (cfg->random_value)
-				randomize_value(cfg, value_buf);
+				randomize_value(thread, value_buf);
 			asyncop->set_value(asyncop, value_buf);
 			if ((ret = asyncop->insert(asyncop)) == 0)
 				break;
 			goto op_err;
 		case WORKER_UPDATE:
 			if (cfg->random_value)
-				randomize_value(cfg, value_buf);
+				randomize_value(thread, value_buf);
 			asyncop->set_value(asyncop, value_buf);
 			if ((ret = asyncop->update(asyncop)) == 0)
 				break;
@@ -455,7 +456,7 @@ worker(void *arg)
 		case WORKER_INSERT_RMW:
 			trk = &thread->insert;
 			if (cfg->random_range)
-				next_val = wtperf_rand(cfg);
+				next_val = wtperf_rand(thread);
 			else
 				next_val = cfg->icount + get_next_incr(cfg);
 			break;
@@ -465,7 +466,7 @@ worker(void *arg)
 		case WORKER_UPDATE:
 			if (*op == WORKER_UPDATE)
 				trk = &thread->update;
-			next_val = wtperf_rand(cfg);
+			next_val = wtperf_rand(thread);
 
 			/*
 			 * If the workload is started without a populate phase
@@ -532,7 +533,7 @@ worker(void *arg)
 			/* FALLTHROUGH */
 		case WORKER_INSERT:
 			if (cfg->random_value)
-				randomize_value(cfg, value_buf);
+				randomize_value(thread, value_buf);
 			cursor->set_value(cursor, value_buf);
 			if ((ret = cursor->insert(cursor)) == 0)
 				break;
@@ -556,7 +557,7 @@ worker(void *arg)
 				else
 					value_buf[0] = 'a';
 				if (cfg->random_value)
-					randomize_value(cfg, value_buf);
+					randomize_value(thread, value_buf);
 				cursor->set_value(cursor, value_buf);
 				if ((ret = cursor->update(cursor)) == 0)
 					break;
@@ -812,7 +813,7 @@ populate_thread(void *arg)
 		}
 		cursor->set_key(cursor, key_buf);
 		if (cfg->random_value)
-			randomize_value(cfg, value_buf);
+			randomize_value(thread, value_buf);
 		cursor->set_value(cursor, value_buf);
 		if ((ret = cursor->insert(cursor)) != 0) {
 			lprintf(cfg, ret, 0, "Failed inserting");
@@ -941,7 +942,7 @@ populate_async(void *arg)
 		generate_key(cfg, key_buf, op);
 		asyncop->set_key(asyncop, key_buf);
 		if (cfg->random_value)
-			randomize_value(cfg, value_buf);
+			randomize_value(thread, value_buf);
 		asyncop->set_value(asyncop, value_buf);
 		if ((ret = asyncop->insert(asyncop)) != 0) {
 			lprintf(cfg, ret, 0, "Failed inserting");
@@ -1200,7 +1201,7 @@ execute_populate(CONFIG *cfg)
 	CONFIG_THREAD *popth;
 	WT_ASYNC_OP *asyncop;
 	size_t i;
-	uint64_t last_ops, secs;
+	uint64_t last_ops, msecs;
 	uint32_t interval, tables;
 	int elapsed, ret;
 	void *(*pfunc)(void *);
@@ -1278,12 +1279,11 @@ execute_populate(CONFIG *cfg)
 	}
 
 	lprintf(cfg, 0, 1, "Finished load of %" PRIu32 " items", cfg->icount);
-	secs = WT_TIMEDIFF(stop, start) / BILLION;
-	if (secs == 0)
-		++secs;
+	msecs = ns_to_ms(WT_TIMEDIFF(stop, start));
 	lprintf(cfg, 0, 1,
-	    "Load time: %" PRIu64 "\n" "load ops/sec: %" PRIu64,
-	    secs, cfg->icount / secs);
+	    "Load time: %.2f\n" "load ops/sec: %" PRIu64,
+	    (double)msecs / (double)THOUSAND, 
+	    (uint64_t)((cfg->icount / msecs) / THOUSAND));
 
 	/*
 	 * If configured, compact to allow LSM merging to complete.  We
@@ -1323,9 +1323,9 @@ execute_populate(CONFIG *cfg)
 			lprintf(cfg, ret, 0, "Get time failed in populate.");
 			return (ret);
 		}
-		secs = WT_TIMEDIFF(stop, start) / BILLION;
 		lprintf(cfg, 0, 1,
-		    "Compact completed in %" PRIu64 " seconds", secs);
+		    "Compact completed in %" PRIu64 " seconds",
+		    (uint64_t)(ns_to_sec(WT_TIMEDIFF(stop, start))));
 		assert(tables == 0);
 	}
 	return (0);
@@ -1746,6 +1746,8 @@ start_run(CONFIG *cfg)
 	char helium_buf[256];
 
 	monitor_created = ret = 0;
+					/* [-Wconditional-uninitialized] */
+	memset(&monitor_thread, 0, sizeof(monitor_thread));
 	
 	if ((ret = setup_log_file(cfg)) != 0)
 		goto err;
@@ -2104,14 +2106,29 @@ err:	config_free(cfg);
 
 static int
 start_threads(CONFIG *cfg,
-    WORKLOAD *workp, CONFIG_THREAD *thread, u_int num, void *(*func)(void *))
+    WORKLOAD *workp, CONFIG_THREAD *base, u_int num, void *(*func)(void *))
 {
-	u_int i;
+	CONFIG_THREAD *thread;
+	u_int i, j;
 	int ret;
 
-	for (i = 0; i < num; ++i, ++thread) {
+	/* Initialize the threads. */
+	for (i = 0, thread = base; i < num; ++i, ++thread) {
 		thread->cfg = cfg;
 		thread->workload = workp;
+
+		/*
+		 * We don't want the threads executing in lock-step, move each
+		 * new RNG state further along in the sequence.
+		 */
+		if (i == 0)
+			__wt_random_init(thread->rnd);
+		else {
+			thread->rnd[0] = (thread - 1)->rnd[0];
+			thread->rnd[1] = (thread - 1)->rnd[1];
+		}
+		for (j = 0; j < 1000; ++j)
+			(void)__wt_random(thread->rnd);
 
 		/*
 		 * Every thread gets a key/data buffer because we don't bother
@@ -2128,7 +2145,7 @@ start_threads(CONFIG *cfg,
 		 */
 		memset(thread->value_buf, 'a', cfg->value_sz - 1);
 		if (cfg->random_value)
-			randomize_value(cfg, thread->value_buf);
+			randomize_value(thread, thread->value_buf);
 
 		/*
 		 * Every thread gets tracking information and is initialized
@@ -2139,13 +2156,16 @@ start_threads(CONFIG *cfg,
 		thread->update.min_latency = UINT32_MAX;
 		thread->ckpt.max_latency = thread->insert.max_latency =
 		thread->read.max_latency = thread->update.max_latency = 0;
+	}
 
+	/* Start the threads. */
+	for (i = 0, thread = base; i < num; ++i, ++thread)
 		if ((ret = pthread_create(
 		    &thread->handle, NULL, func, thread)) != 0) {
 			lprintf(cfg, ret, 0, "Error creating thread");
 			return (ret);
 		}
-	}
+
 	return (0);
 }
 
@@ -2189,16 +2209,19 @@ wtperf_value_range(CONFIG *cfg)
 }
 
 static uint64_t
-wtperf_rand(CONFIG *cfg)
+wtperf_rand(CONFIG_THREAD *thread)
 {
+	CONFIG *cfg;
 	double S1, S2, U;
 	uint64_t rval;
+
+	cfg = thread->cfg;
 
 	/*
 	 * Use WiredTiger's random number routine: it's lock-free and fairly
 	 * good.
 	 */
-	rval = (uint64_t)__wt_random();
+	rval = (uint64_t)__wt_random(thread->rnd);
 
 	/* Use Pareto distribution to give 80/20 hot/cold values. */
 	if (cfg->pareto) {

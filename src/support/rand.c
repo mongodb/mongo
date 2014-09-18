@@ -27,6 +27,22 @@
 
 #include "wt_internal.h"
 
+#undef	M_W
+#define	M_W	(rnd)[0]
+#undef	M_Z
+#define	M_Z	(rnd)[1]
+
+/*
+ * __wt_random_init --
+ *	Initialize return of a 32-bit pseudo-random number.
+ */
+void
+__wt_random_init(uint32_t *rnd)
+{
+	M_W = 521288629;
+	M_Z = 362436069;
+}
+
 /*
  * __wt_random --
  *	Return a 32-bit pseudo-random number.
@@ -43,13 +59,11 @@
  * forever.  Take local copies of the shared values to avoid this.
  */
 uint32_t
-__wt_random(void)
+__wt_random(uint32_t *rnd)
 {
-	static uint32_t m_w = 521288629;
-	static uint32_t m_z = 362436069;
-	uint32_t w = m_w, z = m_z;
+	uint32_t w = M_W, z = M_Z;
 
-	m_z = z = 36969 * (z & 65535) + (z >> 16);
-	m_w = w = 18000 * (w & 65535) + (w >> 16);
+	M_Z = z = 36969 * (z & 65535) + (z >> 16);
+	M_W = w = 18000 * (w & 65535) + (w >> 16);
 	return (z << 16) + (w & 65535);
 }

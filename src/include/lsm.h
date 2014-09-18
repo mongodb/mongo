@@ -192,11 +192,11 @@ struct __wt_lsm_tree {
 	int freeing_old_chunks;		/* Whether chunks are being freed */
 	uint32_t merge_aggressiveness;	/* Increase amount of work per merge */
 
-#define	WT_LSM_TREE_ACTIVE	0x01	/* Workers are active */
-#define	WT_LSM_TREE_COMPACTING	0x02	/* Tree is being compacted */
-#define	WT_LSM_TREE_NEED_SWITCH	0x04	/* A new chunk should be created */
-#define	WT_LSM_TREE_OPEN	0x08	/* The tree is open */
-#define	WT_LSM_TREE_THROTTLE	0x10	/* Throttle updates */
+#define	WT_LSM_TREE_ACTIVE		0x01	/* Workers are active */
+#define	WT_LSM_TREE_COMPACTING		0x02	/* Tree being compacted */
+#define	WT_LSM_TREE_NEED_SWITCH		0x04	/* New chunk needs creating */
+#define	WT_LSM_TREE_OPEN		0x08	/* The tree is open */
+#define	WT_LSM_TREE_THROTTLE		0x10	/* Throttle updates */
 	uint32_t flags;
 
 #define	WT_LSM_TREE_EXCLUSIVE	0x01	/* Tree is opened exclusively */

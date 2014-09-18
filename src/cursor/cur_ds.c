@@ -448,10 +448,10 @@ __wt_curds_open(
     const char *cfg[], WT_DATA_SOURCE *dsrc, WT_CURSOR **cursorp)
 {
 	WT_CURSOR_STATIC_INIT(iface,
-	    NULL,			/* get-key */
-	    NULL,			/* get-value */
-	    NULL,			/* set-key */
-	    NULL,			/* set-value */
+	    __wt_cursor_get_key,	/* get-key */
+	    __wt_cursor_get_value,	/* get-value */
+	    __wt_cursor_set_key,	/* set-key */
+	    __wt_cursor_set_value,	/* set-value */
 	    __curds_compare,		/* compare */
 	    __curds_next,		/* next */
 	    __curds_prev,		/* prev */

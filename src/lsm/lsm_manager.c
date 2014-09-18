@@ -14,6 +14,25 @@ static int __lsm_manager_worker_setup(WT_SESSION_IMPL *);
 static void * __lsm_worker_manager(void *);
 
 /*
+ * __wt_lsm_manager_config --
+ *	Re-configure the LSM manager.
+ */
+int
+__wt_lsm_manager_config(WT_SESSION_IMPL *session, const char **cfg)
+{
+	WT_CONNECTION_IMPL *conn;
+	WT_CONFIG_ITEM cval;
+
+	conn = S2C(session);
+
+	WT_RET(__wt_config_gets(
+	    session, cfg, "lsm_manager.worker_thread_max", &cval));
+	if (cval.val)
+		conn->lsm_manager.lsm_workers_max = (uint32_t)cval.val;
+	return (0);
+}
+
+/*
  * __wt_lsm_manager_start --
  *	Start the LSM management infrastructure. Our queues and locks were
  *	initialized when the connection was initialized.
@@ -89,17 +108,17 @@ __wt_lsm_manager_free_work_unit(
  *	Destroy the LSM manager threads and subsystem.
  */
 int
-__wt_lsm_manager_destroy(WT_CONNECTION_IMPL *conn)
+__wt_lsm_manager_destroy(WT_SESSION_IMPL *session)
 {
+	WT_CONNECTION_IMPL *conn;
 	WT_DECL_RET;
 	WT_LSM_MANAGER *manager;
 	WT_LSM_WORK_UNIT *current, *next;
 	WT_SESSION *wt_session;
-	WT_SESSION_IMPL *session;
 	uint32_t i;
 	uint64_t removed;
 
-	session = conn->default_session;
+	conn = S2C(session);
 	manager = &conn->lsm_manager;
 	removed = 0;
 
@@ -109,7 +128,7 @@ __wt_lsm_manager_destroy(WT_CONNECTION_IMPL *conn)
 			__wt_yield();
 
 		/* Clean up open LSM handles. */
-		ret = __wt_lsm_tree_close_all(conn->default_session);
+		ret = __wt_lsm_tree_close_all(session);
 
 		WT_TRET(__wt_thread_join(
 		    session, manager->lsm_worker_cookies[0].tid));
@@ -185,10 +204,10 @@ __lsm_manager_aggressive_update(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 
 	if (lsm_tree->merge_aggressiveness > old_aggressive)
 		WT_RET(__wt_verbose(session, WT_VERB_LSM,
-		     "LSM merge got aggressive (%u), "
-		     "%u / %" PRIu64,
-		     lsm_tree->merge_aggressiveness, stallms,
-		     lsm_tree->chunk_fill_ms));
+		    "LSM merge %s got aggressive (%u), "
+		    "%u / %" PRIu64,
+		    lsm_tree->name, lsm_tree->merge_aggressiveness, stallms,
+		    lsm_tree->chunk_fill_ms));
 	return (0);
 }
 

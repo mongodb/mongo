@@ -246,7 +246,7 @@ __wt_log_open(WT_SESSION_IMPL *session)
 	 */
 	if (logcount > 0) {
 		log->trunc_lsn = log->alloc_lsn;
-		WT_ERR(__wt_txn_recover(session));
+		WT_ERR(__wt_txn_recover(conn));
 	}
 
 err:	__wt_log_files_free(session, logfiles, logcount);

@@ -495,7 +495,7 @@ __wt_ovfl_reuse_add(WT_SESSION_IMPL *session, WT_PAGE *page,
 	head = page->modify->ovfl_track->ovfl_reuse;
 
 	/* Choose a skiplist depth for this insert. */
-	skipdepth = __wt_skip_choose_depth();
+	skipdepth = __wt_skip_choose_depth(session);
 
 	/*
 	 * Allocate the WT_OVFL_REUSE structure, next pointers for the skip
@@ -783,7 +783,7 @@ __wt_ovfl_txnc_add(WT_SESSION_IMPL *session, WT_PAGE *page,
 	head = page->modify->ovfl_track->ovfl_txnc;
 
 	/* Choose a skiplist depth for this insert. */
-	skipdepth = __wt_skip_choose_depth();
+	skipdepth = __wt_skip_choose_depth(session);
 
 	/*
 	 * Allocate the WT_OVFL_TXNC structure, next pointers for the skip
@@ -807,7 +807,7 @@ __wt_ovfl_txnc_add(WT_SESSION_IMPL *session, WT_PAGE *page,
 	txnc->value_offset = WT_PTRDIFF32(p, txnc);
 	txnc->value_size = WT_STORE_SIZE(value_size);
 	memcpy(p, value, value_size);
-	txnc->current = __wt_txn_current_id(session);
+	txnc->current = __wt_txn_new_id(session);
 
 	__wt_cache_page_inmem_incr(session, page,
 	    WT_OVFL_SIZE(WT_OVFL_TXNC) + addr_size + value_size);

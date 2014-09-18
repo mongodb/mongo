@@ -188,42 +188,85 @@ __wt_open_cursor(WT_SESSION_IMPL *session,
 {
 	WT_COLGROUP *colgroup;
 	WT_DATA_SOURCE *dsrc;
-	WT_DECL_RET;
 
-	if (WT_PREFIX_MATCH(uri, "backup:"))
-		ret = __wt_curbackup_open(session, uri, cfg, cursorp);
-	else if (WT_PREFIX_MATCH(uri, "colgroup:")) {
-		/*
-		 * Column groups are a special case: open a cursor on the
-		 * underlying data source.
-		 */
-		WT_RET(__wt_schema_get_colgroup(session, uri, NULL, &colgroup));
-		ret = __wt_open_cursor(
-		    session, colgroup->source, owner, cfg, cursorp);
-	} else if (WT_PREFIX_MATCH(uri, "config:"))
-		ret = __wt_curconfig_open(session, uri, cfg, cursorp);
-	else if (WT_PREFIX_MATCH(uri, "file:"))
-		ret = __wt_curfile_open(session, uri, owner, cfg, cursorp);
-	else if (WT_PREFIX_MATCH(uri, "lsm:"))
-		ret = __wt_clsm_open(session, uri, owner, cfg, cursorp);
-	else if (WT_PREFIX_MATCH(uri, WT_METADATA_URI))
-		ret = __wt_curmetadata_open(session, uri, owner, cfg, cursorp);
-	else if (WT_PREFIX_MATCH(uri, "index:"))
-		ret = __wt_curindex_open(session, uri, owner, cfg, cursorp);
-	else if (WT_PREFIX_MATCH(uri, "log:"))
-		ret = __wt_curlog_open(session, uri, cfg, cursorp);
-	else if (WT_PREFIX_MATCH(uri, "statistics:"))
-		ret = __wt_curstat_open(session, uri, cfg, cursorp);
-	else if (WT_PREFIX_MATCH(uri, "table:"))
-		ret = __wt_curtable_open(session, uri, cfg, cursorp);
-	else if ((dsrc = __wt_schema_get_source(session, uri)) != NULL)
-		ret = dsrc->open_cursor == NULL ?
+	/*
+	 * Open specific cursor types we know about, or call the generic data
+	 * source open function.
+	 *
+	 * Unwind a set of string comparisons into a switch statement hoping
+	 * the compiler can make it fast, but list the common choices first
+	 * instead of sorting so if/else patterns are still fast.
+	 */
+	switch (uri[0]) {
+	/*
+	 * Common cursor types.
+	 */
+	case 't':
+		if (WT_PREFIX_MATCH(uri, "table:"))
+			return (__wt_curtable_open(session, uri, cfg, cursorp));
+		break;
+	case 'c':
+		if (WT_PREFIX_MATCH(uri, "colgroup:")) {
+			/*
+			 * Column groups are a special case: open a cursor on
+			 * the underlying data source.
+			 */
+			WT_RET(__wt_schema_get_colgroup(
+			    session, uri, NULL, &colgroup));
+			return (__wt_open_cursor(
+			    session, colgroup->source, owner, cfg, cursorp));
+		}
+
+		if (WT_PREFIX_MATCH(uri, "config:"))
+			return (
+			    __wt_curconfig_open(session, uri, cfg, cursorp));
+		break;
+	case 'i':
+		if (WT_PREFIX_MATCH(uri, "index:"))
+			return (__wt_curindex_open(
+			    session, uri, owner, cfg, cursorp));
+		break;
+	case 'l':
+		if (WT_PREFIX_MATCH(uri, "lsm:"))
+			return (__wt_clsm_open(
+			    session, uri, owner, cfg, cursorp));
+
+		if (WT_PREFIX_MATCH(uri, "log:"))
+			return (__wt_curlog_open(session, uri, cfg, cursorp));
+		break;
+
+	/*
+	 * Less common cursor types.
+	 */
+	case 'f':
+		if (WT_PREFIX_MATCH(uri, "file:"))
+			return (__wt_curfile_open(
+			    session, uri, owner, cfg, cursorp));
+		break;
+	case 'm':
+		if (WT_PREFIX_MATCH(uri, WT_METADATA_URI))
+			return (__wt_curmetadata_open(
+			    session, uri, owner, cfg, cursorp));
+		break;
+	case 'b':
+		if (WT_PREFIX_MATCH(uri, "backup:"))
+			return (
+			    __wt_curbackup_open(session, uri, cfg, cursorp));
+		break;
+	case 's':
+		if (WT_PREFIX_MATCH(uri, "statistics:"))
+			return (__wt_curstat_open(session, uri, cfg, cursorp));
+		break;
+	default:
+		break;
+	}
+
+	if ((dsrc = __wt_schema_get_source(session, uri)) != NULL)
+		return (dsrc->open_cursor == NULL ?
 		    __wt_object_unsupported(session, uri) :
-		    __wt_curds_open(session, uri, owner, cfg, dsrc, cursorp);
-	else
-		ret = __wt_bad_object_type(session, uri);
+		    __wt_curds_open(session, uri, owner, cfg, dsrc, cursorp));
 
-	return (ret);
+	return (__wt_bad_object_type(session, uri));
 }
 
 /*
@@ -875,6 +918,8 @@ __wt_open_session(WT_CONNECTION_IMPL *conn,
 	session_ret->iface.connection = &conn->iface;
 
 	WT_ERR(__wt_cond_alloc(session, "session", 0, &session_ret->cond));
+
+	__wt_random_init(session_ret->rnd);
 
 	__wt_event_handler_set(session_ret,
 	    event_handler == NULL ? session->event_handler : event_handler);

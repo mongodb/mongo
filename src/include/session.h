@@ -52,6 +52,8 @@ struct __wt_session_impl {
 
 	WT_CONDVAR *cond;		/* Condition variable */
 
+	uint32_t rnd[2];		/* Random number generation state */
+
 	WT_EVENT_HANDLER *event_handler;/* Application's event handlers */
 
 	WT_DATA_HANDLE *dhandle;	/* Current data handle */

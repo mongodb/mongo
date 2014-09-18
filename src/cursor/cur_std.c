@@ -434,19 +434,6 @@ err:		cursor->saved_err = ret;
 }
 
 /*
- * __cursor_search --
- *	WT_CURSOR->search default implementation.
- */
-static int
-__cursor_search(WT_CURSOR *cursor)
-{
-	int exact;
-
-	WT_RET(cursor->search_near(cursor, &exact));
-	return ((exact == 0) ? 0 : WT_NOTFOUND);
-}
-
-/*
  * __wt_cursor_close --
  *	WT_CURSOR->close default implementation.
  */
@@ -549,47 +536,11 @@ int
 __wt_cursor_init(WT_CURSOR *cursor,
     const char *uri, WT_CURSOR *owner, const char *cfg[], WT_CURSOR **cursorp)
 {
-	WT_CURSOR *cdump;
 	WT_CONFIG_ITEM cval;
+	WT_CURSOR *cdump;
 	WT_SESSION_IMPL *session;
 
 	session = (WT_SESSION_IMPL *)cursor->session;
-
-	/*
-	 * Fill in unspecified cursor methods: get/set key/value, position
-	 * duplication, search and reconfiguration are all standard, else
-	 * if the method isn't set, assume it's unsupported.
-	 */
-	if (cursor->get_key == NULL)
-		cursor->get_key = __wt_cursor_get_key;
-	if (cursor->get_value == NULL)
-		cursor->get_value = __wt_cursor_get_value;
-	if (cursor->set_key == NULL)
-		cursor->set_key = __wt_cursor_set_key;
-	if (cursor->set_value == NULL)
-		cursor->set_value = __wt_cursor_set_value;
-	if (cursor->compare == NULL)
-		cursor->compare = (int (*)
-		    (WT_CURSOR *, WT_CURSOR *, int *))__wt_cursor_notsup;
-	if (cursor->next == NULL)
-		cursor->next = __wt_cursor_notsup;
-	if (cursor->prev == NULL)
-		cursor->prev = __wt_cursor_notsup;
-	if (cursor->reset == NULL)
-		cursor->reset = __wt_cursor_noop;
-	if (cursor->search == NULL)
-		cursor->search = __cursor_search;
-	if (cursor->search_near == NULL)
-		cursor->search_near =
-		    (int (*)(WT_CURSOR *, int *))__wt_cursor_notsup;
-	if (cursor->insert == NULL)
-		cursor->insert = __wt_cursor_notsup;
-	if (cursor->update == NULL)
-		cursor->update = __wt_cursor_notsup;
-	if (cursor->remove == NULL)
-		cursor->remove = __wt_cursor_notsup;
-	if (cursor->close == NULL)
-		WT_RET_MSG(session, EINVAL, "cursor lacks a close method");
 
 	if (cursor->uri == NULL)
 		WT_RET(__wt_strdup(session, uri, &cursor->uri));
@@ -618,8 +569,8 @@ __wt_cursor_init(WT_CURSOR *cursor,
 		cursor->remove = __wt_cursor_notsup;
 	}
 
-	/* dump */
 	/*
+	 * dump
 	 * If an index cursor is opened with dump, then this
 	 * function is called on the index files, with the dump
 	 * config string, and with the index cursor as an owner.

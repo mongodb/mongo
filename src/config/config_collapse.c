@@ -80,9 +80,9 @@ err:	__wt_scr_free(&tmp);
  * We need a character that can't appear in a key as a separator.
  */
 #undef	SEP					/* separator key, character */
-#define	SEP	"."
+#define	SEP	"["
 #undef	SEPC
-#define	SEPC	'.'
+#define	SEPC	'['
 
 /*
  * Individual configuration entries, including a generation number used to make
@@ -117,7 +117,6 @@ __config_merge_scan(WT_SESSION_IMPL *session,
 	WT_DECL_ITEM(vb);
 	WT_DECL_RET;
 	size_t len;
-	const char *str;
 
 	WT_ERR(__wt_scr_alloc(session, 0, &kb));
 	WT_ERR(__wt_scr_alloc(session, 0, &vb));
@@ -141,23 +140,21 @@ __config_merge_scan(WT_SESSION_IMPL *session,
 
 		/*
 		 * !!!
-		 * WiredTiger names its internal checkpoints with a trailing
-		 * dot and a number, for example, "WiredTigerCheckpoint.37".
-		 * We're using dot to separate names in nested structures,
-		 * and there's an obvious conflict. This works for now because
-		 * that's the only case of a dot in a key name, and we never
-		 * merge configuration strings that contain checkpoint names,
-		 * for historic reasons. For now, return an error if there's
-		 * ever a problem. (Note, it's probably safe if the dot is in
-		 * a quoted key, that is, a key of type WT_CONFIG_ITEM_STRING,
-		 * but since this isn't ever supposed to happen, I'm leaving
-		 * the test simple.)
+		 * We're using a JSON quote character to separate the names we
+		 * create for nested structures. That's not completely safe as
+		 * it's possible to quote characters in JSON such that a quote
+		 * character appears as a literal character in a key name. In
+		 * a few cases, applications can create their own key namespace
+		 * (for example, shared library extension names), and therefore
+		 * it's possible for an application to confuse us. Error if we
+		 * we ever see a key with a magic character.
 		 */
-		for (str = k.str, len = k.len; len > 0; ++str, --len)
-			if (*str == SEPC)
+		for (len = 0; len < k.len; ++len)
+			if (k.str[len] == SEPC)
 				WT_ERR_MSG(session, EINVAL,
-				    "key %s contains a separator character "
-				    "(%s)", (char *)kb->data, SEP);
+				    "key %.*s contains a '%c' separator "
+				    "character",
+				    (int)k.len, (char *)k.str, SEPC);
 
 		/* Build the key/value strings. */
 		WT_ERR(__wt_buf_fmt(session,
@@ -197,10 +194,11 @@ __config_merge_scan(WT_SESSION_IMPL *session,
 		cp->entries[cp->entries_next].gen = cp->entries_next;
 		++cp->entries_next;
 	}
+	WT_ERR_NOTFOUND_OK(ret);
 
 err:	__wt_scr_free(&kb);
 	__wt_scr_free(&vb);
-	return (0);
+	return (ret);
 }
 
 /*

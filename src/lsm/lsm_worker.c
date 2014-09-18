@@ -47,9 +47,16 @@ __lsm_worker_general_op(
 	if ((entry->flags & WT_LSM_WORK_MASK) == WT_LSM_WORK_FLUSH) {
 		force = F_ISSET(entry, WT_LSM_WORK_FORCE);
 		F_CLR(entry, WT_LSM_WORK_FORCE);
-		WT_ERR(__wt_lsm_get_chunk_to_flush(
-		    session, entry->lsm_tree, force, &chunk));
+		WT_ERR(__wt_lsm_get_chunk_to_flush(session,
+		    entry->lsm_tree, force, &chunk));
+		/*
+		 * If we got a chunk to flush, checkpoint it.
+		 */
 		if (chunk != NULL) {
+			WT_ERR(__wt_verbose(session, WT_VERB_LSM,
+			    "Flush%s chunk %d %s",
+			    force ? " w/ force" : "",
+			    chunk->id, chunk->uri));
 			ret = __wt_lsm_checkpoint_chunk(
 			    session, entry->lsm_tree, chunk);
 			WT_ASSERT(session, chunk->refcnt > 0);

@@ -349,7 +349,7 @@ __wt_curdump_create(WT_CURSOR *child, WT_CURSOR *owner, WT_CURSOR **cursorp)
 	    __curdump_get_value,	/* get-value */
 	    __curdump_set_key,		/* set-key */
 	    __curdump_set_value,	/* set-value */
-	    NULL,			/* compare */
+	    __wt_cursor_notsup,		/* compare */
 	    __curdump_next,		/* next */
 	    __curdump_prev,		/* prev */
 	    __curdump_reset,		/* reset */

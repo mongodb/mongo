@@ -1980,6 +1980,30 @@ __rec_split(WT_SESSION_IMPL *session, WT_RECONCILE *r)
 }
 
 /*
+ * __rec_skipped_update_chk --
+ *	Return if a skipped update makes this a waste of time.
+ */
+static inline int
+__rec_skipped_update_chk(WT_SESSION_IMPL *session, WT_RECONCILE *r)
+{
+	/*
+	 * If we're doing an eviction, and we skipped an update, it only pays
+	 * off to continue if we're writing multiple blocks, that is, we'll be
+	 * able to evict something.  This should be unlikely (why did eviction
+	 * choose a recently written, small block), but it's possible.  Our
+	 * caller is responsible for calling us at the right moment, when all
+	 * of the rows have been reviewed and we're about to finalize a write.
+	 */
+	if (F_ISSET(r, WT_SKIP_UPDATE_RESTORE) &&
+	    r->bnd_next == 0 && r->leave_dirty) {
+		WT_STAT_FAST_CONN_INCR(session, rec_skipped_update);
+		WT_STAT_FAST_DATA_INCR(session, rec_skipped_update);
+		return (EBUSY);
+	}
+	return (0);
+}
+
+/*
  * __rec_split_raw_worker --
  *	Handle the raw compression page reconciliation bookkeeping.
  */
@@ -2338,21 +2362,12 @@ no_slots:
 		return (0);
 	}
 
+	/* Check if a skipped update makes this a waste of time. */
+	if (last_block)
+		WT_RET (__rec_skipped_update_chk(session, r));
+
 	/* We have a block, update the boundary counter. */
 	++r->bnd_next;
-
-	/*
-	 * If we're doing an eviction, and we skipped an update, it only pays
-	 * off to continue if we're writing multiple blocks, that is, we'll be
-	 * able to evict something.  This should be unlikely (why did eviction
-	 * choose a recently written, small block), but it's possible.
-	 */
-	if (r->bnd_next == 1 && last_block &&
-	    F_ISSET(r, WT_SKIP_UPDATE_RESTORE) && r->leave_dirty) {
-		WT_STAT_FAST_CONN_INCR(session, rec_skipped_update);
-		WT_STAT_FAST_DATA_INCR(session, rec_skipped_update);
-		return (EBUSY);
-	}
 
 	/*
 	 * If we are writing the whole page in our first/only attempt, it might
@@ -2458,18 +2473,8 @@ __rec_split_finish_std(WT_SESSION_IMPL *session, WT_RECONCILE *r)
 	WT_ILLEGAL_VALUE(session);
 	}
 
-	/*
-	 * If we're doing an eviction, and we skipped an update, it only pays
-	 * off to continue if we're writing multiple blocks, that is, we'll be
-	 * able to evict something.  This should be unlikely (why did eviction
-	 * choose a recently written, small block), but it's possible.
-	 */
-	if (F_ISSET(r, WT_SKIP_UPDATE_RESTORE) &&
-	    r->bnd_next == 0 && r->leave_dirty) {
-		WT_STAT_FAST_CONN_INCR(session, rec_skipped_update);
-		WT_STAT_FAST_DATA_INCR(session, rec_skipped_update);
-		return (EBUSY);
-	}
+	/* Check if a skipped update makes this a waste of time. */
+	WT_RET (__rec_skipped_update_chk(session, r));
 
 	/*
 	 * We only arrive here with no entries to write if the page was entirely
@@ -2504,6 +2509,10 @@ __rec_split_finish_std(WT_SESSION_IMPL *session, WT_RECONCILE *r)
 static inline int
 __rec_split_finish_raw(WT_SESSION_IMPL *session, WT_RECONCILE *r)
 {
+	/* Check if a skipped update makes this a waste of time. */
+	if (r->entries == 0)
+		WT_RET (__rec_skipped_update_chk(session, r));
+
 	while (r->entries != 0)
 		WT_RET(__rec_split_raw_worker(session, r, 1));
 	return (0);
@@ -5414,7 +5423,7 @@ __rec_dictionary_init(WT_SESSION_IMPL *session, WT_RECONCILE *r, u_int slots)
 	WT_RET(__wt_calloc(session,
 	    r->dictionary_slots, sizeof(WT_DICTIONARY *), &r->dictionary));
 	for (i = 0; i < r->dictionary_slots; ++i) {
-		depth = __wt_skip_choose_depth();
+		depth = __wt_skip_choose_depth(session);
 		WT_RET(__wt_calloc(session, 1,
 		    sizeof(WT_DICTIONARY) + depth * sizeof(WT_DICTIONARY *),
 		    &r->dictionary[i]));

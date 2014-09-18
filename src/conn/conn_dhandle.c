@@ -575,6 +575,7 @@ __wt_conn_dhandle_discard_single(
 	WT_CONNECTION_IMPL *conn;
 	WT_DATA_HANDLE *save_dhandle;
 	WT_DECL_RET;
+	WT_DECL_SPINLOCK_ID(id);			/* Must appear last */
 
 	conn = S2C(session);
 
@@ -594,12 +595,21 @@ __wt_conn_dhandle_discard_single(
 
 	/* 
 	 * Get the schema lock (required to remove entries from the data handle
-	 * list), get the dhandle lock to block the eviction server from walking
-	 * the list.
+	 * list), get the dhandle lock to block the eviction server from
+	 * walking the list.
 	 */
 	F_SET(session, WT_SESSION_SCHEMA_LOCKED);
 	__wt_spin_lock(session, &conn->schema_lock);
-	__wt_spin_lock(session, &conn->dhandle_lock);
+
+	/*
+	 * If the eviction server is running, don't block waiting for it while
+	 * holding the schema lock.  The sweep server will try again.
+	 */
+	if (final)
+		__wt_spin_lock(session, &conn->dhandle_lock);
+	else if ((ret =
+	    __wt_spin_trylock(session, &conn->dhandle_lock, &id)) != 0)
+		goto unlock;
 
 	/*
 	 * Check if the handle was reacquired by a session while we waited;
@@ -612,7 +622,8 @@ __wt_conn_dhandle_discard_single(
 		SLIST_REMOVE(&conn->dhlh, dhandle, __wt_data_handle, l);
 
 	__wt_spin_unlock(session, &conn->dhandle_lock);
-	__wt_spin_unlock(session, &conn->schema_lock);
+
+unlock:	__wt_spin_unlock(session, &conn->schema_lock);
 	F_CLR(session, WT_SESSION_SCHEMA_LOCKED);
 
 	/*
@@ -640,13 +651,13 @@ err:	session->dhandle = save_dhandle;
  *	Close/discard all data handles.
  */
 int
-__wt_conn_dhandle_discard(WT_CONNECTION_IMPL *conn)
+__wt_conn_dhandle_discard(WT_SESSION_IMPL *session)
 {
+	WT_CONNECTION_IMPL *conn;
 	WT_DATA_HANDLE *dhandle;
 	WT_DECL_RET;
-	WT_SESSION_IMPL *session;
 
-	session = conn->default_session;
+	conn = S2C(session);
 
 	/*
 	 * Close open data handles: first, everything but the metadata file
