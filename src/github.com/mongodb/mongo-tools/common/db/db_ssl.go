@@ -1,4 +1,4 @@
-// +build !ssl
+// +build ssl
 
 // Package db implements generic connection to MongoDB, and contains
 // subpackages for specific methods of connection.
@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"github.com/mongodb/mongo-tools/common/db/command"
 	"github.com/mongodb/mongo-tools/common/db/kerberos"
+	"github.com/mongodb/mongo-tools/common/db/openssl"
 	"github.com/mongodb/mongo-tools/common/options"
 	"gopkg.in/mgo.v2"
 	"sync"
@@ -111,5 +112,10 @@ func getConnector(opts options.ToolOptions) DBConnector {
 	if opts.Auth.Mechanism == "GSSAPI" {
 		return &kerberos.KerberosDBConnector{}
 	}
+
+	if opts.SSL.UseSSL {
+		return &openssl.SSLDBConnector{}
+	}
+
 	return &VanillaDBConnector{}
 }
