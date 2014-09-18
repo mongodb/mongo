@@ -34,6 +34,7 @@
 
 #include <limits>
 
+#include "mongo/base/error_codes.h"
 #include "mongo/base/parse_number.h"
 #include "mongo/client/dbclientinterface.h"
 #include "mongo/db/exec/cached_plan.h"
@@ -872,6 +873,43 @@ namespace mongo {
         PlanStage* root;
         QuerySolution* querySolution;
 
+        // If collection exists and the query is empty, no additional canonicalization is needed.
+        if (collection && request.query.isEmpty()) {
+            // If the query is empty, then we can determine the count by just asking the collection
+            // for its number of records. This is implemented by the CountStage, and we don't need
+            // to create a child for the count stage in this case.
+            root = new CountStage(txn, collection, request, ws.get(), NULL);
+            return PlanExecutor::make(txn, ws.release(), root, request.ns, yieldPolicy, execOut);
+        }
+
+        auto_ptr<CanonicalQuery> cq;
+        if (!request.query.isEmpty()) {
+            // If query is not empty, canonicalize it before working with collection.
+            typedef MatchExpressionParser::WhereCallback WhereCallback;
+            CanonicalQuery* rawCq = NULL;
+            Status canonStatus = CanonicalQuery::canonicalize(
+                request.ns,
+                request.query,
+                BSONObj(), // sort
+                BSONObj(), // projection
+                0, // skip
+                0, // limit
+                request.hint,
+                BSONObj(), // min
+                BSONObj(), // max
+                false, // snapshot
+                request.explain,
+                &rawCq,
+                collection ?
+                    static_cast<const WhereCallback&>(WhereCallbackReal(txn,
+                                                                        collection->ns().db())) :
+                    static_cast<const WhereCallback&>(WhereCallbackNoop()));
+            if (!canonStatus.isOK()) {
+                return canonStatus;
+            }
+            cq.reset(rawCq);
+        }
+
         if (!collection) {
             // Treat collections that do not exist as empty collections. Note that the explain
             // reporting machinery always assumes that the root stage for a count operation is
@@ -880,35 +918,7 @@ namespace mongo {
             return PlanExecutor::make(txn, ws.release(), root, request.ns, yieldPolicy, execOut);
         }
 
-        if (request.query.isEmpty()) {
-            // If the query is empty, then we can determine the count by just asking the collection
-            // for its number of records. This is implemented by the CountStage, and we don't need
-            // to create a child for the count stage in this case.
-            root = new CountStage(txn, collection, request, ws.get(), NULL);
-            return PlanExecutor::make(txn, ws.release(), root, request.ns, yieldPolicy, execOut);
-        }
-
-        const WhereCallbackReal whereCallback(txn, collection->ns().db());
-
-        CanonicalQuery* rawCq;
-        Status canonStatus = CanonicalQuery::canonicalize(collection->ns().ns(),
-                                                          request.query,
-                                                          BSONObj(), // sort
-                                                          BSONObj(), // projection
-                                                          0, // skip
-                                                          0, // limit
-                                                          request.hint,
-                                                          BSONObj(), // min
-                                                          BSONObj(), // max
-                                                          false, // snapshot
-                                                          request.explain,
-                                                          &rawCq,
-                                                          whereCallback);
-        if (!canonStatus.isOK()) {
-            return canonStatus;
-        }
-
-        auto_ptr<CanonicalQuery> cq(rawCq);
+        invariant(cq.get());
 
         const size_t plannerOptions = QueryPlannerParams::PRIVATE_IS_COUNT;
         Status prepStatus = prepareExecution(txn, collection, ws.get(), cq.get(), plannerOptions,
