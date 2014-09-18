@@ -1,5 +1,2 @@
-mongo-tools-proto
-=================
-- mongotop
-- mongoexport
-- mongoimport
+mongo-tools
+===========
