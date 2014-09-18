@@ -164,7 +164,7 @@ __wt_schema_range_truncate(
 	const char *uri;
 
 	cursor = (start != NULL) ? start : stop;
-	uri = cursor->uri;
+	uri = cursor->internal_uri;
 
 	if (WT_PREFIX_MATCH(uri, "file:"))
 		WT_WITH_BTREE(session, ((WT_CURSOR_BTREE *)cursor)->btree,
