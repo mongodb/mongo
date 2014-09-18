@@ -1457,6 +1457,11 @@ def doConfigure(myenv):
             cxx11_mode = "on"
             myenv = cxx11Env
 
+    # rocksdb requires C++11 mode
+    if has_option("rocksdb") and cxx11_mode == "off":
+        print("--rocksdb requires C++11 mode to be enabled");
+        Exit(1)
+
     if has_option("use-glibcxx-debug"):
         # If we are using a modern libstdc++ and this is a debug build and we control all C++
         # dependencies, then turn on the debugging features in libstdc++.
