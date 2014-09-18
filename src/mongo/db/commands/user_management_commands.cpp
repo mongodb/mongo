@@ -1171,15 +1171,6 @@ namespace mongo {
                 }
 
                 AuthorizationManager* authzManager = getGlobalAuthorizationManager();
-                int authzVersion;
-                Status status = authzManager->getAuthorizationVersion(txn, &authzVersion);
-                if (!status.isOK()) {
-                    return appendCommandStatus(result, status);
-                }
-                NamespaceString usersNamespace =
-                        authzVersion== AuthorizationManager::schemaVersion26Final ?
-                                AuthorizationManager::usersCollectionNamespace :
-                                AuthorizationManager::usersAltCollectionNamespace;
                 BSONObjBuilder projection;
                 if (!args.showCredentials) {
                     projection.append("credentials", 0);
@@ -1189,7 +1180,7 @@ namespace mongo {
                         &usersArrayBuilder,
                         stdx::placeholders::_1);
                 authzManager->queryAuthzDocument(txn,
-                                                 usersNamespace,
+                                                 AuthorizationManager::usersCollectionNamespace,
                                                  queryBuilder.done(),
                                                  projection.done(),
                                                  function);

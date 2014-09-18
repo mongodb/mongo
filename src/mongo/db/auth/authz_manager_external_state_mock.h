@@ -116,9 +116,6 @@ namespace mongo {
         typedef std::vector<BSONObj> BSONObjCollection;
         typedef std::map<NamespaceString, BSONObjCollection> NamespaceDocumentMap;
 
-        virtual Status _getUserDocument(
-                            OperationContext* txn, const UserName& userName, BSONObj* userDoc);
-
         Status _findOneIter(const NamespaceString& collectionName,
                             const BSONObj& query,
                             BSONObjCollection::iterator* result);

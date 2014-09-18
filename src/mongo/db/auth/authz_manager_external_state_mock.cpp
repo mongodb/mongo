@@ -100,39 +100,6 @@ namespace {
                           BSONObj()));
     }
 
-    Status AuthzManagerExternalStateMock::_getUserDocument(OperationContext* txn,
-                                                           const UserName& userName,
-                                                           BSONObj* userDoc) {
-        int authzVersion;
-        Status status = getStoredAuthorizationVersion(txn, &authzVersion);
-        if (!status.isOK())
-            return status;
-
-        switch (authzVersion) {
-        case AuthorizationManager::schemaVersion26Upgrade:
-        case AuthorizationManager::schemaVersion26Final:
-            break;
-        default:
-            return Status(ErrorCodes::AuthSchemaIncompatible, mongoutils::str::stream() <<
-                          "Unsupported schema version for getUserDescription(): " <<
-                          authzVersion);
-        }
-
-        status = findOne(
-                txn,
-                (authzVersion == AuthorizationManager::schemaVersion26Final ?
-                 AuthorizationManager::usersCollectionNamespace :
-                 AuthorizationManager::usersAltCollectionNamespace),
-                BSON(AuthorizationManager::USER_NAME_FIELD_NAME << userName.getUser() <<
-                     AuthorizationManager::USER_DB_FIELD_NAME << userName.getDB()),
-                userDoc);
-        if (status == ErrorCodes::NoMatchingDocument) {
-            status = Status(ErrorCodes::UserNotFound, mongoutils::str::stream() <<
-                            "Could not find user " << userName.getFullName());
-        }
-        return status;
-    }
-
     Status AuthzManagerExternalStateMock::getAllDatabaseNames(
             OperationContext* txn,
             std::vector<std::string>* dbnames) {
