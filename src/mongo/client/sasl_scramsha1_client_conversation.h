@@ -48,7 +48,7 @@ namespace mongo {
         /**
          * Implements the client side of a SASL PLAIN mechanism session.
          **/
-        explicit SaslSCRAMSHA1ClientConversation(SaslClientSession* saslClientSession); 
+        explicit SaslSCRAMSHA1ClientConversation(SaslClientSession* saslClientSession);
 
         virtual ~SaslSCRAMSHA1ClientConversation();
 
@@ -66,21 +66,21 @@ namespace mongo {
          * Generates client-first-message.
          **/
         StatusWith<bool> _firstStep(std::string* outputData);
-        
-        /** 
+
+        /**
          * Parses server-first-message and generate client-final-message.
-         **/  
+         **/
         StatusWith<bool> _secondStep(const std::vector<string>& input, std::string* outputData);
-        
+
         /**
          * Generates client-first-message.
          **/
         StatusWith<bool> _thirdStep(const std::vector<string>& input, std::string* outputData);
-        
+
         int _step;
         std::string _authMessage;
         unsigned char _saltedPassword[scram::hashSize];
- 
+
         // client and server nonce concatenated
         std::string _clientNonce;
     };

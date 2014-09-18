@@ -47,7 +47,7 @@
 #include "mongo/util/mongoutils/str.h"
 
 namespace mongo {
-    SaslAuthenticationSession::SaslAuthenticationSessionFactoryFn 
+    SaslAuthenticationSession::SaslAuthenticationSessionFactoryFn
         SaslAuthenticationSession::create = NULL;
 
     // Mechanism name constants.
@@ -56,7 +56,7 @@ namespace mongo {
     const char SaslAuthenticationSession::mechanismSCRAMSHA1[] = "SCRAM-SHA-1";
     const char SaslAuthenticationSession::mechanismGSSAPI[] = "GSSAPI";
     const char SaslAuthenticationSession::mechanismPLAIN[] = "PLAIN";
-    
+
     /**
      * Standard method in mongodb for determining if "authenticatedUser" may act as "requestedUser."
      *

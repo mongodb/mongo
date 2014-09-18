@@ -46,73 +46,71 @@ namespace {
 
     Status checkReplicaMemberVersions() {
 
-        // TODO(spencer): SERVER-14460 Resurrect or remove this function.
-//        if (repl::getGlobalReplicationCoordinator()->getReplicationMode() !=
-//                repl::ReplicationCoordinator::modeReplSet)
-//            return Status::OK();
-//
-//
-//        std::list<repl::Target> rsMembers;
-//        try {
-//            const unsigned rsSelfId = repl::theReplSet->selfId();
-//            const std::vector<repl::ReplSetConfig::MemberCfg>& rsMemberConfigs =
-//                repl::theReplSet->config().members;
-//            for (size_t i = 0; i < rsMemberConfigs.size(); ++i) {
-//                const unsigned otherId = rsMemberConfigs[i]._id;
-//                if (rsSelfId == otherId)
-//                    continue;
-//                const repl::Member* other = repl::theReplSet->findById(otherId);
-//                if (!other) {
-//                    log() << "During authSchemaUpgrade, no information about replica set member "
-//                        "with id " << otherId << "; ignoring.";
-//                    continue;
-//                }
-//                if (!other->hbinfo().maybeUp()) {
-//                    log() << "During authSchemaUpgrade, replica set member " << other->h() <<
-//                        " is down; ignoring.";
-//                    continue;
-//                }
-//                rsMembers.push_back(repl::Target(other->fullName()));
-//            }
-//
-//            multiCommand(BSON("buildInfo" << 1), rsMembers);
-//        }
-//        catch (const DBException& ex) {
-//            return ex.toStatus();
-//        }
-//
-//        for (std::list<repl::Target>::const_iterator iter = rsMembers.begin();
-//             iter != rsMembers.end();
-//             ++iter) {
-//
-//            if (!iter->ok) {
-//                logger::LogstreamBuilder wlog = warning();
-//                wlog << "During authSchemaUpgrade, could not run buildInfo command on " <<
-//                    iter->toHost;
-//                if (!iter->result.isEmpty())
-//                    wlog << "; response was " << iter->result.toString();
-//                wlog << "; ignoring.";
-//                continue;
-//            }
-//
-//            const char* version = iter->result["version"].valuestrsafe();
-//            if (!*version) {
-//                return Status(ErrorCodes::RemoteValidationError, mongoutils::str::stream() <<
-//                              "Missing or non-string \"version\" field in result of buildInfo "
-//                              "command sent to " << iter->toHost << "; found " <<
-//                              iter->result["version"]);
-//            }
-//
-//            if (!isSameMajorVersion(version)) {
-//                BSONArray foundVersionArray = toVersionArray(version);
-//                return Status(ErrorCodes::RemoteValidationError, mongoutils::str::stream() <<
-//                              "To upgrade auth schema in a replica set, all members must be "
-//                              "running the same release series of mongod; found " <<
-//                              foundVersionArray["0"] << '.' << foundVersionArray["1"] <<
-//                              " on host  " << iter->toHost << " but expected " <<
-//                              versionArray["0"] << '.' << versionArray["1"]);
-//            }
-//        }
+        if (repl::getGlobalReplicationCoordinator()->getReplicationMode() !=
+                repl::ReplicationCoordinator::modeReplSet)
+            return Status::OK();
+
+        std::list<repl::Target> rsMembers;
+        try {
+            const unsigned rsSelfId = repl::theReplSet->selfId();
+            const std::vector<repl::ReplSetConfig::MemberCfg>& rsMemberConfigs =
+                repl::theReplSet->config().members;
+            for (size_t i = 0; i < rsMemberConfigs.size(); ++i) {
+                const unsigned otherId = rsMemberConfigs[i]._id;
+                if (rsSelfId == otherId)
+                    continue;
+                const repl::Member* other = repl::theReplSet->findById(otherId);
+                if (!other) {
+                    log() << "During authSchemaUpgrade, no information about replica set member "
+                        "with id " << otherId << "; ignoring.";
+                    continue;
+                }
+                if (!other->hbinfo().maybeUp()) {
+                    log() << "During authSchemaUpgrade, replica set member " << other->h() <<
+                        " is down; ignoring.";
+                    continue;
+                }
+                rsMembers.push_back(repl::Target(other->fullName()));
+            }
+
+            multiCommand(BSON("buildInfo" << 1), rsMembers);
+        }
+        catch (const DBException& ex) {
+            return ex.toStatus();
+        }
+
+        for (std::list<repl::Target>::const_iterator iter = rsMembers.begin();
+             iter != rsMembers.end();
+             ++iter) {
+
+            if (!iter->ok) {
+                logger::LogstreamBuilder wlog = warning();
+                wlog << "During authSchemaUpgrade, could not run buildInfo command on " <<
+                    iter->toHost;
+                if (!iter->result.isEmpty())
+                    wlog << "; response was " << iter->result.toString();
+                wlog << "; ignoring.";
+                continue;
+            }
+
+            const char* version = iter->result["version"].valuestrsafe();
+            if (!*version) {
+                return Status(ErrorCodes::RemoteValidationError, mongoutils::str::stream() <<
+                              "Missing or non-string \"version\" field in result of buildInfo "
+                              "command sent to " << iter->toHost << "; found " <<
+                              iter->result["version"]);
+            }
+
+            if (!isSameMajorVersion(version)) {
+                BSONArray foundVersionArray = toVersionArray(version);
+                return Status(ErrorCodes::RemoteValidationError, mongoutils::str::stream() <<
+                              "To upgrade auth schema in a replica set, all members must be "
+                              "running the same release series of mongod; found " <<
+                              foundVersionArray["0"] << '.' << foundVersionArray["1"] <<
+                              " on host  " << iter->toHost << " but expected " <<
+                              versionArray["0"] << '.' << versionArray["1"]);
+            }
+        }
         return Status(ErrorCodes::InternalError,
                       "Auth schema upgrade check for replica sets not implemented");
     }

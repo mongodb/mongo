@@ -152,7 +152,7 @@ namespace {
                         Status(ErrorCodes::LockBusy, "Could not lock auth data update lock."));
             }
 
-            status = checkClusterMongoVersions(configServer.getConnectionString(), "2.5.4");
+            status = checkClusterMongoVersions(configServer.getConnectionString(), "2.7.6");
             if (!status.isOK()) {
                 log() << "Auth schema upgrade failed: " << status << endl;
                 return appendCommandStatus(result, status);

@@ -30,6 +30,7 @@
 #include "mongo/client/cyrus_sasl_client_session.h"
 
 #include "mongo/base/init.h"
+#include "mongo/client/native_sasl_client_session.h"
 #include "mongo/util/allocator.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/concurrency/mutex.h"
@@ -39,10 +40,13 @@
 namespace mongo {
 namespace {
 
-    SaslClientSession* createCyrusSaslClientSession() {
+    SaslClientSession* createCyrusSaslClientSession(const std::string& mech) {
+        if (mech == "SCRAM-SHA-1") {
+            return new NativeSaslClientSession();
+        }
         return new CyrusSaslClientSession();
     }
-     
+
     /*
      * Allocator functions to be used by the SASL library, if the client
      * doesn't initialize the library for us.
@@ -123,17 +127,17 @@ namespace {
      *
      * If a client wishes to override this initialization but keep the allocator and mutex
      * initialization, it should implement a MONGO_INITIALIZER_GENERAL with
-     * CyrusSaslAllocatorsAndMutexes as a prerequisite and CyrusSaslClientContext as a 
+     * CyrusSaslAllocatorsAndMutexes as a prerequisite and CyrusSaslClientContext as a
      * dependent.  If it wishes to override both, it should implement a MONGO_INITIALIZER_GENERAL
-     * with CyrusSaslAllocatorsAndMutexes and CyrusSaslClientContext as dependents, or 
+     * with CyrusSaslAllocatorsAndMutexes and CyrusSaslClientContext as dependents, or
      * initialize the library before calling mongo::runGlobalInitializersOrDie().
      */
-    MONGO_INITIALIZER_WITH_PREREQUISITES(CyrusSaslClientContext, 
+    MONGO_INITIALIZER_WITH_PREREQUISITES(CyrusSaslClientContext,
                                         ("NativeSaslClientContext",
                                          "CyrusSaslAllocatorsAndMutexes"))
         (InitializerContext* context) {
 
-        static sasl_callback_t saslClientGlobalCallbacks[] = 
+        static sasl_callback_t saslClientGlobalCallbacks[] =
             { { SASL_CB_LOG, SaslCallbackFn(saslClientLogSwallow), NULL /* context */ },
               { SASL_CB_LIST_END } };
 
@@ -149,7 +153,7 @@ namespace {
                           sasl_errstring(result, NULL, NULL) <<
                           ")");
         }
-   
+
         SaslClientSession::create = createCyrusSaslClientSession;
         return Status::OK();
     }
@@ -254,7 +258,7 @@ namespace {
 
     Status CyrusSaslClientSession::initialize() {
         if (_saslConnection != NULL)
-            return Status(ErrorCodes::AlreadyInitialized, 
+            return Status(ErrorCodes::AlreadyInitialized,
                 "Cannot reinitialize CyrusSaslClientSession.");
 
         int result = sasl_client_new(getParameter(parameterServiceName).toString().c_str(),

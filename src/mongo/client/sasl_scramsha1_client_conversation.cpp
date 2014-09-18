@@ -59,13 +59,13 @@ namespace mongo {
         memset(_saltedPassword, 0, scram::hashSize);
     }
 
-    StatusWith<bool> SaslSCRAMSHA1ClientConversation::step(const StringData& inputData, 
+    StatusWith<bool> SaslSCRAMSHA1ClientConversation::step(const StringData& inputData,
                                                            std::string* outputData) {
         std::vector<std::string> input = StringSplitter::split(inputData.toString(), ",");
         _step++;
 
         switch (_step) {
-            case 1: 
+            case 1:
                 return _firstStep(outputData);
             case 2:
                 // Append server-first-message to _authMessage
@@ -75,12 +75,12 @@ namespace mongo {
                 return _thirdStep(input, outputData);
             default:
                 return StatusWith<bool>(ErrorCodes::AuthenticationFailed,
-                                        mongoutils::str::stream() << 
+                                        mongoutils::str::stream() <<
                                         "Invalid SCRAM-SHA-1 authentication step: " << _step);
         }
     }
-   
-    /* 
+
+    /*
      * RFC 5802 specifies that in SCRAM user names characters ',' and '=' are encoded as
      * =2C and =3D respectively.
      */
@@ -101,19 +101,19 @@ namespace mongo {
         // Create text-based nonce as base64 encoding of a binary blob of length multiple of 3
         const int nonceLenQWords = 3;
         uint64_t binaryNonce[nonceLenQWords];
-        
+
         scoped_ptr<SecureRandom> sr(SecureRandom::create());
 
         binaryNonce[0] = sr->nextInt64();
         binaryNonce[1] = sr->nextInt64();
         binaryNonce[2] = sr->nextInt64();
-       
-        std::string user = 
+
+        std::string user =
             _saslClientSession->getParameter(SaslClientSession::parameterUser).toString();
         encodeSCRAMUsername(user);
-        std::string clientNonce = base64::encode(reinterpret_cast<char*>(binaryNonce), 
+        std::string clientNonce = base64::encode(reinterpret_cast<char*>(binaryNonce),
                                                  sizeof(binaryNonce));
-       
+
         // Append client-first-message-bare to authMessage
         _authMessage = "n=" + user + ",r=" + clientNonce + ",";
 
@@ -127,7 +127,7 @@ namespace mongo {
 #endif // MONGO_SSL
     }
 
-    /** 
+    /**
      * Parse server-first-message on the form:
      * r=client-nonce|server-nonce,s=user-salt,i=iteration-count
      *
@@ -135,42 +135,42 @@ namespace mongo {
      * c=channel-binding(base64),r=client-nonce|server-nonce,p=ClientProof
      *
      **/
-    StatusWith<bool> SaslSCRAMSHA1ClientConversation::_secondStep(const std::vector<string>& input, 
+    StatusWith<bool> SaslSCRAMSHA1ClientConversation::_secondStep(const std::vector<string>& input,
                                                                   std::string* outputData) {
 #ifndef MONGO_SSL
-        return StatusWith<bool>(ErrorCodes::InternalError, 
+        return StatusWith<bool>(ErrorCodes::InternalError,
             "The server is not compiled with SSL support");
 #else
         if (input.size() != 3) {
-            return StatusWith<bool>(ErrorCodes::BadValue, mongoutils::str::stream() << 
-                "Incorrect number of arguments for first SCRAM-SHA-1 server message, got " << 
+            return StatusWith<bool>(ErrorCodes::BadValue, mongoutils::str::stream() <<
+                "Incorrect number of arguments for first SCRAM-SHA-1 server message, got " <<
                 input.size() << " expected 3");
         }
         else if (!str::startsWith(input[0], "r=") || input[0].size() < 2) {
-            return StatusWith<bool>(ErrorCodes::BadValue, mongoutils::str::stream() << 
+            return StatusWith<bool>(ErrorCodes::BadValue, mongoutils::str::stream() <<
                 "Incorrect SCRAM-SHA-1 client|server nonce: " << input[0]);
         }
         else if (!str::startsWith(input[1], "s=") || input[1].size() < 6) {
-            return StatusWith<bool>(ErrorCodes::BadValue, mongoutils::str::stream() << 
+            return StatusWith<bool>(ErrorCodes::BadValue, mongoutils::str::stream() <<
                 "Incorrect SCRAM-SHA-1 salt: " << input[1]);
         }
         else if(!str::startsWith(input[2], "i=") || input[2].size() < 3) {
-            return StatusWith<bool>(ErrorCodes::BadValue, mongoutils::str::stream() << 
+            return StatusWith<bool>(ErrorCodes::BadValue, mongoutils::str::stream() <<
                 "Incorrect SCRAM-SHA-1 iteration count: " << input[2]);
         }
 
         std::string nonce = input[0].substr(2);
         if(!str::startsWith(nonce, _clientNonce)) {
-            return StatusWith<bool>(ErrorCodes::BadValue, mongoutils::str::stream() << 
+            return StatusWith<bool>(ErrorCodes::BadValue, mongoutils::str::stream() <<
                 "Server SCRAM-SHA-1 nonce does not match client nonce" << input[2]);
         }
 
         std::string salt = input[1].substr(2);
         int iterationCount;
-        
+
         Status status = parseNumberFromStringWithBase(input[2].substr(2), 10, &iterationCount);
         if (status != Status::OK()) {
-            return StatusWith<bool>(ErrorCodes::BadValue, mongoutils::str::stream() << 
+            return StatusWith<bool>(ErrorCodes::BadValue, mongoutils::str::stream() <<
                 "Failed to parse SCRAM-SHA-1 iteration count: " << input[2]);
         }
 
@@ -191,55 +191,55 @@ namespace mongo {
                             decodedSalt.size(),
                             iterationCount,
                             _saltedPassword);
-       
+
         std::string clientProof = scram::generateClientProof(_saltedPassword, _authMessage);
-        
+
         StringBuilder sb;
-        sb << "c=biws,r=" << nonce << ",p=" << clientProof; 
+        sb << "c=biws,r=" << nonce << ",p=" << clientProof;
         *outputData = sb.str();
 
         return StatusWith<bool>(false);
 #endif // MONGO_SSL
     }
 
-    /** 
+    /**
      * Verify server-final-message on the form:
-     * v=ServerSignature 
-     * 
+     * v=ServerSignature
+     *
      * or failed authentication server-final-message on the form:
      * e=message
      **/
-    StatusWith<bool> SaslSCRAMSHA1ClientConversation::_thirdStep(const std::vector<string>& input, 
+    StatusWith<bool> SaslSCRAMSHA1ClientConversation::_thirdStep(const std::vector<string>& input,
                                                                   std::string* outputData) {
 #ifndef MONGO_SSL
-        return StatusWith<bool>(ErrorCodes::InternalError, 
+        return StatusWith<bool>(ErrorCodes::InternalError,
             "The server is not compiled with SSL support");
 #else
 
         if (input.size() != 1) {
-            return StatusWith<bool>(ErrorCodes::BadValue, mongoutils::str::stream() << 
-                "Incorrect number of arguments for final SCRAM-SHA-1 server message, got " << 
+            return StatusWith<bool>(ErrorCodes::BadValue, mongoutils::str::stream() <<
+                "Incorrect number of arguments for final SCRAM-SHA-1 server message, got " <<
                 input.size() << " expected 1");
         }
         else if (input[0].size() < 3) {
-            return StatusWith<bool>(ErrorCodes::BadValue, mongoutils::str::stream() << 
+            return StatusWith<bool>(ErrorCodes::BadValue, mongoutils::str::stream() <<
                 "Incorrect SCRAM-SHA-1 server message length: " << input[0]);
         }
         else if (str::startsWith(input[0], "e=")) {
-            return StatusWith<bool>(ErrorCodes::AuthenticationFailed, mongoutils::str::stream() << 
+            return StatusWith<bool>(ErrorCodes::AuthenticationFailed, mongoutils::str::stream() <<
                 "SCRAM-SHA-1 authentication failure: " << input[0].substr(2));
         }
         else if (!str::startsWith(input[0], "v=")) {
-            return StatusWith<bool>(ErrorCodes::BadValue, mongoutils::str::stream() << 
+            return StatusWith<bool>(ErrorCodes::BadValue, mongoutils::str::stream() <<
                 "Incorrect SCRAM-SHA-1 ServerSignature: " << input[0]);
         }
 
-        bool validServerSignature = 
+        bool validServerSignature =
             scram::verifyServerSignature(_saltedPassword, _authMessage, input[0].substr(2));
 
         if (!validServerSignature) {
             *outputData = "e=Invalid server signature";
-            return StatusWith<bool>(ErrorCodes::BadValue, mongoutils::str::stream() << 
+            return StatusWith<bool>(ErrorCodes::BadValue, mongoutils::str::stream() <<
                     "Client failed to verify SCRAM-SHA-1 ServerSignature, received " <<
                     input[0].substr(2));
         }

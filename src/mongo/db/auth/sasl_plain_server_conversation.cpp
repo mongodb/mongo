@@ -33,20 +33,20 @@
 #include "mongo/util/text.h"
 
 namespace mongo {
-   
+
     SaslPLAINServerConversation::SaslPLAINServerConversation(
                                                     SaslAuthenticationSession* saslAuthSession) :
         SaslServerConversation(saslAuthSession) {
     }
 
     SaslPLAINServerConversation::~SaslPLAINServerConversation() {};
-    
-    StatusWith<bool> SaslPLAINServerConversation::step(const StringData& inputData, 
+
+    StatusWith<bool> SaslPLAINServerConversation::step(const StringData& inputData,
                                                        std::string* outputData) {
         // Expecting user input on the form: user\0user\0pwd
         std::string input = inputData.toString();
         std::string pwd = "";
- 
+
         try {
             _user = input.substr(0, inputData.find('\0'));
             pwd = input.substr(inputData.find('\0', _user.size()+1)+1);
@@ -72,7 +72,7 @@ namespace mongo {
                 releaseUser(userObj);
 
         std::string authDigest = createPasswordDigest(_user, pwd);
- 
+
         if (authDigest != creds.password) {
             return StatusWith<bool>(ErrorCodes::AuthenticationFailed,
                 mongoutils::str::stream() << "Incorrect user name or password");
@@ -82,5 +82,5 @@ namespace mongo {
 
         return StatusWith<bool>(true);
     }
-    
+
 }  // namespace mongo
