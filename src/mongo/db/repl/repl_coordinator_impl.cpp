@@ -86,6 +86,7 @@ namespace {
                    const OpTime* _opTime,
                    const WriteConcernOptions* _writeConcern,
                    boost::condition_variable* _condVar) : list(_list),
+                                                          master(true),
                                                           opID(_opID),
                                                           opTime(_opTime),
                                                           writeConcern(_writeConcern),
@@ -98,6 +99,7 @@ namespace {
         }
 
         std::vector<WaiterInfo*>* list;
+        bool master; // Set to false to indicate that stepDown was called while waiting
         const unsigned int opID;
         const OpTime* opTime;
         const WriteConcernOptions* writeConcern;
@@ -602,14 +604,6 @@ namespace {
             const OperationContext* txn,
             const OpTime& opTime,
             const WriteConcernOptions& writeConcern) {
-        if (writeConcern.wMode.empty()) {
-            if (writeConcern.wNumNodes < 1) {
-                return StatusAndDuration(Status::OK(), Milliseconds(timer->millis()));
-            }
-            else if (writeConcern.wNumNodes == 1 && _getLastOpApplied_inlock() >= opTime) {
-                return StatusAndDuration(Status::OK(), Milliseconds(timer->millis()));
-            }
-        }
 
         const Mode replMode = _getReplicationMode_inlock();
         if (replMode == modeNone || serverGlobalParams.configsvr) {
@@ -617,7 +611,7 @@ namespace {
             return StatusAndDuration(Status::OK(), Milliseconds(timer->millis()));
         }
 
-        if (writeConcern.wMode == "majority" && replMode == modeMasterSlave) {
+        if (replMode == modeMasterSlave && writeConcern.wMode == "majority") {
             // with master/slave, majority is equivalent to w=1
             return StatusAndDuration(Status::OK(), Milliseconds(timer->millis()));
         }
@@ -625,6 +619,21 @@ namespace {
         if (opTime.isNull()) {
             // If waiting for the empty optime, always say it's been replicated.
             return StatusAndDuration(Status::OK(), Milliseconds(timer->millis()));
+        }
+
+        if (replMode == modeReplSet && !_currentState.primary()) {
+            return StatusAndDuration(Status(ErrorCodes::NotMaster,
+                                            "Not master while waiting for replication"),
+                                     Milliseconds(timer->millis()));
+        }
+
+        if (writeConcern.wMode.empty()) {
+            if (writeConcern.wNumNodes < 1) {
+                return StatusAndDuration(Status::OK(), Milliseconds(timer->millis()));
+            }
+            else if (writeConcern.wNumNodes == 1 && _getLastOpApplied_inlock() >= opTime) {
+                return StatusAndDuration(Status::OK(), Milliseconds(timer->millis()));
+            }
         }
 
         // Must hold _mutex before constructing waitInfo as it will modify _replicationWaiterList
@@ -638,6 +647,12 @@ namespace {
                 txn->checkForInterrupt();
             } catch (const DBException& e) {
                 return StatusAndDuration(e.toStatus(), Milliseconds(elapsed));
+            }
+
+            if (!waitInfo.master) {
+                return StatusAndDuration(Status(ErrorCodes::NotMaster,
+                                                "Not master anymore while waiting for replication"),
+                                         Milliseconds(elapsed));
             }
 
             if (writeConcern.wTimeout != WriteConcernOptions::kNoTimeout &&
@@ -738,6 +753,7 @@ namespace {
             return cbh.getStatus();
         }
         fassert(18705, cbh.getStatus());
+        lock.unlock();
         _replExecutor.wait(cbh.getValue());
         return result;
     }
@@ -753,6 +769,12 @@ namespace {
             return;
         }
 
+        boost::lock_guard<boost::mutex> lock(_mutex);
+        if (!_getCurrentMemberState_inlock().primary()) {
+            *result = Status(ErrorCodes::NotMaster, "not primary anymore so can't step down");
+            return;
+        }
+
         if (_replExecutor.now() >= stepdownUntil) {
             *result = Status(ErrorCodes::ExceededTimeLimit,
                              "By the time we were ready to step down, we were already past the "
@@ -764,6 +786,13 @@ namespace {
         _topCoord->stepDown();
         _currentState = _topCoord->getMemberState();
         _externalState->closeClientConnections();
+        // Wake up any threads blocked in awaitReplication
+        for (std::vector<WaiterInfo*>::iterator it = _replicationWaiterList.begin();
+                it != _replicationWaiterList.end(); ++it) {
+            WaiterInfo* info = *it;
+            info->master = false;
+            info->condVar->notify_all();
+        }
         *result = Status::OK();
     }
 
