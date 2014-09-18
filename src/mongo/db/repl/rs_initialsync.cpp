@@ -352,7 +352,7 @@ namespace repl {
      */
     void ReplSetImpl::_initialSync() {
         InitialSync init(BackgroundSync::get());
-        SyncTail tail(BackgroundSync::get());
+        SyncTail tail(BackgroundSync::get(), multiSyncApply);
         sethbmsg("initial sync pending",0);
 
         // if this is the first node, it may have already become primary

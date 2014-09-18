@@ -299,10 +299,6 @@ namespace repl {
 
         // keep a list of hosts that we've tried recently that didn't work
         map<string,time_t> _veto;
-        // persistent pool of worker threads for writing ops to the databases
-        threadpool::ThreadPool _writerPool;
-        // persistent pool of worker threads for prefetching
-        threadpool::ThreadPool _prefetcherPool;
 
     public:
         // Allow index prefetching to be turned on/off
@@ -317,10 +313,6 @@ namespace repl {
             return _indexPrefetchConfig;
         }
             
-        static const int replWriterThreadCount;
-        static const int replPrefetcherThreadCount;
-        threadpool::ThreadPool& getPrefetchPool() { return _prefetcherPool; }
-        threadpool::ThreadPool& getWriterPool() { return _writerPool; }
 
         const ReplSetConfig::MemberCfg& myConfig() const { return _config; }
         void tryToGoLiveAsASecondary(OperationContext* txn);

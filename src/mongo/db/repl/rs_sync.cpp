@@ -210,7 +210,7 @@ namespace repl {
         getGlobalReplicationCoordinator()->setFollowerMode(MemberState::RS_RECOVERING);
 
         /* we have some data.  continue tailing. */
-        SyncTail tail(BackgroundSync::get());
+        SyncTail tail(BackgroundSync::get(), multiSyncApply);
         tail.oplogApplication();
     }
 

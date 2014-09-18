@@ -53,6 +53,13 @@
 namespace mongo {
 
 namespace repl {
+#ifdef MONGO_PLATFORM_64
+    const int replWriterThreadCount = 16;
+    const int replPrefetcherThreadCount = 16;
+#else
+    const int replWriterThreadCount = 2;
+    const int replPrefetcherThreadCount = 2;
+#endif
 
     static Counter64 opsAppliedStats;
 
@@ -74,11 +81,14 @@ namespace repl {
         }
     }
 
-    SyncTail::SyncTail(BackgroundSyncInterface *q) :
-        Sync(""), oplogVersion(0), _networkQueue(q), _applyFunc(multiSyncApply) {}
-
     SyncTail::SyncTail(BackgroundSyncInterface *q, MultiSyncApplyFunc func) :
-        Sync(""), oplogVersion(0), _networkQueue(q), _applyFunc(func) {}
+        Sync(""), 
+        oplogVersion(0), 
+        _networkQueue(q), 
+        _applyFunc(func),
+        _writerPool(replWriterThreadCount),
+        _prefetcherPool(replPrefetcherThreadCount)
+    {}
 
     SyncTail::~SyncTail() {}
 
@@ -154,27 +164,25 @@ namespace repl {
 
     // Doles out all the work to the reader pool threads and waits for them to complete
     void SyncTail::prefetchOps(const std::deque<BSONObj>& ops) {
-        threadpool::ThreadPool& prefetcherPool = theReplSet->getPrefetchPool();
         for (std::deque<BSONObj>::const_iterator it = ops.begin();
              it != ops.end();
              ++it) {
-            prefetcherPool.schedule(&prefetchOp, *it);
+            _prefetcherPool.schedule(&prefetchOp, *it);
         }
-        prefetcherPool.join();
+        _prefetcherPool.join();
     }
     
     // Doles out all the work to the writer pool threads and waits for them to complete
     void SyncTail::applyOps(const std::vector< std::vector<BSONObj> >& writerVectors) {
-        ThreadPool& writerPool = theReplSet->getWriterPool();
         TimerHolder timer(&applyBatchStats);
         for (std::vector< std::vector<BSONObj> >::const_iterator it = writerVectors.begin();
              it != writerVectors.end();
              ++it) {
             if (!it->empty()) {
-                writerPool.schedule(_applyFunc, boost::cref(*it), this);
+                _writerPool.schedule(_applyFunc, boost::cref(*it), this);
             }
         }
-        writerPool.join();
+        _writerPool.join();
     }
 
     // Doles out all the work to the writer pool threads and waits for them to complete
@@ -183,7 +191,7 @@ namespace repl {
         // Use a ThreadPool to prefetch all the operations in a batch.
         prefetchOps(ops);
         
-        std::vector< std::vector<BSONObj> > writerVectors(theReplSet->replWriterThreadCount);
+        std::vector< std::vector<BSONObj> > writerVectors(replWriterThreadCount);
         fillWriterVectors(ops, &writerVectors);
         LOG(2) << "replication batch size is " << ops.size() << endl;
         // We must grab this because we're going to grab write locks later.

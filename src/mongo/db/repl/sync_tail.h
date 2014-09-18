@@ -32,6 +32,7 @@
 
 #include "mongo/db/storage/mmap_v1/dur.h"
 #include "mongo/db/repl/sync.h"
+#include "mongo/util/concurrency/thread_pool.h"
 
 namespace mongo {
 
@@ -47,7 +48,6 @@ namespace repl {
     class SyncTail : public Sync {
         typedef void (*MultiSyncApplyFunc)(const std::vector<BSONObj>& ops, SyncTail* st);
     public:
-        SyncTail(BackgroundSyncInterface *q);
         SyncTail(BackgroundSyncInterface *q, MultiSyncApplyFunc func);
         virtual ~SyncTail();
         virtual bool syncApply(OperationContext* txn,
@@ -135,6 +135,12 @@ namespace repl {
                                std::vector< std::vector<BSONObj> >* writerVectors);
         void handleSlaveDelay(const BSONObj& op);
         void setOplogVersion(const BSONObj& op);
+
+        // persistent pool of worker threads for writing ops to the databases
+        threadpool::ThreadPool _writerPool;
+        // persistent pool of worker threads for prefetching
+        threadpool::ThreadPool _prefetcherPool;
+
     };
 
     // These free functions are used by the thread pool workers to write ops to the db.
