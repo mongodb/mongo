@@ -5,7 +5,7 @@ functions:
       working_dir: src
       script: |
         set -o verbose
-        if [ "Windows_NT" = "$OS" ]; then export GOPATH=C:$(pwd | sed 's,/,\\,g' else export GOPATH=`pwd`; fi;
+        if [ "Windows_NT" = "$OS" ]; then export GOPATH=C:$(pwd | sed 's,/,\\,g') else export GOPATH=`pwd`; fi;
         ${preproc_gpm|echo} ./gpm
         ./gpm install
 
@@ -15,7 +15,7 @@ functions:
       working_dir: src
       script: |
         set -o verbose
-        if [ "Windows_NT" = "$OS" ]; then export GOPATH=C:$(pwd | sed 's,/,\\,g' else export GOPATH=`pwd`; fi;
+        if [ "Windows_NT" = "$OS" ]; then export GOPATH=C:$(pwd | sed 's,/,\\,g') else export GOPATH=`pwd`; fi;
         if [ '${coverage|false}' = 'true' ]
         then
             go tool cover -html=coverage.out -o coverage.html
@@ -74,7 +74,7 @@ functions:
       working_dir: src
       script: |
         set -o verbose
-        if [ "Windows_NT" = "$OS" ]; then export GOPATH=C:$(pwd | sed 's,/,\\,g' else export GOPATH=`pwd`; fi;
+        if [ "Windows_NT" = "$OS" ]; then export GOPATH=C:$(pwd | sed 's,/,\\,g') else export GOPATH=`pwd`; fi;
         cd src/github.com/mongodb/mongo-tools/${package}
         go test -i
         if [ '${coverage|false}' = 'true' ]
@@ -209,7 +209,7 @@ tasks:
         working_dir: src
         script: |
           set -o verbose
-          if [ "Windows_NT" = "$OS" ]; then export GOPATH=C:$(pwd | sed 's,/,\\,g' else export GOPATH=`pwd`; fi;
+          if [ "Windows_NT" = "$OS" ]; then export GOPATH=C:$(pwd | sed 's,/,\\,g') else export GOPATH=`pwd`; fi;
           go run src/github.com/3rf/mongo-lint/golint/golint.go src/github.com/mongodb/mongo-tools
 
 - name: vet
@@ -223,7 +223,7 @@ tasks:
         working_dir: src
         script: |
           set -o verbose
-          if [ "Windows_NT" = "$OS" ]; then export GOPATH=C:$(pwd | sed 's,/,\\,g' else export GOPATH=`pwd`; fi;
+          if [ "Windows_NT" = "$OS" ]; then export GOPATH=C:$(pwd | sed 's,/,\\,g') else export GOPATH=`pwd`; fi;
           go tool vet src/github.com/mongodb/mongo-tools/
 
 - name: util
