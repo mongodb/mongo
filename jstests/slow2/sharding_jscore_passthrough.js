@@ -106,6 +106,7 @@ files.forEach(function(x) {
         'dbadmin|' +
         'error1|' +
         'explain_count|' + // TODO: allow passthrough once explain is implemented on mongos
+        'explain_delete|' + // TODO: allow passthrough once explain is implemented on mongos
         'explain_find|' + // TODO: allow passthrough once explain is implemented on mongos
         'fsync|' +
         'fsync2|' +

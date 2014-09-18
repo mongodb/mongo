@@ -32,6 +32,7 @@
 
 #include "mongo/base/disallow_copying.h"
 #include "mongo/base/status.h"
+#include "mongo/db/query/plan_executor.h"
 
 
 namespace mongo {
@@ -87,6 +88,22 @@ namespace mongo {
         Status prepare();
 
         /**
+         * Performs preparatory work that *does* require the appropriate database lock. This
+         * preparation involves construction of a PlanExecutor. Construction of a PlanExecutor
+         * requires the database lock because it goes through query planning and optimization,
+         * which may involve partial execution of the delete plan tree.
+         *
+         * On success, a non-NULL PlanExecutor will be available via getPlanExecutor().
+         */
+        Status prepareInLock(Database* db);
+
+        /**
+         * Retrieve the PlanExecutor that will be used to execute this delete upon calling
+         * execute(). Returns NULL if no PlanExecutor has been created.
+         */
+        PlanExecutor* getPlanExecutor();
+
+        /**
          * Execute a delete.  Requires the caller to hold the database lock on the
          * appropriate resources for the request.
          *
@@ -100,6 +117,9 @@ namespace mongo {
 
         /// Parsed query object, or NULL if the query proves to be an id hack query.
         std::auto_ptr<CanonicalQuery> _canonicalQuery;
+
+        // The tree of execution stages which will be used to execute the update.
+        boost::scoped_ptr<PlanExecutor> _exec;
 
         /// Flag indicating if the query has been successfully parsed.
         bool _isQueryParsed;

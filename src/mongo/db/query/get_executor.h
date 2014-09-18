@@ -148,6 +148,7 @@ namespace mongo {
                              bool isMulti,
                              bool shouldCallLogOp,
                              bool fromMigrate,
+                             bool isExplain,
                              PlanExecutor** execOut);
 
     /**
@@ -166,6 +167,7 @@ namespace mongo {
                              bool isMulti,
                              bool shouldCallLogOp,
                              bool fromMigrate,
+                             bool isExplain,
                              PlanExecutor** execOut);
 
     //
