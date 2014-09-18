@@ -123,7 +123,6 @@ struct __wt_lsm_manager {
 	WT_SPINLOCK	switch_lock;	/* Lock for switch queue */
 	WT_SPINLOCK	app_lock;	/* Lock for application queue */
 	WT_SPINLOCK	manager_lock;	/* Lock for manager queue */
-#define	LSM_MAX_WORK_QUEUE_LEN	1000
 	int64_t		switch_len;	/* Length of switch queue */
 	int64_t		app_len;	/* Length of application queue */
 	int64_t		manager_len;	/* Length of manager queue */
@@ -146,6 +145,7 @@ struct __wt_lsm_tree {
 	const char *collator_name;
 
 	int refcnt;			/* Number of users of the tree */
+#define	LSM_TREE_MAX_QUEUE	100
 	int queue_ref;
 	WT_RWLOCK *rwlock;
 	TAILQ_ENTRY(__wt_lsm_tree) q;

@@ -196,7 +196,7 @@ __lsm_manager_aggressive_update(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 	 * been created by now. Use 10 seconds as a default if we don't have an
 	 * estimate.
 	 */
-	if (lsm_tree->nchunks > lsm_tree->merge_min)
+	if (lsm_tree->nchunks > 1)
 		chunk_wait = stallms / (lsm_tree->chunk_fill_ms == 0 ?
 		    10000 : lsm_tree->chunk_fill_ms);
 	else
@@ -341,6 +341,7 @@ __lsm_manager_run_server(WT_SESSION_IMPL *session)
 			 * more.
 			 */
 			if (lsm_tree->nchunks > 1 &&
+			    lsm_tree->queue_ref < LSM_TREE_MAX_QUEUE &&
 			    (!lsm_tree->modified ||
 			    lsm_tree->queue_ref == 0 ||
 			    (lsm_tree->merge_aggressiveness > 3 &&
@@ -354,6 +355,15 @@ __lsm_manager_run_server(WT_SESSION_IMPL *session)
 				    session, WT_LSM_WORK_FLUSH, 0, lsm_tree));
 				WT_RET(__wt_lsm_manager_push_entry(
 				    session, WT_LSM_WORK_BLOOM, 0, lsm_tree));
+				WT_RET(__wt_verbose(session, WT_VERB_LSM,
+				    "MGR %s: queue %d mod %d nchunks %d"
+				    " flags 0x%x aggressive %d pushms %" PRIu64
+				    " fillms %" PRIu64,
+				    lsm_tree->name, lsm_tree->queue_ref,
+				    lsm_tree->modified, lsm_tree->nchunks,
+				    lsm_tree->flags,
+				    lsm_tree->merge_aggressiveness,
+				    pushms, fillms));
 				WT_RET(__wt_lsm_manager_push_entry(
 				    session, WT_LSM_WORK_MERGE, 0, lsm_tree));
 			}
@@ -511,7 +521,6 @@ __wt_lsm_manager_pop_entry(
 	__wt_spin_lock(session, qlock);					\
 	TAILQ_INSERT_TAIL((qh), entry, q);				\
 	(qlen)++;							\
-	WT_ASSERT(session, (qlen) <= LSM_MAX_WORK_QUEUE_LEN);		\
 	__wt_spin_unlock(session, qlock);				\
 } while (0)
 
