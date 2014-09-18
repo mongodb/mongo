@@ -89,14 +89,12 @@ namespace mongo {
         private:
             class IndexCursor : public SortedDataInterface::Cursor {
                 public:
-                IndexCursor(const WiredTigerIndex &idx, shared_ptr<WiredTigerSession> &session, bool forward)
-                   : _session(session),
-                     _cursor(idx.GetURI(), *session),
-                     _forward(forward),
-                     _eof(true) {
-                }
+                IndexCursor(const WiredTigerIndex &idx,
+                        OperationContext *txn,
+                        shared_ptr<WiredTigerSession> &session,
+                        bool forward);
 
-                virtual ~IndexCursor() { }
+                virtual ~IndexCursor();
 
                 virtual int getDirection() const;
 
@@ -134,8 +132,10 @@ namespace mongo {
                 virtual void restorePosition( OperationContext *txn );
 
             private:
+                OperationContext *_txn;
                 shared_ptr<WiredTigerSession> _session;
-                WiredTigerCursor _cursor;
+                WiredTigerCursor *_cursor;
+                const WiredTigerIndex &_idx;    // Someone else owns this.
                 bool _forward;
                 bool _eof;
 

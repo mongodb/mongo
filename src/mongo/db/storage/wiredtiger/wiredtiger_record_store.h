@@ -168,6 +168,8 @@ namespace mongo {
                       bool tailable,
                       const CollectionScanParams::Direction& dir );
 
+            virtual ~Iterator();
+
             virtual bool isEOF();
             virtual DiskLoc curr();
             virtual DiskLoc getNext();
@@ -188,7 +190,7 @@ namespace mongo {
             shared_ptr<WiredTigerSession> _session;
             bool _tailable;
             CollectionScanParams::Direction _dir;
-            WiredTigerCursor _cursor;
+            WiredTigerCursor *_cursor;
             bool _eof;
 
             // Position for save/restore
