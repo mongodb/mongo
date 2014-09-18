@@ -306,6 +306,11 @@ namespace mongo {
                 return false;
             }
 
+            // Only explode if there's at least one field to explode for this scan.
+            if (0 == boundsIdx) {
+                return false;
+            }
+
             // The rest of the fields define the sort order we could obtain by exploding
             // the bounds.
             BSONObjBuilder resultingSortBob;
@@ -496,7 +501,6 @@ namespace mongo {
                                                            QuerySolutionNode* solnRoot) {
         auto_ptr<QuerySolution> soln(new QuerySolution());
         soln->filterData = query.getQueryObj();
-        verify(soln->filterData.isOwned());
         soln->indexFilterApplied = params.indexFiltersApplied;
 
         solnRoot->computeProperties();

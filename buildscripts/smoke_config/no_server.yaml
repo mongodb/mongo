@@ -1,0 +1,9 @@
+executor:
+  fixtures:
+
+    # Global shell context
+    shell_globals:
+      fixture_class: smoke.GlobalShellFixture
+
+  testers:
+    js_test: {}

@@ -404,17 +404,26 @@ namespace mongo {
         Status parseStatus = LiteParsedQuery::make(qm, &lpq);
         if (!parseStatus.isOK()) { return parseStatus; }
 
+        return CanonicalQuery::canonicalize(lpq, out, whereCallback);
+    }
+
+    // static
+    Status CanonicalQuery::canonicalize(LiteParsedQuery* lpq,
+                                        CanonicalQuery** out,
+                                        const MatchExpressionParser::WhereCallback& whereCallback) {
+        auto_ptr<LiteParsedQuery> autoLpq(lpq);
+
         // Make MatchExpression.
-        StatusWithMatchExpression swme = MatchExpressionParser::parse(lpq->getFilter(), whereCallback);
+        StatusWithMatchExpression swme = MatchExpressionParser::parse(autoLpq->getFilter(),
+                                                                      whereCallback);
         if (!swme.isOK()) {
-            delete lpq;
             return swme.getStatus();
         }
 
         // Make the CQ we'll hopefully return.
         auto_ptr<CanonicalQuery> cq(new CanonicalQuery());
         // Takes ownership of lpq and the MatchExpression* in swme.
-        Status initStatus = cq->init(lpq, whereCallback, swme.getValue());
+        Status initStatus = cq->init(autoLpq.release(), whereCallback, swme.getValue());
 
         if (!initStatus.isOK()) { return initStatus; }
         *out = cq.release();

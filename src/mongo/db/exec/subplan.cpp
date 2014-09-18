@@ -135,7 +135,7 @@ namespace mongo {
         }
 
         // Tailable cursors won't get cached, just turn into collscans.
-        if (query.getParsed().hasOption(QueryOption_CursorTailable)) {
+        if (query.getParsed().getOptions().tailable) {
             return false;
         }
 
@@ -438,6 +438,7 @@ namespace mongo {
     }
 
     void SubplanStage::restoreState(OperationContext* opCtx) {
+        _txn = opCtx;
         ++_commonStats.unyields;
         if (_killed) {
             return;

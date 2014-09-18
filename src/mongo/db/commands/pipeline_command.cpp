@@ -39,6 +39,7 @@
 #include "mongo/db/curop.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/exec/pipeline_proxy.h"
+#include "mongo/db/global_environment_experiment.h"
 #include "mongo/db/pipeline/accumulator.h"
 #include "mongo/db/pipeline/document.h"
 #include "mongo/db/pipeline/document_source.h"
@@ -142,6 +143,12 @@ namespace mongo {
             // If a time limit was set on the pipeline, remaining time is "rolled over" to the
             // cursor (for use by future getmore ops).
             cursor->setLeftoverMaxTimeMicros( txn->getCurOp()->getRemainingMaxTimeMicros() );
+
+            // We stash away the RecoveryUnit in the ClientCursor.  It's used for subsequent
+            // getMore requests.  The calling OpCtx gets a fresh RecoveryUnit.
+            cursor->setOwnedRecoveryUnit(txn->releaseRecoveryUnit());
+            StorageEngine* storageEngine = getGlobalEnvironment()->getGlobalStorageEngine();
+            txn->setRecoveryUnit(storageEngine->newRecoveryUnit(txn));
         }
 
         BSONObjBuilder cursorObj(result.subobjStart("cursor"));
@@ -250,6 +257,7 @@ namespace mongo {
                 }
 
                 if (collection) {
+                    // XXX
                     ClientCursor* cursor = new ClientCursor(collection, execHolder.release());
                     cursor->isAggCursor = true; // enable special locking behavior
                     pin.reset(new ClientCursorPin(collection, cursor->cursorid()));

@@ -170,8 +170,9 @@ namespace mongo {
                                                                           false ) );
 
         BSONObj a = md.toBSON();
-        ASSERT_EQUALS( 2, a.nFields() );
+        ASSERT_EQUALS( 3, a.nFields() );
         ASSERT_EQUALS( string("test.foo"), a["ns"].String() );
+        ASSERT_EQUALS( BSONObj(), a["options"].Obj() );
         BSONObj indexes = a["indexes"].Obj();
         ASSERT_EQUALS( 1, indexes.nFields() );
         BSONObj idx = indexes["0"].Obj();

@@ -221,6 +221,7 @@ namespace repl {
     bool ReplSetImpl::resync(OperationContext* txn, string& errmsg) {
         changeState(MemberState::RS_RECOVERING);
 
+        WriteUnitOfWork wunit(txn);
         Client::Context ctx(txn, "local");
 
         ctx.db()->dropCollection(txn, "local.oplog.rs");
@@ -230,6 +231,8 @@ namespace repl {
         }
         getGlobalReplicationCoordinator()->setMyLastOptime(txn, OpTime());
         _veto.clear();
+
+        wunit.commit();
         return true;
     }
 

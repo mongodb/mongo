@@ -1,5 +1,6 @@
 //
 // This checks to make sure that sharded regex queries behave the same as unsharded regex queries
+// @tags : [ hashed ]
 //
 
 var options = { mongosOptions : { binVersion : "" },

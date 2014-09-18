@@ -425,6 +425,7 @@ namespace mongo {
     }
 
     void SortStage::restoreState(OperationContext* opCtx) {
+        _txn = opCtx;
         ++_commonStats.unyields;
         _child->restoreState(opCtx);
     }

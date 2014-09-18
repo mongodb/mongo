@@ -44,8 +44,22 @@ namespace mongo {
     public:
         /**
          * Caller owns the pointer in 'out' if any call to canonicalize returns Status::OK().
+         *
+         * Used for legacy find through the OP_QUERY message.
          */
         static Status canonicalize(const QueryMessage& qm,
+                                   CanonicalQuery** out,
+                                   const MatchExpressionParser::WhereCallback& whereCallback =
+                                            MatchExpressionParser::WhereCallback());
+
+        /**
+         * Takes ownership of 'lpq'.
+         *
+         * Caller owns the pointer in 'out' if any call to canonicalize returns Status::OK().
+         *
+         * Used for finds using the find command path.
+         */
+        static Status canonicalize(LiteParsedQuery* lpq,
                                    CanonicalQuery** out,
                                    const MatchExpressionParser::WhereCallback& whereCallback =
                                             MatchExpressionParser::WhereCallback());

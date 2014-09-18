@@ -38,6 +38,7 @@
 #include "mongo/db/exec/filter.h"
 #include "mongo/db/exec/oplogstart.h"
 #include "mongo/db/exec/working_set_common.h"
+#include "mongo/db/global_environment_experiment.h"
 #include "mongo/db/keypattern.h"
 #include "mongo/db/query/explain.h"
 #include "mongo/db/query/find_constants.h"
@@ -136,8 +137,30 @@ namespace mongo {
         return true;
     }
 
+    struct ScopedRecoveryUnitSwapper {
+        explicit ScopedRecoveryUnitSwapper(ClientCursor* cc, OperationContext* txn)
+            : _cc(cc), _txn(txn) {
+
+            // Save this for later.  We restore it upon destruction.
+            _txnPreviousRecoveryUnit = txn->releaseRecoveryUnit();
+
+            // Transfer ownership of the RecoveryUnit from the ClientCursor to the OpCtx.
+            RecoveryUnit* ccRecoveryUnit = cc->releaseOwnedRecoveryUnit();
+            txn->setRecoveryUnit(ccRecoveryUnit);
+        }
+
+        ~ScopedRecoveryUnitSwapper() {
+            _cc->setOwnedRecoveryUnit(_txn->releaseRecoveryUnit());
+            _txn->setRecoveryUnit(_txnPreviousRecoveryUnit);
+        }
+
+        ClientCursor* _cc;
+        OperationContext* _txn;
+        RecoveryUnit* _txnPreviousRecoveryUnit;
+    };
+
     /**
-     * Also called by db/ops/query.cpp.  This is the new getMore entry point.
+     * Called by db/instance.cpp.  This is the getMore entry point.
      *
      * pass - when QueryOption_AwaitData is in use, the caller will make repeated calls 
      *        when this method returns an empty result, incrementing pass on each call.  
@@ -150,7 +173,8 @@ namespace mongo {
                             CurOp& curop,
                             int pass,
                             bool& exhaust,
-                            bool* isCursorAuthorized) {
+                            bool* isCursorAuthorized,
+                            bool fromDBDirectClient) {
 
         // For testing, we may want to fail if we receive a getmore.
         if (MONGO_FAIL_POINT(failReceivedGetmore)) {
@@ -182,6 +206,15 @@ namespace mongo {
         ClientCursorPin ccPin(collection, cursorid);
         ClientCursor* cc = ccPin.c();
 
+        // If we're not being called from DBDirectClient we want to associate the RecoveryUnit
+        // used to create the execution machinery inside the cursor with our OperationContext.
+        // If we throw or otherwise exit this method in a disorderly fashion, we must ensure
+        // that further calls to getMore won't fail, and that the provided OperationContext
+        // has a valid RecoveryUnit.  As such, we use RAII to accomplish this.
+        //
+        // This must be destroyed before the ClientCursor is destroyed.
+        std::auto_ptr<ScopedRecoveryUnitSwapper> ruSwapper;
+
         // These are set in the QueryResult msg we return.
         int resultFlags = ResultFlag_AwaitCapable;
 
@@ -203,6 +236,15 @@ namespace mongo {
             // there for the cursor
             uassert(17011, "auth error", str::equals(ns, cc->ns().c_str()));
             *isCursorAuthorized = true;
+
+            // Restore the RecoveryUnit if we need to.
+            if (fromDBDirectClient) {
+                invariant(txn->recoveryUnit() == cc->getUnownedRecoveryUnit());
+            }
+            else {
+                // Swap RecoveryUnit(s) between the ClientCursor and OperationContext.
+                ruSwapper.reset(new ScopedRecoveryUnitSwapper(cc, txn));
+            }
 
             // Reset timeout timer on the cursor since the cursor is still in use.
             cc->setIdleTime(0);
@@ -313,6 +355,7 @@ namespace mongo {
             }
 
             if (!saveClientCursor) {
+                ruSwapper.reset();
                 ccPin.deleteUnderlying();
                 // cc is now invalid, as is the executor
                 cursorid = 0;
@@ -421,7 +464,7 @@ namespace mongo {
         params.collection = collection;
         params.start = startLoc;
         params.direction = CollectionScanParams::FORWARD;
-        params.tailable = cq->getParsed().hasOption(QueryOption_CursorTailable);
+        params.tailable = cq->getParsed().getOptions().tailable;
 
         WorkingSet* ws = new WorkingSet();
         CollectionScan* cs = new CollectionScan(txn, params, ws, cq->root());
@@ -434,7 +477,8 @@ namespace mongo {
                             Message& m,
                             QueryMessage& q,
                             CurOp& curop,
-                            Message &result) {
+                            Message &result,
+                            bool fromDBDirectClient) {
         // Validate the namespace.
         const char *ns = q.ns;
         uassert(16332, "can't have an empty ns", ns[0]);
@@ -526,7 +570,7 @@ namespace mongo {
             // Takes ownership of 'cq'.
             rawExec = new PlanExecutor(ws, eofStage, cq, NULL);
         }
-        else if (pq.hasOption(QueryOption_OplogReplay)) {
+        else if (pq.getOptions().oplogReplay) {
             // Takes ownership of 'cq'.
             status = getOplogStartHack(txn, collection, cq, &rawExec);
         }
@@ -590,7 +634,7 @@ namespace mongo {
         txn->checkForInterrupt(); // May trigger maxTimeAlwaysTimeOut fail point.
 
         // uassert if we are not on a primary, and not a secondary with SlaveOk query parameter set.
-        bool slaveOK = pq.hasOption(QueryOption_SlaveOk) || pq.hasReadPref();
+        bool slaveOK = pq.getOptions().slaveOk || pq.hasReadPref();
         status = repl::getGlobalReplicationCoordinator()->checkCanServeReadsFor(
                 txn,
                 NamespaceString(cq->ns()),
@@ -645,7 +689,7 @@ namespace mongo {
             ++numResults;
 
             // Possibly note slave's position in the oplog.
-            if (pq.hasOption(QueryOption_OplogReplay)) {
+            if (pq.getOptions().oplogReplay) {
                 BSONElement e = obj["ts"];
                 if (Date == e.type() || Timestamp == e.type()) {
                     slaveReadTill = e._opTime();
@@ -693,7 +737,7 @@ namespace mongo {
         if (PlanExecutor::DEAD == state) {
             saveClientCursor = false;
         }
-        else if (pq.hasOption(QueryOption_CursorTailable)) {
+        else if (pq.getOptions().tailable) {
             // If we're tailing a capped collection, we don't bother saving the cursor if the
             // collection is empty. Otherwise, the semantics of the tailable cursor is that the
             // client will keep trying to read from it. So we'll keep it around.
@@ -751,9 +795,20 @@ namespace mongo {
             // Allocate a new ClientCursor.  We don't have to worry about leaking it as it's
             // inserted into a global map by its ctor.
             ClientCursor* cc = new ClientCursor(collection, exec.get(),
-                                                cq->getParsed().getOptions(),
+                                                cq->getParsed().getOptions().toInt(),
                                                 cq->getParsed().getFilter());
             ccId = cc->cursorid();
+
+            if (fromDBDirectClient) {
+                cc->setUnownedRecoveryUnit(txn->recoveryUnit());
+            }
+            else {
+                // We stash away the RecoveryUnit in the ClientCursor.  It's used for subsequent
+                // getMore requests.  The calling OpCtx gets a fresh RecoveryUnit.
+                cc->setOwnedRecoveryUnit(txn->releaseRecoveryUnit());
+                StorageEngine* storageEngine = getGlobalEnvironment()->getGlobalStorageEngine();
+                txn->setRecoveryUnit(storageEngine->newRecoveryUnit(txn));
+            }
 
             QLOG() << "caching executor with cursorid " << ccId
                    << " after returning " << numResults << " results" << endl;
@@ -762,12 +817,12 @@ namespace mongo {
             exec.release();
 
             // TODO document
-            if (pq.hasOption(QueryOption_OplogReplay) && !slaveReadTill.isNull()) {
+            if (pq.getOptions().oplogReplay && !slaveReadTill.isNull()) {
                 cc->slaveReadTill(slaveReadTill);
             }
 
             // TODO document
-            if (pq.hasOption(QueryOption_Exhaust)) {
+            if (pq.getOptions().exhaust) {
                 curop.debug().exhaust = true;
             }
 

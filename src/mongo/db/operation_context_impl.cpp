@@ -61,6 +61,14 @@ namespace mongo {
         return _recovery.get();
     }
 
+    RecoveryUnit* OperationContextImpl::releaseRecoveryUnit() {
+        return _recovery.release();
+    }
+
+    void OperationContextImpl::setRecoveryUnit(RecoveryUnit* unit) {
+        _recovery.reset(unit);
+    }
+
     Locker* OperationContextImpl::lockState() const {
         return _locker.get();
     }

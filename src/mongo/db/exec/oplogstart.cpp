@@ -165,6 +165,7 @@ namespace mongo {
     }
 
     void OplogStart::restoreState(OperationContext* opCtx) {
+        _txn = opCtx;
         if (_cs) {
             _cs->restoreState(opCtx);
         }

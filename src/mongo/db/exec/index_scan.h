@@ -80,6 +80,25 @@ namespace mongo {
      */
     class IndexScan : public PlanStage {
     public:
+
+        /**
+         * Keeps track of what this index scan is currently doing so that it
+         * can do the right thing on the next call to work().
+         */
+        enum ScanState {
+            // Need to initialize the underlying index traversal machinery.
+            INITIALIZING,
+
+            // Skipping keys in order to check whether we have reached the end.
+            CHECKING_END,
+
+            // Retrieving the next key, and applying the filter if necessary.
+            GETTING_NEXT,
+
+            // The index scan is finished.
+            HIT_END
+        };
+
         IndexScan(OperationContext* txn,
                   const IndexScanParams& params,
                   WorkingSet* workingSet,
@@ -117,21 +136,6 @@ namespace mongo {
         // transactional context for read locks. Not owned by us
         OperationContext* _txn;
 
-        // The number of keys examined during a call to checkEnd() that have not yet been
-        // accounted for by returning a NEED_TIME.
-        //
-        // Good plan ranking requires that the index scan uses one work cycle per index key
-        // examined. Since checkEnd() may examine multiple keys, we keep track of them here
-        // and make up for it later by returning NEED_TIME.
-        //
-        // Example of how this is useful for plan ranking:
-        //   Say you have indices {a: 1, b: 1} and {a: 1, x: 1, b: 1}, with predicates over
-        //   fields 'a' and 'b'. It's cheaper to use index {a: 1, b: 1}. Why? Because for
-        //   index {a: 1, x: 1, b: 1} you have to skip lots of keys due to the interceding
-        //   'x' field. This skipping is done inside checkEnd(), and we use '_checkEndKeys'
-        //   to account for it.
-        size_t _checkEndKeys;
-
         // The WorkingSet we annotate with results.  Not owned by us.
         WorkingSet* _workingSet;
 
@@ -140,8 +144,8 @@ namespace mongo {
         scoped_ptr<IndexCursor> _indexCursor;
         BSONObj _keyPattern;
 
-        // Have we hit the end of the index scan?
-        bool _hitEnd;
+        // Keeps track of what work we need to do next.
+        ScanState _scanState;
 
         // Contains expressions only over fields in the index key.  We assume this is built
         // correctly by whomever creates this class.
@@ -155,9 +159,6 @@ namespace mongo {
         // For yielding.
         BSONObj _savedKey;
         DiskLoc _savedLoc;
-
-        // True if there was a yield and the yield changed the cursor position.
-        bool _yieldMovedCursor;
 
         IndexScanParams _params;
 

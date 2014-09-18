@@ -47,6 +47,7 @@ namespace mongo {
     class Database;
     class NamespaceDetails;
     class ParsedQuery;
+    class RecoveryUnit;
 
     typedef long long CursorId; /* passed to the client so it can send back on getMore */
     static const CursorId INVALID_CURSOR_ID = -1; // But see SERVER-5726.
@@ -148,6 +149,45 @@ namespace mongo {
 
         static long long totalOpen();
 
+        //
+        // Storage engine state for getMore.
+        //
+
+        /**
+         * 
+         * If a ClientCursor is created via DBDirectClient, it uses the same storage engine
+         * context as the DBDirectClient caller.  We store this context in _unownedRU.  We use
+         * this to verify that all further callers use the same RecoveryUnit.
+         *
+         * Once a ClientCursor has an unowned RecoveryUnit, it will always have one.
+         *
+         * Sets the unowned RecoveryUnit to 'ru'.  Does NOT take ownership of the pointer.
+         */
+        void setUnownedRecoveryUnit(RecoveryUnit* ru);
+
+        /**
+         * Return the unowned RecoveryUnit.  'this' does not own pointer and therefore cannot
+         * transfer ownership.
+         */
+        RecoveryUnit* getUnownedRecoveryUnit() const;
+
+        /**
+         * If a ClientCursor is created via a client request, we bind its lifetime to the
+         * ClientCursor's by storing it un _ownedRU.  In order to execute the query over repeated
+         * network requests, we have to keep the execution state around.
+         */
+
+        /**
+         * Set the owned recovery unit to 'ru'.  Takes ownership of it.  If there is a previous
+         * owned recovery unit, it is deleted.
+         */
+        void setOwnedRecoveryUnit(RecoveryUnit* ru);
+
+        /**
+         * Returns the owned recovery unit.  Ownership is transferred to the caller.
+         */
+        RecoveryUnit* releaseOwnedRecoveryUnit();
+
     private:
         friend class ClientCursorMonitor;
         friend class CmdCursorInfo;
@@ -209,6 +249,10 @@ namespace mongo {
         // The underlying execution machinery.
         //
         scoped_ptr<PlanExecutor> _exec;
+
+        // Only one of these is not-NULL.
+        RecoveryUnit* _unownedRU;
+        std::auto_ptr<RecoveryUnit> _ownedRU;
     };
 
     /**

@@ -107,7 +107,11 @@ namespace mongo {
     void receivedUpdate(OperationContext* txn, Message& m, CurOp& op);
     void receivedDelete(OperationContext* txn, Message& m, CurOp& op);
     void receivedInsert(OperationContext* txn, Message& m, CurOp& op);
-    bool receivedGetMore(OperationContext* txn, DbResponse& dbresponse, Message& m, CurOp& curop );
+    bool receivedGetMore(OperationContext* txn,
+                         DbResponse& dbresponse,
+                         Message& m,
+                         CurOp& curop,
+                         bool fromDBDirectClient);
 
     int nloggedsome = 0;
 #define LOGWITHRATELIMIT if( ++nloggedsome < 1000 || nloggedsome % 100 == 0 )
@@ -239,7 +243,11 @@ namespace mongo {
         replyToQuery(0, m, dbresponse, obj);
     }
 
-    static bool receivedQuery(OperationContext* txn, Client& c, DbResponse& dbresponse, Message& m ) {
+    static bool receivedQuery(OperationContext* txn,
+                              Client& c,
+                              DbResponse& dbresponse,
+                              Message& m,
+                              bool fromDBDirectClient) {
         bool ok = true;
         MSGID responseTo = m.header().getId();
 
@@ -260,7 +268,7 @@ namespace mongo {
                 audit::logQueryAuthzCheck(client, ns, q.query, status.code());
                 uassertStatusOK(status);
             }
-            dbresponse.exhaustNS = newRunQuery(txn, m, q, op, *resp);
+            dbresponse.exhaustNS = newRunQuery(txn, m, q, op, *resp, fromDBDirectClient);
             verify( !resp->empty() );
         }
         catch ( SendStaleConfigException& e ){
@@ -339,7 +347,8 @@ namespace mongo {
     void assembleResponse( OperationContext* txn,
                            Message& m,
                            DbResponse& dbresponse,
-                           const HostAndPort& remote ) {
+                           const HostAndPort& remote,
+                           bool fromDBDirectClient ) {
         // before we lock...
         int op = m.operation();
         bool isCommand = false;
@@ -434,10 +443,10 @@ namespace mongo {
         if ( op == dbQuery ) {
             if (!checkShardVersion(m, &dbresponse))
                 return;
-            receivedQuery(txn, c , dbresponse, m );
+            receivedQuery(txn, c , dbresponse, m, fromDBDirectClient );
         }
         else if ( op == dbGetMore ) {
-            if ( ! receivedGetMore(txn, dbresponse, m, currentOp) )
+            if ( ! receivedGetMore(txn, dbresponse, m, currentOp, fromDBDirectClient) )
                 shouldLog = true;
         }
         else if ( op == dbMsg ) {
@@ -658,7 +667,11 @@ namespace mongo {
 
     QueryResult::View emptyMoreResult(long long);
 
-    bool receivedGetMore(OperationContext* txn, DbResponse& dbresponse, Message& m, CurOp& curop ) {
+    bool receivedGetMore(OperationContext* txn,
+                         DbResponse& dbresponse,
+                         Message& m,
+                         CurOp& curop,
+                         bool fromDBDirectClient) {
         bool ok = true;
 
         DbMessage d(m);
@@ -708,7 +721,8 @@ namespace mongo {
                                      curop,
                                      pass,
                                      exhaust,
-                                     &isCursorAuthorized);
+                                     &isCursorAuthorized,
+                                     fromDBDirectClient);
             }
             catch ( AssertionException& e ) {
                 if ( isCursorAuthorized ) {

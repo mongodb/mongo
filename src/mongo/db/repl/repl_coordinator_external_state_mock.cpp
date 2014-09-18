@@ -34,7 +34,7 @@
 #include "mongo/bson/oid.h"
 #include "mongo/db/client.h"
 #include "mongo/db/jsobj.h"
-#include "mongo/db/operation_context_impl.h"
+#include "mongo/db/operation_context_noop.h"
 #include "mongo/util/net/hostandport.h"
 #include "mongo/util/sequence_util.h"
 
@@ -112,11 +112,16 @@ namespace repl {
     ReplicationCoordinatorExternalStateMock::GlobalSharedLockAcquirer::GlobalSharedLockAcquirer(
             bool canAcquireLock) : _canAcquireLock(canAcquireLock) {}
 
-    ReplicationCoordinatorExternalStateMock::GlobalSharedLockAcquirer::~GlobalSharedLockAcquirer() {}
+    ReplicationCoordinatorExternalStateMock::GlobalSharedLockAcquirer::~GlobalSharedLockAcquirer() {
+    }
 
     bool ReplicationCoordinatorExternalStateMock::GlobalSharedLockAcquirer::try_lock(
             OperationContext* txn, const Milliseconds& timeout) {
         return _canAcquireLock;
+    }
+
+    OperationContext* ReplicationCoordinatorExternalStateMock::createOperationContext() {
+        return new OperationContextNoop;
     }
 } // namespace repl
 } // namespace mongo

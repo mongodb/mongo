@@ -62,6 +62,22 @@ namespace mongo {
         virtual RecoveryUnit* recoveryUnit() const = 0;
 
         /**
+         * Returns the RecoveryUnit (same return value as recoveryUnit()) but the caller takes
+         * ownership of the returned RecoveryUnit, and the OperationContext instance relinquishes
+         * ownership.  Sets the RecoveryUnit to NULL.
+         *
+         * Used to transfer ownership of storage engine state from OperationContext
+         * to ClientCursor for getMore-able queries.
+         *
+         * Note that we don't allow the top-level locks to be stored across getMore.
+         * We rely on active cursors being killed when collections or databases are dropped,
+         * or when collection metadata changes.
+         */
+        virtual RecoveryUnit* releaseRecoveryUnit() = 0;
+
+        virtual void setRecoveryUnit(RecoveryUnit* unit) = 0;
+
+        /**
          * Interface for locking.  Caller DOES NOT own pointer.
          */
         virtual Locker* lockState() const = 0;

@@ -30,3 +30,9 @@ assert.eq( 0 , t.find( { loc : { $within : { $box : [ [100 , 100 ] , [ 110 , 110
 assert.eq( num , t.find( { loc : { $within : { $box : [ [ 0 , 0 ] , [ 110 , 110 ] ] } } } ).count() , "E3" )
 assert.eq( num , t.find( { loc : { $within : { $box : [ [ 0 , 0 ] , [ 110 , 110 ] ] } } } ).itcount() , "E4" )
 assert.eq( 57 , t.find( { loc : { $within : { $box : [ [ 0 , 0 ] , [ 110 , 110 ] ] } } } ).limit(57).itcount() , "E5" )
+
+// SERVER-13621
+// Eetect and invert the $box coordinates when they're specified incorrectly.
+assert.eq( num , t.find( { loc : { $within : { $box : [ [ 110 , 110 ], [ 0 , 0 ] ] } } } ).count() , "E5" )
+assert.eq( num , t.find( { loc : { $within : { $box : [ [ 110 , 0 ], [ 0 , 110 ] ] } } } ).count() , "E6" )
+assert.eq( num , t.find( { loc : { $within : { $box : [ [ 0 , 110 ], [ 110 , 0 ] ] } } } ).count() , "E7" )

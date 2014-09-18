@@ -41,6 +41,21 @@ namespace mongo {
     class OperationContext;
 
     /**
+     * Constructs a PlanExecutor for a query with the oplogReplay option set to true,
+     * for the query 'cq' over the collection 'collection'. The PlanExecutor will
+     * wrap a singleton OplogStart stage.
+     *
+     * The oplog start finding hack requires that 'cq' has a $gt or $gte predicate over
+     * a field named 'ts'.
+     *
+     * On success, caller takes ownership of *execOut.
+     */
+    Status getOplogStartHack(OperationContext* txn,
+                             Collection* collection,
+                             CanonicalQuery* cq,
+                             PlanExecutor** execOut);
+
+    /**
      * Called from the getMore entry point in ops/query.cpp.
      */
     QueryResult::View newGetMore(OperationContext* txn,
@@ -50,7 +65,8 @@ namespace mongo {
                             CurOp& curop,
                             int pass,
                             bool& exhaust,
-                            bool* isCursorAuthorized);
+                            bool* isCursorAuthorized,
+                            bool fromDBDirectClient);
 
     /**
      * Run the query 'q' and place the result in 'result'.
@@ -59,6 +75,7 @@ namespace mongo {
                             Message& m,
                             QueryMessage& q,
                             CurOp& curop,
-                            Message &result);
+                            Message &result,
+                            bool fromDBDirectClient);
 
 }  // namespace mongo

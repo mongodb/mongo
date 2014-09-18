@@ -121,7 +121,7 @@ namespace mongo {
         }
 
         DbResponse dbResponse;
-        assembleResponse(_txn, toSend, dbResponse, dummyHost);
+        assembleResponse(_txn, toSend, dbResponse, dummyHost, true);
         verify(dbResponse.response);
 
         // can get rid of this if we make response handling smarter
@@ -138,7 +138,7 @@ namespace mongo {
         }
 
         DbResponse dbResponse;
-        assembleResponse(_txn, toSend, dbResponse, dummyHost);
+        assembleResponse(_txn, toSend, dbResponse, dummyHost, true);
     }
 
     auto_ptr<DBClientCursor> DBDirectClient::query(const string& ns,

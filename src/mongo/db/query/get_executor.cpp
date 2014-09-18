@@ -246,7 +246,7 @@ namespace mongo {
             }
 
             // Tailable: If the query requests tailable the collection must be capped.
-            if (canonicalQuery->getParsed().hasOption(QueryOption_CursorTailable)) {
+            if (canonicalQuery->getParsed().getOptions().tailable) {
                 if (!collection->isCapped()) {
                     return Status(ErrorCodes::BadValue,
                                   "error processing query: " + canonicalQuery->toString() +

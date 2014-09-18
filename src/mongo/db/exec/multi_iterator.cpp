@@ -68,6 +68,7 @@ namespace mongo {
     }
 
     void MultiIteratorStage::restoreState(OperationContext* opCtx) {
+        _txn = opCtx;
         for (size_t i = 0; i < _iterators.size(); i++) {
             if (!_iterators[i]->restoreState(opCtx)) {
                 kill();

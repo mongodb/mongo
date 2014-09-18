@@ -1,0 +1,9 @@
+executor:
+  fixtures: {}
+
+  testers:
+    # Test runners for the suite
+
+    js_test: {}
+    db_test: {}
+    exe_test: {}
