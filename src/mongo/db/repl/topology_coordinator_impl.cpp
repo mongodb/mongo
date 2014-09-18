@@ -1314,6 +1314,14 @@ namespace {
         _stepDownUntil = newTime;
     }
 
+    OpTime TopologyCoordinatorImpl::getElectionTime() const {
+        return _electionTime;
+    }
+
+    OID TopologyCoordinatorImpl::getElectionId() const {
+        return _electionId;
+    }
+
     int TopologyCoordinatorImpl::getCurrentPrimaryIndex() const {
         return _currentPrimaryIndex;
     }

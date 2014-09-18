@@ -211,6 +211,12 @@ namespace repl {
         // set the current primary.
         void _setCurrentPrimaryForTest(int primaryIndex);
 
+        // Returns _electionTime.  Only used in unittests.
+        OpTime getElectionTime() const;
+
+        // Returns _electionId.  Only used in unittests.
+        OID getElectionId() const;
+
         // Returns _currentPrimaryIndex.  Only used in unittests.
         int getCurrentPrimaryIndex() const;
 

@@ -1789,6 +1789,386 @@ namespace {
         ASSERT_TRUE(TopologyCoordinator::Role::candidate == getTopoCoord().getRole());
     }
 
+    TEST_F(HeartbeatResponseTest, ElectionStartElectionWhileCandidate) {
+        // In this test, the TopologyCoordinator goes through the steps of a successful election,
+        // during which it receives a heartbeat that would normally trigger it to become a candidate
+        // and respond with a StartElection HeartbeatResponseAction. However, since it is already in
+        // candidate state, it responds with a NoAction HeartbeatResponseAction. Then finishes by
+        // being winning the election.
+
+        // 1. All nodes heartbeat to indicate that they are up and that "host2" is PRIMARY.
+        // 2. "host2" goes down, triggering an election.
+        // 3. "host2" comes back, which would normally trigger election, but since the
+        //     TopologyCoordinator is already in candidate mode, does not.
+        // 4. TopologyCoordinator concludes its freshness round successfully and wins the election.
+
+        setSelfMemberState(MemberState::RS_SECONDARY);
+        now() += 3000; // we need to be more than LastVote::leaseTime from the start of time or else
+                       // some Date_t math goes horribly awry
+
+        OpTime election = OpTime(0,0);
+        OpTime lastOpTimeApplied = OpTime(13,0);
+        OID round = OID::gen();
+
+        ASSERT_EQUALS(-1, getCurrentPrimaryIndex());
+        HeartbeatResponseAction nextAction = receiveUpHeartbeat(HostAndPort("host2"),
+                                                                "rs0",
+                                                                MemberState::RS_PRIMARY,
+                                                                election,
+                                                                lastOpTimeApplied,
+                                                                lastOpTimeApplied);
+        ASSERT_NO_ACTION(nextAction.getAction());
+        ASSERT_EQUALS(1, getCurrentPrimaryIndex());
+
+        nextAction = receiveUpHeartbeat(HostAndPort("host3"),
+                                        "rs0",
+                                        MemberState::RS_SECONDARY,
+                                        election,
+                                        lastOpTimeApplied,
+                                        lastOpTimeApplied);
+        ASSERT_NO_ACTION(nextAction.getAction());
+
+        // candidate time!
+        nextAction = receiveDownHeartbeat(HostAndPort("host2"), "rs0");
+        ASSERT_EQUALS(-1, getCurrentPrimaryIndex());
+        ASSERT_EQUALS(HeartbeatResponseAction::StartElection, nextAction.getAction());
+        ASSERT_TRUE(TopologyCoordinator::Role::candidate == getTopoCoord().getRole());
+
+        // see the downed node as SECONDARY and decide to take no action, but are still a candidate
+        nextAction = receiveUpHeartbeat(HostAndPort("host2"),
+                                        "rs0",
+                                        MemberState::RS_SECONDARY,
+                                        election,
+                                        lastOpTimeApplied,
+                                        lastOpTimeApplied);
+        ASSERT_EQUALS(-1, getCurrentPrimaryIndex());
+
+        // normally this would trigger StartElection, but we are already a candidate
+        ASSERT_NO_ACTION(nextAction.getAction());
+        ASSERT_TRUE(TopologyCoordinator::Role::candidate == getTopoCoord().getRole());
+
+        // now voteForSelf as though we received all our fresh responses
+        ASSERT_TRUE(getTopoCoord().voteForMyself(now()++));
+
+        // now win election and ensure _electionId and _electionTime are set properly
+        getTopoCoord().processWinElection(now()++, round, lastOpTimeApplied, election);
+        ASSERT_EQUALS(round, getTopoCoord().getElectionId());
+        ASSERT_EQUALS(election, getTopoCoord().getElectionTime());
+        ASSERT_TRUE(TopologyCoordinator::Role::leader == getTopoCoord().getRole());
+        ASSERT_EQUALS(0, getCurrentPrimaryIndex());
+    }
+
+    TEST_F(HeartbeatResponseTest, ElectionVoteForAnotherNodeBeforeFreshnessReturns) {
+        // In this test, the TopologyCoordinator goes through the steps of an election. However,
+        // before its freshness round ends, it receives a fresh command followed by an elect command
+        // from another node, both of which it responds positively to. The TopologyCoordinator's
+        // freshness round then concludes successfully, but it fails to vote for itself, since it
+        // recently voted for another node.
+
+        // 1. All nodes heartbeat to indicate that they are up and that "host2" is PRIMARY.
+        // 2. "host2" goes down, triggering an election.
+        // 3. "host3" sends a fresh command, which the TopologyCoordinator responds to positively.
+        // 4. "host3" sends an elect command, which the TopologyCoordinator responds to positively.
+        // 5. The TopologyCoordinator's concludes its freshness round successfully.
+        // 6. The TopologyCoordinator loses the election.
+
+        setSelfMemberState(MemberState::RS_SECONDARY);
+        now() += 3000; // we need to be more than LastVote::leaseTime from the start of time or else
+                       // some Date_t math goes horribly awry
+
+        OpTime election = OpTime(0,0);
+        OpTime lastOpTimeApplied = OpTime(10,0);
+        OpTime fresherLastOpTimeApplied = OpTime(20,0);
+
+        ASSERT_EQUALS(-1, getCurrentPrimaryIndex());
+        HeartbeatResponseAction nextAction = receiveUpHeartbeat(HostAndPort("host2"),
+                                                                "rs0",
+                                                                MemberState::RS_PRIMARY,
+                                                                election,
+                                                                lastOpTimeApplied,
+                                                                lastOpTimeApplied);
+        ASSERT_NO_ACTION(nextAction.getAction());
+        ASSERT_EQUALS(1, getCurrentPrimaryIndex());
+
+        nextAction = receiveUpHeartbeat(HostAndPort("host3"),
+                                        "rs0",
+                                        MemberState::RS_SECONDARY,
+                                        election,
+                                        fresherLastOpTimeApplied,
+                                        lastOpTimeApplied);
+        ASSERT_NO_ACTION(nextAction.getAction());
+
+        // candidate time!
+        nextAction = receiveDownHeartbeat(HostAndPort("host2"), "rs0");
+        ASSERT_EQUALS(-1, getCurrentPrimaryIndex());
+        ASSERT_EQUALS(HeartbeatResponseAction::StartElection, nextAction.getAction());
+        ASSERT_TRUE(TopologyCoordinator::Role::candidate == getTopoCoord().getRole());
+
+        OpTime originalElectionTime = getTopoCoord().getElectionTime();
+        OID originalElectionId = getTopoCoord().getElectionId();
+        // prepare an incoming fresh command
+        ReplicationCoordinator::ReplSetFreshArgs freshArgs;
+        freshArgs.setName = "rs0";
+        freshArgs.cfgver = 5;
+        freshArgs.id = 2;
+        freshArgs.who = HostAndPort("host3");
+        freshArgs.opTime = lastOpTimeApplied;
+
+        BSONObjBuilder freshResponseBuilder;
+        Status result = Status(ErrorCodes::InternalError, "status not set by prepareElectResponse");
+        getTopoCoord().prepareFreshResponse(
+                cbData(), freshArgs, lastOpTimeApplied, &freshResponseBuilder, &result);
+        BSONObj response = freshResponseBuilder.obj();
+        ASSERT_OK(result);
+        ASSERT_EQUALS(lastOpTimeApplied, OpTime(response["opTime"].timestampValue()));
+        ASSERT_TRUE(response["fresher"].trueValue());
+        ASSERT_FALSE(response["veto"].trueValue());
+        ASSERT_TRUE(TopologyCoordinator::Role::candidate == getTopoCoord().getRole());
+        // make sure incoming fresh commands do not change electionTime and electionId
+        ASSERT_EQUALS(originalElectionTime, getTopoCoord().getElectionTime());
+        ASSERT_EQUALS(originalElectionId, getTopoCoord().getElectionId());
+
+        // an elect command comes in
+        ReplicationCoordinator::ReplSetElectArgs electArgs;
+        OID round = OID::gen();
+        electArgs.set = "rs0";
+        electArgs.round = round;
+        electArgs.cfgver = 5;
+        electArgs.whoid = 2;
+
+        BSONObjBuilder electResponseBuilder;
+        result = Status(ErrorCodes::InternalError, "status not set by prepareElectResponse");
+        startCapturingLogMessages();
+        getTopoCoord().prepareElectResponse(
+                cbData(), electArgs, now()++, &electResponseBuilder, &result);
+        stopCapturingLogMessages();
+        response = electResponseBuilder.obj();
+        ASSERT_OK(result);
+        ASSERT_EQUALS(1, response["vote"].Int());
+        ASSERT_EQUALS(round, response["round"].OID());
+        ASSERT_EQUALS(1, countLogLinesContaining("voting yea for host3:27017 (2)"));
+        ASSERT_TRUE(TopologyCoordinator::Role::candidate == getTopoCoord().getRole());
+        // make sure incoming elect commands do not change electionTime and electionId
+        ASSERT_EQUALS(originalElectionTime, getTopoCoord().getElectionTime());
+        ASSERT_EQUALS(originalElectionId, getTopoCoord().getElectionId());
+
+        // now voteForSelf as though we received all our fresh responses
+        ASSERT_FALSE(getTopoCoord().voteForMyself(now()++));
+
+        // receive a heartbeat indicating the other node was elected
+        nextAction = receiveUpHeartbeat(HostAndPort("host3"),
+                                        "rs0",
+                                        MemberState::RS_PRIMARY,
+                                        election,
+                                        lastOpTimeApplied,
+                                        lastOpTimeApplied);
+        ASSERT_NO_ACTION(nextAction.getAction());
+        ASSERT_EQUALS(2, getCurrentPrimaryIndex());
+        // make sure seeing a new primary does not change electionTime and electionId
+        ASSERT_EQUALS(originalElectionTime, getTopoCoord().getElectionTime());
+        ASSERT_EQUALS(originalElectionId, getTopoCoord().getElectionId());
+
+        // now lose election and ensure _electionTime and _electionId are 0'd out 
+        getTopoCoord().processLoseElection(now()++, lastOpTimeApplied);
+        ASSERT_EQUALS(OID(), getTopoCoord().getElectionId());
+        ASSERT_EQUALS(OpTime(0,0), getTopoCoord().getElectionTime());
+        ASSERT_TRUE(TopologyCoordinator::Role::follower == getTopoCoord().getRole());
+        ASSERT_EQUALS(2, getCurrentPrimaryIndex());
+    }
+
+    TEST_F(HeartbeatResponseTest, ElectionRespondToFreshBeforeOurFreshnessReturns) {
+        // In this test, the TopologyCoordinator goes through the steps of an election. However,
+        // before its freshness round ends, the TopologyCoordinator receives a fresh command from
+        // another node, which it responds positively to. Its freshness then ends successfully and
+        // it wins the election. The other node's elect command then comes in and is responded to
+        // negatively, maintaining the TopologyCoordinator's PRIMARY state.
+
+        // 1. All nodes heartbeat to indicate that they are up and that "host2" is PRIMARY.
+        // 2. "host2" goes down, triggering an election.
+        // 3. "host3" sends a fresh command, which the TopologyCoordinator responds to positively.
+        // 4. The TopologyCoordinator concludes its freshness round successfully and wins
+        //    the election.
+        // 5. "host3" sends an elect command, which the TopologyCoordinator responds to negatively.
+
+        setSelfMemberState(MemberState::RS_SECONDARY);
+        now() += 3000; // we need to be more than LastVote::leaseTime from the start of time or else
+                       // some Date_t math goes horribly awry
+
+        OpTime election = OpTime(0,0);
+        OpTime lastOpTimeApplied = OpTime(10,0);
+        OpTime fresherLastOpTimeApplied = OpTime(20,0);
+        OID round = OID::gen();
+        OID remoteRound = OID::gen();
+
+        ASSERT_EQUALS(-1, getCurrentPrimaryIndex());
+        HeartbeatResponseAction nextAction = receiveUpHeartbeat(HostAndPort("host2"),
+                                                                "rs0",
+                                                                MemberState::RS_PRIMARY,
+                                                                election,
+                                                                lastOpTimeApplied,
+                                                                lastOpTimeApplied);
+        ASSERT_NO_ACTION(nextAction.getAction());
+        ASSERT_EQUALS(1, getCurrentPrimaryIndex());
+
+        nextAction = receiveUpHeartbeat(HostAndPort("host3"),
+                                        "rs0",
+                                        MemberState::RS_SECONDARY,
+                                        election,
+                                        fresherLastOpTimeApplied,
+                                        lastOpTimeApplied);
+        ASSERT_NO_ACTION(nextAction.getAction());
+
+        // candidate time!
+        nextAction = receiveDownHeartbeat(HostAndPort("host2"), "rs0");
+        ASSERT_EQUALS(-1, getCurrentPrimaryIndex());
+        ASSERT_EQUALS(HeartbeatResponseAction::StartElection, nextAction.getAction());
+        ASSERT_TRUE(TopologyCoordinator::Role::candidate == getTopoCoord().getRole());
+
+        // prepare an incoming fresh command
+        ReplicationCoordinator::ReplSetFreshArgs freshArgs;
+        freshArgs.setName = "rs0";
+        freshArgs.cfgver = 5;
+        freshArgs.id = 2;
+        freshArgs.who = HostAndPort("host3");
+        freshArgs.opTime = lastOpTimeApplied;
+
+        BSONObjBuilder freshResponseBuilder;
+        Status result = Status(ErrorCodes::InternalError, "status not set by prepareElectResponse");
+        getTopoCoord().prepareFreshResponse(
+                cbData(), freshArgs, lastOpTimeApplied, &freshResponseBuilder, &result);
+        BSONObj response = freshResponseBuilder.obj();
+        ASSERT_OK(result);
+        ASSERT_EQUALS(lastOpTimeApplied, OpTime(response["opTime"].timestampValue()));
+        ASSERT_TRUE(response["fresher"].trueValue());
+        ASSERT_FALSE(response["veto"].trueValue());
+        ASSERT_TRUE(TopologyCoordinator::Role::candidate == getTopoCoord().getRole());
+
+        // now voteForSelf as though we received all our fresh responses
+        ASSERT_TRUE(getTopoCoord().voteForMyself(now()++));
+        // now win election and ensure _electionId and _electionTime are set properly
+        getTopoCoord().processWinElection(now()++, round, lastOpTimeApplied, election);
+        ASSERT_EQUALS(round, getTopoCoord().getElectionId());
+        ASSERT_EQUALS(election, getTopoCoord().getElectionTime());
+        ASSERT_TRUE(TopologyCoordinator::Role::leader == getTopoCoord().getRole());
+        ASSERT_EQUALS(0, getCurrentPrimaryIndex());
+
+        // an elect command comes in
+        ReplicationCoordinator::ReplSetElectArgs electArgs;
+        electArgs.set = "rs0";
+        electArgs.round = remoteRound;
+        electArgs.cfgver = 5;
+        electArgs.whoid = 2;
+
+        BSONObjBuilder electResponseBuilder;
+        result = Status(ErrorCodes::InternalError, "status not set by prepareElectResponse");
+        startCapturingLogMessages();
+        getTopoCoord().prepareElectResponse(
+                cbData(), electArgs, now()++, &electResponseBuilder, &result);
+        stopCapturingLogMessages();
+        response = electResponseBuilder.obj();
+        ASSERT_OK(result);
+        ASSERT_EQUALS(-10000, response["vote"].Int());
+        ASSERT_EQUALS(remoteRound, response["round"].OID());
+        ASSERT_TRUE(TopologyCoordinator::Role::leader == getTopoCoord().getRole());
+        ASSERT_EQUALS(0, getCurrentPrimaryIndex());
+    }
+
+    TEST_F(HeartbeatResponseTest, ElectionCompleteElectionThenReceiveFresh) {
+        // In this test, the TopologyCoordinator goes through the steps of an election. After
+        // being successfully elected, a fresher node sends a fresh command, which the
+        // TopologyCoordinator responds positively to. The fresher node then sends an elect command,
+        // which the Topology coordinator negatively to since the TopologyCoordinator just elected
+        // itself.
+
+        // 1. All nodes heartbeat to indicate that they are up and that "host2" is PRIMARY.
+        // 2. "host2" goes down, triggering an election.
+        // 3. The TopologyCoordinator concludes its freshness round successfully and wins
+        //    the election.
+        // 4. "host3" sends a fresh command, which the TopologyCoordinator responds to positively.
+        // 5. "host3" sends an elect command, which the TopologyCoordinator responds to negatively.
+
+        setSelfMemberState(MemberState::RS_SECONDARY);
+        now() += 3000; // we need to be more than LastVote::leaseTime from the start of time or else
+                       // some Date_t math goes horribly awry
+
+        OpTime election = OpTime(0,0);
+        OpTime lastOpTimeApplied = OpTime(10,0);
+        OpTime fresherLastOpTimeApplied = OpTime(20,0);
+        OID round = OID::gen();
+        OID remoteRound = OID::gen();
+
+        ASSERT_EQUALS(-1, getCurrentPrimaryIndex());
+        HeartbeatResponseAction nextAction = receiveUpHeartbeat(HostAndPort("host2"),
+                                                                "rs0",
+                                                                MemberState::RS_PRIMARY,
+                                                                election,
+                                                                lastOpTimeApplied,
+                                                                lastOpTimeApplied);
+        ASSERT_NO_ACTION(nextAction.getAction());
+        ASSERT_EQUALS(1, getCurrentPrimaryIndex());
+
+        nextAction = receiveUpHeartbeat(HostAndPort("host3"),
+                                        "rs0",
+                                        MemberState::RS_SECONDARY,
+                                        election,
+                                        fresherLastOpTimeApplied,
+                                        lastOpTimeApplied);
+        ASSERT_NO_ACTION(nextAction.getAction());
+
+        // candidate time!
+        nextAction = receiveDownHeartbeat(HostAndPort("host2"), "rs0");
+        ASSERT_EQUALS(-1, getCurrentPrimaryIndex());
+        ASSERT_EQUALS(HeartbeatResponseAction::StartElection, nextAction.getAction());
+        ASSERT_TRUE(TopologyCoordinator::Role::candidate == getTopoCoord().getRole());
+
+        // now voteForSelf as though we received all our fresh responses
+        ASSERT_TRUE(getTopoCoord().voteForMyself(now()++));
+        // now win election
+        getTopoCoord().processWinElection(now()++, round, lastOpTimeApplied, election);
+        ASSERT_EQUALS(0, getTopoCoord().getCurrentPrimaryIndex());
+        ASSERT_TRUE(TopologyCoordinator::Role::leader == getTopoCoord().getRole());
+
+        // prepare an incoming fresh command
+        ReplicationCoordinator::ReplSetFreshArgs freshArgs;
+        freshArgs.setName = "rs0";
+        freshArgs.cfgver = 5;
+        freshArgs.id = 2;
+        freshArgs.who = HostAndPort("host3");
+        freshArgs.opTime = lastOpTimeApplied;
+
+        BSONObjBuilder freshResponseBuilder;
+        Status result = Status(ErrorCodes::InternalError, "status not set by prepareElectResponse");
+        getTopoCoord().prepareFreshResponse(
+                cbData(), freshArgs, lastOpTimeApplied, &freshResponseBuilder, &result);
+        BSONObj response = freshResponseBuilder.obj();
+        ASSERT_OK(result);
+        ASSERT_EQUALS(lastOpTimeApplied, OpTime(response["opTime"].timestampValue()));
+        ASSERT_TRUE(response["fresher"].trueValue());
+        ASSERT_FALSE(response["veto"].trueValue());
+        ASSERT_TRUE(TopologyCoordinator::Role::leader == getTopoCoord().getRole());
+        ASSERT_EQUALS(0, getCurrentPrimaryIndex());
+
+        // an elect command comes in
+        ReplicationCoordinator::ReplSetElectArgs electArgs;
+        electArgs.set = "rs0";
+        electArgs.round = remoteRound;
+        electArgs.cfgver = 5;
+        electArgs.whoid = 2;
+
+        BSONObjBuilder electResponseBuilder;
+        result = Status(ErrorCodes::InternalError, "status not set by prepareElectResponse");
+        startCapturingLogMessages();
+        getTopoCoord().prepareElectResponse(
+                cbData(), electArgs, now()++, &electResponseBuilder, &result);
+        stopCapturingLogMessages();
+        response = electResponseBuilder.obj();
+        ASSERT_OK(result);
+        ASSERT_EQUALS(-10000, response["vote"].Int());
+        ASSERT_EQUALS(remoteRound, response["round"].OID());
+        ASSERT_TRUE(TopologyCoordinator::Role::leader == getTopoCoord().getRole());
+        ASSERT_EQUALS(0, getCurrentPrimaryIndex());
+    }
+
     TEST_F(HeartbeatResponseTest, UpdateHeartbeatDataPrimaryDownMajorityOfVotersUp) {
         updateConfig(BSON("_id" << "rs0" <<
                           "version" << 5 <<
