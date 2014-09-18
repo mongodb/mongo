@@ -279,6 +279,22 @@ namespace mongo {
     }
 
     /* Cursor implementation */
+    WiredTigerIndex::IndexCursor::IndexCursor(const WiredTigerIndex &idx,
+            OperationContext *txn,
+            shared_ptr<WiredTigerSession> &session,
+            bool forward)
+       : _txn(txn),
+         _session(session),
+         _idx(idx),
+         _forward(forward),
+         _eof(true) {
+         _cursor = new WiredTigerCursor(_idx.GetURI(), *_session);
+    }
+
+    WiredTigerIndex::IndexCursor::~IndexCursor() {
+        delete _cursor;
+    }
+
     int WiredTigerIndex::IndexCursor::getDirection() const { return _forward ? 1 : -1; }
 
     bool WiredTigerIndex::IndexCursor::isEOF() const { return _eof; }
@@ -287,7 +303,7 @@ namespace mongo {
             const SortedDataInterface::Cursor &genother) const {
         const WiredTigerIndex::IndexCursor &other =
             dynamic_cast<const WiredTigerIndex::IndexCursor &>(genother);
-        WT_CURSOR *c = _cursor.Get(), *otherc = other._cursor.Get();
+        WT_CURSOR *c = _cursor->Get(), *otherc = other._cursor->Get();
         int cmp, ret = c->compare(c, otherc, &cmp);
         invariant(ret == 0);
         return cmp == 0;
@@ -314,7 +330,7 @@ namespace mongo {
     }
 
     bool WiredTigerIndex::IndexCursor::_locate(const BSONObj &key, const DiskLoc& loc) {
-        WT_CURSOR *c = _cursor.Get();
+        WT_CURSOR *c = _cursor->Get();
         _eof = !WiredTigerIndex::_search(c, key, loc, _forward);
         if (_eof)
             return false;
@@ -326,7 +342,7 @@ namespace mongo {
 
         // Empty keys mean go to the beginning
         if (key.isEmpty()) {
-            WT_CURSOR *c = _cursor.Get();
+            WT_CURSOR *c = _cursor->Get();
             ret = c->reset(c);
             invariant(ret == 0);
             advance();
@@ -360,7 +376,7 @@ namespace mongo {
     }
 
     BSONObj WiredTigerIndex::IndexCursor::getKey() const {
-        WT_CURSOR *c = _cursor.Get();
+        WT_CURSOR *c = _cursor->Get();
         WT_ITEM keyItem;
         uint64_t locVal;
         int ret = c->get_key(c, &keyItem, &locVal);
@@ -369,7 +385,7 @@ namespace mongo {
     }
 
     DiskLoc WiredTigerIndex::IndexCursor::getDiskLoc() const {
-        WT_CURSOR *c = _cursor.Get();
+        WT_CURSOR *c = _cursor->Get();
         WT_ITEM keyItem;
         uint64_t locVal;
         int ret = c->get_key(c, &keyItem, &locVal);
@@ -378,7 +394,7 @@ namespace mongo {
     }
 
     void WiredTigerIndex::IndexCursor::advance() {
-        WT_CURSOR *c = _cursor.Get();
+        WT_CURSOR *c = _cursor->Get();
         int ret = _forward ? c->next(c) : c->prev(c);
         if (ret == WT_NOTFOUND)
             _eof = true;
@@ -393,9 +409,18 @@ namespace mongo {
             _savedKey = getKey();
             _savedLoc = getDiskLoc();
         }
+        delete _cursor;
+        _cursor = NULL;
     }
 
     void WiredTigerIndex::IndexCursor::restorePosition( OperationContext *txn ) {
+        // Update the session handle with our new operation context.
+        if (txn != _txn) {
+            fprintf(stderr, "Updating transaction in IndexCursor::restorePosition\n");
+            _txn = txn;
+            _session = WiredTigerRecoveryUnit::Get(txn).GetSharedSession();
+        }
+         _cursor = new WiredTigerCursor(_idx.GetURI(), *_session);
         if (_savedAtEnd) {
             _eof = true;
             return;
@@ -408,7 +433,7 @@ namespace mongo {
             OperationContext* txn, int direction) const {
         invariant((direction == 1) || (direction == -1));
 
-        return new IndexCursor(*this, WiredTigerRecoveryUnit::Get(txn).GetSharedSession(), direction == 1);
+        return new IndexCursor(*this, txn, WiredTigerRecoveryUnit::Get(txn).GetSharedSession(), direction == 1);
     }
 
     Status WiredTigerIndex::initAsEmpty(OperationContext* txn) {

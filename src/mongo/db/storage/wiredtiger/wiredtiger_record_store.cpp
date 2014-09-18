@@ -508,13 +508,17 @@ namespace mongo {
           _txn( txn ),
           _session( session ),
           _tailable( tailable ),
-          _dir( dir ),
-          _cursor(rs.GetURI(), *session) {
+          _dir( dir ) {
+            _cursor = new WiredTigerCursor(rs.GetURI(), *session);
             _locate(start, true);
     }
 
+    WiredTigerRecordStore::Iterator::~Iterator() {
+        delete _cursor;
+    }
+
     void WiredTigerRecordStore::Iterator::_locate(const DiskLoc &loc, bool exact) {
-        WT_CURSOR *c = _cursor.Get();
+        WT_CURSOR *c = _cursor->Get();
         int ret;
         if (loc.isNull()) {
             ret = _forward() ? c->next(c) : c->prev(c);
@@ -550,7 +554,7 @@ namespace mongo {
         if (_eof)
             return DiskLoc();
 
-        WT_CURSOR *c = _cursor.Get();
+        WT_CURSOR *c = _cursor->Get();
         uint64_t key;
         int ret = c->get_key(c, &key);
         invariant(ret == 0);
@@ -562,7 +566,7 @@ namespace mongo {
     }
 
     void WiredTigerRecordStore::Iterator::_getNext() {
-        WT_CURSOR *c = _cursor.Get();
+        WT_CURSOR *c = _cursor->Get();
         int ret = _forward() ? c->next(c) : c->prev(c);
         invariant(ret == 0 || ret == WT_NOTFOUND);
         _eof = (ret == WT_NOTFOUND);
@@ -591,12 +595,21 @@ namespace mongo {
         _savedInvalidated = false;
 
         // Reset the cursor so it doesn't keep any resources pinned.
-        WT_CURSOR *c = _cursor.Get();
-        int ret = c->reset(c);
-        invariant(ret == 0);
+        delete _cursor;
+        _cursor = NULL; // avoid attempting to delete again.
     }
 
     bool WiredTigerRecordStore::Iterator::restoreState( OperationContext *txn ) {
+        // This is normally already the case, but sometimes we are given a new
+        // OperationContext on restore - update the iterators context in that
+        // case
+        if (txn != _txn) {
+            fprintf(stderr, "Updating transaction in Iterator::restoreState\n");
+
+            _txn = txn;
+            _session = WiredTigerRecoveryUnit::Get(txn).GetSharedSession();
+        }
+        _cursor = new WiredTigerCursor(_rs.GetURI(), *_session);
         if (_savedLoc.isNull())
             _eof = true;
         else
@@ -611,7 +624,7 @@ namespace mongo {
         // open a new cursor and find the data to avoid upsetting the iterators
         // cursor position.
         if (loc == _curr())
-            return (_rs._getData(_cursor));
+            return (_rs._getData(*_cursor));
         else
             return (_rs.dataFor( _txn, loc ));
     }
