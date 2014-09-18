@@ -32,16 +32,16 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/base/init.h"
+#include "mongo/db/cloner.h"
+
 #include "mongo/base/status.h"
 #include "mongo/bson/util/builder.h"
 #include "mongo/client/dbclientinterface.h"
-#include "mongo/db/auth/action_set.h"
-#include "mongo/db/auth/resource_pattern.h"
-#include "mongo/db/auth/authorization_session.h"
+#include "mongo/db/auth/authorization_manager.h"
+#include "mongo/db/auth/authorization_manager_global.h"
+#include "mongo/db/auth/security_key.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/index_create.h"
-#include "mongo/db/cloner.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/copydb.h"
 #include "mongo/db/commands/rename_collection.h"
@@ -52,7 +52,6 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/repl/isself.h"
 #include "mongo/db/repl/oplog.h"
-#include "mongo/db/repl/oplogreader.h"
 #include "mongo/db/storage_options.h"
 #include "mongo/util/log.h"
 
@@ -399,8 +398,11 @@ namespace mongo {
                 auto_ptr<DBClientBase> con( cs.connect( errmsg ));
                 if ( !con.get() )
                     return false;
-                if (!repl::replAuthenticate(con.get()))
+                if (getGlobalAuthorizationManager()->isAuthEnabled() &&
+                    !authenticateInternalUser(con.get())) {
+
                     return false;
+                }
 
                 _conn = con;
             }

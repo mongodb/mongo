@@ -38,7 +38,6 @@
 #include "mongo/db/field_parser.h"
 #include "mongo/db/lasterror.h"
 #include "mongo/db/repl/repl_coordinator_global.h"
-#include "mongo/db/repl/rs.h"
 #include "mongo/db/write_concern.h"
 #include "mongo/util/log.h"
 
