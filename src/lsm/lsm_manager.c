@@ -238,7 +238,7 @@ __lsm_manager_worker_setup(WT_SESSION_IMPL *session)
 	worker_args = &manager->lsm_worker_cookies[1];
 	worker_args->work_cond = manager->work_cond;
 	worker_args->id = manager->lsm_workers++;
-	worker_args->type = WT_LSM_WORK_SWITCH | WT_LSM_WORK_DROP;
+	worker_args->type = WT_LSM_WORK_DROP | WT_LSM_WORK_SWITCH;
 	/* Start the switch thread. */
 	WT_RET(__wt_lsm_worker_start(session, worker_args));
 

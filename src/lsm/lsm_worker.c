@@ -13,7 +13,7 @@ static void * __lsm_worker(void *);
 
 /*
  * __wt_lsm_worker_start --
- *	A wrapper around the LSM worker thread start
+ *	A wrapper around the LSM worker thread start.
  */
 int
 __wt_lsm_worker_start(WT_SESSION_IMPL *session, WT_LSM_WORKER_ARGS *args)
@@ -23,7 +23,7 @@ __wt_lsm_worker_start(WT_SESSION_IMPL *session, WT_LSM_WORKER_ARGS *args)
 
 /*
  * __lsm_worker_general_op --
- *	Execute a single bloom, drop or flush work unit
+ *	Execute a single bloom, drop or flush work unit.
  */
 static int
 __lsm_worker_general_op(
@@ -35,10 +35,12 @@ __lsm_worker_general_op(
 	int force;
 
 	*completed = 0;
-	if (!FLD_ISSET(cookie->type, WT_LSM_WORK_FLUSH) &&
-	    !FLD_ISSET(cookie->type, WT_LSM_WORK_DROP) &&
-	    !FLD_ISSET(cookie->type, WT_LSM_WORK_BLOOM))
-	    return (WT_NOTFOUND);
+	/*
+	 * Return if this thread cannot process a bloom, drop or flush.
+	 */
+	if (!FLD_ISSET(cookie->type,
+	    WT_LSM_WORK_BLOOM | WT_LSM_WORK_DROP | WT_LSM_WORK_FLUSH))
+		return (WT_NOTFOUND);
 
 	if ((ret = __wt_lsm_manager_pop_entry(session,
 	    cookie->type, &entry)) != 0 || entry == NULL)
@@ -97,7 +99,7 @@ __lsm_worker(void *arg)
 
 		/*
 		 * Workers process the different LSM work queues.  Some workers
-		 * can handle several or all work unit types.  So they are
+		 * can handle several or all work unit types.  So the code is
 		 * prioritized so important operations happen first.
 		 * Switches are the highest priority.
 		 */
