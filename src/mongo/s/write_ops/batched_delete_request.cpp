@@ -66,6 +66,7 @@ namespace mongo {
             *errMsg = stream() << "missing " << deletes.name() << " field";
             return false;
         }
+
         return true;
     }
 
