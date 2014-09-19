@@ -572,6 +572,9 @@ namespace {
                 // take note of our ejection
                 changeState(MemberState::RS_REMOVED);
 
+                // clear sync target to avoid faulty sync attempts
+                BackgroundSync::get()->clearSyncTarget();
+
                 // go into holding pattern
                 log() << "replSet info self not present in the repl set configuration:" << rsLog;
                 log() << c.toString() << rsLog;

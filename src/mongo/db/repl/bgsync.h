@@ -59,6 +59,9 @@ namespace repl {
         // Returns the member we're currently syncing from (or NULL)
         virtual const Member* getSyncTarget() = 0;
 
+        // Sets the member we're currently syncing from to be NULL
+        virtual void clearSyncTarget() = 0;
+
         // wait up to 1 second for more ops to appear
         virtual void waitForMore() = 0;
     };
@@ -134,6 +137,7 @@ namespace repl {
         virtual bool peek(BSONObj* op);
         virtual void consume();
         virtual const Member* getSyncTarget();
+        virtual void clearSyncTarget();
         virtual void waitForMore();
 
         // For monitoring

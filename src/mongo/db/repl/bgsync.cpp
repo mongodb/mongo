@@ -563,6 +563,11 @@ namespace repl {
         return _currentSyncTarget;
     }
 
+    void BackgroundSync::clearSyncTarget() {
+        boost::unique_lock<boost::mutex> lock(_mutex);
+        _currentSyncTarget = NULL;
+    }
+
     void BackgroundSync::stop() {
         boost::unique_lock<boost::mutex> lock(_mutex);
 
