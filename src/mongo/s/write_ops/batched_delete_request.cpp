@@ -66,17 +66,6 @@ namespace mongo {
             *errMsg = stream() << "missing " << deletes.name() << " field";
             return false;
         }
-        
-        // verify limit field is 0 or 1 as defined in spec
-        for (std::vector<BatchedDeleteDocument*>::const_iterator it = _deletes.begin();
-            it != _deletes.end();
-            ++it) {
-            if ((*it)->getLimit() != 0 && (*it)->getLimit() != 1) {
-                *errMsg = stream() << "specify either a 0 to delete all"
-                    << "matching documents or 1 to delete a single document";
-                return false;
-            }
-        }
         return true;
     }
 
