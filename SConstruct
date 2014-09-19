@@ -790,7 +790,9 @@ elif windows:
     #  C++ exception specification ignored except to indicate a function is not __declspec(nothrow
     #  A function is declared using exception specification, which Visual C++ accepts but does not
     #  implement
-    env.Append( CCFLAGS=["/wd4355", "/wd4800", "/wd4267", "/wd4244", "/wd4290"] )
+    # c4068
+    #  unknown pragma -- added so that we can specify unknown pragmas for other compilers
+    env.Append( CCFLAGS=["/wd4355", "/wd4800", "/wd4267", "/wd4244", "/wd4290", "/wd4068"] )
 
     # some warnings we should treat as errors:
     # c4099
