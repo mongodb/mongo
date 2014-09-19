@@ -94,11 +94,8 @@ namespace mongo {
 
                 // Sort document normalization.
                 BSONObj sort = el.Obj().getOwned();
-                if (!sort.isEmpty()) {
-                    if (!isValidSortOrder(sort)) {
-                        return Status(ErrorCodes::BadValue, "bad sort specification");
-                    }
-                    sort = normalizeSortOrder(sort);
+                if (!isValidSortOrder(sort)) {
+                    return Status(ErrorCodes::BadValue, "bad sort specification");
                 }
 
                 pq->_sort = sort;
@@ -410,23 +407,6 @@ namespace mongo {
         return false;
     }
 
-    // static
-    BSONObj LiteParsedQuery::normalizeSortOrder(const BSONObj& sortObj) {
-        BSONObjBuilder b;
-        BSONObjIterator i(sortObj);
-        while (i.more()) {
-            BSONElement e = i.next();
-            if (isTextScoreMeta(e)) {
-                b.append(e);
-                continue;
-            }
-            long long n = e.safeNumberLong();
-            int sortOrder = n >= 0 ? 1 : -1;
-            b.append(e.fieldName(), sortOrder);
-        }
-        return b.obj();
-    }
-
     LiteParsedQuery::LiteParsedQuery() :
         _skip(0),
         _limit(0),
@@ -710,11 +690,8 @@ namespace mongo {
 
         _options.hasReadPref = queryObj.hasField("$readPreference");
 
-        if (!_sort.isEmpty()) {
-            if (!isValidSortOrder(_sort)) {
-                return Status(ErrorCodes::BadValue, "bad sort specification");
-            }
-            _sort = normalizeSortOrder(_sort);
+        if (!isValidSortOrder(_sort)) {
+            return Status(ErrorCodes::BadValue, "bad sort specification");
         }
 
         return validate();

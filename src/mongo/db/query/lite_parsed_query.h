@@ -159,15 +159,6 @@ namespace mongo {
          */
         static bool isQueryIsolated(const BSONObj& query);
 
-        /**
-         * Helper function to create a normalized sort object.
-         * Each element of the object returned satisfies one of:
-         * 1. a number with value 1
-         * 2. a number with value -1
-         * 3. isTextScoreMeta
-         */
-        static BSONObj normalizeSortOrder(const BSONObj& sortObj);
-
         // Names of the maxTimeMS command and query option.
         static const std::string cmdOptionMaxTimeMS;
         static const std::string queryOptionMaxTimeMS;

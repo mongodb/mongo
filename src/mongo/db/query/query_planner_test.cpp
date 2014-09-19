@@ -1345,6 +1345,19 @@ namespace {
                                 "node: {cscan: {dir: 1, filter: {}}}}}");
     }
 
+    TEST_F(QueryPlannerTest, CantUseHashedIndexToProvideSortWithIndexablePred) {
+        addIndex(BSON("x" << "hashed"));
+        runQuerySortProj(BSON("x" << BSON("$in" << BSON_ARRAY(0 << 1))), BSON("x" << 1), BSONObj());
+
+        ASSERT_EQUALS(getNumSolutions(), 2U);
+        assertSolutionExists("{sort: {pattern: {x: 1}, limit: 0, node: "
+                               "{fetch: {node: "
+                                 "{ixscan: {pattern: {x: 'hashed'}}}}}}}");
+        assertSolutionExists("{sort: {pattern: {x: 1}, limit: 0, node: "
+                               "{cscan: {dir: 1, filter: {x: {$in: [0, 1]}}}}}}");
+    }
+
+
     TEST_F(QueryPlannerTest, CantUseTextIndexToProvideSort) {
         addIndex(BSON("x" << 1 << "_fts" << "text" << "_ftsx" << 1));
         runQuerySortProj(BSONObj(), BSON("x" << 1), BSONObj());
@@ -1363,13 +1376,42 @@ namespace {
                                 "node: {cscan: {dir: 1, filter: {}}}}}");
     }
 
-    TEST_F(QueryPlannerTest, CantUseCompoundGeoIndexToProvideSort) {
+    TEST_F(QueryPlannerTest, CantUseNonCompoundGeoIndexToProvideSortWithIndexablePred) {
+        addIndex(BSON("x" << "2dsphere"));
+        runQuerySortProj(fromjson("{x: {$geoIntersects: {$geometry: {type: 'Point',"
+                                  "                                  coordinates: [0, 0]}}}}"),
+                         BSON("x" << 1),
+                         BSONObj());
+
+        ASSERT_EQUALS(getNumSolutions(), 2U);
+        assertSolutionExists("{sort: {pattern: {x: 1}, limit: 0, node: "
+                               "{fetch: {node: "
+                                 "{ixscan: {pattern: {x: '2dsphere'}}}}}}}");
+        assertSolutionExists("{sort: {pattern: {x: 1}, limit: 0, node: "
+                               "{cscan: {dir: 1}}}}");
+    }
+
+    TEST_F(QueryPlannerTest, CantUseCompoundGeoIndexToProvideSortIfNoGeoPred) {
         addIndex(BSON("x" << 1 << "y" << "2dsphere"));
         runQuerySortProj(BSONObj(), BSON("x" << 1), BSONObj());
 
         ASSERT_EQUALS(getNumSolutions(), 1U);
         assertSolutionExists("{sort: {pattern: {x: 1}, limit: 0, "
                                 "node: {cscan: {dir: 1, filter: {}}}}}");
+    }
+
+    TEST_F(QueryPlannerTest, CanUseCompoundGeoIndexToProvideSortWithGeoPred) {
+        addIndex(BSON("x" << 1 << "y" << "2dsphere"));
+        runQuerySortProj(fromjson("{x: 1, y: {$geoIntersects: {$geometry: {type: 'Point',"
+                                  "                                        coordinates: [0, 0]}}}}"),
+                         BSON("x" << 1),
+                         BSONObj());
+
+        ASSERT_EQUALS(getNumSolutions(), 2U);
+        assertSolutionExists("{fetch: {node: "
+                                 "{ixscan: {pattern: {x: 1, y: '2dsphere'}}}}}");
+        assertSolutionExists("{sort: {pattern: {x: 1}, limit: 0, node: "
+                               "{cscan: {dir: 1}}}}");
     }
 
     TEST_F(QueryPlannerTest, BasicSortWithIndexablePred) {
