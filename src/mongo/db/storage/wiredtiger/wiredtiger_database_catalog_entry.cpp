@@ -128,7 +128,6 @@ namespace mongo {
             WiredTigerCollectionCatalogEntry *entry =
                 new WiredTigerCollectionCatalogEntry(swrap, StringData(name));
             _entryMap[name.c_str()] = entry;
-            //_loadCollection(swrap, key);
         }
         invariant(ret == WT_NOTFOUND || ret == 0);
         name();
@@ -325,9 +324,8 @@ namespace mongo {
 
         // Load the newly renamed collection into memory
         WiredTigerCollectionCatalogEntry *newEntry =
-            new WiredTigerCollectionCatalogEntry(swrap, toNS);
+            new WiredTigerCollectionCatalogEntry(swrap, toNS, stayTemp);
         _entryMap[toNS.toString().c_str()] = newEntry;
-        //_loadCollection(swrap, toUri, stayTemp);
 
         return Status::OK();
     }
