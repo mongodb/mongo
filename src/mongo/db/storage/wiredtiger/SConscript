@@ -23,6 +23,24 @@ if has_option("wiredtiger"):
 	SYSLIBDEPS=["wiredtiger"]
 	)
 
+    env.CppUnitTest(
+	   target='storage_wiredtiger_index_test',
+	   source=['wiredtiger_index_test.cpp',
+	           ],
+	   LIBDEPS=[
+	        'storage_wiredtiger',
+	        "$BUILD_DIR/mongo/coredb",
+	        "$BUILD_DIR/mongo/coreserver",
+	        '$BUILD_DIR/mongo/db/index/index_descriptor',
+	        '$BUILD_DIR/mongo/db/storage/index_entry_comparison',
+	        '$BUILD_DIR/mongo/db/storage/sorted_data_interface_test_harness',
+	        '$BUILD_DIR/mongo/global_environment_experiment',
+	        '$BUILD_DIR/mongo/index_names',
+	        '$BUILD_DIR/mongo/serveronly'
+	       ],
+	       NO_CRUTCH=True
+	   )
+
 #env.CppUnitTest(
 #    target='storage_wiredtiger_test',
 #    source=['wiredtiger_test.cpp',
