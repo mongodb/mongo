@@ -5,7 +5,7 @@ functions:
       working_dir: src
       script: |
         set -o verbose
-        export GOPATH=`pwd`
+        if [ "Windows_NT" = "$OS" ]; then export GOPATH=C:$(pwd | sed 's,/,\\,g') else export GOPATH=`pwd`; fi;
         ${preproc_gpm|echo} ./gpm
         ./gpm install
 
@@ -15,7 +15,7 @@ functions:
       working_dir: src
       script: |
         set -o verbose
-        export GOPATH=`pwd`
+        if [ "Windows_NT" = "$OS" ]; then export GOPATH=C:$(pwd | sed 's,/,\\,g') else export GOPATH=`pwd`; fi;
         if [ '${coverage|false}' = 'true' ]
         then
             go tool cover -html=coverage.out -o coverage.html
@@ -74,7 +74,7 @@ functions:
       working_dir: src
       script: |
         set -o verbose
-        export GOPATH=`pwd`
+        if [ "Windows_NT" = "$OS" ]; then export GOPATH=C:$(pwd | sed 's,/,\\,g') else export GOPATH=`pwd`; fi;
         cd src/github.com/mongodb/mongo-tools/${package}
         go test -i
         if [ '${coverage|false}' = 'true' ]
@@ -209,7 +209,7 @@ tasks:
         working_dir: src
         script: |
           set -o verbose
-          export GOPATH=`pwd`
+          if [ "Windows_NT" = "$OS" ]; then export GOPATH=C:$(pwd | sed 's,/,\\,g') else export GOPATH=`pwd`; fi;
           go run src/github.com/3rf/mongo-lint/golint/golint.go src/github.com/mongodb/mongo-tools
 
 - name: vet
@@ -223,7 +223,7 @@ tasks:
         working_dir: src
         script: |
           set -o verbose
-          export GOPATH=`pwd`
+          if [ "Windows_NT" = "$OS" ]; then export GOPATH=C:$(pwd | sed 's,/,\\,g') else export GOPATH=`pwd`; fi;
           go tool vet src/github.com/mongodb/mongo-tools/
 
 - name: util
@@ -255,7 +255,7 @@ tasks:
       params:
         updates:
           - key: "package"
-            value: "common/db/ssl"
+            value: "common/db/openssl"
           - key: "types"
             value: "ssl"
           - key: "port"
@@ -269,7 +269,7 @@ tasks:
           - key: "types"
             value: "ssl_auth"
           - key: "mongod_extra_options"
-            value: "--sslMode requireSSL --sslCAFile src/src/github.com/mongodb/mongo-tools/common/db/ssl/testdata/ca.pem --sslPEMKeyFile src/src/github.com/mongodb/mongo-tools/common/db/ssl/testdata/server.pem --auth"
+            value: "--sslMode requireSSL --sslCAFile src/src/github.com/mongodb/mongo-tools/common/db/openssl/testdata/ca.pem --sslPEMKeyFile src/src/github.com/mongodb/mongo-tools/common/db/openssl/testdata/server.pem --auth"
     - func: "start mongod"
     - func: "run tests"
 
@@ -316,7 +316,7 @@ buildvariants:
   - ubuntu1404-test
   expansions:
     mongo_url: http://downloads.10gen.com/linux/mongodb-linux-x86_64-enterprise-ubuntu1404-latest.tgz
-    mongod_extra_options: --sslMode requireSSL --sslCAFile src/src/github.com/mongodb/mongo-tools/common/db/ssl/testdata/ca.pem --sslPEMKeyFile src/src/github.com/mongodb/mongo-tools/common/db/ssl/testdata/server.pem
+    mongod_extra_options: --sslMode requireSSL --sslCAFile src/src/github.com/mongodb/mongo-tools/common/db/openssl/testdata/ca.pem --sslPEMKeyFile src/src/github.com/mongodb/mongo-tools/common/db/openssl/testdata/server.pem
   tasks:
   - name: ssl
 
