@@ -1,4 +1,5 @@
 *.swp
+*.exe
 
 bin/
 pkg/
@@ -10,4 +11,6 @@ src/github.com/jacobsa/
 src/github.com/jessevdk/
 src/github.com/ogier/
 src/github.com/smartystreets/
+src/github.com/spacemonkeygo/
+src/gopkg.in
 src/labix.org

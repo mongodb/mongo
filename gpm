@@ -84,6 +84,7 @@ set_dependencies() {
           local dest_path="${GOPATH%%:*}/src/${dest%%/...}"
         fi
         mkdir -p "$(dirname "$dest_path")"
+        cd "$(dirname "$dest_path")"
         rm -rf $dest_path
         mv $install_path $dest_path
         echo ">> moved $install_path to $dest_path"
