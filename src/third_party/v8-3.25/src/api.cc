@@ -67,6 +67,11 @@
 #include "version.h"
 #include "vm-state-inl.h"
 
+// Disable error about "this" never being NULL in well
+// defined C++ code (Clang 3.5)
+// See SERVER-15306
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wtautological-undefined-compare"
 
 #define LOG_API(isolate, expr) LOG(isolate, ApiEntryCall(expr))
 
@@ -7652,3 +7657,5 @@ void InvokeFunctionCallback(const v8::FunctionCallbackInfo<v8::Value>& info,
 
 
 } }  // namespace v8::internal
+
+#pragma clang diagnostic pop
