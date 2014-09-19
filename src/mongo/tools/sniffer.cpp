@@ -259,7 +259,7 @@ void got_packet(u_char *args, const struct pcap_pkthdr *header, const u_char *pa
     out() << inet_ntoa(ip->ip_dst) << ":" << ntohs( tcp->th_dport )
           << " " << (d.messageShouldHaveNs() ? d.getns() : "")
           << "  " << m.header().getLen() << " bytes "
-          << " id:" << hex << m.header().getId() << dec << "\t" << m.header().getId()
+          << " id:" << hex << m.header().getId() << dec << "\t" << m.header().getId();
 
     processMessage( c , m );
 }
