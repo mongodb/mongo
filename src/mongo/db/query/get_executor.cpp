@@ -871,16 +871,6 @@ namespace mongo {
         PlanStage* root;
         QuerySolution* querySolution;
 
-        if (!collection) {
-            // Treat collections that do not exist as empty collections. Note that the explain
-            // reporting machinery always assumes that the root stage for a count operation is
-            // a CountStage, so in this case we put a CountStage on top of an EOFStage.
-            root = new CountStage(txn, collection, request, ws.get(), new EOFStage());
-            *execOut = new PlanExecutor(ws.release(), root, request.ns);
-            Status status(ErrorCodes::NamespaceNotFound, "source collection does not exist");
-            return status;
-        }
-
         if (request.query.isEmpty()) {
             // If the query is empty, then we can determine the count by just asking the collection
             // for its number of records. This is implemented by the CountStage, and we don't need
@@ -890,10 +880,12 @@ namespace mongo {
             return Status::OK();
         }
 
-        const WhereCallbackReal whereCallback(txn, collection->ns().db());
+        const WhereCallbackReal whereCallback(txn, !collection ? request.ns 
+            : collection->ns().db());
 
         CanonicalQuery* rawCq;
-        Status canonStatus = CanonicalQuery::canonicalize(collection->ns().ns(),
+        Status canonStatus = CanonicalQuery::canonicalize(!collection ? request.ns 
+                                                            : collection->ns().ns(),
                                                           request.query,
                                                           BSONObj(),
                                                           BSONObj(),
@@ -904,6 +896,15 @@ namespace mongo {
                                                           whereCallback);
         if (!canonStatus.isOK()) {
             return canonStatus;
+        }
+
+        if (!collection) {
+            // Treat collections that do not exist as empty collections. Note that the explain
+            // reporting machinery always assumes that the root stage for a count operation is
+            // a CountStage, so in this case we put a CountStage on top of an EOFStage.
+            root = new CountStage(txn, collection, request, ws.get(), new EOFStage());
+            *execOut = new PlanExecutor(ws.release(), root, request.ns);
+            return Status::OK();
         }
 
         auto_ptr<CanonicalQuery> cq(rawCq);
