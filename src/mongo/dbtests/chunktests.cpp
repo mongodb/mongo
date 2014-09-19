@@ -38,17 +38,19 @@ namespace mongo {
 
     class TestableChunkManager : public ChunkManager {
     public:
-        void setShardKey( const BSONObj &keyPattern ) {
-            const_cast<ShardKeyPattern&>(_key) = ShardKeyPattern( keyPattern );
+
+        TestableChunkManager(const string& ns, const ShardKeyPattern& keyPattern, bool unique)
+            : ChunkManager(ns, keyPattern, unique) {
         }
+
         void setSingleChunkForShards( const vector<BSONObj> &splitPoints ) {
             ChunkMap &chunkMap = const_cast<ChunkMap&>( _chunkMap );
             ChunkRangeManager &chunkRanges = const_cast<ChunkRangeManager&>( _chunkRanges );
             set<Shard> &shards = const_cast<set<Shard>&>( _shards );
             
             vector<BSONObj> mySplitPoints( splitPoints );
-            mySplitPoints.insert( mySplitPoints.begin(), _key.globalMin() );
-            mySplitPoints.push_back( _key.globalMax() );
+            mySplitPoints.insert( mySplitPoints.begin(), _keyPattern.getKeyPattern().globalMin() );
+            mySplitPoints.push_back( _keyPattern.getKeyPattern().globalMax() );
             
             for( unsigned i = 1; i < mySplitPoints.size(); ++i ) {
                 string name = str::stream() << (i-1);
@@ -75,20 +77,13 @@ namespace ChunkTests {
     namespace ChunkManagerTests {
         
         typedef mongo::TestableChunkManager ChunkManager;
-        
-        class Create {
-        public:
-            void run() {
-                ChunkManager chunkManager;
-            }
-        };
-        
+
         class Base {
         public:
             virtual ~Base() {}
             void run() {
-                ChunkManager chunkManager;
-                chunkManager.setShardKey( shardKey() );
+                ShardKeyPattern shardKeyPattern(shardKey());
+                ChunkManager chunkManager("", shardKeyPattern, false);
                 chunkManager.setSingleChunkForShards( splitPointsVector() );
                 
                 set<Shard> shards;
@@ -259,7 +254,6 @@ namespace ChunkTests {
         }
         
         void setupTests() {
-            add<ChunkManagerTests::Create>();
             add<ChunkManagerTests::EmptyQuerySingleShard>();
             add<ChunkManagerTests::EmptyQueryMultiShard>();
             add<ChunkManagerTests::UniversalRangeMultiShard>();

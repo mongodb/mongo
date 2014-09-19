@@ -214,11 +214,12 @@ namespace mongo {
                         shardingState.getCollectionMetadata( ns.toString() ));
 
                 if ( metadata ) {
-                    BSONObj shardKey(metadata->getKeyPattern());
-                    if ( !isUniqueIndexCompatible( shardKey, newIdxKey )) {
+                    ShardKeyPattern shardKeyPattern(metadata->getKeyPattern());
+                    if (!shardKeyPattern.isUniqueIndexCompatible(newIdxKey)) {
                         return Status(ErrorCodes::CannotCreateIndex,
-                                str::stream() << "cannot create unique index over " << newIdxKey
-                                              << " with shard key pattern " << shardKey);
+                            str::stream() << "cannot create unique index over " << newIdxKey
+                                          << " with shard key pattern "
+                                          << shardKeyPattern.toBSON());
                     }
                 }
             }

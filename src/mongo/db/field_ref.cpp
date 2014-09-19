@@ -198,25 +198,36 @@ namespace mongo {
     }
 
     StringData FieldRef::dottedField( size_t offset ) const {
-        if (_size == 0 || offset >= numParts() )
+        return dottedSubstring(offset, numParts());
+    }
+
+    StringData FieldRef::dottedSubstring(size_t startPart, size_t endPart) const {
+        if (_size == 0 || startPart >= endPart || endPart > numParts())
             return StringData();
 
         if (!_replacements.empty())
             reserialize();
         dassert(_replacements.empty());
 
-        // Assume we want the whole thing
         StringData result(_dotted);
 
-        // Strip off any leading parts we were asked to ignore
-        for (size_t i = 0; i < offset; ++i) {
-            const StringData part = getPart(i);
-            result = StringData(
-                result.rawData() + part.size() + 1,
-                result.size() - part.size() - 1);
-        }
+        // Fast-path if we want the whole thing
+        if (startPart == 0 && endPart == numParts())
+            return result;
 
-        return result;
+        size_t startChar = 0;
+        for (size_t i = 0; i < startPart; ++i) {
+            startChar += getPart(i).size() + 1; // correct for '.'
+        }
+        size_t endChar = startChar;
+        for (size_t i = startPart; i < endPart; ++i) {
+            endChar += getPart(i).size() + 1;
+        }
+        // correct for last '.'
+        if (endPart != numParts())
+            --endChar;
+
+        return result.substr(startChar, endChar - startChar);
     }
 
     bool FieldRef::equalsDottedField( const StringData& other ) const {

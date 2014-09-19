@@ -86,18 +86,9 @@ namespace mongo {
     Status ChunkManagerTargeter::targetInsert( const BSONObj& doc,
                                                ShardEndpoint** endpoint ) const {
 
-        if ( !_primary && !_manager )  {
-            return Status( ErrorCodes::NamespaceNotFound,
-                           str::stream() << "could not target insert in collection "
-                                         << getNS().ns()
-                                         << "; no metadata found" );
-        }
+        BSONObj shardKey;
 
-        if ( _primary ) {
-            *endpoint = new ShardEndpoint( _primary->getName(),
-                                           ChunkVersion::UNSHARDED() );
-        }
-        else {
+        if ( _manager ) {
 
             //
             // Sharded collections have the following requirements for targeting:
@@ -105,22 +96,37 @@ namespace mongo {
             // Inserts must contain the exact shard key.
             //
 
-            if ( !_manager->hasShardKey( doc ) ) {
-                return Status( ErrorCodes::ShardKeyNotFound,
-                               stream() << "document " << doc
-                                        << " does not contain shard key for pattern "
-                                        << _manager->getShardKey().key() );
+            shardKey = _manager->getShardKeyPattern().extractShardKeyFromDoc(doc);
+
+            // Check shard key exists
+            if (shardKey.isEmpty()) {
+                return Status(ErrorCodes::ShardKeyNotFound,
+                              stream() << "document " << doc
+                                       << " does not contain shard key for pattern "
+                                       << _manager->getShardKeyPattern().toString());
             }
 
-            ChunkPtr chunk = _manager->findChunkForDoc( doc );
-            *endpoint = new ShardEndpoint(chunk->getShard().getName(),
-                                          _manager->getVersion(chunk->getShard().getName()));
-
-            // Track autosplit stats for sharded collections
-            _stats->chunkSizeDelta[chunk->getMin()] += doc.objsize();
+            // Check shard key size on insert
+            Status status = ShardKeyPattern::checkShardKeySize(shardKey);
+            if (!status.isOK())
+                return status;
         }
 
-        return Status::OK();
+        // Target the shard key or database primary
+        if (!shardKey.isEmpty()) {
+            return targetShardKey(shardKey, doc.objsize(), endpoint);
+        }
+        else {
+
+            if (!_primary) {
+                return Status(ErrorCodes::NamespaceNotFound,
+                              str::stream() << "could not target insert in collection "
+                                            << getNS().ns() << "; no metadata found");
+            }
+
+            *endpoint = new ShardEndpoint(_primary->getName(), ChunkVersion::UNSHARDED());
+            return Status::OK();
+        }
     }
 
     namespace {
@@ -177,8 +183,12 @@ namespace mongo {
          *     { _id : { $lt : 30 } } => false
          *     { foo : <anything> } => false
          */
-        bool isExactIdQuery( const BSONObj& query ) {
-            return query.hasField( "_id" ) && getGtLtOp( query["_id"] ) == BSONObj::Equality;
+        bool isExactIdQuery(const BSONObj& query) {
+            static const ShardKeyPattern virtualIdShardKey(BSON("_id" << 1));
+            StatusWith<BSONObj> status = virtualIdShardKey.extractShardKeyFromQuery(query);
+            if (!status.isOK())
+                return false;
+            return !status.getValue()["_id"].eoo();
         }
     }
 
@@ -197,6 +207,9 @@ namespace mongo {
         // The rule is simple - If the update is replacement style (no '$set'), we target using the
         // update.  If the update is replacement style, we target using the query.
         //
+        // If we have the exact shard key in either the query or replacement doc, we target using
+        // that extracted key.
+        //
 
         BSONObj query = updateDoc.getQuery();
         BSONObj updateExpr = updateDoc.getUpdateExpr();
@@ -209,9 +222,7 @@ namespace mongo {
                                     << " has mixed $operator and non-$operator style fields" );
         }
 
-        BSONObj targetedDoc = updateType == UpdateType_OpStyle ? query : updateExpr;
-
-        bool exactShardKeyQuery = false;
+        BSONObj shardKey;
 
         if ( _manager ) {
 
@@ -222,54 +233,76 @@ namespace mongo {
             // Non-multi updates must be targeted exactly by shard key *or* exact _id.
             //
 
-            exactShardKeyQuery = _manager->hasTargetableShardKey(targetedDoc);
+            // Get the shard key
+            if (updateType == UpdateType_OpStyle) {
 
-            if ( updateDoc.getUpsert() && !exactShardKeyQuery ) {
-                return Status( ErrorCodes::ShardKeyNotFound,
-                               stream() << "upsert " << updateDoc.toBSON()
-                                        << " does not contain shard key for pattern "
-                                        << _manager->getShardKey().key() );
+                // Target using the query
+                StatusWith<BSONObj> status =
+                    _manager->getShardKeyPattern().extractShardKeyFromQuery(query);
+
+                // Bad query
+                if (!status.isOK())
+                    return status.getStatus();
+
+                shardKey = status.getValue();
+            }
+            else {
+                // Target using the replacement document
+                shardKey = _manager->getShardKeyPattern().extractShardKeyFromDoc(updateExpr);
             }
 
-            bool exactIdQuery = isExactIdQuery( updateDoc.getQuery() );
+            //
+            // Extra sharded update validation
+            //
 
-            if ( !updateDoc.getMulti() && !exactShardKeyQuery && !exactIdQuery ) {
-                return Status( ErrorCodes::ShardKeyNotFound,
-                               stream() << "update " << updateDoc.toBSON()
-                                        << " does not contain _id or shard key for pattern "
-                                        << _manager->getShardKey().key() );
+            if (updateDoc.getUpsert()) {
+
+                // Sharded upserts *always* need to be exactly targeted by shard key
+                if (shardKey.isEmpty()) {
+                    return Status(ErrorCodes::ShardKeyNotFound,
+                                  stream() << "upsert " << updateDoc.toBSON()
+                                           << " does not contain shard key for pattern "
+                                           << _manager->getShardKeyPattern().toString());
+                }
+
+                // Also check shard key size on upsert
+                Status status = ShardKeyPattern::checkShardKeySize(shardKey);
+                if (!status.isOK())
+                    return status;
             }
 
-            // Track autosplit stats for sharded collections
-            // Note: this is only best effort accounting and is not accurate.
-            if ( exactShardKeyQuery ) {
-                ChunkPtr chunk = _manager->findChunkForDoc(targetedDoc);
-                _stats->chunkSizeDelta[chunk->getMin()] +=
-                    ( query.objsize() + updateExpr.objsize() );
+            // Validate that single (non-multi) sharded updates are targeted by shard key or _id
+            if (!updateDoc.getMulti() && shardKey.isEmpty()
+                && !isExactIdQuery(updateDoc.getQuery())) {
+                return Status(ErrorCodes::ShardKeyNotFound,
+                              stream() << "update " << updateDoc.toBSON()
+                                       << " does not contain _id or shard key for pattern "
+                                       << _manager->getShardKeyPattern().toString());
             }
         }
 
-        Status result = Status::OK();
-        if (exactShardKeyQuery) {
+        // Target the shard key, query, or replacement doc
+        if (!shardKey.isEmpty()) {
             // We can't rely on our query targeting to be exact
             ShardEndpoint* endpoint = NULL;
-            result = targetShardKey(targetedDoc, &endpoint);
+            Status result = targetShardKey(shardKey,
+                                           (query.objsize() + updateExpr.objsize()),
+                                           &endpoint);
             endpoints->push_back(endpoint);
-
-            invariant(result.isOK());
-            invariant(NULL != endpoint);
+            return result;
+        }
+        else if (updateType == UpdateType_OpStyle) {
+            return targetQuery(query, endpoints);
         }
         else {
-            result = targetQuery(targetedDoc, endpoints);
+            return targetDoc(updateExpr, endpoints);
         }
-
-        return result;
     }
 
     Status ChunkManagerTargeter::targetDelete( const BatchedDeleteDocument& deleteDoc,
                                                vector<ShardEndpoint*>* endpoints ) const {
 
-        bool exactShardKeyQuery = false;
+        BSONObj shardKey;
 
         if ( _manager ) {
 
@@ -279,32 +312,44 @@ namespace mongo {
             // Limit-1 deletes must be targeted exactly by shard key *or* exact _id
             //
 
-            exactShardKeyQuery = _manager->hasTargetableShardKey(deleteDoc.getQuery());
-            bool exactIdQuery = isExactIdQuery( deleteDoc.getQuery() );
+            // Get the shard key
+            StatusWith<BSONObj> status =
+                _manager->getShardKeyPattern().extractShardKeyFromQuery(deleteDoc.getQuery());
 
-            if ( deleteDoc.getLimit() == 1 && !exactShardKeyQuery && !exactIdQuery ) {
-                return Status( ErrorCodes::ShardKeyNotFound,
-                               stream() << "delete " << deleteDoc.toBSON()
-                                        << " does not contain _id or shard key for pattern "
-                                        << _manager->getShardKey().key() );
+            // Bad query
+            if (!status.isOK())
+                return status.getStatus();
+
+            shardKey = status.getValue();
+
+            // Validate that single (limit-1) sharded deletes are targeted by shard key or _id
+            if (deleteDoc.getLimit() == 1 && shardKey.isEmpty()
+                && !isExactIdQuery(deleteDoc.getQuery())) {
+                return Status(ErrorCodes::ShardKeyNotFound,
+                              stream() << "delete " << deleteDoc.toBSON()
+                                       << " does not contain _id or shard key for pattern "
+                                       << _manager->getShardKeyPattern().toString());
             }
         }
 
-        Status result = Status::OK();
-        if (exactShardKeyQuery) {
+        // Target the shard key or delete query
+        if (!shardKey.isEmpty()) {
             // We can't rely on our query targeting to be exact
             ShardEndpoint* endpoint = NULL;
-            result = targetShardKey(deleteDoc.getQuery(), &endpoint);
+            Status result = targetShardKey(shardKey, 0, &endpoint);
             endpoints->push_back(endpoint);
-
-            invariant(result.isOK());
-            invariant(NULL != endpoint);
+            return result;
         }
         else {
-            result = targetQuery(deleteDoc.getQuery(), endpoints);
+            return targetQuery(deleteDoc.getQuery(), endpoints);
         }
+    }
 
-        return result;
+    Status ChunkManagerTargeter::targetDoc(const BSONObj& doc,
+                                           vector<ShardEndpoint*>* endpoints) const {
+        // NOTE: This is weird and fragile, but it's the way our language works right now -
+        // documents are either A) invalid or B) valid equality queries over themselves.
+        return targetQuery(doc, endpoints);
     }
 
     Status ChunkManagerTargeter::targetQuery( const BSONObj& query,
@@ -339,13 +384,17 @@ namespace mongo {
         return Status::OK();
     }
 
-    Status ChunkManagerTargeter::targetShardKey(const BSONObj& doc,
+    Status ChunkManagerTargeter::targetShardKey(const BSONObj& shardKey,
+                                                long long estDataSize,
                                                 ShardEndpoint** endpoint) const {
-
         invariant(NULL != _manager);
-        dassert(_manager->hasShardKey(doc));
 
-        ChunkPtr chunk = _manager->findChunkForDoc(doc);
+        ChunkPtr chunk = _manager->findIntersectingChunk(shardKey);
+
+        // Track autosplit stats for sharded collections
+        // Note: this is only best effort accounting and is not accurate.
+        if (estDataSize > 0)
+            _stats->chunkSizeDelta[chunk->getMin()] += estDataSize;
 
         Shard shard = chunk->getShard();
         *endpoint = new ShardEndpoint(shard.getName(),

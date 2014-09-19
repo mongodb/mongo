@@ -38,6 +38,8 @@
 namespace mongo {
 namespace pathsupport {
 
+    using mongoutils::str::stream;
+
     namespace {
 
         bool isNumeric(const StringData& str, size_t* num) {
@@ -255,6 +257,200 @@ namespace pathsupport {
             if (!status.isOK()) {
                 return status;
             }
+        }
+
+        return Status::OK();
+    }
+
+    Status setElementAtPath(const FieldRef& path,
+                            const BSONElement& value,
+                            mutablebson::Document* doc) {
+
+        size_t deepestElemPathPart;
+        mutablebson::Element deepestElem(doc->end());
+
+        // Get the existing parents of this path
+        Status status = findLongestPrefix(path,
+                                          doc->root(),
+                                          &deepestElemPathPart,
+                                          &deepestElem);
+
+        // TODO: All this is pretty awkward, why not return the position immediately after the
+        // consumed path or use a signed sentinel?  Why is it a special case when we've consumed the
+        // whole path?
+
+        if (!status.isOK() && status.code() != ErrorCodes::NonExistentPath)
+            return status;
+
+        // Inc the path by one *unless* we matched nothing
+        if (status.code() != ErrorCodes::NonExistentPath) {
+            ++deepestElemPathPart;
+        }
+        else {
+            deepestElemPathPart = 0;
+            deepestElem = doc->root();
+        }
+
+        if (deepestElemPathPart == path.numParts()) {
+            // The full path exists already in the document, so just set a value
+            return deepestElem.setValueBSONElement(value);
+        }
+        else {
+            // Construct the rest of the path we need with empty documents and set the value
+            StringData leafFieldName = path.getPart(path.numParts() - 1);
+            mutablebson::Element leafElem = doc->makeElementWithNewFieldName(leafFieldName,
+                                                                             value);
+            dassert(leafElem.ok());
+            return createPathAt(path, deepestElemPathPart, deepestElem, leafElem);
+        }
+    }
+
+    const BSONElement& findParentEqualityElement(const EqualityMatches& equalities,
+                                                 const FieldRef& path,
+                                                 int* parentPathParts) {
+
+        // We may have an equality match to an object at a higher point in the pattern path, check
+        // all path prefixes for equality matches
+        // ex: path: 'a.b', query : { 'a' : { b : <value> } }
+        // ex: path: 'a.b.c', query : { 'a.b' : { c : <value> } }
+        for (int i = static_cast<int>(path.numParts()); i >= 0; --i) {
+
+            // "" element is *not* a parent of anyone but itself
+            if (i == 0 && path.numParts() != 0)
+                continue;
+
+            StringData subPathStr = path.dottedSubstring(0, i);
+            EqualityMatches::const_iterator seenIt = equalities.find(subPathStr);
+            if (seenIt == equalities.end())
+                continue;
+
+            *parentPathParts = i;
+            return seenIt->second->getData();
+        }
+
+        *parentPathParts = -1;
+        static const BSONElement eooElement;
+        return eooElement;
+    }
+
+    /**
+     * Helper function to check if the current equality match paths conflict with a new path.
+     */
+    static Status checkEqualityConflicts(const EqualityMatches& equalities, const FieldRef& path) {
+
+        int parentPathPart = -1;
+        const BSONElement& parentEl = findParentEqualityElement(equalities,
+                                                                path,
+                                                                &parentPathPart);
+
+        if (parentEl.eoo())
+            return Status::OK();
+
+        string errMsg = "cannot infer query fields to set, ";
+
+        StringData pathStr = path.dottedField();
+        StringData prefixStr = path.dottedSubstring(0, parentPathPart);
+        StringData suffixStr = path.dottedSubstring(parentPathPart, path.numParts());
+
+        if (suffixStr.size() != 0)
+            errMsg += stream() << "both paths '" << pathStr << "' and '" << prefixStr
+                               << "' are matched";
+        else
+            errMsg += stream() << "path '" << pathStr << "' is matched twice";
+
+        return Status(ErrorCodes::NotSingleValueField, errMsg);
+    }
+
+    /**
+     * Helper function to check if path conflicts are all prefixes.
+     */
+    static Status checkPathIsPrefixOf(const FieldRef& path, const FieldRefSet& conflictPaths) {
+
+        for (FieldRefSet::const_iterator it = conflictPaths.begin(); it != conflictPaths.end();
+            ++it) {
+
+            const FieldRef* conflictingPath = *it;
+            // Conflicts are always prefixes (or equal to) the path, or vice versa
+            if (path.numParts() > conflictingPath->numParts()) {
+
+                string errMsg = stream() << "field at '" << conflictingPath->dottedField()
+                                         << "' must be exactly specified, field at sub-path '"
+                                         << path.dottedField() << "'found";
+                return Status(ErrorCodes::NotExactValueField, errMsg);
+            }
+        }
+
+        return Status::OK();
+    }
+
+    static Status _extractFullEqualityMatches(const MatchExpression& root,
+                                              const FieldRefSet* fullPathsToExtract,
+                                              EqualityMatches* equalities) {
+
+        if (root.matchType() == MatchExpression::EQ) {
+
+            // Extract equality matches
+            const EqualityMatchExpression& eqChild =
+                static_cast<const EqualityMatchExpression&>(root);
+
+            FieldRef path(eqChild.path());
+
+            if (fullPathsToExtract) {
+
+                FieldRefSet conflictPaths;
+                fullPathsToExtract->findConflicts(&path, &conflictPaths);
+
+                // Ignore if this path is unrelated to the full paths
+                if (conflictPaths.empty())
+                    return Status::OK();
+
+                // Make sure we're a prefix of all the conflict paths
+                Status status = checkPathIsPrefixOf(path, conflictPaths);
+                if (!status.isOK())
+                    return status;
+            }
+
+            Status status = checkEqualityConflicts(*equalities, path);
+            if (!status.isOK())
+                return status;
+
+            equalities->insert(make_pair(eqChild.path(), &eqChild));
+        }
+        else if (root.matchType() == MatchExpression::AND) {
+
+            // Further explore $and matches
+            for (size_t i = 0; i < root.numChildren(); ++i) {
+                MatchExpression* child = root.getChild(i);
+                Status status = _extractFullEqualityMatches(*child, fullPathsToExtract, equalities);
+                if (!status.isOK())
+                    return status;
+            }
+        }
+
+        return Status::OK();
+    }
+
+    Status extractFullEqualityMatches(const MatchExpression& root,
+                                      const FieldRefSet& fullPathsToExtract,
+                                      EqualityMatches* equalities) {
+        return _extractFullEqualityMatches(root, &fullPathsToExtract, equalities);
+    }
+
+    Status extractEqualityMatches(const MatchExpression& root, EqualityMatches* equalities) {
+        return _extractFullEqualityMatches(root, NULL, equalities);
+    }
+
+    Status addEqualitiesToDoc(const EqualityMatches& equalities, mutablebson::Document* doc) {
+
+        for (EqualityMatches::const_iterator it = equalities.begin(); it != equalities.end();
+            ++it) {
+
+            FieldRef path(it->first);
+            const BSONElement& data = it->second->getData();
+
+            Status status = setElementAtPath(path, data, doc);
+            if (!status.isOK())
+                return status;
         }
 
         return Status::OK();

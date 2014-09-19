@@ -460,7 +460,7 @@ namespace mongo {
             for ( unsigned i = 0; i < ranges.size(); i++ ) {
                 BSONObj min = ranges[i].min;
 
-                min = cm->getShardKey().extendRangeBound( min, false );
+                min = cm->getShardKeyPattern().getKeyPattern().extendRangeBound( min, false );
 
                 if ( allChunkMinimums.count( min ) > 0 )
                     continue;

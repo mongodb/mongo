@@ -58,6 +58,7 @@
 #include "mongo/s/collection_metadata.h"
 #include "mongo/s/d_state.h"
 #include "mongo/s/grid.h"
+#include "mongo/s/shard_key_pattern.h"
 #include "mongo/s/stale_exception.h"
 #include "mongo/util/log.h"
 #include "mongo/util/scopeguard.h"
@@ -1371,7 +1372,7 @@ namespace mongo {
                             // check to see if this is a new object we don't own yet
                             // because of a chunk migration
                             if ( collMetadata ) {
-                                KeyPattern kp( collMetadata->getKeyPattern() );
+                                ShardKeyPattern kp( collMetadata->getKeyPattern() );
                                 if (!collMetadata->keyBelongsToMe(kp.extractShardKeyFromDoc(o))) {
                                     continue;
                                 }

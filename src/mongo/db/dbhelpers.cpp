@@ -43,6 +43,7 @@
 #include "mongo/db/db.h"
 #include "mongo/db/exec/working_set_common.h"
 #include "mongo/db/json.h"
+#include "mongo/db/keypattern.h"
 #include "mongo/db/index/btree_access_method.h"
 #include "mongo/db/ops/delete.h"
 #include "mongo/db/ops/update.h"
@@ -60,6 +61,7 @@
 #include "mongo/db/storage_options.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/s/d_state.h"
+#include "mongo/s/shard_key_pattern.h"
 #include "mongo/util/log.h"
 
 namespace mongo {
@@ -420,7 +422,7 @@ namespace mongo {
 
                     bool docIsOrphan;
                     if ( metadataNow ) {
-                        KeyPattern kp( metadataNow->getKeyPattern() );
+                        ShardKeyPattern kp( metadataNow->getKeyPattern() );
                         BSONObj key = kp.extractShardKeyFromDoc(obj);
                         docIsOrphan = !metadataNow->keyBelongsToMe( key )
                             && !metadataNow->keyIsPending( key );

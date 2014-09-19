@@ -69,9 +69,11 @@ namespace mongo {
          * conflicts along the way then those errors will be returned.
          */
         Status populateDocumentWithQueryFields(const BSONObj& query,
+                                               const vector<FieldRef*>* immutablePaths,
                                                mutablebson::Document& doc) const;
 
         Status populateDocumentWithQueryFields(const CanonicalQuery* query,
+                                               const vector<FieldRef*>* immutablePaths,
                                                mutablebson::Document& doc) const;
 
         /**

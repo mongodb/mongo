@@ -149,7 +149,8 @@ namespace ShardingTests {
 
         void run(){
 
-            ChunkManager manager( collName(), ShardKeyPattern( BSON( "_id" << 1 ) ), false );
+            ShardKeyPattern shardKeyPattern(BSON("_id" << 1));
+            ChunkManager manager(collName(), shardKeyPattern, false);
             manager.createFirstChunks( shard().getConnString(), shard(), NULL, NULL );
 
             BSONObj firstChunk = _client.findOne(ChunkType::ConfigNS, BSONObj()).getOwned();
@@ -199,7 +200,8 @@ namespace ShardingTests {
             vector<BSONObj> splitKeys;
             genRandomSplitKeys( keyName, &splitKeys );
 
-            ChunkManager manager( collName(), ShardKeyPattern( BSON( keyName << 1 ) ), false );
+            ShardKeyPattern shardKeyPattern(BSON(keyName << 1));
+            ChunkManager manager(collName(), shardKeyPattern, false);
 
             manager.createFirstChunks( shard().getConnString(), shard(), &splitKeys, NULL );
         }
@@ -283,7 +285,9 @@ namespace ShardingTests {
             _client.update(ChunkType::ConfigNS, BSONObj(), BSON( "$set" << b.obj()));
 
             // Make new manager load chunk diff
-            ChunkManager newManager(manager.getns(), manager.getShardKey(), manager.isUnique());
+            ChunkManager newManager(manager.getns(),
+                                    manager.getShardKeyPattern(),
+                                    manager.isUnique());
             newManager.loadExistingRanges(shard().getConnString(), &manager);
 
             ASSERT( newManager.getVersion().toLong() == laterVersion.toLong() );

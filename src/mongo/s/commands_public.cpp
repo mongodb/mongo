@@ -1182,9 +1182,19 @@ namespace mongo {
                 massert( 13002 ,  "shard internal error chunk manager should never be null" , cm );
 
                 BSONObj filter = cmdObj.getObjectField("query");
-                uassert(13343,  "query for sharded findAndModify must have shardkey", cm->hasShardKey(filter));
 
-                ChunkPtr chunk = cm->findChunkForDoc(filter);
+                StatusWith<BSONObj> status =
+                    cm->getShardKeyPattern().extractShardKeyFromQuery(filter);
+
+                // Bad query
+                if (!status.isOK())
+                    return appendCommandStatus(result, status.getStatus());
+
+                BSONObj shardKey = status.getValue();
+                uassert(13343, "query for sharded findAndModify must have shardkey",
+                        !shardKey.isEmpty());
+
+                ChunkPtr chunk = cm->findIntersectingChunk(shardKey);
                 ShardConnection conn( chunk->getShard() , fullns );
                 BSONObj res;
                 bool ok = conn->runCommand( conf->getName() , cmdObj , res );
@@ -1236,11 +1246,14 @@ namespace mongo {
                 BSONObj keyPattern = cmdObj.getObjectField( "keyPattern" );
 
                 uassert( 13408, "keyPattern must equal shard key",
-                         cm->getShardKey().key() == keyPattern );
+                         cm->getShardKeyPattern().toBSON() == keyPattern );
                 uassert( 13405, str::stream() << "min value " << min << " does not have shard key",
-                         cm->hasShardKey(min) );
+                         cm->getShardKeyPattern().isShardKey(min) );
                 uassert( 13406, str::stream() << "max value " << max << " does not have shard key",
-                         cm->hasShardKey(max) );
+                         cm->getShardKeyPattern().isShardKey(max) );
+
+                min = cm->getShardKeyPattern().normalizeShardKey(min);
+                max = cm->getShardKeyPattern().normalizeShardKey(max);
 
                 // yes these are doubles...
                 double size = 0;
@@ -1478,7 +1491,7 @@ namespace mongo {
 
                 ChunkManagerPtr cm = conf->getChunkManager( fullns );
                 massert( 13091 , "how could chunk manager be null!" , cm );
-                if(cm->getShardKey().key() == BSON("files_id" << 1)) {
+                if(cm->getShardKeyPattern().toBSON() == BSON("files_id" << 1)) {
                     BSONObj finder = BSON("files_id" << cmdObj.firstElement());
 
                     vector<Strategy::CommandResult> results;
@@ -1489,7 +1502,7 @@ namespace mongo {
                     result.appendElements(res);
                     return res["ok"].trueValue();
                 }
-                else if (cm->getShardKey().key() == BSON("files_id" << 1 << "n" << 1)) {
+                else if (cm->getShardKeyPattern().toBSON() == BSON("files_id" << 1 << "n" << 1)) {
                     int n = 0;
                     BSONObj lastResult;
 
@@ -2025,11 +2038,12 @@ namespace mongo {
                         confOut->getAllShards( shardSet );
                         vector<Shard> outShards( shardSet.begin() , shardSet.end() );
 
-                        confOut->shardCollection( finalColLong ,
-                                                  sortKey ,
-                                                  true ,
-                                                  &sortedSplitPts ,
-                                                  &outShards );
+                        ShardKeyPattern sortKeyPattern(sortKey);
+                        confOut->shardCollection(finalColLong,
+                                                 sortKeyPattern,
+                                                 true,
+                                                 &sortedSplitPts,
+                                                 &outShards);
 
                     }
 

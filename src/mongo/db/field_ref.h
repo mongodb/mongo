@@ -89,10 +89,16 @@ namespace mongo {
         size_t commonPrefixSize( const FieldRef& other ) const;
 
         /**
-         * Returns a copy of the full dotted field in its current state (i.e., some parts may
+         * Returns a StringData of the full dotted field in its current state (i.e., some parts may
          * have been replaced since the parse() call).
          */
         StringData dottedField( size_t offsetFromStart = 0 ) const;
+
+        /**
+         * Returns a StringData of parts of the dotted field from startPart to endPart in its
+         * current state (i.e., some parts may have been replaced since the parse() call).
+         */
+        StringData dottedSubstring(size_t startPart, size_t endPart) const;
 
         /**
          * Compares the full dotted path represented by this FieldRef to other

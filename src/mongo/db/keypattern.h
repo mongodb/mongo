@@ -1,5 +1,3 @@
-// @file keypattern.h - Utilities for manipulating index/shard key patterns.
-
 /**
 *    Copyright (C) 2012 10gen Inc.
 *
@@ -32,46 +30,24 @@
 
 #include "mongo/base/string_data.h"
 #include "mongo/db/jsobj.h"
-#include "mongo/platform/unordered_set.h"
-#include "mongo/util/mongoutils/str.h"
-#include "mongo/db/query/index_bounds.h"
-#include "mongo/db/matcher/matchable.h"
 
 namespace mongo {
 
     /**
-     * A BoundList contains intervals specified by inclusive start
-     * and end bounds.  The intervals should be nonoverlapping and occur in
-     * the specified direction of traversal.  For example, given a simple index {i:1}
-     * and direction +1, one valid BoundList is: (1, 2); (4, 6).  The same BoundList
-     * would be valid for index {i:-1} with direction -1.
-     */
-    typedef std::vector<std::pair<BSONObj,BSONObj> > BoundList;
-
-    /** A KeyPattern is an expression describing a transformation of a document into a
-     *  document key.  Document keys are used to store documents in indices and to target
-     *  sharded queries.
+     * A KeyPattern is an expression describing a transformation of a document into a
+     * document key.  Document keys are used to store documents in indices and to target
+     * sharded queries.
      *
-     *  Examples:
+     * The root field names of KeyPatterns are always (potentially-dotted) paths, and the values of
+     * the fields describe the type of indexing over the found elements.
+     *
+     * Examples:
      *    { a : 1 }
      *    { a : 1 , b  : -1 }
      *    { a : "hashed" }
      */
     class KeyPattern {
     public:
-
-        //maximum number of intervals produced by $in queries.
-        static const unsigned MAX_IN_COMBINATIONS = 4000000;
-
-        /*
-         * We are allowing implicit conversion from BSON
-         */
-        KeyPattern( const BSONObj& pattern );
-
-        /*
-         *  Returns a BSON representation of this KeyPattern.
-         */
-        BSONObj toBSON() const { return _pattern; }
 
         /**
          * Is the provided key pattern the index over the ID field?
@@ -83,6 +59,27 @@ namespace mongo {
          * Is the provided key pattern ordered increasing or decreasing or not?
          */
         static bool isOrderedKeyPattern(const BSONObj& pattern);
+
+        /**
+         * Does the provided key pattern hash its keys?
+         */
+        static bool isHashedKeyPattern(const BSONObj& pattern);
+
+        /**
+         * Constructs a new key pattern based on a BSON document
+         */
+        KeyPattern(const BSONObj& pattern);
+
+        /**
+         * Returns a BSON representation of this KeyPattern.
+         */
+        const BSONObj& toBSON() const { return _pattern; }
+
+        /**
+         * Returns a string representation of this KeyPattern
+         */
+        std::string toString() const{ return toBSON().toString(); }
+
 
         /* Takes a BSONObj whose field names are a prefix of the fields in this keyPattern, and
          * outputs a new bound with MinKey values appended to match the fields in this keyPattern
@@ -109,66 +106,9 @@ namespace mongo {
          */
         BSONObj extendRangeBound( const BSONObj& bound , bool makeUpperInclusive ) const;
 
-        std::string toString() const{ return toBSON().toString(); }
+        BSONObj globalMin() const;
 
-        /**
-         * Given a document, extracts the shard key corresponding to the key pattern.
-         * Warning: assumes that there is a *single* key to be extracted!
-         *
-         * Examples:
-         *  If 'this' KeyPattern is { a  : 1 }
-         *   { a: "hi" , b : 4} --> returns { a : "hi" }
-         *   { c : 4 , a : 2 } -->  returns { a : 2 }
-         *   { b : 2 }  (bad input, don't call with this)
-         *   { a : [1,2] }  (bad input, don't call with this)
-         *  If 'this' KeyPattern is { a  : "hashed" }
-         *   { a: 1 } --> returns { a : NumberLong("5902408780260971510")  }
-         *  If 'this' KeyPattern is { 'a.b' : 1 }
-         *   { a : { b : "hi" } } --> returns { a : "hi" }
-         */
-        BSONObj extractShardKeyFromDoc(const BSONObj& doc) const;
-
-        /**
-         * Given a MatchableDocument, extracts the shard key corresponding to the key pattern.
-         * See above.
-         */
-        BSONObj extractShardKeyFromMatchable(const MatchableDocument& matchable) const;
-
-        /**
-         * Given a query expression, extracts the shard key corresponding to the key pattern.
-         *
-         * NOTE: This generally is similar to the above, however "a.b" fields in the query (which
-         * are invalid document fields) may match "a.b" fields in the shard key pattern.
-         *
-         * Examples:
-         *  If the key pattern is { a : 1 }
-         *   { a : "hi", b : 4 } --> returns { a : "hi" }
-         *  If the key pattern is { 'a.b' : 1 }
-         *   { a : { b : "hi" } } --> returns { 'a.b' : "hi" }
-         *   { 'a.b' : "hi" } --> returns { 'a.b' : "hi" }
-         */
-        BSONObj extractShardKeyFromQuery(const BSONObj& query) const;
-
-        /**
-         * Return an ordered list of bounds generated using this KeyPattern and the
-         * bounds from the IndexBounds.  This function is used in sharding to
-         * determine where to route queries according to the shard key pattern.
-         *
-         * Examples:
-         *
-         * Key { a: 1 }, Bounds a: [0] => { a: 0 } -> { a: 0 }
-         * Key { a: 1 }, Bounds a: [2, 3) => { a: 2 } -> { a: 3 }  // bound inclusion ignored.
-         *
-         * The bounds returned by this function may be a superset of those defined
-         * by the constraints.  For instance, if this KeyPattern is {a : 1, b: 1}
-         * Bounds: { a : {$in : [1,2]} , b : {$in : [3,4,5]} }
-         *         => {a : 1 , b : 3} -> {a : 1 , b : 5}, {a : 2 , b : 3} -> {a : 2 , b : 5}
-         *
-         * If the IndexBounds are not defined for all the fields in this keypattern, which
-         * means some fields are unsatisfied, an empty BoundList could return.
-         *
-         */
-        static BoundList flattenBounds( const BSONObj& keyPattern, const IndexBounds& indexBounds );
+        BSONObj globalMax() const;
 
     private:
         BSONObj _pattern;

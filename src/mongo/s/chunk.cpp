@@ -202,33 +202,35 @@ namespace mongo {
         return _manager->getns();
     }
 
-    bool Chunk::containsPoint( const BSONObj& point ) const {
-        return getMin().woCompare( point ) <= 0 && point.woCompare( getMax() ) < 0;
+    bool Chunk::containsKey( const BSONObj& shardKey ) const {
+        return getMin().woCompare( shardKey ) <= 0 && shardKey.woCompare( getMax() ) < 0;
     }
 
-    bool ChunkRange::containsPoint( const BSONObj& point ) const {
+    bool ChunkRange::containsKey( const BSONObj& shardKey ) const {
         // same as Chunk method
-        return getMin().woCompare( point ) <= 0 && point.woCompare( getMax() ) < 0;
+        return getMin().woCompare( shardKey ) <= 0 && shardKey.woCompare( getMax() ) < 0;
     }
 
     bool Chunk::minIsInf() const {
-        return _manager->getShardKey().globalMin().woCompare( getMin() ) == 0;
+        return 0 ==
+            _manager->getShardKeyPattern().getKeyPattern().globalMin().woCompare( getMin() );
     }
 
     bool Chunk::maxIsInf() const {
-        return _manager->getShardKey().globalMax().woCompare( getMax() ) == 0;
+        return 0 ==
+            _manager->getShardKeyPattern().getKeyPattern().globalMax().woCompare( getMax() );
     }
 
     BSONObj Chunk::_getExtremeKey( int sort ) const {
         Query q;
         if ( sort == 1 ) {
-            q.sort( _manager->getShardKey().key() );
+            q.sort( _manager->getShardKeyPattern().toBSON() );
         }
         else {
             // need to invert shard key pattern to sort backwards
             // TODO: make a helper in ShardKeyPattern?
 
-            BSONObj k = _manager->getShardKey().key();
+            BSONObj k = _manager->getShardKeyPattern().toBSON();
             BSONObjBuilder r;
 
             BSONObjIterator i(k);
@@ -246,7 +248,7 @@ namespace mongo {
         conn.done();
         if ( end.isEmpty() )
             return BSONObj();
-        return _manager->getShardKey().extractKeyFromQueryOrDoc( end );
+        return _manager->getShardKeyPattern().extractShardKeyFromDoc(end);
     }
 
     void Chunk::pickMedianKey( BSONObj& medianKey ) const {
@@ -255,7 +257,7 @@ namespace mongo {
         BSONObj result;
         BSONObjBuilder cmd;
         cmd.append( "splitVector" , _manager->getns() );
-        cmd.append( "keyPattern" , _manager->getShardKey().key() );
+        cmd.append( "keyPattern" , _manager->getShardKeyPattern().toBSON() );
         cmd.append( "min" , getMin() );
         cmd.append( "max" , getMax() );
         cmd.appendBool( "force" , true );
@@ -285,7 +287,7 @@ namespace mongo {
         BSONObj result;
         BSONObjBuilder cmd;
         cmd.append( "splitVector" , _manager->getns() );
-        cmd.append( "keyPattern" , _manager->getShardKey().key() );
+        cmd.append( "keyPattern" , _manager->getShardKeyPattern().toBSON() );
         cmd.append( "min" , getMin() );
         cmd.append( "max" , getMax() );
         cmd.append( "maxChunkSizeBytes" , chunkSize );
@@ -351,7 +353,7 @@ namespace mongo {
         // the very first (or last) key as a split point.
         // This heuristic is skipped for "special" shard key patterns that are not likely to
         // produce monotonically increasing or decreasing values (e.g. hashed shard keys).
-        if (KeyPattern::isOrderedKeyPattern(skey().key())) {
+        if (KeyPattern::isOrderedKeyPattern(_manager->getShardKeyPattern().toBSON())) {
             if ( minIsInf() ) {
                 BSONObj key = _getExtremeKey( 1 );
                 if ( ! key.isEmpty() ) {
@@ -425,7 +427,7 @@ namespace mongo {
 
         BSONObjBuilder cmd;
         cmd.append( "splitChunk" , _manager->getns() );
-        cmd.append( "keyPattern" , _manager->getShardKey().key() );
+        cmd.append( "keyPattern" , _manager->getShardKeyPattern().toBSON() );
         cmd.append( "min" , getMin() );
         cmd.append( "max" , getMax() );
         cmd.append( "from" , getShard().getName() );
@@ -621,7 +623,7 @@ namespace mongo {
         BSONObj result;
         uassert( 10169 ,  "datasize failed!" , conn->runCommand( "admin" ,
                  BSON( "datasize" << _manager->getns()
-                       << "keyPattern" << _manager->getShardKey().key()
+                       << "keyPattern" << _manager->getShardKeyPattern().toBSON()
                        << "min" << getMin()
                        << "max" << getMax()
                        << "maxSize" << ( MaxChunkSize + 1 )
@@ -684,10 +686,6 @@ namespace mongo {
            << ChunkType::min()                << ": " << _min                << ", "
            << ChunkType::max()                << ": " << _max;
         return ss.str();
-    }
-
-    ShardKeyPattern Chunk::skey() const {
-        return _manager->getShardKey();
     }
 
     void Chunk::markAsJumbo() const {
@@ -753,7 +751,7 @@ namespace mongo {
 
     ChunkManager::ChunkManager( const string& ns, const ShardKeyPattern& pattern , bool unique ) :
         _ns( ns ),
-        _key( pattern ),
+        _keyPattern( pattern.getKeyPattern() ),
         _unique( unique ),
         _chunkRanges(),
         _mutex("ChunkManager"),
@@ -770,7 +768,7 @@ namespace mongo {
         _ns(collDoc[CollectionType::ns()].type() == String ?
                                                         collDoc[CollectionType::ns()].String() :
                                                         ""),
-        _key(collDoc[CollectionType::keyPattern()].type() == Object ?
+        _keyPattern(collDoc[CollectionType::keyPattern()].type() == Object ?
                                                         collDoc[CollectionType::keyPattern()].Obj().getOwned() :
                                                         BSONObj()),
         _unique(collDoc[CollectionType::unique()].trueValue()),
@@ -787,12 +785,12 @@ namespace mongo {
         //
 
         verify( _ns != ""  );
-        verify( ! _key.key().isEmpty() );
+        verify( ! _keyPattern.toBSON().isEmpty() );
 
         _version = ChunkVersion::fromBSON( collDoc );
     }
 
-    void ChunkManager::loadExistingRanges(const string& config, const ChunkManager* oldManager){
+    void ChunkManager::loadExistingRanges( const string& config, const ChunkManager* oldManager ){
 
         int tries = 3;
         while (tries--) {
@@ -1074,14 +1072,6 @@ namespace mongo {
         }
     }
 
-    bool ChunkManager::hasShardKey(const BSONObj& doc) const {
-        return _key.hasShardKey(doc);
-    }
-
-    bool ChunkManager::hasTargetableShardKey(const BSONObj& doc) const {
-        return _key.hasTargetableShardKey(doc);
-    }
-
     void ChunkManager::calcInitSplitsAndShards( const Shard& primary,
                                                 const vector<BSONObj>* initPoints,
                                                 const vector<Shard>* initShards,
@@ -1091,7 +1081,8 @@ namespace mongo {
         verify( _chunkMap.size() == 0 );
 
         unsigned long long numObjects = 0;
-        Chunk c(this, _key.globalMin(), _key.globalMax(), primary);
+        Chunk c(this, _keyPattern.getKeyPattern().globalMin(),
+                      _keyPattern.getKeyPattern().globalMax(), primary);
 
         if ( !initPoints || !initPoints->size() ) {
             // discover split points
@@ -1163,8 +1154,9 @@ namespace mongo {
         conn.done();
 
         for ( unsigned i=0; i<=splitPoints.size(); i++ ) {
-            BSONObj min = i == 0 ? _key.globalMin() : splitPoints[i-1];
-            BSONObj max = i < splitPoints.size() ? splitPoints[i] : _key.globalMax();
+            BSONObj min = i == 0 ? _keyPattern.getKeyPattern().globalMin() : splitPoints[i-1];
+            BSONObj max = i < splitPoints.size() ?
+                splitPoints[i] : _keyPattern.getKeyPattern().globalMax();
 
             Chunk temp( this , min , max , shards[ i % shards.size() ], version );
 
@@ -1193,27 +1185,26 @@ namespace mongo {
         _version = ChunkVersion( 0, 0, version.epoch() );
     }
 
-    ChunkPtr ChunkManager::findIntersectingChunk( const BSONObj& point ) const {
+    ChunkPtr ChunkManager::findIntersectingChunk( const BSONObj& shardKey ) const {
         {
-            BSONObj foo;
-            ChunkPtr c;
+            BSONObj chunkMin;
+            ChunkPtr chunk;
             {
-                ChunkMap::const_iterator it = _chunkMap.upper_bound( point );
+                ChunkMap::const_iterator it = _chunkMap.upper_bound( shardKey );
                 if (it != _chunkMap.end()) {
-                    foo = it->first;
-                    c = it->second;
+                    chunkMin = it->first;
+                    chunk = it->second;
                 }
             }
 
-            if ( c ) {
-                if ( c->containsPoint( point ) ){
-                    dassert( c->containsPoint( point ) ); // doesn't use fast-path in extractKey
-                    return c;
+            if ( chunk ) {
+                if ( chunk->containsKey( shardKey ) ){
+                    return chunk;
                 }
 
-                PRINT(foo);
-                PRINT(*c);
-                PRINT( point );
+                PRINT(chunkMin);
+                PRINT(*chunk);
+                PRINT( shardKey );
 
                 reload();
                 massert(13141, "Chunk map pointed to incorrect chunk", false);
@@ -1221,25 +1212,10 @@ namespace mongo {
         }
 
         msgasserted( 8070 ,
-                     str::stream() << "couldn't find a chunk intersecting: " << point
+                     str::stream() << "couldn't find a chunk intersecting: " << shardKey
                                    << " for ns: " << _ns
                                    << " at version: " << _version.toString()
                                    << ", number of chunks: " << _chunkMap.size() );
-    }
-
-    ChunkPtr ChunkManager::findChunkForDoc( const BSONObj& doc ) const {
-        BSONObj key = _key.extractKeyFromQueryOrDoc( doc );
-        return findIntersectingChunk( key );
-    }
-
-    ChunkPtr ChunkManager::findChunkOnServer( const Shard& shard ) const {
-        for ( ChunkMap::const_iterator i=_chunkMap.begin(); i!=_chunkMap.end(); ++i ) {
-            ChunkPtr c = i->second;
-            if ( c->getShard() == shard )
-                return c;
-        }
-
-        return ChunkPtr();
     }
 
     void ChunkManager::getShardsForQuery( set<Shard>& shards , const BSONObj& query ) const {
@@ -1265,17 +1241,19 @@ namespace mongo {
         //   Query { a : { $gte : 1, $lt : 2 },
         //            b : { $gte : 3, $lt : 4 } }
         //   => Bounds { a : [1, 2), b : [3, 4) }
-        IndexBounds bounds = getIndexBoundsForQuery(_key.key(), canonicalQuery);
+        IndexBounds bounds = getIndexBoundsForQuery(_keyPattern.toBSON(), canonicalQuery);
 
         // Transforms bounds for each shard key field into full shard key ranges
         // for example :
         //   Key { a : 1, b : 1 }
         //   Bounds { a : [1, 2), b : [3, 4) }
         //   => Ranges { a : 1, b : 3 } => { a : 2, b : 4 }
-        BoundList ranges = KeyPattern::flattenBounds(_key.key(), bounds);
+        BoundList ranges = _keyPattern.flattenBounds(bounds);
 
-        for ( BoundList::const_iterator it=ranges.begin(); it != ranges.end(); ++it ){
-            getShardsForRange( shards, it->first /*min*/, it->second /*max*/ );
+        for (BoundList::const_iterator it = ranges.begin(); it != ranges.end();
+            ++it) {
+
+            getShardsForRange(shards, it->first /*min*/, it->second /*max*/);
 
             // once we know we need to visit all shards no need to keep looping
             if( shards.size() == _shards.size() ) break;
@@ -1417,20 +1395,6 @@ namespace mongo {
         return other.getVersion(shardName).equals(getVersion(shardName));
     }
 
-    bool ChunkManager::compatibleWith( const Chunk& other ) const {
-
-        // Do this first, b/c findIntersectingChunk asserts if the key isn't similar
-        if( ! this->_key.hasShardKey( other.getMin() ) ) return false;
-        // We assume here that chunks will have consistent fields in min/max
-
-        ChunkPtr myChunk = this->findIntersectingChunk( other.getMin() );
-
-        if( other.getMin() != myChunk->getMin() ) return false;
-        if( other.getMax() != myChunk->getMax() ) return false;
-        if( other.getShard() != myChunk->getShard() ) return false;
-        return true;
-    }
-
     void ChunkManager::drop( ChunkManagerPtr me ) const {
         scoped_lock lk( _mutex );
 
@@ -1546,14 +1510,14 @@ namespace mongo {
     }
 
     void ChunkManager::getInfo( BSONObjBuilder& b ) const {
-        b.append(CollectionType::keyPattern(), _key.key());
+        b.append(CollectionType::keyPattern(), _keyPattern.toBSON());
         b.appendBool(CollectionType::unique(), _unique);
         _version.addEpochToBSON(b, CollectionType::DEPRECATED_lastmod());
     }
 
     string ChunkManager::toString() const {
         stringstream ss;
-        ss << "ChunkManager: " << _ns << " key:" << _key.toString() << '\n';
+        ss << "ChunkManager: " << _ns << " key:" << _keyPattern.toString() << '\n';
         for ( ChunkMap::const_iterator i=_chunkMap.begin(); i!=_chunkMap.end(); ++i ) {
             const ChunkPtr c = i->second;
             ss << "\t" << c->toString() << '\n';
@@ -1598,8 +1562,8 @@ namespace mongo {
                 verify(max != _ranges.end());
                 verify(min == max);
                 verify(min->second->getShard() == chunk->getShard());
-                verify(min->second->containsPoint( chunk->getMin() ));
-                verify(min->second->containsPoint( chunk->getMax() ) || (min->second->getMax() == chunk->getMax()));
+                verify(min->second->containsKey( chunk->getMin() ));
+                verify(min->second->containsKey( chunk->getMax() ) || (min->second->getMax() == chunk->getMax()));
             }
 
         }
@@ -1655,38 +1619,6 @@ namespace mongo {
 
         return splitThreshold;
     }
-
-    /** This is for testing only, just setting up minimal basic defaults. */
-    ChunkManager::ChunkManager() :
-    _unique(),
-    _chunkRanges(),
-    _mutex( "ChunkManager" ),
-    _sequenceNumber()
-    {}
-
-    class ChunkObjUnitTest : public StartupTest {
-    public:
-        void runChunkVersion() {
-            vector<ChunkVersion> all;
-            all.push_back( ChunkVersion(1,1, OID()) );
-            all.push_back( ChunkVersion(1,2, OID()) );
-            all.push_back( ChunkVersion(2,1, OID()) );
-            all.push_back( ChunkVersion(2,2, OID()) );
-
-            for ( unsigned i=0; i<all.size(); i++ ) {
-                for ( unsigned j=i+1; j<all.size(); j++ ) {
-                    verify( all[i] < all[j] );
-                }
-            }
-
-        }
-
-        void run() {
-            runChunkVersion();
-            LOG(1) << "shardObjTest passed" << endl;
-        }
-    } shardObjTest;
-
 
     // ----- to be removed ---
     extern OID serverID;

@@ -486,8 +486,8 @@ namespace mongo {
             CollectionMetadataPtr metadata = shardingState->getCollectionMetadata( nss.ns() );
 
             if ( metadata ) {
-                if ( !isUniqueIndexCompatible( metadata->getKeyPattern(),
-                                               request.getIndexKeyPattern() ) ) {
+                ShardKeyPattern shardKeyPattern(metadata->getKeyPattern());
+                if (!shardKeyPattern.isUniqueIndexCompatible(request.getIndexKeyPattern())) {
 
                     result->setError(new WriteErrorDetail);
                     buildUniqueIndexError(metadata->getKeyPattern(),

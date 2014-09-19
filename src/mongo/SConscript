@@ -467,7 +467,6 @@ coredbEnv.Library("coredb", [
         "db/commands/write_commands/write_commands_common.cpp",
         "db/pipeline/pipeline.cpp",
         "db/dbcommands_generic.cpp",
-        "db/keypattern.cpp",
         "db/matcher/matcher.cpp",
         "db/pipeline/accumulator_add_to_set.cpp",
         "db/pipeline/accumulator_avg.cpp",
@@ -747,11 +746,10 @@ env.Library('coreshard', [# This is only here temporarily for auto-split logic i
                           # No good reason to be here other than chunk.cpp needs this.
                           's/config_server_checker_service.cpp',
                           's/shard.cpp',
-                          's/shardkey.cpp',
                           's/shard_key_pattern.cpp'],
             LIBDEPS=['s/base',
                      's/cluster_ops_impl']);
-    
+
 mongosLibraryFiles = [
     "s/strategy.cpp",
     "s/commands_admin.cpp",
@@ -783,6 +781,13 @@ env.Library( "mongoscore",
                       's/cluster_write_op_conversion',
                       's/upgrade',
                      ] )
+
+env.CppUnitTest("shard_key_pattern_test", [ "s/shard_key_pattern_test.cpp" ],
+                LIBDEPS=["mongoscore",
+                         "coreshard",
+                         "mongocommon",
+                         "coreserver",
+                         "coredb"])
 
 env.CppUnitTest( "balancer_policy_test" , [ "s/balancer_policy_tests.cpp" ] ,
                 LIBDEPS=["mongoscore",
