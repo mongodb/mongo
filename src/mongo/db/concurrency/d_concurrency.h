@@ -35,6 +35,7 @@
 #include <climits> // For UINT_MAX
 
 #include "mongo/base/string_data.h"
+#include "mongo/db/concurrency/lock_mgr_new.h"
 #include "mongo/db/concurrency/lock_stat.h"
 #include "mongo/util/concurrency/mutex.h"
 #include "mongo/util/concurrency/rwlock.h"
@@ -75,7 +76,6 @@ namespace mongo {
         };
 
     public:
-
         class ScopedLock : boost::noncopyable {
         public:
             virtual ~ScopedLock();
@@ -123,9 +123,13 @@ namespace mongo {
             char _type;      // 'r','w','R','W'
         };
 
-        // note that for these classes recursive locking is ok if the recursive locking "makes sense"
-        // i.e. you could grab globalread after globalwrite.
-        
+        /**
+         * Global exclusive lock
+         *
+         * Allows exclusive write access to all databases and collections, blocking all other
+         * access. Allows further (recursive) acquisition of the global lock in any mode,
+         * see newlm::LockMode.
+         */
         class GlobalWrite : public ScopedLock {
         protected:
             void _tempRelease();
@@ -136,6 +140,13 @@ namespace mongo {
             virtual ~GlobalWrite();
         };
 
+        /**
+         * Global shared lock
+         *
+         * Allows concurrent read access to all databases and collections, blocking any writers.
+         * Allows further (recursive) acquisition of the global lock in shared (S) or intent-shared
+         * (IS) mode, see newlm::LockMode.
+         */
         class GlobalRead : public ScopedLock {
         public:
             // timeoutms is only for readlocktry -- deprecated -- do not use
@@ -143,32 +154,83 @@ namespace mongo {
             virtual ~GlobalRead();
         };
 
-        class DBWrite : public ScopedLock {
+        /**
+         * Database lock with support for collection- and document-level locking
+         *
+         * This lock supports four modes (see newlm::Lock_Mode):
+         *   MODE_IS: concurrent database access, requiring further collection read locks
+         *   MODE_IX: concurrent database access, requiring further collection read or write locks
+         *   MODE_S:  shared read access to the database, blocking any writers
+         *   MODE_X:  exclusive access to the database, blocking all other readers and writers
+         *
+         * For MODE_IS or MODE_S also acquires global lock in intent-shared (IS) mode, and
+         * for MODE_IX or MODE_X also acquires global lock in intent-exclusive (IX) mode.
+         * For storage engines that do not support collection-level locking, MODE_IS will be
+         * upgraded to MODE_S and MODE_IX will be upgraded to MODE_X.
+         */
+        class DBLock : public ScopedLock {
+        public:
+            DBLock(Locker* lockState, const StringData& db, const newlm::LockMode mode);
+            virtual ~DBLock();
+
+        private:
             void lockDB();
             void unlockDB();
+
+            const newlm::ResourceId _id;
+            const newlm::LockMode _mode;
 
         protected:
-            void _tempRelease();
-            void _relock();
-
-        public:
-            DBWrite(Locker* lockState, const StringData& dbOrNs);
-            virtual ~DBWrite();
-
-        private:
-            const std::string _ns;
+            // Still need to override these for ScopedLock::tempRelease() and relock().
+            // TODO: make this go away
+            void _tempRelease()  { unlockDB(); }
+            void _relock() { lockDB(); }
         };
 
-        class DBRead : public ScopedLock {
-            void lockDB();
-            void unlockDB();
+        /**
+         * Collection lock with support for document-level locking
+         *
+         * This lock supports four modes (see newlm::Lock_Mode):
+         *   MODE_IS: concurrent collection access, requiring document level locking read locks
+         *   MODE_IX: concurrent collection access, requiring document level read or write locks
+         *   MODE_S:  shared read access to the collection, blocking any writers
+         *   MODE_X:  exclusive access to the collection, blocking all other readers and writers
+         *
+         * An appropriate DBLock must already be held before locking a collection.
+         * For storage engines that do not support document-level locking, MODE_IS will be
+         * upgraded to MODE_S and MODE_IX will be upgraded to MODE_X.
+         */
+        class CollectionLock : boost::noncopyable {
+        public:
+            CollectionLock (Locker* lockState, const StringData& ns, const newlm::LockMode);
+            virtual ~CollectionLock();
+        private:
+            const newlm::ResourceId _id;
+            Locker* _lockState;
+        };
 
+        /**
+         * Exclusive database lock -- DEPRECATED, please transition to DBLock and collection locks
+         *
+         * Allows exclusive write access to the given database, blocking any other access.
+         * Allows further (recursive) acquisition of database locks for this database in any mode.
+         * Also acquires the global lock in intent-exclusive (IX) mode.
+         */
+        class DBWrite : public DBLock {
+        public:
+            DBWrite(Locker* lockState, const StringData& dbOrNs);
+        };
+
+        /**
+         * Shared database lock -- DEPRECATED, please transition to DBLock and collection locks
+         *
+         * Allows concurrent read access to the given database, blocking any writers.
+         * Allows further (recursive) acquisision of database locks for this database in shared
+         * or intent-shared mode. Also acquires global lock in intent-shared (IS) mode.
+         */
+        class DBRead : public DBLock {
         public:
             DBRead(Locker* lockState, const StringData& dbOrNs);
-            virtual ~DBRead();
-
-        private:
-            const std::string _ns;
         };
     };
 

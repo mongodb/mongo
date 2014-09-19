@@ -28,6 +28,8 @@
 
 #include "mongo/platform/basic.h"
 
+#include <string>
+
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/concurrency/lock_mgr_test_help.h"
 #include "mongo/unittest/unittest.h"
@@ -143,8 +145,8 @@ namespace mongo {
     TEST(DConcurrency, MultipleWriteDBLocksOnSameThread) {
         LockState ls;
 
-        Lock::DBWrite r1(&ls, "db1");
-        Lock::DBWrite r2(&ls, "db1");
+        Lock::DBLock r1(&ls, "db1", newlm::MODE_X);
+        Lock::DBLock r2(&ls, "db1", newlm::MODE_X);
 
         ASSERT(ls.isWriteLocked("db1"));
     }
@@ -152,10 +154,21 @@ namespace mongo {
     TEST(DConcurrency, MultipleConflictingDBLocksOnSameThread) {
         LockState ls;
 
-        Lock::DBWrite r1(&ls, "db1");
+        Lock::DBLock r1(&ls, "db1", newlm::MODE_X);
         Lock::DBRead r2(&ls, "db1");
 
         ASSERT(ls.isWriteLocked("db1"));
     }
 
+    TEST(DConcurrenty, IntentCollectionLock) {
+        LockState ls;
+        const std::string ns("db1.coll");
+        const newlm::ResourceId id(newlm::RESOURCE_COLLECTION, ns);
+        Lock::DBLock r1(&ls, "db1", newlm::MODE_X);
+        {
+            Lock::CollectionLock r2(&ls, ns, newlm::MODE_S);
+            ASSERT(ls.isAtLeastReadLocked(ns));
+        }
+        ASSERT(ls.getLockMode(id) == newlm::MODE_NONE);
+    }
 } // namespace mongo
