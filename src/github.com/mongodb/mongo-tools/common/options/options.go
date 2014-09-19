@@ -101,6 +101,14 @@ type Kerberos struct {
 	ServiceHost string `long:"gssapiHostName" description:"Hostname to use when authenticating using GSSAPI/Kerberos (remote server's address by default)"`
 }
 
+type OptionRegistrationFunction func(self *ToolOptions) error
+
+var OptionRegistrationFunctions []OptionRegistrationFunction
+
+func init() {
+	OptionRegistrationFunctions = append(OptionRegistrationFunctions, registerCommonOptions, registerExtraOptions)
+}
+
 // Ask for a new instance of tool options
 func New(appName, usageStr string) *ToolOptions {
 	return &ToolOptions{
@@ -167,26 +175,49 @@ func (self *ToolOptions) Parse() ([]string, error) {
 	self.parser = flags.NewNamedParser(self.AppName, flags.None)
 	self.parser.Usage = self.UsageStr
 
-	// register self to receive the flags
-	_, err := self.parser.AddGroup("general options", "", self.General)
-	_, err = self.parser.AddGroup("verbosity options", "", self.Verbosity)
-	_, err = self.parser.AddGroup("connection options", "", self.Connection)
-	_, err = self.parser.AddGroup("ssl options", "", self.SSL)
-	_, err = self.parser.AddGroup("authentication options", "", self.Auth)
-	_, err = self.parser.AddGroup("namespace options", "", self.Namespace)
-	_, err = self.parser.AddGroup("kerberos options", "", self.Kerberos)
-
-	// register all of the extra options
-	for _, eo := range self.Extra {
-		_, err = self.parser.AddGroup(eo.Name()+" options", "", eo)
-		if err != nil {
-			return nil, fmt.Errorf("error setting command line options for"+
-				" %v: %v", eo.Name(), err)
+	for _, optionRegistrationFunction := range OptionRegistrationFunctions {
+		if err := optionRegistrationFunction(self); err != nil {
+			return nil, err
 		}
 	}
 
 	// parse
 	return self.parser.Parse()
+}
+
+func registerExtraOptions(self *ToolOptions) error {
+
+	// register all of the extra options
+	for _, eo := range self.Extra {
+		_, err := self.parser.AddGroup(eo.Name()+" options", "", eo)
+		if err != nil {
+			return fmt.Errorf("error setting command line options for"+
+				" %v: %v", eo.Name(), err)
+		}
+	}
+	return nil
+
+}
+
+func registerCommonOptions(self *ToolOptions) error {
+
+	// register self to receive the flags
+	if _, err := self.parser.AddGroup("general options", "", self.General); err != nil {
+		return err
+	}
+	if _, err := self.parser.AddGroup("verbosity options", "", self.Verbosity); err != nil {
+		return err
+	}
+	if _, err := self.parser.AddGroup("connection options", "", self.Connection); err != nil {
+		return err
+	}
+	if _, err := self.parser.AddGroup("authentication options", "", self.Auth); err != nil {
+		return err
+	}
+	if _, err := self.parser.AddGroup("namespace options", "", self.Namespace); err != nil {
+		return err
+	}
+	return nil
 }
 
 ////////////

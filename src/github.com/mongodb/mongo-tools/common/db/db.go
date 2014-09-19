@@ -1,5 +1,3 @@
-// +build !ssl
-
 // Package db implements generic connection to MongoDB, and contains
 // subpackages for specific methods of connection.
 package db
@@ -7,11 +5,14 @@ package db
 import (
 	"fmt"
 	"github.com/mongodb/mongo-tools/common/db/command"
-	"github.com/mongodb/mongo-tools/common/db/kerberos"
 	"github.com/mongodb/mongo-tools/common/options"
 	"gopkg.in/mgo.v2"
 	"sync"
 )
+
+type GetConnectorFunc func(opts options.ToolOptions) DBConnector
+
+var GetConnectorFuncs []GetConnectorFunc
 
 // Used to manage database sessions
 type SessionProvider struct {
@@ -108,8 +109,10 @@ func InitSessionProvider(opts options.ToolOptions) (*SessionProvider,
 
 // Get the right type of connector, based on the options
 func getConnector(opts options.ToolOptions) DBConnector {
-	if opts.Auth.Mechanism == "GSSAPI" {
-		return &kerberos.KerberosDBConnector{}
+	for _, getConnectorFunc := range GetConnectorFuncs {
+		if connector := getConnectorFunc(opts); connector != nil {
+			return connector
+		}
 	}
 	return &VanillaDBConnector{}
 }
