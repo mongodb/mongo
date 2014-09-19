@@ -51,10 +51,7 @@ env.Library('saslauth',
              'sasl_plain_server_conversation.cpp',
              'sasl_scramsha1_server_conversation.cpp',
              'sasl_server_conversation.cpp'],
-             LIBDEPS=['authcore', 'scramauth'])
-
-env.Library('scramauth',
-            ['mechanism_scram.cpp'])
+             LIBDEPS=['authcore', '$BUILD_DIR/mongo/crypto/scramauth'])
 
 env.Library('authmongod',
             ['authz_manager_external_state_d.cpp',

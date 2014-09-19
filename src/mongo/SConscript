@@ -20,6 +20,7 @@ env.InjectThirdPartyIncludePaths(libraries=['boost', 's2', 'pcre'])
 env.InjectMongoIncludePaths()
 
 env.SConscript(['base/SConscript',
+                'crypto/SConscript',
                 'db/auth/SConscript',
                 'db/catalog/SConscript',
                 'db/commands/SConscript',
@@ -300,7 +301,7 @@ env.Library('clientdriver', [
             "client/syncclusterconnection.cpp",
             "db/dbmessage.cpp"
             ],
-            LIBDEPS=['$BUILD_DIR/mongo/db/auth/scramauth', 'network'
+            LIBDEPS=['$BUILD_DIR/mongo/crypto/scramauth', 'network'
             ])
 
 env.CppUnitTest("replica_set_monitor_test",

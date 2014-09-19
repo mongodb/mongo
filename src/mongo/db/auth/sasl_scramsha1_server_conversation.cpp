@@ -38,7 +38,7 @@
 #include <openssl/hmac.h>
 #endif
 
-#include "mongo/db/auth/mechanism_scram.h"
+#include "mongo/crypto/mechanism_scram.h"
 #include "mongo/platform/random.h"
 #include "mongo/util/base64.h"
 #include "mongo/util/log.h"

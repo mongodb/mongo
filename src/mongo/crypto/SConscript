@@ -1,0 +1,7 @@
+# -*- mode: python -*-
+
+Import("env")
+env.Library('scramauth',
+            ['mechanism_scram.cpp'],
+            LIBDEPS=['$BUILD_DIR/mongo/base/base',
+                     '$BUILD_DIR/mongo/stringutils'])
