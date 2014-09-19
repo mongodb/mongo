@@ -191,23 +191,6 @@ namespace mongo {
         return false;
     }
 
-    // static
-    BSONObj LiteParsedQuery::normalizeSortOrder(const BSONObj& sortObj) {
-        BSONObjBuilder b;
-        BSONObjIterator i(sortObj);
-        while (i.more()) {
-            BSONElement e = i.next();
-            if (isTextScoreMeta(e)) {
-                b.append(e);
-                continue;
-            }
-            long long n = e.safeNumberLong();
-            int sortOrder = n >= 0 ? 1 : -1;
-            b.append(e.fieldName(), sortOrder);
-        }
-        return b.obj();
-    }
-
     LiteParsedQuery::LiteParsedQuery() : _wantMore(true), _explain(false), _snapshot(false),
                                          _returnKey(false), _showDiskLoc(false), _maxScan(0),
                                          _maxTimeMS(0) { }
@@ -257,11 +240,8 @@ namespace mongo {
 
         _hasReadPref = queryObj.hasField("$readPreference");
 
-        if (!_sort.isEmpty()) {
-            if (!isValidSortOrder(_sort)) {
-                return Status(ErrorCodes::BadValue, "bad sort specification");
-            }
-            _sort = normalizeSortOrder(_sort);
+        if (!isValidSortOrder(_sort)) {
+            return Status(ErrorCodes::BadValue, "bad sort specification");
         }
 
         // Min and Max objects must have the same fields.

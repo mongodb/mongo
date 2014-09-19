@@ -27,7 +27,9 @@
  */
 
 #include "mongo/db/query/query_solution.h"
-#include "mongo/db/query/lite_parsed_query.h"
+
+#include "mongo/db/query/planner_analysis.h"
+#include "mongo/db/query/query_planner_common.h"
 
 namespace mongo {
 
@@ -448,23 +450,11 @@ namespace mongo {
     void IndexScanNode::computeProperties() {
         _sorts.clear();
 
-        BSONObj sortPattern;
-        {
-            BSONObjBuilder sortBob;
-            BSONObj normalizedIndexKeyPattern(LiteParsedQuery::normalizeSortOrder(indexKeyPattern));
-            BSONObjIterator it(normalizedIndexKeyPattern);
-            while (it.more()) {
-                BSONElement elt = it.next();
-                // Zero is returned if elt is not a number.  This happens when elt is hashed or
-                // 2dsphere, our two projection indices.  We want to drop those from the sort
-                // pattern.
-                int val = elt.numberInt() * direction;
-                if (0 != val) {
-                    sortBob.append(elt.fieldName(), val);
-                }
-            }
-            sortPattern = sortBob.obj();
+        BSONObj sortPattern = QueryPlannerAnalysis::getSortPattern(indexKeyPattern);
+        if (direction == -1) {
+            sortPattern = QueryPlannerCommon::reverseSortObj(sortPattern);
         }
+
         _sorts.insert(sortPattern);
 
         const int nFields = sortPattern.nFields();
