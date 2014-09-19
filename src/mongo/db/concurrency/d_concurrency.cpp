@@ -367,7 +367,7 @@ namespace {
             }
         }
         else {
-            _lockState->lock(resIdDb, newlm::MODE_X);
+            _lockState->lock(resIdDb, newlm::MODE_S);
         }
 
         resetTime();
