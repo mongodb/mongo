@@ -66,10 +66,14 @@ namespace mongo {
                                long long dataSize,
                                long long numRecords ) = 0;
 
-        virtual const DiskLoc& deletedListEntry( int bucket ) const = 0;
+        virtual DiskLoc deletedListEntry( int bucket ) const = 0;
         virtual void setDeletedListEntry( OperationContext* txn,
                                           int bucket,
                                           const DiskLoc& loc ) = 0;
+
+        virtual DiskLoc deletedListLegacyGrabBag() const = 0;
+        virtual void setDeletedListLegacyGrabBag(OperationContext* txn, const DiskLoc& loc) = 0;
+
         virtual void orphanDeletedList(OperationContext* txn) = 0;
 
         virtual const DiskLoc& firstExtent( OperationContext* txn ) const = 0;
@@ -96,8 +100,8 @@ namespace mongo {
     class RecordStoreV1Base : public RecordStore {
     public:
 
-        static const int Buckets;
-        static const int MaxBucket;
+        static const int Buckets = 26;
+        static const int MaxAllowedAllocation = 16*1024*1024 + 512*1024;
 
         static const int bucketSizes[];
 
@@ -185,6 +189,8 @@ namespace mongo {
          * Quantize 'minSize' to the nearest allocation size.
          */
         static int quantizeAllocationSpace(int minSize);
+
+        static bool isQuantized(int recordSize);
 
         /* return which "deleted bucket" for this size object */
         static int bucket(int size);

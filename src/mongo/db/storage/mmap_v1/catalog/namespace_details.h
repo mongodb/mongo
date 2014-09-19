@@ -39,14 +39,6 @@ namespace mongo {
     class NamespaceIndex;
     class OperationContext;
 
-    /* deleted lists -- linked lists of deleted records -- are placed in 'buckets' of various sizes
-       so you can look for a deleterecord about the right size.
-    */
-    const int Buckets = 19;
-    const int MaxBucket = 18;
-
-    extern int bucketSizes[];
-
 #pragma pack(1)
     /* NamespaceDetails : this is the "header" for a collection that has all its details.
        It's in the .ns file and this is a memory mapped region (thus the pack pragma above).
@@ -55,6 +47,11 @@ namespace mongo {
     public:
         enum { NIndexesMax = 64, NIndexesExtra = 30, NIndexesBase  = 10 };
 
+        // deleted lists -- linked lists of deleted records -- are placed in 'buckets' of various
+        // sizes so you can look for a deleted record of about the right size. These buckets are
+        // split into small and large groups for compatibility with old versions.
+        static const int SmallBuckets = 18;
+        static const int LargeBuckets = 8;
 
 
         /*-------- data fields, as present on disk : */
@@ -69,7 +66,8 @@ namespace mongo {
                  changes, this value is updated.  !deletedList[1].isValid() when this value is not
                  yet computed.
         */
-        DiskLoc deletedList[Buckets];
+        DiskLoc deletedListSmall[SmallBuckets];
+        DiskLoc deletedListLegacyGrabBag; // old implementations put records of multiple sizes here.
 
         // ofs 168 (8 byte aligned)
         struct Stats {
@@ -113,7 +111,12 @@ namespace mongo {
 
         int userFlags;
 
-        char _reserved[72];
+        DiskLoc deletedListLarge[LargeBuckets];
+
+        // Think carefully before using this. We need at least 8 bytes reserved to leave room for a
+        // DiskLoc pointing to more data (eg in a dummy Record or Extent). There is still _reservedA
+        // above, but these are the final two reserved 8-byte regions.
+        char _reserved[8];
         /*-------- end data 496 bytes */
     public:
         explicit NamespaceDetails( const DiskLoc &loc, bool _capped );

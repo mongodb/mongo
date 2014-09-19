@@ -45,20 +45,26 @@
 
 namespace mongo {
 
-    const int RecordStoreV1Base::Buckets = 19;
-    const int RecordStoreV1Base::MaxBucket = 18;
-
     /* Deleted list buckets are used to quickly locate free space based on size.  Each bucket
-       contains records up to that size.  All records >= 4mb are placed into the 16mb bucket.
+       contains records up to that size (meaning a record with a size exactly equal to
+       bucketSizes[n] would go into bucket n+1).
     */
     const int RecordStoreV1Base::bucketSizes[] = {
-        0x20,     0x40,     0x80,     0x100,      // 32,   64,   128,  256
-        0x200,    0x400,    0x800,    0x1000,     // 512,  1K,   2K,   4K
-        0x2000,   0x4000,   0x8000,   0x10000,    // 8K,   16K,  32K,  64K
-        0x20000,  0x40000,  0x80000,  0x100000,   // 128K, 256K, 512K, 1M
-        0x200000, 0x400000, 0x1000000,            // 2M,   4M,   16M (see above)
+        0x20,     0x40,     0x80,     0x100,    // 32,   64,   128,  256
+        0x200,    0x400,    0x800,    0x1000,   // 512,  1K,   2K,   4K
+        0x2000,   0x4000,   0x8000,   0x10000,  // 8K,   16K,  32K,  64K
+        0x20000,  0x40000,  0x80000,  0x100000, // 128K, 256K, 512K, 1M
+        0x200000, 0x400000, 0x600000, 0x800000, // 2M,   4M,   6M,   8M
+        0xA00000, 0xC00000, 0xE00000,           // 10M,  12M,  14M,
+        MaxAllowedAllocation,                   // 16.5M
+        MaxAllowedAllocation + 1,               // Only MaxAllowedAllocation sized records go here.
+        INT_MAX,                                // "oversized" bucket for unused parts of extents.
      };
 
+    // If this fails, it means that bucketSizes doesn't have the correct number of entries.
+    BOOST_STATIC_ASSERT(sizeof(RecordStoreV1Base::bucketSizes)
+                        / sizeof(RecordStoreV1Base::bucketSizes[0])
+                        == RecordStoreV1Base::Buckets);
 
     RecordStoreV1Base::RecordStoreV1Base( const StringData& ns,
                                           RecordStoreV1MetaData* details,
@@ -241,6 +247,10 @@ namespace mongo {
                                         "record has to be >= 4 bytes" );
         }
         int lenWHdr = docSize + Record::HeaderSize;
+        if ( lenWHdr > MaxAllowedAllocation ) {
+            return StatusWith<DiskLoc>( ErrorCodes::InvalidLength,
+                                        "record has to be <= 16.5MB" );
+        }
         if (doc->addPadding() && !isCapped())
             lenWHdr = quantizeAllocationSpace( lenWHdr );
 
@@ -269,6 +279,11 @@ namespace mongo {
         if ( len < 4 ) {
             return StatusWith<DiskLoc>( ErrorCodes::InvalidLength,
                                         "record has to be >= 4 bytes" );
+        }
+
+        if ( len + Record::HeaderSize > MaxAllowedAllocation ) {
+            return StatusWith<DiskLoc>( ErrorCodes::InvalidLength,
+                                        "record has to be <= 16.5MB" );
         }
 
         return _insertRecord( txn, data, len, enforceQuota );
@@ -321,6 +336,10 @@ namespace mongo {
                                         10003 );
 
         // we have to move
+        if ( dataSize + Record::HeaderSize > MaxAllowedAllocation ) {
+            return StatusWith<DiskLoc>( ErrorCodes::InvalidLength,
+                                        "record has to be <= 16.5MB" );
+        }
 
         StatusWith<DiskLoc> newLocation = _insertRecord( txn, data, dataSize, enforceQuota );
         if ( !newLocation.isOK() )
@@ -663,8 +682,7 @@ namespace mongo {
                     len += r->lengthWithHeaders();
                     nlen += r->netLength();
 
-                    if ( r->lengthWithHeaders() ==
-                         quantizeAllocationSpace( r->lengthWithHeaders() ) ) {
+                    if ( isQuantized( r->lengthWithHeaders() ) ) {
                         // Count the number of records having a size consistent with
                         // the quantizeAllocationSpace quantization implementation.
                         ++nQuantizedSize;
@@ -864,16 +882,21 @@ namespace mongo {
     }
 
     int RecordStoreV1Base::quantizeAllocationSpace(int allocSize) {
-        for ( int i = 0; i < Buckets; i++ ) {
+        invariant(allocSize <= MaxAllowedAllocation);
+        for ( int i = 0; i < Buckets - 2; i++ ) { // last two bucketSizes are invalid
             if ( bucketSizes[i] >= allocSize ) {
                 // Return the size of the first bucket sized >= the requested size.
                 return bucketSizes[i];
             }
         }
+        invariant(false); // prior invariant means we should find something.
+    }
 
-        // TODO make a specific bucket large enough to hold all documents rather than doing this.
-        invariant(allocSize < bucketSizes[MaxBucket] + 1024*1024);
-        return bucketSizes[MaxBucket] + 1024*1024;
+    bool RecordStoreV1Base::isQuantized(int recordSize) {
+        if (recordSize > MaxAllowedAllocation)
+            return false;
+
+        return recordSize == quantizeAllocationSpace(recordSize);
     }
 
     int RecordStoreV1Base::bucket(int size) {
@@ -885,7 +908,10 @@ namespace mongo {
                 return i;
             }
         }
-        return MaxBucket;
+        // Technically, this is reachable if size == INT_MAX, but it would be an error to pass that
+        // in anyway since it would be impossible to have a record that large given the file and
+        // extent headers.
+        invariant(false);
     }
 
     Status RecordStoreV1Base::setCustomOption( OperationContext* txn,

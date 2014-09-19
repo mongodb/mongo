@@ -46,24 +46,26 @@ namespace {
         ASSERT_EQUALS(RecordStoreV1Base::quantizeAllocationSpace(10001), 16*1024);
         ASSERT_EQUALS(RecordStoreV1Base::quantizeAllocationSpace(100000), 128*1024);
         ASSERT_EQUALS(RecordStoreV1Base::quantizeAllocationSpace(1000001), 1024*1024);
-        ASSERT_EQUALS(RecordStoreV1Base::quantizeAllocationSpace(10000000), 16*1024*1024);
-        ASSERT_EQUALS(RecordStoreV1Base::quantizeAllocationSpace(16*1024*1024), 16*1024*1024);
-        ASSERT_EQUALS(RecordStoreV1Base::quantizeAllocationSpace(16*1024*1024 + 1), 17*1024*1024);
+        ASSERT_EQUALS(RecordStoreV1Base::quantizeAllocationSpace(10000000), 10*1024*1024);
+        ASSERT_EQUALS(RecordStoreV1Base::quantizeAllocationSpace(14*1024*1024 - 1), 14*1024*1024);
+        ASSERT_EQUALS(RecordStoreV1Base::quantizeAllocationSpace(14*1024*1024), 14*1024*1024);
+        ASSERT_EQUALS(RecordStoreV1Base::quantizeAllocationSpace(14*1024*1024 + 1),
+                                                                 16*1024*1024 + 512*1024);
+        ASSERT_EQUALS(RecordStoreV1Base::quantizeAllocationSpace(16*1024*1024 + 512*1024),
+                                                                 16*1024*1024 + 512*1024);
     }
 
     TEST( SimpleRecordStoreV1, quantizeAllocationMinMaxBound ) {
-        const int maxSize = 16 * 1024 * 1024;
+        const int maxSize = RecordStoreV1Base::MaxAllowedAllocation;
         ASSERT_EQUALS(RecordStoreV1Base::quantizeAllocationSpace(1), 32);
         ASSERT_EQUALS(RecordStoreV1Base::quantizeAllocationSpace(maxSize), maxSize);
     }
 
     /**
-     * For buckets up to 4MB powerOf2 allocation should round up to next power of 2. It should be
-     * return the input unmodified if it is already a power of 2.
+     * Tests quantization of sizes around all valid bucket sizes.
      */
-    TEST( SimpleRecordStoreV1, quantizePowerOf2Small ) {
-        // only tests buckets <= 4MB. Higher buckets quatize to 1MB even with powerOf2
-        for (int bucket = 0; bucket < RecordStoreV1Base::MaxBucket; bucket++) {
+    TEST( SimpleRecordStoreV1, quantizeAroundBucketSizes ) {
+        for (int bucket = 0; bucket < RecordStoreV1Base::Buckets - 2; bucket++) {
             const int size = RecordStoreV1Base::bucketSizes[bucket];
             const int nextSize = RecordStoreV1Base::bucketSizes[bucket + 1];
 
@@ -75,8 +77,8 @@ namespace {
             ASSERT_EQUALS( size,
                            RecordStoreV1Base::quantizeAllocationSpace( size ) );
 
-            // size + 1 is quantized to nextSize (unless > 4MB which is covered by next test)
-            if (size < 4*1024*1024) {
+            // size + 1 is quantized to nextSize (if it is a valid allocation)
+            if (size + 1 <= RecordStoreV1Base::MaxAllowedAllocation) {
                 ASSERT_EQUALS( nextSize,
                                RecordStoreV1Base::quantizeAllocationSpace( size + 1 ) );
             }
@@ -188,7 +190,7 @@ namespace {
                 {DiskLoc(0, 1000), 512 + 31},
                 {}
             };
-            initializeV1RS(&txn, NULL, drecs, &em, md);
+            initializeV1RS(&txn, NULL, drecs, NULL, &em, md);
         }
 
         BsonDocWriter docWriter(docForRecordSize( 300 ), true);
@@ -203,7 +205,7 @@ namespace {
             LocAndSize drecs[] = {
                 {}
             };
-            assertStateV1RS(&txn, recs, drecs, &em, md);
+            assertStateV1RS(&txn, recs, drecs, NULL, &em, md);
         }
     }
 
@@ -221,7 +223,7 @@ namespace {
                 {DiskLoc(0, 1000), 512 + 32},
                 {}
             };
-            initializeV1RS(&txn, NULL, drecs, &em, md);
+            initializeV1RS(&txn, NULL, drecs, NULL, &em, md);
         }
 
         BsonDocWriter docWriter(docForRecordSize( 300 ), true);
@@ -237,7 +239,7 @@ namespace {
                 {DiskLoc(0, 1512), 32},
                 {}
             };
-            assertStateV1RS(&txn, recs, drecs, &em, md);
+            assertStateV1RS(&txn, recs, drecs, NULL, &em, md);
         }
     }
 
@@ -255,7 +257,7 @@ namespace {
                 {DiskLoc(0, 1000), 331},
                 {}
             };
-            initializeV1RS(&txn, NULL, drecs, &em, md);
+            initializeV1RS(&txn, NULL, drecs, NULL, &em, md);
         }
 
         BsonDocWriter docWriter(docForRecordSize( 300 ), false);
@@ -270,7 +272,7 @@ namespace {
             LocAndSize drecs[] = {
                 {}
             };
-            assertStateV1RS(&txn, recs, drecs, &em, md);
+            assertStateV1RS(&txn, recs, drecs, NULL, &em, md);
         }
     }
 
@@ -288,7 +290,7 @@ namespace {
                 {DiskLoc(0, 1000), 332},
                 {}
             };
-            initializeV1RS(&txn, NULL, drecs, &em, md);
+            initializeV1RS(&txn, NULL, drecs, NULL, &em, md);
         }
 
         BsonDocWriter docWriter(docForRecordSize( 300 ), false);
@@ -304,7 +306,135 @@ namespace {
                 {DiskLoc(0, 1300), 32},
                 {}
             };
-            assertStateV1RS(&txn, recs, drecs, &em, md);
+            assertStateV1RS(&txn, recs, drecs, NULL, &em, md);
+        }
+    }
+
+    /**
+     * alloc() will use from the legacy grab bag if it can.
+     */
+    TEST(SimpleRecordStoreV1, GrabBagIsUsed) {
+        OperationContextNoop txn;
+        DummyExtentManager em;
+        DummyRecordStoreV1MetaData* md = new DummyRecordStoreV1MetaData( false, 0 );
+        SimpleRecordStoreV1 rs( &txn, "test.foo", md, &em, false );
+
+        {
+            LocAndSize drecs[] = {
+                {}
+            };
+            LocAndSize grabBag[] = {
+                {DiskLoc(0, 1000), 4*1024*1024},
+                {DiskLoc(1, 1000), 4*1024*1024},
+                {}
+            };
+            initializeV1RS(&txn, NULL, drecs, grabBag, &em, md);
+        }
+
+        BsonDocWriter docWriter(docForRecordSize( 256 ), false);
+        StatusWith<DiskLoc> actualLocation = rs.insertRecord(&txn, &docWriter, false);
+        ASSERT_OK( actualLocation.getStatus() );
+
+        {
+            LocAndSize recs[] = {
+                {DiskLoc(0, 1000), 256},
+                {}
+            };
+            LocAndSize drecs[] = {
+                {DiskLoc(0, 1256), 4*1024*1024 - 256},
+                {}
+            };
+            LocAndSize grabBag[] = {
+                {DiskLoc(1, 1000), 4*1024*1024},
+                {}
+            };
+            assertStateV1RS(&txn, recs, drecs, grabBag, &em, md);
+        }
+    }
+
+    /**
+     * alloc() will pull from the legacy grab bag even if it isn't needed.
+     */
+    TEST(SimpleRecordStoreV1, GrabBagIsPoppedEvenIfUnneeded) {
+        OperationContextNoop txn;
+        DummyExtentManager em;
+        DummyRecordStoreV1MetaData* md = new DummyRecordStoreV1MetaData( false, 0 );
+        SimpleRecordStoreV1 rs( &txn, "test.foo", md, &em, false );
+
+        {
+            LocAndSize drecs[] = {
+                {DiskLoc(0, 1000), 1000},
+                {}
+            };
+            LocAndSize grabBag[] = {
+                {DiskLoc(1, 1000), 4*1024*1024},
+                {DiskLoc(2, 1000), 4*1024*1024},
+                {}
+            };
+            initializeV1RS(&txn, NULL, drecs, grabBag, &em, md);
+        }
+
+        BsonDocWriter docWriter(docForRecordSize( 1000 ), false);
+        StatusWith<DiskLoc> actualLocation = rs.insertRecord(&txn, &docWriter, false);
+        ASSERT_OK( actualLocation.getStatus() );
+
+        {
+            LocAndSize recs[] = {
+                {DiskLoc(0, 1000), 1000},
+                {}
+            };
+            LocAndSize drecs[] = {
+                {DiskLoc(1, 1000), 4*1024*1024},
+                {}
+            };
+            LocAndSize grabBag[] = {
+                {DiskLoc(2, 1000), 4*1024*1024},
+                {}
+            };
+            assertStateV1RS(&txn, recs, drecs, grabBag, &em, md);
+        }
+    }
+
+    /**
+     * alloc() will pull from the legacy grab bag even if it can't be used
+     */
+    TEST(SimpleRecordStoreV1, GrabBagIsPoppedEvenIfUnusable) {
+        OperationContextNoop txn;
+        DummyExtentManager em;
+        DummyRecordStoreV1MetaData* md = new DummyRecordStoreV1MetaData( false, 0 );
+        SimpleRecordStoreV1 rs( &txn, "test.foo", md, &em, false );
+
+        {
+            LocAndSize drecs[] = {
+                {DiskLoc(0, 1000), 8*1024*1024},
+                {}
+            };
+            LocAndSize grabBag[] = {
+                {DiskLoc(1, 1000), 4*1024*1024},
+                {DiskLoc(2, 1000), 4*1024*1024},
+                {}
+            };
+            initializeV1RS(&txn, NULL, drecs, grabBag, &em, md);
+        }
+
+        BsonDocWriter docWriter(docForRecordSize( 8*1024*1024 ), false);
+        StatusWith<DiskLoc> actualLocation = rs.insertRecord(&txn, &docWriter, false);
+        ASSERT_OK( actualLocation.getStatus() );
+
+        {
+            LocAndSize recs[] = {
+                {DiskLoc(0, 1000), 8*1024*1024},
+                {}
+            };
+            LocAndSize drecs[] = {
+                {DiskLoc(1, 1000), 4*1024*1024},
+                {}
+            };
+            LocAndSize grabBag[] = {
+                {DiskLoc(2, 1000), 4*1024*1024},
+                {}
+            };
+            assertStateV1RS(&txn, recs, drecs, grabBag, &em, md);
         }
     }
 
@@ -352,7 +482,7 @@ namespace {
                 {}
             };
 
-            initializeV1RS(&txn, recs, drecs, &em, md);
+            initializeV1RS(&txn, recs, drecs, NULL, &em, md);
 
             ASSERT_EQUALS(em.getExtent(DiskLoc(0, 0))->length, em.minSize());
         }
@@ -368,7 +498,7 @@ namespace {
                 {DiskLoc(0, Extent::HeaderSize()), em.minSize() - Extent::HeaderSize()},
                 {}
             };
-            assertStateV1RS(&txn, recs, drecs, &em, md);
+            assertStateV1RS(&txn, recs, drecs, NULL, &em, md);
         }
     }
 }

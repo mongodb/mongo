@@ -75,7 +75,7 @@ namespace mongo {
         // For capped case, signal that we are doing initial extent allocation.
         if ( capped ) {
             // WAS: cappedLastDelRecLastExtent().setInvalid();
-            deletedList[1].setInvalid();
+            deletedListSmall[1].setInvalid();
         }
         verify( sizeof(_dataFileVersion) == 2 );
         _dataFileVersion = 0;

@@ -59,10 +59,14 @@ namespace mongo {
                                long long dataSize,
                                long long numRecords );
 
-        virtual const DiskLoc& deletedListEntry( int bucket ) const;
+        virtual DiskLoc deletedListEntry( int bucket ) const;
         virtual void setDeletedListEntry( OperationContext* txn,
                                           int bucket,
                                           const DiskLoc& loc );
+
+        virtual DiskLoc deletedListLegacyGrabBag() const;
+        virtual void setDeletedListLegacyGrabBag(OperationContext* txn, const DiskLoc& loc);
+
         virtual void orphanDeletedList(OperationContext* txn);
 
         virtual const DiskLoc& firstExtent( OperationContext* txn ) const;
@@ -104,6 +108,7 @@ namespace mongo {
         double _paddingFactor;
 
         std::vector<DiskLoc> _deletedLists;
+        DiskLoc _deletedListLegacyGrabBag;
     };
 
     class DummyExtentManager : public ExtentManager {
@@ -177,6 +182,7 @@ namespace mongo {
     void initializeV1RS(OperationContext* txn,
                         const LocAndSize* records,
                         const LocAndSize* drecs,
+                        const LocAndSize* legacyGrabBag,
                         DummyExtentManager* em,
                         DummyRecordStoreV1MetaData* md);
 
@@ -190,6 +196,7 @@ namespace mongo {
     void assertStateV1RS(OperationContext* txn,
                          const LocAndSize* records,
                          const LocAndSize* drecs,
+                         const LocAndSize* legacyGrabBag,
                          const ExtentManager* em,
                          const DummyRecordStoreV1MetaData* md);
 

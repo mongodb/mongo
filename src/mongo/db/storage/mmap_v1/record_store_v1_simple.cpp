@@ -45,6 +45,7 @@
 #include "mongo/db/storage/mmap_v1/record_store_v1_simple_iterator.h"
 #include "mongo/util/log.h"
 #include "mongo/util/progress_meter.h"
+#include "mongo/util/mongoutils/str.h"
 #include "mongo/util/timer.h"
 #include "mongo/util/touch_pages.h"
 
@@ -80,6 +81,20 @@ namespace mongo {
 
     DiskLoc SimpleRecordStoreV1::_allocFromExistingExtents( OperationContext* txn,
                                                             int lenToAllocRaw ) {
+
+        // Slowly drain the deletedListLegacyGrabBag by popping one record off and putting it in the
+        // correct deleted list each time we try to allocate a new record. This ensures we won't
+        // orphan any data when upgrading from old versions, without needing a long upgrade phase.
+        // This is done before we try to allocate the new record so we can take advantage of the new
+        // space immediately.
+        {
+            const DiskLoc head = _details->deletedListLegacyGrabBag();
+            if (!head.isNull()) {
+                _details->setDeletedListLegacyGrabBag(txn, drec(head)->nextDeleted());
+                addDeletedRec(txn, head);
+            }
+        }
+
         // align size up to a multiple of 4
         const int lenToAlloc = (lenToAllocRaw + (4-1)) & ~(4-1);
 
@@ -132,6 +147,13 @@ namespace mongo {
     StatusWith<DiskLoc> SimpleRecordStoreV1::allocRecord( OperationContext* txn,
                                                           int lengthWithHeaders,
                                                           bool enforceQuota ) {
+        if (lengthWithHeaders > MaxAllowedAllocation) {
+            return StatusWith<DiskLoc>(
+                ErrorCodes::InvalidLength,
+                str::stream() << "Attempting to allocate a record larger than maximum size: "
+                              << lengthWithHeaders << " > 16.5MB");
+        }
+
         DiskLoc loc = _allocFromExistingExtents( txn, lengthWithHeaders );
         if ( !loc.isNull() )
             return StatusWith<DiskLoc>( loc );

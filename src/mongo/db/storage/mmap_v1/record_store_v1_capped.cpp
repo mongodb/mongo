@@ -310,7 +310,7 @@ namespace mongo {
 
     }
 
-    const DiskLoc &CappedRecordStoreV1::cappedFirstDeletedInCurExtent() const {
+    DiskLoc CappedRecordStoreV1::cappedFirstDeletedInCurExtent() const {
         if ( cappedLastDelRecLastExtent().isNull() )
             return cappedListOfAllDeletedRecords();
         else
@@ -549,7 +549,7 @@ namespace mongo {
         }
     }
 
-    const DiskLoc& CappedRecordStoreV1::cappedListOfAllDeletedRecords() const {
+    DiskLoc CappedRecordStoreV1::cappedListOfAllDeletedRecords() const {
         return _details->deletedListEntry(0);
     }
 
@@ -558,7 +558,7 @@ namespace mongo {
         return _details->setDeletedListEntry(txn, 0, loc);
     }
 
-    const DiskLoc& CappedRecordStoreV1::cappedLastDelRecLastExtent() const {
+    DiskLoc CappedRecordStoreV1::cappedLastDelRecLastExtent() const {
         return _details->deletedListEntry(1);
     }
 

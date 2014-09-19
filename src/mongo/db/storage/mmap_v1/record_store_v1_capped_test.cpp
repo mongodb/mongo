@@ -116,7 +116,7 @@ namespace {
             };
             md->setCapExtent(&txn, DiskLoc(0, 0));
             md->setCapFirstNewRecord(&txn, DiskLoc().setInvalid());
-            initializeV1RS(&txn, records, drecs, &em, md);
+            initializeV1RS(&txn, records, drecs, NULL, &em, md);
         }
 
         rs.insertRecord(&txn, zeros, 100 - Record::HeaderSize, false);
@@ -130,7 +130,7 @@ namespace {
                 {DiskLoc(0, 1100), 900},
                 {}
             };
-            assertStateV1RS(&txn, recs, drecs, &em, md);
+            assertStateV1RS(&txn, recs, drecs, NULL, &em, md);
             ASSERT_EQUALS(md->capExtent(), DiskLoc(0, 0));
             ASSERT_EQUALS(md->capFirstNewRecord(), DiskLoc().setInvalid()); // unlooped
         }
@@ -158,7 +158,7 @@ namespace {
             };
             md->setCapExtent(&txn, DiskLoc(0, 0));
             md->setCapFirstNewRecord(&txn, DiskLoc().setInvalid()); // unlooped
-            initializeV1RS(&txn, records, drecs, &em, md);
+            initializeV1RS(&txn, records, drecs, NULL, &em, md);
         }
 
         rs.insertRecord(&txn, zeros, 100 - Record::HeaderSize, false);
@@ -176,7 +176,7 @@ namespace {
                 {DiskLoc(0, 1500), 50}, // gap at end of extent
                 {}
             };
-            assertStateV1RS(&txn, recs, drecs, &em, md);
+            assertStateV1RS(&txn, recs, drecs, NULL, &em, md);
             ASSERT_EQUALS(md->capExtent(), DiskLoc(0, 0));
             ASSERT_EQUALS(md->capFirstNewRecord(), DiskLoc(0, 1000));
         }
@@ -204,7 +204,7 @@ namespace {
             };
             md->setCapExtent(&txn, DiskLoc(0, 0));
             md->setCapFirstNewRecord(&txn, DiskLoc(0, 1000));
-            initializeV1RS(&txn, records, drecs, &em, md);
+            initializeV1RS(&txn, records, drecs, NULL, &em, md);
         }
 
         rs.insertRecord(&txn, zeros, 100 - Record::HeaderSize, false);
@@ -222,7 +222,7 @@ namespace {
                 {DiskLoc(0, 1500), 50}, // gap at end of extent
                 {}
             };
-            assertStateV1RS(&txn, recs, drecs, &em, md);
+            assertStateV1RS(&txn, recs, drecs, NULL, &em, md);
             ASSERT_EQUALS(md->capExtent(), DiskLoc(0, 0));
             ASSERT_EQUALS(md->capFirstNewRecord(), DiskLoc(0, 1000));
         }
@@ -253,7 +253,7 @@ namespace {
             };
             md->setCapExtent(&txn, DiskLoc(0, 0));
             md->setCapFirstNewRecord(&txn, DiskLoc(0, 1000));
-            initializeV1RS(&txn, records, drecs, &em, md);
+            initializeV1RS(&txn, records, drecs, NULL, &em, md);
         }
 
         rs.insertRecord(&txn, zeros, 100 - Record::HeaderSize, false);
@@ -271,7 +271,7 @@ namespace {
                 {DiskLoc(0, 1500), 123}, // gap at end of extent
                 {}
             };
-            assertStateV1RS(&txn, recs, drecs, &em, md);
+            assertStateV1RS(&txn, recs, drecs, NULL, &em, md);
             ASSERT_EQUALS(md->capExtent(), DiskLoc(0, 0));
             ASSERT_EQUALS(md->capFirstNewRecord(), DiskLoc(0, 1000));
         }
@@ -299,7 +299,7 @@ namespace {
             };
             md->setCapExtent(&txn, DiskLoc(0, 0));
             md->setCapFirstNewRecord(&txn, DiskLoc(0, 1000));
-            initializeV1RS(&txn, records, drecs, &em, md);
+            initializeV1RS(&txn, records, drecs, NULL, &em, md);
         }
 
         rs.insertRecord(&txn, zeros, 100 - Record::HeaderSize, false);
@@ -318,7 +318,7 @@ namespace {
                 {DiskLoc(0, 1600), 24}, // gap at end of extent
                 {}
             };
-            assertStateV1RS(&txn, recs, drecs, &em, md);
+            assertStateV1RS(&txn, recs, drecs, NULL, &em, md);
             ASSERT_EQUALS(md->capExtent(), DiskLoc(0, 0));
             ASSERT_EQUALS(md->capFirstNewRecord(), DiskLoc(0, 1000));
         }
@@ -346,7 +346,7 @@ namespace {
             };
             md->setCapExtent(&txn, DiskLoc(0, 0));
             md->setCapFirstNewRecord(&txn, DiskLoc().setInvalid());
-            initializeV1RS(&txn, records, drecs, &em, md);
+            initializeV1RS(&txn, records, drecs, NULL, &em, md);
         }
 
         rs.insertRecord(&txn, zeros, 100 - Record::HeaderSize, false);
@@ -365,7 +365,7 @@ namespace {
                 {DiskLoc(1, 1100), 900},
                 {}
             };
-            assertStateV1RS(&txn, recs, drecs, &em, md);
+            assertStateV1RS(&txn, recs, drecs, NULL, &em, md);
             ASSERT_EQUALS(md->capExtent(), DiskLoc(1, 0));
             ASSERT_EQUALS(md->capFirstNewRecord(), DiskLoc().setInvalid()); // unlooped
         }
@@ -396,7 +396,7 @@ namespace {
             };
             md->setCapExtent(&txn, DiskLoc(0, 0));
             md->setCapFirstNewRecord(&txn, DiskLoc(0, 1000));
-            initializeV1RS(&txn, records, drecs, &em, md);
+            initializeV1RS(&txn, records, drecs, NULL, &em, md);
         }
 
         rs.insertRecord(&txn, zeros, 200 - Record::HeaderSize, false);
@@ -416,7 +416,7 @@ namespace {
                 {DiskLoc(1, 1900), 100},
                 {}
             };
-            assertStateV1RS(&txn, recs, drecs, &em, md);
+            assertStateV1RS(&txn, recs, drecs, NULL, &em, md);
             ASSERT_EQUALS(md->capExtent(), DiskLoc(1, 0));
             ASSERT_EQUALS(md->capFirstNewRecord(), DiskLoc(1, 1000));
         }
@@ -449,7 +449,7 @@ namespace {
             };
             md->setCapExtent(&txn, DiskLoc(0, 0));
             md->setCapFirstNewRecord(&txn, DiskLoc().setInvalid()); // unlooped
-            initializeV1RS(&txn, records, drecs, &em, md);
+            initializeV1RS(&txn, records, drecs, NULL, &em, md);
         }
 
         rs.insertRecord(&txn, zeros, 500 - Record::HeaderSize, false);
@@ -471,7 +471,7 @@ namespace {
                 {DiskLoc(0, 1920), 80},
                 {}
             };
-            assertStateV1RS(&txn, recs, drecs, &em, md);
+            assertStateV1RS(&txn, recs, drecs, NULL, &em, md);
             ASSERT_EQUALS(md->capExtent(), DiskLoc(0, 0));
             ASSERT_EQUALS(md->capFirstNewRecord(), DiskLoc(0, 1000));
         }
@@ -499,7 +499,7 @@ namespace {
             };
             md->setCapExtent(&txn, DiskLoc(0, 0));
             md->setCapFirstNewRecord(&txn, DiskLoc().setInvalid()); // unlooped
-            initializeV1RS(&txn, records, drecs, &em, md);
+            initializeV1RS(&txn, records, drecs, NULL, &em, md);
         }
 
         // This list of sizes was empirically generated to achieve this outcome. Don't think too
@@ -553,7 +553,7 @@ namespace {
                 {DiskLoc(0, 1628), 84},
                 {}
             };
-            assertStateV1RS(&txn, recs, drecs, &em, md);
+            assertStateV1RS(&txn, recs, drecs, NULL, &em, md);
             ASSERT_EQUALS(md->capExtent(), DiskLoc(0, 0));
             ASSERT_EQUALS(md->capFirstNewRecord(), DiskLoc(0, 1000));
         }
@@ -584,7 +584,7 @@ namespace {
 
             md->setCapExtent(&txn, DiskLoc(0, 0));
             md->setCapFirstNewRecord(&txn, DiskLoc().setInvalid()); // unlooped
-            initializeV1RS(&txn, recs, drecs, &em, md);
+            initializeV1RS(&txn, recs, drecs, NULL, &em, md);
         }
 
         // Insert bypasses standard alloc/insert routines to use the extent we want.

@@ -104,7 +104,7 @@ namespace mongo {
         DiskLoc myNull;
     }
 
-    const DiskLoc& DummyRecordStoreV1MetaData::deletedListEntry( int bucket ) const {
+    DiskLoc DummyRecordStoreV1MetaData::deletedListEntry( int bucket ) const {
         invariant( bucket >= 0 );
         if ( static_cast<size_t>( bucket ) >= _deletedLists.size() )
             return myNull;
@@ -119,6 +119,15 @@ namespace mongo {
         while ( static_cast<size_t>( bucket ) >= _deletedLists.size() )
             _deletedLists.push_back( DiskLoc() );
         _deletedLists[bucket] = loc;
+    }
+
+    DiskLoc DummyRecordStoreV1MetaData::deletedListLegacyGrabBag() const {
+        return _deletedListLegacyGrabBag;
+    }
+
+    void DummyRecordStoreV1MetaData::setDeletedListLegacyGrabBag(OperationContext* txn,
+                                                                   const DiskLoc& loc) {
+        _deletedListLegacyGrabBag = loc;
     }
 
     void DummyRecordStoreV1MetaData::orphanDeletedList(OperationContext* txn) {
@@ -367,6 +376,7 @@ namespace {
     void initializeV1RS(OperationContext* txn,
                         const LocAndSize* records,
                         const LocAndSize* drecs,
+                        const LocAndSize* legacyGrabBag,
                         DummyExtentManager* em,
                         DummyRecordStoreV1MetaData* md) {
         invariant(records || drecs); // if both are NULL nothing is being created...
@@ -381,6 +391,7 @@ namespace {
             ExtentSizes extentSizes;
             accumulateExtentSizeRequirements(records, &extentSizes);
             accumulateExtentSizeRequirements(drecs, &extentSizes);
+            accumulateExtentSizeRequirements(legacyGrabBag, &extentSizes);
             invariant(!extentSizes.empty());
 
             const int maxExtent = extentSizes.rbegin()->first;
@@ -493,13 +504,41 @@ namespace {
             }
         }
 
+        if (legacyGrabBag && !legacyGrabBag[0].loc.isNull()) {
+            invariant(!md->isCapped()); // capped should have an empty legacy grab bag.
+
+            int grabBagIdx = 0;
+            DiskLoc* prevNextPtr = NULL;
+            while (!legacyGrabBag[grabBagIdx].loc.isNull()) {
+                const DiskLoc loc = legacyGrabBag[grabBagIdx].loc;
+                const int size = legacyGrabBag[grabBagIdx].size;
+                invariant(size >= Record::HeaderSize);
+
+                if (grabBagIdx == 0) {
+                    md->setDeletedListLegacyGrabBag(txn, loc);
+                }
+                else {
+                    *prevNextPtr = loc;
+                }
+
+                DeletedRecord* drec = &em->recordForV1(loc)->asDeleted();
+                drec->lengthWithHeaders() = size;
+                drec->extentOfs() = 0;
+                drec->nextDeleted() = DiskLoc();
+                prevNextPtr = &drec->nextDeleted();
+
+                grabBagIdx++;
+            }
+        }
+
         // Make sure we set everything up as requested.
-        assertStateV1RS(txn, records, drecs, em, md);
+        assertStateV1RS(txn, records, drecs, legacyGrabBag, em, md);
     }
 
     void assertStateV1RS(OperationContext* txn,
                          const LocAndSize* records,
                          const LocAndSize* drecs,
+                         const LocAndSize* legacyGrabBag,
                          const ExtentManager* em,
                          const DummyRecordStoreV1MetaData* md) {
         invariant(records || drecs); // if both are NULL nothing is being asserted...
@@ -596,6 +635,28 @@ namespace {
                 }
                 // both the expected and actual deleted lists must be done at this point
                 ASSERT_EQUALS(drecs[drecIdx].loc, DiskLoc());
+            }
+
+            if (legacyGrabBag) {
+                int grabBagIdx = 0;
+                DiskLoc actualLoc = md->deletedListLegacyGrabBag();
+                while (!actualLoc.isNull()) {
+                    const DeletedRecord* actualDrec = &em->recordForV1(actualLoc)->asDeleted();
+                    const int actualSize = actualDrec->lengthWithHeaders();
+
+                    ASSERT_EQUALS(actualLoc, legacyGrabBag[grabBagIdx].loc);
+                    ASSERT_EQUALS(actualSize, legacyGrabBag[grabBagIdx].size);
+
+                    grabBagIdx++;
+                    actualLoc = actualDrec->nextDeleted();
+                }
+
+                // both the expected and actual deleted lists must be done at this point
+                ASSERT_EQUALS(legacyGrabBag[grabBagIdx].loc, DiskLoc());
+            }
+            else {
+                // Unless a test is actually using the grabBag it should be empty
+                ASSERT_EQUALS(md->deletedListLegacyGrabBag(), DiskLoc());
             }
         }
         catch (...) {
