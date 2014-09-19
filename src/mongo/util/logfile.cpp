@@ -193,7 +193,8 @@ namespace mongo {
         }
 #ifdef __linux__
         ssize_t tmpBlkSize = ioctl(_fd, BLKBSZGET);
-        if (tmpBlkSize >= 0) {
+        // TODO: We need some sanity checking on tmpBlkSize even if ioctl() did not fail.
+        if (tmpBlkSize > 0) {
             _blkSize = (size_t)tmpBlkSize;
         }
 #endif
