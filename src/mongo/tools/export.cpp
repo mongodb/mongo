@@ -38,6 +38,7 @@
 #include "mongo/tools/mongoexport_options.h"
 #include "mongo/tools/tool.h"
 #include "mongo/tools/tool_logger.h"
+#include "mongo/util/hex.h"
 #include "mongo/util/options_parser/option_section.h"
 
 using namespace mongo;

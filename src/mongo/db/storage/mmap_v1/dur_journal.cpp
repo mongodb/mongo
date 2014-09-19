@@ -50,6 +50,7 @@
 #include "mongo/util/checksum.h"
 #include "mongo/util/compress.h"
 #include "mongo/util/file.h"
+#include "mongo/util/hex.h"
 #include "mongo/util/log.h"
 #include "mongo/util/logfile.h"
 #include "mongo/util/mmap.h"

@@ -197,7 +197,7 @@ namespace mongo {
                 return Status::OK();
 
             case jstOID:
-                if ( !buffer->skip( sizeof(OID) ) )
+                if ( !buffer->skip( OID::kOIDSize ) )
                     return makeError("invalid bson", idElem);
                 return Status::OK();
 
@@ -224,7 +224,7 @@ namespace mongo {
                 status = buffer->readUTF8String( NULL );
                 if ( !status.isOK() )
                     return status;
-                buffer->skip( sizeof(OID) );
+                buffer->skip( OID::kOIDSize );
                 return Status::OK();
 
             case RegEx:

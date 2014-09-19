@@ -34,6 +34,7 @@
 
 #include "mongo/db/jsobj.h"
 #include "mongo/db/pipeline/document.h"
+#include "mongo/util/hex.h"
 #include "mongo/util/mongoutils/str.h"
 
 namespace mongo {
@@ -166,8 +167,8 @@ namespace mongo {
         }
 
         case jstOID:
-            BOOST_STATIC_ASSERT(sizeof(_storage.oid) == sizeof(OID));
-            memcpy(_storage.oid, elem.OID().getData(), sizeof(OID));
+            BOOST_STATIC_ASSERT(sizeof(_storage.oid) == OID::kOIDSize);
+            memcpy(_storage.oid, elem.OID().view().view(), OID::kOIDSize);
             break;
 
         case Bool:
@@ -600,7 +601,7 @@ namespace mongo {
             }
 
         case jstOID:
-            return memcmp(rL._storage.oid, rR._storage.oid, sizeof(OID));
+            return memcmp(rL._storage.oid, rR._storage.oid, OID::kOIDSize);
 
         case Code:
         case Symbol:
@@ -1011,7 +1012,7 @@ namespace mongo {
             return Value(ValueStorage(type));
 
         // simple types
-        case jstOID:       return Value(buf.read<OID>());
+        case jstOID:       return Value(OID::from(buf.skip(OID::kOIDSize)));
         case NumberInt:    return Value(buf.read<int>());
         case NumberLong:   return Value(buf.read<long long>());
         case NumberDouble: return Value(buf.read<double>());
@@ -1046,7 +1047,7 @@ namespace mongo {
                                                         Document::SorterDeserializeSettings()));
 
         case DBRef: {
-            OID oid = buf.read<OID>();
+            OID oid = OID::from(buf.skip(OID::kOIDSize));
             StringData ns = buf.readCStr();
             return Value(BSONDBRef(ns, oid));
         }

@@ -285,8 +285,9 @@ namespace JsonTests {
         class DBRef {
         public:
             void run() {
-                OID oid;
-                memset( &oid, 0xff, 12 );
+                char OIDbytes[OID::kOIDSize];
+                memset( &OIDbytes, 0xff, OID::kOIDSize );
+                OID oid = OID::from(OIDbytes);
                 BSONObjBuilder b;
                 b.appendDBRef( "a", "namespace", oid );
                 BSONObj built = b.done();
@@ -302,8 +303,9 @@ namespace JsonTests {
         class DBRefZero {
         public:
             void run() {
-                OID oid;
-                memset( &oid, 0, 12 );
+                char OIDbytes[OID::kOIDSize];
+                memset( &OIDbytes, 0, OID::kOIDSize );
+                OID oid = OID::from(OIDbytes);
                 BSONObjBuilder b;
                 b.appendDBRef( "a", "namespace", oid );
                 ASSERT_EQUALS( "{ \"a\" : { \"$ref\" : \"namespace\", \"$id\" : \"000000000000000000000000\" } }",
@@ -314,8 +316,9 @@ namespace JsonTests {
         class ObjectId {
         public:
             void run() {
-                OID oid;
-                memset( &oid, 0xff, 12 );
+                char OIDbytes[OID::kOIDSize];
+                memset( &OIDbytes, 0xff, OID::kOIDSize );
+                OID oid = OID::from(OIDbytes);
                 BSONObjBuilder b;
                 b.appendOID( "a", &oid );
                 BSONObj built = b.done();
@@ -1174,7 +1177,6 @@ namespace JsonTests {
             virtual BSONObj bson() const {
                 BSONObjBuilder b;
                 OID o;
-                memset( &o, 0, 12 );
                 BSONObjBuilder subBuilder(b.subobjStart("a"));
                 subBuilder.append("$ref", "ns");
                 subBuilder.append("$id", o);
@@ -1190,7 +1192,6 @@ namespace JsonTests {
             virtual BSONObj bson() const {
                 BSONObjBuilder b;
                 OID o;
-                memset( &o, 0, 12 );
                 BSONObjBuilder subBuilder(b.subobjStart("a"));
                 subBuilder.append("$ref", "ns");
                 subBuilder.append("$id", o);
@@ -1232,8 +1233,9 @@ namespace JsonTests {
         class Oid2 : public Base {
             virtual BSONObj bson() const {
                 BSONObjBuilder b;
-                OID o;
-                memset( &o, 0x0f, 12 );
+                char OIDbytes[OID::kOIDSize];
+                memset( &OIDbytes, 0x0f, OID::kOIDSize );
+                OID o = OID::from(OIDbytes);
                 b.appendOID( "_id", &o );
                 return b.obj();
             }

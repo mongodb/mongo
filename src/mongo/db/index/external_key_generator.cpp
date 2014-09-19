@@ -117,7 +117,7 @@ namespace {
                 break;
             case jstOID:
                 size += 1;
-                size += sizeof(OID);
+                size += OID::kOIDSize;
                 break;
             case BinData:
                 {

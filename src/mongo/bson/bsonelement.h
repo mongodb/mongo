@@ -252,9 +252,7 @@ namespace mongo {
         /** Retrieve the object ID stored in the object.
             You must ensure the element is of type jstOID first. */
         mongo::OID __oid() const {
-            class OID oid;
-            std::memcpy(&oid, value(), sizeof(oid));
-            return oid;
+            return OID::from(value());
         }
 
         /** True if element is null. */
@@ -454,9 +452,7 @@ namespace mongo {
             uassert( 10064 ,  "not a dbref" , type() == DBRef );
             const char * start = value();
             start += 4 + ConstDataView(start).readLE<int>();
-            class OID result;
-            std::memcpy(&result, start, sizeof(result));
-            return result;
+            return mongo::OID::from(start);
         }
 
         /** this does not use fieldName in the comparison, just the value */

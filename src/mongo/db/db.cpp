@@ -128,12 +128,6 @@ namespace mongo {
 
     Timer startupSrandTimer;
 
-    struct MyStartupTests {
-        MyStartupTests() {
-            verify( sizeof(OID) == 12 );
-        }
-    } mystartupdbcpp;
-
     QueryResult::View emptyMoreResult(long long);
 
 
@@ -829,7 +823,7 @@ static void startupConfigActions(const std::vector<std::string>& args) {
 }
 
 MONGO_INITIALIZER_GENERAL(CreateAuthorizationManager,
-                          ("SetupInternalSecurityUser"),
+                          ("SetupInternalSecurityUser", "OIDGeneration"),
                           MONGO_NO_DEPENDENTS)
         (InitializerContext* context) {
     AuthorizationManager* authzManager =

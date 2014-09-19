@@ -56,13 +56,13 @@ namespace mongo {
 int dbtestsMain( int argc, char** argv, char** envp ) {
     static StaticObserver StaticObserver;
     setWindowsUnhandledExceptionFilter();
-    setGlobalAuthorizationManager(new AuthorizationManager(new AuthzManagerExternalStateMock()));
     setGlobalEnvironment(new GlobalEnvironmentMongoD());
     repl::ReplSettings replSettings;
     replSettings.oplogSize = 10 * 1024 * 1024;
     repl::setGlobalReplicationCoordinator(new repl::ReplicationCoordinatorMock(replSettings));
     Command::testCommandsEnabled = 1;
     mongo::runGlobalInitializersOrDie(argc, argv, envp);
+    setGlobalAuthorizationManager(new AuthorizationManager(new AuthzManagerExternalStateMock()));
     StartupTest::runTests();
     return mongo::dbtests::runDbTests(argc, argv);
 }
