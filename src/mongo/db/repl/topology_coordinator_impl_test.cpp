@@ -2621,6 +2621,295 @@ namespace {
         ASSERT_EQUALS(1, response.getVersion());
         ASSERT_EQUALS(HostAndPort("h2").toString(), response.getSyncingTo());
     }
+
+    TEST_F(TopoCoordTest, ReconfigToBeTheLoneNode) {
+        ASSERT_TRUE(TopologyCoordinator::Role::follower == getTopoCoord().getRole());
+        ASSERT_EQUALS(MemberState::RS_STARTUP, getTopoCoord().getMemberState().s);
+        updateConfig(BSON("_id" << "rs0" <<
+                          "version" << 1 <<
+                          "members" << BSON_ARRAY(
+                              BSON("_id" << 1 << "host" << "hself"))),
+                     0);
+
+        // if we are the only node, we should become a candidate
+        ASSERT_TRUE(TopologyCoordinator::Role::candidate == getTopoCoord().getRole());
+        ASSERT_EQUALS(MemberState::RS_STARTUP2, getTopoCoord().getMemberState().s);
+    }
+
+    TEST_F(TopoCoordTest, ReconfigToBeTheLoneUnelectableNode) {
+        ASSERT_TRUE(TopologyCoordinator::Role::follower == getTopoCoord().getRole());
+        ASSERT_EQUALS(MemberState::RS_STARTUP, getTopoCoord().getMemberState().s);
+        ReplicaSetConfig cfg;
+        cfg.initialize(BSON("_id" << "rs0" <<
+                            "version" << 1 <<
+                            "members" << BSON_ARRAY(
+                                BSON("_id" << 1 << "host" << "hself" << "priority" << 0))));
+
+        getTopoCoord().updateConfig(cfg, 0, now()++, OpTime(0,0));
+
+        // despite being the only node, we are unelectable, so we should not become primary
+        ASSERT_TRUE(TopologyCoordinator::Role::follower == getTopoCoord().getRole());
+        ASSERT_EQUALS(MemberState::RS_STARTUP2, getTopoCoord().getMemberState().s);
+    }
+
+    TEST_F(TopoCoordTest, ReconfigToBeAddedToTheSet) {
+        ASSERT_TRUE(TopologyCoordinator::Role::follower == getTopoCoord().getRole());
+        ASSERT_EQUALS(MemberState::RS_STARTUP, getTopoCoord().getMemberState().s);
+        // config to be absent from the set
+        updateConfig(BSON("_id" << "rs0" <<
+                          "version" << 1 <<
+                          "members" << BSON_ARRAY(
+                              BSON("_id" << 1 << "host" << "host2:27017") <<
+                              BSON("_id" << 2 << "host" << "host3:27017"))),
+                     -1);
+        // should become removed since we are not in the set
+        ASSERT_TRUE(TopologyCoordinator::Role::follower == getTopoCoord().getRole());
+        ASSERT_EQUALS(MemberState::RS_REMOVED, getTopoCoord().getMemberState().s);
+
+        // reconfig to add to set
+        updateConfig(BSON("_id" << "rs0" <<
+                          "version" << 2 <<
+                          "members" << BSON_ARRAY(
+                              BSON("_id" << 0 << "host" << "host1:27017") <<
+                              BSON("_id" << 1 << "host" << "host2:27017") <<
+                              BSON("_id" << 2 << "host" << "host3:27017"))),
+                     0);
+        // having been added to the config, we should no longer be REMOVED and should enter STARTUP2
+        ASSERT_TRUE(TopologyCoordinator::Role::follower == getTopoCoord().getRole());
+        ASSERT_EQUALS(MemberState::RS_STARTUP2, getTopoCoord().getMemberState().s);
+    }
+
+    TEST_F(TopoCoordTest, ReconfigToBeRemovedFromTheSet) {
+        ASSERT_TRUE(TopologyCoordinator::Role::follower == getTopoCoord().getRole());
+        ASSERT_EQUALS(MemberState::RS_STARTUP, getTopoCoord().getMemberState().s);
+        updateConfig(BSON("_id" << "rs0" <<
+                          "version" << 1 <<
+                          "members" << BSON_ARRAY(
+                              BSON("_id" << 0 << "host" << "host1:27017") <<
+                              BSON("_id" << 1 << "host" << "host2:27017") <<
+                              BSON("_id" << 2 << "host" << "host3:27017"))),
+                     0);
+        ASSERT_TRUE(TopologyCoordinator::Role::follower == getTopoCoord().getRole());
+        ASSERT_EQUALS(MemberState::RS_STARTUP2, getTopoCoord().getMemberState().s);
+        
+        // reconfig to remove self
+        updateConfig(BSON("_id" << "rs0" <<
+                          "version" << 2 <<
+                          "members" << BSON_ARRAY(
+                              BSON("_id" << 1 << "host" << "host2:27017") <<
+                              BSON("_id" << 2 << "host" << "host3:27017"))),
+                     -1);
+        // should become removed since we are no longer in the set
+        ASSERT_TRUE(TopologyCoordinator::Role::follower == getTopoCoord().getRole());
+        ASSERT_EQUALS(MemberState::RS_REMOVED, getTopoCoord().getMemberState().s);
+    }
+
+    TEST_F(TopoCoordTest, ReconfigToBeRemovedFromTheSetAsPrimary) {
+        ASSERT_TRUE(TopologyCoordinator::Role::follower == getTopoCoord().getRole());
+        ASSERT_EQUALS(MemberState::RS_STARTUP, getTopoCoord().getMemberState().s);
+        updateConfig(BSON("_id" << "rs0" <<
+                          "version" << 1 <<
+                          "members" << BSON_ARRAY(
+                              BSON("_id" << 0 << "host" << "host1:27017"))),
+                     0);
+        ASSERT_TRUE(TopologyCoordinator::Role::candidate == getTopoCoord().getRole());
+        ASSERT_EQUALS(MemberState::RS_STARTUP2, getTopoCoord().getMemberState().s);
+
+        // win election and primary
+        getTopoCoord().processWinElection(now()++, OID::gen(), OpTime(0,0), OpTime(0,0));
+        ASSERT_TRUE(TopologyCoordinator::Role::leader == getTopoCoord().getRole());
+        ASSERT_EQUALS(MemberState::RS_PRIMARY, getTopoCoord().getMemberState().s);
+
+        // reconfig to remove self
+        updateConfig(BSON("_id" << "rs0" <<
+                          "version" << 2 <<
+                          "members" << BSON_ARRAY(
+                              BSON("_id" << 1 << "host" << "host2:27017") <<
+                              BSON("_id" << 2 << "host" << "host3:27017"))),
+                     -1);
+        // should become removed since we are no longer in the set even though we were primary
+        ASSERT_TRUE(TopologyCoordinator::Role::follower == getTopoCoord().getRole());
+        ASSERT_EQUALS(MemberState::RS_REMOVED, getTopoCoord().getMemberState().s);
+    }
+
+    TEST_F(TopoCoordTest, ReconfigCanNoLongerBePrimary) {
+        ASSERT_TRUE(TopologyCoordinator::Role::follower == getTopoCoord().getRole());
+        ASSERT_EQUALS(MemberState::RS_STARTUP, getTopoCoord().getMemberState().s);
+        updateConfig(BSON("_id" << "rs0" <<
+                          "version" << 1 <<
+                          "members" << BSON_ARRAY(
+                              BSON("_id" << 0 << "host" << "host1:27017"))),
+                     0);
+        ASSERT_TRUE(TopologyCoordinator::Role::candidate == getTopoCoord().getRole());
+        ASSERT_EQUALS(MemberState::RS_STARTUP2, getTopoCoord().getMemberState().s);
+
+        // win election and primary
+        getTopoCoord().processWinElection(now()++, OID::gen(), OpTime(0,0), OpTime(0,0));
+        ASSERT_TRUE(TopologyCoordinator::Role::leader == getTopoCoord().getRole());
+        ASSERT_EQUALS(MemberState::RS_PRIMARY, getTopoCoord().getMemberState().s);
+
+        // now lose primary due to lose of electability
+        updateConfig(BSON("_id" << "rs0" <<
+                          "version" << 2 <<
+                          "members" << BSON_ARRAY(
+                              BSON("_id" << 0 << "host" << "host1:27017" << "priority" << 0) <<
+                              BSON("_id" << 1 << "host" << "host2:27017") <<
+                              BSON("_id" << 2 << "host" << "host3:27017"))),
+                     0);
+        ASSERT_TRUE(TopologyCoordinator::Role::follower == getTopoCoord().getRole());
+        ASSERT_EQUALS(MemberState::RS_STARTUP2, getTopoCoord().getMemberState().s);
+    }
+
+//     uncomment once primariness can be maintained through a reconfig
+//     TEST_F(TopoCoordTest, ReconfigContinueToBePrimary) {
+//         ASSERT_TRUE(TopologyCoordinator::Role::follower == getTopoCoord().getRole());
+//         ASSERT_EQUALS(MemberState::RS_STARTUP, getTopoCoord().getMemberState().s);
+//         updateConfig(BSON("_id" << "rs0" <<
+//                           "version" << 1 <<
+//                           "members" << BSON_ARRAY(
+//                               BSON("_id" << 1 << "host" << "host1:27017"))),
+//                      0);
+//         ASSERT_TRUE(TopologyCoordinator::Role::leader == getTopoCoord().getRole());
+//         ASSERT_EQUALS(MemberState::RS_PRIMARY, getTopoCoord().getMemberState().s);
+// 
+//         // reconfig in a manner that leaves us electable and ensure we are still the primary
+//         updateConfig(BSON("_id" << "rs0" <<
+//                           "version" << 2 <<
+//                           "members" << BSON_ARRAY(
+//                               BSON("_id" << 0 << "host" << "host1:27017") <<
+//                               BSON("_id" << 1 << "host" << "host2:27017") <<
+//                               BSON("_id" << 2 << "host" << "host3:27017"))),
+//                      0);
+//         ASSERT_TRUE(TopologyCoordinator::Role::leader == getTopoCoord().getRole());
+//         ASSERT_EQUALS(MemberState::RS_PRIMARY, getTopoCoord().getMemberState().s);
+//     }
+
+    TEST_F(TopoCoordTest, ReconfigKeepSecondary) {
+        updateConfig(BSON("_id" << "rs0" <<
+                          "version" << 1 <<
+                          "members" << BSON_ARRAY(
+                              BSON("_id" << 1 << "host" << "host1:27017") <<
+                              BSON("_id" << 2 << "host" << "host2:27017"))),
+                     0);
+        ASSERT_TRUE(TopologyCoordinator::Role::follower == getTopoCoord().getRole());
+        ASSERT_EQUALS(MemberState::RS_STARTUP2, getTopoCoord().getMemberState().s);
+        setSelfMemberState(MemberState::RS_SECONDARY);
+        ASSERT_EQUALS(MemberState::RS_SECONDARY, getTopoCoord().getMemberState().s);
+
+        // reconfig and stay secondary
+        updateConfig(BSON("_id" << "rs0" <<
+                          "version" << 2 <<
+                          "members" << BSON_ARRAY(
+                              BSON("_id" << 0 << "host" << "host1:27017") <<
+                              BSON("_id" << 1 << "host" << "host2:27017") <<
+                              BSON("_id" << 2 << "host" << "host3:27017"))),
+                     0);
+        ASSERT_TRUE(TopologyCoordinator::Role::follower == getTopoCoord().getRole());
+        ASSERT_EQUALS(MemberState::RS_SECONDARY, getTopoCoord().getMemberState().s);
+    }
+
+    TEST_F(HeartbeatResponseTest, ReconfigBetweenHeartbeatRequestAndRepsonse) {
+        OpTime election = OpTime(14,0);
+        OpTime lastOpTimeApplied = OpTime(13,0);
+
+        // all three members up and secondaries
+        setSelfMemberState(MemberState::RS_SECONDARY);
+
+        HeartbeatResponseAction nextAction = receiveUpHeartbeat(HostAndPort("host3"),
+                                                                "rs0",
+                                                                MemberState::RS_SECONDARY,
+                                                                election,
+                                                                lastOpTimeApplied,
+                                                                lastOpTimeApplied);
+        ASSERT_NO_ACTION(nextAction.getAction());
+
+        nextAction = receiveUpHeartbeat(HostAndPort("host2"),
+                                        "rs0",
+                                        MemberState::RS_SECONDARY,
+                                        election,
+                                        lastOpTimeApplied,
+                                        lastOpTimeApplied);
+        ASSERT_NO_ACTION(nextAction.getAction());
+
+        // now request from host3 and receive after host2 has been removed via reconfig
+        getTopoCoord().prepareHeartbeatRequest(now()++, "rs0", HostAndPort("host3"));
+
+        updateConfig(BSON("_id" << "rs0" <<
+                          "version" << 2 <<
+                          "members" << BSON_ARRAY(
+                              BSON("_id" << 0 << "host" << "host1:27017") <<
+                              BSON("_id" << 2 << "host" << "host3:27017"))),
+                     0);
+
+        ReplSetHeartbeatResponse hb;
+        hb.initialize(BSON("ok" << 1 <<
+                           "v" << 1 <<
+                           "state" << MemberState::RS_PRIMARY));
+        hb.setOpTime(lastOpTimeApplied);
+        hb.setElectionTime(election);
+        StatusWith<ReplSetHeartbeatResponse> hbResponse = StatusWith<ReplSetHeartbeatResponse>(hb);
+        HeartbeatResponseAction action = getTopoCoord().processHeartbeatResponse(now()++,
+                                                Milliseconds(0),
+                                                HostAndPort("host3"),
+                                                hbResponse,
+                                                lastOpTimeApplied);
+
+        // now primary should be host3, index 1, and we should perform NoAction in response
+        ASSERT_EQUALS(1, getCurrentPrimaryIndex());
+        ASSERT_NO_ACTION(action.getAction());
+    }
+
+    TEST_F(HeartbeatResponseTest, ReconfigNodeRemovedBetweenHeartbeatRequestAndRepsonse) {
+        OpTime election = OpTime(14,0);
+        OpTime lastOpTimeApplied = OpTime(13,0);
+
+        // all three members up and secondaries
+        setSelfMemberState(MemberState::RS_SECONDARY);
+
+        HeartbeatResponseAction nextAction = receiveUpHeartbeat(HostAndPort("host3"),
+                                                                "rs0",
+                                                                MemberState::RS_SECONDARY,
+                                                                election,
+                                                                lastOpTimeApplied,
+                                                                lastOpTimeApplied);
+        ASSERT_NO_ACTION(nextAction.getAction());
+
+        nextAction = receiveUpHeartbeat(HostAndPort("host2"),
+                                        "rs0",
+                                        MemberState::RS_SECONDARY,
+                                        election,
+                                        lastOpTimeApplied,
+                                        lastOpTimeApplied);
+        ASSERT_NO_ACTION(nextAction.getAction());
+
+        // now request from host3 and receive after host2 has been removed via reconfig
+        getTopoCoord().prepareHeartbeatRequest(now()++, "rs0", HostAndPort("host3"));
+
+        updateConfig(BSON("_id" << "rs0" <<
+                          "version" << 2 <<
+                          "members" << BSON_ARRAY(
+                              BSON("_id" << 0 << "host" << "host1:27017") <<
+                              BSON("_id" << 1 << "host" << "host2:27017"))),
+                     0);
+
+        ReplSetHeartbeatResponse hb;
+        hb.initialize(BSON("ok" << 1 <<
+                           "v" << 1 <<
+                           "state" << MemberState::RS_PRIMARY));
+        hb.setOpTime(lastOpTimeApplied);
+        hb.setElectionTime(election);
+        StatusWith<ReplSetHeartbeatResponse> hbResponse = StatusWith<ReplSetHeartbeatResponse>(hb);
+        HeartbeatResponseAction action = getTopoCoord().processHeartbeatResponse(now()++,
+                                                Milliseconds(0),
+                                                HostAndPort("host3"),
+                                                hbResponse,
+                                                lastOpTimeApplied);
+
+        // primary should not be set and we should perform NoAction in response
+        ASSERT_EQUALS(-1, getCurrentPrimaryIndex());
+        ASSERT_NO_ACTION(action.getAction());
+    }
+
 }  // namespace
 }  // namespace repl
 }  // namespace mongo
