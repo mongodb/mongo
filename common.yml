@@ -1,13 +1,108 @@
+#######################################
+#    Tools Driver Config for MCI      #
+#######################################
+
+mongo_tools_variables:
+
+## Common download URLs (merge in as hashes)
+  mongo_download_urls:
+    osx_108: &mongo_url_osx108
+      mongo_url: "https://fastdl.mongodb.org/osx/mongodb-osx-x86_64-2.6.4.tgz"
+    solaris: &mongo_url_solaris
+      mongo_url: "https://fastdl.mongodb.org/sunos5/mongodb-sunos5-x86_64-2.6.4.tgz"
+    rhel55_32: &mongo_url_rhell55_32
+      mongo_url: "https://fastdl.mongodb.org/linux/mongodb-linux-i686-2.6.4.tgz"
+    ubuntu1204: &mongo_url_ubuntu1204
+      mongo_url: "http://downloads.10gen.com/linux/mongodb-linux-x86_64-enterprise-ubuntu1204-latest.tgz"
+    windows32-bit: &mongo_url_windows32
+      mongo_url: "https://fastdl.mongodb.org/win32/mongodb-win32-i386-2.6.4.zip"
+    windows64-bit: &mongo_url_windows64
+      mongo_url: "https://fastdl.mongodb.org/win32/mongodb-win32-x86_64-2008plus-2.6.4.zip"
+
+
+## List of tests to run on each buildvariant
+  mongo_tools_task_lists:
+    osx_108_task_list: &osx_108_tasks
+      - name: bsonutil
+      - name: db
+      - name: dist
+      - name: json
+      - name: log
+    rhel55_32_task_list: &rhel55_32_tasks
+      - name: bsonutil
+      - name: db
+      - name: dist
+      - name: json
+      - name: log
+      - name: util
+    solaris_task_list: &solaris_tasks
+      - name: db
+      - name: dist
+      - name: util
+    ubuntu1204_task_list: &ubuntu1204_tasks
+      - name: bsonutil
+      - name: db
+      - name: dist
+      - name: json
+      - name: lint
+      - name: log
+      - name: pool
+      - name: progress
+      - name: text
+      - name: util
+    windows_32_task_list: &windows_32_tasks
+      - name: db
+      - name: dist
+      - name: util
+    windows_64_task_list: &windows_64_tasks
+      - name: db
+      - name: dist
+      - name: util
+
+
+## Common mongodb arguments
+  mongodb_arguments:
+    standard: &mongodb_startup_args
+      mongodb_standard_args: "--dbpath mongodb/db_files --port 27017 --httpinterface --setParameter=enableTestCommands=1 &"
+
 functions:
-  "setup go env":
+  "attach coverage reports" :
+    command: attach.task_files
+    params:
+      "Coverage Report (HTML)": https://s3.amazonaws.com/mciuploads/mongo-tools/coverage/${task_id}.html
+      "Coverage Report (TXT)": https://s3.amazonaws.com/mciuploads/mongo-tools/coverage/${task_id}.txt
+
+  "attach tool":
+    command: attach.task_files
+    params:
+      "${tool}": https://s3.amazonaws.com/mciuploads/mongo-tools/binaries/${build_id}/${tool}
+
+  "build tool":
     command: shell.exec
     params:
       working_dir: src
       script: |
         set -o verbose
-        if [ "Windows_NT" = "$OS" ]; then export GOPATH=C:$(pwd | sed 's,/,\\,g') else export GOPATH=`pwd`; fi;
-        ${preproc_gpm|echo} ./gpm
-        ./gpm install
+        if [ "Windows_NT" = "$OS" ]; then
+          export GOPATH=$(cygpath -w $(pwd));
+        else
+          export GOPATH=`pwd`;
+        fi;
+        echo "Building ${tool}..."
+        go build -o ${tool} github.com/mongodb/mongo-tools/${tool}/main
+
+  "download mongod":
+    command: shell.exec
+    params:
+      working_dir: src
+      script: |
+        rm -rf mongodb
+        mkdir mongodb
+        cd mongodb
+        curl -s ${mongo_url} --output mongodb.tgz
+        ${decompress} mongodb.tgz
+        chmod +x ./mongodb-*/bin/*;
+        mv ./mongodb-*/bin/* .
 
   "generate coverage html + text":
     command: shell.exec
@@ -15,75 +110,72 @@ functions:
       working_dir: src
       script: |
         set -o verbose
-        if [ "Windows_NT" = "$OS" ]; then export GOPATH=C:$(pwd | sed 's,/,\\,g') else export GOPATH=`pwd`; fi;
-        if [ '${coverage|false}' = 'true' ]
-        then
+        if [ "Windows_NT" = "$OS" ]; then
+          export GOPATH=$(cygpath -w $(pwd));
+        else
+          export GOPATH=`pwd`;
+        fi;
+        if [ "${coverage|false}" = "true" ]; then
             go tool cover -html=coverage.out -o coverage.html
             go tool cover -func=coverage.out -o coverage.txt
-        fi
+        fi;
 
-  "upload coverage report":
-    command: s3.put
-    params:
-      aws_key: ${aws_key}
-      aws_secret: ${aws_secret}
-      local_file: src/coverage.${format|txt}
-      remote_file: mci-tools/coverage/${task_id}.${format|txt}
-      bucket: mciuploads
-      permissions: public-read
-      content_type: ${content_type|text/plain}
-      build_variants: ["ubuntu"]
-
-  "attach coverage reports" :
-    command: attach.task_files
-    params:
-      "Coverage Report (HTML)": https://s3.amazonaws.com/mciuploads/mci-tools/coverage/${task_id}.html
-      "Coverage Report (TXT)": https://s3.amazonaws.com/mciuploads/mci-tools/coverage/${task_id}.txt
-
-  "download mongod":
-    command: shell.exec
-    params:
-      script: |
-        set -o errexit
-        rm -rf mongodb
-        mkdir mongodb
-        cd mongodb
-        curl -s ${mongo_url} --output mongodb.tgz
-        ${decompress} mongodb.tgz
-        mv ./mongodb-*/* .
-
-  "start mongod":
-    command: shell.exec
-    params:
-      script: |
-        set -o errexit
-        rm -rf mongodb/${db_files_dir|db_files}
-        rm -f mongodb/${logfile|run.log}
-        mkdir mongodb/${db_files_dir|db_files}
-        ./mongodb/bin/mongod --dbpath ./mongodb/${db_files_dir|db_files} --logpath ./mongodb/${logfile|run.log} --port ${port|27017} --fork ${mongod_extra_options|}
-
-  "kill mongod":
-    command: shell.exec
-    params:
-      script: |
-        pkill -9 mongod;
-
-  "run tests":
+  "setup go env":
     command: shell.exec
     params:
       working_dir: src
       script: |
         set -o verbose
-        if [ "Windows_NT" = "$OS" ]; then export GOPATH=C:$(pwd | sed 's,/,\\,g') else export GOPATH=`pwd`; fi;
-        cd src/github.com/mongodb/mongo-tools/${package}
-        go test -i
+        if [ "Windows_NT" = "$OS" ]; then
+          export GOPATH=$(cygpath -w $(pwd));
+        else
+          export GOPATH=`pwd`;
+        fi;
+        ${preproc_gpm|echo} ./gpm
+        ./gpm install
+
+  "move coverage data":
+    command: shell.exec
+    params:
+      working_dir: src
+      script: |
+        set -o verbose
+        mv src/github.com/mongodb/mongo-tools/common/${package}/coverage.out $GOPATH
+
+  "run mongod test":
+    command: shell.exec
+    params:
+      working_dir: src
+      script: |
+        set -o verbose
+        if [ "${start_mongod|true}" = "true" ]; then
+          rm -rf mongodb/${db_files_dir|db_files} mongodb/${logfile|run.log};
+          mkdir mongodb/${db_files_dir|db_files};
+          echo "Starting mongod...";
+          ./mongodb/mongod${extension} ${mongodb_standard_args} ${mongod_extra_options|}
+        fi;
+
+        if [ "Windows_NT" = "$OS" ]; then
+          export GOPATH=$(cygpath -w $(pwd));
+        else
+          export GOPATH=`pwd`;
+        fi;
+
+        cd src/github.com/mongodb/mongo-tools/${package};
+
+        go test -i;
+        exit_code=-1;
         if [ '${coverage|false}' = 'true' ]
         then
-            go test -v -test.types=${types} -coverprofile=coverage.out
-            mv coverage.out $GOPATH
+            go test -v -test.types=${types} -coverprofile=coverage.out;
+            exit_code=$?;
+            mv coverage.out $GOPATH;
         else
-            go test -v -test.types=${types} 
+            go test -v -test.types=${types};
+            exit_code=$?;
         fi
+        pkill -9 mongod;
+        exit $exit_code;
 
   "run unit tests":
     command: gotest.run
@@ -93,13 +185,28 @@ functions:
         - dir: src/github.com/mongodb/mongo-tools/common/${package}
           args: ${coverage_args}
 
-  "move coverage data":
-    command: shell.exec
+  "upload coverage report":
+    command: s3.put
     params:
-      working_dir: src
-      script: |
-        set -o verbose
-        mv src/github.com/mongodb/mongo-tools/common/${package}/coverage.out $GOPATH
+      aws_key: ${aws_key}
+      aws_secret: ${aws_secret}
+      local_file: src/coverage.${format|txt}
+      remote_file: mongo-tools/coverage/${task_id}.${format|txt}
+      bucket: mciuploads
+      permissions: public-read
+      content_type: ${content_type|text/plain}
+      build_variants: ["ubuntu"]
+
+  "upload tool":
+    command: s3.put
+    params:
+      aws_key: ${aws_key}
+      aws_secret: ${aws_secret}
+      local_file: src/${tool}
+      remote_file: mongo-tools/binaries/${build_id}/${tool}
+      bucket: mciuploads
+      permissions: public-read
+      content_type: application/octet-stream
 
 pre:
   - command: expansions.fetch
@@ -110,10 +217,25 @@ pre:
         - local_key: "aws_secret"
           remote_key: "project_aws_secret"
 
-post:
-  - func: "kill mongod"
-
 tasks:
+- name: auth
+  commands:
+    - command: git.get_project
+      params:
+        directory: src
+    - func: "setup go env"
+    - func: "download mongod"
+    - func: "run mongod test"
+      vars:
+        package: "common/db"
+        types: "auth"
+    - func: "generate coverage html + text"
+    - func: "upload coverage report"
+    - func: "upload coverage report"
+      vars:
+        format: "html"
+        content_type: "text/html"
+    - func: "attach coverage reports"
 
 - name: bsonutil
   commands:
@@ -143,11 +265,11 @@ tasks:
         directory: src
     - func: "setup go env"
     - func: "download mongod"
-    - func: "start mongod"
-    - func: "run tests"
+    - func: "run mongod test"
       vars:
         package: "common/db"
         types: "db"
+
     - func: "generate coverage html + text"
     - func: "upload coverage report"
     - func: "upload coverage report"
@@ -155,6 +277,85 @@ tasks:
         format: "html"
         content_type: "text/html"
     - func: "attach coverage reports"
+
+- name: dist
+  depends_on:
+  #- name: "unit"
+  commands:
+    - command: git.get_project
+      params:
+        directory: src
+    - func: "setup go env"
+    # bsondump
+    - func: "build tool"
+      vars:
+        tool: bsondump
+    - func: "upload tool"
+      vars:
+        tool: bsondump
+    - func: "attach tool"
+      vars:
+        tool: bsondump
+    # mongodump
+    - func: "build tool"
+      vars:
+        tool: mongodump
+    - func: "upload tool"
+      vars:
+        tool: mongodump
+    - func: "attach tool"
+      vars:
+        tool: mongodump
+    # mongoexport
+    - func: "build tool"
+      vars:
+        tool: mongoexport
+    - func: "upload tool"
+      vars:
+        tool: mongoexport
+    - func: "attach tool"
+      vars:
+        tool: mongoexport
+    # mongofiles
+    - func: "build tool"
+      vars:
+        tool: mongofiles
+    - func: "upload tool"
+      vars:
+        tool: mongofiles
+    - func: "attach tool"
+      vars:
+        tool: mongofiles
+    # mongoimport
+    - func: "build tool"
+      vars:
+        tool: mongoimport
+    - func: "upload tool"
+      vars:
+        tool: mongoimport
+    - func: "attach tool"
+      vars:
+        tool: mongoimport
+    # mongostat
+    - func: "build tool"
+      vars:
+        tool: mongostat
+    - func: "upload tool"
+      vars:
+        tool: mongostat
+    - func: "attach tool"
+      vars:
+        tool: mongostat
+    # mongotop
+    - func: "build tool"
+      vars:
+        tool: mongotop
+    - func: "upload tool"
+      vars:
+        tool: mongotop
+    - func: "attach tool"
+      vars:
+        tool: mongotop
 
 - name: json
   commands:
@@ -177,6 +378,20 @@ tasks:
         content_type: "text/html"
     - func: "attach coverage reports"
 
+- name: lint
+  commands:
+    - command: git.get_project
+      params:
+        directory: src
+    - func: "setup go env"
+    - command: shell.exec
+      params:
+        working_dir: src
+        script: |
+          set -o verbose
+          if [ "Windows_NT" = "$OS" ]; then  export GOPATH=$(cygpath -w $(pwd)); else export GOPATH=`pwd`; fi;
+          go run src/github.com/3rf/mongo-lint/golint/golint.go src/github.com/mongodb/mongo-tools
+
 - name: log
   commands:
     - command: git.get_project
@@ -198,44 +413,40 @@ tasks:
         content_type: "text/html"
     - func: "attach coverage reports"
 
-- name: lint
+- name: pool
   commands:
     - command: git.get_project
       params:
         directory: src
     - func: "setup go env"
-    - command: shell.exec
+    - command: expansions.update
       params:
-        working_dir: src
-        script: |
-          set -o verbose
-          if [ "Windows_NT" = "$OS" ]; then export GOPATH=C:$(pwd | sed 's,/,\\,g') else export GOPATH=`pwd`; fi;
-          go run src/github.com/3rf/mongo-lint/golint/golint.go src/github.com/mongodb/mongo-tools
-
-- name: vet
-  commands:
-    - command: git.get_project
-      params:
-        directory: src
-    - func: "setup go env"
-    - command: shell.exec
-      params:
-        working_dir: src
-        script: |
-          set -o verbose
-          if [ "Windows_NT" = "$OS" ]; then export GOPATH=C:$(pwd | sed 's,/,\\,g') else export GOPATH=`pwd`; fi;
-          go tool vet src/github.com/mongodb/mongo-tools/
-
-- name: util
-  commands:
-    - command: git.get_project
-      params:
-        directory: src
-    - func: "setup go env"
-    - func: "run tests"
+        updates:
+          - key: "package"
+            value: "pool"
+    - func: "run unit tests"
+    - func: "move coverage data"
+    - func: "generate coverage html + text"
+    - func: "upload coverage report"
+    - func: "upload coverage report"
       vars:
-        package: "common/util"
-        types: "unit"
+        format: "html"
+        content_type: "text/html"
+    - func: "attach coverage reports"
+
+- name: progress
+  commands:
+    - command: git.get_project
+      params:
+        directory: src
+    - func: "setup go env"
+    - command: expansions.update
+      params:
+        updates:
+          - key: "package"
+            value: "progress"
+    - func: "run unit tests"
+    - func: "move coverage data"
     - func: "generate coverage html + text"
     - func: "upload coverage report"
     - func: "upload coverage report"
@@ -260,9 +471,7 @@ tasks:
             value: "ssl"
           - key: "port"
             value: "20000"
-    - func: "start mongod"
-    - func: "run tests"
-    - func: "kill mongod"
+    - func: "run mongod test"
     - command: expansions.update
       params:
         updates:
@@ -270,21 +479,21 @@ tasks:
             value: "ssl_auth"
           - key: "mongod_extra_options"
             value: "--sslMode requireSSL --sslCAFile src/src/github.com/mongodb/mongo-tools/common/db/openssl/testdata/ca.pem --sslPEMKeyFile src/src/github.com/mongodb/mongo-tools/common/db/openssl/testdata/server.pem --auth"
-    - func: "start mongod"
-    - func: "run tests"
+    - func: "run mongod test"
 
-- name: auth
+- name: text
   commands:
     - command: git.get_project
       params:
         directory: src
     - func: "setup go env"
-    - func: "download mongod"
-    - func: "start mongod"
-    - func: "run tests"
-      vars:
-        package: "common/db"
-        types: "auth"
+    - command: expansions.update
+      params:
+        updates:
+          - key: "package"
+            value: "text"
+    - func: "run unit tests"
+    - func: "move coverage data"
     - func: "generate coverage html + text"
     - func: "upload coverage report"
     - func: "upload coverage report"
@@ -293,29 +502,104 @@ tasks:
         content_type: "text/html"
     - func: "attach coverage reports"
 
-buildvariants:
+- name: util
+  commands:
+    - command: git.get_project
+      params:
+        directory: src
+    - func: "setup go env"
+    - func: "run mongod test"
+      vars:
+        package: "common/util"
+        types: "unit"
+        start_mongod: false
+    - func: "generate coverage html + text"
+    - func: "upload coverage report"
+    - func: "upload coverage report"
+      vars:
+        format: "html"
+        content_type: "text/html"
+    - func: "attach coverage reports"
 
-- name: ubuntu
-  display_name: Ubuntu
+- name: vet
+  commands:
+    - command: git.get_project
+      params:
+        directory: src
+    - func: "setup go env"
+    - command: shell.exec
+      params:
+        working_dir: src
+        script: |
+          set -o verbose
+          if [ "Windows_NT" = "$OS" ]; then
+            export GOPATH=$(cygpath -w $(pwd));
+          else
+            export GOPATH=`pwd`;
+          fi;
+          go tool vet src/github.com/mongodb/mongo-tools/
+
+buildvariants:
+#######################################
+#           OSX Buildvariant          #
+#######################################
+- name: osx-108
+  display_name: OSX 10.8
   run_on:
-  - ubuntu1404-test
+  - osx-108
   expansions:
-    mongo_url: http://fastdl.mongodb.org/linux/mongodb-linux-x86_64-2.6.4.tgz
-    coverage: 'true'
+    <<: *mongo_url_osx108
+    <<: *mongodb_startup_args
     coverage_args: "-coverprofile=coverage.out"
-  tasks:
-  - name: bsonutil
-  - name: db
-  - name: json
-  - name: log
-  - name: util
+  tasks: *osx_108_tasks
+
+#######################################
+#          RHEL Buildvariant          #
+#######################################
+- name: linux-32
+  display_name: Linux 32-bit
+  run_on:
+  - rhel55-32
+  expansions:
+    <<: *mongo_url_rhell55_32
+    <<: *mongodb_startup_args
+    coverage: true
+    coverage_args: "-coverprofile=coverage.out"
+  tasks: *rhel55_32_tasks
+
+#######################################
+#         Solaris Buildvariant        #
+#######################################
+- name: solaris
+  display_name: Solaris
+  run_on:
+  - solaris
+  expansions:
+    <<: *mongo_url_solaris
+    <<: *mongodb_startup_args
+  tasks: *solaris_tasks
+
+#######################################
+#         Ubuntu Buildvariants        #
+#######################################
+- name: ubuntu
+  display_name: Ubuntu 1204
+  run_on:
+  - ubuntu1204-test
+  expansions:
+    <<: *mongo_url_ubuntu1204
+    <<: *mongodb_startup_args
+    coverage: true
+    coverage_args: "-coverprofile=coverage.out"
+  tasks: *ubuntu1204_tasks
 
 - name: ubuntu-ssl
   display_name: Ubuntu SSL
   run_on:
-  - ubuntu1404-test
+  - ubuntu1204-test
   expansions:
-    mongo_url: http://downloads.10gen.com/linux/mongodb-linux-x86_64-enterprise-ubuntu1404-latest.tgz
+    <<: *mongo_url_ubuntu1204
+    <<: *mongodb_startup_args
     mongod_extra_options: --sslMode requireSSL --sslCAFile src/src/github.com/mongodb/mongo-tools/common/db/openssl/testdata/ca.pem --sslPEMKeyFile src/src/github.com/mongodb/mongo-tools/common/db/openssl/testdata/server.pem
   tasks:
   - name: ssl
@@ -323,44 +607,35 @@ buildvariants:
 - name: ubuntu-auth
   display_name: Ubuntu Auth
   run_on:
-  - ubuntu1404-test
+  - ubuntu1204-test
   expansions:
-    mongo_url: http://downloads.10gen.com/linux/mongodb-linux-x86_64-enterprise-ubuntu1404-latest.tgz
+    <<: *mongo_url_ubuntu1204
+    <<: *mongodb_startup_args
     mongod_extra_options: --auth
   tasks:
   - name: auth
 
-- name: osx-108
-  display_name: OSX 10.8
+#######################################
+#        Windows Buildvariants        #
+#######################################
+- name: windows-32
+  display_name: Windows 32-bit
   run_on:
-  - osx-108
+  - windows-32
   expansions:
-    mongo_url: https://fastdl.mongodb.org/osx/mongodb-osx-x86_64-2.6.4.tgz
-    coverage_args: "-coverprofile=coverage.out"
-  tasks:
-  - name: bsonutil
-  - name: db
-  - name: json
-  - name: log
-  - name: util
-
-- name: solaris
-  display_name: Solaris
-  run_on:
-  - solaris
-  expansions:
-    mongo_url: https://fastdl.mongodb.org/sunos5/mongodb-sunos5-x86_64-2.6.4.tgz
-  tasks:
-  - name: db
-  - name: util
+    <<: *mongo_url_windows32
+    <<: *mongodb_startup_args
+    extension: .exe
+    preproc_gpm: "perl -pi -e 's/\\r\\n/\\n/g' "
+  tasks: *windows_32_tasks
 
 - name: windows-64
-  display_name: Windows-64
+  display_name: Windows 64-bit
   run_on:
   - windows-64-vs2013-test
   expansions:
-    mongo_url: https://fastdl.mongodb.org/win32/mongodb-win32-x86_64-2008plus-2.6.4.zip
+    <<: *mongo_url_windows64
+    <<: *mongodb_startup_args
+    extension: .exe
     preproc_gpm: "perl -pi -e 's/\\r\\n/\\n/g' "
-  tasks:
-  - name: db
-  - name: util
+  tasks: *windows_64_tasks
