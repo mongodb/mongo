@@ -245,14 +245,17 @@ namespace mongo {
         // is coming from (or a vestige of) an ongoing migration.
         CollectionMetadataPtr _collMetadata;
 
+        // Only one of these is not-NULL.
+        RecoveryUnit* _unownedRU;
+        std::auto_ptr<RecoveryUnit> _ownedRU;
+        // NOTE: _ownedRU must come before _exec, because _ownedRU must outlive _exec.
+        // The storage engine can have resources in the PlanExecutor that rely on
+        // the RecoveryUnit being alive.
+
         //
         // The underlying execution machinery.
         //
         scoped_ptr<PlanExecutor> _exec;
-
-        // Only one of these is not-NULL.
-        RecoveryUnit* _unownedRU;
-        std::auto_ptr<RecoveryUnit> _ownedRU;
     };
 
     /**
