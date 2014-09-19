@@ -91,9 +91,6 @@ namespace mongo {
         virtual void releaseAuthzUpdateLock();
 
     private:
-        virtual Status _getUserDocument(
-                            OperationContext* txn, const UserName& userName, BSONObj* userDoc);
-
         boost::timed_mutex _authzDataUpdateLock;
     };
 
