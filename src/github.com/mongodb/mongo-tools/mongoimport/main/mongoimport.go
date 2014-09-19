@@ -38,10 +38,7 @@ func main() {
 	}
 
 	// create a session provider to connect to the db
-	sessionProvider, err := db.InitSessionProvider(*opts)
-	if err != nil {
-		util.Panicf("error initializing database session: %v", err)
-	}
+	sessionProvider := db.NewSessionProvider(*opts)
 
 	importer := mongoimport.MongoImport{
 		ToolOptions:     opts,

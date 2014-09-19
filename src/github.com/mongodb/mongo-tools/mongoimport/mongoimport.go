@@ -59,6 +59,34 @@ type ImportInput interface {
 	SetHeader() error
 }
 
+func (mongoImport *MongoImport) getImportWriter() ImportWriter {
+	var upsertFields []string
+	if mongoImport.IngestOptions.Upsert &&
+		len(mongoImport.IngestOptions.UpsertFields) != 0 {
+		upsertFields = strings.Split(mongoImport.IngestOptions.UpsertFields, ",")
+	}
+	if mongoImport.ToolOptions.DBPath == "" {
+		return &DriverImportWriter{
+			upsertMode:      mongoImport.IngestOptions.Upsert,
+			upsertFields:    upsertFields,
+			sessionProvider: mongoImport.SessionProvider,
+			session:         nil,
+		}
+	} else {
+		if mongoImport.IngestOptions.Upsert {
+			panic("not implemented! see SERVER-15309")
+		}
+		return &ShimImportWriter{
+			upsertMode:   mongoImport.IngestOptions.Upsert,
+			upsertFields: upsertFields,
+			dbPath:       mongoImport.ToolOptions.DBPath,
+			dbName:       mongoImport.ToolOptions.Namespace.DB,
+			collection:   mongoImport.ToolOptions.Namespace.Collection,
+		}
+	}
+	//return DriverImportWriter{}
+}
+
 // ValidateSettings ensures that the tool specific options supplied for
 // MongoImport are valid
 func (mongoImport *MongoImport) ValidateSettings() error {
@@ -148,39 +176,26 @@ func (mongoImport *MongoImport) ImportDocuments() (int64, error) {
 // importDocuments is a helper to ImportDocuments and does all the ingestion
 // work by taking data from the 'importInput' source and writing it to the
 // appropriate namespace
-func (mongoImport *MongoImport) importDocuments(importInput ImportInput) (
-	int64, error) {
-	session, err := mongoImport.SessionProvider.GetSession()
-	if err != nil {
-		return 0, err
-	}
-	defer session.Close()
+func (mongoImport *MongoImport) importDocuments(importInput ImportInput) (int64, error) {
+	importWriter := mongoImport.getImportWriter()
 	connUrl := mongoImport.ToolOptions.Host
 	if mongoImport.ToolOptions.Port != "" {
 		connUrl = connUrl + ":" + mongoImport.ToolOptions.Port
 	}
 	fmt.Fprintf(os.Stdout, "connected to: %v\n", connUrl)
-	collection := session.DB(mongoImport.ToolOptions.DB).
-		C(mongoImport.ToolOptions.Collection)
+	err := importWriter.Open(mongoImport.ToolOptions.Namespace.DB, mongoImport.ToolOptions.Namespace.Collection)
+	if err != nil {
+		return 0, err
+	}
 
 	// drop the database if necessary
 	if mongoImport.IngestOptions.Drop {
 		util.PrintfTimeStamped("dropping: %v.%v\n", mongoImport.ToolOptions.DB,
 			mongoImport.ToolOptions.Collection)
-		if err := collection.DropCollection(); err != nil {
-			// this is hacky but necessary :(
-			if err.Error() != errNsNotFound.Error() {
-				return 0, err
-			}
-		}
-	}
 
-	// trim upsert fields if supplied
-	var upsertFields []string
-	if mongoImport.IngestOptions.Upsert {
-		if len(mongoImport.IngestOptions.UpsertFields) != 0 {
-			upsertFields = strings.Split(mongoImport.IngestOptions.UpsertFields,
-				",")
+		if err := importWriter.Drop(); err != nil &&
+			err.Error() != errNsNotFound.Error() {
+			return 0, err
 		}
 	}
 
@@ -205,18 +220,7 @@ func (mongoImport *MongoImport) importDocuments(importInput ImportInput) (
 			mongoImport.InputOptions.Type != JSON {
 			document = removeBlankFields(document)
 		}
-
-		// if upsert is specified without any fields, default to inserts
-		if mongoImport.IngestOptions.Upsert {
-			selector := constructUpsertDocument(upsertFields, document)
-			if selector == nil {
-				err = collection.Insert(document)
-			} else {
-				_, err = collection.Upsert(selector, document)
-			}
-		} else {
-			err = collection.Insert(document)
-		}
+		err = importWriter.Import(document)
 		if err != nil {
 			if mongoImport.IngestOptions.StopOnError {
 				return docsCount, err
@@ -227,43 +231,6 @@ func (mongoImport *MongoImport) importDocuments(importInput ImportInput) (
 		docsCount++
 	}
 	return docsCount, nil
-}
-
-// constructUpsertDocument constructs a BSON document to use for upserts
-func constructUpsertDocument(upsertFields []string, document bson.M) bson.M {
-	upsertDocument := bson.M{}
-	var hasDocumentKey bool
-	for _, key := range upsertFields {
-		upsertDocument[key] = getUpsertValue(key, document)
-		if upsertDocument[key] != nil {
-			hasDocumentKey = true
-		}
-	}
-	if !hasDocumentKey {
-		return nil
-	}
-	return upsertDocument
-}
-
-// getUpsertValue takes a given BSON document and a given field, and returns the
-// field's associated value in the document. The field is specified using dot
-// notation for nested fields. e.g. "person.age" would return 34 would return
-// 34 in the document: bson.M{"person": bson.M{"age": 34}} whereas,
-// "person.name" would return nil
-func getUpsertValue(field string, document bson.M) interface{} {
-	index := strings.Index(field, ".")
-	if index == -1 {
-		return document[field]
-	}
-	left := field[0:index]
-	if document[left] == nil {
-		return nil
-	}
-	subDoc, ok := document[left].(bson.M)
-	if !ok {
-		return nil
-	}
-	return getUpsertValue(field[index+1:], subDoc)
 }
 
 // removeBlankFields removes empty/blank fields in csv and tsv
