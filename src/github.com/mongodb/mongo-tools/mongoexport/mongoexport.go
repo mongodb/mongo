@@ -108,10 +108,7 @@ func getDocSource(exp MongoExport) (db.DocSource, error) {
 		return db.NewDecodedBSONSource(iter), nil
 	}
 
-	sessionProvider, err := db.InitSessionProvider(exp.ToolOptions)
-	if err != nil {
-		return nil, err
-	}
+	sessionProvider := db.NewSessionProvider(exp.ToolOptions)
 	session, err := sessionProvider.GetSession()
 	if err != nil {
 		return nil, err
