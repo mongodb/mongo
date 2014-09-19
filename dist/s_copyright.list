@@ -1,3 +1,4 @@
+skip	api/leveldb/leveldb_wt_config.in
 skip	dist/api_config.py
 skip	dist/api_data.py
 skip	dist/api_err.py

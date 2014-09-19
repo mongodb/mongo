@@ -191,8 +191,7 @@ __evict_server(void *arg)
 		F_CLR(cache, WT_EVICT_ACTIVE);
 		WT_ERR(__wt_verbose(session, WT_VERB_EVICTSERVER, "sleeping"));
 		/* Don't rely on signals: check periodically. */
-		WT_ERR_TIMEDOUT_OK(
-		    __wt_cond_wait(session, cache->evict_cond, 100000));
+		WT_ERR(__wt_cond_wait(session, cache->evict_cond, 100000));
 		WT_ERR(__wt_verbose(session, WT_VERB_EVICTSERVER, "waking"));
 	}
 
@@ -228,11 +227,13 @@ err:
  *	Start the eviction server thread.
  */
 int
-__wt_evict_create(WT_CONNECTION_IMPL *conn)
+__wt_evict_create(WT_SESSION_IMPL *session)
 {
-	WT_SESSION_IMPL *session;
+	WT_CONNECTION_IMPL *conn;
 	WT_EVICT_WORKER *workers;
 	u_int i;
+
+	conn = S2C(session);
 
 	/* Set first, the thread might run before we finish up. */
 	F_SET(conn, WT_CONN_EVICTION_RUN);
@@ -288,17 +289,17 @@ __wt_evict_create(WT_CONNECTION_IMPL *conn)
  *	Destroy the eviction server thread.
  */
 int
-__wt_evict_destroy(WT_CONNECTION_IMPL *conn)
+__wt_evict_destroy(WT_SESSION_IMPL *session)
 {
 	WT_CACHE *cache;
+	WT_CONNECTION_IMPL *conn;
 	WT_DECL_RET;
 	WT_EVICT_WORKER *workers;
 	WT_SESSION *wt_session;
-	WT_SESSION_IMPL *session;
 	u_int i;
 
+	conn = S2C(session);
 	cache = conn->cache;
-	session = conn->default_session;
 	workers = conn->evict_workctx;
 
 	F_CLR(conn, WT_CONN_EVICTION_RUN);

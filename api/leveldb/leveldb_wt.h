@@ -27,7 +27,7 @@
 #ifndef _INCLUDE_LEVELDB_WT_H
 #define _INCLUDE_LEVELDB_WT_H 1
 
-#include "wiredtiger_config.h"
+#include "leveldb_wt_config.h"
 
 #include "leveldb/cache.h"
 #include "leveldb/comparator.h"
@@ -171,6 +171,7 @@ private:
 class CacheImpl : public Cache {
 public:
   CacheImpl(size_t capacity) : Cache(), capacity_(capacity) {}
+  virtual ~CacheImpl() {}
 
   virtual Handle* Insert(const Slice&, void*, size_t,
       void (*)(const Slice&, void*)) { return 0; }

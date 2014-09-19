@@ -52,6 +52,8 @@ struct __wt_session_impl {
 
 	WT_CONDVAR *cond;		/* Condition variable */
 
+	uint32_t rnd[2];		/* Random number generation state */
+
 	WT_EVENT_HANDLER *event_handler;/* Application's event handlers */
 
 	WT_DATA_HANDLE *dhandle;	/* Current data handle */
@@ -113,8 +115,6 @@ struct __wt_session_impl {
 	int	(*reconcile_cleanup)(WT_SESSION_IMPL *);
 
 	int compaction;			/* Compaction did some work */
-	int skip_schema_lock;		/* Another thread holds the schema lock
-					 * on our behalf */
 
 	/*
 	 * The split stash memory and hazard information persist past session

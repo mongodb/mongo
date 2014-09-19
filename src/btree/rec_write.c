@@ -530,6 +530,52 @@ err:	__wt_page_out(session, &next);
 }
 
 /*
+ * __rec_raw_compression_config --
+ *	Configure raw compression.
+ */
+static inline int
+__rec_raw_compression_config(
+    WT_SESSION_IMPL *session, WT_PAGE *page, WT_SALVAGE_COOKIE *salvage)
+{
+	WT_BTREE *btree;
+
+	btree = S2BT(session);
+
+	/* Check if raw compression configured. */
+	if (btree->compressor == NULL ||
+	    btree->compressor->compress_raw == NULL)
+		return (0);
+
+	/* Only for row-store and variable-length column-store objects. */
+	if (page->type == WT_PAGE_COL_FIX)
+		return (0);
+
+	/*
+	 * Raw compression cannot support dictionary compression. (Technically,
+	 * we could still use the raw callback on column-store variable length
+	 * internal pages with dictionary compression configured, because
+	 * dictionary compression only applies to column-store leaf pages, but
+	 * that seems an unlikely use case.)
+	 */
+	if (btree->dictionary != 0)
+		return (0);
+
+	/* Raw compression cannot support prefix compression. */
+	if (btree->prefix_compression != 0)
+		return (0);
+
+	/*
+	 * Raw compression is also turned off during salvage: we can't allow
+	 * pages to split during salvage, raw compression has no point if it
+	 * can't manipulate the page size.
+	 */
+	if (salvage != NULL)
+		return (0);
+
+	return (1);
+}
+
+/*
  * __rec_write_init --
  *	Initialize the reconciliation structure.
  */
@@ -566,27 +612,9 @@ __rec_write_init(WT_SESSION_IMPL *session,
 	/* Track if the page can be marked clean. */
 	r->leave_dirty = 0;
 
-	/*
-	 * Raw compression, the application builds disk images: applicable only
-	 * to row-and variable-length column-store objects.  Dictionary and
-	 * prefix compression must be turned off or we ignore raw-compression,
-	 * raw compression can't support either one.  (Technically, we could
-	 * still use the raw callback on column-store variable length internal
-	 * pages with dictionary compression configured, because dictionary
-	 * compression only applies to column-store leaf pages, but that seems
-	 * an unlikely use case.)
-	 *
-	 * Raw compression is also turned off during salvage: we can't allow
-	 * pages to split during salvage, raw compression has no point if it
-	 * can't manipulate the page size.
-	 */
+	/* Raw compression. */
 	r->raw_compression =
-	    btree->compressor != NULL &&
-	    btree->compressor->compress_raw != NULL &&
-	    page->type != WT_PAGE_COL_FIX &&
-	    btree->dictionary == 0 &&
-	    btree->prefix_compression == 0 &&
-	    salvage == NULL;
+	    __rec_raw_compression_config(session, page, salvage);
 	r->raw_destination.flags = WT_ITEM_ALIGNED;
 
 	/* Track overflow items. */
@@ -1952,6 +1980,30 @@ __rec_split(WT_SESSION_IMPL *session, WT_RECONCILE *r)
 }
 
 /*
+ * __rec_skipped_update_chk --
+ *	Return if a skipped update makes this a waste of time.
+ */
+static inline int
+__rec_skipped_update_chk(WT_SESSION_IMPL *session, WT_RECONCILE *r)
+{
+	/*
+	 * If we're doing an eviction, and we skipped an update, it only pays
+	 * off to continue if we're writing multiple blocks, that is, we'll be
+	 * able to evict something.  This should be unlikely (why did eviction
+	 * choose a recently written, small block), but it's possible.  Our
+	 * caller is responsible for calling us at the right moment, when all
+	 * of the rows have been reviewed and we're about to finalize a write.
+	 */
+	if (F_ISSET(r, WT_SKIP_UPDATE_RESTORE) &&
+	    r->bnd_next == 0 && r->leave_dirty) {
+		WT_STAT_FAST_CONN_INCR(session, rec_skipped_update);
+		WT_STAT_FAST_DATA_INCR(session, rec_skipped_update);
+		return (EBUSY);
+	}
+	return (0);
+}
+
+/*
  * __rec_split_raw_worker --
  *	Handle the raw compression page reconciliation bookkeeping.
  */
@@ -2310,21 +2362,12 @@ no_slots:
 		return (0);
 	}
 
+	/* Check if a skipped update makes this a waste of time. */
+	if (last_block)
+		WT_RET (__rec_skipped_update_chk(session, r));
+
 	/* We have a block, update the boundary counter. */
 	++r->bnd_next;
-
-	/*
-	 * If we're doing an eviction, and we skipped an update, it only pays
-	 * off to continue if we're writing multiple blocks, that is, we'll be
-	 * able to evict something.  This should be unlikely (why did eviction
-	 * choose a recently written, small block), but it's possible.
-	 */
-	if (r->bnd_next == 1 && last_block &&
-	    F_ISSET(r, WT_SKIP_UPDATE_RESTORE) && r->leave_dirty) {
-		WT_STAT_FAST_CONN_INCR(session, rec_skipped_update);
-		WT_STAT_FAST_DATA_INCR(session, rec_skipped_update);
-		return (EBUSY);
-	}
 
 	/*
 	 * If we are writing the whole page in our first/only attempt, it might
@@ -2430,18 +2473,8 @@ __rec_split_finish_std(WT_SESSION_IMPL *session, WT_RECONCILE *r)
 	WT_ILLEGAL_VALUE(session);
 	}
 
-	/*
-	 * If we're doing an eviction, and we skipped an update, it only pays
-	 * off to continue if we're writing multiple blocks, that is, we'll be
-	 * able to evict something.  This should be unlikely (why did eviction
-	 * choose a recently written, small block), but it's possible.
-	 */
-	if (F_ISSET(r, WT_SKIP_UPDATE_RESTORE) &&
-	    r->bnd_next == 0 && r->leave_dirty) {
-		WT_STAT_FAST_CONN_INCR(session, rec_skipped_update);
-		WT_STAT_FAST_DATA_INCR(session, rec_skipped_update);
-		return (EBUSY);
-	}
+	/* Check if a skipped update makes this a waste of time. */
+	WT_RET (__rec_skipped_update_chk(session, r));
 
 	/*
 	 * We only arrive here with no entries to write if the page was entirely
@@ -2476,6 +2509,10 @@ __rec_split_finish_std(WT_SESSION_IMPL *session, WT_RECONCILE *r)
 static inline int
 __rec_split_finish_raw(WT_SESSION_IMPL *session, WT_RECONCILE *r)
 {
+	/* Check if a skipped update makes this a waste of time. */
+	if (r->entries == 0)
+		WT_RET (__rec_skipped_update_chk(session, r));
+
 	while (r->entries != 0)
 		WT_RET(__rec_split_raw_worker(session, r, 1));
 	return (0);
@@ -3831,7 +3868,7 @@ __rec_row_int(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 	WT_REF *ref;
 	size_t size;
 	u_int vtype;
-	int hazard, onpage_ovfl, ovfl_key, state;
+	int hazard, key_onpage_ovfl, ovfl_key, state;
 	const void *p;
 
 	btree = S2BT(session);
@@ -3879,11 +3916,12 @@ __rec_row_int(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 		ikey = __wt_ref_key_instantiated(ref);
 		if (ikey == NULL || ikey->cell_offset == 0) {
 			cell = NULL;
-			onpage_ovfl = 0;
+			key_onpage_ovfl = 0;
 		} else {
 			cell = WT_PAGE_REF_OFFSET(page, ikey->cell_offset);
 			__wt_cell_unpack(cell, kpack);
-			onpage_ovfl = kpack->ovfl == 1 ? 1 : 0;
+			key_onpage_ovfl =
+			    kpack->ovfl && kpack->raw != WT_CELL_KEY_OVFL_RM;
 		}
 
 		WT_ERR(__rec_child_modify(session, r, ref, &hazard, &state));
@@ -3900,7 +3938,7 @@ __rec_row_int(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 			 * always instantiated.  Don't worry about reuse,
 			 * reusing this key in this reconciliation is unlikely.
 			 */
-			if (onpage_ovfl && kpack->raw != WT_CELL_KEY_OVFL_RM)
+			if (key_onpage_ovfl)
 				WT_ERR(__wt_ovfl_discard_add(
 				    session, page, kpack->cell));
 			CHILD_RELEASE_ERR(session, hazard, ref);
@@ -3926,8 +3964,7 @@ __rec_row_int(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 				 * worry about reuse, reusing this key in this
 				 * reconciliation is unlikely.
 				 */
-				if (onpage_ovfl &&
-				    kpack->raw != WT_CELL_KEY_OVFL_RM)
+				if (key_onpage_ovfl)
 					WT_ERR(__wt_ovfl_discard_add(
 					    session, page, kpack->cell));
 				CHILD_RELEASE_ERR(session, hazard, ref);
@@ -3942,8 +3979,7 @@ __rec_row_int(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 				 * worry about reuse, reusing this key in this
 				 * reconciliation is unlikely.
 				 */
-				if (onpage_ovfl &&
-				    kpack->raw != WT_CELL_KEY_OVFL_RM)
+				if (key_onpage_ovfl)
 					WT_ERR(__wt_ovfl_discard_add(
 					    session, page, kpack->cell));
 
@@ -3983,18 +4019,10 @@ __rec_row_int(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 		CHILD_RELEASE_ERR(session, hazard, ref);
 
 		/*
-		 * If the key is an overflow key, check to see if the backing
-		 * blocks have been freed; in that case, we have to build a new
-		 * key.
-		 */
-		if (onpage_ovfl && kpack->raw == WT_CELL_KEY_OVFL_RM)
-			onpage_ovfl = 0;
-
-		/*
 		 * Build key cell.
 		 * Truncate any 0th key, internal pages don't need 0th keys.
 		 */
-		if (onpage_ovfl) {
+		if (key_onpage_ovfl) {
 			key->buf.data = cell;
 			key->buf.size = __wt_cell_total_len(kpack);
 			key->cell_len = 0;
@@ -4020,10 +4048,10 @@ __rec_row_int(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 			 * case, we have to build the actual key now because we
 			 * are about to promote it.
 			 */
-			if (onpage_ovfl) {
+			if (key_onpage_ovfl) {
 				WT_ERR(__wt_buf_set(session,
 				    r->cur, WT_IKEY_DATA(ikey), ikey->size));
-				onpage_ovfl = 0;
+				key_onpage_ovfl = 0;
 			}
 			WT_ERR(__rec_split(session, r));
 		}
@@ -5395,7 +5423,7 @@ __rec_dictionary_init(WT_SESSION_IMPL *session, WT_RECONCILE *r, u_int slots)
 	WT_RET(__wt_calloc(session,
 	    r->dictionary_slots, sizeof(WT_DICTIONARY *), &r->dictionary));
 	for (i = 0; i < r->dictionary_slots; ++i) {
-		depth = __wt_skip_choose_depth();
+		depth = __wt_skip_choose_depth(session);
 		WT_RET(__wt_calloc(session, 1,
 		    sizeof(WT_DICTIONARY) + depth * sizeof(WT_DICTIONARY *),
 		    &r->dictionary[i]));

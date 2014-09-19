@@ -61,6 +61,7 @@ __wt_lsm_merge(
 	uint32_t aggressive, generation, max_gap, max_gen, max_level, start_id;
 	uint64_t insert_count, record_count, chunk_size;
 	u_int dest_id, end_chunk, i, merge_max, merge_min, nchunks, start_chunk;
+	u_int verb;
 	int create_bloom, locked, tret;
 	const char *cfg[3];
 	const char *drop_cfg[] =
@@ -72,16 +73,17 @@ __wt_lsm_merge(
 	dest = src = NULL;
 	locked = 0;
 	start_id = 0;
-	aggressive = lsm_tree->merge_aggressiveness;
 
 	/*
-	 * If the tree is open read-only be very aggressive. Otherwise, we can
-	 * spend a long time waiting for merges to start in read-only
-	 * applications.
+	 * If the tree is open read-only or we are compacting, be very
+	 * aggressive. Otherwise, we can spend a long time waiting for merges
+	 * to start in read-only applications.
 	 */
-	if (!lsm_tree->modified)
+	if (!lsm_tree->modified ||
+	    F_ISSET(lsm_tree, WT_LSM_TREE_COMPACTING))
 		lsm_tree->merge_aggressiveness = 10;
 
+	aggressive = lsm_tree->merge_aggressiveness;
 	merge_max = (aggressive > 5) ? 100 : lsm_tree->merge_min;
 	merge_min = (aggressive > 5) ? 2 : lsm_tree->merge_min;
 	max_gap = (aggressive + 4) / 5;
@@ -249,10 +251,22 @@ __wt_lsm_merge(
 	/* Allocate an ID for the merge. */
 	dest_id = WT_ATOMIC_ADD(lsm_tree->last, 1);
 
-	WT_RET(__wt_verbose(session, WT_VERB_LSM,
-	    "Merging chunks %u-%u into %u (%" PRIu64 " records)"
-	    ", generation %" PRIu32,
-	    start_chunk, end_chunk, dest_id, record_count, generation));
+	/*
+	 * We only want to do the chunk loop if we're running with verbose,
+	 * so we wrap these statements in the conditional.  Avoid the loop
+	 * in the normal path.
+	 */
+	if (WT_VERBOSE_ISSET(session, WT_VERB_LSM)) {
+		WT_RET(__wt_verbose(session, WT_VERB_LSM,
+		    "Merging %s chunks %u-%u into %u (%" PRIu64 " records)"
+		    ", generation %" PRIu32,
+		    lsm_tree->name,
+		    start_chunk, end_chunk, dest_id, record_count, generation));
+		for (verb = start_chunk; verb <= end_chunk; verb++)
+			WT_RET(__wt_verbose(session, WT_VERB_LSM,
+			    "%s: Chunk[%u] id %u",
+			    lsm_tree->name, verb, lsm_tree->chunk[verb]->id));
+	}
 
 	WT_RET(__wt_calloc_def(session, 1, &chunk));
 	chunk->id = dest_id;
@@ -341,6 +355,13 @@ __wt_lsm_merge(
 
 	F_CLR(session, WT_SESSION_NO_CACHE);
 
+	/*
+	 * We're doing advisory reads to fault the new trees into cache.
+	 * Don't block if the cache is full: our next unit of work may be to
+	 * discard some trees to free space.
+	 */
+	F_SET(session, WT_SESSION_NO_CACHE_CHECK);
+
 	if (create_bloom) {
 		if (ret == 0)
 			WT_TRET(__wt_bloom_finalize(bloom));
@@ -419,7 +440,7 @@ __wt_lsm_merge(
 
 	/* Schedule a pass to discard old chunks */
 	WT_ERR(__wt_lsm_manager_push_entry(
-	    session, WT_LSM_WORK_DROP, lsm_tree));
+	    session, WT_LSM_WORK_DROP, 0, lsm_tree));
 
 err:	if (locked)
 		WT_TRET(__wt_lsm_tree_unlock(session, lsm_tree));
@@ -450,7 +471,7 @@ err:	if (locked)
 		else
 			WT_TRET(__wt_verbose(session, WT_VERB_LSM,
 			    "Merge failed with %s", wiredtiger_strerror(ret)));
-		F_CLR(session, WT_SESSION_NO_CACHE);
 	}
+	F_CLR(session, WT_SESSION_NO_CACHE | WT_SESSION_NO_CACHE_CHECK);
 	return (ret);
 }

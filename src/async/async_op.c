@@ -91,7 +91,7 @@ static int
 __async_op_wrap(WT_ASYNC_OP_IMPL *op, WT_ASYNC_OPTYPE type)
 {
 	op->optype = type;
-	return (__wt_async_op_enqueue(O2C(op), op));
+	return (__wt_async_op_enqueue(O2S(op), op));
 }
 
 /*
@@ -254,20 +254,22 @@ __async_op_init(WT_CONNECTION_IMPL *conn, WT_ASYNC_OP_IMPL *op, uint32_t id)
  *	Enqueue an operation onto the work queue.
  */
 int
-__wt_async_op_enqueue(WT_CONNECTION_IMPL *conn, WT_ASYNC_OP_IMPL *op)
+__wt_async_op_enqueue(WT_SESSION_IMPL *session, WT_ASYNC_OP_IMPL *op)
 {
 	WT_ASYNC *async;
+	WT_CONNECTION_IMPL *conn;
 	WT_DECL_RET;
 	uint64_t cur_head, cur_tail, my_alloc, my_slot;
 #ifdef	HAVE_DIAGNOSTIC
 	WT_ASYNC_OP_IMPL *my_op;
 #endif
 
+	conn = S2C(session);
 	async = conn->async;
 	/*
 	 * Enqueue op at the tail of the work queue.
 	 */
-	WT_ASSERT(conn->default_session, op->state == WT_ASYNCOP_READY);
+	WT_ASSERT(session, op->state == WT_ASYNCOP_READY);
 	/*
 	 * We get our slot in the ring buffer to use.
 	 */
@@ -287,7 +289,7 @@ __wt_async_op_enqueue(WT_CONNECTION_IMPL *conn, WT_ASYNC_OP_IMPL *op)
 #ifdef	HAVE_DIAGNOSTIC
 	WT_ORDERED_READ(my_op, async->async_queue[my_slot]);
 	if (my_op != NULL)
-		return (__wt_panic(conn->default_session));
+		return (__wt_panic(session));
 #endif
 	WT_PUBLISH(async->async_queue[my_slot], op);
 	op->state = WT_ASYNCOP_ENQUEUED;
@@ -311,14 +313,17 @@ __wt_async_op_enqueue(WT_CONNECTION_IMPL *conn, WT_ASYNC_OP_IMPL *op)
  *	Initialize all the op handles.
  */
 int
-__wt_async_op_init(WT_CONNECTION_IMPL *conn)
+__wt_async_op_init(WT_SESSION_IMPL *session)
 {
 	WT_ASYNC *async;
 	WT_ASYNC_OP_IMPL *op;
+	WT_CONNECTION_IMPL *conn;
 	WT_DECL_RET;
 	uint32_t i;
 
+	conn = S2C(session);
 	async = conn->async;
+
 	/*
 	 * Initialize the flush op structure.
 	 */
@@ -330,13 +335,12 @@ __wt_async_op_init(WT_CONNECTION_IMPL *conn)
 	 * can never overlap the tail.  Include extra for the flush op.
 	 */
 	async->async_qsize = conn->async_size + 2;
-	WT_RET(__wt_calloc_def(conn->default_session,
-	    async->async_qsize, &async->async_queue));
+	WT_RET(__wt_calloc_def(
+	    session, async->async_qsize, &async->async_queue));
 	/*
 	 * Allocate and initialize all the user ops.
 	 */
-	WT_ERR(__wt_calloc_def(conn->default_session,
-	    conn->async_size, &async->async_ops));
+	WT_ERR(__wt_calloc_def(session, conn->async_size, &async->async_ops));
 	for (i = 0; i < conn->async_size; i++) {
 		op = &async->async_ops[i];
 		WT_ERR(__async_op_init(conn, op, i));
@@ -344,11 +348,11 @@ __wt_async_op_init(WT_CONNECTION_IMPL *conn)
 	return (0);
 err:
 	if (async->async_ops != NULL) {
-		__wt_free(conn->default_session, async->async_ops);
+		__wt_free(session, async->async_ops);
 		async->async_ops = NULL;
 	}
 	if (async->async_queue != NULL) {
-		__wt_free(conn->default_session, async->async_queue);
+		__wt_free(session, async->async_queue);
 		async->async_queue = NULL;
 	}
 	return (ret);

@@ -12,65 +12,52 @@
  *	Configure the underlying cache.
  */
 int
-__wt_cache_config(WT_CONNECTION_IMPL *conn, const char *cfg[])
+__wt_cache_config(WT_SESSION_IMPL *session, const char *cfg[])
 {
 	WT_CACHE *cache;
 	WT_CONFIG_ITEM cval;
-	WT_DECL_RET;
-	WT_SESSION_IMPL *session;
+	WT_CONNECTION_IMPL *conn;
 
-	session = conn->default_session;
+	conn = S2C(session);
 	cache = conn->cache;
 
 	/*
 	 * If not using a shared cache configure the cache size, otherwise
 	 * check for a reserved size.
 	 */
-	if (!F_ISSET(conn, WT_CONN_CACHE_POOL) &&
-	    (ret = __wt_config_gets(session, cfg, "cache_size", &cval)) == 0)
+	if (!F_ISSET(conn, WT_CONN_CACHE_POOL)) {
+		WT_RET(__wt_config_gets(session, cfg, "cache_size", &cval));
 		conn->cache_size = (uint64_t)cval.val;
-
-	if (F_ISSET(conn, WT_CONN_CACHE_POOL) &&
-	    (ret = __wt_config_gets(session, cfg,
-	    "shared_cache.reserve", &cval)) == 0 && cval.val != 0)
+	} else {
+		WT_RET(__wt_config_gets(
+		    session, cfg, "shared_cache.reserve", &cval));
+		if (cval.val == 0)
+			WT_RET(__wt_config_gets(
+			    session, cfg, "shared_cache.chunk", &cval));
 		cache->cp_reserved = (uint64_t)cval.val;
-	else if ((ret = __wt_config_gets(session, cfg,
-	    "shared_cache.chunk", &cval)) == 0)
-		cache->cp_reserved = (uint64_t)cval.val;
-	WT_RET_NOTFOUND_OK(ret);
+	}
 
-	if ((ret =
-	    __wt_config_gets(session, cfg, "eviction_target", &cval)) == 0)
-		cache->eviction_target = (u_int)cval.val;
-	WT_RET_NOTFOUND_OK(ret);
+	WT_RET(__wt_config_gets(session, cfg, "eviction_target", &cval));
+	cache->eviction_target = (u_int)cval.val;
 
-	if ((ret =
-	    __wt_config_gets(session, cfg, "eviction_trigger", &cval)) == 0)
-		cache->eviction_trigger = (u_int)cval.val;
-	WT_RET_NOTFOUND_OK(ret);
+	WT_RET(__wt_config_gets(session, cfg, "eviction_trigger", &cval));
+	cache->eviction_trigger = (u_int)cval.val;
 
-	if ((ret = __wt_config_gets(
-	    session, cfg, "eviction_dirty_target", &cval)) == 0)
-		cache->eviction_dirty_target = (u_int)cval.val;
-	WT_RET_NOTFOUND_OK(ret);
+	WT_RET(__wt_config_gets(session, cfg, "eviction_dirty_target", &cval));
+	cache->eviction_dirty_target = (u_int)cval.val;
 
 	/*
 	 * The eviction thread configuration options include the main eviction
 	 * thread and workers. Our implementation splits them out. Adjust for
 	 * the difference when parsing the configuration.
 	 */
-	if ((ret = __wt_config_gets(
-	    session, cfg, "eviction.threads_max", &cval)) == 0) {
-		WT_ASSERT(session, cval.val > 0);
-		conn->evict_workers_max = (u_int)cval.val - 1;
-	}
-	WT_RET_NOTFOUND_OK(ret);
-	if ((ret = __wt_config_gets(
-	    session, cfg, "eviction.threads_min", &cval)) == 0) {
-		WT_ASSERT(session, cval.val > 0);
-		conn->evict_workers_min = (u_int)cval.val - 1;
-	}
-	WT_RET_NOTFOUND_OK(ret);
+	WT_RET(__wt_config_gets(session, cfg, "eviction.threads_max", &cval));
+	WT_ASSERT(session, cval.val > 0);
+	conn->evict_workers_max = (u_int)cval.val - 1;
+
+	WT_RET(__wt_config_gets(session, cfg, "eviction.threads_min", &cval));
+	WT_ASSERT(session, cval.val > 0);
+	conn->evict_workers_min = (u_int)cval.val - 1;
 
 	if (conn->evict_workers_min > conn->evict_workers_max)
 		WT_RET_MSG(session, EINVAL,
@@ -85,13 +72,13 @@ __wt_cache_config(WT_CONNECTION_IMPL *conn, const char *cfg[])
  *	Create the underlying cache.
  */
 int
-__wt_cache_create(WT_CONNECTION_IMPL *conn, const char *cfg[])
+__wt_cache_create(WT_SESSION_IMPL *session, const char *cfg[])
 {
 	WT_CACHE *cache;
+	WT_CONNECTION_IMPL *conn;
 	WT_DECL_RET;
-	WT_SESSION_IMPL *session;
 
-	session = conn->default_session;
+	conn = S2C(session);
 
 	WT_ASSERT(session, conn->cache == NULL ||
 	    (F_ISSET(conn, WT_CONN_CACHE_POOL) && conn->cache != NULL));
@@ -101,7 +88,7 @@ __wt_cache_create(WT_CONNECTION_IMPL *conn, const char *cfg[])
 	cache = conn->cache;
 
 	/* Use a common routine for run-time configuration options. */
-	WT_RET(__wt_cache_config(conn, cfg));
+	WT_RET(__wt_cache_config(session, cfg));
 
 	/* Add the configured cache to the cache pool. */
 	if (F_ISSET(conn, WT_CONN_CACHE_POOL))
@@ -133,7 +120,7 @@ __wt_cache_create(WT_CONNECTION_IMPL *conn, const char *cfg[])
 	__wt_cache_stats_update(session);
 	return (0);
 
-err:	WT_RET(__wt_cache_destroy(conn));
+err:	WT_RET(__wt_cache_destroy(session));
 	return (ret);
 }
 
@@ -164,13 +151,13 @@ __wt_cache_stats_update(WT_SESSION_IMPL *session)
  *	Discard the underlying cache.
  */
 int
-__wt_cache_destroy(WT_CONNECTION_IMPL *conn)
+__wt_cache_destroy(WT_SESSION_IMPL *session)
 {
 	WT_CACHE *cache;
+	WT_CONNECTION_IMPL *conn;
 	WT_DECL_RET;
-	WT_SESSION_IMPL *session;
 
-	session = conn->default_session;
+	conn = S2C(session);
 	cache = conn->cache;
 
 	if (cache == NULL)

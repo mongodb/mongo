@@ -55,13 +55,13 @@ __wt_connection_open(WT_CONNECTION_IMPL *conn, const char *cfg[])
 	WT_WRITE_BARRIER();
 
 	/* Connect to a cache pool. */
-	WT_RET(__wt_conn_cache_pool_config(session, cfg));
+	WT_RET(__wt_cache_pool_config(session, cfg));
 
 	/* Create the cache. */
-	WT_RET(__wt_cache_create(conn, cfg));
+	WT_RET(__wt_cache_create(session, cfg));
 
 	/* Initialize transaction support. */
-	WT_RET(__wt_txn_global_init(conn, cfg));
+	WT_RET(__wt_txn_global_init(session, cfg));
 
 	return (0);
 }
@@ -81,16 +81,30 @@ __wt_connection_close(WT_CONNECTION_IMPL *conn)
 	WT_NAMED_COMPRESSOR *ncomp;
 	WT_NAMED_DATA_SOURCE *ndsrc;
 	WT_SESSION_IMPL *s, *session;
+	WT_TXN_GLOBAL *txn_global;
 	u_int i;
 
 	wt_conn = &conn->iface;
+	txn_global = &conn->txn_global;
 	session = conn->default_session;
 
-	/* We're shutting down.  Make sure everything gets freed. */
-	__wt_txn_update_oldest(session);
+	/*
+	 * We're shutting down.  Make sure everything gets freed.
+	 *
+	 * It's possible that the eviction server is in the middle of a long
+	 * operation, with a transaction ID pinned.  In that case, we will loop
+	 * here until the transaction ID is released, when the oldest
+	 * transaction ID will catch up with the current ID.
+	 */
+	for (;;) {
+		__wt_txn_update_oldest(session);
+		if (txn_global->oldest_id == txn_global->current)
+			break;
+		__wt_yield();
+	}
 
 	/* Clear any pending async ops. */
-	WT_TRET(__wt_async_flush(conn));
+	WT_TRET(__wt_async_flush(session));
 
 	/*
 	 * Shut down server threads other than the eviction server, which is
@@ -99,14 +113,14 @@ __wt_connection_close(WT_CONNECTION_IMPL *conn)
 	 * exit before files are closed.
 	 */
 	F_CLR(conn, WT_CONN_SERVER_RUN);
-	WT_TRET(__wt_async_destroy(conn));
-	WT_TRET(__wt_lsm_manager_destroy(conn));
-	WT_TRET(__wt_checkpoint_server_destroy(conn));
-	WT_TRET(__wt_statlog_destroy(conn, 1));
-	WT_TRET(__wt_sweep_destroy(conn));
+	WT_TRET(__wt_async_destroy(session));
+	WT_TRET(__wt_lsm_manager_destroy(session));
+	WT_TRET(__wt_checkpoint_server_destroy(session));
+	WT_TRET(__wt_statlog_destroy(session, 1));
+	WT_TRET(__wt_sweep_destroy(session));
 
 	/* Close open data handles. */
-	WT_TRET(__wt_conn_dhandle_discard(conn));
+	WT_TRET(__wt_conn_dhandle_discard(session));
 
 	/*
 	 * Now that all data handles are closed, tell logging that a checkpoint
@@ -116,20 +130,20 @@ __wt_connection_close(WT_CONNECTION_IMPL *conn)
 	if (conn->logging) {
 		WT_TRET(__wt_txn_checkpoint_log(
 		    session, 1, WT_TXN_LOG_CKPT_STOP, NULL));
-		WT_TRET(__wt_logmgr_destroy(conn));
+		WT_TRET(__wt_logmgr_destroy(session));
 	}
 
 	/* Free memory for collators */
 	while ((ncoll = TAILQ_FIRST(&conn->collqh)) != NULL)
-		WT_TRET(__wt_conn_remove_collator(conn, ncoll));
+		WT_TRET(__wt_conn_remove_collator(session, ncoll));
 
 	/* Free memory for compressors */
 	while ((ncomp = TAILQ_FIRST(&conn->compqh)) != NULL)
-		WT_TRET(__wt_conn_remove_compressor(conn, ncomp));
+		WT_TRET(__wt_conn_remove_compressor(session, ncomp));
 
 	/* Free memory for data sources */
 	while ((ndsrc = TAILQ_FIRST(&conn->dsrcqh)) != NULL)
-		WT_TRET(__wt_conn_remove_data_source(conn, ndsrc));
+		WT_TRET(__wt_conn_remove_data_source(session, ndsrc));
 
 	/*
 	 * Complain if files weren't closed, ignoring the lock file, we'll
@@ -146,16 +160,16 @@ __wt_connection_close(WT_CONNECTION_IMPL *conn)
 	}
 
 	/* Shut down the eviction server thread. */
-	WT_TRET(__wt_evict_destroy(conn));
+	WT_TRET(__wt_evict_destroy(session));
 
 	/* Disconnect from shared cache - must be before cache destroy. */
-	WT_TRET(__wt_conn_cache_pool_destroy(conn));
+	WT_TRET(__wt_conn_cache_pool_destroy(session));
 
 	/* Discard the cache. */
-	WT_TRET(__wt_cache_destroy(conn));
+	WT_TRET(__wt_cache_destroy(session));
 
 	/* Discard transaction state. */
-	__wt_txn_global_destroy(conn);
+	__wt_txn_global_destroy(session);
 
 	/* Close extensions, first calling any unload entry point. */
 	while ((dlh = TAILQ_FIRST(&conn->dlhqh)) != NULL) {
@@ -207,38 +221,34 @@ __wt_connection_close(WT_CONNECTION_IMPL *conn)
 int
 __wt_connection_workers(WT_SESSION_IMPL *session, const char *cfg[])
 {
-	WT_CONNECTION_IMPL *conn;
-
-	conn = S2C(session);
-
 	/*
 	 * Start the eviction thread.
 	 */
-	WT_RET(__wt_evict_create(conn));
+	WT_RET(__wt_evict_create(session));
 
 	/*
 	 * Start the handle sweep thread.
 	 */
-	WT_RET(__wt_sweep_create(conn));
+	WT_RET(__wt_sweep_create(session));
 
 	/*
 	 * Start the optional statistics thread.  Start statistics first so that
 	 * other optional threads can know if statistics are enabled or not.
 	 */
-	WT_RET(__wt_statlog_create(conn, cfg));
+	WT_RET(__wt_statlog_create(session, cfg));
 
 	/* Start the optional async threads. */
-	WT_RET(__wt_async_create(conn, cfg));
+	WT_RET(__wt_async_create(session, cfg));
 
 	/*
 	 * Start the optional logging/archive thread.
 	 * NOTE: The log manager must be started before checkpoints so that the
 	 * checkpoint server knows if logging is enabled.
 	 */
-	WT_RET(__wt_logmgr_create(conn, cfg));
+	WT_RET(__wt_logmgr_create(session, cfg));
 
 	/* Start the optional checkpoint thread. */
-	WT_RET(__wt_checkpoint_server_create(conn, cfg));
+	WT_RET(__wt_checkpoint_server_create(session, cfg));
 
 	return (0);
 }

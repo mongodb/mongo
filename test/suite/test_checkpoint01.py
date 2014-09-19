@@ -308,8 +308,8 @@ class test_checkpoint_last(wttest.WiredTigerTestCase):
 
 
 # Check we can't use the reserved name as an application checkpoint name.
-class test_checkpoint_last_name(wttest.WiredTigerTestCase):
-    def test_checkpoint_last_name(self):
+class test_checkpoint_illegal_name(wttest.WiredTigerTestCase):
+    def test_checkpoint_illegal_name(self):
         simple_populate(self, "file:checkpoint", 'key_format=S', 100)
         msg = '/the checkpoint name.*is reserved/'
         for conf in (
@@ -322,6 +322,12 @@ class test_checkpoint_last_name(wttest.WiredTigerTestCase):
             'drop=(to=WiredTigerCheckpoint)',
             'drop=(to=WiredTigerCheckpoint.)',
             'drop=(to=WiredTigerCheckpointX)'):
+                self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
+                    lambda: self.session.checkpoint(conf), msg)
+        msg = '/WiredTiger objects should not include grouping/'
+        for conf in (
+            'name=check{point',
+            'name=check\\point'):
                 self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
                     lambda: self.session.checkpoint(conf), msg)
 

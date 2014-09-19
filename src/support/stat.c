@@ -412,6 +412,12 @@ __wt_stat_init_connection_stats(WT_CONNECTION_STATS *stats)
 	    "sleep for LSM checkpoint throttle";
 	stats->lsm_merge_throttle.desc = "sleep for LSM merge throttle";
 	stats->lsm_rows_merged.desc = "rows merged in an LSM tree";
+	stats->lsm_work_queue_app.desc = "LSM App work units currently queued";
+	stats->lsm_work_queue_manager.desc =
+	    "LSM Merge work units currently queued";
+	stats->lsm_work_queue_max.desc = "LSM tree queue hit maximum";
+	stats->lsm_work_queue_switch.desc =
+	    "LSM Switch work units currently queued";
 	stats->lsm_work_units_created.desc =
 	    "LSM tree maintenance operations scheduled";
 	stats->lsm_work_units_discarded.desc =
@@ -526,6 +532,7 @@ __wt_stat_refresh_connection_stats(void *stats_arg)
 	stats->lsm_checkpoint_throttle.v = 0;
 	stats->lsm_merge_throttle.v = 0;
 	stats->lsm_rows_merged.v = 0;
+	stats->lsm_work_queue_max.v = 0;
 	stats->lsm_work_units_created.v = 0;
 	stats->lsm_work_units_discarded.v = 0;
 	stats->lsm_work_units_done.v = 0;

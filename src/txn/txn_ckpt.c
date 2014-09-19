@@ -8,6 +8,30 @@
 #include "wt_internal.h"
 
 /*
+ * __wt_checkpoint_name_ok --
+ *	Complain if the checkpoint name isn't acceptable.
+ */
+int
+__wt_checkpoint_name_ok(WT_SESSION_IMPL *session, const char *name, size_t len)
+{
+	/* Check for characters we don't want to see in a metadata file. */
+	WT_RET(__wt_name_check(session, name, len));
+
+	/*
+	 * The internal checkpoint name is special, applications aren't allowed
+	 * to use it.  Be aggressive and disallow any matching prefix, it makes
+	 * things easier when checking in other places.
+	 */
+	if (len < strlen(WT_CHECKPOINT))
+		return (0);
+	if (!WT_PREFIX_MATCH(name, WT_CHECKPOINT))
+		return (0);
+
+	WT_RET_MSG(session, EINVAL,
+	    "the checkpoint name \"%s\" is reserved", WT_CHECKPOINT);
+}
+
+/*
  * __checkpoint_name_check --
  *	Check for an attempt to name a checkpoint that includes anything
  * other than a file object.
@@ -75,9 +99,11 @@ __checkpoint_apply(WT_SESSION_IMPL *session, const char *cfg[],
 
 	target_list = 0;
 
-	/* Flag if this is a named checkpoint. */
-	WT_ERR(__wt_config_gets(session, cfg, "name", &cval));
+	/* Flag if this is a named checkpoint, and check if the name is OK. */
+	WT_RET(__wt_config_gets(session, cfg, "name", &cval));
 	named = cval.len != 0;
+	if (named)
+		WT_RET(__wt_checkpoint_name_ok(session, cval.str, cval.len));
 
 	/* Step through the targets and optionally operate on each one. */
 	WT_ERR(__wt_config_gets(session, cfg, "target", &cval));
@@ -413,27 +439,6 @@ err:	/*
 }
 
 /*
- * __ckpt_name_ok --
- *	Complain if our reserved checkpoint name is used.
- */
-static int
-__ckpt_name_ok(WT_SESSION_IMPL *session, const char *name, size_t len)
-{
-	/*
-	 * The internal checkpoint name is special, applications aren't allowed
-	 * to use it.  Be aggressive and disallow any matching prefix, it makes
-	 * things easier when checking in other places.
-	 */
-	if (len < strlen(WT_CHECKPOINT))
-		return (0);
-	if (!WT_PREFIX_MATCH(name, WT_CHECKPOINT))
-		return (0);
-
-	WT_RET_MSG(session, EINVAL,
-	    "the checkpoint name \"%s\" is reserved", WT_CHECKPOINT);
-}
-
-/*
  * __drop --
  *	Drop all checkpoints with a specific name.
  */
@@ -575,7 +580,7 @@ __checkpoint_worker(
 	if (cval.len == 0)
 		name = WT_CHECKPOINT;
 	else {
-		WT_ERR(__ckpt_name_ok(session, cval.str, cval.len));
+		WT_ERR(__wt_checkpoint_name_ok(session, cval.str, cval.len));
 		WT_ERR(__wt_strndup(session, cval.str, cval.len, &name_alloc));
 		name = name_alloc;
 	}
@@ -588,12 +593,12 @@ __checkpoint_worker(
 			WT_ERR(__wt_config_subinit(session, &dropconf, &cval));
 			while ((ret =
 			    __wt_config_next(&dropconf, &k, &v)) == 0) {
-				/* Disallow the reserved checkpoint name. */
+				/* Disallow unsafe checkpoint names. */
 				if (v.len == 0)
-					WT_ERR(__ckpt_name_ok(
+					WT_ERR(__wt_checkpoint_name_ok(
 					    session, k.str, k.len));
 				else
-					WT_ERR(__ckpt_name_ok(
+					WT_ERR(__wt_checkpoint_name_ok(
 					    session, v.str, v.len));
 
 				if (v.len == 0)

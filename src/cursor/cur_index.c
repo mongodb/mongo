@@ -337,11 +337,11 @@ __wt_curindex_open(WT_SESSION_IMPL *session,
     const char *uri, WT_CURSOR *owner, const char *cfg[], WT_CURSOR **cursorp)
 {
 	WT_CURSOR_STATIC_INIT(iface,
-	    NULL,			/* get-key */
+	    __wt_cursor_get_key,	/* get-key */
 	    __curindex_get_value,	/* get-value */
-	    NULL,			/* set-key */
+	    __wt_cursor_set_key,	/* set-key */
 	    __curindex_set_value,	/* set-value */
-	    NULL,			/* compare */
+	    __wt_cursor_notsup,		/* compare */
 	    __curindex_next,		/* next */
 	    __curindex_prev,		/* prev */
 	    __curindex_reset,		/* reset */

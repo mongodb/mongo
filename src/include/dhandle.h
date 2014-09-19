@@ -18,7 +18,7 @@
 #define	WT_SET_BTREE_IN_SESSION(s, b)	((s)->dhandle = b->dhandle)
 #define	WT_CLEAR_BTREE_IN_SESSION(s)	((s)->dhandle = NULL)
 
-#define	WT_WITH_DHANDLE(s, d, e)	do {				\
+#define	WT_WITH_DHANDLE(s, d, e) do {					\
 	WT_DATA_HANDLE *__saved_dhandle = (s)->dhandle;			\
 	(s)->dhandle = (d);						\
 	e;								\

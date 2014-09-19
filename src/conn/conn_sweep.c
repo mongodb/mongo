@@ -109,7 +109,7 @@ __sweep_server(void *arg)
 	    F_ISSET(conn, WT_CONN_SERVER_SWEEP)) {
 
 		/* Wait until the next event. */
-		WT_ERR_TIMEDOUT_OK(
+		WT_ERR(
 		    __wt_cond_wait(session, conn->sweep_cond, 30 * WT_MILLION));
 
 		/* Sweep the handles. */
@@ -127,9 +127,11 @@ err:		__wt_err(session, ret, "handle sweep server error");
  *	Start the handle sweep thread.
  */
 int
-__wt_sweep_create(WT_CONNECTION_IMPL *conn)
+__wt_sweep_create(WT_SESSION_IMPL *session)
 {
-	WT_SESSION_IMPL *session;
+	WT_CONNECTION_IMPL *conn;
+
+	conn = S2C(session);
 
 	/* Set first, the thread might run before we finish up. */
 	F_SET(conn, WT_CONN_SERVER_SWEEP);
@@ -159,13 +161,13 @@ __wt_sweep_create(WT_CONNECTION_IMPL *conn)
  *	Destroy the handle-sweep thread.
  */
 int
-__wt_sweep_destroy(WT_CONNECTION_IMPL *conn)
+__wt_sweep_destroy(WT_SESSION_IMPL *session)
 {
+	WT_CONNECTION_IMPL *conn;
 	WT_DECL_RET;
 	WT_SESSION *wt_session;
-	WT_SESSION_IMPL *session;
 
-	session = conn->default_session;
+	conn = S2C(session);
 
 	F_CLR(conn, WT_CONN_SERVER_SWEEP);
 	if (conn->sweep_tid_set) {

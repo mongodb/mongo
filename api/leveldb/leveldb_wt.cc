@@ -755,13 +755,8 @@ IteratorImpl::Next()
   int ret;
   WT_ITEM item;
 
-  if (!Status().ok())
+  if (!Status().ok() || !valid_)
     return;
-
-  if (!valid_) {
-    SetError(EINVAL);
-    return;
-  }
 
   ret = cursor_->next(cursor_);
   if (ret != 0) {
@@ -791,13 +786,8 @@ IteratorImpl::Prev()
 {
   WT_ITEM item;
 
-  if (!Status().ok())
+  if (!Status().ok() || !valid_)
     return;
-
-  if (!valid_) {
-    SetError(EINVAL);
-    return;
-  }
 
   int ret = cursor_->prev(cursor_);
   if (ret != 0) {

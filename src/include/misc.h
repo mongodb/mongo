@@ -148,10 +148,16 @@
 
 /* Check if a string matches a prefix. */
 #define	WT_PREFIX_MATCH(str, pfx)					\
-	(strncmp((str), (pfx), strlen(pfx)) == 0)
+	(((const char *)str)[0] == ((const char *)pfx)[0] &&		\
+	    strncmp((str), (pfx), strlen(pfx)) == 0)
 
+/* Check if a non-nul-terminated string matches a prefix. */
 #define	WT_PREFIX_MATCH_LEN(str, len, pfx)				\
 	((len) >= strlen(pfx) && WT_PREFIX_MATCH(str, pfx))
+
+/* Check if a string matches a prefix, and move past it. */
+#define	WT_PREFIX_SKIP(str, pfx)					\
+	(WT_PREFIX_MATCH(str, pfx) ? ((str) += strlen(pfx), 1) : 0)
 
 /*
  * Check if a variable string equals a constant string.  Inline the common
@@ -162,14 +168,10 @@
 	(sizeof(cs) == 2 ? (s)[0] == (cs)[0] && (s)[1] == '\0' :	\
 	strcmp(s, cs) == 0)
 
-/* Check if a string matches a prefix, and move past it. */
-#define	WT_PREFIX_SKIP(str, pfx)					\
-	((strncmp((str), (pfx), strlen(pfx)) == 0) ?			\
-	    ((str) += strlen(pfx), 1) : 0)
-
 /* Check if a string matches a byte string of len bytes. */
 #define	WT_STRING_MATCH(str, bytes, len)				\
-	(strncmp(str, bytes, len) == 0 && (str)[(len)] == '\0')
+	(((const char *)str)[0] == ((const char *)bytes)[0] &&		\
+	    strncmp(str, bytes, len) == 0 && (str)[(len)] == '\0')
 
 /*
  * Macro that produces a string literal that isn't wrapped in quotes, to avoid
@@ -185,6 +187,12 @@
 #define	WT_DATA_IN_ITEM(i)						\
 	((i)->mem != NULL && (i)->data >= (i)->mem &&			\
 	    WT_PTRDIFF((i)->data, (i)->mem) < (i)->memsize)
+
+/* Copy the data and size fields of an item. */
+#define	WT_ITEM_SET(dst, src) do {					\
+	(dst).data = (src).data;					\
+	(dst).size = (src).size;					\
+} while (0)
 
 /*
  * In diagnostic mode we track the locations from which hazard pointers and

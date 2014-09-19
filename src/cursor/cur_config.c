@@ -26,14 +26,14 @@ __wt_curconfig_open(WT_SESSION_IMPL *session,
     const char *uri, const char *cfg[], WT_CURSOR **cursorp)
 {
 	WT_CURSOR_STATIC_INIT(iface,
-	    NULL,			/* get-key */
-	    NULL,			/* get-value */
-	    NULL,			/* set-key */
-	    NULL,			/* set-value */
-	    NULL,			/* compare */
+	    __wt_cursor_get_key,	/* get-key */
+	    __wt_cursor_get_value,	/* get-value */
+	    __wt_cursor_set_key,	/* set-key */
+	    __wt_cursor_set_value,	/* set-value */
+	    __wt_cursor_notsup,		/* compare */
 	    __wt_cursor_notsup,		/* next */
 	    __wt_cursor_notsup,		/* prev */
-	    __wt_cursor_notsup,		/* reset */
+	    __wt_cursor_noop,		/* reset */
 	    __wt_cursor_notsup,		/* search */
 	    __wt_cursor_notsup,		/* search-near */
 	    __wt_cursor_notsup,		/* insert */

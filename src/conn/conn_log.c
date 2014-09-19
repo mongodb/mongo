@@ -106,7 +106,7 @@ __log_archive_server(void *arg)
 				    "log_archive: Blocked due to open log "
 				    "cursor holding archive lock"));
 			}
-			WT_ERR_TIMEDOUT_OK(
+			WT_ERR(
 			    __wt_cond_wait(session, conn->arch_cond, 1000000));
 			continue;
 		}
@@ -150,8 +150,7 @@ __log_archive_server(void *arg)
 		WT_ERR(__wt_rwunlock(session, log->log_archive_lock));
 
 		/* Wait until the next event. */
-		WT_ERR_TIMEDOUT_OK(
-		    __wt_cond_wait(session, conn->arch_cond, 1000000));
+		WT_ERR(__wt_cond_wait(session, conn->arch_cond, 1000000));
 	}
 
 	if (0) {
@@ -167,13 +166,13 @@ err:		__wt_err(session, ret, "log archive server error");
  *	Start the log subsystem and archive server thread.
  */
 int
-__wt_logmgr_create(WT_CONNECTION_IMPL *conn, const char *cfg[])
+__wt_logmgr_create(WT_SESSION_IMPL *session, const char *cfg[])
 {
-	WT_SESSION_IMPL *session;
+	WT_CONNECTION_IMPL *conn;
 	WT_LOG *log;
 	int run;
 
-	session = conn->default_session;
+	conn = S2C(session);
 
 	/* Handle configuration. */
 	WT_RET(__logmgr_config(session, cfg, &run));
@@ -245,13 +244,13 @@ __wt_logmgr_create(WT_CONNECTION_IMPL *conn, const char *cfg[])
  *	Destroy the log archiving server thread and logging subsystem.
  */
 int
-__wt_logmgr_destroy(WT_CONNECTION_IMPL *conn)
+__wt_logmgr_destroy(WT_SESSION_IMPL *session)
 {
+	WT_CONNECTION_IMPL *conn;
 	WT_DECL_RET;
 	WT_SESSION *wt_session;
-	WT_SESSION_IMPL *session;
 
-	session = conn->default_session;
+	conn = S2C(session);
 
 	if (!conn->logging)
 		return (0);

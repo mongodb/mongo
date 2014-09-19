@@ -3,7 +3,8 @@
 @section file_formats_formats File formats
 
 WiredTiger supports two underlying file formats: row-store and
-column-store, both are key/value stores.
+column-store, where both are B+tree implementations of key/value stores.
+WiredTiger also supports @ref lsm, implemented as a tree of B+trees.
 
 In a row-store, both keys and data are variable-length byte strings.  In
 a column-store, keys are 64-bit record numbers (key_format type 'r'),
@@ -28,13 +29,37 @@ deleting a value is the same as storing a value of 0.  For the same
 reason, storing a value of 0 will cause cursor scans to skip the record.
 
 WiredTiger does not support duplicate data items: there can be only a
-single value for any given key, and applications are responsible for
-creating unique key/value pairs.
+single value associated with any given key, and applications are
+responsible for creating unique key/value pairs.
 
 WiredTiger allocates space from the underlying files in block units.
 The minimum file allocation unit WiredTiger supports is 512B and the
 maximum file allocation unit is 512MB.  File block offsets are 64-bit
 (meaning the maximum file size is very, very large).
+
+@section file_formats_choice Choosing a file format
+
+The row-store format is the default choice for most applications. When
+the primary key is a record number, there are advantages to storing
+columns in separate files, or the underlying data is a set of bits,
+column-store format may be a better choice.
+
+Both row- and column-store formats can maintain high volumes of writes,
+but for data sets requiring sustained, extreme write throughput, @ref
+lsm are usually a better choice.  For applications that do not require
+extreme write throughput, row- or column-store is likely to be a better
+choice because the read throughput is better than with LSM trees (an
+effect that becomes more pronounced as additional read threads are added).
+
+Applications with complex schemas may also benefit from using multiple
+storage formats, that is, using a combination of different formats in
+the database, and even in individual tables (for example, a sparse, wide
+table configured with a column-store primary, where indexes are stored
+in an LSM tree).
+
+Finally, as WiredTiger makes it easy to switch back-and-forth between
+storage configurations, it's usually worthwhile benchmarking possible
+configurations when there is any question.
 
 @section file_formats_compression File formats and compression
 

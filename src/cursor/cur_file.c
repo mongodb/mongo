@@ -10,29 +10,22 @@
 /*
  * WT_BTREE_CURSOR_SAVE_AND_RESTORE
  *	Save the cursor's key/value data/size fields, call an underlying btree
- * function, and then consistently handle failure and success.
+ *	function, and then consistently handle failure and success.
  */
 #define	WT_BTREE_CURSOR_SAVE_AND_RESTORE(cursor, f, ret) do {		\
-	const void *__key_data = (cursor)->key.data;			\
-	const void *__value_data = (cursor)->value.data;		\
+	WT_ITEM __key_copy = (cursor)->key;				\
 	uint64_t __recno = (cursor)->recno;				\
-	size_t __key_size = (cursor)->key.size;				\
-	size_t __value_size = (cursor)->value.size;			\
+	WT_ITEM __value_copy = (cursor)->value;				\
 	if (((ret) = (f)) == 0) {					\
 		F_CLR(cursor, WT_CURSTD_KEY_EXT | WT_CURSTD_VALUE_EXT);	\
 		F_SET(cursor, WT_CURSTD_KEY_INT | WT_CURSTD_VALUE_INT);	\
-	} else if ((ret) == WT_NOTFOUND)				\
-		F_CLR(cursor, WT_CURSTD_KEY_SET | WT_CURSTD_VALUE_SET);	\
-	else {								\
+	} else {							\
 		if (F_ISSET(cursor, WT_CURSTD_KEY_EXT)) {		\
 			(cursor)->recno = __recno;			\
-			(cursor)->key.data = __key_data;		\
-			(cursor)->key.size = __key_size;		\
+			WT_ITEM_SET((cursor)->key, __key_copy);		\
 		}							\
-		if (F_ISSET(cursor, WT_CURSTD_VALUE_EXT)) {		\
-			(cursor)->value.data = __value_data;		\
-			(cursor)->value.size = __value_size;		\
-		}							\
+		if (F_ISSET(cursor, WT_CURSTD_VALUE_EXT))		\
+			WT_ITEM_SET((cursor)->value, __value_copy);	\
 		F_CLR(cursor, WT_CURSTD_KEY_INT | WT_CURSTD_VALUE_INT);	\
 	}								\
 } while (0)
@@ -347,10 +340,10 @@ __wt_curfile_create(WT_SESSION_IMPL *session,
     WT_CURSOR **cursorp)
 {
 	WT_CURSOR_STATIC_INIT(iface,
-	    NULL,			/* get-key */
-	    NULL,			/* get-value */
-	    NULL,			/* set-key */
-	    NULL,			/* set-value */
+	    __wt_cursor_get_key,	/* get-key */
+	    __wt_cursor_get_value,	/* get-value */
+	    __wt_cursor_set_key,	/* set-key */
+	    __wt_cursor_set_value,	/* set-value */
 	    __curfile_compare,		/* compare */
 	    __curfile_next,		/* next */
 	    __curfile_prev,		/* prev */

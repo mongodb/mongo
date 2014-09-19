@@ -403,10 +403,10 @@ __wt_curmetadata_open(WT_SESSION_IMPL *session,
     const char *uri, WT_CURSOR *owner, const char *cfg[], WT_CURSOR **cursorp)
 {
 	WT_CURSOR_STATIC_INIT(iface,
-	    NULL,			/* get-key */
-	    NULL,			/* get-value */
-	    NULL,			/* set-key */
-	    NULL,			/* set-value */
+	    __wt_cursor_get_key,	/* get-key */
+	    __wt_cursor_get_value,	/* get-value */
+	    __wt_cursor_set_key,	/* set-key */
+	    __wt_cursor_set_value,	/* set-value */
 	    __curmetadata_compare,	/* compare */
 	    __curmetadata_next,		/* next */
 	    __curmetadata_prev,		/* prev */

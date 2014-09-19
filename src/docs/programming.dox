@@ -18,8 +18,8 @@ each of which is ordered by one or more columns.
 
 <h2>Storage options</h2>
 - @subpage schema
-- @subpage lsm
 - @subpage file_formats
+- @subpage lsm
 - @subpage compression
 
 <h2>Programming notes</h2>

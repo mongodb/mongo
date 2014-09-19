@@ -50,7 +50,7 @@ __clsm_enter_update(WT_CURSOR_LSM *clsm)
 	WT_LSM_CHUNK *primary_chunk;
 	WT_LSM_TREE *lsm_tree;
 	WT_SESSION_IMPL *session;
-	int have_primary, need_signal, ovfl;
+	int have_primary, ovfl;
 
 	lsm_tree = clsm->lsm_tree;
 	if (clsm->nchunks == 0 ||
@@ -88,19 +88,14 @@ __clsm_enter_update(WT_CURSOR_LSM *clsm)
 			 * when only one switch is required, creating very
 			 * small chunks.
 			 */
-			need_signal = 0;
 			WT_RET(__wt_lsm_tree_lock(session, lsm_tree, 0));
 			if (clsm->dsk_gen == lsm_tree->dsk_gen &&
 			    !F_ISSET(lsm_tree, WT_LSM_TREE_NEED_SWITCH)) {
 				WT_RET(__wt_lsm_manager_push_entry(
-				    session, WT_LSM_WORK_SWITCH, lsm_tree));
+				    session, WT_LSM_WORK_SWITCH, 0, lsm_tree));
 				F_SET(lsm_tree, WT_LSM_TREE_NEED_SWITCH);
-				need_signal = 1;
 			}
 			WT_RET(__wt_lsm_tree_unlock(session, lsm_tree));
-			if (need_signal)
-				WT_RET(__wt_cond_signal(
-				    session, lsm_tree->work_cond));
 			ovfl = 0;
 		}
 	} else if (have_primary)
@@ -422,7 +417,6 @@ __clsm_open_cursors(
 		F_SET(lsm_tree, WT_LSM_TREE_NEED_SWITCH);
 		locked = 0;
 		WT_ERR(__wt_lsm_tree_unlock(session, lsm_tree));
-		WT_ERR(__wt_cond_signal(session, lsm_tree->work_cond));
 
 		/*
 		 * Give the worker thread a chance to run before locking the
@@ -706,7 +700,7 @@ __clsm_get_current(
 	multiple = 0;
 
 	WT_FORALL_CURSORS(clsm, c, i) {
-		if (!F_ISSET(c, WT_CURSTD_KEY_SET))
+		if (!F_ISSET(c, WT_CURSTD_KEY_INT))
 			continue;
 		if (current == NULL) {
 			current = c;
@@ -829,7 +823,7 @@ retry:		/*
 		if (F_ISSET(clsm, WT_CLSM_MULTIPLE)) {
 			check = 0;
 			WT_FORALL_CURSORS(clsm, c, i) {
-				if (!F_ISSET(c, WT_CURSTD_KEY_SET))
+				if (!F_ISSET(c, WT_CURSTD_KEY_INT))
 					continue;
 				if (check) {
 					WT_ERR(WT_LSM_CURCMP(session,
@@ -912,7 +906,7 @@ retry:		/*
 		if (F_ISSET(clsm, WT_CLSM_MULTIPLE)) {
 			check = 0;
 			WT_FORALL_CURSORS(clsm, c, i) {
-				if (!F_ISSET(c, WT_CURSTD_KEY_SET))
+				if (!F_ISSET(c, WT_CURSTD_KEY_INT))
 					continue;
 				if (check) {
 					WT_ERR(WT_LSM_CURCMP(session,
@@ -964,7 +958,7 @@ __clsm_reset_cursors(WT_CURSOR_LSM *clsm, WT_CURSOR *skip)
 	WT_FORALL_CURSORS(clsm, c, i) {
 		if (c == skip)
 			continue;
-		if (F_ISSET(c, WT_CURSTD_KEY_SET))
+		if (F_ISSET(c, WT_CURSTD_KEY_INT))
 			WT_TRET(c->reset(c));
 	}
 
@@ -1448,10 +1442,10 @@ __wt_clsm_open(WT_SESSION_IMPL *session,
 {
 	WT_CONFIG_ITEM cval;
 	WT_CURSOR_STATIC_INIT(iface,
-	    NULL,			/* get-key */
-	    NULL,			/* get-value */
-	    NULL,			/* set-key */
-	    NULL,			/* set-value */
+	    __wt_cursor_get_key,	/* get-key */
+	    __wt_cursor_get_value,	/* get-value */
+	    __wt_cursor_set_key,	/* set-key */
+	    __wt_cursor_set_value,	/* set-value */
 	    __clsm_compare,		/* compare */
 	    __clsm_next,		/* next */
 	    __clsm_prev,		/* prev */

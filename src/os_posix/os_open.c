@@ -46,12 +46,13 @@ __open_directory_sync(WT_SESSION_IMPL *session, char *path)
 
 err:	WT_SYSCALL_RETRY(close(fd), ret);
 	if (ret != 0)
-		WT_ERR_MSG(session, ret, "%s: close", path);
+		__wt_err(session, ret, "%s: close", path);
+	return (ret);
 #else
 	WT_UNUSED(session);
 	WT_UNUSED(path);
-#endif
 	return (0);
+#endif
 }
 
 /*

@@ -338,25 +338,6 @@ DbImpl::LiveBackup(const Slice& name)
 	if ((t_ret = cursor->close(cursor)) != 0 && ret == 0)
 		ret = t_ret;
 
-	// We only copied file contents that are on-disk.
-	// At this point we want to use a ReplayIterator to
-	// apply any in-memory operations.
-	DB* db;
-	leveldb::Options options;
-	ReplayIteratorImpl *iter = new ReplayIteratorImpl(context);
-	Status s = Open(options, backup, &db);
-	assert(s.ok());
-
-	while (iter->Valid()) {
-		if (iter->HasValue())
-			s = db->Put(leveldb::WriteOptions(),
-			    iter->key(), iter->value());
-		else
-			s = db->Delete(leveldb::WriteOptions(), iter->key());
-		iter->Next();
-	}
-	delete iter;
-	delete db;
 	return (WiredTigerErrorToStatus(ret));
 }
 

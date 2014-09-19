@@ -66,10 +66,10 @@ err:	WT_TRET(__wt_lsm_tree_unlock(session, lsm_tree));
  *	Find and pin a chunk in the LSM tree that is likely to need flushing.
  */
 int
-__wt_lsm_get_chunk_to_flush(
-    WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree, WT_LSM_CHUNK **chunkp)
+__wt_lsm_get_chunk_to_flush(WT_SESSION_IMPL *session,
+    WT_LSM_TREE *lsm_tree, int force, WT_LSM_CHUNK **chunkp)
 {
-	u_int i;
+	u_int i, end;
 
 	*chunkp = NULL;
 
@@ -78,9 +78,19 @@ __wt_lsm_get_chunk_to_flush(
 	if (!F_ISSET(lsm_tree, WT_LSM_TREE_ACTIVE))
 		return (__wt_lsm_tree_unlock(session, lsm_tree));
 
-	for (i = 0; i < lsm_tree->nchunks - 1; i++) {
+	/*
+	 * Normally we don't want to force out the last chunk.  But if we're
+	 * doing a forced flush, likely from a compact call, then we want
+	 * to include the final chunk.
+	 */
+	end = force ? lsm_tree->nchunks : lsm_tree->nchunks - 1;
+	for (i = 0; i < end; i++) {
 		if (!F_ISSET(lsm_tree->chunk[i], WT_LSM_CHUNK_ONDISK)) {
 			(void)WT_ATOMIC_ADD(lsm_tree->chunk[i]->refcnt, 1);
+			WT_RET(__wt_verbose(session, WT_VERB_LSM,
+			    "Flush%s: return chunk %u of %u: %s",
+			    force ? " w/ force" : "", i, end - 1,
+			    lsm_tree->chunk[i]->uri));
 			*chunkp = lsm_tree->chunk[i];
 			break;
 		}
@@ -112,23 +122,53 @@ __lsm_unpin_chunks(WT_SESSION_IMPL *session, WT_LSM_WORKER_COOKIE *cookie)
 }
 
 /*
- * __wt_lsm_bloom_work --
+ * __wt_lsm_work_switch --
+ *	Do a switch if the LSM tree needs one.
+ */
+int
+__wt_lsm_work_switch(
+    WT_SESSION_IMPL *session, WT_LSM_WORK_UNIT **entryp, int *ran)
+{
+	WT_DECL_RET;
+	WT_LSM_WORK_UNIT *entry;
+
+	/* We've become responsible for freeing the work unit. */
+	entry = *entryp;
+	*ran = 0;
+	*entryp = NULL;
+
+	if (F_ISSET(entry->lsm_tree, WT_LSM_TREE_NEED_SWITCH)) {
+		WT_WITH_SCHEMA_LOCK(session, ret =
+		    __wt_lsm_tree_switch(session, entry->lsm_tree));
+		/* Failing to complete the switch is fine */
+		if (ret == EBUSY)
+			ret = 0;
+		else
+			*ran = 1;
+	}
+	__wt_lsm_manager_free_work_unit(session, entry);
+	return (ret);
+}
+
+/*
+ * __wt_lsm_work_bloom --
  *	Try to create a Bloom filter for the newest on-disk chunk that doesn't
  *	have one.
  */
 int
-__wt_lsm_bloom_work(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
+__wt_lsm_work_bloom(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 {
 	WT_DECL_RET;
 	WT_LSM_CHUNK *chunk;
 	WT_LSM_WORKER_COOKIE cookie;
-	u_int i;
+	u_int i, merge;
 
 	WT_CLEAR(cookie);
 
 	WT_RET(__lsm_copy_chunks(session, lsm_tree, &cookie, 0));
 
 	/* Create bloom filters in all checkpointed chunks. */
+	merge = 0;
 	for (i = 0; i < cookie.nchunks; i++) {
 		chunk = cookie.chunk_array[i];
 
@@ -147,14 +187,28 @@ __wt_lsm_bloom_work(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 		 * recheck that the chunk still needs a Bloom filter.
 		 */
 		if (WT_ATOMIC_CAS(chunk->bloom_busy, 0, 1)) {
-			if (!F_ISSET(chunk, WT_LSM_CHUNK_BLOOM))
+			if (!F_ISSET(chunk, WT_LSM_CHUNK_BLOOM)) {
 				ret = __lsm_bloom_create(
 				    session, lsm_tree, chunk, (u_int)i);
+				/*
+				 * Record if we were successful so that we can
+				 * later push a merge work unit.
+				 */
+				if (ret == 0)
+					merge = 1;
+			}
 			chunk->bloom_busy = 0;
 			break;
 		}
 	}
+	/*
+	 * If we created any bloom filters, we push a merge work unit now.
+	 */
+	if (merge)
+		WT_ERR(__wt_lsm_manager_push_entry(
+		    session, WT_LSM_WORK_MERGE, 0, lsm_tree));
 
+err:
 	__lsm_unpin_chunks(session, &cookie);
 	__wt_free(session, cookie.chunk_array);
 	return (ret);
@@ -186,16 +240,25 @@ __wt_lsm_checkpoint_chunk(WT_SESSION_IMPL *session,
 		else
 			WT_RET_MSG(session, ret, "discard handle");
 	}
-	if (F_ISSET(chunk, WT_LSM_CHUNK_ONDISK))
+	if (F_ISSET(chunk, WT_LSM_CHUNK_ONDISK)) {
+		WT_RET(__wt_verbose(session, WT_VERB_LSM,
+		    "LSM worker %s already on disk",
+		    chunk->uri));
 		return (0);
+	}
 
 	/* Stop if a running transaction needs the chunk. */
 	__wt_txn_update_oldest(session);
 	if (chunk->switch_txn == WT_TXN_NONE ||
-	    !__wt_txn_visible_all(session, chunk->switch_txn))
+	    !__wt_txn_visible_all(session, chunk->switch_txn)) {
+		WT_RET(__wt_verbose(session, WT_VERB_LSM,
+		    "LSM worker %s: running transaction, return",
+		    chunk->uri));
 		return (0);
+	}
 
-	WT_RET(__wt_verbose(session, WT_VERB_LSM, "LSM worker flushing"));
+	WT_RET(__wt_verbose(session, WT_VERB_LSM, "LSM worker flushing %s",
+	    chunk->uri));
 
 	/*
 	 * Flush the file before checkpointing: this is the expensive part in
@@ -218,7 +281,8 @@ __wt_lsm_checkpoint_chunk(WT_SESSION_IMPL *session,
 	}
 	WT_RET(ret);
 
-	WT_RET(__wt_verbose(session, WT_VERB_LSM, "LSM worker checkpointing"));
+	WT_RET(__wt_verbose(session, WT_VERB_LSM, "LSM worker checkpointing %s",
+	    chunk->uri));
 
 	WT_WITH_SCHEMA_LOCK(session,
 	    ret = __wt_schema_worker(session, chunk->uri,
@@ -259,15 +323,16 @@ __wt_lsm_checkpoint_chunk(WT_SESSION_IMPL *session,
 	/* Make sure we aren't pinning a transaction ID. */
 	__wt_txn_release_snapshot(session);
 
-	WT_RET(__wt_verbose(session, WT_VERB_LSM, "LSM worker checkpointed"));
+	WT_RET(__wt_verbose(session, WT_VERB_LSM, "LSM worker checkpointed %s",
+	    chunk->uri));
 	/*
 	 * Schedule a bloom filter create for our newly flushed chunk */
 	if (!FLD_ISSET(lsm_tree->bloom, WT_LSM_BLOOM_OFF))
 		WT_RET(__wt_lsm_manager_push_entry(
-		    session, WT_LSM_WORK_BLOOM, lsm_tree));
+		    session, WT_LSM_WORK_BLOOM, 0, lsm_tree));
 	else
 		WT_RET(__wt_lsm_manager_push_entry(
-		    session, WT_LSM_WORK_MERGE, lsm_tree));
+		    session, WT_LSM_WORK_MERGE, 0, lsm_tree));
 	return (0);
 }
 
@@ -334,7 +399,15 @@ __lsm_bloom_create(WT_SESSION_IMPL *session,
 
 	F_CLR(session, WT_SESSION_NO_CACHE);
 
-	/* Load the new Bloom filter into cache. */
+	/*
+	 * Load the new Bloom filter into cache.
+	 *
+	 * We're doing advisory reads to fault the new trees into cache.
+	 * Don't block if the cache is full: our next unit of work may be to
+	 * discard some trees to free space.
+	 */
+	F_SET(session, WT_SESSION_NO_CACHE_CHECK);
+
 	WT_CLEAR(key);
 	WT_ERR_NOTFOUND_OK(__wt_bloom_get(bloom, &key));
 
@@ -355,7 +428,7 @@ __lsm_bloom_create(WT_SESSION_IMPL *session,
 
 err:	if (bloom != NULL)
 		WT_TRET(__wt_bloom_close(bloom));
-	F_CLR(session, WT_SESSION_NO_CACHE);
+	F_CLR(session, WT_SESSION_NO_CACHE | WT_SESSION_NO_CACHE_CHECK);
 	return (ret);
 }
 

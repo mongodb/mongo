@@ -8,18 +8,11 @@ hold positions in objects, and therefore long-lived cursor positions can
 decrease performance by blocking page eviction or looking like a
 long-lived transaction.
 
-One solution is to cache cursors, but use the WT_CURSOR::reset method
+Best practices are to cache cursors, but use the WT_CURSOR::reset method
 to discard the cursor's position in the object when the position is no
-longer needed.  And, use the WT_CURSOR::insert method instead of the
-WT_CURSOR::update method, when there's no reason to track a position in
-the object, because the WT_CURSOR::insert method never maintains a cursor
-position, so there's no need to call WT_CURSOR::reset.
-
-Additionally, cursors are automatically reset whenever a transaction
-boundary is crossed; when a transaction is started with the
-WT_SESSION::begin_transaction or ended with either
-WT_SESSION::commit_transaction or WT_SESSION::rollback_transaction, all
-open cursors are automatically reset, there is no need to call the
-WT_CURSOR::reset method explicitly.
+longer needed.  Additionally, use the WT_CURSOR::insert method instead
+of the WT_CURSOR::update method when there's no need to hold a position
+in the object, because the WT_CURSOR::insert method never holds a cursor
+position and there's no need to call WT_CURSOR::reset.
 
  */
