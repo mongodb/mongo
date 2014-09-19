@@ -123,9 +123,8 @@ namespace newlm {
             return isLockHeldForMode(resIdColl, newlm::MODE_IS);
         }
 
-        // IS on the database is not sufficient to call the database read-locked, because it won't
-        // conflict with other IX operations.
-        return false;
+        // We're just asking about a database, so IS on the db is enough.
+        return true;
     }
 
     bool LockerImpl::isRecursive() const {
