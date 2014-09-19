@@ -1353,7 +1353,7 @@ namespace mongo {
         v8::HandleScope handle_scope;
         v8::Handle<v8::Function> idCons = ObjectIdFT()->GetFunction();
         v8::Handle<v8::Value> argv[1];
-        const string& idString = id.str();
+        const string& idString = id.toString();
         argv[0] = v8::String::New(idString.c_str(), idString.length());
         return handle_scope.Close(idCons->NewInstance(1, argv));
     }

@@ -42,6 +42,7 @@
 #include "mongo/scripting/v8_utils.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/base64.h"
+#include "mongo/util/hex.h"
 #include "mongo/util/text.h"
 
 using namespace std;
@@ -689,7 +690,7 @@ namespace mongo {
             oid.init(s);
         }
 
-        it->ForceSet(scope->v8StringData("str"), v8::String::New(oid.str().c_str()));
+        it->ForceSet(scope->v8StringData("str"), v8::String::New(oid.toString().c_str()));
         return it;
     }
 

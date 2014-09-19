@@ -31,6 +31,7 @@
 
 #include "mongo/db/jsobj.h"
 #include "mongo/util/base64.h"
+#include "mongo/util/hex.h"
 #include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
 
@@ -134,7 +135,6 @@ namespace mongo {
             break;
         }
         case DBRef: {
-            mongo::OID *x = (mongo::OID *) (valuestr() + valuestrsize());
             if ( format == TenGen )
                 s << "Dbref( ";
             else
@@ -142,7 +142,7 @@ namespace mongo {
             s << '"' << valuestr() << "\", ";
             if ( format != TenGen )
                 s << "\"$id\" : ";
-            s << '"' << *x << "\" ";
+            s << '"' << mongo::OID::from(valuestr() + valuestrsize()) << "\" ";
             if ( format == TenGen )
                 s << ')';
             else
@@ -459,7 +459,7 @@ namespace mongo {
             x = 8;
             break;
         case jstOID:
-            x = 12;
+            x = OID::kOIDSize;
             break;
         case Symbol:
         case Code:
@@ -539,7 +539,7 @@ namespace mongo {
             x = 8;
             break;
         case jstOID:
-            x = 12;
+            x = OID::kOIDSize;
             break;
         case Symbol:
         case Code:
@@ -672,11 +672,7 @@ namespace mongo {
             break;
         case DBRef:
             s << "DBRef('" << valuestr() << "',";
-            {
-                mongo::OID x;
-                std::memcpy(&x, valuestr() + valuestrsize(), sizeof(x));
-                s << x << ')';
-            }
+            s << mongo::OID::from(valuestr() + valuestrsize()) << ')';
             break;
         case jstOID:
             s << "ObjectId('";
@@ -875,7 +871,7 @@ dodouble:
                 return 1;
             }
         case jstOID:
-            return memcmp(l.value(), r.value(), 12);
+            return memcmp(l.value(), r.value(), OID::kOIDSize);
         case Code:
         case Symbol:
         case String:
