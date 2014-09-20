@@ -2231,7 +2231,7 @@ __rec_split_raw_worker(
 
 			/*
 			 * Mark it as uncompressed so the standard compression
-			 * function is called before the buffer is written..
+			 * function is called before the buffer is written.
 			 */
 			last->already_compressed = 0;
 		} else {
