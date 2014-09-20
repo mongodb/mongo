@@ -600,12 +600,9 @@ extern int __wt_collator_config(WT_SESSION_IMPL *session,
     const char **cfg,
     WT_COLLATOR **collatorp,
     int *ownp);
-extern int __wt_conn_remove_collator(WT_SESSION_IMPL *session,
-    WT_NAMED_COLLATOR *ncoll);
-extern int __wt_conn_remove_compressor( WT_SESSION_IMPL *session,
-    WT_NAMED_COMPRESSOR *ncomp);
-extern int __wt_conn_remove_data_source( WT_SESSION_IMPL *session,
-    WT_NAMED_DATA_SOURCE *ndsrc);
+extern int __wt_conn_remove_collator(WT_SESSION_IMPL *session);
+extern int __wt_conn_remove_compressor(WT_SESSION_IMPL *session);
+extern int __wt_conn_remove_data_source(WT_SESSION_IMPL *session);
 extern int __wt_verbose_config(WT_SESSION_IMPL *session, const char *cfg[]);
 extern int __wt_cache_config(WT_SESSION_IMPL *session, const char *cfg[]);
 extern int __wt_cache_create(WT_SESSION_IMPL *session, const char *cfg[]);
