@@ -38,10 +38,12 @@ namespace mongo {
 
     void BsonTemplateEvaluator::initializeEvaluator() {
         addOperator("RAND_INT", &BsonTemplateEvaluator::evalRandInt);
+        addOperator("RAND_INT_PLUS_THREAD", &BsonTemplateEvaluator::evalRandPlusThread);
         addOperator("SEQ_INT", &BsonTemplateEvaluator::evalSeqInt);
         addOperator("RAND_STRING", &BsonTemplateEvaluator::evalRandString);
         addOperator("CONCAT", &BsonTemplateEvaluator::evalConcat);
         addOperator("OID", &BsonTemplateEvaluator::evalObjId);
+        addOperator("VARIABLE", &BsonTemplateEvaluator::evalVariable);
     }
 
     BsonTemplateEvaluator::BsonTemplateEvaluator() : _id(0) {
@@ -81,6 +83,12 @@ namespace mongo {
         return StatusSuccess;
     }
 
+    /* Sets the variable
+     */
+    void BsonTemplateEvaluator::setVariable(const std::string& name, const BSONElement& elem) {
+        this->_varMap[name] = elem.wrap();
+    }
+
     BsonTemplateEvaluator::Status BsonTemplateEvaluator::_evalElem(BSONElement in,
                                                                    BSONObjBuilder& out) {
        if (in.type() != Object) {
@@ -109,7 +117,7 @@ namespace mongo {
                                                                      BSONObjBuilder& out) {
         // in = { #RAND_INT: [10, 20] }
         BSONObj range = in.firstElement().embeddedObject();
-        if (!range[0].isNumber() || !range[1].isNumber())
+        if (!range["0"].isNumber() || !range["1"].isNumber())
             return StatusOpEvaluationError;
         const int min = range["0"].numberInt();
         const int max  = range["1"].numberInt();
@@ -121,6 +129,25 @@ namespace mongo {
                 return StatusOpEvaluationError;
             randomNum *= range[2].numberInt();
         }
+        out.append(fieldName, randomNum);
+        return StatusSuccess;
+    }
+
+    BsonTemplateEvaluator::Status
+       BsonTemplateEvaluator::evalRandPlusThread(BsonTemplateEvaluator* btl,
+                                                   const char* fieldName,
+                                                   const BSONObj& in,
+                                                   BSONObjBuilder& out) {
+        // in = { #RAND_INT_PLUS_THREAD: [10, 20] }
+        BSONObj range = in.firstElement().embeddedObject();
+        if (!range["0"].isNumber() || !range["1"].isNumber())
+            return StatusOpEvaluationError;
+        const int min = range["0"].numberInt();
+        const int max  = range["1"].numberInt();
+        if (max <= min)
+            return StatusOpEvaluationError;
+        int randomNum = min + (rand() % (max - min));
+        randomNum += ((max - min) * btl->_id);
         out.append(fieldName, randomNum);
         return StatusSuccess;
     }
@@ -239,6 +266,16 @@ namespace mongo {
             // Error: must be generating a value for the _id field.
             return StatusOpEvaluationError;
         out.genOID();
+        return StatusSuccess;
+    }
+
+    BsonTemplateEvaluator::Status BsonTemplateEvaluator::evalVariable(BsonTemplateEvaluator* btl,
+                                                                      const char* fieldName,
+                                                                      const BSONObj& in,
+                                                                      BSONObjBuilder& out) {
+        // in = { #VARIABLE: "x" }
+        BSONElement varEle = btl->_varMap[in["#VARIABLE"].String()].firstElement();;
+        out.appendAs(varEle, fieldName);
         return StatusSuccess;
     }
 

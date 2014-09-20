@@ -483,13 +483,15 @@ namespace mongo {
 
                         bool multi = e["multi"].trueValue();
                         bool upsert = e["upsert"].trueValue();
-                        BSONObj query = e["query"].eoo() ? BSONObj() : e["query"].Obj();
-                        BSONObj update = e["update"].Obj();
+                        BSONObj queryOrginal = e["query"].eoo() ? BSONObj() : e["query"].Obj();
+                        BSONObj updateOriginal = e["update"].Obj();
                         BSONObj result;
                         bool safe = e["safe"].trueValue();
 
                         {
                             BenchRunEventTrace _bret(&_stats.updateCounter);
+                            BSONObj query = fixQuery(queryOrginal, bsonTemplateEvaluator);
+                            BSONObj update = fixQuery(updateOriginal, bsonTemplateEvaluator);
 
                             if (useWriteCmd) {
                                 // TODO: Replace after SERVER-11774.
@@ -498,7 +500,7 @@ namespace mongo {
                                     nsToCollectionSubstring(ns));
                                 BSONArrayBuilder docBuilder(
                                     builder.subarrayStart("updates"));
-                                docBuilder.append(BSON("q" << fixQuery(query, bsonTemplateEvaluator) <<
+                                docBuilder.append(BSON("q" << query <<
                                                        "u" << update <<
                                                        "multi" << multi <<
                                                        "upsert" << upsert));
@@ -508,8 +510,7 @@ namespace mongo {
                                     builder.done(), result);
                             }
                             else {
-                                conn->update(ns, fixQuery(query,
-                                            bsonTemplateEvaluator), update,
+                                conn->update(ns, query, update,
                                             upsert , multi);
                                 if (safe)
                                     result = conn->getLastErrorDetailed();
@@ -542,16 +543,15 @@ namespace mongo {
                         {
                             BenchRunEventTrace _bret(&_stats.insertCounter);
 
-                            BSONObjBuilder builder;
                             BSONObj insertDoc = fixQuery(e["doc"].Obj(), bsonTemplateEvaluator);
-                            builder.append("insert",
-                                nsToCollectionSubstring(ns));
-                            BSONArrayBuilder docBuilder(
-                                builder.subarrayStart("documents"));
-                            docBuilder.append(insertDoc);
-                            docBuilder.done();
 
                             if (useWriteCmd) {
+                                BSONObjBuilder builder;
+                                builder.append("insert", nsToCollectionSubstring(ns));
+                                BSONArrayBuilder docBuilder(
+                                    builder.subarrayStart("documents"));
+                                docBuilder.append(insertDoc);
+                                docBuilder.done();
                                 // TODO: Replace after SERVER-11774.
                                 conn->runCommand(
                                     nsToDatabaseSubstring(ns).toString(),
@@ -589,11 +589,11 @@ namespace mongo {
                         BSONObj query = e["query"].eoo() ? BSONObj() : e["query"].Obj();
                         bool safe = e["safe"].trueValue();
                         BSONObj result;
-
                         {
                             BenchRunEventTrace _bret(&_stats.deleteCounter);
-
+                            BSONObj predicate = fixQuery(query, bsonTemplateEvaluator);
                             if (useWriteCmd) {
+
                                 // TODO: Replace after SERVER-11774.
                                 BSONObjBuilder builder;
                                 builder.append("delete",
@@ -602,7 +602,7 @@ namespace mongo {
                                     builder.subarrayStart("deletes"));
                                 int limit = (multi == true) ? 0 : 1;
                                 docBuilder.append(
-                                        BSON("q" << fixQuery(query, bsonTemplateEvaluator) <<
+                                        BSON("q" << predicate <<
                                              "limit" << limit));
                                 docBuilder.done();
                                 conn->runCommand(
@@ -610,8 +610,7 @@ namespace mongo {
                                     builder.done(), result);
                             }
                             else {
-                                conn->remove(ns, fixQuery(query,
-                                    bsonTemplateEvaluator), !multi);
+                                conn->remove(ns, predicate, !multi);
                                 if (safe)
                                     result = conn->getLastErrorDetailed();
                             }
@@ -641,6 +640,15 @@ namespace mongo {
                     }
                     else if ( op == "dropIndex" ) {
                         conn->dropIndex( ns , e["key"].Obj()  );
+                    }
+                    else if( op == "let" ) {
+                        string target = e["target"].eoo() ? string() : e["target"].String();
+                        BSONElement value = e["value"].eoo() ? BSONElement() : e["value"];
+                        BSONObjBuilder valBuilder;
+                        BSONObjBuilder templateBuilder;
+                        valBuilder.append(value);
+                        bsonTemplateEvaluator.evaluate(valBuilder.done(), templateBuilder);
+                        bsonTemplateEvaluator.setVariable(target, templateBuilder.done().firstElement());
                     }
                     else {
                         log() << "don't understand op: " << op << endl;
