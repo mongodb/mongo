@@ -99,7 +99,7 @@ func (cluster *ClusterMonitor) printSnapshot(includeHeaders bool, discover bool)
 
 //Monitor starts the goroutines that listen for incoming stat data,
 //and dump snapshots at a regular interval.
-func (cluster *ClusterMonitor) Monitor(discover bool, maxRows int, done chan struct{}, sleep time.Duration) {
+func (cluster *ClusterMonitor) Monitor(discover bool, maxRows int, done chan error, sleep time.Duration) {
 	receivedData := false
 	gotFirstStat := make(chan struct{})
 	go func() {
@@ -108,6 +108,10 @@ func (cluster *ClusterMonitor) Monitor(discover bool, maxRows int, done chan str
 			cluster.updateHostInfo(newStat)
 			if !receivedData {
 				receivedData = true
+				if newStat.Error != nil {
+					done <- newStat.Error
+					return
+				}
 				gotFirstStat <- struct{}{}
 			}
 		}
@@ -128,7 +132,7 @@ func (cluster *ClusterMonitor) Monitor(discover bool, maxRows int, done chan str
 			}
 			time.Sleep(sleep)
 		}
-		done <- struct{}{}
+		done <- nil
 	}()
 }
 
@@ -244,7 +248,7 @@ func (mstat *MongoStat) AddNewNode(fullhost string) {
 
 //Run is the top-level function that starts the monitoring
 //and discovery goroutines
-func (mstat *MongoStat) Run() {
+func (mstat *MongoStat) Run() error {
 	if mstat.Discovered != nil {
 		go func() {
 			for {
@@ -255,9 +259,10 @@ func (mstat *MongoStat) Run() {
 	}
 
 	//Channel to wait
-	finished := make(chan struct{})
+	finished := make(chan error)
 	go mstat.Cluster.Monitor(mstat.Discovered != nil, mstat.StatOptions.RowCount, finished, mstat.SleepInterval)
 
-	_ = <-finished
+	err := <-finished
+	return err
 
 }

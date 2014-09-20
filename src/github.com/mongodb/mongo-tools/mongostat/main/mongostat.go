@@ -80,6 +80,10 @@ func main() {
 	stat.AddNewNode(seedHost)
 
 	// kick it off
-	stat.Run()
+	err = stat.Run()
+	if err != nil {
+		fmt.Println(err)
+		os.Exit(1)
+	}
 
 }

@@ -11,14 +11,14 @@ type OutputFormatOptions struct {
 	CSV bool `long:"csv" description:"export to csv instead of json"`
 
 	//OutputFile specifies an output file path.
-	OutputFile string `long:"out" short:"o" description:"output file- if not specified, stdout is used"`
+	OutputFile string `long:"out" short:"o" description:"output file; if not specified, stdout is used"`
 
 	//JSONArray if set will export the documents an array of json docs
 	JSONArray bool `long:"jsonArray" description:"output to a json array rather than one object per line"`
 }
 
 func (self *OutputFormatOptions) Name() string {
-	return "output format"
+	return "output"
 }
 
 type InputOptions struct {
@@ -31,5 +31,5 @@ type InputOptions struct {
 }
 
 func (self *InputOptions) Name() string {
-	return "querying options"
+	return "querying"
 }
