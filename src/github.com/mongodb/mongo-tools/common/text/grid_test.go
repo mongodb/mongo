@@ -1,6 +1,7 @@
 package text
 
 import (
+	"bytes"
 	"fmt"
 	. "github.com/smartystreets/goconvey/convey"
 	"testing"
@@ -15,18 +16,26 @@ func TestWriteGrid(t *testing.T) {
 			}
 			gw.EndRow()
 		}
-		output := gw.String()
+		buf := bytes.Buffer{}
+		gw.Flush(&buf)
+		output := buf.String()
+
 		So(output, ShouldEqual,
-			"(0,0)(0,1)(0,2)\n(1,0)(1,1)(1,2)\n(2,0)(2,1)(2,2)\n\n")
+			"(0,0)(0,1)(0,2)\n(1,0)(1,1)(1,2)\n(2,0)(2,1)(2,2)\n")
 
 		gw.MinWidth = 7
-		output = gw.String()
+
+		buf = bytes.Buffer{}
+		gw.Flush(&buf)
+		output = buf.String()
 		So(output, ShouldStartWith,
 			"  (0,0)  (0,1)  (0,2)\n  (1,0)  (1,1)")
 
 		gw.MinWidth = 0
 		gw.ColumnPadding = 1
-		output = gw.String()
+		buf = bytes.Buffer{}
+		gw.Flush(&buf)
+		output = buf.String()
 		So(output, ShouldStartWith,
 			"(0,0) (0,1) (0,2)\n(1,0) (1,1)")
 	})

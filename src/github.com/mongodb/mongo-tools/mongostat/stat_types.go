@@ -285,6 +285,7 @@ type LockStatus struct {
 }
 
 type StatLine struct {
+	Error    error
 	IsMongos bool
 	Host     string
 
@@ -392,6 +393,10 @@ func FormatLines(lines []StatLine, includeHeader bool, discover bool) string {
 	for _, line := range lines {
 		if discover {
 			out.WriteCell(line.Host)
+		}
+		if line.Error != nil {
+			out.Feed(line.Error.Error())
+			continue
 		}
 
 		out.WriteCell(formatOpcount(line.Insert, line.InsertR, false))

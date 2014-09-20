@@ -157,6 +157,7 @@ func (node *NodeMonitor) Report(discover chan string, all bool, out chan StatLin
 	if err != nil {
 		node.Err = err
 		node.LastStatus = nil
+		out <- StatLine{Host: node.host, Error: err}
 		return
 	}
 
@@ -169,7 +170,7 @@ func (node *NodeMonitor) Report(discover chan string, all bool, out chan StatLin
 	err = s.DB("admin").Run(bson.D{{"serverStatus", 1}}, result)
 	if err != nil {
 		result = nil
-		node.Err = err
+		out <- StatLine{Host: node.host, Error: err}
 		return
 	}
 
@@ -199,10 +200,7 @@ func (node *NodeMonitor) Report(discover chan string, all bool, out chan StatLin
 				discover <- shardHost
 			}
 		}
-		if err := shardCursor.Close(); err != nil {
-			//TODO log an error.
-			//return err
-		}
+		shardCursor.Close()
 	}
 
 	node.LastStatus = result

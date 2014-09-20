@@ -6,10 +6,15 @@ import (
 	"strings"
 )
 
+type Cell struct {
+	contents string
+	feed     bool
+}
+
 type GridWriter struct {
 	ColumnPadding int
 	MinWidth      int
-	Grid          [][]string
+	Grid          [][]Cell
 	CurrentRow    int
 	CurrentCol    int
 }
@@ -21,20 +26,33 @@ func max(a, b int) int {
 	return b
 }
 
+//init() makes the initial row if this is the first time any data is being written.
+//otherwise, no-op.
+func (gw *GridWriter) init() {
+	if len(gw.Grid) <= gw.CurrentRow {
+		gw.Grid = append(gw.Grid, []Cell{})
+	}
+}
+
 //WriteCell writes the given string into the next cell in the current row.
 func (gw *GridWriter) WriteCell(data string) {
-	//If this is the first time being used, make the initial row
-	if len(gw.Grid) <= gw.CurrentRow {
-		gw.Grid = append(gw.Grid, []string{})
-	}
-	gw.Grid[gw.CurrentRow] = append(gw.Grid[gw.CurrentRow], data)
+	gw.init()
+	gw.Grid[gw.CurrentRow] = append(gw.Grid[gw.CurrentRow], Cell{data, false})
+}
+
+//Feed writes the given string into the current cell but allowing the cell contents
+//to extend past the width of the current column, and ends the row.
+func (gw *GridWriter) Feed(data string) {
+	gw.init()
+	gw.Grid[gw.CurrentRow] = append(gw.Grid[gw.CurrentRow], Cell{data, true})
+	gw.EndRow()
 }
 
 //EndRow terminates the row of cells and begins a new row in the grid.
 func (gw *GridWriter) EndRow() {
 	gw.CurrentRow += 1
 	if len(gw.Grid) <= gw.CurrentRow {
-		gw.Grid = append(gw.Grid, []string{})
+		gw.Grid = append(gw.Grid, []Cell{})
 	}
 }
 
@@ -42,6 +60,7 @@ func (gw *GridWriter) EndRow() {
 //each column in the grid.
 func (gw *GridWriter) calculateWidths() []int {
 	colWidths := []int{}
+
 	//Loop over each column
 	for j := 0; ; j++ {
 		found := false
@@ -56,9 +75,14 @@ func (gw *GridWriter) calculateWidths() []int {
 			if len(colWidths) <= j {
 				colWidths = append(colWidths, 0)
 			}
+
+			if gw.Grid[i][j].feed {
+				//we're at a row-terminating cell - skip over the rest of this row
+				continue
+			}
 			//Set the size for the row to be the largest
 			//of all the cells in the column
-			newMin := max(gw.MinWidth, len(gw.Grid[i][j]))
+			newMin := max(gw.MinWidth, len(gw.Grid[i][j].contents))
 			if newMin > colWidths[j] {
 				colWidths[j] = newMin
 			}
@@ -80,7 +104,7 @@ func (gw *GridWriter) Flush(w io.Writer) {
 		for j, cell := range row {
 			lastCol := (j == len(row)-1)
 			width := colWidths[j]
-			fmt.Fprintf(w, fmt.Sprintf("%%%vs", width), cell)
+			fmt.Fprintf(w, fmt.Sprintf("%%%vs", width), cell.contents)
 			if gw.ColumnPadding > 0 && !lastCol {
 				fmt.Fprint(w, strings.Repeat(" ", gw.ColumnPadding))
 			}
