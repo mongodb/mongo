@@ -157,7 +157,7 @@ type OpcountStats struct {
 	Query   int `bson:"query"`
 	Update  int `bson:"update"`
 	Delete  int `bson:"delete"`
-	GetMore int `bson:"getMore"`
+	GetMore int `bson:"getmore"`
 	Command int `bson:"command"`
 }
 
@@ -290,18 +290,21 @@ type StatLine struct {
 
 	//Opcounter fields
 	Insert, Query, Update, Delete, GetMore, Command int
-	Flushes                                         int
-	Mapped, Virtual, Resident, NonMapped            int64
-	Faults                                          int
-	HighestLocked                                   *LockStatus
-	IndexMissPercent                                float64
-	QueuedReaders, QueuedWriters                    int
-	ActiveReaders, ActiveWriters                    int
-	NetIn, NetOut                                   int64
-	NumConnections                                  int
-	Time                                            time.Time
-	ReplSetName                                     string
-	NodeType                                        string
+
+	//Replicated Opcounter fields
+	InsertR, QueryR, UpdateR, DeleteR, GetMoreR, CommandR int
+	Flushes                                               int
+	Mapped, Virtual, Resident, NonMapped                  int64
+	Faults                                                int
+	HighestLocked                                         *LockStatus
+	IndexMissPercent                                      float64
+	QueuedReaders, QueuedWriters                          int
+	ActiveReaders, ActiveWriters                          int
+	NetIn, NetOut                                         int64
+	NumConnections                                        int
+	Time                                                  time.Time
+	ReplSetName                                           string
+	NodeType                                              string
 }
 
 func parseLocks(stat ServerStatus) map[string]LockUsage {
@@ -336,6 +339,21 @@ func computeLockDiffs(prevLocks, curLocks map[string]LockUsage) []LockUsage {
 	//Sort the array in order of least to most locked
 	sort.Sort(lockUsages)
 	return lockUsages
+}
+
+//formatOpcount returns a string for mongostat to display replset count
+func formatOpcount(opcount, opcountRepl int, both bool) string {
+	if both {
+		return fmt.Sprintf("%v|%v", opcount, opcountRepl)
+	}
+	if opcount > 0 && opcountRepl > 0 {
+		return fmt.Sprintf("%v|%v", opcount, opcountRepl)
+	} else if opcount > 0 {
+		return fmt.Sprintf("%v", opcount)
+	} else if opcountRepl > 0 {
+		return fmt.Sprintf("*%v", opcountRepl)
+	}
+	return "*0"
 }
 
 func FormatLines(lines []StatLine, includeHeader bool, discover bool) string {
@@ -376,13 +394,15 @@ func FormatLines(lines []StatLine, includeHeader bool, discover bool) string {
 			out.WriteCell(line.Host)
 		}
 
-		out.WriteCell(fmt.Sprintf("%v", line.Insert))
-		out.WriteCell(fmt.Sprintf("%v", line.Query))
-		out.WriteCell(fmt.Sprintf("%v", line.Update))
-		out.WriteCell(fmt.Sprintf("%v", line.Delete))
+		out.WriteCell(formatOpcount(line.Insert, line.InsertR, false))
+		out.WriteCell(formatOpcount(line.Query, line.QueryR, false))
+		out.WriteCell(formatOpcount(line.Update, line.UpdateR, false))
+		out.WriteCell(formatOpcount(line.Delete, line.DeleteR, false))
 		out.WriteCell(fmt.Sprintf("%v", line.GetMore))
-		out.WriteCell(fmt.Sprintf("%v", line.Command))
+		out.WriteCell(formatOpcount(line.Command, line.CommandR, true))
+
 		out.WriteCell(fmt.Sprintf("%v", line.Flushes))
+
 		if line.Mapped > 0 {
 			out.WriteCell(formatMegs(int64(line.Mapped)))
 		} else {
@@ -451,6 +471,16 @@ func NewStatLine(oldStat, newStat ServerStatus, all bool) *StatLine {
 		returnVal.GetMore = newStat.Opcounters.GetMore - oldStat.Opcounters.GetMore
 		returnVal.Command = newStat.Opcounters.Command - oldStat.Opcounters.Command
 	}
+
+	if newStat.OpcountersRepl != nil && oldStat.OpcountersRepl != nil {
+		returnVal.InsertR = newStat.OpcountersRepl.Insert - oldStat.OpcountersRepl.Insert
+		returnVal.QueryR = newStat.OpcountersRepl.Query - oldStat.OpcountersRepl.Query
+		returnVal.UpdateR = newStat.OpcountersRepl.Update - oldStat.OpcountersRepl.Update
+		returnVal.DeleteR = newStat.OpcountersRepl.Delete - oldStat.OpcountersRepl.Delete
+		returnVal.GetMoreR = newStat.OpcountersRepl.GetMore - oldStat.OpcountersRepl.GetMore
+		returnVal.CommandR = newStat.OpcountersRepl.Command - oldStat.OpcountersRepl.Command
+	}
+
 	if newStat.BackgroundFlushing != nil && oldStat.BackgroundFlushing != nil {
 		returnVal.Flushes = newStat.BackgroundFlushing.Flushes - oldStat.BackgroundFlushing.Flushes
 	}
