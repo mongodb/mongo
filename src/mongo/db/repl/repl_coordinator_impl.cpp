@@ -36,6 +36,7 @@
 #include <boost/thread.hpp>
 
 #include "mongo/base/status.h"
+#include "mongo/db/global_optime.h"
 #include "mongo/db/operation_context_noop.h"
 #include "mongo/db/repl/check_quorum_for_config_change.h"
 #include "mongo/db/repl/handshake_args.h"
@@ -114,6 +115,7 @@ namespace {
         _externalState(externalState),
         _inShutdown(false),
         _currentState(MemberState::RS_STARTUP),
+        _isWaitingForDrainToComplete(false),
         _rsConfigState(kConfigStartingUp),
         _thisMembersConfigIndex(-1),
         _sleptLastElection(false) {
@@ -159,6 +161,17 @@ namespace {
             return true;
         }
 
+        StatusWith<ReplicationCoordinatorExternalState::OpTimeAndHash> lastOpTimeStatus =
+            _externalState->loadLastOpTimeAndHash(txn);
+        OpTime lastOpTime(0, 0);
+        if (!lastOpTimeStatus.isOK()) {
+            warning() << "Failed to load timestamp of most recently applied operation; " <<
+                lastOpTimeStatus.getStatus();
+        }
+        else {
+            lastOpTime = lastOpTimeStatus.getValue().opTime;
+        }
+
         // Use a callback here, because _finishLoadLocalConfig calls isself() which requires
         // that the server's networking layer be up and running and accepting connections, which
         // doesn't happen until startReplication finishes.
@@ -166,18 +179,20 @@ namespace {
                 stdx::bind(&ReplicationCoordinatorImpl::_finishLoadLocalConfig,
                            this,
                            stdx::placeholders::_1,
-                           localConfig));
+                           localConfig,
+                           lastOpTime));
         return false;
     }
 
     void ReplicationCoordinatorImpl::_finishLoadLocalConfig(
             const ReplicationExecutor::CallbackData& cbData,
-            const ReplicaSetConfig& localConfig) {
+            const ReplicaSetConfig& localConfig,
+            OpTime lastOpTime) {
         if (!cbData.status.isOK()) {
             LOG(1) << "Loading local replica set configuration failed due to " << cbData.status;
             return;
         }
-        _finishLoadLocalConfig_helper(cbData, localConfig);
+        _finishLoadLocalConfig_helper(cbData, localConfig, lastOpTime);
 
         // Make sure that no matter how _finishLoadLocalConfig_helper terminates (short of
         // throwing an exception, which it shouldn't do and would cause the process to terminate),
@@ -195,7 +210,8 @@ namespace {
 
     void ReplicationCoordinatorImpl::_finishLoadLocalConfig_helper(
             const ReplicationExecutor::CallbackData& cbData,
-            const ReplicaSetConfig& localConfig) {
+            const ReplicaSetConfig& localConfig,
+            OpTime lastOpTime) {
 
         StatusWith<int> myIndex = validateConfigForStartUp(_externalState.get(),
                                                            _rsConfig,
@@ -207,9 +223,10 @@ namespace {
             return;
         }
 
-        boost::lock_guard<boost::mutex> lk(_mutex);
+        boost::unique_lock<boost::mutex> lk(_mutex);
         invariant(_rsConfigState == kConfigStartingUp);
         _setCurrentRSConfig_inlock(localConfig, myIndex.getValue());
+        _setLastOptime_inlock(&lk, _getMyRID_inlock(), lastOpTime);
     }
 
     void ReplicationCoordinatorImpl::startReplication(OperationContext* txn) {
@@ -335,6 +352,17 @@ namespace {
         _replExecutor.wait(cbh.getValue());
     }
 
+    bool ReplicationCoordinatorImpl::isWaitingForApplierToDrain() {
+        boost::lock_guard<boost::mutex> lk(_mutex);
+        return _isWaitingForDrainToComplete;
+    }
+
+    void ReplicationCoordinatorImpl::signalDrainComplete() {
+        boost::lock_guard<boost::mutex> lk(_mutex);
+        invariant(_isWaitingForDrainToComplete);
+        _isWaitingForDrainToComplete = false;
+    }
+
     void ReplicationCoordinatorImpl::_setFollowerModeFinish(
             const ReplicationExecutor::CallbackData& cbData,
             const MemberState& newState) {
@@ -367,7 +395,9 @@ namespace {
         boost::unique_lock<boost::mutex> lock(_mutex);
 
         SlaveInfoMap::const_iterator it(_slaveInfoMap.find(_getMyRID_inlock()));
-        invariant(it != _slaveInfoMap.end());
+        if (it == _slaveInfoMap.end()) {
+            return OpTime(0,0);
+        }
         return it->second.opTime;
     }
 
@@ -558,12 +588,17 @@ namespace {
         const Mode replMode = _getReplicationMode_inlock();
         if (replMode == modeNone || serverGlobalParams.configsvr) {
             // no replication check needed (validated above)
-            return StatusAndDuration(Status::OK(), Milliseconds(0));
+            return StatusAndDuration(Status::OK(), Milliseconds(timer->millis()));
         }
 
         if (writeConcern.wMode == "majority" && replMode == modeMasterSlave) {
             // with master/slave, majority is equivalent to w=1
-            return StatusAndDuration(Status::OK(), Milliseconds(0));
+            return StatusAndDuration(Status::OK(), Milliseconds(timer->millis()));
+        }
+
+        if (opTime.isNull()) {
+            // If waiting for the empty optime, always say it's been replicated.
+            return StatusAndDuration(Status::OK(), Milliseconds(timer->millis()));
         }
 
         // Must hold _mutex before constructing waitInfo as it will modify _replicationWaiterList
@@ -739,7 +774,8 @@ namespace {
         boost::lock_guard<boost::mutex> lk(_mutex);
         if (_settings.usingReplSets()) {
             if (_getReplicationMode_inlock() == modeReplSet &&
-                    _getCurrentMemberState_inlock().primary()) {
+                    _getCurrentMemberState_inlock().primary() &&
+                    !_isWaitingForDrainToComplete) {
                 return true;
             }
             return dbName == "local";
@@ -808,13 +844,6 @@ namespace {
                (ms == MemberState::RS_ROLLBACK))) {
             return false;
         }
-        // TODO(spencer): SERVER-14233 Remove support for old oplog versions, or move oplogVersion
-        // into the repl coordinator
-        /* // 2 is the oldest oplog version where operations
-        // are fully idempotent.
-        if (theReplSet->oplogVersion < 2) {
-            return false;
-        }*/
 
         return true;
     }
@@ -906,6 +935,30 @@ namespace {
     void ReplicationCoordinatorImpl::processReplSetGetConfig(BSONObjBuilder* result) {
         boost::lock_guard<boost::mutex> lock(_mutex);
         result->append("config", _rsConfig.toBSON());
+    }
+
+    bool ReplicationCoordinatorImpl::getMaintenanceMode() {
+        bool maintenanceMode(false);
+        CBHStatus cbh = _replExecutor.scheduleWork(
+            stdx::bind(&ReplicationCoordinatorImpl::_getMaintenanceMode_helper,
+                       this,
+                       stdx::placeholders::_1,
+                       &maintenanceMode));
+        if (cbh.getStatus() == ErrorCodes::ShutdownInProgress) {
+            return false;
+        }
+        fassert(18811, cbh.getStatus());
+        _replExecutor.wait(cbh.getValue());
+        return maintenanceMode;
+    }
+
+    void ReplicationCoordinatorImpl::_getMaintenanceMode_helper(
+            const ReplicationExecutor::CallbackData& cbData,
+            bool* maintenanceMode) {
+        if (cbData.status == ErrorCodes::CallbackCanceled) {
+            return;
+        }
+        *maintenanceMode = _topCoord->getMaintenanceCount() > 0;
     }
 
     Status ReplicationCoordinatorImpl::setMaintenanceMode(OperationContext* txn, bool activate) {
@@ -1173,19 +1226,21 @@ namespace {
 
     Status ReplicationCoordinatorImpl::processReplSetElect(const ReplSetElectArgs& args,
                                                            BSONObjBuilder* resultObj) {
+        Status result = Status(ErrorCodes::InternalError, "status not set by callback");
         CBHStatus cbh = _replExecutor.scheduleWork(
                 stdx::bind(&TopologyCoordinator::prepareElectResponse,
                            _topCoord.get(),
                            stdx::placeholders::_1,
                            args,
                            _replExecutor.now(),
-                           resultObj));
+                           resultObj,
+                           &result));
         if (cbh.getStatus() == ErrorCodes::ShutdownInProgress) {
             return Status(ErrorCodes::ShutdownInProgress, "replication shutdown in progress");
         }
         fassert(18657, cbh.getStatus());
         _replExecutor.wait(cbh.getValue());
-        return Status::OK();
+        return result;
     }
 
     void ReplicationCoordinatorImpl::_setCurrentRSConfig(
@@ -1216,8 +1271,21 @@ namespace {
                  myIndex,
                  _replExecutor.now(),
                  lastOpApplied);
-         _currentState = _topCoord->getMemberState();
 
+         if (newConfig.getNumMembers() == 1 &&
+             myIndex == 0 &&
+             newConfig.getMemberAt(myIndex).isElectable()) {
+             // If the new config describes a one-node replica set, we're the one member, and
+             // we're electable, we must short-circuit the election.  Elections are normally
+             // triggered by incoming heartbeats, but with a one-node set there are no
+             // heartbeats.
+             _topCoord->processWinElection(_replExecutor.now(),
+                                           OID::gen(),
+                                           lastOpApplied,
+                                           getNextGlobalOptime());
+         }
+
+         _currentState = _topCoord->getMemberState();
          // Ensure that there's an entry in the _slaveInfoMap for ourself
          _slaveInfoMap[_getMyRID_inlock()].memberID = _rsConfig.getMemberAt(myIndex).getId();
          _slaveInfoMap[_getMyRID_inlock()].hostAndPort =

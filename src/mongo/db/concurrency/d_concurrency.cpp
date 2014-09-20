@@ -222,20 +222,6 @@ namespace {
         resetTime();
     }
 
-    void Lock::GlobalRead::_tempRelease() { 
-        invariant(_lockState->isR());
-
-        invariant(_lockState->unlockGlobal());
-        recordTime();
-    }
-    void Lock::GlobalRead::_relock() { 
-        invariant(!_lockState->isLocked());
-
-        TrackLockAcquireTime a('R');
-        _lockState->lockGlobal(newlm::MODE_S);
-        resetTime();
-    }
-
     void Lock::DBWrite::_tempRelease() {
         unlockDB();
     }

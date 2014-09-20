@@ -146,7 +146,8 @@ namespace repl {
         virtual void prepareElectResponse(const ReplicationExecutor::CallbackData& data,
                                           const ReplicationCoordinator::ReplSetElectArgs& args,
                                           const Date_t now,
-                                          BSONObjBuilder* response);
+                                          BSONObjBuilder* response,
+                                          Status* result);
         virtual void prepareHeartbeatResponse(const ReplicationExecutor::CallbackData& data,
                                               Date_t now,
                                               const ReplSetHeartbeatArgs& args,
@@ -187,6 +188,7 @@ namespace repl {
                 OpTime electionOpTime);
         virtual void processLoseElection(Date_t now, OpTime myLastOpApplied);
         virtual void stepDown();
+        virtual Date_t getStepDownTime() const;
 
         ////////////////////////////////////////////////////////////
         //
@@ -195,7 +197,8 @@ namespace repl {
         ////////////////////////////////////////////////////////////
 
         // Changes _memberState to newMemberState.  Only for testing.
-        virtual void changeMemberState_forTest(const MemberState& newMemberState);
+        void changeMemberState_forTest(const MemberState& newMemberState,
+                                       OpTime electionTime = OpTime(0,0));
 
         // Sets "_electionTime" to "newElectionTime".  Only for testing.
         void _setElectionTime(const OpTime& newElectionTime);
@@ -205,7 +208,8 @@ namespace repl {
         // set the current primary.
         void _setCurrentPrimaryForTest(int primaryIndex);
 
-        virtual Date_t getStepDownTime() const;
+        // Returns _currentPrimaryIndex.  Only used in unittests.
+        int getCurrentPrimaryIndex() const;
 
     private:
 
@@ -294,7 +298,7 @@ namespace repl {
         // The time at which the current PRIMARY was elected.
         OpTime _electionTime;
 
-        // the member we currently believe is primary, if one exists
+        // the index of the member we currently believe is primary, if one exists, otherwise -1
         int _currentPrimaryIndex;
         // the hostandport we are currently syncing from
         // empty if no sync source (we are primary, or we cannot connect to anyone yet)

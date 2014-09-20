@@ -26,7 +26,7 @@
 *    it in the license file.
 */
 
-#include "mongo/pch.h"
+#include "mongo/platform/basic.h"
 
 #include "mongo/db/repl/rs_sync.h"
 
@@ -45,6 +45,7 @@
 #include "mongo/db/prefetch.h"
 #include "mongo/db/repl/bgsync.h"
 #include "mongo/db/repl/member.h"
+#include "mongo/db/repl/minvalid.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/repl_settings.h"
 #include "mongo/db/repl/repl_coordinator_global.h"
@@ -62,46 +63,42 @@ namespace mongo {
 namespace repl {
 
     /* should be in RECOVERING state on arrival here.
-       readlocks
-       @return true if transitioned to SECONDARY
     */
-    bool ReplSetImpl::tryToGoLiveAsASecondary(OperationContext* txn, OpTime& /*out*/ minvalid) {
-        bool golive = false;
+    void ReplSetImpl::tryToGoLiveAsASecondary(OperationContext* txn) {
+        if (getGlobalReplicationCoordinator()->getMaintenanceMode()) {
+            // we're not actually going live
+            return;
+        }
 
         lock rsLock( this );
 
-        if (_maintenanceMode > 0) {
-            // we're not actually going live
-            return true;
-        }
-
         // if we're blocking sync, don't change state
         if (_blockSync) {
-            return false;
+            return;
+        }
+
+        // if we're fsync-and-locked, don't bother checking
+        if (lockedForWriting()) {
+            return;
         }
 
         Lock::GlobalWrite writeLock(txn->lockState());
 
-        // make sure we're not primary, secondary, rollback already
-        if (box.getState().primary() || box.getState().secondary() ||
-            box.getState().rollback()) {
-            return false;
+        // Only state RECOVERING can transition to SECONDARY.
+        MemberState state(getGlobalReplicationCoordinator()->getCurrentMemberState());
+        if (!state.recovering()) {
+            return;
         }
 
-        minvalid = getMinValid(txn);
-        if( minvalid <= lastOpTimeWritten ) {
-            golive=true;
-        }
-        else {
+        OpTime minvalid = getMinValid(txn);
+        if (minvalid > getGlobalReplicationCoordinator()->getMyLastOptime()) {
             sethbmsg(str::stream() << "still syncing, not yet to minValid optime " <<
                      minvalid.toString());
+            return;
         }
 
-        if( golive ) {
-            sethbmsg("");
-            changeState(MemberState::RS_SECONDARY);
-        }
-        return golive;
+        sethbmsg("");
+        getGlobalReplicationCoordinator()->setFollowerMode(MemberState::RS_SECONDARY);
     }
 
 
@@ -190,12 +187,8 @@ namespace repl {
 
     void ReplSetImpl::_syncThread() {
         StateBox::SP sp = box.get();
-        if( sp.state.primary() ) {
+        if (sp.state.primary() || _blockSync) {
             sleepsecs(1);
-            return;
-        }
-        if( _blockSync || sp.state.startup() ) {
-            sleepsecs(5);
             return;
         }
 
@@ -208,13 +201,16 @@ namespace repl {
         // 1. If the oplog is empty, do an initial sync
         // 2. If minValid has _initialSyncFlag set, do an initial sync
         // 3. If initialSyncRequested is true
-        if (lastOpTimeWritten.isNull() || getInitialSyncFlag() || initialSyncRequested) {
+        if (getGlobalReplicationCoordinator()->getMyLastOptime().isNull() || 
+            getInitialSyncFlag() || 
+            initialSyncRequested) {
             syncDoInitialSync();
             return; // _syncThread will be recalled, starts from top again in case sync failed.
         }
+        getGlobalReplicationCoordinator()->setFollowerMode(MemberState::RS_RECOVERING);
 
         /* we have some data.  continue tailing. */
-        SyncTail tail(BackgroundSync::get());
+        SyncTail tail(BackgroundSync::get(), multiSyncApply);
         tail.oplogApplication();
     }
 
@@ -262,7 +258,6 @@ namespace repl {
                 // TODO : SET NOT SECONDARY here?
                 sleepsecs(60);
             }
-            sleepsecs(1);
         }
     }
 

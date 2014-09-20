@@ -256,6 +256,10 @@ namespace repl {
          * have called it again, passing in false.
          */
         bool setMaintenanceMode(OperationContext* txn, const bool inc);
+        bool getMaintenanceMode() {
+            lock rsLock( this );
+            return _maintenanceMode > 0;
+        }
 
     private:
         Member* head() const { return _members.head(); }
@@ -295,10 +299,6 @@ namespace repl {
 
         // keep a list of hosts that we've tried recently that didn't work
         map<string,time_t> _veto;
-        // persistent pool of worker threads for writing ops to the databases
-        threadpool::ThreadPool _writerPool;
-        // persistent pool of worker threads for prefetching
-        threadpool::ThreadPool _prefetcherPool;
 
     public:
         // Allow index prefetching to be turned on/off
@@ -313,37 +313,15 @@ namespace repl {
             return _indexPrefetchConfig;
         }
             
-        static const int replWriterThreadCount;
-        static const int replPrefetcherThreadCount;
-        threadpool::ThreadPool& getPrefetchPool() { return _prefetcherPool; }
-        threadpool::ThreadPool& getWriterPool() { return _writerPool; }
 
         const ReplSetConfig::MemberCfg& myConfig() const { return _config; }
-        bool tryToGoLiveAsASecondary(OperationContext* txn, OpTime&); // readlocks
+        void tryToGoLiveAsASecondary(OperationContext* txn);
         void syncThread();
         const OpTime lastOtherOpTime() const;
         /**
          * The most up to date electable replica
          */
         const OpTime lastOtherElectableOpTime() const;
-
-        /**
-         * When a member reaches its minValid optime it is in a consistent state.  Thus, minValid is
-         * set as the last step in initial sync.  At the beginning of initial sync, _initialSyncFlag
-         * is appended onto minValid to indicate that initial sync was started but has not yet 
-         * completed.
-         * minValid is also used during "normal" sync: the last op in each batch is used to set 
-         * minValid, to indicate that we are in a consistent state when the batch has been fully 
-         * applied.
-         */
-        static void setMinValid(OperationContext* ctx, BSONObj obj);
-        static void setMinValid(OperationContext* ctx, OpTime opTime);
-        static OpTime getMinValid(OperationContext* txn);
-        static void clearInitialSyncFlag(OperationContext* txn);
-        static bool getInitialSyncFlag();
-        static void setInitialSyncFlag(OperationContext* txn);
-
-        int oplogVersion;
 
         // bool for indicating resync need on this node and the mutex that protects it
         bool initialSyncRequested;

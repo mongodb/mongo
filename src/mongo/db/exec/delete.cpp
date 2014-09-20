@@ -100,20 +100,25 @@ namespace mongo {
 
                 const bool deleteCappedOK = false;
                 const bool deleteNoWarn = false;
-                _collection->deleteDocument(_txn, rloc, deleteCappedOK, deleteNoWarn,
-                                            _params.shouldCallLogOp ? &deletedDoc : NULL);
 
-                if (_params.shouldCallLogOp) {
-                    if (deletedDoc.isEmpty()) {
-                        log() << "Deleted object without id in collection " << _collection->ns()
-                        << ", not logging.";
-                    }
-                    else {
-                        bool replJustOne = true;
-                        repl::logOp(_txn, "d", _collection->ns().ns().c_str(), deletedDoc, 0,
-                                    &replJustOne, _params.fromMigrate);
+                // Do the write, unless this is an explain.
+                if (!_params.isExplain) {
+                    _collection->deleteDocument(_txn, rloc, deleteCappedOK, deleteNoWarn,
+                                                _params.shouldCallLogOp ? &deletedDoc : NULL);
+
+                    if (_params.shouldCallLogOp) {
+                        if (deletedDoc.isEmpty()) {
+                            log() << "Deleted object without id in collection " << _collection->ns()
+                            << ", not logging.";
+                        }
+                        else {
+                            bool replJustOne = true;
+                            repl::logOp(_txn, "d", _collection->ns().ns().c_str(), deletedDoc, 0,
+                                        &replJustOne, _params.fromMigrate);
+                        }
                     }
                 }
+
                 wunit.commit();
             }
 

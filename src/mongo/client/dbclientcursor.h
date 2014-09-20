@@ -119,7 +119,7 @@ namespace mongo {
            'dead' may be preset yet some data still queued and locally
            available from the dbclientcursor.
         */
-        bool isDead() const { return  !this || cursorId == 0; }
+        bool isDead() const { return cursorId == 0; }
 
         bool tailable() const { return (opts & QueryOption_CursorTailable) != 0; }
 

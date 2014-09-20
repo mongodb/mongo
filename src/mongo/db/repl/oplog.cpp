@@ -119,7 +119,7 @@ namespace repl {
     /** write an op to the oplog that is already built.
         todo : make _logOpRS() call this so we don't repeat ourself?
         */
-    void _logOpObjRS(OperationContext* txn, const BSONObj& op) {
+    OpTime _logOpObjRS(OperationContext* txn, const BSONObj& op) {
         Lock::DBWrite lk(txn->lockState(), "local");
         // XXX soon this needs to be part of an outer WUOW not its own.
         // We can't do this yet due to locking limitations.
@@ -169,6 +169,7 @@ namespace repl {
 
         setNewOptime(ts);
         wunit.commit();
+        return ts;
     }
 
     /**
@@ -235,7 +236,6 @@ namespace repl {
     // the compiler would use if inside the function.  the reason this is static is to avoid a malloc/free for this
     // on every logop call.
     static BufBuilder logopbufbuilder(8*1024);
-    static const int OPLOG_VERSION = 2;
     static void _logOpRS(OperationContext* txn,
                          const char *opstr,
                          const char *ns,

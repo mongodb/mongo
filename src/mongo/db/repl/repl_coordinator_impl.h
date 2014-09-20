@@ -138,6 +138,10 @@ namespace repl {
 
         virtual void setFollowerMode(const MemberState& newState);
 
+        virtual bool isWaitingForApplierToDrain();
+
+        virtual void signalDrainComplete();
+
         virtual void prepareReplSetUpdatePositionCommand(OperationContext* txn,
                                                          BSONObjBuilder* cmdBuilder);
 
@@ -150,6 +154,8 @@ namespace repl {
         virtual void processReplSetGetConfig(BSONObjBuilder* result);
 
         virtual Status setMaintenanceMode(OperationContext* txn, bool activate);
+
+        virtual bool getMaintenanceMode();
 
         virtual Status processReplSetSyncFrom(const HostAndPort& target,
                                               BSONObjBuilder* resultObj);
@@ -325,6 +331,13 @@ namespace repl {
                                         Status* result);
 
         /**
+         * Helper method for retrieving maintenance mode.  Scheduled by getMaintenanceMode() to run
+         * in the replication executor thread.
+         */
+        void _getMaintenanceMode_helper(const ReplicationExecutor::CallbackData& cbData,
+                                        bool* maintenanceMode);
+
+        /**
          * Bottom half of _setCurrentMemberState_forTest.
          */
         void _setCurrentMemberState_forTestFinish(const ReplicationExecutor::CallbackData& cbData,
@@ -440,14 +453,16 @@ namespace repl {
          * _isStartupComplete to true, so that we can begin processing heartbeats and reconfigs.
          */
         void _finishLoadLocalConfig(const ReplicationExecutor::CallbackData& cbData,
-                                    const ReplicaSetConfig& localConfig);
+                                    const ReplicaSetConfig& localConfig,
+                                    OpTime lastOpTime);
 
         /**
          * Helper method that does most of the work of _finishLoadLocalConfig, minus setting
          * _isStartupComplete to true.
          */
         void _finishLoadLocalConfig_helper(const ReplicationExecutor::CallbackData& cbData,
-                                           const ReplicaSetConfig& localConfig);
+                                           const ReplicaSetConfig& localConfig,
+                                           OpTime lastOpTime);
 
         /**
          * Callback that finishes the work of processReplSetInitiate() inside the replication
@@ -574,6 +589,9 @@ namespace repl {
 
         // Current ReplicaSet state.
         MemberState _currentState;                                                        // (M)
+
+        // True if we are waiting for the applier to finish draining.
+        bool _isWaitingForDrainToComplete;                                                // (M)
 
         // Used to signal threads waiting for changes to _rsConfigState.
         boost::condition_variable _rsConfigStateChange;                                   // (M)

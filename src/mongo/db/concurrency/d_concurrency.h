@@ -137,9 +137,6 @@ namespace mongo {
         };
 
         class GlobalRead : public ScopedLock {
-        protected:
-            void _tempRelease();
-            void _relock();
         public:
             // timeoutms is only for readlocktry -- deprecated -- do not use
             GlobalRead(Locker* lockState, unsigned timeoutms = UINT_MAX);

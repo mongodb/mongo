@@ -749,8 +749,7 @@ namespace PerfTests {
         virtual int howLongMillis() { return 3000; }
         string name() { return "thread-local-storage"; }
         void timed() {
-            if( &cc() )
-                dontOptimizeOutHopefully++;
+            dontOptimizeOutHopefully++;
         }
         virtual bool showDurStats() { return false; }
     };

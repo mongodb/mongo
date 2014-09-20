@@ -125,7 +125,7 @@ namespace repl {
         virtual void blacklistSyncSource(const HostAndPort& host, Date_t until) = 0;
 
         /**
-         * Sets the earliest time the the current node will stand for election to "newTime".
+         * Sets the earliest time the current node will stand for election to "newTime".
          *
          * Does not affect the node's state or the process of any elections in flight.
          */
@@ -172,7 +172,8 @@ namespace repl {
         virtual void prepareElectResponse(const ReplicationExecutor::CallbackData& data,
                                           const ReplicationCoordinator::ReplSetElectArgs& args,
                                           const Date_t now,
-                                          BSONObjBuilder* response) = 0;
+                                          BSONObjBuilder* response,
+                                          Status* result) = 0;
 
         // produce a reply to a heartbeat
         virtual void prepareHeartbeatResponse(const ReplicationExecutor::CallbackData& data,
@@ -311,7 +312,8 @@ namespace repl {
         // Testing interface
         //
         ////////////////////////////////////////////////////////////
-        virtual void changeMemberState_forTest(const MemberState& newState) = 0;
+        virtual void changeMemberState_forTest(const MemberState& newState,
+                                               OpTime electionTime = OpTime(0,0)) = 0;
 
     protected:
         TopologyCoordinator() {}

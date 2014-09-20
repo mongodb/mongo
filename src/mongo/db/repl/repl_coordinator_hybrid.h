@@ -104,6 +104,10 @@ namespace repl {
 
         virtual void setFollowerMode(const MemberState& newState);
 
+        virtual bool isWaitingForApplierToDrain();
+
+        virtual void signalDrainComplete();
+
         virtual void prepareReplSetUpdatePositionCommand(OperationContext* txn,
                                                          BSONObjBuilder* cmdBuilder);
 
@@ -116,6 +120,8 @@ namespace repl {
         virtual void processReplSetGetConfig(BSONObjBuilder* result);
 
         virtual Status setMaintenanceMode(OperationContext* txn, bool activate);
+
+        virtual bool getMaintenanceMode();
 
         virtual Status processReplSetSyncFrom(const HostAndPort& target,
                                               BSONObjBuilder* resultObj);

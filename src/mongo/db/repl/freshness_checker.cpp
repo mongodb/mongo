@@ -159,7 +159,7 @@ namespace repl {
         return _originalConfigVersion;
     }
 
-    FreshnessChecker::FreshnessChecker() {}
+    FreshnessChecker::FreshnessChecker() : _isCanceled(false) {}
     FreshnessChecker::~FreshnessChecker() {}
 
     StatusWith<ReplicationExecutor::EventHandle> FreshnessChecker::start(
@@ -174,6 +174,11 @@ namespace repl {
         _algorithm.reset(new Algorithm(lastOpTimeApplied, currentConfig, selfIndex, targets));
         _runner.reset(new ScatterGatherRunner(_algorithm.get()));
         return _runner->start(executor, onCompletion);
+    }
+
+    void FreshnessChecker::cancel(ReplicationExecutor* executor) {
+        _isCanceled = true;
+        _runner->cancel(executor);
     }
 
 } // namespace repl

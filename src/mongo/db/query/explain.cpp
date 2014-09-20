@@ -289,6 +289,13 @@ namespace mongo {
             bob->append("keyPattern", spec->keyPattern);
             bob->appendBool("isMultiKey", spec->isMultiKey);
         }
+        else if (STAGE_DELETE == stats.stageType) {
+            DeleteStats* spec = static_cast<DeleteStats*>(stats.specific.get());
+
+            if (verbosity >= Explain::EXEC_STATS) {
+                bob->appendNumber("nWouldDelete", spec->docsDeleted);
+            }
+        }
         else if (STAGE_FETCH == stats.stageType) {
             FetchStats* spec = static_cast<FetchStats*>(stats.specific.get());
             if (verbosity >= Explain::EXEC_STATS) {

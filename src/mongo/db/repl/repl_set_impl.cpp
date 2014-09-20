@@ -41,6 +41,7 @@
 #include "mongo/db/repl/bgsync.h"
 #include "mongo/db/repl/connections.h"
 #include "mongo/db/repl/isself.h"
+#include "mongo/db/repl/minvalid.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/oplogreader.h"
 #include "mongo/db/repl/repl_set_seed_list.h"
@@ -57,13 +58,6 @@
 namespace mongo {
 
 namespace repl {
-#ifdef MONGO_PLATFORM_64
-    const int ReplSetImpl::replWriterThreadCount = 16;
-    const int ReplSetImpl::replPrefetcherThreadCount = 16;
-#else
-    const int ReplSetImpl::replWriterThreadCount = 2;
-    const int ReplSetImpl::replPrefetcherThreadCount = 2;
-#endif
 
     void ReplSetImpl::sethbmsg(const std::string& s, int logLevel) {
         static time_t lastLogged;
@@ -98,7 +92,7 @@ namespace repl {
               << rsLog;
 
         // reset minvalid so that we can't become primary prematurely
-        setMinValid(txn, oldest);
+        setMinValid(txn, oldest["ts"]._opTime());
 
         sethbmsg("error RS102 too stale to catch up");
         changeState(MemberState::RS_RECOVERING);
@@ -443,9 +437,6 @@ namespace {
         _self(0),
         _maintenanceMode(0),
         mgr(0),
-        _writerPool(replWriterThreadCount),
-        _prefetcherPool(replPrefetcherThreadCount),
-        oplogVersion(0),
         initialSyncRequested(false), // only used for resync
         _indexPrefetchConfig(PREFETCH_ALL) {
     }
@@ -503,7 +494,7 @@ namespace {
             }
         }
 
-        changeState(MemberState::RS_STARTUP2);
+        getGlobalReplicationCoordinator()->setFollowerMode(MemberState::RS_STARTUP2);
         startThreads();
         newReplUp(); // oplog.cpp
     }
@@ -589,6 +580,11 @@ namespace {
                 return false; 
             }
             uassert(13302, "replSet error self appears twice in the repl set configuration", me<=1);
+
+            if (state().removed()) {
+                // If we were removed and have now been added back in, switch state.
+                changeState(MemberState::RS_RECOVERING);
+            }
 
             // if we found different members that the original config, reload everything
             if (reconf && config().members.size() != nfound)
@@ -877,57 +873,6 @@ namespace {
         }
         startupStatusMsg.set("? started");
         startupStatus = STARTED;
-    }
-
-    const char* ReplSetImpl::_initialSyncFlagString = "doingInitialSync";
-    const BSONObj ReplSetImpl::_initialSyncFlag(BSON(_initialSyncFlagString << true));
-
-    namespace {
-        const char* minvalidNS = "local.replset.minvalid";
-    } // namespace
-
-    void ReplSetImpl::clearInitialSyncFlag(OperationContext* txn) {
-        Lock::DBWrite lk(txn->lockState(), "local");
-        WriteUnitOfWork wunit(txn);
-        Helpers::putSingleton(txn, minvalidNS, BSON("$unset" << _initialSyncFlag));
-        wunit.commit();
-    }
-
-    void ReplSetImpl::setInitialSyncFlag(OperationContext* txn) {
-        Lock::DBWrite lk(txn->lockState(), "local");
-        WriteUnitOfWork wunit(txn);
-        Helpers::putSingleton(txn, minvalidNS, BSON("$set" << _initialSyncFlag));
-        wunit.commit();
-    }
-
-    bool ReplSetImpl::getInitialSyncFlag() {
-        OperationContextImpl txn; // XXX?
-        Lock::DBRead lk (txn.lockState(), "local");
-        BSONObj mv;
-        if (Helpers::getSingleton(&txn, minvalidNS, mv)) {
-            return mv[_initialSyncFlagString].trueValue();
-        }
-        return false;
-    }
-
-    void ReplSetImpl::setMinValid(OperationContext* ctx, OpTime ts) {
-        Lock::DBWrite lk(ctx->lockState(), "local");
-        WriteUnitOfWork wunit(ctx);
-        Helpers::putSingleton(ctx, minvalidNS, BSON("$set" << BSON("ts" << ts)));
-        wunit.commit();
-    }
-
-    void ReplSetImpl::setMinValid(OperationContext* ctx, BSONObj obj) {
-        setMinValid(ctx, obj["ts"]._opTime());
-    }
-
-    OpTime ReplSetImpl::getMinValid(OperationContext* txn) {
-        Lock::DBRead lk(txn->lockState(), "local.replset.minvalid");
-        BSONObj mv;
-        if (Helpers::getSingleton(txn, minvalidNS, mv)) {
-            return mv["ts"]._opTime();
-        }
-        return OpTime();
     }
 
 } // namespace repl

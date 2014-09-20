@@ -458,7 +458,13 @@ namespace {
             const ReplicationExecutor::CallbackData& data,
             const ReplicationCoordinator::ReplSetElectArgs& args,
             const Date_t now,
-            BSONObjBuilder* response) {
+            BSONObjBuilder* response,
+            Status* result) {
+
+        if (data.status == ErrorCodes::CallbackCanceled) {
+            *result = Status(ErrorCodes::ShutdownInProgress, "replication system is shutting down");
+            return;
+        }
 
         const long long myver = _currentConfig.getConfigVersion();
         const int highestPriorityIndex = _getHighestPriorityElectableIndex();
@@ -525,6 +531,7 @@ namespace {
 
         response->append("vote", vote);
         response->append("round", args.round);
+        *result = Status::OK();
     }
 
     // produce a reply to a heartbeat
@@ -1015,7 +1022,8 @@ namespace {
         return maxIndex;
     }
 
-    void TopologyCoordinatorImpl::changeMemberState_forTest(const MemberState& newMemberState) {
+    void TopologyCoordinatorImpl::changeMemberState_forTest(const MemberState& newMemberState,
+                                                            OpTime electionTime) {
         invariant(_selfIndex != -1);
         if (newMemberState == getMemberState())
             return;
@@ -1027,7 +1035,7 @@ namespace {
                     hbData.getLastHeartbeat(),
                     OID(),
                     OpTime(0, 0),
-                    OpTime(0, 0));
+                    electionTime);
             invariant(_role == Role::leader);
             break;
         case MemberState::RS_SECONDARY:
@@ -1249,6 +1257,10 @@ namespace {
         _stepDownUntil = newTime;
     }
 
+    int TopologyCoordinatorImpl::getCurrentPrimaryIndex() const {
+        return _currentPrimaryIndex;
+    }
+
     Date_t TopologyCoordinatorImpl::getStepDownTime() const {
         return _stepDownUntil;
     }
@@ -1297,8 +1309,8 @@ namespace {
             _currentConfig.getMemberAt(_selfIndex).isElectable()) {
 
             // If the new config describes a one-node replica set, we're the one member, and
-            // we're electable, we must be the leader.
-            _role = Role::leader;
+            // we're electable, we must transition to candidate, in leiu of heartbeats.
+            _role = Role::candidate;
         }
 
     }
@@ -1511,7 +1523,8 @@ namespace {
     }
 
     void TopologyCoordinatorImpl::setFollowerMode(MemberState::MS newMode) {
-        invariant(_role == Role::follower);
+        // TODO(emilkie): Uncomment once legacy StateBox is replaced with replcoord's MemberState.
+        //invariant(_role == Role::follower);
         switch (newMode) {
         case MemberState::RS_RECOVERING:
         case MemberState::RS_ROLLBACK:

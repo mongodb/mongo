@@ -113,7 +113,14 @@ S2RegionCoverer::Candidate* S2RegionCoverer::NewCandidate(S2Cell const& cell) {
     size += sizeof(Candidate*) << max_children_shift();
   }
   Candidate* candidate = static_cast<Candidate*>(malloc(size));
+
+// Disable error on Clang 3.5
+// See SERVER-15184
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wdynamic-class-memaccess"
   memset(candidate, 0, size);
+#pragma clang diagnostic pop
+
   candidate->cell = cell;
   candidate->is_terminal = is_terminal;
   ++candidates_created_counter_;

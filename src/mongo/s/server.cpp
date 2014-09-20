@@ -393,7 +393,7 @@ namespace mongo {
 #endif
 
 MONGO_INITIALIZER_GENERAL(CreateAuthorizationManager,
-                          ("SetupInternalSecurityUser"),
+                          ("SetupInternalSecurityUser", "OIDGeneration"),
                           MONGO_NO_DEPENDENTS)
         (InitializerContext* context) {
     AuthorizationManager* authzManager =

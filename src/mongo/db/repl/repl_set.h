@@ -66,8 +66,6 @@ namespace repl {
         void summarizeAsHtml(OperationContext* txn, stringstream& ss) const { _summarizeAsHtml(txn, ss); }
         void summarizeStatus(BSONObjBuilder& b) const  { _summarizeStatus(b); }
         void fillIsMaster(BSONObjBuilder& b) { _fillIsMaster(b); }
-        threadpool::ThreadPool& getPrefetchPool() { return ReplSetImpl::getPrefetchPool(); }
-        threadpool::ThreadPool& getWriterPool() { return ReplSetImpl::getWriterPool(); }
 
         /**
          * We have a new config (reconfig) - apply it.

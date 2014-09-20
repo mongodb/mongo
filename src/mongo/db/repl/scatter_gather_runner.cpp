@@ -115,6 +115,11 @@ namespace repl {
         return evh;
     }
 
+    void ScatterGatherRunner::cancel(ReplicationExecutor* executor) {
+        invariant(_started);
+        _signalSufficientResponsesReceived(executor);
+    }
+
     void ScatterGatherRunner::_processResponse(
             const ReplicationExecutor::RemoteCommandCallbackData& cbData,
             ScatterGatherRunner* runner) {

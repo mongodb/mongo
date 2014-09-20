@@ -144,6 +144,13 @@ namespace repl {
     void ReplicationCoordinatorMock::setFollowerMode(const MemberState& newState) {
     }
 
+    bool ReplicationCoordinatorMock::isWaitingForApplierToDrain() {
+        return false;
+    }
+
+    void ReplicationCoordinatorMock::signalDrainComplete() {
+    }
+
     void ReplicationCoordinatorMock::prepareReplSetUpdatePositionCommand(
             OperationContext* txn,
             BSONObjBuilder* cmdBuilder) {}
@@ -162,6 +169,10 @@ namespace repl {
 
     Status ReplicationCoordinatorMock::setMaintenanceMode(OperationContext* txn, bool activate) {
         return Status::OK();
+    }
+
+    bool ReplicationCoordinatorMock::getMaintenanceMode() {
+        return false;
     }
 
     Status ReplicationCoordinatorMock::processReplSetSyncFrom(const HostAndPort& target,

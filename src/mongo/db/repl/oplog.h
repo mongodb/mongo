@@ -51,9 +51,11 @@ namespace repl {
 
     // This poorly-named function writes an op into the replica-set oplog;
     // used internally by replication secondaries after they have applied an op
-    void _logOpObjRS(OperationContext* txn, const BSONObj& op);
+    // Returns the newly-generated optime for the applied op.
+    OpTime _logOpObjRS(OperationContext* txn, const BSONObj& op);
 
     const char rsoplog[] = "local.oplog.rs";
+    static const int OPLOG_VERSION = 2;
 
     /** Log an operation to the local oplog 
 

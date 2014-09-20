@@ -65,9 +65,6 @@ namespace repl {
 
 
     /**
-     * notifierThread() uses lastOpTimeWritten to inform the sync target where this member is
-     * currently synced to.
-     *
      * Lock order:
      * 1. rslock
      * 2. rwlock

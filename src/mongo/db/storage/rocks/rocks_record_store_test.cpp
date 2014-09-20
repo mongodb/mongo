@@ -664,45 +664,4 @@ namespace mongo {
             }
         }
     }
-
-    TEST( RocksRecordStoreTest, Snapshots1 ) {
-        unittest::TempDir td( _rocksRecordStoreTestDir );
-        scoped_ptr<rocksdb::DB> db( getDB( td.path() ) );
-        boost::shared_ptr<rocksdb::ColumnFamilyHandle> cfh = _createCfh( db.get() );
-
-        DiskLoc loc;
-        int size = -1;
-
-        {
-            RocksRecordStore rs( "foo.bar", db.get(), cfh.get(), db->DefaultColumnFamily() );
-            string s = "test string";
-            size = s.length() + 1;
-
-            MyOperationContext opCtx( db.get() );
-            {
-                WriteUnitOfWork uow( &opCtx );
-                StatusWith<DiskLoc> res = rs.insertRecord( &opCtx, s.c_str(), s.size() + 1, -1 );
-                ASSERT_OK( res.getStatus() );
-                loc = res.getValue();
-            }
-        }
-
-        {
-            MyOperationContext opCtx( db.get() );
-            MyOperationContext opCtx2( db.get() );
-
-            RocksRecordStore rs( "foo.bar", db.get(), cfh.get(), db->DefaultColumnFamily() );
-
-            rs.deleteRecord( &opCtx, loc );
-
-            RecordData recData = rs.dataFor( NULL,  loc/*, &opCtx */ );
-            ASSERT( !recData.data() && recData.size() == 0 );
-
-            // XXX this test doesn't yet work, but there should be some notion of snapshots,
-            // and the op context that doesn't see the deletion shouldn't know that this data
-            // has been deleted
-            RecordData recData2 = rs.dataFor( NULL,  loc/*, &opCtx2 */ );
-            ASSERT( recData.data() && recData.size() == size );
-        }
-    }
 }

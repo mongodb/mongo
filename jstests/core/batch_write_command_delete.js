@@ -219,3 +219,13 @@ for (var field in result) {
     assert.eq('ok', field, 'unexpected field found in result: ' + field);
 }
 
+//
+// When limit is not 0 and 1
+coll.remove({});
+coll.insert({a:1});
+printjson( request = {'delete' : coll.getName(),
+                      deletes: [{q: {a: 1}, limit: 2}],
+                      writeConcern:{w:0},
+                      ordered: false} );
+printjson(result = coll.runCommand(request));
+assert(resultNOK(result));

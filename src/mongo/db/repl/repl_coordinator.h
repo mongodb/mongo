@@ -287,6 +287,23 @@ namespace repl {
         virtual void setFollowerMode(const MemberState& newState) = 0;
 
         /**
+         * Returns true if the coordinator wants the applier to pause application.
+         *
+         * If this returns true, the applier should call signalDrainComplete() when it when it has
+         * completed draining its operation buffer and no further ops are being applied.
+         */
+        virtual bool isWaitingForApplierToDrain() = 0;
+
+        /**
+         * Signals that a previously requested pause and drain of the applier buffer
+         * has completed.
+         *
+         * This is an interface that allows the applier to reenable writes after
+         * a successful election triggers the draining of the applier buffer.
+         */
+        virtual void signalDrainComplete() = 0;
+
+        /**
          * Prepares a BSONObj describing an invocation of the replSetUpdatePosition command that can
          * be sent to this node's sync source to update it about our progress in replication.
          */
@@ -319,6 +336,11 @@ namespace repl {
          * PRIMARY, and OperationFailed if we are not currently in maintenance mode
          */
         virtual Status setMaintenanceMode(OperationContext* txn, bool activate) = 0;
+
+        /**
+         * Retrieves the current count of maintenanceMode and returns 'true' if greater than 0.
+         */
+        virtual bool getMaintenanceMode() = 0;
 
         /**
          * Handles an incoming replSetSyncFrom command. Adds BSON to 'result'

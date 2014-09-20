@@ -36,6 +36,8 @@
 #include "mongo/db/curop.h"
 #include "mongo/db/json.h"
 #include "mongo/db/lasterror.h"
+#include "mongo/db/ops/delete_executor.h"
+#include "mongo/db/ops/delete_request.h"
 #include "mongo/db/ops/update_executor.h"
 #include "mongo/db/ops/update_lifecycle_impl.h"
 #include "mongo/db/query/explain.h"
@@ -147,10 +149,11 @@ namespace mongo {
                              const BSONObj& cmdObj,
                              Explain::Verbosity verbosity,
                              BSONObjBuilder* out) const {
-        // For now we only explain updates.
-        if ( BatchedCommandRequest::BatchType_Update != _writeType ) {
+        // For now we only explain update and delete write commands.
+        if ( BatchedCommandRequest::BatchType_Update != _writeType &&
+             BatchedCommandRequest::BatchType_Delete != _writeType ) {
             return Status( ErrorCodes::IllegalOperation,
-                           "Non-update write ops cannot yet be explained" );
+                           "Only update and delete write ops can be explained" );
         }
 
         // Parse the batch request.
@@ -184,39 +187,75 @@ namespace mongo {
         // Get a reference to the singleton batch item (it's the 0th item in the batch).
         BatchItemRef batchItem( &request, 0 );
 
-        // Create the update request.
-        UpdateRequest updateRequest( txn, nsString );
-        updateRequest.setQuery( batchItem.getUpdate()->getQuery() );
-        updateRequest.setUpdates( batchItem.getUpdate()->getUpdateExpr() );
-        updateRequest.setMulti( batchItem.getUpdate()->getMulti() );
-        updateRequest.setUpsert( batchItem.getUpdate()->getUpsert() );
-        updateRequest.setUpdateOpLog( true );
-        UpdateLifecycleImpl updateLifecycle( true, updateRequest.getNamespaceString() );
-        updateRequest.setLifecycle( &updateLifecycle );
-        updateRequest.setExplain();
+        if ( BatchedCommandRequest::BatchType_Update == _writeType ) {
+            // Create the update request.
+            UpdateRequest updateRequest( txn, nsString );
+            updateRequest.setQuery( batchItem.getUpdate()->getQuery() );
+            updateRequest.setUpdates( batchItem.getUpdate()->getUpdateExpr() );
+            updateRequest.setMulti( batchItem.getUpdate()->getMulti() );
+            updateRequest.setUpsert( batchItem.getUpdate()->getUpsert() );
+            updateRequest.setUpdateOpLog( true );
+            UpdateLifecycleImpl updateLifecycle( true, updateRequest.getNamespaceString() );
+            updateRequest.setLifecycle( &updateLifecycle );
+            updateRequest.setExplain();
 
-        // Use the request to create an UpdateExecutor, and from it extract the
-        // plan tree which will be used to execute this update.
-        UpdateExecutor updateExecutor( &updateRequest, &txn->getCurOp()->debug() );
-        Status prepStatus = updateExecutor.prepare();
-        if ( !prepStatus.isOK() ) {
-            return prepStatus;
+            // Use the request to create an UpdateExecutor, and from it extract the
+            // plan tree which will be used to execute this update.
+            UpdateExecutor updateExecutor( &updateRequest, &txn->getCurOp()->debug() );
+            Status prepStatus = updateExecutor.prepare();
+            if ( !prepStatus.isOK() ) {
+                return prepStatus;
+            }
+
+            // Explains of write commands are read-only, but we take a write lock so that timing
+            // info is more accurate.
+            Client::WriteContext ctx( txn, nsString );
+
+            Status prepInLockStatus = updateExecutor.prepareInLock( ctx.ctx().db() );
+            if ( !prepInLockStatus.isOK() ) {
+                return prepInLockStatus;
+            }
+
+            PlanExecutor* exec = updateExecutor.getPlanExecutor();
+            const ScopedExecutorRegistration safety( exec );
+
+            // Explain the plan tree.
+            return Explain::explainStages( exec, verbosity, out );
         }
+        else {
+            invariant( BatchedCommandRequest::BatchType_Delete == _writeType );
 
-        // Explains of write commands are read-only, but we take a write lock so that timing info
-        // is more accurate.
-        Client::WriteContext ctx( txn, nsString );
+            // Create the delete request.
+            DeleteRequest deleteRequest( txn, nsString );
+            deleteRequest.setQuery( batchItem.getDelete()->getQuery() );
+            deleteRequest.setMulti( batchItem.getDelete()->getLimit() != 1 );
+            deleteRequest.setUpdateOpLog(true);
+            deleteRequest.setGod( false );
+            deleteRequest.setExplain();
 
-        Status prepInLockStatus = updateExecutor.prepareInLock( ctx.ctx().db() );
-        if ( !prepInLockStatus.isOK() ) {
-            return prepInLockStatus;
+            // Use the request to create a DeleteExecutor, and from it extract the
+            // plan tree which will be used to execute this update.
+            DeleteExecutor deleteExecutor( &deleteRequest );
+            Status prepStatus = deleteExecutor.prepare();
+            if ( !prepStatus.isOK() ) {
+                return prepStatus;
+            }
+
+            // Explains of write commands are read-only, but we take a write lock so that timing
+            // info is more accurate.
+            Client::WriteContext ctx( txn, nsString );
+
+            Status prepInLockStatus = deleteExecutor.prepareInLock( ctx.ctx().db() );
+            if ( !prepInLockStatus.isOK()) {
+                return prepInLockStatus;
+            }
+
+            PlanExecutor* exec = deleteExecutor.getPlanExecutor();
+            const ScopedExecutorRegistration safety( exec );
+
+            // Explain the plan tree.
+            return Explain::explainStages( exec, verbosity, out );
         }
-
-        PlanExecutor* exec = updateExecutor.getPlanExecutor();
-        const ScopedExecutorRegistration safety( exec );
-
-        // Explain the plan tree.
-        return Explain::explainStages( exec, verbosity, out );
     }
 
     CmdInsert::CmdInsert() :

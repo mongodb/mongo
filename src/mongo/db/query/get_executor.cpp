@@ -474,6 +474,7 @@ namespace mongo {
                              bool isMulti,
                              bool shouldCallLogOp,
                              bool fromMigrate,
+                             bool isExplain,
                              PlanExecutor** out) {
         auto_ptr<CanonicalQuery> canonicalQuery(rawCanonicalQuery);
         auto_ptr<WorkingSet> ws(new WorkingSet());
@@ -490,6 +491,7 @@ namespace mongo {
         deleteStageParams.isMulti = isMulti;
         deleteStageParams.shouldCallLogOp = shouldCallLogOp;
         deleteStageParams.fromMigrate = fromMigrate;
+        deleteStageParams.isExplain = isExplain;
         root = new DeleteStage(txn, deleteStageParams, ws.get(), collection, root);
         // We must have a tree of stages in order to have a valid plan executor, but the query
         // solution may be null.
@@ -505,12 +507,14 @@ namespace mongo {
                              bool isMulti,
                              bool shouldCallLogOp,
                              bool fromMigrate,
+                             bool isExplain,
                              PlanExecutor** out) {
         auto_ptr<WorkingSet> ws(new WorkingSet());
         DeleteStageParams deleteStageParams;
         deleteStageParams.isMulti = isMulti;
         deleteStageParams.shouldCallLogOp = shouldCallLogOp;
         deleteStageParams.fromMigrate = fromMigrate;
+        deleteStageParams.isExplain = isExplain;
         if (!collection) {
             // Treat collections that do not exist as empty collections.  Note that the explain
             // reporting machinery always assumes that the root stage for a delete operation is a
@@ -543,8 +547,8 @@ namespace mongo {
             return status;
 
         // Takes ownership of 'cq'.
-        return getExecutorDelete(txn, collection, cq, isMulti,
-                                 shouldCallLogOp, fromMigrate, out);
+        return getExecutorDelete(txn, collection, cq, isMulti, shouldCallLogOp,
+                                 fromMigrate, isExplain, out);
     }
 
     //

@@ -140,21 +140,14 @@ namespace ThreadedTests {
                 if( i % 7 == 0 ) {
                     Lock::GlobalRead r(&lockState); // nested test
                     Lock::GlobalRead r2(&lockState);
-                    if( sometimes ) {
-                        Lock::TempRelease t(&lockState);
-                    }
                 }
                 else if( i % 7 == 1 ) {
                     Lock::GlobalRead r(&lockState);
                     ASSERT(lockState.hasAnyReadLock());
-                    if( sometimes ) {
-                        Lock::TempRelease t(&lockState);
-                    }
                 }
                 else if( i % 7 == 4 && 
                          tnumber == 1 /*only one upgrader legal*/ ) {
                     Lock::GlobalWrite w(&lockState);
-                    ASSERT( lockState.isW() );
                     ASSERT( lockState.isW() );
                     if( i % 7 == 2 ) {
                         Lock::TempRelease t(&lockState);
@@ -162,7 +155,6 @@ namespace ThreadedTests {
                 }
                 else if( i % 7 == 2 ) {
                     Lock::GlobalWrite w(&lockState);
-                    ASSERT( lockState.isW() );
                     ASSERT( lockState.isW() );
                     if( sometimes ) {
                         Lock::TempRelease t(&lockState);
@@ -174,7 +166,6 @@ namespace ThreadedTests {
                         Lock::TempRelease t(&lockState);
                     }
                     Lock::GlobalRead r(&lockState);
-                    ASSERT( lockState.isW() );
                     ASSERT( lockState.isW() );
                     if( sometimes ) {
                         Lock::TempRelease t(&lockState);

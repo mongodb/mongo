@@ -73,7 +73,7 @@ namespace mongo {
 
             const OID& oid = cmdObj.firstElement().__oid();
             result.append( "oid" , oid );
-            result.append( "str" , oid.str() );
+            result.append( "str" , oid.toString() );
 
             return true;
         }

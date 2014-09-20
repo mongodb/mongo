@@ -50,6 +50,7 @@
 #include "mongo/util/checksum.h"
 #include "mongo/util/compress.h"
 #include "mongo/util/file.h"
+#include "mongo/util/hex.h"
 #include "mongo/util/log.h"
 #include "mongo/util/logfile.h"
 #include "mongo/util/mmap.h"
@@ -789,8 +790,3 @@ namespace mongo {
 
     }
 }
-
-/* todo
-   test (and handle) disk full on journal append.  best quick thing to do is to terminate.
-   if we roll back operations, there are nuances such as is ReplSetImpl::lastOpTimeWritten too new in ram then?
-*/

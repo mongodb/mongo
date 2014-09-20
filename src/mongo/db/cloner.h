@@ -39,6 +39,7 @@ namespace mongo {
     struct CloneOptions;
     class DBClientBase;
     class DBClientCursor;
+    class NamespaceString;
     class OperationContext;
     class Query;
 

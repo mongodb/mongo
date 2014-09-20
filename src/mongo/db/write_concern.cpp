@@ -26,19 +26,20 @@
  *    it in the license file.
  */
 
+#include "mongo/platform/basic.h"
+
+#include "mongo/db/write_concern.h"
+
 #include "mongo/base/counter.h"
 #include "mongo/db/commands/server_status_metric.h"
 #include "mongo/db/global_environment_experiment.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/repl_coordinator_global.h"
-#include "mongo/db/repl/repl_settings.h"
-#include "mongo/db/repl/write_concern.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/stats/timer_stats.h"
 #include "mongo/db/storage/mmap_v1/dur.h"
 #include "mongo/db/storage/storage_engine.h"
-#include "mongo/db/write_concern.h"
-#include "mongo/util/mmap.h"
+#include "mongo/db/write_concern_options.h"
 
 namespace mongo {
 

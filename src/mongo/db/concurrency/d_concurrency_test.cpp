@@ -110,18 +110,6 @@ namespace mongo {
         }
     }
 
-    TEST(DConcurrency, TempReleaseGlobalRead) {
-        LockState ls;
-        Lock::GlobalRead globalRead(&ls);
-
-        {
-            Lock::TempRelease tempRelease(&ls);
-            ASSERT(!ls.isLocked());
-        }
-
-        ASSERT(ls.isR());
-    }
-
     TEST(DConcurrency, TempReleaseGlobalWrite) {
         LockState ls;
         Lock::GlobalWrite globalWrite(&ls);

@@ -222,6 +222,17 @@ namespace repl {
         _impl.setFollowerMode(newState);
     }
 
+    bool HybridReplicationCoordinator::isWaitingForApplierToDrain() {
+        bool legacyWaiting = _legacy.isWaitingForApplierToDrain();
+        // fassert(18813, legacyWaiting == _impl.isWaitingForApplierToDrain());
+        return legacyWaiting;
+    }
+
+    void HybridReplicationCoordinator::signalDrainComplete() {
+        _legacy.signalDrainComplete();
+        _impl.signalDrainComplete();
+    }
+
     void HybridReplicationCoordinator::prepareReplSetUpdatePositionCommand(OperationContext* txn,
                                                                            BSONObjBuilder* result) {
         _impl.prepareReplSetUpdatePositionCommand(txn, result);
@@ -254,6 +265,17 @@ namespace repl {
         Status legacyResponse = _legacy.setMaintenanceMode(txn, activate);
         _impl.setMaintenanceMode(txn, activate);
         return legacyResponse;
+    }
+
+    bool HybridReplicationCoordinator::getMaintenanceMode() {
+        bool legacyMode(_legacy.getMaintenanceMode());
+        bool implMode(_impl.getMaintenanceMode());
+        if (legacyMode != implMode) {
+            severe() << "maintenance mode mismatch between legacy and impl: " << 
+                legacyMode << " and " << implMode;
+            fassertFailed(18810);
+        }
+        return implMode;
     }
 
     Status HybridReplicationCoordinator::processHeartbeat(const ReplSetHeartbeatArgs& args,
