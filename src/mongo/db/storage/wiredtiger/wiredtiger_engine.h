@@ -73,7 +73,7 @@ namespace mongo {
                                        bool preserveClonedFilesOnFailure = false,
                                        bool backupOriginalFiles = false ) { return Status::OK(); }
 
-	virtual bool supportsDocLocking() const { return false; }
+        virtual bool supportsDocLocking() const { return true; }
 
     private:
         void loadExistingDatabases();

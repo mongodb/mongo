@@ -51,6 +51,7 @@ namespace mongo {
         }
         static int Create(WiredTigerDatabase &db,
                 const std::string &ns, const std::string &idxName, IndexCatalogEntry& info);
+        static bool _search(WT_CURSOR *c, const WiredTigerItem& item, bool forward);
         static bool _search(WT_CURSOR *c, const BSONObj &key, const DiskLoc& loc, bool forward);
 
         WiredTigerIndex(WiredTigerDatabase &db, const IndexCatalogEntry& info,
@@ -77,7 +78,8 @@ namespace mongo {
         
         virtual long long getSpaceUsedBytes( OperationContext* txn ) const;
 
-        bool isDup(WT_CURSOR *c, const BSONObj& key, DiskLoc loc);
+        bool isDup(WT_CURSOR *c, const BSONObj& key, const DiskLoc& loc,
+                   const WiredTigerItem& item );
 
         virtual SortedDataInterface::Cursor* newCursor(
                 OperationContext* txn, int direction) const;

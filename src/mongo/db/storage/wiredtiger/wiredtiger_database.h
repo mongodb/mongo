@@ -123,5 +123,6 @@ namespace mongo {
             size = str.size();
         }
         WT_ITEM *Get() { return this; }
+        const WT_ITEM *Get() const { return this; }
     };
 }
