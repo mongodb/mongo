@@ -735,7 +735,7 @@ static void
 __rec_bnd_cleanup(WT_SESSION_IMPL *session, WT_RECONCILE *r, int destroy)
 {
 	WT_BOUNDARY *bnd;
-	uint32_t i;
+	uint32_t i, last_used;
 
 	if (r->bnd == NULL)
 		return;
@@ -761,26 +761,37 @@ __rec_bnd_cleanup(WT_SESSION_IMPL *session, WT_RECONCILE *r, int destroy)
 		__wt_free(session, r->bnd);
 		r->bnd_next = 0;
 		r->bnd_entries = r->bnd_allocated = 0;
-	} else
-		for (bnd = r->bnd, i = 0; i < r->bnd_next; ++bnd, ++i) {
+	} else {
+		/*
+		 * The boundary-next field points to the next boundary structure
+		 * we were going to use, but there's no requirement that value
+		 * be incremented before reconciliation updates the structure it
+		 * points to, that is, there's no guarantee elements of the next
+		 * boundary structure are still unchanged. Be defensive, clean
+		 * up the "next" structure as well as the ones we know we used.
+		 */
+		last_used = r->bnd_next;
+		if (last_used < r->bnd_entries)
+			++last_used;
+		for (bnd = r->bnd, i = 0; i < last_used; ++bnd, ++i) {
 			bnd->start = NULL;
 			bnd->recno = 0;
 			bnd->entries = 0;
 			__wt_free(session, bnd->addr.addr);
-			bnd->addr.size = 0;
-			bnd->addr.type = 0;
-			bnd->addr.reuse = 0;
+			WT_CLEAR(bnd->addr);
+			bnd->size = 0;
 			bnd->cksum = 0;
 			__wt_free(session, bnd->dsk);
 			__wt_free(session, bnd->skip);
 			bnd->skip_next = 0;
 			bnd->skip_allocated = 0;
 			/*
-			 * Ignore the key, we re-use that memory during each
-			 * reconciliation.
+			 * Leave the key in place, we re-use that memory during
+			 * each reconciliation.
 			 */
 			bnd->already_compressed = 0;
 		}
+	}
 }
 
 /*
