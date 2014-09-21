@@ -102,6 +102,46 @@ MacBook-Josue:MyMongo josue$
 
   Now, I cam commit my changes:
   
-  
+  MacBook-Josue:MyMongo josue$ git add .
+MacBook-Josue:MyMongo josue$ git commit -am "Josue Figueroa: Contribution #1 - General Procedure to create a PR"
+[JosueFigueroaContributions 3b786b6] Josue Figueroa: Contribution #1 - General Procedure to create a PR
+ 1 file changed, 37 insertions(+)
+ 
+ I hope this contribution help you as an example of creating a PR
+ 
+ Regarding MongoDB, I will use the mongo shell to show some examples of how to insert, update and delete documents in
+ the "data" collection:
+ 
+ > show dbs
+blog	0.203125GB
+course	0.203125GB
+demo	0.203125GB
+local	0.078125GB
+m101	0.203125GB
+test	0.203125GB
+weather	0.203125GB
+> use weather
+switched to db weather
+> show collections
+data
+system.indexes
+> 
+> db.data.findOne()
+{
+	"_id" : ObjectId("5341f73afe9bc65a25a1cb5a"),
+	"Day" : 1,
+	"Time" : 54,
+	"State" : "Vermont",
+	"Airport" : "BTV",
+	"Temperature" : 39,
+	"Humidity" : 57,
+	"Wind Speed" : 6,
+	"Wind Direction" : 170,
+	"Station Pressure" : 29.6,
+	"Sea Level Pressure" : 150
+}
+>  
+ 
+ ###############################################################################################################
   
   
