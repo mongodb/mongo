@@ -100,7 +100,7 @@ Changes not staged for commit:
 no changes added to commit (use "git add" and/or "git commit -a")
 MacBook-Josue:MyMongo josue$ 
 
-  Now, I cam commit my changes:
+  Now, I can commit my changes:
   
   MacBook-Josue:MyMongo josue$ git add .
 MacBook-Josue:MyMongo josue$ git commit -am "Josue Figueroa: Contribution #1 - General Procedure to create a PR"
