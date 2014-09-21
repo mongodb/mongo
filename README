@@ -68,3 +68,40 @@ LICENSE
   As an exception, the files in the client/, debian/, rpm/,
   utils/mongoutils, and all subdirectories thereof are made available under
   the terms of the Apache License, version 2.0.
+
+#######################################################################################################
+  
+THIS IS A JOSUE FIGUEROA CONTRIBUTION:
+  
+  To start making contributions to MongoDB, first, I forked the mongo repository. This will allow
+  me to make contibutions without access to the souce repository:
+  
+  https://github.com/jfigueroagama/mongo
+  
+  After I forked the mongo repository, I cloned the repository locally in my machine to create a branch
+  "JosueFigueroaContributions" and make my contributions in this branch locally:
+  
+  MacBook-Josue:MyMongo josue$ git branch
+* JosueFigueroaContributions
+  v2.6.3
+MacBook-Josue:MyMongo josue$ 
+  
+  Once my first contribution is done, then, I can check the status to review the changes I made. In this case,
+  the changes are only in the README file: 
+  
+ MacBook-Josue:MyMongo josue$ git status
+On branch JosueFigueroaContributions
+Changes not staged for commit:
+  (use "git add <file>..." to update what will be committed)
+  (use "git checkout -- <file>..." to discard changes in working directory)
+
+	modified:   README
+
+no changes added to commit (use "git add" and/or "git commit -a")
+MacBook-Josue:MyMongo josue$ 
+
+  Now, I cam commit my changes:
+  
+  
+  
+  
