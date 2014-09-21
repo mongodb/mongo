@@ -1,6 +1,7 @@
 package db
 
 import (
+	"fmt"
 	"github.com/mongodb/mongo-tools/common/options"
 	"github.com/mongodb/mongo-tools/common/util"
 	"gopkg.in/mgo.v2"
@@ -36,7 +37,7 @@ func (self *VanillaDBConnector) Configure(opts options.ToolOptions) error {
 	self.dialInfo = &mgo.DialInfo{
 		Addrs:     connectionAddrs,
 		Timeout:   DefaultDialTimeout,
-		Direct:    true,
+		Direct:    opts.Direct,
 		Username:  opts.Auth.Username,
 		Password:  opts.Auth.Password,
 		Source:    opts.Auth.Source,
