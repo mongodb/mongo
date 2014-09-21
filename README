@@ -68,3 +68,80 @@ LICENSE
   As an exception, the files in the client/, debian/, rpm/,
   utils/mongoutils, and all subdirectories thereof are made available under
   the terms of the Apache License, version 2.0.
+
+#######################################################################################################
+  
+THIS IS A JOSUE FIGUEROA CONTRIBUTION:
+  
+  To start making contributions to MongoDB, first, I forked the mongo repository. This will allow
+  me to make contibutions without access to the souce repository:
+  
+  https://github.com/jfigueroagama/mongo
+  
+  After I forked the mongo repository, I cloned the repository locally in my machine to create a branch
+  "JosueFigueroaContributions" and make my contributions in this branch locally:
+  
+  MacBook-Josue:MyMongo josue$ git branch
+* JosueFigueroaContributions
+  v2.6.3
+MacBook-Josue:MyMongo josue$ 
+  
+  Once my first contribution is done, then, I can check the status to review the changes I made. In this case,
+  the changes are only in the README file: 
+  
+ MacBook-Josue:MyMongo josue$ git status
+On branch JosueFigueroaContributions
+Changes not staged for commit:
+  (use "git add <file>..." to update what will be committed)
+  (use "git checkout -- <file>..." to discard changes in working directory)
+
+	modified:   README
+
+no changes added to commit (use "git add" and/or "git commit -a")
+MacBook-Josue:MyMongo josue$ 
+
+  Now, I can commit my changes:
+  
+  MacBook-Josue:MyMongo josue$ git add .
+MacBook-Josue:MyMongo josue$ git commit -am "Josue Figueroa: Contribution #1 - General Procedure to create a PR"
+[JosueFigueroaContributions 3b786b6] Josue Figueroa: Contribution #1 - General Procedure to create a PR
+ 1 file changed, 37 insertions(+)
+ 
+ I hope this contribution help you as an example of creating a PR
+ 
+ Regarding MongoDB, I will use the mongo shell to show some examples of how to insert, update and delete documents in
+ the "data" collection:
+ 
+ > show dbs
+blog	0.203125GB
+course	0.203125GB
+demo	0.203125GB
+local	0.078125GB
+m101	0.203125GB
+test	0.203125GB
+weather	0.203125GB
+> use weather
+switched to db weather
+> show collections
+data
+system.indexes
+> 
+> db.data.findOne()
+{
+	"_id" : ObjectId("5341f73afe9bc65a25a1cb5a"),
+	"Day" : 1,
+	"Time" : 54,
+	"State" : "Vermont",
+	"Airport" : "BTV",
+	"Temperature" : 39,
+	"Humidity" : 57,
+	"Wind Speed" : 6,
+	"Wind Direction" : 170,
+	"Station Pressure" : 29.6,
+	"Sea Level Pressure" : 150
+}
+>  
+ 
+ ###############################################################################################################
+  
+  
