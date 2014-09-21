@@ -125,6 +125,10 @@ func (bs *BSONSink) WriteBytes(buf []byte) (int, error) {
 	return bs.writer.Write(buf)
 }
 
+func (bs *BSONSink) Close() error {
+	return bs.writer.Close()
+}
+
 func (ebs *EncodedBSONSink) WriteDoc(out interface{}) (int, error) {
 	outbuf, err := bson.Marshal(out)
 	if err != nil {
