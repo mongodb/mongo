@@ -954,24 +954,27 @@ namespace mongo {
         if (remoteHost.empty()) {
             return peerSubjectName;
         }
+       
+        int cnBegin = peerSubjectName.find("CN=") + 3;
+        int cnEnd = peerSubjectName.find(",", cnBegin);
+        std::string commonName = peerSubjectName.substr(cnBegin, cnEnd-cnBegin);
+        
+        if (_hostNameMatch(remoteHost.c_str(), commonName.c_str())) {
+            return peerSubjectName;
+        }
 
-        // Try to match using the Subject Alternate Name, if it exists.
-        // RFC-2818 requires the Subject Alternate Name to be used if present.
-        // Otherwise, the most specific Common Name field in the subject field
-        // must be used.
-
-        bool sanMatch = false;
-        bool cnMatch = false;
-
+        // If Common Name (CN) didn't match, check Subject Alternate Name (SAN)
         STACK_OF(GENERAL_NAME)* sanNames = static_cast<STACK_OF(GENERAL_NAME)*>
             (X509_get_ext_d2i(peerCert, NID_subject_alt_name, NULL, NULL));
-
+        
+        bool sanMatch = false;
         if (sanNames != NULL) {
             int sanNamesList = sk_GENERAL_NAME_num(sanNames);
+            
             for (int i = 0; i < sanNamesList; i++) {
                 const GENERAL_NAME* currentName = sk_GENERAL_NAME_value(sanNames, i);
                 if (currentName && currentName->type == GEN_DNS) {
-                    char *dnsName =
+                    char *dnsName = 
                         reinterpret_cast<char *>(ASN1_STRING_data(currentName->d.dNSName));
                     if (_hostNameMatch(remoteHost.c_str(), dnsName)) {
                         sanMatch = true;
@@ -979,22 +982,12 @@ namespace mongo {
                     }
                 }
             }
-            sk_GENERAL_NAME_pop_free(sanNames, GENERAL_NAME_free);
         }
-        else {
-            // If Subject Alternate Name (SAN) didn't exist, check Common Name (CN).
-            int cnBegin = peerSubjectName.find("CN=") + 3;
-            int cnEnd = peerSubjectName.find(",", cnBegin);
-            std::string commonName = peerSubjectName.substr(cnBegin, cnEnd-cnBegin);
+        sk_GENERAL_NAME_pop_free(sanNames, GENERAL_NAME_free);
 
-            if (_hostNameMatch(remoteHost.c_str(), commonName.c_str())) {
-                cnMatch = true;
-            }
-        }
-
-        if (!sanMatch && !cnMatch) {
+        if (!sanMatch) {
             if (_allowInvalidCertificates || _allowInvalidHostnames) {
-                warning() << "The server certificate does not match the host name " <<
+                warning() << "The server certificate does not match the host name " << 
                     remoteHost;
             }
             else {
