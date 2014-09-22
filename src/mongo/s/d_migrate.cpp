@@ -1673,13 +1673,6 @@ namespace mongo {
             verify( getState() == READY );
             verify( ! min.isEmpty() );
             verify( ! max.isEmpty() );
-            
-            if (repl::getGlobalReplicationCoordinator()->getReplicationMode() ==
-                    repl::ReplicationCoordinator::modeReplSet) {
-                replSetMajorityCount = repl::theReplSet->config().getMajority();
-            } else {
-                replSetMajorityCount = 0;
-            }
 
             log() << "starting receiving-end of migration of chunk " << min << " -> " << max <<
                     " for collection " << ns << " from " << from
@@ -2196,8 +2189,8 @@ namespace mongo {
         bool flushPendingWrites(OperationContext* txn, const ReplTime& lastOpApplied ) {
             if (!opReplicatedEnough(txn, lastOpApplied)) {
                 OpTime op( lastOpApplied );
-                OCCASIONALLY warning() << "migrate commit waiting for " << replSetMajorityCount 
-                                       << " slaves for '" << ns << "' " << min << " -> " << max 
+                OCCASIONALLY warning() << "migrate commit waiting for a majority of slaves for '"
+                                       << ns << "' " << min << " -> " << max
                                        << " waiting for: " << op
                                        << migrateLog;
                 return false;
@@ -2290,8 +2283,6 @@ namespace mongo {
         long long numCatchup;
         long long numSteady;
         WriteConcernOptions writeConcern;
-
-        int replSetMajorityCount;
 
         // protects state
         mutable mutex stateMutex;
