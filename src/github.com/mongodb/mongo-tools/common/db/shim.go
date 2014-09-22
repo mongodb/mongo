@@ -140,6 +140,10 @@ func (bs *BSONSink) Close() error {
 	return bs.writer.Close()
 }
 
+func (ebs *EncodedBSONSink) Close() error {
+	return ebs.BSONIn.Close()
+}
+
 func (ebs *EncodedBSONSink) WriteDoc(out interface{}) (int, error) {
 	outbuf, err := bson.Marshal(out)
 	if err != nil {
