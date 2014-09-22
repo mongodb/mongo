@@ -2,24 +2,26 @@ package auth
 
 import (
 	"fmt"
+	"github.com/mongodb/mongo-tools/common/db"
 	"github.com/mongodb/mongo-tools/common/util"
-	"gopkg.in/mgo.v2"
 	"gopkg.in/mgo.v2/bson"
 	"strings"
 )
 
-func GetAuthVersion(session *mgo.Session) (int, error) {
+func GetAuthVersion(commander db.CommandRunner) (int, error) {
 	results := bson.M{}
-	err := session.Run(
+	err := commander.Run(
 		bson.D{
 			{"getParameter", 1},
 			{"authSchemaVersion", 1},
 		},
 		&results,
+		"admin",
 	)
 	if err != nil {
 		return 0, err
 	}
+
 	if util.IsTruthy(results["ok"]) {
 		version, ok := results["authSchemaVersion"].(int)
 		if !ok {
@@ -47,5 +49,4 @@ func GetAuthVersion(session *mgo.Session) (int, error) {
 		}
 		return 0, fmt.Errorf(errMessage)
 	}
-
 }

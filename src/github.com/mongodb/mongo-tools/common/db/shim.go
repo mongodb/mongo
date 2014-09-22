@@ -3,6 +3,7 @@ package db
 import (
 	"errors"
 	"fmt"
+	"github.com/mongodb/mongo-tools/common/bsonutil"
 	"github.com/mongodb/mongo-tools/common/json"
 	"gopkg.in/mgo.v2/bson"
 	"io"
@@ -10,6 +11,8 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"sort"
+	"strings"
 )
 
 const MaxBSONSize = 16 * 1024 * 1024
@@ -59,7 +62,20 @@ func (sds *ShimDocSource) Close() (err error) {
 	return
 }
 
-func (shim *Shim) Find(DB, Collection string, Skip, Limit int, Query string) (RawDocSource, error) {
+func (shim *Shim) Find(DB, Collection string, Skip, Limit int, Query interface{}, Sort []string) (RawDocSource, error) {
+	var queryStr string
+	if Query == nil {
+		queryStr = ""
+	} else if queryRaw, ok := Query.(string); ok {
+		queryStr = queryRaw
+	} else {
+		queryBytes, err := json.Marshal(Query)
+		if err != nil {
+			return nil, err
+		}
+		queryStr = string(queryBytes)
+	}
+
 	queryShim := StorageShim{
 		DBPath:     shim.DBPath,
 		Database:   DB,
@@ -67,7 +83,8 @@ func (shim *Shim) Find(DB, Collection string, Skip, Limit int, Query string) (Ra
 		Skip:       Skip,
 		Limit:      Limit,
 		ShimPath:   shim.ShimPath,
-		Query:      Query,
+		Query:      queryStr,
+		Sort:       Sort,
 		Mode:       Dump,
 	}
 	out, _, err := queryShim.Open()
@@ -77,7 +94,73 @@ func (shim *Shim) Find(DB, Collection string, Skip, Limit int, Query string) (Ra
 	return &ShimDocSource{out, queryShim}, nil
 }
 
-func (shim *Shim) Run(command bson.M, out interface{}, database string) error {
+func (shim *Shim) FindDocs(DB, Collection string, Skip, Limit int, Query interface{}, Sort []string) (DocSource, error) {
+	rds, err := shim.Find(DB, Collection, Skip, Limit, Query, Sort)
+	if err != nil {
+		return nil, err
+	}
+	return NewDecodedBSONSource(rds), nil
+}
+
+func (shim *Shim) FindOne(DB, Collection string, Skip int, Query interface{}, Sort []string, out interface{}) error {
+	docSource, err := shim.FindDocs(DB, Collection, Skip, 1, Query, Sort)
+	if err != nil {
+		return err
+	}
+	defer docSource.Close()
+	hasDoc := docSource.Next(out)
+	if !hasDoc {
+		return docSource.Err()
+	}
+	return nil
+}
+
+type databaseNames struct {
+	Databases []struct {
+		Name  string
+		Empty bool
+	}
+}
+
+func (shim *Shim) CollectionNames(dbName string) (names []string, err error) {
+	//TODO handle diff storage engines?
+	c := len(dbName) + 1
+	iter, err := shim.FindDocs(dbName, "system.namespaces", 0, 0, nil, nil)
+	if err != nil {
+		return
+	}
+	defer iter.Close()
+	var result *struct{ Name string }
+	for iter.Next(&result) {
+		if strings.Index(result.Name, "$") < 0 || strings.Index(result.Name, ".oplog.$") >= 0 {
+			names = append(names, result.Name[c:])
+		}
+	}
+	sort.Strings(names)
+	return names, nil
+
+}
+
+func (shim *Shim) DatabaseNames() ([]string, error) {
+	var result databaseNames
+	err := shim.Run("listDatabases", &result, "admin")
+	if err != nil {
+		return nil, err
+	}
+	names := []string{}
+	for _, db := range result.Databases {
+		if !db.Empty {
+			names = append(names, db.Name)
+		}
+	}
+	return names, nil
+
+}
+
+func (shim *Shim) Run(command interface{}, out interface{}, database string) error {
+	if name, ok := command.(string); ok {
+		command = bson.M{name: 1}
+	}
 	commandRaw, err := json.Marshal(command)
 	if err != nil {
 		return err
@@ -117,12 +200,26 @@ type StorageShim struct {
 	Limit       int
 	ShimPath    string
 	Query       string
+	Sort        []string
 	Mode        ShimMode
 	shimProcess *exec.Cmd
 	stdin       io.WriteCloser
 }
 
-func buildArgs(shim StorageShim) []string {
+func makeSort(fields []string) bson.D {
+	val := bson.D{}
+	for _, field := range fields {
+		direction := 1
+		if strings.HasPrefix(field, "-") {
+			direction = -1
+		}
+		dElem := bson.DocElem{Name: field, Value: direction}
+		val = append(val, dElem)
+	}
+	return val
+}
+
+func buildArgs(shim StorageShim) ([]string, error) {
 	returnVal := []string{}
 	if shim.DBPath != "" {
 		returnVal = append(returnVal, "--dbpath", shim.DBPath)
@@ -139,10 +236,25 @@ func buildArgs(shim StorageShim) []string {
 	if shim.Skip > 0 {
 		returnVal = append(returnVal, "--skip", fmt.Sprintf("%v", shim.Skip))
 	}
+	if len(shim.Sort) > 0 {
+		sortObj := bsonutil.MarshalD(makeSort(shim.Sort))
+		sortObjJson, err := json.Marshal(sortObj)
+		if err != nil {
+			return nil, nil
+		}
+		returnVal = append(returnVal, "--sort", string(sortObjJson))
+
+	}
 
 	if shim.Mode != Drop && shim.Query != "" {
 		returnVal = append(returnVal, "--query", shim.Query)
 	}
+
+	/*
+		if shim.Mode == Dump {
+			returnVal = append(returnVal, "--query", shim.Sort)
+		}
+	*/
 
 	switch shim.Mode {
 	case Dump:
@@ -151,7 +263,7 @@ func buildArgs(shim StorageShim) []string {
 	case Drop:
 		returnVal = append(returnVal, "--drop")
 	}
-	return returnVal
+	return returnVal, nil
 }
 
 func checkExists(path string) (bool, error) {
@@ -231,7 +343,11 @@ func RunShimCommand(command bson.M, out interface{}, dbpath, database string) er
 //Open() starts the external shim process and returns an instance of BSONSource
 //bound to its STDOUT stream.
 func (shim *StorageShim) Open() (*BSONSource, *BSONSink, error) {
-	args := buildArgs(*shim)
+	args, err := buildArgs(*shim)
+	if err != nil {
+		return nil, nil, err
+	}
+	fmt.Println(args)
 	cmd := exec.Command(shim.ShimPath, args...)
 	stdOut, err := cmd.StdoutPipe()
 	if err != nil {

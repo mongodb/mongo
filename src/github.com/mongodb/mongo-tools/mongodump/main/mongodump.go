@@ -2,7 +2,6 @@ package main
 
 import (
 	"fmt"
-	"github.com/mongodb/mongo-tools/common/db"
 	"github.com/mongodb/mongo-tools/common/log"
 	commonopts "github.com/mongodb/mongo-tools/common/options"
 	"github.com/mongodb/mongo-tools/common/util"
@@ -40,18 +39,15 @@ func main() {
 	// init logger
 	log.InitToolLogger(opts.Verbosity)
 
-	// create a session provider to connect to the db
-	sessionProvider, err := db.InitSessionProvider(*opts)
-	if err != nil {
-		fmt.Printf("error initializing database session: %v\n", err)
-		os.Exit(1) //TODO copy legacy exit code
+	dump := mongodump.MongoDump{
+		ToolOptions:   opts,
+		OutputOptions: outputOpts,
+		InputOptions:  inputOpts,
 	}
 
-	dump := mongodump.MongoDump{
-		ToolOptions:     opts,
-		OutputOptions:   outputOpts,
-		InputOptions:    inputOpts,
-		SessionProvider: sessionProvider,
+	err = dump.Init()
+	if err != nil {
+		util.Exitf(1, "%v", err)
 	}
 
 	err = dump.Dump()

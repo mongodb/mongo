@@ -9,15 +9,15 @@ import (
 	"github.com/mongodb/mongo-tools/common/json"
 	"github.com/mongodb/mongo-tools/common/log"
 	commonopts "github.com/mongodb/mongo-tools/common/options"
-	"github.com/mongodb/mongo-tools/common/progress"
+	//"github.com/mongodb/mongo-tools/common/progress"
 	"github.com/mongodb/mongo-tools/mongodump/options"
-	"gopkg.in/mgo.v2"
+	//"gopkg.in/mgo.v2"
 	"gopkg.in/mgo.v2/bson"
 	"io"
 	"os"
 	"path/filepath"
 	"strings"
-	"time"
+	//"time"
 )
 
 const ProgressBarLength = 24
@@ -29,7 +29,7 @@ type MongoDump struct {
 	InputOptions  *options.InputOptions
 	OutputOptions *options.OutputOptions
 
-	SessionProvider *db.SessionProvider
+	cmdRunner db.CommandRunner
 
 	// useful internals that we don't directly expose as options
 	useStdout       bool
@@ -54,6 +54,20 @@ func (dump *MongoDump) ValidateOptions() error {
 	case dump.OutputOptions.Oplog && dump.ToolOptions.DB != "":
 		return fmt.Errorf("--oplog mode only supported on full dumps")
 	}
+	return nil
+}
+
+func (dump *MongoDump) Init() error {
+	if dump.ToolOptions.Namespace.DBPath != "" {
+		fmt.Println("doing dbpath init")
+		shim, err := db.NewShim(dump.ToolOptions.Namespace.DBPath)
+		if err != nil {
+			return err
+		}
+		dump.cmdRunner = shim
+		return nil
+	}
+	dump.cmdRunner = db.NewSessionProvider(*dump.ToolOptions)
 	return nil
 }
 
@@ -88,12 +102,11 @@ func (dump *MongoDump) Dump() error {
 	}
 
 	if dump.OutputOptions.DumpDBUsersAndRoles {
-		session, err := dump.SessionProvider.GetSession()
 		if err != nil {
 			return fmt.Errorf("error establishing database connection: %v", err)
 		}
 		//first make sure this is possible with the connected database
-		dump.authVersion, err = auth.GetAuthVersion(session)
+		dump.authVersion, err = auth.GetAuthVersion(dump.cmdRunner)
 		if err != nil {
 			return fmt.Errorf("error getting auth schema version for dumpDbUsersAndRoles: %v", err)
 		}
@@ -152,12 +165,7 @@ func (dump *MongoDump) DumpEverything() error {
 		}
 	}
 
-	// Iterate over all database names, dumping them
-	session, err := dump.SessionProvider.GetSession()
-	if err != nil {
-		return fmt.Errorf("error establishing database connection: %v", err)
-	}
-	dbs, err := session.DatabaseNames()
+	dbs, err := dump.cmdRunner.DatabaseNames()
 	if err != nil {
 		return fmt.Errorf("error getting database names: %v", err)
 	}
@@ -195,14 +203,13 @@ func (dump *MongoDump) DumpEverything() error {
 		}
 
 		log.Logf(0, "writing captured oplog to %v", oplogFilepath)
-		session.SetPrefetch(1.0) //mimic exhaust cursor
-		oplogQuery := session.DB("local").C(dump.oplogCollection).Find(
-			bson.M{
-				"ts": bson.M{
-					"$gt": oplogStart,
-				},
-			}).LogReplay()
-		err = dump.dumpQueryToWriter(oplogQuery, oplogOut)
+		//session.SetPrefetch(1.0) //mimic exhaust cursor
+		queryObj := bson.M{"ts": bson.M{"$gt": oplogStart}}
+		oplogQuery, err := dump.cmdRunner.FindDocs("local", dump.oplogCollection, 0, 0, queryObj, nil)
+		if err != nil {
+			return err
+		}
+		err = dump.dumpDocSourceToWriter(oplogQuery, oplogOut)
 		if err != nil {
 			return err
 		}
@@ -227,12 +234,7 @@ func (dump *MongoDump) DumpEverything() error {
 
 // DumpDatabase dumps the specified database
 func (dump *MongoDump) DumpDatabase(db string) error {
-	session, err := dump.SessionProvider.GetSession()
-	if err != nil {
-		return fmt.Errorf("error establishing database connection: %v", err)
-	}
-
-	cols, err := session.DB(db).CollectionNames()
+	cols, err := dump.cmdRunner.CollectionNames(db)
 	if err != nil {
 		return fmt.Errorf("error getting collections names for database `%v`: %v", dump.ToolOptions.DB, err)
 	}
@@ -247,32 +249,35 @@ func (dump *MongoDump) DumpDatabase(db string) error {
 }
 
 // DumpCollection dumps the specified database's collection
-func (dump *MongoDump) DumpCollection(db, c string) error {
-	session, err := dump.SessionProvider.GetSession()
-	if err != nil {
-		return fmt.Errorf("error establishing database connection: %v", err)
-	}
+func (dump *MongoDump) DumpCollection(dbName, c string) error {
 	// in mgo, setting prefetch = 1.0 causes the driver to make requests for
 	// more results as soon as results are returned. This effectively
 	// duplicates the behavior of an exhaust cursor.
-	session.SetPrefetch(1.0)
+	//TODO reenable (mob)
+	//session.SetPrefetch(1.0)
 
-	var findQuery *mgo.Query
+	var findQuery db.DocSource
+	var err error
 	switch {
 	case len(dump.query) > 0:
-		findQuery = session.DB(db).C(c).Find(dump.query)
+		findQuery, err = dump.cmdRunner.FindDocs(dbName, c, 0, 0, dump.query, nil)
 	case dump.InputOptions.TableScan:
 		// ---forceTablesScan runs the query without snapshot enabled
-		findQuery = session.DB(db).C(c).Find(nil)
+		//TODO reenable this
+		findQuery, err = dump.cmdRunner.FindDocs(dbName, c, 0, 0, nil, nil)
 	default:
-		findQuery = session.DB(db).C(c).Find(nil).Snapshot()
+		//TODO this should use snapshot
+		findQuery, err = dump.cmdRunner.FindDocs(dbName, c, 0, 0, nil, nil)
+	}
+	if err != nil {
+		return err
 	}
 
 	if dump.useStdout {
-		log.Logf(0, "writing %v.%v to stdout", db, c)
-		return dump.dumpQueryToWriter(findQuery, os.Stdout)
+		log.Logf(0, "writing %v.%v to stdout", dbName, c)
+		return dump.dumpDocSourceToWriter(findQuery, os.Stdout)
 	} else {
-		dbFolder := filepath.Join(dump.OutputOptions.Out, db)
+		dbFolder := filepath.Join(dump.OutputOptions.Out, dbName)
 		err := os.MkdirAll(dbFolder, 0755)
 		if err != nil {
 			return fmt.Errorf("error creating directory `%v`: %v", dbFolder, err)
@@ -285,8 +290,8 @@ func (dump *MongoDump) DumpCollection(db, c string) error {
 		}
 		defer out.Close()
 
-		log.Logf(0, "writing %v.%v to %v", db, c, outFilepath)
-		err = dump.dumpQueryToWriter(findQuery, out)
+		log.Logf(0, "writing %v.%v to %v", dbName, c, outFilepath)
+		err = dump.dumpDocSourceToWriter(findQuery, out)
 		if err != nil {
 			return err
 		}
@@ -298,16 +303,16 @@ func (dump *MongoDump) DumpCollection(db, c string) error {
 		}
 		defer metaOut.Close()
 
-		log.Logf(0, "writing %v.%v metadata to %v", db, c, metadataFilepath)
-		return dump.dumpMetadataToWriter(db, c, metaOut)
+		log.Logf(0, "writing %v.%v metadata to %v", dbName, c, metadataFilepath)
+		return dump.dumpMetadataToWriter(dbName, c, metaOut)
 	}
 }
 
 // dumpQueryToWriter takes an mgo Query and a writer, performs the query,
 // and writes the raw bson results to the writer.
-func (dump *MongoDump) dumpQueryToWriter(query *mgo.Query, writer io.Writer) error {
-	var dumpCounter int
-	total, err := query.Count()
+func (dump *MongoDump) dumpDocSourceToWriter(query db.DocSource, writer io.Writer) (err error) {
+	//var dumpCounter int
+	/*total, err := query.Count()
 	if err != nil {
 		return fmt.Errorf("error reading from db: %v", err)
 	}
@@ -322,9 +327,13 @@ func (dump *MongoDump) dumpQueryToWriter(query *mgo.Query, writer io.Writer) err
 	}
 	bar.Start()
 	defer bar.Stop()
-
-	cursor := query.Iter()
-	defer cursor.Close()
+	*/
+	defer func() {
+		err2 := query.Close()
+		if err == nil {
+			err = err2
+		}
+	}()
 
 	// We run the result iteration in its own goroutine,
 	// this allows disk i/o to not block reads from the db,
@@ -333,10 +342,10 @@ func (dump *MongoDump) dumpQueryToWriter(query *mgo.Query, writer io.Writer) err
 	go func() {
 		for {
 			raw := &bson.Raw{}
-			if err := cursor.Err(); err != nil {
+			if err := query.Err(); err != nil {
 				log.Logf(0, "error reading from db: %v", err)
 			}
-			next := cursor.Next(raw)
+			next := query.Next(raw)
 			if !next {
 				close(buffChan)
 				return
@@ -354,8 +363,8 @@ func (dump *MongoDump) dumpQueryToWriter(query *mgo.Query, writer io.Writer) err
 	for {
 		buff, alive := <-buffChan
 		if !alive {
-			if cursor.Err() != nil {
-				return fmt.Errorf("error reading collection: %v", cursor.Err())
+			if query.Err() != nil {
+				return fmt.Errorf("error reading collection: %v", query.Err())
 			}
 			break
 		}
@@ -363,7 +372,7 @@ func (dump *MongoDump) dumpQueryToWriter(query *mgo.Query, writer io.Writer) err
 		if err != nil {
 			return fmt.Errorf("error writing to file: %v", err)
 		}
-		dumpCounter++
+		//dumpCounter++
 	}
 	err = w.Flush()
 	if err != nil {
@@ -375,10 +384,6 @@ func (dump *MongoDump) dumpQueryToWriter(query *mgo.Query, writer io.Writer) err
 // DumpUsersAndRolesForDB queries and dumps the users and roles tied
 // to the given the db. Only works with schema version == 3
 func (dump *MongoDump) DumpUsersAndRolesForDB(db string) error {
-	session, err := dump.SessionProvider.GetSession()
-	if err != nil {
-		return fmt.Errorf("error establishing database connection: %v", err)
-	}
 	dbQuery := bson.M{"db": db}
 	outDir := filepath.Join(dump.OutputOptions.Out, db)
 
@@ -386,8 +391,12 @@ func (dump *MongoDump) DumpUsersAndRolesForDB(db string) error {
 	if err != nil {
 		return fmt.Errorf("error creating file for db users: %v", err)
 	}
-	usersQuery := session.DB("admin").C("system.users").Find(dbQuery)
-	err = dump.dumpQueryToWriter(usersQuery, usersFile)
+
+	usersQuery, err := dump.cmdRunner.FindDocs("admin", "system.users", 0, 0, dbQuery, nil)
+	if err != nil {
+		return err
+	}
+	err = dump.dumpDocSourceToWriter(usersQuery, usersFile)
 	if err != nil {
 		return fmt.Errorf("error dumping db users: %v", err)
 	}
@@ -396,8 +405,12 @@ func (dump *MongoDump) DumpUsersAndRolesForDB(db string) error {
 	if err != nil {
 		return fmt.Errorf("error creating file for db roles: %v", err)
 	}
-	rolesQuery := session.DB("admin").C("system.roles").Find(dbQuery)
-	err = dump.dumpQueryToWriter(rolesQuery, rolesFile)
+
+	rolesQuery, err := dump.cmdRunner.FindDocs("admin", "system.roles", 0, 0, dbQuery, nil)
+	if err != nil {
+		return err
+	}
+	err = dump.dumpDocSourceToWriter(rolesQuery, rolesFile)
 	if err != nil {
 		return fmt.Errorf("error dumping db roles: %v", err)
 	}

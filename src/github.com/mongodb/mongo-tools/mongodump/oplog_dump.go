@@ -21,13 +21,9 @@ type Oplog struct {
 // determineOplogCollectionName uses a command to infer
 // the name of the oplog collection in the connected db
 func (dump *MongoDump) determineOplogCollectionName() error {
-	session, err := dump.SessionProvider.GetSession()
-	if err != nil {
-		return fmt.Errorf("error establishing database connection: %v", err)
-	}
-
 	masterDoc := bson.M{}
-	err = session.Run("isMaster", &masterDoc)
+	fmt.Println("checking oplgo coll name")
+	err := dump.cmdRunner.Run("isMaster", &masterDoc, "admin")
 	if err != nil {
 		return fmt.Errorf("error running command: %v", err)
 	}
@@ -53,13 +49,9 @@ func (dump *MongoDump) determineOplogCollectionName() error {
 
 // getOplogStartTime returns the most recent oplog entry
 func (dump *MongoDump) getOplogStartTime() (bson.MongoTimestamp, error) {
-	session, err := dump.SessionProvider.GetSession()
-	if err != nil {
-		return 0, fmt.Errorf("error establishing database connection: %v", err)
-	}
 	mostRecentOplogEntry := Oplog{}
-	collection := session.DB("local").C(dump.oplogCollection)
-	err = collection.Find(bson.M{}).Sort("-$natural").Limit(1).One(&mostRecentOplogEntry)
+
+	err := dump.cmdRunner.FindOne("local", dump.oplogCollection, 0, nil, []string{"-$natural"}, &mostRecentOplogEntry)
 	if err != nil {
 		//TODO different error depending on not found vs connection issues
 		return 0, err
@@ -72,20 +64,13 @@ func (dump *MongoDump) getOplogStartTime() (bson.MongoTimestamp, error) {
 // still in the database and making sure it happened at or before the timestamp
 // captured at the start of the dump.
 func (dump *MongoDump) checkOplogTimestampExists(ts bson.MongoTimestamp) (bool, error) {
-	session, err := dump.SessionProvider.GetSession()
-	if err != nil {
-		return false, fmt.Errorf("error establishing database connection: %v", err)
-	}
 	oldestOplogEntry := Oplog{}
-	collection := session.DB("local").C(dump.oplogCollection)
-
-	err = collection.Find(bson.M{}).Sort("$natural").Limit(1).One(&oldestOplogEntry)
+	err := dump.cmdRunner.FindOne("local", dump.oplogCollection, 0, nil, []string{"+$natural"}, &oldestOplogEntry)
 	if err != nil {
 		return false, fmt.Errorf("unable to read entry from oplog: %v", err)
 	}
 
 	log.Logf(3, "oldest oplog entry has timestamp %v", oldestOplogEntry.Timestamp)
-
 	if oldestOplogEntry.Timestamp > ts {
 		log.Logf(1, "oldest oplog entry of timestamp %v is older than %v",
 			oldestOplogEntry.Timestamp, ts)

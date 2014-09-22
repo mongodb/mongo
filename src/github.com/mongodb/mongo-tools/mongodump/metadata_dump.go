@@ -39,16 +39,11 @@ type IndexDocFromDB struct {
 
 // This helper gets the metadata for a collection and writes it
 // in readable JSON format
-func (dump *MongoDump) dumpMetadataToWriter(db, c string, writer io.Writer) error {
-	session, err := dump.SessionProvider.GetSession()
-	if err != nil {
-		return fmt.Errorf("error establishing database connection: %v", err)
-	}
-
+func (dump *MongoDump) dumpMetadataToWriter(dbName, c string, writer io.Writer) error {
 	// make a buffered writer for nicer disk i/o
 	w := bufio.NewWriter(writer)
 
-	nsID := fmt.Sprintf("%v.%v", db, c)
+	nsID := fmt.Sprintf("%v.%v", dbName, c)
 	meta := Metadata{
 		// We have to initialize Indexes to an empty slice, not nil, so that an empty
 		// array is marshalled into json instead of null. That is, {indexes:[]} is okay
@@ -61,9 +56,8 @@ func (dump *MongoDump) dumpMetadataToWriter(db, c string, writer io.Writer) erro
 	// collection for tracking collection names and properties. For mongodump,
 	// we copy just the "options" subdocument for the collection.
 	log.Logf(3, "\treading options for `%v`", nsID)
-	collection := session.DB(db).C("system.namespaces")
 	namespaceDoc := bson.M{}
-	err = collection.Find(bson.M{"name": nsID}).One(&namespaceDoc)
+	err := dump.cmdRunner.FindOne(dbName, c, 0, bson.M{"name": nsID}, nil, namespaceDoc)
 	if err != nil {
 		return fmt.Errorf("error finding metadata for collection `%v`: %v", nsID, err)
 	}
@@ -76,8 +70,13 @@ func (dump *MongoDump) dumpMetadataToWriter(db, c string, writer io.Writer) erro
 	// for the current collection as we iterate over the cursor, and include
 	// that list as the "indexes" field of the metadata document.
 	log.Logf(3, "\treading indexes for `%v`", nsID)
-	collection = session.DB(db).C("system.indexes")
-	cursor := collection.Find(bson.M{"ns": nsID}).Snapshot().Iter()
+
+	//TODO - snapshot (mob)
+	cursor, err := dump.cmdRunner.FindDocs(dbName, "system.indexes", 0, 0, bson.M{"ns": nsID}, nil)
+	if err != nil {
+		return err
+	}
+	defer cursor.Close()
 	indexDocDB := IndexDocFromDB{}
 	for cursor.Next(&indexDocDB) {
 		// FIXME this is super annoying and could be fixed with an mgo pull request
