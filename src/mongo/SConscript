@@ -553,19 +553,15 @@ else:
     env.Library('scripting', scripting_common_files + ['scripting/engine_none.cpp'],
                 LIBDEPS=['bson_template_evaluator'])
 
-mmapFiles = [ "util/mmap.cpp" ]
-
-if has_option( "mm" ):
-    mmapFiles += [ "util/mmap_mm.cpp" ]
-else:
-    mmapFiles += [ "util/mmap_${OS_FAMILY}.cpp" ]
-
-env.Library('update_index_data', [ 'db/update_index_data.cpp' ], LIPDEPS=[ 'db/common' ])
+env.Library('update_index_data', [ 'db/update_index_data.cpp' ], LIBDEPS=[ 'db/common' ])
 
 # Global Configuration.  Used by both mongos and mongod.
 env.Library('global_environment_experiment',
             [ 'db/global_environment_experiment.cpp',
               'db/global_environment_noop.cpp' ])
+
+# Memory-mapped files support.  Used by mongod and some tools.
+env.Library('mmap', ['util/mmap.cpp', 'util/mmap_${OS_FAMILY}.cpp'], LIBDEPS=['foundation'])
 
 # mongod files - also files used in tools. present in dbtests, but not in mongos and not in client
 # libs.
@@ -733,8 +729,6 @@ env.Library('stacktrace',
                      'stringutils',
                      'version',
                      '$BUILD_DIR/mongo/base/base'])
-
-serverOnlyFiles += mmapFiles
 
 serverOnlyFiles += [ "db/stats/snapshots.cpp", "db/stats/range_deleter_server_status.cpp" ]
 
@@ -937,6 +931,7 @@ serveronlyLibdeps = ["coreshard",
                      "db/repl/rslog",
                      'db/storage/mmap_v1/storage_mmapv1',
                      'db/storage/heap1/storage_heap1',
+                     'mmap',
                      '$BUILD_DIR/third_party/shim_snappy']
 
 if has_option("rocksdb" ):

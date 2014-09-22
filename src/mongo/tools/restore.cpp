@@ -26,7 +26,7 @@
 *    then also delete it in the license file.
 */
 
-#include "mongo/pch.h"
+#include "mongo/platform/basic.h"
 
 #include <boost/filesystem/convenience.hpp>
 #include <boost/filesystem/operations.hpp>
@@ -49,7 +49,6 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/tools/mongorestore_options.h"
 #include "mongo/tools/tool.h"
-#include "mongo/util/mmap.h"
 #include "mongo/util/options_parser/option_section.h"
 #include "mongo/util/stringutils.h"
 
