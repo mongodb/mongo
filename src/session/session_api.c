@@ -270,7 +270,13 @@ __wt_open_cursor(WT_SESSION_IMPL *session,
 	if (*cursorp == NULL)
 		return (__wt_bad_object_type(session, uri));
 
-	if ((ret = __wt_strdup(session, uri, &(*cursorp)->uri)) != 0)
+	/*
+	 * When opening simple tables, the table code calls this function on the
+	 * underlying data source, in which case the application's URI has been
+	 * copied.
+	 */
+	if ((*cursorp)->uri == NULL &&
+	    (ret = __wt_strdup(session, uri, &(*cursorp)->uri)) != 0)
 		WT_TRET((*cursorp)->close(*cursorp));
 
 	return (ret);
