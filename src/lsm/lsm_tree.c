@@ -340,10 +340,6 @@ __wt_lsm_tree_create(WT_SESSION_IMPL *session,
 	if (lsm_tree->merge_min > lsm_tree->merge_max)
 		WT_ERR_MSG(session, EINVAL,
 		    "LSM merge_min must be less than or equal to merge_max");
-	WT_ERR(__wt_config_gets(session, cfg, "lsm.merge_threads", &cval));
-	lsm_tree->merge_threads = (uint32_t)cval.val;
-	/* Sanity check that api_data.py is in sync with lsm.h */
-	WT_ASSERT(session, lsm_tree->merge_threads <= WT_LSM_MAX_WORKERS);
 
 	/*
 	 * Set up the config for each chunk.
@@ -398,9 +394,12 @@ __lsm_tree_open_check(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 	WT_RET(__wt_config_gets(session, cfg, "leaf_page_max", &cval));
 	maxleafpage = (uint64_t)cval.val;
 
-	/* Three chunks, plus one page for each participant in a merge. */
+	/*
+	 * Three chunks, plus one page for each participant in up to three
+	 * concurrent merges.
+	 */
 	required = 3 * lsm_tree->chunk_size +
-	    lsm_tree->merge_threads * (lsm_tree->merge_max * maxleafpage);
+	    3 * (lsm_tree->merge_max * maxleafpage);
 	if (S2C(session)->cache_size < required)
 		WT_RET_MSG(session, EINVAL,
 		    "The LSM configuration requires a cache size of at least %"
@@ -549,7 +548,7 @@ __wt_lsm_tree_release(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 #define	WT_LSM_MERGE_THROTTLE_BUMP_PCT	(100 / lsm_tree->merge_max)
 /* Number of level 0 chunks that need to be present to throttle inserts */
 #define	WT_LSM_MERGE_THROTTLE_THRESHOLD					\
-	(lsm_tree->merge_threads * lsm_tree->merge_min)
+	(2 * lsm_tree->merge_min)
 /* Minimal throttling time */
 #define	WT_LSM_THROTTLE_START		20
 
@@ -663,12 +662,10 @@ __wt_lsm_tree_throttle(
 	/*
 	 * Merge throttling, based on the number of on-disk, level 0 chunks.
 	 *
-	 * Don't throttle if there is only a single merge thread - that thread
-	 * is likely busy creating bloom filters.  Similarly, don't throttle if
-	 * the tree has less than a single level's number of chunks.
+	 * Don't throttle if the tree has less than a single level's number
+	 * of chunks.
 	 */
-	if (lsm_tree->merge_threads < 2 ||
-	    lsm_tree->nchunks < lsm_tree->merge_max)
+	if (lsm_tree->nchunks < lsm_tree->merge_max)
 		lsm_tree->merge_throttle = 0;
 	else if (gen0_chunks < WT_LSM_MERGE_THROTTLE_THRESHOLD)
 		WT_LSM_MERGE_THROTTLE_DECREASE(lsm_tree->merge_throttle);

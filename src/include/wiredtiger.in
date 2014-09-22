@@ -1065,9 +1065,6 @@ struct __wt_session {
 	 * chunks to include in a merge operation.  If set to 0 or 1 half the
 	 * value of merge_max is used., an integer no more than 100; default \c
 	 * 0.}
-	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;merge_threads, the number of
-	 * threads to perform merge operations., an integer between 1 and 10;
-	 * default \c 2.}
 	 * @config{ ),,}
 	 * @config{memory_page_max, the maximum size a page can grow to in
 	 * memory before being reconciled to disk.  The specified size will be
