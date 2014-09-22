@@ -871,7 +871,8 @@ namespace mongo {
         PlanStage* root;
         QuerySolution* querySolution;
 
-        if (request.query.isEmpty()) {
+        // if collection exists and query is empty no additional canonicalization needed
+        if (collection && request.query.isEmpty()) {
             // If the query is empty, then we can determine the count by just asking the collection
             // for its number of records. This is implemented by the CountStage, and we don't need
             // to create a child for the count stage in this case.
@@ -880,22 +881,26 @@ namespace mongo {
             return Status::OK();
         }
 
-        const WhereCallbackReal whereCallback(txn, !collection ? request.ns 
-            : collection->ns().db());
-
         CanonicalQuery* rawCq;
-        Status canonStatus = CanonicalQuery::canonicalize(!collection ? request.ns 
-                                                            : collection->ns().ns(),
-                                                          request.query,
-                                                          BSONObj(),
-                                                          BSONObj(),
-                                                          0,
-                                                          0,
-                                                          request.hint,
-                                                          &rawCq,
-                                                          whereCallback);
-        if (!canonStatus.isOK()) {
-            return canonStatus;
+        
+        if (!request.query.isEmpty()) {
+            // if query is not empty we try to canonicalize it before working with collection
+            const WhereCallbackReal whereCallback(txn, !collection ? request.ns
+                : collection->ns().db());
+            
+            Status canonStatus = CanonicalQuery::canonicalize(!collection ? request.ns
+                : collection->ns().ns(),
+                request.query,
+                BSONObj(),
+                BSONObj(),
+                0,
+                0,
+                request.hint,
+                &rawCq,
+                whereCallback);
+            if (!canonStatus.isOK()) {
+                return canonStatus;
+            }
         }
 
         if (!collection) {
@@ -907,6 +912,7 @@ namespace mongo {
             return Status::OK();
         }
 
+        // at this point we have non-empty canonical query and collection exists
         auto_ptr<CanonicalQuery> cq(rawCq);
 
         const size_t plannerOptions = QueryPlannerParams::PRIVATE_IS_COUNT;
