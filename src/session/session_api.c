@@ -189,7 +189,6 @@ __wt_open_cursor(WT_SESSION_IMPL *session,
 	WT_COLGROUP *colgroup;
 	WT_DATA_SOURCE *dsrc;
 	WT_DECL_RET;
-	char *uri_copy;
 
 	*cursorp = NULL;
 
@@ -271,13 +270,9 @@ __wt_open_cursor(WT_SESSION_IMPL *session,
 	if (*cursorp == NULL)
 		return (__wt_bad_object_type(session, uri));
 
-	WT_ERR(__wt_strdup(session, uri, &uri_copy));
-	(*cursorp)->uri = (const char *)uri_copy;
+	if ((ret = __wt_strdup(session, uri, &(*cursorp)->uri)) != 0)
+		WT_TRET((*cursorp)->close(*cursorp));
 
-	/* Clean up if memory allocation failed for URI string. */
-	if (0) {
-err:		(void)(*cursorp)->close(*cursorp);
-	}
 	return (ret);
 }
 
