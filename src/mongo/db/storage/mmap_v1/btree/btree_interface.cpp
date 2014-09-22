@@ -193,7 +193,9 @@ namespace mongo {
             }
 
             virtual void advance() {
-                _btree->advance(_txn, &_bucket, &_ofs, _direction);
+                if (!_bucket.isNull()) {
+                    _btree->advance(_txn, &_bucket, &_ofs, _direction);
+                }
             }
 
             virtual void savePosition() {
