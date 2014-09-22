@@ -54,17 +54,20 @@ struct president_data {
 
 static const struct president_data example_data[] = {
 	{ 0, "Obama", "Barack", 2009, 2014 },
-	{ 1, "Bush", "George W", 2001, 2009 },
-	{ 2, "Clinton", "Bill", 1993, 2001 },
-	{ 3, "Bush", "George H", 1989, 1993 },
-	{ 4, "Reagan", "Ronald", 1981, 1989 },
+	{ 1, "Bush", "George W", 2005, 2009 },
+	{ 2, "Bush", "George W", 2001, 2005 },
+	{ 3, "Clinton", "Bill", 1997, 2001 },
+	{ 4, "Clinton", "Bill", 1993, 1997 },
+	{ 5, "Bush", "George H", 1989, 1993 },
+	{ 6, "Reagan", "Ronald", 1985, 1989 },
+	{ 7, "Reagan", "Ronald", 1981, 1985 },
 	{ 0, NULL, NULL, 0, 0 }
 };
 
 static int
-my_extract(WT_EXTRACTOR *extractor, WT_SESSION *session,
+my_extract_mult_next(WT_EXTRACTOR_MULTIPLE *em, WT_SESSION *session,
     const WT_ITEM *key, const WT_ITEM *value,
-    WT_CURSOR *result_cursor, WT_EXTRACTOR_MULTIPLE **emp)
+    WT_CURSOR *result_cursor)
 {
 	char *last_name, first_name;
 	uint16_t term_end, term_start;
@@ -74,8 +77,45 @@ my_extract(WT_EXTRACTOR *extractor, WT_SESSION *session,
 	(void)session;
 	(void)key;
 
+	result_cursor->set_key(result_cursor, value);
+	return (0);
+}
+
+static int
+my_extract_mult_terminate(WT_EXTRACTOR_MULTIPLE *em, WT_SESSION *session)
+{
+	(void)extractor;
+	(void)session;
+	return (0);
+}
+
+WT_EXTRACTOR_MULTIPLE my_extractor_mult = {
+    my_extract_mult_next, my_extract_mult_terminate};
+
+static int
+my_extract(WT_EXTRACTOR *extractor, WT_SESSION *session,
+    const WT_ITEM *key, const WT_ITEM *value,
+    WT_CURSOR *result_cursor, WT_EXTRACTOR_MULTIPLE **emp)
+{
+	char *last_name, first_name;
+	int ret;
+	uint16_t term_end, term_start;
+
+	/* Unused parameters */
+	(void)extractor;
+	(void)session;
+	(void)key;
+	*emp = my_extract_mult;
 
 	result_cursor->set_key(result_cursor, value);
+	return (0);
+}
+
+static int
+my_extract_terminate(WT_EXTRACTOR *extractor, WT_SESSION *session)
+{
+	(void)extractor;
+	(void)session;
 	return (0);
 }
 
@@ -84,8 +124,7 @@ add_extractor(WT_CONNECTION *conn)
 {
 	int ret;
 
-	static WT_EXTRACTOR my_extractor = {my_extract};
-
+	static WT_EXTRACTOR my_extractor = {my_extract, my_extract_terminate);
 	ret = conn->add_extractor(conn, "my_extractor", &my_extractor, NULL);
 
 	return (ret);
