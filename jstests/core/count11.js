@@ -1,31 +1,38 @@
 // SERVER-8514
 
-var t = db.server8514;
+var t = db.count11;
 
 t.drop();
 
 var query_good = {a: {$in: [null]}};
 var query_bad = {a: {$in: null}};
 
-function  getCount(q) {
-    try {
-        return t.find(q).count();
-    }
-    catch (e) {
-      return e;
-    }
-}
-
-result = getCount(query_good);
+// query non-existing collection
+// returns 0 on valid syntax query
+// fails on invalid syntax query
+result = t.find(query_good).count();
 assert.eq(0, result);
-result = getCount(query_bad);
-assert(result.message.match(/count failed/) !== null);
+assert.throws(function() { t.find(query_bad).count(); });
 
+// query itcount on non-existing collection
+// returns 0 on valid syntax query
+// fails on invalid syntax query
+result = t.find(query_good).itcount();
+assert.eq(0, result);
+assert.throws(function() { t.find(query_bad).itcount(); });
+
+// query existing but collection
+// returns 0 on valid syntax query
+// fails on invalid syntax query
+db.createCollection("count11");
+result = t.find(query_good).count();
+assert.eq(0, result);
+assert.throws(function() { t.find(query_bad).count(); });
+
+// query non-empty collection
+// returns 0 on valid syntax query
+// fails on invalid syntax query
 t.save({a: [1, 2]});
-
-// query on non-empty collection should yield zero documents
-// since the predicate is invalid
-result = getCount(query_good);
+result = t.find(query_good).count();
 assert.eq(0, result);
-result = getCount(query_bad);
-assert(result.message.match(/count failed/) !== null);
+assert.throws(function() { t.find(query_bad).count(); });
