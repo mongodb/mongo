@@ -710,6 +710,9 @@ namespace mongo {
         for( int i = 0; i < Buckets; i++ ) {
             _deletedList[i].writing().Null();
         }
+
+        // SERVER-15319: Zero out reserved bytes that will become deleted-list buckets in 2.8.
+        memset(_reserved, 0, sizeof(_reserved) - 8);
     }
 
     int NamespaceDetails::_catalogFindIndexByName(const StringData& name,
