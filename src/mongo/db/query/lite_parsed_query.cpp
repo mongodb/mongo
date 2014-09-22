@@ -628,10 +628,10 @@ namespace mongo {
                                  bool explain,
                                  LiteParsedQuery** out) {
         auto_ptr<LiteParsedQuery> pq(new LiteParsedQuery());
-        pq->_sort = sort;
-        pq->_hint = hint;
-        pq->_options.min = minObj;
-        pq->_options.max = maxObj;
+        pq->_sort = sort.getOwned();
+        pq->_hint = hint.getOwned();
+        pq->_options.min = minObj.getOwned();
+        pq->_options.max = maxObj.getOwned();
         pq->_options.snapshot = snapshot;
         pq->_explain = explain;
 
@@ -706,7 +706,7 @@ namespace mongo {
 
             if (0 == strcmp("$orderby", name) || 0 == strcmp("orderby", name)) {
                 if (Object == e.type()) {
-                    _sort = e.embeddedObject();
+                    _sort = e.embeddedObject().getOwned();
                 }
                 else if (Array == e.type()) {
                     _sort = e.embeddedObject();
@@ -757,17 +757,17 @@ namespace mongo {
                     if (!e.isABSONObj()) {
                         return Status(ErrorCodes::BadValue, "$min must be a BSONObj");
                     }
-                    _options.min = e.embeddedObject();
+                    _options.min = e.embeddedObject().getOwned();
                 }
                 else if (str::equals("max", name)) {
                     if (!e.isABSONObj()) {
                         return Status(ErrorCodes::BadValue, "$max must be a BSONObj");
                     }
-                    _options.max = e.embeddedObject();
+                    _options.max = e.embeddedObject().getOwned();
                 }
                 else if (str::equals("hint", name)) {
                     if (e.isABSONObj()) {
-                        _hint = e.embeddedObject();
+                        _hint = e.embeddedObject().getOwned();
                     }
                     else {
                         // Hint can be specified as an object or as a string.  Wrap takes care of
