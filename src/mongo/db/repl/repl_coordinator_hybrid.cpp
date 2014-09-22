@@ -398,6 +398,10 @@ namespace repl {
         return implResponse;
     }
 
+    vector<HostAndPort> HybridReplicationCoordinator::getOtherNodesInReplSet() const {
+        return _legacy.getOtherNodesInReplSet();
+    }
+
     Status HybridReplicationCoordinator::checkIfWriteConcernCanBeSatisfied(
             const WriteConcernOptions& writeConcern) const {
         return _impl.checkIfWriteConcernCanBeSatisfied(writeConcern);

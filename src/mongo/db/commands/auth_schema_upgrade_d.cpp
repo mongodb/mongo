@@ -46,33 +46,17 @@ namespace {
 
     Status checkReplicaMemberVersions() {
 
-        if (repl::getGlobalReplicationCoordinator()->getReplicationMode() !=
-                repl::ReplicationCoordinator::modeReplSet)
+        repl::ReplicationCoordinator* replCoord = repl::getGlobalReplicationCoordinator();
+        if (replCoord->getReplicationMode() != repl::ReplicationCoordinator::modeReplSet)
             return Status::OK();
 
         std::list<repl::Target> rsMembers;
-        try {
-            const unsigned rsSelfId = repl::theReplSet->selfId();
-            const std::vector<repl::ReplSetConfig::MemberCfg>& rsMemberConfigs =
-                repl::theReplSet->config().members;
-            for (size_t i = 0; i < rsMemberConfigs.size(); ++i) {
-                const unsigned otherId = rsMemberConfigs[i]._id;
-                if (rsSelfId == otherId)
-                    continue;
-                const repl::Member* other = repl::theReplSet->findById(otherId);
-                if (!other) {
-                    log() << "During authSchemaUpgrade, no information about replica set member "
-                        "with id " << otherId << "; ignoring.";
-                    continue;
-                }
-                if (!other->hbinfo().maybeUp()) {
-                    log() << "During authSchemaUpgrade, replica set member " << other->h() <<
-                        " is down; ignoring.";
-                    continue;
-                }
-                rsMembers.push_back(repl::Target(other->fullName()));
-            }
+        std::vector<HostAndPort> rsMemberHosts = replCoord->getOtherNodesInReplSet();
+        for (size_t i = 0; i < rsMemberHosts.size(); ++i) {
+            rsMembers.push_back(repl::Target(rsMemberHosts[i].toString()));
+        }
 
+        try {
             multiCommand(BSON("buildInfo" << 1), rsMembers);
         }
         catch (const DBException& ex) {

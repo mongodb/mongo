@@ -970,6 +970,24 @@ namespace {
         return hosts;
     }
 
+    vector<HostAndPort> LegacyReplicationCoordinator::getOtherNodesInReplSet() const {
+        std::vector<HostAndPort> rsMembers;
+        const unsigned rsSelfId = theReplSet->selfId();
+        const std::vector<repl::ReplSetConfig::MemberCfg>& rsMemberConfigs =
+            repl::theReplSet->config().members;
+        for (size_t i = 0; i < rsMemberConfigs.size(); ++i) {
+            const unsigned otherId = rsMemberConfigs[i]._id;
+            if (rsSelfId == otherId)
+                continue;
+            const repl::Member* other = repl::theReplSet->findById(otherId);
+            if (!other) {
+                continue;
+            }
+            rsMembers.push_back(other->h());
+        }
+        return rsMembers;
+    }
+
     Status LegacyReplicationCoordinator::checkIfWriteConcernCanBeSatisfied(
             const WriteConcernOptions& writeConcern) const {
         // TODO: rewrite this method with the correct version. Note that this just a

@@ -241,6 +241,10 @@ namespace repl {
         return std::vector<HostAndPort>();
     }
 
+    vector<HostAndPort> ReplicationCoordinatorMock::getOtherNodesInReplSet() const {
+        return std::vector<HostAndPort>();
+    }
+
     Status ReplicationCoordinatorMock::checkIfWriteConcernCanBeSatisfied(
             const WriteConcernOptions& writeConcern) const {
         return Status::OK();

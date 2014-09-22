@@ -1327,6 +1327,35 @@ namespace {
         ASSERT_EQUALS(clientHost, caughtUpHosts[0]);
     }
 
+    TEST_F(ReplCoordTest, GetOtherNodesInReplSetNoConfig) {
+        start();
+        ASSERT_EQUALS(0U, getReplCoord()->getOtherNodesInReplSet().size());
+    }
+
+    TEST_F(ReplCoordTest, GetOtherNodesInRepl) {
+        assertStartSuccess(
+                BSON("_id" << "mySet" <<
+                     "version" << 2 <<
+                     "members" << BSON_ARRAY(BSON("_id" << 0 << "host" << "h1") <<
+                                             BSON("_id" << 1 << "host" << "h2") <<
+                                             BSON("_id" << 2 <<
+                                                  "host" << "h3" <<
+                                                  "priority" << 0 <<
+                                                  "hidden" << true))),
+                HostAndPort("h1"));
+
+        std::vector<HostAndPort> otherNodes = getReplCoord()->getOtherNodesInReplSet();
+        ASSERT_EQUALS(2U, otherNodes.size());
+        if (otherNodes[0] == HostAndPort("h2")) {
+            ASSERT_EQUALS(HostAndPort("h3"), otherNodes[1]);
+        }
+        else {
+            ASSERT_EQUALS(HostAndPort("h3"), otherNodes[0]);
+            ASSERT_EQUALS(HostAndPort("h2"), otherNodes[0]);
+        }
+    }
+
+
     // TODO(schwerin): Unit test election id updating
 
 }  // namespace

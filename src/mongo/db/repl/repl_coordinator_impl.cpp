@@ -1403,6 +1403,21 @@ namespace {
         return hosts;
     }
 
+    std::vector<HostAndPort> ReplicationCoordinatorImpl::getOtherNodesInReplSet() const {
+        boost::lock_guard<boost::mutex> lk(_mutex);
+        invariant(_settings.usingReplSets());
+
+        std::vector<HostAndPort> nodes;
+
+        for (int i = 0; i < _rsConfig.getNumMembers(); ++i) {
+            if (i == _thisMembersConfigIndex)
+                continue;
+
+            nodes.push_back(_rsConfig.getMemberAt(i).getHostAndPort());
+        }
+        return nodes;
+    }
+
     Status ReplicationCoordinatorImpl::checkIfWriteConcernCanBeSatisfied(
             const WriteConcernOptions& writeConcern) const {
         boost::lock_guard<boost::mutex> lock(_mutex);

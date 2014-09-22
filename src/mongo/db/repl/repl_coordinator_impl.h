@@ -193,6 +193,8 @@ namespace repl {
 
         virtual std::vector<HostAndPort> getHostsWrittenTo(const OpTime& op);
 
+        virtual std::vector<HostAndPort> getOtherNodesInReplSet() const;
+
         virtual BSONObj getGetLastErrorDefault();
 
         virtual Status checkReplEnabledForCommand(BSONObjBuilder* result);
