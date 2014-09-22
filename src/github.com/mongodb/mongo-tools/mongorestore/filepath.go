@@ -2,7 +2,7 @@ package mongorestore
 
 import (
 	"fmt"
-	"github.com/shelman/mongo-tools-proto/common/log"
+	"github.com/mongodb/mongo-tools/common/log"
 	"io/ioutil"
 	"os"
 	"path/filepath"

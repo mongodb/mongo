@@ -1,7 +1,7 @@
 package mongorestore
 
 import (
-	"github.com/shelman/mongo-tools-proto/common/testutil"
+	"github.com/mongodb/mongo-tools/common/testutil"
 	. "github.com/smartystreets/goconvey/convey"
 	"testing"
 )

@@ -2,12 +2,12 @@ package main
 
 import (
 	"fmt"
-	"github.com/shelman/mongo-tools-proto/common/db"
-	"github.com/shelman/mongo-tools-proto/common/log"
-	commonopts "github.com/shelman/mongo-tools-proto/common/options"
-	"github.com/shelman/mongo-tools-proto/common/util"
-	"github.com/shelman/mongo-tools-proto/mongorestore"
-	"github.com/shelman/mongo-tools-proto/mongorestore/options"
+	"github.com/mongodb/mongo-tools/common/db"
+	"github.com/mongodb/mongo-tools/common/log"
+	commonopts "github.com/mongodb/mongo-tools/common/options"
+	"github.com/mongodb/mongo-tools/common/util"
+	"github.com/mongodb/mongo-tools/mongorestore"
+	"github.com/mongodb/mongo-tools/mongorestore/options"
 	"os"
 )
 

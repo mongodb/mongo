@@ -2,9 +2,9 @@ package mongorestore
 
 import (
 	"bytes"
-	"github.com/shelman/mongo-tools-proto/common/log"
-	"github.com/shelman/mongo-tools-proto/common/options"
-	"github.com/shelman/mongo-tools-proto/common/testutil"
+	"github.com/mongodb/mongo-tools/common/log"
+	"github.com/mongodb/mongo-tools/common/options"
+	"github.com/mongodb/mongo-tools/common/testutil"
 	. "github.com/smartystreets/goconvey/convey"
 	"strings"
 	"testing"

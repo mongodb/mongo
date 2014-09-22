@@ -49,3 +49,17 @@ func ToUInt32(number interface{}) (uint32, error) {
 	// no check for "ok" here, since we know it will work
 	return asInterface.(uint32), nil
 }
+
+var intConverter = newNumberConverter(reflect.TypeOf(int(0)))
+
+// ToInt is a function for converting any numeric type
+// into an int. This can easily result in a loss of information
+// due to truncation of floats.
+func ToInt(number interface{}) (int, error) {
+	asInterface, err := intConverter(number)
+	if err != nil {
+		return 0, err
+	}
+	// no check for "ok" here, since we know it will work
+	return asInterface.(int), nil
+}

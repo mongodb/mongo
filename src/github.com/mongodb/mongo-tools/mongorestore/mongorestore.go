@@ -2,10 +2,11 @@ package mongorestore
 
 import (
 	"fmt"
-	"github.com/shelman/mongo-tools-proto/common/db"
-	"github.com/shelman/mongo-tools-proto/common/log"
-	commonopts "github.com/shelman/mongo-tools-proto/common/options"
-	"github.com/shelman/mongo-tools-proto/mongorestore/options"
+	"github.com/mongodb/mongo-tools/common/db"
+	"github.com/mongodb/mongo-tools/common/log"
+	commonopts "github.com/mongodb/mongo-tools/common/options"
+	"github.com/mongodb/mongo-tools/mongorestore/options"
+	"gopkg.in/mgo.v2"
 )
 
 type MongoRestore struct {
@@ -19,6 +20,7 @@ type MongoRestore struct {
 
 	// other internal state
 	manager *IntentManager
+	safety  *mgo.Safe
 }
 
 func (restore *MongoRestore) Restore() error {
@@ -55,9 +57,9 @@ func (restore *MongoRestore) Restore() error {
 	// 2. Restore them...
 	err = restore.RestoreIntents()
 	if err != nil {
-		return fmt.Errorf("restore error: %v")
+		return fmt.Errorf("restore error: %v", err)
 	}
+	log.Log(0, "done")
 
 	return nil
 }
-
