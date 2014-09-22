@@ -330,7 +330,7 @@ __curdump_close(WT_CURSOR *cursor)
 	if (child != NULL)
 		WT_TRET(child->close(child));
 	/* We shared the child's URI. */
-	cursor->uri = NULL;
+	cursor->internal_uri = NULL;
 	__wt_json_close(session, cursor);
 	WT_TRET(__wt_cursor_close(cursor));
 
@@ -374,7 +374,7 @@ __wt_curdump_create(WT_CURSOR *child, WT_CURSOR *owner, WT_CURSOR **cursorp)
 	cursor = &cdump->iface;
 	*cursor = iface;
 	cursor->session = child->session;
-	cursor->uri = child->uri;
+	cursor->internal_uri = child->internal_uri;
 	cursor->key_format = child->key_format;
 	cursor->value_format = child->value_format;
 	cdump->child = child;

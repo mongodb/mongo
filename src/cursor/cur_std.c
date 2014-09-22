@@ -454,6 +454,7 @@ __wt_cursor_close(WT_CURSOR *cursor)
 		WT_STAT_FAST_CONN_ATOMIC_DECR(session, session_cursor_open);
 	}
 
+	__wt_free(session, cursor->internal_uri);
 	__wt_free(session, cursor->uri);
 	__wt_overwrite_and_free(session, cursor);
 	return (ret);
@@ -542,8 +543,8 @@ __wt_cursor_init(WT_CURSOR *cursor,
 
 	session = (WT_SESSION_IMPL *)cursor->session;
 
-	if (cursor->uri == NULL)
-		WT_RET(__wt_strdup(session, uri, &cursor->uri));
+	if (cursor->internal_uri == NULL)
+		WT_RET(__wt_strdup(session, uri, &cursor->internal_uri));
 
 	/* Set runtime-configurable settings. */
 	WT_RET(__cursor_runtime_config(cursor, cfg));
