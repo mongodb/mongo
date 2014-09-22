@@ -1728,19 +1728,28 @@ namespace {
                           "members" << BSON_ARRAY(
                               BSON("_id" << 0 << "host" << "host1:27017" <<
                                    "arbiterOnly" << true) <<
-                              BSON("_id" << 1 << "host" << "host2:27017"))),
+                              BSON("_id" << 1 << "host" << "host2:27017") <<
+                              BSON("_id" << 2 << "host" << "host3:27017"))),
                      0);
 
         OpTime election = OpTime(4,0);
         OpTime lastOpTimeApplied = OpTime(3,0);
 
-        ASSERT_EQUALS(-1, getCurrentPrimaryIndex());
-        HeartbeatResponseAction nextAction = receiveUpHeartbeat(HostAndPort("host2"),
+        HeartbeatResponseAction nextAction = receiveUpHeartbeat(HostAndPort("host3"),
                                                                 "rs0",
-                                                                MemberState::RS_PRIMARY,
+                                                                MemberState::RS_SECONDARY,
                                                                 election,
                                                                 election,
                                                                 lastOpTimeApplied);
+        ASSERT_NO_ACTION(nextAction.getAction());
+        ASSERT_EQUALS(-1, getCurrentPrimaryIndex());
+
+        nextAction = receiveUpHeartbeat(HostAndPort("host2"),
+                                        "rs0",
+                                        MemberState::RS_PRIMARY,
+                                        election,
+                                        election,
+                                        lastOpTimeApplied);
         ASSERT_NO_ACTION(nextAction.getAction());
         ASSERT_EQUALS(1, getCurrentPrimaryIndex());
 
