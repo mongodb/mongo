@@ -1755,10 +1755,42 @@ def doConfigure(myenv):
         context.Result(ret)
         return ret
 
+    # not all C++11-enabled gcc versions have type properties
+    def CheckCXX11IsTriviallyCopyable(context):
+        test_body = """
+        #include <type_traits>
+        int main(int argc, char **argv) {
+            class Trivial {
+                int trivial1;
+                double trivial2;
+                struct {
+                    float trivial3;
+                    short trivial4;
+                } trivial_member;
+            };
+
+            class NotTrivial {
+                int x, y;
+                NotTrivial(const NotTrivial& o) : x(o.y), y(o.x) {}
+            };
+
+            static_assert(std::is_trivially_copyable<Trivial>::value,
+                          "I should be trivially copyable");
+            static_assert(!std::is_trivially_copyable<NotTrivial>::value,
+                          "I should not be trivially copyable");
+            return 0;
+        }
+        """
+        context.Message('Checking for C++11 is_trivially_copyable support... ')
+        ret = context.TryCompile(textwrap.dedent(test_body), '.cpp')
+        context.Result(ret)
+        return ret
+
     conf = Configure(myenv, help=False, custom_tests = {
         'CheckCXX11Atomics': CheckCXX11Atomics,
         'CheckGCCAtomicBuiltins': CheckGCCAtomicBuiltins,
         'CheckGCCSyncBuiltins': CheckGCCSyncBuiltins,
+        'CheckCXX11IsTriviallyCopyable': CheckCXX11IsTriviallyCopyable,
     })
 
     # Figure out what atomics mode to use by way of the tests defined above.
@@ -1788,6 +1820,10 @@ def doConfigure(myenv):
         else:
             if conf.CheckGCCSyncBuiltins():
                 conf.env.Append(CPPDEFINES=["MONGO_HAVE_GCC_SYNC_BUILTINS"])
+
+    if (cxx11_mode == "on") and conf.CheckCXX11IsTriviallyCopyable():
+        conf.env.Append(CPPDEFINES=['MONGO_HAVE_STD_IS_TRIVIALLY_COPYABLE'])
+
     myenv = conf.Finish()
 
     conf = Configure(myenv)
