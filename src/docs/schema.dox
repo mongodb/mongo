@@ -165,7 +165,7 @@ follows:
 @snippet ex_all.c Set the cursor's record number key
 
 A more complex example, setting a composite key for a row-store table where
-the key_format was \c "SiS", would be done as follows:
+the key_format was \c "SiH", would be done as follows:
 
 @snippet ex_all.c Set the cursor's composite key
 
