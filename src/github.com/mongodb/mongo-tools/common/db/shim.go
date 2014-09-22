@@ -4,7 +4,6 @@ import (
 	"errors"
 	"fmt"
 	"github.com/mongodb/mongo-tools/common/json"
-	"gopkg.in/mgo.v2"
 	"gopkg.in/mgo.v2/bson"
 	"io"
 	"os"
@@ -23,6 +22,93 @@ const (
 	Drop
 )
 
+type Shim struct {
+	DBPath   string
+	ShimPath string
+}
+
+func NewShim(dbPath string) (*Shim, error) {
+	shimLoc, err := LocateShim()
+	if err != nil {
+		return nil, err
+	}
+	return &Shim{dbPath, shimLoc}, nil
+}
+
+type ShimDocSource struct {
+	stream      *BSONSource
+	shimProcess StorageShim
+}
+
+func (sds *ShimDocSource) Err() error {
+	return sds.stream.Err()
+}
+
+func (sds *ShimDocSource) LoadNextInto(into []byte) (bool, int32) {
+	return sds.stream.LoadNextInto(into)
+}
+
+func (sds *ShimDocSource) Close() (err error) {
+	defer func() {
+		err2 := sds.shimProcess.WaitResult()
+		if err2 == nil {
+			err = err2
+		}
+	}()
+	err = sds.stream.Close()
+	return
+}
+
+func (shim *Shim) Find(DB, Collection string, Skip, Limit int, Query string) (RawDocSource, error) {
+	queryShim := StorageShim{
+		DBPath:     shim.DBPath,
+		Database:   DB,
+		Collection: Collection,
+		Skip:       Skip,
+		Limit:      Limit,
+		ShimPath:   shim.ShimPath,
+		Query:      Query,
+		Mode:       Dump,
+	}
+	out, _, err := queryShim.Open()
+	if err != nil {
+		return nil, err
+	}
+	return &ShimDocSource{out, queryShim}, nil
+}
+
+func (shim *Shim) Run(command bson.M, out interface{}, database string) error {
+	commandRaw, err := json.Marshal(command)
+	if err != nil {
+		return err
+	}
+	commandShim := StorageShim{
+		DBPath:     shim.DBPath,
+		Database:   "admin",
+		Collection: "$cmd",
+		Skip:       0,
+		Limit:      1,
+		ShimPath:   shim.ShimPath,
+		Query:      string(commandRaw),
+		Mode:       Dump,
+	}
+	bsonSource, _, err := commandShim.Open()
+	if err != nil {
+		return err
+	}
+	decodedResult := NewDecodedBSONSource(bsonSource)
+	hasDoc := decodedResult.Next(out)
+	if !hasDoc {
+		if err := decodedResult.Err(); err != nil {
+			return err
+		} else {
+			return fmt.Errorf("Didn't receive response from shim with command result.")
+		}
+	}
+	defer commandShim.Close()
+	return commandShim.WaitResult()
+}
+
 type StorageShim struct {
 	DBPath      string
 	Database    string
@@ -33,52 +119,7 @@ type StorageShim struct {
 	Query       string
 	Mode        ShimMode
 	shimProcess *exec.Cmd
-}
-
-//BSONSource wraps a stream
-type BSONSource struct {
-	Stream io.ReadCloser
-	err    error
-}
-
-type DecodedBSONSource struct {
-	reusableBuf []byte
-	*BSONSource
-}
-
-func NewBSONSource(in io.ReadCloser) *BSONSource {
-	return &BSONSource{in, nil}
-}
-
-func (bsonSource *BSONSource) Close() error {
-	return bsonSource.Stream.Close()
-}
-
-type DocSink interface {
-	WriteDoc(out interface{}) error
-	Close() error
-}
-
-func NewDecodedBSONSource(str *BSONSource) *DecodedBSONSource {
-	return &DecodedBSONSource{make([]byte, MaxBSONSize), str}
-}
-
-func (decStrm *DecodedBSONSource) Close() error {
-	return decStrm.Stream.Close()
-}
-
-func (decStrm *DecodedBSONSource) Next(into interface{}) bool {
-	hasDoc, docSize := decStrm.LoadNextInto(decStrm.reusableBuf)
-	if !hasDoc {
-		return false
-	}
-	if err := bson.Unmarshal(decStrm.reusableBuf[0:docSize], into); err != nil {
-		decStrm.err = err
-		return false
-	}
-	decStrm.err = nil
-	return true
-
+	stdin       io.WriteCloser
 }
 
 func buildArgs(shim StorageShim) []string {
@@ -111,58 +152,6 @@ func buildArgs(shim StorageShim) []string {
 		returnVal = append(returnVal, "--drop")
 	}
 	return returnVal
-}
-
-type DocSource interface {
-	Next(interface{}) bool
-	Close() error
-	Err() error
-}
-
-type CursorDocSource struct {
-	Iter    *mgo.Iter
-	Session *mgo.Session
-}
-
-type BSONSink struct {
-	writer io.WriteCloser
-}
-
-type EncodedBSONSink struct {
-	BSONIn *BSONSink
-}
-
-func (bs *BSONSink) WriteBytes(buf []byte) (int, error) {
-	return bs.writer.Write(buf)
-}
-
-func (bs *BSONSink) Close() error {
-	return bs.writer.Close()
-}
-
-func (ebs *EncodedBSONSink) Close() error {
-	return ebs.BSONIn.Close()
-}
-
-func (ebs *EncodedBSONSink) WriteDoc(out interface{}) (int, error) {
-	outbuf, err := bson.Marshal(out)
-	if err != nil {
-		return 0, fmt.Errorf("Failed to encode document into BSON: %v", err)
-	}
-	return ebs.BSONIn.WriteBytes(outbuf)
-}
-
-func (cds *CursorDocSource) Next(out interface{}) bool {
-	return cds.Iter.Next(out)
-}
-
-func (cds *CursorDocSource) Close() error {
-	defer cds.Session.Close()
-	return cds.Iter.Close()
-}
-
-func (cds *CursorDocSource) Err() error {
-	return cds.Iter.Err()
 }
 
 func checkExists(path string) (bool, error) {
@@ -243,7 +232,6 @@ func RunShimCommand(command bson.M, out interface{}, dbpath, database string) er
 //bound to its STDOUT stream.
 func (shim *StorageShim) Open() (*BSONSource, *BSONSink, error) {
 	args := buildArgs(*shim)
-	fmt.Println(args)
 	cmd := exec.Command(shim.ShimPath, args...)
 	stdOut, err := cmd.StdoutPipe()
 	if err != nil {
@@ -257,10 +245,11 @@ func (shim *StorageShim) Open() (*BSONSource, *BSONSink, error) {
 		io.Copy(os.Stderr, stdErr)
 	}()
 
-	stdIn, err := cmd.StdinPipe()
+	stdin, err := cmd.StdinPipe()
 	if err != nil {
 		return nil, nil, err
 	}
+	shim.stdin = stdin
 
 	err = cmd.Start()
 	if err != nil {
@@ -268,7 +257,7 @@ func (shim *StorageShim) Open() (*BSONSource, *BSONSink, error) {
 	}
 	shim.shimProcess = cmd
 
-	return &BSONSource{stdOut, nil}, &BSONSink{stdIn}, nil
+	return &BSONSource{stdOut, nil}, &BSONSink{stdin}, nil
 }
 
 func (shim *StorageShim) WaitResult() error {
@@ -282,58 +271,10 @@ func (shim *StorageShim) WaitResult() error {
 
 func (shim *StorageShim) Close() error {
 	if shim.shimProcess != nil && shim.shimProcess.Process != nil {
+		shim.stdin.Close()
 		_, err := shim.shimProcess.Process.Wait()
 		return err
 	} else {
 		return nil
 	}
-}
-
-func (shim *BSONSource) LoadNextInto(into []byte) (bool, int32) {
-	//Read the bson object size (a 4 byte integer)
-	_, err := io.ReadAtLeast(shim.Stream, into[0:4], 4)
-	if err != nil {
-		if err != io.EOF {
-			shim.err = err
-			return false, 0
-		} else {
-			//We hit EOF right away, so we're at the end of the stream.
-			shim.err = nil
-			return false, 0
-		}
-	}
-
-	bsonSize := int32(
-		(uint32(into[0]) << 0) |
-			(uint32(into[1]) << 8) |
-			(uint32(into[2]) << 16) |
-			(uint32(into[3]) << 24),
-	)
-
-	//Verify that the size of the BSON object we are about to read can
-	//actually fit into the buffer that was provided. If not, either the BSON is
-	//invalid, or the buffer passed in is too small.
-	if bsonSize > int32(len(into)) {
-		shim.err = fmt.Errorf("Invalid BSONSize: %v bytes", bsonSize)
-		return false, 0
-	}
-	_, err = io.ReadAtLeast(shim.Stream, into[4:int(bsonSize)], int(bsonSize-4))
-	if err != nil {
-		if err != io.EOF {
-			shim.err = err
-			return false, 0
-		} else {
-			//This case means we hit EOF but read a partial document,
-			//so there's a broken doc in the stream. Treat this as error.
-			shim.err = fmt.Errorf("Invalid bson: %v", err)
-			return false, 0
-		}
-	}
-
-	shim.err = nil
-	return true, bsonSize
-}
-
-func (shim *BSONSource) Err() error {
-	return shim.err
 }

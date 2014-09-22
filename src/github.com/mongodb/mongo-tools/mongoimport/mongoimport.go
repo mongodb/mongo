@@ -139,6 +139,7 @@ func (mongoImport *MongoImport) ValidateSettings() error {
 // getInputReader returns an io.Reader corresponding to the input location
 func (mongoImport *MongoImport) getInputReader() (io.ReadCloser, error) {
 	if mongoImport.InputOptions.File != "" {
+		fmt.Println("it's a file")
 		file, err := os.Open(mongoImport.InputOptions.File)
 		if err != nil {
 			return nil, err
@@ -176,17 +177,25 @@ func (mongoImport *MongoImport) ImportDocuments() (int64, error) {
 // importDocuments is a helper to ImportDocuments and does all the ingestion
 // work by taking data from the 'importInput' source and writing it to the
 // appropriate namespace
-func (mongoImport *MongoImport) importDocuments(importInput ImportInput) (int64, error) {
+func (mongoImport *MongoImport) importDocuments(importInput ImportInput) (docsCount int64, err error) {
 	importWriter := mongoImport.getImportWriter()
 	connUrl := mongoImport.ToolOptions.Host
 	if mongoImport.ToolOptions.Port != "" {
 		connUrl = connUrl + ":" + mongoImport.ToolOptions.Port
 	}
 	fmt.Fprintf(os.Stdout, "connected to: %v\n", connUrl)
-	err := importWriter.Open(mongoImport.ToolOptions.Namespace.DB, mongoImport.ToolOptions.Namespace.Collection)
+	err = importWriter.Open(mongoImport.ToolOptions.Namespace.DB, mongoImport.ToolOptions.Namespace.Collection)
 	if err != nil {
-		return 0, err
+		return
 	}
+
+	defer func() {
+		fmt.Println("closing!")
+		err2 := importWriter.Close()
+		if err == nil {
+			err = err2
+		}
+	}()
 
 	// drop the database if necessary
 	if mongoImport.IngestOptions.Drop {
@@ -199,7 +208,6 @@ func (mongoImport *MongoImport) importDocuments(importInput ImportInput) (int64,
 		}
 	}
 
-	docsCount := int64(0)
 	for {
 		document, err := importInput.ImportDocument()
 		if err != nil {

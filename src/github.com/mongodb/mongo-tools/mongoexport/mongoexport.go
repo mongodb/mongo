@@ -87,21 +87,12 @@ func (exp *MongoExport) getOutputWriter() (io.WriteCloser, error) {
 
 func getDocSource(exp MongoExport) (db.DocSource, error) {
 	if exp.ToolOptions.Namespace.DBPath != "" {
-		shimPath, err := db.LocateShim()
+		shimConf, err := db.NewShim(exp.ToolOptions.Namespace.DBPath)
 		if err != nil {
 			return nil, err
 		}
-		bsonTool := db.StorageShim{
-			DBPath:     exp.ToolOptions.Namespace.DBPath,
-			Database:   exp.ToolOptions.Namespace.DB,
-			Collection: exp.ToolOptions.Namespace.Collection,
-			Query:      exp.InputOpts.Query,
-			Skip:       exp.InputOpts.Skip,
-			Limit:      exp.InputOpts.Limit,
-			ShimPath:   shimPath,
-		}
 
-		iter, _, err := bsonTool.Open()
+		iter, err := shimConf.Find(exp.ToolOptions.Namespace.DB, exp.ToolOptions.Namespace.Collection, exp.InputOpts.Skip, exp.InputOpts.Limit, exp.InputOpts.Query)
 		if err != nil {
 			return nil, err
 		}

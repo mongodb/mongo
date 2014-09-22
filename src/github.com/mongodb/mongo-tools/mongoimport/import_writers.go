@@ -1,6 +1,7 @@
 package mongoimport
 
 import (
+	"fmt"
 	"github.com/mongodb/mongo-tools/common/db"
 	"gopkg.in/mgo.v2"
 	"gopkg.in/mgo.v2/bson"
@@ -75,7 +76,7 @@ func (siw *ShimImportWriter) initImportShim() error {
 		Database:   siw.dbName,
 		Collection: siw.collection,
 		ShimPath:   siw.shimPath,
-		Query:      "{}",
+		Query:      "",
 		Mode:       db.Insert,
 	}
 	_, inStream, err := importShim.Open()
@@ -104,8 +105,8 @@ func (siw *ShimImportWriter) Import(doc bson.M) error {
 
 func (siw *ShimImportWriter) Close() error {
 	if siw.importShim != nil {
-		siw.importShim.Close()
-		return siw.importShim.WaitResult()
+		fmt.Println("closing the shim!")
+		return siw.importShim.Close()
 	}
 	return nil
 }

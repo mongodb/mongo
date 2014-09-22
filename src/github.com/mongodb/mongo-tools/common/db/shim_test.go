@@ -105,4 +105,15 @@ func TestShimCommand(t *testing.T) {
 
 	})
 
+	Convey("Test running shim command", t, func() {
+		shim, err := NewShim("/data/db")
+		if err != nil {
+			t.Fatal(err)
+		}
+		out := bson.M{}
+		err = shim.Run(bson.M{"listDatabases": 1}, &out, "admin")
+		So(err, ShouldBeNil)
+		fmt.Println(err, out)
+	})
+
 }
