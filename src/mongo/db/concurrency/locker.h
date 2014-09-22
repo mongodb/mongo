@@ -29,6 +29,7 @@
 #pragma once
 
 #include <climits> // For UINT_MAX
+#include <vector>
 
 #include "mongo/base/disallow_copying.h"
 #include "mongo/bson/bsonobj.h"
@@ -78,14 +79,16 @@ namespace mongo {
                                              unsigned timeoutMs = UINT_MAX) = 0;
 
         /**
-         * It decrements the references on the global lock. One of these calls should follow each
-         * beginTransaction call and it is an error not to do so.
+         * Decrements the reference count on the global lock.  If the reference count on the
+         * global lock hits zero, the transaction is over, and unlockAll unlocks all other locks.
          *
          * @return true if this is the last endTransaction call (i.e., the global lock was
          *          released); false if there are still references on the global lock. This value
          *          should not be relied on and is only used for assertion purposes.
+         *
+         * @return false if the global lock is still held.
          */
-        virtual bool unlockGlobal() = 0;
+        virtual bool unlockAll() = 0;
 
         /**
          * This is only necessary for the MMAP V1 engine and in particular, the fsyncLock command
@@ -147,6 +150,40 @@ namespace mongo {
         virtual newlm::LockMode getLockMode(const newlm::ResourceId& resId) const = 0;
         virtual bool isLockHeldForMode(const newlm::ResourceId& resId,
                                        newlm::LockMode mode) const = 0;
+
+        /**
+         * LockSnapshot captures the state of all resources that are locked, what modes they're
+         * locked in, and how many times they've been locked in that mode.
+         */
+        struct LockSnapshot {
+            // The global lock is handled differently from all other locks.
+            newlm::LockMode globalMode;
+
+            struct OneLock {
+                // What lock resource is held?
+                newlm::ResourceId resourceId;
+
+                // In what mode is it held?
+                newlm::LockMode mode;
+
+                // What's the recursive count of this lock?  Note that we don't store any state
+                // about how we got this lock (eg upgrade), just how many times we've locked it
+                // in this mode.
+                unsigned recursiveCount;
+            };
+
+            // The non-global non-flush locks held, sorted by granularity.  That is, locks[i] is
+            // coarser or as coarse as locks[i + 1].
+            std::vector<OneLock> locks;
+        };
+
+        /**
+         * Retrieve all locks held by this transaction, and what mode they're held in.
+         *
+         * Clobbers anything in 'stateOut'.
+         */
+        virtual void saveLockState(LockSnapshot* stateOut) const = 0;
+        virtual void restoreLockState(const LockSnapshot& stateToRestore) = 0;
 
         //
         // These methods are legacy from LockState and will eventually go away or be converted to

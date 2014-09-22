@@ -211,7 +211,7 @@ namespace {
     void Lock::GlobalWrite::_tempRelease() { 
         invariant(_lockState->isW());
 
-        invariant(_lockState->unlockGlobal());
+        invariant(_lockState->unlockAll());
         recordTime();
     }
     void Lock::GlobalWrite::_relock() { 
@@ -239,7 +239,7 @@ namespace {
         // If the lock state is R, this means downgrade happened and this is only for fsyncLock.
         invariant(_lockState->isW() || _lockState->isR());
 
-        _lockState->unlockGlobal();
+        _lockState->unlockAll();
         recordTime();
     }
 
@@ -257,7 +257,7 @@ namespace {
     }
 
     Lock::GlobalRead::~GlobalRead() {
-        _lockState->unlockGlobal();
+        _lockState->unlockAll();
         recordTime();
     }
 
@@ -294,7 +294,7 @@ namespace {
         _lockState->unlock(_id);
 
         // The last release reports time the lock was held
-        if (_lockState->unlockGlobal()) {
+        if (_lockState->unlockAll()) {
             recordTime();
         }
     }
