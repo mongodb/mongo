@@ -111,7 +111,7 @@ case "${1:-"install"}" in
   "install")
     deps_file="${2:-"Godeps"}"
     [[ -f "$deps_file" ]] || (echo ">> $deps_file file does not exist." && exit 1)
-    (which go > /dev/null) ||
+    (go version > /dev/null) ||
       ( echo ">> Go is currently not installed or in your PATH" && exit 1)
     set_dependencies $deps_file
     ;;
