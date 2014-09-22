@@ -796,10 +796,11 @@ namespace mongo {
         invariant(cc().database());
         invariant(cc().curop());
 
-        // If profiling is enabled or this update has taken longer than slowMs, then get
-        // debug information from the query runner.
+        // If profiling is enabled, this update has taken longer than slowMs, or the logLevel
+        // is at least set to logLevel 1, then get debug information from the query runner.
         if (cc().database()->getProfilingLevel() > 0 ||
-            cc().curop()->elapsedMillis() > serverGlobalParams.slowMS) {
+            cc().curop()->elapsedMillis() > serverGlobalParams.slowMS ||
+            logger::globalLogDomain()->shouldLog(logger::LogSeverity::Debug(1))) {
             TypeExplain* rawExplain;
             Status infoStatus = runner->getInfo(&rawExplain, NULL);
             if (infoStatus.isOK()) {

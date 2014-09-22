@@ -685,14 +685,16 @@ namespace mongo {
 
         // Get explain information if:
         // 1) it is needed by an explain query;
-        // 2) profiling is enabled; or
-        // 3) profiling is disabled but we still need explain details to log a "slow" query.
+        // 2) profiling is enabled;
+        // 3) profiling is disabled but we still need explain details to log a "slow" query; or
+        // 4) the log level is set to at least logLevel 1.
         // Producing explain information is expensive and should be done only if we are certain
         // the information will be used.
         boost::scoped_ptr<TypeExplain> explain(NULL);
         if (isExplain ||
             ctx.ctx().db()->getProfilingLevel() > 0 ||
-            elapsedMillis > serverGlobalParams.slowMS) {
+            elapsedMillis > serverGlobalParams.slowMS ||
+            logger::globalLogDomain()->shouldLog(logger::LogSeverity::Debug(1))) {
             // Ask the runner to produce explain information.
             TypeExplain* bareExplain;
             Status res = runner->getInfo(&bareExplain, NULL);
