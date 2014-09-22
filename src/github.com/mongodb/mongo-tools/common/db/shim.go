@@ -3,6 +3,7 @@ package db
 import (
 	"errors"
 	"fmt"
+	"github.com/mongodb/mongo-tools/common/json"
 	"gopkg.in/mgo.v2"
 	"gopkg.in/mgo.v2/bson"
 	"io"
@@ -19,6 +20,7 @@ type ShimMode int
 const (
 	Dump ShimMode = iota
 	Insert
+	Drop
 )
 
 type StorageShim struct {
@@ -90,14 +92,23 @@ func buildArgs(shim StorageShim) []string {
 	if shim.Collection != "" {
 		returnVal = append(returnVal, "-c", shim.Collection)
 	}
-	if shim.Query != "" {
+	if shim.Limit > 0 {
+		returnVal = append(returnVal, "--limit", fmt.Sprintf("%v", shim.Limit))
+	}
+	if shim.Skip > 0 {
+		returnVal = append(returnVal, "--skip", fmt.Sprintf("%v", shim.Skip))
+	}
+
+	if shim.Mode != Drop && shim.Query != "" {
 		returnVal = append(returnVal, "--query", shim.Query)
 	}
 
-	if shim.Mode == Dump {
-		//Do nothing, since dump is the default behavior
-	} else if shim.Mode == Insert {
+	switch shim.Mode {
+	case Dump:
+	case Insert:
 		returnVal = append(returnVal, "--load")
+	case Drop:
+		returnVal = append(returnVal, "--drop")
 	}
 	return returnVal
 }
@@ -118,7 +129,7 @@ type BSONSink struct {
 }
 
 type EncodedBSONSink struct {
-	bsonOut *BSONSink
+	BSONIn *BSONSink
 }
 
 func (bs *BSONSink) WriteBytes(buf []byte) (int, error) {
@@ -134,7 +145,7 @@ func (ebs *EncodedBSONSink) WriteDoc(out interface{}) (int, error) {
 	if err != nil {
 		return 0, fmt.Errorf("Failed to encode document into BSON: %v", err)
 	}
-	return ebs.bsonOut.WriteBytes(outbuf)
+	return ebs.BSONIn.WriteBytes(outbuf)
 }
 
 func (cds *CursorDocSource) Next(out interface{}) bool {
@@ -189,10 +200,46 @@ func LocateShim() (string, error) {
 	return shimLoc, nil
 }
 
+func RunShimCommand(command bson.M, out interface{}, dbpath, database string) error {
+	shimLoc, err := LocateShim()
+	if err != nil {
+		return err
+	}
+	commandRaw, err := json.Marshal(command)
+	if err != nil {
+		return err
+	}
+	commandShim := StorageShim{
+		DBPath:     dbpath,
+		Database:   "admin",
+		Collection: "$cmd",
+		Skip:       0,
+		Limit:      1,
+		ShimPath:   shimLoc,
+		Query:      string(commandRaw),
+		Mode:       Dump,
+	}
+	bsonSource, _, err := commandShim.Open()
+	if err != nil {
+		return err
+	}
+	decodedResult := NewDecodedBSONSource(bsonSource)
+	hasDoc := decodedResult.Next(out)
+	if !hasDoc {
+		if err := decodedResult.Err(); err != nil {
+			return err
+		} else {
+			return fmt.Errorf("Didn't receive response from shim with command result.")
+		}
+	}
+	return commandShim.Close()
+}
+
 //Open() starts the external shim process and returns an instance of BSONSource
 //bound to its STDOUT stream.
 func (shim *StorageShim) Open() (*BSONSource, *BSONSink, error) {
 	args := buildArgs(*shim)
+	fmt.Println(args)
 	cmd := exec.Command(shim.ShimPath, args...)
 	stdOut, err := cmd.StdoutPipe()
 	if err != nil {
@@ -215,8 +262,27 @@ func (shim *StorageShim) Open() (*BSONSource, *BSONSink, error) {
 	if err != nil {
 		return nil, nil, err
 	}
+	shim.shimProcess = cmd
 
 	return &BSONSource{stdOut, nil}, &BSONSink{stdIn}, nil
+}
+
+func (shim *StorageShim) WaitResult() error {
+	if shim.shimProcess != nil {
+		err := shim.shimProcess.Wait()
+		return err
+	} else {
+		return nil
+	}
+}
+
+func (shim *StorageShim) Close() error {
+	if shim.shimProcess != nil && shim.shimProcess.Process != nil {
+		_, err := shim.shimProcess.Process.Wait()
+		return err
+	} else {
+		return nil
+	}
 }
 
 func (shim *BSONSource) LoadNextInto(into []byte) (bool, int32) {

@@ -1,6 +1,7 @@
 package db
 
 import (
+	"fmt"
 	. "github.com/smartystreets/goconvey/convey"
 	"gopkg.in/mgo.v2/bson"
 	"testing"
@@ -93,4 +94,15 @@ func TestShimRead(t *testing.T) {
 			So(n, ShouldBeGreaterThan, 0)
 		})
 	})
+}
+
+func TestShimCommand(t *testing.T) {
+
+	Convey("Test shim process in read mode", t, func() {
+		out := bson.M{}
+		err := RunShimCommand(bson.M{"listDatabases": 1}, &out, "/data/db", "admin")
+		fmt.Println(err, out)
+
+	})
+
 }

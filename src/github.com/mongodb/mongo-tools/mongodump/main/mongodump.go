@@ -41,7 +41,7 @@ func main() {
 	log.InitToolLogger(opts.Verbosity)
 
 	// create a session provider to connect to the db
-	sessionProvider, err := db.InitSessionProvider(opts)
+	sessionProvider, err := db.InitSessionProvider(*opts)
 	if err != nil {
 		fmt.Printf("error initializing database session: %v\n", err)
 		os.Exit(1) //TODO copy legacy exit code

@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/mongodb/mongo-tools/common/json"
+	"github.com/mongodb/mongo-tools/common/util"
 	"gopkg.in/mgo.v2/bson"
 	"strconv"
 	"time"
@@ -115,6 +116,36 @@ func ParseSpecialKeys(doc map[string]interface{}) (interface{}, error) {
 			}
 		}
 
+		if jsonValue, ok := doc["$timestamp"]; ok {
+			ts := json.Timestamp{}
+
+			tsDoc, ok := jsonValue.(map[string]interface{})
+			if !ok {
+				return nil, errors.New("expected $timestamp key to have internal document")
+			}
+
+			if seconds, ok := tsDoc["t"]; ok {
+				if asUint32, err := util.ToUInt32(seconds); err == nil {
+					ts.Seconds = asUint32
+				} else {
+					return nil, errors.New("expected $timestamp 't' field to be a numeric type")
+				}
+			} else {
+				return nil, errors.New("expected $timestamp to have 't' field")
+			}
+			if inc, ok := tsDoc["i"]; ok {
+				if asUint32, err := util.ToUInt32(inc); err == nil {
+					ts.Increment = asUint32
+				} else {
+					return nil, errors.New("expected $timestamp 'i' field to be  a numeric type")
+				}
+			} else {
+				return nil, errors.New("expected $timestamp to have 'i' field")
+			}
+			// see BSON spec for details on the bit fiddling here
+			return bson.MongoTimestamp(int64(ts.Seconds)<<32 | int64(ts.Increment)), nil
+		}
+
 		if _, ok := doc["$undefined"]; ok {
 			return bson.Undefined, nil
 		}
@@ -195,6 +226,7 @@ func ParseSpecialKeys(doc map[string]interface{}) (interface{}, error) {
 			}
 			return binary, nil
 		}
+
 	}
 
 	// Did not match any special ('$') keys, so convert all sub-values.

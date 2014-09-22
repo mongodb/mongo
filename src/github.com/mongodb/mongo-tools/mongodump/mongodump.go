@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"fmt"
 	"github.com/mongodb/mongo-tools/common/auth"
+	"github.com/mongodb/mongo-tools/common/bsonutil"
 	"github.com/mongodb/mongo-tools/common/db"
 	"github.com/mongodb/mongo-tools/common/json"
 	"github.com/mongodb/mongo-tools/common/log"
@@ -64,13 +65,22 @@ func (dump *MongoDump) Dump() error {
 	}
 
 	if dump.InputOptions.Query != "" {
-		// TODO, check for extended json support...
-		// gonna need to do some exploring later on, since im 95% sure
-		// this is undefined in the current tools
-		err = json.Unmarshal([]byte(dump.InputOptions.Query), &dump.query)
+		// parse JSON then convert extended JSON values
+		var asJSON interface{}
+		err = json.Unmarshal([]byte(dump.InputOptions.Query), &asJSON)
 		if err != nil {
-			return fmt.Errorf("error parsing query: %v", err)
+			return fmt.Errorf("error parsing query as json: %v", err)
 		}
+		convertedJSON, err := bsonutil.ConvertJSONValueToBSON(asJSON)
+		if err != nil {
+			return fmt.Errorf("error converting query to bson: %v", err)
+		}
+		asMap, ok := convertedJSON.(map[string]interface{})
+		if !ok {
+			// unlikely to be reached, TODO: think about what could make this happen
+			return fmt.Errorf("query is not in proper format")
+		}
+		dump.query = bson.M(asMap)
 	}
 
 	if dump.OutputOptions.Out == "-" {
@@ -78,8 +88,12 @@ func (dump *MongoDump) Dump() error {
 	}
 
 	if dump.OutputOptions.DumpDBUsersAndRoles {
+		session, err := dump.SessionProvider.GetSession()
+		if err != nil {
+			return fmt.Errorf("error establishing database connection: %v", err)
+		}
 		//first make sure this is possible with the connected database
-		dump.authVersion, err = auth.GetAuthVersion(dump.SessionProvider.GetSession())
+		dump.authVersion, err = auth.GetAuthVersion(session)
 		if err != nil {
 			return fmt.Errorf("error getting auth schema version for dumpDbUsersAndRoles: %v", err)
 		}
@@ -139,7 +153,10 @@ func (dump *MongoDump) DumpEverything() error {
 	}
 
 	// Iterate over all database names, dumping them
-	session := dump.SessionProvider.GetSession()
+	session, err := dump.SessionProvider.GetSession()
+	if err != nil {
+		return fmt.Errorf("error establishing database connection: %v", err)
+	}
 	dbs, err := session.DatabaseNames()
 	if err != nil {
 		return fmt.Errorf("error getting database names: %v", err)
@@ -210,7 +227,10 @@ func (dump *MongoDump) DumpEverything() error {
 
 // DumpDatabase dumps the specified database
 func (dump *MongoDump) DumpDatabase(db string) error {
-	session := dump.SessionProvider.GetSession()
+	session, err := dump.SessionProvider.GetSession()
+	if err != nil {
+		return fmt.Errorf("error establishing database connection: %v", err)
+	}
 
 	cols, err := session.DB(db).CollectionNames()
 	if err != nil {
@@ -228,7 +248,10 @@ func (dump *MongoDump) DumpDatabase(db string) error {
 
 // DumpCollection dumps the specified database's collection
 func (dump *MongoDump) DumpCollection(db, c string) error {
-	session := dump.SessionProvider.GetSession()
+	session, err := dump.SessionProvider.GetSession()
+	if err != nil {
+		return fmt.Errorf("error establishing database connection: %v", err)
+	}
 	// in mgo, setting prefetch = 1.0 causes the driver to make requests for
 	// more results as soon as results are returned. This effectively
 	// duplicates the behavior of an exhaust cursor.
@@ -352,7 +375,10 @@ func (dump *MongoDump) dumpQueryToWriter(query *mgo.Query, writer io.Writer) err
 // DumpUsersAndRolesForDB queries and dumps the users and roles tied
 // to the given the db. Only works with schema version == 3
 func (dump *MongoDump) DumpUsersAndRolesForDB(db string) error {
-	session := dump.SessionProvider.GetSession()
+	session, err := dump.SessionProvider.GetSession()
+	if err != nil {
+		return fmt.Errorf("error establishing database connection: %v", err)
+	}
 	dbQuery := bson.M{"db": db}
 	outDir := filepath.Join(dump.OutputOptions.Out, db)
 
