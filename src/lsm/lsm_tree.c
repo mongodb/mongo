@@ -769,7 +769,7 @@ err:	WT_TRET(__wt_lsm_tree_unlock(session, lsm_tree));
 		WT_PANIC_RET(session, ret, "Failed doing LSM switch");
 	else if (!first_switch)
 		WT_RET(__wt_lsm_manager_push_entry(
-		    session, WT_LSM_WORK_FLUSH, lsm_tree));
+		    session, WT_LSM_WORK_FLUSH, 0, lsm_tree));
 	return (ret);
 }
 
@@ -1086,7 +1086,7 @@ __wt_lsm_compact(WT_SESSION_IMPL *session, const char *name, int *skip)
 		 * chunk if the tree is being used read-only now.
 		 */
 		WT_ERR(__wt_lsm_manager_push_entry(session,
-		    WT_LSM_WORK_FLUSH | WT_LSM_WORK_FORCE, lsm_tree));
+		    WT_LSM_WORK_FLUSH, WT_LSM_WORK_FORCE, lsm_tree));
 	} else {
 		/*
 		 * If there is no chunk to flush, go straight to the
@@ -1094,6 +1094,8 @@ __wt_lsm_compact(WT_SESSION_IMPL *session, const char *name, int *skip)
 		 */
 		compacting = 1;
 		F_SET(lsm_tree, WT_LSM_TREE_COMPACTING);
+		WT_ERR(__wt_verbose(session, WT_VERB_LSM,
+		    "COMPACT: Start compacting %s", lsm_tree->name));
 	}
 
 	/* Wait for the work unit queues to drain. */
@@ -1108,7 +1110,8 @@ __wt_lsm_compact(WT_SESSION_IMPL *session, const char *name, int *skip)
 			if (F_ISSET(chunk, WT_LSM_CHUNK_ONDISK)) {
 				WT_ERR(__wt_verbose(session,
 				    WT_VERB_LSM,
-				    "Compact flush done %s chunk %u",
+				    "Compact flush done %s chunk %u.  "
+				    "Start compacting",
 				    name, chunk->id));
 				(void)WT_ATOMIC_SUB(chunk->refcnt, 1);
 				flushing = ref = 0;
@@ -1119,7 +1122,7 @@ __wt_lsm_compact(WT_SESSION_IMPL *session, const char *name, int *skip)
 				    "Compact flush retry %s chunk %u",
 				    name, chunk->id));
 				WT_ERR(__wt_lsm_manager_push_entry(session,
-				    WT_LSM_WORK_FLUSH | WT_LSM_WORK_FORCE,
+				    WT_LSM_WORK_FLUSH, WT_LSM_WORK_FORCE,
 				    lsm_tree));
 			}
 		}
@@ -1154,7 +1157,7 @@ __wt_lsm_compact(WT_SESSION_IMPL *session, const char *name, int *skip)
 			    i < COMPACT_PARALLEL_MERGES; i++) {
 				lsm_tree->merge_aggressiveness = 10;
 				WT_ERR(__wt_lsm_manager_push_entry(
-				    session, WT_LSM_WORK_MERGE, lsm_tree));
+				    session, WT_LSM_WORK_MERGE, 0, lsm_tree));
 			}
 	}
 err:

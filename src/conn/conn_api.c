@@ -178,8 +178,8 @@ __conn_load_extension(
 	WT_DLH *dlh;
 	WT_SESSION_IMPL *session;
 	int (*load)(WT_CONNECTION *, WT_CONFIG_ARG *);
-	const char *init_name, *terminate_name;
 	int is_local;
+	const char *init_name, *terminate_name;
 
 	dlh = NULL;
 	init_name = terminate_name = NULL;
@@ -233,8 +233,8 @@ err:	if (dlh != NULL)
 static int
 __conn_load_extensions(WT_SESSION_IMPL *session, const char *cfg[])
 {
-	WT_CONFIG_ITEM cval, skey, sval;
 	WT_CONFIG subconfig;
+	WT_CONFIG_ITEM cval, skey, sval;
 	WT_CONNECTION_IMPL *conn;
 	WT_DECL_ITEM(exconfig);
 	WT_DECL_ITEM(expath);
@@ -310,22 +310,25 @@ err:	if (ncoll != NULL) {
  * internally.
  */
 int
-__wt_conn_remove_collator(WT_SESSION_IMPL *session, WT_NAMED_COLLATOR *ncoll)
+__wt_conn_remove_collator(WT_SESSION_IMPL *session)
 {
 	WT_CONNECTION_IMPL *conn;
 	WT_DECL_RET;
+	WT_NAMED_COLLATOR *ncoll;
 
 	conn = S2C(session);
 
-	/* Call any termination method. */
-	if (ncoll->collator->terminate != NULL)
-		ret = ncoll->collator->terminate(
-		    ncoll->collator, (WT_SESSION *)session);
+	while ((ncoll = TAILQ_FIRST(&conn->collqh)) != NULL) {
+		/* Call any termination method. */
+		if (ncoll->collator->terminate != NULL)
+			WT_TRET(ncoll->collator->terminate(
+			    ncoll->collator, (WT_SESSION *)session));
 
-	/* Remove from the connection's list, free memory. */
-	TAILQ_REMOVE(&conn->collqh, ncoll, q);
-	__wt_free(session, ncoll->name);
-	__wt_free(session, ncoll);
+		/* Remove from the connection's list, free memory. */
+		TAILQ_REMOVE(&conn->collqh, ncoll, q);
+		__wt_free(session, ncoll->name);
+		__wt_free(session, ncoll);
+	}
 
 	return (ret);
 }
@@ -374,23 +377,25 @@ err:	if (ncomp != NULL) {
  * internally.
  */
 int
-__wt_conn_remove_compressor(
-    WT_SESSION_IMPL *session, WT_NAMED_COMPRESSOR *ncomp)
+__wt_conn_remove_compressor(WT_SESSION_IMPL *session)
 {
 	WT_CONNECTION_IMPL *conn;
 	WT_DECL_RET;
+	WT_NAMED_COMPRESSOR *ncomp;
 
 	conn = S2C(session);
 
-	/* Call any termination method. */
-	if (ncomp->compressor->terminate != NULL)
-		ret = ncomp->compressor->terminate(
-		    ncomp->compressor, (WT_SESSION *)session);
+	while ((ncomp = TAILQ_FIRST(&conn->compqh)) != NULL) {
+		/* Call any termination method. */
+		if (ncomp->compressor->terminate != NULL)
+			WT_TRET(ncomp->compressor->terminate(
+			    ncomp->compressor, (WT_SESSION *)session));
 
-	/* Remove from the connection's list, free memory. */
-	TAILQ_REMOVE(&conn->compqh, ncomp, q);
-	__wt_free(session, ncomp->name);
-	__wt_free(session, ncomp);
+		/* Remove from the connection's list, free memory. */
+		TAILQ_REMOVE(&conn->compqh, ncomp, q);
+		__wt_free(session, ncomp->name);
+		__wt_free(session, ncomp);
+	}
 
 	return (ret);
 }
@@ -405,8 +410,8 @@ __conn_add_data_source(WT_CONNECTION *wt_conn,
 {
 	WT_CONNECTION_IMPL *conn;
 	WT_DECL_RET;
-	WT_SESSION_IMPL *session;
 	WT_NAMED_DATA_SOURCE *ndsrc;
+	WT_SESSION_IMPL *session;
 
 	ndsrc = NULL;
 
@@ -437,23 +442,25 @@ err:	if (ndsrc != NULL) {
  *	Remove data source added by WT_CONNECTION->add_data_source.
  */
 int
-__wt_conn_remove_data_source(
-    WT_SESSION_IMPL *session, WT_NAMED_DATA_SOURCE *ndsrc)
+__wt_conn_remove_data_source(WT_SESSION_IMPL *session)
 {
-	WT_DECL_RET;
 	WT_CONNECTION_IMPL *conn;
+	WT_DECL_RET;
+	WT_NAMED_DATA_SOURCE *ndsrc;
 
 	conn = S2C(session);
 
-	/* Call any termination method. */
-	if (ndsrc->dsrc->terminate != NULL)
-		ret =
-		    ndsrc->dsrc->terminate(ndsrc->dsrc, (WT_SESSION *)session);
+	while ((ndsrc = TAILQ_FIRST(&conn->dsrcqh)) != NULL) {
+		/* Call any termination method. */
+		if (ndsrc->dsrc->terminate != NULL)
+			WT_TRET(ndsrc->dsrc->terminate(
+			    ndsrc->dsrc, (WT_SESSION *)session));
 
-	/* Remove from the connection's list, free memory. */
-	TAILQ_REMOVE(&conn->dsrcqh, ndsrc, q);
-	__wt_free(session, ndsrc->prefix);
-	__wt_free(session, ndsrc);
+		/* Remove from the connection's list, free memory. */
+		TAILQ_REMOVE(&conn->dsrcqh, ndsrc, q);
+		__wt_free(session, ndsrc->prefix);
+		__wt_free(session, ndsrc);
+	}
 
 	return (ret);
 }

@@ -207,6 +207,10 @@ struct __wt_connection_stats {
 	WT_STATS lsm_checkpoint_throttle;
 	WT_STATS lsm_merge_throttle;
 	WT_STATS lsm_rows_merged;
+	WT_STATS lsm_work_queue_app;
+	WT_STATS lsm_work_queue_manager;
+	WT_STATS lsm_work_queue_max;
+	WT_STATS lsm_work_queue_switch;
 	WT_STATS lsm_work_units_created;
 	WT_STATS lsm_work_units_discarded;
 	WT_STATS lsm_work_units_done;
