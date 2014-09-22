@@ -91,9 +91,7 @@ public:
                                                            0,
                                                            QueryOption_NoCursorTimeout);
 
-            long long num = 0;
             while ( cursor->more() ) {
-                num++;
                 BSONObj obj = cursor->next();
                 out->write( obj.objdata(), obj.objsize() );
             }

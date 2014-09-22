@@ -59,7 +59,7 @@ namespace mongo {
         }
 
         options->addOptionChaining("load", "load", moe::Switch,
-                                   "loat data" );
+                                   "load data" );
 
         options->addOptionChaining("drop", "drop", moe::Switch,
                                    "drop collection before import" );
@@ -93,7 +93,7 @@ namespace mongo {
     }
 
     void printMongoShimHelp(std::ostream* out) {
-        *out << "Shim MongoDB data to CSV, TSV or JSON files.\n" << std::endl;
+        *out << "Read/write directly to stored format.\n" << std::endl;
         *out << moe::startupOptions.helpString();
         *out << std::flush;
     }
