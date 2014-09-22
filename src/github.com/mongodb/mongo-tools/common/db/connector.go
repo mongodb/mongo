@@ -1,7 +1,6 @@
 package db
 
 import (
-	"fmt"
 	"github.com/mongodb/mongo-tools/common/options"
 	"github.com/mongodb/mongo-tools/common/util"
 	"gopkg.in/mgo.v2"
