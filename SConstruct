@@ -668,11 +668,9 @@ extraLibPlaces = []
 
 env['EXTRACPPPATH'] = []
 env['EXTRALIBPATH'] = []
-env['EXTRABINPATH'] = []
 
 def addExtraLibs( s ):
     for x in s.split(","):
-        env.Append( EXTRABINPATH=[ x + "/bin" ] )
         env.Append( EXTRACPPPATH=[ x + "/include" ] )
         env.Append( EXTRALIBPATH=[ x + "/lib" ] )
         env.Append( EXTRALIBPATH=[ x + "/lib64" ] )

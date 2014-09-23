@@ -170,8 +170,7 @@ def get_preferred_filename(input_filename, transformations):
     returns the substituted string
     '''
     for match, replace in transformations:
-        input_filename_lower = input_filename.lower()
-        if input_filename_lower.startswith(match):
+        if input_filename.startswith(match):
             return replace + input_filename[len(match):]
     return input_filename
 
