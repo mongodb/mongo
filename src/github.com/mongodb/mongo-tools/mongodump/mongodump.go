@@ -59,11 +59,11 @@ func (dump *MongoDump) ValidateOptions() error {
 
 func (dump *MongoDump) Init() error {
 	if dump.ToolOptions.Namespace.DBPath != "" {
-		fmt.Println("doing dbpath init")
-		shim, err := db.NewShim(dump.ToolOptions.Namespace.DBPath)
+		shim, err := db.NewShim(dump.ToolOptions.Namespace.DBPath, dump.ToolOptions.DirectoryPerDB, dump.ToolOptions.Journal)
 		if err != nil {
 			return err
 		}
+		fmt.Printf("%#v", shim)
 		dump.cmdRunner = shim
 		return nil
 	}
@@ -126,6 +126,7 @@ func (dump *MongoDump) Dump() error {
 	case dump.ToolOptions.DB != "" && dump.ToolOptions.Collection != "":
 		err = dump.DumpCollection(dump.ToolOptions.DB, dump.ToolOptions.Collection)
 	}
+	fmt.Println(err)
 
 	if dump.OutputOptions.DumpDBUsersAndRoles {
 		log.Logf(0, "dumping users and roles for %v", dump.ToolOptions.DB)
@@ -149,6 +150,7 @@ func (dump *MongoDump) Dump() error {
 func (dump *MongoDump) DumpEverything() error {
 	var oplogStart bson.MongoTimestamp
 
+	fmt.Println("dumping everything")
 	// If oplog capturing is enabled, we first check the most recent
 	// oplog entry and save its timestamp, this will let us later
 	// copy all oplog entries that occurred while dumping, creating
@@ -169,6 +171,7 @@ func (dump *MongoDump) DumpEverything() error {
 	if err != nil {
 		return fmt.Errorf("error getting database names: %v", err)
 	}
+	fmt.Println("dbs is ", dbs)
 	for _, dbName := range dbs {
 		if dbName != "local" { // local can only be explicitly dumped
 			log.Logf(0, "dumping database %v", dbName)
@@ -205,7 +208,7 @@ func (dump *MongoDump) DumpEverything() error {
 		log.Logf(0, "writing captured oplog to %v", oplogFilepath)
 		//session.SetPrefetch(1.0) //mimic exhaust cursor
 		queryObj := bson.M{"ts": bson.M{"$gt": oplogStart}}
-		oplogQuery, err := dump.cmdRunner.FindDocs("local", dump.oplogCollection, 0, 0, queryObj, nil)
+		oplogQuery, err := dump.cmdRunner.FindDocs("local", dump.oplogCollection, 0, 0, queryObj, nil, db.Prefetch)
 		if err != nil {
 			return err
 		}
@@ -260,14 +263,12 @@ func (dump *MongoDump) DumpCollection(dbName, c string) error {
 	var err error
 	switch {
 	case len(dump.query) > 0:
-		findQuery, err = dump.cmdRunner.FindDocs(dbName, c, 0, 0, dump.query, nil)
+		findQuery, err = dump.cmdRunner.FindDocs(dbName, c, 0, 0, dump.query, nil, db.Prefetch)
 	case dump.InputOptions.TableScan:
 		// ---forceTablesScan runs the query without snapshot enabled
-		//TODO reenable this
-		findQuery, err = dump.cmdRunner.FindDocs(dbName, c, 0, 0, nil, nil)
+		findQuery, err = dump.cmdRunner.FindDocs(dbName, c, 0, 0, nil, nil, db.Prefetch)
 	default:
-		//TODO this should use snapshot
-		findQuery, err = dump.cmdRunner.FindDocs(dbName, c, 0, 0, nil, nil)
+		findQuery, err = dump.cmdRunner.FindDocs(dbName, c, 0, 0, nil, nil, db.Prefetch&db.Snapshot)
 	}
 	if err != nil {
 		return err
@@ -392,7 +393,7 @@ func (dump *MongoDump) DumpUsersAndRolesForDB(db string) error {
 		return fmt.Errorf("error creating file for db users: %v", err)
 	}
 
-	usersQuery, err := dump.cmdRunner.FindDocs("admin", "system.users", 0, 0, dbQuery, nil)
+	usersQuery, err := dump.cmdRunner.FindDocs("admin", "system.users", 0, 0, dbQuery, nil, 0)
 	if err != nil {
 		return err
 	}
@@ -406,7 +407,7 @@ func (dump *MongoDump) DumpUsersAndRolesForDB(db string) error {
 		return fmt.Errorf("error creating file for db roles: %v", err)
 	}
 
-	rolesQuery, err := dump.cmdRunner.FindDocs("admin", "system.roles", 0, 0, dbQuery, nil)
+	rolesQuery, err := dump.cmdRunner.FindDocs("admin", "system.roles", 0, 0, dbQuery, nil, 0)
 	if err != nil {
 		return err
 	}

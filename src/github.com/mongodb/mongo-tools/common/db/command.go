@@ -1,10 +1,18 @@
 package db
 
+import "gopkg.in/mgo.v2"
+
+const (
+	Snapshot = 1 << iota
+	LogReplay
+	Prefetch
+)
+
 type CommandRunner interface {
 	Run(command interface{}, out interface{}, database string) error
 	//Find(DB, Collection string, Skip, Limit int, Query interface{}, Sort interface{}) (RawDocSource, error)
-	FindDocs(DB, Collection string, Skip, Limit int, Query interface{}, Sort []string) (DocSource, error)
-	FindOne(DB, Collection string, Skip int, Query interface{}, Sort []string, into interface{}) error
+	FindDocs(DB, Collection string, Skip, Limit int, Query interface{}, Sort []string, opts int) (DocSource, error)
+	FindOne(DB, Collection string, Skip int, Query interface{}, Sort []string, into interface{}, opts int) error
 	DatabaseNames() ([]string, error)
 	CollectionNames(dbName string) ([]string, error)
 }
@@ -36,23 +44,37 @@ func (sp *SessionProvider) CollectionNames(dbName string) ([]string, error) {
 	return session.DB(dbName).CollectionNames()
 }
 
-func (sp *SessionProvider) FindDocs(DB, Collection string, Skip, Limit int, Query interface{}, Sort []string) (DocSource, error) {
+func (sp *SessionProvider) FindDocs(DB, Collection string, Skip, Limit int, Query interface{}, Sort []string, flags int) (DocSource, error) {
 	session, err := sp.GetSession()
 	if err != nil {
 		return nil, err
 	}
-	//TODO sort!!!!
 	q := session.DB(DB).C(Collection).Find(Query).Sort(Sort...).Skip(Skip).Limit(Limit)
+	q = applyFlags(q, session, flags)
 	return &CursorDocSource{q.Iter(), session}, nil
 }
 
-func (sp *SessionProvider) FindOne(DB, Collection string, Skip int, Query interface{}, Sort []string, into interface{}) error {
+func (sp *SessionProvider) FindOne(DB, Collection string, Skip int, Query interface{}, Sort []string, into interface{}, flags int) error {
 	session, err := sp.GetSession()
 	if err != nil {
 		return err
 	}
 	defer session.Close()
-	//TODO sort!!!!
-	err = session.DB(DB).C(Collection).Find(Query).Sort(Sort...).Skip(Skip).One(into)
-	return err
+
+	q := session.DB(DB).C(Collection).Find(Query).Sort(Sort...).Skip(Skip)
+	q = applyFlags(q, session, flags)
+	return q.One(into)
+}
+
+func applyFlags(q *mgo.Query, session *mgo.Session, flags int) *mgo.Query {
+	if flags&Snapshot > 0 {
+		q = q.Snapshot()
+	}
+	if flags&LogReplay > 0 {
+		q = q.Snapshot()
+	}
+	if flags&Prefetch > 0 {
+		session.SetPrefetch(1.0)
+	}
+	return q
 }

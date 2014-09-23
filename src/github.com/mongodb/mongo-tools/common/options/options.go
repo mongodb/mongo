@@ -49,7 +49,9 @@ type Namespace struct {
 	Collection string `short:"c" long:"collection" description:"collection to use"`
 
 	// DBPath for direct-storage interface
-	DBPath string `long:"dbpath"`
+	DBPath         string `long:"dbpath"`
+	DirectoryPerDB bool   `long:"directoryperdb" default:"false"`
+	Journal        bool   `long:"journal" default:"false"`
 }
 
 // Struct holding generic options

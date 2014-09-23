@@ -26,16 +26,18 @@ const (
 )
 
 type Shim struct {
-	DBPath   string
-	ShimPath string
+	DBPath         string
+	ShimPath       string
+	Journal        bool
+	DirectoryPerDB bool
 }
 
-func NewShim(dbPath string) (*Shim, error) {
+func NewShim(dbPath string, directoryPerDb, journal bool) (*Shim, error) {
 	shimLoc, err := LocateShim()
 	if err != nil {
 		return nil, err
 	}
-	return &Shim{dbPath, shimLoc}, nil
+	return &Shim{dbPath, shimLoc, journal, directoryPerDb}, nil
 }
 
 type ShimDocSource struct {
@@ -77,15 +79,17 @@ func (shim *Shim) Find(DB, Collection string, Skip, Limit int, Query interface{}
 	}
 
 	queryShim := StorageShim{
-		DBPath:     shim.DBPath,
-		Database:   DB,
-		Collection: Collection,
-		Skip:       Skip,
-		Limit:      Limit,
-		ShimPath:   shim.ShimPath,
-		Query:      queryStr,
-		Sort:       Sort,
-		Mode:       Dump,
+		DBPath:         shim.DBPath,
+		Database:       DB,
+		Collection:     Collection,
+		Skip:           Skip,
+		Limit:          Limit,
+		ShimPath:       shim.ShimPath,
+		Query:          queryStr,
+		Sort:           Sort,
+		Mode:           Dump,
+		DirectoryPerDB: shim.DirectoryPerDB,
+		Journal:        shim.Journal,
 	}
 	out, _, err := queryShim.Open()
 	if err != nil {
@@ -94,7 +98,7 @@ func (shim *Shim) Find(DB, Collection string, Skip, Limit int, Query interface{}
 	return &ShimDocSource{out, queryShim}, nil
 }
 
-func (shim *Shim) FindDocs(DB, Collection string, Skip, Limit int, Query interface{}, Sort []string) (DocSource, error) {
+func (shim *Shim) FindDocs(DB, Collection string, Skip, Limit int, Query interface{}, Sort []string, flags int) (DocSource, error) {
 	rds, err := shim.Find(DB, Collection, Skip, Limit, Query, Sort)
 	if err != nil {
 		return nil, err
@@ -102,8 +106,8 @@ func (shim *Shim) FindDocs(DB, Collection string, Skip, Limit int, Query interfa
 	return NewDecodedBSONSource(rds), nil
 }
 
-func (shim *Shim) FindOne(DB, Collection string, Skip int, Query interface{}, Sort []string, out interface{}) error {
-	docSource, err := shim.FindDocs(DB, Collection, Skip, 1, Query, Sort)
+func (shim *Shim) FindOne(DB, Collection string, Skip int, Query interface{}, Sort []string, out interface{}, flags int) error {
+	docSource, err := shim.FindDocs(DB, Collection, Skip, 1, Query, Sort, flags)
 	if err != nil {
 		return err
 	}
@@ -125,7 +129,7 @@ type databaseNames struct {
 func (shim *Shim) CollectionNames(dbName string) (names []string, err error) {
 	//TODO handle diff storage engines?
 	c := len(dbName) + 1
-	iter, err := shim.FindDocs(dbName, "system.namespaces", 0, 0, nil, nil)
+	iter, err := shim.FindDocs(dbName, "system.namespaces", 0, 0, nil, nil, 0)
 	if err != nil {
 		return
 	}
@@ -166,14 +170,16 @@ func (shim *Shim) Run(command interface{}, out interface{}, database string) err
 		return err
 	}
 	commandShim := StorageShim{
-		DBPath:     shim.DBPath,
-		Database:   "admin",
-		Collection: "$cmd",
-		Skip:       0,
-		Limit:      1,
-		ShimPath:   shim.ShimPath,
-		Query:      string(commandRaw),
-		Mode:       Dump,
+		DBPath:         shim.DBPath,
+		Database:       "admin",
+		Collection:     "$cmd",
+		Skip:           0,
+		Limit:          1,
+		ShimPath:       shim.ShimPath,
+		Query:          string(commandRaw),
+		Mode:           Dump,
+		DirectoryPerDB: shim.DirectoryPerDB,
+		Journal:        shim.Journal,
 	}
 	bsonSource, _, err := commandShim.Open()
 	if err != nil {
@@ -193,17 +199,19 @@ func (shim *Shim) Run(command interface{}, out interface{}, database string) err
 }
 
 type StorageShim struct {
-	DBPath      string
-	Database    string
-	Collection  string
-	Skip        int
-	Limit       int
-	ShimPath    string
-	Query       string
-	Sort        []string
-	Mode        ShimMode
-	shimProcess *exec.Cmd
-	stdin       io.WriteCloser
+	DBPath         string
+	Database       string
+	Collection     string
+	Skip           int
+	Limit          int
+	ShimPath       string
+	Query          string
+	Sort           []string
+	DirectoryPerDB bool
+	Journal        bool
+	Mode           ShimMode
+	shimProcess    *exec.Cmd
+	stdin          io.WriteCloser
 }
 
 func makeSort(fields []string) bson.D {
@@ -223,6 +231,12 @@ func buildArgs(shim StorageShim) ([]string, error) {
 	returnVal := []string{}
 	if shim.DBPath != "" {
 		returnVal = append(returnVal, "--dbpath", shim.DBPath)
+	}
+	if shim.Journal {
+		returnVal = append(returnVal, "--journal")
+	}
+	if shim.DirectoryPerDB {
+		returnVal = append(returnVal, "--directoryperdb")
 	}
 	if shim.Database != "" {
 		returnVal = append(returnVal, "-d", shim.Database)
@@ -303,41 +317,6 @@ func LocateShim() (string, error) {
 		return "", ShimNotFoundErr
 	}
 	return shimLoc, nil
-}
-
-func RunShimCommand(command bson.M, out interface{}, dbpath, database string) error {
-	shimLoc, err := LocateShim()
-	if err != nil {
-		return err
-	}
-	commandRaw, err := json.Marshal(command)
-	if err != nil {
-		return err
-	}
-	commandShim := StorageShim{
-		DBPath:     dbpath,
-		Database:   "admin",
-		Collection: "$cmd",
-		Skip:       0,
-		Limit:      1,
-		ShimPath:   shimLoc,
-		Query:      string(commandRaw),
-		Mode:       Dump,
-	}
-	bsonSource, _, err := commandShim.Open()
-	if err != nil {
-		return err
-	}
-	decodedResult := NewDecodedBSONSource(bsonSource)
-	hasDoc := decodedResult.Next(out)
-	if !hasDoc {
-		if err := decodedResult.Err(); err != nil {
-			return err
-		} else {
-			return fmt.Errorf("Didn't receive response from shim with command result.")
-		}
-	}
-	return commandShim.Close()
 }
 
 //Open() starts the external shim process and returns an instance of BSONSource

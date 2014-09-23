@@ -51,7 +51,7 @@ func (dump *MongoDump) determineOplogCollectionName() error {
 func (dump *MongoDump) getOplogStartTime() (bson.MongoTimestamp, error) {
 	mostRecentOplogEntry := Oplog{}
 
-	err := dump.cmdRunner.FindOne("local", dump.oplogCollection, 0, nil, []string{"-$natural"}, &mostRecentOplogEntry)
+	err := dump.cmdRunner.FindOne("local", dump.oplogCollection, 0, nil, []string{"-$natural"}, &mostRecentOplogEntry, 0)
 	if err != nil {
 		//TODO different error depending on not found vs connection issues
 		return 0, err
@@ -65,7 +65,7 @@ func (dump *MongoDump) getOplogStartTime() (bson.MongoTimestamp, error) {
 // captured at the start of the dump.
 func (dump *MongoDump) checkOplogTimestampExists(ts bson.MongoTimestamp) (bool, error) {
 	oldestOplogEntry := Oplog{}
-	err := dump.cmdRunner.FindOne("local", dump.oplogCollection, 0, nil, []string{"+$natural"}, &oldestOplogEntry)
+	err := dump.cmdRunner.FindOne("local", dump.oplogCollection, 0, nil, []string{"+$natural"}, &oldestOplogEntry, 0)
 	if err != nil {
 		return false, fmt.Errorf("unable to read entry from oplog: %v", err)
 	}

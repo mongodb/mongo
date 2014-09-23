@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/mongodb/mongo-tools/common/bsonutil"
+	"github.com/mongodb/mongo-tools/common/db"
 	"github.com/mongodb/mongo-tools/common/log"
 	"gopkg.in/mgo.v2/bson"
 	"io"
@@ -57,7 +58,7 @@ func (dump *MongoDump) dumpMetadataToWriter(dbName, c string, writer io.Writer) 
 	// we copy just the "options" subdocument for the collection.
 	log.Logf(3, "\treading options for `%v`", nsID)
 	namespaceDoc := bson.M{}
-	err := dump.cmdRunner.FindOne(dbName, c, 0, bson.M{"name": nsID}, nil, namespaceDoc)
+	err := dump.cmdRunner.FindOne(dbName, c, 0, bson.M{"name": nsID}, nil, namespaceDoc, 0)
 	if err != nil {
 		return fmt.Errorf("error finding metadata for collection `%v`: %v", nsID, err)
 	}
@@ -71,8 +72,7 @@ func (dump *MongoDump) dumpMetadataToWriter(dbName, c string, writer io.Writer) 
 	// that list as the "indexes" field of the metadata document.
 	log.Logf(3, "\treading indexes for `%v`", nsID)
 
-	//TODO - snapshot (mob)
-	cursor, err := dump.cmdRunner.FindDocs(dbName, "system.indexes", 0, 0, bson.M{"ns": nsID}, nil)
+	cursor, err := dump.cmdRunner.FindDocs(dbName, "system.indexes", 0, 0, bson.M{"ns": nsID}, nil, db.Snapshot)
 	if err != nil {
 		return err
 	}
