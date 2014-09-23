@@ -450,6 +450,7 @@ connection_runtime_config = [
 	        'salvage',
 	        'shared_cache',
 	        'split',
+	        'temporary',
 	        'verify',
 	        'version',
 	        'write']),
