@@ -7,7 +7,7 @@ import (
 	"io"
 )
 
-// ===================== Source ===================== 
+// ===================== Source =====================
 //BSONSource wraps a stream
 type BSONSource struct {
 	Stream io.ReadCloser
@@ -129,8 +129,7 @@ func (shim *BSONSource) Err() error {
 	return shim.err
 }
 
-
-// ===================== Sink ===================== 
+// ===================== Sink =====================
 
 type DocSink interface {
 	WriteDoc(out interface{}) error

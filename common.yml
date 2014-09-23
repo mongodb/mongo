@@ -25,24 +25,25 @@ mongo_tools_variables:
     osx_108_task_list: &osx_108_tasks
       - name: bsonutil
       - name: db
-      - name: dist
+      - name: communityDist
       - name: json
       - name: log
     rhel55_32_task_list: &rhel55_32_tasks
       - name: bsonutil
       - name: db
-      - name: dist
+      - name: communityDist
       - name: json
       - name: log
       - name: util
     solaris_task_list: &solaris_tasks
       - name: db
-      - name: dist
+      - name: communityDist
       - name: util
     ubuntu1204_task_list: &ubuntu1204_tasks
       - name: bsonutil
       - name: db
-      - name: dist
+      - name: communityDist
+      - name: enterpriseDist
       - name: json
       - name: lint
       - name: log
@@ -52,18 +53,23 @@ mongo_tools_variables:
       - name: util
     windows_32_task_list: &windows_32_tasks
       - name: db
-      - name: dist
+      - name: communityDist
       - name: util
     windows_64_task_list: &windows_64_tasks
       - name: db
-      - name: dist
+      - name: communityDist
+      - name: enterpriseDist
       - name: util
 
 
 ## Common mongodb arguments
   mongodb_arguments:
-    standard: &mongodb_startup_args
-      mongodb_standard_args: "--dbpath mongodb/db_files --port 27017 --httpinterface --setParameter=enableTestCommands=1 &"
+    default: &mongodb_default_startup_args
+      mongodb_default_args: "--dbpath mongodb/db_files --port 27017 --httpinterface --setParameter=enableTestCommands=1 &"
+    ssl: &mongodb_ssl_startup_args
+      mongodb_ssl_args: "--sslMode requireSSL --sslCAFile src/src/github.com/mongodb/mongo-tools/common/db/openssl/testdata/ca.pem --sslPEMKeyFile src/src/github.com/mongodb/mongo-tools/common/db/openssl/testdata/server.pem"
+    auth: &mongodb_auth_startup_args
+      mongodb_auth_args: "--auth"
 
 functions:
   "attach coverage reports" :
@@ -75,7 +81,7 @@ functions:
   "attach tool":
     command: attach.task_files
     params:
-      "${tool}": https://s3.amazonaws.com/mciuploads/mongo-tools/binaries/${build_id}/${tool}
+      "${tool} (${edition|community})": https://s3.amazonaws.com/mciuploads/mongo-tools/binaries/${build_id}/${edition|community}/${tool}
 
   "build tool":
     command: shell.exec
@@ -89,7 +95,7 @@ functions:
           export GOPATH=`pwd`;
         fi;
         echo "Building ${tool}..."
-        go build -o ${tool} github.com/mongodb/mongo-tools/${tool}/main
+        go build ${args} -o ${tool} github.com/mongodb/mongo-tools/${tool}/main
 
   "download mongod":
     command: shell.exec
@@ -120,20 +126,6 @@ functions:
             go tool cover -func=coverage.out -o coverage.txt
         fi;
 
-  "setup go env":
-    command: shell.exec
-    params:
-      working_dir: src
-      script: |
-        set -o verbose
-        if [ "Windows_NT" = "$OS" ]; then
-          export GOPATH=$(cygpath -w $(pwd));
-        else
-          export GOPATH=`pwd`;
-        fi;
-        ${preproc_gpm|echo} ./gpm
-        ./gpm install
-
   "move coverage data":
     command: shell.exec
     params:
@@ -152,7 +144,7 @@ functions:
           rm -rf mongodb/${db_files_dir|db_files} mongodb/${logfile|run.log};
           mkdir mongodb/${db_files_dir|db_files};
           echo "Starting mongod...";
-          ./mongodb/mongod${extension} ${mongodb_standard_args} ${mongod_extra_options|}
+          ./mongodb/mongod${extension} ${mongodb_default_args} ${mongod_extra_options|}
         fi;
 
         if [ "Windows_NT" = "$OS" ]; then
@@ -185,6 +177,20 @@ functions:
         - dir: src/github.com/mongodb/mongo-tools/common/${package}
           args: ${coverage_args}
 
+  "setup go env":
+    command: shell.exec
+    params:
+      working_dir: src
+      script: |
+        set -o verbose
+        if [ "Windows_NT" = "$OS" ]; then
+          export GOPATH=$(cygpath -w $(pwd));
+        else
+          export GOPATH=`pwd`;
+        fi;
+        ${preproc_gpm|echo} ./gpm
+        ./gpm install
+
   "upload coverage report":
     command: s3.put
     params:
@@ -203,7 +209,7 @@ functions:
       aws_key: ${aws_key}
       aws_secret: ${aws_secret}
       local_file: src/${tool}
-      remote_file: mongo-tools/binaries/${build_id}/${tool}
+      remote_file: mongo-tools/binaries/${build_id}/${edition|community}/${tool}
       bucket: mciuploads
       permissions: public-read
       content_type: application/octet-stream
@@ -278,7 +284,7 @@ tasks:
         content_type: "text/html"
     - func: "attach coverage reports"
 
-- name: dist
+- name: communityDist
   depends_on:
   #- name: "unit"
   commands:
@@ -357,6 +363,106 @@ tasks:
       vars:
         tool: mongotop
 
+- name: enterpriseDist
+  depends_on:
+  #- name: "unit"
+  commands:
+    - command: git.get_project
+      params:
+        directory: src
+    - func: "setup go env"
+    # bsondump
+    - func: "build tool"
+      vars:
+        tool: bsondump
+        args: -tags 'ssl sasl'
+    - func: "upload tool"
+      vars:
+        tool: bsondump
+        edition: enterprise
+    - func: "attach tool"
+      vars:
+        tool: bsondump
+        edition: enterprise
+    # mongodump
+    - func: "build tool"
+      vars:
+        tool: mongodump
+        args: -tags 'ssl sasl'
+    - func: "upload tool"
+      vars:
+        tool: mongodump
+        edition: enterprise
+    - func: "attach tool"
+      vars:
+        tool: mongodump
+        edition: enterprise
+    # mongoexport
+    - func: "build tool"
+      vars:
+        tool: mongoexport
+        args: -tags 'ssl sasl'
+    - func: "upload tool"
+      vars:
+        tool: mongoexport
+        edition: enterprise
+    - func: "attach tool"
+      vars:
+        tool: mongoexport
+        edition: enterprise
+    # mongofiles
+    - func: "build tool"
+      vars:
+        tool: mongofiles
+        args: -tags 'ssl sasl'
+    - func: "upload tool"
+      vars:
+        tool: mongofiles
+        edition: enterprise
+    - func: "attach tool"
+      vars:
+        tool: mongofiles
+        edition: enterprise
+    # mongoimport
+    - func: "build tool"
+      vars:
+        tool: mongoimport
+        args: -tags 'ssl sasl'
+    - func: "upload tool"
+      vars:
+        tool: mongoimport
+        edition: enterprise
+    - func: "attach tool"
+      vars:
+        tool: mongoimport
+        edition: enterprise
+    # mongostat
+    - func: "build tool"
+      vars:
+        tool: mongostat
+        args: -tags 'ssl sasl'
+    - func: "upload tool"
+      vars:
+        tool: mongostat
+        edition: enterprise
+    - func: "attach tool"
+      vars:
+        tool: mongostat
+        edition: enterprise
+    # mongotop
+    - func: "build tool"
+      vars:
+        tool: mongotop
+        args: -tags 'ssl sasl'
+    - func: "upload tool"
+      vars:
+        tool: mongotop
+        edition: enterprise
+    - func: "attach tool"
+      vars:
+        tool: mongotop
+        edition: enterprise
+
 - name: json
   commands:
     - command: git.get_project
@@ -388,10 +494,10 @@ tasks:
       params:
         working_dir: src
         script: |
+          set -o errexit
           set -o verbose
           if [ "Windows_NT" = "$OS" ]; then  export GOPATH=$(cygpath -w $(pwd)); else export GOPATH=`pwd`; fi;
-          go run src/github.com/3rf/mongo-lint/golint/golint.go src/github.com/mongodb/mongo-tools
-
+          retVal=$(go run src/github.com/3rf/mongo-lint/golint/golint.go src/github.com/mongodb/mongo-tools/); if [ "$retVal" = "" ]; then exit 0; else exit 1; fi;
 - name: log
   commands:
     - command: git.get_project
@@ -544,76 +650,41 @@ buildvariants:
 #           OSX Buildvariant          #
 #######################################
 - name: osx-108
-  display_name: OSX 10.8
+  display_name: OSX 10.8 64-bit
   run_on:
   - osx-108
   expansions:
     <<: *mongo_url_osx108
-    <<: *mongodb_startup_args
+    <<: *mongodb_default_startup_args
     coverage_args: "-coverprofile=coverage.out"
   tasks: *osx_108_tasks
 
 #######################################
 #          RHEL Buildvariant          #
 #######################################
-- name: linux-32
-  display_name: Linux 32-bit
+
+- name: ubuntu
+  display_name: Linux 64-bit
   run_on:
-  - rhel55-32
+  - ubuntu1204-test
   expansions:
-    <<: *mongo_url_rhell55_32
-    <<: *mongodb_startup_args
+    <<: *mongo_url_ubuntu1204
+    <<: *mongodb_default_startup_args
     coverage: true
     coverage_args: "-coverprofile=coverage.out"
-  tasks: *rhel55_32_tasks
+  tasks: *ubuntu1204_tasks
 
 #######################################
 #         Solaris Buildvariant        #
 #######################################
 - name: solaris
-  display_name: Solaris
+  display_name: Solaris 64-bit
   run_on:
   - solaris
   expansions:
     <<: *mongo_url_solaris
-    <<: *mongodb_startup_args
+    <<: *mongodb_default_startup_args
   tasks: *solaris_tasks
-
-#######################################
-#         Ubuntu Buildvariants        #
-#######################################
-- name: ubuntu
-  display_name: Ubuntu 1204
-  run_on:
-  - ubuntu1204-test
-  expansions:
-    <<: *mongo_url_ubuntu1204
-    <<: *mongodb_startup_args
-    coverage: true
-    coverage_args: "-coverprofile=coverage.out"
-  tasks: *ubuntu1204_tasks
-
-- name: ubuntu-ssl
-  display_name: Ubuntu SSL
-  run_on:
-  - ubuntu1204-test
-  expansions:
-    <<: *mongo_url_ubuntu1204
-    <<: *mongodb_startup_args
-    mongod_extra_options: --sslMode requireSSL --sslCAFile src/src/github.com/mongodb/mongo-tools/common/db/openssl/testdata/ca.pem --sslPEMKeyFile src/src/github.com/mongodb/mongo-tools/common/db/openssl/testdata/server.pem
-  tasks:
-  - name: ssl
-
-- name: ubuntu-auth
-  display_name: Ubuntu Auth
-  run_on:
-  - ubuntu1204-test
-  expansions:
-    <<: *mongo_url_ubuntu1204
-    <<: *mongodb_startup_args
-    mongod_extra_options: --auth
-  tasks:
-  - name: auth
 
 #######################################
 #        Windows Buildvariants        #
@@ -624,7 +695,7 @@ buildvariants:
   - windows-32
   expansions:
     <<: *mongo_url_windows32
-    <<: *mongodb_startup_args
+    <<: *mongodb_default_startup_args
     extension: .exe
     preproc_gpm: "perl -pi -e 's/\\r\\n/\\n/g' "
   tasks: *windows_32_tasks
@@ -635,7 +706,7 @@ buildvariants:
   - windows-64-vs2013-test
   expansions:
     <<: *mongo_url_windows64
-    <<: *mongodb_startup_args
+    <<: *mongodb_default_startup_args
     extension: .exe
     preproc_gpm: "perl -pi -e 's/\\r\\n/\\n/g' "
   tasks: *windows_64_tasks
