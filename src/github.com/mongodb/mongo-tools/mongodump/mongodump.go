@@ -279,7 +279,7 @@ func (dump *MongoDump) DumpCollection(dbName, c string) error {
 		return dump.dumpDocSourceToWriter(findQuery, os.Stdout)
 	}
 	dbFolder := filepath.Join(dump.OutputOptions.Out, dbName)
-	err := os.MkdirAll(dbFolder, 0755)
+	err = os.MkdirAll(dbFolder, 0755)
 	if err != nil {
 		return fmt.Errorf("error creating directory `%v`: %v", dbFolder, err)
 	}
