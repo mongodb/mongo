@@ -38,7 +38,6 @@
 #include "mongo/db/commands/server_status_metric.h"
 #include "mongo/db/dbhelpers.h"
 #include "mongo/db/operation_context_impl.h"
-#include "mongo/db/repl/minvalid.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/repl_coordinator_global.h"
 #include "mongo/db/repl/repl_coordinator_impl.h"
@@ -54,8 +53,11 @@ namespace mongo {
 
 namespace repl {
 
+namespace {
+    const char hashFieldName[] = "h";
     int SleepToAllowBatchingMillis = 2;
     const int BatchIsSmallish = 40000; // bytes
+} // namespace
 
     MONGO_FP_DECLARE(rsBgSyncProduce);
 
@@ -98,12 +100,12 @@ namespace repl {
     }
 
     BackgroundSync::BackgroundSync() : _buffer(bufferMaxSizeGauge, &getSize),
-                                       _lastOpTimeFetched(0, 0),
-                                       _lastH(0),
+                                       _lastOpTimeFetched(std::numeric_limits<int>::max(),
+                                                          0),
+                                       _lastHash(0),
                                        _pause(true),
                                        _appliedBuffer(true),
                                        _assumingPrimary(false),
-                                       _currentSyncTarget(NULL),
                                        _replCoord(getGlobalReplicationCoordinator()) {
     }
 
@@ -120,14 +122,12 @@ namespace repl {
     }
 
     void BackgroundSync::notify() {
-        {
-            boost::unique_lock<boost::mutex> lock(s_instance->_mutex);
+        boost::lock_guard<boost::mutex> lock(_mutex);
 
-            // If all ops in the buffer have been applied, unblock waitForRepl (if it's waiting)
-            if (s_instance->_buffer.empty()) {
-                s_instance->_appliedBuffer = true;
-                s_instance->_condvar.notify_all();
-            }
+        // If all ops in the buffer have been applied, unblock waitForRepl (if it's waiting)
+        if (_buffer.empty()) {
+            _appliedBuffer = true;
+            _condvar.notify_all();
         }
     }
 
@@ -152,8 +152,6 @@ namespace repl {
     }
 
     void BackgroundSync::_producerThread() {
-        OperationContextImpl txn;
-
         MemberState state = theReplSet->state();
 
         // we want to pause when the state changes to primary
@@ -170,10 +168,9 @@ namespace repl {
             return;
         }
 
-        // if this member has an empty oplog, we cannot start syncing
-        // Note: This logic is insane, but I will keep it here because if we can't
-        // connect the oplogreader for initial sync, it will be unlikely that we can connect
-        // the BGSync oplogreader.
+        OperationContextImpl txn;
+
+        // We need to wait until initial sync has started.
         if (_replCoord->getMyLastOptime().isNull()) {
             sleepsecs(1);
             return;
@@ -181,7 +178,7 @@ namespace repl {
         // we want to unpause when we're no longer primary
         // start() also loads _lastOpTimeFetched, which we know is set from the "if"
         else if (_pause) {
-            start();
+            start(&txn);
         }
 
         produce(&txn);
@@ -190,13 +187,10 @@ namespace repl {
     void BackgroundSync::produce(OperationContext* txn) {
         // this oplog reader does not do a handshake because we don't want the server it's syncing
         // from to track how far it has synced
-        OplogReader r;
-
         {
             boost::unique_lock<boost::mutex> lock(_mutex);
             if (_lastOpTimeFetched.isNull()) {
                 // then we're initial syncing and we're still waiting for this to be set
-                _currentSyncTarget = NULL;
                 lock.unlock();
                 sleepsecs(1);
                 // if there is no one to sync from
@@ -214,43 +208,49 @@ namespace repl {
         }
 
 
-        // find a target to sync from the last op time written
-        _replCoord->connectOplogReader(txn, this, &r);
-
+        // find a target to sync from the last optime fetched
         OpTime lastOpTimeFetched;
+        {
+            boost::unique_lock<boost::mutex> lock(_mutex);
+            lastOpTimeFetched = _lastOpTimeFetched;
+            _syncSourceHost = HostAndPort();
+        }
+        _syncSourceReader.resetConnection();
+        _syncSourceReader.connectToSyncSource(txn, lastOpTimeFetched, _replCoord);
 
         {
             boost::unique_lock<boost::mutex> lock(_mutex);
             // no server found
-            if (_currentSyncTarget == NULL) {
+            if (_syncSourceReader.getHost().empty()) {
                 lock.unlock();
                 sleepsecs(1);
                 // if there is no one to sync from
                 return;
             }
             lastOpTimeFetched = _lastOpTimeFetched;
+            _syncSourceHost = _syncSourceReader.getHost();
         }
 
-        r.tailingQueryGTE(rsoplog, lastOpTimeFetched);
+        _syncSourceReader.tailingQueryGTE(rsoplog, lastOpTimeFetched);
 
         // if target cut connections between connecting and querying (for
         // example, because it stepped down) we might not have a cursor
-        if (!r.haveCursor()) {
+        if (!_syncSourceReader.haveCursor()) {
             return;
         }
 
-        if (_rollbackIfNeeded(txn, r)) {
+        if (_rollbackIfNeeded(txn, _syncSourceReader)) {
             stop();
             return;
         }
 
         while (!inShutdown()) {
-            if (!r.moreInCurrentBatch()) {
+            if (!_syncSourceReader.moreInCurrentBatch()) {
                 // Check some things periodically
                 // (whenever we run out of items in the
                 // current cursor batch)
 
-                int bs = r.currentBatchMessageSize();
+                int bs = _syncSourceReader.currentBatchMessageSize();
                 if( bs > 0 && bs < BatchIsSmallish ) {
                     // on a very low latency network, if we don't wait a little, we'll be 
                     // getting ops to write almost one at a time.  this will both be expensive
@@ -273,10 +273,9 @@ namespace repl {
                 }
 
                 // re-evaluate quality of sync target
-                if (shouldChangeSyncTarget()) {
+                if (shouldChangeSyncSource()) {
                     return;
                 }
-
 
                 {
                     //record time for each getmore
@@ -284,24 +283,22 @@ namespace repl {
                     
                     // This calls receiveMore() on the oplogreader cursor.
                     // It can wait up to five seconds for more data.
-                    r.more();
+                    _syncSourceReader.more();
                 }
-                networkByteStats.increment(r.currentBatchMessageSize());
+                networkByteStats.increment(_syncSourceReader.currentBatchMessageSize());
 
-                if (!r.moreInCurrentBatch()) {
+                if (!_syncSourceReader.moreInCurrentBatch()) {
                     // If there is still no data from upstream, check a few more things
                     // and then loop back for another pass at getting more data
                     {
                         boost::unique_lock<boost::mutex> lock(_mutex);
-                        if (_pause || 
-                            !_currentSyncTarget || 
-                            !_currentSyncTarget->hbinfo().hbstate.readable()) {
+                        if (_pause) {
                             return;
                         }
                     }
 
-                    r.tailCheck();
-                    if( !r.haveCursor() ) {
+                    _syncSourceReader.tailCheck();
+                    if( !_syncSourceReader.haveCursor() ) {
                         LOG(1) << "replSet end syncTail pass" << rsLog;
                         return;
                     }
@@ -312,7 +309,7 @@ namespace repl {
 
             // At this point, we are guaranteed to have at least one thing to read out
             // of the oplogreader cursor.
-            BSONObj o = r.nextSafe().getOwned();
+            BSONObj o = _syncSourceReader.nextSafe().getOwned();
             opsReadStats.increment();
 
             {
@@ -330,7 +327,7 @@ namespace repl {
 
             {
                 boost::unique_lock<boost::mutex> lock(_mutex);
-                _lastH = o["h"].numberLong();
+                _lastHash = o["h"].numberLong();
                 _lastOpTimeFetched = o["ts"]._opTime();
                 LOG(3) << "replSet lastOpTimeFetched: "
                        << _lastOpTimeFetched.toStringPretty() << rsLog;
@@ -338,17 +335,15 @@ namespace repl {
         }
     }
 
-    bool BackgroundSync::shouldChangeSyncTarget() {
-        boost::unique_lock<boost::mutex> lock(_mutex);
-
+    bool BackgroundSync::shouldChangeSyncSource() {
         // is it even still around?
-        if (!_currentSyncTarget || !_currentSyncTarget->hbinfo().hbstate.readable()) {
+        if (_syncSourceReader.getHost().empty()) {
             return true;
         }
 
-        // check other members: is any member's optime more than 30 seconds ahead of the guy we're
-        // syncing from?
-        return theReplSet->shouldChangeSyncTarget(_currentSyncTarget->hbinfo().opTime);
+        // check other members: is any member's optime more than MaxSyncSourceLag seconds 
+        // ahead of the current sync source?
+        return _replCoord->shouldChangeSyncSource(_syncSourceReader.getHost());
     }
 
 
@@ -371,149 +366,22 @@ namespace repl {
         bufferSizeGauge.decrement(getSize(op));
     }
 
-    bool BackgroundSync::isStale(OplogReader& r, BSONObj& remoteOldestOp) {
+    bool BackgroundSync::isStale(OpTime lastOpTimeFetched, 
+                                 OplogReader& r, 
+                                 BSONObj& remoteOldestOp) {
         remoteOldestOp = r.findOne(rsoplog, Query());
         OpTime remoteTs = remoteOldestOp["ts"]._opTime();
-        DEV {
-            log() << "replSet remoteOldestOp:    " << remoteTs.toStringLong() << rsLog;
-            log() << "replSet lastOpTimeFetched: " << _lastOpTimeFetched.toStringLong() << rsLog;
-        }
-
         {
             boost::unique_lock<boost::mutex> lock(_mutex);
 
-            if (_lastOpTimeFetched >= remoteTs) {
+            if (lastOpTimeFetched >= remoteTs) {
                 return false;
             }
+            log() << "replSet remoteOldestOp:    " << remoteTs.toStringLong() << rsLog;
+            log() << "replSet lastOpTimeFetched: " << lastOpTimeFetched.toStringLong() << rsLog;
         }
 
         return true;
-    }
-
-    void BackgroundSync::getOplogReaderLegacy(OperationContext* txn, OplogReader* r) {
-        const Member *target = NULL, *stale = NULL;
-        BSONObj oldest;
-
-        verify(r->conn() == NULL);
-
-        while ((target = theReplSet->getMemberToSyncTo()) != NULL) {
-            string current = target->fullName();
-
-            if (!r->connect(target->h())) {
-                LOG(2) << "replSet can't connect to " << current << " to read operations" << rsLog;
-                r->resetConnection();
-                theReplSet->veto(current);
-                sleepsecs(1);
-                continue;
-            }
-
-            if (isStale(*r, oldest)) {
-                r->resetConnection();
-                theReplSet->veto(current, 600);
-                stale = target;
-                continue;
-            }
-
-            // if we made it here, the target is up and not stale
-            {
-                boost::unique_lock<boost::mutex> lock(_mutex);
-                // this will trigger the syncSourceFeedback
-                _currentSyncTarget = target;
-            }
-
-            return;
-        }
-
-        // the only viable sync target was stale
-        if (stale) {
-            theReplSet->goStale(txn, stale, oldest);
-            sleepsecs(120);
-        }
-
-        {
-            boost::unique_lock<boost::mutex> lock(_mutex);
-            _currentSyncTarget = NULL;
-        }
-
-    }
-
-    void BackgroundSync::connectOplogReader(OperationContext* txn, 
-                                            ReplicationCoordinatorImpl* replCoordImpl,
-                                            OplogReader* reader) {
-        OpTime lastOpTimeFetched;
-        {
-            boost::unique_lock<boost::mutex> lock(_mutex);
-            lastOpTimeFetched = _lastOpTimeFetched;
-        }
-        const OpTime sentinel(Milliseconds(curTimeMillis64()).total_seconds(), 0);
-        OpTime oldestOpTimeSeen = sentinel;
-
-        while (true) {
-            HostAndPort candidate = replCoordImpl->chooseNewSyncSource();
-
-            if (candidate.empty()) {
-                if (oldestOpTimeSeen == sentinel) {
-                    // If, in this invocation of connectOplogReader(), we did not successfully 
-                    // connect to any node ahead of us,
-                    // we apparently have no sync sources to connect to.
-                    // This situation is common; e.g. if there are no writes to the primary at
-                    // the moment.
-                    return;
-                }
-
-                // Connected to at least one member, but in all cases we were too stale to use them
-                // as a sync source.
-                log() << "replSet error RS102 too stale to catch up" << rsLog;
-                log() << "replSet our last optime : " << lastOpTimeFetched.toStringLong() << rsLog;
-                log() << "replSet oldest available is " << oldestOpTimeSeen.toStringLong() <<
-                    rsLog;
-                log() << "replSet "
-                    "See http://dochub.mongodb.org/core/resyncingaverystalereplicasetmember" 
-                      << rsLog;
-                sethbmsg("error RS102 too stale to catch up");
-                setMinValid(txn, oldestOpTimeSeen);
-                replCoordImpl->setFollowerMode(MemberState::RS_RECOVERING);
-                return;
-            }
-
-            if (!reader->connect(candidate)) {
-                LOG(2) << "replSet can't connect to " << candidate.toString() << 
-                    " to read operations" << rsLog;
-                reader->resetConnection();
-                replCoordImpl->blacklistSyncSource(candidate, Date_t(curTimeMillis64() + 10*1000));
-                continue;
-            }
-            // Read the first (oldest) op and confirm that it's not newer than our last
-            // fetched op. Otherwise, we have fallen off the back of that source's oplog.
-            BSONObj remoteOldestOp(reader->findOne(rsoplog, Query()));
-            BSONElement tsElem(remoteOldestOp["ts"]);
-            if (tsElem.type() != Timestamp) {
-                // This member's got a bad op in its oplog.
-                warning() << "oplog invalid format on node " << candidate.toString();
-                reader->resetConnection();
-                replCoordImpl->blacklistSyncSource(candidate, 
-                                                    Date_t(curTimeMillis64() + 600*1000));
-                continue;
-            }
-            OpTime remoteOldOpTime = tsElem._opTime();
-
-            if (lastOpTimeFetched < remoteOldOpTime) {
-                // We're too stale to use this sync source.
-                reader->resetConnection();
-                replCoordImpl->blacklistSyncSource(candidate, 
-                                                    Date_t(curTimeMillis64() + 600*1000));
-                if (oldestOpTimeSeen > remoteOldOpTime) {
-                    warning() << "we are too stale to use " << candidate.toString() << 
-                        " as a sync source";
-                    oldestOpTimeSeen = remoteOldOpTime;
-                }
-                continue;
-            }
-
-            // Got a valid sync source.
-            return;
-        } // while (true)
-
     }
 
     bool BackgroundSync::_rollbackIfNeeded(OperationContext* txn, OplogReader& r) {
@@ -547,8 +415,8 @@ namespace repl {
 
         BSONObj o = r.nextSafe();
         OpTime ts = o["ts"]._opTime();
-        long long h = o["h"].numberLong();
-        if( ts != _lastOpTimeFetched || h != _lastH ) {
+        long long hash = o["h"].numberLong();
+        if( ts != _lastOpTimeFetched || hash != _lastHash ) {
             log() << "replSet our last op time fetched: " << _lastOpTimeFetched.toStringPretty() << rsLog;
             log() << "replset source's GTE: " << ts.toStringPretty() << rsLog;
             syncRollback(txn, _replCoord->getMyLastOptime(), &r, _replCoord);
@@ -558,27 +426,29 @@ namespace repl {
         return false;
     }
 
-    const Member* BackgroundSync::getSyncTarget() {
+    HostAndPort BackgroundSync::getSyncTarget() {
         boost::unique_lock<boost::mutex> lock(_mutex);
-        return _currentSyncTarget;
+        return _syncSourceHost;
     }
 
     void BackgroundSync::clearSyncTarget() {
         boost::unique_lock<boost::mutex> lock(_mutex);
-        _currentSyncTarget = NULL;
+        _syncSourceReader.resetConnection();
+        _syncSourceHost = HostAndPort();
     }
 
     void BackgroundSync::stop() {
         boost::unique_lock<boost::mutex> lock(_mutex);
 
         _pause = true;
-        _currentSyncTarget = NULL;
+        _syncSourceReader.resetConnection();
+        _syncSourceHost = HostAndPort();
         _lastOpTimeFetched = OpTime(0,0);
-        _lastH = 0;
+        _lastHash = 0;
         _condvar.notify_all();
     }
 
-    void BackgroundSync::start() {
+    void BackgroundSync::start(OperationContext* txn) {
         massert(16235, "going to start syncing, but buffer is not empty", _buffer.empty());
 
         boost::unique_lock<boost::mutex> lock(_mutex);
@@ -586,9 +456,11 @@ namespace repl {
 
         // reset _last fields with current data
         _lastOpTimeFetched = _replCoord->getMyLastOptime();
-        _lastH = theReplSet->lastH;
 
-        LOG(1) << "replset bgsync fetch queue set to: " << _lastOpTimeFetched << " " << _lastH << rsLog;
+        loadLastHash(txn);
+
+        LOG(1) << "replset bgsync fetch queue set to: " << _lastOpTimeFetched << 
+            " " << _lastHash << rsLog;
     }
 
     bool BackgroundSync::isAssumingPrimary() {
@@ -610,6 +482,57 @@ namespace repl {
         // 3. Now actually become primary
         _assumingPrimary = false;
     }
+
+    long long BackgroundSync::getLastHash() const {
+        boost::lock_guard<boost::mutex> lck(_mutex);
+        return _lastHash;
+    }
+
+    void BackgroundSync::setLastHash(long long newHash) {
+        boost::lock_guard<boost::mutex> lck(_mutex);
+        _lastHash = newHash;
+    }
+
+    void BackgroundSync::loadLastHash(OperationContext* txn) {
+        Lock::DBRead lk(txn->lockState(), rsoplog);
+        BSONObj oplogEntry;
+        try {
+            if (!Helpers::getLast(txn, rsoplog, oplogEntry)) {
+                // This can happen when we are to do an initial sync.  lastHash will be set
+                // after the initial sync is complete.
+                _lastHash = 0;
+                return;
+            }
+        }
+        catch (const DBException& ex) {
+            severe() << "Problem reading " << rsoplog << ": " << ex.toStatus();
+            fassertFailed(18904);
+        }
+        BSONElement hashElement = oplogEntry[hashFieldName];
+        if (hashElement.eoo()) {
+            severe() << "Most recent entry in " << rsoplog << " missing \"" << hashFieldName <<
+                "\" field";
+            fassertFailed(18902);
+        }
+        if (hashElement.type() != NumberLong) {
+            severe() << "Expected type of \"" << hashFieldName << "\" in most recent " << 
+                rsoplog << " entry to have type NumberLong, but found " << 
+                typeName(hashElement.type());
+            fassertFailed(18903);
+        }
+        _lastHash = hashElement.safeNumberLong();
+    }
+
+    bool BackgroundSync::getInitialSyncRequestedFlag() {
+        boost::lock_guard<boost::mutex> lock(_initialSyncMutex);
+        return _initialSyncRequestedFlag;
+    }
+
+    void BackgroundSync::setInitialSyncRequestedFlag(bool value) {
+        boost::lock_guard<boost::mutex> lock(_initialSyncMutex);
+        _initialSyncRequestedFlag = value;
+    }
+
 
 } // namespace repl
 } // namespace mongo

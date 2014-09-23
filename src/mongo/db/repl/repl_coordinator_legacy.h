@@ -98,6 +98,8 @@ namespace repl {
 
         virtual OID getMyRID() const;
 
+        virtual int getMyId() const;
+
         virtual void setFollowerMode(const MemberState& newState);
 
         virtual bool isWaitingForApplierToDrain();
@@ -165,9 +167,13 @@ namespace repl {
 
         virtual bool isReplEnabled() const;
 
-        virtual void connectOplogReader(OperationContext* txn, 
-                                        BackgroundSync* bgsync,
-                                        OplogReader* r);
+        virtual HostAndPort chooseNewSyncSource();
+
+        virtual void blacklistSyncSource(const HostAndPort& host, Date_t until);
+
+        virtual void resetLastOpTimeFromOplog(OperationContext* txn);
+
+        virtual bool shouldChangeSyncSource(const HostAndPort& currentSource);
 
     private:
 

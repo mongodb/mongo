@@ -141,6 +141,10 @@ namespace repl {
         return OID();
     }
 
+    int ReplicationCoordinatorMock::getMyId() const {
+        return 0;
+    }
+
     void ReplicationCoordinatorMock::setFollowerMode(const MemberState& newState) {
     }
 
@@ -262,9 +266,20 @@ namespace repl {
         return Status::OK();
     }
 
-    void ReplicationCoordinatorMock::connectOplogReader(OperationContext* txn,
-                                                        BackgroundSync* bgsync, 
-                                                        OplogReader* r) {
+    HostAndPort ReplicationCoordinatorMock::chooseNewSyncSource() {
+        invariant(false);
+        return HostAndPort();
+    }
+
+    void ReplicationCoordinatorMock::blacklistSyncSource(const HostAndPort& host, Date_t until) {
+        invariant(false);
+    }
+
+    void ReplicationCoordinatorMock::resetLastOpTimeFromOplog(OperationContext* txn) {
+        invariant(false);
+    }
+
+    bool ReplicationCoordinatorMock::shouldChangeSyncSource(const HostAndPort& currentSource) {
         invariant(false);
     }
 

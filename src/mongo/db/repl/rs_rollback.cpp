@@ -45,11 +45,12 @@
 #include "mongo/db/ops/update_lifecycle_impl.h"
 #include "mongo/db/ops/update_request.h"
 #include "mongo/db/query/internal_plans.h"
+#include "mongo/db/repl/bgsync.h"
 #include "mongo/db/repl/minvalid.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/oplogreader.h"
 #include "mongo/db/repl/repl_coordinator.h"
-#include "mongo/db/repl/rs.h"
+#include "mongo/db/repl/repl_coordinator_impl.h"
 #include "mongo/db/repl/rslog.h"
 #include "mongo/util/log.h"
 
@@ -695,8 +696,10 @@ namespace {
             warn = true;
         }
 
-        // reset cached lastoptimewritten and h value
-        theReplSet->loadLastOpTimeWritten(txn);
+        // Reload the lastOpTimeApplied value in the replcoord and the lastHash value in bgsync
+        // to reflect our new last op.
+        replCoord->resetLastOpTimeFromOplog(txn);
+        BackgroundSync::get()->loadLastHash(txn);
 
         // done
         if (warn)

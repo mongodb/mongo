@@ -253,7 +253,7 @@ namespace {
             return _syncSource;
         }
         _syncSource = _currentConfig.getMemberAt(closestIndex).getHostAndPort();
-        std::string msg(str::stream() << "syncing to: " << _syncSource.toString(), 0);
+        std::string msg(str::stream() << "syncing from: " << _syncSource.toString(), 0);
         _sethbmsg(msg);
         log() << msg;
         return _syncSource;

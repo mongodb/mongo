@@ -448,11 +448,11 @@ namespace repl {
         b.append("set", name());
         b.appendTimeT("date", time(0));
         b.append("myState", myState.s);
-        const Member *syncTarget = BackgroundSync::get()->getSyncTarget();
-        if ( syncTarget &&
+        const HostAndPort syncTarget = BackgroundSync::get()->getSyncTarget();
+        if ( !syncTarget.empty() &&
             (myState != MemberState::RS_PRIMARY) &&
             (myState != MemberState::RS_REMOVED) ) {
-            b.append("syncingTo", syncTarget->fullName());
+            b.append("syncingTo", syncTarget.toString());
         }
         b.append("members", v);
         if( replSetBlind )

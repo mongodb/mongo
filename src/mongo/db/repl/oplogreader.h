@@ -40,6 +40,8 @@ namespace mongo {
     extern const BSONObj reverseNaturalObj; // { $natural : -1 }
 
 namespace repl {
+    class ReplicationCoordinator;
+
     /**
      * Authenticates conn using the server's cluster-membership credentials.
      *
@@ -131,6 +133,19 @@ namespace repl {
         void putBack(BSONObj op) { cursor->putBack(op); }
 
         HostAndPort getHost() const;
+
+        /**
+         * Connects this OplogReader to a valid sync source, using the provided lastOpTimeFetched
+         * and ReplicationCoordinator objects.
+         * If this function fails to connect to a sync source that is viable, this OplogReader
+         * is left unconnected, where this->conn() equals NULL.
+         * In the process of connecting, this function may add items to the repl coordinator's
+         * sync source blacklist.
+         * This function may throw DB exceptions.
+         */
+        void connectToSyncSource(OperationContext* txn, 
+                                 OpTime lastOpTimeFetched,
+                                 ReplicationCoordinator* replCoord);
     };
 
 } // namespace repl

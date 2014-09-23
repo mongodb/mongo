@@ -90,8 +90,6 @@ namespace {
         {
             Client::WriteContext cx(txn, rsConfigNs);
 
-            //theReplSet->lastOpTimeWritten = ??;
-            //rather than above, do a logOp()? probably
             Helpers::putSingletonGod(txn,
                                      rsConfigNs.c_str(),
                                      newConfigBSON,

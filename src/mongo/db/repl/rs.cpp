@@ -135,10 +135,6 @@ namespace repl {
         cc().shutdown();
     }
 
-    void ReplSet::shutdown() {
-        BackgroundSync::shutdown();
-    }
-
     void replLocalAuth() {
         cc().getAuthorizationSession()->grantInternalAuthorization();
     }

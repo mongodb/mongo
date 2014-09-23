@@ -39,7 +39,6 @@ namespace mongo {
     class OperationContext;
 
 namespace repl {
-
     class BackgroundSyncInterface;
 
     /**

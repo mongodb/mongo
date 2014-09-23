@@ -43,7 +43,7 @@ namespace repl {
 
     ReplicationCoordinatorExternalStateMock::ReplicationCoordinatorExternalStateMock()
         : _localRsConfigDocument(ErrorCodes::NoMatchingDocument, "No local config document"),
-          _lastOpTimeAndHash(ErrorCodes::NoMatchingDocument, "No last oplog entry"),
+          _lastOpTime(ErrorCodes::NoMatchingDocument, "No last oplog entry"),
          _canAcquireGlobalSharedLock(true),
          _connectionsClosed(false) {
     }
@@ -95,16 +95,14 @@ namespace repl {
         _localRsConfigDocument = localConfigDocument;
     }
 
-    StatusWith<ReplicationCoordinatorExternalState::OpTimeAndHash>
-    ReplicationCoordinatorExternalStateMock::loadLastOpTimeAndHash(
-            OperationContext* txn) {
-        return _lastOpTimeAndHash;
+    StatusWith<OpTime> ReplicationCoordinatorExternalStateMock::loadLastOpTime(
+        OperationContext* txn) {
+        return _lastOpTime;
     }
 
-    void ReplicationCoordinatorExternalStateMock::setLastOpTimeAndHash(
-            const StatusWith<OpTimeAndHash>& lastApplied) {
-
-        _lastOpTimeAndHash = lastApplied;
+    void ReplicationCoordinatorExternalStateMock::setLastOpTime(
+        const StatusWith<OpTime>& lastApplied) {
+        _lastOpTime = lastApplied;
     }
 
     void ReplicationCoordinatorExternalStateMock::closeClientConnections() {

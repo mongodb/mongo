@@ -46,6 +46,7 @@
 #include "mongo/db/repl/rslog.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/util/log.h"
+#include "mongo/util/net/hostandport.h"
 
 namespace mongo {
 
@@ -54,8 +55,7 @@ namespace repl {
     // used in replAuthenticate
     static const BSONObj userReplQuery = fromjson("{\"user\":\"repl\"}");
 
-    SyncSourceFeedback::SyncSourceFeedback() : _syncTarget(NULL),
-                                               _positionChanged(false),
+    SyncSourceFeedback::SyncSourceFeedback() : _positionChanged(false),
                                                _handshakeNeeded(false),
                                                _shutdownSignaled(false) {}
     SyncSourceFeedback::~SyncSourceFeedback() {}
@@ -253,18 +253,18 @@ namespace repl {
                 _resetConnection();
                 continue;
             }
-            const Member* target = BackgroundSync::get()->getSyncTarget();
+            const HostAndPort target = BackgroundSync::get()->getSyncTarget();
             if (_syncTarget != target) {
                 _resetConnection();
                 _syncTarget = target;
             }
             if (!hasConnection()) {
                 // fix connection if need be
-                if (!target) {
+                if (target.empty()) {
                     sleepmillis(500);
                     continue;
                 }
-                if (!_connect(&txn, target->h())) {
+                if (!_connect(&txn, target)) {
                     sleepmillis(500);
                     continue;
                 }

@@ -190,19 +190,26 @@ namespace repl {
 
     Status HybridReplicationCoordinator::setMyLastOptime(OperationContext* txn, const OpTime& ts) {
         Status legacyStatus = _legacy.setMyLastOptime(txn, ts);
-        Status implStatus = _impl.setMyLastOptime(txn, ts);
-        if (legacyStatus.code() != implStatus.code()) {
-            warning() << "Hybrid response difference in setMyLastOptime. Legacy response: "
-                      << legacyStatus << ", impl response: " << implStatus;
+        // Currently, the legacy code calls logOp before we have a config, which
+        // means we can't set the last optime in the impl because we have no place to store it.
+        if (getReplicationMode() == ReplicationCoordinator::modeReplSet ||
+            getReplicationMode() == ReplicationCoordinator::modeMasterSlave) {
+            Status implStatus = _impl.setMyLastOptime(txn, ts);
+            if (legacyStatus.code() != implStatus.code()) {
+                warning() << "Hybrid response difference in setMyLastOptime. Legacy response: "
+                          << legacyStatus << ", impl response: " << implStatus;
+            }
+            fassert(18666, legacyStatus.code() == implStatus.code());
         }
-        fassert(18666, legacyStatus.code() == implStatus.code());
         return legacyStatus;
     }
 
     OpTime HybridReplicationCoordinator::getMyLastOptime() const {
-        _legacy.getMyLastOptime();
-        OpTime implOpTime = _impl.getMyLastOptime();
-        return implOpTime;
+        OpTime legacyOpTime = _legacy.getMyLastOptime();
+        _impl.getMyLastOptime();
+        // Returning the legacy one for now, because at startup we can only set the legacy and not
+        // the impl (see comment in setMyLastOptime() above).
+        return legacyOpTime;
     }
 
     OID HybridReplicationCoordinator::getElectionId() {
@@ -215,6 +222,10 @@ namespace repl {
         OID legacyRID = _legacy.getMyRID();
         fassert(18696, legacyRID == _impl.getMyRID());
         return legacyRID;
+    }
+
+    int HybridReplicationCoordinator::getMyId() const {
+        return _impl.getMyId();
     }
 
     void HybridReplicationCoordinator::setFollowerMode(const MemberState& newState) {
@@ -430,18 +441,25 @@ namespace repl {
         return legacyResponse;
     }
 
-    void HybridReplicationCoordinator::connectOplogReader(OperationContext* txn,
-                                                          BackgroundSync* bgsync,
-                                                          OplogReader* r) {
-        _legacy.connectOplogReader(txn, bgsync, r);
-        HostAndPort legacySyncSource = r->getHost();
-        bgsync->connectOplogReader(txn, &_impl, r);
-        HostAndPort implSyncSource = r->getHost();
-        if (legacySyncSource != implSyncSource) {
-            severe() << "sync source mismatch between legacy and impl: " << 
-                legacySyncSource.toString() << " and " << implSyncSource.toString();
-            fassertFailed(18742);
-        }
+    HostAndPort HybridReplicationCoordinator::chooseNewSyncSource() {
+        return _legacy.chooseNewSyncSource();
+        //return _impl.chooseNewSyncSource();
+    }
+
+    void HybridReplicationCoordinator::blacklistSyncSource(const HostAndPort& host, Date_t until) {
+        _legacy.blacklistSyncSource(host, until);
+        _impl.blacklistSyncSource(host, until);
+    }
+
+    void HybridReplicationCoordinator::resetLastOpTimeFromOplog(OperationContext* txn) {
+        _impl.resetLastOpTimeFromOplog(txn);
+        _legacy.resetLastOpTimeFromOplog(txn);
+    }
+
+    bool HybridReplicationCoordinator::shouldChangeSyncSource(const HostAndPort& currentSource) {
+        // Doesn't yet return the correct answer because we have no heartbeats.
+        _impl.shouldChangeSyncSource(currentSource);
+        return _legacy.shouldChangeSyncSource(currentSource);
     }
 
     void HybridReplicationCoordinator::setImplConfigHack(const ReplSetConfig* config) {

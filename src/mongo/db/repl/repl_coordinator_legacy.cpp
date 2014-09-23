@@ -99,9 +99,6 @@ namespace repl {
     }
 
     void LegacyReplicationCoordinator::shutdown() {
-        if (getReplicationMode() == modeReplSet) {
-            theReplSet->shutdown();
-        }
     }
 
     ReplSettings& LegacyReplicationCoordinator::getSettings() {
@@ -424,7 +421,9 @@ namespace {
         boost::lock_guard<boost::mutex> lock(_mutex);
 
         SlaveOpTimeMap::const_iterator it(_slaveOpTimeMap.find(_myRID));
-        invariant(it != _slaveOpTimeMap.end());
+        if (it == _slaveOpTimeMap.end()) {
+            return OpTime(0,0);
+        }
         OpTime legacyMapOpTime = it->second;
         OpTime legacyOpTime = theReplSet->lastOpTimeWritten;
         // TODO(emilkie): SERVER-15209 
@@ -442,6 +441,11 @@ namespace {
 
     OID LegacyReplicationCoordinator::getMyRID() const {
         return _myRID;
+    }
+
+    int LegacyReplicationCoordinator::getMyId() const {
+        invariant(false);
+        return 0;
     }
 
     void LegacyReplicationCoordinator::setFollowerMode(const MemberState& newState) {
@@ -600,9 +604,9 @@ namespace {
         response->setHbMsg(theReplSet->hbmsg());
         response->setTime(Seconds(time(0)));
         response->setOpTime(theReplSet->lastOpTimeWritten.asDate());
-        const Member *syncTarget = BackgroundSync::get()->getSyncTarget();
-        if (syncTarget) {
-            response->setSyncingTo(syncTarget->fullName());
+        const HostAndPort syncTarget = BackgroundSync::get()->getSyncTarget();
+        if (!syncTarget.empty()) {
+            response->setSyncingTo(syncTarget.toString());
         }
 
         int v = theReplSet->config().version;
@@ -1028,12 +1032,27 @@ namespace {
         return _settings.usingReplSets() || _settings.slave || _settings.master;
     }
 
-    void LegacyReplicationCoordinator::connectOplogReader(OperationContext* txn, 
-                                                          BackgroundSync* bgsync,
-                                                          OplogReader* r) {
-        bgsync->getOplogReaderLegacy(txn, r);
+    HostAndPort LegacyReplicationCoordinator::chooseNewSyncSource() {
+        const Member* member = theReplSet->getMemberToSyncTo();
+        if (member) {
+            return member->h();
+        }
+        else {
+            return HostAndPort();
+        }
     }
 
+    void LegacyReplicationCoordinator::blacklistSyncSource(const HostAndPort& host, Date_t until) {
+        theReplSet->veto(host.toString(), until);
+    }
+
+    void LegacyReplicationCoordinator::resetLastOpTimeFromOplog(OperationContext* txn) {
+        theReplSet->loadLastOpTimeWritten(txn, false);
+    }
+
+    bool LegacyReplicationCoordinator::shouldChangeSyncSource(const HostAndPort& currentSource) {
+        return theReplSet->shouldChangeSyncTarget(currentSource);
+    }
     
 
 } // namespace repl

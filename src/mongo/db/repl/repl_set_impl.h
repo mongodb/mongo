@@ -90,19 +90,16 @@ namespace repl {
         OpTime lastOpTimeWritten;
         OpTime getEarliestOpTimeWritten() const;
 
-        // hash we use to make sure we are reading the right flow of ops and aren't on
-        // an out-of-date "fork"
-        long long lastH; 
         Status forceSyncFrom(const string& host, BSONObjBuilder* result);
         // Check if the current sync target is suboptimal. This must be called while holding a mutex
         // that prevents the sync source from changing.
-        bool shouldChangeSyncTarget(const OpTime& target) const;
+        bool shouldChangeSyncTarget(const HostAndPort& target) const;
 
         /**
          * Find the closest member (using ping time) with a higher latest optime.
          */
         const Member* getMemberToSyncTo();
-        void veto(const string& host, unsigned secs=10);
+        void veto(const string& host, Date_t until);
         bool gotForceSync();
         void goStale(OperationContext* txn, const Member* m, const BSONObj& o);
 
@@ -292,15 +289,14 @@ namespace repl {
                                     OplogReader* r,
                                     const Member* source);
         void _initialSync();
-        void syncDoInitialSync();
         void _syncThread();
         void syncTail();
         void syncFixUp(OperationContext* txn, FixUpInfo& h, OplogReader& r);
 
+    public:
         // keep a list of hosts that we've tried recently that didn't work
         map<string,time_t> _veto;
 
-    public:
         // Allow index prefetching to be turned on/off
         enum IndexPrefetchConfig {
             PREFETCH_NONE=0, PREFETCH_ID_ONLY=1, PREFETCH_ALL=2
@@ -312,10 +308,8 @@ namespace repl {
         IndexPrefetchConfig getIndexPrefetchConfig() {
             return _indexPrefetchConfig;
         }
-            
 
         const ReplSetConfig::MemberCfg& myConfig() const { return _config; }
-        void tryToGoLiveAsASecondary(OperationContext* txn);
         void syncThread();
         const OpTime lastOtherOpTime() const;
         /**
@@ -323,16 +317,9 @@ namespace repl {
          */
         const OpTime lastOtherElectableOpTime() const;
 
-        // bool for indicating resync need on this node and the mutex that protects it
-        bool initialSyncRequested;
-        boost::mutex initialSyncMutex;
-
         BSONObj getLastErrorDefault;
     private:
         IndexPrefetchConfig _indexPrefetchConfig;
-
-        static const char* _initialSyncFlagString;
-        static const BSONObj _initialSyncFlag;
     };
 } // namespace repl
 } // namespace mongo

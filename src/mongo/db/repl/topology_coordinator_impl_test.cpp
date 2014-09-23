@@ -2625,7 +2625,7 @@ namespace {
         ASSERT_EQUALS(OpTime(0,0), response.getOpTime());
         ASSERT_EQUALS(Seconds(0).total_milliseconds(), response.getTime().total_milliseconds());
         // changed to a syncing message because our sync source changed recently
-        ASSERT_EQUALS("syncing to: h2:27017", response.getHbMsg());
+        ASSERT_EQUALS("syncing from: h2:27017", response.getHbMsg());
         ASSERT_EQUALS("rs0", response.getReplicaSetName());
         ASSERT_EQUALS(1, response.getVersion());
         ASSERT_EQUALS(HostAndPort("h2").toString(), response.getSyncingTo());

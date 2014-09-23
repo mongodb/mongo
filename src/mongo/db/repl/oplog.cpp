@@ -55,7 +55,6 @@
 #include "mongo/db/ops/delete.h"
 #include "mongo/db/repl/bgsync.h"
 #include "mongo/db/repl/repl_coordinator_global.h"
-#include "mongo/db/repl/rs.h"
 #include "mongo/db/repl/write_concern.h"
 #include "mongo/db/stats/counters.h"
 #include "mongo/db/operation_context_impl.h"
@@ -126,7 +125,7 @@ namespace repl {
         WriteUnitOfWork wunit(txn);
 
         const OpTime ts = op["ts"]._opTime();
-        long long h = op["h"].numberLong();
+        long long hash = op["h"].numberLong();
 
         {
             if ( localOplogRSCollection == 0 ) {
@@ -142,29 +141,20 @@ namespace repl {
             Client::Context ctx(txn, rsoplog, localDB);
             checkOplogInsert(localOplogRSCollection->insertDocument(txn, op, false));
 
-            /* todo: now() has code to handle clock skew.  but if the skew server to server is large it will get unhappy.
-                     this code (or code in now() maybe) should be improved.
-                     */
             ReplicationCoordinator* replCoord = getGlobalReplicationCoordinator();
-            if (replCoord->getReplicationMode() == ReplicationCoordinator::modeReplSet) {
-                OpTime myLastOptime = replCoord->getMyLastOptime();
-                if (!(myLastOptime < ts)) {
-                    warning() << "replication oplog stream went back in time. previous timestamp: "
-                              << myLastOptime << " newest timestamp: " << ts
-                              << ". attempting to sync directly from primary." << endl;
-                    BSONObjBuilder result;
-                    HostAndPort targetHostAndPort = theReplSet->box.getPrimary()->h();
-                    Status status = replCoord->processReplSetSyncFrom(targetHostAndPort, &result);
-                    if (!status.isOK()) {
-                        error() << "Can't sync from primary: " << status;
-                    }
-                }
-                theReplSet->lastH = h;
-                ctx.getClient()->setLastOp( ts );
-
-                replCoord->setMyLastOptime(txn, ts);
-                BackgroundSync::notify();
+            OpTime myLastOptime = replCoord->getMyLastOptime();
+            if (!(myLastOptime < ts)) {
+                severe() << "replication oplog stream went back in time. previous timestamp: "
+                         << myLastOptime << " newest timestamp: " << ts;
+                fassertFailedNoTrace(18905);
             }
+            
+            BackgroundSync* bgsync = BackgroundSync::get();
+            bgsync->setLastHash(hash);
+            ctx.getClient()->setLastOp( ts );
+            
+            replCoord->setMyLastOptime(txn, ts);
+            bgsync->notify();
         }
 
         setNewOptime(ts);
@@ -252,25 +242,32 @@ namespace repl {
                 resetSlaveCache();
             return;
         }
+        ReplicationCoordinator* replCoord = getGlobalReplicationCoordinator();
 
         mutex::scoped_lock lk2(newOpMutex);
 
         OpTime ts(getNextGlobalOptime());
         newOptimeNotifier.notify_all();
 
-        long long hashNew;
-        if( theReplSet ) {
-            if (!theReplSet->box.getState().primary()) {
-                log() << "replSet error : logOp() but not primary";
-                fassertFailed(17405);
-            }
-            hashNew = (theReplSet->lastH * 131 + ts.asLL()) * 17 + theReplSet->selfId();
+        long long hashNew = BackgroundSync::get()->getLastHash();
+
+        // Check to make sure logOp() is legal at this point.
+        if (*opstr == 'n') {
+            // 'n' operations are always logged
+            invariant(*ns == '\0');
+
+            // 'n' operations do not advance the hash, since they are not rolled back
         }
         else {
-            // must be initiation
-            verify( *ns == 0 );
-            hashNew = 0;
+            if (!replCoord->canAcceptWritesForDatabase(nsToDatabaseSubstring(ns))) {
+                severe() << "replSet error : logOp() but can't accept write to collection " << ns;
+                fassertFailed(17405);
+            }
+
+            // Advance the hash
+            hashNew = (hashNew * 131 + ts.asLL()) * 17 + replCoord->getMyId();
         }
+
 
         /* we jump through a bunch of hoops here to avoid copying the obj buffer twice --
            instead we do a single copy to the destination position in the memory mapped file.
@@ -305,12 +302,10 @@ namespace repl {
         OplogDocWriter writer( partial, obj );
         checkOplogInsert( localOplogRSCollection->insertDocument( txn, &writer, false ) );
 
-        ReplicationCoordinator* replCoord = getGlobalReplicationCoordinator();
-        if (replCoord->getReplicationMode() == repl::ReplicationCoordinator::modeReplSet) {
-            theReplSet->lastH = hashNew;
-            ctx.getClient()->setLastOp( ts );
-            replCoord->setMyLastOptime(txn, ts);
-        }
+        BackgroundSync::get()->setLastHash(hashNew);
+        ctx.getClient()->setLastOp( ts );
+        replCoord->setMyLastOptime(txn, ts);
+
         wunit.commit();
 
     }

@@ -385,7 +385,6 @@ namespace {
         _cfg = 0;
         memset(_hbmsg, 0, sizeof(_hbmsg));
         strcpy(_hbmsg , "initial startup");
-        lastH = 0;
         changeState(MemberState::RS_STARTUP);
 
         _seeds = &replSetSeedList.seeds;
@@ -437,7 +436,6 @@ namespace {
         _self(0),
         _maintenanceMode(0),
         mgr(0),
-        initialSyncRequested(false), // only used for resync
         _indexPrefetchConfig(PREFETCH_ALL) {
     }
 
@@ -445,7 +443,6 @@ namespace {
         Lock::DBRead lk(txn->lockState(), rsoplog);
         BSONObj o;
         if (Helpers::getLast(txn, rsoplog, o)) {
-            lastH = o["h"].numberLong();
             OpTime lastOpTime = o["ts"]._opTime();
             uassert(13290, "bad replSet oplog entry?", quiet || !lastOpTime.isNull());
             getGlobalReplicationCoordinator()->setMyLastOptime(txn, lastOpTime);
@@ -469,6 +466,8 @@ namespace {
         OperationContextImpl txn;
 
         try {
+            // Note: this sets lastOpTimeWritten, which the Applier uses to determine whether to
+            // do an initial sync or not.
             loadLastOpTimeWritten(&txn);
         }
         catch (std::exception& e) {
@@ -493,6 +492,7 @@ namespace {
                 sleepsecs(1);
             }
         }
+
 
         getGlobalReplicationCoordinator()->setFollowerMode(MemberState::RS_STARTUP2);
         startThreads();
@@ -876,6 +876,125 @@ namespace {
         }
         startupStatusMsg.set("? started");
         startupStatus = STARTED;
+    }
+    const Member* ReplSetImpl::getMemberToSyncTo() {
+        lock lk(this);
+
+        // if we have a target we've requested to sync from, use it
+
+        if (_forceSyncTarget) {
+            Member* target = _forceSyncTarget;
+            _forceSyncTarget = 0;
+            sethbmsg( str::stream() << "syncing to: " << target->fullName() << " by request", 0);
+            return target;
+        }
+
+        const Member* primary = box.getPrimary();
+
+        // wait for 2N pings before choosing a sync target
+        if (_cfg) {
+            int needMorePings = config().members.size()*2 - HeartbeatInfo::numPings;
+
+            if (needMorePings > 0) {
+                OCCASIONALLY log() << "waiting for " << needMorePings << " pings from other members before syncing" << endl;
+                return NULL;
+            }
+
+            // If we are only allowed to sync from the primary, return that
+            if (!_cfg->chainingAllowed()) {
+                // Returns NULL if we cannot reach the primary
+                return primary;
+            }
+        }
+
+        // find the member with the lowest ping time that has more data than me
+
+        // Find primary's oplog time. Reject sync candidates that are more than
+        // maxSyncSourceLagSecs seconds behind.
+        OpTime primaryOpTime;
+        if (primary)
+            primaryOpTime = primary->hbinfo().opTime;
+        else
+            // choose a time that will exclude no candidates, since we don't see a primary
+            primaryOpTime = OpTime(maxSyncSourceLagSecs, 0);
+
+        if (primaryOpTime.getSecs() < static_cast<unsigned int>(maxSyncSourceLagSecs)) {
+            // erh - I think this means there was just a new election
+            // and we don't yet know the new primary's optime
+            primaryOpTime = OpTime(maxSyncSourceLagSecs, 0);
+        }
+
+        OpTime oldestSyncOpTime(primaryOpTime.getSecs() - maxSyncSourceLagSecs, 0);
+
+        Member *closest = 0;
+        time_t now = 0;
+
+        // Make two attempts.  The first attempt, we ignore those nodes with
+        // slave delay higher than our own.  The second attempt includes such
+        // nodes, in case those are the only ones we can reach.
+        // This loop attempts to set 'closest'.
+        for (int attempts = 0; attempts < 2; ++attempts) {
+            for (Member *m = _members.head(); m; m = m->next()) {
+                if (!m->syncable())
+                    continue;
+
+                if (m->state() == MemberState::RS_SECONDARY) {
+                    // only consider secondaries that are ahead of where we are
+                    if (m->hbinfo().opTime <= lastOpTimeWritten)
+                        continue;
+                    // omit secondaries that are excessively behind, on the first attempt at least.
+                    if (attempts == 0 &&
+                        m->hbinfo().opTime < oldestSyncOpTime)
+                        continue;
+                }
+
+                // omit nodes that are more latent than anything we've already considered
+                if (closest &&
+                    (m->hbinfo().ping > closest->hbinfo().ping))
+                    continue;
+
+                if (attempts == 0 &&
+                    (myConfig().slaveDelay < m->config().slaveDelay || m->config().hidden)) {
+                    continue; // skip this one in the first attempt
+                }
+
+                map<string,time_t>::iterator vetoed = _veto.find(m->fullName());
+                if (vetoed != _veto.end()) {
+                    // Do some veto housekeeping
+                    if (now == 0) {
+                        now = time(0);
+                    }
+
+                    // if this was on the veto list, check if it was vetoed in the last "while".
+                    // if it was, skip.
+                    if (vetoed->second >= now) {
+                        if (time(0) % 5 == 0) {
+                            log() << "replSet not trying to sync from " << (*vetoed).first
+                                  << ", it is vetoed for " << ((*vetoed).second - now) << " more seconds" << rsLog;
+                        }
+                        continue;
+                    }
+                    _veto.erase(vetoed);
+                    // fall through, this is a valid candidate now
+                }
+                // This candidate has passed all tests; set 'closest'
+                closest = m;
+            }
+            if (closest) break; // no need for second attempt
+        }
+
+        if (!closest) {
+            return NULL;
+        }
+
+        sethbmsg( str::stream() << "syncing to: " << closest->fullName(), 0);
+
+        return closest;
+    }
+
+    void ReplSetImpl::veto(const string& host, const Date_t until) {
+        lock lk(this);
+        _veto[host] = until.toTimeT();
     }
 
 } // namespace repl

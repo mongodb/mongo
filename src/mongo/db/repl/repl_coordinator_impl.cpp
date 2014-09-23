@@ -162,15 +162,14 @@ namespace {
             return true;
         }
 
-        StatusWith<ReplicationCoordinatorExternalState::OpTimeAndHash> lastOpTimeStatus =
-            _externalState->loadLastOpTimeAndHash(txn);
+        StatusWith<OpTime> lastOpTimeStatus = _externalState->loadLastOpTime(txn);
         OpTime lastOpTime(0, 0);
         if (!lastOpTimeStatus.isOK()) {
             warning() << "Failed to load timestamp of most recently applied operation; " <<
                 lastOpTimeStatus.getStatus();
         }
         else {
-            lastOpTime = lastOpTimeStatus.getValue().opTime;
+            lastOpTime = lastOpTimeStatus.getValue();
         }
 
         // Use a callback here, because _finishLoadLocalConfig calls isself() which requires
@@ -871,6 +870,16 @@ namespace {
         return _myRID;
     }
 
+    int ReplicationCoordinatorImpl::getMyId() const {
+        boost::lock_guard<boost::mutex> lock(_mutex);
+        return _getMyId_inlock();
+    }
+
+    int ReplicationCoordinatorImpl::_getMyId_inlock() const {
+        const MemberConfig& self = _rsConfig.getMemberAt(_thisMembersConfigIndex);
+        return self.getId();
+    }
+
     void ReplicationCoordinatorImpl::prepareReplSetUpdatePositionCommand(
             OperationContext* txn,
             BSONObjBuilder* cmdBuilder) {
@@ -1503,12 +1512,6 @@ namespace {
         return _settings.usingReplSets() || _settings.master || _settings.slave;
     }
 
-    void ReplicationCoordinatorImpl::connectOplogReader(OperationContext* txn, 
-                                                        BackgroundSync* bgsync,
-                                                        OplogReader* r) {
-        invariant(false);
-    }
-
     void ReplicationCoordinatorImpl::_chooseNewSyncSource(
             const ReplicationExecutor::CallbackData& cbData,
             HostAndPort* newSyncSource) {
@@ -1556,6 +1559,46 @@ namespace {
         fassert(18741, cbh.getStatus());
         _replExecutor.wait(cbh.getValue());
     }        
+
+    void ReplicationCoordinatorImpl::resetLastOpTimeFromOplog(OperationContext* txn) {
+        StatusWith<OpTime> lastOpTimeStatus = _externalState->loadLastOpTime(txn);
+        OpTime lastOpTime(0, 0);
+        if (!lastOpTimeStatus.isOK()) {
+            warning() << "Failed to load timestamp of most recently applied operation; " <<
+                lastOpTimeStatus.getStatus();
+        }
+        else {
+            lastOpTime = lastOpTimeStatus.getValue();
+        }
+        boost::unique_lock<boost::mutex> lk(_mutex);
+        _setLastOptime_inlock(&lk, _getMyRID_inlock(), lastOpTime);
+    }
+
+    void ReplicationCoordinatorImpl::_shouldChangeSyncSource(
+            const ReplicationExecutor::CallbackData& cbData,
+            const HostAndPort& currentSource,
+            bool* shouldChange) {
+        if (cbData.status == ErrorCodes::CallbackCanceled) {
+            return;
+        }
+        *shouldChange = _topCoord->shouldChangeSyncSource(currentSource);
+    }
+
+    bool ReplicationCoordinatorImpl::shouldChangeSyncSource(const HostAndPort& currentSource) {
+        bool shouldChange(false);
+        CBHStatus cbh = _replExecutor.scheduleWork(
+            stdx::bind(&ReplicationCoordinatorImpl::_shouldChangeSyncSource,
+                       this,
+                       stdx::placeholders::_1,
+                       currentSource,
+                       &shouldChange));
+        if (cbh.getStatus() == ErrorCodes::ShutdownInProgress) {
+            return false;
+        }
+        fassert(18906, cbh.getStatus());
+        _replExecutor.wait(cbh.getValue());
+        return shouldChange;
+    }
 
 } // namespace repl
 } // namespace mongo

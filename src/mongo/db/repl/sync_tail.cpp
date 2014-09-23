@@ -35,6 +35,7 @@
 #include "third_party/murmurhash3/MurmurHash3.h"
 
 #include "mongo/base/counter.h"
+#include "mongo/db/catalog/database.h"
 #include "mongo/db/commands/fsync.h"
 #include "mongo/db/commands/server_status_metric.h"
 #include "mongo/db/curop.h"
@@ -324,12 +325,20 @@ namespace {
                 // (always checked in the first iteration of this do-while loop, because
                 // ops is empty)
                 if (ops.empty() || now > lastTimeChecked) {
-                    {
-                        boost::unique_lock<boost::mutex> lock(theReplSet->initialSyncMutex);
-                        if (theReplSet->initialSyncRequested) {
-                            // got a resync command
-                            return;
-                        }
+                    BackgroundSync* bgsync = BackgroundSync::get();
+                    if (bgsync->getInitialSyncRequestedFlag()) {
+                        // got a resync command
+                        Lock::DBWrite lk(txn.lockState(), "local");
+                        WriteUnitOfWork wunit(&txn);
+                        Client::Context ctx(&txn, "local");
+
+                        ctx.db()->dropCollection(&txn, "local.oplog.rs");
+                        getGlobalReplicationCoordinator()->setMyLastOptime(&txn, OpTime());
+                        theReplSet->_veto.clear();
+                        bgsync->stop();
+                        wunit.commit();
+
+                        return;
                     }
                     lastTimeChecked = now;
                     // can we become secondary?
@@ -389,18 +398,8 @@ namespace {
             OpTime minValid = lastOp["ts"]._opTime();
             setMinValid(&txn, minValid);
 
-            if (BackgroundSync::get()->isAssumingPrimary()) {
-                LOG(1) << "about to apply batch up to optime: "
-                       << ops.getDeque().back()["ts"]._opTime().toStringPretty();
-            }
-            
             multiApply(ops.getDeque());
 
-            if (BackgroundSync::get()->isAssumingPrimary()) {
-                LOG(1) << "about to update oplog to optime: "
-                       << ops.getDeque().back()["ts"]._opTime().toStringPretty();
-            }
-            
             applyOpsToOplog(&ops.getDeque());
 
             // If we're just testing (no manager), don't keep looping if we exhausted the bgqueue
@@ -494,12 +493,8 @@ namespace {
             wunit.commit();
         }
 
-        if (BackgroundSync::get()->isAssumingPrimary()) {
-            LOG(1) << "notifying BackgroundSync";
-        }
-            
         // Update write concern on primary
-        BackgroundSync::notify();
+        BackgroundSync::get()->notify();
         return lastOpTime;
     }
 
