@@ -366,30 +366,6 @@ namespace mongo {
                          ChunkVersion& wanted );
 
     /**
-     * @return true if we took care of the message and nothing else should be done
-     */
-    struct DbResponse;
-
-    /**
-     * Returns true if the version of this thread is compatible wit hthe global
-     * version of this shard. Also builds an error response if the version was
-     * not compatible.
-     */
-    bool _checkShardVersion(Message &m, DbResponse* dbresponse);
-
-    /**
-     * Returns true if the version of this thread is compatible with the global
-     * version of this shard.
-     *
-     * Note: Last use of this function are for queries.
-     */
-    inline bool checkShardVersion(Message &m, DbResponse* dbresponse) {
-        if( !shardingState.enabled() ) 
-            return true;
-        return _checkShardVersion(m, dbresponse);
-    }
-
-    /**
      * If a migration for the chunk in 'ns' where 'obj' lives is occurring, save this log entry
      * if it's relevant. The entries saved here are later transferred to the receiving side of
      * the migration. A relevant entry is an insertion, a deletion, or an update.
