@@ -41,12 +41,3 @@ if has_option("wiredtiger"):
 	       NO_CRUTCH=True
 	   )
 
-#env.CppUnitTest(
-#    target='storage_wiredtiger_test',
-#    source=['wiredtiger_test.cpp',
-#            ],
-#    LIBDEPS=[
-#        'storage_wiredtiger'
-#        ]
-#    )
-
