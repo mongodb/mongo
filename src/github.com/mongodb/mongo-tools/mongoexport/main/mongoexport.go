@@ -42,13 +42,12 @@ func main() {
 
 	err = exporter.ValidateSettings()
 	if err != nil {
-		//TODO log to stderr for real
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+		os.Exit(1)
 	}
 
 	numDocs, err := exporter.Export()
 	if err != nil {
-		//TODO log to stderr for real
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 		os.Exit(1)
 	}
