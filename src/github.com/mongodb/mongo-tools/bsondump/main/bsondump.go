@@ -65,7 +65,7 @@ func main() {
 		err = fmt.Errorf("Unsupported output type '%'. Must be either 'debug' or 'json'", bsonDumpOpts.Type)
 	}
 	if err != nil {
-		fmt.Fprintf(os.Stderr, err)
+		fmt.Fprintf(os.Stderr, err.Error())
 		os.Exit(1)
 	}
 }
