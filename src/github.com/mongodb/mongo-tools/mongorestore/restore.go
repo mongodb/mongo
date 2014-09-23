@@ -5,6 +5,7 @@ import (
 	"github.com/mongodb/mongo-tools/common/db"
 	"github.com/mongodb/mongo-tools/common/log"
 	"github.com/mongodb/mongo-tools/common/progress"
+	"gopkg.in/mgo.v2"
 	"gopkg.in/mgo.v2/bson"
 	"io/ioutil"
 	"os"
@@ -24,15 +25,54 @@ func (restore *MongoRestore) RestoreIntents() error {
 }
 
 func (restore *MongoRestore) RestoreIntent(intent *Intent) error {
+
+	session, err := restore.SessionProvider.GetSession()
+	if err != nil {
+		return fmt.Errorf("can't esablish session: %v", err)
+	}
+	session.SetSafe(restore.safety)
+	defer session.Close()
+	c := session.DB(intent.DB).C(intent.C)
+
+	collectionExists, err := DBHasCollection(session.DB(intent.DB), intent.Key())
+	if err != nil {
+		return fmt.Errorf("error reading database: %v", err)
+	}
+
+	if restore.OutputOptions.Drop {
+		if collectionExists {
+			log.Logf(2, "collection %v doesn't exist, skipping drop command", intent.Key())
+		} else {
+			log.Logf(1, "dropping collection %v before restoring", intent.Key())
+			err = c.DropCollection()
+			if err != nil {
+				return fmt.Errorf("error dropping collection: %v", err)
+			}
+		}
+	}
+
+	var collectionOptions *mgo.CollectionInfo
+
 	//first create collection with options
 	if intent.MetadataPath != "" {
 		jsonBytes, err := ioutil.ReadFile(intent.MetadataPath)
 		if err != nil {
 			return fmt.Errorf("error reading metadata file: %v", err) //TODO better errors here
 		}
-		_, _, err = MetadataFromJSON(jsonBytes)
+		collectionOptions, _, err = MetadataFromJSON(jsonBytes)
 		if err != nil {
 			return fmt.Errorf("error parsing metadata file: %v", err)
+		}
+		if collectionOptions != nil {
+			if collectionExists {
+				log.Logf(1, "collection %v already exists", intent.Key())
+			} else {
+				log.Logf(1, "creating collection %v using options from metadata", intent.Key())
+				err = c.Create(collectionOptions)
+				if err != nil {
+					return fmt.Errorf("error creating collection %v: %v", intent.Key(), err)
+				}
+			}
 		}
 	}
 
@@ -65,29 +105,19 @@ func (restore *MongoRestore) RestoreIntent(intent *Intent) error {
 func (restore *MongoRestore) RestoreCollectionToDB(dbName, colName string,
 	bsonSource *db.DecodedBSONSource, fileSize int64) error {
 
-	//TODO drop
 	session, err := restore.SessionProvider.GetSession()
 	if err != nil {
 		return fmt.Errorf("can't esablish session: %v", err)
 	}
+	defer session.Close()
 
 	session.SetSafe(restore.safety)
-	defer session.Close()
 	c := session.DB(dbName).C(colName)
 
 	if restore.safety == nil && !restore.OutputOptions.Drop {
 		//TODO check if the collection already exists!
 		log.Logf(0, "restoring to %v.%v without dropping", dbName, colName)
-		log.Log(0, "restored data will be inserted without raising errors; check your server log")
-	}
-
-	//TODO, probably move this to the create command stuff
-	if restore.OutputOptions.Drop {
-		log.Logf(1, "dropping collection %v.%v before restoring", dbName, colName)
-		err = c.DropCollection()
-		if err != nil {
-			return fmt.Errorf("error dropping collection: %v", err)
-		}
+		log.Log(0, "IMPORTANT: restored data will be inserted without raising errors; check your server log")
 	}
 
 	//progress bar handler
