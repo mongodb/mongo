@@ -1346,6 +1346,11 @@ namespace {
 
 namespace {
     bool isAuthzNamespace(const StringData& ns) {
+        if (nsToCollectionSubstring(ns) == "system.users") {
+            // SERVER-15360 Make sure that changes made to non-admin system.users collections on a
+            // 2.4 primary replicating to us get detected and cause the user cache to be invalidated
+            return true;
+        }
         return (ns == AuthorizationManager::rolesCollectionNamespace.ns() ||
                 ns == AuthorizationManager::usersCollectionNamespace.ns() ||
                 ns == AuthorizationManager::versionCollectionNamespace.ns());
