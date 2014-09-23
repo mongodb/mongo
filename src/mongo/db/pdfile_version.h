@@ -35,6 +35,9 @@ namespace mongo {
     const int PDFILE_VERSION_MINOR_22_AND_OLDER = 5;
     const int PDFILE_VERSION_MINOR_24_AND_NEWER = 6;
 
+    const int PDFILE_VERSION_MINOR_INDEX_MASK = 0xf;
+    const int PDFILE_VERSION_MINOR_28_FREELIST_MASK = (1 << 4); // SERVER-14081
+
     // For backward compatibility with versions before 2.4.0 all new DBs start
     // with PDFILE_VERSION_MINOR_22_AND_OLDER and are converted when the first
     // index using a new plugin is created. See the logic in

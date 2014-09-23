@@ -420,7 +420,7 @@ namespace mongo {
                     const BSONObj key = index.getObjectField("key");
                     const string plugin = IndexNames::findPluginName(key);
 
-                    if (h->versionMinor == PDFILE_VERSION_MINOR_22_AND_OLDER) {
+                    if (!h->is24IndexClean()) {
                         if (IndexNames::existedBefore24(plugin))
                             continue;
 

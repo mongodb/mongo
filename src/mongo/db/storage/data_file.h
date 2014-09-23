@@ -69,10 +69,18 @@ namespace mongo {
 
         // all of this should move up to the database level
         bool isCurrentVersion() const {
-            return version == PDFILE_VERSION && ( versionMinor == PDFILE_VERSION_MINOR_22_AND_OLDER
-                                               || versionMinor == PDFILE_VERSION_MINOR_24_AND_NEWER
-                                                );
+            if (version != PDFILE_VERSION)
+               return false;
+
+            // Masking off the 2.8 freelist bit since this version of the code is safe to use with
+            // it. SERVER-15319
+            const int minor = versionMinor & ~PDFILE_VERSION_MINOR_28_FREELIST_MASK;
+            return minor == PDFILE_VERSION_MINOR_22_AND_OLDER
+                || minor == PDFILE_VERSION_MINOR_24_AND_NEWER;
         }
+
+        bool is24IndexClean() const;
+        void setIs24IndexClean();
 
         bool uninitialized() const { return version == 0; }
 

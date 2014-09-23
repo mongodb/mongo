@@ -174,6 +174,16 @@ namespace mongo {
 
     // -------------------------------------------------------------------------------
 
+    bool DataFileHeader::is24IndexClean() const {
+        return (versionMinor & PDFILE_VERSION_MINOR_INDEX_MASK)
+            == PDFILE_VERSION_MINOR_24_AND_NEWER;
+    }
+
+    void DataFileHeader::setIs24IndexClean() {
+        getDur().writingInt(versionMinor) = ((versionMinor & ~PDFILE_VERSION_MINOR_INDEX_MASK)
+                                          | PDFILE_VERSION_MINOR_24_AND_NEWER);
+    }
+
     void DataFileHeader::init(int fileno, int filelength, const char* filename) {
         if ( uninitialized() ) {
             DEV log() << "datafileheader::init initializing " << filename << " n:" << fileno << endl;

@@ -182,13 +182,8 @@ namespace mongo {
     bool IndexCatalog::_shouldOverridePlugin(const BSONObj& keyPattern) const {
         string pluginName = IndexNames::findPluginName(keyPattern);
         bool known = IndexNames::isKnownName(pluginName);
-
-        int majorVersion;
-        int minorVersion;
-
-        _collection->_database->getFileFormat( &majorVersion, &minorVersion );
             
-        if (minorVersion == PDFILE_VERSION_MINOR_24_AND_NEWER) {
+        if (_collection->_database->getExtentManager().getFile(0)->getHeader()->is24IndexClean()) {
             // RulesFor24
             // This assert will be triggered when downgrading from a future version that
             // supports an index plugin unsupported by this version.
@@ -236,11 +231,11 @@ namespace mongo {
         Database* db = _collection->_database;
 
         DataFileHeader* dfh = db->getExtentManager().getFile(0)->getHeader();
-        if ( dfh->versionMinor == PDFILE_VERSION_MINOR_24_AND_NEWER ) {
+        if ( dfh->is24IndexClean() ) {
             return Status::OK(); // these checks have already been done
         }
 
-        fassert(16737, dfh->versionMinor == PDFILE_VERSION_MINOR_22_AND_OLDER);
+        fassert(16737, dfh->isCurrentVersion());
 
         auto_ptr<Runner> runner( InternalPlanner::collectionScan( db->_indexesName ) );
 
@@ -265,7 +260,7 @@ namespace mongo {
             warning() << "Internal error while reading system.indexes collection";
         }
 
-        getDur().writingInt(dfh->versionMinor) = PDFILE_VERSION_MINOR_24_AND_NEWER;
+        dfh->setIs24IndexClean();
 
         return Status::OK();
     }
