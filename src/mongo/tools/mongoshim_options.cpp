@@ -58,6 +58,11 @@ namespace mongo {
             return ret;
         }
 
+        ret = addBSONToolOptions(options);
+        if (!ret.isOK()) {
+            return ret;
+        }
+
         options->addOptionChaining("load", "load", moe::Switch,
                                    "load data" );
 
@@ -120,6 +125,11 @@ namespace mongo {
         invariant( toolGlobalParams.useDirectClient );
 
         ret = storeFieldOptions(params, args);
+        if (!ret.isOK()) {
+            return ret;
+        }
+
+        ret = storeBSONToolOptions(params, args);
         if (!ret.isOK()) {
             return ret;
         }
