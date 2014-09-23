@@ -149,12 +149,6 @@ namespace optionenvironment {
         std::string positionalHelpString(const std::string& execName) const;
         std::string helpString() const;
 
-        /**
-         * Looks in self and all children for the given option.
-         * @ return actual modifiable reference or NULL
-         */
-        OptionDescription* findOption(const std::string& dottedName );
-
         // Debugging
         void dump() const;
 

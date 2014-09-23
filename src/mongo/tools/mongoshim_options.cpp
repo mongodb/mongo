@@ -92,8 +92,6 @@ namespace mongo {
         options->addOptionChaining("sort", "sort", moe::String,
                 "sort order, as a JSON string, e.g., '{x:1}'");
 
-        options->findOption( "dbpath" )->setDefault( moe::Value(std::string("/data/db")) );
-
         return Status::OK();
     }
 
@@ -122,7 +120,10 @@ namespace mongo {
             return ret;
         }
 
-        invariant( toolGlobalParams.useDirectClient );
+        if (!toolGlobalParams.useDirectClient) {
+            return Status(ErrorCodes::BadValue,
+                          "MongoShim requires a --dbpath value to proceed");
+        }
 
         ret = storeFieldOptions(params, args);
         if (!ret.isOK()) {
