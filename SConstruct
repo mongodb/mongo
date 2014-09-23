@@ -668,9 +668,11 @@ extraLibPlaces = []
 
 env['EXTRACPPPATH'] = []
 env['EXTRALIBPATH'] = []
+env['EXTRABINPATH'] = []
 
 def addExtraLibs( s ):
     for x in s.split(","):
+        env.Append( EXTRABINPATH=[ x + "/bin" ] )
         env.Append( EXTRACPPPATH=[ x + "/include" ] )
         env.Append( EXTRALIBPATH=[ x + "/lib" ] )
         env.Append( EXTRALIBPATH=[ x + "/lib64" ] )
@@ -750,6 +752,8 @@ elif openbsd:
 elif windows:
     dynamicCRT = has_option("dynamic-windows")
 
+    # MAXLINELENGTH is  the CreateProcess Command Line length limit on Windows
+    env['MAXLINELENGTH'] = 32767
     env['DIST_ARCHIVE_SUFFIX'] = '.zip'
 
     if has_option('win-version-min') and has_option('win2008plus'):
