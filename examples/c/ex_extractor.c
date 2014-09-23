@@ -54,38 +54,72 @@ struct president_data {
 
 static const struct president_data example_data[] = {
 	{ 0, "Obama", "Barack", 2009, 2014 },
-	{ 1, "Bush", "George W", 2005, 2009 },
-	{ 2, "Bush", "George W", 2001, 2005 },
-	{ 3, "Clinton", "Bill", 1997, 2001 },
-	{ 4, "Clinton", "Bill", 1993, 1997 },
-	{ 5, "Bush", "George H", 1989, 1993 },
-	{ 6, "Reagan", "Ronald", 1985, 1989 },
-	{ 7, "Reagan", "Ronald", 1981, 1985 },
+	{ 1, "Bush", "George W", 2001, 2009 },
+	{ 2, "Clinton", "Bill", 1993, 2001 },
+	{ 3, "Bush", "George H", 1989, 1993 },
+	{ 4, "Reagan", "Ronald", 1981, 1989 },
 	{ 0, NULL, NULL, 0, 0 }
 };
+/*
+ * Number of years this data spans
+ */
+#define	YEAR_BASE	1981
+#define	YEAR_SPAN	(2014-1981)
+
+typedef struct {
+	WT_EXTRACTOR_MULTIPLE iface;
+	uint16_t	year_returned;
+} EXTRACT_TERM;
 
 static int
 my_extract_mult_next(WT_EXTRACTOR_MULTIPLE *em, WT_SESSION *session,
     const WT_ITEM *key, const WT_ITEM *value,
     WT_CURSOR *result_cursor)
 {
-	char *last_name, first_name;
+	EXTRACT_TERM *term = (EXTRACT_TERM *)em;
+	int ret;
+	char *last_name, *first_name;
 	uint16_t term_end, term_start;
 
 	/* Unused parameters */
-	(void)extractor;
 	(void)session;
 	(void)key;
 
-	result_cursor->set_key(result_cursor, value);
+	/*
+	 * Unpack the value.
+	 */
+	if ((ret = wiredtiger_struct_unpack(
+	    session, value->data, value->size, "SSHH",
+	    &last_name, &first_name, &term_start, &term_end)) != 0)
+		return (ret);
+	/*
+	 * Set the key for each iterative call to the next year of
+	 * the term between term_start and term_end, inclusive,
+	 * and both parts of the name.
+	 */
+	if (term->year_returned == 0)
+		term->year_returned = term_start;
+	else if (++term->year_returned > term_end)
+		return (WT_NOTFOUND);
+	/*
+	 * XXX
+	 * We have overlapping years.  Might return two keys for the
+	 * same year with different data.
+	 */
+	result_cursor->set_key(result_cursor, term->year_returned);
 	return (0);
 }
 
 static int
 my_extract_mult_terminate(WT_EXTRACTOR_MULTIPLE *em, WT_SESSION *session)
 {
-	(void)extractor;
 	(void)session;
+	/*
+	 * Free the structure we allocated.
+	 * XXX - it is unbalanced that we allocate this at the extractor
+	 * layer, but free it at the extractor_multiple layer.
+	 */
+	free(em);
 	return (0);
 }
 
@@ -97,17 +131,23 @@ my_extract(WT_EXTRACTOR *extractor, WT_SESSION *session,
     const WT_ITEM *key, const WT_ITEM *value,
     WT_CURSOR *result_cursor, WT_EXTRACTOR_MULTIPLE **emp)
 {
-	char *last_name, first_name;
+	EXTRACT_TERM *em;
 	int ret;
-	uint16_t term_end, term_start;
 
 	/* Unused parameters */
 	(void)extractor;
 	(void)session;
 	(void)key;
-	*emp = my_extract_mult;
-
-	result_cursor->set_key(result_cursor, value);
+	(void)value;
+	(void)result_cursor;
+	/*
+	 * XXX
+	 * Anything else to do other than allocate this?
+	 */
+	*emp = NULL;
+	if ((em = calloc(1, sizeof(EXTRACT_TERM))) == NULL)
+		return (ENOMEM);
+	*emp = &em->iface;
 	return (0);
 }
 
@@ -116,6 +156,9 @@ my_extract_terminate(WT_EXTRACTOR *extractor, WT_SESSION *session)
 {
 	(void)extractor;
 	(void)session;
+	/*
+	 * XXX - Anything to do?
+	 */
 	return (0);
 }
 
@@ -124,21 +167,55 @@ add_extractor(WT_CONNECTION *conn)
 {
 	int ret;
 
-	static WT_EXTRACTOR my_extractor = {my_extract, my_extract_terminate);
+	static WT_EXTRACTOR my_extractor = {my_extract, my_extract_terminate};
 	ret = conn->add_extractor(conn, "my_extractor", &my_extractor, NULL);
 
 	return (ret);
 }
 
+/*
+ * Read the index by year and print out who was in office that year.
+ */
 static int
-setup_table(WT_CONNECTION *conn)
+read_index(WT_SESSION *session)
 {
 	WT_CURSOR *cursor;
-	WT_SESSION *session;
+	int i, ret;
+	char *first_name, *last_name;
+	uint16_t term_end, term_start, year;
+
+	srandom(getpid());
+	ret = session->open_cursor(
+	    session, "index:termindex", NULL, NULL, &cursor);
+	/*
+	 * Pick 10 random years and read the data.
+	 */
+	for (i = 0; i < 10; i++) {
+		year = (random() % YEAR_SPAN) + YEAR_BASE;
+		cursor->set_key(cursor, year);
+		if ((ret = cursor->search(cursor)) == 0) {
+			if ((ret = cursor->get_value(cursor, &last_name,
+			    &first_name, &term_start, &term_end)) != 0)
+				goto err;
+			printf("Year %d: %s %s\n",year, first_name, last_name);
+		} else {
+			fprintf(stderr, "Error %d for year %d\n", ret, year);
+			goto err;
+		}
+	}
+err:	cursor->close(cursor);
+	return (ret);
+}
+
+/*
+ * Set up the table and index of the data.
+ */
+static int
+setup_table(WT_SESSION *session)
+{
+	WT_CURSOR *cursor;
 	struct president_data p;
 	int i, ret;
-
-	ret = conn->open_session(conn, NULL, NULL, &session);
 
 	/* Create the primary table. It has a key of the unique ID. */
 	ret = session->create(session, "table:presidents",
@@ -151,7 +228,7 @@ setup_table(WT_CONNECTION *conn)
 	 * was in office.
 	 */
 	ret = session->create(session, "index:termindex",
-	    "key_format=S,columns=(term),extractor=my_extractor");
+	    "key_format=HSS,columns=(term),extractor=my_extractor");
 
 	ret = session->open_cursor(
 	    session, "table:presidents", NULL, NULL, &cursor);
@@ -169,6 +246,7 @@ int
 main(void)
 {
 	WT_CONNECTION *conn;
+	WT_SESSION *session;
 	int ret;
 
 	/*
@@ -183,8 +261,11 @@ main(void)
 
 	ret = wiredtiger_open(home, NULL, "create,cache_size=500M", &conn);
 	ret = add_extractor(conn);
+	ret = conn->open_session(conn, NULL, NULL, &session);
 
-	ret = setup_table(conn);
+	ret = setup_table(session);
+	ret = read_index(session);
+
 	ret = conn->close(conn, NULL);
 
 	return (ret);
