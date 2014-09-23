@@ -1065,6 +1065,12 @@ __conn_statistics_config(WT_SESSION_IMPL *session, const char *cfg[])
 	return (0);
 }
 
+/* Simple structure for name and flag configuration searches. */
+typedef struct {
+	const char *name;
+	uint32_t flag;
+} WT_NAME_FLAG;
+
 /*
  * __wt_verbose_config --
  *	Set verbose configuration.
@@ -1072,14 +1078,7 @@ __conn_statistics_config(WT_SESSION_IMPL *session, const char *cfg[])
 int
 __wt_verbose_config(WT_SESSION_IMPL *session, const char *cfg[])
 {
-	WT_CONFIG_ITEM cval, sval;
-	WT_CONNECTION_IMPL *conn;
-	WT_DECL_RET;
-	uint32_t flags;
-	static const struct {
-		const char *name;
-		uint32_t flag;
-	} *ft, verbtypes[] = {
+	static const WT_NAME_FLAG verbtypes[] = {
 		{ "api",		WT_VERB_API },
 		{ "block",		WT_VERB_BLOCK },
 		{ "checkpoint",		WT_VERB_CHECKPOINT },
@@ -1103,6 +1102,11 @@ __wt_verbose_config(WT_SESSION_IMPL *session, const char *cfg[])
 		{ "write",		WT_VERB_WRITE },
 		{ NULL, 0 }
 	};
+	WT_CONFIG_ITEM cval, sval;
+	WT_CONNECTION_IMPL *conn;
+	WT_DECL_RET;
+	const WT_NAME_FLAG *ft;
+	uint32_t flags;
 
 	conn = S2C(session);
 
@@ -1206,21 +1210,21 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
 		__conn_add_extractor,
 		__conn_get_extension_api
 	};
-	static const struct {
-		const char *name;
-		uint32_t flag;
-	} *ft, file_types[] = {
+	static const WT_NAME_FLAG file_types[] = {
 		{ "checkpoint",	WT_FILE_TYPE_CHECKPOINT },
 		{ "data",	WT_FILE_TYPE_DATA },
 		{ "log",	WT_FILE_TYPE_LOG },
 		{ NULL, 0 }
 	};
+
 	WT_CONFIG_ITEM cval, sval;
 	WT_CONNECTION_IMPL *conn;
-	WT_ITEM cbbuf, cubuf;
 	WT_DECL_RET;
+	WT_ITEM cbbuf, cubuf;
+	const WT_NAME_FLAG *ft;
 	WT_SESSION_IMPL *session;
 	int exist;
+
 	/* Leave space for optional additional configuration. */
 	const char *cfg[] = { NULL, NULL, NULL, NULL, NULL, NULL };
 
