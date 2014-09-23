@@ -221,7 +221,7 @@ func makeSort(fields []string) bson.D {
 		if strings.HasPrefix(field, "-") {
 			direction = -1
 		}
-		dElem := bson.DocElem{Name: field, Value: direction}
+		dElem := bson.DocElem{Name: field[1:], Value: direction}
 		val = append(val, dElem)
 	}
 	return val
@@ -326,7 +326,6 @@ func (shim *StorageShim) Open() (*BSONSource, *BSONSink, error) {
 	if err != nil {
 		return nil, nil, err
 	}
-	fmt.Println(args)
 	cmd := exec.Command(shim.ShimPath, args...)
 	stdOut, err := cmd.StdoutPipe()
 	if err != nil {

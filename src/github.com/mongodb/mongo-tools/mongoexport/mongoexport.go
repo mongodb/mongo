@@ -38,8 +38,22 @@ type MongoExport struct {
 	InputOpts *options.InputOptions
 
 	// for connecting to the db
+	cmdRunner       db.CommandRunner
 	SessionProvider *db.SessionProvider
 	ExportOutput    ExportOutput
+}
+
+func (exp *MongoExport) Init() error {
+	if exp.ToolOptions.Namespace.DBPath != "" {
+		shim, err := db.NewShim(exp.ToolOptions.Namespace.DBPath, exp.ToolOptions.DirectoryPerDB, exp.ToolOptions.Journal)
+		if err != nil {
+			return err
+		}
+		exp.cmdRunner = shim
+		return nil
+	}
+	exp.cmdRunner = db.NewSessionProvider(exp.ToolOptions)
+	return nil
 }
 
 //ValidateSettings returns an error if any settings specified on the command line
@@ -86,25 +100,17 @@ func (exp *MongoExport) getOutputWriter() (io.WriteCloser, error) {
 }
 
 func getDocSource(exp MongoExport) (db.DocSource, error) {
-	if exp.ToolOptions.Namespace.DBPath != "" {
-		shimConf, err := db.NewShim(exp.ToolOptions.Namespace.DBPath)
+	sortFields := []string{}
+	if exp.InputOpts != nil && exp.InputOpts.Sort != "" {
+		sortD, err := getSortFromArg(exp.InputOpts.Sort)
 		if err != nil {
 			return nil, err
 		}
-
-		iter, err := shimConf.Find(exp.ToolOptions.Namespace.DB, exp.ToolOptions.Namespace.Collection, exp.InputOpts.Skip, exp.InputOpts.Limit, exp.InputOpts.Query)
+		sortFields, err = bsonutil.MakeSortString(sortD)
 		if err != nil {
 			return nil, err
 		}
-		return db.NewDecodedBSONSource(iter), nil
 	}
-
-	sessionProvider := db.NewSessionProvider(exp.ToolOptions)
-	session, err := sessionProvider.GetSession()
-	if err != nil {
-		return nil, err
-	}
-	collection := session.DB(exp.ToolOptions.Namespace.DB).C(exp.ToolOptions.Namespace.Collection)
 
 	query := map[string]interface{}{}
 	if exp.InputOpts != nil && exp.InputOpts.Query != "" {
@@ -115,33 +121,12 @@ func getDocSource(exp MongoExport) (db.DocSource, error) {
 		}
 	}
 
-	q := collection.Find(query)
-
-	if exp.InputOpts != nil && exp.InputOpts.Skip > 0 {
-		q = q.Skip(exp.InputOpts.Skip)
-	}
-	if exp.InputOpts != nil && exp.InputOpts.Limit > 0 {
-		q = q.Limit(exp.InputOpts.Limit)
-	}
-
-	if exp.InputOpts != nil && exp.InputOpts.Sort != "" {
-		sortD, err := getSortFromArg(exp.InputOpts.Sort)
-		if err != nil {
-			return nil, err
-		}
-		sortFields, err := bsonutil.MakeSortString(sortD)
-		if err != nil {
-			return nil, err
-		}
-		q = q.Sort(sortFields...)
-	}
-
+	flags := 0
 	if len(query) == 0 && exp.InputOpts != nil && exp.InputOpts.ForceTableScan != true && exp.InputOpts.Sort == "" {
-		q = q.Snapshot()
+		flags = flags | db.Snapshot
 	}
 
-	cursor := q.Iter()
-	return &db.CursorDocSource{cursor, session}, nil
+	return exp.cmdRunner.FindDocs(exp.ToolOptions.Namespace.DB, exp.ToolOptions.Namespace.Collection, 0, 0, query, sortFields, flags)
 }
 
 //Export executes the entire export operation. It returns an integer of the count

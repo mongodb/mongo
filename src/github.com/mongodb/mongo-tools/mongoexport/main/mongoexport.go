@@ -46,6 +46,12 @@ func main() {
 		os.Exit(1)
 	}
 
+	err = exporter.Init()
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+		os.Exit(1)
+	}
+
 	numDocs, err := exporter.Export()
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
