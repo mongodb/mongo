@@ -1,4 +1,4 @@
-// Package ssl implements connection to MongoDB over ssl.
+// Package openssl implements connection to MongoDB over ssl.
 package openssl
 
 import (

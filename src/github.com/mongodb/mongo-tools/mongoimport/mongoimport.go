@@ -72,19 +72,17 @@ func (mongoImport *MongoImport) getImportWriter() ImportWriter {
 			sessionProvider: mongoImport.SessionProvider,
 			session:         nil,
 		}
-	} else {
-		if mongoImport.IngestOptions.Upsert {
-			panic("not implemented! see SERVER-15309")
-		}
-		return &ShimImportWriter{
-			upsertMode:   mongoImport.IngestOptions.Upsert,
-			upsertFields: upsertFields,
-			dbPath:       mongoImport.ToolOptions.DBPath,
-			dbName:       mongoImport.ToolOptions.Namespace.DB,
-			collection:   mongoImport.ToolOptions.Namespace.Collection,
-		}
 	}
-	//return DriverImportWriter{}
+	if mongoImport.IngestOptions.Upsert {
+		panic("not implemented! see SERVER-15309")
+	}
+	return &ShimImportWriter{
+		upsertMode:   mongoImport.IngestOptions.Upsert,
+		upsertFields: upsertFields,
+		dbPath:       mongoImport.ToolOptions.DBPath,
+		dbName:       mongoImport.ToolOptions.Namespace.DB,
+		collection:   mongoImport.ToolOptions.Namespace.Collection,
+	}
 }
 
 // ValidateSettings ensures that the tool specific options supplied for

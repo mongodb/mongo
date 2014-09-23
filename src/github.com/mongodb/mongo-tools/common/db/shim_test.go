@@ -96,7 +96,6 @@ func TestShimWrite(t *testing.T) {
 	})
 }
 
-
 func TestShimCommand(t *testing.T) {
 
 	Convey("Test running shim command", t, func() {

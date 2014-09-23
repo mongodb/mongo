@@ -50,7 +50,7 @@ func (gw *GridWriter) Feed(data string) {
 
 //EndRow terminates the row of cells and begins a new row in the grid.
 func (gw *GridWriter) EndRow() {
-	gw.CurrentRow += 1
+	gw.CurrentRow++
 	if len(gw.Grid) <= gw.CurrentRow {
 		gw.Grid = append(gw.Grid, []Cell{})
 	}
@@ -66,7 +66,7 @@ func (gw *GridWriter) calculateWidths() []int {
 		found := false
 
 		//Examine all the rows at column 'j'
-		for i, _ := range gw.Grid {
+		for i := range gw.Grid {
 			if len(gw.Grid[i]) <= j {
 				continue
 			}
