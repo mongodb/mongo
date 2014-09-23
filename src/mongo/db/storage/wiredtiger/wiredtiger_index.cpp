@@ -333,7 +333,7 @@ namespace mongo {
         if (loc.isNull())
             searchLoc = forward ? DiskLoc(0, 0) : DiskLoc(INT_MAX, INT_MAX);
         boost::scoped_array<char> data;
-        WiredTigerItem myKey = _toItem( key, loc, &data );
+        WiredTigerItem myKey = _toItem( key, searchLoc, &data );
         return _search( c, myKey, forward );
     }
 
