@@ -125,6 +125,13 @@ namespace repl {
         virtual void blacklistSyncSource(const HostAndPort& host, Date_t until) = 0;
 
         /**
+         * Determine if a new sync source should be chosen, if a better candidate sync source is
+         * available.  If the current sync source's last optime is more than _maxSyncSourceLagSecs
+         * behind any syncable source, this function returns true.
+         */
+        virtual bool shouldChangeSyncSource(const HostAndPort& currentSource) const = 0;
+
+        /**
          * Sets the earliest time the current node will stand for election to "newTime".
          *
          * Does not affect the node's state or the process of any elections in flight.

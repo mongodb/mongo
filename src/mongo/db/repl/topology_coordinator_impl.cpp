@@ -1562,5 +1562,44 @@ namespace {
         return _maintenanceModeCalls;
     }
 
+    bool TopologyCoordinatorImpl::shouldChangeSyncSource(const HostAndPort& currentSource) const
+    {
+        // Methodology:
+        // If there exists a viable sync source member other than currentSource, whose oplog has
+        // reached an optime greater than _maxSyncSourceLagSecs later than currentSource's, return
+        // true.
+        const int currentMemberIndex = findMemberIndexForHostAndPort(_currentConfig, currentSource);
+        if (currentMemberIndex == -1) {
+            return true;
+        }
+        OpTime currentOpTime = _hbdata[currentMemberIndex].getOpTime();
+        if (currentOpTime.isNull()) {
+            // Haven't received a heartbeat from the sync source yet, so can't tell if we should
+            // change.
+            return false;
+        }
+        unsigned int currentSecs = currentOpTime.getSecs();
+        unsigned int goalSecs = currentSecs + _maxSyncSourceLagSecs.total_seconds();
+
+        for (std::vector<MemberHeartbeatData>::const_iterator it = _hbdata.begin();
+             it != _hbdata.end();
+             ++it) {
+            const MemberConfig& candidateConfig = _currentConfig.getMemberAt(it->getConfigIndex());
+            if (it->up() &&
+                (candidateConfig.shouldBuildIndexes() || !_selfConfig().shouldBuildIndexes()) &&
+                it->getState().readable() &&
+                goalSecs < it->getOpTime().getSecs()) {
+                log() << "changing sync target because current sync target's most recent OpTime is "
+                      << currentOpTime.toStringLong() << " which is more than "
+                      << _maxSyncSourceLagSecs.total_seconds() << " seconds behind member " 
+                      <<  candidateConfig.getHostAndPort().toString()
+                      << " whose most recent OpTime is " << it->getOpTime().toStringLong();
+                return true;
+            }
+        }
+        return false;
+    }
+
+
 } // namespace repl
 } // namespace mongo
