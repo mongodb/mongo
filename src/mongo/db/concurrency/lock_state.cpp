@@ -381,7 +381,12 @@ namespace newlm {
             }
             else {
                 // It's a non-flush lock, so release it.
-                unlock(request->resourceId);
+                // If we're here we should only have one reference to this lock.
+                // Even if we're in DBDirectClient or some other nested scope, we would
+                // have to release the global lock fully before we get here.
+                // Therefore we're not here unless we've unlocked the global lock, in which
+                // case it's a programming error to have >1 reference to this lock.
+                invariant(unlock(request->resourceId));
 
                 // Unlocking modifies the state of _requests, but we're iterating over it, so we
                 // have to start from the beginning every time we unlock something.
@@ -510,6 +515,8 @@ namespace {
 
     bool LockerImpl::unlock(const ResourceId& resId) {
         LockRequest* request = _find(resId);
+
+        invariant(request);
         invariant(request->mode != MODE_NONE);
 
         // Methods on the Locker class are always called single-threadly, so it is safe to release
@@ -553,21 +560,25 @@ namespace {
         };
     }
 
-    void LockerImpl::saveLockState(Locker::LockSnapshot* stateOut) const {
+    void LockerImpl::saveLockStateAndUnlock(Locker::LockSnapshot* stateOut) {
         // Clear out whatever is in stateOut.
         stateOut->locks.clear();
         stateOut->globalMode = MODE_NONE;
+        stateOut->globalRecursiveCount = 0;
 
-        // _requests is protected by _lock.
-        scoped_spinlock scopedLock(_lock);
-
-        // First, we look at the global.  There is special handling for this (as the flush
+        // First, we look at the global lock.  There is special handling for this (as the flush
         // lock goes along with it) so we store it separately from the more pedestrian locks.
         //
         // Flush lock state is inferred from the global state so we don't bother to store it.
         LockRequest* globalRequest = _find(resourceIdGlobal);
         if (NULL != globalRequest) {
             stateOut->globalMode = globalRequest->mode;
+            stateOut->globalRecursiveCount = globalRequest->recursiveCount;
+        }
+        else {
+            // If there's no global lock there isn't really anything to do.
+            invariant(_requests.empty());
+            return;
         }
 
         // Next, the non-global locks.
@@ -597,16 +608,37 @@ namespace {
             stateOut->locks.push_back(info);
         }
 
-        // Sort locks from coarsest to finest.
+        // Sort locks from coarsest to finest.  They'll later be acquired in this order.
         std::sort(stateOut->locks.begin(), stateOut->locks.end(), SortByGranularity());
+
+        // Unlock everything.
+
+        // Step 1: Unlock all requests that are not-flush and not-global.
+        for (size_t i = 0; i < stateOut->locks.size(); ++i) {
+            for (size_t j = 0; j < stateOut->locks[i].recursiveCount; ++j) {
+                unlock(stateOut->locks[i].resourceId);
+            }
+        }
+
+        // Step 2: Unlock the global lock.
+        for (size_t i = 0; i < stateOut->globalRecursiveCount; ++i) {
+            unlock(resourceIdGlobal);
+        }
+
+        // Step 3: Unlock flush.  It's only acquired on the first global lock acquisition
+        // so we only unlock it once.
+        invariant(unlock(resourceIdMMAPV1Flush));
     }
 
     void LockerImpl::restoreLockState(const Locker::LockSnapshot& state) {
-        lockGlobal(state.globalMode);
+        // We expect to be able to unlock each lock 'recursiveCount' number of times.
+        // So, we relock each lock that number of times.
+
+        for (size_t i = 0; i < state.globalRecursiveCount; ++i) {
+            lockGlobal(state.globalMode);
+        }
 
         for (size_t i = 0; i < state.locks.size(); ++i) {
-            // We expect to be able to unlock this lock 'recursiveCount' number of times.  So, we relock
-            // it that number of times.
             for (size_t j = 0; j < state.locks[i].recursiveCount; ++j) {
                 invariant(LOCK_OK == lock(state.locks[i].resourceId, state.locks[i].mode));
             }

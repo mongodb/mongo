@@ -111,7 +111,8 @@ namespace newlm {
         virtual LockMode getLockMode(const ResourceId& resId) const;
         virtual bool isLockHeldForMode(const ResourceId& resId, LockMode mode) const;
 
-        virtual void saveLockState(LockSnapshot* stateOut) const;
+        virtual void saveLockStateAndUnlock(LockSnapshot* stateOut);
+
         virtual void restoreLockState(const LockSnapshot& stateToRestore);
 
         /**

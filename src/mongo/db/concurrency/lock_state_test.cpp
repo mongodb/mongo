@@ -154,47 +154,38 @@ namespace newlm {
     /**
      * Test that saveLockState works by examining the output.
      */
-    TEST(Locker, saveLockState) {
+    TEST(Locker, saveAndRestoreGlobal) {
         Locker::LockSnapshot lockInfo;
 
         LockerImpl locker(1);
 
         // No lock requests made, no locks held.
-        locker.saveLockState(&lockInfo);
+        locker.saveLockStateAndUnlock(&lockInfo);
         ASSERT_EQUALS(0U, lockInfo.locks.size());
 
-        // Lock something.
+        // Lock the global lock twice.
+        locker.lockGlobal(MODE_IX);
         locker.lockGlobal(MODE_IX);
 
         // We've locked the global lock.  This should be reflected in the lockInfo.
-        locker.saveLockState(&lockInfo);
+        locker.saveLockStateAndUnlock(&lockInfo);
+        ASSERT(!locker.isLocked());
         ASSERT_EQUALS(MODE_IX, lockInfo.globalMode);
-        // But we haven't locked anything non-global.
-        ASSERT_EQUALS(0U, lockInfo.locks.size());
+        ASSERT_EQUALS(2U, lockInfo.globalRecursiveCount);
 
-        // Now we'll lock a non-global lock.  This should show up in lockInfo.locks.
-        const ResourceId resIdCollection(RESOURCE_COLLECTION, std::string("TestDB.collection"));
-        ASSERT(LOCK_OK == locker.lock(resIdCollection, MODE_IX, 0));
+        // Restore the lock(s) we had.
+        locker.restoreLockState(lockInfo);
 
-        // Make sure the lock state deets are correct.
-        locker.saveLockState(&lockInfo);
-        ASSERT_EQUALS(1U, lockInfo.locks.size());
-        ASSERT_EQUALS(resIdCollection, lockInfo.locks[0].resourceId);
-        ASSERT_EQUALS(MODE_IX, lockInfo.locks[0].mode);
-        ASSERT_EQUALS(1U, lockInfo.locks[0].recursiveCount);
-
-        // Then we'll unlock the collection and make sure it doesn't appear in saved lock state.
-        ASSERT(locker.unlock(resIdCollection));
-        locker.saveLockState(&lockInfo);
-        ASSERT_EQUALS(0U, lockInfo.locks.size());
-
-        locker.unlockAll();
+        // We have to unlock the global lock twice because we locked it twice.
+        ASSERT(!locker.unlockAll());
+        ASSERT(locker.isLocked());
+        ASSERT(locker.unlockAll());
     }
 
     /**
      * Tests that restoreLockState works by locking a db and collection and saving + restoring.
      */
-    TEST(Locker, saveAndRestore) {
+    TEST(Locker, saveAndRestoreDBAndCollection) {
         Locker::LockSnapshot lockInfo;
 
         LockerImpl locker(1);
@@ -204,13 +195,11 @@ namespace newlm {
 
         // Lock some stuff.
         locker.lockGlobal(MODE_IX);
-        ASSERT(LOCK_OK == locker.lock(resIdDatabase, MODE_IX, 0));
-        ASSERT(LOCK_OK == locker.lock(resIdCollection, MODE_X, 0));
-        locker.saveLockState(&lockInfo);
+        ASSERT(LOCK_OK == locker.lock(resIdDatabase, MODE_IX));
+        ASSERT(LOCK_OK == locker.lock(resIdCollection, MODE_X));
+        locker.saveLockStateAndUnlock(&lockInfo);
 
-        // Unlock everything.
-        locker.unlockAll();
-
+        // Things shouldn't be locked anymore.
         ASSERT(locker.getLockMode(resIdDatabase) == MODE_NONE);
         ASSERT(locker.getLockMode(resIdCollection) == MODE_NONE);
 

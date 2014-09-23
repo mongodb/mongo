@@ -159,6 +159,9 @@ namespace mongo {
             // The global lock is handled differently from all other locks.
             newlm::LockMode globalMode;
 
+            // One can acquire the global lock repeatedly.
+            unsigned globalRecursiveCount;
+
             struct OneLock {
                 // What lock resource is held?
                 newlm::ResourceId resourceId;
@@ -178,11 +181,20 @@ namespace mongo {
         };
 
         /**
-         * Retrieve all locks held by this transaction, and what mode they're held in.
+         * Retrieves all locks held by this transaction, and what mode they're held in.
+         * Stores these locks in 'stateOut', destroying any previous state.  Unlocks all locks
+         * held by this transaction.  This functionality is used for yielding in the MMAPV1
+         * storage engine.  MMAPV1 uses voluntary/cooperative lock release and reacquisition
+         * in order to allow for interleaving of otherwise conflicting long-running operations.
          *
-         * Clobbers anything in 'stateOut'.
+         * This functionality is also used for releasing locks on databases and collections
+         * when cursors are dormant and waiting for a getMore request.
          */
-        virtual void saveLockState(LockSnapshot* stateOut) const = 0;
+        virtual void saveLockStateAndUnlock(LockSnapshot* stateOut) = 0;
+
+        /**
+         * Re-locks all locks whose state was stored in 'stateToRestore'.
+         */
         virtual void restoreLockState(const LockSnapshot& stateToRestore) = 0;
 
         //
