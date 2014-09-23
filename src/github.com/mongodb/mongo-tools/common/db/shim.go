@@ -138,12 +138,12 @@ func (shim *Shim) OpenInsertStream(DB, Collection string) (DocSink, error) {
 
 // not supported yet!
 func (shim *Shim) Remove(DB, Collection string, Query interface{}) error {
-	return fmt.Errorf("mongoshim doesn't support Remove yet!")
+	return fmt.Errorf("mongoshim doesn't support Remove yet")
 }
 
 // not supported yet!
 func (shim *Shim) RemoveAll(DB, Collection string, Query interface{}) error {
-	return fmt.Errorf("mongoshim doesn't support RemoveAll yet!")
+	return fmt.Errorf("mongoshim doesn't support RemoveAll yet")
 }
 
 type databaseNames struct {
