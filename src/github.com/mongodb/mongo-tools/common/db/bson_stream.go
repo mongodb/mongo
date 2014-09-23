@@ -113,11 +113,10 @@ func (shim *BSONSource) LoadNextInto(into []byte) (bool, int32) {
 		if err != io.EOF {
 			shim.err = err
 			return false, 0
-		} else {
-			//We hit EOF right away, so we're at the end of the stream.
-			shim.err = nil
-			return false, 0
 		}
+		//We hit EOF right away, so we're at the end of the stream.
+		shim.err = nil
+		return false, 0
 	}
 
 	bsonSize := int32(
@@ -139,12 +138,11 @@ func (shim *BSONSource) LoadNextInto(into []byte) (bool, int32) {
 		if err != io.EOF {
 			shim.err = err
 			return false, 0
-		} else {
-			//This case means we hit EOF but read a partial document,
-			//so there's a broken doc in the stream. Treat this as error.
-			shim.err = fmt.Errorf("Invalid bson: %v", err)
-			return false, 0
 		}
+		//This case means we hit EOF but read a partial document,
+		//so there's a broken doc in the stream. Treat this as error.
+		shim.err = fmt.Errorf("Invalid bson: %v", err)
+		return false, 0
 	}
 
 	shim.err = nil

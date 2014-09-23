@@ -190,9 +190,8 @@ func (shim *Shim) Run(command interface{}, out interface{}, database string) err
 	if !hasDoc {
 		if err := decodedResult.Err(); err != nil {
 			return err
-		} else {
-			return fmt.Errorf("Didn't receive response from shim with command result.")
 		}
+		return fmt.Errorf("Didn't receive response from shim with command result.")
 	}
 	defer commandShim.Close()
 	return commandShim.WaitResult()
@@ -290,7 +289,7 @@ func checkExists(path string) (bool, error) {
 	return true, nil
 }
 
-var ShimNotFoundErr = errors.New("Shim not found")
+var ErrShimNotFound = errors.New("Shim not found")
 
 func LocateShim() (string, error) {
 	shimLoc := os.Getenv("MONGOSHIM")
@@ -306,7 +305,7 @@ func LocateShim() (string, error) {
 	}
 
 	if shimLoc == "" {
-		return "", ShimNotFoundErr
+		return "", ErrShimNotFound
 	}
 
 	exists, err := checkExists(shimLoc)
@@ -314,7 +313,7 @@ func LocateShim() (string, error) {
 		return "", err
 	}
 	if !exists {
-		return "", ShimNotFoundErr
+		return "", ErrShimNotFound
 	}
 	return shimLoc, nil
 }
@@ -358,9 +357,8 @@ func (shim *StorageShim) WaitResult() error {
 	if shim.shimProcess != nil {
 		err := shim.shimProcess.Wait()
 		return err
-	} else {
-		return nil
 	}
+	return nil
 }
 
 func (shim *StorageShim) Close() error {
@@ -368,7 +366,6 @@ func (shim *StorageShim) Close() error {
 		shim.stdin.Close()
 		_, err := shim.shimProcess.Process.Wait()
 		return err
-	} else {
-		return nil
 	}
+	return nil
 }

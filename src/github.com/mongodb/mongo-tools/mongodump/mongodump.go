@@ -277,36 +277,35 @@ func (dump *MongoDump) DumpCollection(dbName, c string) error {
 	if dump.useStdout {
 		log.Logf(0, "writing %v.%v to stdout", dbName, c)
 		return dump.dumpDocSourceToWriter(findQuery, os.Stdout)
-	} else {
-		dbFolder := filepath.Join(dump.OutputOptions.Out, dbName)
-		err := os.MkdirAll(dbFolder, 0755)
-		if err != nil {
-			return fmt.Errorf("error creating directory `%v`: %v", dbFolder, err)
-		}
-
-		outFilepath := filepath.Join(dbFolder, fmt.Sprintf("%v.bson", c))
-		out, err := os.Create(outFilepath)
-		if err != nil {
-			return fmt.Errorf("error creating bson file `%v`: %v", outFilepath, err)
-		}
-		defer out.Close()
-
-		log.Logf(0, "writing %v.%v to %v", dbName, c, outFilepath)
-		err = dump.dumpDocSourceToWriter(findQuery, out)
-		if err != nil {
-			return err
-		}
-
-		metadataFilepath := filepath.Join(dbFolder, fmt.Sprintf("%v.metadata.json", c))
-		metaOut, err := os.Create(metadataFilepath)
-		if err != nil {
-			return fmt.Errorf("error creating metadata.json file `%v`: %v", outFilepath, err)
-		}
-		defer metaOut.Close()
-
-		log.Logf(0, "writing %v.%v metadata to %v", dbName, c, metadataFilepath)
-		return dump.dumpMetadataToWriter(dbName, c, metaOut)
 	}
+	dbFolder := filepath.Join(dump.OutputOptions.Out, dbName)
+	err := os.MkdirAll(dbFolder, 0755)
+	if err != nil {
+		return fmt.Errorf("error creating directory `%v`: %v", dbFolder, err)
+	}
+
+	outFilepath := filepath.Join(dbFolder, fmt.Sprintf("%v.bson", c))
+	out, err := os.Create(outFilepath)
+	if err != nil {
+		return fmt.Errorf("error creating bson file `%v`: %v", outFilepath, err)
+	}
+	defer out.Close()
+
+	log.Logf(0, "writing %v.%v to %v", dbName, c, outFilepath)
+	err = dump.dumpDocSourceToWriter(findQuery, out)
+	if err != nil {
+		return err
+	}
+
+	metadataFilepath := filepath.Join(dbFolder, fmt.Sprintf("%v.metadata.json", c))
+	metaOut, err := os.Create(metadataFilepath)
+	if err != nil {
+		return fmt.Errorf("error creating metadata.json file `%v`: %v", outFilepath, err)
+	}
+	defer metaOut.Close()
+
+	log.Logf(0, "writing %v.%v metadata to %v", dbName, c, metadataFilepath)
+	return dump.dumpMetadataToWriter(dbName, c, metaOut)
 }
 
 // dumpQueryToWriter takes an mgo Query and a writer, performs the query,

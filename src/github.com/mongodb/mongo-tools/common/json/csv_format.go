@@ -24,11 +24,10 @@ func (d Date) String() string {
 		n := int64(d)
 		t := time.Unix(n/1e3, n%1e3*1e6)
 		return t.UTC().Format(JSON_DATE_FORMAT)
-	} else {
-		//date.MarshalJSON always returns a nil err.
-		data, _ := d.MarshalJSON()
-		return string(data)
 	}
+	//date.MarshalJSON always returns a nil err.
+	data, _ := d.MarshalJSON()
+	return string(data)
 }
 
 func (d DBRef) String() string {

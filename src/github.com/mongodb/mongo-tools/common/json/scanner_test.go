@@ -168,7 +168,7 @@ var indentErrorTests = []indentErrorTest{
 
 func TestIndentErrors(t *testing.T) {
 	for i, tt := range indentErrorTests {
-		slice := make([]uint8, 0)
+		var slice []uint8
 		buf := bytes.NewBuffer(slice)
 		if err := Indent(buf, []uint8(tt.in), "", ""); err != nil {
 			if !reflect.DeepEqual(err, tt.err) {
