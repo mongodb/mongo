@@ -83,7 +83,7 @@ func (siw *ShimImportWriter) initImportShim() error {
 		return err
 	}
 	siw.importShim = importShim
-	siw.docSink = &db.EncodedBSONSink{inStream}
+	siw.docSink = &db.EncodedBSONSink{inStream, importShim}
 	return nil
 }
 
@@ -95,7 +95,7 @@ func (siw *ShimImportWriter) Import(doc bson.M) error {
 			return err
 		}
 	}
-	_, err := siw.docSink.WriteDoc(doc)
+	err := siw.docSink.WriteDoc(doc)
 	if err != nil {
 		return err
 	}
