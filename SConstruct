@@ -972,6 +972,7 @@ if "uname" in dir(os):
 
 if has_option( "ssl" ):
     env.Append( CPPDEFINES=["MONGO_SSL"] )
+    env.Append( MONGO_CRYPTO=["openssl"] )
     if windows:
         env.Append( LIBS=["libeay32"] )
         env.Append( LIBS=["ssleay32"] )
@@ -980,6 +981,8 @@ if has_option( "ssl" ):
         env.Append( LIBS=["crypto"] )
     if has_option("ssl-fips-capability"):
         env.Append( CPPDEFINES=["MONGO_SSL_FIPS"] )
+else:
+    env.Append( MONGO_CRYPTO=["tom"] )
 
 env['MONGO_REPL_IMPL'] = get_option('replication-implementation')
 

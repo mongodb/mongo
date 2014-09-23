@@ -21,6 +21,7 @@ env.InjectMongoIncludePaths()
 
 env.SConscript(['base/SConscript',
                 'crypto/SConscript',
+                'crypto/tom/SConscript',
                 'db/auth/SConscript',
                 'db/catalog/SConscript',
                 'db/commands/SConscript',

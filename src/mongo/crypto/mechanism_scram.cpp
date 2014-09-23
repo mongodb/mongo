@@ -32,21 +32,14 @@
 
 #include <vector>
 
-#ifdef MONGO_SSL
-#include <openssl/sha.h>
-#include <openssl/evp.h>
-#include <openssl/hmac.h>
-#endif
-
+#include "mongo/crypto/crypto.h"
 #include "mongo/platform/random.h"
 #include "mongo/util/base64.h"
+#include "mongo/util/log.h"
 
 namespace mongo {
 namespace scram {
 
-// Need to #ifdef this until our SCRAM implementation
-// is independent of libcrypto
-#ifdef MONGO_SSL
     // Compute the SCRAM step Hi() as defined in RFC5802
     static void HMACIteration(const unsigned char input[],
                               size_t inputLen,
@@ -68,26 +61,25 @@ namespace scram {
         startKey[saltLen+3] = 1;
 
         // U1 = HMAC(input, salt + 0001)
-        fassert(17494, HMAC(EVP_sha1(),
-                            input,
-                            inputLen,
-                            startKey,
-                            saltLen + 4,
-                            output,
-                            &hashLen));
+        fassert(17494, crypto::hmacSha1(input,
+                                        inputLen,
+                                        startKey,
+                                        saltLen + 4,
+                                        output,
+                                        &hashLen));
 
         memcpy(intermediateDigest, output, hashSize);
 
         // intermediateDigest contains Ui and output contains the accumulated XOR:ed result
         for (size_t i = 2; i <= iterationCount; i++) {
-            fassert(17495, HMAC(EVP_sha1(),
-                                input,
-                                inputLen,
-                                intermediateDigest,
-                                hashSize,
-                                intermediateDigest,
-                                &hashLen));
-
+            unsigned char intermediateOutput[hashSize];
+            fassert(17495, crypto::hmacSha1(input,
+                                            inputLen,
+                                            intermediateDigest,
+                                            hashSize,
+                                            intermediateOutput,
+                                            &hashLen));
+            memcpy(intermediateDigest, intermediateOutput, hashSize);
             for (size_t k = 0; k < hashSize; k++) {
                 output[k] ^= intermediateDigest[k];
             }
@@ -129,36 +121,31 @@ namespace scram {
                                saltedPassword);
 
         // clientKey = HMAC(saltedPassword, "Client Key")
-        fassert(17498, HMAC(EVP_sha1(),
-                            saltedPassword,
-                            hashSize,
-                            reinterpret_cast<const unsigned char*>(clientKeyConst.data()),
-                            clientKeyConst.size(),
-                            clientKey,
-                            &hashLen));
+        fassert(17498, 
+                crypto::hmacSha1(saltedPassword,
+                                 hashSize,
+                                 reinterpret_cast<const unsigned char*>(clientKeyConst.data()),
+                                 clientKeyConst.size(),
+                                 clientKey,
+                                 &hashLen));
 
         // storedKey = H(clientKey)
-        fassert(17499, SHA1(clientKey, hashSize, storedKey));
+        fassert(17499, crypto::sha1(clientKey, hashSize, storedKey));
 
         // serverKey = HMAC(saltedPassword, "Server Key")
-        fassert(17500, HMAC(EVP_sha1(),
-                            saltedPassword,
-                            hashSize,
-                            reinterpret_cast<const unsigned char*>(serverKeyConst.data()),
-                            serverKeyConst.size(),
-                            serverKey,
-                            &hashLen));
+        fassert(17500, 
+                crypto::hmacSha1(saltedPassword,
+                                 hashSize,
+                                 reinterpret_cast<const unsigned char*>(serverKeyConst.data()),
+                                 serverKeyConst.size(),
+                                 serverKey,
+                                 &hashLen));
     }
 
-#endif //MONGO_SSL
-
     BSONObj generateCredentials(const std::string& hashedPassword) {
-#ifndef MONGO_SSL
-        return BSONObj();
-#else
 
         // TODO: configure the default iteration count via setParameter
-        const int iterationCount = 10000;
+        const int iterationCount = 10;
         const int saltLenQWords = 2;
 
         // Generate salt
@@ -191,39 +178,35 @@ namespace scram {
                     "salt" << encodedUserSalt <<
                     "storedKey" << encodedStoredKey <<
                     "serverKey" << encodedServerKey);
-#endif
     }
 
     std::string generateClientProof(const unsigned char saltedPassword[hashSize],
                                     const std::string& authMessage) {
-#ifndef MONGO_SSL
-        return "";
-#else
-
+        
         // ClientKey := HMAC(saltedPassword, "Client Key")
         unsigned char clientKey[hashSize];
         unsigned int hashLen = 0;
-        fassert(18689, HMAC(EVP_sha1(),
-                            saltedPassword,
-                            hashSize,
-                            reinterpret_cast<const unsigned char*>(clientKeyConst.data()),
-                            clientKeyConst.size(),
-                            clientKey,
-                            &hashLen));
+        fassert(18689, 
+                crypto::hmacSha1(saltedPassword,
+                                 hashSize,
+                                 reinterpret_cast<const unsigned char*>(clientKeyConst.data()),
+                                 clientKeyConst.size(),
+                                 clientKey,
+                                 &hashLen));
 
         // StoredKey := H(clientKey)
         unsigned char storedKey[hashSize];
-        fassert(18701, SHA1(clientKey, hashSize, storedKey));
+        fassert(18701, crypto::sha1(clientKey, hashSize, storedKey));
 
         // ClientSignature := HMAC(StoredKey, AuthMessage)
         unsigned char clientSignature[hashSize];
-        fassert(18702, HMAC(EVP_sha1(),
-                            storedKey,
-                            hashSize,
-                            reinterpret_cast<const unsigned char*>(authMessage.c_str()),
-                            authMessage.size(),
-                            clientSignature,
-                            &hashLen));
+        fassert(18702,
+                crypto::hmacSha1(storedKey,
+                                 hashSize,
+                                 reinterpret_cast<const unsigned char*>(authMessage.c_str()),
+                                 authMessage.size(),
+                                 clientSignature,
+                                 &hashLen));
 
         // ClientProof   := ClientKey XOR ClientSignature
         unsigned char clientProof[hashSize];
@@ -233,40 +216,36 @@ namespace scram {
 
         return base64::encode(reinterpret_cast<char*>(clientProof), hashSize);
 
-#endif // MONGO_SSL
     }
 
     bool verifyServerSignature(const unsigned char saltedPassword[hashSize],
                                const std::string& authMessage,
                                const std::string& receivedServerSignature) {
-#ifndef MONGO_SSL
-        return false;
-#else
+        
         // ServerKey       := HMAC(SaltedPassword, "Server Key")
         unsigned int hashLen;
         unsigned char serverKey[hashSize];
-        fassert(18703, HMAC(EVP_sha1(),
-                            saltedPassword,
-                            hashSize,
-                            reinterpret_cast<const unsigned char*>(serverKeyConst.data()),
-                            serverKeyConst.size(),
-                            serverKey,
-                            &hashLen));
+        fassert(18703, 
+                crypto::hmacSha1(saltedPassword,
+                                 hashSize,
+                                 reinterpret_cast<const unsigned char*>(serverKeyConst.data()),
+                                 serverKeyConst.size(),
+                                 serverKey,
+                                 &hashLen));
 
         // ServerSignature := HMAC(ServerKey, AuthMessage)
         unsigned char serverSignature[hashSize];
-        fassert(18704, HMAC(EVP_sha1(),
-                            serverKey,
-                            hashSize,
-                            reinterpret_cast<const unsigned char*>(authMessage.c_str()),
-                            authMessage.size(),
-                            serverSignature,
-                            &hashLen));
+        fassert(18704,
+                crypto::hmacSha1(serverKey,
+                                 hashSize,
+                                 reinterpret_cast<const unsigned char*>(authMessage.c_str()),
+                                 authMessage.size(),
+                                 serverSignature,
+                                 &hashLen));
 
         std::string encodedServerSignature =
             base64::encode(reinterpret_cast<char*>(serverSignature), sizeof(serverSignature));
         return (receivedServerSignature == encodedServerSignature);
-#endif
     }
 
 } // namespace scram
