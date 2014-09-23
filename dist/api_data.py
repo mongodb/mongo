@@ -445,7 +445,6 @@ connection_runtime_config = [
 	        'mutex',
 	        'overflow',
 	        'read',
-	        'readserver',
 	        'reconcile',
 	        'recovery',
 	        'salvage',

@@ -102,9 +102,9 @@ static const WT_CONFIG_CHECK confchk_connection_reconfigure[] = {
 	{ "verbose", "list",
 	    "choices=[\"api\",\"block\",\"checkpoint\",\"compact\",\"evict\""
 	    ",\"evictserver\",\"fileops\",\"log\",\"lsm\",\"metadata\","
-	    "\"mutex\",\"overflow\",\"read\",\"readserver\",\"reconcile\","
-	    "\"recovery\",\"salvage\",\"shared_cache\",\"split\",\"verify\","
-	    "\"version\",\"write\"]",
+	    "\"mutex\",\"overflow\",\"read\",\"reconcile\",\"recovery\","
+	    "\"salvage\",\"shared_cache\",\"split\",\"verify\",\"version\","
+	    "\"write\"]",
 	    NULL },
 	{ NULL, NULL, NULL, NULL }
 };
@@ -342,9 +342,9 @@ static const WT_CONFIG_CHECK confchk_wiredtiger_open[] = {
 	{ "verbose", "list",
 	    "choices=[\"api\",\"block\",\"checkpoint\",\"compact\",\"evict\""
 	    ",\"evictserver\",\"fileops\",\"log\",\"lsm\",\"metadata\","
-	    "\"mutex\",\"overflow\",\"read\",\"readserver\",\"reconcile\","
-	    "\"recovery\",\"salvage\",\"shared_cache\",\"split\",\"verify\","
-	    "\"version\",\"write\"]",
+	    "\"mutex\",\"overflow\",\"read\",\"reconcile\",\"recovery\","
+	    "\"salvage\",\"shared_cache\",\"split\",\"verify\",\"version\","
+	    "\"write\"]",
 	    NULL },
 	{ NULL, NULL, NULL, NULL }
 };
