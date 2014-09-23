@@ -22,7 +22,6 @@ type Oplog struct {
 // the name of the oplog collection in the connected db
 func (dump *MongoDump) determineOplogCollectionName() error {
 	masterDoc := bson.M{}
-	fmt.Println("checking oplgo coll name")
 	err := dump.cmdRunner.Run("isMaster", &masterDoc, "admin")
 	if err != nil {
 		return fmt.Errorf("error running command: %v", err)

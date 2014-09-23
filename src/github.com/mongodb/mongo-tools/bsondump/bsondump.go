@@ -107,7 +107,6 @@ func DebugBSON(raw bson.Raw, indentLevel int, out io.Writer) error {
 	var rawD bson.RawD
 	err := bson.Unmarshal(raw.Data, &rawD)
 	if err != nil {
-		fmt.Println(err)
 		return err
 	}
 	for _, rawElem := range rawD {

@@ -37,14 +37,14 @@ func main() {
 		opts.PrintHelp()
 		return
 	} else if len(extra) > 1 {
-		fmt.Println("Too many positional operators.")
+		fmt.Fprintln(os.Stderr, "Too many positional operators.")
 		opts.PrintHelp()
 		os.Exit(1)
 		return
 	} else {
 		filename = extra[0]
 		if filename == "" {
-			fmt.Println("Filename must not be blank.")
+			fmt.Fprintln(os.Stderr, "Filename must not be blank.")
 			opts.PrintHelp()
 			os.Exit(1)
 		}
@@ -65,7 +65,7 @@ func main() {
 		err = fmt.Errorf("Unsupported output type '%'. Must be either 'debug' or 'json'", bsonDumpOpts.Type)
 	}
 	if err != nil {
-		fmt.Println(err)
+		fmt.Fprintf(os.Stderr, err)
 		os.Exit(1)
 	}
 }

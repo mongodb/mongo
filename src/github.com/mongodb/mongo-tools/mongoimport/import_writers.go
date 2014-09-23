@@ -105,7 +105,6 @@ func (siw *ShimImportWriter) Import(doc bson.M) error {
 
 func (siw *ShimImportWriter) Close() error {
 	if siw.importShim != nil {
-		fmt.Println("closing the shim!")
 		return siw.importShim.Close()
 	}
 	return nil

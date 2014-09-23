@@ -81,7 +81,6 @@ func extractFieldByName(fieldName string, document interface{}) (interface{}, er
 		docValue := reflect.ValueOf(subdoc)
 		docType := docValue.Type()
 		docKind := docType.Kind()
-		//fmt.Println("dockind is", docKind, "subdoc", subdoc)
 		if docKind == reflect.Map {
 			subdocVal := docValue.MapIndex(reflect.ValueOf(path))
 			if subdocVal.Kind() == reflect.Invalid {

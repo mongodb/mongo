@@ -126,7 +126,9 @@ func (dump *MongoDump) Dump() error {
 	case dump.ToolOptions.DB != "" && dump.ToolOptions.Collection != "":
 		err = dump.DumpCollection(dump.ToolOptions.DB, dump.ToolOptions.Collection)
 	}
-	fmt.Println(err)
+	if err != nil {
+		return err
+	}
 
 	if dump.OutputOptions.DumpDBUsersAndRoles {
 		log.Logf(0, "dumping users and roles for %v", dump.ToolOptions.DB)
@@ -150,7 +152,6 @@ func (dump *MongoDump) Dump() error {
 func (dump *MongoDump) DumpEverything() error {
 	var oplogStart bson.MongoTimestamp
 
-	fmt.Println("dumping everything")
 	// If oplog capturing is enabled, we first check the most recent
 	// oplog entry and save its timestamp, this will let us later
 	// copy all oplog entries that occurred while dumping, creating
@@ -171,7 +172,6 @@ func (dump *MongoDump) DumpEverything() error {
 	if err != nil {
 		return fmt.Errorf("error getting database names: %v", err)
 	}
-	fmt.Println("dbs is ", dbs)
 	for _, dbName := range dbs {
 		if dbName != "local" { // local can only be explicitly dumped
 			log.Logf(0, "dumping database %v", dbName)
