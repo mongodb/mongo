@@ -425,6 +425,8 @@ namespace mongo {
 
         OID _oid;
         BenchRunState _brState;
+        Timer *_brTimer;
+        unsigned long long _microsElapsed;
         boost::scoped_ptr<BenchRunConfig> _config;
         std::vector<BenchRunWorker *> _workers;
 

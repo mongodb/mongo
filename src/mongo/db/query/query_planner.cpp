@@ -232,19 +232,7 @@ namespace mongo {
     }
 
     bool providesSort(const CanonicalQuery& query, const BSONObj& kp) {
-        BSONObjIterator sortIt(query.getParsed().getSort());
-        BSONObjIterator kpIt(kp);
-
-        while (sortIt.more() && kpIt.more()) {
-            // We want the field name to be the same as well (so we pass true).
-            // TODO: see if we can pull a reverse sort out...
-            if (0 != sortIt.next().woCompare(kpIt.next(), true)) {
-                return false;
-            }
-        }
-
-        // every elt in sort matched kp
-        return !sortIt.more();
+        return query.getParsed().getSort().isPrefixOf(kp);
     }
 
     // static
@@ -877,7 +865,7 @@ namespace mongo {
                     //   2dsphereIndexVersion=2) should be able to provide a sort for
                     //   find({b: GEO}).sort({a:1}).  SERVER-10801.
 
-                    const BSONObj kp = LiteParsedQuery::normalizeSortOrder(index.keyPattern);
+                    const BSONObj kp = QueryPlannerAnalysis::getSortPattern(index.keyPattern);
                     if (providesSort(query, kp)) {
                         QLOG() << "Planner: outputting soln that uses index to provide sort."
                                << endl;

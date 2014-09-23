@@ -31,6 +31,10 @@
 
 #include "mongo/platform/endian.h"
 
+#if __cplusplus >= 201103L
+#include <type_traits>
+#endif
+
 namespace mongo {
 
     class ConstDataView {
@@ -90,6 +94,10 @@ namespace mongo {
 
         template<typename T>
         DataView& writeNative(const T& value, std::size_t offset = 0) {
+#if MONGO_HAVE_STD_IS_TRIVIALLY_COPYABLE
+            static_assert(std::is_trivially_copyable<T>::value,
+                          "Type for DataView::writeNative must be trivially copyable");
+#endif
             std::memcpy(view(offset), &value, sizeof(value));
             return *this;
         }

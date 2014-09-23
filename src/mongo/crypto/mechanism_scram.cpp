@@ -28,7 +28,7 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/db/auth/mechanism_scram.h"
+#include "mongo/crypto/mechanism_scram.h"
 
 #include <vector>
 
@@ -61,7 +61,7 @@ namespace scram {
 
         uassert(17450, "invalid salt length provided", saltLen + 4 == hashSize);
         memcpy (startKey, salt, saltLen);
-        
+
         startKey[saltLen] = 0;
         startKey[saltLen+1] = 0;
         startKey[saltLen+2] = 0;
@@ -97,9 +97,9 @@ namespace scram {
     // Iterate the hash function to generate SaltedPassword
     void generateSaltedPassword(const StringData& password,
                                 const unsigned char* salt,
-                                const int saltLen,       
+                                const int saltLen,
                                 const int iterationCount,
-                                unsigned char saltedPassword[hashSize]) { 
+                                unsigned char saltedPassword[hashSize]) {
         // saltedPassword = Hi(password, salt)
         HMACIteration(reinterpret_cast<const unsigned char*>(password.rawData()),
                       password.size(),
@@ -136,10 +136,10 @@ namespace scram {
                             clientKeyConst.size(),
                             clientKey,
                             &hashLen));
-        
+
         // storedKey = H(clientKey)
         fassert(17499, SHA1(clientKey, hashSize, storedKey));
-        
+
         // serverKey = HMAC(saltedPassword, "Server Key")
         fassert(17500, HMAC(EVP_sha1(),
                             saltedPassword,
@@ -149,7 +149,7 @@ namespace scram {
                             serverKey,
                             &hashLen));
     }
-    
+
 #endif //MONGO_SSL
 
     BSONObj generateCredentials(const std::string& hashedPassword) {
@@ -163,12 +163,12 @@ namespace scram {
 
         // Generate salt
         uint64_t userSalt[saltLenQWords];
-        
+
         scoped_ptr<SecureRandom> sr(SecureRandom::create());
 
         userSalt[0] = sr->nextInt64();
         userSalt[1] = sr->nextInt64();
-        std::string encodedUserSalt = 
+        std::string encodedUserSalt =
             base64::encode(reinterpret_cast<char*>(userSalt), sizeof(userSalt));
 
         // Compute SCRAM secrets serverKey and storedKey
@@ -182,13 +182,13 @@ namespace scram {
                           storedKey,
                           serverKey);
 
-        std::string encodedStoredKey = 
+        std::string encodedStoredKey =
             base64::encode(reinterpret_cast<char*>(storedKey), hashSize);
-        std::string encodedServerKey = 
+        std::string encodedServerKey =
             base64::encode(reinterpret_cast<char*>(serverKey), hashSize);
-     
+
         return BSON("iterationCount" << iterationCount <<
-                    "salt" << encodedUserSalt << 
+                    "salt" << encodedUserSalt <<
                     "storedKey" << encodedStoredKey <<
                     "serverKey" << encodedServerKey);
 #endif
@@ -210,7 +210,7 @@ namespace scram {
                             clientKeyConst.size(),
                             clientKey,
                             &hashLen));
-        
+
         // StoredKey := H(clientKey)
         unsigned char storedKey[hashSize];
         fassert(18701, SHA1(clientKey, hashSize, storedKey));
@@ -224,7 +224,7 @@ namespace scram {
                             authMessage.size(),
                             clientSignature,
                             &hashLen));
-        
+
         // ClientProof   := ClientKey XOR ClientSignature
         unsigned char clientProof[hashSize];
         for (size_t i = 0; i<hashSize; i++) {
@@ -252,7 +252,7 @@ namespace scram {
                             serverKeyConst.size(),
                             serverKey,
                             &hashLen));
-        
+
         // ServerSignature := HMAC(ServerKey, AuthMessage)
         unsigned char serverSignature[hashSize];
         fassert(18704, HMAC(EVP_sha1(),
@@ -263,7 +263,7 @@ namespace scram {
                             serverSignature,
                             &hashLen));
 
-        std::string encodedServerSignature =  
+        std::string encodedServerSignature =
             base64::encode(reinterpret_cast<char*>(serverSignature), sizeof(serverSignature));
         return (receivedServerSignature == encodedServerSignature);
 #endif

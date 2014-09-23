@@ -35,8 +35,7 @@
 #include "mongo/base/status.h"
 #include "mongo/base/string_data.h"
 #include "mongo/client/sasl_client_conversation.h"
-#include "mongo/db/auth/mechanism_scram.h"
-#include "mongo/db/auth/user.h"
+#include "mongo/crypto/mechanism_scram.h"
 
 namespace mongo {
     /**

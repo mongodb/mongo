@@ -1,6 +1,7 @@
-// mmap_mm.cpp - in memory (no file) version
+// mongoshim_options.h
 
-/*    Copyright 2009 10gen Inc.
+/*
+ *    Copyright (C) 2014 MongoDB Inc.
  *
  *    This program is free software: you can redistribute it and/or  modify
  *    it under the terms of the GNU Affero General Public License, version 3,
@@ -27,41 +28,45 @@
  *    then also delete it in the license file.
  */
 
-#include "mongo/pch.h"
+#pragma once
 
-#include "mongo/util/mmap.h"
+#include <iosfwd>
+#include <string>
+#include <vector>
 
-#include "mongo/util/allocator.h"
-
-/* in memory (no file) version */
+#include "mongo/base/status.h"
+#include "mongo/tools/tool_options.h"
 
 namespace mongo {
 
-    MemoryMappedFile::MemoryMappedFile() : _uniqueId(0) {
-        fd = 0;
-        maphandle = 0;
-        view = 0;
-        len = 0;
-    }
+    struct MongoShimGlobalParams {
 
-    void MemoryMappedFile::close() {
-        if ( view )
-            free( view );
-        view = 0;
-        len = 0;
-    }
+        bool load;
 
-    void* MemoryMappedFile::map(const char *filename, long& length , int options ) {
-        verify( length );
-        view = mongoMalloc( length );
-        return view;
-    }
+        bool drop;
+        bool upsert;
 
-    void MemoryMappedFile::flush(bool sync) {
-    }
+        std::string query;
+        bool slaveOk;
+        bool snapShotQuery;
+        unsigned int skip;
+        unsigned int limit;
+        std::string sort;
+    };
 
-    void MemoryMappedFile::_lock() {}
-    void MemoryMappedFile::_unlock() {}
+    extern MongoShimGlobalParams mongoShimGlobalParams;
 
+    Status addMongoShimOptions(moe::OptionSection* options);
+
+    void printMongoShimHelp(std::ostream* out);
+
+    /**
+     * Handle options that should come before validation, such as "help".
+     *
+     * Returns false if an option was found that implies we should prematurely exit with success.
+     */
+    bool handlePreValidationMongoShimOptions(const moe::Environment& params);
+
+    Status storeMongoShimOptions(const moe::Environment& params,
+                                   const std::vector<std::string>& args);
 }
-

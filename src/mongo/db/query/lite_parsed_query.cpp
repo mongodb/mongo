@@ -94,11 +94,8 @@ namespace mongo {
 
                 // Sort document normalization.
                 BSONObj sort = el.Obj().getOwned();
-                if (!sort.isEmpty()) {
-                    if (!isValidSortOrder(sort)) {
-                        return Status(ErrorCodes::BadValue, "bad sort specification");
-                    }
-                    sort = normalizeSortOrder(sort);
+                if (!isValidSortOrder(sort)) {
+                    return Status(ErrorCodes::BadValue, "bad sort specification");
                 }
 
                 pq->_sort = sort;
@@ -410,23 +407,6 @@ namespace mongo {
         return false;
     }
 
-    // static
-    BSONObj LiteParsedQuery::normalizeSortOrder(const BSONObj& sortObj) {
-        BSONObjBuilder b;
-        BSONObjIterator i(sortObj);
-        while (i.more()) {
-            BSONElement e = i.next();
-            if (isTextScoreMeta(e)) {
-                b.append(e);
-                continue;
-            }
-            long long n = e.safeNumberLong();
-            int sortOrder = n >= 0 ? 1 : -1;
-            b.append(e.fieldName(), sortOrder);
-        }
-        return b.obj();
-    }
-
     LiteParsedQuery::LiteParsedQuery() :
         _skip(0),
         _limit(0),
@@ -648,10 +628,10 @@ namespace mongo {
                                  bool explain,
                                  LiteParsedQuery** out) {
         auto_ptr<LiteParsedQuery> pq(new LiteParsedQuery());
-        pq->_sort = sort;
-        pq->_hint = hint;
-        pq->_options.min = minObj;
-        pq->_options.max = maxObj;
+        pq->_sort = sort.getOwned();
+        pq->_hint = hint.getOwned();
+        pq->_options.min = minObj.getOwned();
+        pq->_options.max = maxObj.getOwned();
         pq->_options.snapshot = snapshot;
         pq->_explain = explain;
 
@@ -710,11 +690,8 @@ namespace mongo {
 
         _options.hasReadPref = queryObj.hasField("$readPreference");
 
-        if (!_sort.isEmpty()) {
-            if (!isValidSortOrder(_sort)) {
-                return Status(ErrorCodes::BadValue, "bad sort specification");
-            }
-            _sort = normalizeSortOrder(_sort);
+        if (!isValidSortOrder(_sort)) {
+            return Status(ErrorCodes::BadValue, "bad sort specification");
         }
 
         return validate();
@@ -729,7 +706,7 @@ namespace mongo {
 
             if (0 == strcmp("$orderby", name) || 0 == strcmp("orderby", name)) {
                 if (Object == e.type()) {
-                    _sort = e.embeddedObject();
+                    _sort = e.embeddedObject().getOwned();
                 }
                 else if (Array == e.type()) {
                     _sort = e.embeddedObject();
@@ -780,17 +757,17 @@ namespace mongo {
                     if (!e.isABSONObj()) {
                         return Status(ErrorCodes::BadValue, "$min must be a BSONObj");
                     }
-                    _options.min = e.embeddedObject();
+                    _options.min = e.embeddedObject().getOwned();
                 }
                 else if (str::equals("max", name)) {
                     if (!e.isABSONObj()) {
                         return Status(ErrorCodes::BadValue, "$max must be a BSONObj");
                     }
-                    _options.max = e.embeddedObject();
+                    _options.max = e.embeddedObject().getOwned();
                 }
                 else if (str::equals("hint", name)) {
                     if (e.isABSONObj()) {
-                        _hint = e.embeddedObject();
+                        _hint = e.embeddedObject().getOwned();
                     }
                     else {
                         // Hint can be specified as an object or as a string.  Wrap takes care of

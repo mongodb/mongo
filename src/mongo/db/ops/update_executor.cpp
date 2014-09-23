@@ -38,6 +38,7 @@
 #include "mongo/db/ops/update_request.h"
 #include "mongo/db/query/canonical_query.h"
 #include "mongo/db/query/get_executor.h"
+#include "mongo/db/repl/oplog.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/log.h"
 
@@ -100,9 +101,30 @@ namespace mongo {
         const NamespaceString& nsString = _request->getNamespaceString();
         UpdateLifecycle* lifecycle = _request->getLifecycle();
 
+        validateUpdate(nsString.ns().c_str(), _request->getUpdates(), _request->getQuery());
+
         Collection* collection = db->getCollection(_request->getOpCtx(), nsString.ns());
 
-        validateUpdate(nsString.ns().c_str(), _request->getUpdates(), _request->getQuery());
+        // The update stage does not create its own collection.  As such, if the update is
+        // an upsert, create the collection that the update stage inserts into beforehand.
+        if (_request->isUpsert()) {
+            if (!collection) {
+                OperationContext* const txn = _request->getOpCtx();
+                WriteUnitOfWork wuow(txn);
+                invariant(txn->lockState()->isWriteLocked());
+                invariant(db->createCollection(txn, nsString.ns()));
+
+                if (!_request->isFromReplication()) {
+                    repl::logOp(txn,
+                                "c",
+                                (db->name() + ".$cmd").c_str(),
+                                BSON("create" << (nsString.coll())));
+                }
+                wuow.commit();
+                collection = db->getCollection(_request->getOpCtx(), nsString.ns());
+            }
+            invariant(collection);
+        }
 
         // TODO: This seems a bit circuitious.
         _opDebug->updateobj = _request->getUpdates();

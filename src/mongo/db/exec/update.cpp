@@ -501,6 +501,7 @@ namespace mongo {
                 if (!_damages.empty() ) {
                     // Don't actually do the write if this is an explain.
                     if (!request->isExplain()) {
+                        invariant(_collection);
                         _collection->updateDocumentWithDamages(request->getOpCtx(), loc, source,
                                                                _damages);
                     }
@@ -526,6 +527,7 @@ namespace mongo {
 
                 // Don't actually do the write if this is an explain.
                 if (!request->isExplain()) {
+                    invariant(_collection);
                     StatusWith<DiskLoc> res = _collection->updateDocument(request->getOpCtx(),
                                                                           loc,
                                                                           newObj,
@@ -659,17 +661,7 @@ namespace mongo {
         }
 
         WriteUnitOfWork wunit(request->getOpCtx());
-        // Only create the collection if the doc will be inserted.
-        if (!_collection) {
-            _collection = _db->getCollection(request->getOpCtx(),
-                                             request->getNamespaceString().ns());
-            if (!_collection) {
-                _collection = _db->createCollection(request->getOpCtx(),
-                                                    request->getNamespaceString().ns());
-            }
-        }
-
-
+        invariant(_collection);
         StatusWith<DiskLoc> newLoc = _collection->insertDocument(request->getOpCtx(),
                                                                  newObj,
                                                                  !request->isGod()/*enforceQuota*/);

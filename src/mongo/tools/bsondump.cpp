@@ -34,7 +34,6 @@
 #include "mongo/client/dbclientcursor.h"
 #include "mongo/tools/bsondump_options.h"
 #include "mongo/tools/tool.h"
-#include "mongo/util/mmap.h"
 #include "mongo/util/options_parser/option_section.h"
 #include "mongo/util/text.h"
 

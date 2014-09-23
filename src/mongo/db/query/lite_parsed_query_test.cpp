@@ -216,59 +216,43 @@ namespace {
         ASSERT_FALSE(isFirstElementTextScoreMeta("{a: {$meta: \"textScore\", b: 1}}"));
     }
 
-    void testSortOrder(bool expectedValid, const char* expectedStr, const char* sortStr) {
-        BSONObj sortOrder = fromjson(sortStr);
-        bool valid = LiteParsedQuery::isValidSortOrder(sortOrder);
-        if (expectedValid != valid) {
-            mongoutils::str::stream ss;
-            ss << sortStr << ": unexpected validation result. Expected: " << expectedValid;
-            FAIL(ss);
-        }
-        BSONObj normalizedSortOrder = LiteParsedQuery::normalizeSortOrder(sortOrder);
-        if (fromjson(expectedStr) != normalizedSortOrder) {
-            mongoutils::str::stream ss;
-            ss << sortStr << ": unexpected normalization result. Expected: " << expectedStr
-               << ". Actual: " << normalizedSortOrder.toString();
-            FAIL(ss);
-        }
-    }
-
     //
-    // Sort order validation and normalization
+    // Sort order validation
     // In a valid sort order, each element satisfies one of:
     // 1. a number with value 1
     // 2. a number with value -1
     // 3. isTextScoreMeta
     //
 
-    TEST(LiteParsedQueryTest, NormalizeAndValidateSortOrder) {
+    TEST(LiteParsedQueryTest, ValidateSortOrder) {
         // Valid sorts
-        testSortOrder(true, "{}", "{}");
-        testSortOrder(true, "{a: 1}", "{a: 1}");
-        testSortOrder(true, "{a: -1}", "{a: -1}");
-        testSortOrder(true, "{a: {$meta: \"textScore\"}}", "{a: {$meta: \"textScore\"}}");
+        ASSERT(LiteParsedQuery::isValidSortOrder(fromjson("{}")));
+        ASSERT(LiteParsedQuery::isValidSortOrder(fromjson("{a: 1}")));
+        ASSERT(LiteParsedQuery::isValidSortOrder(fromjson("{a: -1}")));
+        ASSERT(LiteParsedQuery::isValidSortOrder(fromjson("{a: {$meta: \"textScore\"}}")));
 
         // Invalid sorts
-        testSortOrder(false, "{a: 1}", "{a: 100}");
-        testSortOrder(false, "{a: 1}", "{a: 0}");
-        testSortOrder(false, "{a: -1}", "{a: -100}");
-        testSortOrder(false, "{a: 1}", "{a: Infinity}");
-        testSortOrder(false, "{a: -1}", "{a: -Infinity}");
-        testSortOrder(false, "{a: 1}", "{a: true}");
-        testSortOrder(false, "{a: 1}", "{a: false}");
-        testSortOrder(false, "{a: 1}", "{a: null}");
-        testSortOrder(false, "{a: 1}", "{a: {}}");
-        testSortOrder(false, "{a: 1}", "{a: {b: 1}}");
-        testSortOrder(false, "{a: 1}", "{a: []}");
-        testSortOrder(false, "{a: 1}", "{a: [1, 2, 3]}");
-        testSortOrder(false, "{a: 1}", "{a: \"\"}");
-        testSortOrder(false, "{a: 1}", "{a: \"bb\"}");
-        testSortOrder(false, "{a: 1}", "{a: {$meta: 1}}");
-        testSortOrder(false, "{a: 1}", "{a: {$meta: \"image\"}}");
-        testSortOrder(false, "{a: 1}", "{a: {$world: \"textScore\"}}");
-        testSortOrder(false, "{a: 1}", "{a: {$meta: \"textScore\", b: 1}}");
-        testSortOrder(false, "{'': 1}", "{'': 1}");
-        testSortOrder(false, "{'': -1}", "{'': -1}");
+        ASSERT_FALSE(LiteParsedQuery::isValidSortOrder(fromjson("{a: 100}")));
+        ASSERT_FALSE(LiteParsedQuery::isValidSortOrder(fromjson("{a: 0}")));
+        ASSERT_FALSE(LiteParsedQuery::isValidSortOrder(fromjson("{a: -100}")));
+        ASSERT_FALSE(LiteParsedQuery::isValidSortOrder(fromjson("{a: Infinity}")));
+        ASSERT_FALSE(LiteParsedQuery::isValidSortOrder(fromjson("{a: -Infinity}")));
+        ASSERT_FALSE(LiteParsedQuery::isValidSortOrder(fromjson("{a: true}")));
+        ASSERT_FALSE(LiteParsedQuery::isValidSortOrder(fromjson("{a: false}")));
+        ASSERT_FALSE(LiteParsedQuery::isValidSortOrder(fromjson("{a: null}")));
+        ASSERT_FALSE(LiteParsedQuery::isValidSortOrder(fromjson("{a: {}}")));
+        ASSERT_FALSE(LiteParsedQuery::isValidSortOrder(fromjson("{a: {b: 1}}")));
+        ASSERT_FALSE(LiteParsedQuery::isValidSortOrder(fromjson("{a: []}")));
+        ASSERT_FALSE(LiteParsedQuery::isValidSortOrder(fromjson("{a: [1, 2, 3]}")));
+        ASSERT_FALSE(LiteParsedQuery::isValidSortOrder(fromjson("{a: \"\"}")));
+        ASSERT_FALSE(LiteParsedQuery::isValidSortOrder(fromjson("{a: \"bb\"}")));
+        ASSERT_FALSE(LiteParsedQuery::isValidSortOrder(fromjson("{a: {$meta: 1}}")));
+        ASSERT_FALSE(LiteParsedQuery::isValidSortOrder(fromjson("{a: {$meta: \"image\"}}")));
+        ASSERT_FALSE(LiteParsedQuery::isValidSortOrder(fromjson("{a: {$world: \"textScore\"}}")));
+        ASSERT_FALSE(LiteParsedQuery::isValidSortOrder(fromjson("{a: {$meta: \"textScore\","
+                                                                " b: 1}}")));
+        ASSERT_FALSE(LiteParsedQuery::isValidSortOrder(fromjson("{'': 1}")));
+        ASSERT_FALSE(LiteParsedQuery::isValidSortOrder(fromjson("{'': -1}")));
     }
 
     //

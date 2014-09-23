@@ -54,7 +54,6 @@
 #include "mongo/db/repl/rs_config.h"
 #include "mongo/db/repl/rslog.h"
 #include "mongo/util/log.h"
-#include "mongo/util/mmap.h"
 #include "mongo/util/mongoutils/str.h"
 
 namespace mongo {

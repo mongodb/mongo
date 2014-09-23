@@ -44,6 +44,7 @@
 #include "mongo/util/log.h"
 #include "mongo/util/md5.h"
 #include "mongo/util/timer.h"
+#include "mongo/util/time_support.h"
 #include "mongo/util/version.h"
 
 
@@ -389,7 +390,10 @@ namespace mongo {
                 }
 
                 try {
-                    if ( op == "findOne" ) {
+                    if ( op == "nop") {
+                        // do nothing
+                    }
+                    else if ( op == "findOne" ) {
 
                         BSONObj result;
                         {
@@ -694,7 +698,9 @@ namespace mongo {
                     conn->getLastError();
                 }
 
-                sleepmillis( delay );
+                if (delay > 0)
+                    sleepmillis( delay );
+
             }
         }
 
@@ -758,7 +764,6 @@ namespace mongo {
 
      void BenchRunner::start( ) {
 
-
          {
              boost::scoped_ptr<DBClientBase> conn( _config->createConnection() );
              // Must authenticate to admin db in order to run serverStatus command
@@ -771,24 +776,28 @@ namespace mongo {
                                "required to use benchRun with auth enabled");
                  }
              }
-             // Get initial stats
+
+             // Start threads
+             for ( unsigned i = 0; i < _config->parallel; i++ ) {
+                 BenchRunWorker *worker = new BenchRunWorker(i, _config.get(), &_brState);
+                 worker->start();
+                 _workers.push_back(worker);
+             }
+
+             _brState.waitForState(BenchRunState::BRS_RUNNING);
+
+             // initial stats
              conn->simpleCommand( "admin" , &before , "serverStatus" );
              before = before.getOwned();
+             _brTimer = new mongo::Timer();
          }
-
-         // Start threads
-         for ( unsigned i = 0; i < _config->parallel; i++ ) {
-             BenchRunWorker *worker = new BenchRunWorker(i, _config.get(), &_brState);
-             worker->start();
-             _workers.push_back(worker);
-         }
-
-         _brState.waitForState(BenchRunState::BRS_RUNNING);
      }
 
      void BenchRunner::stop() {
          _brState.tellWorkersToFinish();
          _brState.waitForState(BenchRunState::BRS_FINISHED);
+         _microsElapsed = _brTimer->micros();
+         delete _brTimer;
 
          {
              boost::scoped_ptr<DBClientBase> conn( _config->createConnection() );
@@ -882,7 +891,8 @@ namespace mongo {
                  BSONElement e = i.next();
                  double x = e.number();
                  x -= before[e.fieldName()].number();
-                 buf.append( e.fieldName() , x / runner->_config->seconds );
+                 std::string s = e.fieldName();
+                 buf.append( s, x / (runner->_microsElapsed / 1000000.0) );
              }
          }
 
@@ -904,6 +914,7 @@ namespace mongo {
 
          OID oid = OID( start.firstElement().String() );
          BenchRunner* runner = BenchRunner::get( oid );
+
          sleepmillis( (int)(1000.0 * runner->config().seconds) );
 
          return benchFinish( start, data );
@@ -931,7 +942,7 @@ namespace mongo {
 
         OID oid = OID( argsFake.firstElement().String() );
 
-        // Get new BenchRunner object
+        // Get old BenchRunner object
         BenchRunner* runner = BenchRunner::get( oid );
 
         BSONObj finalObj = BenchRunner::finish( runner );

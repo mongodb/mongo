@@ -56,6 +56,7 @@ namespace QueryStageUpdate {
               _nsString(StringData(ns())) {
             Client::WriteContext ctx(&_txn, ns());
             _client.dropCollection(ns());
+            _client.createCollection(ns());
             ctx.commit();
         }
 

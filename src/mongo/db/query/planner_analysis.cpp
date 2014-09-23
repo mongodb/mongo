@@ -248,6 +248,23 @@ namespace mongo {
 
     }  // namespace
 
+    // static
+    BSONObj QueryPlannerAnalysis::getSortPattern(const BSONObj& indexKeyPattern) {
+        BSONObjBuilder sortBob;
+        BSONObjIterator kpIt(indexKeyPattern);
+        while (kpIt.more()) {
+            BSONElement elt = kpIt.next();
+            if (elt.type() == mongo::String) {
+                break;
+            }
+            long long val = elt.safeNumberLong();
+            int sortOrder = val >= 0 ? 1 : -1;
+            sortBob.append(elt.fieldName(), sortOrder);
+        }
+        return sortBob.obj();
+    }
+
+    // static
     bool QueryPlannerAnalysis::explodeForSort(const CanonicalQuery& query,
                                               const QueryPlannerParams& params,
                                               QuerySolutionNode** solnRoot) {

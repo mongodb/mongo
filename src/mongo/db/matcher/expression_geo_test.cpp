@@ -44,7 +44,7 @@ namespace mongo {
         BSONObj query = fromjson("{loc:{$within:{$box:[{x: 4, y:4},[6,6]]}}}");
 
         auto_ptr<GeoExpression> gq(new GeoExpression);
-        ASSERT( gq->parseFrom( query["loc"].Obj() ) );
+        ASSERT_OK( gq->parseFrom( query["loc"].Obj() ) );
 
         GeoMatchExpression ge;
         ASSERT( ge.init("a", gq.release(), query ).isOK() );

@@ -222,13 +222,6 @@ namespace {
         resetTime();
     }
 
-    void Lock::DBWrite::_tempRelease() {
-        unlockDB();
-    }
-    void Lock::DBWrite::_relock() {
-        lockDB();
-    }
-
     Lock::GlobalWrite::GlobalWrite(Locker* lockState, unsigned timeoutms)
         : ScopedLock(lockState, 'W') {
 
@@ -268,54 +261,37 @@ namespace {
         recordTime();
     }
 
-
-    Lock::DBWrite::DBWrite(Locker* lockState, const StringData& dbOrNs)
-        : ScopedLock(lockState, 'w'),
-          _ns(dbOrNs.toString()) {
-
-        dassert(!_ns.empty());
+    Lock::DBLock::DBLock(Locker* lockState, const StringData& db, const newlm::LockMode mode)
+        : ScopedLock(lockState, mode == newlm::MODE_S || mode == newlm::MODE_IS ? 'r' : 'w'),
+          _id(newlm::RESOURCE_DATABASE, db),
+          _mode(mode) {
+        dassert(!db.empty());
+        dassert(!nsIsFull(db));
         lockDB();
     }
 
-    Lock::DBWrite::~DBWrite() {
+    Lock::DBLock::~DBLock() {
         unlockDB();
     }
 
-    void Lock::DBWrite::lockDB() {
-        TrackLockAcquireTime a('w');
+    void Lock::DBLock::lockDB() {
+        const bool isRead = (_mode == newlm::MODE_S || _mode == newlm::MODE_IS);
+        TrackLockAcquireTime a(isRead ? 'r' : 'w');
 
-        const StringData db = nsToDatabaseSubstring(_ns);
-        const newlm::ResourceId resIdDb(newlm::RESOURCE_DATABASE, db);
-
-        _lockState->lockGlobal(newlm::MODE_IX);
+        _lockState->lockGlobal(isRead ? newlm::MODE_IS : newlm::MODE_IX);
 
         if (supportsDocLocking()) {
-            _lockState->lock(resIdDb, newlm::MODE_IX);
-
-            if (nsIsFull(_ns)) {
-                const newlm::ResourceId resIdCollection(newlm::RESOURCE_COLLECTION, _ns);
-                _lockState->lock(resIdCollection, newlm::MODE_IX);
-            }
+            _lockState->lock(_id, _mode);
         }
         else {
-            _lockState->lock(resIdDb, newlm::MODE_X);
+            _lockState->lock(_id, isRead ? newlm::MODE_S : newlm::MODE_X);
         }
 
         resetTime();
     }
 
-    void Lock::DBWrite::unlockDB() {
-
-        if (supportsDocLocking()) {
-            if (nsIsFull(_ns)) {
-                const newlm::ResourceId resIdCollection(newlm::RESOURCE_COLLECTION, _ns);
-                _lockState->unlock(resIdCollection);
-            }
-        }
-
-        const StringData db = nsToDatabaseSubstring(_ns);
-        const newlm::ResourceId resIdDb(newlm::RESOURCE_DATABASE, db);
-        _lockState->unlock(resIdDb);
+    void Lock::DBLock::unlockDB() {
+        _lockState->unlock(_id);
 
         // The last release reports time the lock was held
         if (_lockState->unlockGlobal()) {
@@ -323,61 +299,34 @@ namespace {
         }
     }
 
-
-    Lock::DBRead::DBRead(Locker* lockState, const StringData& dbOrNs)
-        : ScopedLock(lockState, 'r'),
-          _ns(dbOrNs.toString()) {
-
-        dassert(!_ns.empty());
-        lockDB();
-    }
-
-    Lock::DBRead::~DBRead() {
-        unlockDB();
-    }
-
-    void Lock::DBRead::lockDB() {
-        TrackLockAcquireTime a('r');
-
-        const StringData db = nsToDatabaseSubstring(_ns);
-        const newlm::ResourceId resIdDb(newlm::RESOURCE_DATABASE, db);
-
-        _lockState->lockGlobal(newlm::MODE_IS);
-
+    Lock::CollectionLock::CollectionLock(Locker* lockState,
+                                         const StringData& ns,
+                                         newlm::LockMode mode)
+        : _id(newlm::RESOURCE_COLLECTION, ns),
+          _lockState(lockState) {
+        const bool isRead = (mode == newlm::MODE_S || mode == newlm::MODE_IS);
+        dassert(!ns.empty());
+        dassert(nsIsFull(ns));
+        dassert(_lockState->isLockHeldForMode(newlm::ResourceId(newlm::RESOURCE_DATABASE,
+                                                                nsToDatabaseSubstring(ns)),
+                                              isRead ? newlm::MODE_IS : newlm::MODE_IX));
         if (supportsDocLocking()) {
-            _lockState->lock(resIdDb, newlm::MODE_IS);
-
-            if (nsIsFull(_ns)) {
-                const newlm::ResourceId resIdCollection(newlm::RESOURCE_COLLECTION, _ns);
-                _lockState->lock(resIdCollection, newlm::MODE_IS);
-            }
+            _lockState->lock(_id, mode);
         }
-        else {
-            _lockState->lock(resIdDb, newlm::MODE_S);
-        }
-
-        resetTime();
-    }
-
-    void Lock::DBRead::unlockDB() {
-
-        if (supportsDocLocking()) {
-            if (nsIsFull(_ns)) {
-                const newlm::ResourceId resIdCollection(newlm::RESOURCE_COLLECTION, _ns);
-                _lockState->unlock(resIdCollection);
-            }
-        }
-
-        const StringData db = nsToDatabaseSubstring(_ns);
-        const newlm::ResourceId resIdDb(newlm::RESOURCE_DATABASE, db);
-        _lockState->unlock(resIdDb);
-
-        // The last release reports time the lock was held
-        if (_lockState->unlockGlobal()) {
-            recordTime();
+        else if (isRead) {
+            _lockState->lock(_id, isRead ? newlm::MODE_S : newlm::MODE_X);
         }
     }
 
+    Lock::CollectionLock::~CollectionLock() {
+        _lockState->unlock(_id);
+    }
+
+    Lock::DBWrite::DBWrite(Locker* lockState, const StringData& dbOrNs) :
+        DBLock(lockState, nsToDatabaseSubstring(dbOrNs), newlm::MODE_X) { }
+
+    Lock::DBRead::DBRead(Locker* lockState, const StringData& dbOrNs) :
+        DBLock(lockState, nsToDatabaseSubstring(dbOrNs), newlm::MODE_S) { }
 
     writelocktry::writelocktry(Locker* lockState, int tryms) :
         _got( false ),

@@ -51,8 +51,16 @@ namespace mongo {
 namespace newlm {
 
     /**
-     * Lock modes. Refer to the compatiblity matrix in the source file for information on how
-     * these conflict.
+     * Lock modes.
+     *
+     * Compatibility Matrix
+     *                                          Granted mode
+     *   ---------------.--------------------------------------------------------.
+     *   Requested Mode | MODE_NONE  MODE_IS   MODE_IX  MODE_S   MODE_X  |
+     *     MODE_IS      |      +        +         +        +        -    |
+     *     MODE_IX      |      +        +         +        -        -    |
+     *     MODE_S       |      +        +         -        +        -
+     *     MODE_X       |      +        -         -        -        -
      */
     enum LockMode {
         MODE_NONE       = 0,
