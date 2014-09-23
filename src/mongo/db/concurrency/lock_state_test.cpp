@@ -161,7 +161,7 @@ namespace newlm {
 
         // No lock requests made, no locks held.
         locker.saveLockState(&lockInfo);
-        ASSERT_EQUALS(0, lockInfo.locks.size());
+        ASSERT_EQUALS(0U, lockInfo.locks.size());
 
         // Lock something.
         locker.lockGlobal(MODE_IX);
@@ -170,7 +170,7 @@ namespace newlm {
         locker.saveLockState(&lockInfo);
         ASSERT_EQUALS(MODE_IX, lockInfo.globalMode);
         // But we haven't locked anything non-global.
-        ASSERT_EQUALS(0, lockInfo.locks.size());
+        ASSERT_EQUALS(0U, lockInfo.locks.size());
 
         // Now we'll lock a non-global lock.  This should show up in lockInfo.locks.
         const ResourceId resIdCollection(RESOURCE_COLLECTION, std::string("TestDB.collection"));
@@ -178,15 +178,15 @@ namespace newlm {
 
         // Make sure the lock state deets are correct.
         locker.saveLockState(&lockInfo);
-        ASSERT_EQUALS(1, lockInfo.locks.size());
+        ASSERT_EQUALS(1U, lockInfo.locks.size());
         ASSERT_EQUALS(resIdCollection, lockInfo.locks[0].resourceId);
         ASSERT_EQUALS(MODE_IX, lockInfo.locks[0].mode);
-        ASSERT_EQUALS(1, lockInfo.locks[0].recursiveCount);
+        ASSERT_EQUALS(1U, lockInfo.locks[0].recursiveCount);
 
         // Then we'll unlock the collection and make sure it doesn't appear in saved lock state.
         ASSERT(locker.unlock(resIdCollection));
         locker.saveLockState(&lockInfo);
-        ASSERT_EQUALS(0, lockInfo.locks.size());
+        ASSERT_EQUALS(0U, lockInfo.locks.size());
 
         locker.unlockAll();
     }
