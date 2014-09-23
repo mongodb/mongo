@@ -194,7 +194,7 @@ void got_packet(u_char *args, const struct pcap_pkthdr *header, const u_char *pa
     const u_char * payload = (const u_char*)(packet + captureHeaderSize + size_ip + size_tcp);
 
     unsigned totalSize = ntohs(ip->ip_len);
-    verify( totalSize <= header->caplen );
+    //verify( totalSize <= header->caplen );
 
     int size_payload = totalSize - (size_ip + size_tcp);
     if (size_payload <= 0 )
