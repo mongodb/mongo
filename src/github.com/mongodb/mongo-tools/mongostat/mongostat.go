@@ -141,7 +141,7 @@ func (cluster *ClusterMonitor) Monitor(discover bool, maxRows int, done chan err
 func NewNodeMonitor(opts commonopts.ToolOptions, fullHost string) *NodeMonitor {
 	optsCopy := opts
 	host, port := parseHostPort(fullHost)
-	optsCopy.Connection = &commonopts.Connection{host, port}
+	optsCopy.Connection = &commonopts.Connection{Host: host, Port: port}
 	optsCopy.Direct = true
 	sessionProvider := db.NewSessionProvider(optsCopy)
 	return &NodeMonitor{

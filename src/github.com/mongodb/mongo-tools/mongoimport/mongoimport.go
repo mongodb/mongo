@@ -236,7 +236,6 @@ func (mongoImport *MongoImport) importDocuments(importInput ImportInput) (docsCo
 		}
 		docsCount++
 	}
-	return docsCount, nil
 }
 
 // removeBlankFields removes empty/blank fields in csv and tsv
