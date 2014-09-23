@@ -1,7 +1,6 @@
 package db
 
 import (
-	"fmt"
 	. "github.com/smartystreets/goconvey/convey"
 	"gopkg.in/mgo.v2/bson"
 	"testing"
@@ -63,7 +62,9 @@ func TestShimRead(t *testing.T) {
 			So(docCount, ShouldEqual, 100)
 		})
 	})
+}
 
+func TestShimWrite(t *testing.T) {
 	Convey("Test shim process in write mode", t, func() {
 		var bsonTool StorageShim
 		resetFunc := func() {
@@ -88,32 +89,25 @@ func TestShimRead(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			encodedSink := &EncodedBSONSink{writer}
-			n, err := encodedSink.WriteDoc(bson.M{"hi": "there"})
+			encodedSink := &EncodedBSONSink{writer, &bsonTool}
+			err = encodedSink.WriteDoc(bson.M{"hi": "there"})
 			So(err, ShouldBeNil)
-			So(n, ShouldBeGreaterThan, 0)
 		})
 	})
 }
 
+
 func TestShimCommand(t *testing.T) {
 
-	Convey("Test shim process in read mode", t, func() {
-		out := bson.M{}
-		err := RunShimCommand(bson.M{"listDatabases": 1}, &out, "/data/db", "admin")
-		fmt.Println(err, out)
-
-	})
-
 	Convey("Test running shim command", t, func() {
-		shim, err := NewShim("/data/db")
+		shim, err := NewShim("testdata", false, false)
 		if err != nil {
 			t.Fatal(err)
 		}
 		out := bson.M{}
 		err = shim.Run(bson.M{"listDatabases": 1}, &out, "admin")
 		So(err, ShouldBeNil)
-		fmt.Println(err, out)
 	})
 
 }
+

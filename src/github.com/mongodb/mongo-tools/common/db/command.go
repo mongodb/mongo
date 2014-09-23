@@ -10,11 +10,49 @@ const (
 
 type CommandRunner interface {
 	Run(command interface{}, out interface{}, database string) error
-	//Find(DB, Collection string, Skip, Limit int, Query interface{}, Sort interface{}) (RawDocSource, error)
+
 	FindDocs(DB, Collection string, Skip, Limit int, Query interface{}, Sort []string, opts int) (DocSource, error)
 	FindOne(DB, Collection string, Skip int, Query interface{}, Sort []string, into interface{}, opts int) error
+	
+	OpenInsertStream(DB, Collection string) (DocSink, error)
+	
+	Remove(DB, Collection string, Query interface{}) error
+	RemoveAll(DB, Collection string, Query interface{}) error
+	
 	DatabaseNames() ([]string, error)
 	CollectionNames(dbName string) ([]string, error)
+}
+
+func (sp *SessionProvider) OpenInsertStream(DB, Collection string) (DocSink, error) {
+	session, err := sp.GetSession()
+	if err != nil {
+		return nil, err
+	}
+	defer session.Close()	
+	
+	coll := session.DB(DB).C(Collection)
+	return &CollectionSink{coll, session}, nil
+}
+
+func (sp *SessionProvider) Remove(DB, Collection string, Query interface{}) error {
+	session, err := sp.GetSession()
+	if err != nil {
+		return err
+	}
+	defer session.Close()	
+
+	return session.DB(DB).C(Collection).Remove(Query)
+}
+
+func (sp *SessionProvider) RemoveAll(DB, Collection string, Query interface{}) error {
+	session, err := sp.GetSession()
+	if err != nil {
+		return err
+	}
+	defer session.Close()	
+
+	_, err = session.DB(DB).C(Collection).RemoveAll(Query)
+	return err
 }
 
 func (sp *SessionProvider) Run(command interface{}, out interface{}, database string) error {

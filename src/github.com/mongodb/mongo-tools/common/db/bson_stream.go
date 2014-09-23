@@ -7,6 +7,7 @@ import (
 	"io"
 )
 
+// ===================== Source ===================== 
 //BSONSource wraps a stream
 type BSONSource struct {
 	Stream io.ReadCloser
@@ -25,11 +26,6 @@ func NewBSONSource(in io.ReadCloser) *BSONSource {
 
 func (bsonSource *BSONSource) Close() error {
 	return bsonSource.Stream.Close()
-}
-
-type DocSink interface {
-	WriteDoc(out interface{}) error
-	Close() error
 }
 
 func NewDecodedBSONSource(str RawDocSource) *DecodedBSONSource {
@@ -71,26 +67,6 @@ type RawDocSource interface {
 type CursorDocSource struct {
 	Iter    *mgo.Iter
 	Session *mgo.Session
-}
-
-type BSONSink struct {
-	writer io.WriteCloser
-}
-
-type EncodedBSONSink struct {
-	BSONIn *BSONSink
-}
-
-func (bs *BSONSink) WriteBytes(buf []byte) (int, error) {
-	return bs.writer.Write(buf)
-}
-
-func (ebs *EncodedBSONSink) WriteDoc(out interface{}) (int, error) {
-	outbuf, err := bson.Marshal(out)
-	if err != nil {
-		return 0, fmt.Errorf("Failed to encode document into BSON: %v", err)
-	}
-	return ebs.BSONIn.WriteBytes(outbuf)
 }
 
 func (cds *CursorDocSource) Next(out interface{}) bool {
@@ -153,4 +129,61 @@ func (shim *BSONSource) LoadNextInto(into []byte) (bool, int32) {
 
 func (shim *BSONSource) Err() error {
 	return shim.err
+}
+
+
+// ===================== Sink ===================== 
+
+type DocSink interface {
+	WriteDoc(out interface{}) error
+	Close() error
+}
+
+type BSONSink struct {
+	writer io.WriteCloser
+}
+
+type EncodedBSONSink struct {
+	BSONIn     *BSONSink
+	WriterShim *StorageShim
+}
+
+func (bs *BSONSink) Close() error {
+	return bs.writer.Close()
+}
+
+func (bs *BSONSink) WriteBytes(buf []byte) (int, error) {
+	return bs.writer.Write(buf)
+}
+
+func (ebs *EncodedBSONSink) WriteDoc(out interface{}) error {
+	outbuf, err := bson.Marshal(out)
+	if err != nil {
+		return fmt.Errorf("Failed to encode document into BSON: %v", err)
+	}
+	_, err = ebs.BSONIn.WriteBytes(outbuf)
+	if err != nil {
+		return fmt.Errorf("Error while attempting to write to db: %v", err)
+	}
+	return nil
+}
+
+func (ebs *EncodedBSONSink) Close() error {
+	defer ebs.WriterShim.Close()
+	return ebs.BSONIn.Close()
+}
+
+type CollectionSink struct {
+	Coll    *mgo.Collection
+	Session *mgo.Session
+}
+
+func (cls *CollectionSink) WriteDoc(out interface{}) error {
+	return cls.Coll.Insert(out)
+}
+
+func (cls *CollectionSink) Close() error {
+	// cls.Session.Close() returns nothing
+	cls.Session.Close()
+	return nil
 }

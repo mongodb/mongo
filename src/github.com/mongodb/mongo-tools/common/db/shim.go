@@ -119,6 +119,33 @@ func (shim *Shim) FindOne(DB, Collection string, Skip int, Query interface{}, So
 	return nil
 }
 
+func (shim *Shim) OpenInsertStream(DB, Collection string) (DocSink, error) {
+	writerShim := &StorageShim{
+		DBPath:         shim.DBPath,
+		Database:       DB,
+		Collection:     Collection,
+		ShimPath:       shim.ShimPath,
+		Mode:           Insert,
+		DirectoryPerDB: shim.DirectoryPerDB,
+		Journal:        shim.Journal,
+	}
+	_, writer, err := writerShim.Open()
+	if err != nil {
+		return nil, err
+	}
+	return &EncodedBSONSink{writer, writerShim}, nil
+}
+
+// not supported yet!
+func (shim *Shim) Remove(DB, Collection string, Query interface{}) error {
+	return fmt.Errorf("mongoshim doesn't support Remove yet!")
+}
+
+// not supported yet!
+func (shim *Shim) RemoveAll(DB, Collection string, Query interface{}) error {
+	return fmt.Errorf("mongoshim doesn't support RemoveAll yet!")
+}
+
 type databaseNames struct {
 	Databases []struct {
 		Name  string
