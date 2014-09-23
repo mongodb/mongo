@@ -99,7 +99,7 @@ wts_open(const char *home, int set_api, WT_CONNECTION **connp)
 	    "[\"%s\", \"%s\", \"%s\", \"%s\", \"%s\", \"%s\"],"
 	    "%s,%s",
 	    g.c_cache,
-	    g.c_merge_threads,
+	    g.c_lsm_worker_threads,
 	    g.progname,
 	    g.c_data_extend ? "file_extend=(data=8MB)" : "",
 	    g.c_logging ? "log=(enabled=true)" : "",

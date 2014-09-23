@@ -196,13 +196,13 @@ static CONFIG c[] = {
 	  "if logging configured",				/* 30% */
 	  C_BOOL, 30, 0, 0, &g.c_logging, NULL },
 
+	{ "lsm_worker_threads",
+	  "the number of LSM worker threads",
+	  0x0, 3, 4, 20, &g.c_lsm_worker_threads, NULL },
+
 	{ "merge_max",
 	  "the maximum number of chunks to include in a merge operation",
 	  0x0, 4, 20, 100, &g.c_merge_max, NULL },
-
-	{ "merge_threads",
-	  "the number of threads to perform merge operations",
-	  0x0, 3, 4, 20, &g.c_merge_threads, NULL },
 
 	{ "mmap",
 	  "configure for mmap operations",			/* 90% */
