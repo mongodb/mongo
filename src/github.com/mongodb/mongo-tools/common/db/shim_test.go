@@ -98,15 +98,8 @@ func TestShimRead(t *testing.T) {
 
 func TestShimCommand(t *testing.T) {
 
-	Convey("Test shim process in read mode", t, func() {
-		out := bson.M{}
-		err := RunShimCommand(bson.M{"listDatabases": 1}, &out, "/data/db", "admin")
-		fmt.Println(err, out)
-
-	})
-
 	Convey("Test running shim command", t, func() {
-		shim, err := NewShim("/data/db")
+		shim, err := NewShim("/data/db", false, false)
 		if err != nil {
 			t.Fatal(err)
 		}
