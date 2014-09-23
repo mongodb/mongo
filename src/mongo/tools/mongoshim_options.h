@@ -43,6 +43,10 @@ namespace mongo {
 
         bool load;
 
+        // If true, removes all documents in collection.
+        // If query is provided, only documents matching query will be removed.
+        bool remove;
+
         bool drop;
         bool upsert;
         std::vector<std::string> upsertFields;

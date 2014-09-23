@@ -68,6 +68,12 @@ namespace mongo {
         options->addOptionChaining("load", "load", moe::Switch,
                                    "load data" );
 
+        options->addOptionChaining("remove", "remove", moe::Switch,
+                "removes documents from collection matching query "
+                "(or all documents if query is not provided)" )
+                                  .incompatibleWith("load")
+                                  .incompatibleWith("drop");
+
         options->addOptionChaining("drop", "drop", moe::Switch,
                                    "drop collection before import" );
 
@@ -144,6 +150,8 @@ namespace mongo {
         }
 
         mongoShimGlobalParams.load = params.count("load") > 0;
+        mongoShimGlobalParams.remove = params.count("remove") > 0;
+
         mongoShimGlobalParams.drop = params.count("drop") > 0;
         mongoShimGlobalParams.upsert = params.count("upsert") > 0;
 

@@ -89,6 +89,11 @@ public:
             }
             processFile( "-" );
         }
+        else if (mongoShimGlobalParams.remove) {
+            // Removes all documents matching query
+            bool justOne = false;
+            conn().remove(_ns, mongoShimGlobalParams.query, justOne);
+        }
         else {
             ostream *out = &cout;
 
