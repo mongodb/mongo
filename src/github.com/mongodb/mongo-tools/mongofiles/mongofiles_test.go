@@ -195,8 +195,8 @@ func TestMongoFilesCommands(t *testing.T) {
 			args := []string{"list", "gibberish"}
 
 			mf, err := driverMongoFilesInstance(args)
-			So(mf, ShouldNotBeNil)
 			So(err, ShouldBeNil)
+			So(mf, ShouldNotBeNil)
 
 			output, err := mf.Run()
 			So(err, ShouldBeNil)
@@ -207,8 +207,8 @@ func TestMongoFilesCommands(t *testing.T) {
 			args := []string{"list", "testf"}
 
 			mf, err := driverMongoFilesInstance(args)
-			So(mf, ShouldNotBeNil)
 			So(err, ShouldBeNil)
+			So(mf, ShouldNotBeNil)
 
 			str, err := mf.Run()
 			So(err, ShouldBeNil)
@@ -231,8 +231,8 @@ func TestMongoFilesCommands(t *testing.T) {
 			args := []string{"get", "testfile1"}
 
 			mf, err := driverMongoFilesInstance(args)
-			So(mf, ShouldNotBeNil)
 			So(err, ShouldBeNil)
+			So(mf, ShouldNotBeNil)
 
 			So(err, ShouldBeNil)
 			str, err := mf.Run()
@@ -255,8 +255,8 @@ func TestMongoFilesCommands(t *testing.T) {
 			args := []string{"search", "file"}
 
 			mf, err := driverMongoFilesInstance(args)
-			So(mf, ShouldNotBeNil)
 			So(err, ShouldBeNil)
+			So(mf, ShouldNotBeNil)
 
 			str, err := mf.Run()
 			So(err, ShouldBeNil)
@@ -290,8 +290,8 @@ func TestMongoFilesCommands(t *testing.T) {
 
 			mf, err := shimMongoFilesInstance(args)
 
-			So(mf, ShouldNotBeNil)
 			So(err, ShouldBeNil)
+			So(mf, ShouldNotBeNil)
 
 			output, err := mf.Run()
 			So(err, ShouldBeNil)
@@ -303,8 +303,8 @@ func TestMongoFilesCommands(t *testing.T) {
 
 			mf, err := shimMongoFilesInstance(args)
 
-			So(mf, ShouldNotBeNil)
 			So(err, ShouldBeNil)
+			So(mf, ShouldNotBeNil)
 
 			str, err := mf.Run()
 			So(err, ShouldBeNil)
@@ -326,8 +326,8 @@ func TestMongoFilesCommands(t *testing.T) {
 
 			mf, err := shimMongoFilesInstance(args)
 
-			So(mf, ShouldNotBeNil)
 			So(err, ShouldBeNil)
+			So(mf, ShouldNotBeNil)
 
 			So(err, ShouldBeNil)
 			str, err := mf.Run()
