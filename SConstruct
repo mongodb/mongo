@@ -792,7 +792,12 @@ elif windows:
     #  implement
     # c4068
     #  unknown pragma -- added so that we can specify unknown pragmas for other compilers
-    env.Append( CCFLAGS=["/wd4355", "/wd4800", "/wd4267", "/wd4244", "/wd4290", "/wd4068"] )
+    # c4351
+    #  on extremely old versions of MSVC (pre 2k5), default constructing an array member in a
+    #  constructor's initialization list would not zero the array members "in some cases".
+    #  since we don't target MSVC versions that old, this warning is safe to ignore.
+    env.Append( CCFLAGS=["/wd4355", "/wd4800", "/wd4267", "/wd4244",
+                         "/wd4290", "/wd4068", "/wd4351"] )
 
     # some warnings we should treat as errors:
     # c4099
