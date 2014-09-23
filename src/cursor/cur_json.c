@@ -428,7 +428,7 @@ __wt_json_column_init(WT_CURSOR *cursor, const char *keyformat,
 } while (0)
 
 /*
- * __wt_json_token
+ * __wt_json_token --
  *	Return the type, start position and length of the next JSON
  *	token in the input.  String tokens include the quotes.  JSON
  *	can be entirely parsed using calls to this tokenizer, each
@@ -570,7 +570,7 @@ __wt_json_token(WT_SESSION *wt_session, const char *src, int *toktype,
 		    (int)(src - bad), bad);
 		break;
 	}
-	*toklen = (int)(src - *tokstart);
+	*toklen = (size_t)(src - *tokstart);
 	*toktype = result;
 	return (result < 0 ? EINVAL : 0);
 }
@@ -602,14 +602,16 @@ __wt_json_tokname(int toktype)
 }
 
 /*
- * Returns a first cut of the needed string in item.
- * The result has not been stripped of escapes.
+ * json_string_arg --
+ *	Returns a first cut of the needed string in item.
+ *	The result has not been stripped of escapes.
  */
 static int
 json_string_arg(WT_SESSION_IMPL *session, const char **jstr, WT_ITEM *item)
 {
 	const char *tokstart;
-	int ret, tok;
+	int tok;
+	WT_DECL_RET;
 
 	WT_RET(__wt_json_token((WT_SESSION *)session, *jstr, &tok, &tokstart,
 		&item->size));
@@ -628,8 +630,9 @@ json_string_arg(WT_SESSION_IMPL *session, const char **jstr, WT_ITEM *item)
 }
 
 /*
- * Returns a signed integral value from the current position
- * in the JSON string.
+ * json_int_arg --
+ *	Returns a signed integral value from the current position
+ *	in the JSON string.
  */
 static int
 json_int_arg(WT_SESSION_IMPL *session, const char **jstr, int64_t *ip)
@@ -657,8 +660,9 @@ json_int_arg(WT_SESSION_IMPL *session, const char **jstr, int64_t *ip)
 }
 
 /*
- * Returns an unsigned integral value from the current position
- * in the JSON string.
+ * json_uint_arg --
+ *	Returns an unsigned integral value from the current position
+ *	in the JSON string.
  */
 static int
 json_uint_arg(WT_SESSION_IMPL *session, const char **jstr, uint64_t *up)
@@ -703,7 +707,7 @@ json_uint_arg(WT_SESSION_IMPL *session, const char **jstr, uint64_t *up)
 } while (0)
 
 /*
- * __wt_struct_pack --
+ * __json_pack_struct --
  *	Pack a byte string from a JSON string.
  */
 static int
@@ -755,6 +759,9 @@ __json_pack_struct(WT_SESSION_IMPL *session, void *buffer, size_t size,
 /*
  * __json_pack_size --
  *	Calculate the size of a packed byte string from a JSON string.
+ *	We verify that the names and value types provided in JSON match
+ *	the column names and type from the schema format, returning error
+ *	if not.
  */
 static int
 __json_pack_size(
@@ -795,6 +802,11 @@ __json_pack_size(
 	return (0);
 }
 
+/*
+ * __wt_json_to_item --
+ *	Convert a JSON input string for either key/value to a raw WT_ITEM.
+ *	Checks that the input matches the expected format.
+ */
 int
 __wt_json_to_item(WT_SESSION_IMPL *session, const char *jstr,
     const char *format, WT_CURSOR_JSON *json, int iskey, WT_ITEM *item)
@@ -809,22 +821,23 @@ __wt_json_to_item(WT_SESSION_IMPL *session, const char *jstr,
 }
 
 /*
- * __wt_json_strlen
+ * __wt_json_strlen --
  *	Return the number of bytes represented by a string in JSON format,
  *	or -1 if the format is incorrect.
  */
 ssize_t
 __wt_json_strlen(const char *src, size_t srclen)
 {
-	size_t dstlen = 0;
-	const char *srcend = src + srclen;
+	const char *srcend;
+	size_t dstlen;
+	u_char hi, lo;
 
+	dstlen = 0;
+	srcend = src + srclen;
 	while (src < srcend) {
-		/* JSON can include any UTF-8 expressed in 4 hex bytes. */
+		/* JSON can include any UTF-8 expressed in 4 hex chars. */
 		if (*src == '\\') {
 			if (*++src == 'u') {
-				u_char hi;
-				u_char lo;
 				if (__wt_hex2byte((const u_char *)++src, &hi))
 					return (-1);
 				src += 2;
@@ -848,11 +861,11 @@ __wt_json_strlen(const char *src, size_t srclen)
 	}
 	if (src != srcend)
 		return (-1);   /* invalid input, e.g. final char is '\\' */
-	return (dstlen);
+	return ((size_t)dstlen);
 }
 
 /*
- * __wt_json_strncpy
+ * __wt_json_strncpy --
  *	Copy bytes of string in JSON format to a destination,
  *	up to dstlen bytes.  If dstlen is greater than the needed size,
  *	the result if zero padded.
@@ -860,16 +873,17 @@ __wt_json_strlen(const char *src, size_t srclen)
 int
 __wt_json_strncpy(char **pdst, size_t dstlen, const char *src, size_t srclen)
 {
-	char *dst = *pdst;
-	const char *dstend = dst + dstlen;
-	const char *srcend = src + srclen;
+	char *dst;
+	const char *dstend, *srcend;
+	u_char hi, lo;
 
+	dst = *pdst;
+	dstend = dst + dstlen;
+	srcend = src + srclen;
 	while (src < srcend && dst < dstend) {
-		/* JSON can include any UTF-8 expressed in 4 hex bytes. */
+		/* JSON can include any UTF-8 expressed in 4 hex chars. */
 		if (*src == '\\') {
 			if (*++src == 'u') {
-				u_char hi;
-				u_char lo;
 				if (__wt_hex2byte((const u_char *)++src, &hi))
 					return (EINVAL);
 				src += 2;
@@ -899,7 +913,7 @@ __wt_json_strncpy(char **pdst, size_t dstlen, const char *src, size_t srclen)
 				} else
 					/* else 1 byte total */
 					/* byte 0: 0LLLLLLL */
-					*dst++ = lo;
+					*dst++ = (char)lo;
 			}
 			else
 				*dst++ = *src;

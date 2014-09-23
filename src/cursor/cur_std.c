@@ -276,7 +276,7 @@ __wt_cursor_set_keyv(WT_CURSOR *cursor, uint32_t flags, va_list ap)
 		cursor->key.data = &cursor->recno;
 		sz = sizeof(cursor->recno);
 	} else {
-		/* Fast path some common cases. */
+		/* Fast path some common cases and special case WT_ITEMs. */
 		fmt = cursor->key_format;
 		if (LF_ISSET(WT_CURSOR_RAW_OK | WT_CURSTD_DUMP_JSON) ||
 		    WT_STREQ(fmt, "u")) {

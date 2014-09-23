@@ -6,65 +6,11 @@
  */
 
 #include "util.h"
+#include "util_load.h"
 
-/*
- * Encapsulates the input state for parsing JSON.
- *
- * At any time, we may be peeking at an unconsumed token; this is
- * indicated by 'peeking' as true.  toktype, tokstart, toklen will be
- * set in this case.
- *
- * Generally we are collecting and processing tokens one by one.
- * In JSON, tokens never span lines so this makes processing easy.
- * The exception is that a JSON dump cursor takes the complete
- * set of keys or values during cursor->set_key/set_value calls,
- * which may contain many tokens and span lines.  E.g.
- *   cursor->set_value("\"name\" : \"jo\", \"phone\" : 2348765");
- * The raw key/value string is collected in in the kvraw field.
- */
-typedef struct {
-	WT_SESSION *session;    /* associated session */
-	ULINE line;		/* current line */
-	const char *p;		/* points to cur position in line.mem */
-	int ateof;		/* current token is EOF */
-	int peeking;		/* peeking at next token */
-	int toktype;		/* next token, defined by __wt_json_token() */
-	const char *tokstart;	/* next token start (points into line.mem) */
-	size_t toklen;		/* next token length */
-	char *kvraw;		/* multiline raw content collected so far */
-	size_t kvrawstart;	/* pos on cur line that JSON key/value starts */
-	const char *filename;   /* filename for error reporting */
-	int linenum;		/* line number for error reporting */
-} JSON_INPUT_STATE;
-
-/*
- * A list of configuration strings.
- */
-typedef struct {
-	char **list;		/* array of alternating (uri, config) values */
-	int entry;		/* next entry available in list */
-	int max_entry;		/* how many allocated in list */
-} CONFIG_LIST;
-
-static int config_exec(WT_SESSION *, char **);
-static int config_list_add(CONFIG_LIST *, char *);
-static int config_read(char ***, int *);
-static int config_rename(char **, const char *);
-static void config_remove(char *, const char *);
-static int config_reorder(char **);
-static int config_update(WT_SESSION *, char **);
 static int format(void);
 static int insert(WT_CURSOR *, const char *);
-static int json_cgidx(WT_SESSION *, JSON_INPUT_STATE *, CONFIG_LIST *, int);
-static int json_data(WT_SESSION *, JSON_INPUT_STATE *, CONFIG_LIST *);
-static int json_expect(WT_SESSION *, JSON_INPUT_STATE *, int);
-static int json_peek(WT_SESSION *, JSON_INPUT_STATE *);
-static int json_skip(WT_SESSION *, JSON_INPUT_STATE *, const char **);
-static int json_kvraw_append(JSON_INPUT_STATE *, const char *, size_t);
-static int json_strdup(JSON_INPUT_STATE *, char **);
-static int json_top_level(WT_SESSION *, JSON_INPUT_STATE *);
 static int load_dump(WT_SESSION *);
-static int load_json(WT_SESSION *, const char *);
 static int usage(void);
 
 static int	append;		/* -a append (ignore record number keys) */
@@ -73,23 +19,12 @@ static char   **cmdconfig;	/* configuration pairs */
 static int	json;		/* -j input is JSON format */
 static int	no_overwrite;	/* -n don't overwrite existing data */
 
-#define JSON_STRING_MATCH(ins, match)					\
-	((ins)->toklen - 2 == strlen(match) &&				\
-	    strncmp((ins)->tokstart + 1, (match), (ins)->toklen - 2) == 0)
-
-#define JSON_INPUT_POS(ins)						\
-	((int)((ins)->p - (const char *)(ins)->line.mem))
-
-#define JSON_EXPECT(session, ins, tok) do {				\
-	if (json_expect(session, ins, tok))				\
-		goto err;						\
-} while (0)
-
 int
 util_load(WT_SESSION *session, int argc, char *argv[])
 {
 	int ch;
 	const char *filename;
+	uint32_t flags;
 
 	filename = "<stdin>";
 	while ((ch = util_getopt(argc, argv, "af:jnr:")) != EOF)
@@ -104,7 +39,7 @@ util_load(WT_SESSION *session, int argc, char *argv[])
 			else
 				filename = util_optarg;
 			break;
-		case 'j':	/* input file */
+		case 'j':	/* input is JSON */
 			json = 1;
 			break;
 		case 'n':	/* don't overwrite existing data */
@@ -133,537 +68,12 @@ util_load(WT_SESSION *session, int argc, char *argv[])
 		cmdconfig = argv;
 	}
 
-	if (json)
-		return (load_json(session, filename));
-	else
+	if (json) {
+		flags = (append ? LOAD_JSON_APPEND : 0) |
+		    (no_overwrite ? LOAD_JSON_NO_OVERWRITE : 0);
+		return (util_load_json(session, filename, flags));
+	} else
 		return (load_dump(session));
-}
-
-/*
- * json_cgidx --
- *	Parse a column group or index entry from JSON input.
- */
-static int
-json_cgidx(WT_SESSION *session, JSON_INPUT_STATE *ins, CONFIG_LIST *clp,
-    int idx)
-{
-	WT_DECL_RET;
-	char *config, *p, *uri;
-	int isconfig;
-
-	uri = NULL;
-	config = NULL;
-
-	while (json_peek(session, ins) == '{') {
-		JSON_EXPECT(session, ins, '{');
-		JSON_EXPECT(session, ins, 's');
-		isconfig = JSON_STRING_MATCH(ins, "config");
-		if (!isconfig && !JSON_STRING_MATCH(ins, "uri"))
-			goto err;
-		JSON_EXPECT(session, ins, ':');
-		JSON_EXPECT(session, ins, 's');
-
-		if ((ret = json_strdup(ins, &p)) != 0) {
-			ret = util_err(ret, NULL);
-			goto err;
-		}
-		if (isconfig)
-			config = p;
-		else
-			uri = p;
-
-		isconfig = !isconfig;
-		JSON_EXPECT(session, ins, ',');
-		JSON_EXPECT(session, ins, 's');
-		if (!JSON_STRING_MATCH(ins, isconfig ? "config" : "uri"))
-			goto err;
-		JSON_EXPECT(session, ins, ':');
-		JSON_EXPECT(session, ins, 's');
-
-		if ((ret = json_strdup(ins, &p)) != 0) {
-			ret = util_err(ret, NULL);
-			goto err;
-		}
-		if (isconfig)
-			config = p;
-		else
-			uri = p;
-		JSON_EXPECT(session, ins, '}');
-		if ((idx && strncmp(uri, "index:", 6) != 0) ||
-		    (!idx && strncmp(uri, "colgroup:", 9) != 0)) {
-			ret = util_err(EINVAL,
-			    "%s: misplaced colgroup or index", uri);
-			goto err;
-		}
-		if ((ret = config_list_add(clp, uri)) != 0 ||
-		    (ret = config_list_add(clp, config)) != 0)
-			goto err;
-
-		if (json_peek(session, ins) != ',')
-			break;
-		JSON_EXPECT(session, ins, ',');
-		if (json_peek(session, ins) != '{')
-			goto err;
-	}
-	if (0) {
-err:		if (ret == 0)
-			ret = EINVAL;
-	}
-	return (ret);
-}
-
-/*
- * json_kvraw_append --
- *	Append to the kvraw buffer, which is used to collect all the
- *	raw key/value pairs from JSON input.
- */
-static int json_kvraw_append(JSON_INPUT_STATE *ins, const char *str, size_t len)
-{
-	char *tmp;
-	size_t needsize;
-
-	if (len > 0) {
-		needsize = strlen(ins->kvraw) + len + 2;
-		if ((tmp = malloc(needsize)) == NULL)
-			return (util_err(errno, NULL));
-		snprintf(tmp, needsize, "%s %.*s", ins->kvraw, (int)len, str);
-		free(ins->kvraw);
-		ins->kvraw = tmp;
-	}
-	return (0);
-}
-
-/*
- * json_strdup --
- *	Return a string, with no escapes or other JSON-isms, from the
- *	JSON string at the current input position.
- */
-static int
-json_strdup(JSON_INPUT_STATE *ins, char **resultp)
-{
-	WT_DECL_RET;
-	char *result, *resultcpy;
-	const char *src;
-	ssize_t resultlen, srclen;
-
-	result = NULL;
-	src = ins->tokstart + 1;  /*strip "" from token */
-	srclen = ins->toklen - 2;
-	if ((resultlen = __wt_json_strlen(src, srclen)) < 0) {
-		ret = util_err(EINVAL, "Invalid config string");
-		goto err;
-	}
-	resultlen += 1;
-	if ((result = (char *)malloc(resultlen)) == NULL) {
-		ret = util_err(errno, NULL);
-		goto err;
-	}
-	*resultp = result;
-	resultcpy = result;
-	if ((ret = __wt_json_strncpy(&resultcpy, resultlen, src, srclen))
-	    != 0) {
-		ret = util_err(ret, NULL);
-		goto err;
-	}
-
-	if (0) {
-err:		if (ret == 0)
-			ret = EINVAL;
-		if (result != NULL)
-			free(result);
-		*resultp = NULL;
-	}
-	return (ret);
-}
-
-static int
-config_list_add(CONFIG_LIST *clp, char *val)
-{
-	if (clp->entry + 1 >= clp->max_entry)
-		if ((clp->list = realloc(clp->list, (size_t)
-		    (clp->max_entry += 100) * sizeof(char *))) == NULL)
-			/* List already freed by realloc. */
-			return (util_err(errno, NULL));
-
-	clp->list[clp->entry++] = val;
-	clp->list[clp->entry] = NULL;
-	return (0);
-}
-
-static void
-config_list_free(CONFIG_LIST *clp)
-{
-	char **entry;
-
-	if (clp->list != NULL)
-		for (entry = &clp->list[0]; *entry != NULL; entry++)
-			free(*entry);
-	free(clp->list);
-	clp->list = NULL;
-}
-
-/*
- * json_data --
- *	Parse the data portion of the JSON input, and insert all
- *	values.
- */
-static int
-json_data(WT_SESSION *session, JSON_INPUT_STATE *ins, CONFIG_LIST *clp)
-{
-	WT_CURSOR *cursor;
-	WT_DECL_RET;
-	char config[64], *endp, *uri;
-	const char *keyformat;
-	int isrec, nfield, nkeys, toktype, tret;
-	size_t gotnolen, keystrlen;
-	uint64_t gotno, recno;
-
-	cursor = NULL;
-	uri = NULL;
-
-	/* Reorder and check the list. */
-	if ((ret = config_reorder(clp->list)) != 0)
-		goto err;
-
-	/* Update config based on command-line configuration. */
-	if ((ret = config_update(session, clp->list)) != 0)
-		goto err;
-
-	/* Create the items collected. */
-	if ((ret = config_exec(session, clp->list)) != 0)
-		goto err;
-
-	uri = clp->list[0];
-	(void)snprintf(config, sizeof(config),
-	    "dump=json%s%s",
-	    append ? ",append" : "", no_overwrite ? ",overwrite=false" : "");
-	if ((ret = session->open_cursor(
-	    session, uri, NULL, config, &cursor)) != 0) {
-		ret = util_err(ret, "%s: session.open", uri);
-		goto err;
-	}
-	keyformat = cursor->key_format;
-	isrec = (strcmp(keyformat, "r") == 0);
-	for (nkeys = 0; *keyformat; keyformat++)
-		if (!isdigit(*keyformat))
-			nkeys++;
-
-	recno = 0;
-	while (json_peek(session, ins) == '{') {
-		nfield = 0;
-		JSON_EXPECT(session, ins, '{');
-		if ((ins)->kvraw == NULL)
-			(ins)->kvraw = (char *)malloc(1);
-		(ins)->kvraw[0] = '\0';
-		(ins)->kvrawstart = JSON_INPUT_POS(ins);
-		keystrlen = 0;
-		while (json_peek(session, ins) == 's') {
-			JSON_EXPECT(session, ins, 's');
-			JSON_EXPECT(session, ins, ':');
-			toktype = json_peek(session, ins);
-			JSON_EXPECT(session, ins, toktype);
-			if (isrec && nfield == 0) {
-				/* Verify the dump has recnos in order. */
-				recno++;
-				gotno = __wt_strtouq(ins->tokstart, &endp, 0);
-				gotnolen = (endp - ins->tokstart);
-				if (recno != gotno || ins->toklen != gotnolen) {
-					ret = util_err(0,
-					    "%s: recno out of order", uri);
-					goto err;
-				}
-			}
-			if (++nfield == nkeys) {
-				int curpos = JSON_INPUT_POS(ins);
-				if ((ret = json_kvraw_append(ins,
-				    (char *)(ins)->line.mem + (ins)->kvrawstart,
-				    curpos - (ins)->kvrawstart)) != 0)
-					goto err;
-				ins->kvrawstart = curpos;
-				keystrlen = strlen(ins->kvraw);
-			}
-			if (json_peek(session, ins) != ',')
-				break;
-			JSON_EXPECT(session, ins, ',');
-			if (json_peek(session, ins) != 's')
-				goto err;
-		}
-		if (json_kvraw_append(ins, ins->line.mem, JSON_INPUT_POS(ins)))
-			goto err;
-
-		ins->kvraw[keystrlen] = '\0';
-		if (!append)
-			cursor->set_key(cursor, ins->kvraw);
-		/* skip over inserted space and comma */
-		cursor->set_value(cursor, &ins->kvraw[keystrlen+2]);
-		if ((ret = cursor->insert(cursor)) != 0) {
-			ret = util_err(ret, "%s: cursor.insert", uri);
-			goto err;
-		}
-
-		JSON_EXPECT(session, ins, '}');
-		if (json_peek(session, ins) != ',')
-			break;
-		JSON_EXPECT(session, ins, ',');
-		if (json_peek(session, ins) != '{')
-			goto err;
-	}
-	if (0) {
-err:		if (ret == 0)
-			ret = EINVAL;
-	}
-	/*
-	 * Technically, we don't have to close the cursor because the session
-	 * handle will do it for us, but I'd like to see the flush to disk and
-	 * the close succeed, it's better to fail early when loading files.
-	 */
-	if (cursor != NULL && (tret = cursor->close(cursor)) != 0) {
-		tret = util_err(tret, "%s: cursor.close", uri);
-		if (ret == 0)
-			ret = tret;
-	}
-	if (ret == 0)
-		ret = util_flush(session, uri);
-	return (ret);
-}
-
-/*
- * json_top_level --
- *	Parse the top level JSON input.
- */
-static int
-json_top_level(WT_SESSION *session, JSON_INPUT_STATE *ins)
-{
-	CONFIG_LIST cl;
-	WT_DECL_RET;
-	char *config, *tableuri;
-	int toktype;
-	static const char *json_markers[] = {
-	    "\"config\"", "\"colgroups\"", "\"indices\"", "\"data\"", NULL };
-
-	memset(&cl, 0, sizeof(cl));
-	tableuri = NULL;
-	JSON_EXPECT(session, ins, '{');
-	while (json_peek(session, ins) == 's') {
-		JSON_EXPECT(session, ins, 's');
-		tableuri = realloc(tableuri, ins->toklen);
-		snprintf(tableuri, ins->toklen, "%.*s",
-		    (int)(ins->toklen - 2), ins->tokstart + 1);
-		JSON_EXPECT(session, ins, ':');
-
-		/*
-		 * Allow any ordering of 'config', 'colgroups',
-		 * 'indices' before 'data', which must appear last.
-		 * The non-'data' items build up a list of entries
-		 * that created in our session before the data is
-		 * inserted.
-		 */
-		for (;;) {
-			if (json_skip(session, ins, json_markers) != 0)
-				goto err;
-			JSON_EXPECT(session, ins, 's');
-			if (JSON_STRING_MATCH(ins, "config")) {
-				JSON_EXPECT(session, ins, ':');
-				JSON_EXPECT(session, ins, 's');
-				if ((ret = json_strdup(ins, &config)) != 0) {
-					ret = util_err(ret, NULL);
-					goto err;
-				}
-				config_list_add(&cl, tableuri);
-				config_list_add(&cl, config);
-				tableuri = NULL;
-			} else if (JSON_STRING_MATCH(ins, "colgroups")) {
-				JSON_EXPECT(session, ins, ':');
-				JSON_EXPECT(session, ins, '[');
-				if ((ret = json_cgidx(session, ins, &cl, 0))
-				    != 0)
-					goto err;
-				JSON_EXPECT(session, ins, ']');
-			} else if (JSON_STRING_MATCH(ins, "indices")) {
-				JSON_EXPECT(session, ins, ':');
-				JSON_EXPECT(session, ins, '[');
-				if ((ret = json_cgidx(session, ins, &cl, 1))
-				    != 0)
-					goto err;
-				JSON_EXPECT(session, ins, ']');
-			} else if (JSON_STRING_MATCH(ins, "data")) {
-				JSON_EXPECT(session, ins, ':');
-				JSON_EXPECT(session, ins, '[');
-				if ((ret = json_data(session, ins, &cl)) != 0)
-					goto err;
-				config_list_free(&cl);
-				break;
-			}
-			else
-				goto err;
-		}
-
-		while ((toktype = json_peek(session, ins)) == '}' ||
-		    toktype == ']')
-			JSON_EXPECT(session, ins, toktype);
-		if (toktype == 0) /* Check EOF. */
-			break;
-		if (toktype == ',') {
-			JSON_EXPECT(session, ins, ',');
-			if (json_peek(session, ins) != 's')
-				goto err;
-			continue;
-		}
-	}
-	JSON_EXPECT(session, ins, 0);
-
-	if (0) {
-err:		if (ret == 0)
-			ret = EINVAL;
-	}
-	config_list_free(&cl);
-	if (tableuri != NULL)
-		free(tableuri);
-	return (ret);
-}
-
-/*
- * json_peek --
- *	Set the input state to the next available token in the input
- *	and return its tokentype, a code defined by __wt_json_token().
- */
-static int
-json_peek(WT_SESSION *session, JSON_INPUT_STATE *ins)
-{
-	int ret = 0;
-
-	if (!ins->peeking) {
-		while (!ins->ateof) {
-			while (isspace(*ins->p))
-				ins->p++;
-			if (*ins->p)
-				break;
-			if (ins->kvraw != NULL) {
-				if (json_kvraw_append(ins,
-				    (char *)ins->line.mem + ins->kvrawstart,
-				    strlen(ins->line.mem) - ins->kvrawstart)) {
-					ret = -1;
-					goto err;
-				}
-				ins->kvrawstart = 0;
-			}
-			if (util_read_line(&ins->line, 1,
-			    &ins->ateof)) {
-				ins->toktype = -1;
-				ret = -1;
-				goto err;
-			}
-			ins->linenum++;
-			ins->p = (const char *)ins->line.mem;
-		}
-		if (ins->ateof)
-			ins->toktype = 0;
-		else if (__wt_json_token(session, ins->p,
-		    &ins->toktype, &ins->tokstart,
-		    &ins->toklen) != 0)
-			ins->toktype = -1;
-		ins->peeking = 1;
-	}
-	if (0) {
-	err:	if (ret == 0)
-			ret = -1;
-	}
-	return (ret == 0 ? ins->toktype : -1);
-}
-
-/*
- * json_expect --
- *	Ensure that the type of the next token in the input matches
- *	the wanted value, and advance past it.  The values of the
- *	input state will be set so specific string or integer values
- *	can be pulled out after this call.
- */
-static int
-json_expect(WT_SESSION *session, JSON_INPUT_STATE *ins, int wanttok)
-{
-	if (json_peek(session, ins) < 0)
-		return (1);
-	ins->p += ins->toklen;
-	ins->peeking = 0;
-	if (ins->toktype != wanttok) {
-		fprintf(stderr,
-		    "%s: %d: %d: expected %s, got %s\n",
-		    ins->filename,
-		    ins->linenum,
-		    JSON_INPUT_POS(ins) + 1,
-		    __wt_json_tokname(wanttok),
-		    __wt_json_tokname(ins->toktype));
-		return (1);
-	}
-	return (0);
-}
-
-
-/*
- * json_skip --
- *	Skip over JSON input until one of the specified strings appears.
- *	The tokenizer will be set to point to the beginning of
- *	that string.
- */
-static int
-json_skip(WT_SESSION *session, JSON_INPUT_STATE *ins, const char **matches)
-{
-	char *hit;
-	const char **match;
-
-	if (ins->kvraw != NULL)
-		return (1);
-
-	hit = NULL;
-	while (!ins->ateof) {
-		for (match = matches; *match != NULL; match++)
-			if ((hit = strstr(ins->p, *match)) != NULL)
-				goto out;
-		if (util_read_line(&ins->line, 1, &ins->ateof)) {
-			ins->toktype = -1;
-			return (1);
-		}
-		ins->linenum++;
-		ins->p = (const char *)ins->line.mem;
-	}
-out:
-	if (hit == NULL)
-		return (1);
-
-	/* Set to this token. */
-	ins->p = hit;
-	ins->peeking = 0;
-	ins->toktype = 0;
-	(void)json_peek(session, ins);
-	return (0);
-}
-
-
-/*
- * load_json --
- *	Load from the JSON format produced by 'wt dump -j'.
- */
-static int
-load_json(WT_SESSION *session, const char *filename)
-{
-	JSON_INPUT_STATE instate;
-	WT_DECL_RET;
-
-	memset(&instate, 0, sizeof(instate));
-	instate.session = session;
-	if (util_read_line(&instate.line, 0, &instate.ateof))
-		return (1);
-	instate.p = (const char *)instate.line.mem;
-	instate.linenum = 1;
-	instate.filename = filename;
-
-	if ((ret = json_top_level(session, &instate)) != 0)
-		goto err;
-
-err:	if (instate.line.mem != NULL)
-		free(instate.line.mem);
-	free(instate.kvraw);
-	return (ret);
 }
 
 /*
@@ -748,10 +158,10 @@ err:	/*
  * config_exec --
  *	Create the tables/indices/colgroups implied by the list.
  */
-static int
+int
 config_exec(WT_SESSION *session, char **list)
 {
-	int ret;
+	WT_DECL_RET;
 
 	for (; *list != NULL; list += 2)
 		if ((ret = session->create(session, list[0], list[1])) != 0)
@@ -759,11 +169,37 @@ config_exec(WT_SESSION *session, char **list)
 	return (0);
 }
 
+int
+config_list_add(CONFIG_LIST *clp, char *val)
+{
+	if (clp->entry + 1 >= clp->max_entry)
+		if ((clp->list = realloc(clp->list, (size_t)
+		    (clp->max_entry += 100) * sizeof(char *))) == NULL)
+			/* List already freed by realloc. */
+			return (util_err(errno, NULL));
+
+	clp->list[clp->entry++] = val;
+	clp->list[clp->entry] = NULL;
+	return (0);
+}
+
+void
+config_list_free(CONFIG_LIST *clp)
+{
+	char **entry;
+
+	if (clp->list != NULL)
+		for (entry = &clp->list[0]; *entry != NULL; entry++)
+			free(*entry);
+	free(clp->list);
+	clp->list = NULL;
+}
+
 /*
  * config_read --
  *	Read the config lines and do some basic validation.
  */
-static int
+int
 config_read(char ***listp, int *hexp)
 {
 	ULINE l;
@@ -851,7 +287,7 @@ err:	if (list != NULL) {
  *	For table dumps, reorder the list so tables are first.
  *	For other dumps, make any needed checks.
  */
-static int
+int
 config_reorder(char **list)
 {
 	char **entry, *p;
@@ -893,7 +329,7 @@ config_reorder(char **list)
  *	Reconcile and update the command line configuration against the
  *	config we found.
  */
-static int
+int
 config_update(WT_SESSION *session, char **list)
 {
 	int found;
@@ -1006,7 +442,7 @@ config_update(WT_SESSION *session, char **list)
  * config_rename --
  *	Update the URI name.
  */
-static int
+int
 config_rename(char **urip, const char *name)
 {
 	size_t len;
@@ -1037,7 +473,7 @@ config_rename(char **urip, const char *name)
  * config_remove --
  *	Remove a single config key and its value.
  */
-static void
+void
 config_remove(char *config, const char *ckey)
 {
 	int parens, quoted;
