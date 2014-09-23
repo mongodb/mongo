@@ -31,13 +31,73 @@
 #pragma once
 
 #include "mongo/db/diskloc.h"
-#include "mongo/db/pdfile_version.h"
 #include "mongo/db/storage/mmap_v1/durable_mapped_file.h"
 
 namespace mongo {
 
     class ExtentManager;
     class OperationContext;
+
+#pragma pack(1)
+    class DataFileVersion {
+    public:
+        DataFileVersion(uint32_t major, uint32_t minor) :_major(major), _minor(minor) {}
+
+        static DataFileVersion defaultForNewFiles() {
+            return DataFileVersion(kCurrentMajor, kIndexes24AndNewer
+                                                | kMayHave28Freelist
+                                                );
+        }
+
+        bool isCompatibleWithCurrentCode() const {
+            if (_major != kCurrentMajor)
+                return false;
+
+            if (_minor & ~kUsedMinorFlagsMask)
+                return false;
+
+            const uint32_t indexCleanliness = _minor & kIndexPluginMask;
+            if (indexCleanliness != kIndexes24AndNewer && indexCleanliness != kIndexes22AndOlder)
+                return false;
+
+            // We are compatible with either setting of kMayHave28Freelist.
+
+            return true;
+        }
+
+        bool is24IndexClean() const { return (_minor & kIndexPluginMask) == kIndexes24AndNewer; }
+        void setIs24IndexClean() { _minor = ((_minor & ~kIndexPluginMask) | kIndexes24AndNewer); }
+
+        bool mayHave28Freelist() const { return _minor & kMayHave28Freelist; }
+        void setMayHave28Freelist() { _minor |= kMayHave28Freelist; }
+
+        uint32_t major() const { return _major; }
+        uint32_t minorRaw() const { return _minor; }
+
+    private:
+        static const uint32_t kCurrentMajor = 4;
+
+        // minor layout:
+        // first 4 bits - index plugin cleanliness.
+        //    see IndexCatalog::_upgradeDatabaseMinorVersionIfNeeded for details
+        // 5th bit - 1 if started with 2.8-style freelist implementation (SERVER-14081)
+        // 6th through 31st bit - reserved and must be set to 0.
+        static const uint32_t kIndexPluginMask = 0xf;
+        static const uint32_t kIndexes22AndOlder = 5;
+        static const uint32_t kIndexes24AndNewer = 6;
+
+        static const uint32_t kMayHave28Freelist = (1 << 4);
+
+        // All set bits we know about are covered by this mask.
+        static const uint32_t kUsedMinorFlagsMask = 0x1f;
+
+        uint32_t _major;
+        uint32_t _minor;
+    };
+
+    // Note: Intentionally not defining relational operators for DataFileVersion as there is no
+    // total ordering of all versions now that '_minor' is used as a bit vector.
+#pragma pack()
 
     /*  a datafile - i.e. the "dbname.<#>" files :
 
@@ -55,8 +115,7 @@ namespace mongo {
 #pragma pack(1)
     class DataFileHeader {
     public:
-        int version;
-        int versionMinor;
+        DataFileVersion version;
         int fileLength;
         DiskLoc unused; /* unused is the portion of the file that doesn't belong to any allocated extents. -1 = no more */
         int unusedLength;
@@ -68,14 +127,7 @@ namespace mongo {
 
         enum { HeaderSize = 8192 };
 
-        // all of this should move up to the database level
-        bool isCurrentVersion() const {
-            return version == PDFILE_VERSION && ( versionMinor == PDFILE_VERSION_MINOR_22_AND_OLDER
-                                               || versionMinor == PDFILE_VERSION_MINOR_24_AND_NEWER
-                                                );
-        }
-
-        bool uninitialized() const { return version == 0; }
+        bool uninitialized() const { return version.major() == 0; }
 
         void init(OperationContext* txn, int fileno, int filelength, const char* filename);
 

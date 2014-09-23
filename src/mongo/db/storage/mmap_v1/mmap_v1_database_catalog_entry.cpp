@@ -43,12 +43,12 @@
 #include "mongo/db/index/hash_access_method.h"
 #include "mongo/db/index/haystack_access_method.h"
 #include "mongo/db/index/s2_access_method.h"
-#include "mongo/db/pdfile_version.h"
 #include "mongo/db/server_parameters.h"
 #include "mongo/db/storage/mmap_v1/btree/btree_interface.h"
 #include "mongo/db/storage/mmap_v1/catalog/namespace_details.h"
 #include "mongo/db/storage/mmap_v1/catalog/namespace_details_collection_entry.h"
 #include "mongo/db/storage/mmap_v1/catalog/namespace_details_rsv1_metadata.h"
+#include "mongo/db/storage/mmap_v1/dur.h"
 #include "mongo/db/storage/mmap_v1/data_file.h"
 #include "mongo/db/storage/mmap_v1/dur_recovery_unit.h"
 #include "mongo/db/storage/mmap_v1/record_store_v1_capped.h"
@@ -169,6 +169,13 @@ namespace mongo {
                                 IndexDescriptor::makeIndexNamespace(ns, indexNames[i]));
                         }
                     }
+                }
+
+                DataFileVersion version = _extentManager.getFileFormat(txn);
+                if (version.isCompatibleWithCurrentCode() && !version.mayHave28Freelist()) {
+                    // Any DB that can be opened and written to gets this flag set.
+                    version.setMayHave28Freelist();
+                    _extentManager.setFileFormat(txn, version);
                 }
             }
 
@@ -435,13 +442,11 @@ namespace mongo {
 
             {
 
-                int major = 0;
-                int minor = 0;
-                _extentManager.getFileFormat( opCtx, &major, &minor );
+                const DataFileVersion version = _extentManager.getFileFormat(opCtx);
 
                 BSONObjBuilder dataFileVersion( output->subobjStart( "dataFileVersion" ) );
-                dataFileVersion.append( "major", major );
-                dataFileVersion.append( "minor", minor );
+                dataFileVersion.append( "major", version.major() );
+                dataFileVersion.append( "minor", version.minorRaw() );
                 dataFileVersion.done();
             }
         }
@@ -452,40 +457,33 @@ namespace mongo {
         if ( _extentManager.numFiles() == 0 )
             return false;
 
-        int major = 0;
-        int minor = 0;
+        const DataFileVersion version = _extentManager.getFileFormat(opCtx);
 
-        _extentManager.getFileFormat( opCtx, &major, &minor );
+        invariant(version.isCompatibleWithCurrentCode());
 
-        invariant( major == PDFILE_VERSION );
-
-        return minor == PDFILE_VERSION_MINOR_22_AND_OLDER;
+        return !version.is24IndexClean();
     }
 
     void MMAPV1DatabaseCatalogEntry::markIndexSafe24AndUp( OperationContext* opCtx ) {
         if ( _extentManager.numFiles() == 0 )
             return;
 
-        int major = 0;
-        int minor = 0;
+        DataFileVersion version = _extentManager.getFileFormat(opCtx);
 
-        _extentManager.getFileFormat( opCtx, &major, &minor );
+        invariant(version.isCompatibleWithCurrentCode());
 
-        invariant( major == PDFILE_VERSION );
+        if (version.is24IndexClean())
+            return; // nothing to do
 
-        if ( minor == PDFILE_VERSION_MINOR_24_AND_NEWER )
-            return;
-
-        invariant( minor == PDFILE_VERSION_MINOR_22_AND_OLDER );
-
-        _extentManager.setFileFormat(opCtx, major, PDFILE_VERSION_MINOR_24_AND_NEWER);
+        version.setIs24IndexClean();
+        _extentManager.setFileFormat(opCtx, version);
     }
 
     bool MMAPV1DatabaseCatalogEntry::currentFilesCompatible( OperationContext* opCtx ) const {
         if ( _extentManager.numFiles() == 0 )
             return true;
 
-        return _extentManager.getOpenFile( 0 )->getHeader()->isCurrentVersion();
+        return _extentManager.getOpenFile( 0 )->getHeader()->version.isCompatibleWithCurrentCode();
     }
 
     void MMAPV1DatabaseCatalogEntry::getCollectionNamespaces( std::list<std::string>* tofill ) const {

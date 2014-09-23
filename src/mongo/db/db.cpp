@@ -65,7 +65,6 @@
 #include "mongo/db/log_process_details.h"
 #include "mongo/db/mongod_options.h"
 #include "mongo/db/operation_context_impl.h"
-#include "mongo/db/pdfile_version.h"
 #include "mongo/db/query/internal_plans.h"
 #include "mongo/db/range_deleter_service.h"
 #include "mongo/db/repl/repl_coordinator_global.h"

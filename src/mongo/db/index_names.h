@@ -71,8 +71,8 @@ namespace mongo {
 
         /**
          * True if is a regular (non-plugin) index or uses a plugin that existed before 2.4.
-         * These plugins are grandfathered in and allowed to exist in DBs with
-         * PDFILE_MINOR_VERSION_22_AND_OLDER
+         * These plugins are grandfathered in and allowed to exist in DBs where
+         * DataFileVersion::is24IndexClean() returns false.
          */
         static bool existedBefore24(const std::string& name);
 
