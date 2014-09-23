@@ -1,7 +1,6 @@
 package mongoimport
 
 import (
-	"fmt"
 	"github.com/mongodb/mongo-tools/common/db"
 	"gopkg.in/mgo.v2"
 	"gopkg.in/mgo.v2/bson"
