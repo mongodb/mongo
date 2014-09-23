@@ -1326,20 +1326,9 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
 	WT_ERR(__wt_config_gets(session, cfg, "session_max", &cval));
 	conn->session_size = (uint32_t)cval.val + WT_NUM_INTERNAL_SESSIONS;
 
-	WT_ERR(__wt_config_gets(session, cfg, "lsm_manager.merge", &cval));
-	if (cval.val)
-		F_SET(conn, WT_CONN_LSM_MERGE);
-
-	WT_ERR(__wt_config_gets(
-	    session, cfg, "lsm_manager.worker_thread_max", &cval));
-	if (cval.val)
-		conn->lsm_manager.lsm_workers_max = (uint32_t)cval.val;
-
 	WT_ERR(__wt_config_gets(session, cfg, "checkpoint_sync", &cval));
 	if (cval.val)
 		F_SET(conn, WT_CONN_CKPT_SYNC);
-
-	WT_ERR(__wt_verbose_config(session, cfg));
 
 	WT_ERR(__wt_config_gets(session, cfg, "buffer_alignment", &cval));
 	if (cval.val == -1)
@@ -1382,6 +1371,8 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
 	conn->mmap = cval.val == 0 ? 0 : 1;
 
 	WT_ERR(__conn_statistics_config(session, cfg));
+	WT_ERR(__wt_lsm_manager_config(session, cfg));
+	WT_ERR(__wt_verbose_config(session, cfg));
 
 	/* Write the base configuration file, if we're creating the database. */
 	if (conn->is_new)

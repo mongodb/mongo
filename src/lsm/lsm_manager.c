@@ -25,6 +25,9 @@ __wt_lsm_manager_config(WT_SESSION_IMPL *session, const char **cfg)
 
 	conn = S2C(session);
 
+	WT_RET(__wt_config_gets(session, cfg, "lsm_manager.merge", &cval));
+	if (cval.val)
+		F_SET(conn, WT_CONN_LSM_MERGE);
 	WT_RET(__wt_config_gets(
 	    session, cfg, "lsm_manager.worker_thread_max", &cval));
 	if (cval.val)
@@ -42,7 +45,6 @@ __wt_lsm_manager_start(WT_SESSION_IMPL *session)
 {
 	WT_DECL_RET;
 	WT_LSM_MANAGER *manager;
-	WT_LSM_WORKER_ARGS *cookies;
 	WT_SESSION_IMPL *worker_session;
 	uint32_t i;
 
@@ -53,8 +55,6 @@ __wt_lsm_manager_start(WT_SESSION_IMPL *session)
 	 * worker.
 	 */
 	WT_ASSERT(session, manager->lsm_workers_max > 2);
-	WT_RET(__wt_calloc_def(session, manager->lsm_workers_max, &cookies));
-	manager->lsm_worker_cookies = cookies;
 
 	/*
 	 * Open sessions for all potential worker threads here - it's not
@@ -67,22 +67,22 @@ __wt_lsm_manager_start(WT_SESSION_IMPL *session)
 		WT_ERR(__wt_open_internal_session(
 		    S2C(session), "lsm-worker", 1, 0, &worker_session));
 		worker_session->isolation = TXN_ISO_READ_UNCOMMITTED;
-		cookies[i].session = worker_session;
+		manager->lsm_worker_cookies[i].session = worker_session;
 	}
 
 	/* Start the LSM manager thread. */
-	WT_ERR(__wt_thread_create(
-	    session, &cookies[0].tid, __lsm_worker_manager, &cookies[0]));
+	WT_ERR(__wt_thread_create(session, &manager->lsm_worker_cookies[0].tid,
+	    __lsm_worker_manager, &manager->lsm_worker_cookies[0]));
 
 	F_SET(S2C(session), WT_CONN_SERVER_LSM);
 
 	if (0) {
 err:		for (i = 0;
-		    (worker_session = cookies[i].session) != NULL;
+		    (worker_session =
+		    manager->lsm_worker_cookies[i].session) != NULL;
 		    i++)
 			WT_TRET((&worker_session->iface)->close(
 			    &worker_session->iface, NULL));
-		__wt_free(session, cookies);
 	}
 	return (ret);
 }
@@ -122,8 +122,10 @@ __wt_lsm_manager_destroy(WT_SESSION_IMPL *session)
 	manager = &conn->lsm_manager;
 	removed = 0;
 
-	if (manager->lsm_worker_cookies != NULL) {
-		/* Wait for the server to notice and wrap up. */
+	if (manager->lsm_workers > 0) {
+		/*
+		 * Stop the main LSM manager thread first.
+		 */
 		while (F_ISSET(conn, WT_CONN_SERVER_LSM))
 			__wt_yield();
 
@@ -156,17 +158,18 @@ __wt_lsm_manager_destroy(WT_SESSION_IMPL *session)
 			++removed;
 			__wt_lsm_manager_free_work_unit(session, current);
 		}
+	}
+	WT_STAT_FAST_CONN_INCRV(session,
+	    lsm_work_units_discarded, removed);
 
-		/* Close all LSM worker sessions. */
-		for (i = 0; i < manager->lsm_workers_max; i++) {
-			wt_session =
-			    &manager->lsm_worker_cookies[i].session->iface;
-			WT_TRET(wt_session->close(wt_session, NULL));
-		}
-
-		WT_STAT_FAST_CONN_INCRV(session,
-		    lsm_work_units_discarded, removed);
-		__wt_free(session, manager->lsm_worker_cookies);
+	/*
+	 * Close all LSM worker sessions.  Start at 1 because we already
+	 * shut down the main LSM manager thread.
+	 */
+	for (i = 1; i < manager->lsm_workers; i++) {
+		wt_session =
+		    &manager->lsm_worker_cookies[i].session->iface;
+		WT_TRET(wt_session->close(wt_session, NULL));
 	}
 
 	/* Free resources that are allocated in connection initialize */
@@ -239,6 +242,7 @@ __lsm_manager_worker_setup(WT_SESSION_IMPL *session)
 	worker_args->work_cond = manager->work_cond;
 	worker_args->id = manager->lsm_workers++;
 	worker_args->type = WT_LSM_WORK_DROP | WT_LSM_WORK_SWITCH;
+	F_SET(worker_args, WT_LSM_WORKER_RUN);
 	/* Start the switch thread. */
 	WT_RET(__wt_lsm_worker_start(session, worker_args));
 
@@ -249,7 +253,6 @@ __lsm_manager_worker_setup(WT_SESSION_IMPL *session)
 	 */
 	for (; manager->lsm_workers < manager->lsm_workers_max;
 	    manager->lsm_workers++) {
-		/* Freed by the worker thread when it shuts down */
 		worker_args =
 		    &manager->lsm_worker_cookies[manager->lsm_workers];
 		worker_args->work_cond = manager->work_cond;
@@ -259,6 +262,7 @@ __lsm_manager_worker_setup(WT_SESSION_IMPL *session)
 		    WT_LSM_WORK_DROP |
 		    WT_LSM_WORK_FLUSH |
 		    WT_LSM_WORK_SWITCH;
+		F_SET(worker_args, WT_LSM_WORKER_RUN);
 		/*
 		 * Only allow half of the threads to run merges to avoid all
 		 * all workers getting stuck in long-running merge operations.
