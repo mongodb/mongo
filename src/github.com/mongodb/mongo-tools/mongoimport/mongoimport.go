@@ -188,7 +188,6 @@ func (mongoImport *MongoImport) importDocuments(importInput ImportInput) (docsCo
 	}
 
 	defer func() {
-		fmt.Println("closing!")
 		err2 := importWriter.Close()
 		if err == nil {
 			err = err2
