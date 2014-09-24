@@ -1,5 +1,5 @@
 /*
- *    Copyright (C) 2014 10gen, Inc.  All Rights Reserved.
+ *    Copyright (C) 2014 10gen, Inc.
  *
  *    This program is free software: you can redistribute it and/or  modify
  *    it under the terms of the GNU Affero General Public License, version 3,
