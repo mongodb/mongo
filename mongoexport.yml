@@ -95,6 +95,8 @@ pre:
           remote_key: "project_aws_key"
         - local_key: "aws_secret"
           remote_key: "project_aws_secret"
+        - local_key: "kerberos_password"
+          remote_key: "kerberos_password"
 post:
   - func: "kill mongod"
 
@@ -145,6 +147,30 @@ tasks:
       params:
         "mongoexport": https://s3.amazonaws.com/mciuploads/mongo-tools/binaries/${build_id}/mongoexport
 
+- name: kerberos-e2e
+  commands:
+    - command: git.get_project
+      params:
+        directory: src
+    - command: git.apply_patch
+      params:
+        directory: src
+    - func: "setup go env"
+    - command: shell.exec
+      params:
+        working_dir: src
+        script: |
+          set -o verbose
+          export GOPATH=`pwd`
+          # Output is a binary called `mongoexport` in current directory
+          make mongoexport-kerberos
+          # Make sure mongoexport is in the PATH
+          export PATH=$PATH:`pwd`
+          # Get a Kerberos ticket
+          echo "${kerberos_password}" | kinit -p drivers@LDAPTEST.10GEN.CC
+          # Run Kerberos e2e test
+          cd src/github.com/mongodb/mongo-tools/mongoexport/e2e
+          go test -test.v
 
 buildvariants:
 - name: ubuntu
@@ -156,8 +182,9 @@ buildvariants:
     coverage: true
     coverage_args: "-coverprofile=coverage.out"
   tasks:
-  - name: dist
   - name: unit
+  - name: dist
+  - name: kerberos-e2e
 
 - name: osx 10.8
   display_name: OSX 10.8
