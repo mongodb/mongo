@@ -29,12 +29,23 @@ For a detailed usage example, see src/SConscript.client or src/mongo/SConscript.
 import optparse
 import os
 import sys
+import shlex
 import shutil
 import zipfile
 from subprocess import (Popen, PIPE, STDOUT)
 
 def main(argv):
-    opts = parse_options(argv[1:])
+    args = []
+    for arg in argv[1:]:
+        if arg.startswith("@"):
+            file_name = arg[1:]
+            f_handle = open(file_name, "r")
+            args.extend(s1.strip('"') for s1 in shlex.split(f_handle.readline(), posix=False))
+            f_handle.close()
+        else:
+            args.append(arg)
+
+    opts = parse_options(args)
     if opts.archive_format in ('tar', 'tgz'):
         make_tar_archive(opts)
     elif opts.archive_format in ('zip'):
@@ -170,7 +181,9 @@ def get_preferred_filename(input_filename, transformations):
     returns the substituted string
     '''
     for match, replace in transformations:
-        if input_filename.startswith(match):
+        match_lower = match.lower()
+        input_filename_lower = input_filename.lower()
+        if input_filename_lower.startswith(match_lower):
             return replace + input_filename[len(match):]
     return input_filename
 
