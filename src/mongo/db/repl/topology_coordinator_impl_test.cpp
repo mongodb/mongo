@@ -2919,6 +2919,186 @@ namespace {
         ASSERT_NO_ACTION(action.getAction());
     }
 
+    TEST_F(HeartbeatResponseTest, ShouldChangeSyncSourceMemberNotInConfig) {
+        // In this test, the TopologyCoordinator should tell us to change sync sources away from
+        // "host4" since "host4" is absent from the config
+        ASSERT_TRUE(getTopoCoord().shouldChangeSyncSource(HostAndPort("host4")));
+    }
+
+    TEST_F(HeartbeatResponseTest, ShouldChangeSyncSourceMemberHasYetToHeartbeat) {
+        // In this test, the TopologyCoordinator should not tell us to change sync sources away from
+        // "host2" since we do not yet have a heartbeat (and as a result do not yet have an optime)
+        // for "host2"
+        ASSERT_FALSE(getTopoCoord().shouldChangeSyncSource(HostAndPort("host2")));
+    }
+
+    TEST_F(HeartbeatResponseTest, ShouldChangeSyncSourceFresherHappierMemberExists) {
+        // In this test, the TopologyCoordinator should tell us to change sync sources away from 
+        // "host2" and to "host3" since "host2" is more than maxSyncSourceLagSecs(30) behind "host3"
+        OpTime election = OpTime(0,0);
+        OpTime lastOpTimeApplied = OpTime(4,0);
+        // ahead by more than maxSyncSourceLagSecs (30)
+        OpTime fresherLastOpTimeApplied = OpTime(3005,0);
+
+        HeartbeatResponseAction nextAction = receiveUpHeartbeat(HostAndPort("host2"),
+                                                                "rs0",
+                                                                MemberState::RS_SECONDARY,
+                                                                election,
+                                                                lastOpTimeApplied,
+                                                                lastOpTimeApplied);
+        ASSERT_NO_ACTION(nextAction.getAction());
+
+        nextAction = receiveUpHeartbeat(HostAndPort("host3"),
+                                        "rs0",
+                                        MemberState::RS_SECONDARY,
+                                        election,
+                                        fresherLastOpTimeApplied,
+                                        lastOpTimeApplied);
+        ASSERT_NO_ACTION(nextAction.getAction());
+
+        // set up complete, time for actual check
+        startCapturingLogMessages();
+        ASSERT_TRUE(getTopoCoord().shouldChangeSyncSource(HostAndPort("host2")));
+        stopCapturingLogMessages();
+        ASSERT_EQUALS(1, countLogLinesContaining("changing sync target"));
+    }
+
+    TEST_F(HeartbeatResponseTest, ShouldChangeSyncSourceFresherMemberIsDown) {
+        // In this test, the TopologyCoordinator should not tell us to change sync sources away from 
+        // "host2" and to "host3" despite "host2" being more than maxSyncSourceLagSecs(30) behind
+        // "host3", since "host3" is down
+        OpTime election = OpTime(0,0);
+        OpTime lastOpTimeApplied = OpTime(4,0);
+        // ahead by more than maxSyncSourceLagSecs (30)
+        OpTime fresherLastOpTimeApplied = OpTime(3005,0);
+
+        HeartbeatResponseAction nextAction = receiveUpHeartbeat(HostAndPort("host2"),
+                                                                "rs0",
+                                                                MemberState::RS_SECONDARY,
+                                                                election,
+                                                                lastOpTimeApplied,
+                                                                lastOpTimeApplied);
+        ASSERT_NO_ACTION(nextAction.getAction());
+
+        nextAction = receiveUpHeartbeat(HostAndPort("host3"),
+                                        "rs0",
+                                        MemberState::RS_SECONDARY,
+                                        election,
+                                        fresherLastOpTimeApplied,
+                                        lastOpTimeApplied);
+        ASSERT_NO_ACTION(nextAction.getAction());
+
+        // set up complete, time for actual check
+        nextAction = receiveDownHeartbeat(HostAndPort("host3"), "rs0");
+        ASSERT_NO_ACTION(nextAction.getAction());
+        ASSERT_FALSE(getTopoCoord().shouldChangeSyncSource(HostAndPort("host2")));
+    }
+
+    TEST_F(HeartbeatResponseTest, ShouldChangeSyncSourceFresherMemberIsNotReadable) {
+        // In this test, the TopologyCoordinator should not tell us to change sync sources away from 
+        // "host2" and to "host3" despite "host2" being more than maxSyncSourceLagSecs(30) behind
+        // "host3", since "host3" is in a non-readable mode (RS_ROLLBACK)
+        OpTime election = OpTime(0,0);
+        OpTime lastOpTimeApplied = OpTime(4,0);
+        // ahead by more than maxSyncSourceLagSecs (30)
+        OpTime fresherLastOpTimeApplied = OpTime(3005,0);
+
+        HeartbeatResponseAction nextAction = receiveUpHeartbeat(HostAndPort("host2"),
+                                                                "rs0",
+                                                                MemberState::RS_SECONDARY,
+                                                                election,
+                                                                lastOpTimeApplied,
+                                                                lastOpTimeApplied);
+        ASSERT_NO_ACTION(nextAction.getAction());
+
+        nextAction = receiveUpHeartbeat(HostAndPort("host3"),
+                                        "rs0",
+                                        MemberState::RS_ROLLBACK,
+                                        election,
+                                        fresherLastOpTimeApplied,
+                                        lastOpTimeApplied);
+        ASSERT_NO_ACTION(nextAction.getAction());
+
+        // set up complete, time for actual check
+        ASSERT_FALSE(getTopoCoord().shouldChangeSyncSource(HostAndPort("host2")));
+    }
+
+    TEST_F(HeartbeatResponseTest, ShouldChangeSyncSourceFresherMemberDoesNotBuildIndexes) {
+        // In this test, the TopologyCoordinator should not tell us to change sync sources away from 
+        // "host2" and to "host3" despite "host2" being more than maxSyncSourceLagSecs(30) behind
+        // "host3", since "host3" does not build indexes
+        OpTime election = OpTime(0,0);
+        OpTime lastOpTimeApplied = OpTime(4,0);
+        // ahead by more than maxSyncSourceLagSecs (30)
+        OpTime fresherLastOpTimeApplied = OpTime(3005,0);
+
+        updateConfig(BSON("_id" << "rs0" <<
+                          "version" << 6 <<
+                          "members" << BSON_ARRAY(
+                              BSON("_id" << 0 << "host" << "hself") <<
+                              BSON("_id" << 1 << "host" << "host2") <<
+                              BSON("_id" << 2 << "host" << "host3" <<
+                                   "buildIndexes" << false << "priority" << 0))),
+                     0);
+        HeartbeatResponseAction nextAction = receiveUpHeartbeat(HostAndPort("host2"),
+                                                                "rs0",
+                                                                MemberState::RS_SECONDARY,
+                                                                election,
+                                                                lastOpTimeApplied,
+                                                                lastOpTimeApplied);
+        ASSERT_NO_ACTION(nextAction.getAction());
+        nextAction = receiveUpHeartbeat(HostAndPort("host3"),
+                                        "rs0",
+                                        MemberState::RS_SECONDARY,
+                                        election,
+                                        fresherLastOpTimeApplied,
+                                        lastOpTimeApplied);
+        ASSERT_NO_ACTION(nextAction.getAction());
+
+        // set up complete, time for actual check
+        ASSERT_FALSE(getTopoCoord().shouldChangeSyncSource(HostAndPort("host2")));
+    }
+
+    TEST_F(HeartbeatResponseTest, ShouldChangeSyncSourceFresherMemberDoesNotBuildIndexesNorDoWe) {
+        // In this test, the TopologyCoordinator should tell us to change sync sources away from 
+        // "host2" and to "host3" despite "host3" not building indexes because we do not build
+        // indexes either and "host2" is more than maxSyncSourceLagSecs(30) behind "host3"
+        OpTime election = OpTime(0,0);
+        OpTime lastOpTimeApplied = OpTime(4,0);
+        // ahead by more than maxSyncSourceLagSecs (30)
+        OpTime fresherLastOpTimeApplied = OpTime(3005,0);
+
+        updateConfig(BSON("_id" << "rs0" <<
+                          "version" << 7 <<
+                          "members" << BSON_ARRAY(
+                              BSON("_id" << 0 << "host" << "hself" <<
+                                   "buildIndexes" << false << "priority" << 0) <<
+                              BSON("_id" << 1 << "host" << "host2") <<
+                              BSON("_id" << 2 << "host" << "host3" <<
+                                   "buildIndexes" << false << "priority" << 0))),
+                     0);
+        HeartbeatResponseAction nextAction = receiveUpHeartbeat(HostAndPort("host2"),
+                                                                "rs0",
+                                                                MemberState::RS_SECONDARY,
+                                                                election,
+                                                                lastOpTimeApplied,
+                                                                lastOpTimeApplied);
+        ASSERT_NO_ACTION(nextAction.getAction());
+        nextAction = receiveUpHeartbeat(HostAndPort("host3"),
+                                        "rs0",
+                                        MemberState::RS_SECONDARY,
+                                        election,
+                                        fresherLastOpTimeApplied,
+                                        lastOpTimeApplied);
+        ASSERT_NO_ACTION(nextAction.getAction());
+
+        // set up complete, time for actual check
+        startCapturingLogMessages();
+        ASSERT_TRUE(getTopoCoord().shouldChangeSyncSource(HostAndPort("host2")));
+        stopCapturingLogMessages();
+        ASSERT_EQUALS(1, countLogLinesContaining("changing sync target"));
+    }
+
 }  // namespace
 }  // namespace repl
 }  // namespace mongo

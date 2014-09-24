@@ -1645,6 +1645,7 @@ namespace {
                       << _maxSyncSourceLagSecs.total_seconds() << " seconds behind member " 
                       <<  candidateConfig.getHostAndPort().toString()
                       << " whose most recent OpTime is " << it->getOpTime().toStringLong();
+                invariant(it->getConfigIndex() != _selfIndex);
                 return true;
             }
         }

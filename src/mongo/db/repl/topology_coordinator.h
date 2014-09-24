@@ -125,7 +125,7 @@ namespace repl {
         virtual void blacklistSyncSource(const HostAndPort& host, Date_t until) = 0;
 
         /**
-         * Determine if a new sync source should be chosen, if a better candidate sync source is
+         * Determines if a new sync source should be chosen, if a better candidate sync source is
          * available.  If the current sync source's last optime is more than _maxSyncSourceLagSecs
          * behind any syncable source, this function returns true.
          */
