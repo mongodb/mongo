@@ -6,6 +6,7 @@ import (
 	"github.com/mongodb/mongo-tools/mongostat"
 	"github.com/mongodb/mongo-tools/mongostat/options"
 	"os"
+	"runtime"
 	"strconv"
 	"time"
 )
@@ -83,7 +84,13 @@ func main() {
 	err = stat.Run()
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error: %v", err)
-		os.Exit(1)
+
+		//Required for stat1.js: exit code on failure is -1, or 255 for Windows
+		failureCode := -1
+		if runtime.GOOS == "windows" {
+			failureCode = 255
+		}
+		os.Exit(failureCode)
 	}
 
 }
