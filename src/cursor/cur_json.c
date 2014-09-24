@@ -861,7 +861,7 @@ __wt_json_strlen(const char *src, size_t srclen)
 	}
 	if (src != srcend)
 		return (-1);   /* invalid input, e.g. final char is '\\' */
-	return ((size_t)dstlen);
+	return ((ssize_t)dstlen);
 }
 
 /*
