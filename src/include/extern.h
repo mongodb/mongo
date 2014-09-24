@@ -931,6 +931,8 @@ extern int __wt_clsm_open(WT_SESSION_IMPL *session,
     const char *cfg[],
     WT_CURSOR **cursorp);
 extern int __wt_lsm_manager_config(WT_SESSION_IMPL *session, const char **cfg);
+extern int __wt_lsm_manager_reconfig(WT_SESSION_IMPL *session,
+    const char **cfg);
 extern int __wt_lsm_manager_start(WT_SESSION_IMPL *session);
 extern void __wt_lsm_manager_free_work_unit( WT_SESSION_IMPL *session,
     WT_LSM_WORK_UNIT *entry);

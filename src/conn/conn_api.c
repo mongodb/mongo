@@ -663,7 +663,7 @@ __conn_reconfigure(WT_CONNECTION *wt_conn, const char *config)
 	WT_ERR(__wt_cache_config(session, config_cfg));
 	WT_ERR(__wt_cache_pool_config(session, config_cfg));
 	WT_ERR(__wt_checkpoint_server_create(session, config_cfg));
-	WT_ERR(__wt_lsm_manager_config(session, config_cfg));
+	WT_ERR(__wt_lsm_manager_reconfig(session, config_cfg));
 	WT_ERR(__wt_statlog_create(session, config_cfg));
 	WT_ERR(__wt_verbose_config(session, config_cfg));
 
