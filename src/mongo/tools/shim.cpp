@@ -35,6 +35,9 @@
 #include "mongo/tools/tool_logger.h"
 #include "mongo/util/options_parser/option_section.h"
 
+using std::string;
+using std::vector;
+
 using namespace mongo;
 
 class Shim : public BSONTool {
@@ -46,8 +49,24 @@ public:
     }
 
     virtual void gotObject( const BSONObj& obj ) {
-        if ( mongoShimGlobalParams.upsert ) {
-            conn().update(_ns,obj["_id"].wrap(),obj,true);
+        if (mongoShimGlobalParams.upsert) {
+            BSONObjBuilder b;
+            invariant(!mongoShimGlobalParams.upsertFields.empty());
+            for (vector<string>::const_iterator it = mongoShimGlobalParams.upsertFields.begin(),
+                 end = mongoShimGlobalParams.upsertFields.end(); it != end; ++it) {
+                BSONElement e = obj.getFieldDotted(it->c_str());
+                // If we cannot construct a valid query using the provided upsertFields,
+                // insert the object and skip the rest of the fields.
+                if (e.eoo()) {
+                    conn().insert(_ns, obj);
+                    return;
+                }
+                b.appendAs(e, *it);
+            }
+            Query query(b.obj());
+            bool upsert = true;
+            bool multi = false;
+            conn().update(_ns, query, obj, upsert, multi);
         }
         else {
             conn().insert(_ns, obj );

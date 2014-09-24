@@ -32,6 +32,7 @@
 
 #include "mongo/base/status.h"
 #include "mongo/util/options_parser/startup_options.h"
+#include "mongo/util/text.h"
 
 namespace mongo {
 
@@ -63,6 +64,7 @@ namespace mongo {
             return ret;
         }
 
+        // TODO(benety): Refactor some of these related options (load, upsert, ...) into modes.
         options->addOptionChaining("load", "load", moe::Switch,
                                    "load data" );
 
@@ -70,7 +72,13 @@ namespace mongo {
                                    "drop collection before import" );
 
         options->addOptionChaining("upsert", "upsert", moe::Switch,
-                                   "upsert instead of insert" );
+                                   "upsert instead of insert" )
+                                  .requires("load");
+
+        options->addOptionChaining("upsertFields", "upsertFields", moe::String,
+                "comma-separated fields for the query part of the upsert. "
+                "Ensure these fields are indexed.")
+                                  .requires("upsert");
 
         options->addOptionChaining("query", "query,q", moe::String,
                 "query filter, as a JSON string, e.g., '{x:{$gt:1}}'");
@@ -138,6 +146,16 @@ namespace mongo {
         mongoShimGlobalParams.load = params.count("load") > 0;
         mongoShimGlobalParams.drop = params.count("drop") > 0;
         mongoShimGlobalParams.upsert = params.count("upsert") > 0;
+
+        if (mongoShimGlobalParams.upsert) {
+            string uf = getParam("upsertFields");
+            if (uf.empty()) {
+                mongoShimGlobalParams.upsertFields.push_back("_id");
+            }
+            else {
+                StringSplitter(uf.c_str(), ",").split(mongoShimGlobalParams.upsertFields);
+            }
+        }
 
         mongoShimGlobalParams.query = getParam("query", "");
         mongoShimGlobalParams.snapShotQuery = false;

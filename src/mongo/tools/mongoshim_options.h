@@ -45,6 +45,7 @@ namespace mongo {
 
         bool drop;
         bool upsert;
+        std::vector<std::string> upsertFields;
 
         std::string query;
         bool slaveOk;
