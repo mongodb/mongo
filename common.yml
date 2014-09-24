@@ -48,6 +48,7 @@ mongo_tools_variables:
       - name: communityDist
       - name: enterpriseDist
       - name: json
+      - name: legacy
       - name: lint
       - name: log
       - name: pool
@@ -88,7 +89,7 @@ functions:
   "attach tool":
     command: attach.task_files
     params:
-      "${tool} (${edition|community})": https://s3.amazonaws.com/mciuploads/mongo-tools/binaries/${build_id}/${edition|community}/${tool}
+      "${tool} (${edition|community})": https://s3.amazonaws.com/mciuploads/mongo-tools/binaries/${build_id}/${edition|community}/${tool}${extension}
 
   "build tool":
     command: shell.exec
@@ -117,6 +118,15 @@ functions:
         chmod +x ./mongodb-*/bin/*;
         mv ./mongodb-*/bin/* .
 
+  "fetch tool" :
+    command: s3.get
+    params:
+      bucket: mciuploads
+      aws_key: ${aws_key}
+      aws_secret: ${aws_secret}
+      local_file: src/src/github.com/mongodb/mongo-tools/legacy/${tool}${extension}
+      remote_file: mongo-tools/binary/${build_id}/${edition|community}/${tool}${extension}
+
   "generate coverage html + text":
     command: shell.exec
     params:
@@ -132,6 +142,12 @@ functions:
           go tool cover -html=coverage.out -o coverage.html
           go tool cover -func=coverage.out -o coverage.txt
         fi;
+
+  "get buildnumber":
+    command: keyval.inc
+    params:
+      key: "${build_variant}_tools"
+      destination: "builder_num"
 
   "kill mongod":
     command: shell.exec
@@ -178,6 +194,17 @@ functions:
         - dir: src/github.com/mongodb/mongo-tools/mongofiles
           args: ${coverage_args} ${args}
 
+  "setup credentials" :
+    command: shell.exec
+    params:
+      working_dir: src
+      silent: true
+      script: |
+        cat > mci.buildlogger <<END_OF_CREDS
+        slavename='${slave}'
+        passwd='${passwd}'
+        END_OF_CREDS
+
   "setup go env":
     command: shell.exec
     params:
@@ -222,7 +249,7 @@ functions:
       aws_key: ${aws_key}
       aws_secret: ${aws_secret}
       local_file: src/${tool}
-      remote_file: mongo-tools/binaries/${build_id}/${edition|community}/${tool}
+      remote_file: mongo-tools/binaries/${build_id}/${edition|community}/${tool}${extension}
       bucket: mciuploads
       permissions: public-read
       content_type: application/octet-stream
@@ -333,7 +360,7 @@ tasks:
 
 - name: communityDist
   depends_on:
-  - name: "unit"
+  # - name: "unit"
   commands:
     - func: "kill mongod"
     - command: git.get_project
@@ -534,6 +561,47 @@ tasks:
         content_type: "text/html"
     - func: "attach coverage reports"
 
+- name: legacy
+  commands:
+    - func: "kill mongod"
+    - command: git.get_project
+      params:
+        directory: src
+    - func: "setup go env"
+    - func: "get buildnumber"
+    - func: "setup credentials"
+    - func: "download mongod"
+    - command: shell.exec
+      params:
+        working_dir: src
+        script: |
+          set -o verbose
+          mv mongo* src/github.com/mongodb/mongo-tools/legacy
+    - func: "fetch tool"
+      vars:
+        tools: mongoimport
+    - func: "fetch tool"
+      vars:
+        tools: mongoexport
+    - func: "fetch tool"
+      vars:
+        tools: mongodump
+    - func: "fetch tool"
+      vars:
+        tools: mongofiles
+    - command: shell.exec
+      params:
+        working_dir: src/src/github.com/mongodb/mongo-tools/legacy
+        script: |
+          set -o errexit
+          set -o verbose
+          if [ "Windows_NT" = "$OS" ]; then
+            export GOPATH=$(cygpath -w $(pwd));
+          else
+            export GOPATH=`pwd`;
+          fi;
+          python smoke.py --nopreallocj --with-cleanbb --mongod ./mongod --mongo ./mongo --report-file report.json ${test_flags|} --buildlogger-builder MCI_${build_variant} --buildlogger-buildnum ${builder_num|} --buildlogger-credentials ./mci.buildlogger --buildlogger-phase ${task_name}_${execution} tool
+
 - name: lint
   commands:
     - func: "kill mongod"
@@ -547,7 +615,11 @@ tasks:
         script: |
           set -o errexit
           set -o verbose
-          if [ "Windows_NT" = "$OS" ]; then  export GOPATH=$(cygpath -w $(pwd)); else export GOPATH=`pwd`; fi;
+          if [ "Windows_NT" = "$OS" ]; then
+            export GOPATH=$(cygpath -w $(pwd));
+          else
+            export GOPATH=`pwd`;
+          fi;
           retVal=$(go run src/github.com/3rf/mongo-lint/golint/golint.go src/github.com/mongodb/mongo-tools/); if [ "$retVal" = "" ]; then exit 0; else exit 1; fi;
 
 - name: log
