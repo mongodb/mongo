@@ -111,7 +111,7 @@ namespace mongo {
         const ScopedExecutorRegistration safety(exec.get());
 
         // Got the execution tree. Explain it.
-        return Explain::explainStages(exec.get(), verbosity, out);
+        return Explain::explainStages(txn, exec.get(), verbosity, out);
     }
 
     bool FindCmd::run(OperationContext* txn,

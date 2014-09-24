@@ -39,6 +39,7 @@
 #include "mongo/db/query/stage_types.h"
 #include "mongo/platform/cstdint.h"
 #include "mongo/util/time_support.h"
+#include "mongo/util/net/listen.h" // for Listener::getElapsedTimeMillis()
 
 namespace mongo {
 
@@ -99,17 +100,18 @@ namespace mongo {
     };
 
     /**
-     * This class increments a counter by the time elapsed since its construction when
-     * it goes out of scope.
+     * This class increments a counter by a rough estimate of the time elapsed since its
+     * construction when it goes out of scope.
      */
     class ScopedTimer {
     public:
-        ScopedTimer(long long* counter) : _counter(counter) {
-            _start = curTimeMillis64();
+        ScopedTimer(long long* counter) :
+            _counter(counter),
+            _start(Listener::getElapsedTimeMillis()) {
         }
 
         ~ScopedTimer() {
-            long long elapsed = curTimeMillis64() - _start;
+            long long elapsed = Listener::getElapsedTimeMillis() - _start;
             *_counter += elapsed;
         }
 

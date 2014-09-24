@@ -191,7 +191,7 @@ namespace mongo {
         }
         scoped_ptr<PlanExecutor> planExecutor(rawPlanExecutor);
 
-        return Explain::explainStages(planExecutor.get(), verbosity, out);
+        return Explain::explainStages(txn, planExecutor.get(), verbosity, out);
     }
 
 }  // namespace mongo

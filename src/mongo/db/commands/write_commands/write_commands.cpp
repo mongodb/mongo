@@ -220,7 +220,7 @@ namespace mongo {
             const ScopedExecutorRegistration safety( exec );
 
             // Explain the plan tree.
-            return Explain::explainStages( exec, verbosity, out );
+            return Explain::explainStages( txn, exec, verbosity, out );
         }
         else {
             invariant( BatchedCommandRequest::BatchType_Delete == _writeType );
@@ -254,7 +254,7 @@ namespace mongo {
             const ScopedExecutorRegistration safety( exec );
 
             // Explain the plan tree.
-            return Explain::explainStages( exec, verbosity, out );
+            return Explain::explainStages( txn, exec, verbosity, out );
         }
     }
 

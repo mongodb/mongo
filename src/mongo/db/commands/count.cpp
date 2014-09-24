@@ -87,7 +87,7 @@ namespace mongo {
 
             const ScopedExecutorRegistration safety(exec.get());
 
-            return Explain::explainStages(exec.get(), verbosity, out);
+            return Explain::explainStages(txn, exec.get(), verbosity, out);
         }
 
         virtual bool run(OperationContext* txn,
