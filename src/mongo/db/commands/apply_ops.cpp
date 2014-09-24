@@ -74,11 +74,9 @@ namespace mongo {
                 BSONObjIterator i( ops );
                 while ( i.more() ) {
                     BSONElement e = i.next();
-                    if ( e.type() == Object )
-                        continue;
-                    errmsg = "op not an object: ";
-                    errmsg += e.fieldName();
-                    return false;
+                    if (!_checkOperation(e, errmsg)) {
+                        return false;
+                    }
                 }
             }
 
@@ -121,6 +119,10 @@ namespace mongo {
             while ( i.more() ) {
                 BSONElement e = i.next();
                 const BSONObj& temp = e.Obj();
+
+                // Ignore 'n' operations.
+                const char *opType = temp["op"].valuestrsafe();
+                if (*opType == 'n') continue;
 
                 string ns = temp["ns"].String();
 
@@ -187,6 +189,55 @@ namespace mongo {
                 return false;
             }
 
+            return true;
+        }
+
+    private:
+        /**
+         * Returns true if 'e' contains a valid operation.
+         */
+        bool _checkOperation(const BSONElement& e, string& errmsg) {
+            if (e.type() != Object) {
+                errmsg = str::stream() << "op not an object: " << e.fieldName();
+                return false;
+            }
+            BSONObj obj = e.Obj();
+            // op - operation type
+            BSONElement opElement = obj.getField("op");
+            if (opElement.eoo()) {
+                errmsg = str::stream() << "op does not contain required \"op\" field: "
+                                       << e.fieldName();
+                return false;
+            }
+            if (opElement.type() != mongo::String) {
+                errmsg = str::stream() << "\"op\" field is not a string: " << e.fieldName();
+                return false;
+            }
+            // operation type -- see logOp() comments for types
+            const char *opType = opElement.valuestrsafe();
+            if (*opType == '\0') {
+                errmsg = str::stream() << "\"op\" field value cannot be empty: " << e.fieldName();
+                return false;
+            }
+
+            // ns - namespace
+            // Only operations of type 'n' are allowed to have an empty namespace.
+            BSONElement nsElement = obj.getField("ns");
+            if (nsElement.eoo()) {
+                errmsg = str::stream() << "op does not contain required \"ns\" field: "
+                                       << e.fieldName();
+                return false;
+            }
+            if (nsElement.type() != mongo::String) {
+                errmsg = str::stream() << "\"ns\" field is not a string: " << e.fieldName();
+                return false;
+            }
+            if (*opType != 'n' && nsElement.String().empty()) {
+                errmsg = str::stream()
+                    << "\"ns\" field value cannot be empty when op type is not 'n': "
+                    << e.fieldName();
+                return false;
+            }
             return true;
         }
     } applyOpsCmd;
