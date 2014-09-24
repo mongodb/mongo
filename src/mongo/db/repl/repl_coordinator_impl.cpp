@@ -942,7 +942,10 @@ namespace {
                        stdx::placeholders::_1,
                        response));
         _replExecutor.wait(cbh.getValue());
-        // TODO(spencer): check if we are in drain mode and change master reporting to false if so.
+        if (isWaitingForApplierToDrain()) {
+            // Report NotMaster when draining the applier.
+            response->setIsMaster(false);
+        }
     }
 
     void ReplicationCoordinatorImpl::_fillIsMasterForReplSet_finish(
