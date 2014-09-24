@@ -126,7 +126,13 @@ func getDocSource(exp MongoExport) (db.DocSource, error) {
 		flags = flags | db.Snapshot
 	}
 
-	return exp.cmdRunner.FindDocs(exp.ToolOptions.Namespace.DB, exp.ToolOptions.Namespace.Collection, 0, 0, query, sortFields, flags)
+	return exp.cmdRunner.FindDocs(exp.ToolOptions.Namespace.DB,
+		exp.ToolOptions.Namespace.Collection,
+		exp.InputOpts.Skip,
+		exp.InputOpts.Limit,
+		query,
+		sortFields,
+		flags)
 }
 
 //Export executes the entire export operation. It returns an integer of the count
