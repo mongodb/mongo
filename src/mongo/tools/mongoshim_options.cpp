@@ -74,6 +74,11 @@ namespace mongo {
                                   .incompatibleWith("load")
                                   .incompatibleWith("drop");
 
+        options->addOptionChaining("applyOps", "applyOps", moe::Switch,
+                                   "apply oplog entries" )
+                                  .incompatibleWith("load")
+                                  .incompatibleWith("drop");
+
         options->addOptionChaining("drop", "drop", moe::Switch,
                                    "drop collection before import" );
 
@@ -151,6 +156,7 @@ namespace mongo {
 
         mongoShimGlobalParams.load = params.count("load") > 0;
         mongoShimGlobalParams.remove = params.count("remove") > 0;
+        mongoShimGlobalParams.applyOps = params.count("applyOps") > 0;
 
         mongoShimGlobalParams.drop = params.count("drop") > 0;
         mongoShimGlobalParams.upsert = params.count("upsert") > 0;

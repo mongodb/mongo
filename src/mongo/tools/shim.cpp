@@ -28,6 +28,7 @@
 *    then also delete it in the license file.
 */
 
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/client/dbclientcursor.h"
 #include "mongo/db/json.h"
 #include "mongo/tools/mongoshim_options.h"
@@ -68,6 +69,34 @@ public:
             bool multi = false;
             conn().update(_ns, query, obj, upsert, multi);
         }
+        else if (mongoShimGlobalParams.applyOps) {
+            // A valid oplog entry contains a non-empty "ns" string field.
+            // This does not apply to oplog entries of type 'n', which typically
+            // have empty 'ns' field values. However, for the purposes of applyOps,
+            // we ignore oplog entries of type 'n'.
+            BSONElement nsElement = obj.getField("ns");
+            if (nsElement.type() != mongo::String) {
+                toolError() << "Skipping oplog entry without required \"ns\" field: " << obj;
+                return;
+            }
+            else if (nsElement.String().empty()) {
+                toolError() << "Skipping oplog entry with empty \"ns\" value: " << obj;
+                return;
+            }
+
+            BSONObjBuilder b(obj.objsize() + 32);
+            BSONArrayBuilder updates(b.subarrayStart("applyOps"));
+            updates.append(obj);
+            updates.done();
+
+            BSONObj c = b.obj();
+
+            BSONObj res;
+            bool ok = conn().runCommand("admin", c, res);
+            if (!ok) {
+                toolError() << "Failed to add oplog entry " << obj << ": " << res;
+            }
+        }
         else {
             conn().insert(_ns, obj );
         }
@@ -83,7 +112,8 @@ public:
             return 1;
         }
 
-        if ( mongoShimGlobalParams.load ) {
+        if (mongoShimGlobalParams.load ||
+            mongoShimGlobalParams.applyOps) {
             if ( mongoShimGlobalParams.drop ) {
                 conn().dropCollection( _ns );
             }

@@ -47,6 +47,9 @@ namespace mongo {
         // If query is provided, only documents matching query will be removed.
         bool remove;
 
+        // If true, read oplog entries from stdin to use as input to "applyOps" command.
+        bool applyOps;
+
         bool drop;
         bool upsert;
         std::vector<std::string> upsertFields;
