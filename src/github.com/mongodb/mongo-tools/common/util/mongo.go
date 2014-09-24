@@ -5,6 +5,11 @@ import (
 	"strings"
 )
 
+const (
+	InvalidDBChars         = "/\\. \"\x00"
+	InvalidCollectionChars = "$\x00"
+)
+
 // Split the host string into the individual nodes to connect to, appending the
 // port if necessary.
 func CreateConnectionAddrs(host, port string) []string {
@@ -123,11 +128,11 @@ func ValidateDBName(database string) error {
 
 	// must be < 64 characters
 	if len([]byte(database)) > 63 {
-		return fmt.Errorf("'%v' is longer than 63 characters", database)
+		return fmt.Errorf("db name '%v' is longer than 63 characters", database)
 	}
 
 	// check for illegal characters
-	if strings.ContainsAny(database, "/\\. \""+string([]byte{0})) {
+	if strings.ContainsAny(database, InvalidDBChars) {
 		return fmt.Errorf("illegal character found in '%v'", database)
 	}
 
@@ -141,12 +146,12 @@ func ValidateCollectionName(collection string) error {
 
 	// collection names cannot begin with 'system.'
 	if strings.HasPrefix(collection, "system.") {
-		return fmt.Errorf("'%v' is not allowed to begin with 'system.'",
-			collection)
+		return fmt.Errorf("collection name '%v' is not allowed to begin with"+
+			" 'system.'", collection)
 	}
 
 	// check for illegal characters
-	if strings.ContainsAny(collection, "$"+string([]byte{0})) {
+	if strings.ContainsAny(collection, InvalidCollectionChars) {
 		return fmt.Errorf("illegal character found in '%v'", collection)
 	}
 
