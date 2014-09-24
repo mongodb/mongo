@@ -117,7 +117,7 @@ namespace {
         _inShutdown(false),
         _currentState(MemberState::RS_STARTUP),
         _isWaitingForDrainToComplete(false),
-        _rsConfigState(kConfigStartingUp),
+        _rsConfigState(kConfigPreStart),
         _thisMembersConfigIndex(-1),
         _sleptLastElection(false) {
 
@@ -134,7 +134,7 @@ namespace {
 
     void ReplicationCoordinatorImpl::waitForStartUpComplete() {
         boost::unique_lock<boost::mutex> lk(_mutex);
-        while (_rsConfigState == kConfigStartingUp) {
+        while (_rsConfigState == kConfigPreStart || _rsConfigState == kConfigStartingUp) {
             _rsConfigStateChange.wait(lk);
         }
     }
@@ -193,7 +193,7 @@ namespace {
             LOG(1) << "Loading local replica set configuration failed due to " << cbData.status;
             return;
         }
-        _finishLoadLocalConfig_helper(cbData, localConfig, lastOpTime);
+        _finishLoadLocalConfig_helper(localConfig, lastOpTime);
 
         // Make sure that no matter how _finishLoadLocalConfig_helper terminates (short of
         // throwing an exception, which it shouldn't do and would cause the process to terminate),
@@ -210,7 +210,6 @@ namespace {
     }
 
     void ReplicationCoordinatorImpl::_finishLoadLocalConfig_helper(
-            const ReplicationExecutor::CallbackData& cbData,
             const ReplicaSetConfig& localConfig,
             OpTime lastOpTime) {
 
@@ -239,6 +238,8 @@ namespace {
 
         {
             boost::lock_guard<boost::mutex> lk(_mutex);
+            fassert(18822, !_inShutdown);
+            _setConfigState_inlock(kConfigStartingUp);
             _myRID = _externalState->ensureMe(txn);
         }
 
@@ -273,6 +274,13 @@ namespace {
         {
             boost::lock_guard<boost::mutex> lk(_mutex);
             _inShutdown = true;
+            if (_rsConfigState == kConfigPreStart) {
+                warning() << "ReplicationCoordinatorImpl::shutdown() called before "
+                        "startReplication() finished.  Shutting down without cleaning up the "
+                        "replication system";
+                return;
+            }
+            fassert(18823, _rsConfigState != kConfigStartingUp);
             for (std::vector<WaiterInfo*>::iterator it = _replicationWaiterList.begin();
                     it != _replicationWaiterList.end(); ++it) {
                 WaiterInfo* waiter = *it;
@@ -1082,7 +1090,7 @@ namespace {
                                                         ReplSetHeartbeatResponse* response) {
         {
             boost::lock_guard<boost::mutex> lock(_mutex);
-            if (_rsConfigState == kConfigStartingUp) {
+            if (_rsConfigState == kConfigPreStart || _rsConfigState == kConfigStartingUp) {
                 return Status(ErrorCodes::NotYetInitialized,
                               "Received heartbeat while still initializing replication system");
             }
@@ -1126,7 +1134,7 @@ namespace {
                           "server is not running with --replSet");
         }
 
-        while (_rsConfigState == kConfigStartingUp) {
+        while (_rsConfigState == kConfigPreStart || _rsConfigState == kConfigStartingUp) {
             _rsConfigStateChange.wait(lk);
         }
 
@@ -1329,7 +1337,7 @@ namespace {
 
         // Wait until we're done loading our local config
         boost::unique_lock<boost::mutex> lock(_mutex);
-        while (_rsConfigState == kConfigStartingUp) {
+        while (_rsConfigState == kConfigPreStart || _rsConfigState == kConfigStartingUp) {
             _rsConfigStateChange.wait(lock);
         }
         lock.unlock();

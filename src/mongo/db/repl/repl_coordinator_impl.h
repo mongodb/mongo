@@ -273,20 +273,24 @@ namespace repl {
          *
          * Transition diagram:
          *
-         * ReplicationDisabled   +----------> HBReconfig
-         *    ^                  |                     \
-         *    |                  v                      |
-         * StartingUp -> Uninitialized <-> Initiating   |
-         *          \                    /              |
-         *           \        __________/               /
-         *            v      v                         /
-         *             Steady <-----------------------
-         *               ^
-         *               |
-         *               v
-         *             Reconfig
+         * PreStart ------------------> ReplicationDisabled
+         *    |
+         *    |
+         *    v
+         * StartingUp -------> Uninitialized <------> Initiating
+         *         \                     ^               |
+         *          -------              |               |
+         *                 |             |               |
+         *                 v             v               |
+         * Reconfig <---> Steady <----> HBReconfig       |
+         *                    ^                          /
+         *                    |                         /
+         *                     \                       /
+         *                      -----------------------
+         *
          */
         enum ConfigState {
+            kConfigPreStart,
             kConfigStartingUp,
             kConfigReplicationDisabled,
             kConfigUninitialized,
@@ -469,8 +473,7 @@ namespace repl {
          * Helper method that does most of the work of _finishLoadLocalConfig, minus setting
          * _isStartupComplete to true.
          */
-        void _finishLoadLocalConfig_helper(const ReplicationExecutor::CallbackData& cbData,
-                                           const ReplicaSetConfig& localConfig,
+        void _finishLoadLocalConfig_helper(const ReplicaSetConfig& localConfig,
                                            OpTime lastOpTime);
 
         /**
