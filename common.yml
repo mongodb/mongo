@@ -713,7 +713,7 @@ buildvariants:
 #######################################
 
 - name: ubuntu
-  display_name: Linux 64-bit Kerberos
+  display_name: Linux 64-bit
   run_on:
   - ubuntu1204-test
   expansions:
@@ -721,10 +721,7 @@ buildvariants:
     <<: *mongodb_default_startup_args
     coverage: true
     coverage_args: "-coverprofile=coverage.out"
-    compile_flags: "-tags sasl"
-    run_kinit: true
-  tasks:
-  - name: db
+  tasks: *ubuntu1204_tasks
 
 - name: ubuntu-kerberos
   display_name: Linux 64-bit Kerberos
