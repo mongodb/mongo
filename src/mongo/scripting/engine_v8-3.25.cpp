@@ -1425,7 +1425,7 @@ namespace mongo {
         v8::EscapableHandleScope handle_scope(_isolate);
         v8::Local<v8::Function> idCons = ObjectIdFT()->GetFunction();
         v8::Local<v8::Value> argv[1];
-        const string& idString = id.str();
+        const string& idString = id.toString();
         argv[0] = v8StringData(idString);
         return handle_scope.Escape(idCons->NewInstance(1, argv));
     }
