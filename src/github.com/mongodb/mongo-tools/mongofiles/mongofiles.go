@@ -214,11 +214,9 @@ func (self *MongoFiles) handlePut() (string, error) {
 
 // remove file from GridFS
 func (self *MongoFiles) removeGridFSFile(fileName string) error {
-	query := bson.M{"filename": fileName}
-
 	errorStr := "error removing '%v' from GridFS : %v"
 	// find all files with that name
-	docSource, err := self.cmdRunner.FindDocs(self.ToolOptions.Namespace.DB, GridFSFiles, 0, 0, query, []string{}, 0)
+	docSource, err := self.cmdRunner.FindDocs(self.ToolOptions.Namespace.DB, GridFSFiles, 0, 0, bson.M{"filename":fileName}, []string{}, 0)
 	if err != nil {
 		return fmt.Errorf(errorStr, fileName, err)
 	}
@@ -226,12 +224,6 @@ func (self *MongoFiles) removeGridFSFile(fileName string) error {
 
 	var result bson.M
 	for docSource.Next(&result) {
-		// remove file from GridFSFiles collection
-		err = self.cmdRunner.Remove(self.ToolOptions.Namespace.DB, GridFSFiles, query)
-		if err != nil {
-			return fmt.Errorf(errorStr, fileName, err)
-		}
-		// remove file from GridFSChunks collection
 		fileOID := result["_id"]
 		if self.ToolOptions.Namespace.DBPath != "" {
 			// encode fileOID in extended JSON if using shim
@@ -239,8 +231,14 @@ func (self *MongoFiles) removeGridFSFile(fileName string) error {
 			if fileOID, ok = getExtendedJSONOID(fileOID); !ok {
 				return fmt.Errorf("invalid ObjectID '%v' for file '%v'", fileOID, fileName)
 			}
-		}		
-		err = self.cmdRunner.RemoveAll(self.ToolOptions.Namespace.DB, GridFSChunks, bson.M{"files_id": fileOID})
+		}
+		// remove file from GridFSFiles collection
+		err = self.cmdRunner.RemoveAll(self.ToolOptions.Namespace.DB, GridFSFiles, bson.M{"_id":fileOID})
+		if err != nil {
+			return fmt.Errorf(errorStr, fileName, err)
+		}
+		// remove file from GridFSChunks collection
+		err = self.cmdRunner.RemoveAll(self.ToolOptions.Namespace.DB, GridFSChunks, bson.M{"files_id":fileOID})
 	}
 	if err := docSource.Err(); err != nil {
 		return fmt.Errorf(errorStr, fileName, err)
