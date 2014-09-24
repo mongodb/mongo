@@ -42,6 +42,7 @@
 #include "mongo/scripting/v8-3.25_utils.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/base64.h"
+#include "mongo/util/hex.h"
 #include "mongo/util/text.h"
 
 using namespace std;
@@ -734,7 +735,7 @@ namespace mongo {
         }
 
         it->ForceSet(scope->v8StringData("str"),
-                     v8::String::NewFromUtf8(scope->getIsolate(), oid.str().c_str()));
+                     v8::String::NewFromUtf8(scope->getIsolate(), oid.toString().c_str()));
         return it;
     }
 
