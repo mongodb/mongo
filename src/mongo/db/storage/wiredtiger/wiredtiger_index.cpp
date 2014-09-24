@@ -194,11 +194,11 @@ namespace mongo {
         WiredTigerCursor curwrap(GetURI(), swrap);
         WT_CURSOR *c = curwrap.Get();
 
+        if (!dupsAllowed && isDup(c, key, loc))
+            return dupKeyError(key);
+
         boost::scoped_array<char> data;
         WiredTigerItem item = _toItem( key, loc, &data );
-
-        if (!dupsAllowed && isDup(c, key, loc, item))
-            return dupKeyError(key);
 
         c->set_key(c, item.Get() );
         c->set_value(c, &emptyItem);
@@ -251,9 +251,7 @@ namespace mongo {
         WiredTigerCursor curwrap(GetURI(), swrap);
         WT_CURSOR *c = curwrap.Get();
 
-        boost::scoped_array<char> data;
-        WiredTigerItem item = _toItem( key, loc, &data );
-        if (isDup(c, key, loc, item))
+        if (isDup(c, key, loc))
             return dupKeyError(key);
         return Status::OK();
     }
@@ -278,8 +276,11 @@ namespace mongo {
     
     long long WiredTigerIndex::getSpaceUsedBytes( OperationContext* txn ) const { return 1; }
 
-    bool WiredTigerIndex::isDup(WT_CURSOR *c, const BSONObj& key, const DiskLoc& loc,
-                                const WiredTigerItem& item) {
+    bool WiredTigerIndex::isDup(WT_CURSOR *c, const BSONObj& key, const DiskLoc& loc ) {
+        // First check whether the key exists. Pass in an empty disk location to find
+        // any matching keys, regardless of location.
+        boost::scoped_array<char> data;
+        WiredTigerItem item = _toItem( key, DiskLoc(), &data );
         bool found = _search(c, item, true);
         if (!found)
             return false;

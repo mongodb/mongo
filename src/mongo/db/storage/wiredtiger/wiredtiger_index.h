@@ -78,8 +78,7 @@ namespace mongo {
         
         virtual long long getSpaceUsedBytes( OperationContext* txn ) const;
 
-        bool isDup(WT_CURSOR *c, const BSONObj& key, const DiskLoc& loc,
-                   const WiredTigerItem& item );
+        bool isDup(WT_CURSOR *c, const BSONObj& key, const DiskLoc& loc );
 
         virtual SortedDataInterface::Cursor* newCursor(
                 OperationContext* txn, int direction) const;
