@@ -317,6 +317,25 @@ namespace {
         return _getCurrentMemberState_inlock();
     }
 
+    void ReplicationCoordinatorImpl::clearSyncSourceBlacklist() {
+        CBHStatus cbh = _replExecutor.scheduleWork(
+                stdx::bind(&ReplicationCoordinatorImpl::_clearSyncSourceBlacklist_finish,
+                           this,
+                           stdx::placeholders::_1));
+        if (cbh.getStatus() == ErrorCodes::ShutdownInProgress) {
+            return;
+        }
+        fassert(18907, cbh.getStatus());
+        _replExecutor.wait(cbh.getValue());
+    }
+
+    void ReplicationCoordinatorImpl::_clearSyncSourceBlacklist_finish(
+            const ReplicationExecutor::CallbackData& cbData) {
+        if (cbData.status == ErrorCodes::CallbackCanceled)
+            return;
+        _topCoord->clearSyncSourceBlacklist();
+    }
+
     MemberState ReplicationCoordinatorImpl::_getCurrentMemberState_inlock() const {
         invariant(_settings.usingReplSets());
         return _currentState;

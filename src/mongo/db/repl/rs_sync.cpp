@@ -173,8 +173,11 @@ namespace repl {
     bool ReplSetImpl::resync(OperationContext* txn, string& errmsg) {
         getGlobalReplicationCoordinator()->setFollowerMode(MemberState::RS_STARTUP2);
         BackgroundSync::get()->setInitialSyncRequestedFlag(true);
-
         return true;
+    }
+
+    void ReplSetImpl::clearVetoes() {
+        _veto.clear();
     }
 
     void ReplSetImpl::syncThread() {

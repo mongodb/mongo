@@ -65,6 +65,8 @@ namespace repl {
         invariant(false);
     }
 
+    void ReplicationCoordinatorMock::clearSyncSourceBlacklist() {}
+
     ReplicationCoordinator::StatusAndDuration ReplicationCoordinatorMock::awaitReplication(
             const OperationContext* txn,
             const OpTime& ts,

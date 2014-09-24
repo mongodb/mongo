@@ -90,6 +90,11 @@ namespace repl {
         return legacyState;
     }
 
+    void HybridReplicationCoordinator::clearSyncSourceBlacklist() {
+        _legacy.clearSyncSourceBlacklist();
+        _impl.clearSyncSourceBlacklist();
+    }
+
     ReplicationCoordinator::StatusAndDuration HybridReplicationCoordinator::awaitReplication(
             const OperationContext* txn,
             const OpTime& ts,

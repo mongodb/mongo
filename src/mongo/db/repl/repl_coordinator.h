@@ -137,6 +137,11 @@ namespace repl {
         virtual MemberState getCurrentMemberState() const = 0;
 
         /**
+         * Clears the list of sync sources we have blacklisted.
+         */
+        virtual void clearSyncSourceBlacklist() = 0;
+
+        /**
          * Blocks the calling thread for up to writeConcern.wTimeout millis, or until "ts" has been
          * replicated to at least a set of nodes that satisfies the writeConcern, whichever comes
          * first. A writeConcern.wTimeout of 0 indicates no timeout (block forever) and a

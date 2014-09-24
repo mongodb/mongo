@@ -83,6 +83,8 @@ namespace repl {
 
         virtual MemberState getCurrentMemberState() const;
 
+        virtual void clearSyncSourceBlacklist();
+
         /*
          * Implementation of the KillOpListenerInterface interrupt method so that we can wake up
          * threads blocked in awaitReplication() when a killOp command comes in.
@@ -344,8 +346,13 @@ namespace repl {
         /**
          * Bottom half of fillIsMasterForReplSet.
          */
-        void _fillIsMasterForReplSet_finish(const ReplicationExecutor::CallbackData& dbData,
+        void _fillIsMasterForReplSet_finish(const ReplicationExecutor::CallbackData& cbData,
                                             IsMasterResponse* result);
+
+        /*
+         * Bottom half of clearSyncSourceBlacklist
+         */
+        void _clearSyncSourceBlacklist_finish(const ReplicationExecutor::CallbackData& cbData);
         /*
          * Returns the OpTime of the last applied operation on this node.
          */

@@ -263,6 +263,10 @@ namespace {
         _syncSourceBlacklist[host] = until;
     }
 
+    void TopologyCoordinatorImpl::clearSyncSourceBlacklist() {
+        _syncSourceBlacklist.clear();
+    }
+
     void TopologyCoordinatorImpl::prepareSyncFromResponse(
             const ReplicationExecutor::CallbackData& data,
             const HostAndPort& target,

@@ -119,6 +119,10 @@ namespace repl {
         return theReplSet->state();
     }
 
+    void LegacyReplicationCoordinator::clearSyncSourceBlacklist() {
+        theReplSet->clearVetoes();
+    }
+
     ReplicationCoordinator::StatusAndDuration LegacyReplicationCoordinator::awaitReplication(
             const OperationContext* txn,
             const OpTime& ts,

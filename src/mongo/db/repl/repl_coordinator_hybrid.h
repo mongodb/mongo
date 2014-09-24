@@ -61,6 +61,8 @@ namespace repl {
 
         virtual MemberState getCurrentMemberState() const;
 
+        virtual void clearSyncSourceBlacklist();
+
         virtual ReplicationCoordinator::StatusAndDuration awaitReplication(
                 const OperationContext* txn,
                 const OpTime& ts,

@@ -269,6 +269,10 @@ namespace repl {
          * Cause the node to resync from scratch.
          */
         bool resync(OperationContext* txn, std::string& errmsg);
+
+        // Clears the vetoes (blacklisted sync sources)
+        void clearVetoes();
+
     private:
         void _getTargets(list<Target>&, int &configVersion);
         void getTargets(list<Target>&, int &configVersion);

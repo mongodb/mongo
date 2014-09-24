@@ -334,7 +334,7 @@ namespace {
 
                         ctx.db()->dropCollection(&txn, "local.oplog.rs");
                         getGlobalReplicationCoordinator()->setMyLastOptime(&txn, OpTime());
-                        theReplSet->_veto.clear();
+                        getGlobalReplicationCoordinator()->clearSyncSourceBlacklist();
                         bgsync->stop();
                         wunit.commit();
 

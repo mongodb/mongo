@@ -130,6 +130,7 @@ namespace repl {
         virtual HostAndPort chooseNewSyncSource(Date_t now, 
                                                 const OpTime& lastOpApplied);
         virtual void blacklistSyncSource(const HostAndPort& host, Date_t until);
+        virtual void clearSyncSourceBlacklist();
         virtual bool shouldChangeSyncSource(const HostAndPort& currentSource) const;
         virtual void setStepDownTime(Date_t newTime);
         virtual void setFollowerMode(MemberState::MS newMode);
