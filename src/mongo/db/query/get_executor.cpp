@@ -638,7 +638,7 @@ namespace mongo {
     //
 
     Status getExecutorGroup(OperationContext* txn,
-                            Database* db,
+                            Collection* collection,
                             const GroupRequest& request,
                             PlanExecutor** execOut) {
         if (!globalScriptEngine) {
@@ -649,18 +649,17 @@ namespace mongo {
         PlanStage* root;
         QuerySolution* querySolution;
 
-        Collection* collection = db->getCollection(txn, request.ns);
-
         if (!collection) {
             // Treat collections that do not exist as empty collections.  Note that the explain
             // reporting machinery always assumes that the root stage for a group operation is a
             // GroupStage, so in this case we put a GroupStage on top of an EOFStage.
-            root = new GroupStage(txn, db, request, ws.get(), new EOFStage());
+            root = new GroupStage(txn, request, ws.get(), new EOFStage());
             *execOut = new PlanExecutor(ws.release(), root, request.ns);
             return Status::OK();
         }
 
-        const WhereCallbackReal whereCallback(txn, StringData(db->name()));
+        const NamespaceString nss(request.ns);
+        const WhereCallbackReal whereCallback(txn, nss.db());
         CanonicalQuery* rawCanonicalQuery;
         Status canonicalizeStatus = CanonicalQuery::canonicalize(request.ns, request.query,
                                                                  &rawCanonicalQuery,
@@ -678,7 +677,7 @@ namespace mongo {
         }
         invariant(root);
 
-        root = new GroupStage(txn, db, request, ws.get(), root);
+        root = new GroupStage(txn, request, ws.get(), root);
         // We must have a tree of stages in order to have a valid plan executor, but the query
         // solution may be null. Takes ownership of all args other than 'collection'.
         *execOut = new PlanExecutor(ws.release(), root, querySolution, canonicalQuery.release(),

@@ -228,7 +228,7 @@ namespace mongo {
      * If an executor could not be created, returns a Status indicating why.
      */
     Status getExecutorGroup(OperationContext* txn,
-                            Database* db,
+                            Collection* collection,
                             const GroupRequest& request,
                             PlanExecutor** execOut);
 

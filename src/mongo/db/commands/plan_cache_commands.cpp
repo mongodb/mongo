@@ -67,11 +67,12 @@ namespace {
     /**
      * Retrieves a collection's plan cache from the database.
      */
-    Status getPlanCache(OperationContext* txn, Database* db, const string& ns, PlanCache** planCacheOut) {
-        invariant(db);
-
+    static Status getPlanCache(OperationContext* txn,
+                               Collection* collection,
+                               const string& ns,
+                               PlanCache** planCacheOut) {
         *planCacheOut = NULL;
-        Collection* collection = db->getCollection(txn, ns);
+
         if (NULL == collection) {
             return Status(ErrorCodes::BadValue, "no such collection");
         }
@@ -220,10 +221,10 @@ namespace mongo {
                                                          BSONObj& cmdObj,
                                                          BSONObjBuilder* bob) {
         // This is a read lock. The query cache is owned by the collection.
-        Client::ReadContext readCtx(txn, ns);
-        Client::Context& ctx = readCtx.ctx();
+        Client::ReadContext ctx(txn, ns);
+        Collection* collection = ctx.ctx().db()->getCollection(txn, ns);
         PlanCache* planCache;
-        Status status = getPlanCache(txn, ctx.db(), ns, &planCache);
+        Status status = getPlanCache(txn, collection, ns, &planCache);
         if (!status.isOK()) {
             // No collection - return results with empty shapes array.
             BSONArrayBuilder arrayBuilder(bob->subarrayStart("shapes"));
@@ -268,10 +269,10 @@ namespace mongo {
                                                BSONObj& cmdObj,
                                                BSONObjBuilder* bob) {
         // This is a read lock. The query cache is owned by the collection.
-        Client::ReadContext readCtx(txn, ns);
-        Client::Context& ctx = readCtx.ctx();
+        Client::ReadContext ctx(txn, ns);
+        Collection* collection = ctx.ctx().db()->getCollection(txn, ns);
         PlanCache* planCache;
-        Status status = getPlanCache(txn, ctx.db(), ns, &planCache);
+        Status status = getPlanCache(txn, collection, ns, &planCache);
         if (!status.isOK()) {
             // No collection - nothing to do. Return OK status.
             return Status::OK();
@@ -342,10 +343,10 @@ namespace mongo {
                                                    const std::string& ns,
                                                    BSONObj& cmdObj,
                                                    BSONObjBuilder* bob) {
-        Client::ReadContext readCtx(txn, ns);
-        Client::Context& ctx = readCtx.ctx();
+        Client::ReadContext ctx(txn, ns);
+        Collection* collection = ctx.ctx().db()->getCollection(txn, ns);
         PlanCache* planCache;
-        Status status = getPlanCache(txn, ctx.db(), ns, &planCache);
+        Status status = getPlanCache(txn, collection, ns, &planCache);
         if (!status.isOK()) {
             // No collection - return empty plans array.
             BSONArrayBuilder plansBuilder(bob->subarrayStart("plans"));

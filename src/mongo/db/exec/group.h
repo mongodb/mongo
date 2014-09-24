@@ -32,7 +32,7 @@
 
 namespace mongo {
 
-    class Database;
+    class Collection;
 
     /**
      * A description of a request for a group operation.  Copyable.
@@ -77,7 +77,6 @@ namespace mongo {
         MONGO_DISALLOW_COPYING(GroupStage);
     public:
         GroupStage(OperationContext* txn,
-                   Database* db,
                    const GroupRequest& request,
                    WorkingSet* workingSet,
                    PlanStage* child);
@@ -104,9 +103,6 @@ namespace mongo {
     private:
         // Transactional context for read locks.  Not owned by us.
         OperationContext* _txn;
-
-        // Database to operate on.  Not owned by us.
-        Database* _db;
 
         GroupRequest _request;
 

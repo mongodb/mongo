@@ -68,15 +68,13 @@ namespace {
      * Retrieves a collection's query settings and plan cache from the database.
      */
     static Status getQuerySettingsAndPlanCache(OperationContext* txn,
-                                               Database* db,
+                                               Collection* collection,
                                                const string& ns,
                                                QuerySettings** querySettingsOut,
                                                PlanCache** planCacheOut) {
-        invariant(db);
 
         *querySettingsOut = NULL;
         *planCacheOut = NULL;
-        Collection* collection = db->getCollection(txn, ns);
         if (NULL == collection) {
             return Status(ErrorCodes::BadValue, "no such collection");
         }
@@ -171,11 +169,11 @@ namespace mongo {
                                               BSONObj& cmdObj,
                                               BSONObjBuilder* bob) {
         // This is a read lock. The query settings is owned by the collection.
-        Client::ReadContext readCtx(txn, ns);
-        Client::Context& ctx = readCtx.ctx();
+        Client::ReadContext ctx(txn, ns);
+        Collection* collection = ctx.ctx().db()->getCollection(txn, ns);
         QuerySettings* querySettings;
         PlanCache* unused;
-        Status status = getQuerySettingsAndPlanCache(txn, ctx.db(), ns, &querySettings, &unused);
+        Status status = getQuerySettingsAndPlanCache(txn, collection, ns, &querySettings, &unused);
         if (!status.isOK()) {
             // No collection - return empty array of filters.
             BSONArrayBuilder hintsBuilder(bob->subarrayStart("filters"));
@@ -233,11 +231,12 @@ namespace mongo {
                                                BSONObj& cmdObj,
                                                BSONObjBuilder* bob) {
         // This is a read lock. The query settings is owned by the collection.
-        Client::ReadContext readCtx(txn, ns);
-        Client::Context& ctx = readCtx.ctx();
+        Client::ReadContext ctx(txn, ns);
+        Collection* collection = ctx.ctx().db()->getCollection(txn, ns);
         QuerySettings* querySettings;
         PlanCache* planCache;
-        Status status = getQuerySettingsAndPlanCache(txn, ctx.db(), ns, &querySettings, &planCache);
+        Status status =
+            getQuerySettingsAndPlanCache(txn, collection, ns, &querySettings, &planCache);
         if (!status.isOK()) {
             // No collection - do nothing.
             return Status::OK();
@@ -327,11 +326,12 @@ namespace mongo {
                                             BSONObj& cmdObj,
                                             BSONObjBuilder* bob) {
         // This is a read lock. The query settings is owned by the collection.
-        Client::ReadContext readCtx(txn, ns);
-        Client::Context& ctx = readCtx.ctx();
+        Client::ReadContext ctx(txn, ns);
+        Collection* collection = ctx.ctx().db()->getCollection(txn, ns);
         QuerySettings* querySettings;
         PlanCache* planCache;
-        Status status = getQuerySettingsAndPlanCache(txn, ctx.db(), ns, &querySettings, &planCache);
+        Status status =
+            getQuerySettingsAndPlanCache(txn, collection, ns, &querySettings, &planCache);
         if (!status.isOK()) {
             return status;
         }

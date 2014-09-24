@@ -34,6 +34,7 @@
 #include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/auth/privilege.h"
+#include "mongo/db/catalog/database.h"
 #include "mongo/db/client_basic.h"
 #include "mongo/db/exec/group.h"
 #include "mongo/db/exec/working_set_common.h"
@@ -131,10 +132,10 @@ namespace mongo {
         }
 
         Client::ReadContext ctx(txn, groupRequest.ns);
-        Database* db = ctx.ctx().db();
+        Collection* coll = ctx.ctx().db()->getCollection(txn, groupRequest.ns);
 
         PlanExecutor *rawPlanExecutor;
-        Status getExecStatus = getExecutorGroup(txn, db, groupRequest, &rawPlanExecutor); 
+        Status getExecStatus = getExecutorGroup(txn, coll, groupRequest, &rawPlanExecutor);
         if (!getExecStatus.isOK()) {
             return appendCommandStatus(out, getExecStatus);
         }
@@ -181,10 +182,10 @@ namespace mongo {
         }
 
         Client::ReadContext ctx(txn, groupRequest.ns);
-        Database* db = ctx.ctx().db();
+        Collection* coll = ctx.ctx().db()->getCollection(txn, groupRequest.ns);
 
         PlanExecutor *rawPlanExecutor;
-        Status getExecStatus = getExecutorGroup(txn, db, groupRequest, &rawPlanExecutor); 
+        Status getExecStatus = getExecutorGroup(txn, coll, groupRequest, &rawPlanExecutor); 
         if (!getExecStatus.isOK()) {
             return getExecStatus;
         }
