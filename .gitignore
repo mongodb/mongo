@@ -14,3 +14,5 @@ src/github.com/smartystreets/
 src/github.com/spacemonkeygo/
 src/gopkg.in
 src/labix.org
+
+.godeps
