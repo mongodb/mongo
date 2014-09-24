@@ -155,15 +155,20 @@ functions:
 
         cd src/github.com/mongodb/mongo-tools/${package};
 
+        if [ '${run_kinit|false}' = 'true' ]
+        then
+          echo "${kerberos_password}" | kinit -p drivers@LDAPTEST.10GEN.CC;
+        fi
+
         go test -i;
         exit_code=-1;
         if [ '${coverage|false}' = 'true' ]
         then
-            go test -v -test.types=${types} -coverprofile=coverage.out;
+            go test -v -test.types=${types} ${compile_flags} -coverprofile=coverage.out;
             exit_code=$?;
             mv coverage.out $GOPATH;
         else
-            go test -v -test.types=${types};
+            go test -v -test.types=${types} ${compile_flags};
             exit_code=$?;
         fi
         pkill -9 mongod;
@@ -175,7 +180,7 @@ functions:
       working_dir: src
       tests:
         - dir: src/github.com/mongodb/mongo-tools/common/${package}
-          args: ${coverage_args}
+          args: ${coverage_args} ${compile_flags}
 
   "setup go env":
     command: shell.exec
@@ -222,11 +227,16 @@ pre:
           remote_key: "project_aws_key"
         - local_key: "aws_secret"
           remote_key: "project_aws_secret"
+        - local_key: "kerberos_password"
+          remote_key: "kerberos_password"
 
 tasks:
 - name: auth
   commands:
     - command: git.get_project
+      params:
+        directory: src
+    - command: git.apply_patch
       params:
         directory: src
     - func: "setup go env"
@@ -246,6 +256,9 @@ tasks:
 - name: bsonutil
   commands:
     - command: git.get_project
+      params:
+        directory: src
+    - command: git.apply_patch
       params:
         directory: src
     - func: "setup go env"
@@ -269,6 +282,9 @@ tasks:
     - command: git.get_project
       params:
         directory: src
+    - command: git.apply_patch
+      params:
+        directory: src
     - func: "setup go env"
     - func: "download mongod"
     - func: "run mongod test"
@@ -289,6 +305,9 @@ tasks:
   #- name: "unit"
   commands:
     - command: git.get_project
+      params:
+        directory: src
+    - command: git.apply_patch
       params:
         directory: src
     - func: "setup go env"
@@ -368,6 +387,9 @@ tasks:
   #- name: "unit"
   commands:
     - command: git.get_project
+      params:
+        directory: src
+    - command: git.apply_patch
       params:
         directory: src
     - func: "setup go env"
@@ -468,6 +490,9 @@ tasks:
     - command: git.get_project
       params:
         directory: src
+    - command: git.apply_patch
+      params:
+        directory: src
     - func: "setup go env"
     - command: expansions.update
       params:
@@ -489,6 +514,9 @@ tasks:
     - command: git.get_project
       params:
         directory: src
+    - command: git.apply_patch
+      params:
+        directory: src
     - func: "setup go env"
     - command: shell.exec
       params:
@@ -501,6 +529,9 @@ tasks:
 - name: log
   commands:
     - command: git.get_project
+      params:
+        directory: src
+    - command: git.apply_patch
       params:
         directory: src
     - func: "setup go env"
@@ -524,6 +555,9 @@ tasks:
     - command: git.get_project
       params:
         directory: src
+    - command: git.apply_patch
+      params:
+        directory: src
     - func: "setup go env"
     - command: expansions.update
       params:
@@ -545,6 +579,9 @@ tasks:
     - command: git.get_project
       params:
         directory: src
+    - command: git.apply_patch
+      params:
+        directory: src
     - func: "setup go env"
     - command: expansions.update
       params:
@@ -564,6 +601,9 @@ tasks:
 - name: ssl
   commands:
     - command: git.get_project
+      params:
+        directory: src
+    - command: git.apply_patch
       params:
         directory: src
     - func: "setup go env"
@@ -592,6 +632,9 @@ tasks:
     - command: git.get_project
       params:
         directory: src
+    - command: git.apply_patch
+      params:
+        directory: src
     - func: "setup go env"
     - command: expansions.update
       params:
@@ -613,6 +656,9 @@ tasks:
     - command: git.get_project
       params:
         directory: src
+    - command: git.apply_patch
+      params:
+        directory: src
     - func: "setup go env"
     - func: "run mongod test"
       vars:
@@ -630,6 +676,9 @@ tasks:
 - name: vet
   commands:
     - command: git.get_project
+      params:
+        directory: src
+    - command: git.apply_patch
       params:
         directory: src
     - func: "setup go env"
@@ -664,7 +713,7 @@ buildvariants:
 #######################################
 
 - name: ubuntu
-  display_name: Linux 64-bit
+  display_name: Linux 64-bit Kerberos
   run_on:
   - ubuntu1204-test
   expansions:
@@ -672,6 +721,22 @@ buildvariants:
     <<: *mongodb_default_startup_args
     coverage: true
     coverage_args: "-coverprofile=coverage.out"
+    compile_flags: "-tags sasl"
+    run_kinit: true
+  tasks:
+  - name: db
+
+- name: ubuntu-kerberos
+  display_name: Linux 64-bit Kerberos
+  run_on:
+  - ubuntu1204-test
+  expansions:
+    <<: *mongo_url_ubuntu1204
+    <<: *mongodb_default_startup_args
+    coverage: true
+    coverage_args: "-coverprofile=coverage.out"
+    compile_flags: "-tags sasl"
+    run_kinit: true
   tasks: *ubuntu1204_tasks
 
 #######################################

@@ -4,6 +4,17 @@ package db
 
 // This file runs Kerberos tests if build with sasl is enabled
 
+import (
+	"fmt"
+	"github.com/mongodb/mongo-tools/common/db/kerberos"
+	"github.com/mongodb/mongo-tools/common/options"
+	. "github.com/smartystreets/goconvey/convey"
+	"gopkg.in/mgo.v2/bson"
+	"os"
+	"runtime"
+	"testing"
+)
+
 var (
 	KERBEROS_HOST = "ldaptest.10gen.cc"
 	KERBEROS_USER = "drivers@LDAPTEST.10GEN.CC"
