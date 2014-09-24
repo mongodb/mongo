@@ -60,7 +60,10 @@ func (restore *MongoRestore) CreateAllIntents(fullpath string) error {
 			}
 		} else {
 			if entry.Name() == "oplog.bson" {
-				//TODO handle oplog
+				restore.manager.Put(&Intent{
+					C:        "oplog", //TODO make this a helper in intent
+					BSONPath: filepath.Join(fullpath, entry.Name()),
+				})
 			} else {
 				log.Logf(0, `don't know what to do with file "%v", skipping...`,
 					filepath.Join(fullpath, entry.Name()))

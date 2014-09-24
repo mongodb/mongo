@@ -51,9 +51,10 @@ func (im *IntentManager) Put(intent *Intent) {
 
 	if intent.IsOplog() {
 		im.oplogIntent = intent
+		return
 	}
 
-	// TODO oplog + usersAndRoles???
+	// TODO usersAndRoles???
 
 	if existing := im.intents[intent.Key()]; existing != nil {
 		// merge new intent into old intent
@@ -82,4 +83,8 @@ func (im *IntentManager) Pop() *Intent {
 	delete(im.intents, intent.Key())
 
 	return intent
+}
+
+func (im *IntentManager) Oplog() *Intent {
+	return im.oplogIntent
 }

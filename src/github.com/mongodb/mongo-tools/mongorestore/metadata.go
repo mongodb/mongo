@@ -20,16 +20,22 @@ type IndexDocument struct {
 	Namespace string `bson:"ns"`
 	Value     int    `bson:"v"`
 	Key       bson.D `bson:"key"`
+
+	Unique     bool `bson:"unique"`
+	DropDups   bool `bson:"dropDups"`
+	Background bool `bson:"background"`
+	Sparse     bool `bson:"sparse"`
+
+	//TODO expire, etc
 }
 
-func MetadataFromJSON(jsonBytes []byte) (*mgo.CollectionInfo, []IndexDocument, error) {
+func MetadataFromJSON(jsonBytes []byte) (*mgo.CollectionInfo, []mgo.Index, error) {
 	meta := &Metadata{}
 	err := json.Unmarshal(jsonBytes, meta)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	log.Logf(0, "%+v", meta.Options)
 	var colInfo *mgo.CollectionInfo
 	if len(meta.Options) > 0 {
 		colInfo, err = CollectionInfoFromOptions(meta.Options)
@@ -37,8 +43,17 @@ func MetadataFromJSON(jsonBytes []byte) (*mgo.CollectionInfo, []IndexDocument, e
 			return nil, nil, fmt.Errorf("error reading options: %v", err)
 		}
 	}
-	log.Logf(0, "%+v", meta.Indexes)
-	return colInfo, nil, nil
+
+	newIndexes := []mgo.Index{}
+	for _, idx := range meta.Indexes {
+		newIndex, err := idx.ToMgoFormat()
+		if err != nil {
+			return nil, nil, fmt.Errorf("error reading indexes: %v", err)
+		}
+		newIndexes = append(newIndexes, newIndex)
+	}
+
+	return colInfo, newIndexes, nil
 }
 
 func CollectionInfoFromOptions(in bson.M) (*mgo.CollectionInfo, error) {
@@ -74,23 +89,28 @@ func CollectionInfoFromOptions(in bson.M) (*mgo.CollectionInfo, error) {
 
 }
 
-func (idx IndexDocument) ToMgoFormat() (*mgo.Index, error) {
-	mgoIdx := &mgo.Index{}
+func (idx IndexDocument) ToMgoFormat() (mgo.Index, error) {
+	mgoIdx := mgo.Index{}
 	for _, elem := range idx.Key {
 		keyField := elem.Name
 		keyInt, err := util.ToInt(elem.Value)
 		if err != nil {
-			return nil, err
+			return mgoIdx, err
 		}
 		newKeyVal := "" //TODO, is this logic safe??
 		if keyInt > 0 {
-			newKeyVal = "+" + keyField
+			newKeyVal = "+" + keyField //TODO SUPPORT HASHED INDEX
 		} else {
 			newKeyVal = "-" + keyField
 		}
 		mgoIdx.Key = append(mgoIdx.Key, newKeyVal)
 	}
-	//TODO the rest of it...
+	mgoIdx.Name = idx.Name
+	mgoIdx.Unique = idx.Unique
+	mgoIdx.DropDups = idx.DropDups
+	mgoIdx.Background = idx.Background
+	mgoIdx.Sparse = idx.Sparse
+	//TODO the rest of it..., stop using MGO here
 	return mgoIdx, nil
 }
 

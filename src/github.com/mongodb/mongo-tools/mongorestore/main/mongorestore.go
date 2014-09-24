@@ -34,19 +34,24 @@ func main() {
 		return
 	}
 
-	targetDir := ""
-	if len(args) == 0 {
-		targetDir = "dump"
-	} else {
-		targetDir = args[0]
-		if len(args) > 1 {
-			fmt.Printf("error parsing command line: too many arguments\n")
-			os.Exit(1)
-		}
-	}
-
 	// init logger
 	log.InitToolLogger(opts.Verbosity)
+
+	targetDir := ""
+	if inputOpts.Directory != "" {
+		targetDir = inputOpts.Directory
+		log.Log(0, "using --dir flag instead of arguments")
+	} else {
+		if len(args) == 0 {
+			targetDir = "dump"
+		} else {
+			targetDir = args[0]
+			if len(args) > 1 {
+				fmt.Printf("error parsing command line: too many arguments\n")
+				os.Exit(1)
+			}
+		}
+	}
 
 	// create a session provider to connect to the db
 	sessionProvider, err := db.InitSessionProvider(*opts)
