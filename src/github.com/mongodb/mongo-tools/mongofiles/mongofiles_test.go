@@ -9,6 +9,7 @@ import (
 	"gopkg.in/mgo.v2"
 	"io/ioutil"
 	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 )
@@ -86,21 +87,50 @@ func tearDownGridFSTestData() error {
 	return nil
 }
 
-func simpleMongoFilesInstance(args []string) (*MongoFiles, error) {
-	// initialize db session provider
-	sessionProvider, err := db.InitSessionProvider(*toolOptions)
+// mongofiles instance that doesn't use the shim
+func driverMongoFilesInstance(args []string) (*MongoFiles, error) {
+	mongofiles := MongoFiles{
+		ToolOptions:    toolOptions,
+		StorageOptions: &options.StorageOptions{},
+		Command:        args[0],
+		FileName:       args[1],
+	}
+	if err := mongofiles.Init(); err != nil {
+		return nil, err
+	}
 
+	return &mongofiles, nil
+}
+
+func cleanAndTokenizeTestOutput(str string) []string {
+	// remove last \n in str to avoid unnecessary line on split
+	if str != "" {
+		str = str[:len(str)-1]
+	}
+	return strings.Split(strings.Trim(str, "\n"), "\n")
+}
+
+// mongofiles instance that uses the shim
+func shimMongoFilesInstance(args []string) (*MongoFiles, error) {
+	mongofiles := MongoFiles{
+		ToolOptions:    toolOptions,
+		StorageOptions: &options.StorageOptions{},
+		Command:        args[0],
+		FileName:       args[1],
+	}
+	path, err := os.Getwd()
 	if err != nil {
 		return nil, err
 	}
 
-	return &MongoFiles{
-		ToolOptions:     toolOptions,
-		StorageOptions:  &options.StorageOptions{},
-		SessionProvider: sessionProvider,
-		Command:         args[0],
-		Filename:        args[1],
-	}, nil
+	mongofiles.ToolOptions.Namespace.DB = "shimtest"
+	mongofiles.ToolOptions.Namespace.DBPath = filepath.Join(path, "testdata")
+
+	if err := mongofiles.Init(); err != nil {
+		return nil, err
+	}
+
+	return &mongofiles, nil
 }
 
 // Test that it works whenever valid arguments are passed in and that
@@ -112,21 +142,21 @@ func TestValidArguments(t *testing.T) {
 			args := []string{}
 			_, err := ValidateCommand(args)
 			So(err, ShouldNotBeNil)
-			So(err.Error(), ShouldEqual, "You must specify a command")
+			So(err.Error(), ShouldEqual, "you must specify a command")
 		})
 
 		Convey("It should error out when too many positional arguments provided", func() {
 			args := []string{"list", "something", "another"}
 			_, err := ValidateCommand(args)
 			So(err, ShouldNotBeNil)
-			So(err.Error(), ShouldEqual, "Too many positional arguments")
+			So(err.Error(), ShouldEqual, "too many positional arguments")
 		})
 
 		Convey("It should not error out when list command isn't given an argument", func() {
 			args := []string{"list"}
-			filename, err := ValidateCommand(args)
+			fileName, err := ValidateCommand(args)
 			So(err, ShouldBeNil)
-			So(filename, ShouldEqual, "")
+			So(fileName, ShouldEqual, "")
 		})
 
 		Convey("It should error out when any of (get|put|delete|search) not given supporting argument",
@@ -157,14 +187,14 @@ func TestValidArguments(t *testing.T) {
 
 // Test that the output from mongofiles is actually correct
 func TestMongoFilesCommands(t *testing.T) {
-	Convey("With a MongoFiles instance testing the various commands:(get|put|delete|search|list)", t, func() {
+	Convey("With a MongoFiles instance (THAT DOESN'T USE THE SHIM) testing the various commands:(get|put|delete|search|list)", t, func() {
 		bytesWritten, err := setUpGridFSTestData()
 		So(err, ShouldBeNil)
 
 		Convey("Testing the 'list' command with no output should", func() {
 			args := []string{"list", "gibberish"}
 
-			mf, err := simpleMongoFilesInstance(args)
+			mf, err := driverMongoFilesInstance(args)
 			So(mf, ShouldNotBeNil)
 			So(err, ShouldBeNil)
 
@@ -176,7 +206,7 @@ func TestMongoFilesCommands(t *testing.T) {
 		Convey("Testing the 'list' command with some output should", func() {
 			args := []string{"list", "testf"}
 
-			mf, err := simpleMongoFilesInstance(args)
+			mf, err := driverMongoFilesInstance(args)
 			So(mf, ShouldNotBeNil)
 			So(err, ShouldBeNil)
 
@@ -185,9 +215,7 @@ func TestMongoFilesCommands(t *testing.T) {
 			So(len(str), ShouldNotEqual, 0)
 
 			filesExpected := []string{"testfile1", "testfile2", "testfile3"}
-			// remove last \n in str to avoid unnecessary line on split
-			str = str[:len(str)-1]
-			lines := strings.Split(strings.Trim(str, "\n"), "\n")
+			lines := cleanAndTokenizeTestOutput(str)
 			So(len(lines), ShouldEqual, len(filesExpected))
 
 			var fileName string
@@ -202,7 +230,7 @@ func TestMongoFilesCommands(t *testing.T) {
 		Convey("Testing the 'get' command with some output should", func() {
 			args := []string{"get", "testfile1"}
 
-			mf, err := simpleMongoFilesInstance(args)
+			mf, err := driverMongoFilesInstance(args)
 			So(mf, ShouldNotBeNil)
 			So(err, ShouldBeNil)
 
@@ -226,7 +254,7 @@ func TestMongoFilesCommands(t *testing.T) {
 		Convey("Testing the 'search' command with some output should", func() {
 			args := []string{"search", "file"}
 
-			mf, err := simpleMongoFilesInstance(args)
+			mf, err := driverMongoFilesInstance(args)
 			So(mf, ShouldNotBeNil)
 			So(err, ShouldBeNil)
 
@@ -235,8 +263,7 @@ func TestMongoFilesCommands(t *testing.T) {
 			So(len(str), ShouldNotEqual, 0)
 
 			filesExpected := []string{"testfile1", "testfile2", "testfile3"}
-			// remove last \n in str to avoid unnecessary line on split
-			lines := strings.Split(strings.Trim(str, "\n"), "\n")
+			lines := cleanAndTokenizeTestOutput(str)
 			So(len(lines), ShouldEqual, len(filesExpected))
 
 			var fileName string
@@ -251,5 +278,73 @@ func TestMongoFilesCommands(t *testing.T) {
 		Reset(func() {
 			So(tearDownGridFSTestData(), ShouldBeNil)
 		})
+	})
+
+	Convey("With a MongoFiles instance (THAT USES THE SHIM) testing the various commands:(get|put|delete|search|list)", t, func() {
+
+		filesExpected := []string{"samplefile1.txt", "samplefile2.txt", "samplefile3.txt"}
+		bytesExpected := []int{71, 41, 51}
+
+		Convey("Testing the 'list' command with no output should", func() {
+			args := []string{"list", "gibberish"}
+
+			mf, err := shimMongoFilesInstance(args)
+
+			So(mf, ShouldNotBeNil)
+			So(err, ShouldBeNil)
+
+			output, err := mf.Run()
+			So(err, ShouldBeNil)
+			So(len(output), ShouldEqual, 0)
+		})
+
+		Convey("Testing the 'list' command with some output should", func() {
+			args := []string{"list", "sample"}
+
+			mf, err := shimMongoFilesInstance(args)
+
+			So(mf, ShouldNotBeNil)
+			So(err, ShouldBeNil)
+
+			str, err := mf.Run()
+			So(err, ShouldBeNil)
+
+			lines := cleanAndTokenizeTestOutput(str)
+			So(len(lines), ShouldEqual, len(filesExpected))
+
+			var fileName string
+			var byteCount int
+			for _, line := range lines {
+				fmt.Sscanf(line, "%s\t%d", &fileName, &byteCount)
+				So(filesExpected, ShouldContain, fileName)
+				So(bytesExpected, ShouldContain, byteCount)
+			}
+		})
+
+		Convey("Testing the 'get' command with some output should", func() {
+			args := []string{"get", "samplefile1.txt"}
+
+			mf, err := shimMongoFilesInstance(args)
+
+			So(mf, ShouldNotBeNil)
+			So(err, ShouldBeNil)
+
+			So(err, ShouldBeNil)
+			str, err := mf.Run()
+			So(err, ShouldBeNil)
+			So(len(str), ShouldNotEqual, 0)
+
+			testFile, err := os.Open("samplefile1.txt")
+			So(err, ShouldBeNil)
+			sampleFile1Bytes, err := ioutil.ReadAll(testFile)
+			So(err, ShouldBeNil)
+			So(len(sampleFile1Bytes), ShouldEqual, bytesExpected[0])
+
+			Reset(func() {
+				err = os.Remove("samplefile1.txt")
+				So(err, ShouldBeNil)
+			})
+		})
+
 	})
 }

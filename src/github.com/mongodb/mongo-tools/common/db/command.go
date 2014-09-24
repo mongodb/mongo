@@ -27,7 +27,6 @@ func (sp *SessionProvider) OpenInsertStream(DB, Collection string) (DocSink, err
 	if err != nil {
 		return nil, err
 	}
-	defer session.Close()
 	
 	coll := session.DB(DB).C(Collection)
 	return &CollectionSink{coll, session}, nil
