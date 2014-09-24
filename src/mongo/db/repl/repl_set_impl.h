@@ -265,11 +265,6 @@ namespace repl {
         Member* getMutableMember(unsigned id);
         Member* findByName(const std::string& hostname) const;
 
-        /**
-         * Cause the node to resync from scratch.
-         */
-        bool resync(OperationContext* txn, std::string& errmsg);
-
         // Clears the vetoes (blacklisted sync sources)
         void clearVetoes();
 

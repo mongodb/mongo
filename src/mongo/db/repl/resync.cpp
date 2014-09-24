@@ -27,6 +27,7 @@
 */
 
 #include "mongo/db/commands.h"
+#include "mongo/db/repl/bgsync.h"
 #include "mongo/db/repl/master_slave.h"  // replSettings
 #include "mongo/db/repl/repl_coordinator_global.h"
 #include "mongo/db/repl/rs.h" // replLocalAuth()
@@ -68,16 +69,20 @@ namespace repl {
 
             Lock::GlobalWrite globalWriteLock(txn->lockState());
 
+            ReplicationCoordinator* replCoord = getGlobalReplicationCoordinator();
             if (getGlobalReplicationCoordinator()->getSettings().usingReplSets()) {
-                if (!theReplSet) {
-                    errmsg = "no replication yet active";
-                    return false;
+                if (replCoord->getReplicationMode() != ReplicationCoordinator::modeReplSet) {
+                    return appendCommandStatus(result, Status(ErrorCodes::NotYetInitialized,
+                                                              "no replication yet active"));
                 }
-                if (theReplSet->isPrimary()) {
-                    errmsg = "primaries cannot resync";
-                    return false;
+                if (replCoord->getCurrentMemberState().primary()) {
+                    return appendCommandStatus(result, Status(ErrorCodes::NotSecondary,
+                                                              "primaries cannot resync"));
                 }
-                return theReplSet->resync(txn, errmsg);
+
+                replCoord->setFollowerMode(MemberState::RS_STARTUP2);
+                BackgroundSync::get()->setInitialSyncRequestedFlag(true);
+                return true;
             }
 
             // below this comment pertains only to master/slave replication
