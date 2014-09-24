@@ -91,6 +91,7 @@ static int	 start_threads(CONFIG *,
 static int	 stop_threads(CONFIG *, u_int, CONFIG_THREAD *);
 static void	*thread_run_wtperf(void *);
 static void	*worker(void *);
+static void	worker_throttle(uint64_t, uint64_t *, struct timespec *);
 static uint64_t	 wtperf_rand(CONFIG_THREAD *);
 static uint64_t	 wtperf_value_range(CONFIG *);
 
@@ -399,7 +400,7 @@ err:		cfg->error = cfg->stop = 1;
 static void *
 worker(void *arg)
 {
-	struct timespec start, stop;
+	struct timespec start, stop, interval;
 	CONFIG *cfg;
 	CONFIG_THREAD *thread;
 	TRACK *trk;
@@ -407,7 +408,7 @@ worker(void *arg)
 	WT_CURSOR **cursors, *cursor;
 	WT_SESSION *session;
 	size_t i;
-	uint64_t next_val, usecs;
+	uint64_t next_val, throttle_ops, usecs;
 	uint8_t *op, *op_end;
 	int measure_latency, ret;
 	char *value_buf, *key_buf, *value;
@@ -418,6 +419,7 @@ worker(void *arg)
 	cursors = NULL;
 	session = NULL;
 	trk = NULL;
+	throttle_ops = 0;
 
 	if ((ret = conn->open_session(
 	    conn, NULL, cfg->sess_config, &session)) != 0) {
@@ -438,6 +440,12 @@ worker(void *arg)
 			    cfg->uris[i]);
 			goto err;
 		}
+	}
+	/* Setup the timer for throttling. */
+	if (thread->workload->throttle != 0 &&
+	    (ret = __wt_epoch(NULL, &interval)) != 0) {
+		lprintf(cfg, ret, 0, "Get time call failed");
+		goto err;
 	}
 
 	key_buf = thread->key_buf;
@@ -609,6 +617,15 @@ op_err:			lprintf(cfg, ret, 0,
 		/* Schedule the next operation */
 		if (++op == op_end)
 			op = thread->workload->ops;
+
+		/*
+		 * Check throttling every 100 operations to avoid taking too
+		 * many time samples.
+		 */
+		if (thread->workload->throttle != 0 &&
+		    throttle_ops++ % 100 == 0)
+			worker_throttle(thread->workload->throttle,
+			     &throttle_ops, &interval);
 	}
 
 	if ((ret = session->close(session, NULL)) != 0) {
@@ -2197,6 +2214,32 @@ stop_threads(CONFIG *cfg, u_int num, CONFIG_THREAD *threads)
 	 * program, leaking memory isn't a concern, and it's simpler that way.
 	 */
 	return (0);
+}
+
+/*
+ * TODO: Spread the stalls out, so we don't flood at the start of each
+ * second and then pause. Doing this every 10th of a second is probably enough
+ */
+static void
+worker_throttle(uint64_t throttle, uint64_t *ops, struct timespec *interval)
+{
+	struct timespec now;
+	uint64_t usecs_to_complete;
+	if (*ops < throttle)
+		return;
+
+	/* Ignore errors, we don't really care. */
+	if (__wt_epoch(NULL, &now) != 0)
+		return;
+
+	/* If more than a second has passed reset the counters */
+#define	WTPERF_US_PER_SECOND	1000000
+	usecs_to_complete = ns_to_us(WT_TIMEDIFF(now, *interval));
+	if (usecs_to_complete < WTPERF_US_PER_SECOND)
+		(void)usleep(WTPERF_US_PER_SECOND - usecs_to_complete);
+
+	*ops = 0;
+	*interval = now;
 }
 
 static uint64_t
