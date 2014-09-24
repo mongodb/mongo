@@ -23,6 +23,7 @@ const (
 	Dump ShimMode = iota
 	Insert
 	Drop
+	Remove
 )
 
 type Shim struct {
@@ -136,14 +137,28 @@ func (shim *Shim) OpenInsertStream(DB, Collection string) (DocSink, error) {
 	return &EncodedBSONSink{writer, writerShim}, nil
 }
 
-// not supported yet!
-func (shim *Shim) Remove(DB, Collection string, Query interface{}) error {
-	return fmt.Errorf("mongoshim doesn't support Remove yet")
-}
 
-// not supported yet!
 func (shim *Shim) RemoveAll(DB, Collection string, Query interface{}) error {
-	return fmt.Errorf("mongoshim doesn't support RemoveAll yet")
+	queryBytes, err := json.Marshal(Query)
+	if err != nil {
+		return err
+	}
+	removerShim := StorageShim{
+		DBPath:         shim.DBPath,
+		Database:       DB,
+		Collection:     Collection,
+		ShimPath:       shim.ShimPath,
+		Query:          string(queryBytes),
+		Mode:           Remove,
+		DirectoryPerDB: shim.DirectoryPerDB,
+		Journal:        shim.Journal,
+	}
+	_, _, err = removerShim.Open()
+	if err != nil {
+		return err
+	}
+	defer removerShim.Close()
+	return nil
 }
 
 type databaseNames struct {
@@ -302,6 +317,8 @@ func buildArgs(shim StorageShim) ([]string, error) {
 		returnVal = append(returnVal, "--load")
 	case Drop:
 		returnVal = append(returnVal, "--drop")
+	case Remove:
+		returnVal = append(returnVal, "--remove")
 	}
 	return returnVal, nil
 }

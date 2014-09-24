@@ -16,7 +16,6 @@ type CommandRunner interface {
 	
 	OpenInsertStream(DB, Collection string) (DocSink, error)
 	
-	Remove(DB, Collection string, Query interface{}) error
 	RemoveAll(DB, Collection string, Query interface{}) error
 	
 	DatabaseNames() ([]string, error)
@@ -28,20 +27,10 @@ func (sp *SessionProvider) OpenInsertStream(DB, Collection string) (DocSink, err
 	if err != nil {
 		return nil, err
 	}
-	defer session.Close()	
+	defer session.Close()
 	
 	coll := session.DB(DB).C(Collection)
 	return &CollectionSink{coll, session}, nil
-}
-
-func (sp *SessionProvider) Remove(DB, Collection string, Query interface{}) error {
-	session, err := sp.GetSession()
-	if err != nil {
-		return err
-	}
-	defer session.Close()	
-
-	return session.DB(DB).C(Collection).Remove(Query)
 }
 
 func (sp *SessionProvider) RemoveAll(DB, Collection string, Query interface{}) error {
