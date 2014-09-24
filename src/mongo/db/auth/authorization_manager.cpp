@@ -302,13 +302,14 @@ namespace mongo {
         return _externalState->hasAnyPrivilegeDocuments(txn);
     }
 
-    Status AuthorizationManager::writeAuthSchemaVersionIfNeeded(OperationContext* txn) {
+    Status AuthorizationManager::writeAuthSchemaVersionIfNeeded(OperationContext* txn,
+                                                                int foundSchemaVersion) {
         Status status =  _externalState->updateOne(
                 txn,
                 AuthorizationManager::versionCollectionNamespace,
                 AuthorizationManager::versionDocumentQuery,
                 BSON("$set" << BSON(AuthorizationManager::schemaVersionFieldName <<
-                                    AuthorizationManager::schemaVersion26Final)),
+                                    foundSchemaVersion)),
                 true,  // upsert
                 BSONObj());  // write concern
         if (status == ErrorCodes::NoMatchingDocument) {    // SERVER-11492

@@ -548,7 +548,7 @@ namespace mongo {
             if (!status.isOK()) {
                 log() << "Auth schema version is incompatible: "
                       << "User and role management commands require auth data to have "
-                      << "schema version " << AuthorizationManager::schemaVersion26Final
+                      << "at least schema version " << AuthorizationManager::schemaVersion26Final
                       << " but startup could not verify schema version: " << status.toString()
                       << endl;
                 exitCleanly(EXIT_NEED_UPGRADE);
@@ -556,7 +556,7 @@ namespace mongo {
             if (foundSchemaVersion < AuthorizationManager::schemaVersion26Final) {
                 log() << "Auth schema version is incompatible: "
                       << "User and role management commands require auth data to have "
-                      << "schema version " << AuthorizationManager::schemaVersion26Final
+                      << "at least schema version " << AuthorizationManager::schemaVersion26Final
                       << " but found " << foundSchemaVersion << ". In order to upgrade "
                       << "the auth schema, first downgrade MongoDB binaries to version "
                       << "2.6 and then run the authSchemaUpgrade command." << endl;
