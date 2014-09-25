@@ -854,6 +854,9 @@ tasks:
     - func: "move coverage data"
     - func: "generate coverage html + text"
     - func: "upload coverage report"
+      vars:
+        format: "txt"
+        content_type: "text/plain"
     - func: "upload coverage report"
       vars:
         format: "html"
@@ -868,6 +871,9 @@ tasks:
     - func: "move coverage data"
     - func: "generate coverage html + text"
     - func: "upload coverage report"
+      vars:
+        format: "txt"
+        content_type: "text/plain"
     - func: "upload coverage report"
       vars:
         format: "html"
@@ -882,6 +888,9 @@ tasks:
     - func: "move coverage data"
     - func: "generate coverage html + text"
     - func: "upload coverage report"
+      vars:
+        format: "txt"
+        content_type: "text/plain"
     - func: "upload coverage report"
       vars:
         format: "html"
@@ -896,6 +905,9 @@ tasks:
     - func: "move coverage data"
     - func: "generate coverage html + text"
     - func: "upload coverage report"
+      vars:
+        format: "txt"
+        content_type: "text/plain"
     - func: "upload coverage report"
       vars:
         format: "html"
@@ -910,6 +922,9 @@ tasks:
     - func: "move coverage data"
     - func: "generate coverage html + text"
     - func: "upload coverage report"
+      vars:
+        format: "txt"
+        content_type: "text/plain"
     - func: "upload coverage report"
       vars:
         format: "html"
@@ -924,6 +939,9 @@ tasks:
     - func: "move coverage data"
     - func: "generate coverage html + text"
     - func: "upload coverage report"
+      vars:
+        format: "txt"
+        content_type: "text/plain"
     - func: "upload coverage report"
       vars:
         format: "html"
