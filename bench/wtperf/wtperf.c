@@ -620,11 +620,11 @@ op_err:			lprintf(cfg, ret, 0,
 			op = thread->workload->ops;
 
 		/*
-		 * Check throttling every 100 operations to avoid taking too
+		 * Check throttling periodically to avoid taking too
 		 * many time samples.
 		 */
 		if (thread->workload->throttle != 0 &&
-		    throttle_ops++ % 100 == 0)
+		    throttle_ops++ % THROTTLE_OPS == 0)
 			worker_throttle(thread->workload->throttle,
 			     &throttle_ops, &interval);
 	}
@@ -1300,8 +1300,8 @@ execute_populate(CONFIG *cfg)
 	msecs = ns_to_ms(WT_TIMEDIFF(stop, start));
 	lprintf(cfg, 0, 1,
 	    "Load time: %.2f\n" "load ops/sec: %" PRIu64,
-	    (double)msecs / (double)THOUSAND, 
-	    (uint64_t)((cfg->icount / msecs) / THOUSAND));
+	    (double)msecs / (double)MSEC_PER_SEC, 
+	    (uint64_t)((cfg->icount / msecs) / MSEC_PER_SEC));
 
 	/*
 	 * If configured, compact to allow LSM merging to complete.  We
@@ -2233,11 +2233,14 @@ worker_throttle(int64_t throttle, int64_t *ops, struct timespec *interval)
 	if (__wt_epoch(NULL, &now) != 0)
 		return;
 
-	/* If more than a second has passed reset the counters */
-#define	WTPERF_US_PER_SECOND	1000000
+	/* 
+	 * If we've completed enough operations, reset the counters.
+	 * If we did enough operations in less than a second, sleep for
+	 * the rest of the second.
+	 */
 	usecs_to_complete = ns_to_us(WT_TIMEDIFF(now, *interval));
-	if (usecs_to_complete < WTPERF_US_PER_SECOND)
-		(void)usleep(WTPERF_US_PER_SECOND - usecs_to_complete);
+	if (usecs_to_complete < USEC_PER_SEC)
+		(void)usleep(USEC_PER_SEC - usecs_to_complete);
 
 	*ops = 0;
 	*interval = now;
