@@ -23,28 +23,20 @@ mongo_tools_variables:
 ## List of tests to run on each buildvariant
   mongo_tools_task_lists:
     osx_108_task_list: &osx_108_tasks
-      - name: bsonutil
       - name: db
       - name: communityDist
-      - name: json
       - name: legacy
-      - name: log
       - name: unit
     rhel55_32_task_list: &rhel55_32_tasks
-      - name: bsonutil
       - name: db
       - name: communityDist
-      - name: json
       - name: legacy
-      - name: log
       - name: unit
-      - name: util
     solaris_task_list: &solaris_tasks
       - name: db
       - name: communityDist
       - name: legacy
       - name: unit
-      - name: util
     ubuntu1204_task_list: &ubuntu1204_tasks
       - name: bsonutil
       - name: db
@@ -65,14 +57,12 @@ mongo_tools_variables:
       - name: communityDist
       - name: legacy
       - name: unit
-      - name: util
     windows_64_task_list: &windows_64_tasks
       - name: db
       - name: communityDist
       - name: enterpriseDist
       - name: legacy
       - name: unit
-      - name: util
 
 
 ## Common mongodb arguments
