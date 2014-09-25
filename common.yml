@@ -27,6 +27,7 @@ mongo_tools_variables:
       - name: db
       - name: communityDist
       - name: json
+      - name: legacy
       - name: log
       - name: unit
     rhel55_32_task_list: &rhel55_32_tasks
@@ -34,12 +35,14 @@ mongo_tools_variables:
       - name: db
       - name: communityDist
       - name: json
+      - name: legacy
       - name: log
       - name: unit
       - name: util
     solaris_task_list: &solaris_tasks
       - name: db
       - name: communityDist
+      - name: legacy
       - name: unit
       - name: util
     ubuntu1204_task_list: &ubuntu1204_tasks
@@ -60,12 +63,14 @@ mongo_tools_variables:
     windows_32_task_list: &windows_32_tasks
       - name: db
       - name: communityDist
+      - name: legacy
       - name: unit
       - name: util
     windows_64_task_list: &windows_64_tasks
       - name: db
       - name: communityDist
       - name: enterpriseDist
+      - name: legacy
       - name: unit
       - name: util
 
@@ -152,7 +157,6 @@ functions:
   "kill mongod":
     command: shell.exec
     params:
-      working_dir: src
       script: |
         set -o verbose
         pkill -9 mongod || true;
@@ -422,6 +426,26 @@ tasks:
     - func: "attach tool"
       vars:
         tool: mongoimport
+    # mongooplog
+    - func: "build tool"
+      vars:
+        tool: mongooplog
+    - func: "upload tool"
+      vars:
+        tool: mongooplog
+    - func: "attach tool"
+      vars:
+        tool: mongooplog
+    # mongorestore
+    - func: "build tool"
+      vars:
+        tool: mongorestore
+    - func: "upload tool"
+      vars:
+        tool: mongorestore
+    - func: "attach tool"
+      vars:
+        tool: mongorestore
     # mongostat
     - func: "build tool"
       vars:
@@ -517,6 +541,32 @@ tasks:
       vars:
         tool: mongoimport
         edition: enterprise
+    # mongooplog
+    - func: "build tool"
+      vars:
+        tool: mongooplog
+        args: -tags 'ssl sasl'
+    - func: "upload tool"
+      vars:
+        tool: mongooplog
+        edition: enterprise
+    - func: "attach tool"
+      vars:
+        tool: mongooplog
+        edition: enterprise
+    # mongorestore
+    - func: "build tool"
+      vars:
+        tool: mongorestore
+        args: -tags 'ssl sasl'
+    - func: "upload tool"
+      vars:
+        tool: mongorestore
+        edition: enterprise
+    - func: "attach tool"
+      vars:
+        tool: mongorestore
+        edition: enterprise
     # mongostat
     - func: "build tool"
       vars:
@@ -590,11 +640,16 @@ tasks:
     - func: "fetch tool"
       vars:
         tool: mongorestore
+    - func: "fetch tool"
+      vars:
+        tool: mongooplog
+    - func: "fetch tool"
+      vars:
+        tool: mongofiles
     - command: shell.exec
       params:
         working_dir: src
         script: |
-          set -o errexit
           set -o verbose
           if [ "Windows_NT" = "$OS" ]; then
             export GOPATH=$(cygpath -w $(pwd));
@@ -606,6 +661,16 @@ tasks:
           mv src/github.com/mongodb/mongo-tools/legacy/* .
           chmod +x mongo*
           python buildscripts/smoke.py --nopreallocj --with-cleanbb --mongod ./mongod --mongo ./mongo --report-file report.json --continue-on-failure --buildlogger-builder MCI_${build_variant} --buildlogger-buildnum ${builder_num|} --buildlogger-credentials ./mci.buildlogger --buildlogger-phase ${task_name}_${execution} tool
+          echo $? > retVal
+    - command: attach.results
+      params:
+        file_location: src/report.json
+    - command: shell.exec
+      params:
+        script: |
+          set -o errexit
+          pkill mongo; pkill -9 mongod; pkill -9 mongos; pkill -f buildlogger.py; pkill -f smoke.py || true
+          exit $(cat retVal)
 
 - name: lint
   commands:
@@ -802,6 +867,7 @@ buildvariants:
 #######################################
 - name: linux-32
   display_name: Linux 32-bit
+  disabled: true
   run_on:
   - rhel55-32
   expansions:
