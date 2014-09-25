@@ -1,7 +1,7 @@
 package mongoimport
 
 import (
-	"encoding/csv"
+	"github.com/mongodb/mongo-tools/mongoimport/csv"
 	"gopkg.in/mgo.v2/bson"
 	"io"
 	"strconv"
@@ -24,6 +24,7 @@ func NewCSVImportInput(fields []string, in io.Reader) *CSVImportInput {
 	csvReader := csv.NewReader(in)
 	// allow variable number of fields in document
 	csvReader.FieldsPerRecord = -1
+	csvReader.TrimLeadingSpace = true
 	return &CSVImportInput{
 		Fields:    fields,
 		csvReader: csvReader,
