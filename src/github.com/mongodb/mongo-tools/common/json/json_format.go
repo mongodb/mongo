@@ -13,6 +13,10 @@ func (b BinData) MarshalJSON() ([]byte, error) {
 	return []byte(data), nil
 }
 
+func (js Javascript) MarshalJSON() ([]byte, error) {
+	return []byte(js.Code), nil
+}
+
 func (d Date) MarshalJSON() ([]byte, error) {
 	var data string
 	n := int64(d)

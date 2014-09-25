@@ -162,6 +162,9 @@ func ConvertBSONValueToJSON(x interface{}) (interface{}, error) {
 		inc := uint32(int64(v) & 0xffff)
 		secs := uint32((int64(v) & (0xffff << 32)) >> 32)
 		return json.Timestamp{secs, inc}, nil
+	case bson.JavaScript:
+		//TODO handle code with scope
+		return json.Javascript{v.Code, nil}, nil
 
 	default:
 		switch x {

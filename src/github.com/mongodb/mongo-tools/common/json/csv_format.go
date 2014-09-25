@@ -19,6 +19,10 @@ func (b BinData) String() string {
 	return fmt.Sprintf("%X", data) // use uppercase hexadecimal
 }
 
+func (js Javascript) String() string {
+	return js.Code
+}
+
 func (d Date) String() string {
 	if d.isFormatable() {
 		n := int64(d)

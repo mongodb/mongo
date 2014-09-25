@@ -4,6 +4,7 @@ import (
 	"encoding/csv"
 	"fmt"
 	"github.com/mongodb/mongo-tools/common/bsonutil"
+	"github.com/mongodb/mongo-tools/common/json"
 	"gopkg.in/mgo.v2/bson"
 	"io"
 	"reflect"
@@ -60,7 +61,17 @@ func (csvExporter *CSVExportOutput) ExportDocument(document bson.M) error {
 		if err != nil {
 			return nil
 		}
-		rowOut = append(rowOut, fmt.Sprintf("%s", fieldVal))
+
+		if reflect.TypeOf(fieldVal) == reflect.TypeOf(bson.M{}) || reflect.TypeOf(fieldVal) == reflect.TypeOf([]interface{}{}) {
+			buf, err := json.Marshal(fieldVal)
+			if err != nil {
+				rowOut = append(rowOut, "")
+			} else {
+				rowOut = append(rowOut, string(buf))
+			}
+		} else {
+			rowOut = append(rowOut, fmt.Sprintf("%s", fieldVal))
+		}
 	}
 	err = csvExporter.csvWriter.Write(rowOut)
 	if err != nil {

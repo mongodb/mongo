@@ -48,6 +48,11 @@ type Timestamp struct {
 	Increment uint32
 }
 
+type Javascript struct {
+	Code  string
+	Scope interface{}
+}
+
 // Represents the literal undefined.
 type Undefined struct{}
 
