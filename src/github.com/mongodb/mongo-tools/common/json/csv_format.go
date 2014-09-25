@@ -39,6 +39,10 @@ func (d DBRef) String() string {
 		d.Collection, d.Id, d.Database)
 }
 
+func (f Float) String() string {
+	return fmt.Sprintf("%v", float64(f))
+}
+
 func (_ MinKey) String() string {
 	return "$MinKey"
 }
