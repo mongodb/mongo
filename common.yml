@@ -324,6 +324,9 @@ tasks:
     - command: git.get_project
       params:
         directory: src
+    - command: git.apply_patch
+      params:
+        directory: src
     - func: "setup go env"
     - command: expansions.update
       params:
@@ -344,6 +347,9 @@ tasks:
   commands:
     - func: "kill mongod"
     - command: git.get_project
+      params:
+        directory: src
+    - command: git.apply_patch
       params:
         directory: src
     - func: "setup go env"
@@ -373,6 +379,9 @@ tasks:
   commands:
     - func: "kill mongod"
     - command: git.get_project
+      params:
+        directory: src
+    - command: git.apply_patch
       params:
         directory: src
     - func: "setup go env"
@@ -473,6 +482,9 @@ tasks:
   commands:
     - func: "kill mongod"
     - command: git.get_project
+      params:
+        directory: src
+    - command: git.apply_patch
       params:
         directory: src
     - func: "setup go env"
@@ -600,6 +612,9 @@ tasks:
     - command: git.get_project
       params:
         directory: src
+    - command: git.apply_patch
+      params:
+        directory: src
     - func: "setup go env"
     - command: expansions.update
       params:
@@ -681,6 +696,9 @@ tasks:
     - command: git.get_project
       params:
         directory: src
+    - command: git.apply_patch
+      params:
+        directory: src
     - func: "setup go env"
     - command: shell.exec
       params:
@@ -699,6 +717,9 @@ tasks:
   commands:
     - func: "kill mongod"
     - command: git.get_project
+      params:
+        directory: src
+    - command: git.apply_patch
       params:
         directory: src
     - func: "setup go env"
@@ -723,6 +744,9 @@ tasks:
     - command: git.get_project
       params:
         directory: src
+    - command: git.apply_patch
+      params:
+        directory: src
     - func: "setup go env"
     - command: expansions.update
       params:
@@ -742,6 +766,9 @@ tasks:
 - name: progress
   commands:
     - command: git.get_project
+      params:
+        directory: src
+    - command: git.apply_patch
       params:
         directory: src
     - func: "setup go env"
@@ -766,6 +793,9 @@ tasks:
     - command: git.get_project
       params:
         directory: src
+    - command: git.apply_patch
+      params:
+        directory: src
     - func: "setup go env"
     - command: expansions.update
       params:
@@ -786,6 +816,9 @@ tasks:
   commands:
     - func: "kill mongod"
     - command: git.get_project
+      params:
+        directory: src
+    - command: git.apply_patch
       params:
         directory: src
     - func: "setup go env"
@@ -817,6 +850,9 @@ tasks:
     - command: git.get_project
       params:
         directory: src
+    - command: git.apply_patch
+      params:
+        directory: src
     - func: "setup go env"
     - command: expansions.update
       params:
@@ -837,6 +873,9 @@ tasks:
   commands:
     - func: "kill mongod"
     - command: git.get_project
+      params:
+        directory: src
+    - command: git.apply_patch
       params:
         directory: src
     - func: "setup go env"
