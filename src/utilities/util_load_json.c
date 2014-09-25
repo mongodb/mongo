@@ -20,7 +20,7 @@
  * The exception is that a JSON dump cursor takes the complete
  * set of keys or values during cursor->set_key/set_value calls,
  * which may contain many tokens and span lines.  E.g.
- *   cursor->set_value("\"name\" : \"jo\", \"phone\" : 2348765");
+ *   cursor->set_value("\"name\" : \"John\", \"phone\" : 2348765");
  * The raw key/value string is collected in the kvraw field.
  */
 typedef struct {
@@ -32,7 +32,7 @@ typedef struct {
 	int toktype;		/* next token, defined by __wt_json_token() */
 	const char *tokstart;	/* next token start (points into line.mem) */
 	size_t toklen;		/* next token length */
-	char *kvraw;		/* multiline raw content collected so far */
+	char *kvraw;		/* multiple line raw content collected so far */
 	size_t kvrawstart;	/* pos on cur line that JSON key/value starts */
 	const char *filename;   /* filename for error reporting */
 	int linenum;		/* line number for error reporting */
@@ -48,14 +48,14 @@ static int json_kvraw_append(JSON_INPUT_STATE *, const char *, size_t);
 static int json_strdup(JSON_INPUT_STATE *, char **);
 static int json_top_level(WT_SESSION *, JSON_INPUT_STATE *, uint32_t);
 
-#define JSON_STRING_MATCH(ins, match)					\
+#define	JSON_STRING_MATCH(ins, match)					\
 	((ins)->toklen - 2 == strlen(match) &&				\
 	    strncmp((ins)->tokstart + 1, (match), (ins)->toklen - 2) == 0)
 
-#define JSON_INPUT_POS(ins)						\
-	((int)((ins)->p - (const char *)(ins)->line.mem))
+#define	JSON_INPUT_POS(ins)						\
+	((size_t)((ins)->p - (const char *)(ins)->line.mem))
 
-#define JSON_EXPECT(session, ins, tok) do {				\
+#define	JSON_EXPECT(session, ins, tok) do {				\
 	if (json_expect(session, ins, tok))				\
 		goto err;						\
 } while (0)
@@ -165,7 +165,8 @@ json_strdup(JSON_INPUT_STATE *ins, char **resultp)
 	WT_DECL_RET;
 	char *result, *resultcpy;
 	const char *src;
-	ssize_t resultlen, srclen;
+	ssize_t resultlen;
+	size_t srclen;
 
 	result = NULL;
 	src = ins->tokstart + 1;  /*strip "" from token */
@@ -175,13 +176,14 @@ json_strdup(JSON_INPUT_STATE *ins, char **resultp)
 		goto err;
 	}
 	resultlen += 1;
-	if ((result = (char *)malloc(resultlen)) == NULL) {
+	if ((result = (char *)malloc((size_t)resultlen)) == NULL) {
 		ret = util_err(errno, NULL);
 		goto err;
 	}
 	*resultp = result;
 	resultcpy = result;
-	if ((ret = __wt_json_strncpy(&resultcpy, resultlen, src, srclen))
+	if ((ret = __wt_json_strncpy(&resultcpy, (size_t)resultlen, src,
+	    srclen))
 	    != 0) {
 		ret = util_err(ret, NULL);
 		goto err;
@@ -211,7 +213,8 @@ json_data(WT_SESSION *session, JSON_INPUT_STATE *ins, CONFIG_LIST *clp,
 	char config[64], *endp, *uri;
 	const char *keyformat;
 	int isrec, nfield, nkeys, toktype, tret;
-	size_t gotnolen, keystrlen;
+	size_t keystrlen;
+	ssize_t gotnolen;
 	uint64_t gotno, recno;
 
 	cursor = NULL;
@@ -264,14 +267,15 @@ json_data(WT_SESSION *session, JSON_INPUT_STATE *ins, CONFIG_LIST *clp,
 				recno++;
 				gotno = __wt_strtouq(ins->tokstart, &endp, 0);
 				gotnolen = (endp - ins->tokstart);
-				if (recno != gotno || ins->toklen != gotnolen) {
+				if (recno != gotno ||
+				    ins->toklen != (size_t)gotnolen) {
 					ret = util_err(0,
 					    "%s: recno out of order", uri);
 					goto err;
 				}
 			}
 			if (++nfield == nkeys) {
-				int curpos = JSON_INPUT_POS(ins);
+				size_t curpos = JSON_INPUT_POS(ins);
 				if ((ret = json_kvraw_append(ins,
 				    (char *)(ins)->line.mem + (ins)->kvrawstart,
 				    curpos - (ins)->kvrawstart)) != 0)
@@ -423,7 +427,7 @@ err:		if (ret == 0)
 /*
  * json_peek --
  *	Set the input state to the next available token in the input
- *	and return its tokentype, a code defined by __wt_json_token().
+ *	and return its token type, a code defined by __wt_json_token().
  */
 static int
 json_peek(WT_SESSION *session, JSON_INPUT_STATE *ins)
@@ -485,7 +489,7 @@ json_expect(WT_SESSION *session, JSON_INPUT_STATE *ins, int wanttok)
 	ins->peeking = 0;
 	if (ins->toktype != wanttok) {
 		fprintf(stderr,
-		    "%s: %d: %d: expected %s, got %s\n",
+		    "%s: %d: %ld: expected %s, got %s\n",
 		    ins->filename,
 		    ins->linenum,
 		    JSON_INPUT_POS(ins) + 1,
@@ -495,7 +499,6 @@ json_expect(WT_SESSION *session, JSON_INPUT_STATE *ins, int wanttok)
 	}
 	return (0);
 }
-
 
 /*
  * json_skip --
@@ -535,7 +538,6 @@ out:
 	(void)json_peek(session, ins);
 	return (0);
 }
-
 
 /*
  * load_json --

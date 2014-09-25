@@ -24,7 +24,7 @@ int	 config_reorder(char **);
 int	 config_update(WT_SESSION *, char **);
 
 /* Flags for util_load_json */
-#define LOAD_JSON_APPEND	0x0001	/* append (ignore record number keys) */
-#define LOAD_JSON_NO_OVERWRITE	0x0002	/* don't overwrite existing data */
+#define	LOAD_JSON_APPEND	0x0001	/* append (ignore record number keys) */
+#define	LOAD_JSON_NO_OVERWRITE	0x0002	/* don't overwrite existing data */
 
 int	 util_load_json(WT_SESSION *, const char *, uint32_t);

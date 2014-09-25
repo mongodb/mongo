@@ -413,7 +413,7 @@ __wt_json_column_init(WT_CURSOR *cursor, const char *keyformat,
 	return (0);
 }
 
-#define MATCH_KEYWORD(session, in, result, keyword, matchval) 	do {	\
+#define	MATCH_KEYWORD(session, in, result, keyword, matchval) 	do {	\
 	size_t _kwlen = strlen(keyword);				\
 	if (strncmp(in, keyword, _kwlen) == 0 && !isalnum(in[_kwlen])) { \
 		in += _kwlen;						\
@@ -468,7 +468,7 @@ __wt_json_token(WT_SESSION *wt_session, const char *src, int *toktype,
 	if (*src == '\0') {
 		*toktype = 0;
 		*toklen = 0;
-		return 0;
+		return (0);
 	}
 
 	/* JSON is specified in RFC 4627. */
@@ -689,7 +689,7 @@ json_uint_arg(WT_SESSION_IMPL *session, const char **jstr, uint64_t *up)
 	return (0);
 }
 
-#define JSON_EXPECT_TOKEN_GET(session, jstr, tokval, start, sz) do {	\
+#define	JSON_EXPECT_TOKEN_GET(session, jstr, tokval, start, sz) do {	\
     int __tok;								\
     WT_RET(__wt_json_token((WT_SESSION *)session, jstr, &__tok, &start, &sz));\
     if (__tok != tokval) {						\
@@ -700,7 +700,7 @@ json_uint_arg(WT_SESSION_IMPL *session, const char **jstr, uint64_t *up)
     jstr = start + sz;							\
 } while (0)
 
-#define JSON_EXPECT_TOKEN(session, jstr, tokval) do {			\
+#define	JSON_EXPECT_TOKEN(session, jstr, tokval) do {			\
     const char *__start;						\
     size_t __sz;							\
     JSON_EXPECT_TOKEN_GET(session, jstr, tokval, __start, __sz);	\
@@ -896,20 +896,20 @@ __wt_json_strncpy(char **pdst, size_t dstlen, const char *src, size_t srclen)
 					/* byte 0: 1110HHHH */
 					/* byte 1: 10HHHHLL */
 					/* byte 2: 10LLLLLL */
-					*dst++ = 0xe0 |
-					    ((hi << 4) & 0x0f);
-					*dst++ = 0x80 |
+					*dst++ = (char)(0xe0 |
+					    ((hi << 4) & 0x0f));
+					*dst++ = (char)(0x80 |
 					    ((hi << 2) & 0x3c) |
-					    ((lo >> 6) & 0x03);
-					*dst++ = 0x80 | (lo & 0x3f);
+					    ((lo >> 6) & 0x03));
+					*dst++ = (char)(0x80 | (lo & 0x3f));
 				} else if (hi != 0 || lo >= 0x80) {
 					/* 2 bytes total */
 					/* byte 0: 110HHHLL */
 					/* byte 1: 10LLLLLL */
-					*dst++ = 0xc0 |
+					*dst++ = (char)(0xc0 |
 					    (hi << 2) |
-					    ((lo >> 6) & 0x03);
-					*dst++ = 0x80 | (lo & 0x3f);
+					    ((lo >> 6) & 0x03));
+					*dst++ = (char)(0x80 | (lo & 0x3f));
 				} else
 					/* else 1 byte total */
 					/* byte 0: 0LLLLLLL */

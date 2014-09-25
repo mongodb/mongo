@@ -63,6 +63,7 @@ Comparator
 Config
 CustomersPhone
 DATAITEMs
+DECL
 DESC
 DHANDLE
 DNE
@@ -113,6 +114,9 @@ Gcc
 Geoff
 Givargis
 Google
+HHHH
+HHHHLL
+HHHLL
 IEC
 IEEE
 IFF
@@ -141,6 +145,8 @@ Kanowski's
 Kounavis
 LEX
 LF
+LLLLLL
+LLLLLLL
 LNO
 LOGREC
 LOGSCAN
@@ -193,6 +199,8 @@ PADDR
 PAGE's
 PARAM
 POSIX
+PRIu
+PRIu64
 PSIZE
 PTHREAD
 PTR
@@ -461,6 +469,7 @@ ds
 dsk
 dsrc
 dst
+dstlen
 dsync
 dt
 dtype
@@ -516,6 +525,7 @@ fillms
 firstfit
 fixup
 flcs
+floatnum
 fmt
 fmterr
 fnv
@@ -588,12 +598,14 @@ insertK
 insertV
 instantiation
 intl
+intnum
 intpack
 ints
 inuse
 io
 ip
 ispo
+jnr
 jrx
 json
 kb
@@ -603,10 +615,13 @@ keygen
 keyname
 keyv
 kv
+kvraw
 kvs
 kvsbdb
 lang
 latencies
+lbrace
+lbracket
 ld
 len
 lenp
@@ -739,6 +754,7 @@ os
 ovfl
 ownp
 packv
+parens
 parserp
 patchp
 pathname
@@ -760,6 +776,7 @@ primary's
 printf
 printlog
 priv
+progname
 ps
 pse
 psp
@@ -777,6 +794,8 @@ qsort
 quartile
 qup
 rS
+rbrace
+rbracket
 rdlock
 rduppo
 readlock
@@ -869,6 +888,7 @@ strerror
 strftime
 strget
 stringin
+strlen
 strncmp
 strncpy
 strndup
@@ -912,6 +932,11 @@ tinsert
 tlist
 tload
 tmp
+tokenizer
+toklen
+tokname
+tokstart
+toktype
 toffpage
 toverflow
 tparent
@@ -971,6 +996,7 @@ unpackv
 unreferenced
 unregister
 unsized
+unterminated
 untyped
 upd
 update's
