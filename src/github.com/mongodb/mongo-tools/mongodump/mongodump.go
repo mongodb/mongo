@@ -53,6 +53,14 @@ func (dump *MongoDump) ValidateOptions() error {
 		return fmt.Errorf("cannot specify a collection when running with dumpDbUsersAndRoles") //TODO: why?
 	case dump.OutputOptions.Oplog && dump.ToolOptions.DB != "":
 		return fmt.Errorf("--oplog mode only supported on full dumps")
+	case len(dump.OutputOptions.ExcludedCollections) > 0 && dump.ToolOptions.Collection != "":
+		return fmt.Errorf("--collection is not allowed when --excludeCollection is specified")
+	case len(dump.OutputOptions.ExcludedCollectionPrefixes) > 0 && dump.ToolOptions.Collection != "":
+		return fmt.Errorf("--collection is not allowed when --excludeCollectionsWithPrefix is specified")
+	case len(dump.OutputOptions.ExcludedCollections) > 0 && dump.ToolOptions.DB == "":
+		return fmt.Errorf("--db is required when --excludeCollection is specified")
+	case len(dump.OutputOptions.ExcludedCollectionPrefixes) > 0 && dump.ToolOptions.DB == "":
+		return fmt.Errorf("--db is required when --excludeCollectionsWithPrefix is specified")
 	}
 	return nil
 }
@@ -235,6 +243,20 @@ func (dump *MongoDump) DumpEverything() error {
 	return nil
 }
 
+func (dump *MongoDump) skipCollection(colName string) bool {
+	for _, excludedCollection := range dump.OutputOptions.ExcludedCollections {
+		if colName == excludedCollection {
+			return true
+		}
+	}
+	for _, excludedCollectionPrefix := range dump.OutputOptions.ExcludedCollectionPrefixes {
+		if strings.HasPrefix(colName, excludedCollectionPrefix) {
+			return true
+		}
+	}
+	return false
+}
+
 // DumpDatabase dumps the specified database
 func (dump *MongoDump) DumpDatabase(db string) error {
 	cols, err := dump.cmdRunner.CollectionNames(db)
@@ -243,6 +265,10 @@ func (dump *MongoDump) DumpDatabase(db string) error {
 	}
 	log.Logf(2, "found collections: %v", strings.Join(cols, ", "))
 	for _, col := range cols {
+		if dump.skipCollection(col) {
+			log.Logf(2, "skipping %v, it is excluded", col)
+			continue
+		}
 		err = dump.DumpCollection(db, col)
 		if err != nil {
 			return err
