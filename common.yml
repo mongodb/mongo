@@ -49,7 +49,7 @@ mongo_tools_variables:
       - name: pool
       - name: progress
       - name: text
-      - name: unit
+      - name: unit-coverage
       - name: util
       - name: vet
     windows_32_task_list: &windows_32_tasks
@@ -143,13 +143,6 @@ functions:
     params:
       key: "${build_variant}_tools"
       destination: "builder_num"
-
-  "kill mongod":
-    command: shell.exec
-    params:
-      script: |
-        set -o verbose
-        pkill -9 mongod || true;
 
   "move coverage data":
     command: shell.exec
@@ -267,6 +260,14 @@ pre:
           remote_key: "slave"
         - local_key: "passwd"
           remote_key: "passwd"
+  - command: shell.exec
+    params:
+      script: |
+        set -o verbose
+        rm -rf src || true
+        ${killall_mci|pkill -9 mongo; pkill -9 mongodump; pkill -9 mongoexport; pkill -9 mongoimport; pkill -9 mongofiles; pkill -9 mongooplog; pkill -9 mongorestore; pkill -9 mongostat; pkill -9 mongotop; pkill -9 mongod; pkill -9 mongos; pkill -f buildlogger.py; pkill -f smoke.py}
+        rm -rf /data/db/*
+        true
 
 tasks:
 #- name: auth
@@ -316,7 +317,6 @@ tasks:
 #
 - name: bsonutil
   commands:
-    - func: "kill mongod"
     - command: git.get_project
       params:
         directory: src
@@ -339,41 +339,10 @@ tasks:
         content_type: "text/html"
     - func: "attach coverage reports"
 
-- name: db
-  commands:
-    - func: "kill mongod"
-    - command: git.get_project
-      params:
-        directory: src
-    - command: git.apply_patch
-      params:
-        directory: src
-    - func: "setup go env"
-    - command: expansions.update
-      params:
-        updates:
-          - key: "package"
-            value: "common/db"
-          - key: "args"
-            value: "-test.types=db"
-    - func: "download mongod"
-    - func: "start mongod"
-    - func: "run unit test"
-    - func: "kill mongod"
-    - func: "move coverage data"
-    - func: "generate coverage html + text"
-    - func: "upload coverage report"
-    - func: "upload coverage report"
-      vars:
-        format: "html"
-        content_type: "text/html"
-    - func: "attach coverage reports"
-
 - name: communityDist
   depends_on:
   # - name: "unit"
   commands:
-    - func: "kill mongod"
     - command: git.get_project
       params:
         directory: src
@@ -472,11 +441,39 @@ tasks:
       vars:
         tool: mongotop
 
+- name: db
+  commands:
+    - command: git.get_project
+      params:
+        directory: src
+    - command: git.apply_patch
+      params:
+        directory: src
+    - func: "setup go env"
+    - command: expansions.update
+      params:
+        updates:
+          - key: "package"
+            value: "common/db"
+          - key: "args"
+            value: "-test.types=db"
+    - func: "download mongod"
+    - func: "start mongod"
+    - func: "run unit test"
+    - func: "kill mongod"
+    - func: "move coverage data"
+    - func: "generate coverage html + text"
+    - func: "upload coverage report"
+    - func: "upload coverage report"
+      vars:
+        format: "html"
+        content_type: "text/html"
+    - func: "attach coverage reports"
+
 - name: enterpriseDist
   depends_on:
   - name: "unit"
   commands:
-    - func: "kill mongod"
     - command: git.get_project
       params:
         directory: src
@@ -604,7 +601,6 @@ tasks:
 
 - name: json
   commands:
-    - func: "kill mongod"
     - command: git.get_project
       params:
         directory: src
@@ -631,7 +627,6 @@ tasks:
   depends_on:
   - name: communityDist
   commands:
-    - func: "kill mongod"
     - command: git.get_project
       params:
         directory: src
@@ -681,7 +676,7 @@ tasks:
       params:
         script: |
           set -o errexit
-          pkill mongo; pkill -9 mongod; pkill -9 mongos; pkill -f buildlogger.py; pkill -f smoke.py || true
+          ${killall_mci|pkill -9 mongo; pkill -9 mongodump; pkill -9 mongoexport; pkill -9 mongoimport; pkill -9 mongofiles; pkill -9 mongooplog; pkill -9 mongorestore; pkill -9 mongostat; pkill -9 mongotop; pkill -9 mongod; pkill -9 mongos; pkill -f buildlogger.py; pkill -f smoke.py}
           exit $(cat retVal)
 
 - name: lint
@@ -826,6 +821,27 @@ tasks:
     - func: "start mongod"
     - func: "run tool tests"
     - func: "kill mongod"
+
+- name: unit-coverage
+  commands:
+    - func: "kill mongod"
+    - command: git.get_project
+      params:
+        directory: src
+    - command: git.apply_patch
+      params:
+        directory: src
+    - func: "setup go env"
+    - func: "download mongod"
+    - command: shell.exec
+      params:
+        working_dir: src
+        script: |
+          set -o verbose
+          cp ./mongodb/mongoshim${extension} src/github.com/mongodb/mongo-tools/mongofiles
+    - func: "start mongod"
+    - func: "run tool tests"
+    - func: "kill mongod"
     - command: expansions.update
       params:
         updates:
@@ -839,6 +855,7 @@ tasks:
         format: "html"
         content_type: "text/html"
     - func: "attach coverage reports"
+
     - command: expansions.update
       params:
         updates:
@@ -852,6 +869,7 @@ tasks:
         format: "html"
         content_type: "text/html"
     - func: "attach coverage reports"
+
     - command: expansions.update
       params:
         updates:
@@ -865,6 +883,7 @@ tasks:
         format: "html"
         content_type: "text/html"
     - func: "attach coverage reports"
+
     - command: expansions.update
       params:
         updates:
@@ -878,7 +897,7 @@ tasks:
         format: "html"
         content_type: "text/html"
     - func: "attach coverage reports"
-    - func: "attach coverage reports"
+
     - command: expansions.update
       params:
         updates:
@@ -892,6 +911,7 @@ tasks:
         format: "html"
         content_type: "text/html"
     - func: "attach coverage reports"
+
     - command: expansions.update
       params:
         updates:
