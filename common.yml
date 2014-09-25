@@ -179,11 +179,18 @@ functions:
     params:
       working_dir: src
       tests:
+        # TODO bsondump needs tests
+        # TODO mongodump needs tests
+        # TODO mongotop needs tests
         - dir: src/github.com/mongodb/mongo-tools/mongoimport
           args: ${coverage_args} ${args}
         - dir: src/github.com/mongodb/mongo-tools/mongoexport
           args: ${coverage_args} ${args}
         - dir: src/github.com/mongodb/mongo-tools/mongostat
+          args: ${coverage_args} ${args}
+        - dir: src/github.com/mongodb/mongo-tools/mongooplog
+          args: ${coverage_args} ${args}
+        - dir: src/github.com/mongodb/mongo-tools/mongorestore
           args: ${coverage_args} ${args}
         - dir: src/github.com/mongodb/mongo-tools/mongofiles
           args: ${coverage_args} ${args} 2>&1 > /dev/null; MONGOSHIM=./mongoshim go test -v ${coverage_args} ${args}
@@ -810,23 +817,20 @@ tasks:
         directory: src
     - func: "setup go env"
     - func: "download mongod"
-    # mongoimport
-    - command: expansions.update
-      params:
-        updates:
-          - key: "package"
-            value: "mongoimport"
     - command: shell.exec
       params:
         working_dir: src
         script: |
           set -o verbose
-          cp ./mongodb/mongoshim${extension} src/github.com/mongodb/mongo-tools/mongoimport
-          cp ./mongodb/mongoshim${extension} src/github.com/mongodb/mongo-tools/mongoexport
           cp ./mongodb/mongoshim${extension} src/github.com/mongodb/mongo-tools/mongofiles
     - func: "start mongod"
     - func: "run tool tests"
     - func: "kill mongod"
+    - command: expansions.update
+      params:
+        updates:
+          - key: "package"
+            value: "mongoimport"
     - func: "move coverage data"
     - func: "generate coverage html + text"
     - func: "upload coverage report"
@@ -835,9 +839,85 @@ tasks:
         format: "html"
         content_type: "text/html"
     - func: "attach coverage reports"
-    # TODO bsondump needs tests
-    # TODO mongodump needs tests
-    # TODO mongotop needs tests
+    - command: expansions.update
+      params:
+        updates:
+          - key: "package"
+            value: "mongoexport"
+    - func: "move coverage data"
+    - func: "generate coverage html + text"
+    - func: "upload coverage report"
+    - func: "upload coverage report"
+      vars:
+        format: "html"
+        content_type: "text/html"
+    - func: "attach coverage reports"
+    - command: expansions.update
+      params:
+        updates:
+          - key: "package"
+            value: "mongostat"
+    - func: "move coverage data"
+    - func: "generate coverage html + text"
+    - func: "upload coverage report"
+    - func: "upload coverage report"
+      vars:
+        format: "html"
+        content_type: "text/html"
+    - func: "attach coverage reports"
+    - command: expansions.update
+      params:
+        updates:
+          - key: "package"
+            value: "mongooplog"
+    - func: "move coverage data"
+    - func: "generate coverage html + text"
+    - func: "upload coverage report"
+    - func: "upload coverage report"
+      vars:
+        format: "html"
+        content_type: "text/html"
+    - func: "attach coverage reports"
+    - command: expansions.update
+      params:
+        updates:
+          - key: "package"
+            value: "mongooplog"
+    - func: "move coverage data"
+    - func: "generate coverage html + text"
+    - func: "upload coverage report"
+    - func: "upload coverage report"
+      vars:
+        format: "html"
+        content_type: "text/html"
+    - func: "attach coverage reports"
+    - func: "attach coverage reports"
+    - command: expansions.update
+      params:
+        updates:
+          - key: "package"
+            value: "mongorestore"
+    - func: "move coverage data"
+    - func: "generate coverage html + text"
+    - func: "upload coverage report"
+    - func: "upload coverage report"
+      vars:
+        format: "html"
+        content_type: "text/html"
+    - func: "attach coverage reports"
+    - command: expansions.update
+      params:
+        updates:
+          - key: "package"
+            value: "mongofiles"
+    - func: "move coverage data"
+    - func: "generate coverage html + text"
+    - func: "upload coverage report"
+    - func: "upload coverage report"
+      vars:
+        format: "html"
+        content_type: "text/html"
+    - func: "attach coverage reports"
 
 - name: util
   commands:
