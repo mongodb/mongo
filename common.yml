@@ -184,6 +184,16 @@ functions:
         - dir: src/github.com/mongodb/mongo-tools/${package}
           args: ${coverage_args} ${args}
 
+  "setup integration test":
+    command: shell.exec
+    params:
+      working_dir: src
+      script: |
+        if [ '${run_kinit}' = 'true' ]
+        then
+          echo "${kerberos_password}" | kinit -p drivers@LDAPTEST.10GEN.CC;
+        fi
+
   "run tool tests":
     command: gotest.run
     params:
@@ -270,6 +280,8 @@ pre:
           remote_key: "slave"
         - local_key: "passwd"
           remote_key: "passwd"
+        - local_key: "kerberos_password"
+          remote_key: "kerberos_password"
 
 tasks:
 #- name: auth
@@ -361,6 +373,7 @@ tasks:
             value: "-test.types=db"
     - func: "download mongod"
     - func: "start mongod"
+    - func: "setup integration test"
     - func: "run unit test"
     - func: "kill mongod"
     - func: "move coverage data"
@@ -919,6 +932,10 @@ buildvariants:
     <<: *mongodb_default_startup_args
   tasks: *rhel55_32_tasks
 
+#######################################
+#          Ubuntu Buildvariants       #
+#######################################
+
 - name: ubuntu
   display_name: Linux 64-bit
   run_on:
@@ -928,6 +945,18 @@ buildvariants:
     <<: *mongodb_default_startup_args
     coverage: true
     coverage_args: "-coverprofile=coverage.out"
+  tasks: *ubuntu1204_tasks
+- name: ubuntu-kerberos
+  display_name: Linux 64-bit Kerberos
+  run_on:
+  - ubuntu1204-test
+  expansions:
+    <<: *mongo_url_ubuntu1204
+    <<: *mongodb_default_startup_args
+    coverage: true
+    coverage_args: "-coverprofile=coverage.out"
+    args: "-tags sasl"
+    run_kinit: true
   tasks: *ubuntu1204_tasks
 
 #######################################
