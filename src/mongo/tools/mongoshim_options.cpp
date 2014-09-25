@@ -94,6 +94,12 @@ namespace mongo {
         options->addOptionChaining("query", "query,q", moe::String,
                 "query filter, as a JSON string, e.g., '{x:{$gt:1}}'");
 
+        options->addOptionChaining("repair", "repair", moe::Switch,
+                "try to recover a crashed collection")
+                                  .incompatibleWith("applyOps")
+                                  .incompatibleWith("load")
+                                  .incompatibleWith("remove");
+
         options->addOptionChaining("slaveOk", "slaveOk,k", moe::Bool,
                 "use secondaries for export if available, default true")
                                   .setDefault(moe::Value(true));
@@ -157,6 +163,7 @@ namespace mongo {
         mongoShimGlobalParams.load = params.count("load") > 0;
         mongoShimGlobalParams.remove = params.count("remove") > 0;
         mongoShimGlobalParams.applyOps = params.count("applyOps") > 0;
+        mongoShimGlobalParams.repair = params.count("repair") > 0;
 
         mongoShimGlobalParams.drop = params.count("drop") > 0;
         mongoShimGlobalParams.upsert = params.count("upsert") > 0;

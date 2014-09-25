@@ -50,6 +50,10 @@ namespace mongo {
         // If true, read oplog entries from stdin to use as input to "applyOps" command.
         bool applyOps;
 
+        // If true, attempts to repair bad data in collection.
+        // Also writes contents of collection to output.
+        bool repair;
+
         bool drop;
         bool upsert;
         std::vector<std::string> upsertFields;

@@ -28,12 +28,21 @@
 *    then also delete it in the license file.
 */
 
+#include <boost/scoped_ptr.hpp>
+
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/client/dbclientcursor.h"
+#include "mongo/db/catalog/collection.h"
+#include "mongo/db/catalog/database.h"
+#include "mongo/db/catalog/database_holder.h"
+#include "mongo/db/client.h"
 #include "mongo/db/json.h"
+#include "mongo/db/operation_context_impl.h"
+#include "mongo/db/storage/record_store.h"
 #include "mongo/tools/mongoshim_options.h"
 #include "mongo/tools/tool.h"
 #include "mongo/tools/tool_logger.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/options_parser/option_section.h"
 
 using std::string;
@@ -124,6 +133,11 @@ public:
             bool justOne = false;
             conn().remove(_ns, mongoShimGlobalParams.query, justOne);
         }
+        else if (mongoShimGlobalParams.repair) {
+            // Repairs collection before writing documents to output.
+            ostream *out = &cout;
+            _repair(*out);
+        }
         else {
             ostream *out = &cout;
 
@@ -155,6 +169,68 @@ public:
     }
 
 private:
+    /**
+     * Writes valid objects in collection to output.
+     */
+    void _repair(std::ostream& out) {
+        toolInfoLog() << "going to try to recover data from: " << _ns << std::endl;
+        OperationContextImpl txn;
+        Client::WriteContext cx(&txn, toolGlobalParams.db);
+
+        Database* db = dbHolder().get(&txn, toolGlobalParams.db);
+        Collection* collection = db->getCollection(&txn, _ns);
+
+        if (!collection) {
+            toolError() << "Collection does not exist: " << toolGlobalParams.coll << std::endl;
+            return;
+        }
+
+        toolInfoLog() << "nrecords: " << collection->numRecords(&txn)
+                      << " datasize: " << collection->dataSize(&txn);
+        try {
+            boost::scoped_ptr<RecordIterator> iter(
+                collection->getRecordStore()->getIteratorForRepair(&txn));
+            for (DiskLoc currLoc = iter->getNext(); !currLoc.isNull(); currLoc = iter->getNext()) {
+                if (logger::globalLogDomain()->shouldLog(logger::LogSeverity::Debug(1))) {
+                    toolInfoLog() << currLoc;
+                }
+
+                BSONObj obj;
+                try {
+                    obj = collection->docFor(&txn, currLoc);
+
+                    // If this is a corrupted object, just skip it, but do not abort the scan
+                    //
+                    if (!obj.valid()) {
+                        continue;
+                    }
+
+                    if (logger::globalLogDomain()->shouldLog(logger::LogSeverity::Debug(1))) {
+                        toolInfoLog() << obj;
+                    }
+
+                    // Write valid object to output stream.
+                    out.write(obj.objdata(), obj.objsize());
+                }
+                catch (std::exception& ex) {
+                    toolError() << "found invalid document @ " << currLoc << " " << ex.what();
+                    if ( ! obj.isEmpty() ) {
+                        try {
+                            toolError() << "first element: " << obj.firstElement();
+                        }
+                        catch ( std::exception& ) {
+                            toolError() << "unable to log invalid document @ " << currLoc;
+                        }
+                    }
+                }
+            }
+        }
+        catch (DBException& e) {
+            toolError() << "ERROR recovering: " << _ns << " " << e.toString();
+        }
+        cx.commit();
+    }
+
     string _ns;
 };
 
