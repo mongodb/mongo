@@ -263,9 +263,10 @@ __lsm_manager_worker_setup(WT_SESSION_IMPL *session)
 		 * Only allow half of the threads to run merges to avoid all
 		 * all workers getting stuck in long-running merge operations.
 		 * Make sure the first worker is allowed, so that there is at
-		 * least one thread capable of running merges.
+		 * least one thread capable of running merges.  We know the
+		 * first worker is id 2, so set merges on even numbered workers.
 		 */
-		if (manager->lsm_workers % 2 == 1)
+		if (manager->lsm_workers % 2 == 0)
 			FLD_SET(worker_args->type, WT_LSM_WORK_MERGE);
 		WT_RET(__wt_lsm_worker_start(session, worker_args));
 	}
