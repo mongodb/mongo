@@ -11,6 +11,7 @@ import (
 	"gopkg.in/mgo.v2/bson"
 	"io"
 	"os"
+	"path/filepath"
 	// 	"reflect"
 	// 	"strconv"
 	"strings"
@@ -89,7 +90,14 @@ func (exp *MongoExport) ValidateSettings() error {
 //specified in the options.
 func (exp *MongoExport) getOutputWriter() (io.WriteCloser, error) {
 	if exp.OutputOpts.OutputFile != "" {
-		//TODO do we care if the file exists already? Overwrite it, or fail?
+		//If the directory in which the output file is to be
+		//written does not exist, create it
+		fileDir := filepath.Dir(exp.OutputOpts.OutputFile)
+		err := os.MkdirAll(fileDir, 0750)
+		if err != nil {
+			return nil, err
+		}
+
 		file, err := os.Create(exp.OutputOpts.OutputFile)
 		if err != nil {
 			return nil, err
