@@ -118,13 +118,13 @@ type ApplyOpsResponse struct {
 
 // TODO: move this to common / merge with the one in mongodump
 type OplogEntry struct {
-	Timestamp bson.MongoTimestamp `bson:"ts"`
-	HistoryID int64               `bson:"h"`
-	Version   int                 `bson:"v"`
-	Operation string              `bson:"op"`
-	Namespace string              `bson:"ns"`
-	Object    bson.M              `bson:"o"`
-	Query     bson.M              `bson:"o2"`
+	Timestamp bson.MongoTimestamp `bson:"ts" json:"ts"`
+	HistoryID int64               `bson:"h" json:"h"`
+	Version   int                 `bson:"v" json:"v"`
+	Operation string              `bson:"op" json:"op"`
+	Namespace string              `bson:"ns" json:"ns"`
+	Object    bson.M              `bson:"o" json:"o"`
+	Query     bson.M              `bson:"o2" json:"o2"`
 }
 
 // get the tailing cursor for the oplog collection, based on the options
