@@ -196,7 +196,7 @@ functions:
         - dir: src/github.com/mongodb/mongo-tools/mongostat
           args: ${coverage_args} ${args}
         - dir: src/github.com/mongodb/mongo-tools/mongofiles
-          args: ${coverage_args} ${args}
+          args: ${coverage_args} ${args} 2>&1 > /dev/null; MONGOSHIM=./mongoshim go test -v ${coverage_args} ${args}
 
   "setup credentials" :
     command: shell.exec
@@ -670,12 +670,6 @@ tasks:
       params:
         working_dir: src
         script: |
-          set -o verbose
-          if [ "Windows_NT" = "$OS" ]; then
-            export GOPATH=$(cygpath -w $(pwd));
-          else
-            export GOPATH=`pwd`;
-          fi;
           mv ./mongodb/mongod${extension} .
           mv ./mongodb/mongo${extension} .
           mv ./mongodb/mongoshim${extension} .
@@ -832,6 +826,14 @@ tasks:
         updates:
           - key: "package"
             value: "mongoimport"
+    - command: shell.exec
+      params:
+        working_dir: src
+        script: |
+          set -o verbose
+          cp ./mongodb/mongoshim${extension} src/github.com/mongodb/mongo-tools/mongoimport
+          cp ./mongodb/mongoshim${extension} src/github.com/mongodb/mongo-tools/mongoexport
+          cp ./mongodb/mongoshim${extension} src/github.com/mongodb/mongo-tools/mongofiles
     - func: "start mongod"
     - func: "run tool tests"
     - func: "kill mongod"
