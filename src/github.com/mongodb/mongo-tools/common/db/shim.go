@@ -360,10 +360,6 @@ func LocateShim() (string, error) {
 		}
 	}
 
-	if shimLoc == "" {
-		return "", ErrShimNotFound
-	}
-
 	exists, err := checkExists(shimLoc)
 	if err != nil {
 		return "", err
