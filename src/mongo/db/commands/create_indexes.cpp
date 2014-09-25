@@ -134,7 +134,7 @@ namespace mongo {
 
             // now we know we have to create index(es)
             // Note: createIndexes command does not currently respect shard versioning.
-            Lock::DBWrite lk(txn->lockState(), ns.ns());
+            Lock::DBLock lk(txn->lockState(), dbname, newlm::MODE_X);
             Client::Context ctx(txn, ns.ns(), false /* doVersion */ );
             Database* db = ctx.db();
 

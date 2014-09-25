@@ -97,7 +97,7 @@ namespace mongo {
                 return false;
             }
 
-            Lock::DBWrite dbXLock(txn->lockState(), dbname);
+            Lock::DBLock dbXLock(txn->lockState(), dbname, newlm::MODE_X);
             Client::Context ctx(txn, ns);
             
             return runNoDirectClient( txn, ns , 
@@ -137,7 +137,7 @@ namespace mongo {
                                       BSONObjBuilder& result,
                                       string& errmsg) {
 
-            Lock::DBWrite lk(txn->lockState(), ns);
+            Lock::DBLock lk(txn->lockState(), nsToDatabaseSubstring(ns), newlm::MODE_X);
             WriteUnitOfWork wunit(txn);
             Client::Context cx(txn, ns);
             
@@ -335,7 +335,7 @@ namespace mongo {
                 }
             }
 
-            Lock::DBWrite dbXLock(txn->lockState(), dbname);
+            Lock::DBLock dbXLock(txn->lockState(), dbname, newlm::MODE_X);
             WriteUnitOfWork wunit(txn);
             Client::Context ctx(txn, ns);
 

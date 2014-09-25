@@ -621,7 +621,7 @@ namespace mongo {
         UpdateExecutor executor(&request, &op.debug());
         uassertStatusOK(executor.prepare());
 
-        Lock::DBWrite lk(txn->lockState(), ns.ns());
+        Lock::DBLock lk(txn->lockState(), ns.db(), newlm::MODE_X);
         Client::Context ctx(txn,  ns );
 
         UpdateResult res = executor.execute(ctx.db());
@@ -655,7 +655,7 @@ namespace mongo {
         DeleteExecutor executor(&request);
         uassertStatusOK(executor.prepare());
 
-        Lock::DBWrite lk(txn->lockState(), ns.ns());
+        Lock::DBLock lk(txn->lockState(), ns.db(), newlm::MODE_X);
         Client::Context ctx(txn, ns);
 
         long long n = executor.execute(ctx.db());
@@ -914,7 +914,7 @@ namespace mongo {
             uassertStatusOK(status);
         }
 
-        Lock::DBWrite lk(txn->lockState(), ns);
+        Lock::DBLock lk(txn->lockState(), nsString.db(), newlm::MODE_X);
 
         // CONCURRENCY TODO: is being read locked in big log sufficient here?
         // writelock is used to synchronize stepdowns w/ writes
