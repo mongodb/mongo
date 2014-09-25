@@ -597,8 +597,12 @@ tasks:
           else
             export GOPATH=`pwd`;
           fi;
-          mv ./mongodb/mongo* .
+          ls -al
+          mv ./mongodb/mongod .
+          mv ./mongodb/mongo .
+          ls -al
           mv src/github.com/mongodb/mongo-tools/legacy/* .
+          ls -al
           python smoke.py --nopreallocj --with-cleanbb --mongod ./mongod --mongo ./mongo --report-file report.json ${test_flags|} --buildlogger-builder MCI_${build_variant} --buildlogger-buildnum ${builder_num|} --buildlogger-credentials ./mci.buildlogger --buildlogger-phase ${task_name}_${execution} tool
 
 - name: lint
