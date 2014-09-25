@@ -12,8 +12,6 @@ import (
 	"time"
 )
 
-
-
 const ProgressBarLength = 24
 
 func (restore *MongoRestore) RestoreIntents() error {
@@ -59,13 +57,14 @@ func (restore *MongoRestore) RestoreIntent(intent *Intent) error {
 
 	//first create collection with options
 	if intent.MetadataPath != "" {
+		log.Logf(0, "reading metadata file from %v", intent.MetadataPath)
 		jsonBytes, err := ioutil.ReadFile(intent.MetadataPath)
 		if err != nil {
 			return fmt.Errorf("error reading metadata file: %v", err) //TODO better errors here
 		}
 		options, indexes, err = MetadataFromJSON(jsonBytes)
 		if err != nil {
-			return fmt.Errorf("error parsing metadata file: %v", err)
+			return fmt.Errorf("error parsing metadata file (%v): %v", string(jsonBytes), err)
 		}
 		if options != nil {
 			if collectionExists {
