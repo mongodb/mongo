@@ -141,7 +141,6 @@ func (shim *Shim) OpenInsertStream(DB, Collection string) (DocSink, error) {
 	return &EncodedBSONSink{writer, writerShim}, nil
 }
 
-
 func (shim *Shim) Remove(DB, Collection string, Query interface{}) error {
 	Query, err := bsonutil.ConvertBSONValueToJSON(Query)
 	if err != nil {
@@ -149,7 +148,7 @@ func (shim *Shim) Remove(DB, Collection string, Query interface{}) error {
 	}
 	queryBytes, err := json.Marshal(Query)
 	if err != nil {
-		return fmt.Errorf("error marshaling query '%v' into bytes: %v", Query, err) 
+		return fmt.Errorf("error marshaling query '%v' into bytes: %v", Query, err)
 	}
 	removerShim := StorageShim{
 		DBPath:         shim.DBPath,

@@ -7,17 +7,17 @@ mongo_tools_variables:
 ## Common download URLs (merge in as hashes)
   mongo_download_urls:
     osx_108: &mongo_url_osx108
-      mongo_url: "https://fastdl.mongodb.org/osx/mongodb-osx-x86_64-2.6.4.tgz"
+      mongo_url: "https://fastdl.mongodb.org/osx/mongodb-osx-x86_64-latest.tgz"
     solaris: &mongo_url_solaris
-      mongo_url: "https://fastdl.mongodb.org/sunos5/mongodb-sunos5-x86_64-2.6.4.tgz"
+      mongo_url: "https://fastdl.mongodb.org/sunos5/mongodb-sunos5-x86_64-latest.tgz"
     rhel55_32: &mongo_url_rhell55_32
-      mongo_url: "https://fastdl.mongodb.org/linux/mongodb-linux-i686-2.6.4.tgz"
+      mongo_url: "https://fastdl.mongodb.org/linux/mongodb-linux-i686-latest.tgz"
     ubuntu1204: &mongo_url_ubuntu1204
       mongo_url: "http://downloads.10gen.com/linux/mongodb-linux-x86_64-enterprise-ubuntu1204-latest.tgz"
     windows32-bit: &mongo_url_windows32
-      mongo_url: "https://fastdl.mongodb.org/win32/mongodb-win32-i386-2.6.4.zip"
+      mongo_url: "https://fastdl.mongodb.org/win32/mongodb-win32-i386-latest.zip"
     windows64-bit: &mongo_url_windows64
-      mongo_url: "https://fastdl.mongodb.org/win32/mongodb-win32-x86_64-2008plus-2.6.4.zip"
+      mongo_url: "https://fastdl.mongodb.org/win32/mongodb-win32-x86_64-2008plus-latest.zip"
 
 
 ## List of tests to run on each buildvariant
@@ -676,8 +676,9 @@ tasks:
           else
             export GOPATH=`pwd`;
           fi;
-          mv ./mongodb/mongod .
-          mv ./mongodb/mongo .
+          mv ./mongodb/mongod${extension} .
+          mv ./mongodb/mongo${extension} .
+          mv ./mongodb/mongoshim${extension} .
           mv src/github.com/mongodb/mongo-tools/legacy/* .
           chmod +x mongo*
           python buildscripts/smoke.py --nopreallocj --with-cleanbb --mongod ./mongod --mongo ./mongo --report-file report.json --continue-on-failure --buildlogger-builder MCI_${build_variant} --buildlogger-buildnum ${builder_num|} --buildlogger-credentials ./mci.buildlogger --buildlogger-phase ${task_name}_${execution} tool
