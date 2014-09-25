@@ -565,10 +565,23 @@ namespace {
             response->noteMismatched();
             return;
         }
-        invariant(_currentConfig.getReplSetName() == args.getSetName());
 
         // This is a replica set
         response->noteReplSet();
+
+/*
+        if( cmdObj["checkEmpty"].trueValue() ) {
+            // Eric: XXX takes read lock; only used for initial sync heartbeat
+            resultObj->append("hasData", replHasDatabases());
+        }
+*/
+
+        // Verify that the config's replset name matches
+        if (_currentConfig.getReplSetName() != args.getSetName()) {
+            *result = Status(ErrorCodes::BadValue, "repl set names do not match (2)");
+            response->noteMismatched();
+            return; 
+        }
         response->setSetName(_currentConfig.getReplSetName());
 
         const MemberState myState = getMemberState();
