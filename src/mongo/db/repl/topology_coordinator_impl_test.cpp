@@ -1554,6 +1554,131 @@ namespace {
         ASSERT_TRUE(TopologyCoordinator::Role::leader == getTopoCoord().getRole());
     }
 
+    TEST_F(HeartbeatResponseTest, UpdateHeartbeatDataStepDownPrimaryForHighPriorityFreshNode) {
+        // In this test, the Topology coordinator sees a PRIMARY ("host2") and then sees a higher
+        // priority and similarly fresh node ("host3"). As a result it responds with a
+        // StepDownRemote action for the PRIMARY ("host2").
+        updateConfig(BSON("_id" << "rs0" <<
+                          "version" << 6 <<
+                          "members" << BSON_ARRAY(
+                              BSON("_id" << 0 << "host" << "host1:27017") <<
+                              BSON("_id" << 1 << "host" << "host2:27017") <<
+                              BSON("_id" << 2 << "host" << "host3:27017" << "priority" << 3)) <<
+                          "settings" << BSON("heartbeatTimeoutSecs" << 5)),
+                     0);
+        setSelfMemberState(MemberState::RS_SECONDARY);
+
+        OpTime election = OpTime(0,0);
+        OpTime lastOpTimeApplied = OpTime(13,0);
+        OpTime slightlyLessFreshLastOpTimeApplied = OpTime(3,0);
+
+        ASSERT_EQUALS(-1, getCurrentPrimaryIndex());
+        HeartbeatResponseAction nextAction = receiveUpHeartbeat(HostAndPort("host2"),
+                                                                "rs0",
+                                                                MemberState::RS_PRIMARY,
+                                                                election,
+                                                                lastOpTimeApplied,
+                                                                lastOpTimeApplied);
+        ASSERT_EQUALS(1, getCurrentPrimaryIndex());
+
+        nextAction = receiveUpHeartbeat(HostAndPort("host3"),
+                                        "rs0",
+                                        MemberState::RS_SECONDARY,
+                                        election,
+                                        slightlyLessFreshLastOpTimeApplied,
+                                        lastOpTimeApplied);
+        ASSERT_EQUALS(HeartbeatResponseAction::StepDownRemotePrimary, nextAction.getAction());
+        ASSERT_EQUALS(-1, nextAction.getPrimaryConfigIndex());
+    }
+
+    TEST_F(HeartbeatResponseTest, UpdateHeartbeatDataStepDownSelfForHighPriorityFreshNode) {
+        // In this test, the Topology coordinator becomes PRIMARY and then sees a higher priority
+        // and equally fresh node ("host3"). As a result it responds with a StepDownSelf action.
+        updateConfig(BSON("_id" << "rs0" <<
+                          "version" << 6 <<
+                          "members" << BSON_ARRAY(
+                              BSON("_id" << 0 << "host" << "host1:27017") <<
+                              BSON("_id" << 1 << "host" << "host2:27017") <<
+                              BSON("_id" << 2 << "host" << "host3:27017" << "priority" << 3)) <<
+                          "settings" << BSON("heartbeatTimeoutSecs" << 5)),
+                     0);
+        OpTime election = OpTime(1000,0);
+
+        ASSERT_EQUALS(-1, getCurrentPrimaryIndex());
+        makeSelfPrimary(election);
+        ASSERT_EQUALS(0, getCurrentPrimaryIndex());
+
+        HeartbeatResponseAction nextAction = receiveUpHeartbeat(HostAndPort("host3"),
+                                                                "rs0",
+                                                                MemberState::RS_SECONDARY,
+                                                                election,
+                                                                election,
+                                                                election);
+        ASSERT_EQUALS(HeartbeatResponseAction::StepDownSelf, nextAction.getAction());
+        ASSERT_EQUALS(0, nextAction.getPrimaryConfigIndex());
+    }
+
+    TEST_F(HeartbeatResponseTest, UpdateHeartbeatDataDoNotStepDownSelfForHighPriorityStaleNode) {
+        // In this test, the Topology coordinator becomes PRIMARY and then sees a higher priority
+        // and stale node ("host3"). As a result it responds with NoAction.
+        updateConfig(BSON("_id" << "rs0" <<
+                          "version" << 6 <<
+                          "members" << BSON_ARRAY(
+                              BSON("_id" << 0 << "host" << "host1:27017") <<
+                              BSON("_id" << 1 << "host" << "host2:27017") <<
+                              BSON("_id" << 2 << "host" << "host3:27017" << "priority" << 3)) <<
+                          "settings" << BSON("heartbeatTimeoutSecs" << 5)),
+                     0);
+        OpTime election = OpTime(1000,0);
+        OpTime staleTime = OpTime(0,0);
+
+        ASSERT_EQUALS(-1, getCurrentPrimaryIndex());
+        makeSelfPrimary(election);
+        ASSERT_EQUALS(0, getCurrentPrimaryIndex());
+
+        HeartbeatResponseAction nextAction = receiveUpHeartbeat(HostAndPort("host3"),
+                                                                "rs0",
+                                                                MemberState::RS_SECONDARY,
+                                                                election,
+                                                                staleTime,
+                                                                election);
+        ASSERT_NO_ACTION(nextAction.getAction());
+    }
+
+    TEST_F(HeartbeatResponseTest, UpdateHeartbeatDataDoNotStepDownPrimaryForHighPriorityStaleNode) {
+        // In this test, the Topology coordinator sees a PRIMARY ("host2") and then sees a higher
+        // priority and stale node ("host3"). As a result it responds with NoAction.
+        updateConfig(BSON("_id" << "rs0" <<
+                          "version" << 6 <<
+                          "members" << BSON_ARRAY(
+                              BSON("_id" << 0 << "host" << "host1:27017") <<
+                              BSON("_id" << 1 << "host" << "host2:27017") <<
+                              BSON("_id" << 2 << "host" << "host3:27017" << "priority" << 3)) <<
+                          "settings" << BSON("heartbeatTimeoutSecs" << 5)),
+                     0);
+        setSelfMemberState(MemberState::RS_SECONDARY);
+
+        OpTime election = OpTime(1000,0);
+        OpTime stale = OpTime(0,0);
+
+        ASSERT_EQUALS(-1, getCurrentPrimaryIndex());
+        HeartbeatResponseAction nextAction = receiveUpHeartbeat(HostAndPort("host2"),
+                                                                "rs0",
+                                                                MemberState::RS_PRIMARY,
+                                                                election,
+                                                                election,
+                                                                election);
+        ASSERT_EQUALS(1, getCurrentPrimaryIndex());
+
+        nextAction = receiveUpHeartbeat(HostAndPort("host3"),
+                                        "rs0",
+                                        MemberState::RS_SECONDARY,
+                                        election,
+                                        stale,
+                                        election);
+        ASSERT_NO_ACTION(nextAction.getAction());
+    }
+
     TEST_F(HeartbeatResponseTest, UpdateHeartbeatDataTwoPrimariesIncludingMeNewOneNewer) {
         ASSERT_EQUALS(-1, getCurrentPrimaryIndex());
         makeSelfPrimary(OpTime(2,0));
