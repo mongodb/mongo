@@ -204,7 +204,6 @@ functions:
       working_dir: src
       silent: true
       script: |
-        set -o verbose
         cat > mci.buildlogger <<END_OF_CREDS
         slavename='${slave}'
         passwd='${passwd}'
