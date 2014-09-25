@@ -35,6 +35,7 @@
 #include <vector>
 
 #include "mongo/base/status.h"
+#include "mongo/bson/bsonobj.h"
 #include "mongo/tools/tool_options.h"
 
 namespace mongo {
@@ -59,6 +60,22 @@ namespace mongo {
         std::vector<std::string> upsertFields;
 
         std::string query;
+
+        // If --in is specified, reads documents from 'outputFile' instead of stdin.
+        // Used primarily for testing.
+        std::string inputFile;
+        bool inputFileSpecified;
+
+        // If --inputDocuments is specified, documents will be parsed from option value
+        // instead of being read from stdin.
+        // Used primarily for testing.
+        BSONObj inputDocuments;
+
+        // If --out is specified, writes output to 'outputFile' instead of stdout.
+        // Used primarily for testing.
+        std::string outputFile;
+        bool outputFileSpecified;
+
         bool slaveOk;
         bool snapShotQuery;
         unsigned int skip;
