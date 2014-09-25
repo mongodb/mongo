@@ -11,6 +11,6 @@ checkpoint_interval=120
 checkpoint_threads=1
 report_interval=5
 run_time=36000
-threads=((count=1,throttle=4000,reads=1),(count=1,throttle=4000,inserts=1))
+threads=((count=1,throttle=1000,reads=1),(count=1,throttle=1000,inserts=1))
 value_sz=100
 warmup=10

@@ -91,7 +91,7 @@ static int	 start_threads(CONFIG *,
 static int	 stop_threads(CONFIG *, u_int, CONFIG_THREAD *);
 static void	*thread_run_wtperf(void *);
 static void	*worker(void *);
-static void	worker_throttle(uint64_t, uint64_t *, struct timespec *);
+static void	worker_throttle(int64_t, int64_t *, struct timespec *);
 static uint64_t	 wtperf_rand(CONFIG_THREAD *);
 static uint64_t	 wtperf_value_range(CONFIG *);
 
@@ -407,8 +407,9 @@ worker(void *arg)
 	WT_CONNECTION *conn;
 	WT_CURSOR **cursors, *cursor;
 	WT_SESSION *session;
+	int64_t throttle_ops;
 	size_t i;
-	uint64_t next_val, throttle_ops, usecs;
+	uint64_t next_val, usecs;
 	uint8_t *op, *op_end;
 	int measure_latency, ret;
 	char *value_buf, *key_buf, *value;
@@ -2221,7 +2222,7 @@ stop_threads(CONFIG *cfg, u_int num, CONFIG_THREAD *threads)
  * second and then pause. Doing this every 10th of a second is probably enough
  */
 static void
-worker_throttle(uint64_t throttle, uint64_t *ops, struct timespec *interval)
+worker_throttle(int64_t throttle, int64_t *ops, struct timespec *interval)
 {
 	struct timespec now;
 	uint64_t usecs_to_complete;
