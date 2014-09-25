@@ -45,6 +45,8 @@ func (dump *MongoDump) ValidateOptions() error {
 		return fmt.Errorf("can only dump a single collection to stdout")
 	case dump.ToolOptions.DB == "" && dump.ToolOptions.Collection != "":
 		return fmt.Errorf("cannot dump a collection without a specified database")
+	case dump.ToolOptions.DBPath != "" && dump.ToolOptions.Host != "":
+		return fmt.Errorf("--dbpath is not allowed when --host is specified")
 	case dump.InputOptions.Query != "" && dump.ToolOptions.Collection == "":
 		return fmt.Errorf("cannot dump using a query without a specified collection")
 	case dump.OutputOptions.DumpDBUsersAndRoles && dump.ToolOptions.DB == "":
@@ -66,6 +68,10 @@ func (dump *MongoDump) ValidateOptions() error {
 }
 
 func (dump *MongoDump) Init() error {
+	err := dump.ValidateOptions()
+	if err != nil {
+		return fmt.Errorf("Bad Option: %v", err)
+	}
 	if dump.ToolOptions.Namespace.DBPath != "" {
 		shim, err := db.NewShim(dump.ToolOptions.Namespace.DBPath, dump.ToolOptions.DirectoryPerDB, dump.ToolOptions.Journal)
 		if err != nil {
