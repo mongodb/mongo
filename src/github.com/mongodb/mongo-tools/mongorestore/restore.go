@@ -56,7 +56,7 @@ func (restore *MongoRestore) RestoreIntent(intent *Intent) error {
 	var indexes []mgo.Index
 
 	//first create collection with options
-	if intent.MetadataPath != "" {
+	if intent.MetadataPath != "" && !restore.OutputOptions.NoOptionsRestore {
 		log.Logf(0, "reading metadata file from %v", intent.MetadataPath)
 		jsonBytes, err := ioutil.ReadFile(intent.MetadataPath)
 		if err != nil {
@@ -105,7 +105,7 @@ func (restore *MongoRestore) RestoreIntent(intent *Intent) error {
 	}
 
 	//finally, add indexes
-	if len(indexes) > 0 {
+	if len(indexes) > 0 && !restore.OutputOptions.NoIndexRestore {
 		log.Logf(0, "restoring indexes for collection %v from metadata", intent.Key())
 		for _, idx := range indexes {
 			log.Logf(0, "\tcreating index %v", idx.Name)
