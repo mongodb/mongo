@@ -91,6 +91,7 @@ static int	 start_threads(CONFIG *,
 static int	 stop_threads(CONFIG *, u_int, CONFIG_THREAD *);
 static void	*thread_run_wtperf(void *);
 static void	*worker(void *);
+static void	worker_throttle(int64_t, int64_t *, struct timespec *);
 static uint64_t	 wtperf_rand(CONFIG_THREAD *);
 static uint64_t	 wtperf_value_range(CONFIG *);
 
@@ -399,13 +400,14 @@ err:		cfg->error = cfg->stop = 1;
 static void *
 worker(void *arg)
 {
-	struct timespec start, stop;
+	struct timespec start, stop, interval;
 	CONFIG *cfg;
 	CONFIG_THREAD *thread;
 	TRACK *trk;
 	WT_CONNECTION *conn;
 	WT_CURSOR **cursors, *cursor;
 	WT_SESSION *session;
+	int64_t throttle_ops;
 	size_t i;
 	uint64_t next_val, usecs;
 	uint8_t *op, *op_end;
@@ -418,6 +420,7 @@ worker(void *arg)
 	cursors = NULL;
 	session = NULL;
 	trk = NULL;
+	throttle_ops = 0;
 
 	if ((ret = conn->open_session(
 	    conn, NULL, cfg->sess_config, &session)) != 0) {
@@ -438,6 +441,12 @@ worker(void *arg)
 			    cfg->uris[i]);
 			goto err;
 		}
+	}
+	/* Setup the timer for throttling. */
+	if (thread->workload->throttle != 0 &&
+	    (ret = __wt_epoch(NULL, &interval)) != 0) {
+		lprintf(cfg, ret, 0, "Get time call failed");
+		goto err;
 	}
 
 	key_buf = thread->key_buf;
@@ -609,6 +618,15 @@ op_err:			lprintf(cfg, ret, 0,
 		/* Schedule the next operation */
 		if (++op == op_end)
 			op = thread->workload->ops;
+
+		/*
+		 * Check throttling periodically to avoid taking too
+		 * many time samples.
+		 */
+		if (thread->workload->throttle != 0 &&
+		    throttle_ops++ % THROTTLE_OPS == 0)
+			worker_throttle(thread->workload->throttle,
+			     &throttle_ops, &interval);
 	}
 
 	if ((ret = session->close(session, NULL)) != 0) {
@@ -1282,8 +1300,8 @@ execute_populate(CONFIG *cfg)
 	msecs = ns_to_ms(WT_TIMEDIFF(stop, start));
 	lprintf(cfg, 0, 1,
 	    "Load time: %.2f\n" "load ops/sec: %" PRIu64,
-	    (double)msecs / (double)THOUSAND, 
-	    (uint64_t)((cfg->icount / msecs) / THOUSAND));
+	    (double)msecs / (double)MSEC_PER_SEC, 
+	    (uint64_t)((cfg->icount / msecs) / MSEC_PER_SEC));
 
 	/*
 	 * If configured, compact to allow LSM merging to complete.  We
@@ -2197,6 +2215,35 @@ stop_threads(CONFIG *cfg, u_int num, CONFIG_THREAD *threads)
 	 * program, leaking memory isn't a concern, and it's simpler that way.
 	 */
 	return (0);
+}
+
+/*
+ * TODO: Spread the stalls out, so we don't flood at the start of each
+ * second and then pause. Doing this every 10th of a second is probably enough
+ */
+static void
+worker_throttle(int64_t throttle, int64_t *ops, struct timespec *interval)
+{
+	struct timespec now;
+	uint64_t usecs_to_complete;
+	if (*ops < throttle)
+		return;
+
+	/* Ignore errors, we don't really care. */
+	if (__wt_epoch(NULL, &now) != 0)
+		return;
+
+	/* 
+	 * If we've completed enough operations, reset the counters.
+	 * If we did enough operations in less than a second, sleep for
+	 * the rest of the second.
+	 */
+	usecs_to_complete = ns_to_us(WT_TIMEDIFF(now, *interval));
+	if (usecs_to_complete < USEC_PER_SEC)
+		(void)usleep(USEC_PER_SEC - usecs_to_complete);
+
+	*ops = 0;
+	*interval = now;
 }
 
 static uint64_t
