@@ -878,19 +878,6 @@ tasks:
         format: "html"
         content_type: "text/html"
     - func: "attach coverage reports"
-    - command: expansions.update
-      params:
-        updates:
-          - key: "package"
-            value: "mongooplog"
-    - func: "move coverage data"
-    - func: "generate coverage html + text"
-    - func: "upload coverage report"
-    - func: "upload coverage report"
-      vars:
-        format: "html"
-        content_type: "text/html"
-    - func: "attach coverage reports"
     - func: "attach coverage reports"
     - command: expansions.update
       params:
