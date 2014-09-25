@@ -250,7 +250,7 @@ namespace mongo {
         long long storageSize = 0;
         long long numExtents = 0;
         long long indexes = 0;
-        long long indexSize = 0;
+        size_t indexSize = 0;
 
         for (list<string>::const_iterator it = collections.begin(); it != collections.end(); ++it) {
             const string ns = *it;

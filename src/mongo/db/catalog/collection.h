@@ -257,7 +257,7 @@ namespace mongo {
             return static_cast<int>( dataSize( txn ) / n );
         }
 
-        uint64_t getIndexSize(OperationContext* opCtx,
+        size_t getIndexSize(OperationContext* opCtx,
                               BSONObjBuilder* details = NULL,
                               int scale = 1);
 

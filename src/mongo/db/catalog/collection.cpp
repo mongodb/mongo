@@ -441,7 +441,7 @@ namespace mongo {
         return _recordStore->dataSize( txn );
     }
 
-    uint64_t Collection::getIndexSize(OperationContext* opCtx,
+    size_t Collection::getIndexSize(OperationContext* opCtx,
                                       BSONObjBuilder* details,
                                       int scale) {
 
