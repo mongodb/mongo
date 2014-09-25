@@ -88,12 +88,9 @@ __lsm_general_worker_start(WT_SESSION_IMPL *session)
 static int
 __lsm_stop_workers(WT_SESSION_IMPL *session)
 {
-	WT_CONNECTION_IMPL *conn;
 	WT_LSM_MANAGER *manager;
 	WT_LSM_WORKER_ARGS *worker_args;
 	uint32_t i;
-
-	conn = S2C(session);
 
 	manager = &S2C(session)->lsm_manager;
 	/*
@@ -129,11 +126,8 @@ __lsm_stop_workers(WT_SESSION_IMPL *session)
 int
 __wt_lsm_manager_reconfig(WT_SESSION_IMPL *session, const char **cfg)
 {
-	WT_CONNECTION_IMPL *conn;
 	WT_LSM_MANAGER *manager;
 	uint32_t orig_workers;
-
-	conn = S2C(session);
 
 	manager = &S2C(session)->lsm_manager;
 	orig_workers = manager->lsm_workers_max;
