@@ -66,6 +66,10 @@ namespace mongo {
             return Command::NONE;
         }
 
+        bool slaveOverrideOk() const {
+            return true;
+        }
+
         void help(stringstream& ss) const {
             ss << _helpText;
         }
@@ -75,11 +79,11 @@ namespace mongo {
                                     const BSONObj& cmdObj ) {
             AuthorizationSession* authzSession = client->getAuthorizationSession();
             ResourcePattern pattern = parseResourcePattern(dbname, cmdObj);
-    
+
             if (authzSession->isAuthorizedForActionsOnResource(pattern, _actionType)) {
                 return Status::OK();
             }
-    
+
             return Status(ErrorCodes::Unauthorized, "unauthorized");
         }
 

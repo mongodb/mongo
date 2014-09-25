@@ -70,6 +70,8 @@ namespace mongo {
 
         virtual bool slaveOk() const;
 
+        virtual bool slaveOverrideOk() const;
+
         virtual void help(std::stringstream& ss) const;
 
         /**
