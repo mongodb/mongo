@@ -33,6 +33,7 @@
 #include <boost/filesystem/operations.hpp>
 
 #include "mongo/db/structure/catalog/namespace_details.h"
+#include "mongo/util/file.h"
 
 
 namespace mongo {
@@ -166,6 +167,23 @@ namespace mongo {
                     storageGlobalParams.lenForNewNsFiles >= 1024*1024);
             maybeMkdir();
             unsigned long long l = storageGlobalParams.lenForNewNsFiles;
+
+            {
+                // Due to SERVER-15369 we need to explicitly write zero-bytes to the NS file.
+                const unsigned long long kBlockSize = 1024*1024;
+                invariant(l % kBlockSize == 0); // ns files can only be multiples of 1MB
+                const std::vector<char> zeros(kBlockSize, 0);
+
+                File file;
+                file.open(pathString.c_str());
+                massert(18825, str::stream() << "couldn't create file " << pathString, file.is_open());
+                for (fileofs ofs = 0; ofs < l; ofs += kBlockSize ) {
+                    file.write(ofs, &zeros[0], kBlockSize);
+                }
+                file.fsync();
+                massert(18826, str::stream() << "failure writing file " << pathString, !file.bad() );
+            }
+
             if ( _f.create(pathString, l, true) ) {
                 getDur().createdFile(pathString, l); // always a new file
                 len = l;
