@@ -72,6 +72,10 @@ func (shim *Shim) Find(DB, Collection string, Skip, Limit int, Query interface{}
 	} else if queryRaw, ok := Query.(string); ok {
 		queryStr = queryRaw
 	} else {
+		Query, err := bsonutil.ConvertBSONValueToJSON(Query)
+		if err != nil {
+			return nil, err
+		}
 		queryBytes, err := json.Marshal(Query)
 		if err != nil {
 			return nil, err
@@ -138,10 +142,14 @@ func (shim *Shim) OpenInsertStream(DB, Collection string) (DocSink, error) {
 }
 
 
-func (shim *Shim) RemoveAll(DB, Collection string, Query interface{}) error {
+func (shim *Shim) Remove(DB, Collection string, Query interface{}) error {
+	Query, err := bsonutil.ConvertBSONValueToJSON(Query)
+	if err != nil {
+		return fmt.Errorf("error converting query '%v' into JSON: %v", Query, err)
+	}
 	queryBytes, err := json.Marshal(Query)
 	if err != nil {
-		return err
+		return fmt.Errorf("error marshaling query '%v' into bytes: %v", Query, err) 
 	}
 	removerShim := StorageShim{
 		DBPath:         shim.DBPath,
@@ -155,9 +163,12 @@ func (shim *Shim) RemoveAll(DB, Collection string, Query interface{}) error {
 	}
 	_, _, err = removerShim.Open()
 	if err != nil {
-		return err
+		return fmt.Errorf("error opening mongoshim: %v", err)
 	}
-	defer removerShim.Close()
+	err = removerShim.Close()
+	if err != nil {
+		return fmt.Errorf("error closing mongoshim resource handle: %v", err)
+	}
 	return nil
 }
 
@@ -207,13 +218,14 @@ func (shim *Shim) Run(command interface{}, out interface{}, database string) err
 	if name, ok := command.(string); ok {
 		command = bson.M{name: 1}
 	}
+
 	commandRaw, err := json.Marshal(command)
 	if err != nil {
 		return err
 	}
 	commandShim := StorageShim{
 		DBPath:         shim.DBPath,
-		Database:       "admin",
+		Database:       database,
 		Collection:     "$cmd",
 		Skip:           0,
 		Limit:          1,
@@ -261,8 +273,9 @@ func makeSort(fields []string) bson.D {
 		direction := 1
 		if strings.HasPrefix(field, "-") {
 			direction = -1
+			field = field[1:]
 		}
-		dElem := bson.DocElem{Name: field[1:], Value: direction}
+		dElem := bson.DocElem{Name: field, Value: direction}
 		val = append(val, dElem)
 	}
 	return val
