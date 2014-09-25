@@ -227,6 +227,8 @@ namespace repl {
 
     /* applies oplog from "now" until endOpTime using the applier threads for initial sync*/
     void SyncTail::_applyOplogUntil(OperationContext* txn, const OpTime& endOpTime) {
+        unsigned long long bytesApplied = 0;
+        unsigned long long entriesApplied = 0;
         while (true) {
             OpQueue ops;
             OperationContextImpl ctx;
@@ -263,11 +265,18 @@ namespace repl {
 
             const BSONObj lastOp = ops.back().getOwned();
 
+            // Tally operation information
+            bytesApplied += ops.getSize();
+            entriesApplied += ops.getDeque().size();
+
             multiApply(ops.getDeque());
             OpTime lastOpTime = applyOpsToOplog(&ops.getDeque());
 
             // if the last op applied was our end, return
             if (lastOpTime == endOpTime) {
+                LOG(1) << "SyncTail applied " << entriesApplied
+                       << " entries (" << bytesApplied << " bytes)"
+                       << " and finished at opTime " << endOpTime.toStringPretty();
                 return;
             }
         } // end of while (true)
