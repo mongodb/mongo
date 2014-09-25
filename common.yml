@@ -460,7 +460,6 @@ tasks:
     - func: "download mongod"
     - func: "start mongod"
     - func: "run unit test"
-    - func: "kill mongod"
     - func: "move coverage data"
     - func: "generate coverage html + text"
     - func: "upload coverage report"
@@ -681,7 +680,6 @@ tasks:
 
 - name: lint
   commands:
-    - func: "kill mongod"
     - command: git.get_project
       params:
         directory: src
@@ -704,7 +702,6 @@ tasks:
 
 - name: log
   commands:
-    - func: "kill mongod"
     - command: git.get_project
       params:
         directory: src
@@ -729,7 +726,6 @@ tasks:
 
 - name: pool
   commands:
-    - func: "kill mongod"
     - command: git.get_project
       params:
         directory: src
@@ -778,7 +774,6 @@ tasks:
 
 - name: text
   commands:
-    - func: "kill mongod"
     - command: git.get_project
       params:
         directory: src
@@ -803,7 +798,6 @@ tasks:
 
 - name: unit
   commands:
-    - func: "kill mongod"
     - command: git.get_project
       params:
         directory: src
@@ -820,11 +814,9 @@ tasks:
           cp ./mongodb/mongoshim${extension} src/github.com/mongodb/mongo-tools/mongofiles
     - func: "start mongod"
     - func: "run tool tests"
-    - func: "kill mongod"
 
 - name: unit-coverage
   commands:
-    - func: "kill mongod"
     - command: git.get_project
       params:
         directory: src
@@ -841,7 +833,6 @@ tasks:
           cp ./mongodb/mongoshim${extension} src/github.com/mongodb/mongo-tools/mongofiles
     - func: "start mongod"
     - func: "run tool tests"
-    - func: "kill mongod"
     - command: expansions.update
       params:
         updates:
@@ -928,7 +919,6 @@ tasks:
 
 - name: util
   commands:
-    - func: "kill mongod"
     - command: git.get_project
       params:
         directory: src
@@ -953,7 +943,6 @@ tasks:
 
 - name: vet
   commands:
-    - func: "kill mongod"
     - command: git.get_project
       params:
         directory: src
