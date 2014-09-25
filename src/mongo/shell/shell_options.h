@@ -88,6 +88,4 @@ namespace mongo {
 
     Status storeMongoShellOptions(const moe::Environment& params,
                                   const std::vector<std::string>& args);
-
-    Status validateMongoShellOptions(const moe::Environment& params);
 }

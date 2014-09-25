@@ -290,13 +290,4 @@ namespace mongo {
         return Status::OK();
     }
 
-    Status validateMongoShellOptions(const moe::Environment& params) {
-#ifdef MONGO_SSL
-        Status ret = validateSSLMongoShellOptions(params);
-        if (!ret.isOK()) {
-            return ret;
-        }
-#endif
-        return Status::OK();
-    }
 }

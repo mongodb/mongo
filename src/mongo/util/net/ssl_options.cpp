@@ -329,16 +329,4 @@ namespace mongo {
         return Status::OK();
     }
 
-    Status validateSSLMongoShellOptions(const moe::Environment& params) {
-        // Users must specify either a CAFile or allowInvalidCertificates if ssl=true.
-        if (params.count("ssl") &&
-                params["ssl"].as<bool>() == true &&
-                !params.count("ssl.CAFile") &&
-                !params.count("ssl.allowInvalidCertificates")) {
-            return Status(ErrorCodes::BadValue,
-                    "need to either provide sslCAFile or specify sslAllowInvalidCertificates");
-        }
-        return Status::OK();
-    }
-
 } // namespace mongo
