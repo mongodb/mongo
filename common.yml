@@ -115,7 +115,7 @@ functions:
         cd mongodb
         curl -s ${mongo_url} --output mongodb.tgz
         ${decompress} mongodb.tgz
-        chmod +x ./mongodb-*/bin/*;
+        chmod +x ./mongodb-*/bin/*
         mv ./mongodb-*/bin/* .
 
   "fetch tool" :
@@ -124,8 +124,8 @@ functions:
       bucket: mciuploads
       aws_key: ${aws_key}
       aws_secret: ${aws_secret}
-      local_file: src/src/github.com/mongodb/mongo-tools/legacy/${tool}${extension}
-      remote_file: mongo-tools/binary/${build_id}/${edition|community}/${tool}${extension}
+      local_file: src/${tool}${extension}
+      remote_file: mongo-tools/binaries/${build_id}/${edition|community}/${tool}${extension}
 
   "generate coverage html + text":
     command: shell.exec
@@ -200,6 +200,7 @@ functions:
       working_dir: src
       silent: true
       script: |
+        set -o verbose
         cat > mci.buildlogger <<END_OF_CREDS
         slavename='${slave}'
         passwd='${passwd}'
@@ -562,6 +563,8 @@ tasks:
     - func: "attach coverage reports"
 
 - name: legacy
+  depends_on:
+  - name: communityDist
   commands:
     - func: "kill mongod"
     - command: git.get_project
@@ -571,27 +574,21 @@ tasks:
     - func: "get buildnumber"
     - func: "setup credentials"
     - func: "download mongod"
+    - func: "fetch tool"
+      vars:
+        tool: mongoimport
+    - func: "fetch tool"
+      vars:
+        tool: mongoexport
+    - func: "fetch tool"
+      vars:
+        tool: mongodump
+    - func: "fetch tool"
+      vars:
+        tool: mongofiles
     - command: shell.exec
       params:
         working_dir: src
-        script: |
-          set -o verbose
-          mv mongo* src/github.com/mongodb/mongo-tools/legacy
-    - func: "fetch tool"
-      vars:
-        tools: mongoimport
-    - func: "fetch tool"
-      vars:
-        tools: mongoexport
-    - func: "fetch tool"
-      vars:
-        tools: mongodump
-    - func: "fetch tool"
-      vars:
-        tools: mongofiles
-    - command: shell.exec
-      params:
-        working_dir: src/src/github.com/mongodb/mongo-tools/legacy
         script: |
           set -o errexit
           set -o verbose
@@ -600,6 +597,8 @@ tasks:
           else
             export GOPATH=`pwd`;
           fi;
+          mv ./mongodb/mongo* .
+          mv src/github.com/mongodb/mongo-tools/legacy/* .
           python smoke.py --nopreallocj --with-cleanbb --mongod ./mongod --mongo ./mongo --report-file report.json ${test_flags|} --buildlogger-builder MCI_${build_variant} --buildlogger-buildnum ${builder_num|} --buildlogger-credentials ./mci.buildlogger --buildlogger-phase ${task_name}_${execution} tool
 
 - name: lint
