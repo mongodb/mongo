@@ -59,7 +59,6 @@
 #include "mongo/db/storage_options.h"
 #include "mongo/s/chunk_version.h"
 #include "mongo/s/d_state.h"
-#include "mongo/s/stale_exception.h" // for SendStaleConfigException
 #include "mongo/scripting/engine.h"
 #include "mongo/util/concurrency/thread_name.h"
 #include "mongo/util/file_allocator.h"
@@ -255,14 +254,7 @@ namespace mongo {
         case dbDelete:
             break;
         default: {
-            string errmsg;
-            ChunkVersion received;
-            ChunkVersion wanted;
-            if ( ! shardVersionOk( _ns , errmsg, received, wanted ) ) {
-                ostringstream os;
-                os << "[" << _ns << "] shard version not ok in Client::Context: " << errmsg;
-                throw SendStaleConfigException( _ns, os.str(), received, wanted );
-            }
+            ensureShardVersionOKOrThrow(_ns);
         }
         }
     }

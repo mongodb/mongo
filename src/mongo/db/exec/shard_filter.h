@@ -33,7 +33,6 @@
 #include "mongo/db/exec/plan_stage.h"
 #include "mongo/s/chunk_version.h"
 #include "mongo/s/d_state.h"
-#include "mongo/s/stale_exception.h"
 
 namespace mongo {
 

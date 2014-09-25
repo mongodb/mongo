@@ -31,6 +31,7 @@
 #include "mongo/db/exec/filter.h"
 #include "mongo/db/exec/working_set_common.h"
 #include "mongo/db/keypattern.h"
+#include "mongo/s/stale_exception.h"
 #include "mongo/util/log.h"
 
 namespace mongo {
