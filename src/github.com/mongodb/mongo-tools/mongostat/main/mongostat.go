@@ -7,7 +7,6 @@ import (
 	"github.com/mongodb/mongo-tools/mongostat"
 	"github.com/mongodb/mongo-tools/mongostat/options"
 	"os"
-	"runtime"
 	"strconv"
 	"time"
 )
@@ -24,7 +23,7 @@ func main() {
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Invalid options: %v\n", err)
 		opts.PrintHelp()
-		util.exitFail()
+		util.ExitFail()
 		return
 	}
 
@@ -33,18 +32,18 @@ func main() {
 		if len(extra) != 1 {
 			fmt.Fprintf(os.Stderr, "Too many positional operators\n")
 			opts.PrintHelp()
-			util.exitFail()
+			util.ExitFail()
 			return
 		}
 		sleepInterval, err = strconv.Atoi(extra[0])
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "Bad sleep interval: %v\n", extra[0])
-			util.exitFail()
+			util.ExitFail()
 			return
 		}
 		if sleepInterval < 1 {
 			fmt.Fprintf(os.Stderr, "Sleep interval must be at least 1 second\n")
-			util.exitFail()
+			util.ExitFail()
 			return
 		}
 	}
@@ -89,7 +88,7 @@ func main() {
 	err = stat.Run()
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error: %v", err)
-		util.exitFail()
+		util.ExitFail()
 		return
 	}
 }
