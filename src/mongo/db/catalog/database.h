@@ -91,6 +91,11 @@ namespace mongo {
 
         void getStats( OperationContext* opCtx, BSONObjBuilder* output, double scale = 1 );
 
+        long long getIndexSizeForCollection( OperationContext* opCtx,
+                                             Collection* collections,
+                                             BSONObjBuilder* details = NULL,
+                                             int scale = 1 );
+
         const DatabaseCatalogEntry* getDatabaseCatalogEntry() const;
 
         Status dropCollection( OperationContext* txn, const StringData& fullns );

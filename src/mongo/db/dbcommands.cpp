@@ -951,9 +951,10 @@ namespace mongo {
             collection->getRecordStore()->appendCustomStats( txn, &result, scale );
 
             BSONObjBuilder indexSizes;
-            result.appendNumber("totalIndexSize", collection->getIndexSize(txn,
-                                                                           &indexSizes,
-                                                                           scale) / scale);
+            result.appendNumber( "totalIndexSize" , db->getIndexSizeForCollection(txn,
+                                                                                  collection,
+                                                                                  &indexSizes,
+                                                                                  scale) / scale );
             result.append("indexSizes", indexSizes.obj());
 
             return true;

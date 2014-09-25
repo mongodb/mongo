@@ -240,6 +240,34 @@ namespace mongo {
         return true;
     }
 
+    long long Database::getIndexSizeForCollection(OperationContext* opCtx,
+                                                  Collection* coll,
+                                                  BSONObjBuilder* details,
+                                                  int scale ) {
+        if ( !coll )
+            return 0;
+
+        IndexCatalog* idxCatalog = coll->getIndexCatalog();
+
+        IndexCatalog::IndexIterator ii = idxCatalog->getIndexIterator( opCtx, true );
+
+        long long totalSize = 0;
+
+        while ( ii.more() ) {
+            IndexDescriptor* d = ii.next();
+            IndexAccessMethod* iam = idxCatalog->getIndex( d );
+
+            long long ds = iam->getSpaceUsedBytes( opCtx );
+
+            totalSize += ds;
+            if ( details ) {
+                details->appendNumber( d->indexName(), ds / scale );
+            }
+        }
+
+        return totalSize;
+    }
+
     void Database::getStats( OperationContext* opCtx, BSONObjBuilder* output, double scale ) {
         list<string> collections;
         _dbEntry->getCollectionNamespaces( &collections );
@@ -250,7 +278,7 @@ namespace mongo {
         long long storageSize = 0;
         long long numExtents = 0;
         long long indexes = 0;
-        size_t indexSize = 0;
+        long long indexSize = 0;
 
         for (list<string>::const_iterator it = collections.begin(); it != collections.end(); ++it) {
             const string ns = *it;
@@ -268,7 +296,7 @@ namespace mongo {
             numExtents += temp.obj()["numExtents"].numberInt(); // XXX
 
             indexes += collection->getIndexCatalog()->numIndexesTotal( opCtx );
-            indexSize += collection->getIndexSize(opCtx);
+            indexSize += getIndexSizeForCollection(opCtx, collection);
         }
 
         output->append      ( "db" , _name );
