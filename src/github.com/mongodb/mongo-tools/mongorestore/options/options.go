@@ -6,6 +6,7 @@ type InputOptions struct {
 	OplogReplay            bool   `long:"oplogReplay" description:"Replay oplog for point-in-time restore"`
 	OplogLimit             string `long:"oplogLimit" description:"Include oplog entries before the provided Timestamp (seconds[:ordinal])"`
 	RestoreDBUsersAndRoles bool   `long:"restoreDbUsersAndRoles" description:"Restore user and role definitions for the given database"`
+	Directory              string `long:"dir" description:"alternative flag for entering the dump directory"`
 }
 
 func (self *InputOptions) Name() string {

@@ -19,6 +19,10 @@ func (b BinData) String() string {
 	return fmt.Sprintf("%X", data) // use uppercase hexadecimal
 }
 
+func (js Javascript) String() string {
+	return js.Code
+}
+
 func (d Date) String() string {
 	if d.isFormatable() {
 		n := int64(d)
@@ -33,6 +37,10 @@ func (d Date) String() string {
 func (d DBRef) String() string {
 	return fmt.Sprintf(`{ "$ref": "%v", "$id": %v, "$db": "%v" }`,
 		d.Collection, d.Id, d.Database)
+}
+
+func (f Float) String() string {
+	return fmt.Sprintf("%v", float64(f))
 }
 
 func (_ MinKey) String() string {

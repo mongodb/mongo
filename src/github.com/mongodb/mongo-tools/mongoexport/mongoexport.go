@@ -11,6 +11,7 @@ import (
 	"gopkg.in/mgo.v2/bson"
 	"io"
 	"os"
+	"path/filepath"
 	// 	"reflect"
 	// 	"strconv"
 	"strings"
@@ -89,7 +90,14 @@ func (exp *MongoExport) ValidateSettings() error {
 //specified in the options.
 func (exp *MongoExport) getOutputWriter() (io.WriteCloser, error) {
 	if exp.OutputOpts.OutputFile != "" {
-		//TODO do we care if the file exists already? Overwrite it, or fail?
+		//If the directory in which the output file is to be
+		//written does not exist, create it
+		fileDir := filepath.Dir(exp.OutputOpts.OutputFile)
+		err := os.MkdirAll(fileDir, 0750)
+		if err != nil {
+			return nil, err
+		}
+
 		file, err := os.Create(exp.OutputOpts.OutputFile)
 		if err != nil {
 			return nil, err
@@ -126,7 +134,13 @@ func getDocSource(exp MongoExport) (db.DocSource, error) {
 		flags = flags | db.Snapshot
 	}
 
-	return exp.cmdRunner.FindDocs(exp.ToolOptions.Namespace.DB, exp.ToolOptions.Namespace.Collection, 0, 0, query, sortFields, flags)
+	return exp.cmdRunner.FindDocs(exp.ToolOptions.Namespace.DB,
+		exp.ToolOptions.Namespace.Collection,
+		exp.InputOpts.Skip,
+		exp.InputOpts.Limit,
+		query,
+		sortFields,
+		flags)
 }
 
 //Export executes the entire export operation. It returns an integer of the count

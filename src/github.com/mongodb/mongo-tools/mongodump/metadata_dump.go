@@ -58,7 +58,7 @@ func (dump *MongoDump) dumpMetadataToWriter(dbName, c string, writer io.Writer) 
 	// we copy just the "options" subdocument for the collection.
 	log.Logf(3, "\treading options for `%v`", nsID)
 	namespaceDoc := bson.M{}
-	err := dump.cmdRunner.FindOne(dbName, c, 0, bson.M{"name": nsID}, nil, namespaceDoc, 0)
+	err := dump.cmdRunner.FindOne(dbName, "system.namespaces", 0, bson.M{"name": nsID}, nil, namespaceDoc, 0)
 	if err != nil {
 		return fmt.Errorf("error finding metadata for collection `%v`: %v", nsID, err)
 	}

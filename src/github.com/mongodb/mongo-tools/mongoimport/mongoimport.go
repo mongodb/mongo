@@ -137,7 +137,6 @@ func (mongoImport *MongoImport) ValidateSettings() error {
 // getInputReader returns an io.Reader corresponding to the input location
 func (mongoImport *MongoImport) getInputReader() (io.ReadCloser, error) {
 	if mongoImport.InputOptions.File != "" {
-		fmt.Println("it's a file")
 		file, err := os.Open(mongoImport.InputOptions.File)
 		if err != nil {
 			return nil, err
@@ -188,7 +187,6 @@ func (mongoImport *MongoImport) importDocuments(importInput ImportInput) (docsCo
 	}
 
 	defer func() {
-		fmt.Println("closing!")
 		err2 := importWriter.Close()
 		if err == nil {
 			err = err2

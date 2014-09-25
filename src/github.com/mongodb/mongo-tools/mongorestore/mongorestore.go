@@ -19,17 +19,47 @@ type MongoRestore struct {
 	TargetDirectory string
 
 	// other internal state
-	manager *IntentManager
-	safety  *mgo.Safe
+	manager  *IntentManager
+	safety   *mgo.Safe
+	objCheck bool
+}
+
+func (restore *MongoRestore) ParseAndValidateOptions() error {
+	// Can't use option pkg defaults for --objcheck because it's two seperate flags,
+	// and we need to be able to see if they're both being used. We default to
+	// true here and then see if noobjcheck is enable.
+	log.Log(3, "checking options")
+	restore.objCheck = true
+	if restore.InputOptions.NoObjcheck {
+		restore.objCheck = false
+		log.Log(3, "\tdumping with object check disabled")
+		if restore.InputOptions.Objcheck {
+			return fmt.Errorf("cannot use both the --objcheck and --noobjcheck flags")
+		}
+	} else {
+		log.Log(3, "\tdumping with object check enabled")
+	}
+
+	if restore.OutputOptions.WriteConcern > 0 {
+		restore.safety = &mgo.Safe{W: restore.OutputOptions.WriteConcern} //TODO, audit extra steps
+		log.Logf(3, "\tdumping with w=%v", restore.safety.W)
+	}
+
+	//TODO check oplog is okay
+
+	return nil
 }
 
 func (restore *MongoRestore) Restore() error {
 	// TODO validate options
+	err := restore.ParseAndValidateOptions()
+	if err != nil {
+		return fmt.Errorf("options error: %v", err)
+	}
 
 	// 1. Build up all intents to be restored
 	restore.manager = NewIntentManager()
 
-	var err error
 	switch {
 	case restore.ToolOptions.DB == "" && restore.ToolOptions.Collection == "":
 		log.Logf(0,
@@ -60,6 +90,14 @@ func (restore *MongoRestore) Restore() error {
 		return fmt.Errorf("restore error: %v", err)
 	}
 	log.Log(0, "done")
+
+	// 3. Restore oplog
+	if restore.InputOptions.OplogReplay {
+		err = restore.RestoreOplog()
+		if err != nil {
+			return fmt.Errorf("restore error: %v", err)
+		}
+	}
 
 	return nil
 }
