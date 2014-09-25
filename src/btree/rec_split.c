@@ -486,14 +486,11 @@ __split_deepen(WT_SESSION_IMPL *session, WT_PAGE *parent)
 		__wt_page_only_modify_set(session, child);
 
 		/*
-		 * Once the split goes live, the newly created children can be
-		 * evicted and their WT_REF structures freed.  If the child
+		 * Once the split goes live, the newly created internal pages
+		 * might be evicted and their WT_REF structures freed.  If those
 		 * pages are evicted before threads exit the previous page index
 		 * array, a thread might see a freed WT_REF.  Set the eviction
-		 * transaction requirement for split pages.  (Note, we're about
-		 * to process those pages below, too, without holding hazard
-		 * references; this "pin" based on the current transaction makes
-		 * that safe as well.)
+		 * transaction requirement for the newly created internal pages.
 		 */
 		child->modify->mod_split_txn = __wt_txn_new_id(session);
 
@@ -513,8 +510,8 @@ __split_deepen(WT_SESSION_IMPL *session, WT_PAGE *parent)
 			    parent, *parent_refp, &parent_decr, &child_incr));
 			*child_refp++ = *parent_refp++;
 
-			WT_MEMSIZE_TRANSFER(parent_decr, child_incr,
-			    sizeof(WT_REF));
+			WT_MEMSIZE_TRANSFER(
+			    parent_decr, child_incr, sizeof(WT_REF));
 		}
 		__wt_cache_page_inmem_incr(session, child, child_incr);
 	}
