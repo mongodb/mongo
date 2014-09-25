@@ -78,6 +78,7 @@ func (self *MongoOplog) Run() error {
 	// server in the process
 	oplogEntry := &OplogEntry{}
 	res := &ApplyOpsResponse{}
+
 	for tail.Next(oplogEntry) {
 
 		// make sure there was no tailing error
@@ -151,6 +152,6 @@ func buildTailingCursor(oplog *mgo.Collection,
 	}
 
 	// TODO: wait time
-	return oplog.Find(oplogQuery).Iter()
+	return oplog.Find(oplogQuery).Sort("$natural").Tail(3)
 
 }

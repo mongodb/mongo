@@ -36,6 +36,9 @@ func TestBasicOps(t *testing.T) {
 		Convey("all operations should be applied correctly, without"+
 			" error", func() {
 
+			// set the "oplog" we will use
+			sourceOpts.OplogNS = "mongooplog_test.oplog"
+
 			// initialize a session provider for the source
 			sourceSP, err := db.InitSessionProvider(*opts)
 			So(err, ShouldBeNil)
@@ -48,9 +51,15 @@ func TestBasicOps(t *testing.T) {
 			sess, err := sourceSP.GetSession()
 			So(err, ShouldBeNil)
 			defer sess.Close()
-			oplogColl := sess.DB("local").C("oplog.rs")
-			_, err = oplogColl.RemoveAll(bson.M{})
-			So(err, ShouldBeNil)
+			oplogColl := sess.DB("mongooplog_test").C("oplog")
+			oplogColl.DropCollection()
+
+			// create the oplog as a capped collection, so it can be tailed
+			So(sess.DB("mongooplog_test").Run(
+				bson.D{{"create", "oplog"}, {"capped", true},
+					{"size", 10000}},
+				bson.M{}),
+				ShouldBeNil)
 
 			// clear out the collection we'll use for testing
 			testColl := sess.DB("mongooplog_test").C("data")
@@ -65,7 +74,7 @@ func TestBasicOps(t *testing.T) {
 				Operation: "i",
 				Namespace: "mongooplog_test.data",
 				Object: bson.M{
-					"_id": 1,
+					"_id": 3,
 				},
 			}
 			So(oplogColl.Insert(op1), ShouldBeNil)
@@ -76,7 +85,7 @@ func TestBasicOps(t *testing.T) {
 				Operation: "i",
 				Namespace: "mongooplog_test.data",
 				Object: bson.M{
-					"_id": 2,
+					"_id": 4,
 				},
 			}
 			So(oplogColl.Insert(op2), ShouldBeNil)
@@ -106,95 +115,13 @@ func TestBasicOps(t *testing.T) {
 			// run it
 			So(oplog.Run(), ShouldBeNil)
 
-			// all the operations after the threshold should have been applied
+			// the operations should have been applied
 			var inserted []bson.M
 			So(testColl.Find(bson.M{}).Sort("_id").All(&inserted),
 				ShouldBeNil)
 			So(len(inserted), ShouldEqual, 2)
-			So(inserted[0]["_id"], ShouldEqual, 1)
-			So(inserted[1]["_id"], ShouldEqual, 2)
-
-		})
-
-		Convey("when using a non-default oplog", func() {
-
-			Convey("all operations should be applied correctly, without"+
-				" error", func() {
-
-				// change the oplog to a different collection
-				sourceOpts.OplogNS = "mongooplog_test.oplog"
-
-				// initialize a session provider for the source
-				sourceSP, err := db.InitSessionProvider(*opts)
-				So(err, ShouldBeNil)
-
-				// initialize a session provider for the destination
-				destSP, err := db.InitSessionProvider(*opts)
-				So(err, ShouldBeNil)
-
-				// clear out the oplog
-				sess, err := sourceSP.GetSession()
-				So(err, ShouldBeNil)
-				defer sess.Close()
-				oplogColl := sess.DB("mongooplog_test").C("oplog")
-				oplogColl.DropCollection()
-
-				// create the oplog as a capped collection, so it can be tailed
-				So(sess.DB("mongooplog_test").Run(
-					bson.D{{"create", "oplog"}, {"capped", true},
-						{"size", 10000}},
-					bson.M{}),
-					ShouldBeNil)
-
-				// clear out the collection we'll use for testing
-				testColl := sess.DB("mongooplog_test").C("data")
-				_, err = testColl.RemoveAll(bson.M{})
-				So(err, ShouldBeNil)
-
-				// insert some "ops" into the oplog to be found and applied
-				op1 := &OplogEntry{
-					Timestamp: bson.MongoTimestamp(1<<63 - 1), // years in the future
-					HistoryID: 100,
-					Version:   2,
-					Operation: "i",
-					Namespace: "mongooplog_test.data",
-					Object: bson.M{
-						"_id": 3,
-					},
-				}
-				So(oplogColl.Insert(op1), ShouldBeNil)
-				op2 := &OplogEntry{
-					Timestamp: bson.MongoTimestamp(1<<63 - 1), // years in the future
-					HistoryID: 200,
-					Version:   2,
-					Operation: "i",
-					Namespace: "mongooplog_test.data",
-					Object: bson.M{
-						"_id": 4,
-					},
-				}
-				So(oplogColl.Insert(op2), ShouldBeNil)
-
-				// initialize the mongooplog
-				oplog := MongoOplog{
-					ToolOptions:         opts,
-					SourceOptions:       sourceOpts,
-					SessionProviderFrom: sourceSP,
-					CmdRunnerTo:         destSP,
-				}
-
-				// run it
-				So(oplog.Run(), ShouldBeNil)
-
-				// the operations should have been applied
-				var inserted []bson.M
-				So(testColl.Find(bson.M{}).Sort("_id").All(&inserted),
-					ShouldBeNil)
-				So(len(inserted), ShouldEqual, 2)
-				So(inserted[0]["_id"], ShouldEqual, 3)
-				So(inserted[1]["_id"], ShouldEqual, 4)
-
-			})
+			So(inserted[0]["_id"], ShouldEqual, 3)
+			So(inserted[1]["_id"], ShouldEqual, 4)
 
 		})
 

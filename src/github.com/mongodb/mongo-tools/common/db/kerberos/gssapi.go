@@ -31,10 +31,10 @@ func (self *KerberosDBConnector) Configure(opts options.ToolOptions) error {
 
 		Username: opts.Auth.Username,
 		// This should always be '$external', but legacy tools require this
-		Source:  opts.Auth.Source,
-		Service: opts.Kerberos.Service,
-		//ServiceHost: opts.Kerberos.ServiceHost,
-		Mechanism: KERBEROS_AUTHENTICATION_MECHANISM,
+		Source:      opts.Auth.Source,
+		Service:     opts.Kerberos.Service,
+		ServiceHost: opts.Kerberos.ServiceHost,
+		Mechanism:   KERBEROS_AUTHENTICATION_MECHANISM,
 	}
 
 	return nil
