@@ -31,6 +31,7 @@
 #include "mongo/db/ops/update.h"
 #include "mongo/db/pdfile.h"
 #include "mongo/scripting/engine.h"
+#include "mongo/util/file.h"
 #include "mongo/util/hashtab.h"
 
 namespace mongo {
@@ -179,8 +180,26 @@ namespace mongo {
         else {
             // use lenForNewNsFiles, we are making a new database
             massert( 10343, "bad lenForNewNsFiles", lenForNewNsFiles >= 1024*1024 );
+
             maybeMkdir();
             unsigned long long l = lenForNewNsFiles;
+
+            {
+                // Due to SERVER-15369 we need to explicitly write zero-bytes to the NS file.
+                const unsigned long long kBlockSize = 1024*1024;
+                verify(l % kBlockSize == 0); // ns files can only be multiples of 1MB
+                const std::vector<char> zeros(kBlockSize, 0);
+
+                File file;
+                file.open(pathString.c_str());
+                massert(18825, str::stream() << "couldn't create file " << pathString, file.is_open());
+                for (fileofs ofs = 0; ofs < l; ofs += kBlockSize ) {
+                    file.write(ofs, &zeros[0], kBlockSize);
+                }
+                file.fsync();
+                massert(18826, str::stream() << "failure writing file " << pathString, !file.bad() );
+            }
+
             if( f.create(pathString, l, true) ) {
                 getDur().createdFile(pathString, l); // always a new file
                 len = l;
