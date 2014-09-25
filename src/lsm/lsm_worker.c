@@ -96,7 +96,8 @@ __lsm_worker(void *arg)
 	conn = S2C(session);
 
 	entry = NULL;
-	while (F_ISSET(conn, WT_CONN_SERVER_RUN)) {
+	while (F_ISSET(conn, WT_CONN_SERVER_RUN) &&
+	    F_ISSET(cookie, WT_LSM_WORKER_RUN)) {
 		progress = 0;
 
 		/*
