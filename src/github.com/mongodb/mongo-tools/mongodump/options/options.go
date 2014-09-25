@@ -14,6 +14,7 @@ func (self *InputOptions) Name() string {
 
 type OutputOptions struct {
 	Out                 string `long:"out" short:"o" description:"output directory or - for stdout" default:"dump"`
+	Repair              bool   `long:"repair" description:"try to recover a crashed database"`
 	Oplog               bool   `long:"oplog" description:"Use oplog for point-in-time snapshotting"`
 	DumpDBUsersAndRoles bool   `long:"dumpDbUsersAndRoles" description:"Dump user and role definitions for the given database"`
 }
