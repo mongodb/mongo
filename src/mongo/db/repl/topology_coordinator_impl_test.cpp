@@ -1034,6 +1034,138 @@ namespace {
         }
     };
 
+    class HeartbeatResponseHighVerbosityTest : public HeartbeatResponseTest {
+    public:
+
+        virtual void setUp() {
+            HeartbeatResponseTest::setUp();
+            // set verbosity as high as the highest verbosity log message we'd like to check for
+            logger::globalLogDomain()->setMinimumLoggedSeverity(logger::LogSeverity::Debug(3));
+        }
+
+        virtual void tearDown() {
+            HeartbeatResponseTest::tearDown();
+            logger::globalLogDomain()->setMinimumLoggedSeverity(logger::LogSeverity::Log());
+        }
+
+    };
+
+    TEST_F(HeartbeatResponseHighVerbosityTest, UpdateHeartbeatDataNodeBelivesWeAreDown) {
+        OpTime lastOpTimeApplied = OpTime(3,0);
+
+        // request heartbeat
+        std::pair<ReplSetHeartbeatArgs, Milliseconds> request =
+            getTopoCoord().prepareHeartbeatRequest(now()++, "rs0", HostAndPort("host2"));
+
+        ReplSetHeartbeatResponse believesWeAreDownResponse;
+        believesWeAreDownResponse.noteReplSet();
+        believesWeAreDownResponse.setSetName("rs0");
+        believesWeAreDownResponse.setState(MemberState::RS_SECONDARY);
+        believesWeAreDownResponse.setElectable(true);
+        believesWeAreDownResponse.noteStateDisagreement();
+        startCapturingLogMessages();
+        HeartbeatResponseAction action = getTopoCoord().processHeartbeatResponse(
+                    now()++, // Time is left.
+                    Milliseconds(400), // Spent 0.4 of the 0.5 second in the network.
+                    HostAndPort("host2"),
+                    StatusWith<ReplSetHeartbeatResponse>(believesWeAreDownResponse),
+                    lastOpTimeApplied);
+        stopCapturingLogMessages();
+        ASSERT_NO_ACTION(action.getAction());
+        ASSERT_EQUALS(1, countLogLinesContaining("host2:27017 thinks that we are down"));
+        
+    }
+
+    TEST_F(HeartbeatResponseHighVerbosityTest, UpdateHeartbeatDataMemberNotInConfig) {
+        OpTime lastOpTimeApplied = OpTime(3,0);
+
+        // request heartbeat
+        std::pair<ReplSetHeartbeatArgs, Milliseconds> request =
+            getTopoCoord().prepareHeartbeatRequest(now()++, "rs0", HostAndPort("host5"));
+
+        ReplSetHeartbeatResponse memberMissingResponse;
+        memberMissingResponse.noteReplSet();
+        memberMissingResponse.setSetName("rs0");
+        memberMissingResponse.setState(MemberState::RS_SECONDARY);
+        memberMissingResponse.setElectable(true);
+        memberMissingResponse.noteStateDisagreement();
+        startCapturingLogMessages();
+        HeartbeatResponseAction action = getTopoCoord().processHeartbeatResponse(
+                    now()++, // Time is left.
+                    Milliseconds(400), // Spent 0.4 of the 0.5 second in the network.
+                    HostAndPort("host5"),
+                    StatusWith<ReplSetHeartbeatResponse>(memberMissingResponse),
+                    lastOpTimeApplied);
+        stopCapturingLogMessages();
+        ASSERT_NO_ACTION(action.getAction());
+        ASSERT_EQUALS(1, countLogLinesContaining("Could not find host5:27017 in current config"));
+    }
+
+    TEST_F(HeartbeatResponseHighVerbosityTest, UpdateHeartbeatDataSameConfig) {
+        OpTime lastOpTimeApplied = OpTime(3,0);
+
+        // request heartbeat
+        std::pair<ReplSetHeartbeatArgs, Milliseconds> request =
+            getTopoCoord().prepareHeartbeatRequest(now()++, "rs0", HostAndPort("host2"));
+
+        // construct a copy of the original config for log message checking later
+        // see HeartbeatResponseTest for the origin of the original config
+        ReplicaSetConfig originalConfig;
+        originalConfig.initialize(BSON("_id" << "rs0" <<
+                                       "version" << 5 <<
+                                       "members" << BSON_ARRAY(
+                                           BSON("_id" << 0 << "host" << "host1:27017") <<
+                                           BSON("_id" << 1 << "host" << "host2:27017") <<
+                                           BSON("_id" << 2 << "host" << "host3:27017")) <<
+                                       "settings" << BSON("heartbeatTimeoutSecs" << 5)));
+
+        ReplSetHeartbeatResponse sameConfigResponse;
+        sameConfigResponse.noteReplSet();
+        sameConfigResponse.setSetName("rs0");
+        sameConfigResponse.setState(MemberState::RS_SECONDARY);
+        sameConfigResponse.setElectable(true);
+        sameConfigResponse.noteStateDisagreement();
+        sameConfigResponse.setVersion(2);
+        sameConfigResponse.setConfig(originalConfig);
+        startCapturingLogMessages();
+        HeartbeatResponseAction action = getTopoCoord().processHeartbeatResponse(
+                    now()++, // Time is left.
+                    Milliseconds(400), // Spent 0.4 of the 0.5 second in the network.
+                    HostAndPort("host2"),
+                    StatusWith<ReplSetHeartbeatResponse>(sameConfigResponse),
+                    lastOpTimeApplied);
+        stopCapturingLogMessages();
+        ASSERT_NO_ACTION(action.getAction());
+        ASSERT_EQUALS(1, countLogLinesContaining("Config from heartbeat response was "
+                                                 "same as ours."));
+    }
+
+    TEST_F(HeartbeatResponseHighVerbosityTest, UpdateHeartbeatDataOldConfig) {
+        OpTime lastOpTimeApplied = OpTime(3,0);
+
+        // request heartbeat
+        std::pair<ReplSetHeartbeatArgs, Milliseconds> request =
+            getTopoCoord().prepareHeartbeatRequest(now()++, "rs0", HostAndPort("host2"));
+
+        ReplSetHeartbeatResponse believesWeAreDownResponse;
+        believesWeAreDownResponse.noteReplSet();
+        believesWeAreDownResponse.setSetName("rs0");
+        believesWeAreDownResponse.setState(MemberState::RS_SECONDARY);
+        believesWeAreDownResponse.setElectable(true);
+        believesWeAreDownResponse.noteStateDisagreement();
+        startCapturingLogMessages();
+        HeartbeatResponseAction action = getTopoCoord().processHeartbeatResponse(
+                    now()++, // Time is left.
+                    Milliseconds(400), // Spent 0.4 of the 0.5 second in the network.
+                    HostAndPort("host2"),
+                    StatusWith<ReplSetHeartbeatResponse>(believesWeAreDownResponse),
+                    lastOpTimeApplied);
+        stopCapturingLogMessages();
+        ASSERT_NO_ACTION(action.getAction());
+        ASSERT_EQUALS(1, countLogLinesContaining("host2:27017 thinks that we are down"));
+        
+    }
+
     TEST_F(HeartbeatResponseTestOneRetry, DecideToReconfig) {
         // Confirm that action responses can come back from retries; in this, expect a Reconfig
         // action.
@@ -1186,40 +1318,6 @@ namespace {
         // Because this is the second retry, rather than retry again, we expect to wait for the
         // heartbeat interval of 2 seconds to elapse.
         ASSERT_EQUALS(Date_t(firstRequestDate() + 6800), action.getNextHeartbeatStartDate());
-    }
-
-    TEST_F(HeartbeatResponseTestTwoRetries, DecideToReconfig) {
-        // Confirm that action responses can come back from retries; in this, expect a Reconfig
-        // action.
-        ReplicaSetConfig newConfig;
-        ASSERT_OK(newConfig.initialize(
-                          BSON("_id" << "rs0" <<
-                               "version" << 7 <<
-                               "members" << BSON_ARRAY(
-                                       BSON("_id" << 0 << "host" << "host1:27017") <<
-                                       BSON("_id" << 1 << "host" << "host2:27017") <<
-                                       BSON("_id" << 2 << "host" << "host3:27017") <<
-                                       BSON("_id" << 3 << "host" << "host4:27017")) <<
-                               "settings" << BSON("heartbeatTimeoutSecs" << 5))));
-        ASSERT_OK(newConfig.validate());
-
-        ReplSetHeartbeatResponse reconfigResponse;
-        reconfigResponse.noteReplSet();
-        reconfigResponse.setSetName("rs0");
-        reconfigResponse.setState(MemberState::RS_SECONDARY);
-        reconfigResponse.setElectable(true);
-        reconfigResponse.setVersion(7);
-        reconfigResponse.setConfig(newConfig);
-        HeartbeatResponseAction action =
-            getTopoCoord().processHeartbeatResponse(
-                    firstRequestDate() + 5000, // Time is left.
-                    Milliseconds(400), // Spent 0.4 of the 0.5 second in the network.
-                    target(),
-                    StatusWith<ReplSetHeartbeatResponse>(reconfigResponse),
-                    OpTime(0, 0));  // We've never applied anything.
-        ASSERT_EQUALS(HeartbeatResponseAction::Reconfig, action.getAction());
-        ASSERT_TRUE(TopologyCoordinator::Role::follower == getTopoCoord().getRole());
-        ASSERT_EQUALS(Date_t(firstRequestDate() + 7000), action.getNextHeartbeatStartDate());
     }
 
     TEST_F(HeartbeatResponseTestTwoRetries, DecideToStepDownRemotePrimary) {
