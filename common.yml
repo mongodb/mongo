@@ -945,10 +945,7 @@ buildvariants:
     <<: *mongodb_default_startup_args
     coverage: true
     coverage_args: "-coverprofile=coverage.out"
-    build_tags: "-tags sasl"
-    run_kinit: true
-  tasks:
-  - name: db
+  tasks: *ubuntu1204_tasks
 
 - name: ubuntu-kerberos
   display_name: Linux 64-bit Kerberos
