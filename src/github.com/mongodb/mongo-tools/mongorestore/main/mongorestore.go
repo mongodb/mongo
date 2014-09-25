@@ -2,7 +2,6 @@ package main
 
 import (
 	"fmt"
-	"github.com/mongodb/mongo-tools/common/db"
 	"github.com/mongodb/mongo-tools/common/log"
 	commonopts "github.com/mongodb/mongo-tools/common/options"
 	"github.com/mongodb/mongo-tools/common/util"
@@ -56,20 +55,16 @@ func main() {
 
 	opts.Direct = true
 
-	// create a session provider to connect to the db
-	sessionProvider, err := db.InitSessionProvider(*opts)
-	if err != nil {
-		fmt.Printf("error initializing database session: %v\n", err)
-		util.ExitFail()
-		return
-	}
-
 	restore := mongorestore.MongoRestore{
 		ToolOptions:     opts,
 		OutputOptions:   outputOpts,
 		InputOptions:    inputOpts,
-		SessionProvider: sessionProvider,
 		TargetDirectory: targetDir,
+	}
+
+	err = restore.Init()
+	if err != nil {
+		util.Exitf(1, "%v", err)
 	}
 
 	err = restore.Restore()

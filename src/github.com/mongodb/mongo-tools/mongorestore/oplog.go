@@ -5,7 +5,6 @@ import (
 	"github.com/mongodb/mongo-tools/common/db"
 	"github.com/mongodb/mongo-tools/common/log"
 	"github.com/mongodb/mongo-tools/common/progress"
-	"gopkg.in/mgo.v2"
 	"gopkg.in/mgo.v2/bson"
 	"os"
 	"time"
@@ -25,17 +24,11 @@ type Oplog struct {
 }
 
 func (restore *MongoRestore) RestoreOplog() error {
+	log.Log(0, "replaying oplog")
 	intent := restore.manager.Oplog()
 	if intent == nil {
 		log.Log(0, "no oplog.bson file in root of the dump directory, skipping oplog application")
 	}
-
-	session, err := restore.SessionProvider.GetSession()
-	if err != nil {
-		return fmt.Errorf("can't esablish session: %v", err)
-	}
-	session.SetSafe(restore.safety)
-	defer session.Close()
 
 	fileInfo, err := os.Lstat(intent.BSONPath)
 	if err != nil {
@@ -69,12 +62,11 @@ func (restore *MongoRestore) RestoreOplog() error {
 
 	// To restore the oplog, we iterate over the oplog entries,
 	// filling up a buffer. Once the buffer reaches max document size,
-	//
-	//
+	// apply the current buffered ops and reset the buffer.
 	for bsonSource.Next(rawOplogEntry) {
 		entrySize = len(rawOplogEntry.Data)
 		if bufferedBytes+entrySize > OplogMaxCommandSize {
-			err = ApplyOps(session, entryArray)
+			err = restore.ApplyOps(entryArray)
 			if err != nil {
 				return fmt.Errorf("error applying oplog: %v", err)
 			}
@@ -88,7 +80,7 @@ func (restore *MongoRestore) RestoreOplog() error {
 	}
 	// finally, flush the remaining entries
 	if len(entryArray) > 0 {
-		err = ApplyOps(session, entryArray)
+		err = restore.ApplyOps(entryArray)
 		if err != nil {
 			return fmt.Errorf("error applying oplog: %v", err)
 		}
@@ -98,13 +90,14 @@ func (restore *MongoRestore) RestoreOplog() error {
 
 }
 
-func ApplyOps(session *mgo.Session, entries []bson.Raw) error {
+func (restore *MongoRestore) ApplyOps(entries []bson.Raw) error {
 	res := &bson.M{}
-	err := session.Run(bson.M{"applyOps": entries}, res)
+	err := restore.cmdRunner.Run(bson.M{"applyOps": entries}, res, "admin")
 	if err != nil {
 		return fmt.Errorf("applyOps: %v", err)
 	}
 
-	//log.Logf(0, "%+v", *res)
+	//TODO check results?
+
 	return nil
 }

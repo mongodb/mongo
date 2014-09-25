@@ -6,6 +6,7 @@ import (
 	"github.com/mongodb/mongo-tools/common/db"
 	commonopts "github.com/mongodb/mongo-tools/common/options"
 	"github.com/mongodb/mongo-tools/mongofiles/options"
+	"gopkg.in/mgo.v2"
 	"gopkg.in/mgo.v2/bson"
 	"io"
 	"os"
@@ -334,7 +335,7 @@ func (self *MongoFiles) createGridFSFile(gridFSFileName, contentType string, loc
 	}
 
 	// open GridFSChunks DocSink to write to
-	chunksSink, err := self.cmdRunner.OpenInsertStream(self.ToolOptions.Namespace.DB, GridFSChunks)
+	chunksSink, err := self.cmdRunner.OpenInsertStream(self.ToolOptions.Namespace.DB, GridFSChunks, &mgo.Safe{})
 	if err != nil {
 		return fmt.Errorf("error while trying to open stream for writing chunks: %v", err)
 	}
@@ -404,7 +405,7 @@ func (self *MongoFiles) createGridFSFile(gridFSFileName, contentType string, loc
 	}
 
 	// open GridFSFiles DocSink to write to
-	filesSink, err := self.cmdRunner.OpenInsertStream(self.ToolOptions.Namespace.DB, GridFSFiles)
+	filesSink, err := self.cmdRunner.OpenInsertStream(self.ToolOptions.Namespace.DB, GridFSFiles, &mgo.Safe{})
 	if err != nil {
 		return fmt.Errorf("error while trying to open stream for inserting file information into %s: %v", GridFSFiles, err)
 	}

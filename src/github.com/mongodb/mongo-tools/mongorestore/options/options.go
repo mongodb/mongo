@@ -18,7 +18,7 @@ type OutputOptions struct {
 	WriteConcern     int  `long:"w" description:"Minimum number of replicas per write"`
 	NoIndexRestore   bool `long:"noIndexRestore" description:"Don't restore indexes"`
 	NoOptionsRestore bool `long:"noOptionsRestore" description:"Don't restore options"`
-	//TODO keepIndexVersion????
+	KeepIndexVersion bool `long:"keepIndexVersion" description:"Don't update index version"`
 }
 
 func (self *OutputOptions) Name() string {

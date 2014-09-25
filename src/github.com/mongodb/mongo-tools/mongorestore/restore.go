@@ -5,7 +5,6 @@ import (
 	"github.com/mongodb/mongo-tools/common/db"
 	"github.com/mongodb/mongo-tools/common/log"
 	"github.com/mongodb/mongo-tools/common/progress"
-	"gopkg.in/mgo.v2"
 	"gopkg.in/mgo.v2/bson"
 	"io/ioutil"
 	"os"
@@ -26,23 +25,22 @@ func (restore *MongoRestore) RestoreIntents() error {
 
 func (restore *MongoRestore) RestoreIntent(intent *Intent) error {
 
-	session, err := restore.SessionProvider.GetSession()
-	if err != nil {
-		return fmt.Errorf("can't esablish session: %v", err)
-	}
-	session.SetSafe(restore.safety)
-	defer session.Close()
-	c := session.DB(intent.DB).C(intent.C)
+	//session.SetSafe(restore.safety)
 
-	collectionExists, err := DBHasCollection(session.DB(intent.DB), intent.Key())
+	collectionExists, err := restore.DBHasCollection(intent)
 	if err != nil {
 		return fmt.Errorf("error reading database: %v", err)
+	}
+
+	if restore.safety == nil && !restore.OutputOptions.Drop && collectionExists {
+		log.Logf(0, "restoring to %v without dropping", intent.Key())
+		log.Log(0, "IMPORTANT: restored data will be inserted without raising errors; check your server log")
 	}
 
 	if restore.OutputOptions.Drop {
 		if collectionExists {
 			log.Logf(1, "dropping collection %v before restoring", intent.Key())
-			err = c.DropCollection()
+			err = restore.cmdRunner.Run(bson.M{"drop": intent.C}, &bson.M{}, intent.DB) //TODO check result?
 			if err != nil {
 				return fmt.Errorf("error dropping collection: %v", err)
 			}
@@ -52,8 +50,8 @@ func (restore *MongoRestore) RestoreIntent(intent *Intent) error {
 		}
 	}
 
-	var options *mgo.CollectionInfo
-	var indexes []mgo.Index
+	var options bson.D
+	var indexes []IndexDocument
 
 	//first create collection with options
 	if intent.MetadataPath != "" && !restore.OutputOptions.NoOptionsRestore {
@@ -62,7 +60,7 @@ func (restore *MongoRestore) RestoreIntent(intent *Intent) error {
 		if err != nil {
 			return fmt.Errorf("error reading metadata file: %v", err) //TODO better errors here
 		}
-		options, indexes, err = MetadataFromJSON(jsonBytes)
+		options, indexes, err = restore.MetadataFromJSON(jsonBytes)
 		if err != nil {
 			return fmt.Errorf("error parsing metadata file (%v): %v", string(jsonBytes), err)
 		}
@@ -71,7 +69,7 @@ func (restore *MongoRestore) RestoreIntent(intent *Intent) error {
 				log.Logf(1, "collection %v already exists", intent.Key())
 			} else {
 				log.Logf(1, "creating collection %v using options from metadata", intent.Key())
-				err = c.Create(options)
+				err = restore.cmdRunner.Run(append(bson.D{{"create", intent.C}}, options...), &bson.M{}, intent.DB)
 				if err != nil {
 					return fmt.Errorf("error creating collection %v: %v", intent.Key(), err)
 				}
@@ -108,10 +106,10 @@ func (restore *MongoRestore) RestoreIntent(intent *Intent) error {
 	if len(indexes) > 0 && !restore.OutputOptions.NoIndexRestore {
 		log.Logf(0, "restoring indexes for collection %v from metadata", intent.Key())
 		for _, idx := range indexes {
-			log.Logf(0, "\tcreating index %v", idx.Name)
-			err = c.EnsureIndex(idx)
+			log.Logf(0, "\tcreating index %v", idx.Options["name"])
+			err = restore.InsertIndex(intent.DB, idx)
 			if err != nil {
-				return fmt.Errorf("error creating index %v: %v", idx.Name, err)
+				return fmt.Errorf("error creating index %v: %v", idx.Options["name"], err)
 			}
 		}
 	} else {
@@ -123,20 +121,11 @@ func (restore *MongoRestore) RestoreIntent(intent *Intent) error {
 func (restore *MongoRestore) RestoreCollectionToDB(dbName, colName string,
 	bsonSource *db.DecodedBSONSource, fileSize int64) error {
 
-	session, err := restore.SessionProvider.GetSession()
+	insertStream, err := restore.cmdRunner.OpenInsertStream(dbName, colName, restore.safety)
 	if err != nil {
-		return fmt.Errorf("can't esablish session: %v", err)
+		return fmt.Errorf("error opening insert connection: %v", err)
 	}
-	defer session.Close()
-
-	session.SetSafe(restore.safety)
-	c := session.DB(dbName).C(colName)
-
-	if restore.safety == nil && !restore.OutputOptions.Drop {
-		//TODO check if the collection already exists!
-		log.Logf(0, "restoring to %v.%v without dropping", dbName, colName)
-		log.Log(0, "IMPORTANT: restored data will be inserted without raising errors; check your server log")
-	}
+	defer insertStream.Close()
 
 	//progress bar handler
 	bytesRead := 0
@@ -161,10 +150,9 @@ func (restore *MongoRestore) RestoreCollectionToDB(dbName, colName string,
 				break
 			}
 		}
-		err := c.Insert(doc)
+		err := insertStream.WriteDoc(doc)
 		if err != nil {
-			fmt.Println(err)
-			break
+			return err
 		}
 	}
 	if err = bsonSource.Err(); err != nil {

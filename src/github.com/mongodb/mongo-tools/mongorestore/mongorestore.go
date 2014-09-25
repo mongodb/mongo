@@ -14,7 +14,7 @@ type MongoRestore struct {
 	InputOptions  *options.InputOptions
 	OutputOptions *options.OutputOptions
 
-	SessionProvider *db.SessionProvider
+	cmdRunner db.CommandRunner
 
 	TargetDirectory string
 
@@ -23,6 +23,21 @@ type MongoRestore struct {
 	safety   *mgo.Safe
 	objCheck bool
 }
+
+func (restore *MongoRestore) Init() error {
+	if restore.ToolOptions.Namespace.DBPath != "" {
+		shim, err := db.NewShim(restore.ToolOptions.Namespace.DBPath, restore.ToolOptions.DirectoryPerDB, restore.ToolOptions.Journal)
+		if err != nil {
+			return err
+		}
+		fmt.Printf("%#v", shim)
+		restore.cmdRunner = shim
+		return nil
+	}
+	restore.cmdRunner = db.NewSessionProvider(*restore.ToolOptions)
+	return nil
+}
+
 
 func (restore *MongoRestore) ParseAndValidateOptions() error {
 	// Can't use option pkg defaults for --objcheck because it's two seperate flags,
@@ -89,7 +104,6 @@ func (restore *MongoRestore) Restore() error {
 	if err != nil {
 		return fmt.Errorf("restore error: %v", err)
 	}
-	log.Log(0, "done")
 
 	// 3. Restore oplog
 	if restore.InputOptions.OplogReplay {
@@ -98,6 +112,7 @@ func (restore *MongoRestore) Restore() error {
 			return fmt.Errorf("restore error: %v", err)
 		}
 	}
+	log.Log(0, "done")
 
 	return nil
 }

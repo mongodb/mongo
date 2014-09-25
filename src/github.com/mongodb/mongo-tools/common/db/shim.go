@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/mongodb/mongo-tools/common/bsonutil"
 	"github.com/mongodb/mongo-tools/common/json"
+	"gopkg.in/mgo.v2"
 	"gopkg.in/mgo.v2/bson"
 	"io"
 	"os"
@@ -124,7 +125,7 @@ func (shim *Shim) FindOne(DB, Collection string, Skip int, Query interface{}, So
 	return nil
 }
 
-func (shim *Shim) OpenInsertStream(DB, Collection string) (DocSink, error) {
+func (shim *Shim) OpenInsertStream(DB, Collection string, _ *mgo.Safe) (DocSink, error) {
 	writerShim := &StorageShim{
 		DBPath:         shim.DBPath,
 		Database:       DB,
