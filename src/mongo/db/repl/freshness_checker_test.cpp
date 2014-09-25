@@ -895,6 +895,208 @@ namespace {
         ASSERT_FALSE(tied);
     }
 
+    class FreshnessScatterGatherTest : public mongo::unittest::Test {
+    public:
+        virtual void setUp() {
+            int selfConfigIndex = 0;
+            OpTime lastOpTimeApplied = OpTime(100, 0);
+
+            ReplicaSetConfig config;
+            config.initialize(BSON("_id" << "rs0" <<
+                                   "version" << 1 <<
+                                   "members" << BSON_ARRAY(
+                                       BSON("_id" << 0 << "host" << "host0") <<
+                                       BSON("_id" << 1 << "host" << "host1") <<
+                                       BSON("_id" << 2 << "host" << "host2"))));
+
+            std::vector<HostAndPort> hosts;
+            for (ReplicaSetConfig::MemberIterator mem = ++config.membersBegin();
+                    mem != config.membersEnd();
+                    ++mem) {
+                hosts.push_back(mem->getHostAndPort());
+            }
+
+            _checker.reset(new FreshnessChecker::Algorithm(lastOpTimeApplied,
+                                                           config,
+                                                           selfConfigIndex,
+                                                           hosts));
+
+        }
+
+        virtual void tearDown() {
+            _checker.reset(NULL);
+        }
+
+    protected:
+        bool isFreshest() {
+            return _checker->isFreshest();
+        }
+
+        bool isTiedForFreshest() {
+            return _checker->isTiedForFreshest();
+        }
+
+        bool hasReceivedSufficientResponses() {
+            return _checker->hasReceivedSufficientResponses();
+        }
+
+        void processResponse(const RemoteCommandRequest& request, const ResponseStatus& response) {
+            _checker->processResponse(request, response);
+        }
+
+        ResponseStatus lessFresh() {
+            BSONObjBuilder bb;
+            bb.appendDate("opTime", OpTime(10, 0).asDate());
+            return ResponseStatus(NetworkInterfaceMock::Response(bb.obj(), Milliseconds(10)));
+        }
+
+        ResponseStatus moreFreshViaOpTime() {
+            BSONObjBuilder bb;
+            bb.appendDate("opTime", OpTime(110, 0).asDate());
+            return ResponseStatus(NetworkInterfaceMock::Response(bb.obj(), Milliseconds(10)));
+        }
+
+        ResponseStatus wrongTypeForOpTime() {
+            BSONObjBuilder bb;
+            bb.append("opTime", std::string("several minutes ago"));
+            return ResponseStatus(NetworkInterfaceMock::Response(bb.obj(), Milliseconds(10)));
+        }
+
+        ResponseStatus tiedForFreshness() {
+            BSONObjBuilder bb;
+            bb.appendDate("opTime", OpTime(100, 0).asDate());
+            return ResponseStatus(NetworkInterfaceMock::Response(bb.obj(), Milliseconds(10)));
+        }
+
+        ResponseStatus moreFresh() {
+            return ResponseStatus(NetworkInterfaceMock::Response(BSON("fresher" << true),
+                                                                 Milliseconds(10)));
+        }
+
+        ResponseStatus veto() {
+            return ResponseStatus(NetworkInterfaceMock::Response(BSON("veto" << true <<
+                                                                      "errmsg" << "vetoed!"),
+                                                                 Milliseconds(10)));
+        }
+
+        RemoteCommandRequest requestFrom(std::string hostname) {
+            return RemoteCommandRequest(HostAndPort(hostname),
+                                        "", // the non-hostname fields do not matter in Freshness
+                                        BSONObj(),
+                                        Milliseconds(0));
+        }
+    private:
+        scoped_ptr<FreshnessChecker::Algorithm> _checker;
+    };
+
+    TEST_F(FreshnessScatterGatherTest, BothNodesLessFresh) {
+        ASSERT_FALSE(hasReceivedSufficientResponses());
+        
+        processResponse(requestFrom("host1"), lessFresh());
+        ASSERT_FALSE(hasReceivedSufficientResponses());
+
+        processResponse(requestFrom("host2"), lessFresh());
+        ASSERT_TRUE(hasReceivedSufficientResponses());
+        ASSERT_TRUE(isFreshest());
+        ASSERT_FALSE(isTiedForFreshest());
+    }
+
+    TEST_F(FreshnessScatterGatherTest, FirstNodeFresher) {
+        ASSERT_FALSE(hasReceivedSufficientResponses());
+        
+        processResponse(requestFrom("host1"), moreFresh());
+        ASSERT_TRUE(hasReceivedSufficientResponses());
+        ASSERT_FALSE(isFreshest());
+        ASSERT_FALSE(isTiedForFreshest());
+    }
+
+    TEST_F(FreshnessScatterGatherTest, FirstNodeFresherViaOpTime) {
+        ASSERT_FALSE(hasReceivedSufficientResponses());
+        
+        processResponse(requestFrom("host1"), moreFreshViaOpTime());
+        ASSERT_TRUE(hasReceivedSufficientResponses());
+        ASSERT_FALSE(isFreshest());
+        ASSERT_FALSE(isTiedForFreshest());
+    }
+
+    TEST_F(FreshnessScatterGatherTest, FirstNodeVetoes) {
+        ASSERT_FALSE(hasReceivedSufficientResponses());
+        
+        processResponse(requestFrom("host1"), veto());
+        ASSERT_TRUE(hasReceivedSufficientResponses());
+        ASSERT_FALSE(isFreshest());
+        ASSERT_FALSE(isTiedForFreshest());
+    }
+
+    TEST_F(FreshnessScatterGatherTest, FirstNodeWrongTypeForOpTime) {
+        ASSERT_FALSE(hasReceivedSufficientResponses());
+        
+        processResponse(requestFrom("host1"), wrongTypeForOpTime());
+        ASSERT_TRUE(hasReceivedSufficientResponses());
+        ASSERT_FALSE(isFreshest());
+        ASSERT_FALSE(isTiedForFreshest());
+    }
+
+    TEST_F(FreshnessScatterGatherTest, FirstNodeTiedForFreshness) {
+        ASSERT_FALSE(hasReceivedSufficientResponses());
+        
+        processResponse(requestFrom("host1"), tiedForFreshness());
+        ASSERT_FALSE(hasReceivedSufficientResponses());
+
+        processResponse(requestFrom("host2"), lessFresh());
+        ASSERT_TRUE(hasReceivedSufficientResponses());
+        ASSERT_TRUE(isFreshest());
+        ASSERT_TRUE(isTiedForFreshest());
+    }
+
+    TEST_F(FreshnessScatterGatherTest, FirstNodeTiedAndSecondFresher) {
+        ASSERT_FALSE(hasReceivedSufficientResponses());
+        
+        processResponse(requestFrom("host1"), tiedForFreshness());
+        ASSERT_FALSE(hasReceivedSufficientResponses());
+
+        processResponse(requestFrom("host2"), moreFresh());
+        ASSERT_TRUE(hasReceivedSufficientResponses());
+        ASSERT_FALSE(isFreshest());
+        ASSERT_TRUE(isTiedForFreshest());
+    }
+
+    TEST_F(FreshnessScatterGatherTest, FirstNodeTiedAndSecondFresherViaOpTime) {
+        ASSERT_FALSE(hasReceivedSufficientResponses());
+        
+        processResponse(requestFrom("host1"), tiedForFreshness());
+        ASSERT_FALSE(hasReceivedSufficientResponses());
+
+        processResponse(requestFrom("host2"), moreFreshViaOpTime());
+        ASSERT_TRUE(hasReceivedSufficientResponses());
+        ASSERT_FALSE(isFreshest());
+        ASSERT_TRUE(isTiedForFreshest());
+    }
+
+    TEST_F(FreshnessScatterGatherTest, FirstNodeTiedAndSecondVetoes) {
+        ASSERT_FALSE(hasReceivedSufficientResponses());
+        
+        processResponse(requestFrom("host1"), tiedForFreshness());
+        ASSERT_FALSE(hasReceivedSufficientResponses());
+
+        processResponse(requestFrom("host2"), veto());
+        ASSERT_TRUE(hasReceivedSufficientResponses());
+        ASSERT_FALSE(isFreshest());
+        ASSERT_TRUE(isTiedForFreshest());
+    }
+
+    TEST_F(FreshnessScatterGatherTest, FirstNodeTiedAndSecondWrongTypeForOpTime) {
+        ASSERT_FALSE(hasReceivedSufficientResponses());
+        
+        processResponse(requestFrom("host1"), tiedForFreshness());
+        ASSERT_FALSE(hasReceivedSufficientResponses());
+
+        processResponse(requestFrom("host2"), wrongTypeForOpTime());
+        ASSERT_TRUE(hasReceivedSufficientResponses());
+        ASSERT_FALSE(isFreshest());
+        ASSERT_TRUE(isTiedForFreshest());
+    }
+
 }  // namespace
 }  // namespace repl
 }  // namespace mongo
