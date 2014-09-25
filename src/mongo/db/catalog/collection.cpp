@@ -441,6 +441,31 @@ namespace mongo {
         return _recordStore->dataSize( txn );
     }
 
+    uint64_t Collection::getIndexSize(OperationContext* opCtx,
+                                      BSONObjBuilder* details,
+                                      int scale) {
+
+        IndexCatalog* idxCatalog = getIndexCatalog();
+
+        IndexCatalog::IndexIterator ii = idxCatalog->getIndexIterator(opCtx, true);
+
+        uint64_t totalSize = 0;
+
+        while (ii.more()) {
+            IndexDescriptor* d = ii.next();
+            IndexAccessMethod* iam = idxCatalog->getIndex(d);
+
+            long long ds = iam->getSpaceUsedBytes(opCtx);
+
+            totalSize += ds;
+            if (details) {
+                details->appendNumber(d->indexName(), ds / scale);
+            }
+        }
+
+        return totalSize;
+    }
+
     /**
      * order will be:
      * 1) store index specs
