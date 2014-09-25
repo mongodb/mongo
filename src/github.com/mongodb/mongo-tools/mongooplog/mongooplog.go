@@ -152,6 +152,6 @@ func buildTailingCursor(oplog *mgo.Collection,
 	}
 
 	// TODO: wait time
-	return oplog.Find(oplogQuery).Sort("$natural").Tail(3)
+	return oplog.Find(oplogQuery).Tail(3)
 
 }
