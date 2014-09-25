@@ -639,6 +639,9 @@ tasks:
         tool: mongodump
     - func: "fetch tool"
       vars:
+        tool: mongostat
+    - func: "fetch tool"
+      vars:
         tool: mongorestore
     - func: "fetch tool"
       vars:
