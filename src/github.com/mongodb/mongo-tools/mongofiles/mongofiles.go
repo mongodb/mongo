@@ -2,6 +2,7 @@ package mongofiles
 
 import (
 	"fmt"
+	"github.com/mongodb/mongo-tools/common/bsonutil"
 	"github.com/mongodb/mongo-tools/common/db"
 	commonopts "github.com/mongodb/mongo-tools/common/options"
 	"github.com/mongodb/mongo-tools/mongofiles/options"
@@ -49,6 +50,30 @@ type MongoFiles struct {
 	FileName string
 }
 
+// represents a GridFS file
+type GFSFile struct {
+	Id          bson.ObjectId `bson:"_id"`
+	ChunkSize   int           `bson:"chunkSize"`
+	FileName    string        `bson:"filename"`
+	Length      int64         `bson:"length"`
+	Md5         string        `bson:"md5"`
+	UploadDate  time.Time     `bson:"uploadDate"`
+	ContentType string        `bson:"contentType,omitempty"`
+}
+
+// represents a GridFS chunk
+type GFSChunk struct {
+	FilesId  bson.ObjectId `bson:"files_id"`
+	ChunkNum int           `bson:"n"`
+	Data     []byte        `bson:"data"`
+}
+
+// for storing md5 hash for GridFS file
+type FileMD5 struct {
+	Ok  bool   `bson:"ok"`
+	Md5 string `bson:"md5,omitempty"`
+}
+
 func ValidateCommand(args []string) (string, error) {
 	// make sure a command is specified and that we don't have
 	// too many arguments
@@ -68,7 +93,7 @@ func ValidateCommand(args []string) (string, error) {
 		}
 	case Search, Put, Get, Delete:
 		// also make sure the supporting argument isn't literally an empty string
-		// for example, ./mongofiles get ""
+		// for example, mongofiles get ""
 		if len(args) == 1 || args[1] == "" {
 			return "", fmt.Errorf("'%v' requires a non-empty supporting argument", args[0])
 		}
@@ -84,15 +109,16 @@ func ValidateCommand(args []string) (string, error) {
 func (self *MongoFiles) findAndDisplay(query bson.M) (string, error) {
 	display := ""
 
-	docSource, err := self.cmdRunner.FindDocs(self.ToolOptions.Namespace.DB, GridFSFiles, 0, 0, query, []string{}, 0)
+	docSource, err := self.cmdRunner.FindDocs(self.ToolOptions.Namespace.DB, GridFSFiles,
+		0, 0, query, []string{}, 0)
 	if err != nil {
 		return "", fmt.Errorf("error finding GridFS files : %v", err)
 	}
 	defer docSource.Close()
 
-	var result bson.M
-	for docSource.Next(&result) {
-		display += fmt.Sprintf("%s\t%d\n", result["filename"], result["length"])
+	var fileResult GFSFile
+	for docSource.Next(&fileResult) {
+		display += fmt.Sprintf("%s\t%d\n", fileResult.FileName, fileResult.Length)
 	}
 	if err := docSource.Err(); err != nil {
 		return "", fmt.Errorf("error retrieving list of GridFS files: %v", err)
@@ -113,6 +139,7 @@ func (self *MongoFiles) Init() error {
 		self.cmdRunner = shim
 		return nil
 	}
+
 	self.cmdRunner = db.NewSessionProvider(*self.ToolOptions)
 	return nil
 }
@@ -126,19 +153,11 @@ func (self *MongoFiles) getLocalFileName() string {
 	return localFileName
 }
 
-// Return ObjectID in extended JSON format
-func getExtendedJSONOID(oid interface{}) (bson.M, bool) {
-	oidCast, ok := oid.(bson.ObjectId)
-	if !ok {
-		return nil, false
-	}
-	return bson.M{"$oid": oidCast.Hex()}, true
-}
-
 // handle logic for 'get' command
 func (self *MongoFiles) handleGet() (string, error) {
-	var fileResult bson.M
-	err := self.cmdRunner.FindOne(self.ToolOptions.Namespace.DB, GridFSFiles, 0, bson.M{"filename": self.FileName}, []string{}, &fileResult, 0)
+	var fileResult GFSFile
+	err := self.cmdRunner.FindOne(self.ToolOptions.Namespace.DB, GridFSFiles, 0,
+		bson.M{"filename": self.FileName}, []string{}, &fileResult, 0)
 	if err != nil {
 		return "", fmt.Errorf("error retrieving '%v' from GridFS: %v", self.FileName, err)
 	}
@@ -149,34 +168,26 @@ func (self *MongoFiles) handleGet() (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("error creating '%v', '%v'", localFileName, err)
 	}
-
-	fileOID := fileResult["_id"]
-	if self.ToolOptions.Namespace.DBPath != "" {
-		// encode fileOID in extended JSON if using shim
-		var ok bool
-		if fileOID, ok = getExtendedJSONOID(fileOID); !ok {
-			return "", fmt.Errorf("invalid ObjectID '%v' for file '%v'", fileOID, self.FileName)
-		}
-	}
+	defer localFile.Close()
 
 	// read chunks for file
-	docSource, err := self.cmdRunner.FindDocs(self.ToolOptions.Namespace.DB, GridFSChunks, 0, 0, bson.M{"files_id": fileOID}, []string{}, 0)
+	docSource, err := self.cmdRunner.FindDocs(self.ToolOptions.Namespace.DB, GridFSChunks, 0, 0, bson.M{"files_id": fileResult.Id}, []string{"n"}, 0)
 	if err != nil {
 		return "", fmt.Errorf("error retrieving chunks for '%v': %v", self.FileName, err)
 	}
 	defer docSource.Close()
 
-	var result bson.M
+	var chunkResult GFSChunk
 	var dataBytes []byte
-	var ok bool
-	for docSource.Next(&result) {
-		if dataBytes, ok = result["data"].([]byte); !ok {
-			return "", fmt.Errorf("error reading data for '%v'", self.FileName)
-		}
+	for docSource.Next(&chunkResult) {
+		dataBytes = chunkResult.Data
 		_, err = localFile.Write(dataBytes)
 		if err != nil {
 			return "", fmt.Errorf("error while writing to file '%v' : %v", localFileName, err)
 		}
+	}
+	if err = docSource.Err(); err != nil {
+		return "", fmt.Errorf("error reading data for '%v' : %v", self.FileName, err)
 	}
 
 	return fmt.Sprintf("Finished writing to: %s\n", localFileName), nil
@@ -214,70 +225,65 @@ func (self *MongoFiles) handlePut() (string, error) {
 
 // remove file from GridFS
 func (self *MongoFiles) removeGridFSFile(fileName string) error {
-	errorStr := "error removing '%v' from GridFS : %v"
+	errorStr := fmt.Sprintf("error removing '%v' from GridFS : %%v", fileName)
+
 	// find all files with that name
-	docSource, err := self.cmdRunner.FindDocs(self.ToolOptions.Namespace.DB, GridFSFiles, 0, 0, bson.M{"filename":fileName}, []string{}, 0)
+	docSource, err := self.cmdRunner.FindDocs(self.ToolOptions.Namespace.DB, GridFSFiles, 0, 0, bson.M{"filename": fileName}, []string{}, 0)
 	if err != nil {
-		return fmt.Errorf(errorStr, fileName, err)
+		return fmt.Errorf(errorStr, err)
 	}
 	defer docSource.Close()
 
-	var result bson.M
-	for docSource.Next(&result) {
-		fileOID := result["_id"]
-		if self.ToolOptions.Namespace.DBPath != "" {
-			// encode fileOID in extended JSON if using shim
-			var ok bool
-			if fileOID, ok = getExtendedJSONOID(fileOID); !ok {
-				return fmt.Errorf("invalid ObjectID '%v' for file '%v'", fileOID, fileName)
-			}
-		}
+	var fileResult GFSFile
+	for docSource.Next(&fileResult) {
 		// remove file from GridFSFiles collection
-		err = self.cmdRunner.RemoveAll(self.ToolOptions.Namespace.DB, GridFSFiles, bson.M{"_id":fileOID})
+		err = self.cmdRunner.Remove(self.ToolOptions.Namespace.DB, GridFSFiles, bson.M{"_id": fileResult.Id})
 		if err != nil {
-			return fmt.Errorf(errorStr, fileName, err)
+			return fmt.Errorf(errorStr, err)
 		}
 		// remove file from GridFSChunks collection
-		err = self.cmdRunner.RemoveAll(self.ToolOptions.Namespace.DB, GridFSChunks, bson.M{"files_id":fileOID})
+		err = self.cmdRunner.Remove(self.ToolOptions.Namespace.DB, GridFSChunks, bson.M{"files_id": fileResult.Id})
 	}
 	if err := docSource.Err(); err != nil {
-		return fmt.Errorf(errorStr, fileName, err)
+		return fmt.Errorf(errorStr, err)
 	}
 
 	return nil
 }
 
 // creates a GridFS file and copies over data from a the local file 'localFSFile'
-func (self *MongoFiles) createGridFSFile(gridFSFilename, contentType string, localFSFile *os.File) error {
+func (self *MongoFiles) createGridFSFile(gridFSFileName, contentType string, localFSFile *os.File) error {
 
 	// construct file info
 	// add in other attributes (especially the time-critical 'uploadDate') immediately
 	// before insertion into the DB
-	newFile := bson.M{
-		"_id":       bson.NewObjectId(),
-		"chunkSize": DefaultChunkSize,
-		"filename":  gridFSFilename,
+	newFile := GFSFile{
+		Id:        bson.NewObjectId(),
+		ChunkSize: DefaultChunkSize,
+		FileName:  gridFSFileName,
 	}
 
 	// open GridFSChunks DocSink to write to
 	chunksSink, err := self.cmdRunner.OpenInsertStream(self.ToolOptions.Namespace.DB, GridFSChunks)
 	if err != nil {
-		return err
+		return fmt.Errorf("error while trying to open stream for writing chunks: %v", err)
 	}
 
 	// construct chunks for this file
 	chunkBytes := make([]byte, DefaultChunkSize)
 	length := int64(0)
 	chunkNum := 0
-	newChunk := bson.M{
-		"files_id": newFile["_id"],
-		"n":        chunkNum,
+
+	newChunk := GFSChunk{
+		FilesId:  newFile.Id,
+		ChunkNum: chunkNum,
 	}
 
 	var nRead int
 	for {
 		nRead, err = localFSFile.Read(chunkBytes)
 		if err != nil && err != io.EOF {
+			chunksSink.Close()
 			return fmt.Errorf("error while reading in file '%v' : %v",
 				localFSFile.Name(),
 				err)
@@ -288,60 +294,75 @@ func (self *MongoFiles) createGridFSFile(gridFSFilename, contentType string, loc
 		}
 
 		length += int64(nRead)
-		newChunk["data"] = chunkBytes[:nRead]
+
+		newChunk.Data = chunkBytes[:nRead]
 		err = chunksSink.WriteDoc(newChunk)
 		if err != nil {
-			return err
+			chunksSink.Close()
+			return fmt.Errorf("error while trying to write chunks to the database: %v", err)
 		}
-		newChunk["n"] = chunkNum
+
+		newChunk.ChunkNum = chunkNum
 		chunkNum++
 	}
-	chunksSink.Close()
-	
+	err = chunksSink.Close()
+	if err != nil {
+		return fmt.Errorf("error while trying to close write stream for chunks: %v", err)
+	}
+
 	// set length, md5, uploadDate, and (if applicable) contentType
 
 	// length
-	newFile["length"] = length
+	newFile.Length = length
 
 	// md5
-	var md5Res bson.M
-	err = self.cmdRunner.Run(bson.M{"filemd5": newFile["_id"], "root": GridFSPrefix}, &md5Res, self.ToolOptions.Namespace.DB)
+	var md5Res FileMD5
+	command := bsonutil.MarshalD{{"filemd5", newFile.Id}, {"root", GridFSPrefix}}
+	err = self.cmdRunner.Run(command, &md5Res, "admin")
 	if err != nil {
-		return err
+		return fmt.Errorf("error while trying to compute md5: %v", err)
 	}
-	newFile["md5"] = md5Res["md5"]
+	if !md5Res.Ok {
+		return fmt.Errorf("invalid command to retrieve md5: %v", command)
+	}
+	newFile.Md5 = md5Res.Md5
 
 	// upload date
-	newFile["uploadDate"] = time.Now()
+	newFile.UploadDate = time.Now()
 
 	// content type
 	if contentType != "" {
-		newFile["contentType"] = contentType
+		newFile.ContentType = contentType
 	}
 
 	// open GridFSFiles DocSink to write to
 	filesSink, err := self.cmdRunner.OpenInsertStream(self.ToolOptions.Namespace.DB, GridFSFiles)
 	if err != nil {
-		return err
+		return fmt.Errorf("error while trying to open stream for inserting file information into %s: %v", GridFSFiles, err)
 	}
-	defer filesSink.Close()
 
 	err = filesSink.WriteDoc(newFile)
 	if err != nil {
-		return err
+		return fmt.Errorf("error while trying to write file information into %s: %v", GridFSFiles, err)
+	}
+	err = filesSink.Close()
+	if err != nil {
+		return fmt.Errorf("error while trying to close write stream for files: %v", err)
 	}
 
 	return nil
 }
 
 // Run the mongofiles utility
-func (self *MongoFiles) Run() (string, error) {
-	// get connection url
-	connUrl := self.ToolOptions.Host
-	if self.ToolOptions.Port != "" {
-		connUrl = fmt.Sprintf("%s:%s", connUrl, self.ToolOptions.Port)
+func (self *MongoFiles) Run(displayConnUrl bool) (string, error) {
+	if displayConnUrl {
+		// get connection url
+		connUrl := self.ToolOptions.Host
+		if self.ToolOptions.Port != "" {
+			connUrl = fmt.Sprintf("%s:%s", connUrl, self.ToolOptions.Port)
+		}
+		fmt.Printf("connected to: %v\n", connUrl)
 	}
-	fmt.Printf("connected to: %v\n", connUrl)
 
 	var output string
 	var err error

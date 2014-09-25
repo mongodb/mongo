@@ -74,7 +74,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	output, err := mongofiles.Run()
+	output, err := mongofiles.Run(true)
 	if err != nil {
 		fmt.Printf("%v\n", err)
 		os.Exit(1)
