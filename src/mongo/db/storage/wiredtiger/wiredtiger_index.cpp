@@ -330,12 +330,14 @@ namespace mongo {
 
     bool WiredTigerIndex::_search(WT_CURSOR *c, const BSONObj &key, const DiskLoc& loc, bool forward) {
         DiskLoc searchLoc = loc;
-        /* Reverse cursors should start on the last matching key. */
+        // Null cursors should start at the zero key to maintain search ordering in the
+        // collator.
+        // Reverse cursors should start on the last matching key.
         if (loc.isNull())
             searchLoc = forward ? DiskLoc(0, 0) : DiskLoc(INT_MAX, INT_MAX);
         boost::scoped_array<char> data;
         WiredTigerItem myKey = _toItem( key, searchLoc, &data );
-        return _search( c, myKey, forward );
+        return ( _search( c, myKey, forward ) );
     }
 
     bool WiredTigerIndex::_search(WT_CURSOR *c, const WiredTigerItem& myKey, bool forward) {
@@ -354,25 +356,34 @@ namespace mongo {
     bool WiredTigerIndex::IndexCursor::_locate(const BSONObj &key, const DiskLoc& loc) {
         WT_CURSOR *c = _cursor->Get();
         _eof = !WiredTigerIndex::_search(c, key, loc, _forward);
-        if (_eof)
+        if ( _eof )
             return false;
         return key == getKey();
     }
 
     bool WiredTigerIndex::IndexCursor::locate(const BSONObj &key, const DiskLoc& loc) {
         int ret;
+        bool result;
 
         // Empty keys mean go to the beginning
         if (key.isEmpty()) {
             WT_CURSOR *c = _cursor->Get();
             ret = c->reset(c);
             invariant(ret == 0);
-            advance();
-            return !isEOF();
+            if ( ( !_forward && loc == minDiskLoc ) || ( _forward && loc == maxDiskLoc ) )
+                _eof = true;
+            else
+                advance();
+            result = !isEOF();
+        } else {
+            const BSONObj finalKey = stripFieldNames(key);
+            result = _locate(finalKey, loc);
         }
 
-        const BSONObj finalKey = stripFieldNames(key);
-        return _locate(finalKey, loc);
+        // An explicit search at the start of the range should always return false
+        if (loc == minDiskLoc || loc == maxDiskLoc )
+                return ( false );
+        return ( result );
    }
 
     void WiredTigerIndex::IndexCursor::advanceTo(const BSONObj &keyBegin,
@@ -445,7 +456,7 @@ namespace mongo {
             return;
         }
         else
-            (void)locate(_savedKey, _savedLoc);
+            (void)_locate(_savedKey, _savedLoc);
     }
 
     SortedDataInterface::Cursor* WiredTigerIndex::newCursor(
