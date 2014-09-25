@@ -130,9 +130,11 @@ func (self *MongoFiles) findAndDisplay(query bson.M) (string, error) {
 // initialize cmdRunner to use either shim or session provider
 func (self *MongoFiles) Init() error {
 	if self.ToolOptions.Namespace.DBPath != "" {
-		shim, err := db.NewShim(self.ToolOptions.Namespace.DBPath,
+		shim, err := db.NewShim(
+			self.ToolOptions.Namespace.DBPath,
 			self.ToolOptions.DirectoryPerDB,
-			self.ToolOptions.Journal)
+			self.ToolOptions.Journal,
+		)
 		if err != nil {
 			return err
 		}

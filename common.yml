@@ -7,44 +7,36 @@ mongo_tools_variables:
 ## Common download URLs (merge in as hashes)
   mongo_download_urls:
     osx_108: &mongo_url_osx108
-      mongo_url: "https://fastdl.mongodb.org/osx/mongodb-osx-x86_64-2.6.4.tgz"
+      mongo_url: "https://fastdl.mongodb.org/osx/mongodb-osx-x86_64-latest.tgz"
     solaris: &mongo_url_solaris
-      mongo_url: "https://fastdl.mongodb.org/sunos5/mongodb-sunos5-x86_64-2.6.4.tgz"
+      mongo_url: "https://fastdl.mongodb.org/sunos5/mongodb-sunos5-x86_64-latest.tgz"
     rhel55_32: &mongo_url_rhell55_32
-      mongo_url: "https://fastdl.mongodb.org/linux/mongodb-linux-i686-2.6.4.tgz"
+      mongo_url: "https://fastdl.mongodb.org/linux/mongodb-linux-i686-latest.tgz"
     ubuntu1204: &mongo_url_ubuntu1204
       mongo_url: "http://downloads.10gen.com/linux/mongodb-linux-x86_64-enterprise-ubuntu1204-latest.tgz"
     windows32-bit: &mongo_url_windows32
-      mongo_url: "https://fastdl.mongodb.org/win32/mongodb-win32-i386-2.6.4.zip"
+      mongo_url: "https://fastdl.mongodb.org/win32/mongodb-win32-i386-latest.zip"
     windows64-bit: &mongo_url_windows64
-      mongo_url: "https://fastdl.mongodb.org/win32/mongodb-win32-x86_64-2008plus-2.6.4.zip"
+      mongo_url: "https://fastdl.mongodb.org/win32/mongodb-win32-x86_64-2008plus-latest.zip"
 
 
 ## List of tests to run on each buildvariant
   mongo_tools_task_lists:
     osx_108_task_list: &osx_108_tasks
-      - name: bsonutil
       - name: db
       - name: communityDist
-      - name: json
       - name: legacy
-      - name: log
       - name: unit
     rhel55_32_task_list: &rhel55_32_tasks
-      - name: bsonutil
       - name: db
       - name: communityDist
-      - name: json
       - name: legacy
-      - name: log
       - name: unit
-      - name: util
     solaris_task_list: &solaris_tasks
       - name: db
       - name: communityDist
       - name: legacy
       - name: unit
-      - name: util
     ubuntu1204_task_list: &ubuntu1204_tasks
       - name: bsonutil
       - name: db
@@ -57,7 +49,7 @@ mongo_tools_variables:
       - name: pool
       - name: progress
       - name: text
-      - name: unit
+      - name: unit-coverage
       - name: util
       - name: vet
     windows_32_task_list: &windows_32_tasks
@@ -65,14 +57,12 @@ mongo_tools_variables:
       - name: communityDist
       - name: legacy
       - name: unit
-      - name: util
     windows_64_task_list: &windows_64_tasks
       - name: db
       - name: communityDist
       - name: enterpriseDist
       - name: legacy
       - name: unit
-      - name: util
 
 
 ## Common mongodb arguments
@@ -154,13 +144,6 @@ functions:
       key: "${build_variant}_tools"
       destination: "builder_num"
 
-  "kill mongod":
-    command: shell.exec
-    params:
-      script: |
-        set -o verbose
-        pkill -9 mongod || true;
-
   "move coverage data":
     command: shell.exec
     params:
@@ -199,14 +182,21 @@ functions:
     params:
       working_dir: src
       tests:
+        # TODO bsondump needs tests
+        # TODO mongodump needs tests
+        # TODO mongotop needs tests
         - dir: src/github.com/mongodb/mongo-tools/mongoimport
           args: ${coverage_args} ${args}
         - dir: src/github.com/mongodb/mongo-tools/mongoexport
           args: ${coverage_args} ${args}
         - dir: src/github.com/mongodb/mongo-tools/mongostat
           args: ${coverage_args} ${args}
-        - dir: src/github.com/mongodb/mongo-tools/mongofiles
+        - dir: src/github.com/mongodb/mongo-tools/mongooplog
           args: ${coverage_args} ${args}
+        - dir: src/github.com/mongodb/mongo-tools/mongorestore
+          args: ${coverage_args} ${args}
+        - dir: src/github.com/mongodb/mongo-tools/mongofiles
+          args: ${coverage_args} ${args} 2>&1 > /dev/null; MONGOSHIM=./mongoshim go test -v ${coverage_args} ${args}
 
   "setup credentials" :
     command: shell.exec
@@ -282,6 +272,14 @@ pre:
           remote_key: "passwd"
         - local_key: "kerberos_password"
           remote_key: "kerberos_password"
+  - command: shell.exec
+    params:
+      script: |
+        set -o verbose
+        rm -rf src || true
+        ${killall_mci|pkill -9 mongo; pkill -9 mongodump; pkill -9 mongoexport; pkill -9 mongoimport; pkill -9 mongofiles; pkill -9 mongooplog; pkill -9 mongorestore; pkill -9 mongostat; pkill -9 mongotop; pkill -9 mongod; pkill -9 mongos; pkill -f buildlogger.py; pkill -f smoke.py}
+        rm -rf /data/db/*
+        true
 
 tasks:
 #- name: auth
@@ -331,7 +329,6 @@ tasks:
 #
 - name: bsonutil
   commands:
-    - func: "kill mongod"
     - command: git.get_project
       params:
         directory: src
@@ -354,42 +351,10 @@ tasks:
         content_type: "text/html"
     - func: "attach coverage reports"
 
-- name: db
-  commands:
-    - func: "kill mongod"
-    - command: git.get_project
-      params:
-        directory: src
-    - command: git.apply_patch
-      params:
-        directory: src
-    - func: "setup go env"
-    - command: expansions.update
-      params:
-        updates:
-          - key: "package"
-            value: "common/db"
-          - key: "args"
-            value: "-test.types=db"
-    - func: "download mongod"
-    - func: "start mongod"
-    - func: "setup integration test"
-    - func: "run unit test"
-    - func: "kill mongod"
-    - func: "move coverage data"
-    - func: "generate coverage html + text"
-    - func: "upload coverage report"
-    - func: "upload coverage report"
-      vars:
-        format: "html"
-        content_type: "text/html"
-    - func: "attach coverage reports"
-
 - name: communityDist
   depends_on:
   # - name: "unit"
   commands:
-    - func: "kill mongod"
     - command: git.get_project
       params:
         directory: src
@@ -488,11 +453,39 @@ tasks:
       vars:
         tool: mongotop
 
+- name: db
+  commands:
+    - command: git.get_project
+      params:
+        directory: src
+    - command: git.apply_patch
+      params:
+        directory: src
+    - func: "setup go env"
+    - command: expansions.update
+      params:
+        updates:
+          - key: "package"
+            value: "common/db"
+          - key: "args"
+            value: "-test.types=db"
+    - func: "download mongod"
+    - func: "start mongod"
+    - func: "setup integration test"
+    - func: "run unit test"
+    - func: "move coverage data"
+    - func: "generate coverage html + text"
+    - func: "upload coverage report"
+    - func: "upload coverage report"
+      vars:
+        format: "html"
+        content_type: "text/html"
+    - func: "attach coverage reports"
+
 - name: enterpriseDist
   depends_on:
   - name: "unit"
   commands:
-    - func: "kill mongod"
     - command: git.get_project
       params:
         directory: src
@@ -620,7 +613,6 @@ tasks:
 
 - name: json
   commands:
-    - func: "kill mongod"
     - command: git.get_project
       params:
         directory: src
@@ -647,7 +639,6 @@ tasks:
   depends_on:
   - name: communityDist
   commands:
-    - func: "kill mongod"
     - command: git.get_project
       params:
         directory: src
@@ -683,14 +674,9 @@ tasks:
       params:
         working_dir: src
         script: |
-          set -o verbose
-          if [ "Windows_NT" = "$OS" ]; then
-            export GOPATH=$(cygpath -w $(pwd));
-          else
-            export GOPATH=`pwd`;
-          fi;
-          mv ./mongodb/mongod .
-          mv ./mongodb/mongo .
+          mv ./mongodb/mongod${extension} .
+          mv ./mongodb/mongo${extension} .
+          mv ./mongodb/mongoshim${extension} .
           mv src/github.com/mongodb/mongo-tools/legacy/* .
           chmod +x mongo*
           python buildscripts/smoke.py --nopreallocj --with-cleanbb --mongod ./mongod --mongo ./mongo --report-file report.json --continue-on-failure --buildlogger-builder MCI_${build_variant} --buildlogger-buildnum ${builder_num|} --buildlogger-credentials ./mci.buildlogger --buildlogger-phase ${task_name}_${execution} tool
@@ -702,12 +688,11 @@ tasks:
       params:
         script: |
           set -o errexit
-          pkill mongo; pkill -9 mongod; pkill -9 mongos; pkill -f buildlogger.py; pkill -f smoke.py || true
+          ${killall_mci|pkill -9 mongo; pkill -9 mongodump; pkill -9 mongoexport; pkill -9 mongoimport; pkill -9 mongofiles; pkill -9 mongooplog; pkill -9 mongorestore; pkill -9 mongostat; pkill -9 mongotop; pkill -9 mongod; pkill -9 mongos; pkill -f buildlogger.py; pkill -f smoke.py}
           exit $(cat retVal)
 
 - name: lint
   commands:
-    - func: "kill mongod"
     - command: git.get_project
       params:
         directory: src
@@ -730,7 +715,6 @@ tasks:
 
 - name: log
   commands:
-    - func: "kill mongod"
     - command: git.get_project
       params:
         directory: src
@@ -755,7 +739,6 @@ tasks:
 
 - name: pool
   commands:
-    - func: "kill mongod"
     - command: git.get_project
       params:
         directory: src
@@ -804,7 +787,6 @@ tasks:
 
 - name: text
   commands:
-    - func: "kill mongod"
     - command: git.get_project
       params:
         directory: src
@@ -829,7 +811,6 @@ tasks:
 
 - name: unit
   commands:
-    - func: "kill mongod"
     - command: git.get_project
       params:
         directory: src
@@ -838,15 +819,38 @@ tasks:
         directory: src
     - func: "setup go env"
     - func: "download mongod"
-    # mongoimport
+    - command: shell.exec
+      params:
+        working_dir: src
+        script: |
+          set -o verbose
+          cp ./mongodb/mongoshim${extension} src/github.com/mongodb/mongo-tools/mongofiles
+    - func: "start mongod"
+    - func: "run tool tests"
+
+- name: unit-coverage
+  commands:
+    - command: git.get_project
+      params:
+        directory: src
+    - command: git.apply_patch
+      params:
+        directory: src
+    - func: "setup go env"
+    - func: "download mongod"
+    - command: shell.exec
+      params:
+        working_dir: src
+        script: |
+          set -o verbose
+          cp ./mongodb/mongoshim${extension} src/github.com/mongodb/mongo-tools/mongofiles
+    - func: "start mongod"
+    - func: "run tool tests"
     - command: expansions.update
       params:
         updates:
           - key: "package"
             value: "mongoimport"
-    - func: "start mongod"
-    - func: "run tool tests"
-    - func: "kill mongod"
     - func: "move coverage data"
     - func: "generate coverage html + text"
     - func: "upload coverage report"
@@ -855,13 +859,79 @@ tasks:
         format: "html"
         content_type: "text/html"
     - func: "attach coverage reports"
-    # TODO bsondump needs tests
-    # TODO mongodump needs tests
-    # TODO mongotop needs tests
+
+    - command: expansions.update
+      params:
+        updates:
+          - key: "package"
+            value: "mongoexport"
+    - func: "move coverage data"
+    - func: "generate coverage html + text"
+    - func: "upload coverage report"
+    - func: "upload coverage report"
+      vars:
+        format: "html"
+        content_type: "text/html"
+    - func: "attach coverage reports"
+
+    - command: expansions.update
+      params:
+        updates:
+          - key: "package"
+            value: "mongostat"
+    - func: "move coverage data"
+    - func: "generate coverage html + text"
+    - func: "upload coverage report"
+    - func: "upload coverage report"
+      vars:
+        format: "html"
+        content_type: "text/html"
+    - func: "attach coverage reports"
+
+    - command: expansions.update
+      params:
+        updates:
+          - key: "package"
+            value: "mongooplog"
+    - func: "move coverage data"
+    - func: "generate coverage html + text"
+    - func: "upload coverage report"
+    - func: "upload coverage report"
+      vars:
+        format: "html"
+        content_type: "text/html"
+    - func: "attach coverage reports"
+
+    - command: expansions.update
+      params:
+        updates:
+          - key: "package"
+            value: "mongorestore"
+    - func: "move coverage data"
+    - func: "generate coverage html + text"
+    - func: "upload coverage report"
+    - func: "upload coverage report"
+      vars:
+        format: "html"
+        content_type: "text/html"
+    - func: "attach coverage reports"
+
+    - command: expansions.update
+      params:
+        updates:
+          - key: "package"
+            value: "mongofiles"
+    - func: "move coverage data"
+    - func: "generate coverage html + text"
+    - func: "upload coverage report"
+    - func: "upload coverage report"
+      vars:
+        format: "html"
+        content_type: "text/html"
+    - func: "attach coverage reports"
 
 - name: util
   commands:
-    - func: "kill mongod"
     - command: git.get_project
       params:
         directory: src
@@ -886,7 +956,6 @@ tasks:
 
 - name: vet
   commands:
-    - func: "kill mongod"
     - command: git.get_project
       params:
         directory: src

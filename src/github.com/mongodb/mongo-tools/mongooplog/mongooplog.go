@@ -18,13 +18,15 @@ type MongoOplog struct {
 	// mongooplog-specific options
 	SourceOptions *options.SourceOptions
 
-	// session providers for the source server
+	// session provider for the source server
 	SessionProviderFrom *db.SessionProvider
 
 	// command runner for the destination server
 	CmdRunnerTo db.CommandRunner
 }
 
+// CreateCommandRunner returns either a shim or a session provider, based
+// on whether --dbpath is set.
 func CreateCommandRunner(opts *commonopts.ToolOptions) (db.CommandRunner,
 	error) {
 
@@ -74,7 +76,7 @@ func (self *MongoOplog) Run() error {
 
 	// read the cursor dry, applying ops to the destination
 	// server in the process
-	oplogEntry := &Oplog{}
+	oplogEntry := &OplogEntry{}
 	res := &ApplyOpsResponse{}
 	for tail.Next(oplogEntry) {
 
@@ -89,7 +91,7 @@ func (self *MongoOplog) Run() error {
 		}
 
 		// prepare the op to be applied
-		opsToApply := []Oplog{*oplogEntry}
+		opsToApply := []OplogEntry{*oplogEntry}
 
 		// apply the operation
 		err := self.CmdRunnerTo.Run(bson.M{"applyOps": opsToApply},
@@ -115,14 +117,14 @@ type ApplyOpsResponse struct {
 }
 
 // TODO: move this to common / merge with the one in mongodump
-type Oplog struct {
-	Timestamp bson.MongoTimestamp `bson:"ts"`
-	HistoryID int64               `bson:"h"`
-	Version   int                 `bson:"v"`
-	Operation string              `bson:"op"`
-	Namespace string              `bson:"ns"`
-	Object    bson.M              `bson:"o"`
-	Query     bson.M              `bson:"o2"`
+type OplogEntry struct {
+	Timestamp bson.MongoTimestamp `bson:"ts" json:"ts"`
+	HistoryID int64               `bson:"h" json:"h"`
+	Version   int                 `bson:"v" json:"v"`
+	Operation string              `bson:"op" json:"op"`
+	Namespace string              `bson:"ns" json:"ns"`
+	Object    bson.M              `bson:"o" json:"o"`
+	Query     bson.M              `bson:"o2" json:"o2"`
 }
 
 // get the tailing cursor for the oplog collection, based on the options
@@ -139,7 +141,7 @@ func buildTailingCursor(oplog *mgo.Collection,
 
 	// shift it appropriately, to prepare it to be converted to an
 	// oplog timestamp
-	thresholdShifted := thresholdAsUnix << 32
+	thresholdShifted := uint64(thresholdAsUnix) << 32
 
 	// build the oplog query
 	oplogQuery := bson.M{

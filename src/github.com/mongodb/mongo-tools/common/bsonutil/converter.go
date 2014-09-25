@@ -108,6 +108,7 @@ func ConvertBSONValueToJSON(x interface{}) (interface{}, error) {
 		return nil, nil
 	case bool:
 		return v, nil
+
 	case *bson.M: // document
 		doc, err := convertKeys(*v)
 		if err != nil {
@@ -115,6 +116,8 @@ func ConvertBSONValueToJSON(x interface{}) (interface{}, error) {
 		}
 		return doc, err
 	case bson.M: // document
+		return convertKeys(v)
+	case map[string]interface{}:
 		return convertKeys(v)
 	case []interface{}: // array
 		for i, value := range v {

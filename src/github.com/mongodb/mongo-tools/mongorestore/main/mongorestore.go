@@ -48,16 +48,20 @@ func main() {
 			targetDir = args[0]
 			if len(args) > 1 {
 				fmt.Printf("error parsing command line: too many arguments\n")
-				os.Exit(1)
+				util.ExitFail()
+				return
 			}
 		}
 	}
+
+	opts.Direct = true
 
 	// create a session provider to connect to the db
 	sessionProvider, err := db.InitSessionProvider(*opts)
 	if err != nil {
 		fmt.Printf("error initializing database session: %v\n", err)
-		os.Exit(1) //TODO copy legacy exit code
+		util.ExitFail()
+		return
 	}
 
 	restore := mongorestore.MongoRestore{
@@ -70,7 +74,9 @@ func main() {
 
 	err = restore.Restore()
 	if err != nil {
-		util.Exitf(1, "%v", err)
+		fmt.Fprintf(os.Stderr, "%v\n", err)
+		util.ExitFail()
+		return
 	}
 
 }

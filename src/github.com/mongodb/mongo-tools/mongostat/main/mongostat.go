@@ -3,10 +3,10 @@ package main
 import (
 	"fmt"
 	commonopts "github.com/mongodb/mongo-tools/common/options"
+	"github.com/mongodb/mongo-tools/common/util"
 	"github.com/mongodb/mongo-tools/mongostat"
 	"github.com/mongodb/mongo-tools/mongostat/options"
 	"os"
-	"runtime"
 	"strconv"
 	"time"
 )
@@ -23,7 +23,8 @@ func main() {
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Invalid options: %v\n", err)
 		opts.PrintHelp()
-		os.Exit(1)
+		util.ExitFail()
+		return
 	}
 
 	sleepInterval := 1
@@ -31,16 +32,19 @@ func main() {
 		if len(extra) != 1 {
 			fmt.Fprintf(os.Stderr, "Too many positional operators\n")
 			opts.PrintHelp()
-			os.Exit(1)
+			util.ExitFail()
+			return
 		}
 		sleepInterval, err = strconv.Atoi(extra[0])
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "Bad sleep interval: %v\n", extra[0])
-			os.Exit(1)
+			util.ExitFail()
+			return
 		}
 		if sleepInterval < 1 {
 			fmt.Fprintf(os.Stderr, "Sleep interval must be at least 1 second\n")
-			os.Exit(1)
+			util.ExitFail()
+			return
 		}
 	}
 
@@ -84,13 +88,7 @@ func main() {
 	err = stat.Run()
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error: %v", err)
-
-		//Required for stat1.js: exit code on failure is -1, or 255 for Windows
-		failureCode := -1
-		if runtime.GOOS == "windows" {
-			failureCode = 255
-		}
-		os.Exit(failureCode)
+		util.ExitFail()
+		return
 	}
-
 }

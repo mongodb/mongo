@@ -49,7 +49,8 @@ func main() {
 
 	if err = importer.ValidateSettings(); err != nil {
 		util.PrintfTimeStamped("Error validating settings: %v\n", err)
-		os.Exit(1)
+		util.ExitFail()
+		return
 	}
 
 	numDocs, err := importer.ImportDocuments()
@@ -62,6 +63,7 @@ func main() {
 	}
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error importing documents: %v\n", err)
-		os.Exit(1)
+		util.ExitFail()
+		return
 	}
 }
