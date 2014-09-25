@@ -16,9 +16,19 @@ function checkNWouldDelete(explain, nWouldDelete) {
     assert("executionStats" in explain);
     var executionStats = explain.executionStats;
     assert("executionStages" in executionStats);
-    var rootStage = executionStats.executionStages;
-    assert.eq(rootStage.stage, "DELETE");
-    assert.eq(rootStage.nWouldDelete, nWouldDelete);
+
+    // If passed through mongos, then DELETE should be below the SINGLE_SHARD mongos stage.
+    // Otherwise it is the root stage.
+    var execStages = executionStats.executionStages;
+    if ("SHARD_WRITE" === execStages.stage) {
+        var deleteStage = execStages.shards[0].executionStages;
+        assert.eq(deleteStage.stage, "DELETE");
+        assert.eq(deleteStage.nWouldDelete, nWouldDelete);
+    }
+    else {
+        assert.eq(execStages.stage, "DELETE");
+        assert.eq(execStages.nWouldDelete, nWouldDelete);
+    }
 }
 
 // Explain delete against an empty collection.

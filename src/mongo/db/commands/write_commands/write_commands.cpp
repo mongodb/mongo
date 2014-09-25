@@ -147,7 +147,7 @@ namespace mongo {
     Status WriteCmd::explain(OperationContext* txn,
                              const std::string& dbname,
                              const BSONObj& cmdObj,
-                             Explain::Verbosity verbosity,
+                             ExplainCommon::Verbosity verbosity,
                              BSONObjBuilder* out) const {
         // For now we only explain update and delete write commands.
         if ( BatchedCommandRequest::BatchType_Update != _writeType &&

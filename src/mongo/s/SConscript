@@ -345,6 +345,7 @@ env.Library(
     target='cluster_ops_impl',
     source=[
         'chunk_manager_targeter.cpp',
+        'cluster_explain.cpp',
         'cluster_write.cpp',
         'dbclient_multi_command.cpp',
         'dbclient_shard_resolver.cpp',

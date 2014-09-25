@@ -105,9 +105,6 @@ files.forEach(function(x) {
     var notForShardingPattern = new RegExp('[\\/\\\\](' +
         'dbadmin|' +
         'error1|' +
-        'explain_count|' + // TODO: allow passthrough once explain is implemented on mongos
-        'explain_delete|' + // TODO: allow passthrough once explain is implemented on mongos
-        'explain_find|' + // TODO: allow passthrough once explain is implemented on mongos
         'fsync|' +
         'fsync2|' +
         'geo.*|' +
@@ -149,7 +146,7 @@ files.forEach(function(x) {
         print(" !!!!!!!!!!!!!!! skipping test that should not run under sharding: " + x.name);
         return;
     }
-    
+
     print(" *******************************************");
     print("         Test : " + x.name + " ...");
     print("                " +

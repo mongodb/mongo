@@ -28,27 +28,33 @@
 
 #pragma once
 
-#include "mongo/db/catalog/collection.h"
 #include "mongo/db/commands.h"
-#include "mongo/db/query/lite_parsed_query.h"
 
 namespace mongo {
 
     /**
-     * The find command will be the main entry point for running queries once newRunQuery()
-     * is deprecated.
+     * Implements the explain command on mongos.
      *
-     * Currently, only explains run through the FindCmd, and regular queries use the old code
-     * path.
+     * "Old-style" explains (i.e. queries which have the $explain flag set), do not run
+     * through this path. Such explains will be supported for backwards compatibility,
+     * and must succeed in multiversion clusters.
+     *
+     * "New-style" explains use the explain command. When the explain command is routed
+     * through mongos, it is forwarded to all relevant shards. If *any* shard does not
+     * support a new-style explain, then the entire explain will fail (i.e. new-style
+     * explains cannot be used in multiversion clusters).
      */
-    class FindCmd : public Command {
+    class ClusterExplainCmd : public Command {
+    MONGO_DISALLOW_COPYING(ClusterExplainCmd);
     public:
-        FindCmd() : Command("find") { }
+        ClusterExplainCmd() : Command("explain") { }
 
         virtual bool isWriteCommandForConfigServer() const { return false; }
 
+        /**
+         * Running an explain on a secondary requires explicitly setting slaveOk.
+         */
         virtual bool slaveOk() const { return false; }
-
         virtual bool slaveOverrideOk() const { return true; }
 
         virtual bool maintenanceOk() const { return false; }
@@ -56,33 +62,25 @@ namespace mongo {
         virtual bool adminOnly() const { return false; }
 
         virtual void help( stringstream& help ) const {
-            help << "query for documents";
+            help << "explain database reads and writes";
         }
 
         /**
-         * In order to run the find command, you must be authorized for the "find" action
-         * type on the collection.
+         * You are authorized to run an explain if you are authorized to run
+         * the command that you are explaining. The auth check is performed recursively
+         * on the nested command.
          */
         virtual Status checkAuthForCommand(ClientBasic* client,
                                            const std::string& dbname,
                                            const BSONObj& cmdObj);
 
-        virtual Status explain(OperationContext* txn,
-                               const std::string& dbname,
-                               const BSONObj& cmdObj,
-                               ExplainCommon::Verbosity verbosity,
-                               BSONObjBuilder* out) const;
-
-        /**
-         * TODO: This needs to be implemented. Currently it does nothing.
-         */
-        virtual bool run(OperationContext* txn,
-                         const string& dbname,
-                         BSONObj& cmdObj, int options,
+        virtual bool run(OperationContext* txn, const string& dbName,
+                         BSONObj& cmdObj,
+                         int options,
                          string& errmsg,
                          BSONObjBuilder& result,
                          bool fromRepl);
 
     };
 
-}  // namespace mongo
+} // namespace mongo

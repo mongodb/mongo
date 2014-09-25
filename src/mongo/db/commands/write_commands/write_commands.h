@@ -85,7 +85,7 @@ namespace mongo {
         virtual Status explain(OperationContext* txn,
                                const std::string& dbname,
                                const BSONObj& cmdObj,
-                               Explain::Verbosity verbosity,
+                               ExplainCommon::Verbosity verbosity,
                                BSONObjBuilder* out) const;
 
         // Type of batch (e.g. insert).

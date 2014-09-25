@@ -37,10 +37,12 @@
 #include "mongo/db/lasterror.h"
 #include "mongo/db/stats/counters.h"
 #include "mongo/s/client_info.h"
+#include "mongo/s/cluster_explain.h"
 #include "mongo/s/write_ops/batched_command_request.h"
 #include "mongo/s/write_ops/batched_command_response.h"
 #include "mongo/s/write_ops/batch_upconvert.h"
 #include "mongo/db/stats/counters.h"
+#include "mongo/util/timer.h"
 
 namespace mongo {
 
@@ -81,6 +83,12 @@ namespace mongo {
 
             return status;
         }
+
+        virtual Status explain(OperationContext* txn,
+                               const std::string& dbname,
+                               const BSONObj& cmdObj,
+                               ExplainCommon::Verbosity verbosity,
+                               BSONObjBuilder* out) const;
 
         // Cluster write command entry point.
         bool run(OperationContext* txn, const string& dbname,
@@ -227,6 +235,49 @@ namespace mongo {
         // return response.getOk();
         result.appendElements( response.toBSON() );
         return true;
+    }
+
+    Status ClusterWriteCmd::explain(OperationContext* txn,
+                                    const std::string& dbname,
+                                    const BSONObj& cmdObj,
+                                    ExplainCommon::Verbosity verbosity,
+                                    BSONObjBuilder* out) const {
+        const string fullns = parseNs(dbname, cmdObj);
+
+        BatchedCommandRequest request(_writeType);
+
+        string errMsg;
+        if (!request.parseBSON(cmdObj, &errMsg) || !request.isValid(&errMsg)) {
+            return Status(ErrorCodes::FailedToParse, errMsg);
+        }
+
+        // We can only explain write batches of size 1.
+        if (request.sizeWriteOps() != 1U) {
+            return Status(ErrorCodes::InvalidLength, "explained write batches must be of size 1");
+        }
+
+        BSONObjBuilder explainCmdBob;
+        ClusterExplain::wrapAsExplain(cmdObj, verbosity, &explainCmdBob);
+
+        // We will time how long it takes to run the commands on the shards.
+        Timer timer;
+
+        // Target the command to the shards based on the singleton batch item.
+        BatchItemRef targetingBatchItem(&request, 0);
+        vector<Strategy::CommandResult> shardResults;
+        STRATEGY->commandOpWrite(dbname,
+                                 explainCmdBob.obj(),
+                                 0,
+                                 fullns,
+                                 targetingBatchItem,
+                                 &shardResults);
+
+        long long millisElapsed = timer.millis();
+
+        return ClusterExplain::buildExplainResult(shardResults,
+                                                  ClusterExplain::kWriteOnShards,
+                                                  millisElapsed,
+                                                  out);
     }
 
     //

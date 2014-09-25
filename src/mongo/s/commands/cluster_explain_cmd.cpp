@@ -28,23 +28,17 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/db/commands/explain_cmd.h"
+#include "mongo/s/commands/cluster_explain_cmd.h"
 
-#include "mongo/client/dbclientinterface.h"
-#include "mongo/db/catalog/database.h"
-#include "mongo/db/client.h"
-#include "mongo/db/commands.h"
 #include "mongo/db/query/explain.h"
-#include "mongo/db/repl/repl_coordinator_global.h"
-#include "mongo/util/mongoutils/str.h"
 
 namespace mongo {
 
-    static CmdExplain cmdExplain;
+    static ClusterExplainCmd cmdExplainCluster;
 
-    Status CmdExplain::checkAuthForCommand(ClientBasic* client,
-                                           const std::string& dbname,
-                                           const BSONObj& cmdObj) {
+    Status ClusterExplainCmd::checkAuthForCommand(ClientBasic* client,
+                                                  const std::string& dbname,
+                                                  const BSONObj& cmdObj) {
         if (Object != cmdObj.firstElement().type()) {
             return Status(ErrorCodes::BadValue, "explain command requires a nested object");
         }
@@ -61,18 +55,17 @@ namespace mongo {
         return commToExplain->checkAuthForCommand(client, dbname, explainObj);
     }
 
-    bool CmdExplain::run(OperationContext* txn,
-                         const string& dbname,
-                         BSONObj& cmdObj, int options,
-                         string& errmsg,
-                         BSONObjBuilder& result,
-                         bool fromRepl) {
+    bool ClusterExplainCmd::run(OperationContext* txn, const string& dbName,
+                                BSONObj& cmdObj,
+                                int options,
+                                string& errmsg,
+                                BSONObjBuilder& result,
+                                bool fromRepl) {
         // Should never get explain commands issued from replication.
         if (fromRepl) {
             Status commandStat(ErrorCodes::IllegalOperation,
                                "explain command should not be from repl");
-            appendCommandStatus(result, commandStat);
-            return false;
+            return appendCommandStatus(result, commandStat);
         }
 
         ExplainCommon::Verbosity verbosity;
@@ -84,33 +77,17 @@ namespace mongo {
         // This is the nested command which we are explaining.
         BSONObj explainObj = cmdObj.firstElement().Obj();
 
-        Command* commToExplain = Command::findCommand(explainObj.firstElementFieldName());
+        const std::string cmdName = explainObj.firstElementFieldName();
+        Command* commToExplain = Command::findCommand(cmdName);
         if (NULL == commToExplain) {
             mongoutils::str::stream ss;
-            ss << "Explain failed due to unknown command: " << explainObj.firstElementFieldName();
+            ss << "Explain failed due to unknown command: " << cmdName;
             Status explainStatus(ErrorCodes::CommandNotFound, ss);
             return appendCommandStatus(result, explainStatus);
         }
 
-        // Check whether the child command is allowed to run here. TODO: this logic is
-        // copied from Command::execCommand and should be abstracted. Until then, make
-        // sure to keep it up to date.
-        repl::ReplicationCoordinator* replCoord = repl::getGlobalReplicationCoordinator();
-        bool canRunHere =
-            replCoord->canAcceptWritesForDatabase(dbname) ||
-            commToExplain->slaveOk() ||
-            (commToExplain->slaveOverrideOk() && (options & QueryOption_SlaveOk));
-
-        if (!canRunHere) {
-            mongoutils::str::stream ss;
-            ss << "Explain's child command cannot run on this node. "
-               << "Are you explaining a write command on a secondary?";
-            appendCommandStatus(result, false, ss);
-            return false;
-        }
-
         // Actually call the nested command's explain(...) method.
-        Status explainStatus = commToExplain->explain(txn, dbname, explainObj, verbosity, &result);
+        Status explainStatus = commToExplain->explain(txn, dbName, explainObj, verbosity, &result);
         if (!explainStatus.isOK()) {
             return appendCommandStatus(result, explainStatus);
         }

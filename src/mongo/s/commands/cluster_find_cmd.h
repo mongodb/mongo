@@ -28,22 +28,19 @@
 
 #pragma once
 
-#include "mongo/db/catalog/collection.h"
 #include "mongo/db/commands.h"
-#include "mongo/db/query/lite_parsed_query.h"
 
 namespace mongo {
 
     /**
-     * The find command will be the main entry point for running queries once newRunQuery()
-     * is deprecated.
+     * Implements the find command on mongos.
      *
-     * Currently, only explains run through the FindCmd, and regular queries use the old code
-     * path.
+     * TODO: this is just a placeholder. It needs to be implemented for real under SERVER-15176.
      */
-    class FindCmd : public Command {
+    class ClusterFindCmd : public Command {
+    MONGO_DISALLOW_COPYING(ClusterFindCmd);
     public:
-        FindCmd() : Command("find") { }
+        ClusterFindCmd() : Command("find") { }
 
         virtual bool isWriteCommandForConfigServer() const { return false; }
 
@@ -55,7 +52,7 @@ namespace mongo {
 
         virtual bool adminOnly() const { return false; }
 
-        virtual void help( stringstream& help ) const {
+        virtual void help(stringstream& help) const {
             help << "query for documents";
         }
 
@@ -73,9 +70,6 @@ namespace mongo {
                                ExplainCommon::Verbosity verbosity,
                                BSONObjBuilder* out) const;
 
-        /**
-         * TODO: This needs to be implemented. Currently it does nothing.
-         */
         virtual bool run(OperationContext* txn,
                          const string& dbname,
                          BSONObj& cmdObj, int options,
@@ -85,4 +79,4 @@ namespace mongo {
 
     };
 
-}  // namespace mongo
+} // namespace mongo
