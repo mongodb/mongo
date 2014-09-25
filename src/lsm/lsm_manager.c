@@ -112,6 +112,7 @@ __lsm_stop_workers(WT_SESSION_IMPL *session)
 		worker_args->tid = 0;
 		worker_args->type = 0;
 		worker_args->flags = 0;
+		manager->lsm_workers--;
 		/*
 		 * We do not clear the session because they are allocated
 		 * statically when the connection was opened.
@@ -156,6 +157,9 @@ __wt_lsm_manager_reconfig(WT_SESSION_IMPL *session, const char **cfg)
 	if (manager->lsm_workers_max > orig_workers)
 		return (__lsm_general_worker_start(session));
 
+	/*
+	 * Otherwise we want to reduce the number of workers.
+	 */
 	WT_ASSERT(session, manager->lsm_workers_max < orig_workers);
 	WT_RET(__lsm_stop_workers(session));
 	return (0);
