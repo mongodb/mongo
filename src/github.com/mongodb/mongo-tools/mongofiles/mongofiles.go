@@ -21,6 +21,9 @@ const (
 	Get    = "get"
 	Delete = "delete"
 
+	// 'system.indexes' collection
+	SystemIndexes = "system.indexes"
+
 	// prefix for grid fs collections
 	GridFSPrefix = "fs"
 
@@ -33,6 +36,7 @@ const (
 	// default chunk size for a GridFS file -- 255KB
 	DefaultChunkSize = 255 * 1024
 )
+
 
 type MongoFiles struct {
 	// generic mongo tool options
@@ -253,8 +257,72 @@ func (self *MongoFiles) removeGridFSFile(fileName string) error {
 	return nil
 }
 
+// creates an index
+func (self *MongoFiles) createIndex(collection string, indexDoc bsonutil.MarshalD, indexName string, isUnique bool) error {
+	var indexesResult bson.M
+	createIndexCommand := bsonutil.MarshalD{
+		{"createIndexes", collection}, {"indexes", []interface{}{
+			bson.M{
+				"key":    indexDoc,
+				"name":   indexName,
+				"unique": isUnique,
+			},
+		}}}
+	err := self.cmdRunner.Run(createIndexCommand, &indexesResult, self.ToolOptions.Namespace.DB)
+	if err != nil {
+		return fmt.Errorf("error creating indexes on collection '%v': %v", collection, err)
+	}
+	return nil
+}
+
+// ensure index
+func (self *MongoFiles) ensureIndex(collection string, indexDoc bsonutil.MarshalD, indexName string, isUnique bool) error {
+	indexQuery := bsonutil.MarshalD{{"key", indexDoc}}
+	if isUnique {
+		indexQuery = append(indexQuery, bson.DocElem{"unique", true})
+	}
+	// using FindDocs instead of FindOne because of FindOne's error semantics
+	docSource, err := self.cmdRunner.FindDocs(self.ToolOptions.Namespace.DB, SystemIndexes, 0, 0,
+		bsonutil.MarshalD{{"key", indexDoc}}, []string{}, 0)
+	if err != nil {
+		return fmt.Errorf("error checking for indexes on the '%v' collection: %v", collection, err)
+	}
+
+	var result bson.M
+	indexExists := docSource.Next(&result)
+	
+	if err = docSource.Err(); err != nil {
+		return fmt.Errorf("error retrieving indexes on the '%v' collection: %v", collection, err)
+	}
+
+	// must close before creating index because if using shim we can only have one shim open at a time
+	err = docSource.Close()
+	if err != nil {
+		return fmt.Errorf("error closing shim: %v", err)
+	}
+	
+	if !indexExists {
+		// if an index doesn't exist, create one
+		err = self.createIndex(collection, indexDoc, indexName, isUnique)
+		if err != nil {
+			return fmt.Errorf("error creating an index: %v", err)
+		}
+	}
+
+	return nil
+}
+
 // creates a GridFS file and copies over data from a the local file 'localFSFile'
 func (self *MongoFiles) createGridFSFile(gridFSFileName, contentType string, localFSFile *os.File) error {
+	// ensure indexes exist on "filename" field in GridFSFiles and "files_id","n" in GridFSChunks
+	err := self.ensureIndex(GridFSFiles, bsonutil.MarshalD{{"filename", 1}}, "filename_1", false)
+	if err != nil {
+		return fmt.Errorf("error creating indexes on the fs.files collection: %v", err)
+	}
+	err = self.ensureIndex(GridFSChunks, bsonutil.MarshalD{{"files_id", 1}, {"n", 1}}, "files_id_n_1", true)
+	if err != nil {
+		return fmt.Errorf("error creating indexes on the fs.chunks collection: %v", err)
+	}
 
 	// construct file info
 	// add in other attributes (especially the time-critical 'uploadDate') immediately
@@ -277,8 +345,7 @@ func (self *MongoFiles) createGridFSFile(gridFSFileName, contentType string, loc
 	chunkNum := 0
 
 	newChunk := GFSChunk{
-		FilesId:  newFile.Id,
-		ChunkNum: chunkNum,
+		FilesId: newFile.Id,
 	}
 
 	var nRead int
@@ -297,15 +364,14 @@ func (self *MongoFiles) createGridFSFile(gridFSFileName, contentType string, loc
 
 		length += int64(nRead)
 
+		newChunk.ChunkNum = chunkNum
+		chunkNum++
 		newChunk.Data = chunkBytes[:nRead]
 		err = chunksSink.WriteDoc(newChunk)
 		if err != nil {
 			chunksSink.Close()
 			return fmt.Errorf("error while trying to write chunks to the database: %v", err)
 		}
-
-		newChunk.ChunkNum = chunkNum
-		chunkNum++
 	}
 	err = chunksSink.Close()
 	if err != nil {
@@ -320,7 +386,7 @@ func (self *MongoFiles) createGridFSFile(gridFSFileName, contentType string, loc
 	// md5
 	var md5Res FileMD5
 	command := bsonutil.MarshalD{{"filemd5", newFile.Id}, {"root", GridFSPrefix}}
-	err = self.cmdRunner.Run(command, &md5Res, "admin")
+	err = self.cmdRunner.Run(command, &md5Res, self.ToolOptions.Namespace.DB)
 	if err != nil {
 		return fmt.Errorf("error while trying to compute md5: %v", err)
 	}
