@@ -141,6 +141,10 @@ namespace mongo {
         return false;
     }
 
+    bool PlanCacheCommand::slaveOverrideOk() const {
+        return true;
+    }
+
     void PlanCacheCommand::help(stringstream& ss) const {
         ss << helpText;
     }
