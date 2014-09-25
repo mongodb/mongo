@@ -66,7 +66,8 @@ var (
 
 	// object types
 	binDataType     = reflect.TypeOf(BinData{})
-	dateType        = reflect.TypeOf(Date(0))
+	floatType       = reflect.TypeOf(Date(0))
+	dateType        = reflect.TypeOf(Float(0))
 	dbRefType       = reflect.TypeOf(DBRef{})
 	maxKeyType      = reflect.TypeOf(MaxKey{})
 	minKeyType      = reflect.TypeOf(MinKey{})
