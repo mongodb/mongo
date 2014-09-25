@@ -65,7 +65,7 @@ func (mongoImport *MongoImport) getImportWriter() ImportWriter {
 		len(mongoImport.IngestOptions.UpsertFields) != 0 {
 		upsertFields = strings.Split(mongoImport.IngestOptions.UpsertFields, ",")
 	}
-	if mongoImport.ToolOptions.DBPath == "" {
+	if mongoImport.ToolOptions.DBPath != "" {
 		return &DriverImportWriter{
 			upsertMode:      mongoImport.IngestOptions.Upsert,
 			upsertFields:    upsertFields,
