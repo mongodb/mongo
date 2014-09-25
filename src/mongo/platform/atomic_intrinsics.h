@@ -57,7 +57,7 @@
 #endif
 
 #if defined(_WIN32)
-#include "mongo/platform/atomic_intrinsics_win32.h"
+#error "Windows builds must use a compiler supporting std::atomic"
 #elif defined(MONGO_HAVE_GCC_ATOMIC_BUILTINS)
 #include "mongo/platform/atomic_intrinsics_gcc_atomic.h"
 #elif defined(MONGO_HAVE_GCC_SYNC_BUILTINS)

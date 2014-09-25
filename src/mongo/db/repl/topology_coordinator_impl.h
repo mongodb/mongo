@@ -130,6 +130,7 @@ namespace repl {
         virtual HostAndPort chooseNewSyncSource(Date_t now, 
                                                 const OpTime& lastOpApplied);
         virtual void blacklistSyncSource(const HostAndPort& host, Date_t until);
+        virtual bool shouldChangeSyncSource(const HostAndPort& currentSource) const;
         virtual void setStepDownTime(Date_t newTime);
         virtual void setFollowerMode(MemberState::MS newMode);
         virtual void adjustMaintenanceCountBy(int inc);
@@ -161,6 +162,7 @@ namespace repl {
                                            const OpTime& lastOpApplied,
                                            BSONObjBuilder* response,
                                            Status* result);
+        virtual void fillIsMasterForReplSet(IsMasterResponse* response);
         virtual void prepareFreezeResponse(const ReplicationExecutor::CallbackData& data,
                                            Date_t now,
                                            int secs,

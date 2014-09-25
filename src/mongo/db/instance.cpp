@@ -441,8 +441,6 @@ namespace mongo {
         bool shouldLog = logger::globalLogDomain()->shouldLog(logger::LogSeverity::Debug(1));
 
         if ( op == dbQuery ) {
-            if (!checkShardVersion(m, &dbresponse))
-                return;
             receivedQuery(txn, c , dbresponse, m, fromDBDirectClient );
         }
         else if ( op == dbGetMore ) {

@@ -30,6 +30,7 @@
 #include <cstring>
 #include <deque>
 
+#include "mongo/base/data_view.h"
 #include "mongo/bson/bson_validate.h"
 #include "mongo/bson/oid.h"
 #include "mongo/db/jsobj.h"
@@ -63,8 +64,7 @@ namespace mongo {
                 if ( ( _position + sizeof(N) ) > _maxLength )
                     return false;
                 if ( out ) {
-                    const N* temp = reinterpret_cast<const N*>(_buffer + _position);
-                    *out = *temp;
+                    *out = ConstDataView(_buffer).readLE<N>(_position);
                 }
                 _position += sizeof(N);
                 return true;

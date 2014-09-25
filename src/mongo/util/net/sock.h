@@ -103,11 +103,7 @@ namespace mongo {
      * wrapped around os representation of network address
      */
     struct SockAddr {
-        SockAddr() {
-            addressSize = sizeof(sa);
-            memset(&sa, 0, sizeof(sa));
-            sa.ss_family = AF_UNSPEC;
-        }
+        SockAddr();
         explicit SockAddr(int sourcePort); /* listener side */
         SockAddr(const char *ip, int port); /* EndPoint (remote) side, or if you want to specify which interface locally */
 
@@ -115,6 +111,8 @@ namespace mongo {
         template <typename T> const T& as() const { return *(const T*)(&sa); }
         
         std::string toString(bool includePort=true) const;
+
+        bool isValid() const { return _isValid; }
 
         /** 
          * @return one of AF_INET, AF_INET6, or AF_UNIX
@@ -139,6 +137,7 @@ namespace mongo {
         socklen_t addressSize;
     private:
         struct sockaddr_storage sa;
+        bool _isValid;
     };
 
     extern SockAddr unknownAddress; // ( "0.0.0.0", 0 )
@@ -214,7 +213,16 @@ namespace mongo {
 
         ~Socket();
 
+        /** The correct way to initialize and connect to a socket is as follows: (1) construct the
+         *  SockAddr, (2) check whether the SockAddr isValid(), (3) if the SockAddr is valid, a
+         *  Socket may then try to connect to that SockAddr. It is critical to check the return
+         *  value of connect as a false return indicates that there was an error, and the Socket
+         *  failed to connect to the given SockAddr. This failure may be due to ConnectBG returning
+         *  an error, or due to a timeout on connection, or due to the system socket deciding the
+         *  socket is invalid.
+         */
         bool connect(SockAddr& farEnd);
+
         void close();
         void send( const char * data , int len, const char *context );
         void send( const std::vector< std::pair< char *, int > > &data, const char *context );

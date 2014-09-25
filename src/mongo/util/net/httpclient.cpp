@@ -109,6 +109,7 @@ namespace mongo {
         }
 
         SockAddr addr( server.c_str() , port );
+        uassert( 15000 ,  "server socket addr is invalid" , addr.isValid() );
         HD( "addr: " << addr.toString() );
 
         Socket sock;

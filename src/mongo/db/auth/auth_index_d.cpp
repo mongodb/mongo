@@ -80,7 +80,7 @@ namespace {
             return;
         }
 
-        if (dbname == "admin" && authzVersion == AuthorizationManager::schemaVersion26Final) {
+        if (dbname == "admin" && authzVersion >= AuthorizationManager::schemaVersion26Final) {
             NamespaceString systemUsers(dbname, "system.users");
 
             // Make sure the old unique index from v2.4 on system.users doesn't exist.

@@ -255,6 +255,10 @@ namespace repl {
         return legacyStatus;
     }
 
+    void HybridReplicationCoordinator::fillIsMasterForReplSet(IsMasterResponse* result) {
+        _legacy.fillIsMasterForReplSet(result);
+    }
+
     void HybridReplicationCoordinator::processReplSetGetConfig(BSONObjBuilder* result) {
         _legacy.processReplSetGetConfig(result);
         BSONObjBuilder implResult;
@@ -396,6 +400,10 @@ namespace repl {
     vector<HostAndPort> HybridReplicationCoordinator::getHostsWrittenTo(const OpTime& op) {
         vector<HostAndPort> implResponse = _impl.getHostsWrittenTo(op);
         return implResponse;
+    }
+
+    vector<HostAndPort> HybridReplicationCoordinator::getOtherNodesInReplSet() const {
+        return _legacy.getOtherNodesInReplSet();
     }
 
     Status HybridReplicationCoordinator::checkIfWriteConcernCanBeSatisfied(

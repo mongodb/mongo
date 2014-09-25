@@ -41,6 +41,7 @@
 #include "mongo/db/repl/bgsync.h"
 #include "mongo/db/repl/connections.h"
 #include "mongo/db/repl/handshake_args.h"
+#include "mongo/db/repl/is_master_response.h"
 #include "mongo/db/repl/master_slave.h"
 #include "mongo/db/repl/member.h"
 #include "mongo/db/repl/oplog.h" // for newRepl()
@@ -523,6 +524,20 @@ namespace {
         return Status::OK();
     }
 
+    void LegacyReplicationCoordinator::fillIsMasterForReplSet(IsMasterResponse* result) {
+        invariant(getSettings().usingReplSets());
+        if (getReplicationMode() != ReplicationCoordinator::modeReplSet
+                || getCurrentMemberState().removed()) {
+            result->markAsNoConfig();
+        }
+        else {
+            BSONObjBuilder resultBuilder;
+            theReplSet->fillIsMaster(resultBuilder);
+            Status status = result->initialize(resultBuilder.done());
+            fassert(18821, status);
+        }
+    }
+
     void LegacyReplicationCoordinator::processReplSetGetConfig(BSONObjBuilder* result) {
         result->append("config", theReplSet->config().asBson());
     }
@@ -968,6 +983,24 @@ namespace {
             hosts.push_back(HostAndPort(configs[i]["host"].String()));
         }
         return hosts;
+    }
+
+    vector<HostAndPort> LegacyReplicationCoordinator::getOtherNodesInReplSet() const {
+        std::vector<HostAndPort> rsMembers;
+        const unsigned rsSelfId = theReplSet->selfId();
+        const std::vector<repl::ReplSetConfig::MemberCfg>& rsMemberConfigs =
+            repl::theReplSet->config().members;
+        for (size_t i = 0; i < rsMemberConfigs.size(); ++i) {
+            const unsigned otherId = rsMemberConfigs[i]._id;
+            if (rsSelfId == otherId)
+                continue;
+            const repl::Member* other = repl::theReplSet->findById(otherId);
+            if (!other) {
+                continue;
+            }
+            rsMembers.push_back(other->h());
+        }
+        return rsMembers;
     }
 
     Status LegacyReplicationCoordinator::checkIfWriteConcernCanBeSatisfied(

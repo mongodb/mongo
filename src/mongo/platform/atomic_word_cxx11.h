@@ -62,7 +62,7 @@ namespace mongo {
 
 #if __cplusplus >= 201103L
         // In C++11, AtomicWords are not copyable or movable.
-        AtomicWord(AtomicWord&) = delete;
+        AtomicWord(const AtomicWord&) = delete;
         AtomicWord& operator=(const AtomicWord&) = delete;
         AtomicWord(AtomicWord&&) = delete;
         AtomicWord& operator=(AtomicWord&&) = delete;

@@ -151,6 +151,8 @@ namespace repl {
 
         virtual Status processReplSetGetStatus(BSONObjBuilder* result);
 
+        virtual void fillIsMasterForReplSet(IsMasterResponse* result);
+
         virtual void processReplSetGetConfig(BSONObjBuilder* result);
 
         virtual Status setMaintenanceMode(OperationContext* txn, bool activate);
@@ -192,6 +194,8 @@ namespace repl {
         virtual bool buildsIndexes();
 
         virtual std::vector<HostAndPort> getHostsWrittenTo(const OpTime& op);
+
+        virtual std::vector<HostAndPort> getOtherNodesInReplSet() const;
 
         virtual BSONObj getGetLastErrorDefault();
 
@@ -343,6 +347,11 @@ namespace repl {
         void _setCurrentMemberState_forTestFinish(const ReplicationExecutor::CallbackData& cbData,
                                                   const MemberState& newState);
 
+        /**
+         * Bottom half of fillIsMasterForReplSet.
+         */
+        void _fillIsMasterForReplSet_finish(const ReplicationExecutor::CallbackData& dbData,
+                                            IsMasterResponse* result);
         /*
          * Returns the OpTime of the last applied operation on this node.
          */

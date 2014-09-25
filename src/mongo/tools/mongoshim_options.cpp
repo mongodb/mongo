@@ -32,6 +32,7 @@
 
 #include "mongo/base/status.h"
 #include "mongo/util/options_parser/startup_options.h"
+#include "mongo/util/text.h"
 
 namespace mongo {
 
@@ -58,14 +59,37 @@ namespace mongo {
             return ret;
         }
 
+        ret = addBSONToolOptions(options);
+        if (!ret.isOK()) {
+            return ret;
+        }
+
+        // TODO(benety): Refactor some of these related options (load, upsert, ...) into modes.
         options->addOptionChaining("load", "load", moe::Switch,
                                    "load data" );
+
+        options->addOptionChaining("remove", "remove", moe::Switch,
+                "removes documents from collection matching query "
+                "(or all documents if query is not provided)" )
+                                  .incompatibleWith("load")
+                                  .incompatibleWith("drop");
+
+        options->addOptionChaining("applyOps", "applyOps", moe::Switch,
+                                   "apply oplog entries" )
+                                  .incompatibleWith("load")
+                                  .incompatibleWith("drop");
 
         options->addOptionChaining("drop", "drop", moe::Switch,
                                    "drop collection before import" );
 
         options->addOptionChaining("upsert", "upsert", moe::Switch,
-                                   "upsert instead of insert" );
+                                   "upsert instead of insert" )
+                                  .requires("load");
+
+        options->addOptionChaining("upsertFields", "upsertFields", moe::String,
+                "comma-separated fields for the query part of the upsert. "
+                "Ensure these fields are indexed.")
+                                  .requires("upsert");
 
         options->addOptionChaining("query", "query,q", moe::String,
                 "query filter, as a JSON string, e.g., '{x:{$gt:1}}'");
@@ -86,8 +110,6 @@ namespace mongo {
 
         options->addOptionChaining("sort", "sort", moe::String,
                 "sort order, as a JSON string, e.g., '{x:1}'");
-
-        options->findOption( "dbpath" )->setDefault( moe::Value(std::string("/data/db")) );
 
         return Status::OK();
     }
@@ -117,16 +139,37 @@ namespace mongo {
             return ret;
         }
 
-        invariant( toolGlobalParams.useDirectClient );
+        if (!toolGlobalParams.useDirectClient) {
+            return Status(ErrorCodes::BadValue,
+                          "MongoShim requires a --dbpath value to proceed");
+        }
 
         ret = storeFieldOptions(params, args);
         if (!ret.isOK()) {
             return ret;
         }
 
+        ret = storeBSONToolOptions(params, args);
+        if (!ret.isOK()) {
+            return ret;
+        }
+
         mongoShimGlobalParams.load = params.count("load") > 0;
+        mongoShimGlobalParams.remove = params.count("remove") > 0;
+        mongoShimGlobalParams.applyOps = params.count("applyOps") > 0;
+
         mongoShimGlobalParams.drop = params.count("drop") > 0;
         mongoShimGlobalParams.upsert = params.count("upsert") > 0;
+
+        if (mongoShimGlobalParams.upsert) {
+            string uf = getParam("upsertFields");
+            if (uf.empty()) {
+                mongoShimGlobalParams.upsertFields.push_back("_id");
+            }
+            else {
+                StringSplitter(uf.c_str(), ",").split(mongoShimGlobalParams.upsertFields);
+            }
+        }
 
         mongoShimGlobalParams.query = getParam("query", "");
         mongoShimGlobalParams.snapShotQuery = false;

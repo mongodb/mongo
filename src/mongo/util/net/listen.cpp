@@ -105,7 +105,8 @@ namespace mongo {
             out.push_back(sa);
 
 #ifndef _WIN32
-            if (useUnixSockets && (sa.getAddr() == "127.0.0.1" || sa.getAddr() == "0.0.0.0")) // only IPv4
+            if (sa.isValid() && useUnixSockets &&
+                    (sa.getAddr() == "127.0.0.1" || sa.getAddr() == "0.0.0.0")) // only IPv4
                 out.push_back(SockAddr(makeUnixSockPath(port).c_str(), port));
 #endif
         }
@@ -141,6 +142,11 @@ namespace mongo {
              ++it) {
 
             const SockAddr& me = *it;
+
+            if (!me.isValid()) {
+                error() << "listen(): socket is invalid." << endl;
+                return;
+            }
 
             SOCKET sock = ::socket(me.getType(), SOCK_STREAM, 0);
             ScopeGuard socketGuard = MakeGuard(&closesocket, sock);

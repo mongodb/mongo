@@ -434,10 +434,11 @@ public:
                                                                       &serverAuthzVersion));
             uassert(17369,
                     mongoutils::str::stream() << "Backing up users and roles is only supported for "
-                            "clusters with auth schema versions 1 or 3, found: " <<
+                            "clusters with auth schema versions 1, 3 or 4; found " <<
                             serverAuthzVersion,
                     serverAuthzVersion == AuthorizationManager::schemaVersion24 ||
-                    serverAuthzVersion == AuthorizationManager::schemaVersion26Final);
+                    serverAuthzVersion == AuthorizationManager::schemaVersion26Final ||
+                    serverAuthzVersion == AuthorizationManager::schemaVersion28SCRAM);
         }
 
         string opLogName = "";
@@ -530,7 +531,7 @@ public:
                     << std::endl;
             go(toolGlobalParams.db, toolGlobalParams.coll, dumpQuery, outdir, "", usingMongos);
             if (mongoDumpGlobalParams.dumpUsersAndRoles &&
-                    serverAuthzVersion == AuthorizationManager::schemaVersion26Final &&
+                    serverAuthzVersion >= AuthorizationManager::schemaVersion26Final &&
                     toolGlobalParams.db != "admin") {
                 toolInfoLog() << "Backing up user and role data for the " << toolGlobalParams.db <<
                         " database";

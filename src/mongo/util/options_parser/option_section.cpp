@@ -597,25 +597,5 @@ namespace optionenvironment {
         }
     }
 
-    OptionDescription* OptionSection::findOption(const std::string& dottedName ) {
-        for (std::list<OptionDescription>::iterator i = _options.begin();
-             i != _options.end();
-             ++i) {
-            OptionDescription& od = *i;
-            if ( dottedName == od._dottedName )
-                return &od;
-        }
-
-        for ( std::list<OptionSection>::iterator i = _subSections.begin();
-              i != _subSections.end();
-              ++i ) {
-            OptionSection& os = *i;
-            OptionDescription* od = os.findOption( dottedName );
-            if ( od )
-                return od;
-        }
-        return NULL;
-    }
-
 } // namespace optionenvironment
 } // namespace mongo

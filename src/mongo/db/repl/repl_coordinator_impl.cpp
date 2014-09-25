@@ -40,6 +40,7 @@
 #include "mongo/db/operation_context_noop.h"
 #include "mongo/db/repl/check_quorum_for_config_change.h"
 #include "mongo/db/repl/handshake_args.h"
+#include "mongo/db/repl/is_master_response.h"
 #include "mongo/db/repl/master_slave.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/repl_set_heartbeat_args.h"
@@ -932,6 +933,31 @@ namespace {
         return result;
     }
 
+    void ReplicationCoordinatorImpl::fillIsMasterForReplSet(IsMasterResponse* response) {
+        invariant(getSettings().usingReplSets());
+
+        CBHStatus cbh = _replExecutor.scheduleWork(
+            stdx::bind(&ReplicationCoordinatorImpl::_fillIsMasterForReplSet_finish,
+                       this,
+                       stdx::placeholders::_1,
+                       response));
+        _replExecutor.wait(cbh.getValue());
+        if (isWaitingForApplierToDrain()) {
+            // Report NotMaster when draining the applier.
+            response->setIsMaster(false);
+        }
+    }
+
+    void ReplicationCoordinatorImpl::_fillIsMasterForReplSet_finish(
+            const ReplicationExecutor::CallbackData& cbData, IsMasterResponse* response) {
+        if (cbData.status == ErrorCodes::CallbackCanceled) {
+            response->markAsShutdownInProgress();
+            return;
+        }
+        _topCoord->fillIsMasterForReplSet(response);
+    }
+
+
     void ReplicationCoordinatorImpl::processReplSetGetConfig(BSONObjBuilder* result) {
         boost::lock_guard<boost::mutex> lock(_mutex);
         result->append("config", _rsConfig.toBSON());
@@ -1401,6 +1427,21 @@ namespace {
             }
         }
         return hosts;
+    }
+
+    std::vector<HostAndPort> ReplicationCoordinatorImpl::getOtherNodesInReplSet() const {
+        boost::lock_guard<boost::mutex> lk(_mutex);
+        invariant(_settings.usingReplSets());
+
+        std::vector<HostAndPort> nodes;
+
+        for (int i = 0; i < _rsConfig.getNumMembers(); ++i) {
+            if (i == _thisMembersConfigIndex)
+                continue;
+
+            nodes.push_back(_rsConfig.getMemberAt(i).getHostAndPort());
+        }
+        return nodes;
     }
 
     Status ReplicationCoordinatorImpl::checkIfWriteConcernCanBeSatisfied(

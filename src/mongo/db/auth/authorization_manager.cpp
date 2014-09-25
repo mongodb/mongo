@@ -109,6 +109,7 @@ namespace mongo {
     const int AuthorizationManager::schemaVersion24;
     const int AuthorizationManager::schemaVersion26Upgrade;
     const int AuthorizationManager::schemaVersion26Final;
+    const int AuthorizationManager::schemaVersion28SCRAM;
 #endif
 
     /**
@@ -582,6 +583,7 @@ namespace mongo {
                                 "Illegal value for authorization data schema version, " <<
                                 authzVersion);
                 break;
+            case schemaVersion28SCRAM:
             case schemaVersion26Final:
             case schemaVersion26Upgrade:
                 status = _fetchUserV2(txn, userName, &user);

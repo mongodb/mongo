@@ -886,7 +886,7 @@ _awaitRSHostViaRSMonitor = function(hostAddr, desiredState, rsName, timeout) {
             var stateReached = true;
             for(var prop in desiredState) {
                 if (isObject(desiredState[prop])) {
-                    if (!friendlyEqual(desiredState[prop], node[prop])) {
+                    if (!friendlyEqual(sortDoc(desiredState[prop]), sortDoc(node[prop]))) {
                         stateReached = false;
                         break;
                     }

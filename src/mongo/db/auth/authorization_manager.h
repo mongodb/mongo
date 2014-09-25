@@ -131,7 +131,7 @@ namespace mongo {
          * Users are stored in admin.system.users, roles in admin.system.roles.
          * MONGODB-CR credentials have been replaced with SCRAM credentials in the user documents.
          */
-        static const int schemaVersion28SCRAM = 4;
+        static const int schemaVersion28SCRAM = 5;
 
         // TODO: Make the following functions no longer static.
 

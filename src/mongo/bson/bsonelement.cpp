@@ -29,6 +29,7 @@
 
 #include "mongo/bson/bsonelement.h"
 
+#include "mongo/base/data_cursor.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/util/base64.h"
 #include "mongo/util/hex.h"
@@ -165,12 +166,12 @@ namespace mongo {
             }
             break;
         case BinData: {
-            const int len = *( reinterpret_cast<const int*>( value() ) );
-            BinDataType type = BinDataType( *( reinterpret_cast<const unsigned char*>( value() ) +
-                                               sizeof( int ) ) );
+            ConstDataCursor reader( value() );
+            const int len = reader.readLEAndAdvance<int>();
+            BinDataType type = static_cast<BinDataType>(reader.readLEAndAdvance<uint8_t>());
+
             s << "{ \"$binary\" : \"";
-            const char *start = reinterpret_cast<const char*>( value() ) + sizeof( int ) + 1;
-            base64::encode( s , start , len );
+            base64::encode( s , reader.view() , len );
             s << "\", \"$type\" : \"" << hex;
             s.width( 2 );
             s.fill( '0' );
@@ -706,7 +707,7 @@ namespace mongo {
         case Code:
             return std::string(valuestr(), valuestrsize()-1);
         case CodeWScope:
-            return std::string(codeWScopeCode(), *(int*)(valuestr())-1);
+            return std::string(codeWScopeCode(), ConstDataView(valuestr()).readLE<int>() - 1);
         default:
             log() << "can't convert type: " << (int)(type()) << " to code" << std::endl;
         }

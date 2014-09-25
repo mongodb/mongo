@@ -99,11 +99,13 @@ public:
         uassert(17370,
                 mongoutils::str::stream() << "Restoring users and roles is only supported for "
                         "clusters with auth schema versions " <<
-                        AuthorizationManager::schemaVersion24 << " or " <<
-                        AuthorizationManager::schemaVersion26Final << ", found: " <<
+                        AuthorizationManager::schemaVersion24 << ", " <<
+                        AuthorizationManager::schemaVersion26Final  << " or " <<
+                        AuthorizationManager::schemaVersion28SCRAM << ", found: " <<
                         _serverAuthzVersion,
                 _serverAuthzVersion == AuthorizationManager::schemaVersion24 ||
-                _serverAuthzVersion == AuthorizationManager::schemaVersion26Final);
+                _serverAuthzVersion == AuthorizationManager::schemaVersion26Final ||
+                _serverAuthzVersion == AuthorizationManager::schemaVersion28SCRAM);
 
         _serverAuthzVersionDocExists = !conn().findOne(
                 AuthorizationManager::versionCollectionNamespace,
@@ -671,13 +673,13 @@ public:
             uassert(17416,
                     mongoutils::str::stream() << "Cannot modify user data on a server with version "
                             "greater than or equal to 2.5.4 that has not yet updated the "
-                            "authorization data to schema version " <<
+                            "authorization data to at least schema version " <<
                             AuthorizationManager::schemaVersion26Final <<
                             ". Found server version " << _serverBinVersion << " with "
                             "authorization schema version " << _serverAuthzVersion,
                     _curdb != "admin" ||
                     versionCmp(_serverBinVersion, "2.5.4") < 0 ||
-                    _serverAuthzVersion == AuthorizationManager::schemaVersion26Final);
+                    _serverAuthzVersion >= AuthorizationManager::schemaVersion26Final);
 
             if (obj.hasField("credentials")) {
                 if (_serverAuthzVersion == AuthorizationManager::schemaVersion24) {
@@ -704,7 +706,7 @@ public:
                 }
             } else {
                 if (_curdb == "admin" &&
-                        _serverAuthzVersion == AuthorizationManager::schemaVersion26Final &&
+                        _serverAuthzVersion >= AuthorizationManager::schemaVersion26Final &&
                         !_serverAuthzVersionDocExists) {
                     // server with schemaVersion26Final implies it is running 2.5.4 or greater.
                     uasserted(17415,
@@ -740,7 +742,7 @@ public:
                     uasserted(17408,
                               mongoutils::str::stream()
                                       << "Server has authorization schema version "
-                                      << AuthorizationManager::schemaVersion26Final
+                                      << _serverAuthzVersion
                                       << ", but found a schema version "
                                       << AuthorizationManager::schemaVersion24 << " user: "
                                       << obj.toString());

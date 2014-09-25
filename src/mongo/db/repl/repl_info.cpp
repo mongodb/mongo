@@ -34,6 +34,7 @@
 #include "mongo/db/commands/server_status.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/query/internal_plans.h"
+#include "mongo/db/repl/is_master_response.h"
 #include "mongo/db/repl/master_slave.h"
 #include "mongo/db/repl/oplogreader.h"
 #include "mongo/db/repl/repl_coordinator_global.h"
@@ -49,16 +50,9 @@ namespace repl {
     void appendReplicationInfo(OperationContext* txn, BSONObjBuilder& result, int level) {
         ReplicationCoordinator* replCoord = getGlobalReplicationCoordinator();
         if (replCoord->getSettings().usingReplSets()) {
-            if (replCoord->getReplicationMode() != ReplicationCoordinator::modeReplSet
-                    || replCoord->getCurrentMemberState().removed()) {
-                result.append("ismaster", false);
-                result.append("secondary", false);
-                result.append("info", ReplSet::startupStatusMsg.get());
-                result.append( "isreplicaset" , true );
-            }
-            else {
-                theReplSet->fillIsMaster(result);
-            }
+            IsMasterResponse isMasterResponse;
+            replCoord->fillIsMasterForReplSet(&isMasterResponse);
+            result.appendElements(isMasterResponse.toBSON());
             return;
         }
         
@@ -73,10 +67,7 @@ namespace repl {
                               getGlobalReplicationCoordinator()->isMasterForReportingPurposes());
         }
         
-        if (level && replCoord->getSettings().usingReplSets()) {
-            result.append( "info" , "is replica set" );
-        }
-        else if ( level ) {
+        if (level) {
             BSONObjBuilder sources( result.subarrayStart( "sources" ) );
             
             int n = 0;

@@ -161,6 +161,7 @@ env.Library('replmocks',
 env.Library('replica_set_messages',
             [
                 'handshake_args.cpp',
+                'is_master_response.cpp',
                 'member_config.cpp',
                 'repl_set_heartbeat_args.cpp',
                 'repl_set_heartbeat_response.cpp',

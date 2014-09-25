@@ -167,6 +167,8 @@ namespace repl {
         return Status::OK();
     }
 
+    void ReplicationCoordinatorMock::fillIsMasterForReplSet(IsMasterResponse* result) {}
+
     Status ReplicationCoordinatorMock::setMaintenanceMode(OperationContext* txn, bool activate) {
         return Status::OK();
     }
@@ -238,6 +240,10 @@ namespace repl {
     }
 
     std::vector<HostAndPort> ReplicationCoordinatorMock::getHostsWrittenTo(const OpTime& op) {
+        return std::vector<HostAndPort>();
+    }
+
+    vector<HostAndPort> ReplicationCoordinatorMock::getOtherNodesInReplSet() const {
         return std::vector<HostAndPort>();
     }
 

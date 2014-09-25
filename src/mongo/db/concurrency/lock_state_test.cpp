@@ -28,6 +28,8 @@
 
 #include "mongo/platform/basic.h"
 
+#include <vector>
+
 #include "mongo/db/concurrency/lock_mgr_test_help.h"
 #include "mongo/unittest/unittest.h"
 
@@ -50,7 +52,7 @@ namespace newlm {
 
         ASSERT(locker.isLockHeldForMode(resId, MODE_NONE));
 
-        locker.unlockGlobal();
+        locker.unlockAll();
     }
 
     TEST(LockerImpl, ReLockNoConflict) {
@@ -68,7 +70,7 @@ namespace newlm {
         ASSERT(locker.unlock(resId));
         ASSERT(locker.isLockHeldForMode(resId, MODE_NONE));
 
-        ASSERT(locker.unlockGlobal());
+        ASSERT(locker.unlockAll());
     }
 
     TEST(LockerImpl, ConflictWithTimeout) {
@@ -86,23 +88,23 @@ namespace newlm {
 
         ASSERT(locker1.unlock(resId));
 
-        ASSERT(locker1.unlockGlobal());
-        ASSERT(locker2.unlockGlobal());
+        ASSERT(locker1.unlockAll());
+        ASSERT(locker2.unlockAll());
     }
 
     TEST(Locker, ReadTransaction) {
         LockerImpl locker(1);
 
         locker.lockGlobal(MODE_IS);
-        locker.unlockGlobal();
+        locker.unlockAll();
 
         locker.lockGlobal(MODE_IX);
-        locker.unlockGlobal();
+        locker.unlockAll();
 
         locker.lockGlobal(MODE_IX);
         locker.lockGlobal(MODE_IS);
-        locker.unlockGlobal();
-        locker.unlockGlobal();
+        locker.unlockAll();
+        locker.unlockAll();
     }
 
     TEST(Locker, WriteTransactionWithCommit) {
@@ -146,7 +148,69 @@ namespace newlm {
 
             ASSERT(locker.unlock(resIdCollection));
         }
-        locker.unlockGlobal();
+        locker.unlockAll();
+    }
+
+    /**
+     * Test that saveLockState works by examining the output.
+     */
+    TEST(Locker, saveAndRestoreGlobal) {
+        Locker::LockSnapshot lockInfo;
+
+        LockerImpl locker(1);
+
+        // No lock requests made, no locks held.
+        locker.saveLockStateAndUnlock(&lockInfo);
+        ASSERT_EQUALS(0U, lockInfo.locks.size());
+
+        // Lock the global lock twice.
+        locker.lockGlobal(MODE_IX);
+        locker.lockGlobal(MODE_IX);
+
+        // We've locked the global lock.  This should be reflected in the lockInfo.
+        locker.saveLockStateAndUnlock(&lockInfo);
+        ASSERT(!locker.isLocked());
+        ASSERT_EQUALS(MODE_IX, lockInfo.globalMode);
+        ASSERT_EQUALS(2U, lockInfo.globalRecursiveCount);
+
+        // Restore the lock(s) we had.
+        locker.restoreLockState(lockInfo);
+
+        // We have to unlock the global lock twice because we locked it twice.
+        ASSERT(!locker.unlockAll());
+        ASSERT(locker.isLocked());
+        ASSERT(locker.unlockAll());
+    }
+
+    /**
+     * Tests that restoreLockState works by locking a db and collection and saving + restoring.
+     */
+    TEST(Locker, saveAndRestoreDBAndCollection) {
+        Locker::LockSnapshot lockInfo;
+
+        LockerImpl locker(1);
+
+        const ResourceId resIdDatabase(RESOURCE_DATABASE, std::string("TestDB"));
+        const ResourceId resIdCollection(RESOURCE_COLLECTION, std::string("TestDB.collection"));
+
+        // Lock some stuff.
+        locker.lockGlobal(MODE_IX);
+        ASSERT(LOCK_OK == locker.lock(resIdDatabase, MODE_IX));
+        ASSERT(LOCK_OK == locker.lock(resIdCollection, MODE_X));
+        locker.saveLockStateAndUnlock(&lockInfo);
+
+        // Things shouldn't be locked anymore.
+        ASSERT(locker.getLockMode(resIdDatabase) == MODE_NONE);
+        ASSERT(locker.getLockMode(resIdCollection) == MODE_NONE);
+
+        // Restore lock state.
+        locker.restoreLockState(lockInfo);
+
+        // Make sure things were re-locked.
+        ASSERT(locker.getLockMode(resIdDatabase) == MODE_IX);
+        ASSERT(locker.getLockMode(resIdCollection) == MODE_X);
+
+        locker.unlockAll();
     }
 
 } // namespace newlm

@@ -95,7 +95,7 @@ namespace newlm {
 
         virtual LockResult lockGlobal(LockMode mode, unsigned timeoutMs = UINT_MAX);
         virtual void downgradeGlobalXtoSForMMAPV1();
-        virtual bool unlockGlobal();
+        virtual bool unlockAll();
 
         virtual void beginWriteUnitOfWork();
         virtual void endWriteUnitOfWork();
@@ -110,6 +110,10 @@ namespace newlm {
 
         virtual LockMode getLockMode(const ResourceId& resId) const;
         virtual bool isLockHeldForMode(const ResourceId& resId, LockMode mode) const;
+
+        virtual void saveLockStateAndUnlock(LockSnapshot* stateOut);
+
+        virtual void restoreLockState(const LockSnapshot& stateToRestore);
 
         /**
          * Dumps all locks, on the global lock manager to the log for debugging purposes.

@@ -51,6 +51,7 @@ namespace repl {
 
     class BackgroundSync;
     class HandshakeArgs;
+    class IsMasterResponse;
     class OplogReader;
     class ReplSetHeartbeatArgs;
     class ReplSetHeartbeatResponse;
@@ -326,6 +327,12 @@ namespace repl {
         virtual Status processReplSetGetStatus(BSONObjBuilder* result) = 0;
 
         /**
+         * Handles an incoming isMaster command for a replica set node.  Should not be
+         * called on a master-slave or standalone node.
+         */
+        virtual void fillIsMasterForReplSet(IsMasterResponse* result) = 0;
+
+        /**
          * Handles an incoming replSetGetConfig command. Adds BSON to 'result'.
          */
         virtual void processReplSetGetConfig(BSONObjBuilder* result) = 0;
@@ -464,6 +471,13 @@ namespace repl {
          * Returns a vector of members that have applied the operation with OpTime 'op'.
          */
         virtual std::vector<HostAndPort> getHostsWrittenTo(const OpTime& op) = 0;
+
+        /**
+         * Returns a vector of the members other than ourself in the replica set, as specified in
+         * the replica set config.  Invalid to call if we are not in replica set mode.  Returns
+         * an empty vector if we do not have a valid config.
+         */
+        virtual std::vector<HostAndPort> getOtherNodesInReplSet() const = 0;
 
         /**
          * Returns a BSONObj containing a representation of the current default write concern.

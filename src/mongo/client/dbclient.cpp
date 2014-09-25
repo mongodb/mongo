@@ -991,7 +991,15 @@ namespace mongo {
 
         // we keep around SockAddr for connection life -- maybe MessagingPort
         // requires that?
-        server.reset(new SockAddr(_server.host().c_str(), _server.port()));
+        std::auto_ptr<SockAddr> serverSockAddr(new SockAddr(_server.host().c_str(),
+                                                            _server.port()));
+        if (!serverSockAddr->isValid()) {
+            errmsg = str::stream() << "couldn't initialize connection to host "
+                                   << _server.host().c_str() << ", address is invalid";
+            return false;
+        }
+
+        server.reset(serverSockAddr.release());
         p.reset(new MessagingPort( _so_timeout, _logLevel ));
 
         if (_server.host().empty() ) {

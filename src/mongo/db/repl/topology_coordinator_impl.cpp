@@ -36,6 +36,7 @@
 
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/heartbeat_response_action.h"
+#include "mongo/db/repl/is_master_response.h"
 #include "mongo/db/repl/isself.h"
 #include "mongo/db/repl/repl_set_heartbeat_args.h"
 #include "mongo/db/repl/repl_set_heartbeat_response.h"
@@ -1221,6 +1222,69 @@ namespace {
         *result = Status::OK();
     }
 
+    void TopologyCoordinatorImpl::fillIsMasterForReplSet(IsMasterResponse* response) {
+
+        const MemberState myState = getMemberState();
+        if (!_currentConfig.isInitialized() || myState.removed()) {
+            response->markAsNoConfig();
+            return;
+        }
+
+        response->setReplSetName(_currentConfig.getReplSetName());
+        response->setReplSetVersion(_currentConfig.getConfigVersion());
+        response->setIsMaster(myState.primary());
+        response->setIsSecondary(myState.secondary());
+
+        {
+            for (ReplicaSetConfig::MemberIterator it = _currentConfig.membersBegin();
+                    it != _currentConfig.membersEnd(); ++it) {
+                if (it->isHidden() || it->getSlaveDelay().total_seconds() > 0) {
+                    continue;
+                }
+
+                if (it->isElectable()) {
+                    response->addHost(it->getHostAndPort());
+                }
+                else if (it->isArbiter()) {
+                    response->addArbiter(it->getHostAndPort());
+                }
+                else {
+                    response->addPassive(it->getHostAndPort());
+                }
+            }
+        }
+
+        const MemberConfig* curPrimary = _currentPrimaryMember();
+        if (curPrimary) {
+            response->setPrimary(curPrimary->getHostAndPort());
+        }
+
+        const MemberConfig& selfConfig = _currentConfig.getMemberAt(_selfIndex);
+        if (selfConfig.isArbiter()) {
+            response->setIsArbiterOnly(true);
+        }
+        else if (selfConfig.getPriority() == 0) {
+            response->setIsPassive(true);
+        }
+        if (selfConfig.getSlaveDelay().total_seconds()) {
+            response->setSlaveDelay(selfConfig.getSlaveDelay());
+        }
+        if (selfConfig.isHidden()) {
+            response->setIsHidden(true);
+        }
+        if (!selfConfig.shouldBuildIndexes()) {
+            response->setShouldBuildIndexes(false);
+        }
+        if (selfConfig.getNumTags()) {
+            const ReplicaSetTagConfig tagConfig = _currentConfig.getTagConfig();
+            for (MemberConfig::TagIterator tag = selfConfig.tagsBegin();
+                    tag != selfConfig.tagsEnd(); ++tag) {
+                response->addTag(tagConfig.getTagKey(*tag), tagConfig.getTagValue(*tag));
+            }
+        }
+        response->setMe(selfConfig.getHostAndPort());
+    }
+
     void TopologyCoordinatorImpl::prepareFreezeResponse(
             const ReplicationExecutor::CallbackData& data,
             Date_t now,
@@ -1561,6 +1625,45 @@ namespace {
     int TopologyCoordinatorImpl::getMaintenanceCount() const {
         return _maintenanceModeCalls;
     }
+
+    bool TopologyCoordinatorImpl::shouldChangeSyncSource(const HostAndPort& currentSource) const
+    {
+        // Methodology:
+        // If there exists a viable sync source member other than currentSource, whose oplog has
+        // reached an optime greater than _maxSyncSourceLagSecs later than currentSource's, return
+        // true.
+        const int currentMemberIndex = findMemberIndexForHostAndPort(_currentConfig, currentSource);
+        if (currentMemberIndex == -1) {
+            return true;
+        }
+        OpTime currentOpTime = _hbdata[currentMemberIndex].getOpTime();
+        if (currentOpTime.isNull()) {
+            // Haven't received a heartbeat from the sync source yet, so can't tell if we should
+            // change.
+            return false;
+        }
+        unsigned int currentSecs = currentOpTime.getSecs();
+        unsigned int goalSecs = currentSecs + _maxSyncSourceLagSecs.total_seconds();
+
+        for (std::vector<MemberHeartbeatData>::const_iterator it = _hbdata.begin();
+             it != _hbdata.end();
+             ++it) {
+            const MemberConfig& candidateConfig = _currentConfig.getMemberAt(it->getConfigIndex());
+            if (it->up() &&
+                (candidateConfig.shouldBuildIndexes() || !_selfConfig().shouldBuildIndexes()) &&
+                it->getState().readable() &&
+                goalSecs < it->getOpTime().getSecs()) {
+                log() << "changing sync target because current sync target's most recent OpTime is "
+                      << currentOpTime.toStringLong() << " which is more than "
+                      << _maxSyncSourceLagSecs.total_seconds() << " seconds behind member " 
+                      <<  candidateConfig.getHostAndPort().toString()
+                      << " whose most recent OpTime is " << it->getOpTime().toStringLong();
+                return true;
+            }
+        }
+        return false;
+    }
+
 
 } // namespace repl
 } // namespace mongo
