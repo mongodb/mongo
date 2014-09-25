@@ -263,6 +263,10 @@ pre:
           remote_key: "project_aws_key"
         - local_key: "aws_secret"
           remote_key: "project_aws_secret"
+        - local_key: "slave"
+          remote_key: "slave"
+        - local_key: "passwd"
+          remote_key: "passwd"
 
 tasks:
 #- name: auth
@@ -585,7 +589,7 @@ tasks:
         tool: mongodump
     - func: "fetch tool"
       vars:
-        tool: mongofiles
+        tool: mongorestore
     - command: shell.exec
       params:
         working_dir: src
@@ -597,13 +601,11 @@ tasks:
           else
             export GOPATH=`pwd`;
           fi;
-          ls -al
           mv ./mongodb/mongod .
           mv ./mongodb/mongo .
-          ls -al
           mv src/github.com/mongodb/mongo-tools/legacy/* .
-          ls -al
-          python smoke.py --nopreallocj --with-cleanbb --mongod ./mongod --mongo ./mongo --report-file report.json ${test_flags|} --buildlogger-builder MCI_${build_variant} --buildlogger-buildnum ${builder_num|} --buildlogger-credentials ./mci.buildlogger --buildlogger-phase ${task_name}_${execution} tool
+          chmod +x mongo*
+          python buildscripts/smoke.py --nopreallocj --with-cleanbb --mongod ./mongod --mongo ./mongo --report-file report.json --continue-on-failure --buildlogger-builder MCI_${build_variant} --buildlogger-buildnum ${builder_num|} --buildlogger-credentials ./mci.buildlogger --buildlogger-phase ${task_name}_${execution} tool
 
 - name: lint
   commands:
