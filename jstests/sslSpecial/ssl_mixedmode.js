@@ -26,6 +26,7 @@ function testCombination(sslMode, sslShell, shouldSucceed) {
     if (sslShell) {
         mongo = runMongoProgram("mongo", "--port", port, "--ssl", 
                                 "--sslPEMKeyFile", CLIENT_CERT,
+                                "--sslAllowInvalidCertificates",
                                 "--eval", ";");
     }
     else {
