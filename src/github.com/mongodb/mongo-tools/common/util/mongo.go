@@ -14,6 +14,14 @@ const (
 // port if necessary.
 func CreateConnectionAddrs(host, port string) []string {
 
+	// set to the defaults, if necessary
+	if host == "" {
+		host = "localhost"
+		if port == "" {
+			host += ":27017"
+		}
+	}
+
 	// parse the host string into the individual hosts
 	addrs := parseHost(host)
 
