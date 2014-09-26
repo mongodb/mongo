@@ -1,3 +1,5 @@
+// +build sasl
+
 package db
 
 import (

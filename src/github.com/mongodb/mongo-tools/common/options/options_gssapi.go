@@ -1,3 +1,5 @@
+// +build sasl
+
 package options
 
 func init() {
