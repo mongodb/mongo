@@ -31,7 +31,7 @@ func printHelpAndExit() {
 func main() {
 
 	// initialize command-line opts
-	opts := commonopts.New("mongofiles", "0.0.1", Usage)
+	opts := commonopts.New("mongofiles", Usage)
 
 	storageOpts := &options.StorageOptions{}
 	opts.AddOptions(storageOpts)

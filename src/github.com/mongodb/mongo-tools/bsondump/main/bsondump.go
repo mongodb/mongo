@@ -12,7 +12,7 @@ import (
 
 func main() {
 	// initialize command-line opts
-	opts := commonopts.New("bsondump", "0.0.1", "<file>")
+	opts := commonopts.New("bsondump", "<file>")
 	bsonDumpOpts := &options.BSONDumpOptions{}
 	opts.AddOptions(bsonDumpOpts)
 

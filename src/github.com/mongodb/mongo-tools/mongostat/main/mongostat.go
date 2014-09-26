@@ -13,7 +13,7 @@ import (
 
 func main() {
 	// initialize command-line opts
-	opts := commonopts.New("mongostat", "0.0.1", "<options>")
+	opts := commonopts.New("mongostat", "<options>")
 
 	// add mongotop-specific options
 	statOpts := &options.StatOptions{}

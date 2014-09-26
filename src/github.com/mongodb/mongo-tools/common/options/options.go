@@ -9,6 +9,10 @@ import (
 	"os"
 )
 
+const (
+	VersionStr = "2.7.7"
+)
+
 // Struct encompassing all of the options that are reused across tools: "help",
 // "version", verbosity settings, ssl settings, etc.
 type ToolOptions struct {
@@ -98,10 +102,10 @@ type Kerberos struct {
 }
 
 // Ask for a new instance of tool options
-func New(appName, versionStr, usageStr string) *ToolOptions {
+func New(appName, usageStr string) *ToolOptions {
 	return &ToolOptions{
 		AppName:    appName,
-		VersionStr: versionStr,
+		VersionStr: VersionStr,
 		UsageStr:   usageStr,
 
 		General:    &General{},

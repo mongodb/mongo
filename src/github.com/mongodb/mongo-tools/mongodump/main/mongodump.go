@@ -12,7 +12,7 @@ import (
 
 func main() {
 	// initialize command-line opts
-	opts := commonopts.New("mongodump", "0.0.1", "<options>")
+	opts := commonopts.New("mongodump", "<options>")
 
 	inputOpts := &options.InputOptions{}
 	opts.AddOptions(inputOpts)

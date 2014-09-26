@@ -13,7 +13,7 @@ import (
 func main() {
 
 	// initialize command line options
-	opts := commonopts.New("mongooplog", "0.0.1", "<options>")
+	opts := commonopts.New("mongooplog", "<options>")
 
 	// add the mongooplog-specific options
 	sourceOpts := &options.SourceOptions{}
