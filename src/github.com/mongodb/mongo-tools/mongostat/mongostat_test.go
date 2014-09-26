@@ -7,8 +7,8 @@ import (
 )
 
 func TestStatLine(t *testing.T) {
-	faultsOld := 10
-	faultsNew := 15
+	faultsOld := int64(10)
+	faultsNew := int64(15)
 	serverStatusOld := ServerStatus{
 		SampleTime:     time.Now(),
 		Host:           "localhost",
@@ -19,7 +19,7 @@ func TestStatLine(t *testing.T) {
 		UptimeMillis:   1000,
 		UptimeEstimate: 1000,
 		LocalTime:      time.Now(),
-		Asserts:        map[string]int{},
+		Asserts:        map[string]int64{},
 		BackgroundFlushing: &FlushStats{
 			Flushes:      2,
 			TotalMs:      100,
@@ -113,7 +113,7 @@ func TestStatLine(t *testing.T) {
 		UptimeMillis:   1000,
 		UptimeEstimate: 1000,
 		LocalTime:      time.Now(),
-		Asserts:        map[string]int{},
+		Asserts:        map[string]int64{},
 		BackgroundFlushing: &FlushStats{
 			Flushes:      2,
 			TotalMs:      100,

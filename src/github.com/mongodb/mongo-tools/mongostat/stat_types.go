@@ -36,11 +36,11 @@ type ServerStatus struct {
 	Version            string                 `bson:"version"`
 	Process            string                 `bson:"process"`
 	Pid                int64                  `bson:"pid"`
-	Uptime             int                    `bson:"uptime"`
+	Uptime             int64                  `bson:"uptime"`
 	UptimeMillis       int64                  `bson:"uptimeMillis"`
-	UptimeEstimate     int                    `bson:"uptimeEstimate"`
+	UptimeEstimate     int64                  `bson:"uptimeEstimate"`
 	LocalTime          time.Time              `bson:"localTime"`
-	Asserts            map[string]int         `bson:"asserts"`
+	Asserts            map[string]int64       `bson:"asserts"`
 	BackgroundFlushing *FlushStats            `bson:"backgroundFlushing"`
 	ExtraInfo          *ExtraInfo             `bson:"extra_info"`
 	Connections        *ConnectionStats       `bson:"connections"`
@@ -69,14 +69,14 @@ type ReplStatus struct {
 }
 
 type DBRecordStats struct {
-	AccessesNotInMemory       int                       `bson:"accessesNotInMemory"`
-	PageFaultExceptionsThrown int                       `bson:"pageFaultExceptionsThrown"`
+	AccessesNotInMemory       int64                     `bson:"accessesNotInMemory"`
+	PageFaultExceptionsThrown int64                     `bson:"pageFaultExceptionsThrown"`
 	DBRecordAccesses          map[string]RecordAccesses `bson:",inline"`
 }
 
 type RecordAccesses struct {
-	AccessesNotInMemory       int `bson:"accessesNotInMemory"`
-	PageFaultExceptionsThrown int `bson:"pageFaultExceptionsThrown"`
+	AccessesNotInMemory       int64 `bson:"accessesNotInMemory"`
+	PageFaultExceptionsThrown int64 `bson:"pageFaultExceptionsThrown"`
 }
 
 type MemStats struct {
@@ -89,46 +89,46 @@ type MemStats struct {
 }
 
 type FlushStats struct {
-	Flushes      int       `bson:"flushes"`
-	TotalMs      int       `bson:"total_ms"`
+	Flushes      int64     `bson:"flushes"`
+	TotalMs      int64     `bson:"total_ms"`
 	AverageMs    float64   `bson:"average_ms"`
-	LastMs       int       `bson:"last_ms"`
+	LastMs       int64     `bson:"last_ms"`
 	LastFinished time.Time `bson:"last_finished"`
 }
 
 type ConnectionStats struct {
-	Current      int   `bson:"current"`
-	Available    int   `bson:"available"`
+	Current      int64 `bson:"current"`
+	Available    int64 `bson:"available"`
 	TotalCreated int64 `bson:"totalCreated"`
 }
 
 type DurTiming struct {
-	Dt               int `bson:"dt"`
-	PrepLogBuffer    int `bson:"prepLogBuffer"`
-	WriteToJournal   int `bson:"writeToJournal"`
-	WriteToDataFiles int `bson:"writeToDataFiles"`
-	RemapPrivateView int `bson:"remapPrivateView"`
+	Dt               int64 `bson:"dt"`
+	PrepLogBuffer    int64 `bson:"prepLogBuffer"`
+	WriteToJournal   int64 `bson:"writeToJournal"`
+	WriteToDataFiles int64 `bson:"writeToDataFiles"`
+	RemapPrivateView int64 `bson:"remapPrivateView"`
 }
 
 type DurStats struct {
-	Commits            int `bson:"commits"`
-	JournaledMB        int `bson:"journaledMB"`
-	WriteToDataFilesMB int `bson:"writeToDataFilesMB"`
-	Compression        int `bson:"compression"`
-	CommitsInWriteLock int `bson:"commitsInWriteLock"`
-	EarlyCommits       int `bson:"earlyCommits"`
+	Commits            int64 `bson:"commits"`
+	JournaledMB        int64 `bson:"journaledMB"`
+	WriteToDataFilesMB int64 `bson:"writeToDataFilesMB"`
+	Compression        int64 `bson:"compression"`
+	CommitsInWriteLock int64 `bson:"commitsInWriteLock"`
+	EarlyCommits       int64 `bson:"earlyCommits"`
 	TimeMs             DurTiming
 }
 type QueueStats struct {
-	Total   int `bson:"total"`
-	Readers int `bson:"readers"`
-	Writers int `bson:"writers"`
+	Total   int64 `bson:"total"`
+	Readers int64 `bson:"readers"`
+	Writers int64 `bson:"writers"`
 }
 
 type ClientStats struct {
-	Total   int `bson:"total"`
-	Readers int `bson:"readers"`
-	Writers int `bson:"writers"`
+	Total   int64 `bson:"total"`
+	Readers int64 `bson:"readers"`
+	Writers int64 `bson:"writers"`
 }
 
 type GlobalLockStats struct {
@@ -139,26 +139,26 @@ type GlobalLockStats struct {
 }
 
 type IndexCounterStats struct {
-	Accesses  int `bson:"accesses"`
-	Hits      int `bson:"hits"`
-	Misses    int `bson:"misses"`
-	Resets    int `bson:"resets"`
-	MissRatio int `bson:"missRatio"`
+	Accesses  int64 `bson:"accesses"`
+	Hits      int64 `bson:"hits"`
+	Misses    int64 `bson:"misses"`
+	Resets    int64 `bson:"resets"`
+	MissRatio int64 `bson:"missRatio"`
 }
 
 type NetworkStats struct {
 	BytesIn     int64 `bson:"bytesIn"`
 	BytesOut    int64 `bson:"bytesOut"`
-	NumRequests int   `bson:"numRequests"`
+	NumRequests int64 `bson:"numRequests"`
 }
 
 type OpcountStats struct {
-	Insert  int `bson:"insert"`
-	Query   int `bson:"query"`
-	Update  int `bson:"update"`
-	Delete  int `bson:"delete"`
-	GetMore int `bson:"getmore"`
-	Command int `bson:"command"`
+	Insert  int64 `bson:"insert"`
+	Query   int64 `bson:"query"`
+	Update  int64 `bson:"update"`
+	Delete  int64 `bson:"delete"`
+	GetMore int64 `bson:"getmore"`
+	Command int64 `bson:"command"`
 }
 
 type ReadWriteLockTimes struct {
@@ -174,7 +174,7 @@ type LockStats struct {
 }
 
 type ExtraInfo struct {
-	PageFaults *int `bson:"page_faults"`
+	PageFaults *int64 `bson:"page_faults"`
 }
 
 //StatHeader describes a single column for mongostat's terminal output,
@@ -290,19 +290,19 @@ type StatLine struct {
 	Host     string
 
 	//Opcounter fields
-	Insert, Query, Update, Delete, GetMore, Command int
+	Insert, Query, Update, Delete, GetMore, Command int64
 
 	//Replicated Opcounter fields
-	InsertR, QueryR, UpdateR, DeleteR, GetMoreR, CommandR int
-	Flushes                                               int
+	InsertR, QueryR, UpdateR, DeleteR, GetMoreR, CommandR int64
+	Flushes                                               int64
 	Mapped, Virtual, Resident, NonMapped                  int64
-	Faults                                                int
+	Faults                                                int64
 	HighestLocked                                         *LockStatus
 	IndexMissPercent                                      float64
-	QueuedReaders, QueuedWriters                          int
-	ActiveReaders, ActiveWriters                          int
+	QueuedReaders, QueuedWriters                          int64
+	ActiveReaders, ActiveWriters                          int64
 	NetIn, NetOut                                         int64
-	NumConnections                                        int
+	NumConnections                                        int64
 	Time                                                  time.Time
 	ReplSetName                                           string
 	NodeType                                              string
@@ -343,7 +343,7 @@ func computeLockDiffs(prevLocks, curLocks map[string]LockUsage) []LockUsage {
 }
 
 //formatOpcount returns a string for mongostat to display replset count
-func formatOpcount(opcount, opcountRepl int, both bool) string {
+func formatOpcount(opcount, opcountRepl int64, both bool) string {
 	if both {
 		return fmt.Sprintf("%v|%v", opcount, opcountRepl)
 	}
