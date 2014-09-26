@@ -69,6 +69,9 @@ func (self *MongoOplog) Run() error {
 	}
 	defer fromSession.Close()
 
+	// set slave ok
+	fromSession.SetMode(mgo.Eventual, true)
+
 	// get the tailing cursor for the source server's oplog
 	tail := buildTailingCursor(fromSession.DB(oplogDB).C(oplogColl),
 		self.SourceOptions)
@@ -128,7 +131,7 @@ type OplogEntry struct {
 	Query     bson.M              `bson:"o2" json:"o2"`
 }
 
-// get the tailing cursor for the oplog collection, based on the options
+// get the cursor for the oplog collection, based on the options
 // passed in to mongooplog
 func buildTailingCursor(oplog *mgo.Collection,
 	sourceOptions *options.SourceOptions) *mgo.Iter {
@@ -152,6 +155,6 @@ func buildTailingCursor(oplog *mgo.Collection,
 	}
 
 	// TODO: wait time
-	return oplog.Find(oplogQuery).Tail()
+	return oplog.Find(oplogQuery).Iter()
 
 }
