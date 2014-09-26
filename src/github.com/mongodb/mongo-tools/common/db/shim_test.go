@@ -21,9 +21,9 @@ func TestShimRead(t *testing.T) {
 		resetFunc := func() {
 			//invokes a fake shim that just cat's a bson file
 			bsonTool = StorageShim{
-				DBPath:     "/data/db",
-				Database:   "mci_dev",
-				Collection: "tasks",
+				DBPath:     "fake db path",
+				Database:   "fake database",
+				Collection: "fake collection",
 				Query:      "{}",
 				Skip:       0,
 				Limit:      0,
@@ -83,9 +83,9 @@ func TestShimWrite(t *testing.T) {
 		resetFunc := func() {
 			//invokes a fake shim that just cat's a bson file
 			bsonTool = StorageShim{
-				DBPath:     "/data/db",
-				Database:   "xxxxx",
-				Collection: "x",
+				DBPath:     "fake db path",
+				Database:   "fake database",
+				Collection: "fake collection",
 				Query:      "{}",
 				Skip:       0,
 				Limit:      0,
