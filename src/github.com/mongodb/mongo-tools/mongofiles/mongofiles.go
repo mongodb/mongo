@@ -2,8 +2,8 @@ package mongofiles
 
 import (
 	"fmt"
-	"github.com/mongodb/mongo-tools/common/bsonutil"
 	"github.com/mongodb/mongo-tools/common/db"
+	"github.com/mongodb/mongo-tools/common/bsonutil"
 	commonopts "github.com/mongodb/mongo-tools/common/options"
 	"github.com/mongodb/mongo-tools/mongofiles/options"
 	"gopkg.in/mgo.v2"
@@ -81,8 +81,9 @@ type FileMD5 struct {
 
 // for storing result from a 'createIndexes' command
 type CreateIndexesResult struct {
-	Ok   bool `bson:"ok"`
-	Code int  `bson:"code"`
+	Ok     bool   `bson:"ok"`
+	Code   int    `bson:"code"`
+	ErrMsg string `bson:"errmsg"`
 }
 
 func ValidateCommand(args []string) (string, error) {
@@ -280,17 +281,13 @@ func (self *MongoFiles) createIndex(collection string, indexDoc bsonutil.Marshal
 		return fmt.Errorf("error creating indexes on collection '%v': %v", collection, err)
 	}
 	if !createIndexesResult.Ok {
-		return fmt.Errorf("indexes not created on collection '%v': %v", collection, err)
+		return fmt.Errorf("indexes not created on collection '%v': %+v", collection, createIndexesResult)
 	}
 	return nil
 }
 
 // ensure index
 func (self *MongoFiles) ensureIndex(collection string, indexDoc bsonutil.MarshalD, indexName string, isUnique bool) error {
-	indexQuery := bsonutil.MarshalD{{"key", indexDoc}}
-	if isUnique {
-		indexQuery = append(indexQuery, bson.DocElem{"unique", true})
-	}
 	// using FindDocs instead of FindOne because of FindOne's error semantics
 	docSource, err := self.cmdRunner.FindDocs(self.ToolOptions.Namespace.DB, SystemIndexes, 0, 0,
 		bsonutil.MarshalD{{"key", indexDoc}}, []string{}, 0)
@@ -324,6 +321,7 @@ func (self *MongoFiles) ensureIndex(collection string, indexDoc bsonutil.Marshal
 
 // creates a GridFS file and copies over data from a the local file 'localFSFile'
 func (self *MongoFiles) createGridFSFile(gridFSFileName, contentType string, localFSFile *os.File) error {
+
 	// ensure indexes exist on "filename" field in GridFSFiles and "files_id","n" in GridFSChunks
 	err := self.ensureIndex(GridFSFiles, bsonutil.MarshalD{{"filename", 1}}, "filename_1", false)
 	if err != nil {

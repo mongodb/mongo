@@ -128,6 +128,8 @@ func ConvertBSONValueToJSON(x interface{}) (interface{}, error) {
 			v[i].Value = jsonValue
 		}
 		return MarshalD(v), nil
+	case MarshalD:
+		return v, nil
 	case []interface{}: // array
 		for i, value := range v {
 			jsonValue, err := ConvertBSONValueToJSON(value)

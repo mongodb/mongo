@@ -40,7 +40,7 @@ var (
 )
 
 // put in some test data into GridFS
-func setUpGridFSTestData() ([]interface{}, error) {
+func setUpGridFSTestNonShimData() ([]interface{}, error) {
 	sessionProvider, err := db.InitSessionProvider(*toolOptions)
 	if err != nil {
 		return nil, err
@@ -75,7 +75,7 @@ func setUpGridFSTestData() ([]interface{}, error) {
 }
 
 // remove test data from GridFS
-func tearDownGridFSTestData() error {
+func tearDownGridFSTestNonShimData() error {
 	sessionProvider, err := db.InitSessionProvider(*toolOptions)
 	if err != nil {
 		return err
@@ -90,6 +90,69 @@ func tearDownGridFSTestData() error {
 		return err
 	}
 
+	return nil
+}
+
+// setup GridFS test data to be accessed via mongoshim
+func setUpGridFSTestShimData() ([]interface{}, error) {	
+	bytesWritten := []interface{}{}
+
+	path, err := os.Getwd()
+	if err != nil {
+		return nil, err
+	}
+
+	dataFilesDir := filepath.Join(path, "testdata/datafiles")
+	err = os.MkdirAll(dataFilesDir, 0744)
+	if err != nil {
+		return nil, err
+	}
+
+	var testFile *os.File
+	var args []string
+	var mf *MongoFiles
+	var filePath string
+	var bytesRead []byte
+	for _ ,item := range []string {"samplefile1.txt", "samplefile2.txt", "samplefile3.txt"} {
+		filePath = fmt.Sprintf("testdata/%s", item)
+		testFile, err = os.Open(filePath)
+		if err != nil {
+			return nil, err
+		}
+		defer testFile.Close()
+		bytesRead, err = ioutil.ReadAll(testFile)
+		if err != nil {
+			return nil, err
+		}
+		
+		args = []string{"put", item}
+		mf, err = shimMongoFilesInstance(args)
+		mf.StorageOptions.LocalFileName = filePath
+			
+		if err != nil {
+			return nil, err
+		}
+		_, err := mf.Run(false)
+		if err != nil {
+			return nil, err
+		}
+		bytesWritten = append(bytesWritten, len(bytesRead))
+	}
+	return bytesWritten, nil
+}
+
+// remove GridFS test data created in the testdata/datafiles directory
+func tearDownGridFSTestShimData() error {
+	path, err := os.Getwd()
+	if err != nil {
+		return err
+	}
+
+	dataFilesDir := filepath.Join(path, "testdata/datafiles")
+	err = os.RemoveAll(dataFilesDir)
+	if err != nil {
+		return err
+	}
 	return nil
 }
 
@@ -170,7 +233,9 @@ func shimMongoFilesInstance(args []string) (*MongoFiles, error) {
 	// for testing mongofiles through mongoshim,
 	// we'll use a database called 'shimtest'
 	mongofiles.ToolOptions.Namespace.DB = "shimtest"
-	mongofiles.ToolOptions.Namespace.DBPath = filepath.Join(path, "testdata/datafiles")
+	
+	dataFilesDir := filepath.Join(path, "testdata/datafiles")
+	mongofiles.ToolOptions.Namespace.DBPath = dataFilesDir
 
 	if err := mongofiles.Init(); err != nil {
 		return nil, err
@@ -239,7 +304,7 @@ func TestValidArguments(t *testing.T) {
 func TestMongoFilesCommands(t *testing.T) {
 	Convey("With a MongoFiles instance (THAT DOESN'T USE THE SHIM) testing the various commands:(get|put|delete|search|list)", t, func() {
 
-		bytesExpected, err := setUpGridFSTestData()
+		bytesExpected, err := setUpGridFSTestNonShimData()
 		So(err, ShouldBeNil)
 
 		// []interface{} here so we can use 'ensureSetEquality' method for both []string and []int
@@ -357,11 +422,12 @@ func TestMongoFilesCommands(t *testing.T) {
 		})
 
 		Convey("Testing the 'put' command by putting some lorem ipsum file with 287613 bytes should", func() {
-			args := []string{"put", "testdata/lorem_ipsum_287613_bytes.txt"}
+			args := []string{"put", "lorem_ipsum_287613_bytes.txt"}
 
 			mf, err := driverMongoFilesInstance(args)
 			So(err, ShouldBeNil)
 			So(mf, ShouldNotBeNil)
+			mf.StorageOptions.LocalFileName = "testdata/lorem_ipsum_287613_bytes.txt"
 
 			Convey("insert the file by creating two chunks (ceil(287,613 / 255 * 1024)) in GridFS", func() {
 				str, err := mf.Run(false)
@@ -382,12 +448,12 @@ func TestMongoFilesCommands(t *testing.T) {
 					filesGotten, bytesGotten := getFilesAndBytesFromLines(lines)
 					So(len(lines), ShouldEqual, len(filesExpected)+1)
 
-					So(filesGotten, ShouldContain, "testdata/lorem_ipsum_287613_bytes.txt")
+					So(filesGotten, ShouldContain, "lorem_ipsum_287613_bytes.txt")
 					So(bytesGotten, ShouldContain, 287613)
 				})
 
 				Convey("and should have exactly the same content as the original file", func() {
-					args = []string{"get", "testdata/lorem_ipsum_287613_bytes.txt"}
+					args = []string{"get", "lorem_ipsum_287613_bytes.txt"}
 					So(err, ShouldBeNil)
 					mfAfter, err := driverMongoFilesInstance(args)
 					So(err, ShouldBeNil)
@@ -476,15 +542,17 @@ func TestMongoFilesCommands(t *testing.T) {
 		})
 
 		Reset(func() {
-			So(tearDownGridFSTestData(), ShouldBeNil)
+			So(tearDownGridFSTestNonShimData(), ShouldBeNil)
 		})
 	})
 
 	Convey("With a MongoFiles instance (THAT USES THE SHIM) testing the various commands:(get|put|delete|search|list)", t, func() {
 
-		// both []interface{} so we can use 'ensureSetEquality' on both []string and []int
+		bytesExpected, err := setUpGridFSTestShimData()
+		So(err, ShouldBeNil)
+
+		// []interface{} here so we can use 'ensureSetEquality' method for both []string and []int
 		filesExpected := []interface{}{"samplefile1.txt", "samplefile2.txt", "samplefile3.txt"}
-		bytesExpected := []interface{}{45, 41, 80}
 
 		Convey("Testing the 'list' command with a file that isn't in GridFS should", func() {
 			args := []string{"list", "gibberish"}
@@ -571,6 +639,10 @@ func TestMongoFilesCommands(t *testing.T) {
 					So(err, ShouldBeNil)
 				})
 			})
+		})
+
+		Reset(func() {
+			So(tearDownGridFSTestShimData(), ShouldBeNil)
 		})
 
 	})
