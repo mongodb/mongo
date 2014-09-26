@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"github.com/mongodb/mongo-tools/common/json"
 	"github.com/mongodb/mongo-tools/common/log"
+	"github.com/mongodb/mongo-tools/common/util"
 	"gopkg.in/mgo.v2"
 	"gopkg.in/mgo.v2/bson"
 )
@@ -78,5 +79,17 @@ func (restore *MongoRestore) InsertIndex(dbName string, index IndexDocument) err
 		//TODO, more error checking? Audit this...
 	}
 
+	return nil
+}
+
+func (restore *MongoRestore) CreateCollection(intent *Intent, options bson.D) error {
+	res := bson.M{}
+	err := restore.cmdRunner.Run(append(bson.D{{"create", intent.C}}, options...), &res, intent.DB)
+	if err != nil {
+		return fmt.Errorf("error running create command: %v", err)
+	}
+	if util.IsFalsy(res["ok"]) {
+		return fmt.Errorf("create command: %v", res["errmsg"])
+	}
 	return nil
 }

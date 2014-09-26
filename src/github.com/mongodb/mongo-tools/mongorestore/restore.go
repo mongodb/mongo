@@ -69,7 +69,7 @@ func (restore *MongoRestore) RestoreIntent(intent *Intent) error {
 				log.Logf(1, "collection %v already exists", intent.Key())
 			} else {
 				log.Logf(1, "creating collection %v using options from metadata", intent.Key())
-				err = restore.cmdRunner.Run(append(bson.D{{"create", intent.C}}, options...), &bson.M{}, intent.DB)
+				err = restore.CreateCollection(intent, options)
 				if err != nil {
 					return fmt.Errorf("error creating collection %v: %v", intent.Key(), err)
 				}

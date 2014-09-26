@@ -5,6 +5,7 @@ import (
 	"github.com/mongodb/mongo-tools/common/db"
 	"github.com/mongodb/mongo-tools/common/log"
 	"github.com/mongodb/mongo-tools/common/progress"
+	"github.com/mongodb/mongo-tools/common/util"
 	"gopkg.in/mgo.v2/bson"
 	"os"
 	"time"
@@ -45,7 +46,7 @@ func (restore *MongoRestore) RestoreOplog() error {
 	bsonSource := db.NewDecodedBSONSource(db.NewBSONSource(oplogFile))
 	defer bsonSource.Close()
 
-	entryArray := make([]bson.Raw, 0, 1024)
+	entryArray := make([]interface{}, 0, 1024)
 	rawOplogEntry := &bson.Raw{}
 
 	var totalBytes, entrySize, bufferedBytes int
@@ -63,6 +64,7 @@ func (restore *MongoRestore) RestoreOplog() error {
 	// To restore the oplog, we iterate over the oplog entries,
 	// filling up a buffer. Once the buffer reaches max document size,
 	// apply the current buffered ops and reset the buffer.
+	// TODO use the new shim mode
 	for bsonSource.Next(rawOplogEntry) {
 		entrySize = len(rawOplogEntry.Data)
 		if bufferedBytes+entrySize > OplogMaxCommandSize {
@@ -70,13 +72,19 @@ func (restore *MongoRestore) RestoreOplog() error {
 			if err != nil {
 				return fmt.Errorf("error applying oplog: %v", err)
 			}
-			entryArray = make([]bson.Raw, 0, 1024)
+			entryArray = make([]interface{}, 0, 1024)
 			bufferedBytes = 0
+		}
+
+		entryAsD := bson.D{}
+		err = bson.Unmarshal(rawOplogEntry.Data, &entryAsD)
+		if err != nil {
+			return fmt.Errorf("error reading oplog: %v", err)
 		}
 
 		bufferedBytes += entrySize
 		totalBytes += entrySize
-		entryArray = append(entryArray, *rawOplogEntry)
+		entryArray = append(entryArray, entryAsD)
 	}
 	// finally, flush the remaining entries
 	if len(entryArray) > 0 {
@@ -90,14 +98,15 @@ func (restore *MongoRestore) RestoreOplog() error {
 
 }
 
-func (restore *MongoRestore) ApplyOps(entries []bson.Raw) error {
-	res := &bson.M{}
-	err := restore.cmdRunner.Run(bson.M{"applyOps": entries}, res, "admin")
+func (restore *MongoRestore) ApplyOps(entries []interface{}) error {
+	res := bson.M{}
+	err := restore.cmdRunner.Run(bson.M{"applyOps": entries}, &res, "admin")
 	if err != nil {
 		return fmt.Errorf("applyOps: %v", err)
 	}
-
-	//TODO check results?
+	if util.IsFalsy(res["ok"]) {
+		return fmt.Errorf("applyOps command: %v", res["errmsg"])
+	}
 
 	return nil
 }

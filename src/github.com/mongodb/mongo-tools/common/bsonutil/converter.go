@@ -119,6 +119,15 @@ func ConvertBSONValueToJSON(x interface{}) (interface{}, error) {
 		return convertKeys(v)
 	case map[string]interface{}:
 		return convertKeys(v)
+	case bson.D:
+		for i, value := range v {
+			jsonValue, err := ConvertBSONValueToJSON(value.Value)
+			if err != nil {
+				return nil, err
+			}
+			v[i].Value = jsonValue
+		}
+		return MarshalD(v), nil
 	case []interface{}: // array
 		for i, value := range v {
 			jsonValue, err := ConvertBSONValueToJSON(value)
