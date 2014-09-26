@@ -6,6 +6,30 @@
  */
 
 /*
+ * WT_LSM_WORKER_COOKIE --
+ *	State for an LSM worker thread.
+ */
+struct __wt_lsm_worker_cookie {
+	WT_LSM_CHUNK **chunk_array;
+	size_t chunk_alloc;
+	u_int nchunks;
+};
+
+/*
+ * WT_LSM_WORKER_ARGS --
+ *	State for an LSM worker thread.
+ */
+struct __wt_lsm_worker_args {
+	WT_SESSION_IMPL	*session;	/* Session */
+	WT_CONDVAR	*work_cond;	/* Owned by the manager */
+	pthread_t	tid;		/* Thread id */
+	u_int		id;		/* My manager slot id */
+	uint32_t	type;		/* Types of operations handled */
+#define	WT_LSM_WORKER_RUN	0x01
+	uint32_t	flags;		/* Worker flags */
+};
+
+/*
  * WT_CURSOR_LSM --
  *	An LSM cursor.
  */
@@ -126,7 +150,8 @@ struct __wt_lsm_manager {
 	WT_CONDVAR     *work_cond;	/* Used to notify worker of activity */
 	uint32_t	lsm_workers;	/* Current number of LSM workers */
 	uint32_t	lsm_workers_max;
-	WT_LSM_WORKER_ARGS *lsm_worker_cookies;
+#define	WT_LSM_MAX_WORKERS	20
+	WT_LSM_WORKER_ARGS lsm_worker_cookies[WT_LSM_MAX_WORKERS];
 };
 
 /*
@@ -164,7 +189,6 @@ struct __wt_lsm_tree {
 	uint64_t chunk_size;
 	uint64_t chunk_max;
 	u_int merge_min, merge_max;
-	u_int merge_threads;
 
 	u_int merge_idle;		/* Count of idle merge threads */
 
@@ -172,14 +196,6 @@ struct __wt_lsm_tree {
 #define	WT_LSM_BLOOM_OFF				0x00000002
 #define	WT_LSM_BLOOM_OLDEST				0x00000004
 	uint32_t bloom;			/* Bloom creation policy */
-
-#define	WT_LSM_MAX_WORKERS	10
-					/* Passed to thread_create */
-	WT_SESSION_IMPL *worker_sessions[WT_LSM_MAX_WORKERS];
-					/* LSM worker thread(s) */
-	pthread_t worker_tids[WT_LSM_MAX_WORKERS];
-	WT_SESSION_IMPL *ckpt_session;	/* For checkpoint worker */
-	pthread_t ckpt_tid;		/* LSM checkpoint worker thread */
 
 	WT_LSM_CHUNK **chunk;		/* Array of active LSM chunks */
 	size_t chunk_alloc;		/* Space allocated for chunks */
@@ -212,26 +228,4 @@ struct __wt_lsm_data_source {
 	WT_DATA_SOURCE iface;
 
 	WT_RWLOCK *rwlock;
-};
-
-/*
- * WT_LSM_WORKER_COOKIE --
- *	State for an LSM worker thread.
- */
-struct __wt_lsm_worker_cookie {
-	WT_LSM_CHUNK **chunk_array;
-	size_t chunk_alloc;
-	u_int nchunks;
-};
-
-/*
- * WT_LSM_WORKER_ARGS --
- *	State for an LSM worker thread.
- */
-struct __wt_lsm_worker_args {
-	WT_SESSION_IMPL	*session;	/* Session */
-	WT_CONDVAR	*work_cond;	/* Owned by the manager */
-	pthread_t	tid;		/* Thread id */
-	u_int		id;		/* My manager slot id */
-	uint32_t	type;		/* Types of operations handled */
 };

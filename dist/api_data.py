@@ -138,9 +138,6 @@ lsm_config = [
 	        the minimum number of chunks to include in a merge operation. If
 	        set to 0 or 1 half the value of merge_max is used''',
 	        max='100'),
-	    Config('merge_threads', '2', r'''
-	        the number of threads to perform merge operations''',
-	        min='1', max='10'), # !!! max must match WT_LSM_MAX_WORKERS
 	]),
 ]
 
@@ -354,7 +351,7 @@ connection_runtime_config = [
 	    Config('worker_thread_max', '4', r'''
 	        Configure a set of threads to manage merging LSM trees in
 			the database.''',
-	        min='3', max='20'),
+	        min='3', max='20'),     # !!! Must match WT_LSM_MAX_WORKERS
 	    Config('merge', 'true', r'''
 	        merge LSM chunks where possible''',
 	        type='boolean')
@@ -448,12 +445,12 @@ connection_runtime_config = [
 	        'mutex',
 	        'overflow',
 	        'read',
-	        'readserver',
 	        'reconcile',
 	        'recovery',
 	        'salvage',
 	        'shared_cache',
 	        'split',
+	        'temporary',
 	        'verify',
 	        'version',
 	        'write']),

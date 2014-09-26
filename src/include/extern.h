@@ -543,11 +543,11 @@ extern int __wt_config_gets(WT_SESSION_IMPL *session,
     const char **cfg,
     const char *key,
     WT_CONFIG_ITEM *value);
-extern  int __wt_config_getone(WT_SESSION_IMPL *session,
+extern int __wt_config_getone(WT_SESSION_IMPL *session,
     const char *config,
     WT_CONFIG_ITEM *key,
     WT_CONFIG_ITEM *value);
-extern  int __wt_config_getones(WT_SESSION_IMPL *session,
+extern int __wt_config_getones(WT_SESSION_IMPL *session,
     const char *config,
     const char *key,
     WT_CONFIG_ITEM *value);
@@ -556,11 +556,11 @@ extern int __wt_config_gets_def(WT_SESSION_IMPL *session,
     const char *key,
     int def,
     WT_CONFIG_ITEM *value);
-extern  int __wt_config_subgetraw(WT_SESSION_IMPL *session,
+extern int __wt_config_subgetraw(WT_SESSION_IMPL *session,
     WT_CONFIG_ITEM *cfg,
     WT_CONFIG_ITEM *key,
     WT_CONFIG_ITEM *value);
-extern  int __wt_config_subgets(WT_SESSION_IMPL *session,
+extern int __wt_config_subgets(WT_SESSION_IMPL *session,
     WT_CONFIG_ITEM *cfg,
     const char *key,
     WT_CONFIG_ITEM *value);
@@ -600,12 +600,9 @@ extern int __wt_collator_config(WT_SESSION_IMPL *session,
     const char **cfg,
     WT_COLLATOR **collatorp,
     int *ownp);
-extern int __wt_conn_remove_collator(WT_SESSION_IMPL *session,
-    WT_NAMED_COLLATOR *ncoll);
-extern int __wt_conn_remove_compressor( WT_SESSION_IMPL *session,
-    WT_NAMED_COMPRESSOR *ncomp);
-extern int __wt_conn_remove_data_source( WT_SESSION_IMPL *session,
-    WT_NAMED_DATA_SOURCE *ndsrc);
+extern int __wt_conn_remove_collator(WT_SESSION_IMPL *session);
+extern int __wt_conn_remove_compressor(WT_SESSION_IMPL *session);
+extern int __wt_conn_remove_data_source(WT_SESSION_IMPL *session);
 extern int __wt_verbose_config(WT_SESSION_IMPL *session, const char *cfg[]);
 extern int __wt_cache_config(WT_SESSION_IMPL *session, const char *cfg[]);
 extern int __wt_cache_create(WT_SESSION_IMPL *session, const char *cfg[]);
@@ -951,6 +948,8 @@ extern int __wt_clsm_open(WT_SESSION_IMPL *session,
     const char *cfg[],
     WT_CURSOR **cursorp);
 extern int __wt_lsm_manager_config(WT_SESSION_IMPL *session, const char **cfg);
+extern int __wt_lsm_manager_reconfig(WT_SESSION_IMPL *session,
+    const char **cfg);
 extern int __wt_lsm_manager_start(WT_SESSION_IMPL *session);
 extern void __wt_lsm_manager_free_work_unit( WT_SESSION_IMPL *session,
     WT_LSM_WORK_UNIT *entry);

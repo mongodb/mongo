@@ -15,7 +15,7 @@ static void * __lsm_worker_manager(void *);
 
 /*
  * __wt_lsm_manager_config --
- *	Re-configure the LSM manager.
+ *	Configure the LSM manager.
  */
 int
 __wt_lsm_manager_config(WT_SESSION_IMPL *session, const char **cfg)
@@ -25,10 +25,138 @@ __wt_lsm_manager_config(WT_SESSION_IMPL *session, const char **cfg)
 
 	conn = S2C(session);
 
+	WT_RET(__wt_config_gets(session, cfg, "lsm_manager.merge", &cval));
+	if (cval.val)
+		F_SET(conn, WT_CONN_LSM_MERGE);
 	WT_RET(__wt_config_gets(
 	    session, cfg, "lsm_manager.worker_thread_max", &cval));
 	if (cval.val)
 		conn->lsm_manager.lsm_workers_max = (uint32_t)cval.val;
+	return (0);
+}
+
+/*
+ * __lsm_general_worker_start --
+ *	Start up all of the general LSM worker threads.
+ */
+static int
+__lsm_general_worker_start(WT_SESSION_IMPL *session)
+{
+	WT_CONNECTION_IMPL *conn;
+	WT_LSM_MANAGER *manager;
+	WT_LSM_WORKER_ARGS *worker_args;
+
+	conn = S2C(session);
+	manager = &conn->lsm_manager;
+
+	/*
+	 * Start the remaining worker threads.
+	 * This should get more sophisticated in the future - only launching
+	 * as many worker threads as are required to keep up with demand.
+	 */
+	WT_ASSERT(session, manager->lsm_workers > 1);
+	for (; manager->lsm_workers < manager->lsm_workers_max;
+	    manager->lsm_workers++) {
+		worker_args =
+		    &manager->lsm_worker_cookies[manager->lsm_workers];
+		worker_args->work_cond = manager->work_cond;
+		worker_args->id = manager->lsm_workers;
+		worker_args->type =
+		    WT_LSM_WORK_BLOOM |
+		    WT_LSM_WORK_DROP |
+		    WT_LSM_WORK_FLUSH |
+		    WT_LSM_WORK_SWITCH;
+		F_SET(worker_args, WT_LSM_WORKER_RUN);
+		/*
+		 * Only allow half of the threads to run merges to avoid all
+		 * all workers getting stuck in long-running merge operations.
+		 * Make sure the first worker is allowed, so that there is at
+		 * least one thread capable of running merges.  We know the
+		 * first worker is id 2, so set merges on even numbered workers.
+		 */
+		if (manager->lsm_workers % 2 == 0)
+			FLD_SET(worker_args->type, WT_LSM_WORK_MERGE);
+		WT_RET(__wt_lsm_worker_start(session, worker_args));
+	}
+	return (0);
+}
+
+/*
+ * __lsm_stop_workers --
+ *	Stop worker threads until the number reaches the configured amount.
+ */
+static int
+__lsm_stop_workers(WT_SESSION_IMPL *session)
+{
+	WT_LSM_MANAGER *manager;
+	WT_LSM_WORKER_ARGS *worker_args;
+	uint32_t i;
+
+	manager = &S2C(session)->lsm_manager;
+	/*
+	 * Start at the end of the list of threads and stop them until we
+	 * have the desired number.  We want to keep all active threads
+	 * packed at the front of the worker array.
+	 */
+	WT_ASSERT(session, manager->lsm_workers != 0);
+	for (i = manager->lsm_workers - 1; i >= manager->lsm_workers_max; i--) {
+		worker_args = &manager->lsm_worker_cookies[i];
+		/*
+		 * Clear this worker's flag so it stops.
+		 */
+		F_CLR(worker_args, WT_LSM_WORKER_RUN);
+		WT_ASSERT(session, worker_args->tid != 0);
+		WT_RET(__wt_thread_join(session, worker_args->tid));
+		worker_args->tid = 0;
+		worker_args->type = 0;
+		worker_args->flags = 0;
+		manager->lsm_workers--;
+		/*
+		 * We do not clear the session because they are allocated
+		 * statically when the connection was opened.
+		 */
+	}
+	return (0);
+}
+
+/*
+ * __wt_lsm_manager_reconfig --
+ *	Re-configure the LSM manager.
+ */
+int
+__wt_lsm_manager_reconfig(WT_SESSION_IMPL *session, const char **cfg)
+{
+	WT_LSM_MANAGER *manager;
+	uint32_t orig_workers;
+
+	manager = &S2C(session)->lsm_manager;
+	orig_workers = manager->lsm_workers_max;
+
+	WT_RET(__wt_lsm_manager_config(session, cfg));
+	/*
+	 * If LSM hasn't started yet, we simply reconfigured the settings
+	 * and we'll let the normal code path start the threads.
+	 */
+	if (manager->lsm_workers_max == 0)
+		return (0);
+	if (manager->lsm_workers == 0)
+		return (0);
+	/*
+	 * If the number of workers has not changed, we're done.
+	 */
+	if (orig_workers == manager->lsm_workers_max)
+		return (0);
+	/*
+	 * If we want more threads, start them.
+	 */
+	if (manager->lsm_workers_max > orig_workers)
+		return (__lsm_general_worker_start(session));
+
+	/*
+	 * Otherwise we want to reduce the number of workers.
+	 */
+	WT_ASSERT(session, manager->lsm_workers_max < orig_workers);
+	WT_RET(__lsm_stop_workers(session));
 	return (0);
 }
 
@@ -42,7 +170,6 @@ __wt_lsm_manager_start(WT_SESSION_IMPL *session)
 {
 	WT_DECL_RET;
 	WT_LSM_MANAGER *manager;
-	WT_LSM_WORKER_ARGS *cookies;
 	WT_SESSION_IMPL *worker_session;
 	uint32_t i;
 
@@ -53,8 +180,6 @@ __wt_lsm_manager_start(WT_SESSION_IMPL *session)
 	 * worker.
 	 */
 	WT_ASSERT(session, manager->lsm_workers_max > 2);
-	WT_RET(__wt_calloc_def(session, manager->lsm_workers_max, &cookies));
-	manager->lsm_worker_cookies = cookies;
 
 	/*
 	 * Open sessions for all potential worker threads here - it's not
@@ -63,26 +188,26 @@ __wt_lsm_manager_start(WT_SESSION_IMPL *session)
 	 * files. Use read-uncommitted isolation to avoid keeping
 	 * updates in cache unnecessarily.
 	 */
-	for (i = 0; i < manager->lsm_workers_max; i++) {
+	for (i = 0; i < WT_LSM_MAX_WORKERS; i++) {
 		WT_ERR(__wt_open_internal_session(
 		    S2C(session), "lsm-worker", 1, 0, &worker_session));
 		worker_session->isolation = TXN_ISO_READ_UNCOMMITTED;
-		cookies[i].session = worker_session;
+		manager->lsm_worker_cookies[i].session = worker_session;
 	}
 
 	/* Start the LSM manager thread. */
-	WT_ERR(__wt_thread_create(
-	    session, &cookies[0].tid, __lsm_worker_manager, &cookies[0]));
+	WT_ERR(__wt_thread_create(session, &manager->lsm_worker_cookies[0].tid,
+	    __lsm_worker_manager, &manager->lsm_worker_cookies[0]));
 
 	F_SET(S2C(session), WT_CONN_SERVER_LSM);
 
 	if (0) {
 err:		for (i = 0;
-		    (worker_session = cookies[i].session) != NULL;
+		    (worker_session =
+		    manager->lsm_worker_cookies[i].session) != NULL;
 		    i++)
 			WT_TRET((&worker_session->iface)->close(
 			    &worker_session->iface, NULL));
-		__wt_free(session, cookies);
 	}
 	return (ret);
 }
@@ -122,8 +247,10 @@ __wt_lsm_manager_destroy(WT_SESSION_IMPL *session)
 	manager = &conn->lsm_manager;
 	removed = 0;
 
-	if (manager->lsm_worker_cookies != NULL) {
-		/* Wait for the server to notice and wrap up. */
+	if (manager->lsm_workers > 0) {
+		/*
+		 * Stop the main LSM manager thread first.
+		 */
 		while (F_ISSET(conn, WT_CONN_SERVER_LSM))
 			__wt_yield();
 
@@ -156,17 +283,18 @@ __wt_lsm_manager_destroy(WT_SESSION_IMPL *session)
 			++removed;
 			__wt_lsm_manager_free_work_unit(session, current);
 		}
+	}
+	WT_STAT_FAST_CONN_INCRV(session,
+	    lsm_work_units_discarded, removed);
 
-		/* Close all LSM worker sessions. */
-		for (i = 0; i < manager->lsm_workers_max; i++) {
-			wt_session =
-			    &manager->lsm_worker_cookies[i].session->iface;
-			WT_TRET(wt_session->close(wt_session, NULL));
-		}
-
-		WT_STAT_FAST_CONN_INCRV(session,
-		    lsm_work_units_discarded, removed);
-		__wt_free(session, manager->lsm_worker_cookies);
+	/*
+	 * Close all LSM worker sessions.  Start at 1 because we already
+	 * shut down the main LSM manager thread.
+	 */
+	for (i = 1; i < manager->lsm_workers; i++) {
+		wt_session =
+		    &manager->lsm_worker_cookies[i].session->iface;
+		WT_TRET(wt_session->close(wt_session, NULL));
 	}
 
 	/* Free resources that are allocated in connection initialize */
@@ -239,36 +367,11 @@ __lsm_manager_worker_setup(WT_SESSION_IMPL *session)
 	worker_args->work_cond = manager->work_cond;
 	worker_args->id = manager->lsm_workers++;
 	worker_args->type = WT_LSM_WORK_DROP | WT_LSM_WORK_SWITCH;
+	F_SET(worker_args, WT_LSM_WORKER_RUN);
 	/* Start the switch thread. */
 	WT_RET(__wt_lsm_worker_start(session, worker_args));
+	WT_RET(__lsm_general_worker_start(session));
 
-	/*
-	 * Start the remaining worker threads.
-	 * This should get more sophisticated in the future - only launching
-	 * as many worker threads as are required to keep up with demand.
-	 */
-	for (; manager->lsm_workers < manager->lsm_workers_max;
-	    manager->lsm_workers++) {
-		/* Freed by the worker thread when it shuts down */
-		worker_args =
-		    &manager->lsm_worker_cookies[manager->lsm_workers];
-		worker_args->work_cond = manager->work_cond;
-		worker_args->id = manager->lsm_workers;
-		worker_args->type =
-		    WT_LSM_WORK_BLOOM |
-		    WT_LSM_WORK_DROP |
-		    WT_LSM_WORK_FLUSH |
-		    WT_LSM_WORK_SWITCH;
-		/*
-		 * Only allow half of the threads to run merges to avoid all
-		 * all workers getting stuck in long-running merge operations.
-		 * Make sure the first worker is allowed, so that there is at
-		 * least one thread capable of running merges.
-		 */
-		if (manager->lsm_workers % 2 == 1)
-			FLD_SET(worker_args->type, WT_LSM_WORK_MERGE);
-		WT_RET(__wt_lsm_worker_start(session, worker_args));
-	}
 	return (0);
 }
 

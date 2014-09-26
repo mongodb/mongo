@@ -48,7 +48,7 @@ __curfile_compare(WT_CURSOR *a, WT_CURSOR *b, int *cmpp)
 	 * Confirm both cursors refer to the same source and have keys, then
 	 * call the underlying object to compare them.
 	 */
-	if (strcmp(a->uri, b->uri) != 0)
+	if (strcmp(a->internal_uri, b->internal_uri) != 0)
 		WT_ERR_MSG(session, EINVAL,
 		    "Cursors must reference the same object");
 
@@ -324,7 +324,7 @@ __curfile_close(WT_CURSOR *cursor)
 	if (cbt->btree != NULL)
 		WT_TRET(__wt_session_release_btree(session));
 	/* The URI is owned by the btree handle. */
-	cursor->uri = NULL;
+	cursor->internal_uri = NULL;
 	WT_TRET(__wt_cursor_close(cursor));
 
 err:	API_END_RET(session, ret);
@@ -375,7 +375,7 @@ __wt_curfile_create(WT_SESSION_IMPL *session,
 	cursor = &cbt->iface;
 	*cursor = iface;
 	cursor->session = &session->iface;
-	cursor->uri = btree->dhandle->name;
+	cursor->internal_uri = btree->dhandle->name;
 	cursor->key_format = btree->key_format;
 	cursor->value_format = btree->value_format;
 
@@ -404,7 +404,8 @@ __wt_curfile_create(WT_SESSION_IMPL *session,
 	}
 
 	/* __wt_cursor_init is last so we don't have to clean up on error. */
-	WT_ERR(__wt_cursor_init(cursor, cursor->uri, owner, cfg, cursorp));
+	WT_ERR(__wt_cursor_init(
+	    cursor, cursor->internal_uri, owner, cfg, cursorp));
 
 	WT_STAT_FAST_CONN_INCR(session, cursor_create);
 	WT_STAT_FAST_DATA_INCR(session, cursor_create);

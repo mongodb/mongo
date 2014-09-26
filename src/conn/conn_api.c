@@ -178,8 +178,8 @@ __conn_load_extension(
 	WT_DLH *dlh;
 	WT_SESSION_IMPL *session;
 	int (*load)(WT_CONNECTION *, WT_CONFIG_ARG *);
-	const char *init_name, *terminate_name;
 	int is_local;
+	const char *init_name, *terminate_name;
 
 	dlh = NULL;
 	init_name = terminate_name = NULL;
@@ -233,8 +233,8 @@ err:	if (dlh != NULL)
 static int
 __conn_load_extensions(WT_SESSION_IMPL *session, const char *cfg[])
 {
-	WT_CONFIG_ITEM cval, skey, sval;
 	WT_CONFIG subconfig;
+	WT_CONFIG_ITEM cval, skey, sval;
 	WT_CONNECTION_IMPL *conn;
 	WT_DECL_ITEM(exconfig);
 	WT_DECL_ITEM(expath);
@@ -310,22 +310,25 @@ err:	if (ncoll != NULL) {
  * internally.
  */
 int
-__wt_conn_remove_collator(WT_SESSION_IMPL *session, WT_NAMED_COLLATOR *ncoll)
+__wt_conn_remove_collator(WT_SESSION_IMPL *session)
 {
 	WT_CONNECTION_IMPL *conn;
 	WT_DECL_RET;
+	WT_NAMED_COLLATOR *ncoll;
 
 	conn = S2C(session);
 
-	/* Call any termination method. */
-	if (ncoll->collator->terminate != NULL)
-		ret = ncoll->collator->terminate(
-		    ncoll->collator, (WT_SESSION *)session);
+	while ((ncoll = TAILQ_FIRST(&conn->collqh)) != NULL) {
+		/* Call any termination method. */
+		if (ncoll->collator->terminate != NULL)
+			WT_TRET(ncoll->collator->terminate(
+			    ncoll->collator, (WT_SESSION *)session));
 
-	/* Remove from the connection's list, free memory. */
-	TAILQ_REMOVE(&conn->collqh, ncoll, q);
-	__wt_free(session, ncoll->name);
-	__wt_free(session, ncoll);
+		/* Remove from the connection's list, free memory. */
+		TAILQ_REMOVE(&conn->collqh, ncoll, q);
+		__wt_free(session, ncoll->name);
+		__wt_free(session, ncoll);
+	}
 
 	return (ret);
 }
@@ -374,23 +377,25 @@ err:	if (ncomp != NULL) {
  * internally.
  */
 int
-__wt_conn_remove_compressor(
-    WT_SESSION_IMPL *session, WT_NAMED_COMPRESSOR *ncomp)
+__wt_conn_remove_compressor(WT_SESSION_IMPL *session)
 {
 	WT_CONNECTION_IMPL *conn;
 	WT_DECL_RET;
+	WT_NAMED_COMPRESSOR *ncomp;
 
 	conn = S2C(session);
 
-	/* Call any termination method. */
-	if (ncomp->compressor->terminate != NULL)
-		ret = ncomp->compressor->terminate(
-		    ncomp->compressor, (WT_SESSION *)session);
+	while ((ncomp = TAILQ_FIRST(&conn->compqh)) != NULL) {
+		/* Call any termination method. */
+		if (ncomp->compressor->terminate != NULL)
+			WT_TRET(ncomp->compressor->terminate(
+			    ncomp->compressor, (WT_SESSION *)session));
 
-	/* Remove from the connection's list, free memory. */
-	TAILQ_REMOVE(&conn->compqh, ncomp, q);
-	__wt_free(session, ncomp->name);
-	__wt_free(session, ncomp);
+		/* Remove from the connection's list, free memory. */
+		TAILQ_REMOVE(&conn->compqh, ncomp, q);
+		__wt_free(session, ncomp->name);
+		__wt_free(session, ncomp);
+	}
 
 	return (ret);
 }
@@ -405,8 +410,8 @@ __conn_add_data_source(WT_CONNECTION *wt_conn,
 {
 	WT_CONNECTION_IMPL *conn;
 	WT_DECL_RET;
-	WT_SESSION_IMPL *session;
 	WT_NAMED_DATA_SOURCE *ndsrc;
+	WT_SESSION_IMPL *session;
 
 	ndsrc = NULL;
 
@@ -437,23 +442,25 @@ err:	if (ndsrc != NULL) {
  *	Remove data source added by WT_CONNECTION->add_data_source.
  */
 int
-__wt_conn_remove_data_source(
-    WT_SESSION_IMPL *session, WT_NAMED_DATA_SOURCE *ndsrc)
+__wt_conn_remove_data_source(WT_SESSION_IMPL *session)
 {
-	WT_DECL_RET;
 	WT_CONNECTION_IMPL *conn;
+	WT_DECL_RET;
+	WT_NAMED_DATA_SOURCE *ndsrc;
 
 	conn = S2C(session);
 
-	/* Call any termination method. */
-	if (ndsrc->dsrc->terminate != NULL)
-		ret =
-		    ndsrc->dsrc->terminate(ndsrc->dsrc, (WT_SESSION *)session);
+	while ((ndsrc = TAILQ_FIRST(&conn->dsrcqh)) != NULL) {
+		/* Call any termination method. */
+		if (ndsrc->dsrc->terminate != NULL)
+			WT_TRET(ndsrc->dsrc->terminate(
+			    ndsrc->dsrc, (WT_SESSION *)session));
 
-	/* Remove from the connection's list, free memory. */
-	TAILQ_REMOVE(&conn->dsrcqh, ndsrc, q);
-	__wt_free(session, ndsrc->prefix);
-	__wt_free(session, ndsrc);
+		/* Remove from the connection's list, free memory. */
+		TAILQ_REMOVE(&conn->dsrcqh, ndsrc, q);
+		__wt_free(session, ndsrc->prefix);
+		__wt_free(session, ndsrc);
+	}
 
 	return (ret);
 }
@@ -656,7 +663,7 @@ __conn_reconfigure(WT_CONNECTION *wt_conn, const char *config)
 	WT_ERR(__wt_cache_config(session, config_cfg));
 	WT_ERR(__wt_cache_pool_config(session, config_cfg));
 	WT_ERR(__wt_checkpoint_server_create(session, config_cfg));
-	WT_ERR(__wt_lsm_manager_config(session, config_cfg));
+	WT_ERR(__wt_lsm_manager_reconfig(session, config_cfg));
 	WT_ERR(__wt_statlog_create(session, config_cfg));
 	WT_ERR(__wt_verbose_config(session, config_cfg));
 
@@ -1058,6 +1065,12 @@ __conn_statistics_config(WT_SESSION_IMPL *session, const char *cfg[])
 	return (0);
 }
 
+/* Simple structure for name and flag configuration searches. */
+typedef struct {
+	const char *name;
+	uint32_t flag;
+} WT_NAME_FLAG;
+
 /*
  * __wt_verbose_config --
  *	Set verbose configuration.
@@ -1065,14 +1078,7 @@ __conn_statistics_config(WT_SESSION_IMPL *session, const char *cfg[])
 int
 __wt_verbose_config(WT_SESSION_IMPL *session, const char *cfg[])
 {
-	WT_CONFIG_ITEM cval, sval;
-	WT_CONNECTION_IMPL *conn;
-	WT_DECL_RET;
-	uint32_t flags;
-	static const struct {
-		const char *name;
-		uint32_t flag;
-	} *ft, verbtypes[] = {
+	static const WT_NAME_FLAG verbtypes[] = {
 		{ "api",		WT_VERB_API },
 		{ "block",		WT_VERB_BLOCK },
 		{ "checkpoint",		WT_VERB_CHECKPOINT },
@@ -1091,11 +1097,17 @@ __wt_verbose_config(WT_SESSION_IMPL *session, const char *cfg[])
 		{ "salvage",		WT_VERB_SALVAGE },
 		{ "shared_cache",	WT_VERB_SHARED_CACHE },
 		{ "split",		WT_VERB_SPLIT },
+		{ "temporary",		WT_VERB_TEMPORARY },
 		{ "verify",		WT_VERB_VERIFY },
 		{ "version",		WT_VERB_VERSION },
 		{ "write",		WT_VERB_WRITE },
 		{ NULL, 0 }
 	};
+	WT_CONFIG_ITEM cval, sval;
+	WT_CONNECTION_IMPL *conn;
+	WT_DECL_RET;
+	const WT_NAME_FLAG *ft;
+	uint32_t flags;
 
 	conn = S2C(session);
 
@@ -1199,21 +1211,21 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
 		__conn_add_extractor,
 		__conn_get_extension_api
 	};
-	static const struct {
-		const char *name;
-		uint32_t flag;
-	} *ft, file_types[] = {
+	static const WT_NAME_FLAG file_types[] = {
 		{ "checkpoint",	WT_FILE_TYPE_CHECKPOINT },
 		{ "data",	WT_FILE_TYPE_DATA },
 		{ "log",	WT_FILE_TYPE_LOG },
 		{ NULL, 0 }
 	};
+
 	WT_CONFIG_ITEM cval, sval;
 	WT_CONNECTION_IMPL *conn;
-	WT_ITEM cbbuf, cubuf;
 	WT_DECL_RET;
+	WT_ITEM cbbuf, cubuf;
+	const WT_NAME_FLAG *ft;
 	WT_SESSION_IMPL *session;
 	int exist;
+
 	/* Leave space for optional additional configuration. */
 	const char *cfg[] = { NULL, NULL, NULL, NULL, NULL, NULL };
 
@@ -1314,20 +1326,9 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
 	WT_ERR(__wt_config_gets(session, cfg, "session_max", &cval));
 	conn->session_size = (uint32_t)cval.val + WT_NUM_INTERNAL_SESSIONS;
 
-	WT_ERR(__wt_config_gets(session, cfg, "lsm_manager.merge", &cval));
-	if (cval.val)
-		F_SET(conn, WT_CONN_LSM_MERGE);
-
-	WT_ERR(__wt_config_gets(
-	    session, cfg, "lsm_manager.worker_thread_max", &cval));
-	if (cval.val)
-		conn->lsm_manager.lsm_workers_max = (uint32_t)cval.val;
-
 	WT_ERR(__wt_config_gets(session, cfg, "checkpoint_sync", &cval));
 	if (cval.val)
 		F_SET(conn, WT_CONN_CKPT_SYNC);
-
-	WT_ERR(__wt_verbose_config(session, cfg));
 
 	WT_ERR(__wt_config_gets(session, cfg, "buffer_alignment", &cval));
 	if (cval.val == -1)
@@ -1370,6 +1371,8 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
 	conn->mmap = cval.val == 0 ? 0 : 1;
 
 	WT_ERR(__conn_statistics_config(session, cfg));
+	WT_ERR(__wt_lsm_manager_config(session, cfg));
+	WT_ERR(__wt_verbose_config(session, cfg));
 
 	/* Write the base configuration file, if we're creating the database. */
 	if (conn->is_new)

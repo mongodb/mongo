@@ -186,7 +186,7 @@ __curtable_compare(WT_CURSOR *a, WT_CURSOR *b, int *cmpp)
 	 * Confirm both cursors refer to the same source and have keys, then
 	 * call the underlying object's comparison routine.
 	 */
-	if (strcmp(a->uri, b->uri) != 0)
+	if (strcmp(a->internal_uri, b->internal_uri) != 0)
 		WT_ERR_MSG(session, EINVAL,
 		    "comparison method cursors must reference the same object");
 	WT_CURSOR_NEEDKEY(WT_CURSOR_PRIMARY(a));
@@ -584,7 +584,7 @@ __curtable_close(WT_CURSOR *cursor)
 	__wt_free(session, ctable->idx_cursors);
 	__wt_schema_release_table(session, ctable->table);
 	/* The URI is owned by the table. */
-	cursor->uri = NULL;
+	cursor->internal_uri = NULL;
 	WT_TRET(__wt_cursor_close(cursor));
 
 err:	API_END_RET(session, ret);
@@ -723,7 +723,7 @@ __wt_curtable_open(WT_SESSION_IMPL *session,
 	cursor = &ctable->iface;
 	*cursor = iface;
 	cursor->session = &session->iface;
-	cursor->uri = table->name;
+	cursor->internal_uri = table->name;
 	cursor->key_format = table->key_format;
 	cursor->value_format = table->value_format;
 
@@ -756,7 +756,8 @@ __wt_curtable_open(WT_SESSION_IMPL *session,
 		cursor->reset = __curtable_reset;
 	}
 
-	WT_ERR(__wt_cursor_init(cursor, cursor->uri, NULL, cfg, cursorp));
+	WT_ERR(__wt_cursor_init(
+	    cursor, cursor->internal_uri, NULL, cfg, cursorp));
 
 	if (F_ISSET(cursor, WT_CURSTD_DUMP_JSON))
 		WT_ERR(__wt_json_column_init(cursor, table->key_format,

@@ -73,6 +73,7 @@ typedef struct {
 	int64_t insert;			/* Insert ratio */
 	int64_t read;			/* Read ratio */
 	int64_t update;			/* Update ratio */
+	int64_t throttle;		/* Maximum operations/second */
 
 #define	WORKER_INSERT		1	/* Insert */
 #define	WORKER_INSERT_RMW	2	/* Insert with read-modify-write */
@@ -135,6 +136,8 @@ struct __config {			/* Configuration struction */
 
 #define	ELEMENTS(a)	(sizeof(a) / sizeof(a[0]))
 
+#define	THROTTLE_OPS	100
+
 /* From include/os.h */
 #define	WT_TIMEDIFF(end, begin)                                         \
 	(1000000000 * (uint64_t)((end).tv_sec - (begin).tv_sec) +       \
@@ -143,6 +146,10 @@ struct __config {			/* Configuration struction */
 #define	THOUSAND	(1000ULL)
 #define	MILLION		(1000000ULL)
 #define	BILLION		(1000000000ULL)
+
+#define	NSEC_PER_SEC	BILLION
+#define	USEC_PER_SEC	MILLION
+#define	MSEC_PER_SEC	THOUSAND
 
 #define	ns_to_ms(v)	((v) / MILLION)
 #define	ns_to_sec(v)	((v) / BILLION)
