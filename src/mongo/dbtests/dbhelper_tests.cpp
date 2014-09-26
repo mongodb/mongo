@@ -187,7 +187,6 @@ namespace mongo {
         long long estSizeBytes;
         {
             Lock::DBRead lk(txn.lockState(), ns);
-            Client::Context ctx(&txn,  ns );
 
             // search invalid index range
             KeyRange range( ns,
@@ -233,7 +232,7 @@ namespace mongo {
         long long estSizeBytes;
         {
             Lock::DBRead lk(txn.lockState(), ns);
-            Client::Context ctx(&txn,  ns );
+
             KeyRange range( ns,
                             BSON( "_id" << 0 ),
                             BSON( "_id" << numDocsInserted ),

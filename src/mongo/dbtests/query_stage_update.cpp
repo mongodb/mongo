@@ -223,8 +223,8 @@ namespace QueryStageUpdate {
 
             // Verify the contents of the resulting collection.
             {
-                Client::ReadContext ctx(&_txn, ns());
-                Collection* collection = ctx.ctx().db()->getCollection(&_txn, ns());
+                AutoGetCollectionForRead ctx(&_txn, ns());
+                Collection* collection = ctx.getCollection();
 
                 vector<BSONObj> objs;
                 getCollContents(collection, &objs);
@@ -332,8 +332,8 @@ namespace QueryStageUpdate {
 
             // Check the contents of the collection.
             {
-                Client::ReadContext ctx(&_txn, ns());
-                Collection* collection = ctx.ctx().db()->getCollection(&_txn, ns());
+                AutoGetCollectionForRead ctx(&_txn, ns());
+                Collection* collection = ctx.getCollection();
 
                 vector<BSONObj> objs;
                 getCollContents(collection, &objs);

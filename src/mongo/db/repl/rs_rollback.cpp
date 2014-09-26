@@ -455,8 +455,7 @@ namespace {
 
                 const NamespaceString nss(ns);
 
-                bool unused;
-                Database* db = dbHolder().getOrCreate(txn, nss.db().toString(), unused);
+                Database* db = dbHolder().openDb(txn, nss.db().toString());
                 invariant(db);
 
                 {

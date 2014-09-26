@@ -74,12 +74,11 @@ namespace {
         if( names.size() == 1 ) {
             if( names[0] != "local" )
                 return true;
+
             // we have a local database.  return true if oplog isn't empty
-            {
-                Lock::DBRead lk(txn->lockState(), repl::rsoplog);
-                BSONObj o;
-                if( Helpers::getFirst(txn, repl::rsoplog, o) )
-                    return true;
+            BSONObj o;
+            if (Helpers::getSingleton(txn, repl::rsoplog, o)) {
+                return true;
             }
         }
         return false;

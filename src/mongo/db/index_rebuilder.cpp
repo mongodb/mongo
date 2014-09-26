@@ -134,10 +134,8 @@ namespace {
     }
 } // namespace
 
-    void restartInProgressIndexesFromLastShutdown() {
-        OperationContextImpl txn;
-
-        txn.getClient()->getAuthorizationSession()->grantInternalAuthorization();
+    void restartInProgressIndexesFromLastShutdown(OperationContext* txn) {
+        txn->getClient()->getAuthorizationSession()->grantInternalAuthorization();
 
         std::vector<std::string> dbNames;
 
@@ -149,12 +147,12 @@ namespace {
             for (std::vector<std::string>::const_iterator dbName = dbNames.begin();
                  dbName < dbNames.end();
                  ++dbName) {
-                Client::ReadContext ctx(&txn, *dbName);
+                AutoGetDb autoDb(txn, *dbName, newlm::MODE_S);
 
-                Database* db = ctx.ctx().db();
+                Database* db = autoDb.getDb();
                 db->getDatabaseCatalogEntry()->getCollectionNamespaces(&collNames);
             }
-            checkNS(&txn, collNames);
+            checkNS(txn, collNames);
         }
         catch (const DBException& e) {
             error() << "Index rebuilding did not complete: " << e.toString();

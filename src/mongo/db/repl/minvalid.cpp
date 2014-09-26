@@ -64,7 +64,6 @@ namespace {
 
     bool getInitialSyncFlag() {
         OperationContextImpl txn; // XXX?
-        Lock::DBRead lk (txn.lockState(), "local");
         BSONObj mv;
         if (Helpers::getSingleton(&txn, minvalidNS, mv)) {
             return mv[initialSyncFlagString].trueValue();
@@ -80,7 +79,6 @@ namespace {
     }
 
     OpTime getMinValid(OperationContext* txn) {
-        Lock::DBRead lk(txn->lockState(), "local.replset.minvalid");
         BSONObj mv;
         if (Helpers::getSingleton(txn, minvalidNS, mv)) {
             return mv["ts"]._opTime();

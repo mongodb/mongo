@@ -94,7 +94,7 @@ namespace mongo {
             projBob.appendElements(sortSpec);
             BSONObj projObj = projBob.obj();
 
-            Client::ReadContext ctx(txn, ns);
+            AutoGetCollectionForRead ctx(txn, ns);
 
             CanonicalQuery* cq;
             Status canonicalizeStatus = 
@@ -106,15 +106,14 @@ namespace mongo {
                                                  limit,
                                                  BSONObj(),
                                                  &cq,
-                                                 WhereCallbackReal(txn, StringData(dbname)));
+                                                 WhereCallbackReal(txn, dbname));
             if (!canonicalizeStatus.isOK()) {
                 errmsg = canonicalizeStatus.reason();
                 return false;
             }
 
             PlanExecutor* rawExec;
-            Status getExecStatus = getExecutor(
-                txn, ctx.ctx().db()->getCollection(txn, ns), cq, &rawExec);
+            Status getExecStatus = getExecutor(txn, ctx.getCollection(), cq, &rawExec);
             if (!getExecStatus.isOK()) {
                 errmsg = getExecStatus.reason();
                 return false;

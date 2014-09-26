@@ -527,7 +527,7 @@ namespace NamespaceTests {
                 Lock::DBWrite lk(txn.lockState(), dbName);
 
                 bool justCreated;
-                Database* db = dbHolder().getOrCreate(&txn, dbName, justCreated);
+                Database* db = dbHolder().openDb(&txn, dbName, &justCreated);
                 ASSERT(justCreated);
 
                 Collection* committedColl;
@@ -570,7 +570,7 @@ namespace NamespaceTests {
                 Lock::DBWrite lk(txn.lockState(), dbName);
 
                 bool justCreated;
-                Database* db = dbHolder().getOrCreate(&txn, dbName, justCreated);
+                Database* db = dbHolder().openDb(&txn, dbName, &justCreated);
                 ASSERT(justCreated);
 
                 {

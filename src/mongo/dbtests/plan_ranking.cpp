@@ -100,8 +100,8 @@ namespace PlanRankingTests {
          * Takes ownership of 'cq'.  Caller DOES NOT own the returned QuerySolution*.
          */
         QuerySolution* pickBestPlan(CanonicalQuery* cq) {
-            Client::ReadContext ctx(&_txn, ns);
-            Collection* collection = ctx.ctx().db()->getCollection(&_txn, ns);
+            AutoGetCollectionForRead ctx(&_txn, ns);
+            Collection* collection = ctx.getCollection();
 
             QueryPlannerParams plannerParams;
             fillOutPlannerParams(&_txn, collection, cq, &plannerParams);

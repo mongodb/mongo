@@ -914,7 +914,9 @@ namespace mongo {
 
     bool WriteBatchExecutor::ExecInsertsState::_lockAndCheckImpl(WriteOpResult* result) {
         if (hasLock()) {
-            txn->getCurOp()->enter(_context.get());
+            // TODO: Client::Context legacy, needs to be removed
+            txn->getCurOp()->enter(_context->ns(),
+                                   _context->db() ? _context->db()->getProfilingLevel() : 0);
             return true;
         }
 

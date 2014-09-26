@@ -39,30 +39,41 @@ namespace mongo {
      * Registry of opened databases.
      */
     class DatabaseHolder {
-        typedef StringMap<Database*> DBs;
-        // todo: we want something faster than this if called a lot:
-        mutable SimpleMutex _m;
-        DBs _dbs;
     public:
         DatabaseHolder() : _m("dbholder") { }
 
-        Database* get(OperationContext* txn,
-                      const StringData& ns) const;
-
-        Database* getOrCreate(OperationContext* txn,
-                              const StringData& ns,
-                              bool& justCreated);
-
-
-        void close(OperationContext* txn, const StringData& ns);
-
-        /** @param force - force close even if something underway - use at shutdown */
-        bool closeAll(OperationContext* txn,
-                      BSONObjBuilder& result,
-                      bool force);
+        /**
+         * Retrieves an already opened database or returns NULL. Must be called with the database
+         * locked in at least IS-mode.
+         */
+        Database* get(OperationContext* txn, const StringData& ns) const;
 
         /**
-         * need some lock
+         * Retrieves a database reference if it is already opened, or opens it if it hasn't been
+         * opened/created yet. Must be called with the database locked in X-mode.
+         *
+         * @param justCreated Returns whether the database was newly created (true) or it already
+         *          existed (false). Can be NULL if this information is not necessary.
+         */
+        Database* openDb(OperationContext* txn, const StringData& ns, bool* justCreated = NULL);
+
+        /**
+         * Closes the specified database. Must be called with the database locked in X-mode.
+         */
+        void close(OperationContext* txn, const StringData& ns);
+
+        /**
+         * Closes all opened databases. Must be called with the global lock acquired in X-mode.
+         *
+         * @param result Populated with the names of the databases, which were closed.
+         * @param force Force close even if something underway - use at shutdown
+         */
+        bool closeAll(OperationContext* txn, BSONObjBuilder& result, bool force);
+
+        /**
+         * Retrieves the names of all currently opened databases. Does not require locking, but it
+         * is not guaranteed that the returned set of names will be still valid unless a global
+         * lock is held, which would prevent database from disappearing or being created.
          */
         void getAllShortNames( std::set<std::string>& all ) const {
             SimpleMutex::scoped_lock lk(_m);
@@ -72,20 +83,10 @@ namespace mongo {
         }
 
     private:
-        static StringData _todb( const StringData& ns ) {
-            StringData d = __todb( ns );
-            uassert(13280, "invalid db name: " + ns.toString(), NamespaceString::validDBName(d));
-            return d;
-        }
-        static StringData __todb( const StringData& ns ) {
-            size_t i = ns.find( '.' );
-            if ( i == std::string::npos ) {
-                uassert( 13074 , "db name can't be empty" , ns.size() );
-                return ns;
-            }
-            uassert( 13075 , "db name can't be empty" , i > 0 );
-            return ns.substr( 0 , i );
-        }
+        typedef StringMap<Database*> DBs;
+
+        mutable SimpleMutex _m;
+        DBs _dbs;
     };
 
     DatabaseHolder& dbHolder();

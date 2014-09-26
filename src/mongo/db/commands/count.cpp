@@ -77,8 +77,8 @@ namespace mongo {
             request.explain = true;
 
             // Acquire the db read lock.
-            Client::ReadContext ctx(txn, request.ns);
-            Collection* collection = ctx.ctx().db()->getCollection(txn, request.ns);
+            AutoGetCollectionForRead ctx(txn, request.ns);
+            Collection* collection = ctx.getCollection();
 
             PlanExecutor* rawExec;
             Status getExecStatus = getExecutorCount(txn, collection, request, &rawExec);
@@ -105,8 +105,8 @@ namespace mongo {
                 return appendCommandStatus(result, parseStatus);
             }
 
-            Client::ReadContext ctx(txn, request.ns);
-            Collection* collection = ctx.ctx().db()->getCollection(txn, request.ns);
+            AutoGetCollectionForRead ctx(txn, request.ns);
+            Collection* collection = ctx.getCollection();
 
             PlanExecutor* rawExec;
             Status getExecStatus = getExecutorCount(txn, collection, request, &rawExec);
@@ -234,19 +234,19 @@ namespace mongo {
                        string &err,
                        int &errCode) {
 
-        // Lock 'ns'.
-        Client::ReadContext ctx(txn, ns);
-        Collection* collection = ctx.ctx().db()->getCollection(txn, ns);
-        const string& dbname = ctx.ctx().db()->name();
+        AutoGetCollectionForRead ctx(txn, ns);
 
+        Collection* collection = ctx.getCollection();
         if (NULL == collection) {
             err = "ns missing";
             return -1;
         }
 
+        const NamespaceString nss(ns);
+
         CountRequest request;
         CmdCount* countComm = static_cast<CmdCount*>(Command::findCommand("count"));
-        Status parseStatus = countComm->parseRequest(dbname, cmd, &request);
+        Status parseStatus = countComm->parseRequest(nss.db().toString(), cmd, &request);
         if (!parseStatus.isOK()) {
             err = parseStatus.reason();
             errCode = parseStatus.code();

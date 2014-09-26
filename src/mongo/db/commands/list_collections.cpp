@@ -67,9 +67,9 @@ namespace mongo {
                  BSONObjBuilder& result,
                  bool /*fromRepl*/) {
 
-            Lock::DBRead lk( txn->lockState(), dbname );
+            AutoGetDb autoDb(txn, dbname, newlm::MODE_S);
 
-            const Database* d = dbHolder().get( txn, dbname );
+            const Database* d = autoDb.getDb();
             const DatabaseCatalogEntry* dbEntry = NULL;
 
             list<string> names;

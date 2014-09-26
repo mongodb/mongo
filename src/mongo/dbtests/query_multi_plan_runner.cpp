@@ -87,11 +87,6 @@ namespace QueryMultiPlanRunner {
             ctx.commit();
         }
 
-        IndexDescriptor* getIndex(OperationContext* txn, Database* db, const BSONObj& obj) {
-            const Collection* collection = db->getCollection( txn, ns() );
-            return collection->getIndexCatalog()->findIndexByKeyPattern(txn, obj);
-        }
-
         void insert(const BSONObj& obj) {
             Client::WriteContext ctx(&_txn, ns());
             _client.insert(ns(), obj);
@@ -124,14 +119,14 @@ namespace QueryMultiPlanRunner {
 
             addIndex(BSON("foo" << 1));
 
-            Client::ReadContext ctx(&_txn, ns());
-            const Collection* coll = ctx.ctx().db()->getCollection(&_txn, ns());
+            AutoGetCollectionForRead ctx(&_txn, ns());
+            const Collection* coll = ctx.getCollection();
 
             // Plan 0: IXScan over foo == 7
             // Every call to work() returns something so this should clearly win (by current scoring
             // at least).
             IndexScanParams ixparams;
-            ixparams.descriptor = getIndex(&_txn, ctx.ctx().db(), BSON("foo" << 1));
+            ixparams.descriptor = coll->getIndexCatalog()->findIndexByKeyPattern(&_txn, BSON("foo" << 1));
             ixparams.bounds.isSimpleRange = true;
             ixparams.bounds.startKey = BSON("" << 7);
             ixparams.bounds.endKey = BSON("" << 7);
@@ -144,7 +139,7 @@ namespace QueryMultiPlanRunner {
 
             // Plan 1: CollScan with matcher.
             CollectionScanParams csparams;
-            csparams.collection = ctx.ctx().db()->getCollection( &_txn, ns() );
+            csparams.collection = coll;
             csparams.direction = CollectionScanParams::FORWARD;
 
             // Make the filter.
@@ -161,9 +156,7 @@ namespace QueryMultiPlanRunner {
             verify(CanonicalQuery::canonicalize(ns(), BSON("foo" << 7), &cq).isOK());
             verify(NULL != cq);
 
-            MultiPlanStage* mps = new MultiPlanStage(&_txn,
-                                                     ctx.ctx().db()->getCollection(&_txn, ns()),
-                                                     cq);
+            MultiPlanStage* mps = new MultiPlanStage(&_txn, ctx.getCollection(), cq);
             mps->addPlan(createQuerySolution(), firstRoot.release(), sharedWs.get());
             mps->addPlan(createQuerySolution(), secondRoot.release(), sharedWs.get());
 
@@ -172,9 +165,8 @@ namespace QueryMultiPlanRunner {
             ASSERT(mps->bestPlanChosen());
             ASSERT_EQUALS(0, mps->bestPlanIdx());
 
-            Collection* collection = ctx.ctx().db()->getCollection(&_txn, ns());
             // Takes ownership of arguments other than 'collection'.
-            PlanExecutor exec(&_txn, sharedWs.release(), mps, cq, collection);
+            PlanExecutor exec(&_txn, sharedWs.release(), mps, cq, coll);
 
             // Get all our results out.
             int results = 0;
@@ -200,8 +192,8 @@ namespace QueryMultiPlanRunner {
             addIndex(BSON("a" << 1));
             addIndex(BSON("b" << 1));
 
-            Client::ReadContext ctx(&_txn, ns());
-            Collection* collection = ctx.ctx().db()->getCollection(&_txn, ns());
+            AutoGetCollectionForRead ctx(&_txn, ns());
+            Collection* collection = ctx.getCollection();
 
             // Query for both 'a' and 'b' and sort on 'b'.
             CanonicalQuery* cq;

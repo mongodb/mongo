@@ -207,7 +207,7 @@ namespace MatcherTests {
     public:
         void run() {
             OperationContextImpl txn;
-            Client::ReadContext ctx(&txn, "unittests.matchertests");
+            AutoGetCollectionForRead ctx(&txn, "unittests.matchertests");
 
             M m(BSON("$where" << "function(){ return this.a == 1; }"),
                 WhereCallbackReal(&txn, StringData("unittests")));

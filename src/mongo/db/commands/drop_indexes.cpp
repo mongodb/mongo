@@ -36,6 +36,7 @@
 #include <vector>
 
 #include "mongo/db/background.h"
+#include "mongo/db/client.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/index_builder.h"

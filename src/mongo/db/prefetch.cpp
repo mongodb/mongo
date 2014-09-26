@@ -117,7 +117,11 @@ namespace {
     }
 
     // page in the data pages for a record associated with an object
-    void prefetchRecordPages(OperationContext* txn, const char* ns, const BSONObj& obj) {
+    void prefetchRecordPages(OperationContext* txn,
+                             Database* db,
+                             const char* ns,
+                             const BSONObj& obj) {
+
         BSONElement _id;
         if( obj.getObjectID(_id) ) {
             TimerHolder timer(&prefetchDocStats);
@@ -125,12 +129,10 @@ namespace {
             builder.append(_id);
             BSONObj result;
             try {
-                // we can probably use Client::Context here instead of ReadContext as we
-                // have locked higher up the call stack already
-                Client::ReadContext ctx(txn, ns);
-                if( Helpers::findById(txn, ctx.ctx().db(), ns, builder.done(), result) ) {
+                if (Helpers::findById(txn, db, ns, builder.done(), result)) {
                     // do we want to use Record::touch() here?  it's pretty similar.
                     volatile char _dummy_char = '\0';
+
                     // Touch the first word on every page in order to fault it into memory
                     for (int i = 0; i < result.objsize(); i += g_minOSPageSizeBytes) {
                         _dummy_char += *(result.objdata() + i);
@@ -170,13 +172,14 @@ namespace {
         BSONObj obj = op.getObjectField(opField);
         const char *ns = op.getStringField("ns");
 
+        txn->lockState()->assertAtLeastReadLocked(ns);
+
         Collection* collection = db->getCollection( txn, ns );
-        if ( !collection )
+        if (!collection) {
             return;
+        }
 
         LOG(4) << "index prefetch for op " << *opType << endl;
-
-        DEV txn->lockState()->assertAtLeastReadLocked(ns);
 
         // should we prefetch index pages on updates? if the update is in-place and doesn't change 
         // indexed values, it is actually slower - a lot slower if there are a dozen indexes or 
@@ -205,7 +208,7 @@ namespace {
             // do not prefetch the data for capped collections because
             // they typically do not have an _id index for findById() to use.
             !collection->isCapped()) {
-            prefetchRecordPages(txn, ns, obj);
+            prefetchRecordPages(txn, db, ns, obj);
         }
     }
 

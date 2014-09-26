@@ -43,7 +43,6 @@
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/database.h"
 #include "mongo/db/catalog/database_holder.h"
-#include "mongo/db/client.h"
 #include "mongo/db/json.h"
 #include "mongo/db/operation_context_impl.h"
 #include "mongo/db/storage/record_store.h"
@@ -237,12 +236,16 @@ public:
     virtual void generateOutputDocuments(std::ostream* out) const {
         invariant(out);
         toolInfoLog() << "going to try to recover data from: " << _ns << std::endl;
+
         OperationContextImpl txn;
-        Client::WriteContext cx(&txn, toolGlobalParams.db);
 
-        Database* db = dbHolder().get(&txn, toolGlobalParams.db);
+        Database* db = dbHolder().openDb(&txn, toolGlobalParams.db);
+        if (!db) {
+            toolError() << "Database does not exist: " << toolGlobalParams.db << std::endl;
+            return;
+        }
+
         Collection* collection = db->getCollection(&txn, _ns);
-
         if (!collection) {
             toolError() << "Collection does not exist: " << toolGlobalParams.coll << std::endl;
             return;
@@ -251,6 +254,8 @@ public:
         toolInfoLog() << "nrecords: " << collection->numRecords(&txn)
                       << " datasize: " << collection->dataSize(&txn);
         try {
+            WriteUnitOfWork wunit(&txn);
+
             boost::scoped_ptr<RecordIterator> iter(
                 collection->getRecordStore()->getIteratorForRepair(&txn));
             for (DiskLoc currLoc = iter->getNext(); !currLoc.isNull(); currLoc = iter->getNext()) {
@@ -287,11 +292,12 @@ public:
                     }
                 }
             }
+
+            wunit.commit();
         }
         catch (DBException& e) {
             toolError() << "ERROR recovering: " << _ns << " " << e.toString();
         }
-        cx.commit();
     }
 
 private:

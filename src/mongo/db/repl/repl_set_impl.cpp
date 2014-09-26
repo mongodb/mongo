@@ -403,12 +403,10 @@ namespace {
         }
     }
 
-    OpTime ReplSetImpl::getEarliestOpTimeWritten() const {
-        OperationContextImpl txn; // XXX?
-        Lock::DBRead lk(txn.lockState(), rsoplog);
+    OpTime ReplSetImpl::getEarliestOpTimeWritten(OperationContext* txn) const {
         BSONObj o;
         uassert(17347, "Problem reading earliest entry from oplog",
-                Helpers::getFirst(&txn, rsoplog, o));
+                Helpers::getSingleton(txn, rsoplog, o));
         return o["ts"]._opTime();
     }
 

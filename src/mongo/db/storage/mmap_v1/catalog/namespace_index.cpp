@@ -134,20 +134,7 @@ namespace mongo {
     }
 
     NOINLINE_DECL void NamespaceIndex::_init( OperationContext* txn ) {
-        verify( !_ht.get() );
-
-        txn->lockState()->assertWriteLocked(_database);
-
-        /* if someone manually deleted the datafiles for a database,
-           we need to be sure to clear any cached info for the database in
-           local.*.
-        */
-        /*
-        if ( "local" != _database ) {
-            DBInfo i(_database.c_str());
-            i.dbDropped();
-        }
-        */
+        invariant(!_ht.get());
 
         unsigned long long len = 0;
         boost::filesystem::path nsPath = path();

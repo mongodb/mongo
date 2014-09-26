@@ -67,14 +67,14 @@ namespace mongo {
                  BSONObjBuilder& result,
                  bool /*fromRepl*/) {
 
-            string ns = parseNs( dbname, cmdObj );
-
-            Lock::DBRead lock( txn->lockState(), dbname );
-            const Database* d = dbHolder().get( txn, dbname );
+            AutoGetDb autoDb(txn, dbname, newlm::MODE_S);
+            const Database* d = autoDb.getDb();
             if ( !d ) {
                 return appendCommandStatus( result, Status( ErrorCodes::NamespaceNotFound,
                                                             "no database" ) );
             }
+
+            const string ns = parseNs(dbname, cmdObj);
 
             const DatabaseCatalogEntry* dbEntry = d->getDatabaseCatalogEntry();
             const CollectionCatalogEntry* cce = dbEntry->getCollectionCatalogEntry( txn, ns );

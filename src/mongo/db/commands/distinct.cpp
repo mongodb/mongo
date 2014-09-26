@@ -70,7 +70,6 @@ namespace mongo {
                  bool fromRepl ) {
 
             Timer t;
-            string ns = dbname + '.' + cmdObj.firstElement().valuestr();
 
             // ensure that the key is a string
             uassert(18510,
@@ -98,10 +97,10 @@ namespace mongo {
             BSONArrayBuilder arr( bb );
             BSONElementSet values;
 
-            Client::ReadContext ctx(txn, ns);
+            const string ns = parseNs(dbname, cmdObj);
+            AutoGetCollectionForRead ctx(txn, ns);
 
-            Collection* collection = ctx.ctx().db()->getCollection( txn, ns );
-
+            Collection* collection = ctx.getCollection();
             if (!collection) {
                 result.appendArray( "values" , BSONObj() );
                 result.append("stats", BSON("n" << 0 <<

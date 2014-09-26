@@ -195,20 +195,20 @@ namespace mongo {
        Returns: true if object exists.
     */
     bool Helpers::getSingleton(OperationContext* txn, const char *ns, BSONObj& result) {
-        Client::Context context(txn, ns);
-        auto_ptr<PlanExecutor> exec(
-            InternalPlanner::collectionScan(txn, ns, context.db()->getCollection(txn, ns)));
+        AutoGetCollectionForRead ctx(txn, ns);
+        auto_ptr<PlanExecutor> exec(InternalPlanner::collectionScan(txn, ns, ctx.getCollection()));
 
         PlanExecutor::ExecState state = exec->getNext(&result, NULL);
-        context.getClient()->curop()->done();
+        txn->getCurOp()->done();
         return PlanExecutor::ADVANCED == state;
     }
 
     bool Helpers::getLast(OperationContext* txn, const char *ns, BSONObj& result) {
-        Client::Context ctx(txn, ns);
-        Collection* coll = ctx.db()->getCollection( txn, ns );
-        auto_ptr<PlanExecutor> exec(
-            InternalPlanner::collectionScan(txn, ns, coll, InternalPlanner::BACKWARD));
+        AutoGetCollectionForRead autoColl(txn, ns);
+        auto_ptr<PlanExecutor> exec(InternalPlanner::collectionScan(txn,
+                                                                    ns,
+                                                                    autoColl.getCollection(),
+                                                                    InternalPlanner::BACKWARD));
 
         PlanExecutor::ExecState state = exec->getNext(&result, NULL);
         return PlanExecutor::ADVANCED == state;
@@ -295,10 +295,11 @@ namespace mongo {
                                          const BSONObj& shardKeyPattern,
                                          BSONObj* indexPattern ) {
 
-        Client::ReadContext context(txn, ns);
-        Collection* collection = context.ctx().db()->getCollection( txn, ns );
-        if ( !collection )
+        AutoGetCollectionForRead ctx(txn, ns);
+        Collection* collection = ctx.getCollection();
+        if (!collection) {
             return false;
+        }
 
         // Allow multiKey based on the invariant that shard keys must be single-valued.
         // Therefore, any multi-key index prefixed by shard key cannot be multikey over
@@ -492,9 +493,12 @@ namespace mongo {
         *estChunkSizeBytes = 0;
         *numDocs = 0;
 
-        Client::ReadContext ctx(txn, ns);
-        Collection* collection = ctx.ctx().db()->getCollection( txn, ns );
-        if ( !collection ) return Status( ErrorCodes::NamespaceNotFound, ns );
+        AutoGetCollectionForRead ctx(txn, ns);
+
+        Collection* collection = ctx.getCollection();
+        if (!collection) {
+            return Status(ErrorCodes::NamespaceNotFound, ns);
+        }
 
         // Require single key
         IndexDescriptor *idx =

@@ -62,12 +62,6 @@ namespace QueryStageDistinct {
             _client.insert(ns(), obj);
         }
 
-        IndexDescriptor* getIndex(const BSONObj& obj) {
-            Client::ReadContext ctx(&_txn, ns());
-            Collection* collection = ctx.ctx().db()->getCollection( &_txn, ns() );
-            return collection->getIndexCatalog()->findIndexByKeyPattern( &_txn, obj );
-        }
-
         /**
          * Returns the projected value from the working set that would
          * be returned in the 'values' field of the distinct command result.
@@ -123,11 +117,12 @@ namespace QueryStageDistinct {
             // Make an index on a:1
             addIndex(BSON("a" << 1));
 
-            Client::ReadContext ctx(&_txn, ns());
+            AutoGetCollectionForRead ctx(&_txn, ns());
+            Collection* coll = ctx.getCollection();
 
             // Set up the distinct stage.
             DistinctParams params;
-            params.descriptor = getIndex(BSON("a" << 1));
+            params.descriptor = coll->getIndexCatalog()->findIndexByKeyPattern(&_txn, BSON("a" << 1));
             verify(params.descriptor);
             params.direction = 1;
             // Distinct-ing over the 0-th field of the keypattern.
@@ -186,11 +181,12 @@ namespace QueryStageDistinct {
             // Make an index on a:1
             addIndex(BSON("a" << 1));
 
-            Client::ReadContext ctx(&_txn, ns());
+            AutoGetCollectionForRead ctx(&_txn, ns());
+            Collection* coll = ctx.getCollection();
 
             // Set up the distinct stage.
             DistinctParams params;
-            params.descriptor = getIndex(BSON("a" << 1));
+            params.descriptor = coll->getIndexCatalog()->findIndexByKeyPattern(&_txn, BSON("a" << 1));
             ASSERT_TRUE(params.descriptor->isMultikey(&_txn));
 
             verify(params.descriptor);

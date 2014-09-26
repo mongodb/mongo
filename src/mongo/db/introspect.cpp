@@ -195,8 +195,11 @@ namespace {
         collectionOptions.capped = true;
         collectionOptions.cappedSize = 1024 * 1024;
 
+        WriteUnitOfWork wunit(txn);
         collection = db->createCollection( txn, profileName, collectionOptions );
         invariant( collection );
+        wunit.commit();
+
         return collection;
     }
 

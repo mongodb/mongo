@@ -1396,7 +1396,7 @@ namespace mongo {
         ChunkVersion wanted;
         if (!shardVersionOk(ns, errmsg, received, wanted)) {
             StringBuilder sb;
-            sb << "[" << ns << "] shard version not ok in Client::Context: " << errmsg;
+            sb << "[" << ns << "] shard version not ok: " << errmsg;
             throw SendStaleConfigException(ns, sb.str(), received, wanted);
         }
     }

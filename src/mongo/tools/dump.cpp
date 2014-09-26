@@ -26,7 +26,7 @@
 *    then also delete it in the license file.
 */
 
-#include "mongo/pch.h"
+#include "mongo/platform/basic.h"
 
 #include <boost/filesystem/operations.hpp>
 #include <boost/filesystem/convenience.hpp>
@@ -39,10 +39,11 @@
 #include "mongo/client/dbclientcursor.h"
 #include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/catalog/database_catalog_entry.h"
-#include "mongo/db/db.h"
+#include "mongo/db/catalog/database_holder.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context_impl.h"
 #include "mongo/db/catalog/collection.h"
+#include "mongo/db/catalog/database.h"
 #include "mongo/tools/mongodump_options.h"
 #include "mongo/tools/tool.h"
 #include "mongo/util/options_parser/option_section.h"
@@ -360,7 +361,9 @@ public:
         Writer w( f , &m );
 
         try {
+            WriteUnitOfWork wunit(opCtx);
             _repairExtents(opCtx, collection, w);
+            wunit.commit();
         }
         catch ( DBException& e ){
             toolError() << "Repair scan failed: " << e.toString() << std::endl;
@@ -373,9 +376,7 @@ public:
     
     int _repairByName(string dbname) {
         OperationContextImpl txn;
-        Client::WriteContext cx(&txn, dbname);
-
-        Database* db = dbHolder().get(&txn, dbname);
+        Database* db = dbHolder().openDb(&txn, dbname);
 
         list<string> namespaces;
         db->getDatabaseCatalogEntry()->getCollectionNamespaces( &namespaces );
@@ -409,8 +410,7 @@ public:
                 toolError() << "ERROR recovering: " << ns << " " << e.toString() << std::endl;
             }
         }
-        cx.commit();
-   
+
         return 0;
     }
 

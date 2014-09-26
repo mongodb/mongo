@@ -147,10 +147,8 @@ namespace repl {
                 // one possible tweak here would be to stay in the read lock for this database 
                 // for multiple prefetches if they are for the same database.
                 OperationContextImpl txn;
-                Client::ReadContext ctx(&txn, ns);
-                prefetchPagesForReplicatedOp(&txn,
-                                             ctx.ctx().db(),
-                                             op);
+                AutoGetCollectionForRead ctx(&txn, ns);
+                prefetchPagesForReplicatedOp(&txn, ctx.getDb(), op);
             }
             catch (const DBException& e) {
                 LOG(2) << "ignoring exception in prefetchOp(): " << e.what() << endl;

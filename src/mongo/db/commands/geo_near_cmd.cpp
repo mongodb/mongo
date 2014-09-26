@@ -32,6 +32,7 @@
 #include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/privilege.h"
 #include "mongo/db/catalog/database.h"
+#include "mongo/db/client.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/geo/geoconstants.h"
@@ -69,22 +70,15 @@ namespace mongo {
         }
 
         bool run(OperationContext* txn, const string& dbname, BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
-            const string ns = dbname + "." + cmdObj.firstElement().valuestr();
-
             if (!cmdObj["start"].eoo()) {
                 errmsg = "using deprecated 'start' argument to geoNear";
                 return false;
             }
 
-            Client::ReadContext ctx(txn, ns);
+            const NamespaceString nss(parseNs(dbname, cmdObj));
+            AutoGetCollectionForRead ctx(txn, nss);
 
-            Database* db = ctx.ctx().db();
-            if ( !db ) {
-                errmsg = "can't find ns";
-                return false;
-            }
-
-            Collection* collection = db->getCollection( txn, ns );
+            Collection* collection = ctx.getCollection();
             if ( !collection ) {
                 errmsg = "can't find ns";
                 return false;
@@ -131,7 +125,7 @@ namespace mongo {
             }
 
             if (!cmdObj["uniqueDocs"].eoo()) {
-                warning() << ns << ": ignoring deprecated uniqueDocs option in geoNear command";
+                warning() << nss << ": ignoring deprecated uniqueDocs option in geoNear command";
             }
 
             // And, build the full query expression.
@@ -170,11 +164,9 @@ namespace mongo {
                                    "$dis" << BSON("$meta" << LiteParsedQuery::metaGeoNearDistance));
 
             CanonicalQuery* cq;
-
-            const NamespaceString nss(dbname);
             const WhereCallbackReal whereCallback(txn, nss.db());
 
-            if (!CanonicalQuery::canonicalize(ns,
+            if (!CanonicalQuery::canonicalize(nss,
                                               rewritten,
                                               BSONObj(),
                                               projObj,

@@ -814,7 +814,7 @@ namespace {
                    it is ok if the initiating member has *other* data than that.
                    */
                 BSONObj o;
-                if( Helpers::getFirst(txn, rsoplog, o) ) {
+                if (Helpers::getSingleton(txn, rsoplog, o)) {
                     return Status(ErrorCodes::AlreadyInitialized,
                                   rsoplog + string(" is not empty on the initiating member.  "
                                           "cannot initiate."));

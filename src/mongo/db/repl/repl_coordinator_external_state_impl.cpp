@@ -123,7 +123,6 @@ namespace {
             OperationContext* txn) {
         try {
             BSONObj config;
-            Lock::DBRead dbReadLock(txn->lockState(), configCollectionName);
             if (!Helpers::getSingleton(txn, configCollectionName, config)) {
                 return StatusWith<BSONObj>(
                         ErrorCodes::NoMatchingDocument,
@@ -154,7 +153,6 @@ namespace {
             OperationContext* txn) {
 
         try {
-            Lock::DBRead lk(txn->lockState(), rsoplog);
             BSONObj oplogEntry;
             if (!Helpers::getLast(txn, rsoplog, oplogEntry)) {
                 return StatusWith<OpTime>(

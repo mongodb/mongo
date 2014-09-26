@@ -163,12 +163,10 @@ namespace repl {
 
     void ReplSource::ensureMe(OperationContext* txn) {
         string myname = getHostName();
-        bool exists = false;
-        {
-            Client::ReadContext ctx(txn, "local");
-            // local.me is an identifier for a server for getLastError w:2+
-            exists = Helpers::getSingleton(txn, "local.me", _me);
-        }
+
+        // local.me is an identifier for a server for getLastError w:2+
+        bool exists = Helpers::getSingleton(txn, "local.me", _me);
+
         if (!exists || !_me.hasField("host") || _me["host"].String() != myname) {
             Client::WriteContext ctx(txn, "local");
             // clean out local.me
@@ -1375,9 +1373,10 @@ namespace repl {
                 BSONObjBuilder b;
                 b.append(_id);
                 BSONObj result;
-                Client::ReadContext ctx(txn, ns );
-                if( Helpers::findById(txn, ctx.ctx().db(), ns, b.done(), result) )
+                AutoGetCollectionForRead ctx(txn, ns );
+                if (Helpers::findById(txn, ctx.getDb(), ns, b.done(), result)) {
                     _dummy_z += result.objsize(); // touch
+                }
             }
         }
         catch( DBException& ) {

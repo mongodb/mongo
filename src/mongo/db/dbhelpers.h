@@ -115,9 +115,6 @@ namespace mongo {
         static bool getSingleton(OperationContext* txn, const char *ns, BSONObj& result);
         static void putSingleton(OperationContext* txn, const char *ns, BSONObj obj);
         static void putSingletonGod(OperationContext* txn, const char *ns, BSONObj obj, bool logTheOp);
-        static bool getFirst(OperationContext* txn, const char *ns, BSONObj& result) {
-            return getSingleton(txn, ns, result);
-        }
 
         /**
          * get last object int he collection; e.g. {$natural : -1}

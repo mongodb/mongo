@@ -83,9 +83,9 @@ namespace QueryPlanExecutor {
          *
          * The caller takes ownership of the returned PlanExecutor*.
          */
-        PlanExecutor* makeCollScanExec(Client::Context& ctx, BSONObj& filterObj) {
+        PlanExecutor* makeCollScanExec(Collection* coll, BSONObj& filterObj) {
             CollectionScanParams csparams;
-            csparams.collection = ctx.db()->getCollection( &_txn, ns() );
+            csparams.collection = coll;
             csparams.direction = CollectionScanParams::FORWARD;
             auto_ptr<WorkingSet> ws(new WorkingSet());
             // Parse the filter.
@@ -100,8 +100,7 @@ namespace QueryPlanExecutor {
             verify(NULL != cq);
 
             // Hand the plan off to the executor.
-            PlanExecutor* exec = new PlanExecutor(&_txn, ws.release(), root.release(), cq,
-                                                  ctx.db()->getCollection(&_txn, ns()));
+            PlanExecutor* exec = new PlanExecutor(&_txn, ws.release(), root.release(), cq, coll);
             return exec;
         }
 
@@ -146,22 +145,24 @@ namespace QueryPlanExecutor {
         static const char* ns() { return "unittests.QueryPlanExecutor"; }
 
         size_t numCursors() {
-            Client::ReadContext ctx(&_txn, ns() );
-            Collection* collection = ctx.ctx().db()->getCollection( &_txn, ns() );
+            AutoGetCollectionForRead ctx(&_txn, ns() );
+            Collection* collection = ctx.getCollection();
             if ( !collection )
                 return 0;
             return collection->cursorCache()->numCursors();
         }
 
         void registerExec( PlanExecutor* exec ) {
-            Client::ReadContext ctx(&_txn, ns());
-            Collection* collection = ctx.ctx().db()->getOrCreateCollection( &_txn, ns() );
+            // TODO: This is not correct (create collection under S-lock)
+            AutoGetCollectionForRead ctx(&_txn, ns());
+            Collection* collection = ctx.getDb()->getOrCreateCollection(&_txn, ns());
             collection->cursorCache()->registerExecutor( exec );
         }
 
         void deregisterExec( PlanExecutor* exec ) {
-            Client::ReadContext ctx(&_txn, ns());
-            Collection* collection = ctx.ctx().db()->getOrCreateCollection( &_txn, ns() );
+            // TODO: This is not correct (create collection under S-lock)
+            AutoGetCollectionForRead ctx(&_txn, ns());
+            Collection* collection = ctx.getDb()->getOrCreateCollection(&_txn, ns());
             collection->cursorCache()->deregisterExecutor( exec );
         }
 
@@ -189,7 +190,9 @@ namespace QueryPlanExecutor {
             insert(BSON("_id" << 2));
 
             BSONObj filterObj = fromjson("{_id: {$gt: 0}}");
-            scoped_ptr<PlanExecutor> exec(makeCollScanExec(ctx.ctx(),filterObj));
+
+            Collection* coll = ctx.ctx().db()->getCollection(&_txn, ns());
+            scoped_ptr<PlanExecutor> exec(makeCollScanExec(coll, filterObj));
             registerExec(exec.get());
 
             BSONObj objOut;
@@ -339,7 +342,9 @@ namespace QueryPlanExecutor {
             setupCollection();
 
             BSONObj filterObj = fromjson("{a: {$gte: 2}}");
-            scoped_ptr<PlanExecutor> exec(makeCollScanExec(ctx.ctx(),filterObj));
+
+            Collection* coll = ctx.ctx().db()->getCollection(&_txn, ns());
+            scoped_ptr<PlanExecutor> exec(makeCollScanExec(coll, filterObj));
 
             BSONObj objOut;
             ASSERT_EQUALS(PlanExecutor::ADVANCED, exec->getNext(&objOut, NULL));
@@ -397,11 +402,12 @@ namespace QueryPlanExecutor {
                 insert(BSON("a" << 1 << "b" << 1));
 
                 BSONObj filterObj = fromjson("{_id: {$gt: 0}, b: {$gt: 0}}");
-                PlanExecutor* exec = makeCollScanExec(ctx.ctx(),filterObj);
+
+                Collection* coll = ctx.ctx().db()->getCollection(&_txn, ns());
+                PlanExecutor* exec = makeCollScanExec(coll,filterObj);
 
                 // Make a client cursor from the runner.
-                new ClientCursor(ctx.ctx().db()->getCollection(&_txn, ns()),
-                                 exec, 0, BSONObj());
+                new ClientCursor(coll, exec, 0, BSONObj());
 
                 // There should be one cursor before invalidation,
                 // and zero cursors after invalidation.
@@ -425,12 +431,11 @@ namespace QueryPlanExecutor {
                 Collection* collection = ctx.ctx().db()->getCollection(&_txn, ns());
 
                 BSONObj filterObj = fromjson("{_id: {$gt: 0}, b: {$gt: 0}}");
-                PlanExecutor* exec = makeCollScanExec(ctx.ctx(),filterObj);
+                PlanExecutor* exec = makeCollScanExec(collection, filterObj);
 
                 // Make a client cursor from the runner.
-                ClientCursor* cc = new ClientCursor(collection,
-                                                    exec, 0, BSONObj());
-                ClientCursorPin ccPin(collection,cc->cursorid());
+                ClientCursor* cc = new ClientCursor(collection, exec, 0, BSONObj());
+                ClientCursorPin ccPin(collection, cc->cursorid());
 
                 // If the cursor is pinned, it sticks around,
                 // even after invalidation.
@@ -464,11 +469,11 @@ namespace QueryPlanExecutor {
                 }
 
                 {
-                    Client::ReadContext ctx(&_txn, ns());
-                    Collection* collection = ctx.ctx().db()->getCollection(&_txn, ns());
+                    AutoGetCollectionForRead ctx(&_txn, ns());
+                    Collection* collection = ctx.getCollection();
 
                     BSONObj filterObj = fromjson("{_id: {$gt: 0}, b: {$gt: 0}}");
-                    PlanExecutor* exec = makeCollScanExec(ctx.ctx(),filterObj);
+                    PlanExecutor* exec = makeCollScanExec(collection, filterObj);
 
                     // Make a client cursor from the runner.
                     new ClientCursor(collection, exec, 0, BSONObj());

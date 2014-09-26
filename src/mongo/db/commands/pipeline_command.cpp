@@ -26,7 +26,7 @@
  * it in the license file.
  */
 
-#include "mongo/pch.h"
+#include "mongo/platform/basic.h"
 
 #include <boost/smart_ptr.hpp>
 #include <vector>
@@ -223,9 +223,9 @@ namespace mongo {
                 // sharding version that we synchronize on here. This is also why we always need to
                 // create a ClientCursor even when we aren't outputting to a cursor. See the comment
                 // on ShardFilterStage for more details.
-                Client::ReadContext ctx(txn, ns);
+                AutoGetCollectionForRead ctx(txn, ns);
 
-                Collection* collection = ctx.ctx().db()->getCollection(txn, ns);
+                Collection* collection = ctx.getCollection();
 
                 // This does mongod-specific stuff like creating the input PlanExecutor and adding
                 // it to the front of the pipeline if needed.

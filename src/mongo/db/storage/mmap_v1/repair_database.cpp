@@ -306,8 +306,7 @@ namespace mongo {
                                                             reservedPath ) );
 
         {
-            bool unusedJustCreated;
-            Database* originalDatabase = dbHolder().getOrCreate(txn, dbName, unusedJustCreated);
+            Database* originalDatabase = dbHolder().openDb(txn, dbName);
             if (originalDatabase == NULL) {
                 return Status(ErrorCodes::NamespaceNotFound, "database does not exist to repair");
             }
@@ -448,7 +447,8 @@ namespace mongo {
         if ( repairFileDeleter.get() )
             repairFileDeleter->success();
 
-        dbHolder().close( txn, dbName );
+        // Close the database so we can rename/delete the original data files
+        dbHolder().close(txn, dbName);
 
         if ( backupOriginalFiles ) {
             _renameForBackup( dbName, reservedPath );
@@ -470,8 +470,12 @@ namespace mongo {
 
         _replaceWithRecovered( dbName, reservedPathString.c_str() );
 
-        if ( !backupOriginalFiles )
-            MONGO_ASSERT_ON_EXCEPTION( boost::filesystem::remove_all( reservedPath ) );
+        if (!backupOriginalFiles) {
+            MONGO_ASSERT_ON_EXCEPTION(boost::filesystem::remove_all(reservedPath));
+        }
+
+        // Reopen the database so it's discoverable
+        dbHolder().openDb(txn, dbName);
 
         return Status::OK();
     }
