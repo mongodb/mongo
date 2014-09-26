@@ -276,8 +276,8 @@ pre:
     params:
       script: |
         set -o verbose
-        rm -rf src || true
         ${killall_mci|pkill -9 mongo; pkill -9 mongodump; pkill -9 mongoexport; pkill -9 mongoimport; pkill -9 mongofiles; pkill -9 mongooplog; pkill -9 mongorestore; pkill -9 mongostat; pkill -9 mongotop; pkill -9 mongod; pkill -9 mongos; pkill -f buildlogger.py; pkill -f smoke.py}
+        rm -rf src || true
         rm -rf /data/db/*
         true
 
