@@ -7,6 +7,7 @@ import (
 	"github.com/mongodb/mongo-tools/common/testutil"
 	. "github.com/smartystreets/goconvey/convey"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 )
@@ -19,7 +20,10 @@ func init() {
 }
 
 func toUniversalPath(unixPath string) string {
-	return strings.Replace(unixPath, "\\", string(filepath.Separator), -1)
+	if runtime.GOOS != "windows" {
+		return unixPath
+	}
+	return strings.Replace(unixPath, "/", string(filepath.Separator), -1)
 }
 
 func TestCreateAllIntents(t *testing.T) {
@@ -166,7 +170,7 @@ func TestCreateIntentsForCollection(t *testing.T) {
 
 		Convey("running CreateIntentForCollection on a file without metadata", func() {
 			err := mr.CreateIntentForCollection(
-				"myDB", "myC", "testdata/testdirs/db1/c2.bson")
+				"myDB", "myC", toUniversalPath("testdata/testdirs/db1/c2.bson"))
 			So(err, ShouldBeNil)
 
 			Convey("should create one intent with 'myDb' and 'myC' fields", func() {
@@ -188,7 +192,7 @@ func TestCreateIntentsForCollection(t *testing.T) {
 
 		Convey("running CreateIntentForCollection on a file *with* metadata", func() {
 			err := mr.CreateIntentForCollection(
-				"myDB", "myC", "testdata/testdirs/db1/c1.bson")
+				"myDB", "myC", toUniversalPath("testdata/testdirs/db1/c1.bson"))
 			So(err, ShouldBeNil)
 
 			Convey("should create one intent with 'myDb' and 'myC' fields", func() {
