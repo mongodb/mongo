@@ -39,7 +39,7 @@ func (restore *MongoRestore) Init() error {
 }
 
 func (restore *MongoRestore) ParseAndValidateOptions() error {
-	// Can't use option pkg defaults for --objcheck because it's two seperate flags,
+	// Can't use option pkg defaults for --objcheck because it's two separate flags,
 	// and we need to be able to see if they're both being used. We default to
 	// true here and then see if noobjcheck is enable.
 	log.Log(3, "checking options")
@@ -65,7 +65,6 @@ func (restore *MongoRestore) ParseAndValidateOptions() error {
 }
 
 func (restore *MongoRestore) Restore() error {
-	// TODO validate options
 	err := restore.ParseAndValidateOptions()
 	if err != nil {
 		return fmt.Errorf("options error: %v", err)

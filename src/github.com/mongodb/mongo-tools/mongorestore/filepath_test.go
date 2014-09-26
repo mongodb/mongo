@@ -6,6 +6,7 @@ import (
 	"github.com/mongodb/mongo-tools/common/options"
 	"github.com/mongodb/mongo-tools/common/testutil"
 	. "github.com/smartystreets/goconvey/convey"
+	"path/filepath"
 	"strings"
 	"testing"
 )
@@ -15,6 +16,10 @@ func init() {
 	log.InitToolLogger(&options.Verbosity{
 		Verbose: []bool{true, true, true, true},
 	})
+}
+
+func toUniversalPath(unixPath string) string {
+	return strings.Replace(unixPath, "\\", string(filepath.Separator), -1)
 }
 
 func TestCreateAllIntents(t *testing.T) {
@@ -169,7 +174,7 @@ func TestCreateIntentsForCollection(t *testing.T) {
 				So(i0, ShouldNotBeNil)
 				So(i0.DB, ShouldEqual, "myDB")
 				So(i0.C, ShouldEqual, "myC")
-				So(i0.BSONPath, ShouldEqual, "testdata/testdirs/db1/c2.bson")
+				So(i0.BSONPath, ShouldEqual, toUniversalPath("testdata/testdirs/db1/c2.bson"))
 				i1 := mr.manager.Pop()
 				So(i1, ShouldBeNil)
 
@@ -191,19 +196,19 @@ func TestCreateIntentsForCollection(t *testing.T) {
 				So(i0, ShouldNotBeNil)
 				So(i0.DB, ShouldEqual, "myDB")
 				So(i0.C, ShouldEqual, "myC")
-				So(i0.BSONPath, ShouldEqual, "testdata/testdirs/db1/c1.bson")
+				So(i0.BSONPath, ShouldEqual, toUniversalPath("testdata/testdirs/db1/c1.bson"))
 				i1 := mr.manager.Pop()
 				So(i1, ShouldBeNil)
 
 				Convey("and a set Metadata path", func() {
-					So(i0.MetadataPath, ShouldEqual, "testdata/testdirs/db1/c1.metadata.json")
+					So(i0.MetadataPath, ShouldEqual, toUniversalPath("testdata/testdirs/db1/c1.metadata.json"))
 					logs := buff.String()
 					So(strings.Contains(logs, "found metadata"), ShouldEqual, true)
 				})
 			})
 		})
 
-		Convey("running CreateIntentForCollection on a non-existant file", func() {
+		Convey("running CreateIntentForCollection on a non-existent file", func() {
 			err := mr.CreateIntentForCollection(
 				"myDB", "myC", "aaaaaaaaaaaaaa.bson")
 

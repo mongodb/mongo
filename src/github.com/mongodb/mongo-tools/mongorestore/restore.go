@@ -8,11 +8,14 @@ import (
 	"gopkg.in/mgo.v2/bson"
 	"io/ioutil"
 	"os"
+	"strings"
 	"time"
 )
 
 const ProgressBarLength = 24
 
+// RestoreIntents iterates through all of the normal intents
+// stored in the IntentManager, and restores them.
 func (restore *MongoRestore) RestoreIntents() error {
 	for intent := restore.manager.Pop(); intent != nil; intent = restore.manager.Pop() {
 		err := restore.RestoreIntent(intent)
@@ -23,9 +26,10 @@ func (restore *MongoRestore) RestoreIntents() error {
 	return nil
 }
 
+// RestoreIntent does the bulk of the logic to restore a collection
+// from the BSON and metadata files linked to in the given intent.
+// TODO: overly didactic comments on each step
 func (restore *MongoRestore) RestoreIntent(intent *Intent) error {
-
-	//session.SetSafe(restore.safety)
 
 	collectionExists, err := restore.DBHasCollection(intent)
 	if err != nil {
@@ -33,18 +37,22 @@ func (restore *MongoRestore) RestoreIntent(intent *Intent) error {
 	}
 
 	if restore.safety == nil && !restore.OutputOptions.Drop && collectionExists {
-		log.Logf(0, "restoring to %v without dropping", intent.Key())
+		log.Logf(0, "restoring to existing collection %v without dropping", intent.Key())
 		log.Log(0, "IMPORTANT: restored data will be inserted without raising errors; check your server log")
 	}
 
 	if restore.OutputOptions.Drop {
 		if collectionExists {
-			log.Logf(1, "dropping collection %v before restoring", intent.Key())
-			err = restore.cmdRunner.Run(bson.M{"drop": intent.C}, &bson.M{}, intent.DB) //TODO check result?
-			if err != nil {
-				return fmt.Errorf("error dropping collection: %v", err)
+			if strings.HasPrefix(intent.C, "system.") {
+				log.Logf(0, "cannot drop system collection %v, skipping", intent.Key())
+			} else {
+				log.Logf(1, "dropping collection %v before restoring", intent.Key())
+				err = restore.cmdRunner.Run(bson.M{"drop": intent.C}, &bson.M{}, intent.DB) //TODO check result?
+				if err != nil {
+					return fmt.Errorf("error dropping collection: %v", err)
+				}
+				collectionExists = false
 			}
-			collectionExists = false
 		} else {
 			log.Logf(2, "collection %v doesn't exist, skipping drop command", intent.Key())
 		}
@@ -118,6 +126,7 @@ func (restore *MongoRestore) RestoreIntent(intent *Intent) error {
 	return nil
 }
 
+// RestoreCollectionToDB pipes the given BSON data into the database.
 func (restore *MongoRestore) RestoreCollectionToDB(dbName, colName string,
 	bsonSource *db.DecodedBSONSource, fileSize int64) error {
 
@@ -146,7 +155,7 @@ func (restore *MongoRestore) RestoreCollectionToDB(dbName, colName string,
 			//TODO encapsulate to reuse bson obj??
 			err := bson.Unmarshal(doc.Data, &bson.M{})
 			if err != nil {
-				fmt.Println(err) //TODO
+				return err
 				break
 			}
 		}

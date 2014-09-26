@@ -219,12 +219,7 @@ func (shim *Shim) Run(command interface{}, out interface{}, database string) err
 		command = bson.M{name: 1}
 	}
 
-	jsonCommand, err := bsonutil.ConvertBSONValueToJSON(command)
-	if err != nil {
-		return err
-	}
-
-	commandRaw, err := json.Marshal(jsonCommand)
+	commandRaw, err := json.Marshal(command)
 	if err != nil {
 		return err
 	}

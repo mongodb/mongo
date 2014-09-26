@@ -2,6 +2,7 @@ package mongorestore
 
 import (
 	"fmt"
+	"github.com/mongodb/mongo-tools/common/bsonutil"
 	"github.com/mongodb/mongo-tools/common/db"
 	"github.com/mongodb/mongo-tools/common/log"
 	"github.com/mongodb/mongo-tools/common/progress"
@@ -98,9 +99,18 @@ func (restore *MongoRestore) RestoreOplog() error {
 
 }
 
+// ApplyOps is a wrapper for the applyOps database command
 func (restore *MongoRestore) ApplyOps(entries []interface{}) error {
 	res := bson.M{}
-	err := restore.cmdRunner.Run(bson.M{"applyOps": entries}, &res, "admin")
+
+	jsonCommand, err := bsonutil.ConvertBSONValueToJSON(
+		bson.M{"applyOps": entries},
+	)
+	if err != nil {
+		return err
+	}
+
+	err = restore.cmdRunner.Run(jsonCommand, &res, "admin")
 	if err != nil {
 		return fmt.Errorf("applyOps: %v", err)
 	}

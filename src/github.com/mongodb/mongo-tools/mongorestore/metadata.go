@@ -2,6 +2,7 @@ package mongorestore
 
 import (
 	"fmt"
+	"github.com/mongodb/mongo-tools/common/bsonutil"
 	"github.com/mongodb/mongo-tools/common/json"
 	"github.com/mongodb/mongo-tools/common/log"
 	"github.com/mongodb/mongo-tools/common/util"
@@ -15,7 +16,8 @@ type Metadata struct {
 	Indexes []IndexDocument `json:"indexes"`
 }
 
-type MetaDataMapIndex struct {
+// this struct is used to read in the options of a set of indexes
+type metaDataMapIndex struct {
 	Indexes []bson.M `json:"indexes"`
 }
 
@@ -24,6 +26,8 @@ type IndexDocument struct {
 	Key     bson.D `bson:"key"`
 }
 
+// MetadataFromJSON takes a slice of JSON bytes and unmarshals them into usable
+// collection options and indexes for restoring collections.
 func (restore *MongoRestore) MetadataFromJSON(jsonBytes []byte) (bson.D, []IndexDocument, error) {
 	meta := &Metadata{}
 	err := json.Unmarshal(jsonBytes, meta)
@@ -33,7 +37,7 @@ func (restore *MongoRestore) MetadataFromJSON(jsonBytes []byte) (bson.D, []Index
 
 	// first get the ordered key information for each index,
 	// then merge it with a set of options stored as a map
-	metaAsMap := MetaDataMapIndex{}
+	metaAsMap := metaDataMapIndex{}
 	err = json.Unmarshal(jsonBytes, &metaAsMap)
 	if err != nil {
 		return nil, nil, fmt.Errorf("error unmarshalling metadata as map: %v", err)
@@ -46,8 +50,6 @@ func (restore *MongoRestore) MetadataFromJSON(jsonBytes []byte) (bson.D, []Index
 		}
 		meta.Indexes[i].Options = metaAsMap.Indexes[i]
 	}
-
-	log.Logf(0, "%#v", meta.Options)
 
 	return meta.Options, meta.Indexes, nil
 }
@@ -83,8 +85,16 @@ func (restore *MongoRestore) InsertIndex(dbName string, index IndexDocument) err
 }
 
 func (restore *MongoRestore) CreateCollection(intent *Intent, options bson.D) error {
+
+	jsonCommand, err := bsonutil.ConvertBSONValueToJSON(
+		append(bson.D{{"create", intent.C}}, options...),
+	)
+	if err != nil {
+		return err
+	}
+
 	res := bson.M{}
-	err := restore.cmdRunner.Run(append(bson.D{{"create", intent.C}}, options...), &res, intent.DB)
+	err = restore.cmdRunner.Run(jsonCommand, &res, intent.DB)
 	if err != nil {
 		return fmt.Errorf("error running create command: %v", err)
 	}
