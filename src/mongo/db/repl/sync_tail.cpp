@@ -328,7 +328,7 @@ namespace {
                     BackgroundSync* bgsync = BackgroundSync::get();
                     if (bgsync->getInitialSyncRequestedFlag()) {
                         // got a resync command
-                        Lock::DBWrite lk(txn.lockState(), "local");
+                        Lock::DBLock lk(txn.lockState(), "local", newlm::MODE_X);
                         WriteUnitOfWork wunit(&txn);
                         Client::Context ctx(&txn, "local");
 
