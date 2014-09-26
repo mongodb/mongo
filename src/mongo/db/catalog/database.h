@@ -56,10 +56,7 @@ namespace mongo {
     */
     class Database {
     public:
-        // you probably need to be in dbHolderMutex when constructing this
-        Database(OperationContext* txn,
-                 const StringData& name,
-                 DatabaseCatalogEntry* dbEntry ); // not owner here
+        Database(const StringData& name, DatabaseCatalogEntry* dbEntry);
 
         // must call close first
         ~Database();

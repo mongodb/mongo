@@ -84,7 +84,7 @@ namespace mongo {
     }
 
     /** @return true if found and opened. if uninitialized (prealloc only) does not open. */
-    Status DataFile::openExisting( OperationContext* txn, const char *filename ) {
+    Status DataFile::openExisting(const char *filename) {
         verify( _mb == 0 );
         if( !boost::filesystem::exists(filename) )
             return Status( ErrorCodes::InvalidPath, "DataFile::openExisting - file does not exist" );

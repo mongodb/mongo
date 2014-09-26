@@ -132,9 +132,7 @@ namespace mongo {
         return Status::OK();
     }
 
-    Database::Database(OperationContext* txn,
-                       const StringData& name,
-                       DatabaseCatalogEntry* dbEntry )
+    Database::Database(const StringData& name, DatabaseCatalogEntry* dbEntry)
         : _name(name.toString()),
           _dbEntry( dbEntry ),
           _profileName(_name + ".system.profile"),
