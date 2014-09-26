@@ -150,7 +150,9 @@ namespace repl {
             }
             
             BackgroundSync* bgsync = BackgroundSync::get();
-            bgsync->setLastHash(hash);
+            // Keep this up-to-date, in case we step up to primary.
+            bgsync->setLastAppliedHash(hash);
+
             ctx.getClient()->setLastOp( ts );
             
             replCoord->setMyLastOptime(txn, ts);
@@ -249,7 +251,7 @@ namespace repl {
         OpTime ts(getNextGlobalOptime());
         newOptimeNotifier.notify_all();
 
-        long long hashNew = BackgroundSync::get()->getLastHash();
+        long long hashNew = BackgroundSync::get()->getLastAppliedHash();
 
         // Check to make sure logOp() is legal at this point.
         if (*opstr == 'n') {
@@ -302,7 +304,7 @@ namespace repl {
         OplogDocWriter writer( partial, obj );
         checkOplogInsert( localOplogRSCollection->insertDocument( txn, &writer, false ) );
 
-        BackgroundSync::get()->setLastHash(hashNew);
+        BackgroundSync::get()->setLastAppliedHash(hashNew);
         ctx.getClient()->setLastOp( ts );
         replCoord->setMyLastOptime(txn, ts);
 

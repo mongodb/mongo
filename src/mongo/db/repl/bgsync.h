@@ -81,9 +81,11 @@ namespace repl {
 
         OpTime _lastOpTimeFetched;
 
-        // hash we use to make sure we are reading the right flow of ops and aren't on
-        // an out-of-date "fork"
-        long long _lastHash;
+        // lastAppliedHash is used to generate a new hash for the following op, when primary.
+        long long _lastAppliedHash;
+        // lastFetchedHash is used to match ops to determine if we need to rollback, when
+        // a secondary.
+        long long _lastFetchedHash;
 
         // if produce thread should be running
         bool _pause;
@@ -151,9 +153,9 @@ namespace repl {
         // primary.
         void stopReplicationAndFlushBuffer();
 
-        long long getLastHash() const;
-        void setLastHash(long long oldH);
-        void loadLastHash(OperationContext* txn);
+        long long getLastAppliedHash() const;
+        void setLastAppliedHash(long long oldH);
+        void loadLastAppliedHash(OperationContext* txn);
 
         bool getInitialSyncRequestedFlag();
         void setInitialSyncRequestedFlag(bool value);

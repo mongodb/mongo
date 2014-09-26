@@ -696,10 +696,10 @@ namespace {
             warn = true;
         }
 
-        // Reload the lastOpTimeApplied value in the replcoord and the lastHash value in bgsync
-        // to reflect our new last op.
+        // Reload the lastOpTimeApplied value in the replcoord and the lastAppliedHash value in 
+        // bgsync to reflect our new last op.
         replCoord->resetLastOpTimeFromOplog(txn);
-        BackgroundSync::get()->loadLastHash(txn);
+        BackgroundSync::get()->loadLastAppliedHash(txn);
 
         // done
         if (warn)

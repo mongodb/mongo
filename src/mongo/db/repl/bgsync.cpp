@@ -102,7 +102,8 @@ namespace {
     BackgroundSync::BackgroundSync() : _buffer(bufferMaxSizeGauge, &getSize),
                                        _lastOpTimeFetched(std::numeric_limits<int>::max(),
                                                           0),
-                                       _lastHash(0),
+                                       _lastAppliedHash(0),
+                                       _lastFetchedHash(0),
                                        _pause(true),
                                        _appliedBuffer(true),
                                        _assumingPrimary(false),
@@ -328,7 +329,7 @@ namespace {
 
             {
                 boost::unique_lock<boost::mutex> lock(_mutex);
-                _lastHash = o["h"].numberLong();
+                _lastFetchedHash = o["h"].numberLong();
                 _lastOpTimeFetched = o["ts"]._opTime();
                 LOG(3) << "replSet lastOpTimeFetched: "
                        << _lastOpTimeFetched.toStringPretty() << rsLog;
@@ -417,7 +418,7 @@ namespace {
         BSONObj o = r.nextSafe();
         OpTime ts = o["ts"]._opTime();
         long long hash = o["h"].numberLong();
-        if( ts != _lastOpTimeFetched || hash != _lastHash ) {
+        if( ts != _lastOpTimeFetched || hash != _lastFetchedHash ) {
             log() << "replSet our last op time fetched: " << _lastOpTimeFetched.toStringPretty() << rsLog;
             log() << "replset source's GTE: " << ts.toStringPretty() << rsLog;
             syncRollback(txn, _replCoord->getMyLastOptime(), &r, _replCoord);
@@ -445,7 +446,7 @@ namespace {
         _syncSourceReader.resetConnection();
         _syncSourceHost = HostAndPort();
         _lastOpTimeFetched = OpTime(0,0);
-        _lastHash = 0;
+        _lastFetchedHash = 0;
         _condvar.notify_all();
     }
 
@@ -455,13 +456,13 @@ namespace {
         boost::unique_lock<boost::mutex> lock(_mutex);
         _pause = false;
 
-        // reset _last fields with current data
+        // reset _last fields with current oplog data
         _lastOpTimeFetched = _replCoord->getMyLastOptime();
-
-        loadLastHash(txn);
+        loadLastAppliedHash(txn);
+        _lastFetchedHash = _lastAppliedHash;
 
         LOG(1) << "replset bgsync fetch queue set to: " << _lastOpTimeFetched << 
-            " " << _lastHash << rsLog;
+            " " << _lastFetchedHash << rsLog;
     }
 
     bool BackgroundSync::isAssumingPrimary() {
@@ -484,24 +485,24 @@ namespace {
         _assumingPrimary = false;
     }
 
-    long long BackgroundSync::getLastHash() const {
+    long long BackgroundSync::getLastAppliedHash() const {
         boost::lock_guard<boost::mutex> lck(_mutex);
-        return _lastHash;
+        return _lastAppliedHash;
     }
 
-    void BackgroundSync::setLastHash(long long newHash) {
+    void BackgroundSync::setLastAppliedHash(long long newHash) {
         boost::lock_guard<boost::mutex> lck(_mutex);
-        _lastHash = newHash;
+        _lastAppliedHash = newHash;
     }
 
-    void BackgroundSync::loadLastHash(OperationContext* txn) {
+    void BackgroundSync::loadLastAppliedHash(OperationContext* txn) {
         Lock::DBRead lk(txn->lockState(), rsoplog);
         BSONObj oplogEntry;
         try {
             if (!Helpers::getLast(txn, rsoplog, oplogEntry)) {
                 // This can happen when we are to do an initial sync.  lastHash will be set
                 // after the initial sync is complete.
-                _lastHash = 0;
+                _lastAppliedHash = 0;
                 return;
             }
         }
@@ -521,7 +522,7 @@ namespace {
                 typeName(hashElement.type());
             fassertFailed(18903);
         }
-        _lastHash = hashElement.safeNumberLong();
+        _lastAppliedHash = hashElement.safeNumberLong();
     }
 
     bool BackgroundSync::getInitialSyncRequestedFlag() {

@@ -153,7 +153,7 @@ namespace {
                   << rsLog;
 
             getGlobalReplicationCoordinator()->setMyLastOptime(ctx, OpTime());
-            BackgroundSync::get()->setLastHash(0);
+            BackgroundSync::get()->setLastAppliedHash(0);
 
             sleepsecs(5);
             return false;
