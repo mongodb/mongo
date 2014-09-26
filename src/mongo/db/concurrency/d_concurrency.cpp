@@ -97,23 +97,6 @@ namespace mongo {
         Locker* const _ls;
     };
 
-namespace {
-    /**
-     * Shortcut for querying the storage engine if it supports document-level locking. If this
-     * call becomes too expensive, we could cache the value somewhere so we don't have to fetch
-     * the storage engine every time.
-     */
-    bool supportsDocLocking() {
-        if (hasGlobalEnvironment()) {
-            StorageEngine* globalStorageEngine = getGlobalEnvironment()->getGlobalStorageEngine();
-            if (globalStorageEngine != NULL) {
-                return globalStorageEngine->supportsDocLocking();
-            }
-        }
-
-        return false;
-    }
-}
 
     RWLockRecursive &Lock::ParallelBatchWriterMode::_batchLock = *(new RWLockRecursive("special"));
     void Lock::ParallelBatchWriterMode::iAmABatchParticipant(Locker* lockState) {

@@ -59,4 +59,15 @@ namespace mongo {
         globalEnvironmentExperiment = newGlobalEnvironment;
     }
 
+    bool supportsDocLocking() {
+        if (hasGlobalEnvironment()) {
+            StorageEngine* globalStorageEngine = getGlobalEnvironment()->getGlobalStorageEngine();
+            if (globalStorageEngine != NULL) {
+                return globalStorageEngine->supportsDocLocking();
+            }
+        }
+
+        return false;
+    }
+
 }  // namespace mongo
