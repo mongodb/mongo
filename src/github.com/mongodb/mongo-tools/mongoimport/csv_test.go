@@ -13,8 +13,70 @@ func TestCSVImportDocument(t *testing.T) {
 	Convey("With a CSV import input", t, func() {
 		var err error
 		var csvFile, fileHandle *os.File
+		Convey("badly encoded csv should result in a parsing error", func() {
+			contents := `1, 2, foo"bar`
+			fields := []string{"a", "b", "c"}
+
+			csvFile, err = ioutil.TempFile("", "mongoimport_")
+			So(err, ShouldBeNil)
+			_, err = io.WriteString(csvFile, contents)
+			So(err, ShouldBeNil)
+			fileHandle, err := os.Open(csvFile.Name())
+			So(err, ShouldBeNil)
+			csvImporter := NewCSVImportInput(fields, fileHandle)
+			_, err = csvImporter.ImportDocument()
+			So(err, ShouldNotBeNil)
+		})
+		Convey("escaped quotes are parsed correctly", func() {
+			contents := `1, 2, "foo""bar"`
+			fields := []string{"a", "b", "c"}
+
+			csvFile, err = ioutil.TempFile("", "mongoimport_")
+			So(err, ShouldBeNil)
+			_, err = io.WriteString(csvFile, contents)
+			So(err, ShouldBeNil)
+			fileHandle, err := os.Open(csvFile.Name())
+			So(err, ShouldBeNil)
+			csvImporter := NewCSVImportInput(fields, fileHandle)
+			_, err = csvImporter.ImportDocument()
+			So(err, ShouldBeNil)
+		})
+		Convey("whitespace separated quoted strings are still an error", func() {
+			contents := `1, 2, "foo"  "bar"`
+			fields := []string{"a", "b", "c"}
+
+			csvFile, err = ioutil.TempFile("", "mongoimport_")
+			So(err, ShouldBeNil)
+			_, err = io.WriteString(csvFile, contents)
+			So(err, ShouldBeNil)
+			fileHandle, err := os.Open(csvFile.Name())
+			So(err, ShouldBeNil)
+			csvImporter := NewCSVImportInput(fields, fileHandle)
+			_, err = csvImporter.ImportDocument()
+			So(err, ShouldNotBeNil)
+		})
+		Convey("multiple escaped quotes separated by whitespace parsed correctly", func() {
+			contents := `1, 2, "foo"" ""bar"`
+			fields := []string{"a", "b", "c"}
+			expectedRead := bson.M{
+				"a": 1,
+				"b": 2,
+				"c": `foo" "bar`,
+			}
+
+			csvFile, err = ioutil.TempFile("", "mongoimport_")
+			So(err, ShouldBeNil)
+			_, err = io.WriteString(csvFile, contents)
+			So(err, ShouldBeNil)
+			fileHandle, err := os.Open(csvFile.Name())
+			So(err, ShouldBeNil)
+			csvImporter := NewCSVImportInput(fields, fileHandle)
+			bsonDoc, err := csvImporter.ImportDocument()
+			So(err, ShouldBeNil)
+			So(bsonDoc, ShouldResemble, expectedRead)
+		})
 		Convey("integer valued strings should be converted", func() {
-			contents := "1, 2, 3e"
+			contents := `1, 2, " 3e"`
 			fields := []string{"a", "b", "c"}
 			expectedRead := bson.M{
 				"a": 1,
@@ -35,11 +97,11 @@ func TestCSVImportDocument(t *testing.T) {
 		})
 
 		Convey("extra fields should be prefixed with 'field'", func() {
-			contents := "1, 2, 3e, may"
+			contents := `1, 2f , " 3e" , " may"`
 			fields := []string{"a", "b", "c"}
 			expectedRead := bson.M{
 				"a":      1,
-				"b":      2,
+				"b":      "2f",
 				"c":      " 3e",
 				"field3": " may",
 			}

@@ -260,6 +260,8 @@ func (r *Reader) parseField() (haveField bool, delim rune, err error) {
 		return false, 0, err
 	}
 
+	var ws bytes.Buffer
+
 	switch r1 {
 	case r.Comma:
 		// will check below
@@ -325,7 +327,14 @@ func (r *Reader) parseField() (haveField bool, delim rune, err error) {
 	default:
 		// unquoted field
 		for {
-			r.field.WriteRune(r1)
+			// only write sections of whitespace if it's followed by non-whitespace
+			if unicode.IsSpace(r1) {
+				ws.WriteRune(r1)
+			} else {
+				r.field.WriteString(ws.String())
+				ws.Reset()
+				r.field.WriteRune(r1)
+			}
 			r1, err = r.readRune()
 			if err != nil || r1 == r.Comma {
 				break
@@ -337,6 +346,10 @@ func (r *Reader) parseField() (haveField bool, delim rune, err error) {
 				return false, 0, r.error(ErrBareQuote)
 			}
 		}
+	}
+	//write any remaining section of whitespace unless TrimLeadingSpace on
+	if !r.TrimLeadingSpace {
+		r.field.WriteString(ws.String())
 	}
 
 	if err != nil {
