@@ -26,6 +26,8 @@ util_load(WT_SESSION *session, int argc, char *argv[])
 	const char *filename;
 	uint32_t flags;
 
+	flags = 0;
+
 	filename = "<stdin>";
 	while ((ch = util_getopt(argc, argv, "af:jnr:")) != EOF)
 		switch (ch) {
@@ -69,8 +71,10 @@ util_load(WT_SESSION *session, int argc, char *argv[])
 	}
 
 	if (json) {
-		flags = (append ? LOAD_JSON_APPEND : 0) |
-		    (no_overwrite ? LOAD_JSON_NO_OVERWRITE : 0);
+		if (append)
+			flags |= LOAD_JSON_APPEND;
+		if (no_overwrite)
+			flags |= LOAD_JSON_NO_OVERWRITE;
 		return (util_load_json(session, filename, flags));
 	} else
 		return (load_dump(session));
