@@ -291,7 +291,7 @@ __wt_lsm_manager_destroy(WT_SESSION_IMPL *session)
 	 * Close all LSM worker sessions.  Start at 1 because we already
 	 * shut down the main LSM manager thread.
 	 */
-	for (i = 1; i < manager->lsm_workers; i++) {
+	for (i = 1; i < WT_LSM_MAX_WORKERS; i++) {
 		wt_session =
 		    &manager->lsm_worker_cookies[i].session->iface;
 		WT_TRET(wt_session->close(wt_session, NULL));
