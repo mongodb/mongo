@@ -38,7 +38,6 @@ func (restore *MongoRestore) Init() error {
 	return nil
 }
 
-
 func (restore *MongoRestore) ParseAndValidateOptions() error {
 	// Can't use option pkg defaults for --objcheck because it's two seperate flags,
 	// and we need to be able to see if they're both being used. We default to
