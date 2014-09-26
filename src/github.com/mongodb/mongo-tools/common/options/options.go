@@ -68,8 +68,8 @@ type Verbosity struct {
 
 // Struct holding connection-related options
 type Connection struct {
-	Host string `short:"h" long:"host" description:"Specify a resolvable hostname to which to connect" default:"localhost:27017"`
-	Port string `long:"port" description:"Specify the tcp port on which the mongod is listening"`
+	Host string `short:"h" long:"host" description:"Specify a resolvable hostname to which to connect" default:"localhost"`
+	Port string `long:"port" description:"Specify the tcp port on which the mongod is listening" default:"27017"`
 }
 
 // Struct holding ssl-related options
