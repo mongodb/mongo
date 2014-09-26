@@ -13,8 +13,8 @@ a = c.find().sort( { a : 1 } ).toArray();
 delete a[0]._id
 delete a[1]._id
 
-assert.eq( { a : "a" , b : "b" , c : "c" , d: "d", e: "e"} , a[1] , "tsv parse 1" );
-assert.eq( base , a[0] , "tsv parse 0" )
+assert.docEq( { a : "a" , b : "b" , c : "c" , d: "d", e: "e"} , a[1] , "tsv parse 1" );
+assert.docEq( base , a[0] , "tsv parse 0" )
 
 c.drop()
 assert.eq( 0 , c.count() , "after drop 2" )

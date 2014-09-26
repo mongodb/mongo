@@ -37,6 +37,7 @@ Fetched 2 record(s) in 1ms -- Index[none]
 
 --headerline should have no effect on JSON input sources
 
+In the csvexport1.js tests, we check, for example, for `ObjectId(3f3)` which seems in accurate but in the new tools, we check instead for `ObjectId('3f3')`.
 
 ##Mongoexport:
 
