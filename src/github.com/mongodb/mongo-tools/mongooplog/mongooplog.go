@@ -29,6 +29,9 @@ type MongoOplog struct {
 // on whether --dbpath is set.
 func CreateCommandRunner(opts *commonopts.ToolOptions) (db.CommandRunner,
 	error) {
+	if err := opts.Validate(); err != nil {
+		return nil, err
+	}
 
 	// handle --dbpath, if appropriate
 	if opts.Namespace.DBPath != "" {

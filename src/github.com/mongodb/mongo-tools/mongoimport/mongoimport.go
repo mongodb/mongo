@@ -88,6 +88,9 @@ func (mongoImport *MongoImport) getImportWriter() ImportWriter {
 // ValidateSettings ensures that the tool specific options supplied for
 // MongoImport are valid
 func (mongoImport *MongoImport) ValidateSettings() error {
+	if err := mongoImport.ToolOptions.Validate(); err != nil {
+		return err
+	}
 	// Namespace must have a valid database
 	if mongoImport.ToolOptions.Namespace.DB == "" {
 		return fmt.Errorf("must specify a database")

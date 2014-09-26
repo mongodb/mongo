@@ -43,6 +43,9 @@ func (restore *MongoRestore) ParseAndValidateOptions() error {
 	// and we need to be able to see if they're both being used. We default to
 	// true here and then see if noobjcheck is enable.
 	log.Log(3, "checking options")
+	if err := restore.ToolOptions.Validate(); err != nil {
+		return err
+	}
 	restore.objCheck = true
 	if restore.InputOptions.NoObjcheck {
 		restore.objCheck = false

@@ -40,13 +40,14 @@ type MongoDump struct {
 
 // ValidateOptions checks for any incompatible sets of options
 func (dump *MongoDump) ValidateOptions() error {
+	if err := dump.ToolOptions.Validate(); err != nil {
+		return err
+	}
 	switch {
 	case dump.OutputOptions.Out == "-" && dump.ToolOptions.Collection == "":
 		return fmt.Errorf("can only dump a single collection to stdout")
 	case dump.ToolOptions.DB == "" && dump.ToolOptions.Collection != "":
 		return fmt.Errorf("cannot dump a collection without a specified database")
-	case dump.ToolOptions.DBPath != "" && dump.ToolOptions.Host != "":
-		return fmt.Errorf("--dbpath is not allowed when --host is specified")
 	case dump.InputOptions.Query != "" && dump.ToolOptions.Collection == "":
 		return fmt.Errorf("cannot dump using a query without a specified collection")
 	case dump.OutputOptions.DumpDBUsersAndRoles && dump.ToolOptions.DB == "":
