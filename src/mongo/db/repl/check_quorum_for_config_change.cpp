@@ -41,80 +41,6 @@
 
 namespace mongo {
 namespace repl {
-namespace {
-    /**
-     * Quorum checking state machine.
-     *
-     * Usage: Construct a QuorumChecker, pass in a pointer to the configuration for which you're
-     * checking quorum, and the integer index of the member config representing the "executing"
-     * node.  Use ScatterGatherRunner or otherwise execute a scatter-gather procedure as desribed in
-     * the class comment for the ScatterGatherAlgorithm class.  After
-     * hasReceivedSufficientResponses() returns true, you may call getFinalStatus() to get the
-     * result of the quorum check.
-     */
-    class QuorumChecker : public ScatterGatherAlgorithm {
-        MONGO_DISALLOW_COPYING(QuorumChecker);
-    public:
-        /**
-         * Constructs a QuorumChecker that is used to confirm that sufficient nodes are up to accept
-         * "rsConfig".  "myIndex" is the index of the local node, which is assumed to be up.
-         *
-         * "rsConfig" must stay in scope until QuorumChecker's destructor completes.
-         */
-        QuorumChecker(const ReplicaSetConfig* rsConfig, int myIndex);
-        virtual ~QuorumChecker();
-
-        virtual std::vector<ReplicationExecutor::RemoteCommandRequest> getRequests() const;
-        virtual void processResponse(
-                const ReplicationExecutor::RemoteCommandRequest& request,
-                const ResponseStatus& response);
-
-        virtual bool hasReceivedSufficientResponses() const;
-
-        Status getFinalStatus() const { return _finalStatus; }
-
-    private:
-        /**
-         * Callback that executes after _haveReceivedSufficientReplies() becomes true.
-         *
-         * Computes the quorum result based on responses received so far, stores it into
-         * _finalStatus, and enables QuorumChecker::run() to return.
-         */
-        void _onQuorumCheckComplete();
-
-        /**
-         * Updates the QuorumChecker state based on the data from a single heartbeat response.
-         */
-        void _tabulateHeartbeatResponse(
-                const ReplicationExecutor::RemoteCommandRequest& request,
-                const ResponseStatus& response);
-
-        // Pointer to the replica set configuration for which we're checking quorum.
-        const ReplicaSetConfig* const _rsConfig;
-
-        // Index of the local node's member configuration in _rsConfig.
-        const int _myIndex;
-
-        // List of nodes believed to be down.
-        std::vector<HostAndPort> _down;
-
-        // List of voting nodes that have responded affirmatively.
-        std::vector<HostAndPort> _voters;
-
-        // Total number of responses and timeouts processed.
-        int _numResponses;
-
-        // Number of electable nodes that have responded affirmatively.
-        int _numElectable;
-
-        // Set to a non-OK status if a response from a remote node indicates
-        // that the quorum check should definitely fail, such as because of
-        // a replica set name mismatch.
-        Status _vetoStatus;
-
-        // Final status of the quorum check, returned by run().
-        Status _finalStatus;
-    };
 
     QuorumChecker::QuorumChecker(const ReplicaSetConfig* rsConfig, int myIndex)
         : _rsConfig(rsConfig),
@@ -318,7 +244,6 @@ namespace {
 
         return checker.getFinalStatus();
     }
-}  // namespace
 
     Status checkQuorumForInitiate(ReplicationExecutor* executor,
                                   const ReplicaSetConfig& rsConfig,
