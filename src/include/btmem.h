@@ -982,17 +982,17 @@ struct __wt_insert_head {
  * an index, we don't want the oldest split generation to move forward and
  * potentially free it.
  */
-#define	WT_ENTER_PAGE_INDEX(session) do {                               \
-	uint64_t prev_split_gen = session->split_gen;                   \
-	if (prev_split_gen == 0)                                        \
-		WT_PUBLISH(session->split_gen, S2C(session)->split_gen)
+#define	WT_ENTER_PAGE_INDEX(session) do {				\
+	uint64_t __prev_split_gen = (session)->split_gen;		\
+	if (__prev_split_gen == 0)					\
+		WT_PUBLISH((session)->split_gen, S2C(session)->split_gen)
 
-#define	WT_LEAVE_PAGE_INDEX(session)                                    \
-	if (prev_split_gen == 0)                                        \
-		session->split_gen = 0;                                 \
+#define	WT_LEAVE_PAGE_INDEX(session)					\
+	if (__prev_split_gen == 0)					\
+		(session)->split_gen = 0;				\
 	} while (0)
 
-#define	WT_WITH_PAGE_INDEX(session, e)                                  \
-	WT_ENTER_PAGE_INDEX(session);                                   \
-	(e);                                                            \
+#define	WT_WITH_PAGE_INDEX(session, e)					\
+	WT_ENTER_PAGE_INDEX(session);					\
+	(e);								\
 	WT_LEAVE_PAGE_INDEX(session)
