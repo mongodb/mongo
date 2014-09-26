@@ -41,9 +41,9 @@
  * and 1 if lsn0 > lsn1.
  */
 #define	LOG_CMP(lsn1, lsn2)						\
-	((lsn1)->file != (lsn2)->file ?                                 \
-	((lsn1)->file < (lsn2)->file ? -1 : 1) :                        \
-	((lsn1)->offset != (lsn2)->offset ?                             \
+	((lsn1)->file != (lsn2)->file ?					\
+	((lsn1)->file < (lsn2)->file ? -1 : 1) :			\
+	((lsn1)->offset != (lsn2)->offset ?				\
 	((lsn1)->offset < (lsn2)->offset ? -1 : 1) : 0))
 
 /*

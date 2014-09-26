@@ -52,7 +52,7 @@
 #define	TXN_API_CALL_NOCONF(s, h, n, cur, bt) do {			\
 	int __autotxn = 0;						\
 	API_CALL_NOCONF(s, h, n, cur, bt);				\
-	__autotxn = !F_ISSET(&(s)->txn, TXN_AUTOCOMMIT | TXN_RUNNING);  \
+	__autotxn = !F_ISSET(&(s)->txn, TXN_AUTOCOMMIT | TXN_RUNNING);	\
 	if (__autotxn)							\
 		F_SET(&(s)->txn, TXN_AUTOCOMMIT)
 
