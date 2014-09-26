@@ -42,6 +42,7 @@ type StorageShim struct {
 	Sort           []string
 	DirectoryPerDB bool
 	Journal        bool
+	Repair         bool
 	Mode           ShimMode
 	shimProcess    *exec.Cmd
 	stdin          io.WriteCloser
@@ -52,6 +53,7 @@ type Shim struct {
 	ShimPath       string
 	Journal        bool
 	DirectoryPerDB bool
+	Repair         bool
 }
 
 func NewShim(dbPath string, directoryPerDb, journal bool) (*Shim, error) {
@@ -59,7 +61,7 @@ func NewShim(dbPath string, directoryPerDb, journal bool) (*Shim, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &Shim{dbPath, shimLoc, journal, directoryPerDb}, nil
+	return &Shim{dbPath, shimLoc, journal, directoryPerDb, false}, nil
 }
 
 type ShimDocSource struct {
@@ -115,6 +117,7 @@ func (shim *Shim) Find(DB, Collection string, Skip, Limit int, Query interface{}
 		Sort:           Sort,
 		Mode:           Dump,
 		DirectoryPerDB: shim.DirectoryPerDB,
+		Repair:         shim.Repair,
 		Journal:        shim.Journal,
 	}
 	out, _, err := queryShim.Open()
@@ -154,6 +157,7 @@ func (shim *Shim) OpenInsertStream(DB, Collection string, _ *mgo.Safe) (DocSink,
 		Mode:           Insert,
 		DirectoryPerDB: shim.DirectoryPerDB,
 		Journal:        shim.Journal,
+		Repair:         shim.Repair,
 	}
 	_, writer, err := writerShim.Open()
 	if err != nil {
@@ -179,6 +183,7 @@ func (shim *Shim) Remove(DB, Collection string, Query interface{}) error {
 		Query:          string(queryBytes),
 		Mode:           Remove,
 		DirectoryPerDB: shim.DirectoryPerDB,
+		Repair:         shim.Repair,
 		Journal:        shim.Journal,
 	}
 	_, _, err = removerShim.Open()
@@ -253,6 +258,7 @@ func (shim *Shim) Run(command interface{}, out interface{}, database string) (er
 		Query:          string(commandRaw),
 		Mode:           Dump,
 		DirectoryPerDB: shim.DirectoryPerDB,
+		Repair:         shim.Repair,
 		Journal:        shim.Journal,
 	}
 	bsonSource, _, err := commandShim.Open()
@@ -300,6 +306,9 @@ func buildArgs(shim StorageShim) ([]string, error) {
 	}
 	if shim.DirectoryPerDB {
 		returnVal = append(returnVal, "--directoryperdb")
+	}
+	if shim.Repair {
+		returnVal = append(returnVal, "--repair")
 	}
 	if shim.Database != "" {
 		returnVal = append(returnVal, "-d", shim.Database)
@@ -380,6 +389,7 @@ func (shim *StorageShim) Open() (*BSONSource, *BSONSink, error) {
 	if err != nil {
 		return nil, nil, err
 	}
+	fmt.Printf("shim args: %#v\n", args)
 	cmd := exec.Command(shim.ShimPath, args...)
 	stdOut, err := cmd.StdoutPipe()
 	if err != nil {

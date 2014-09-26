@@ -78,7 +78,7 @@ func (dump *MongoDump) Init() error {
 		if err != nil {
 			return err
 		}
-		fmt.Printf("%#v", shim)
+		shim.Repair = dump.OutputOptions.Repair
 		dump.cmdRunner = shim
 		return nil
 	}
