@@ -566,14 +566,15 @@ namespace {
                 // kill off rsHealthPoll threads (because they Know Too Much about our past)
                 endOldHealthTasks();
 
+                // clear sync target to avoid faulty sync attempts; we must do this before we
+                // close sockets, since that will trigger the bgsync thread to reconnect.
+                BackgroundSync::get()->clearSyncTarget();
+
                 // close sockets to force clients to re-evaluate this member
                 MessagingPort::closeAllSockets(0);
 
                 // take note of our ejection
                 changeState(MemberState::RS_REMOVED);
-
-                // clear sync target to avoid faulty sync attempts
-                BackgroundSync::get()->clearSyncTarget();
 
                 // go into holding pattern
                 log() << "replSet info self not present in the repl set configuration:" << rsLog;
@@ -857,9 +858,9 @@ namespace {
                 }
 
                 if (!_loadConfigFinish(txn, configs.mutableVector())) {
-                    log() << "replSet info Couldn't load config yet. Sleeping 20sec and will try "
+                    log() << "replSet info Couldn't load config yet. Sleeping 3 sec and will try "
                              "again." << rsLog;
-                    sleepsecs(20);
+                    sleepsecs(3);
                     continue;
                 }
             }

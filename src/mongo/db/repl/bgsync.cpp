@@ -435,7 +435,6 @@ namespace {
 
     void BackgroundSync::clearSyncTarget() {
         boost::unique_lock<boost::mutex> lock(_mutex);
-        _syncSourceReader.resetConnection();
         _syncSourceHost = HostAndPort();
     }
 
