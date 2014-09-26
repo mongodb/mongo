@@ -54,6 +54,10 @@ func (restore *MongoRestore) ParseAndValidateOptions() error {
 		log.Log(3, "\tdumping with object check enabled")
 	}
 
+	if restore.ToolOptions.DB == "" && restore.ToolOptions.Collection != "" {
+		return fmt.Errorf("cannot dump a collection without a specified database")
+	}
+
 	if restore.OutputOptions.WriteConcern > 0 {
 		restore.safety = &mgo.Safe{W: restore.OutputOptions.WriteConcern} //TODO, audit extra steps
 		log.Logf(3, "\tdumping with w=%v", restore.safety.W)
