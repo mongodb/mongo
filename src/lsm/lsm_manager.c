@@ -283,19 +283,19 @@ __wt_lsm_manager_destroy(WT_SESSION_IMPL *session)
 			++removed;
 			__wt_lsm_manager_free_work_unit(session, current);
 		}
+
+		/*
+		 * Close all LSM worker sessions.  Start at 1 because we have
+		 * already shut down the main LSM manager thread.
+		 */
+		for (i = 1; i < WT_LSM_MAX_WORKERS; i++) {
+			wt_session =
+			    &manager->lsm_worker_cookies[i].session->iface;
+			WT_TRET(wt_session->close(wt_session, NULL));
+		}
 	}
 	WT_STAT_FAST_CONN_INCRV(session,
 	    lsm_work_units_discarded, removed);
-
-	/*
-	 * Close all LSM worker sessions.  Start at 1 because we already
-	 * shut down the main LSM manager thread.
-	 */
-	for (i = 1; i < WT_LSM_MAX_WORKERS; i++) {
-		wt_session =
-		    &manager->lsm_worker_cookies[i].session->iface;
-		WT_TRET(wt_session->close(wt_session, NULL));
-	}
 
 	/* Free resources that are allocated in connection initialize */
 	__wt_spin_destroy(session, &manager->switch_lock);
