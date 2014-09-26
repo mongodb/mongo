@@ -224,6 +224,142 @@ namespace {
         ASSERT_EQUALS(electCmdRunner.getReceivedVotes(), 1);
     }
 
+    class ElectScatterGatherTest : public mongo::unittest::Test {
+    public:
+        virtual void start(const BSONObj& configObj) {
+            int selfConfigIndex = 0;
+
+            ReplicaSetConfig config;
+            config.initialize(configObj);
+
+            std::vector<HostAndPort> hosts;
+            for (ReplicaSetConfig::MemberIterator mem = ++config.membersBegin();
+                    mem != config.membersEnd();
+                    ++mem) {
+                hosts.push_back(mem->getHostAndPort());
+            }
+
+            _checker.reset(new ElectCmdRunner::Algorithm(config,
+                                                         selfConfigIndex,
+                                                         hosts,
+                                                         1954878951734LL));
+        }
+
+        virtual void tearDown() {
+            _checker.reset(NULL);
+        }
+
+    protected:
+        bool hasReceivedSufficientResponses() {
+            return _checker->hasReceivedSufficientResponses();
+        }
+
+        int getReceivedVotes() {
+            return _checker->getReceivedVotes();
+        }
+
+        void processResponse(const RemoteCommandRequest& request, const ResponseStatus& response) {
+            _checker->processResponse(request, response);
+        }
+
+        RemoteCommandRequest requestFrom(std::string hostname) {
+            return RemoteCommandRequest(HostAndPort(hostname),
+                                        "", // the non-hostname fields do not matter for Elect
+                                        BSONObj(),
+                                        Milliseconds(0));
+        }
+
+        ResponseStatus badResponseStatus() {
+            return ResponseStatus(ErrorCodes::NodeNotFound, "not on my watch");
+        }
+
+        ResponseStatus wrongTypeForVoteField() {
+            return ResponseStatus(NetworkInterfaceMock::Response(BSON("vote" << std::string("yea")),
+                                                                 Milliseconds(10)));
+        }
+
+        ResponseStatus voteYea() {
+            return ResponseStatus(NetworkInterfaceMock::Response(BSON("vote" << 1),
+                                                                 Milliseconds(10)));
+        }
+
+        ResponseStatus voteNay() {
+            return ResponseStatus(NetworkInterfaceMock::Response(BSON("vote" << -10000),
+                                                                 Milliseconds(10)));
+        }
+
+        ResponseStatus abstainFromVoting() {
+            return ResponseStatus(NetworkInterfaceMock::Response(BSON("vote" << 0),
+                                                                 Milliseconds(10)));
+        }
+
+        BSONObj basicThreeNodeConfig() {
+            return BSON("_id" << "rs0" <<
+                        "version" << 1 <<
+                        "members" << BSON_ARRAY(
+                            BSON("_id" << 0 << "host" << "host0") <<
+                            BSON("_id" << 1 << "host" << "host1") <<
+                            BSON("_id" << 2 << "host" << "host2")));
+        }
+
+    private:
+        scoped_ptr<ElectCmdRunner::Algorithm> _checker;
+    };
+
+    TEST_F(ElectScatterGatherTest, NodeRespondsWithBadVoteType) {
+        start(basicThreeNodeConfig());
+        ASSERT_FALSE(hasReceivedSufficientResponses());
+
+        processResponse(requestFrom("host2"), wrongTypeForVoteField());
+        ASSERT_TRUE(hasReceivedSufficientResponses());
+        ASSERT_EQUALS(1, getReceivedVotes()); // 1 because we have 1 vote and voted for ourself
+    }
+
+    TEST_F(ElectScatterGatherTest, NodeRespondsWithBadStatus) {
+        start(basicThreeNodeConfig());
+        ASSERT_FALSE(hasReceivedSufficientResponses());
+
+        processResponse(requestFrom("host2"), badResponseStatus());
+        ASSERT_FALSE(hasReceivedSufficientResponses());
+
+        processResponse(requestFrom("host3"), abstainFromVoting());
+        ASSERT_TRUE(hasReceivedSufficientResponses());
+        ASSERT_EQUALS(1, getReceivedVotes()); // 1 because we have 1 vote and voted for ourself
+    }
+
+    TEST_F(ElectScatterGatherTest, FirstNodeRespondsWithYea) {
+        start(basicThreeNodeConfig());
+        ASSERT_FALSE(hasReceivedSufficientResponses());
+
+        processResponse(requestFrom("host2"), voteYea());
+        ASSERT_TRUE(hasReceivedSufficientResponses());
+        ASSERT_EQUALS(2, getReceivedVotes());
+    }
+
+    TEST_F(ElectScatterGatherTest, FirstNodeRespondsWithNaySecondWithYea) {
+        start(basicThreeNodeConfig());
+        ASSERT_FALSE(hasReceivedSufficientResponses());
+
+        processResponse(requestFrom("host2"), voteNay());
+        ASSERT_FALSE(hasReceivedSufficientResponses());
+
+        processResponse(requestFrom("host3"), voteYea());
+        ASSERT_TRUE(hasReceivedSufficientResponses());
+        ASSERT_EQUALS(-9998, getReceivedVotes());
+    }
+
+    TEST_F(ElectScatterGatherTest, BothNodesAbstainFromVoting) {
+        start(basicThreeNodeConfig());
+        ASSERT_FALSE(hasReceivedSufficientResponses());
+
+        processResponse(requestFrom("host2"), abstainFromVoting());
+        ASSERT_FALSE(hasReceivedSufficientResponses());
+
+        processResponse(requestFrom("host3"), abstainFromVoting());
+        ASSERT_TRUE(hasReceivedSufficientResponses());
+        ASSERT_EQUALS(1, getReceivedVotes());
+    }
+
 }  // namespace
 }  // namespace repl
 }  // namespace mongo
