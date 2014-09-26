@@ -275,12 +275,12 @@ namespace repl {
 
 namespace {
     void tryToGoLiveAsASecondary(OperationContext* txn) {
+        Lock::GlobalRead readLock(txn->lockState());
+
         if (getGlobalReplicationCoordinator()->getMaintenanceMode()) {
             // we're not actually going live
             return;
         }
-
-        Lock::GlobalRead readLock(txn->lockState());
 
         // Only state RECOVERING can transition to SECONDARY.
         MemberState state(getGlobalReplicationCoordinator()->getCurrentMemberState());
