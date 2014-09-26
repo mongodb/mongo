@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/mongodb/mongo-tools/common/db"
 	commonOpts "github.com/mongodb/mongo-tools/common/options"
+	"github.com/mongodb/mongo-tools/common/util"
 	"github.com/mongodb/mongo-tools/mongofiles/options"
 	. "github.com/smartystreets/goconvey/convey"
 	"gopkg.in/mgo.v2"
@@ -102,7 +103,7 @@ func setUpGridFSTestShimData() ([]interface{}, error) {
 		return nil, err
 	}
 
-	dataFilesDir := filepath.Join(path, "testdata/datafiles")
+	dataFilesDir := util.ToUniversalPath(filepath.Join(path, "testdata/datafiles"))
 	err = os.MkdirAll(dataFilesDir, 0744)
 	if err != nil {
 		return nil, err
@@ -114,7 +115,7 @@ func setUpGridFSTestShimData() ([]interface{}, error) {
 	var filePath string
 	var bytesRead []byte
 	for _, item := range []string{"samplefile1.txt", "samplefile2.txt", "samplefile3.txt"} {
-		filePath = fmt.Sprintf("testdata/%s", item)
+		filePath = util.ToUniversalPath(fmt.Sprintf("testdata/%s", item))
 		testFile, err = os.Open(filePath)
 		if err != nil {
 			return nil, err
@@ -148,7 +149,7 @@ func tearDownGridFSTestShimData() error {
 		return err
 	}
 
-	dataFilesDir := filepath.Join(path, "testdata/datafiles")
+	dataFilesDir := util.ToUniversalPath(filepath.Join(path, "testdata/datafiles"))
 	err = os.RemoveAll(dataFilesDir)
 	if err != nil {
 		return err
@@ -234,7 +235,7 @@ func shimMongoFilesInstance(args []string) (*MongoFiles, error) {
 	// we'll use a database called 'shimtest'
 	mongofiles.ToolOptions.Namespace.DB = "shimtest"
 
-	dataFilesDir := filepath.Join(path, "testdata/datafiles")
+	dataFilesDir := util.ToUniversalPath(filepath.Join(path, "testdata/datafiles"))
 	mongofiles.ToolOptions.Namespace.DBPath = dataFilesDir
 
 	if err := mongofiles.Init(); err != nil {
@@ -427,7 +428,7 @@ func TestMongoFilesCommands(t *testing.T) {
 			mf, err := driverMongoFilesInstance(args)
 			So(err, ShouldBeNil)
 			So(mf, ShouldNotBeNil)
-			mf.StorageOptions.LocalFileName = "testdata/lorem_ipsum_287613_bytes.txt"
+			mf.StorageOptions.LocalFileName = util.ToUniversalPath("testdata/lorem_ipsum_287613_bytes.txt")
 
 			Convey("insert the file by creating two chunks (ceil(287,613 / 255 * 1024)) in GridFS", func() {
 				str, err := mf.Run(false)
@@ -464,7 +465,7 @@ func TestMongoFilesCommands(t *testing.T) {
 					So(err, ShouldBeNil)
 					So(len(str), ShouldNotEqual, 0)
 
-					loremIpsumOrig, err := os.Open("testdata/lorem_ipsum_287613_bytes.txt")
+					loremIpsumOrig, err := os.Open(util.ToUniversalPath("testdata/lorem_ipsum_287613_bytes.txt"))
 					So(err, ShouldBeNil)
 
 					loremIpsumCopy, err := os.Open("lorem_ipsum_copy.txt")

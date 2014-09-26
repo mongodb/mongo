@@ -3,6 +3,9 @@ package util
 import (
 	"bufio"
 	"os"
+	"path/filepath"
+	"runtime"
+	"strings"
 )
 
 // GetFieldsFromFile fetches the first line from the contents of the file
@@ -23,4 +26,11 @@ func GetFieldsFromFile(path string) ([]string, error) {
 		return nil, err
 	}
 	return fields, nil
+}
+
+func ToUniversalPath(unixPath string) string {
+	if runtime.GOOS != "windows" {
+		return unixPath
+	}
+	return strings.Replace(unixPath, "/", string(filepath.Separator), -1)
 }

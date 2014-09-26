@@ -5,9 +5,8 @@ import (
 	"github.com/mongodb/mongo-tools/common/log"
 	"github.com/mongodb/mongo-tools/common/options"
 	"github.com/mongodb/mongo-tools/common/testutil"
+	"github.com/mongodb/mongo-tools/common/util"
 	. "github.com/smartystreets/goconvey/convey"
-	"path/filepath"
-	"runtime"
 	"strings"
 	"testing"
 )
@@ -17,13 +16,6 @@ func init() {
 	log.InitToolLogger(&options.Verbosity{
 		Verbose: []bool{true, true, true, true},
 	})
-}
-
-func toUniversalPath(unixPath string) string {
-	if runtime.GOOS != "windows" {
-		return unixPath
-	}
-	return strings.Replace(unixPath, "/", string(filepath.Separator), -1)
 }
 
 func TestCreateAllIntents(t *testing.T) {
@@ -170,7 +162,7 @@ func TestCreateIntentsForCollection(t *testing.T) {
 
 		Convey("running CreateIntentForCollection on a file without metadata", func() {
 			err := mr.CreateIntentForCollection(
-				"myDB", "myC", toUniversalPath("testdata/testdirs/db1/c2.bson"))
+				"myDB", "myC", util.ToUniversalPath("testdata/testdirs/db1/c2.bson"))
 			So(err, ShouldBeNil)
 
 			Convey("should create one intent with 'myDb' and 'myC' fields", func() {
@@ -178,7 +170,7 @@ func TestCreateIntentsForCollection(t *testing.T) {
 				So(i0, ShouldNotBeNil)
 				So(i0.DB, ShouldEqual, "myDB")
 				So(i0.C, ShouldEqual, "myC")
-				So(i0.BSONPath, ShouldEqual, toUniversalPath("testdata/testdirs/db1/c2.bson"))
+				So(i0.BSONPath, ShouldEqual, util.ToUniversalPath("testdata/testdirs/db1/c2.bson"))
 				i1 := mr.manager.Pop()
 				So(i1, ShouldBeNil)
 
@@ -192,7 +184,7 @@ func TestCreateIntentsForCollection(t *testing.T) {
 
 		Convey("running CreateIntentForCollection on a file *with* metadata", func() {
 			err := mr.CreateIntentForCollection(
-				"myDB", "myC", toUniversalPath("testdata/testdirs/db1/c1.bson"))
+				"myDB", "myC", util.ToUniversalPath("testdata/testdirs/db1/c1.bson"))
 			So(err, ShouldBeNil)
 
 			Convey("should create one intent with 'myDb' and 'myC' fields", func() {
@@ -200,12 +192,12 @@ func TestCreateIntentsForCollection(t *testing.T) {
 				So(i0, ShouldNotBeNil)
 				So(i0.DB, ShouldEqual, "myDB")
 				So(i0.C, ShouldEqual, "myC")
-				So(i0.BSONPath, ShouldEqual, toUniversalPath("testdata/testdirs/db1/c1.bson"))
+				So(i0.BSONPath, ShouldEqual, util.ToUniversalPath("testdata/testdirs/db1/c1.bson"))
 				i1 := mr.manager.Pop()
 				So(i1, ShouldBeNil)
 
 				Convey("and a set Metadata path", func() {
-					So(i0.MetadataPath, ShouldEqual, toUniversalPath("testdata/testdirs/db1/c1.metadata.json"))
+					So(i0.MetadataPath, ShouldEqual, util.ToUniversalPath("testdata/testdirs/db1/c1.metadata.json"))
 					logs := buff.String()
 					So(strings.Contains(logs, "found metadata"), ShouldEqual, true)
 				})
