@@ -9,6 +9,7 @@ import (
 	"github.com/mongodb/mongo-tools/common/log"
 	"gopkg.in/mgo.v2/bson"
 	"io"
+	"os"
 )
 
 // Metadata consists of two parts, a collection's options and
@@ -60,7 +61,8 @@ func (dump *MongoDump) dumpMetadataToWriter(dbName, c string, writer io.Writer) 
 	namespaceDoc := bson.M{}
 	err := dump.cmdRunner.FindOne(dbName, "system.namespaces", 0, bson.M{"name": nsID}, nil, namespaceDoc, 0)
 	if err != nil {
-		return fmt.Errorf("error finding metadata for collection `%v`: %v", nsID, err)
+		fmt.Fprintf(os.Stderr, "Warning: no metadata found for collection: `%v`: %v", nsID, err)
+		return nil
 	}
 	if opts, ok := namespaceDoc["options"]; ok {
 		meta.Options = opts.(bson.M)
