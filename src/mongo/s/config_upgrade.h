@@ -104,7 +104,15 @@ namespace mongo {
          *   config server before contacting each shard. Because of this, mongos should be
          *   upgraded first before mongod or never drop collections during upgrade.
          */
-        UpgradeHistory_DummyBumpPre2_6 = 5
+        UpgradeHistory_DummyBumpPre2_6 = 5,
+
+        /**
+         * Version upgrade with the following changes:
+         *
+         * + "_secondaryThrottle" field for config.settings now accepts write concern
+         *   specifications.
+         */
+        UpgradeHistory_DummyBumpPre2_8 = 6,
     };
 
     //
@@ -113,10 +121,10 @@ namespace mongo {
     //
 
     // Earliest version we're compatible with
-    const int MIN_COMPATIBLE_CONFIG_VERSION = UpgradeHistory_MandatoryEpochVersion;
+    const int MIN_COMPATIBLE_CONFIG_VERSION = UpgradeHistory_DummyBumpPre2_6;
 
     // Latest version we know how to communicate with
-    const int CURRENT_CONFIG_VERSION = UpgradeHistory_DummyBumpPre2_6;
+    const int CURRENT_CONFIG_VERSION = UpgradeHistory_DummyBumpPre2_8;
 
     //
     // DECLARATION OF UPGRADE FUNCTIONALITY
@@ -124,11 +132,11 @@ namespace mongo {
     // config_upgrade.cpp::createRegistry()
     //
 
-    bool doUpgradeV0ToV5(const ConnectionString& configLoc,
+    bool doUpgradeV0ToV6(const ConnectionString& configLoc,
                          const VersionType& lastVersionInfo,
                          std::string* errMsg);
 
-    bool doUpgradeV4ToV5(const ConnectionString& configLoc,
+    bool doUpgradeV5ToV6(const ConnectionString& configLoc,
                          const VersionType& lastVersionInfo,
                          std::string* errMsg);
 

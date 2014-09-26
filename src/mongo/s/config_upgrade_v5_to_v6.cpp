@@ -34,29 +34,27 @@
 
 namespace mongo {
 
-    static const char* minMongoProcessVersion = "2.4";
+    static const char* minMongoProcessVersion = "2.6";
 
     static const char* cannotCleanupMessage =
             "\n\n"
             "******\n"
-            "Cannot upgrade config database from v4 to v5 because a previous upgrade\n"
+            "Cannot upgrade config database from v5 to v6 because a previous upgrade\n"
             "failed in the critical section.  Manual intervention is required to re-sync\n"
-            "the config servers.  See:\n"
-            // TODO: verify release note link
-            "http://docs.mongodb.org/manual/release-notes/2dot6upgradenotes/\n"
+            "the config servers.\n"
             "******\n";
 
     /**
-     * Upgrades v4 to v5.
+     * Upgrades v5 to v6.
      */
-    bool doUpgradeV4ToV5(const ConnectionString& configLoc,
+    bool doUpgradeV5ToV6(const ConnectionString& configLoc,
                          const VersionType& lastVersionInfo,
                          string* errMsg)
     {
         string dummy;
         if (!errMsg) errMsg = &dummy;
 
-        verify(lastVersionInfo.getCurrentVersion() == UpgradeHistory_MandatoryEpochVersion);
+        verify(lastVersionInfo.getCurrentVersion() == UpgradeHistory_DummyBumpPre2_6);
         Status result = preUpgradeCheck(configLoc, lastVersionInfo, minMongoProcessVersion);
 
         if (!result.isOK()) {

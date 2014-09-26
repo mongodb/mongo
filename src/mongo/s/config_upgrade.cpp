@@ -119,13 +119,13 @@ namespace mongo {
 
         ConfigUpgradeRegistry registry;
 
-        // v0 to v5
-        Upgrade v0ToV5(0, VersionRange(4, 5), doUpgradeV0ToV5);
-        registry.insert(make_pair(v0ToV5.fromVersion, v0ToV5));
+        // v0 to v6
+        Upgrade v0ToV6(0, VersionRange(5, 6), doUpgradeV0ToV6);
+        registry.insert(make_pair(v0ToV6.fromVersion, v0ToV6));
 
-        // v4 to v5
-        Upgrade v4ToV5(4, VersionRange(4, 5), doUpgradeV4ToV5);
-        registry.insert(make_pair(v4ToV5.fromVersion, v4ToV5));
+        // v5 to v6
+        Upgrade v5ToV6(5, VersionRange(5, 6), doUpgradeV5ToV6);
+        registry.insert(make_pair(v5ToV6.fromVersion, v5ToV6));
 
         validateRegistry(registry);
 

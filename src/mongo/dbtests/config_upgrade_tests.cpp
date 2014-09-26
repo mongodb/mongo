@@ -88,7 +88,7 @@ namespace mongo {
          */
         OID storeConfigVersion(int configVersion) {
 
-            if (configVersion < UpgradeHistory_MandatoryEpochVersion) {
+            if (configVersion < CURRENT_CONFIG_VERSION) {
                 storeLegacyConfigVersion(configVersion);
                 return OID();
             }
@@ -168,8 +168,8 @@ namespace mongo {
         //
 
         VersionType newVersion;
-        newVersion.setMinCompatibleVersion(UpgradeHistory_NoEpochVersion);
-        newVersion.setCurrentVersion(UpgradeHistory_MandatoryEpochVersion);
+        newVersion.setMinCompatibleVersion(MIN_COMPATIBLE_CONFIG_VERSION);
+        newVersion.setCurrentVersion(CURRENT_CONFIG_VERSION);
         storeConfigVersion(newVersion);
 
         newVersion.clear();
@@ -182,8 +182,8 @@ namespace mongo {
 
         OID clusterId = OID::gen();
         newVersion.setClusterId(clusterId);
-        newVersion.setMinCompatibleVersion(UpgradeHistory_NoEpochVersion);
-        newVersion.setCurrentVersion(UpgradeHistory_MandatoryEpochVersion);
+        newVersion.setMinCompatibleVersion(MIN_COMPATIBLE_CONFIG_VERSION);
+        newVersion.setCurrentVersion(CURRENT_CONFIG_VERSION);
 
         clearVersion();
         storeConfigVersion(newVersion);
@@ -194,8 +194,8 @@ namespace mongo {
         status = getConfigVersion(configSvr(), &newVersion);
         ASSERT(status.isOK());
 
-        ASSERT_EQUALS(newVersion.getMinCompatibleVersion(), UpgradeHistory_NoEpochVersion);
-        ASSERT_EQUALS(newVersion.getCurrentVersion(), UpgradeHistory_MandatoryEpochVersion);
+        ASSERT_EQUALS(newVersion.getMinCompatibleVersion(), MIN_COMPATIBLE_CONFIG_VERSION);
+        ASSERT_EQUALS(newVersion.getCurrentVersion(), CURRENT_CONFIG_VERSION);
         ASSERT_EQUALS(newVersion.getClusterId(), clusterId);
     }
 
