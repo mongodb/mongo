@@ -214,7 +214,7 @@ func (shim *Shim) DatabaseNames() ([]string, error) {
 
 }
 
-func (shim *Shim) Run(command interface{}, out interface{}, database string) error {
+func (shim *Shim) Run(command interface{}, out interface{}, database string) (err error) {
 	if name, ok := command.(string); ok {
 		command = bson.M{name: 1}
 	}
@@ -239,6 +239,12 @@ func (shim *Shim) Run(command interface{}, out interface{}, database string) err
 	if err != nil {
 		return err
 	}
+	defer func() {
+		closeErr := commandShim.Close()
+		if err == nil {
+			err = closeErr
+		}
+	}()
 	decodedResult := NewDecodedBSONSource(bsonSource)
 	hasDoc := decodedResult.Next(out)
 	if !hasDoc {
@@ -247,8 +253,7 @@ func (shim *Shim) Run(command interface{}, out interface{}, database string) err
 		}
 		return fmt.Errorf("Didn't receive response from shim with command result.")
 	}
-	defer commandShim.Close()
-	return commandShim.WaitResult()
+	return err
 }
 
 type StorageShim struct {
