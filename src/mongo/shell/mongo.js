@@ -52,8 +52,41 @@ Mongo.prototype.adminCommand = function( cmd ){
     return this.getDB( "admin" ).runCommand( cmd );
 }
 
-Mongo.prototype.setLogLevel = function( logLevel ){
-    return this.adminCommand({ setParameter : 1, logLevel : logLevel })
+/**
+ * Returns all log components and current verbosity values
+ */
+Mongo.prototype.getLogComponents = function() {
+    var res = this.adminCommand({ getParameter:1, logComponentVerbosity:1 });
+    if (!res.ok)
+        throw Error( "getLogComponents failed:" + tojson(res));
+    return res.logComponentVerbosity;
+}
+
+/**
+ * Accepts optional second argument "component",
+ * string of form "storage.journaling"
+ */
+Mongo.prototype.setLogLevel = function(logLevel, component) {
+    componentNames = [];
+    if (typeof component === "string") {
+        componentNames = component.split(".");
+    }
+    else if (component !== undefined) {
+        throw Error( "setLogLevel component must be a string:" + tojson(component));
+    }
+    var vDoc = { verbosity: logLevel };
+
+    // nest vDoc
+    for (var key,obj; componentNames.length > 0;) {
+        obj = {};
+        key = componentNames.pop();
+        obj[ key ] = vDoc;
+        vDoc = obj;
+    }
+    var res = this.adminCommand({ setParameter : 1, logComponentVerbosity : vDoc });
+    if (!res.ok)
+        throw Error( "setLogLevel failed:" + tojson(res));
+    return res;
 }
 
 Mongo.prototype.getDBNames = function(){
