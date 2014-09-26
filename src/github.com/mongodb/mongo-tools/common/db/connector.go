@@ -39,7 +39,7 @@ func (self *VanillaDBConnector) Configure(opts options.ToolOptions) error {
 		Direct:    opts.Direct,
 		Username:  opts.Auth.Username,
 		Password:  opts.Auth.Password,
-		Source:    opts.Auth.Source,
+		Source:    opts.GetAuthenticationDatabase(),
 		Mechanism: opts.Auth.Mechanism,
 	}
 

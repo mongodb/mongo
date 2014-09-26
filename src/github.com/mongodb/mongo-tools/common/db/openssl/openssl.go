@@ -53,7 +53,7 @@ func (self *SSLDBConnector) Configure(opts options.ToolOptions) error {
 
 		Username:  opts.Auth.Username,
 		Password:  opts.Auth.Password,
-		Source:    opts.Auth.Source,
+		Source:    opts.GetAuthenticationDatabase(),
 		Mechanism: opts.Auth.Mechanism,
 	}
 

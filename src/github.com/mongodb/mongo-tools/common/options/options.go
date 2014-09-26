@@ -68,8 +68,8 @@ type Verbosity struct {
 
 // Struct holding connection-related options
 type Connection struct {
-	Host string `short:"h" long:"host" description:"Specify a resolvable hostname to which to connect" default:"localhost"`
-	Port string `long:"port" description:"Specify the tcp port on which the mongod is listening" default:"27017"`
+	Host string `short:"h" long:"host" description:"Specify a resolvable hostname to which to connect" default:"localhost:27017"`
+	Port string `long:"port" description:"Specify the tcp port on which the mongod is listening"`
 }
 
 // Struct holding ssl-related options
@@ -136,6 +136,18 @@ func (self *ToolOptions) PrintVersion() bool {
 type ExtraOptions interface {
 	// Name specifying what type of options these are
 	Name() string
+}
+
+// Get the authentication database to use. Should be the value of
+// --authenticationDatabase if it's provided, otherwise, the database that's
+// specified in the tool's --db arg.
+func (self *ToolOptions) GetAuthenticationDatabase() string {
+	if self.Auth.Source != "" {
+		return self.Auth.Source
+	} else if self.Namespace != nil && self.Namespace.DB != "" {
+		return self.Namespace.DB
+	}
+	return ""
 }
 
 // Add extra command line options into the tool options
