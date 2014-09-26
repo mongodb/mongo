@@ -1390,13 +1390,7 @@ namespace {
                 return;
         }
 
-        unsigned sz = s.size();
-        if (sz >= 256)
-            memcpy(_hbmsg, s.c_str(), 255);
-        else {
-            _hbmsg[sz] = 0;
-            memcpy(_hbmsg, s.c_str(), sz);
-        }
+        _hbmsg = s;
         if (!s.empty()) {
             lastLogged = _hbmsgTime;
             LOG(logLevel) << "replSet " << s;

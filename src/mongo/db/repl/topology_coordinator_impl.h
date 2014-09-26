@@ -317,7 +317,7 @@ namespace repl {
 
         // "heartbeat message"
         // sent in requestHeartbeat respond in field "hbm"
-        char _hbmsg[256]; // we change this unlocked, thus not a std::string
+        std::string _hbmsg;
         Date_t _hbmsgTime; // when it was logged
         void _sethbmsg(const std::string& s, int logLevel = 0);
         // heartbeat msg to send to others; descriptive diagnostic info
