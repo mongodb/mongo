@@ -106,7 +106,8 @@ namespace {
                                        _pause(true),
                                        _appliedBuffer(true),
                                        _assumingPrimary(false),
-                                       _replCoord(getGlobalReplicationCoordinator()) {
+                                       _replCoord(getGlobalReplicationCoordinator()),
+                                       _initialSyncRequestedFlag(false) {
     }
 
     BackgroundSync* BackgroundSync::get() {
