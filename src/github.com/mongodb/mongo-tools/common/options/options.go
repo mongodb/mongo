@@ -229,5 +229,10 @@ func (self *ToolOptions) Validate() error {
 		}
 	*/
 
+	switch {
+	case self.DBPath != "" && self.Host != "":
+		return fmt.Errorf("--dbpath is not allowed when --host is specified")
+	}
+
 	return nil
 }

@@ -63,6 +63,9 @@ func (exp *MongoExport) ValidateSettings() error {
 	//TODO - on legacy mongoexport, if -d is blank, it assumes some default database.
 	//Do we want to use that same behavior? It seems very odd to assume the DB
 	//when only a collection is provided, but that's the behavior of the legacy tools.
+	if err := exp.ToolOptions.Validate(); err != nil {
+		return err
+	}
 
 	//Namespace must have a valid database and collection
 	if exp.ToolOptions.Namespace.DB == "" || exp.ToolOptions.Namespace.Collection == "" {
