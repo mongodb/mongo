@@ -10,7 +10,7 @@ var md = startMongod("--port", port1, "--dbpath",
                      "--sslPEMKeyFile", "jstests/libs/server.pem",
                      "--sslFIPSMode");
 
-var mongo = runMongoProgram("mongo", "--port", port1, "--ssl",
+var mongo = runMongoProgram("mongo", "--port", port1, "--ssl", "--sslAllowInvalidCertificates",
                             "--sslPEMKeyFile", "jstests/libs/client.pem",
                             "--sslFIPSMode",
                             "--eval", ";");

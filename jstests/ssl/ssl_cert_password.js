@@ -22,7 +22,7 @@ md = startMongod("--nopreallocj",
 // Password incorrect; error logged is:
 //  error:06065064:digital envelope routines:EVP_DecryptFinal_ex:bad decrypt
 var exit_code = runMongoProgram("mongo", "--port", port,
-                                "--ssl",
+                                "--ssl", "--sslAllowInvalidCertificates",
                                 "--sslPEMKeyFile", "jstests/libs/password_protected.pem",
                                 "--sslPEMKeyPassword", "barf");
 
