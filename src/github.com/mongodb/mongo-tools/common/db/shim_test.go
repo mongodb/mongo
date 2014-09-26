@@ -3,10 +3,19 @@ package db
 import (
 	. "github.com/smartystreets/goconvey/convey"
 	"gopkg.in/mgo.v2/bson"
+	"runtime"
 	"testing"
 )
 
+const (
+	windowsShimPath = `testdata\mock_shim.bat`
+)
+
 func TestShimRead(t *testing.T) {
+	shimPath := "testdata/mock_shim.sh"
+	if runtime.GOOS == "windows" {
+		shimPath = windowsShimPath
+	}
 	Convey("Test shim process in read mode", t, func() {
 		var bsonTool StorageShim
 		resetFunc := func() {
@@ -19,7 +28,7 @@ func TestShimRead(t *testing.T) {
 				Skip:       0,
 				Limit:      0,
 				Mode:       Dump,
-				ShimPath:   "testdata/mock_shim.sh",
+				ShimPath:   shimPath,
 			}
 		}
 		Reset(resetFunc)
@@ -65,6 +74,10 @@ func TestShimRead(t *testing.T) {
 }
 
 func TestShimWrite(t *testing.T) {
+	shimPath := "testdata/mock_shim_write.sh"
+	if runtime.GOOS == "windows" {
+		shimPath = windowsShimPath
+	}
 	Convey("Test shim process in write mode", t, func() {
 		var bsonTool StorageShim
 		resetFunc := func() {
@@ -77,7 +90,7 @@ func TestShimWrite(t *testing.T) {
 				Skip:       0,
 				Limit:      0,
 				Mode:       Insert,
-				ShimPath:   "testdata/mock_shim_write.sh",
+				ShimPath:   shimPath,
 			}
 		}
 		Reset(resetFunc)
