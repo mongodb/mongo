@@ -56,9 +56,9 @@ func (tsvImporter *TSVImportInput) ImportDocument() (bson.M, error) {
 	}
 	document := bson.M{}
 
-	// strip the trailing '\n' from ReadString
+	// strip the trailing '\r\n' from ReadString
 	if len(tsvRecord) != 0 {
-		tsvRecord = tsvRecord[:len(tsvRecord)-1]
+		tsvRecord = strings.TrimRight(tsvRecord, "\r\n")
 	}
 	tokens := strings.Split(tsvRecord, tokenSeparator)
 	for index, token := range tokens {
