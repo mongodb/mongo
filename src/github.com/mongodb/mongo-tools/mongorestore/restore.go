@@ -115,7 +115,7 @@ func (restore *MongoRestore) RestoreIntent(intent *Intent) error {
 		log.Logf(0, "restoring indexes for collection %v from metadata", intent.Key())
 		for _, idx := range indexes {
 			log.Logf(0, "\tcreating index %v", idx.Options["name"])
-			err = restore.InsertIndex(intent.DB, idx)
+			err = restore.InsertIndex(intent, idx)
 			if err != nil {
 				return fmt.Errorf("error creating index %v: %v", idx.Options["name"], err)
 			}

@@ -68,9 +68,12 @@ func (restore *MongoRestore) DBHasCollection(intent *Intent) (bool, error) {
 	return true, nil
 }
 
-func (restore *MongoRestore) InsertIndex(dbName string, index IndexDocument) error {
+func (restore *MongoRestore) InsertIndex(intent *Intent, index IndexDocument) error {
+	//first, update the namespace of the index before inserting
+	index.Options["ns"] = intent.Key()
+
 	// overwrite safety to make sure we catch errors
-	insertStream, err := restore.cmdRunner.OpenInsertStream(dbName, "system.indexes", &mgo.Safe{})
+	insertStream, err := restore.cmdRunner.OpenInsertStream(intent.DB, "system.indexes", &mgo.Safe{})
 	if err != nil {
 		return fmt.Errorf("error opening insert connection: %v", err)
 	}
