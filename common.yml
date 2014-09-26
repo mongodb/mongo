@@ -196,7 +196,7 @@ functions:
         - dir: src/github.com/mongodb/mongo-tools/mongorestore
           args: ${coverage_args} ${args}
         - dir: src/github.com/mongodb/mongo-tools/mongofiles
-          args: ${coverage_args} ${args} 2>&1 > /dev/null; MONGOSHIM=./mongoshim go test -v ${coverage_args} ${args}
+          args: ${coverage_args} ${args} 2>&1 > /dev/null; MONGOSHIM=./mongoshim${extension} go test -v ${coverage_args} ${args}
 
   "setup credentials" :
     command: shell.exec
