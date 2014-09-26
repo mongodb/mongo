@@ -144,12 +144,12 @@ namespace mongo {
 
             // cout << "rewritten query: " << rewritten.toString() << endl;
 
-            int numWanted = 100;
+            long long numWanted = 100;
             const char* limitName = !cmdObj["num"].eoo() ? "num" : "limit";
             BSONElement eNumWanted = cmdObj[limitName];
             if (!eNumWanted.eoo()) {
                 uassert(17303, "limit must be number", eNumWanted.isNumber());
-                numWanted = eNumWanted.numberInt();
+                numWanted = eNumWanted.safeNumberLong();
                 uassert(17302, "limit must be >=0", numWanted >= 0);
             }
 
@@ -201,7 +201,7 @@ namespace mongo {
             double farthestDist = 0;
 
             BSONObj currObj;
-            int results = 0;
+            long long results = 0;
             while ((results < numWanted) && PlanExecutor::ADVANCED == exec->getNext(&currObj, NULL)) {
 
                 // Come up with the correct distance.
