@@ -94,7 +94,7 @@ func tearDownGridFSTestNonShimData() error {
 }
 
 // setup GridFS test data to be accessed via mongoshim
-func setUpGridFSTestShimData() ([]interface{}, error) {	
+func setUpGridFSTestShimData() ([]interface{}, error) {
 	bytesWritten := []interface{}{}
 
 	path, err := os.Getwd()
@@ -113,7 +113,7 @@ func setUpGridFSTestShimData() ([]interface{}, error) {
 	var mf *MongoFiles
 	var filePath string
 	var bytesRead []byte
-	for _ ,item := range []string {"samplefile1.txt", "samplefile2.txt", "samplefile3.txt"} {
+	for _, item := range []string{"samplefile1.txt", "samplefile2.txt", "samplefile3.txt"} {
 		filePath = fmt.Sprintf("testdata/%s", item)
 		testFile, err = os.Open(filePath)
 		if err != nil {
@@ -124,11 +124,11 @@ func setUpGridFSTestShimData() ([]interface{}, error) {
 		if err != nil {
 			return nil, err
 		}
-		
+
 		args = []string{"put", item}
 		mf, err = shimMongoFilesInstance(args)
 		mf.StorageOptions.LocalFileName = filePath
-			
+
 		if err != nil {
 			return nil, err
 		}
@@ -173,12 +173,12 @@ func driverMongoFilesInstance(args []string) (*MongoFiles, error) {
 
 // test output needs some cleaning
 func cleanAndTokenizeTestOutput(str string) []string {
-	// remove last \n in str to avoid unnecessary line on split
+	// remove last \r\n in str to avoid unnecessary line on split
 	if str != "" {
 		str = str[:len(str)-1]
 	}
 
-	return strings.Split(strings.Trim(str, "\n"), "\n")
+	return strings.Split(strings.Trim(str, "\r\n"), "\n")
 }
 
 // return slices of files and bytes in each file represented by each line
@@ -233,7 +233,7 @@ func shimMongoFilesInstance(args []string) (*MongoFiles, error) {
 	// for testing mongofiles through mongoshim,
 	// we'll use a database called 'shimtest'
 	mongofiles.ToolOptions.Namespace.DB = "shimtest"
-	
+
 	dataFilesDir := filepath.Join(path, "testdata/datafiles")
 	mongofiles.ToolOptions.Namespace.DBPath = dataFilesDir
 
