@@ -79,6 +79,12 @@ type FileMD5 struct {
 	Md5 string `bson:"md5,omitempty"`
 }
 
+// for storing result from a 'createIndexes' command
+type CreateIndexesResult struct {
+	Ok   bool `bson:"ok"`
+	Code int  `bson:"code"`
+}
+
 func ValidateCommand(args []string) (string, error) {
 	// make sure a command is specified and that we don't have
 	// too many arguments
@@ -260,7 +266,7 @@ func (self *MongoFiles) removeGridFSFile(fileName string) error {
 
 // creates an index
 func (self *MongoFiles) createIndex(collection string, indexDoc bsonutil.MarshalD, indexName string, isUnique bool) error {
-	var indexesResult bson.M
+	var createIndexesResult CreateIndexesResult
 	createIndexCommand := bsonutil.MarshalD{
 		{"createIndexes", collection}, {"indexes", []interface{}{
 			bson.M{
@@ -269,9 +275,12 @@ func (self *MongoFiles) createIndex(collection string, indexDoc bsonutil.Marshal
 				"unique": isUnique,
 			},
 		}}}
-	err := self.cmdRunner.Run(createIndexCommand, &indexesResult, self.ToolOptions.Namespace.DB)
+	err := self.cmdRunner.Run(createIndexCommand, &createIndexesResult, self.ToolOptions.Namespace.DB)
 	if err != nil {
 		return fmt.Errorf("error creating indexes on collection '%v': %v", collection, err)
+	}
+	if !createIndexesResult.Ok {
+		return fmt.Errorf("indexes not created on collection '%v': %v", collection, err)
 	}
 	return nil
 }
