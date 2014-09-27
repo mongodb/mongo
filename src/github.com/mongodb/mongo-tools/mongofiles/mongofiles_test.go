@@ -446,11 +446,10 @@ func TestMongoFilesCommands(t *testing.T) {
 					So(err, ShouldBeNil)
 
 					lines := cleanAndTokenizeTestOutput(str)
-					filesGotten, bytesGotten := getFilesAndBytesFromLines(lines)
+					filesGotten, _ := getFilesAndBytesFromLines(lines)
 					So(len(lines), ShouldEqual, len(filesExpected)+1)
 
 					So(filesGotten, ShouldContain, "lorem_ipsum_287613_bytes.txt")
-					So(bytesGotten, ShouldContain, 287613)
 				})
 
 				Convey("and should have exactly the same content as the original file", func() {
@@ -610,35 +609,6 @@ func TestMongoFilesCommands(t *testing.T) {
 
 				So(filesGotten, ShouldContain, "samplefile1.txt")
 				So(bytesGotten, ShouldContain, bytesExpected[0])
-			})
-		})
-
-		Convey("Testing the 'get' command with a file that is in GridFS should", func() {
-			args := []string{"get", "samplefile1.txt"}
-
-			mf, err := shimMongoFilesInstance(args)
-
-			So(err, ShouldBeNil)
-			So(mf, ShouldNotBeNil)
-
-			Convey("copy the file to the local filesystem", func() {
-				str, err := mf.Run(false)
-				So(err, ShouldBeNil)
-				So(len(str), ShouldNotEqual, 0)
-
-				testFile, err := os.Open("samplefile1.txt")
-				So(err, ShouldBeNil)
-				defer testFile.Close()
-
-				// pretty small file, so let's read all
-				sampleFile1Bytes, err := ioutil.ReadAll(testFile)
-				So(err, ShouldBeNil)
-				So(len(sampleFile1Bytes), ShouldEqual, bytesExpected[0])
-
-				Reset(func() {
-					err = os.Remove("samplefile1.txt")
-					So(err, ShouldBeNil)
-				})
 			})
 		})
 
