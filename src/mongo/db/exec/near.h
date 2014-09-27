@@ -161,9 +161,6 @@ namespace mongo {
             SearchState_Finished
         } _searchState;
 
-        // The current stage from which this stage should buffer results
-        scoped_ptr<CoveredInterval> _nextInterval;
-
         // May need to track disklocs from the child stage to do our own deduping, also to do
         // invalidation of buffered results.
         unordered_map<DiskLoc, WorkingSetID, DiskLoc::Hasher> _nextIntervalSeen;
@@ -177,6 +174,16 @@ namespace mongo {
 
         // Stats
         scoped_ptr<PlanStageStats> _stats;
+
+        // The current stage from which this stage should buffer results
+        // Pointer to the last interval in _childrenIntervals. Owned by _childrenIntervals.
+        CoveredInterval* _nextInterval;
+
+        // All children CoveredIntervals and the sub-stages owned by them.
+        //
+        // All children intervals except the last active one are only used by getStats(),
+        // because they are all EOF.
+        OwnedPointerVector<CoveredInterval> _childrenIntervals;
     };
 
     /**
@@ -190,7 +197,8 @@ namespace mongo {
                         double maxDistance,
                         bool inclusiveMax);
 
-        const scoped_ptr<PlanStage> covering;
+        // Owned by NearStage
+        scoped_ptr<PlanStage> const covering;
         const bool dedupCovering;
 
         const double minDistance;
