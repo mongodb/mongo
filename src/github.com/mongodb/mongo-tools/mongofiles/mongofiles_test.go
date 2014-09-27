@@ -612,6 +612,29 @@ func TestMongoFilesCommands(t *testing.T) {
 			})
 		})
 
+		Convey("Testing the 'get' command with a file that is in GridFS should", func() {
+			args := []string{"get", "samplefile1.txt"}
+
+			mf, err := shimMongoFilesInstance(args)
+
+			So(err, ShouldBeNil)
+			So(mf, ShouldNotBeNil)
+
+			Convey("copy the file to the local filesystem", func() {
+				str, err := mf.Run(false)
+				So(err, ShouldBeNil)
+				So(len(str), ShouldNotEqual, 0)
+
+				// check that 'samplefile1.txt' now exists on local filesystem
+				So(fileExists("samplefile1.txt"), ShouldBeTrue)
+
+				Reset(func() {
+					err = os.Remove("samplefile1.txt")
+					So(err, ShouldBeNil)
+				})
+			})
+		})
+
 		Reset(func() {
 			So(tearDownGridFSTestShimData(), ShouldBeNil)
 		})
