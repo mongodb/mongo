@@ -137,6 +137,8 @@ namespace mongo {
             return;
         }
 
+        c->_commandsExecuted.increment();
+
         std::string errmsg;
         bool ok;
         try {
@@ -153,6 +155,10 @@ namespace mongo {
             ss << "exception: " << e.what();
             errmsg = ss.str();
             result.append( "code" , code );
+        }
+
+        if ( !ok ) {
+            c->_commandsFailed.increment();
         }
 
         appendCommandStatus(result, ok, errmsg);

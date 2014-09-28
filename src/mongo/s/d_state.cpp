@@ -59,6 +59,7 @@
 #include "mongo/s/d_state.h"
 #include "mongo/s/metadata_loader.h"
 #include "mongo/s/shard.h"
+#include "mongo/s/stale_exception.h"
 #include "mongo/util/queue.h"
 #include "mongo/util/concurrency/mutex.h"
 #include "mongo/util/concurrency/ticketholder.h"
@@ -594,7 +595,7 @@ namespace mongo {
         {
             // DBLock needed since we're now potentially changing the metadata, and don't want
             // reads/writes to be ongoing.
-            Lock::DBWrite writeLk(txn->lockState(), ns );
+            Lock::DBLock writeLk(txn->lockState(), nsToDatabaseSubstring(ns), newlm::MODE_X);
 
             //
             // Get the metadata now that the load has completed
@@ -1297,7 +1298,7 @@ namespace mongo {
         }
 
         bool run(OperationContext* txn, const string& dbname, BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool) {
-            Lock::DBWrite dbXLock(txn->lockState(), dbname);
+            Lock::DBLock dbXLock(txn->lockState(), dbname, newlm::MODE_X);
             Client::Context ctx(txn, dbname);
 
             shardingState.appendInfo( result );
@@ -1310,7 +1311,10 @@ namespace mongo {
      * @ return true if not in sharded mode
                      or if version for this client is ok
      */
-    bool shardVersionOk( const string& ns , string& errmsg, ChunkVersion& received, ChunkVersion& wanted ) {
+    static bool shardVersionOk(const string& ns,
+                               string& errmsg,
+                               ChunkVersion& received,
+                               ChunkVersion& wanted) {
 
         if ( ! shardingState.enabled() )
             return true;
@@ -1384,6 +1388,17 @@ namespace mongo {
 
         return false;
 
+    }
+
+    void ensureShardVersionOKOrThrow(const std::string& ns) {
+        string errmsg;
+        ChunkVersion received;
+        ChunkVersion wanted;
+        if (!shardVersionOk(ns, errmsg, received, wanted)) {
+            StringBuilder sb;
+            sb << "[" << ns << "] shard version not ok in Client::Context: " << errmsg;
+            throw SendStaleConfigException(ns, sb.str(), received, wanted);
+        }
     }
 
     void usingAShardConnection( const string& addr ) {

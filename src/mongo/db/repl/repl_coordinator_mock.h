@@ -58,6 +58,8 @@ namespace repl {
 
         virtual MemberState getCurrentMemberState() const;
 
+        virtual void clearSyncSourceBlacklist();
+
         virtual ReplicationCoordinator::StatusAndDuration awaitReplication(
                 const OperationContext* txn,
                 const OpTime& ts,
@@ -98,6 +100,8 @@ namespace repl {
         virtual OID getElectionId();
 
         virtual OID getMyRID() const;
+
+        virtual int getMyId() const;
 
         virtual void setFollowerMode(const MemberState& newState);
 
@@ -164,9 +168,13 @@ namespace repl {
 
         virtual Status checkReplEnabledForCommand(BSONObjBuilder* result);
 
-        virtual void connectOplogReader(OperationContext* txn,
-                                        BackgroundSync* bgsync, 
-                                        OplogReader* r);
+        virtual HostAndPort chooseNewSyncSource();
+
+        virtual void blacklistSyncSource(const HostAndPort& host, Date_t until);
+
+        virtual void resetLastOpTimeFromOplog(OperationContext* txn);
+
+        virtual bool shouldChangeSyncSource(const HostAndPort& currentSource);
 
     private:
 

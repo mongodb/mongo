@@ -349,7 +349,7 @@ namespace mongo {
             // Needs to be locked exclusively, because creates the system.profile collection
             // in the local database.
             //
-            Lock::DBWrite dbXLock(txn->lockState(), dbname);
+            Lock::DBLock dbXLock(txn->lockState(), dbname, newlm::MODE_X);
             WriteUnitOfWork wunit(txn);
             Client::Context ctx(txn, dbname);
 
@@ -405,7 +405,7 @@ namespace mongo {
             // This doesn't look like it requires exclusive DB lock, because it uses its own diag
             // locking, but originally the lock was set to be WRITE, so preserving the behaviour.
             //
-            Lock::DBWrite dbXLock(txn->lockState(), dbname);
+            Lock::DBLock dbXLock(txn->lockState(), dbname, newlm::MODE_X);
             Client::Context ctx(txn, dbname);
 
             int was = _diaglog.setLevel( cmdObj.firstElement().numberInt() );
@@ -461,7 +461,7 @@ namespace mongo {
                 return false;
             }
 
-            Lock::DBWrite dbXLock(txn->lockState(), dbname);
+            Lock::DBLock dbXLock(txn->lockState(), dbname, newlm::MODE_X);
             WriteUnitOfWork wunit(txn);
             Client::Context ctx(txn, nsToDrop);
             Database* db = ctx.db();
@@ -561,7 +561,7 @@ namespace mongo {
                     !options["capped"].trueValue() || options["size"].isNumber() ||
                         options.hasField("$nExtents"));
 
-            Lock::DBWrite dbXLock(txn->lockState(), dbname);
+            Lock::DBLock dbXLock(txn->lockState(), dbname, newlm::MODE_X);
             WriteUnitOfWork wunit(txn);
             Client::Context ctx(txn, ns);
 
@@ -951,10 +951,9 @@ namespace mongo {
             collection->getRecordStore()->appendCustomStats( txn, &result, scale );
 
             BSONObjBuilder indexSizes;
-            result.appendNumber( "totalIndexSize" , db->getIndexSizeForCollection(txn,
-                                                                                  collection,
-                                                                                  &indexSizes,
-                                                                                  scale) / scale );
+            long long indexSize = collection->getIndexSize(txn, &indexSizes, scale);
+
+            result.appendNumber("totalIndexSize", indexSize / scale);
             result.append("indexSizes", indexSizes.obj());
 
             return true;
@@ -988,7 +987,7 @@ namespace mongo {
         bool run(OperationContext* txn, const string& dbname, BSONObj& jsobj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl ) {
             const string ns = dbname + "." + jsobj.firstElement().valuestr();
 
-            Lock::DBWrite dbXLock(txn->lockState(), dbname);
+            Lock::DBLock dbXLock(txn->lockState(), dbname, newlm::MODE_X);
             WriteUnitOfWork wunit(txn);
             Client::Context ctx(txn,  ns );
 
@@ -1378,7 +1377,13 @@ namespace mongo {
 
         txn->getCurOp()->ensureStarted();
 
+        c->_commandsExecuted.increment();
+
         retval = _execCommand(txn, c, dbname, cmdObj, queryOptions, errmsg, result, fromRepl);
+
+        if ( !retval ){
+            c->_commandsFailed.increment();
+        }
 
         appendCommandStatus(result, retval, errmsg);
         
@@ -1458,6 +1463,7 @@ namespace mongo {
                                          str::stream() << "no such cmd: " << e.fieldName());
             anObjBuilder.append("code", ErrorCodes::CommandNotFound);
             anObjBuilder.append("bad cmd" , _cmdobj );
+            Command::unknownCommands.increment();
         }
 
         BSONObj x = anObjBuilder.done();

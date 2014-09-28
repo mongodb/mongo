@@ -31,7 +31,7 @@
 #include "mongo/db/exec/group.h"
 
 #include "mongo/db/auth/authorization_session.h"
-#include "mongo/db/catalog/database.h"
+#include "mongo/db/catalog/collection.h"
 #include "mongo/db/client_basic.h"
 #include "mongo/db/exec/working_set_common.h"
 #include "mongo/scripting/engine.h"
@@ -72,12 +72,10 @@ namespace mongo {
     const char* GroupStage::kStageType = "GROUP";
 
     GroupStage::GroupStage(OperationContext* txn,
-                           Database* db,
                            const GroupRequest& request,
                            WorkingSet* workingSet,
                            PlanStage* child)
         : _txn(txn),
-          _db(db),
           _request(request),
           _ws(workingSet),
           _commonStats(kStageType),
@@ -100,8 +98,10 @@ namespace mongo {
         const std::string userToken =
             ClientBasic::getCurrent()->getAuthorizationSession()
                                      ->getAuthenticatedUserNamesToken();
-        auto_ptr<Scope> s = globalScriptEngine->getPooledScope(_txn, _db->name(),
-                                                               "group" + userToken);
+
+        const NamespaceString nss(_request.ns);
+        auto_ptr<Scope> s = globalScriptEngine->getPooledScope(
+                                    _txn, nss.db().toString(), "group" + userToken);
         if (!_request.reduceScope.isEmpty()) {
             s->init(&_request.reduceScope);
         }

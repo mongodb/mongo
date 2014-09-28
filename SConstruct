@@ -305,6 +305,8 @@ add_option( "use-system-yaml", "use system version of yaml", 0, True )
 
 add_option( "use-system-all" , "use all system libraries", 0 , True )
 
+add_option( "use-new-tools" , "put new tools in the tarball", 0 , False )
+
 add_option( "use-cpu-profiler",
             "Link against the google-perftools profiler library",
             0, False )
@@ -669,9 +671,11 @@ extraLibPlaces = []
 
 env['EXTRACPPPATH'] = []
 env['EXTRALIBPATH'] = []
+env['EXTRABINPATH'] = []
 
 def addExtraLibs( s ):
     for x in s.split(","):
+        env.Append( EXTRABINPATH=[ x + "/bin" ] )
         env.Append( EXTRACPPPATH=[ x + "/include" ] )
         env.Append( EXTRALIBPATH=[ x + "/lib" ] )
         env.Append( EXTRALIBPATH=[ x + "/lib64" ] )
@@ -793,7 +797,12 @@ elif windows:
     #  implement
     # c4068
     #  unknown pragma -- added so that we can specify unknown pragmas for other compilers
-    env.Append( CCFLAGS=["/wd4355", "/wd4800", "/wd4267", "/wd4244", "/wd4290", "/wd4068"] )
+    # c4351
+    #  on extremely old versions of MSVC (pre 2k5), default constructing an array member in a
+    #  constructor's initialization list would not zero the array members "in some cases".
+    #  since we don't target MSVC versions that old, this warning is safe to ignore.
+    env.Append( CCFLAGS=["/wd4355", "/wd4800", "/wd4267", "/wd4244",
+                         "/wd4290", "/wd4068", "/wd4351"] )
 
     # some warnings we should treat as errors:
     # c4099

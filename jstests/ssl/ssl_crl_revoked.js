@@ -13,7 +13,7 @@ var md = startMongod( "--port", port, "--dbpath", MongoRunner.dataPath + baseNam
                     "--sslCRLFile", "jstests/libs/crl_client_revoked.pem");
 
 
-var mongo = runMongoProgram("mongo", "--port", port, "--ssl", 
+var mongo = runMongoProgram("mongo", "--port", port, "--ssl", "--sslAllowInvalidCertificates",
                             "--sslPEMKeyFile", "jstests/libs/client_revoked.pem",
                             "--eval", ";");
 

@@ -50,7 +50,7 @@ namespace repl {
         virtual bool isSelf(const HostAndPort& host);
         virtual StatusWith<BSONObj> loadLocalConfigDocument(OperationContext* txn);
         virtual Status storeLocalConfigDocument(OperationContext* txn, const BSONObj& config);
-        virtual StatusWith<OpTimeAndHash> loadLastOpTimeAndHash(OperationContext* txn);
+        virtual StatusWith<OpTime> loadLastOpTime(OperationContext* txn);
         virtual HostAndPort getClientHostAndPort(const OperationContext* txn);
         virtual void closeClientConnections();
         virtual ReplicationCoordinatorExternalState::GlobalSharedLockAcquirer*

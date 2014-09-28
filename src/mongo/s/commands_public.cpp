@@ -59,6 +59,7 @@
 #include "mongo/s/cursors.h"
 #include "mongo/s/distlock.h"
 #include "mongo/s/grid.h"
+#include "mongo/s/stale_exception.h"
 #include "mongo/s/strategy.h"
 #include "mongo/s/version_manager.h"
 #include "mongo/scripting/engine.h"
@@ -2588,6 +2589,7 @@ namespace mongo {
                                          false,
                                          str::stream() << "no such cmd: " << commandName);
             anObjBuilder.append("code", ErrorCodes::CommandNotFound);
+            Command::unknownCommands.increment();
             return;
         }
         ClientInfo *client = ClientInfo::get();

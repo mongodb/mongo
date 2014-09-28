@@ -55,7 +55,6 @@ namespace repl {
 
         /* call after constructing to start - returns fairly quickly after launching its threads */
         void go() { _go(); }
-        void shutdown();
 
         virtual bool isPrimary() { return box.getState().primary(); }
         virtual bool isSecondary() {  return box.getState().secondary(); }

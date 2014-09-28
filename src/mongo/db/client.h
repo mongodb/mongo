@@ -154,7 +154,7 @@ namespace mongo {
             Context(OperationContext* txn, const std::string& ns, bool doVersion = true);
 
             /** note: this does not call finishInit -- i.e., does not call 
-                      shardVersionOk() for example. 
+                      ensureShardVersionOKOrThrow for example.
                 see also: reset().
             */
             Context(OperationContext* txn, const std::string& ns, Database * db);
@@ -204,7 +204,7 @@ namespace mongo {
             Context& ctx() { return _c; }
 
         private:
-            Lock::DBWrite _lk;
+            Lock::DBLock _lk;
             WriteUnitOfWork _wunit;
             Context _c;
         };

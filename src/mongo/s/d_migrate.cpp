@@ -1244,7 +1244,7 @@ namespace mongo {
                 myVersion.incMajor();
 
                 {
-                    Lock::DBWrite lk(txn->lockState(), ns );
+                    Lock::DBLock lk(txn->lockState(), dbname, newlm::MODE_X);
                     verify( myVersion > shardingState.getVersion( ns ) );
 
                     // bump the metadata's version up and "forget" about the chunk being moved
@@ -1658,7 +1658,7 @@ namespace mongo {
 
             if ( getState() != DONE ) {
                 // Unprotect the range if needed/possible on unsuccessful TO migration
-                Lock::DBWrite lk(txn->lockState(), ns);
+                Lock::DBLock lk(txn->lockState(), nsToDatabaseSubstring(ns), newlm::MODE_X);
                 string errMsg;
                 if (!shardingState.forgetPending(txn, ns, min, max, epoch, &errMsg)) {
                     warning() << errMsg << endl;
@@ -1719,7 +1719,7 @@ namespace mongo {
                     }
                 }
 
-                Lock::DBWrite lk(txn->lockState(),  ns);
+                Lock::DBLock lk(txn->lockState(),  nsToDatabaseSubstring(ns), newlm::MODE_X);
                 Client::Context ctx(txn,  ns);
                 Database* db = ctx.db();
                 Collection* collection = db->getCollection( txn, ns );
@@ -1804,7 +1804,7 @@ namespace mongo {
 
                 {
                     // Protect the range by noting that we're now starting a migration to it
-                    Lock::DBWrite lk(txn->lockState(), ns);
+                    Lock::DBLock lk(txn->lockState(), nsToDatabaseSubstring(ns), newlm::MODE_X);
                     if (!shardingState.notePending(txn, ns, min, max, epoch, &errmsg)) {
                         warning() << errmsg << endl;
                         setState(FAIL);
@@ -2104,7 +2104,7 @@ namespace mongo {
                         }
                     }
 
-                    Lock::DBWrite lk(txn->lockState(), ns);
+                    Lock::DBLock lk(txn->lockState(), nsToDatabaseSubstring(ns), newlm::MODE_X);
                     Client::Context ctx(txn, ns);
 
                     if (serverGlobalParams.moveParanoia) {

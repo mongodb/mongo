@@ -57,7 +57,7 @@ namespace repl {
         virtual HostAndPort getClientHostAndPort(const OperationContext* txn);
         virtual StatusWith<BSONObj> loadLocalConfigDocument(OperationContext* txn);
         virtual Status storeLocalConfigDocument(OperationContext* txn, const BSONObj& config);
-        virtual StatusWith<OpTimeAndHash> loadLastOpTimeAndHash(OperationContext* txn);
+        virtual StatusWith<OpTime> loadLastOpTime(OperationContext* txn);
         virtual void closeClientConnections();
         virtual ReplicationCoordinatorExternalState::GlobalSharedLockAcquirer*
                 getGlobalSharedLockAcquirer();
@@ -88,11 +88,11 @@ namespace repl {
         /**
          * Sets the return value for subsequent calls to loadLastOpTimeApplied.
          */
-        void setLastOpTimeAndHash(const StatusWith<OpTimeAndHash>& lastApplied);
+        void setLastOpTime(const StatusWith<OpTime>& lastApplied);
 
     private:
         StatusWith<BSONObj> _localRsConfigDocument;
-        StatusWith<OpTimeAndHash>  _lastOpTimeAndHash;
+        StatusWith<OpTime>  _lastOpTime;
         std::vector<HostAndPort> _selfHosts;
         bool _canAcquireGlobalSharedLock;
         bool _connectionsClosed;

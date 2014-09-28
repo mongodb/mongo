@@ -137,6 +137,11 @@ namespace repl {
         virtual MemberState getCurrentMemberState() const = 0;
 
         /**
+         * Clears the list of sync sources we have blacklisted.
+         */
+        virtual void clearSyncSourceBlacklist() = 0;
+
+        /**
          * Blocks the calling thread for up to writeConcern.wTimeout millis, or until "ts" has been
          * replicated to at least a set of nodes that satisfies the writeConcern, whichever comes
          * first. A writeConcern.wTimeout of 0 indicates no timeout (block forever) and a
@@ -270,6 +275,11 @@ namespace repl {
          * when sending updates about our replication progress.
          */
         virtual OID getMyRID() const = 0;
+
+        /**
+         * Returns the id for this node as specified in the current replica set configuration.
+         */
+        virtual int getMyId() const = 0;
 
         /**
          * Sets this node into a specific follower mode.
@@ -495,14 +505,26 @@ namespace repl {
         virtual Status checkReplEnabledForCommand(BSONObjBuilder* result) = 0;
 
         /**
-         * Connects an oplog reader to a viable sync source, using BackgroundSync object bgsync.
-         * When this function returns, reader is connected to a viable sync source or is left
-         * unconnected if no sync sources are currently available.  In legacy, bgsync's 
-         * _currentSyncTarget is also set appropriately.
-         **/
-        virtual void connectOplogReader(OperationContext* txn,
-                                        BackgroundSync* bgsync, 
-                                        OplogReader* reader) = 0;
+         * Chooses a viable sync source, or, if none available, returns empty HostAndPort.
+         */
+        virtual HostAndPort chooseNewSyncSource() = 0;
+
+        /**
+         * Blacklists choosing 'host' as a sync source until time 'until'.
+         */
+        virtual void blacklistSyncSource(const HostAndPort& host, Date_t until) = 0;
+
+        /**
+         * Loads the optime from the last op in the oplog into the coordinator's lastOpApplied
+         * value.
+         */
+        virtual void resetLastOpTimeFromOplog(OperationContext* txn) = 0;
+
+        /**
+         * Determines if a new sync source should be considered.
+         * currentSource: the current sync source
+         */
+        virtual bool shouldChangeSyncSource(const HostAndPort& currentSource) = 0;
 
     protected:
 

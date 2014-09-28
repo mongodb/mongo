@@ -46,6 +46,7 @@
 #include "mongo/db/repl/rslog.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/util/log.h"
+#include "mongo/util/net/hostandport.h"
 
 namespace mongo {
 
@@ -54,8 +55,7 @@ namespace repl {
     // used in replAuthenticate
     static const BSONObj userReplQuery = fromjson("{\"user\":\"repl\"}");
 
-    SyncSourceFeedback::SyncSourceFeedback() : _syncTarget(NULL),
-                                               _positionChanged(false),
+    SyncSourceFeedback::SyncSourceFeedback() : _positionChanged(false),
                                                _handshakeNeeded(false),
                                                _shutdownSignaled(false) {}
     SyncSourceFeedback::~SyncSourceFeedback() {}
@@ -118,11 +118,21 @@ namespace repl {
                 LOG(2) << "Sending to " << _connection.get()->toString() << " the replication "
                         "handshake: " << *it;
                 if (!_connection->runCommand("admin", *it, res)) {
+                    std::string errMsg = res["errmsg"].valuestrsafe();
                     massert(17447, "upstream updater is not supported by the member from which we"
                             " are syncing, please update all nodes to 2.6 or later.",
-                            res["errmsg"].str().find("no such cmd") == std::string::npos);
+                            errMsg.find("no such cmd") == std::string::npos);
+
                     log() << "replSet error while handshaking the upstream updater: "
-                        << res["errmsg"].valuestrsafe();
+                        << errMsg;
+
+                    // sleep half a second if we are not in our sync source's config
+                    // TODO(dannenberg) after 2.8, remove the string comparison 
+                    if (res["code"].numberInt() == ErrorCodes::NodeNotFound ||
+                            errMsg.find("could not be found in replica set config while attempting "
+                                        "to associate it with") != std::string::npos) {
+                        sleepmillis(500);
+                    }
 
                     _resetConnection();
                     return false;
@@ -243,18 +253,18 @@ namespace repl {
                 _resetConnection();
                 continue;
             }
-            const Member* target = BackgroundSync::get()->getSyncTarget();
+            const HostAndPort target = BackgroundSync::get()->getSyncTarget();
             if (_syncTarget != target) {
                 _resetConnection();
                 _syncTarget = target;
             }
             if (!hasConnection()) {
                 // fix connection if need be
-                if (!target) {
+                if (target.empty()) {
                     sleepmillis(500);
                     continue;
                 }
-                if (!_connect(&txn, target->h())) {
+                if (!_connect(&txn, target)) {
                     sleepmillis(500);
                     continue;
                 }

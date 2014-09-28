@@ -26,7 +26,7 @@
  * it in the license file.
  */
 
-#include "mongo/pch.h"
+#include "mongo/platform/basic.h"
 
 #include "mongo/db/pipeline/document_source.h"
 
@@ -37,7 +37,7 @@
 #include "mongo/db/query/find_constants.h"
 #include "mongo/db/storage_options.h"
 #include "mongo/s/d_state.h"
-#include "mongo/s/stale_exception.h" // for SendStaleConfigException
+
 
 namespace mongo {
 

@@ -41,6 +41,7 @@
 #include "mongo/db/dbhelpers.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/operation_context_impl.h"
+#include "mongo/db/repl/bgsync.h"
 #include "mongo/db/repl/connections.h"
 #include "mongo/db/repl/isself.h"
 #include "mongo/db/repl/oplog.h"
@@ -55,9 +56,10 @@ namespace repl {
 namespace {
     // TODO: Change this to local.system.replset when we remove disable the hybrid coordinator.
     const char configCollectionName[] = "local.new.replset";
+    const char configDatabaseName[] = "local";
     const char meCollectionName[] = "local.me";
+    const char meDatabaseName[] = "local";
     const char tsFieldName[] = "ts";
-    const char hashFieldName[] = "h";
 }  // namespace
 
     ReplicationCoordinatorExternalStateImpl::ReplicationCoordinatorExternalStateImpl() {}
@@ -69,6 +71,11 @@ namespace {
 
     void ReplicationCoordinatorExternalStateImpl::shutdown() {
         _syncSourceFeedback.shutdown();
+        BackgroundSync* bgsync = BackgroundSync::get();
+        // bgsync can be null if we shut down prior to installing our initial replset config.
+        if (bgsync) {
+            bgsync->shutdown();
+        }
     }
 
     void ReplicationCoordinatorExternalStateImpl::forwardSlaveHandshake() {
@@ -83,7 +90,7 @@ namespace {
         std::string myname = getHostName();
         OID myRID;
         {
-            Lock::DBWrite lock(txn->lockState(), meCollectionName);
+            Lock::DBLock lock(txn->lockState(), meDatabaseName, newlm::MODE_X);
 
             BSONObj me;
             // local.me is an identifier for a server for getLastError w:2+
@@ -130,7 +137,7 @@ namespace {
             OperationContext* txn,
             const BSONObj& config) {
         try {
-            Lock::DBWrite dbWriteLock(txn->lockState(), configCollectionName);
+            Lock::DBLock dbWriteLock(txn->lockState(), configDatabaseName, newlm::MODE_X);
             Helpers::putSingleton(txn, configCollectionName, config);
             return Status::OK();
         }
@@ -139,37 +146,35 @@ namespace {
         }
     }
 
-    StatusWith<ReplicationCoordinatorExternalState::OpTimeAndHash>
-    ReplicationCoordinatorExternalStateImpl::loadLastOpTimeAndHash(
+    StatusWith<OpTime> ReplicationCoordinatorExternalStateImpl::loadLastOpTime(
             OperationContext* txn) {
 
         try {
             Lock::DBRead lk(txn->lockState(), rsoplog);
             BSONObj oplogEntry;
             if (!Helpers::getLast(txn, rsoplog, oplogEntry)) {
-                return StatusWith<OpTimeAndHash>(
+                return StatusWith<OpTime>(
                         ErrorCodes::NoMatchingDocument,
                         str::stream() << "Did not find any entries in " << rsoplog);
             }
             BSONElement tsElement = oplogEntry[tsFieldName];
             if (tsElement.eoo()) {
-                return StatusWith<OpTimeAndHash>(
+                return StatusWith<OpTime>(
                         ErrorCodes::NoSuchKey,
                         str::stream() << "Most recent entry in " << rsoplog << " missing \"" <<
                         tsFieldName << "\" field");
             }
             if (tsElement.type() != Timestamp) {
-                return StatusWith<OpTimeAndHash>(
+                return StatusWith<OpTime>(
                         ErrorCodes::TypeMismatch,
                         str::stream() << "Expected type of \"" << tsFieldName <<
                         "\" in most recent " << rsoplog <<
                         " entry to have type Timestamp, but found " << typeName(tsElement.type()));
             }
-            return StatusWith<OpTimeAndHash>(
-                    OpTimeAndHash(tsElement._opTime(), oplogEntry[hashFieldName].safeNumberLong()));
+            return StatusWith<OpTime>(tsElement._opTime());
         }
         catch (const DBException& ex) {
-            return StatusWith<OpTimeAndHash>(ex.toStatus());
+            return StatusWith<OpTime>(ex.toStatus());
         }
     }
 

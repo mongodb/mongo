@@ -35,6 +35,7 @@
 #include "third_party/murmurhash3/MurmurHash3.h"
 
 #include "mongo/base/counter.h"
+#include "mongo/db/catalog/database.h"
 #include "mongo/db/commands/fsync.h"
 #include "mongo/db/commands/server_status_metric.h"
 #include "mongo/db/curop.h"
@@ -122,7 +123,7 @@ namespace repl {
             lk.reset(new Lock::GlobalWrite(txn->lockState()));
         } else {
             // DB level lock for this operation
-            lk.reset(new Lock::DBWrite(txn->lockState(), ns)); 
+            lk.reset(new Lock::DBLock(txn->lockState(), nsToDatabaseSubstring(ns), newlm::MODE_X));
         }
 
         Client::Context ctx(txn, ns);
@@ -274,12 +275,12 @@ namespace repl {
 
 namespace {
     void tryToGoLiveAsASecondary(OperationContext* txn) {
+        Lock::GlobalRead readLock(txn->lockState());
+
         if (getGlobalReplicationCoordinator()->getMaintenanceMode()) {
             // we're not actually going live
             return;
         }
-
-        Lock::GlobalRead readLock(txn->lockState());
 
         // Only state RECOVERING can transition to SECONDARY.
         MemberState state(getGlobalReplicationCoordinator()->getCurrentMemberState());
@@ -324,12 +325,20 @@ namespace {
                 // (always checked in the first iteration of this do-while loop, because
                 // ops is empty)
                 if (ops.empty() || now > lastTimeChecked) {
-                    {
-                        boost::unique_lock<boost::mutex> lock(theReplSet->initialSyncMutex);
-                        if (theReplSet->initialSyncRequested) {
-                            // got a resync command
-                            return;
-                        }
+                    BackgroundSync* bgsync = BackgroundSync::get();
+                    if (bgsync->getInitialSyncRequestedFlag()) {
+                        // got a resync command
+                        Lock::DBLock lk(txn.lockState(), "local", newlm::MODE_X);
+                        WriteUnitOfWork wunit(&txn);
+                        Client::Context ctx(&txn, "local");
+
+                        ctx.db()->dropCollection(&txn, "local.oplog.rs");
+                        getGlobalReplicationCoordinator()->setMyLastOptime(&txn, OpTime());
+                        getGlobalReplicationCoordinator()->clearSyncSourceBlacklist();
+                        bgsync->stop();
+                        wunit.commit();
+
+                        return;
                     }
                     lastTimeChecked = now;
                     // can we become secondary?
@@ -389,18 +398,8 @@ namespace {
             OpTime minValid = lastOp["ts"]._opTime();
             setMinValid(&txn, minValid);
 
-            if (BackgroundSync::get()->isAssumingPrimary()) {
-                LOG(1) << "about to apply batch up to optime: "
-                       << ops.getDeque().back()["ts"]._opTime().toStringPretty();
-            }
-            
             multiApply(ops.getDeque());
 
-            if (BackgroundSync::get()->isAssumingPrimary()) {
-                LOG(1) << "about to update oplog to optime: "
-                       << ops.getDeque().back()["ts"]._opTime().toStringPretty();
-            }
-            
             applyOpsToOplog(&ops.getDeque());
 
             // If we're just testing (no manager), don't keep looping if we exhausted the bgqueue
@@ -482,7 +481,7 @@ namespace {
         OpTime lastOpTime;
         {
             OperationContextImpl txn; // XXX?
-            Lock::DBWrite lk(txn.lockState(), "local");
+            Lock::DBLock lk(txn.lockState(), "local", newlm::MODE_X);
             WriteUnitOfWork wunit(&txn);
 
             while (!ops->empty()) {
@@ -494,12 +493,8 @@ namespace {
             wunit.commit();
         }
 
-        if (BackgroundSync::get()->isAssumingPrimary()) {
-            LOG(1) << "notifying BackgroundSync";
-        }
-            
         // Update write concern on primary
-        BackgroundSync::notify();
+        BackgroundSync::get()->notify();
         return lastOpTime;
     }
 

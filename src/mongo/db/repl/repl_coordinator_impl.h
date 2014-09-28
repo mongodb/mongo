@@ -83,6 +83,8 @@ namespace repl {
 
         virtual MemberState getCurrentMemberState() const;
 
+        virtual void clearSyncSourceBlacklist();
+
         /*
          * Implementation of the KillOpListenerInterface interrupt method so that we can wake up
          * threads blocked in awaitReplication() when a killOp command comes in.
@@ -135,6 +137,8 @@ namespace repl {
         virtual OID getElectionId();
 
         virtual OID getMyRID() const;
+
+        virtual int getMyId() const;
 
         virtual void setFollowerMode(const MemberState& newState);
 
@@ -203,11 +207,14 @@ namespace repl {
 
         virtual bool isReplEnabled() const;
 
-        virtual void connectOplogReader(OperationContext* txn,
-                                        BackgroundSync* bgsync,
-                                        OplogReader* r);
+        virtual HostAndPort chooseNewSyncSource();
 
-        
+        virtual void blacklistSyncSource(const HostAndPort& host, Date_t until);
+
+        virtual void resetLastOpTimeFromOplog(OperationContext* txn);
+
+        virtual bool shouldChangeSyncSource(const HostAndPort& currentSource);
+
         // ================== Members of replication code internal API ===================
 
         // This is a temporary hack to set the replset config to the config detected by the
@@ -230,21 +237,6 @@ namespace repl {
          * of calls via the executor.
          */
         void cancelHeartbeats();
-
-        /**
-         * Chooses a sync source.
-         * A wrapper that schedules _chooseNewSyncSource() through the Replication Executor and
-         * waits for its completion.
-         */
-        HostAndPort chooseNewSyncSource();
-
-        /**
-         * Blacklists 'host' until 'until'.
-         * A wrapper that schedules _blacklistSyncSource() through the Replication Executor and
-         * waits for its completion.
-         */
-        void blacklistSyncSource(const HostAndPort& host, Date_t until);
-
 
         // ================== Test support API ===================
 
@@ -273,20 +265,24 @@ namespace repl {
          *
          * Transition diagram:
          *
-         * ReplicationDisabled   +----------> HBReconfig
-         *    ^                  |                     \
-         *    |                  v                      |
-         * StartingUp -> Uninitialized <-> Initiating   |
-         *          \                    /              |
-         *           \        __________/               /
-         *            v      v                         /
-         *             Steady <-----------------------
-         *               ^
-         *               |
-         *               v
-         *             Reconfig
+         * PreStart ------------------> ReplicationDisabled
+         *    |
+         *    |
+         *    v
+         * StartingUp -------> Uninitialized <------> Initiating
+         *         \                     ^               |
+         *          -------              |               |
+         *                 |             |               |
+         *                 v             v               |
+         * Reconfig <---> Steady <----> HBReconfig       |
+         *                    ^                          /
+         *                    |                         /
+         *                     \                       /
+         *                      -----------------------
+         *
          */
         enum ConfigState {
+            kConfigPreStart,
             kConfigStartingUp,
             kConfigReplicationDisabled,
             kConfigUninitialized,
@@ -350,8 +346,13 @@ namespace repl {
         /**
          * Bottom half of fillIsMasterForReplSet.
          */
-        void _fillIsMasterForReplSet_finish(const ReplicationExecutor::CallbackData& dbData,
+        void _fillIsMasterForReplSet_finish(const ReplicationExecutor::CallbackData& cbData,
                                             IsMasterResponse* result);
+
+        /*
+         * Bottom half of clearSyncSourceBlacklist
+         */
+        void _clearSyncSourceBlacklist_finish(const ReplicationExecutor::CallbackData& cbData);
         /*
          * Returns the OpTime of the last applied operation on this node.
          */
@@ -403,6 +404,8 @@ namespace repl {
                              Status* result);
 
         OID _getMyRID_inlock() const;
+
+        int _getMyId_inlock() const;
 
         /**
          * Bottom half of setFollowerMode.
@@ -469,8 +472,7 @@ namespace repl {
          * Helper method that does most of the work of _finishLoadLocalConfig, minus setting
          * _isStartupComplete to true.
          */
-        void _finishLoadLocalConfig_helper(const ReplicationExecutor::CallbackData& cbData,
-                                           const ReplicaSetConfig& localConfig,
+        void _finishLoadLocalConfig_helper(const ReplicaSetConfig& localConfig,
                                            OpTime lastOpTime);
 
         /**
@@ -529,7 +531,14 @@ namespace repl {
         void _blacklistSyncSource(const ReplicationExecutor::CallbackData& cbData,
                                   const HostAndPort& host,
                                   Date_t until);
-
+        /**
+         * Determines if a new sync source should be considered.
+         *
+         * Must be scheduled as a callback.
+         */
+        void _shouldChangeSyncSource(const ReplicationExecutor::CallbackData& cbData,
+                                     const HostAndPort& currentSource,
+                                     bool* shouldChange);
 
         //
         // All member variables are labeled with one of the following codes indicating the

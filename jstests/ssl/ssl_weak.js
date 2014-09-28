@@ -14,14 +14,14 @@ var md = startMongod( "--port", ports[0], "--dbpath", MongoRunner.dataPath + bas
                       "--sslCAFile", "jstests/libs/ca.pem",
                       "--sslAllowConnectionsWithoutCertificates");
 
-var mongo = runMongoProgram("mongo", "--port", ports[0], "--ssl", 
+var mongo = runMongoProgram("mongo", "--port", ports[0], "--ssl", "--sslAllowInvalidCertificates",
                             "--eval", ";");
 
 // 0 is the exit code for success
 assert(mongo==0);
 
 // Test that connecting with a valid client certificate connects successfully.
-mongo = runMongoProgram("mongo", "--port", ports[0], "--ssl", 
+mongo = runMongoProgram("mongo", "--port", ports[0], "--ssl", "--sslAllowInvalidCertificates",
                         "--sslPEMKeyFile", "jstests/libs/client.pem",
                         "--eval", ";");
 
@@ -36,7 +36,7 @@ var md2 = startMongod( "--port", ports[1], "--dbpath", MongoRunner.dataPath + ba
                        "--sslPEMKeyFile", "jstests/libs/server.pem",
                        "--sslCAFile", "jstests/libs/ca.pem");
 
-mongo = runMongoProgram("mongo", "--port", ports[1], "--ssl", 
+mongo = runMongoProgram("mongo", "--port", ports[1], "--ssl", "--sslAllowInvalidCertificates",
                         "--eval", ";");
 
 // 1 is the exit code for failure

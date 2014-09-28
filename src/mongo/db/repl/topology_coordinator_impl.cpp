@@ -253,7 +253,7 @@ namespace {
             return _syncSource;
         }
         _syncSource = _currentConfig.getMemberAt(closestIndex).getHostAndPort();
-        std::string msg(str::stream() << "syncing to: " << _syncSource.toString(), 0);
+        std::string msg(str::stream() << "syncing from: " << _syncSource.toString(), 0);
         _sethbmsg(msg);
         log() << msg;
         return _syncSource;
@@ -261,6 +261,10 @@ namespace {
 
     void TopologyCoordinatorImpl::blacklistSyncSource(const HostAndPort& host, Date_t until) {
         _syncSourceBlacklist[host] = until;
+    }
+
+    void TopologyCoordinatorImpl::clearSyncSourceBlacklist() {
+        _syncSourceBlacklist.clear();
     }
 
     void TopologyCoordinatorImpl::prepareSyncFromResponse(
@@ -1390,13 +1394,7 @@ namespace {
                 return;
         }
 
-        unsigned sz = s.size();
-        if (sz >= 256)
-            memcpy(_hbmsg, s.c_str(), 255);
-        else {
-            _hbmsg[sz] = 0;
-            memcpy(_hbmsg, s.c_str(), sz);
-        }
+        _hbmsg = s;
         if (!s.empty()) {
             lastLogged = _hbmsgTime;
             LOG(logLevel) << "replSet " << s;
@@ -1658,6 +1656,7 @@ namespace {
                       << _maxSyncSourceLagSecs.total_seconds() << " seconds behind member " 
                       <<  candidateConfig.getHostAndPort().toString()
                       << " whose most recent OpTime is " << it->getOpTime().toStringLong();
+                invariant(it->getConfigIndex() != _selfIndex);
                 return true;
             }
         }

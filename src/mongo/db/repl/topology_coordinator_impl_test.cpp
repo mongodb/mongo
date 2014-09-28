@@ -951,7 +951,351 @@ namespace {
         }
     };
 
-    TEST_F(HeartbeatResponseTest, HeartbeatRetriesAtMostTwice) {
+    class HeartbeatResponseTestOneRetry : public HeartbeatResponseTest {
+    public:
+        virtual void setUp() {
+            HeartbeatResponseTest::setUp();
+
+            _target = HostAndPort("host2", 27017);
+            _firstRequestDate = unittest::assertGet(dateFromISOString("2014-08-29T13:00Z"));
+
+            // Initial heartbeat request prepared, at t + 0.
+            std::pair<ReplSetHeartbeatArgs, Milliseconds> request =
+                getTopoCoord().prepareHeartbeatRequest(_firstRequestDate,
+                                                       "rs0",
+                                                       _target);
+            // 5 seconds to successfully complete the heartbeat before the timeout expires.
+            ASSERT_EQUALS(5000, request.second.total_milliseconds());
+
+            // Initial heartbeat request fails at t + 4000ms
+            HeartbeatResponseAction action =
+                getTopoCoord().processHeartbeatResponse(
+                        _firstRequestDate + 4000, // 4 seconds elapsed, retry allowed.
+                        Milliseconds(3990), // Spent 3.99 of the 4 seconds in the network.
+                        _target,
+                        StatusWith<ReplSetHeartbeatResponse>(ErrorCodes::ExceededTimeLimit,
+                                                             "Took too long"),
+                        OpTime(0, 0));  // We've never applied anything.
+
+            ASSERT_EQUALS(HeartbeatResponseAction::NoAction, action.getAction());
+            ASSERT_TRUE(TopologyCoordinator::Role::follower == getTopoCoord().getRole());
+            // Because the heartbeat failed without timing out, we expect to retry immediately.
+            ASSERT_EQUALS(Date_t(_firstRequestDate + 4000), action.getNextHeartbeatStartDate());
+
+            // First heartbeat retry prepared, at t + 4000ms.
+            request =
+                getTopoCoord().prepareHeartbeatRequest(
+                        _firstRequestDate + 4000,
+                        "rs0",
+                        _target);
+            // One second left to complete the heartbeat.
+            ASSERT_EQUALS(1000, request.second.total_milliseconds());
+        }
+        
+        Date_t firstRequestDate() {
+            return _firstRequestDate;
+        }
+
+        HostAndPort target() {
+            return _target;
+        }
+
+    private:
+        Date_t _firstRequestDate;
+        HostAndPort _target;
+
+    };
+
+    class HeartbeatResponseTestTwoRetries : public HeartbeatResponseTestOneRetry {
+    public:
+        virtual void setUp() {
+            HeartbeatResponseTestOneRetry::setUp();
+            // First retry fails at t + 4500ms
+            HeartbeatResponseAction action =
+                getTopoCoord().processHeartbeatResponse(
+                        firstRequestDate() + 4500, // 4.5 of the 5 seconds elapsed; could retry.
+                        Milliseconds(400), // Spent 0.4 of the 0.5 seconds in the network.
+                        target(),
+                        StatusWith<ReplSetHeartbeatResponse>(ErrorCodes::NodeNotFound, "Bad DNS?"),
+                        OpTime(0, 0));  // We've never applied anything.
+            ASSERT_EQUALS(HeartbeatResponseAction::NoAction, action.getAction());
+            ASSERT_TRUE(TopologyCoordinator::Role::follower == getTopoCoord().getRole());
+            // Because the first retry failed without timing out, we expect to retry immediately.
+            ASSERT_EQUALS(Date_t(firstRequestDate() + 4500), action.getNextHeartbeatStartDate());
+
+            // Second retry prepared at t + 4500ms.
+            std::pair<ReplSetHeartbeatArgs, Milliseconds> request =
+                getTopoCoord().prepareHeartbeatRequest(
+                        firstRequestDate() + 4500,
+                        "rs0",
+                        target());
+            // 500ms left to complete the heartbeat.
+            ASSERT_EQUALS(500, request.second.total_milliseconds());
+        }
+    };
+
+    class HeartbeatResponseHighVerbosityTest : public HeartbeatResponseTest {
+    public:
+
+        virtual void setUp() {
+            HeartbeatResponseTest::setUp();
+            // set verbosity as high as the highest verbosity log message we'd like to check for
+            logger::globalLogDomain()->setMinimumLoggedSeverity(logger::LogSeverity::Debug(3));
+        }
+
+        virtual void tearDown() {
+            HeartbeatResponseTest::tearDown();
+            logger::globalLogDomain()->setMinimumLoggedSeverity(logger::LogSeverity::Log());
+        }
+
+    };
+
+    TEST_F(HeartbeatResponseHighVerbosityTest, UpdateHeartbeatDataNodeBelivesWeAreDown) {
+        OpTime lastOpTimeApplied = OpTime(3,0);
+
+        // request heartbeat
+        std::pair<ReplSetHeartbeatArgs, Milliseconds> request =
+            getTopoCoord().prepareHeartbeatRequest(now()++, "rs0", HostAndPort("host2"));
+
+        ReplSetHeartbeatResponse believesWeAreDownResponse;
+        believesWeAreDownResponse.noteReplSet();
+        believesWeAreDownResponse.setSetName("rs0");
+        believesWeAreDownResponse.setState(MemberState::RS_SECONDARY);
+        believesWeAreDownResponse.setElectable(true);
+        believesWeAreDownResponse.noteStateDisagreement();
+        startCapturingLogMessages();
+        HeartbeatResponseAction action = getTopoCoord().processHeartbeatResponse(
+                    now()++, // Time is left.
+                    Milliseconds(400), // Spent 0.4 of the 0.5 second in the network.
+                    HostAndPort("host2"),
+                    StatusWith<ReplSetHeartbeatResponse>(believesWeAreDownResponse),
+                    lastOpTimeApplied);
+        stopCapturingLogMessages();
+        ASSERT_NO_ACTION(action.getAction());
+        ASSERT_EQUALS(1, countLogLinesContaining("host2:27017 thinks that we are down"));
+        
+    }
+
+    TEST_F(HeartbeatResponseHighVerbosityTest, UpdateHeartbeatDataMemberNotInConfig) {
+        OpTime lastOpTimeApplied = OpTime(3,0);
+
+        // request heartbeat
+        std::pair<ReplSetHeartbeatArgs, Milliseconds> request =
+            getTopoCoord().prepareHeartbeatRequest(now()++, "rs0", HostAndPort("host5"));
+
+        ReplSetHeartbeatResponse memberMissingResponse;
+        memberMissingResponse.noteReplSet();
+        memberMissingResponse.setSetName("rs0");
+        memberMissingResponse.setState(MemberState::RS_SECONDARY);
+        memberMissingResponse.setElectable(true);
+        memberMissingResponse.noteStateDisagreement();
+        startCapturingLogMessages();
+        HeartbeatResponseAction action = getTopoCoord().processHeartbeatResponse(
+                    now()++, // Time is left.
+                    Milliseconds(400), // Spent 0.4 of the 0.5 second in the network.
+                    HostAndPort("host5"),
+                    StatusWith<ReplSetHeartbeatResponse>(memberMissingResponse),
+                    lastOpTimeApplied);
+        stopCapturingLogMessages();
+        ASSERT_NO_ACTION(action.getAction());
+        ASSERT_EQUALS(1, countLogLinesContaining("Could not find host5:27017 in current config"));
+    }
+
+    TEST_F(HeartbeatResponseHighVerbosityTest, UpdateHeartbeatDataSameConfig) {
+        OpTime lastOpTimeApplied = OpTime(3,0);
+
+        // request heartbeat
+        std::pair<ReplSetHeartbeatArgs, Milliseconds> request =
+            getTopoCoord().prepareHeartbeatRequest(now()++, "rs0", HostAndPort("host2"));
+
+        // construct a copy of the original config for log message checking later
+        // see HeartbeatResponseTest for the origin of the original config
+        ReplicaSetConfig originalConfig;
+        originalConfig.initialize(BSON("_id" << "rs0" <<
+                                       "version" << 5 <<
+                                       "members" << BSON_ARRAY(
+                                           BSON("_id" << 0 << "host" << "host1:27017") <<
+                                           BSON("_id" << 1 << "host" << "host2:27017") <<
+                                           BSON("_id" << 2 << "host" << "host3:27017")) <<
+                                       "settings" << BSON("heartbeatTimeoutSecs" << 5)));
+
+        ReplSetHeartbeatResponse sameConfigResponse;
+        sameConfigResponse.noteReplSet();
+        sameConfigResponse.setSetName("rs0");
+        sameConfigResponse.setState(MemberState::RS_SECONDARY);
+        sameConfigResponse.setElectable(true);
+        sameConfigResponse.noteStateDisagreement();
+        sameConfigResponse.setVersion(2);
+        sameConfigResponse.setConfig(originalConfig);
+        startCapturingLogMessages();
+        HeartbeatResponseAction action = getTopoCoord().processHeartbeatResponse(
+                    now()++, // Time is left.
+                    Milliseconds(400), // Spent 0.4 of the 0.5 second in the network.
+                    HostAndPort("host2"),
+                    StatusWith<ReplSetHeartbeatResponse>(sameConfigResponse),
+                    lastOpTimeApplied);
+        stopCapturingLogMessages();
+        ASSERT_NO_ACTION(action.getAction());
+        ASSERT_EQUALS(1, countLogLinesContaining("Config from heartbeat response was "
+                                                 "same as ours."));
+    }
+
+    TEST_F(HeartbeatResponseHighVerbosityTest, UpdateHeartbeatDataOldConfig) {
+        OpTime lastOpTimeApplied = OpTime(3,0);
+
+        // request heartbeat
+        std::pair<ReplSetHeartbeatArgs, Milliseconds> request =
+            getTopoCoord().prepareHeartbeatRequest(now()++, "rs0", HostAndPort("host2"));
+
+        ReplSetHeartbeatResponse believesWeAreDownResponse;
+        believesWeAreDownResponse.noteReplSet();
+        believesWeAreDownResponse.setSetName("rs0");
+        believesWeAreDownResponse.setState(MemberState::RS_SECONDARY);
+        believesWeAreDownResponse.setElectable(true);
+        believesWeAreDownResponse.noteStateDisagreement();
+        startCapturingLogMessages();
+        HeartbeatResponseAction action = getTopoCoord().processHeartbeatResponse(
+                    now()++, // Time is left.
+                    Milliseconds(400), // Spent 0.4 of the 0.5 second in the network.
+                    HostAndPort("host2"),
+                    StatusWith<ReplSetHeartbeatResponse>(believesWeAreDownResponse),
+                    lastOpTimeApplied);
+        stopCapturingLogMessages();
+        ASSERT_NO_ACTION(action.getAction());
+        ASSERT_EQUALS(1, countLogLinesContaining("host2:27017 thinks that we are down"));
+        
+    }
+
+    TEST_F(HeartbeatResponseTestOneRetry, DecideToReconfig) {
+        // Confirm that action responses can come back from retries; in this, expect a Reconfig
+        // action.
+        ReplicaSetConfig newConfig;
+        ASSERT_OK(newConfig.initialize(
+                          BSON("_id" << "rs0" <<
+                               "version" << 7 <<
+                               "members" << BSON_ARRAY(
+                                       BSON("_id" << 0 << "host" << "host1:27017") <<
+                                       BSON("_id" << 1 << "host" << "host2:27017") <<
+                                       BSON("_id" << 2 << "host" << "host3:27017") <<
+                                       BSON("_id" << 3 << "host" << "host4:27017")) <<
+                               "settings" << BSON("heartbeatTimeoutSecs" << 5))));
+        ASSERT_OK(newConfig.validate());
+
+        ReplSetHeartbeatResponse reconfigResponse;
+        reconfigResponse.noteReplSet();
+        reconfigResponse.setSetName("rs0");
+        reconfigResponse.setState(MemberState::RS_SECONDARY);
+        reconfigResponse.setElectable(true);
+        reconfigResponse.setVersion(7);
+        reconfigResponse.setConfig(newConfig);
+        HeartbeatResponseAction action =
+            getTopoCoord().processHeartbeatResponse(
+                    firstRequestDate() + 4500, // Time is left.
+                    Milliseconds(400), // Spent 0.4 of the 0.5 second in the network.
+                    target(),
+                    StatusWith<ReplSetHeartbeatResponse>(reconfigResponse),
+                    OpTime(0, 0));  // We've never applied anything.
+        ASSERT_EQUALS(HeartbeatResponseAction::Reconfig, action.getAction());
+        ASSERT_TRUE(TopologyCoordinator::Role::follower == getTopoCoord().getRole());
+        ASSERT_EQUALS(Date_t(firstRequestDate() + 6500), action.getNextHeartbeatStartDate());
+    }
+
+    TEST_F(HeartbeatResponseTestOneRetry, DecideToStepDownRemotePrimary) {
+        // Confirm that action responses can come back from retries; in this, expect a StepDownSelf
+        // action.
+        
+        // make self primary
+        ASSERT_EQUALS(-1, getCurrentPrimaryIndex());
+        makeSelfPrimary(OpTime(5,0));
+        ASSERT_EQUALS(0, getCurrentPrimaryIndex());
+
+        ReplSetHeartbeatResponse electedMoreRecentlyResponse;
+        electedMoreRecentlyResponse.noteReplSet();
+        electedMoreRecentlyResponse.setSetName("rs0");
+        electedMoreRecentlyResponse.setState(MemberState::RS_PRIMARY);
+        electedMoreRecentlyResponse.setElectable(true);
+        electedMoreRecentlyResponse.setElectionTime(OpTime(3,0));
+        electedMoreRecentlyResponse.setVersion(5);
+        HeartbeatResponseAction action =
+            getTopoCoord().processHeartbeatResponse(
+                    firstRequestDate() + 4500, // Time is left.
+                    Milliseconds(400), // Spent 0.4 of the 0.5 second in the network.
+                    target(),
+                    StatusWith<ReplSetHeartbeatResponse>(electedMoreRecentlyResponse),
+                    OpTime(0,0));  // We've never applied anything.
+        ASSERT_EQUALS(HeartbeatResponseAction::StepDownRemotePrimary, action.getAction());
+        ASSERT_EQUALS(1, action.getPrimaryConfigIndex());
+        ASSERT_EQUALS(Date_t(firstRequestDate() + 6500), action.getNextHeartbeatStartDate());
+    }
+
+    TEST_F(HeartbeatResponseTestOneRetry, DecideToStepDownSelf) {
+        // Confirm that action responses can come back from retries; in this, expect a StepDownSelf
+        // action.
+        
+        // acknowledge the other member so that we see a majority
+        HeartbeatResponseAction action = receiveDownHeartbeat(HostAndPort("host3"), "rs0");
+        ASSERT_NO_ACTION(action.getAction());
+
+        // make us PRIMARY
+        makeSelfPrimary();
+
+        ReplSetHeartbeatResponse electedMoreRecentlyResponse;
+        electedMoreRecentlyResponse.noteReplSet();
+        electedMoreRecentlyResponse.setSetName("rs0");
+        electedMoreRecentlyResponse.setState(MemberState::RS_PRIMARY);
+        electedMoreRecentlyResponse.setElectable(false);
+        electedMoreRecentlyResponse.setElectionTime(OpTime(10,0));
+        electedMoreRecentlyResponse.setVersion(5);
+        action =
+            getTopoCoord().processHeartbeatResponse(
+                    firstRequestDate() + 4500, // Time is left.
+                    Milliseconds(400), // Spent 0.4 of the 0.5 second in the network.
+                    target(),
+                    StatusWith<ReplSetHeartbeatResponse>(electedMoreRecentlyResponse),
+                    OpTime(0, 0));  // We've never applied anything.
+        ASSERT_EQUALS(HeartbeatResponseAction::StepDownSelf, action.getAction());
+        ASSERT_EQUALS(0, action.getPrimaryConfigIndex());
+        ASSERT_TRUE(TopologyCoordinator::Role::follower == getTopoCoord().getRole());
+        ASSERT_EQUALS(Date_t(firstRequestDate() + 6500), action.getNextHeartbeatStartDate());
+    }
+
+    TEST_F(HeartbeatResponseTestOneRetry, DecideToStartElection) {
+        // Confirm that action responses can come back from retries; in this, expect a StartElection
+        // action.
+        
+        // acknowledge the other member so that we see a majority
+        OpTime election = OpTime(4,0);
+        OpTime lastOpTimeApplied = OpTime(3,0);
+        HeartbeatResponseAction action = receiveUpHeartbeat(HostAndPort("host3"),
+                                                            "rs0",
+                                                            MemberState::RS_SECONDARY,
+                                                            election,
+                                                            election,
+                                                            lastOpTimeApplied);
+        ASSERT_NO_ACTION(action.getAction());
+
+        // make sure we are electable
+        setSelfMemberState(MemberState::RS_SECONDARY);
+
+        ReplSetHeartbeatResponse startElectionResponse;
+        startElectionResponse.noteReplSet();
+        startElectionResponse.setSetName("rs0");
+        startElectionResponse.setState(MemberState::RS_SECONDARY);
+        startElectionResponse.setElectable(true);
+        startElectionResponse.setVersion(5);
+        action =
+            getTopoCoord().processHeartbeatResponse(
+                    firstRequestDate() + 4500, // Time is left.
+                    Milliseconds(400), // Spent 0.4 of the 0.5 second in the network.
+                    target(),
+                    StatusWith<ReplSetHeartbeatResponse>(startElectionResponse),
+                    OpTime(0, 0));  // We've never applied anything.
+        ASSERT_EQUALS(HeartbeatResponseAction::StartElection, action.getAction());
+        ASSERT_TRUE(TopologyCoordinator::Role::candidate == getTopoCoord().getRole());
+        ASSERT_EQUALS(Date_t(firstRequestDate() + 6500), action.getNextHeartbeatStartDate());
+    }
+
+    TEST_F(HeartbeatResponseTestTwoRetries, HeartbeatRetriesAtMostTwice) {
         // Confirm that the topology coordinator attempts to retry a failed heartbeat two times
         // after initial failure, assuming that the heartbeat timeout (set to 5 seconds in the
         // fixture) has not expired.
@@ -960,75 +1304,115 @@ namespace {
         // can detect a retry vs the next regularly scheduled heartbeat because retries are
         // scheduled immediately, while subsequent heartbeats are scheduled after the hard-coded
         // heartbeat interval of 2 seconds.
-        HostAndPort target("host2", 27017);
-        Date_t firstRequestDate = unittest::assertGet(dateFromISOString("2014-08-29T13:00Z"));
-
-        // Initial heartbeat request prepared, at t + 0.
-        std::pair<ReplSetHeartbeatArgs, Milliseconds> request =
-            getTopoCoord().prepareHeartbeatRequest(firstRequestDate,
-                                                   "rs0",
-                                                   target);
-        // 5 seconds to successfully complete the heartbeat before the timeout expires.
-        ASSERT_EQUALS(5000, request.second.total_milliseconds());
-
-        // Initial heartbeat request fails at t + 4000ms
-        HeartbeatResponseAction action =
-            getTopoCoord().processHeartbeatResponse(
-                    firstRequestDate + 4000, // 4 of the 5 seconds elapsed; could still retry.
-                    Milliseconds(3990), // Spent 3.99 of the 4 seconds in the network.
-                    target,
-                    StatusWith<ReplSetHeartbeatResponse>(ErrorCodes::NodeNotFound, "Bad DNS?"),
-                    OpTime(0, 0));  // We've never applied anything.
-
-        ASSERT_EQUALS(HeartbeatResponseAction::NoAction, action.getAction());
-        ASSERT_TRUE(TopologyCoordinator::Role::follower == getTopoCoord().getRole());
-        // Because the heartbeat failed without timing out, we expect to retry immediately.
-        ASSERT_EQUALS(Date_t(firstRequestDate + 4000), action.getNextHeartbeatStartDate());
-
-        // First heartbeat retry prepared, at t + 4000ms.
-        request =
-            getTopoCoord().prepareHeartbeatRequest(
-                    firstRequestDate + 4000,
-                    "rs0",
-                    target);
-        // One second left to complete the heartbeat.
-        ASSERT_EQUALS(1000, request.second.total_milliseconds());
-
-        // First retry fails at t + 4500ms
-        action =
-            getTopoCoord().processHeartbeatResponse(
-                    firstRequestDate + 4500, // 4.5 of the 5 seconds elapsed; could still retry.
-                    Milliseconds(400), // Spent 0.4 of the 0.5 seconds in the network.
-                    target,
-                    StatusWith<ReplSetHeartbeatResponse>(ErrorCodes::NodeNotFound, "Bad DNS?"),
-                    OpTime(0, 0));  // We've never applied anything.
-        ASSERT_EQUALS(HeartbeatResponseAction::NoAction, action.getAction());
-        ASSERT_TRUE(TopologyCoordinator::Role::follower == getTopoCoord().getRole());
-        // Because the first retry failed without timing out, we expect to retry immediately.
-        ASSERT_EQUALS(Date_t(firstRequestDate + 4500), action.getNextHeartbeatStartDate());
-
-        // Second retry prepared at t + 4500ms.
-        request =
-            getTopoCoord().prepareHeartbeatRequest(
-                    firstRequestDate + 4500,
-                    "rs0",
-                    target);
-        // 500ms left to complete the heartbeat.
-        ASSERT_EQUALS(500, request.second.total_milliseconds());
 
         // Second retry fails at t + 4800ms
-        action =
+        HeartbeatResponseAction action =
             getTopoCoord().processHeartbeatResponse(
-                    firstRequestDate + 4800, // 4.8 of the 5 seconds elapsed; could still retry.
+                    firstRequestDate() + 4800, // 4.8 of the 5 seconds elapsed; could still retry.
                     Milliseconds(100), // Spent 0.1 of the 0.3 seconds in the network.
-                    target,
+                    target(),
                     StatusWith<ReplSetHeartbeatResponse>(ErrorCodes::NodeNotFound, "Bad DNS?"),
                     OpTime(0, 0));  // We've never applied anything.
         ASSERT_EQUALS(HeartbeatResponseAction::NoAction, action.getAction());
         ASSERT_TRUE(TopologyCoordinator::Role::follower == getTopoCoord().getRole());
         // Because this is the second retry, rather than retry again, we expect to wait for the
         // heartbeat interval of 2 seconds to elapse.
-        ASSERT_EQUALS(Date_t(firstRequestDate + 6800), action.getNextHeartbeatStartDate());
+        ASSERT_EQUALS(Date_t(firstRequestDate() + 6800), action.getNextHeartbeatStartDate());
+    }
+
+    TEST_F(HeartbeatResponseTestTwoRetries, DecideToStepDownRemotePrimary) {
+        // Confirm that action responses can come back from retries; in this, expect a StepDownSelf
+        // action.
+        
+        // make self primary
+        ASSERT_EQUALS(-1, getCurrentPrimaryIndex());
+        makeSelfPrimary(OpTime(5,0));
+        ASSERT_EQUALS(0, getCurrentPrimaryIndex());
+
+        ReplSetHeartbeatResponse electedMoreRecentlyResponse;
+        electedMoreRecentlyResponse.noteReplSet();
+        electedMoreRecentlyResponse.setSetName("rs0");
+        electedMoreRecentlyResponse.setState(MemberState::RS_PRIMARY);
+        electedMoreRecentlyResponse.setElectable(true);
+        electedMoreRecentlyResponse.setElectionTime(OpTime(3,0));
+        electedMoreRecentlyResponse.setVersion(5);
+        HeartbeatResponseAction action =
+            getTopoCoord().processHeartbeatResponse(
+                    firstRequestDate() + 5000, // Time is left.
+                    Milliseconds(400), // Spent 0.4 of the 0.5 second in the network.
+                    target(),
+                    StatusWith<ReplSetHeartbeatResponse>(electedMoreRecentlyResponse),
+                    OpTime(0,0));  // We've never applied anything.
+        ASSERT_EQUALS(HeartbeatResponseAction::StepDownRemotePrimary, action.getAction());
+        ASSERT_EQUALS(1, action.getPrimaryConfigIndex());
+        ASSERT_EQUALS(Date_t(firstRequestDate() + 7000), action.getNextHeartbeatStartDate());
+    }
+
+    TEST_F(HeartbeatResponseTestTwoRetries, DecideToStepDownSelf) {
+        // Confirm that action responses can come back from retries; in this, expect a StepDownSelf
+        // action.
+        
+        // acknowledge the other member so that we see a majority
+        HeartbeatResponseAction action = receiveDownHeartbeat(HostAndPort("host3"), "rs0");
+        ASSERT_NO_ACTION(action.getAction());
+
+        // make us PRIMARY
+        makeSelfPrimary();
+
+        ReplSetHeartbeatResponse electedMoreRecentlyResponse;
+        electedMoreRecentlyResponse.noteReplSet();
+        electedMoreRecentlyResponse.setSetName("rs0");
+        electedMoreRecentlyResponse.setState(MemberState::RS_PRIMARY);
+        electedMoreRecentlyResponse.setElectable(false);
+        electedMoreRecentlyResponse.setElectionTime(OpTime(10,0));
+        electedMoreRecentlyResponse.setVersion(5);
+        action =
+            getTopoCoord().processHeartbeatResponse(
+                    firstRequestDate() + 5000, // Time is left.
+                    Milliseconds(400), // Spent 0.4 of the 0.5 second in the network.
+                    target(),
+                    StatusWith<ReplSetHeartbeatResponse>(electedMoreRecentlyResponse),
+                    OpTime(0, 0));  // We've never applied anything.
+        ASSERT_EQUALS(HeartbeatResponseAction::StepDownSelf, action.getAction());
+        ASSERT_EQUALS(0, action.getPrimaryConfigIndex());
+        ASSERT_TRUE(TopologyCoordinator::Role::follower == getTopoCoord().getRole());
+        ASSERT_EQUALS(Date_t(firstRequestDate() + 7000), action.getNextHeartbeatStartDate());
+    }
+
+    TEST_F(HeartbeatResponseTestTwoRetries, DecideToStartElection) {
+        // Confirm that action responses can come back from retries; in this, expect a StartElection
+        // action.
+        
+        // acknowledge the other member so that we see a majority
+        OpTime election = OpTime(4,0);
+        OpTime lastOpTimeApplied = OpTime(3,0);
+        HeartbeatResponseAction action = receiveUpHeartbeat(HostAndPort("host3"),
+                                                            "rs0",
+                                                            MemberState::RS_SECONDARY,
+                                                            election,
+                                                            election,
+                                                            lastOpTimeApplied);
+        ASSERT_NO_ACTION(action.getAction());
+
+        // make sure we are electable
+        setSelfMemberState(MemberState::RS_SECONDARY);
+
+        ReplSetHeartbeatResponse startElectionResponse;
+        startElectionResponse.noteReplSet();
+        startElectionResponse.setSetName("rs0");
+        startElectionResponse.setState(MemberState::RS_SECONDARY);
+        startElectionResponse.setElectable(true);
+        startElectionResponse.setVersion(5);
+        action =
+            getTopoCoord().processHeartbeatResponse(
+                    firstRequestDate() + 5000, // Time is left.
+                    Milliseconds(400), // Spent 0.4 of the 0.5 second in the network.
+                    target(),
+                    StatusWith<ReplSetHeartbeatResponse>(startElectionResponse),
+                    OpTime(0, 0));  // We've never applied anything.
+        ASSERT_EQUALS(HeartbeatResponseAction::StartElection, action.getAction());
+        ASSERT_TRUE(TopologyCoordinator::Role::candidate == getTopoCoord().getRole());
+        ASSERT_EQUALS(Date_t(firstRequestDate() + 7000), action.getNextHeartbeatStartDate());
     }
 
     TEST_F(HeartbeatResponseTest, HeartbeatTimeoutSuppressesFirstRetry) {
@@ -1062,50 +1446,14 @@ namespace {
         ASSERT_EQUALS(Date_t(firstRequestDate + 7000), action.getNextHeartbeatStartDate());
     }
 
-    TEST_F(HeartbeatResponseTest, HeartbeatTimeoutSuppressesSecondRetry) {
+    TEST_F(HeartbeatResponseTestOneRetry, HeartbeatTimeoutSuppressesSecondRetry) {
         // Confirm that the topology coordinator does not schedule an second heartbeat retry if
         // the heartbeat timeout period expired before the first retry completed.
-
-        HostAndPort target("host2", 27017);
-        Date_t firstRequestDate = unittest::assertGet(dateFromISOString("2014-08-29T13:00Z"));
-
-        // Initial heartbeat request prepared, at t + 0.
-        std::pair<ReplSetHeartbeatArgs, Milliseconds> request =
-            getTopoCoord().prepareHeartbeatRequest(firstRequestDate,
-                                                   "rs0",
-                                                   target);
-        // 5 seconds to successfully complete the heartbeat before the timeout expires.
-        ASSERT_EQUALS(5000, request.second.total_milliseconds());
-
-        // Initial heartbeat request fails at t + 5000ms
         HeartbeatResponseAction action =
             getTopoCoord().processHeartbeatResponse(
-                    firstRequestDate + 4000, // 4 seconds elapsed, retry allowed.
-                    Milliseconds(3990), // Spent 3.99 of the 4 seconds in the network.
-                    target,
-                    StatusWith<ReplSetHeartbeatResponse>(ErrorCodes::ExceededTimeLimit,
-                                                         "Took too long"),
-                    OpTime(0, 0));  // We've never applied anything.
-
-        ASSERT_EQUALS(HeartbeatResponseAction::NoAction, action.getAction());
-        ASSERT_TRUE(TopologyCoordinator::Role::follower == getTopoCoord().getRole());
-        // Because the heartbeat failed without timing out, we expect to retry immediately.
-        ASSERT_EQUALS(Date_t(firstRequestDate + 4000), action.getNextHeartbeatStartDate());
-
-        // First heartbeat retry prepared, at t + 4000ms.
-        request =
-            getTopoCoord().prepareHeartbeatRequest(
-                    firstRequestDate + 4000,
-                    "rs0",
-                    target);
-        // One second left to complete the heartbeat.
-        ASSERT_EQUALS(1000, request.second.total_milliseconds());
-
-        action =
-            getTopoCoord().processHeartbeatResponse(
-                    firstRequestDate + 5010, // Entire heartbeat period elapsed; no retry allowed.
+                    firstRequestDate() + 5010, // Entire heartbeat period elapsed; no retry allowed.
                     Milliseconds(1000), // Spent 1 of the 1.01 seconds in the network.
-                    target,
+                    target(),
                     StatusWith<ReplSetHeartbeatResponse>(ErrorCodes::ExceededTimeLimit,
                                                          "Took too long"),
                     OpTime(0, 0));  // We've never applied anything.
@@ -1113,77 +1461,7 @@ namespace {
         ASSERT_EQUALS(HeartbeatResponseAction::NoAction, action.getAction());
         ASSERT_TRUE(TopologyCoordinator::Role::follower == getTopoCoord().getRole());
         // Because the heartbeat timed out, we'll retry in 2 seconds.
-        ASSERT_EQUALS(Date_t(firstRequestDate + 7010), action.getNextHeartbeatStartDate());
-    }
-
-    TEST_F(HeartbeatResponseTest, DecideToReconfigAfterFirstRetry) {
-        // Confirm that action responses can come back from retries; in this, expect a Reconfig
-        // action.
-
-        HostAndPort target("host2", 27017);
-        Date_t firstRequestDate = unittest::assertGet(dateFromISOString("2014-08-29T13:00Z"));
-
-        // Initial heartbeat request prepared, at t + 0.
-        std::pair<ReplSetHeartbeatArgs, Milliseconds> request =
-            getTopoCoord().prepareHeartbeatRequest(firstRequestDate,
-                                                   "rs0",
-                                                   target);
-        // 5 seconds to successfully complete the heartbeat before the timeout expires.
-        ASSERT_EQUALS(5000, request.second.total_milliseconds());
-
-        // Initial heartbeat request fails at t + 5000ms
-        HeartbeatResponseAction action =
-            getTopoCoord().processHeartbeatResponse(
-                    firstRequestDate + 4000, // 4 seconds elapsed, retry allowed.
-                    Milliseconds(3990), // Spent 3.99 of the 4 seconds in the network.
-                    target,
-                    StatusWith<ReplSetHeartbeatResponse>(ErrorCodes::ExceededTimeLimit,
-                                                         "Took too long"),
-                    OpTime(0, 0));  // We've never applied anything.
-
-        ASSERT_EQUALS(HeartbeatResponseAction::NoAction, action.getAction());
-        ASSERT_TRUE(TopologyCoordinator::Role::follower == getTopoCoord().getRole());
-        // Because the heartbeat failed without timing out, we expect to retry immediately.
-        ASSERT_EQUALS(Date_t(firstRequestDate + 4000), action.getNextHeartbeatStartDate());
-
-        // First heartbeat retry prepared, at t + 4000ms.
-        request =
-            getTopoCoord().prepareHeartbeatRequest(
-                    firstRequestDate + 4000,
-                    "rs0",
-                    target);
-        // One second left to complete the heartbeat.
-        ASSERT_EQUALS(1000, request.second.total_milliseconds());
-
-        ReplicaSetConfig newConfig;
-        ASSERT_OK(newConfig.initialize(
-                          BSON("_id" << "rs0" <<
-                               "version" << 7 <<
-                               "members" << BSON_ARRAY(
-                                       BSON("_id" << 0 << "host" << "host1:27017") <<
-                                       BSON("_id" << 1 << "host" << "host2:27017") <<
-                                       BSON("_id" << 2 << "host" << "host3:27017") <<
-                                       BSON("_id" << 3 << "host" << "host4:27017")) <<
-                               "settings" << BSON("heartbeatTimeoutSecs" << 5))));
-        ASSERT_OK(newConfig.validate());
-
-        ReplSetHeartbeatResponse reconfigResponse;
-        reconfigResponse.noteReplSet();
-        reconfigResponse.setSetName("rs0");
-        reconfigResponse.setState(MemberState::RS_SECONDARY);
-        reconfigResponse.setElectable(true);
-        reconfigResponse.setVersion(7);
-        reconfigResponse.setConfig(newConfig);
-        action =
-            getTopoCoord().processHeartbeatResponse(
-                    firstRequestDate + 4500, // Time is left.
-                    Milliseconds(400), // Spent 0.4 of the 0.5 second in the network.
-                    target,
-                    StatusWith<ReplSetHeartbeatResponse>(reconfigResponse),
-                    OpTime(0, 0));  // We've never applied anything.
-        ASSERT_EQUALS(HeartbeatResponseAction::Reconfig, action.getAction());
-        ASSERT_TRUE(TopologyCoordinator::Role::follower == getTopoCoord().getRole());
-        ASSERT_EQUALS(Date_t(firstRequestDate + 6500), action.getNextHeartbeatStartDate());
+        ASSERT_EQUALS(Date_t(firstRequestDate() + 7010), action.getNextHeartbeatStartDate());
     }
 
     TEST_F(HeartbeatResponseTest, UpdateHeartbeatDataNewPrimary) {
@@ -1450,19 +1728,28 @@ namespace {
                           "members" << BSON_ARRAY(
                               BSON("_id" << 0 << "host" << "host1:27017" <<
                                    "arbiterOnly" << true) <<
-                              BSON("_id" << 1 << "host" << "host2:27017"))),
+                              BSON("_id" << 1 << "host" << "host2:27017") <<
+                              BSON("_id" << 2 << "host" << "host3:27017"))),
                      0);
 
         OpTime election = OpTime(4,0);
         OpTime lastOpTimeApplied = OpTime(3,0);
 
-        ASSERT_EQUALS(-1, getCurrentPrimaryIndex());
-        HeartbeatResponseAction nextAction = receiveUpHeartbeat(HostAndPort("host2"),
+        HeartbeatResponseAction nextAction = receiveUpHeartbeat(HostAndPort("host3"),
                                                                 "rs0",
-                                                                MemberState::RS_PRIMARY,
+                                                                MemberState::RS_SECONDARY,
                                                                 election,
                                                                 election,
                                                                 lastOpTimeApplied);
+        ASSERT_NO_ACTION(nextAction.getAction());
+        ASSERT_EQUALS(-1, getCurrentPrimaryIndex());
+
+        nextAction = receiveUpHeartbeat(HostAndPort("host2"),
+                                        "rs0",
+                                        MemberState::RS_PRIMARY,
+                                        election,
+                                        election,
+                                        lastOpTimeApplied);
         ASSERT_NO_ACTION(nextAction.getAction());
         ASSERT_EQUALS(1, getCurrentPrimaryIndex());
 
@@ -1553,6 +1840,43 @@ namespace {
         ASSERT_EQUALS(-1, getCurrentPrimaryIndex());
         ASSERT_EQUALS(HeartbeatResponseAction::StartElection, nextAction.getAction());
         ASSERT_TRUE(TopologyCoordinator::Role::candidate == getTopoCoord().getRole());
+    }
+
+    TEST_F(HeartbeatResponseTest, UpdateHeartbeatDataRelinquishPrimaryDueToNodeDisappearing) {
+        // become PRIMARY
+        ASSERT_EQUALS(-1, getCurrentPrimaryIndex());
+        makeSelfPrimary(OpTime(2,0));
+        ASSERT_EQUALS(0, getCurrentPrimaryIndex());
+
+        // become aware of other nodes
+        heartbeatFromMember(HostAndPort("host2"), "rs0", MemberState::RS_SECONDARY, OpTime(1,0));
+        heartbeatFromMember(HostAndPort("host2"), "rs0", MemberState::RS_SECONDARY, OpTime(1,0));
+        heartbeatFromMember(HostAndPort("host3"), "rs0", MemberState::RS_SECONDARY, OpTime(0,0));
+        heartbeatFromMember(HostAndPort("host3"), "rs0", MemberState::RS_SECONDARY, OpTime(0,0));
+
+        // lose that awareness and be sure we are going to stepdown
+        HeartbeatResponseAction nextAction = receiveDownHeartbeat(HostAndPort("host2"), "rs0");
+        ASSERT_NO_ACTION(nextAction.getAction());
+        nextAction = receiveDownHeartbeat(HostAndPort("host3"), "rs0");
+        ASSERT_EQUALS(HeartbeatResponseAction::StepDownSelf, nextAction.getAction());
+        ASSERT_EQUALS(0, nextAction.getPrimaryConfigIndex());
+        ASSERT_TRUE(TopologyCoordinator::Role::follower == getTopoCoord().getRole());
+    }
+
+    TEST_F(HeartbeatResponseTest, UpdateHeartbeatDataRemoteDoesNotExist) {
+        OpTime election = OpTime(5,0);
+        OpTime lastOpTimeApplied = OpTime(3,0);
+
+        ASSERT_EQUALS(-1, getCurrentPrimaryIndex());
+        HeartbeatResponseAction nextAction = receiveUpHeartbeat(HostAndPort("host9"),
+                                                                "rs0",
+                                                                MemberState::RS_PRIMARY,
+                                                                election,
+                                                                election,
+                                                                lastOpTimeApplied);
+        ASSERT_EQUALS(-1, getCurrentPrimaryIndex());
+        ASSERT_NO_ACTION(nextAction.getAction());
+        ASSERT_TRUE(TopologyCoordinator::Role::follower == getTopoCoord().getRole());
     }
 
     class PrepareElectResponseTest : public TopoCoordTest {
@@ -2128,6 +2452,29 @@ namespace {
         ASSERT_EQUALS(1, response.getVersion());
     }
 
+    TEST_F(PrepareHeartbeatResponseTest, PrepareHeartbeatResponseSenderIDNotInConfig) {
+        // set up args with a senderID which is not present in our config
+        ReplSetHeartbeatArgs args;
+        args.setProtocolVersion(1);
+        args.setSetName("rs0");
+        args.setConfigVersion(1);
+        args.setSenderId(2);
+        ReplSetHeartbeatResponse response;
+        Status result(ErrorCodes::InternalError, "prepareHeartbeatResponse didn't set result");
+
+        // prepare response and check the results
+        prepareHeartbeatResponse(args, OpTime(0,0), &response, &result);
+        ASSERT_OK(result);
+        ASSERT_FALSE(response.isElectable());
+        ASSERT_TRUE(response.isReplSet());
+        ASSERT_EQUALS(MemberState::RS_SECONDARY, response.getState().s);
+        ASSERT_EQUALS(OpTime(0,0), response.getOpTime());
+        ASSERT_EQUALS(Seconds(0).total_milliseconds(), response.getTime().total_milliseconds());
+        ASSERT_EQUALS("", response.getHbMsg());
+        ASSERT_EQUALS("rs0", response.getReplicaSetName());
+        ASSERT_EQUALS(1, response.getVersion());
+    }
+
     TEST_F(PrepareHeartbeatResponseTest, PrepareHeartbeatResponseConfigVersionLow) {
         // set up args with a config version lower than ours
         ReplSetHeartbeatArgs args;
@@ -2142,6 +2489,30 @@ namespace {
         prepareHeartbeatResponse(args, OpTime(0,0), &response, &result);
         ASSERT_OK(result);
         ASSERT_TRUE(response.hasConfig());
+        ASSERT_FALSE(response.isElectable());
+        ASSERT_TRUE(response.isReplSet());
+        ASSERT_EQUALS(MemberState::RS_SECONDARY, response.getState().s);
+        ASSERT_EQUALS(OpTime(0,0), response.getOpTime());
+        ASSERT_EQUALS(Seconds(0).total_milliseconds(), response.getTime().total_milliseconds());
+        ASSERT_EQUALS("", response.getHbMsg());
+        ASSERT_EQUALS("rs0", response.getReplicaSetName());
+        ASSERT_EQUALS(1, response.getVersion());
+    }
+
+    TEST_F(PrepareHeartbeatResponseTest, PrepareHeartbeatResponseConfigVersionHigh) {
+        // set up args with a config version higher than ours
+        ReplSetHeartbeatArgs args;
+        args.setProtocolVersion(1);
+        args.setConfigVersion(10);
+        args.setSetName("rs0");
+        args.setSenderId(20);
+        ReplSetHeartbeatResponse response;
+        Status result(ErrorCodes::InternalError, "prepareHeartbeatResponse didn't set result");
+
+        // prepare response and check the results
+        prepareHeartbeatResponse(args, OpTime(0,0), &response, &result);
+        ASSERT_OK(result);
+        ASSERT_FALSE(response.hasConfig());
         ASSERT_FALSE(response.isElectable());
         ASSERT_TRUE(response.isReplSet());
         ASSERT_EQUALS(MemberState::RS_SECONDARY, response.getState().s);
@@ -2254,11 +2625,480 @@ namespace {
         ASSERT_EQUALS(OpTime(0,0), response.getOpTime());
         ASSERT_EQUALS(Seconds(0).total_milliseconds(), response.getTime().total_milliseconds());
         // changed to a syncing message because our sync source changed recently
-        ASSERT_EQUALS("syncing to: h2:27017", response.getHbMsg());
+        ASSERT_EQUALS("syncing from: h2:27017", response.getHbMsg());
         ASSERT_EQUALS("rs0", response.getReplicaSetName());
         ASSERT_EQUALS(1, response.getVersion());
         ASSERT_EQUALS(HostAndPort("h2").toString(), response.getSyncingTo());
     }
+
+    TEST_F(TopoCoordTest, ReconfigToBeTheLoneNode) {
+        ASSERT_TRUE(TopologyCoordinator::Role::follower == getTopoCoord().getRole());
+        ASSERT_EQUALS(MemberState::RS_STARTUP, getTopoCoord().getMemberState().s);
+        updateConfig(BSON("_id" << "rs0" <<
+                          "version" << 1 <<
+                          "members" << BSON_ARRAY(
+                              BSON("_id" << 1 << "host" << "hself"))),
+                     0);
+
+        // if we are the only node, we should become a candidate
+        ASSERT_TRUE(TopologyCoordinator::Role::candidate == getTopoCoord().getRole());
+        ASSERT_EQUALS(MemberState::RS_STARTUP2, getTopoCoord().getMemberState().s);
+    }
+
+    TEST_F(TopoCoordTest, ReconfigToBeTheLoneUnelectableNode) {
+        ASSERT_TRUE(TopologyCoordinator::Role::follower == getTopoCoord().getRole());
+        ASSERT_EQUALS(MemberState::RS_STARTUP, getTopoCoord().getMemberState().s);
+        ReplicaSetConfig cfg;
+        cfg.initialize(BSON("_id" << "rs0" <<
+                            "version" << 1 <<
+                            "members" << BSON_ARRAY(
+                                BSON("_id" << 1 << "host" << "hself" << "priority" << 0))));
+
+        getTopoCoord().updateConfig(cfg, 0, now()++, OpTime(0,0));
+
+        // despite being the only node, we are unelectable, so we should not become primary
+        ASSERT_TRUE(TopologyCoordinator::Role::follower == getTopoCoord().getRole());
+        ASSERT_EQUALS(MemberState::RS_STARTUP2, getTopoCoord().getMemberState().s);
+    }
+
+    TEST_F(TopoCoordTest, ReconfigToBeAddedToTheSet) {
+        ASSERT_TRUE(TopologyCoordinator::Role::follower == getTopoCoord().getRole());
+        ASSERT_EQUALS(MemberState::RS_STARTUP, getTopoCoord().getMemberState().s);
+        // config to be absent from the set
+        updateConfig(BSON("_id" << "rs0" <<
+                          "version" << 1 <<
+                          "members" << BSON_ARRAY(
+                              BSON("_id" << 1 << "host" << "host2:27017") <<
+                              BSON("_id" << 2 << "host" << "host3:27017"))),
+                     -1);
+        // should become removed since we are not in the set
+        ASSERT_TRUE(TopologyCoordinator::Role::follower == getTopoCoord().getRole());
+        ASSERT_EQUALS(MemberState::RS_REMOVED, getTopoCoord().getMemberState().s);
+
+        // reconfig to add to set
+        updateConfig(BSON("_id" << "rs0" <<
+                          "version" << 2 <<
+                          "members" << BSON_ARRAY(
+                              BSON("_id" << 0 << "host" << "host1:27017") <<
+                              BSON("_id" << 1 << "host" << "host2:27017") <<
+                              BSON("_id" << 2 << "host" << "host3:27017"))),
+                     0);
+        // having been added to the config, we should no longer be REMOVED and should enter STARTUP2
+        ASSERT_TRUE(TopologyCoordinator::Role::follower == getTopoCoord().getRole());
+        ASSERT_EQUALS(MemberState::RS_STARTUP2, getTopoCoord().getMemberState().s);
+    }
+
+    TEST_F(TopoCoordTest, ReconfigToBeRemovedFromTheSet) {
+        ASSERT_TRUE(TopologyCoordinator::Role::follower == getTopoCoord().getRole());
+        ASSERT_EQUALS(MemberState::RS_STARTUP, getTopoCoord().getMemberState().s);
+        updateConfig(BSON("_id" << "rs0" <<
+                          "version" << 1 <<
+                          "members" << BSON_ARRAY(
+                              BSON("_id" << 0 << "host" << "host1:27017") <<
+                              BSON("_id" << 1 << "host" << "host2:27017") <<
+                              BSON("_id" << 2 << "host" << "host3:27017"))),
+                     0);
+        ASSERT_TRUE(TopologyCoordinator::Role::follower == getTopoCoord().getRole());
+        ASSERT_EQUALS(MemberState::RS_STARTUP2, getTopoCoord().getMemberState().s);
+        
+        // reconfig to remove self
+        updateConfig(BSON("_id" << "rs0" <<
+                          "version" << 2 <<
+                          "members" << BSON_ARRAY(
+                              BSON("_id" << 1 << "host" << "host2:27017") <<
+                              BSON("_id" << 2 << "host" << "host3:27017"))),
+                     -1);
+        // should become removed since we are no longer in the set
+        ASSERT_TRUE(TopologyCoordinator::Role::follower == getTopoCoord().getRole());
+        ASSERT_EQUALS(MemberState::RS_REMOVED, getTopoCoord().getMemberState().s);
+    }
+
+    TEST_F(TopoCoordTest, ReconfigToBeRemovedFromTheSetAsPrimary) {
+        ASSERT_TRUE(TopologyCoordinator::Role::follower == getTopoCoord().getRole());
+        ASSERT_EQUALS(MemberState::RS_STARTUP, getTopoCoord().getMemberState().s);
+        updateConfig(BSON("_id" << "rs0" <<
+                          "version" << 1 <<
+                          "members" << BSON_ARRAY(
+                              BSON("_id" << 0 << "host" << "host1:27017"))),
+                     0);
+        ASSERT_TRUE(TopologyCoordinator::Role::candidate == getTopoCoord().getRole());
+        ASSERT_EQUALS(MemberState::RS_STARTUP2, getTopoCoord().getMemberState().s);
+
+        // win election and primary
+        getTopoCoord().processWinElection(now()++, OID::gen(), OpTime(0,0), OpTime(0,0));
+        ASSERT_TRUE(TopologyCoordinator::Role::leader == getTopoCoord().getRole());
+        ASSERT_EQUALS(MemberState::RS_PRIMARY, getTopoCoord().getMemberState().s);
+
+        // reconfig to remove self
+        updateConfig(BSON("_id" << "rs0" <<
+                          "version" << 2 <<
+                          "members" << BSON_ARRAY(
+                              BSON("_id" << 1 << "host" << "host2:27017") <<
+                              BSON("_id" << 2 << "host" << "host3:27017"))),
+                     -1);
+        // should become removed since we are no longer in the set even though we were primary
+        ASSERT_TRUE(TopologyCoordinator::Role::follower == getTopoCoord().getRole());
+        ASSERT_EQUALS(MemberState::RS_REMOVED, getTopoCoord().getMemberState().s);
+    }
+
+    TEST_F(TopoCoordTest, ReconfigCanNoLongerBePrimary) {
+        ASSERT_TRUE(TopologyCoordinator::Role::follower == getTopoCoord().getRole());
+        ASSERT_EQUALS(MemberState::RS_STARTUP, getTopoCoord().getMemberState().s);
+        updateConfig(BSON("_id" << "rs0" <<
+                          "version" << 1 <<
+                          "members" << BSON_ARRAY(
+                              BSON("_id" << 0 << "host" << "host1:27017"))),
+                     0);
+        ASSERT_TRUE(TopologyCoordinator::Role::candidate == getTopoCoord().getRole());
+        ASSERT_EQUALS(MemberState::RS_STARTUP2, getTopoCoord().getMemberState().s);
+
+        // win election and primary
+        getTopoCoord().processWinElection(now()++, OID::gen(), OpTime(0,0), OpTime(0,0));
+        ASSERT_TRUE(TopologyCoordinator::Role::leader == getTopoCoord().getRole());
+        ASSERT_EQUALS(MemberState::RS_PRIMARY, getTopoCoord().getMemberState().s);
+
+        // now lose primary due to lose of electability
+        updateConfig(BSON("_id" << "rs0" <<
+                          "version" << 2 <<
+                          "members" << BSON_ARRAY(
+                              BSON("_id" << 0 << "host" << "host1:27017" << "priority" << 0) <<
+                              BSON("_id" << 1 << "host" << "host2:27017") <<
+                              BSON("_id" << 2 << "host" << "host3:27017"))),
+                     0);
+        ASSERT_TRUE(TopologyCoordinator::Role::follower == getTopoCoord().getRole());
+        ASSERT_EQUALS(MemberState::RS_STARTUP2, getTopoCoord().getMemberState().s);
+    }
+
+//     uncomment once primariness can be maintained through a reconfig
+//     TEST_F(TopoCoordTest, ReconfigContinueToBePrimary) {
+//         ASSERT_TRUE(TopologyCoordinator::Role::follower == getTopoCoord().getRole());
+//         ASSERT_EQUALS(MemberState::RS_STARTUP, getTopoCoord().getMemberState().s);
+//         updateConfig(BSON("_id" << "rs0" <<
+//                           "version" << 1 <<
+//                           "members" << BSON_ARRAY(
+//                               BSON("_id" << 1 << "host" << "host1:27017"))),
+//                      0);
+//         ASSERT_TRUE(TopologyCoordinator::Role::leader == getTopoCoord().getRole());
+//         ASSERT_EQUALS(MemberState::RS_PRIMARY, getTopoCoord().getMemberState().s);
+// 
+//         // reconfig in a manner that leaves us electable and ensure we are still the primary
+//         updateConfig(BSON("_id" << "rs0" <<
+//                           "version" << 2 <<
+//                           "members" << BSON_ARRAY(
+//                               BSON("_id" << 0 << "host" << "host1:27017") <<
+//                               BSON("_id" << 1 << "host" << "host2:27017") <<
+//                               BSON("_id" << 2 << "host" << "host3:27017"))),
+//                      0);
+//         ASSERT_TRUE(TopologyCoordinator::Role::leader == getTopoCoord().getRole());
+//         ASSERT_EQUALS(MemberState::RS_PRIMARY, getTopoCoord().getMemberState().s);
+//     }
+
+    TEST_F(TopoCoordTest, ReconfigKeepSecondary) {
+        updateConfig(BSON("_id" << "rs0" <<
+                          "version" << 1 <<
+                          "members" << BSON_ARRAY(
+                              BSON("_id" << 1 << "host" << "host1:27017") <<
+                              BSON("_id" << 2 << "host" << "host2:27017"))),
+                     0);
+        ASSERT_TRUE(TopologyCoordinator::Role::follower == getTopoCoord().getRole());
+        ASSERT_EQUALS(MemberState::RS_STARTUP2, getTopoCoord().getMemberState().s);
+        setSelfMemberState(MemberState::RS_SECONDARY);
+        ASSERT_EQUALS(MemberState::RS_SECONDARY, getTopoCoord().getMemberState().s);
+
+        // reconfig and stay secondary
+        updateConfig(BSON("_id" << "rs0" <<
+                          "version" << 2 <<
+                          "members" << BSON_ARRAY(
+                              BSON("_id" << 0 << "host" << "host1:27017") <<
+                              BSON("_id" << 1 << "host" << "host2:27017") <<
+                              BSON("_id" << 2 << "host" << "host3:27017"))),
+                     0);
+        ASSERT_TRUE(TopologyCoordinator::Role::follower == getTopoCoord().getRole());
+        ASSERT_EQUALS(MemberState::RS_SECONDARY, getTopoCoord().getMemberState().s);
+    }
+
+    TEST_F(HeartbeatResponseTest, ReconfigBetweenHeartbeatRequestAndRepsonse) {
+        OpTime election = OpTime(14,0);
+        OpTime lastOpTimeApplied = OpTime(13,0);
+
+        // all three members up and secondaries
+        setSelfMemberState(MemberState::RS_SECONDARY);
+
+        HeartbeatResponseAction nextAction = receiveUpHeartbeat(HostAndPort("host3"),
+                                                                "rs0",
+                                                                MemberState::RS_SECONDARY,
+                                                                election,
+                                                                lastOpTimeApplied,
+                                                                lastOpTimeApplied);
+        ASSERT_NO_ACTION(nextAction.getAction());
+
+        nextAction = receiveUpHeartbeat(HostAndPort("host2"),
+                                        "rs0",
+                                        MemberState::RS_SECONDARY,
+                                        election,
+                                        lastOpTimeApplied,
+                                        lastOpTimeApplied);
+        ASSERT_NO_ACTION(nextAction.getAction());
+
+        // now request from host3 and receive after host2 has been removed via reconfig
+        getTopoCoord().prepareHeartbeatRequest(now()++, "rs0", HostAndPort("host3"));
+
+        updateConfig(BSON("_id" << "rs0" <<
+                          "version" << 2 <<
+                          "members" << BSON_ARRAY(
+                              BSON("_id" << 0 << "host" << "host1:27017") <<
+                              BSON("_id" << 2 << "host" << "host3:27017"))),
+                     0);
+
+        ReplSetHeartbeatResponse hb;
+        hb.initialize(BSON("ok" << 1 <<
+                           "v" << 1 <<
+                           "state" << MemberState::RS_PRIMARY));
+        hb.setOpTime(lastOpTimeApplied);
+        hb.setElectionTime(election);
+        StatusWith<ReplSetHeartbeatResponse> hbResponse = StatusWith<ReplSetHeartbeatResponse>(hb);
+        HeartbeatResponseAction action = getTopoCoord().processHeartbeatResponse(now()++,
+                                                Milliseconds(0),
+                                                HostAndPort("host3"),
+                                                hbResponse,
+                                                lastOpTimeApplied);
+
+        // now primary should be host3, index 1, and we should perform NoAction in response
+        ASSERT_EQUALS(1, getCurrentPrimaryIndex());
+        ASSERT_NO_ACTION(action.getAction());
+    }
+
+    TEST_F(HeartbeatResponseTest, ReconfigNodeRemovedBetweenHeartbeatRequestAndRepsonse) {
+        OpTime election = OpTime(14,0);
+        OpTime lastOpTimeApplied = OpTime(13,0);
+
+        // all three members up and secondaries
+        setSelfMemberState(MemberState::RS_SECONDARY);
+
+        HeartbeatResponseAction nextAction = receiveUpHeartbeat(HostAndPort("host3"),
+                                                                "rs0",
+                                                                MemberState::RS_SECONDARY,
+                                                                election,
+                                                                lastOpTimeApplied,
+                                                                lastOpTimeApplied);
+        ASSERT_NO_ACTION(nextAction.getAction());
+
+        nextAction = receiveUpHeartbeat(HostAndPort("host2"),
+                                        "rs0",
+                                        MemberState::RS_SECONDARY,
+                                        election,
+                                        lastOpTimeApplied,
+                                        lastOpTimeApplied);
+        ASSERT_NO_ACTION(nextAction.getAction());
+
+        // now request from host3 and receive after host2 has been removed via reconfig
+        getTopoCoord().prepareHeartbeatRequest(now()++, "rs0", HostAndPort("host3"));
+
+        updateConfig(BSON("_id" << "rs0" <<
+                          "version" << 2 <<
+                          "members" << BSON_ARRAY(
+                              BSON("_id" << 0 << "host" << "host1:27017") <<
+                              BSON("_id" << 1 << "host" << "host2:27017"))),
+                     0);
+
+        ReplSetHeartbeatResponse hb;
+        hb.initialize(BSON("ok" << 1 <<
+                           "v" << 1 <<
+                           "state" << MemberState::RS_PRIMARY));
+        hb.setOpTime(lastOpTimeApplied);
+        hb.setElectionTime(election);
+        StatusWith<ReplSetHeartbeatResponse> hbResponse = StatusWith<ReplSetHeartbeatResponse>(hb);
+        HeartbeatResponseAction action = getTopoCoord().processHeartbeatResponse(now()++,
+                                                Milliseconds(0),
+                                                HostAndPort("host3"),
+                                                hbResponse,
+                                                lastOpTimeApplied);
+
+        // primary should not be set and we should perform NoAction in response
+        ASSERT_EQUALS(-1, getCurrentPrimaryIndex());
+        ASSERT_NO_ACTION(action.getAction());
+    }
+
+    TEST_F(HeartbeatResponseTest, ShouldChangeSyncSourceMemberNotInConfig) {
+        // In this test, the TopologyCoordinator should tell us to change sync sources away from
+        // "host4" since "host4" is absent from the config
+        ASSERT_TRUE(getTopoCoord().shouldChangeSyncSource(HostAndPort("host4")));
+    }
+
+    TEST_F(HeartbeatResponseTest, ShouldChangeSyncSourceMemberHasYetToHeartbeat) {
+        // In this test, the TopologyCoordinator should not tell us to change sync sources away from
+        // "host2" since we do not yet have a heartbeat (and as a result do not yet have an optime)
+        // for "host2"
+        ASSERT_FALSE(getTopoCoord().shouldChangeSyncSource(HostAndPort("host2")));
+    }
+
+    TEST_F(HeartbeatResponseTest, ShouldChangeSyncSourceFresherHappierMemberExists) {
+        // In this test, the TopologyCoordinator should tell us to change sync sources away from 
+        // "host2" and to "host3" since "host2" is more than maxSyncSourceLagSecs(30) behind "host3"
+        OpTime election = OpTime(0,0);
+        OpTime lastOpTimeApplied = OpTime(4,0);
+        // ahead by more than maxSyncSourceLagSecs (30)
+        OpTime fresherLastOpTimeApplied = OpTime(3005,0);
+
+        HeartbeatResponseAction nextAction = receiveUpHeartbeat(HostAndPort("host2"),
+                                                                "rs0",
+                                                                MemberState::RS_SECONDARY,
+                                                                election,
+                                                                lastOpTimeApplied,
+                                                                lastOpTimeApplied);
+        ASSERT_NO_ACTION(nextAction.getAction());
+
+        nextAction = receiveUpHeartbeat(HostAndPort("host3"),
+                                        "rs0",
+                                        MemberState::RS_SECONDARY,
+                                        election,
+                                        fresherLastOpTimeApplied,
+                                        lastOpTimeApplied);
+        ASSERT_NO_ACTION(nextAction.getAction());
+
+        // set up complete, time for actual check
+        startCapturingLogMessages();
+        ASSERT_TRUE(getTopoCoord().shouldChangeSyncSource(HostAndPort("host2")));
+        stopCapturingLogMessages();
+        ASSERT_EQUALS(1, countLogLinesContaining("changing sync target"));
+    }
+
+    TEST_F(HeartbeatResponseTest, ShouldChangeSyncSourceFresherMemberIsDown) {
+        // In this test, the TopologyCoordinator should not tell us to change sync sources away from 
+        // "host2" and to "host3" despite "host2" being more than maxSyncSourceLagSecs(30) behind
+        // "host3", since "host3" is down
+        OpTime election = OpTime(0,0);
+        OpTime lastOpTimeApplied = OpTime(4,0);
+        // ahead by more than maxSyncSourceLagSecs (30)
+        OpTime fresherLastOpTimeApplied = OpTime(3005,0);
+
+        HeartbeatResponseAction nextAction = receiveUpHeartbeat(HostAndPort("host2"),
+                                                                "rs0",
+                                                                MemberState::RS_SECONDARY,
+                                                                election,
+                                                                lastOpTimeApplied,
+                                                                lastOpTimeApplied);
+        ASSERT_NO_ACTION(nextAction.getAction());
+
+        nextAction = receiveUpHeartbeat(HostAndPort("host3"),
+                                        "rs0",
+                                        MemberState::RS_SECONDARY,
+                                        election,
+                                        fresherLastOpTimeApplied,
+                                        lastOpTimeApplied);
+        ASSERT_NO_ACTION(nextAction.getAction());
+
+        // set up complete, time for actual check
+        nextAction = receiveDownHeartbeat(HostAndPort("host3"), "rs0");
+        ASSERT_NO_ACTION(nextAction.getAction());
+        ASSERT_FALSE(getTopoCoord().shouldChangeSyncSource(HostAndPort("host2")));
+    }
+
+    TEST_F(HeartbeatResponseTest, ShouldChangeSyncSourceFresherMemberIsNotReadable) {
+        // In this test, the TopologyCoordinator should not tell us to change sync sources away from 
+        // "host2" and to "host3" despite "host2" being more than maxSyncSourceLagSecs(30) behind
+        // "host3", since "host3" is in a non-readable mode (RS_ROLLBACK)
+        OpTime election = OpTime(0,0);
+        OpTime lastOpTimeApplied = OpTime(4,0);
+        // ahead by more than maxSyncSourceLagSecs (30)
+        OpTime fresherLastOpTimeApplied = OpTime(3005,0);
+
+        HeartbeatResponseAction nextAction = receiveUpHeartbeat(HostAndPort("host2"),
+                                                                "rs0",
+                                                                MemberState::RS_SECONDARY,
+                                                                election,
+                                                                lastOpTimeApplied,
+                                                                lastOpTimeApplied);
+        ASSERT_NO_ACTION(nextAction.getAction());
+
+        nextAction = receiveUpHeartbeat(HostAndPort("host3"),
+                                        "rs0",
+                                        MemberState::RS_ROLLBACK,
+                                        election,
+                                        fresherLastOpTimeApplied,
+                                        lastOpTimeApplied);
+        ASSERT_NO_ACTION(nextAction.getAction());
+
+        // set up complete, time for actual check
+        ASSERT_FALSE(getTopoCoord().shouldChangeSyncSource(HostAndPort("host2")));
+    }
+
+    TEST_F(HeartbeatResponseTest, ShouldChangeSyncSourceFresherMemberDoesNotBuildIndexes) {
+        // In this test, the TopologyCoordinator should not tell us to change sync sources away from 
+        // "host2" and to "host3" despite "host2" being more than maxSyncSourceLagSecs(30) behind
+        // "host3", since "host3" does not build indexes
+        OpTime election = OpTime(0,0);
+        OpTime lastOpTimeApplied = OpTime(4,0);
+        // ahead by more than maxSyncSourceLagSecs (30)
+        OpTime fresherLastOpTimeApplied = OpTime(3005,0);
+
+        updateConfig(BSON("_id" << "rs0" <<
+                          "version" << 6 <<
+                          "members" << BSON_ARRAY(
+                              BSON("_id" << 0 << "host" << "hself") <<
+                              BSON("_id" << 1 << "host" << "host2") <<
+                              BSON("_id" << 2 << "host" << "host3" <<
+                                   "buildIndexes" << false << "priority" << 0))),
+                     0);
+        HeartbeatResponseAction nextAction = receiveUpHeartbeat(HostAndPort("host2"),
+                                                                "rs0",
+                                                                MemberState::RS_SECONDARY,
+                                                                election,
+                                                                lastOpTimeApplied,
+                                                                lastOpTimeApplied);
+        ASSERT_NO_ACTION(nextAction.getAction());
+        nextAction = receiveUpHeartbeat(HostAndPort("host3"),
+                                        "rs0",
+                                        MemberState::RS_SECONDARY,
+                                        election,
+                                        fresherLastOpTimeApplied,
+                                        lastOpTimeApplied);
+        ASSERT_NO_ACTION(nextAction.getAction());
+
+        // set up complete, time for actual check
+        ASSERT_FALSE(getTopoCoord().shouldChangeSyncSource(HostAndPort("host2")));
+    }
+
+    TEST_F(HeartbeatResponseTest, ShouldChangeSyncSourceFresherMemberDoesNotBuildIndexesNorDoWe) {
+        // In this test, the TopologyCoordinator should tell us to change sync sources away from 
+        // "host2" and to "host3" despite "host3" not building indexes because we do not build
+        // indexes either and "host2" is more than maxSyncSourceLagSecs(30) behind "host3"
+        OpTime election = OpTime(0,0);
+        OpTime lastOpTimeApplied = OpTime(4,0);
+        // ahead by more than maxSyncSourceLagSecs (30)
+        OpTime fresherLastOpTimeApplied = OpTime(3005,0);
+
+        updateConfig(BSON("_id" << "rs0" <<
+                          "version" << 7 <<
+                          "members" << BSON_ARRAY(
+                              BSON("_id" << 0 << "host" << "hself" <<
+                                   "buildIndexes" << false << "priority" << 0) <<
+                              BSON("_id" << 1 << "host" << "host2") <<
+                              BSON("_id" << 2 << "host" << "host3" <<
+                                   "buildIndexes" << false << "priority" << 0))),
+                     0);
+        HeartbeatResponseAction nextAction = receiveUpHeartbeat(HostAndPort("host2"),
+                                                                "rs0",
+                                                                MemberState::RS_SECONDARY,
+                                                                election,
+                                                                lastOpTimeApplied,
+                                                                lastOpTimeApplied);
+        ASSERT_NO_ACTION(nextAction.getAction());
+        nextAction = receiveUpHeartbeat(HostAndPort("host3"),
+                                        "rs0",
+                                        MemberState::RS_SECONDARY,
+                                        election,
+                                        fresherLastOpTimeApplied,
+                                        lastOpTimeApplied);
+        ASSERT_NO_ACTION(nextAction.getAction());
+
+        // set up complete, time for actual check
+        startCapturingLogMessages();
+        ASSERT_TRUE(getTopoCoord().shouldChangeSyncSource(HostAndPort("host2")));
+        stopCapturingLogMessages();
+        ASSERT_EQUALS(1, countLogLinesContaining("changing sync target"));
+    }
+
 }  // namespace
 }  // namespace repl
 }  // namespace mongo

@@ -31,6 +31,7 @@
 #include "mongo/tools/mongoshim_options.h"
 
 #include "mongo/base/status.h"
+#include "mongo/db/json.h"
 #include "mongo/util/options_parser/startup_options.h"
 #include "mongo/util/text.h"
 
@@ -64,35 +65,71 @@ namespace mongo {
             return ret;
         }
 
-        // TODO(benety): Refactor some of these related options (load, upsert, ...) into modes.
+        const string modeDisplayFormat("find, insert, upsert, remove, repair or applyOps");
+        options->addOptionChaining("mode", "mode", moe::String,
+                "Runs shim in one of several modes: " + modeDisplayFormat)
+                                  .format("find|insert|upsert|remove|repair|applyOps",
+                                          modeDisplayFormat)
+                                  .incompatibleWith("load")
+                                  .incompatibleWith("remove")
+                                  .incompatibleWith("repair")
+                                  .incompatibleWith("applyOps");
+
         options->addOptionChaining("load", "load", moe::Switch,
-                                   "load data" );
+                                   "load data" )
+                                  .hidden();
 
         options->addOptionChaining("remove", "remove", moe::Switch,
                 "removes documents from collection matching query "
                 "(or all documents if query is not provided)" )
                                   .incompatibleWith("load")
-                                  .incompatibleWith("drop");
+                                  .incompatibleWith("drop")
+                                  .hidden();
 
         options->addOptionChaining("applyOps", "applyOps", moe::Switch,
                                    "apply oplog entries" )
                                   .incompatibleWith("load")
-                                  .incompatibleWith("drop");
+                                  .incompatibleWith("drop")
+                                  .hidden();
 
         options->addOptionChaining("drop", "drop", moe::Switch,
                                    "drop collection before import" );
 
         options->addOptionChaining("upsert", "upsert", moe::Switch,
                                    "upsert instead of insert" )
-                                  .requires("load");
+                                  .requires("load")
+                                  .hidden();
 
         options->addOptionChaining("upsertFields", "upsertFields", moe::String,
                 "comma-separated fields for the query part of the upsert. "
-                "Ensure these fields are indexed.")
-                                  .requires("upsert");
+                "Ensure these fields are indexed.");
 
         options->addOptionChaining("query", "query,q", moe::String,
                 "query filter, as a JSON string, e.g., '{x:{$gt:1}}'");
+
+        options->addOptionChaining("repair", "repair", moe::Switch,
+                "try to recover a crashed collection")
+                                  .incompatibleWith("applyOps")
+                                  .incompatibleWith("load")
+                                  .incompatibleWith("remove")
+                                  .hidden();
+
+        // Used for testing.
+        options->addOptionChaining("in", "in", moe::String,
+                "input file; if not specified, stdin is used")
+                                  .hidden();
+
+        // Used for testing.
+        options->addOptionChaining("inputDocuments", "inputDocuments", moe::String,
+                "input documents. If specified, stdin will be ignored. "
+                "Format: --inputDocuments=\"{in: [doc1, doc2, doc3, ...]}\". ")
+                                  .incompatibleWith("in")
+                                  .hidden();
+        // Used for testing.
+        options->addOptionChaining("out", "out", moe::String,
+                "output file; if not specified, stdout is used")
+                                  .incompatibleWith("in")
+                                  .hidden();
 
         options->addOptionChaining("slaveOk", "slaveOk,k", moe::Bool,
                 "use secondaries for export if available, default true")
@@ -144,6 +181,15 @@ namespace mongo {
                           "MongoShim requires a --dbpath value to proceed");
         }
 
+        // Ensure that collection is specified.
+        // Tool::getNs() validates --collection but error
+        // is not propagated to calling process because Tool::main()
+        // always exits cleanly when --dbpath is enabled.
+        if (toolGlobalParams.coll.size() == 0) {
+            return Status(ErrorCodes::BadValue,
+                          "MongoShim requires a --collection value to proceed");
+        }
+
         ret = storeFieldOptions(params, args);
         if (!ret.isOK()) {
             return ret;
@@ -157,9 +203,34 @@ namespace mongo {
         mongoShimGlobalParams.load = params.count("load") > 0;
         mongoShimGlobalParams.remove = params.count("remove") > 0;
         mongoShimGlobalParams.applyOps = params.count("applyOps") > 0;
+        mongoShimGlobalParams.repair = params.count("repair") > 0;
 
         mongoShimGlobalParams.drop = params.count("drop") > 0;
         mongoShimGlobalParams.upsert = params.count("upsert") > 0;
+
+        // Process shim mode. Using --mode is preferred to --load, --applyOps, --remove, ...
+        if (params.count("mode") > 0) {
+            const string mode = getParam("mode");
+            if (mode == "find") {
+                // No change to mongoShimGlobalParams.
+            }
+            else if (mode == "insert") {
+                mongoShimGlobalParams.load = true;
+            }
+            else if (mode == "remove") {
+                mongoShimGlobalParams.remove = true;
+            }
+            else if (mode == "repair") {
+                mongoShimGlobalParams.repair = true;
+            }
+            else if (mode == "upsert") {
+                mongoShimGlobalParams.load = true;
+                mongoShimGlobalParams.upsert = true;
+            }
+            else if (mode == "applyOps") {
+                mongoShimGlobalParams.applyOps = true;
+            }
+        }
 
         if (mongoShimGlobalParams.upsert) {
             string uf = getParam("upsertFields");
@@ -170,6 +241,17 @@ namespace mongo {
                 StringSplitter(uf.c_str(), ",").split(mongoShimGlobalParams.upsertFields);
             }
         }
+
+        // Used for testing. In normal operation, results will be written to stdout.
+        mongoShimGlobalParams.outputFile = getParam("out");
+        mongoShimGlobalParams.outputFileSpecified = params.count("out") > 0;
+
+        // Used for testing. In normal operation, documents will be read from stdin.
+        mongoShimGlobalParams.inputFile = getParam("in");
+        mongoShimGlobalParams.inputFileSpecified = params.count("in") > 0;
+
+        // Used for testing. In normal operation, documents will be read from stdin.
+        mongoShimGlobalParams.inputDocuments = mongo::fromjson(getParam("inputDocuments", "{}"));
 
         mongoShimGlobalParams.query = getParam("query", "");
         mongoShimGlobalParams.snapShotQuery = false;

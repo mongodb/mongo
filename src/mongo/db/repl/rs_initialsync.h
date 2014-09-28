@@ -1,5 +1,5 @@
-/*
- *    Copyright (C) 2014 10gen, Inc.
+/**
+ *    Copyright (C) 2014 MongoDB Inc.
  *
  *    This program is free software: you can redistribute it and/or  modify
  *    it under the terms of the GNU Affero General Public License, version 3,
@@ -28,43 +28,12 @@
 
 #pragma once
 
-#include <string>
-
-#include "mongo/base/disallow_copying.h"
-#include "mongo/base/status.h"
-#include "mongo/base/string_data.h"
-#include "mongo/db/auth/authentication_session.h"
-#include "mongo/platform/cstdint.h"
-#include "mongo/db/auth/sasl_authentication_session.h"
-#include "mongo/db/auth/sasl_server_conversation.h"
-
 namespace mongo {
-
+namespace repl {
     /**
-     * Authentication session data for the server side of SASL authentication.
+     * Begins an initial sync of a node.  This drops all data, chooses a sync source,
+     * and runs the cloner from that sync source.  The node's state is not changed.
      */
-    class NativeSaslAuthenticationSession : public SaslAuthenticationSession {
-        MONGO_DISALLOW_COPYING(NativeSaslAuthenticationSession);
-    public:
-
-        explicit NativeSaslAuthenticationSession(AuthorizationSession* authSession);
-        virtual ~NativeSaslAuthenticationSession();
-
-        virtual Status start(const StringData& authenticationDatabase,
-                             const StringData& mechanism,
-                             const StringData& serviceName,
-                             const StringData& serviceHostname,
-                             int64_t conversationId,
-                             bool autoAuthorize);
-
-        virtual Status step(const StringData& inputData, std::string* outputData);
-
-        virtual std::string getPrincipalId() const;
-
-        virtual const char* getMechanism() const;
-
-    private:
-        std::string _mechanism;
-        boost::scoped_ptr<SaslServerConversation> _saslConversation;
-    };
-}  // namespace mongo
+    void syncDoInitialSync();
+}
+}

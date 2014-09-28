@@ -38,10 +38,11 @@
 #include "mongo/db/matcher/matcher.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/s/shard.h"
-#include "mongo/s/stale_exception.h"  // for StaleConfigException
 #include "mongo/util/concurrency/mvar.h"
 
 namespace mongo {
+
+    class StaleConfigException;
 
     /**
      * holder for a server address and a query to run

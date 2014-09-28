@@ -28,14 +28,34 @@
 *    then also delete it in the license file.
 */
 
+#include "mongo/platform/basic.h"
+
+#include <boost/scoped_ptr.hpp>
+
+#include <boost/filesystem/convenience.hpp>
+#include <boost/filesystem/operations.hpp>
+#include <fstream>
+#include <iostream>
+#include <memory>
+
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/client/dbclientcursor.h"
+#include "mongo/db/catalog/collection.h"
+#include "mongo/db/catalog/database.h"
+#include "mongo/db/catalog/database_holder.h"
+#include "mongo/db/client.h"
 #include "mongo/db/json.h"
+#include "mongo/db/operation_context_impl.h"
+#include "mongo/db/storage/record_store.h"
 #include "mongo/tools/mongoshim_options.h"
 #include "mongo/tools/tool.h"
 #include "mongo/tools/tool_logger.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/options_parser/option_section.h"
 
+using std::auto_ptr;
+using std::ios_base;
+using std::ofstream;
 using std::string;
 using std::vector;
 
@@ -117,15 +137,60 @@ public:
             if ( mongoShimGlobalParams.drop ) {
                 conn().dropCollection( _ns );
             }
-            processFile( "-" );
+            // --inputDocuments and --in are used primarily for testing.
+            if (!mongoShimGlobalParams.inputDocuments.isEmpty()) {
+                BSONElement firstElement = mongoShimGlobalParams.inputDocuments.firstElement();
+                if (firstElement.type() != Array) {
+                    toolError() << "first element of --inputDocuments has to be an array: "
+                                << firstElement;
+                    return -1;
+                }
+                BSONObjIterator i(firstElement.Obj());
+                while ( i.more() ) {
+                   BSONElement e = i.next();
+                   if (!e.isABSONObj()) {
+                       toolError() << "skipping non-object in input documents: " << e;
+                       continue;
+                   }
+                   gotObject(e.Obj());
+                }
+            }
+            else if (mongoShimGlobalParams.inputFileSpecified) {
+                processFile(mongoShimGlobalParams.inputFile);
+            }
+            else {
+                processFile("-");
+            }
         }
         else if (mongoShimGlobalParams.remove) {
             // Removes all documents matching query
             bool justOne = false;
             conn().remove(_ns, mongoShimGlobalParams.query, justOne);
         }
-        else {
+        else if (mongoShimGlobalParams.repair) {
+            // Repairs collection before writing documents to output.
             ostream *out = &cout;
+            auto_ptr<ofstream> fileStream = _createOutputFile();
+            if (fileStream.get()) {
+                if (!fileStream->good()) {
+                    toolError() << "couldn't open [" << mongoShimGlobalParams.outputFile << "]";
+                    return -1;
+                }
+                out = fileStream.get();
+            }
+            _repair(*out);
+        }
+        else {
+            // Write results to stdout unless output file is specified using --out option.
+            ostream *out = &cout;
+            auto_ptr<ofstream> fileStream = _createOutputFile();
+            if (fileStream.get()) {
+                if (!fileStream->good()) {
+                    toolError() << "couldn't open [" << mongoShimGlobalParams.outputFile << "]";
+                    return -1;
+                }
+                out = fileStream.get();
+            }
 
             Query q(mongoShimGlobalParams.query);
             if (mongoShimGlobalParams.sort != "") {
@@ -155,6 +220,85 @@ public:
     }
 
 private:
+    /**
+     * Writes valid objects in collection to output.
+     */
+    void _repair(std::ostream& out) {
+        toolInfoLog() << "going to try to recover data from: " << _ns << std::endl;
+        OperationContextImpl txn;
+        Client::WriteContext cx(&txn, toolGlobalParams.db);
+
+        Database* db = dbHolder().get(&txn, toolGlobalParams.db);
+        Collection* collection = db->getCollection(&txn, _ns);
+
+        if (!collection) {
+            toolError() << "Collection does not exist: " << toolGlobalParams.coll << std::endl;
+            return;
+        }
+
+        toolInfoLog() << "nrecords: " << collection->numRecords(&txn)
+                      << " datasize: " << collection->dataSize(&txn);
+        try {
+            boost::scoped_ptr<RecordIterator> iter(
+                collection->getRecordStore()->getIteratorForRepair(&txn));
+            for (DiskLoc currLoc = iter->getNext(); !currLoc.isNull(); currLoc = iter->getNext()) {
+                if (logger::globalLogDomain()->shouldLog(logger::LogSeverity::Debug(1))) {
+                    toolInfoLog() << currLoc;
+                }
+
+                BSONObj obj;
+                try {
+                    obj = collection->docFor(&txn, currLoc);
+
+                    // If this is a corrupted object, just skip it, but do not abort the scan
+                    //
+                    if (!obj.valid()) {
+                        continue;
+                    }
+
+                    if (logger::globalLogDomain()->shouldLog(logger::LogSeverity::Debug(1))) {
+                        toolInfoLog() << obj;
+                    }
+
+                    // Write valid object to output stream.
+                    out.write(obj.objdata(), obj.objsize());
+                }
+                catch (std::exception& ex) {
+                    toolError() << "found invalid document @ " << currLoc << " " << ex.what();
+                    if ( ! obj.isEmpty() ) {
+                        try {
+                            toolError() << "first element: " << obj.firstElement();
+                        }
+                        catch ( std::exception& ) {
+                            toolError() << "unable to log invalid document @ " << currLoc;
+                        }
+                    }
+                }
+            }
+        }
+        catch (DBException& e) {
+            toolError() << "ERROR recovering: " << _ns << " " << e.toString();
+        }
+        cx.commit();
+    }
+
+    /**
+     * Returns a valid filestream if output file is specified and is not "-".
+     */
+    auto_ptr<ofstream> _createOutputFile() {
+        auto_ptr<ofstream> fileStream;
+        if (mongoShimGlobalParams.outputFileSpecified && mongoShimGlobalParams.outputFile != "-") {
+            size_t idx = mongoShimGlobalParams.outputFile.rfind("/");
+            if (idx != string::npos) {
+                string dir = mongoShimGlobalParams.outputFile.substr(0 , idx + 1);
+                boost::filesystem::create_directories(dir);
+            }
+            fileStream.reset(new ofstream(mongoShimGlobalParams.outputFile.c_str(),
+                                          ios_base::out | ios_base::binary));
+        }
+        return fileStream;
+    }
+
     string _ns;
 };
 
