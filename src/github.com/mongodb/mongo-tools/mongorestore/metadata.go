@@ -3,11 +3,14 @@ package mongorestore
 import (
 	"fmt"
 	"github.com/mongodb/mongo-tools/common/bsonutil"
+	"github.com/mongodb/mongo-tools/common/db"
 	"github.com/mongodb/mongo-tools/common/json"
 	"github.com/mongodb/mongo-tools/common/log"
 	"github.com/mongodb/mongo-tools/common/util"
 	"gopkg.in/mgo.v2"
 	"gopkg.in/mgo.v2/bson"
+	"os"
+	"strings"
 )
 
 //TODO make this common
@@ -45,13 +48,48 @@ func (restore *MongoRestore) MetadataFromJSON(jsonBytes []byte) (bson.D, []Index
 	for i := range meta.Indexes {
 		// remove "key" and "v" from the map versions
 		delete(metaAsMap.Indexes[i], "key")
-		if !restore.OutputOptions.KeepIndexVersion {
-			delete(metaAsMap.Indexes[i], "v")
-		}
 		meta.Indexes[i].Options = metaAsMap.Indexes[i]
 	}
 
 	return meta.Options, meta.Indexes, nil
+}
+
+//TODO test this
+func (restore *MongoRestore) IndexesFromBSON(intent *Intent, bsonFile string) ([]IndexDocument, error) {
+	log.Logf(2, "scanning %v for indexes on %v collections", bsonFile, intent.C)
+
+	rawFile, err := os.Open(bsonFile)
+	if err != nil {
+		return nil, fmt.Errorf("error reading index bson file %v: %v", bsonFile, err)
+	}
+
+	bsonSource := db.NewDecodedBSONSource(db.NewBSONSource(rawFile))
+	defer bsonSource.Close()
+
+	// iterate over stored indexes, saving all that match the collection
+	indexDocument := &IndexDocument{}
+	collectionIndexes := []IndexDocument{}
+	for bsonSource.Next(indexDocument) {
+		namespace := indexDocument.Options["ns"].(string)
+		if stripDBFromNS(namespace) == intent.C {
+			log.Logf(3, "\tfound index %v", indexDocument.Options["name"])
+			collectionIndexes = append(collectionIndexes, *indexDocument)
+		}
+
+	}
+	if bsonSource.Err() != nil {
+		return nil, fmt.Errorf("error scanning system.indexes for %v indexes: %v", intent.C, err)
+	}
+
+	return collectionIndexes, nil
+}
+
+func stripDBFromNS(ns string) string {
+	i := strings.Index(ns, ".")
+	if i > 0 && i < len(ns) {
+		return ns[i+1:]
+	}
+	return ns
 }
 
 func (restore *MongoRestore) DBHasCollection(intent *Intent) (bool, error) {
@@ -69,8 +107,14 @@ func (restore *MongoRestore) DBHasCollection(intent *Intent) (bool, error) {
 }
 
 func (restore *MongoRestore) InsertIndex(intent *Intent, index IndexDocument) error {
-	//first, update the namespace of the index before inserting
+	// first, update the namespace of the index before inserting
 	index.Options["ns"] = intent.Key()
+
+	// remove the index version, forcing an update,
+	// unless we specifically want to keey it
+	if !restore.OutputOptions.KeepIndexVersion {
+		delete(index.Options, "v")
+	}
 
 	// overwrite safety to make sure we catch errors
 	insertStream, err := restore.cmdRunner.OpenInsertStream(intent.DB, "system.indexes", &mgo.Safe{})
@@ -88,7 +132,6 @@ func (restore *MongoRestore) InsertIndex(intent *Intent, index IndexDocument) er
 }
 
 func (restore *MongoRestore) CreateCollection(intent *Intent, options bson.D) error {
-
 	jsonCommand, err := bsonutil.ConvertBSONValueToJSON(
 		append(bson.D{{"create", intent.C}}, options...),
 	)

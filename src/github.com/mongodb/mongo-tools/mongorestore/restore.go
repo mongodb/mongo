@@ -61,6 +61,16 @@ func (restore *MongoRestore) RestoreIntent(intent *Intent) error {
 	var options bson.D
 	var indexes []IndexDocument
 
+	// get indexes from system.indexes dump if we have it but don't have metadata files
+	if intent.MetadataPath == "" && restore.manager.SystemIndexes(intent.DB) != nil {
+		systemIndexesFile := restore.manager.SystemIndexes(intent.DB).BSONPath
+		log.Logf(0, "no metadata file; reading indexes from %v", systemIndexesFile)
+		indexes, err = restore.IndexesFromBSON(intent, systemIndexesFile)
+		if err != nil {
+			return fmt.Errorf("error reading indexes: %v", err)
+		}
+	}
+
 	//first create collection with options
 	if intent.MetadataPath != "" && !restore.OutputOptions.NoOptionsRestore {
 		log.Logf(0, "reading metadata file from %v", intent.MetadataPath)

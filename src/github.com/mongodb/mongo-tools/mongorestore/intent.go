@@ -22,6 +22,10 @@ func (it *Intent) IsOplog() bool {
 	return it.DB == "" && it.C == "oplog"
 }
 
+func (it *Intent) IsSystemIndexes() bool {
+	return it.C == "system.indexes" && it.BSONPath != ""
+}
+
 // Intent Manager
 // TODO make this an interface, for testing ease
 
@@ -38,12 +42,14 @@ type IntentManager struct {
 	// handled outside of the basic logic of the tool
 	oplogIntent         *Intent
 	usersAndRolesIntent *Intent
+	indexIntents        map[string]*Intent
 }
 
 func NewIntentManager() *IntentManager {
 	return &IntentManager{
-		intents: map[string]*Intent{},
-		queue:   []*Intent{},
+		intents:      map[string]*Intent{},
+		queue:        []*Intent{},
+		indexIntents: map[string]*Intent{},
 	}
 }
 
@@ -60,7 +66,10 @@ func (manager *IntentManager) Put(intent *Intent) {
 		manager.oplogIntent = intent
 		return
 	}
-
+	if intent.IsSystemIndexes() {
+		manager.indexIntents[intent.DB] = intent
+		return
+	}
 	// TODO usersAndRoles???
 
 	// BSON and metadata files for the same collection are merged
@@ -104,4 +113,9 @@ func (manager *IntentManager) Pop() *Intent {
 // a very different way from other collections.
 func (manager *IntentManager) Oplog() *Intent {
 	return manager.oplogIntent
+}
+
+// SystemIndexes returns the system.indexes bson for a database
+func (manager *IntentManager) SystemIndexes(dbName string) *Intent {
+	return manager.indexIntents[dbName]
 }
