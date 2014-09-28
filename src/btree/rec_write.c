@@ -3139,7 +3139,7 @@ __rec_col_int(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 	    session, r, page, page->pg_intl_recno, btree->maxintlpage));
 
 	/* For each entry in the in-memory page... */
-	WT_INTL_FOREACH_BEGIN(page, ref) {
+	WT_INTL_FOREACH_BEGIN(session, page, ref) {
 		/* Update the starting record number in case we split. */
 		r->recno = ref->key.recno;
 
@@ -3934,7 +3934,7 @@ __rec_row_int(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 	r->cell_zero = 1;
 
 	/* For each entry in the in-memory page... */
-	WT_INTL_FOREACH_BEGIN(page, ref) {
+	WT_INTL_FOREACH_BEGIN(session, page, ref) {
 		/*
 		 * There are different paths if the key is an overflow item vs.
 		 * a straight-forward on-page value.   If an overflow item, we

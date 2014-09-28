@@ -568,7 +568,7 @@ __btree_preload(WT_SESSION_IMPL *session)
 	bm = btree->bm;
 
 	/* Pre-load the second-level internal pages. */
-	WT_INTL_FOREACH_BEGIN(btree->root.page, ref) {
+	WT_INTL_FOREACH_BEGIN(session, btree->root.page, ref) {
 		WT_RET(__wt_ref_info(session, ref, &addr, &addr_size, NULL));
 		if (addr != NULL)
 			WT_RET(bm->preload(bm, session, addr, addr_size));

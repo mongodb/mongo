@@ -404,20 +404,34 @@ struct __wt_page {
 #undef	pg_intl_recno
 #define	pg_intl_recno			u.intl.recno
 #define	pg_intl_parent_ref		u.intl.parent_ref
+
+	/*
+	 * Macros to copy/set the index because the name is obscured to ensure
+	 * the field isn't read multiple times.
+	 */
 #define	WT_INTL_INDEX_COPY(page)	((page)->u.intl.__index)
 #define	WT_INTL_INDEX_SET(page, v) do {					\
 	WT_WRITE_BARRIER();						\
 	((page)->u.intl.__index) = (v);					\
 } while (0)
-#define	WT_INTL_FOREACH_BEGIN(page, ref) do {				\
+
+	/*
+	 * Macro to walk the list of references in an internal page.
+	 */
+#define	WT_INTL_FOREACH_BEGIN(session, page, ref) do {			\
 	WT_PAGE_INDEX *__pindex;					\
 	WT_REF **__refp;						\
+	WT_SESSION_IMPL *__session = (session);				\
 	uint32_t __entries;						\
+	WT_ENTER_PAGE_INDEX(session);					\
 	for (__pindex = WT_INTL_INDEX_COPY(page),			\
 	    __refp = __pindex->index,					\
 	    __entries = __pindex->entries; __entries > 0; --__entries) {\
 		(ref) = *__refp++;
-#define	WT_INTL_FOREACH_END	} } while (0)
+#define	WT_INTL_FOREACH_END						\
+		}							\
+		WT_LEAVE_PAGE_INDEX(__session);				\
+	} while (0)
 
 		/* Row-store leaf page. */
 		struct {
