@@ -8,15 +8,10 @@
  */
 
 function authAllNodes() {
-    assert.soon(function () {
-        for (var n = 0; n < rst.nodes.length; n++) {
-            var status = rst.nodes[n].getDB("admin").auth("root", "pwd");
-            if (status === 0) {
-                return false;
-            }
-        }
-        return true;
-    }, "Adding root user didn't replicate");
+    for (var n = 0; n < rst.nodes.length; n++) {
+        var status = rst.nodes[n].getDB("admin").auth("root", "pwd");
+        assert.eq(status, 1);
+    }
 };
 
 // If we are running in use-x509 passthrough mode, turn it off
@@ -28,14 +23,15 @@ opts = {sslMode:"allowSSL", sslPEMKeyFile: SERVER_CERT,
         sslAllowInvalidCertificates: "",
         clusterAuthMode:"sendKeyFile", keyFile: KEYFILE,
         sslCAFile: CA_CERT};
-var rst = new ReplSetTest({ name: 'sslSet', nodes: 3, nodeOptions : opts });
+var NUM_NODES = 3;
+var rst = new ReplSetTest({ name: 'sslSet', nodes: NUM_NODES, nodeOptions : opts });
 rst.startSet();
 rst.initiate();
 
 // Connect to master and do some basic operations
 var rstConn1 = rst.getMaster();
 print("Performing basic operations on master.");
-rstConn1.getDB("admin").createUser({user:"root", pwd:"pwd", roles:["root"]});
+rstConn1.getDB("admin").createUser({user:"root", pwd:"pwd", roles:["root"]}, {w: NUM_NODES});
 rstConn1.getDB("admin").auth("root", "pwd");
 rstConn1.getDB("test").a.insert({a:1, str:"TESTTESTTEST"});
 rstConn1.getDB("test").a.insert({a:1, str:"WOOPWOOPWOOPWOOPWOOP"});
