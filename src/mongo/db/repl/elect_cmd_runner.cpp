@@ -46,7 +46,7 @@ namespace repl {
             const ReplicaSetConfig& rsConfig,
             int selfIndex,
             const std::vector<HostAndPort>& targets,
-            long long round)
+            OID round)
         : _actualResponses(0),
           _sufficientResponsesReceived(false),
           _rsConfig(rsConfig),
@@ -96,6 +96,9 @@ namespace repl {
         if (_receivedVotes >= _rsConfig.getMajorityNumber()) {
             return true;
         }
+        if (_receivedVotes < 0) {
+            return true;
+        }
         if (_actualResponses == _targets.size()) {
             return true;
         }
@@ -137,8 +140,7 @@ namespace repl {
             const std::vector<HostAndPort>& targets,
             const stdx::function<void ()>& onCompletion) {
 
-        const long long round(executor->nextRandomInt64(std::numeric_limits<int64_t>::max()));
-        _algorithm.reset(new Algorithm(currentConfig, selfIndex, targets, round));
+        _algorithm.reset(new Algorithm(currentConfig, selfIndex, targets, OID::gen()));
         _runner.reset(new ScatterGatherRunner(_algorithm.get()));
         return _runner->start(executor, onCompletion);
     }

@@ -104,6 +104,18 @@ namespace {
                     "round" << 380865962699346850ll);
     }
 
+    BSONObj stripRound(const BSONObj& orig) {
+        BSONObjBuilder builder;
+        for (BSONObjIterator iter(orig); iter.more(); iter.next()) {
+            BSONElement e = *iter;
+            if (e.fieldNameStringData() == "round") {
+                continue;
+            }
+            builder.append(e);
+        }
+        return builder.obj();
+    }
+
     // This is necessary because the run method must be scheduled in the Replication Executor
     // for correct concurrency operation.
     void ElectCmdRunnerTest::electCmdRunnerRunner(
@@ -183,7 +195,7 @@ namespace {
         _net->enterNetwork();
         const NetworkInterfaceMock::NetworkOperationIterator noi = _net->getNextReadyRequest();
         ASSERT_EQUALS("admin", noi->getRequest().dbname);
-        ASSERT_EQUALS(electRequest, noi->getRequest().cmdObj);
+        ASSERT_EQUALS(stripRound(electRequest), stripRound(noi->getRequest().cmdObj));
         ASSERT_EQUALS(HostAndPort("h1"), noi->getRequest().target);
         _net->scheduleResponse(noi,
                                startDate + 10,
@@ -249,7 +261,7 @@ namespace {
             _checker.reset(new ElectCmdRunner::Algorithm(config,
                                                          selfConfigIndex,
                                                          hosts,
-                                                         1954878951734LL));
+                                                         OID()));
         }
 
         virtual void tearDown() {
