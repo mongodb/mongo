@@ -247,9 +247,7 @@ namespace {
         _topCoordDriverThread.reset(new boost::thread(stdx::bind(&ReplicationExecutor::run,
                                                                  &_replExecutor)));
 
-        _syncSourceFeedbackThread.reset(new boost::thread(
-                stdx::bind(&ReplicationCoordinatorExternalState::runSyncSourceFeedback,
-                           _externalState.get())));
+        _externalState->startThreads();
 
         bool doneLoadingConfig = _startLoadLocalConfig(txn);
         if (doneLoadingConfig) {
@@ -292,7 +290,6 @@ namespace {
         _replExecutor.shutdown();
         _topCoordDriverThread->join(); // must happen outside _mutex
         _externalState->shutdown();
-        _syncSourceFeedbackThread->join();
     }
 
     ReplSettings& ReplicationCoordinatorImpl::getSettings() {

@@ -155,7 +155,7 @@ namespace repl {
         _veto.clear();
     }
 
-    void startSyncThread() {
+    void runSyncThread() {
         Client::initThread("rsSync");
         replLocalAuth();
         ReplicationCoordinator* replCoord = getGlobalReplicationCoordinator();

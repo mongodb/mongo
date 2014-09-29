@@ -48,7 +48,7 @@ namespace repl {
 
         ReplicationCoordinatorExternalStateMock();
         virtual ~ReplicationCoordinatorExternalStateMock();
-        virtual void runSyncSourceFeedback();
+        virtual void startThreads();
         virtual void shutdown();
         virtual void forwardSlaveHandshake();
         virtual void forwardSlaveProgress();

@@ -572,10 +572,6 @@ namespace repl {
         // Pointer to the ReplicationCoordinatorExternalState owned by this ReplicationCoordinator.
         boost::scoped_ptr<ReplicationCoordinatorExternalState> _externalState;            // (PS)
 
-        // Thread that _syncSourceFeedback runs in to send replSetUpdatePosition commands upstream.
-        // Set in startReplication() and thereafter accessed in shutdown.
-        boost::scoped_ptr<boost::thread> _syncSourceFeedbackThread;                       // (I)
-
         // Thread that drives actions in the topology coordinator
         // Set in startReplication() and thereafter accessed in shutdown.
         boost::scoped_ptr<boost::thread> _topCoordDriverThread;                           // (I)

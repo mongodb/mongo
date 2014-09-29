@@ -45,6 +45,8 @@
 #include "mongo/db/repl/connections.h"
 #include "mongo/db/repl/isself.h"
 #include "mongo/db/repl/oplog.h"
+#include "mongo/db/repl/rs_sync.h"
+#include "mongo/stdx/functional.h"
 #include "mongo/util/mongoutils/str.h"
 #include "mongo/util/net/hostandport.h"
 #include "mongo/util/net/message_port.h"
@@ -65,17 +67,22 @@ namespace {
     ReplicationCoordinatorExternalStateImpl::ReplicationCoordinatorExternalStateImpl() {}
     ReplicationCoordinatorExternalStateImpl::~ReplicationCoordinatorExternalStateImpl() {}
 
-    void ReplicationCoordinatorExternalStateImpl::runSyncSourceFeedback() {
-        _syncSourceFeedback.run();
+    void ReplicationCoordinatorExternalStateImpl::startThreads() {
+        _backgroundSyncThread.reset(new boost::thread(runSyncThread));
+        BackgroundSync* bgsync = BackgroundSync::get();
+        _producerThread.reset(new boost::thread(stdx::bind(&BackgroundSync::producerThread,
+                                                           bgsync)));
+        _syncSourceFeedbackThread.reset(new boost::thread(stdx::bind(&SyncSourceFeedback::run,
+                                                                     &_syncSourceFeedback)));
     }
 
     void ReplicationCoordinatorExternalStateImpl::shutdown() {
         _syncSourceFeedback.shutdown();
         BackgroundSync* bgsync = BackgroundSync::get();
-        // bgsync can be null if we shut down prior to installing our initial replset config.
-        if (bgsync) {
-            bgsync->shutdown();
-        }
+        bgsync->shutdown();
+        _syncSourceFeedbackThread->join();
+        _backgroundSyncThread->join();
+        _producerThread->join();
     }
 
     void ReplicationCoordinatorExternalStateImpl::forwardSlaveHandshake() {

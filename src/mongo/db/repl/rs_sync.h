@@ -44,5 +44,8 @@ namespace repl {
     // TODO: move hbmsg into an error-keeping class (SERVER-4444)
     void sethbmsg(const std::string& s, const int logLevel=0);
 
+    // Body of the thread that will do the background sync.
+    void runSyncThread();
+
 } // namespace repl
 } // namespace mongo

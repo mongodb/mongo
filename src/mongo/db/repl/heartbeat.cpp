@@ -44,6 +44,7 @@
 #include "mongo/db/repl/repl_set_heartbeat_response.h"
 #include "mongo/db/repl/replset_commands.h"
 #include "mongo/db/repl/rs.h"
+#include "mongo/db/repl/rs_sync.h"
 #include "mongo/db/repl/server.h"
 #include "mongo/db/storage/storage_engine.h"
 #include "mongo/util/background.h"
@@ -200,8 +201,6 @@ namespace {
         task::repeat(task, 2000);
     }
 
-    void startSyncThread();
-
     /** called during repl set startup.  caller expects it to return fairly quickly.
         note ReplSet object is only created once we get a config - so this won't run
         until the initiation.
@@ -218,7 +217,7 @@ namespace {
         // so that we needn't check for its existence
         BackgroundSync* sync = BackgroundSync::get();
 
-        boost::thread t(startSyncThread);
+        boost::thread t(runSyncThread);
                         
         boost::thread producer(stdx::bind(&BackgroundSync::producerThread, sync));
         boost::thread feedback(stdx::bind(&SyncSourceFeedback::run,
