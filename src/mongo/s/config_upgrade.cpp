@@ -505,11 +505,9 @@ namespace mongo {
         upgradeLock.setLockMessage(stream() << "upgrading config database to new format v"
                                             << CURRENT_CONFIG_VERSION);
 
-        if (!upgradeLock.acquire(20 * 60 * 1000, errMsg)) {
-
-            *errMsg = stream() << "could not acquire upgrade lock for config upgrade to v"
-                               << CURRENT_CONFIG_VERSION << causedBy(errMsg);
-
+        Status acquisitionStatus = upgradeLock.acquire(20 * 60 * 1000);
+        if (!acquisitionStatus.isOK()) {
+            *errMsg = acquisitionStatus.toString();
             return false;
         }
 

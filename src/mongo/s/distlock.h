@@ -166,12 +166,11 @@ namespace mongo {
         bool lock_try( const std::string& why , bool reenter = false, BSONObj * other = 0, double timeout = 0.0 );
 
         /**
-         * Returns true if we currently believe we hold this lock and it was possible to
-         * confirm that, within 'timeout' seconds, if provided, with the config servers. If the
-         * lock is not held or if we failed to contact the config servers within the timeout,
-         * returns false.
+         * Returns OK if this lock is held (but does not guarantee that this owns it) and
+         * it was possible to confirm that, within 'timeout' seconds, if provided, with the
+         * config servers.
          */
-        bool isLockHeld( double timeout, std::string* errMsg );
+        Status checkStatus(double timeout);
 
         /**
          * Releases a previously taken lock.
@@ -243,37 +242,39 @@ namespace mongo {
     class MONGO_CLIENT_API dist_lock_try {
     public:
 
-    	dist_lock_try() : _lock(NULL), _got(false) {}
+        dist_lock_try() : _lock(NULL), _got(false) {}
 
-    	dist_lock_try( const dist_lock_try& that ) : _lock(that._lock), _got(that._got), _other(that._other) {
-    		_other.getOwned();
+        dist_lock_try( const dist_lock_try& that ) :
+                _lock(that._lock), _got(that._got), _other(that._other) {
 
-    		// Make sure the lock ownership passes to this object,
-    		// so we only unlock once.
-    		((dist_lock_try&) that)._got = false;
-    		((dist_lock_try&) that)._lock = NULL;
-    		((dist_lock_try&) that)._other = BSONObj();
-    	}
+            _other.getOwned();
 
-    	// Needed so we can handle lock exceptions in context of lock try.
-    	dist_lock_try& operator=( const dist_lock_try& that ){
+            // Make sure the lock ownership passes to this object,
+            // so we only unlock once.
+            ((dist_lock_try&) that)._got = false;
+            ((dist_lock_try&) that)._lock = NULL;
+            ((dist_lock_try&) that)._other = BSONObj();
+        }
 
-    	    if( this == &that ) return *this;
+        // Needed so we can handle lock exceptions in context of lock try.
+        dist_lock_try& operator=( const dist_lock_try& that ){
 
-    	    _lock = that._lock;
-    	    _got = that._got;
-    	    _other = that._other;
-    	    _other.getOwned();
-    	    _why = that._why;
+            if( this == &that ) return *this;
 
-    	    // Make sure the lock ownership passes to this object,
-    	    // so we only unlock once.
-    	    ((dist_lock_try&) that)._got = false;
-    	    ((dist_lock_try&) that)._lock = NULL;
-    	    ((dist_lock_try&) that)._other = BSONObj();
+            _lock = that._lock;
+            _got = that._got;
+            _other = that._other;
+            _other.getOwned();
+            _why = that._why;
 
-    	    return *this;
-    	}
+            // Make sure the lock ownership passes to this object,
+            // so we only unlock once.
+            ((dist_lock_try&) that)._got = false;
+            ((dist_lock_try&) that)._lock = NULL;
+            ((dist_lock_try&) that)._other = BSONObj();
+
+            return *this;
+        }
 
         dist_lock_try( DistributedLock * lock , const std::string& why, double timeout = 0.0 )
             : _lock(lock), _why(why) {
@@ -288,22 +289,20 @@ namespace mongo {
         }
 
         /**
-         * Returns false if the lock is known _not_ to be held, otherwise asks the underlying
-         * lock to issue a 'isLockHeld' call and returns whatever that calls does.
+         * Returns not OK  if the lock is known _not_ to be held.
          */
-        bool isLockHeld( double timeout, std::string* errMsg) {
+        Status checkStatus(double timeout) {
             if ( !_lock ) {
-                *errMsg = "Lock is not currently set up";
-                return false;
+                return Status(ErrorCodes::LockFailed, "Lock is not currently set up");
             }
 
             if ( !_got ) {
-                *errMsg = str::stream() << "Lock " << _lock->_name << " is currently held by "
-                                        << _other;
-                return false;
+                return Status(ErrorCodes::LockFailed,
+                        str::stream() << "Lock " << _lock->_name << " is currently held by "
+                                      << _other);
             }
 
-            return _lock->isLockHeld( timeout, errMsg );
+            return _lock->checkStatus(timeout);
         }
 
         bool got() const { return _got; }
@@ -332,10 +331,13 @@ namespace mongo {
         ~ScopedDistributedLock();
 
         /**
-         * Tries once to obtain a lock, and can fail with an error message.
-         * Returns true if the lock was successfully acquired.
+         * Tries to obtain the lock once.
+         *
+         * Returns OK if the lock was successfully acquired.
+         * Returns ErrorCodes::DistributedClockSkewed when a clock skew is detected.
+         * Returns ErrorCodes::LockBusy if the lock is being held.
          */
-        bool tryAcquire(std::string* errMsg);
+        Status tryAcquire();
 
         /**
          * Tries to unlock the lock if acquired.  Cannot report an error or block indefinitely
@@ -345,20 +347,23 @@ namespace mongo {
 
         /**
          * Tries multiple times to unlock the lock, using the specified lock try interval, until
-         * a certain amount of time has passed.  An error message is immediately returned if the
-         * lock acquisition attempt fails with an error message.
+         * a certain amount of time has passed.
+         *
          * waitForMillis = 0 indicates there should only be one attempt to acquire the lock, and
          * no waiting.
          * waitForMillis = -1 indicates we should retry indefinitely.
-         * @return true if the lock was acquired
+         *
+         * Returns OK if the lock was successfully acquired.
+         * Returns ErrorCodes::DistributedClockSkewed when a clock skew is detected.
+         * Returns ErrorCodes::LockBusy if the lock is being held.
          */
-        bool acquire(long long waitForMillis, std::string* errMsg);
+        Status acquire(long long waitForMillis);
 
         /**
          * If lock is held, remotely verifies that the lock has not been forced as a sanity check.
-         * If the lock is not held or cannot be verified, returns false with errMsg.
+         * If the lock is not held or cannot be verified, returns not OK.
          */
-        bool verifyLockHeld(std::string* errMsg);
+        Status checkStatus();
 
         bool isAcquired() const {
             return _acquired;

@@ -348,11 +348,11 @@ namespace mongo {
                 configServer.getConnectionString(), "authorizationData"));
         lockHolder->setLockMessage(why.toString());
 
-        std::string errmsg;
-        if (!lockHolder->acquire(_authzUpdateLockAcquisitionTimeoutMillis, &errmsg)) {
+        Status acquisitionStatus = lockHolder->acquire(_authzUpdateLockAcquisitionTimeoutMillis);
+        if (!acquisitionStatus.isOK()) {
             warning() <<
                     "Error while attempting to acquire distributed lock for user modification: " <<
-                    errmsg << endl;
+                    acquisitionStatus.toString() << endl;
             return false;
         }
         _authzDataUpdateLock.reset(lockHolder.release());
