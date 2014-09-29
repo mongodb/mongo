@@ -189,8 +189,14 @@ namespace mongo {
          *
          * This functionality is also used for releasing locks on databases and collections
          * when cursors are dormant and waiting for a getMore request.
+         *
+         * Returns true if locks are released.  It is expected that restoreLockState will be called
+         * in the future.
+         *
+         * Returns false if locks are not released.  restoreLockState(...) does not need to be
+         * called in this case.
          */
-        virtual void saveLockStateAndUnlock(LockSnapshot* stateOut) = 0;
+        virtual bool saveLockStateAndUnlock(LockSnapshot* stateOut) = 0;
 
         /**
          * Re-locks all locks whose state was stored in 'stateToRestore'.

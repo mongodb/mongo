@@ -91,21 +91,10 @@ namespace mongo {
             EXEC_ERROR,
         };
 
-        static std::string statestr(ExecState s) {
-            if (PlanExecutor::ADVANCED == s) {
-                return "ADVANCED";
-            }
-            else if (PlanExecutor::IS_EOF == s) {
-                return "IS_EOF";
-            }
-            else if (PlanExecutor::DEAD == s) {
-                return "DEAD";
-            }
-            else {
-                verify(PlanExecutor::EXEC_ERROR == s);
-                return "EXEC_ERROR";
-            }
-        }
+        /**
+         * Helper method to aid in displaying an ExecState for debug or other recreational purposes.
+         */
+        static std::string statestr(ExecState s);
 
         //
         // Constructors / destructor.
@@ -166,6 +155,11 @@ namespace mongo {
         const Collection* collection() const;
 
         /**
+         * Return the NS that the query is running over.
+         */
+        const std::string& ns();
+
+        /**
          * Generates a tree of stats objects with a separate lifetime from the execution
          * stage tree wrapped by this PlanExecutor. The caller owns the returned pointer.
          *
@@ -177,28 +171,57 @@ namespace mongo {
         // Methods that just pass down to the PlanStage tree.
         //
 
-        /** TODO document me */
+        /**
+         * Save any state required to either
+         * 1. hibernate waiting for a getMore, or
+         * 2. yield the lock (on applicable storage engines) to allow writes to proceed.
+         */
         void saveState();
 
-        /** TODO document me */
+        /**
+         * Restores the state saved by a saveState() call.
+         *
+         * Returns true if the state was successfully restored and the execution tree can be
+         * work()'d.
+         *
+         * Returns false otherwise.  The execution tree cannot be worked and should be deleted.
+         */
         bool restoreState(OperationContext* opCtx);
-
-        /** TODO document me */
-        void invalidate(const DiskLoc& dl, InvalidationType type);
 
         //
         // Running Support
         //
 
-        /** TODO document me */
+        /**
+         * Return the next result from the underlying execution tree.
+         *
+         * For read operations, objOut or dlOut are populated with another query result.
+         *
+         * For write operations, the return depends on the particulars of the write stage.
+         */
         ExecState getNext(BSONObj* objOut, DiskLoc* dlOut);
 
-        /** TOOD document me */
+        /**
+         * Returns 'true' if the plan is done producing results (or writing), 'false' otherwise.
+         *
+         * Tailable cursors are a possible exception to this: they may have further results even if
+         * isEOF() returns true.
+         */
         bool isEOF();
 
         /**
+         * Execute the plan to completion, throwing out the results.  Used when you want to work the
+         * underlying tree without getting results back.
+         */
+        Status executePlan();
+
+        //
+        // Concurrency-related methods.
+        //
+
+        /**
          * Register this plan executor with the collection cursor cache so that it
-         * receives event notifications.
+         * receives notifications for events that happen while yielding any locks.
          *
          * Deregistration happens automatically when this plan executor is destroyed.
          *
@@ -207,28 +230,22 @@ namespace mongo {
          *  -- InternalPlanner::indexScan(...) (see internal_plans.h)
          *  -- getOplogStartHack(...) (see new_find.cpp)
          *  -- storeCurrentLocs(...) (see d_migrate.cpp)
-         *
-         * TODO: we probably don't need this for 2.8.
          */
         void registerExecInternalPlan();
 
         /**
-         * During the yield, the database we're operating over or any collection we're relying on
+         * If we're yielding locks, the database we're operating over or any collection we're relying on
          * may be dropped.  When this happens all cursors and plan executors on that database and
          * collection are killed or deleted in some fashion. (This is how the _killed gets set.)
          */
         void kill();
 
         /**
-         * Execute the plan to completion, throwing out the results.  Used when you want to work the
-         * underlying tree without getting results back.
+         * If we're yielding locks, writes may occur to documents that we rely on to keep valid
+         * state.  As such, if the plan yields, it must be notified of relevant writes so that
+         * we can ensure that it doesn't crash if we try to access invalid state.
          */
-        Status executePlan();
-
-        /**
-         * Return the NS that the query is running over.
-         */
-        const std::string& ns();
+        void invalidate(const DiskLoc& dl, InvalidationType type);
 
     private:
         /**
@@ -248,6 +265,7 @@ namespace mongo {
         // Deregisters this executor when it is destroyed.
         boost::scoped_ptr<ScopedExecutorRegistration> _safety;
 
+        // What namespace are we operating over?
         std::string _ns;
 
         // Did somebody drop an index we care about or the namespace we're looking at?  If so,

@@ -163,22 +163,45 @@ namespace newlm {
         locker.saveLockStateAndUnlock(&lockInfo);
         ASSERT_EQUALS(0U, lockInfo.locks.size());
 
-        // Lock the global lock twice.
-        locker.lockGlobal(MODE_IX);
+        // Lock the global lock, but just once.
         locker.lockGlobal(MODE_IX);
 
         // We've locked the global lock.  This should be reflected in the lockInfo.
         locker.saveLockStateAndUnlock(&lockInfo);
         ASSERT(!locker.isLocked());
         ASSERT_EQUALS(MODE_IX, lockInfo.globalMode);
-        ASSERT_EQUALS(2U, lockInfo.globalRecursiveCount);
+        ASSERT_EQUALS(1U, lockInfo.globalRecursiveCount);
 
         // Restore the lock(s) we had.
         locker.restoreLockState(lockInfo);
 
-        // We have to unlock the global lock twice because we locked it twice.
-        ASSERT(!locker.unlockAll());
         ASSERT(locker.isLocked());
+        ASSERT(locker.unlockAll());
+    }
+
+    /**
+     * Test that we don't unlock when we have the global lock more than once.
+     */
+    TEST(Locker, saveAndRestoreGlobalAcquiredTwice) {
+        Locker::LockSnapshot lockInfo;
+
+        LockerImpl locker(1);
+
+        // No lock requests made, no locks held.
+        locker.saveLockStateAndUnlock(&lockInfo);
+        ASSERT_EQUALS(0U, lockInfo.locks.size());
+
+        // Lock the global lock.
+        locker.lockGlobal(MODE_IX);
+        locker.lockGlobal(MODE_IX);
+
+        // This shouldn't actually unlock as we're in a nested scope.
+        ASSERT(!locker.saveLockStateAndUnlock(&lockInfo));
+
+        ASSERT(locker.isLocked());
+
+        // We must unlockAll twice.
+        ASSERT(!locker.unlockAll());
         ASSERT(locker.unlockAll());
     }
 
