@@ -384,7 +384,10 @@ namespace {
                     invariant(_ridMemberMap.count(rid));
                     Member* mem = _ridMemberMap[rid];
                     invariant(mem);
-                    config = BSON("_id" << mem->id());
+                    config = BSON("_id" << mem->id() << "host" << mem->h().toString());
+                }
+                else if (getReplicationMode() == modeMasterSlave){
+                    config = BSON("host" << txn->getClient()->getRemote().toString());
                 }
                 LOG(2) << "received notification that node with RID " << rid << " and config "
                        << config << " has reached optime: " << ts;
@@ -448,8 +451,8 @@ namespace {
     }
 
     int LegacyReplicationCoordinator::getMyId() const {
-        invariant(false);
-        return 0;
+        invariant(theReplSet);
+        return theReplSet->myConfig()._id;
     }
 
     void LegacyReplicationCoordinator::setFollowerMode(const MemberState& newState) {
