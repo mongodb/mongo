@@ -63,10 +63,6 @@ namespace {
         }
     }
 
-    NetworkInterfaceMockWithMap* ReplCoordTest::getNetWithMap() {
-        return dynamic_cast<NetworkInterfaceMockWithMap*>(_net);
-    }
-
     void ReplCoordTest::init() {
         invariant(!_repl);
         invariant(!_callShutdown);
@@ -75,7 +71,7 @@ namespace {
         const int64_t seed = 0;
 
         _topo = new TopologyCoordinatorImpl(Seconds(0));
-        _net = new NetworkInterfaceMockWithMap;
+        _net = new NetworkInterfaceMock;
         _externalState = new ReplicationCoordinatorExternalStateMock;
         _repl.reset(new ReplicationCoordinatorImpl(_settings,
                                                    _externalState,
@@ -140,6 +136,7 @@ namespace {
 
     void ReplCoordTest::shutdown() {
         invariant(_callShutdown);
+        _net->exitNetwork();
         _repl->shutdown();
         _callShutdown = false;
     }

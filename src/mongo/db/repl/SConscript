@@ -91,14 +91,21 @@ env.Library('repl_coordinator_impl',
                      'topology_coordinator',
                  ])
 
+env.Library('repl_coordinator_test_fixture',
+            [
+                'repl_coordinator_test_fixture.cpp',
+            ],
+            LIBDEPS=[
+                'repl_coordinator_impl',
+                'replmocks',
+                'topology_coordinator_impl',
+            ])
+
 env.CppUnitTest('repl_coordinator_impl_test',
                 [
                     'repl_coordinator_impl_test.cpp',
-                    'repl_coordinator_test_fixture.cpp',
                 ],
-                LIBDEPS=['repl_coordinator_impl',
-                         'topology_coordinator_impl',
-                         'replmocks'])
+                LIBDEPS=['repl_coordinator_test_fixture'])
 
 env.CppUnitTest('replica_set_config_checks_test',
                 'replica_set_config_checks_test.cpp',
@@ -129,9 +136,7 @@ env.CppUnitTest('elect_cmd_runner_test',
 
 env.CppUnitTest('repl_coordinator_impl_elect_test',
                 'repl_coordinator_impl_elect_test.cpp',
-                LIBDEPS=['repl_coordinator_impl',
-                         'topology_coordinator_impl',
-                         'replmocks'])
+                LIBDEPS=['repl_coordinator_test_fixture'])
 
 env.Library('repl_coordinator_interface',
             ['repl_coordinator.cpp',
@@ -144,10 +149,6 @@ env.Library('repl_coordinator_interface',
 env.Library('repl_coordinator_global',
             'repl_coordinator_global.cpp',
             LIBDEPS=['repl_coordinator_interface'])
-            
-env.CppUnitTest('network_interface_mock_test',
-                'network_interface_mock_test.cpp',
-                LIBDEPS=['replmocks'])
 
 env.Library('replmocks',
             ['repl_coordinator_mock.cpp',

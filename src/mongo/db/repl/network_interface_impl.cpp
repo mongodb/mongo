@@ -43,8 +43,116 @@
 namespace mongo {
 namespace repl {
 
-    NetworkInterfaceImpl::NetworkInterfaceImpl() {}
-    NetworkInterfaceImpl::~NetworkInterfaceImpl() {}
+    static const size_t kNumThreads = 8;
+
+    NetworkInterfaceImpl::NetworkInterfaceImpl() : _isExecutorRunnable(false), _inShutdown(false) {}
+
+    NetworkInterfaceImpl::~NetworkInterfaceImpl() { }
+
+    void NetworkInterfaceImpl::startup() {
+        boost::lock_guard<boost::mutex> lk(_mutex);
+        invariant(!_inShutdown);
+        if (!_threads.empty()) {
+            return;
+        }
+        for (size_t i = 0; i < kNumThreads; ++i) {
+            _threads.push_back(
+                    boost::shared_ptr<boost::thread>(
+                            new boost::thread(
+                                    stdx::bind(&NetworkInterfaceImpl::_consumeNetworkRequests,
+                                               this))));
+        }
+    }
+
+    void NetworkInterfaceImpl::shutdown() {
+        boost::unique_lock<boost::mutex> lk(_mutex);
+        _inShutdown = true;
+        _hasPending.notify_all();
+        lk.unlock();
+        std::for_each(_threads.begin(),
+                      _threads.end(),
+                      stdx::bind(&boost::thread::join, stdx::placeholders::_1));
+    }
+
+    void NetworkInterfaceImpl::signalWorkAvailable() {
+        boost::lock_guard<boost::mutex> lk(_mutex);
+        _signalWorkAvailable_inlock();
+    }
+
+    void NetworkInterfaceImpl::_signalWorkAvailable_inlock() {
+        if (!_isExecutorRunnable) {
+            _isExecutorRunnable = true;
+            _isExecutorRunnableCondition.notify_one();
+        }
+    }
+
+    void NetworkInterfaceImpl::waitForWork() {
+        boost::unique_lock<boost::mutex> lk(_mutex);
+        while (!_isExecutorRunnable) {
+            _isExecutorRunnableCondition.wait(lk);
+        }
+        _isExecutorRunnable = false;
+    }
+
+    void NetworkInterfaceImpl::waitForWorkUntil(Date_t when) {
+        boost::unique_lock<boost::mutex> lk(_mutex);
+        while (!_isExecutorRunnable) {
+            const Milliseconds waitTime(when - now());
+            if (waitTime <= Milliseconds(0)) {
+                break;
+            }
+            _isExecutorRunnableCondition.timed_wait(lk, waitTime);
+        }
+        _isExecutorRunnable = false;
+    }
+
+    void NetworkInterfaceImpl::_consumeNetworkRequests() {
+        boost::unique_lock<boost::mutex> lk(_mutex);
+        while (!_inShutdown) {
+            if (_pending.empty()) {
+                _hasPending.wait(lk);
+                continue;
+            }
+            CommandData todo = _pending.front();
+            _pending.pop_front();
+            lk.unlock();
+            todo.onFinish(_runCommand(todo.request));
+            lk.lock();
+            _signalWorkAvailable_inlock();
+        }
+    }
+
+    void NetworkInterfaceImpl::startCommand(
+            const ReplicationExecutor::CallbackHandle& cbHandle,
+            const ReplicationExecutor::RemoteCommandRequest& request,
+            const RemoteCommandCompletionFn& onFinish) {
+        boost::unique_lock<boost::mutex> lk(_mutex);
+        _pending.push_back(CommandData());
+        CommandData& cd = _pending.back();
+        cd.cbHandle = cbHandle;
+        cd.request = request;
+        cd.onFinish = onFinish;
+        _hasPending.notify_one();
+    }
+
+    void NetworkInterfaceImpl::cancelCommand(const ReplicationExecutor::CallbackHandle& cbHandle) {
+        boost::unique_lock<boost::mutex> lk(_mutex);
+        CommandDataList::iterator iter;
+        for (iter = _pending.begin(); iter != _pending.end(); ++iter) {
+            if (iter->cbHandle == cbHandle) {
+                break;
+            }
+        }
+        if (iter == _pending.end()) {
+            return;
+        }
+        const RemoteCommandCompletionFn onFinish = iter->onFinish;
+        _pending.erase(iter);
+        lk.unlock();
+        onFinish(ResponseStatus(ErrorCodes::CallbackCanceled, "Callback canceled"));
+        lk.lock();
+        _signalWorkAvailable_inlock();
+    }
 
     Date_t NetworkInterfaceImpl::now() {
         return curTimeMillis64();
@@ -69,7 +177,7 @@ namespace repl {
         }
     } //namespace
 
-    ResponseStatus NetworkInterfaceImpl::runCommand(
+    ResponseStatus NetworkInterfaceImpl::_runCommand(
             const ReplicationExecutor::RemoteCommandRequest& request) {
 
         try {

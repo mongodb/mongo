@@ -29,24 +29,56 @@
 
 #pragma once
 
-#include "mongo/base/status_with.h"
-#include "mongo/db/jsobj.h"
+#include <boost/shared_ptr.hpp>
+#include <boost/thread.hpp>
+#include <boost/thread/condition_variable.hpp>
+#include <boost/thread/mutex.hpp>
+#include <vector>
+
 #include "mongo/db/repl/replication_executor.h"
-#include "mongo/platform/compiler.h"
-#include "mongo/util/time_support.h"
+#include "mongo/stdx/list.h"
 
 namespace mongo {
 namespace repl {
 
     class NetworkInterfaceImpl : public ReplicationExecutor::NetworkInterface {
     public:
-        NetworkInterfaceImpl();
+        explicit NetworkInterfaceImpl();
         virtual ~NetworkInterfaceImpl();
+        virtual void startup();
+        virtual void shutdown();
+        virtual void waitForWork();
+        virtual void waitForWorkUntil(Date_t when);
+        virtual void signalWorkAvailable();
         virtual Date_t now();
-        virtual ResponseStatus runCommand(
-                const ReplicationExecutor::RemoteCommandRequest& request);
+        virtual void startCommand(
+                const ReplicationExecutor::CallbackHandle& cbHandle,
+                const ReplicationExecutor::RemoteCommandRequest& request,
+                const RemoteCommandCompletionFn& onFinish);
+        virtual void cancelCommand(const ReplicationExecutor::CallbackHandle& cbHandle);
         virtual void runCallbackWithGlobalExclusiveLock(
                 const stdx::function<void (OperationContext*)>& callback);
+
+    private:
+        struct CommandData {
+            ReplicationExecutor::CallbackHandle cbHandle;
+            ReplicationExecutor::RemoteCommandRequest request;
+            RemoteCommandCompletionFn onFinish;
+        };
+        typedef stdx::list<CommandData> CommandDataList;
+        typedef std::vector<boost::shared_ptr<boost::thread> > ThreadList;
+
+        void _consumeNetworkRequests();
+        ResponseStatus _runCommand(const ReplicationExecutor::RemoteCommandRequest& request);
+        void _signalWorkAvailable_inlock();
+
+        boost::mutex _mutex;
+        boost::condition_variable _hasPending;
+        CommandDataList _pending;
+        ThreadList _threads;
+        boost::condition_variable _isExecutorRunnableCondition;
+        bool _isExecutorRunnable;
+        bool _inShutdown;
     };
 
 }  // namespace repl

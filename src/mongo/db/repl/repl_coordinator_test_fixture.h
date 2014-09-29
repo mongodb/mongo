@@ -43,7 +43,6 @@ namespace mongo {
 namespace repl {
 
     class NetworkInterfaceMock;
-    class NetworkInterfaceMockWithMap;
     class ReplicationCoordinatorExternalStateMock;
     class ReplicationCoordinatorImpl;
     class TopologyCoordinatorImpl;
@@ -59,12 +58,6 @@ namespace repl {
     protected:
         virtual void setUp();
         virtual void tearDown();
-
-        /**
-         * Gets the network mock, casted to the mock-with-map form, or NULL if that's an illegal
-         * cast.
-         */
-        NetworkInterfaceMockWithMap* getNetWithMap();
 
         /**
          * Gets the network mock.
