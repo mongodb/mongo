@@ -209,6 +209,7 @@ namespace repl {
                                                  "Request(" << request.target.toString() << ", " <<
                                                  request.dbname << ", " << request.cmdObj << ')'),
                                             false));
+
             if (!result.isBlocked) {
                 return result.response;
             }

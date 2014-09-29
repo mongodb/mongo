@@ -563,7 +563,8 @@ namespace {
         // Verify that replica set names match
         std::string rshb = std::string(args.getSetName());
         if (ourSetName != rshb) {
-            *result = Status(ErrorCodes::BadValue, "repl set names do not match");
+            *result = Status(ErrorCodes::InconsistentReplicaSetNames,
+                             "repl set names do not match");
             log() << "replSet set names do not match, ours: " << ourSetName <<
                 "; remote node's: " << rshb;
             response->noteMismatched();

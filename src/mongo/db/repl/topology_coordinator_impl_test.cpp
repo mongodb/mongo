@@ -2841,8 +2841,8 @@ namespace {
                                                 &response,
                                                 &result);
         ASSERT_EQUALS(ErrorCodes::ShutdownInProgress, result);
-        // hbmsg is always present in ReplSetHeartbeatArgs, but nothing else should be populated
-        ASSERT_EQUALS(1, response.toBSON().nFields());
+        // hbmsg/ok are always present in ReplSetHeartbeatArgs, but nothing else should be populated
+        ASSERT_EQUALS(2, response.toBSON().nFields());
     }
 
     TEST_F(ShutdownInProgressTest, ShutDownInProgressWhenCallbackCanceledStatus) {
@@ -2922,17 +2922,8 @@ namespace {
         ReplSetHeartbeatResponse response;
         Status result(ErrorCodes::InternalError, "prepareHeartbeatResponse didn't set result");
 
-        // prepare response and check the results, including log messages
-        startCapturingLogMessages();
         prepareHeartbeatResponse(args, OpTime(0,0), &response, &result);
-        stopCapturingLogMessages();
-        ASSERT_EQUALS(ErrorCodes::BadValue, result);
-        ASSERT_EQUALS("repl set names do not match", result.reason());
-        ASSERT_EQUALS(1,
-                      countLogLinesContaining("replSet set names do not match, ours: rs0; remote "
-                            "node's: rs1"));
-        ASSERT_TRUE(response.isMismatched());
-        ASSERT_EQUALS("", response.getHbMsg());
+        ASSERT_EQUALS(ErrorCodes::InconsistentReplicaSetNames, result);
     }
 
     TEST_F(PrepareHeartbeatResponseTest, PrepareHeartbeatResponseSenderIDMissing) {

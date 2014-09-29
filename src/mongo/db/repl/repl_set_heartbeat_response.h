@@ -64,6 +64,11 @@ namespace repl {
          */
         BSONObj toBSON() const;
 
+        /**
+         * Returns toBSON().toString()
+         */
+        const std::string toString() const { return toBSON().toString(); }
+
         bool isMismatched() const { return _mismatch; }
         bool isReplSet() const { return _isReplSet; }
         bool isStateDisagreement() const { return _stateDisagreement; }

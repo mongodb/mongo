@@ -36,10 +36,12 @@
 #include "mongo/db/repl/check_quorum_for_config_change.h"
 #include "mongo/db/repl/network_interface_mock.h"
 #include "mongo/db/repl/repl_set_heartbeat_args.h"
+#include "mongo/db/repl/repl_set_heartbeat_response.h"
 #include "mongo/db/repl/replica_set_config.h"
 #include "mongo/db/repl/replication_executor.h"
 #include "mongo/stdx/functional.h"
 #include "mongo/unittest/unittest.h"
+#include "mongo/util/log.h"
 
 #define ASSERT_REASON_CONTAINS(STATUS, PATTERN) do {                    \
         const mongo::Status s_ = (STATUS);                              \
@@ -58,6 +60,12 @@ namespace repl {
 namespace {
 
     typedef ReplicationExecutor::RemoteCommandRequest RemoteCommandRequest;
+
+    BSONObj makeHBResp() {
+        ReplSetHeartbeatResponse resp;
+        resp.setVersion(2);
+        return resp.toBSON();
+    }
 
     class CheckQuorumTest : public mongo::unittest::Test {
     protected:
@@ -164,23 +172,24 @@ namespace {
                              BSON("_id" << 5 << "host" << "h5:1"))));
         const int myConfigIndex = 2;
         const BSONObj hbRequest = makeHeartbeatRequest(rsConfig, myConfigIndex);
+        const BSONObj defaultHBRespBSON = makeHBResp();
 
         _net->addResponse(RemoteCommandRequest(HostAndPort("h1", 1),
                                                "admin",
                                                hbRequest),
-                          StatusWith<BSONObj>(BSON("ok" << 1)));
+                          StatusWith<BSONObj>(defaultHBRespBSON));
         _net->addResponse(RemoteCommandRequest(HostAndPort("h2", 1),
                                                "admin",
                                                hbRequest),
-                          StatusWith<BSONObj>(BSON("ok" << 1)));
+                          StatusWith<BSONObj>(defaultHBRespBSON));
         _net->addResponse(RemoteCommandRequest(HostAndPort("h4", 1),
                                                "admin",
                                                hbRequest),
-                          StatusWith<BSONObj>(BSON("ok" << 1)));
+                          StatusWith<BSONObj>(defaultHBRespBSON));
         _net->addResponse(RemoteCommandRequest(HostAndPort("h5", 1),
                                                "admin",
                                                hbRequest),
-                          StatusWith<BSONObj>(BSON("ok" << 1)));
+                          StatusWith<BSONObj>(defaultHBRespBSON));
 
         ASSERT_OK(checkQuorumForInitiate(_executor.get(), rsConfig, myConfigIndex));
     }
@@ -204,23 +213,24 @@ namespace {
                              BSON("_id" << 6 << "host" << "h6:1"))));
         const int myConfigIndex = 2;
         const BSONObj hbRequest = makeHeartbeatRequest(rsConfig, myConfigIndex);
+        const BSONObj defaultHBRespBSON = makeHBResp();
 
         _net->addResponse(RemoteCommandRequest(HostAndPort("h1", 1),
                                                "admin",
                                                hbRequest),
-                          StatusWith<BSONObj>(BSON("ok" << 1)));
+                          StatusWith<BSONObj>(defaultHBRespBSON));
         _net->addResponse(RemoteCommandRequest(HostAndPort("h4", 1),
                                                "admin",
                                                hbRequest),
-                          StatusWith<BSONObj>(BSON("ok" << 1)));
+                          StatusWith<BSONObj>(defaultHBRespBSON));
         _net->addResponse(RemoteCommandRequest(HostAndPort("h5", 1),
                                                "admin",
                                                hbRequest),
-                          StatusWith<BSONObj>(BSON("ok" << 1)));
+                          StatusWith<BSONObj>(defaultHBRespBSON));
         _net->addResponse(RemoteCommandRequest(HostAndPort("h6", 1),
                                                "admin",
                                                hbRequest),
-                          StatusWith<BSONObj>(BSON("ok" << 1)));
+                          StatusWith<BSONObj>(defaultHBRespBSON));
 
         Status status = checkQuorumForInitiate(_executor.get(), rsConfig, myConfigIndex);
         ASSERT_EQUALS(ErrorCodes::NodeNotFound, status);
@@ -250,15 +260,16 @@ namespace {
                              BSON("_id" << 5 << "host" << "h5:1"))));
         const int myConfigIndex = 2;
         const BSONObj hbRequest = makeHeartbeatRequest(rsConfig, myConfigIndex);
+        const BSONObj defaultHBRespBSON = makeHBResp();
 
         _net->addResponse(RemoteCommandRequest(HostAndPort("h1", 1),
                                                "admin",
                                                hbRequest),
-                          StatusWith<BSONObj>(BSON("ok" << 1)));
+                          StatusWith<BSONObj>(defaultHBRespBSON));
         _net->addResponse(RemoteCommandRequest(HostAndPort("h2", 1),
                                                "admin",
                                                hbRequest),
-                          StatusWith<BSONObj>(BSON("ok" << 1)));
+                          StatusWith<BSONObj>(defaultHBRespBSON));
         _net->addResponse(RemoteCommandRequest(HostAndPort("h4", 1),
                                                "admin",
                                                hbRequest),
@@ -266,7 +277,7 @@ namespace {
         _net->addResponse(RemoteCommandRequest(HostAndPort("h5", 1),
                                                "admin",
                                                hbRequest),
-                          StatusWith<BSONObj>(BSON("ok" << 1)));
+                          StatusWith<BSONObj>(defaultHBRespBSON));
 
         Status status = checkQuorumForInitiate(_executor.get(), rsConfig, myConfigIndex);
         ASSERT_EQUALS(ErrorCodes::NewReplicaSetConfigurationIncompatible, status);
@@ -295,19 +306,20 @@ namespace {
                              BSON("_id" << 5 << "host" << "h5:1"))));
         const int myConfigIndex = 2;
         const BSONObj hbRequest = makeHeartbeatRequest(rsConfig, myConfigIndex);
+        const BSONObj defaultHBRespBSON = makeHBResp();
 
         _net->addResponse(RemoteCommandRequest(HostAndPort("h1", 1),
                                                "admin",
                                                hbRequest),
-                          StatusWith<BSONObj>(BSON("ok" << 1)));
+                          StatusWith<BSONObj>(defaultHBRespBSON));
         _net->addResponse(RemoteCommandRequest(HostAndPort("h2", 1),
                                                "admin",
                                                hbRequest),
-                          StatusWith<BSONObj>(BSON("ok" << 1)));
+                          StatusWith<BSONObj>(defaultHBRespBSON));
         _net->addResponse(RemoteCommandRequest(HostAndPort("h4", 1),
                                                "admin",
                                                hbRequest),
-                          StatusWith<BSONObj>(BSON("ok" << 1)));
+                          StatusWith<BSONObj>(defaultHBRespBSON));
         _net->addResponse(RemoteCommandRequest(HostAndPort("h5", 1),
                                                "admin",
                                                hbRequest),
@@ -343,23 +355,24 @@ namespace {
                              BSON("_id" << 5 << "host" << "h5:1"))));
         const int myConfigIndex = 2;
         const BSONObj hbRequest = makeHeartbeatRequest(rsConfig, myConfigIndex);
+        const BSONObj defaultHBRespBSON = makeHBResp();
 
         // Responses from nodes h1, h2 and h4 and blocked until after the test
         // completes.
         _net->addResponse(RemoteCommandRequest(HostAndPort("h1", 1),
                                                "admin",
                                                hbRequest),
-                          StatusWith<BSONObj>(BSON("ok" << 1)),
+                          StatusWith<BSONObj>(defaultHBRespBSON),
                           true);
         _net->addResponse(RemoteCommandRequest(HostAndPort("h2", 1),
                                                "admin",
                                                hbRequest),
-                          StatusWith<BSONObj>(BSON("ok" << 1)),
+                          StatusWith<BSONObj>(defaultHBRespBSON),
                           true);
         _net->addResponse(RemoteCommandRequest(HostAndPort("h4", 1),
                                                "admin",
                                                hbRequest),
-                          StatusWith<BSONObj>(BSON("ok" << 1)),
+                          StatusWith<BSONObj>(defaultHBRespBSON),
                           true);
 
         // h5 responds, with a version incompatibility.
@@ -454,15 +467,16 @@ namespace {
                              BSON("_id" << 5 << "host" << "h5:1" << "votes" << 0))));
         const int myConfigIndex = 3;
         const BSONObj hbRequest = makeHeartbeatRequest(rsConfig, myConfigIndex);
+        const BSONObj defaultHBRespBSON = makeHBResp();
 
         _net->addResponse(RemoteCommandRequest(HostAndPort("h1", 1),
                                                "admin",
                                                hbRequest),
-                          StatusWith<BSONObj>(BSON("ok" << 1)));
+                          StatusWith<BSONObj>(defaultHBRespBSON));
         _net->addResponse(RemoteCommandRequest(HostAndPort("h5", 1),
                                                "admin",
                                                hbRequest),
-                          StatusWith<BSONObj>(BSON("ok" << 1)));
+                          StatusWith<BSONObj>(defaultHBRespBSON));
         Status status = checkQuorumForReconfig(_executor.get(), rsConfig, myConfigIndex);
         ASSERT_EQUALS(ErrorCodes::NodeNotFound, status);
         ASSERT_REASON_CONTAINS(status, "not enough voting nodes responded; required 2 but only");
@@ -488,11 +502,12 @@ namespace {
                              BSON("_id" << 5 << "host" << "h5:1" << "priority" << 0))));
         const int myConfigIndex = 3;
         const BSONObj hbRequest = makeHeartbeatRequest(rsConfig, myConfigIndex);
+        const BSONObj defaultHBRespBSON = makeHBResp();
 
         _net->addResponse(RemoteCommandRequest(HostAndPort("h5", 1),
                                                "admin",
                                                hbRequest),
-                          StatusWith<BSONObj>(BSON("ok" << 1)));
+                          StatusWith<BSONObj>(defaultHBRespBSON));
         Status status = checkQuorumForReconfig(_executor.get(), rsConfig, myConfigIndex);
         ASSERT_EQUALS(ErrorCodes::NodeNotFound, status);
         ASSERT_REASON_CONTAINS(status, "no electable nodes responded");
@@ -515,15 +530,16 @@ namespace {
                              BSON("_id" << 5 << "host" << "h5:1" << "votes" << 0))));
         const int myConfigIndex = 3;
         const BSONObj hbRequest = makeHeartbeatRequest(rsConfig, myConfigIndex);
+        const BSONObj defaultHBRespBSON = makeHBResp();
 
         _net->addResponse(RemoteCommandRequest(HostAndPort("h1", 1),
                                                "admin",
                                                hbRequest),
-                          StatusWith<BSONObj>(BSON("ok" << 1)));
+                          StatusWith<BSONObj>(defaultHBRespBSON));
         _net->addResponse(RemoteCommandRequest(HostAndPort("h2", 1),
                                                "admin",
                                                hbRequest),
-                          StatusWith<BSONObj>(BSON("ok" << 1)));
+                          StatusWith<BSONObj>(defaultHBRespBSON));
 
         // If this message arrived, the reconfig would be vetoed, but it is delayed
         // until the quorum check completes, and so has no effect.
@@ -579,18 +595,24 @@ namespace {
         }
 
         ResponseStatus mismatchSetName() {
-            return ResponseStatus(NetworkInterfaceMock::Response(BSON("mismatch" << true),
+            ReplSetHeartbeatResponse resp;
+            resp.noteMismatched();
+            return ResponseStatus(NetworkInterfaceMock::Response(resp.toBSON(),
                                                                  Milliseconds(10)));
         }
 
         ResponseStatus higherConfigValue() {
-            return ResponseStatus(NetworkInterfaceMock::Response(BSON("set" << std::string("rs0") <<
-                                                                      "v" << 3),
+            ReplSetHeartbeatResponse resp;
+            resp.setSetName("rs0");
+            resp.setVersion(3);
+            return ResponseStatus(NetworkInterfaceMock::Response(resp.toBSON(),
                                                                  Milliseconds(10)));
         }
 
         ResponseStatus ok() {
-            return ResponseStatus(NetworkInterfaceMock::Response(BSON("ok" << 1),
+            ReplSetHeartbeatResponse resp;
+            resp.setVersion(1);
+            return ResponseStatus(NetworkInterfaceMock::Response(resp.toBSON(),
                                                                  Milliseconds(10)));
         }
 

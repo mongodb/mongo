@@ -211,15 +211,16 @@ namespace {
         ASSERT_EQUALS(ReplicationCoordinator::modeNone, getReplCoord()->getReplicationMode());
 
         BSONObjBuilder result1;
+        const BSONObj config = BSON("_id" << "mySet" <<
+                                    "version" << 1 <<
+                                    "members" << BSON_ARRAY(
+                                                    BSON("_id" << 0 << "host" << "node1:12345") <<
+                                                    BSON("_id" << 1 << "host" << "node2:54321")));
         ASSERT_EQUALS(
                 ErrorCodes::NodeNotFound,
                 getReplCoord()->processReplSetInitiate(
                         &txn,
-                        BSON("_id" << "mySet" <<
-                             "version" << 1 <<
-                             "members" << BSON_ARRAY(
-                                     BSON("_id" << 0 << "host" << "node1:12345") <<
-                                     BSON("_id" << 1 << "host" << "node2:54321"))),
+                        config,
                         &result1));
         ASSERT_EQUALS(ReplicationCoordinator::modeNone, getReplCoord()->getReplicationMode());
 
@@ -235,16 +236,12 @@ namespace {
                         HostAndPort("node2", 54321),
                         "admin",
                         hbArgs.toBSON()),
-                StatusWith<BSONObj>(BSON("ok" << 1)));
+                StatusWith<BSONObj>(BSON("ok" << 1 << "v" << 1)));
 
         ASSERT_OK(
                 getReplCoord()->processReplSetInitiate(
                         &txn,
-                        BSON("_id" << "mySet" <<
-                             "version" << 1 <<
-                             "members" << BSON_ARRAY(
-                                     BSON("_id" << 0 << "host" << "node1:12345") <<
-                                     BSON("_id" << 1 << "host" << "node2:54321"))),
+                        config,
                         &result1));
         ASSERT_EQUALS(ReplicationCoordinator::modeReplSet, getReplCoord()->getReplicationMode());
     }

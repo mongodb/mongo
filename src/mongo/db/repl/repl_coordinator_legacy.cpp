@@ -625,7 +625,8 @@ namespace {
                       << rsLog;
                 log() << "replSet s: " << args.getSetName() << rsLog;
                 response->noteMismatched();
-                return Status(ErrorCodes::BadValue, "repl set names do not match");
+                return Status(ErrorCodes::InconsistentReplicaSetNames,
+                              "repl set names do not match");
             }
         }
 
@@ -641,7 +642,8 @@ namespace {
 
         if (theReplSet->name() != args.getSetName()) {
             response->noteMismatched();
-            return Status(ErrorCodes::BadValue, "repl set names do not match (2)");
+            return Status(ErrorCodes::InconsistentReplicaSetNames,
+                          "repl set names do not match (2)");
         }
         response->setSetName(theReplSet->name());
 

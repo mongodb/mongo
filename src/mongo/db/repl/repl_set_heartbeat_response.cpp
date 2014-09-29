@@ -37,12 +37,16 @@
 #include "mongo/base/status.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
 
 namespace mongo {
 namespace repl {
 namespace {
 
+    const std::string kOkFieldName = "ok";
+    const std::string kErrMsgFieldName = "errmsg";
+    const std::string kErrorCodeFieldName = "code";
     const std::string kOpTimeFieldName = "opTime";
     const std::string kTimeFieldName = "time";
     const std::string kElectionTimeFieldName = "electionTime";
@@ -75,6 +79,13 @@ namespace {
             {}
 
     void ReplSetHeartbeatResponse::addToBSON(BSONObjBuilder* builder) const {
+        if (_mismatch) {
+            *builder << kOkFieldName << 0.0;
+            *builder << kMismatchFieldName << _mismatch;
+            return;
+        }
+
+        builder->append(kOkFieldName, 1.0);
         if (_opTimeSet) {
             builder->appendDate(kOpTimeFieldName, _opTime.asDate());
         }
@@ -89,9 +100,6 @@ namespace {
         }
         if (_electableSet) {
             *builder << kIsElectableFieldName << _electable;
-        }
-        if (_mismatch) {
-            *builder << kMismatchFieldName << _mismatch;
         }
         if (_isReplSet) {
             *builder << "rs" << _isReplSet;
@@ -121,6 +129,41 @@ namespace {
     }
 
     Status ReplSetHeartbeatResponse::initialize(const BSONObj& doc) {
+
+        // Old versions set this even though they returned not "ok"
+        _mismatch = doc[kMismatchFieldName].trueValue();
+        if (_mismatch)
+            return Status(ErrorCodes::InconsistentReplicaSetNames,
+                          "replica set name doesn't match.");
+
+        // Old versions sometimes set the replica set name ("set") but ok:0
+        const BSONElement replSetNameElement = doc[kReplSetFieldName];
+        if (replSetNameElement.eoo()) {
+            _setName.clear();
+        }
+        else if (replSetNameElement.type() != String) {
+            return Status(ErrorCodes::TypeMismatch, str::stream() << "Expected \"" <<
+                          kReplSetFieldName << "\" field in response to replSetHeartbeat to have "
+                          "type String, but found " << typeName(replSetNameElement.type()));
+        }
+        else {
+            _setName = replSetNameElement.String();
+        }
+
+        if (_setName.empty()  && !doc[kOkFieldName].trueValue()) {
+            std::string errMsg = doc[kErrMsgFieldName].str();
+
+            BSONElement errCodeElem = doc[kErrorCodeFieldName];
+            if (errCodeElem.ok()) {
+                if (!errCodeElem.isNumber())
+                    return Status(ErrorCodes::BadValue, "Error code is not a number!");
+
+                int errorCode = errCodeElem.numberInt();
+                return Status(ErrorCodes::Error(errorCode), errMsg);
+            }
+            return Status(ErrorCodes::UnknownError, errMsg);
+        }
+
         const BSONElement electionTimeElement = doc[kElectionTimeFieldName];
         if (electionTimeElement.eoo()) {
             _electionTimeSet = false;
@@ -183,7 +226,6 @@ namespace {
             _electable = electableElement.trueValue();
         }
 
-        _mismatch = doc[kMismatchFieldName].trueValue();
         _isReplSet = doc[kIsReplSetFieldName].trueValue();
 
         const BSONElement memberStateElement = doc[kMemberStateFieldName];
@@ -224,19 +266,6 @@ namespace {
                           "type NumberInt, but found " << typeName(versionElement.type()));
         }
         _version = versionElement.numberInt();
-
-        const BSONElement replSetNameElement = doc[kReplSetFieldName];
-        if (replSetNameElement.eoo()) {
-            _setName.clear();
-        }
-        else if (replSetNameElement.type() != String) {
-            return Status(ErrorCodes::TypeMismatch, str::stream() << "Expected \"" <<
-                          kReplSetFieldName << "\" field in response to replSetHeartbeat to have "
-                          "type String, but found " << typeName(replSetNameElement.type()));
-        }
-        else {
-            _setName = replSetNameElement.String();
-        }
 
         const BSONElement hbMsgElement = doc[kHbMessageFieldName];
         if (hbMsgElement.eoo()) {
