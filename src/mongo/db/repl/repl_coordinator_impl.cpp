@@ -319,6 +319,11 @@ namespace {
         return _getCurrentMemberState_inlock();
     }
 
+    MemberState ReplicationCoordinatorImpl::_getCurrentMemberState_inlock() const {
+        invariant(_settings.usingReplSets());
+        return _currentState;
+    }
+
     void ReplicationCoordinatorImpl::clearSyncSourceBlacklist() {
         CBHStatus cbh = _replExecutor.scheduleWork(
                 stdx::bind(&ReplicationCoordinatorImpl::_clearSyncSourceBlacklist_finish,
@@ -336,11 +341,6 @@ namespace {
         if (cbData.status == ErrorCodes::CallbackCanceled)
             return;
         _topCoord->clearSyncSourceBlacklist();
-    }
-
-    MemberState ReplicationCoordinatorImpl::_getCurrentMemberState_inlock() const {
-        invariant(_settings.usingReplSets());
-        return _currentState;
     }
 
     void ReplicationCoordinatorImpl::_setCurrentMemberState_forTest(const MemberState& newState) {

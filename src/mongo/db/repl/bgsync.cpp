@@ -155,8 +155,7 @@ namespace {
     }
 
     void BackgroundSync::_producerThread() {
-        MemberState state = _replCoord->getCurrentMemberState();
-
+        const MemberState state = _replCoord->getCurrentMemberState();
         // we want to pause when the state changes to primary
         if (_replCoord->isWaitingForApplierToDrain() || state.primary()) {
             if (!_pause) {
@@ -166,7 +165,9 @@ namespace {
             return;
         }
 
+        // TODO(spencer): Use a condition variable to await loading a config.
         if (state.startup()) {
+            // Wait for a config to be loaded
             sleepsecs(1);
             return;
         }

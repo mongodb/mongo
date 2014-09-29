@@ -56,6 +56,7 @@
 #include "mongo/db/stats/timer_stats.h"
 #include "mongo/db/operation_context_impl.h"
 #include "mongo/db/storage_options.h"
+#include "mongo/util/exit.h"
 #include "mongo/util/fail_point_service.h"
 #include "mongo/util/log.h"
 
@@ -149,54 +150,58 @@ namespace repl {
         return false;
     }
 
-    void ReplSetImpl::_syncThread() {
-        StateBox::SP sp = box.get();
-        if (sp.state.primary()) {
-            sleepsecs(1);
-            return;
-        }
-        bool initialSyncRequested = BackgroundSync::get()->getInitialSyncRequestedFlag();
-        // Check criteria for doing an initial sync:
-        // 1. If the oplog is empty, do an initial sync
-        // 2. If minValid has _initialSyncFlag set, do an initial sync
-        // 3. If initialSyncRequested is true
-        if (getGlobalReplicationCoordinator()->getMyLastOptime().isNull() || 
-            getInitialSyncFlag() || 
-            initialSyncRequested) {
-            syncDoInitialSync();
-            return; // _syncThread will be recalled, starts from top again in case sync failed.
-        }
-        getGlobalReplicationCoordinator()->setFollowerMode(MemberState::RS_RECOVERING);
-
-        /* we have some data.  continue tailing. */
-        SyncTail tail(BackgroundSync::get(), multiSyncApply);
-        tail.oplogApplication();
-    }
-
     void ReplSetImpl::clearVetoes() {
         lock lk(this);
         _veto.clear();
     }
 
-    void ReplSetImpl::syncThread() {
-        while( 1 ) {
+    void startSyncThread() {
+        Client::initThread("rsSync");
+        replLocalAuth();
+        ReplicationCoordinator* replCoord = getGlobalReplicationCoordinator();
+        while (!inShutdown()) {
             // After a reconfig, we may not be in the replica set anymore, so
             // check that we are in the set (and not an arbiter) before
             // trying to sync with other replicas.
-            if( ! _self ) {
-                log() << "replSet warning did not receive a valid config yet, sleeping 20 seconds " << rsLog;
-                sleepsecs(20);
+            // TODO(spencer): Use a condition variable to await loading a config
+            if (replCoord->getReplicationMode() != ReplicationCoordinator::modeReplSet) {
+                log() << "replSet warning did not receive a valid config yet, sleeping 5 seconds "
+                      << rsLog;
+                sleepsecs(5);
                 continue;
             }
-            if( myConfig().arbiterOnly ) {
-                return;
+
+            const MemberState memberState = replCoord->getCurrentMemberState();
+            if (replCoord->getCurrentMemberState().arbiter()) {
+                break;
             }
 
             try {
-                _syncThread();
+
+                if (memberState.primary()) {
+                    sleepsecs(1);
+                    continue;
+                }
+
+                bool initialSyncRequested = BackgroundSync::get()->getInitialSyncRequestedFlag();
+                // Check criteria for doing an initial sync:
+                // 1. If the oplog is empty, do an initial sync
+                // 2. If minValid has _initialSyncFlag set, do an initial sync
+                // 3. If initialSyncRequested is true
+                if (getGlobalReplicationCoordinator()->getMyLastOptime().isNull() ||
+                        getInitialSyncFlag() ||
+                        initialSyncRequested) {
+                    syncDoInitialSync();
+                    continue; // start from top again in case sync failed.
+                }
+                replCoord->setFollowerMode(MemberState::RS_RECOVERING);
+
+                /* we have some data.  continue tailing. */
+                SyncTail tail(BackgroundSync::get(), multiSyncApply);
+                tail.oplogApplication();
             }
             catch(const DBException& e) {
-                sethbmsg(str::stream() << "syncThread: " << e.toString());
+                log() << "Received exception while syncing: " << e.toString();
                 sleepsecs(10);
             }
             catch(...) {
@@ -205,12 +210,6 @@ namespace repl {
                 sleepsecs(60);
             }
         }
-    }
-
-    void startSyncThread() {
-        Client::initThread("rsSync");
-        replLocalAuth();
-        theReplSet->syncThread();
         cc().shutdown();
     }
 
