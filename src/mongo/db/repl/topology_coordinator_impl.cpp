@@ -540,35 +540,26 @@ namespace {
     }
 
     // produce a reply to a heartbeat
-    void TopologyCoordinatorImpl::prepareHeartbeatResponse(
-            const ReplicationExecutor::CallbackData& data,
+    Status TopologyCoordinatorImpl::prepareHeartbeatResponse(
             Date_t now,
             const ReplSetHeartbeatArgs& args,
             const std::string& ourSetName,
             const OpTime& lastOpApplied,
-            ReplSetHeartbeatResponse* response,
-            Status* result) {
-        if (data.status == ErrorCodes::CallbackCanceled) {
-            *result = Status(ErrorCodes::ShutdownInProgress, "replication system is shutting down");
-            return;
-        }
+            ReplSetHeartbeatResponse* response) {
 
         if (args.getProtocolVersion() != 1) {
-            *result = Status(ErrorCodes::BadValue,
-                             str::stream() << "replset: incompatible replset protocol version: "
-                                           << args.getProtocolVersion());
-            return;
+            return Status(ErrorCodes::BadValue,
+                          str::stream() << "replset: incompatible replset protocol version: "
+                          << args.getProtocolVersion());
         }
 
         // Verify that replica set names match
-        std::string rshb = std::string(args.getSetName());
+        const std::string rshb = args.getSetName();
         if (ourSetName != rshb) {
-            *result = Status(ErrorCodes::InconsistentReplicaSetNames,
-                             "repl set names do not match");
             log() << "replSet set names do not match, ours: " << ourSetName <<
                 "; remote node's: " << rshb;
             response->noteMismatched();
-            return;
+            return Status(ErrorCodes::InconsistentReplicaSetNames, "repl set names do not match");
         }
         if (_currentConfig.isInitialized()) {
             invariant(_currentConfig.getReplSetName() == args.getSetName());
@@ -576,7 +567,7 @@ namespace {
 
         // This is a replica set
         response->noteReplSet();
-        response->setSetName(_currentConfig.getReplSetName());
+        response->setSetName(ourSetName);
 
         const MemberState myState = getMemberState();
         response->setState(myState.s);
@@ -596,11 +587,16 @@ namespace {
             response->setSyncingTo(_syncSource.toString());
         }
 
-        long long v = _currentConfig.getConfigVersion();
-        response->setVersion(v);
-        // Deliver new config if caller's version is older than ours
-        if (v > args.getConfigVersion()) {
-            response->setConfig(_currentConfig);
+        if (_currentConfig.isInitialized()) {
+            long long v = _currentConfig.getConfigVersion();
+            response->setVersion(v);
+            // Deliver new config if caller's version is older than ours
+            if (v > args.getConfigVersion()) {
+                response->setConfig(_currentConfig);
+            }
+        }
+        else {
+            response->setVersion(0);
         }
 
         // Resolve the caller's id in our Member list
@@ -610,8 +606,7 @@ namespace {
         }
         if (from == -1) {
             // Can't find the member, so we leave out the stateDisagreement field
-            *result = Status::OK();
-            return;
+            return Status::OK();
         }
 
         // if we thought that this node is down, let it know
@@ -621,7 +616,7 @@ namespace {
 
         // note that we got a heartbeat from this node
         _hbdata[from].setLastHeartbeatRecv(now);
-        *result = Status::OK();
+        return Status::OK();
     }
 
 
@@ -912,6 +907,7 @@ namespace {
                 return _stepDownSelf();
             }
 
+            LOG(2) << "Choosing to remain primary";
             return HeartbeatResponseAction::makeNoAction();
         }
 
@@ -921,10 +917,14 @@ namespace {
         // candidate.
 
         if (_role == Role::candidate) {
+            LOG(2) << "Not standing for election again; already candidate";
             return HeartbeatResponseAction::makeNoAction();
         }
 
-        if (None != _getMyUnelectableReason(now, lastOpApplied)) {
+        UnelectableReason unelectableReason = _getMyUnelectableReason(now, lastOpApplied);
+        if (None != unelectableReason) {
+            LOG(2) << "Not standing for election because " <<
+                _getUnelectableReasonString(unelectableReason);
             return HeartbeatResponseAction::makeNoAction();
         }
 
@@ -961,16 +961,12 @@ namespace {
     }
 
     int TopologyCoordinatorImpl::_totalVotes() const {
-        static int complain = 0;
         int vTot = 0;
         for (ReplicaSetConfig::MemberIterator it = _currentConfig.membersBegin();
              it != _currentConfig.membersEnd();
              ++it) {
             vTot += it->getNumVotes();
         }
-        if( vTot % 2 == 0 && vTot && complain++ == 0 )
-            log() << "replSet warning: even number of voting members in replica set config - "
-                     "add an arbiter or set votes to 0 on one of the existing members";
         return vTot;
     }
 
@@ -1378,7 +1374,6 @@ namespace {
             // we're electable, we must transition to candidate, in leiu of heartbeats.
             _role = Role::candidate;
         }
-
     }
 
     // TODO(emilkie): Better story for heartbeat message handling.

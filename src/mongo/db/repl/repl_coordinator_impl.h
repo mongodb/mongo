@@ -537,6 +537,14 @@ namespace repl {
                                      const HostAndPort& currentSource,
                                      bool* shouldChange);
 
+        /**
+         * Bottom half of processHeartbeat(), which runs in the replication executor.
+         */
+        void _processHeartbeatFinish(const ReplicationExecutor::CallbackData& cbData,
+                                     const ReplSetHeartbeatArgs& args,
+                                     ReplSetHeartbeatResponse* response,
+                                     Status* outStatus);
+
         //
         // All member variables are labeled with one of the following codes indicating the
         // synchronization rules for accessing them.

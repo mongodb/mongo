@@ -1159,21 +1159,38 @@ namespace {
 
         Status result(ErrorCodes::InternalError, "didn't set status in prepareHeartbeatResponse");
         CBHStatus cbh = _replExecutor.scheduleWork(
-            stdx::bind(&TopologyCoordinator::prepareHeartbeatResponse,
-                       _topCoord.get(),
-                       stdx::placeholders::_1,
-                       _replExecutor.now(),
-                       args,
-                       _settings.ourSetName(),
-                       _getLastOpApplied(),
-                       response,
-                       &result));
+                stdx::bind(&ReplicationCoordinatorImpl::_processHeartbeatFinish,
+                           this,
+                           stdx::placeholders::_1,
+                           args,
+                           response,
+                           &result));
         if (cbh.getStatus() == ErrorCodes::ShutdownInProgress) {
             return Status(ErrorCodes::ShutdownInProgress, "replication shutdown in progress");
         }
         fassert(18508, cbh.getStatus());
         _replExecutor.wait(cbh.getValue());
         return result;
+    }
+
+    void ReplicationCoordinatorImpl::_processHeartbeatFinish(
+            const ReplicationExecutor::CallbackData& cbData,
+            const ReplSetHeartbeatArgs& args,
+            ReplSetHeartbeatResponse* response,
+            Status* outStatus) {
+
+        if (cbData.status == ErrorCodes::CallbackCanceled) {
+            *outStatus = Status(ErrorCodes::ShutdownInProgress, "Replication shutdown in progress");
+            return;
+        }
+        fassert(18910, cbData.status);
+        const Date_t now = _replExecutor.now();
+        *outStatus = _topCoord->prepareHeartbeatResponse(
+                now,
+                args,
+                _settings.ourSetName(),
+                _getLastOpApplied(),
+                response);
     }
 
     Status ReplicationCoordinatorImpl::processReplSetReconfig(OperationContext* txn,

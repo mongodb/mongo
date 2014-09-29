@@ -150,13 +150,11 @@ namespace repl {
                                           const Date_t now,
                                           BSONObjBuilder* response,
                                           Status* result);
-        virtual void prepareHeartbeatResponse(const ReplicationExecutor::CallbackData& data,
-                                              Date_t now,
-                                              const ReplSetHeartbeatArgs& args,
-                                              const std::string& ourSetName,
-                                              const OpTime& lastOpApplied,
-                                              ReplSetHeartbeatResponse* response,
-                                              Status* result);
+        virtual Status prepareHeartbeatResponse(Date_t now,
+                                                const ReplSetHeartbeatArgs& args,
+                                                const std::string& ourSetName,
+                                                const OpTime& lastOpApplied,
+                                                ReplSetHeartbeatResponse* response);
         virtual void prepareStatusResponse(const ReplicationExecutor::CallbackData& data,
                                            Date_t now,
                                            unsigned uptime,
