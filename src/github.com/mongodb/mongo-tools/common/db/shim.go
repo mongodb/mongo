@@ -326,17 +326,16 @@ func buildArgs(shim StorageShim) ([]string, error) {
 		returnVal = append(returnVal, "--query", shim.Query)
 	}
 
-	returnVal = append(returnVal, "--mode")
 	switch shim.Mode {
 	case Dump:
 	case Insert:
-		returnVal = append(returnVal, "insert")
+		returnVal = append(returnVal, "--mode", "insert")
 	case Upsert:
-		returnVal = append(returnVal, "upsert", "--upsertFields", shim.UpsertFields)
+		returnVal = append(returnVal, "--mode", "upsert", "--upsertFields", shim.UpsertFields)
 	case Drop:
-		returnVal = append(returnVal, "drop")
+		returnVal = append(returnVal, "--mode", "drop")
 	case Remove:
-		returnVal = append(returnVal, "remove")
+		returnVal = append(returnVal, "--mode", "remove")
 	}
 	return returnVal, nil
 }
