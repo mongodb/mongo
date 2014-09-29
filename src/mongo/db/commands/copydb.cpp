@@ -182,14 +182,15 @@ namespace mongo {
                 cloner.setConnection(conn);
             }
 
-            if (fromSelf) {
-                // SERVER-4328 todo lock just the two db's not everything for the fromself case
-                Lock::GlobalWrite lk(txn->lockState());
-                return cloner.go(txn, todb, fromhost, cloneOptions, NULL, errmsg);
-            }
 
-            Lock::DBLock lk (txn->lockState(), todb, newlm::MODE_X);
-            return cloner.go(txn, todb, fromhost, cloneOptions, NULL, errmsg);
+            // SERVER-4328 todo lock just the two db's not everything for the fromself case
+            scoped_ptr<Lock::ScopedLock> lk( fromSelf ?
+                                             static_cast<Lock::ScopedLock*>(new Lock::GlobalWrite(txn->lockState())) :
+                                             static_cast<Lock::ScopedLock*>(new Lock::DBWrite(txn->lockState(), todb)));
+            if (!cloner.go(txn, todb, fromhost, cloneOptions, NULL, errmsg )) {
+                return false;
+            }
+            return true;
         }
 
     } cmdCopyDB;

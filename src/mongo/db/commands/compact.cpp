@@ -97,7 +97,7 @@ namespace mongo {
                 return false;
             }
 
-            NamespaceString ns(db, coll);
+            NamespaceString ns(db,coll);
             if ( !ns.isNormal() ) {
                 errmsg = "bad namespace name";
                 return false;
@@ -144,7 +144,7 @@ namespace mongo {
                 compactOptions.validateDocuments = cmdObj["validate"].trueValue();
 
 
-            Lock::DBLock lk(txn->lockState(), db, newlm::MODE_X);
+            Lock::DBWrite lk(txn->lockState(), ns.ns());
             BackgroundOperation::assertNoBgOpInProgForNs(ns.ns());
             Client::Context ctx(txn, ns);
 

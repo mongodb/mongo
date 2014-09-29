@@ -308,15 +308,15 @@ namespace mongo {
                                 bool logForRepl) {
 
         const NamespaceString nss(ns);
-        const string dbname = nss.db().toString();
+        Lock::DBWrite dbWrite(txn->lockState(), nss.db());
 
-        Lock::DBLock dbWrite(txn->lockState(), dbname, newlm::MODE_X);
+        const string dbName = nss.db().toString();
 
         bool unused;
-        Database* db = dbHolder().getOrCreate(txn, dbname, unused);
+        Database* db = dbHolder().getOrCreate(txn, dbName, unused);
 
         // config
-        string temp = dbname + ".system.namespaces";
+        string temp = dbName + ".system.namespaces";
         BSONObj config = _conn->findOne(temp , BSON("name" << ns));
         if (config["options"].isABSONObj()) {
             WriteUnitOfWork wunit(txn);
@@ -329,7 +329,7 @@ namespace mongo {
         }
 
         // main data
-        copy(txn, dbname,
+        copy(txn, dbName,
              nss, nss,
              logForRepl, false, true, mayYield, mayBeInterrupted,
              Query(query).snapshot());
@@ -340,7 +340,7 @@ namespace mongo {
         }
 
         // indexes
-        copyIndexes(txn, dbname,
+        copyIndexes(txn, dbName,
                     NamespaceString(ns), NamespaceString(ns),
                     logForRepl, false, true, mayYield,
                     mayBeInterrupted);

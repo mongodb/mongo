@@ -313,7 +313,7 @@ namespace {
         if (supportsDocLocking()) {
             _lockState->lock(_id, mode);
         }
-        else {
+        else if (isRead) {
             _lockState->lock(_id, isRead ? newlm::MODE_S : newlm::MODE_X);
         }
     }
@@ -321,6 +321,9 @@ namespace {
     Lock::CollectionLock::~CollectionLock() {
         _lockState->unlock(_id);
     }
+
+    Lock::DBWrite::DBWrite(Locker* lockState, const StringData& dbOrNs) :
+        DBLock(lockState, nsToDatabaseSubstring(dbOrNs), newlm::MODE_X) { }
 
     Lock::DBRead::DBRead(Locker* lockState, const StringData& dbOrNs) :
         DBLock(lockState, nsToDatabaseSubstring(dbOrNs), newlm::MODE_S) { }
