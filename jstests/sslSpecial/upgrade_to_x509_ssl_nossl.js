@@ -9,29 +9,33 @@
 
 load("jstests/ssl/libs/ssl_helpers.js");
 
+function authAllNodes() {
+    for (var n = 0; n < rst.nodes.length; n++) {
+        var status = rst.nodes[n].getDB("admin").auth("root", "pwd");
+        assert.eq(status, 1);
+    }
+};
+
 opts = {sslMode:"disabled", clusterAuthMode:"keyFile", keyFile: KEYFILE}
-var rst = new ReplSetTest({ name: 'sslSet', nodes: 3, nodeOptions : opts });
+var NUM_NODES = 3;
+var rst = new ReplSetTest({ name: 'sslSet', nodes: NUM_NODES, nodeOptions : opts });
 rst.startSet();
 rst.initiate();
 
 // Connect to master and do some basic operations
 var rstConn1 = rst.getMaster();
-rstConn1.getDB("admin").createUser({user: "root", pwd: "pwd", roles: ["root"]});
+rstConn1.getDB("admin").createUser({user: "root", pwd: "pwd", roles: ["root"]}, {w: NUM_NODES});
 rstConn1.getDB("admin").auth("root", "pwd");
 rstConn1.getDB("test").a.insert({a:1, str:"TESTTESTTEST"});
 assert.eq(1, rstConn1.getDB("test").a.count(), "Error interacting with replSet");
 
 print("===== UPGRADE disabled,keyFile -> allowSSL,sendKeyfile =====");
-for (var n = 0; n < rst.nodes.length; n++) {
-    rst.nodes[n].getDB("admin").auth("root", "pwd");
-}
+authAllNodes();
 rst.upgradeSet({sslMode:"allowSSL", sslPEMKeyFile: SERVER_CERT,
                 sslAllowInvalidCertificates:"",
                 clusterAuthMode:"sendKeyFile", keyFile: KEYFILE,
                 sslCAFile: CA_CERT}, "root", "pwd");
-for (var n = 0; n < rst.nodes.length; n++) {
-    rst.nodes[n].getDB("admin").auth("root", "pwd");
-}
+authAllNodes();
 rst.awaitReplication();
 
 var rstConn2 = rst.getMaster();
@@ -43,9 +47,7 @@ rst.upgradeSet({sslMode:"preferSSL", sslPEMKeyFile: SERVER_CERT,
                 sslAllowInvalidCertificates:"",
                 clusterAuthMode:"sendX509", keyFile: KEYFILE,
                 sslCAFile: CA_CERT}, "root", "pwd");
-for (var n = 0; n < rst.nodes.length; n++) {
-    rst.nodes[n].getDB("admin").auth("root", "pwd");
-}
+authAllNodes();
 rst.awaitReplication();
 
 var rstConn3 = rst.getMaster();
@@ -63,9 +65,7 @@ rst.upgradeSet({sslMode:"preferSSL", sslPEMKeyFile: SERVER_CERT,
                 sslAllowInvalidCertificates:"",
                 clusterAuthMode:"x509", keyFile: KEYFILE,
                 sslCAFile: CA_CERT}, "root", "pwd");
-for (var n = 0; n < rst.nodes.length; n++) {
-    rst.nodes[n].getDB("admin").auth("root", "pwd");
-}
+authAllNodes();
 rst.awaitReplication();
 var rstConn4 = rst.getMaster();
 rstConn4.getDB("test").a.insert({a:4, str:"BEEP BOOP"});

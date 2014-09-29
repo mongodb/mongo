@@ -93,20 +93,19 @@ var doc = collection.findOne();
 stopServer();
 
 // "read" mode - read collection with single document and write results to file.
-assert.eq(0, runMongoProgram('mongoshim', '--dbpath', dbPath,
-                             '--db', dbName, '--collection', collectionName,
-                             '--out', externalFile),
-          'failed to run mongoshim in "read" mode on ' + collectionName);
+// XXX: Do not check tool exit code. See SERVER-5520
+runMongoProgram('mongoshim', '--dbpath', dbPath,
+                '--db', dbName, '--collection', collectionName,
+                '--out', externalFile);
 assert.eq(Object.bsonsize(doc), fileSize(externalBaseName),
           'output BSON file size does not match size of document returned from find()');
 
 // "insert" mode - insert document from file into collection.
 resetDbpath(dbPath);
-assert.eq(0, runMongoProgram('mongoshim', '--dbpath', dbPath,
-                             '--db', dbName, '--collection', collectionName,
-                             '--mode', 'insert',
-                             '--in', externalFile),
-          'failed to run mongoshim in "insert" mode');
+runMongoProgram('mongoshim', '--dbpath', dbPath,
+                '--db', dbName, '--collection', collectionName,
+                '--mode', 'insert',
+                '--in', externalFile);
 mongod = startServer();
 collection = mongod.getDB(dbName).getCollection(collectionName);
 assert.eq(1, collection.count(), 'test document was not added to collection');
@@ -117,12 +116,11 @@ stopServer();
 // "upsert" mode - upsert document from file into collection.
 // Since document already exists in collection, this upsert operation will
 // have no effect.
-assert.eq(0, runMongoProgram('mongoshim', '--dbpath', dbPath,
-                             '--db', dbName, '--collection', collectionName,
-                             '--mode', 'upsert',
-                             '--upsertFields', 'a',
-                             '--inputDocuments', tojson({in: [{a: 1, b: 1}]})),
-          'failed to run mongoshim in "upsert" mode');
+runMongoProgram('mongoshim', '--dbpath', dbPath,
+                '--db', dbName, '--collection', collectionName,
+                '--mode', 'upsert',
+                '--upsertFields', 'a',
+                '--inputDocuments', tojson({in: [{a: 1, b: 1}]}));
 mongod = startServer();
 collection = mongod.getDB(dbName).getCollection(collectionName);
 assert.eq(1, collection.count(), 'test document was not added to collection');
@@ -132,10 +130,9 @@ stopServer();
 
 // "remove" mode - remove documents from collection.
 resetDbpath(dbPath);
-assert.eq(0, runMongoProgram('mongoshim', '--dbpath', dbPath,
-                             '--db', dbName, '--collection', collectionName,
-                             '--mode', 'remove'),
-          'failed to run mongoshim in "remove" mode');
+runMongoProgram('mongoshim', '--dbpath', dbPath,
+                '--db', dbName, '--collection', collectionName,
+                '--mode', 'remove');
 mongod = startServer();
 collection = mongod.getDB(dbName).getCollection(collectionName);
 assert.eq(0, collection.count(), 'test document was not removed from collection');
@@ -150,18 +147,16 @@ var operationsCollection = mongod.getDB(dbName).getCollection(operationsCollecti
 operationsCollection.save({op: 'i', ns: collectionFullName, o: {_id: 1, a: 1 }});
 collection.drop();
 stopServer();
-assert.eq(0, runMongoProgram('mongoshim', '--dbpath', dbPath,
-                             '--db', dbName, '--collection', operationsCollectionName,
-                             '--out', externalOperationsFile),
-          'failed to run mongoshim in "read" mode on ' + operationsCollectionName);
+runMongoProgram('mongoshim', '--dbpath', dbPath,
+                '--db', dbName, '--collection', operationsCollectionName,
+                '--out', externalOperationsFile);
 // Apply operations in BSON file.
 // If operation was applied successfully, we should see a document in
 // 'collectionName' collection (not 'operationsCollectionName').
-assert.eq(0, runMongoProgram('mongoshim', '--dbpath', dbPath,
-                             '--db', dbName, '--collection', operationsCollectionName,
-                             '--mode', 'applyOps',
-                             '--in', externalOperationsFile),
-          'failed to run mongoshim in "applyOps" mode');
+runMongoProgram('mongoshim', '--dbpath', dbPath,
+                '--db', dbName, '--collection', operationsCollectionName,
+                '--mode', 'applyOps',
+                '--in', externalOperationsFile);
 mongod = startServer();
 collection = mongod.getDB(dbName).getCollection(collectionName);
 assert.eq({_id: 1, a: 1 }, collection.findOne(),

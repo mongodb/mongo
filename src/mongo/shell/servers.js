@@ -798,6 +798,10 @@ function appendSetParameterArgs(argArray) {
         }
         // mongod only options
         else if (programName.endsWith('mongod')) {
+            // set storageEngine for mongod
+            if (jsTest.options().storageEngine) {
+                argArray.push.apply(argArray, ['--storageEngine', jsTest.options().storageEngine]);
+            }
             // apply setParameters for mongod
             if (jsTest.options().setParameters) {
                 var params = jsTest.options().setParameters.split(",");

@@ -5,18 +5,19 @@
 // Runs the tool with the given name against the given mongod.  If shutdownServer is true,
 // first shuts down the mongod and uses the --dbpath option to the tool to operate on the data
 // files directly
+// XXX: Do not check tool exit code. See SERVER-5520
 function runTool(toolName, mongod, shutdownServer, options) {
     if (shutdownServer) {
         MongoRunner.stopMongod(mongod);
         var opts = {dbpath: mongod.fullOptions.pathOpts.dbpath};
         Object.extend(opts, options);
-        assert(!MongoRunner.runMongoTool(toolName, opts));
+        MongoRunner.runMongoTool(toolName, opts);
         mongod.fullOptions.restart = true;
         return MongoRunner.runMongod(mongod.fullOptions);
     } else {
         var opts = {host: mongod.host};
         Object.extend(opts, options);
-        assert(!MongoRunner.runMongoTool(toolName, opts));
+        MongoRunner.runMongoTool(toolName, opts);
         return mongod;
     }
 }

@@ -696,7 +696,7 @@ namespace mongo {
         /**
          * Gets the lock-holding object.  Only valid if hasLock().
          */
-        Lock::DBLock& getLock() { return *_writeLock; }
+        Lock::DBWrite& getLock() { return *_writeLock; }
 
         /**
          * Gets the target collection for the batch operation.  Value is undefined
@@ -721,7 +721,7 @@ namespace mongo {
         bool _lockAndCheckImpl(WriteOpResult* result);
 
         // Guard object for the write lock on the target database.
-        scoped_ptr<Lock::DBLock> _writeLock;
+        scoped_ptr<Lock::DBWrite> _writeLock;
 
         // Context object on the target database.  Must appear after writeLock, so that it is
         // destroyed in proper order.
@@ -919,9 +919,7 @@ namespace mongo {
         }
 
         invariant(!_context.get());
-        _writeLock.reset(new Lock::DBLock(txn->lockState(),
-                                          nsToDatabase(request->getNS()),
-                                          newlm::MODE_X));
+        _writeLock.reset(new Lock::DBWrite(txn->lockState(), request->getNS()));
         if (!checkIsMasterForDatabase(request->getNS(), result)) {
             return false;
         }
@@ -1126,7 +1124,7 @@ namespace mongo {
         }
 
         ///////////////////////////////////////////
-        Lock::DBLock writeLock(txn->lockState(), nsString.db(), newlm::MODE_X);
+        Lock::DBWrite writeLock(txn->lockState(), nsString.ns());
         ///////////////////////////////////////////
 
         if (!checkShardVersion(txn, &shardingState, *updateItem.getRequest(), result))
@@ -1181,7 +1179,7 @@ namespace mongo {
         }
 
         ///////////////////////////////////////////
-        Lock::DBLock writeLock(txn->lockState(), nss.db(), newlm::MODE_X);
+        Lock::DBWrite writeLock(txn->lockState(), nss.ns());
         ///////////////////////////////////////////
 
         // Check version once we're locked

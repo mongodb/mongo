@@ -560,7 +560,7 @@ namespace {
         };
     }
 
-    void LockerImpl::saveLockStateAndUnlock(Locker::LockSnapshot* stateOut) {
+    bool LockerImpl::saveLockStateAndUnlock(Locker::LockSnapshot* stateOut) {
         // Clear out whatever is in stateOut.
         stateOut->locks.clear();
         stateOut->globalMode = MODE_NONE;
@@ -568,18 +568,26 @@ namespace {
 
         // First, we look at the global lock.  There is special handling for this (as the flush
         // lock goes along with it) so we store it separately from the more pedestrian locks.
-        //
-        // Flush lock state is inferred from the global state so we don't bother to store it.
         LockRequest* globalRequest = _find(resourceIdGlobal);
-        if (NULL != globalRequest) {
-            stateOut->globalMode = globalRequest->mode;
-            stateOut->globalRecursiveCount = globalRequest->recursiveCount;
-        }
-        else {
+        if (NULL == globalRequest) {
             // If there's no global lock there isn't really anything to do.
             invariant(_requests.empty());
-            return;
+            return false;
         }
+
+        // If the global lock has been acquired more than once, we're probably somewhere in a
+        // DBDirectClient call.  It's not safe to release and reacquire locks -- the context using
+        // the DBDirectClient is probably not prepared for lock release.
+        if (globalRequest->recursiveCount > 1) {
+            return false;
+        }
+
+        // The global lock has been acquired just once.
+        invariant(1 == globalRequest->recursiveCount);
+        stateOut->globalMode = globalRequest->mode;
+        stateOut->globalRecursiveCount = globalRequest->recursiveCount;
+
+        // Flush lock state is inferred from the global state so we don't bother to store it.
 
         // Next, the non-global locks.
         for (LockRequestsMap::const_iterator it = _requests.begin(); it != _requests.end(); it++) {
@@ -628,6 +636,7 @@ namespace {
         // Step 3: Unlock flush.  It's only acquired on the first global lock acquisition
         // so we only unlock it once.
         invariant(unlock(resourceIdMMAPV1Flush));
+        return true;
     }
 
     void LockerImpl::restoreLockState(const Locker::LockSnapshot& state) {

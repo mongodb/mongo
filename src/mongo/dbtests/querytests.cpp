@@ -239,7 +239,7 @@ namespace QueryTests {
 
             {
                 // Check internal server handoff to getmore.
-                Lock::DBLock lk(_txn.lockState(), "unittests", newlm::MODE_X);
+                Lock::DBWrite lk(_txn.lockState(), ns);
                 WriteUnitOfWork wunit(&_txn);
                 Client::Context ctx(&_txn,  ns );
                 ClientCursorPin clientCursor( ctx.db()->getCollection(&_txn, ns), cursorId );
@@ -585,7 +585,7 @@ namespace QueryTests {
         }
         void run() {
             const char *ns = "unittests.querytests.OplogReplaySlaveReadTill";
-            Lock::DBLock lk(_txn.lockState(), "unittests", newlm::MODE_X);
+            Lock::DBWrite lk(_txn.lockState(), ns);
             WriteUnitOfWork wunit(&_txn);
             Client::Context ctx(&_txn,  ns );
 
@@ -1401,7 +1401,7 @@ namespace QueryTests {
     public:
         CollectionInternalBase( const char *nsLeaf ) :
           CollectionBase( nsLeaf ),
-          _lk(_txn.lockState(), "unittests", newlm::MODE_X),
+          _lk(_txn.lockState(), ns() ),
           _wunit( &_txn ),
           _ctx(&_txn, ns()) {
         }
@@ -1410,7 +1410,7 @@ namespace QueryTests {
         }
 
     private:
-        Lock::DBLock _lk;
+        Lock::DBWrite _lk;
         WriteUnitOfWork _wunit;
         Client::Context _ctx;
     };

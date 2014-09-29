@@ -169,6 +169,7 @@ namespace mongo {
                     storageGlobalParams.lenForNewNsFiles >= 1024*1024);
             maybeMkdir();
             unsigned long long l = storageGlobalParams.lenForNewNsFiles;
+            log() << "allocating new ns file " << pathString << ", filling with zeroes..." << endl;
 
             {
                 // Due to SERVER-15369 we need to explicitly write zero-bytes to the NS file.
@@ -179,10 +180,21 @@ namespace mongo {
                 File file;
                 file.open(pathString.c_str());
                 massert(18825, str::stream() << "couldn't create file " << pathString, file.is_open());
-                for (fileofs ofs = 0; ofs < l; ofs += kBlockSize ) {
+                for (fileofs ofs = 0; ofs < l && !file.bad(); ofs += kBlockSize ) {
                     file.write(ofs, &zeros[0], kBlockSize);
                 }
-                file.fsync();
+                if (file.bad()) {
+                    try {
+                        boost::filesystem::remove(pathString);
+                    } catch (const std::exception& e) {
+                        StringBuilder ss;
+                        ss << "error removing file: " << e.what();
+                        massert(18909, ss.str(), 0);
+                    }
+                }
+                else {
+                    file.fsync();
+                }
                 massert(18826, str::stream() << "failure writing file " << pathString, !file.bad() );
             }
 

@@ -48,12 +48,12 @@ namespace mongo {
      * CollectionMetadata has both persisted and volatile state (for now) - the persisted 
      * config server chunk state and the volatile pending state which is only tracked locally
      * while a server is the primary.  This requires a two-step loading process - the persisted
-     * chunk state *cannot* be loaded in a DBLock lock while the pending chunk state *must* be.
+     * chunk state *cannot* be loaded in a DBWrite lock while the pending chunk state *must* be.
      * 
      * Example usage: 
      * beforeMetadata = <get latest local metadata>;
      * remoteMetadata = makeCollectionMetadata( beforeMetadata, remoteMetadata );
-     * DBLock lock(txn, dbname, newlm::MODE_X);
+     * DBWrite lock( ns );
      * afterMetadata = <get latest local metadata>;
      * promotePendingChunks( afterMetadata, remoteMetadata );
      *

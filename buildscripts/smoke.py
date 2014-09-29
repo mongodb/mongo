@@ -219,7 +219,7 @@ class mongod(NullMongod):
         utils.ensureDir(dir_name)
 
         argv = [mongod_executable, "--port", str(self.port), "--dbpath", dir_name]
-        # These parameters are alwas set for tests
+        # These parameters are always set for tests
         # SERVER-9137 Added httpinterface parameter to keep previous behavior
         argv += ['--setParameter', 'enableTestCommands=1', '--httpinterface']
         if self.kwargs.get('small_oplog'):
@@ -542,6 +542,7 @@ def runTest(test, result):
     # hangs... that's bad.
     if ( argv[0].endswith( 'mongo' ) or argv[0].endswith( 'mongo.exe' ) ) and not '--eval' in argv :
         evalString = 'TestData = new Object();' + \
+                     'TestData.storageEngine = "' + ternary( storage_engine, storage_engine, "" ) + '";' + \
                      'TestData.testPath = "' + path + '";' + \
                      'TestData.testFile = "' + os.path.basename( path ) + '";' + \
                      'TestData.testName = "' + re.sub( ".js$", "", os.path.basename( path ) ) + '";' + \

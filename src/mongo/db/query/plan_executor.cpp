@@ -89,6 +89,23 @@ namespace mongo {
 
     PlanExecutor::~PlanExecutor() { }
 
+    // static
+    std::string PlanExecutor::statestr(ExecState s) {
+        if (PlanExecutor::ADVANCED == s) {
+            return "ADVANCED";
+        }
+        else if (PlanExecutor::IS_EOF == s) {
+            return "IS_EOF";
+        }
+        else if (PlanExecutor::DEAD == s) {
+            return "DEAD";
+        }
+        else {
+            verify(PlanExecutor::EXEC_ERROR == s);
+            return "EXEC_ERROR";
+        }
+    }
+
     WorkingSet* PlanExecutor::getWorkingSet() const {
         return _workingSet.get();
     }

@@ -115,7 +115,7 @@ namespace mongo {
 
             set<string> clonedColls;
 
-            Lock::DBLock dbXLock(txn->lockState(), dbname, newlm::MODE_X);
+            Lock::DBWrite dbXLock(txn->lockState(), dbname);
 
             Cloner cloner;
             bool rval = cloner.go(txn, dbname, from, opts, &clonedColls, errmsg);

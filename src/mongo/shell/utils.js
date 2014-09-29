@@ -145,6 +145,7 @@ jsTestOptions = function(){
         return Object.merge(_jsTestOptions,
                             { setParameters : TestData.setParameters,
                               setParametersMongos : TestData.setParametersMongos,
+                              storageEngine: TestData.storageEngine,
                               noJournal : TestData.noJournal,
                               noJournalPrealloc : TestData.noJournalPrealloc,
                               auth : TestData.auth,
