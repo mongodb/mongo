@@ -150,7 +150,7 @@ namespace repl {
 
     void ReplSetImpl::_syncThread() {
         StateBox::SP sp = box.get();
-        if (sp.state.primary() || _blockSync) {
+        if (sp.state.primary()) {
             sleepsecs(1);
             return;
         }
@@ -212,14 +212,5 @@ namespace repl {
         cc().shutdown();
     }
 
-    void ReplSetImpl::blockSync(bool block) {
-        // RS lock is already taken in Manager::checkAuth
-        _blockSync = block;
-        if (_blockSync) {
-            // syncing is how we get into SECONDARY state, so we'll be stuck in
-            // RECOVERING until we unblock
-            changeState(MemberState::RS_RECOVERING);
-        }
-    }
 } // namespace repl
 } // namespace mongo

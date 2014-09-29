@@ -453,6 +453,13 @@ namespace {
     }
 
     void LegacyReplicationCoordinator::setFollowerMode(const MemberState& newState) {
+        if (newState.secondary() &&
+                theReplSet->state().recovering() &&
+                theReplSet->mgr->shouldBeRecoveringDueToAuthIssue()) {
+            // If tryToGoLiveAsSecondary is trying to take us from RECOVERING to SECONDARY, but we
+            // still have an authIssue, don't actually change states.
+            return;
+        }
         theReplSet->changeState(newState);
     }
 

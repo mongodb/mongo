@@ -431,7 +431,6 @@ namespace {
     ReplSetImpl::ReplSetImpl() :
         elect(this),
         _forceSyncTarget(0),
-        _blockSync(false),
         _hbmsgTime(0),
         _self(0),
         _maintenanceMode(0),

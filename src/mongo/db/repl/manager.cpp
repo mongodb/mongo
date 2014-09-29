@@ -172,7 +172,7 @@ namespace repl {
         }
     }
 
-    void Manager::checkAuth(OperationContext* txn) {
+    bool Manager::shouldBeRecoveringDueToAuthIssue() {
         int down = 0, authIssue = 0, total = 0;
 
         for( Member *m = rs->head(); m; m=m->next() ) {
@@ -190,7 +190,11 @@ namespace repl {
         // if all nodes are down or failed auth AND at least one failed
         // auth, go into recovering.  If all nodes are down, stay a
         // secondary.
-        if (authIssue > 0 && down == total) {
+        return authIssue > 0 && down == total;
+    }
+
+    void Manager::checkAuth(OperationContext* txn) {
+        if (shouldBeRecoveringDueToAuthIssue()) {
             log() << "replset error could not reach/authenticate against any members" << endl;
 
             if (rs->box.getPrimary() == rs->_self) {
@@ -198,10 +202,7 @@ namespace repl {
                 rs->relinquish(txn);
             }
 
-            rs->blockSync(true);
-        }
-        else {
-            rs->blockSync(false);
+            rs->changeState(MemberState::RS_RECOVERING);
         }
     }
 

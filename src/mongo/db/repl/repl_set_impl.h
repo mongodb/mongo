@@ -124,9 +124,6 @@ namespace repl {
 
         Member* _forceSyncTarget;
 
-        bool _blockSync;
-        void blockSync(bool block);
-
         // set of electable members' _ids
         set<unsigned> _electableSet;
     protected:
