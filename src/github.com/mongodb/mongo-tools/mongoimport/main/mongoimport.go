@@ -22,7 +22,7 @@ func main() {
 	ingestOpts := &options.IngestOptions{}
 	opts.AddOptions(ingestOpts)
 
-	_, err := opts.Parse()
+	args, err := opts.Parse()
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error parsing command line options: %v\n", err)
 		util.ExitFail()
@@ -48,7 +48,7 @@ func main() {
 		SessionProvider: sessionProvider,
 	}
 
-	if err = importer.ValidateSettings(); err != nil {
+	if err = importer.ValidateSettings(args); err != nil {
 		util.PrintfTimeStamped("Error validating settings: %v\n", err)
 		util.ExitFail()
 	}

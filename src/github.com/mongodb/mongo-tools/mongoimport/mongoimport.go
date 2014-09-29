@@ -10,7 +10,6 @@ import (
 	"gopkg.in/mgo.v2/bson"
 	"io"
 	"os"
-	"path/filepath"
 	"reflect"
 	"strings"
 )
@@ -85,13 +84,18 @@ func (mongoImport *MongoImport) getImportWriter() ImportWriter {
 
 // ValidateSettings ensures that the tool specific options supplied for
 // MongoImport are valid
-func (mongoImport *MongoImport) ValidateSettings() error {
+func (mongoImport *MongoImport) ValidateSettings(args []string) error {
 	if err := mongoImport.ToolOptions.Validate(); err != nil {
 		return err
 	}
-	// Namespace must have a valid database
+	// Namespace must have a valid database if none is specified,
+	// use 'test'
 	if mongoImport.ToolOptions.Namespace.DB == "" {
-		return fmt.Errorf("must specify a database")
+		mongoImport.ToolOptions.Namespace.DB = "test"
+	} else {
+		if err := util.ValidateDBName(mongoImport.ToolOptions.Namespace.DB); err != nil {
+			return err
+		}
 	}
 
 	// use JSON as default input type
@@ -120,17 +124,32 @@ func (mongoImport *MongoImport) ValidateSettings() error {
 
 	// ensure we have a valid string to use for the collection
 	if mongoImport.ToolOptions.Namespace.Collection == "" {
-		if mongoImport.InputOptions.File == "" {
-			return fmt.Errorf("must specify a collection or filename")
+		if len(args) > 1 {
+			return fmt.Errorf("too many positional arguments")
 		}
-		fileBaseName := filepath.Base(mongoImport.InputOptions.File)
+		if mongoImport.InputOptions.File == "" && len(args) == 0 {
+			return fmt.Errorf("must specify a collection, or input file")
+		}
+		if mongoImport.InputOptions.File != "" && len(args) != 0 {
+			return fmt.Errorf(`multiple occurrences of option "--file"`)
+		}
+		var fileBaseName string
+		if mongoImport.InputOptions.File != "" {
+			fileBaseName = mongoImport.InputOptions.File
+		} else {
+			fileBaseName = args[0]
+		}
 		lastDotIndex := strings.LastIndex(fileBaseName, ".")
 		if lastDotIndex != -1 {
 			fileBaseName = fileBaseName[0:lastDotIndex]
 		}
+		if err := util.ValidateCollectionName(fileBaseName); err != nil {
+			return err
+		}
 		mongoImport.ToolOptions.Namespace.Collection = fileBaseName
 		util.PrintlnTimeStamped("no collection specified!")
-		util.PrintfTimeStamped("using filename '%v' as collection\n", fileBaseName)
+		util.PrintfTimeStamped("using filename '%v' as collection\n",
+			mongoImport.ToolOptions.Namespace.Collection)
 	}
 	return nil
 }

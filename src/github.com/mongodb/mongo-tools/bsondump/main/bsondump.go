@@ -40,7 +40,6 @@ func main() {
 		fmt.Fprintln(os.Stderr, "Too many positional operators.")
 		opts.PrintHelp()
 		os.Exit(1)
-		return
 	} else {
 		filename = extra[0]
 		if filename == "" {
