@@ -105,7 +105,6 @@ namespace mongo {
             : _cursor(session.GetCursor(uri)), _session(session) {}
         ~WiredTigerCursor() { _session.ReleaseCursor(_cursor); }
 
-        WiredTigerSession &GetSession(void) { return _session; }
         WT_CURSOR *Get() const { return _cursor; }
     
     private:

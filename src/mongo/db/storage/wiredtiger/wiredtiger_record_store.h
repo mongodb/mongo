@@ -163,7 +163,6 @@ namespace mongo {
         public:
             Iterator( const WiredTigerRecordStore& rs,
                       OperationContext* txn,
-                      shared_ptr<WiredTigerSession> &session,
                       const DiskLoc& start,
                       bool tailable,
                       const CollectionScanParams::Direction& dir );
@@ -187,7 +186,6 @@ namespace mongo {
 
             const WiredTigerRecordStore& _rs;
             OperationContext* _txn;
-            shared_ptr<WiredTigerSession> _session;
             bool _tailable;
             CollectionScanParams::Direction _dir;
             WiredTigerCursor *_cursor;

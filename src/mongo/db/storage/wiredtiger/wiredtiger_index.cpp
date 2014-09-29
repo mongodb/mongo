@@ -296,14 +296,13 @@ namespace mongo {
     /* Cursor implementation */
     WiredTigerIndex::IndexCursor::IndexCursor(const WiredTigerIndex &idx,
             OperationContext *txn,
-            shared_ptr<WiredTigerSession> &session,
             bool forward)
        : _txn(txn),
-         _session(session),
          _idx(idx),
          _forward(forward),
          _eof(true) {
-         _cursor = new WiredTigerCursor(_idx.GetURI(), *_session);
+         _cursor = new WiredTigerCursor(_idx.GetURI(),
+                                        WiredTigerRecoveryUnit::Get(txn).GetSession());
     }
 
     WiredTigerIndex::IndexCursor::~IndexCursor() {
@@ -446,11 +445,9 @@ namespace mongo {
 
     void WiredTigerIndex::IndexCursor::restorePosition( OperationContext *txn ) {
         // Update the session handle with our new operation context.
-        if (txn != _txn) {
-            _txn = txn;
-            _session = WiredTigerRecoveryUnit::Get(txn).GetSharedSession();
-        }
-        _cursor = new WiredTigerCursor(_idx.GetURI(), *_session);
+        _txn = txn;
+        _cursor = new WiredTigerCursor(_idx.GetURI(),
+                                       WiredTigerRecoveryUnit::Get(txn).GetSession());
         if (_savedAtEnd) {
             _eof = true;
             return;
@@ -463,7 +460,7 @@ namespace mongo {
             OperationContext* txn, int direction) const {
         invariant((direction == 1) || (direction == -1));
 
-        return new IndexCursor(*this, txn, WiredTigerRecoveryUnit::Get(txn).GetSharedSession(), direction == 1);
+        return new IndexCursor(*this, txn, direction == 1);
     }
 
     Status WiredTigerIndex::initAsEmpty(OperationContext* txn) {
