@@ -1712,11 +1712,8 @@ namespace mongo {
                 
                 vector<BSONObj> indexSpecs;
                 {
-                    auto_ptr<DBClientCursor> indexes = conn->getIndexes( ns );
-                    
-                    while ( indexes->more() ) {
-                        indexSpecs.push_back( indexes->nextSafe().getOwned() );
-                    }
+                    const std::list<BSONObj> indexes = conn->getIndexSpecs(ns);
+                    indexSpecs.insert(indexSpecs.begin(), indexes.begin(), indexes.end());
                 }
 
                 Lock::DBLock lk(txn->lockState(),  nsToDatabaseSubstring(ns), newlm::MODE_X);

@@ -1319,10 +1319,6 @@ namespace mongo {
         say( toSend );
     }
 
-    auto_ptr<DBClientCursor> DBClientWithCommands::getIndexes( const string &ns ) {
-        return query( NamespaceString( ns ).getSystemIndexesCollection() , BSON( "ns" << ns ) );
-    }
-
     list<BSONObj> DBClientWithCommands::getIndexSpecs( const string &ns, int options ) {
         list<BSONObj> specs;
 
@@ -1350,7 +1346,9 @@ namespace mongo {
             }
         }
 
-        auto_ptr<DBClientCursor> cursor = getIndexes( ns );
+        // fallback to querying system.indexes
+        auto_ptr<DBClientCursor> cursor = query(NamespaceString(ns).getSystemIndexesCollection(),
+                                                BSON("ns" << ns));
         while ( cursor->more() ) {
             BSONObj spec = cursor->nextSafe();
             specs.push_back( spec.getOwned() );
@@ -1387,19 +1385,14 @@ namespace mongo {
     }
 
     void DBClientWithCommands::reIndex( const string& ns ) {
-        list<BSONObj> all;
-        auto_ptr<DBClientCursor> i = getIndexes( ns );
-        while ( i->more() ) {
-            all.push_back( i->next().getOwned() );
-        }
-
-        dropIndexes( ns );
-
-        for ( list<BSONObj>::iterator i=all.begin(); i!=all.end(); i++ ) {
-            BSONObj o = *i;
-            insert( NamespaceString( ns ).getSystemIndexesCollection() , o );
-        }
-
+        resetIndexCache();
+        BSONObj info;
+        uassert(18908,
+                str::stream() << "reIndex failed: " << info,
+                runCommand(nsToDatabase(ns),
+                           BSON("reIndex" << nsToCollectionSubstring(ns)),
+                           info)
+                );
     }
 
 
