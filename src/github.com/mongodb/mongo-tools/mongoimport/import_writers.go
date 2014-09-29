@@ -25,13 +25,12 @@ type DriverImportWriter struct {
 type ShimImportWriter struct {
 	upsertMode   bool
 	upsertFields []string
-
-	importShim *db.StorageShim //shim used during the actual import phase itself
-	docSink    *db.EncodedBSONSink
-
-	dbPath             string
-	dbName, collection string
-	shimPath           string
+	importShim   *db.StorageShim
+	docSink      *db.EncodedBSONSink
+	dbPath       string
+	dbName       string
+	collection   string
+	shimPath     string
 }
 
 func (siw *ShimImportWriter) Open(dbName, collection string) error {
