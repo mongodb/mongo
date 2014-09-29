@@ -10,6 +10,7 @@ import (
 	"gopkg.in/mgo.v2/bson"
 	"io"
 	"os"
+	"path/filepath"
 	"reflect"
 	"strings"
 )
@@ -139,8 +140,8 @@ func (mongoImport *MongoImport) ValidateSettings(args []string) error {
 		} else {
 			fileBaseName = args[0]
 		}
-		lastDotIndex := strings.LastIndex(fileBaseName, ".")
-		if lastDotIndex != -1 {
+		fileBaseName = filepath.Base(fileBaseName)
+		if lastDotIndex := strings.LastIndex(fileBaseName, "."); lastDotIndex != -1 {
 			fileBaseName = fileBaseName[0:lastDotIndex]
 		}
 		if err := util.ValidateCollectionName(fileBaseName); err != nil {

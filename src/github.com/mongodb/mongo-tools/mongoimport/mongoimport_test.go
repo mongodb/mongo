@@ -56,7 +56,7 @@ func TestMongoImportValidateSettings(t *testing.T) {
 				InputOptions:  inputOptions,
 				IngestOptions: ingestOptions,
 			}
-			So(mongoImport.ValidateSettings(), ShouldNotBeNil)
+			So(mongoImport.ValidateSettings([]string{}), ShouldNotBeNil)
 		})
 
 		Convey("an error should be thrown if an invalid type is given", func() {
@@ -76,7 +76,7 @@ func TestMongoImportValidateSettings(t *testing.T) {
 				InputOptions:  inputOptions,
 				IngestOptions: ingestOptions,
 			}
-			So(mongoImport.ValidateSettings(), ShouldNotBeNil)
+			So(mongoImport.ValidateSettings([]string{}), ShouldNotBeNil)
 		})
 
 		Convey("an error should be thrown if neither --headerline is supplied "+
@@ -97,7 +97,7 @@ func TestMongoImportValidateSettings(t *testing.T) {
 				InputOptions:  inputOptions,
 				IngestOptions: ingestOptions,
 			}
-			So(mongoImport.ValidateSettings(), ShouldNotBeNil)
+			So(mongoImport.ValidateSettings([]string{}), ShouldNotBeNil)
 		})
 
 		Convey("no error should be thrown if --headerline is not supplied "+
@@ -119,7 +119,7 @@ func TestMongoImportValidateSettings(t *testing.T) {
 				InputOptions:  inputOptions,
 				IngestOptions: ingestOptions,
 			}
-			So(mongoImport.ValidateSettings(), ShouldBeNil)
+			So(mongoImport.ValidateSettings([]string{}), ShouldBeNil)
 		})
 
 		Convey("no error should be thrown if no input type is supplied",
@@ -140,7 +140,7 @@ func TestMongoImportValidateSettings(t *testing.T) {
 					InputOptions:  inputOptions,
 					IngestOptions: ingestOptions,
 				}
-				So(mongoImport.ValidateSettings(), ShouldBeNil)
+				So(mongoImport.ValidateSettings([]string{}), ShouldBeNil)
 			})
 
 		Convey("no error should be thrown if --headerline is not supplied "+
@@ -162,7 +162,7 @@ func TestMongoImportValidateSettings(t *testing.T) {
 				InputOptions:  inputOptions,
 				IngestOptions: ingestOptions,
 			}
-			So(mongoImport.ValidateSettings(), ShouldBeNil)
+			So(mongoImport.ValidateSettings([]string{}), ShouldBeNil)
 		})
 
 		Convey("an error should be thrown if no collection and no file is "+
@@ -183,7 +183,7 @@ func TestMongoImportValidateSettings(t *testing.T) {
 				InputOptions:  inputOptions,
 				IngestOptions: ingestOptions,
 			}
-			So(mongoImport.ValidateSettings(), ShouldNotBeNil)
+			So(mongoImport.ValidateSettings([]string{}), ShouldNotBeNil)
 		})
 
 		Convey("no error should be thrown if no collection but a file is "+
@@ -206,7 +206,7 @@ func TestMongoImportValidateSettings(t *testing.T) {
 				InputOptions:  inputOptions,
 				IngestOptions: ingestOptions,
 			}
-			So(mongoImport.ValidateSettings(), ShouldBeNil)
+			So(mongoImport.ValidateSettings([]string{}), ShouldBeNil)
 			So(mongoImport.ToolOptions.Namespace.Collection, ShouldEqual,
 				mongoImport.InputOptions.File)
 		})
@@ -231,7 +231,7 @@ func TestMongoImportValidateSettings(t *testing.T) {
 				InputOptions:  inputOptions,
 				IngestOptions: ingestOptions,
 			}
-			So(mongoImport.ValidateSettings(), ShouldBeNil)
+			So(mongoImport.ValidateSettings([]string{}), ShouldBeNil)
 			So(mongoImport.ToolOptions.Namespace.Collection, ShouldEqual,
 				"input")
 		})
