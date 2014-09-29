@@ -2,8 +2,8 @@ package mongofiles
 
 import (
 	"fmt"
-	"github.com/mongodb/mongo-tools/common/db"
 	"github.com/mongodb/mongo-tools/common/bsonutil"
+	"github.com/mongodb/mongo-tools/common/db"
 	commonopts "github.com/mongodb/mongo-tools/common/options"
 	"github.com/mongodb/mongo-tools/mongofiles/options"
 	"gopkg.in/mgo.v2"
@@ -37,7 +37,6 @@ const (
 	// default chunk size for a GridFS file -- 255KB
 	DefaultChunkSize = 255 * 1024
 )
-
 
 type MongoFiles struct {
 	// generic mongo tool options
@@ -297,7 +296,7 @@ func (self *MongoFiles) ensureIndex(collection string, indexDoc bsonutil.Marshal
 
 	var result bson.M
 	indexExists := docSource.Next(&result)
-	
+
 	if err = docSource.Err(); err != nil {
 		return fmt.Errorf("error retrieving indexes on the '%v' collection: %v", collection, err)
 	}
@@ -307,7 +306,7 @@ func (self *MongoFiles) ensureIndex(collection string, indexDoc bsonutil.Marshal
 	if err != nil {
 		return fmt.Errorf("error closing shim: %v", err)
 	}
-	
+
 	if !indexExists {
 		// if an index doesn't exist, create one
 		err = self.createIndex(collection, indexDoc, indexName, isUnique)

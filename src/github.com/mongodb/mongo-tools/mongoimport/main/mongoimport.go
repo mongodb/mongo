@@ -24,7 +24,7 @@ func main() {
 
 	_, err := opts.Parse()
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error parsing command line options: %v", err)
+		fmt.Fprintf(os.Stderr, "Error parsing command line options: %v\n", err)
 		util.ExitFail()
 	}
 

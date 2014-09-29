@@ -73,14 +73,12 @@ func (mongoImport *MongoImport) getImportWriter() ImportWriter {
 			session:         nil,
 		}
 	}
-	if mongoImport.IngestOptions.Upsert {
-		panic("not implemented! see SERVER-15309")
-	}
 	return &ShimImportWriter{
 		upsertMode:   mongoImport.IngestOptions.Upsert,
 		upsertFields: upsertFields,
 		dbPath:       mongoImport.ToolOptions.DBPath,
-		dbName:       mongoImport.ToolOptions.Namespace.DB,
+		dirPerDB:     mongoImport.ToolOptions.DirectoryPerDB,
+		db:           mongoImport.ToolOptions.Namespace.DB,
 		collection:   mongoImport.ToolOptions.Namespace.Collection,
 	}
 }
@@ -183,22 +181,27 @@ func (mongoImport *MongoImport) importDocuments(importInput ImportInput) (docsCo
 	if mongoImport.ToolOptions.Port != "" {
 		connUrl = connUrl + ":" + mongoImport.ToolOptions.Port
 	}
-	fmt.Fprintf(os.Stdout, "connected to: %v\n", connUrl)
-	err = importWriter.Open(mongoImport.ToolOptions.Namespace.DB, mongoImport.ToolOptions.Namespace.Collection)
+	util.PrintfTimeStamped("connected to: %v\n", connUrl)
+
+	err = importWriter.Open(
+		mongoImport.ToolOptions.Namespace.DB,
+		mongoImport.ToolOptions.Namespace.Collection,
+	)
 	if err != nil {
 		return
 	}
 
 	defer func() {
-		err2 := importWriter.Close()
+		closeErr := importWriter.Close()
 		if err == nil {
-			err = err2
+			err = closeErr
 		}
 	}()
 
 	// drop the database if necessary
 	if mongoImport.IngestOptions.Drop {
-		util.PrintfTimeStamped("dropping: %v.%v\n", mongoImport.ToolOptions.DB,
+		util.PrintfTimeStamped("dropping: %v.%v\n",
+			mongoImport.ToolOptions.DB,
 			mongoImport.ToolOptions.Collection)
 
 		if err := importWriter.Drop(); err != nil &&
@@ -206,6 +209,9 @@ func (mongoImport *MongoImport) importDocuments(importInput ImportInput) (docsCo
 			return 0, err
 		}
 	}
+
+	ignoreBlanks := mongoImport.IngestOptions.IgnoreBlanks &&
+		mongoImport.InputOptions.Type != JSON
 
 	for {
 		document, err := importInput.ImportDocument()
@@ -223,12 +229,10 @@ func (mongoImport *MongoImport) importDocuments(importInput ImportInput) (docsCo
 		}
 
 		// ignore blank fields if specified
-		if mongoImport.IngestOptions.IgnoreBlanks &&
-			mongoImport.InputOptions.Type != JSON {
+		if ignoreBlanks {
 			document = removeBlankFields(document)
 		}
-		err = importWriter.Import(document)
-		if err != nil {
+		if err = importWriter.Import(document); err != nil {
 			if mongoImport.IngestOptions.StopOnError {
 				return docsCount, err
 			}

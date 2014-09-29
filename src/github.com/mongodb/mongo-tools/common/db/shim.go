@@ -20,12 +20,32 @@ const MaxBSONSize = 16 * 1024 * 1024
 
 type ShimMode int
 
+var ErrShimNotFound = errors.New("Shim not found")
+
 const (
 	Dump ShimMode = iota
 	Insert
+	Upsert
 	Drop
 	Remove
 )
+
+type StorageShim struct {
+	DBPath         string
+	Database       string
+	Collection     string
+	Skip           int
+	Limit          int
+	ShimPath       string
+	Query          string
+	UpsertFields   string
+	Sort           []string
+	DirectoryPerDB bool
+	Journal        bool
+	Mode           ShimMode
+	shimProcess    *exec.Cmd
+	stdin          io.WriteCloser
+}
 
 type Shim struct {
 	DBPath         string
@@ -256,22 +276,6 @@ func (shim *Shim) Run(command interface{}, out interface{}, database string) (er
 	return err
 }
 
-type StorageShim struct {
-	DBPath         string
-	Database       string
-	Collection     string
-	Skip           int
-	Limit          int
-	ShimPath       string
-	Query          string
-	Sort           []string
-	DirectoryPerDB bool
-	Journal        bool
-	Mode           ShimMode
-	shimProcess    *exec.Cmd
-	stdin          io.WriteCloser
-}
-
 func makeSort(fields []string) bson.D {
 	val := bson.D{}
 	for _, field := range fields {
@@ -318,25 +322,21 @@ func buildArgs(shim StorageShim) ([]string, error) {
 		returnVal = append(returnVal, "--sort", string(sortObjJson))
 
 	}
-
 	if shim.Mode != Drop && shim.Query != "" {
 		returnVal = append(returnVal, "--query", shim.Query)
 	}
 
-	/*
-		if shim.Mode == Dump {
-			returnVal = append(returnVal, "--query", shim.Sort)
-		}
-	*/
-
+	returnVal = append(returnVal, "--mode")
 	switch shim.Mode {
 	case Dump:
 	case Insert:
-		returnVal = append(returnVal, "--load")
+		returnVal = append(returnVal, "insert")
+	case Upsert:
+		returnVal = append(returnVal, "upsert", "--upsertFields", shim.UpsertFields)
 	case Drop:
-		returnVal = append(returnVal, "--drop")
+		returnVal = append(returnVal, "drop")
 	case Remove:
-		returnVal = append(returnVal, "--remove")
+		returnVal = append(returnVal, "remove")
 	}
 	return returnVal, nil
 }
@@ -350,8 +350,6 @@ func checkExists(path string) (bool, error) {
 	}
 	return true, nil
 }
-
-var ErrShimNotFound = errors.New("Shim not found")
 
 func LocateShim() (string, error) {
 	shimLoc := os.Getenv("MONGOSHIM")
@@ -407,14 +405,12 @@ func (shim *StorageShim) Open() (*BSONSource, *BSONSink, error) {
 		return nil, nil, err
 	}
 	shim.shimProcess = cmd
-
 	return &BSONSource{stdOut, nil}, &BSONSink{stdin}, nil
 }
 
 func (shim *StorageShim) WaitResult() error {
 	if shim.shimProcess != nil {
-		err := shim.shimProcess.Wait()
-		return err
+		return shim.shimProcess.Wait()
 	}
 	return nil
 }

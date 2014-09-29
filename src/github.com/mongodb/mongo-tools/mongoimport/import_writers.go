@@ -28,13 +28,14 @@ type ShimImportWriter struct {
 	importShim   *db.StorageShim
 	docSink      *db.EncodedBSONSink
 	dbPath       string
-	dbName       string
+	dirPerDB     bool
+	db           string
 	collection   string
 	shimPath     string
 }
 
 func (siw *ShimImportWriter) Open(dbName, collection string) error {
-	siw.dbName = dbName
+	siw.db = dbName
 	siw.collection = collection
 	shimPath, err := db.LocateShim()
 	if err != nil {
@@ -46,59 +47,57 @@ func (siw *ShimImportWriter) Open(dbName, collection string) error {
 
 func (siw *ShimImportWriter) Drop() error {
 	dropShim := db.StorageShim{
-		DBPath:     siw.dbPath,
-		Database:   siw.dbName,
-		Collection: siw.collection,
-		ShimPath:   siw.shimPath,
-		Query:      "{}",
-		Mode:       db.Drop,
+		DBPath:         siw.dbPath,
+		DirectoryPerDB: siw.dirPerDB,
+		Database:       siw.db,
+		Collection:     siw.collection,
+		ShimPath:       siw.shimPath,
+		Query:          "{}",
+		Mode:           db.Drop,
 	}
 	_, _, err := dropShim.Open()
 	if err != nil {
 		return err
 	}
-
-	/*
-		decodedResult := db.NewDecodedBSONSource(out)
-		resultDoc := bson.M{}
-		decodedResult.Next(&resultDoc)
-	*/
-
 	defer dropShim.Close()
 	return dropShim.WaitResult()
 }
 
-func (siw *ShimImportWriter) initImportShim() error {
+func (siw *ShimImportWriter) initImportShim(upsert bool) error {
+	mode := db.Insert
+	if upsert {
+		mode = db.Upsert
+	}
 	importShim := &db.StorageShim{
-		DBPath:     siw.dbPath,
-		Database:   siw.dbName,
-		Collection: siw.collection,
-		ShimPath:   siw.shimPath,
-		Query:      "",
-		Mode:       db.Insert,
+		DBPath:         siw.dbPath,
+		DirectoryPerDB: siw.dirPerDB,
+		Database:       siw.db,
+		Collection:     siw.collection,
+		ShimPath:       siw.shimPath,
+		Query:          "",
+		Mode:           mode,
+		UpsertFields:   strings.Join(siw.upsertFields, ","),
 	}
 	_, inStream, err := importShim.Open()
 	if err != nil {
 		return err
 	}
 	siw.importShim = importShim
-	siw.docSink = &db.EncodedBSONSink{inStream, importShim}
+	siw.docSink = &db.EncodedBSONSink{
+		BSONIn:     inStream,
+		WriterShim: importShim,
+	}
 	return nil
 }
 
 func (siw *ShimImportWriter) Import(doc bson.M) error {
 	if siw.importShim == nil {
-		//lazily initialize import shim
-		err := siw.initImportShim()
-		if err != nil {
+		// lazily initialize import shim
+		if err := siw.initImportShim(siw.upsertMode); err != nil {
 			return err
 		}
 	}
-	err := siw.docSink.WriteDoc(doc)
-	if err != nil {
-		return err
-	}
-	return nil
+	return siw.docSink.WriteDoc(doc)
 }
 
 func (siw *ShimImportWriter) Close() error {
