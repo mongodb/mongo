@@ -266,11 +266,16 @@ namespace {
     StatusWith<int> validateConfigForReconfig(
             ReplicationCoordinatorExternalState* externalState,
             const ReplicaSetConfig& oldConfig,
-            const ReplicaSetConfig& newConfig) {
+            const ReplicaSetConfig& newConfig,
+            bool force) {
 
         Status status = newConfig.validate();
         if (!status.isOK()) {
             return StatusWith<int>(status);
+        }
+
+        if (force) {
+            return findSelfInConfig(externalState, newConfig);
         }
 
         status = validateOldAndNewConfigsCompatible(oldConfig, newConfig);

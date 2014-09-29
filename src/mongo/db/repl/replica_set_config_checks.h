@@ -66,13 +66,17 @@ namespace repl {
      * Validates that "newConfig" is a legal successor configuration to "oldConfig" that can be
      * initiated by the current node (identified via "externalState").
      *
+     * If "force" is set to true, then compatibility with the old configuration and electability of
+     * the current node in "newConfig" are not considered when determining if the reconfig is valid.
+     *
      * Returns the index of the current node's member configuration in "newConfig",
      * on success, and an indicative error on failure.
      */
     StatusWith<int> validateConfigForReconfig(
             ReplicationCoordinatorExternalState* externalState,
             const ReplicaSetConfig& oldConfig,
-            const ReplicaSetConfig& newConfig);
+            const ReplicaSetConfig& newConfig,
+            bool force);
 
     /**
      * Validates that "newConfig" is an acceptable configuration when received in a heartbeat
