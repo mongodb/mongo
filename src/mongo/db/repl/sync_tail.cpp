@@ -465,7 +465,7 @@ namespace {
         
         if (curVersion != OPLOG_VERSION) {
             severe() << "expected oplog version " << OPLOG_VERSION << " but found version " 
-                     << curVersion;
+                     << curVersion << " in oplog entry: " << op;
             fassertFailedNoTrace(18820);
         }
     
