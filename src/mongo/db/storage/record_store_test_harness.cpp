@@ -38,7 +38,10 @@ namespace mongo {
         scoped_ptr<HarnessHelper> harnessHelper( newHarnessHelper() );
         scoped_ptr<RecordStore> rs( harnessHelper->newNonCappedRecordStore() );
 
-        ASSERT_EQUALS( 0, rs->numRecords( NULL ) );
+        {
+            scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
+            ASSERT_EQUALS( 0, rs->numRecords( opCtx.get() ) );
+        }
 
         string s = "eliot was here";
 
@@ -57,8 +60,11 @@ namespace mongo {
             ASSERT_EQUALS( s, rs->dataFor( opCtx.get(), loc1 ).data() );
         }
 
-        ASSERT_EQUALS( s, rs->dataFor( NULL, loc1 ).data() );
-        ASSERT_EQUALS( 1, rs->numRecords( NULL ) );
+        {
+            scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
+            ASSERT_EQUALS( s, rs->dataFor( opCtx.get(), loc1 ).data() );
+            ASSERT_EQUALS( 1, rs->numRecords( opCtx.get() ) );
+        }
 
         {
             scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
@@ -71,7 +77,10 @@ namespace mongo {
 
         }
 
-        ASSERT_EQUALS( 2, rs->numRecords( NULL ) );
+        {
+            scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
+            ASSERT_EQUALS( 2, rs->numRecords( opCtx.get() ) );
+        }
     }
 
     namespace {
@@ -114,7 +123,10 @@ namespace mongo {
         scoped_ptr<HarnessHelper> harnessHelper( newHarnessHelper() );
         scoped_ptr<RecordStore> rs( harnessHelper->newNonCappedRecordStore() );
 
-        ASSERT_EQUALS( 0, rs->numRecords( NULL ) );
+        {
+            scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
+            ASSERT_EQUALS( 0, rs->numRecords( opCtx.get() ) );
+        }
 
         string s = "eliot was here";
 
@@ -134,7 +146,10 @@ namespace mongo {
 
         }
 
-        ASSERT_EQUALS( 1, rs->numRecords( NULL ) );
+        {
+            scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
+            ASSERT_EQUALS( 1, rs->numRecords( opCtx.get() ) );
+        }
 
         {
             scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
@@ -154,7 +169,10 @@ namespace mongo {
         scoped_ptr<HarnessHelper> harnessHelper( newHarnessHelper() );
         scoped_ptr<RecordStore> rs( harnessHelper->newNonCappedRecordStore() );
 
-        ASSERT_EQUALS( 0, rs->numRecords( NULL ) );
+        {
+            scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
+            ASSERT_EQUALS( 0, rs->numRecords( opCtx.get() ) );
+        }
 
         string s = "eliot was here";
 
@@ -173,8 +191,12 @@ namespace mongo {
             }
 
         }
-        ASSERT_EQUALS( s, rs->dataFor( NULL, loc ).data() );
-        ASSERT_EQUALS( 2, rs->numRecords( NULL ) );
+
+        {
+            scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
+            ASSERT_EQUALS( s, rs->dataFor( opCtx.get(), loc ).data() );
+            ASSERT_EQUALS( 2, rs->numRecords( opCtx.get() ) );
+        }
 
         {
             scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
@@ -190,7 +212,10 @@ namespace mongo {
         scoped_ptr<HarnessHelper> harnessHelper( newHarnessHelper() );
         scoped_ptr<RecordStore> rs( harnessHelper->newNonCappedRecordStore() );
 
-        ASSERT_EQUALS( 0, rs->numRecords( NULL ) );
+        {
+            scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
+            ASSERT_EQUALS( 0, rs->numRecords( opCtx.get() ) );
+        }
 
         string s1 = "eliot was here";
         string s2 = "eliot was here again";
@@ -210,7 +235,10 @@ namespace mongo {
 
         }
 
-        ASSERT_EQUALS( s1, rs->dataFor( NULL, loc ).data() );
+        {
+            scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
+            ASSERT_EQUALS( s1, rs->dataFor( opCtx.get(), loc ).data() );
+        }
 
         {
             scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
@@ -226,8 +254,11 @@ namespace mongo {
 
         }
 
-        ASSERT_EQUALS( 1, rs->numRecords( NULL ) );
-        ASSERT_EQUALS( s2, rs->dataFor( NULL, loc ).data() );
+        {
+            scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
+            ASSERT_EQUALS( 1, rs->numRecords( opCtx.get() ) );
+            ASSERT_EQUALS( s2, rs->dataFor( opCtx.get(), loc ).data() );
+        }
 
     }
 
@@ -254,7 +285,10 @@ namespace mongo {
 
         }
 
-        ASSERT_EQUALS( s1, rs->dataFor( NULL, loc ).data() );
+        {
+            scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
+            ASSERT_EQUALS( s1, rs->dataFor( opCtx.get(), loc ).data() );
+        }
 
         {
             scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
@@ -274,7 +308,11 @@ namespace mongo {
                 uow.commit();
             }
         }
-        ASSERT_EQUALS( s2, rs->dataFor( NULL, loc ).data() );
+
+        {
+            scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
+            ASSERT_EQUALS( s2, rs->dataFor( opCtx.get(), loc ).data() );
+        }
     }
 
 
@@ -282,7 +320,10 @@ namespace mongo {
         scoped_ptr<HarnessHelper> harnessHelper( newHarnessHelper() );
         scoped_ptr<RecordStore> rs( harnessHelper->newNonCappedRecordStore() );
 
-        ASSERT_EQUALS( 0, rs->numRecords( NULL ) );
+        {
+            scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
+            ASSERT_EQUALS( 0, rs->numRecords( opCtx.get() ) );
+        }
 
         string s = "eliot was here";
 
@@ -299,9 +340,16 @@ namespace mongo {
 
         }
 
-        ASSERT_EQUALS( s, rs->dataFor( NULL, loc ).data() );
 
-        ASSERT_EQUALS( 1, rs->numRecords( NULL ) );
+        {
+            scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
+            ASSERT_EQUALS( s, rs->dataFor( opCtx.get(), loc ).data() );
+        }
+
+        {
+            scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
+            ASSERT_EQUALS( 1, rs->numRecords( opCtx.get() ) );
+        }
 
         {
             scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
@@ -313,7 +361,10 @@ namespace mongo {
 
         }
 
-        ASSERT_EQUALS( 0, rs->numRecords( NULL ) );
+        {
+            scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
+            ASSERT_EQUALS( 0, rs->numRecords( opCtx.get() ) );
+        }
 
     }
 
@@ -323,7 +374,10 @@ namespace mongo {
         scoped_ptr<HarnessHelper> harnessHelper( newHarnessHelper() );
         scoped_ptr<RecordStore> rs( harnessHelper->newNonCappedRecordStore() );
 
-        ASSERT_EQUALS( 0, rs->numRecords( NULL ) );
+        {
+            scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
+            ASSERT_EQUALS( 0, rs->numRecords( opCtx.get() ) );
+        }
 
         {
             scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
@@ -337,7 +391,10 @@ namespace mongo {
             }
         }
 
-        ASSERT_EQUALS( N, rs->numRecords( NULL ) );
+        {
+            scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
+            ASSERT_EQUALS( N, rs->numRecords( opCtx.get() ) );
+        }
 
         {
             int x = 0;
