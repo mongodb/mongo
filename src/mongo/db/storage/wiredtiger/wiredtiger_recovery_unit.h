@@ -66,7 +66,7 @@ namespace mongo {
             if (_begun) {
                 WT_SESSION *s = _session.Get();
                 int ret = s->commit_transaction(s, NULL);
-                invariant(ret == 0);
+                invariantWTOK(ret);
                 _begun = false;
             }
         }
@@ -78,7 +78,7 @@ namespace mongo {
             if (_begun) {
                 WT_SESSION *s = _session.Get();
                 int ret = s->rollback_transaction(s, NULL);
-                invariant(ret == 0);
+                invariantWTOK(ret);
                 _begun = false;
             }
         }
@@ -110,7 +110,7 @@ namespace mongo {
             if (!_begun) {
                 WT_SESSION *s = _session.Get();
                 int ret = s->begin_transaction(s, NULL);
-                invariant(ret == 0);
+                invariantWTOK(ret);
                 _begun = true;
             }
             return _session;

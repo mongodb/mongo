@@ -3,9 +3,30 @@
 #include <wiredtiger.h>
 
 #include "mongo/util/assert_util.h"
+#include "mongo/util/mongoutils/str.h"
 
 namespace mongo {
     class WiredTigerOperationContext;
+
+    /**
+     * converts wiredtiger return codes to mongodb statuses.
+     */
+    inline Status wtRCToStatus(int retCode) {
+        if (MONGO_likely(retCode == 0))
+            return Status::OK();
+
+        // TODO convert specific codes rather than just using INTERNAL_ERROR for everything.
+        return Status(ErrorCodes::InternalError,
+                      str::stream() << retCode << ": " << wiredtiger_strerror(retCode));
+
+    }
+
+    inline void invariantWTOK(int retCode) {
+        if (MONGO_likely(retCode == 0))
+            return;
+
+        fassertFailedWithStatus(28519, wtRCToStatus(retCode));
+    }
 
     class WiredTigerDatabase {
     public:
@@ -30,12 +51,12 @@ namespace mongo {
         WiredTigerOperationContext(WiredTigerDatabase &db) : _db(db), _session(0) {
             WT_CONNECTION *conn = _db.Get();
             int ret = conn->open_session(conn, NULL, NULL, &_session);
-            invariant(ret == 0);
+            invariantWTOK(ret);
         }
         ~WiredTigerOperationContext() {
             if (_session) {
                 int ret = _session->close(_session, NULL);
-                invariant(ret == 0);
+                invariantWTOK(ret);
             }
         }
 
@@ -48,7 +69,7 @@ namespace mongo {
                 return c;
             }
             int ret = _session->open_cursor(_session, uri.c_str(), NULL, NULL, &c);
-            invariant(ret == 0 || ret == ENOENT);
+            if (ret != ENOENT) invariantWTOK(ret);
             return c;
         }
 
@@ -56,10 +77,10 @@ namespace mongo {
             const std::string uri(cursor->uri);
             if (_curmap[uri]) {
                 int ret = cursor->close(cursor);
-                invariant(ret == 0);
+                invariantWTOK(ret);
             } else {
                 int ret = cursor->reset(cursor);
-                invariant(ret == 0);
+                invariantWTOK(ret);
                 _curmap[uri] = cursor;
             }
         }
@@ -69,7 +90,7 @@ namespace mongo {
                 WT_CURSOR *cursor = i->second;
                 if (cursor) {
                     int ret = cursor->close(cursor);
-                    invariant(ret == 0);
+                    invariantWTOK(ret);
                 }
                 _curmap.erase(i);
             }
