@@ -115,7 +115,7 @@ namespace mongo {
         std::string table_prefix = "table:" + name() + ".";
         while ((ret = c->next(c)) == 0) {
             ret = c->get_key(c, &key);
-            invariant(ret == 0);
+            invariantWTOK(ret);
             if (strcmp("metadata:", key) == 0)
                 continue;
             if (strncmp(table_prefix.c_str(), key, table_prefix.length()) != 0)
@@ -129,7 +129,7 @@ namespace mongo {
                 new WiredTigerCollectionCatalogEntry(swrap, StringData(name));
             _entryMap[name.c_str()] = entry;
         }
-        invariant(ret == WT_NOTFOUND || ret == 0);
+        if (ret != WT_NOTFOUND) invariantWTOK(ret);
         name();
     }
 
@@ -152,7 +152,7 @@ namespace mongo {
                            "cannot create collection, already exists" );
 
         int ret = WiredTigerRecordStore::Create(_db, ns, options, allocateDefaultSpace);
-        invariant(ret == 0);
+        invariantWTOK(ret);
 
         entry = new WiredTigerCollectionCatalogEntry( ns, options );
 
@@ -303,7 +303,7 @@ namespace mongo {
                     WiredTigerIndex::_getURI(fromNS.toString(), *idx).c_str(),
                     WiredTigerIndex::_getURI(toNS.toString(), *idx).c_str(),
                     "force");
-            invariant(ret == 0);
+            invariantWTOK(ret);
         }
 
         // Rename the primary WiredTiger table

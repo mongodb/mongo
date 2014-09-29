@@ -28,6 +28,7 @@
  */
 
 #include <boost/shared_ptr.hpp>
+#include <wiredtiger.h>
 
 #include "mongo/db/storage/index_entry_comparison.h"
 #include "mongo/db/storage/sorted_data_interface.h"
@@ -36,6 +37,7 @@
 
 namespace mongo {
     class IndexCatalogEntry;
+    class WiredTigerDatabase;
 
     /**
      * Caller takes ownership.
@@ -92,7 +94,6 @@ namespace mongo {
                 public:
                 IndexCursor(const WiredTigerIndex &idx,
                         OperationContext *txn,
-                        shared_ptr<WiredTigerSession> &session,
                         bool forward);
 
                 virtual ~IndexCursor();
@@ -134,7 +135,6 @@ namespace mongo {
 
             private:
                 OperationContext *_txn;
-                shared_ptr<WiredTigerSession> _session;
                 WiredTigerCursor *_cursor;
                 const WiredTigerIndex &_idx;    // Someone else owns this.
                 bool _forward;

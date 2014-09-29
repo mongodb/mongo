@@ -91,11 +91,11 @@ namespace mongo {
         WiredTigerCursor curwrap(GetURI(), swrap);
         WT_CURSOR *c = curwrap.Get();
         int ret = c->prev(c);
-        invariant(ret == 0 || ret == WT_NOTFOUND);
+        if (ret != WT_NOTFOUND) invariantWTOK(ret);
         uint64_t key = 0;
         if (ret == 0) {
             ret = c->get_key(c, &key);
-            invariant(ret == 0);
+            invariantWTOK(ret);
             _numRecords = key;
         } else
             _numRecords = 0;
@@ -148,7 +148,7 @@ namespace mongo {
         WT_CURSOR *c = curwrap.Get();
         WT_ITEM value;
         int ret = c->get_value(c, &value);
-        invariant(ret == 0);
+        invariantWTOK(ret);
 
         boost::shared_array<char> data( new char[value.size] );
         memcpy( data.get(), value.data, value.size );
@@ -162,7 +162,7 @@ namespace mongo {
         WT_CURSOR *c = curwrap.Get();
         c->set_key(c, _makeKey(loc));
         int ret = c->search(c);
-        invariant(ret == 0);
+        invariantWTOK(ret);
 
         return _getData(curwrap);
     }
@@ -173,16 +173,16 @@ namespace mongo {
         WT_CURSOR *c = curwrap.Get();
         c->set_key(c, _makeKey(loc));
         int ret = c->search(c);
-        invariant(ret == 0);
+        invariantWTOK(ret);
 
         WT_ITEM old_value;
         ret = c->get_value(c, &old_value);
-        invariant(ret == 0);
+        invariantWTOK(ret);
 
         int old_length = old_value.size;
 
         ret = c->remove(c);
-        invariant(ret == 0);
+        invariantWTOK(ret);
 
         _changeNumRecords(txn, false);
         _increaseDataSize(txn, -old_length);
@@ -214,7 +214,7 @@ namespace mongo {
 
             uint64_t key;
             ret = c->get_key(c, &key);
-            invariant(ret == 0);
+            invariantWTOK(ret);
             DiskLoc oldest = _fromKey(key);
 
             if ( _cappedDeleteCallback )
@@ -224,7 +224,7 @@ namespace mongo {
             ret = c->next(c);
         }
 
-        invariant(ret == 0 || ret == WT_NOTFOUND);
+        if (ret != WT_NOTFOUND) invariantWTOK(ret);
     }
 
     StatusWith<DiskLoc> WiredTigerRecordStore::insertRecord( OperationContext* txn,
@@ -243,7 +243,7 @@ namespace mongo {
         c->set_key(c, _makeKey(loc));
         c->set_value(c, WiredTigerItem(data, len).Get());
         int ret = c->insert(c);
-        invariant(ret == 0);
+        invariantWTOK(ret);
 
         _changeNumRecords( txn, true );
         _increaseDataSize( txn, len );
@@ -273,7 +273,7 @@ namespace mongo {
         c->set_key(c, _makeKey(loc));
         c->set_value(c, WiredTigerItem(buf.get(), len).Get());
         int ret = c->insert(c);
-        invariant(ret == 0);
+        invariantWTOK(ret);
 
         _changeNumRecords( txn, true );
         _increaseDataSize( txn, len );
@@ -294,18 +294,18 @@ namespace mongo {
         WT_CURSOR *c = curwrap.Get();
         c->set_key(c, _makeKey(loc));
         int ret = c->search(c);
-        invariant(ret == 0);
+        invariantWTOK(ret);
 
         WT_ITEM old_value;
         ret = c->get_value(c, &old_value);
-        invariant(ret == 0);
+        invariantWTOK(ret);
 
         int old_length = old_value.size;
 
         c->set_key(c, _makeKey(loc));
         c->set_value(c, WiredTigerItem(data, len).Get());
         ret = c->insert(c);
-        invariant(ret == 0);
+        invariantWTOK(ret);
 
         _increaseDataSize(txn, len - old_length);
 
@@ -324,11 +324,11 @@ namespace mongo {
         WT_CURSOR *c = curwrap.Get();
         c->set_key(c, _makeKey(loc));
         int ret = c->search(c);
-        invariant(ret == 0);
+        invariantWTOK(ret);
 
         WT_ITEM old_value;
         ret = c->get_value(c, &old_value);
-        invariant(ret == 0);
+        invariantWTOK(ret);
 
         std::string data(reinterpret_cast<const char *>(old_value.data), old_value.size);
 
@@ -344,7 +344,7 @@ namespace mongo {
         // write back
         c->set_value(c, WiredTigerItem(data).Get());
         ret = c->insert(c);
-        invariant(ret == 0);
+        invariantWTOK(ret);
 
         return Status::OK();
     }
@@ -354,7 +354,7 @@ namespace mongo {
                                                    bool tailable,
                                                    const CollectionScanParams::Direction& dir
                                                    ) const {
-        return new Iterator(*this, txn, WiredTigerRecoveryUnit::Get(txn).GetSharedSession(), start, tailable, dir);
+        return new Iterator(*this, txn, start, tailable, dir);
     }
 
 
@@ -391,7 +391,7 @@ namespace mongo {
         WiredTigerSession &swrap = WiredTigerRecoveryUnit::Get(txn).GetSession();
         WT_SESSION *s = swrap.Get();
         int ret = s->compact(s, GetURI().c_str(), NULL);
-        invariant(ret == 0);
+        invariantWTOK(ret);
         return Status::OK();
     }
 
@@ -500,16 +500,15 @@ namespace mongo {
     WiredTigerRecordStore::Iterator::Iterator(
             const WiredTigerRecordStore& rs,
             OperationContext *txn,
-            shared_ptr<WiredTigerSession> &session,
             const DiskLoc& start,
             bool tailable,
             const CollectionScanParams::Direction& dir )
         : _rs( rs ),
           _txn( txn ),
-          _session( session ),
           _tailable( tailable ),
           _dir( dir ) {
-            _cursor = new WiredTigerCursor(rs.GetURI(), *session);
+            _cursor = new WiredTigerCursor(rs.GetURI(),
+                                           WiredTigerRecoveryUnit::Get(txn).GetSession());
             _locate(start, true);
     }
 
@@ -522,7 +521,7 @@ namespace mongo {
         int ret;
         if (loc.isNull()) {
             ret = _forward() ? c->next(c) : c->prev(c);
-            invariant(ret == 0 || ret == WT_NOTFOUND);
+            if (ret != WT_NOTFOUND) invariantWTOK(ret);
             _eof = (ret == WT_NOTFOUND);
             return;
         }
@@ -537,7 +536,7 @@ namespace mongo {
             if (ret == 0 && cmp > 0)
                 ret = c->prev(c);
         }
-        invariant(ret == 0 || ret == WT_NOTFOUND);
+        if (ret != WT_NOTFOUND) invariantWTOK(ret);
         _eof = (ret == WT_NOTFOUND);
     }
 
@@ -557,7 +556,7 @@ namespace mongo {
         WT_CURSOR *c = _cursor->Get();
         uint64_t key;
         int ret = c->get_key(c, &key);
-        invariant(ret == 0);
+        invariantWTOK(ret);
         return _fromKey(key);
     }
 
@@ -568,7 +567,7 @@ namespace mongo {
     void WiredTigerRecordStore::Iterator::_getNext() {
         WT_CURSOR *c = _cursor->Get();
         int ret = _forward() ? c->next(c) : c->prev(c);
-        invariant(ret == 0 || ret == WT_NOTFOUND);
+        if (ret != WT_NOTFOUND) invariantWTOK(ret);
         _eof = (ret == WT_NOTFOUND);
     }
 
@@ -603,11 +602,8 @@ namespace mongo {
         // This is normally already the case, but sometimes we are given a new
         // OperationContext on restore - update the iterators context in that
         // case
-        if (txn != _txn) {
-            _txn = txn;
-            _session = WiredTigerRecoveryUnit::Get(txn).GetSharedSession();
-        }
-        _cursor = new WiredTigerCursor(_rs.GetURI(), *_session);
+        _txn = txn;
+        _cursor = new WiredTigerCursor(_rs.GetURI(), WiredTigerRecoveryUnit::Get(txn).GetSession());
         if (_savedLoc.isNull())
             _eof = true;
         else

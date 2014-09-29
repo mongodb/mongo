@@ -61,7 +61,7 @@ namespace mongo {
         c->set_key(c, tbl_uri.c_str());
         int ret = c->search(c);
         // TODO: Could we reasonably fail with NOTFOUND here?
-        invariant (ret == 0);
+        invariantWTOK(ret);
         BSONObj b = _getSavedMetadata(cursor);
 
         // Create the collection
@@ -79,7 +79,7 @@ namespace mongo {
         while (ret == 0) {
             const char *uri_str;
             ret = c->get_key(c, &uri_str);
-            invariant ( ret == 0);
+            invariantWTOK(ret);
             std::string uri(uri_str);
             // No more indexes for this table
             if (uri.substr(0, tbl_uri.size()) != tbl_uri)
@@ -187,7 +187,7 @@ namespace mongo {
 
         WT_SESSION *session = swrap.Get();
         int ret = session->drop(session, WiredTigerIndex::_getURI(ns().toString(), idxName.toString()).c_str(), "force");
-        invariant(ret == 0);
+        invariantWTOK(ret);
         indexes.erase( idxName.toString() );
         return Status::OK();
     }
@@ -246,14 +246,14 @@ namespace mongo {
 
         const char *meta;
         int ret = c->get_value(c, &meta);
-        invariant( ret == 0 );
+        invariantWTOK(ret);
         WT_CONFIG_PARSER *cp;
         ret = wiredtiger_config_parser_open(
                 NULL, meta, strlen(meta), &cp);
-        invariant ( ret == 0 );
+        invariantWTOK(ret);
         WT_CONFIG_ITEM cval;
         ret = cp->get(cp, "app_metadata", &cval);
-        invariant ( ret == 0 );
+        invariantWTOK(ret);
 
         BSONObj b( fromjson(std::string(cval.str, cval.len)));
         cp->close(cp);

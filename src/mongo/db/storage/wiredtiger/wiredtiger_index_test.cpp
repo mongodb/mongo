@@ -51,7 +51,7 @@ namespace mongo {
 
             WT_CONNECTION* conn;
             int ret = wiredtiger_open( _td.path().c_str(), NULL, config.c_str(), &conn );
-            invariant( ret == 0 );
+            invariantWTOK(ret);
 
             _db.reset( new WiredTigerDatabase( conn ) );
         }

@@ -56,7 +56,7 @@ namespace mongo {
                      ") failed. Using default options instead." << endl;
             ret = wiredtiger_open(path.c_str(), NULL, default_config, &conn);
         }
-        invariant(ret == 0);
+        invariantWTOK(ret);
         _db = new WiredTigerDatabase(conn);
         loadExistingDatabases();
     }

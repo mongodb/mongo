@@ -38,7 +38,7 @@ namespace mongo {
         ClearCache();
         if (_conn) {
             int ret = _conn->close(_conn, NULL);
-            invariant(ret == 0);
+            invariantWTOK(ret);
         }
     }
 
