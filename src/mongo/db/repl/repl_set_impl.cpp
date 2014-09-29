@@ -46,7 +46,6 @@
 #include "mongo/db/repl/oplogreader.h"
 #include "mongo/db/repl/repl_set_seed_list.h"
 #include "mongo/db/repl/repl_coordinator_global.h"
-#include "mongo/db/repl/repl_coordinator_hybrid.h"
 #include "mongo/db/repl/rslog.h"
 #include "mongo/db/storage/storage_engine.h"
 #include "mongo/s/d_state.h"
@@ -578,15 +577,6 @@ namespace {
         verify(_name.empty() || _name == config()._id);
         _name = config()._id;
         verify(!_name.empty());
-
-        {
-            // Hack to force ReplicationCoordinatorImpl to have a config.
-            // TODO(spencer): rm this once the ReplicationCoordinatorImpl can load its own config.
-            HybridReplicationCoordinator* replCoord =
-                    dynamic_cast<HybridReplicationCoordinator*>(getGlobalReplicationCoordinator());
-            fassert(18648, replCoord);
-            replCoord->setImplConfigHack(_cfg);
-        }
 
         // this is a shortcut for simple changes
         if (additive) {

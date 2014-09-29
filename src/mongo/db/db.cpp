@@ -73,7 +73,7 @@
 #include "mongo/db/repair_database.h"
 #include "mongo/db/repl/network_interface_impl.h"
 #include "mongo/db/repl/repl_coordinator_global.h"
-#include "mongo/db/repl/repl_coordinator_hybrid.h"
+#include "mongo/db/repl/repl_coordinator_legacy.h"
 #include "mongo/db/repl/repl_settings.h"
 #include "mongo/db/restapi.h"
 #include "mongo/db/server_parameters.h"
@@ -844,7 +844,7 @@ namespace mongo {
 
 MONGO_INITIALIZER_WITH_PREREQUISITES(CreateReplicationManager, ("SetGlobalEnvironment"))
         (InitializerContext* context) {
-    repl::setGlobalReplicationCoordinator(new repl::HybridReplicationCoordinator(replSettings));
+    repl::setGlobalReplicationCoordinator(new repl::LegacyReplicationCoordinator(replSettings));
     return Status::OK();
 }
 

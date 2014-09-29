@@ -1354,32 +1354,6 @@ namespace {
          _startHeartbeats();
      }
 
-    void ReplicationCoordinatorImpl::forceCurrentRSConfigHack(const BSONObj& configObj,
-                                                              int myIndex) {
-        LOG(2) << "Force setting rs config in ReplCoordinatorImpl to " << configObj.toString() <<
-                " with self at index " << myIndex;
-        ReplicaSetConfig config;
-        fassert(18647, config.initialize(configObj));
-
-
-        // Wait until we're done loading our local config
-        boost::unique_lock<boost::mutex> lock(_mutex);
-        while (_rsConfigState == kConfigPreStart || _rsConfigState == kConfigStartingUp) {
-            _rsConfigStateChange.wait(lock);
-        }
-        lock.unlock();
-
-        CBHStatus cbh = _replExecutor.scheduleWork(
-                stdx::bind(&ReplicationCoordinatorImpl::_setCurrentRSConfig,
-                           this,
-                           stdx::placeholders::_1,
-                           config,
-                           myIndex));
-        if (cbh.isOK()) {
-            _replExecutor.wait(cbh.getValue());
-        }
-    }
-
     Status ReplicationCoordinatorImpl::processReplSetUpdatePosition(
             OperationContext* txn,
             const UpdatePositionArgs& updates) {
