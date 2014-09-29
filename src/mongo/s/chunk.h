@@ -112,10 +112,10 @@ namespace mongo {
         // split support
         //
 
-        long getBytesWritten() const { return _dataWritten; }
+        long long getBytesWritten() const { return _dataWritten; }
         // Const since _dataWritten is mutable and a heuristic
         // TODO: Split data tracking and chunk information
-        void setBytesWritten( long bytesWritten ) const { _dataWritten = bytesWritten; }
+        void setBytesWritten(long long bytesWritten) const { _dataWritten = bytesWritten; }
 
         /**
          * if the amount of data written nears the max size of a shard
@@ -162,7 +162,10 @@ namespace mongo {
          * @param maxPoints limits the number of split points that are needed, zero is max (optional)
          * @param maxObjs limits the number of objects in each chunk, zero is as max (optional)
          */
-        void pickSplitVector( std::vector<BSONObj>& splitPoints , int chunkSize , int maxPoints = 0, int maxObjs = 0) const;
+        void pickSplitVector(std::vector<BSONObj>& splitPoints,
+                             long long chunkSize,
+                             int maxPoints = 0,
+                             int maxObjs = 0) const;
 
         //
         // migration support
@@ -216,7 +219,7 @@ namespace mongo {
         // public constants
         //
 
-        static int MaxChunkSize;
+        static long long MaxChunkSize;
         static int MaxObjectPerChunk;
         static bool ShouldAutoSplit;
 
@@ -251,7 +254,7 @@ namespace mongo {
 
         // transient stuff
 
-        mutable long _dataWritten;
+        mutable long long _dataWritten;
 
         // methods, etc..
 
@@ -557,7 +560,6 @@ namespace mongo {
             // (for now) for parallel or sequential oversplitting.
             // TODO: Make splitting a separate thread with notifications?
             static const int staleMinorReloadThreshold = maxParallelSplits;
-
         };
 
         mutable SplitHeuristics _splitHeuristics;
