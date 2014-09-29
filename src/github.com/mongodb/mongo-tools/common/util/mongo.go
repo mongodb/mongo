@@ -8,6 +8,8 @@ import (
 const (
 	InvalidDBChars         = "/\\. \"\x00"
 	InvalidCollectionChars = "$\x00"
+	DefaultHost            = "localhost"
+	DefaultPort            = "27017"
 )
 
 // Split the host string into the individual nodes to connect to, appending the
@@ -16,9 +18,9 @@ func CreateConnectionAddrs(host, port string) []string {
 
 	// set to the defaults, if necessary
 	if host == "" {
-		host = "localhost"
+		host = DefaultHost
 		if port == "" {
-			host += ":27017"
+			host += fmt.Sprintf(":%v", DefaultPort)
 		}
 	}
 

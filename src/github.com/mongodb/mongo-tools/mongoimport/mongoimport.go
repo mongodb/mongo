@@ -122,24 +122,24 @@ func (mongoImport *MongoImport) ValidateSettings(args []string) error {
 			}
 		}
 	}
+	if len(args) > 1 {
+		return fmt.Errorf("too many positional arguments")
+	}
+	if mongoImport.InputOptions.File != "" && len(args) != 0 {
+		return fmt.Errorf(`multiple occurrences of option "--file"`)
+	}
+	var fileBaseName string
+	if mongoImport.InputOptions.File != "" {
+		fileBaseName = mongoImport.InputOptions.File
+	} else {
+		if len(args) != 0 {
+			fileBaseName = args[0]
+			mongoImport.InputOptions.File = args[0]
+		}
+	}
 
 	// ensure we have a valid string to use for the collection
 	if mongoImport.ToolOptions.Namespace.Collection == "" {
-		if len(args) > 1 {
-			return fmt.Errorf("too many positional arguments")
-		}
-		if mongoImport.InputOptions.File == "" && len(args) == 0 {
-			return fmt.Errorf("must specify a collection, or input file")
-		}
-		if mongoImport.InputOptions.File != "" && len(args) != 0 {
-			return fmt.Errorf(`multiple occurrences of option "--file"`)
-		}
-		var fileBaseName string
-		if mongoImport.InputOptions.File != "" {
-			fileBaseName = mongoImport.InputOptions.File
-		} else {
-			fileBaseName = args[0]
-		}
 		fileBaseName = filepath.Base(fileBaseName)
 		if lastDotIndex := strings.LastIndex(fileBaseName, "."); lastDotIndex != -1 {
 			fileBaseName = fileBaseName[0:lastDotIndex]
@@ -175,7 +175,6 @@ func (mongoImport *MongoImport) ImportDocuments() (int64, error) {
 	if err != nil {
 		return 0, err
 	}
-
 	defer in.Close()
 
 	importInput, err := mongoImport.getImportInput(in)
@@ -198,6 +197,9 @@ func (mongoImport *MongoImport) ImportDocuments() (int64, error) {
 func (mongoImport *MongoImport) importDocuments(importInput ImportInput) (docsCount int64, err error) {
 	importWriter := mongoImport.getImportWriter()
 	connUrl := mongoImport.ToolOptions.Host
+	if connUrl == "" {
+		connUrl = util.DefaultHost
+	}
 	if mongoImport.ToolOptions.Port != "" {
 		connUrl = connUrl + ":" + mongoImport.ToolOptions.Port
 	}
