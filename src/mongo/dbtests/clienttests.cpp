@@ -69,19 +69,19 @@ namespace ClientTests {
             DBDirectClient db(&txn);
 
             db.insert( ns() , BSON( "x" << 2 ) );
-            ASSERT_EQUALS( 1 , db.getIndexes( ns() )->itcount() );
+            ASSERT_EQUALS( 1u , db.getIndexSpecs(ns()).size() );
 
             db.ensureIndex( ns() , BSON( "x" << 1 ) );
-            ASSERT_EQUALS( 2 , db.getIndexes( ns() )->itcount() );
+            ASSERT_EQUALS( 2u , db.getIndexSpecs(ns()).size() );
 
             db.dropIndex( ns() , BSON( "x" << 1 ) );
-            ASSERT_EQUALS( 1 , db.getIndexes( ns() )->itcount() );
+            ASSERT_EQUALS( 1u , db.getIndexSpecs(ns()).size() );
 
             db.ensureIndex( ns() , BSON( "x" << 1 ) );
-            ASSERT_EQUALS( 2 , db.getIndexes( ns() )->itcount() );
+            ASSERT_EQUALS( 2u , db.getIndexSpecs(ns()).size() );
 
             db.dropIndexes( ns() );
-            ASSERT_EQUALS( 1 , db.getIndexes( ns() )->itcount() );
+            ASSERT_EQUALS( 1u , db.getIndexSpecs(ns()).size() );
         }
     };
 
@@ -93,13 +93,13 @@ namespace ClientTests {
             DBDirectClient db(&txn);
 
             db.insert( ns() , BSON( "x" << 2 ) );
-            ASSERT_EQUALS( 1 , db.getIndexes( ns() )->itcount() );
+            ASSERT_EQUALS( 1u , db.getIndexSpecs(ns()).size() );
 
             db.ensureIndex( ns() , BSON( "x" << 1 ) );
-            ASSERT_EQUALS( 2 , db.getIndexes( ns() )->itcount() );
+            ASSERT_EQUALS( 2u , db.getIndexSpecs(ns()).size() );
 
             db.reIndex( ns() );
-            ASSERT_EQUALS( 2 , db.getIndexes( ns() )->itcount() );
+            ASSERT_EQUALS( 2u , db.getIndexSpecs(ns()).size() );
         }
 
     };
@@ -112,15 +112,15 @@ namespace ClientTests {
             DBDirectClient db(&txn);
 
             db.insert( ns() , BSON( "x" << 2 ) );
-            ASSERT_EQUALS( 1 , db.getIndexes( ns() )->itcount() );
+            ASSERT_EQUALS( 1u , db.getIndexSpecs(ns()).size() );
 
             db.ensureIndex( ns() , BSON( "x" << 1 ) );
-            ASSERT_EQUALS( 2 , db.getIndexes( ns() )->itcount() );
+            ASSERT_EQUALS( 2u , db.getIndexSpecs(ns()).size() );
 
             BSONObj out;
             ASSERT( db.runCommand( "test" , BSON( "reIndex" << "reindex2" ) , out ) );
             ASSERT_EQUALS( 2 , out["nIndexes"].number() );
-            ASSERT_EQUALS( 2 , db.getIndexes( ns() )->itcount() );
+            ASSERT_EQUALS( 2u , db.getIndexSpecs(ns()).size() );
         }
 
     };
