@@ -29,7 +29,6 @@ var primaryAddress = getHostName()+":"+replSet.ports[0];
 var bAddress = getHostName()+":"+replSet.ports[2];
 
 print("Force A to sync from B");
-A.runCommand({replSetSyncFrom : bAddress});
 assert.soon(
     function() {
         if (A.runCommand({replSetGetStatus : 1}).syncingTo === bAddress) {
