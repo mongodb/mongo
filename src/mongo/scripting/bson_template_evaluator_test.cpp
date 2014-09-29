@@ -607,5 +607,79 @@ namespace mongo {
             // so total string length should 1 + 13 + 5 = 19
             ASSERT_EQUALS(obj2.firstElement().str().length(), 19U);
         }
+
+        // Test template recursion and other general features
+        TEST(BSONTemplateEvaluatorTest, NESTING) {
+
+            BsonTemplateEvaluator *t = new BsonTemplateEvaluator();
+            int randValue1, randValue2;
+
+            // Test failure when operators are arbitrarily nested
+            // {id: { #op: [ { #op: [0, 5] }, 10] }
+            BSONObjBuilder builder1;
+            BSONObj innerObj = BSON( "#RANT_INT" << BSON_ARRAY( 0 << 5 ) );
+            BSONObj outerObj = BSON( "#RAND_INT" << BSON_ARRAY( innerObj << 10 ) );
+            ASSERT_EQUALS( BsonTemplateEvaluator::StatusOpEvaluationError,
+                           t->evaluate(BSON("randField" << outerObj), builder1) );
+
+            // Test success when operators are arbitrarily nested
+            // {foo: { bar: { #op: [1, 5] } } }
+            BSONObjBuilder builder2;
+            innerObj = BSON( "#RAND_INT" << BSON_ARRAY( 1 << 5 ) );
+            outerObj = BSON( "bar" << innerObj );
+            ASSERT_EQUALS( BsonTemplateEvaluator::StatusSuccess,
+                           t->evaluate(BSON("foo" << outerObj), builder2) );
+            BSONObj obj2 = builder2.obj();
+            BSONElement obj2_foo = obj2["foo"];
+            randValue1 = obj2_foo["bar"].numberInt();
+            ASSERT_GREATER_THAN_OR_EQUALS(randValue1, 1);
+            ASSERT_LESS_THAN(randValue1, 5);
+
+            // Test success when operators are arbitrarily nested within multiple elements
+            // {id: { foo: "hi", bar: { baz: { #op, [5, 10] } } } }
+            BSONObjBuilder builder3;
+            innerObj = BSON( "#RAND_INT" << BSON_ARRAY( 1 << 5 ) );
+            BSONObj bazObj = BSON( "baz" << innerObj);
+            outerObj = BSON( "foo" << "hi" << "bar" << bazObj );
+            ASSERT_EQUALS( BsonTemplateEvaluator::StatusSuccess,
+                           t->evaluate(BSON("id" << outerObj), builder3) );
+            BSONObj obj3 = builder3.obj();
+            BSONElement obj3_id = obj3["id"];
+            BSONElement obj3_bar = obj3_id["bar"];
+            randValue1 = obj3_bar["baz"].numberInt();
+            ASSERT_GREATER_THAN_OR_EQUALS(randValue1, 1);
+            ASSERT_LESS_THAN(randValue1, 5);
+
+            // Test success when operators are arbitrarily nested within multiple elements
+            // {id: { foo: "hi", bar: { #op: [1, 5] }, baz: { baz_a: { #op, [5, 10] }, baz_b: { #op, [10, 15] }, baz_c: "bye" } }
+            BSONObjBuilder builder4;
+            BSONObj barObj4 = BSON( "#RAND_INT" << BSON_ARRAY( 1 << 5 ) );
+            BSONObj bazObj4a = BSON( "#RAND_INT" << BSON_ARRAY( 5 << 10 ) );
+            BSONObj bazObj4b = BSON( "#RAND_INT" << BSON_ARRAY( 10 << 15 ) )    ;
+            BSONObj bazObj4 = BSON( "baz_a" << bazObj4a << "baz_b" << bazObj4b << "baz_c" << "bye" );
+            outerObj = BSON("foo" << "hi" << "bar" << barObj4 << "baz" << bazObj4 );
+            ASSERT_EQUALS( BsonTemplateEvaluator::StatusSuccess,
+                           t->evaluate(BSON("id" << outerObj), builder4) );
+            BSONObj obj4 = builder4.obj();
+            BSONElement obj4_id = obj4["id"];
+            randValue1 = obj4_id["bar"].numberInt();
+            ASSERT_GREATER_THAN_OR_EQUALS(randValue1, 1);
+            ASSERT_LESS_THAN(randValue1, 5);
+            BSONElement obj4_baz = obj4_id["baz"];
+            randValue1 = obj4_baz["baz_a"].numberInt();
+            ASSERT_GREATER_THAN_OR_EQUALS(randValue1, 5);
+            ASSERT_LESS_THAN(randValue1, 10);
+            randValue1 = obj4_baz["baz_b"].numberInt();
+            ASSERT_GREATER_THAN_OR_EQUALS(randValue1, 10);
+            ASSERT_LESS_THAN(randValue1, 15);
+
+            // Test success
+            // { op: "let", target: "x", value: {"#NOT_A_VALID_OP": [0, 1000]}}
+            BSONObjBuilder builder5;
+            innerObj = BSON( "#NOT_A_VALID_OP" << BSON_ARRAY( 0 << 1000 ) );
+            outerObj = BSON( "op" << "let" << "target" << "x" << "value" << innerObj );
+            ASSERT_EQUALS( BsonTemplateEvaluator::StatusBadOperator,
+                           t->evaluate(outerObj, builder5) );
+        }
     } // end anonymous namespace
 } // end namespace mongo

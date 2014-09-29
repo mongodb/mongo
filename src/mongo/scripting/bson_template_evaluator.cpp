@@ -89,25 +89,49 @@ namespace mongo {
         this->_varMap[name] = elem.wrap();
     }
 
-    BsonTemplateEvaluator::Status BsonTemplateEvaluator::_evalElem(BSONElement in,
+    BsonTemplateEvaluator::Status BsonTemplateEvaluator::_evalElem(const BSONElement in,
                                                                    BSONObjBuilder& out) {
        if (in.type() != Object) {
            out.append(in);
            return StatusSuccess;
        }
        BSONObj subObj = in.embeddedObject();
-       const char* opOrNot = subObj.firstElementFieldName();
-       if (opOrNot[0] != '#') {
-           out.append(in);
-           return StatusSuccess;
+       BSONObjBuilder objBuilder;
+
+       BSONObjIterator i( subObj );
+       while ( i.more() ) {
+           BSONObjBuilder subBuilder;
+           BSONElement e = i.next();
+           if ( e.type() == Object && e.fieldName()[0] != '#' ) {
+               Status st = _evalElem(e, subBuilder);
+               if (st != StatusSuccess)
+                   return st;
+            }
+            if ( e.fieldName()[0] != '#' ) {
+                if (e.type() == Object ) {
+                    objBuilder.appendElements(subBuilder.obj());
+                }
+                else {
+                    objBuilder.append(e);
+                }
+            }
+            if ( e.fieldName()[0] == '#' ) {
+                const char* op = e.fieldName()+1;
+                OperatorFn fn = operatorEvaluator(op);
+                if (!fn)
+                    return StatusBadOperator;
+                Status st = fn(this, in.fieldName(), subObj, subBuilder);
+                if (st != StatusSuccess)
+                    return st;
+                // Needs SERVER-15320 for a better solution to take the expanded value and place back into another element.
+                // The workaround is to place the expanded element back one level higher, so the subsequent call to ElemntsUnique
+                // will not replace this value.
+                out.appendElements(subBuilder.obj());
+            }
        }
-       const char* op = opOrNot+1;
-       OperatorFn fn = operatorEvaluator(op);
-       if (!fn)
-           return StatusBadOperator;
-       Status st = fn(this, in.fieldName(), subObj, out);
-       if (st != StatusSuccess)
-           return st;
+
+       // Needs SERVER-15320, see above
+       out.appendElementsUnique(BSON(in.fieldName() << objBuilder.obj()));
        return StatusSuccess;
     }
 
