@@ -438,22 +438,6 @@ var authCommandsLib = {
             ]
         },
         {
-            testname: "closeAllDatabases",
-            command: {closeAllDatabases: "x"},
-            skipSharded: true,
-            testcases: [
-                {
-                    runOnDb: adminDbName,
-                    roles: roles_hostManager,
-                    privileges: [
-                        { resource: {cluster: true}, actions: ["closeAllDatabases"] }
-                    ]
-                },
-                { runOnDb: firstDbName, roles: {} },
-                { runOnDb: secondDbName, roles: {} }
-            ]
-        },
-        {
             testname: "collMod",
             command: {collMod: "foo", usePowerOf2Sizes: true},
             setup: function (db) { db.foo.save( {} ); },

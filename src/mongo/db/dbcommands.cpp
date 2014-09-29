@@ -577,51 +577,6 @@ namespace mongo {
     } cmdCreate;
 
 
-    /* note an access to a database right after this will open it back up - so this is mainly
-       for diagnostic purposes.
-       */
-    class CmdCloseAllDatabases : public Command {
-    public:
-        virtual void help( stringstream& help ) const { 
-            help << "Close all database files." << endl 
-                << "A new request will cause an immediate reopening; thus, this is mostly for testing purposes.";
-        }
-
-        virtual bool adminOnly() const { return true; }
-        virtual bool slaveOk() const { return false; }
-        virtual bool isWriteCommandForConfigServer() const { return true; }
-        virtual void addRequiredPrivileges(const std::string& dbname,
-                                           const BSONObj& cmdObj,
-                                           std::vector<Privilege>* out) {
-            ActionSet actions;
-            actions.addAction(ActionType::closeAllDatabases);
-            out->push_back(Privilege(ResourcePattern::forClusterResource(), actions));
-        }
-
-        CmdCloseAllDatabases() : Command( "closeAllDatabases" ) {
-
-        }
-
-        bool run(OperationContext* txn, const string& dbname , BSONObj& jsobj, int, string& errmsg, BSONObjBuilder& result, bool /*fromRepl*/) {
-            Lock::GlobalWrite globalWriteLock(txn->lockState());
-            // No WriteUnitOfWork necessary, as no actual writes happen.
-            Client::Context ctx(txn, dbname);
-
-            try {
-                return dbHolder().closeAll(txn, result, false);
-            }
-            catch(DBException&) { 
-                throw;
-            }
-            catch(...) { 
-                log() << "ERROR uncaught exception in command closeAllDatabases" << endl;
-                errmsg = "unexpected uncaught exception";
-                return false;
-            }
-        }
-
-    } cmdCloseAllDatabases;
-
     class CmdFileMD5 : public Command {
     public:
         CmdFileMD5() : Command( "filemd5" ) {

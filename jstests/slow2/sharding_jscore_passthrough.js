@@ -24,8 +24,6 @@ files.forEach(function(x) {
     //                  the ShardingTest setup.  SERVER-1440.
 
     // cursor8: cursorInfo different/meaningless(?) in mongos.
-    //          closeAllDatabases may not work through mongos
-    //          SERVER-1441.
     //          deal with cursorInfo in mongos SERVER-1442.
 
     // dbcase: Database names are case-insensitive under ShardingTest?

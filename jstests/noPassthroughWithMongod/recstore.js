@@ -20,5 +20,3 @@ assert( t.find().sort({z:1})[0].z == 2 );
 
 t.ensureIndex({z:1});
 t.ensureIndex({q:1});
-
-db.getSisterDB('admin').$cmd.findOne({closeAllDatabases:1});
