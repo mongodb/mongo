@@ -22,6 +22,26 @@ func (it *Intent) IsOplog() bool {
 	return it.DB == "" && it.C == "oplog"
 }
 
+func (it *Intent) IsUsers() bool {
+	if it.C == "$admin.system.users" {
+		return true
+	}
+	if it.DB == "admin" && it.C == "system.users" {
+		return true
+	}
+	return false
+}
+
+func (it *Intent) IsRoles() bool {
+	if it.C == "$admin.system.roles" {
+		return true
+	}
+	if it.DB == "admin" && it.C == "system.roles" {
+		return true
+	}
+	return false
+}
+
 func (it *Intent) IsSystemIndexes() bool {
 	return it.C == "system.indexes" && it.BSONPath != ""
 }
@@ -40,9 +60,10 @@ type IntentManager struct {
 	// special cases that should be saved but not be part of the queue.
 	// used to deal with oplog and user/roles restoration, which are
 	// handled outside of the basic logic of the tool
-	oplogIntent         *Intent
-	usersAndRolesIntent *Intent
-	indexIntents        map[string]*Intent
+	oplogIntent  *Intent
+	usersIntent  *Intent
+	rolesIntent  *Intent
+	indexIntents map[string]*Intent
 }
 
 func NewIntentManager() *IntentManager {
@@ -70,7 +91,18 @@ func (manager *IntentManager) Put(intent *Intent) {
 		manager.indexIntents[intent.DB] = intent
 		return
 	}
-	// TODO usersAndRoles???
+	if intent.IsUsers() {
+		if intent.BSONPath != "" { //TODO(erf) make this elegant
+			manager.usersIntent = intent
+		}
+		return
+	}
+	if intent.IsRoles() {
+		if intent.BSONPath != "" {
+			manager.rolesIntent = intent
+		}
+		return
+	}
 
 	// BSON and metadata files for the same collection are merged
 	// into the same intent. This is done to allow for simple
@@ -118,4 +150,12 @@ func (manager *IntentManager) Oplog() *Intent {
 // SystemIndexes returns the system.indexes bson for a database
 func (manager *IntentManager) SystemIndexes(dbName string) *Intent {
 	return manager.indexIntents[dbName]
+}
+
+func (manager *IntentManager) Users() *Intent {
+	return manager.usersIntent
+}
+
+func (manager *IntentManager) Roles() *Intent {
+	return manager.rolesIntent
 }

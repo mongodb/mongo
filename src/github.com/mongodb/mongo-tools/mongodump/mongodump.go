@@ -420,7 +420,7 @@ func (dump *MongoDump) DumpUsersAndRolesForDB(db string) error {
 	dbQuery := bson.M{"db": db}
 	outDir := filepath.Join(dump.OutputOptions.Out, db)
 
-	usersFile, err := os.Create(filepath.Join(outDir, "$admin.system.users"))
+	usersFile, err := os.Create(filepath.Join(outDir, "$admin.system.users.bson"))
 	if err != nil {
 		return fmt.Errorf("error creating file for db users: %v", err)
 	}
@@ -434,7 +434,7 @@ func (dump *MongoDump) DumpUsersAndRolesForDB(db string) error {
 		return fmt.Errorf("error dumping db users: %v", err)
 	}
 
-	rolesFile, err := os.Create(filepath.Join(outDir, "$admin.system.roles"))
+	rolesFile, err := os.Create(filepath.Join(outDir, "$admin.system.roles.bson"))
 	if err != nil {
 		return fmt.Errorf("error creating file for db roles: %v", err)
 	}

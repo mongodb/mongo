@@ -13,7 +13,10 @@ import (
 	"strings"
 )
 
-//TODO make this common
+const Users = "users"
+const Roles = "roles"
+
+//TODO(erf) make this common
 type Metadata struct {
 	Options bson.D          `json:"options,omitempty"`
 	Indexes []IndexDocument `json:"indexes"`
@@ -75,7 +78,6 @@ func (restore *MongoRestore) IndexesFromBSON(intent *Intent, bsonFile string) ([
 			log.Logf(3, "\tfound index %v", indexDocument.Options["name"])
 			collectionIndexes = append(collectionIndexes, *indexDocument)
 		}
-
 	}
 	if bsonSource.Err() != nil {
 		return nil, fmt.Errorf("error scanning system.indexes for %v indexes: %v", intent.C, err)
@@ -148,4 +150,79 @@ func (restore *MongoRestore) CreateCollection(intent *Intent, options bson.D) er
 		return fmt.Errorf("create command: %v", res["errmsg"])
 	}
 	return nil
+}
+
+func (restore *MongoRestore) RestoreUsersOrRoles(collectionType string, intent *Intent) error {
+	log.Logf(0, "restoring %v from %v", collectionType, intent.BSONPath)
+
+	var tempCol, tempColCommandField string
+	switch collectionType {
+	case Users:
+		tempCol = restore.tempUsersCol
+		tempColCommandField = "tempUsersCollection"
+	case Roles:
+		tempCol = restore.tempRolesCol
+		tempColCommandField = "tempRolesCollection"
+	default:
+		// panic should be fine here, since this is a programmer (not user) error
+		util.Panicf("cannot use %v as a collection type in RestoreUsersOrRoles", collectionType)
+	}
+
+	rawFile, err := os.Open(intent.BSONPath)
+	if err != nil {
+		return fmt.Errorf("error reading index bson file %v: %v", intent.BSONPath, err)
+	}
+
+	bsonSource := db.NewDecodedBSONSource(db.NewBSONSource(rawFile))
+	defer bsonSource.Close()
+
+	tempColExists, err := restore.DBHasCollection(&Intent{DB: "admin", C: tempCol})
+	if err != nil {
+		return err
+	}
+	if tempColExists {
+		return fmt.Errorf("temporary collection %v already exists", tempCol) //TODO(erf) make this more helpful
+	}
+
+	log.Logf(3, "restoring %v to temporary collection", collectionType)
+	err = restore.RestoreCollectionToDB("admin", tempCol, bsonSource, 0)
+	if err != nil {
+		return fmt.Errorf("error restoring %v: %v", collectionType, err)
+	}
+
+	// make sure we always drop the temporary collection
+	defer func() {
+		err = restore.cmdRunner.Run(bson.M{"drop": tempCol}, &bson.M{}, "admin")
+		if err != nil {
+			log.Logf(0, "error dropping temporary collection %v: %v", tempCol, err)
+		}
+	}()
+
+	//TODO(erf) defer temp collection drop??
+
+	userTargetDB := "admin"
+	// use "admin" as the merge db unless we are restoring admin
+	if restore.ToolOptions.DB == "admin" {
+		userTargetDB = ""
+	}
+
+	command := bson.D{
+		{"_mergeAuthzCollections", 1},
+		{tempColCommandField, "admin." + tempCol},
+		{"drop", restore.OutputOptions.Drop},
+		{"writeConcern", bson.M{"w": restore.OutputOptions.WriteConcern}},
+		{"db", userTargetDB}, //TODO FIXME admin
+	}
+
+	log.Logf(3, "merging %v from temp collection", collectionType)
+	res := bson.M{}
+	err = restore.cmdRunner.Run(command, &res, "admin")
+	if err != nil {
+		return fmt.Errorf("error running merge command: %v", err)
+	}
+	if util.IsFalsy(res["ok"]) {
+		return fmt.Errorf("_mergeAuthzCollections command: %v", res["errmsg"])
+	}
+	return nil
+
 }

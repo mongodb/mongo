@@ -18,6 +18,9 @@ type MongoRestore struct {
 
 	TargetDirectory string
 
+	tempUsersCol string
+	tempRolesCol string
+
 	// other internal state
 	manager  *IntentManager
 	safety   *mgo.Safe
@@ -68,6 +71,13 @@ func (restore *MongoRestore) ParseAndValidateOptions() error {
 
 	//TODO check oplog is okay
 
+	if restore.tempUsersCol == "" {
+		restore.tempUsersCol = "tempusers"
+	}
+	if restore.tempRolesCol == "" {
+		restore.tempRolesCol = "temproles"
+	}
+
 	return nil
 }
 
@@ -110,14 +120,32 @@ func (restore *MongoRestore) Restore() error {
 		return fmt.Errorf("restore error: %v", err)
 	}
 
-	// 3. Restore oplog
+	// 3. Restore users/roles
+	if restore.InputOptions.RestoreDBUsersAndRoles || restore.ToolOptions.DB == "" {
+		if restore.manager.Users() != nil {
+			log.Logf(0, "%#v", *restore.manager.Users())
+			err = restore.RestoreUsersOrRoles(Users, restore.manager.Users())
+			if err != nil {
+				return fmt.Errorf("restore error: %v", err)
+			}
+		}
+		if restore.manager.Roles() != nil {
+			log.Logf(0, "%#v", *restore.manager.Roles())
+			err = restore.RestoreUsersOrRoles(Roles, restore.manager.Roles())
+			if err != nil {
+				return fmt.Errorf("restore error: %v", err)
+			}
+		}
+	}
+
+	// 4. Restore oplog
 	if restore.InputOptions.OplogReplay {
 		err = restore.RestoreOplog()
 		if err != nil {
 			return fmt.Errorf("restore error: %v", err)
 		}
 	}
-	log.Log(0, "done")
 
+	log.Log(0, "done")
 	return nil
 }

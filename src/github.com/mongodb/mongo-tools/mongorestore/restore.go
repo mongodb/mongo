@@ -71,7 +71,7 @@ func (restore *MongoRestore) RestoreIntent(intent *Intent) error {
 		}
 	}
 
-	//first create collection with options
+	// first create collection with options
 	if intent.MetadataPath != "" && !restore.OutputOptions.NoOptionsRestore {
 		log.Logf(0, "reading metadata file from %v", intent.MetadataPath)
 		jsonBytes, err := ioutil.ReadFile(intent.MetadataPath)
@@ -95,7 +95,7 @@ func (restore *MongoRestore) RestoreIntent(intent *Intent) error {
 		}
 	}
 
-	//then do bson
+	// then do bson
 	if intent.BSONPath != "" {
 		log.Logf(0, "restoring %v from file %v", intent.Key(), intent.BSONPath)
 
@@ -120,7 +120,7 @@ func (restore *MongoRestore) RestoreIntent(intent *Intent) error {
 		}
 	}
 
-	//finally, add indexes
+	// finally, add indexes
 	if len(indexes) > 0 && !restore.OutputOptions.NoIndexRestore {
 		log.Logf(0, "restoring indexes for collection %v from metadata", intent.Key())
 		for _, idx := range indexes {
