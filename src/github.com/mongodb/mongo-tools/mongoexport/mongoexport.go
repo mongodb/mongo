@@ -65,9 +65,22 @@ func (exp *MongoExport) ValidateSettings() error {
 		return err
 	}
 
-	//Namespace must have a valid database and collection
-	if exp.ToolOptions.Namespace.DB == "" || exp.ToolOptions.Namespace.Collection == "" {
-		return fmt.Errorf("must specify a database and collection")
+	// Namespace must have a valid database if none is specified,
+	// use 'test'
+	if exp.ToolOptions.Namespace.DB == "" {
+		exp.ToolOptions.Namespace.DB = "test"
+	} else {
+		if err := util.ValidateDBName(exp.ToolOptions.Namespace.DB); err != nil {
+			return err
+		}
+	}
+
+	if exp.ToolOptions.Namespace.Collection == "" {
+		return fmt.Errorf("must specify a collection")
+	} else {
+		if err := util.ValidateCollectionName(exp.ToolOptions.Namespace.Collection); err != nil {
+			return err
+		}
 	}
 
 	if exp.InputOpts != nil && exp.InputOpts.Query != "" {
