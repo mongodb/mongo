@@ -145,12 +145,12 @@ namespace QueryStageDistinct {
             params.bounds.fields.push_back(oil);
 
             WorkingSet ws;
-            DistinctScan* distinct = new DistinctScan(&_txn, params, &ws);
+            DistinctScan distinct(&_txn, params, &ws);
 
             WorkingSetID wsid;
             // Get our first result.
             int firstResultWorks = 0;
-            while (PlanStage::ADVANCED != distinct->work(&wsid)) {
+            while (PlanStage::ADVANCED != distinct.work(&wsid)) {
                 ++firstResultWorks;
             }
             // 5 is a bogus number.  There's some amount of setup done by the first few calls but
@@ -161,7 +161,7 @@ namespace QueryStageDistinct {
             // Getting our second result should be very quick as we just skip
             // over the first result.
             int secondResultWorks = 0;
-            while (PlanStage::ADVANCED != distinct->work(&wsid)) {
+            while (PlanStage::ADVANCED != distinct.work(&wsid)) {
                 ++secondResultWorks;
             }
             ASSERT_EQUALS(2, getIntFieldDotted(ws, wsid, "a"));
@@ -169,7 +169,7 @@ namespace QueryStageDistinct {
             // all the 'a' values.
             ASSERT_EQUALS(0, secondResultWorks);
 
-            ASSERT_EQUALS(PlanStage::IS_EOF, distinct->work(&wsid));
+            ASSERT_EQUALS(PlanStage::IS_EOF, distinct.work(&wsid));
         }
     };
 
@@ -210,14 +210,14 @@ namespace QueryStageDistinct {
             params.bounds.fields.push_back(oil);
 
             WorkingSet ws;
-            DistinctScan* distinct = new DistinctScan(&_txn, params, &ws);
+            DistinctScan distinct(&_txn, params, &ws);
 
             // We should see each number in the range [1, 6] exactly once.
             std::set<int> seen;
 
             WorkingSetID wsid;
             PlanStage::StageState state;
-            while (PlanStage::IS_EOF != (state = distinct->work(&wsid))) {
+            while (PlanStage::IS_EOF != (state = distinct.work(&wsid))) {
                 if (PlanStage::ADVANCED == state) {
                     // Check int value.
                     int currentNumber = getIntFieldDotted(ws, wsid, "a");
