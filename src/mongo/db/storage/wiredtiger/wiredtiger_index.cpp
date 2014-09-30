@@ -435,7 +435,7 @@ namespace mongo {
 
     void WiredTigerIndex::IndexCursor::savePosition() {
         if ((_savedAtEnd = isEOF()) == false) {
-            _savedKey = getKey();
+            _savedKey = getKey().getOwned();
             _savedLoc = getDiskLoc();
         }
         delete _cursor;
