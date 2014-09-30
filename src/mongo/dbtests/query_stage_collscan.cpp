@@ -90,7 +90,7 @@ namespace QueryStageCollectionScan {
             // Make a scan and have the runner own it.
             WorkingSet* ws = new WorkingSet();
             PlanStage* ps = new CollectionScan(&_txn, params, ws, filterExpr.get());
-            PlanExecutor runner(ws, ps, params.collection);
+            PlanExecutor runner(&_txn, ws, ps, params.collection);
 
             // Use the runner to count the number of objects scanned.
             int count = 0;
@@ -195,7 +195,7 @@ namespace QueryStageCollectionScan {
             // Make a scan and have the runner own it.
             WorkingSet* ws = new WorkingSet();
             PlanStage* ps = new CollectionScan(&_txn, params, ws, NULL);
-            PlanExecutor runner(ws, ps, params.collection);
+            PlanExecutor runner(&_txn, ws, ps, params.collection);
 
             int count = 0;
             for (BSONObj obj; PlanExecutor::ADVANCED == runner.getNext(&obj, NULL); ) {
@@ -224,7 +224,7 @@ namespace QueryStageCollectionScan {
 
             WorkingSet* ws = new WorkingSet();
             PlanStage* ps = new CollectionScan(&_txn, params, ws, NULL);
-            PlanExecutor runner(ws, ps, params.collection);
+            PlanExecutor runner(&_txn, ws, ps, params.collection);
 
             int count = 0;
             for (BSONObj obj; PlanExecutor::ADVANCED == runner.getNext(&obj, NULL); ) {

@@ -147,7 +147,7 @@ namespace mongo {
             // TODO: Do we want to do this for the user?  I think so.
             PlanStage* rootFetch = new FetchStage(txn, ws.get(), userRoot, NULL, collection);
 
-            PlanExecutor runner(ws.release(), rootFetch, collection);
+            PlanExecutor runner(txn, ws.release(), rootFetch, collection);
 
             BSONArrayBuilder resultBuilder(result.subarrayStart("results"));
 

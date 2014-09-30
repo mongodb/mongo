@@ -82,7 +82,8 @@ namespace QueryStageTests {
             auto_ptr<MatchExpression> filterExpr(swme.getValue());
 
             WorkingSet* ws = new WorkingSet();
-            PlanExecutor runner(ws, 
+            PlanExecutor runner(&_txn,
+                                ws, 
                                 new IndexScan(&_txn, params, ws, filterExpr.get()), 
                                 ctx.ctx().db()->getCollection(&_txn, ns()));
 

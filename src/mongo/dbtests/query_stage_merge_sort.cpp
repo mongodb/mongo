@@ -155,7 +155,7 @@ namespace QueryStageMergeSortTests {
             ctx.commit();
 
             // Must fetch if we want to easily pull out an obj.
-            PlanExecutor runner(ws, new FetchStage(&_txn, ws, ms, NULL, coll), coll);
+            PlanExecutor runner(&_txn, ws, new FetchStage(&_txn, ws, ms, NULL, coll), coll);
 
             for (int i = 0; i < N; ++i) {
                 BSONObj first, second;
@@ -218,7 +218,7 @@ namespace QueryStageMergeSortTests {
             ms->addChild(new IndexScan(&_txn, params, ws, NULL));
             ctx.commit();
 
-            PlanExecutor runner(ws, new FetchStage(&_txn, ws, ms, NULL, coll), coll);
+            PlanExecutor runner(&_txn, ws, new FetchStage(&_txn, ws, ms, NULL, coll), coll);
 
             for (int i = 0; i < N; ++i) {
                 BSONObj first, second;
@@ -281,7 +281,7 @@ namespace QueryStageMergeSortTests {
             ms->addChild(new IndexScan(&_txn, params, ws, NULL));
             ctx.commit();
 
-            PlanExecutor runner(ws, new FetchStage(&_txn, ws, ms, NULL, coll), coll);
+            PlanExecutor runner(&_txn, ws, new FetchStage(&_txn, ws, ms, NULL, coll), coll);
 
             for (int i = 0; i < N; ++i) {
                 BSONObj first, second;
@@ -347,7 +347,7 @@ namespace QueryStageMergeSortTests {
             ms->addChild(new IndexScan(&_txn, params, ws, NULL));
             ctx.commit();
 
-            PlanExecutor runner(ws, new FetchStage(&_txn, ws, ms, NULL, coll), coll);
+            PlanExecutor runner(&_txn, ws, new FetchStage(&_txn, ws, ms, NULL, coll), coll);
 
             for (int i = 0; i < N; ++i) {
                 BSONObj first, second;
@@ -412,7 +412,7 @@ namespace QueryStageMergeSortTests {
             ms->addChild(new IndexScan(&_txn, params, ws, NULL));
             ctx.commit();
 
-            PlanExecutor runner(ws, new FetchStage(&_txn, ws, ms, NULL, coll), coll);
+            PlanExecutor runner(&_txn, ws, new FetchStage(&_txn, ws, ms, NULL, coll), coll);
 
             // Only getting results from the a:1 index scan.
             for (int i = 0; i < N; ++i) {
@@ -465,7 +465,7 @@ namespace QueryStageMergeSortTests {
             }
             ctx.commit();
 
-            PlanExecutor runner(ws, new FetchStage(&_txn, ws, ms, NULL, coll), coll);
+            PlanExecutor runner(&_txn, ws, new FetchStage(&_txn, ws, ms, NULL, coll), coll);
 
             for (int i = 0; i < numIndices; ++i) {
                 BSONObj obj;

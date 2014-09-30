@@ -415,7 +415,7 @@ namespace mongo {
         invariant(root);
         // We must have a tree of stages in order to have a valid plan executor, but the query
         // solution may be null.
-        *out = new PlanExecutor(ws.release(), root, querySolution, canonicalQuery.release(),
+        *out = new PlanExecutor(txn, ws.release(), root, querySolution, canonicalQuery.release(),
                                 collection);
         return Status::OK();
     }
@@ -431,7 +431,7 @@ namespace mongo {
                    << " Using EOF stage: " << unparsedQuery.toString();
             EOFStage* eofStage = new EOFStage();
             WorkingSet* ws = new WorkingSet();
-            *out = new PlanExecutor(ws, eofStage, ns);
+            *out = new PlanExecutor(txn, ws, eofStage, ns);
             return Status::OK();
         }
 
@@ -460,7 +460,7 @@ namespace mongo {
                                         root);
         }
 
-        *out = new PlanExecutor(ws, root, collection);
+        *out = new PlanExecutor(txn, ws, root, collection);
         return Status::OK();
     }
 
@@ -495,7 +495,7 @@ namespace mongo {
         root = new DeleteStage(txn, deleteStageParams, ws.get(), collection, root);
         // We must have a tree of stages in order to have a valid plan executor, but the query
         // solution may be null.
-        *out = new PlanExecutor(ws.release(), root, querySolution, canonicalQuery.release(),
+        *out = new PlanExecutor(txn, ws.release(), root, querySolution, canonicalQuery.release(),
                                 collection);
         return Status::OK();
     }
@@ -523,7 +523,7 @@ namespace mongo {
                    << " Using EOF stage: " << unparsedQuery.toString();
             DeleteStage* deleteStage = new DeleteStage(txn, deleteStageParams, ws.get(), NULL,
                                                        new EOFStage());
-            *out = new PlanExecutor(ws.release(), deleteStage, ns);
+            *out = new PlanExecutor(txn, ws.release(), deleteStage, ns);
             return Status::OK();
         }
 
@@ -535,7 +535,7 @@ namespace mongo {
                                                      ws.get());
             DeleteStage* root = new DeleteStage(txn, deleteStageParams, ws.get(), collection,
                                                 idHackStage);
-            *out = new PlanExecutor(ws.release(), root, collection);
+            *out = new PlanExecutor(txn, ws.release(), root, collection);
             return Status::OK();
         }
 
@@ -583,8 +583,12 @@ namespace mongo {
         updateStageParams.canonicalQuery = rawCanonicalQuery;
         root = new UpdateStage(updateStageParams, ws.get(), db, root);
         // We must have a tree of stages in order to have a valid plan executor, but the query
-        // solution may be null. Takes ownership of all args other than 'collection'.
-        *execOut = new PlanExecutor(ws.release(), root, querySolution, canonicalQuery.release(),
+        // solution may be null. Takes ownership of all args other than 'collection' and 'txn'
+        *execOut = new PlanExecutor(txn,
+                                    ws.release(),
+                                    root,
+                                    querySolution,
+                                    canonicalQuery.release(),
                                     collection);
         return Status::OK();
     }
@@ -610,7 +614,7 @@ namespace mongo {
                    << " Using EOF stage: " << unparsedQuery.toString();
             UpdateStage* updateStage = new UpdateStage(updateStageParams, ws.get(), db,
                                                        new EOFStage());
-            *execOut = new PlanExecutor(ws.release(), updateStage, ns);
+            *execOut = new PlanExecutor(txn, ws.release(), updateStage, ns);
             return Status::OK();
         }
 
@@ -621,7 +625,7 @@ namespace mongo {
             PlanStage* idHackStage = new IDHackStage(txn, collection, unparsedQuery["_id"].wrap(),
                                                      ws.get());
             UpdateStage* root = new UpdateStage(updateStageParams, ws.get(), db, idHackStage);
-            *execOut = new PlanExecutor(ws.release(), root, collection);
+            *execOut = new PlanExecutor(txn, ws.release(), root, collection);
             return Status::OK();
         }
 
@@ -660,7 +664,7 @@ namespace mongo {
             // reporting machinery always assumes that the root stage for a group operation is a
             // GroupStage, so in this case we put a GroupStage on top of an EOFStage.
             root = new GroupStage(txn, request, ws.get(), new EOFStage());
-            *execOut = new PlanExecutor(ws.release(), root, request.ns);
+            *execOut = new PlanExecutor(txn, ws.release(), root, request.ns);
             return Status::OK();
         }
 
@@ -688,7 +692,11 @@ namespace mongo {
         root = new GroupStage(txn, request, ws.get(), root);
         // We must have a tree of stages in order to have a valid plan executor, but the query
         // solution may be null. Takes ownership of all args other than 'collection'.
-        *execOut = new PlanExecutor(ws.release(), root, querySolution, canonicalQuery.release(),
+        *execOut = new PlanExecutor(txn,
+                                    ws.release(),
+                                    root,
+                                    querySolution,
+                                    canonicalQuery.release(),
                                     collection);
         return Status::OK();
     }
@@ -882,7 +890,7 @@ namespace mongo {
             // reporting machinery always assumes that the root stage for a count operation is
             // a CountStage, so in this case we put a CountStage on top of an EOFStage.
             root = new CountStage(txn, collection, request, ws.get(), new EOFStage());
-            *execOut = new PlanExecutor(ws.release(), root, request.ns);
+            *execOut = new PlanExecutor(txn, ws.release(), root, request.ns);
             return Status::OK();
         }
 
@@ -891,7 +899,7 @@ namespace mongo {
             // for its number of records. This is implemented by the CountStage, and we don't need
             // to create a child for the count stage in this case.
             root = new CountStage(txn, collection, request, ws.get(), NULL);
-            *execOut = new PlanExecutor(ws.release(), root, request.ns);
+            *execOut = new PlanExecutor(txn, ws.release(), root, request.ns);
             return Status::OK();
         }
 
@@ -928,8 +936,13 @@ namespace mongo {
         // Make a CountStage to be the new root.
         root = new CountStage(txn, collection, request, ws.get(), root);
         // We must have a tree of stages in order to have a valid plan executor, but the query
-        // solution may be NULL. Takes ownership of all args other than 'collection'.
-        *execOut = new PlanExecutor(ws.release(), root, querySolution, cq.release(), collection);
+        // solution may be NULL. Takes ownership of all args other than 'collection' and 'txn'
+        *execOut = new PlanExecutor(txn,
+                                    ws.release(),
+                                    root,
+                                    querySolution,
+                                    cq.release(),
+                                    collection);
 
         return Status::OK();
     }
@@ -1089,7 +1102,7 @@ namespace mongo {
                    << ", planSummary: " << Explain::getPlanSummary(root);
 
             // Takes ownership of its arguments (except for 'collection').
-            *out = new PlanExecutor(ws, root, soln, autoCq.release(), collection);
+            *out = new PlanExecutor(txn, ws, root, soln, autoCq.release(), collection);
             return Status::OK();
         }
 
@@ -1119,7 +1132,7 @@ namespace mongo {
                        << ", planSummary: " << Explain::getPlanSummary(root);
 
                 // Takes ownership of its arguments (except for 'collection').
-                *out = new PlanExecutor(ws, root, solutions[i], autoCq.release(), collection);
+                *out = new PlanExecutor(txn, ws, root, solutions[i], autoCq.release(), collection);
                 return Status::OK();
             }
         }

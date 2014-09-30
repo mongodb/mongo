@@ -429,7 +429,7 @@ namespace mongo {
             WorkingSet* ws = new WorkingSet();
             DeleteNotificationStage* dns = new DeleteNotificationStage();
             // Takes ownership of 'ws' and 'dns'.
-            PlanExecutor* deleteNotifyExec = new PlanExecutor(ws, dns, collection);
+            PlanExecutor* deleteNotifyExec = new PlanExecutor(txn, ws, dns, collection);
             deleteNotifyExec->registerExecInternalPlan();
             _deleteNotifyExec.reset(deleteNotifyExec);
 

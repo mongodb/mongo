@@ -100,7 +100,7 @@ namespace QueryPlanExecutor {
             verify(NULL != cq);
 
             // Hand the plan off to the executor.
-            PlanExecutor* exec = new PlanExecutor(ws.release(), root.release(), cq,
+            PlanExecutor* exec = new PlanExecutor(&_txn, ws.release(), root.release(), cq,
                                                   ctx.db()->getCollection(&_txn, ns()));
             return exec;
         }
@@ -140,7 +140,7 @@ namespace QueryPlanExecutor {
             verify(NULL != cq);
 
             // Hand the plan off to the executor.
-            return new PlanExecutor(ws.release(), root.release(), cq, coll);
+            return new PlanExecutor(&_txn, ws.release(), root.release(), cq, coll);
         }
 
         static const char* ns() { return "unittests.QueryPlanExecutor"; }

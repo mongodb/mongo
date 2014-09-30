@@ -242,10 +242,13 @@ namespace mongo {
                 auto_ptr<PipelineProxyStage> proxy(
                     new PipelineProxyStage(pPipeline, input, ws.get()));
                 if (NULL == collection) {
-                    execHolder.reset(new PlanExecutor(ws.release(), proxy.release(), ns));
+                    execHolder.reset(new PlanExecutor(txn, ws.release(), proxy.release(), ns));
                 }
                 else {
-                    execHolder.reset(new PlanExecutor(ws.release(), proxy.release(), collection));
+                    execHolder.reset(new PlanExecutor(txn,
+                                                      ws.release(),
+                                                      proxy.release(),
+                                                      collection));
                 }
                 exec = execHolder.get();
 

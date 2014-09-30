@@ -39,6 +39,7 @@ env.Library(
         "new_find.cpp",
         "plan_executor.cpp",
         "plan_ranker.cpp",
+        "plan_yield_policy.cpp",
         "stage_builder.cpp",
     ],
     LIBDEPS=[
