@@ -62,173 +62,180 @@ using std::vector;
 
 using namespace mongo;
 
-class Shim : public BSONTool {
+
+
+/**
+ * Mongoshim mode handlers
+ */
+class ShimHandler {
 public:
-    Shim() : BSONTool() { }
+    virtual ~ShimHandler() { }
 
-    virtual void printHelp( ostream & out ) {
-        printMongoShimHelp(&out);
-    }
+    /**
+     * Returns true if this mode requires an output stream
+     */
+    virtual bool requiresOutputStream() const = 0;
 
-    virtual void gotObject( const BSONObj& obj ) {
-        if (mongoShimGlobalParams.upsert) {
-            BSONObjBuilder b;
-            invariant(!mongoShimGlobalParams.upsertFields.empty());
-            for (vector<string>::const_iterator it = mongoShimGlobalParams.upsertFields.begin(),
-                 end = mongoShimGlobalParams.upsertFields.end(); it != end; ++it) {
-                BSONElement e = obj.getFieldDotted(it->c_str());
-                // If we cannot construct a valid query using the provided upsertFields,
-                // insert the object and skip the rest of the fields.
-                if (e.eoo()) {
-                    conn().insert(_ns, obj);
-                    return;
-                }
-                b.appendAs(e, *it);
-            }
-            Query query(b.obj());
-            bool upsert = true;
-            bool multi = false;
-            conn().update(_ns, query, obj, upsert, multi);
-        }
-        else if (mongoShimGlobalParams.applyOps) {
-            // A valid oplog entry contains a non-empty "ns" string field.
-            // This does not apply to oplog entries of type 'n', which typically
-            // have empty 'ns' field values. However, for the purposes of applyOps,
-            // we ignore oplog entries of type 'n'.
-            BSONElement nsElement = obj.getField("ns");
-            if (nsElement.type() != mongo::String) {
-                toolError() << "Skipping oplog entry without required \"ns\" field: " << obj;
-                return;
-            }
-            else if (nsElement.String().empty()) {
-                toolError() << "Skipping oplog entry with empty \"ns\" value: " << obj;
-                return;
-            }
+    /**
+     * If true, processes documents read from input in gotObject() - doRun() will not be called.
+     */
+    virtual bool acceptsInputDocuments() const = 0;
 
-            BSONObjBuilder b(obj.objsize() + 32);
-            BSONArrayBuilder updates(b.subarrayStart("applyOps"));
-            updates.append(obj);
-            updates.done();
+    /**
+     * Process input document.
+     * Results may be written to output stream if provided.
+     */
+    virtual void handleSingleInputDocument(const BSONObj& obj, std::ostream* out) const = 0;
 
-            BSONObj c = b.obj();
+    /**
+     * Generate results for this mode and write results to output stream if applicable.
+     * During processing, only one of handleSingleInputDocument() or generateOutputDocuments()
+     * will be called as determined by the result of acceptsInputDocuments().
+     */
+    virtual void generateOutputDocuments(std::ostream* out) const = 0;
+};
 
-            BSONObj res;
-            bool ok = conn().runCommand("admin", c, res);
-            if (!ok) {
-                toolError() << "Failed to add oplog entry " << obj << ": " << res;
-            }
-        }
-        else {
-            conn().insert(_ns, obj );
-        }
-    }
 
-    int doRun() {
-        // Flush stdout before returning from doRun().
-        // XXX: This seems to be an issue under RHEL55 but not under other OSes or more recent
-        //      versions of Linux
-        ON_BLOCK_EXIT(&std::ostream::flush, &cout);
 
-        try {
-            _ns = getNS();
-        }
-        catch (...) {
-            printHelp(cerr);
-            return 1;
+/**
+ * Find mode.
+ */
+class FindShimHandler : public ShimHandler {
+public:
+    FindShimHandler(DBClientBase& connection, const string& ns)
+        : _connection(connection), _ns(ns) { }
+
+    virtual bool requiresOutputStream() const { return true; }
+    virtual bool acceptsInputDocuments() const { return false; }
+    virtual void handleSingleInputDocument(const BSONObj& obj, std::ostream* out) const { }
+    virtual void generateOutputDocuments(std::ostream* out) const {
+        invariant(out);
+        Query q(mongoShimGlobalParams.query);
+        if (mongoShimGlobalParams.sort != "") {
+            BSONObj sortSpec = mongo::fromjson(mongoShimGlobalParams.sort);
+            q.sort(sortSpec);
         }
 
-        if (mongoShimGlobalParams.load ||
-            mongoShimGlobalParams.applyOps) {
-            if ( mongoShimGlobalParams.drop ) {
-                conn().dropCollection( _ns );
-            }
-            // --inputDocuments and --in are used primarily for testing.
-            if (!mongoShimGlobalParams.inputDocuments.isEmpty()) {
-                BSONElement firstElement = mongoShimGlobalParams.inputDocuments.firstElement();
-                if (firstElement.type() != Array) {
-                    toolError() << "first element of --inputDocuments has to be an array: "
-                                << firstElement;
-                    return -1;
-                }
-                BSONObjIterator i(firstElement.Obj());
-                while ( i.more() ) {
-                   BSONElement e = i.next();
-                   if (!e.isABSONObj()) {
-                       toolError() << "skipping non-object in input documents: " << e;
-                       continue;
-                   }
-                   gotObject(e.Obj());
-                }
-            }
-            else if (mongoShimGlobalParams.inputFileSpecified) {
-                processFile(mongoShimGlobalParams.inputFile);
-            }
-            else {
-                processFile("-");
-            }
+        auto_ptr<DBClientCursor> cursor =
+            _connection.query(_ns, q, mongoShimGlobalParams.limit, mongoShimGlobalParams.skip,
+                              NULL, 0, QueryOption_NoCursorTimeout);
+
+        while ( cursor->more() ) {
+            BSONObj obj = cursor->next();
+            out->write( obj.objdata(), obj.objsize() );
         }
-        else if (mongoShimGlobalParams.remove) {
-            // Removes all documents matching query
-            bool justOne = false;
-            conn().remove(_ns, mongoShimGlobalParams.query, justOne);
-        }
-        else if (mongoShimGlobalParams.repair) {
-            // Repairs collection before writing documents to output.
-            ostream *out = &cout;
-            auto_ptr<ofstream> fileStream = _createOutputFile();
-            if (fileStream.get()) {
-                if (!fileStream->good()) {
-                    toolError() << "couldn't open [" << mongoShimGlobalParams.outputFile << "]";
-                    return -1;
-                }
-                out = fileStream.get();
-            }
-            _repair(*out);
-        }
-        else {
-            // Write results to stdout unless output file is specified using --out option.
-            ostream *out = &cout;
-            auto_ptr<ofstream> fileStream = _createOutputFile();
-            if (fileStream.get()) {
-                if (!fileStream->good()) {
-                    toolError() << "couldn't open [" << mongoShimGlobalParams.outputFile << "]";
-                    return -1;
-                }
-                out = fileStream.get();
-            }
-
-            Query q(mongoShimGlobalParams.query);
-            if (mongoShimGlobalParams.sort != "") {
-                BSONObj sortSpec = mongo::fromjson(mongoShimGlobalParams.sort);
-                q.sort(sortSpec);
-            }
-
-            if (mongoShimGlobalParams.snapShotQuery) {
-                q.snapshot();
-            }
-
-            auto_ptr<DBClientCursor> cursor = conn().query(_ns,
-                                                           q,
-                                                           mongoShimGlobalParams.limit,
-                                                           mongoShimGlobalParams.skip,
-                                                           NULL,
-                                                           0,
-                                                           QueryOption_NoCursorTimeout);
-
-            while ( cursor->more() ) {
-                BSONObj obj = cursor->next();
-                out->write( obj.objdata(), obj.objsize() );
-            }
-        }
-
-        return 0;
     }
 
 private:
-    /**
-     * Writes valid objects in collection to output.
-     */
-    void _repair(std::ostream& out) {
+    DBClientBase& _connection;
+    string _ns;
+};
+
+
+
+/**
+ * Insert mode.
+ */
+class InsertShimHandler : public ShimHandler {
+public:
+    InsertShimHandler(DBClientBase& connection, const string& ns)
+        : _connection(connection), _ns(ns) {
+        if (mongoShimGlobalParams.drop) {
+            invariant(!_ns.empty());
+            _connection.dropCollection(_ns);
+        }
+    }
+
+    virtual bool requiresOutputStream() const { return false; }
+    virtual bool acceptsInputDocuments() const { return true; }
+    virtual void handleSingleInputDocument(const BSONObj& obj, std::ostream* out) const {
+        _connection.insert(_ns, obj);
+    }
+    virtual void generateOutputDocuments(std::ostream* out) const { }
+
+private:
+    DBClientBase& _connection;
+    string _ns;
+};
+
+
+
+/**
+ * Upsert mode.
+ */
+class UpsertShimHandler : public ShimHandler {
+public:
+    UpsertShimHandler(DBClientBase& connection, const string& ns)
+        : _connection(connection), _ns(ns) { }
+
+    virtual bool requiresOutputStream() const { return false; }
+    virtual bool acceptsInputDocuments() const { return true; }
+    virtual void handleSingleInputDocument(const BSONObj& obj, std::ostream* out) const {
+        BSONObjBuilder b;
+        invariant(!mongoShimGlobalParams.upsertFields.empty());
+        for (vector<string>::const_iterator it = mongoShimGlobalParams.upsertFields.begin(),
+             end = mongoShimGlobalParams.upsertFields.end(); it != end; ++it) {
+            BSONElement e = obj.getFieldDotted(it->c_str());
+            // If we cannot construct a valid query using the provided upsertFields,
+            // insert the object and skip the rest of the fields.
+            if (e.eoo()) {
+                _connection.insert(_ns, obj);
+                return;
+            }
+            b.appendAs(e, *it);
+        }
+        Query query(b.obj());
+        bool upsert = true;
+        bool multi = false;
+        _connection.update(_ns, query, obj, upsert, multi);
+    }
+    virtual void generateOutputDocuments(std::ostream* out) const { }
+
+private:
+    DBClientBase& _connection;
+    string _ns;
+};
+
+
+
+/**
+ * Remove mode.
+ */
+class RemoveShimHandler : public ShimHandler {
+public:
+    RemoveShimHandler(DBClientBase& connection, const string& ns)
+        : _connection(connection), _ns(ns) { }
+
+    virtual bool requiresOutputStream() const { return false; }
+    virtual bool acceptsInputDocuments() const { return false; }
+    virtual void handleSingleInputDocument(const BSONObj& obj, std::ostream* out) const { }
+    virtual void generateOutputDocuments(std::ostream* out) const {
+        // Removes all documents matching query
+        bool justOne = false;
+        _connection.remove(_ns, mongoShimGlobalParams.query, justOne);
+    }
+
+private:
+    DBClientBase& _connection;
+    string _ns;
+};
+
+
+
+/**
+ * Repair mode.
+ * Writes valid objects in collection to output.
+ */
+class RepairShimHandler : public ShimHandler {
+public:
+    RepairShimHandler(DBClientBase& connection, const string& ns)
+        : _connection(connection), _ns(ns) { }
+
+    virtual bool requiresOutputStream() const { return true; }
+    virtual bool acceptsInputDocuments() const { return false; }
+    virtual void handleSingleInputDocument(const BSONObj& obj, std::ostream* out) const { }
+    virtual void generateOutputDocuments(std::ostream* out) const {
+        invariant(out);
         toolInfoLog() << "going to try to recover data from: " << _ns << std::endl;
         OperationContextImpl txn;
         Client::WriteContext cx(&txn, toolGlobalParams.db);
@@ -266,7 +273,7 @@ private:
                     }
 
                     // Write valid object to output stream.
-                    out.write(obj.objdata(), obj.objsize());
+                    out->write(obj.objdata(), obj.objsize());
                 }
                 catch (std::exception& ex) {
                     toolError() << "found invalid document @ " << currLoc << " " << ex.what();
@@ -287,6 +294,152 @@ private:
         cx.commit();
     }
 
+private:
+    DBClientBase& _connection;
+    string _ns;
+};
+
+
+
+/**
+ * Command mode.
+ */
+class CommandShimHandler : public ShimHandler {
+public:
+    CommandShimHandler(DBClientBase& connection)
+        : _connection(connection) { }
+
+    virtual bool requiresOutputStream() const { return true; }
+    virtual bool acceptsInputDocuments() const { return true; }
+    virtual void handleSingleInputDocument(const BSONObj& obj, std::ostream* out) const {
+        invariant(out);
+        // Every document read from input is a separate command object.
+        BSONObj res;
+        bool ok = _connection.runCommand(toolGlobalParams.db, obj, res);
+        if (!ok) {
+            toolError() << "Failed to run command " << obj << ": " << res;
+        }
+        invariant(res.isValid());
+        out->write(res.objdata(), res.objsize());
+    }
+    virtual void generateOutputDocuments(std::ostream* out) const { }
+
+private:
+    DBClientBase& _connection;
+};
+
+
+
+class Shim : public BSONTool {
+public:
+    Shim() : BSONTool() { }
+
+    virtual void printHelp( ostream & out ) {
+        printMongoShimHelp(&out);
+    }
+
+    virtual void gotObject(const BSONObj& obj, std::ostream* out) {
+        invariant(_shimHandler.get());
+        _shimHandler->handleSingleInputDocument(obj, out);
+    }
+
+    int doRun() {
+        // Flush stdout before returning from doRun().
+        // XXX: This seems to be an issue under RHEL55 but not under other OSes or more recent
+        //      versions of Linux
+        ON_BLOCK_EXIT(&std::ostream::flush, &cout);
+
+        // getNS() could throw an exception.
+        string ns;
+        try {
+            if (mongoShimGlobalParams.mode != ShimMode::kCommand) {
+                ns = getNS();
+            }
+        }
+        catch (...) {
+            printHelp(cerr);
+            return EXIT_FAILURE;
+        }
+
+        switch (mongoShimGlobalParams.mode) {
+        case ShimMode::kFind:
+            _shimHandler.reset(new FindShimHandler(conn(), ns));
+            break;
+        case ShimMode::kInsert:
+            _shimHandler.reset(new InsertShimHandler(conn(), ns));
+            break;
+        case ShimMode::kUpsert:
+            _shimHandler.reset(new UpsertShimHandler(conn(), ns));
+            break;
+        case ShimMode::kRemove:
+            _shimHandler.reset(new RemoveShimHandler(conn(), ns));
+            break;
+        case ShimMode::kRepair:
+            _shimHandler.reset(new RepairShimHandler(conn(), ns));
+            break;
+        case ShimMode::kCommand:
+            _shimHandler.reset(new CommandShimHandler(conn()));
+            break;
+        case ShimMode::kNumShimModes:
+            invariant(false);
+        }
+
+        // Initialize output stream if handler needs it.
+        ostream *out = NULL;
+        auto_ptr<ofstream> fileStream;
+        if (_shimHandler->requiresOutputStream()) {
+            fileStream = _createOutputFile();
+            if (fileStream.get()) {
+                if (!fileStream->good()) {
+                    toolError() << "couldn't open [" << mongoShimGlobalParams.outputFile << "]";
+                    return EXIT_FAILURE;
+                }
+                out = fileStream.get();
+            }
+            else {
+                // Write results to stdout by default.
+                out = &cout;
+            }
+        }
+
+        // Skip doRun() if handler needs to read documents from input.
+        // The handler may still write results to output stream.
+        if (_shimHandler->acceptsInputDocuments()) {
+            // --inputDocuments and --in are used primarily for testing.
+            if (!mongoShimGlobalParams.inputDocuments.isEmpty()) {
+                BSONElement firstElement = mongoShimGlobalParams.inputDocuments.firstElement();
+                if (firstElement.type() != Array) {
+                    toolError() << "first element of --inputDocuments has to be an array: "
+                                << firstElement;
+                    return EXIT_FAILURE;
+                }
+                BSONObjIterator i(firstElement.Obj());
+                while ( i.more() ) {
+                   BSONElement e = i.next();
+                   if (!e.isABSONObj()) {
+                       toolError() << "skipping non-object in input documents: " << e;
+                       continue;
+                   }
+                   gotObject(e.Obj(), out);
+                }
+            }
+            else if (mongoShimGlobalParams.inputFileSpecified) {
+                processFile(mongoShimGlobalParams.inputFile, out);
+            }
+            else {
+                processFile("-", out);
+            }
+        }
+        else {
+            // 'out' may be NULL if not required by handler (eg. "remove" mode).
+            _shimHandler->generateOutputDocuments(out);
+        }
+
+        return EXIT_SUCCESS;
+    }
+
+private:
+
     /**
      * Returns a valid filestream if output file is specified and is not "-".
      */
@@ -304,7 +457,7 @@ private:
         return fileStream;
     }
 
-    string _ns;
+    auto_ptr<ShimHandler> _shimHandler;
 };
 
 REGISTER_MONGO_TOOL(Shim);

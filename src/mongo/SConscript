@@ -1012,6 +1012,7 @@ Default( mongod )
 
 # tools
 allToolFiles = ["tools/tool.cpp",
+                "tools/shim_mode.cpp",
                 "tools/stat_util.cpp",
                 "tools/tool_logger.cpp"]
 env.Library("tool_options", "tools/tool_options.cpp",

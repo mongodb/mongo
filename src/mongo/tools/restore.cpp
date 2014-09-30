@@ -294,7 +294,7 @@ public:
         if (mongoRestoreGlobalParams.oplogReplay) {
             toolInfoLog() << "\t Replaying oplog" << std::endl;
             _curns = OPLOG_SENTINEL;
-            processFile( root / "oplog.bson" );
+            processFile(root / "oplog.bson", NULL );
             toolInfoLog() << "Applied " << _oplogEntryApplies << " oplog entries out of "
                           << _oplogEntryApplies + _oplogEntrySkips << " (" << _oplogEntrySkips
                           << " skipped)." << std::endl;
@@ -534,7 +534,7 @@ public:
         }
 
         // 3) Actually restore the BSONObjs inside the dump file
-        processFile( root );
+        processFile(root, NULL);
 
         // 4) If running with --drop, remove any users/roles that were in the system at the
         // beginning of the restore but weren't found in the dump file
@@ -631,7 +631,7 @@ public:
         }
     }
 
-    virtual void gotObject( const BSONObj& obj ) {
+    virtual void gotObject(const BSONObj& obj, std::ostream* out) {
         if (_curns == OPLOG_SENTINEL) { // intentional ptr compare
             if (obj["op"].valuestr()[0] == 'n') // skip no-ops
                 return;

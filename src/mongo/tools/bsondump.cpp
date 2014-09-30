@@ -69,7 +69,7 @@ public:
             return 1;
         }
 
-        processFile( root );
+        processFile(root, NULL);
         return 0;
     }
 
@@ -138,7 +138,7 @@ public:
         return true;
     }
 
-    virtual void gotObject( const BSONObj& o ) {
+    virtual void gotObject(const BSONObj& o, std::ostream* out) {
         switch ( _type ) {
         case JSON:
             cout << o.jsonString( TenGen ) << endl;

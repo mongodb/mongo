@@ -30,6 +30,7 @@
 
 #pragma once
 
+#include <iosfwd>
 #include <string>
 
 #if defined(_WIN32)
@@ -96,11 +97,16 @@ namespace mongo {
         BSONTool();
 
         virtual int doRun() = 0;
-        virtual void gotObject( const BSONObj& obj ) = 0;
+        virtual void gotObject(const BSONObj& obj, std::ostream* out) = 0;
 
         virtual int run();
 
-        long long processFile( const boost::filesystem::path& file );
+        /**
+         * Read BSON documents from file and invoke gotObject() for every document.
+         * Output stream will be passed along to gotObject().
+         * If output stream is not provided, a NULL output stream will be passed to gotObject().
+         */
+        long long processFile(const boost::filesystem::path& file, std::ostream* out);
 
     };
 
