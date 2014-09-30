@@ -12,8 +12,6 @@ import (
 	"io"
 	"os"
 	"path/filepath"
-	// 	"reflect"
-	// 	"strconv"
 	"strings"
 )
 
@@ -248,7 +246,7 @@ func getObjectFromArg(queryRaw string) (map[string]interface{}, error) {
 	parsedJSON := map[string]interface{}{}
 	err := sloppyjson.Unmarshal([]byte(queryRaw), &parsedJSON)
 	if err != nil {
-		return nil, fmt.Errorf("Query is not valid JSON: %v", err)
+		return nil, fmt.Errorf("Query '%v' is not valid JSON: %v", queryRaw, err)
 	}
 
 	for key, val := range parsedJSON {

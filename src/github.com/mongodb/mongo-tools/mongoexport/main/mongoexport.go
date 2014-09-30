@@ -2,9 +2,7 @@ package main
 
 import (
 	"fmt"
-	//"github.com/mongodb/mongo-tools/common/db"
 	commonopts "github.com/mongodb/mongo-tools/common/options"
-	"github.com/mongodb/mongo-tools/common/util"
 	"github.com/mongodb/mongo-tools/mongoexport"
 	"github.com/mongodb/mongo-tools/mongoexport/options"
 	"os"
@@ -19,9 +17,14 @@ func main() {
 	inputOpts := &options.InputOptions{}
 	opts.AddOptions(inputOpts)
 
-	_, err := opts.Parse()
+	args, err := opts.Parse()
 	if err != nil {
-		util.Panicf("error parsing command line options: %v", err)
+		fmt.Fprintf(os.Stderr, "Error parsing command line options: %v\n", err)
+		os.Exit(1)
+	}
+	if len(args) != 0 {
+		fmt.Fprintf(os.Stderr, "Error parsing command line: too many positional options: %v\n", args)
+		os.Exit(1)
 	}
 
 	// print help, if specified
@@ -65,5 +68,4 @@ func main() {
 			fmt.Fprintf(os.Stderr, fmt.Sprintf("exported %v records\n", numDocs))
 		}
 	}
-
 }
