@@ -44,23 +44,27 @@ namespace CountTests {
     class Base {
     public:
         Base() : _lk(_txn.lockState(), nsToDatabaseSubstring(ns()), newlm::MODE_X),
-                 _wunit(&_txn),
                  _context(&_txn, ns()),
                  _client(&_txn) {
 
             _database = _context.db();
-            _collection = _database->getCollection( &_txn, ns() );
-            if ( _collection ) {
-                _database->dropCollection( &_txn, ns() );
+            {
+                WriteUnitOfWork wunit(&_txn);
+                _collection = _database->getCollection( &_txn, ns() );
+                if ( _collection ) {
+                    _database->dropCollection( &_txn, ns() );
+                }
+                _collection = _database->createCollection( &_txn, ns() );
+                wunit.commit();
             }
-            _collection = _database->createCollection( &_txn, ns() );
 
             addIndex( fromjson( "{\"a\":1}" ) );
         }
         ~Base() {
             try {
+                WriteUnitOfWork wunit(&_txn);
                 uassertStatusOK( _database->dropCollection( &_txn, ns() ) );
-                _wunit.commit();
+                wunit.commit();
             }
             catch ( ... ) {
                 FAIL( "Exception while cleaning up collection" );
@@ -82,6 +86,7 @@ namespace CountTests {
         }
 
         void insert( const char *s ) {
+            WriteUnitOfWork wunit(&_txn);
             const BSONObj o = fromjson(s);
 
             if ( o["_id"].eoo() ) {
@@ -95,12 +100,12 @@ namespace CountTests {
             else {
                 _collection->insertDocument( &_txn, o, false );
             }
+            wunit.commit();
         }
 
 
         OperationContextImpl _txn;
         Lock::DBLock _lk;
-        WriteUnitOfWork _wunit;
 
         Client::Context _context;
 

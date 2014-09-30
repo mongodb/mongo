@@ -44,15 +44,15 @@ namespace PdfileTests {
         class Base {
         public:
             Base() : _lk(_txn.lockState()),
-            _wunit(&_txn),
                      _context(&_txn, ns()) {
             }
 
             virtual ~Base() {
                 if ( !collection() )
                     return;
+                WriteUnitOfWork wunit(&_txn);
                 _context.db()->dropCollection( &_txn, ns() );
-                 _wunit.commit();
+                wunit.commit();
             }
 
         protected:
@@ -65,13 +65,13 @@ namespace PdfileTests {
 
             OperationContextImpl _txn;
             Lock::GlobalWrite _lk;
-            WriteUnitOfWork _wunit;
             Client::Context _context;
         };
 
         class InsertNoId : public Base {
         public:
             void run() {
+                WriteUnitOfWork wunit(&_txn);
                 BSONObj x = BSON( "x" << 1 );
                 ASSERT( x["_id"].type() == 0 );
                 Collection* collection = _context.db()->getOrCreateCollection( &_txn, ns() );
@@ -84,6 +84,7 @@ namespace PdfileTests {
                 ASSERT( x["_id"].type() == jstOID );
                 dl = collection->insertDocument( &_txn, x, true );
                 ASSERT( dl.isOK() );
+                wunit.commit();
             }
         };
 
