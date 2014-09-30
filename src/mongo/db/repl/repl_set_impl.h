@@ -243,17 +243,6 @@ namespace repl {
         // this is called from within a writelock in logOpRS
         unsigned selfId() const { return _id; }
         Manager *mgr;
-        /**
-         * This forces a secondary to go into recovering state and stay there
-         * until this is called again, passing in "false".  Multiple threads can
-         * call this and it will leave maintenance mode once all of the callers
-         * have called it again, passing in false.
-         */
-        bool setMaintenanceMode(OperationContext* txn, const bool inc);
-        bool getMaintenanceMode() {
-            lock rsLock( this );
-            return _maintenanceMode > 0;
-        }
 
     private:
         Member* head() const { return _members.head(); }

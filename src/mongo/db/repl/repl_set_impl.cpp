@@ -145,37 +145,6 @@ namespace {
 
     void ReplSetImpl::changeState(MemberState s) { box.change(s, _self); }
 
-    bool ReplSetImpl::setMaintenanceMode(OperationContext* txn, const bool inc) {
-        lock replLock(this);
-
-        // Lock here to prevent state from changing between checking the state and changing it
-        Lock::GlobalWrite writeLock(txn->lockState());
-
-        if (box.getState().primary()) {
-            return false;
-        }
-
-        if (inc) {
-            log() << "replSet going into maintenance mode (" << _maintenanceMode
-                  << " other tasks)" << rsLog;
-
-            _maintenanceMode++;
-            changeState(MemberState::RS_RECOVERING);
-        }
-        else if (_maintenanceMode > 0) {
-            _maintenanceMode--;
-            // no need to change state, syncTail will try to go live as a secondary soon
-
-            log() << "leaving maintenance mode (" << _maintenanceMode << " other tasks)" << rsLog;
-        }
-        else {
-            return false;
-        }
-
-        fassert(16844, _maintenanceMode >= 0);
-        return true;
-    }
-
     Member* ReplSetImpl::getMostElectable() {
         lock lk(this);
 
