@@ -44,6 +44,7 @@ type MongoExport struct {
 
 func (exp *MongoExport) Init() error {
 	if exp.ToolOptions.Namespace.DBPath != "" {
+		exp.ToolOptions.Namespace.DBPath = util.ToUniversalPath(exp.ToolOptions.Namespace.DBPath)
 		shim, err := db.NewShim(exp.ToolOptions.Namespace.DBPath, exp.ToolOptions.DirectoryPerDB, exp.ToolOptions.Journal)
 		if err != nil {
 			return err
@@ -111,7 +112,7 @@ func (exp *MongoExport) getOutputWriter() (io.WriteCloser, error) {
 			return nil, err
 		}
 
-		file, err := os.Create(exp.OutputOpts.OutputFile)
+		file, err := os.Create(util.ToUniversalPath(exp.OutputOpts.OutputFile))
 		if err != nil {
 			return nil, err
 		}
