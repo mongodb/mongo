@@ -49,8 +49,6 @@
 #include "mongo/db/catalog/index_key_validate.h"
 #include "mongo/db/client.h"
 #include "mongo/db/clientcursor.h"
-#include "mongo/db/commands/server_status.h"
-#include "mongo/db/commands/server_status_metric.h"
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/db.h"
 #include "mongo/db/dbdirectclient.h"
@@ -85,14 +83,12 @@
 #include "mongo/db/ttl.h"
 #include "mongo/platform/process_id.h"
 #include "mongo/scripting/engine.h"
-#include "mongo/util/background.h"
 #include "mongo/util/cmdline_utils/censor_cmdline.h"
 #include "mongo/util/concurrency/task.h"
 #include "mongo/util/concurrency/thread_name.h"
 #include "mongo/util/exception_filter_win32.h"
 #include "mongo/util/exit.h"
 #include "mongo/util/log.h"
-#include "mongo/util/mmap.h"
 #include "mongo/util/net/message_server.h"
 #include "mongo/util/net/ssl_manager.h"
 #include "mongo/util/ntservice.h"
@@ -420,107 +416,6 @@ namespace mongo {
         return 0;
     }
 
-    /**
-     * does background async flushes of mmapped files
-     */
-    class DataFileSync : public BackgroundJob , public ServerStatusSection {
-    public:
-        DataFileSync()
-            : ServerStatusSection( "backgroundFlushing" ),
-              _total_time( 0 ),
-              _flushes( 0 ),
-              _last() {
-        }
-
-        virtual bool includeByDefault() const { return true; }
-
-        string name() const { return "DataFileSync"; }
-
-        void run() {
-            Client::initThread( name().c_str() );
-
-            if (storageGlobalParams.syncdelay == 0) {
-                log() << "warning: --syncdelay 0 is not recommended and can have strange performance" << endl;
-            }
-            else if (storageGlobalParams.syncdelay == 1) {
-                log() << "--syncdelay 1" << endl;
-            }
-            else if (storageGlobalParams.syncdelay != 60) {
-                LOG(1) << "--syncdelay " << storageGlobalParams.syncdelay << endl;
-            }
-            int time_flushing = 0;
-            while ( ! inShutdown() ) {
-                _diaglog.flush();
-                if (storageGlobalParams.syncdelay == 0) {
-                    // in case at some point we add an option to change at runtime
-                    sleepsecs(5);
-                    continue;
-                }
-
-                sleepmillis((long long) std::max(0.0, (storageGlobalParams.syncdelay * 1000) - time_flushing));
-
-                if ( inShutdown() ) {
-                    // occasional issue trying to flush during shutdown when sleep interrupted
-                    break;
-                }
-
-                Date_t start = jsTime();
-                StorageEngine* storageEngine = getGlobalEnvironment()->getGlobalStorageEngine();
-                int numFiles = storageEngine->flushAllFiles( true );
-                time_flushing = (int) (jsTime() - start);
-
-                _flushed(time_flushing);
-
-                if( logger::globalLogDomain()->shouldLog(logger::LogSeverity::Debug(1)) || time_flushing >= 10000 ) {
-                    log() << "flushing mmaps took " << time_flushing << "ms " << " for " << numFiles << " files" << endl;
-                }
-            }
-        }
-
-        BSONObj generateSection(const BSONElement& configElement) const {
-            BSONObjBuilder b;
-            b.appendNumber( "flushes" , _flushes );
-            b.appendNumber( "total_ms" , _total_time );
-            b.appendNumber( "average_ms" , (_flushes ? (_total_time / double(_flushes)) : 0.0) );
-            b.appendNumber( "last_ms" , _last_time );
-            b.append("last_finished", _last);
-            return b.obj();
-        }
-
-    private:
-
-        void _flushed(int ms) {
-            _flushes++;
-            _total_time += ms;
-            _last_time = ms;
-            _last = jsTime();
-        }
-
-        long long _total_time;
-        long long _flushes;
-        int _last_time;
-        Date_t _last;
-
-
-    } dataFileSync;
-
-    namespace {
-        class MemJournalServerStatusMetric : public ServerStatusMetric {
-        public:
-            MemJournalServerStatusMetric() : ServerStatusMetric(".mem.mapped") {}
-            virtual void appendAtLeaf( BSONObjBuilder& b ) const {
-                int m = static_cast<int>(MemoryMappedFile::totalMappedLength() / ( 1024 * 1024 ));
-                b.appendNumber( "mapped" , m );
-
-                if (storageGlobalParams.dur) {
-                    m *= 2;
-                    b.appendNumber( "mappedWithJournal" , m );
-                }
-
-            }
-        } memJournalServerStatusMetric;
-    }
-
     static void _initAndListen(int listenPort ) {
         Client::initThread("initandlisten");
 
@@ -833,18 +728,18 @@ MONGO_INITIALIZER_GENERAL(CreateAuthorizationManager,
 }
 
 namespace {
-    repl::ReplSettings replSettings;
+    repl::ReplSettings globalReplSettings;
 } // namespace
 
 namespace mongo {
     void setGlobalReplSettings(const repl::ReplSettings& settings) {
-        replSettings = settings;
+        globalReplSettings = settings;
     }
 } // namespace mongo
 
 MONGO_INITIALIZER_WITH_PREREQUISITES(CreateReplicationManager, ("SetGlobalEnvironment"))
         (InitializerContext* context) {
-    repl::setGlobalReplicationCoordinator(new repl::LegacyReplicationCoordinator(replSettings));
+    repl::setGlobalReplicationCoordinator(new repl::LegacyReplicationCoordinator(globalReplSettings));
     return Status::OK();
 }
 
@@ -919,8 +814,6 @@ static int mongoDbMain(int argc, char* argv[], char **envp) {
     // Per SERVER-7434, startSignalProcessingThread() must run after any forks
     // (initializeServerGlobalState()) and before creation of any other threads.
     startSignalProcessingThread();
-
-    dataFileSync.go();
 
 #if defined(_WIN32)
     if (ntservice::shouldStartService()) {
