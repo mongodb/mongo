@@ -39,6 +39,7 @@ type JSONImportInput struct {
 	// bytesFromReader is used to store the next byte read from the Reader for
 	// JSON array imports
 	bytesFromReader []byte
+	bufferReader    io.Reader
 }
 
 const (
@@ -98,8 +99,11 @@ func (jsonImporter *JSONImportInput) readJSONArraySeparator() error {
 	}
 
 	var readByte byte
+	scanp := 0
+	jsonImporter.bufferReader = io.MultiReader(jsonImporter.Decoder.Buffered(), jsonImporter.Decoder.R)
 	for readByte != jsonImporter.expectedByte {
-		n, err := jsonImporter.Reader.Read(jsonImporter.bytesFromReader)
+		n, err := jsonImporter.bufferReader.Read(jsonImporter.bytesFromReader)
+		scanp += n
 		if n == 0 || err != nil {
 			if err == io.EOF {
 				return ErrNoClosingBracket
@@ -112,7 +116,7 @@ func (jsonImporter *JSONImportInput) readJSONArraySeparator() error {
 			// if we read the end of the JSON array, ensure we have no other
 			// non-whitespace characters at the end of the array
 			for {
-				_, err = jsonImporter.Reader.Read(jsonImporter.bytesFromReader)
+				_, err = jsonImporter.bufferReader.Read(jsonImporter.bytesFromReader)
 				if err != nil {
 					// takes care of the '[]' case
 					if !jsonImporter.readOpeningBracket {
@@ -142,6 +146,10 @@ func (jsonImporter *JSONImportInput) readJSONArraySeparator() error {
 				"JSON object/array in input source", string(readByte))
 		}
 	}
+	// adjust the buffer for account for read bytes
+	if scanp < len(jsonImporter.Decoder.Buf) {
+		jsonImporter.Decoder.Buf = jsonImporter.Decoder.Buf[scanp:]
+	}
 	jsonImporter.readOpeningBracket = true
 	return nil
 }
@@ -154,15 +162,9 @@ func (jsonImporter *JSONImportInput) ImportDocument() (bson.M, error) {
 			return nil, err
 		}
 	}
-
 	if err := jsonImporter.Decoder.Decode(&document); err != nil {
 		return nil, err
 	}
-
-	// reinitialize the reader with data left in the decoder's buffer and the
-	// handle to the underlying reader
-	jsonImporter.Reader = io.MultiReader(jsonImporter.Decoder.Buffered(),
-		jsonImporter.readerPtr)
 
 	// convert any data produced by mongoexport to the appropriate underlying
 	// extended BSON type. NOTE: this assumes specially formated JSON values
@@ -180,8 +182,5 @@ func (jsonImporter *JSONImportInput) ImportDocument() (bson.M, error) {
 	}
 	jsonImporter.NumImported++
 
-	// reinitialize the decoder with its existing buffer and the underlying
-	// reader
-	jsonImporter.Decoder = json.NewDecoder(jsonImporter.Reader)
 	return document, nil
 }
