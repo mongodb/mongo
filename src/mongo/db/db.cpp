@@ -254,35 +254,7 @@ namespace mongo {
         c.insert( name, o);
     }
 
-    // Starts the listener port and never returns unless an error occurs
-    static void listen(int port) {
-        MessageServer::Options options;
-        options.port = port;
-        options.ipList = serverGlobalParams.bind_ip;
-
-        MessageServer * server = createServer( options , new MyMessageHandler() );
-        server->setAsTimeTracker();
-        // we must setupSockets prior to logStartup() to avoid getting too high
-        // a file descriptor for our calls to select()
-        server->setupSockets();
-
-        logStartup();
-        {
-            OperationContextImpl txn;
-            repl::getGlobalReplicationCoordinator()->startReplication(&txn);
-        }
-        if (serverGlobalParams.isHttpInterfaceEnabled)
-            boost::thread web(stdx::bind(&webServerThread,
-                                         new RestAdminAccess())); // takes ownership
-
-#if(TESTEXHAUST)
-        boost::thread thr(testExhaust);
-#endif
-        server->run();
-    }
-
-    void checkForIdIndexes( OperationContext* txn, Database* db ) {
-
+    static void checkForIdIndexes(OperationContext* txn, Database* db) {
         if ( db->name() == "local") {
             // we do not need an _id index on anything in the local database
             return;
@@ -315,88 +287,6 @@ namespace mongo {
         }
     }
 
-    // ran at startup.
-    static void repairDatabasesAndCheckVersion(bool shouldClearNonLocalTmpCollections) {
-        LOG(1) << "enter repairDatabases (to check pdfile version #)" << endl;
-
-        OperationContextImpl txn;
-        Lock::GlobalWrite lk(txn.lockState());
-
-        vector< string > dbNames;
-
-        StorageEngine* storageEngine = getGlobalEnvironment()->getGlobalStorageEngine();
-        storageEngine->listDatabases( &dbNames );
-
-        for ( vector< string >::iterator i = dbNames.begin(); i != dbNames.end(); ++i ) {
-            string dbName = *i;
-            LOG(1) << "\t" << dbName << endl;
-
-            Client::Context ctx(&txn,  dbName );
-
-            if (repl::getGlobalReplicationCoordinator()->getSettings().usingReplSets()) {
-                // we only care about the _id index if we are in a replset
-                checkForIdIndexes(&txn, ctx.db());
-            }
-
-            if (shouldClearNonLocalTmpCollections || dbName == "local")
-                ctx.db()->clearTmpCollections(&txn);
-
-            if ( storageGlobalParams.repair ) {
-                fassert(18506, storageEngine->repairDatabase(&txn, dbName));
-            }
-            else if (!ctx.db()->getDatabaseCatalogEntry()->currentFilesCompatible(&txn)) {
-                log() << "****";
-                log() << "cannot do this upgrade without an upgrade in the middle";
-                log() << "please do a --repair with 2.6 and then start this version";
-                dbexit( EXIT_NEED_UPGRADE );
-                invariant( false );
-                return;
-            }
-            else {
-                // major versions match, check indexes
-
-                const string systemIndexes = ctx.db()->name() + ".system.indexes";
-                Collection* coll = ctx.db()->getCollection( &txn, systemIndexes );
-                auto_ptr<PlanExecutor> exec(
-                    InternalPlanner::collectionScan(&txn, systemIndexes,coll));
-                BSONObj index;
-                PlanExecutor::ExecState state;
-                while (PlanExecutor::ADVANCED == (state = exec->getNext(&index, NULL))) {
-                    const BSONObj key = index.getObjectField("key");
-                    const string plugin = IndexNames::findPluginName(key);
-
-                    if (ctx.db()->getDatabaseCatalogEntry()->isOlderThan24(&txn)) {
-                        if (IndexNames::existedBefore24(plugin))
-                            continue;
-
-                        log() << "Index " << index << " claims to be of type '" << plugin << "', "
-                              << "which is either invalid or did not exist before v2.4. "
-                              << "See the upgrade section: "
-                              << "http://dochub.mongodb.org/core/upgrade-2.4"
-                              << startupWarningsLog;
-                    }
-
-                    const Status keyStatus = validateKeyPattern(key);
-                    if (!keyStatus.isOK()) {
-                        log() << "Problem with index " << index << ": " << keyStatus.reason()
-                              << " This index can still be used however it cannot be rebuilt."
-                              << " For more info see"
-                              << " http://dochub.mongodb.org/core/index-validation"
-                              << startupWarningsLog;
-                    }
-                }
-
-                if (PlanExecutor::IS_EOF != state) {
-                    warning() << "Internal error while reading collection " << systemIndexes;
-                }
-
-                dbHolder().close( &txn, dbName );
-            }
-        }
-
-        LOG(1) << "done repairDatabases" << endl;
-    }
-
     /**
      * Checks if this server was started without --replset but has a config in local.system.replset
      * (meaning that this is probably a replica set member started in stand-alone mode).
@@ -404,22 +294,120 @@ namespace mongo {
      * @returns the number of documents in local.system.replset or 0 if this was started with
      *          --replset.
      */
-    static unsigned long long checkIfReplMissingFromCommandLine() {
-        OperationContextImpl txn;
-
+    static unsigned long long checkIfReplMissingFromCommandLine(OperationContext* txn) {
         // This is helpful for the query below to work as you can't open files when readlocked
-        Lock::GlobalWrite lk(txn.lockState());
+        Lock::GlobalWrite lk(txn->lockState());
         if (!repl::getGlobalReplicationCoordinator()->getSettings().usingReplSets()) {
-            DBDirectClient c(&txn);
+            DBDirectClient c(txn);
             return c.count("local.system.replset");
         }
         return 0;
     }
 
+    static void repairDatabasesAndCheckVersion() {
+        LOG(1) << "enter repairDatabases (to check pdfile version #)" << endl;
+
+        OperationContextImpl txn;
+        Lock::GlobalWrite lk(txn.lockState());
+
+        vector<string> dbNames;
+
+        StorageEngine* storageEngine = getGlobalEnvironment()->getGlobalStorageEngine();
+        storageEngine->listDatabases( &dbNames );
+
+        // Repair all databases first, so that we do not try to open them if they are in bad shape
+        if (storageGlobalParams.repair) {
+            for (vector<string>::const_iterator i = dbNames.begin(); i != dbNames.end(); ++i) {
+                const string dbName = *i;
+                LOG(1) << "    Repairing database: " << dbName << endl;
+
+                fassert(18506, storageEngine->repairDatabase(&txn, dbName));
+            }
+        }
+
+        const repl::ReplSettings& replSettings =
+            repl::getGlobalReplicationCoordinator()->getSettings();
+
+        // On replica set members we only clear temp collections on DBs other than "local" during
+        // promotion to primary. On pure slaves, they are only cleared when the oplog tells them
+        // to. The local DB is special because it is not replicated.  See SERVER-10927 for more
+        // details.
+        const bool shouldClearNonLocalTmpCollections = !(checkIfReplMissingFromCommandLine(&txn)
+                                                    || replSettings.usingReplSets()
+                                                    || replSettings.slave == repl::SimpleSlave);
+
+        for ( vector< string >::iterator i = dbNames.begin(); i != dbNames.end(); ++i ) {
+            const string dbName = *i;
+            LOG(1) << "    Recovering database: " << dbName << endl;
+
+            bool unusedJustCreated;
+            Database* db = dbHolder().getOrCreate(&txn, dbName, unusedJustCreated);
+            invariant(db);
+
+            // First thing after opening the database is to check for file compatibility,
+            // otherwise we might crash if this is a deprecated format.
+            if (!db->getDatabaseCatalogEntry()->currentFilesCompatible(&txn)) {
+                log() << "****";
+                log() << "cannot do this upgrade without an upgrade in the middle";
+                log() << "please do a --repair with 2.6 and then start this version";
+                dbexit(EXIT_NEED_UPGRADE);
+                return;
+            }
+
+            // Major versions match, check indexes
+            const string systemIndexes = db->name() + ".system.indexes";
+
+            Collection* coll = db->getCollection( &txn, systemIndexes );
+            auto_ptr<PlanExecutor> exec(
+                InternalPlanner::collectionScan(&txn, systemIndexes, coll));
+
+            BSONObj index;
+            PlanExecutor::ExecState state;
+            while (PlanExecutor::ADVANCED == (state = exec->getNext(&index, NULL))) {
+                const BSONObj key = index.getObjectField("key");
+                const string plugin = IndexNames::findPluginName(key);
+
+                if (db->getDatabaseCatalogEntry()->isOlderThan24(&txn)) {
+                    if (IndexNames::existedBefore24(plugin)) {
+                        continue;
+                    }
+
+                    log() << "Index " << index << " claims to be of type '" << plugin << "', "
+                            << "which is either invalid or did not exist before v2.4. "
+                            << "See the upgrade section: "
+                            << "http://dochub.mongodb.org/core/upgrade-2.4"
+                            << startupWarningsLog;
+                }
+
+                const Status keyStatus = validateKeyPattern(key);
+                if (!keyStatus.isOK()) {
+                    log() << "Problem with index " << index << ": " << keyStatus.reason()
+                            << " This index can still be used however it cannot be rebuilt."
+                            << " For more info see"
+                            << " http://dochub.mongodb.org/core/index-validation"
+                            << startupWarningsLog;
+                }
+            }
+
+            if (PlanExecutor::IS_EOF != state) {
+                warning() << "Internal error while reading collection " << systemIndexes;
+            }
+
+            if (replSettings.usingReplSets()) {
+                // We only care about the _id index if we are in a replset
+                checkForIdIndexes(&txn, db);
+            }
+
+            if (shouldClearNonLocalTmpCollections || dbName == "local") {
+                db->clearTmpCollections(&txn);
+            }
+        }
+
+        LOG(1) << "done repairDatabases" << endl;
+    }
+
     static void _initAndListen(int listenPort ) {
         Client::initThread("initandlisten");
-
-        bool is32bit = sizeof(int*) == 4;
 
         const repl::ReplSettings& replSettings =
                 repl::getGlobalReplicationCoordinator()->getSettings();
@@ -431,14 +419,20 @@ namespace mongo {
               << " dbpath=" << storageGlobalParams.dbpath;
             if( replSettings.master ) l << " master=" << replSettings.master;
             if( replSettings.slave )  l << " slave=" << (int) replSettings.slave;
+
+            const bool is32bit = sizeof(int*) == 4;
             l << ( is32bit ? " 32" : " 64" ) << "-bit host=" << getHostNameCached() << endl;
         }
+
         DEV log(LogComponent::kDefault) << "_DEBUG build (which is slower)" << endl;
         logMongodStartupWarnings();
+
 #if defined(_WIN32)
         printTargetMinOS();
 #endif
+
         logProcessDetails();
+
         {
             stringstream ss;
             ss << endl;
@@ -449,12 +443,27 @@ namespace mongo {
             ss << "*********************************************************************" << endl;
             uassert(10296,  ss.str().c_str(), boost::filesystem::exists(storageGlobalParams.dbpath));
         }
+
         {
             stringstream ss;
             ss << "repairpath (" << storageGlobalParams.repairpath << ") does not exist";
-            uassert(12590,  ss.str().c_str(),
+            uassert(12590, 
+                    ss.str().c_str(),
                     boost::filesystem::exists(storageGlobalParams.repairpath));
         }
+
+        // Due to SERVER-15389, we must setupSockets first thing at startup in order to avoid
+        // obtaining too high a file descriptor for our calls to select().
+        MessageServer::Options options;
+        options.port = listenPort;
+        options.ipList = serverGlobalParams.bind_ip;
+
+        MessageServer* server = createServer(options, new MyMessageHandler());
+        server->setAsTimeTracker();
+
+        // This is what actually creates the sockets, but does not yet listen on them because we
+        // do not want connections to just hang if recovery takes a very long time.
+        server->setupSockets();
 
         // TODO:  This should go into a MONGO_INITIALIZER once we have figured out the correct
         // dependencies.
@@ -469,29 +478,11 @@ namespace mongo {
         if (storageGlobalParams.durOptions & StorageGlobalParams::DurRecoverOnly)
             return;
 
-        unsigned long long missingRepl = checkIfReplMissingFromCommandLine();
-        if (missingRepl) {
-            log() << startupWarningsLog;
-            log() << "** WARNING: mongod started without --replSet yet " << missingRepl
-                  << " documents are present in local.system.replset" << startupWarningsLog;
-            log() << "**          Restart with --replSet unless you are doing maintenance and no"
-                  << " other clients are connected." << startupWarningsLog;
-            log() << "**          The TTL collection monitor will not start because of this." << startupWarningsLog;
-            log() << "**          For more info see http://dochub.mongodb.org/core/ttlcollections" << startupWarningsLog;
-            log() << startupWarningsLog;
-        }
-
         if (mongodGlobalParams.scriptingEnabled) {
             ScriptEngine::setup();
         }
 
-        // On replica set members we only clear temp collections on DBs other than "local" during
-        // promotion to primary. On pure slaves, they are only cleared when the oplog tells them to.
-        // The local DB is special because it is not replicated.  See SERVER-10927 for more details.
-        const bool shouldClearNonLocalTmpCollections =!(missingRepl
-                                         || replSettings.usingReplSets()
-                                         || replSettings.slave == repl::SimpleSlave);
-        repairDatabasesAndCheckVersion(shouldClearNonLocalTmpCollections);
+        repairDatabasesAndCheckVersion();
 
         if (storageGlobalParams.upgrade) {
             log() << "finished checking dbs" << endl;
@@ -501,7 +492,6 @@ namespace mongo {
 
         {
             OperationContextImpl txn;
-
             uassertStatusOK(getGlobalAuthorizationManager()->initialize(&txn));
         }
 
@@ -510,24 +500,38 @@ namespace mongo {
 
         // The snapshot thread provides historical collection level and lock statistics for use
         // by the web interface. Only needed when HTTP is enabled.
-        if (serverGlobalParams.isHttpInterfaceEnabled)
+        if (serverGlobalParams.isHttpInterfaceEnabled) {
             snapshotThread.go();
+
+            boost::thread web(stdx::bind(&webServerThread, new RestAdminAccess()));
+            web.detach();
+        }
 
         startClientCursorMonitor();
 
         PeriodicTask::startRunningPeriodicTasks();
-        if (missingRepl) {
-            // a warning was logged earlier
-        }
-        else {
-            startTTLBackgroundJob();
-        }
+
+        {
+            OperationContextImpl txn;
+            const unsigned long long missingRepl = checkIfReplMissingFromCommandLine(&txn);
+
+            if (missingRepl) {
+                log() << startupWarningsLog;
+                log() << "** WARNING: mongod started without --replSet yet " << missingRepl
+                      << " documents are present in local.system.replset" << startupWarningsLog;
+                log() << "**          Restart with --replSet unless you are doing maintenance and no"
+                      << " other clients are connected." << startupWarningsLog;
+                log() << "**          The TTL collection monitor will not start because of this." << startupWarningsLog;
+                log() << "**          For more info see http://dochub.mongodb.org/core/ttlcollections" << startupWarningsLog;
+                log() << startupWarningsLog;
+            }
+            else {
+                startTTLBackgroundJob();
+            }
 
 #ifndef _WIN32
         mongo::signalForkSuccess();
 #endif
-        {
-            OperationContextImpl txn;
 
             if (getGlobalAuthorizationManager()->isAuthEnabled()) {
                 // open admin db in case we need to use it later. TODO this is not the right way to
@@ -558,15 +562,22 @@ namespace mongo {
                       << "2.6 and then run the authSchemaUpgrade command." << endl;
                 exitCleanly(EXIT_NEED_UPGRADE);
             }
+
+            getDeleter()->startWorkers();
+
+            restartInProgressIndexesFromLastShutdown();
+
+            repl::getGlobalReplicationCoordinator()->startReplication(&txn);
         }
 
-        getDeleter()->startWorkers();
+        logStartup();
 
-        restartInProgressIndexesFromLastShutdown();
+#if(TESTEXHAUST)
+        boost::thread thr(testExhaust);
+#endif
 
-        listen(listenPort);
-
-        // listen() will return when exit code closes its socket.
+        // MessageServer::run will return when exit code closes its socket
+        server->run();
     }
 
     ExitCode initAndListen(int listenPort) {

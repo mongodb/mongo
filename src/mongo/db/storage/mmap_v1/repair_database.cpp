@@ -306,8 +306,8 @@ namespace mongo {
                                                             reservedPath ) );
 
         {
-            Database* originalDatabase =
-                            dbHolder().get(txn, dbName);
+            bool unusedJustCreated;
+            Database* originalDatabase = dbHolder().getOrCreate(txn, dbName, unusedJustCreated);
             if (originalDatabase == NULL) {
                 return Status(ErrorCodes::NamespaceNotFound, "database does not exist to repair");
             }
