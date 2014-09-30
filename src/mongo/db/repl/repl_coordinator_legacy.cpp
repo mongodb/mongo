@@ -457,11 +457,11 @@ namespace {
     }
 
     bool LegacyReplicationCoordinator::isWaitingForApplierToDrain() {
-        // TODO
-        return false;
+        return BackgroundSync::get()->isAssumingPrimary_inlock();
     }
 
     void LegacyReplicationCoordinator::signalDrainComplete() {
+        // nothing further to do
     }
 
     void LegacyReplicationCoordinator::prepareReplSetUpdatePositionCommand(

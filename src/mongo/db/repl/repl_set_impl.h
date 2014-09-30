@@ -93,7 +93,7 @@ namespace repl {
         Status forceSyncFrom(const string& host, BSONObjBuilder* result);
         // Check if the current sync target is suboptimal. This must be called while holding a mutex
         // that prevents the sync source from changing.
-        bool shouldChangeSyncTarget(const HostAndPort& target) const;
+        bool shouldChangeSyncTarget(const HostAndPort& target);
 
         /**
          * Find the closest member (using ping time) with a higher latest optime.

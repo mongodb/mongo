@@ -240,13 +240,13 @@ namespace repl {
 
     bool HybridReplicationCoordinator::isWaitingForApplierToDrain() {
         bool legacyWaiting = _legacy.isWaitingForApplierToDrain();
-        // fassert(18813, legacyWaiting == _impl.isWaitingForApplierToDrain());
+        //fassert(18813, legacyWaiting == _impl.isWaitingForApplierToDrain());
         return legacyWaiting;
     }
 
     void HybridReplicationCoordinator::signalDrainComplete() {
         _legacy.signalDrainComplete();
-        _impl.signalDrainComplete();
+        //_impl.signalDrainComplete();
     }
 
     void HybridReplicationCoordinator::prepareReplSetUpdatePositionCommand(OperationContext* txn,

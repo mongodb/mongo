@@ -130,7 +130,7 @@ namespace repl {
         return _forceSyncTarget != 0;
     }
 
-    bool ReplSetImpl::shouldChangeSyncTarget(const HostAndPort& currentTarget) const {
+    bool ReplSetImpl::shouldChangeSyncTarget(const HostAndPort& currentTarget) {
         OpTime targetOpTime = findByName(currentTarget.toString())->hbinfo().opTime;
         for (Member *m = _members.head(); m; m = m->next()) {
             if (m->syncable() &&
@@ -142,7 +142,9 @@ namespace repl {
                 return true;
             }
         }
-
+        if (gotForceSync()) {
+            return true;
+        }
         return false;
     }
 

@@ -300,7 +300,7 @@ namespace repl {
         /**
          * Returns true if the coordinator wants the applier to pause application.
          *
-         * If this returns true, the applier should call signalDrainComplete() when it when it has
+         * If this returns true, the applier should call signalDrainComplete() when it has
          * completed draining its operation buffer and no further ops are being applied.
          */
         virtual bool isWaitingForApplierToDrain() = 0;

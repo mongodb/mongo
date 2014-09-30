@@ -386,7 +386,6 @@ namespace {
 
     void ReplicationCoordinatorImpl::signalDrainComplete() {
         boost::lock_guard<boost::mutex> lk(_mutex);
-        invariant(_isWaitingForDrainToComplete);
         _isWaitingForDrainToComplete = false;
     }
 
