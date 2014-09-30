@@ -49,13 +49,9 @@ namespace mongo {
     } // namespace
 
     MONGO_INITIALIZER_WITH_PREREQUISITES(WiredTigerEngineInit,
-                              MONGO_DEFAULT_PREREQUISITES)(InitializerContext* context ) {
-        // Some tests don't setup a global environment before we get here. Set it up now
-        // so we can run WiredTiger unit tests.
-        if (!hasGlobalEnvironment())
-            setGlobalEnvironment(new GlobalEnvironmentMongoD());
-        getGlobalEnvironment()->registerStorageEngine(
-                "wiredtiger", new WiredTigerFactory() );
+                                         ("SetGlobalEnvironment"))
+        (InitializerContext* context ) {
+        getGlobalEnvironment()->registerStorageEngine("wiredtiger", new WiredTigerFactory() );
         return Status::OK();
     }
 

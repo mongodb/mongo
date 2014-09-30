@@ -390,7 +390,6 @@ namespace mongo {
            bool afterKey,
            const vector<const BSONElement*>& keyEnd,
            const vector<bool>& keyEndInclusive) {
-        // XXX I think these do the same thing????
 
         BSONObj key = IndexEntryComparison::makeQueryObject(
                          keyBegin, keyBeginLen,
