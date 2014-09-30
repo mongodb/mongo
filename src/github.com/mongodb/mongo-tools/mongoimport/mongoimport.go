@@ -76,7 +76,7 @@ func (mongoImport *MongoImport) getImportWriter() ImportWriter {
 	return &ShimImportWriter{
 		upsertMode:   mongoImport.IngestOptions.Upsert,
 		upsertFields: upsertFields,
-		dbPath:       mongoImport.ToolOptions.DBPath,
+		dbPath:       util.ToUniversalPath(mongoImport.ToolOptions.DBPath),
 		dirPerDB:     mongoImport.ToolOptions.DirectoryPerDB,
 		db:           mongoImport.ToolOptions.Namespace.DB,
 		collection:   mongoImport.ToolOptions.Namespace.Collection,
@@ -161,7 +161,7 @@ func (mongoImport *MongoImport) ValidateSettings(args []string) error {
 // getInputReader returns an io.Reader corresponding to the input location
 func (mongoImport *MongoImport) getInputReader() (io.ReadCloser, error) {
 	if mongoImport.InputOptions.File != "" {
-		file, err := os.Open(mongoImport.InputOptions.File)
+		file, err := os.Open(util.ToUniversalPath(mongoImport.InputOptions.File))
 		if err != nil {
 			return nil, err
 		}
