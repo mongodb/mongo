@@ -269,10 +269,12 @@ namespace {
         ASSERT_EQUALS(HostAndPort("node2", 54321), noi->getRequest().target);
         ASSERT_EQUALS("admin", noi->getRequest().dbname);
         ASSERT_EQUALS(hbArgs.toBSON(), noi->getRequest().cmdObj);
+        ReplSetHeartbeatResponse hbResp;
+        hbResp.setVersion(0);
         getNet()->scheduleResponse(
                 noi,
                 startDate + 10,
-                ResponseStatus(ReplicationExecutor::RemoteCommandResponse(BSON("ok" << 1),
+                ResponseStatus(ReplicationExecutor::RemoteCommandResponse(hbResp.toBSON(),
                                                                           Milliseconds(8))));
         getNet()->runUntil(startDate + 10);
         getNet()->exitNetwork();

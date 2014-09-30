@@ -559,7 +559,9 @@ namespace {
             log() << "replSet set names do not match, ours: " << ourSetName <<
                 "; remote node's: " << rshb;
             response->noteMismatched();
-            return Status(ErrorCodes::InconsistentReplicaSetNames, "repl set names do not match");
+            return Status(ErrorCodes::InconsistentReplicaSetNames, str::stream() <<
+                          "Our set name of " << ourSetName << " does not match name " << rshb <<
+                          " reported by remote node");
         }
         if (_currentConfig.isInitialized()) {
             invariant(_currentConfig.getReplSetName() == args.getSetName());
@@ -587,16 +589,16 @@ namespace {
             response->setSyncingTo(_syncSource.toString());
         }
 
-        if (_currentConfig.isInitialized()) {
-            long long v = _currentConfig.getConfigVersion();
-            response->setVersion(v);
-            // Deliver new config if caller's version is older than ours
-            if (v > args.getConfigVersion()) {
-                response->setConfig(_currentConfig);
-            }
-        }
-        else {
+        if (!_currentConfig.isInitialized()) {
             response->setVersion(0);
+            return Status::OK();
+        }
+
+        const long long v = _currentConfig.getConfigVersion();
+        response->setVersion(v);
+        // Deliver new config if caller's version is older than ours
+        if (v > args.getConfigVersion()) {
+            response->setConfig(_currentConfig);
         }
 
         // Resolve the caller's id in our Member list

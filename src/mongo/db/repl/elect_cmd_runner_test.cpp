@@ -360,11 +360,8 @@ namespace {
         ASSERT_FALSE(hasReceivedSufficientResponses());
 
         processResponse(requestFrom("host2"), voteNay());
-        ASSERT_FALSE(hasReceivedSufficientResponses());
-
-        processResponse(requestFrom("host3"), voteYea());
         ASSERT_TRUE(hasReceivedSufficientResponses());
-        ASSERT_EQUALS(-9998, getReceivedVotes());
+        ASSERT_EQUALS(-9999, getReceivedVotes());
     }
 
     TEST_F(ElectScatterGatherTest, BothNodesAbstainFromVoting) {

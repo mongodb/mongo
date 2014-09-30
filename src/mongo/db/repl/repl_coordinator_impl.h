@@ -37,22 +37,25 @@
 #include "mongo/base/status.h"
 #include "mongo/bson/optime.h"
 #include "mongo/db/global_environment_experiment.h"
-#include "mongo/db/repl/freshness_checker.h"
-#include "mongo/db/repl/elect_cmd_runner.h"
 #include "mongo/db/repl/member_state.h"
 #include "mongo/db/repl/repl_coordinator.h"
 #include "mongo/db/repl/repl_coordinator_external_state.h"
 #include "mongo/db/repl/replica_set_config.h"
 #include "mongo/db/repl/replication_executor.h"
 #include "mongo/platform/unordered_map.h"
+#include "mongo/platform/unordered_set.h"
 #include "mongo/util/net/hostandport.h"
 
 namespace mongo {
 
     class Timer;
+    template <typename T> class StatusWith;
 
 namespace repl {
 
+    class ElectCmdRunner;
+    class FreshnessChecker;
+    class HeartbeatResponseAction;
     class OplogReader;
     class SyncSourceFeedback;
     class TopologyCoordinator;
@@ -142,7 +145,7 @@ namespace repl {
 
         virtual int getMyId() const;
 
-        virtual void setFollowerMode(const MemberState& newState);
+        virtual bool setFollowerMode(const MemberState& newState);
 
         virtual bool isWaitingForApplierToDrain();
 
@@ -217,23 +220,6 @@ namespace repl {
 
         virtual bool shouldChangeSyncSource(const HostAndPort& currentSource);
 
-        // ================== Members of replication code internal API ===================
-
-        /**
-         * Does a heartbeat for a member of the replica set.
-         * Should be started during (re)configuration or in the heartbeat callback only.
-         */
-        void doMemberHeartbeat(ReplicationExecutor::CallbackData cbData,
-                               const HostAndPort& hap);
-
-        /**
-         * Cancels all heartbeats.
-         *
-         * This is only called during the callback when there is a new config.
-         * At this time no new heartbeats can be scheduled due to the serialization
-         * of calls via the executor.
-         */
-        void cancelHeartbeats();
 
         // ================== Test support API ===================
 
@@ -244,16 +230,9 @@ namespace repl {
         void waitForStartUpComplete();
 
         /**
-         * Used by testing code to run election proceedings, in leiu of a better
-         * method to acheive this.
+         * Gets the replica set configuration in use by the node.
          */
-        void testElection();
-
-        /**
-         * Used to set the current member state of this node.
-         * Should only be used in unit tests.
-         */
-        void _setCurrentMemberState_forTest(const MemberState& newState);
+        ReplicaSetConfig getReplicaSetConfig_forTest();
 
     private:
 
@@ -276,7 +255,6 @@ namespace repl {
          *                    |                         /
          *                     \                       /
          *                      -----------------------
-         *
          */
         enum ConfigState {
             kConfigPreStart,
@@ -335,12 +313,6 @@ namespace repl {
                                         bool* maintenanceMode);
 
         /**
-         * Bottom half of _setCurrentMemberState_forTest.
-         */
-        void _setCurrentMemberState_forTestFinish(const ReplicationExecutor::CallbackData& cbData,
-                                                  const MemberState& newState);
-
-        /**
          * Bottom half of fillIsMasterForReplSet.
          */
         void _fillIsMasterForReplSet_finish(const ReplicationExecutor::CallbackData& cbData,
@@ -395,8 +367,6 @@ namespace repl {
          * same time.
          */
         void _stepDownFinish(const ReplicationExecutor::CallbackData& cbData,
-                             bool force,
-                             const Milliseconds& waitTime,
                              const Date_t& stepdownUntil,
                              Status* result);
 
@@ -406,9 +376,17 @@ namespace repl {
 
         /**
          * Bottom half of setFollowerMode.
+         *
+         * May reschedule itself after the current election, so it is not sufficient to
+         * wait for a callback scheduled to execute this method to complete.  Instead,
+         * supply an event, "finishedSettingFollowerMode", and wait for that event to
+         * be signaled.  Do not observe "*success" until after the event is signaled.
          */
-        void _setFollowerModeFinish(const ReplicationExecutor::CallbackData& cbData,
-                                    const MemberState& newState);
+        void _setFollowerModeFinish(
+                const ReplicationExecutor::CallbackData& cbData,
+                const MemberState& newState,
+                const ReplicationExecutor::EventHandle& finishedSettingFollowerMode,
+                bool* success);
 
         /**
          * Helper method for setLastOptime and setMyLastOptime that takes in a unique lock on
@@ -420,23 +398,40 @@ namespace repl {
                                      const OpTime& ts);
 
         /**
-         * Processes each heartbeat response.
-         * Also responsible for scheduling additional heartbeats within the timeout if they error,
-         * and on success.
+         * Schedules a heartbeat to be sent to "target" at "when".
          */
-        void _handleHeartbeatResponse(const ReplicationExecutor::RemoteCommandCallbackData& cbData,
-                                      const HostAndPort& hap,
-                                      Date_t firstCallDate,
-                                      int retriesLeft);
+        void _scheduleHeartbeatToTarget(const HostAndPort& host, Date_t when);
 
-        void _trackHeartbeatHandle(const ReplicationExecutor::CallbackHandle& handle);
+        /**
+         * Processes each heartbeat response.
+         *
+         * Schedules additional heartbeats, triggers elections and step downs, etc.
+         */
+        void _handleHeartbeatResponse(const ReplicationExecutor::RemoteCommandCallbackData& cbData);
+
+        void _trackHeartbeatHandle(const StatusWith<ReplicationExecutor::CallbackHandle>& handle);
 
         void _untrackHeartbeatHandle(const ReplicationExecutor::CallbackHandle& handle);
 
         /**
-         * Starts a heartbeat for each member in the current config
+         * Starts a heartbeat for each member in the current config.  Called within the executor
+         * context.
          */
         void _startHeartbeats();
+
+        /**
+         * Cancels all heartbeats.  Called within executor context.
+         */
+        void _cancelHeartbeats();
+
+        /**
+         * Asynchronously sends a heartbeat to "target".
+         *
+         * Scheduled by _scheduleHeartbeatToTarget.
+         */
+        void _doMemberHeartbeat(ReplicationExecutor::CallbackData cbData,
+                                const HostAndPort& target);
+
 
         MemberState _getCurrentMemberState_inlock() const;
 
@@ -458,19 +453,12 @@ namespace repl {
         bool _startLoadLocalConfig(OperationContext* txn);
 
         /**
-         * Callback that finishes the work started in _startLoadLocalConfig and sets
-         * _isStartupComplete to true, so that we can begin processing heartbeats and reconfigs.
+         * Callback that finishes the work started in _startLoadLocalConfig and sets _rsConfigState
+         * to kConfigSteady, so that we can begin processing heartbeats and reconfigs.
          */
         void _finishLoadLocalConfig(const ReplicationExecutor::CallbackData& cbData,
                                     const ReplicaSetConfig& localConfig,
                                     OpTime lastOpTime);
-
-        /**
-         * Helper method that does most of the work of _finishLoadLocalConfig, minus setting
-         * _isStartupComplete to true.
-         */
-        void _finishLoadLocalConfig_helper(const ReplicaSetConfig& localConfig,
-                                           OpTime lastOpTime);
 
         /**
          * Callback that finishes the work of processReplSetInitiate() inside the replication
@@ -487,32 +475,36 @@ namespace repl {
         void _setConfigState_inlock(ConfigState newState);
 
         /**
+         * Updates the cached value, _currentState, to match _topCoord's reported
+         * member state, from getMemberState().
+         */
+        void _updateCurrentMemberStateFromTopologyCoordinator_inlock();
+
+        /**
          * Begins an attempt to elect this node.
          * Called after an incoming heartbeat changes this node's view of the set such that it
          * believes it can be elected PRIMARY.
          * For proper concurrency, must be called via a ReplicationExecutor callback.
-         * finishEvh is an event that is signaled when election is done, regardless of success.
-         **/
-        void _startElectSelf(const ReplicationExecutor::CallbackData& cbData,
-                             const ReplicationExecutor::EventHandle& finishEvh);
+         */
+        void _startElectSelf();
 
         /**
          * Callback called when the FreshnessChecker has completed; checks the results and
          * decides whether to continue election proceedings.
          * finishEvh is an event that is signaled when election is complete.
          **/
-        void _onFreshnessCheckComplete(const ReplicationExecutor::EventHandle& finishEvh);
+        void _onFreshnessCheckComplete();
 
         /**
          * Callback called when the ElectCmdRunner has completed; checks the results and
          * decides whether to complete the election and change state to primary.
          * finishEvh is an event that is signaled when election is complete.
          **/
-        void _onElectCmdRunnerComplete(const ReplicationExecutor::EventHandle& finishEvh);
+        void _onElectCmdRunnerComplete();
 
         /**
          * Chooses a new sync source.  Must be scheduled as a callback.
-         * 
+         *
          * Calls into the Topology Coordinator, which uses its current view of the set to choose
          * the most appropriate sync source.
          */
@@ -528,6 +520,7 @@ namespace repl {
         void _blacklistSyncSource(const ReplicationExecutor::CallbackData& cbData,
                                   const HostAndPort& host,
                                   Date_t until);
+
         /**
          * Determines if a new sync source should be considered.
          *
@@ -536,6 +529,53 @@ namespace repl {
         void _shouldChangeSyncSource(const ReplicationExecutor::CallbackData& cbData,
                                      const HostAndPort& currentSource,
                                      bool* shouldChange);
+
+        /**
+         * Schedules a request that the given host step down; logs any errors.
+         */
+        void _requestRemotePrimaryStepdown(const HostAndPort& target);
+
+        void _heartbeatStepDownStart();
+
+        /**
+         * Completes a step-down of the current node triggered by a heartbeat.  Must
+         * be run with a global shared or global exclusive lock.
+         */
+        void _heartbeatStepDownFinish(const ReplicationExecutor::CallbackData& cbData);
+
+        /**
+         * Schedules a replica set config change.
+         */
+        void _scheduleHeartbeatReconfig(const ReplicaSetConfig& newConfig);
+
+        /**
+         * Callback that continues a heartbeat-initiated reconfig after a running election
+         * completes.
+         */
+        void _heartbeatReconfigAfterElectionCanceled(
+                const ReplicationExecutor::CallbackData& cbData,
+                const ReplicaSetConfig& newConfig);
+
+        /**
+         * Method to write a configuration transmitted via heartbeat message to stable storage.
+         */
+        void _heartbeatReconfigStore(const ReplicaSetConfig& newConfig);
+
+        /**
+         * Conclusion actions of a heartbeat-triggered reconfiguration.
+         */
+        void _heartbeatReconfigFinish(const ReplicationExecutor::CallbackData& cbData,
+                                      const ReplicaSetConfig& newConfig,
+                                      StatusWith<int> myIndex);
+
+        /**
+         * Utility method that schedules or performs actions specified by a HeartbeatResponseAction
+         * returned by a TopologyCoordinator::processHeartbeatResponse call with the given
+         * value of "responseStatus".
+         */
+        void _handleHeartbeatResponseAction(
+                const HeartbeatResponseAction& action,
+                const StatusWith<ReplSetHeartbeatResponse>& responseStatus);
 
         /**
          * Bottom half of processHeartbeat(), which runs in the replication executor.
@@ -564,6 +604,12 @@ namespace repl {
 
         // Handles to actively queued heartbeats.
         HeartbeatHandles _heartbeatHandles;                                               // (X)
+
+        // When this node does not know itself to be a member of a config, it adds
+        // every host that sends it a heartbeat request to this set, and also starts
+        // sending heartbeat requests to that host.  This set is cleared whenever
+        // a node discovers that it is a member of a config.
+        std::unordered_set<HostAndPort> _seedList;                                        // (X)
 
         // Parsed command line arguments related to replication.
         // TODO(spencer): Currently there is global mutable state
@@ -627,11 +673,16 @@ namespace repl {
         // This member's index position in the current config.
         int _thisMembersConfigIndex;                                                      // (MX)
 
-        // Used for conducting an election of this node;
+        // State for conducting an election of this node.
         // the presence of a non-null _freshnessChecker pointer indicates that an election is
         // currently in progress.  Only one election is allowed at once.
         boost::scoped_ptr<FreshnessChecker> _freshnessChecker;                            // (X)
+
         boost::scoped_ptr<ElectCmdRunner> _electCmdRunner;                                // (X)
+
+        // Event that the election code will signal when the in-progress election completes.
+        // Unspecified value when _freshnessChecker is NULL.
+        ReplicationExecutor::EventHandle _electionFinishedEvent;                          // (X)
 
         // Whether we slept last time we attempted an election but possibly tied with other nodes.
         bool _sleptLastElection;                                                          // (X)

@@ -151,7 +151,8 @@ namespace repl {
         return 0;
     }
 
-    void ReplicationCoordinatorMock::setFollowerMode(const MemberState& newState) {
+    bool ReplicationCoordinatorMock::setFollowerMode(const MemberState& newState) {
+        return true;
     }
 
     bool ReplicationCoordinatorMock::isWaitingForApplierToDrain() {

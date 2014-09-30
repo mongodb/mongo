@@ -33,6 +33,7 @@
 
 #include "mongo/db/repl/repl_coordinator.h"
 #include "mongo/db/repl/repl_settings.h"
+#include "mongo/db/repl/replication_executor.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo {
@@ -43,6 +44,7 @@ namespace mongo {
 namespace repl {
 
     class NetworkInterfaceMock;
+    class ReplicaSetConfig;
     class ReplicationCoordinatorExternalStateMock;
     class ReplicationCoordinatorImpl;
     class TopologyCoordinatorImpl;
@@ -52,6 +54,17 @@ namespace repl {
      */
     class ReplCoordTest : public mongo::unittest::Test {
     public:
+        /**
+         * Makes a ResponseStatus with the given "doc" response and optional elapsed time "millis".
+         */
+        static ResponseStatus makeResponseStatus(const BSONObj& doc,
+                                                 Milliseconds millis = Milliseconds(0));
+
+        /**
+         * Constructs a ReplicaSetConfig from the given BSON, or raises a test failure exception.
+         */
+        static ReplicaSetConfig assertMakeRSConfig(const BSONObj& configBSON);
+
         ReplCoordTest();
         virtual ~ReplCoordTest();
 
@@ -78,6 +91,21 @@ namespace repl {
          * Gets the external state used by the replication coordinator under test.
          */
         ReplicationCoordinatorExternalStateMock* getExternalState() { return _externalState; }
+
+        /**
+         * Adds "selfHost" to the list of hosts that identify as "this" host.
+         */
+        void addSelf(const HostAndPort& selfHost);
+
+        /**
+         * Shorthand for getNet()->enterNetwork()
+         */
+        void enterNetwork();
+
+        /**
+         * Shorthand for getNet()->exitNetwork()
+         */
+        void exitNetwork();
 
         /**
          * Initializes the objects under test; this behavior is optional, in case you need to call
@@ -120,6 +148,20 @@ namespace repl {
         void assertStart(ReplicationCoordinator::Mode expectedMode,
                          const BSONObj& configDoc,
                          const HostAndPort& selfHost);
+
+        /**
+         * Brings the repl coord from SECONDARY to PRIMARY by simulating the messages required to
+         * elect it.
+         *
+         * Behavior is unspecified if node does not have a clean config, is not in SECONDARY, etc.
+         */
+        void simulateSuccessfulElection();
+
+        /**
+         * Brings the repl coord from PRIMARY to SECONDARY by simulating a period of time in which
+         * all heartbeats respond with an error condition, such as time out.
+         */
+        void simulateStepDownOnIsolation();
 
         /**
          * Shorthand for assertStart(ReplicationCoordinator::modeReplSet, configDoc, selfHost).

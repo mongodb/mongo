@@ -39,6 +39,8 @@
 #include "mongo/db/global_optime.h"
 #include "mongo/db/operation_context_noop.h"
 #include "mongo/db/repl/check_quorum_for_config_change.h"
+#include "mongo/db/repl/elect_cmd_runner.h"
+#include "mongo/db/repl/freshness_checker.h"
 #include "mongo/db/repl/handshake_args.h"
 #include "mongo/db/repl/is_master_response.h"
 #include "mongo/db/repl/master_slave.h"
@@ -141,6 +143,11 @@ namespace {
         }
     }
 
+    ReplicaSetConfig ReplicationCoordinatorImpl::getReplicaSetConfig_forTest() {
+        boost::lock_guard<boost::mutex> lk(_mutex);
+        return _rsConfig;
+    }
+
     bool ReplicationCoordinatorImpl::_startLoadLocalConfig(OperationContext* txn) {
 
         StatusWith<BSONObj> cfg = _externalState->loadLocalConfigDocument(txn);
@@ -155,12 +162,6 @@ namespace {
             warning() << "Locally stored replica set configuration does not parse; "
                 "waiting for rsInitiate or remote heartbeat; Got " << status << " while parsing " <<
                 cfg.getValue();
-            return true;
-        }
-        if (localConfig.getReplSetName() != _settings.ourSetName()) {
-            warning() << "Local replica set configuration document reports set name of " <<
-                localConfig.getReplSetName() << ", but command line reports " <<
-                _settings.ourSetName() << "; ignoring local configuration document";
             return true;
         }
 
@@ -194,34 +195,22 @@ namespace {
             LOG(1) << "Loading local replica set configuration failed due to " << cbData.status;
             return;
         }
-        _finishLoadLocalConfig_helper(localConfig, lastOpTime);
-
-        // Make sure that no matter how _finishLoadLocalConfig_helper terminates (short of
-        // throwing an exception, which it shouldn't do and would cause the process to terminate),
-        // we always set _rsConfigState to either kConfigSteady or kConfigUninitialized.
-        boost::lock_guard<boost::mutex> lk(_mutex);
-        if (_rsConfigState != kConfigStartingUp) {
-            invariant(_rsConfigState == kConfigSteady);
-            invariant(_rsConfig.isInitialized());
-        }
-        else {
-            invariant(!_rsConfig.isInitialized());
-            _setConfigState_inlock(kConfigUninitialized);
-        }
-    }
-
-    void ReplicationCoordinatorImpl::_finishLoadLocalConfig_helper(
-            const ReplicaSetConfig& localConfig,
-            OpTime lastOpTime) {
 
         StatusWith<int> myIndex = validateConfigForStartUp(_externalState.get(),
                                                            _rsConfig,
                                                            localConfig);
         if (!myIndex.isOK()) {
             warning() << "Locally stored replica set configuration not valid for current node; "
-                "waiting for rsInitiate or remote heartbeat; Got " << myIndex.getStatus() <<
+                "waiting for reconfig or remote heartbeat; Got " << myIndex.getStatus() <<
                 " while validating " << localConfig.toBSON();
-            return;
+            myIndex = StatusWith<int>(-1);
+        }
+
+        if (localConfig.getReplSetName() != _settings.ourSetName()) {
+            warning() << "Local replica set configuration document reports set name of " <<
+                localConfig.getReplSetName() << ", but command line reports " <<
+                _settings.ourSetName() << "; waitng for reconfig or remote heartbeat";
+            myIndex = StatusWith<int>(-1);
         }
 
         boost::unique_lock<boost::mutex> lk(_mutex);
@@ -346,42 +335,27 @@ namespace {
         _topCoord->clearSyncSourceBlacklist();
     }
 
-    void ReplicationCoordinatorImpl::_setCurrentMemberState_forTest(const MemberState& newState) {
-        CBHStatus cbh = _replExecutor.scheduleWork(
-                stdx::bind(&ReplicationCoordinatorImpl::_setCurrentMemberState_forTestFinish,
-                           this,
-                           stdx::placeholders::_1,
-                           newState));
-        if (cbh.getStatus() == ErrorCodes::ShutdownInProgress) {
-            return;
+    bool ReplicationCoordinatorImpl::setFollowerMode(const MemberState& newState) {
+        StatusWith<ReplicationExecutor::EventHandle> finishedSettingFollowerState =
+            _replExecutor.makeEvent();
+        if (finishedSettingFollowerState.getStatus() == ErrorCodes::ShutdownInProgress) {
+            return false;
         }
-        fassert(18700, cbh.getStatus());
-        _replExecutor.wait(cbh.getValue());
-    }
-
-    void ReplicationCoordinatorImpl::_setCurrentMemberState_forTestFinish(
-            const ReplicationExecutor::CallbackData& cbData,
-            const MemberState& newState) {
-
-        if (cbData.status == ErrorCodes::CallbackCanceled)
-            return;
-        boost::lock_guard<boost::mutex> lk(_mutex);
-        _topCoord->changeMemberState_forTest(newState);
-        invariant(newState == _topCoord->getMemberState());
-        _currentState = newState;
-    }
-
-    void ReplicationCoordinatorImpl::setFollowerMode(const MemberState& newState) {
+        fassert(18812, finishedSettingFollowerState.getStatus());
+        bool success = false;
         CBHStatus cbh = _replExecutor.scheduleWork(
                 stdx::bind(&ReplicationCoordinatorImpl::_setFollowerModeFinish,
                            this,
                            stdx::placeholders::_1,
-                           newState));
+                           newState,
+                           finishedSettingFollowerState.getValue(),
+                           &success));
         if (cbh.getStatus() == ErrorCodes::ShutdownInProgress) {
-            return;
+            return false;
         }
         fassert(18699, cbh.getStatus());
-        _replExecutor.wait(cbh.getValue());
+        _replExecutor.waitForEvent(finishedSettingFollowerState.getValue());
+        return success;
     }
 
     bool ReplicationCoordinatorImpl::isWaitingForApplierToDrain() {
@@ -396,18 +370,50 @@ namespace {
 
     void ReplicationCoordinatorImpl::_setFollowerModeFinish(
             const ReplicationExecutor::CallbackData& cbData,
-            const MemberState& newState) {
+            const MemberState& newState,
+            const ReplicationExecutor::EventHandle& finishedSettingFollowerMode,
+            bool* success) {
 
-        if (cbData.status == ErrorCodes::CallbackCanceled)
+        if (cbData.status == ErrorCodes::CallbackCanceled) {
             return;
+        }
+        if (newState == _topCoord->getMemberState()) {
+            *success = true;
+            _replExecutor.signalEvent(finishedSettingFollowerMode);
+            return;
+        }
+        if (_topCoord->getRole() == TopologyCoordinator::Role::leader) {
+            *success = false;
+            _replExecutor.signalEvent(finishedSettingFollowerMode);
+            return;
+        }
+
+        if (_topCoord->getRole() == TopologyCoordinator::Role::candidate) {
+            // We are a candidate, which means _topCoord believs us to be in state RS_SECONDARY, and
+            // we know that newState != RS_SECONDARY because we would have returned early, above if
+            // the old and new state were equal.  So, cancel the running election and try again to
+            // finish setting the follower mode.
+            invariant(_freshnessChecker);
+            _freshnessChecker->cancel(&_replExecutor);
+            if (_electCmdRunner) {
+                _electCmdRunner->cancel(&_replExecutor);
+            }
+            _replExecutor.onEvent(
+                    _electionFinishedEvent,
+                    stdx::bind(&ReplicationCoordinatorImpl::_setFollowerModeFinish,
+                               this,
+                               stdx::placeholders::_1,
+                               newState,
+                               finishedSettingFollowerMode,
+                               success));
+            return;
+        }
+
         boost::lock_guard<boost::mutex> lk(_mutex);
-        // TODO(schwerin) If _topCoord->getRole() == Role::candidate, we need to cancel the election
-        // process and call loseElection before calling setFollowerMode.  It is a programming error
-        // to get here if we're in state primary, because we should not have called
-        // _topCoord->processWinElection() while the applier was still running, and only the applier
-        // should be calling this.
         _topCoord->setFollowerMode(newState.s);
-        _currentState = _topCoord->getMemberState();
+        _updateCurrentMemberStateFromTopologyCoordinator_inlock();
+        *success = true;
+        _replExecutor.signalEvent(finishedSettingFollowerMode);
     }
 
     Status ReplicationCoordinatorImpl::setLastOptime(OperationContext* txn,
@@ -441,13 +447,19 @@ namespace {
                 " has reached optime: " << ts;
 
         SlaveInfo& slaveInfo = _slaveInfoMap[rid];
-        if (slaveInfo.memberID < 0 && _getReplicationMode_inlock() == modeReplSet) {
-            warning() << "Received replSetUpdatePosition for node with RID" << rid
-                      << ", but we haven't yet received a handshake for that node. Stored "
-                      << "member ID: " << slaveInfo.memberID << ", stored member hostAndPort: "
-                      << slaveInfo.hostAndPort.toString() << ".  Our RID: " << _getMyRID_inlock();
+        if ((slaveInfo.memberID < 0) && (_getReplicationMode_inlock() == modeReplSet)) {
+            if (rid != _getMyRID_inlock()) {
+                warning() << "Received replSetUpdatePosition for node with RID " << rid
+                          << ", but we haven't yet received a handshake for that node. Stored "
+                          << "member ID: " << slaveInfo.memberID << ", stored member hostAndPort: "
+                          << slaveInfo.hostAndPort.toString() << ".  Our RID: " << _getMyRID_inlock();
+            }
+            else {
+                // If this member were part of the current configuration, we would have put an entry
+                // for it into the slaveInfo map when we stored the configuration.
+                invariant(_thisMembersConfigIndex == -1);
+            }
         }
-        invariant(slaveInfo.memberID >= 0 || _getReplicationMode_inlock() == modeMasterSlave);
 
         LOG(3) << "Node with RID " << rid << " currently has optime " << slaveInfo.opTime <<
                 "; updating to " << ts;
@@ -750,14 +762,12 @@ namespace {
             stdx::bind(&ReplicationCoordinatorImpl::_stepDownFinish,
                        this,
                        stdx::placeholders::_1,
-                       force,
-                       waitTime,
                        stepDownUntil,
                        &result));
         if (cbh.getStatus() == ErrorCodes::ShutdownInProgress) {
             return cbh.getStatus();
         }
-        fassert(18705, cbh.getStatus());
+        fassert(18809, cbh.getStatus());
         lock.unlock();
         _replExecutor.wait(cbh.getValue());
         return result;
@@ -765,31 +775,30 @@ namespace {
 
     void ReplicationCoordinatorImpl::_stepDownFinish(
             const ReplicationExecutor::CallbackData& cbData,
-            bool force,
-            const Milliseconds& waitTime,
             const Date_t& stepdownUntil,
             Status* result) {
         if (!cbData.status.isOK()) {
             *result = cbData.status;
             return;
         }
-
-        boost::lock_guard<boost::mutex> lock(_mutex);
-        if (!_getCurrentMemberState_inlock().primary()) {
-            *result = Status(ErrorCodes::NotMaster, "not primary anymore so can't step down");
+        if (_topCoord->getRole() != TopologyCoordinator::Role::leader) {
+            *result = Status(ErrorCodes::NotMaster,
+                             "Already stepped down from primary while processing step down "
+                             "request");
             return;
         }
-
         if (_replExecutor.now() >= stepdownUntil) {
             *result = Status(ErrorCodes::ExceededTimeLimit,
                              "By the time we were ready to step down, we were already past the "
-                                     "time we were supposed to step down until");
+                             "time we were supposed to step down until");
             return;
         }
 
         _topCoord->setStepDownTime(stepdownUntil);
         _topCoord->stepDown();
-        _currentState = _topCoord->getMemberState();
+        boost::unique_lock<boost::mutex> lk(_mutex);
+        _updateCurrentMemberStateFromTopologyCoordinator_inlock();
+        lk.unlock();
         _externalState->closeClientConnections();
         // Wake up any threads blocked in awaitReplication
         for (std::vector<WaiterInfo*>::iterator it = _replicationWaiterList.begin();
@@ -1106,7 +1115,7 @@ namespace {
             return;
         }
 
-        _currentState = _topCoord->getMemberState();
+        _updateCurrentMemberStateFromTopologyCoordinator_inlock();
         *result = Status::OK();
     }
 
@@ -1191,6 +1200,15 @@ namespace {
                 _settings.ourSetName(),
                 _getLastOpApplied(),
                 response);
+        if (outStatus->isOK() && _thisMembersConfigIndex < 0) {
+            // If this node does not belong to the configuration it knows about, send heartbeats
+            // back to any node that sends us a heartbeat, in case one of those remote nodes has
+            // a configuration that contains us.  Chances are excellent that it will, since that
+            // is the only reason for a remote node to send this node a heartbeat request.
+            if (!args.getSenderHost().empty() && _seedList.insert(args.getSenderHost()).second) {
+                _scheduleHeartbeatToTarget(args.getSenderHost(), now);
+            }
+        }
     }
 
     Status ReplicationCoordinatorImpl::processReplSetReconfig(OperationContext* txn,
@@ -1203,13 +1221,11 @@ namespace {
     Status ReplicationCoordinatorImpl::processReplSetInitiate(OperationContext* txn,
                                                               const BSONObj& configObj,
                                                               BSONObjBuilder* resultObj) {
-        log() << "replSet replSetInitiate admin command received from client" << rsLog;
+        log() << "replSetInitiate admin command received from client" << rsLog;
 
         boost::unique_lock<boost::mutex> lk(_mutex);
-
         if (!_settings.usingReplSets()) {
-            return Status(ErrorCodes::NoReplicationEnabled,
-                          "server is not running with --replSet");
+            return Status(ErrorCodes::NoReplicationEnabled, "server is not running with --replSet");
         }
 
         while (_rsConfigState == kConfigPreStart || _rsConfigState == kConfigStartingUp) {
@@ -1237,13 +1253,6 @@ namespace {
             error() << "replSet initiate got " << status << " while parsing " << configObj << rsLog;
             return status;
         }
-        StatusWith<int> myIndex = validateConfigForInitiate(_externalState.get(), newConfig);
-        if (!myIndex.isOK()) {
-            error() << "replSet initiate got " << myIndex.getStatus() << " while validating " <<
-                configObj << rsLog;
-            return myIndex.getStatus();
-        }
-
         if (newConfig.getReplSetName() != _settings.ourSetName()) {
             str::stream errmsg;
             errmsg << "Attempting to initiate a replica set with name " <<
@@ -1251,6 +1260,13 @@ namespace {
                 _settings.ourSetName() << "; rejecting";
             error() << std::string(errmsg);
             return Status(ErrorCodes::BadValue, errmsg);
+        }
+
+        StatusWith<int> myIndex = validateConfigForInitiate(_externalState.get(), newConfig);
+        if (!myIndex.isOK()) {
+            error() << "replSet initiate got " << myIndex.getStatus() << " while validating " <<
+                configObj << rsLog;
+            return myIndex.getStatus();
         }
 
         log() << "replSet replSetInitiate config object with " << newConfig.getNumMembers() <<
@@ -1302,6 +1318,13 @@ namespace {
         if (newState != _rsConfigState) {
             _rsConfigState = newState;
             _rsConfigStateChange.notify_all();
+        }
+    }
+
+    void ReplicationCoordinatorImpl::_updateCurrentMemberStateFromTopologyCoordinator_inlock() {
+        const MemberState newState = _topCoord->getMemberState();
+        if (newState != _currentState) {
+            _currentState = newState;
         }
     }
 
@@ -1371,10 +1394,8 @@ namespace {
             const ReplicaSetConfig& newConfig,
             int myIndex) {
          invariant(_settings.usingReplSets());
-         if (_rsConfig.isInitialized()) {
-             cancelHeartbeats();
-         }
-         OpTime lastOpApplied(_getLastOpApplied_inlock());
+         const OpTime lastOpApplied(_getLastOpApplied_inlock());
+         _cancelHeartbeats();
          _setConfigState_inlock(kConfigSteady);
          _rsConfig = newConfig;
          _thisMembersConfigIndex = myIndex;
@@ -1397,11 +1418,17 @@ namespace {
                                            getNextGlobalOptime());
          }
 
-         _currentState = _topCoord->getMemberState();
-         // Ensure that there's an entry in the _slaveInfoMap for ourself
-         _slaveInfoMap[_getMyRID_inlock()].memberID = _rsConfig.getMemberAt(myIndex).getId();
-         _slaveInfoMap[_getMyRID_inlock()].hostAndPort =
-                 _rsConfig.getMemberAt(myIndex).getHostAndPort();
+         _updateCurrentMemberStateFromTopologyCoordinator_inlock();
+         SlaveInfo& mySlaveInfo = _slaveInfoMap[_getMyRID_inlock()];
+         if (myIndex >= 0) {
+             // Ensure that there's an entry in the _slaveInfoMap for ourself
+             mySlaveInfo.memberID = _rsConfig.getMemberAt(myIndex).getId();
+             mySlaveInfo.hostAndPort = _rsConfig.getMemberAt(myIndex).getHostAndPort();
+         }
+         else {
+             mySlaveInfo.memberID = -1;
+             mySlaveInfo.hostAndPort = HostAndPort();
+         }
          _startHeartbeats();
      }
 

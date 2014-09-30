@@ -108,6 +108,7 @@ error_code("IncompatibleShardingMetadata", 105)
 error_code("DistributedClockSkewed", 106)
 error_code("LockFailed", 107)
 error_code("InconsistentReplicaSetNames", 108)
+error_code("ConfigurationInProgress", 109)
 
 # Non-sequential error codes (for compatibility only)
 error_code("NotMaster", 10107) #this comes from assert_util.h

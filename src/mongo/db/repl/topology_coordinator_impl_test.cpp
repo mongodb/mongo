@@ -2905,8 +2905,17 @@ namespace {
         ReplSetHeartbeatResponse response;
         Status result(ErrorCodes::InternalError, "prepareHeartbeatResponse didn't set result");
 
+        startCapturingLogMessages();
         prepareHeartbeatResponse(args, OpTime(0,0), &response, &result);
+        stopCapturingLogMessages();
         ASSERT_EQUALS(ErrorCodes::InconsistentReplicaSetNames, result);
+        ASSERT(result.reason().find("repl set names do not match")) << "Actual string was \"" <<
+               result.reason() << '"';
+        ASSERT_EQUALS(1,
+                      countLogLinesContaining("replSet set names do not match, ours: rs0; remote "
+                            "node's: rs1"));
+        ASSERT_TRUE(response.isMismatched());
+        ASSERT_EQUALS("", response.getHbMsg());
     }
 
     TEST_F(PrepareHeartbeatResponseTest, PrepareHeartbeatResponseSenderIDMissing) {
