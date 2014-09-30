@@ -225,6 +225,8 @@ func (exp *MongoExport) getExportOutput(out io.Writer) (ExportOutput, error) {
 			if err != nil {
 				return nil, err
 			}
+		} else {
+			return nil, fmt.Errorf("csv mode requires a field list")
 		}
 		return NewCSVExportOutput(fields, out), nil
 	}
