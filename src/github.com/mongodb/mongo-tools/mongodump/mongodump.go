@@ -379,11 +379,16 @@ func (dump *MongoDump) dumpDocSourceToWriter(query db.DocSource, writer io.Write
 				log.Logf(0, "error reading from db: %v", err)
 			}
 			next := query.Next(raw)
+
 			if !next {
 				close(buffChan)
 				return
 			}
-			buffChan <- raw.Data
+
+			nextCopy := make([]byte, len(raw.Data))
+			copy(nextCopy, raw.Data)
+
+			buffChan <- nextCopy
 		}
 	}()
 
