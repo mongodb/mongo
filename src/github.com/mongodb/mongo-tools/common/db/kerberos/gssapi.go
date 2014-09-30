@@ -1,5 +1,8 @@
 package kerberos
 
+// #cgo windows CFLAGS: -Ic:/sasl/include
+// #cgo windows LDFLAGS: -Lc:/sasl/lib
+
 import (
 	"github.com/mongodb/mongo-tools/common/options"
 	"github.com/mongodb/mongo-tools/common/util"
