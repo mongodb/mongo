@@ -401,7 +401,7 @@ namespace mongo {
                                        ValidateResults* results,
                                        BSONObjBuilder* output ) const {
 
-        uint64_t nrecords = 0;
+        int64_t nrecords = 0;
         boost::scoped_ptr<RecordIterator> iter( getIterator( txn ) );
         while( !iter->isEOF() ) {
             ++nrecords;
