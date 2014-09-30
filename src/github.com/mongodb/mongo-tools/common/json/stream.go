@@ -27,6 +27,14 @@ func NewDecoder(r io.Reader) *Decoder {
 	return &Decoder{R: r}
 }
 
+func NewTopLevelArrayDecoder(r io.Reader) *Decoder {
+	d := &Decoder{R: r}
+	d.d.nextscan.topLevelArray = true
+	d.d.scan.topLevelArray = true
+	d.scan.topLevelArray = true
+	return d
+}
+
 // UseNumber causes the Decoder to unmarshal a number into an interface{} as a
 // Number instead of as a float64.
 func (dec *Decoder) UseNumber() { dec.d.useNumber = true }

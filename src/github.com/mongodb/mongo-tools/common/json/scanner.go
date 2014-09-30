@@ -96,6 +96,10 @@ type scanner struct {
 
 	// total bytes consumed, updated by decoder.Decode
 	bytes int64
+
+	// parse a top level array as a series of values as opposed to a single value
+	topLevelArray   bool
+	inTopLevelArray bool
 }
 
 // These values are returned by the state transition functions
@@ -202,10 +206,34 @@ func stateBeginValueOrEmpty(s *scanner, c int) int {
 	return stateBeginValue(s, c)
 }
 
+func stateReadWSUntilEOF(s *scanner, c int) int {
+	if c <= ' ' && isSpace(rune(c)) {
+		return scanSkipSpace
+	}
+	return s.error(c, "junk data after end of top level array")
+}
+
 // stateBeginValue is the state at the beginning of the input.
 func stateBeginValue(s *scanner, c int) int {
 	if c <= ' ' && isSpace(rune(c)) {
 		return scanSkipSpace
+	}
+	if s.topLevelArray && 0 == len(s.parseState) {
+		if s.inTopLevelArray {
+			if c == ',' {
+				return scanSkipSpace
+			} else if c == ']' {
+				s.inTopLevelArray = false
+				s.step = stateReadWSUntilEOF
+				return scanSkipSpace
+			}
+		} else {
+			if c == '[' {
+				s.inTopLevelArray = true
+				return scanSkipSpace
+			}
+			return s.error(c, "junk data before start of top level array")
+		}
 	}
 	switch c {
 	case '{':
