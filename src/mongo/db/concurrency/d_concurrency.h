@@ -196,9 +196,10 @@ namespace mongo {
          *   MODE_S:  shared read access to the collection, blocking any writers
          *   MODE_X:  exclusive access to the collection, blocking all other readers and writers
          *
-         * An appropriate DBLock must already be held before locking a collection.
-         * For storage engines that do not support document-level locking, MODE_IS will be
-         * upgraded to MODE_S and MODE_IX will be upgraded to MODE_X.
+         * An appropriate DBLock must already be held before locking a collection: it is an error,
+         * checked with a dassert(), to not have a suitable database lock before locking the
+         * collection. For storage engines that do not support document-level locking, MODE_IS
+         * will be upgraded to MODE_S and MODE_IX will be upgraded to MODE_X.
          */
         class CollectionLock : boost::noncopyable {
         public:
@@ -207,18 +208,6 @@ namespace mongo {
         private:
             const newlm::ResourceId _id;
             Locker* _lockState;
-        };
-
-        /**
-         * Exclusive database lock -- DEPRECATED, please transition to DBLock and collection locks
-         *
-         * Allows exclusive write access to the given database, blocking any other access.
-         * Allows further (recursive) acquisition of database locks for this database in any mode.
-         * Also acquires the global lock in intent-exclusive (IX) mode.
-         */
-        class DBWrite : public DBLock {
-        public:
-            DBWrite(Locker* lockState, const StringData& dbOrNs);
         };
 
         /**

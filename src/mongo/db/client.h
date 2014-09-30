@@ -204,7 +204,7 @@ namespace mongo {
             Context& ctx() { return _c; }
 
         private:
-            Lock::DBWrite _lk;
+            Lock::DBLock _lk;
             WriteUnitOfWork _wunit;
             Context _c;
         };
