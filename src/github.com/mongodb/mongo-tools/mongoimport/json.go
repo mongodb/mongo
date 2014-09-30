@@ -58,15 +58,9 @@ var (
 // NewJSONImportInput creates a new JSONImportInput in array mode if specified,
 // configured to read data to the given io.Reader
 func NewJSONImportInput(isArray bool, in io.Reader) *JSONImportInput {
-	var decoder *json.Decoder
-	if isArray {
-		decoder = json.NewTopLevelArrayDecoder(in)
-	} else {
-		decoder = json.NewDecoder(in)
-	}
 	return &JSONImportInput{
 		IsArray:            isArray,
-		Decoder:            decoder,
+		Decoder:            json.NewDecoder(in),
 		NumImported:        0,
 		readOpeningBracket: false,
 		bytesFromReader:    make([]byte, 1),
@@ -158,6 +152,11 @@ func (jsonImporter *JSONImportInput) readJSONArraySeparator() error {
 // ImportDocument converts the given JSON object to a BSON object
 func (jsonImporter *JSONImportInput) ImportDocument() (bson.M, error) {
 	var document bson.M
+	if jsonImporter.IsArray {
+		if err := jsonImporter.readJSONArraySeparator(); err != nil {
+			return nil, err
+		}
+	}
 	if err := jsonImporter.Decoder.Decode(&document); err != nil {
 		return nil, err
 	}

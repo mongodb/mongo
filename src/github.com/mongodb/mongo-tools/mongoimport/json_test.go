@@ -23,7 +23,7 @@ func TestJSONArrayImportDocument(t *testing.T) {
 				fileHandle, err := os.Open(jsonFile.Name())
 				So(err, ShouldBeNil)
 				_, err = NewJSONImportInput(true, fileHandle).ImportDocument()
-				So(err, ShouldNotBeNil)
+				So(err, ShouldEqual, ErrNoOpeningBracket)
 			})
 
 		Convey("reading a JSON object that has no opening bracket should "+
@@ -37,7 +37,7 @@ func TestJSONArrayImportDocument(t *testing.T) {
 				fileHandle, err := os.Open(jsonFile.Name())
 				So(err, ShouldBeNil)
 				_, err = NewJSONImportInput(true, fileHandle).ImportDocument()
-				So(err, ShouldNotBeNil)
+				So(err, ShouldEqual, ErrNoOpeningBracket)
 			})
 
 		Convey("JSON arrays that do not end with a closing bracket should "+
@@ -53,7 +53,7 @@ func TestJSONArrayImportDocument(t *testing.T) {
 				_, err = NewJSONImportInput(true, fileHandle).ImportDocument()
 				So(err, ShouldBeNil)
 				_, err = NewJSONImportInput(true, fileHandle).ImportDocument()
-				So(err, ShouldNotBeNil)
+				So(err, ShouldEqual, ErrNoClosingBracket)
 			})
 
 		// TODO: we'll accept inputs like [[{},{}]] and just do nothing instead
@@ -63,7 +63,7 @@ func TestJSONArrayImportDocument(t *testing.T) {
 				fileHandle, err := os.Open("testdata/test_plain.json")
 				So(err, ShouldBeNil)
 				_, err = NewJSONImportInput(true, fileHandle).ImportDocument()
-				So(err, ShouldNotBeNil)
+				So(err, ShouldEqual, ErrNoOpeningBracket)
 			})
 
 		Convey("array JSON input file sources should be parsed correctly and "+
@@ -298,7 +298,7 @@ func TestReadJSONArraySeparator(t *testing.T) {
 				_, err = jsonImporter.ImportDocument()
 				So(err, ShouldBeNil)
 				_, err = jsonImporter.ImportDocument()
-				So(err, ShouldBeNil)
+				So(err, ShouldNotBeNil)
 			})
 		Reset(func() {
 			jsonFile.Close()
