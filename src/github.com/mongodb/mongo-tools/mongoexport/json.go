@@ -8,19 +8,19 @@ import (
 	"io"
 )
 
-//JSONExportOutput is an implementation of ExportOutput that writes documents
-//to the output in JSON format.
+// JSONExportOutput is an implementation of ExportOutput that writes documents
+// to the output in JSON format.
 type JSONExportOutput struct {
-	//ArrayOutput when set to true indicates that the output should be written
-	//as a JSON array, where each document is an element in the array.
+	// ArrayOutput when set to true indicates that the output should be written
+	// as a JSON array, where each document is an element in the array.
 	ArrayOutput bool
 	Encoder     *json.Encoder
 	Out         io.Writer
 	NumExported int64
 }
 
-//NewJSONExportOutput creates a new JSONExportOutput in array mode if specified,
-//configured to write data to the given io.Writer
+// NewJSONExportOutput creates a new JSONExportOutput in array mode if specified,
+// configured to write data to the given io.Writer
 func NewJSONExportOutput(arrayOutput bool, out io.Writer) *JSONExportOutput {
 	return &JSONExportOutput{
 		arrayOutput,
@@ -30,11 +30,11 @@ func NewJSONExportOutput(arrayOutput bool, out io.Writer) *JSONExportOutput {
 	}
 }
 
-//WriteHeader writes the opening square bracket if in array mode, otherwise it
-//behaves as a no-op.
+// WriteHeader writes the opening square bracket if in array mode, otherwise it
+// behaves as a no-op.
 func (jsonExporter *JSONExportOutput) WriteHeader() error {
 	if jsonExporter.ArrayOutput {
-		//TODO check # bytes written?
+		// TODO check # bytes written?
 		_, err := jsonExporter.Out.Write([]byte(JSON_ARRAY_START))
 		if err != nil {
 			return err
@@ -43,12 +43,12 @@ func (jsonExporter *JSONExportOutput) WriteHeader() error {
 	return nil
 }
 
-//WriteFooter writes the closing square bracket if in array mode, otherwise it
-//behaves as a no-op.
+// WriteFooter writes the closing square bracket if in array mode, otherwise it
+// behaves as a no-op.
 func (jsonExporter *JSONExportOutput) WriteFooter() error {
 	if jsonExporter.ArrayOutput {
 		_, err := jsonExporter.Out.Write([]byte(JSON_ARRAY_END + "\n"))
-		//TODO check # bytes written?
+		// TODO check # bytes written?
 		if err != nil {
 			return err
 		}
@@ -60,8 +60,8 @@ func (jsonExporter *JSONExportOutput) Flush() error {
 	return nil
 }
 
-//ExportDocument converts the given document to extended json, and writes it
-//to the output.
+// ExportDocument converts the given document to extended json, and writes it
+// to the output.
 func (jsonExporter *JSONExportOutput) ExportDocument(document bson.M) error {
 	if jsonExporter.ArrayOutput {
 		if jsonExporter.NumExported >= 1 {
