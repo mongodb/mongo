@@ -12,6 +12,7 @@ if has_option("wiredtiger"):
 	    'wiredtiger_index.cpp',
 	    'wiredtiger_options_init.cpp',
 	    'wiredtiger_init.cpp',
+	    'wiredtiger_metadata.cpp',
 	    'wiredtiger_record_store.cpp',
 	    'wiredtiger_recovery_unit.cpp',
 	    ],
