@@ -470,6 +470,15 @@ namespace repl {
                 int myIndex);
 
         /**
+         * Callback that finishes the work of processReplSetReconfig inside the replication
+         * executor context, in the event of a successful quorum check.
+         */
+        void _finishReplSetReconfig(
+                const ReplicationExecutor::CallbackData& cbData,
+                const ReplicaSetConfig& newConfig,
+                int myIndex);
+
+        /**
          * Changes _rsConfigState to newState, and notify any waiters.
          */
         void _setConfigState_inlock(ConfigState newState);

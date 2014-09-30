@@ -1214,8 +1214,128 @@ namespace {
     Status ReplicationCoordinatorImpl::processReplSetReconfig(OperationContext* txn,
                                                               const ReplSetReconfigArgs& args,
                                                               BSONObjBuilder* resultObj) {
-        // TODO
+
+        log() << "replSetReconfig admin command received from client" << rsLog;
+
+        boost::unique_lock<boost::mutex> lk(_mutex);
+
+        if (!_settings.usingReplSets()) {
+            return Status(ErrorCodes::NoReplicationEnabled, "server is not running with --replSet");
+        }
+
+        while (_rsConfigState == kConfigPreStart || _rsConfigState == kConfigStartingUp) {
+            _rsConfigStateChange.wait(lk);
+        }
+
+        switch (_rsConfigState) {
+        case kConfigSteady:
+            break;
+        case kConfigUninitialized:
+            return Status(ErrorCodes::NotYetInitialized,
+                          "Node not yet initialized; use the replSetInitiate command");
+        case kConfigReplicationDisabled:
+            return Status(ErrorCodes::NoReplicationEnabled, "Node is not a replica set member");
+        case kConfigInitiating:
+        case kConfigReconfiguring:
+        case kConfigHBReconfiguring:
+            return Status(ErrorCodes::ConfigurationInProgress,
+                          "Cannot run replSetReconfig because the node is currently updating "
+                          "its configuration");
+        default:
+            severe() << "Unexpected _rsConfigState " << int(_rsConfigState);
+            fassertFailed(18914);
+        }
+
+        invariant(_rsConfig.isInitialized());
+
+        if (!args.force && !_getCurrentMemberState_inlock().primary()) {
+            return Status(ErrorCodes::NotMaster, str::stream() <<
+                          "replSetReconfig should only be run on PRIMARY, but my state is " <<
+                          _getCurrentMemberState_inlock().toString() <<
+                          "; use the \"force\" argument to override");
+        }
+
+        _setConfigState_inlock(kConfigReconfiguring);
+        ScopeGuard configStateGuard = MakeGuard(
+                lockAndCall,
+                &lk,
+                stdx::bind(&ReplicationCoordinatorImpl::_setConfigState_inlock,
+                           this,
+                           kConfigSteady));
+
+        ReplicaSetConfig oldConfig = _rsConfig;
+        lk.unlock();
+
+        ReplicaSetConfig newConfig;
+        Status status = newConfig.initialize(args.newConfigObj);
+        if (!status.isOK()) {
+            error() << "replSetReconfig got " << status << " while parsing " << args.newConfigObj <<
+                rsLog;
+            return status;
+        }
+        if (newConfig.getReplSetName() != _settings.ourSetName()) {
+            str::stream errmsg;
+            errmsg << "Attempting to reconfigure a replica set with name " <<
+                newConfig.getReplSetName() << ", but command line reports " <<
+                _settings.ourSetName() << "; rejecting";
+            error() << std::string(errmsg);
+            return Status(ErrorCodes::BadValue, errmsg);
+        }
+
+        StatusWith<int> myIndex = validateConfigForReconfig(
+                _externalState.get(),
+                oldConfig,
+                newConfig,
+                args.force);
+        if (!myIndex.isOK()) {
+            error() << "replSetReconfig got " << myIndex.getStatus() << " while validating " <<
+                args.newConfigObj << rsLog;
+            return myIndex.getStatus();
+        }
+
+        log() << "replSetReconfig config object with " << newConfig.getNumMembers() <<
+            " members parses ok" << rsLog;
+
+        if (!args.force) {
+            status = checkQuorumForReconfig(&_replExecutor,
+                                            newConfig,
+                                            myIndex.getValue());
+            if (!status.isOK()) {
+                error() << "replSetReconfig failed; " << status << rsLog;
+                return status;
+            }
+        }
+
+        status = _externalState->storeLocalConfigDocument(txn, args.newConfigObj);
+        if (!status.isOK()) {
+            error() << "replSetReconfig failed to store config document; " << status;
+            return status;
+        }
+
+        CBHStatus cbh = _replExecutor.scheduleWork(
+                stdx::bind(&ReplicationCoordinatorImpl::_finishReplSetReconfig,
+                           this,
+                           stdx::placeholders::_1,
+                           newConfig,
+                           myIndex.getValue()));
+        if (cbh.getStatus() == ErrorCodes::ShutdownInProgress) {
+            return status;
+        }
+        fassert(18824, cbh.getStatus());
+        configStateGuard.Dismiss();
+        _replExecutor.wait(cbh.getValue());
         return Status::OK();
+    }
+
+    void ReplicationCoordinatorImpl::_finishReplSetReconfig(
+            const ReplicationExecutor::CallbackData& cbData,
+            const ReplicaSetConfig& newConfig,
+            int myIndex) {
+
+        boost::lock_guard<boost::mutex> lk(_mutex);
+        invariant(_rsConfigState == kConfigReconfiguring);
+        invariant(_rsConfig.isInitialized());
+        _setCurrentRSConfig_inlock(newConfig, myIndex);
     }
 
     Status ReplicationCoordinatorImpl::processReplSetInitiate(OperationContext* txn,
