@@ -174,7 +174,120 @@ func TestJSONPlainImportDocument(t *testing.T) {
 				bsonDoc, err = jsonImporter.ImportDocument()
 				So(err, ShouldBeNil)
 				So(bsonDoc, ShouldNotResemble, expectedReadTwo)
-				contents := `[{"a":3},,{"b":4}]`
+			})
+
+		Reset(func() {
+			jsonFile.Close()
+			fileHandle.Close()
+		})
+	})
+}
+
+func TestReadJSONArraySeparator(t *testing.T) {
+	Convey("With an array JSON import input", t, func() {
+		var err error
+		var jsonFile, fileHandle *os.File
+		Convey("reading a JSON array separator should consume [",
+			func() {
+				contents := `[{"a": "ae"}`
+				jsonFile, err = ioutil.TempFile("", "mongoimport_")
+				So(err, ShouldBeNil)
+				_, err = io.WriteString(jsonFile, contents)
+				So(err, ShouldBeNil)
+				fileHandle, err := os.Open(jsonFile.Name())
+				So(err, ShouldBeNil)
+				jsonImporter := NewJSONImportInput(true, fileHandle)
+				So(jsonImporter.readJSONArraySeparator(), ShouldBeNil)
+				// at this point it should have consumed all bytes up to `{`
+				So(jsonImporter.readJSONArraySeparator(), ShouldNotBeNil)
+			})
+		Convey("reading a closing JSON array separator without a "+
+			"corresponding opening bracket should error out ",
+			func() {
+				contents := `]`
+				jsonFile, err = ioutil.TempFile("", "mongoimport_")
+				So(err, ShouldBeNil)
+				_, err = io.WriteString(jsonFile, contents)
+				So(err, ShouldBeNil)
+				fileHandle, err := os.Open(jsonFile.Name())
+				So(err, ShouldBeNil)
+				jsonImporter := NewJSONImportInput(true, fileHandle)
+				So(jsonImporter.readJSONArraySeparator(), ShouldNotBeNil)
+			})
+		Convey("reading an opening JSON array separator without a "+
+			"corresponding closing bracket should error out ",
+			func() {
+				contents := `[`
+				jsonFile, err = ioutil.TempFile("", "mongoimport_")
+				So(err, ShouldBeNil)
+				_, err = io.WriteString(jsonFile, contents)
+				So(err, ShouldBeNil)
+				fileHandle, err := os.Open(jsonFile.Name())
+				So(err, ShouldBeNil)
+				jsonImporter := NewJSONImportInput(true, fileHandle)
+				So(jsonImporter.readJSONArraySeparator(), ShouldBeNil)
+				So(jsonImporter.readJSONArraySeparator(), ShouldNotBeNil)
+			})
+		Convey("reading an opening JSON array separator with an ending "+
+			"closing bracket should return EOF",
+			func() {
+				contents := `[]`
+				jsonFile, err = ioutil.TempFile("", "mongoimport_")
+				So(err, ShouldBeNil)
+				_, err = io.WriteString(jsonFile, contents)
+				So(err, ShouldBeNil)
+				fileHandle, err := os.Open(jsonFile.Name())
+				So(err, ShouldBeNil)
+				jsonImporter := NewJSONImportInput(true, fileHandle)
+				So(jsonImporter.readJSONArraySeparator(), ShouldBeNil)
+				So(jsonImporter.readJSONArraySeparator(), ShouldEqual, io.EOF)
+			})
+		Convey("reading an opening JSON array separator, an ending closing "+
+			"bracket but then additional characters after that, should error",
+			func() {
+				contents := `[]a`
+				jsonFile, err = ioutil.TempFile("", "mongoimport_")
+				So(err, ShouldBeNil)
+				_, err = io.WriteString(jsonFile, contents)
+				So(err, ShouldBeNil)
+				fileHandle, err := os.Open(jsonFile.Name())
+				So(err, ShouldBeNil)
+				jsonImporter := NewJSONImportInput(true, fileHandle)
+				So(jsonImporter.readJSONArraySeparator(), ShouldBeNil)
+				So(jsonImporter.readJSONArraySeparator(), ShouldNotBeNil)
+			})
+		Convey("reading invalid JSON objects between valid objects should "+
+			"error out",
+			func() {
+				contents := `[{"a":3}x{"b":4}]`
+				jsonFile, err = ioutil.TempFile("", "mongoimport_")
+				So(err, ShouldBeNil)
+				_, err = io.WriteString(jsonFile, contents)
+				So(err, ShouldBeNil)
+				fileHandle, err := os.Open(jsonFile.Name())
+				So(err, ShouldBeNil)
+				jsonImporter := NewJSONImportInput(true, fileHandle)
+				_, err = jsonImporter.ImportDocument()
+				So(err, ShouldBeNil)
+				So(jsonImporter.readJSONArraySeparator(), ShouldNotBeNil)
+			})
+		Convey("reading invalid JSON objects after valid objects but between "+
+			"valid objects should error out",
+			func() {
+				contents := `[{"a":3},b{"b":4}]`
+				jsonFile, err = ioutil.TempFile("", "mongoimport_")
+				So(err, ShouldBeNil)
+				_, err = io.WriteString(jsonFile, contents)
+				So(err, ShouldBeNil)
+				fileHandle, err := os.Open(jsonFile.Name())
+				So(err, ShouldBeNil)
+				jsonImporter := NewJSONImportInput(true, fileHandle)
+				_, err = jsonImporter.ImportDocument()
+				So(err, ShouldBeNil)
+				So(jsonImporter.readJSONArraySeparator(), ShouldBeNil)
+				So(jsonImporter.readJSONArraySeparator(), ShouldNotBeNil)
+
+				contents = `[{"a":3},,{"b":4}]`
 				jsonFile, err = ioutil.TempFile("", "mongoimport_")
 				So(err, ShouldBeNil)
 				_, err = io.WriteString(jsonFile, contents)
@@ -187,7 +300,6 @@ func TestJSONPlainImportDocument(t *testing.T) {
 				_, err = jsonImporter.ImportDocument()
 				So(err, ShouldBeNil)
 			})
-
 		Reset(func() {
 			jsonFile.Close()
 			fileHandle.Close()

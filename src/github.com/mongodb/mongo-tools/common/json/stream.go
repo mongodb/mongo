@@ -12,8 +12,8 @@ import (
 
 // A Decoder reads and decodes JSON objects from an input stream.
 type Decoder struct {
-	r    io.Reader
-	buf  []byte
+	R    io.Reader
+	Buf  []byte
 	d    decodeState
 	scan scanner
 	err  error
@@ -24,16 +24,11 @@ type Decoder struct {
 // The decoder introduces its own buffering and may
 // read data from r beyond the JSON values requested.
 func NewDecoder(r io.Reader) *Decoder {
-	return &Decoder{r: r}
+	return &Decoder{R: r}
 }
 
-// NewTopLevelArrayDecoder returns a new decoder that reads from r
-// for JSON arrays.
-//
-// The decoder introduces its own buffering and may
-// read data from r beyond the JSON values requested.
 func NewTopLevelArrayDecoder(r io.Reader) *Decoder {
-	d := &Decoder{r: r}
+	d := &Decoder{R: r}
 	d.d.nextscan.topLevelArray = true
 	d.d.scan.topLevelArray = true
 	d.scan.topLevelArray = true
@@ -62,12 +57,12 @@ func (dec *Decoder) Decode(v interface{}) error {
 	// Don't save err from unmarshal into dec.err:
 	// the connection is still usable since we read a complete JSON
 	// object from it before the error happened.
-	dec.d.init(dec.buf[0:n])
+	dec.d.init(dec.Buf[0:n])
 	err = dec.d.unmarshal(v)
 
 	// Slide rest of data down.
-	rest := copy(dec.buf, dec.buf[n:])
-	dec.buf = dec.buf[0:rest]
+	rest := copy(dec.Buf, dec.Buf[n:])
+	dec.Buf = dec.Buf[0:rest]
 
 	return err
 }
@@ -75,10 +70,10 @@ func (dec *Decoder) Decode(v interface{}) error {
 // Buffered returns a reader of the data remaining in the Decoder's
 // buffer. The reader is valid until the next call to Decode.
 func (dec *Decoder) Buffered() io.Reader {
-	return bytes.NewReader(dec.buf)
+	return bytes.NewReader(dec.Buf)
 }
 
-// readValue reads a JSON value into dec.buf.
+// readValue reads a JSON value into dec.Buf.
 // It returns the length of the encoding.
 func (dec *Decoder) readValue() (int, error) {
 	dec.scan.reset()
@@ -88,7 +83,7 @@ func (dec *Decoder) readValue() (int, error) {
 Input:
 	for {
 		// Look in the buffer for a new value.
-		for i, c := range dec.buf[scanp:] {
+		for i, c := range dec.Buf[scanp:] {
 			dec.scan.bytes++
 			v := dec.scan.step(&dec.scan, int(c))
 			if v == scanEnd {
@@ -107,7 +102,7 @@ Input:
 				return 0, dec.scan.err
 			}
 		}
-		scanp = len(dec.buf)
+		scanp = len(dec.Buf)
 
 		// Did the last read have an error?
 		// Delayed until now to allow buffer scan.
@@ -116,7 +111,7 @@ Input:
 				if dec.scan.step(&dec.scan, ' ') == scanEnd {
 					break Input
 				}
-				if nonSpace(dec.buf) {
+				if nonSpace(dec.Buf) {
 					err = io.ErrUnexpectedEOF
 				}
 			}
@@ -126,16 +121,16 @@ Input:
 
 		// Make room to read more into the buffer.
 		const minRead = 512
-		if cap(dec.buf)-len(dec.buf) < minRead {
-			newBuf := make([]byte, len(dec.buf), 2*cap(dec.buf)+minRead)
-			copy(newBuf, dec.buf)
-			dec.buf = newBuf
+		if cap(dec.Buf)-len(dec.Buf) < minRead {
+			newBuf := make([]byte, len(dec.Buf), 2*cap(dec.Buf)+minRead)
+			copy(newBuf, dec.Buf)
+			dec.Buf = newBuf
 		}
 
 		// Read.  Delay error for next iteration (after scan).
 		var n int
-		n, err = dec.r.Read(dec.buf[len(dec.buf):cap(dec.buf)])
-		dec.buf = dec.buf[0 : len(dec.buf)+n]
+		n, err = dec.R.Read(dec.Buf[len(dec.Buf):cap(dec.Buf)])
+		dec.Buf = dec.Buf[0 : len(dec.Buf)+n]
 	}
 	return scanp, nil
 }
