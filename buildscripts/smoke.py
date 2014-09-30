@@ -521,6 +521,10 @@ def runTest(test, result):
             if smoke_db_prefix:
                 dir_name = smoke_db_prefix + '/unittests'
                 argv.extend(["--dbpath", dir_name] )
+
+            if storage_engine:
+                argv.extend(["--storageEngine", storage_engine])
+
         # more blech
         elif os.path.basename(path) in ['mongos', 'mongos.exe']:
             argv = [path, "--test"]
