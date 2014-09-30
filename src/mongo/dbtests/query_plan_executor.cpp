@@ -33,10 +33,13 @@
 #include "mongo/db/exec/collection_scan.h"
 #include "mongo/db/exec/fetch.h"
 #include "mongo/db/exec/index_scan.h"
+#include "mongo/db/exec/pipeline_proxy.h"
 #include "mongo/db/exec/plan_stage.h"
 #include "mongo/db/json.h"
 #include "mongo/db/matcher/expression_parser.h"
 #include "mongo/db/operation_context_impl.h"
+#include "mongo/db/pipeline/expression_context.h"
+#include "mongo/db/pipeline/pipeline.h"
 #include "mongo/db/query/plan_executor.h"
 #include "mongo/db/query/query_solution.h"
 #include "mongo/dbtests/dbtests.h"
@@ -229,6 +232,57 @@ namespace QueryPlanExecutor {
             ASSERT_EQUALS(PlanExecutor::DEAD, exec->getNext(&objOut, NULL));
 
             deregisterExec(exec.get());
+            ctx.commit();
+        }
+    };
+
+    /**
+     * Test dropping the collection while an agg PlanExecutor is doing an index scan.
+     */
+    class DropIndexScanAgg : public PlanExecutorBase {
+    public:
+        void run() {
+            Client::WriteContext ctx(&_txn, ns());
+
+            insert(BSON("_id" << 1 << "a" << 6));
+            insert(BSON("_id" << 2 << "a" << 7));
+            insert(BSON("_id" << 3 << "a" << 8));
+            BSONObj indexSpec = BSON("a" << 1);
+            addIndex(indexSpec);
+
+            // Create the PlanExecutor which feeds the aggregation pipeline.
+            boost::shared_ptr<PlanExecutor> innerExec(
+                makeIndexScanExec(ctx.ctx(), indexSpec, 7, 10));
+
+            // Create the aggregation pipeline.
+            boost::intrusive_ptr<ExpressionContext> expCtx =
+                new ExpressionContext(&_txn, NamespaceString(ns()));
+
+            string errmsg;
+            BSONObj inputBson = fromjson("{$match: {a: {$gte: 7, $lte: 10}}}");
+            boost::intrusive_ptr<Pipeline> pipeline =
+                Pipeline::parseCommand(errmsg, inputBson, expCtx);
+            ASSERT_EQUALS(errmsg, "");
+
+            // Create the output PlanExecutor that pulls results from the pipeline.
+            std::auto_ptr<WorkingSet> ws(new WorkingSet());
+            std::auto_ptr<PipelineProxyStage> proxy(
+                new PipelineProxyStage(pipeline, innerExec, ws.get()));
+            Collection* collection = ctx.ctx().db()->getCollection(&_txn, ns());
+            boost::scoped_ptr<PlanExecutor> outerExec(
+                new PlanExecutor(ws.release(), proxy.release(), collection));
+
+            // Only the outer executor gets registered.
+            registerExec(outerExec.get());
+
+            // Verify that both the "inner" and "outer" plan executors have been killed after
+            // dropping the collection.
+            BSONObj objOut;
+            dropCollection();
+            ASSERT_EQUALS(PlanExecutor::DEAD, innerExec->getNext(&objOut, NULL));
+            ASSERT_EQUALS(PlanExecutor::DEAD, outerExec->getNext(&objOut, NULL));
+
+            deregisterExec(outerExec.get());
             ctx.commit();
         }
     };
@@ -437,6 +491,7 @@ namespace QueryPlanExecutor {
         void setupTests() {
             add<DropCollScan>();
             add<DropIndexScan>();
+            add<DropIndexScanAgg>();
             add<SnapshotControl>();
             add<SnapshotTest>();
             add<ClientCursor::Invalidate>();

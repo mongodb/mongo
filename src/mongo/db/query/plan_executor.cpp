@@ -29,6 +29,7 @@
 #include "mongo/db/query/plan_executor.h"
 
 #include "mongo/db/catalog/collection.h"
+#include "mongo/db/exec/pipeline_proxy.h"
 #include "mongo/db/exec/plan_stage.h"
 #include "mongo/db/exec/plan_stats.h"
 #include "mongo/db/exec/working_set.h"
@@ -224,6 +225,22 @@ namespace mongo {
     void PlanExecutor::kill() {
         _killed = true;
         _collection = NULL;
+
+        // XXX: PlanExecutor is designed to wrap a single execution tree. In the case of
+        // aggregation queries, PlanExecutor wraps a proxy stage responsible for pulling results
+        // from an aggregation pipeline. The aggregation pipeline pulls results from yet another
+        // PlanExecutor. Such nested PlanExecutors require us to manually propagate kill() to
+        // the "inner" executor. This is bad, and hopefully can be fixed down the line with the
+        // unification of agg and query.
+        //
+        // TODO: get rid of this code block.
+        if (STAGE_PIPELINE_PROXY == _root->stageType()) {
+            PipelineProxyStage* proxyStage = static_cast<PipelineProxyStage*>(_root.get());
+            shared_ptr<PlanExecutor> childExec = proxyStage->getChildExecutor();
+            if (childExec) {
+                childExec->kill();
+            }
+        }
     }
 
     Status PlanExecutor::executePlan() {

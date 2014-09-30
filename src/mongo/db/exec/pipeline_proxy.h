@@ -66,6 +66,12 @@ namespace mongo {
          */
         void pushBack(const BSONObj& obj);
 
+        /**
+         * Return a shared pointer to the PlanExecutor that feeds the pipeline. The returned
+         * pointer may be NULL.
+         */
+        boost::shared_ptr<PlanExecutor> getChildExecutor();
+
         //
         // These should not be used.
         //

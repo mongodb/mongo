@@ -118,4 +118,8 @@ namespace mongo {
         return boost::none;
     }
 
+    shared_ptr<PlanExecutor> PipelineProxyStage::getChildExecutor() {
+        return _childExec.lock();
+    }
+
 } // namespace mongo

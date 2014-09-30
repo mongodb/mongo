@@ -679,7 +679,6 @@ namespace mongo {
                 return empty;
             }
             virtual StageType stageType() const {
-                invariant( false );
                 return STAGE_NOTIFY_DELETE;
             }
         };
