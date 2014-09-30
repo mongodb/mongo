@@ -141,7 +141,7 @@ func (mongoImport *MongoImport) ValidateSettings(args []string) error {
 	// ensure we have a valid string to use for the collection
 	if mongoImport.ToolOptions.Namespace.Collection == "" {
 		if fileBaseName == "" {
-			return fmt.Errorf("no collection specified!")
+			return fmt.Errorf("no collection specified")
 		}
 		fileBaseName = filepath.Base(fileBaseName)
 		if lastDotIndex := strings.LastIndex(fileBaseName, "."); lastDotIndex != -1 {
@@ -151,7 +151,7 @@ func (mongoImport *MongoImport) ValidateSettings(args []string) error {
 			return err
 		}
 		mongoImport.ToolOptions.Namespace.Collection = fileBaseName
-		util.PrintlnTimeStamped("no collection specified!")
+		util.PrintlnTimeStamped("no collection specified")
 		util.PrintfTimeStamped("using filename '%v' as collection\n",
 			mongoImport.ToolOptions.Namespace.Collection)
 	}
