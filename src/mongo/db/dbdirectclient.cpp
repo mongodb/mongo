@@ -29,7 +29,6 @@
 #include "mongo/db/dbdirectclient.h"
 
 #include "mongo/db/client.h"
-#include "mongo/db/commands/count.h"
 #include "mongo/db/instance.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/util/log.h"
@@ -166,32 +165,38 @@ namespace mongo {
 
     const HostAndPort DBDirectClient::dummyHost("0.0.0.0", 0);
 
+    extern long long runCount(OperationContext* txn,
+                              const string& ns,
+                              const BSONObj &cmd,
+                              string &err,
+                              int &errCode);
+
     unsigned long long DBDirectClient::count(const string& ns,
                                              const BSONObj& query,
                                              int options,
                                              int limit,
                                              int skip) {
+
         if (skip < 0) {
             warning() << "setting negative skip value: " << skip
-                      << " to zero in query: " << query << endl;
+                << " to zero in query: " << query << endl;
             skip = 0;
         }
 
-        Lock::DBRead lk(_txn->lockState(), ns);
         string errmsg;
         int errCode;
         long long res = runCount(_txn,
-                                 ns,
-                                 _countCmd(ns, query, options, limit, skip),
-                                 errmsg,
-                                 errCode);
+            ns,
+            _countCmd(ns, query, options, limit, skip),
+            errmsg,
+            errCode);
 
         if (res == -1) {
             // namespace doesn't exist
             return 0;
         }
-        massert(errCode, str::stream() << "count failed in DBDirectClient: " << errmsg , res >= 0);
-        return (unsigned long long )res;
+        massert(errCode, str::stream() << "count failed in DBDirectClient: " << errmsg, res >= 0);
+        return (unsigned long long)res;
     }
 
 }  // namespace mongo

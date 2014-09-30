@@ -31,9 +31,9 @@
 #include <boost/thread/thread.hpp>
 
 #include "mongo/db/db.h"
+#include "mongo/db/dbdirectclient.h"
 #include "mongo/db/dbhelpers.h"
 #include "mongo/db/json.h"
-#include "mongo/db/commands/count.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/operation_context_impl.h"
 
@@ -43,8 +43,11 @@ namespace CountTests {
 
     class Base {
     public:
-        Base() : lk(_txn.lockState(), nsToDatabaseSubstring(ns()), newlm::MODE_X),
-                 _wunit(&_txn), _context(&_txn, ns()) {
+        Base() : _lk(_txn.lockState(), nsToDatabaseSubstring(ns()), newlm::MODE_X),
+                 _wunit(&_txn),
+                 _context(&_txn, ns()),
+                 _client(&_txn) {
+
             _database = _context.db();
             _collection = _database->getCollection( &_txn, ns() );
             if ( _collection ) {
@@ -63,10 +66,13 @@ namespace CountTests {
                 FAIL( "Exception while cleaning up collection" );
             }
         }
+
     protected:
+
         static const char *ns() {
             return "unittests.counttests";
         }
+
         void addIndex( const BSONObj &key ) {
             Helpers::ensureIndex(&_txn,
                                  _collection,
@@ -74,10 +80,10 @@ namespace CountTests {
                                  /*unique=*/ false,
                                  /*name=*/ key.firstElementFieldName());
         }
+
         void insert( const char *s ) {
-            insert( fromjson( s ) );
-        }
-        void insert( const BSONObj &o ) {
+            const BSONObj o = fromjson(s);
+
             if ( o["_id"].eoo() ) {
                 BSONObjBuilder b;
                 OID oid;
@@ -90,14 +96,10 @@ namespace CountTests {
                 _collection->insertDocument( &_txn, o, false );
             }
         }
-        static BSONObj countCommand( const BSONObj &query ) {
-            return BSON( "query" << query );
-        }
+
 
         OperationContextImpl _txn;
-
-    private:
-        Lock::DBLock lk;
+        Lock::DBLock _lk;
         WriteUnitOfWork _wunit;
 
         Client::Context _context;
@@ -105,16 +107,15 @@ namespace CountTests {
         Database* _database;
         Collection* _collection;
 
+        DBDirectClient _client;
     };
     
     class Basic : public Base {
     public:
         void run() {
-            insert( "{\"a\":\"b\"}" );
-            BSONObj cmd = fromjson( "{\"query\":{}}" );
-            string err;
-            int errCode;
-            ASSERT_EQUALS( 1, runCount( &_txn, ns(), cmd, err, errCode ) );
+            insert("{\"a\":\"b\"}");
+            insert("{\"c\":\"d\"}");
+            ASSERT_EQUALS(2ULL, _client.count(ns(), fromjson("{}")));
         }
     };
     
@@ -124,22 +125,7 @@ namespace CountTests {
             insert( "{\"a\":\"b\"}" );
             insert( "{\"a\":\"b\",\"x\":\"y\"}" );
             insert( "{\"a\":\"c\"}" );
-            BSONObj cmd = fromjson( "{\"query\":{\"a\":\"b\"}}" );
-            string err;
-            int errCode;
-            ASSERT_EQUALS( 2, runCount( &_txn, ns(), cmd, err, errCode ) );
-        }
-    };
-    
-    class Fields : public Base {
-    public:
-        void run() {
-            insert( "{\"a\":\"b\"}" );
-            insert( "{\"c\":\"d\"}" );
-            BSONObj cmd = fromjson( "{\"query\":{},\"fields\":{\"a\":1}}" );
-            string err;
-            int errCode;
-            ASSERT_EQUALS( 2, runCount( &_txn, ns(), cmd, err, errCode ) );
+            ASSERT_EQUALS(2ULL, _client.count(ns(), fromjson("{\"a\":\"b\"}")));
         }
     };
     
@@ -149,62 +135,33 @@ namespace CountTests {
             insert( "{\"a\":\"b\"}" );
             insert( "{\"a\":\"c\"}" );
             insert( "{\"d\":\"e\"}" );
-            BSONObj cmd = fromjson( "{\"query\":{\"a\":\"b\"},\"fields\":{\"a\":1}}" );
-            string err;
-            int errCode;
-            ASSERT_EQUALS( 1, runCount( &_txn, ns(), cmd, err, errCode ) );
+            ASSERT_EQUALS(1ULL, _client.count(ns(), fromjson("{\"a\":\"b\"}")));
         }
     };
     
     class IndexedRegex : public Base {
     public:
         void run() {
-            insert( "{\"a\":\"b\"}" );
             insert( "{\"a\":\"c\"}" );
-            BSONObj cmd = fromjson( "{\"query\":{\"a\":/^b/}}" );
-            string err;
-            int errCode;
-            ASSERT_EQUALS( 1, runCount( &_txn, ns(), cmd, err, errCode ) );
+            insert( "{\"a\":\"b\"}" );
+            insert( "{\"a\":\"d\"}" );
+            ASSERT_EQUALS(1ULL, _client.count(ns(), fromjson("{\"a\":/^b/}")));
         }
-    };
-
-    /** Set a value or await an expected value. */
-    class PendingValue {
-    public:
-        PendingValue( int initialValue ) :
-            _value( initialValue ),
-            _mutex( "CountTests::PendingValue::_mutex" ) {
-        }
-        void set( int newValue ) {
-            scoped_lock lk( _mutex );
-            _value = newValue;
-            _condition.notify_all();
-        }
-        void await( int expectedValue ) const {
-            scoped_lock lk( _mutex );
-            while( _value != expectedValue ) {
-                _condition.wait( lk.boost() );
-            }
-        }
-    private:
-        int _value;
-        mutable mongo::mutex _mutex;
-        mutable boost::condition _condition;
     };
 
     
     class All : public Suite {
     public:
         All() : Suite( "count" ) {
+
         }
         
         void setupTests() {
             add<Basic>();
             add<Query>();
-            add<Fields>();
             add<QueryFields>();
             add<IndexedRegex>();
         }
     } myall;
-    
+
 } // namespace CountTests
