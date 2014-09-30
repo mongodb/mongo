@@ -172,13 +172,8 @@ namespace mongo {
                 limit = -limit;
             }
 
-            BSONObj query;
-            if (!cmdObj["query"].eoo()) {
-                if (Object != cmdObj["query"].type()) {
-                    return Status(ErrorCodes::BadValue, "query field for count must be an object");
-                }
-                query = cmdObj.getObjectField("query");
-            }
+            // We don't validate that "query" is a nested object due to SERVER-15456.
+            BSONObj query = cmdObj.getObjectField("query");
 
             BSONObj hintObj;
             if (Object == cmdObj["hint"].type()) {
