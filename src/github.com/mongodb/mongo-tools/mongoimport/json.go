@@ -18,14 +18,6 @@ type JSONImportInput struct {
 	IsArray bool
 	// Decoder is used to read the next valid JSON object from the input source
 	Decoder *json.Decoder
-	// Reader is used to advance the underlying io.Reader implementation to skip
-	// things like array start/end and commas
-	Reader io.Reader
-
-	//readerPtr is used to store the original reader which can be used to
-	//construct a MultiReader without nesting
-	readerPtr io.Reader
-
 	// NumImported indicates the number of JSON objects successfully parsed from
 	// the JSON input source
 	NumImported int64
@@ -39,7 +31,10 @@ type JSONImportInput struct {
 	// bytesFromReader is used to store the next byte read from the Reader for
 	// JSON array imports
 	bytesFromReader []byte
-	bufferReader    io.Reader
+	// separatorReader is used for JSON arrays to look for a valid array
+	// separator. It is a reader consisting of the decoder's buffer and the
+	// underlying reader
+	separatorReader io.Reader
 }
 
 const (
@@ -66,8 +61,6 @@ func NewJSONImportInput(isArray bool, in io.Reader) *JSONImportInput {
 	return &JSONImportInput{
 		IsArray:            isArray,
 		Decoder:            json.NewDecoder(in),
-		Reader:             in,
-		readerPtr:          in,
 		NumImported:        0,
 		readOpeningBracket: false,
 		bytesFromReader:    make([]byte, 1),
@@ -100,9 +93,9 @@ func (jsonImporter *JSONImportInput) readJSONArraySeparator() error {
 
 	var readByte byte
 	scanp := 0
-	jsonImporter.bufferReader = io.MultiReader(jsonImporter.Decoder.Buffered(), jsonImporter.Decoder.R)
+	jsonImporter.separatorReader = io.MultiReader(jsonImporter.Decoder.Buffered(), jsonImporter.Decoder.R)
 	for readByte != jsonImporter.expectedByte {
-		n, err := jsonImporter.bufferReader.Read(jsonImporter.bytesFromReader)
+		n, err := jsonImporter.separatorReader.Read(jsonImporter.bytesFromReader)
 		scanp += n
 		if n == 0 || err != nil {
 			if err == io.EOF {
@@ -116,7 +109,7 @@ func (jsonImporter *JSONImportInput) readJSONArraySeparator() error {
 			// if we read the end of the JSON array, ensure we have no other
 			// non-whitespace characters at the end of the array
 			for {
-				_, err = jsonImporter.bufferReader.Read(jsonImporter.bytesFromReader)
+				_, err = jsonImporter.separatorReader.Read(jsonImporter.bytesFromReader)
 				if err != nil {
 					// takes care of the '[]' case
 					if !jsonImporter.readOpeningBracket {
@@ -146,9 +139,11 @@ func (jsonImporter *JSONImportInput) readJSONArraySeparator() error {
 				"JSON object/array in input source", string(readByte))
 		}
 	}
-	// adjust the buffer for account for read bytes
+	// adjust the buffer to account for read bytes
 	if scanp < len(jsonImporter.Decoder.Buf) {
 		jsonImporter.Decoder.Buf = jsonImporter.Decoder.Buf[scanp:]
+	} else {
+		jsonImporter.Decoder.Buf = []byte{}
 	}
 	jsonImporter.readOpeningBracket = true
 	return nil

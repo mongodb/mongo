@@ -469,8 +469,30 @@ func TestImportDocuments(t *testing.T) {
 				SessionProvider: sessionProvider,
 			}
 			numImported, err := mongoImport.ImportDocuments()
-			So(numImported, ShouldEqual, 3)
 			So(err, ShouldBeNil)
+			So(numImported, ShouldEqual, 3)
+		})
+
+		Convey("TOOLS-247: no error should be thrown for JSON import on test "+
+			"data and all documents should be imported correctly", func() {
+			toolOptions := getBasicToolOptions()
+			inputOptions := &options.InputOptions{
+				File: "testdata/test_plain2.json",
+			}
+			ingestOptions := &options.IngestOptions{
+				IgnoreBlanks: true,
+			}
+			sessionProvider, err := db.InitSessionProvider(*toolOptions)
+			So(err, ShouldBeNil)
+			mongoImport := MongoImport{
+				ToolOptions:     toolOptions,
+				InputOptions:    inputOptions,
+				IngestOptions:   ingestOptions,
+				SessionProvider: sessionProvider,
+			}
+			numImported, err := mongoImport.ImportDocuments()
+			So(err, ShouldBeNil)
+			So(numImported, ShouldEqual, 10)
 		})
 		Convey("no error should be thrown for CSV import on test data with "+
 			"--ignoreBlanks only fields without blanks should be imported",
@@ -493,8 +515,8 @@ func TestImportDocuments(t *testing.T) {
 					SessionProvider: sessionProvider,
 				}
 				numImported, err := mongoImport.ImportDocuments()
-				So(numImported, ShouldEqual, 3)
 				So(err, ShouldBeNil)
+				So(numImported, ShouldEqual, 3)
 				expectedDocuments := []bson.M{
 					bson.M{"_id": 1, "b": 2},
 					bson.M{"_id": 5, "c": "6e"},
@@ -521,8 +543,8 @@ func TestImportDocuments(t *testing.T) {
 					SessionProvider: sessionProvider,
 				}
 				numImported, err := mongoImport.ImportDocuments()
-				So(numImported, ShouldEqual, 3)
 				So(err, ShouldBeNil)
+				So(numImported, ShouldEqual, 3)
 				expectedDocuments := []bson.M{
 					bson.M{"_id": 1, "b": 2, "c": ""},
 					bson.M{"_id": 5, "b": "", "c": "6e"},
@@ -550,8 +572,8 @@ func TestImportDocuments(t *testing.T) {
 				SessionProvider: sessionProvider,
 			}
 			numImported, err := mongoImport.ImportDocuments()
-			So(numImported, ShouldEqual, 3)
 			So(err, ShouldBeNil)
+			So(numImported, ShouldEqual, 3)
 			expectedDocuments := []bson.M{
 				bson.M{"_id": 1, "b": 2, "c": 3},
 				bson.M{"_id": 3, "b": 5.4, "c": "string"},
@@ -580,8 +602,8 @@ func TestImportDocuments(t *testing.T) {
 					SessionProvider: sessionProvider,
 				}
 				numImported, err := mongoImport.ImportDocuments()
-				So(numImported, ShouldEqual, 3)
 				So(err, ShouldBeNil)
+				So(numImported, ShouldEqual, 3)
 				expectedDocuments := []bson.M{
 					bson.M{"_id": 1, "b": 2, "c": 3},
 					bson.M{"_id": 3, "b": 5.4, "c": "string"},
@@ -607,8 +629,8 @@ func TestImportDocuments(t *testing.T) {
 				SessionProvider: sessionProvider,
 			}
 			numImported, err := mongoImport.ImportDocuments()
-			So(numImported, ShouldEqual, 4)
 			So(err, ShouldBeNil)
+			So(numImported, ShouldEqual, 4)
 			expectedDocuments := []bson.M{
 				bson.M{"_id": 1, "b": 2, "c": 3},
 				bson.M{"_id": 3, "b": 5.4, "c": "string"},
@@ -637,8 +659,8 @@ func TestImportDocuments(t *testing.T) {
 				SessionProvider: sessionProvider,
 			}
 			numImported, err := mongoImport.ImportDocuments()
-			So(numImported, ShouldEqual, 3)
 			So(err, ShouldBeNil)
+			So(numImported, ShouldEqual, 3)
 			expectedDocuments := []bson.M{
 				bson.M{"_id": 1, "b": 2, "c": 3},
 				bson.M{"_id": 3, "b": 5.4, "c": "string"},
@@ -664,8 +686,8 @@ func TestImportDocuments(t *testing.T) {
 				SessionProvider: sessionProvider,
 			}
 			numImported, err := mongoImport.ImportDocuments()
-			So(numImported, ShouldEqual, 2)
 			So(err, ShouldBeNil)
+			So(numImported, ShouldEqual, 2)
 		})
 		Convey("EOF should be thrown for CSV import on test data with "+
 			"--headerLine if the input file is empty", func() {
@@ -688,8 +710,8 @@ func TestImportDocuments(t *testing.T) {
 				SessionProvider: sessionProvider,
 			}
 			numImported, err := mongoImport.ImportDocuments()
-			So(numImported, ShouldEqual, 0)
 			So(err, ShouldEqual, io.EOF)
+			So(numImported, ShouldEqual, 0)
 		})
 		Convey("no error should be thrown for CSV import on test data with "+
 			"--upsert and --upsertFields", func() {
@@ -712,8 +734,8 @@ func TestImportDocuments(t *testing.T) {
 				SessionProvider: sessionProvider,
 			}
 			numImported, err := mongoImport.ImportDocuments()
-			So(numImported, ShouldEqual, 3)
 			So(err, ShouldBeNil)
+			So(numImported, ShouldEqual, 3)
 			expectedDocuments := []bson.M{
 				bson.M{"_id": 1, "b": 2, "c": 3},
 				bson.M{"_id": 3, "b": 5.4, "c": "string"},
@@ -743,8 +765,8 @@ func TestImportDocuments(t *testing.T) {
 				SessionProvider: sessionProvider,
 			}
 			numImported, err := mongoImport.ImportDocuments()
-			So(numImported, ShouldEqual, 5)
 			So(err, ShouldBeNil)
+			So(numImported, ShouldEqual, 5)
 			expectedDocuments := []bson.M{
 				bson.M{"_id": 1, "b": 2, "c": 3},
 				bson.M{"_id": 3, "b": 5.4, "c": "string"},
@@ -773,8 +795,8 @@ func TestImportDocuments(t *testing.T) {
 				SessionProvider: sessionProvider,
 			}
 			numImported, err := mongoImport.ImportDocuments()
-			So(numImported, ShouldEqual, 3)
 			So(err, ShouldNotBeNil)
+			So(numImported, ShouldEqual, 3)
 			expectedDocuments := []bson.M{
 				bson.M{"_id": 1, "b": 2, "c": 3},
 				bson.M{"_id": 3, "b": 5.4, "c": "string"},
@@ -800,8 +822,8 @@ func TestImportDocuments(t *testing.T) {
 					SessionProvider: sessionProvider,
 				}
 				numImported, err := mongoImport.ImportDocuments()
-				So(numImported, ShouldEqual, 1)
 				So(err, ShouldNotBeNil)
+				So(numImported, ShouldEqual, 1)
 				expectedDocuments := []bson.M{
 					bson.M{"_id": 1, "b": 2, "c": 3},
 				}
