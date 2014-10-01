@@ -2,7 +2,6 @@ package main
 
 import (
 	"fmt"
-	"github.com/mongodb/mongo-tools/common/log"
 	commonopts "github.com/mongodb/mongo-tools/common/options"
 	"github.com/mongodb/mongo-tools/mongofiles"
 	"github.com/mongodb/mongo-tools/mongofiles/options"
@@ -57,9 +56,6 @@ func main() {
 		fmt.Printf("Error: %v\n", err)
 		printHelpAndExit()
 	}
-
-	// initialize logger
-	log.InitToolLogger(opts.Verbosity)
 
 	mongofiles := mongofiles.MongoFiles{
 		ToolOptions:    opts,

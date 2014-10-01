@@ -37,6 +37,7 @@ var (
 		Namespace:  namespace,
 		Connection: connection,
 		Auth:       &commonOpts.Auth{},
+		Verbosity:  &commonOpts.Verbosity{},
 	}
 )
 

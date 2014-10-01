@@ -5,6 +5,7 @@ import (
 	"github.com/mongodb/mongo-tools/common/bsonutil"
 	"github.com/mongodb/mongo-tools/common/util"
 	"github.com/mongodb/mongo-tools/common/db"
+	"github.com/mongodb/mongo-tools/common/log"
 	commonopts "github.com/mongodb/mongo-tools/common/options"
 	"github.com/mongodb/mongo-tools/mongofiles/options"
 	"gopkg.in/mgo.v2"
@@ -141,6 +142,19 @@ func (self *MongoFiles) findAndDisplay(query bson.M) (string, error) {
 
 // initialize cmdRunner to use either shim or session provider
 func (self *MongoFiles) Init() error {
+	if self.ToolOptions.Namespace.DB == "" {
+		self.ToolOptions.Namespace.DB = "test"
+	} else {
+		if err := util.ValidateDBName(self.ToolOptions.Namespace.DB); err != nil {
+			return err
+		}
+	}
+
+	// initialize logger
+	log.InitToolLogger(self.ToolOptions.Verbosity)
+
+	log.Logf(2, "initializing mongofiles tool for db: '%v'", self.ToolOptions.Namespace.DB)
+
 	if self.ToolOptions.Namespace.DBPath != "" {
 		shim, err := db.NewShim(
 			self.ToolOptions.Namespace.DBPath,
@@ -151,6 +165,8 @@ func (self *MongoFiles) Init() error {
 			return err
 		}
 		self.cmdRunner = shim
+
+		log.Log(2, "using mongoshim to access database datafiles")
 		return nil
 	}
 
@@ -183,6 +199,7 @@ func (self *MongoFiles) handleGet() (string, error) {
 		return "", fmt.Errorf("error creating '%v', '%v'", localFileName, err)
 	}
 	defer localFile.Close()
+	log.Logf(2, "created local file '%v'", localFileName)
 
 	// read chunks for file
 	docSource, err := self.cmdRunner.FindDocs(self.ToolOptions.Namespace.DB, GridFSChunks, 0, 0, bson.M{"files_id": fileResult.Id}, []string{"n"}, 0)
@@ -190,19 +207,26 @@ func (self *MongoFiles) handleGet() (string, error) {
 		return "", fmt.Errorf("error retrieving chunks for '%v': %v", self.FileName, err)
 	}
 	defer docSource.Close()
+	log.Logf(2, "retrieving data chunks for GridFS file '%v'...", self.FileName)
 
 	var chunkResult GFSChunk
 	var dataBytes []byte
+	chunkNum := 1
 	for docSource.Next(&chunkResult) {
 		dataBytes = chunkResult.Data
 		_, err = localFile.Write(dataBytes)
 		if err != nil {
 			return "", fmt.Errorf("error while writing to file '%v' : %v", localFileName, err)
 		}
+
+		log.Logf(2, "retrieving chunk %d for '%v'", chunkNum, self.FileName)
+		chunkNum++
 	}
 	if err = docSource.Err(); err != nil {
 		return "", fmt.Errorf("error reading data for '%v' : %v", self.FileName, err)
 	}
+
+	log.Logf(2, "done writing data chunks for GridFS file '%v' to local file '%v'", self.FileName, localFileName)
 
 	return fmt.Sprintf("Finished writing to: %s\n", localFileName), nil
 }
@@ -227,6 +251,7 @@ func (self *MongoFiles) handlePut() (string, error) {
 		return "", fmt.Errorf("error while opening local file '%v' : %v\n", localFileName, err)
 	}
 	defer localFile.Close()
+	log.Logf(2, "creating GridFS file '%v' from local file '%v'", self.FileName, localFileName)
 
 	err = self.createGridFSFile(self.FileName, self.StorageOptions.ContentType, localFile)
 	if err != nil {
@@ -255,8 +280,11 @@ func (self *MongoFiles) removeGridFSFile(fileName string) error {
 		if err != nil {
 			return fmt.Errorf(errorStr, err)
 		}
-		// remove file from GridFSChunks collection
+		log.Logf(2, "removed file '%v': %+v", fileName, fileResult)
+
+		// remove file chunks from GridFSChunks collection
 		err = self.cmdRunner.Remove(self.ToolOptions.Namespace.DB, GridFSChunks, bson.M{"files_id": fileResult.Id})
+		log.Logf(2, "removed all chunks for '%v': %+v", fileName, fileResult)
 	}
 	if err := docSource.Err(); err != nil {
 		return fmt.Errorf(errorStr, err)
@@ -267,6 +295,8 @@ func (self *MongoFiles) removeGridFSFile(fileName string) error {
 
 // creates an index
 func (self *MongoFiles) createIndex(collection string, indexDoc bsonutil.MarshalD, indexName string, isUnique bool) error {
+	log.Logf(2, "creating index with key '%#v' for the %v collection...", indexDoc, collection)
+
 	var createIndexesResult CreateIndexesResult
 	createIndexCommand := bsonutil.MarshalD{
 		{"createIndexes", collection}, {"indexes", []interface{}{
@@ -283,6 +313,8 @@ func (self *MongoFiles) createIndex(collection string, indexDoc bsonutil.Marshal
 	if !createIndexesResult.Ok {
 		return fmt.Errorf("indexes not created on collection '%v': %+v", collection, createIndexesResult)
 	}
+	log.Logf(2, "index creation result: %+v", createIndexesResult)
+
 	return nil
 }
 
@@ -294,6 +326,7 @@ func (self *MongoFiles) ensureIndex(collection string, indexDoc bsonutil.Marshal
 	if err != nil {
 		return fmt.Errorf("error checking for indexes on the '%v' collection: %v", collection, err)
 	}
+	log.Logf(2, "checking for indexes on the %v collection", collection)
 
 	var result bson.M
 	indexExists := docSource.Next(&result)
@@ -346,6 +379,7 @@ func (self *MongoFiles) createGridFSFile(gridFSFileName, contentType string, loc
 	if err != nil {
 		return fmt.Errorf("error while trying to open stream for writing chunks: %v", err)
 	}
+	log.Logf(2, "opened fs.chunks sink")
 
 	// construct chunks for this file
 	chunkBytes := make([]byte, DefaultChunkSize)
@@ -385,11 +419,13 @@ func (self *MongoFiles) createGridFSFile(gridFSFileName, contentType string, loc
 	if err != nil {
 		return fmt.Errorf("error while trying to close write stream for chunks: %v", err)
 	}
+	log.Logf(2, "closed fs.chunks sink without error")
 
 	// set length, md5, uploadDate, and (if applicable) contentType
 
 	// length
 	newFile.Length = length
+	log.Logf(2, "length of file '%v': %d bytes", self.FileName, length)
 
 	// md5
 	var md5Res FileMD5
@@ -402,13 +438,16 @@ func (self *MongoFiles) createGridFSFile(gridFSFileName, contentType string, loc
 		return fmt.Errorf("invalid command to retrieve md5: %v", command)
 	}
 	newFile.Md5 = md5Res.Md5
+	log.Logf(2, "md5 for file '%v': %v", self.FileName, md5Res.Md5)
 
 	// upload date
 	newFile.UploadDate = time.Now()
+	log.Logf(2, "upload date for file '%v': %v", self.FileName, newFile.UploadDate)
 
 	// content type
 	if contentType != "" {
 		newFile.ContentType = contentType
+		log.Logf(2, "setting content/MIME type for file '%v' to '%v'", self.FileName, contentType)
 	}
 
 	// open GridFSFiles DocSink to write to
@@ -416,12 +455,16 @@ func (self *MongoFiles) createGridFSFile(gridFSFileName, contentType string, loc
 	if err != nil {
 		return fmt.Errorf("error while trying to open stream for inserting file information into %s: %v", GridFSFiles, err)
 	}
+	log.Log(2, "fs.files sink opened")
 
 	err = filesSink.WriteDoc(newFile)
 	if err != nil {
 		return fmt.Errorf("error while trying to write file information into %s: %v", GridFSFiles, err)
 	}
+	log.Log(2, "finished writing to fs.files sink")
+
 	err = filesSink.Close()
+	log.Log(2, "closing fs.files sink")
 	if err != nil {
 		return fmt.Errorf("error while trying to close write stream for files: %v", err)
 	}
@@ -446,6 +489,8 @@ func (self *MongoFiles) Run(displayConnUrl bool) (string, error) {
 
 	var output string
 	var err error
+
+	log.Logf(1, "handling mongofiles '%v' command...", self.Command)
 
 	switch self.Command {
 

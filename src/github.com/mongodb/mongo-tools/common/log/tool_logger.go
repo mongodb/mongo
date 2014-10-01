@@ -104,10 +104,9 @@ func assertGlobalToolLoggerInitialized() {
 }
 
 func InitToolLogger(verbosity *options.Verbosity) {
-	if globalToolLogger != nil {
-		panic("global ToolLogger already initialized")
+	if globalToolLogger == nil {
+		globalToolLogger = NewToolLogger(verbosity)
 	}
-	globalToolLogger = NewToolLogger(verbosity)
 }
 
 func Logf(minVerb int, format string, a ...interface{}) {
