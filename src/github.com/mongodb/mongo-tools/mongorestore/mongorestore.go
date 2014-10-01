@@ -121,16 +121,15 @@ func (restore *MongoRestore) Restore() error {
 	}
 
 	// 3. Restore users/roles
-	if restore.InputOptions.RestoreDBUsersAndRoles || restore.ToolOptions.DB == "" {
+	// TODO comment all cases
+	if restore.InputOptions.RestoreDBUsersAndRoles || restore.ToolOptions.DB == "" || restore.ToolOptions.DB == "admin" {
 		if restore.manager.Users() != nil {
-			log.Logf(0, "%#v", *restore.manager.Users())
 			err = restore.RestoreUsersOrRoles(Users, restore.manager.Users())
 			if err != nil {
 				return fmt.Errorf("restore error: %v", err)
 			}
 		}
 		if restore.manager.Roles() != nil {
-			log.Logf(0, "%#v", *restore.manager.Roles())
 			err = restore.RestoreUsersOrRoles(Roles, restore.manager.Roles())
 			if err != nil {
 				return fmt.Errorf("restore error: %v", err)

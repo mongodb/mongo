@@ -96,16 +96,22 @@ func stripDBFromNS(ns string) string {
 
 func (restore *MongoRestore) DBHasCollection(intent *Intent) (bool, error) {
 	collectionNS := intent.Key()
-	err := restore.cmdRunner.FindOne(intent.DB, "system.namespaces", 0, bson.M{"name": collectionNS}, nil, &bson.M{}, 0)
+	result := bson.M{}
+	err := restore.cmdRunner.FindOne(intent.DB, "system.namespaces", 0, bson.M{"name": collectionNS}, nil, &result, 0)
 	if err != nil {
+		// handle case when using db connection
 		if err == mgo.ErrNotFound {
 			log.Logf(3, "collection %v does not exists", collectionNS)
 			return false, nil
 		}
 		return false, err
 	}
-	log.Logf(3, "collection %v already exists", collectionNS)
-	return true, nil
+	if len(result) > 0 {
+		log.Logf(3, "collection %v already exists", collectionNS)
+		return true, nil
+	}
+	log.Logf(3, "collection %v does not exists", collectionNS)
+	return false, nil
 }
 
 func (restore *MongoRestore) InsertIndex(intent *Intent, index IndexDocument) error {
@@ -155,14 +161,16 @@ func (restore *MongoRestore) CreateCollection(intent *Intent, options bson.D) er
 func (restore *MongoRestore) RestoreUsersOrRoles(collectionType string, intent *Intent) error {
 	log.Logf(0, "restoring %v from %v", collectionType, intent.BSONPath)
 
-	var tempCol, tempColCommandField string
+	var tempCol, tempColCommandField, collectionName string
 	switch collectionType {
 	case Users:
 		tempCol = restore.tempUsersCol
 		tempColCommandField = "tempUsersCollection"
+		collectionName = "system.users"
 	case Roles:
 		tempCol = restore.tempRolesCol
 		tempColCommandField = "tempRolesCollection"
+		collectionName = "system.roles"
 	default:
 		// panic should be fine here, since this is a programmer (not user) error
 		util.Panicf("cannot use %v as a collection type in RestoreUsersOrRoles", collectionType)
@@ -172,19 +180,67 @@ func (restore *MongoRestore) RestoreUsersOrRoles(collectionType string, intent *
 	if err != nil {
 		return fmt.Errorf("error reading index bson file %v: %v", intent.BSONPath, err)
 	}
-
 	bsonSource := db.NewDecodedBSONSource(db.NewBSONSource(rawFile))
 	defer bsonSource.Close()
+
+	// branch here, using a temporary collection if the db is live and simple inserts if it's the shim
+	// TODO nicer encapsulation of logic
+	if _, ok := restore.cmdRunner.(*db.Shim); ok {
+		log.Logf(2, "using the shim, restoring %v directly", collectionType)
+
+		// first, drop all db-related users/roles if drop is enabled
+		if restore.OutputOptions.Drop {
+			if intent.DB != "admin" {
+				log.Logf(2, "removing all %v for database %v from admin db", collectionType, intent.DB)
+				err := restore.cmdRunner.Remove("admin", collectionName, bson.M{"db": intent.DB})
+				if err != nil {
+					return fmt.Errorf("error dropping all %v for database %v: %v", collectionType, intent.DB, err)
+				}
+			} else {
+				log.Logf(2, "removing all %v from admin db", collectionType)
+				err := restore.cmdRunner.Remove("admin", collectionName, bson.M{})
+				if err != nil {
+					return fmt.Errorf("error dropping all %v from admin db", collectionType, intent.DB, err)
+				}
+			}
+		}
+
+		// then iterate through all entries, updating their "db" and inserting them
+		insertStream, err := restore.cmdRunner.OpenInsertStream("admin", collectionName, restore.safety)
+		if err != nil {
+			return fmt.Errorf("error opening insert connection: %v", err)
+		}
+		defer insertStream.Close()
+		doc := bson.M{}
+
+		log.Logf(0, "restoring %v for database %v into admin.%v", collectionType, intent.DB, collectionName)
+		for bsonSource.Next(&doc) {
+			if restore.ToolOptions.DB != "" && intent.DB != "admin" {
+				// update the db field if we're restoring with a db option
+				// TODO: confirm we should do this?
+				doc["db"] = restore.ToolOptions.DB
+			}
+			err := insertStream.WriteDoc(doc)
+			if err != nil {
+				return fmt.Errorf("error inserting %v: %v", collectionType, err)
+			}
+		}
+		if bsonSource.Err() != nil {
+			return fmt.Errorf("error reading %v: %v", intent.BSONPath, bsonSource.Err())
+		}
+
+		return nil
+	}
 
 	tempColExists, err := restore.DBHasCollection(&Intent{DB: "admin", C: tempCol})
 	if err != nil {
 		return err
 	}
 	if tempColExists {
-		return fmt.Errorf("temporary collection %v already exists", tempCol) //TODO(erf) make this more helpful
+		return fmt.Errorf("temporary collection admin.%v already exists", tempCol) //TODO(erf) make this more helpful
 	}
 
-	log.Logf(3, "restoring %v to temporary collection", collectionType)
+	log.Logf(2, "restoring %v to temporary collection", collectionType)
 	err = restore.RestoreCollectionToDB("admin", tempCol, bsonSource, 0)
 	if err != nil {
 		return fmt.Errorf("error restoring %v: %v", collectionType, err)
@@ -192,29 +248,28 @@ func (restore *MongoRestore) RestoreUsersOrRoles(collectionType string, intent *
 
 	// make sure we always drop the temporary collection
 	defer func() {
+		log.Logf(3, "dropping temporary collection %v", tempCol) //TODO(erf) increase verbosity here
 		err = restore.cmdRunner.Run(bson.M{"drop": tempCol}, &bson.M{}, "admin")
 		if err != nil {
 			log.Logf(0, "error dropping temporary collection %v: %v", tempCol, err)
 		}
 	}()
 
-	//TODO(erf) defer temp collection drop??
-
-	userTargetDB := "admin"
+	userTargetDB := intent.DB
 	// use "admin" as the merge db unless we are restoring admin
 	if restore.ToolOptions.DB == "admin" {
 		userTargetDB = ""
 	}
 
-	command := bson.D{
+	command := bsonutil.MarshalD{
 		{"_mergeAuthzCollections", 1},
 		{tempColCommandField, "admin." + tempCol},
 		{"drop", restore.OutputOptions.Drop},
 		{"writeConcern", bson.M{"w": restore.OutputOptions.WriteConcern}},
-		{"db", userTargetDB}, //TODO FIXME admin
+		{"db", userTargetDB},
 	}
 
-	log.Logf(3, "merging %v from temp collection", collectionType)
+	log.Logf(2, "merging %v from temp collection", collectionType)
 	res := bson.M{}
 	err = restore.cmdRunner.Run(command, &res, "admin")
 	if err != nil {
