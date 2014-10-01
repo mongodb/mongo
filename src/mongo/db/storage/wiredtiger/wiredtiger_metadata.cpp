@@ -43,6 +43,12 @@
 
 namespace mongo {
 
+    const char * WiredTigerMetaData::WT_METADATA_URI = "table:metadata";
+    // Key is the identifier, value is name, isIndex, metadata
+    const char * WiredTigerMetaData::WT_METADATA_CONFIG =
+        "key_format=q,value_format=SbS,leaf_page_max=4k,internal_page_max=4k";
+    const uint64_t WiredTigerMetaData::INVALID_METADATA_IDENTIFIER = std::numeric_limits<uint64_t>::max();
+
     WiredTigerMetaData::WiredTigerMetaData( )
     {
         _nextId = 1;

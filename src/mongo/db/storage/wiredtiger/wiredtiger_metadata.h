@@ -96,11 +96,10 @@ namespace mongo {
                                     // matching entry in the persistent table.
         };
 
-        const char * WT_METADATA_URI = "table:metadata";
-        // Key is the identifier, value is name, isIndex, metadata
-        const char * WT_METADATA_CONFIG =
-            "key_format=q,value_format=SbS,leaf_page_max=4k,internal_page_max=4k";
-        const uint64_t INVALID_METADATA_IDENTIFIER = UINT64_MAX;
+        static const char * WT_METADATA_URI;
+        static const char * WT_METADATA_CONFIG;
+        static const uint64_t INVALID_METADATA_IDENTIFIER;
+
         //AtomicUInt64 _nextId; TODO: I'm getting an error relating to this not being copyable
         uint64_t _nextId;
 
