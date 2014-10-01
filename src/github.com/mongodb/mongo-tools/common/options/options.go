@@ -78,13 +78,14 @@ type Connection struct {
 
 // Struct holding ssl-related options
 type SSL struct {
-	UseSSL            bool   `long:"ssl" description:"Enable connection to a mongod or mongos that has ssl enabled"`
-	SSLCAFile         string `long:"sslCAFile" description:"Specify the .pem file containing the root certificate chain from the certificate authority"`
-	SSLPEMKeyFile     string `long:"sslPEMKeyFile" description:"Specify the .pem file containing the certificate and key"`
-	SSLPEMKeyPassword string `long:"sslPEMKeyPassword" description:"Specify the password to decrypt the sslPEMKeyFile, if necessary"`
-	SSLCRLFile        string `long:"sslCRLFile" description:"Specify the .pem file containing the certificate revocation list"`
-	SSLAllowInvalid   bool   `long:"sslAllowInvalidCertificates" description:"Bypass the validation for server certificates"`
-	SSLFipsMode       bool   `long:"sslFIPSMode" description:"Use FIPS mode of the installed openssl library"`
+	UseSSL              bool   `long:"ssl" description:"Enable connection to a mongod or mongos that has ssl enabled"`
+	SSLCAFile           string `long:"sslCAFile" description:"Specify the .pem file containing the root certificate chain from the certificate authority"`
+	SSLPEMKeyFile       string `long:"sslPEMKeyFile" description:"Specify the .pem file containing the certificate and key"`
+	SSLPEMKeyPassword   string `long:"sslPEMKeyPassword" description:"Specify the password to decrypt the sslPEMKeyFile, if necessary"`
+	SSLCRLFile          string `long:"sslCRLFile" description:"Specify the .pem file containing the certificate revocation list"`
+	SSLAllowInvalidCert bool   `long:"sslAllowInvalidCertificates" description:"Bypass the validation for server certificates"`
+	SSLAllowInvalidHost bool   `long:"sslAllowInvalidHosts" description:"Bypass the validation for server name"`
+	SSLFipsMode         bool   `long:"sslFIPSMode" description:"Use FIPS mode of the installed openssl library"`
 }
 
 // Struct holding auth-related options

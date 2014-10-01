@@ -38,9 +38,13 @@ func (self *SSLDBConnector) Configure(opts options.ToolOptions) error {
 		return fmt.Errorf("setupCtx: %v", err)
 	}
 
+	var flags openssl.DialFlags = 0
+	if opts.SSLAllowInvalidCert || opts.SSLAllowInvalidHost || opts.SSLCAFile == "" {
+		flags = openssl.InsecureSkipHostVerification
+	}
 	// create the dialer func that will be used to connect
 	dialer := func(addr *mgo.ServerAddr) (net.Conn, error) {
-		conn, err := openssl.Dial("tcp", addr.String(), self.ctx, 0)
+		conn, err := openssl.Dial("tcp", addr.String(), self.ctx, flags)
 		self.dialError = err
 		return conn, err
 	}
@@ -102,9 +106,15 @@ func setupCtx(opts options.ToolOptions) (*openssl.Ctx, error) {
 		if err = ctx.UseCertificateChainFile(opts.SSLPEMKeyFile); err != nil {
 			return nil, fmt.Errorf("UseCertificateChainFile: %v", err)
 		}
-		// TODO support password encrypted key files
-		if err = ctx.UsePrivateKeyFile(opts.SSLPEMKeyFile, openssl.FiletypePEM); err != nil {
-			return nil, fmt.Errorf("UsePrivateKeyFile: %v", err)
+		if opts.SSLPEMKeyPassword != "" {
+			if err = ctx.UsePrivateKeyFileWithPassword(
+				opts.SSLPEMKeyFile, openssl.FiletypePEM, opts.SSLPEMKeyPassword); err != nil {
+				return nil, fmt.Errorf("UsePrivateKeyFile: %v", err)
+			}
+		} else {
+			if err = ctx.UsePrivateKeyFile(opts.SSLPEMKeyFile, openssl.FiletypePEM); err != nil {
+				return nil, fmt.Errorf("UsePrivateKeyFile: %v", err)
+			}
 		}
 		// Verify that the certificate and the key go together.
 		if err = ctx.CheckPrivateKey(); err != nil {
@@ -131,7 +141,7 @@ func setupCtx(opts options.ToolOptions) (*openssl.Ctx, error) {
 		}
 
 		var verifyOption openssl.VerifyOptions
-		if opts.SSLAllowInvalid {
+		if opts.SSLAllowInvalidCert {
 			verifyOption = openssl.VerifyNone
 		} else {
 			verifyOption = openssl.VerifyPeer
