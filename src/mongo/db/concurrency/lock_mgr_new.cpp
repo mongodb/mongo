@@ -94,6 +94,8 @@ namespace newlm {
     }
 
     LockManager::~LockManager() {
+        cleanupUnusedLocks();
+
         for (unsigned i = 0; i < _numLockBuckets; i++) {
             LockBucket* bucket = &_lockBuckets[i];
 
@@ -139,11 +141,12 @@ namespace newlm {
         else {
             // Lock is not free
             lock = it->second;
-
-            invariant(lock->grantedQueue != NULL);
-            invariant(lock->grantedModes != 0);
         }
 
+        // Sanity check if requests are being reused
+        invariant(request->lock == NULL || request->lock == lock);
+
+        request->lock = lock;
         request->recursiveCount++;
 
         if (request->status == LockRequest::STATUS_NEW) {
@@ -248,6 +251,8 @@ namespace newlm {
     }
 
     bool LockManager::unlock(LockRequest* request) {
+        invariant(request->lock);
+
         // Fast path for decrementing multiple references of the same lock. It is safe to do this
         // without locking, because 1) all calls for the same lock request must be done on the same
         // thread and 2) if there are lock requests hanging of a given LockHead, then this lock
@@ -257,16 +262,10 @@ namespace newlm {
             return false;
         }
 
-        LockBucket* bucket = _getBucket(request->resourceId);
+        LockHead* lock = request->lock;
+
+        LockBucket* bucket = _getBucket(lock->resourceId);
         scoped_spinlock scopedLock(bucket->mutex);
-
-        LockHeadMap::iterator it = bucket->data.find(request->resourceId);
-
-        // We should not have empty locks in the LockManager and should never try to unlock a lock
-        // that's not been acquired previously
-        invariant(it != bucket->data.end());
-
-        LockHead* lock = it->second;
 
         invariant(lock->grantedQueue != NULL);
         invariant(lock->grantedModes != 0);
@@ -341,20 +340,13 @@ namespace newlm {
             // If some locks have been granted then there should be something on the grantedQueue and
             // vice versa (sanity check that either one or the other is true).
             invariant((lock->grantedModes == 0) ^ (lock->grantedQueue != NULL));
-
-            // This lock is no longer in use
-            if (lock->grantedModes == 0) {
-                bucket->data.erase(it);
-
-                // TODO: As an optimization, we could keep a cache of pre-allocated LockHead objects
-                delete lock;
-            }
         }
 
         return (request->recursiveCount == 0);
     }
 
     void LockManager::downgrade(LockRequest* request, LockMode newMode) {
+        invariant(request->lock);
         invariant(request->status == LockRequest::STATUS_GRANTED);
         invariant(request->recursiveCount > 0);
 
@@ -363,16 +355,10 @@ namespace newlm {
         invariant((LockConflictsTable[request->mode] | LockConflictsTable[newMode]) 
                                 == LockConflictsTable[request->mode]);
 
-        LockBucket* bucket = _getBucket(request->resourceId);
+        LockHead* lock = request->lock;
+
+        LockBucket* bucket = _getBucket(lock->resourceId);
         scoped_spinlock scopedLock(bucket->mutex);
-
-        LockHeadMap::iterator it = bucket->data.find(request->resourceId);
-
-        // We should not have empty locks in the LockManager and should never try to unlock a lock
-        // that's not been acquired previously
-        invariant(it != bucket->data.end());
-
-        LockHead* lock = it->second;
 
         invariant(lock->grantedQueue != NULL);
         invariant(lock->grantedModes != 0);
@@ -381,7 +367,31 @@ namespace newlm {
         lock->changeGrantedModeCount(request->mode, LockHead::Decrement);
         request->mode = newMode;
 
-        _onLockModeChanged(it->second);
+        _onLockModeChanged(lock);
+    }
+
+    void LockManager::cleanupUnusedLocks() {
+        for (unsigned i = 0; i < _numLockBuckets; i++) {
+            LockBucket* bucket = &_lockBuckets[i];
+            scoped_spinlock scopedLock(bucket->mutex);
+
+            LockHeadMap::iterator it = bucket->data.begin();
+            while (it != bucket->data.end()) {
+                LockHead* lock = it->second;
+                if (lock->grantedModes == 0) {
+                    invariant(lock->grantedQueue == NULL);
+                    invariant(lock->conflictModes == 0);
+                    invariant(lock->conflictQueueBegin == NULL);
+                    invariant(lock->conflictQueueEnd == NULL);
+
+                    bucket->data.erase(it++);
+                    delete lock;
+                }
+                else {
+                    it++;
+                }
+            }
+        }
     }
 
     void LockManager::setNoCheckForLeakedLocksTestOnly(bool newValue) {
@@ -625,13 +635,11 @@ namespace newlm {
     // LockRequest
     //
 
-    void LockRequest::initNew(const ResourceId& resourceId,
-                              Locker* locker,
-                              LockGrantNotification* notify) {
-        this->resourceId = resourceId;
+    void LockRequest::initNew(Locker* locker, LockGrantNotification* notify) {
         this->locker = locker;
-        this->notify = notify;        
+        this->notify = notify;
 
+        lock = NULL;
         prev = NULL;
         next = NULL;
         status = STATUS_NEW;
