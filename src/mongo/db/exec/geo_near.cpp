@@ -265,10 +265,14 @@ namespace mongo {
         return fullBounds;
     }
 
-    static double twoDBoundsIncrement(const GeoNearParams& nearParams) {
-        // TODO: Revisit and tune these
+    static double twoDBoundsIncrement(IndexDescriptor* twoDIndex, const GeoNearParams& nearParams) {
         if (FLAT == nearParams.nearQuery->centroid->crs) {
-            return 10;
+            GeoHashConverter::Parameters hashParams;
+            Status status = GeoHashConverter::parseParameters(twoDIndex->infoObj(), &hashParams);
+            invariant(status.isOK()); // The index status should always be valid
+
+            GeoHashConverter converter(hashParams);
+            return 5 * converter.sizeEdge(GeoHash(0u, 0u, hashParams.bits));
         }
         else {
             return kMaxEarthDistanceInMeters / 1000.0;
@@ -291,7 +295,7 @@ namespace mongo {
           _twoDIndex(twoDIndex),
           _fullBounds(twoDDistanceBounds(nearParams, twoDIndex)),
           _currBounds(_fullBounds.center(), -1, _fullBounds.getInner()),
-          _boundsIncrement(twoDBoundsIncrement(nearParams)) {
+          _boundsIncrement(twoDBoundsIncrement(twoDIndex, nearParams)) {
 
         getNearStats()->keyPattern = twoDIndex->keyPattern();
     }
