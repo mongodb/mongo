@@ -53,6 +53,8 @@ func main() {
 		}
 	}
 
+	targetDir = util.ToUniversalPath(targetDir)
+
 	opts.Direct = true
 
 	restore := mongorestore.MongoRestore{
