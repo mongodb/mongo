@@ -74,6 +74,8 @@ namespace mongo {
                 return parseStatus;
             }
 
+            request.explain = true;
+
             // Acquire the db read lock.
             Client::ReadContext ctx(txn, request.ns);
             Collection* collection = ctx.ctx().db()->getCollection(txn, request.ns);
@@ -190,6 +192,9 @@ namespace mongo {
             request->hint = hintObj;
             request->limit = limit;
             request->skip = skip;
+
+            // By default, count requests are regular count not explain of count.
+            request->explain = false;
 
             return Status::OK();
         }

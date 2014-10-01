@@ -266,7 +266,8 @@ namespace {
                                    "projection: {_id: 0, a: 1}}");
 
         LiteParsedQuery* rawLpq;
-        Status status = LiteParsedQuery::make("testns", cmdObj, &rawLpq);
+        bool isExplain = false;
+        Status status = LiteParsedQuery::make("testns", cmdObj, isExplain, &rawLpq);
         ASSERT_OK(status);
         scoped_ptr<LiteParsedQuery> lpq(rawLpq);
     }
@@ -279,7 +280,8 @@ namespace {
                                    "options: {showDiskLoc: true, maxScan: 1000}}");
 
         LiteParsedQuery* rawLpq;
-        Status status = LiteParsedQuery::make("testns", cmdObj, &rawLpq);
+        bool isExplain = false;
+        Status status = LiteParsedQuery::make("testns", cmdObj, isExplain, &rawLpq);
         ASSERT_OK(status);
         scoped_ptr<LiteParsedQuery> lpq(rawLpq);
 
@@ -294,7 +296,8 @@ namespace {
                                    "hint: 'foo_1'}");
 
         LiteParsedQuery* rawLpq;
-        Status status = LiteParsedQuery::make("testns", cmdObj, &rawLpq);
+        bool isExplain = false;
+        Status status = LiteParsedQuery::make("testns", cmdObj, isExplain, &rawLpq);
         ASSERT_OK(status);
         scoped_ptr<LiteParsedQuery> lpq(rawLpq);
 
@@ -306,7 +309,8 @@ namespace {
                                    "projection: {a: 1},"
                                    "sort: {a: 1}}");
         LiteParsedQuery* rawLpq;
-        Status status = LiteParsedQuery::make("testns", cmdObj, &rawLpq);
+        bool isExplain = false;
+        Status status = LiteParsedQuery::make("testns", cmdObj, isExplain, &rawLpq);
         ASSERT_OK(status);
         scoped_ptr<LiteParsedQuery> lpq(rawLpq);
     }
@@ -316,7 +320,8 @@ namespace {
                                    "projection: {a: {$meta: 'textScore'}},"
                                    "sort: {a: {$meta: 'textScore'}}}");
         LiteParsedQuery* rawLpq;
-        Status status = LiteParsedQuery::make("testns", cmdObj, &rawLpq);
+        bool isExplain = false;
+        Status status = LiteParsedQuery::make("testns", cmdObj, isExplain, &rawLpq);
         ASSERT_OK(status);
         scoped_ptr<LiteParsedQuery> lpq(rawLpq);
     }
@@ -334,7 +339,8 @@ namespace {
                                   "}}");
 
         LiteParsedQuery* rawLpq;
-        Status status = LiteParsedQuery::make("testns", cmdObj, &rawLpq);
+        bool isExplain = false;
+        Status status = LiteParsedQuery::make("testns", cmdObj, isExplain, &rawLpq);
         ASSERT_OK(status);
         scoped_ptr<LiteParsedQuery> lpq(rawLpq);
 
@@ -357,7 +363,8 @@ namespace {
                                   "}}");
 
         LiteParsedQuery* rawLpq;
-        Status status = LiteParsedQuery::make("testns", cmdObj, &rawLpq);
+        bool isExplain = false;
+        Status status = LiteParsedQuery::make("testns", cmdObj, isExplain, &rawLpq);
         ASSERT_OK(status);
         scoped_ptr<LiteParsedQuery> lpq(rawLpq);
 
@@ -380,7 +387,8 @@ namespace {
                                    "singleBatch: false}");
 
         LiteParsedQuery* rawLpq;
-        Status status = LiteParsedQuery::make("testns", cmdObj, &rawLpq);
+        bool isExplain = false;
+        Status status = LiteParsedQuery::make("testns", cmdObj, isExplain, &rawLpq);
         ASSERT_OK(status);
         scoped_ptr<LiteParsedQuery> lpq(rawLpq);
 
@@ -408,7 +416,8 @@ namespace {
                                    "query:  3}");
 
         LiteParsedQuery* rawLpq;
-        Status status = LiteParsedQuery::make("testns", cmdObj, &rawLpq);
+        bool isExplain = false;
+        Status status = LiteParsedQuery::make("testns", cmdObj, isExplain, &rawLpq);
         ASSERT_NOT_OK(status);
     }
 
@@ -418,7 +427,8 @@ namespace {
                                    "sort: 3}");
 
         LiteParsedQuery* rawLpq;
-        Status status = LiteParsedQuery::make("testns", cmdObj, &rawLpq);
+        bool isExplain = false;
+        Status status = LiteParsedQuery::make("testns", cmdObj, isExplain, &rawLpq);
         ASSERT_NOT_OK(status);
     }
 
@@ -428,7 +438,8 @@ namespace {
                                    "projection: 'foo'}");
 
         LiteParsedQuery* rawLpq;
-        Status status = LiteParsedQuery::make("testns", cmdObj, &rawLpq);
+        bool isExplain = false;
+        Status status = LiteParsedQuery::make("testns", cmdObj, isExplain, &rawLpq);
         ASSERT_NOT_OK(status);
     }
 
@@ -439,7 +450,8 @@ namespace {
                                    "projection: {a: 1}}");
 
         LiteParsedQuery* rawLpq;
-        Status status = LiteParsedQuery::make("testns", cmdObj, &rawLpq);
+        bool isExplain = false;
+        Status status = LiteParsedQuery::make("testns", cmdObj, isExplain, &rawLpq);
         ASSERT_NOT_OK(status);
     }
 
@@ -450,7 +462,8 @@ namespace {
                                    "projection: {a: 1}}");
 
         LiteParsedQuery* rawLpq;
-        Status status = LiteParsedQuery::make("testns", cmdObj, &rawLpq);
+        bool isExplain = false;
+        Status status = LiteParsedQuery::make("testns", cmdObj, isExplain, &rawLpq);
         ASSERT_NOT_OK(status);
     }
 
@@ -461,7 +474,8 @@ namespace {
                                    "projection: {a: 1}}");
 
         LiteParsedQuery* rawLpq;
-        Status status = LiteParsedQuery::make("testns", cmdObj, &rawLpq);
+        bool isExplain = false;
+        Status status = LiteParsedQuery::make("testns", cmdObj, isExplain, &rawLpq);
         ASSERT_NOT_OK(status);
     }
 
@@ -472,7 +486,8 @@ namespace {
                                    "projection: {a: 1}}");
 
         LiteParsedQuery* rawLpq;
-        Status status = LiteParsedQuery::make("testns", cmdObj, &rawLpq);
+        bool isExplain = false;
+        Status status = LiteParsedQuery::make("testns", cmdObj, isExplain, &rawLpq);
         ASSERT_NOT_OK(status);
     }
 
@@ -482,7 +497,8 @@ namespace {
                                    "options: {comment: 1}}");
 
         LiteParsedQuery* rawLpq;
-        Status status = LiteParsedQuery::make("testns", cmdObj, &rawLpq);
+        bool isExplain = false;
+        Status status = LiteParsedQuery::make("testns", cmdObj, isExplain, &rawLpq);
         ASSERT_NOT_OK(status);
     }
 
@@ -492,7 +508,8 @@ namespace {
                                    "options: {maxScan: true, comment: 'foo'}}");
 
         LiteParsedQuery* rawLpq;
-        Status status = LiteParsedQuery::make("testns", cmdObj, &rawLpq);
+        bool isExplain = false;
+        Status status = LiteParsedQuery::make("testns", cmdObj, isExplain, &rawLpq);
         ASSERT_NOT_OK(status);
     }
 
@@ -502,7 +519,8 @@ namespace {
                                    "options: {maxTimeMS: true}}");
 
         LiteParsedQuery* rawLpq;
-        Status status = LiteParsedQuery::make("testns", cmdObj, &rawLpq);
+        bool isExplain = false;
+        Status status = LiteParsedQuery::make("testns", cmdObj, isExplain, &rawLpq);
         ASSERT_NOT_OK(status);
     }
 
@@ -512,7 +530,8 @@ namespace {
                                    "options: {max: 3}}");
 
         LiteParsedQuery* rawLpq;
-        Status status = LiteParsedQuery::make("testns", cmdObj, &rawLpq);
+        bool isExplain = false;
+        Status status = LiteParsedQuery::make("testns", cmdObj, isExplain, &rawLpq);
         ASSERT_NOT_OK(status);
     }
 
@@ -522,7 +541,8 @@ namespace {
                                    "options: {min: 3}}");
 
         LiteParsedQuery* rawLpq;
-        Status status = LiteParsedQuery::make("testns", cmdObj, &rawLpq);
+        bool isExplain = false;
+        Status status = LiteParsedQuery::make("testns", cmdObj, isExplain, &rawLpq);
         ASSERT_NOT_OK(status);
     }
 
@@ -532,7 +552,8 @@ namespace {
                                    "options: {returnKey: 3}}");
 
         LiteParsedQuery* rawLpq;
-        Status status = LiteParsedQuery::make("testns", cmdObj, &rawLpq);
+        bool isExplain = false;
+        Status status = LiteParsedQuery::make("testns", cmdObj, isExplain, &rawLpq);
         ASSERT_NOT_OK(status);
     }
 
@@ -543,7 +564,8 @@ namespace {
                                    "options: {showDiskLoc: 3}}");
 
         LiteParsedQuery* rawLpq;
-        Status status = LiteParsedQuery::make("testns", cmdObj, &rawLpq);
+        bool isExplain = false;
+        Status status = LiteParsedQuery::make("testns", cmdObj, isExplain, &rawLpq);
         ASSERT_NOT_OK(status);
     }
 
@@ -553,7 +575,8 @@ namespace {
                                    "options: {snapshot: 3}}");
 
         LiteParsedQuery* rawLpq;
-        Status status = LiteParsedQuery::make("testns", cmdObj, &rawLpq);
+        bool isExplain = false;
+        Status status = LiteParsedQuery::make("testns", cmdObj, isExplain, &rawLpq);
         ASSERT_NOT_OK(status);
     }
 
@@ -563,7 +586,8 @@ namespace {
                                    "options: {tailable: 3}}");
 
         LiteParsedQuery* rawLpq;
-        Status status = LiteParsedQuery::make("testns", cmdObj, &rawLpq);
+        bool isExplain = false;
+        Status status = LiteParsedQuery::make("testns", cmdObj, isExplain, &rawLpq);
         ASSERT_NOT_OK(status);
     }
 
@@ -573,7 +597,8 @@ namespace {
                                    "options: {slaveOk: 3}}");
 
         LiteParsedQuery* rawLpq;
-        Status status = LiteParsedQuery::make("testns", cmdObj, &rawLpq);
+        bool isExplain = false;
+        Status status = LiteParsedQuery::make("testns", cmdObj, isExplain, &rawLpq);
         ASSERT_NOT_OK(status);
     }
 
@@ -583,7 +608,8 @@ namespace {
                                    "options: {oplogReplay: 3}}");
 
         LiteParsedQuery* rawLpq;
-        Status status = LiteParsedQuery::make("testns", cmdObj, &rawLpq);
+        bool isExplain = false;
+        Status status = LiteParsedQuery::make("testns", cmdObj, isExplain, &rawLpq);
         ASSERT_NOT_OK(status);
     }
 
@@ -593,7 +619,8 @@ namespace {
                                    "options: {noCursorTimeout: 3}}");
 
         LiteParsedQuery* rawLpq;
-        Status status = LiteParsedQuery::make("testns", cmdObj, &rawLpq);
+        bool isExplain = false;
+        Status status = LiteParsedQuery::make("testns", cmdObj, isExplain, &rawLpq);
         ASSERT_NOT_OK(status);
     }
 
@@ -603,7 +630,8 @@ namespace {
                                    "options: {awaitData: 3}}");
 
         LiteParsedQuery* rawLpq;
-        Status status = LiteParsedQuery::make("testns", cmdObj, &rawLpq);
+        bool isExplain = false;
+        Status status = LiteParsedQuery::make("testns", cmdObj, isExplain, &rawLpq);
         ASSERT_NOT_OK(status);
     }
 
@@ -613,7 +641,8 @@ namespace {
                                    "options: {exhaust: 3}}");
 
         LiteParsedQuery* rawLpq;
-        Status status = LiteParsedQuery::make("testns", cmdObj, &rawLpq);
+        bool isExplain = false;
+        Status status = LiteParsedQuery::make("testns", cmdObj, isExplain, &rawLpq);
         ASSERT_NOT_OK(status);
     }
 
@@ -623,7 +652,8 @@ namespace {
                                    "options: {exhaust: 3}}");
 
         LiteParsedQuery* rawLpq;
-        Status status = LiteParsedQuery::make("testns", cmdObj, &rawLpq);
+        bool isExplain = false;
+        Status status = LiteParsedQuery::make("testns", cmdObj, isExplain, &rawLpq);
         ASSERT_NOT_OK(status);
     }
 
@@ -637,7 +667,8 @@ namespace {
                                    "query: {a: 3}}");
 
         LiteParsedQuery* rawLpq;
-        Status status = LiteParsedQuery::make("testns", cmdObj, &rawLpq);
+        bool isExplain = false;
+        Status status = LiteParsedQuery::make("testns", cmdObj, isExplain, &rawLpq);
         ASSERT_NOT_OK(status);
     }
 
@@ -647,7 +678,8 @@ namespace {
                                    "query: {a: 3}}");
 
         LiteParsedQuery* rawLpq;
-        Status status = LiteParsedQuery::make("testns", cmdObj, &rawLpq);
+        bool isExplain = false;
+        Status status = LiteParsedQuery::make("testns", cmdObj, isExplain, &rawLpq);
         ASSERT_NOT_OK(status);
     }
 
@@ -657,7 +689,8 @@ namespace {
                                    "query: {a: 3}}");
 
         LiteParsedQuery* rawLpq;
-        Status status = LiteParsedQuery::make("testns", cmdObj, &rawLpq);
+        bool isExplain = false;
+        Status status = LiteParsedQuery::make("testns", cmdObj, isExplain, &rawLpq);
         ASSERT_NOT_OK(status);
     }
 
@@ -670,7 +703,8 @@ namespace {
                                    "options: {min: {a: 3}, max: {b: 4}}}");
 
         LiteParsedQuery* rawLpq;
-        Status status = LiteParsedQuery::make("testns", cmdObj, &rawLpq);
+        bool isExplain = false;
+        Status status = LiteParsedQuery::make("testns", cmdObj, isExplain, &rawLpq);
         ASSERT_NOT_OK(status);
     }
 
@@ -680,7 +714,8 @@ namespace {
                                    "options: {snapshot: true}}");
 
         LiteParsedQuery* rawLpq;
-        Status status = LiteParsedQuery::make("testns", cmdObj, &rawLpq);
+        bool isExplain = false;
+        Status status = LiteParsedQuery::make("testns", cmdObj, isExplain, &rawLpq);
         ASSERT_NOT_OK(status);
     }
 
@@ -690,7 +725,8 @@ namespace {
                                    "hint: {a: 1}}");
 
         LiteParsedQuery* rawLpq;
-        Status status = LiteParsedQuery::make("testns", cmdObj, &rawLpq);
+        bool isExplain = false;
+        Status status = LiteParsedQuery::make("testns", cmdObj, isExplain, &rawLpq);
         ASSERT_NOT_OK(status);
     }
 
@@ -702,14 +738,15 @@ namespace {
                            "projection: {a: {$meta: 'textScore'}},"
                            "sort: {a: 1}}");
         LiteParsedQuery* rawLpq;
-        status = LiteParsedQuery::make("testns", cmdObj, &rawLpq);
+        bool isExplain = false;
+        status = LiteParsedQuery::make("testns", cmdObj, isExplain, &rawLpq);
         ASSERT_NOT_OK(status);
 
 
         cmdObj = fromjson("{find: 'testns',"
                            "projection: {a: {$meta: 'textScore'}},"
                            "sort: {b: 1}}");
-        status = LiteParsedQuery::make("testns", cmdObj, &rawLpq);
+        status = LiteParsedQuery::make("testns", cmdObj, isExplain, &rawLpq);
         ASSERT_OK(status);
         scoped_ptr<LiteParsedQuery> lpq(rawLpq);
     }
@@ -722,13 +759,14 @@ namespace {
                            "projection: {a: 1},"
                            "sort: {a: {$meta: 'textScore'}}}");
         LiteParsedQuery* rawLpq;
-        status = LiteParsedQuery::make("testns", cmdObj, &rawLpq);
+        bool isExplain = false;
+        status = LiteParsedQuery::make("testns", cmdObj, isExplain, &rawLpq);
         ASSERT_NOT_OK(status);
 
         cmdObj = fromjson("{find: 'testns',"
                            "projection: {b: 1},"
                            "sort: {a: {$meta: 'textScore'}}}");
-        status = LiteParsedQuery::make("testns", cmdObj, &rawLpq);
+        status = LiteParsedQuery::make("testns", cmdObj, isExplain, &rawLpq);
         ASSERT_NOT_OK(status);
     }
 
@@ -742,7 +780,8 @@ namespace {
                                    "foo: {a: 1}}");
 
         LiteParsedQuery* rawLpq;
-        Status status = LiteParsedQuery::make("testns", cmdObj, &rawLpq);
+        bool isExplain = false;
+        Status status = LiteParsedQuery::make("testns", cmdObj, isExplain, &rawLpq);
         ASSERT_NOT_OK(status);
     }
 
@@ -751,7 +790,8 @@ namespace {
                                    "options: {snapshot: true, foo: true}}");
 
         LiteParsedQuery* rawLpq;
-        Status status = LiteParsedQuery::make("testns", cmdObj, &rawLpq);
+        bool isExplain = false;
+        Status status = LiteParsedQuery::make("testns", cmdObj, isExplain, &rawLpq);
         ASSERT_NOT_OK(status);
     }
 

@@ -64,9 +64,11 @@ namespace mongo {
     // static
     Status LiteParsedQuery::make(const std::string& fullns,
                                  const BSONObj& cmdObj,
+                                 bool isExplain,
                                  LiteParsedQuery** out) {
         auto_ptr<LiteParsedQuery> pq(new LiteParsedQuery());
         pq->_ns = fullns;
+        pq->_explain = isExplain;
 
         // Parse the command BSON by looping through one element at a time.
         BSONObjIterator it(cmdObj);

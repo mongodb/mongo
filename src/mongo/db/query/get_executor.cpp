@@ -541,7 +541,10 @@ namespace mongo {
 
         const WhereCallbackReal whereCallback(txn, collection->ns().db());
         CanonicalQuery* cq;
-        Status status = CanonicalQuery::canonicalize(collection->ns(), unparsedQuery, &cq,
+        Status status = CanonicalQuery::canonicalize(collection->ns(),
+                                                     unparsedQuery,
+                                                     deleteStageParams.isExplain,
+                                                     &cq,
                                                      whereCallback);
         if (!status.isOK())
             return status;
@@ -624,7 +627,10 @@ namespace mongo {
 
         const WhereCallbackReal whereCallback(txn, collection->ns().db());
         CanonicalQuery* cq;
-        Status status = CanonicalQuery::canonicalize(collection->ns(), unparsedQuery, &cq,
+        Status status = CanonicalQuery::canonicalize(collection->ns(),
+                                                     unparsedQuery,
+                                                     request->isExplain(),
+                                                     &cq,
                                                      whereCallback);
         if (!status.isOK())
             return status;
@@ -661,7 +667,9 @@ namespace mongo {
         const NamespaceString nss(request.ns);
         const WhereCallbackReal whereCallback(txn, nss.db());
         CanonicalQuery* rawCanonicalQuery;
-        Status canonicalizeStatus = CanonicalQuery::canonicalize(request.ns, request.query,
+        Status canonicalizeStatus = CanonicalQuery::canonicalize(request.ns,
+                                                                 request.query,
+                                                                 request.explain,
                                                                  &rawCanonicalQuery,
                                                                  whereCallback);
         if (!canonicalizeStatus.isOK()) {
@@ -892,11 +900,15 @@ namespace mongo {
         CanonicalQuery* rawCq;
         Status canonStatus = CanonicalQuery::canonicalize(collection->ns().ns(),
                                                           request.query,
-                                                          BSONObj(),
-                                                          BSONObj(),
-                                                          0,
-                                                          0,
+                                                          BSONObj(), // sort
+                                                          BSONObj(), // projection
+                                                          0, // skip
+                                                          0, // limit
                                                           request.hint,
+                                                          BSONObj(), // min
+                                                          BSONObj(), // max
+                                                          false, // snapshot
+                                                          request.explain,
                                                           &rawCq,
                                                           whereCallback);
         if (!canonStatus.isOK()) {

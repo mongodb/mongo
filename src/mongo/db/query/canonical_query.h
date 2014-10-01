@@ -87,6 +87,13 @@ namespace mongo {
                                    const MatchExpressionParser::WhereCallback& whereCallback =
                                             MatchExpressionParser::WhereCallback());
 
+        static Status canonicalize(const std::string& ns,
+                                   const BSONObj& query,
+                                   bool explain,
+                                   CanonicalQuery** out,
+                                   const MatchExpressionParser::WhereCallback& whereCallback =
+                                            MatchExpressionParser::WhereCallback());
+
         static Status canonicalize(const std::string& ns, 
                                    const BSONObj& query,
                                    long long skip,
