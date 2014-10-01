@@ -65,6 +65,10 @@ namespace repl {
         invariant(false);
     }
 
+    Seconds ReplicationCoordinatorMock::getSlaveDelaySecs() const {
+        return Seconds(0);
+    }
+
     void ReplicationCoordinatorMock::clearSyncSourceBlacklist() {}
 
     ReplicationCoordinator::StatusAndDuration ReplicationCoordinatorMock::awaitReplication(

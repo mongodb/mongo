@@ -319,6 +319,12 @@ namespace {
         return _getCurrentMemberState_inlock();
     }
 
+    Seconds ReplicationCoordinatorImpl::getSlaveDelaySecs() const {
+        boost::lock_guard<boost::mutex> lk(_mutex);
+        invariant(_rsConfig.isInitialized());
+        return _rsConfig.getMemberAt(_thisMembersConfigIndex).getSlaveDelay();
+    }
+
     MemberState ReplicationCoordinatorImpl::_getCurrentMemberState_inlock() const {
         invariant(_settings.usingReplSets());
         return _currentState;

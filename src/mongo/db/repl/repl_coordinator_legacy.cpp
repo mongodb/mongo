@@ -119,6 +119,11 @@ namespace repl {
         return theReplSet->state();
     }
 
+    Seconds LegacyReplicationCoordinator::getSlaveDelaySecs() const {
+        invariant(getReplicationMode() == modeReplSet);
+        return Seconds(theReplSet->myConfig().slaveDelay);
+    }
+
     void LegacyReplicationCoordinator::clearSyncSourceBlacklist() {
         theReplSet->clearVetoes();
     }

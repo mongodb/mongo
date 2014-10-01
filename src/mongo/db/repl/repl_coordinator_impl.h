@@ -83,6 +83,8 @@ namespace repl {
 
         virtual MemberState getCurrentMemberState() const;
 
+        virtual Seconds getSlaveDelaySecs() const;
+
         virtual void clearSyncSourceBlacklist();
 
         /*
