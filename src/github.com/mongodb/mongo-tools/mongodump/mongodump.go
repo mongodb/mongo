@@ -44,25 +44,25 @@ func (dump *MongoDump) ValidateOptions() error {
 		return err
 	}
 	switch {
-	case dump.OutputOptions.Out == "-" && dump.ToolOptions.Collection == "":
+	case dump.OutputOptions.Out == "-" && dump.ToolOptions.Namespace.Collection == "":
 		return fmt.Errorf("can only dump a single collection to stdout")
-	case dump.ToolOptions.DB == "" && dump.ToolOptions.Collection != "":
+	case dump.ToolOptions.Namespace.DB == "" && dump.ToolOptions.Namespace.Collection != "":
 		return fmt.Errorf("cannot dump a collection without a specified database")
-	case dump.InputOptions.Query != "" && dump.ToolOptions.Collection == "":
+	case dump.InputOptions.Query != "" && dump.ToolOptions.Namespace.Collection == "":
 		return fmt.Errorf("cannot dump using a query without a specified collection")
-	case dump.OutputOptions.DumpDBUsersAndRoles && dump.ToolOptions.DB == "":
+	case dump.OutputOptions.DumpDBUsersAndRoles && dump.ToolOptions.Namespace.DB == "":
 		return fmt.Errorf("must specify a database when running with dumpDbUsersAndRoles")
-	case dump.OutputOptions.DumpDBUsersAndRoles && dump.ToolOptions.Collection != "":
+	case dump.OutputOptions.DumpDBUsersAndRoles && dump.ToolOptions.Namespace.Collection != "":
 		return fmt.Errorf("cannot specify a collection when running with dumpDbUsersAndRoles") //TODO: why?
-	case dump.OutputOptions.Oplog && dump.ToolOptions.DB != "":
+	case dump.OutputOptions.Oplog && dump.ToolOptions.Namespace.DB != "":
 		return fmt.Errorf("--oplog mode only supported on full dumps")
-	case len(dump.OutputOptions.ExcludedCollections) > 0 && dump.ToolOptions.Collection != "":
+	case len(dump.OutputOptions.ExcludedCollections) > 0 && dump.ToolOptions.Namespace.Collection != "":
 		return fmt.Errorf("--collection is not allowed when --excludeCollection is specified")
-	case len(dump.OutputOptions.ExcludedCollectionPrefixes) > 0 && dump.ToolOptions.Collection != "":
+	case len(dump.OutputOptions.ExcludedCollectionPrefixes) > 0 && dump.ToolOptions.Namespace.Collection != "":
 		return fmt.Errorf("--collection is not allowed when --excludeCollectionsWithPrefix is specified")
-	case len(dump.OutputOptions.ExcludedCollections) > 0 && dump.ToolOptions.DB == "":
+	case len(dump.OutputOptions.ExcludedCollections) > 0 && dump.ToolOptions.Namespace.DB == "":
 		return fmt.Errorf("--db is required when --excludeCollection is specified")
-	case len(dump.OutputOptions.ExcludedCollectionPrefixes) > 0 && dump.ToolOptions.DB == "":
+	case len(dump.OutputOptions.ExcludedCollectionPrefixes) > 0 && dump.ToolOptions.Namespace.DB == "":
 		return fmt.Errorf("--db is required when --excludeCollectionsWithPrefix is specified")
 	}
 	return nil
