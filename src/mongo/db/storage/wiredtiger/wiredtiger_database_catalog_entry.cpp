@@ -47,6 +47,7 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_collection_catalog_entry.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_index.h"
+#include "mongo/db/storage/wiredtiger/wiredtiger_metadata.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_recovery_unit.h"
 
 #include "mongo/db/storage_options.h"
@@ -126,7 +127,7 @@ namespace mongo {
             // Initialize the namespace we found
             std::string name = WiredTigerRecordStore::_fromURI(key);
             WiredTigerCollectionCatalogEntry *entry =
-                new WiredTigerCollectionCatalogEntry(swrap, StringData(name));
+                new WiredTigerCollectionCatalogEntry(_db, StringData(name));
             _entryMap[name.c_str()] = entry;
         }
         if (ret != WT_NOTFOUND) invariantWTOK(ret);
@@ -202,7 +203,9 @@ namespace mongo {
         swrap.GetContext().CloseAllCursors();
 
         WT_SESSION *session = swrap.Get();
-        int ret = session->drop(session, WiredTigerRecordStore::_getURI(ns).c_str(), "force");
+        WiredTigerMetaData &md = _db.GetMetaData();
+        std::string uri = md.getURI( ns.toString() );
+        int ret = session->drop(session, uri.c_str(), "force");
         if (ret != 0)
             return Status( ErrorCodes::OperationFailed, "Collection drop failed" );
 
@@ -307,9 +310,13 @@ namespace mongo {
         }
 
         // Rename the primary WiredTiger table
-        std::string fromUri = WiredTigerRecordStore::_getURI(fromNS);
-        std::string toUri = WiredTigerRecordStore::_getURI(toNS);
-        ret = session->rename(session, fromUri.c_str(), toUri.c_str(), NULL);
+        // TODO: This can become an entirely metadata operation.
+        WiredTigerMetaData &md = _db.GetMetaData();
+        uint64_t fromId = md.getIdentifier(fromNS.toString());
+        std::string fromURI = md.getURI(fromId);
+        uint64_t toId = md.getIdentifier(toNS.toString());
+        std::string toURI = md.getURI(toId);
+        ret = session->rename(session, fromURI.c_str(), toURI.c_str(), NULL);
         if (ret != 0)
             return Status( ErrorCodes::OperationFailed, "Collection rename failed" );
 
@@ -324,7 +331,7 @@ namespace mongo {
 
         // Load the newly renamed collection into memory
         WiredTigerCollectionCatalogEntry *newEntry =
-            new WiredTigerCollectionCatalogEntry(swrap, toNS, stayTemp);
+            new WiredTigerCollectionCatalogEntry( _db, toNS, stayTemp );
         _entryMap[toNS.toString().c_str()] = newEntry;
 
         return Status::OK();

@@ -41,6 +41,7 @@
 #include "mongo/db/storage/wiredtiger/wiredtiger_record_store.h"
 
 namespace mongo {
+    class WiredTigerDatabase;
 
     // A class that wraps all the metadata information for a database including:
     //  * Translating from table names to identifiers
@@ -50,17 +51,19 @@ namespace mongo {
     // This class holds an entry for each Collection and for all indexes
     class WiredTigerMetaData {
     public:
-        WiredTigerMetaData( WiredTigerDatabase &db );
+        WiredTigerMetaData( );
 
         virtual ~WiredTigerMetaData();
+        void initialize( WiredTigerDatabase &db );
 
-        std::string getTableName(uint64_t identifier);
-        std::string getTableURI(uint64_t identifier);
+        std::string getName(uint64_t identifier);
+        std::string getURI(uint64_t identifier);
+        std::string getURI(std::string name);   // Inefficient, prefer identifier version.
         uint64_t getIdentifier(std::string tableName);
         uint64_t generateIdentifier(std::string tableName, BSONObj metaData);
 
-        Status removeTable(uint64_t identifier, bool failedDrop = false);
-        Status renameTable(uint64_t identifier, std::string newTableName);
+        Status remove(uint64_t identifier, bool failedDrop = false);
+        Status rename(uint64_t identifier, std::string newName);
         Status updateMetaData(uint64_t identifier, BSONObj newMetaData);
         std::map<std::string, BSONObj> getAllTables();
         std::map<std::string, BSONObj> getAllIndexes(std::string identifier);
@@ -98,11 +101,11 @@ namespace mongo {
         const char * WT_METADATA_CONFIG =
             "key_format=q,value_format=SbS,leaf_page_max=4k,internal_page_max=4k";
         const uint64_t INVALID_METADATA_IDENTIFIER = UINT64_MAX;
-        AtomicUInt64 _nextId;
+        //AtomicUInt64 _nextId; TODO: I'm getting an error relating to this not being copyable
+        uint64_t _nextId;
 
         typedef std::map<uint64_t, MetaDataEntry> WiredTigerMetaDataMap;
         WiredTigerMetaDataMap _tables;
-        WiredTigerDatabase &_db;
         WT_CURSOR *_metaDataCursor;
 	};
 }

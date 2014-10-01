@@ -35,7 +35,9 @@
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/json.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_collection_catalog_entry.h"
+#include "mongo/db/storage/wiredtiger/wiredtiger_database.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_index.h"
+#include "mongo/db/storage/wiredtiger/wiredtiger_metadata.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_record_store.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_recovery_unit.h"
 
@@ -49,12 +51,15 @@ namespace mongo {
     // Constructor for a catalog entry that loads information from
     // an existing collection.
     WiredTigerCollectionCatalogEntry::WiredTigerCollectionCatalogEntry(
-        WiredTigerSession& swrap, const StringData& ns, bool stayTemp)
+        WiredTigerDatabase& db, const StringData& ns, bool stayTemp)
         : CollectionCatalogEntry ( ns ), options() {
 
-        std::string tbl_uri = WiredTigerRecordStore::_getURI(ns);
+        WiredTigerMetaData &md = db.GetMetaData();
+        uint64_t tblIdentifier = md.generateIdentifier( ns.toString(), options.toBSON() );
+        std::string tbl_uri = md.getURI( tblIdentifier );
 
         // Open the WiredTiger metadata so we can retrieve saved options.
+        WiredTigerSession swrap(db);
         WiredTigerCursor cursor("metadata:", swrap);
         WT_CURSOR *c = cursor.Get();
         invariant(c != NULL);

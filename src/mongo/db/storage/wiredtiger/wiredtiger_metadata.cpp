@@ -30,6 +30,7 @@
  */
  
 #include "mongo/db/storage/wiredtiger/wiredtiger_metadata.h"
+#include "mongo/db/storage/wiredtiger/wiredtiger_database.h"
 
 #include "mongo/db/catalog/collection_options.h"
 #include "mongo/db/json.h"
@@ -38,10 +39,21 @@
 #include "mongo/db/storage_options.h"
 #include "mongo/util/log.h"
 
+#include <wiredtiger.h>
+
 namespace mongo {
 
-    WiredTigerMetaData::WiredTigerMetaData( WiredTigerDatabase &db )
-        : _db(db)
+    WiredTigerMetaData::WiredTigerMetaData( )
+    {
+        _nextId = 1;
+    }
+
+    WiredTigerMetaData::~WiredTigerMetaData()
+    {
+        // Free up our in-memory structure
+    }
+
+    void WiredTigerMetaData::initialize( WiredTigerDatabase &db )
     {
         WiredTigerSession swrap(db);
         WT_SESSION *s(swrap.Get());
@@ -58,28 +70,28 @@ namespace mongo {
             invariant( ret == 0 );
             ret = s->open_cursor(s, WT_METADATA_URI, NULL, NULL, &_metaDataCursor);
             invariant( ret == 0 );
-            _nextId.store( 1 );
+            _nextId = 1;
         }
     }
 
-    WiredTigerMetaData::~WiredTigerMetaData()
-    {
-        // Free up our in-memory structure
-    }
-
-    std::string WiredTigerMetaData::getTableName(uint64_t identifier)
+    std::string WiredTigerMetaData::getName(uint64_t identifier)
     {
         WiredTigerMetaDataMap::iterator itr = _tables.find(identifier);
         invariant( itr != _tables.end() );
         return ( itr->second.name );
     }
 
-    std::string WiredTigerMetaData::getTableURI(uint64_t identifier)
+    std::string WiredTigerMetaData::getURI(uint64_t identifier)
     {
         WiredTigerMetaDataMap::iterator itr = _tables.find(identifier);
         invariant( itr != _tables.end() );
         return ( itr->second.uri );
     }
+
+    std::string WiredTigerMetaData::getURI(std::string name)
+    {
+        return getURI( getIdentifier( name ) );
+   }
 
     uint64_t WiredTigerMetaData::getIdentifier(std::string tableName)
     {
@@ -108,12 +120,12 @@ namespace mongo {
         return id;
     }
 
-    Status WiredTigerMetaData::removeTable(uint64_t identifier, bool failedDrop)
+    Status WiredTigerMetaData::remove(uint64_t identifier, bool failedDrop)
     {
         return Status::OK();
     }
 
-    Status WiredTigerMetaData::renameTable(uint64_t identifier, std::string newTableName)
+    Status WiredTigerMetaData::rename(uint64_t identifier, std::string newName)
     {
         return Status::OK();
     }
@@ -157,14 +169,15 @@ namespace mongo {
 
         _metaDataCursor->reset(_metaDataCursor);
 
-        _nextId.store( max_id + 1 );
+        _nextId = max_id + 1;
 
         return Status::OK();
     }
 
     uint64_t WiredTigerMetaData::_generateIdentifier(std::string tableName)
     {
-        return ( _nextId.fetchAndAdd(1) );
+        return ( ++_nextId );
+        //return ( _nextId.fetchAndAdd(1) );
     }
 
     bool WiredTigerMetaData::_isIndexName(std::string tableName)

@@ -42,6 +42,7 @@
 
 namespace mongo {
 
+    class WiredTigerDatabase;
     class WiredTigerDatabaseCatalogEntry;
 
     class WiredTigerEngine : public StorageEngine {

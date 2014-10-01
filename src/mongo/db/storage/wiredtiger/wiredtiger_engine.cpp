@@ -35,6 +35,7 @@
 #include <boost/filesystem/path.hpp>
 #include <boost/regex.hpp>
 
+#include "mongo/db/storage/wiredtiger/wiredtiger_database.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_database_catalog_entry.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_recovery_unit.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_global_options.h"
@@ -58,6 +59,7 @@ namespace mongo {
         }
         invariantWTOK(ret);
         _db = new WiredTigerDatabase(conn);
+        _db->InitMetaData();
         loadExistingDatabases();
     }
 
@@ -103,7 +105,6 @@ namespace mongo {
             _dbs[dbName] = new WiredTigerDatabaseCatalogEntry( *_db, dbName );
         }
         invariant ( ret == WT_NOTFOUND );
-        
     }
 
     void WiredTigerEngine::listDatabases( std::vector<std::string>* out ) const {

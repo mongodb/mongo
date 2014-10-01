@@ -34,6 +34,7 @@
 #include "mongo/db/storage_options.h"
 #include "mongo/util/log.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_global_options.h"
+#include "mongo/db/storage/wiredtiger/wiredtiger_metadata.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_record_store.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_recovery_unit.h"
 
@@ -43,6 +44,12 @@ namespace mongo {
             const StringData &ns, const CollectionOptions &options, bool allocateDefaultSpace) {
         WiredTigerSession swrap(db);
         WT_SESSION *s = swrap.Get();
+
+        // Add the collection into the meta data
+        WiredTigerMetaData &md = db.GetMetaData();
+        uint64_t tblIdentifier = md.generateIdentifier( ns.toString(), options.toBSON() );
+        std::string newUri = md.getURI( tblIdentifier );
+
         // Separate out a prefix and suffix in the default string. User configuration will
         // override values in the prefix, but not values in the suffix.
         const char *default_config_pfx = "type=file,leaf_page_max=512k,memory_page_max=10m,";
@@ -50,13 +57,13 @@ namespace mongo {
         std::string config = std::string(default_config_pfx +
                 wiredTigerGlobalOptions.collectionConfig + default_config_sfx +
                 options.toBSON().jsonString());
-        int ret = s->create(s, _getURI(ns).c_str(), config.c_str());
+        int ret = s->create(s, newUri.c_str(), config.c_str());
         if (ret  != 0) {
             log() << "Creating collection with custom options (" << config <<
                      ") failed. Using default options instead." << endl;
             config = std::string(default_config_pfx);
             config += default_config_sfx + options.toBSON().jsonString();
-            ret = s->create(s, _getURI(ns).c_str(), config.c_str());
+            ret = s->create(s, newUri.c_str(), config.c_str());
         }
         return (ret);
     }
@@ -69,11 +76,11 @@ namespace mongo {
                                         CappedDocumentDeleteCallback* cappedDeleteCallback )
         : RecordStore( ns ),
           _db( db ),
-          _uri (_getURI(ns) ),
           _isCapped( isCapped ),
           _cappedMaxSize( cappedMaxSize ),
           _cappedMaxDocs( cappedMaxDocs ),
           _cappedDeleteCallback( cappedDeleteCallback ) {
+        _uri = _db.GetMetaData().getURI( ns.toString() );
         if (_isCapped) {
             invariant(_cappedMaxSize > 0);
             invariant(_cappedMaxDocs == -1 || _cappedMaxDocs > 0);
@@ -105,6 +112,7 @@ namespace mongo {
 
         // Need to start at 1 so we are always higher than minDiskLoc
         _nextIdNum.store(key + 1);
+
     }
 
     WiredTigerRecordStore::~WiredTigerRecordStore() { }
