@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"github.com/mongodb/mongo-tools/common/log"
 	commonopts "github.com/mongodb/mongo-tools/common/options"
 	"github.com/mongodb/mongo-tools/mongoexport"
 	"github.com/mongodb/mongo-tools/mongoexport/options"
@@ -19,11 +20,11 @@ func main() {
 
 	args, err := opts.Parse()
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error parsing command line options: %v\n", err)
+		log.Logf(0, "error parsing command line options: %v", err)
 		os.Exit(1)
 	}
 	if len(args) != 0 {
-		fmt.Fprintf(os.Stderr, "Error parsing command line: too many positional options: %v\n", args)
+		log.Logf(0, "error parsing command line: too many positional options: %v", args)
 		os.Exit(1)
 	}
 
@@ -37,6 +38,8 @@ func main() {
 		return
 	}
 
+	log.InitToolLogger(opts.Verbosity)
+
 	exporter := mongoexport.MongoExport{
 		ToolOptions: *opts,
 		OutputOpts:  outputOpts,
@@ -45,13 +48,13 @@ func main() {
 
 	err = exporter.ValidateSettings()
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+		log.Logf(0, "error validating settings: %v", err)
 		os.Exit(1)
 	}
 
 	err = exporter.Init()
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+		log.Logf(0, "error initializing mongoexport: %v", err)
 		os.Exit(1)
 	}
 
@@ -63,9 +66,9 @@ func main() {
 
 	if !opts.Quiet {
 		if numDocs == 1 {
-			fmt.Fprintf(os.Stderr, fmt.Sprintf("exported %v record\n", numDocs))
+			log.Logf(0, "exported %v record", numDocs)
 		} else {
-			fmt.Fprintf(os.Stderr, fmt.Sprintf("exported %v records\n", numDocs))
+			log.Logf(0, "exported %v records", numDocs)
 		}
 	}
 }

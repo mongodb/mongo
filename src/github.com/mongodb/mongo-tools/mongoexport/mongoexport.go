@@ -5,6 +5,7 @@ import (
 	"github.com/mongodb/mongo-tools/common/bsonutil"
 	"github.com/mongodb/mongo-tools/common/db"
 	sloppyjson "github.com/mongodb/mongo-tools/common/json"
+	"github.com/mongodb/mongo-tools/common/log"
 	commonopts "github.com/mongodb/mongo-tools/common/options"
 	"github.com/mongodb/mongo-tools/common/util"
 	"github.com/mongodb/mongo-tools/mongoexport/options"
@@ -40,6 +41,25 @@ type MongoExport struct {
 	cmdRunner       db.CommandRunner
 	SessionProvider *db.SessionProvider
 	ExportOutput    ExportOutput
+}
+
+// ExportOutput is an interface that specifies how a document should be formatted
+// and written to an output stream
+type ExportOutput interface {
+	// WriteHeader outputs any pre-record headers that are written once
+	// per output file.
+	WriteHeader() error
+
+	// WriteRecord writes the given document to the given io.Writer according to
+	// the format supported by the underlying ExportOutput implementation.
+	ExportDocument(bson.M) error
+
+	// WriteFooter outputs any post-record headers that are written once per
+	// output file.
+	WriteFooter() error
+
+	// Flush writes any pending data to the underlying I/O stream.
+	Flush() error
 }
 
 func (exp *MongoExport) Init() error {
@@ -177,8 +197,15 @@ func (exp *MongoExport) Export() (int64, error) {
 	if err != nil {
 		return 0, err
 	}
-
 	defer docSource.Close()
+	connURL := exp.ToolOptions.Host
+	if connURL == "" {
+		connURL = util.DefaultHost
+	}
+	if exp.ToolOptions.Port != "" {
+		connURL = connURL + ":" + exp.ToolOptions.Port
+	}
+	log.Logf(0, "connected to: %v", connURL)
 
 	// Write headers
 	err = exportOutput.WriteHeader()
@@ -226,30 +253,11 @@ func (exp *MongoExport) getExportOutput(out io.Writer) (ExportOutput, error) {
 				return nil, err
 			}
 		} else {
-			return nil, fmt.Errorf("csv mode requires a field list")
+			return nil, fmt.Errorf("CSV mode requires a field list")
 		}
 		return NewCSVExportOutput(fields, out), nil
 	}
 	return NewJSONExportOutput(exp.OutputOpts.JSONArray, out), nil
-}
-
-// ExportOutput is an interface that specifies how a document should be formatted
-// and written to an output stream
-type ExportOutput interface {
-	// WriteHeader outputs any pre-record headers that are written once
-	// per output file.
-	WriteHeader() error
-
-	// WriteRecord writes the given document to the given io.Writer according to
-	// the format supported by the underlying ExportOutput implementation.
-	ExportDocument(bson.M) error
-
-	// WriteFooter outputs any post-record headers that are written once per
-	// output file.
-	WriteFooter() error
-
-	// Flush writes any pending data to the underlying I/O stream.
-	Flush() error
 }
 
 // getObjectFromArg takes an object in extended JSON, and converts it to an object that
@@ -259,14 +267,14 @@ func getObjectFromArg(queryRaw string) (map[string]interface{}, error) {
 	parsedJSON := map[string]interface{}{}
 	err := sloppyjson.Unmarshal([]byte(queryRaw), &parsedJSON)
 	if err != nil {
-		return nil, fmt.Errorf("Query '%v' is not valid JSON: %v", queryRaw, err)
+		return nil, fmt.Errorf("query '%v' is not valid JSON: %v", queryRaw, err)
 	}
 
 	for key, val := range parsedJSON {
 		if valSubDoc, ok := val.(map[string]interface{}); ok {
 			newVal, err := bsonutil.ParseSpecialKeys(valSubDoc)
 			if err != nil {
-				return nil, fmt.Errorf("Error in query: %v", err)
+				return nil, fmt.Errorf("error parsing query '%v': %v", valSubDoc, err)
 			}
 			parsedJSON[key] = newVal
 		}
@@ -280,7 +288,8 @@ func getSortFromArg(queryRaw string) (bson.D, error) {
 	parsedJSON := bson.D{}
 	err := sloppyjson.Unmarshal([]byte(queryRaw), &parsedJSON)
 	if err != nil {
-		return nil, fmt.Errorf("Query is not valid JSON: %v", err)
+		return nil, fmt.Errorf("query '%v' is not valid JSON: %v", queryRaw, err)
 	}
+	// TODO: verify sort specification before returning a nil error
 	return parsedJSON, nil
 }
