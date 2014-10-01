@@ -58,6 +58,7 @@ namespace repl {
         virtual ~Manager();
         void msgReceivedNewConfig(BSONObj);
         void msgCheckNewState();
+        bool shouldBeRecoveringDueToAuthIssue();
     };
 
 } // namespace repl

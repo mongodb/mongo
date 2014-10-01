@@ -33,22 +33,6 @@ assert.eq( 1, t.find( {a:{$type:6}} ).hint( {a:1} ).itcount() );
 t.save( {a:null} );
 assert.eq( 1, t.find( {a:{$type:6}} ).hint( {a:1} ).itcount() );
 
-// Type Timestamp
-t.remove({});
-t.save( {a:new Timestamp()} );
-assert.eq( 1, t.find( {a:{$type:17}} ).itcount() );
-if ( 0 ) { // SERVER-3304
-assert.eq( 0, t.find( {a:{$type:9}} ).itcount() );
-}
-
-// Type Date
-t.remove({});
-t.save( {a:new Date()} );
-if ( 0 ) { // SERVER-3304
-assert.eq( 0, t.find( {a:{$type:17}} ).itcount() );
-}
-assert.eq( 1, t.find( {a:{$type:9}} ).itcount() );
-
 // Type Code
 t.remove({});
 t.save( {a:function(){var a = 0;}} );
@@ -58,3 +42,24 @@ assert.eq( 1, t.find( {a:{$type:13}} ).itcount() );
 t.remove({});
 t.save( {a:new BinData(0,'')} );
 assert.eq( 1, t.find( {a:{$type:5}} ).itcount() );
+
+// Type Timestamp
+t.remove({});
+t.save( {a:new Timestamp()} );
+assert.eq( 1, t.find( {a:{$type:17}} ).itcount() );
+if ( 0 ) { // SERVER-3304
+assert.eq( 0, t.find( {a:{$type:9}} ).itcount() );
+}
+
+// Due to SERVER-3304 we need to restart with a completely clean index with no possible traces of
+// the Timestamp before inserting the Date.
+t.drop();
+t.ensureIndex({a:1});
+
+// Type Date
+t.remove({});
+t.save( {a:new Date()} );
+if ( 0 ) { // SERVER-3304
+assert.eq( 0, t.find( {a:{$type:17}} ).itcount() );
+}
+assert.eq( 1, t.find( {a:{$type:9}} ).itcount() );

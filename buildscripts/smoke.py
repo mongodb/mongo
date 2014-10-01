@@ -521,6 +521,10 @@ def runTest(test, result):
             if smoke_db_prefix:
                 dir_name = smoke_db_prefix + '/unittests'
                 argv.extend(["--dbpath", dir_name] )
+
+            if storage_engine:
+                argv.extend(["--storageEngine", storage_engine])
+
         # more blech
         elif os.path.basename(path) in ['mongos', 'mongos.exe']:
             argv = [path, "--test"]
@@ -670,7 +674,9 @@ def run_tests(tests):
             master.start()
 
         if small_oplog:
-            slave = mongod(slave=True, set_parameters=set_parameters)
+            slave = mongod(slave=True,
+                           storage_engine=storage_engine,
+                           set_parameters=set_parameters)
             slave.start()
         elif small_oplog_rs:
             slave = mongod(slave=True,

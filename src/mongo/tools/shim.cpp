@@ -52,6 +52,7 @@
 #include "mongo/tools/tool_logger.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/options_parser/option_section.h"
+#include "mongo/util/scopeguard.h"
 
 using std::auto_ptr;
 using std::ios_base;
@@ -123,6 +124,10 @@ public:
     }
 
     int doRun() {
+        // Flush stdout before returning from doRun().
+        // XXX: This seems to be an issue under RHEL55 but not under other OSes or more recent
+        //      versions of Linux
+        ON_BLOCK_EXIT(&std::ostream::flush, &cout);
 
         try {
             _ns = getNS();

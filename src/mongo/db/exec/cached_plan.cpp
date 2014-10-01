@@ -98,9 +98,7 @@ namespace mongo {
     }
 
     void CachedPlanStage::saveState() {
-        if (! _usingBackupChild) {
-            _mainChildPlan->saveState();
-        }
+        _mainChildPlan->saveState();
 
         if (NULL != _backupChildPlan.get()) {
             _backupChildPlan->saveState();
@@ -109,12 +107,10 @@ namespace mongo {
     }
 
     void CachedPlanStage::restoreState(OperationContext* opCtx) {
+        _mainChildPlan->restoreState(opCtx);
+
         if (NULL != _backupChildPlan.get()) {
             _backupChildPlan->restoreState(opCtx);
-        }
-
-        if (! _usingBackupChild) {
-            _mainChildPlan->restoreState(opCtx);
         }
         ++_commonStats.unyields;
     }

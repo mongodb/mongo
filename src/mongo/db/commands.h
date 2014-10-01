@@ -155,7 +155,7 @@ namespace mutablebson {
         virtual Status explain(OperationContext* txn,
                                const std::string& dbname,
                                const BSONObj& cmdObj,
-                               Explain::Verbosity verbosity,
+                               ExplainCommon::Verbosity verbosity,
                                BSONObjBuilder* out) const {
             return Status(ErrorCodes::IllegalOperation, "Cannot explain cmd: " + name);
         }

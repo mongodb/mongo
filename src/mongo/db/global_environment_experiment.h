@@ -189,4 +189,11 @@ namespace mongo {
      */
     void setGlobalEnvironment(GlobalEnvironmentExperiment* globalEnvironment);
 
+    /**
+     * Shortcut for querying the storage engine about whether it supports document-level locking.
+     * If this call becomes too expensive, we could cache the value somewhere so we don't have to
+     * fetch the storage engine every time.
+     */
+    bool supportsDocLocking();
+
 }  // namespace mongo

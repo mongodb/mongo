@@ -787,14 +787,14 @@ namespace mongo {
             //
             
             {
-                Lock::DBWrite writeLk(txn->lockState(), ns);
+                Lock::DBLock writeLk(txn->lockState(), nsToDatabaseSubstring(ns), newlm::MODE_X);
 
-                // NOTE: The newShardVersion resulting from this split is higher than any other
-                // chunk version, so it's also implicitly the newCollVersion
+                // NOTE: The newShardVersion resulting from this split is higher than any
+                // other chunk version, so it's also implicitly the newCollVersion
                 ChunkVersion newShardVersion = collVersion;
 
-                // Increment the minor version once, shardingState.splitChunk increments once per
-                // split point (resulting in the correct final shard/collection version)
+                // Increment the minor version once, shardingState.splitChunk increments once
+                // per split point (resulting in the correct final shard/collection version)
                 // TODO: Revisit this interface, it's a bit clunky
                 newShardVersion.incMinor();
 

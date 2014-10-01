@@ -165,7 +165,7 @@ namespace mongo {
             massert(17392, "No _exec. Were we disposed before explained?", _exec);
 
             _exec->restoreState(pExpCtx->opCtx);
-            explainStatus = Explain::explainStages(_exec.get(), Explain::QUERY_PLANNER,
+            explainStatus = Explain::explainStages(_exec.get(), ExplainCommon::QUERY_PLANNER,
                                                    &explainBuilder);
             _exec->saveState();
         }

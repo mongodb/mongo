@@ -10,6 +10,7 @@ env.Library(
                "catalog/namespace_details_rsv1_metadata.cpp",
                "catalog/namespace_index.cpp",
                "data_file.cpp",
+               "data_file_sync.cpp",
                "durable_mapped_file.cpp",
                "dur.cpp",
                "durop.cpp",

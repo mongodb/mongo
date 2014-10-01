@@ -130,7 +130,7 @@ namespace repl {
         return _forceSyncTarget != 0;
     }
 
-    bool ReplSetImpl::shouldChangeSyncTarget(const HostAndPort& currentTarget) const {
+    bool ReplSetImpl::shouldChangeSyncTarget(const HostAndPort& currentTarget) {
         OpTime targetOpTime = findByName(currentTarget.toString())->hbinfo().opTime;
         for (Member *m = _members.head(); m; m = m->next()) {
             if (m->syncable() &&
@@ -142,13 +142,15 @@ namespace repl {
                 return true;
             }
         }
-
+        if (gotForceSync()) {
+            return true;
+        }
         return false;
     }
 
     void ReplSetImpl::_syncThread() {
         StateBox::SP sp = box.get();
-        if (sp.state.primary() || _blockSync) {
+        if (sp.state.primary()) {
             sleepsecs(1);
             return;
         }
@@ -210,14 +212,5 @@ namespace repl {
         cc().shutdown();
     }
 
-    void ReplSetImpl::blockSync(bool block) {
-        // RS lock is already taken in Manager::checkAuth
-        _blockSync = block;
-        if (_blockSync) {
-            // syncing is how we get into SECONDARY state, so we'll be stuck in
-            // RECOVERING until we unblock
-            changeState(MemberState::RS_RECOVERING);
-        }
-    }
 } // namespace repl
 } // namespace mongo

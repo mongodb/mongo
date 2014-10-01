@@ -28,76 +28,55 @@
 
 #pragma once
 
-#include "mongo/db/catalog/collection.h"
 #include "mongo/db/commands.h"
-#include "mongo/db/exec/count.h"
-#include "mongo/db/jsobj.h"
-#include "mongo/db/repl/repl_coordinator_global.h"
 
 namespace mongo {
 
-    class OperationContext;
-
     /**
-     * 'ns' is the namespace we're counting on.
+     * Implements the find command on mongos.
      *
-     * { count: "collectionname"[, query: <query>] }
-     *
-     * @return -1 on ns does not exist error and other errors, 0 on other errors, otherwise the
-     * match count.
-     *
-     * TODO: This is currently used only by the db direct client. It should be removed.
+     * TODO: this is just a placeholder. It needs to be implemented for real under SERVER-15176.
      */
-    long long runCount(OperationContext* txn,
-                       const std::string& ns,
-                       const BSONObj& cmd,
-                       std::string& err,
-                       int& errCode);
-
-    /* select count(*) */
-    class CmdCount : public Command {
+    class ClusterFindCmd : public Command {
+    MONGO_DISALLOW_COPYING(ClusterFindCmd);
     public:
+        ClusterFindCmd() : Command("find") { }
+
         virtual bool isWriteCommandForConfigServer() const { return false; }
-        CmdCount() : Command("count") { }
-        virtual bool slaveOk() const {
-            // ok on --slave setups
-            return repl::getGlobalReplicationCoordinator()->getSettings().slave == repl::SimpleSlave;
-        }
+
+        virtual bool slaveOk() const { return false; }
+
         virtual bool slaveOverrideOk() const { return true; }
+
         virtual bool maintenanceOk() const { return false; }
+
         virtual bool adminOnly() const { return false; }
-        virtual void help( stringstream& help ) const { help << "count objects in collection"; }
-        virtual void addRequiredPrivileges(const std::string& dbname,
-                                           const BSONObj& cmdObj,
-                                           std::vector<Privilege>* out) {
-            ActionSet actions;
-            actions.addAction(ActionType::find);
-            out->push_back(Privilege(parseResourcePattern(dbname, cmdObj), actions));
+
+        virtual void help(stringstream& help) const {
+            help << "query for documents";
         }
+
+        /**
+         * In order to run the find command, you must be authorized for the "find" action
+         * type on the collection.
+         */
+        virtual Status checkAuthForCommand(ClientBasic* client,
+                                           const std::string& dbname,
+                                           const BSONObj& cmdObj);
 
         virtual Status explain(OperationContext* txn,
                                const std::string& dbname,
                                const BSONObj& cmdObj,
-                               Explain::Verbosity verbosity,
+                               ExplainCommon::Verbosity verbosity,
                                BSONObjBuilder* out) const;
 
         virtual bool run(OperationContext* txn,
                          const string& dbname,
-                         BSONObj& cmdObj,
-                         int, string& errmsg,
-                         BSONObjBuilder& result, bool);
-
-        /**
-         * Parses a count command object, 'cmdObj'.
-         *
-         * On success, fills in the out-parameter 'request' and returns an OK status.
-         *
-         * Returns a failure status if 'cmdObj' is not well formed.
-         */
-        Status parseRequest(const std::string& dbname,
-                            const BSONObj& cmdObj,
-                            CountRequest* request) const;
+                         BSONObj& cmdObj, int options,
+                         string& errmsg,
+                         BSONObjBuilder& result,
+                         bool fromRepl);
 
     };
 
-}  // namespace mongo
+} // namespace mongo

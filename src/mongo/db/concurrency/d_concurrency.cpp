@@ -97,23 +97,6 @@ namespace mongo {
         Locker* const _ls;
     };
 
-namespace {
-    /**
-     * Shortcut for querying the storage engine if it supports document-level locking. If this
-     * call becomes too expensive, we could cache the value somewhere so we don't have to fetch
-     * the storage engine every time.
-     */
-    bool supportsDocLocking() {
-        if (hasGlobalEnvironment()) {
-            StorageEngine* globalStorageEngine = getGlobalEnvironment()->getGlobalStorageEngine();
-            if (globalStorageEngine != NULL) {
-                return globalStorageEngine->supportsDocLocking();
-            }
-        }
-
-        return false;
-    }
-}
 
     RWLockRecursive &Lock::ParallelBatchWriterMode::_batchLock = *(new RWLockRecursive("special"));
     void Lock::ParallelBatchWriterMode::iAmABatchParticipant(Locker* lockState) {
@@ -313,7 +296,7 @@ namespace {
         if (supportsDocLocking()) {
             _lockState->lock(_id, mode);
         }
-        else if (isRead) {
+        else {
             _lockState->lock(_id, isRead ? newlm::MODE_S : newlm::MODE_X);
         }
     }
@@ -321,9 +304,6 @@ namespace {
     Lock::CollectionLock::~CollectionLock() {
         _lockState->unlock(_id);
     }
-
-    Lock::DBWrite::DBWrite(Locker* lockState, const StringData& dbOrNs) :
-        DBLock(lockState, nsToDatabaseSubstring(dbOrNs), newlm::MODE_X) { }
 
     Lock::DBRead::DBRead(Locker* lockState, const StringData& dbOrNs) :
         DBLock(lockState, nsToDatabaseSubstring(dbOrNs), newlm::MODE_S) { }

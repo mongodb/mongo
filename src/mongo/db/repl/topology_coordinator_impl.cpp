@@ -569,23 +569,12 @@ namespace {
             response->noteMismatched();
             return;
         }
+        if (_currentConfig.isInitialized()) {
+            invariant(_currentConfig.getReplSetName() == args.getSetName());
+        }
 
         // This is a replica set
         response->noteReplSet();
-
-/*
-        if( cmdObj["checkEmpty"].trueValue() ) {
-            // Eric: XXX takes read lock; only used for initial sync heartbeat
-            resultObj->append("hasData", replHasDatabases());
-        }
-*/
-
-        // Verify that the config's replset name matches
-        if (_currentConfig.getReplSetName() != args.getSetName()) {
-            *result = Status(ErrorCodes::BadValue, "repl set names do not match (2)");
-            response->noteMismatched();
-            return; 
-        }
         response->setSetName(_currentConfig.getReplSetName());
 
         const MemberState myState = getMemberState();
@@ -1325,6 +1314,14 @@ namespace {
         _stepDownUntil = newTime;
     }
 
+    OpTime TopologyCoordinatorImpl::getElectionTime() const {
+        return _electionTime;
+    }
+
+    OID TopologyCoordinatorImpl::getElectionId() const {
+        return _electionId;
+    }
+
     int TopologyCoordinatorImpl::getCurrentPrimaryIndex() const {
         return _currentPrimaryIndex;
     }
@@ -1630,6 +1627,12 @@ namespace {
         // If there exists a viable sync source member other than currentSource, whose oplog has
         // reached an optime greater than _maxSyncSourceLagSecs later than currentSource's, return
         // true.
+
+        // If the user requested a sync source change, return true.
+        if (_forceSyncSourceIndex != -1) {
+            return true;
+        }
+
         const int currentMemberIndex = findMemberIndexForHostAndPort(_currentConfig, currentSource);
         if (currentMemberIndex == -1) {
             return true;

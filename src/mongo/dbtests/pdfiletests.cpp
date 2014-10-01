@@ -35,10 +35,6 @@
 #include "mongo/db/json.h"
 #include "mongo/db/ops/insert.h"
 #include "mongo/db/catalog/collection.h"
-#include "mongo/db/storage/mmap_v1/data_file.h"
-#include "mongo/db/storage/mmap_v1/extent.h"
-#include "mongo/db/storage/mmap_v1/extent_manager.h"
-#include "mongo/db/storage/mmap_v1/mmap_v1_extent_manager.h"
 #include "mongo/db/operation_context_impl.h"
 #include "mongo/dbtests/dbtests.h"
 
@@ -48,15 +44,15 @@ namespace PdfileTests {
         class Base {
         public:
             Base() : _lk(_txn.lockState()),
-            _wunit(&_txn),
                      _context(&_txn, ns()) {
             }
 
             virtual ~Base() {
                 if ( !collection() )
                     return;
+                WriteUnitOfWork wunit(&_txn);
                 _context.db()->dropCollection( &_txn, ns() );
-                 _wunit.commit();
+                wunit.commit();
             }
 
         protected:
@@ -69,13 +65,13 @@ namespace PdfileTests {
 
             OperationContextImpl _txn;
             Lock::GlobalWrite _lk;
-            WriteUnitOfWork _wunit;
             Client::Context _context;
         };
 
         class InsertNoId : public Base {
         public:
             void run() {
+                WriteUnitOfWork wunit(&_txn);
                 BSONObj x = BSON( "x" << 1 );
                 ASSERT( x["_id"].type() == 0 );
                 Collection* collection = _context.db()->getOrCreateCollection( &_txn, ns() );
@@ -88,6 +84,7 @@ namespace PdfileTests {
                 ASSERT( x["_id"].type() == jstOID );
                 dl = collection->insertDocument( &_txn, x, true );
                 ASSERT( dl.isOK() );
+                wunit.commit();
             }
         };
 
@@ -154,51 +151,6 @@ namespace PdfileTests {
         };
     } // namespace Insert
 
-    class ExtentSizing {
-    public:
-        void run() {
-            MmapV1ExtentManager em( "x", "x", false );
-
-            ASSERT_EQUALS( em.maxSize(), em.quantizeExtentSize( em.maxSize() ) );
-
-            // test that no matter what we start with, we always get to max extent size
-            for ( int obj=16; obj<BSONObjMaxUserSize; obj += 111 ) {
-
-                int sz = em.initialSize( obj );
-
-                double totalExtentSize = sz;
-
-                int numFiles = 1;
-                int sizeLeftInExtent = em.maxSize() - 1;
-
-                for ( int i=0; i<100; i++ ) {
-                    sz = em.followupSize( obj , sz );
-                    ASSERT( sz >= obj );
-                    ASSERT( sz >= em.minSize() );
-                    ASSERT( sz <= em.maxSize() );
-                    ASSERT( sz <= em.maxSize() );
-
-                    totalExtentSize += sz;
-
-                    if ( sz < sizeLeftInExtent ) {
-                        sizeLeftInExtent -= sz;
-                    }
-                    else {
-                        numFiles++;
-                        sizeLeftInExtent = em.maxSize() - sz;
-                    }
-                }
-                ASSERT_EQUALS( em.maxSize(), sz );
-
-                double allocatedOnDisk = (double)numFiles * em.maxSize();
-
-                ASSERT( ( totalExtentSize / allocatedOnDisk ) > .95 );
-
-                invariant( em.numFiles() == 0 );
-            }
-        }
-    };
-
     class All : public Suite {
     public:
         All() : Suite( "pdfile" ) {}
@@ -208,7 +160,6 @@ namespace PdfileTests {
             add< Insert::UpdateDate >();
             add< Insert::UpdateDate2 >();
             add< Insert::ValidId >();
-            add< ExtentSizing >();
         }
     } myall;
 

@@ -6,6 +6,7 @@ Import("env")
 Import("windows")
 Import("mongoCodeVersion")
 Import("s3push")
+Import("has_option")
 
 env = env.Clone()
 env['WIX'] = os.environ.get('WIX')
@@ -30,6 +31,10 @@ objects = [ "$BUILD_DIR/msi/BinaryFragment.wixobj",
 
 # Need to do this in order to get scons to translate path separators into native format
 buildDir = Dir(env["BUILD_DIR"]).path
+if has_option("use-new-tools"):
+	toolBuildDir = "src\mongo-tools"
+else:
+	toolBuildDir = buildDir + r'\mongo'
 
 enterprisebase = 'src\mongo\db\modules\enterprise'
 
@@ -105,6 +110,7 @@ env.Command(objects,
             ' -dLicenseSource=distsrc'
             r' -dEnterpriseBase=' + enterprisebase + '\\'
             ' -dBinarySource=' + buildDir + r'\mongo'
+            ' -dToolBinarySource=' + toolBuildDir +
             ' -dMergeModulesBasePath="$MERGEMODULESBASEPATH"'
             ' -dEdition=' + msi_edition +
             ' -d"ProductId=*\"'

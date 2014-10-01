@@ -320,17 +320,13 @@ namespace mongo {
             ON_BLOCK_EXIT(&RecoveryUnit::syncDataAndTruncateJournal, txn->recoveryUnit());
 
             {
-                WriteUnitOfWork wunit(txn);
                 dbEntry.reset(new MMAPV1DatabaseCatalogEntry(txn,
                                                              dbName,
                                                              reservedPathString,
                                                              storageGlobalParams.directoryperdb,
                                                              true));
                 invariant(!dbEntry->exists());
-                tempDatabase.reset( new Database(txn,
-                                                 dbName,
-                                                 dbEntry.get()));
-                wunit.commit();
+                tempDatabase.reset( new Database(dbName, dbEntry.get()));
             }
 
             map<string,CollectionOptions> namespacesToCopy;

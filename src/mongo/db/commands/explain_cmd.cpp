@@ -75,33 +75,10 @@ namespace mongo {
             return false;
         }
 
-        // Get the verbosity. We use the executionStats verbosity by default.
-        Explain::Verbosity verbosity = Explain::EXEC_STATS;
-        if (!cmdObj["verbosity"].eoo()) {
-            const char* verbStr = cmdObj["verbosity"].valuestrsafe();
-            if (mongoutils::str::equals(verbStr, "queryPlanner")) {
-                verbosity = Explain::QUERY_PLANNER;
-            }
-            else if (mongoutils::str::equals(verbStr, "allPlansExecution")) {
-                verbosity = Explain::EXEC_ALL_PLANS;
-            }
-            else if (mongoutils::str::equals(verbStr, "full")) {
-                verbosity = Explain::FULL;
-            }
-            else if (!mongoutils::str::equals(verbStr, "executionStats")) {
-                Status commandStat(ErrorCodes::BadValue,
-                                   "verbosity string must be one of "
-                                   "{'queryPlanner', 'executionStats', 'allPlansExecution'}");
-                appendCommandStatus(result, commandStat);
-                return false;
-            }
-        }
-
-        if (Object != cmdObj.firstElement().type()) {
-            Status commandStat(ErrorCodes::BadValue,
-                               "explain command requires a nested object");
-            appendCommandStatus(result, commandStat);
-            return false;
+        ExplainCommon::Verbosity verbosity;
+        Status parseStatus = ExplainCommon::parseCmdBSON(cmdObj, &verbosity);
+        if (!parseStatus.isOK()) {
+            return appendCommandStatus(result, parseStatus);
         }
 
         // This is the nested command which we are explaining.
@@ -110,7 +87,7 @@ namespace mongo {
         Command* commToExplain = Command::findCommand(explainObj.firstElementFieldName());
         if (NULL == commToExplain) {
             mongoutils::str::stream ss;
-            ss << "unknown command: " << explainObj.firstElementFieldName();
+            ss << "Explain failed due to unknown command: " << explainObj.firstElementFieldName();
             Status explainStatus(ErrorCodes::CommandNotFound, ss);
             return appendCommandStatus(result, explainStatus);
         }

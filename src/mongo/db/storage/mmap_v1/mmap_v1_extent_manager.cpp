@@ -109,7 +109,7 @@ namespace mongo {
 
             auto_ptr<DataFile> df( new DataFile(n) );
 
-            Status s = df->openExisting( txn, fullNameString.c_str() );
+            Status s = df->openExisting(fullNameString.c_str());
             if ( !s.isOK() ) {
                 return s;
             }

@@ -238,7 +238,7 @@ namespace mongo {
 
     Client::WriteContext::WriteContext(
                 OperationContext* opCtx, const std::string& ns, bool doVersion)
-        : _lk(opCtx->lockState(), ns),
+        : _lk(opCtx->lockState(), nsToDatabaseSubstring(ns), newlm::MODE_X),
           _wunit(opCtx),
           _c(opCtx, ns, doVersion) {
     }
