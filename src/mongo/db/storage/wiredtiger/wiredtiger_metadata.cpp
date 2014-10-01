@@ -199,7 +199,7 @@ namespace mongo {
 
         std::vector<uint64_t> indexes;
         for( itr = _tables.begin(); itr != _tables.end(); ++itr ) {
-            if ( boost::starts_with(itr->second.name, primary.name) )
+            if ( itr->second.isIndex &&  boost::starts_with(itr->second.name, primary.name) )
                 indexes.push_back( itr->first );
         }
         return indexes;
