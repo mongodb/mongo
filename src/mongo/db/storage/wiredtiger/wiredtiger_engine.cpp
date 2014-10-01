@@ -92,7 +92,9 @@ namespace mongo {
 
     void WiredTigerEngine::listDatabases( std::vector<std::string>* out ) const {
         for ( DBMap::const_iterator i = _dbs.begin(); i != _dbs.end(); ++i) {
-            out->push_back( i->first );
+            if ( !i->second->isEmpty() ) {
+                out->push_back( i->first );
+            }
         } 
     }
 
