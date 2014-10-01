@@ -124,7 +124,7 @@ namespace repl {
     public:
         // stop syncing (when this node becomes a primary, e.g.)
         void stop();
-        bool isAssumingPrimary();
+        bool isAssumingPrimary_inlock();
 
         static BackgroundSync* get();
         void shutdown();

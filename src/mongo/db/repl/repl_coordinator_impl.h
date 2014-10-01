@@ -217,11 +217,6 @@ namespace repl {
 
         // ================== Members of replication code internal API ===================
 
-        // This is a temporary hack to set the replset config to the config detected by the
-        // legacy coordinator.
-        // TODO(spencer): Remove this once this class can load its own config
-        void forceCurrentRSConfigHack(const BSONObj& config, int myIndex);
-
         /**
          * Does a heartbeat for a member of the replica set.
          * Should be started during (re)configuration or in the heartbeat callback only.

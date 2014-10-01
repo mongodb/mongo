@@ -394,39 +394,16 @@ namespace mongo {
     }
 
     void MultiPlanStage::saveState() {
-        if (_failure) return;
-
-        // this logic is from multi_plan_runner
-        // but does it really make sense to operate on
-        // the _bestPlan if we've switched to the backup?
-
-        if (bestPlanChosen()) {
-            _candidates[_bestPlanIdx].root->saveState();
-            if (hasBackupPlan()) {
-                _candidates[_backupPlanIdx].root->saveState();
-            }
-        }
-        else {
-            allPlansSaveState();
+        for (size_t i = 0; i < _candidates.size(); ++i) {
+            _candidates[i].root->saveState();
         }
     }
 
     void MultiPlanStage::restoreState(OperationContext* opCtx) {
         _txn = opCtx;
-        if (_failure) return;
 
-        // this logic is from multi_plan_runner
-        // but does it really make sense to operate on
-        // the _bestPlan if we've switched to the backup?
-
-        if (bestPlanChosen()) {
-            _candidates[_bestPlanIdx].root->restoreState(opCtx);
-            if (hasBackupPlan()) {
-                _candidates[_backupPlanIdx].root->restoreState(opCtx);
-            }
-        }
-        else {
-            allPlansRestoreState(opCtx);
+        for (size_t i = 0; i < _candidates.size(); ++i) {
+            _candidates[i].root->restoreState(opCtx);
         }
     }
 
@@ -493,18 +470,6 @@ namespace mongo {
             return NULL;
 
         return _candidates[_bestPlanIdx].solution;
-    }
-
-    void MultiPlanStage::allPlansSaveState() {
-        for (size_t i = 0; i < _candidates.size(); ++i) {
-            _candidates[i].root->saveState();
-        }
-    }
-
-    void MultiPlanStage::allPlansRestoreState(OperationContext* opCtx) {
-        for (size_t i = 0; i < _candidates.size(); ++i) {
-            _candidates[i].root->restoreState(opCtx);
-        }
     }
 
     vector<PlanStage*> MultiPlanStage::getChildren() const {

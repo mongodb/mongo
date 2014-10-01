@@ -55,6 +55,7 @@
 #include "mongo/s/request.h"
 #include "mongo/s/stale_exception.h"
 #include "mongo/s/version_manager.h"
+#include "mongo/s/write_ops/batched_command_request.h"
 #include "mongo/s/write_ops/batch_upconvert.h"
 #include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
@@ -448,6 +449,57 @@ namespace mongo {
             results->push_back( result );
         }
 
+    }
+
+    void Strategy::commandOpWrite(const std::string& db,
+                                  const BSONObj& command,
+                                  int options,
+                                  const std::string& versionedNS,
+                                  BatchItemRef targetingBatchItem,
+                                  std::vector<CommandResult>* results) {
+        // TODO: implement this to target correctly.
+        commandOp(db, command, options, versionedNS, BSONObj(), results);
+    }
+
+    Status Strategy::commandOpUnsharded(const std::string& db,
+                                        const BSONObj& command,
+                                        int options,
+                                        const std::string& versionedNS,
+                                        CommandResult* cmdResult) {
+        DBConfigPtr conf = grid.getDBConfig(db , false);
+        if (!conf) {
+            mongoutils::str::stream ss;
+            ss << "Passthrough command failed: " << command.toString()
+               << " on ns " << versionedNS << ". Cannot find db config info.";
+            return Status(ErrorCodes::IllegalOperation, ss);
+        }
+
+        if (conf->isSharded(versionedNS)) {
+            mongoutils::str::stream ss;
+            ss << "Passthrough command failed: " << command.toString()
+               << " on ns " << versionedNS << ". Cannot run on sharded namespace.";
+            return Status(ErrorCodes::IllegalOperation, ss);
+        }
+
+        Shard primaryShard = conf->getPrimary();
+
+        BSONObj shardResult;
+        try {
+            ShardConnection conn(primaryShard, "");
+            // TODO: this can throw a stale config when mongos is not up-to-date -- fix.
+            conn->runCommand(db, command, shardResult, options);
+            conn.done();
+        }
+        catch (const DBException& ex) {
+            return ex.toStatus();
+        }
+
+        // Fill out the command result.
+        cmdResult->shardTarget = primaryShard;
+        cmdResult->result = shardResult;
+        cmdResult->target = primaryShard.getAddress();
+
+        return Status::OK();
     }
 
     void Strategy::getMore( Request& r ) {

@@ -141,10 +141,6 @@ namespace mongo {
          */
         bool workAllPlans(size_t numResults);
 
-        void allPlansSaveState();
-
-        void allPlansRestoreState(OperationContext* opCtx);
-
         static const int kNoSuchPlan = -1;
 
         // not owned here

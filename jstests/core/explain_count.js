@@ -11,9 +11,20 @@ t.drop();
  */
 function checkCountExplain(explain, nCounted) {
     printjson(explain);
-    var rootStage = explain.executionStats.executionStages;
-    assert.eq(rootStage.stage, "COUNT", "root stage is not COUNT");
-    assert.eq(rootStage.nCounted, nCounted, "wrong count result");
+    var execStages = explain.executionStats.executionStages;
+
+    // If passed through mongos, then the root stage should be the mongos SINGLE_SHARD stage,
+    // with COUNT as its child. If explaining directly on the shard, then COUNT is the root
+    // stage.
+    if ("SINGLE_SHARD" == execStages.stage) {
+        var countStage = execStages.shards[0].executionStages;
+        assert.eq(countStage.stage, "COUNT", "root stage on shard is not COUNT");
+        assert.eq(countStage.nCounted, nCounted, "wrong count result");
+    }
+    else {
+        assert.eq(execStages.stage, "COUNT", "root stage is not COUNT");
+        assert.eq(execStages.nCounted, nCounted, "wrong count result");
+    }
 }
 
 // Collection does not exist.

@@ -46,6 +46,7 @@
 #include "mongo/db/storage/wiredtiger/wiredtiger_recovery_unit.h"
 
 namespace mongo {
+namespace {
     static const int TempKeyMaxSize = 1024; // this goes away with SERVER-3372
 
     static const WiredTigerItem emptyItem(NULL, 0);
@@ -96,9 +97,10 @@ namespace mongo {
      */
     struct WiredTigerIndexCollator : public WT_COLLATOR {
         public:
-            WiredTigerIndexCollator(const Ordering& order): _indexComparator( order ) {
-                    compare = _compare;
-                    terminate = _terminate;
+            WiredTigerIndexCollator(const Ordering& order)
+                    :WT_COLLATOR(), _indexComparator(order) {
+                compare = _compare;
+                terminate = _terminate;
             }
 
             int Compare(WT_SESSION *s, const WT_ITEM *a, const WT_ITEM *b) const {
@@ -149,6 +151,7 @@ namespace mongo {
         sb << "dup key: " << key;
         return Status(ErrorCodes::DuplicateKey, sb.str());
     }
+} // namespace
 
     int WiredTigerIndex::Create(WiredTigerDatabase &db,
             const std::string &ns, const std::string &idxName, IndexCatalogEntry& info) {
@@ -435,7 +438,7 @@ namespace mongo {
 
     void WiredTigerIndex::IndexCursor::savePosition() {
         if ((_savedAtEnd = isEOF()) == false) {
-            _savedKey = getKey();
+            _savedKey = getKey().getOwned();
             _savedLoc = getDiskLoc();
         }
         delete _cursor;

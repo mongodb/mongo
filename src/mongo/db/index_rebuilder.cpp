@@ -64,7 +64,7 @@ namespace {
 
             // This write lock is held throughout the index building process
             // for this namespace.
-            Lock::DBWrite lk(txn->lockState(), ns);
+            Lock::DBLock lk(txn->lockState(), nsToDatabaseSubstring(ns), newlm::MODE_X);
             Client::Context ctx(txn, ns);
 
             Collection* collection = ctx.db()->getCollection(txn, ns);

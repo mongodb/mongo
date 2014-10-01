@@ -77,6 +77,9 @@ namespace mongo {
         options->addOptionChaining("perfHist", "perfHist", moe::Unsigned,
                 "number of back runs of perf stats to display");
 
+        options->addOptionChaining("storage.engine", "storageEngine", moe::String,
+                                   "what storage engine to use")
+               .setDefault(moe::Value(std::string("mmapv1")));
 
         options->addOptionChaining("suites", "suites", moe::StringVector, "test suites to run")
                                   .hidden()
@@ -205,6 +208,8 @@ namespace mongo {
                 log() << "****************" << endl;
             }
         }
+
+        storageGlobalParams.engine = params["storage.engine"].as<string>();
 
         if (params.count("suites")) {
             frameworkGlobalParams.suites = params["suites"].as< vector<string> >();

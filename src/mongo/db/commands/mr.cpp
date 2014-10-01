@@ -332,7 +332,9 @@ namespace mongo {
             if (_useIncremental) {
                 // We don't want to log the deletion of incLong as it isn't replicated. While
                 // harmless, this would lead to a scary looking warning on the secondaries.
-                Lock::DBWrite lk(_txn->lockState(), _config.incLong);
+                Lock::DBLock lk(_txn->lockState(),
+                                nsToDatabaseSubstring(_config.incLong),
+                                newlm::MODE_X);
                 if (Database* db = dbHolder().get(_txn, _config.incLong)) {
                     WriteUnitOfWork wunit(_txn);
                     db->dropCollection(_txn, _config.incLong);
@@ -591,9 +593,11 @@ namespace mongo {
                 op->setMessage("m/r: merge post processing",
                                "M/R Merge Post Processing Progress",
                                _safeCount(_db, _config.tempNamespace, BSONObj()));
-                auto_ptr<DBClientCursor> cursor = _db.query( _config.tempNamespace , BSONObj() );
-                while ( cursor->more() ) {
-                    Lock::DBWrite lock(_txn->lockState(), _config.outputOptions.finalNamespace);
+                auto_ptr<DBClientCursor> cursor = _db.query(_config.tempNamespace , BSONObj());
+                while (cursor->more()) {
+                    Lock::DBLock lock(_txn->lockState(),
+                                      nsToDatabaseSubstring(_config.outputOptions.finalNamespace),
+                                      newlm::MODE_X);
                     WriteUnitOfWork wunit(_txn);
                     BSONObj o = cursor->nextSafe();
                     Helpers::upsert( _txn, _config.outputOptions.finalNamespace , o );
@@ -1110,7 +1114,9 @@ namespace mongo {
             if ( ! _onDisk )
                 return;
 
-            Lock::DBWrite kl(_txn->lockState(), _config.incLong);
+            Lock::DBLock kl(_txn->lockState(),
+                            nsToDatabaseSubstring(_config.incLong),
+                            newlm::MODE_X);
             WriteUnitOfWork wunit(_txn);
 
             for ( InMemory::iterator i=_temp->begin(); i!=_temp->end(); i++ ) {

@@ -173,7 +173,7 @@ namespace mongo {
     Status GroupCommand::explain(OperationContext* txn,
                                  const std::string& dbname,
                                  const BSONObj& cmdObj,
-                                 Explain::Verbosity verbosity,
+                                 ExplainCommon::Verbosity verbosity,
                                  BSONObjBuilder* out) const {
         GroupRequest groupRequest;
         Status parseRequestStatus = parseRequest(dbname, cmdObj, &groupRequest);

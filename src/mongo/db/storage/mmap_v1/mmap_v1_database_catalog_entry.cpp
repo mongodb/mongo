@@ -28,11 +28,14 @@
 *    it in the license file.
 */
 
+#include "mongo/platform/basic.h"
+
 #include "mongo/db/storage/mmap_v1/mmap_v1_database_catalog_entry.h"
 
 #include <utility>
 
 #include "mongo/db/catalog/index_catalog_entry.h"
+#include "mongo/db/client.h"
 #include "mongo/db/index/2d_access_method.h"
 #include "mongo/db/index/btree_access_method.h"
 #include "mongo/db/index/btree_based_access_method.h"
@@ -50,6 +53,7 @@
 #include "mongo/db/storage/mmap_v1/dur_recovery_unit.h"
 #include "mongo/db/storage/mmap_v1/record_store_v1_capped.h"
 #include "mongo/db/storage/mmap_v1/record_store_v1_simple.h"
+#include "mongo/util/file_allocator.h"
 #include "mongo/util/log.h"
 
 namespace mongo {
@@ -114,7 +118,18 @@ namespace mongo {
           _extentManager( name, path, directoryPerDB ),
           _namespaceIndex( _path, name.toString() ) {
 
+        uassert(17507,
+                "Cannot open or create database while out of disk space",
+                !FileAllocator::get()->hasFailed());
+
         try {
+            // we mark our thread as having done writes now as we do not want any exceptions
+            // once we start creating a new database
+            // TODO(Mathias): Remove this when rollback is enabled.
+            txn->getClient()->writeHappened();
+
+            WriteUnitOfWork wunit(txn);
+
             Status s = _extentManager.init(txn);
             if ( !s.isOK() ) {
                 msgasserted( 16966, str::stream() << "_extentManager.init failed: " << s.toString() );
@@ -163,6 +178,8 @@ namespace mongo {
                     }
                 }
             }
+
+            wunit.commit();
         }
         catch(std::exception& e) {
             log() << "warning database " << path << " " << name << " could not be opened";

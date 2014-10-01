@@ -129,6 +129,7 @@ namespace {
         // If all ops in the buffer have been applied, unblock waitForRepl (if it's waiting)
         if (_buffer.empty()) {
             _appliedBuffer = true;
+            _replCoord->signalDrainComplete();
             _condvar.notify_all();
         }
     }
@@ -154,10 +155,10 @@ namespace {
     }
 
     void BackgroundSync::_producerThread() {
-        MemberState state = theReplSet->state();
+        MemberState state = _replCoord->getCurrentMemberState();
 
         // we want to pause when the state changes to primary
-        if (isAssumingPrimary() || state.primary()) {
+        if (_replCoord->isWaitingForApplierToDrain() || state.primary()) {
             if (!_pause) {
                 stop();
             }
@@ -264,13 +265,11 @@ namespace {
                     //
                     sleepmillis(SleepToAllowBatchingMillis);
                 }
-  
-                if (theReplSet->gotForceSync()) {
-                    return;
-                }
+
                 // If we are transitioning to primary state, we need to leave
                 // this loop in order to go into bgsync-pause mode.
-                if (isAssumingPrimary() || theReplSet->isPrimary()) {
+                if (_replCoord->isWaitingForApplierToDrain() || 
+                    _replCoord->getCurrentMemberState().primary()) {
                     return;
                 }
 
@@ -464,8 +463,7 @@ namespace {
             " " << _lastFetchedHash << rsLog;
     }
 
-    bool BackgroundSync::isAssumingPrimary() {
-        boost::unique_lock<boost::mutex> lck(_mutex);
+    bool BackgroundSync::isAssumingPrimary_inlock() {
         return _assumingPrimary;
     }
 

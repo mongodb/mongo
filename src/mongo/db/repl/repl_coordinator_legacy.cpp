@@ -67,7 +67,7 @@ namespace mongo {
 namespace repl {
 
     LegacyReplicationCoordinator::LegacyReplicationCoordinator(const ReplSettings& settings) :
-            _settings(settings) {
+            _maintenanceMode(0), _settings(settings) {
         // this is ok but micros or combo with some rand() and/or 64 bits might be better --
         // imagine a restart and a clock correction simultaneously (very unlikely but possible...)
         _rbid = (int) curTimeMillis64();
@@ -384,7 +384,10 @@ namespace {
                     invariant(_ridMemberMap.count(rid));
                     Member* mem = _ridMemberMap[rid];
                     invariant(mem);
-                    config = BSON("_id" << mem->id());
+                    config = BSON("_id" << mem->id() << "host" << mem->h().toString());
+                }
+                else if (getReplicationMode() == modeMasterSlave){
+                    config = BSON("host" << txn->getClient()->getRemote().toString());
                 }
                 LOG(2) << "received notification that node with RID " << rid << " and config "
                        << config << " has reached optime: " << ts;
@@ -448,20 +451,27 @@ namespace {
     }
 
     int LegacyReplicationCoordinator::getMyId() const {
-        invariant(false);
-        return 0;
+        invariant(theReplSet);
+        return theReplSet->myConfig()._id;
     }
 
     void LegacyReplicationCoordinator::setFollowerMode(const MemberState& newState) {
+        if (newState.secondary() &&
+                theReplSet->state().recovering() &&
+                theReplSet->mgr->shouldBeRecoveringDueToAuthIssue()) {
+            // If tryToGoLiveAsSecondary is trying to take us from RECOVERING to SECONDARY, but we
+            // still have an authIssue, don't actually change states.
+            return;
+        }
         theReplSet->changeState(newState);
     }
 
     bool LegacyReplicationCoordinator::isWaitingForApplierToDrain() {
-        // TODO
-        return false;
+        return BackgroundSync::get()->isAssumingPrimary_inlock();
     }
 
     void LegacyReplicationCoordinator::signalDrainComplete() {
+        // nothing further to do
     }
 
     void LegacyReplicationCoordinator::prepareReplSetUpdatePositionCommand(
@@ -550,8 +560,39 @@ namespace {
         result->append("config", theReplSet->config().asBson());
     }
 
+    bool LegacyReplicationCoordinator::_setMaintenanceMode_inlock(OperationContext* txn,
+                                                                  bool activate) {
+        if (theReplSet->state().primary()) {
+            return false;
+        }
+
+        if (activate) {
+            log() << "replSet going into maintenance mode (" << _maintenanceMode
+                  << " other tasks)" << rsLog;
+
+            _maintenanceMode++;
+            theReplSet->changeState(MemberState::RS_RECOVERING);
+        }
+        else if (_maintenanceMode > 0) {
+            _maintenanceMode--;
+            // no need to change state, syncTail will try to go live as a secondary soon
+
+            log() << "leaving maintenance mode (" << _maintenanceMode << " other tasks)" << rsLog;
+        }
+        else {
+            return false;
+        }
+
+        fassert(16844, _maintenanceMode >= 0);
+        return true;
+    }
+
     Status LegacyReplicationCoordinator::setMaintenanceMode(OperationContext* txn, bool activate) {
-        if (!theReplSet->setMaintenanceMode(txn, activate)) {
+        // Lock here to prevent state from changing between checking the state and changing it
+        Lock::GlobalWrite writeLock(txn->lockState());
+        boost::lock_guard<boost::mutex> lock(_mutex);
+
+        if (!_setMaintenanceMode_inlock(txn, activate)) {
             if (theReplSet->isPrimary()) {
                 return Status(ErrorCodes::NotSecondary, "primaries can't modify maintenance mode");
             }
@@ -563,7 +604,8 @@ namespace {
     }
 
     bool LegacyReplicationCoordinator::getMaintenanceMode() {
-        return theReplSet->getMaintenanceMode();
+        boost::lock_guard<boost::mutex> lock(_mutex);
+        return _maintenanceMode > 0;
     }
 
     Status LegacyReplicationCoordinator::processHeartbeat(const ReplSetHeartbeatArgs& args,

@@ -72,8 +72,8 @@ def parseSourceFiles( callback ):
 
                 for b in bad:
                     if b.search(line):
-                        print( "%s\n%d" % (sourceFile, line) )
                         msg = "Bare assert prohibited. Replace with [umwdf]assert"
+                        print( "%s:%s: %s\n%s" % (sourceFile, lineNum, msg, line) )
                         raise Exception(msg)
 
                 # no more than one pattern should ever match
