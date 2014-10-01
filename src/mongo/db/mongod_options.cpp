@@ -1181,4 +1181,16 @@ namespace mongo {
         return Status::OK();
     }
 
+namespace {
+    repl::ReplSettings globalReplSettings;
+} // namespace
+
+    void setGlobalReplSettings(const repl::ReplSettings& settings) {
+        globalReplSettings = settings;
+    }
+
+    const repl::ReplSettings& getGlobalReplSettings() {
+        return globalReplSettings;
+    }
+
 } // namespace mongo

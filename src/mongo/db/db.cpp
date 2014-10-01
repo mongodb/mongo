@@ -69,9 +69,7 @@
 #include "mongo/db/query/internal_plans.h"
 #include "mongo/db/range_deleter_service.h"
 #include "mongo/db/repair_database.h"
-#include "mongo/db/repl/network_interface_impl.h"
 #include "mongo/db/repl/repl_coordinator_global.h"
-#include "mongo/db/repl/repl_coordinator_legacy.h"
 #include "mongo/db/repl/repl_settings.h"
 #include "mongo/db/restapi.h"
 #include "mongo/db/server_parameters.h"
@@ -735,22 +733,6 @@ MONGO_INITIALIZER_GENERAL(CreateAuthorizationManager,
     AuthorizationManager* authzManager =
             new AuthorizationManager(new AuthzManagerExternalStateMongod());
     setGlobalAuthorizationManager(authzManager);
-    return Status::OK();
-}
-
-namespace {
-    repl::ReplSettings globalReplSettings;
-} // namespace
-
-namespace mongo {
-    void setGlobalReplSettings(const repl::ReplSettings& settings) {
-        globalReplSettings = settings;
-    }
-} // namespace mongo
-
-MONGO_INITIALIZER_WITH_PREREQUISITES(CreateReplicationManager, ("SetGlobalEnvironment"))
-        (InitializerContext* context) {
-    repl::setGlobalReplicationCoordinator(new repl::LegacyReplicationCoordinator(globalReplSettings));
     return Status::OK();
 }
 

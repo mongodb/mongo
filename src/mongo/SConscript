@@ -965,7 +965,8 @@ env.Library("mongodwebserver",
              ],
             LIBDEPS=["coredb", "mongodandmongos"])
 
-mongodOnlyFiles = [ "db/db.cpp", "db/commands/touch.cpp", "db/mongod_options_init.cpp" ]
+mongodOnlyFiles = [ "db/db.cpp", "db/commands/touch.cpp", "db/mongod_options_init.cpp",
+                    "db/repl/replication_initializer_${MONGO_REPL_IMPL}.cpp", ]
 
 # ----- TARGETS ------
 

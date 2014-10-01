@@ -43,6 +43,4 @@ namespace repl {
 
     extern void (*snmpInit)();
 
-    void setGlobalReplSettings(const repl::ReplSettings& settings);
-
 } // namespace mongo
