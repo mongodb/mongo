@@ -34,12 +34,7 @@ for i in `sed -e '/^[a-z]/! d' filelist`; do
 	    -e 's/WT_GCC_FUNC_/WT_GCC_/' \
 	    -e 's/$/;/p' \
 	    < ../$i
-done) | awk '{
-
-	if (length() > 80)
-		gsub(", ", ",\n    ");
-	print $0
-}' > $t
+done) > $t
 
 f=../src/include/extern.h
 cmp $t $f > /dev/null 2>&1 ||
