@@ -29,6 +29,8 @@
  *    it in the license file.
  */
  
+#include <boost/algorithm/string/predicate.hpp>
+
 #include "mongo/db/storage/wiredtiger/wiredtiger_metadata.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_database.h"
 
@@ -43,11 +45,12 @@
 
 namespace mongo {
 
-    const char * WiredTigerMetaData::WT_METADATA_URI = "table:metadata";
-    // Key is the identifier, value is name, isIndex, metadata
+    const char * WiredTigerMetaData::WT_METADATA_URI = "table:db_metadata";
+    // Key is the identifier, value is name, uri, isIndex, isDeleted, metadata
     const char * WiredTigerMetaData::WT_METADATA_CONFIG =
-        "key_format=q,value_format=SbS,leaf_page_max=4k,internal_page_max=4k";
-    const uint64_t WiredTigerMetaData::INVALID_METADATA_IDENTIFIER = std::numeric_limits<uint64_t>::max();
+        "key_format=q,value_format=SSbbS,leaf_page_max=4k,internal_page_max=4k";
+    const uint64_t WiredTigerMetaData::INVALID_METADATA_IDENTIFIER =
+                                         std::numeric_limits<uint64_t>::max();
 
     WiredTigerMetaData::WiredTigerMetaData( )
     {
@@ -94,6 +97,13 @@ namespace mongo {
         return ( itr->second.uri );
     }
 
+    BSONObj &WiredTigerMetaData::getConfig(uint64_t identifier)
+    {
+        WiredTigerMetaDataMap::iterator itr = _tables.find(identifier);
+        invariant( itr != _tables.end() );
+        return ( itr->second.config );
+    }
+
     std::string WiredTigerMetaData::getURI(std::string name)
     {
         return getURI( getIdentifier( name ) );
@@ -109,7 +119,7 @@ namespace mongo {
         return INVALID_METADATA_IDENTIFIER;
     }
 
-    uint64_t WiredTigerMetaData::generateIdentifier(std::string tableName, BSONObj metaData)
+    uint64_t WiredTigerMetaData::generateIdentifier(std::string tableName, BSONObj config)
     {
         uint64_t old_id;
 
@@ -121,53 +131,96 @@ namespace mongo {
 
         uint64_t id = _generateIdentifier(tableName);
         std::string uri = _generateURI(tableName, id);
-        MetaDataEntry entry(tableName, uri, metaData, _isIndexName(tableName), false);
+
+        // Add the new table to the in memory map
+        MetaDataEntry entry(tableName, uri, config, _isIndexName(tableName), false);
         _tables.insert( std::pair<uint64_t, MetaDataEntry>( id, entry ) );
+
+        // Add the new table to the WiredTiger metadata table.
+        _persistEntry( id, entry );
 
         return id;
     }
 
     Status WiredTigerMetaData::remove(uint64_t identifier, bool failedDrop)
     {
+        if ( failedDrop ) {
+            WiredTigerMetaDataMap::iterator itr = _tables.find(identifier);
+            invariant( itr != _tables.end() );
+            MetaDataEntry &entry = itr->second;
+            entry.isDeleted = true;
+            _persistEntry( identifier, entry );
+        } else {
+            // Remove the entry from the map and metadata table
+            _tables.erase( identifier );
+            _metaDataCursor->set_key( _metaDataCursor, identifier );
+            _metaDataCursor->remove( _metaDataCursor );
+            _metaDataCursor->reset(_metaDataCursor);
+        }
         return Status::OK();
     }
 
     Status WiredTigerMetaData::rename(uint64_t identifier, std::string newName)
     {
+        WiredTigerMetaDataMap::iterator itr = _tables.find(identifier);
+        invariant( itr != _tables.end() );
+        MetaDataEntry &entry = itr->second;
+        entry.name = newName;
+        _persistEntry( identifier, entry );
         return Status::OK();
     }
 
-    Status WiredTigerMetaData::updateMetaData(uint64_t identifier, BSONObj newMetaData)
+    Status WiredTigerMetaData::updateConfig(uint64_t identifier, BSONObj newConfig)
     {
+        WiredTigerMetaDataMap::iterator itr = _tables.find(identifier);
+        invariant( itr != _tables.end() );
+        MetaDataEntry &entry = itr->second;
+        entry.config = newConfig;
+        _persistEntry( identifier, entry );
         return Status::OK();
     }
 
-    std::map<std::string, BSONObj> WiredTigerMetaData::getAllTables()
+    std::vector<uint64_t> WiredTigerMetaData::getAllTables()
     {
-        return std::map<std::string, BSONObj>();
+        WiredTigerMetaDataMap::iterator itr;
+        std::vector<uint64_t> tables;
+        for( itr = _tables.begin(); itr != _tables.end(); ++itr ) {
+            if ( !itr->second.isIndex )
+                tables.push_back( itr->first );
+        }
+        return tables;
     }
 
-    std::map<std::string, BSONObj> WiredTigerMetaData::getAllIndexes(std::string identifier)
+    std::vector<uint64_t> WiredTigerMetaData::getAllIndexes(uint64_t identifier)
     {
-        return std::map<std::string, BSONObj>();
+        WiredTigerMetaDataMap::iterator itr = _tables.find(identifier);
+        invariant( itr != _tables.end() );
+        MetaDataEntry &primary = itr->second;
+
+        std::vector<uint64_t> indexes;
+        for( itr = _tables.begin(); itr != _tables.end(); ++itr ) {
+            if ( boost::starts_with(itr->second.name, primary.name) )
+                indexes.push_back( itr->first );
+        }
+        return indexes;
     }
 
     // Internal methods.
     Status WiredTigerMetaData::_populate()
     {
         uint64_t identifier, max_id;
-        const char *cTableName;
+        const char *cTableName, *cURI;
         bool isIndex;
-        const char *metaData;
+        const char *config;
         max_id = 0;
         while ( _metaDataCursor->next(_metaDataCursor) == 0 )
         {
             _metaDataCursor->get_key(_metaDataCursor, &identifier);
-            _metaDataCursor->get_value(_metaDataCursor, &cTableName, &isIndex, &metaData);
-            BSONObj b( fromjson(std::string(metaData)));
+            _metaDataCursor->get_value(_metaDataCursor, &cTableName, &cURI, &isIndex, &config);
+            BSONObj b( fromjson(std::string(config)));
 
             std::string tableName(cTableName);
-            std::string uri = _generateURI(tableName, identifier);
+            std::string uri(cURI);
             _tables.insert( std::pair<uint64_t, MetaDataEntry>( identifier, 
                 MetaDataEntry(tableName, uri, b, isIndex, false) ) );
             if (identifier > max_id)
@@ -192,7 +245,6 @@ namespace mongo {
         return ( tableName.find( ".$" ) != string::npos );
     }
 
-    // Passes in the tableName to generate different identifiers for collections and indexes
     std::string WiredTigerMetaData::_generateURI(std::string tableName, uint64_t id)
     {
         std::ostringstream uri;
@@ -201,4 +253,17 @@ namespace mongo {
         return uri.str();
     }
 
+    void WiredTigerMetaData::_persistEntry(uint64_t id, MetaDataEntry &entry)
+    {
+        _metaDataCursor->set_key(_metaDataCursor, id);
+        _metaDataCursor->set_value(_metaDataCursor,
+                     entry.name.c_str(),
+                     entry.uri.c_str(),
+                     entry.isIndex,
+                     entry.isDeleted,
+                     entry.config.jsonString().c_str());
+        int ret = _metaDataCursor->insert(_metaDataCursor);
+        invariant( ret == 0 );
+        _metaDataCursor->reset(_metaDataCursor);
+    }
 }

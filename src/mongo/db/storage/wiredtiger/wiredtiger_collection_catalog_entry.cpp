@@ -55,19 +55,12 @@ namespace mongo {
         : CollectionCatalogEntry ( ns ), options() {
 
         WiredTigerMetaData &md = db.GetMetaData();
-        uint64_t tblIdentifier = md.generateIdentifier( ns.toString(), options.toBSON() );
+        uint64_t tblIdentifier = md.getIdentifier( ns.toString() );
         std::string tbl_uri = md.getURI( tblIdentifier );
+        BSONObj b = md.getConfig( tblIdentifier );
 
         // Open the WiredTiger metadata so we can retrieve saved options.
         WiredTigerSession swrap(db);
-        WiredTigerCursor cursor("metadata:", swrap);
-        WT_CURSOR *c = cursor.Get();
-        invariant(c != NULL);
-        c->set_key(c, tbl_uri.c_str());
-        int ret = c->search(c);
-        // TODO: Could we reasonably fail with NOTFOUND here?
-        invariantWTOK(ret);
-        BSONObj b = _getSavedMetadata(cursor);
 
         // Create the collection
         options.parse(b);
@@ -80,35 +73,21 @@ namespace mongo {
         rs.reset(wtRecordStore);
 
         // Open any existing indexes
-        ret = c->next(c);
-        while (ret == 0) {
-            const char *uri_str;
-            ret = c->get_key(c, &uri_str);
-            invariantWTOK(ret);
-            std::string uri(uri_str);
-            // No more indexes for this table
-            if (uri.substr(0, tbl_uri.size()) != tbl_uri)
-                break;
+        std::vector<uint64_t> indexIds = md.getAllIndexes( tblIdentifier );
+        for ( std::vector<uint64_t>::iterator it = indexIds.begin();
+                it != indexIds.end(); ++it ) {
+            b = md.getConfig( *it );
+            std::string name(b.getStringField("name"));
+            IndexDescriptor desc(0, "unknown", b);
+            auto_ptr<IndexEntry> newEntry( new IndexEntry() );
+            newEntry->name = name;
+            newEntry->spec = desc.infoObj();
+            // TODO: We need to stash the options field on create and decode them
+            // here.
+            newEntry->ready = true;
+            newEntry->isMultikey = false;
 
-            size_t pos;
-            if ((pos = uri.find('$')) != std::string::npos && pos < uri.size() - 1) {
-                std::string idx_name = uri.substr(pos + 1);
-
-                b = _getSavedMetadata(cursor);
-                std::string name(b.getStringField("name"));
-                IndexDescriptor desc(0, "unknown", b);
-                auto_ptr<IndexEntry> newEntry( new IndexEntry() );
-                newEntry->name = name;
-                newEntry->spec = desc.infoObj();
-                // TODO: We need to stash the options field on create and decode them
-                // here.
-                newEntry->ready = true;
-                newEntry->isMultikey = false;
-
-                indexes[name] = newEntry.release();
-            }
-
-            ret = c->next(c);
+            indexes[name] = newEntry.release();
         }
     }
 
@@ -186,12 +165,14 @@ namespace mongo {
         WiredTigerSession &swrap_real = WiredTigerRecoveryUnit::Get(txn).GetSession();
         WiredTigerSession swrap(swrap_real.GetDatabase());
 
-        // Close and cached cursors
+        // Close any cached cursors
         swrap_real.GetContext().CloseAllCursors();
         swrap.GetContext().CloseAllCursors();
 
+        std::string uri = swrap_real.GetDatabase().GetMetaData().getURI(
+                WiredTigerIndex::toTableName( ns().toString(), idxName.toString() ) );
         WT_SESSION *session = swrap.Get();
-        int ret = session->drop(session, WiredTigerIndex::_getURI(ns().toString(), idxName.toString()).c_str(), "force");
+        int ret = session->drop(session, uri.c_str(), "force");
         invariantWTOK(ret);
         indexes.erase( idxName.toString() );
         return Status::OK();

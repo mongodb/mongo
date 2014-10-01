@@ -31,6 +31,7 @@
  
 #include "mongo/db/storage/wiredtiger/wiredtiger_database_catalog_entry.h"
 
+#include <boost/algorithm/string/predicate.hpp>
 #include <boost/filesystem/operations.hpp>
 #include <boost/filesystem/path.hpp>
 
@@ -106,32 +107,18 @@ namespace mongo {
         if (!_entryMap.empty())
             return;
 
-        WiredTigerSession swrap(_db);
-        WiredTigerCursor cursor("metadata:", swrap);
-        WT_CURSOR *c = cursor.Get();
-        invariant(c != NULL);
-
-        int ret;
-        const char *key;
-        std::string table_prefix = "table:" + name() + ".";
-        while ((ret = c->next(c)) == 0) {
-            ret = c->get_key(c, &key);
-            invariantWTOK(ret);
-            if (strcmp("metadata:", key) == 0)
-                continue;
-            if (strncmp(table_prefix.c_str(), key, table_prefix.length()) != 0)
-                continue;
-            if (strstr(key, ".$") != NULL)
-                continue;
-
-            // Initialize the namespace we found
-            std::string name = WiredTigerRecordStore::_fromURI(key);
-            WiredTigerCollectionCatalogEntry *entry =
-                new WiredTigerCollectionCatalogEntry(_db, StringData(name));
-            _entryMap[name.c_str()] = entry;
+        std::string ns = name();
+        WiredTigerMetaData &md = _db.GetMetaData();
+        std::vector<uint64_t> tables = md.getAllTables();
+        for ( std::vector<uint64_t>::iterator it = tables.begin(); it != tables.end(); ++it) {
+            std::string name = md.getName( *it );
+            if ( boost::starts_with(name, ns) ) {
+                // Initialize the namespace we found
+                WiredTigerCollectionCatalogEntry *entry =
+                    new WiredTigerCollectionCatalogEntry(_db, StringData(name));
+                _entryMap[name.c_str()] = entry;
+            }
         }
-        if (ret != WT_NOTFOUND) invariantWTOK(ret);
-        name();
     }
 
     void WiredTigerDatabaseCatalogEntry::getCollectionNamespaces(
@@ -204,10 +191,13 @@ namespace mongo {
 
         WT_SESSION *session = swrap.Get();
         WiredTigerMetaData &md = _db.GetMetaData();
-        std::string uri = md.getURI( ns.toString() );
+        uint64_t id = md.getIdentifier( ns.toString() );
+        std::string uri = md.getURI( id );
         int ret = session->drop(session, uri.c_str(), "force");
         if (ret != 0)
             return Status( ErrorCodes::OperationFailed, "Collection drop failed" );
+
+        md.remove(id);
 
         std::vector<std::string> names;
         entry->getAllIndexes( txn, &names );
@@ -270,7 +260,6 @@ namespace mongo {
                                                         const StringData& fromNS,
                                                         const StringData& toNS,
                                                         bool stayTemp ) {
-        int ret;
         boost::mutex::scoped_lock lk( _entryMapLock );
         EntryMap::iterator i = _entryMap.find( toNS.toString() );
         if ( i != _entryMap.end() )
@@ -289,36 +278,26 @@ namespace mongo {
         // and can't deal with rolling back a rename.
         WiredTigerSession &swrap_real = WiredTigerRecoveryUnit::Get(txn).GetSession();
         WiredTigerSession swrap(swrap_real.GetDatabase());
-        WT_SESSION *session = swrap.Get();
 
         // Close any cached cursors we can...
         swrap_real.GetContext().CloseAllCursors();
         swrap.GetDatabase().ClearCache();
 
+        WiredTigerMetaData &md = _db.GetMetaData();
         // Rename all indexes in the entry
         std::vector<std::string> names;
         entry->getAllIndexes( txn, &names );
         std::vector<std::string>::const_iterator idx;
         for (idx = names.begin(); idx != names.end(); ++idx) {
-            //std::string fromName = *idx;
-            //std::string toName(toNS.toString() + fromName.substr(fromNS.toString().length()));
-            ret = session->rename(session,
-                    WiredTigerIndex::_getURI(fromNS.toString(), *idx).c_str(),
-                    WiredTigerIndex::_getURI(toNS.toString(), *idx).c_str(),
-                    "force");
-            invariantWTOK(ret);
+            // Metadata based version - doesn't require WiredTiger operation
+            uint64_t indexId = md.getIdentifier( 
+                    WiredTigerIndex::toTableName( fromNS.toString(), *idx ) );
+            md.rename(indexId, WiredTigerIndex::toTableName( toNS.toString(), *idx ) );
         }
 
         // Rename the primary WiredTiger table
-        // TODO: This can become an entirely metadata operation.
-        WiredTigerMetaData &md = _db.GetMetaData();
         uint64_t fromId = md.getIdentifier(fromNS.toString());
-        std::string fromURI = md.getURI(fromId);
-        uint64_t toId = md.getIdentifier(toNS.toString());
-        std::string toURI = md.getURI(toId);
-        ret = session->rename(session, fromURI.c_str(), toURI.c_str(), NULL);
-        if (ret != 0)
-            return Status( ErrorCodes::OperationFailed, "Collection rename failed" );
+        md.rename( fromId, toNS.toString() );
 
         bool was_capped = entry->rs->isCapped();
         int64_t maxDocs, maxSize;

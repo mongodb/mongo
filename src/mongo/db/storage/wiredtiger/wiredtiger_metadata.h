@@ -59,38 +59,33 @@ namespace mongo {
         std::string getName(uint64_t identifier);
         std::string getURI(uint64_t identifier);
         std::string getURI(std::string name);   // Inefficient, prefer identifier version.
+        BSONObj &getConfig(uint64_t identifer);
         uint64_t getIdentifier(std::string tableName);
-        uint64_t generateIdentifier(std::string tableName, BSONObj metaData);
+        uint64_t generateIdentifier(std::string tableName, BSONObj config);
 
         Status remove(uint64_t identifier, bool failedDrop = false);
         Status rename(uint64_t identifier, std::string newName);
-        Status updateMetaData(uint64_t identifier, BSONObj newMetaData);
-        std::map<std::string, BSONObj> getAllTables();
-        std::map<std::string, BSONObj> getAllIndexes(std::string identifier);
+        Status updateConfig(uint64_t identifier, BSONObj newConfig);
+        std::vector<uint64_t> getAllTables();
+        std::vector<uint64_t> getAllIndexes(uint64_t identifier);
     private:
-
-        // Called from constructor to read metadata table and populate in-memory map
-        Status _populate();
-        uint64_t _generateIdentifier(std::string tableName);
-        std::string _generateURI(std::string tableName, uint64_t id);
-        bool _isIndexName(std::string tableName);
 
         struct MetaDataEntry {
             MetaDataEntry(
                     std::string name_,
                     std::string uri_,
-                    BSONObj metadata_,
+                    BSONObj config_,
                     bool isIndex_,
                     bool isDeleted_ ) :
                 name(name_),
                 uri(uri_),
-                metadata(metadata_),
+                config(config_),
                 isIndex(isIndex_),
                 isDeleted(isDeleted_) {}
 
             std::string name;
             std::string uri;        // Not saved to disk, kept for efficiency
-            BSONObj     metadata;
+            BSONObj     config;
             bool        isIndex;
             bool        isDeleted;  // Not saved to disk, any deleted entry should not have a
                                     // matching entry in the persistent table.
@@ -99,6 +94,13 @@ namespace mongo {
         static const char * WT_METADATA_URI;
         static const char * WT_METADATA_CONFIG;
         static const uint64_t INVALID_METADATA_IDENTIFIER;
+
+        // Called from constructor to read metadata table and populate in-memory map
+        Status _populate();
+        uint64_t _generateIdentifier(std::string tableName);
+        std::string _generateURI(std::string tableName, uint64_t id);
+        bool _isIndexName(std::string tableName);
+        void _persistEntry(uint64_t id, MetaDataEntry &entry);
 
         //AtomicUInt64 _nextId; TODO: I'm getting an error relating to this not being copyable
         uint64_t _nextId;

@@ -42,6 +42,7 @@
 #include "mongo/db/storage/wiredtiger/wiredtiger_engine.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_global_options.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_index.h"
+#include "mongo/db/storage/wiredtiger/wiredtiger_metadata.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_record_store.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_recovery_unit.h"
 
@@ -155,6 +156,12 @@ namespace mongo {
         WiredTigerSession swrap(db);
         WT_SESSION *s(swrap.Get());
 
+        std::string tableName = toTableName(ns, idxName);
+        // Add the collection into the meta data
+        WiredTigerMetaData &md = db.GetMetaData();
+        uint64_t tblIdentifier = md.generateIdentifier( tableName, info.descriptor()->infoObj() );
+        std::string newURI = md.getURI( tblIdentifier );
+
         // Separate out a prefix and suffix in the default string. User configuration will
         // override values in the prefix, but not values in the suffix.
         const char *default_config_pfx = "type=file,leaf_page_max=16k,";
@@ -163,16 +170,23 @@ namespace mongo {
         std::string config = std::string(default_config_pfx +
                 wiredTigerGlobalOptions.indexConfig + default_config_sfx +
                 info.descriptor()->infoObj().jsonString());
-        LOG(1) << "create uri: " << _getURI( ns, idxName ) << " config: " << config;
-        int ret = s->create(s, _getURI(ns, idxName).c_str(), config.c_str());
+        LOG(1) << "create uri: " << newURI << " config: " << config;
+        int ret = s->create(s, newURI.c_str(), config.c_str());
         if (ret != 0) {
             log() << "Creating index with custom options (" << config <<
                      ") failed. Using default options instead." << endl;
             config = std::string(default_config_pfx);
             config += default_config_sfx + info.descriptor()->infoObj().jsonString();
-            ret = s->create(s, _getURI(ns, idxName).c_str(), config.c_str());
+            ret = s->create(s, newURI.c_str(), config.c_str());
         }
         return (ret);
+    }
+
+    WiredTigerIndex::WiredTigerIndex(WiredTigerDatabase &db, const IndexCatalogEntry& info,
+            const std::string &ns, const std::string &idxName)
+        : _db(db), _info(info)
+    {
+        _uri = _db.GetMetaData().getURI( toTableName(ns, idxName) );
     }
 
     Status WiredTigerIndex::insert(OperationContext* txn,
