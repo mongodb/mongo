@@ -653,7 +653,7 @@ namespace {
                 return StatusAndDuration(Status(ErrorCodes::NotMaster,
                                                 "Not master anymore while waiting for replication"
                                                         " - this most likely means that a step down"
-                                                        "occurred while waiting for replication"),
+                                                        " occurred while waiting for replication"),
                                          Milliseconds(elapsed));
             }
 
