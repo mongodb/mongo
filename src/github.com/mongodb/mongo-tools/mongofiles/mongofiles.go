@@ -3,6 +3,7 @@ package mongofiles
 import (
 	"fmt"
 	"github.com/mongodb/mongo-tools/common/bsonutil"
+	"github.com/mongodb/mongo-tools/common/util"
 	"github.com/mongodb/mongo-tools/common/db"
 	commonopts "github.com/mongodb/mongo-tools/common/options"
 	"github.com/mongodb/mongo-tools/mongofiles/options"
@@ -431,12 +432,16 @@ func (self *MongoFiles) createGridFSFile(gridFSFileName, contentType string, loc
 // Run the mongofiles utility
 func (self *MongoFiles) Run(displayConnUrl bool) (string, error) {
 	if displayConnUrl {
-		// get connection url
-		connUrl := self.ToolOptions.Host
-		if self.ToolOptions.Port != "" {
-			connUrl = fmt.Sprintf("%s:%s", connUrl, self.ToolOptions.Port)
+		connHost := self.ToolOptions.Host
+		if connHost == "" {
+			connHost = util.DefaultHost
 		}
-		fmt.Printf("connected to: %v\n", connUrl)
+		connPort := self.ToolOptions.Port
+		if connPort == "" {
+			connPort = util.DefaultPort
+		}
+		
+		fmt.Printf("connected to: %v\n", fmt.Sprintf("%s:%s", connHost, connPort))
 	}
 
 	var output string
