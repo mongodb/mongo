@@ -116,6 +116,7 @@ namespace mongo {
         uint64_t id = _generateIdentifier(tableName);
         std::string uri = _generateURI(tableName, id);
         MetaDataEntry entry(tableName, uri, metaData, _isIndexName(tableName), false);
+        _tables.insert( std::pair<uint64_t, MetaDataEntry>( id, entry ) );
 
         return id;
     }
@@ -188,14 +189,10 @@ namespace mongo {
     // Passes in the tableName to generate different identifiers for collections and indexes
     std::string WiredTigerMetaData::_generateURI(std::string tableName, uint64_t id)
     {
-        std::string uri("table:");
-        // Check for an index
-        if ( _isIndexName(tableName) )
-            uri += "i";
-        else
-            uri += "t";
-        uri += id;
-        return uri;
+        std::ostringstream uri;
+        
+        uri << "table:" << tableName << "_" << id;
+        return uri.str();
     }
 
 }
