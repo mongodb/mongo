@@ -38,7 +38,8 @@ func (self *SSLDBConnector) Configure(opts options.ToolOptions) error {
 		return fmt.Errorf("setupCtx: %v", err)
 	}
 
-	var flags openssl.DialFlags = 0
+	var flags openssl.DialFlags
+	flags = 0
 	if opts.SSLAllowInvalidCert || opts.SSLAllowInvalidHost || opts.SSLCAFile == "" {
 		flags = openssl.InsecureSkipHostVerification
 	}

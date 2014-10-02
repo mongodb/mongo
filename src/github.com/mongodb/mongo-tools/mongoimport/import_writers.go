@@ -8,7 +8,7 @@ import (
 	"strings"
 )
 
-var noServer = errors.New("no reachable servers")
+var errNoReachableServer = errors.New("no reachable servers")
 
 type ImportWriter interface {
 	Open(db, collection string) error
