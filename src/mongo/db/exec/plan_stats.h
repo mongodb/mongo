@@ -99,35 +99,6 @@ namespace mongo {
         CommonStats();
     };
 
-    /**
-     * This class increments a counter by a rough estimate of the time elapsed since its
-     * construction when it goes out of scope.
-     */
-    class ScopedTimer {
-    public:
-        ScopedTimer(long long* counter) :
-            _counter(counter),
-            _start(Listener::getElapsedTimeMillis()) {
-        }
-
-        ~ScopedTimer() {
-            long long elapsed = Listener::getElapsedTimeMillis() - _start;
-            *_counter += elapsed;
-        }
-
-    private:
-        // Default constructor disallowed.
-        ScopedTimer();
-
-        MONGO_DISALLOW_COPYING(ScopedTimer);
-
-        // Reference to the counter that we are incrementing with the elapsed time.
-        long long* _counter;
-
-        // Time at which the timer was constructed.
-        long long _start;
-    };
-
     // The universal container for a stage's stats.
     struct PlanStageStats {
         PlanStageStats(const CommonStats& c, StageType t) : stageType(t), common(c) { }

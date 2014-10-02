@@ -27,6 +27,8 @@
  */
 
 #include "mongo/db/exec/limit.h"
+
+#include "mongo/db/exec/scoped_timer.h"
 #include "mongo/db/exec/working_set_common.h"
 #include "mongo/util/mongoutils/str.h"
 

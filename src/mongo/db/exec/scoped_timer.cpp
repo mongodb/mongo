@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2013 10gen Inc.
+ *    Copyright (C) 2013-2014 MongoDB Inc.
  *
  *    This program is free software: you can redistribute it and/or  modify
  *    it under the terms of the GNU Affero General Public License, version 3,
@@ -28,58 +28,20 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/db/exec/eof.h"
-
 #include "mongo/db/exec/scoped_timer.h"
+
+#include "mongo/util/net/listen.h"
 
 namespace mongo {
 
-    // static
-    const char* EOFStage::kStageType = "EOF";
-
-    EOFStage::EOFStage() : _commonStats(kStageType) { }
-
-    EOFStage::~EOFStage() { }
-
-    bool EOFStage::isEOF() {
-        return true;
+    ScopedTimer::ScopedTimer(long long* counter) :
+        _counter(counter),
+        _start(Listener::getElapsedTimeMillis()) {
     }
 
-    PlanStage::StageState EOFStage::work(WorkingSetID* out) {
-        ++_commonStats.works;
-        // Adds the amount of time taken by work() to executionTimeMillis.
-        ScopedTimer timer(&_commonStats.executionTimeMillis);
-        return PlanStage::IS_EOF;
-    }
-
-    void EOFStage::saveState() {
-        ++_commonStats.yields;
-    }
-
-    void EOFStage::restoreState(OperationContext* opCtx) {
-        ++_commonStats.unyields;
-    }
-
-    void EOFStage::invalidate(const DiskLoc& dl, InvalidationType type) {
-        ++_commonStats.invalidates;
-    }
-
-    vector<PlanStage*> EOFStage::getChildren() const {
-        vector<PlanStage*> empty;
-        return empty;
-    }
-
-    PlanStageStats* EOFStage::getStats() {
-        _commonStats.isEOF = isEOF();
-        return new PlanStageStats(_commonStats, STAGE_EOF);
-    }
-
-    const CommonStats* EOFStage::getCommonStats() {
-        return &_commonStats;
-    }
-
-    const SpecificStats* EOFStage::getSpecificStats() {
-        return NULL;
+    ScopedTimer::~ScopedTimer() {
+        long long elapsed = Listener::getElapsedTimeMillis() - _start;
+        *_counter += elapsed;
     }
 
 }  // namespace mongo

@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2013 10gen Inc.
+ *    Copyright (C) 2013-2014 MongoDB Inc.
  *
  *    This program is free software: you can redistribute it and/or  modify
  *    it under the terms of the GNU Affero General Public License, version 3,
@@ -26,60 +26,32 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#pragma once
 
-#include "mongo/db/exec/eof.h"
-
-#include "mongo/db/exec/scoped_timer.h"
+#include "mongo/base/disallow_copying.h"
 
 namespace mongo {
 
-    // static
-    const char* EOFStage::kStageType = "EOF";
+    /**
+     * This class increments a counter by a rough estimate of the time elapsed since its
+     * construction when it goes out of scope.
+     */
+    class ScopedTimer {
+        MONGO_DISALLOW_COPYING(ScopedTimer);
+    public:
+        ScopedTimer(long long* counter);
 
-    EOFStage::EOFStage() : _commonStats(kStageType) { }
+        ~ScopedTimer();
 
-    EOFStage::~EOFStage() { }
+    private:
+        // Default constructor disallowed.
+        ScopedTimer();
 
-    bool EOFStage::isEOF() {
-        return true;
-    }
+        // Reference to the counter that we are incrementing with the elapsed time.
+        long long* _counter;
 
-    PlanStage::StageState EOFStage::work(WorkingSetID* out) {
-        ++_commonStats.works;
-        // Adds the amount of time taken by work() to executionTimeMillis.
-        ScopedTimer timer(&_commonStats.executionTimeMillis);
-        return PlanStage::IS_EOF;
-    }
-
-    void EOFStage::saveState() {
-        ++_commonStats.yields;
-    }
-
-    void EOFStage::restoreState(OperationContext* opCtx) {
-        ++_commonStats.unyields;
-    }
-
-    void EOFStage::invalidate(const DiskLoc& dl, InvalidationType type) {
-        ++_commonStats.invalidates;
-    }
-
-    vector<PlanStage*> EOFStage::getChildren() const {
-        vector<PlanStage*> empty;
-        return empty;
-    }
-
-    PlanStageStats* EOFStage::getStats() {
-        _commonStats.isEOF = isEOF();
-        return new PlanStageStats(_commonStats, STAGE_EOF);
-    }
-
-    const CommonStats* EOFStage::getCommonStats() {
-        return &_commonStats;
-    }
-
-    const SpecificStats* EOFStage::getSpecificStats() {
-        return NULL;
-    }
+        // Time at which the timer was constructed.
+        long long _start;
+    };
 
 }  // namespace mongo

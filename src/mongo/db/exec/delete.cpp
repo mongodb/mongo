@@ -31,6 +31,7 @@
 #include "mongo/db/exec/delete.h"
 
 #include "mongo/db/catalog/collection.h"
+#include "mongo/db/exec/scoped_timer.h"
 #include "mongo/db/exec/working_set_common.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/repl_coordinator_global.h"
