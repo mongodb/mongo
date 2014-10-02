@@ -19,7 +19,7 @@ type CSVImportInput struct {
 	// csvReader is the underlying reader used to read data in from the CSV
 	// or TSV file
 	csvReader *csv.Reader
-	// NumImported indicates the number of CSV documents processed
+	// numProcessed indicates the number of CSV documents processed
 	numProcessed int64
 	// headerLine is a boolean that indicates if the import input has a header line
 	headerLine bool
@@ -88,7 +88,6 @@ func (csvImporter *CSVImportInput) SetHeader() (err error) {
 // ImportDocument reads a line of input with the CSV representation of a doc and
 // returns the BSON equivalent.
 func (csvImporter *CSVImportInput) ImportDocument() (bson.M, error) {
-	document := bson.M{}
 	csvImporter.numProcessed++
 	tokens, err := csvImporter.csvReader.Read()
 	if err != nil {
@@ -98,6 +97,7 @@ func (csvImporter *CSVImportInput) ImportDocument() (bson.M, error) {
 		return nil, fmt.Errorf("read error on entry #%v: %v", csvImporter.numProcessed, err)
 	}
 	var key string
+	document := bson.M{}
 	for index, token := range tokens {
 		parsedValue := getParsedValue(token)
 		if index < len(csvImporter.Fields) {
