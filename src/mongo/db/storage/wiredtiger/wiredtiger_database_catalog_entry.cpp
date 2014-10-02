@@ -194,8 +194,6 @@ namespace mongo {
         uint64_t id = md.getIdentifier( ns.toString() );
         std::string uri = md.getURI( id );
         int ret = session->drop(session, uri.c_str(), "force");
-        //if (ret != 0)
-        //    return Status( ErrorCodes::OperationFailed, "Collection drop failed" );
 
         md.remove(id, ret != 0);
 
