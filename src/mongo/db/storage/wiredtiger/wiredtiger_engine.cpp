@@ -59,7 +59,6 @@ namespace mongo {
         }
         invariantWTOK(ret);
         _db = new WiredTigerDatabase(conn);
-        _db->InitMetaData();
         loadExistingDatabases();
     }
 

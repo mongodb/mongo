@@ -40,6 +40,7 @@ namespace mongo {
         : _conn(conn)
     {
         _metaData = new WiredTigerMetaData();
+        InitMetaData();
     }
 
     WiredTigerDatabase::~WiredTigerDatabase() {
