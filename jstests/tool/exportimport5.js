@@ -21,7 +21,7 @@ install_test_data = function() {
 // attempt to export fields without Infinity
 install_test_data();
 
-t.runTool( "export" , "--out" , t.extFile , "-d" , t.baseName , "-c" , "foo", "-q", "{ a: { \"$nin\": [ Infinity ] } }" );
+t.runTool( "export" , "--out" , t.extFile , "-d" , t.baseName , "-c" , "foo", "-q", "{a:{\"$nin\":[Infinity]}}" );
 
 c.drop();
 assert.eq( 0 , c.count() , "after drop" , "-d" , t.baseName , "-c" , "foo" );
@@ -33,7 +33,7 @@ assert.eq( 3 , c.count() , "after restore 1" );
 // attempt to export fields with Infinity
 install_test_data();
 
-t.runTool( "export" , "--out" , t.extFile , "-d" , t.baseName , "-c" , "foo", "-q", "{ a: Infinity }" );
+t.runTool( "export" , "--out" , t.extFile , "-d" , t.baseName , "-c" , "foo", "-q", "{a:Infinity}" );
 
 c.drop();
 assert.eq( 0 , c.count() , "after drop" , "-d" , t.baseName , "-c" , "foo" );
@@ -45,7 +45,7 @@ assert.eq( 3 , c.count() , "after restore 2" );
 // attempt to export fields without -Infinity
 install_test_data();
 
-t.runTool( "export" , "--out" , t.extFile , "-d" , t.baseName , "-c" , "foo", "-q", "{ a: { \"$nin\": [ -Infinity ] } }" );
+t.runTool( "export" , "--out" , t.extFile , "-d" , t.baseName , "-c" , "foo", "-q", "{a:{\"$nin\":[-Infinity]}}" );
 
 c.drop();
 assert.eq( 0 , c.count() , "after drop" , "-d" , t.baseName , "-c" , "foo" );
@@ -57,7 +57,7 @@ assert.eq( 4 , c.count() , "after restore 3" );
 // attempt to export fields with -Infinity
 install_test_data();
 
-t.runTool( "export" , "--out" , t.extFile , "-d" , t.baseName , "-c" , "foo", "-q", "{ a: -Infinity }" );
+t.runTool( "export" , "--out" , t.extFile , "-d" , t.baseName , "-c" , "foo", "-q", "{a:-Infinity}" );
 
 c.drop();
 assert.eq( 0 , c.count() , "after drop" , "-d" , t.baseName , "-c" , "foo" );
