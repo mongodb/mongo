@@ -121,11 +121,18 @@ func (dump *MongoDump) Dump() error {
 			return fmt.Errorf("error establishing database connection: %v", err)
 		}
 		//first make sure this is possible with the connected database
-		dump.authVersion, err = auth.GetAuthVersion(dump.cmdRunner)
-		if err != nil {
-			return fmt.Errorf("error getting auth schema version for dumpDbUsersAndRoles: %v", err)
+		if _, ok := dump.cmdRunner.(*db.Shim); ok { //TODO make this check a method
+			// the shim does not know about auth, so we must assume version 3,
+			// as that's all we support. If we add a new version, we'll have to fix this hack
+			log.Logf(2, "using shim; assuming auth version 3")
+			dump.authVersion = 3
+		} else {
+			dump.authVersion, err = auth.GetAuthVersion(dump.cmdRunner)
+			if err != nil {
+				return fmt.Errorf("error getting auth schema version for dumpDbUsersAndRoles: %v", err)
+			}
+			log.Logf(2, "using auth schema version %v", dump.authVersion)
 		}
-		log.Logf(2, "using auth schema version %v", dump.authVersion)
 		if dump.authVersion != 3 {
 			return fmt.Errorf("backing up users and roles is only supported for "+
 				"deployments with auth schema versions 3, found: %v", dump.authVersion)
