@@ -3,11 +3,11 @@ package main
 import (
 	"fmt"
 	"github.com/mongodb/mongo-tools/common/db"
+	"github.com/mongodb/mongo-tools/common/log"
 	commonopts "github.com/mongodb/mongo-tools/common/options"
 	"github.com/mongodb/mongo-tools/common/util"
 	"github.com/mongodb/mongo-tools/mongoimport"
 	"github.com/mongodb/mongo-tools/mongoimport/options"
-	"os"
 )
 
 func main() {
@@ -24,7 +24,7 @@ func main() {
 
 	args, err := opts.Parse()
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error parsing command line options: %v\n", err)
+		log.Logf(0, "error parsing command line options: %v", err)
 		util.ExitFail()
 	}
 
@@ -38,7 +38,11 @@ func main() {
 		return
 	}
 
+<<<<<<< HEAD
 	opts.Direct = true
+=======
+	log.InitToolLogger(opts.Verbosity)
+>>>>>>> 47837db... TOOLS-252: mongoimport should use log package
 
 	// create a session provider to connect to the db
 	sessionProvider := db.NewSessionProvider(*opts)
@@ -51,20 +55,20 @@ func main() {
 	}
 
 	if err = importer.ValidateSettings(args); err != nil {
-		util.PrintfTimeStamped("Error validating settings: %v\n", err)
+		log.Logf(0, "error validating settings: %v", err)
 		util.ExitFail()
 	}
 
 	numDocs, err := importer.ImportDocuments()
 	if !opts.Quiet {
-		message := fmt.Sprintf("imported 1 object\n")
+		message := fmt.Sprintf("imported 1 document")
 		if numDocs != 1 {
-			message = fmt.Sprintf("imported %v objects\n", numDocs)
+			message = fmt.Sprintf("imported %v documents", numDocs)
 		}
-		util.PrintfTimeStamped(message)
+		log.Logf(0, message)
 	}
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error importing documents: %v\n", err)
+		log.Logf(0, "error importing documents: %v", err)
 		util.ExitFail()
 	}
 }

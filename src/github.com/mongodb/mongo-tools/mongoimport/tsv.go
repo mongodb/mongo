@@ -2,6 +2,7 @@ package mongoimport
 
 import (
 	"bufio"
+	"github.com/mongodb/mongo-tools/common/log"
 	"gopkg.in/mgo.v2/bson"
 	"io"
 	"strconv"
@@ -41,10 +42,14 @@ func (tsvImporter *TSVImportInput) SetHeader() error {
 		return err
 	}
 	tokenizedHeaders := strings.Split(headers, tokenSeparator)
-
 	for _, header := range tokenizedHeaders {
 		tsvImporter.Fields = append(tsvImporter.Fields,
 			strings.TrimSpace(header))
+	}
+	if len(tokenizedHeaders) == 1 {
+		log.Logf(1, "using field %v", tokenizedHeaders[0])
+	} else {
+		log.Logf(1, "using fields '%v'", headers)
 	}
 	return nil
 }
@@ -56,13 +61,14 @@ func (tsvImporter *TSVImportInput) ImportDocument() (bson.M, error) {
 	if err != nil {
 		return nil, err
 	}
-	document := bson.M{}
+	log.Logf(2, "got line: %v", tsvRecord)
 
 	// strip the trailing '\r\n' from ReadString
 	if len(tsvRecord) != 0 {
 		tsvRecord = strings.TrimRight(tsvRecord, "\r\n")
 	}
 	tokens := strings.Split(tsvRecord, tokenSeparator)
+	document := bson.M{}
 	for index, token := range tokens {
 		parsedValue := getParsedValue(token)
 		if index < len(tsvImporter.Fields) {

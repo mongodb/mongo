@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/mongodb/mongo-tools/common/db"
+	"github.com/mongodb/mongo-tools/common/log"
 	commonOpts "github.com/mongodb/mongo-tools/common/options"
 	"github.com/mongodb/mongo-tools/common/util"
 	"github.com/mongodb/mongo-tools/mongoimport/options"
@@ -151,8 +152,8 @@ func (mongoImport *MongoImport) ValidateSettings(args []string) error {
 			return err
 		}
 		mongoImport.ToolOptions.Namespace.Collection = fileBaseName
-		util.PrintlnTimeStamped("no collection specified")
-		util.PrintfTimeStamped("using filename '%v' as collection\n",
+		log.Logf(0, "no collection specified")
+		log.Logf(0, "using filename '%v' as collection",
 			mongoImport.ToolOptions.Namespace.Collection)
 	}
 	return nil
@@ -165,8 +166,14 @@ func (mongoImport *MongoImport) getInputReader() (io.ReadCloser, error) {
 		if err != nil {
 			return nil, err
 		}
+		fileStat, err := file.Stat()
+		if err != nil {
+			return nil, err
+		}
+		log.Logf(1, "filesize: %v", fileStat.Size())
 		return file, err
 	}
+	log.Logf(1, "filesize: 0")
 	return os.Stdin, nil
 }
 
@@ -197,14 +204,14 @@ func (mongoImport *MongoImport) ImportDocuments() (int64, error) {
 // appropriate namespace
 func (mongoImport *MongoImport) importDocuments(importInput ImportInput) (docsCount int64, err error) {
 	importWriter := mongoImport.getImportWriter()
-	connUrl := mongoImport.ToolOptions.Host
-	if connUrl == "" {
-		connUrl = util.DefaultHost
+	connURL := mongoImport.ToolOptions.Host
+	if connURL == "" {
+		connURL = util.DefaultHost
 	}
 	if mongoImport.ToolOptions.Port != "" {
-		connUrl = connUrl + ":" + mongoImport.ToolOptions.Port
+		connURL = connURL + ":" + mongoImport.ToolOptions.Port
 	}
-	util.PrintfTimeStamped("connected to: %v\n", connUrl)
+	log.Logf(0, "connected to: %v", connURL)
 
 	err = importWriter.Open(
 		mongoImport.ToolOptions.Namespace.DB,
@@ -213,6 +220,9 @@ func (mongoImport *MongoImport) importDocuments(importInput ImportInput) (docsCo
 	if err != nil {
 		return
 	}
+	log.Logf(1, "ns: %v.%v",
+		mongoImport.ToolOptions.Namespace.DB,
+		mongoImport.ToolOptions.Namespace.Collection)
 
 	defer func() {
 		closeErr := importWriter.Close()
@@ -223,7 +233,7 @@ func (mongoImport *MongoImport) importDocuments(importInput ImportInput) (docsCo
 
 	// drop the database if necessary
 	if mongoImport.IngestOptions.Drop {
-		util.PrintfTimeStamped("dropping: %v.%v\n",
+		log.Logf(0, "dropping: %v.%v",
 			mongoImport.ToolOptions.DB,
 			mongoImport.ToolOptions.Collection)
 
@@ -248,7 +258,7 @@ func (mongoImport *MongoImport) importDocuments(importInput ImportInput) (docsCo
 			if document == nil {
 				return docsCount, err
 			}
-			fmt.Fprintf(os.Stderr, "error importing document: %v\n", err)
+			log.Logf(0, "error importing document: %v", err)
 			continue
 		}
 
@@ -263,7 +273,7 @@ func (mongoImport *MongoImport) importDocuments(importInput ImportInput) (docsCo
 			if mongoImport.IngestOptions.StopOnError {
 				return docsCount, err
 			}
-			fmt.Fprintf(os.Stderr, "error inserting document: %v\n", err)
+			log.Logf(0, "error inserting document: %v", err)
 			continue
 		}
 		docsCount++

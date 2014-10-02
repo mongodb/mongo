@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/mongodb/mongo-tools/common/bsonutil"
 	"github.com/mongodb/mongo-tools/common/json"
+	"github.com/mongodb/mongo-tools/common/log"
 	"gopkg.in/mgo.v2/bson"
 	"io"
 	"strings"
@@ -166,6 +167,7 @@ func (jsonImporter *JSONImportInput) ImportDocument() (bson.M, error) {
 		}
 		return nil, fmt.Errorf("JSON decode error on document #%v: %v", jsonImporter.numProcessed, err)
 	}
+	log.Logf(2, "got line: %#v", document)
 
 	// convert any data produced by mongoexport to the appropriate underlying
 	// extended BSON type. NOTE: this assumes specially formated JSON values
@@ -181,5 +183,6 @@ func (jsonImporter *JSONImportInput) ImportDocument() (bson.M, error) {
 	if err := bsonutil.ConvertJSONDocumentToBSON(document); err != nil {
 		return nil, fmt.Errorf("JSON => BSON conversion error on document #%v: %v", jsonImporter.numProcessed, err)
 	}
+	log.Logf(3, "got extended line: %#v", document)
 	return document, nil
 }

@@ -1,6 +1,8 @@
 package mongoimport
 
 import (
+	"github.com/mongodb/mongo-tools/common/log"
+	"github.com/mongodb/mongo-tools/common/options"
 	. "github.com/smartystreets/goconvey/convey"
 	"gopkg.in/mgo.v2/bson"
 	"io"
@@ -8,6 +10,12 @@ import (
 	"os"
 	"testing"
 )
+
+func init() {
+	log.InitToolLogger(&options.Verbosity{
+		Verbose: []bool{true, true, true, true},
+	})
+}
 
 func TestCSVImportDocument(t *testing.T) {
 	Convey("With a CSV import input", t, func() {

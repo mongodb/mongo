@@ -2,6 +2,7 @@ package mongoimport
 
 import (
 	"fmt"
+	"github.com/mongodb/mongo-tools/common/log"
 	"github.com/mongodb/mongo-tools/common/util"
 	"github.com/mongodb/mongo-tools/mongoimport/csv"
 	"gopkg.in/mgo.v2/bson"
@@ -82,6 +83,11 @@ func (csvImporter *CSVImportInput) SetHeader() (err error) {
 		}
 		csvImporter.Fields = append(csvImporter.Fields, unsortedHeaders[index])
 	}
+	if len(headers) == 1 {
+		log.Logf(1, "using field: %v", csvImporter.Fields[0])
+	} else {
+		log.Logf(1, "using fields: %v", strings.Join(csvImporter.Fields, ","))
+	}
 	return nil
 }
 
@@ -96,6 +102,7 @@ func (csvImporter *CSVImportInput) ImportDocument() (bson.M, error) {
 		}
 		return nil, fmt.Errorf("read error on entry #%v: %v", csvImporter.numProcessed, err)
 	}
+	log.Logf(2, "got line: %v", strings.Join(tokens, ","))
 	var key string
 	document := bson.M{}
 	for index, token := range tokens {
