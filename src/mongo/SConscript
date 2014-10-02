@@ -677,6 +677,7 @@ serverOnlyFiles = [ "db/background.cpp",
                     "db/repl/sync_tail.cpp",
                     "db/repl/write_concern.cpp",
                     "db/startup_warnings_mongod.cpp",
+                    "db/stats/lock_server_status_section.cpp",
                     "db/stats/range_deleter_server_status.cpp",
                     "db/stats/snapshots.cpp",
                     "db/stats/top.cpp",
@@ -692,7 +693,8 @@ serverOnlyFiles = [ "db/background.cpp",
                     "util/alignedbuilder.cpp",
                     "util/compress.cpp",
                     "util/elapsed_tracker.cpp",
-                    "util/logfile.cpp", ]
+                    "util/logfile.cpp",
+                ]
 
 # This library exists because some libraries, such as our networking library, need access to server
 # options, but not to the helpers to set them from the command line.  libserver_options_core.a just
