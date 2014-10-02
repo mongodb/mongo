@@ -56,17 +56,16 @@ __wt_verify_build(void)
 	 * The btree code encodes key/value pairs in size_t's, and requires at
 	 * least 8B size_t's.
 	 */
-	STATIC_ASSERT(sizeof(size_t) >= sizeof(int64_t));
+	STATIC_ASSERT(sizeof(size_t) >= 8);
 
 	/*
-	 * We require an off_t fit into an 8B chunk because 8B is the largest
+	 * We require a wt_off_t fit into an 8B chunk because 8B is the largest
 	 * integral value we can encode into an address cookie.
 	 *
-	 * WiredTiger has never been tested on a system with 4B off_t types,
+	 * WiredTiger has never been tested on a system with 4B file offsets,
 	 * disallow them for now.
 	 */
-	STATIC_ASSERT(sizeof(off_t) == sizeof(int64_t));
-	STATIC_ASSERT(sizeof(wt_off_t) == sizeof(int64_t));
+	STATIC_ASSERT(sizeof(wt_off_t) == 8);
 }
 
 #undef ALIGN_CHECK

@@ -984,7 +984,7 @@ __conn_single(WT_SESSION_IMPL *session, const char *cfg[])
 		WT_ERR(__wt_open(session, WT_WIREDTIGER, 1, 0, 0, &fh));
 		len = (size_t)snprintf(buf, sizeof(buf),
 		    "%s\n%s\n", WT_WIREDTIGER, WIREDTIGER_VERSION_STRING);
-		WT_ERR(__wt_write(session, fh, (off_t)0, len, buf));
+		WT_ERR(__wt_write(session, fh, (wt_off_t)0, len, buf));
 		WT_ERR(__wt_close(session, fh));
 		fh = NULL;
 
@@ -993,7 +993,7 @@ __conn_single(WT_SESSION_IMPL *session, const char *cfg[])
 		 * this isn't necessary, but zero-length files make me nervous.
 		 */
 #define	WT_SINGLETHREAD_STRING	"WiredTiger lock file\n"
-		WT_ERR(__wt_write(session, conn->lock_fh, (off_t)0,
+		WT_ERR(__wt_write(session, conn->lock_fh, (wt_off_t)0,
 		    strlen(WT_SINGLETHREAD_STRING), WT_SINGLETHREAD_STRING));
 
 		created = 1;
