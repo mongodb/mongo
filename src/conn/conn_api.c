@@ -726,7 +726,7 @@ __conn_config_file(WT_SESSION_IMPL *session,
 {
 	WT_DECL_RET;
 	WT_FH *fh;
-	off_t size;
+	wt_off_t size;
 	size_t len;
 	int exist, quoted;
 	uint8_t *p, *t;
@@ -748,7 +748,7 @@ __conn_config_file(WT_SESSION_IMPL *session,
 	 * Sanity test: a 100KB configuration file would be insane.  (There's
 	 * no practical reason to limit the file size, but I can either limit
 	 * the file size to something rational, or I can add code to test if
-	 * the off_t size is larger than a uint32_t, which is more complicated
+	 * the wt_off_t size is larger than a uint32_t, which is more complicated
 	 * and a waste of time.)
 	 */
 	if (size > 100 * 1024)
@@ -766,7 +766,7 @@ __conn_config_file(WT_SESSION_IMPL *session,
 	 */
 	WT_ERR(__wt_buf_init(session, cbuf, len + 10));
 	WT_ERR(
-	    __wt_read(session, fh, (off_t)0, len, ((uint8_t *)cbuf->mem) + 1));
+	    __wt_read(session, fh, (wt_off_t)0, len, ((uint8_t *)cbuf->mem) + 1));
 	((uint8_t *)cbuf->mem)[0] = '\n';
 	cbuf->size = len + 1;
 
@@ -929,7 +929,7 @@ __conn_single(WT_SESSION_IMPL *session, const char *cfg[])
 	WT_CONFIG_ITEM cval;
 	WT_CONNECTION_IMPL *conn, *t;
 	WT_DECL_RET;
-	off_t size;
+	wt_off_t size;
 	size_t len;
 	int created;
 	char buf[256];
@@ -951,7 +951,7 @@ __conn_single(WT_SESSION_IMPL *session, const char *cfg[])
 	 * and that's OK, the underlying call supports acquisition of locks past
 	 * the end-of-file.
 	 */
-	if (__wt_bytelock(conn->lock_fh, (off_t)0, 1) != 0)
+	if (__wt_bytelock(conn->lock_fh, (wt_off_t)0, 1) != 0)
 		WT_ERR_MSG(session, EBUSY,
 		    "WiredTiger database is already being managed by another "
 		    "process");
@@ -980,7 +980,7 @@ __conn_single(WT_SESSION_IMPL *session, const char *cfg[])
 	if (size == 0) {
 		len = (size_t)snprintf(buf, sizeof(buf), "%s\n%s\n",
 		    WT_SINGLETHREAD, WIREDTIGER_VERSION_STRING);
-		WT_ERR(__wt_write(session, conn->lock_fh, (off_t)0, len, buf));
+		WT_ERR(__wt_write(session, conn->lock_fh, (wt_off_t)0, len, buf));
 		created = 1;
 	} else {
 		WT_ERR(__wt_config_gets(session, cfg, "exclusive", &cval));

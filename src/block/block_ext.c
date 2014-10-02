@@ -7,12 +7,12 @@
 
 #include "wt_internal.h"
 
-static int __block_append(WT_SESSION_IMPL *, WT_EXTLIST *, off_t, off_t);
+static int __block_append(WT_SESSION_IMPL *, WT_EXTLIST *, wt_off_t, wt_off_t);
 static int __block_ext_overlap(WT_SESSION_IMPL *,
 	WT_BLOCK *, WT_EXTLIST *, WT_EXT **, WT_EXTLIST *, WT_EXT **);
 static int __block_extlist_dump(
 	WT_SESSION_IMPL *, const char *, WT_EXTLIST *, int);
-static int __block_merge(WT_SESSION_IMPL *, WT_EXTLIST *, off_t, off_t);
+static int __block_merge(WT_SESSION_IMPL *, WT_EXTLIST *, wt_off_t, wt_off_t);
 
 /*
  * __block_off_srch_last --
@@ -45,7 +45,7 @@ __block_off_srch_last(WT_EXT **head, WT_EXT ***stack)
  * by-offset list referenced by a size entry), for the specified offset.
  */
 static inline void
-__block_off_srch(WT_EXT **head, off_t off, WT_EXT ***stack, int skip_off)
+__block_off_srch(WT_EXT **head, wt_off_t off, WT_EXT ***stack, int skip_off)
 {
 	WT_EXT **extp;
 	int i;
@@ -73,7 +73,7 @@ __block_off_srch(WT_EXT **head, off_t off, WT_EXT ***stack, int skip_off)
  *	Search the skiplist for the first available slot.
  */
 static inline int
-__block_first_srch(WT_EXT **head, off_t size, WT_EXT ***stack)
+__block_first_srch(WT_EXT **head, wt_off_t size, WT_EXT ***stack)
 {
 	WT_EXT *ext;
 
@@ -97,7 +97,7 @@ __block_first_srch(WT_EXT **head, off_t size, WT_EXT ***stack)
  *	Search the by-size skiplist for the specified size.
  */
 static inline void
-__block_size_srch(WT_SIZE **head, off_t size, WT_SIZE ***stack)
+__block_size_srch(WT_SIZE **head, wt_off_t size, WT_SIZE ***stack)
 {
 	WT_SIZE **szp;
 	int i;
@@ -122,7 +122,7 @@ __block_size_srch(WT_SIZE **head, off_t size, WT_SIZE ***stack)
  */
 static inline void
 __block_off_srch_pair(
-    WT_EXTLIST *el, off_t off, WT_EXT **beforep, WT_EXT **afterp)
+    WT_EXTLIST *el, wt_off_t off, WT_EXT **beforep, WT_EXT **afterp)
 {
 	WT_EXT **head, **extp;
 	int i;
@@ -220,7 +220,7 @@ __block_ext_insert(WT_SESSION_IMPL *session, WT_EXTLIST *el, WT_EXT *ext)
  */
 static int
 __block_off_insert(
-    WT_SESSION_IMPL *session, WT_EXTLIST *el, off_t off, off_t size)
+    WT_SESSION_IMPL *session, WT_EXTLIST *el, wt_off_t off, wt_off_t size)
 {
 	WT_EXT *ext;
 
@@ -238,7 +238,7 @@ __block_off_insert(
  * list.
  */
 static int
-__block_off_match(WT_EXTLIST *el, off_t off, off_t size)
+__block_off_match(WT_EXTLIST *el, wt_off_t off, wt_off_t size)
 {
 	WT_EXT *before, *after;
 
@@ -259,7 +259,7 @@ __block_off_match(WT_EXTLIST *el, off_t off, off_t size)
  */
 int
 __wt_block_misplaced(WT_SESSION_IMPL *session,
-   WT_BLOCK *block, const char *tag, off_t offset, uint32_t size, int live)
+   WT_BLOCK *block, const char *tag, wt_off_t offset, uint32_t size, int live)
 {
 	const char *name;
 
@@ -301,7 +301,7 @@ __wt_block_misplaced(WT_SESSION_IMPL *session,
  */
 static int
 __block_off_remove(
-    WT_SESSION_IMPL *session, WT_EXTLIST *el, off_t off, WT_EXT **extp)
+    WT_SESSION_IMPL *session, WT_EXTLIST *el, wt_off_t off, WT_EXT **extp)
 {
 	WT_EXT *ext, **astack[WT_SKIP_MAXDEPTH];
 	WT_SIZE *szp, **sstack[WT_SKIP_MAXDEPTH];
@@ -373,10 +373,10 @@ corrupt:
  */
 int
 __wt_block_off_remove_overlap(
-    WT_SESSION_IMPL *session, WT_EXTLIST *el, off_t off, off_t size)
+    WT_SESSION_IMPL *session, WT_EXTLIST *el, wt_off_t off, wt_off_t size)
 {
 	WT_EXT *before, *after, *ext;
-	off_t a_off, a_size, b_off, b_size;
+	wt_off_t a_off, a_size, b_off, b_size;
 
 	WT_ASSERT(session, off != WT_BLOCK_INVALID_OFFSET);
 
@@ -437,7 +437,7 @@ __wt_block_off_remove_overlap(
  */
 static inline int
 __block_extend(
-    WT_SESSION_IMPL *session, WT_BLOCK *block, off_t *offp, off_t size)
+    WT_SESSION_IMPL *session, WT_BLOCK *block, wt_off_t *offp, wt_off_t size)
 {
 	WT_FH *fh;
 
@@ -456,11 +456,11 @@ __block_extend(
 
 	/*
 	 * Make sure we don't allocate past the maximum file size.  There's no
-	 * easy way to know the maximum off_t on a system, limit growth to 8B
-	 * bits (we currently check an off_t is 8B in verify_build.h).  I don't
+	 * easy way to know the maximum wt_off_t on a system, limit growth to 8B
+	 * bits (we currently check an wt_off_t is 8B in verify_build.h).  I don't
 	 * think we're likely to see anything bigger for awhile.
 	 */
-	if (fh->size > (off_t)INT64_MAX - size)
+	if (fh->size > (wt_off_t)INT64_MAX - size)
 		WT_RET_MSG(session, WT_ERROR,
 		    "block allocation failed, file cannot grow further");
 
@@ -481,7 +481,7 @@ __block_extend(
  */
 int
 __wt_block_alloc(
-    WT_SESSION_IMPL *session, WT_BLOCK *block, off_t *offp, off_t size)
+    WT_SESSION_IMPL *session, WT_BLOCK *block, wt_off_t *offp, wt_off_t size)
 {
 	WT_EXT *ext, **estack[WT_SKIP_MAXDEPTH];
 	WT_SIZE *szp, **sstack[WT_SKIP_MAXDEPTH];
@@ -519,7 +519,7 @@ __wt_block_alloc(
 		if ((szp = *sstack[0]) == NULL) {
 append:			WT_RET(__block_extend(session, block, offp, size));
 			WT_RET(__block_append(
-			    session, &block->live.alloc, *offp, (off_t)size));
+			    session, &block->live.alloc, *offp, (wt_off_t)size));
 			return (0);
 		}
 
@@ -553,7 +553,7 @@ append:			WT_RET(__block_extend(session, block, offp, size));
 	}
 
 	/* Add the newly allocated extent to the list of allocations. */
-	WT_RET(__block_merge(session, &block->live.alloc, *offp, (off_t)size));
+	WT_RET(__block_merge(session, &block->live.alloc, *offp, (wt_off_t)size));
 	return (0);
 }
 
@@ -566,7 +566,7 @@ __wt_block_free(WT_SESSION_IMPL *session,
     WT_BLOCK *block, const uint8_t *addr, size_t addr_size)
 {
 	WT_DECL_RET;
-	off_t offset;
+	wt_off_t offset;
 	uint32_t cksum, size;
 
 	WT_UNUSED(addr_size);
@@ -583,7 +583,7 @@ __wt_block_free(WT_SESSION_IMPL *session,
 #endif
 	WT_RET(__wt_block_ext_prealloc(session, 5));
 	__wt_spin_lock(session, &block->live_lock);
-	ret = __wt_block_off_free(session, block, offset, (off_t)size);
+	ret = __wt_block_off_free(session, block, offset, (wt_off_t)size);
 	__wt_spin_unlock(session, &block->live_lock);
 
 	return (ret);
@@ -595,7 +595,7 @@ __wt_block_free(WT_SESSION_IMPL *session,
  */
 int
 __wt_block_off_free(
-    WT_SESSION_IMPL *session, WT_BLOCK *block, off_t offset, off_t size)
+    WT_SESSION_IMPL *session, WT_BLOCK *block, wt_off_t offset, wt_off_t size)
 {
 	WT_DECL_RET;
 
@@ -612,10 +612,10 @@ __wt_block_off_free(
 	if ((ret = __wt_block_off_remove_overlap(
 	    session, &block->live.alloc, offset, size)) == 0)
 		ret = __block_merge(
-		    session, &block->live.avail, offset, (off_t)size);
+		    session, &block->live.avail, offset, (wt_off_t)size);
 	else if (ret == WT_NOTFOUND)
 		ret = __block_merge(
-		    session, &block->live.discard, offset, (off_t)size);
+		    session, &block->live.discard, offset, (wt_off_t)size);
 	return (ret);
 }
 
@@ -701,7 +701,7 @@ __block_ext_overlap(WT_SESSION_IMPL *session,
 {
 	WT_EXT *a, *b, **ext;
 	WT_EXTLIST *avail, *el;
-	off_t off, size;
+	wt_off_t off, size;
 
 	avail = &block->live.ckpt_avail;
 
@@ -925,7 +925,7 @@ __wt_block_extlist_merge(WT_SESSION_IMPL *session, WT_EXTLIST *a, WT_EXTLIST *b)
  *	Append a new entry to the allocation list.
  */
 static int
-__block_append(WT_SESSION_IMPL *session, WT_EXTLIST *el, off_t off, off_t size)
+__block_append(WT_SESSION_IMPL *session, WT_EXTLIST *el, wt_off_t off, wt_off_t size)
 {
 	WT_EXT *ext, **astack[WT_SKIP_MAXDEPTH];
 	u_int i;
@@ -971,7 +971,7 @@ __block_append(WT_SESSION_IMPL *session, WT_EXTLIST *el, off_t off, off_t size)
  */
 int
 __wt_block_insert_ext(
-    WT_SESSION_IMPL *session, WT_EXTLIST *el, off_t off, off_t size)
+    WT_SESSION_IMPL *session, WT_EXTLIST *el, wt_off_t off, wt_off_t size)
 {
 	/*
 	 * There are currently two copies of this function (this code is a one-
@@ -993,7 +993,7 @@ __wt_block_insert_ext(
  *	version).
  */
 static int
-__block_merge(WT_SESSION_IMPL *session, WT_EXTLIST *el, off_t off, off_t size)
+__block_merge(WT_SESSION_IMPL *session, WT_EXTLIST *el, wt_off_t off, wt_off_t size)
 {
 	WT_EXT *ext, *after, *before;
 
@@ -1081,7 +1081,7 @@ __block_merge(WT_SESSION_IMPL *session, WT_EXTLIST *el, off_t off, off_t size)
  */
 int
 __wt_block_extlist_read_avail(
-    WT_SESSION_IMPL *session, WT_BLOCK *block, WT_EXTLIST *el, off_t ckpt_size)
+    WT_SESSION_IMPL *session, WT_BLOCK *block, WT_EXTLIST *el, wt_off_t ckpt_size)
 {
 	WT_DECL_RET;
 
@@ -1122,12 +1122,12 @@ err:
  */
 int
 __wt_block_extlist_read(
-    WT_SESSION_IMPL *session, WT_BLOCK *block, WT_EXTLIST *el, off_t ckpt_size)
+    WT_SESSION_IMPL *session, WT_BLOCK *block, WT_EXTLIST *el, wt_off_t ckpt_size)
 {
 	WT_DECL_ITEM(tmp);
 	WT_DECL_RET;
-	off_t off, size;
-	int (*func)(WT_SESSION_IMPL *, WT_EXTLIST *, off_t, off_t);
+	wt_off_t off, size;
+	int (*func)(WT_SESSION_IMPL *, WT_EXTLIST *, wt_off_t, wt_off_t);
 	const uint8_t *p;
 
 	/* If there isn't a list, we're done. */
@@ -1141,7 +1141,7 @@ __wt_block_extlist_read(
 #define	WT_EXTLIST_READ(p, v) do {					\
 	uint64_t _v;							\
 	WT_ERR(__wt_vunpack_uint(&(p), 0, &_v));			\
-	(v) = (off_t)_v;						\
+	(v) = (wt_off_t)_v;						\
 } while (0)
 
 	p = WT_BLOCK_HEADER_BYTE(tmp->mem);
@@ -1300,7 +1300,7 @@ __wt_block_extlist_truncate(
 {
 	WT_EXT *ext, **astack[WT_SKIP_MAXDEPTH];
 	WT_FH *fh;
-	off_t size;
+	wt_off_t size;
 
 	fh = block->fh;
 

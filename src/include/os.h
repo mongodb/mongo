@@ -49,9 +49,9 @@ struct __wt_fh {
 	char	*name;				/* File name */
 
 	int	fd;				/* POSIX file handle */
-	off_t	size;				/* File size */
-	off_t   extend_size;			/* File extended size */
-	off_t   extend_len;			/* File extend chunk size */
+	wt_off_t	size;				/* File size */
+	wt_off_t   extend_size;			/* File extended size */
+	wt_off_t   extend_len;			/* File extend chunk size */
 
 	int	direct_io;			/* O_DIRECT configured */
 };

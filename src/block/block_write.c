@@ -49,7 +49,7 @@ __wt_block_write_size(WT_SESSION_IMPL *session, WT_BLOCK *block, size_t *sizep)
  *	Extend the file.
  */
 static inline int
-__block_extend(WT_SESSION_IMPL *session, WT_FH *fh, off_t offset, size_t size)
+__block_extend(WT_SESSION_IMPL *session, WT_FH *fh, wt_off_t offset, size_t size)
 {
 	/*
 	 * Extend the file in chunks.  We want to limit the number of threads
@@ -74,7 +74,7 @@ __block_extend(WT_SESSION_IMPL *session, WT_FH *fh, off_t offset, size_t size)
     defined(HAVE_FTRUNCATE) || defined(HAVE_POSIX_FALLOCATE)
 	if (fh->extend_size <= fh->size ||
 	    (offset + fh->extend_len <= fh->extend_size &&
-	    offset + fh->extend_len + (off_t)size >= fh->extend_size)) {
+	    offset + fh->extend_len + (wt_off_t)size >= fh->extend_size)) {
 		fh->extend_size = offset + fh->extend_len * 2;
 		return (
 		    __wt_fallocate(session, fh, offset, fh->extend_len * 2));
@@ -91,7 +91,7 @@ int
 __wt_block_write(WT_SESSION_IMPL *session, WT_BLOCK *block,
     WT_ITEM *buf, uint8_t *addr, size_t *addr_sizep, int data_cksum)
 {
-	off_t offset;
+	wt_off_t offset;
 	uint32_t size, cksum;
 	uint8_t *endp;
 
@@ -112,13 +112,13 @@ __wt_block_write(WT_SESSION_IMPL *session, WT_BLOCK *block,
  */
 int
 __wt_block_write_off(WT_SESSION_IMPL *session, WT_BLOCK *block,
-    WT_ITEM *buf, off_t *offsetp, uint32_t *sizep, uint32_t *cksump,
+    WT_ITEM *buf, wt_off_t *offsetp, uint32_t *sizep, uint32_t *cksump,
     int data_cksum, int locked)
 {
 	WT_BLOCK_HEADER *blk;
 	WT_DECL_RET;
 	WT_FH *fh;
-	off_t offset;
+	wt_off_t offset;
 	size_t align_size;
 
 	blk = WT_BLOCK_HEADER_REF(buf->mem);
@@ -183,7 +183,7 @@ __wt_block_write_off(WT_SESSION_IMPL *session, WT_BLOCK *block,
 		WT_RET(__wt_block_ext_prealloc(session, 5));
 		__wt_spin_lock(session, &block->live_lock);
 	}
-	ret = __wt_block_alloc(session, block, &offset, (off_t)align_size);
+	ret = __wt_block_alloc(session, block, &offset, (wt_off_t)align_size);
 
 	/*
 	 * File extension requires locking unless we have the Linux fallocate
@@ -207,7 +207,7 @@ __wt_block_write_off(WT_SESSION_IMPL *session, WT_BLOCK *block,
 		if (!locked)
 			__wt_spin_lock(session, &block->live_lock);
 		WT_TRET(__wt_block_off_free(
-		    session, block, offset, (off_t)align_size));
+		    session, block, offset, (wt_off_t)align_size));
 		if (!locked)
 			__wt_spin_unlock(session, &block->live_lock);
 		WT_RET(ret);
@@ -231,7 +231,7 @@ __wt_block_write_off(WT_SESSION_IMPL *session, WT_BLOCK *block,
 	    (block->os_cache += align_size) > block->os_cache_max) {
 		block->os_cache = 0;
 		if ((ret = posix_fadvise(fh->fd,
-		    (off_t)0, (off_t)0, POSIX_FADV_DONTNEED)) != 0)
+		    (wt_off_t)0, (wt_off_t)0, POSIX_FADV_DONTNEED)) != 0)
 			WT_RET_MSG(
 			    session, ret, "%s: posix_fadvise", block->name);
 	}

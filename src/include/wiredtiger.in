@@ -50,6 +50,7 @@ extern "C" {
  *
  * @{
  */
+typedef int64_t wt_off_t;
 
 /*******************************************
  * Public forward structure declarations
@@ -136,7 +137,7 @@ struct __wt_item {
  */
 struct __wt_lsn {
 	uint32_t        file;           /*!< Log file number */
-	off_t           offset;         /*!< Log file offset */
+	wt_off_t        offset;         /*!< Log file offset */
 };
 
 /*!

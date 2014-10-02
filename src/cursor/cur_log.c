@@ -22,7 +22,7 @@ __curlog_logrec(
 	/* Set up the LSNs and take a copy of the log record for the cursor. */
 	*cl->cur_lsn = *lsnp;
 	*cl->next_lsn = *lsnp;
-	cl->next_lsn->offset += (off_t)logrec->size;
+	cl->next_lsn->offset += (wt_off_t)logrec->size;
 	WT_RET(__wt_buf_set(session, cl->logrec, logrec->data, logrec->size));
 
 	/*
