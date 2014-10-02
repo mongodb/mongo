@@ -397,7 +397,7 @@ tasks:
 
 - name: dist
   depends_on:
-  # - name: "unit"
+  - name: "unit"
   commands:
     - command: git.get_project
       params:
