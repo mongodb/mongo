@@ -169,10 +169,9 @@ namespace {
         // override values in the prefix, but not values in the suffix.
         const char *default_config_pfx = "type=file,leaf_page_max=16k,";
         const char *default_config_sfx =
-            ",key_format=u,value_format=u,collator=mongo_index,app_metadata=";
-        std::string config = std::string(default_config_pfx +
-                wiredTigerGlobalOptions.indexConfig + default_config_sfx +
-                info.descriptor()->infoObj().jsonString());
+            ",key_format=u,value_format=u,collator=mongo_index";
+        std::string config = std::string( default_config_pfx +
+                wiredTigerGlobalOptions.indexConfig + default_config_sfx );
         LOG(1) << "create uri: " << newURI << " config: " << config;
         int ret = s->create(s, newURI.c_str(), config.c_str());
         if (ret != 0) {

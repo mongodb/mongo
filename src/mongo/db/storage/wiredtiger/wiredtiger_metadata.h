@@ -66,6 +66,7 @@ namespace mongo {
         Status remove(uint64_t identifier, bool failedDrop = false);
         Status rename(uint64_t identifier, std::string newName);
         Status updateConfig(uint64_t identifier, BSONObj newConfig);
+        std::vector<uint64_t> getDeleted();
         std::vector<uint64_t> getAllTables();
         std::vector<uint64_t> getAllIndexes(uint64_t identifier);
     private:

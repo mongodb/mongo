@@ -71,10 +71,10 @@ namespace mongo {
         _db = 0;
     }
 
-    // We can't do this in the constructor, since the rest of MongoDB isn't
-    // initialized enough to create CatalogEntry objects.
     void WiredTigerEngine::loadExistingDatabases() {
         boost::mutex::scoped_lock lk( _dbLock );
+
+        _db->DropDeletedTables();
 
         WiredTigerMetaData &md = _db->GetMetaData();
         std::vector<uint64_t> tables = md.getAllTables();

@@ -86,4 +86,21 @@ namespace mongo {
     WiredTigerMetaData &WiredTigerDatabase::GetMetaData() {
         return *_metaData;
     }
+
+    void WiredTigerDatabase::DropDeletedTables() {
+        // Clean up any tables that we failed to drop last time the server was running
+        std::vector<uint64_t> toDrop = _metaData->getDeleted();
+        if ( toDrop.size() != 0 ) {
+            WT_SESSION *s;
+            int ret = _conn->open_session(_conn, NULL, NULL, &s);
+            invariantWTOK(ret);
+            for ( std::vector<uint64_t>::iterator it = toDrop.begin(); it != toDrop.end(); ++it) {
+                std::string uri = _metaData->getURI( *it );
+                ret = s->drop( s, uri.c_str(), "force" );
+                if ( ret == 0 )
+                    _metaData->remove( *it );
+            }
+            s->close( s, NULL );
+        }
+    }
 }

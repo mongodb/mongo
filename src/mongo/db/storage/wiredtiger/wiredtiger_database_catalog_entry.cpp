@@ -194,10 +194,10 @@ namespace mongo {
         uint64_t id = md.getIdentifier( ns.toString() );
         std::string uri = md.getURI( id );
         int ret = session->drop(session, uri.c_str(), "force");
-        if (ret != 0)
-            return Status( ErrorCodes::OperationFailed, "Collection drop failed" );
+        //if (ret != 0)
+        //    return Status( ErrorCodes::OperationFailed, "Collection drop failed" );
 
-        md.remove(id);
+        md.remove(id, ret != 0);
 
         std::vector<std::string> names;
         entry->getAllIndexes( txn, &names );

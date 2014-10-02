@@ -169,12 +169,14 @@ namespace mongo {
         swrap_real.GetContext().CloseAllCursors();
         swrap.GetContext().CloseAllCursors();
 
-        std::string uri = swrap_real.GetDatabase().GetMetaData().getURI(
-                WiredTigerIndex::toTableName( ns().toString(), idxName.toString() ) );
+        WiredTigerMetaData &md = swrap_real.GetDatabase().GetMetaData();
+        uint64_t identifier = md.getIdentifier(
+                    WiredTigerIndex::toTableName( ns().toString(), idxName.toString() ) );
+        std::string uri = md.getURI( identifier );
         WT_SESSION *session = swrap.Get();
         int ret = session->drop(session, uri.c_str(), "force");
-        invariantWTOK(ret);
         indexes.erase( idxName.toString() );
+        md.remove( identifier, ret != 0 );
         return Status::OK();
     }
 
@@ -220,30 +222,6 @@ namespace mongo {
     bool WiredTigerCollectionCatalogEntry::indexExists( const StringData &idxName ) const {
         WiredTigerCollectionCatalogEntry::Indexes::const_iterator i = indexes.find( idxName.toString() );
         return ( i != indexes.end() );
-    }
-
-    // The cursor must be open on the metadata, and positioned on the table
-    // we are retrieving the data for.
-    // TODO: This belongs in WiredTigerCollectionCatalogEntry
-    BSONObj WiredTigerCollectionCatalogEntry::_getSavedMetadata(WiredTigerCursor &cursor)
-    {
-        WT_CURSOR *c;
-        c = cursor.Get();
-
-        const char *meta;
-        int ret = c->get_value(c, &meta);
-        invariantWTOK(ret);
-        WT_CONFIG_PARSER *cp;
-        ret = wiredtiger_config_parser_open(
-                NULL, meta, strlen(meta), &cp);
-        invariantWTOK(ret);
-        WT_CONFIG_ITEM cval;
-        ret = cp->get(cp, "app_metadata", &cval);
-        invariantWTOK(ret);
-
-        BSONObj b( fromjson(std::string(cval.str, cval.len)));
-        cp->close(cp);
-        return b;
     }
 
 }

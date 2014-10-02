@@ -109,7 +109,6 @@ namespace mongo {
         };
         // Not currently used, but needed to implement interface.
         BSONCollectionCatalogEntry::MetaData _metaData;
-        BSONObj _getSavedMetadata(WiredTigerCursor &cursor);
     public:
         typedef std::map<std::string,IndexEntry*> Indexes;
         Indexes indexes;

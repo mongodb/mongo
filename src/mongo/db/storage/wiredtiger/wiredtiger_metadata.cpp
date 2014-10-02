@@ -113,6 +113,8 @@ namespace mongo {
     {
         WiredTigerMetaDataMap::iterator itr;
         for (itr = _tables.begin(); itr != _tables.end(); itr++) {
+            if (itr->second.isDeleted)
+                continue;
             if (itr->second.name == tableName)
                 return itr->first;
         }
@@ -185,7 +187,7 @@ namespace mongo {
         WiredTigerMetaDataMap::iterator itr;
         std::vector<uint64_t> tables;
         for( itr = _tables.begin(); itr != _tables.end(); ++itr ) {
-            if ( !itr->second.isIndex )
+            if ( !itr->second.isDeleted && !itr->second.isIndex )
                 tables.push_back( itr->first );
         }
         return tables;
@@ -199,10 +201,22 @@ namespace mongo {
 
         std::vector<uint64_t> indexes;
         for( itr = _tables.begin(); itr != _tables.end(); ++itr ) {
-            if ( itr->second.isIndex &&  boost::starts_with(itr->second.name, primary.name) )
+            if ( !itr->second.isDeleted && itr->second.isIndex &&
+                  boost::starts_with(itr->second.name, primary.name) )
                 indexes.push_back( itr->first );
         }
         return indexes;
+    }
+
+    std::vector<uint64_t> WiredTigerMetaData::getDeleted()
+    {
+        WiredTigerMetaDataMap::iterator itr;
+        std::vector<uint64_t> tables;
+        for( itr = _tables.begin(); itr != _tables.end(); ++itr ) {
+            if ( itr->second.isDeleted )
+                tables.push_back( itr->first );
+        }
+        return tables;
     }
 
     // Internal methods.

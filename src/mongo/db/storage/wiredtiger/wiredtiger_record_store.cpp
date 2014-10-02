@@ -45,6 +45,10 @@ namespace mongo {
         WiredTigerSession swrap(db);
         WT_SESSION *s = swrap.Get();
 
+        // Attempt to drop any tables or indexes that we couldn't drop earlier. This is
+        // a cleanup step - not directly related to create.
+        db.DropDeletedTables();
+
         // Add the collection into the meta data
         WiredTigerMetaData &md = db.GetMetaData();
         uint64_t tblIdentifier = md.generateIdentifier( ns.toString(), options.toBSON() );
@@ -53,10 +57,9 @@ namespace mongo {
         // Separate out a prefix and suffix in the default string. User configuration will
         // override values in the prefix, but not values in the suffix.
         const char *default_config_pfx = "type=file,leaf_page_max=512k,memory_page_max=10m,";
-        const char *default_config_sfx = ",key_format=q,value_format=u,app_metadata=";
-        std::string config = std::string(default_config_pfx +
-                wiredTigerGlobalOptions.collectionConfig + default_config_sfx +
-                options.toBSON().jsonString());
+        const char *default_config_sfx = ",key_format=q,value_format=u";
+        std::string config = std::string( default_config_pfx +
+                wiredTigerGlobalOptions.collectionConfig + default_config_sfx );
         int ret = s->create(s, newUri.c_str(), config.c_str());
         if (ret  != 0) {
             log() << "Creating collection with custom options (" << config <<

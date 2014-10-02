@@ -41,6 +41,7 @@ namespace mongo {
         void ClearCache();
         void InitMetaData();
         WiredTigerMetaData& GetMetaData();
+        void DropDeletedTables();
 
     private:
         WT_CONNECTION *_conn;
