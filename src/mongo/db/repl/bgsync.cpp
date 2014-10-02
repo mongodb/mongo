@@ -108,7 +108,8 @@ namespace {
                                        _appliedBuffer(true),
                                        _assumingPrimary(false),
                                        _replCoord(getGlobalReplicationCoordinator()),
-                                       _initialSyncRequestedFlag(false) {
+                                       _initialSyncRequestedFlag(false),
+                                       _indexPrefetchConfig(PREFETCH_ALL) {
     }
 
     BackgroundSync* BackgroundSync::get() {

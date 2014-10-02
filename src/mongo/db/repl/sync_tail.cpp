@@ -150,7 +150,6 @@ namespace repl {
                 Client::ReadContext ctx(&txn, ns);
                 prefetchPagesForReplicatedOp(&txn,
                                              ctx.ctx().db(),
-                                             theReplSet->getIndexPrefetchConfig(),
                                              op);
             }
             catch (const DBException& e) {

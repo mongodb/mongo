@@ -41,7 +41,6 @@
 #include "mongo/db/curop.h"
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/namespace_string.h"
-#include "mongo/db/prefetch.h"
 #include "mongo/db/repl/bgsync.h"
 #include "mongo/db/repl/member.h"
 #include "mongo/db/repl/minvalid.h"
@@ -159,6 +158,24 @@ namespace repl {
         Client::initThread("rsSync");
         replLocalAuth();
         ReplicationCoordinator* replCoord = getGlobalReplicationCoordinator();
+
+        // Set initial indexPrefetch setting
+        std::string& prefetch = replCoord->getSettings().rsIndexPrefetch;
+        if (!prefetch.empty()) {
+            BackgroundSync::IndexPrefetchConfig prefetchConfig = BackgroundSync::PREFETCH_ALL;
+            if (prefetch == "none")
+                prefetchConfig = BackgroundSync::PREFETCH_NONE;
+            else if (prefetch == "_id_only")
+                prefetchConfig = BackgroundSync::PREFETCH_ID_ONLY;
+            else if (prefetch == "all")
+                prefetchConfig = BackgroundSync::PREFETCH_ALL;
+            else {
+                warning() << "unrecognized indexPrefetch setting " << prefetch << ", defaulting "
+                          << "to \"all\"";
+            }
+            BackgroundSync::get()->setIndexPrefetchConfig(prefetchConfig);
+        }
+
         while (!inShutdown()) {
             // After a reconfig, we may not be in the replica set anymore, so
             // check that we are in the set (and not an arbiter) before

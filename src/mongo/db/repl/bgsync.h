@@ -67,6 +67,60 @@ namespace repl {
      * 3. BackgroundSync::_mutex
      */
     class BackgroundSync : public BackgroundSyncInterface {
+    public:
+        // Allow index prefetching to be turned on/off
+        enum IndexPrefetchConfig {
+            PREFETCH_NONE=0, PREFETCH_ID_ONLY=1, PREFETCH_ALL=2
+        };
+
+        static BackgroundSync* get();
+
+        // stop syncing (when this node becomes a primary, e.g.)
+        void stop();
+        bool isAssumingPrimary_inlock();
+
+
+        void shutdown();
+        void notify();
+
+        virtual ~BackgroundSync() {}
+
+        // starts the producer thread
+        void producerThread();
+        // starts the sync target notifying thread
+        void notifierThread();
+
+        HostAndPort getSyncTarget();
+
+        // Interface implementation
+
+        virtual bool peek(BSONObj* op);
+        virtual void consume();
+        virtual void clearSyncTarget();
+        virtual void waitForMore();
+
+        // For monitoring
+        BSONObj getCounters();
+
+        // Wait for replication to finish and buffer to be applied so that the member can become
+        // primary.
+        void stopReplicationAndFlushBuffer();
+
+        long long getLastAppliedHash() const;
+        void setLastAppliedHash(long long oldH);
+        void loadLastAppliedHash(OperationContext* txn);
+
+        bool getInitialSyncRequestedFlag();
+        void setInitialSyncRequestedFlag(bool value);
+
+        void setIndexPrefetchConfig(const IndexPrefetchConfig cfg) {
+            _indexPrefetchConfig = cfg;
+        }
+
+        IndexPrefetchConfig getIndexPrefetchConfig() {
+            return _indexPrefetchConfig;
+        }
+
     private:
         static BackgroundSync *s_instance;
         // protects creation of s_instance
@@ -121,44 +175,9 @@ namespace repl {
         bool _initialSyncRequestedFlag;
         boost::mutex _initialSyncMutex;
 
-    public:
-        // stop syncing (when this node becomes a primary, e.g.)
-        void stop();
-        bool isAssumingPrimary_inlock();
+        // This setting affects the Applier prefetcher behavior.
+        IndexPrefetchConfig _indexPrefetchConfig;
 
-        static BackgroundSync* get();
-        void shutdown();
-        void notify();
-
-        virtual ~BackgroundSync() {}
-
-        // starts the producer thread
-        void producerThread();
-        // starts the sync target notifying thread
-        void notifierThread();
-
-        HostAndPort getSyncTarget();
-
-        // Interface implementation
-
-        virtual bool peek(BSONObj* op);
-        virtual void consume();
-        virtual void clearSyncTarget();
-        virtual void waitForMore();
-
-        // For monitoring
-        BSONObj getCounters();
-
-        // Wait for replication to finish and buffer to be applied so that the member can become
-        // primary.
-        void stopReplicationAndFlushBuffer();
-
-        long long getLastAppliedHash() const;
-        void setLastAppliedHash(long long oldH);
-        void loadLastAppliedHash(OperationContext* txn);
-
-        bool getInitialSyncRequestedFlag();
-        void setInitialSyncRequestedFlag(bool value);
     };
 
 
