@@ -32,6 +32,8 @@ mongo_tools_variables:
       - name: dist
       - name: legacy
       - name: unit
+    osx_108_ssl_task_list: &osx_108_ssl_tasks
+      - name: dist
     rhel55_32_task_list: &rhel55_32_tasks
       - name: db
       - name: dist
@@ -896,6 +898,15 @@ buildvariants:
     <<: *mongo_url_osx108
     <<: *mongodb_default_startup_args
   tasks: *osx_108_tasks
+
+- name: osx-108-ssl
+  display_name: OSX 10.8 64-bit SSL
+  run_on:
+  - osx-108
+  expansions:
+    build_tags: -tags "ssl"
+    edition: ssl
+  tasks: *osx_108_ssl_tasks
 
 #######################################
 #          RHEL Buildvariant          #
