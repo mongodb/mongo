@@ -65,7 +65,7 @@ typedef struct {
 	int32_t	 slot_error;		/* Error value */
 #define	SLOT_INVALID_INDEX	0xffffffff
 	uint32_t slot_index;		/* Active slot index */
-	off_t	 slot_start_offset;	/* Starting file offset */
+	wt_off_t	 slot_start_offset;	/* Starting file offset */
 	WT_LSN	slot_release_lsn;	/* Slot release LSN */
 	WT_LSN	slot_start_lsn;	/* Slot starting LSN */
 	WT_LSN	slot_end_lsn;	/* Slot ending LSN */
@@ -81,14 +81,14 @@ typedef struct {
 
 typedef struct {
 	WT_LOGSLOT	*slot;
-	off_t		 offset;
+	wt_off_t		 offset;
 } WT_MYSLOT;
 
 #define	LOG_FIRST_RECORD	log->allocsize	/* Offset of first record */
 
 typedef struct {
 	uint32_t	allocsize;	/* Allocation alignment size */
-	off_t		log_written;	/* Amount of log written this period */
+	wt_off_t	log_written;	/* Amount of log written this period */
 	/*
 	 * Log file information
 	 */

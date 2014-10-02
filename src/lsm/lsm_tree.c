@@ -190,7 +190,7 @@ int
 __wt_lsm_tree_set_chunk_size(
     WT_SESSION_IMPL *session, WT_LSM_CHUNK *chunk)
 {
-	off_t size;
+	wt_off_t size;
 	const char *filename;
 
 	filename = chunk->uri;

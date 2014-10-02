@@ -13,7 +13,7 @@
  */
 int
 __wt_read(
-    WT_SESSION_IMPL *session, WT_FH *fh, off_t offset, size_t len, void *buf)
+    WT_SESSION_IMPL *session, WT_FH *fh, wt_off_t offset, size_t len, void *buf)
 {
 	size_t chunk;
 	ssize_t nr;
@@ -52,7 +52,7 @@ __wt_read(
  */
 int
 __wt_write(WT_SESSION_IMPL *session,
-    WT_FH *fh, off_t offset, size_t len, const void *buf)
+    WT_FH *fh, wt_off_t offset, size_t len, const void *buf)
 {
 	size_t chunk;
 	ssize_t nw;

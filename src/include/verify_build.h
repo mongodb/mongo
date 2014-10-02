@@ -66,6 +66,7 @@ __wt_verify_build(void)
 	 * disallow them for now.
 	 */
 	STATIC_ASSERT(sizeof(off_t) == sizeof(int64_t));
+	STATIC_ASSERT(sizeof(wt_off_t) == sizeof(int64_t));
 }
 
 #undef ALIGN_CHECK

@@ -160,7 +160,7 @@ join_slot:
 	if (LF_ISSET(WT_LOG_FSYNC))
 		F_SET(slot, SLOT_SYNC);
 	myslotp->slot = slot;
-	myslotp->offset = (off_t)old_state - WT_LOG_SLOT_READY;
+	myslotp->offset = (wt_off_t)old_state - WT_LOG_SLOT_READY;
 	return (0);
 }
 

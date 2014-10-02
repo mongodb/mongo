@@ -63,7 +63,7 @@ __wt_block_compact_skip(WT_SESSION_IMPL *session, WT_BLOCK *block, int *skipp)
 	WT_EXT *ext;
 	WT_EXTLIST *el;
 	WT_FH *fh;
-	off_t avail, ninety;
+	wt_off_t avail, ninety;
 
 	*skipp = 1;				/* Return a default skip. */
 
@@ -125,7 +125,7 @@ __wt_block_compact_page_skip(WT_SESSION_IMPL *session,
 	WT_EXT *ext;
 	WT_EXTLIST *el;
 	WT_FH *fh;
-	off_t ninety, offset;
+	wt_off_t ninety, offset;
 	uint32_t size, cksum;
 
 	WT_UNUSED(addr_size);
@@ -169,7 +169,7 @@ __block_dump_avail(WT_SESSION_IMPL *session, WT_BLOCK *block)
 {
 	WT_EXTLIST *el;
 	WT_EXT *ext;
-	off_t decile[10], percentile[100], size, v;
+	wt_off_t decile[10], percentile[100], size, v;
 	u_int i;
 
 	el = &block->live.avail;
@@ -205,7 +205,7 @@ __block_dump_avail(WT_SESSION_IMPL *session, WT_BLOCK *block)
 		    "%2u%%: %12" PRIuMAX "MB, (%" PRIuMAX "B, %"
 		    PRIuMAX "%%)",
 		    i, (uintmax_t)v / WT_MEGABYTE, (uintmax_t)v,
-		    (uintmax_t)((v * 100) / (off_t)el->bytes)));
+		    (uintmax_t)((v * 100) / (wt_off_t)el->bytes)));
 	}
 #endif
 	for (i = 0; i < WT_ELEMENTS(decile); ++i) {
@@ -214,7 +214,7 @@ __block_dump_avail(WT_SESSION_IMPL *session, WT_BLOCK *block)
 		    "%2u%%: %12" PRIuMAX "MB, (%" PRIuMAX "B, %"
 		    PRIuMAX "%%)",
 		    i * 10, (uintmax_t)v / WT_MEGABYTE, (uintmax_t)v,
-		    (uintmax_t)((v * 100) / (off_t)el->bytes)));
+		    (uintmax_t)((v * 100) / (wt_off_t)el->bytes)));
 	}
 
 	return (0);
