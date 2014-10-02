@@ -78,10 +78,9 @@ func (exp *MongoExport) ValidateSettings() error {
 
 	if exp.ToolOptions.Namespace.Collection == "" {
 		return fmt.Errorf("must specify a collection")
-	} else {
-		if err := util.ValidateCollectionName(exp.ToolOptions.Namespace.Collection); err != nil {
-			return err
-		}
+	}
+	if err := util.ValidateCollectionName(exp.ToolOptions.Namespace.Collection); err != nil {
+		return err
 	}
 
 	if exp.InputOpts != nil && exp.InputOpts.Query != "" {
