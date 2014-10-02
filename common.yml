@@ -12,12 +12,16 @@ mongo_tools_variables:
       mongo_url: "https://fastdl.mongodb.org/sunos5/mongodb-sunos5-x86_64-latest.tgz"
     rhel55_32: &mongo_url_rhell55_32
       mongo_url: "https://fastdl.mongodb.org/linux/mongodb-linux-i686-latest.tgz"
-    ubuntu1204: &mongo_url_ubuntu1204
-      mongo_url: "http://downloads.10gen.com/linux/mongodb-linux-x86_64-enterprise-ubuntu1204-latest.tgz"
-    windows32-bit: &mongo_url_windows32
+    linux_64_bit: &mongo_url_ubuntu1204
+      mongo_url: "http://downloads.10gen.com/linux/mongodb-linux-x86_64-latest.tgz"
+    linux_64_bit_enterprise: &mongo_url_ubuntu1204_enterprise
+      mongo_url: "http://downloads.10gen.com/linux/mongodb-linux-x86_64-enterprise-ubuntu1204-2.7.7.tgz"
+    windows_32_bit: &mongo_url_windows32
       mongo_url: "https://fastdl.mongodb.org/win32/mongodb-win32-i386-latest.zip"
-    windows64-bit: &mongo_url_windows64
+    windows_64_bit: &mongo_url_windows64
       mongo_url: "https://fastdl.mongodb.org/win32/mongodb-win32-x86_64-2008plus-latest.zip"
+    windows_64_bit_enterprise: &mongo_url_windows64_enterprise
+      mongo_url: "http://downloads.10gen.com/win32/mongodb-win32-x86_64-enterprise-windows-64-2.7.7.zip"
 
 
 ## List of tests to run on each buildvariant
@@ -55,14 +59,24 @@ mongo_tools_variables:
       - name: dist
     windows_32_task_list: &windows_32_tasks
       - name: db
+        distros:
+        - windows-64-vs2013-test
       - name: dist
       - name: legacy
+        distros:
+        - windows-64-vs2013-test
       - name: unit
     windows_64_task_list: &windows_64_tasks
       - name: db
+        distros:
+        - windows-64-vs2013-test
       - name: dist
       - name: legacy
+        distros:
+        - windows-64-vs2013-test
       - name: unit
+        distros:
+        - windows-64-vs2013-compile
     windows_64_ssl_task_list: &windows_64_ssl_tasks
       - name: dist
 
@@ -906,33 +920,28 @@ buildvariants:
     coverage_args: "-coverprofile=coverage.out"
   tasks: *ubuntu1204_tasks
 
+- name: ubuntu-ssl
+  display_name: Linux 64-bit SSL
+  run_on:
+  - ubuntu1204-test
+  expansions:
+    build_tags: -tags "ssl"
+    edition: ssl
+  tasks: *ubuntu1204_ssl_tasks
+
 - name: ubuntu-enterprise
   display_name: Linux 64-bit Enterprise
   run_on:
   - ubuntu1204-test
   expansions:
-    <<: *mongo_url_ubuntu1204
-    <<: *mongodb_default_startup_args
+    <<: *mongo_url_ubuntu1204_enterprise
+    <<: *mongodb_ssl_startup_args
     build_tags: -tags "ssl sasl"
     coverage: true
     coverage_args: "-coverprofile=coverage.out"
     edition: enterprise
     run_kinit: true
   tasks: *ubuntu1204_tasks
-
-- name: ubuntu-ssl
-  display_name: Linux 64-bit SSL
-  run_on:
-  - ubuntu1204-test
-  expansions:
-    <<: *mongo_url_ubuntu1204
-    <<: *mongodb_default_startup_args
-    build_tags: -tags "ssl"
-    coverage: true
-    coverage_args: "-coverprofile=coverage.out"
-    edition: ssl
-    run_kinit: true
-  tasks: *ubuntu1204_ssl_tasks
 
 #######################################
 #         Solaris Buildvariant        #
@@ -976,8 +985,6 @@ buildvariants:
   run_on:
   - windows-64-vs2013-compile
   expansions:
-    <<: *mongo_url_windows64
-    <<: *mongodb_default_startup_args
     build_tags: -tags "ssl"
     edition: ssl
     extension: .exe
@@ -990,8 +997,8 @@ buildvariants:
   run_on:
   - windows-64-vs2013-compile
   expansions:
-    <<: *mongo_url_windows64
-    <<: *mongodb_default_startup_args
+    <<: *mongo_url_windows64_enterprise
+    <<: *mongodb_ssl_startup_args
     build_tags: -tags "sasl ssl"
     edition: enterprise
     extension: .exe
