@@ -19,7 +19,20 @@ env.Library(
 env.Library(
     target='sorted_data_interface_test_harness',
     source=[
+        'sorted_data_interface_test_cursor.cpp',
+        'sorted_data_interface_test_cursor_advanceto.cpp',
+        'sorted_data_interface_test_cursor_locate.cpp',
+        'sorted_data_interface_test_cursor_position.cpp',
+        'sorted_data_interface_test_cursor_saverestore.cpp',
+        'sorted_data_interface_test_dupkeycheck.cpp',
+        'sorted_data_interface_test_fullvalidate.cpp',
         'sorted_data_interface_test_harness.cpp',
+        'sorted_data_interface_test_insert.cpp',
+        'sorted_data_interface_test_isempty.cpp',
+        'sorted_data_interface_test_rollback.cpp',
+        'sorted_data_interface_test_spaceused.cpp',
+        'sorted_data_interface_test_touch.cpp',
+        'sorted_data_interface_test_unindex.cpp',
         ],
     LIBDEPS=[]
     )
