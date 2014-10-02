@@ -743,10 +743,10 @@ struct __wt_col {
 	 *
 	 * If the value is 0, it's a single, deleted record.
 	 *
-	 * Obscure the field name, code shouldn't use WT_COL->value, the public
-	 * interface is WT_COL_PTR.
+	 * Obscure the field name, code shouldn't use WT_COL->__col_value, the
+	 * public interface is WT_COL_PTR and WT_COL_PTR_SET.
 	 */
-	uint32_t __value;
+	uint32_t __col_value;
 };
 
 /*
@@ -762,12 +762,15 @@ struct __wt_col_rle {
 } WT_GCC_ATTRIBUTE((packed));
 
 /*
- * WT_COL_PTR --
- *	Return a pointer corresponding to the data offset -- if the item doesn't
- * exist on the page, return a NULL.
+ * WT_COL_PTR, WT_COL_PTR_SET --
+ *	Return/Set a pointer corresponding to the data offset. (If the item does
+ * not exist on the page, return a NULL.)
  */
 #define	WT_COL_PTR(page, cip)						\
-	((cip)->__value == 0 ? NULL : WT_PAGE_REF_OFFSET(page, (cip)->__value))
+	((cip)->__col_value == 0 ?					\
+	    NULL : WT_PAGE_REF_OFFSET(page, (cip)->__col_value))
+#define	WT_COL_PTR_SET(cip, value)					\
+	(cip)->__col_value = (value)
 
 /*
  * WT_COL_FOREACH --
