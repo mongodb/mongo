@@ -51,6 +51,9 @@ namespace OplogStartTests {
         ~Base() {
             client()->dropCollection(ns());
             _wunit.commit();
+
+            // The OplogStart stage is not allowed to outlive it's RecoveryUnit.
+            _stage.reset();
         }
 
     protected:
