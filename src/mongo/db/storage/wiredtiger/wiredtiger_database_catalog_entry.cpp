@@ -112,7 +112,7 @@ namespace mongo {
         std::vector<uint64_t> tables = md.getAllTables();
         for ( std::vector<uint64_t>::iterator it = tables.begin(); it != tables.end(); ++it) {
             std::string name = md.getName( *it );
-            if ( boost::starts_with(name, ns) ) {
+            if ( ns == nsToDatabaseSubstring( name ) ) {
                 // Initialize the namespace we found
                 WiredTigerCollectionCatalogEntry *entry =
                     new WiredTigerCollectionCatalogEntry(_db, StringData(name));
