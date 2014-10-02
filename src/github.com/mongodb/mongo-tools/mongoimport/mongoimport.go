@@ -281,13 +281,11 @@ func removeBlankFields(document bson.M) bson.M {
 }
 
 // getImportInput returns an implementation of ImportInput which can handle
-// transforming tsv, csv, or JSON into appropriate BSON documents
+// transforming TSV, CSV, or JSON into appropriate BSON documents
 func (mongoImport *MongoImport) getImportInput(in io.Reader) (ImportInput,
 	error) {
 	var fields []string
 	var err error
-	// there should be some sanity checks done for field names - e.g. that they
-	// don't contain dots
 	if len(mongoImport.InputOptions.Fields) != 0 {
 		fields = strings.Split(strings.Trim(mongoImport.InputOptions.Fields,
 			" "), ",")
@@ -298,7 +296,11 @@ func (mongoImport *MongoImport) getImportInput(in io.Reader) (ImportInput,
 		}
 	}
 	if mongoImport.InputOptions.Type == CSV {
-		return NewCSVImportInput(fields, in), nil
+		csvImportInput := NewCSVImportInput(fields, in)
+		if !mongoImport.InputOptions.HeaderLine {
+			csvImportInput.NumProcessed--
+		}
+		return csvImportInput, nil
 	} else if mongoImport.InputOptions.Type == TSV {
 		return NewTSVImportInput(fields, in), nil
 	}

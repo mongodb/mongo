@@ -19,9 +19,6 @@ type CSVImportInput struct {
 	// csvReader is the underlying reader used to read data in from the CSV
 	// or TSV file
 	csvReader *csv.Reader
-	// NumImported indicates the number of CSV documents successfully parsed from
-	// the CSV input source
-	NumImported int64
 	// NumImported indicates the number of CSV documents processed
 	NumProcessed int64
 }
@@ -67,9 +64,9 @@ func (csvImporter *CSVImportInput) SetHeader() error {
 // returns the BSON equivalent.
 func (csvImporter *CSVImportInput) ImportDocument() (bson.M, error) {
 	document := bson.M{}
+	csvImporter.NumProcessed++
 	tokens, err := csvImporter.csvReader.Read()
 	if err != nil {
-		csvImporter.NumProcessed++
 		if err == io.EOF {
 			return nil, err
 		}
@@ -87,14 +84,11 @@ func (csvImporter *CSVImportInput) ImportDocument() (bson.M, error) {
 		} else {
 			key = "field" + strconv.Itoa(index)
 			if util.StringSliceContains(csvImporter.Fields, key) {
-				csvImporter.NumProcessed++
 				return document, fmt.Errorf("key collision for token #%v ('%v') on document #%v", index+1, parsedValue, csvImporter.NumProcessed)
 			}
 			document[key] = parsedValue
 		}
 	}
-	csvImporter.NumImported++
-	csvImporter.NumProcessed++
 	return document, nil
 }
 

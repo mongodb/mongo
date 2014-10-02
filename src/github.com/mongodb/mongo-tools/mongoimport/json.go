@@ -18,9 +18,6 @@ type JSONImportInput struct {
 	IsArray bool
 	// Decoder is used to read the next valid JSON documents from the input source
 	Decoder *json.Decoder
-	// NumImported indicates the number of JSON documents successfully parsed from
-	// the JSON input source
-	NumImported int64
 	// NumProcessed indicates the number of JSON documents processed
 	NumProcessed int64
 	// readOpeningBracket indicates if the underlying io.Reader has consumed
@@ -63,7 +60,6 @@ func NewJSONImportInput(isArray bool, in io.Reader) *JSONImportInput {
 	return &JSONImportInput{
 		IsArray:            isArray,
 		Decoder:            json.NewDecoder(in),
-		NumImported:        0,
 		readOpeningBracket: false,
 		bytesFromReader:    make([]byte, 1),
 	}
@@ -89,7 +85,7 @@ func (jsonImporter *JSONImportInput) SetHeader() error {
 // input source content is a valid JSON array
 func (jsonImporter *JSONImportInput) readJSONArraySeparator() error {
 	jsonImporter.expectedByte = JSON_ARRAY_SEP
-	if jsonImporter.NumImported == 0 {
+	if jsonImporter.NumProcessed == 0 {
 		jsonImporter.expectedByte = JSON_ARRAY_START
 	}
 
@@ -156,15 +152,15 @@ func (jsonImporter *JSONImportInput) ImportDocument() (bson.M, error) {
 	var document bson.M
 	if jsonImporter.IsArray {
 		if err := jsonImporter.readJSONArraySeparator(); err != nil {
-			jsonImporter.NumProcessed++
 			if err == io.EOF {
 				return nil, err
 			}
+			jsonImporter.NumProcessed++
 			return nil, fmt.Errorf("error reading separator after document #%v: %v", jsonImporter.NumProcessed, err)
 		}
 	}
+	jsonImporter.NumProcessed++
 	if err := jsonImporter.Decoder.Decode(&document); err != nil {
-		jsonImporter.NumProcessed++
 		if err == io.EOF {
 			return nil, err
 		}
@@ -183,10 +179,7 @@ func (jsonImporter *JSONImportInput) ImportDocument() (bson.M, error) {
 	//
 	// This applies for all the other extended JSON types MongoDB supports
 	if err := bsonutil.ConvertJSONDocumentToBSON(document); err != nil {
-		jsonImporter.NumProcessed++
 		return nil, fmt.Errorf("conversion error on document #%v: %v", jsonImporter.NumProcessed, err)
 	}
-	jsonImporter.NumImported++
-	jsonImporter.NumProcessed++
 	return document, nil
 }
