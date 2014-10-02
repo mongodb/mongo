@@ -118,6 +118,45 @@ func TestCSVImportDocument(t *testing.T) {
 			So(bsonDoc, ShouldResemble, expectedRead)
 		})
 
+		Convey("nested csv fields should be imported properly", func() {
+			contents := `1, 2f , " 3e" , " may"`
+			fields := []string{"a", "b.c", "c"}
+			expectedRead := bson.M{
+				"a": 1,
+				"b": bson.M{
+					"c": "2f",
+				},
+				"c":      " 3e",
+				"field3": " may",
+			}
+
+			csvFile, err = ioutil.TempFile("", "mongoimport_")
+			So(err, ShouldBeNil)
+			_, err = io.WriteString(csvFile, contents)
+			So(err, ShouldBeNil)
+			fileHandle, err = os.Open(csvFile.Name())
+			So(err, ShouldBeNil)
+			csvImporter := NewCSVImportInput(fields, fileHandle)
+			bsonDoc, err := csvImporter.ImportDocument()
+			So(err, ShouldBeNil)
+			So(bsonDoc, ShouldResemble, expectedRead)
+		})
+
+		Convey("nested csv fields causing header collisions should error", func() {
+			contents := `1, 2f , " 3e" , " may", june`
+			fields := []string{"a", "b.c", "field3"}
+
+			csvFile, err = ioutil.TempFile("", "mongoimport_")
+			So(err, ShouldBeNil)
+			_, err = io.WriteString(csvFile, contents)
+			So(err, ShouldBeNil)
+			fileHandle, err = os.Open(csvFile.Name())
+			So(err, ShouldBeNil)
+			csvImporter := NewCSVImportInput(fields, fileHandle)
+			_, err := csvImporter.ImportDocument()
+			So(err, ShouldNotBeNil)
+		})
+
 		Convey("calling ImportDocument() for CSVs should return next set of "+
 			"values", func() {
 			contents := "1, 2, 3\n4, 5, 6"
@@ -174,6 +213,99 @@ func TestCSVSetHeader(t *testing.T) {
 				So(csvImporter.SetHeader(), ShouldBeNil)
 				So(len(csvImporter.Fields), ShouldEqual, 3)
 			})
+
+		Convey("setting non-colliding nested csv headers should not raise an error", func() {
+			contents := "a, b, c"
+			fields := []string{}
+
+			csvFile, err = ioutil.TempFile("", "mongoimport_")
+			So(err, ShouldBeNil)
+			_, err = io.WriteString(csvFile, contents)
+			So(err, ShouldBeNil)
+			fileHandle, err = os.Open(csvFile.Name())
+			So(err, ShouldBeNil)
+			csvImporter := NewCSVImportInput(fields, fileHandle)
+			So(csvImporter.SetHeader(), ShouldBeNil)
+			So(len(csvImporter.Fields), ShouldEqual, 3)
+
+			contents = "a.b.c, a.b.d, c"
+			fields = []string{}
+
+			csvFile, err = ioutil.TempFile("", "mongoimport_")
+			So(err, ShouldBeNil)
+			_, err = io.WriteString(csvFile, contents)
+			So(err, ShouldBeNil)
+			fileHandle, err = os.Open(csvFile.Name())
+			So(err, ShouldBeNil)
+			csvImporter = NewCSVImportInput(fields, fileHandle)
+			So(csvImporter.SetHeader(), ShouldBeNil)
+			So(len(csvImporter.Fields), ShouldEqual, 3)
+
+			contents = "a.b, ab, a.c"
+			fields = []string{}
+
+			csvFile, err = ioutil.TempFile("", "mongoimport_")
+			So(err, ShouldBeNil)
+			_, err = io.WriteString(csvFile, contents)
+			So(err, ShouldBeNil)
+			fileHandle, err = os.Open(csvFile.Name())
+			So(err, ShouldBeNil)
+			csvImporter = NewCSVImportInput(fields, fileHandle)
+			So(csvImporter.SetHeader(), ShouldBeNil)
+			So(len(csvImporter.Fields), ShouldEqual, 3)
+
+			contents = "a, ab, ac, dd"
+			fields = []string{}
+
+			csvFile, err = ioutil.TempFile("", "mongoimport_")
+			So(err, ShouldBeNil)
+			_, err = io.WriteString(csvFile, contents)
+			So(err, ShouldBeNil)
+			fileHandle, err = os.Open(csvFile.Name())
+			So(err, ShouldBeNil)
+			csvImporter = NewCSVImportInput(fields, fileHandle)
+			So(csvImporter.SetHeader(), ShouldBeNil)
+			So(len(csvImporter.Fields), ShouldEqual, 4)
+		})
+
+		Convey("setting colliding nested csv headers should raise an error", func() {
+			contents := "a, a.b, c"
+			fields := []string{}
+
+			csvFile, err = ioutil.TempFile("", "mongoimport_")
+			So(err, ShouldBeNil)
+			_, err = io.WriteString(csvFile, contents)
+			So(err, ShouldBeNil)
+			fileHandle, err = os.Open(csvFile.Name())
+			So(err, ShouldBeNil)
+			csvImporter := NewCSVImportInput(fields, fileHandle)
+			So(csvImporter.SetHeader(), ShouldNotBeNil)
+
+			contents = "a.b.c, a.b.d.c, a.b.d"
+			fields = []string{}
+
+			csvFile, err = ioutil.TempFile("", "mongoimport_")
+			So(err, ShouldBeNil)
+			_, err = io.WriteString(csvFile, contents)
+			So(err, ShouldBeNil)
+			fileHandle, err = os.Open(csvFile.Name())
+			So(err, ShouldBeNil)
+			csvImporter = NewCSVImportInput(fields, fileHandle)
+			So(csvImporter.SetHeader(), ShouldNotBeNil)
+
+			contents = "a, a, a"
+			fields = []string{}
+
+			csvFile, err = ioutil.TempFile("", "mongoimport_")
+			So(err, ShouldBeNil)
+			_, err = io.WriteString(csvFile, contents)
+			So(err, ShouldBeNil)
+			fileHandle, err = os.Open(csvFile.Name())
+			So(err, ShouldBeNil)
+			csvImporter = NewCSVImportInput(fields, fileHandle)
+			So(csvImporter.SetHeader(), ShouldNotBeNil)
+		})
+
 		Convey("setting the header using an empty file should return EOF",
 			func() {
 				contents := ""

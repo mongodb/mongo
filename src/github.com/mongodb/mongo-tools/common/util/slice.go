@@ -24,6 +24,18 @@ func SliceContains(slice, elt interface{}) bool {
 	return false
 }
 
+func StringSliceContains(slice []string, str string) bool {
+	if slice == nil {
+		return false
+	}
+	for _, element := range slice {
+		if element == str {
+			return true
+		}
+	}
+	return false
+}
+
 // generic function taht returns number of instances of 'elt' in 'slice'.
 // panics if slice is not of Kind reflect.Slice
 func SliceCount(slice, elt interface{}) int {

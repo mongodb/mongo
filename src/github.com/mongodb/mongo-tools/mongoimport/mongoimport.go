@@ -250,6 +250,7 @@ func (mongoImport *MongoImport) importDocuments(importInput ImportInput) (docsCo
 			if document == nil {
 				return docsCount, err
 			}
+			fmt.Fprintf(os.Stderr, "error importing document: %v\n", err)
 			continue
 		}
 
