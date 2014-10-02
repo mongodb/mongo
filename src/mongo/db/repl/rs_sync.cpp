@@ -173,6 +173,7 @@ namespace repl {
     }
 
     void ReplSetImpl::clearVetoes() {
+        lock lk(this);
         _veto.clear();
     }
 
