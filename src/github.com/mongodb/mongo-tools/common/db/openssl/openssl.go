@@ -78,13 +78,18 @@ func (self *SSLDBConnector) GetNewSession() (*mgo.Session, error) {
 // To be handed to mgo.DialInfo for connecting to the server.
 type dialerFunc func(addr *mgo.ServerAddr) (net.Conn, error)
 
+// Handle optionally compiled SSL initialization functions (fips mode set)
+type sslInitializationFunction func(options.ToolOptions) error
+
+var sslInitializationFunctions []sslInitializationFunction
+
 // Creates and configures an openssl.Ctx
 func setupCtx(opts options.ToolOptions) (*openssl.Ctx, error) {
 	var ctx *openssl.Ctx
 	var err error
 
-	if err := openssl.FIPSModeSet(opts.SSLFipsMode); err != nil {
-		return nil, fmt.Errorf("couldn't set FIPS mode to %v: %v", opts.SSLFipsMode, err)
+	for _, sslInitFunc := range sslInitializationFunctions {
+		sslInitFunc(opts)
 	}
 
 	if ctx, err = openssl.NewCtxWithVersion(openssl.AnyVersion); err != nil {
