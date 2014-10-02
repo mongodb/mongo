@@ -37,7 +37,7 @@ var (
 		Connection: connection,
 		Auth:       &commonOpts.Auth{},
 	}
-	sessionProvider, _ = db.InitSessionProvider(*toolOptions)
+	sessionProvider = db.NewSessionProvider(*toolOptions)
 )
 
 func TestMongoImportValidateSettings(t *testing.T) {

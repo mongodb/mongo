@@ -13,7 +13,8 @@ mongo_tools_variables:
     rhel55_32: &mongo_url_rhell55_32
       mongo_url: "https://fastdl.mongodb.org/linux/mongodb-linux-i686-latest.tgz"
     linux_64_bit: &mongo_url_ubuntu1204
-      mongo_url: "http://downloads.10gen.com/linux/mongodb-linux-x86_64-latest.tgz"
+      # 10/02/2014: shim not present in http://downloads.10gen.com/linux/mongodb-linux-x86_64-latest.tgz
+      mongo_url: "http://downloads.10gen.com/linux/mongodb-linux-x86_64-enterprise-ubuntu1204-latest.tgz"
     linux_64_bit_enterprise: &mongo_url_ubuntu1204_enterprise
       mongo_url: "http://downloads.10gen.com/linux/mongodb-linux-x86_64-enterprise-ubuntu1204-latest.tgz"
     windows_32_bit: &mongo_url_windows32
@@ -68,15 +69,11 @@ mongo_tools_variables:
       - name: unit
     windows_64_task_list: &windows_64_tasks
       - name: db
-        distros:
-        - windows-64-vs2013-test
       - name: dist
       - name: legacy
         distros:
         - windows-64-vs2013-test
       - name: unit
-        distros:
-        - windows-64-vs2013-compile
     windows_64_ssl_task_list: &windows_64_ssl_tasks
       - name: dist
 
@@ -120,6 +117,7 @@ functions:
     params:
       working_dir: src
       script: |
+        set -o verbose
         rm -rf mongodb
         mkdir mongodb
         cd mongodb
@@ -732,6 +730,8 @@ tasks:
           cp ./mongodb/mongoshim${extension} src/github.com/mongodb/mongo-tools/mongofiles
     - func: "start mongod"
     - func: "run tool tests"
+
+    # mongoimport
     - command: expansions.update
       params:
         updates:
@@ -749,6 +749,7 @@ tasks:
         content_type: "text/html"
     - func: "attach coverage reports"
 
+    # mongoexport
     - command: expansions.update
       params:
         updates:
@@ -766,6 +767,7 @@ tasks:
         content_type: "text/html"
     - func: "attach coverage reports"
 
+    # mongostat
     - command: expansions.update
       params:
         updates:
@@ -783,6 +785,7 @@ tasks:
         content_type: "text/html"
     - func: "attach coverage reports"
 
+    # mongooplog
     - command: expansions.update
       params:
         updates:
@@ -800,6 +803,7 @@ tasks:
         content_type: "text/html"
     - func: "attach coverage reports"
 
+    # mongorestore
     - command: expansions.update
       params:
         updates:
@@ -817,6 +821,7 @@ tasks:
         content_type: "text/html"
     - func: "attach coverage reports"
 
+    # mongofiles
     - command: expansions.update
       params:
         updates:
