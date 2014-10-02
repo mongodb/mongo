@@ -926,17 +926,19 @@ __conn_single(WT_SESSION_IMPL *session, const char *cfg[])
 	WT_CONFIG_ITEM cval;
 	WT_CONNECTION_IMPL *conn, *t;
 	WT_DECL_RET;
+	WT_FH *fh;
 	off_t size;
 	size_t len;
 	int created;
 	char buf[256];
 
 	conn = S2C(session);
+	fh = NULL;
 
 	/*
-	 * Optionally create the wiredtiger flag file if it doesn't already
-	 * exist.  We don't actually care if we create it or not, the "am I the
-	 * only locker" tests are all that matter.
+	 * Optionally create the WiredTiger lock file if it doesn't already
+	 * exist.  We don't actually care if we create it or not, the "am I
+	 * the only locker" tests are all that matter.
 	 */
 	WT_RET(__wt_config_gets(session, cfg, "create", &cval));
 	WT_RET(__wt_open(session,
@@ -953,7 +955,10 @@ __conn_single(WT_SESSION_IMPL *session, const char *cfg[])
 		    "WiredTiger database is already being managed by another "
 		    "process");
 
-	/* Check to see if another thread of control has this database open. */
+	/*
+	 * The byte-lock protects against other processes, also check to see if
+	 * another thread of control in this process has this database open.
+	 */
 	__wt_spin_lock(session, &__wt_process.spinlock);
 	TAILQ_FOREACH(t, &__wt_process.connqh, q)
 		if (t->home != NULL &&
@@ -968,16 +973,29 @@ __conn_single(WT_SESSION_IMPL *session, const char *cfg[])
 		    "thread in this process");
 
 	/*
-	 * If the size of the file is 0, we created it (or we're racing with
-	 * the thread that created it, it doesn't matter), write some bytes
-	 * into the file.  Strictly speaking, this isn't even necessary, but
-	 * zero-length files always make me nervous.
+	 * If the size of the file is 0, we created it (or we won a race with
+	 * the thread that created it, it doesn't matter).
 	 */
 	WT_ERR(__wt_filesize(session, conn->lock_fh, &size));
 	if (size == 0) {
-		len = (size_t)snprintf(buf, sizeof(buf), "%s\n%s\n",
-		    WT_SINGLETHREAD, WIREDTIGER_VERSION_STRING);
-		WT_ERR(__wt_write(session, conn->lock_fh, (off_t)0, len, buf));
+		/*
+		 * Write the WiredTiger version/date file.
+		 */
+		WT_ERR(__wt_open(session, WT_WIREDTIGER, 1, 0, 0, &fh));
+		len = (size_t)snprintf(buf, sizeof(buf),
+		    "%s\n%s\n", WT_WIREDTIGER, WIREDTIGER_VERSION_STRING);
+		WT_ERR(__wt_write(session, fh, (off_t)0, len, buf));
+		WT_ERR(__wt_close(session, fh));
+		fh = NULL;
+
+		/*
+		 * Write some bytes into the WiredTiger lock file. Technically
+		 * this isn't necessary, but zero-length files make me nervous.
+		 */
+#define	WT_SINGLETHREAD_STRING	"WiredTiger lock file\n"
+		WT_ERR(__wt_write(session, conn->lock_fh, (off_t)0,
+		    strlen(WT_SINGLETHREAD_STRING), WT_SINGLETHREAD_STRING));
+
 		created = 1;
 	} else {
 		WT_ERR(__wt_config_gets(session, cfg, "exclusive", &cval));
@@ -1000,7 +1018,9 @@ __conn_single(WT_SESSION_IMPL *session, const char *cfg[])
 
 	return (0);
 
-err:	if (conn->lock_fh != NULL) {
+err:	if (fh != NULL)
+		WT_TRET(__wt_close(session, fh));
+	if (conn->lock_fh != NULL) {
 		WT_TRET(__wt_close(session, conn->lock_fh));
 		conn->lock_fh = NULL;
 	}
