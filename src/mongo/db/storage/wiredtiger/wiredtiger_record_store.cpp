@@ -541,11 +541,22 @@ namespace mongo {
             ret = c->search(c);
         }
         else {
-            // Inexact matches should find the largest record less than or equal to the search key.
+            // If loc doesn't exist, inexact matches should find the first existing record before
+            // it, in the direction of the scan. Note that inexact callers will call _getNext()
+            // after locate so they actually return the record *after* the one we seek to.
             int cmp;
             ret = c->search_near(c, &cmp);
-            if (ret == 0 && cmp > 0)
-                ret = c->prev(c);
+            invariantWTOK(ret);
+            if (_forward()) {
+                // return <= loc
+                if (cmp > 0)
+                    ret = c->prev(c);
+            }
+            else {
+                // return >= loc
+                if (cmp < 0)
+                    ret = c->next(c);
+            }
         }
         if (ret != WT_NOTFOUND) invariantWTOK(ret);
         _eof = (ret == WT_NOTFOUND);
