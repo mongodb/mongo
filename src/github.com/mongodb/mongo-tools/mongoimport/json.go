@@ -179,7 +179,7 @@ func (jsonImporter *JSONImportInput) ImportDocument() (bson.M, error) {
 	//
 	// This applies for all the other extended JSON types MongoDB supports
 	if err := bsonutil.ConvertJSONDocumentToBSON(document); err != nil {
-		return nil, fmt.Errorf("conversion error on document #%v: %v", jsonImporter.NumProcessed, err)
+		return nil, fmt.Errorf("JSON => BSON conversion error on document #%v: %v", jsonImporter.NumProcessed, err)
 	}
 	return document, nil
 }

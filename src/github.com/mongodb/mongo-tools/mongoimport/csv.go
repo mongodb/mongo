@@ -84,7 +84,8 @@ func (csvImporter *CSVImportInput) ImportDocument() (bson.M, error) {
 		} else {
 			key = "field" + strconv.Itoa(index)
 			if util.StringSliceContains(csvImporter.Fields, key) {
-				return document, fmt.Errorf("key collision for token #%v ('%v') on document #%v", index+1, parsedValue, csvImporter.NumProcessed)
+				return document, fmt.Errorf("Duplicate header name - on %v - for token #%v ('%v') in document #%v",
+					key, index+1, parsedValue, csvImporter.NumProcessed)
 			}
 			document[key] = parsedValue
 		}
