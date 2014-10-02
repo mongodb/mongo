@@ -596,7 +596,8 @@ tasks:
           else
             export GOPATH=`pwd`;
           fi;
-          retVal=$(go run src/github.com/3rf/mongo-lint/golint/golint.go src/github.com/mongodb/mongo-tools/); if [ "$retVal" = "" ]; then exit 0; else exit 1; fi;
+          retVal=$(go run src/github.com/3rf/mongo-lint/golint/golint.go src/github.com/mongodb/mongo-tools/);
+          if [ "$retVal" = "" ]; then exit 0; else echo $retVal; exit 1; fi;
 
 - name: log
   commands:
