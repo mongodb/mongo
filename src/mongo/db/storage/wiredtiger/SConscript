@@ -10,6 +10,7 @@ if has_option("wiredtiger"):
             'wiredtiger_database_catalog_entry.cpp',
             'wiredtiger_engine.cpp',
             'wiredtiger_index.cpp',
+            'wiredtiger_metadata.cpp',
             'wiredtiger_record_store.cpp',
             ],
         LIBDEPS= [
