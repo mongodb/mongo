@@ -180,7 +180,13 @@ namespace mongo {
         }
 
         DBClientBase * get( const string& addr , const string& ns ) {
-            _check( ns );
+
+            {
+                // We want to report ns stats
+                scoped_spinlock lock(_lock);
+                if (ns.size() > 0)
+                    _seenNS.insert(ns);
+            }
 
             Status* s = _getStatus( addr );
 
@@ -286,19 +292,6 @@ namespace mongo {
             shardConnectionPool.release( addr , conn );
         }
 
-        void _check( const string& ns ) {
-
-            {
-                // We want to report ns stats too
-                scoped_spinlock lock( _lock );
-                if ( ns.size() == 0 || _seenNS.count( ns ) )
-                    return;
-                _seenNS.insert( ns );
-            }
-
-            checkVersions( ns );
-        }
-        
         /**
          * Appends info about the client connection pool to a BOBuilder
          * Safe to call with activeClientConnections lock
@@ -417,17 +410,17 @@ namespace mongo {
             return;
         _finishedInit = true;
 
-        if ( _ns.size() && versionManager.isVersionableCB( _conn ) ) {
+        if (versionManager.isVersionableCB(_conn)) {
             // Make sure we specified a manager for the correct namespace
-            if( _manager ) verify( _manager->getns() == _ns );
+            if (_ns.size() && _manager)
+                verify(_manager->getns() == _ns);
             _setVersion = versionManager.checkShardVersionCB( this , false , 1 );
         }
         else {
-            // Make sure we didn't specify a manager for an empty namespace
-            verify( ! _manager );
+            // Make sure we didn't specify a manager for a non-versionable connection (i.e. config)
+            verify(!_manager);
             _setVersion = false;
         }
-
     }
 
     void ShardConnection::done() {
