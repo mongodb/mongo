@@ -31,16 +31,12 @@
 #include "mongo/db/concurrency/d_concurrency.h"
 
 #include "mongo/db/client.h"
-#include "mongo/db/commands/server_status.h"
 #include "mongo/db/curop.h"
-#include "mongo/db/global_environment_experiment.h"
 #include "mongo/db/concurrency/locker.h"
 #include "mongo/db/concurrency/lock_stat.h"
 #include "mongo/db/concurrency/lock_state.h"
 #include "mongo/db/global_environment_experiment.h"
 #include "mongo/db/namespace_string.h"
-#include "mongo/db/server_parameters.h"
-#include "mongo/db/operation_context.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
@@ -343,105 +339,4 @@ namespace mongo {
 
     }
 
-    /**
-     * This is passed to the iterator for global environments and aggregates information about the
-     * locks which are currently being held or waited on.
-     */
-    class LockerAggregator : public GlobalEnvironmentExperiment::ProcessOperationContext {
-    public:
-        LockerAggregator(bool blockedOnly) 
-            : numWriteLocked(0),
-              numReadLocked(0),
-              _blockedOnly(blockedOnly) {
-
-        }
-
-        virtual void processOpContext(OperationContext* txn) {
-            if (_blockedOnly && !txn->lockState()->hasLockPending()) {
-                return;
-            }
-
-            if (txn->lockState()->isWriteLocked()) {
-                numWriteLocked++;
-            }
-            else {
-                numReadLocked++;
-            }
-        }
-
-        int numWriteLocked;
-        int numReadLocked;
-
-    private:
-        const bool _blockedOnly;
-    };
-
-
-    class GlobalLockServerStatusSection : public ServerStatusSection {
-    public:
-        GlobalLockServerStatusSection() : ServerStatusSection( "globalLock" ){
-            _started = curTimeMillis64();
-        }
-
-        virtual bool includeByDefault() const { return true; }
-
-        virtual BSONObj generateSection( const BSONElement& configElement ) const {
-            BSONObjBuilder t;
-
-            t.append( "totalTime" , (long long)(1000 * ( curTimeMillis64() - _started ) ) );
-
-            // SERVER-14978: Need to report the global lock statistics somehow
-            //
-            // t.append( "lockTime" , qlk.stats.getTimeLocked( 'W' ) );
-
-            // This returns the blocked lock states
-            {
-                BSONObjBuilder ttt( t.subobjStart( "currentQueue" ) );
-
-                LockerAggregator blocked(true);
-                getGlobalEnvironment()->forEachOperationContext(&blocked);
-
-                ttt.append("total", blocked.numReadLocked + blocked.numWriteLocked);
-                ttt.append("readers", blocked.numReadLocked);
-                ttt.append("writers", blocked.numWriteLocked);
-                ttt.done();
-            }
-
-            // This returns all the active clients (including those holding locks)
-            {
-                BSONObjBuilder ttt( t.subobjStart( "activeClients" ) );
-
-                LockerAggregator active(false);
-                getGlobalEnvironment()->forEachOperationContext(&active);
-
-                ttt.append("total", active.numReadLocked + active.numWriteLocked);
-                ttt.append("readers", active.numReadLocked);
-                ttt.append("writers", active.numWriteLocked);
-                ttt.done();
-            }
-
-            return t.obj();
-        }
-
-    private:
-        unsigned long long _started;
-
-    } globalLockServerStatusSection;
-
-    class LockStatsServerStatusSection : public ServerStatusSection {
-    public:
-        LockStatsServerStatusSection() : ServerStatusSection( "locks" ){}
-        virtual bool includeByDefault() const { return true; }
-
-        BSONObj generateSection( const BSONElement& configElement ) const {
-            BSONObjBuilder b;
-
-            // SERVER-14978: Need to report the global and per-DB lock stats here
-            //
-            // b.append(".", qlk.stats.report());
-
-            return b.obj();
-        }
-
-    } lockStatsServerStatusSection;
 }

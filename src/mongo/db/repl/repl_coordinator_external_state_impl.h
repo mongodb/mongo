@@ -28,6 +28,9 @@
 
 #pragma once
 
+#include <boost/scoped_ptr.hpp>
+#include <boost/thread.hpp>
+
 #include "mongo/base/disallow_copying.h"
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/repl/repl_coordinator_external_state.h"
@@ -42,7 +45,7 @@ namespace repl {
 
         ReplicationCoordinatorExternalStateImpl();
         virtual ~ReplicationCoordinatorExternalStateImpl();
-        virtual void runSyncSourceFeedback();
+        virtual void startThreads();
         virtual void shutdown();
         virtual void forwardSlaveHandshake();
         virtual void forwardSlaveProgress();
@@ -63,6 +66,15 @@ namespace repl {
         // for forwarding replication progress information upstream when there is chained
         // replication.
         SyncSourceFeedback _syncSourceFeedback;
+
+        // Thread running SyncSourceFeedback::run().
+        boost::scoped_ptr<boost::thread> _syncSourceFeedbackThread;
+
+        // Thread running runSyncThread().
+        boost::scoped_ptr<boost::thread> _backgroundSyncThread;
+
+        // Thread running BackgroundSync::producerThread().
+        boost::scoped_ptr<boost::thread> _producerThread;
     };
 
 } // namespace repl

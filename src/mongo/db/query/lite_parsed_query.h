@@ -108,7 +108,8 @@ namespace mongo {
         };
 
         /**
-         * Parses a count command object, 'cmdObj'.
+         * Parses a count command object, 'cmdObj'. Caller must indicate whether or not
+         * this lite parsed query is an explained query or not via 'isExplain'.
          *
          * On success, fills in the out-parameter 'parsedQuery' and returns an OK status.
          * The caller takes ownership of *out.
@@ -118,6 +119,7 @@ namespace mongo {
          */
         static Status make(const std::string& fullns,
                            const BSONObj& cmdObj,
+                           bool isExplain,
                            LiteParsedQuery** out);
 
         /**

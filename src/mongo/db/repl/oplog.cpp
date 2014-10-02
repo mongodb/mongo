@@ -42,6 +42,7 @@
 #include "mongo/db/auth/authorization_manager_global.h"
 #include "mongo/db/background.h"
 #include "mongo/db/auth/privilege.h"
+#include "mongo/db/catalog/collection_catalog_entry.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/dbhash.h"
 #include "mongo/db/dbdirectclient.h"
@@ -467,7 +468,10 @@ namespace repl {
         if ( collection ) {
 
             if (replSettings.oplogSize != 0) {
-                int o = (int)(collection->getRecordStore()->storageSize(txn) / ( 1024 * 1024 ) );
+                const CollectionOptions oplogOpts =
+                    collection->getCatalogEntry()->getCollectionOptions(txn);
+
+                int o = (int)(oplogOpts.cappedSize / ( 1024 * 1024 ) );
                 int n = (int)(replSettings.oplogSize / (1024 * 1024));
                 if ( n != o ) {
                     stringstream ss;

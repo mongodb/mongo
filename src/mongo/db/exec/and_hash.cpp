@@ -30,6 +30,7 @@
 
 #include "mongo/db/exec/and_common-inl.h"
 #include "mongo/db/exec/filter.h"
+#include "mongo/db/exec/scoped_timer.h"
 #include "mongo/db/exec/working_set_common.h"
 #include "mongo/db/exec/working_set.h"
 #include "mongo/util/mongoutils/str.h"

@@ -466,15 +466,6 @@ namespace mongo {
 
     void Socket::close() {
         if ( _fd >= 0 ) {
-#ifdef MONGO_SSL
-            if (_sslConnection.get()) {
-                try {
-                    _sslManager->SSL_shutdown( _sslConnection.get() );
-                }
-                catch (const SocketException&) { // SSL_shutdown may throw if the connection fails
-                }  
-            }
-#endif
             // Stop any blocking reads/writes, and prevent new reads/writes
 #if defined(_WIN32)
             shutdown( _fd, SD_BOTH );

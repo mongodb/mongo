@@ -30,9 +30,40 @@
 
 #pragma once
 
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/db/diskloc.h"
 #include "mongo/db/operation_context_noop.h"
 
 namespace mongo {
+
+    const BSONObj key0 = BSON( "" << 0 );
+    const BSONObj key1 = BSON( "" << 1 );
+    const BSONObj key2 = BSON( "" << 2 );
+    const BSONObj key3 = BSON( "" << 3 );
+    const BSONObj key4 = BSON( "" << 4 );
+    const BSONObj key5 = BSON( "" << 5 );
+    const BSONObj key6 = BSON( "" << 6 );
+
+    const BSONObj compoundKey1a = BSON( "" << 1 << "" << "a" );
+    const BSONObj compoundKey1b = BSON( "" << 1 << "" << "b" );
+    const BSONObj compoundKey1c = BSON( "" << 1 << "" << "c" );
+    const BSONObj compoundKey1d = BSON( "" << 1 << "" << "d" );
+    const BSONObj compoundKey2a = BSON( "" << 2 << "" << "a" );
+    const BSONObj compoundKey2b = BSON( "" << 2 << "" << "b" );
+    const BSONObj compoundKey2c = BSON( "" << 2 << "" << "c" );
+    const BSONObj compoundKey3a = BSON( "" << 3 << "" << "a" );
+    const BSONObj compoundKey3b = BSON( "" << 3 << "" << "b" );
+    const BSONObj compoundKey3c = BSON( "" << 3 << "" << "c" );
+
+    const DiskLoc loc1( 10, 42 );
+    const DiskLoc loc2( 10, 44 );
+    const DiskLoc loc3( 10, 46 );
+    const DiskLoc loc4( 10, 48 );
+    const DiskLoc loc5( 10, 50 );
+    const DiskLoc loc6( 10, 52 );
+    const DiskLoc loc7( 10, 54 );
+    const DiskLoc loc8( 10, 56 );
 
     class RecoveryUnit;
     class SortedDataInterface;

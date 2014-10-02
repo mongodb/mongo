@@ -972,13 +972,13 @@ namespace mongo {
             collLock.setLockMessage(str::stream() << "migrating chunk [" << minKey << ", " << maxKey
                                                   << ") in " << ns);
 
-            if (!collLock.tryAcquire(&errmsg)) {
+            Status acquisitionStatus = collLock.tryAcquire();
+            if (!acquisitionStatus.isOK()) {
+                errmsg = stream() << "could not acquire collection lock for " << ns
+                                  << " to migrate chunk [" << minKey << "," << maxKey << ")"
+                                  << causedBy(acquisitionStatus);
 
-                errmsg = str::stream() << "could not acquire collection lock for " << ns
-                                       << " to migrate chunk [" << minKey << "," << maxKey << ")"
-                                       << causedBy(errmsg);
-
-                warning() << errmsg;
+                warning() << errmsg << endl;
                 return false;
             }
 
@@ -1224,11 +1224,10 @@ namespace mongo {
             }
 
             // Ensure distributed lock still held
-            string lockHeldMsg;
-            bool lockHeld = collLock.verifyLockHeld(&lockHeldMsg);
-            if ( !lockHeld ) {
+            Status lockStatus = collLock.checkStatus();
+            if (!lockStatus.isOK()) {
                 errmsg = str::stream() << "not entering migrate critical section because "
-                                       << lockHeldMsg;
+                                       << lockStatus.toString();
                 warning() << errmsg << endl;
                 return false;
             }

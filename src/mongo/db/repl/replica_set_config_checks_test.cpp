@@ -121,20 +121,25 @@ namespace {
         ASSERT_OK(newConfig.validate());
 
         // Can reconfig from old to new.
-        ASSERT_OK(validateConfigForReconfig(&externalState, oldConfig, newConfig).getStatus());
+        ASSERT_OK(validateConfigForReconfig(&externalState,
+                                            oldConfig,
+                                            newConfig,
+                                            false).getStatus());
 
 
         // Cannot reconfig from old to old (versions must be different).
         ASSERT_EQUALS(ErrorCodes::NewReplicaSetConfigurationIncompatible,
                       validateConfigForReconfig(&externalState,
                                                 oldConfig,
-                                                oldConfig).getStatus());
+                                                oldConfig,
+                                                false).getStatus());
 
         // Cannot reconfig from new to old (versions must increase).
         ASSERT_EQUALS(ErrorCodes::NewReplicaSetConfigurationIncompatible,
                       validateConfigForReconfig(&externalState,
                                                 newConfig,
-                                                oldConfig).getStatus());
+                                                oldConfig,
+                                                false).getStatus());
     }
 
     TEST(ValidateConfigForReconfig, NewConfigMustNotChangeSetName) {
@@ -166,7 +171,8 @@ namespace {
         ASSERT_EQUALS(ErrorCodes::NewReplicaSetConfigurationIncompatible,
                       validateConfigForReconfig(&externalState,
                                                 oldConfig,
-                                                newConfig).getStatus());
+                                                newConfig,
+                                                false).getStatus());
     }
 
     TEST(ValidateConfigForReconfig, NewConfigMustNotFlipBuildIndexesFlag) {
@@ -214,11 +220,13 @@ namespace {
         ASSERT_OK(oldConfigRefresh.validate());
         ASSERT_OK(validateConfigForReconfig(&externalState,
                                             oldConfig,
-                                            oldConfigRefresh).getStatus());
+                                            oldConfigRefresh,
+                                            false).getStatus());
         ASSERT_EQUALS(ErrorCodes::NewReplicaSetConfigurationIncompatible,
                       validateConfigForReconfig(&externalState,
                                                 oldConfig,
-                                                newConfig).getStatus());
+                                                newConfig,
+                                                false).getStatus());
     }
 
     TEST(ValidateConfigForReconfig, NewConfigMustNotFlipArbiterFlag) {
@@ -263,11 +271,13 @@ namespace {
         ASSERT_OK(oldConfigRefresh.validate());
         ASSERT_OK(validateConfigForReconfig(&externalState,
                                             oldConfig,
-                                            oldConfigRefresh).getStatus());
+                                            oldConfigRefresh,
+                                            false).getStatus());
         ASSERT_EQUALS(ErrorCodes::NewReplicaSetConfigurationIncompatible,
                       validateConfigForReconfig(&externalState,
                                                 oldConfig,
-                                                newConfig).getStatus());
+                                                newConfig,
+                                                false).getStatus());
     }
 
     TEST(ValidateConfigForReconfig, HostAndIdRemappingRestricted) {
@@ -306,7 +316,8 @@ namespace {
         ASSERT_OK(legalNewConfigWithNewHostAndId.validate());
         ASSERT_OK(validateConfigForReconfig(&externalState,
                                             oldConfig,
-                                            legalNewConfigWithNewHostAndId).getStatus());
+                                            legalNewConfigWithNewHostAndId,
+                                            false).getStatus());
 
         //
         // Here, the new config is invalid because we've reused host name "h2" with
@@ -323,7 +334,8 @@ namespace {
         ASSERT_EQUALS(ErrorCodes::NewReplicaSetConfigurationIncompatible,
                       validateConfigForReconfig(&externalState,
                                                 oldConfig,
-                                                illegalNewConfigReusingHost).getStatus());
+                                                illegalNewConfigReusingHost,
+                                                false).getStatus());
         //
         // Here, the new config is invalid because we've reused _id 2 with
         // new host name "h4".
@@ -339,7 +351,8 @@ namespace {
         ASSERT_EQUALS(ErrorCodes::NewReplicaSetConfigurationIncompatible,
                       validateConfigForReconfig(&externalState,
                                                 oldConfig,
-                                                illegalNewConfigReusingId).getStatus());
+                                                illegalNewConfigReusingId,
+                                                false).getStatus());
     }
 
     TEST(ValidateConfigForReconfig, MustFindSelf) {
@@ -370,14 +383,17 @@ namespace {
         ASSERT_EQUALS(ErrorCodes::NodeNotFound,
                       validateConfigForReconfig(&notPresentExternalState,
                                                 oldConfig,
-                                                newConfig).getStatus());
+                                                newConfig,
+                                                false).getStatus());
         ASSERT_EQUALS(ErrorCodes::DuplicateKey,
                       validateConfigForReconfig(&presentTwiceExternalState,
                                                 oldConfig,
-                                                newConfig).getStatus());
+                                                newConfig,
+                                                false).getStatus());
         ASSERT_EQUALS(1, unittest::assertGet(validateConfigForReconfig(&presentOnceExternalState,
                                                                        oldConfig,
-                                                                       newConfig)));
+                                                                       newConfig,
+                                                                       false)));
     }
 
     TEST(ValidateConfigForReconfig, SelfMustEndElectable) {
@@ -405,7 +421,8 @@ namespace {
         ASSERT_EQUALS(ErrorCodes::NodeNotElectable,
                       validateConfigForReconfig(&presentOnceExternalState,
                                                 oldConfig,
-                                                newConfig).getStatus());
+                                                newConfig,
+                                                false).getStatus());
     }
 
 }  // namespace

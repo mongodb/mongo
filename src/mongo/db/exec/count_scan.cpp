@@ -28,6 +28,7 @@
 
 #include "mongo/db/exec/count_scan.h"
 
+#include "mongo/db/exec/scoped_timer.h"
 #include "mongo/db/index/index_cursor.h"
 #include "mongo/db/index/index_descriptor.h"
 

@@ -68,6 +68,9 @@ namespace mongo {
                                       GroupRequest* request) const {
         request->ns = parseNs(dbname, cmdObj);
 
+        // By default, group requests are regular group not explain of group.
+        request->explain = false;
+
         const BSONObj& p = cmdObj.firstElement().embeddedObjectUserCheck();
 
         if (p["cond"].type() == Object) {
@@ -181,17 +184,19 @@ namespace mongo {
             return parseRequestStatus;
         }
 
+        groupRequest.explain = true;
+
         Client::ReadContext ctx(txn, groupRequest.ns);
         Collection* coll = ctx.ctx().db()->getCollection(txn, groupRequest.ns);
 
         PlanExecutor *rawPlanExecutor;
-        Status getExecStatus = getExecutorGroup(txn, coll, groupRequest, &rawPlanExecutor); 
+        Status getExecStatus = getExecutorGroup(txn, coll, groupRequest, &rawPlanExecutor);
         if (!getExecStatus.isOK()) {
             return getExecStatus;
         }
         scoped_ptr<PlanExecutor> planExecutor(rawPlanExecutor);
 
-        return Explain::explainStages(planExecutor.get(), verbosity, out);
+        return Explain::explainStages(txn, planExecutor.get(), verbosity, out);
     }
 
 }  // namespace mongo

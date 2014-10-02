@@ -594,13 +594,13 @@ namespace mongo {
             collLock.setLockMessage(str::stream() << "splitting chunk [" << minKey << ", " << maxKey
                                                   << ") in " << ns);
 
-            if (!collLock.tryAcquire(&errmsg)) {
-
+            Status acquisitionStatus = collLock.tryAcquire();
+            if (!acquisitionStatus.isOK()) {
                 errmsg = str::stream() << "could not acquire collection lock for " << ns
                                        << " to split chunk [" << minKey << "," << maxKey << ")"
-                                       << causedBy(errmsg);
+                                       << causedBy(acquisitionStatus);
 
-                warning() << errmsg;
+                warning() << errmsg << endl;
                 return false;
             }
 

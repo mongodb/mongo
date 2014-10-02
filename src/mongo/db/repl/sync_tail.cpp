@@ -48,6 +48,7 @@
 #include "mongo/db/repl/rslog.h"
 #include "mongo/db/stats/timer_stats.h"
 #include "mongo/db/operation_context_impl.h"
+#include "mongo/util/exit.h"
 #include "mongo/util/fail_point_service.h"
 #include "mongo/util/log.h"
 
@@ -299,7 +300,9 @@ namespace {
 
     /* tail an oplog.  ok to return, will be re-called. */
     void SyncTail::oplogApplication() {
-        while( 1 ) {
+        ReplicationCoordinator* replCoord = getGlobalReplicationCoordinator();
+
+        while(!inShutdown()) {
             OpQueue ops;
             OperationContextImpl txn;
 
@@ -307,7 +310,7 @@ namespace {
             int lastTimeChecked = 0;
 
             do {
-                if (theReplSet->isPrimary()) {
+                if (replCoord->getCurrentMemberState().primary()) {
                     massert(16620, "there are ops to sync, but I'm primary", ops.empty());
                     return;
                 }
@@ -333,8 +336,8 @@ namespace {
                         Client::Context ctx(&txn, "local");
 
                         ctx.db()->dropCollection(&txn, "local.oplog.rs");
-                        getGlobalReplicationCoordinator()->setMyLastOptime(&txn, OpTime());
-                        getGlobalReplicationCoordinator()->clearSyncSourceBlacklist();
+                        replCoord->setMyLastOptime(&txn, OpTime());
+                        replCoord->clearSyncSourceBlacklist();
                         bgsync->stop();
                         wunit.commit();
 
@@ -352,8 +355,9 @@ namespace {
                     // replset there are no heartbeat threads, so we do it here to be sure.  this is
                     // relevant if the singleton member has done a stepDown() and needs to come back
                     // up.
-                    if (theReplSet->config().members.size() == 1 &&
-                        theReplSet->myConfig().potentiallyHot()) {
+                    if (theReplSet &&
+                            theReplSet->config().members.size() == 1 &&
+                            theReplSet->myConfig().potentiallyHot()) {
                         Manager* mgr = theReplSet->mgr;
                         // When would mgr be null?  During replsettest'ing, in which case we should
                         // fall through and actually apply ops as if we were a real secondary.
@@ -366,7 +370,7 @@ namespace {
                     }
                 }
 
-                const int slaveDelaySecs = theReplSet->myConfig().slaveDelay;
+                const int slaveDelaySecs = replCoord->getSlaveDelaySecs().total_seconds();
                 if (!ops.empty() && slaveDelaySecs > 0) {
                     const BSONObj& lastOp = ops.getDeque().back();
                     const unsigned int opTimestampSecs = lastOp["ts"]._opTime().getSecs();
@@ -382,7 +386,8 @@ namespace {
                 // keep fetching more ops as long as we haven't filled up a full batch yet
             } while (!tryPopAndWaitForMore(&ops) && // tryPopAndWaitForMore returns true 
                                                     // when we need to end a batch early
-                   (ops.getSize() < replBatchLimitBytes));
+                   (ops.getSize() < replBatchLimitBytes) &&
+                   !inShutdown());
 
             // For pausing replication in tests
             while (MONGO_FAIL_POINT(rsSyncApplyStop)) {
@@ -403,7 +408,9 @@ namespace {
             applyOpsToOplog(&ops.getDeque());
 
             // If we're just testing (no manager), don't keep looping if we exhausted the bgqueue
-            if (!theReplSet->mgr) {
+            // TODO(spencer): Remove repltest.cpp dbtest or make this work with the new replication
+            // coordinator
+            if (theReplSet && !theReplSet->mgr) {
                 BSONObj op;
                 if (!peek(&op)) {
                     return;

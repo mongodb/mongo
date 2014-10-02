@@ -32,6 +32,7 @@
 
 #include <string>
 #include <sstream>
+#include <cmath>
 
 #include "mongo/db/geo/hash.h"
 #include "mongo/platform/random.h"
@@ -39,6 +40,7 @@
 #include "mongo/util/assert_util.h"
 
 using mongo::GeoHash;
+using mongo::GeoHashConverter;
 using std::string;
 using std::stringstream;
 
@@ -82,5 +84,23 @@ namespace {
     TEST(GeoHash, MakeOddHash) {
         string a = makeRandomBitString(13);
         ASSERT_THROWS(makeHash(a), mongo::UserException);
+    }
+
+    TEST(GeoHashConvertor, EdgeLength) {
+        const double kError = 10E-15;
+        GeoHashConverter::Parameters params;
+        params.max = 200.0;
+        params.min = 100.0;
+        params.bits = 32;
+        double numBuckets = (1024 * 1024 * 1024 * 4.0);
+        params.scaling = numBuckets / (params.max - params.min);
+
+        GeoHashConverter converter(params);
+
+        ASSERT_APPROX_EQUAL(100.0, converter.sizeEdge(GeoHash(0, 0, 0)), kError);
+        ASSERT_APPROX_EQUAL(50.0, converter.sizeEdge(GeoHash(0, 0, 1)), kError);
+        ASSERT_APPROX_EQUAL(25.0, converter.sizeEdge(GeoHash(0, 0, 2)), kError);
+        ASSERT_APPROX_EQUAL(ldexp(100.0, -26), converter.sizeEdge(GeoHash(0, 0, 26)), kError);
+        ASSERT_APPROX_EQUAL(ldexp(100.0, -32), converter.sizeEdge(GeoHash(0, 0, 32)), kError);
     }
 }

@@ -51,6 +51,9 @@ namespace OplogStartTests {
         ~Base() {
             client()->dropCollection(ns());
             _wunit.commit();
+
+            // The OplogStart stage is not allowed to outlive it's RecoveryUnit.
+            _stage.reset();
         }
 
     protected:
@@ -351,14 +354,19 @@ namespace OplogStartTests {
         void setupTests() {
             add< OplogStartIsOldest >();
             add< OplogStartIsNewest >();
-            add< OplogStartIsNewestExtentHop >();
-            add< OplogStartOneEmptyExtent >();
-            add< OplogStartTwoEmptyExtents >();
-            add< OplogStartTwoFullExtents >();
-            add< OplogStartThreeFullOneEmpty >();
-            add< OplogStartOneFullExtent >();
-            add< OplogStartFirstExtentEmpty >();
-            add< OplogStartEOF >();
+
+            // These tests rely on extent allocation details specific to mmapv1.
+            // TODO figure out a way to generically test this.
+            if (storageGlobalParams.engine == "mmapv1") {
+                add< OplogStartIsNewestExtentHop >();
+                add< OplogStartOneEmptyExtent >();
+                add< OplogStartTwoEmptyExtents >();
+                add< OplogStartTwoFullExtents >();
+                add< OplogStartThreeFullOneEmpty >();
+                add< OplogStartOneFullExtent >();
+                add< OplogStartFirstExtentEmpty >();
+                add< OplogStartEOF >();
+            }
         }
     } oplogStart;
 

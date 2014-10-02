@@ -72,6 +72,7 @@ namespace repl {
         bool rollback() const { return s == RS_ROLLBACK; }
         bool readable() const { return s == RS_PRIMARY || s == RS_SECONDARY; }
         bool removed() const { return s == RS_REMOVED; }
+        bool arbiter() const { return s == RS_ARBITER; }
 
         std::string toString() const;
 

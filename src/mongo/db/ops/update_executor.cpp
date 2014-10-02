@@ -228,6 +228,7 @@ namespace mongo {
 
         Status status = CanonicalQuery::canonicalize(_request->getNamespaceString().ns(),
                                                      _request->getQuery(),
+                                                     _request->isExplain(),
                                                      &cqRaw,
                                                      whereCallback);
         if (status.isOK()) {

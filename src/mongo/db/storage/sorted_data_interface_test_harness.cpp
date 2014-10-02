@@ -32,7 +32,6 @@
 
 #include "mongo/db/storage/sorted_data_interface.h"
 #include "mongo/unittest/unittest.h"
-#include "mongo/unittest/temp_dir.h"
 
 namespace mongo {
 
@@ -593,4 +592,4 @@ namespace mongo {
         }
     }
 
-}
+} // namespace mongo

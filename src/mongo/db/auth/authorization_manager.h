@@ -183,12 +183,11 @@ namespace mongo {
         bool hasAnyPrivilegeDocuments(OperationContext* txn) const;
 
         /**
-         * Updates the auth schema version document to reflect that the system is upgraded to
-         * schemaVersion26Final.
-         *
-         * Do not call if getAuthorizationVersion() reports a value other than schemaVersion26Final.
+         * Updates the auth schema version document to reflect the current state of the system.
+         * 'foundSchemaVersion' is the authSchemaVersion to update with.
          */
-        Status writeAuthSchemaVersionIfNeeded(OperationContext* txn);
+        Status writeAuthSchemaVersionIfNeeded(OperationContext* txn,
+                                              int foundSchemaVersion);
 
         /**
          * Creates the given user object in the given database.

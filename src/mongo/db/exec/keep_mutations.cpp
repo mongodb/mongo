@@ -27,7 +27,9 @@
  */
 
 #include "mongo/db/exec/keep_mutations.h"
+
 #include "mongo/db/exec/filter.h"
+#include "mongo/db/exec/scoped_timer.h"
 
 namespace mongo {
 

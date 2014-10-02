@@ -137,6 +137,11 @@ namespace repl {
         virtual MemberState getCurrentMemberState() const = 0;
 
         /**
+         * Returns how slave delayed this node is configured to be.
+         */
+        virtual Seconds getSlaveDelaySecs() const = 0;
+
+        /**
          * Clears the list of sync sources we have blacklisted.
          */
         virtual void clearSyncSourceBlacklist() = 0;

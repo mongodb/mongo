@@ -247,9 +247,7 @@ namespace {
         _topCoordDriverThread.reset(new boost::thread(stdx::bind(&ReplicationExecutor::run,
                                                                  &_replExecutor)));
 
-        _syncSourceFeedbackThread.reset(new boost::thread(
-                stdx::bind(&ReplicationCoordinatorExternalState::runSyncSourceFeedback,
-                           _externalState.get())));
+        _externalState->startThreads();
 
         bool doneLoadingConfig = _startLoadLocalConfig(txn);
         if (doneLoadingConfig) {
@@ -292,7 +290,6 @@ namespace {
         _replExecutor.shutdown();
         _topCoordDriverThread->join(); // must happen outside _mutex
         _externalState->shutdown();
-        _syncSourceFeedbackThread->join();
     }
 
     ReplSettings& ReplicationCoordinatorImpl::getSettings() {
@@ -319,6 +316,17 @@ namespace {
         return _getCurrentMemberState_inlock();
     }
 
+    Seconds ReplicationCoordinatorImpl::getSlaveDelaySecs() const {
+        boost::lock_guard<boost::mutex> lk(_mutex);
+        invariant(_rsConfig.isInitialized());
+        return _rsConfig.getMemberAt(_thisMembersConfigIndex).getSlaveDelay();
+    }
+
+    MemberState ReplicationCoordinatorImpl::_getCurrentMemberState_inlock() const {
+        invariant(_settings.usingReplSets());
+        return _currentState;
+    }
+
     void ReplicationCoordinatorImpl::clearSyncSourceBlacklist() {
         CBHStatus cbh = _replExecutor.scheduleWork(
                 stdx::bind(&ReplicationCoordinatorImpl::_clearSyncSourceBlacklist_finish,
@@ -336,11 +344,6 @@ namespace {
         if (cbData.status == ErrorCodes::CallbackCanceled)
             return;
         _topCoord->clearSyncSourceBlacklist();
-    }
-
-    MemberState ReplicationCoordinatorImpl::_getCurrentMemberState_inlock() const {
-        invariant(_settings.usingReplSets());
-        return _currentState;
     }
 
     void ReplicationCoordinatorImpl::_setCurrentMemberState_forTest(const MemberState& newState) {
@@ -651,7 +654,9 @@ namespace {
 
             if (!waitInfo.master) {
                 return StatusAndDuration(Status(ErrorCodes::NotMaster,
-                                                "Not master anymore while waiting for replication"),
+                                                "Not master anymore while waiting for replication"
+                                                        " - this most likely means that a step down"
+                                                        " occurred while waiting for replication"),
                                          Milliseconds(elapsed));
             }
 

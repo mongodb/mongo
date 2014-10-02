@@ -78,11 +78,11 @@ namespace mongo {
         collLock.setLockMessage( stream() << "merging chunks in " << nss.ns() << " from "
                                           << minKey << " to " << maxKey );
 
-        if ( !collLock.tryAcquire( errMsg ) ) {
-
+        Status acquisitionStatus = collLock.tryAcquire();
+        if (!acquisitionStatus.isOK()) {
             *errMsg = stream() << "could not acquire collection lock for " << nss.ns()
                                << " to merge chunks in [" << minKey << "," << maxKey << ")"
-                               << causedBy( *errMsg );
+                               << causedBy(acquisitionStatus);
 
             warning() << *errMsg << endl;
             return false;

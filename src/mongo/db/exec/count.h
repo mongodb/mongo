@@ -57,6 +57,9 @@ namespace mongo {
 
         // An integer indicating to not include the first n documents in the count.
         long long skip;
+
+        // Whether this is an explain of a count.
+        bool explain;
     };
 
     /**

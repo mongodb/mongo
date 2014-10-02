@@ -30,6 +30,8 @@
 
 #include "mongo/db/exec/eof.h"
 
+#include "mongo/db/exec/scoped_timer.h"
+
 namespace mongo {
 
     // static

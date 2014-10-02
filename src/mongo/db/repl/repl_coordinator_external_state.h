@@ -62,14 +62,13 @@ namespace repl {
         virtual ~ReplicationCoordinatorExternalState();
 
         /**
-         * Simple wrapper around SyncSourceFeedback::run().  Loops continuously until shutdown() is
-         * called.
+         * Starts the background sync, producer, and sync source feedback threads.
          */
-        virtual void runSyncSourceFeedback() = 0;
+        virtual void startThreads() = 0;
 
         /**
-         * Performs any necessary external state specific shutdown tasks, such as signaling
-         * the SyncSourceFeedback thread to terminate.
+         * Performs any necessary external state specific shutdown tasks, such as cleaning up
+         * the threads it started.
          */
         virtual void shutdown() = 0;
 

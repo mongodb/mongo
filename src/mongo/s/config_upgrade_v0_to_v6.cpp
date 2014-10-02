@@ -43,11 +43,11 @@ namespace mongo {
     using mongo::str::stream;
 
     /**
-     * Upgrade v0 to v5 described here
+     * Upgrade v0 to v6 described here
      *
      * This upgrade takes the config server from empty to an initial version.
      */
-    bool doUpgradeV0ToV5(const ConnectionString& configLoc,
+    bool doUpgradeV0ToV6(const ConnectionString& configLoc,
                          const VersionType& lastVersionInfo,
                          string* errMsg)
     {

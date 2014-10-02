@@ -30,6 +30,7 @@
 
 #include "mongo/db/diskloc.h"
 #include "mongo/db/exec/plan_stage.h"
+#include "mongo/db/exec/scoped_timer.h"
 #include "mongo/db/exec/working_set_common.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/matcher/expression.h"

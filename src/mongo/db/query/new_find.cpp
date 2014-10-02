@@ -598,7 +598,9 @@ namespace mongo {
             bb.skip(sizeof(QueryResult::Value));
 
             BSONObjBuilder explainBob;
-            Status explainStatus = Explain::explainStages(exec.get(), ExplainCommon::EXEC_ALL_PLANS,
+            Status explainStatus = Explain::explainStages(txn,
+                                                          exec.get(),
+                                                          ExplainCommon::EXEC_ALL_PLANS,
                                                           &explainBob);
             if (!explainStatus.isOK()) {
                 uasserted(18521, "Explain error: " + explainStatus.reason());

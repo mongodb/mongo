@@ -194,13 +194,6 @@ namespace mongo {
                 ListeningSockets::get()->addPath( me.getAddr() );
             }
 #endif
-            
-            if ( ::listen(sock, 128) != 0 ) {
-                error() << "listen(): listen() failed " << errnoWithDescription() << endl;
-                return;
-            }
-
-            ListeningSockets::get()->add( sock );
 
             _socks.push_back(sock);
             socketGuard.Dismiss();
@@ -218,8 +211,16 @@ namespace mongo {
 
         SOCKET maxfd = 0; // needed for select()
         for (unsigned i = 0; i < _socks.size(); i++) {
-            if (_socks[i] > maxfd)
+            if (::listen(_socks[i], 128) != 0) {
+                error() << "listen(): listen() failed " << errnoWithDescription() << endl;
+                return;
+            }
+
+            ListeningSockets::get()->add(_socks[i]);
+
+            if (_socks[i] > maxfd) {
                 maxfd = _socks[i];
+            }
         }
 
         if ( maxfd >= FD_SETSIZE ) {
@@ -387,12 +388,21 @@ namespace mongo {
             return;
         }
 
+        for (unsigned i = 0; i < _socks.size(); i++) {
+            if (::listen(_socks[i], 128) != 0) {
+                error() << "listen(): listen() failed " << errnoWithDescription() << endl;
+                return;
+            }
+
+            ListeningSockets::get()->add(_socks[i]);
+        }
+
 #ifdef MONGO_SSL
         _logListen(_port, _ssl);
 #else
         _logListen(_port, false);
 #endif
-                
+
         OwnedPointerVector<EventHolder> eventHolders;
         boost::scoped_array<WSAEVENT> events(new WSAEVENT[_socks.size()]);
         

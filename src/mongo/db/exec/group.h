@@ -64,6 +64,9 @@ namespace mongo {
 
         // A Javascript function that "finalizes" a group result.  Optional.
         std::string finalize;
+
+        // Whether this is an explain of a group.
+        bool explain;
     };
 
     /**

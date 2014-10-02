@@ -274,7 +274,6 @@ namespace repl {
                                     OplogReader* r,
                                     const Member* source);
         void _initialSync();
-        void _syncThread();
         void syncTail();
         void syncFixUp(OperationContext* txn, FixUpInfo& h, OplogReader& r);
 
@@ -295,7 +294,6 @@ namespace repl {
         }
 
         const ReplSetConfig::MemberCfg& myConfig() const { return _config; }
-        void syncThread();
         const OpTime lastOtherOpTime() const;
         /**
          * The most up to date electable replica

@@ -33,6 +33,15 @@ env.Library(
 )
 
 env.Library(
+    target = "scoped_timer",
+    source = [
+        "scoped_timer.cpp",
+    ],
+    LIBDEPS = [
+    ],
+)
+
+env.Library(
     target = 'exec',
     source = [
         "and_hash.cpp",
@@ -70,6 +79,7 @@ env.Library(
         "working_set_common.cpp",
     ],
     LIBDEPS = [
+        "scoped_timer",
         "$BUILD_DIR/mongo/bson",
     ],
 )

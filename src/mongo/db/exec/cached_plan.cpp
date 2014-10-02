@@ -27,6 +27,7 @@
  */
 
 #include "mongo/db/exec/cached_plan.h"
+#include "mongo/db/exec/scoped_timer.h"
 #include "mongo/db/exec/working_set_common.h"
 #include "mongo/util/mongoutils/str.h"
 
@@ -94,6 +95,15 @@ namespace mongo {
             _usingBackupChild = true;
             childStatus = _backupChildPlan->work(out);
         }
+
+        // Update stats.
+        if (PlanStage::NEED_TIME == childStatus) {
+            _commonStats.needTime++;
+        }
+        else if (PlanStage::ADVANCED == childStatus) {
+            _commonStats.advanced++;
+        }
+
         return childStatus;
     }
 

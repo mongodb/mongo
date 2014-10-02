@@ -31,6 +31,7 @@
 #include "mongo/db/exec/count.h"
 
 #include "mongo/db/catalog/collection.h"
+#include "mongo/db/exec/scoped_timer.h"
 #include "mongo/db/exec/working_set_common.h"
 
 namespace mongo {

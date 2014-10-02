@@ -656,14 +656,14 @@ DB.tsToSeconds = function(x){
   *                          of date than that, it can't recover without a complete resync
 */
 DB.prototype.getReplicationInfo = function() { 
-    var db = this.getSiblingDB("local");
+    var localdb = this.getSiblingDB("local");
 
     var result = { };
     var oplog;
-    if (db.system.namespaces.findOne({name:"local.oplog.rs"}) != null) {
+    if (localdb.system.namespaces.findOne({name:"local.oplog.rs"}) != null) {
         oplog = 'oplog.rs';
     }
-    else if (db.system.namespaces.findOne({name:"local.oplog.$main"}) != null) {
+    else if (localdb.system.namespaces.findOne({name:"local.oplog.$main"}) != null) {
         oplog = 'oplog.$main';
     }
     else {
@@ -671,14 +671,14 @@ DB.prototype.getReplicationInfo = function() {
         return result;
     }
 
-    var ol_entry = db.system.namespaces.findOne({name:"local."+oplog});
+    var ol_entry = localdb.system.namespaces.findOne({name:"local."+oplog});
     if( ol_entry && ol_entry.options ) {
         result.logSizeMB = ol_entry.options.size / ( 1024 * 1024 );
     } else {
         result.errmsg  = "local."+oplog+", or its options, not found in system.namespaces collection";
         return result;
     }
-    ol = db.getCollection(oplog);
+    ol = localdb.getCollection(oplog);
 
     result.usedMB = ol.stats().size / ( 1024 * 1024 );
     result.usedMB = Math.ceil( result.usedMB * 100 ) / 100;
@@ -973,9 +973,9 @@ DB.prototype._updateUserV1 = function(name, updateObject, writeConcern) {
         setObj["roles"] = updateObject.roles;
     }
 
-    db.system.users.update({user : name, userSource : null},
-                           {$set : setObj});
-    var err = db.getLastError(writeConcern['w'], writeConcern['wtimeout']);
+    this.system.users.update({user : name, userSource : null},
+                             {$set : setObj});
+    var err = this.getLastError(writeConcern['w'], writeConcern['wtimeout']);
     if (err) {
         throw Error("Updating user failed: " + err);
     }
@@ -1011,7 +1011,7 @@ DB.prototype.logout = function(){
 // For backwards compatibility
 DB.prototype.removeUser = function( username, writeConcern ) {
     print("WARNING: db.removeUser has been deprecated, please use db.dropUser instead");
-    return db.dropUser(username, writeConcern);
+    return this.dropUser(username, writeConcern);
 }
 
 DB.prototype.dropUser = function( username, writeConcern ){
@@ -1041,7 +1041,7 @@ DB.prototype.dropUser = function( username, writeConcern ){
 DB.prototype._removeUserV1 = function(username, writeConcern) {
     this.getCollection( "system.users" ).remove( { user : username } );
 
-    var le = db.getLastErrorObj(writeConcern['w'], writeConcern['wtimeout']);
+    var le = this.getLastErrorObj(writeConcern['w'], writeConcern['wtimeout']);
 
     if (le.err) {
         throw Error( "Couldn't remove user: " + le.err );

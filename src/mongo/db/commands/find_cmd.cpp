@@ -66,7 +66,8 @@ namespace mongo {
 
         // Parse the command BSON to a LiteParsedQuery.
         LiteParsedQuery* rawLpq;
-        Status lpqStatus = LiteParsedQuery::make(fullns, cmdObj, &rawLpq);
+        bool isExplain = true;
+        Status lpqStatus = LiteParsedQuery::make(fullns, cmdObj, isExplain, &rawLpq);
         if (!lpqStatus.isOK()) {
             return lpqStatus;
         }
@@ -111,7 +112,7 @@ namespace mongo {
         const ScopedExecutorRegistration safety(exec.get());
 
         // Got the execution tree. Explain it.
-        return Explain::explainStages(exec.get(), verbosity, out);
+        return Explain::explainStages(txn, exec.get(), verbosity, out);
     }
 
     bool FindCmd::run(OperationContext* txn,

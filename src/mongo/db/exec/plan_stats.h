@@ -39,6 +39,7 @@
 #include "mongo/db/query/stage_types.h"
 #include "mongo/platform/cstdint.h"
 #include "mongo/util/time_support.h"
+#include "mongo/util/net/listen.h" // for Listener::getElapsedTimeMillis()
 
 namespace mongo {
 
@@ -96,34 +97,6 @@ namespace mongo {
     private:
         // Default constructor is illegal.
         CommonStats();
-    };
-
-    /**
-     * This class increments a counter by the time elapsed since its construction when
-     * it goes out of scope.
-     */
-    class ScopedTimer {
-    public:
-        ScopedTimer(long long* counter) : _counter(counter) {
-            _start = curTimeMillis64();
-        }
-
-        ~ScopedTimer() {
-            long long elapsed = curTimeMillis64() - _start;
-            *_counter += elapsed;
-        }
-
-    private:
-        // Default constructor disallowed.
-        ScopedTimer();
-
-        MONGO_DISALLOW_COPYING(ScopedTimer);
-
-        // Reference to the counter that we are incrementing with the elapsed time.
-        long long* _counter;
-
-        // Time at which the timer was constructed.
-        long long _start;
     };
 
     // The universal container for a stage's stats.

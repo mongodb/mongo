@@ -690,6 +690,7 @@ namespace mongo {
         return distanceBetweenHashes(a, b);
     }
 
+    // TODO: Use ldexp(max - min, -level)
     double GeoHashConverter::sizeEdge(const GeoHash& a) const {
         if (!a.constrains())
             return _params.max - _params.min;

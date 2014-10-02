@@ -331,6 +331,28 @@ namespace mongo {
     }
 
     // static
+    Status CanonicalQuery::canonicalize(const std::string& ns,
+                                        const BSONObj& query,
+                                        bool explain,
+                                        CanonicalQuery** out,
+                                        const MatchExpressionParser::WhereCallback& whereCallback) {
+        const BSONObj emptyObj;
+        return CanonicalQuery::canonicalize(ns,
+                                            query,
+                                            emptyObj, // sort
+                                            emptyObj, // projection
+                                            0, // skip
+                                            0, // limit
+                                            emptyObj, // hint
+                                            emptyObj, // min
+                                            emptyObj, // max
+                                            false, // snapshot
+                                            explain,
+                                            out,
+                                            whereCallback);
+    }
+
+    // static
     Status CanonicalQuery::canonicalize(const string& ns,
                                         const BSONObj& query,
                                         long long skip,

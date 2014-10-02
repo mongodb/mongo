@@ -29,6 +29,7 @@
 #include "mongo/db/exec/index_scan.h"
 
 #include "mongo/db/exec/filter.h"
+#include "mongo/db/exec/scoped_timer.h"
 #include "mongo/db/exec/working_set_computed_data.h"
 #include "mongo/db/index/index_access_method.h"
 #include "mongo/db/index/index_cursor.h"

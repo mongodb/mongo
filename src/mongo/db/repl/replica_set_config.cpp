@@ -412,8 +412,8 @@ namespace {
             return StatusWith<ReplicaSetTagPattern>(
                     ErrorCodes::UnknownReplWriteConcern,
                     str::stream() <<
-                    "No write concern mode named \"" << escape(patternName.toString()) <<
-                    " found in replica set configuration");
+                    "No write concern mode named '" << escape(patternName.toString()) <<
+                    "' found in replica set configuration");
         }
         return StatusWith<ReplicaSetTagPattern>(iter->second);
     }

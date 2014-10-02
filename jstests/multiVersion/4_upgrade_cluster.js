@@ -105,8 +105,14 @@ var joinFindInsert =
 var joinShardedFindInsert = 
     startParallelOps( staticMongod, // The connection where the test info is passed and stored
                       findAndInsert,
-                      [ st.s1.host, shardedInsertNS ] )
+                      [ st.s1.host, shardedInsertNS ] );
 
+var configConnStr = st._configDB;
+var mongos = MongoRunner.runMongos({ binVersion : "latest", configdb : configConnStr });
+assert.eq(null, mongos); // New mongos cannot start before upgrading.
+
+mongos = MongoRunner.runMongos({ binVersion : "latest", configdb : configConnStr, upgrade: '' });
+assert.eq(null, mongos); // mongos terminates after upgrading.
 
 jsTest.log( "Upgrading cluster..." )
 
