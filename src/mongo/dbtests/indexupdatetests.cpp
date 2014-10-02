@@ -570,6 +570,8 @@ namespace IndexUpdateTests {
             for( int32_t i = 0; i < nDocs; ++i ) {
                 _client.insert( _ns, BSON( "a" << i ) );
             }
+            // Start with just _id
+            ASSERT_EQUALS( 1U, _client.getIndexSpecs(_ns).size());
             // Initialize curop.
             _txn.getCurOp()->reset();
             // Request an interrupt.  killAll() rather than kill() is required because the direct
@@ -579,10 +581,8 @@ namespace IndexUpdateTests {
             _client.ensureIndex( _ns, BSON( "a" << 1 ) );
             // only want to interrupt the index build
             getGlobalEnvironment()->unsetKillAllOperations();
-            // The new index is listed in system.indexes because the index build completed.
-            ASSERT_EQUALS( 1U,
-                           _client.count( "unittests.system.indexes",
-                                          BSON( "ns" << _ns << "name" << "a_1" ) ) );
+            // The new index is listed in getIndexSpecs because the index build completed.
+            ASSERT_EQUALS( 2U, _client.getIndexSpecs(_ns).size());
         }
     };
 
@@ -596,6 +596,8 @@ namespace IndexUpdateTests {
             for( int32_t i = 0; i < nDocs; ++i ) {
                 _client.insert( _ns, BSON( "a" << i ) );
             }
+            // Start with just _id
+            ASSERT_EQUALS( 1U, _client.getIndexSpecs(_ns).size());
             // Initialize curop.
             _txn.getCurOp()->reset();
             // Request an interrupt.
@@ -605,10 +607,8 @@ namespace IndexUpdateTests {
             // only want to interrupt the index build
             wunit.commit();
             getGlobalEnvironment()->unsetKillAllOperations();
-            // The new index is listed in system.indexes because the index build completed.
-            ASSERT_EQUALS( 1U,
-                           _client.count( "unittests.system.indexes",
-                                          BSON( "ns" << _ns << "name" << "a_1" ) ) );
+            // The new index is listed in getIndexSpecs because the index build completed.
+            ASSERT_EQUALS( 2U, _client.getIndexSpecs(_ns).size());
         }
     };
     // QUERY_MIGRATION
