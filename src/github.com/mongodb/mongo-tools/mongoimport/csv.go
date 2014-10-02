@@ -22,6 +22,8 @@ type CSVImportInput struct {
 	// NumImported indicates the number of CSV documents successfully parsed from
 	// the CSV input source
 	NumImported int64
+	// NumImported indicates the number of CSV documents processed
+	NumProcessed int64
 }
 
 // NewCSVImportInput returns a CSVImportInput configured to read input from the
@@ -64,11 +66,15 @@ func (csvImporter *CSVImportInput) SetHeader() error {
 // ImportDocument reads a line of input with the CSV representation of a doc and
 // returns the BSON equivalent.
 func (csvImporter *CSVImportInput) ImportDocument() (bson.M, error) {
+	document := bson.M{}
 	tokens, err := csvImporter.csvReader.Read()
 	if err != nil {
-		return nil, err
+		csvImporter.NumProcessed++
+		if err == io.EOF {
+			return nil, err
+		}
+		return nil, fmt.Errorf("read error on entry #%v: %v", csvImporter.NumProcessed, err)
 	}
-	document := bson.M{}
 	var key string
 	for index, token := range tokens {
 		parsedValue := getParsedValue(token)
@@ -81,13 +87,14 @@ func (csvImporter *CSVImportInput) ImportDocument() (bson.M, error) {
 		} else {
 			key = "field" + strconv.Itoa(index)
 			if util.StringSliceContains(csvImporter.Fields, key) {
-				csvImporter.NumImported++
-				return document, fmt.Errorf("key collision for token #%v ('%v') on document #%v", index+1, parsedValue, csvImporter.NumImported)
+				csvImporter.NumProcessed++
+				return document, fmt.Errorf("key collision for token #%v ('%v') on document #%v", index+1, parsedValue, csvImporter.NumProcessed)
 			}
 			document[key] = parsedValue
 		}
 	}
 	csvImporter.NumImported++
+	csvImporter.NumProcessed++
 	return document, nil
 }
 

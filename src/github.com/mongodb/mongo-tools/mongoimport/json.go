@@ -21,6 +21,8 @@ type JSONImportInput struct {
 	// NumImported indicates the number of JSON documents successfully parsed from
 	// the JSON input source
 	NumImported int64
+	// NumProcessed indicates the number of JSON documents processed
+	NumProcessed int64
 	// readOpeningBracket indicates if the underlying io.Reader has consumed
 	// an opening bracket from the input source. Used to prevent errors when
 	// a JSON input source contains just '[]'
@@ -154,11 +156,19 @@ func (jsonImporter *JSONImportInput) ImportDocument() (bson.M, error) {
 	var document bson.M
 	if jsonImporter.IsArray {
 		if err := jsonImporter.readJSONArraySeparator(); err != nil {
-			return nil, err
+			jsonImporter.NumProcessed++
+			if err == io.EOF {
+				return nil, err
+			}
+			return nil, fmt.Errorf("error reading separator after document #%v: %v", jsonImporter.NumProcessed, err)
 		}
 	}
 	if err := jsonImporter.Decoder.Decode(&document); err != nil {
-		return nil, err
+		jsonImporter.NumProcessed++
+		if err == io.EOF {
+			return nil, err
+		}
+		return nil, fmt.Errorf("JSON decode error on document #%v: %v", jsonImporter.NumProcessed, err)
 	}
 
 	// convert any data produced by mongoexport to the appropriate underlying
@@ -173,9 +183,10 @@ func (jsonImporter *JSONImportInput) ImportDocument() (bson.M, error) {
 	//
 	// This applies for all the other extended JSON types MongoDB supports
 	if err := bsonutil.ConvertJSONDocumentToBSON(document); err != nil {
-		return nil, err
+		jsonImporter.NumProcessed++
+		return nil, fmt.Errorf("conversion error on document #%v: %v", jsonImporter.NumProcessed, err)
 	}
 	jsonImporter.NumImported++
-
+	jsonImporter.NumProcessed++
 	return document, nil
 }
