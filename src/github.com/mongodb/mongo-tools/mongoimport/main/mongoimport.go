@@ -38,11 +38,10 @@ func main() {
 		return
 	}
 
-<<<<<<< HEAD
+	// don't attempt to discover other members of a replica set
 	opts.Direct = true
-=======
+
 	log.InitToolLogger(opts.Verbosity)
->>>>>>> 47837db... TOOLS-252: mongoimport should use log package
 
 	// create a session provider to connect to the db
 	sessionProvider := db.NewSessionProvider(*opts)
