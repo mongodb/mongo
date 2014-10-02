@@ -38,6 +38,8 @@ func main() {
 		return
 	}
 
+	opts.Direct = true
+
 	// create a session provider to connect to the db
 	sessionProvider := db.NewSessionProvider(*opts)
 

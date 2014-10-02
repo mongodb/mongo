@@ -258,6 +258,9 @@ func (mongoImport *MongoImport) importDocuments(importInput ImportInput) (docsCo
 			document = removeBlankFields(document)
 		}
 		if err = importWriter.Import(document); err != nil {
+			if err.Error() == noServer.Error() {
+				return docsCount, err
+			}
 			if mongoImport.IngestOptions.StopOnError {
 				return docsCount, err
 			}

@@ -1,11 +1,14 @@
 package mongoimport
 
 import (
+	"errors"
 	"github.com/mongodb/mongo-tools/common/db"
 	"gopkg.in/mgo.v2"
 	"gopkg.in/mgo.v2/bson"
 	"strings"
 )
+
+var noServer = errors.New("no reachable servers")
 
 type ImportWriter interface {
 	Open(db, collection string) error
