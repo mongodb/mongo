@@ -107,16 +107,15 @@ namespace mongo {
         if (!_entryMap.empty())
             return;
 
-        std::string ns = name();
         WiredTigerMetaData &md = _db.GetMetaData();
         std::vector<uint64_t> tables = md.getAllTables();
         for ( std::vector<uint64_t>::iterator it = tables.begin(); it != tables.end(); ++it) {
-            std::string name = md.getName( *it );
-            if ( ns == nsToDatabaseSubstring( name ) ) {
+            std::string ns = md.getName( *it );
+            if ( name() == nsToDatabaseSubstring( ns ) ) {
                 // Initialize the namespace we found
                 WiredTigerCollectionCatalogEntry *entry =
-                    new WiredTigerCollectionCatalogEntry(_db, StringData(name));
-                _entryMap[name.c_str()] = entry;
+                    new WiredTigerCollectionCatalogEntry(_db, ns);
+                _entryMap[ns] = entry;
             }
         }
     }
