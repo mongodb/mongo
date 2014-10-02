@@ -7,6 +7,9 @@
 
 #define	WT_SINGLETHREAD		"WiredTiger"		/* Locking file */
 
+#define	WT_BASECONFIG		"WiredTiger.basecfg"	/* Configuration */
+#define	WT_USERCONFIG		"WiredTiger.config"	/* Configuration */
+
 #define	WT_METADATA_BACKUP	"WiredTiger.backup"	/* Hot backup file */
 
 #define	WT_METADATA_TURTLE	"WiredTiger.turtle"	/* Metadata metadata */
