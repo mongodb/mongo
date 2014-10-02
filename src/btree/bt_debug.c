@@ -240,7 +240,7 @@ err:	__wt_scr_free(&buf);
  */
 int
 __wt_debug_offset_blind(
-    WT_SESSION_IMPL *session, off_t offset, const char *ofile)
+    WT_SESSION_IMPL *session, wt_off_t offset, const char *ofile)
 {
 	WT_DECL_ITEM(buf);
 	WT_DECL_RET;
@@ -268,7 +268,7 @@ err:	__wt_scr_free(&buf);
  */
 int
 __wt_debug_offset(WT_SESSION_IMPL *session,
-     off_t offset, uint32_t size, uint32_t cksum, const char *ofile)
+     wt_off_t offset, uint32_t size, uint32_t cksum, const char *ofile)
 {
 	WT_DECL_ITEM(buf);
 	WT_DECL_RET;

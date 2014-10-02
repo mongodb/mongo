@@ -28,6 +28,7 @@ extern "C" {
 /*******************************************
  * Portable type names
  *******************************************/
+@off_t_decl@
 @uintmax_t_decl@
 @uintptr_t_decl@
 
@@ -136,7 +137,7 @@ struct __wt_item {
  */
 struct __wt_lsn {
 	uint32_t        file;           /*!< Log file number */
-	off_t           offset;         /*!< Log file offset */
+	wt_off_t        offset;         /*!< Log file offset */
 };
 
 /*!

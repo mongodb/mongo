@@ -209,7 +209,8 @@ __verify_config_offsets(WT_SESSION_IMPL *session, const char *cfg[], int *quitp)
 		WT_RET_MSG(session, ENOTSUP,
 		    "the WiredTiger library was not built in diagnostic mode");
 #else
-		WT_TRET(__wt_debug_offset_blind(session, (off_t)offset, NULL));
+		WT_TRET(
+		    __wt_debug_offset_blind(session, (wt_off_t)offset, NULL));
 #endif
 	}
 	return (ret == WT_NOTFOUND ? 0 : ret);
