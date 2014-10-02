@@ -95,7 +95,7 @@ found:	if (fstat(fd, &sb) == -1)
 	(void)snprintf(buf, sizeof(buf), "%s/slvg.corrupt", g.home);
 	if ((fp = fopen(buf, "w")) == NULL)
 		die(errno, "salvage-corrupt: open: %s", buf);
-	(void(fp,
+	(void)fprintf(fp,
 	    "salvage-corrupt: offset %" PRIuMAX ", length %zu\n",
 	    (uintmax_t)offset, len);
 	(void)fclose(fp);

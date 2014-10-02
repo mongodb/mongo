@@ -456,9 +456,9 @@ __block_extend(
 
 	/*
 	 * Make sure we don't allocate past the maximum file size.  There's no
-	 * easy way to know the maximum wt_off_t on a system, limit growth to 8B
-	 * bits (we currently check an wt_off_t is 8B in verify_build.h).  I don't
-	 * think we're likely to see anything bigger for awhile.
+	 * easy way to know the maximum wt_off_t on a system, limit growth to
+	 * 8B bits (we currently check an wt_off_t is 8B in verify_build.h). I
+	 * don't think we're likely to see anything bigger for awhile.
 	 */
 	if (fh->size > (wt_off_t)INT64_MAX - size)
 		WT_RET_MSG(session, WT_ERROR,
@@ -518,8 +518,8 @@ __wt_block_alloc(
 		__block_size_srch(block->live.avail.sz, size, sstack);
 		if ((szp = *sstack[0]) == NULL) {
 append:			WT_RET(__block_extend(session, block, offp, size));
-			WT_RET(__block_append(
-			    session, &block->live.alloc, *offp, (wt_off_t)size));
+			WT_RET(__block_append(session,
+			    &block->live.alloc, *offp, (wt_off_t)size));
 			return (0);
 		}
 
@@ -553,7 +553,8 @@ append:			WT_RET(__block_extend(session, block, offp, size));
 	}
 
 	/* Add the newly allocated extent to the list of allocations. */
-	WT_RET(__block_merge(session, &block->live.alloc, *offp, (wt_off_t)size));
+	WT_RET(__block_merge(
+	    session, &block->live.alloc, *offp, (wt_off_t)size));
 	return (0);
 }
 
@@ -925,7 +926,8 @@ __wt_block_extlist_merge(WT_SESSION_IMPL *session, WT_EXTLIST *a, WT_EXTLIST *b)
  *	Append a new entry to the allocation list.
  */
 static int
-__block_append(WT_SESSION_IMPL *session, WT_EXTLIST *el, wt_off_t off, wt_off_t size)
+__block_append(
+    WT_SESSION_IMPL *session, WT_EXTLIST *el, wt_off_t off, wt_off_t size)
 {
 	WT_EXT *ext, **astack[WT_SKIP_MAXDEPTH];
 	u_int i;
@@ -993,7 +995,8 @@ __wt_block_insert_ext(
  *	version).
  */
 static int
-__block_merge(WT_SESSION_IMPL *session, WT_EXTLIST *el, wt_off_t off, wt_off_t size)
+__block_merge(
+    WT_SESSION_IMPL *session, WT_EXTLIST *el, wt_off_t off, wt_off_t size)
 {
 	WT_EXT *ext, *after, *before;
 
@@ -1080,8 +1083,8 @@ __block_merge(WT_SESSION_IMPL *session, WT_EXTLIST *el, wt_off_t off, wt_off_t s
  *	Read an avail extent list, includes minor special handling.
  */
 int
-__wt_block_extlist_read_avail(
-    WT_SESSION_IMPL *session, WT_BLOCK *block, WT_EXTLIST *el, wt_off_t ckpt_size)
+__wt_block_extlist_read_avail(WT_SESSION_IMPL *session,
+    WT_BLOCK *block, WT_EXTLIST *el, wt_off_t ckpt_size)
 {
 	WT_DECL_RET;
 
@@ -1121,8 +1124,8 @@ err:
  *	Read an extent list.
  */
 int
-__wt_block_extlist_read(
-    WT_SESSION_IMPL *session, WT_BLOCK *block, WT_EXTLIST *el, wt_off_t ckpt_size)
+__wt_block_extlist_read(WT_SESSION_IMPL *session,
+    WT_BLOCK *block, WT_EXTLIST *el, wt_off_t ckpt_size)
 {
 	WT_DECL_ITEM(tmp);
 	WT_DECL_RET;

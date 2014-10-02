@@ -28,6 +28,7 @@ extern "C" {
 /*******************************************
  * Portable type names
  *******************************************/
+@off_t_decl@
 @uintmax_t_decl@
 @uintptr_t_decl@
 
@@ -50,7 +51,6 @@ extern "C" {
  *
  * @{
  */
-typedef int64_t wt_off_t;
 
 /*******************************************
  * Public forward structure declarations

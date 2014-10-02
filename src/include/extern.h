@@ -34,8 +34,8 @@ extern int __wt_block_extlist_check( WT_SESSION_IMPL *session, WT_EXTLIST *al, W
 extern int __wt_block_extlist_overlap( WT_SESSION_IMPL *session, WT_BLOCK *block, WT_BLOCK_CKPT *ci);
 extern int __wt_block_extlist_merge(WT_SESSION_IMPL *session, WT_EXTLIST *a, WT_EXTLIST *b);
 extern int __wt_block_insert_ext( WT_SESSION_IMPL *session, WT_EXTLIST *el, wt_off_t off, wt_off_t size);
-extern int __wt_block_extlist_read_avail( WT_SESSION_IMPL *session, WT_BLOCK *block, WT_EXTLIST *el, wt_off_t ckpt_size);
-extern int __wt_block_extlist_read( WT_SESSION_IMPL *session, WT_BLOCK *block, WT_EXTLIST *el, wt_off_t ckpt_size);
+extern int __wt_block_extlist_read_avail(WT_SESSION_IMPL *session, WT_BLOCK *block, WT_EXTLIST *el, wt_off_t ckpt_size);
+extern int __wt_block_extlist_read(WT_SESSION_IMPL *session, WT_BLOCK *block, WT_EXTLIST *el, wt_off_t ckpt_size);
 extern int __wt_block_extlist_write(WT_SESSION_IMPL *session, WT_BLOCK *block, WT_EXTLIST *el, WT_EXTLIST *additional);
 extern int __wt_block_extlist_truncate( WT_SESSION_IMPL *session, WT_BLOCK *block, WT_EXTLIST *el);
 extern int __wt_block_extlist_init(WT_SESSION_IMPL *session, WT_EXTLIST *el, const char *name, const char *extname, int track_size);
@@ -432,9 +432,9 @@ extern int __wt_dlsym(WT_SESSION_IMPL *session, WT_DLH *dlh, const char *name, i
 extern int __wt_dlclose(WT_SESSION_IMPL *session, WT_DLH *dlh);
 extern int __wt_errno(void);
 extern int __wt_exist(WT_SESSION_IMPL *session, const char *filename, int *existp);
-extern int __wt_fallocate(WT_SESSION_IMPL *session, WT_FH *fh, wt_off_t offset, wt_off_t len);
+extern int __wt_fallocate( WT_SESSION_IMPL *session, WT_FH *fh, wt_off_t offset, wt_off_t len);
 extern int __wt_filesize(WT_SESSION_IMPL *session, WT_FH *fh, wt_off_t *sizep);
-extern int __wt_filesize_name(WT_SESSION_IMPL *session, const char *filename, wt_off_t *sizep);
+extern int __wt_filesize_name( WT_SESSION_IMPL *session, const char *filename, wt_off_t *sizep);
 extern int __wt_bytelock(WT_FH *fhp, wt_off_t byte, int lock);
 extern int __wt_fsync(WT_SESSION_IMPL *session, WT_FH *fh);
 extern int __wt_fsync_async(WT_SESSION_IMPL *session, WT_FH *fh);

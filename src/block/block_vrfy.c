@@ -7,7 +7,8 @@
 
 #include "wt_internal.h"
 
-static int __verify_ckptfrag_add(WT_SESSION_IMPL *, WT_BLOCK *, wt_off_t, wt_off_t);
+static int __verify_ckptfrag_add(
+	WT_SESSION_IMPL *, WT_BLOCK *, wt_off_t, wt_off_t);
 static int __verify_ckptfrag_chk(WT_SESSION_IMPL *, WT_BLOCK *);
 static int __verify_filefrag_add(
 	WT_SESSION_IMPL *, WT_BLOCK *, const char *, wt_off_t, wt_off_t, int);
@@ -193,17 +194,16 @@ __wt_verify_ckpt_load(
 	 * the list of blocks we've "seen" from the file.
 	 */
 	if (ci->root_offset != WT_BLOCK_INVALID_OFFSET)
-		WT_RET(__verify_filefrag_add(session, block,
-		    "checkpoint", ci->root_offset, (wt_off_t)ci->root_size, 1));
+		WT_RET(__verify_filefrag_add(session, block, "checkpoint",
+		    ci->root_offset, (wt_off_t)ci->root_size, 1));
 	if (ci->alloc.offset != WT_BLOCK_INVALID_OFFSET)
-		WT_RET(__verify_filefrag_add(session, block,
-		    "alloc list", ci->alloc.offset, (wt_off_t)ci->alloc.size, 1));
+		WT_RET(__verify_filefrag_add(session, block, "alloc list",
+		    ci->alloc.offset, (wt_off_t)ci->alloc.size, 1));
 	if (ci->avail.offset != WT_BLOCK_INVALID_OFFSET)
-		WT_RET(__verify_filefrag_add(session, block,
-		    "avail list", ci->avail.offset, (wt_off_t)ci->avail.size, 1));
+		WT_RET(__verify_filefrag_add(session, block, "avail list",
+		    ci->avail.offset, (wt_off_t)ci->avail.size, 1));
 	if (ci->discard.offset != WT_BLOCK_INVALID_OFFSET)
-		WT_RET(__verify_filefrag_add(session, block,
-		    "discard list",
+		WT_RET(__verify_filefrag_add(session, block, "discard list",
 		    ci->discard.offset, (wt_off_t)ci->discard.size, 1));
 
 	/*

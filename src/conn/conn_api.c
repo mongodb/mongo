@@ -744,8 +744,8 @@ __conn_config_file(WT_SESSION_IMPL *session,
 	/*
 	 * Sanity test: a 100KB configuration file would be insane.  (There's
 	 * no practical reason to limit the file size, but I can either limit
-	 * the file size to something rational, or I can add code to test if
-	 * the wt_off_t size is larger than a uint32_t, which is more complicated
+	 * the file size to something rational, or add code to test if the
+	 * wt_off_t size is larger than a uint32_t, which is more complicated
 	 * and a waste of time.)
 	 */
 	if (size > 100 * 1024)
@@ -762,8 +762,8 @@ __conn_config_file(WT_SESSION_IMPL *session,
 	 * what we're doing.
 	 */
 	WT_ERR(__wt_buf_init(session, cbuf, len + 10));
-	WT_ERR(
-	    __wt_read(session, fh, (wt_off_t)0, len, ((uint8_t *)cbuf->mem) + 1));
+	WT_ERR(__wt_read(
+	    session, fh, (wt_off_t)0, len, ((uint8_t *)cbuf->mem) + 1));
 	((uint8_t *)cbuf->mem)[0] = '\n';
 	cbuf->size = len + 1;
 

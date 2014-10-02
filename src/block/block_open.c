@@ -263,8 +263,8 @@ __desc_read(WT_SESSION_IMPL *session, WT_BLOCK *block)
 	WT_RET(__wt_scr_alloc(session, block->allocsize, &buf));
 
 	/* Read the first allocation-sized block and verify the file format. */
-	WT_ERR(__wt_read(
-	    session, block->fh, (wt_off_t)0, (size_t)block->allocsize, buf->mem));
+	WT_ERR(__wt_read(session,
+	    block->fh, (wt_off_t)0, (size_t)block->allocsize, buf->mem));
 
 	desc = buf->mem;
 	WT_ERR(__wt_verbose(session, WT_VERB_BLOCK,

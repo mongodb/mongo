@@ -49,7 +49,8 @@ __wt_block_write_size(WT_SESSION_IMPL *session, WT_BLOCK *block, size_t *sizep)
  *	Extend the file.
  */
 static inline int
-__block_extend(WT_SESSION_IMPL *session, WT_FH *fh, wt_off_t offset, size_t size)
+__block_extend(
+    WT_SESSION_IMPL *session, WT_FH *fh, wt_off_t offset, size_t size)
 {
 	/*
 	 * Extend the file in chunks.  We want to limit the number of threads

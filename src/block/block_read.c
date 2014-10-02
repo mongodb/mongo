@@ -161,8 +161,8 @@ __wt_block_read_off_blind(
  *	Read an addr/size pair referenced block into a buffer.
  */
 int
-__wt_block_read_off(WT_SESSION_IMPL *session,
-    WT_BLOCK *block, WT_ITEM *buf, wt_off_t offset, uint32_t size, uint32_t cksum)
+__wt_block_read_off(WT_SESSION_IMPL *session, WT_BLOCK *block,
+    WT_ITEM *buf, wt_off_t offset, uint32_t size, uint32_t cksum)
 {
 	WT_BLOCK_HEADER *blk;
 	size_t bufsize;
