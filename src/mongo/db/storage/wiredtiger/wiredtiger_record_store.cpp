@@ -609,6 +609,11 @@ namespace mongo {
     void WiredTigerRecordStore::Iterator::invalidate( const DiskLoc& dl ) {
         if ( _savedLoc == dl )
             _savedInvalidated = true;
+
+        // This is the case where a capped collection wraps around completely while a tailable
+        // cursor was at the old end.
+        if (_tailable && _savedLoc.isNull() && dl == _lastLoc)
+            _savedInvalidated = true;
     }
 
     void WiredTigerRecordStore::Iterator::saveState() {
@@ -621,6 +626,13 @@ namespace mongo {
     }
 
     bool WiredTigerRecordStore::Iterator::restoreState( OperationContext *txn ) {
+        // Iterators over capped collections cannot be restored if they are invalidated. We want to
+        // signal an error if the deletion of old records catches up to the cursor rather than
+        // silently dropping results.
+        if (_savedInvalidated && _rs.isCapped()) {
+            return false;
+        }
+
         // This is normally already the case, but sometimes we are given a new
         // OperationContext on restore - update the iterators context in that
         // case
