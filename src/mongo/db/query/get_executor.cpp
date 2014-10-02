@@ -34,6 +34,7 @@
 
 #include <limits>
 
+#include "mongo/base/error_codes.h"
 #include "mongo/base/parse_number.h"
 #include "mongo/client/dbclientinterface.h"
 #include "mongo/db/exec/cached_plan.h"
@@ -869,6 +870,38 @@ namespace mongo {
         PlanStage* root;
         QuerySolution* querySolution;
 
+        // if collection exists and query is empty no additional canonicalization needed
+        if (collection && request.query.isEmpty()) {
+            // If the query is empty, then we can determine the count by just asking the collection
+            // for its number of records. This is implemented by the CountStage, and we don't need
+            // to create a child for the count stage in this case.
+            root = new CountStage(txn, collection, request, ws.get(), NULL);
+            *execOut = new PlanExecutor(ws.release(), root, request.ns);
+            return Status::OK();
+        }
+
+        CanonicalQuery* rawCq;
+        
+        if (!request.query.isEmpty()) {
+            // if query is not empty we try to canonicalize it before working with collection
+            const WhereCallbackReal whereCallback(txn, !collection ? request.ns
+                : collection->ns().db());
+            
+            Status canonStatus = CanonicalQuery::canonicalize(!collection ? request.ns
+                : collection->ns().ns(),
+                request.query,
+                BSONObj(),
+                BSONObj(),
+                0,
+                0,
+                request.hint,
+                &rawCq,
+                whereCallback);
+            if (!canonStatus.isOK()) {
+                return canonStatus;
+            }
+        }
+
         if (!collection) {
             // Treat collections that do not exist as empty collections. Note that the explain
             // reporting machinery always assumes that the root stage for a count operation is
@@ -878,31 +911,7 @@ namespace mongo {
             return Status::OK();
         }
 
-        if (request.query.isEmpty()) {
-            // If the query is empty, then we can determine the count by just asking the collection
-            // for its number of records. This is implemented by the CountStage, and we don't need
-            // to create a child for the count stage in this case.
-            root = new CountStage(txn, collection, request, ws.get(), NULL);
-            *execOut = new PlanExecutor(ws.release(), root, request.ns);
-            return Status::OK();
-        }
-
-        const WhereCallbackReal whereCallback(txn, collection->ns().db());
-
-        CanonicalQuery* rawCq;
-        Status canonStatus = CanonicalQuery::canonicalize(collection->ns().ns(),
-                                                          request.query,
-                                                          BSONObj(),
-                                                          BSONObj(),
-                                                          0,
-                                                          0,
-                                                          request.hint,
-                                                          &rawCq,
-                                                          whereCallback);
-        if (!canonStatus.isOK()) {
-            return canonStatus;
-        }
-
+        // at this point we have non-empty canonical query and collection exists
         auto_ptr<CanonicalQuery> cq(rawCq);
 
         const size_t plannerOptions = QueryPlannerParams::PRIVATE_IS_COUNT;
