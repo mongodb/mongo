@@ -6,11 +6,12 @@ if has_option("wiredtiger"):
         target= 'storage_wiredtiger_core',
         source= [
             'wiredtiger_collection_catalog_entry.cpp',
+            'wiredtiger_database.cpp',
             'wiredtiger_database_catalog_entry.cpp',
             'wiredtiger_engine.cpp',
             'wiredtiger_index.cpp',
+            'wiredtiger_metadata.cpp',
             'wiredtiger_record_store.cpp',
-            'wiredtiger_recovery_unit.cpp',
             ],
         LIBDEPS= [
             '$BUILD_DIR/mongo/bson',

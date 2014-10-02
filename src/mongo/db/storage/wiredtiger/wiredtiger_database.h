@@ -7,6 +7,7 @@
 
 namespace mongo {
     class WiredTigerOperationContext;
+    class WiredTigerMetaData;
 
     /**
      * converts wiredtiger return codes to mongodb statuses.
@@ -30,20 +31,24 @@ namespace mongo {
 
     class WiredTigerDatabase {
     public:
-        WiredTigerDatabase(WT_CONNECTION *conn) : _conn(conn) {}
-        ~WiredTigerDatabase();
+        WiredTigerDatabase(WT_CONNECTION *conn);
+        virtual ~WiredTigerDatabase();
 
         WiredTigerOperationContext &GetContext();
         void ReleaseContext(WiredTigerOperationContext &ctx);
         WT_CONNECTION *Get() const { return _conn; }
 
         void ClearCache();
+        void InitMetaData();
+        WiredTigerMetaData& GetMetaData();
+        void DropDeletedTables();
 
     private:
         WT_CONNECTION *_conn;
         mutable boost::mutex _ctxLock;
         typedef std::vector<WiredTigerOperationContext *> ContextVector;
         ContextVector _ctxCache;
+        WiredTigerMetaData *_metaData;
     };
 
     class WiredTigerOperationContext {

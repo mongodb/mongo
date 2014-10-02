@@ -101,10 +101,6 @@ namespace mongo {
     private:
 
         void _loadAllCollections();
-        //BSONObj _getSavedMetadata( WiredTigerCursor &cursor );
-        //void _loadCollection( WiredTigerSession& swrap,
-        //                      const std::string &tbl_uri,
-        //                      bool stayTemp = false );
 
         WiredTigerDatabase &_db;
 

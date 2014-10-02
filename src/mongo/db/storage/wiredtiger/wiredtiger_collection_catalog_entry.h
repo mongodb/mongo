@@ -38,11 +38,15 @@
 #include "mongo/db/storage/wiredtiger/wiredtiger_record_store.h"
 
 namespace mongo {
+    class WiredTigerDatabase;
+    class WiredTigerSession;
+
     class WiredTigerCollectionCatalogEntry : public CollectionCatalogEntry {
     public:
-        WiredTigerCollectionCatalogEntry( const StringData& ns, const CollectionOptions& options );
         WiredTigerCollectionCatalogEntry(
-            WiredTigerSession& swrap, const StringData& ns, bool stayTemp = false);
+                const StringData& ns, const CollectionOptions& options );
+        WiredTigerCollectionCatalogEntry(
+            WiredTigerDatabase& db, const StringData& ns, bool stayTemp = false);
         virtual ~WiredTigerCollectionCatalogEntry();
 
         int getTotalIndexCount( OperationContext* txn ) const;
@@ -105,7 +109,6 @@ namespace mongo {
         };
         // Not currently used, but needed to implement interface.
         BSONCollectionCatalogEntry::MetaData _metaData;
-        BSONObj _getSavedMetadata(WiredTigerCursor &cursor);
     public:
         typedef std::map<std::string,IndexEntry*> Indexes;
         Indexes indexes;

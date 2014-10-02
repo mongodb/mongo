@@ -34,7 +34,9 @@
 #include <boost/filesystem/operations.hpp>
 #include <boost/filesystem/path.hpp>
 
+#include "mongo/db/storage/wiredtiger/wiredtiger_database.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_database_catalog_entry.h"
+#include "mongo/db/storage/wiredtiger/wiredtiger_metadata.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_recovery_unit.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_global_options.h"
 
@@ -57,6 +59,7 @@ namespace mongo {
         }
         invariantWTOK(ret);
         _db = new WiredTigerDatabase(conn);
+        _db->InitMetaData();
         loadExistingDatabases();
     }
 
@@ -68,41 +71,24 @@ namespace mongo {
         _db = 0;
     }
 
-    // We can't do this in the constructor, since the rest of MongoDB isn't
-    // initialized enough to create CatalogEntry objects.
     void WiredTigerEngine::loadExistingDatabases() {
         boost::mutex::scoped_lock lk( _dbLock );
 
-        WiredTigerSession swrap(*_db);
-        WiredTigerCursor cursor("metadata:", swrap);
-        WT_CURSOR *c = cursor.Get();
-        invariant(c != NULL);
+        _db->DropDeletedTables();
 
-        const char *uri;
-        size_t end;
-        int ret;
-        // Find all tables with unique prefixes.
-        while ((ret = c->next(c)) == 0) {
-            c->get_key(c, &uri);
-            StringData uri_str(uri);
-            // Only look at tables that, skip indexes. All URIs should have a 
-            // period character, but check to be sure.
-            if (!uri_str.startsWith("table:") ||
-                uri_str.find('$') != std::string::npos ||
-                (end = uri_str.find('.')) == std::string::npos)
-                continue;
-
-            // Extract the database name.
-            std::string dbName = WiredTigerRecordStore::_fromURI(uri);
-
+        WiredTigerMetaData &md = _db->GetMetaData();
+        std::vector<uint64_t> tables = md.getAllTables();
+        for ( std::vector<uint64_t>::iterator it = tables.begin(); it != tables.end(); ++it) {
+            // The database name is all up to the first period
+            std::string dbName = md.getName( *it );
+            dbName = dbName.substr( 0, dbName.find('.') );
             // We've seen it already.
             if (_dbs[dbName])
                 continue;
 
             _dbs[dbName] = new WiredTigerDatabaseCatalogEntry( *_db, dbName );
         }
-        invariant ( ret == WT_NOTFOUND );
-        
+
     }
 
     void WiredTigerEngine::listDatabases( std::vector<std::string>* out ) const {

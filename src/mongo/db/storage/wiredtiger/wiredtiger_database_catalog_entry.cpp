@@ -31,6 +31,7 @@
  
 #include "mongo/db/storage/wiredtiger/wiredtiger_database_catalog_entry.h"
 
+#include <boost/algorithm/string/predicate.hpp>
 #include <boost/filesystem/operations.hpp>
 #include <boost/filesystem/path.hpp>
 
@@ -47,6 +48,7 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_collection_catalog_entry.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_index.h"
+#include "mongo/db/storage/wiredtiger/wiredtiger_metadata.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_recovery_unit.h"
 
 #include "mongo/db/storage_options.h"
@@ -105,32 +107,18 @@ namespace mongo {
         if (!_entryMap.empty())
             return;
 
-        WiredTigerSession swrap(_db);
-        WiredTigerCursor cursor("metadata:", swrap);
-        WT_CURSOR *c = cursor.Get();
-        invariant(c != NULL);
-
-        int ret;
-        const char *key;
-        std::string table_prefix = "table:" + name() + ".";
-        while ((ret = c->next(c)) == 0) {
-            ret = c->get_key(c, &key);
-            invariantWTOK(ret);
-            if (strcmp("metadata:", key) == 0)
-                continue;
-            if (strncmp(table_prefix.c_str(), key, table_prefix.length()) != 0)
-                continue;
-            if (strstr(key, ".$") != NULL)
-                continue;
-
-            // Initialize the namespace we found
-            std::string name = WiredTigerRecordStore::_fromURI(key);
-            WiredTigerCollectionCatalogEntry *entry =
-                new WiredTigerCollectionCatalogEntry(swrap, StringData(name));
-            _entryMap[name.c_str()] = entry;
+        std::string ns = name();
+        WiredTigerMetaData &md = _db.GetMetaData();
+        std::vector<uint64_t> tables = md.getAllTables();
+        for ( std::vector<uint64_t>::iterator it = tables.begin(); it != tables.end(); ++it) {
+            std::string name = md.getName( *it );
+            if ( boost::starts_with(name, ns) ) {
+                // Initialize the namespace we found
+                WiredTigerCollectionCatalogEntry *entry =
+                    new WiredTigerCollectionCatalogEntry(_db, StringData(name));
+                _entryMap[name.c_str()] = entry;
+            }
         }
-        if (ret != WT_NOTFOUND) invariantWTOK(ret);
-        name();
     }
 
     void WiredTigerDatabaseCatalogEntry::getCollectionNamespaces(
@@ -202,10 +190,11 @@ namespace mongo {
         swrap.GetContext().CloseAllCursors();
 
         WT_SESSION *session = swrap.Get();
-        int ret = session->drop(session, WiredTigerRecordStore::_getURI(ns).c_str(), "force");
-        if (ret != 0)
-            return Status( ErrorCodes::OperationFailed, "Collection drop failed" );
+        WiredTigerMetaData &md = _db.GetMetaData();
+        uint64_t id = md.getIdentifier( ns.toString() );
 
+        // Remove any remaining indexes before dropping the collection, this is generally
+        // handled in outside of the engine, but it doesn't hurt to be paranoid.
         std::vector<std::string> names;
         entry->getAllIndexes( txn, &names );
         std::vector<std::string>::const_iterator idx;
@@ -213,6 +202,13 @@ namespace mongo {
             Status s = entry->removeIndex(txn, StringData(*idx));
             invariant(s.isOK());
         }
+
+        //Finally remove the collection.
+        std::string uri = md.getURI( id );
+        int ret = session->drop(session, uri.c_str(), "force");
+        md.remove(id, ret != 0);
+
+
         delete entry;
         _entryMap.erase( i );
 
@@ -267,7 +263,6 @@ namespace mongo {
                                                         const StringData& fromNS,
                                                         const StringData& toNS,
                                                         bool stayTemp ) {
-        int ret;
         boost::mutex::scoped_lock lk( _entryMapLock );
         EntryMap::iterator i = _entryMap.find( toNS.toString() );
         if ( i != _entryMap.end() )
@@ -286,32 +281,38 @@ namespace mongo {
         // and can't deal with rolling back a rename.
         WiredTigerSession &swrap_real = WiredTigerRecoveryUnit::Get(txn).GetSession();
         WiredTigerSession swrap(swrap_real.GetDatabase());
-        WT_SESSION *session = swrap.Get();
 
         // Close any cached cursors we can...
         swrap_real.GetContext().CloseAllCursors();
         swrap.GetDatabase().ClearCache();
 
+        WiredTigerMetaData &md = _db.GetMetaData();
         // Rename all indexes in the entry
         std::vector<std::string> names;
         entry->getAllIndexes( txn, &names );
         std::vector<std::string>::const_iterator idx;
         for (idx = names.begin(); idx != names.end(); ++idx) {
-            //std::string fromName = *idx;
-            //std::string toName(toNS.toString() + fromName.substr(fromNS.toString().length()));
-            ret = session->rename(session,
-                    WiredTigerIndex::_getURI(fromNS.toString(), *idx).c_str(),
-                    WiredTigerIndex::_getURI(toNS.toString(), *idx).c_str(),
-                    "force");
-            invariantWTOK(ret);
+            // Metadata based version - doesn't require WiredTiger operation
+            uint64_t indexId = md.getIdentifier( 
+                    WiredTigerIndex::toTableName( fromNS.toString(), *idx ) );
+            std::string newName = WiredTigerIndex::toTableName( toNS.toString(), *idx );
+            // XXX: This should be an error, but sometimes the _id_ (default) index
+            // appears not to be dropped when a collection is dropped. An example is
+            // in jstests/core/mr1.js
+            uint64_t old_id;
+            if ( ( old_id = md.getIdentifier( newName ) ) !=
+                        WiredTigerMetaData::INVALID_METADATA_IDENTIFIER ) {
+                WT_SESSION *session = swrap.Get();
+                int ret = session->drop(session, md.getURI( old_id ).c_str(), "force");
+                invariantWTOK(ret);
+                md.remove( old_id );
+            }
+            md.rename(indexId, WiredTigerIndex::toTableName( toNS.toString(), *idx ) );
         }
 
         // Rename the primary WiredTiger table
-        std::string fromUri = WiredTigerRecordStore::_getURI(fromNS);
-        std::string toUri = WiredTigerRecordStore::_getURI(toNS);
-        ret = session->rename(session, fromUri.c_str(), toUri.c_str(), NULL);
-        if (ret != 0)
-            return Status( ErrorCodes::OperationFailed, "Collection rename failed" );
+        uint64_t fromId = md.getIdentifier(fromNS.toString());
+        md.rename( fromId, toNS.toString() );
 
         bool was_capped = entry->rs->isCapped();
         int64_t maxDocs, maxSize;
@@ -324,7 +325,7 @@ namespace mongo {
 
         // Load the newly renamed collection into memory
         WiredTigerCollectionCatalogEntry *newEntry =
-            new WiredTigerCollectionCatalogEntry(swrap, toNS, stayTemp);
+            new WiredTigerCollectionCatalogEntry( _db, toNS, stayTemp );
         _entryMap[toNS.toString().c_str()] = newEntry;
 
         return Status::OK();

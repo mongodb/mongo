@@ -43,16 +43,15 @@
 
 namespace mongo {
 
+    class WiredTigerCursor;
+    class WiredTigerDatabase;
+    class WiredTigerMetaData;
     class WiredTigerRecoveryUnit;
 
     class WiredTigerRecordStore : public RecordStore {
         public:
         static int Create(WiredTigerDatabase &db,
             const StringData &ns, const CollectionOptions &options, bool allocateDefaultSpace);
-
-        static std::string _getURI(const StringData &ns) {
-            return "table:" + ns.toString();
-        }
 
         static std::string _fromURI(const std::string &uri) {
             return uri.substr(strlen("table:"));
@@ -208,7 +207,8 @@ namespace mongo {
         RecordData _getData( const WiredTigerCursor &cursor) const;
 
         WiredTigerDatabase &_db;
-        const std::string _uri;
+        std::string _uri;
+
         // The capped settings should not be updated once operations have started
         bool _isCapped;
         int64_t _cappedMaxSize;

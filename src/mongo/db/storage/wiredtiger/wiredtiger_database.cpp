@@ -1,4 +1,4 @@
-// wiredtiger_recovery_unit.cpp
+// wiredtiger_database.cpp
 
 /**
  *    Copyright (C) 2014 MongoDB Inc.
@@ -31,15 +31,24 @@
 
 #include "mongo/platform/basic.h"
 
+#include "mongo/db/storage/wiredtiger/wiredtiger_database.h"
+#include "mongo/db/storage/wiredtiger/wiredtiger_metadata.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_recovery_unit.h"
 
 namespace mongo {
+    WiredTigerDatabase::WiredTigerDatabase(WT_CONNECTION *conn)
+        : _conn(conn)
+    {
+        _metaData = new WiredTigerMetaData();
+    }
+
     WiredTigerDatabase::~WiredTigerDatabase() {
         ClearCache();
         if (_conn) {
             int ret = _conn->close(_conn, NULL);
             invariantWTOK(ret);
         }
+        delete _metaData;
     }
 
     void WiredTigerDatabase::ClearCache() {
@@ -68,5 +77,30 @@ namespace mongo {
 
         boost::mutex::scoped_lock lk( _ctxLock );
         _ctxCache.push_back(&ctx);
+    }
+
+    void WiredTigerDatabase::InitMetaData() {
+        _metaData->initialize( *this );
+    }
+
+    WiredTigerMetaData &WiredTigerDatabase::GetMetaData() {
+        return *_metaData;
+    }
+
+    void WiredTigerDatabase::DropDeletedTables() {
+        // Clean up any tables that we failed to drop last time the server was running
+        std::vector<uint64_t> toDrop = _metaData->getDeleted();
+        if ( toDrop.size() != 0 ) {
+            WT_SESSION *s;
+            int ret = _conn->open_session(_conn, NULL, NULL, &s);
+            invariantWTOK(ret);
+            for ( std::vector<uint64_t>::iterator it = toDrop.begin(); it != toDrop.end(); ++it) {
+                std::string uri = _metaData->getURI( *it );
+                ret = s->drop( s, uri.c_str(), "force" );
+                if ( ret == 0 )
+                    _metaData->remove( *it );
+            }
+            s->close( s, NULL );
+        }
     }
 }
