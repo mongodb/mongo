@@ -156,10 +156,17 @@ namespace mongo {
         log() << "replset setting syncSourceFeedback to " << hostName << rsLog;
         _connection.reset(new DBClientConnection(false, 0, OplogReader::tcp_timeout));
         string errmsg;
-        if (!_connection->connect(hostName.c_str(), errmsg) ||
-            (getGlobalAuthorizationManager()->isAuthEnabled() && !replAuthenticate())) {
+        try {
+            if (!_connection->connect(hostName.c_str(), errmsg) ||
+                (getGlobalAuthorizationManager()->isAuthEnabled() && !replAuthenticate())) {
+                resetConnection();
+                log() << "repl: " << errmsg << endl;
+                return false;
+            }
+        }
+        catch (const DBException& e) {
+            log() << "Error connecting to " << hostName << ": " << e.what();
             resetConnection();
-            log() << "repl: " << errmsg << endl;
             return false;
         }
 
