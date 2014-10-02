@@ -46,8 +46,11 @@ func (csvImporter *CSVImportInput) SetHeader() error {
 	sort.Sort(sort.StringSlice(headers))
 	for index, header := range headers {
 		csvImporter.Fields = append(csvImporter.Fields, header)
-		if strings.Contains(header, ".") && header[len(header)-1] == '.' {
-			return fmt.Errorf("header '%v' can not end in '.'", header)
+		if strings.Contains(header, ".") && (header[len(header)-1] == '.' || header[0] == '.') {
+			return fmt.Errorf("header '%v' can not start or end in '.'", header)
+		}
+		if strings.Contains(header, "..") {
+			return fmt.Errorf("header '%v' can not contain consecutive '.' characters", header)
 		}
 		for _, latterHeader := range headers[index+1:] {
 			if strings.HasPrefix(latterHeader, header) && (strings.Contains(header, ".") || strings.Contains(latterHeader, ".")) {
@@ -74,7 +77,7 @@ func (csvImporter *CSVImportInput) ImportDocument() (bson.M, error) {
 		parsedValue := getParsedValue(token)
 		if index < len(csvImporter.Fields) {
 			if strings.Contains(csvImporter.Fields[index], ".") {
-				setUpsertValue(csvImporter.Fields[index], &document, parsedValue)
+				setNestedValue(csvImporter.Fields[index], parsedValue, &document)
 			} else {
 				document[csvImporter.Fields[index]] = parsedValue
 			}
@@ -91,9 +94,10 @@ func (csvImporter *CSVImportInput) ImportDocument() (bson.M, error) {
 	return document, nil
 }
 
-// setUpsertValue takes a nested field - in the form "a.b.c"
-// and sets the value passed in the nested field in the document
-func setUpsertValue(field string, doc *bson.M, value interface{}) bson.M {
+// setNestedValue takes a nested field - in the form "a.b.c" -
+// its associated value, and a document. It then assigns that
+// value to the appropriate nested field within the document
+func setNestedValue(field string, value interface{}, doc *bson.M) bson.M {
 	document := *doc
 	index := strings.Index(field, ".")
 	if index == -1 {
@@ -105,10 +109,10 @@ func setUpsertValue(field string, doc *bson.M, value interface{}) bson.M {
 	}
 	left := field[0:index]
 	if document[left] == nil {
-		document[left] = setUpsertValue(field[index+1:], &bson.M{}, value)
+		document[left] = setNestedValue(field[index+1:], value, &bson.M{})
 	} else {
-		subDoc := document[left].(bson.M)
-		document[left] = setUpsertValue(field[index+1:], &subDoc, value)
+		subDocument := document[left].(bson.M)
+		document[left] = setNestedValue(field[index+1:], value, &subDocument)
 	}
 	return document
 }

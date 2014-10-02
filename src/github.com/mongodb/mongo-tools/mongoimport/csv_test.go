@@ -306,6 +306,59 @@ func TestCSVSetHeader(t *testing.T) {
 			So(csvImporter.SetHeader(), ShouldNotBeNil)
 		})
 
+		Convey("setting the header that ends in a dot should error",
+			func() {
+				contents := "c, a., b"
+				fields := []string{}
+
+				csvFile, err = ioutil.TempFile("", "mongoimport_")
+				So(err, ShouldBeNil)
+				_, err = io.WriteString(csvFile, contents)
+				So(err, ShouldBeNil)
+				fileHandle, err = os.Open(csvFile.Name())
+				So(err, ShouldBeNil)
+				So(NewCSVImportInput(fields, fileHandle).SetHeader(), ShouldNotBeNil)
+			})
+
+		Convey("setting the header that starts in a dot should error",
+			func() {
+				contents := "c, .a, b"
+				fields := []string{}
+
+				csvFile, err = ioutil.TempFile("", "mongoimport_")
+				So(err, ShouldBeNil)
+				_, err = io.WriteString(csvFile, contents)
+				So(err, ShouldBeNil)
+				fileHandle, err = os.Open(csvFile.Name())
+				So(err, ShouldBeNil)
+				So(NewCSVImportInput(fields, fileHandle).SetHeader(), ShouldNotBeNil)
+			})
+
+		Convey("setting the header that contains multiple consecutive dots should error",
+			func() {
+				contents := "c, a..a, b"
+				fields := []string{}
+
+				csvFile, err = ioutil.TempFile("", "mongoimport_")
+				So(err, ShouldBeNil)
+				_, err = io.WriteString(csvFile, contents)
+				So(err, ShouldBeNil)
+				fileHandle, err = os.Open(csvFile.Name())
+				So(err, ShouldBeNil)
+				So(NewCSVImportInput(fields, fileHandle).SetHeader(), ShouldNotBeNil)
+
+				contents = "c, a.a, b.b...b"
+				fields = []string{}
+
+				csvFile, err = ioutil.TempFile("", "mongoimport_")
+				So(err, ShouldBeNil)
+				_, err = io.WriteString(csvFile, contents)
+				So(err, ShouldBeNil)
+				fileHandle, err = os.Open(csvFile.Name())
+				So(err, ShouldBeNil)
+				So(NewCSVImportInput(fields, fileHandle).SetHeader(), ShouldNotBeNil)
+			})
+
 		Convey("setting the header using an empty file should return EOF",
 			func() {
 				contents := ""
@@ -365,17 +418,80 @@ func TestCSVSetHeader(t *testing.T) {
 
 func TestGetParsedValue(t *testing.T) {
 	Convey("Given a string token to parse", t, func() {
-		Convey("an int token should return the underlying int value",
-			func() {
-				So(getParsedValue("3"), ShouldEqual, 3)
-			})
-		Convey("a float token should return the underlying float value",
-			func() {
-				So(getParsedValue(".33"), ShouldEqual, 0.33)
-			})
-		Convey("a string token should return the underlying string value",
-			func() {
-				So(getParsedValue("sd"), ShouldEqual, "sd")
-			})
+		Convey("an int token should return the underlying int value", func() {
+			So(getParsedValue("3"), ShouldEqual, 3)
+		})
+		Convey("a float token should return the underlying float value", func() {
+			So(getParsedValue(".33"), ShouldEqual, 0.33)
+		})
+		Convey("a string token should return the underlying string value", func() {
+			So(getParsedValue("sd"), ShouldEqual, "sd")
+		})
+	})
+}
+
+func TestSetNestedValue(t *testing.T) {
+	Convey("Given a field, its value, and an existing BSON document...", t, func() {
+		currentDocument := bson.M{
+			"a": 3,
+			"b": bson.M{
+				"c": "d",
+			},
+		}
+		Convey("ensure top level fields are set and others, unchanged", func() {
+			testDocument := currentDocument
+			expectedDocument := bson.M{
+				"a": 3,
+				"b": bson.M{
+					"c": "d",
+				},
+				"c": 4,
+			}
+			So(setNestedValue("c", 4, &testDocument), ShouldResemble, expectedDocument)
+		})
+		Convey("ensure new nested top-level fields are set and others, unchanged", func() {
+			testDocument := currentDocument
+			expectedDocument := bson.M{
+				"a": 3,
+				"b": bson.M{
+					"c": "d",
+				},
+				"c": bson.M{
+					"b": "4",
+				},
+			}
+			So(setNestedValue("c.b", "4", &testDocument), ShouldResemble, expectedDocument)
+		})
+		Convey("ensure existing nested level fields are set and others, unchanged", func() {
+			testDocument := currentDocument
+			expectedDocument := bson.M{
+				"a": 3,
+				"b": bson.M{
+					"c": "d",
+					"d": 9,
+				},
+			}
+			So(setNestedValue("b.d", 9, &testDocument), ShouldResemble, expectedDocument)
+		})
+		Convey("ensure subsequent calls update fields accordingly", func() {
+			testDocument := currentDocument
+			expectedDocumentOne := bson.M{
+				"a": 3,
+				"b": bson.M{
+					"c": "d",
+					"d": 9,
+				},
+			}
+			expectedDocumentTwo := bson.M{
+				"a": 3,
+				"b": bson.M{
+					"c": "d",
+					"d": 9,
+				},
+				"f": 23,
+			}
+			So(setNestedValue("b.d", 9, &testDocument), ShouldResemble, expectedDocumentOne)
+			So(setNestedValue("f", 23, &testDocument), ShouldResemble, expectedDocumentTwo)
+		})
 	})
 }

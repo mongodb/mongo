@@ -13,6 +13,8 @@ const (
 	tokenSeparator = "\t"
 )
 
+// TODO: TOOLS-64, TOOLS-70 for TSV
+
 // TSVImportInput is a struct that implements the ImportInput interface for a
 // TSV input source
 type TSVImportInput struct {
