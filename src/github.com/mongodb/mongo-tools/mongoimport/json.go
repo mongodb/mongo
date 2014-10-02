@@ -13,12 +13,12 @@ import (
 // JSONImportInput is an implementation of ImportInput that reads documents
 // in JSON format.
 type JSONImportInput struct {
-	// IsArray indicates if the JSON import is an array of JSON objects (true)
+	// IsArray indicates if the JSON import is an array of JSON documents (true)
 	// or not
 	IsArray bool
-	// Decoder is used to read the next valid JSON object from the input source
+	// Decoder is used to read the next valid JSON documents from the input source
 	Decoder *json.Decoder
-	// NumImported indicates the number of JSON objects successfully parsed from
+	// NumImported indicates the number of JSON documents successfully parsed from
 	// the JSON input source
 	NumImported int64
 	// readOpeningBracket indicates if the underlying io.Reader has consumed
