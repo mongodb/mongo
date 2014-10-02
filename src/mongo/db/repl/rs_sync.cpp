@@ -131,6 +131,7 @@ namespace repl {
     }
 
     bool ReplSetImpl::shouldChangeSyncTarget(const HostAndPort& currentTarget) {
+        lock lk(this);
         OpTime targetOpTime = findByName(currentTarget.toString())->hbinfo().opTime;
         for (Member *m = _members.head(); m; m = m->next()) {
             if (m->syncable() &&
