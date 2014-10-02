@@ -49,8 +49,8 @@ func (tsvImporter *TSVImportInput) SetHeader() error {
 	return nil
 }
 
-// ImportDocument reads a line of input with the TSV representation of a doc and
-// returns the BSON equivalent.
+// ImportDocument reads a line of input with the TSV representation of a
+// document and returns the BSON equivalent.
 func (tsvImporter *TSVImportInput) ImportDocument() (bson.M, error) {
 	tsvRecord, err := tsvImporter.tsvReader.ReadString(entryDelimiter)
 	if err != nil {

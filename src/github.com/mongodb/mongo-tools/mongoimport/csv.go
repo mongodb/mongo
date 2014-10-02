@@ -19,9 +19,8 @@ type CSVImportInput struct {
 	// csvReader is the underlying reader used to read data in from the CSV
 	// or TSV file
 	csvReader *csv.Reader
-	// NumImported indicates the number of CSV documents successfully parsed from
-	// the CSV input source
-	NumImported int64
+	// NumImported indicates the number of CSV documents processed
+	numProcessed int64
 	// headerLine is a boolean that indicates if the import input has a header line
 	headerLine bool
 }
@@ -33,10 +32,12 @@ func NewCSVImportInput(fields []string, headerLine bool, in io.Reader) *CSVImpor
 	// allow variable number of fields in document
 	csvReader.FieldsPerRecord = -1
 	csvReader.TrimLeadingSpace = true
+	numProcessed := int64(0)
 	return &CSVImportInput{
-		Fields:     fields,
-		headerLine: headerLine,
-		csvReader:  csvReader,
+		Fields:       fields,
+		headerLine:   headerLine,
+		csvReader:    csvReader,
+		numProcessed: numProcessed,
 	}
 }
 
@@ -87,11 +88,15 @@ func (csvImporter *CSVImportInput) SetHeader() (err error) {
 // ImportDocument reads a line of input with the CSV representation of a doc and
 // returns the BSON equivalent.
 func (csvImporter *CSVImportInput) ImportDocument() (bson.M, error) {
+	document := bson.M{}
+	csvImporter.numProcessed++
 	tokens, err := csvImporter.csvReader.Read()
 	if err != nil {
-		return nil, err
+		if err == io.EOF {
+			return nil, err
+		}
+		return nil, fmt.Errorf("read error on entry #%v: %v", csvImporter.numProcessed, err)
 	}
-	document := bson.M{}
 	var key string
 	for index, token := range tokens {
 		parsedValue := getParsedValue(token)
@@ -106,13 +111,12 @@ func (csvImporter *CSVImportInput) ImportDocument() (bson.M, error) {
 		} else {
 			key = "field" + strconv.Itoa(index)
 			if util.StringSliceContains(csvImporter.Fields, key) {
-				csvImporter.NumImported++
-				return document, fmt.Errorf("key collision for token #%v ('%v') on document #%v", index+1, parsedValue, csvImporter.NumImported)
+				return document, fmt.Errorf("Duplicate header name - on %v - for token #%v ('%v') in document #%v",
+					key, index+1, parsedValue, csvImporter.numProcessed)
 			}
 			document[key] = parsedValue
 		}
 	}
-	csvImporter.NumImported++
 	return document, nil
 }
 
@@ -132,7 +136,6 @@ func setNestedValue(field string, value interface{}, document bson.M) {
 	}
 	setNestedValue(field[index+1:], value, subDocument)
 	document[left] = subDocument
-	return
 }
 
 // getParsedValue returns the appropriate concrete type for the given token
