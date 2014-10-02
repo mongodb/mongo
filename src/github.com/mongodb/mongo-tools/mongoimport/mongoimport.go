@@ -185,11 +185,9 @@ func (mongoImport *MongoImport) ImportDocuments() (int64, error) {
 		return 0, err
 	}
 
-	if mongoImport.InputOptions.HeaderLine {
-		err = importInput.SetHeader()
-		if err != nil {
-			return 0, err
-		}
+	err = importInput.SetHeader()
+	if err != nil {
+		return 0, err
 	}
 	return mongoImport.importDocuments(importInput)
 }
@@ -289,8 +287,6 @@ func (mongoImport *MongoImport) getImportInput(in io.Reader) (ImportInput,
 	error) {
 	var fields []string
 	var err error
-	// there should be some sanity checks done for field names - e.g. that they
-	// don't contain dots
 	if len(mongoImport.InputOptions.Fields) != 0 {
 		fields = strings.Split(strings.Trim(mongoImport.InputOptions.Fields,
 			" "), ",")
@@ -300,8 +296,9 @@ func (mongoImport *MongoImport) getImportInput(in io.Reader) (ImportInput,
 			return nil, err
 		}
 	}
+
 	if mongoImport.InputOptions.Type == CSV {
-		return NewCSVImportInput(fields, in), nil
+		return NewCSVImportInput(fields, mongoImport.InputOptions.HeaderLine, in), nil
 	} else if mongoImport.InputOptions.Type == TSV {
 		return NewTSVImportInput(fields, in), nil
 	}

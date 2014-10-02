@@ -22,44 +22,64 @@ type CSVImportInput struct {
 	// NumImported indicates the number of CSV documents successfully parsed from
 	// the CSV input source
 	NumImported int64
+	// headerLine is a boolean that indicates if the import input has a header line
+	headerLine bool
 }
 
 // NewCSVImportInput returns a CSVImportInput configured to read input from the
 // given io.Reader, extracting the specified fields only.
-func NewCSVImportInput(fields []string, in io.Reader) *CSVImportInput {
+func NewCSVImportInput(fields []string, headerLine bool, in io.Reader) *CSVImportInput {
 	csvReader := csv.NewReader(in)
 	// allow variable number of fields in document
 	csvReader.FieldsPerRecord = -1
 	csvReader.TrimLeadingSpace = true
 	return &CSVImportInput{
-		Fields:    fields,
-		csvReader: csvReader,
+		Fields:     fields,
+		headerLine: headerLine,
+		csvReader:  csvReader,
 	}
 }
 
 // SetHeader sets the header field for a CSV
-func (csvImporter *CSVImportInput) SetHeader() error {
-	headers, err := csvImporter.csvReader.Read()
-	if err != nil {
-		return err
+func (csvImporter *CSVImportInput) SetHeader() (err error) {
+	unsortedHeaders := []string{}
+	// NOTE: if --headerline was passed on the command line, we will
+	// attempt to read headers from the input source - even if --fields
+	// or --fieldFile is supplied.
+	// TODO: add validation for this case
+	if csvImporter.headerLine {
+		unsortedHeaders, err = csvImporter.csvReader.Read()
+		if err != nil {
+			return err
+		}
+	} else {
+		unsortedHeaders = csvImporter.Fields
+		csvImporter.Fields = []string{}
 	}
+	headers := make([]string, len(unsortedHeaders), len(unsortedHeaders))
+	copy(headers, unsortedHeaders)
 	sort.Sort(sort.StringSlice(headers))
 	for index, header := range headers {
-		csvImporter.Fields = append(csvImporter.Fields, header)
-		if strings.Contains(header, ".") && (header[len(header)-1] == '.' || header[0] == '.') {
+		if strings.HasSuffix(header, ".") || strings.HasPrefix(header, ".") {
 			return fmt.Errorf("header '%v' can not start or end in '.'", header)
 		}
 		if strings.Contains(header, "..") {
 			return fmt.Errorf("header '%v' can not contain consecutive '.' characters", header)
 		}
+		// NOTE: since headers is sorted, this check ensures that no header
+		// is incompatible with another one that occurs further down the list.
+		// meant to prevent cases where we have headers like "a" and "a.c"
 		for _, latterHeader := range headers[index+1:] {
 			if strings.HasPrefix(latterHeader, header) && (strings.Contains(header, ".") || strings.Contains(latterHeader, ".")) {
 				return fmt.Errorf("incompatible headers found: '%v' and '%v", header, latterHeader)
 			}
+			// NOTE: this means we will not support imports that have fields like
+			// a,a - since this is invalid in MongoDB
 			if header == latterHeader {
 				return fmt.Errorf("headers can not be identical: '%v' and '%v", header, latterHeader)
 			}
 		}
+		csvImporter.Fields = append(csvImporter.Fields, unsortedHeaders[index])
 	}
 	return nil
 }
@@ -76,8 +96,10 @@ func (csvImporter *CSVImportInput) ImportDocument() (bson.M, error) {
 	for index, token := range tokens {
 		parsedValue := getParsedValue(token)
 		if index < len(csvImporter.Fields) {
+			// for nested fields - in the form "a.b.c", ensure
+			// that the value is set accordingly
 			if strings.Contains(csvImporter.Fields[index], ".") {
-				setNestedValue(csvImporter.Fields[index], parsedValue, &document)
+				setNestedValue(csvImporter.Fields[index], parsedValue, document)
 			} else {
 				document[csvImporter.Fields[index]] = parsedValue
 			}
@@ -97,24 +119,20 @@ func (csvImporter *CSVImportInput) ImportDocument() (bson.M, error) {
 // setNestedValue takes a nested field - in the form "a.b.c" -
 // its associated value, and a document. It then assigns that
 // value to the appropriate nested field within the document
-func setNestedValue(field string, value interface{}, doc *bson.M) bson.M {
-	document := *doc
+func setNestedValue(field string, value interface{}, document bson.M) {
 	index := strings.Index(field, ".")
 	if index == -1 {
-		if document == nil {
-			return bson.M{field: value}
-		}
 		document[field] = value
-		return document
+		return
 	}
 	left := field[0:index]
-	if document[left] == nil {
-		document[left] = setNestedValue(field[index+1:], value, &bson.M{})
-	} else {
-		subDocument := document[left].(bson.M)
-		document[left] = setNestedValue(field[index+1:], value, &subDocument)
+	subDocument := bson.M{}
+	if document[left] != nil {
+		subDocument = document[left].(bson.M)
 	}
-	return document
+	setNestedValue(field[index+1:], value, subDocument)
+	document[left] = subDocument
+	return
 }
 
 // getParsedValue returns the appropriate concrete type for the given token

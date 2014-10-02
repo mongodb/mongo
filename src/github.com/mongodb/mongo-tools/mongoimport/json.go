@@ -13,7 +13,7 @@ import (
 // JSONImportInput is an implementation of ImportInput that reads documents
 // in JSON format.
 type JSONImportInput struct {
-	// IsArray indicates if the JSON import is an array of JSON documents (true)
+	// IsArray indicates if the JSON import is an array of JSON documents
 	// or not
 	IsArray bool
 	// Decoder is used to read the next valid JSON documents from the input source

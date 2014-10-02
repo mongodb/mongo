@@ -719,7 +719,7 @@ func TestImportDocuments(t *testing.T) {
 			inputOptions := &options.InputOptions{
 				Type:   CSV,
 				File:   "testdata/test.csv",
-				Fields: "_id,b,c",
+				Fields: "_id,c,b",
 			}
 			ingestOptions := &options.IngestOptions{
 				Upsert:       true,
@@ -737,9 +737,9 @@ func TestImportDocuments(t *testing.T) {
 			So(err, ShouldBeNil)
 			So(numImported, ShouldEqual, 3)
 			expectedDocuments := []bson.M{
-				bson.M{"_id": 1, "b": 2, "c": 3},
-				bson.M{"_id": 3, "b": 5.4, "c": "string"},
-				bson.M{"_id": 5, "b": 6, "c": 6},
+				bson.M{"_id": 1, "c": 2, "b": 3},
+				bson.M{"_id": 3, "c": 5.4, "b": "string"},
+				bson.M{"_id": 5, "c": 6, "b": 6},
 			}
 			So(checkOnlyHasDocuments(expectedDocuments), ShouldBeNil)
 		})
