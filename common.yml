@@ -15,13 +15,13 @@ mongo_tools_variables:
     linux_64_bit: &mongo_url_ubuntu1204
       mongo_url: "http://downloads.10gen.com/linux/mongodb-linux-x86_64-latest.tgz"
     linux_64_bit_enterprise: &mongo_url_ubuntu1204_enterprise
-      mongo_url: "http://downloads.10gen.com/linux/mongodb-linux-x86_64-enterprise-ubuntu1204-2.7.7.tgz"
+      mongo_url: "http://downloads.10gen.com/linux/mongodb-linux-x86_64-enterprise-ubuntu1204-latest.tgz"
     windows_32_bit: &mongo_url_windows32
       mongo_url: "https://fastdl.mongodb.org/win32/mongodb-win32-i386-latest.zip"
     windows_64_bit: &mongo_url_windows64
       mongo_url: "https://fastdl.mongodb.org/win32/mongodb-win32-x86_64-2008plus-latest.zip"
     windows_64_bit_enterprise: &mongo_url_windows64_enterprise
-      mongo_url: "http://downloads.10gen.com/win32/mongodb-win32-x86_64-enterprise-windows-64-2.7.7.zip"
+      mongo_url: "http://downloads.10gen.com/win32/mongodb-win32-x86_64-enterprise-windows-64-latest.zip"
 
 
 ## List of tests to run on each buildvariant
@@ -85,7 +85,7 @@ mongo_tools_variables:
     default: &mongodb_default_startup_args
       mongodb_args: "--dbpath mongodb/db_files --port 27017 --httpinterface --setParameter=enableTestCommands=1 &"
     ssl: &mongodb_ssl_startup_args
-      mongodb_args: "--sslMode requireSSL --sslCAFile src/src/github.com/mongodb/mongo-tools/common/db/openssl/testdata/ca.pem --sslPEMKeyFile src/src/github.com/mongodb/mongo-tools/common/db/openssl/testdata/server.pem --dbpath mongodb/db_files --port 27017 --httpinterface --setParameter=enableTestCommands=1 &"
+      mongodb_args: "--sslMode requireSSL --sslCAFile src/github.com/mongodb/mongo-tools/common/db/openssl/testdata/ca.pem --sslPEMKeyFile src/github.com/mongodb/mongo-tools/common/db/openssl/testdata/server.pem --dbpath mongodb/db_files --port 27017 --httpinterface --setParameter=enableTestCommands=1 &"
     auth: &mongodb_auth_startup_args
       mongodb_args: "--auth --dbpath mongodb/db_files --port 27017 --httpinterface --setParameter=enableTestCommands=1 &"
 
