@@ -110,7 +110,7 @@ namespace mongo {
         WiredTigerMetaData &md = _db.GetMetaData();
         std::vector<uint64_t> tables = md.getAllTables();
         for ( std::vector<uint64_t>::iterator it = tables.begin(); it != tables.end(); ++it) {
-            std::string ns = md.getName( *it );
+            std::string ns = md.getTableName( *it );
             if ( name() == nsToDatabaseSubstring( ns ) ) {
                 // Initialize the namespace we found
                 WiredTigerCollectionCatalogEntry *entry =

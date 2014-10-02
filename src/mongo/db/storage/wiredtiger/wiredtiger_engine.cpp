@@ -79,7 +79,7 @@ namespace mongo {
         std::vector<uint64_t> tables = md.getAllTables();
         for ( std::vector<uint64_t>::iterator it = tables.begin(); it != tables.end(); ++it) {
             // The database name is all up to the first period
-            std::string dbName = md.getName( *it );
+            std::string dbName = md.getTableName( *it );
             dbName = dbName.substr( 0, dbName.find('.') );
             // We've seen it already.
             if (_dbs[dbName])

@@ -52,9 +52,8 @@ namespace mongo {
     const uint64_t WiredTigerMetaData::INVALID_METADATA_IDENTIFIER =
                                          std::numeric_limits<uint64_t>::max();
 
-    WiredTigerMetaData::WiredTigerMetaData( )
+    WiredTigerMetaData::WiredTigerMetaData( ) : _nextId( 1 ), _isInitialized( false )
     {
-        _nextId = 1;
     }
 
     WiredTigerMetaData::~WiredTigerMetaData()
@@ -64,6 +63,9 @@ namespace mongo {
 
     void WiredTigerMetaData::initialize( WiredTigerDatabase &db )
     {
+        boost::mutex::scoped_lock lk( _metaDataLock );
+        if ( _isInitialized )
+            return;
         WiredTigerSession swrap(db);
         WT_SESSION *s(swrap.Get());
 
@@ -81,10 +83,12 @@ namespace mongo {
             invariant( ret == 0 );
             _nextId = 1;
         }
+        _isInitialized = true;
     }
 
-    std::string WiredTigerMetaData::getName(uint64_t identifier)
+    std::string WiredTigerMetaData::getTableName(uint64_t identifier)
     {
+        boost::mutex::scoped_lock lk( _metaDataLock );
         WiredTigerMetaDataMap::iterator itr = _tables.find(identifier);
         invariant( itr != _tables.end() );
         return ( itr->second.name );
@@ -92,6 +96,7 @@ namespace mongo {
 
     std::string WiredTigerMetaData::getURI(uint64_t identifier)
     {
+        boost::mutex::scoped_lock lk( _metaDataLock );
         WiredTigerMetaDataMap::iterator itr = _tables.find(identifier);
         invariant( itr != _tables.end() );
         return ( itr->second.uri );
@@ -99,17 +104,34 @@ namespace mongo {
 
     BSONObj &WiredTigerMetaData::getConfig(uint64_t identifier)
     {
+        boost::mutex::scoped_lock lk( _metaDataLock );
         WiredTigerMetaDataMap::iterator itr = _tables.find(identifier);
         invariant( itr != _tables.end() );
         return ( itr->second.config );
     }
 
-    std::string WiredTigerMetaData::getURI(std::string name)
+    std::string WiredTigerMetaData::getURI(std::string tableName)
     {
-        return getURI( getIdentifier( name ) );
-   }
+        boost::mutex::scoped_lock lk( _metaDataLock );
+        WiredTigerMetaDataMap::iterator itr;
+        for (itr = _tables.begin(); itr != _tables.end(); itr++) {
+            if (itr->second.isDeleted)
+                continue;
+            if (itr->second.name == tableName)
+                return itr->second.uri;
+        }
+        // We expect queries to always be satisfied.
+        invariant( 0 );
+        return std::string( "" );
+    }
 
     uint64_t WiredTigerMetaData::getIdentifier(std::string tableName)
+    {
+        boost::mutex::scoped_lock lk( _metaDataLock );
+        return _getIdentifierLocked( tableName );
+    }
+
+    uint64_t WiredTigerMetaData::_getIdentifierLocked(std::string tableName)
     {
         WiredTigerMetaDataMap::iterator itr;
         for (itr = _tables.begin(); itr != _tables.end(); itr++) {
@@ -123,9 +145,10 @@ namespace mongo {
 
     uint64_t WiredTigerMetaData::generateIdentifier(std::string tableName, BSONObj config)
     {
+        boost::mutex::scoped_lock lk( _metaDataLock );
         uint64_t old_id;
 
-        if ( (old_id = getIdentifier(tableName)) != INVALID_METADATA_IDENTIFIER) {
+        if ( (old_id = _getIdentifierLocked(tableName)) != INVALID_METADATA_IDENTIFIER) {
             // We shouldn't ever end up with multiple tables that have matching names.
             // Check the deleted flag, and re-try a failed delete.
             //_retryTableDrop( old_id );
@@ -146,6 +169,7 @@ namespace mongo {
 
     Status WiredTigerMetaData::remove(uint64_t identifier, bool failedDrop)
     {
+        boost::mutex::scoped_lock lk( _metaDataLock );
         if ( failedDrop ) {
             WiredTigerMetaDataMap::iterator itr = _tables.find(identifier);
             invariant( itr != _tables.end() );
@@ -166,8 +190,9 @@ namespace mongo {
 
     Status WiredTigerMetaData::rename(uint64_t identifier, std::string newName)
     {
+        boost::mutex::scoped_lock lk( _metaDataLock );
         uint64_t old_id;
-        if ( (old_id = getIdentifier(newName)) != INVALID_METADATA_IDENTIFIER) {
+        if ( (old_id = _getIdentifierLocked(newName)) != INVALID_METADATA_IDENTIFIER) {
             LOG(1) << "Metadata rename to an existing name: " << newName << old_id << endl;
             invariant ( 0 );
         }
@@ -182,6 +207,7 @@ namespace mongo {
 
     Status WiredTigerMetaData::updateConfig(uint64_t identifier, BSONObj newConfig)
     {
+        boost::mutex::scoped_lock lk( _metaDataLock );
         WiredTigerMetaDataMap::iterator itr = _tables.find(identifier);
         invariant( itr != _tables.end() );
         MetaDataEntry &entry = itr->second;
@@ -192,6 +218,7 @@ namespace mongo {
 
     std::vector<uint64_t> WiredTigerMetaData::getAllTables()
     {
+        boost::mutex::scoped_lock lk( _metaDataLock );
         WiredTigerMetaDataMap::iterator itr;
         std::vector<uint64_t> tables;
         for( itr = _tables.begin(); itr != _tables.end(); ++itr ) {
@@ -203,6 +230,7 @@ namespace mongo {
 
     std::vector<uint64_t> WiredTigerMetaData::getAllIndexes(uint64_t identifier)
     {
+        boost::mutex::scoped_lock lk( _metaDataLock );
         WiredTigerMetaDataMap::iterator itr = _tables.find(identifier);
         invariant( itr != _tables.end() );
         MetaDataEntry &primary = itr->second;
@@ -218,6 +246,7 @@ namespace mongo {
 
     std::vector<uint64_t> WiredTigerMetaData::getDeleted()
     {
+        boost::mutex::scoped_lock lk( _metaDataLock );
         WiredTigerMetaDataMap::iterator itr;
         std::vector<uint64_t> tables;
         for( itr = _tables.begin(); itr != _tables.end(); ++itr ) {

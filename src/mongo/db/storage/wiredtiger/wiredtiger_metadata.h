@@ -56,7 +56,7 @@ namespace mongo {
         virtual ~WiredTigerMetaData();
         void initialize( WiredTigerDatabase &db );
 
-        std::string getName(uint64_t identifier);
+        std::string getTableName(uint64_t identifier);
         std::string getURI(uint64_t identifier);
         std::string getURI(std::string name);   // Inefficient, prefer identifier version.
         BSONObj &getConfig(uint64_t identifer);
@@ -99,6 +99,7 @@ namespace mongo {
         // Called from constructor to read metadata table and populate in-memory map
         Status _populate();
         uint64_t _generateIdentifier(std::string tableName);
+        uint64_t _getIdentifierLocked(std::string tableName);
         std::string _generateURI(std::string tableName, uint64_t id);
         bool _isIndexName(std::string tableName);
         void _persistEntry(uint64_t id, MetaDataEntry &entry);
@@ -109,5 +110,7 @@ namespace mongo {
         typedef std::map<uint64_t, MetaDataEntry> WiredTigerMetaDataMap;
         WiredTigerMetaDataMap _tables;
         WT_CURSOR *_metaDataCursor;
+        bool _isInitialized;
+        mutable boost::mutex _metaDataLock;
 	};
 }
