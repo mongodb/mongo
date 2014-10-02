@@ -92,7 +92,6 @@ namespace QueryStageSortTests {
                 member.loc = *it;
                 member.state = WorkingSetMember::LOC_AND_UNOWNED_OBJ;
                 member.obj = coll->docFor(&_txn, *it);
-                ASSERT_FALSE(member.obj.isOwned());
                 ms->pushBack(member);
             }
         }
