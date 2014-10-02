@@ -35,9 +35,22 @@
 // This will probably get us _exit on non-unistd platforms like Windows.
 #include <cstdlib>
 
+#if !defined(__has_feature)
+#define __has_feature(x) 0
+#endif
+
+#if __has_feature(address_sanitizer)
+#include <sanitizer/lsan_interface.h>
+#endif
+
 namespace mongo {
 
     void quickExit(int code) {
+
+#if __has_feature(address_sanitizer)
+        __lsan_do_leak_check();
+#endif
+
         ::_exit(code);
     }
 
