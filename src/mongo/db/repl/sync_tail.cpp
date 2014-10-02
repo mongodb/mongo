@@ -506,16 +506,17 @@ namespace {
     }
 
     void SyncTail::handleSlaveDelay(const BSONObj& lastOp) {
-        int sd = theReplSet->myConfig().slaveDelay;
+        ReplicationCoordinator* replCoord = getGlobalReplicationCoordinator();
+        int slaveDelaySecs = replCoord->getSlaveDelaySecs().total_seconds();
 
         // ignore slaveDelay if the box is still initializing. once
         // it becomes secondary we can worry about it.
-        if( sd && theReplSet->isSecondary() ) {
+        if( slaveDelaySecs > 0 && replCoord->getCurrentMemberState().secondary() ) {
             const OpTime ts = lastOp["ts"]._opTime();
             long long a = ts.getSecs();
             long long b = time(0);
             long long lag = b - a;
-            long long sleeptime = sd - lag;
+            long long sleeptime = slaveDelaySecs - lag;
             if( sleeptime > 0 ) {
                 uassert(12000, "rs slaveDelay differential too big check clocks and systems",
                         sleeptime < 0x40000000);
@@ -523,15 +524,15 @@ namespace {
                     sleepsecs((int) sleeptime);
                 }
                 else {
-                    log() << "replSet slavedelay sleep long time: " << sleeptime << rsLog;
+                    warning() << "replSet slavedelay causing a long sleep of " << sleeptime
+                              << " seconds" << rsLog;
                     // sleep(hours) would prevent reconfigs from taking effect & such!
                     long long waitUntil = b + sleeptime;
-                    while( 1 ) {
+                    while(time(0) < waitUntil) {
                         sleepsecs(6);
-                        if( time(0) >= waitUntil )
-                            break;
 
-                        if( theReplSet->myConfig().slaveDelay != sd ) // reconf
+                        // Handle reconfigs that changed the slave delay
+                        if (replCoord->getSlaveDelaySecs().total_seconds() != slaveDelaySecs)
                             break;
                     }
                 }
