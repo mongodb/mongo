@@ -150,6 +150,8 @@ namespace mongo {
             WiredTigerMetaDataMap::iterator itr = _tables.find(identifier);
             invariant( itr != _tables.end() );
             MetaDataEntry &entry = itr->second;
+            LOG(1) << "Metadata remove drop failed, uri: " << entry.uri <<
+                " name: " << entry.name << endl;
             entry.isDeleted = true;
             _persistEntry( identifier, entry );
         } else {
@@ -164,6 +166,12 @@ namespace mongo {
 
     Status WiredTigerMetaData::rename(uint64_t identifier, std::string newName)
     {
+        uint64_t old_id;
+        if ( (old_id = getIdentifier(newName)) != INVALID_METADATA_IDENTIFIER) {
+            LOG(1) << "Metadata rename to an existing name: " << newName << old_id << endl;
+            invariant ( 0 );
+        }
+
         WiredTigerMetaDataMap::iterator itr = _tables.find(identifier);
         invariant( itr != _tables.end() );
         MetaDataEntry &entry = itr->second;

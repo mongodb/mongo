@@ -69,6 +69,10 @@ namespace mongo {
         std::vector<uint64_t> getDeleted();
         std::vector<uint64_t> getAllTables();
         std::vector<uint64_t> getAllIndexes(uint64_t identifier);
+
+        static const char * WT_METADATA_URI;
+        static const char * WT_METADATA_CONFIG;
+        static const uint64_t INVALID_METADATA_IDENTIFIER;
     private:
 
         struct MetaDataEntry {
@@ -91,10 +95,6 @@ namespace mongo {
             bool        isDeleted;  // Not saved to disk, any deleted entry should not have a
                                     // matching entry in the persistent table.
         };
-
-        static const char * WT_METADATA_URI;
-        static const char * WT_METADATA_CONFIG;
-        static const uint64_t INVALID_METADATA_IDENTIFIER;
 
         // Called from constructor to read metadata table and populate in-memory map
         Status _populate();

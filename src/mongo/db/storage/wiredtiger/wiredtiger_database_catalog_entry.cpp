@@ -192,11 +192,9 @@ namespace mongo {
         WT_SESSION *session = swrap.Get();
         WiredTigerMetaData &md = _db.GetMetaData();
         uint64_t id = md.getIdentifier( ns.toString() );
-        std::string uri = md.getURI( id );
-        int ret = session->drop(session, uri.c_str(), "force");
 
-        md.remove(id, ret != 0);
-
+        // Remove any remaining indexes before dropping the collection, this is generally
+        // handled in outside of the engine, but it doesn't hurt to be paranoid.
         std::vector<std::string> names;
         entry->getAllIndexes( txn, &names );
         std::vector<std::string>::const_iterator idx;
@@ -204,6 +202,13 @@ namespace mongo {
             Status s = entry->removeIndex(txn, StringData(*idx));
             invariant(s.isOK());
         }
+
+        //Finally remove the collection.
+        std::string uri = md.getURI( id );
+        int ret = session->drop(session, uri.c_str(), "force");
+        md.remove(id, ret != 0);
+
+
         delete entry;
         _entryMap.erase( i );
 
@@ -290,6 +295,18 @@ namespace mongo {
             // Metadata based version - doesn't require WiredTiger operation
             uint64_t indexId = md.getIdentifier( 
                     WiredTigerIndex::toTableName( fromNS.toString(), *idx ) );
+            std::string newName = WiredTigerIndex::toTableName( toNS.toString(), *idx );
+            // XXX: This should be an error, but sometimes the _id_ (default) index
+            // appears not to be dropped when a collection is dropped. An example is
+            // in jstests/core/mr1.js
+            uint64_t old_id;
+            if ( ( old_id = md.getIdentifier( newName ) ) !=
+                        WiredTigerMetaData::INVALID_METADATA_IDENTIFIER ) {
+                WT_SESSION *session = swrap.Get();
+                int ret = session->drop(session, md.getURI( old_id ).c_str(), "force");
+                invariantWTOK(ret);
+                md.remove( old_id );
+            }
             md.rename(indexId, WiredTigerIndex::toTableName( toNS.toString(), *idx ) );
         }
 

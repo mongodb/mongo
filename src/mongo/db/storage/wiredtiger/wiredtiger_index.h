@@ -52,6 +52,7 @@ namespace mongo {
         static std::string toTableName(const std::string &ns, const std::string &idxName) {
             return ns + ".$" + idxName;
         }
+
         static int Create(WiredTigerDatabase &db,
                 const std::string &ns, const std::string &idxName, IndexCatalogEntry& info);
         static bool _search(WT_CURSOR *c, const WiredTigerItem& item, bool forward);
