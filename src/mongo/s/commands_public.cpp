@@ -54,6 +54,7 @@
 #include "mongo/db/query/lite_parsed_query.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/s/client_info.h"
+#include "mongo/s/cluster_explain.h"
 #include "mongo/s/chunk.h"
 #include "mongo/s/config.h"
 #include "mongo/s/cursors.h"
@@ -971,6 +972,45 @@ namespace mongo {
 
                 return true;
             }
+
+            Status explain(OperationContext* txn,
+                           const std::string& dbname,
+                           const BSONObj& cmdObj,
+                           ExplainCommon::Verbosity verbosity,
+                           BSONObjBuilder* out) const {
+                const string fullns = parseNs(dbname, cmdObj);
+
+                // Extract the targeting query.
+                BSONObj targetingQuery;
+                if (Object == cmdObj["query"].type()) {
+                    targetingQuery = cmdObj["query"].Obj();
+                }
+
+                BSONObjBuilder explainCmdBob;
+                ClusterExplain::wrapAsExplain(cmdObj, verbosity, &explainCmdBob);
+
+                // We will time how long it takes to run the commands on the shards.
+                Timer timer;
+
+                vector<Strategy::CommandResult> shardResults;
+                STRATEGY->commandOp(dbname,
+                                    explainCmdBob.obj(),
+                                    0,
+                                    fullns,
+                                    targetingQuery,
+                                    &shardResults);
+
+                long long millisElapsed = timer.millis();
+
+                const char* mongosStageName = ClusterExplain::getStageNameForReadOp(shardResults,
+                                                                                    cmdObj);
+
+                return ClusterExplain::buildExplainResult(shardResults,
+                                                          mongosStageName,
+                                                          millisElapsed,
+                                                          out);
+            }
+
         } countCmd;
 
         class CollectionStats : public PublicGridCommand {
@@ -1265,6 +1305,45 @@ namespace mongo {
             virtual bool passOptions() const { return true; }
             virtual string getFullNS( const string& dbName , const BSONObj& cmdObj ) {
                 return dbName + "." + cmdObj.firstElement().embeddedObjectUserCheck()["ns"].valuestrsafe();
+            }
+            virtual std::string parseNs(const std::string& dbName, const BSONObj& cmdObj) const {
+                return dbName + "." + cmdObj.firstElement()
+                                            .embeddedObjectUserCheck()["ns"]
+                                            .valuestrsafe();
+            }
+
+            Status explain(OperationContext* txn,
+                           const std::string& dbname,
+                           const BSONObj& cmdObj,
+                           ExplainCommon::Verbosity verbosity,
+                           BSONObjBuilder* out) const {
+                const string fullns = parseNs(dbname, cmdObj);
+
+                BSONObjBuilder explainCmdBob;
+                ClusterExplain::wrapAsExplain(cmdObj, verbosity, &explainCmdBob);
+
+                // We will time how long it takes to run the commands on the shards.
+                Timer timer;
+
+                Strategy::CommandResult singleResult;
+                Status commandStat = STRATEGY->commandOpUnsharded(dbname,
+                                                                  explainCmdBob.obj(),
+                                                                  0,
+                                                                  fullns,
+                                                                  &singleResult);
+                if (!commandStat.isOK()) {
+                    return commandStat;
+                }
+
+                long long millisElapsed = timer.millis();
+
+                vector<Strategy::CommandResult> shardResults;
+                shardResults.push_back(singleResult);
+
+                return ClusterExplain::buildExplainResult(shardResults,
+                                                          ClusterExplain::kSingleShard,
+                                                          millisElapsed,
+                                                          out);
             }
 
         } groupCmd;

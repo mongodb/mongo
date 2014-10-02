@@ -95,7 +95,7 @@ namespace mongo {
         DataFile(int fn) : _mb(0), fileNo(fn) { }
 
         /** @return true if found and opened. if uninitialized (prealloc only) does not open. */
-        Status openExisting( OperationContext* txn, const char *filename );
+        Status openExisting(const char *filename );
 
         /** creates if DNE */
         void open(OperationContext* txn,

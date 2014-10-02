@@ -25,7 +25,7 @@ assert.eq( 1 , c.count() , "after restore 2" );
 
 x = c.findOne()
 delete x._id;
-assert.eq( base , x , "tsv parse 2" )
+assert.docEq( base , x , "tsv parse 2" )
 
 
 

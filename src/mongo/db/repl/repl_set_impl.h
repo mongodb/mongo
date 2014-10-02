@@ -93,7 +93,7 @@ namespace repl {
         Status forceSyncFrom(const string& host, BSONObjBuilder* result);
         // Check if the current sync target is suboptimal. This must be called while holding a mutex
         // that prevents the sync source from changing.
-        bool shouldChangeSyncTarget(const HostAndPort& target) const;
+        bool shouldChangeSyncTarget(const HostAndPort& target);
 
         /**
          * Find the closest member (using ping time) with a higher latest optime.
@@ -123,9 +123,6 @@ namespace repl {
         void changeState(MemberState s);
 
         Member* _forceSyncTarget;
-
-        bool _blockSync;
-        void blockSync(bool block);
 
         // set of electable members' _ids
         set<unsigned> _electableSet;
@@ -246,17 +243,6 @@ namespace repl {
         // this is called from within a writelock in logOpRS
         unsigned selfId() const { return _id; }
         Manager *mgr;
-        /**
-         * This forces a secondary to go into recovering state and stay there
-         * until this is called again, passing in "false".  Multiple threads can
-         * call this and it will leave maintenance mode once all of the callers
-         * have called it again, passing in false.
-         */
-        bool setMaintenanceMode(OperationContext* txn, const bool inc);
-        bool getMaintenanceMode() {
-            lock rsLock( this );
-            return _maintenanceMode > 0;
-        }
 
     private:
         Member* head() const { return _members.head(); }

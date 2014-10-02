@@ -1627,6 +1627,12 @@ namespace {
         // If there exists a viable sync source member other than currentSource, whose oplog has
         // reached an optime greater than _maxSyncSourceLagSecs later than currentSource's, return
         // true.
+
+        // If the user requested a sync source change, return true.
+        if (_forceSyncSourceIndex != -1) {
+            return true;
+        }
+
         const int currentMemberIndex = findMemberIndexForHostAndPort(_currentConfig, currentSource);
         if (currentMemberIndex == -1) {
             return true;

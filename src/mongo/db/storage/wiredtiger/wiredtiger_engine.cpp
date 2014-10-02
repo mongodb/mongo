@@ -33,7 +33,6 @@
 
 #include <boost/filesystem/operations.hpp>
 #include <boost/filesystem/path.hpp>
-#include <boost/regex.hpp>
 
 #include "mongo/db/storage/wiredtiger/wiredtiger_database.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_database_catalog_entry.h"

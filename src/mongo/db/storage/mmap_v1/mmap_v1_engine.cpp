@@ -43,6 +43,7 @@
 #endif
 
 #include "mongo/db/mongod_options.h"
+#include "mongo/db/storage/mmap_v1/data_file_sync.h"
 #include "mongo/db/storage/mmap_v1/dur.h"
 #include "mongo/db/storage/mmap_v1/dur_commitjob.h"
 #include "mongo/db/storage/mmap_v1/dur_journal.h"
@@ -298,6 +299,8 @@ namespace {
     }
 
     void MMAPV1Engine::finishInit() {
+        dataFileSync.go();
+
         // Replays the journal (if needed) and starts the background thread. This requires the
         // ability to create OperationContexts.
         dur::startup();

@@ -46,7 +46,6 @@
 #include "mongo/db/repl/oplogreader.h"
 #include "mongo/db/repl/repl_set_seed_list.h"
 #include "mongo/db/repl/repl_coordinator_global.h"
-#include "mongo/db/repl/repl_coordinator_hybrid.h"
 #include "mongo/db/repl/rslog.h"
 #include "mongo/db/storage/storage_engine.h"
 #include "mongo/s/d_state.h"
@@ -144,37 +143,6 @@ namespace {
     }
 
     void ReplSetImpl::changeState(MemberState s) { box.change(s, _self); }
-
-    bool ReplSetImpl::setMaintenanceMode(OperationContext* txn, const bool inc) {
-        lock replLock(this);
-
-        // Lock here to prevent state from changing between checking the state and changing it
-        Lock::GlobalWrite writeLock(txn->lockState());
-
-        if (box.getState().primary()) {
-            return false;
-        }
-
-        if (inc) {
-            log() << "replSet going into maintenance mode (" << _maintenanceMode
-                  << " other tasks)" << rsLog;
-
-            _maintenanceMode++;
-            changeState(MemberState::RS_RECOVERING);
-        }
-        else if (_maintenanceMode > 0) {
-            _maintenanceMode--;
-            // no need to change state, syncTail will try to go live as a secondary soon
-
-            log() << "leaving maintenance mode (" << _maintenanceMode << " other tasks)" << rsLog;
-        }
-        else {
-            return false;
-        }
-
-        fassert(16844, _maintenanceMode >= 0);
-        return true;
-    }
 
     Member* ReplSetImpl::getMostElectable() {
         lock lk(this);
@@ -431,7 +399,6 @@ namespace {
     ReplSetImpl::ReplSetImpl() :
         elect(this),
         _forceSyncTarget(0),
-        _blockSync(false),
         _hbmsgTime(0),
         _self(0),
         _maintenanceMode(0),
@@ -610,15 +577,6 @@ namespace {
         verify(_name.empty() || _name == config()._id);
         _name = config()._id;
         verify(!_name.empty());
-
-        {
-            // Hack to force ReplicationCoordinatorImpl to have a config.
-            // TODO(spencer): rm this once the ReplicationCoordinatorImpl can load its own config.
-            HybridReplicationCoordinator* replCoord =
-                    dynamic_cast<HybridReplicationCoordinator*>(getGlobalReplicationCoordinator());
-            fassert(18648, replCoord);
-            replCoord->setImplConfigHack(_cfg);
-        }
 
         // this is a shortcut for simple changes
         if (additive) {

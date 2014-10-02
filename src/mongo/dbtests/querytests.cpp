@@ -57,7 +57,6 @@ namespace QueryTests {
     protected:
         OperationContextImpl _txn;
         Lock::GlobalWrite _lk;
-        WriteUnitOfWork _wunit;
         Client::Context _context;
 
         Database* _database;
@@ -65,20 +64,24 @@ namespace QueryTests {
 
     public:
         Base() : _lk(_txn.lockState()),
-                 _wunit(&_txn),
                  _context(&_txn, ns()) {
-            _database = _context.db();
-            _collection = _database->getCollection( &_txn, ns() );
-            if ( _collection ) {
-                _database->dropCollection( &_txn, ns() );
+            {
+                WriteUnitOfWork wunit(&_txn);
+                _database = _context.db();
+                _collection = _database->getCollection( &_txn, ns() );
+                if ( _collection ) {
+                    _database->dropCollection( &_txn, ns() );
+                }
+                _collection = _database->createCollection( &_txn, ns() );
+                wunit.commit();
             }
-            _collection = _database->createCollection( &_txn, ns() );
             addIndex( fromjson( "{\"a\":1}" ) );
         }
         ~Base() {
             try {
+                WriteUnitOfWork wunit(&_txn);
                 uassertStatusOK( _database->dropCollection( &_txn, ns() ) );
-                _wunit.commit();
+                wunit.commit();
             }
             catch ( ... ) {
                 FAIL( "Exception while cleaning up collection" );
@@ -92,9 +95,12 @@ namespace QueryTests {
             Helpers::ensureIndex(&_txn, _collection, key, false, key.firstElementFieldName());
         }
         void insert( const char *s ) {
+            WriteUnitOfWork wunit(&_txn);
             insert( fromjson( s ) );
+            wunit.commit();
         }
         void insert( const BSONObj &o ) {
+            WriteUnitOfWork wunit(&_txn);
             if ( o["_id"].eoo() ) {
                 BSONObjBuilder b;
                 OID oid;
@@ -106,6 +112,7 @@ namespace QueryTests {
             else {
                 _collection->insertDocument( &_txn, o, false );
             }
+            wunit.commit();
         }
     };
 
@@ -159,12 +166,16 @@ namespace QueryTests {
             Lock::GlobalWrite lk(_txn.lockState());
             Client::Context ctx(&_txn,  "unittests.querytests" );
 
-            Database* db = ctx.db();
-            if ( db->getCollection( &_txn, ns() ) ) {
-                _collection = NULL;
-                db->dropCollection( &_txn, ns() );
+            {
+                WriteUnitOfWork wunit(&_txn);
+                Database* db = ctx.db();
+                if ( db->getCollection( &_txn, ns() ) ) {
+                    _collection = NULL;
+                    db->dropCollection( &_txn, ns() );
+                }
+                _collection = db->createCollection( &_txn, ns(), CollectionOptions(), true, false );
+                wunit.commit();
             }
-            _collection = db->createCollection( &_txn, ns(), CollectionOptions(), true, false );
             ASSERT( _collection );
 
             DBDirectClient cl(&_txn);
@@ -239,7 +250,7 @@ namespace QueryTests {
 
             {
                 // Check internal server handoff to getmore.
-                Lock::DBWrite lk(_txn.lockState(), ns);
+                Lock::DBLock lk(_txn.lockState(), "unittests", newlm::MODE_X);
                 WriteUnitOfWork wunit(&_txn);
                 Client::Context ctx(&_txn,  ns );
                 ClientCursorPin clientCursor( ctx.db()->getCollection(&_txn, ns), cursorId );
@@ -585,7 +596,7 @@ namespace QueryTests {
         }
         void run() {
             const char *ns = "unittests.querytests.OplogReplaySlaveReadTill";
-            Lock::DBWrite lk(_txn.lockState(), ns);
+            Lock::DBLock lk(_txn.lockState(), "unittests", newlm::MODE_X);
             WriteUnitOfWork wunit(&_txn);
             Client::Context ctx(&_txn,  ns );
 
@@ -1401,17 +1412,12 @@ namespace QueryTests {
     public:
         CollectionInternalBase( const char *nsLeaf ) :
           CollectionBase( nsLeaf ),
-          _lk(_txn.lockState(), ns() ),
-          _wunit( &_txn ),
+          _lk(_txn.lockState(), "unittests", newlm::MODE_X),
           _ctx(&_txn, ns()) {
-        }
-        ~CollectionInternalBase() {
-            _wunit.commit();
         }
 
     private:
-        Lock::DBWrite _lk;
-        WriteUnitOfWork _wunit;
+        Lock::DBLock _lk;
         Client::Context _ctx;
     };
     

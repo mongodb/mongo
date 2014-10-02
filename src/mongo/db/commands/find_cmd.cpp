@@ -60,7 +60,7 @@ namespace mongo {
     Status FindCmd::explain(OperationContext* txn,
                              const std::string& dbname,
                              const BSONObj& cmdObj,
-                             Explain::Verbosity verbosity,
+                             ExplainCommon::Verbosity verbosity,
                              BSONObjBuilder* out) const {
         const string fullns = parseNs(dbname, cmdObj);
 

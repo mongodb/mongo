@@ -179,7 +179,9 @@ namespace repl {
 
     private:
 
-        // Mutex that protects the _slaveOpTimeMap
+        bool _setMaintenanceMode_inlock(OperationContext* txn, bool activate);
+
+        // Mutex that protects the _slaveOpTimeMap, and _maintenceMode
         mutable boost::mutex _mutex;
 
         // Map from RID to Member pointer for replica set nodes
@@ -190,6 +192,9 @@ namespace repl {
         // TODO(spencer): change to unordered_map
         typedef std::map<OID, OpTime> SlaveOpTimeMap;
         SlaveOpTimeMap _slaveOpTimeMap;
+
+        // Count of active callers into maintenance mode
+        int _maintenanceMode;
 
         // Rollback id. used to check if a rollback happened during some interval of time
         // TODO: ideally this should only change on rollbacks NOT on mongod restarts also.

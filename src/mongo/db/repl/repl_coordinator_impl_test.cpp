@@ -332,7 +332,7 @@ namespace {
         ASSERT_EQUALS(incrementedValue, initialValue + 1);
     }
 
-    TEST_F(ReplCoordTest, AwaitReplicationNumberBaseCases) {
+    TEST_F(ReplCoordTest, AwaitReplicationNoReplEnabled) {
         init("");
         OperationContextNoop txn;
         OpTime time(1, 1);
@@ -346,22 +346,51 @@ namespace {
         ReplicationCoordinator::StatusAndDuration statusAndDur =
                                         getReplCoord()->awaitReplication(&txn, time, writeConcern);
         ASSERT_OK(statusAndDur.status);
+    }
 
-        // Now make us a master in master/slave
-        getReplCoord()->getSettings().master = true;
+    TEST_F(ReplCoordTest, AwaitReplicationMasterSlaveMajorityBaseCase) {
+        ReplSettings settings;
+        settings.master = true;
+        init(settings);
+        OperationContextNoop txn;
+        OpTime time(1, 1);
+
+        WriteConcernOptions writeConcern;
+        writeConcern.wTimeout = WriteConcernOptions::kNoWaiting;
+        writeConcern.wNumNodes = 2;
+
 
         writeConcern.wNumNodes = 0;
         writeConcern.wMode = "majority";
         // w:majority always works on master/slave
-        statusAndDur = getReplCoord()->awaitReplication(&txn, time, writeConcern);
+        ReplicationCoordinator::StatusAndDuration statusAndDur = getReplCoord()->awaitReplication(
+                &txn, time, writeConcern);
         ASSERT_OK(statusAndDur.status);
+    }
 
-        // Now make us a replica set
-        getReplCoord()->getSettings().replSet = "mySet/node1:12345,node2:54321";
+    TEST_F(ReplCoordTest, AwaitReplicationReplSetBaseCases) {
+        assertStartSuccess(
+                BSON("_id" << "mySet" <<
+                     "version" << 2 <<
+                     "members" << BSON_ARRAY(BSON("host" << "node1:12345" << "_id" << 0) <<
+                                             BSON("host" << "node2:12345" << "_id" << 1) <<
+                                             BSON("host" << "node3:12345" << "_id" << 2))),
+                HostAndPort("node1", 12345));
 
-        // Waiting for 0 nodes always works
-        writeConcern.wNumNodes = 0;
+        OperationContextNoop txn;
+        OpTime time(1, 1);
+
+        WriteConcernOptions writeConcern;
+        writeConcern.wTimeout = WriteConcernOptions::kNoWaiting;
+        writeConcern.wNumNodes = 0; // Waiting for 0 nodes always works
         writeConcern.wMode = "";
+
+        // Should fail when not primary
+        ReplicationCoordinator::StatusAndDuration statusAndDur = getReplCoord()->awaitReplication(
+                &txn, time, writeConcern);
+        ASSERT_EQUALS(ErrorCodes::NotMaster, statusAndDur.status);
+
+        getReplCoord()->_setCurrentMemberState_forTest(MemberState::RS_PRIMARY);
         statusAndDur = getReplCoord()->awaitReplication(&txn, time, writeConcern);
         ASSERT_OK(statusAndDur.status);
     }
@@ -375,8 +404,9 @@ namespace {
                                              BSON("host" << "node3:12345" << "_id" << 2) <<
                                              BSON("host" << "node4:12345" << "_id" << 3))),
                 HostAndPort("node1", 12345));
-        OperationContextNoop txn;
+        getReplCoord()->_setCurrentMemberState_forTest(MemberState::RS_PRIMARY);
 
+        OperationContextNoop txn;
         OID myOID = getReplCoord()->getMyRID();
         OID client1 = OID::gen();
         OID client2 = OID::gen();
@@ -461,6 +491,7 @@ namespace {
                                         BSON("multiDC" << BSON("dc" << 2) <<
                                              "multiDCAndRack" << BSON("dc" << 2 << "rack" << 3)))),
                 HostAndPort("node0"));
+        getReplCoord()->_setCurrentMemberState_forTest(MemberState::RS_PRIMARY);
 
         OperationContextNoop txn;
         OID selfRID = getReplCoord()->getMyRID();
@@ -618,6 +649,7 @@ namespace {
                                              BSON("host" << "node2:12345" << "_id" << 1) <<
                                              BSON("host" << "node3:12345" << "_id" << 2))),
                 HostAndPort("node1", 12345));
+        getReplCoord()->_setCurrentMemberState_forTest(MemberState::RS_PRIMARY);
 
         OperationContextNoop txn;
         ReplicationAwaiter awaiter(getReplCoord(), &txn);
@@ -676,6 +708,8 @@ namespace {
                                              BSON("host" << "node2:12345" << "_id" << 1) <<
                                              BSON("host" << "node3:12345" << "_id" << 2))),
                 HostAndPort("node1", 12345));
+        getReplCoord()->_setCurrentMemberState_forTest(MemberState::RS_PRIMARY);
+
         OperationContextNoop txn;
         ReplicationAwaiter awaiter(getReplCoord(), &txn);
 
@@ -711,6 +745,8 @@ namespace {
                                              BSON("host" << "node2:12345" << "_id" << 1) <<
                                              BSON("host" << "node3:12345" << "_id" << 2))),
                 HostAndPort("node1", 12345));
+        getReplCoord()->_setCurrentMemberState_forTest(MemberState::RS_PRIMARY);
+
         OperationContextNoop txn;
         ReplicationAwaiter awaiter(getReplCoord(), &txn);
 
@@ -739,6 +775,49 @@ namespace {
         shutdown();
         ReplicationCoordinator::StatusAndDuration statusAndDur = awaiter.getResult();
         ASSERT_EQUALS(ErrorCodes::ShutdownInProgress, statusAndDur.status);
+        awaiter.reset();
+    }
+
+    TEST_F(ReplCoordTest, AwaitReplicationStepDown) {
+        // Test that a thread blocked in awaitReplication will be woken up and return NotMaster
+        // if the node steps down while it is waiting.
+        assertStartSuccess(
+                BSON("_id" << "mySet" <<
+                     "version" << 2 <<
+                     "members" << BSON_ARRAY(BSON("host" << "node1:12345" << "_id" << 0) <<
+                                             BSON("host" << "node2:12345" << "_id" << 1) <<
+                                             BSON("host" << "node3:12345" << "_id" << 2))),
+                HostAndPort("node1", 12345));
+        getReplCoord()->_setCurrentMemberState_forTest(MemberState::RS_PRIMARY);
+
+        OperationContextNoop txn;
+        ReplicationAwaiter awaiter(getReplCoord(), &txn);
+
+        OID client1 = OID::gen();
+        OID client2 = OID::gen();
+        OpTime time1(1, 1);
+        OpTime time2(1, 2);
+
+        HandshakeArgs handshake1;
+        ASSERT_OK(handshake1.initialize(BSON("handshake" << client1 << "member" << 1)));
+        ASSERT_OK(getReplCoord()->processHandshake(&txn, handshake1));
+        HandshakeArgs handshake2;
+        ASSERT_OK(handshake2.initialize(BSON("handshake" << client2 << "member" << 2)));
+        ASSERT_OK(getReplCoord()->processHandshake(&txn, handshake2));
+
+        WriteConcernOptions writeConcern;
+        writeConcern.wTimeout = WriteConcernOptions::kNoTimeout;
+        writeConcern.wNumNodes = 2;
+
+        // 2 nodes waiting for time2
+        awaiter.setOpTime(time2);
+        awaiter.setWriteConcern(writeConcern);
+        awaiter.start(&txn);
+        ASSERT_OK(getReplCoord()->setLastOptime(&txn, client1, time1));
+        ASSERT_OK(getReplCoord()->setLastOptime(&txn, client2, time1));
+        getReplCoord()->stepDown(&txn, false, Milliseconds(0), Milliseconds(1000));
+        ReplicationCoordinator::StatusAndDuration statusAndDur = awaiter.getResult();
+        ASSERT_EQUALS(ErrorCodes::NotMaster, statusAndDur.status);
         awaiter.reset();
     }
 
@@ -785,6 +864,8 @@ namespace {
                                              BSON("_id" << 1 << "host" << "node2") <<
                                              BSON("_id" << 2 << "host" << "node3"))),
                 HostAndPort("node1"));
+        getReplCoord()->_setCurrentMemberState_forTest(MemberState::RS_PRIMARY);
+
         OperationContextNoopWithInterrupt txn;
         ReplicationAwaiter awaiter(getReplCoord(), &txn);
 

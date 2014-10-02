@@ -642,7 +642,7 @@ namespace mongo {
 
                         // Now we have the final min and max. This index is only relevant for
                         // the min/max query if min < max.
-                        if (0 > finishedMinObj.woCompare(finishedMaxObj, kp, false)) {
+                        if (0 >= finishedMinObj.woCompare(finishedMaxObj, kp, false)) {
                             // Found a relevant index.
                             idxNo = i;
                             break;

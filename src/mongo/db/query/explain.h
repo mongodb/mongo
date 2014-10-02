@@ -31,6 +31,7 @@
 #include "mongo/db/exec/plan_stage.h"
 #include "mongo/db/exec/plan_stats.h"
 #include "mongo/db/query/canonical_query.h"
+#include "mongo/db/query/explain_common.h"
 #include "mongo/db/query/plan_executor.h"
 #include "mongo/db/query/query_planner_params.h"
 #include "mongo/db/query/query_solution.h"
@@ -81,34 +82,6 @@ namespace mongo {
     class Explain {
     public:
         /**
-         * The various supported verbosity levels for explain. The order is
-         * significant: the enum values are assigned in order of increasing verbosity.
-         */
-        enum Verbosity {
-            // At all verbosities greater than or equal to QUERY_PLANNER, we display information
-            // about the plan selected and alternate rejected plans. Does not include any execution-
-            // related info. String alias is "queryPlanner".
-            QUERY_PLANNER = 0,
-
-            // At all verbosities greater than or equal to EXEC_STATS, we display a section of
-            // output containing both overall execution stats, and stats per stage in the
-            // execution tree. String alias is "execStats".
-            EXEC_STATS = 1,
-
-            // At this second-highest verbosity level, we generate the execution stats for each
-            // rejected plan as well as the winning plan. String alias is "allPlansExecution".
-            EXEC_ALL_PLANS = 2,
-
-            // This is the highest verbosity level. It has the same behavior as EXEC_ALL_PLANS,
-            // except it includes more detailed stats. String alias is "full".
-            //
-            // The FULL verbosity level is used to generate detailed debug information for the
-            // plan cache and for logging. It includes metrics like "works", "isEOF", and "advanced"
-            // that are omitted at lesser verbosities.
-            FULL = 3,
-        };
-
-        /**
          * Get explain BSON for the execution stages contained by 'exec'. Use this function if you
          * have a PlanExecutor and want to convert it into a human readable explain format. Any
          * operation which has a query component (e.g. find, update, group) can be explained via
@@ -121,7 +94,7 @@ namespace mongo {
          * Does not take ownership of its arguments.
          */
         static Status explainStages(PlanExecutor* exec,
-                                    Explain::Verbosity verbosity,
+                                    ExplainCommon::Verbosity verbosity,
                                     BSONObjBuilder* out);
 
         /**
@@ -132,7 +105,7 @@ namespace mongo {
          * to the highest verbosity (FULL).
          */
         static BSONObj statsToBSON(const PlanStageStats& stats,
-                                   Explain::Verbosity verbosity = FULL);
+                                   ExplainCommon::Verbosity verbosity = ExplainCommon::FULL);
 
         /**
          * This version of stats tree to BSON conversion returns the result through the
@@ -143,7 +116,7 @@ namespace mongo {
          */
         static void statsToBSON(const PlanStageStats& stats,
                                 BSONObjBuilder* bob,
-                                Explain::Verbosity verbosity = FULL);
+                                ExplainCommon::Verbosity verbosity = ExplainCommon::FULL);
 
         /**
          * Returns a short plan summary std::string describing the leaves of the query plan.
@@ -173,7 +146,7 @@ namespace mongo {
          * Not used except as a helper to the public statsToBSON(...) functions.
          */
         static void statsToBSON(const PlanStageStats& stats,
-                                Explain::Verbosity verbosity,
+                                ExplainCommon::Verbosity verbosity,
                                 BSONObjBuilder* bob,
                                 BSONObjBuilder* topLevelBob);
 
@@ -201,7 +174,7 @@ namespace mongo {
          * This is a helper for generating explain BSON. It is used by explainStages(...).
          */
         static void generateExecStats(PlanStageStats* stats,
-                                      Explain::Verbosity verbosity,
+                                      ExplainCommon::Verbosity verbosity,
                                       BSONObjBuilder* out);
 
         /**
