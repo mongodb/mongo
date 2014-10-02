@@ -91,6 +91,7 @@
 #include "mongo/util/net/ssl_manager.h"
 #include "mongo/util/ntservice.h"
 #include "mongo/util/options_parser/startup_options.h"
+#include "mongo/util/quick_exit.h"
 #include "mongo/util/ramlog.h"
 #include "mongo/util/scopeguard.h"
 #include "mongo/util/signal_handlers.h"
@@ -625,12 +626,12 @@ static int mongoDbMain(int argc, char* argv[], char** envp);
 int wmain(int argc, wchar_t* argvW[], wchar_t* envpW[]) {
     WindowsCommandLine wcl(argc, argvW, envpW);
     int exitCode = mongoDbMain(argc, wcl.argv(), wcl.envp());
-    ::_exit(exitCode);
+    quickExit(exitCode);
 }
 #else
 int main(int argc, char* argv[], char** envp) {
     int exitCode = mongoDbMain(argc, argv, envp);
-    ::_exit(exitCode);
+    quickExit(exitCode);
 }
 #endif
 
@@ -654,19 +655,19 @@ static void startupConfigActions(const std::vector<std::string>& args) {
 
         if (command[0].compare("dbpath") == 0) {
             cout << storageGlobalParams.dbpath << endl;
-            ::_exit(EXIT_SUCCESS);
+            quickExit(EXIT_SUCCESS);
         }
 
         if (command[0].compare("run") != 0) {
             cout << "Invalid command: " << command[0] << endl;
             printMongodHelp(moe::startupOptions);
-            ::_exit(EXIT_FAILURE);
+            quickExit(EXIT_FAILURE);
         }
 
         if (command.size() > 1) {
             cout << "Too many parameters to 'run' command" << endl;
             printMongodHelp(moe::startupOptions);
-            ::_exit(EXIT_FAILURE);
+            quickExit(EXIT_FAILURE);
         }
     }
 
@@ -706,7 +707,7 @@ static void startupConfigActions(const std::vector<std::string>& args) {
         if (failed) {
             std::cerr << "There doesn't seem to be a server running with dbpath: "
                       << storageGlobalParams.dbpath << std::endl;
-            ::_exit(EXIT_FAILURE);
+            quickExit(EXIT_FAILURE);
         }
 
         cout << "killing process with pid: " << pid << endl;
@@ -714,14 +715,14 @@ static void startupConfigActions(const std::vector<std::string>& args) {
         if (ret) {
             int e = errno;
             cerr << "failed to kill process: " << errnoWithDescription(e) << endl;
-            ::_exit(EXIT_FAILURE);
+            quickExit(EXIT_FAILURE);
         }
 
         while (boost::filesystem::exists(procPath)) {
             sleepsecs(1);
         }
 
-        ::_exit(EXIT_SUCCESS);
+        quickExit(EXIT_SUCCESS);
     }
 #endif
 }
@@ -795,14 +796,14 @@ static int mongoDbMain(int argc, char* argv[], char **envp) {
     Status status = mongo::runGlobalInitializers(argc, argv, envp);
     if (!status.isOK()) {
         severe(LogComponent::kDefault) << "Failed global initialization: " << status;
-        ::_exit(EXIT_FAILURE);
+        quickExit(EXIT_FAILURE);
     }
 
     startupConfigActions(std::vector<std::string>(argv, argv + argc));
     cmdline_utils::censorArgvArray(argc, argv);
 
     if (!initializeServerGlobalState())
-        ::_exit(EXIT_FAILURE);
+        quickExit(EXIT_FAILURE);
 
     // Per SERVER-7434, startSignalProcessingThread() must run after any forks
     // (initializeServerGlobalState()) and before creation of any other threads.

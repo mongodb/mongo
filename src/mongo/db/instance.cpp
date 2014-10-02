@@ -83,6 +83,7 @@
 #include "mongo/util/goodies.h"
 #include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
+#include "mongo/util/quick_exit.h"
 #include "mongo/util/time_support.h"
 
 namespace mongo {
@@ -1005,14 +1006,14 @@ namespace mongo {
 
 #ifdef _WIN32
         // Windows Service Controller wants to be told when we are down,
-        //  so don't call ::_exit() yet, or say "really exiting now"
+        //  so don't call quickExit() yet, or say "really exiting now"
         //
         if ( rc == EXIT_WINDOWS_SERVICE_STOP ) {
             return;
         }
 #endif
 
-        ::_exit(rc);
+        quickExit(rc);
     }
 
     // ----- BEGIN Diaglog -----

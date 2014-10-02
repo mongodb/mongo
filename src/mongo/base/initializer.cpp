@@ -29,6 +29,7 @@
 
 #include <iostream>
 #include "mongo/util/assert_util.h"
+#include "mongo/util/quick_exit.h"
 #include "mongo/base/global_initializer.h"
 
 namespace mongo {
@@ -93,7 +94,7 @@ namespace mongo {
         Status status = runGlobalInitializers(argc, argv, envp);
         if (!status.isOK()) {
             std::cerr << "Failed global initialization: " << status << std::endl;
-            ::_exit(1);
+            quickExit(1);
         }
     }
 

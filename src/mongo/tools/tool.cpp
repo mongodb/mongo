@@ -59,6 +59,7 @@
 #include "mongo/util/options_parser/option_section.h"
 #include "mongo/util/password.h"
 #include "mongo/util/net/ssl_options.h"
+#include "mongo/util/quick_exit.h"
 #include "mongo/util/signal_handlers.h"
 #include "mongo/util/text.h"
 #include "mongo/util/version.h"
@@ -113,14 +114,14 @@ namespace mongo {
                 if ( ! cs.isValid() ) {
                     toolError() << "invalid hostname [" << toolGlobalParams.connectionString << "] "
                               << errmsg << std::endl;
-                    ::_exit(-1);
+                    quickExit(-1);
                 }
 
                 _conn = cs.connect( errmsg );
                 if ( ! _conn ) {
                     toolError() << "couldn't connect to [" << toolGlobalParams.connectionString
                               << "] " << errmsg << std::endl;
-                    ::_exit(-1);
+                    quickExit(-1);
                 }
 
                 toolInfoOutput() << "connected to: " << toolGlobalParams.connectionString
@@ -146,7 +147,7 @@ namespace mongo {
                     toolError() << "Failed to initialize storage engine: " << ex.toString();
                 }
                 dbexit( EXIT_FS );
-                ::_exit(EXIT_FAILURE);
+                quickExit(EXIT_FAILURE);
             }
 
             _txn.reset(new OperationContextImpl());
@@ -200,7 +201,7 @@ namespace mongo {
 
         fflush(stdout);
         fflush(stderr);
-        ::_exit(ret);
+        quickExit(ret);
     }
 
     DBClientBase& Tool::conn( bool slaveIfPaired ) {
@@ -424,12 +425,12 @@ int wmain(int argc, wchar_t* argvW[], wchar_t* envpW[]) {
     mongo::WindowsCommandLine wcl(argc, argvW, envpW);
     auto_ptr<Tool> instance = (*Tool::createInstance)();
     int exitCode = instance->main(argc, wcl.argv(), wcl.envp());
-    ::_exit(exitCode);
+    quickExit(exitCode);
 }
 
 #else
 int main(int argc, char* argv[], char** envp) {
     auto_ptr<Tool> instance = (*Tool::createInstance)();
-    ::_exit(instance->main(argc, argv, envp));
+    quickExit(instance->main(argc, argv, envp));
 }
 #endif

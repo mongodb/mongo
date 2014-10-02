@@ -83,6 +83,7 @@
 #include "mongo/util/ntservice.h"
 #include "mongo/util/options_parser/startup_options.h"
 #include "mongo/util/processinfo.h"
+#include "mongo/util/quick_exit.h"
 #include "mongo/util/ramlog.h"
 #include "mongo/util/scopeguard.h"
 #include "mongo/util/signal_handlers.h"
@@ -428,7 +429,7 @@ int mongoSMain(int argc, char* argv[], char** envp) {
     Status status = mongo::runGlobalInitializers(argc, argv, envp);
     if (!status.isOK()) {
         severe(LogComponent::kDefault) << "Failed global initialization: " << status;
-        ::_exit(EXIT_FAILURE);
+        quickExit(EXIT_FAILURE);
     }
 
     startupConfigActions(std::vector<std::string>(argv, argv + argc));
@@ -467,12 +468,12 @@ int mongoSMain(int argc, char* argv[], char** envp) {
 int wmain(int argc, wchar_t* argvW[], wchar_t* envpW[]) {
     WindowsCommandLine wcl(argc, argvW, envpW);
     int exitCode = mongoSMain(argc, wcl.argv(), wcl.envp());
-    ::_exit(exitCode);
+    quickExit(exitCode);
 }
 #else
 int main(int argc, char* argv[], char** envp) {
     int exitCode = mongoSMain(argc, argv, envp);
-    ::_exit(exitCode);
+    quickExit(exitCode);
 }
 #endif
 
@@ -496,5 +497,5 @@ void mongo::dbexit( ExitCode rc, const char *why ) {
           << " rc:" << rc
           << endl;
     flushForGcov();
-    ::_exit(rc);
+    quickExit(rc);
 }

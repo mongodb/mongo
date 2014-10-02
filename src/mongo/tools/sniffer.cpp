@@ -67,6 +67,7 @@
 #include "mongo/db/dbmessage.h"
 #include "mongo/util/net/message.h"
 #include "mongo/util/mmap.h"
+#include "mongo/util/quick_exit.h"
 #include "mongo/util/text.h"
 
 using namespace std;
@@ -587,11 +588,11 @@ int toolMain(int argc, char **argv, char** envp) {
 int wmain(int argc, wchar_t* argvW[], wchar_t* envpW[]) {
     WindowsCommandLine wcl(argc, argvW, envpW);
     int exitCode = toolMain(argc, wcl.argv(), wcl.envp());
-    ::_exit(exitCode);
+    quickExit(exitCode);
 }
 #else
 int main(int argc, char* argv[], char** envp) {
     int exitCode = toolMain(argc, argv, envp);
-    ::_exit(exitCode);
+    quickExit(exitCode);
 }
 #endif

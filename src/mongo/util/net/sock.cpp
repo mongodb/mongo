@@ -56,6 +56,7 @@
 #include "mongo/util/net/message.h"
 #include "mongo/util/net/ssl_manager.h"
 #include "mongo/util/net/socket_poll.h"
+#include "mongo/util/quick_exit.h"
 
 namespace mongo {
 
@@ -947,7 +948,7 @@ namespace mongo {
             WSADATA d;
             if ( WSAStartup(MAKEWORD(2,2), &d) != 0 ) {
                 log() << "ERROR: wsastartup failed " << errnoWithDescription() << endl;
-                _exit(EXIT_NTSERVICE_ERROR);
+                quickExit(EXIT_NTSERVICE_ERROR);
             }
         }
     } winsock_init;

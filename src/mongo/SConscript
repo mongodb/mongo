@@ -729,6 +729,11 @@ env.Library('stacktrace',
                      'version',
                      '$BUILD_DIR/mongo/base/base'])
 
+env.Library(target='quick_exit',
+            source=[
+                'util/quick_exit.cpp',
+            ])
+
 env.Library('coreshard', [# This is only here temporarily for auto-split logic in chunk.cpp.
                           's/balancer_policy.cpp',
                           's/distlock.cpp',
