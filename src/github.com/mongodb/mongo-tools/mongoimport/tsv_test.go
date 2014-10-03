@@ -1,6 +1,7 @@
 package mongoimport
 
 import (
+	"bytes"
 	. "github.com/smartystreets/goconvey/convey"
 	"gopkg.in/mgo.v2/bson"
 	"io"
@@ -13,8 +14,6 @@ import (
 // TODO: currently doesn't work for lines like `a, b, "cccc,cccc", d`
 func TestTSVImportDocument(t *testing.T) {
 	Convey("With a TSV import input", t, func() {
-		var err error
-		var tsvFile, fileHandle *os.File
 		Convey("integer valued strings should be converted", func() {
 			contents := "1\t2\t3e\n"
 			fields := []string{"a", "b", "c"}
@@ -23,14 +22,7 @@ func TestTSVImportDocument(t *testing.T) {
 				"b": 2,
 				"c": "3e",
 			}
-
-			tsvFile, err = ioutil.TempFile("", "mongoimport_")
-			So(err, ShouldBeNil)
-			_, err = io.WriteString(tsvFile, contents)
-			So(err, ShouldBeNil)
-			fileHandle, err := os.Open(tsvFile.Name())
-			So(err, ShouldBeNil)
-			tsvImporter := NewTSVImportInput(fields, fileHandle)
+			tsvImporter := NewTSVImportInput(fields, bytes.NewReader([]byte(contents)))
 			bsonDoc, err := tsvImporter.ImportDocument()
 			So(err, ShouldBeNil)
 			So(bsonDoc, ShouldResemble, expectedRead)
@@ -45,14 +37,7 @@ func TestTSVImportDocument(t *testing.T) {
 				"c":      "3e",
 				"field3": " may",
 			}
-
-			tsvFile, err = ioutil.TempFile("", "mongoimport_")
-			So(err, ShouldBeNil)
-			_, err = io.WriteString(tsvFile, contents)
-			So(err, ShouldBeNil)
-			fileHandle, err = os.Open(tsvFile.Name())
-			So(err, ShouldBeNil)
-			tsvImporter := NewTSVImportInput(fields, fileHandle)
+			tsvImporter := NewTSVImportInput(fields, bytes.NewReader([]byte(contents)))
 			bsonDoc, err := tsvImporter.ImportDocument()
 			So(err, ShouldBeNil)
 			So(bsonDoc, ShouldResemble, expectedRead)
@@ -67,13 +52,7 @@ func TestTSVImportDocument(t *testing.T) {
 				"c": "Inline",
 				"d": 14,
 			}
-			tsvFile, err = ioutil.TempFile("", "mongoimport_")
-			So(err, ShouldBeNil)
-			_, err = io.WriteString(tsvFile, contents)
-			So(err, ShouldBeNil)
-			fileHandle, err = os.Open(tsvFile.Name())
-			So(err, ShouldBeNil)
-			tsvImporter := NewTSVImportInput(fields, fileHandle)
+			tsvImporter := NewTSVImportInput(fields, bytes.NewReader([]byte(contents)))
 			bsonDoc, err := tsvImporter.ImportDocument()
 			So(err, ShouldBeNil)
 			So(bsonDoc, ShouldResemble, expectedRead)
@@ -93,14 +72,7 @@ func TestTSVImportDocument(t *testing.T) {
 				"b": 5,
 				"c": 6,
 			}
-
-			tsvFile, err = ioutil.TempFile("", "mongoimport_")
-			So(err, ShouldBeNil)
-			_, err = io.WriteString(tsvFile, contents)
-			So(err, ShouldBeNil)
-			fileHandle, err := os.Open(tsvFile.Name())
-			So(err, ShouldBeNil)
-			tsvImporter := NewTSVImportInput(fields, fileHandle)
+			tsvImporter := NewTSVImportInput(fields, bytes.NewReader([]byte(contents)))
 			bsonDoc, err := tsvImporter.ImportDocument()
 			So(err, ShouldBeNil)
 			So(bsonDoc, ShouldResemble, expectedReadOne)
@@ -123,14 +95,7 @@ func TestTSVImportDocument(t *testing.T) {
 				"b": `"`,
 				"c": 6,
 			}
-
-			tsvFile, err = ioutil.TempFile("", "mongoimport_")
-			So(err, ShouldBeNil)
-			_, err = io.WriteString(tsvFile, contents)
-			So(err, ShouldBeNil)
-			fileHandle, err := os.Open(tsvFile.Name())
-			So(err, ShouldBeNil)
-			tsvImporter := NewTSVImportInput(fields, fileHandle)
+			tsvImporter := NewTSVImportInput(fields, bytes.NewReader([]byte(contents)))
 			bsonDoc, err := tsvImporter.ImportDocument()
 			So(err, ShouldBeNil)
 			So(bsonDoc, ShouldResemble, expectedReadOne)
@@ -155,10 +120,6 @@ func TestTSVImportDocument(t *testing.T) {
 				So(err, ShouldBeNil)
 				So(bsonDoc, ShouldResemble, expectedReadTwo)
 			})
-		Reset(func() {
-			tsvFile.Close()
-			fileHandle.Close()
-		})
 	})
 }
 
@@ -186,14 +147,7 @@ func TestTSVSetHeader(t *testing.T) {
 			func() {
 				contents := "extraHeader\textraHeader2\textraHeader3\n\n"
 				fields := []string{"a", "b", "c"}
-
-				tsvFile, err = ioutil.TempFile("", "mongoimport_")
-				So(err, ShouldBeNil)
-				_, err = io.WriteString(tsvFile, contents)
-				So(err, ShouldBeNil)
-				fileHandle, err = os.Open(tsvFile.Name())
-				So(err, ShouldBeNil)
-				tsvImporter := NewTSVImportInput(fields, fileHandle)
+				tsvImporter := NewTSVImportInput(fields, bytes.NewReader([]byte(contents)))
 				// if SetHeader() is called with fields already passed in,
 				// the header should be replaced with the read header line
 				So(tsvImporter.SetHeader(true), ShouldBeNil)
