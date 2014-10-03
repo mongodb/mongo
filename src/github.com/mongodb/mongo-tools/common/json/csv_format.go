@@ -62,7 +62,7 @@ func (n NumberLong) String() string {
 // Assumes that o represents a valid ObjectId
 // (composed of 24 hexadecimal characters).
 func (o ObjectId) String() string {
-	return fmt.Sprintf("ObjectId('%v')", string(o))
+	return fmt.Sprintf("ObjectId(%v)", string(o))
 }
 
 func (r RegExp) String() string {

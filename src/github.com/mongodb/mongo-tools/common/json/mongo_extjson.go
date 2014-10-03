@@ -81,7 +81,7 @@ var (
 )
 
 func (d Date) isFormatable() bool {
-	return int64(d) < int64(32535215999)
+	return int64(d) < int64(32535215999000)
 }
 
 func stateBeginExtendedValue(s *scanner, c int) int {
