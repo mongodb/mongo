@@ -71,6 +71,16 @@ func (jsonImporter *JSONImportInput) SetHeader(hasHeaderLine bool) error {
 	return nil
 }
 
+// GetHeaders is a no-op for JSON imports
+func (jsonImporter *JSONImportInput) GetHeaders() []string {
+	return nil
+}
+
+// ReadHeadersFromSource is a no-op for JSON imports
+func (jsonImporter *JSONImportInput) ReadHeadersFromSource() ([]string, error) {
+	return nil, nil
+}
+
 // readJSONArraySeparator is a helper method used to process JSON arrays. It is
 // used to read any of the valid separators for a JSON array and flag invalid
 // characters.

@@ -59,6 +59,12 @@ type ImportInput interface {
 	// specified. It a --fields or --fieldFile argument is passed, it overwrites
 	// the values of those with what is read from the input source
 	SetHeader(bool) error
+
+	// ReadHeadersFromSource attempts to reads the header fields for the specific implementation
+	ReadHeadersFromSource() ([]string, error)
+
+	// GetHeaders returns the current set of header fields for the specific implementation
+	GetHeaders() []string
 }
 
 func (mongoImport *MongoImport) getImportWriter() ImportWriter {
@@ -121,6 +127,13 @@ func (mongoImport *MongoImport) ValidateSettings(args []string) error {
 				mongoImport.InputOptions.FieldFile == "" {
 				return fmt.Errorf("You need to specify fields or have a " +
 					"header line to import this file type")
+			}
+		} else {
+			if mongoImport.InputOptions.Fields != "" {
+				return fmt.Errorf("incompatible options: --fields and --headerline")
+			}
+			if mongoImport.InputOptions.FieldFile != "" {
+				return fmt.Errorf("incompatible options: --fieldFile and --headerline")
 			}
 		}
 	}

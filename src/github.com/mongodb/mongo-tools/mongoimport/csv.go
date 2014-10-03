@@ -46,6 +46,16 @@ func (csvImporter *CSVImportInput) SetHeader(hasHeaderLine bool) (err error) {
 	return nil
 }
 
+// GetHeaders returns the current header fields for a CSV importer
+func (csvImporter *CSVImportInput) GetHeaders() []string {
+	return csvImporter.Fields
+}
+
+// ReadHeadersFromSource reads the header field from the CSV importer's reader
+func (csvImporter *CSVImportInput) ReadHeadersFromSource() ([]string, error) {
+	return csvImporter.csvReader.Read()
+}
+
 // ImportDocument reads a line of input with the CSV representation of a doc and
 // returns the BSON equivalent.
 func (csvImporter *CSVImportInput) ImportDocument() (bson.M, error) {

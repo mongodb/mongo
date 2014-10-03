@@ -47,6 +47,25 @@ func (tsvImporter *TSVImportInput) SetHeader(hasHeaderLine bool) (err error) {
 	return nil
 }
 
+// GetHeaders returns the current header fields for a TSV importer
+func (tsvImporter *TSVImportInput) GetHeaders() []string {
+	return tsvImporter.Fields
+}
+
+// ReadHeadersFromSource reads the header field from the TSV importer's reader
+func (tsvImporter *TSVImportInput) ReadHeadersFromSource() ([]string, error) {
+	unsortedHeaders := []string{}
+	stringHeaders, err := tsvImporter.tsvReader.ReadString(entryDelimiter)
+	if err != nil {
+		return nil, err
+	}
+	tokenizedHeaders := strings.Split(stringHeaders, tokenSeparator)
+	for _, header := range tokenizedHeaders {
+		unsortedHeaders = append(unsortedHeaders, strings.TrimSpace(header))
+	}
+	return unsortedHeaders, nil
+}
+
 // ImportDocument reads a line of input with the TSV representation of a
 // document and returns the BSON equivalent.
 func (tsvImporter *TSVImportInput) ImportDocument() (bson.M, error) {

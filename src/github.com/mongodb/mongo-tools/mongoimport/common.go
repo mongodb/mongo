@@ -13,38 +13,13 @@ import (
 // header fields. It returns an error if an issue is found in the header list
 func validateHeaders(importInput ImportInput, hasHeaderLine bool) (validatedFields []string, err error) {
 	unsortedHeaders := []string{}
-	existingImportFields := []string{}
-
-	if reader, isCSV := importInput.(*CSVImportInput); isCSV {
-		existingImportFields = reader.Fields
-	} else if reader, isTSV := importInput.(*TSVImportInput); isTSV {
-		existingImportFields = reader.Fields
-	} else {
-		return nil, fmt.Errorf("importInput '%#v' unknown", importInput)
-	}
-
-	// NOTE: if --headerline was passed on the command line, we will
-	// attempt to read headers from the input source - even if --fields
-	// or --fieldFile is supplied.
-	// TODO: add validation for this case
 	if hasHeaderLine {
-		if reader, isCSV := importInput.(*CSVImportInput); isCSV {
-			unsortedHeaders, err = reader.csvReader.Read()
-			if err != nil {
-				return nil, err
-			}
-		} else if reader, isTSV := importInput.(*TSVImportInput); isTSV {
-			stringHeaders, err := reader.tsvReader.ReadString(entryDelimiter)
-			if err != nil {
-				return nil, err
-			}
-			tokenizedHeaders := strings.Split(stringHeaders, tokenSeparator)
-			for _, header := range tokenizedHeaders {
-				unsortedHeaders = append(unsortedHeaders, strings.TrimSpace(header))
-			}
+		unsortedHeaders, err = importInput.ReadHeadersFromSource()
+		if err != nil {
+			return nil, err
 		}
 	} else {
-		unsortedHeaders = existingImportFields
+		unsortedHeaders = importInput.GetHeaders()
 	}
 
 	headers := make([]string, len(unsortedHeaders), len(unsortedHeaders))
@@ -65,8 +40,8 @@ func validateHeaders(importInput ImportInput, hasHeaderLine bool) (validatedFiel
 			// NOTE: this means we will not support imports that have fields that
 			// include e.g. a, a.b
 			if strings.HasPrefix(latterHeader, header) &&
-				(strings.Contains(header, ".") ||
-					strings.Contains(latterHeader, ".")) {
+				(strings.LastIndex(latterHeader, ".") == len(header)) &&
+				(strings.Contains(header, ".") || strings.Contains(latterHeader, ".")) {
 				return nil, fmt.Errorf("incompatible headers found: '%v' and '%v",
 					header, latterHeader)
 			}
