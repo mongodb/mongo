@@ -33,11 +33,11 @@ __system_is_little_endian(void)
 }
 
 /*
- * __wt_pthread_once --
+ * __wt_global_once --
  *	Global initialization, run once.
  */
 static void
-__wt_pthread_once(void)
+__wt_global_once(void)
 {
 	WT_DECL_RET;
 
@@ -64,7 +64,6 @@ __wt_pthread_once(void)
 int
 __wt_library_init(void)
 {
-	static pthread_once_t once_control = PTHREAD_ONCE_INIT;
 	static int first = 1;
 	WT_DECL_RET;
 
@@ -77,7 +76,7 @@ __wt_library_init(void)
 	 * avoid a race.
 	 */
 	if (first) {
-		if ((ret = pthread_once(&once_control, __wt_pthread_once)) != 0)
+		if ((ret = __wt_once(__wt_global_once)) != 0)
 			__wt_pthread_once_failed = ret;
 		first = 0;
 	}
