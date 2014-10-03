@@ -150,6 +150,11 @@ namespace mongo {
                 return false;
             }
 
+            if ( !NamespaceString::validDBName( todb ) ) {
+                errmsg = "invalid todb name: " + todb;
+                return false;
+            }
+
             Cloner cloner;
             string username = cmdObj.getStringField( "username" );
             string nonce = cmdObj.getStringField( "nonce" );
