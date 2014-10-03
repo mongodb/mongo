@@ -11,6 +11,7 @@ This is the 2.7.x **unstable** branch. This project is a work in progress.
  - **mongooplog** - _Replay oplog entries between MongoDB servers_
  - **mongotop** - _Monitor read/write activity on a mongo server_
 
+Report any bugs, improvements, or new feature requests at https://jira.mongodb.org/browse/tools
 
  
 ####Setup
