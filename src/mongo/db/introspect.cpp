@@ -135,11 +135,10 @@ namespace {
         BufBuilder profileBufBuilder(1024);
 
         try {
-            // NOTE: It's kind of weird that we lock the op's namespace, but have to for now
-            // since we're sometimes inside the lock already
-            const string dbname(nsToDatabase(currentOp.getNS()));
-            Lock::DBLock lk(txn->lockState(), dbname, newlm::MODE_X);
-            if (dbHolder().get(txn, dbname) != NULL) {
+            // NOTE: It's kind of weird that we lock the op's namespace, but have to for now since
+            // we're sometimes inside the lock already
+            Lock::DBWrite lk(txn->lockState(), currentOp.getNS() );
+            if (dbHolder().get(txn, nsToDatabase(currentOp.getNS())) != NULL) {
                 // We are ok with the profiling happening in a different WUOW from the actual op.
                 WriteUnitOfWork wunit(txn);
                 Client::Context cx(txn, currentOp.getNS(), false);

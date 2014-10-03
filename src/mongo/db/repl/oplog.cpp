@@ -120,7 +120,7 @@ namespace repl {
         todo : make _logOpRS() call this so we don't repeat ourself?
         */
     OpTime _logOpObjRS(OperationContext* txn, const BSONObj& op) {
-        Lock::DBLock lk(txn->lockState(), "local", newlm::MODE_X);
+        Lock::DBWrite lk(txn->lockState(), "local");
         // XXX soon this needs to be part of an outer WUOW not its own.
         // We can't do this yet due to locking limitations.
         WriteUnitOfWork wunit(txn);
@@ -237,7 +237,7 @@ namespace repl {
                          BSONObj *o2,
                          bool *bb,
                          bool fromMigrate ) {
-        Lock::DBLock lk1(txn->lockState(), "local", newlm::MODE_X);
+        Lock::DBWrite lk1(txn->lockState(), "local");
         WriteUnitOfWork wunit(txn);
 
         if ( strncmp(ns, "local.", 6) == 0 ) {
@@ -321,7 +321,7 @@ namespace repl {
                           BSONObj *o2,
                           bool *bb,
                           bool fromMigrate ) {
-        Lock::DBLock lk(txn->lockState(), "local", newlm::MODE_X);
+        Lock::DBWrite lk(txn->lockState(), "local");
         WriteUnitOfWork wunit(txn);
         static BufBuilder bufbuilder(8*1024); // todo there is likely a mutex on this constructor
 

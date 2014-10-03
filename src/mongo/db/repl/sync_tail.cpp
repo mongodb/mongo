@@ -124,7 +124,7 @@ namespace repl {
             lk.reset(new Lock::GlobalWrite(txn->lockState()));
         } else {
             // DB level lock for this operation
-            lk.reset(new Lock::DBLock(txn->lockState(), nsToDatabaseSubstring(ns), newlm::MODE_X));
+            lk.reset(new Lock::DBWrite(txn->lockState(), ns)); 
         }
 
         Client::Context ctx(txn, ns);
@@ -330,7 +330,7 @@ namespace {
                     BackgroundSync* bgsync = BackgroundSync::get();
                     if (bgsync->getInitialSyncRequestedFlag()) {
                         // got a resync command
-                        Lock::DBLock lk(txn.lockState(), "local", newlm::MODE_X);
+                        Lock::DBWrite lk(txn.lockState(), "local");
                         WriteUnitOfWork wunit(&txn);
                         Client::Context ctx(&txn, "local");
 
@@ -487,7 +487,7 @@ namespace {
         OpTime lastOpTime;
         {
             OperationContextImpl txn; // XXX?
-            Lock::DBLock lk(txn.lockState(), "local", newlm::MODE_X);
+            Lock::DBWrite lk(txn.lockState(), "local");
             WriteUnitOfWork wunit(&txn);
 
             while (!ops->empty()) {
