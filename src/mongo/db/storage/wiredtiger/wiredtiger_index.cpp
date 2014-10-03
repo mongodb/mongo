@@ -386,29 +386,15 @@ namespace {
     }
 
     bool WiredTigerIndex::IndexCursor::locate(const BSONObj &key, const DiskLoc& loc) {
-        int ret;
-        bool result;
-
         invariant( _cursor != NULL );
-        // Empty keys mean go to the beginning
-        if (key.isEmpty()) {
-            WT_CURSOR *c = _cursor->Get();
-            ret = c->reset(c);
-            invariantWTOK(ret);
-            if ( ( !_forward && loc == minDiskLoc ) || ( _forward && loc == maxDiskLoc ) )
-                _eof = true;
-            else
-                advance();
-            result = !isEOF();
-        } else {
-            const BSONObj finalKey = stripFieldNames(key);
-            result = _locate(finalKey, loc);
-        }
+
+        const BSONObj finalKey = stripFieldNames(key);
+        bool result = _locate(finalKey, loc);
 
         // An explicit search at the start of the range should always return false
         if (loc == minDiskLoc || loc == maxDiskLoc )
-                return ( false );
-        return ( result );
+            return false;
+        return result;
    }
 
     void WiredTigerIndex::IndexCursor::advanceTo(const BSONObj &keyBegin,
