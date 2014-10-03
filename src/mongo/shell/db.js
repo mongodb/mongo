@@ -1069,7 +1069,7 @@ DB.prototype.__pwHash = function( nonce, username, pass ) {
     return hex_md5(nonce + username + _hashPassword(username, pass));
 }
 
-DB.prototype._defaultAuthenticationMechanism = "MONGODB-CR";
+DB.prototype._defaultAuthenticationMechanism = "SCRAM-SHA-1";
 DB.prototype._defaultGssapiServiceName = null;
 
 DB.prototype._authOrThrow = function () {

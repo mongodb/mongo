@@ -79,7 +79,7 @@ namespace mongo {
 
         authenticationOptions.addOptionChaining("authenticationMechanism",
                 "authenticationMechanism", moe::String, "authentication mechanism")
-                                  .setDefault(moe::Value(std::string("MONGODB-CR")));
+                                  .setDefault(moe::Value(std::string("SCRAM-SHA-1")));
 
         authenticationOptions.addOptionChaining("gssapiServiceName", "gssapiServiceName",
                  moe::String,
