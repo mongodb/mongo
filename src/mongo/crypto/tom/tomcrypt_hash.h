@@ -1,3 +1,18 @@
+/*    Copyright 2014 MongoDB Inc.
+ *
+ *    Licensed under the Apache License, Version 2.0 (the "License");
+ *    you may not use this file except in compliance with the License.
+ *    You may obtain a copy of the License at
+ *
+ *    http://www.apache.org/licenses/LICENSE-2.0
+ *
+ *    Unless required by applicable law or agreed to in writing, software
+ *    distributed under the License is distributed on an "AS IS" BASIS,
+ *    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ *    See the License for the specific language governing permissions and
+ *    limitations under the License.
+ */
+
 /* ---- HASH FUNCTIONS ---- */
 #ifdef LTC_SHA512
 struct sha512_state {
@@ -218,7 +233,7 @@ extern const struct ltc_hash_descriptor sha512_desc;
 
 #ifdef LTC_SHA384
 #ifndef LTC_SHA512
-   #error LTC_SHA512 is required for LTC_SHA384
+    #error LTC_SHA512 is required for LTC_SHA384
 #endif
 int sha384_init(hash_state * md);
 #define sha384_process sha512_process
@@ -236,7 +251,7 @@ extern const struct ltc_hash_descriptor sha256_desc;
 
 #ifdef LTC_SHA224
 #ifndef LTC_SHA256
-   #error LTC_SHA256 is required for LTC_SHA224
+    #error LTC_SHA256 is required for LTC_SHA224
 #endif
 int sha224_init(hash_state * md);
 #define sha224_process sha256_process

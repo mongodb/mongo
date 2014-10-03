@@ -1,3 +1,18 @@
+/*    Copyright 2014 MongoDB Inc.
+ *
+ *    Licensed under the Apache License, Version 2.0 (the "License");
+ *    you may not use this file except in compliance with the License.
+ *    You may obtain a copy of the License at
+ *
+ *    http://www.apache.org/licenses/LICENSE-2.0
+ *
+ *    Unless required by applicable law or agreed to in writing, software
+ *    distributed under the License is distributed on an "AS IS" BASIS,
+ *    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ *    See the License for the specific language governing permissions and
+ *    limitations under the License.
+ */
+
 #ifdef LTC_HMAC
 typedef struct Hmac_state {
      hash_state     md;
@@ -26,13 +41,13 @@ int hmac_file(int hash, const char *fname, const unsigned char *key,
 #ifdef LTC_OMAC
 
 typedef struct {
-   int             cipher_idx,
-                   buflen,
-                   blklen;
-   unsigned char   block[MAXBLOCKSIZE],
-                   prev[MAXBLOCKSIZE],
-                   Lu[2][MAXBLOCKSIZE];
-   symmetric_key   key;
+    int             cipher_idx,
+                    buflen,
+                    blklen;
+    unsigned char   block[MAXBLOCKSIZE],
+                    prev[MAXBLOCKSIZE],
+                    Lu[2][MAXBLOCKSIZE];
+    symmetric_key   key;
 } omac_state;
 
 int omac_init(omac_state *omac, int cipher, const unsigned char *key, unsigned long keylen);
@@ -56,17 +71,17 @@ int omac_test(void);
 #ifdef LTC_PMAC
 
 typedef struct {
-   unsigned char     Ls[32][MAXBLOCKSIZE],    /* L shifted by i bits to the left */
-                     Li[MAXBLOCKSIZE],        /* value of Li [current value, we calc from previous recall] */
-                     Lr[MAXBLOCKSIZE],        /* L * x^-1 */
-                     block[MAXBLOCKSIZE],     /* currently accumulated block */
-                     checksum[MAXBLOCKSIZE];  /* current checksum */
+    unsigned char     Ls[32][MAXBLOCKSIZE],    /* L shifted by i bits to the left */
+                        Li[MAXBLOCKSIZE],        /* value of Li [current value, we calc from previous recall] */
+                        Lr[MAXBLOCKSIZE],        /* L * x^-1 */
+                        block[MAXBLOCKSIZE],     /* currently accumulated block */
+                        checksum[MAXBLOCKSIZE];  /* current checksum */
 
-   symmetric_key     key;                     /* scheduled key for cipher */
-   unsigned long     block_index;             /* index # for current block */
-   int               cipher_idx,              /* cipher idx */
-                     block_len,               /* length of block */
-                     buflen;                  /* number of bytes in the buffer */
+    symmetric_key     key;                     /* scheduled key for cipher */
+    unsigned long     block_index;             /* index # for current block */
+    int               cipher_idx,              /* cipher idx */
+                        block_len,               /* length of block */
+                        buflen;                  /* number of bytes in the buffer */
 } pmac_state;
 
 int pmac_init(pmac_state *pmac, int cipher, const unsigned char *key, unsigned long keylen);
@@ -99,13 +114,13 @@ void pmac_shift_xor(pmac_state *pmac);
 #ifdef LTC_EAX_MODE
 
 #if !(defined(LTC_OMAC) && defined(LTC_CTR_MODE))
-   #error LTC_EAX_MODE requires LTC_OMAC and CTR
+    #error LTC_EAX_MODE requires LTC_OMAC and CTR
 #endif
 
 typedef struct {
-   unsigned char N[MAXBLOCKSIZE];
-   symmetric_CTR ctr;
-   omac_state    headeromac, ctomac;
+    unsigned char N[MAXBLOCKSIZE];
+    symmetric_CTR ctr;
+    omac_state    headeromac, ctomac;
 } eax_state;
 
 int eax_init(eax_state *eax, int cipher, const unsigned char *key, unsigned long keylen,
@@ -134,22 +149,22 @@ int eax_decrypt_verify_memory(int cipher,
           unsigned char *tag,    unsigned long taglen,
           int           *stat);
 
- int eax_test(void);
+int eax_test(void);
 #endif /* EAX MODE */
 
 #ifdef LTC_OCB_MODE
 typedef struct {
-   unsigned char     L[MAXBLOCKSIZE],         /* L value */
-                     Ls[32][MAXBLOCKSIZE],    /* L shifted by i bits to the left */
-                     Li[MAXBLOCKSIZE],        /* value of Li [current value, we calc from previous recall] */
-                     Lr[MAXBLOCKSIZE],        /* L * x^-1 */
-                     R[MAXBLOCKSIZE],         /* R value */
-                     checksum[MAXBLOCKSIZE];  /* current checksum */
+    unsigned char     L[MAXBLOCKSIZE],         /* L value */
+                        Ls[32][MAXBLOCKSIZE],    /* L shifted by i bits to the left */
+                        Li[MAXBLOCKSIZE],        /* value of Li [current value, we calc from previous recall] */
+                        Lr[MAXBLOCKSIZE],        /* L * x^-1 */
+                        R[MAXBLOCKSIZE],         /* R value */
+                        checksum[MAXBLOCKSIZE];  /* current checksum */
 
-   symmetric_key     key;                     /* scheduled key for cipher */
-   unsigned long     block_index;             /* index # for current block */
-   int               cipher,                  /* cipher idx */
-                     block_len;               /* length of block */
+    symmetric_key     key;                     /* scheduled key for cipher */
+    unsigned long     block_index;             /* index # for current block */
+    int               cipher,                  /* cipher idx */
+                      block_len;               /* length of block */
 } ocb_state;
 
 int ocb_init(ocb_state *ocb, int cipher,
@@ -232,23 +247,23 @@ extern const unsigned char gcm_shift_table[];
 #define LTC_GCM_MODE_TEXT  2
 
 typedef struct {
-   symmetric_key       K;
-   unsigned char       H[16],        /* multiplier */
-                       X[16],        /* accumulator */
-                       Y[16],        /* counter */
-                       Y_0[16],      /* initial counter */
-                       buf[16];      /* buffer for stuff */
+    symmetric_key       K;
+    unsigned char       H[16],        /* multiplier */
+                        X[16],        /* accumulator */
+                        Y[16],        /* counter */
+                        Y_0[16],      /* initial counter */
+                        buf[16];      /* buffer for stuff */
 
-   int                 cipher,       /* which cipher */
-                       ivmode,       /* Which mode is the IV in? */
-                       mode,         /* mode the GCM code is in */
-                       buflen;       /* length of data in buf */
+    int                 cipher,       /* which cipher */
+                        ivmode,       /* Which mode is the IV in? */
+                        mode,         /* mode the GCM code is in */
+                        buflen;       /* length of data in buf */
 
-   ulong64             totlen,       /* 64-bit counter used for IV and AAD */
-                       pttotlen;     /* 64-bit counter for the PT */
+    ulong64             totlen,       /* 64-bit counter used for IV and AAD */
+                        pttotlen;     /* 64-bit counter for the PT */
 
 #ifdef LTC_GCM_TABLES
-   unsigned char       PC[16][256][16]  /* 16 tables of 8x128 */
+    unsigned char       PC[16][256][16]  /* 16 tables of 8x128 */
 #ifdef LTC_GCM_TABLES_SSE2
 __attribute__ ((aligned (16)))
 #endif
@@ -315,14 +330,14 @@ int pelican_memory(const unsigned char *key, unsigned long keylen,
 #define LTC_XCBC_PURE  0x8000UL
 
 typedef struct {
-   unsigned char K[3][MAXBLOCKSIZE],
-                 IV[MAXBLOCKSIZE];
+    unsigned char K[3][MAXBLOCKSIZE],
+                    IV[MAXBLOCKSIZE];
 
-   symmetric_key key;
+    symmetric_key key;
 
-             int cipher,
-                 buflen,
-                 blocksize;
+                int cipher,
+                    buflen,
+                    blocksize;
 } xcbc_state;
 
 int xcbc_init(xcbc_state *xcbc, int cipher, const unsigned char *key, unsigned long keylen);
@@ -347,16 +362,16 @@ int xcbc_test(void);
 #ifdef LTC_F9_MODE
 
 typedef struct {
-   unsigned char akey[MAXBLOCKSIZE],
-                 ACC[MAXBLOCKSIZE],
-                 IV[MAXBLOCKSIZE];
+    unsigned char akey[MAXBLOCKSIZE],
+                    ACC[MAXBLOCKSIZE],
+                    IV[MAXBLOCKSIZE];
 
-   symmetric_key key;
+    symmetric_key key;
 
-             int cipher,
-                 buflen,
-                 keylen,
-                 blocksize;
+                int cipher,
+                    buflen,
+                    keylen,
+                    blocksize;
 } f9_state;
 
 int f9_init(f9_state *f9, int cipher, const unsigned char *key, unsigned long keylen);

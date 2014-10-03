@@ -1,19 +1,34 @@
+/*    Copyright 2014 MongoDB Inc.
+ *
+ *    Licensed under the Apache License, Version 2.0 (the "License");
+ *    you may not use this file except in compliance with the License.
+ *    You may obtain a copy of the License at
+ *
+ *    http://www.apache.org/licenses/LICENSE-2.0
+ *
+ *    Unless required by applicable law or agreed to in writing, software
+ *    distributed under the License is distributed on an "AS IS" BASIS,
+ *    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ *    See the License for the specific language governing permissions and
+ *    limitations under the License.
+ */
+
 /* fix for MSVC ...evil! */
 #ifdef _MSC_VER
-   #define CONST64(n) n ## ui64
-   typedef unsigned __int64 ulong64;
+    #define CONST64(n) n ## ui64
+    typedef unsigned __int64 ulong64;
 #else
-   #define CONST64(n) n ## ULL
-   typedef unsigned long long ulong64;
+    #define CONST64(n) n ## ULL
+    typedef unsigned long long ulong64;
 #endif
 
 /* this is the "32-bit at least" data type
  * Re-define it to suit your platform but it must be at least 32-bits
  */
 #if defined(__x86_64__) || (defined(__sparc__) && defined(__arch64__))
-   typedef unsigned ulong32;
+    typedef unsigned ulong32;
 #else
-   typedef unsigned long ulong32;
+    typedef unsigned long ulong32;
 #endif
 
 /* ---- HELPER MACROS ---- */
@@ -52,16 +67,16 @@
            ((unsigned long)((y)[3] & 255)); }
 
 #define STORE64H(x, y)                                                                     \
-   { (y)[0] = (unsigned char)(((x)>>56)&255); (y)[1] = (unsigned char)(((x)>>48)&255);     \
-     (y)[2] = (unsigned char)(((x)>>40)&255); (y)[3] = (unsigned char)(((x)>>32)&255);     \
-     (y)[4] = (unsigned char)(((x)>>24)&255); (y)[5] = (unsigned char)(((x)>>16)&255);     \
-     (y)[6] = (unsigned char)(((x)>>8)&255); (y)[7] = (unsigned char)((x)&255); }
+    { (y)[0] = (unsigned char)(((x)>>56)&255); (y)[1] = (unsigned char)(((x)>>48)&255);     \
+        (y)[2] = (unsigned char)(((x)>>40)&255); (y)[3] = (unsigned char)(((x)>>32)&255);     \
+        (y)[4] = (unsigned char)(((x)>>24)&255); (y)[5] = (unsigned char)(((x)>>16)&255);     \
+        (y)[6] = (unsigned char)(((x)>>8)&255); (y)[7] = (unsigned char)((x)&255); }
 
 #define LOAD64H(x, y)                                                      \
-   { x = (((ulong64)((y)[0] & 255))<<56)|(((ulong64)((y)[1] & 255))<<48) | \
-         (((ulong64)((y)[2] & 255))<<40)|(((ulong64)((y)[3] & 255))<<32) | \
-         (((ulong64)((y)[4] & 255))<<24)|(((ulong64)((y)[5] & 255))<<16) | \
-         (((ulong64)((y)[6] & 255))<<8)|(((ulong64)((y)[7] & 255))); }
+    { x = (((ulong64)((y)[0] & 255))<<56)|(((ulong64)((y)[1] & 255))<<48) | \
+            (((ulong64)((y)[2] & 255))<<40)|(((ulong64)((y)[3] & 255))<<32) | \
+            (((ulong64)((y)[4] & 255))<<24)|(((ulong64)((y)[5] & 255))<<16) | \
+            (((ulong64)((y)[6] & 255))<<8)|(((ulong64)((y)[7] & 255))); }
 
 #endif /* ENDIAN_NEUTRAL */
 
@@ -71,28 +86,28 @@
 
 #define STORE32H(x, y)           \
 asm __volatile__ (               \
-   "bswapl %0     \n\t"          \
-   "movl   %0,(%1)\n\t"          \
-   "bswapl %0     \n\t"          \
-      ::"r"(x), "r"(y));
+    "bswapl %0     \n\t"          \
+    "movl   %0,(%1)\n\t"          \
+    "bswapl %0     \n\t"          \
+        ::"r"(x), "r"(y));
 
 #define LOAD32H(x, y)          \
 asm __volatile__ (             \
-   "movl (%1),%0\n\t"          \
-   "bswapl %0\n\t"             \
-   :"=r"(x): "r"(y));
+    "movl (%1),%0\n\t"          \
+    "bswapl %0\n\t"             \
+    :"=r"(x): "r"(y));
 
 #else
 
 #define STORE32H(x, y)                                                                     \
-     { (y)[0] = (unsigned char)(((x)>>24)&255); (y)[1] = (unsigned char)(((x)>>16)&255);   \
-       (y)[2] = (unsigned char)(((x)>>8)&255); (y)[3] = (unsigned char)((x)&255); }
+    { (y)[0] = (unsigned char)(((x)>>24)&255); (y)[1] = (unsigned char)(((x)>>16)&255);   \
+    (y)[2] = (unsigned char)(((x)>>8)&255); (y)[3] = (unsigned char)((x)&255); }
 
 #define LOAD32H(x, y)                            \
-     { x = ((unsigned long)((y)[0] & 255)<<24) | \
-           ((unsigned long)((y)[1] & 255)<<16) | \
-           ((unsigned long)((y)[2] & 255)<<8)  | \
-           ((unsigned long)((y)[3] & 255)); }
+    { x = ((unsigned long)((y)[0] & 255)<<24) | \
+        ((unsigned long)((y)[1] & 255)<<16) | \
+        ((unsigned long)((y)[2] & 255)<<8)  | \
+        ((unsigned long)((y)[3] & 255)); }
 
 #endif
 
@@ -102,63 +117,63 @@ asm __volatile__ (             \
 
 #define STORE64H(x, y)           \
 asm __volatile__ (               \
-   "bswapq %0     \n\t"          \
-   "movq   %0,(%1)\n\t"          \
-   "bswapq %0     \n\t"          \
-      ::"r"(x), "r"(y));
+    "bswapq %0     \n\t"          \
+    "movq   %0,(%1)\n\t"          \
+    "bswapq %0     \n\t"          \
+        ::"r"(x), "r"(y));
 
 #define LOAD64H(x, y)          \
 asm __volatile__ (             \
-   "movq (%1),%0\n\t"          \
-   "bswapq %0\n\t"             \
-   :"=r"(x): "r"(y));
+    "movq (%1),%0\n\t"          \
+    "bswapq %0\n\t"             \
+    :"=r"(x): "r"(y));
 
 #else
 
 #define STORE64H(x, y)                                                                     \
-   { (y)[0] = (unsigned char)(((x)>>56)&255); (y)[1] = (unsigned char)(((x)>>48)&255);     \
-     (y)[2] = (unsigned char)(((x)>>40)&255); (y)[3] = (unsigned char)(((x)>>32)&255);     \
-     (y)[4] = (unsigned char)(((x)>>24)&255); (y)[5] = (unsigned char)(((x)>>16)&255);     \
-     (y)[6] = (unsigned char)(((x)>>8)&255); (y)[7] = (unsigned char)((x)&255); }
+    { (y)[0] = (unsigned char)(((x)>>56)&255); (y)[1] = (unsigned char)(((x)>>48)&255);     \
+        (y)[2] = (unsigned char)(((x)>>40)&255); (y)[3] = (unsigned char)(((x)>>32)&255);     \
+        (y)[4] = (unsigned char)(((x)>>24)&255); (y)[5] = (unsigned char)(((x)>>16)&255);     \
+        (y)[6] = (unsigned char)(((x)>>8)&255); (y)[7] = (unsigned char)((x)&255); }
 
 #define LOAD64H(x, y)                                                      \
-   { x = (((ulong64)((y)[0] & 255))<<56)|(((ulong64)((y)[1] & 255))<<48) | \
-         (((ulong64)((y)[2] & 255))<<40)|(((ulong64)((y)[3] & 255))<<32) | \
-         (((ulong64)((y)[4] & 255))<<24)|(((ulong64)((y)[5] & 255))<<16) | \
-         (((ulong64)((y)[6] & 255))<<8)|(((ulong64)((y)[7] & 255))); }
+    { x = (((ulong64)((y)[0] & 255))<<56)|(((ulong64)((y)[1] & 255))<<48) | \
+            (((ulong64)((y)[2] & 255))<<40)|(((ulong64)((y)[3] & 255))<<32) | \
+            (((ulong64)((y)[4] & 255))<<24)|(((ulong64)((y)[5] & 255))<<16) | \
+            (((ulong64)((y)[6] & 255))<<8)|(((ulong64)((y)[7] & 255))); }
 
 #endif
 
 #ifdef ENDIAN_32BITWORD
 
 #define STORE32L(x, y)        \
-     { ulong32  __t = (x); XMEMCPY(y, &__t, 4); }
+    { ulong32  __t = (x); XMEMCPY(y, &__t, 4); }
 
 #define LOAD32L(x, y)         \
-     XMEMCPY(&(x), y, 4);
+    XMEMCPY(&(x), y, 4);
 
 #define STORE64L(x, y)                                                                     \
-     { (y)[7] = (unsigned char)(((x)>>56)&255); (y)[6] = (unsigned char)(((x)>>48)&255);   \
-       (y)[5] = (unsigned char)(((x)>>40)&255); (y)[4] = (unsigned char)(((x)>>32)&255);   \
-       (y)[3] = (unsigned char)(((x)>>24)&255); (y)[2] = (unsigned char)(((x)>>16)&255);   \
-       (y)[1] = (unsigned char)(((x)>>8)&255); (y)[0] = (unsigned char)((x)&255); }
+    { (y)[7] = (unsigned char)(((x)>>56)&255); (y)[6] = (unsigned char)(((x)>>48)&255);   \
+    (y)[5] = (unsigned char)(((x)>>40)&255); (y)[4] = (unsigned char)(((x)>>32)&255);   \
+    (y)[3] = (unsigned char)(((x)>>24)&255); (y)[2] = (unsigned char)(((x)>>16)&255);   \
+    (y)[1] = (unsigned char)(((x)>>8)&255); (y)[0] = (unsigned char)((x)&255); }
 
 #define LOAD64L(x, y)                                                       \
-     { x = (((ulong64)((y)[7] & 255))<<56)|(((ulong64)((y)[6] & 255))<<48)| \
-           (((ulong64)((y)[5] & 255))<<40)|(((ulong64)((y)[4] & 255))<<32)| \
-           (((ulong64)((y)[3] & 255))<<24)|(((ulong64)((y)[2] & 255))<<16)| \
-           (((ulong64)((y)[1] & 255))<<8)|(((ulong64)((y)[0] & 255))); }
+    { x = (((ulong64)((y)[7] & 255))<<56)|(((ulong64)((y)[6] & 255))<<48)| \
+        (((ulong64)((y)[5] & 255))<<40)|(((ulong64)((y)[4] & 255))<<32)| \
+        (((ulong64)((y)[3] & 255))<<24)|(((ulong64)((y)[2] & 255))<<16)| \
+        (((ulong64)((y)[1] & 255))<<8)|(((ulong64)((y)[0] & 255))); }
 
 #else /* 64-bit words then  */
 
 #define STORE32L(x, y)        \
-     { ulong32 __t = (x); XMEMCPY(y, &__t, 4); }
+    { ulong32 __t = (x); XMEMCPY(y, &__t, 4); }
 
 #define LOAD32L(x, y)         \
-     { XMEMCPY(&(x), y, 4); x &= 0xFFFFFFFF; }
+    { XMEMCPY(&(x), y, 4); x &= 0xFFFFFFFF; }
 
 #define STORE64L(x, y)        \
-     { ulong64 __t = (x); XMEMCPY(y, &__t, 8); }
+    { ulong64 __t = (x); XMEMCPY(y, &__t, 8); }
 
 #define LOAD64L(x, y)         \
     { XMEMCPY(&(x), y, 8); }
@@ -169,57 +184,57 @@ asm __volatile__ (             \
 
 #ifdef ENDIAN_BIG
 #define STORE32L(x, y)                                                                     \
-     { (y)[3] = (unsigned char)(((x)>>24)&255); (y)[2] = (unsigned char)(((x)>>16)&255);   \
-       (y)[1] = (unsigned char)(((x)>>8)&255); (y)[0] = (unsigned char)((x)&255); }
+    { (y)[3] = (unsigned char)(((x)>>24)&255); (y)[2] = (unsigned char)(((x)>>16)&255);   \
+      (y)[1] = (unsigned char)(((x)>>8)&255); (y)[0] = (unsigned char)((x)&255); }
 
 #define LOAD32L(x, y)                            \
-     { x = ((unsigned long)((y)[3] & 255)<<24) | \
-           ((unsigned long)((y)[2] & 255)<<16) | \
-           ((unsigned long)((y)[1] & 255)<<8)  | \
-           ((unsigned long)((y)[0] & 255)); }
+    { x = ((unsigned long)((y)[3] & 255)<<24) | \
+          ((unsigned long)((y)[2] & 255)<<16) | \
+          ((unsigned long)((y)[1] & 255)<<8)  | \
+          ((unsigned long)((y)[0] & 255)); }
 
 #define STORE64L(x, y)                                                                     \
-   { (y)[7] = (unsigned char)(((x)>>56)&255); (y)[6] = (unsigned char)(((x)>>48)&255);     \
-     (y)[5] = (unsigned char)(((x)>>40)&255); (y)[4] = (unsigned char)(((x)>>32)&255);     \
-     (y)[3] = (unsigned char)(((x)>>24)&255); (y)[2] = (unsigned char)(((x)>>16)&255);     \
-     (y)[1] = (unsigned char)(((x)>>8)&255); (y)[0] = (unsigned char)((x)&255); }
+    { (y)[7] = (unsigned char)(((x)>>56)&255); (y)[6] = (unsigned char)(((x)>>48)&255);     \
+      (y)[5] = (unsigned char)(((x)>>40)&255); (y)[4] = (unsigned char)(((x)>>32)&255);     \
+      (y)[3] = (unsigned char)(((x)>>24)&255); (y)[2] = (unsigned char)(((x)>>16)&255);     \
+      (y)[1] = (unsigned char)(((x)>>8)&255); (y)[0] = (unsigned char)((x)&255); }
 
 #define LOAD64L(x, y)                                                      \
-   { x = (((ulong64)((y)[7] & 255))<<56)|(((ulong64)((y)[6] & 255))<<48) | \
-         (((ulong64)((y)[5] & 255))<<40)|(((ulong64)((y)[4] & 255))<<32) | \
-         (((ulong64)((y)[3] & 255))<<24)|(((ulong64)((y)[2] & 255))<<16) | \
-         (((ulong64)((y)[1] & 255))<<8)|(((ulong64)((y)[0] & 255))); }
+    { x = (((ulong64)((y)[7] & 255))<<56)|(((ulong64)((y)[6] & 255))<<48) | \
+          (((ulong64)((y)[5] & 255))<<40)|(((ulong64)((y)[4] & 255))<<32) | \
+          (((ulong64)((y)[3] & 255))<<24)|(((ulong64)((y)[2] & 255))<<16) | \
+          (((ulong64)((y)[1] & 255))<<8)|(((ulong64)((y)[0] & 255))); }
 
 #ifdef ENDIAN_32BITWORD
 
 #define STORE32H(x, y)        \
-     { ulong32 __t = (x); XMEMCPY(y, &__t, 4); }
+    { ulong32 __t = (x); XMEMCPY(y, &__t, 4); }
 
 #define LOAD32H(x, y)         \
-     XMEMCPY(&(x), y, 4);
+    XMEMCPY(&(x), y, 4);
 
 #define STORE64H(x, y)                                                                     \
-     { (y)[0] = (unsigned char)(((x)>>56)&255); (y)[1] = (unsigned char)(((x)>>48)&255);   \
-       (y)[2] = (unsigned char)(((x)>>40)&255); (y)[3] = (unsigned char)(((x)>>32)&255);   \
-       (y)[4] = (unsigned char)(((x)>>24)&255); (y)[5] = (unsigned char)(((x)>>16)&255);   \
-       (y)[6] = (unsigned char)(((x)>>8)&255);  (y)[7] = (unsigned char)((x)&255); }
+    { (y)[0] = (unsigned char)(((x)>>56)&255); (y)[1] = (unsigned char)(((x)>>48)&255);   \
+      (y)[2] = (unsigned char)(((x)>>40)&255); (y)[3] = (unsigned char)(((x)>>32)&255);   \
+      (y)[4] = (unsigned char)(((x)>>24)&255); (y)[5] = (unsigned char)(((x)>>16)&255);   \
+      (y)[6] = (unsigned char)(((x)>>8)&255);  (y)[7] = (unsigned char)((x)&255); }
 
 #define LOAD64H(x, y)                                                       \
-     { x = (((ulong64)((y)[0] & 255))<<56)|(((ulong64)((y)[1] & 255))<<48)| \
-           (((ulong64)((y)[2] & 255))<<40)|(((ulong64)((y)[3] & 255))<<32)| \
-           (((ulong64)((y)[4] & 255))<<24)|(((ulong64)((y)[5] & 255))<<16)| \
-           (((ulong64)((y)[6] & 255))<<8)| (((ulong64)((y)[7] & 255))); }
+    { x = (((ulong64)((y)[0] & 255))<<56)|(((ulong64)((y)[1] & 255))<<48)| \
+          (((ulong64)((y)[2] & 255))<<40)|(((ulong64)((y)[3] & 255))<<32)| \
+          (((ulong64)((y)[4] & 255))<<24)|(((ulong64)((y)[5] & 255))<<16)| \
+          (((ulong64)((y)[6] & 255))<<8)| (((ulong64)((y)[7] & 255))); }
 
 #else /* 64-bit words then  */
 
 #define STORE32H(x, y)        \
-     { ulong32 __t = (x); XMEMCPY(y, &__t, 4); }
+    { ulong32 __t = (x); XMEMCPY(y, &__t, 4); }
 
 #define LOAD32H(x, y)         \
-     { XMEMCPY(&(x), y, 4); x &= 0xFFFFFFFF; }
+    { XMEMCPY(&(x), y, 4); x &= 0xFFFFFFFF; }
 
 #define STORE64H(x, y)        \
-     { ulong64 __t = (x); XMEMCPY(y, &__t, 8); }
+    { ulong64 __t = (x); XMEMCPY(y, &__t, 8); }
 
 #define LOAD64H(x, y)         \
     { XMEMCPY(&(x), y, 8); }
@@ -246,36 +261,36 @@ asm __volatile__ (             \
 
 static inline unsigned ROL(unsigned word, int i)
 {
-   asm ("roll %%cl,%0"
-      :"=r" (word)
-      :"0" (word),"c" (i));
-   return word;
+    asm ("roll %%cl,%0"
+        :"=r" (word)
+        :"0" (word),"c" (i));
+    return word;
 }
 
 static inline unsigned ROR(unsigned word, int i)
 {
-   asm ("rorl %%cl,%0"
-      :"=r" (word)
-      :"0" (word),"c" (i));
-   return word;
+    asm ("rorl %%cl,%0"
+        :"=r" (word)
+        :"0" (word),"c" (i));
+    return word;
 }
 
 #ifndef LTC_NO_ROLC
 
 static inline unsigned ROLc(unsigned word, const int i)
 {
-   asm ("roll %2,%0"
-      :"=r" (word)
-      :"0" (word),"I" (i));
-   return word;
+    asm ("roll %2,%0"
+        :"=r" (word)
+        :"0" (word),"I" (i));
+    return word;
 }
 
 static inline unsigned RORc(unsigned word, const int i)
 {
-   asm ("rorl %2,%0"
-      :"=r" (word)
-      :"0" (word),"I" (i));
-   return word;
+    asm ("rorl %2,%0"
+        :"=r" (word)
+        :"0" (word),"I" (i));
+    return word;
 }
 
 #else
@@ -289,36 +304,36 @@ static inline unsigned RORc(unsigned word, const int i)
 
 static inline unsigned ROL(unsigned word, int i)
 {
-   asm ("rotlw %0,%0,%2"
-      :"=r" (word)
-      :"0" (word),"r" (i));
-   return word;
+    asm ("rotlw %0,%0,%2"
+        :"=r" (word)
+        :"0" (word),"r" (i));
+    return word;
 }
 
 static inline unsigned ROR(unsigned word, int i)
 {
-   asm ("rotlw %0,%0,%2"
-      :"=r" (word)
-      :"0" (word),"r" (32-i));
-   return word;
+    asm ("rotlw %0,%0,%2"
+        :"=r" (word)
+        :"0" (word),"r" (32-i));
+    return word;
 }
 
 #ifndef LTC_NO_ROLC
 
 static inline unsigned ROLc(unsigned word, const int i)
 {
-   asm ("rotlwi %0,%0,%2"
-      :"=r" (word)
-      :"0" (word),"I" (i));
-   return word;
+    asm ("rotlwi %0,%0,%2"
+        :"=r" (word)
+        :"0" (word),"I" (i));
+    return word;
 }
 
 static inline unsigned RORc(unsigned word, const int i)
 {
-   asm ("rotrwi %0,%0,%2"
-      :"=r" (word)
-      :"0" (word),"I" (i));
-   return word;
+    asm ("rotrwi %0,%0,%2"
+        :"=r" (word)
+        :"0" (word),"I" (i));
+    return word;
 }
 
 #else
@@ -345,36 +360,36 @@ static inline unsigned RORc(unsigned word, const int i)
 
 static inline unsigned long ROL64(unsigned long word, int i)
 {
-   asm("rolq %%cl,%0"
-      :"=r" (word)
-      :"0" (word),"c" (i));
-   return word;
+    asm("rolq %%cl,%0"
+        :"=r" (word)
+        :"0" (word),"c" (i));
+    return word;
 }
 
 static inline unsigned long ROR64(unsigned long word, int i)
 {
-   asm("rorq %%cl,%0"
-      :"=r" (word)
-      :"0" (word),"c" (i));
-   return word;
+    asm("rorq %%cl,%0"
+        :"=r" (word)
+        :"0" (word),"c" (i));
+    return word;
 }
 
 #ifndef LTC_NO_ROLC
 
 static inline unsigned long ROL64c(unsigned long word, const int i)
 {
-   asm("rolq %2,%0"
-      :"=r" (word)
-      :"0" (word),"J" (i));
-   return word;
+    asm("rolq %2,%0"
+        :"=r" (word)
+        :"0" (word),"J" (i));
+    return word;
 }
 
 static inline unsigned long ROR64c(unsigned long word, const int i)
 {
-   asm("rorq %2,%0"
-      :"=r" (word)
-      :"0" (word),"J" (i));
-   return word;
+    asm("rorq %2,%0"
+        :"=r" (word)
+        :"0" (word),"J" (i));
+    return word;
 }
 
 #else /* LTC_NO_ROLC */
@@ -405,18 +420,18 @@ static inline unsigned long ROR64c(unsigned long word, const int i)
 #endif
 
 #ifndef MAX
-   #define MAX(x, y) ( ((x)>(y))?(x):(y) )
+    #define MAX(x, y) ( ((x)>(y))?(x):(y) )
 #endif
 
 #ifndef MIN
-   #define MIN(x, y) ( ((x)<(y))?(x):(y) )
+    #define MIN(x, y) ( ((x)<(y))?(x):(y) )
 #endif
 
 /* extract a byte portably */
 #ifdef _MSC_VER
-   #define byte(x, n) ((unsigned char)((x) >> (8 * (n))))
+    #define byte(x, n) ((unsigned char)((x) >> (8 * (n))))
 #else
-   #define byte(x, n) (((x) >> (8 * (n))) & 255)
+    #define byte(x, n) (((x) >> (8 * (n))) & 255)
 #endif
 
 /* $Source: /cvs/libtom/libtomcrypt/src/headers/tomcrypt_macros.h,v $ */
