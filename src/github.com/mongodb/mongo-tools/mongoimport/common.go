@@ -62,6 +62,8 @@ func validateHeaders(importInput ImportInput, hasHeaderLine bool) (validatedFiel
 		// is incompatible with another one that occurs further down the list.
 		// meant to prevent cases where we have headers like "a" and "a.c"
 		for _, latterHeader := range headers[index+1:] {
+			// NOTE: this means we will not support imports that have fields that
+			// include e.g. a, a.b
 			if strings.HasPrefix(latterHeader, header) &&
 				(strings.Contains(header, ".") ||
 					strings.Contains(latterHeader, ".")) {
@@ -69,7 +71,7 @@ func validateHeaders(importInput ImportInput, hasHeaderLine bool) (validatedFiel
 					header, latterHeader)
 			}
 			// NOTE: this means we will not support imports that have fields like
-			// a,a - since this is invalid in MongoDB
+			// a, a - since this is invalid in MongoDB
 			if header == latterHeader {
 				return nil, fmt.Errorf("headers can not be identical: '%v' and '%v",
 					header, latterHeader)
