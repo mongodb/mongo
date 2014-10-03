@@ -318,7 +318,8 @@ namespace {
        : _txn(txn),
          _idx(idx),
          _forward(forward),
-         _eof(true) {
+         _eof(true),
+         _savedAtEnd(false) {
          _cursor = new WiredTigerCursor(_idx.GetURI(),
                                         WiredTigerRecoveryUnit::Get(txn).GetSession());
     }
@@ -335,6 +336,12 @@ namespace {
             const SortedDataInterface::Cursor &genother) const {
         const WiredTigerIndex::IndexCursor &other =
             dynamic_cast<const WiredTigerIndex::IndexCursor &>(genother);
+
+        invariant( _cursor != NULL && other._cursor != NULL);
+        if ( _eof && other._eof )
+            return true;
+        else if ( _eof || other._eof )
+            return false;
         WT_CURSOR *c = _cursor->Get(), *otherc = other._cursor->Get();
         int cmp, ret = c->compare(c, otherc, &cmp);
         invariantWTOK(ret);
@@ -382,6 +389,7 @@ namespace {
         int ret;
         bool result;
 
+        invariant( _cursor != NULL );
         // Empty keys mean go to the beginning
         if (key.isEmpty()) {
             WT_CURSOR *c = _cursor->Get();
@@ -409,6 +417,7 @@ namespace {
            const vector<const BSONElement*>& keyEnd,
            const vector<bool>& keyEndInclusive) {
 
+        invariant( _cursor != NULL );
         BSONObj key = IndexEntryComparison::makeQueryObject(
                          keyBegin, keyBeginLen,
                          afterKey, keyEnd, keyEndInclusive, getDirection() );
@@ -425,6 +434,7 @@ namespace {
     }
 
     BSONObj WiredTigerIndex::IndexCursor::getKey() const {
+        invariant( _cursor != NULL );
         WT_CURSOR *c = _cursor->Get();
         WT_ITEM keyItem;
         int ret = c->get_key(c, &keyItem);
@@ -433,6 +443,7 @@ namespace {
     }
 
     DiskLoc WiredTigerIndex::IndexCursor::getDiskLoc() const {
+        invariant( _cursor != NULL );
         WT_CURSOR *c = _cursor->Get();
         WT_ITEM keyItem;
         int ret = c->get_key(c, &keyItem);
@@ -441,6 +452,10 @@ namespace {
     }
 
     void WiredTigerIndex::IndexCursor::advance() {
+        // Advance on a cursor at the end is a no-op
+        invariant( _cursor != NULL );
+        if ( _eof )
+            return;
         WT_CURSOR *c = _cursor->Get();
         int ret = _forward ? c->next(c) : c->prev(c);
         if (ret == WT_NOTFOUND)
@@ -465,10 +480,8 @@ namespace {
         _txn = txn;
         _cursor = new WiredTigerCursor(_idx.GetURI(),
                                        WiredTigerRecoveryUnit::Get(txn).GetSession());
-        if (_savedAtEnd) {
+        if (_savedAtEnd)
             _eof = true;
-            return;
-        }
         else
             (void)_locate(_savedKey, _savedLoc);
     }
