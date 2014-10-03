@@ -244,10 +244,6 @@ namespace mongo {
             scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
             scoped_ptr<SortedDataInterface::Cursor> cursor( sorted->newCursor( opCtx.get(), 1 ) );
             cursor->savePosition();
-
-            ASSERT( cursor->locate( key1, loc1 ) );
-            ASSERT_EQUALS( key1, cursor->getKey() );
-            ASSERT_EQUALS( loc1, cursor->getDiskLoc() );
         }
     }
 
@@ -280,10 +276,6 @@ namespace mongo {
             scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
             scoped_ptr<SortedDataInterface::Cursor> cursor( sorted->newCursor( opCtx.get(), -1 ) );
             cursor->savePosition();
-
-            ASSERT( cursor->locate( key1, loc1 ) );
-            ASSERT_EQUALS( key1, cursor->getKey() );
-            ASSERT_EQUALS( loc1, cursor->getDiskLoc() );
         }
     }
 
