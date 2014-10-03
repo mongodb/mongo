@@ -389,7 +389,6 @@ func (shim *StorageShim) Open() (*BSONSource, *BSONSink, error) {
 	if err != nil {
 		return nil, nil, err
 	}
-	fmt.Printf("shim args: %#v\n", args)
 	cmd := exec.Command(shim.ShimPath, args...)
 	stdOut, err := cmd.StdoutPipe()
 	if err != nil {

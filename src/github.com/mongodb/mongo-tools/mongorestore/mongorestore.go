@@ -33,7 +33,6 @@ func (restore *MongoRestore) Init() error {
 		if err != nil {
 			return err
 		}
-		fmt.Printf("%#v", shim)
 		restore.cmdRunner = shim
 		return nil
 	}
