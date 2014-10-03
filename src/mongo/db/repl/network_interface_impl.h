@@ -29,6 +29,7 @@
 
 #pragma once
 
+#include <boost/scoped_ptr.hpp>
 #include <boost/shared_ptr.hpp>
 #include <boost/thread.hpp>
 #include <boost/thread/condition_variable.hpp>
@@ -41,6 +42,9 @@
 namespace mongo {
 namespace repl {
 
+    /**
+     * Implementation of the network interface used by the ReplicationExecutor inside mongod.
+     */
     class NetworkInterfaceImpl : public ReplicationExecutor::NetworkInterface {
     public:
         explicit NetworkInterfaceImpl();
@@ -60,6 +64,11 @@ namespace repl {
                 const stdx::function<void (OperationContext*)>& callback);
 
     private:
+        class ConnectionPool;
+
+        /**
+         * Information describing an in-flight command.
+         */
         struct CommandData {
             ReplicationExecutor::CallbackHandle cbHandle;
             ReplicationExecutor::RemoteCommandRequest request;
@@ -68,17 +77,48 @@ namespace repl {
         typedef stdx::list<CommandData> CommandDataList;
         typedef std::vector<boost::shared_ptr<boost::thread> > ThreadList;
 
+        /**
+         * Thread body for threads that synchronously perform network requests from
+         * the _pending list.
+         */
         void _consumeNetworkRequests();
+
+        /**
+         * Synchronously invokes the command described by "request".
+         */
         ResponseStatus _runCommand(const ReplicationExecutor::RemoteCommandRequest& request);
+
+        /**
+         * Notifies the network threads that there is work available.
+         */
         void _signalWorkAvailable_inlock();
 
+        // Mutex guarding the state of the network interface, except for the pool pointed to by
+        // _connPool.
         boost::mutex _mutex;
+
+        // Condition signaled to indicate that there is work in the _pending queue.
         boost::condition_variable _hasPending;
+
+        // Queue of yet-to-be-executed network operations.
         CommandDataList _pending;
+
+        // List of threads serving as the worker pool.
         ThreadList _threads;
+
+        // Condition signaled to indicate that the executor, blocked in waitForWorkUntil or
+        // waitForWork, should wake up.
         boost::condition_variable _isExecutorRunnableCondition;
+
+        // Flag indicating whether or not the executor associated with this interface is runnable.
         bool _isExecutorRunnable;
+
+        // Flag indicating when this interface is being shut down (because shutdown() has executed).
         bool _inShutdown;
+
+        // Pool of connections to remote nodes, used by the worker threads to execute network
+        // requests.
+        boost::scoped_ptr<ConnectionPool> _connPool;  // (R)
     };
 
 }  // namespace repl
