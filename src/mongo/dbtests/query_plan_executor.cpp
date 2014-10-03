@@ -270,7 +270,7 @@ namespace QueryPlanExecutor {
                 new PipelineProxyStage(pipeline, innerExec, ws.get()));
             Collection* collection = ctx.ctx().db()->getCollection(&_txn, ns());
             boost::scoped_ptr<PlanExecutor> outerExec(
-                new PlanExecutor(ws.release(), proxy.release(), collection));
+                new PlanExecutor(&_txn, ws.release(), proxy.release(), collection));
 
             // Only the outer executor gets registered.
             registerExec(outerExec.get());
