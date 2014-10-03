@@ -132,7 +132,7 @@
 /* #define LTC_NO_FILE */
 
 /* disable all forms of ASM */
-/* #define LTC_NO_ASM */
+#define LTC_NO_ASM
 
 /* disable FAST mode */
 /* #define LTC_NO_FAST */
