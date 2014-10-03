@@ -33,6 +33,7 @@
 
 #include <time.h>
 
+#include "mongo/bson/inline_decls.h"
 
 namespace mongo {
 

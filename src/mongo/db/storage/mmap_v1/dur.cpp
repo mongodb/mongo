@@ -288,7 +288,7 @@ namespace mongo {
             // spot in an operation to be terminated.
             cc().checkpointHappened();
 
-            if (likely(commitJob.bytes() < UncommittedBytesLimit)) {
+            if (MONGO_likely(commitJob.bytes() < UncommittedBytesLimit)) {
                 return false;
             }
 

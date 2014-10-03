@@ -34,7 +34,6 @@
 #include <string>
 
 #include "mongo/base/status.h" // NOTE: This is safe as utils depend on base
-#include "mongo/bson/inline_decls.h"
 #include "mongo/client/export_macros.h"
 #include "mongo/platform/compiler.h"
 #include "mongo/logger/log_severity.h"
@@ -220,7 +219,11 @@ namespace mongo {
 
 
     /* "user assert".  if asserts, user did something wrong, not our code */
-#define MONGO_uassert(msgid, msg, expr) (void)( MONGO_likely(!!(expr)) || (::mongo::uasserted(msgid, msg), 0) )
+#define MONGO_uassert(msgid, msg, expr) do {                            \
+        if (MONGO_unlikely(!(expr))) {                                      \
+            ::mongo::uasserted(msgid, msg);                             \
+        }                                                               \
+    } while (false)
 
     MONGO_CLIENT_API inline void uassertStatusOK(const Status& status) {
         if (MONGO_unlikely(!status.isOK())) {
@@ -230,14 +233,22 @@ namespace mongo {
     }
 
     /* warning only - keeps going */
-#define MONGO_wassert(_Expression) (void)( MONGO_likely(!!(_Expression)) || (::mongo::wasserted(#_Expression, __FILE__, __LINE__), 0) )
+#define MONGO_wassert(_Expression) do {                                 \
+        if (MONGO_unlikely(!(_Expression))) {                               \
+            ::mongo::wasserted(#_Expression, __FILE__, __LINE__);       \
+        }                                                               \
+    } while (false)
 
     /* display a message, no context, and throw assertionexception
 
        easy way to throw an exception and log something without our stack trace
        display happening.
     */
-#define MONGO_massert(msgid, msg, expr) (void)( MONGO_likely(!!(expr)) || (::mongo::msgasserted(msgid, msg), 0) )
+#define MONGO_massert(msgid, msg, expr) do {    \
+        if (MONGO_unlikely(!(expr))) {              \
+            ::mongo::msgasserted(msgid, msg);   \
+        }                                       \
+    } while (false)
 
     MONGO_CLIENT_API inline void massertStatusOK(const Status& status) {
         if (MONGO_unlikely(!status.isOK())) {
@@ -248,9 +259,17 @@ namespace mongo {
 
 
     /* same as massert except no msgid */
-#define MONGO_verify(_Expression) (void)( MONGO_likely(!!(_Expression)) || (::mongo::verifyFailed(#_Expression, __FILE__, __LINE__), 0) )
+#define MONGO_verify(_Expression) do {                                  \
+        if (MONGO_unlikely(!(_Expression))) {                               \
+            ::mongo::verifyFailed(#_Expression, __FILE__, __LINE__);    \
+        }                                                               \
+    } while (false)
 
-#define MONGO_invariant(_Expression) (void)( MONGO_likely(!!(_Expression)) || (::mongo::invariantFailed(#_Expression, __FILE__, __LINE__), 0) )
+#define MONGO_invariant(_Expression) do {                               \
+        if (MONGO_unlikely(!(_Expression))) {                               \
+            ::mongo::invariantFailed(#_Expression, __FILE__, __LINE__); \
+        }                                                               \
+    } while (false)
 
     /* dassert is 'debug assert' -- might want to turn off for production as these
        could be slow.
