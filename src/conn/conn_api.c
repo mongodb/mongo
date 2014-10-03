@@ -723,8 +723,8 @@ __conn_config_file(WT_SESSION_IMPL *session,
 {
 	WT_DECL_RET;
 	WT_FH *fh;
-	wt_off_t size;
 	size_t len;
+	wt_off_t size;
 	int exist, quoted;
 	uint8_t *p, *t;
 

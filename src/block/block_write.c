@@ -119,8 +119,8 @@ __wt_block_write_off(WT_SESSION_IMPL *session, WT_BLOCK *block,
 	WT_BLOCK_HEADER *blk;
 	WT_DECL_RET;
 	WT_FH *fh;
-	wt_off_t offset;
 	size_t align_size;
+	wt_off_t offset;
 
 	blk = WT_BLOCK_HEADER_REF(buf->mem);
 	fh = block->fh;

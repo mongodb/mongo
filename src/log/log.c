@@ -404,9 +404,9 @@ __log_filesize(WT_SESSION_IMPL *session, WT_FH *fh, wt_off_t *eof)
 	WT_CONNECTION_IMPL *conn;
 	WT_DECL_RET;
 	WT_LOG *log;
+	wt_off_t log_size, off, off1;
 	uint64_t rec;
 	uint32_t allocsize, bufsz;
-	wt_off_t log_size, off, off1;
 	char *buf, *zerobuf;
 
 	conn = S2C(session);
@@ -792,9 +792,9 @@ __wt_log_scan(WT_SESSION_IMPL *session, WT_LSN *lsnp, uint32_t flags,
     WT_ITEM *record, WT_LSN *lsnp, void *cookie), void *cookie)
 {
 	WT_CONNECTION_IMPL *conn;
-	WT_ITEM buf;
 	WT_DECL_RET;
 	WT_FH *log_fh;
+	WT_ITEM buf;
 	WT_LOG *log;
 	WT_LOG_RECORD *logrec;
 	WT_LSN end_lsn, rd_lsn, start_lsn;
