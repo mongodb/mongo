@@ -16,7 +16,6 @@ import (
 const Users = "users"
 const Roles = "roles"
 
-//TODO(erf) make this common
 type Metadata struct {
 	Options bson.D          `json:"options,omitempty"`
 	Indexes []IndexDocument `json:"indexes"`

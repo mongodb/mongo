@@ -17,26 +17,17 @@ import (
 // Metadata JSON is read in by mongorestore to properly recreate
 // collections with the proper options and indexes.
 type Metadata struct {
-	Options bson.M     `json:"options,omitempty"`
-	Indexes []IndexDoc `json:"indexes"`
+	Options bson.M          `json:"options,omitempty"`
+	Indexes []IndexDocument `json:"indexes"`
 }
 
-// We need two separate types here, because we cannot read BSON
-// into our custom MarshalD type, but we cannot create JSON
-// using mgo's bson.D type. This should be fixed with a driver
-// change before release... TODO
-type IndexDoc struct {
-	Name      string            `json:"name"`
-	Namespace string            `json:"ns"`
-	Value     int               `json:"v"`
-	Key       bsonutil.MarshalD `json:"key"`
-}
+// IndexDocument is used to write out the index info as json
+type IndexDocument bson.M
 
-type IndexDocFromDB struct {
-	Name      string `bson:"name"`
-	Namespace string `bson:"ns"`
-	Value     int    `bson:"v"`
-	Key       bson.D `bson:"key"`
+// IndexDocumentFromDB is used internally to preserve key ordering
+type IndexDocumentFromDB struct {
+	Options bson.M `bson:",inline"`
+	Key     bson.D `bson:"key"`
 }
 
 // This helper gets the metadata for a collection and writes it
@@ -50,7 +41,7 @@ func (dump *MongoDump) dumpMetadataToWriter(dbName, c string, writer io.Writer) 
 		// We have to initialize Indexes to an empty slice, not nil, so that an empty
 		// array is marshalled into json instead of null. That is, {indexes:[]} is okay
 		// but {indexes:null} will cause assertions in our legacy C++ mongotools
-		Indexes: []IndexDoc{},
+		Indexes: []IndexDocument{},
 	}
 
 	// First, we get the options for the collection. These are pulled
@@ -79,16 +70,13 @@ func (dump *MongoDump) dumpMetadataToWriter(dbName, c string, writer io.Writer) 
 		return err
 	}
 	defer cursor.Close()
-	indexDocDB := IndexDocFromDB{}
-	for cursor.Next(&indexDocDB) {
-		// FIXME this is super annoying and could be fixed with an mgo pull request
-		indexDoc := IndexDoc{
-			Name:      indexDocDB.Name,
-			Namespace: indexDocDB.Namespace,
-			Value:     indexDocDB.Value,
-			Key:       bsonutil.MarshalD(indexDocDB.Key),
-		}
-		meta.Indexes = append(meta.Indexes, indexDoc)
+	indexDoc := IndexDocumentFromDB{}
+	for cursor.Next(&indexDoc) {
+		// convert the IndexDocumentFromDB into a regular IndexDocument that we
+		// can marshal into JSON.
+		marshalableIndex := IndexDocument(indexDoc.Options)
+		marshalableIndex["key"] = bsonutil.MarshalD(indexDoc.Key)
+		meta.Indexes = append(meta.Indexes, marshalableIndex)
 	}
 	if err := cursor.Err(); err != nil {
 		return fmt.Errorf("error finding index data for collection `%v`: %v", nsID, err)
