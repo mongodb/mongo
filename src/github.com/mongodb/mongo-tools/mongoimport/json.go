@@ -67,7 +67,7 @@ func NewJSONImportInput(isArray bool, in io.Reader) *JSONImportInput {
 }
 
 // SetHeader is a no-op for JSON imports
-func (jsonImporter *JSONImportInput) SetHeader() error {
+func (jsonImporter *JSONImportInput) SetHeader(hasHeaderLine bool) error {
 	return nil
 }
 

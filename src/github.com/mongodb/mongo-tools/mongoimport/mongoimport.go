@@ -56,8 +56,9 @@ type ImportInput interface {
 	ImportDocument() (bson.M, error)
 
 	// SetHeader sets the header for the CSV/TSV import when --headerline is
-	// specified
-	SetHeader() error
+	// specified. It a --fields or --fieldFile argument is passed, it overwrites
+	// the values of those with what is read from the input source
+	SetHeader(bool) error
 }
 
 func (mongoImport *MongoImport) getImportWriter() ImportWriter {
@@ -192,7 +193,7 @@ func (mongoImport *MongoImport) ImportDocuments() (int64, error) {
 		return 0, err
 	}
 
-	err = importInput.SetHeader()
+	err = importInput.SetHeader(mongoImport.InputOptions.HeaderLine)
 	if err != nil {
 		return 0, err
 	}
@@ -306,10 +307,8 @@ func (mongoImport *MongoImport) getImportInput(in io.Reader) (ImportInput,
 			return nil, err
 		}
 	}
-
 	if mongoImport.InputOptions.Type == CSV {
-		csvImportInput := NewCSVImportInput(fields, mongoImport.InputOptions.HeaderLine, in)
-		return csvImportInput, nil
+		return NewCSVImportInput(fields, in), nil
 	} else if mongoImport.InputOptions.Type == TSV {
 		return NewTSVImportInput(fields, in), nil
 	}

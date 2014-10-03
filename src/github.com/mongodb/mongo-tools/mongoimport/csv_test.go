@@ -8,6 +8,7 @@ import (
 	"io"
 	"io/ioutil"
 	"os"
+	"strings"
 	"testing"
 )
 
@@ -31,7 +32,7 @@ func TestCSVImportDocument(t *testing.T) {
 			So(err, ShouldBeNil)
 			fileHandle, err := os.Open(csvFile.Name())
 			So(err, ShouldBeNil)
-			csvImporter := NewCSVImportInput(fields, false, fileHandle)
+			csvImporter := NewCSVImportInput(fields, fileHandle)
 			_, err = csvImporter.ImportDocument()
 			So(err, ShouldNotBeNil)
 		})
@@ -45,7 +46,7 @@ func TestCSVImportDocument(t *testing.T) {
 			So(err, ShouldBeNil)
 			fileHandle, err := os.Open(csvFile.Name())
 			So(err, ShouldBeNil)
-			csvImporter := NewCSVImportInput(fields, false, fileHandle)
+			csvImporter := NewCSVImportInput(fields, fileHandle)
 			_, err = csvImporter.ImportDocument()
 			So(err, ShouldBeNil)
 		})
@@ -59,7 +60,7 @@ func TestCSVImportDocument(t *testing.T) {
 			So(err, ShouldBeNil)
 			fileHandle, err := os.Open(csvFile.Name())
 			So(err, ShouldBeNil)
-			csvImporter := NewCSVImportInput(fields, false, fileHandle)
+			csvImporter := NewCSVImportInput(fields, fileHandle)
 			_, err = csvImporter.ImportDocument()
 			So(err, ShouldNotBeNil)
 		})
@@ -78,7 +79,7 @@ func TestCSVImportDocument(t *testing.T) {
 			So(err, ShouldBeNil)
 			fileHandle, err := os.Open(csvFile.Name())
 			So(err, ShouldBeNil)
-			csvImporter := NewCSVImportInput(fields, false, fileHandle)
+			csvImporter := NewCSVImportInput(fields, fileHandle)
 			bsonDoc, err := csvImporter.ImportDocument()
 			So(err, ShouldBeNil)
 			So(bsonDoc, ShouldResemble, expectedRead)
@@ -98,7 +99,7 @@ func TestCSVImportDocument(t *testing.T) {
 			So(err, ShouldBeNil)
 			fileHandle, err := os.Open(csvFile.Name())
 			So(err, ShouldBeNil)
-			csvImporter := NewCSVImportInput(fields, false, fileHandle)
+			csvImporter := NewCSVImportInput(fields, fileHandle)
 			bsonDoc, err := csvImporter.ImportDocument()
 			So(err, ShouldBeNil)
 			So(bsonDoc, ShouldResemble, expectedRead)
@@ -120,7 +121,7 @@ func TestCSVImportDocument(t *testing.T) {
 			So(err, ShouldBeNil)
 			fileHandle, err = os.Open(csvFile.Name())
 			So(err, ShouldBeNil)
-			csvImporter := NewCSVImportInput(fields, false, fileHandle)
+			csvImporter := NewCSVImportInput(fields, fileHandle)
 			bsonDoc, err := csvImporter.ImportDocument()
 			So(err, ShouldBeNil)
 			So(bsonDoc, ShouldResemble, expectedRead)
@@ -144,7 +145,7 @@ func TestCSVImportDocument(t *testing.T) {
 			So(err, ShouldBeNil)
 			fileHandle, err = os.Open(csvFile.Name())
 			So(err, ShouldBeNil)
-			csvImporter := NewCSVImportInput(fields, false, fileHandle)
+			csvImporter := NewCSVImportInput(fields, fileHandle)
 			bsonDoc, err := csvImporter.ImportDocument()
 			So(err, ShouldBeNil)
 			So(bsonDoc, ShouldResemble, expectedRead)
@@ -160,7 +161,7 @@ func TestCSVImportDocument(t *testing.T) {
 			So(err, ShouldBeNil)
 			fileHandle, err = os.Open(csvFile.Name())
 			So(err, ShouldBeNil)
-			csvImporter := NewCSVImportInput(fields, false, fileHandle)
+			csvImporter := NewCSVImportInput(fields, fileHandle)
 			_, err := csvImporter.ImportDocument()
 			So(err, ShouldNotBeNil)
 		})
@@ -186,7 +187,7 @@ func TestCSVImportDocument(t *testing.T) {
 			So(err, ShouldBeNil)
 			fileHandle, err := os.Open(csvFile.Name())
 			So(err, ShouldBeNil)
-			csvImporter := NewCSVImportInput(fields, false, fileHandle)
+			csvImporter := NewCSVImportInput(fields, fileHandle)
 			bsonDoc, err := csvImporter.ImportDocument()
 			So(err, ShouldBeNil)
 			So(bsonDoc, ShouldResemble, expectedReadOne)
@@ -217,8 +218,8 @@ func TestCSVSetHeader(t *testing.T) {
 				So(err, ShouldBeNil)
 				fileHandle, err = os.Open(csvFile.Name())
 				So(err, ShouldBeNil)
-				csvImporter := NewCSVImportInput(fields, true, fileHandle)
-				So(csvImporter.SetHeader(), ShouldBeNil)
+				csvImporter := NewCSVImportInput(fields, fileHandle)
+				So(csvImporter.SetHeader(true), ShouldBeNil)
 				So(len(csvImporter.Fields), ShouldEqual, 3)
 			})
 
@@ -232,8 +233,8 @@ func TestCSVSetHeader(t *testing.T) {
 			So(err, ShouldBeNil)
 			fileHandle, err = os.Open(csvFile.Name())
 			So(err, ShouldBeNil)
-			csvImporter := NewCSVImportInput(fields, true, fileHandle)
-			So(csvImporter.SetHeader(), ShouldBeNil)
+			csvImporter := NewCSVImportInput(fields, fileHandle)
+			So(csvImporter.SetHeader(true), ShouldBeNil)
 			So(len(csvImporter.Fields), ShouldEqual, 3)
 
 			contents = "a.b.c, a.b.d, c"
@@ -245,8 +246,8 @@ func TestCSVSetHeader(t *testing.T) {
 			So(err, ShouldBeNil)
 			fileHandle, err = os.Open(csvFile.Name())
 			So(err, ShouldBeNil)
-			csvImporter = NewCSVImportInput(fields, true, fileHandle)
-			So(csvImporter.SetHeader(), ShouldBeNil)
+			csvImporter = NewCSVImportInput(fields, fileHandle)
+			So(csvImporter.SetHeader(true), ShouldBeNil)
 			So(len(csvImporter.Fields), ShouldEqual, 3)
 
 			contents = "a.b, ab, a.c"
@@ -258,8 +259,8 @@ func TestCSVSetHeader(t *testing.T) {
 			So(err, ShouldBeNil)
 			fileHandle, err = os.Open(csvFile.Name())
 			So(err, ShouldBeNil)
-			csvImporter = NewCSVImportInput(fields, true, fileHandle)
-			So(csvImporter.SetHeader(), ShouldBeNil)
+			csvImporter = NewCSVImportInput(fields, fileHandle)
+			So(csvImporter.SetHeader(true), ShouldBeNil)
 			So(len(csvImporter.Fields), ShouldEqual, 3)
 
 			contents = "a, ab, ac, dd"
@@ -271,8 +272,8 @@ func TestCSVSetHeader(t *testing.T) {
 			So(err, ShouldBeNil)
 			fileHandle, err = os.Open(csvFile.Name())
 			So(err, ShouldBeNil)
-			csvImporter = NewCSVImportInput(fields, true, fileHandle)
-			So(csvImporter.SetHeader(), ShouldBeNil)
+			csvImporter = NewCSVImportInput(fields, fileHandle)
+			So(csvImporter.SetHeader(true), ShouldBeNil)
 			So(len(csvImporter.Fields), ShouldEqual, 4)
 		})
 
@@ -286,8 +287,8 @@ func TestCSVSetHeader(t *testing.T) {
 			So(err, ShouldBeNil)
 			fileHandle, err = os.Open(csvFile.Name())
 			So(err, ShouldBeNil)
-			csvImporter := NewCSVImportInput(fields, true, fileHandle)
-			So(csvImporter.SetHeader(), ShouldNotBeNil)
+			csvImporter := NewCSVImportInput(fields, fileHandle)
+			So(csvImporter.SetHeader(true), ShouldNotBeNil)
 
 			contents = "a.b.c, a.b.d.c, a.b.d"
 			fields = []string{}
@@ -298,8 +299,8 @@ func TestCSVSetHeader(t *testing.T) {
 			So(err, ShouldBeNil)
 			fileHandle, err = os.Open(csvFile.Name())
 			So(err, ShouldBeNil)
-			csvImporter = NewCSVImportInput(fields, true, fileHandle)
-			So(csvImporter.SetHeader(), ShouldNotBeNil)
+			csvImporter = NewCSVImportInput(fields, fileHandle)
+			So(csvImporter.SetHeader(true), ShouldNotBeNil)
 
 			contents = "a, a, a"
 			fields = []string{}
@@ -310,8 +311,8 @@ func TestCSVSetHeader(t *testing.T) {
 			So(err, ShouldBeNil)
 			fileHandle, err = os.Open(csvFile.Name())
 			So(err, ShouldBeNil)
-			csvImporter = NewCSVImportInput(fields, true, fileHandle)
-			So(csvImporter.SetHeader(), ShouldNotBeNil)
+			csvImporter = NewCSVImportInput(fields, fileHandle)
+			So(csvImporter.SetHeader(true), ShouldNotBeNil)
 		})
 
 		Convey("setting the header that ends in a dot should error",
@@ -325,7 +326,7 @@ func TestCSVSetHeader(t *testing.T) {
 				So(err, ShouldBeNil)
 				fileHandle, err = os.Open(csvFile.Name())
 				So(err, ShouldBeNil)
-				So(NewCSVImportInput(fields, true, fileHandle).SetHeader(), ShouldNotBeNil)
+				So(NewCSVImportInput(fields, fileHandle).SetHeader(true), ShouldNotBeNil)
 			})
 
 		Convey("setting the header that starts in a dot should error",
@@ -339,7 +340,7 @@ func TestCSVSetHeader(t *testing.T) {
 				So(err, ShouldBeNil)
 				fileHandle, err = os.Open(csvFile.Name())
 				So(err, ShouldBeNil)
-				So(NewCSVImportInput(fields, true, fileHandle).SetHeader(), ShouldNotBeNil)
+				So(NewCSVImportInput(fields, fileHandle).SetHeader(true), ShouldNotBeNil)
 			})
 
 		Convey("setting the header that contains multiple consecutive dots should error",
@@ -353,7 +354,7 @@ func TestCSVSetHeader(t *testing.T) {
 				So(err, ShouldBeNil)
 				fileHandle, err = os.Open(csvFile.Name())
 				So(err, ShouldBeNil)
-				So(NewCSVImportInput(fields, true, fileHandle).SetHeader(), ShouldNotBeNil)
+				So(NewCSVImportInput(fields, fileHandle).SetHeader(true), ShouldNotBeNil)
 
 				contents = "c, a.a, b.b...b"
 				fields = []string{}
@@ -364,7 +365,7 @@ func TestCSVSetHeader(t *testing.T) {
 				So(err, ShouldBeNil)
 				fileHandle, err = os.Open(csvFile.Name())
 				So(err, ShouldBeNil)
-				So(NewCSVImportInput(fields, true, fileHandle).SetHeader(), ShouldNotBeNil)
+				So(NewCSVImportInput(fields, fileHandle).SetHeader(true), ShouldNotBeNil)
 			})
 
 		Convey("setting the header using an empty file should return EOF",
@@ -378,14 +379,14 @@ func TestCSVSetHeader(t *testing.T) {
 				So(err, ShouldBeNil)
 				fileHandle, err = os.Open(csvFile.Name())
 				So(err, ShouldBeNil)
-				csvImporter := NewCSVImportInput(fields, true, fileHandle)
-				So(csvImporter.SetHeader(), ShouldEqual, io.EOF)
+				csvImporter := NewCSVImportInput(fields, fileHandle)
+				So(csvImporter.SetHeader(true), ShouldEqual, io.EOF)
 				So(len(csvImporter.Fields), ShouldEqual, 0)
 			})
 		Convey("setting the header with fields already set, should "+
 			"the header line with the existing fields",
 			func() {
-				contents := "extraHeader1, extraHeader2, extraHeader3\n\n"
+				contents := "extraHeader1,extraHeader2,extraHeader3"
 				fields := []string{"a", "b", "c"}
 
 				csvFile, err = ioutil.TempFile("", "mongoimport_")
@@ -394,11 +395,12 @@ func TestCSVSetHeader(t *testing.T) {
 				So(err, ShouldBeNil)
 				fileHandle, err = os.Open(csvFile.Name())
 				So(err, ShouldBeNil)
-				csvImporter := NewCSVImportInput(fields, true, fileHandle)
-				So(csvImporter.SetHeader(), ShouldBeNil)
-				// if SetHeader() with fields already passed in, the header
-				// should be a union of both the fields and the header line
-				So(len(csvImporter.Fields), ShouldEqual, 6)
+				csvImporter := NewCSVImportInput(fields, fileHandle)
+				So(csvImporter.SetHeader(true), ShouldBeNil)
+				// if SetHeader() is called with fields already passed in,
+				// the header should be replaced with the read header line
+				So(len(csvImporter.Fields), ShouldEqual, 3)
+				So(csvImporter.Fields, ShouldResemble, strings.Split(contents, ","))
 			})
 
 		Convey("plain CSV input file sources should be parsed correctly and "+
@@ -409,7 +411,7 @@ func TestCSVSetHeader(t *testing.T) {
 				expectedReadTwo := bson.M{"a": 3, "b": 5.4, "c": "string"}
 				fileHandle, err := os.Open("testdata/test.csv")
 				So(err, ShouldBeNil)
-				csvImporter := NewCSVImportInput(fields, false, fileHandle)
+				csvImporter := NewCSVImportInput(fields, fileHandle)
 				bsonDoc, err := csvImporter.ImportDocument()
 				So(err, ShouldBeNil)
 				So(bsonDoc, ShouldResemble, expectedReadOne)

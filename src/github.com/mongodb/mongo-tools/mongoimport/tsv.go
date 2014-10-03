@@ -2,7 +2,9 @@ package mongoimport
 
 import (
 	"bufio"
+	"fmt"
 	"github.com/mongodb/mongo-tools/common/log"
+	"github.com/mongodb/mongo-tools/common/util"
 	"gopkg.in/mgo.v2/bson"
 	"io"
 	"strconv"
@@ -14,8 +16,6 @@ const (
 	tokenSeparator = "\t"
 )
 
-// TODO: TOOLS-64, TOOLS-70 for TSV
-
 // TSVImportInput is a struct that implements the ImportInput interface for a
 // TSV input source
 type TSVImportInput struct {
@@ -24,6 +24,8 @@ type TSVImportInput struct {
 	// tsvReader is the underlying reader used to read data in from the TSV
 	// or TSV file
 	tsvReader *bufio.Reader
+	// numProcessed indicates the number of CSV documents processed
+	numProcessed int64
 }
 
 // NewTSVImportInput returns a TSVImportInput configured to read input from the
@@ -36,30 +38,25 @@ func NewTSVImportInput(fields []string, in io.Reader) *TSVImportInput {
 }
 
 // SetHeader sets the header field for a TSV
-func (tsvImporter *TSVImportInput) SetHeader() error {
-	headers, err := tsvImporter.tsvReader.ReadString(entryDelimiter)
+func (tsvImporter *TSVImportInput) SetHeader(hasHeaderLine bool) (err error) {
+	fields, err := validateHeaders(tsvImporter, hasHeaderLine)
 	if err != nil {
 		return err
 	}
-	tokenizedHeaders := strings.Split(headers, tokenSeparator)
-	for _, header := range tokenizedHeaders {
-		tsvImporter.Fields = append(tsvImporter.Fields,
-			strings.TrimSpace(header))
-	}
-	if len(tokenizedHeaders) == 1 {
-		log.Logf(1, "using field %v", tokenizedHeaders[0])
-	} else {
-		log.Logf(1, "using fields '%v'", headers)
-	}
+	tsvImporter.Fields = fields
 	return nil
 }
 
 // ImportDocument reads a line of input with the TSV representation of a
 // document and returns the BSON equivalent.
 func (tsvImporter *TSVImportInput) ImportDocument() (bson.M, error) {
+	tsvImporter.numProcessed++
 	tsvRecord, err := tsvImporter.tsvReader.ReadString(entryDelimiter)
 	if err != nil {
-		return nil, err
+		if err == io.EOF {
+			return nil, err
+		}
+		return nil, fmt.Errorf("read error on entry #%v: %v", tsvImporter.numProcessed, err)
 	}
 	log.Logf(2, "got line: %v", tsvRecord)
 
@@ -69,12 +66,22 @@ func (tsvImporter *TSVImportInput) ImportDocument() (bson.M, error) {
 	}
 	tokens := strings.Split(tsvRecord, tokenSeparator)
 	document := bson.M{}
+	var key string
 	for index, token := range tokens {
 		parsedValue := getParsedValue(token)
 		if index < len(tsvImporter.Fields) {
-			document[tsvImporter.Fields[index]] = parsedValue
+			if strings.Contains(tsvImporter.Fields[index], ".") {
+				setNestedValue(tsvImporter.Fields[index], parsedValue, document)
+			} else {
+				document[tsvImporter.Fields[index]] = parsedValue
+			}
 		} else {
-			document["field"+strconv.Itoa(index)] = parsedValue
+			key = "field" + strconv.Itoa(index)
+			if util.StringSliceContains(tsvImporter.Fields, key) {
+				return document, fmt.Errorf("Duplicate header name - on %v - for token #%v ('%v') in document #%v",
+					key, index+1, parsedValue, tsvImporter.numProcessed)
+			}
+			document[key] = parsedValue
 		}
 	}
 	return document, nil

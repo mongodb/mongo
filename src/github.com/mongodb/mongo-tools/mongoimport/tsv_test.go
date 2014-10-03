@@ -6,6 +6,7 @@ import (
 	"io"
 	"io/ioutil"
 	"os"
+	"strings"
 	"testing"
 )
 
@@ -177,7 +178,7 @@ func TestTSVSetHeader(t *testing.T) {
 				fileHandle, err = os.Open(tsvFile.Name())
 				So(err, ShouldBeNil)
 				tsvImporter := NewTSVImportInput(fields, fileHandle)
-				So(tsvImporter.SetHeader(), ShouldBeNil)
+				So(tsvImporter.SetHeader(true), ShouldBeNil)
 				So(len(tsvImporter.Fields), ShouldEqual, 3)
 			})
 		Convey("setting the header with fields already set, should "+
@@ -193,8 +194,11 @@ func TestTSVSetHeader(t *testing.T) {
 				fileHandle, err = os.Open(tsvFile.Name())
 				So(err, ShouldBeNil)
 				tsvImporter := NewTSVImportInput(fields, fileHandle)
-				So(tsvImporter.SetHeader(), ShouldBeNil)
-				So(len(tsvImporter.Fields), ShouldEqual, 6)
+				// if SetHeader() is called with fields already passed in,
+				// the header should be replaced with the read header line
+				So(tsvImporter.SetHeader(true), ShouldBeNil)
+				So(len(tsvImporter.Fields), ShouldEqual, 3)
+				So(tsvImporter.Fields, ShouldResemble, strings.Split(strings.Trim(contents, "\n"), tokenSeparator))
 			})
 		Reset(func() {
 			tsvFile.Close()
