@@ -69,7 +69,7 @@ __evict_list_clear(WT_SESSION_IMPL *session, WT_EVICT_ENTRY *e)
 	if (e->ref != NULL) {
 		WT_ASSERT(session,
 		    F_ISSET_ATOMIC(e->ref->page, WT_PAGE_EVICT_LRU));
-		F_CLR_ATOMIC(e->ref->page, WT_PAGE_EVICT_LRU);
+		F_CLR_ATOMIC1(e->ref->page, WT_PAGE_EVICT_LRU);
 	}
 	e->ref = NULL;
 	e->btree = WT_DEBUG_POINT;
@@ -953,7 +953,7 @@ __evict_init_candidate(
 	evict->btree = S2BT(session);
 
 	/* Mark the page on the list */
-	F_SET_ATOMIC(ref->page, WT_PAGE_EVICT_LRU);
+	F_SET_ATOMIC1(ref->page, WT_PAGE_EVICT_LRU);
 }
 
 /*
@@ -1157,7 +1157,7 @@ __evict_get_ref(
 		 * multiple attempts to evict it.  For pages that are already
 		 * being evicted, this operation will fail and we will move on.
 		 */
-		if (!WT_ATOMIC_CAS(
+		if (!WT_ATOMIC_CAS4(
 		    evict->ref->state, WT_REF_MEM, WT_REF_LOCKED)) {
 			__evict_list_clear(session, evict);
 			continue;
@@ -1167,7 +1167,7 @@ __evict_get_ref(
 		 * Increment the busy count in the btree handle to prevent it
 		 * from being closed under us.
 		 */
-		(void)WT_ATOMIC_ADD(evict->btree->evict_busy, 1);
+		(void)WT_ATOMIC_ADD4(evict->btree->evict_busy, 1);
 
 		*btreep = evict->btree;
 		*refp = evict->ref;
@@ -1219,7 +1219,7 @@ __wt_evict_lru_page(WT_SESSION_IMPL *session, int is_app)
 
 	WT_WITH_BTREE(session, btree, ret = __wt_evict_page(session, ref));
 
-	(void)WT_ATOMIC_SUB(btree->evict_busy, 1);
+	(void)WT_ATOMIC_SUB4(btree->evict_busy, 1);
 
 	WT_RET(ret);
 

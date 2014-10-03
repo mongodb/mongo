@@ -122,7 +122,7 @@ __update_serial_func(WT_SESSION_IMPL *session,
 	 * and if it is, do a full-barrier to ensure the update's next pointer
 	 * is set before we update the linked list and try again.
 	 */
-	while (!WT_ATOMIC_CAS(*upd_entry, upd->next, upd)) {
+	while (!WT_ATOMIC_CAS8(*upd_entry, upd->next, upd)) {
 		WT_RET(__wt_txn_update_check(session, upd->next = *upd_entry));
 		WT_WRITE_BARRIER();
 	}
@@ -136,12 +136,12 @@ __update_serial_func(WT_SESSION_IMPL *session,
 	 */
 	if (upd->next != NULL &&
 	    F_ISSET(S2C(session)->cache, WT_EVICT_ACTIVE)) {
-		F_CAS_ATOMIC(page, WT_PAGE_SCANNING, ret);
+		F_CAS_ATOMIC1(page, WT_PAGE_SCANNING, ret);
 		/* If we can't lock it, don't scan, that's okay. */
 		if (ret != 0)
 			return (0);
 		obsolete = __wt_update_obsolete_check(session, upd->next);
-		F_CLR_ATOMIC(page, WT_PAGE_SCANNING);
+		F_CLR_ATOMIC1(page, WT_PAGE_SCANNING);
 		if (obsolete != NULL)
 			__wt_update_obsolete_free(session, page, obsolete);
 	}
