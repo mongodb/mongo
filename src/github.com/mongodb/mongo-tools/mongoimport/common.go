@@ -39,9 +39,7 @@ func validateHeaders(importInput ImportInput, hasHeaderLine bool) (validatedFiel
 		for _, latterHeader := range headers[index+1:] {
 			// NOTE: this means we will not support imports that have fields that
 			// include e.g. a, a.b
-			if strings.HasPrefix(latterHeader, header) &&
-				(strings.LastIndex(latterHeader, ".") == len(header)) &&
-				(strings.Contains(header, ".") || strings.Contains(latterHeader, ".")) {
+			if strings.HasPrefix(latterHeader, header+".") {
 				return nil, fmt.Errorf("incompatible headers found: '%v' and '%v",
 					header, latterHeader)
 			}

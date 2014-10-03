@@ -22,6 +22,8 @@ func main() {
 	ingestOpts := &options.IngestOptions{}
 	opts.AddOptions(ingestOpts)
 
+	log.InitToolLogger(opts.Verbosity)
+
 	args, err := opts.Parse()
 	if err != nil {
 		log.Logf(0, "error parsing command line options: %v", err)
@@ -40,8 +42,6 @@ func main() {
 
 	// don't attempt to discover other members of a replica set
 	opts.Direct = true
-
-	log.InitToolLogger(opts.Verbosity)
 
 	// create a session provider to connect to the db
 	sessionProvider := db.NewSessionProvider(*opts)

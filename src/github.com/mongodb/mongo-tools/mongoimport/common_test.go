@@ -59,6 +59,8 @@ func TestValidateHeaders(t *testing.T) {
 			So(err, ShouldNotBeNil)
 			_, err = validateHeaders(NewCSVImportInput([]string{"a", "a.ba", "b.a"}, fileHandle), false)
 			So(err, ShouldNotBeNil)
+			_, err = validateHeaders(NewCSVImportInput([]string{"a", "a.b.c"}, fileHandle), false)
+			So(err, ShouldNotBeNil)
 		})
 		Convey("if the fields don't collide, no error should be thrown", func() {
 			_, err := validateHeaders(NewCSVImportInput([]string{"a", "aa"}, fileHandle), false)
