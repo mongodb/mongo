@@ -45,10 +45,6 @@
 #include "mongo/util/goodies.h"
 #include "mongo/util/log.h"
 
-namespace {
-    const size_t MAX_PROFILE_DOC_SIZE_BYTES = 100*1024;
-}
-
 namespace mongo {
 
 namespace {
@@ -94,8 +90,7 @@ namespace {
         // build object
         BSONObjBuilder b(profileBufBuilder);
 
-        const bool isQueryObjTooBig = !currentOp.debug().append(currentOp, b,
-                MAX_PROFILE_DOC_SIZE_BYTES);
+        currentOp.debug().append(currentOp, b);
 
         b.appendDate("ts", jsTime());
         b.append("client", c.clientAddress());
@@ -104,27 +99,6 @@ namespace {
         _appendUserInfo(currentOp, b, authSession);
 
         BSONObj p = b.done();
-
-        if (static_cast<size_t>(p.objsize()) > MAX_PROFILE_DOC_SIZE_BYTES || isQueryObjTooBig) {
-            string small = p.toString(/*isArray*/false, /*full*/false);
-
-            warning() << "can't add full line to system.profile: " << small << endl;
-
-            // rebuild with limited info
-            BSONObjBuilder b(profileBufBuilder);
-            b.appendDate("ts", jsTime());
-            b.append("client", c.clientAddress() );
-            _appendUserInfo(currentOp, b, authSession);
-
-            b.append("err", "profile line too large (max is 100KB)");
-
-            // should be much smaller but if not don't break anything
-            if (small.size() < MAX_PROFILE_DOC_SIZE_BYTES){
-                b.append("abbreviated", small);
-            }
-
-            p = b.done();
-        }
 
         WriteUnitOfWork wunit(txn);
 

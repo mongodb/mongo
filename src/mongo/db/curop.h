@@ -129,19 +129,10 @@ namespace mongo {
         std::string report( const CurOp& curop ) const;
 
         /**
-         * Appends stored data and information from curop to the builder.
-         *
-         * @param curop information about the current operation which will be
-         *     use to append data to the builder.
-         * @param builder the BSON builder to use for appending data. Data can
-         *     still be appended even if this method returns false.
-         * @param maxSize the maximum allowed combined size for the query object
-         *     and update object
-         *
-         * @return false if the sum of the sizes for the query object and update
-         *     object exceeded maxSize
+         * Appends information about the current operation to "builder".  "curop" must be a
+         * reference to the CurOp that owns this OpDebug.
          */
-        bool append(const CurOp& curop, BSONObjBuilder& builder, size_t maxSize) const;
+        void append(const CurOp& curop, BSONObjBuilder& builder) const;
 
         // -------------------
         
