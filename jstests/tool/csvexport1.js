@@ -29,12 +29,12 @@ assert.soon ( 3 + " == c.count()", "after import");
 
 // Note: Exporting and Importing to/from CSV is not designed to be round-trippable
 expected = []
-expected.push({ a : 1, b : "ObjectId(" + objId.valueOf() + ")", c : "[ 1, 2, 3 ]", d : "{ \"a\" : \"hello\", \"b\" : \"world\" }", e : "-"})
+expected.push({ a : 1, b : "ObjectId(" + objId.valueOf() + ")", c : [ 1, 2, 3 ], d : { "a" : "hello", "b" : "world" }, e : "-"})
 expected.push({ a : -2.0, b : "", c : "$MinKey", d : "Then he said, \"Hello World!\"", e : 3})
 // "t" should be 1234, but the shell interprets the first field of timestamps as milliseconds while
 // they are stored as seconds.  See SERVER-7718.
 expected.push({ a : "D76DF8", b : "2009-08-27T12:34:56.789Z",
-                c : "{ \"$timestamp\" : { \"t\" : 1234, \"i\" : 9876 } }",
+                c : { "$timestamp" : { "t" : 1234, "i" : 9876 } },
                 d : "/foo*\\\"bar\\\"/i", e : tojson(function foo() { print("Hello World!"); })})
 
 actual = []
@@ -44,7 +44,20 @@ actual.push(c.find({a : "D76DF8"}).toArray()[0]);
 
 for (i = 0; i < expected.length; i++) {
     delete actual[i]._id
-    assert.eq( expected[i], actual[i], "CSV export " + i);
+    assert.eq(Object.keys(expected[i]).length, Object.keys(actual[i]).length)
+    keys = Object.keys(expected[i])
+    for(var j=0;j<keys.length;j++){
+        expectedVal = expected[i][keys[j]]
+        if((typeof expectedVal)== "object"){
+            // For fields which contain arrays or objects, they have been
+            // exported as JSON - parse the JSON in the output and verify
+            // that it matches the original document's value
+            assert.docEq(expectedVal, JSON.parse(actual[i][keys[j]]), "CSV export " + i)
+        }else{
+            // Otherwise just compare the values directly
+            assert.eq(expectedVal, actual[i][keys[j]], "CSV export " + i)
+        }
+    }
 }
 
 
