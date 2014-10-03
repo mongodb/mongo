@@ -868,8 +868,6 @@ __wt_split_evict(WT_SESSION_IMPL *session, WT_REF *ref, int exclusive)
 			F_CLR_ATOMIC(parent, WT_PAGE_SPLITTING);
 			continue;
 		}
-		if (ret != EBUSY)
-			goto err;
 		__wt_yield();
 	}
 	locked = 1;
