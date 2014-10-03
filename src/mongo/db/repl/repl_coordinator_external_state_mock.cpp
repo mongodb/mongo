@@ -45,6 +45,7 @@ namespace repl {
         : _localRsConfigDocument(ErrorCodes::NoMatchingDocument, "No local config document"),
           _lastOpTime(ErrorCodes::NoMatchingDocument, "No last oplog entry"),
          _canAcquireGlobalSharedLock(true),
+         _storeLocalConfigDocumentStatus(Status::OK()),
          _connectionsClosed(false) {
     }
 
@@ -86,8 +87,11 @@ namespace repl {
     Status ReplicationCoordinatorExternalStateMock::storeLocalConfigDocument(
             OperationContext* txn,
             const BSONObj& config) {
-        setLocalConfigDocument(StatusWith<BSONObj>(config));
-        return Status::OK();
+        if (_storeLocalConfigDocumentStatus.isOK()) {
+            setLocalConfigDocument(StatusWith<BSONObj>(config));
+            return Status::OK();
+        }
+        return _storeLocalConfigDocumentStatus;
     }
 
     void ReplicationCoordinatorExternalStateMock::setLocalConfigDocument(
@@ -104,6 +108,10 @@ namespace repl {
     void ReplicationCoordinatorExternalStateMock::setLastOpTime(
         const StatusWith<OpTime>& lastApplied) {
         _lastOpTime = lastApplied;
+    }
+
+    void ReplicationCoordinatorExternalStateMock::setStoreLocalConfigDocumentStatus(Status status) {
+        _storeLocalConfigDocumentStatus = status;
     }
 
     void ReplicationCoordinatorExternalStateMock::closeClientConnections() {
