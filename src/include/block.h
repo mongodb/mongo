@@ -236,7 +236,7 @@ struct __wt_block {
 	int		ckpt_inprogress;/* Live checkpoint in progress */
 
 				/* Salvage support */
-	wt_off_t	slvg_off;		/* Salvage file offset */
+	wt_off_t	slvg_off;	/* Salvage file offset */
 
 				/* Verification support */
 	int	   verify;		/* If performing verification */
