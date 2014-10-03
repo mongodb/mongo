@@ -40,7 +40,7 @@ verifyOutput(out);
 out = db.srcNonSharded.mapReduce(map, reduce, { out: { reduce: "mrReduce" + suffix } });
 verifyOutput(out);
 
-out = db.srcNonSharded.mapReduce(map, reduce, { out: { inline: "mrInline" + suffix } });
+out = db.srcNonSharded.mapReduce(map, reduce, { out: { inline: 1 }});
 verifyOutput(out);
 assert(out.results != 'undefined', "no results for inline");
 
