@@ -175,5 +175,3 @@
 	} while (!WT_ATOMIC_CAS1((p)->flags_atomic,			\
 	    __orig, __orig & ~(uint8_t)(mask)));			\
 } while (0)
-
-#define	WT_CACHE_LINE_ALIGNMENT	64	/* Cache line alignment */
