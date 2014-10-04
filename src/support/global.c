@@ -41,6 +41,11 @@ __wt_global_once(void)
 {
 	WT_DECL_RET;
 
+	if ((ret = __system_is_little_endian()) != 0) {
+		__wt_pthread_once_failed = ret;
+		return;
+	}
+
 	if ((ret =
 	    __wt_spin_init(NULL, &__wt_process.spinlock, "global")) != 0) {
 		__wt_pthread_once_failed = ret;
@@ -67,13 +72,11 @@ __wt_library_init(void)
 	static int first = 1;
 	WT_DECL_RET;
 
-	WT_RET(__system_is_little_endian());
-
 	/*
 	 * Do per-process initialization once, before anything else, but only
-	 * once.  I don't know how heavy_weight pthread_once might be, so I'm
-	 * front-ending it with a local static and only using pthread_once to
-	 * avoid a race.
+	 * once.  I don't know how heavy-weight the function (pthread_once, in
+	 * the POSIX world), might be, so I'm front-ending it with a local
+	 * static and only using that function to avoid a race.
 	 */
 	if (first) {
 		if ((ret = __wt_once(__wt_global_once)) != 0)
