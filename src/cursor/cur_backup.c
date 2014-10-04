@@ -121,7 +121,7 @@ __wt_curbackup_open(WT_SESSION_IMPL *session,
 	WT_CURSOR_BACKUP *cb;
 	WT_DECL_RET;
 
-	STATIC_ASSERT(offsetof(WT_CURSOR_BACKUP, iface) == 0);
+	WT_STATIC_ASSERT(offsetof(WT_CURSOR_BACKUP, iface) == 0);
 
 	cb = NULL;
 

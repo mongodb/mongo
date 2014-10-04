@@ -362,7 +362,7 @@ __wt_curfile_create(WT_SESSION_IMPL *session,
 	WT_DECL_RET;
 	size_t csize;
 
-	STATIC_ASSERT(offsetof(WT_CURSOR_BTREE, iface) == 0);
+	WT_STATIC_ASSERT(offsetof(WT_CURSOR_BTREE, iface) == 0);
 
 	cbt = NULL;
 

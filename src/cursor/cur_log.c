@@ -327,7 +327,7 @@ __wt_curlog_open(WT_SESSION_IMPL *session,
 	WT_DECL_RET;
 	WT_LOG *log;
 
-	STATIC_ASSERT(offsetof(WT_CURSOR_LOG, iface) == 0);
+	WT_STATIC_ASSERT(offsetof(WT_CURSOR_LOG, iface) == 0);
 	conn = S2C(session);
 	if (!conn->logging)
 		WT_RET_MSG(session, EINVAL,

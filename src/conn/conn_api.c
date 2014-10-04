@@ -1430,7 +1430,7 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
 	/* Merge the final configuration for later reconfiguration. */
 	WT_ERR(__wt_config_merge(session, cfg, &conn->cfg));
 
-	STATIC_ASSERT(offsetof(WT_CONNECTION_IMPL, iface) == 0);
+	WT_STATIC_ASSERT(offsetof(WT_CONNECTION_IMPL, iface) == 0);
 	*wt_connp = &conn->iface;
 
 err:	__wt_buf_free(session, &cbbuf);
