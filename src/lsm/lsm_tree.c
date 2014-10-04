@@ -507,7 +507,7 @@ __wt_lsm_tree_get(WT_SESSION_IMPL *session,
 			    return (EBUSY);
 
 			if (exclusive) {
-				F_SET_ATOMIC4(lsm_tree, WT_LSM_TREE_EXCLUSIVE);
+				F_SET_ATOMIC(lsm_tree, WT_LSM_TREE_EXCLUSIVE);
 				if (!WT_ATOMIC_CAS4(lsm_tree->refcnt, 0, 1)) {
 					F_CLR(lsm_tree, WT_LSM_TREE_EXCLUSIVE);
 					return (EBUSY);
@@ -541,7 +541,7 @@ __wt_lsm_tree_release(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 {
 	WT_ASSERT(session, lsm_tree->refcnt > 0);
 	(void)WT_ATOMIC_SUB4(lsm_tree->refcnt, 1);
-	F_CLR_ATOMIC4(lsm_tree, WT_LSM_TREE_EXCLUSIVE);
+	F_CLR_ATOMIC(lsm_tree, WT_LSM_TREE_EXCLUSIVE);
 }
 
 /* How aggressively to ramp up or down throttle due to level 0 merging */

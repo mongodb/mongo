@@ -145,47 +145,35 @@
 #error "No write barrier implementation for this hardware"
 #endif
 
-#define	F_ISSET_ATOMIC(p, mask)	((p)->flags_atomic & (uint32_t)(mask))
+#define	F_ISSET_ATOMIC(p, mask)	((p)->flags_atomic & (uint8_t)(mask))
 
-#define	F_SET_ATOMIC_BASE(p, mask, type, func) do {			\
-	type __orig;							\
+#define	F_SET_ATOMIC(p, mask) do {					\
+	uint8_t __orig;							\
 	do {								\
 		__orig = (p)->flags_atomic;				\
-	} while (!func((p)->flags_atomic,				\
-	    __orig, __orig | (type)(mask)));				\
+	} while (!WT_ATOMIC_CAS1((p)->flags_atomic,			\
+	    __orig, __orig | (uint8_t)(mask)));				\
 } while (0)
 
-#define	F_CAS_ATOMIC_BASE(p, mask, ret, type, func) do {		\
-	type __orig;							\
+#define	F_CAS_ATOMIC(p, mask, ret) do {					\
+	uint32_t __orig;						\
 	ret = 0;							\
 	do {								\
 		__orig = (p)->flags_atomic;				\
-		if ((__orig & (type)(mask)) != 0) {			\
+		if ((__orig & (uint8_t)(mask)) != 0) {			\
 			ret = EBUSY;					\
 			break;						\
 		}							\
-	} while (!func((p)->flags_atomic,				\
-	    __orig, __orig | (type)(mask)));				\
+	} while (!WT_ATOMIC_CAS1((p)->flags_atomic,			\
+	    __orig, __orig | (uint8_t)(mask)));				\
 } while (0)
 
-#define	F_CLR_ATOMIC_BASE(p, mask, type, func) do {			\
-	type __orig;							\
+#define	F_CLR_ATOMIC(p, mask)	do {					\
+	uint8_t __orig;							\
 	do {								\
 		__orig = (p)->flags_atomic;				\
-	} while (!func((p)->flags_atomic,				\
-	    __orig, __orig & ~(type)(mask)));				\
+	} while (!WT_ATOMIC_CAS1((p)->flags_atomic,			\
+	    __orig, __orig & ~(uint8_t)(mask)));			\
 } while (0)
 
-#define	F_SET_ATOMIC1(p, mask)						\
-	F_SET_ATOMIC_BASE(p, mask, uint8_t, WT_ATOMIC_CAS1)
-#define	F_CAS_ATOMIC1(p, mask, ret)					\
-	F_CAS_ATOMIC_BASE(p, mask, ret, uint8_t, WT_ATOMIC_CAS1)
-#define	F_CLR_ATOMIC1(p, mask)						\
-	F_CLR_ATOMIC_BASE(p, mask, uint8_t, WT_ATOMIC_CAS1)
-
-#define	F_SET_ATOMIC4(p, mask)						\
-	F_SET_ATOMIC_BASE(p, mask, uint32_t, WT_ATOMIC_CAS4)
-#define	F_CAS_ATOMIC4(p, mask, ret)					\
-	F_CAS_ATOMIC_BASE(p, mask, ret, uint32_t, WT_ATOMIC_CAS4)
-#define	F_CLR_ATOMIC4(p, mask)						\
-	F_CLR_ATOMIC_BASE(p, mask, uint32_t, WT_ATOMIC_CAS4)
+#define	WT_CACHE_LINE_ALIGNMENT	64	/* Cache line alignment */

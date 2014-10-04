@@ -69,7 +69,7 @@ __evict_list_clear(WT_SESSION_IMPL *session, WT_EVICT_ENTRY *e)
 	if (e->ref != NULL) {
 		WT_ASSERT(session,
 		    F_ISSET_ATOMIC(e->ref->page, WT_PAGE_EVICT_LRU));
-		F_CLR_ATOMIC1(e->ref->page, WT_PAGE_EVICT_LRU);
+		F_CLR_ATOMIC(e->ref->page, WT_PAGE_EVICT_LRU);
 	}
 	e->ref = NULL;
 	e->btree = WT_DEBUG_POINT;
@@ -953,7 +953,7 @@ __evict_init_candidate(
 	evict->btree = S2BT(session);
 
 	/* Mark the page on the list */
-	F_SET_ATOMIC1(ref->page, WT_PAGE_EVICT_LRU);
+	F_SET_ATOMIC(ref->page, WT_PAGE_EVICT_LRU);
 }
 
 /*

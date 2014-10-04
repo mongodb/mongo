@@ -135,5 +135,5 @@ struct __wt_cache_pool {
 
 #define	WT_CACHE_POOL_MANAGED	0x01	/* Cache pool has a manager thread */
 #define	WT_CACHE_POOL_ACTIVE	0x02	/* Cache pool is active */
-	uint32_t flags_atomic;
+	uint8_t flags_atomic;
 };

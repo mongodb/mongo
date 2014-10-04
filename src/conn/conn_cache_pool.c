@@ -243,7 +243,7 @@ __wt_conn_cache_pool_open(WT_SESSION_IMPL *session)
 	 * in each connection saves having a complex election process when
 	 * the active connection shuts down.
 	 */
-	F_SET_ATOMIC4(cp, WT_CACHE_POOL_ACTIVE);
+	F_SET_ATOMIC(cp, WT_CACHE_POOL_ACTIVE);
 	F_SET(cache, WT_CACHE_POOL_RUN);
 	WT_RET(__wt_thread_create(session, &cache->cp_tid,
 	    __wt_cache_pool_server, cache->cp_session));
@@ -334,7 +334,7 @@ __wt_conn_cache_pool_destroy(WT_SESSION_IMPL *session)
 
 	if (--cp->refs == 0) {
 		WT_ASSERT(session, TAILQ_EMPTY(&cp->cache_pool_qh));
-		F_CLR_ATOMIC4(cp, WT_CACHE_POOL_ACTIVE);
+		F_CLR_ATOMIC(cp, WT_CACHE_POOL_ACTIVE);
 	}
 
 	if (!F_ISSET_ATOMIC(cp, WT_CACHE_POOL_ACTIVE)) {
@@ -366,7 +366,7 @@ __wt_conn_cache_pool_destroy(WT_SESSION_IMPL *session)
 
 		/* Notify other participants if we were managing */
 		if (F_ISSET(cache, WT_CACHE_POOL_MANAGER)) {
-			F_CLR_ATOMIC4(cp, WT_CACHE_POOL_MANAGED);
+			F_CLR_ATOMIC(cp, WT_CACHE_POOL_MANAGED);
 			WT_TRET(__wt_verbose(session, WT_VERB_SHARED_CACHE,
 			    "Shutting down shared cache manager connection"));
 		}
@@ -617,7 +617,7 @@ __wt_cache_pool_server(void *arg)
 			break;
 
 		/* Try to become the managing thread */
-		F_CAS_ATOMIC4(cp, WT_CACHE_POOL_MANAGED, ret);
+		F_CAS_ATOMIC(cp, WT_CACHE_POOL_MANAGED, ret);
 		if (ret == 0) {
 			F_SET(cache, WT_CACHE_POOL_MANAGER);
 			WT_ERR(__wt_verbose(session, WT_VERB_SHARED_CACHE,
