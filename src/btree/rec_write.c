@@ -384,7 +384,7 @@ __wt_rec_write(WT_SESSION_IMPL *session,
 		WT_PAGE_LOCK(session, page);
 	} else
 		for (;;) {
-			F_CAS_ATOMIC(page, WT_PAGE_SCANNING, ret);
+			F_CAS_ATOMIC1(page, WT_PAGE_SCANNING, ret);
 			if (ret == 0)
 				break;
 			__wt_yield();
@@ -423,7 +423,7 @@ __wt_rec_write(WT_SESSION_IMPL *session,
 	if (locked)
 		WT_PAGE_UNLOCK(session, page);
 	else
-		F_CLR_ATOMIC(page, WT_PAGE_SCANNING);
+		F_CLR_ATOMIC1(page, WT_PAGE_SCANNING);
 
 	/*
 	 * Clean up the boundary structures: some workloads result in millions
@@ -1051,7 +1051,7 @@ __rec_child_modify(WT_SESSION_IMPL *session,
 			 * to see if the delete is visible to us.  Lock down the
 			 * structure.
 			 */
-			if (!WT_ATOMIC_CAS(
+			if (!WT_ATOMIC_CAS4(
 			    ref->state, WT_REF_DELETED, WT_REF_LOCKED))
 				break;
 			ret = __rec_child_deleted(session, r, ref, statep);
@@ -4913,7 +4913,7 @@ err:			__wt_scr_free(&tkey);
 	if (!r->leave_dirty) {
 		mod->rec_max_txn = r->max_txn;
 
-		if (WT_ATOMIC_CAS(mod->write_gen, r->orig_write_gen, 0))
+		if (WT_ATOMIC_CAS4(mod->write_gen, r->orig_write_gen, 0))
 			__wt_cache_dirty_decr(session, page);
 	}
 

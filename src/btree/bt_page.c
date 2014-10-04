@@ -255,7 +255,7 @@ err:			if ((pindex = WT_INTL_INDEX_COPY(page)) != NULL) {
 
 	/* Increment the cache statistics. */
 	__wt_cache_page_inmem_incr(session, page, size);
-	(void)WT_ATOMIC_ADD(cache->pages_inmem, 1);
+	(void)WT_ATOMIC_ADD8(cache->pages_inmem, 1);
 
 	*pagep = page;
 	return (0);
@@ -330,7 +330,7 @@ __wt_page_inmem(WT_SESSION_IMPL *session,
 	WT_RET(__wt_page_alloc(
 	    session, dsk->type, dsk->recno, alloc_entries, 1, &page));
 	page->dsk = dsk;
-	F_SET_ATOMIC(page, flags);
+	F_SET_ATOMIC1(page, flags);
 
 	/*
 	 * Track the memory allocated to build this page so we can update the

@@ -67,7 +67,7 @@ __split_stash_add(WT_SESSION_IMPL *session, void *p, size_t len)
 	    session->split_stash_cnt + 1, &session->split_stash));
 
 	stash = session->split_stash + session->split_stash_cnt++;
-	stash->split_gen = WT_ATOMIC_ADD(S2C(session)->split_gen, 1);
+	stash->split_gen = WT_ATOMIC_ADD8(S2C(session)->split_gen, 1);
 	stash->p = p;
 	stash->len = len;
 
@@ -861,11 +861,11 @@ __wt_split_evict(WT_SESSION_IMPL *session, WT_REF *ref, int exclusive)
 	 */
 	for (;;) {
 		parent = ref->home;
-		F_CAS_ATOMIC(parent, WT_PAGE_SPLITTING, ret);
+		F_CAS_ATOMIC1(parent, WT_PAGE_SPLITTING, ret);
 		if (ret == 0) {
 			if (parent == ref->home)
 				break;
-			F_CLR_ATOMIC(parent, WT_PAGE_SPLITTING);
+			F_CLR_ATOMIC1(parent, WT_PAGE_SPLITTING);
 			continue;
 		}
 		__wt_yield();
@@ -1018,7 +1018,7 @@ __wt_split_evict(WT_SESSION_IMPL *session, WT_REF *ref, int exclusive)
 		ret = __split_deepen(session, parent);
 
 err:	if (locked)
-		F_CLR_ATOMIC(parent, WT_PAGE_SPLITTING);
+		F_CLR_ATOMIC1(parent, WT_PAGE_SPLITTING);
 
 	if (hazard)
 		WT_TRET(__wt_hazard_clear(session, parent));

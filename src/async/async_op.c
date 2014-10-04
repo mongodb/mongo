@@ -273,7 +273,7 @@ __wt_async_op_enqueue(WT_SESSION_IMPL *session, WT_ASYNC_OP_IMPL *op)
 	/*
 	 * We get our slot in the ring buffer to use.
 	 */
-	my_alloc = WT_ATOMIC_ADD(async->alloc_head, 1);
+	my_alloc = WT_ATOMIC_ADD8(async->alloc_head, 1);
 	my_slot = my_alloc % async->async_qsize;
 
 	/*
@@ -293,7 +293,7 @@ __wt_async_op_enqueue(WT_SESSION_IMPL *session, WT_ASYNC_OP_IMPL *op)
 #endif
 	WT_PUBLISH(async->async_queue[my_slot], op);
 	op->state = WT_ASYNCOP_ENQUEUED;
-	if (WT_ATOMIC_ADD(async->cur_queue, 1) > async->max_queue)
+	if (WT_ATOMIC_ADD4(async->cur_queue, 1) > async->max_queue)
 		WT_PUBLISH(async->max_queue, async->cur_queue);
 	/*
 	 * Multiple threads may be adding ops to the queue.  We need to wait

@@ -249,7 +249,7 @@ __wt_lsm_merge(
 		return (WT_NOTFOUND);
 
 	/* Allocate an ID for the merge. */
-	dest_id = WT_ATOMIC_ADD(lsm_tree->last, 1);
+	dest_id = WT_ATOMIC_ADD4(lsm_tree->last, 1);
 
 	/*
 	 * We only want to do the chunk loop if we're running with verbose,

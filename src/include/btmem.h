@@ -911,7 +911,7 @@ struct __wt_insert {
 #define	WT_PAGE_ALLOC_AND_SWAP(s, page, dest, v, count)	do {		\
 	if (((v) = (dest)) == NULL) {					\
 		WT_ERR(__wt_calloc_def(s, count, &(v)));		\
-		if (WT_ATOMIC_CAS(dest, NULL, v))			\
+		if (WT_ATOMIC_CAS8(dest, NULL, v))			\
 			__wt_cache_page_inmem_incr(			\
 			    s, page, (count) * sizeof(*(v)));		\
 		else							\

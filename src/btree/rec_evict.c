@@ -449,7 +449,7 @@ __hazard_exclusive(WT_SESSION_IMPL *session, WT_REF *ref, int top)
 	 * already be in the locked state, lock child pages in memory.
 	 * If another thread already has this page, give up.
 	 */
-	if (!top && !WT_ATOMIC_CAS(ref->state, WT_REF_MEM, WT_REF_LOCKED))
+	if (!top && !WT_ATOMIC_CAS4(ref->state, WT_REF_MEM, WT_REF_LOCKED))
 		return (EBUSY);	/* We couldn't change the state. */
 	WT_ASSERT(session, ref->state == WT_REF_LOCKED);
 
