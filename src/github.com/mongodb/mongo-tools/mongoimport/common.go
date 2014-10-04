@@ -9,6 +9,77 @@ import (
 	"strings"
 )
 
+// constructUpsertDocument constructs a BSON document to use for upserts
+func constructUpsertDocument(upsertFields []string, document bson.M) bson.M {
+	upsertDocument := bson.M{}
+	var hasDocumentKey bool
+	for _, key := range upsertFields {
+		upsertDocument[key] = getUpsertValue(key, document)
+		if upsertDocument[key] != nil {
+			hasDocumentKey = true
+		}
+	}
+	if !hasDocumentKey {
+		return nil
+	}
+	return upsertDocument
+}
+
+// getParsedValue returns the appropriate concrete type for the given token
+// it first attempts to convert it to an int, if that doesn't succeed, it
+// attempts conversion to a float, if that doesn't succeed, it returns the
+// token as is.
+func getParsedValue(token string) interface{} {
+	parsedInt, err := strconv.Atoi(strings.Trim(token, " "))
+	if err == nil {
+		return parsedInt
+	}
+	parsedFloat, err := strconv.ParseFloat(strings.Trim(token, " "), 64)
+	if err == nil {
+		return parsedFloat
+	}
+	return token
+}
+
+// getUpsertValue takes a given BSON document and a given field, and returns the
+// field's associated value in the document. The field is specified using dot
+// notation for nested fields. e.g. "person.age" would return 34 would return
+// 34 in the document: bson.M{"person": bson.M{"age": 34}} whereas,
+// "person.name" would return nil
+func getUpsertValue(field string, document bson.M) interface{} {
+	index := strings.Index(field, ".")
+	if index == -1 {
+		return document[field]
+	}
+	left := field[0:index]
+	if document[left] == nil {
+		return nil
+	}
+	subDoc, ok := document[left].(bson.M)
+	if !ok {
+		return nil
+	}
+	return getUpsertValue(field[index+1:], subDoc)
+}
+
+// setNestedValue takes a nested field - in the form "a.b.c" -
+// its associated value, and a document. It then assigns that
+// value to the appropriate nested field within the document
+func setNestedValue(field string, value interface{}, document bson.M) {
+	index := strings.Index(field, ".")
+	if index == -1 {
+		document[field] = value
+		return
+	}
+	left := field[0:index]
+	subDocument := bson.M{}
+	if document[left] != nil {
+		subDocument = document[left].(bson.M)
+	}
+	setNestedValue(field[index+1:], value, subDocument)
+	document[left] = subDocument
+}
+
 // validateHeaders takes an ImportInput, and does some validation on the
 // header fields. It returns an error if an issue is found in the header list
 func validateHeaders(importInput ImportInput, hasHeaderLine bool) (validatedFields []string, err error) {
@@ -58,38 +129,4 @@ func validateHeaders(importInput ImportInput, hasHeaderLine bool) (validatedFiel
 		log.Logf(1, "using fields: %v", strings.Join(validatedFields, ","))
 	}
 	return validatedFields, nil
-}
-
-// getParsedValue returns the appropriate concrete type for the given token
-// it first attempts to convert it to an int, if that doesn't succeed, it
-// attempts conversion to a float, if that doesn't succeed, it returns the
-// token as is.
-func getParsedValue(token string) interface{} {
-	parsedInt, err := strconv.Atoi(strings.Trim(token, " "))
-	if err == nil {
-		return parsedInt
-	}
-	parsedFloat, err := strconv.ParseFloat(strings.Trim(token, " "), 64)
-	if err == nil {
-		return parsedFloat
-	}
-	return token
-}
-
-// setNestedValue takes a nested field - in the form "a.b.c" -
-// its associated value, and a document. It then assigns that
-// value to the appropriate nested field within the document
-func setNestedValue(field string, value interface{}, document bson.M) {
-	index := strings.Index(field, ".")
-	if index == -1 {
-		document[field] = value
-		return
-	}
-	left := field[0:index]
-	subDocument := bson.M{}
-	if document[left] != nil {
-		subDocument = document[left].(bson.M)
-	}
-	setNestedValue(field[index+1:], value, subDocument)
-	document[left] = subDocument
 }
