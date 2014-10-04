@@ -1,0 +1,67 @@
+/*-
+ * Copyright (c) 2008-2014 WiredTiger, Inc.
+ *	All rights reserved.
+ *
+ * See the file LICENSE for redistribution information.
+ */
+
+#define	WT_GCC_ATTRIBUTE(x)
+#define	WT_GCC_FUNC_ATTRIBUTE(x)
+
+#define	WT_ATOMIC_ADD(v, val)						\
+    ((v) += (val), (v))
+#define	WT_ATOMIC_CAS(v, old, new)					\
+    ((v) = ((v) == (old) ? (new) : (old)), (v) == (old))
+#define	WT_ATOMIC_CAS_VAL(v, old, new)					\
+    ((v) = ((v) == (old) ? (new) : (old)), (v) == (old))
+#define	WT_ATOMIC_STORE(v, val)						\
+    ((v) = (val))
+#define	WT_ATOMIC_SUB(v, val)						\
+    ((v) -= (val), (v))
+
+#define	WT_ATOMIC_ADD1(v, val)		WT_ATOMIC_ADD(v, val)
+#define	WT_ATOMIC_CAS1(v, old, new)	WT_ATOMIC_CAS(v, old, new)
+#define	WT_ATOMIC_CAS_VAL1(v, old, new)	WT_ATOMIC_CAS_VAL(v, old, new)
+#define	WT_ATOMIC_STORE1(v, val)	WT_ATOMIC_STORE(v, val)
+#define	WT_ATOMIC_SUB1(v, val)		WT_ATOMIC_SUB(v, val)
+
+#define	WT_ATOMIC_ADD2(v, val)		WT_ATOMIC_ADD(v, val)
+#define	WT_ATOMIC_CAS2(v, old, new)	WT_ATOMIC_CAS(v, old, new)
+#define	WT_ATOMIC_CAS_VAL2(v, old, new)	WT_ATOMIC_CAS_VAL(v, old, new)
+#define	WT_ATOMIC_STORE2(v, val)	WT_ATOMIC_STORE(v, val)
+#define	WT_ATOMIC_SUB2(v, val)		WT_ATOMIC_SUB(v, val)
+
+#define	WT_ATOMIC_ADD4(v, val)		WT_ATOMIC_ADD(v, val)
+#define	WT_ATOMIC_CAS4(v, old, new)	WT_ATOMIC_CAS(v, old, new)
+#define	WT_ATOMIC_CAS_VAL4(v, old, new)	WT_ATOMIC_CAS_VAL(v, old, new)
+#define	WT_ATOMIC_STORE4(v, val)	WT_ATOMIC_STORE(v, val)
+#define	WT_ATOMIC_SUB4(v, val)		WT_ATOMIC_SUB(v, val)
+
+#define	WT_ATOMIC_ADD8(v, val)		WT_ATOMIC_ADD(v, val)
+#define	WT_ATOMIC_CAS8(v, old, new)	WT_ATOMIC_CAS(v, old, new)
+#define	WT_ATOMIC_CAS_VAL8(v, old, new)	WT_ATOMIC_CAS_VAL(v, old, new)
+#define	WT_ATOMIC_STORE8(v, val)	WT_ATOMIC_STORE(v, val)
+#define	WT_ATOMIC_SUB8(v, val)		WT_ATOMIC_SUB(v, val)
+
+static inline void WT_BARRIER(void) { return; }
+static inline void WT_FULL_BARRIER(void) { return; }
+static inline void WT_PAUSE(void) { return; }
+static inline void WT_READ_BARRIER(void) { return; }
+static inline void WT_WRITE_BARRIER(void) { return; }
+
+#define	F_ISSET_ATOMIC(p, mask)						\
+	((p)->flags_atomic & ((uint32_t)(mask)))
+#define	F_SET_ATOMIC(p, mask)						\
+	((p)->flags_atomic |= ((uint32_t)(mask)))
+#define	F_CAS_ATOMIC(p, mask, ret)					\
+	F_SET_ATOMIC(p, mask)
+#define	F_CLR_ATOMIC(p, mask)						\
+	((p)->flags_atomic &= ~((uint32_t)(mask)))
+
+#define	F_SET_ATOMIC1(p, mask)			F_SET_ATOMIC(p, mask)
+#define	F_CAS_ATOMIC1(p, mask, ret)		F_CAS_ATOMIC(p, mask, ret)
+#define	F_CLR_ATOMIC1(p, mask)			F_CLR_ATOMIC(p, mask)
+
+#define	F_SET_ATOMIC4(p, mask)			F_SET_ATOMIC(p, mask)
+#define	F_CAS_ATOMIC4(p, mask, ret)		F_CAS_ATOMIC(p, mask, ret)
+#define	F_CLR_ATOMIC4(p, mask)			F_CLR_ATOMIC(p, mask)
