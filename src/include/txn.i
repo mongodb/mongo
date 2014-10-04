@@ -208,7 +208,7 @@ __wt_txn_new_id(WT_SESSION_IMPL *session)
 	 * global current ID, so we want post-increment semantics.  Our atomic
 	 * add primitive does pre-increment, so adjust the result here.
 	 */
-	return WT_ATOMIC_ADD8(S2C(session)->txn_global.current, 1) - 1;
+	return (WT_ATOMIC_ADD8(S2C(session)->txn_global.current, 1) - 1);
 }
 
 /*
