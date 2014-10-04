@@ -39,7 +39,7 @@ compact(void *arg)
 	u_int period;
 	int ret;
 
-	WT_UNUSED(arg);
+	(void)(arg);
 
 	/* Compaction isn't supported for all data sources. */
 	if (DATASOURCE("helium") || DATASOURCE("kvsbdb"))

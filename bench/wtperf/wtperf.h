@@ -46,7 +46,6 @@
 
 #include <wiredtiger.h>
 #include <wiredtiger_ext.h>
-#include <gcc.h>			/* WiredTiger internal */
 
 #include "config_opt.h"
 
@@ -225,8 +224,6 @@ void	 latency_read(CONFIG *, uint32_t *, uint32_t *, uint32_t *);
 void	 latency_update(CONFIG *, uint32_t *, uint32_t *, uint32_t *);
 void	 latency_print(CONFIG *);
 int	 enomem(const CONFIG *);
-void	 lprintf(const CONFIG *, int err, uint32_t, const char *, ...)
-	   WT_GCC_ATTRIBUTE((format (printf, 4, 5)));
 int	 setup_log_file(CONFIG *);
 uint64_t sum_ckpt_ops(CONFIG *);
 uint64_t sum_insert_ops(CONFIG *);
@@ -234,3 +231,9 @@ uint64_t sum_pop_ops(CONFIG *);
 uint64_t sum_read_ops(CONFIG *);
 uint64_t sum_update_ops(CONFIG *);
 void	 usage(void);
+
+void	 lprintf(const CONFIG *, int err, uint32_t, const char *, ...)
+#if defined(__GNUC__)
+__attribute__((format (printf, 4, 5)))
+#endif
+;

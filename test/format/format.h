@@ -46,7 +46,6 @@
 #include <db.h>
 #endif
 #include <wiredtiger.h>
-#include <gcc.h>				/* WiredTiger internal */
 
 #include <wiredtiger_ext.h>
 extern WT_EXTENSION_API *wt_api;

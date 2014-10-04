@@ -38,7 +38,6 @@
 #include <unistd.h>
 
 #include <wiredtiger.h>
-#include <gcc.h>				/* WiredTiger internal */
 
 extern WT_CONNECTION *conn;			/* WiredTiger connection */
 
@@ -47,7 +46,6 @@ extern u_int nops;				/* Operations per thread */
 extern const char *uri;				/* Object */
 extern const char *config;			/* Object config */
 
-void die(const char *, int) WT_GCC_ATTRIBUTE((noreturn));
 int  fop_start(u_int);
 void obj_bulk(void);
 void obj_checkpoint(void);
@@ -56,3 +54,9 @@ void obj_cursor(void);
 void obj_drop(void);
 void obj_upgrade(void);
 void obj_verify(void);
+
+void die(const char *, int)
+#if defined(__GNUC__)
+__attribute__((noreturn))
+#endif
+;
