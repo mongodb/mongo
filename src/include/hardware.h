@@ -77,7 +77,7 @@
 	__sync_bool_compare_and_swap(&(v), oldv, newv)
 #define	WT_ATOMIC_CAS_VAL1(v, oldv, newv)				\
 	__sync_val_compare_and_swap(&(v), oldv, newv)
-#define	WT_ATOMIC_STORE1(v, val)						\
+#define	WT_ATOMIC_STORE1(v, val)					\
 	__sync_lock_test_and_set(&(v), val)
 #define	WT_ATOMIC_SUB1(v, val)						\
 	__sync_sub_and_fetch(&(v), val)
@@ -88,7 +88,7 @@
 	__sync_bool_compare_and_swap(&(v), oldv, newv)
 #define	WT_ATOMIC_CAS_VAL4(v, oldv, newv)				\
 	__sync_val_compare_and_swap(&(v), oldv, newv)
-#define	WT_ATOMIC_STORE4(v, val)						\
+#define	WT_ATOMIC_STORE4(v, val)					\
 	__sync_lock_test_and_set(&(v), val)
 #define	WT_ATOMIC_SUB4(v, val)						\
 	__sync_sub_and_fetch(&(v), val)
@@ -99,7 +99,7 @@
 	__sync_bool_compare_and_swap(&(v), oldv, newv)
 #define	WT_ATOMIC_CAS_VAL8(v, oldv, newv)				\
 	__sync_val_compare_and_swap(&(v), oldv, newv)
-#define	WT_ATOMIC_STORE8(v, val)						\
+#define	WT_ATOMIC_STORE8(v, val)					\
 	__sync_lock_test_and_set(&(v), val)
 #define	WT_ATOMIC_SUB8(v, val)						\
 	__sync_sub_and_fetch(&(v), val)
@@ -196,25 +196,29 @@ static inline void WT_WRITE_BARRIER(void) { return; }
  * successfully switch the flags from off to on.
  */
 #if defined(_lint)
-#define	F_ISSET_ATOMIC(p, mask)	((p)->flags_atomic & ((uint32_t)(mask)))
-#define	F_SET_ATOMIC(p, mask)	((p)->flags_atomic |= ((uint32_t)(mask)))
-#define	F_CAS_ATOMIC(p, mask, ret)	F_SET_ATOMIC(p, mask)
-#define	F_CLR_ATOMIC(p, mask)	((p)->flags_atomic &= ~((uint32_t)(mask)))
+#define	F_ISSET_ATOMIC(p, mask)						\
+	((p)->flags_atomic & ((uint32_t)(mask)))
+#define	F_SET_ATOMIC(p, mask)						\
+	((p)->flags_atomic |= ((uint32_t)(mask)))
+#define	F_CAS_ATOMIC(p, mask, ret)					\
+	F_SET_ATOMIC(p, mask)
+#define	F_CLR_ATOMIC(p, mask)						\
+	((p)->flags_atomic &= ~((uint32_t)(mask)))
 
 #else
 
 #define	F_ISSET_ATOMIC(p, mask)	((p)->flags_atomic & (uint32_t)(mask))
 
-#define	F_SET_ATOMIC_BASE(p, mask, type, func)	do {					\
-	type __orig;						\
+#define	F_SET_ATOMIC_BASE(p, mask, type, func) do {			\
+	type __orig;							\
 	do {								\
 		__orig = (p)->flags_atomic;				\
-	} while (!func((p)->flags_atomic,			\
-	    __orig, __orig | (type)(mask)));			\
+	} while (!func((p)->flags_atomic,				\
+	    __orig, __orig | (type)(mask)));				\
 } while (0)
 
-#define	F_CAS_ATOMIC_BASE(p, mask, ret, type, func)	do {				\
-	type __orig;						\
+#define	F_CAS_ATOMIC_BASE(p, mask, ret, type, func) do {		\
+	type __orig;							\
 	ret = 0;							\
 	do {								\
 		__orig = (p)->flags_atomic;				\
@@ -222,30 +226,30 @@ static inline void WT_WRITE_BARRIER(void) { return; }
 			ret = EBUSY;					\
 			break;						\
 		}							\
-	} while (!func((p)->flags_atomic,			\
-	    __orig, __orig | (type)(mask)));			\
+	} while (!func((p)->flags_atomic,				\
+	    __orig, __orig | (type)(mask)));				\
 } while (0)
 
-#define	F_CLR_ATOMIC_BASE(p, mask, type, func)	do {					\
-	type __orig;						\
+#define	F_CLR_ATOMIC_BASE(p, mask, type, func) do {			\
+	type __orig;							\
 	do {								\
 		__orig = (p)->flags_atomic;				\
-	} while (!func((p)->flags_atomic,			\
-	    __orig, __orig & ~(type)(mask)));			\
+	} while (!func((p)->flags_atomic,				\
+	    __orig, __orig & ~(type)(mask)));				\
 } while (0)
 
-#define F_SET_ATOMIC1(p, mask)      F_SET_ATOMIC_BASE(p, mask, uint8_t, WT_ATOMIC_CAS1)
-
-#define F_CAS_ATOMIC1(p, mask, ret) F_CAS_ATOMIC_BASE(p, mask, ret, uint8_t, WT_ATOMIC_CAS1)
-
-#define F_CLR_ATOMIC1(p, mask)      F_CLR_ATOMIC_BASE(p, mask, uint8_t, WT_ATOMIC_CAS1)
-
-#define F_SET_ATOMIC4(p, mask)      F_SET_ATOMIC_BASE(p, mask, uint32_t, WT_ATOMIC_CAS4)
-
-#define F_CAS_ATOMIC4(p, mask, ret) F_CAS_ATOMIC_BASE(p, mask, ret, uint32_t, WT_ATOMIC_CAS4)
-
-#define F_CLR_ATOMIC4(p, mask)      F_CLR_ATOMIC_BASE(p, mask, uint32_t, WT_ATOMIC_CAS4)
-
+#define	F_SET_ATOMIC1(p, mask)						\
+	F_SET_ATOMIC_BASE(p, mask, uint8_t, WT_ATOMIC_CAS1)
+#define	F_CAS_ATOMIC1(p, mask, ret)					\
+	F_CAS_ATOMIC_BASE(p, mask, ret, uint8_t, WT_ATOMIC_CAS1)
+#define	F_CLR_ATOMIC1(p, mask)						\
+	F_CLR_ATOMIC_BASE(p, mask, uint8_t, WT_ATOMIC_CAS1)
+#define	F_SET_ATOMIC4(p, mask)						\
+	F_SET_ATOMIC_BASE(p, mask, uint32_t, WT_ATOMIC_CAS4)
+#define	F_CAS_ATOMIC4(p, mask, ret)					\
+	F_CAS_ATOMIC_BASE(p, mask, ret, uint32_t, WT_ATOMIC_CAS4)
+#define	F_CLR_ATOMIC4(p, mask)						\
+	F_CLR_ATOMIC_BASE(p, mask, uint32_t, WT_ATOMIC_CAS4)
 #endif
 
 #define	WT_CACHE_LINE_ALIGNMENT	64	/* Cache line alignment */
