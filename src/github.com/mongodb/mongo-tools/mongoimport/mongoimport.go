@@ -128,6 +128,10 @@ func (mongoImport *MongoImport) ValidateSettings(args []string) error {
 				return fmt.Errorf("You need to specify fields or have a " +
 					"header line to import this file type")
 			}
+			if mongoImport.InputOptions.Fields != "" &&
+				mongoImport.InputOptions.FieldFile != "" {
+				return fmt.Errorf("incompatible options: --fields and --fieldFile")
+			}
 		} else {
 			if mongoImport.InputOptions.Fields != "" {
 				return fmt.Errorf("incompatible options: --fields and --headerline")
