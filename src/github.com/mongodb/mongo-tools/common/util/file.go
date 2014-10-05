@@ -28,9 +28,9 @@ func GetFieldsFromFile(path string) ([]string, error) {
 	return fields, nil
 }
 
-func ToUniversalPath(unixPath string) string {
-	if runtime.GOOS != "windows" {
-		return unixPath
-	}
-	return strings.Replace(unixPath, "/", string(filepath.Separator), -1)
+// ToUniversalPath returns the result of replacing each slash ('/') character
+// in "path" with an OS-sepcific separator character. Multiple slashes are
+// replaced by multiple separators
+func ToUniversalPath(path string) string {
+	return filepath.FromSlash(path)
 }

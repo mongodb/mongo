@@ -36,7 +36,7 @@ func StringSliceContains(slice []string, str string) bool {
 	return false
 }
 
-// generic function taht returns number of instances of 'elt' in 'slice'.
+// generic function that returns number of instances of 'elt' in 'slice'.
 // panics if slice is not of Kind reflect.Slice
 func SliceCount(slice, elt interface{}) int {
 	v := reflect.ValueOf(slice)
