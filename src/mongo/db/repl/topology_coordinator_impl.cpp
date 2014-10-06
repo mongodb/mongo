@@ -280,6 +280,12 @@ namespace {
 
         response->append("syncFromRequested", target.toString());
 
+        if (_selfIndex == -1) {
+            *result = Status(ErrorCodes::NotSecondary,
+                             "Removed and uninitialized nodes do not sync");
+            return;
+        }
+
         const MemberConfig& selfConfig = _selfConfig();
         if (selfConfig.isArbiter()) {
             *result = Status(ErrorCodes::NotSecondary, "arbiters don't sync");
@@ -364,6 +370,12 @@ namespace {
             Status* result) {
         if (cbData.status == ErrorCodes::CallbackCanceled) {
             *result = Status(ErrorCodes::ShutdownInProgress, "replication system is shutting down");
+            return;
+        }
+
+        if (!_currentConfig.isInitialized()) {
+            *result = Status(ErrorCodes::ReplicaSetNotFound,
+                             "Cannot participate in elections because not initialized");
             return;
         }
 
@@ -468,6 +480,12 @@ namespace {
 
         if (data.status == ErrorCodes::CallbackCanceled) {
             *result = Status(ErrorCodes::ShutdownInProgress, "replication system is shutting down");
+            return;
+        }
+
+        if (_selfIndex == -1) {
+            *result = Status(ErrorCodes::ReplicaSetNotFound,
+                             "Cannot participate in election because not initialized");
             return;
         }
 
@@ -590,7 +608,7 @@ namespace {
         }
 
         if (!_currentConfig.isInitialized()) {
-            response->setVersion(0);
+            response->setVersion(-2);
             return Status::OK();
         }
 
@@ -641,7 +659,8 @@ namespace {
 
         PingStats& hbStats = _pings[target];
         Milliseconds alreadyElapsed(now.asInt64() - hbStats.getLastHeartbeatStartDate().asInt64());
-        if ((hbStats.getNumFailuresSinceLastStart() > kMaxHeartbeatRetries) ||
+        if (!_currentConfig.isInitialized() ||
+            (hbStats.getNumFailuresSinceLastStart() > kMaxHeartbeatRetries) ||
             (alreadyElapsed >= _currentConfig.getHeartbeatTimeoutPeriodMillis())) {
 
             // This is either the first request ever for "target", or the heartbeat timeout has
@@ -666,8 +685,13 @@ namespace {
             hbArgs.setConfigVersion(-2);
         }
 
-        Milliseconds timeout(_currentConfig.getHeartbeatTimeoutPeriodMillis().total_milliseconds() -
-                             alreadyElapsed.total_milliseconds()); 
+        const Milliseconds timeoutPeriod(
+                _currentConfig.isInitialized() ?
+                _currentConfig.getHeartbeatTimeoutPeriodMillis() :
+                Milliseconds(
+                        ReplicaSetConfig::kDefaultHeartbeatTimeoutPeriod.total_milliseconds()));
+        const Milliseconds timeout(
+                timeoutPeriod.total_milliseconds() - alreadyElapsed.total_milliseconds());
         return std::make_pair(hbArgs, timeout);
     }
 
@@ -705,7 +729,8 @@ namespace {
 
         Milliseconds alreadyElapsed(now.asInt64() - hbStats.getLastHeartbeatStartDate().asInt64());
         Date_t nextHeartbeatStartDate;
-        if ((hbStats.getNumFailuresSinceLastStart() <= kMaxHeartbeatRetries) &&
+        if (_currentConfig.isInitialized() &&
+            (hbStats.getNumFailuresSinceLastStart() <= kMaxHeartbeatRetries) &&
             (alreadyElapsed < _currentConfig.getHeartbeatTimeoutPeriodMillis())) {
 
             if (!hbResponse.isOK()) {
@@ -721,8 +746,10 @@ namespace {
         }
 
         if (hbResponse.isOK() && hbResponse.getValue().hasConfig()) {
+            const long long currentConfigVersion =
+                _currentConfig.isInitialized() ? _currentConfig.getConfigVersion() : -2;
             const ReplicaSetConfig& newConfig = hbResponse.getValue().getConfig();
-            if (newConfig.getConfigVersion() > _currentConfig.getConfigVersion()) {
+            if (newConfig.getConfigVersion() > currentConfigVersion) {
                 HeartbeatResponseAction nextAction = HeartbeatResponseAction::makeReconfigAction();
                 nextAction.setNextHeartbeatStartDate(nextHeartbeatStartDate);
                 return nextAction;
@@ -730,19 +757,31 @@ namespace {
             else {
                 // Could be we got the newer version before we got the response, or the
                 // target erroneously sent us one, even through it isn't newer.
-                if (newConfig.getConfigVersion() < _currentConfig.getConfigVersion()) {
+                if (newConfig.getConfigVersion() < currentConfigVersion) {
                     LOG(1) << "Config version from heartbeat was older than ours.";
                 }
                 else {
                     LOG(2) << "Config from heartbeat response was same as ours.";
                 }
-                LOG(2) << "Current Config: " << _currentConfig.toBSON()
-                       << " config in heartbeat: " << newConfig.toBSON();
+                if (logger::globalLogDomain()->shouldLog(
+                            MongoLogDefaultComponent_component,
+                            ::mongo::LogstreamBuilder::severityCast(2))) {
+                    LogstreamBuilder lsb = log();
+                    if (_currentConfig.isInitialized()) {
+                        lsb << "Current config: " << _currentConfig.toBSON() << "; ";
+                    }
+                    lsb << "Config in heartbeat: " << newConfig.toBSON();
+                }
             }
         }
 
         // Check if the heartbeat target is in our config.  If it isn't, there's nothing left to do,
         // so return early.
+        if (!_currentConfig.isInitialized()) {
+            HeartbeatResponseAction nextAction = HeartbeatResponseAction::makeNoAction();
+            nextAction.setNextHeartbeatStartDate(nextHeartbeatStartDate);
+            return nextAction;
+        }
         const int memberIndex = findMemberIndexForHostAndPort(_currentConfig, target);
         if (memberIndex == -1) {
             LOG(1) << "replset: Could not find " << target  << " in current config so ignoring --"
@@ -1196,7 +1235,8 @@ namespace {
         // sort members bson
         sort(membersOut.begin(), membersOut.end());
 
-        response->append("set", _currentConfig.getReplSetName());
+        response->append("set",
+                         _currentConfig.isInitialized() ? _currentConfig.getReplSetName() : "");
         response->append("date", now);
         response->append("myState", myState.s);
 

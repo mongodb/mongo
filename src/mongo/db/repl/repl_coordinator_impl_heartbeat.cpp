@@ -305,7 +305,8 @@ namespace {
             fassertFailed(18807);
         }
         _setConfigState_inlock(kConfigHBReconfiguring);
-        invariant(_rsConfig.getConfigVersion() < newConfig.getConfigVersion());
+        invariant(!_rsConfig.isInitialized() ||
+                  _rsConfig.getConfigVersion() < newConfig.getConfigVersion());
         if (_freshnessChecker) {
             _freshnessChecker->cancel(&_replExecutor);
             if (_electCmdRunner) {
@@ -373,7 +374,8 @@ namespace {
 
         boost::lock_guard<boost::mutex> lk(_mutex);
         invariant(_rsConfigState == kConfigHBReconfiguring);
-        invariant(_rsConfig.getConfigVersion() < newConfig.getConfigVersion());
+        invariant(!_rsConfig.isInitialized() ||
+                  _rsConfig.getConfigVersion() < newConfig.getConfigVersion());
         if (!myIndex.isOK()) {
             switch (myIndex.getStatus().code()) {
             case ErrorCodes::NoSuchKey:
