@@ -28,6 +28,7 @@ const (
 	Upsert
 	Drop
 	Remove
+	Command
 )
 
 type StorageShim struct {
@@ -244,33 +245,43 @@ func (shim *Shim) Run(command interface{}, out interface{}, database string) (er
 		command = bson.M{name: 1}
 	}
 
-	commandRaw, err := json.Marshal(command)
+	commandRaw, err := bson.Marshal(command)
 	if err != nil {
-		return err
+		return fmt.Errorf("Failed to encode document into BSON: %v", err)
 	}
 	commandShim := StorageShim{
 		DBPath:         shim.DBPath,
 		Database:       database,
-		Collection:     "$cmd",
+		Collection:     "",
 		Skip:           0,
-		Limit:          1,
+		Limit:          0,
 		ShimPath:       shim.ShimPath,
-		Query:          string(commandRaw),
-		Mode:           Dump,
+		Query:          "",
+		Mode:           Command,
 		DirectoryPerDB: shim.DirectoryPerDB,
 		Repair:         shim.Repair,
 		Journal:        shim.Journal,
 	}
-	bsonSource, _, err := commandShim.Open()
+	bsonSource, bsonSink, err := commandShim.Open()
 	if err != nil {
 		return err
 	}
+
 	defer func() {
 		closeErr := commandShim.Close()
 		if err == nil {
 			err = closeErr
 		}
 	}()
+
+	_, err = bsonSink.WriteBytes(commandRaw)
+	if err != nil {
+		defer bsonSink.Close()
+		return err
+	}
+
+	bsonSink.Close()
+
 	decodedResult := NewDecodedBSONSource(bsonSource)
 	hasDoc := decodedResult.Next(out)
 	if !hasDoc {
@@ -307,13 +318,10 @@ func buildArgs(shim StorageShim) ([]string, error) {
 	if shim.DirectoryPerDB {
 		returnVal = append(returnVal, "--directoryperdb")
 	}
-	if shim.Repair {
-		returnVal = append(returnVal, "--repair")
-	}
 	if shim.Database != "" {
 		returnVal = append(returnVal, "-d", shim.Database)
 	}
-	if shim.Collection != "" {
+	if shim.Collection != "" && shim.Mode != Command {
 		returnVal = append(returnVal, "-c", shim.Collection)
 	}
 	if shim.Limit > 0 {
@@ -337,6 +345,11 @@ func buildArgs(shim StorageShim) ([]string, error) {
 
 	switch shim.Mode {
 	case Dump:
+		if shim.Repair {
+			returnVal = append(returnVal, "--mode", "repair")
+		} else {
+			returnVal = append(returnVal, "--mode", "find")
+		}
 	case Insert:
 		returnVal = append(returnVal, "--mode", "insert")
 	case Upsert:
@@ -345,6 +358,8 @@ func buildArgs(shim StorageShim) ([]string, error) {
 		returnVal = append(returnVal, "--mode", "drop")
 	case Remove:
 		returnVal = append(returnVal, "--mode", "remove")
+	case Command:
+		returnVal = append(returnVal, "--mode", "command")
 	}
 	return returnVal, nil
 }
