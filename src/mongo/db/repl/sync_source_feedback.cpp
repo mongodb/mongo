@@ -131,7 +131,12 @@ namespace repl {
                     if (res["code"].numberInt() == ErrorCodes::NodeNotFound ||
                             errMsg.find("could not be found in replica set config while attempting "
                                         "to associate it with") != std::string::npos) {
-                        sleepmillis(500);
+
+                        // black list sync target for 10 seconds and find a new one
+                        replCoord->blacklistSyncSource(_syncTarget,
+                                                       Date_t(curTimeMillis64() + 10*1000));
+                        BackgroundSync::get()->clearSyncTarget();
+                        replCoord->chooseNewSyncSource();
                     }
 
                     _resetConnection();
