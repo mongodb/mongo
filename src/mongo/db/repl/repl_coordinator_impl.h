@@ -618,7 +618,7 @@ namespace repl {
         // every host that sends it a heartbeat request to this set, and also starts
         // sending heartbeat requests to that host.  This set is cleared whenever
         // a node discovers that it is a member of a config.
-        std::unordered_set<HostAndPort> _seedList;                                        // (X)
+        unordered_set<HostAndPort> _seedList;                                        // (X)
 
         // Parsed command line arguments related to replication.
         // TODO(spencer): Currently there is global mutable state
