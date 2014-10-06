@@ -251,6 +251,10 @@ namespace repl {
             Status status = getGlobalReplicationCoordinator()->processReplSetInitiate(txn,
                                                                                       configObj,
                                                                                       &result);
+            if (status.isOK()) {
+                createOplog(txn);
+                logOpInitiate(txn, BSON("msg" << "initiating set"));
+            }
             return appendCommandStatus(result, status);
         }
     } cmdReplSetInitiate;
