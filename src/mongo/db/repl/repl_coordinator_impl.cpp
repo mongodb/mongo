@@ -129,9 +129,8 @@ namespace {
             return;
         }
 
-        // this is ok but micros or combo with some rand() and/or 64 bits might be better --
-        // imagine a restart and a clock correction simultaneously (very unlikely but possible...)
-        _rbid = static_cast<int>(_replExecutor.now().asInt64());
+        scoped_ptr<SecureRandom> rbidGenerator(SecureRandom::create());
+        _rbid = static_cast<int>(rbidGenerator->nextInt64());
     }
 
     ReplicationCoordinatorImpl::~ReplicationCoordinatorImpl() {}
