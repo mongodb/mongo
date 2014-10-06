@@ -144,34 +144,3 @@
 #else
 #error "No write barrier implementation for this hardware"
 #endif
-
-#define	F_ISSET_ATOMIC(p, mask)	((p)->flags_atomic & (uint8_t)(mask))
-
-#define	F_SET_ATOMIC(p, mask) do {					\
-	uint8_t __orig;							\
-	do {								\
-		__orig = (p)->flags_atomic;				\
-	} while (!WT_ATOMIC_CAS1((p)->flags_atomic,			\
-	    __orig, __orig | (uint8_t)(mask)));				\
-} while (0)
-
-#define	F_CAS_ATOMIC(p, mask, ret) do {					\
-	uint32_t __orig;						\
-	ret = 0;							\
-	do {								\
-		__orig = (p)->flags_atomic;				\
-		if ((__orig & (uint8_t)(mask)) != 0) {			\
-			ret = EBUSY;					\
-			break;						\
-		}							\
-	} while (!WT_ATOMIC_CAS1((p)->flags_atomic,			\
-	    __orig, __orig | (uint8_t)(mask)));				\
-} while (0)
-
-#define	F_CLR_ATOMIC(p, mask)	do {					\
-	uint8_t __orig;							\
-	do {								\
-		__orig = (p)->flags_atomic;				\
-	} while (!WT_ATOMIC_CAS1((p)->flags_atomic,			\
-	    __orig, __orig & ~(uint8_t)(mask)));			\
-} while (0)
