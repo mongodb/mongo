@@ -6,7 +6,7 @@ import (
 	"github.com/mongodb/mongo-tools/common/util"
 	"github.com/mongodb/mongo-tools/common/db"
 	"github.com/mongodb/mongo-tools/common/log"
-	commonopts "github.com/mongodb/mongo-tools/common/options"
+	commonOpts "github.com/mongodb/mongo-tools/common/options"
 	"github.com/mongodb/mongo-tools/mongofiles/options"
 	"gopkg.in/mgo.v2"
 	"gopkg.in/mgo.v2/bson"
@@ -42,7 +42,7 @@ const (
 
 type MongoFiles struct {
 	// generic mongo tool options
-	ToolOptions *commonopts.ToolOptions
+	ToolOptions *commonOpts.ToolOptions
 
 	// mongofiles-specific storage options
 	StorageOptions *options.StorageOptions

@@ -2,7 +2,7 @@ package main
 
 import (
 	"fmt"
-	commonopts "github.com/mongodb/mongo-tools/common/options"
+	commonOpts "github.com/mongodb/mongo-tools/common/options"
 	"github.com/mongodb/mongo-tools/mongofiles"
 	"github.com/mongodb/mongo-tools/mongofiles/options"
 	"os"
@@ -30,7 +30,7 @@ func printHelpAndExit() {
 func main() {
 
 	// initialize command-line opts
-	opts := commonopts.New("mongofiles", Usage)
+	opts := commonOpts.New("mongofiles", Usage)
 
 	storageOpts := &options.StorageOptions{}
 	opts.AddOptions(storageOpts)
