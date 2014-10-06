@@ -253,8 +253,8 @@ namespace {
                 countLogLinesContaining("wrong type for vote argument in replSetElect command"));
     }
 
-//     TODO(dannenberg) reenable this test once we can ensure message ordering
-//                      This test relies on the first message arriving prior to the second
+// TODO(dannenberg) reenable this test once we can ensure message ordering
+//                  This test relies on the first message arriving prior to the second
 //     TEST_F(ReplCoordElectTest, ElectWrongTypeForVoteButStillElected) {
 //         // one responds with String for votes
 //         startCapturingLogMessages();
