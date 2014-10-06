@@ -3258,7 +3258,7 @@ extern int wiredtiger_extension_terminate(WT_CONNECTION *connection);
 #define	WT_STAT_DSRC_BTREE_COLUMN_VARIABLE		2020
 /*! pages rewritten by compaction */
 #define	WT_STAT_DSRC_BTREE_COMPACT_REWRITE		2021
-/*! total LSM, table or file object key/value pairs */
+/*! number of key/value pairs */
 #define	WT_STAT_DSRC_BTREE_ENTRIES			2022
 /*! fixed-record size */
 #define	WT_STAT_DSRC_BTREE_FIXED_LEN			2023
