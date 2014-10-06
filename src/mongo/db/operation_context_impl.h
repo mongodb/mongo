@@ -70,14 +70,9 @@ namespace mongo {
 
         virtual bool isPrimaryFor( const StringData& ns );
 
-        virtual Transaction* getTransaction();
-
     private:
         std::auto_ptr<RecoveryUnit> _recovery;
-
-        Transaction _tx;
-
-        boost::scoped_ptr<Locker> _locker;
+        std::auto_ptr<Locker> _locker;
     };
 
 }  // namespace mongo

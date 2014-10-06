@@ -35,7 +35,6 @@
 #include "mongo/base/string_data.h"
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/db/concurrency/locker.h"
-#include "mongo/db/concurrency/lock_mgr.h"
 
 
 namespace mongo {
@@ -141,11 +140,6 @@ namespace mongo {
          * @return true if this instance is primary for this namespace
          */
         virtual bool isPrimaryFor( const StringData& ns ) = 0;
-
-        /**
-         * @return Transaction* for LockManager-ment.  Caller does not own pointer
-         */
-        virtual Transaction* getTransaction() = 0;
 
     protected:
         OperationContext() { }

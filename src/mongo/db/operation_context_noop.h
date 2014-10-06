@@ -104,10 +104,6 @@ namespace mongo {
             return 0;
         }
 
-        virtual Transaction* getTransaction() {
-            return NULL;
-        }
-
     private:
         std::auto_ptr<RecoveryUnit> _recoveryUnit;
     };

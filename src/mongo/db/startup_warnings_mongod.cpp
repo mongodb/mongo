@@ -41,8 +41,6 @@
 
 namespace mongo {
 
-    extern bool useExperimentalDocLocking;
-
     void logMongodStartupWarnings() {
         logCommonStartupWarnings();
 
@@ -58,18 +56,6 @@ namespace mongo {
                       << "and is currently off." << startupWarningsLog;
             }
             log() << "**       See http://dochub.mongodb.org/core/32bit" << startupWarningsLog;
-            warned = true;
-        }
-
-        if (useExperimentalDocLocking) {
-            log() << "** WARNING: Experimental (and untested) document-level locking for in-place"
-                  << startupWarningsLog;
-            log() << "            updates, which do not modify indexed values, has been enabled."
-                  << startupWarningsLog;
-            log() << "            This should absolutely not be used on production systems and is"
-                  << startupWarningsLog;
-            log() << "            for demonstration purposes only."
-                  << startupWarningsLog;
             warned = true;
         }
 
