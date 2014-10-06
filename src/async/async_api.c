@@ -150,15 +150,15 @@ retry:
 	 * If we can set the state then the op entry is ours.
 	 * Start the next search at the next entry after this one.
 	 */
-	if (!WT_ATOMIC_CAS(op->state, WT_ASYNCOP_FREE, WT_ASYNCOP_READY)) {
+	if (!WT_ATOMIC_CAS4(op->state, WT_ASYNCOP_FREE, WT_ASYNCOP_READY)) {
 		WT_STAT_FAST_CONN_INCR(session, async_alloc_race);
 		goto retry;
 	}
 	WT_STAT_FAST_CONN_INCRV(session, async_alloc_view, view);
 	WT_RET(__async_get_format(conn, uri, config, op));
-	op->unique_id = WT_ATOMIC_ADD(async->op_id, 1);
+	op->unique_id = WT_ATOMIC_ADD8(async->op_id, 1);
 	op->optype = WT_AOP_NONE;
-	(void)WT_ATOMIC_STORE(async->ops_index, (i + 1) % conn->async_size);
+	(void)WT_ATOMIC_STORE4(async->ops_index, (i + 1) % conn->async_size);
 	*opp = op;
 	return (0);
 }
@@ -511,7 +511,7 @@ retry:
 		 */
 		__wt_sleep(0, 100000);
 
-	if (!WT_ATOMIC_CAS(async->flush_state, WT_ASYNC_FLUSH_NONE,
+	if (!WT_ATOMIC_CAS4(async->flush_state, WT_ASYNC_FLUSH_NONE,
 	    WT_ASYNC_FLUSH_IN_PROGRESS))
 		goto retry;
 	/*
@@ -521,7 +521,7 @@ retry:
 	 * things off the work queue with the lock.
 	 */
 	async->flush_count = 0;
-	(void)WT_ATOMIC_ADD(async->flush_gen, 1);
+	(void)WT_ATOMIC_ADD8(async->flush_gen, 1);
 	WT_ASSERT(session, async->flush_op.state == WT_ASYNCOP_FREE);
 	async->flush_op.state = WT_ASYNCOP_READY;
 	WT_ERR(__wt_async_op_enqueue(session, &async->flush_op));

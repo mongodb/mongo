@@ -240,7 +240,7 @@ err:	__wt_scr_free(&buf);
  */
 int
 __wt_debug_offset_blind(
-    WT_SESSION_IMPL *session, off_t offset, const char *ofile)
+    WT_SESSION_IMPL *session, wt_off_t offset, const char *ofile)
 {
 	WT_DECL_ITEM(buf);
 	WT_DECL_RET;
@@ -268,7 +268,7 @@ err:	__wt_scr_free(&buf);
  */
 int
 __wt_debug_offset(WT_SESSION_IMPL *session,
-     off_t offset, uint32_t size, uint32_t cksum, const char *ofile)
+     wt_off_t offset, uint32_t size, uint32_t cksum, const char *ofile)
 {
 	WT_DECL_ITEM(buf);
 	WT_DECL_RET;
@@ -419,11 +419,14 @@ static void
 __debug_tree_shape_worker(WT_DBG *ds, WT_PAGE *page, int level)
 {
 	WT_REF *ref;
+	WT_SESSION_IMPL *session;
+
+	session = ds->session;
 
 	if (page->type == WT_PAGE_ROW_INT || page->type == WT_PAGE_COL_INT) {
 		__dmsg(ds, "%*s" "I" "%s\n",
 		    level, " ", __debug_tree_shape_info(page));
-		WT_INTL_FOREACH_BEGIN(page, ref) {
+		WT_INTL_FOREACH_BEGIN(session, page, ref) {
 			if (ref->state == WT_REF_MEM)
 				__debug_tree_shape_worker(
 				    ds, ref->page, level + 3);
@@ -701,14 +704,17 @@ static int
 __debug_page_col_int(WT_DBG *ds, WT_PAGE *page, uint32_t flags)
 {
 	WT_REF *ref;
+	WT_SESSION_IMPL *session;
 
-	WT_INTL_FOREACH_BEGIN(page, ref) {
+	session = ds->session;
+
+	WT_INTL_FOREACH_BEGIN(session, page, ref) {
 		__dmsg(ds, "\trecno %" PRIu64 "\n", ref->key.recno);
 		WT_RET(__debug_ref(ds, ref));
 	} WT_INTL_FOREACH_END;
 
 	if (LF_ISSET(WT_DEBUG_TREE_WALK))
-		WT_INTL_FOREACH_BEGIN(page, ref) {
+		WT_INTL_FOREACH_BEGIN(session, page, ref) {
 			if (ref->state == WT_REF_MEM) {
 				__dmsg(ds, "\n");
 				WT_RET(__debug_page(ds, ref->page, flags));
@@ -769,17 +775,20 @@ static int
 __debug_page_row_int(WT_DBG *ds, WT_PAGE *page, uint32_t flags)
 {
 	WT_REF *ref;
+	WT_SESSION_IMPL *session;
 	size_t len;
 	uint8_t *p;
 
-	WT_INTL_FOREACH_BEGIN(page, ref) {
+	session = ds->session;
+
+	WT_INTL_FOREACH_BEGIN(session, page, ref) {
 		__wt_ref_key(page, ref, &p, &len);
 		__debug_item(ds, "K", p, len);
 		WT_RET(__debug_ref(ds, ref));
 	} WT_INTL_FOREACH_END;
 
 	if (LF_ISSET(WT_DEBUG_TREE_WALK))
-		WT_INTL_FOREACH_BEGIN(page, ref) {
+		WT_INTL_FOREACH_BEGIN(session, page, ref) {
 			if (ref->state == WT_REF_MEM) {
 				__dmsg(ds, "\n");
 				WT_RET(__debug_page(ds, ref->page, flags));

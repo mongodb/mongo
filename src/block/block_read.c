@@ -17,7 +17,7 @@ __wt_bm_preload(WT_BM *bm,
 {
 	WT_BLOCK *block;
 	WT_DECL_RET;
-	off_t offset;
+	wt_off_t offset;
 	uint32_t cksum, size;
 	int mapped;
 
@@ -29,14 +29,14 @@ __wt_bm_preload(WT_BM *bm,
 	WT_RET(__wt_block_buffer_to_addr(block, addr, &offset, &size, &cksum));
 
 	/* Check for a mapped block. */
-	mapped = bm->map != NULL && offset + size <= (off_t)bm->maplen;
+	mapped = bm->map != NULL && offset + size <= (wt_off_t)bm->maplen;
 	if (mapped)
 		WT_RET(__wt_mmap_preload(
 		    session, (uint8_t *)bm->map + offset, size));
 	else {
 #ifdef HAVE_POSIX_FADVISE
 		ret = posix_fadvise(block->fh->fd,
-		    (off_t)offset, (off_t)size, POSIX_FADV_WILLNEED);
+		    (wt_off_t)offset, (wt_off_t)size, POSIX_FADV_WILLNEED);
 #endif
 		if (ret != 0) {
 			WT_DECL_ITEM(tmp);
@@ -63,7 +63,7 @@ __wt_bm_read(WT_BM *bm, WT_SESSION_IMPL *session,
 {
 	WT_BLOCK *block;
 	int mapped;
-	off_t offset;
+	wt_off_t offset;
 	uint32_t cksum, size;
 
 	WT_UNUSED(addr_size);
@@ -75,7 +75,7 @@ __wt_bm_read(WT_BM *bm, WT_SESSION_IMPL *session,
 	/*
 	 * Map the block if it's possible.
 	 */
-	mapped = bm->map != NULL && offset + size <= (off_t)bm->maplen;
+	mapped = bm->map != NULL && offset + size <= (wt_off_t)bm->maplen;
 	if (mapped) {
 		buf->data = (uint8_t *)bm->map + offset;
 		buf->size = size;
@@ -110,7 +110,7 @@ __wt_bm_read(WT_BM *bm, WT_SESSION_IMPL *session,
 		block->os_cache = 0;
 		/* Ignore EINVAL - some file systems don't support the flag. */
 		if ((ret = posix_fadvise(block->fh->fd,
-		    (off_t)0, (off_t)0, POSIX_FADV_DONTNEED)) != 0 &&
+		    (wt_off_t)0, (wt_off_t)0, POSIX_FADV_DONTNEED)) != 0 &&
 		    ret != EINVAL)
 			WT_RET_MSG(
 			    session, ret, "%s: posix_fadvise", block->name);
@@ -127,7 +127,7 @@ __wt_bm_read(WT_BM *bm, WT_SESSION_IMPL *session,
  */
 int
 __wt_block_read_off_blind(
-    WT_SESSION_IMPL *session, WT_BLOCK *block, WT_ITEM *buf, off_t offset)
+    WT_SESSION_IMPL *session, WT_BLOCK *block, WT_ITEM *buf, wt_off_t offset)
 {
 	WT_BLOCK_HEADER *blk;
 	uint32_t cksum, size;
@@ -161,8 +161,8 @@ __wt_block_read_off_blind(
  *	Read an addr/size pair referenced block into a buffer.
  */
 int
-__wt_block_read_off(WT_SESSION_IMPL *session,
-    WT_BLOCK *block, WT_ITEM *buf, off_t offset, uint32_t size, uint32_t cksum)
+__wt_block_read_off(WT_SESSION_IMPL *session, WT_BLOCK *block,
+    WT_ITEM *buf, wt_off_t offset, uint32_t size, uint32_t cksum)
 {
 	WT_BLOCK_HEADER *blk;
 	size_t bufsize;

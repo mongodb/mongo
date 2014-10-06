@@ -28,7 +28,7 @@ no_scale_per_second_list = [
     'column-store fixed-size leaf pages',
     'column-store internal pages',
     'column-store variable-size leaf pages',
-    'total LSM, table or file object key/value pairs',
+    'number of key/value pairs',
     'fixed-record size',
     'maximum tree depth',
     'maximum internal page item size',

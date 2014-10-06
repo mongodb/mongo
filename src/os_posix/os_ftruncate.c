@@ -12,7 +12,7 @@
  *	Truncate a file.
  */
 int
-__wt_ftruncate(WT_SESSION_IMPL *session, WT_FH *fh, off_t len)
+__wt_ftruncate(WT_SESSION_IMPL *session, WT_FH *fh, wt_off_t len)
 {
 	WT_DECL_RET;
 

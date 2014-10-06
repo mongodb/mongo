@@ -34,9 +34,9 @@ __wt_cache_read(WT_SESSION_IMPL *session, WT_REF *ref)
 	 * WT_REF_LOCKED, for deleted pages.  If successful, we've won the
 	 * race, read the page.
 	 */
-	if (WT_ATOMIC_CAS(ref->state, WT_REF_DISK, WT_REF_READING))
+	if (WT_ATOMIC_CAS4(ref->state, WT_REF_DISK, WT_REF_READING))
 		previous_state = WT_REF_DISK;
-	else if (WT_ATOMIC_CAS(ref->state, WT_REF_DELETED, WT_REF_LOCKED))
+	else if (WT_ATOMIC_CAS4(ref->state, WT_REF_DELETED, WT_REF_LOCKED))
 		previous_state = WT_REF_DELETED;
 	else
 		return (0);

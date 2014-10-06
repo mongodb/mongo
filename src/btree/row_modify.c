@@ -278,7 +278,7 @@ __wt_update_obsolete_check(WT_SESSION_IMPL *session, WT_UPDATE *upd)
 	 */
 	if (first != NULL &&
 	    (next = first->next) != NULL &&
-	    WT_ATOMIC_CAS(first->next, next, NULL))
+	    WT_ATOMIC_CAS8(first->next, next, NULL))
 		return (next);
 
 	return (NULL);

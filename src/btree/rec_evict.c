@@ -211,7 +211,7 @@ __rec_discard_tree(
 	case WT_PAGE_COL_INT:
 	case WT_PAGE_ROW_INT:
 		/* For each entry in the page... */
-		WT_INTL_FOREACH_BEGIN(ref->page, child) {
+		WT_INTL_FOREACH_BEGIN(session, ref->page, child) {
 			if (child->state == WT_REF_DISK ||
 			    child->state == WT_REF_DELETED)
 				continue;
@@ -268,7 +268,7 @@ __rec_review(
 	 * pages after we've written them.
 	 */
 	if (WT_PAGE_IS_INTERNAL(page))
-		WT_INTL_FOREACH_BEGIN(page, child) {
+		WT_INTL_FOREACH_BEGIN(session, page, child) {
 			switch (child->state) {
 			case WT_REF_DISK:		/* On-disk */
 			case WT_REF_DELETED:		/* On-disk, deleted */
@@ -449,7 +449,7 @@ __hazard_exclusive(WT_SESSION_IMPL *session, WT_REF *ref, int top)
 	 * already be in the locked state, lock child pages in memory.
 	 * If another thread already has this page, give up.
 	 */
-	if (!top && !WT_ATOMIC_CAS(ref->state, WT_REF_MEM, WT_REF_LOCKED))
+	if (!top && !WT_ATOMIC_CAS4(ref->state, WT_REF_MEM, WT_REF_LOCKED))
 		return (EBUSY);	/* We couldn't change the state. */
 	WT_ASSERT(session, ref->state == WT_REF_LOCKED);
 

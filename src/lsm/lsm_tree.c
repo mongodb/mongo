@@ -118,7 +118,7 @@ __wt_lsm_tree_close_all(WT_SESSION_IMPL *session)
 		 * is no need to decrement the reference count since destroy
 		 * is unconditional.
 		 */
-		(void)WT_ATOMIC_ADD(lsm_tree->refcnt, 1);
+		(void)WT_ATOMIC_ADD4(lsm_tree->refcnt, 1);
 		WT_TRET(__lsm_tree_close(session, lsm_tree));
 		WT_TRET(__lsm_tree_discard(session, lsm_tree));
 	}
@@ -190,7 +190,7 @@ int
 __wt_lsm_tree_set_chunk_size(
     WT_SESSION_IMPL *session, WT_LSM_CHUNK *chunk)
 {
-	off_t size;
+	wt_off_t size;
 	const char *filename;
 
 	filename = chunk->uri;
@@ -426,7 +426,7 @@ __lsm_tree_open(
 	WT_ASSERT(session, F_ISSET(session, WT_SESSION_SCHEMA_LOCKED));
 
 	/* Start the LSM manager thread if it isn't running. */
-	if (WT_ATOMIC_CAS(conn->lsm_manager.lsm_workers, 0, 1))
+	if (WT_ATOMIC_CAS4(conn->lsm_manager.lsm_workers, 0, 1))
 		WT_RET(__wt_lsm_manager_start(session));
 
 	/* Make sure no one beat us to it. */
@@ -508,12 +508,12 @@ __wt_lsm_tree_get(WT_SESSION_IMPL *session,
 
 			if (exclusive) {
 				F_SET_ATOMIC(lsm_tree, WT_LSM_TREE_EXCLUSIVE);
-				if (!WT_ATOMIC_CAS(lsm_tree->refcnt, 0, 1)) {
+				if (!WT_ATOMIC_CAS4(lsm_tree->refcnt, 0, 1)) {
 					F_CLR(lsm_tree, WT_LSM_TREE_EXCLUSIVE);
 					return (EBUSY);
 				}
 			} else
-				(void)WT_ATOMIC_ADD(lsm_tree->refcnt, 1);
+				(void)WT_ATOMIC_ADD4(lsm_tree->refcnt, 1);
 
 			/*
 			 * If we got a reference, but an exclusive reference
@@ -521,7 +521,7 @@ __wt_lsm_tree_get(WT_SESSION_IMPL *session,
 			 */
 			if (!exclusive &&
 			    F_ISSET_ATOMIC(lsm_tree, WT_LSM_TREE_EXCLUSIVE)) {
-				(void)WT_ATOMIC_SUB(lsm_tree->refcnt, 1);
+				(void)WT_ATOMIC_SUB4(lsm_tree->refcnt, 1);
 				return (EBUSY);
 			}
 			*treep = lsm_tree;
@@ -540,7 +540,7 @@ void
 __wt_lsm_tree_release(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 {
 	WT_ASSERT(session, lsm_tree->refcnt > 0);
-	(void)WT_ATOMIC_SUB(lsm_tree->refcnt, 1);
+	(void)WT_ATOMIC_SUB4(lsm_tree->refcnt, 1);
 	F_CLR_ATOMIC(lsm_tree, WT_LSM_TREE_EXCLUSIVE);
 }
 
@@ -735,7 +735,7 @@ __wt_lsm_tree_switch(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 	/* Update the throttle time. */
 	__wt_lsm_tree_throttle(session, lsm_tree, 0);
 
-	new_id = WT_ATOMIC_ADD(lsm_tree->last, 1);
+	new_id = WT_ATOMIC_ADD4(lsm_tree->last, 1);
 
 	WT_ERR(__wt_realloc_def(session, &lsm_tree->chunk_alloc,
 	    nchunks + 1, &lsm_tree->chunk));
@@ -925,7 +925,7 @@ __wt_lsm_tree_truncate(
 
 	/* Create the new chunk. */
 	WT_ERR(__wt_calloc_def(session, 1, &chunk));
-	chunk->id = WT_ATOMIC_ADD(lsm_tree->last, 1);
+	chunk->id = WT_ATOMIC_ADD4(lsm_tree->last, 1);
 	WT_ERR(__wt_lsm_tree_setup_chunk(session, lsm_tree, chunk));
 
 	/* Mark all chunks old. */
@@ -1064,7 +1064,7 @@ __wt_lsm_compact(WT_SESSION_IMPL *session, const char *name, int *skip)
 		 * If we have a chunk, we want to look for it to be on-disk.
 		 * So we need to add a reference to keep it available.
 		 */
-		(void)WT_ATOMIC_ADD(chunk->refcnt, 1);
+		(void)WT_ATOMIC_ADD4(chunk->refcnt, 1);
 		ref = 1;
 	}
 
@@ -1110,7 +1110,7 @@ __wt_lsm_compact(WT_SESSION_IMPL *session, const char *name, int *skip)
 				    "Compact flush done %s chunk %u.  "
 				    "Start compacting",
 				    name, chunk->id));
-				(void)WT_ATOMIC_SUB(chunk->refcnt, 1);
+				(void)WT_ATOMIC_SUB4(chunk->refcnt, 1);
 				flushing = ref = 0;
 				compacting = 1;
 				F_SET(lsm_tree, WT_LSM_TREE_COMPACTING);
@@ -1160,7 +1160,7 @@ __wt_lsm_compact(WT_SESSION_IMPL *session, const char *name, int *skip)
 err:
 	/* Ensure anything we set is cleared. */
 	if (ref)
-		(void)WT_ATOMIC_SUB(chunk->refcnt, 1);
+		(void)WT_ATOMIC_SUB4(chunk->refcnt, 1);
 	if (compacting) {
 		F_CLR(lsm_tree, WT_LSM_TREE_COMPACTING);
 		lsm_tree->merge_aggressiveness = 0;

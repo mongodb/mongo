@@ -44,7 +44,7 @@ __wt_curconfig_open(WT_SESSION_IMPL *session,
 	WT_CURSOR *cursor;
 	WT_DECL_RET;
 
-	STATIC_ASSERT(offsetof(WT_CURSOR_CONFIG, iface) == 0);
+	WT_STATIC_ASSERT(offsetof(WT_CURSOR_CONFIG, iface) == 0);
 
 	WT_UNUSED(uri);
 

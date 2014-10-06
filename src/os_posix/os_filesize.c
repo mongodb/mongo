@@ -12,7 +12,7 @@
  *	Get the size of a file in bytes.
  */
 int
-__wt_filesize(WT_SESSION_IMPL *session, WT_FH *fh, off_t *sizep)
+__wt_filesize(WT_SESSION_IMPL *session, WT_FH *fh, wt_off_t *sizep)
 {
 	struct stat sb;
 	WT_DECL_RET;
@@ -33,7 +33,8 @@ __wt_filesize(WT_SESSION_IMPL *session, WT_FH *fh, off_t *sizep)
  *	Return the size of a file in bytes, given a file name.
  */
 int
-__wt_filesize_name(WT_SESSION_IMPL *session, const char *filename, off_t *sizep)
+__wt_filesize_name(
+    WT_SESSION_IMPL *session, const char *filename, wt_off_t *sizep)
 {
 	struct stat sb;
 	WT_DECL_RET;

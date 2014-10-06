@@ -468,7 +468,7 @@ __wt_curds_open(
 	WT_DECL_RET;
 	const char *metaconf;
 
-	STATIC_ASSERT(offsetof(WT_CURSOR_DATA_SOURCE, iface) == 0);
+	WT_STATIC_ASSERT(offsetof(WT_CURSOR_DATA_SOURCE, iface) == 0);
 
 	data_source = NULL;
 	metaconf = NULL;

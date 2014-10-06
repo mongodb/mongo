@@ -12,7 +12,7 @@ type doxygen > /dev/null 2>&1 || {
 	exit 0
 }
 
-. ../RELEASE
+. ../RELEASE_INFO
 
 e=0
 

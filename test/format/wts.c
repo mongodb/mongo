@@ -31,8 +31,8 @@ static int
 handle_message(WT_EVENT_HANDLER *handler,
     WT_SESSION *session, const char *message)
 {
-	WT_UNUSED(handler);
-	WT_UNUSED(session);
+	(void)(handler);
+	(void)(session);
 
 	if (g.logfp != NULL)
 		return (fprintf(
@@ -49,8 +49,8 @@ static int
 handle_progress(WT_EVENT_HANDLER *handler,
     WT_SESSION *session, const char *operation, uint64_t progress)
 {
-	WT_UNUSED(handler);
-	WT_UNUSED(session);
+	(void)(handler);
+	(void)(session);
 
 	track(operation, progress, NULL);
 	return (0);

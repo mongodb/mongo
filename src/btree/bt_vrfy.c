@@ -209,7 +209,8 @@ __verify_config_offsets(WT_SESSION_IMPL *session, const char *cfg[], int *quitp)
 		WT_RET_MSG(session, ENOTSUP,
 		    "the WiredTiger library was not built in diagnostic mode");
 #else
-		WT_TRET(__wt_debug_offset_blind(session, (off_t)offset, NULL));
+		WT_TRET(
+		    __wt_debug_offset_blind(session, (wt_off_t)offset, NULL));
 #endif
 	}
 	return (ret == WT_NOTFOUND ? 0 : ret);
@@ -418,7 +419,7 @@ celltype_err:			WT_RET_MSG(session, WT_ERROR,
 	case WT_PAGE_COL_INT:
 		/* For each entry in an internal page, verify the subtree. */
 		entry = 0;
-		WT_INTL_FOREACH_BEGIN(page, child_ref) {
+		WT_INTL_FOREACH_BEGIN(session, page, child_ref) {
 			/*
 			 * It's a depth-first traversal: this entry's starting
 			 * record number should be 1 more than the total records
@@ -452,7 +453,7 @@ celltype_err:			WT_RET_MSG(session, WT_ERROR,
 	case WT_PAGE_ROW_INT:
 		/* For each entry in an internal page, verify the subtree. */
 		entry = 0;
-		WT_INTL_FOREACH_BEGIN(page, child_ref) {
+		WT_INTL_FOREACH_BEGIN(session, page, child_ref) {
 			/*
 			 * It's a depth-first traversal: this entry's starting
 			 * key should be larger than the largest key previously

@@ -1220,8 +1220,8 @@ __wt_cksum_hw(const void *chunk, size_t len)
 
 /*
  * __wt_cksum --
- *	Return a checksum for a chunk of memory
- *	using the fastest method available.
+ *	Return a checksum for a chunk of memory using the fastest method
+ * available.
  */
 uint32_t
 __wt_cksum(const void *chunk, size_t len)
@@ -1231,8 +1231,7 @@ __wt_cksum(const void *chunk, size_t len)
 
 /*
  * __wt_cksum_init --
- *	Detect CRC hardware if possible, and return one of
- *	CRC_HARDWARE_PRESENT or CRC_HARDWARE_ABSENT.
+ *	Detect CRC hardware and set the checksum function.
  */
 void
 __wt_cksum_init(void)

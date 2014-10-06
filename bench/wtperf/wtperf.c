@@ -2240,7 +2240,7 @@ worker_throttle(int64_t throttle, int64_t *ops, struct timespec *interval)
 	 */
 	usecs_to_complete = ns_to_us(WT_TIMEDIFF(now, *interval));
 	if (usecs_to_complete < USEC_PER_SEC)
-		(void)usleep(USEC_PER_SEC - usecs_to_complete);
+		(void)usleep((useconds_t)(USEC_PER_SEC - usecs_to_complete));
 
 	*ops = 0;
 	*interval = now;

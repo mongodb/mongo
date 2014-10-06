@@ -7,9 +7,6 @@
 
 #include "wt_internal.h"
 
-#define	WT_BASECONFIG	"WiredTiger.basecfg"
-#define	WT_USERCONFIG	"WiredTiger.config"
-
 static int __conn_statistics_config(WT_SESSION_IMPL *, const char *[]);
 
 /*
@@ -726,8 +723,8 @@ __conn_config_file(WT_SESSION_IMPL *session,
 {
 	WT_DECL_RET;
 	WT_FH *fh;
-	off_t size;
 	size_t len;
+	wt_off_t size;
 	int exist, quoted;
 	uint8_t *p, *t;
 
@@ -747,8 +744,8 @@ __conn_config_file(WT_SESSION_IMPL *session,
 	/*
 	 * Sanity test: a 100KB configuration file would be insane.  (There's
 	 * no practical reason to limit the file size, but I can either limit
-	 * the file size to something rational, or I can add code to test if
-	 * the off_t size is larger than a uint32_t, which is more complicated
+	 * the file size to something rational, or add code to test if the
+	 * wt_off_t size is larger than a uint32_t, which is more complicated
 	 * and a waste of time.)
 	 */
 	if (size > 100 * 1024)
@@ -765,8 +762,8 @@ __conn_config_file(WT_SESSION_IMPL *session,
 	 * what we're doing.
 	 */
 	WT_ERR(__wt_buf_init(session, cbuf, len + 10));
-	WT_ERR(
-	    __wt_read(session, fh, (off_t)0, len, ((uint8_t *)cbuf->mem) + 1));
+	WT_ERR(__wt_read(
+	    session, fh, (wt_off_t)0, len, ((uint8_t *)cbuf->mem) + 1));
 	((uint8_t *)cbuf->mem)[0] = '\n';
 	cbuf->size = len + 1;
 
@@ -929,17 +926,19 @@ __conn_single(WT_SESSION_IMPL *session, const char *cfg[])
 	WT_CONFIG_ITEM cval;
 	WT_CONNECTION_IMPL *conn, *t;
 	WT_DECL_RET;
-	off_t size;
+	WT_FH *fh;
 	size_t len;
+	wt_off_t size;
 	int created;
 	char buf[256];
 
 	conn = S2C(session);
+	fh = NULL;
 
 	/*
-	 * Optionally create the wiredtiger flag file if it doesn't already
-	 * exist.  We don't actually care if we create it or not, the "am I the
-	 * only locker" tests are all that matter.
+	 * Optionally create the WiredTiger lock file if it doesn't already
+	 * exist.  We don't actually care if we create it or not, the "am I
+	 * the only locker" tests are all that matter.
 	 */
 	WT_RET(__wt_config_gets(session, cfg, "create", &cval));
 	WT_RET(__wt_open(session,
@@ -951,12 +950,15 @@ __conn_single(WT_SESSION_IMPL *session, const char *cfg[])
 	 * and that's OK, the underlying call supports acquisition of locks past
 	 * the end-of-file.
 	 */
-	if (__wt_bytelock(conn->lock_fh, (off_t)0, 1) != 0)
+	if (__wt_bytelock(conn->lock_fh, (wt_off_t)0, 1) != 0)
 		WT_ERR_MSG(session, EBUSY,
 		    "WiredTiger database is already being managed by another "
 		    "process");
 
-	/* Check to see if another thread of control has this database open. */
+	/*
+	 * The byte-lock protects against other processes, also check to see if
+	 * another thread of control in this process has this database open.
+	 */
 	__wt_spin_lock(session, &__wt_process.spinlock);
 	TAILQ_FOREACH(t, &__wt_process.connqh, q)
 		if (t->home != NULL &&
@@ -971,16 +973,29 @@ __conn_single(WT_SESSION_IMPL *session, const char *cfg[])
 		    "thread in this process");
 
 	/*
-	 * If the size of the file is 0, we created it (or we're racing with
-	 * the thread that created it, it doesn't matter), write some bytes
-	 * into the file.  Strictly speaking, this isn't even necessary, but
-	 * zero-length files always make me nervous.
+	 * If the size of the file is 0, we created it (or we won a race with
+	 * the thread that created it, it doesn't matter).
 	 */
 	WT_ERR(__wt_filesize(session, conn->lock_fh, &size));
 	if (size == 0) {
-		len = (size_t)snprintf(buf, sizeof(buf), "%s\n%s\n",
-		    WT_SINGLETHREAD, WIREDTIGER_VERSION_STRING);
-		WT_ERR(__wt_write(session, conn->lock_fh, (off_t)0, len, buf));
+		/*
+		 * Write the WiredTiger version/date file.
+		 */
+		WT_ERR(__wt_open(session, WT_WIREDTIGER, 1, 0, 0, &fh));
+		len = (size_t)snprintf(buf, sizeof(buf),
+		    "%s\n%s\n", WT_WIREDTIGER, WIREDTIGER_VERSION_STRING);
+		WT_ERR(__wt_write(session, fh, (wt_off_t)0, len, buf));
+		WT_ERR(__wt_close(session, fh));
+		fh = NULL;
+
+		/*
+		 * Write some bytes into the WiredTiger lock file. Technically
+		 * this isn't necessary, but zero-length files make me nervous.
+		 */
+#define	WT_SINGLETHREAD_STRING	"WiredTiger lock file\n"
+		WT_ERR(__wt_write(session, conn->lock_fh, (wt_off_t)0,
+		    strlen(WT_SINGLETHREAD_STRING), WT_SINGLETHREAD_STRING));
+
 		created = 1;
 	} else {
 		WT_ERR(__wt_config_gets(session, cfg, "exclusive", &cval));
@@ -1003,7 +1018,9 @@ __conn_single(WT_SESSION_IMPL *session, const char *cfg[])
 
 	return (0);
 
-err:	if (conn->lock_fh != NULL) {
+err:	if (fh != NULL)
+		WT_TRET(__wt_close(session, fh));
+	if (conn->lock_fh != NULL) {
 		WT_TRET(__wt_close(session, conn->lock_fh));
 		conn->lock_fh = NULL;
 	}
@@ -1413,7 +1430,7 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
 	/* Merge the final configuration for later reconfiguration. */
 	WT_ERR(__wt_config_merge(session, cfg, &conn->cfg));
 
-	STATIC_ASSERT(offsetof(WT_CONNECTION_IMPL, iface) == 0);
+	WT_STATIC_ASSERT(offsetof(WT_CONNECTION_IMPL, iface) == 0);
 	*wt_connp = &conn->iface;
 
 err:	__wt_buf_free(session, &cbbuf);
