@@ -705,7 +705,7 @@ err:	API_END_RET_NOTFOUND_MAP(session, ret);
  * __conn_config_append --
  *	Append an entry to a config stack.
  */
-static inline void
+static void
 __conn_config_append(const char *cfg[], const char *config)
 {
 	while (*cfg != NULL)
