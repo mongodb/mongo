@@ -56,7 +56,7 @@ eviction configuration settings can reduce latency spikes in
 application threads and can improve throughput in some applications.
 
 WiredTiger eviction tuning options can be configured when first opening
-a database via @ref wiredtiger_open, or changed after open with
+a database via ::wiredtiger_open, or changed after open with
 WT_CONNECTION::reconfigure.
 
 The \c eviction_trigger configuration value is the occupied percentage

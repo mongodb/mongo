@@ -1,4 +1,4 @@
-/*! @page cursors Cursors
+/*! @m_page{{c,java},cursors,Cursors}
 
 Common operations in WiredTiger are performed using WT_CURSOR handles.
 A cursor includes:
@@ -77,9 +77,16 @@ See @ref transactions for more information.
 Cursors can be configured for raw mode by specifying the \c "raw" config
 keyword to WT_SESSION::open_cursor.  In this mode, the methods
 WT_CURSOR::get_key, WT_CURSOR::get_value, WT_CURSOR::set_key and
-WT_CURSOR::set_value all take a single WT_ITEM in the variable-length
+WT_CURSOR::set_value all take a single
+@m_if{c}
+WT_ITEM
+@m_else
+byte array
+@m_endif
+in the variable-length
 argument list instead of a separate argument for each column.
 
+@m_if{c}
 WT_ITEM structures do not need to be cleared before use.
 
 For WT_CURSOR::get_key and WT_CURSOR::get_value in raw mode, the WT_ITEM
@@ -91,7 +98,9 @@ cursor's \c key_format or \c value_format, respectively.
 
 The @ex_ref{ex_schema.c} example creates a table where the value format is
 \c "5sHq", where the initial string is the country, the short is a year,
-and the long is a population.  The following example lists the table record
+and the long is a population.
+@m_endif
+The following example lists the table record
 values, using raw mode:
 
 @snippet ex_schema.c List the records in the table using raw mode.

@@ -776,6 +776,7 @@ EXCLUDE_SYMBOLS        = __F \
 # the \include command).
 
 EXAMPLE_PATH           = ../../examples/c \
+			 ../../examples/java/com/wiredtiger/examples/ \
 			 ../../ext/compressors/nop \
 			 ./examples
 

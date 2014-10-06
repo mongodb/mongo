@@ -31,6 +31,7 @@ For more information about building and installing WiredTiger, see:
 For more information about writing WiredTiger applications, see:
 
 - @subpage programming
+- @subpage programming_lang_java
 - @ref wt "WiredTiger API reference manual"
 - @subpage performance
 

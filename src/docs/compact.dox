@@ -1,4 +1,4 @@
-/*! @page compact Compaction
+/*! @m_page{{c,java},compact,Compaction}
 
 The WT_SESSION::compact method can be used to compact data sources.
 

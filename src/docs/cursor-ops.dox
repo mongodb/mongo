@@ -1,4 +1,4 @@
-/*! @page cursor_ops Cursor operations
+/*! @m_page{{c,java},cursor_ops,Cursor operations}
 
 Common operations in WiredTiger are performed using WT_CURSOR handles.
 A cursor includes:
@@ -131,6 +131,7 @@ it may be retried without calling WT_CURSOR::set_key or
 WT_CURSOR::set_value again.  That is, the cursor may still reference the
 application-supplied memory until it is successfully positioned.
 
+@m_if{c}
 Any pointers returned by WT_CURSOR::get_key or WT_CURSOR::get_value are only
 valid until the cursor is positioned.  These pointers may reference private
 WiredTiger data structures that must not be modified or freed by the
@@ -141,4 +142,5 @@ The comments in this example code explain when the application can safely
 modify memory passed to WT_CURSOR::set_key or WT_CURSOR::set_value:
 
 @snippet ex_scope.c cursor scope operation
+@m_endif
  */

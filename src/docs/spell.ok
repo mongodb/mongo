@@ -72,6 +72,7 @@ Vv
 WiredTiger
 WiredTiger's
 WiredTigerCheckpoint
+WiredTigerException
 WiredTigerLog
 WiredTigerTestCase
 Za
@@ -196,6 +197,8 @@ freelist
 fsync
 gcc
 gdbm
+getKey
+getValue
 getopt
 getter
 gid
@@ -230,6 +233,7 @@ keyfmt
 keyname
 keyvalue
 kvs
+lang
 lastname
 len
 leveldb
@@ -329,6 +333,10 @@ priv
 proc
 pthread
 pthreads
+putKey
+putKeyString
+putValue
+putValueString
 py
 qnx
 rdbms

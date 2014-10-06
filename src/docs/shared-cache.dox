@@ -1,10 +1,10 @@
-/*! @page shared_cache Per-process shared caches
+/*! @m_page{{c,java},shared_cache,Per-process shared caches}
 
 WiredTiger supports sharing a single cache among multiple databases within
 a process.
 
 An application configures a shared cache by specifying a shared_cache name
-to the @ref wiredtiger_open function. Applications can optionally
+to the ::wiredtiger_open function. Applications can optionally
 set a minimum amount of cache any connection in the pool will be assigned
 and the granularity at which the cache pool is redistributed among
 connections - called the chunk size.
@@ -35,7 +35,7 @@ period. When a database is closed any resources it is using are distributed
 among the other databases.
 
 WiredTiger shared cache tuning options can be configured when first opening a
-database via @ref wiredtiger_open or changed after open using the
+database via ::wiredtiger_open or changed after open using the
 WT_CONNECTION::reconfigure method.
 
  */
