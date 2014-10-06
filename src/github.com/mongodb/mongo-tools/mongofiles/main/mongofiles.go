@@ -5,6 +5,7 @@ import (
 	commonOpts "github.com/mongodb/mongo-tools/common/options"
 	"github.com/mongodb/mongo-tools/mongofiles"
 	"github.com/mongodb/mongo-tools/mongofiles/options"
+	"github.com/mongodb/mongo-tools/common/log"
 	"os"
 )
 
@@ -37,7 +38,7 @@ func main() {
 
 	args, err := opts.Parse()
 	if err != nil {
-		fmt.Printf("Error parsing command line options: %v\n", err)
+		log.Logf(0, "error parsing command line options: %v", err)
 		printHelpAndExit()
 	}
 
@@ -51,9 +52,11 @@ func main() {
 		return
 	}
 
+	log.SetVerbosity(opts.Verbosity)
+
 	fileName, err := mongofiles.ValidateCommand(args)
 	if err != nil {
-		fmt.Printf("Error: %v\n", err)
+		log.Logf(0, "Error: %v", err)
 		printHelpAndExit()
 	}
 
@@ -66,13 +69,13 @@ func main() {
 
 	err = mongofiles.Init()
 	if err != nil {
-		fmt.Printf("Error initializing mongofiles: %v\n", err)
+		log.Logf(0, "Error initializing mongofiles: %v", err)
 		os.Exit(1)
 	}
 
 	output, err := mongofiles.Run(true)
 	if err != nil {
-		fmt.Printf("%v\n", err)
+		log.Logf(0, "%v", err)
 		os.Exit(1)
 	}
 	fmt.Printf("%s", output)

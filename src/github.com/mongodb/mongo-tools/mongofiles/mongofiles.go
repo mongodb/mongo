@@ -149,10 +149,7 @@ func (self *MongoFiles) Init() error {
 			return err
 		}
 	}
-
-	// initialize logger
-	log.InitToolLogger(self.ToolOptions.Verbosity)
-
+	
 	log.Logf(2, "initializing mongofiles tool for db: '%v'", self.ToolOptions.Namespace.DB)
 
 	if self.ToolOptions.Namespace.DBPath != "" {

@@ -97,44 +97,36 @@ func (tl *ToolLogger) Writer(minVerb int) io.Writer {
 
 var globalToolLogger *ToolLogger
 
-func assertGlobalToolLoggerInitialized() {
+func init() {
 	if globalToolLogger == nil {
-		panic("must initialize the global ToolLogger before use")
-	}
-}
-
-func InitToolLogger(verbosity *options.Verbosity) {
-	if globalToolLogger == nil {
-		globalToolLogger = NewToolLogger(verbosity)
+		// initialize tool logger with verbosity level = 0
+		globalToolLogger = NewToolLogger(&options.Verbosity{
+			[]bool{}, // Verbose
+			false,    // Quiet
+		})
 	}
 }
 
 func Logf(minVerb int, format string, a ...interface{}) {
-	assertGlobalToolLoggerInitialized()
 	globalToolLogger.Logf(minVerb, format, a...)
 }
 
 func Log(minVerb int, msg string) {
-	assertGlobalToolLoggerInitialized()
 	globalToolLogger.Log(minVerb, msg)
 }
 
 func SetVerbosity(verbosity *options.Verbosity) {
-	assertGlobalToolLoggerInitialized()
 	globalToolLogger.SetVerbosity(verbosity)
 }
 
 func SetWriter(writer io.Writer) {
-	assertGlobalToolLoggerInitialized()
 	globalToolLogger.SetWriter(writer)
 }
 
 func SetDateFormat(dateFormat string) {
-	assertGlobalToolLoggerInitialized()
 	globalToolLogger.SetDateFormat(dateFormat)
 }
 
 func Writer(minVerb int) io.Writer {
-	assertGlobalToolLoggerInitialized()
 	return globalToolLogger.Writer(minVerb)
 }

@@ -38,7 +38,7 @@ func main() {
 	}
 
 	// init logger
-	log.InitToolLogger(opts.Verbosity)
+	log.SetVerbosity(opts.Verbosity)
 
 	// validate the mongooplog options
 	if err := sourceOpts.Validate(); err != nil {

@@ -66,19 +66,8 @@ func TestBasicToolLoggerFunctionality(t *testing.T) {
 func TestGlobalToolLoggerFunctionality(t *testing.T) {
 	globalToolLogger = nil // just to be sure
 
-	Convey("With no initialized global ToolLogger", t, func() {
-		So(globalToolLogger, ShouldBeNil)
-
-		Convey("all actions should panic", func() {
-			So(func() { Logf(0, "woooo") }, ShouldPanic)
-			So(func() { SetVerbosity(nil) }, ShouldPanic)
-			So(func() { SetDateFormat("ahaha") }, ShouldPanic)
-			So(func() { SetWriter(os.Stdout) }, ShouldPanic)
-		})
-	})
-
 	Convey("With an initialized global ToolLogger", t, func() {
-		InitToolLogger(&options.Verbosity{
+		globalToolLogger = NewToolLogger(&options.Verbosity{
 			Quiet:   false,
 			Verbose: []bool{true, true, true},
 		})

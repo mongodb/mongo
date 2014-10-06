@@ -33,8 +33,7 @@ func main() {
 		return
 	}
 
-	// init logger
-	log.InitToolLogger(opts.Verbosity)
+	log.SetVerbosity(opts.Verbosity)
 
 	targetDir := ""
 	if inputOpts.Directory != "" {

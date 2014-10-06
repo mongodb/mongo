@@ -22,14 +22,14 @@ func main() {
 	ingestOpts := &options.IngestOptions{}
 	opts.AddOptions(ingestOpts)
 
-	log.InitToolLogger(opts.Verbosity)
-
 	args, err := opts.Parse()
 	if err != nil {
 		log.Logf(0, "error parsing command line options: %v", err)
 		util.ExitFail()
 	}
 
+	log.SetVerbosity(opts.Verbosity)
+	
 	// print help, if specified
 	if opts.PrintHelp() {
 		return

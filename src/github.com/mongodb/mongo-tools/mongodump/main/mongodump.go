@@ -37,7 +37,7 @@ func main() {
 	}
 
 	// init logger
-	log.InitToolLogger(opts.Verbosity)
+	log.SetVerbosity(opts.Verbosity)
 
 	dump := mongodump.MongoDump{
 		ToolOptions:   opts,

@@ -13,7 +13,7 @@ import (
 )
 
 func init() {
-	log.InitToolLogger(&options.Verbosity{
+	log.SetVerbosity(&options.Verbosity{
 		Verbose: []bool{true, true, true, true},
 	})
 }
