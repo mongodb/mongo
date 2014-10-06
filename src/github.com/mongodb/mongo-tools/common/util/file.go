@@ -4,8 +4,6 @@ import (
 	"bufio"
 	"os"
 	"path/filepath"
-	"runtime"
-	"strings"
 )
 
 // GetFieldsFromFile fetches the first line from the contents of the file
