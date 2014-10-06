@@ -192,7 +192,7 @@ namespace repl {
                                            BSONObjBuilder* resultObj);
 
         virtual Status processReplSetElect(const ReplSetElectArgs& args,
-                                           BSONObjBuilder* resultObj);
+                                           BSONObjBuilder* response);
 
         virtual Status processReplSetUpdatePosition(OperationContext* txn,
                                                     const UpdatePositionArgs& updates);
@@ -317,6 +317,23 @@ namespace repl {
          */
         void _fillIsMasterForReplSet_finish(const ReplicationExecutor::CallbackData& cbData,
                                             IsMasterResponse* result);
+
+        /**
+         * Bottom half of processReplSetFresh.
+         */
+        void _processReplSetFresh_finish(const ReplicationExecutor::CallbackData& cbData,
+                                         const ReplSetFreshArgs& args,
+                                         BSONObjBuilder* response,
+                                         Status* result);
+
+        /**
+         * Bottom half of processReplSetElect.
+         */
+        void _processReplSetElect_finish(const ReplicationExecutor::CallbackData& cbData,
+                                         const ReplSetElectArgs& args,
+                                         BSONObjBuilder* response,
+                                         Status* result);
+
 
         /*
          * Bottom half of clearSyncSourceBlacklist
@@ -618,7 +635,7 @@ namespace repl {
         // every host that sends it a heartbeat request to this set, and also starts
         // sending heartbeat requests to that host.  This set is cleared whenever
         // a node discovers that it is a member of a config.
-        unordered_set<HostAndPort> _seedList;                                        // (X)
+        unordered_set<HostAndPort> _seedList;                                             // (X)
 
         // Parsed command line arguments related to replication.
         // TODO(spencer): Currently there is global mutable state
