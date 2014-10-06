@@ -224,11 +224,21 @@ namespace mongo {
         if( isSharded && manager ){
 
             Shard shard = Shard::make( conn->getServerAddress() );
-            if( refManager && ! refManager->compatibleWith( manager, shard ) ){
-                throw SendStaleConfigException( ns, str::stream() << "manager (" << manager->getVersion( shard ).toString()  << " : " << manager->getSequenceNumber() << ") "
-                                                                      << "not compatible with reference manager (" << refManager->getVersion( shard ).toString()  << " : " << refManager->getSequenceNumber() << ") "
-                                                                      << "on shard " << shard.getName() << " (" << shard.getAddress().toString() << ")",
-                                                refManager->getVersion( shard ), manager->getVersion( shard ) );
+            if(refManager && !refManager->compatibleWith(*manager, shard.getName())) {
+                const ChunkVersion refVersion(refManager->getVersion(shard.getName()));
+                const ChunkVersion currentVersion(manager->getVersion(shard.getName()));
+                string msg(str::stream() << "manager ("
+                        << currentVersion.toString()
+                        << " : " << manager->getSequenceNumber() << ") "
+                        << "not compatible with reference manager ("
+                        << refVersion.toString()
+                        << " : " << refManager->getSequenceNumber() << ") "
+                        << "on shard " << shard.getName()
+                        << " (" << shard.getAddress().toString() << ")");
+                throw SendStaleConfigException(ns,
+                                               msg,
+                                               refVersion,
+                                               currentVersion);
             }
         }
         else if( refManager ){
@@ -241,8 +251,10 @@ namespace mongo {
                         << "on conn " << conn->getServerAddress() << " ("
                         << conn_in->getServerAddress() << ")" );
 
-            throw SendStaleConfigException( ns, msg,
-                    refManager->getVersion( shard ), ChunkVersion( 0, 0, OID() ));
+            throw SendStaleConfigException(ns,
+                                           msg,
+                                           refManager->getVersion(shard.getName()),
+                                           ChunkVersion::UNSHARDED());
         }
 
         // has the ChunkManager been reloaded since the last time we updated the connection-level version?
@@ -252,9 +264,10 @@ namespace mongo {
             return false;
         }
 
-        ChunkVersion version = ChunkVersion( 0, 0, OID() );
+        ChunkVersion version(0, 0, OID());
         if ( isSharded && manager ) {
-            version = manager->getVersion( Shard::make( conn->getServerAddress() ) );
+            Shard shard(Shard::make(conn->getServerAddress()));
+            version = manager->getVersion(shard.getName());
         }
 
         if( ! version.isSet() ){

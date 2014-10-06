@@ -49,10 +49,17 @@ namespace mongo {
             : _name("") , _addr("") , _maxSize(0) , _isDraining( false ) {
         }
 
-        Shard( const std::string& name , const std::string& addr, long long maxSize = 0 , bool isDraining = false )
-            : _name(name) , _addr( addr ) , _maxSize( maxSize ) , _isDraining( isDraining ) {
-            _setAddr( addr );
-        }
+        Shard(const std::string& name,
+              const std::string& addr,
+              long long maxSize,
+              bool isDraining,
+              const BSONArray& tags);
+
+        Shard(const std::string& name,
+              const ConnectionString& connStr,
+              long long maxSize,
+              bool isDraining,
+              const std::set<std::string>& tags);
 
         Shard( const std::string& ident ) {
             reset( ident );
@@ -62,11 +69,6 @@ namespace mongo {
             : _name( other._name ) , _addr( other._addr ) , _cs( other._cs ) , 
               _maxSize( other._maxSize ) , _isDraining( other._isDraining ),
               _tags( other._tags ) {
-        }
-
-        Shard( const Shard* other )
-            : _name( other->_name ) , _addr( other->_addr ), _cs( other->_cs ) , 
-              _maxSize( other->_maxSize ) , _isDraining( other->_isDraining ) {
         }
 
         static Shard make( const std::string& ident ) {
@@ -82,8 +84,6 @@ namespace mongo {
          */
         void reset( const std::string& ident );
 
-        void setAddress( const ConnectionString& cs );
-        
         ConnectionString getAddress() const { return _cs; }
 
         std::string getName() const {
@@ -152,7 +152,6 @@ namespace mongo {
         bool containsNode( const std::string& node ) const;
 
         const std::set<std::string>& tags() const { return _tags; }
-        void addTag( const std::string& tag ) { _tags.insert( tag ); }
 
         static void getAllShards( std::vector<Shard>& all );
         static void printShardInfo( std::ostream& out );
@@ -172,10 +171,12 @@ namespace mongo {
 
         static Shard EMPTY;
         
+        static void installShard(const std::string& name, const Shard& shard);
+
     private:
 
         void _setAddr( const std::string& addr );
-        
+
         std::string    _name;
         std::string    _addr;
         ConnectionString _cs;

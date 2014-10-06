@@ -108,9 +108,13 @@ namespace ShardingTests {
 
             // Since we've redirected the conns, the host doesn't matter here so long as it's
             // prefixed with a "$"
-            _shard = Shard( "shard0000", "$hostFooBar:27017" );
+            _shard = Shard("shard0000",
+                           "$hostFooBar:27017",
+                           0 /* maxSize */,
+                           false /* draining */,
+                           BSONArray() /* tags */);
             // Need to run this to ensure the shard is in the global lookup table
-            _shard.setAddress( _shard.getAddress() );
+            Shard::installShard(_shard.getName(), _shard);
 
             // Create an index so that diffing works correctly, otherwise no cursors from S&O
             _client.ensureIndex( ChunkType::ConfigNS, // br
@@ -264,12 +268,12 @@ namespace ShardingTests {
 
             BSONObj collDoc(collDocBuilder.done());
 
-            ChunkManagerPtr manager( new ChunkManager(collDoc) );
-            const_cast<ChunkManager *>(manager.get())->loadExistingRanges(shard().getConnString());
+            ChunkManager manager(collDoc);
+            manager.loadExistingRanges(shard().getConnString(), NULL);
 
-            ASSERT( manager->getVersion().epoch() == version.epoch() );
-            ASSERT( manager->getVersion().minorVersion() == ( numChunks - 1 ) );
-            ASSERT( static_cast<int>( manager->getChunkMap().size() ) == numChunks );
+            ASSERT(manager.getVersion().epoch() == version.epoch());
+            ASSERT(manager.getVersion().minorVersion() == (numChunks - 1));
+            ASSERT(static_cast<int>(manager.getChunkMap().size()) == numChunks);
 
             // Modify chunks collection
             BSONObjBuilder b;
@@ -279,8 +283,8 @@ namespace ShardingTests {
             _client.update(ChunkType::ConfigNS, BSONObj(), BSON( "$set" << b.obj()));
 
             // Make new manager load chunk diff
-            ChunkManager newManager( manager );
-            newManager.loadExistingRanges( shard().getConnString() );
+            ChunkManager newManager(manager.getns(), manager.getShardKey(), manager.isUnique());
+            newManager.loadExistingRanges(shard().getConnString(), &manager);
 
             ASSERT( newManager.getVersion().toLong() == laterVersion.toLong() );
             ASSERT( newManager.getVersion().epoch() == laterVersion.epoch() );
@@ -314,7 +318,6 @@ namespace ShardingTests {
             }
 
             virtual string shardFor( const string& name ) const { return name; }
-            virtual string nameFrom( const string& shard ) const { return shard; }
         };
 
         // Inverts the storage order for chunks from min to max

@@ -81,7 +81,7 @@ namespace mongo {
     void DBConfig::CollectionInfo::shard( ChunkManager* manager ){
 
         // Do this *first* so we're invisible to everyone else
-        manager->loadExistingRanges( configServer.getPrimary().getConnString() );
+        manager->loadExistingRanges(configServer.getPrimary().getConnString(), NULL);
 
         //
         // Collections with no chunks are unsharded, no matter what the collections entry says
@@ -435,8 +435,10 @@ namespace mongo {
                 
             }
             
-            temp.reset( new ChunkManager( oldManager ) );
-            temp->loadExistingRanges( configServer.getPrimary().getConnString() );
+            temp.reset(new ChunkManager(oldManager->getns(),
+                                        oldManager->getShardKey(),
+                                        oldManager->isUnique()));
+            temp->loadExistingRanges(configServer.getPrimary().getConnString(), oldManager.get());
 
             if ( temp->numChunks() == 0 ) {
                 // maybe we're not sharded any more
@@ -826,7 +828,13 @@ namespace mongo {
 
         string fullString;
         joinStringDelim( configHosts, &fullString, ',' );
-        _primary.setAddress( ConnectionString( fullString , ConnectionString::SYNC ) );
+        _primary = Shard(_primary.getName(),
+                         ConnectionString(fullString, ConnectionString::SYNC),
+                         _primary.getMaxSize(),
+                         _primary.isDraining(),
+                         _primary.tags());
+        Shard::installShard(_primary.getName(), _primary);
+
         LOG(1) << " config string : " << fullString << endl;
 
         return true;
