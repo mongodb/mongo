@@ -330,7 +330,7 @@ __wt_page_inmem(WT_SESSION_IMPL *session,
 	WT_RET(__wt_page_alloc(
 	    session, dsk->type, dsk->recno, alloc_entries, 1, &page));
 	page->dsk = dsk;
-	F_SET_ATOMIC1(page, flags);
+	F_SET_ATOMIC(page, flags);
 
 	/*
 	 * Track the memory allocated to build this page so we can update the

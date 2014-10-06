@@ -26,7 +26,7 @@ __wt_row_leaf_keys(WT_SESSION_IMPL *session, WT_PAGE *page)
 	btree = S2BT(session);
 
 	if (page->pg_row_entries == 0) {		/* Just checking... */
-		F_SET_ATOMIC1(page, WT_PAGE_BUILD_KEYS);
+		F_SET_ATOMIC(page, WT_PAGE_BUILD_KEYS);
 		return (0);
 	}
 
@@ -62,7 +62,7 @@ __wt_row_leaf_keys(WT_SESSION_IMPL *session, WT_PAGE *page)
 			WT_ERR(__wt_row_leaf_key_work(
 			    session, page, rip, key, 1));
 
-	F_SET_ATOMIC1(page, WT_PAGE_BUILD_KEYS);
+	F_SET_ATOMIC(page, WT_PAGE_BUILD_KEYS);
 
 err:	__wt_scr_free(&key);
 	__wt_scr_free(&tmp);

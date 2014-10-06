@@ -384,7 +384,7 @@ __wt_rec_write(WT_SESSION_IMPL *session,
 		WT_PAGE_LOCK(session, page);
 	} else
 		for (;;) {
-			F_CAS_ATOMIC1(page, WT_PAGE_SCANNING, ret);
+			F_CAS_ATOMIC(page, WT_PAGE_SCANNING, ret);
 			if (ret == 0)
 				break;
 			__wt_yield();
@@ -423,7 +423,7 @@ __wt_rec_write(WT_SESSION_IMPL *session,
 	if (locked)
 		WT_PAGE_UNLOCK(session, page);
 	else
-		F_CLR_ATOMIC1(page, WT_PAGE_SCANNING);
+		F_CLR_ATOMIC(page, WT_PAGE_SCANNING);
 
 	/*
 	 * Clean up the boundary structures: some workloads result in millions

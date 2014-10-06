@@ -50,18 +50,10 @@ static inline void WT_READ_BARRIER(void) { return; }
 static inline void WT_WRITE_BARRIER(void) { return; }
 
 #define	F_ISSET_ATOMIC(p, mask)						\
-	((p)->flags_atomic & ((uint32_t)(mask)))
+	((p)->flags_atomic & ((uint8_t)(mask)))
 #define	F_SET_ATOMIC(p, mask)						\
-	((p)->flags_atomic |= ((uint32_t)(mask)))
+	((p)->flags_atomic |= ((uint8_t)(mask)))
 #define	F_CAS_ATOMIC(p, mask, ret)					\
 	F_SET_ATOMIC(p, mask)
 #define	F_CLR_ATOMIC(p, mask)						\
-	((p)->flags_atomic &= ~((uint32_t)(mask)))
-
-#define	F_SET_ATOMIC1(p, mask)			F_SET_ATOMIC(p, mask)
-#define	F_CAS_ATOMIC1(p, mask, ret)		F_CAS_ATOMIC(p, mask, ret)
-#define	F_CLR_ATOMIC1(p, mask)			F_CLR_ATOMIC(p, mask)
-
-#define	F_SET_ATOMIC4(p, mask)			F_SET_ATOMIC(p, mask)
-#define	F_CAS_ATOMIC4(p, mask, ret)		F_CAS_ATOMIC(p, mask, ret)
-#define	F_CLR_ATOMIC4(p, mask)			F_CLR_ATOMIC(p, mask)
+	((p)->flags_atomic &= ~((uint8_t)(mask)))

@@ -79,40 +79,43 @@
  * atomic state changes, we rely on the WT_ATOMIC_ADD and WT_ATOMIC_CAS
  * (compare and swap) operations.
  */
-#define	WT_ATOMIC_ADD(v, val)						\
-	__sync_add_and_fetch(&(v), val)
-#define	WT_ATOMIC_CAS(v, oldv, newv)					\
-	__sync_bool_compare_and_swap(&(v), oldv, newv)
-#define	WT_ATOMIC_CAS_VAL(v, oldv, newv)				\
-	__sync_val_compare_and_swap(&(v), oldv, newv)
-#define	WT_ATOMIC_STORE(v, val)						\
-	__sync_lock_test_and_set(&(v), val)
-#define	WT_ATOMIC_SUB(v, val)						\
-	__sync_sub_and_fetch(&(v), val)
+#define	WT_ATOMIC_ADD(v, val, n)					\
+	(WT_STATIC_ASSERT(sizeof(v) == (n)), __sync_add_and_fetch(&(v), val))
+#define	WT_ATOMIC_CAS(v, old, new, n)					\
+	(WT_STATIC_ASSERT(sizeof(v) == (n)),				\
+	__sync_bool_compare_and_swap(&(v), old, new))
+#define	WT_ATOMIC_CAS_VAL(v, old, new, n)				\
+	(WT_STATIC_ASSERT(sizeof(v) == (n)),				\
+	__sync_val_compare_and_swap(&(v), old, new))
+#define	WT_ATOMIC_STORE(v, val, n)					\
+	(WT_STATIC_ASSERT(sizeof(v) == (n)),				\
+	__sync_lock_test_and_set(&(v), val))
+#define	WT_ATOMIC_SUB(v, val, n)					\
+	(WT_STATIC_ASSERT(sizeof(v) == (n)), __sync_sub_and_fetch(&(v), val))
 
-#define	WT_ATOMIC_ADD1(v, val)			WT_ATOMIC_ADD(v, val)
-#define	WT_ATOMIC_CAS1(v, oldv, newv)		WT_ATOMIC_CAS(v, oldv, newv)
-#define	WT_ATOMIC_CAS_VAL1(v, oldv, newv)	WT_ATOMIC_CAS_VAL(v, oldv, newv)
-#define	WT_ATOMIC_STORE1(v, val)		WT_ATOMIC_STORE(v, val)
-#define	WT_ATOMIC_SUB1(v, val)			WT_ATOMIC_SUB(v, val)
+#define	WT_ATOMIC_ADD1(v, val)		WT_ATOMIC_ADD(v, val, 1)
+#define	WT_ATOMIC_CAS1(v, old, new)	WT_ATOMIC_CAS(v, old, new, 1)
+#define	WT_ATOMIC_CAS_VAL1(v, old, new)	WT_ATOMIC_CAS_VAL(v, old, new, 1)
+#define	WT_ATOMIC_STORE1(v, val)	WT_ATOMIC_STORE(v, val, 1)
+#define	WT_ATOMIC_SUB1(v, val)		WT_ATOMIC_SUB(v, val, 1)
 
-#define	WT_ATOMIC_ADD2(v, val)			WT_ATOMIC_ADD(v, val)
-#define	WT_ATOMIC_CAS2(v, oldv, newv)		WT_ATOMIC_CAS(v, oldv, newv)
-#define	WT_ATOMIC_CAS_VAL2(v, oldv, newv)	WT_ATOMIC_CAS_VAL(v, oldv, newv)
-#define	WT_ATOMIC_STORE2(v, val)		WT_ATOMIC_STORE(v, val)
-#define	WT_ATOMIC_SUB2(v, val)			WT_ATOMIC_SUB(v, val)
+#define	WT_ATOMIC_ADD2(v, val)		WT_ATOMIC_ADD(v, val, 2)
+#define	WT_ATOMIC_CAS2(v, old, new)	WT_ATOMIC_CAS(v, old, new, 2)
+#define	WT_ATOMIC_CAS_VAL2(v, old, new)	WT_ATOMIC_CAS_VAL(v, old, new, 2)
+#define	WT_ATOMIC_STORE2(v, val)	WT_ATOMIC_STORE(v, val, 2)
+#define	WT_ATOMIC_SUB2(v, val)		WT_ATOMIC_SUB(v, val, 2)
 
-#define	WT_ATOMIC_ADD4(v, val)			WT_ATOMIC_ADD(v, val)
-#define	WT_ATOMIC_CAS4(v, oldv, newv)		WT_ATOMIC_CAS(v, oldv, newv)
-#define	WT_ATOMIC_CAS_VAL4(v, oldv, newv)	WT_ATOMIC_CAS_VAL(v, oldv, newv)
-#define	WT_ATOMIC_STORE4(v, val)		WT_ATOMIC_STORE(v, val)
-#define	WT_ATOMIC_SUB4(v, val)			WT_ATOMIC_SUB(v, val)
+#define	WT_ATOMIC_ADD4(v, val)		WT_ATOMIC_ADD(v, val, 4)
+#define	WT_ATOMIC_CAS4(v, old, new)	WT_ATOMIC_CAS(v, old, new, 4)
+#define	WT_ATOMIC_CAS_VAL4(v, old, new)	WT_ATOMIC_CAS_VAL(v, old, new, 4)
+#define	WT_ATOMIC_STORE4(v, val)	WT_ATOMIC_STORE(v, val, 4)
+#define	WT_ATOMIC_SUB4(v, val)		WT_ATOMIC_SUB(v, val, 4)
 
-#define	WT_ATOMIC_ADD8(v, val)			WT_ATOMIC_ADD(v, val)
-#define	WT_ATOMIC_CAS8(v, oldv, newv)		WT_ATOMIC_CAS(v, oldv, newv)
-#define	WT_ATOMIC_CAS_VAL8(v, oldv, newv)	WT_ATOMIC_CAS_VAL(v, oldv, newv)
-#define	WT_ATOMIC_STORE8(v, val)		WT_ATOMIC_STORE(v, val)
-#define	WT_ATOMIC_SUB8(v, val)			WT_ATOMIC_SUB(v, val)
+#define	WT_ATOMIC_ADD8(v, val)		WT_ATOMIC_ADD(v, val, 8)
+#define	WT_ATOMIC_CAS8(v, old, new)	WT_ATOMIC_CAS(v, old, new, 8)
+#define	WT_ATOMIC_CAS_VAL8(v, old, new)	WT_ATOMIC_CAS_VAL(v, old, new, 8)
+#define	WT_ATOMIC_STORE8(v, val)	WT_ATOMIC_STORE(v, val, 8)
+#define	WT_ATOMIC_SUB8(v, val)		WT_ATOMIC_SUB(v, val, 8)
 
 /* Compile read-write barrier */
 #define	WT_BARRIER() asm volatile("" ::: "memory")
@@ -142,47 +145,33 @@
 #error "No write barrier implementation for this hardware"
 #endif
 
-#define	F_ISSET_ATOMIC(p, mask)	((p)->flags_atomic & (uint32_t)(mask))
+#define	F_ISSET_ATOMIC(p, mask)	((p)->flags_atomic & (uint8_t)(mask))
 
-#define	F_SET_ATOMIC_BASE(p, mask, type, func) do {			\
-	type __orig;							\
+#define	F_SET_ATOMIC(p, mask) do {					\
+	uint8_t __orig;							\
 	do {								\
 		__orig = (p)->flags_atomic;				\
-	} while (!func((p)->flags_atomic,				\
-	    __orig, __orig | (type)(mask)));				\
+	} while (!WT_ATOMIC_CAS1((p)->flags_atomic,			\
+	    __orig, __orig | (uint8_t)(mask)));				\
 } while (0)
 
-#define	F_CAS_ATOMIC_BASE(p, mask, ret, type, func) do {		\
-	type __orig;							\
+#define	F_CAS_ATOMIC(p, mask, ret) do {					\
+	uint32_t __orig;						\
 	ret = 0;							\
 	do {								\
 		__orig = (p)->flags_atomic;				\
-		if ((__orig & (type)(mask)) != 0) {			\
+		if ((__orig & (uint8_t)(mask)) != 0) {			\
 			ret = EBUSY;					\
 			break;						\
 		}							\
-	} while (!func((p)->flags_atomic,				\
-	    __orig, __orig | (type)(mask)));				\
+	} while (!WT_ATOMIC_CAS1((p)->flags_atomic,			\
+	    __orig, __orig | (uint8_t)(mask)));				\
 } while (0)
 
-#define	F_CLR_ATOMIC_BASE(p, mask, type, func) do {			\
-	type __orig;							\
+#define	F_CLR_ATOMIC(p, mask)	do {					\
+	uint8_t __orig;							\
 	do {								\
 		__orig = (p)->flags_atomic;				\
-	} while (!func((p)->flags_atomic,				\
-	    __orig, __orig & ~(type)(mask)));				\
+	} while (!WT_ATOMIC_CAS1((p)->flags_atomic,			\
+	    __orig, __orig & ~(uint8_t)(mask)));			\
 } while (0)
-
-#define	F_SET_ATOMIC1(p, mask)						\
-	F_SET_ATOMIC_BASE(p, mask, uint8_t, WT_ATOMIC_CAS1)
-#define	F_CAS_ATOMIC1(p, mask, ret)					\
-	F_CAS_ATOMIC_BASE(p, mask, ret, uint8_t, WT_ATOMIC_CAS1)
-#define	F_CLR_ATOMIC1(p, mask)						\
-	F_CLR_ATOMIC_BASE(p, mask, uint8_t, WT_ATOMIC_CAS1)
-
-#define	F_SET_ATOMIC4(p, mask)						\
-	F_SET_ATOMIC_BASE(p, mask, uint32_t, WT_ATOMIC_CAS4)
-#define	F_CAS_ATOMIC4(p, mask, ret)					\
-	F_CAS_ATOMIC_BASE(p, mask, ret, uint32_t, WT_ATOMIC_CAS4)
-#define	F_CLR_ATOMIC4(p, mask)						\
-	F_CLR_ATOMIC_BASE(p, mask, uint32_t, WT_ATOMIC_CAS4)

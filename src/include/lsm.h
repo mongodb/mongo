@@ -217,7 +217,7 @@ struct __wt_lsm_tree {
 	uint32_t flags;
 
 #define	WT_LSM_TREE_EXCLUSIVE	0x01	/* Tree is opened exclusively */
-	uint32_t flags_atomic;
+	uint8_t flags_atomic;
 };
 
 /*

@@ -136,12 +136,12 @@ __update_serial_func(WT_SESSION_IMPL *session,
 	 */
 	if (upd->next != NULL &&
 	    F_ISSET(S2C(session)->cache, WT_EVICT_ACTIVE)) {
-		F_CAS_ATOMIC1(page, WT_PAGE_SCANNING, ret);
+		F_CAS_ATOMIC(page, WT_PAGE_SCANNING, ret);
 		/* If we can't lock it, don't scan, that's okay. */
 		if (ret != 0)
 			return (0);
 		obsolete = __wt_update_obsolete_check(session, upd->next);
-		F_CLR_ATOMIC1(page, WT_PAGE_SCANNING);
+		F_CLR_ATOMIC(page, WT_PAGE_SCANNING);
 		if (obsolete != NULL)
 			__wt_update_obsolete_free(session, page, obsolete);
 	}
