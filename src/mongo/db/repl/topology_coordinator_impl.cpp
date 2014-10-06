@@ -663,7 +663,7 @@ namespace {
         }
         else {
             hbArgs.setSetName(ourSetName);
-            hbArgs.setConfigVersion(0);
+            hbArgs.setConfigVersion(-2);
         }
 
         Milliseconds timeout(_currentConfig.getHeartbeatTimeoutPeriodMillis().total_milliseconds() -

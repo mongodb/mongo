@@ -135,9 +135,8 @@ namespace {
         builder.append("replSetHeartbeat", _setName);
         builder.append("pv", _protocolVersion);
         builder.append("v", _configVersion);
-        if (_hasSenderHost) {
-            builder.append("from", _senderHost.toString());
-        }
+        builder.append("from", _hasSenderHost ? _senderHost.toString() : "");
+
         if (_hasSenderId) {
             builder.append("fromId", _senderId);
         }

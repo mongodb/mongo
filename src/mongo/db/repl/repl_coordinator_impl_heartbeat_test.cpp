@@ -104,7 +104,7 @@ namespace {
         ReplSetHeartbeatArgs hbArgs;
         ASSERT_OK(hbArgs.initialize(request.cmdObj));
         ASSERT_EQUALS("mySet", hbArgs.getSetName());
-        ASSERT_EQUALS(0, hbArgs.getConfigVersion());
+        ASSERT_EQUALS(-2, hbArgs.getConfigVersion());
         ReplSetHeartbeatResponse hbResp;
         hbResp.setSetName("mySet");
         hbResp.setState(MemberState::RS_PRIMARY);
