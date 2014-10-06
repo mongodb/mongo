@@ -283,7 +283,7 @@ __ckpt_extlist_read(WT_SESSION_IMPL *session, WT_BLOCK *block, WT_CKPT *ckpt)
  * __ckpt_extlist_fblocks --
  *	If a checkpoint's extent list is going away, free its blocks.
  */
-static inline int
+static int
 __ckpt_extlist_fblocks(
     WT_SESSION_IMPL *session, WT_BLOCK *block, WT_EXTLIST *el)
 {
