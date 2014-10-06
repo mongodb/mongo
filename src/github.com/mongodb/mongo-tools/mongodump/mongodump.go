@@ -344,6 +344,11 @@ func (dump *MongoDump) DumpCollection(dbName, c string) error {
 		return err
 	}
 
+	// don't dump metatdata for SystemIndexes collection
+	if c == SystemIndexes {
+		return nil
+	}
+
 	metadataFilepath := filepath.Join(dbFolder, fmt.Sprintf("%v.metadata.json", c))
 	metaOut, err := os.Create(metadataFilepath)
 	if err != nil {
