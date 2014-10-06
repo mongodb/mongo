@@ -253,13 +253,19 @@ namespace {
 
         _stateDisagreement = doc[kHasStateDisagreementFieldName].trueValue();
 
+
+        // Not required for the case of uninitialized members -- they have no config
         const BSONElement versionElement = doc[kConfigVersionFieldName];
-        if (versionElement.eoo()) {
+
+        // If we have an optime then we must have a version
+        if (_opTimeSet && versionElement.eoo()) {
             return Status(ErrorCodes::NoSuchKey, str::stream() <<
                           "Response to replSetHeartbeat missing required \"" <<
-                          kConfigVersionFieldName << "\" field");
+                          kConfigVersionFieldName << "\" field even though initialized");
         }
-        if (versionElement.type() != NumberInt) {
+
+        // If there is a "v" (config version) then it must be an int.
+        if (!versionElement.eoo() && versionElement.type() != NumberInt) {
             return Status(ErrorCodes::TypeMismatch, str::stream() << "Expected \"" <<
                           kConfigVersionFieldName <<
                           "\" field in response to replSetHeartbeat to have "

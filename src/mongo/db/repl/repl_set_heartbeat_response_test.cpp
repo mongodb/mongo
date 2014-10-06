@@ -62,10 +62,7 @@ namespace {
         ASSERT_EQUALS(fieldsSet, hbResponseObj.nFields());
         ASSERT_EQUALS("", hbResponseObj["hbmsg"].String());
 
-        Status initializeResult = hbResponseObjRoundTripChecker.initialize(hbResponseObj);
-        ASSERT_EQUALS(ErrorCodes::NoSuchKey, initializeResult);
-        ASSERT_EQUALS("Response to replSetHeartbeat missing required \"v\" field",
-                      initializeResult.reason());
+        Status initializeResult = Status::OK();
         ASSERT_EQUALS(hbResponseObj.toString(), hbResponseObjRoundTripChecker.toBSON().toString());
 
         // set version
@@ -593,15 +590,6 @@ namespace {
                       result.reason());
     }
 
-    TEST(ReplSetHeartbeatResponse, InitializeVersionMissing) {
-        ReplSetHeartbeatResponse hbResponse;
-        BSONObj initializerObj = BSON("ok" << 1.0);
-        Status result = hbResponse.initialize(initializerObj);
-        ASSERT_EQUALS(ErrorCodes::NoSuchKey, result);
-        ASSERT_EQUALS("Response to replSetHeartbeat missing required \"v\" field",
-                      result.reason());
-    }
-
     TEST(ReplSetHeartbeatResponse, InitializeVersionWrongType) {
         ReplSetHeartbeatResponse hbResponse;
         BSONObj initializerObj = BSON("ok" << 1.0 <<
@@ -715,6 +703,27 @@ namespace {
 
         ASSERT_EQUALS(hbResponseTimestamp.getOpTime(), hbResponseTimestamp.getOpTime());
     }
+
+    TEST(ReplSetHeartbeatResponse, NoConfigStillInitializing) {
+        ReplSetHeartbeatResponse hbResp;
+        std::string msg = "still initializing";
+        Status result = hbResp.initialize(BSON("ok" << 1.0 <<
+                                               "rs" << true <<
+                                               "hbmsg" << msg));
+        ASSERT_EQUALS(Status::OK(), result);
+        ASSERT_EQUALS(true, hbResp.isReplSet());
+        ASSERT_EQUALS(msg, hbResp.getHbMsg());
+     }
+
+    TEST(ReplSetHeartbeatResponse, InvalidResponseOpTimeMissesConfigVersion) {
+        ReplSetHeartbeatResponse hbResp;
+        std::string msg = "still initializing";
+        Status result = hbResp.initialize(BSON("ok" << 1.0 <<
+                                               "opTime" << OpTime()));
+        ASSERT_EQUALS(ErrorCodes::NoSuchKey, result.code());
+        ASSERT_TRUE(stringContains(result.reason(), "\"v\""))
+                    << result.reason() << " doesn't contain 'v' field required error msg";
+     }
 
     TEST(ReplSetHeartbeatResponse, MismatchedRepliSetNames) {
         ReplSetHeartbeatResponse hbResponse;
