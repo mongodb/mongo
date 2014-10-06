@@ -9,18 +9,21 @@ import (
 	"github.com/mongodb/mongo-tools/common/json"
 	"github.com/mongodb/mongo-tools/common/log"
 	commonopts "github.com/mongodb/mongo-tools/common/options"
-	//"github.com/mongodb/mongo-tools/common/progress"
 	"github.com/mongodb/mongo-tools/mongodump/options"
-	//"gopkg.in/mgo.v2"
 	"gopkg.in/mgo.v2/bson"
 	"io"
 	"os"
 	"path/filepath"
 	"strings"
-	//"time"
 )
 
-const ProgressBarLength = 24
+const (
+	ProgressBarLength = 24
+
+	SystemIndexes = "system.indexes"
+
+	DumpDefaultPermissions = 0755
+)
 
 type MongoDump struct {
 	// basic mongo tool options
@@ -277,6 +280,10 @@ func (dump *MongoDump) DumpDatabase(db string) error {
 	if err != nil {
 		return fmt.Errorf("error getting collections names for database `%v`: %v", dump.ToolOptions.DB, err)
 	}
+
+	dbFolder := filepath.Join(dump.OutputOptions.Out, db)
+	err = os.MkdirAll(dbFolder, DumpDefaultPermissions)
+
 	log.Logf(2, "found collections: %v", strings.Join(cols, ", "))
 	for _, col := range cols {
 		if dump.skipCollection(col) {
@@ -319,7 +326,7 @@ func (dump *MongoDump) DumpCollection(dbName, c string) error {
 		return dump.dumpDocSourceToWriter(findQuery, os.Stdout)
 	}
 	dbFolder := filepath.Join(dump.OutputOptions.Out, dbName)
-	err = os.MkdirAll(dbFolder, 0755)
+	err = os.MkdirAll(dbFolder, DumpDefaultPermissions)
 	if err != nil {
 		return fmt.Errorf("error creating directory `%v`: %v", dbFolder, err)
 	}
