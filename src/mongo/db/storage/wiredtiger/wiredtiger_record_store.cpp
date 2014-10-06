@@ -30,60 +30,51 @@
  *    it in the license file.
  */
 
+#include <wiredtiger.h>
+
 #include "mongo/db/operation_context.h"
-#include "mongo/db/storage_options.h"
-#include "mongo/util/log.h"
-#include "mongo/db/storage/wiredtiger/wiredtiger_global_options.h"
-#include "mongo/db/storage/wiredtiger/wiredtiger_metadata.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_record_store.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_recovery_unit.h"
+#include "mongo/db/storage/wiredtiger/wiredtiger_session_cache.h"
+#include "mongo/db/storage/wiredtiger/wiredtiger_util.h"
+
+#include "mongo/util/log.h"
+//#define RS_ITERATOR_TRACE(x) log() << "WTRS::Iterator " << (const void*)(_cursor->get()) << " " << x;
+
+#define RS_ITERATOR_TRACE(x)
 
 namespace mongo {
 
-    int WiredTigerRecordStore::Create(WiredTigerDatabase &db,
-            const StringData &ns, const CollectionOptions &options, bool allocateDefaultSpace) {
-        WiredTigerSession swrap(db);
-        WT_SESSION *s = swrap.Get();
-
-        // Attempt to drop any tables or indexes that we couldn't drop earlier. This is
-        // a cleanup step - not directly related to create.
-        db.DropDeletedTables();
-
-        // Add the collection into the meta data
-        WiredTigerMetaData &md = db.GetMetaData();
-        uint64_t tblIdentifier = md.generateIdentifier( ns.toString(), options.toBSON() );
-        std::string newUri = md.getURI( tblIdentifier );
-
+    std::string WiredTigerRecordStore::generateCreateString( const CollectionOptions& options,
+                                                             const StringData& extraStrings ) {
         // Separate out a prefix and suffix in the default string. User configuration will
         // override values in the prefix, but not values in the suffix.
-        const char *default_config_pfx = "type=file,leaf_page_max=512k,memory_page_max=10m,";
-        const char *default_config_sfx = ",key_format=q,value_format=u";
-        std::string config = std::string( default_config_pfx +
-                wiredTigerGlobalOptions.collectionConfig + default_config_sfx );
-        int ret = s->create(s, newUri.c_str(), config.c_str());
-        if (ret  != 0) {
-            log() << "Creating collection with custom options (" << config <<
-                     ") failed. Using default options instead." << endl;
-            config = std::string(default_config_pfx);
-            config += default_config_sfx + options.toBSON().jsonString();
-            ret = s->create(s, newUri.c_str(), config.c_str());
-        }
-        return (ret);
+        std::stringstream ss;
+        ss << "type=file,";
+        ss << "leaf_page_max=512k,";
+        ss << "memory_page_max=10m,";
+
+        ss << extraStrings << ",";
+
+        ss << "key_format=q,value_format=u";
+        return ss.str();
     }
 
-    WiredTigerRecordStore::WiredTigerRecordStore( const StringData& ns,
-                                        WiredTigerDatabase &db,
-                                        bool isCapped,
-                                        int64_t cappedMaxSize,
-                                        int64_t cappedMaxDocs,
-                                        CappedDocumentDeleteCallback* cappedDeleteCallback )
+
+    WiredTigerRecordStore::WiredTigerRecordStore( OperationContext* ctx,
+                                                  const StringData& ns,
+                                                  const StringData& uri,
+                                                  bool isCapped,
+                                                  int64_t cappedMaxSize,
+                                                  int64_t cappedMaxDocs,
+                                                  CappedDocumentDeleteCallback* cappedDeleteCallback )
         : RecordStore( ns ),
-          _db( db ),
+          _uri( uri.toString() ),
           _isCapped( isCapped ),
           _cappedMaxSize( cappedMaxSize ),
           _cappedMaxDocs( cappedMaxDocs ),
           _cappedDeleteCallback( cappedDeleteCallback ) {
-        _uri = _db.GetMetaData().getURI( ns.toString() );
+
         if (_isCapped) {
             invariant(_cappedMaxSize > 0);
             invariant(_cappedMaxDocs == -1 || _cappedMaxDocs > 0);
@@ -97,24 +88,22 @@ namespace mongo {
          * Find the largest DiskLoc currently in use and estimate the number of records.  We don't
          * have an operation context, so we can't use an Iterator.
          */
-        WiredTigerSession swrap(_db);
-        WiredTigerCursor curwrap(GetURI(), swrap);
-        WT_CURSOR *c = curwrap.Get();
-        int ret = c->prev(c);
-        if (ret != WT_NOTFOUND) invariantWTOK(ret);
-        uint64_t key = 0;
-        if (ret == 0) {
-            ret = c->get_key(c, &key);
-            invariantWTOK(ret);
-            _numRecords = key;
-        } else
+        scoped_ptr<RecordIterator> iterator( getIterator( ctx, DiskLoc(), false,
+                                                          CollectionScanParams::BACKWARD ) );
+        if ( iterator->isEOF() ) {
+            _dataSize = 0;
             _numRecords = 0;
+            // Need to start at 1 so we are always higher than minDiskLoc
+            _nextIdNum.store( 1 );
+        }
+        else {
+            uint64_t max = _makeKey( iterator->curr() );
+            _nextIdNum.store( 1 + max );
 
-        // More-or-less random value
-        _dataSize = _numRecords * 10;
-
-        // Need to start at 1 so we are always higher than minDiskLoc
-        _nextIdNum.store(key + 1);
+            // todo: this is all wrong and bad
+            _numRecords = max;
+            _dataSize = _numRecords * 10; // More-or-less random value
+        }
 
     }
 
@@ -155,10 +144,9 @@ namespace mongo {
     }
 
     // Retrieve the value from a positioned cursor.
-    RecordData WiredTigerRecordStore::_getData(const WiredTigerCursor &curwrap) const {
-        WT_CURSOR *c = curwrap.Get();
+    RecordData WiredTigerRecordStore::_getData(const WiredTigerCursor& cursor) const {
         WT_ITEM value;
-        int ret = c->get_value(c, &value);
+        int ret = cursor->get_value(cursor.get(), &value);
         invariantWTOK(ret);
 
         boost::shared_array<char> data( new char[value.size] );
@@ -168,9 +156,8 @@ namespace mongo {
 
     RecordData WiredTigerRecordStore::dataFor(OperationContext* txn, const DiskLoc& loc) const {
         // ownership passes to the shared_array created below
-        WiredTigerSession &swrap = WiredTigerRecoveryUnit::Get(txn).GetSession();
-        WiredTigerCursor curwrap(GetURI(), swrap);
-        WT_CURSOR *c = curwrap.Get();
+        WiredTigerCursor curwrap(GetURI(), txn);
+        WT_CURSOR *c = curwrap.get();
         c->set_key(c, _makeKey(loc));
         int ret = c->search(c);
         invariantWTOK(ret);
@@ -179,9 +166,8 @@ namespace mongo {
     }
 
     void WiredTigerRecordStore::deleteRecord( OperationContext* txn, const DiskLoc& loc ) {
-        WiredTigerSession &swrap = WiredTigerRecoveryUnit::Get(txn).GetSession();
-        WiredTigerCursor curwrap(GetURI(), swrap);
-        WT_CURSOR *c = curwrap.Get();
+        WiredTigerCursor cursor( GetURI(), txn );
+        WT_CURSOR *c = cursor.get();
         c->set_key(c, _makeKey(loc));
         int ret = c->search(c);
         invariantWTOK(ret);
@@ -216,9 +202,8 @@ namespace mongo {
         if (!cappedAndNeedDelete(txn))
             return;
 
-        WiredTigerSession &swrap = WiredTigerRecoveryUnit::Get(txn).GetSession();
-        WiredTigerCursor curwrap(GetURI(), swrap);
-        WT_CURSOR *c = curwrap.Get();
+        WiredTigerCursor curwrap(GetURI(), txn);
+        WT_CURSOR *c = curwrap.get();
         int ret = c->next(c);
         while ( ret == 0 && cappedAndNeedDelete(txn) ) {
             invariant(_numRecords > 0);
@@ -239,17 +224,17 @@ namespace mongo {
     }
 
     StatusWith<DiskLoc> WiredTigerRecordStore::insertRecord( OperationContext* txn,
-                                                        const char* data,
-                                                        int len,
-                                                        bool enforceQuota ) {
+                                                             const char* data,
+                                                             int len,
+                                                             bool enforceQuota ) {
         if ( _isCapped && len > _cappedMaxSize ) {
             return StatusWith<DiskLoc>( ErrorCodes::BadValue,
                                        "object to insert exceeds cappedMaxSize" );
         }
 
-        WiredTigerSession &swrap = WiredTigerRecoveryUnit::Get(txn).GetSession();
-        WiredTigerCursor curwrap(GetURI(), swrap);
-        WT_CURSOR *c = curwrap.Get();
+        WiredTigerCursor curwrap(GetURI(), txn);
+        WT_CURSOR *c = curwrap.get();
+        invariant( c );
         DiskLoc loc = _nextId();
         c->set_key(c, _makeKey(loc));
         c->set_value(c, WiredTigerItem(data, len).Get());
@@ -277,9 +262,8 @@ namespace mongo {
         boost::shared_array<char> buf( new char[len] );
         doc->writeDocument( buf.get() );
 
-        WiredTigerSession &swrap = WiredTigerRecoveryUnit::Get(txn).GetSession();
-        WiredTigerCursor curwrap(GetURI(), swrap);
-        WT_CURSOR *c = curwrap.Get();
+        WiredTigerCursor curwrap(GetURI(), txn);
+        WT_CURSOR *c = curwrap.get();
         DiskLoc loc = _nextId();
         c->set_key(c, _makeKey(loc));
         c->set_value(c, WiredTigerItem(buf.get(), len).Get());
@@ -300,9 +284,8 @@ namespace mongo {
                                                         int len,
                                                         bool enforceQuota,
                                                         UpdateMoveNotifier* notifier ) {
-        WiredTigerSession &swrap = WiredTigerRecoveryUnit::Get(txn).GetSession();
-        WiredTigerCursor curwrap(GetURI(), swrap);
-        WT_CURSOR *c = curwrap.Get();
+        WiredTigerCursor curwrap(GetURI(), txn);
+        WT_CURSOR *c = curwrap.get();
         c->set_key(c, _makeKey(loc));
         int ret = c->search(c);
         invariantWTOK(ret);
@@ -330,9 +313,8 @@ namespace mongo {
                                                 const char* damangeSource,
                                                 const mutablebson::DamageVector& damages ) {
         // get original value
-        WiredTigerSession &swrap = WiredTigerRecoveryUnit::Get(txn).GetSession();
-        WiredTigerCursor curwrap(GetURI(), swrap);
-        WT_CURSOR *c = curwrap.Get();
+        WiredTigerCursor curwrap(GetURI(), txn);
+        WT_CURSOR *c = curwrap.get();
         c->set_key(c, _makeKey(loc));
         int ret = c->search(c);
         invariantWTOK(ret);
@@ -399,8 +381,8 @@ namespace mongo {
                                       RecordStoreCompactAdaptor* adaptor,
                                       const CompactOptions* options,
                                       CompactStats* stats ) {
-        WiredTigerSession &swrap = WiredTigerRecoveryUnit::Get(txn).GetSession();
-        WT_SESSION *s = swrap.Get();
+        WiredTigerSession* session = WiredTigerRecoveryUnit::Get(txn).getSession();
+        WT_SESSION *s = session->getSession();
         int ret = s->compact(s, GetURI().c_str(), NULL);
         invariantWTOK(ret);
         return Status::OK();
@@ -517,23 +499,25 @@ namespace mongo {
         : _rs( rs ),
           _txn( txn ),
           _tailable( tailable ),
-          _dir( dir ) {
-            _cursor = new WiredTigerCursor(rs.GetURI(),
-                                           WiredTigerRecoveryUnit::Get(txn).GetSession());
-            _locate(start, true);
+          _dir( dir ),
+          _cursor( new WiredTigerCursor( rs.GetURI(), txn ) ) {
+        RS_ITERATOR_TRACE("start");
+        _locate(start, true);
     }
 
     WiredTigerRecordStore::Iterator::~Iterator() {
-        delete _cursor;
     }
 
     void WiredTigerRecordStore::Iterator::_locate(const DiskLoc &loc, bool exact) {
-        WT_CURSOR *c = _cursor->Get();
+        RS_ITERATOR_TRACE("_locate " << loc);
+        WT_CURSOR *c = _cursor->get();
+        invariant( c );
         int ret;
         if (loc.isNull()) {
             ret = _forward() ? c->next(c) : c->prev(c);
             if (ret != WT_NOTFOUND) invariantWTOK(ret);
             _eof = (ret == WT_NOTFOUND);
+            RS_ITERATOR_TRACE("_locate   null loc eof: " << _eof);
             return;
         }
         c->set_key(c, _makeKey(loc));
@@ -560,6 +544,7 @@ namespace mongo {
         }
         if (ret != WT_NOTFOUND) invariantWTOK(ret);
         _eof = (ret == WT_NOTFOUND);
+        RS_ITERATOR_TRACE("_locate   not null loc eof: " << _eof);
     }
 
     bool WiredTigerRecordStore::Iterator::isEOF() {
@@ -572,10 +557,11 @@ namespace mongo {
 
     // Allow const functions to use curr to find current location.
     DiskLoc WiredTigerRecordStore::Iterator::_curr() const {
+        RS_ITERATOR_TRACE( "_curr" );
         if (_eof)
             return DiskLoc();
 
-        WT_CURSOR *c = _cursor->Get();
+        WT_CURSOR *c = _cursor->get();
         uint64_t key;
         int ret = c->get_key(c, &key);
         invariantWTOK(ret);
@@ -587,20 +573,28 @@ namespace mongo {
     }
 
     void WiredTigerRecordStore::Iterator::_getNext() {
-        WT_CURSOR *c = _cursor->Get();
+        RS_ITERATOR_TRACE("_getNext");
+        WT_CURSOR *c = _cursor->get();
         int ret = _forward() ? c->next(c) : c->prev(c);
         if (ret != WT_NOTFOUND) invariantWTOK(ret);
         _eof = (ret == WT_NOTFOUND);
+        RS_ITERATOR_TRACE("_getNext " << ret << " " << _eof );
+        if ( !_eof ) {
+            RS_ITERATOR_TRACE("_getNext " << ret << " " << _eof << " " << _curr() );
+        }
     }
 
     DiskLoc WiredTigerRecordStore::Iterator::getNext() {
+        RS_ITERATOR_TRACE( "getNext" );
         /* Take care not to restart a scan if we have hit the end */
         if (isEOF())
             return DiskLoc();
 
         /* MongoDB expects "natural" ordering - which is the order that items are inserted. */
         DiskLoc toReturn = curr();
+        RS_ITERATOR_TRACE( "getNext toReturn: " << toReturn );
         _getNext();
+        RS_ITERATOR_TRACE( " ----" );
         if (_tailable && _eof)
             _lastLoc = toReturn;
         return toReturn;
@@ -617,12 +611,12 @@ namespace mongo {
     }
 
     void WiredTigerRecordStore::Iterator::saveState() {
+        RS_ITERATOR_TRACE("saveState");
         _savedLoc = curr();
         _savedInvalidated = false;
 
         // Reset the cursor so it doesn't keep any resources pinned.
-        delete _cursor;
-        _cursor = NULL; // avoid attempting to delete again.
+        _cursor.reset( NULL );
     }
 
     bool WiredTigerRecordStore::Iterator::restoreState( OperationContext *txn ) {
@@ -637,7 +631,7 @@ namespace mongo {
         // OperationContext on restore - update the iterators context in that
         // case
         _txn = txn;
-        _cursor = new WiredTigerCursor(_rs.GetURI(), WiredTigerRecoveryUnit::Get(txn).GetSession());
+        _cursor.reset( new WiredTigerCursor(_rs.GetURI(), txn) );
         if (_savedLoc.isNull())
             _eof = true;
         else

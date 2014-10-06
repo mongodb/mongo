@@ -2,21 +2,21 @@ Import("env")
 Import("has_option")
 
 if has_option("wiredtiger"):
+
+    # This is the smallest possible set of files that wraps WT
     env.Library(
         target= 'storage_wiredtiger_core',
         source= [
-            'wiredtiger_collection_catalog_entry.cpp',
-            'wiredtiger_database.cpp',
-            'wiredtiger_database_catalog_entry.cpp',
-            'wiredtiger_engine.cpp',
             'wiredtiger_index.cpp',
-            'wiredtiger_metadata.cpp',
+            'wiredtiger_kv_engine.cpp',
             'wiredtiger_record_store.cpp',
+            'wiredtiger_recovery_unit.cpp',
+            'wiredtiger_session_cache.cpp',
             ],
         LIBDEPS= [
             '$BUILD_DIR/mongo/bson',
             '$BUILD_DIR/mongo/db/catalog/collection_options',
-            '$BUILD_DIR/mongo/index_names',
+            '$BUILD_DIR/mongo/db/index/index_descriptor',
             '$BUILD_DIR/mongo/db/storage/index_entry_comparison',
             '$BUILD_DIR/mongo/foundation',
             ],
@@ -30,7 +30,9 @@ if has_option("wiredtiger"):
             'wiredtiger_init.cpp',
             'wiredtiger_options_init.cpp',
             ],
-        LIBDEPS=['storage_wiredtiger_core']
+        LIBDEPS=['storage_wiredtiger_core',
+                 '$BUILD_DIR/mongo/db/storage/kv/kv_engine',
+                 ]
         )
 
     env.CppUnitTest(
@@ -40,13 +42,7 @@ if has_option("wiredtiger"):
         LIBDEPS=[
             'storage_wiredtiger_core',
             '$BUILD_DIR/mongo/db/storage/record_store_test_harness',
-            "$BUILD_DIR/mongo/coredb",
-            "$BUILD_DIR/mongo/coreserver",
-            '$BUILD_DIR/mongo/db/index/index_descriptor',
-            '$BUILD_DIR/mongo/global_environment_experiment',
-            '$BUILD_DIR/mongo/serveronly',
             ],
-        NO_CRUTCH=True
         )
 
     env.CppUnitTest(
@@ -55,13 +51,17 @@ if has_option("wiredtiger"):
                 ],
         LIBDEPS=[
             'storage_wiredtiger_core',
-            "$BUILD_DIR/mongo/coredb",
-            "$BUILD_DIR/mongo/coreserver",
-            '$BUILD_DIR/mongo/db/index/index_descriptor',
             '$BUILD_DIR/mongo/db/storage/sorted_data_interface_test_harness',
-            '$BUILD_DIR/mongo/global_environment_experiment',
-            '$BUILD_DIR/mongo/serveronly'
             ],
-        NO_CRUTCH=True
+        )
+
+    env.CppUnitTest(
+        target='storage_wiredtiger_kv_engine_test',
+        source=['wiredtiger_kv_engine_test.cpp',
+                ],
+        LIBDEPS=[
+            'storage_wiredtiger_core',
+            '$BUILD_DIR/mongo/db/storage/kv/kv_engine_test_harness',
+            ],
         )
 

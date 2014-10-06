@@ -39,19 +39,17 @@
 #include "mongo/db/storage_options.h"
 #include "mongo/util/log.h"
 
-#include "mongo/db/storage/wiredtiger/wiredtiger_engine.h"
-#include "mongo/db/storage/wiredtiger/wiredtiger_global_options.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_index.h"
-#include "mongo/db/storage/wiredtiger/wiredtiger_metadata.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_record_store.h"
-#include "mongo/db/storage/wiredtiger/wiredtiger_recovery_unit.h"
+#include "mongo/db/storage/wiredtiger/wiredtiger_session_cache.h"
+#include "mongo/db/storage/wiredtiger/wiredtiger_util.h"
 
 namespace mongo {
 namespace {
     static const int TempKeyMaxSize = 1024; // this goes away with SERVER-3372
 
     static const WiredTigerItem emptyItem(NULL, 0);
-    
+
     bool hasFieldNames(const BSONObj& obj) {
         BSONForEach(e, obj) {
             if (e.fieldName()[0])
@@ -154,43 +152,25 @@ namespace {
     }
 } // namespace
 
-    int WiredTigerIndex::Create(WiredTigerDatabase &db,
-            const std::string &ns, const std::string &idxName, IndexCatalogEntry& info) {
-        WiredTigerSession swrap(db);
-        WT_SESSION *s(swrap.Get());
-
-        std::string tableName = toTableName(ns, idxName);
-        // Add the collection into the meta data
-        WiredTigerMetaData &md = db.GetMetaData();
-        uint64_t tblIdentifier = md.generateIdentifier( tableName, info.descriptor()->infoObj() );
-        std::string newURI = md.getURI( tblIdentifier );
+    int WiredTigerIndex::Create(OperationContext* txn,
+                                const std::string& uri,
+                                const std::string& extraConfig,
+                                const IndexDescriptor* desc ) {
+        WT_SESSION* s = WiredTigerRecoveryUnit::Get( txn ).getSession()->getSession();
 
         // Separate out a prefix and suffix in the default string. User configuration will
         // override values in the prefix, but not values in the suffix.
-        const char *default_config_pfx = "type=file,leaf_page_max=16k,";
+        string default_config_pfx = "type=file,leaf_page_max=16k,";
         // Indexes need to store the metadata for collation to work as expected.
-        const char *default_config_sfx =
-            ",key_format=u,value_format=u,collator=mongo_index,app_metadata=";
-        std::string config = std::string(default_config_pfx +
-                wiredTigerGlobalOptions.indexConfig + default_config_sfx +
-                info.descriptor()->infoObj().jsonString());
-        LOG(1) << "create uri: " << newURI << " config: " << config;
-        int ret = s->create(s, newURI.c_str(), config.c_str());
-        if (ret != 0) {
-            log() << "Creating index with custom options (" << config <<
-                     ") failed. Using default options instead." << endl;
-            config = std::string(default_config_pfx);
-            config += default_config_sfx + info.descriptor()->infoObj().jsonString();
-            ret = s->create(s, newURI.c_str(), config.c_str());
-        }
-        return (ret);
+        string default_config_sfx = ",key_format=u,value_format=u,collator=mongo_index,app_metadata=";
+
+        std::string config = default_config_pfx + extraConfig + default_config_sfx + desc->infoObj().jsonString();
+        LOG(1) << "create uri: " << uri << " config: " << config;
+        return s->create(s, uri.c_str(), config.c_str());
     }
 
-    WiredTigerIndex::WiredTigerIndex(WiredTigerDatabase &db, const IndexCatalogEntry& info,
-            const std::string &ns, const std::string &idxName)
-        : _db(db), _info(info)
-    {
-        _uri = _db.GetMetaData().getURI( toTableName(ns, idxName) );
+    WiredTigerIndex::WiredTigerIndex(const std::string &uri)
+        : _uri( uri ) {
     }
 
     Status WiredTigerIndex::insert(OperationContext* txn,
@@ -208,9 +188,8 @@ namespace {
             return Status(ErrorCodes::KeyTooLong, msg);
         }
 
-        WiredTigerSession &swrap = WiredTigerRecoveryUnit::Get(txn).GetSession();
-        WiredTigerCursor curwrap(GetURI(), swrap);
-        WT_CURSOR *c = curwrap.Get();
+        WiredTigerCursor curwrap(GetURI(), txn);
+        WT_CURSOR *c = curwrap.get();
 
         if (!dupsAllowed && isDup(c, key, loc))
             return dupKeyError(key);
@@ -230,9 +209,8 @@ namespace {
         invariant(loc.isValid());
         invariant(!hasFieldNames(key));
 
-        WiredTigerSession &swrap = WiredTigerRecoveryUnit::Get(txn).GetSession();
-        WiredTigerCursor curwrap(GetURI(), swrap);
-        WT_CURSOR *c = curwrap.Get();
+        WiredTigerCursor curwrap(GetURI(), txn);
+        WT_CURSOR *c = curwrap.get();
 
         // TODO: can we avoid a search?
         boost::scoped_array<char> data;
@@ -250,9 +228,8 @@ namespace {
 
     void WiredTigerIndex::fullValidate(OperationContext* txn, long long *numKeysOut) const {
         // TODO check invariants?
-        WiredTigerSession &swrap = WiredTigerRecoveryUnit::Get(txn).GetSession();
-        WiredTigerCursor curwrap(GetURI(), swrap);
-        WT_CURSOR *c = curwrap.Get();
+        WiredTigerCursor curwrap(GetURI(), txn);
+        WT_CURSOR *c = curwrap.get();
         if (!c)
             return;
         int ret;
@@ -265,9 +242,8 @@ namespace {
     Status WiredTigerIndex::dupKeyCheck(
             OperationContext* txn, const BSONObj& key, const DiskLoc& loc) {
         invariant(!hasFieldNames(key));
-        WiredTigerSession &swrap = WiredTigerRecoveryUnit::Get(txn).GetSession();
-        WiredTigerCursor curwrap(GetURI(), swrap);
-        WT_CURSOR *c = curwrap.Get();
+        WiredTigerCursor curwrap(GetURI(), txn);
+        WT_CURSOR *c = curwrap.get();
 
         if (isDup(c, key, loc))
             return dupKeyError(key);
@@ -275,9 +251,8 @@ namespace {
     }
 
     bool WiredTigerIndex::isEmpty(OperationContext* txn) {
-        WiredTigerSession &swrap = WiredTigerRecoveryUnit::Get(txn).GetSession();
-        WiredTigerCursor curwrap(GetURI(), swrap);
-        WT_CURSOR *c = curwrap.Get();
+        WiredTigerCursor curwrap(GetURI(), txn);
+        WT_CURSOR *c = curwrap.get();
         if (!c)
             return true;
         int ret = c->next(c);
@@ -320,8 +295,7 @@ namespace {
          _forward(forward),
          _eof(true),
          _savedAtEnd(false) {
-         _cursor = new WiredTigerCursor(_idx.GetURI(),
-                                        WiredTigerRecoveryUnit::Get(txn).GetSession());
+         _cursor = new WiredTigerCursor(_idx.GetURI(), txn);
     }
 
     WiredTigerIndex::IndexCursor::~IndexCursor() {
@@ -342,7 +316,7 @@ namespace {
             return true;
         else if ( _eof || other._eof )
             return false;
-        WT_CURSOR *c = _cursor->Get(), *otherc = other._cursor->Get();
+        WT_CURSOR *c = _cursor->get(), *otherc = other._cursor->get();
         int cmp, ret = c->compare(c, otherc, &cmp);
         invariantWTOK(ret);
         return cmp == 0;
@@ -378,7 +352,7 @@ namespace {
 
 
     bool WiredTigerIndex::IndexCursor::_locate(const BSONObj &key, const DiskLoc& loc) {
-        WT_CURSOR *c = _cursor->Get();
+        WT_CURSOR *c = _cursor->get();
         _eof = !WiredTigerIndex::_search(c, key, loc, _forward);
         if ( _eof )
             return false;
@@ -421,7 +395,7 @@ namespace {
 
     BSONObj WiredTigerIndex::IndexCursor::getKey() const {
         invariant( _cursor != NULL );
-        WT_CURSOR *c = _cursor->Get();
+        WT_CURSOR *c = _cursor->get();
         WT_ITEM keyItem;
         int ret = c->get_key(c, &keyItem);
         invariantWTOK(ret);
@@ -430,7 +404,7 @@ namespace {
 
     DiskLoc WiredTigerIndex::IndexCursor::getDiskLoc() const {
         invariant( _cursor != NULL );
-        WT_CURSOR *c = _cursor->Get();
+        WT_CURSOR *c = _cursor->get();
         WT_ITEM keyItem;
         int ret = c->get_key(c, &keyItem);
         invariantWTOK(ret);
@@ -442,7 +416,7 @@ namespace {
         invariant( _cursor != NULL );
         if ( _eof )
             return;
-        WT_CURSOR *c = _cursor->Get();
+        WT_CURSOR *c = _cursor->get();
         int ret = _forward ? c->next(c) : c->prev(c);
         if (ret == WT_NOTFOUND)
             _eof = true;
@@ -464,8 +438,7 @@ namespace {
     void WiredTigerIndex::IndexCursor::restorePosition( OperationContext *txn ) {
         // Update the session handle with our new operation context.
         _txn = txn;
-        _cursor = new WiredTigerCursor(_idx.GetURI(),
-                                       WiredTigerRecoveryUnit::Get(txn).GetSession());
+        _cursor = new WiredTigerCursor(_idx.GetURI(), txn );
         if (_savedAtEnd)
             _eof = true;
         else
@@ -486,14 +459,6 @@ namespace {
 
     const std::string &WiredTigerIndex::GetURI() const { return _uri; }
 
-    SortedDataInterface* getWiredTigerIndex(
-            WiredTigerDatabase &db, const std::string &ns, const std::string &idxName,
-            IndexCatalogEntry& info) {
-        int ret = WiredTigerIndex::Create(db, ns, idxName, info);
-        invariantWTOK(ret);
-        return new WiredTigerIndex(db, info, ns, idxName);
-    }
-    
     class WiredTigerBuilderImpl : public SortedDataBuilderInterface {
     public:
         WiredTigerBuilderImpl(WiredTigerIndex &idx, OperationContext *txn, bool dupsAllowed)

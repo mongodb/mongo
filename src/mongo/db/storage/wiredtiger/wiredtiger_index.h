@@ -33,18 +33,14 @@
 #include "mongo/db/storage/index_entry_comparison.h"
 #include "mongo/db/storage/sorted_data_interface.h"
 
+#include "mongo/db/storage/wiredtiger/wiredtiger_recovery_unit.h"
+
+
 #pragma once
 
 namespace mongo {
     class IndexCatalogEntry;
-    class WiredTigerDatabase;
-
-    /**
-     * Caller takes ownership.
-     */
-    SortedDataInterface* getWiredTigerIndex(
-            WiredTigerDatabase &db, const std::string &ns,
-            const std::string &idxName, IndexCatalogEntry& info);
+    struct WiredTigerItem;
 
     class WiredTigerIndex : public SortedDataInterface {
         public:
@@ -53,13 +49,15 @@ namespace mongo {
             return ns + ".$" + idxName;
         }
 
-        static int Create(WiredTigerDatabase &db,
-                const std::string &ns, const std::string &idxName, IndexCatalogEntry& info);
+        static int Create(OperationContext* txn,
+                          const std::string& uri,
+                          const std::string& extraConfig,
+                          const IndexDescriptor* desc);
+
         static bool _search(WT_CURSOR *c, const WiredTigerItem& item, bool forward);
         static bool _search(WT_CURSOR *c, const BSONObj &key, const DiskLoc& loc, bool forward);
 
-        WiredTigerIndex(WiredTigerDatabase &db, const IndexCatalogEntry& info,
-                const std::string &ns, const std::string &idxName);
+        WiredTigerIndex(const std::string &uri);
 
         virtual SortedDataBuilderInterface* getBulkBuilder(
                 OperationContext* txn, bool dupsAllowed);
@@ -147,8 +145,6 @@ namespace mongo {
                 DiskLoc _savedLoc;
         };
 
-        WiredTigerDatabase& _db;
-        const IndexCatalogEntry& _info;
         std::string _uri;
     };
 } // namespace

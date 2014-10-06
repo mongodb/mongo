@@ -28,103 +28,81 @@
  *    exception statement from all source files in the program, then also delete
  *    it in the license file.
  */
- 
+
 #pragma once
 
+#include <wiredtiger.h>
+
+#include <memory.h>
+
+#include <boost/scoped_ptr.hpp>
 #include <boost/shared_ptr.hpp>
 
 #include "mongo/db/operation_context.h"
 #include "mongo/db/storage/recovery_unit.h"
 
-#include "mongo/db/storage/wiredtiger/wiredtiger_engine.h"
-
 namespace mongo {
+
+    class WiredTigerSession;
+    class WiredTigerSessionCache;
 
     class WiredTigerRecoveryUnit : public RecoveryUnit {
     public:
-        WiredTigerRecoveryUnit(WiredTigerDatabase &db, bool defaultCommit) :
-                _session(db),
-                _defaultCommit(defaultCommit),
-                _depth(0),
-                _begun(false) {}
+        WiredTigerRecoveryUnit(WiredTigerSessionCache* sc, bool defaultCommit);
 
-        virtual ~WiredTigerRecoveryUnit() {
-            if (_begun) {
-                _depth = 1;
-                if ( _defaultCommit )
-                    commitUnitOfWork();
-                else
-                    endUnitOfWork();
-            }
-        }
+        virtual ~WiredTigerRecoveryUnit();
 
-        virtual void beginUnitOfWork() {
-            ++_depth;
-        }
+        virtual void beginUnitOfWork();
 
-        virtual void commitUnitOfWork() {
-            if (_begun) {
-                WT_SESSION *s = _session.Get();
-                int ret = s->commit_transaction(s, NULL);
-                invariantWTOK(ret);
-                _begun = false;
-            }
-        }
+        virtual void commitUnitOfWork();
 
-        virtual void endUnitOfWork() {
-            invariant(_depth > 0);
-            if (--_depth > 0)
-                return;
-            if (_begun) {
-                WT_SESSION *s = _session.Get();
-                int ret = s->rollback_transaction(s, NULL);
-                invariantWTOK(ret);
-                _begun = false;
-            }
-        }
+        virtual void endUnitOfWork();
 
-        virtual bool commitIfNeeded(bool force = false) {
-            if (!isCommitNeeded())
-                return false;
-            commitUnitOfWork();
-            return true;
-        }
+        virtual bool commitIfNeeded(bool force = false);
 
-        virtual bool awaitCommit() {
-            return true;
-        }
+        virtual bool awaitCommit();
 
-        virtual bool isCommitNeeded() const {
-            return false;
-        }
+        virtual bool isCommitNeeded() const;
 
-        virtual void registerChange(Change *) {}
+        virtual void registerChange(Change *);
 
-        virtual void* writingPtr(void* data, size_t len) {
-            return data;
-        }
-
+        // un-used API
+        virtual void* writingPtr(void* data, size_t len) { return data; }
         virtual void syncDataAndTruncateJournal() {}
 
-        WiredTigerSession &GetSession() {
-            if (!_begun) {
-                WT_SESSION *s = _session.Get();
-                int ret = s->begin_transaction(s, NULL);
-                invariantWTOK(ret);
-                _begun = true;
-            }
-            return _session;
-        }
+        // ---- WT STUFF
 
-        static WiredTigerRecoveryUnit& Get(OperationContext *txn) {
-            return *dynamic_cast<WiredTigerRecoveryUnit*>(txn->recoveryUnit());
-        }
+        WiredTigerSession* getSession();
+        WiredTigerSessionCache* getSessionCache() { return _sessionCache; }
+
+        static WiredTigerRecoveryUnit& Get(OperationContext *txn);
 
     private:
-        WiredTigerSession _session;
+
+        void _abort();
+        void _commit();
+
+        WiredTigerSessionCache* _sessionCache; // not owned
+        WiredTigerSession* _session; // owned, but from pool
         bool _defaultCommit;
         int _depth;
-        bool _begun;
+    };
+
+    /**
+     * This is a smart pointer that wraps a WT_CURSOR and knows how to obtain and get from pool.
+     */
+    class WiredTigerCursor {
+    public:
+        WiredTigerCursor(const std::string& uri, OperationContext* txn);
+        WiredTigerCursor(const std::string& uri, WiredTigerRecoveryUnit* ru);
+        ~WiredTigerCursor();
+
+        WT_CURSOR* get() const { return _cursor; }
+        WT_CURSOR* operator->() const { return _cursor; }
+
+    private:
+        WiredTigerRecoveryUnit* _ru; // not owned
+        WT_CURSOR* _cursor; // owned, but pulled
     };
 
 }

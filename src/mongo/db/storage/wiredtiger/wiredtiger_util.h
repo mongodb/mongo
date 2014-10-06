@@ -1,4 +1,4 @@
-// wiredtiger_init.cpp
+// wiredtiger_util.h
 
 /**
  *    Copyright (C) 2014 MongoDB Inc.
@@ -7,7 +7,6 @@
  *    This program is free software: you can redistribute it and/or  modify
  *    it under the terms of the GNU Affero General Public License, version 3,
  *    as published by the Free Software Foundation.
- *
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -30,36 +29,46 @@
  *    it in the license file.
  */
 
-#include "mongo/base/init.h"
-#include "mongo/db/global_environment_d.h"
-#include "mongo/db/global_environment_experiment.h"
-#include "mongo/db/storage/kv/kv_storage_engine.h"
-#include "mongo/db/storage/wiredtiger/wiredtiger_kv_engine.h"
-#include "mongo/db/storage/wiredtiger/wiredtiger_global_options.h"
-#include "mongo/db/storage_options.h"
+#pragma once
+
+#include <wiredtiger.h>
+
+#include "mongo/util/assert_util.h"
+#include "mongo/util/mongoutils/str.h"
 
 namespace mongo {
 
-    namespace {
-        class WiredTigerFactory : public StorageEngine::Factory {
-        public:
-            virtual ~WiredTigerFactory(){}
-            virtual StorageEngine* create( const StorageGlobalParams& params ) const {
-                WiredTigerKVEngine* kv = new WiredTigerKVEngine( params.dbpath,
-                                                                 wiredTigerGlobalOptions.databaseConfig );
-                kv->setRecordStoreExtraOptions( wiredTigerGlobalOptions.collectionConfig );
-                kv->setSortedDataInterfaceExtraOptions( wiredTigerGlobalOptions.indexConfig );
-                return new KVStorageEngine( kv );
-            }
-        };
-    } // namespace
+    /**
+     * converts wiredtiger return codes to mongodb statuses.
+     */
+    inline Status wtRCToStatus(int retCode) {
+        if (MONGO_likely(retCode == 0))
+            return Status::OK();
 
-    MONGO_INITIALIZER_WITH_PREREQUISITES(WiredTigerEngineInit,
-                                         ("SetGlobalEnvironment"))
-        (InitializerContext* context ) {
-        getGlobalEnvironment()->registerStorageEngine("wiredtiger", new WiredTigerFactory() );
-        return Status::OK();
+        // TODO convert specific codes rather than just using INTERNAL_ERROR for everything.
+        return Status(ErrorCodes::InternalError,
+                      str::stream() << retCode << ": " << wiredtiger_strerror(retCode));
+
     }
 
-}
+    inline void invariantWTOK(int retCode) {
+        if (MONGO_likely(retCode == 0))
+            return;
 
+        fassertFailedWithStatus(28519, wtRCToStatus(retCode));
+    }
+
+    struct WiredTigerItem : public WT_ITEM {
+        WiredTigerItem(const void *d, size_t s) {
+            data = d;
+            size = s;
+        }
+        WiredTigerItem(const std::string &str) {
+            data = str.c_str();
+            size = str.size();
+        }
+        WT_ITEM *Get() { return this; }
+        const WT_ITEM *Get() const { return this; }
+    };
+
+}

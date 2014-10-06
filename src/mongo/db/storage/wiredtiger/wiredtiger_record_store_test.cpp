@@ -28,41 +28,54 @@
  *    it in the license file.
  */
 
-#include "mongo/unittest/unittest.h"
-#include "mongo/unittest/temp_dir.h"
+#include "mongo/db/operation_context_noop.h"
 #include "mongo/db/storage/record_store_test_harness.h"
-#include "mongo/db/storage/wiredtiger/wiredtiger_engine.h"
-#include "mongo/db/catalog/database_catalog_entry.h"
-#include "mongo/db/catalog/collection_options.h"
+#include "mongo/db/storage/wiredtiger/wiredtiger_recovery_unit.h"
+#include "mongo/db/storage/wiredtiger/wiredtiger_record_store.h"
+#include "mongo/db/storage/wiredtiger/wiredtiger_session_cache.h"
+#include "mongo/db/storage/wiredtiger/wiredtiger_util.h"
+#include "mongo/unittest/temp_dir.h"
+#include "mongo/unittest/unittest.h"
 
 namespace mongo {
 
     class WiredTigerHarnessHelper : public HarnessHelper {
     public:
-        WiredTigerHarnessHelper() : _dbpath( "wt_test" ) {
-            _engine.reset( new WiredTigerEngine( _dbpath.path() ) );
+        WiredTigerHarnessHelper() : _dbpath( "wt_test" ), _conn( NULL ) {
+
+            const char* config = "create";
+            int ret = wiredtiger_open( _dbpath.path().c_str(), NULL, config, &_conn);
+            invariantWTOK( ret );
+
+            _sessionCache = new WiredTigerSessionCache( _conn );
+        }
+
+        ~WiredTigerHarnessHelper() {
+            delete _sessionCache;
+            _conn->close(_conn, NULL);
         }
 
         virtual RecordStore* newNonCappedRecordStore() {
             std::string ns = "a.b";
-            OperationContext* txn = NULL;  // unused in this case
-            DatabaseCatalogEntry* dce = _engine->getDatabaseCatalogEntry( txn, ns );
 
-            Status status = dce->createCollection( txn, ns, CollectionOptions(), true );
-            invariant( status == Status::OK() );
+            WiredTigerRecoveryUnit* ru = new WiredTigerRecoveryUnit( _sessionCache, false );
+            OperationContextNoop txn( ru );
+            string uri = "table:a.b";
+            std::string config = WiredTigerRecordStore::generateCreateString(CollectionOptions(), "");
 
-            RecordStore* rs = dce->getRecordStore( txn, ns );
-            invariant( rs );
-            return rs;
+            WT_SESSION* s = ru->getSession()->getSession();
+            invariantWTOK( s->create( s, uri.c_str(), config.c_str() ) );
+
+            return new WiredTigerRecordStore( &txn, ns, uri );
         }
 
         virtual RecoveryUnit* newRecoveryUnit() {
-            OperationContext* txn = NULL;  // unused in this case
-            return _engine->newRecoveryUnit( txn );
+            return new WiredTigerRecoveryUnit( _sessionCache, false );
         }
     private:
         unittest::TempDir _dbpath;
-        scoped_ptr<WiredTigerEngine> _engine;
+        WT_CONNECTION* _conn;
+        WiredTigerSessionCache* _sessionCache;
     };
 
     HarnessHelper* newHarnessHelper() {

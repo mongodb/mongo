@@ -30,12 +30,12 @@
 
 #include "mongo/db/catalog/index_catalog_entry.h"
 #include "mongo/db/index/index_descriptor.h"
-#include "mongo/db/storage/wiredtiger/wiredtiger_database.h"
-#include "mongo/db/storage/wiredtiger/wiredtiger_database_catalog_entry.h"
-#include "mongo/db/storage/wiredtiger/wiredtiger_global_options.h"
+#include "mongo/db/operation_context_noop.h"
+#include "mongo/db/storage/sorted_data_interface_test_harness.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_index.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_recovery_unit.h"
-#include "mongo/db/storage/sorted_data_interface_test_harness.h"
+#include "mongo/db/storage/wiredtiger/wiredtiger_session_cache.h"
+#include "mongo/db/storage/wiredtiger/wiredtiger_util.h"
 #include "mongo/unittest/temp_dir.h"
 #include "mongo/unittest/unittest.h"
 
@@ -43,45 +43,44 @@ namespace mongo {
 
     class MyHarnessHelper : public HarnessHelper {
     public:
-        MyHarnessHelper() :
-             _td("wiredtiger-test"), _db(NULL), _info(NULL) {
+        MyHarnessHelper() : _dbpath( "wt_test" ), _conn( NULL ) {
 
-            const char * def_config = ",create,extensions=[local=(entry=index_collator_extension)]";
-            std::string config = std::string( wiredTigerGlobalOptions.databaseConfig + def_config );
+            const char* config = "create,cache_size=1G,extensions=[local=(entry=index_collator_extension)],";
+            int ret = wiredtiger_open( _dbpath.path().c_str(), NULL, config, &_conn);
+            invariantWTOK( ret );
 
-            WT_CONNECTION* conn;
-            int ret = wiredtiger_open( _td.path().c_str(), NULL, config.c_str(), &conn );
-            invariantWTOK(ret);
+            _sessionCache = new WiredTigerSessionCache( _conn );
+        }
 
-            _db.reset( new WiredTigerDatabase( conn ) );
+        ~MyHarnessHelper() {
+            delete _sessionCache;
+            _conn->close(_conn, NULL);
         }
 
         virtual SortedDataInterface* newSortedDataInterface() {
             std::string ns = "test.wt";
-            WiredTigerDatabaseCatalogEntry d( *_db, ns );
-
-            OperationContext* txn = NULL;
-            CollectionCatalogEntry* coll = d.getCollectionCatalogEntry( txn, ns );
+            OperationContextNoop txn( newRecoveryUnit() );
 
             BSONObj spec = BSON( "key" << BSON( "a" << 1 ) <<
                                  "name" << "testIndex" <<
                                  "ns" << ns );
 
             IndexDescriptor desc( NULL, "", spec );
-            _info = new IndexCatalogEntry( ns, coll, &desc, NULL );
 
-            return getWiredTigerIndex( *_db, "test", "testIndex", *_info );
+            string uri = "table:" + ns;
+            invariantWTOK( WiredTigerIndex::Create( &txn, uri, "", &desc ) );
+
+            return new WiredTigerIndex( uri );
         }
 
         virtual RecoveryUnit* newRecoveryUnit() {
-            return new WiredTigerRecoveryUnit( *_db, true );
+            return new WiredTigerRecoveryUnit( _sessionCache, false );
         }
 
     private:
-        unittest::TempDir _td;
-
-        scoped_ptr<WiredTigerDatabase> _db;
-        IndexCatalogEntry* _info;
+        unittest::TempDir _dbpath;
+        WT_CONNECTION* _conn;
+        WiredTigerSessionCache* _sessionCache;
     };
 
     HarnessHelper* newHarnessHelper() {

@@ -34,6 +34,7 @@
 
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/storage/rocks/rocks_engine.h"
+#include "mongo/util/log.h"
 
 namespace mongo {
 

@@ -29,7 +29,7 @@
  *    exception statement from all source files in the program, then also delete
  *    it in the license file.
  */
- 
+
 #pragma once
 
 #include <string>
@@ -39,33 +39,23 @@
 #include "mongo/db/storage/capped_callback.h"
 #include "mongo/platform/atomic_word.h"
 
-#include "mongo/db/storage/wiredtiger/wiredtiger_engine.h"
-
 namespace mongo {
 
     class WiredTigerCursor;
-    class WiredTigerDatabase;
-    class WiredTigerMetaData;
     class WiredTigerRecoveryUnit;
 
     class WiredTigerRecordStore : public RecordStore {
-        public:
-        static int Create(WiredTigerDatabase &db,
-            const StringData &ns, const CollectionOptions &options, bool allocateDefaultSpace);
+    public:
+        static string generateCreateString(const CollectionOptions &options,
+                                           const StringData& extraStrings );
 
-        static std::string _fromURI(const std::string &uri) {
-            return uri.substr(strlen("table:"));
-        }
-
-        static uint64_t _makeKey(const DiskLoc &loc);
-        static DiskLoc _fromKey(uint64_t k);
-
-        WiredTigerRecordStore(const StringData& ns,
-                          WiredTigerDatabase &db,
-                          bool isCapped = false,
-                          int64_t cappedMaxSize = -1,
-                          int64_t cappedMaxDocs = -1,
-                          CappedDocumentDeleteCallback* cappedDeleteCallback = NULL );
+        WiredTigerRecordStore(OperationContext* txn,
+                              const StringData& ns,
+                              const StringData& uri,
+                              bool isCapped = false,
+                              int64_t cappedMaxSize = -1,
+                              int64_t cappedMaxDocs = -1,
+                              CappedDocumentDeleteCallback* cappedDeleteCallback = NULL );
 
         virtual ~WiredTigerRecordStore();
 
@@ -154,7 +144,7 @@ namespace mongo {
         int64_t cappedMaxDocs() const;
         int64_t cappedMaxSize() const;
 
-        const std::string &GetURI() const { return _uri; }
+        const std::string& GetURI() const { return _uri; }
 
     private:
 
@@ -187,7 +177,7 @@ namespace mongo {
             OperationContext* _txn;
             bool _tailable;
             CollectionScanParams::Direction _dir;
-            WiredTigerCursor *_cursor;
+            scoped_ptr<WiredTigerCursor> _cursor;
             bool _eof;
 
             // Position for save/restore
@@ -198,15 +188,17 @@ namespace mongo {
 
         static WiredTigerRecoveryUnit* _getRecoveryUnit( OperationContext* txn );
 
+        static uint64_t _makeKey(const DiskLoc &loc);
+        static DiskLoc _fromKey(uint64_t k);
+
         DiskLoc _nextId();
         void _setId(DiskLoc loc);
         bool cappedAndNeedDelete(OperationContext* txn) const;
         void cappedDeleteAsNeeded(OperationContext* txn);
         void _changeNumRecords(OperationContext* txn, bool insert);
         void _increaseDataSize(OperationContext* txn, int amount);
-        RecordData _getData( const WiredTigerCursor &cursor) const;
+        RecordData _getData( const WiredTigerCursor& cursor) const;
 
-        WiredTigerDatabase &_db;
         std::string _uri;
 
         // The capped settings should not be updated once operations have started
