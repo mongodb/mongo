@@ -67,7 +67,7 @@ namespace mongo {
                                           BSONObj cmdObj,
                                           std::vector<Privilege>* out);
 
-        intrusive_ptr<ExpressionContext> getContext() const { return pCtx; }
+        const intrusive_ptr<ExpressionContext>& getContext() const { return pCtx; }
 
         /**
           Split the current Pipeline into a Pipeline for each shard, and

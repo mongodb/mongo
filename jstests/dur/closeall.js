@@ -1,4 +1,4 @@
-// testing closealldatabases concurrency
+// testing dropDatabase concurrency
 // this is also a test of saveState() as that will get exercised by the update
 
 function f(variant, quickCommits, paranoid) {
@@ -34,7 +34,7 @@ function f(variant, quickCommits, paranoid) {
     assert.writeOK(db1.foo.remove({}, { writeConcern: { w: 2 }}));
     print("initial sync done")
 
-    var writeOps = startParallelShell('var coll = db.getSiblingDB("closealltest").foo; \
+    var writeOps = startParallelShell('var coll = db.getSiblingDB("' + ourdb + '").foo; \
                                        var bulk = coll.initializeUnorderedBulkOp(); \
                                        for( var i = 0; i < ' + N + '; i++ ) { \
                                            bulk.insert({ x: 1 }); \
@@ -56,15 +56,15 @@ function f(variant, quickCommits, paranoid) {
                 sleep(1);
             else if( variant == 3 && i % 10 == 0 )
                 print(i);
-            res = db2.adminCommand("closeAllDatabases");
+            res = db2.dropDatabase();
         }
         catch (e) {
-            print("\n\n\nFAIL closeall.js closeAllDatabases command invocation threw an exception. i:" + i);
+            print("\n\n\nFAIL closeall.js dropDatabase command invocation threw an exception. i:" + i);
             try {
                 print("getlasterror:");
                 printjson(db2.getLastErrorObj());
-                print("trying one more closealldatabases:");
-                res = db2.adminCommand("closeAllDatabases");
+                print("trying one more dropDatabase:");
+                res = db2.dropDatabase();
                 printjson(res);
             }
             catch (e) {
@@ -73,7 +73,7 @@ function f(variant, quickCommits, paranoid) {
             print("\n\n\n");
             throw e;
         }
-        assert( res.ok, "closeAllDatabases res.ok=false");
+        assert( res.ok, "dropDatabase res.ok=false");
     }
 
     print("closeall.js end test loop.  slave.foo.count:");

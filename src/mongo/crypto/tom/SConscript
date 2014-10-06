@@ -1,0 +1,18 @@
+# -*- mode: python -*-
+
+Import("env")
+
+env.Library('tomcrypt',
+           ['crypt_argchk.c',
+           'crypt_find_hash.c',
+           'crypt_hash_descriptor.c',
+           'crypt_hash_is_valid.c',
+           'crypt_register_hash.c',
+           'hash_memory.c',
+           'hmac_done.c',
+           'hmac_init.c',
+           'hmac_memory.c',
+           'hmac_process.c',
+           'sha1.c',
+           'zeromem.c'],
+           LIBDEPS=[])

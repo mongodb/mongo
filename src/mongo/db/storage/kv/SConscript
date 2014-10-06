@@ -1,0 +1,32 @@
+Import("env")
+
+env.Library(
+    target='kv_engine_core',
+    source=[
+        'kv_catalog.cpp',
+        ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/db/storage/bson_collection_catalog_entry',
+        ]
+    )
+
+env.Library(
+    target='kv_engine',
+    source=[
+        'kv_collection_catalog_entry.cpp',
+        'kv_database_catalog_entry.cpp',
+        'kv_storage_engine.cpp',
+        ],
+    LIBDEPS=[
+        'kv_engine_core',
+        ]
+    )
+
+
+env.Library(
+    target='kv_engine_test_harness',
+    source=[
+        'kv_engine_test_harness.cpp',
+        ],
+    LIBDEPS=['kv_engine_core']
+    )

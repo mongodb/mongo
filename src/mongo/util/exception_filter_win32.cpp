@@ -35,6 +35,7 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/exit_code.h"
 #include "mongo/util/log.h"
+#include "mongo/util/quick_exit.h"
 #include "mongo/util/stacktrace.h"
 #include "mongo/util/text.h"
 
@@ -163,7 +164,7 @@ namespace mongo {
 
             // Don't go through normal shutdown procedure. It may make things worse.
             log() << "*** immediate exit due to unhandled exception" << std::endl;
-            ::_exit(EXIT_ABRUPT);
+            quickExit(EXIT_ABRUPT);
 
             // We won't reach here
             return EXCEPTION_EXECUTE_HANDLER;

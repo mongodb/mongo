@@ -40,6 +40,7 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/log.h"
 #include "mongo/util/options_parser/environment.h"
+#include "mongo/util/quick_exit.h"
 #include "mongo/util/text.h"
 #include "mongo/util/winutil.h"
 
@@ -102,38 +103,38 @@ namespace {
         if (params.count("install")) {
             if ( badOption != -1 ) {
                 log() << "--install cannot be used with --" << disallowedOptions[badOption];
-                ::_exit( EXIT_BADOPTIONS );
+                quickExit( EXIT_BADOPTIONS );
             }
             if ( !params.count("systemLog.destination") ||
                  params["systemLog.destination"].as<std::string>() != "file" ) {
                 log() << "--install has to be used with a log file for server output";
-                ::_exit( EXIT_BADOPTIONS );
+                quickExit( EXIT_BADOPTIONS );
             }
             installService = true;
         }
         if (params.count("reinstall")) {
             if ( badOption != -1 ) {
                 log() << "--reinstall cannot be used with --" << disallowedOptions[badOption];
-                ::_exit( EXIT_BADOPTIONS );
+                quickExit( EXIT_BADOPTIONS );
             }
             if ( !params.count("systemLog.destination") ||
                  params["systemLog.destination"].as<std::string>() != "file" ) {
                 log() << "--reinstall has to be used with a log file for server output";
-                ::_exit( EXIT_BADOPTIONS );
+                quickExit( EXIT_BADOPTIONS );
             }
             reinstallService = true;
         }
         if (params.count("remove")) {
             if ( badOption != -1 ) {
                 log() << "--remove cannot be used with --" << disallowedOptions[badOption];
-                ::_exit( EXIT_BADOPTIONS );
+                quickExit( EXIT_BADOPTIONS );
             }
             removeService = true;
         }
         if (params.count("service")) {
             if ( badOption != -1 ) {
                 log() << "--service cannot be used with --" << disallowedOptions[badOption];
-                ::_exit( EXIT_BADOPTIONS );
+                quickExit( EXIT_BADOPTIONS );
             }
             _startService = true;
         }
@@ -141,7 +142,7 @@ namespace {
         if (params.count("processManagement.windowsService.serviceName")) {
             if ( badOption != -1 ) {
                 log() << "--serviceName cannot be used with --" << disallowedOptions[badOption];
-                ::_exit( EXIT_BADOPTIONS );
+                quickExit( EXIT_BADOPTIONS );
             }
             _serviceName = toWideString(
                     params[ "processManagement.windowsService.serviceName" ].as<string>().c_str() );
@@ -149,7 +150,7 @@ namespace {
         if (params.count("processManagement.windowsService.displayName")) {
             if ( badOption != -1 ) {
                 log() << "--serviceDisplayName cannot be used with --" << disallowedOptions[badOption];
-                ::_exit( EXIT_BADOPTIONS );
+                quickExit( EXIT_BADOPTIONS );
             }
             windowsServiceDisplayName = toWideString(
                     params[ "processManagement.windowsService.displayName" ].as<string>().c_str() );
@@ -157,7 +158,7 @@ namespace {
         if (params.count("processManagement.windowsService.description")) {
             if ( badOption != -1 ) {
                 log() << "--serviceDescription cannot be used with --" << disallowedOptions[badOption];
-                ::_exit( EXIT_BADOPTIONS );
+                quickExit( EXIT_BADOPTIONS );
             }
             windowsServiceDescription = toWideString(
                     params[ "processManagement.windowsService.description" ].as<string>().c_str() );
@@ -165,7 +166,7 @@ namespace {
         if (params.count("processManagement.windowsService.serviceUser")) {
             if ( badOption != -1 ) {
                 log() << "--serviceUser cannot be used with --" << disallowedOptions[badOption];
-                ::_exit( EXIT_BADOPTIONS );
+                quickExit( EXIT_BADOPTIONS );
             }
             windowsServiceUser = toWideString(
                     params[ "processManagement.windowsService.serviceUser" ].as<string>().c_str() );
@@ -173,7 +174,7 @@ namespace {
         if (params.count("processManagement.windowsService.servicePassword")) {
             if ( badOption != -1 ) {
                 log() << "--servicePassword cannot be used with --" << disallowedOptions[badOption];
-                ::_exit( EXIT_BADOPTIONS );
+                quickExit( EXIT_BADOPTIONS );
             }
             windowsServicePassword = toWideString(
                     params[ "processManagement.windowsService.servicePassword"
@@ -193,11 +194,11 @@ namespace {
                     windowsServicePassword,
                     argv,
                     reinstallService);
-            ::_exit(EXIT_CLEAN);
+            quickExit(EXIT_CLEAN);
         }
         else if ( removeService ) {
             removeServiceOrDie(_serviceName);
-            ::_exit( EXIT_CLEAN );
+            quickExit( EXIT_CLEAN );
         }
     }
 
@@ -289,7 +290,7 @@ namespace {
         if ( schSCManager == NULL ) {
             DWORD err = ::GetLastError();
             log() << "Error connecting to the Service Control Manager: " << GetWinErrMsg(err);
-            ::_exit(EXIT_NTSERVICE_ERROR);
+            quickExit(EXIT_NTSERVICE_ERROR);
         }
 
         SC_HANDLE schService = NULL;
@@ -313,7 +314,7 @@ namespace {
                 }
 
                 ::CloseServiceHandle( schSCManager );
-                ::_exit(EXIT_NTSERVICE_ERROR);
+                quickExit(EXIT_NTSERVICE_ERROR);
             }
             else {
                 break;
@@ -341,7 +342,7 @@ namespace {
             DWORD err = ::GetLastError();
             log() << "Error creating service: " << GetWinErrMsg(err);
             ::CloseServiceHandle( schSCManager );
-            ::_exit( EXIT_NTSERVICE_ERROR );
+            quickExit( EXIT_NTSERVICE_ERROR );
         }
 
         log() << "Service '" << toUtf8String(serviceName) << "' (" << toUtf8String(displayName) <<
@@ -419,7 +420,7 @@ namespace {
         ::CloseServiceHandle( schSCManager );
 
         if (!serviceInstalled)
-            ::_exit( EXIT_NTSERVICE_ERROR );
+            quickExit( EXIT_NTSERVICE_ERROR );
     }
 
     void removeServiceOrDie(const wstring& serviceName) {
@@ -429,14 +430,14 @@ namespace {
         if ( schSCManager == NULL ) {
             DWORD err = ::GetLastError();
             log() << "Error connecting to the Service Control Manager: " << GetWinErrMsg(err);
-            ::_exit(EXIT_NTSERVICE_ERROR);
+            quickExit(EXIT_NTSERVICE_ERROR);
         }
 
         SC_HANDLE schService = ::OpenService( schSCManager, serviceName.c_str(), SERVICE_ALL_ACCESS );
         if ( schService == NULL ) {
             log() << "Could not find a service named '" << toUtf8String(serviceName) << "' to remove";
             ::CloseServiceHandle( schSCManager );
-            ::_exit(EXIT_NTSERVICE_ERROR);
+            quickExit(EXIT_NTSERVICE_ERROR);
         }
 
         SERVICE_STATUS serviceStatus;
@@ -466,7 +467,7 @@ namespace {
         }
 
         if (!serviceRemoved)
-            ::_exit(EXIT_NTSERVICE_ERROR);
+            quickExit(EXIT_NTSERVICE_ERROR);
     }
 
     bool reportStatus(DWORD reportState, DWORD waitHint, DWORD exitCode) {
@@ -564,7 +565,7 @@ namespace {
 
         log() << "Trying to start Windows service '" << toUtf8String(_serviceName) << "'";
         if (StartServiceCtrlDispatcherW(dispTable)) {
-            ::_exit(EXIT_CLEAN);
+            quickExit(EXIT_CLEAN);
         }
         else {
             ::exit(EXIT_NTSERVICE_ERROR);

@@ -542,6 +542,235 @@ namespace {
         ASSERT_OK(checkQuorumForReconfig(_executor.get(), rsConfig, myConfigIndex));
     }
 
+    class QuorumScatterGatherTest : public mongo::unittest::Test {
+    public:
+        virtual void start(ReplicaSetConfig* config) {
+            int selfConfigIndex = 0;
+            _checker.reset(new QuorumChecker(config, selfConfigIndex));
+        }
+
+    protected:
+        bool hasReceivedSufficientResponses() {
+            return _checker->hasReceivedSufficientResponses();
+        }
+
+        Status getFinalStatus() {
+            return _checker->getFinalStatus();
+        }
+
+        void processResponse(const RemoteCommandRequest& request, const ResponseStatus& response) {
+            _checker->processResponse(request, response);
+        }
+
+        RemoteCommandRequest requestFrom(std::string hostname) {
+            return RemoteCommandRequest(HostAndPort(hostname),
+                                        "", // the non-hostname fields do not matter for Quorum
+                                        BSONObj(),
+                                        Milliseconds(0));
+        }
+
+        ResponseStatus badResponseStatus() {
+            return ResponseStatus(ErrorCodes::NodeNotFound, "not on my watch");
+        }
+
+        ResponseStatus notOk() {
+            return ResponseStatus(NetworkInterfaceMock::Response(BSON("ok" << 0),
+                                                                 Milliseconds(10)));
+        }
+
+        ResponseStatus mismatchSetName() {
+            return ResponseStatus(NetworkInterfaceMock::Response(BSON("mismatch" << true),
+                                                                 Milliseconds(10)));
+        }
+
+        ResponseStatus higherConfigValue() {
+            return ResponseStatus(NetworkInterfaceMock::Response(BSON("set" << std::string("rs0") <<
+                                                                      "v" << 3),
+                                                                 Milliseconds(10)));
+        }
+
+        ResponseStatus ok() {
+            return ResponseStatus(NetworkInterfaceMock::Response(BSON("ok" << 1),
+                                                                 Milliseconds(10)));
+        }
+
+        BSONObj fiveNodeConfigWeDontVote() {
+            return BSON("_id" << "rs0" <<
+                        "version" << 2 <<
+                        "members" << BSON_ARRAY(
+                            BSON("_id" << 0 << "host" << "host0" << "votes" << 0) <<
+                            BSON("_id" << 1 << "host" << "host1") <<
+                            BSON("_id" << 2 << "host" << "host2") <<
+                            BSON("_id" << 3 << "host" << "host3") <<
+                            BSON("_id" << 4 << "host" << "host4")));
+        }
+
+        BSONObj basicFiveNodeConfig() {
+            return BSON("_id" << "rs0" <<
+                        "version" << 2 <<
+                        "members" << BSON_ARRAY(
+                            BSON("_id" << 0 << "host" << "host0") <<
+                            BSON("_id" << 1 << "host" << "host1") <<
+                            BSON("_id" << 2 << "host" << "host2") <<
+                            BSON("_id" << 3 << "host" << "host3") <<
+                            BSON("_id" << 4 << "host" << "host4")));
+        }
+
+        BSONObj initialThreeNodeConfig() {
+            return BSON("_id" << "rs0" <<
+                        "version" << 1 <<
+                        "members" << BSON_ARRAY(
+                            BSON("_id" << 0 << "host" << "host0") <<
+                            BSON("_id" << 1 << "host" << "host1") <<
+                            BSON("_id" << 2 << "host" << "host2")));
+        }
+
+        BSONObj basicThreeNodeConfig() {
+            return BSON("_id" << "rs0" <<
+                        "version" << 2 <<
+                        "members" << BSON_ARRAY(
+                            BSON("_id" << 0 << "host" << "host0") <<
+                            BSON("_id" << 1 << "host" << "host1") <<
+                            BSON("_id" << 2 << "host" << "host2")));
+        }
+
+        BSONObj threeNodeOnlyOneElectableConfig() {
+            return BSON("_id" << "rs0" <<
+                        "version" << 2 <<
+                        "members" << BSON_ARRAY(
+                            BSON("_id" << 0 << "host" << "host0" << "priority" << 0) <<
+                            BSON("_id" << 1 << "host" << "host1") <<
+                            BSON("_id" << 2 << "host" << "host2" << "priority" << 0)));
+        }
+
+    private:
+        scoped_ptr<QuorumChecker> _checker;
+    };
+
+    TEST_F(QuorumScatterGatherTest, MismatchSetNames) {
+        ReplicaSetConfig config;
+        config.initialize(basicThreeNodeConfig());
+        start(&config);
+        ASSERT_FALSE(hasReceivedSufficientResponses());
+
+        processResponse(requestFrom(std::string("host1")), mismatchSetName());
+        ASSERT_TRUE(hasReceivedSufficientResponses());
+        ASSERT_EQUALS(ErrorCodes::NewReplicaSetConfigurationIncompatible, getFinalStatus());
+        ASSERT_TRUE(getFinalStatus().reason().find("set name did not match") != std::string::npos);
+    }
+
+    TEST_F(QuorumScatterGatherTest, HigherConfigVersionExists) {
+        ReplicaSetConfig config;
+        config.initialize(basicThreeNodeConfig());
+        start(&config);
+        ASSERT_FALSE(hasReceivedSufficientResponses());
+
+        processResponse(requestFrom(std::string("host1")), higherConfigValue());
+        ASSERT_TRUE(hasReceivedSufficientResponses());
+        ASSERT_EQUALS(ErrorCodes::NewReplicaSetConfigurationIncompatible, getFinalStatus());
+        ASSERT_TRUE(getFinalStatus().reason().find("larger than the version") != std::string::npos);
+    }
+
+    TEST_F(QuorumScatterGatherTest, InitialConfigRequiresAllMembers) {
+        ReplicaSetConfig config;
+        config.initialize(initialThreeNodeConfig());
+        start(&config);
+        ASSERT_FALSE(hasReceivedSufficientResponses());
+
+        processResponse(requestFrom(std::string("host1")), ok());
+        ASSERT_FALSE(hasReceivedSufficientResponses());
+
+        processResponse(requestFrom(std::string("host2")), ok());
+        ASSERT_TRUE(hasReceivedSufficientResponses());
+        ASSERT_OK(getFinalStatus());
+    }
+
+    TEST_F(QuorumScatterGatherTest, OneBadStatusDoesntSpoilTheBunch) {
+        ReplicaSetConfig config;
+        config.initialize(basicThreeNodeConfig());
+        start(&config);
+        ASSERT_FALSE(hasReceivedSufficientResponses());
+
+        processResponse(requestFrom(std::string("host1")), badResponseStatus());
+        ASSERT_FALSE(hasReceivedSufficientResponses());
+
+        processResponse(requestFrom(std::string("host2")), ok());
+        ASSERT_TRUE(hasReceivedSufficientResponses());
+        ASSERT_OK(getFinalStatus());
+    }
+
+    TEST_F(QuorumScatterGatherTest, OneNotOkDoesntSpoilTheBunch) {
+        ReplicaSetConfig config;
+        config.initialize(basicThreeNodeConfig());
+        start(&config);
+        ASSERT_FALSE(hasReceivedSufficientResponses());
+
+        processResponse(requestFrom(std::string("host1")), notOk());
+        ASSERT_FALSE(hasReceivedSufficientResponses());
+
+        processResponse(requestFrom(std::string("host2")), ok());
+        ASSERT_TRUE(hasReceivedSufficientResponses());
+        ASSERT_OK(getFinalStatus());
+    }
+
+    TEST_F(QuorumScatterGatherTest, ElectableMemberDoesNotRespond) {
+        ReplicaSetConfig config;
+        config.initialize(threeNodeOnlyOneElectableConfig());
+        start(&config);
+        ASSERT_FALSE(hasReceivedSufficientResponses());
+
+        processResponse(requestFrom(std::string("host1")), notOk());
+        ASSERT_FALSE(hasReceivedSufficientResponses());
+
+        processResponse(requestFrom(std::string("host2")), ok());
+        ASSERT_TRUE(hasReceivedSufficientResponses());
+        ASSERT_EQUALS(ErrorCodes::NodeNotFound, getFinalStatus());
+        ASSERT_TRUE(getFinalStatus().reason().find("no electable nodes") != std::string::npos);
+    }
+
+    TEST_F(QuorumScatterGatherTest, NotEnoughVotes) {
+        ReplicaSetConfig config;
+        config.initialize(basicFiveNodeConfig());
+        start(&config);
+        ASSERT_FALSE(hasReceivedSufficientResponses());
+
+        processResponse(requestFrom(std::string("host1")), notOk());
+        ASSERT_FALSE(hasReceivedSufficientResponses());
+
+        processResponse(requestFrom(std::string("host2")), notOk());
+        ASSERT_FALSE(hasReceivedSufficientResponses());
+
+        processResponse(requestFrom(std::string("host3")), notOk());
+        ASSERT_FALSE(hasReceivedSufficientResponses());
+
+        processResponse(requestFrom(std::string("host4")), ok());
+        ASSERT_TRUE(hasReceivedSufficientResponses());
+        ASSERT_EQUALS(ErrorCodes::NodeNotFound, getFinalStatus());
+        ASSERT_TRUE(getFinalStatus().reason().find("not enough voting nodes") != std::string::npos);
+    }
+
+    TEST_F(QuorumScatterGatherTest, NoVotes) {
+        ReplicaSetConfig config;
+        config.initialize(fiveNodeConfigWeDontVote());
+        start(&config);
+        ASSERT_FALSE(hasReceivedSufficientResponses());
+
+        processResponse(requestFrom(std::string("host1")), notOk());
+        ASSERT_FALSE(hasReceivedSufficientResponses());
+
+        processResponse(requestFrom(std::string("host2")), notOk());
+        ASSERT_FALSE(hasReceivedSufficientResponses());
+
+        processResponse(requestFrom(std::string("host3")), notOk());
+        ASSERT_FALSE(hasReceivedSufficientResponses());
+
+        processResponse(requestFrom(std::string("host4")), notOk());
+        ASSERT_TRUE(hasReceivedSufficientResponses());
+        ASSERT_EQUALS(ErrorCodes::NodeNotFound, getFinalStatus());
+        ASSERT_TRUE(getFinalStatus().reason().find("not enough voting nodes") != std::string::npos);
+        ASSERT_TRUE(getFinalStatus().reason().find("none responded") != std::string::npos);
+    }
+
 }  // namespace
 }  // namespace repl
 }  // namespace mongo

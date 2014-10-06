@@ -21,6 +21,7 @@ env.InjectMongoIncludePaths()
 
 env.SConscript(['base/SConscript',
                 'crypto/SConscript',
+                'crypto/tom/SConscript',
                 'db/auth/SConscript',
                 'db/catalog/SConscript',
                 'db/commands/SConscript',
@@ -35,6 +36,7 @@ env.SConscript(['base/SConscript',
                 'db/sorter/SConscript',
                 'db/storage/SConscript',
                 'db/storage/heap1/SConscript',
+                'db/storage/kv/SConscript',
                 'db/storage/mmap_v1/SConscript',
                 'db/storage/rocks/SConscript',
                 'db/storage/wiredtiger/SConscript',
@@ -730,6 +732,11 @@ env.Library('stacktrace',
                      'version',
                      '$BUILD_DIR/mongo/base/base'])
 
+env.Library(target='quick_exit',
+            source=[
+                'util/quick_exit.cpp',
+            ])
+
 env.Library('coreshard', [# This is only here temporarily for auto-split logic in chunk.cpp.
                           's/balancer_policy.cpp',
                           's/distlock.cpp',
@@ -969,7 +976,8 @@ env.Library("mongodwebserver",
              ],
             LIBDEPS=["coredb", "mongodandmongos"])
 
-mongodOnlyFiles = [ "db/db.cpp", "db/commands/touch.cpp", "db/mongod_options_init.cpp" ]
+mongodOnlyFiles = [ "db/db.cpp", "db/commands/touch.cpp", "db/mongod_options_init.cpp",
+                    "db/repl/replication_initializer_${MONGO_REPL_IMPL}.cpp", ]
 
 # ----- TARGETS ------
 

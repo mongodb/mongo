@@ -787,7 +787,7 @@ namespace mongo {
             //
             
             {
-                Lock::DBLock writeLk(txn->lockState(), nsToDatabaseSubstring(ns), newlm::MODE_X);
+                Lock::DBWrite writeLk(txn->lockState(), ns);
 
                 // NOTE: The newShardVersion resulting from this split is higher than any
                 // other chunk version, so it's also implicitly the newCollVersion

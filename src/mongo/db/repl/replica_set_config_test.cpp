@@ -308,6 +308,171 @@ namespace {
         ASSERT_EQUALS(ErrorCodes::BadValue, config.validate());
     }
 
+    TEST(ReplicaSetConfig, ParseFailsWithUnexpectedField) {
+        ReplicaSetConfig config;
+        Status status = config.initialize(BSON("_id" << "rs0" <<
+                                               "version" << 1 <<
+                                               "unexpectedfield" << "value"));
+        ASSERT_EQUALS(ErrorCodes::BadValue, status);
+    }
+
+    TEST(ReplicaSetConfig, ParseFailsWithNonArrayMembersField) {
+        ReplicaSetConfig config;
+        Status status = config.initialize(BSON("_id" << "rs0" <<
+                                               "version" << 1 <<
+                                               "members" << "value"));
+        ASSERT_EQUALS(ErrorCodes::TypeMismatch, status);
+    }
+
+    TEST(ReplicaSetConfig, ParseFailsWithNonNumericHeartbeatTimeoutSecsField) {
+        ReplicaSetConfig config;
+        Status status = config.initialize(BSON("_id" << "rs0" <<
+                                               "version" << 1 <<
+                                               "members" << BSON_ARRAY(BSON("_id" << 0 <<
+                                                       "host" << "localhost:12345")) <<
+                                               "settings" << BSON("heartbeatTimeoutSecs" << "no")));
+        ASSERT_EQUALS(ErrorCodes::TypeMismatch, status);
+    }
+
+    TEST(ReplicaSetConfig, ParseFailsWithNonBoolChainingAllowedField) {
+        ReplicaSetConfig config;
+        Status status = config.initialize(BSON("_id" << "rs0" <<
+                                               "version" << 1 <<
+                                               "members" << BSON_ARRAY(BSON("_id" << 0 <<
+                                                       "host" << "localhost:12345")) <<
+                                               "settings" << BSON("chainingAllowed" << "no")));
+        ASSERT_EQUALS(ErrorCodes::TypeMismatch, status);
+    }
+
+    TEST(ReplicaSetConfig, ParseFailsWithNonObjectSettingsField) {
+        ReplicaSetConfig config;
+        Status status = config.initialize(BSON("_id" << "rs0" <<
+                                               "version" << 1 <<
+                                               "members" << BSON_ARRAY(BSON("_id" << 0 <<
+                                                       "host" << "localhost:12345")) <<
+                                               "settings" << "none"));
+        ASSERT_EQUALS(ErrorCodes::TypeMismatch, status);
+    }
+
+    TEST(ReplicaSetConfig, ParseFailsWithGetLastErrorDefaultsFieldUnparseable) {
+        ReplicaSetConfig config;
+        Status status = config.initialize(BSON("_id" << "rs0" <<
+                                               "version" << 1 <<
+                                               "members" << BSON_ARRAY(BSON("_id" << 0 <<
+                                                       "host" << "localhost:12345")) <<
+                                               "settings" << BSON("getLastErrorDefaults" << BSON(
+                                                       "fsync" << "seven"))));
+        ASSERT_EQUALS(ErrorCodes::FailedToParse, status);
+    }
+
+    TEST(ReplicaSetConfig, ParseFailsWithNonObjectGetLastErrorDefaultsField) {
+        ReplicaSetConfig config;
+        Status status = config.initialize(BSON("_id" << "rs0" <<
+                                               "version" << 1 <<
+                                               "members" << BSON_ARRAY(BSON("_id" << 0 <<
+                                                       "host" << "localhost:12345")) <<
+                                               "settings" << BSON("getLastErrorDefaults" << "no")));
+        ASSERT_EQUALS(ErrorCodes::TypeMismatch, status);
+    }
+
+    TEST(ReplicaSetConfig, ParseFailsWithNonObjectGetLastErrorModesField) {
+        ReplicaSetConfig config;
+        Status status = config.initialize(BSON("_id" << "rs0" <<
+                                               "version" << 1 <<
+                                               "members" << BSON_ARRAY(BSON("_id" << 0 <<
+                                                       "host" << "localhost:12345")) <<
+                                               "settings" << BSON("getLastErrorModes" << "no")));
+        ASSERT_EQUALS(ErrorCodes::TypeMismatch, status);
+    }
+
+    TEST(ReplicaSetConfig, ParseFailsWithDuplicateGetLastErrorModesField) {
+        ReplicaSetConfig config;
+        Status status = config.initialize(BSON("_id" << "rs0" <<
+                                               "version" << 1 <<
+                                               "members" << BSON_ARRAY(BSON("_id" << 0 <<
+                                                       "host" << "localhost:12345" << 
+                                                       "tags" << BSON("tag" << "yes"))) <<
+                                               "settings" << BSON("getLastErrorModes" << BSON(
+                                                        "one" << BSON("tag" << 1) <<
+                                                        "one" << BSON("tag" << 1)))));
+        ASSERT_EQUALS(ErrorCodes::DuplicateKey, status);
+    }
+
+    TEST(ReplicaSetConfig, ParseFailsWithNonObjectGetLastErrorModesEntryField) {
+        ReplicaSetConfig config;
+        Status status = config.initialize(BSON("_id" << "rs0" <<
+                                               "version" << 1 <<
+                                               "members" << BSON_ARRAY(BSON("_id" << 0 <<
+                                                       "host" << "localhost:12345" << 
+                                                       "tags" << BSON("tag" << "yes"))) <<
+                                               "settings" << BSON("getLastErrorModes" << BSON(
+                                                        "one" << 1))));
+        ASSERT_EQUALS(ErrorCodes::TypeMismatch, status);
+    }
+
+    TEST(ReplicaSetConfig, ParseFailsWithNonNumericGetLastErrorModesConstraintValue) {
+        ReplicaSetConfig config;
+        Status status = config.initialize(BSON("_id" << "rs0" <<
+                                               "version" << 1 <<
+                                               "members" << BSON_ARRAY(BSON("_id" << 0 <<
+                                                       "host" << "localhost:12345" << 
+                                                       "tags" << BSON("tag" << "yes"))) <<
+                                               "settings" << BSON("getLastErrorModes" << BSON(
+                                                        "one" << BSON("tag" << "no")))));
+        ASSERT_EQUALS(ErrorCodes::TypeMismatch, status);
+    }
+
+    TEST(ReplicaSetConfig, ParseFailsWithNegativeGetLastErrorModesConstraintValue) {
+        ReplicaSetConfig config;
+        Status status = config.initialize(BSON("_id" << "rs0" <<
+                                               "version" << 1 <<
+                                               "members" << BSON_ARRAY(BSON("_id" << 0 <<
+                                                       "host" << "localhost:12345" << 
+                                                       "tags" << BSON("tag" << "yes"))) <<
+                                               "settings" << BSON("getLastErrorModes" << BSON(
+                                                        "one" << BSON("tag" << -1)))));
+        ASSERT_EQUALS(ErrorCodes::BadValue, status);
+    }
+
+    TEST(ReplicaSetConfig, ParseFailsWithNonExistentGetLastErrorModesConstraintTag) {
+        ReplicaSetConfig config;
+        Status status = config.initialize(BSON("_id" << "rs0" <<
+                                               "version" << 1 <<
+                                               "members" << BSON_ARRAY(BSON("_id" << 0 <<
+                                                       "host" << "localhost:12345" << 
+                                                       "tags" << BSON("tag" << "yes"))) <<
+                                               "settings" << BSON("getLastErrorModes" << BSON(
+                                                        "one" << BSON("tag2" << 1)))));
+        ASSERT_EQUALS(ErrorCodes::NoSuchKey, status);
+    }
+
+    TEST(ReplicaSetConfig, ValidateFailsWithDuplicateMemberId) {
+        ReplicaSetConfig config;
+        Status status = config.initialize(BSON("_id" << "rs0" <<
+                                               "version" << 1 <<
+                                               "members" << BSON_ARRAY(BSON("_id" << 0 <<
+                                                       "host" << "localhost:12345") <<
+                                                       BSON("_id" << 0 <<
+                                                       "host" << "someoneelse:12345"))));
+        ASSERT_OK(status);
+
+        status = config.validate();
+        ASSERT_EQUALS(ErrorCodes::BadValue, status);
+    }
+
+    TEST(ReplicaSetConfig, ValidateFailsWithInvalidMember) {
+        ReplicaSetConfig config;
+        Status status = config.initialize(BSON("_id" << "rs0" <<
+                                               "version" << 1 <<
+                                               "members" << BSON_ARRAY(BSON("_id" << 0 <<
+                                                       "host" << "localhost:12345" <<
+                                                       "hidden" << true))));
+        ASSERT_OK(status);
+
+        status = config.validate();
+        ASSERT_EQUALS(ErrorCodes::BadValue, status);
+    }
+
     TEST(ReplicaSetConfig, ChainingAllowedField) {
         ReplicaSetConfig config;
         ASSERT_OK(config.initialize(

@@ -105,7 +105,7 @@ namespace mongo {
                 WorkingSet* ws = new WorkingSet();
                 MultiIteratorStage* mis = new MultiIteratorStage(txn, ws, collection);
                 // Takes ownership of 'ws' and 'mis'.
-                execs.push_back(new PlanExecutor(ws, mis, collection));
+                execs.push_back(new PlanExecutor(txn, ws, mis, collection));
             }
 
             // transfer iterators to executors using a round-robin distribution.

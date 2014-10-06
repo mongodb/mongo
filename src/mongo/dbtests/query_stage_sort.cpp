@@ -123,7 +123,8 @@ namespace QueryStageSortTests {
             params.limit = limit();
 
             // Must fetch so we can look at the doc as a BSONObj.
-            PlanExecutor runner(ws,
+            PlanExecutor runner(&_txn,
+                                ws,
                                 new FetchStage(&_txn, ws,
                                                new SortStage(&_txn, params, ws, ms), NULL, coll),
                                 coll);
@@ -372,7 +373,8 @@ namespace QueryStageSortTests {
             params.limit = 0;
 
             // We don't get results back since we're sorting some parallel arrays.
-            PlanExecutor runner(ws,
+            PlanExecutor runner(&_txn,
+                                ws,
                                 new FetchStage(&_txn,
                                                ws,
                                                new SortStage(&_txn, params, ws, ms), NULL, coll),

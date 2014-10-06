@@ -349,7 +349,7 @@ namespace mongo {
             // Needs to be locked exclusively, because creates the system.profile collection
             // in the local database.
             //
-            Lock::DBLock dbXLock(txn->lockState(), dbname, newlm::MODE_X);
+            Lock::DBWrite dbXLock(txn->lockState(), dbname);
             WriteUnitOfWork wunit(txn);
             Client::Context ctx(txn, dbname);
 
@@ -405,7 +405,7 @@ namespace mongo {
             // This doesn't look like it requires exclusive DB lock, because it uses its own diag
             // locking, but originally the lock was set to be WRITE, so preserving the behaviour.
             //
-            Lock::DBLock dbXLock(txn->lockState(), dbname, newlm::MODE_X);
+            Lock::DBWrite dbXLock(txn->lockState(), dbname);
             Client::Context ctx(txn, dbname);
 
             int was = _diaglog.setLevel( cmdObj.firstElement().numberInt() );
@@ -461,7 +461,7 @@ namespace mongo {
                 return false;
             }
 
-            Lock::DBLock dbXLock(txn->lockState(), dbname, newlm::MODE_X);
+            Lock::DBWrite dbXLock(txn->lockState(), dbname);
             WriteUnitOfWork wunit(txn);
             Client::Context ctx(txn, nsToDrop);
             Database* db = ctx.db();
@@ -561,7 +561,7 @@ namespace mongo {
                     !options["capped"].trueValue() || options["size"].isNumber() ||
                         options.hasField("$nExtents"));
 
-            Lock::DBLock dbXLock(txn->lockState(), dbname, newlm::MODE_X);
+            Lock::DBWrite dbXLock(txn->lockState(), dbname);
             WriteUnitOfWork wunit(txn);
             Client::Context ctx(txn, ns);
 
@@ -576,51 +576,6 @@ namespace mongo {
         }
     } cmdCreate;
 
-
-    /* note an access to a database right after this will open it back up - so this is mainly
-       for diagnostic purposes.
-       */
-    class CmdCloseAllDatabases : public Command {
-    public:
-        virtual void help( stringstream& help ) const { 
-            help << "Close all database files." << endl 
-                << "A new request will cause an immediate reopening; thus, this is mostly for testing purposes.";
-        }
-
-        virtual bool adminOnly() const { return true; }
-        virtual bool slaveOk() const { return false; }
-        virtual bool isWriteCommandForConfigServer() const { return true; }
-        virtual void addRequiredPrivileges(const std::string& dbname,
-                                           const BSONObj& cmdObj,
-                                           std::vector<Privilege>* out) {
-            ActionSet actions;
-            actions.addAction(ActionType::closeAllDatabases);
-            out->push_back(Privilege(ResourcePattern::forClusterResource(), actions));
-        }
-
-        CmdCloseAllDatabases() : Command( "closeAllDatabases" ) {
-
-        }
-
-        bool run(OperationContext* txn, const string& dbname , BSONObj& jsobj, int, string& errmsg, BSONObjBuilder& result, bool /*fromRepl*/) {
-            Lock::GlobalWrite globalWriteLock(txn->lockState());
-            // No WriteUnitOfWork necessary, as no actual writes happen.
-            Client::Context ctx(txn, dbname);
-
-            try {
-                return dbHolder().closeAll(txn, result, false);
-            }
-            catch(DBException&) { 
-                throw;
-            }
-            catch(...) { 
-                log() << "ERROR uncaught exception in command closeAllDatabases" << endl;
-                errmsg = "unexpected uncaught exception";
-                return false;
-            }
-        }
-
-    } cmdCloseAllDatabases;
 
     class CmdFileMD5 : public Command {
     public:
@@ -987,7 +942,7 @@ namespace mongo {
         bool run(OperationContext* txn, const string& dbname, BSONObj& jsobj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl ) {
             const string ns = dbname + "." + jsobj.firstElement().valuestr();
 
-            Lock::DBLock dbXLock(txn->lockState(), dbname, newlm::MODE_X);
+            Lock::DBWrite dbXLock(txn->lockState(), dbname);
             WriteUnitOfWork wunit(txn);
             Client::Context ctx(txn,  ns );
 

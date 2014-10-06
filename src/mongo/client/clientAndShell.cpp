@@ -35,6 +35,7 @@
 #include "mongo/s/shard.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/log.h"
+#include "mongo/util/quick_exit.h"
 #include "mongo/util/timer.h"
 
 namespace mongo {
@@ -60,7 +61,7 @@ namespace mongo {
         if ( whyMsg )
             log() << " b/c " << whyMsg << endl;
         log() << "exiting" << endl;
-        ::_exit( returnCode );
+        quickExit( returnCode );
     }
 
     bool inShutdown() {

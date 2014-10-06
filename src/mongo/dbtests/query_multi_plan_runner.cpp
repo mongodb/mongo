@@ -174,7 +174,7 @@ namespace QueryMultiPlanRunner {
 
             Collection* collection = ctx.ctx().db()->getCollection(&_txn, ns());
             // Takes ownership of arguments other than 'collection'.
-            PlanExecutor exec(sharedWs.release(), mps, cq, collection);
+            PlanExecutor exec(&_txn, sharedWs.release(), mps, cq, collection);
 
             // Get all our results out.
             int results = 0;

@@ -50,6 +50,8 @@ namespace mongo {
 
 namespace newlm {
 
+    struct LockHead;
+
     /**
      * Lock modes.
      *
@@ -59,8 +61,8 @@ namespace newlm {
      *   Requested Mode | MODE_NONE  MODE_IS   MODE_IX  MODE_S   MODE_X  |
      *     MODE_IS      |      +        +         +        +        -    |
      *     MODE_IX      |      +        +         +        -        -    |
-     *     MODE_S       |      +        +         -        +        -
-     *     MODE_X       |      +        -         -        -        -
+     *     MODE_S       |      +        +         -        +        -    |
+     *     MODE_X       |      +        -         -        -        -    |
      */
     enum LockMode {
         MODE_NONE       = 0,
@@ -171,17 +173,11 @@ namespace newlm {
         /**
          * Used for initialization of a LockRequest, which might have been retrieved from cache.
          */
-        void initNew(const ResourceId& resourceId, Locker* locker, LockGrantNotification* notify);
+        void initNew(Locker* locker, LockGrantNotification* notify);
 
         //
         // These fields are maintained by the Locker class
         //
-
-        // Id of the resource for which this request applies. The only reason it is here is we can
-        // locate the lock object during unlock. This can be solved either by having a pointer to
-        // the LockHead (which should be alive as long as there are LockRequests on it, or by
-        // requiring resource id to be passed on unlock, along with the lock request).
-        ResourceId resourceId;
 
         // This is the Locker, which created this LockRequest. Pointer is not owned, just
         // referenced. Must outlive the LockRequest.
@@ -196,6 +192,11 @@ namespace newlm {
         //
         // These fields are owned and maintained by the LockManager class
         //
+
+        // Pointer to the lock to which this request belongs, or null if this request has not yet
+        // been assigned to a lock. The LockHead should be alive as long as there are LockRequests
+        // on it, so it is safe to have this pointer hanging around.
+        LockHead* lock;
 
         // The reason intrusive linked list is used instead of the std::list class is to allow
         // for entries to be removed from the middle of the list in O(1) time, if they are known
@@ -346,6 +347,16 @@ namespace newlm {
          */
         void downgrade(LockRequest* request, LockMode newMode);
 
+        /**
+         * Iterates through all buckets and deletes all locks, which have no requests on them. This
+         * call is kind of expensive and should only be used for reducing the memory footprint of
+         * the lock manager.
+         */
+        void cleanupUnusedLocks();
+
+        /**
+         * Dumps the contents of all locks to the log.
+         */
         void dump() const;
 
 
@@ -366,8 +377,8 @@ namespace newlm {
         };
 
         /**
-         * Retrieves a LockHead for the particular resource. The particular bucket must have been
-         * locked before calling this function.
+         * Retrieves the bucket in which the particular resource must reside. There is no need to
+         * hold a lock when calling this function.
          */
         LockBucket* _getBucket(const ResourceId& resId);
 

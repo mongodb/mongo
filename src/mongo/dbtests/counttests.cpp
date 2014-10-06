@@ -43,10 +43,9 @@ namespace CountTests {
 
     class Base {
     public:
-        Base() : _lk(_txn.lockState(), nsToDatabaseSubstring(ns()), newlm::MODE_X),
-                 _context(&_txn, ns()),
-                 _client(&_txn) {
-
+        Base() : lk(_txn.lockState(), ns()),
+                     _context(&_txn, ns()),
+                     _client(&_txn) {
             _database = _context.db();
             {
                 WriteUnitOfWork wunit(&_txn);
@@ -105,7 +104,7 @@ namespace CountTests {
 
 
         OperationContextImpl _txn;
-        Lock::DBLock _lk;
+        Lock::DBWrite lk;
 
         Client::Context _context;
 

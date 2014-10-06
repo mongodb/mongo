@@ -92,9 +92,18 @@ namespace mongo {
         };
 
         /**
-         * Helper method to aid in displaying an ExecState for debug or other recreational purposes.
+         * The yielding policy of the plan executor.  By default, a runner does not yield itself
+         * (YIELD_MANUAL).
          */
-        static std::string statestr(ExecState s);
+        enum YieldPolicy {
+            // Any call to getNext() may yield.  In particular, the runner may be killed during any
+            // call to getNext().  If this occurs, getNext() will return RUNNER_DEAD.
+            YIELD_AUTO,
+
+            // Owner must yield manually if yields are requested.  How to yield yourself:
+            // XXX: go on about this
+            YIELD_MANUAL,
+        };
 
         //
         // Constructors / destructor.
@@ -106,27 +115,40 @@ namespace mongo {
          * Right now this is only for idhack updates which neither canonicalize
          * nor go through normal planning.
          */
-        PlanExecutor(WorkingSet* ws, PlanStage* rt, const Collection* collection);
+        PlanExecutor(OperationContext* opCtx,
+                     WorkingSet* ws,
+                     PlanStage* rt,
+                     const Collection* collection);
 
         /**
          * Used when we have a NULL collection and no canonical query. In this case,
          * we need to explicitly pass a namespace to the plan executor.
          */
-        PlanExecutor(WorkingSet* ws, PlanStage* rt, std::string ns);
+        PlanExecutor(OperationContext* opCtx,
+                     WorkingSet* ws,
+                     PlanStage* rt,
+                     std::string ns);
 
         /**
          * Used when there is a canonical query but no query solution (e.g. idhack
          * queries, queries against a NULL collection, queries using the subplan stage).
          */
-        PlanExecutor(WorkingSet* ws, PlanStage* rt, CanonicalQuery* cq,
+        PlanExecutor(OperationContext* opCtx,
+                     WorkingSet* ws,
+                     PlanStage* rt,
+                     CanonicalQuery* cq,
                      const Collection* collection);
 
         /**
          * The constructor for the normal case, when you have both a canonical query
          * and a query solution.
          */
-        PlanExecutor(WorkingSet* ws, PlanStage* rt, QuerySolution* qs,
-                     CanonicalQuery* cq, const Collection* collection);
+        PlanExecutor(OperationContext* opCtx,
+                     WorkingSet* ws,
+                     PlanStage* rt,
+                     QuerySolution* qs,
+                     CanonicalQuery* cq,
+                     const Collection* collection);
 
         ~PlanExecutor();
 
@@ -158,6 +180,11 @@ namespace mongo {
          * Return the NS that the query is running over.
          */
         const std::string& ns();
+
+        /**
+         * Return the OperationContext that the plan is currently executing within.
+         */
+        OperationContext* getOpCtx() const;
 
         /**
          * Generates a tree of stats objects with a separate lifetime from the execution
@@ -225,7 +252,7 @@ namespace mongo {
          *
          * Deregistration happens automatically when this plan executor is destroyed.
          *
-         * Used just for internal plans:
+         * Used for internal clients of the query system:
          *  -- InternalPlanner::collectionScan(...) (see internal_plans.h)
          *  -- InternalPlanner::indexScan(...) (see internal_plans.h)
          *  -- getOplogStartHack(...) (see new_find.cpp)
@@ -234,9 +261,10 @@ namespace mongo {
         void registerExecInternalPlan();
 
         /**
-         * If we're yielding locks, the database we're operating over or any collection we're relying on
-         * may be dropped.  When this happens all cursors and plan executors on that database and
-         * collection are killed or deleted in some fashion. (This is how the _killed gets set.)
+         * If we're yielding locks, the database we're operating over or any collection we're
+         * relying on may be dropped.  When this happens all cursors and plan executors on that
+         * database and collection are killed or deleted in some fashion. (This is how _killed
+         * gets set.)
          */
         void kill();
 
@@ -247,11 +275,31 @@ namespace mongo {
          */
         void invalidate(const DiskLoc& dl, InvalidationType type);
 
+        /**
+         * Helper method to aid in displaying an ExecState for debug or other recreational purposes.
+         */
+        static std::string statestr(ExecState s);
+
+        /**
+         * Change the yield policy of the PlanExecutor to 'policy'.
+         *
+         * XXX: everybody who sets the policy to YIELD_AUTO really wants to call
+         * registerExecInternalPlan immediately after EXCEPT new_find.cpp...so we expose
+         * the ability to register (or not) via registerExecutor, rather than require
+         * all users to have yet another RAII object.  Only new_find.cpp should ever
+         * set registerExecutor to false.
+         */
+        void setYieldPolicy(YieldPolicy policy, bool registerExecutor = true);
+
     private:
         /**
          * Initialize the namespace using either the canonical query or the collection.
          */
         void initNs();
+
+        // The OperationContext that we're executing within.  We need this in order to release
+        // locks.
+        OperationContext* _opCtx;
 
         // Collection over which this plan executor runs. Used to resolve record ids retrieved by
         // the plan stages. The collection must not be destroyed while there are active plans.

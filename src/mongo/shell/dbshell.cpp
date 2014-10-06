@@ -56,6 +56,7 @@
 #include "mongo/util/log.h"
 #include "mongo/util/net/ssl_options.h"
 #include "mongo/util/password.h"
+#include "mongo/util/quick_exit.h"
 #include "mongo/util/signal_handlers.h"
 #include "mongo/util/stacktrace.h"
 #include "mongo/util/startup_test.h"
@@ -186,7 +187,7 @@ namespace mongo {
 
         ::killOps();
         ::shellHistoryDone();
-        ::_exit(0);
+        quickExit(0);
     }
 }
 
@@ -227,7 +228,7 @@ string fixHost( const std::string& url, const std::string& host, const std::stri
 
     if ( url.find( "/" ) != string::npos ) {
         cerr << "url can't have host or port if you specify them individually" << endl;
-        ::_exit(-1);
+        quickExit(-1);
     }
 
     string newurl( ( host.size() == 0 ) ? "127.0.0.1" : host );
@@ -909,7 +910,7 @@ int wmain(int argc, wchar_t* argvW[], wchar_t* envpW[]) {
         cerr << "exception: " << e.what() << endl;
         returnCode = 1;
     }
-    ::_exit(returnCode);
+    quickExit(returnCode);
 }
 #else // #ifdef _WIN32
 int main( int argc, char* argv[], char **envp ) {
@@ -922,6 +923,6 @@ int main( int argc, char* argv[], char **envp ) {
         cerr << "exception: " << e.what() << endl;
         returnCode = 1;
     }
-    _exit(returnCode);
+    quickExit(returnCode);
 }
 #endif // #ifdef _WIN32

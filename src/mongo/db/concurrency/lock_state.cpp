@@ -373,9 +373,9 @@ namespace newlm {
         // Unlock all non-flush locks.
         LockRequestsMap::const_iterator it = _requests.begin();
         while (it != _requests.end()) {
-            const LockRequest* request = it->second;
+            const ResourceId& resId = it->first;
 
-            if (resourceIdMMAPV1Flush == request->resourceId) {
+            if (resourceIdMMAPV1Flush == resId) {
                 // The flush lock is the last lock to be released, so hold on to it for now.
                 it++;
             }
@@ -386,7 +386,7 @@ namespace newlm {
                 // have to release the global lock fully before we get here.
                 // Therefore we're not here unless we've unlocked the global lock, in which
                 // case it's a programming error to have >1 reference to this lock.
-                invariant(unlock(request->resourceId));
+                invariant(unlock(resId));
 
                 // Unlocking modifies the state of _requests, but we're iterating over it, so we
                 // have to start from the beginning every time we unlock something.
@@ -429,7 +429,7 @@ namespace newlm {
         LockRequest* request = _find(resId);
         if (request == NULL) {
             request = new LockRequest();
-            request->initNew(resId, this, &_notify);
+            request->initNew(this, &_notify);
 
             _requests.insert(LockRequestsPair(resId, request));
         }
@@ -451,7 +451,7 @@ namespace newlm {
             // to do if not in a write unit of work.
             bool unlockedFlushLock = false;
 
-            if (!inAWriteUnitOfWork() && 
+            if (!inAWriteUnitOfWork() &&
                 (resId != resourceIdGlobal) &&
                 (resId != resourceIdMMAPV1Flush) &&
                 (resId != resourceIdLocalDB)) {
@@ -591,25 +591,26 @@ namespace {
 
         // Next, the non-global locks.
         for (LockRequestsMap::const_iterator it = _requests.begin(); it != _requests.end(); it++) {
+            const ResourceId& resId = it->first;
             const LockRequest* request = it->second;
 
             // This is handled separately from normal locks as mentioned above.
-            if (resourceIdGlobal == request->resourceId) {
+            if (resourceIdGlobal == resId) {
                 continue;
             }
 
             // This is an internal lock that is obtained when the global lock is locked.
-            if (resourceIdMMAPV1Flush == request->resourceId) {
+            if (resourceIdMMAPV1Flush == resId) {
                 continue;
             }
 
             // We don't support saving and restoring document-level locks.
-            invariant(RESOURCE_DATABASE == request->resourceId.getType() ||
-                      RESOURCE_COLLECTION == request->resourceId.getType());
+            invariant(RESOURCE_DATABASE == resId.getType() ||
+                      RESOURCE_COLLECTION == resId.getType());
 
             // And, stuff the info into the out parameter.
             Locker::LockSnapshot::OneLock info;
-            info.resourceId = request->resourceId;
+            info.resourceId = resId;
             info.mode = request->mode;
             info.recursiveCount = request->recursiveCount;
 

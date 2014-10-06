@@ -199,7 +199,6 @@ namespace {
         hostManagerRoleClusterActions
             << ActionType::applicationMessage // clusterManager gets this also
             << ActionType::connPoolSync
-            << ActionType::closeAllDatabases
             << ActionType::cpuProfiler
             << ActionType::logRotate
             << ActionType::setParameter

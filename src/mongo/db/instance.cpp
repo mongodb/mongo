@@ -83,6 +83,7 @@
 #include "mongo/util/goodies.h"
 #include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
+#include "mongo/util/quick_exit.h"
 #include "mongo/util/time_support.h"
 
 namespace mongo {
@@ -620,7 +621,7 @@ namespace mongo {
         UpdateExecutor executor(&request, &op.debug());
         uassertStatusOK(executor.prepare());
 
-        Lock::DBLock lk(txn->lockState(), ns.db(), newlm::MODE_X);
+        Lock::DBWrite lk(txn->lockState(), ns.ns());
         Client::Context ctx(txn,  ns );
 
         UpdateResult res = executor.execute(ctx.db());
@@ -654,7 +655,7 @@ namespace mongo {
         DeleteExecutor executor(&request);
         uassertStatusOK(executor.prepare());
 
-        Lock::DBLock lk(txn->lockState(), ns.db(), newlm::MODE_X);
+        Lock::DBWrite lk(txn->lockState(), ns.ns());
         Client::Context ctx(txn, ns);
 
         long long n = executor.execute(ctx.db());
@@ -913,7 +914,7 @@ namespace mongo {
             uassertStatusOK(status);
         }
 
-        Lock::DBLock lk(txn->lockState(), nsString.db(), newlm::MODE_X);
+        Lock::DBWrite lk(txn->lockState(), ns);
 
         // CONCURRENCY TODO: is being read locked in big log sufficient here?
         // writelock is used to synchronize stepdowns w/ writes
@@ -1005,14 +1006,14 @@ namespace mongo {
 
 #ifdef _WIN32
         // Windows Service Controller wants to be told when we are down,
-        //  so don't call ::_exit() yet, or say "really exiting now"
+        //  so don't call quickExit() yet, or say "really exiting now"
         //
         if ( rc == EXIT_WINDOWS_SERVICE_STOP ) {
             return;
         }
 #endif
 
-        ::_exit(rc);
+        quickExit(rc);
     }
 
     // ----- BEGIN Diaglog -----

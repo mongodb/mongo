@@ -73,7 +73,7 @@ namespace mongo {
 
             if (NULL == collection) {
                 EOFStage* eof = new EOFStage();
-                return new PlanExecutor(ws, eof, ns.toString());
+                return new PlanExecutor(txn, ws, eof, ns.toString());
             }
 
             dassert( ns == collection->ns().ns() );
@@ -90,7 +90,7 @@ namespace mongo {
             }
 
             CollectionScan* cs = new CollectionScan(txn, params, ws, NULL);
-            PlanExecutor* exec = new PlanExecutor(ws, cs, collection);
+            PlanExecutor* exec = new PlanExecutor(txn, ws, cs, collection);
             // 'exec' will be registered until it is destroyed.
             exec->registerExecInternalPlan();
             return exec;
@@ -125,7 +125,7 @@ namespace mongo {
                 root = new FetchStage(txn, ws, root, NULL, collection);
             }
 
-            PlanExecutor* exec = new PlanExecutor(ws, root, collection);
+            PlanExecutor* exec = new PlanExecutor(txn, ws, root, collection);
             // 'exec' will be registered until it is destroyed.
             exec->registerExecInternalPlan();
             return exec;

@@ -29,15 +29,22 @@
 #include "mongo/db/query/plan_executor.h"
 
 #include "mongo/db/catalog/collection.h"
+#include "mongo/db/exec/pipeline_proxy.h"
 #include "mongo/db/exec/plan_stage.h"
 #include "mongo/db/exec/plan_stats.h"
 #include "mongo/db/exec/working_set.h"
 #include "mongo/db/exec/working_set_common.h"
 
+#include "mongo/util/stacktrace.h"
+
 namespace mongo {
 
-    PlanExecutor::PlanExecutor(WorkingSet* ws, PlanStage* rt, const Collection* collection)
-        : _collection(collection),
+    PlanExecutor::PlanExecutor(OperationContext* opCtx,
+                               WorkingSet* ws,
+                               PlanStage* rt,
+                               const Collection* collection)
+        : _opCtx(opCtx),
+          _collection(collection),
           _cq(NULL),
           _workingSet(ws),
           _qs(NULL),
@@ -46,8 +53,12 @@ namespace mongo {
         initNs();
     }
 
-    PlanExecutor::PlanExecutor(WorkingSet* ws, PlanStage* rt, std::string ns)
-        : _collection(NULL),
+    PlanExecutor::PlanExecutor(OperationContext* opCtx,
+                               WorkingSet* ws,
+                               PlanStage* rt,
+                               std::string ns)
+        : _opCtx(opCtx),
+          _collection(NULL),
           _cq(NULL),
           _workingSet(ws),
           _qs(NULL),
@@ -55,9 +66,13 @@ namespace mongo {
           _ns(ns),
           _killed(false) { }
 
-    PlanExecutor::PlanExecutor(WorkingSet* ws, PlanStage* rt, CanonicalQuery* cq,
+    PlanExecutor::PlanExecutor(OperationContext* opCtx,
+                               WorkingSet* ws,
+                               PlanStage* rt,
+                               CanonicalQuery* cq,
                                const Collection* collection)
-        : _collection(collection),
+        : _opCtx(opCtx),
+          _collection(collection),
           _cq(cq),
           _workingSet(ws),
           _qs(NULL),
@@ -66,9 +81,14 @@ namespace mongo {
         initNs();
     }
 
-    PlanExecutor::PlanExecutor(WorkingSet* ws, PlanStage* rt, QuerySolution* qs,
-                               CanonicalQuery* cq, const Collection* collection)
-        : _collection(collection),
+    PlanExecutor::PlanExecutor(OperationContext* opCtx,
+                               WorkingSet* ws,
+                               PlanStage* rt,
+                               QuerySolution* qs,
+                               CanonicalQuery* cq,
+                               const Collection* collection)
+        : _opCtx(opCtx),
+          _collection(collection),
           _cq(cq),
           _workingSet(ws),
           _qs(qs),
@@ -126,14 +146,29 @@ namespace mongo {
         return _collection;
     }
 
+    OperationContext* PlanExecutor::getOpCtx() const {
+        return _opCtx;
+    }
+
     void PlanExecutor::saveState() {
-        if (!_killed) { _root->saveState(); }
+        if (!_killed) {
+            _root->saveState();
+        }
+
+        _opCtx = NULL;
     }
 
     bool PlanExecutor::restoreState(OperationContext* opCtx) {
+        // SERVER-15526
+        // invariant(NULL == _opCtx);
+        // invariant(opCtx);
+
+        _opCtx = opCtx;
+
         if (!_killed) {
             _root->restoreState(opCtx);
         }
+
         return !_killed;
     }
 
@@ -224,6 +259,22 @@ namespace mongo {
     void PlanExecutor::kill() {
         _killed = true;
         _collection = NULL;
+
+        // XXX: PlanExecutor is designed to wrap a single execution tree. In the case of
+        // aggregation queries, PlanExecutor wraps a proxy stage responsible for pulling results
+        // from an aggregation pipeline. The aggregation pipeline pulls results from yet another
+        // PlanExecutor. Such nested PlanExecutors require us to manually propagate kill() to
+        // the "inner" executor. This is bad, and hopefully can be fixed down the line with the
+        // unification of agg and query.
+        //
+        // TODO: get rid of this code block.
+        if (STAGE_PIPELINE_PROXY == _root->stageType()) {
+            PipelineProxyStage* proxyStage = static_cast<PipelineProxyStage*>(_root.get());
+            shared_ptr<PlanExecutor> childExec = proxyStage->getChildExecutor();
+            if (childExec) {
+                childExec->kill();
+            }
+        }
     }
 
     Status PlanExecutor::executePlan() {
@@ -245,6 +296,10 @@ namespace mongo {
 
     const string& PlanExecutor::ns() {
         return _ns;
+    }
+
+    void PlanExecutor::setYieldPolicy(YieldPolicy policy, bool registerExecutor) {
+        // TODO: implement.
     }
 
     //

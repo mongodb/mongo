@@ -308,6 +308,7 @@ namespace mongo {
                 && (queryOptions & QueryOption_AwaitData) && (pass < 1000)) {
                 // If the cursor is tailable we don't kill it if it's eof.  We let it try to get
                 // data some # of times first.
+                exec->saveState();
                 return 0;
             }
 
@@ -439,7 +440,7 @@ namespace mongo {
         OplogStart* stage = new OplogStart(txn, collection, tsExpr, oplogws);
 
         // Takes ownership of ws and stage.
-        auto_ptr<PlanExecutor> exec(new PlanExecutor(oplogws, stage, collection));
+        auto_ptr<PlanExecutor> exec(new PlanExecutor(txn, oplogws, stage, collection));
         exec->registerExecInternalPlan();
 
         // The stage returns a DiskLoc of where to start.
@@ -469,7 +470,7 @@ namespace mongo {
         WorkingSet* ws = new WorkingSet();
         CollectionScan* cs = new CollectionScan(txn, params, ws, cq->root());
         // Takes ownership of 'ws', 'cs', and 'cq'.
-        *execOut = new PlanExecutor(ws, cs, autoCq.release(), collection);
+        *execOut = new PlanExecutor(txn, ws, cs, autoCq.release(), collection);
         return Status::OK();
     }
 
@@ -568,7 +569,7 @@ namespace mongo {
             EOFStage* eofStage = new EOFStage();
             WorkingSet* ws = new WorkingSet();
             // Takes ownership of 'cq'.
-            rawExec = new PlanExecutor(ws, eofStage, cq, NULL);
+            rawExec = new PlanExecutor(txn, ws, eofStage, cq, NULL);
         }
         else if (pq.getOptions().oplogReplay) {
             // Takes ownership of 'cq'.

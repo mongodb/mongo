@@ -33,6 +33,7 @@
 #include "mongo/util/options_parser/option_section.h"
 #include "mongo/util/options_parser/options_parser.h"
 #include "mongo/util/options_parser/startup_option_init.h"
+#include "mongo/util/quick_exit.h"
 
 namespace mongo {
 namespace optionenvironment {
@@ -46,7 +47,7 @@ MONGO_STARTUP_OPTIONS_PARSE(StartupOptions)(InitializerContext* context) {
         // TODO: Figure out if there's a use case for this help message ever being different
         std::cerr << "try '" << context->args()[0]
                     << " --help' for more information" << std::endl;
-        ::_exit(EXIT_BADOPTIONS);
+        quickExit(EXIT_BADOPTIONS);
     }
     return Status::OK();
 }

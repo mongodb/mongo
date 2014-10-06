@@ -47,6 +47,7 @@
 #include "mongo/util/options_parser/options_parser.h"
 #include "mongo/util/options_parser/startup_option_init.h"
 #include "mongo/util/options_parser/startup_options.h"
+#include "mongo/util/quick_exit.h"
 #include "mongo/util/scopeguard.h"
 #include "mongo/util/signal_handlers_synchronous.h"
 
@@ -94,7 +95,7 @@ public:
         if (!file::create_directory(_params.path)) {
             std::cerr << "Error: unable to create temporary directory in "
                       << _params.path.parent_path() << std::endl;
-            ::_exit(EXIT_FAILURE);
+            quickExit(EXIT_FAILURE);
         }
     }
 
@@ -260,7 +261,7 @@ Status validateFileAllocatorBenchOptions(const moe::OptionSection& options,
     ret = env.get(moe::Key("help"), &displayHelp);
     if (displayHelp) {
         std::cout << options.helpString() << std::endl;
-        ::_exit(EXIT_SUCCESS);
+        quickExit(EXIT_SUCCESS);
     }
     return Status::OK();
 }
@@ -278,7 +279,7 @@ Status storeFileAllocatorBenchOptions(const moe::Environment& env) {
 
     if (!file::is_directory(rootPath)) {
         std::cerr << "Error: path argument must be a directory" << std::endl;
-        ::_exit(EXIT_FAILURE);
+        quickExit(EXIT_FAILURE);
     }
 
     benchParams.path = rootPath / file::unique_path("allocator-bench-%%%%%%%%");
@@ -304,9 +305,9 @@ int main(int argc, char** argv, char** envp) {
         FileAllocatorBenchmark(benchParams).run();
     } catch (...) {
         std::cerr << "Benchmark ended in failure." << std::endl;
-        ::_exit(EXIT_FAILURE);
+        quickExit(EXIT_FAILURE);
     }
-    ::_exit(EXIT_SUCCESS);
+    quickExit(EXIT_SUCCESS);
 }
 
 MONGO_INITIALIZER(KillLoggingOutput)(InitializerContext* context) {

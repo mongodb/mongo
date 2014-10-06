@@ -80,7 +80,7 @@ namespace ExecutorRegistry {
             CanonicalQuery* cq;
             ASSERT(CanonicalQuery::canonicalize(ns(), BSONObj(), &cq).isOK());
             // Owns all args
-            return new PlanExecutor(ws.release(), scan.release(), cq,
+            return new PlanExecutor(&_opCtx, ws.release(), scan.release(), cq,
                                     _ctx->ctx().db()->getCollection( &_opCtx, ns() ));
         }
 

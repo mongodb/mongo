@@ -37,8 +37,6 @@
 
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/concurrency/lock_state.h"
-#include "mongo/db/dbdirectclient.h"
-#include "mongo/db/operation_context_impl.h"
 #include "mongo/dbtests/dbtests.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/platform/bits.h"
@@ -104,16 +102,6 @@ namespace ThreadedTests {
         }
 
         void run() {
-            DEV {
-                // in _DEBUG builds on linux we mprotect each time a writelock
-                // is taken. That can greatly slow down this test if there are
-                // many open files
-                OperationContextImpl txn;
-                DBDirectClient db(&txn);
-
-                db.simpleCommand("admin", NULL, "closeAllDatabases");
-            }
-
             Timer t;
             cout << "MongoMutexTest N:" << N << endl;
             ThreadedTest<nthr>::run();
@@ -199,7 +187,7 @@ namespace ThreadedTests {
                                 Lock::DBRead x(&lockState, "local");
                             }
                             {
-                                Lock::DBLock x(&lockState, "local", newlm::MODE_X);
+                                Lock::DBWrite x(&lockState, "local");
                                 //  No actual writing here, so no WriteUnitOfWork
                                 if( sometimes ) {
                                     Lock::TempRelease t(&lockState);
@@ -211,11 +199,11 @@ namespace ThreadedTests {
                             }
 
                             { 
-                                Lock::DBLock x(&lockState, "admin", newlm::MODE_X);
+                                Lock::DBWrite x(&lockState, "admin"); 
                             }
                         }
                         else if( q == 3 ) {
-                            Lock::DBLock x(&lockState, "foo", newlm::MODE_X);
+                            Lock::DBWrite x(&lockState, "foo");
                             Lock::DBRead y(&lockState, "admin");
                         }
                         else if( q == 4 ) { 
@@ -223,7 +211,7 @@ namespace ThreadedTests {
                             Lock::DBRead y(&lockState, "admin");
                         }
                         else { 
-                            Lock::DBLock w(&lockState, "foo", newlm::MODE_X);
+                            Lock::DBWrite w(&lockState, "foo");
 
                             {
                                 Lock::TempRelease t(&lockState);

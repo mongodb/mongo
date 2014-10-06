@@ -30,6 +30,7 @@
 
 #include "mongo/util/options_parser/startup_option_init.h"
 #include "mongo/util/options_parser/startup_options.h"
+#include "mongo/util/quick_exit.h"
 
 namespace mongo {
     MONGO_GENERAL_STARTUP_OPTIONS_REGISTER(MongodOptions)(InitializerContext* context) {
@@ -38,7 +39,7 @@ namespace mongo {
 
     MONGO_STARTUP_OPTIONS_VALIDATE(MongodOptions)(InitializerContext* context) {
         if (!handlePreValidationMongodOptions(moe::startupOptionsParsed, context->args())) {
-            ::_exit(EXIT_SUCCESS);
+            quickExit(EXIT_SUCCESS);
         }
         // Run validation, but tell the Environment that we don't want it to be set as "valid",
         // since we may be making it invalid in the canonicalization process.
@@ -72,7 +73,7 @@ namespace mongo {
             std::cerr << ret.toString() << std::endl;
             std::cerr << "try '" << context->args()[0] << " --help' for more information"
                       << std::endl;
-            ::_exit(EXIT_BADOPTIONS);
+            quickExit(EXIT_BADOPTIONS);
         }
         return Status::OK();
     }

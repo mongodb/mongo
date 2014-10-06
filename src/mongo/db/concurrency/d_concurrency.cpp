@@ -301,6 +301,9 @@ namespace mongo {
         _lockState->unlock(_id);
     }
 
+    Lock::DBWrite::DBWrite(Locker* lockState, const StringData& dbOrNs) :
+        DBLock(lockState, nsToDatabaseSubstring(dbOrNs), newlm::MODE_X) { }
+
     Lock::DBRead::DBRead(Locker* lockState, const StringData& dbOrNs) :
         DBLock(lockState, nsToDatabaseSubstring(dbOrNs), newlm::MODE_S) { }
 

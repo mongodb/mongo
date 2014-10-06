@@ -84,7 +84,7 @@ namespace {
             options.syncIndexes = ! dataPass;
 
             // Make database stable
-            Lock::DBLock dbWrite(txn->lockState(), db, newlm::MODE_X);
+            Lock::DBWrite dbWrite(txn->lockState(), db);
 
             if (!cloner.go(txn, db, host, options, NULL, err, &errCode)) {
                 log() << "initial sync: error while "

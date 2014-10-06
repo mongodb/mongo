@@ -124,7 +124,7 @@ namespace mongo {
 
     int BSONCollectionCatalogEntry::MetaData::findIndexOffset( const StringData& name ) const {
         for ( unsigned i = 0; i < indexes.size(); i++ )
-            if ( indexes[i].spec["name"].String() == name )
+            if ( indexes[i].name() == name )
                 return i;
         return -1;
     }
@@ -138,6 +138,17 @@ namespace mongo {
 
         indexes.erase( indexes.begin() + indexOffset );
         return true;
+    }
+
+    void BSONCollectionCatalogEntry::MetaData::rename( const StringData& toNS ) {
+        ns = toNS.toString();
+        for ( size_t i = 0; i < indexes.size(); i++ ) {
+            BSONObj spec = indexes[i].spec;
+            BSONObjBuilder b;
+            b.append( "ns", toNS );
+            b.appendElementsUnique( spec );
+            indexes[i].spec = b.obj();
+        }
     }
 
     BSONObj BSONCollectionCatalogEntry::MetaData::toBSON() const {

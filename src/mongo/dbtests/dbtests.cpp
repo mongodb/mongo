@@ -46,6 +46,7 @@
 #include "mongo/util/gcov.h"
 #include "mongo/util/startup_test.h"
 #include "mongo/util/text.h"
+#include "mongo/util/quick_exit.h"
 
 namespace mongo {
     // This specifies default dbpath for our testing framework
@@ -76,12 +77,12 @@ int dbtestsMain( int argc, char** argv, char** envp ) {
 int wmain(int argc, wchar_t* argvW[], wchar_t* envpW[]) {
     WindowsCommandLine wcl(argc, argvW, envpW);
     int exitCode = dbtestsMain(argc, wcl.argv(), wcl.envp());
-    ::_exit(exitCode);
+    quickExit(exitCode);
 }
 #else
 int main(int argc, char* argv[], char** envp) {
     int exitCode = dbtestsMain(argc, argv, envp);
     flushForGcov();
-    ::_exit(exitCode);
+    quickExit(exitCode);
 }
 #endif
