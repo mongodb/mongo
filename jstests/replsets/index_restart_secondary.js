@@ -39,14 +39,14 @@ assert.writeOK(bulk.execute());
 
 jsTest.log("Creating index");
 masterDB.jstests_fgsec.ensureIndex( {i:1} );
-assert.eq(2, masterDB.system.indexes.count( {ns:"fgIndexSec.jstests_fgsec"} ) );
+assert.eq(2, masterDB.jstests_fgsec.getIndexes().length);
 
 // Wait for the secondary to get the index entry
 assert.soon( function() { 
-    return 2 == secondDB.system.indexes.count( {ns:"fgIndexSec.jstests_fgsec"} ); },
+    return 2 == secondDB.jstests_fgsec.getIndexes().length; },
              "index not created on secondary (prior to restart)", 800000, 50 );
 
-jsTest.log("Index created and system.indexes entry exists on secondary");
+jsTest.log("Index created on secondary");
 
 // restart secondary and reconnect
 jsTest.log("Restarting secondary");
@@ -63,7 +63,7 @@ assert.soon( function() {
 } , "secondary didn't restart", 30000, 1000);
 
 assert.soon( function() { 
-    return 2 == secondDB.system.indexes.count( {ns:"fgIndexSec.jstests_fgsec"} ); }, 
+    return 2 == secondDB.jstests_fgsec.getIndexes().length; }, 
              "Index build not resumed after restart", 30000, 50 );
 
 jsTest.log("index-restart-secondary.js complete");
