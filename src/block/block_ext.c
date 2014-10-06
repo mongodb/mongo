@@ -362,7 +362,7 @@ __block_off_remove(
 	return (0);
 
 corrupt:
-	WT_RET_MSG(session, EINVAL,
+	WT_PANIC_RET(session, EINVAL,
 	    "attempt to remove non-existent offset from an extent list");
 }
 
@@ -451,8 +451,7 @@ __block_extend(
 	 */
 	if (fh->size < block->allocsize)
 		WT_RET_MSG(session, EINVAL,
-		    "cannot allocate from a file with no description "
-		    "information");
+		    "file has no description information");
 
 	/*
 	 * Make sure we don't allocate past the maximum file size.  There's no
@@ -648,7 +647,7 @@ __wt_block_extlist_check(
 			b = b->next[0];
 			continue;
 		}
-		WT_RET_MSG(session, EINVAL,
+		WT_PANIC_RET(session, EINVAL,
 		    "checkpoint merge check: %s list overlaps the %s list",
 		    al->name, bl->name);
 	}
@@ -1007,7 +1006,7 @@ __block_merge(
 	__block_off_srch_pair(el, off, &before, &after);
 	if (before != NULL) {
 		if (before->off + before->size > off)
-			WT_RET_MSG(session, EINVAL,
+			WT_PANIC_RET(session, EINVAL,
 			    "%s: existing range %" PRIdMAX "-%" PRIdMAX
 			    " overlaps with merge range %" PRIdMAX "-%" PRIdMAX,
 			    el->name,
@@ -1019,7 +1018,7 @@ __block_merge(
 	}
 	if (after != NULL) {
 		if (off + size > after->off)
-			WT_RET_MSG(session, EINVAL,
+			WT_PANIC_RET(session, EINVAL,
 			    "%s: merge range %" PRIdMAX "-%" PRIdMAX
 			    " overlaps with existing range %" PRIdMAX
 			    "-%" PRIdMAX,
@@ -1181,7 +1180,7 @@ __wt_block_extlist_read(WT_SESSION_IMPL *session,
 		    off % block->allocsize != 0 ||
 		    size % block->allocsize != 0 ||
 		    off + size > ckpt_size)
-corrupted:		WT_ERR_MSG(session, WT_ERROR,
+corrupted:		WT_PANIC_RET(session, WT_ERROR,
 			    "file contains a corrupted %s extent list, range %"
 			    PRIdMAX "-%" PRIdMAX " past end-of-file",
 			    el->name,
