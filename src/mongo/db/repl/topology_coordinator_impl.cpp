@@ -115,6 +115,11 @@ namespace {
     HostAndPort TopologyCoordinatorImpl::chooseNewSyncSource(Date_t now, 
                                                              const OpTime& lastOpApplied) {
 
+        // If we are not a member of the current replica set configuration, no sync source is valid.
+        if (_selfIndex == -1) {
+            return HostAndPort();
+        }
+
         // if we have a target we've requested to sync from, use it
         if (_forceSyncSourceIndex != -1) {
             invariant(_forceSyncSourceIndex < _currentConfig.getNumMembers());
@@ -836,6 +841,11 @@ namespace {
         // Second, if there is no remote primary, and the local node is not primary, it considers
         // whether or not to stand for election.
         invariant(updatedConfigIndex != _selfIndex);
+
+        // We are missing from the config, so do not participate in primary maintenance or election.
+        if (_selfIndex == -1) {
+            return HeartbeatResponseAction::makeNoAction();
+        }
 
         ////////////////////
         // Phase 1

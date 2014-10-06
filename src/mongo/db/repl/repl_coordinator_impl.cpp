@@ -307,6 +307,9 @@ namespace {
     Seconds ReplicationCoordinatorImpl::getSlaveDelaySecs() const {
         boost::lock_guard<boost::mutex> lk(_mutex);
         invariant(_rsConfig.isInitialized());
+        uassert(28524,
+                "Node not a member of the current set configuration",
+                _thisMembersConfigIndex != -1);
         return _rsConfig.getMemberAt(_thisMembersConfigIndex).getSlaveDelay();
     }
 

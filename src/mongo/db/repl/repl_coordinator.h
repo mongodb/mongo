@@ -138,6 +138,9 @@ namespace repl {
 
         /**
          * Returns how slave delayed this node is configured to be.
+         *
+         * Raises a DBException if this node is not a member of the current replica set
+         * configuration.
          */
         virtual Seconds getSlaveDelaySecs() const = 0;
 
