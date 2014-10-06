@@ -55,22 +55,22 @@ assert.writeOK(bulk.execute());
 
 jsTest.log("Creating index");
 masterDB.jstests_fgsec.ensureIndex( {i:1} );
-assert.eq(2, masterDB.system.indexes.count( {ns:"fgIndexSec.jstests_fgsec"}, {background:true} ) );
+assert.eq(2, masterDB.jstests_fgsec.getIndexes().length );
 
 // Wait for the secondary to get the index entry
 assert.soon( function() { 
-    return 2 == secondDB.system.indexes.count( {ns:"fgIndexSec.jstests_fgsec"} ); },
+    return 2 == secondDB.jstests_fgsec.getIndexes().length; },
              "index not created on secondary", 1000*60*10, 50 );
 
-jsTest.log("Index created and system.indexes entry exists on secondary");
+jsTest.log("Index created on secondary");
 masterDB.runCommand( {dropIndexes: "jstests_fgsec", index: "i_1"} );
 jsTest.log("Waiting on replication");
 replTest.awaitReplication();
 assert.soon( function() {return !checkOp(secondDB)}, "index not cancelled on secondary", 30000, 50);
-masterDB.system.indexes.find().forEach(printjson);
-secondDB.system.indexes.find().forEach(printjson);
+masterDB.jstests_fgsec.getIndexes().forEach(printjson);
+secondDB.jstests_fgsec.getIndexes().forEach(printjson);
 assert.soon( function() { 
-    return 1 == secondDB.system.indexes.count( { ns: "fgIndexSec.jstests_fgsec"} ); }, 
+    return 1 == secondDB.jstests_fgsec.getIndexes().length; }, 
              "Index not dropped on secondary", 30000, 50 );
 
 jsTest.log("index-restart-secondary.js complete");
