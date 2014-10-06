@@ -77,6 +77,8 @@ namespace mongo {
 
             void updateTTLSetting( long long newExpireSeconds );
 
+            std::string name() const { return spec["name"].String(); }
+
             BSONObj spec;
             bool ready;
             DiskLoc head;
@@ -94,6 +96,8 @@ namespace mongo {
              * called name existed and was deleted, and false otherwise.
              */
             bool eraseIndex( const StringData& name );
+
+            void rename( const StringData& toNS );
 
             std::string ns;
             CollectionOptions options;
