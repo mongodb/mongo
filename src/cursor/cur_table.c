@@ -26,6 +26,8 @@ static int __curtable_update(WT_CURSOR *cursor);
 	__cp = (ctable)->idx_cursors;					\
 	for (__i = 0; __i < ctable->table->nindices; __i++, __cp++) {	\
 		idx = ctable->table->indices[__i];			\
+		if (idx->extractor)					\
+			continue;					\
 		WT_ERR(__wt_schema_project_merge(session,		\
 		    ctable->cg_cursors,					\
 		    idx->key_plan, idx->key_format, &(*__cp)->key));	\

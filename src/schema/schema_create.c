@@ -323,6 +323,7 @@ __create_index(WT_SESSION_IMPL *session,
 	const char *sourceconf, *source, *idxconf, *idxname;
 	const char *tablename;
 	size_t tlen;
+	int have_extractor;
 	u_int i;
 
 	idxconf = sourceconf = NULL;
@@ -330,6 +331,7 @@ __create_index(WT_SESSION_IMPL *session,
 	WT_CLEAR(fmt);
 	WT_CLEAR(extra_cols);
 	WT_CLEAR(namebuf);
+	have_extractor = 0;
 
 	tablename = name;
 	if (!WT_PREFIX_SKIP(tablename, "index:"))
@@ -360,8 +362,13 @@ __create_index(WT_SESSION_IMPL *session,
 		    ",source=\"%s\"", source));
 	}
 
+	if (__wt_config_getones(session, config, "extractor", &cval) == 0 &&
+	    cval.len != 0)
+		have_extractor = 1;
+
 	/* Calculate the key/value formats. */
-	if (__wt_config_getones(session, config, "columns", &icols) != 0)
+	if (__wt_config_getones(session, config, "columns", &icols) != 0 &&
+	    !have_extractor)
 		WT_ERR_MSG(session, EINVAL,
 		    "No 'columns' configuration for '%s'", name);
 
@@ -389,16 +396,22 @@ __create_index(WT_SESSION_IMPL *session,
 	if (ret != 0 && ret != WT_NOTFOUND)
 		goto err;
 
-	/*
-	 * Index values are normally empty: all columns are packed into the
-	 * index key.  The exception is LSM, which (currently) reserves empty
-	 * values as tombstones.  Use a single padding byte in that case.
-	 */
-	if (WT_PREFIX_MATCH(source, "lsm:"))
-		WT_ERR(__wt_buf_fmt(session, &fmt, "value_format=x,"));
-	else
-		WT_ERR(__wt_buf_fmt(session, &fmt, "value_format=,"));
+	/* Index values are empty: all columns are packed into the index key. */
 	WT_ERR(__wt_buf_fmt(session, &fmt, "value_format=,key_format="));
+
+	/* Custom extractors must supply a key format. */
+	if (have_extractor) {
+		WT_ERR(
+		    __wt_config_getones(session, config, "key_format", &cval));
+		WT_ERR(__wt_buf_catfmt(session, &fmt, "%.*s",
+		    (int)cval.len, cval.str));
+		WT_CLEAR(icols);
+	}
+
+	/*
+	 * Construct the index key format, or append the primary key columns
+	 * for custom extractors.
+	 */
 	WT_ERR(__wt_struct_reformat(session, table,
 	    icols.str, icols.len, (const char *)extra_cols.data, 0, &fmt));
 

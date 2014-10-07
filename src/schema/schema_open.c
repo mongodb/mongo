@@ -140,6 +140,13 @@ __open_index(WT_SESSION_IMPL *session, WT_TABLE *table, WT_INDEX *idx)
 	WT_ERR(__wt_buf_fmt(session, buf, "%.*s", (int)cval.len, cval.str));
 	WT_ERR(__wt_strndup(session, buf->data, buf->size, &idx->source));
 
+	WT_ERR(__wt_config_getones(session, idx->config, "extractor", &cval));
+	/* TODO: __wt_extractor_config */
+	if (cval.len == 0)
+		idx->extractor = NULL;
+	else
+		idx->extractor = (void *)0x1;
+
 	WT_ERR(__wt_buf_init(session, buf, 0));
 	WT_ERR(__wt_config_getones(session, idx->config, "key_format", &cval));
 	WT_ERR(__wt_buf_fmt(session, buf, "%.*s", (int)cval.len, cval.str));
