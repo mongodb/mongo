@@ -89,27 +89,71 @@ namespace mongo {
         this->_varMap[name] = elem.wrap();
     }
 
-    BsonTemplateEvaluator::Status BsonTemplateEvaluator::_evalElem(BSONElement in,
+    BsonTemplateEvaluator::Status BsonTemplateEvaluator::_evalElem(const BSONElement in,
                                                                    BSONObjBuilder& out) {
-       if (in.type() != Object) {
-           out.append(in);
-           return StatusSuccess;
+       if (in.type() == Array) {
+            BSONArrayBuilder arrayBuilder(out.subarrayStart(in.fieldName()));
+            std::vector<BSONElement> arrElems = in.Array();
+            for (unsigned int i = 0; i < arrElems.size(); i++) {
+                BSONElement element = arrElems[i];
+                if (element.isABSONObj()) {
+
+                    BSONObjBuilder newBuilder( element.objsize() );
+                    Status st = _evalElem(element, newBuilder);
+                    if (st != StatusSuccess)
+                        return st;
+                    // Only want to append the field value, not the whole object
+                    arrayBuilder.append(newBuilder.done().getField(element.fieldName()));
+                }
+                else {
+                    arrayBuilder.append(element);
+                }
+            }
+            arrayBuilder.done();
+            return StatusSuccess;
        }
+
+        if (in.type() != Object) {
+            out.append(in);
+            return StatusSuccess;
+        }
+
+       //continue evaluation on subObject
        BSONObj subObj = in.embeddedObject();
-       const char* opOrNot = subObj.firstElementFieldName();
-       if (opOrNot[0] != '#') {
-           out.append(in);
-           return StatusSuccess;
-       }
-       const char* op = opOrNot+1;
-       OperatorFn fn = operatorEvaluator(op);
-       if (!fn)
-           return StatusBadOperator;
-       Status st = fn(this, in.fieldName(), subObj, out);
+
+       BSONObjBuilder newBuilder( subObj.objsize() + 128 );
+       Status st = _evalObj(subObj, newBuilder);
        if (st != StatusSuccess)
-           return st;
+          return st;
+
+       BSONObj updatedObj = newBuilder.obj();
+
+       //check if updated object needs template evaluation
+       const char* opOrNot = updatedObj.firstElementFieldName();
+       if (opOrNot[0] == '#') {
+           const char* op = opOrNot+1;
+           OperatorFn fn = operatorEvaluator(op);
+           if (!fn)
+               return StatusBadOperator;
+           Status st = fn(this, in.fieldName(), updatedObj, out);
+           if (st != StatusSuccess)
+               return st;
+       }
+       else {
+           out.append(in.fieldName(), updatedObj);
+       }
        return StatusSuccess;
-    }
+     }
+
+     BsonTemplateEvaluator::Status BsonTemplateEvaluator::_evalObj(const BSONObj& in,
+                                                                  BSONObjBuilder& out) {
+         BSONForEach(e, in) {
+            Status st = _evalElem(e, out);
+             if (st != StatusSuccess)
+                 return st;
+         }
+         return StatusSuccess;
+     }
 
     BsonTemplateEvaluator::Status BsonTemplateEvaluator::evalRandInt(BsonTemplateEvaluator* btl,
                                                                      const char* fieldName,
