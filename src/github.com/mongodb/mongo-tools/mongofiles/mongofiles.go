@@ -115,7 +115,7 @@ func (self *MongoFiles) getLocalFileName() string {
 func (self *MongoFiles) handleGet(gfs *mgo.GridFS) (string, error) {
 	gFile, err := gfs.Open(self.FileName)
 	if err != nil {
-		return "", fmt.Errorf("Error opening GridFS file '%s': %v", self.FileName, err)
+		return "", fmt.Errorf("error opening GridFS file '%s': %v", self.FileName, err)
 	}
 	defer gFile.Close()
 
@@ -147,7 +147,7 @@ func (self *MongoFiles) handlePut(gfs *mgo.GridFS) (string, error) {
 		if err != nil {
 			return "", err
 		}
-		output = fmt.Sprintf("Removed all instances of '%v' from GridFS\n", self.FileName)
+		output = fmt.Sprintf("removed all instances of '%v' from GridFS\n", self.FileName)
 	}
 
 	localFile, err := os.Open(localFileName)
@@ -195,7 +195,7 @@ func (self *MongoFiles) Run(displayConnUrl bool) (string, error) {
 	// get session
 	session, err := self.SessionProvider.GetSession()
 	if err != nil {
-		return "", fmt.Errorf("Error connecting to db: %v", err)
+		return "", fmt.Errorf("error connecting to db: %v", err)
 	}
 	defer session.Close()
 

@@ -62,11 +62,7 @@ func main() {
 	}
 
 	// create a session provider to connect to the db
-	sessionProvider, err := db.InitSessionProvider(*opts)
-	if err != nil {
-		log.Logf(0, "error initializing database session: %v\n", err)
-		os.Exit(1)
-	}
+	sessionProvider := db.NewSessionProvider(*opts)
 
 	mongofiles := mongofiles.MongoFiles{
 		ToolOptions:     opts,
