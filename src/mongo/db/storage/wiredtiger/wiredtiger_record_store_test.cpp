@@ -58,7 +58,7 @@ namespace mongo {
         virtual RecordStore* newNonCappedRecordStore() {
             std::string ns = "a.b";
 
-            WiredTigerRecoveryUnit* ru = new WiredTigerRecoveryUnit( _sessionCache, false );
+            WiredTigerRecoveryUnit* ru = new WiredTigerRecoveryUnit( _sessionCache );
             OperationContextNoop txn( ru );
             string uri = "table:a.b";
             std::string config = WiredTigerRecordStore::generateCreateString(CollectionOptions(), "");
@@ -70,7 +70,7 @@ namespace mongo {
         }
 
         virtual RecoveryUnit* newRecoveryUnit() {
-            return new WiredTigerRecoveryUnit( _sessionCache, false );
+            return new WiredTigerRecoveryUnit( _sessionCache );
         }
     private:
         unittest::TempDir _dbpath;

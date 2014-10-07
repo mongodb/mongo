@@ -37,7 +37,7 @@ namespace mongo {
     }
 
     RecoveryUnit* WiredTigerKVEngine::newRecoveryUnit() {
-        return new WiredTigerRecoveryUnit( _sessionCache.get(), false );
+        return new WiredTigerRecoveryUnit( _sessionCache.get() );
     }
 
     void WiredTigerKVEngine::setRecordStoreExtraOptions( const std::string& options ) {

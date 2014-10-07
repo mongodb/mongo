@@ -36,41 +36,46 @@
 
 namespace mongo {
 
-    WiredTigerRecoveryUnit::WiredTigerRecoveryUnit(WiredTigerSessionCache* sc, bool defaultCommit) :
+    WiredTigerRecoveryUnit::WiredTigerRecoveryUnit(WiredTigerSessionCache* sc) :
         _sessionCache( sc ),
         _session( NULL ),
-        _defaultCommit(defaultCommit),
         _depth(0) {
     }
 
     WiredTigerRecoveryUnit::~WiredTigerRecoveryUnit() {
         invariant( _depth == 0 );
-        if ( _defaultCommit ) {
-            _commit();
-        }
-        else {
-            _abort();
-        }
+        _abort();
     }
 
     void WiredTigerRecoveryUnit::_commit() {
-        if ( !_session )
-            return;
-        WT_SESSION *s = _session->getSession();
-        int ret = s->commit_transaction(s, NULL);
-        invariantWTOK(ret);
-        _sessionCache->releaseSession( _session );
-        _session = NULL;
+        if ( _session ) {
+            WT_SESSION *s = _session->getSession();
+            int ret = s->commit_transaction(s, NULL);
+            invariantWTOK(ret);
+            _sessionCache->releaseSession( _session );
+            _session = NULL;
+        }
+
+        for (Changes::iterator it = _changes.begin(), end = _changes.end(); it != end; ++it) {
+            (*it)->commit();
+        }
+        _changes.clear();
     }
 
     void WiredTigerRecoveryUnit::_abort() {
-        if ( !_session )
-            return;
-        WT_SESSION *s = _session->getSession();
-        int ret = s->rollback_transaction(s, NULL);
-        invariantWTOK(ret);
-        _sessionCache->releaseSession( _session );
-        _session = NULL;
+        if ( _session ) {
+            WT_SESSION *s = _session->getSession();
+            int ret = s->rollback_transaction(s, NULL);
+            invariantWTOK(ret);
+            _sessionCache->releaseSession( _session );
+            _session = NULL;
+        }
+
+        for (Changes::reverse_iterator it = _changes.rbegin(), end = _changes.rend();
+                it != end; ++it) {
+            (*it)->rollback();
+        }
+        _changes.clear();
     }
 
     void WiredTigerRecoveryUnit::beginUnitOfWork() {
@@ -78,6 +83,8 @@ namespace mongo {
     }
 
     void WiredTigerRecoveryUnit::commitUnitOfWork() {
+        if (_depth > 1)
+            return; // only outermost WUOW gets committed.
         _commit();
     }
 
@@ -88,23 +95,14 @@ namespace mongo {
         }
     }
 
-    bool WiredTigerRecoveryUnit::commitIfNeeded(bool force ) {
-        if (!isCommitNeeded())
-            return false;
-        commitUnitOfWork();
-        return true;
-    }
-
     bool WiredTigerRecoveryUnit::awaitCommit() {
+        // TODO need to block until data is on disk.
         return true;
     }
 
-    bool WiredTigerRecoveryUnit::isCommitNeeded() const {
-        return false;
-    }
-
-    void WiredTigerRecoveryUnit::registerChange(Change *) {
-        //invariant( false ); // todo
+    void WiredTigerRecoveryUnit::registerChange(Change* change) {
+        invariant(_depth > 0);
+        _changes.push_back(ChangePtr(change));
     }
 
     WiredTigerRecoveryUnit& WiredTigerRecoveryUnit::Get(OperationContext *txn) {

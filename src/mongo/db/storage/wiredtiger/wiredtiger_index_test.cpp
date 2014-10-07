@@ -74,7 +74,7 @@ namespace mongo {
         }
 
         virtual RecoveryUnit* newRecoveryUnit() {
-            return new WiredTigerRecoveryUnit( _sessionCache, false );
+            return new WiredTigerRecoveryUnit( _sessionCache );
         }
 
     private:

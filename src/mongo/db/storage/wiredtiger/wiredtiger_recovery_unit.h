@@ -48,7 +48,7 @@ namespace mongo {
 
     class WiredTigerRecoveryUnit : public RecoveryUnit {
     public:
-        WiredTigerRecoveryUnit(WiredTigerSessionCache* sc, bool defaultCommit);
+        WiredTigerRecoveryUnit(WiredTigerSessionCache* sc);
 
         virtual ~WiredTigerRecoveryUnit();
 
@@ -58,16 +58,12 @@ namespace mongo {
 
         virtual void endUnitOfWork();
 
-        virtual bool commitIfNeeded(bool force = false);
-
         virtual bool awaitCommit();
-
-        virtual bool isCommitNeeded() const;
 
         virtual void registerChange(Change *);
 
         // un-used API
-        virtual void* writingPtr(void* data, size_t len) { return data; }
+        virtual void* writingPtr(void* data, size_t len) { invariant(!"don't call writingPtr"); }
         virtual void syncDataAndTruncateJournal() {}
 
         // ---- WT STUFF
@@ -86,6 +82,10 @@ namespace mongo {
         WiredTigerSession* _session; // owned, but from pool
         bool _defaultCommit;
         int _depth;
+
+        typedef boost::shared_ptr<Change> ChangePtr;
+        typedef std::vector<ChangePtr> Changes;
+        Changes _changes;
     };
 
     /**
