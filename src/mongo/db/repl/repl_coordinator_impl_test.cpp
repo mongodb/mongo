@@ -1622,6 +1622,14 @@ namespace {
         ASSERT_OK(roundTripped.initialize(response.toBSON()));
     }
 
+    TEST_F(ReplCoordTest, ShutDownBeforeStartUpFinished) {
+        init();
+        startCapturingLogMessages();
+        getReplCoord()->shutdown();
+        stopCapturingLogMessages();
+        ASSERT_EQUALS(1,
+                countLogLinesContaining("shutdown() called before startReplication() finished"));
+    }
     // TODO(schwerin): Unit test election id updating
 
 }  // namespace
