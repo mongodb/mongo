@@ -46,10 +46,10 @@ func main() {
 		os.Exit(2)
 	}
 
-	// create a command runner for the destination server
-	cmdRunnerTo, err := mongooplog.CreateCommandRunner(opts)
+	// create a session provider for the destination server
+	sessionProviderTo, err := db.InitSessionProvider(*opts)
 	if err != nil {
-		fmt.Printf("error connecting to destination: %v", err)
+		fmt.Printf("error connecting to destination host: %v", err)
 		os.Exit(1)
 	}
 
@@ -67,7 +67,7 @@ func main() {
 		ToolOptions:         opts,
 		SourceOptions:       sourceOpts,
 		SessionProviderFrom: sessionProviderFrom,
-		CmdRunnerTo:         cmdRunnerTo,
+		SessionProviderTo:   sessionProviderTo,
 	}
 
 	// kick it off

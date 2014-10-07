@@ -109,7 +109,7 @@ func TestBasicOps(t *testing.T) {
 				ToolOptions:         opts,
 				SourceOptions:       sourceOpts,
 				SessionProviderFrom: sourceSP,
-				CmdRunnerTo:         destSP,
+				SessionProviderTo:   destSP,
 			}
 
 			// run it

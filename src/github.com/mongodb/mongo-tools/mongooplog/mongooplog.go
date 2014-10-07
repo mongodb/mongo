@@ -21,33 +21,8 @@ type MongoOplog struct {
 	// session provider for the source server
 	SessionProviderFrom *db.SessionProvider
 
-	// command runner for the destination server
-	CmdRunnerTo db.CommandRunner
-}
-
-// CreateCommandRunner returns either a shim or a session provider, based
-// on whether --dbpath is set.
-func CreateCommandRunner(opts *commonopts.ToolOptions) (db.CommandRunner,
-	error) {
-	if err := opts.Validate(); err != nil {
-		return nil, err
-	}
-
-	// handle --dbpath, if appropriate
-	if opts.Namespace.DBPath != "" {
-		shim, err := db.NewShim(opts.Namespace.DBPath, opts.DirectoryPerDB,
-			opts.Journal)
-		if err != nil {
-			return nil, fmt.Errorf("error attaching to --dbpath: %v", err)
-		}
-
-		// shim successfully created
-		return shim, nil
-	}
-
-	// if --dbpath is not used, create a session provider to connect to
-	// the server
-	return db.NewSessionProvider(*opts), nil
+	// session provider for the destination server
+	SessionProviderTo *db.SessionProvider
 }
 
 func (self *MongoOplog) Run() error {
@@ -64,6 +39,13 @@ func (self *MongoOplog) Run() error {
 	if oplogColl == "" {
 		return fmt.Errorf("the oplog namespace must specify a collection")
 	}
+
+	// connect to the destination server
+	toSession, err := self.SessionProviderTo.GetSession()
+	if err != nil {
+		return fmt.Errorf("error connecting to destination db: %v", err)
+	}
+	defer toSession.Close()
 
 	// connect to the source server
 	fromSession, err := self.SessionProviderFrom.GetSession()
@@ -101,8 +83,7 @@ func (self *MongoOplog) Run() error {
 		opsToApply := []OplogEntry{*oplogEntry}
 
 		// apply the operation
-		err := self.CmdRunnerTo.Run(bson.M{"applyOps": opsToApply},
-			res, "admin")
+		err := toSession.Run(bson.M{"applyOps": opsToApply}, res)
 
 		if err != nil {
 			return fmt.Errorf("error applying ops: %v", err)
