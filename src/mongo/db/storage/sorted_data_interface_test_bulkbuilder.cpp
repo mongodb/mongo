@@ -47,11 +47,13 @@ namespace mongo {
 
         {
             scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
+            WriteUnitOfWork uow( opCtx.get() );
             scoped_ptr<SortedDataBuilderInterface> builder(
                     sorted->getBulkBuilder( opCtx.get(), false ) );
 
             ASSERT_OK( builder->addKey( key1, loc1 ) );
             builder->commit( false );
+            uow.commit();
         }
 
         {
@@ -72,11 +74,13 @@ namespace mongo {
 
         {
             scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
+            WriteUnitOfWork uow( opCtx.get() );
             scoped_ptr<SortedDataBuilderInterface> builder(
                     sorted->getBulkBuilder( opCtx.get(), false ) );
 
             ASSERT_OK( builder->addKey( compoundKey1a, loc1 ) );
             builder->commit( false );
+            uow.commit();
         }
 
         {
@@ -99,12 +103,14 @@ namespace mongo {
 
         {
             scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
+            WriteUnitOfWork uow( opCtx.get() );
             scoped_ptr<SortedDataBuilderInterface> builder(
                     sorted->getBulkBuilder( opCtx.get(), false ) );
 
             ASSERT_OK( builder->addKey( key1, loc1 ) );
             ASSERT_EQUALS( ErrorCodes::DuplicateKey, builder->addKey( key1, loc2 ) );
             builder->commit( false );
+            uow.commit();
         }
 
         {
@@ -126,12 +132,14 @@ namespace mongo {
 
         {
             scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
+            WriteUnitOfWork uow( opCtx.get() );
             scoped_ptr<SortedDataBuilderInterface> builder(
                     sorted->getBulkBuilder( opCtx.get(), true /* allow duplicates */ ) );
 
             ASSERT_OK( builder->addKey( key1, loc1 ) );
             ASSERT_OK( builder->addKey( key1, loc2 ) );
             builder->commit( false );
+            uow.commit();
         }
 
         {
@@ -152,6 +160,7 @@ namespace mongo {
 
         {
             scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
+            WriteUnitOfWork uow( opCtx.get() );
             scoped_ptr<SortedDataBuilderInterface> builder(
                     sorted->getBulkBuilder( opCtx.get(), false ) );
 
@@ -159,6 +168,7 @@ namespace mongo {
             ASSERT_OK( builder->addKey( key2, loc2 ) );
             ASSERT_OK( builder->addKey( key3, loc3 ) );
             builder->commit( false );
+            uow.commit();
         }
 
         {
@@ -179,6 +189,7 @@ namespace mongo {
 
         {
             scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
+            WriteUnitOfWork uow( opCtx.get() );
             scoped_ptr<SortedDataBuilderInterface> builder(
                     sorted->getBulkBuilder( opCtx.get(), false ) );
 
@@ -188,96 +199,12 @@ namespace mongo {
             ASSERT_OK( builder->addKey( compoundKey2b, loc3 ) );
             ASSERT_OK( builder->addKey( compoundKey3a, loc5 ) );
             builder->commit( false );
+            uow.commit();
         }
 
         {
             scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
             ASSERT_EQUALS( 5, sorted->numEntries( opCtx.get() ) );
-        }
-    }
-
-    // Add a key using a bulk builder and then try to add a smaller key
-    // and verify the operation returns an ErrorCodes::InternalError status.
-    TEST( SortedDataInterface, BuilderAddKeyDescending ) {
-        scoped_ptr<HarnessHelper> harnessHelper( newHarnessHelper() );
-        scoped_ptr<SortedDataInterface> sorted( harnessHelper->newSortedDataInterface() );
-
-        {
-            scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
-            ASSERT( sorted->isEmpty( opCtx.get() ) );
-        }
-
-        {
-            scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
-            scoped_ptr<SortedDataBuilderInterface> builder(
-                    sorted->getBulkBuilder( opCtx.get(), false ) );
-
-            ASSERT_OK( builder->addKey( key2, loc1 ) );
-            ASSERT_EQUALS( ErrorCodes::InternalError, builder->addKey( key1, loc2 ) );
-            builder->commit( false );
-        }
-
-        {
-            scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
-            ASSERT_EQUALS( 1, sorted->numEntries( opCtx.get() ) );
-        }
-    }
-
-    // Add a key using a bulk builder and then try to add a smaller key.
-    // Verify the operation returns an ErrorCodes::InternalError status,
-    // even when duplicates are allowed.
-    TEST( SortedDataInterface, BuilderAddKeyDescendingWithDupsAllowed ) {
-        scoped_ptr<HarnessHelper> harnessHelper( newHarnessHelper() );
-        scoped_ptr<SortedDataInterface> sorted( harnessHelper->newSortedDataInterface() );
-
-        {
-            scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
-            ASSERT( sorted->isEmpty( opCtx.get() ) );
-        }
-
-        {
-            scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
-            scoped_ptr<SortedDataBuilderInterface> builder(
-                    sorted->getBulkBuilder( opCtx.get(), true /* allow duplicates */ ) );
-
-            ASSERT_OK( builder->addKey( key2, loc1 ) );
-            ASSERT_EQUALS( ErrorCodes::InternalError, builder->addKey( key1, loc2 ) );
-            builder->commit( false );
-        }
-
-        {
-            scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
-            ASSERT_EQUALS( 1, sorted->numEntries( opCtx.get() ) );
-        }
-    }
-
-    // Add a key using a bulk builder and then try to add the same key at a smaller DiskLoc.
-    // Verify the operation returns an ErrorCodes::InternalError status.
-    TEST( SortedDataInterface, BuilderAddSameKeyDescendingDiskLoc ) {
-        scoped_ptr<HarnessHelper> harnessHelper( newHarnessHelper() );
-        scoped_ptr<SortedDataInterface> sorted( harnessHelper->newSortedDataInterface() );
-
-        {
-            scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
-            ASSERT( sorted->isEmpty( opCtx.get() ) );
-        }
-
-        {
-            scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
-            scoped_ptr<SortedDataBuilderInterface> builder(
-                    sorted->getBulkBuilder( opCtx.get(), true /* allow duplicates */ ) );
-
-            ASSERT_OK( builder->addKey( key1, loc2 ) );
-            // SERVER-15524 (key1, loc1) is inserted even though the last inserted entry was
-            //              (key1, loc2); the >= constraint should apply to (key, DiskLoc)
-            //              pairs and not just keys
-            // ASSERT_EQUALS( ErrorCodes::InternalError, builder->addKey( key1, loc1 ) );
-            builder->commit( false );
-        }
-
-        {
-            scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
-            ASSERT_EQUALS( 1, sorted->numEntries( opCtx.get() ) );
         }
     }
 
