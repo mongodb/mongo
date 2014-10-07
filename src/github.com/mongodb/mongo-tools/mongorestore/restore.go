@@ -72,7 +72,7 @@ func (restore *MongoRestore) RestoreIntent(intent *Intent) error {
 	}
 
 	// first create collection with options
-	if intent.MetadataPath != "" && !restore.OutputOptions.NoOptionsRestore {
+	if intent.MetadataPath != "" {
 		log.Logf(0, "reading metadata file from %v", intent.MetadataPath)
 		jsonBytes, err := ioutil.ReadFile(intent.MetadataPath)
 		if err != nil {
@@ -82,16 +82,22 @@ func (restore *MongoRestore) RestoreIntent(intent *Intent) error {
 		if err != nil {
 			return fmt.Errorf("error parsing metadata file (%v): %v", string(jsonBytes), err)
 		}
-		if options != nil {
-			if collectionExists {
-				log.Logf(1, "collection %v already exists", intent.Key())
-			} else {
-				log.Logf(1, "creating collection %v using options from metadata", intent.Key())
-				err = restore.CreateCollection(intent, options)
-				if err != nil {
-					return fmt.Errorf("error creating collection %v: %v", intent.Key(), err)
+		if !restore.OutputOptions.NoOptionsRestore {
+			if options != nil {
+				if !collectionExists {
+					log.Logf(1, "creating collection %v using options from metadata", intent.Key())
+					err = restore.CreateCollection(intent, options)
+					if err != nil {
+						return fmt.Errorf("error creating collection %v: %v", intent.Key(), err)
+					}
+				} else {
+					log.Logf(1, "collection %v already exists", intent.Key())
 				}
+			} else {
+				log.Log(1, "no options to restore")
 			}
+		} else {
+			log.Log(1, "skipping options restoration")
 		}
 	}
 
