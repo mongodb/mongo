@@ -43,6 +43,14 @@ __wt_schema_worker(WT_SESSION_IMPL *session,
 	/* Get the btree handle(s) and call the underlying function. */
 	if (WT_PREFIX_MATCH(uri, "file:")) {
 		if (file_func != NULL) {
+			/*
+			 * If the operation requires exclusive access, close
+			 * any open file handles, including checkpoints.
+			 */
+			if (FLD_ISSET(open_flags, WT_DHANDLE_EXCLUSIVE))
+				WT_ERR(
+				    __wt_conn_dhandle_close_all(session, uri));
+
 			WT_ERR(__wt_session_get_btree_ckpt(
 			    session, uri, cfg, open_flags));
 			ret = file_func(session, cfg);

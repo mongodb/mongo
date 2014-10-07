@@ -82,7 +82,7 @@ __wt_open(WT_SESSION_IMPL *session,
 	__wt_spin_lock(session, &conn->fh_lock);
 	TAILQ_FOREACH(tfh, &conn->fhqh, q)
 		if (strcmp(name, tfh->name) == 0) {
-			++tfh->refcnt;
+			++tfh->ref;
 			*fhp = tfh;
 			matched = 1;
 			break;
@@ -169,8 +169,9 @@ __wt_open(WT_SESSION_IMPL *session,
 
 	WT_ERR(__wt_calloc(session, 1, sizeof(WT_FH), &fh));
 	WT_ERR(__wt_strdup(session, name, &fh->name));
+	WT_ERR(__wt_spin_init(session, &fh->lock, "file handle"));
 	fh->fd = fd;
-	fh->refcnt = 1;
+	fh->ref = 1;
 	fh->direct_io = direct_io;
 
 	/* Set the file's size. */
@@ -189,7 +190,7 @@ __wt_open(WT_SESSION_IMPL *session,
 	__wt_spin_lock(session, &conn->fh_lock);
 	TAILQ_FOREACH(tfh, &conn->fhqh, q)
 		if (strcmp(name, tfh->name) == 0) {
-			++tfh->refcnt;
+			++tfh->ref;
 			*fhp = tfh;
 			matched = 1;
 			break;
@@ -204,6 +205,7 @@ __wt_open(WT_SESSION_IMPL *session,
 	if (matched) {
 err:		if (fh != NULL) {
 			__wt_free(session, fh->name);
+			__wt_spin_destroy(session, &fh->lock);
 			__wt_free(session, fh);
 		}
 		if (fd != -1)
@@ -227,7 +229,7 @@ __wt_close(WT_SESSION_IMPL *session, WT_FH *fh)
 	conn = S2C(session);
 
 	__wt_spin_lock(session, &conn->fh_lock);
-	if (fh == NULL || fh->refcnt == 0 || --fh->refcnt > 0) {
+	if (fh == NULL || fh->ref == 0 || --fh->ref > 0) {
 		__wt_spin_unlock(session, &conn->fh_lock);
 		return (0);
 	}
@@ -245,6 +247,7 @@ __wt_close(WT_SESSION_IMPL *session, WT_FH *fh)
 	}
 
 	__wt_free(session, fh->name);
+	__wt_spin_destroy(session, &fh->lock);
 	__wt_free(session, fh);
 	return (ret);
 }
