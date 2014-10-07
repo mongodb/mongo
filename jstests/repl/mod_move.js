@@ -40,7 +40,9 @@ for (i = 0; i < BIG; i++) {
 assert.writeOK(bulk.execute());
 assert.eq( BIG , am.a.count() )
 
-assert.eq( 1 , am.a.stats().paddingFactor , "A2"  )
+if ( am.serverStatus().storageEngine.name == "mmapv1" ) {
+    assert.eq( 1 , am.a.stats().paddingFactor , "A2"  )
+}
 
 // start slave
 s = rt.start( false );

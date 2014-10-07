@@ -1093,7 +1093,19 @@ DBCollection.prototype.convertToCapped = function( bytes ){
 }
 
 DBCollection.prototype.exists = function(){
-    return this._db.system.namespaces.findOne( { name : this._fullName } );
+    var res = this._db.runCommand( "listCollections",
+                                  { filter : { name : this._shortName } } );
+    if ( res.ok ) {
+        if ( res.collections.length == 0 )
+            return null;
+        return res.collections[0];
+    }
+
+    if ( res.errmsg && res.errmsg.startsWith( "no such cmd" ) ) {
+        return this._db.system.namespaces.findOne( { name : this._fullName } );
+    }
+
+    throw Error( "listCollections failed: " + tojson( res ) );
 }
 
 DBCollection.prototype.isCapped = function(){
