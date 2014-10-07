@@ -620,7 +620,8 @@ namespace {
         ASSERT_EQUALS("(not reachable/healthy)", member0Status["stateStr"].String());
         ASSERT_EQUALS(0, member0Status["uptime"].Int());
         ASSERT_EQUALS(OpTime(), OpTime(member0Status["optime"].timestampValue()));
-        ASSERT_EQUALS(OpTime().asDate(), member0Status["optimeDate"].Date().millis);
+        ASSERT_EQUALS(Date_t(OpTime().getSecs() * 1000ULL),
+                      member0Status["optimeDate"].Date().millis);
         ASSERT_EQUALS(heartbeatTime, member0Status["lastHeartbeat"].Date());
         ASSERT_EQUALS(Date_t(), member0Status["lastHeartbeatRecv"].Date());
 
@@ -633,7 +634,8 @@ namespace {
                       member1Status["stateStr"].String());
         ASSERT_EQUALS(uptimeSecs.total_seconds(), member1Status["uptime"].Int());
         ASSERT_EQUALS(oplogProgress, OpTime(member1Status["optime"].timestampValue()));
-        ASSERT_EQUALS(oplogProgress.asDate(), member1Status["optimeDate"].Date().millis);
+        ASSERT_EQUALS(Date_t(oplogProgress.getSecs() * 1000ULL),
+                      member1Status["optimeDate"].Date().millis);
         ASSERT_EQUALS(heartbeatTime, member1Status["lastHeartbeat"].Date());
         ASSERT_EQUALS(Date_t(), member1Status["lastHeartbeatRecv"].Date());
         ASSERT_EQUALS("READY", member1Status["lastHeartbeatMessage"].String());
@@ -663,7 +665,8 @@ namespace {
                       selfStatus["stateStr"].String());
         ASSERT_EQUALS(uptimeSecs.total_seconds(), selfStatus["uptime"].Int());
         ASSERT_EQUALS(oplogProgress, OpTime(selfStatus["optime"].timestampValue()));
-        ASSERT_EQUALS(oplogProgress.asDate(), selfStatus["optimeDate"].Date().millis);
+        ASSERT_EQUALS(Date_t(oplogProgress.getSecs() * 1000ULL),
+                      selfStatus["optimeDate"].Date().millis);
 
         // TODO(spencer): Test electionTime and pingMs are set properly
     }
