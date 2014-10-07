@@ -47,13 +47,11 @@ namespace mongo {
 
         {
             scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
-            WriteUnitOfWork uow( opCtx.get() );
             scoped_ptr<SortedDataBuilderInterface> builder(
                     sorted->getBulkBuilder( opCtx.get(), false ) );
 
             ASSERT_OK( builder->addKey( key1, loc1 ) );
             builder->commit( false );
-            uow.commit();
         }
 
         {
@@ -74,13 +72,11 @@ namespace mongo {
 
         {
             scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
-            WriteUnitOfWork uow( opCtx.get() );
             scoped_ptr<SortedDataBuilderInterface> builder(
                     sorted->getBulkBuilder( opCtx.get(), false ) );
 
             ASSERT_OK( builder->addKey( compoundKey1a, loc1 ) );
             builder->commit( false );
-            uow.commit();
         }
 
         {
@@ -103,14 +99,12 @@ namespace mongo {
 
         {
             scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
-            WriteUnitOfWork uow( opCtx.get() );
             scoped_ptr<SortedDataBuilderInterface> builder(
                     sorted->getBulkBuilder( opCtx.get(), false ) );
 
             ASSERT_OK( builder->addKey( key1, loc1 ) );
             ASSERT_EQUALS( ErrorCodes::DuplicateKey, builder->addKey( key1, loc2 ) );
             builder->commit( false );
-            uow.commit();
         }
 
         {
@@ -132,14 +126,12 @@ namespace mongo {
 
         {
             scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
-            WriteUnitOfWork uow( opCtx.get() );
             scoped_ptr<SortedDataBuilderInterface> builder(
                     sorted->getBulkBuilder( opCtx.get(), true /* allow duplicates */ ) );
 
             ASSERT_OK( builder->addKey( key1, loc1 ) );
             ASSERT_OK( builder->addKey( key1, loc2 ) );
             builder->commit( false );
-            uow.commit();
         }
 
         {
@@ -160,7 +152,6 @@ namespace mongo {
 
         {
             scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
-            WriteUnitOfWork uow( opCtx.get() );
             scoped_ptr<SortedDataBuilderInterface> builder(
                     sorted->getBulkBuilder( opCtx.get(), false ) );
 
@@ -168,7 +159,6 @@ namespace mongo {
             ASSERT_OK( builder->addKey( key2, loc2 ) );
             ASSERT_OK( builder->addKey( key3, loc3 ) );
             builder->commit( false );
-            uow.commit();
         }
 
         {
@@ -189,7 +179,6 @@ namespace mongo {
 
         {
             scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
-            WriteUnitOfWork uow( opCtx.get() );
             scoped_ptr<SortedDataBuilderInterface> builder(
                     sorted->getBulkBuilder( opCtx.get(), false ) );
 
@@ -199,7 +188,6 @@ namespace mongo {
             ASSERT_OK( builder->addKey( compoundKey2b, loc3 ) );
             ASSERT_OK( builder->addKey( compoundKey3a, loc5 ) );
             builder->commit( false );
-            uow.commit();
         }
 
         {
