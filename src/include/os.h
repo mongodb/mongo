@@ -46,7 +46,7 @@ struct __wt_fh {
 	char	*name;				/* File name */
 	TAILQ_ENTRY(__wt_fh) q;			/* List of open handles */
 
-	u_int	refcnt;				/* Reference count */
+	u_int	ref;				/* Reference count */
 	u_int	ref_mapped;			/* Mapped reference count */
 
 	WT_SPINLOCK lock;			/* Handle lock */
