@@ -237,7 +237,8 @@ namespace mongo {
         invariant( c );
         DiskLoc loc = _nextId();
         c->set_key(c, _makeKey(loc));
-        c->set_value(c, WiredTigerItem(data, len).Get());
+        WiredTigerItem value(data, len);
+        c->set_value(c, value.Get());
         int ret = c->insert(c);
         invariantWTOK(ret);
 
@@ -266,7 +267,8 @@ namespace mongo {
         WT_CURSOR *c = curwrap.get();
         DiskLoc loc = _nextId();
         c->set_key(c, _makeKey(loc));
-        c->set_value(c, WiredTigerItem(buf.get(), len).Get());
+        WiredTigerItem value(buf.get(), len);
+        c->set_value(c, value.Get());
         int ret = c->insert(c);
         invariantWTOK(ret);
 
@@ -297,7 +299,8 @@ namespace mongo {
         int old_length = old_value.size;
 
         c->set_key(c, _makeKey(loc));
-        c->set_value(c, WiredTigerItem(data, len).Get());
+        WiredTigerItem value(data, len);
+        c->set_value(c, value.Get());
         ret = c->insert(c);
         invariantWTOK(ret);
 
@@ -335,7 +338,8 @@ namespace mongo {
         }
 
         // write back
-        c->set_value(c, WiredTigerItem(data).Get());
+        WiredTigerItem value(data);
+        c->set_value(c, value.Get());
         ret = c->insert(c);
         invariantWTOK(ret);
 

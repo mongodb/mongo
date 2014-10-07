@@ -67,6 +67,8 @@ namespace mongo {
             data = str.c_str();
             size = str.size();
         }
+        // NOTE: do not call Get() on a temporary.
+        // The pointer returned by Get() must not be allowed to live longer than *this.
         WT_ITEM *Get() { return this; }
         const WT_ITEM *Get() const { return this; }
     };
