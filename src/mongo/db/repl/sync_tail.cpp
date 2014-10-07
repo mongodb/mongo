@@ -400,6 +400,10 @@ namespace {
                 sleepmillis(0);
             }
 
+            if (ops.empty()) {
+                continue;
+            }
+
             const BSONObj& lastOp = ops.getDeque().back();
             handleSlaveDelay(lastOp);
 
