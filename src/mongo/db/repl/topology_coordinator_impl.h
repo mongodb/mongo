@@ -265,9 +265,6 @@ namespace repl {
         // Return true if we are currently primary
         bool _iAmPrimary() const;
 
-        // Returns the total number of votes in the current config
-        int _totalVotes() const;
-
         // Scans through all members that are 'up' and return the latest known optime.
         OpTime _latestKnownOpTime(OpTime ourLastOpApplied) const;
 

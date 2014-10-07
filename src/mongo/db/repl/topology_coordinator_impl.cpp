@@ -704,17 +704,6 @@ namespace {
         return std::make_pair(hbArgs, timeout);
     }
 
-namespace {
-    int findMemberIndexForHostAndPort(const ReplicaSetConfig& config, const HostAndPort& host) {
-        for (int i = 0; i < config.getNumMembers(); ++i) {
-            if (config.getMemberAt(i).getHostAndPort() == host) {
-                return i;
-            }
-        }
-        return -1;
-    }
-}  // namespace
-
     HeartbeatResponseAction TopologyCoordinatorImpl::processHeartbeatResponse(
             Date_t now,
             Milliseconds networkRoundTripTime,
@@ -791,7 +780,7 @@ namespace {
             nextAction.setNextHeartbeatStartDate(nextHeartbeatStartDate);
             return nextAction;
         }
-        const int memberIndex = findMemberIndexForHostAndPort(_currentConfig, target);
+        const int memberIndex = _currentConfig.findMemberIndexByHostAndPort(target);
         if (memberIndex == -1) {
             LOG(1) << "replset: Could not find " << target  << " in current config so ignoring --"
                 " current config: " << _currentConfig.toBSON();
@@ -1007,7 +996,7 @@ namespace {
             }
         }
 
-        return vUp * 2 > _totalVotes();
+        return vUp * 2 > _currentConfig.getTotalVotingMembers();
     }
 
     bool TopologyCoordinatorImpl::_isOpTimeCloseEnoughToLatestToElect(
@@ -1022,16 +1011,6 @@ namespace {
             return true;
         }
         return false;
-    }
-
-    int TopologyCoordinatorImpl::_totalVotes() const {
-        int vTot = 0;
-        for (ReplicaSetConfig::MemberIterator it = _currentConfig.membersBegin();
-             it != _currentConfig.membersEnd();
-             ++it) {
-            vTot += it->getNumVotes();
-        }
-        return vTot;
     }
 
     OpTime TopologyCoordinatorImpl::_latestKnownOpTime(OpTime ourLastOpApplied) const {
@@ -1712,7 +1691,7 @@ namespace {
             return true;
         }
 
-        const int currentMemberIndex = findMemberIndexForHostAndPort(_currentConfig, currentSource);
+        const int currentMemberIndex = _currentConfig.findMemberIndexByHostAndPort(currentSource);
         if (currentMemberIndex == -1) {
             return true;
         }

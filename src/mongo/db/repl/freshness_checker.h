@@ -48,6 +48,14 @@ namespace repl {
     class FreshnessChecker {
         MONGO_DISALLOW_COPYING(FreshnessChecker);
     public:
+        enum ElectionAbortReason {
+            None = 0,
+            FresherNodeFound, // Freshness check found fresher node
+            FreshnessTie, // Freshness check resulted in one or more nodes with our lastAppliedOpTime
+            QuorumUnavailable, // Not enough up voters
+            QuorumUnreachable // Too many failed voter responses
+        };
+
         class Algorithm : public ScatterGatherAlgorithm {
         public:
             Algorithm(OpTime lastOpTimeApplied,
@@ -60,28 +68,45 @@ namespace repl {
                     const ReplicationExecutor::RemoteCommandRequest& request,
                     const ResponseStatus& response);
             virtual bool hasReceivedSufficientResponses() const;
-
-            bool isFreshest() const { return _freshest; }
-            bool isTiedForFreshest() const { return _tied; }
+            ElectionAbortReason shouldAbortElection() const;
 
         private:
+            // Returns true if the number of failed votes is over _losableVotes()
+            bool hadTooManyFailedVoterResponses() const;
+
+            // Returns true if the member, by host and port, has a vote.
+            bool _isVotingMember(const HostAndPort host) const;
+
             // Number of responses received so far.
-            size_t _actualResponses;
+            int _responsesProcessed;
 
-            // Does this node have the latest applied optime of all queriable nodes in the set?
-            bool _freshest;
-
-            // Does this node have the same optime as another queriable node in the set?
-            bool _tied;
+            // Number of failed voter responses so far.
+            int _failedVoterResponses;
 
             // Last OpTime applied by the caller; used in the Fresh command 
             const OpTime _lastOpTimeApplied;
 
+            // Config to use for this check
             const ReplicaSetConfig _rsConfig;
 
+            // Our index position in _rsConfig
             const int _selfIndex;
 
+            // The UP members we are checking
             const std::vector<HostAndPort> _targets;
+
+            // Number of voting targets
+            int _votingTargets;
+
+            // Number of voting nodes which can error
+            int _losableVoters;
+
+            // 1 if I have a vote, otherwise 0
+            int _myVote;
+
+            // Reason to abort, start with None
+            ElectionAbortReason _abortReason;
+
         };
 
         FreshnessChecker();
@@ -118,12 +143,9 @@ namespace repl {
         bool isCanceled() const { return _isCanceled; }
 
         /**
-         * Returns whether this node is the freshest of all non-DOWN nodes in the set,
-         * and if any election attempts may be tying because our optime matches another's.
-         * Only valid to call after the event handle supplied to start() has been signaled, which 
-         * guarantees that the data members will no longer be touched by callbacks.
+         * 'None' if the election should continue, otherwise the reason to abort
          */
-        void getResults(bool* freshest, bool* tied) const;
+        ElectionAbortReason shouldAbortElection() const;
 
         /**
          * Returns the config version supplied in the config when start() was called.
