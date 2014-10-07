@@ -229,30 +229,6 @@ namespace mongo {
         }
     }
 
-    Status AuthzManagerExternalStateMongos::getAllDatabaseNames(
-            OperationContext* txn,
-            std::vector<std::string>* dbnames) {
-        try {
-            scoped_ptr<ScopedDbConnection> conn(
-                    getConnectionForAuthzCollection(NamespaceString(DatabaseType::ConfigNS)));
-            auto_ptr<DBClientCursor> c = conn->get()->query(DatabaseType::ConfigNS, Query());
-
-            while (c->more()) {
-                DatabaseType dbInfo;
-                std::string errmsg;
-                if (!dbInfo.parseBSON( c->nextSafe(), &errmsg) || !dbInfo.isValid( &errmsg )) {
-                    return Status(ErrorCodes::FailedToParse, errmsg);
-                }
-                dbnames->push_back(dbInfo.getName());
-            }
-            conn->done();
-            dbnames->push_back("config"); // config db isn't listed in config.databases
-            return Status::OK();
-        } catch (const DBException& e) {
-            return e.toStatus();
-        }
-    }
-
     Status AuthzManagerExternalStateMongos::insert(
             OperationContext* txn,
             const NamespaceString& collectionName,

@@ -70,13 +70,6 @@ namespace mongo {
         }
     }
 
-    Status AuthzManagerExternalStateMongod::getAllDatabaseNames(
-                OperationContext* txn, std::vector<std::string>* dbnames) {
-        StorageEngine* storageEngine = getGlobalEnvironment()->getGlobalStorageEngine();
-        storageEngine->listDatabases(dbnames);
-        return Status::OK();
-    }
-
     Status AuthzManagerExternalStateMongod::findOne(
             OperationContext* txn,
             const NamespaceString& collectionName,
