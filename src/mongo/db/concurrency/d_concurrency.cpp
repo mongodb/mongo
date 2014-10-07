@@ -259,11 +259,11 @@ namespace mongo {
 
         _lockState->lockGlobal(isRead ? newlm::MODE_IS : newlm::MODE_IX);
 
-        if (supportsDocLocking()) {
+        if (supportsDocLocking() || isRead) {
             _lockState->lock(_id, _mode);
         }
         else {
-            _lockState->lock(_id, isRead ? newlm::MODE_S : newlm::MODE_X);
+            _lockState->lock(_id, newlm::MODE_X);
         }
 
         resetTime();

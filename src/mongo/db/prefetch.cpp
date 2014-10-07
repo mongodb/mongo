@@ -172,7 +172,10 @@ namespace {
         BSONObj obj = op.getObjectField(opField);
         const char *ns = op.getStringField("ns");
 
-        txn->lockState()->assertAtLeastReadLocked(ns);
+        // This will have to change for engines other than MMAP V1, because they might not have
+        // means for directly prefetching pages from the collection. For this purpose, acquire S
+        // lock on the database, instead of optimizing with IS.
+        Lock::CollectionLock collLock(txn->lockState(), ns, newlm::MODE_S);
 
         Collection* collection = db->getCollection( txn, ns );
         if (!collection) {

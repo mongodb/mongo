@@ -217,11 +217,11 @@ namespace newlm {
         virtual bool isLocked() const;
         virtual bool isWriteLocked() const;
         virtual bool isWriteLocked(const StringData& ns) const;
+        virtual bool isDbLockedForMode(const StringData& dbName, newlm::LockMode mode) const;
         virtual bool isAtLeastReadLocked(const StringData& ns) const;
         virtual bool isRecursive() const;
 
         virtual void assertWriteLocked(const StringData& ns) const;
-        virtual void assertAtLeastReadLocked(const StringData& ns) const;
 
         /** 
          * Pending means we are currently trying to get a lock.

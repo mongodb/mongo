@@ -222,11 +222,11 @@ namespace mongo {
         virtual bool isLocked() const = 0;
         virtual bool isWriteLocked() const = 0;
         virtual bool isWriteLocked(const StringData& ns) const = 0;
+        virtual bool isDbLockedForMode(const StringData& dbName, newlm::LockMode mode) const = 0;
         virtual bool isAtLeastReadLocked(const StringData& ns) const = 0;
         virtual bool isRecursive() const = 0;
 
         virtual void assertWriteLocked(const StringData& ns) const = 0;
-        virtual void assertAtLeastReadLocked(const StringData& ns) const = 0;
 
         /** pending means we are currently trying to get a lock */
         virtual bool hasLockPending() const = 0;
