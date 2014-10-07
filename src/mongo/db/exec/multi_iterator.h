@@ -36,11 +36,11 @@
 namespace mongo {
 
     /**
-     * Iterates over a collection using multiple underlying iterators. The extents of the
-     * collection are assigned to the iterators in a round-robin fashion.
+     * Iterates over a collection using multiple underlying RecordIterators.
      *
-     * This is a special stage which is used only for the parallelCollectionScan command
-     * (see parallel_collection_scan.cpp).
+     * This is a special stage which is not used automatically by queries. It is intended for
+     * special commands that work with RecordIterators. For example, it is used by the
+     * parallelCollectionScan and repairCursor commands
      */
     class MultiIteratorStage : public PlanStage {
     public:

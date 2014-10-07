@@ -53,6 +53,7 @@ namespace mongo {
         virtual void invalidate(const DiskLoc& dl);
         virtual void saveState() { }
         virtual bool restoreState(OperationContext* txn) {
+            _txn = txn;
             return true;
         }
 
