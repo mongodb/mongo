@@ -795,6 +795,7 @@ namespace mongo {
         if ( isCapped() ) {
             result->appendBool( "capped", true );
             result->appendNumber( "max", _details->maxCappedDocs() );
+            result->appendNumber( "maxSize", static_cast<long long>( storageSize( txn, NULL, 0 ) ) );
         }
     }
 

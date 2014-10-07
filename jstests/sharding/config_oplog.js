@@ -7,7 +7,7 @@ var oplogCol = test.config0.getDB( "local" ).getCollection( "oplog.$main" );
 var stats = oplogCol.stats( );
 
 assert.eq( true, stats.capped );
-assert.eq( 5 * 1024 * 1024, stats.storageSize );
+assert.eq( 5 * 1024 * 1024, stats.maxSize );
 
 test.admin.runCommand( {enableSharding : "test"} );
 
@@ -23,7 +23,7 @@ var conn = startMongodTest( 30001, "config_oplog", false, { configsvr : "", oplo
 stats = conn.getDB( "local" ).getCollection( "oplog.$main" ).stats();
 
 assert.eq( true, stats.capped );
-assert.eq( 2 * 1024 * 1024, stats.storageSize );
+assert.eq( 2 * 1024 * 1024, stats.maxSize );
 
 stopMongoProgram( 30001 );
 
