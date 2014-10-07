@@ -43,10 +43,13 @@
 	     (t1).tv_nsec == (t2).tv_nsec ? 0 : 1 : 1)
 
 struct __wt_fh {
-	u_int	refcnt;				/* Reference count */
+	char	*name;				/* File name */
 	TAILQ_ENTRY(__wt_fh) q;			/* List of open handles */
 
-	char	*name;				/* File name */
+	u_int	refcnt;				/* Reference count */
+	u_int	ref_mapped;			/* Mapped reference count */
+
+	WT_SPINLOCK lock;			/* Handle lock */
 
 	int	 fd;				/* POSIX file handle */
 	wt_off_t size;				/* File size */

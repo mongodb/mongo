@@ -1325,7 +1325,7 @@ __wt_block_extlist_truncate(
 	 * truncate and extent list removal succeed.
 	 */
 	size = ext->off;
-	WT_RET(__wt_ftruncate(session, fh, size));
+	WT_RET_BUSY_OK(__wt_ftruncate(session, block->fh, size));
 	WT_RET(__block_off_remove(session, el, size, NULL));
 	fh->size = size;
 
