@@ -209,32 +209,32 @@ functions:
         # TODO mongodump needs tests
         # TODO mongotop needs tests
         - dir: src/github.com/mongodb/mongo-tools/mongoimport
-          args: -v ${coverage_args} ${args} ${build_tags}
+          args: ${coverage_args} ${args} ${build_tags}
           environment_variables:
             - MONGOSHIM=./mongoshim${extension}
             - ${library_path}
         - dir: src/github.com/mongodb/mongo-tools/mongoexport
-          args: -v ${coverage_args} ${args} ${build_tags}
+          args: ${coverage_args} ${args} ${build_tags}
           environment_variables:
             - MONGOSHIM=./mongoshim${extension}
             - ${library_path}
         - dir: src/github.com/mongodb/mongo-tools/mongostat
-          args: -v ${coverage_args} ${args} ${build_tags}
+          args: ${coverage_args} ${args} ${build_tags}
           environment_variables:
             - MONGOSHIM=./mongoshim${extension}
             - ${library_path}
         - dir: src/github.com/mongodb/mongo-tools/mongooplog
-          args: -v ${coverage_args} ${args} ${build_tags}
+          args: ${coverage_args} ${args} ${build_tags}
           environment_variables:
             - MONGOSHIM=./mongoshim${extension}
             - ${library_path}
         - dir: src/github.com/mongodb/mongo-tools/mongorestore
-          args: -v ${coverage_args} ${args} ${build_tags}
+          args: ${coverage_args} ${args} ${build_tags}
           environment_variables:
             - MONGOSHIM=./mongoshim${extension}
             - ${library_path}
         - dir: src/github.com/mongodb/mongo-tools/mongofiles
-          args: -v ${coverage_args} ${args} ${build_tags}
+          args: ${coverage_args} ${args} ${build_tags}
           environment_variables:
             - MONGOSHIM=./mongoshim${extension}
             - ${library_path}
