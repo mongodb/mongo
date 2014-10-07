@@ -1,8 +1,8 @@
 // Test copyDatabase command with various combinations of authed/unauthed and single node/replica
 // set source and dest.
 
-TestData.authMechanism = "MONGODB-CR"; // SERVER-11428
-DB.prototype._defaultAuthenticationMechanism = "MONGODB-CR"; // SERVER-11428
+TestData.authMechanism = "SCRAM-SHA-1"; // SERVER-11428
+DB.prototype._defaultAuthenticationMechanism = "SCRAM-SHA-1"; // SERVER-11428
 
 var baseName = "jstests_clone_copyauth";
 

@@ -159,10 +159,10 @@ namespace mongo {
         // Generate SCRAM credentials on the fly for mixed MONGODB-CR/SCRAM mode.
         if (_creds.scram.salt.empty() && !_creds.password.empty()) {
             BSONObj scramCreds = scram::generateCredentials(_creds.password);
-            _creds.scram.iterationCount = scramCreds["iterationCount"].Int();
-            _creds.scram.salt = scramCreds["salt"].String();
-            _creds.scram.storedKey = scramCreds["storedKey"].String();
-            _creds.scram.serverKey = scramCreds["serverKey"].String();
+            _creds.scram.iterationCount = scramCreds[scram::iterationCountFieldName].Int();
+            _creds.scram.salt = scramCreds[scram::saltFieldName].String();
+            _creds.scram.storedKey = scramCreds[scram::storedKeyFieldName].String();
+            _creds.scram.serverKey = scramCreds[scram::serverKeyFieldName].String();
         }
 
         // Generate server-first-message

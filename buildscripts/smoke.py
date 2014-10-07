@@ -1242,7 +1242,7 @@ def main():
     parser.add_option('--use-x509', dest='use_x509', default=False,
                       action="store_true",
                       help='Use x509 auth for internal cluster authentication')
-    parser.add_option('--authMechanism', dest='authMechanism', default='MONGODB-CR',
+    parser.add_option('--authMechanism', dest='authMechanism', default='SCRAM-SHA-1',
                       help='Use the given authentication mechanism, when --auth is used.')
     parser.add_option('--keyFile', dest='keyFile', default=None,
                       help='Path to keyFile to use to run replSet and sharding tests with authentication enabled')
