@@ -370,7 +370,7 @@ namespace {
     TEST_F(ReplCoordTest, AwaitReplicationNoReplEnabled) {
         init("");
         OperationContextNoop txn;
-        OpTime time(1, 1);
+        OpTime time(100, 1);
 
         WriteConcernOptions writeConcern;
         writeConcern.wTimeout = WriteConcernOptions::kNoWaiting;
@@ -388,7 +388,7 @@ namespace {
         settings.master = true;
         init(settings);
         OperationContextNoop txn;
-        OpTime time(1, 1);
+        OpTime time(100, 1);
 
         WriteConcernOptions writeConcern;
         writeConcern.wTimeout = WriteConcernOptions::kNoWaiting;
@@ -413,7 +413,7 @@ namespace {
                 HostAndPort("node1", 12345));
 
         OperationContextNoop txn;
-        OpTime time(1, 1);
+        OpTime time(100, 1);
 
         WriteConcernOptions writeConcern;
         writeConcern.wTimeout = WriteConcernOptions::kNoWaiting;
@@ -426,7 +426,7 @@ namespace {
         ASSERT_EQUALS(ErrorCodes::NotMaster, statusAndDur.status);
 
         ASSERT(getReplCoord()->setFollowerMode(MemberState::RS_SECONDARY));
-        getReplCoord()->setMyLastOptime(&txn, OpTime(1, 0));
+        getReplCoord()->setMyLastOptime(&txn, OpTime(100, 0));
         simulateSuccessfulElection();
 
         statusAndDur = getReplCoord()->awaitReplication(&txn, time, writeConcern);
@@ -444,15 +444,15 @@ namespace {
                                              BSON("host" << "node4:12345" << "_id" << 3))),
                 HostAndPort("node1", 12345));
         ASSERT(getReplCoord()->setFollowerMode(MemberState::RS_SECONDARY));
-        getReplCoord()->setMyLastOptime(&txn, OpTime(1, 0));
+        getReplCoord()->setMyLastOptime(&txn, OpTime(100, 0));
         simulateSuccessfulElection();
 
         OID myOID = getReplCoord()->getMyRID();
         OID client1 = OID::gen();
         OID client2 = OID::gen();
         OID client3 = OID::gen();
-        OpTime time1(1, 1);
-        OpTime time2(1, 2);
+        OpTime time1(100, 1);
+        OpTime time2(100, 2);
 
         HandshakeArgs handshake1;
         ASSERT_OK(handshake1.initialize(BSON("handshake" << client1 << "member" << 1)));
@@ -533,7 +533,7 @@ namespace {
                                              "multiDCAndRack" << BSON("dc" << 2 << "rack" << 3)))),
                 HostAndPort("node0"));
         ASSERT(getReplCoord()->setFollowerMode(MemberState::RS_SECONDARY));
-        getReplCoord()->setMyLastOptime(&txn, OpTime(1, 0));
+        getReplCoord()->setMyLastOptime(&txn, OpTime(100, 0));
         simulateSuccessfulElection();
 
         OID selfRID = getReplCoord()->getMyRID();
@@ -541,8 +541,8 @@ namespace {
         OID clientRID2 = OID::gen();
         OID clientRID3 = OID::gen();
         OID clientRID4 = OID::gen();
-        OpTime time1(1, 1);
-        OpTime time2(1, 2);
+        OpTime time1(100, 1);
+        OpTime time2(100, 2);
 
         HandshakeArgs handshake1;
         ASSERT_OK(handshake1.initialize(BSON("handshake" << clientRID1 << "member" << 1)));
@@ -693,7 +693,7 @@ namespace {
                                              BSON("host" << "node3:12345" << "_id" << 2))),
                 HostAndPort("node1", 12345));
         ASSERT(getReplCoord()->setFollowerMode(MemberState::RS_SECONDARY));
-        getReplCoord()->setMyLastOptime(&txn, OpTime(1, 0));
+        getReplCoord()->setMyLastOptime(&txn, OpTime(100, 0));
         simulateSuccessfulElection();
 
         ReplicationAwaiter awaiter(getReplCoord(), &txn);
@@ -701,8 +701,8 @@ namespace {
         OID selfRID = getReplCoord()->getMyRID();
         OID client1 = OID::gen();
         OID client2 = OID::gen();
-        OpTime time1(1, 1);
-        OpTime time2(1, 2);
+        OpTime time1(100, 1);
+        OpTime time2(100, 2);
 
         HandshakeArgs handshake1;
         ASSERT_OK(handshake1.initialize(BSON("handshake" << client1 << "member" << 1)));
@@ -754,15 +754,15 @@ namespace {
                                              BSON("host" << "node3:12345" << "_id" << 2))),
                 HostAndPort("node1", 12345));
         ASSERT(getReplCoord()->setFollowerMode(MemberState::RS_SECONDARY));
-        getReplCoord()->setMyLastOptime(&txn, OpTime(1, 0));
+        getReplCoord()->setMyLastOptime(&txn, OpTime(100, 0));
         simulateSuccessfulElection();
 
         ReplicationAwaiter awaiter(getReplCoord(), &txn);
 
         OID selfRID = getReplCoord()->getMyRID();
         OID client = OID::gen();
-        OpTime time1(1, 1);
-        OpTime time2(1, 2);
+        OpTime time1(100, 1);
+        OpTime time2(100, 2);
 
         HandshakeArgs handshake;
         ASSERT_OK(handshake.initialize(BSON("handshake" << client << "member" << 1)));
@@ -793,15 +793,15 @@ namespace {
                                              BSON("host" << "node3:12345" << "_id" << 2))),
                 HostAndPort("node1", 12345));
         ASSERT(getReplCoord()->setFollowerMode(MemberState::RS_SECONDARY));
-        getReplCoord()->setMyLastOptime(&txn, OpTime(1, 0));
+        getReplCoord()->setMyLastOptime(&txn, OpTime(100, 0));
         simulateSuccessfulElection();
 
         ReplicationAwaiter awaiter(getReplCoord(), &txn);
 
         OID client1 = OID::gen();
         OID client2 = OID::gen();
-        OpTime time1(1, 1);
-        OpTime time2(1, 2);
+        OpTime time1(100, 1);
+        OpTime time2(100, 2);
 
         HandshakeArgs handshake1;
         ASSERT_OK(handshake1.initialize(BSON("handshake" << client1 << "member" << 1)));
@@ -838,15 +838,15 @@ namespace {
                                              BSON("host" << "node3:12345" << "_id" << 2))),
                 HostAndPort("node1", 12345));
         ASSERT(getReplCoord()->setFollowerMode(MemberState::RS_SECONDARY));
-        getReplCoord()->setMyLastOptime(&txn, OpTime(1, 0));
+        getReplCoord()->setMyLastOptime(&txn, OpTime(100, 0));
         simulateSuccessfulElection();
 
         ReplicationAwaiter awaiter(getReplCoord(), &txn);
 
         OID client1 = OID::gen();
         OID client2 = OID::gen();
-        OpTime time1(1, 1);
-        OpTime time2(1, 2);
+        OpTime time1(100, 1);
+        OpTime time2(100, 2);
 
         HandshakeArgs handshake1;
         ASSERT_OK(handshake1.initialize(BSON("handshake" << client1 << "member" << 1)));
@@ -916,15 +916,15 @@ namespace {
                                              BSON("_id" << 2 << "host" << "node3"))),
                 HostAndPort("node1"));
         ASSERT(getReplCoord()->setFollowerMode(MemberState::RS_SECONDARY));
-        getReplCoord()->setMyLastOptime(&txn, OpTime(1, 0));
+        getReplCoord()->setMyLastOptime(&txn, OpTime(100, 0));
         simulateSuccessfulElection();
 
         ReplicationAwaiter awaiter(getReplCoord(), &txn);
 
         OID client1 = OID::gen();
         OID client2 = OID::gen();
-        OpTime time1(1, 1);
-        OpTime time2(1, 2);
+        OpTime time1(100, 1);
+        OpTime time2(100, 2);
 
         HandshakeArgs handshake1;
         ASSERT_OK(handshake1.initialize(BSON("handshake" << client1 << "member" << 1)));
@@ -992,7 +992,7 @@ namespace {
 
     TEST_F(StepDownTest, StepDownNotPrimary) {
         OperationContextNoop txn;
-        OpTime optime1(1, 1);
+        OpTime optime1(100, 1);
         // All nodes are caught up
         ASSERT_OK(getReplCoord()->setLastOptime(&txn, rid1, optime1));
         ASSERT_OK(getReplCoord()->setLastOptime(&txn, rid2, optime1));
@@ -1005,7 +1005,7 @@ namespace {
 
     TEST_F(StepDownTest, StepDownTimeoutAcquiringGlobalLock) {
         OperationContextNoop txn;
-        OpTime optime1(1, 1);
+        OpTime optime1(100, 1);
         // All nodes are caught up
         ASSERT_OK(getReplCoord()->setLastOptime(&txn, rid1, optime1));
         ASSERT_OK(getReplCoord()->setLastOptime(&txn, rid2, optime1));
@@ -1021,7 +1021,7 @@ namespace {
 
     TEST_F(StepDownTest, StepDownNoWaiting) {
         OperationContextNoop txn;
-        OpTime optime1(1, 1);
+        OpTime optime1(100, 1);
         // All nodes are caught up
         ASSERT_OK(getReplCoord()->setLastOptime(&txn, rid1, optime1));
         ASSERT_OK(getReplCoord()->setLastOptime(&txn, rid2, optime1));
@@ -1103,8 +1103,8 @@ namespace {
 
     TEST_F(StepDownTest, StepDownNotCaughtUp) {
         OperationContextNoop txn;
-        OpTime optime1(1, 1);
-        OpTime optime2(1, 2);
+        OpTime optime1(100, 1);
+        OpTime optime2(100, 2);
         // No secondary is caught up
         ASSERT_OK(getReplCoord()->setLastOptime(&txn, rid1, optime2));
         ASSERT_OK(getReplCoord()->setLastOptime(&txn, rid2, optime1));
@@ -1145,8 +1145,8 @@ namespace {
 
     TEST_F(StepDownTest, StepDownCatchUp) {
         OperationContextNoop txn;
-        OpTime optime1(1, 1);
-        OpTime optime2(1, 2);
+        OpTime optime1(100, 1);
+        OpTime optime2(100, 2);
         // No secondary is caught up
         ASSERT_OK(getReplCoord()->setLastOptime(&txn, rid1, optime2));
         ASSERT_OK(getReplCoord()->setLastOptime(&txn, rid2, optime1));
@@ -1228,8 +1228,8 @@ namespace {
                                    "config" << BSON("_id" << 2 << "host" << "test3:1234")));
         ASSERT_OK(getReplCoord()->processHandshake(&txn, handshake2));
         ASSERT_OK(getReplCoord()->processHandshake(&txn, handshake3));
-        OpTime optime1(1, 1);
-        OpTime optime2(1, 2);
+        OpTime optime1(100, 1);
+        OpTime optime2(100, 2);
         OpTime optime3(2, 1);
         ASSERT_OK(getReplCoord()->setLastOptime(&txn, rid1, optime1));
         ASSERT_OK(getReplCoord()->setLastOptime(&txn, rid2, optime2));
@@ -1331,7 +1331,7 @@ namespace {
                 HostAndPort("test2", 1234));
         OperationContextNoop txn;
         getReplCoord()->setFollowerMode(MemberState::RS_SECONDARY);
-        getReplCoord()->setMyLastOptime(&txn, OpTime(1, 0));
+        getReplCoord()->setMyLastOptime(&txn, OpTime(100, 0));
 
         // Can't unset maintenance mode if it was never set to begin with.
         Status status = getReplCoord()->setMaintenanceMode(&txn, false);
@@ -1417,8 +1417,8 @@ namespace {
         OID myRID = getReplCoord()->getMyRID();
         OID client1 = OID::gen();
         OID client2 = OID::gen();
-        OpTime time1(1, 1);
-        OpTime time2(1, 2);
+        OpTime time1(100, 1);
+        OpTime time2(100, 2);
 
         HandshakeArgs handshake1;
         ASSERT_OK(handshake1.initialize(BSON("handshake" << client1 << "member" << 1)));
@@ -1455,8 +1455,8 @@ namespace {
 
         OID myRID = getReplCoord()->getMyRID();
         OID client = OID::gen();
-        OpTime time1(1, 1);
-        OpTime time2(1, 2);
+        OpTime time1(100, 1);
+        OpTime time2(100, 2);
 
         getExternalState()->setClientHostAndPort(clientHost);
         HandshakeArgs handshake;

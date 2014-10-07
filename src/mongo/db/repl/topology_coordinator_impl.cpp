@@ -981,6 +981,12 @@ namespace {
         }
 
         UnelectableReason unelectableReason = _getMyUnelectableReason(now, lastOpApplied);
+        if (NotCloseEnoughToLatestOptime == unelectableReason) {
+            LOG(2) << "Not standing for election because " <<
+                _getUnelectableReasonString(unelectableReason) << "; my last optime is " <<
+                lastOpApplied << " and the newest is " << _latestKnownOpTime(lastOpApplied);
+            return HeartbeatResponseAction::makeNoAction();
+        }
         if (None != unelectableReason) {
             LOG(2) << "Not standing for election because " <<
                 _getUnelectableReasonString(unelectableReason);
@@ -1008,8 +1014,7 @@ namespace {
     bool TopologyCoordinatorImpl::_isOpTimeCloseEnoughToLatestToElect(
             const OpTime& otherOpTime, const OpTime& ourLastOpApplied) const {
         const OpTime latestKnownOpTime = _latestKnownOpTime(ourLastOpApplied);
-        return !latestKnownOpTime.isNull() &&
-                otherOpTime.getSecs() >= (latestKnownOpTime.getSecs() - 10);
+        return otherOpTime.getSecs() >= (latestKnownOpTime.getSecs() - 10);
     }
 
     bool TopologyCoordinatorImpl::_iAmPrimary() const {
@@ -1030,19 +1035,21 @@ namespace {
         return vTot;
     }
 
-    OpTime TopologyCoordinatorImpl::_latestKnownOpTime(const OpTime& ourLastOpApplied) const {
-        OpTime latest(0, 0);
+    OpTime TopologyCoordinatorImpl::_latestKnownOpTime(OpTime ourLastOpApplied) const {
+        OpTime latest = ourLastOpApplied;
 
         for (std::vector<MemberHeartbeatData>::const_iterator it = _hbdata.begin();
              it != _hbdata.end(); 
              ++it) {
 
+            if (it->getConfigIndex() == _selfIndex) {
+                continue;
+            }
             if (!it->up()) {
                 continue;
             }
 
-            OpTime optime = it->getConfigIndex() == _selfIndex ?
-                    ourLastOpApplied : it->getOpTime();
+            OpTime optime = it->getOpTime();
 
             if (optime > latest) {
                 latest = optime;
@@ -1065,7 +1072,7 @@ namespace {
     }
 
     int TopologyCoordinatorImpl::_getHighestPriorityElectableIndex(
-            const Date_t& now, const OpTime& lastOpApplied) const {
+            Date_t now, OpTime lastOpApplied) const {
         int maxIndex = -1;
         for (int currentIndex = 0; currentIndex < _currentConfig.getNumMembers(); currentIndex++) {
             UnelectableReason reason = currentIndex == _selfIndex ?
@@ -1486,6 +1493,9 @@ namespace {
     TopologyCoordinatorImpl::UnelectableReason TopologyCoordinatorImpl::_getMyUnelectableReason(
                                                                 const Date_t now,
                                                                 const OpTime lastApplied) const {
+        if (lastApplied.isNull()) {
+            return NoData;
+        }
         if (!_aMajoritySeemsToBeUp()) {
             return CannotSeeMajority;
         }
@@ -1501,7 +1511,7 @@ namespace {
         else if (!getMemberState().secondary()) {
             return NotSecondary;
         }
-        else if (_isOpTimeCloseEnoughToLatestToElect(lastApplied, lastApplied)) {
+        else if (!_isOpTimeCloseEnoughToLatestToElect(lastApplied, lastApplied)) {
             return NotCloseEnoughToLatestOptime;
         }
         else {
@@ -1511,6 +1521,7 @@ namespace {
 
     std::string TopologyCoordinatorImpl::_getUnelectableReasonString(UnelectableReason ur) const {
         switch (ur) {
+            case NoData: return "node has no applied oplog entries";
             case CannotSeeMajority: return "I cannot see a majority";
             case ArbiterIAm: return "member is an arbiter";
             case NoPriority: return "member has zero priority";
