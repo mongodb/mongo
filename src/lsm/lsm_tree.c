@@ -1004,6 +1004,7 @@ __wt_lsm_compact(WT_SESSION_IMPL *session, const char *name, int *skip)
 	WT_LSM_CHUNK *chunk;
 	WT_LSM_TREE *lsm_tree;
 	time_t begin, end;
+	uint64_t progress;
 	int i, compacting, flushing, locked, ref;
 
 	compacting = flushing = locked = ref = 0;
@@ -1046,6 +1047,7 @@ __wt_lsm_compact(WT_SESSION_IMPL *session, const char *name, int *skip)
 	/* Clear any merge throttle: compact throws out that calculation. */
 	lsm_tree->merge_throttle = 0;
 	lsm_tree->merge_aggressiveness = 0;
+	progress = lsm_tree->merge_progressing;
 
 	/* If another thread started a compact on this tree, we're done. */
 	if (F_ISSET(lsm_tree, WT_LSM_TREE_COMPACTING))
@@ -1090,6 +1092,7 @@ __wt_lsm_compact(WT_SESSION_IMPL *session, const char *name, int *skip)
 		 * compacting state.
 		 */
 		compacting = 1;
+		progress = lsm_tree->merge_progressing;
 		F_SET(lsm_tree, WT_LSM_TREE_COMPACTING);
 		WT_ERR(__wt_verbose(session, WT_VERB_LSM,
 		    "COMPACT: Start compacting %s", lsm_tree->name));
@@ -1108,12 +1111,14 @@ __wt_lsm_compact(WT_SESSION_IMPL *session, const char *name, int *skip)
 				WT_ERR(__wt_verbose(session,
 				    WT_VERB_LSM,
 				    "Compact flush done %s chunk %u.  "
-				    "Start compacting",
-				    name, chunk->id));
+				    "Start compacting progress %" PRIu64,
+				    name, chunk->id,
+				    lsm_tree->merge_progressing));
 				(void)WT_ATOMIC_SUB4(chunk->refcnt, 1);
 				flushing = ref = 0;
 				compacting = 1;
 				F_SET(lsm_tree, WT_LSM_TREE_COMPACTING);
+				progress = lsm_tree->merge_progressing;
 			} else {
 				WT_ERR(__wt_verbose(session, WT_VERB_LSM,
 				    "Compact flush retry %s chunk %u",
@@ -1131,7 +1136,10 @@ __wt_lsm_compact(WT_SESSION_IMPL *session, const char *name, int *skip)
 		 * span chunks with different generations.
 		 */
 		if (compacting && !F_ISSET(lsm_tree, WT_LSM_TREE_COMPACTING)) {
-			if (lsm_tree->merge_aggressiveness < 10) {
+			if (lsm_tree->merge_aggressiveness < 10 ||
+			    (progress < lsm_tree->merge_progressing) ||
+			    lsm_tree->merge_syncing) {
+				progress = lsm_tree->merge_progressing;
 				F_SET(lsm_tree, WT_LSM_TREE_COMPACTING);
 				lsm_tree->merge_aggressiveness = 10;
 			} else
