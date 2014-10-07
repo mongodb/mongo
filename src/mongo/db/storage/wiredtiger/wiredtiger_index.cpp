@@ -473,7 +473,11 @@ namespace {
             return s;
         }
 
-        void commit(bool mayInterrupt) { }
+        void commit(bool mayInterrupt) {
+            // this is bizarre, but required as part of the contract
+            WriteUnitOfWork uow( _txn );
+            uow.commit();
+        }
 
     private:
         WiredTigerIndex &_idx;
