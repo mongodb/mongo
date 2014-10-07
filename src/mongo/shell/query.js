@@ -86,6 +86,132 @@ DBQuery.prototype._exec = function(){
     return this._cursor;
 }
 
+/**
+ * Helper for _convertToCommand() which constructs the "options" part of the find command.
+ */
+DBQuery.prototype._buildCmdOptions = function() {
+    var options = {};
+
+    if (this._query.$comment) {
+        options["comment"] = this._query.$comment;
+    }
+
+    if (this._query.$maxScan) {
+        options["maxScan"] = this._query.$maxScan;
+    }
+
+    if (this._query.$maxTimeMS) {
+        options["maxTimeMS"] = this._query.$maxTimeMS;
+    }
+
+    if (this._query.$max) {
+        options["max"] = this._query.$max;
+    }
+
+    if (this._query.$min) {
+        options["min"] = this._query.$min;
+    }
+
+    if (this._query.$returnKey) {
+        options["returnKey"] = this._query.$returnKey;
+    }
+
+    if (this._query.$showDiskLoc) {
+        options["showDiskLoc"] = this._query.$showDiskLoc;
+    }
+
+    if (this._query.$snapshot) {
+        options["snapshot"] = this._query.$snapshot;
+    }
+
+    if ((this._options & DBQuery.Option.tailable) != 0) {
+        options["tailable"] = true;
+    }
+
+    if ((this._options & DBQuery.Option.slaveOk) != 0) {
+        options["slaveOk"] = true;
+    }
+
+    if ((this._options & DBQuery.Option.oplogReplay) != 0) {
+        options["oplogReplay"] = true;
+    }
+
+    if ((this._options & DBQuery.Option.noTimeout) != 0) {
+        options["noCursorTimeout"] = true;
+    }
+
+    if ((this._options & DBQuery.Option.awaitData) != 0) {
+        options["awaitData"] = true;
+    }
+
+    if ((this._options & DBQuery.Option.exhaust) != 0) {
+        options["exhaust"] = true;
+    }
+
+    if ((this._options & DBQuery.Option.partial) != 0) {
+        options["partial"] = true;
+    }
+
+    return options;
+}
+
+/**
+ * Internal helper used to convert this cursor into the format required by the find command.
+ */
+DBQuery.prototype._convertToCommand = function() {
+    var cmd = {};
+
+    cmd["find"] = this._collection.getName();
+
+    if (this._special) {
+        if (this._query.query) {
+            cmd["query"] = this._query.query;
+        }
+    }
+    else if (this._query) {
+        cmd["query"] = this._query;
+    }
+
+    if (this._skip) {
+        cmd["skip"] = this._skip
+    }
+
+    if (this._batchSize) {
+        cmd["batchSize"] = this._batchSize || 101;
+    }
+
+    if (this._limit) {
+        if (this._limit < 0) {
+            cmd["limit"] = -this._limit;
+            cmd["singleBatch"] = true;
+        }
+        else {
+            cmd["limit"] = this._limit;
+            cmd["singleBatch"] = false;
+        }
+    }
+
+    if (this._query.orderby) {
+        cmd["sort"] = this._query.orderby;
+    }
+
+    if (this._fields) {
+        cmd["projection"] = this._fields;
+    }
+
+    if (this._query.$hint) {
+        cmd["hint"] = this._query.$hint;
+    }
+
+    if (this._query.$readPreference) {
+       cmd["$readPreference"] = this._query.$readPreference;
+    }
+
+    cmd["options"] = this._buildCmdOptions();
+
+    return cmd;
+}
+
 DBQuery.prototype.limit = function( limit ){
     this._checkModify();
     this._limit = limit;
@@ -163,8 +289,9 @@ DBQuery.prototype.toArray = function(){
     return a;
 }
 
-DBQuery.prototype.count = function( applySkipLimit ) {
+DBQuery.prototype._convertToCountCmd = function( applySkipLimit ) {
     var cmd = { count: this._collection.getName() };
+
     if ( this._query ) {
         if ( this._special ) {
             cmd.query = this._query.query;
@@ -187,7 +314,13 @@ DBQuery.prototype.count = function( applySkipLimit ) {
         if ( this._skip )
             cmd.skip = this._skip;
     }
-    
+
+    return cmd;
+}
+
+DBQuery.prototype.count = function( applySkipLimit ) {
+    var cmd = this._convertToCountCmd( applySkipLimit );
+
     var res = this._db.runCommand( cmd );
     if( res && res.n != null ) return res.n;
     throw Error( "count failed: " + tojson( res ) );
@@ -297,42 +430,8 @@ DBQuery.prototype.comment = function (comment) {
 }
 
 DBQuery.prototype.explain = function (verbose) {
-    /* verbose=true --> include allPlans, oldPlan fields */
-    var n = this.clone();
-    n._addSpecial( "$explain", true );
-    n._limit = Math.abs(n._limit) * -1;
-    var e = n.next();
-
-    function cleanup(obj){
-        if (typeof(obj) != 'object'){
-            return;
-        }
-
-        delete obj.allPlans;
-        delete obj.oldPlan;
-        delete obj.stats;
-
-        if (typeof(obj.length) == 'number'){
-            for (var i=0; i < obj.length; i++){
-                cleanup(obj[i]);
-            }
-        }
-
-        if (obj.shards){
-            for (var key in obj.shards){
-                cleanup(obj.shards[key]);
-            }
-        }
-
-        if (obj.clauses){
-            cleanup(obj.clauses);
-        }
-    }
-
-    if (!verbose)
-        cleanup(e);
-
-    return e;
+    var explainQuery = new DBExplainQuery(this, verbose);
+    return explainQuery.finish();
 }
 
 DBQuery.prototype.snapshot = function(){

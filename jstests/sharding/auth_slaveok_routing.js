@@ -13,7 +13,9 @@
  * @return {boolean} true if query was routed to a secondary node.
  */
 function doesRouteToSec( coll, query ) {
-    var serverInfo = coll.find( query ).explain().serverInfo;
+    var explain = coll.find( query ).explain();
+    assert.eq("SINGLE_SHARD", explain.queryPlanner.winningPlan.stage);
+    var serverInfo = explain.queryPlanner.winningPlan.shards[0].serverInfo;
     var conn = new Mongo( serverInfo.host + ":" + serverInfo.port.toString());
     var cmdRes = conn.getDB( 'admin' ).runCommand({ isMaster: 1 });
 

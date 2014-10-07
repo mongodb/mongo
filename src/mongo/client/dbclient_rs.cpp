@@ -59,6 +59,8 @@ namespace {
             _secOkCmdList.insert("count");
             _secOkCmdList.insert("distinct");
             _secOkCmdList.insert("dbStats");
+            _secOkCmdList.insert("explain");
+            _secOkCmdList.insert("find");
             _secOkCmdList.insert("geoNear");
             _secOkCmdList.insert("geoSearch");
             _secOkCmdList.insert("geoWalk");

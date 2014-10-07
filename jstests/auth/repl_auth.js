@@ -49,18 +49,18 @@ rsTest.getSecondaries().forEach(function(sec) {
 // pool if a different secondary is selected from the previous one so we have to iterate
 // a couple of times.
 for (var x = 0; x < 20; x++) {
-    var explain = fooDB0.user.find().readPref('secondary').explain();
+    var explain = fooDB0.user.find().readPref('secondary').explain('executionStats');
     assert.eq(1, explain.executionStats.nReturned);
 
     assert.throws(function() {
-        explain = barDB0.user.find().readPref('secondary').explain();
+        explain = barDB0.user.find().readPref('secondary').explain('executionStats');
     });
 
     assert.throws(function() {
-        explain = fooDB1.user.find().readPref('secondary').explain();
+        explain = fooDB1.user.find().readPref('secondary').explain('executionStats');
     });
 
-    explain = barDB1.user.find().readPref('secondary').explain();
+    explain = barDB1.user.find().readPref('secondary').explain('executionStats');
     assert.eq(1, explain.executionStats.nReturned);
 }
 

@@ -40,7 +40,7 @@ assert.eq( 1, simpleQueryWithLimit( -1 ).skip( 1 )[ 0 ].b );
 
 // No limit is applied.
 assert.eq( 6, simpleQueryWithLimit( 0 ).itcount() );
-assert.eq( 6, simpleQueryWithLimit( 0 ).explain().executionStats.totalKeysExamined );
+assert.eq( 6, simpleQueryWithLimit( 0 ).explain( true ).executionStats.totalKeysExamined );
 assert.eq( 5, simpleQueryWithLimit( 0 ).skip( 1 ).itcount() );
 
 // The query has additional constriants, preventing limit optimization.

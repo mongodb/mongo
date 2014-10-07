@@ -18,7 +18,7 @@ assert.eq( 49 , t.find( q ).count() , "D" );
 assert.eq( 49 , t.find( q ).itcount() , "E" );
 assert.eq( 20 , t.find( q ).limit(20).itcount() , "F" );
 
-assert.eq( 49 , t.find(q).explain().executionStats.nReturned , "G" );
-assert.eq( 20 , t.find(q).limit(20).explain().executionStats.nReturned , "H" );
-assert.eq( 20 , t.find(q).limit(-20).explain().executionStats.nReturned , "I" );
-assert.eq( 49 , t.find(q).batchSize(20).explain().executionStats.nReturned , "J" );
+assert.eq( 49 , t.find(q).explain("executionStats").executionStats.nReturned , "G" );
+assert.eq( 20 , t.find(q).limit(20).explain("executionStats").executionStats.nReturned , "H" );
+assert.eq( 20 , t.find(q).limit(-20).explain("executionStats").executionStats.nReturned , "I" );
+assert.eq( 49 , t.find(q).batchSize(20).explain("executionStats").executionStats.nReturned , "J" );

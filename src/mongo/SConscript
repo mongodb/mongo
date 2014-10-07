@@ -1160,6 +1160,8 @@ env.JSHeader(
                 "shell/bulk_api.js",
                 "shell/collection.js",
                 "shell/db.js",
+                "shell/explain_query.js",
+                "shell/explainable.js",
                 "shell/mongo.js",
                 "shell/mr.js",
                 "shell/query.js",

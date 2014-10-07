@@ -178,6 +178,18 @@ Mongo.prototype.hasWriteCommands = function() {
     return this._hasWriteCommands;
 }
 
+Mongo.prototype.hasExplainCommand = function() {
+    if ( !('_hasExplainCommand' in this) ) {
+        var isMaster = this.getDB("admin").runCommand({ isMaster : 1 });
+        this._hasExplainCommand = (isMaster.ok &&
+                                   'minWireVersion' in isMaster &&
+                                   isMaster.minWireVersion <= 3 &&
+                                   3 <= isMaster.maxWireVersion );
+    }
+
+    return this._hasExplainCommand;
+}
+
 /**
  * {String} Returns the current mode set. Will be commands/legacy/compatibility
  * 

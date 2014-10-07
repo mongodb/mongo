@@ -107,6 +107,11 @@ namespace mongo {
                                        BSONObjBuilder* out) {
         out->append("explain", cmdObj);
         out->append("verbosity", ExplainCommon::verbosityString(verbosity));
+
+        // If the command has a readPreference, then pull it up to the top level.
+        if (cmdObj.hasField("$readPreference")) {
+            out->append("$queryOptions", cmdObj["$readPreference"].wrap());
+        }
     }
 
     // static
@@ -193,6 +198,8 @@ namespace mongo {
             BSONObj serverInfo = shardResults[i].result["serverInfo"].Obj();
 
             singleShardBob.append("shardName", shardResults[i].shardTarget.getName());
+            std::string connStr = shardResults[i].shardTarget.getAddress().toString();
+            singleShardBob.append("connectionString", connStr);
             appendIfRoom(&singleShardBob, serverInfo, "serverInfo");
             appendElementsIfRoom(&singleShardBob, queryPlanner);
 

@@ -77,7 +77,7 @@ namespace mongo {
         vector<Strategy::CommandResult> shardResults;
         STRATEGY->commandOp(dbname,
                             explainCmdBob.obj(),
-                            0,
+                            lpq->getOptions().toInt(),
                             fullns,
                             lpq->getFilter(),
                             &shardResults);
