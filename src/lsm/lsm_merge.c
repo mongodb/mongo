@@ -62,7 +62,7 @@ __wt_lsm_merge(
 	uint64_t insert_count, record_count, chunk_size;
 	u_int dest_id, end_chunk, i, merge_max, merge_min, nchunks, start_chunk;
 	u_int verb;
-	int create_bloom, locked, tret;
+	int create_bloom, locked, in_sync, tret;
 	const char *cfg[3];
 	const char *drop_cfg[] =
 	    { WT_CONFIG_BASE(session, session_drop), "force", NULL };
@@ -73,6 +73,7 @@ __wt_lsm_merge(
 	dest = src = NULL;
 	locked = 0;
 	start_id = 0;
+	in_sync = 0;
 
 	/*
 	 * If the tree is open read-only or we are compacting, be very
@@ -344,6 +345,13 @@ __wt_lsm_merge(
 	    record_count, insert_count));
 
 	/*
+	 * Closing and syncing the files can take a while.  Set the
+	 * merge_syncing field so that compact knows it is still in
+	 * progress.
+	 */
+	WT_ATOMIC_ADD4(lsm_tree->merge_syncing, 1);
+	in_sync = 1;
+	/*
 	 * We've successfully created the new chunk.  Now install it.  We need
 	 * to ensure that the NO_CACHE flag is cleared and the bloom filter
 	 * is closed (even if a step fails), so track errors but don't return
@@ -391,6 +399,9 @@ __wt_lsm_merge(
 	WT_ERR(__wt_open_cursor(session, chunk->uri, NULL, cfg, &dest));
 	WT_TRET(dest->close(dest));
 	dest = NULL;
+	++lsm_tree->merge_progressing;
+	WT_ATOMIC_SUB4(lsm_tree->merge_syncing, 1);
+	in_sync = 0;
 	WT_ERR_NOTFOUND_OK(ret);
 
 	WT_ERR(__wt_lsm_tree_set_chunk_size(session, chunk));
@@ -444,6 +455,8 @@ __wt_lsm_merge(
 
 err:	if (locked)
 		WT_TRET(__wt_lsm_tree_unlock(session, lsm_tree));
+	if (in_sync)
+		WT_ATOMIC_SUB4(lsm_tree->merge_syncing, 1);
 	if (src != NULL)
 		WT_TRET(src->close(src));
 	if (dest != NULL)
