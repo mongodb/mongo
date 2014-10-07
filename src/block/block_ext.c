@@ -1302,7 +1302,7 @@ __wt_block_extlist_truncate(
 {
 	WT_EXT *ext, **astack[WT_SKIP_MAXDEPTH];
 	WT_FH *fh;
-	wt_off_t size;
+	wt_off_t orig, size;
 
 	fh = block->fh;
 
@@ -1312,22 +1312,29 @@ __wt_block_extlist_truncate(
 	 */
 	if ((ext = __block_off_srch_last(el->off, astack)) == NULL)
 		return (0);
-	if (ext->off + ext->size != fh->size)
+	WT_ASSERT(session, ext->off + ext->size <= fh->size);
+	if (ext->off + ext->size < fh->size)
 		return (0);
 
-	WT_RET(__wt_verbose(session, WT_VERB_BLOCK,
-	    "truncate file from %" PRIdMAX " to %" PRIdMAX,
-	    (intmax_t)fh->size, (intmax_t)ext->off));
-
 	/*
-	 * We're about to remove the extent list entry, save the value, we need
-	 * it to reset the cached file size, and that can't happen until after
-	 * truncate and extent list removal succeed.
+	 * Remove the extent list entry. (Save the value, we need it to reset
+	 * the cached file size, and that can't happen until after the extent
+	 * list removal succeeds.)
 	 */
+	orig = fh->size;
 	size = ext->off;
-	WT_RET_BUSY_OK(__wt_ftruncate(session, block->fh, size));
 	WT_RET(__block_off_remove(session, el, size, NULL));
 	fh->size = size;
+
+	/*
+	 * Truncate the file. The truncate might fail if there's a file mapping
+	 * (if there's an open checkpoint on the file), that's OK, we'll ignore
+	 * those blocks.
+	 */
+	WT_RET(__wt_verbose(session, WT_VERB_BLOCK,
+	    "truncate file from %" PRIdMAX " to %" PRIdMAX,
+	    (intmax_t)orig, (intmax_t)size));
+	WT_RET_BUSY_OK(__wt_ftruncate(session, block->fh, size));
 
 	return (0);
 }
