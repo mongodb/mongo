@@ -307,6 +307,7 @@ add_option( "use-system-yaml", "use system version of yaml", 0, True )
 
 add_option( "use-system-all" , "use all system libraries", 0 , True )
 
+# deprecated
 add_option( "use-new-tools" , "put new tools in the tarball", 0 , False )
 
 add_option( "use-cpu-profiler",

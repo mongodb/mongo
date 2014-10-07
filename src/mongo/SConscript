@@ -1011,55 +1011,19 @@ mongod = env.Install(
 Default( mongod )
 
 # tools
-allToolFiles = ["tools/tool.cpp",
-                "tools/shim_mode.cpp",
-                "tools/stat_util.cpp",
-                "tools/tool_logger.cpp"]
-env.Library("tool_options", "tools/tool_options.cpp",
-            LIBDEPS=["server_options",
-                     "$BUILD_DIR/mongo/util/options_parser/options_parser_init",
-                     "serveronly",
-                     "coreserver",
-                     "coredb",
-                     ])
-env.Library("alltools",
-            allToolFiles,
-            LIBDEPS=["serveronly",
-                     "coreserver",
-                     "coredb",
-                     "signal_handlers",
-                     "$BUILD_DIR/mongo/util/options_parser/options_parser",
-                     "$BUILD_DIR/mongo/db/auth/authmocks",
-                     "$BUILD_DIR/mongo/db/auth/authmongod",
-                     "$BUILD_DIR/mongo/db/repl/repl_coordinator_global",
-                     "$BUILD_DIR/mongo/db/repl/replmocks"])
-
-normalTools = [ "dump", "restore", "export", "import", "shim", "stat", "top", "oplog" ]
 rewrittenTools = [ "mongodump", "mongorestore", "mongoexport", "mongoimport", "mongostat", "mongotop", "bsondump", "mongofiles", "mongooplog" ]
-env.Alias( "tools", [ "#/${PROGPREFIX}mongo" + name + "${PROGSUFFIX}" for name in normalTools ] )
-for name in normalTools:
-    env.Install( '#/', env.Program("mongo" + name,
-                                   ["tools/" + name + ".cpp", "tools/mongo" + name + "_options_init.cpp"],
-                                   LIBDEPS=["alltools", "mongo" + name + "_options"]) )
-    env.Library("mongo" + name + "_options", ["tools/mongo" + name + "_options.cpp"],
-                LIBDEPS=['tool_options'])
 
 #some special tools
-env.Library("mongofiles_options", ["tools/mongofiles_options.cpp"],
-            LIBDEPS=['tool_options'])
-env.Library("bsondump_options", ["tools/bsondump_options.cpp"],
-            LIBDEPS=['tool_options'])
 env.Library("mongobridge_options", ["tools/mongobridge_options.cpp"],
             LIBDEPS = [
-                'tool_options',
+                'serveronly',
+                'coreserver',
+                'coredb',
                 'signal_handlers_synchronous',
+                '$BUILD_DIR/mongo/util/options_parser/options_parser_init',
             ])
 
 env.Install( '#/', [
-        env.Program( "mongofiles", ["tools/files.cpp", "tools/mongofiles_options_init.cpp"],
-                     LIBDEPS=["alltools", "gridfs", "mongofiles_options"] ),
-        env.Program( "bsondump", ["tools/bsondump.cpp", "tools/bsondump_options_init.cpp"],
-                     LIBDEPS=["alltools", "bsondump_options"]),
         env.Program( "mongobridge", ["tools/bridge.cpp", "tools/mongobridge_options_init.cpp"],
                      LIBDEPS=["serveronly", "coredb", "mongobridge_options"] ),
         env.Program( "mongoperf", "client/examples/mongoperf.cpp",
@@ -1300,18 +1264,12 @@ def installExternalBinary( e, name ):
     if nix:
         e.AddPostAction( inst, 'chmod 755 $TARGET' )
 
-if has_option("use-new-tools"):
-    for t in rewrittenTools:
-        installExternalBinary(env, "src/mongo-tools/" + t)
+for t in rewrittenTools:
+    installExternalBinary(env, "src/mongo-tools/" + t)
 
-    # old tools + tools not rewritten yet
-    for t in ["mongoperf", "mongoshim"]:
-        installBinary( env, t )
-        env.Alias("tools", '#/' + add_exe(t))
-else:
-    for t in ["mongo" + x for x in normalTools] + ["mongofiles", "bsondump", "mongoperf" ]:
-        installBinary( env, t )
-        env.Alias("tools", '#/' + add_exe(t))
+# old tools
+installBinary(env, "mongoperf")
+env.Alias("tools", '#/' + add_exe("mongoperf"))
 
 env.Alias("tools", "#/" + add_exe("perftest"))
 env.Alias("tools", "#/" + add_exe("mongobridge"))
