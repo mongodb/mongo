@@ -573,16 +573,12 @@ namespace mongo {
                 // 5. If the collection is empty, and it's still possible to create an index
                 //    on the proposed key, we go ahead and do so.
 
-                string indexNS = config->getName() + ".system.indexes";
+                list<BSONObj> indexes = conn->getIndexSpecs( ns );
 
                 // 1.  Verify consistency with existing unique indexes
-                BSONObj uniqueQuery = BSON( "ns" << ns << "unique" << true );
-                auto_ptr<DBClientCursor> uniqueQueryResult =
-                                conn->query( indexNS , uniqueQuery );
-
                 ShardKeyPattern proposedShardKey( proposedKey );
-                while ( uniqueQueryResult->more() ) {
-                    BSONObj idx = uniqueQueryResult->next();
+                for ( list<BSONObj>::iterator it = indexes.begin(); it != indexes.end(); ++it ) {
+                    BSONObj idx = *it;
                     BSONObj currentKey = idx["key"].embeddedObject();
                     if( ! proposedShardKey.isUniqueIndexCompatible( currentKey ) ) {
                         errmsg = str::stream() << "can't shard collection '" << ns << "' "
@@ -598,14 +594,8 @@ namespace mongo {
                 // 2. Check for a useful index
                 bool hasUsefulIndexForKey = false;
 
-                BSONObj allQuery = BSON( "ns" << ns );
-                auto_ptr<DBClientCursor> allQueryResult =
-                                conn->query( indexNS , allQuery );
-
-                BSONArrayBuilder allIndexes;
-                while ( allQueryResult->more() ) {
-                    BSONObj idx = allQueryResult->next();
-                    allIndexes.append( idx );
+                for ( list<BSONObj>::iterator it = indexes.begin(); it != indexes.end(); ++it ) {
+                    BSONObj idx = *it;
                     BSONObj currentKey = idx["key"].embeddedObject();
                     // Check 2.i. and 2.ii.
                     if ( ! idx["sparse"].trueValue() && proposedKey.isPrefixOf( currentKey ) ) {
@@ -633,7 +623,14 @@ namespace mongo {
                 bool careAboutUnique = cmdObj["unique"].trueValue();
                 if ( hasUsefulIndexForKey && careAboutUnique ) {
                     BSONObj eqQuery = BSON( "ns" << ns << "key" << proposedKey );
-                    BSONObj eqQueryResult = conn->findOne( indexNS, eqQuery );
+                    BSONObj eqQueryResult;
+                    for ( list<BSONObj>::iterator it = indexes.begin(); it != indexes.end(); ++it ) {
+                        BSONObj idx = *it;
+                        if ( idx["key"].embeddedObject() == proposedKey ) {
+                            eqQueryResult = idx;
+                            break;
+                        }
+                    }
                     if ( eqQueryResult.isEmpty() ) {
                         hasUsefulIndexForKey = false;  // if no exact match, index not useful,
                                                        // but still possible to create one later
@@ -669,7 +666,7 @@ namespace mongo {
                     errmsg = str::stream() << "please create an index that starts with the "
                                            << "shard key before sharding.";
                     result.append( "proposedKey" , proposedKey );
-                    result.appendArray( "curIndexes" , allIndexes.done() );
+                    result.append( "curIndexes" , indexes );
                     conn.done();
                     return false;
                 }
