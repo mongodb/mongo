@@ -189,6 +189,8 @@ functions:
     command: shell.exec
     params:
       working_dir: src
+      # Set up Kerberos stuff: run kinit if necessary, and add KDC to registry
+      # on Windows (see https://wiki.mongodb.com/display/DH/Testing+Kerberos)
       script: |
         if [ '${run_kinit}' = 'true' ]
         then
