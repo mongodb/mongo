@@ -188,13 +188,11 @@ namespace repl {
                                           Status* result) = 0;
 
         // produce a reply to a heartbeat
-        virtual void prepareHeartbeatResponse(const ReplicationExecutor::CallbackData& data,
-                                              Date_t now,
-                                              const ReplSetHeartbeatArgs& args,
-                                              const std::string& ourSetName,
-                                              const OpTime& lastOpApplied,
-                                              ReplSetHeartbeatResponse* response,
-                                              Status* result) = 0;
+        virtual Status prepareHeartbeatResponse(Date_t now,
+                                                const ReplSetHeartbeatArgs& args,
+                                                const std::string& ourSetName,
+                                                const OpTime& lastOpApplied,
+                                                ReplSetHeartbeatResponse* response) = 0;
 
         // produce a reply to a status request
         virtual void prepareStatusResponse(const ReplicationExecutor::CallbackData& data,

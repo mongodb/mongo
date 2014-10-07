@@ -28,8 +28,10 @@
  *    it in the license file.
  */
 
-#include "mongo/db/ops/update.h"
 #include "mongo/db/storage/mmap_v1/catalog/namespace_details_rsv1_metadata.h"
+
+#include "mongo/db/operation_context.h"
+#include "mongo/db/ops/update.h"
 
 namespace mongo {
     NamespaceDetailsRSV1MetaData::NamespaceDetailsRSV1MetaData( const StringData& ns,

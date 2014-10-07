@@ -280,6 +280,12 @@ namespace {
 
         response->append("syncFromRequested", target.toString());
 
+        if (_selfIndex == -1) {
+            *result = Status(ErrorCodes::NotSecondary,
+                             "Removed and uninitialized nodes do not sync");
+            return;
+        }
+
         const MemberConfig& selfConfig = _selfConfig();
         if (selfConfig.isArbiter()) {
             *result = Status(ErrorCodes::NotSecondary, "arbiters don't sync");
@@ -364,6 +370,12 @@ namespace {
             Status* result) {
         if (cbData.status == ErrorCodes::CallbackCanceled) {
             *result = Status(ErrorCodes::ShutdownInProgress, "replication system is shutting down");
+            return;
+        }
+
+        if (!_currentConfig.isInitialized()) {
+            *result = Status(ErrorCodes::ReplicaSetNotFound,
+                             "Cannot participate in elections because not initialized");
             return;
         }
 
@@ -471,6 +483,12 @@ namespace {
             return;
         }
 
+        if (_selfIndex == -1) {
+            *result = Status(ErrorCodes::ReplicaSetNotFound,
+                             "Cannot participate in election because not initialized");
+            return;
+        }
+
         const long long myver = _currentConfig.getConfigVersion();
         const int highestPriorityIndex = _getHighestPriorityElectableIndex();
 
@@ -540,34 +558,28 @@ namespace {
     }
 
     // produce a reply to a heartbeat
-    void TopologyCoordinatorImpl::prepareHeartbeatResponse(
-            const ReplicationExecutor::CallbackData& data,
+    Status TopologyCoordinatorImpl::prepareHeartbeatResponse(
             Date_t now,
             const ReplSetHeartbeatArgs& args,
             const std::string& ourSetName,
             const OpTime& lastOpApplied,
-            ReplSetHeartbeatResponse* response,
-            Status* result) {
-        if (data.status == ErrorCodes::CallbackCanceled) {
-            *result = Status(ErrorCodes::ShutdownInProgress, "replication system is shutting down");
-            return;
-        }
+            ReplSetHeartbeatResponse* response) {
 
         if (args.getProtocolVersion() != 1) {
-            *result = Status(ErrorCodes::BadValue,
-                             str::stream() << "replset: incompatible replset protocol version: "
-                                           << args.getProtocolVersion());
-            return;
+            return Status(ErrorCodes::BadValue,
+                          str::stream() << "replset: incompatible replset protocol version: "
+                          << args.getProtocolVersion());
         }
 
         // Verify that replica set names match
-        std::string rshb = std::string(args.getSetName());
+        const std::string rshb = args.getSetName();
         if (ourSetName != rshb) {
-            *result = Status(ErrorCodes::BadValue, "repl set names do not match");
             log() << "replSet set names do not match, ours: " << ourSetName <<
                 "; remote node's: " << rshb;
             response->noteMismatched();
-            return;
+            return Status(ErrorCodes::InconsistentReplicaSetNames, str::stream() <<
+                          "Our set name of " << ourSetName << " does not match name " << rshb <<
+                          " reported by remote node");
         }
         if (_currentConfig.isInitialized()) {
             invariant(_currentConfig.getReplSetName() == args.getSetName());
@@ -575,7 +587,7 @@ namespace {
 
         // This is a replica set
         response->noteReplSet();
-        response->setSetName(_currentConfig.getReplSetName());
+        response->setSetName(ourSetName);
 
         const MemberState myState = getMemberState();
         response->setState(myState.s);
@@ -595,7 +607,12 @@ namespace {
             response->setSyncingTo(_syncSource.toString());
         }
 
-        long long v = _currentConfig.getConfigVersion();
+        if (!_currentConfig.isInitialized()) {
+            response->setVersion(-2);
+            return Status::OK();
+        }
+
+        const long long v = _currentConfig.getConfigVersion();
         response->setVersion(v);
         // Deliver new config if caller's version is older than ours
         if (v > args.getConfigVersion()) {
@@ -609,8 +626,7 @@ namespace {
         }
         if (from == -1) {
             // Can't find the member, so we leave out the stateDisagreement field
-            *result = Status::OK();
-            return;
+            return Status::OK();
         }
 
         // if we thought that this node is down, let it know
@@ -620,7 +636,7 @@ namespace {
 
         // note that we got a heartbeat from this node
         _hbdata[from].setLastHeartbeatRecv(now);
-        *result = Status::OK();
+        return Status::OK();
     }
 
 
@@ -643,7 +659,8 @@ namespace {
 
         PingStats& hbStats = _pings[target];
         Milliseconds alreadyElapsed(now.asInt64() - hbStats.getLastHeartbeatStartDate().asInt64());
-        if ((hbStats.getNumFailuresSinceLastStart() > kMaxHeartbeatRetries) ||
+        if (!_currentConfig.isInitialized() ||
+            (hbStats.getNumFailuresSinceLastStart() > kMaxHeartbeatRetries) ||
             (alreadyElapsed >= _currentConfig.getHeartbeatTimeoutPeriodMillis())) {
 
             // This is either the first request ever for "target", or the heartbeat timeout has
@@ -665,11 +682,16 @@ namespace {
         }
         else {
             hbArgs.setSetName(ourSetName);
-            hbArgs.setConfigVersion(0);
+            hbArgs.setConfigVersion(-2);
         }
 
-        Milliseconds timeout(_currentConfig.getHeartbeatTimeoutPeriodMillis().total_milliseconds() -
-                             alreadyElapsed.total_milliseconds()); 
+        const Milliseconds timeoutPeriod(
+                _currentConfig.isInitialized() ?
+                _currentConfig.getHeartbeatTimeoutPeriodMillis() :
+                Milliseconds(
+                        ReplicaSetConfig::kDefaultHeartbeatTimeoutPeriod.total_milliseconds()));
+        const Milliseconds timeout(
+                timeoutPeriod.total_milliseconds() - alreadyElapsed.total_milliseconds());
         return std::make_pair(hbArgs, timeout);
     }
 
@@ -707,7 +729,8 @@ namespace {
 
         Milliseconds alreadyElapsed(now.asInt64() - hbStats.getLastHeartbeatStartDate().asInt64());
         Date_t nextHeartbeatStartDate;
-        if ((hbStats.getNumFailuresSinceLastStart() <= kMaxHeartbeatRetries) &&
+        if (_currentConfig.isInitialized() &&
+            (hbStats.getNumFailuresSinceLastStart() <= kMaxHeartbeatRetries) &&
             (alreadyElapsed < _currentConfig.getHeartbeatTimeoutPeriodMillis())) {
 
             if (!hbResponse.isOK()) {
@@ -723,8 +746,10 @@ namespace {
         }
 
         if (hbResponse.isOK() && hbResponse.getValue().hasConfig()) {
+            const long long currentConfigVersion =
+                _currentConfig.isInitialized() ? _currentConfig.getConfigVersion() : -2;
             const ReplicaSetConfig& newConfig = hbResponse.getValue().getConfig();
-            if (newConfig.getConfigVersion() > _currentConfig.getConfigVersion()) {
+            if (newConfig.getConfigVersion() > currentConfigVersion) {
                 HeartbeatResponseAction nextAction = HeartbeatResponseAction::makeReconfigAction();
                 nextAction.setNextHeartbeatStartDate(nextHeartbeatStartDate);
                 return nextAction;
@@ -732,19 +757,31 @@ namespace {
             else {
                 // Could be we got the newer version before we got the response, or the
                 // target erroneously sent us one, even through it isn't newer.
-                if (newConfig.getConfigVersion() < _currentConfig.getConfigVersion()) {
+                if (newConfig.getConfigVersion() < currentConfigVersion) {
                     LOG(1) << "Config version from heartbeat was older than ours.";
                 }
                 else {
                     LOG(2) << "Config from heartbeat response was same as ours.";
                 }
-                LOG(2) << "Current Config: " << _currentConfig.toBSON()
-                       << " config in heartbeat: " << newConfig.toBSON();
+                if (logger::globalLogDomain()->shouldLog(
+                            MongoLogDefaultComponent_component,
+                            ::mongo::LogstreamBuilder::severityCast(2))) {
+                    LogstreamBuilder lsb = log();
+                    if (_currentConfig.isInitialized()) {
+                        lsb << "Current config: " << _currentConfig.toBSON() << "; ";
+                    }
+                    lsb << "Config in heartbeat: " << newConfig.toBSON();
+                }
             }
         }
 
         // Check if the heartbeat target is in our config.  If it isn't, there's nothing left to do,
         // so return early.
+        if (!_currentConfig.isInitialized()) {
+            HeartbeatResponseAction nextAction = HeartbeatResponseAction::makeNoAction();
+            nextAction.setNextHeartbeatStartDate(nextHeartbeatStartDate);
+            return nextAction;
+        }
         const int memberIndex = findMemberIndexForHostAndPort(_currentConfig, target);
         if (memberIndex == -1) {
             LOG(1) << "replset: Could not find " << target  << " in current config so ignoring --"
@@ -911,6 +948,7 @@ namespace {
                 return _stepDownSelf();
             }
 
+            LOG(2) << "Choosing to remain primary";
             return HeartbeatResponseAction::makeNoAction();
         }
 
@@ -920,10 +958,14 @@ namespace {
         // candidate.
 
         if (_role == Role::candidate) {
+            LOG(2) << "Not standing for election again; already candidate";
             return HeartbeatResponseAction::makeNoAction();
         }
 
-        if (None != _getMyUnelectableReason(now, lastOpApplied)) {
+        UnelectableReason unelectableReason = _getMyUnelectableReason(now, lastOpApplied);
+        if (None != unelectableReason) {
+            LOG(2) << "Not standing for election because " <<
+                _getUnelectableReasonString(unelectableReason);
             return HeartbeatResponseAction::makeNoAction();
         }
 
@@ -960,16 +1002,12 @@ namespace {
     }
 
     int TopologyCoordinatorImpl::_totalVotes() const {
-        static int complain = 0;
         int vTot = 0;
         for (ReplicaSetConfig::MemberIterator it = _currentConfig.membersBegin();
              it != _currentConfig.membersEnd();
              ++it) {
             vTot += it->getNumVotes();
         }
-        if( vTot % 2 == 0 && vTot && complain++ == 0 )
-            log() << "replSet warning: even number of voting members in replica set config - "
-                     "add an arbiter or set votes to 0 on one of the existing members";
         return vTot;
     }
 
@@ -1197,7 +1235,8 @@ namespace {
         // sort members bson
         sort(membersOut.begin(), membersOut.end());
 
-        response->append("set", _currentConfig.getReplSetName());
+        response->append("set",
+                         _currentConfig.isInitialized() ? _currentConfig.getReplSetName() : "");
         response->append("date", now);
         response->append("myState", myState.s);
 
@@ -1377,7 +1416,6 @@ namespace {
             // we're electable, we must transition to candidate, in leiu of heartbeats.
             _role = Role::candidate;
         }
-
     }
 
     // TODO(emilkie): Better story for heartbeat message handling.

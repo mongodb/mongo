@@ -37,7 +37,7 @@
 #include "mongo/db/catalog/database.h"
 #include "mongo/db/catalog/database_holder.h"
 #include "mongo/db/client.h"
-#include "mongo/db/operation_context_impl.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/db/query/plan_executor.h"
 #include "mongo/platform/random.h"
 #include "mongo/util/startup_test.h"
@@ -173,14 +173,14 @@ namespace mongo {
             ns = it->second;
         }
 
-        NamespaceString nss( ns );
+        const NamespaceString nss( ns );
 
         if ( checkAuth ) {
             AuthorizationSession* as = txn->getClient()->getAuthorizationSession();
             bool isAuthorized = as->isAuthorizedForActionsOnNamespace(
                                                 nss, ActionType::killCursors);
             if ( !isAuthorized ) {
-                audit::logKillCursorsAuthzCheck( currentClient.get(),
+                audit::logKillCursorsAuthzCheck( txn->getClient(),
                                                  nss,
                                                  id,
                                                  ErrorCodes::Unauthorized );
@@ -188,22 +188,22 @@ namespace mongo {
             }
         }
 
-        Lock::DBRead lock(txn->lockState(), ns);
-        Database* db = dbHolder().get(txn, ns);
-        if ( !db )
+        AutoGetCollectionForRead ctx(txn, nss);
+        if (!ctx.getDb()) {
             return false;
-        Client::Context context(txn, ns, db );
-        Collection* collection = db->getCollection( txn, ns );
+        }
+
+        Collection* collection = ctx.getCollection();
         if ( !collection ) {
             if ( checkAuth )
-                audit::logKillCursorsAuthzCheck( currentClient.get(),
+                audit::logKillCursorsAuthzCheck( txn->getClient(),
                                                  nss,
                                                  id,
                                                  ErrorCodes::CursorNotFound );
             return false;
         }
 
-        return collection->cursorCache()->eraseCursor( id, checkAuth );
+        return collection->cursorCache()->eraseCursor(txn, id, checkAuth);
     }
 
     std::size_t GlobalCursorIdCache::timeoutCursors(OperationContext* txn, int millisSinceLastCall) {
@@ -217,13 +217,12 @@ namespace mongo {
         size_t totalTimedOut = 0;
 
         for ( unsigned i = 0; i < todo.size(); i++ ) {
-            const string& ns = todo[i];
-            Lock::DBRead lock(txn->lockState(), ns);
-            Database* db = dbHolder().get(txn, ns);
-            if ( !db )
+            AutoGetCollectionForRead ctx(txn, todo[i]);
+            if (!ctx.getDb()) {
                 continue;
-            Client::Context context(txn,  ns, db );
-            Collection* collection = db->getCollection( txn, ns );
+            }
+
+            Collection* collection = ctx.getCollection();
             if ( collection == NULL ) {
                 continue;
             }
@@ -464,14 +463,13 @@ namespace mongo {
         _deregisterCursor_inlock( cc );
     }
 
-    bool CollectionCursorCache::eraseCursor( CursorId id, bool checkAuth ) {
-
+    bool CollectionCursorCache::eraseCursor(OperationContext* txn, CursorId id, bool checkAuth) {
         SimpleMutex::scoped_lock lk( _mutex );
 
         CursorMap::iterator it = _cursors.find( id );
         if ( it == _cursors.end() ) {
             if ( checkAuth )
-                audit::logKillCursorsAuthzCheck( currentClient.get(),
+                audit::logKillCursorsAuthzCheck( txn->getClient(),
                                                  _nss,
                                                  id,
                                                  ErrorCodes::CursorNotFound );
@@ -481,7 +479,7 @@ namespace mongo {
         ClientCursor* cursor = it->second;
 
         if ( checkAuth )
-            audit::logKillCursorsAuthzCheck( currentClient.get(),
+            audit::logKillCursorsAuthzCheck( txn->getClient(),
                                              _nss,
                                              id,
                                              ErrorCodes::OK );

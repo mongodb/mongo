@@ -88,10 +88,7 @@ namespace mongo {
                 b.append( "sizeOnDisk", (double) size );
                 totalSize += size;
 
-                {
-                    Client::ReadContext rc(txn, *i );
-                    b.appendBool( "empty", rc.ctx().db()->getDatabaseCatalogEntry()->isEmpty() );
-                }
+                b.appendBool("empty", size == 0);
 
                 dbInfos.push_back( b.obj() );
 
@@ -99,24 +96,27 @@ namespace mongo {
             }
 
             set<string> allShortNames;
-            {
-                Lock::GlobalRead lk(txn->lockState());
-                dbHolder().getAllShortNames(allShortNames);
-            }
+            dbHolder().getAllShortNames(allShortNames);
 
             for ( set<string>::iterator i = allShortNames.begin(); i != allShortNames.end(); i++ ) {
                 string name = *i;
 
-                if ( seen.count( name ) )
+                if (seen.count(name)) {
                     continue;
+                }
+
+                // This should never happen once the write collection locking changes are in
+                // invariant(false);
 
                 BSONObjBuilder b;
                 b.append( "name" , name );
                 b.append( "sizeOnDisk" , (double)1.0 );
 
                 {
-                    Client::ReadContext ctx(txn, name);
-                    b.appendBool( "empty", ctx.ctx().db()->getDatabaseCatalogEntry()->isEmpty() );
+                    // This will open the database, if it was closed
+                    AutoGetDb autoDb(txn, *i, newlm::MODE_S);
+                    Database* db = autoDb.getDb();
+                    b.appendBool("empty", db->getDatabaseCatalogEntry()->isEmpty());
                 }
 
                 dbInfos.push_back( b.obj() );

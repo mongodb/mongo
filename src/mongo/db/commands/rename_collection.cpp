@@ -178,8 +178,7 @@ namespace mongo {
             // Dismissed on success
             ScopeGuard indexBuildRestorer = MakeGuard(IndexBuilder::restoreIndexes, indexesInProg);
 
-            bool unused;
-            Database* const targetDB = dbHolder().getOrCreate(txn, nsToDatabase(target), unused);
+            Database* const targetDB = dbHolder().openDb(txn, nsToDatabase(target));
 
             {
                 WriteUnitOfWork wunit(txn);

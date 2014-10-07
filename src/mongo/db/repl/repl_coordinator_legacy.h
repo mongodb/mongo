@@ -104,7 +104,7 @@ namespace repl {
 
         virtual int getMyId() const;
 
-        virtual void setFollowerMode(const MemberState& newState);
+        virtual bool setFollowerMode(const MemberState& newState);
 
         virtual bool isWaitingForApplierToDrain();
 

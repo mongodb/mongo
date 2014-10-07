@@ -269,7 +269,6 @@ namespace mongo {
             indexSize += collection->getIndexSize(opCtx);
         }
 
-        output->append      ( "db" , _name );
         output->appendNumber( "collections" , ncollections );
         output->appendNumber( "objects" , objects );
         output->append      ( "avgObjSize" , objects == 0 ? 0 : double(size) / double(objects) );
@@ -507,11 +506,13 @@ namespace mongo {
         if( n.size() == 0 ) return;
         log() << "dropAllDatabasesExceptLocal " << n.size() << endl;
 
-        for( vector<string>::iterator i = n.begin(); i != n.end(); i++ ) {
-            if( *i != "local" ) {
+        for (vector<string>::iterator i = n.begin(); i != n.end(); i++) {
+            if (*i != "local") {
+                Database* db = dbHolder().get(txn, *i);
+                invariant(db);
+
                 WriteUnitOfWork wunit(txn);
-                Client::Context ctx(txn, *i);
-                dropDatabase(txn, ctx.db());
+                dropDatabase(txn, db);
                 wunit.commit();
             }
         }
@@ -539,7 +540,7 @@ namespace mongo {
         txn->recoveryUnit()->syncDataAndTruncateJournal();
 
         dbHolder().close( txn, name );
-        db = 0; // d is now deleted
+        db = NULL; // d is now deleted
 
         getGlobalEnvironment()->getGlobalStorageEngine()->dropDatabase( txn, name );
     }

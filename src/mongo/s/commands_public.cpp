@@ -1843,6 +1843,11 @@ namespace mongo {
                     }
                 }
 
+                if (customOut.hasField("inline") && shardedOutput) {
+                    errmsg = "cannot specify inline and sharded output at the same time";
+                    return false;
+                }
+
                 // modify command to run on shards with output to tmp collection
                 string badShardedField;
                 verify( maxChunkSizeBytes < 0x7fffffff );

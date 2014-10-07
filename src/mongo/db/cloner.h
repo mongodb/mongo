@@ -31,19 +31,18 @@
 #pragma once
 
 #include "mongo/client/dbclientinterface.h"
-#include "mongo/db/client.h"
-#include "mongo/db/jsobj.h"
+#include "mongo/base/disallow_copying.h"
 
 namespace mongo {
 
     struct CloneOptions;
     class DBClientBase;
-    class DBClientCursor;
     class NamespaceString;
     class OperationContext;
-    class Query;
 
-    class Cloner: boost::noncopyable {
+
+    class Cloner {
+        MONGO_DISALLOW_COPYING(Cloner);
     public:
         Cloner();
 

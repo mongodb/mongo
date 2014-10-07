@@ -32,6 +32,7 @@
 #include <vector>
 
 #include "mongo/base/disallow_copying.h"
+#include "mongo/bson/oid.h"
 #include "mongo/db/repl/replica_set_config.h"
 #include "mongo/db/repl/replication_executor.h"
 #include "mongo/db/repl/scatter_gather_algorithm.h"
@@ -53,7 +54,7 @@ namespace repl {
             Algorithm(const ReplicaSetConfig& rsConfig,
                       int selfIndex,
                       const std::vector<HostAndPort>& targets,
-                      long long round);
+                      OID round);
 
             virtual ~Algorithm();
             virtual std::vector<ReplicationExecutor::RemoteCommandRequest> getRequests() const;
@@ -76,7 +77,7 @@ namespace repl {
             const ReplicaSetConfig _rsConfig;
             const int _selfIndex;
             const std::vector<HostAndPort> _targets;
-            const long long _round;
+            const OID _round;
         };
 
         ElectCmdRunner();

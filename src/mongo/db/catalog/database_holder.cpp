@@ -47,6 +47,23 @@ namespace mongo {
 
     static DatabaseHolder _dbHolder;
 
+namespace {
+    static StringData _todb(const StringData& ns) {
+        size_t i = ns.find('.');
+        if (i == std::string::npos) {
+            uassert(13074, "db name can't be empty", ns.size());
+            return ns;
+        }
+
+        uassert(13075, "db name can't be empty", i > 0);
+
+        const StringData d = ns.substr(0, i);
+        uassert(13280, "invalid db name: " + ns.toString(), NamespaceString::validDBName(d));
+
+        return d;
+    }
+}
+
     DatabaseHolder& dbHolder() {
         return _dbHolder;
     }
@@ -54,88 +71,88 @@ namespace mongo {
     Database* DatabaseHolder::get(OperationContext* txn,
                                   const StringData& ns) const {
 
-        const StringData db = _todb( ns );
-        txn->lockState()->assertAtLeastReadLocked(db);
+        const StringData db = _todb(ns);
+        invariant(txn->lockState()->isAtLeastReadLocked(db));
 
         SimpleMutex::scoped_lock lk(_m);
         DBs::const_iterator it = _dbs.find(db);
-        if ( it != _dbs.end() )
+        if (it != _dbs.end()) {
             return it->second;
+        }
+
         return NULL;
     }
 
-    Database* DatabaseHolder::getOrCreate(OperationContext* txn,
-                                          const StringData& ns,
-                                          bool& justCreated) {
+    Database* DatabaseHolder::openDb(OperationContext* txn,
+                                     const StringData& ns,
+                                     bool* justCreated) {
 
-        const StringData dbname = _todb( ns );
-        invariant(txn->lockState()->isAtLeastReadLocked(dbname));
+        const StringData dbname = _todb(ns);
+        invariant(txn->lockState()->isWriteLocked(dbname));
 
         Database* db = get(txn, ns);
         if (db) {
-            justCreated = false;
+            if (justCreated) {
+                *justCreated = false;
+            }
+
             return db;
         }
 
-        // todo: protect against getting sprayed with requests for different db names that DNE -
-        //       that would make the DBs map very large.  not clear what to do to handle though,
-        //       perhaps just log it, which is what we do here with the "> 40" :
-        bool cant = !txn->lockState()->isWriteLocked(ns);
-        if( logger::globalLogDomain()->shouldLog(logger::LogSeverity::Debug(1)) ||
-            _dbs.size() > 40 || cant || DEBUG_BUILD ) {
-            log() << "opening db: " << dbname;
-        }
-
-        massert(15927, "can't open database in a read lock. if db was just closed, consider retrying the query. might otherwise indicate an internal error", !cant);
-
+        // Check casing
         const string duplicate = Database::duplicateUncasedName(dbname.toString());
-        if ( !duplicate.empty() ) {
+        if (!duplicate.empty()) {
             stringstream ss;
             ss << "db already exists with different case already have: ["
                << duplicate
                << "] trying to create ["
                << dbname.toString()
                << "]";
-            uasserted( DatabaseDifferCaseCode , ss.str() );
+            uasserted(DatabaseDifferCaseCode, ss.str());
         }
+
         StorageEngine* storageEngine = getGlobalEnvironment()->getGlobalStorageEngine();
         invariant(storageEngine);
 
         DatabaseCatalogEntry* entry = storageEngine->getDatabaseCatalogEntry(txn, dbname);
         invariant(entry);
-        justCreated = !entry->exists();
+        if (justCreated) {
+            *justCreated = !entry->exists();
+        }
+
+        // Only one thread can be inside this method for the same DB name, because of the
+        // requirement for X-lock on the database. So there is no way we can insert two different
+        // databases for the same name.
+        SimpleMutex::scoped_lock lk(_m);
 
         db = new Database(dbname, entry);
-
-        {
-            SimpleMutex::scoped_lock lk(_m);
-            _dbs[dbname] = db;
-        }
+        _dbs[dbname] = db;
 
         return db;
     }
 
     void DatabaseHolder::close(OperationContext* txn,
                                const StringData& ns) {
+        // TODO: This should be fine if only a DB X-lock
         invariant(txn->lockState()->isW());
 
-        StringData db = _todb(ns);
+        const StringData dbName = _todb(ns);
 
         SimpleMutex::scoped_lock lk(_m);
-        DBs::const_iterator it = _dbs.find(db);
-        if ( it == _dbs.end() )
+
+        DBs::const_iterator it = _dbs.find(dbName);
+        if (it == _dbs.end()) {
             return;
+        }
 
         it->second->close( txn );
         delete it->second;
-        _dbs.erase( db );
+        _dbs.erase(it);
 
-        getGlobalEnvironment()->getGlobalStorageEngine()->closeDatabase( txn, db.toString() );
+        getGlobalEnvironment()->getGlobalStorageEngine()->closeDatabase(txn, dbName.toString());
     }
 
-    bool DatabaseHolder::closeAll(OperationContext* txn,
-                                  BSONObjBuilder& result,
-                                  bool force) {
+    bool DatabaseHolder::closeAll(OperationContext* txn, BSONObjBuilder& result, bool force) {
         invariant(txn->lockState()->isW());
 
         SimpleMutex::scoped_lock lk(_m);

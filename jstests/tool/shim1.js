@@ -4,7 +4,7 @@
 //
 // Mongoshim runs in a few modes:
 //
-// --mode=find (default):
+// --mode=find:
 //     Reads contents of a collection and writes the documents in BSON format to stdout.
 //     Documents may be filtered using the --query option.
 //     Another mongo tool "bsondump" may be used to convert the written BSON to a human-readable
@@ -26,9 +26,8 @@
 // --mode=repair:
 //     Reads record store for collection. Outputs valid documents.
 //
-//  --mode=applyOps:
-//     Applies oplog entries using the applyOps command. BSON documents read from stdin will
-//     be used as the list of operations to be applied to the oplog.
+//  --mode=command:
+//     Invokes db.runCommand() using command objects read from input.
 
 var baseName = 'jstests_tool_shim1';
 var dbPath = MongoRunner.dataPath + baseName + '/';
@@ -73,13 +72,47 @@ function stopServer() {
 // Invalid command line option and mode combinations
 //
 
-// Missing --collection option.
+// Missing --mode option.
 assert.neq(0, runMongoProgram('mongoshim', '--dbpath', dbPath,
                               '--db', dbName,
-                              '--out', externalFile),
+                              '--collection', collectionName),
+           'expected non-zero error code when required --mode option is omitted');
+
+// Missing --dbpath option.
+assert.neq(0, runMongoProgram('mongoshim',
+                              '--db', dbName,
+                              '--collection', collectionName,
+                              '--mode', 'find'),
+           'expected non-zero error code when required --dbpath option is omitted');
+
+// Missing --collection option when mode is not "command".
+assert.neq(0, runMongoProgram('mongoshim', '--dbpath', dbPath,
+                              '--db', dbName,
+                              '--mode', 'find'),
            'expected non-zero error code when required --collection option is omitted');
 
+// --collection and --mode=command are incompatible.
+assert.neq(0, runMongoProgram('mongoshim', '--dbpath', dbPath,
+                              '--db', dbName, '--collection', collectionName,
+                              '--mode', 'command'),
+           'expected non-zero error code when incompatible options --collection and ' +
+           '--mode=command are used');
 
+// --drop cannot be used with non-insert mode.
+assert.neq(0, runMongoProgram('mongoshim', '--dbpath', dbPath,
+                              '--db', dbName,
+                              '--mode', 'command',
+                              '--drop'),
+           'expected non-zero error code when incompatible options --drop and ' +
+           '--mode=command are used');
+
+// --upsertFields cannot be used with non-upsert mode.
+assert.neq(0, runMongoProgram('mongoshim', '--dbpath', dbPath,
+                              '--db', dbName, '--collection', collectionName,
+                              '--mode', 'insert',
+                              '--upsertFields', 'a,b,c'),
+           'expected non-zero error code when incompatible options --upsertFields and ' +
+           '--mode=insert are used');
 
 //
 // Basic tests for each mode.
@@ -92,10 +125,11 @@ collection.save({a: 1});
 var doc = collection.findOne();
 stopServer();
 
-// "read" mode - read collection with single document and write results to file.
+// "find" mode - read collection with single document and write results to file.
 // XXX: Do not check tool exit code. See SERVER-5520
 runMongoProgram('mongoshim', '--dbpath', dbPath,
                 '--db', dbName, '--collection', collectionName,
+                '--mode', 'find',
                 '--out', externalFile);
 assert.eq(Object.bsonsize(doc), fileSize(externalBaseName),
           'output BSON file size does not match size of document returned from find()');
@@ -111,6 +145,19 @@ collection = mongod.getDB(dbName).getCollection(collectionName);
 assert.eq(1, collection.count(), 'test document was not added to collection');
 var newDoc = collection.findOne();
 assert.eq(doc, newDoc, 'invalid document saved by mongoshim --mode=insert')
+stopServer();
+// drop collection before inserting new document.
+resetDbpath(dbPath);
+runMongoProgram('mongoshim', '--dbpath', dbPath,
+                '--db', dbName, '--collection', collectionName,
+                '--mode', 'insert',
+                '--drop',
+                '--inputDocuments', tojson({in: [{a: 1, c: 1}]}));
+mongod = startServer();
+collection = mongod.getDB(dbName).getCollection(collectionName);
+assert.eq(1, collection.count(), 'collection was not dropped before insertion');
+var newDoc = collection.findOne();
+assert.eq(1, newDoc.c, 'invalid document saved by mongoshim --mode=insert')
 stopServer();
 
 // "upsert" mode - upsert document from file into collection.
@@ -139,26 +186,55 @@ assert.eq(0, collection.count(), 'test document was not removed from collection'
 stopServer();
 
 // "applyOps" mode - apply oplog entries to collection.
-// Write BSON file containing operation to be applied.
-mongod = startServer();
-collection = mongod.getDB(dbName).getCollection(collectionName);
-var collectionFullName = collection.getFullName();
-var operationsCollection = mongod.getDB(dbName).getCollection(operationsCollectionName);
-operationsCollection.save({op: 'i', ns: collectionFullName, o: {_id: 1, a: 1 }});
-collection.drop();
-stopServer();
-runMongoProgram('mongoshim', '--dbpath', dbPath,
-                '--db', dbName, '--collection', operationsCollectionName,
-                '--out', externalOperationsFile);
-// Apply operations in BSON file.
+// Simulated using "command" mode.
 // If operation was applied successfully, we should see a document in
 // 'collectionName' collection (not 'operationsCollectionName').
+var collectionFullName = dbName + '.' + collectionName;
 runMongoProgram('mongoshim', '--dbpath', dbPath,
-                '--db', dbName, '--collection', operationsCollectionName,
-                '--mode', 'applyOps',
-                '--in', externalOperationsFile);
+                '--db', dbName,
+                '--mode', 'command',
+                '--inputDocuments',
+                tojson({in: [{applyOps: [
+                    {op: 'i', ns: collectionFullName, o: {_id: 1, a: 1}}]}]}));
 mongod = startServer();
 collection = mongod.getDB(dbName).getCollection(collectionName);
 assert.eq({_id: 1, a: 1 }, collection.findOne(),
           'mongoshim failed to apply operaton to ' + collectionName);
+stopServer();
+
+// "command" mode - invoke db.runCommand with command object read from input.
+// Command result written to output.
+// First "command" test case uses the "ping" command and saves the command
+// result into the test collection for verification.
+// Collection parameter is ignored in "command" mode.
+runMongoProgram('mongoshim', '--dbpath', dbPath,
+                '--db', dbName,
+                '--mode', 'command',
+                '--inputDocuments', tojson({in: [{ping: 1}]}),
+                '--out', externalFile);
+runMongoProgram('mongoshim', '--dbpath', dbPath,
+                '--db', dbName, '--collection', collectionName,
+                '--mode', 'insert',
+                '--drop',
+                '--in', externalFile);
+mongod = startServer();
+collection = mongod.getDB(dbName).getCollection(collectionName);
+assert.commandWorked(collection.findOne(),
+                     'mongoshim failed to run "ping" command');
+stopServer();
+// Second "command" test case runs a non-existent command.
+runMongoProgram('mongoshim', '--dbpath', dbPath,
+                '--db', dbName,
+                '--mode', 'command',
+                '--inputDocuments', tojson({in: [{noSuchCommand: 1}]}),
+                '--out', externalFile);
+runMongoProgram('mongoshim', '--dbpath', dbPath,
+                '--db', dbName, '--collection', collectionName,
+                '--mode', 'insert',
+                '--drop',
+                '--in', externalFile);
+mongod = startServer();
+collection = mongod.getDB(dbName).getCollection(collectionName);
+assert.commandFailed(collection.findOne(),
+                     'mongoshim should get a failed status from running "noSuchCommand" command');
 stopServer();

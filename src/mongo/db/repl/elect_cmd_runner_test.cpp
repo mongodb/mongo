@@ -49,10 +49,12 @@ namespace {
 
     class ElectCmdRunnerTest : public mongo::unittest::Test {
     public:
-        void doTest(ElectCmdRunner* electCmdRunner,
-                    const ReplicaSetConfig& currentConfig,
-                    int selfIndex,
-                    const std::vector<HostAndPort>& hosts);
+        void startTest(ElectCmdRunner* electCmdRunner,
+                       const ReplicaSetConfig& currentConfig,
+                       int selfIndex,
+                       const std::vector<HostAndPort>& hosts);
+
+        void waitForTest();
 
         void electCmdRunnerRunner(const ReplicationExecutor::CallbackData& data,
                                   ElectCmdRunner* electCmdRunner,
@@ -61,24 +63,25 @@ namespace {
                                   int selfIndex,
                                   const std::vector<HostAndPort>& hosts);
 
-        NetworkInterfaceMockWithMap* _net;
+        NetworkInterfaceMock* _net;
         boost::scoped_ptr<ReplicationExecutor> _executor;
         boost::scoped_ptr<boost::thread> _executorThread;
 
     private:
         void setUp();
         void tearDown();
+
+        ReplicationExecutor::EventHandle _allDoneEvent;
     };
 
     void ElectCmdRunnerTest::setUp() {
-        _net = new NetworkInterfaceMockWithMap;
+        _net = new NetworkInterfaceMock;
         _executor.reset(new ReplicationExecutor(_net, 1 /* prng seed */));
         _executorThread.reset(new boost::thread(stdx::bind(&ReplicationExecutor::run,
                                                            _executor.get())));
     }
 
     void ElectCmdRunnerTest::tearDown() {
-        _net->unblockAll();
         _executor->shutdown();
         _executorThread->join();
     }
@@ -101,6 +104,18 @@ namespace {
                     "round" << 380865962699346850ll);
     }
 
+    BSONObj stripRound(const BSONObj& orig) {
+        BSONObjBuilder builder;
+        for (BSONObjIterator iter(orig); iter.more(); iter.next()) {
+            BSONElement e = *iter;
+            if (e.fieldNameStringData() == "round") {
+                continue;
+            }
+            builder.append(e);
+        }
+        return builder.obj();
+    }
+
     // This is necessary because the run method must be scheduled in the Replication Executor
     // for correct concurrency operation.
     void ElectCmdRunnerTest::electCmdRunnerRunner(
@@ -119,10 +134,10 @@ namespace {
                 hosts);
     }
 
-    void ElectCmdRunnerTest::doTest(ElectCmdRunner* electCmdRunner,
-                                    const ReplicaSetConfig& currentConfig,
-                                    int selfIndex,
-                                    const std::vector<HostAndPort>& hosts) {
+    void ElectCmdRunnerTest::startTest(ElectCmdRunner* electCmdRunner,
+                                       const ReplicaSetConfig& currentConfig,
+                                       int selfIndex,
+                                       const std::vector<HostAndPort>& hosts) {
 
         StatusWith<ReplicationExecutor::EventHandle> evh(ErrorCodes::InternalError, "Not set");
         StatusWith<ReplicationExecutor::CallbackHandle> cbh =
@@ -138,7 +153,11 @@ namespace {
         ASSERT_OK(cbh.getStatus());
         _executor->wait(cbh.getValue());
         ASSERT_OK(evh.getStatus());
-        _executor->waitForEvent(evh.getValue());
+        _allDoneEvent = evh.getValue();
+    }
+
+    void ElectCmdRunnerTest::waitForTest() {
+        _executor->waitForEvent(_allDoneEvent);
     }
 
     TEST_F(ElectCmdRunnerTest, OneNode) {
@@ -151,7 +170,8 @@ namespace {
 
         std::vector<HostAndPort> hosts;
         ElectCmdRunner electCmdRunner;
-        doTest(&electCmdRunner, config, 0, hosts);
+        startTest(&electCmdRunner, config, 0, hosts);
+        waitForTest();
         ASSERT_EQUALS(electCmdRunner.getReceivedVotes(), 1);
     }
 
@@ -169,18 +189,27 @@ namespace {
 
         const BSONObj electRequest = makeElectRequest(config, 0);
 
-        _net->addResponse(RemoteCommandRequest(HostAndPort("h1"),
-                                               "admin",
-                                               electRequest),
-                          StatusWith<BSONObj>(BSON("ok" << 1 <<
-                                                   "vote" << 1 <<
-                                                   "round" << 380865962699346850ll)));
-
         ElectCmdRunner electCmdRunner;
-        doTest(&electCmdRunner, config, 0, hosts);
+        startTest(&electCmdRunner, config, 0, hosts);
+        const Date_t startDate = _net->now();
+        _net->enterNetwork();
+        const NetworkInterfaceMock::NetworkOperationIterator noi = _net->getNextReadyRequest();
+        ASSERT_EQUALS("admin", noi->getRequest().dbname);
+        ASSERT_EQUALS(stripRound(electRequest), stripRound(noi->getRequest().cmdObj));
+        ASSERT_EQUALS(HostAndPort("h1"), noi->getRequest().target);
+        _net->scheduleResponse(noi,
+                               startDate + 10,
+                               ResponseStatus(ReplicationExecutor::RemoteCommandResponse(
+                                                      BSON("ok" << 1 <<
+                                                           "vote" << 1 <<
+                                                           "round" << 380865962699346850ll),
+                                                      Milliseconds(8))));
+        _net->runUntil(startDate + 10);
+        _net->exitNetwork();
+        ASSERT_EQUALS(startDate + 10, _net->now());
+        waitForTest();
         ASSERT_EQUALS(electCmdRunner.getReceivedVotes(), 2);
     }
-
 
     TEST_F(ElectCmdRunnerTest, ShuttingDown) {
         // Two nodes, we are node h1.  Shutdown happens while we're scheduling remote commands.
@@ -193,15 +222,6 @@ namespace {
 
         std::vector<HostAndPort> hosts;
         hosts.push_back(config.getMemberAt(1).getHostAndPort());
-
-        const BSONObj electRequest = makeElectRequest(config, 0);
-        _net->addResponse(RemoteCommandRequest(HostAndPort("h1"),
-                                               "admin",
-                                               electRequest),
-                          StatusWith<BSONObj>(BSON("ok" << 1 <<
-                                                   "vote" << 1 <<
-                                                   "round" << 380865962699346850ll)),
-                          true /* isBlocked */);
 
         ElectCmdRunner electCmdRunner;
         StatusWith<ReplicationExecutor::EventHandle> evh(ErrorCodes::InternalError, "Not set");
@@ -219,7 +239,6 @@ namespace {
         _executor->wait(cbh.getValue());
         ASSERT_OK(evh.getStatus());
         _executor->shutdown();
-        _net->unblockAll();
         _executor->waitForEvent(evh.getValue());
         ASSERT_EQUALS(electCmdRunner.getReceivedVotes(), 1);
     }
@@ -242,7 +261,7 @@ namespace {
             _checker.reset(new ElectCmdRunner::Algorithm(config,
                                                          selfConfigIndex,
                                                          hosts,
-                                                         1954878951734LL));
+                                                         OID()));
         }
 
         virtual void tearDown() {
@@ -341,11 +360,8 @@ namespace {
         ASSERT_FALSE(hasReceivedSufficientResponses());
 
         processResponse(requestFrom("host2"), voteNay());
-        ASSERT_FALSE(hasReceivedSufficientResponses());
-
-        processResponse(requestFrom("host3"), voteYea());
         ASSERT_TRUE(hasReceivedSufficientResponses());
-        ASSERT_EQUALS(-9998, getReceivedVotes());
+        ASSERT_EQUALS(-9999, getReceivedVotes());
     }
 
     TEST_F(ElectScatterGatherTest, BothNodesAbstainFromVoting) {

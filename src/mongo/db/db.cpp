@@ -335,12 +335,11 @@ namespace mongo {
                                                     || replSettings.usingReplSets()
                                                     || replSettings.slave == repl::SimpleSlave);
 
-        for ( vector< string >::iterator i = dbNames.begin(); i != dbNames.end(); ++i ) {
+        for (vector<string>::const_iterator i = dbNames.begin(); i != dbNames.end(); ++i) {
             const string dbName = *i;
             LOG(1) << "    Recovering database: " << dbName << endl;
 
-            bool unusedJustCreated;
-            Database* db = dbHolder().getOrCreate(&txn, dbName, unusedJustCreated);
+            Database* db = dbHolder().openDb(&txn, dbName);
             invariant(db);
 
             // First thing after opening the database is to check for file compatibility,
@@ -410,6 +409,7 @@ namespace mongo {
 
         const repl::ReplSettings& replSettings =
                 repl::getGlobalReplicationCoordinator()->getSettings();
+
         {
             ProcessId pid = ProcessId::getCurrent();
             LogstreamBuilder l = log(LogComponent::kDefault);
@@ -512,16 +512,18 @@ namespace mongo {
 
         {
             OperationContextImpl txn;
-            const unsigned long long missingRepl = checkIfReplMissingFromCommandLine(&txn);
 
+            const unsigned long long missingRepl = checkIfReplMissingFromCommandLine(&txn);
             if (missingRepl) {
                 log() << startupWarningsLog;
                 log() << "** WARNING: mongod started without --replSet yet " << missingRepl
                       << " documents are present in local.system.replset" << startupWarningsLog;
-                log() << "**          Restart with --replSet unless you are doing maintenance and no"
-                      << " other clients are connected." << startupWarningsLog;
-                log() << "**          The TTL collection monitor will not start because of this." << startupWarningsLog;
-                log() << "**          For more info see http://dochub.mongodb.org/core/ttlcollections" << startupWarningsLog;
+                log() << "**          Restart with --replSet unless you are doing maintenance and "
+                      << " no other clients are connected." << startupWarningsLog;
+                log() << "**          The TTL collection monitor will not start because of this." 
+                      << startupWarningsLog;
+                log() << "**         ";
+                log() << " For more info see http://dochub.mongodb.org/core/ttlcollections";
                 log() << startupWarningsLog;
             }
             else {
@@ -532,13 +534,7 @@ namespace mongo {
         mongo::signalForkSuccess();
 #endif
 
-            if (getGlobalAuthorizationManager()->isAuthEnabled()) {
-                // open admin db in case we need to use it later. TODO this is not the right way to
-                // resolve this.
-                Client::WriteContext ctx(&txn, "admin");
-            }
-
-            authindex::configureSystemIndexes(&txn, "admin");
+            authindex::configureSystemIndexes(&txn);
 
             // SERVER-14090: Verify that auth schema version is schemaVersion26Final.
             int foundSchemaVersion;
@@ -564,7 +560,7 @@ namespace mongo {
 
             getDeleter()->startWorkers();
 
-            restartInProgressIndexesFromLastShutdown();
+            restartInProgressIndexesFromLastShutdown(&txn);
 
             repl::getGlobalReplicationCoordinator()->startReplication(&txn);
         }

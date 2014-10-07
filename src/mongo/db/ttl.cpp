@@ -128,7 +128,7 @@ namespace mongo {
                     }
 
                     if (!repl::getGlobalReplicationCoordinator()->canAcceptWritesForDatabase(
-                            collection->ns().db())) {
+                            dbName)) {
                         // we've stepped down since we started this function,
                         // so we should stop working as we only do deletes on the primary
                         break;
@@ -181,11 +181,8 @@ namespace mongo {
                     continue;
 
                 set<string> dbs;
-                {
-                    Lock::DBRead lk(txn.lockState(), "local");
-                    dbHolder().getAllShortNames( dbs );
-                }
-                
+                dbHolder().getAllShortNames( dbs );
+
                 ttlPasses.increment();
 
                 for ( set<string>::const_iterator i=dbs.begin(); i!=dbs.end(); ++i ) {

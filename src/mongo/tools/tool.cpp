@@ -42,7 +42,6 @@
 #include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/auth/authorization_manager_global.h"
 #include "mongo/db/auth/authz_manager_external_state_mock.h"
-#include "mongo/db/client.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/global_environment_experiment.h"
 #include "mongo/db/global_environment_d.h"
@@ -300,7 +299,7 @@ namespace mongo {
         return doRun();
     }
 
-    long long BSONTool::processFile( const boost::filesystem::path& root ) {
+    long long BSONTool::processFile(const boost::filesystem::path& root, std::ostream* out) {
         bool isFifoFile = boost::filesystem::status(root).type() == boost::filesystem::fifo_file;
         bool isStdin = root == "-";
 
@@ -384,7 +383,7 @@ namespace mongo {
             }
 
             if (!bsonToolGlobalParams.hasFilter || _matcher->matches(o)) {
-                gotObject( o );
+                gotObject(o, out);
                 processed++;
             }
 

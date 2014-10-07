@@ -186,55 +186,76 @@ namespace mongo {
 
         _finishInit();
     }
-       
-    /** "read lock, and set my context, all in one operation" 
-     *  This handles (if not recursively locked) opening an unopened database.
-     */
-    Client::ReadContext::ReadContext(
-                OperationContext* txn, const string& ns, bool doVersion) {
-        {
-            _lk.reset(new Lock::DBRead(txn->lockState(), ns));
-            Database *db = dbHolder().get(txn, ns);
-            if( db ) {
-                _c.reset(new Context(txn, ns, db, doVersion));
-                return;
-            }
-        }
 
-        // we usually don't get here, so doesn't matter how fast this part is
-        {
-            DEV log(LogComponent::kStorage)
-                << "_DEBUG ReadContext db wasn't open, will try to open " << ns << endl;
-            if (txn->lockState()->isW()) {
-                // write locked already
-                WriteUnitOfWork wunit(txn);
-                DEV RARELY log(LogComponent::kStorage)
-                    << "write locked on ReadContext construction " << ns << endl;
-                _c.reset(new Context(txn, ns, doVersion));
-                wunit.commit();
-            }
-            else if (!txn->lockState()->isRecursive()) {
-                _lk.reset(0);
-                {
-                    Lock::GlobalWrite w(txn->lockState());
-                    WriteUnitOfWork wunit(txn);
-                    Context c(txn, ns, doVersion);
-                    wunit.commit();
-                }
 
-                // db could be closed at this interim point -- that is ok, we will throw, and don't mind throwing.
-                _lk.reset(new Lock::DBRead(txn->lockState(), ns));
-                _c.reset(new Context(txn, ns, doVersion));
-            }
-            else { 
-                uasserted(15928, str::stream() << "can't open a database from a nested read lock " << ns);
-            }
-        }
+    AutoGetDb::AutoGetDb(OperationContext* txn, const StringData& ns, newlm::LockMode mode)
+            : _dbLock(txn->lockState(), ns, mode),
+              _db(dbHolder().get(txn, ns)) {
 
-        // todo: are receipts of thousands of queries for a nonexisting database a potential 
-        //       cause of bad performance due to the write lock acquisition above?  let's fix that.
-        //       it would be easy to first check that there is at least a .ns file, or something similar.
     }
+
+
+    AutoGetCollectionForRead::AutoGetCollectionForRead(OperationContext* txn,
+                                                       const std::string& ns)
+            : _txn(txn),
+              _nss(ns),
+              _dbLock(_txn->lockState(), _nss.db(), newlm::MODE_IS),
+              _db(NULL),
+              _coll(NULL) {
+
+        _init();
+    }
+
+    AutoGetCollectionForRead::AutoGetCollectionForRead(OperationContext* txn,
+                                                       const NamespaceString& nss)
+            : _txn(txn),
+              _nss(nss),
+              _dbLock(_txn->lockState(), _nss.db(), newlm::MODE_IS),
+              _db(NULL),
+              _coll(NULL) {
+
+        _init();
+    }
+
+    void AutoGetCollectionForRead::_init() {
+        invariant(!_nss.coll().empty());
+
+        // TODO: Client::Context legacy, needs to be removed
+        _txn->getCurOp()->ensureStarted();
+        _txn->getCurOp()->setNS(_nss.toString());
+
+        // Lock both the DB and the collection (DB is locked in the constructor), because this is
+        // necessary in order to to shard version checking.
+        const newlm::ResourceId resId(newlm::RESOURCE_COLLECTION, _nss);
+        const newlm::LockMode collLockMode = supportsDocLocking() ? newlm::MODE_IS : newlm::MODE_S;
+
+        invariant(newlm::LOCK_OK == _txn->lockState()->lock(resId, collLockMode));
+
+        // Shard version check needs to be performed under the collection lock
+        ensureShardVersionOKOrThrow(_nss);
+
+        // At this point, we are locked in shared mode for the database by the DB lock in the
+        // constructor, so it is safe to load the DB pointer.
+        _db = dbHolder().get(_txn, _nss.db());
+        if (_db != NULL) {
+            // TODO: Client::Context legacy, needs to be removed
+            _txn->getCurOp()->enter(_nss.toString().c_str(), _db->getProfilingLevel());
+
+            _coll = _db->getCollection(_txn, _nss);
+        }
+    }
+
+    AutoGetCollectionForRead::~AutoGetCollectionForRead() {
+        // If the database is NULL, we would never have tried to lock the collection resource
+        if (_db) {
+            const newlm::ResourceId resId(newlm::RESOURCE_COLLECTION, _nss);
+            _txn->lockState()->unlock(resId);
+        }
+
+        // Report time spent in read lock
+        _txn->getCurOp()->recordGlobalTime(false, _timer.micros());
+    }
+
 
     Client::WriteContext::WriteContext(
                 OperationContext* opCtx, const std::string& ns, bool doVersion)
@@ -258,31 +279,14 @@ namespace mongo {
         }
         }
     }
-
-    // invoked from ReadContext
-    Client::Context::Context(OperationContext* txn,
-                             const string& ns,
-                             Database *db,
-                             bool doVersion)
-        : _client( currentClient.get() ), 
-          _justCreated(false),
-          _doVersion( doVersion ),
-          _ns( ns ), 
-          _db(db),
-          _txn(txn) {
-
-        verify(_db);
-        if (_doVersion) checkNotStale();
-        _client->_curOp->enter( this );
-    }
        
     void Client::Context::_finishInit() {
-        _db = dbHolder().getOrCreate(_txn, _ns, _justCreated);
+        _db = dbHolder().openDb(_txn, _ns, &_justCreated);
         invariant(_db);
 
         if( _doVersion ) checkNotStale();
 
-        _client->_curOp->enter( this );
+        _client->_curOp->enter(_ns.c_str(), _db->getProfilingLevel());
     }
     
     Client::Context::~Context() {

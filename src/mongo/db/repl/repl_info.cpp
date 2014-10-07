@@ -26,6 +26,8 @@
 *    it in the license file.
 */
 
+#include "mongo/platform/basic.h"
+
 #include <list>
 #include <vector>
 #include <boost/scoped_ptr.hpp>
@@ -74,12 +76,9 @@ namespace repl {
             list<BSONObj> src;
             {
                 const char* localSources = "local.sources";
-                Client::ReadContext ctx(txn, localSources);
+                AutoGetCollectionForRead ctx(txn, localSources);
                 auto_ptr<PlanExecutor> exec(
-                    InternalPlanner::collectionScan(txn,
-                                                    localSources,
-                                                    ctx.ctx().db()->getCollection(txn,
-                                                                                  localSources)));
+                    InternalPlanner::collectionScan(txn, localSources, ctx.getCollection()));
                 BSONObj obj;
                 PlanExecutor::ExecState state;
                 while (PlanExecutor::ADVANCED == (state = exec->getNext(&obj, NULL))) {
@@ -156,10 +155,12 @@ namespace repl {
             if (!theReplSet)
                 return BSONObj();
 
+            OperationContextImpl txn;
+
             BSONObjBuilder result;
             result.appendTimestamp("latestOptime", theReplSet->lastOpTimeWritten.asDate());
             result.appendTimestamp("earliestOptime",
-                                   theReplSet->getEarliestOpTimeWritten().asDate());
+                                   theReplSet->getEarliestOpTimeWritten(&txn).asDate());
 
             return result.obj();
         }

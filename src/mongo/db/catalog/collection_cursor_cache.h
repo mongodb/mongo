@@ -94,7 +94,7 @@ namespace mongo {
         CursorId registerCursor( ClientCursor* cc );
         void deregisterCursor( ClientCursor* cc );
 
-        bool eraseCursor( CursorId id, bool checkAuth );
+        bool eraseCursor(OperationContext* txn, CursorId id, bool checkAuth );
 
         void getCursorIds( std::set<CursorId>* openCursors );
         std::size_t numCursors();

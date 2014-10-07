@@ -983,7 +983,7 @@ namespace mongo {
                 verify( foundIndex );
             }
 
-            scoped_ptr<Client::ReadContext> ctx(new Client::ReadContext(_txn, _config.incLong));
+            scoped_ptr<AutoGetCollectionForRead> ctx(new AutoGetCollectionForRead(_txn, _config.incLong));
 
             BSONObj prev;
             BSONList all;
@@ -1004,7 +1004,7 @@ namespace mongo {
                                                 whereCallback).isOK());
 
             PlanExecutor* rawExec;
-            verify(getExecutor(_txn, getCollectionOrUassert(ctx->ctx().db(), _config.incLong),
+            verify(getExecutor(_txn, getCollectionOrUassert(ctx->getDb(), _config.incLong),
                                cq, &rawExec, QueryPlannerParams::NO_TABLE_SCAN).isOK());
 
             auto_ptr<PlanExecutor> exec(rawExec);
@@ -1039,7 +1039,7 @@ namespace mongo {
                 // reduce a finalize array
                 finalReduce( all );
 
-                ctx.reset(new Client::ReadContext(_txn, _config.incLong));
+                ctx.reset(new AutoGetCollectionForRead(_txn, _config.incLong));
 
                 all.clear();
                 prev = o;
@@ -1055,7 +1055,7 @@ namespace mongo {
             ctx.reset();
             // reduce and finalize last array
             finalReduce( all );
-            ctx.reset(new Client::ReadContext(_txn, _config.incLong));
+            ctx.reset(new AutoGetCollectionForRead(_txn, _config.incLong));
 
             pm.finished();
         }
@@ -1270,10 +1270,12 @@ namespace mongo {
                 // Prevent sharding state from changing during the MR.
                 auto_ptr<RangePreserver> rangePreserver;
                 {
-                    Client::ReadContext ctx(txn, config.ns);
-                    Collection* collection = ctx.ctx().db()->getCollection( txn, config.ns );
-                    if ( collection )
+                    AutoGetCollectionForRead ctx(txn, config.ns);
+
+                    Collection* collection = ctx.getCollection();
+                    if (collection) {
                         rangePreserver.reset(new RangePreserver(collection));
+                    }
 
                     // Get metadata before we check our version, to make sure it doesn't increment
                     // in the meantime.  Need to do this in the same lock scope as the block.
@@ -1332,14 +1334,11 @@ namespace mongo {
                     {
                         // We've got a cursor preventing migrations off, now re-establish our useful cursor
 
-                        // Need lock and context to use it
-                        scoped_ptr<Lock::DBRead> lock(new Lock::DBRead(txn->lockState(), config.ns));
-
-                        // This context does no version check, safe b/c we checked earlier and have an
-                        // open cursor
-                        scoped_ptr<Client::Context> ctx(new Client::Context(txn, config.ns, false));
-
                         const NamespaceString nss(config.ns);
+
+                        // Need lock and context to use it
+                        scoped_ptr<Lock::DBRead> lock(new Lock::DBRead(txn->lockState(), nss.db()));
+
                         const WhereCallbackReal whereCallback(txn, nss.db());
 
                         CanonicalQuery* cq;
@@ -1353,8 +1352,11 @@ namespace mongo {
                             return 0;
                         }
 
+                        Database* db = dbHolder().get(txn, nss.db());
+                        invariant(db);
+
                         PlanExecutor* rawExec;
-                        if (!getExecutor(txn, state.getCollectionOrUassert(ctx->db(), config.ns),
+                        if (!getExecutor(txn, state.getCollectionOrUassert(db, config.ns),
                                          cq, &rawExec).isOK()) {
                             uasserted(17239, "Can't get executor for query "
                                              + config.filter.toString());
@@ -1396,12 +1398,21 @@ namespace mongo {
                                 // TODO: As an optimization, we might want to do the save/restore
                                 // state and yield inside the reduceAndSpillInMemoryState method, so
                                 // it only happens if necessary.
-                                ctx.reset();
                                 lock.reset();
                                 state.reduceAndSpillInMemoryStateIfNeeded();
-                                lock.reset(new Lock::DBRead(txn->lockState(), config.ns));
+                                lock.reset(new Lock::DBRead(txn->lockState(), nss.db()));
 
-                                ctx.reset(new Client::Context(txn, config.ns, false));
+                                // Need to reload the database, in case it was dropped after we
+                                // released the lock
+                                db = dbHolder().get(txn, nss.db());
+                                if (db == NULL) {
+                                    // Database was deleted after we freed the lock
+                                    StringBuilder sb;
+                                    sb << "Database "
+                                       << nss.db()
+                                       << " was deleted in the middle of the reduce job.";
+                                    uasserted(28523, sb.str());
+                                }
 
                                 reduceTime += t.micros();
 

@@ -239,8 +239,8 @@ class mongod(NullMongod):
             argv += ['--nopreallocj']
         if self.kwargs.get('auth'):
             argv += ['--auth', '--setParameter', 'enableLocalhostAuthBypass=false']
-            authMechanism = self.kwargs.get('authMechanism', 'MONGODB-CR')
-            if authMechanism != 'MONGODB-CR':
+            authMechanism = self.kwargs.get('authMechanism', 'SCRAM-SHA-1')
+            if authMechanism != 'SCRAM-SHA-1':
                 argv += ['--setParameter', 'authenticationMechanisms=' + authMechanism]
             self.auth = True
         if self.kwargs.get('keyFile'):

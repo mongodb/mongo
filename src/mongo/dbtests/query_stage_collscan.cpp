@@ -74,11 +74,11 @@ namespace QueryStageCollectionScan {
         }
 
         int countResults(CollectionScanParams::Direction direction, const BSONObj& filterObj) {
-            Client::ReadContext ctx(&_txn, ns());
+            AutoGetCollectionForRead ctx(&_txn, ns());
 
             // Configure the scan.
             CollectionScanParams params;
-            params.collection = ctx.ctx().db()->getCollection( &_txn, ns() );
+            params.collection = ctx.getCollection();
             params.direction = direction;
             params.tailable = false;
 
@@ -184,11 +184,11 @@ namespace QueryStageCollectionScan {
     class QueryStageCollscanObjectsInOrderForward : public QueryStageCollectionScanBase {
     public:
         void run() {
-            Client::ReadContext ctx(&_txn, ns());
+            AutoGetCollectionForRead ctx(&_txn, ns());
 
             // Configure the scan.
             CollectionScanParams params;
-            params.collection = ctx.ctx().db()->getCollection( &_txn, ns() );
+            params.collection = ctx.getCollection();
             params.direction = CollectionScanParams::FORWARD;
             params.tailable = false;
 
@@ -215,10 +215,10 @@ namespace QueryStageCollectionScan {
     class QueryStageCollscanObjectsInOrderBackward : public QueryStageCollectionScanBase {
     public:
         void run() {
-            Client::ReadContext ctx(&_txn, ns());
+            AutoGetCollectionForRead ctx(&_txn, ns());
 
             CollectionScanParams params;
-            params.collection = ctx.ctx().db()->getCollection( &_txn, ns() );
+            params.collection = ctx.getCollection();
             params.direction = CollectionScanParams::BACKWARD;
             params.tailable = false;
 

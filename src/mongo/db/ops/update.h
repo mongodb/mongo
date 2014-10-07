@@ -38,6 +38,7 @@
 namespace mongo {
 
     class CanonicalQuery;
+    class Database;
     class OperationContext;
     class UpdateDriver;
 

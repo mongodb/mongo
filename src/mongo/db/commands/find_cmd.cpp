@@ -73,21 +73,23 @@ namespace mongo {
         }
         auto_ptr<LiteParsedQuery> lpq(rawLpq);
 
-        Client::ReadContext ctx(txn, fullns);
-        // The collection may be NULL. If so, getExecutor() should handle it by returning
-        // an execution tree with an EOFStage.
-        Collection* collection = ctx.ctx().db()->getCollection(txn, fullns);
+        const NamespaceString nss(fullns);
 
         // Finish the parsing step by using the LiteParsedQuery to create a CanonicalQuery.
         // This requires a lock on the collection in case we're parsing $where: where-specific
         // parsing code assumes we have a lock and creates execution machinery that requires it.
         CanonicalQuery* rawCq;
-        WhereCallbackReal whereCallback(txn, ctx.ctx().db()->name());
+        WhereCallbackReal whereCallback(txn, nss.db());
         Status canonStatus = CanonicalQuery::canonicalize(lpq.release(), &rawCq, whereCallback);
         if (!canonStatus.isOK()) {
             return canonStatus;
         }
         auto_ptr<CanonicalQuery> cq(rawCq);
+
+        AutoGetCollectionForRead ctx(txn, nss);
+        // The collection may be NULL. If so, getExecutor() should handle it by returning
+        // an execution tree with an EOFStage.
+        Collection* collection = ctx.getCollection();
 
         // We have a parsed query. Time to get the execution plan for it.
         PlanExecutor* rawExec;

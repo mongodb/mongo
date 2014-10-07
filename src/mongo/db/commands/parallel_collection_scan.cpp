@@ -74,11 +74,9 @@ namespace mongo {
 
             NamespaceString ns( dbname, cmdObj[name].String() );
 
-            Client::ReadContext ctx(txn, ns.ns());
+            AutoGetCollectionForRead ctx(txn, ns.ns());
 
-            Database* db = ctx.ctx().db();
-            Collection* collection = db->getCollection( txn, ns );
-
+            Collection* collection = ctx.getCollection();
             if ( !collection )
                 return appendCommandStatus( result,
                                             Status( ErrorCodes::NamespaceNotFound,

@@ -161,6 +161,7 @@ if ( typeof _threadInject != "undefined" ){
                                // These tests expect the profiler to be on or off at specific points
                                // during the test run.
                                parallelFilesDir + "/cursor6.js",
+                               parallelFilesDir + "/geo_s2cursorlimitskip.js",
                                parallelFilesDir + "/profile2.js",
                                parallelFilesDir + "/updatee.js"
                               ];

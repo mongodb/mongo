@@ -122,8 +122,8 @@ namespace mongo {
                 return false;
             }
 
-            Client::ReadContext ctx(txn, ns);
-            Collection* collection = ctx.ctx().db()->getCollection( txn, ns );
+            AutoGetCollectionForRead ctx(txn, ns);
+            Collection* collection = ctx.getCollection();
             if ( !collection ) {
                 errmsg = "ns not found";
                 return false;
@@ -280,8 +280,8 @@ namespace mongo {
 
             {
                 // Get the size estimate for this namespace
-                Client::ReadContext ctx(txn, ns);
-                Collection* collection = ctx.ctx().db()->getCollection( txn, ns );
+                AutoGetCollectionForRead ctx(txn, ns);
+                Collection* collection = ctx.getCollection();
                 if ( !collection ) {
                     errmsg = "ns not found";
                     return false;
@@ -829,8 +829,8 @@ namespace mongo {
             dassert(newChunks.size() > 1);
 
             {
-                Client::ReadContext ctx(txn, ns);
-                Collection* collection = ctx.ctx().db()->getCollection(txn, ns);
+                AutoGetCollectionForRead ctx(txn, ns);
+                Collection* collection = ctx.getCollection();
                 invariant(collection);
 
                 // Allow multiKey based on the invariant that shard keys must be

@@ -169,11 +169,12 @@ namespace mongo {
                                               BSONObj& cmdObj,
                                               BSONObjBuilder* bob) {
         // This is a read lock. The query settings is owned by the collection.
-        Client::ReadContext ctx(txn, ns);
-        Collection* collection = ctx.ctx().db()->getCollection(txn, ns);
+        AutoGetCollectionForRead ctx(txn, ns);
+
         QuerySettings* querySettings;
         PlanCache* unused;
-        Status status = getQuerySettingsAndPlanCache(txn, collection, ns, &querySettings, &unused);
+        Status status = 
+            getQuerySettingsAndPlanCache(txn, ctx.getCollection(), ns, &querySettings, &unused);
         if (!status.isOK()) {
             // No collection - return empty array of filters.
             BSONArrayBuilder hintsBuilder(bob->subarrayStart("filters"));
@@ -231,12 +232,12 @@ namespace mongo {
                                                BSONObj& cmdObj,
                                                BSONObjBuilder* bob) {
         // This is a read lock. The query settings is owned by the collection.
-        Client::ReadContext ctx(txn, ns);
-        Collection* collection = ctx.ctx().db()->getCollection(txn, ns);
+        AutoGetCollectionForRead ctx(txn, ns);
+
         QuerySettings* querySettings;
         PlanCache* planCache;
         Status status =
-            getQuerySettingsAndPlanCache(txn, collection, ns, &querySettings, &planCache);
+            getQuerySettingsAndPlanCache(txn, ctx.getCollection(), ns, &querySettings, &planCache);
         if (!status.isOK()) {
             // No collection - do nothing.
             return Status::OK();
@@ -326,12 +327,13 @@ namespace mongo {
                                             BSONObj& cmdObj,
                                             BSONObjBuilder* bob) {
         // This is a read lock. The query settings is owned by the collection.
-        Client::ReadContext ctx(txn, ns);
-        Collection* collection = ctx.ctx().db()->getCollection(txn, ns);
+        const NamespaceString nss(ns);
+        AutoGetCollectionForRead ctx(txn, nss);
+
         QuerySettings* querySettings;
         PlanCache* planCache;
         Status status =
-            getQuerySettingsAndPlanCache(txn, collection, ns, &querySettings, &planCache);
+            getQuerySettingsAndPlanCache(txn, ctx.getCollection(), ns, &querySettings, &planCache);
         if (!status.isOK()) {
             return status;
         }

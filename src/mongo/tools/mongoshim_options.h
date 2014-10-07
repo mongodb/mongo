@@ -36,27 +36,20 @@
 
 #include "mongo/base/status.h"
 #include "mongo/bson/bsonobj.h"
+#include "mongo/tools/shim_mode.h"
 #include "mongo/tools/tool_options.h"
 
 namespace mongo {
 
     struct MongoShimGlobalParams {
 
-        bool load;
+        MongoShimGlobalParams() : mode(ShimMode::kNumShimModes) { }
 
-        // If true, removes all documents in collection.
-        // If query is provided, only documents matching query will be removed.
-        bool remove;
-
-        // If true, read oplog entries from stdin to use as input to "applyOps" command.
-        bool applyOps;
-
-        // If true, attempts to repair bad data in collection.
-        // Also writes contents of collection to output.
-        bool repair;
-
+        // Mongoshim can run in one mode per invocation.
+        // See shim_mode.h for list of supported modes.
+        ShimMode mode;
         bool drop;
-        bool upsert;
+
         std::vector<std::string> upsertFields;
 
         std::string query;
@@ -76,8 +69,6 @@ namespace mongo {
         std::string outputFile;
         bool outputFileSpecified;
 
-        bool slaveOk;
-        bool snapShotQuery;
         unsigned int skip;
         unsigned int limit;
         std::string sort;

@@ -88,7 +88,7 @@ namespace repl {
         SyncSourceFeedback syncSourceFeedback;
 
         OpTime lastOpTimeWritten;
-        OpTime getEarliestOpTimeWritten() const;
+        OpTime getEarliestOpTimeWritten(OperationContext* txn) const;
 
         Status forceSyncFrom(const string& host, BSONObjBuilder* result);
         // Check if the current sync target is suboptimal. This must be called while holding a mutex
@@ -275,7 +275,6 @@ namespace repl {
                                     const Member* source);
         void _initialSync();
         void syncTail();
-        void syncFixUp(OperationContext* txn, FixUpInfo& h, OplogReader& r);
 
     public:
         // keep a list of hosts that we've tried recently that didn't work

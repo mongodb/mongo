@@ -32,6 +32,7 @@
 #include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/privilege.h"
 #include "mongo/db/catalog/database.h"
+#include "mongo/db/client.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/geo/geoconstants.h"
@@ -69,22 +70,15 @@ namespace mongo {
         }
 
         bool run(OperationContext* txn, const string& dbname, BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
-            const string ns = dbname + "." + cmdObj.firstElement().valuestr();
-
             if (!cmdObj["start"].eoo()) {
                 errmsg = "using deprecated 'start' argument to geoNear";
                 return false;
             }
 
-            Client::ReadContext ctx(txn, ns);
+            const NamespaceString nss(parseNs(dbname, cmdObj));
+            AutoGetCollectionForRead ctx(txn, nss);
 
-            Database* db = ctx.ctx().db();
-            if ( !db ) {
-                errmsg = "can't find ns";
-                return false;
-            }
-
-            Collection* collection = db->getCollection( txn, ns );
+            Collection* collection = ctx.getCollection();
             if ( !collection ) {
                 errmsg = "can't find ns";
                 return false;
@@ -131,7 +125,7 @@ namespace mongo {
             }
 
             if (!cmdObj["uniqueDocs"].eoo()) {
-                warning() << ns << ": ignoring deprecated uniqueDocs option in geoNear command";
+                warning() << nss << ": ignoring deprecated uniqueDocs option in geoNear command";
             }
 
             // And, build the full query expression.
@@ -144,12 +138,12 @@ namespace mongo {
 
             // cout << "rewritten query: " << rewritten.toString() << endl;
 
-            int numWanted = 100;
+            long long numWanted = 100;
             const char* limitName = !cmdObj["num"].eoo() ? "num" : "limit";
             BSONElement eNumWanted = cmdObj[limitName];
             if (!eNumWanted.eoo()) {
                 uassert(17303, "limit must be number", eNumWanted.isNumber());
-                numWanted = eNumWanted.numberInt();
+                numWanted = eNumWanted.safeNumberLong();
                 uassert(17302, "limit must be >=0", numWanted >= 0);
             }
 
@@ -170,11 +164,9 @@ namespace mongo {
                                    "$dis" << BSON("$meta" << LiteParsedQuery::metaGeoNearDistance));
 
             CanonicalQuery* cq;
-
-            const NamespaceString nss(dbname);
             const WhereCallbackReal whereCallback(txn, nss.db());
 
-            if (!CanonicalQuery::canonicalize(ns,
+            if (!CanonicalQuery::canonicalize(nss,
                                               rewritten,
                                               BSONObj(),
                                               projObj,
@@ -201,7 +193,7 @@ namespace mongo {
             double farthestDist = 0;
 
             BSONObj currObj;
-            int results = 0;
+            long long results = 0;
             while ((results < numWanted) && PlanExecutor::ADVANCED == exec->getNext(&currObj, NULL)) {
 
                 // Come up with the correct distance.

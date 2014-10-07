@@ -2830,21 +2830,6 @@ namespace {
         ASSERT_TRUE(response.obj().isEmpty());
     }
 
-    TEST_F(ShutdownInProgressTest, ShutDownInProgressWhenCallbackCanceledHeartbeat) {
-        Status result = Status::OK();
-        ReplSetHeartbeatResponse response;
-        getTopoCoord().prepareHeartbeatResponse(cbData(),
-                                                Date_t(0),
-                                                ReplSetHeartbeatArgs(),
-                                                "",
-                                                OpTime(0,0),
-                                                &response,
-                                                &result);
-        ASSERT_EQUALS(ErrorCodes::ShutdownInProgress, result);
-        // hbmsg is always present in ReplSetHeartbeatArgs, but nothing else should be populated
-        ASSERT_EQUALS(1, response.toBSON().nFields());
-    }
-
     TEST_F(ShutdownInProgressTest, ShutDownInProgressWhenCallbackCanceledStatus) {
         Status result = Status::OK();
         BSONObjBuilder response;
@@ -2889,13 +2874,11 @@ namespace {
                                       OpTime lastOpApplied,
                                       ReplSetHeartbeatResponse* response,
                                       Status* result) {
-            getTopoCoord().prepareHeartbeatResponse(cbData(),
-                                                    now()++,
-                                                    args,
-                                                    "rs0",
-                                                    lastOpApplied,
-                                                    response,
-                                                    result);
+            *result = getTopoCoord().prepareHeartbeatResponse(now()++,
+                                                              args,
+                                                              "rs0",
+                                                              lastOpApplied,
+                                                              response);
         }
 
     };
@@ -2922,12 +2905,12 @@ namespace {
         ReplSetHeartbeatResponse response;
         Status result(ErrorCodes::InternalError, "prepareHeartbeatResponse didn't set result");
 
-        // prepare response and check the results, including log messages
         startCapturingLogMessages();
         prepareHeartbeatResponse(args, OpTime(0,0), &response, &result);
         stopCapturingLogMessages();
-        ASSERT_EQUALS(ErrorCodes::BadValue, result);
-        ASSERT_EQUALS("repl set names do not match", result.reason());
+        ASSERT_EQUALS(ErrorCodes::InconsistentReplicaSetNames, result);
+        ASSERT(result.reason().find("repl set names do not match")) << "Actual string was \"" <<
+               result.reason() << '"';
         ASSERT_EQUALS(1,
                       countLogLinesContaining("replSet set names do not match, ours: rs0; remote "
                             "node's: rs1"));

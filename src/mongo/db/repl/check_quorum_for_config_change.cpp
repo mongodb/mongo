@@ -33,6 +33,7 @@
 #include "mongo/base/disallow_copying.h"
 #include "mongo/base/status.h"
 #include "mongo/db/repl/repl_set_heartbeat_args.h"
+#include "mongo/db/repl/repl_set_heartbeat_response.h"
 #include "mongo/db/repl/replica_set_config.h"
 #include "mongo/db/repl/scatter_gather_algorithm.h"
 #include "mongo/db/repl/scatter_gather_runner.h"
@@ -167,28 +168,33 @@ namespace repl {
             _down.push_back(request.target);
             return;
         }
-        BSONObj res = response.getValue().data;
-        if (res["mismatch"].trueValue()) {
+
+        BSONObj resBSON = response.getValue().data;
+        ReplSetHeartbeatResponse hbResp;
+        Status hbStatus = hbResp.initialize(resBSON);
+
+        if (hbStatus.code() == ErrorCodes::InconsistentReplicaSetNames) {
             std::string message = str::stream() << "Our set name did not match that of " <<
                 request.target.toString();
             _vetoStatus = Status(ErrorCodes::NewReplicaSetConfigurationIncompatible, message);
             warning() << message;
             return;
         }
-        if (res.getStringField("set")[0] != '\0') {
-            if (res["v"].numberInt() >= _rsConfig->getConfigVersion()) {
+        if (!hbResp.getReplicaSetName().empty()) {
+            if (hbResp.getVersion() >= _rsConfig->getConfigVersion()) {
                 std::string message = str::stream() << "Our config version of " <<
                     _rsConfig->getConfigVersion() <<
                     " is no larger than the version on " << request.target.toString() <<
-                    ", which is " << res["v"].toString();
+                    ", which is " << hbResp.getVersion();
                 _vetoStatus = Status(ErrorCodes::NewReplicaSetConfigurationIncompatible, message);
                 warning() << message;
                 return;
             }
         }
-        if (!res["ok"].trueValue()) {
-            warning() << "Got error response on heartbeat request to " << request.target <<
-                "; " << res;
+        if (!hbStatus.isOK()) {
+            warning() << "Got error (" << hbStatus
+                      << ") response on heartbeat request to " << request.target
+                      << "; " << hbResp;
             _down.push_back(request.target);
             return;
         }

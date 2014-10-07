@@ -495,7 +495,6 @@ namespace {
     }
 
     void BackgroundSync::loadLastAppliedHash(OperationContext* txn) {
-        Lock::DBRead lk(txn->lockState(), rsoplog);
         BSONObj oplogEntry;
         try {
             if (!Helpers::getLast(txn, rsoplog, oplogEntry)) {

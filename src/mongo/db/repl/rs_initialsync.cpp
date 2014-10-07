@@ -146,6 +146,8 @@ namespace {
 
         // apply till stopOpTime
         try {
+            LOG(2) << "Applying oplog entries from " << startOpTime.toStringPretty()
+                   << " until " << stopOpTime.toStringPretty();
             syncer.oplogApplication(ctx, stopOpTime);
         }
         catch (const DBException&) {

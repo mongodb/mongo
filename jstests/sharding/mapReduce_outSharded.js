@@ -37,7 +37,7 @@ verifyOutput(out);
 out = db.srcNonSharded.mapReduce(map, reduce, { out: { reduce: "mrReduce" + suffix, sharded: true } });
 verifyOutput(out);
 
-out = db.srcNonSharded.mapReduce(map, reduce, { out: { inline: 1, sharded: true } });
+out = db.srcNonSharded.mapReduce(map, reduce, { out: { inline: 1 }});
 verifyOutput(out);
 assert(out.results != 'undefined', "no results for inline");
 

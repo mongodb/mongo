@@ -35,6 +35,7 @@
 #include "mongo/client/dbclientinterface.h"
 #include "mongo/db/clientcursor.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/catalog/database_holder.h"
 #include "mongo/db/exec/filter.h"
 #include "mongo/db/exec/oplogstart.h"
 #include "mongo/db/exec/working_set_common.h"
@@ -184,8 +185,9 @@ namespace mongo {
         exhaust = false;
 
         // This is a read lock.
-        scoped_ptr<Client::ReadContext> ctx(new Client::ReadContext(txn, ns));
-        Collection* collection = ctx->ctx().db()->getCollection(txn, ns);
+        const NamespaceString nss(ns);
+        scoped_ptr<AutoGetCollectionForRead> ctx(new AutoGetCollectionForRead(txn, nss));
+        Collection* collection = ctx->getCollection();
         uassert( 17356, "collection dropped between getMore calls", collection );
 
         QLOG() << "Running getMore, cursorid: " << cursorid << endl;
@@ -196,7 +198,7 @@ namespace mongo {
         // reads are not okay.
         Status status = repl::getGlobalReplicationCoordinator()->checkCanServeReadsFor(
                 txn,
-                NamespaceString(ns),
+                nss,
                 true);
         uassertStatusOK(status);
 
@@ -527,20 +529,15 @@ namespace mongo {
             return "";
         }
 
-        // This is a read lock.  We require this because if we're parsing a $where, the
-        // where-specific parsing code assumes we have a lock and creates execution machinery that
-        // requires it.
-        Client::ReadContext ctx(txn, q.ns);
-        Collection* collection = ctx.ctx().db()->getCollection( txn, ns );
+        const NamespaceString nss(q.ns);
 
         // Parse the qm into a CanonicalQuery.
         CanonicalQuery* cq;
         Status canonStatus = CanonicalQuery::canonicalize(
-                            q, &cq, WhereCallbackReal(txn, StringData(ctx.ctx().db()->name())));
+                                    q, &cq, WhereCallbackReal(txn, StringData(nss.db())));
         if (!canonStatus.isOK()) {
             uasserted(17287, str::stream() << "Can't canonicalize query: " << canonStatus.toString());
         }
-        verify(cq);
 
         QLOG() << "Running query:\n" << cq->toString();
         LOG(2) << "Running query: " << cq->toStringShort();
@@ -550,6 +547,13 @@ namespace mongo {
 
         // We use this a lot below.
         const LiteParsedQuery& pq = cq->getParsed();
+
+        AutoGetCollectionForRead ctx(txn, nss);
+
+        const int dbProfilingLevel = (ctx.getDb() != NULL) ? ctx.getDb()->getProfilingLevel() :
+                                                             serverGlobalParams.defaultProfile;
+
+        Collection* collection = ctx.getCollection();
 
         // We'll now try to get the query executor that will execute this query for us. There
         // are a few cases in which we know upfront which executor we should get and, therefore,
@@ -744,7 +748,6 @@ namespace mongo {
             // If we're tailing a capped collection, we don't bother saving the cursor if the
             // collection is empty. Otherwise, the semantics of the tailable cursor is that the
             // client will keep trying to read from it. So we'll keep it around.
-            Collection* collection = ctx.ctx().db()->getCollection(txn, cq->ns());
             if (collection && collection->numRecords(txn) != 0 && pq.getNumToReturn() != 1) {
                 saveClientCursor = true;
             }
@@ -763,7 +766,7 @@ namespace mongo {
         const logger::LogSeverity logLevelOne = logger::LogSeverity::Debug(1);
 
         // Set debug information for consumption by the profiler.
-        if (ctx.ctx().db()->getProfilingLevel() > 0 ||
+        if (dbProfilingLevel > 0 ||
             curop.elapsedMillis() > serverGlobalParams.slowMS ||
             logger::globalLogDomain()->shouldLog(queryLogComponent, logLevelOne)) {
             PlanSummaryStats newStats;

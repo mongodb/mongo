@@ -396,10 +396,10 @@ namespace mongo {
             long long size = 0;
 
             {
-                Client::ReadContext cx(txn, _ns);
+                AutoGetCollectionForRead ctx(txn, _ns);
 
-                xfer( txn, cx.ctx().db(), &_deleted, b, "deleted", size, false );
-                xfer( txn, cx.ctx().db(), &_reload, b, "reload", size, true );
+                xfer(txn, ctx.getDb(), &_deleted, b, "deleted", size, false);
+                xfer(txn, ctx.getDb(), &_reload, b, "reload", size, true);
             }
 
             b.append( "size" , size );
@@ -418,8 +418,8 @@ namespace mongo {
                               long long maxChunkSize,
                               string& errmsg,
                               BSONObjBuilder& result ) {
-            Client::ReadContext ctx(txn, _ns);
-            Collection* collection = ctx.ctx().db()->getCollection( txn, _ns );
+            AutoGetCollectionForRead ctx(txn, _ns);
+            Collection* collection = ctx.getCollection();
             if ( !collection ) {
                 errmsg = "ns not found, should be impossible";
                 return false;
@@ -515,9 +515,9 @@ namespace mongo {
 
             int allocSize;
             {
-                Client::ReadContext ctx(txn, _ns);
-                Collection* collection = ctx.ctx().db()->getCollection( txn, _ns );
-                verify( collection );
+                AutoGetCollectionForRead ctx(txn, _ns);
+                Collection* collection = ctx.getCollection();
+                invariant(collection);
                 scoped_spinlock lk( _trackerLocks );
                 allocSize =
                     std::min(BSONObjMaxUserSize,
@@ -528,8 +528,8 @@ namespace mongo {
             while ( 1 ) {
                 bool filledBuffer = false;
                 
-                Client::ReadContext ctx(txn, _ns);
-                Collection* collection = ctx.ctx().db()->getCollection( txn, _ns );
+                AutoGetCollectionForRead ctx(txn, _ns);
+                Collection* collection = ctx.getCollection();
 
                 scoped_spinlock lk( _trackerLocks );
                 set<DiskLoc>::iterator i = _cloneLocs.begin();

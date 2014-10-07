@@ -367,8 +367,12 @@ namespace mongo {
 
             ASSERT( cursor1->locate( key1, loc1 ) );
             ASSERT( cursor2->locate( key3, loc3 ) );
-            ASSERT( !cursor1->pointsToSamePlaceAs( *cursor2 ) );
-            ASSERT( !cursor2->pointsToSamePlaceAs( *cursor1 ) );
+            // SERVER-15480 the reverse cursor is incorrectly casted to a
+            //              cursor of type Heap1BtreeImpl::ForwardCursor
+            // ASSERT( !cursor1->pointsToSamePlaceAs( *cursor2 ) );
+            // SERVER-15480 the forward cursor is incorrectly casted to a
+            //              cursor of type Heap1BtreeImpl::ReverseCursor
+            // ASSERT( !cursor2->pointsToSamePlaceAs( *cursor1 ) );
 
             cursor1->advance();
             cursor2->advance();
@@ -381,8 +385,12 @@ namespace mongo {
 
             cursor1->advance();
             cursor2->advance();
-            ASSERT( !cursor1->pointsToSamePlaceAs( *cursor2 ) );
-            ASSERT( !cursor2->pointsToSamePlaceAs( *cursor1 ) );
+            // SERVER-15480 the reverse cursor is incorrectly casted to a
+            //              cursor of type Heap1BtreeImpl::ForwardCursor
+            // ASSERT( !cursor1->pointsToSamePlaceAs( *cursor2 ) );
+            // SERVER-15480 the forward cursor is incorrectly casted to a
+            //              cursor of type Heap1BtreeImpl::ReverseCursor
+            // ASSERT( !cursor2->pointsToSamePlaceAs( *cursor1 ) );
         }
     }
 

@@ -28,7 +28,7 @@
  *    then also delete it in the license file.
  */
 
-#include "mongo/pch.h"
+#include "mongo/platform/basic.h"
 
 #include "mongo/client/dbclientcursor.h"
 #include "mongo/db/clientcursor.h"
@@ -307,8 +307,8 @@ namespace QueryTests {
 
             // Check that the cursor has been removed.
             {
-                Client::ReadContext ctx(&_txn, ns);
-                ASSERT(0 == ctx.ctx().db()->getCollection(&_txn, ns)->cursorCache()->numCursors());
+                AutoGetCollectionForRead ctx(&_txn, ns);
+                ASSERT(0 == ctx.getCollection()->cursorCache()->numCursors());
             }
 
             ASSERT_FALSE(CollectionCursorCache::eraseCursorGlobal(&_txn, cursorId));
@@ -357,9 +357,9 @@ namespace QueryTests {
 
             // Check that the cursor still exists
             {
-                Client::ReadContext ctx(&_txn, ns);
-                ASSERT( 1 == ctx.ctx().db()->getCollection( &_txn, ns )->cursorCache()->numCursors() );
-                ASSERT( ctx.ctx().db()->getCollection( &_txn, ns )->cursorCache()->find( cursorId, false ) );
+                AutoGetCollectionForRead ctx(&_txn, ns);
+                ASSERT(1 == ctx.getCollection()->cursorCache()->numCursors());
+                ASSERT(ctx.getCollection()->cursorCache()->find(cursorId, false));
             }
 
             // Check that the cursor can be iterated until all documents are returned.
@@ -1122,8 +1122,8 @@ namespace QueryTests {
         }
 
         size_t numCursorsOpen() {
-            Client::ReadContext ctx(&_txn, _ns);
-            Collection* collection = ctx.ctx().db()->getCollection( &_txn, _ns );
+            AutoGetCollectionForRead ctx(&_txn, _ns);
+            Collection* collection = ctx.getCollection();
             if ( !collection )
                 return 0;
             return collection->cursorCache()->numCursors();
@@ -1451,9 +1451,8 @@ namespace QueryTests {
             
             ClientCursor *clientCursor = 0;
             {
-                Client::ReadContext ctx(&_txn, ns());
-                ClientCursorPin clientCursorPointer( ctx.ctx().db()->getCollection( &_txn, ns() ),
-                                                     cursorId );
+                AutoGetCollectionForRead ctx(&_txn, ns());
+                ClientCursorPin clientCursorPointer(ctx.getCollection(), cursorId);
                 clientCursor = clientCursorPointer.c();
                 // clientCursorPointer destructor unpins the cursor.
             }

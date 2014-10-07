@@ -50,9 +50,8 @@ namespace {
         _networkInterface(netInterface),
         _totalEventWaiters(0),
         _inShutdown(false),
-        _networkWorkers(threadpool::ThreadPool::DoNotStartThreadsTag()),
+        _dblockWorkers(threadpool::ThreadPool::DoNotStartThreadsTag(), 1),
         _nextId(0) {
-        _networkInterface->setExecutor(this);
     }
 
     ReplicationExecutor::~ReplicationExecutor() {}
@@ -62,7 +61,8 @@ namespace {
     }
 
     void ReplicationExecutor::run() {
-        _networkWorkers.startThreads();
+        _networkInterface->startup();
+        _dblockWorkers.startThreads();
         std::pair<WorkItem, CallbackHandle> work;
         while ((work = getWork()).first.callback) {
             {
@@ -76,6 +76,7 @@ namespace {
             signalEvent(work.first.finishedEvent);
         }
         finishShutdown();
+        _networkInterface->shutdown();
     }
 
     void ReplicationExecutor::shutdown() {
@@ -102,11 +103,11 @@ namespace {
 
             readyWork->isCanceled = true;
         }
-        _workAvailable.notify_all();
+        _networkInterface->signalWorkAvailable();
     }
 
     void ReplicationExecutor::finishShutdown() {
-        _networkWorkers.join();
+        _dblockWorkers.join();
         boost::unique_lock<boost::mutex> lk(_mutex);
         invariant(_inShutdown);
         invariant(_exclusiveLockInProgressQueue.empty());
@@ -164,7 +165,7 @@ namespace {
         _signaledEvents.splice(_signaledEvents.end(), _unsignaledEvents, event._iter);
         if (!event._iter->waiters.empty()) {
             _readyQueue.splice(_readyQueue.end(), event._iter->waiters);
-            _workAvailable.notify_all();
+            _networkInterface->signalWorkAvailable();
         }
         event._iter->isSignaledCondition->notify_all();
     }
@@ -228,48 +229,27 @@ namespace {
                    ResponseStatus(cbData.status)));
     }
 
-    void ReplicationExecutor::doRemoteCommand(
-            const CallbackHandle& cbHandle,
+    void ReplicationExecutor::_finishRemoteCommand(
             const RemoteCommandRequest& request,
+            const ResponseStatus& response,
+            const CallbackHandle& cbHandle,
+            const uint64_t expectedHandleGeneration,
             const RemoteCommandCallbackFn& cb) {
 
-        // Lock _mutex
-        // Store aside the item's generation.
-        // Unlock _mutex
-        // Do the network work.
-        // Lock _mutex
-        // If the generation changed, return.
-        // Change the callback to one that invokes the "network op done" callback with the result.
-        // Move the item to the ready queue.
-        // Unlock _mutex
-
-        boost::unique_lock<boost::mutex> lk(_mutex);
-        if (_inShutdown)
-            return;
         const WorkQueue::iterator iter = cbHandle._iter;
-        const uint64_t generation = iter->generation;
-        invariant(cbHandle._generation == generation);
-        if (iter->isCanceled) {
-            _readyQueue.splice(_readyQueue.end(), _networkInProgressQueue, iter);
-            _workAvailable.notify_all();
+        boost::lock_guard<boost::mutex> lk(_mutex);
+        if (_inShutdown) {
             return;
         }
-        lk.unlock();
-
-        ResponseStatus cmdResult = _networkInterface->runCommand(request);
-
-        lk.lock();
-        if (_inShutdown)
+        if (expectedHandleGeneration != iter->generation) {
             return;
-        if (generation != iter->generation)
-            return;
+        }
         iter->callback = stdx::bind(remoteCommandFinished,
                                     stdx::placeholders::_1,
                                     cb,
                                     request,
-                                    cmdResult);
+                                    response);
         _readyQueue.splice(_readyQueue.end(), _networkInProgressQueue, iter);
-        _workAvailable.notify_all();
     }
 
     StatusWith<ReplicationExecutor::CallbackHandle> ReplicationExecutor::scheduleRemoteCommand(
@@ -291,11 +271,17 @@ namespace {
                            cb,
                            scheduledRequest));
         if (handle.isOK()) {
-            _networkWorkers.schedule(makeNoExcept(stdx::bind(&ReplicationExecutor::doRemoteCommand,
-                                                             this,
-                                                             handle.getValue(),
-                                                             scheduledRequest,
-                                                             cb)));
+            handle.getValue()._iter->isNetworkOperation = true;
+            _networkInterface->startCommand(
+                    handle.getValue(),
+                    scheduledRequest,
+                    stdx::bind(&ReplicationExecutor::_finishRemoteCommand,
+                               this,
+                               scheduledRequest,
+                               stdx::placeholders::_1,
+                               handle.getValue(),
+                               handle.getValue()._iter->generation,
+                               cb));
         }
         return handle;
     }
@@ -303,7 +289,7 @@ namespace {
     StatusWith<ReplicationExecutor::CallbackHandle> ReplicationExecutor::scheduleWork(
             const CallbackFn& work) {
         boost::lock_guard<boost::mutex> lk(_mutex);
-        _workAvailable.notify_all();
+        _networkInterface->signalWorkAvailable();
         return enqueueWork_inlock(&_readyQueue, work);
     }
 
@@ -363,7 +349,7 @@ namespace {
                     this,
                     stdx::placeholders::_1,
                     handle.getValue());
-            _networkWorkers.schedule(
+            _dblockWorkers.schedule(
                     makeNoExcept(stdx::bind(
                                          &NetworkInterface::runCallbackWithGlobalExclusiveLock,
                                          _networkInterface.get(),
@@ -374,9 +360,13 @@ namespace {
 
     void ReplicationExecutor::cancel(const CallbackHandle& cbHandle) {
         boost::lock_guard<boost::mutex> lk(_mutex);
-        if (cbHandle._iter->generation  != cbHandle._generation)
+        if (cbHandle._iter->generation  != cbHandle._generation) {
             return;
+        }
         cbHandle._iter->isCanceled = true;
+        if (cbHandle._iter->isNetworkOperation) {
+            _networkInterface->cancelCommand(cbHandle);
+        }
     }
 
     void ReplicationExecutor::wait(const CallbackHandle& cbHandle) {
@@ -387,19 +377,22 @@ namespace {
     ReplicationExecutor::getWork() {
         boost::unique_lock<boost::mutex> lk(_mutex);
         while (true) {
-            Milliseconds waitFor = scheduleReadySleepers_inlock();
+            const Date_t now = _networkInterface->now();
+            Date_t nextWakeupDate = scheduleReadySleepers_inlock(now);
             if (!_readyQueue.empty()) {
                 break;
             }
             else if (_inShutdown) {
                 return std::make_pair(WorkItem(), CallbackHandle());
             }
-            if (waitFor.total_milliseconds() < 0) {
-                _workAvailable.wait(lk);
+            lk.unlock();
+            if (nextWakeupDate == Date_t(~0ULL)) {
+                _networkInterface->waitForWork();
             }
             else {
-                _workAvailable.timed_wait(lk, waitFor);
+                _networkInterface->waitForWorkUntil(nextWakeupDate);
             }
+            lk.lock();
         }
         const CallbackHandle cbHandle(_readyQueue.begin());
         const WorkItem work = *cbHandle._iter;
@@ -408,28 +401,21 @@ namespace {
         return std::make_pair(work, cbHandle);
     }
 
-    void ReplicationExecutor::signalWorkForTest() {
-        boost::lock_guard<boost::mutex> lk(_mutex);
-        _workAvailable.notify_all();
-    }
-
     int64_t ReplicationExecutor::nextRandomInt64(int64_t limit) {
         return _random.nextInt64(limit);
     }
 
-    ReplicationExecutor::Milliseconds ReplicationExecutor::scheduleReadySleepers_inlock() {
-        const Date_t now = _networkInterface->now();
+    Date_t ReplicationExecutor::scheduleReadySleepers_inlock(const Date_t now) {
         WorkQueue::iterator iter = _sleepersQueue.begin();
         while ((iter != _sleepersQueue.end()) && (iter->readyDate <= now)) {
             ++iter;
         }
         _readyQueue.splice(_readyQueue.end(), _sleepersQueue, _sleepersQueue.begin(), iter);
-        _workAvailable.notify_all();
         if (iter == _sleepersQueue.end()) {
             // indicate no sleeper to wait for
-            return Milliseconds(-1);
+            return Date_t(~0ULL);
         }
-        return Milliseconds(iter->readyDate - now);
+        return iter->readyDate;
     }
 
     StatusWith<ReplicationExecutor::CallbackHandle> ReplicationExecutor::enqueueWork_inlock(
@@ -515,7 +501,9 @@ namespace {
         response(theResponse) {
     }
 
-    ReplicationExecutor::WorkItem::WorkItem() : generation(0U), isCanceled(false) {}
+    ReplicationExecutor::WorkItem::WorkItem() : generation(0U),
+                                                isNetworkOperation(false),
+                                                isCanceled(false) {}
 
     ReplicationExecutor::Event::Event() :
         generation(0),
@@ -525,7 +513,6 @@ namespace {
 
     ReplicationExecutor::NetworkInterface::NetworkInterface() {}
     ReplicationExecutor::NetworkInterface::~NetworkInterface() {}
-    void ReplicationExecutor::NetworkInterface::setExecutor(ReplicationExecutor*) {}
 
 namespace {
 

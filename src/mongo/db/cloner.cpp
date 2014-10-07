@@ -110,8 +110,7 @@ namespace mongo {
             Lock::GlobalWrite lk(txn->lockState());
 
             // Make sure database still exists after we resume from the temp release
-            bool unused;
-            Database* db = dbHolder().getOrCreate(txn, _dbName, unused);
+            Database* db = dbHolder().openDb(txn, _dbName);
 
             bool createdCollection = false;
             Collection* collection = NULL;
@@ -254,8 +253,7 @@ namespace mongo {
 
         // We are under lock here again, so reload the database in case it may have disappeared
         // during the temp release
-        bool unused;
-        Database* db = dbHolder().getOrCreate(txn, toDBName, unused);
+        Database* db = dbHolder().openDb(txn, toDBName);
 
         Collection* collection = db->getCollection( txn, to_collection );
         if ( !collection ) {
@@ -312,8 +310,7 @@ namespace mongo {
 
         const string dbName = nss.db().toString();
 
-        bool unused;
-        Database* db = dbHolder().getOrCreate(txn, dbName, unused);
+        Database* db = dbHolder().openDb(txn, dbName);
 
         // config
         string temp = dbName + ".system.namespaces";
@@ -487,8 +484,7 @@ namespace mongo {
                     // Copy releases the lock, so we need to re-load the database. This should
                     // probably throw if the database has changed in between, but for now preserve
                     // the existing behaviour.
-                    bool unused;
-                    db = dbHolder().getOrCreate(txn, toDBName, unused);
+                    db = dbHolder().openDb(txn, toDBName);
 
                     // we defer building id index for performance - building it in batch is much
                     // faster

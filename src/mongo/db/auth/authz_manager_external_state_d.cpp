@@ -83,11 +83,11 @@ namespace mongo {
             const BSONObj& query,
             BSONObj* result) {
 
-        Client::ReadContext ctx(txn, collectionName.ns());
+        AutoGetCollectionForRead ctx(txn, collectionName);
 
         BSONObj found;
         if (Helpers::findOne(txn,
-                             ctx.ctx().db()->getCollection(txn, collectionName),
+                             ctx.getCollection(),
                              query,
                              found)) {
             *result = found.getOwned();

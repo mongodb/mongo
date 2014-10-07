@@ -72,7 +72,7 @@ namespace {
 
 }  // namespace
 
-    void configureSystemIndexes(OperationContext* txn, const StringData& dbname) {
+    void configureSystemIndexes(OperationContext* txn) {
         int authzVersion;
         Status status = getGlobalAuthorizationManager()->getAuthorizationVersion(
                                                                 txn, &authzVersion);
@@ -80,22 +80,29 @@ namespace {
             return;
         }
 
-        if (dbname == "admin" && authzVersion >= AuthorizationManager::schemaVersion26Final) {
-            NamespaceString systemUsers(dbname, "system.users");
+        if (authzVersion >= AuthorizationManager::schemaVersion26Final) {
+            const NamespaceString systemUsers("admin", "system.users");
 
             // Make sure the old unique index from v2.4 on system.users doesn't exist.
-            Client::WriteContext wctx(txn, systemUsers);
-            Collection* collection = wctx.ctx().db()->getCollection(txn,
-                                                                    NamespaceString(systemUsers));
+            AutoGetDb autoDb(txn, systemUsers.db(), newlm::MODE_X);
+            if (!autoDb.getDb()) {
+                return;
+            }
+
+            Collection* collection = autoDb.getDb()->getCollection(txn,
+                                                                   NamespaceString(systemUsers));
             if (!collection) {
                 return;
             }
+
             IndexCatalog* indexCatalog = collection->getIndexCatalog();
             IndexDescriptor* oldIndex = NULL;
+
+            WriteUnitOfWork wunit(txn);
             while ((oldIndex = indexCatalog->findIndexByKeyPattern(txn, v1SystemUsersKeyPattern))) {
                 indexCatalog->dropIndex(txn, oldIndex);
             }
-            wctx.commit();
+            wunit.commit();
         }
     }
 

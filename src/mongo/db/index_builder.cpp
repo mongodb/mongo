@@ -66,7 +66,7 @@ namespace mongo {
         Client::initThread(name().c_str());
         Lock::ParallelBatchWriterMode::iAmABatchParticipant(txn.lockState());
 
-        cc().getAuthorizationSession()->grantInternalAuthorization();
+        txn.getClient()->getAuthorizationSession()->grantInternalAuthorization();
 
         txn.getCurOp()->reset(HostAndPort(), dbInsert);
         NamespaceString ns(_index["ns"].String());

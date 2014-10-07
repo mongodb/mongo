@@ -28,9 +28,11 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/base/counter.h"
-#include "mongo/db/commands/server_status_metric.h"
 #include "mongo/db/curop.h"
+
+#include "mongo/base/counter.h"
+#include "mongo/db/client.h"
+#include "mongo/db/commands/server_status_metric.h"
 #include "mongo/db/catalog/database.h"
 #include "mongo/db/stats/top.h"
 #include "mongo/util/fail_point_service.h"
@@ -145,10 +147,10 @@ namespace mongo {
         }
     }
 
-    void CurOp::enter( Client::Context * context ) {
+    void CurOp::enter(const char* ns, int dbProfileLevel) {
         ensureStarted();
-        _ns = context->ns();
-        _dbprofile = std::max( context->_db ? context->_db->getProfilingLevel() : 0 , _dbprofile );
+        _ns = ns;
+        _dbprofile = std::max(dbProfileLevel, _dbprofile);
     }
 
     void CurOp::recordGlobalTime(bool isWriteLocked, long long micros) const {

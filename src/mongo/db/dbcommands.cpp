@@ -350,7 +350,6 @@ namespace mongo {
             // in the local database.
             //
             Lock::DBWrite dbXLock(txn->lockState(), dbname);
-            WriteUnitOfWork wunit(txn);
             Client::Context ctx(txn, dbname);
 
             BSONElement e = cmdObj.firstElement();
@@ -367,10 +366,10 @@ namespace mongo {
             }
 
             BSONElement slow = cmdObj["slowms"];
-            if ( slow.isNumber() )
+            if (slow.isNumber()) {
                 serverGlobalParams.slowMS = slow.numberInt();
+            }
 
-            wunit.commit();
             return ok;
         }
     } cmdProfile;
@@ -637,8 +636,8 @@ namespace mongo {
 
             // Check shard version at startup.
             // This will throw before we've done any work if shard version is outdated
-            Client::ReadContext ctx(txn, ns);
-            Collection* coll = ctx.ctx().db()->getCollection(txn, ns);
+            AutoGetCollectionForRead ctx(txn, ns);
+            Collection* coll = ctx.getCollection();
 
             CanonicalQuery* cq;
             if (!CanonicalQuery::canonicalize(ns, query, sort, BSONObj(), &cq).isOK()) {
@@ -748,9 +747,9 @@ namespace mongo {
             BSONObj keyPattern = jsobj.getObjectField( "keyPattern" );
             bool estimate = jsobj["estimate"].trueValue();
 
-            Client::ReadContext ctx(txn, ns);
+            AutoGetCollectionForRead ctx(txn, ns);
 
-            Collection* collection = ctx.ctx().db()->getCollection( txn, ns );
+            Collection* collection = ctx.getCollection();
 
             if ( !collection || collection->numRecords(txn) == 0 ) {
                 result.appendNumber( "size" , 0 );
@@ -864,17 +863,6 @@ namespace mongo {
         }
 
         bool run(OperationContext* txn, const string& dbname, BSONObj& jsobj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl ) {
-            const string ns = dbname + "." + jsobj.firstElement().valuestr();
-            Client::ReadContext cx(txn, ns);
-            Database* db = cx.ctx().db();
-            Collection* collection = db->getCollection( txn, ns );
-            if ( !collection ) {
-                errmsg = "Collection [" + ns + "] not found.";
-                return false;
-            }
-
-            result.append( "ns" , ns.c_str() );
-
             int scale = 1;
             if ( jsobj["scale"].isNumber() ) {
                 scale = jsobj["scale"].numberInt();
@@ -889,6 +877,27 @@ namespace mongo {
             }
 
             bool verbose = jsobj["verbose"].trueValue();
+
+            const NamespaceString nss(parseNs(dbname, jsobj));
+
+            if (nss.coll().empty()) {
+                errmsg = "No collection name specified";
+                return false;
+            }
+
+            AutoGetCollectionForRead ctx(txn, nss);
+            if (!ctx.getDb()) {
+                errmsg = "Database [" + nss.db().toString() + "] not found.";
+                return false;
+            }
+
+            Collection* collection = ctx.getCollection();
+            if (!collection) {
+                errmsg = "Collection [" + nss.toString() + "] not found.";
+                return false;
+            }
+
+            result.append( "ns" , nss );
 
             long long size = collection->dataSize(txn) / scale;
             long long numRecords = collection->numRecords(txn);
@@ -1079,10 +1088,39 @@ namespace mongo {
 
             const string ns = parseNs(dbname, jsobj);
 
-            Client::ReadContext ctx(txn, ns);
-            Database* d = ctx.ctx().db();
+            // TODO: Client::Context legacy, needs to be removed
+            txn->getCurOp()->ensureStarted();
+            txn->getCurOp()->setNS(dbname);
 
-            d->getStats( txn, &result, scale );
+            // We lock the entire database in S-mode in order to ensure that the contents will not
+            // change for the stats snapshot. This might be unnecessary and if it becomes a
+            // performance issue, we can take IS lock and then lock collection-by-collection.
+            AutoGetDb autoDb(txn, ns, newlm::MODE_S);
+
+            result.append("db", ns);
+
+            Database* db = autoDb.getDb();
+            if (!db) {
+                // TODO: This preserves old behaviour where we used to create an empty database
+                // metadata even when the database is accessed for read. Without this several
+                // unit-tests will fail, which are fairly easy to fix. If backwards compatibility
+                // is not needed for the missing DB case, we can just do the same that's done in
+                // CollectionStats.
+                result.appendNumber("collections", 0);
+                result.appendNumber("objects", 0);
+                result.append("avgObjSize", 0);
+                result.appendNumber("dataSize", 0);
+                result.appendNumber("storageSize", 0);
+                result.appendNumber("numExtents", 0);
+                result.appendNumber("indexes", 0);
+                result.appendNumber("indexSize", 0);
+            }
+            else {
+                // TODO: Client::Context legacy, needs to be removed
+                txn->getCurOp()->enter(dbname.c_str(), db->getProfilingLevel());
+
+                db->getStats(txn, &result, scale);
+            }
 
             return true;
         }

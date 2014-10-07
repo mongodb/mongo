@@ -1,6 +1,34 @@
 t = db.geo_haystack3
 t.drop()
 
+//
+// Tests for geo haystack validity
+//
+
+t.insert({ pos : "invalid" });
+assert.commandFailed(t.ensureIndex({ pos : "geoHaystack", type : 1 }, { bucketSize : 1 }));
+t.drop();
+
+t.insert({ pos : [] });
+assert.commandFailed(t.ensureIndex({ pos : "geoHaystack", type : 1 }, { bucketSize : 1 }));
+t.drop();
+
+t.insert({ pos : [1, 2] });
+assert.commandWorked(t.ensureIndex({ pos : "geoHaystack", type : 1 }, { bucketSize : 1 }));
+t.drop();
+
+t.insert({ pos : {x : 1, y : 2} });
+assert.commandWorked(t.ensureIndex({ pos : "geoHaystack", type : 1 }, { bucketSize : 1 }));
+t.drop();
+
+t.insert({ pos : {x : 1, y : 2, z : 3} });
+assert.commandWorked(t.ensureIndex({ pos : "geoHaystack", type : 1 }, { bucketSize : 1 }));
+t.drop();
+
+//
+// Tests for geo haystack search
+//
+
 t.insert({ pos : { long : 34, lat : 33 }})
 t.insert({ pos : { long : 34.2, lat : 33.3 }, type : ["bar", "restaurant" ]})
 t.insert({ pos : { long : 34.2, lat : 37.3 }, type : ["bar", "chicken" ]})

@@ -26,7 +26,7 @@
  * it in the license file.
  */
 
-#include "mongo/pch.h"
+#include "mongo/platform/basic.h"
 
 #include "mongo/db/pipeline/pipeline_d.h"
 
@@ -63,8 +63,8 @@ namespace {
         }
 
         bool isCapped(const NamespaceString& ns) {
-            Client::ReadContext ctx(_ctx->opCtx, ns.ns());
-            Collection* collection = ctx.ctx().db()->getCollection(_ctx->opCtx, ns);
+            AutoGetCollectionForRead ctx(_ctx->opCtx, ns.ns());
+            Collection* collection = ctx.getCollection();
             return collection && collection->isCapped();
         }
 
@@ -74,7 +74,7 @@ namespace {
     };
 }
 
-    boost::shared_ptr<PlanExecutor> PipelineD::prepareCursorSource(
+    shared_ptr<PlanExecutor> PipelineD::prepareCursorSource(
             OperationContext* txn,
             Collection* collection,
             const intrusive_ptr<Pipeline>& pPipeline,
