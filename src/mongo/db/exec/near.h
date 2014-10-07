@@ -134,12 +134,24 @@ namespace mongo {
          */
         virtual StatusWith<double> computeDistance(WorkingSetMember* member) = 0;
 
+        /*
+         * Initialize near stage before buffering the data.
+         * Return IS_EOF if subclass finishes the initialization.
+         * Return NEED_TIME if we need more time.
+         * Return errors if an error occurs.
+         * Can't return ADVANCED.
+         */
+        virtual StageState initialize(OperationContext* txn,
+                                      WorkingSet* workingSet,
+                                      Collection* collection);
+
     private:
 
         //
         // Generic methods for progressive search functionality
         //
 
+        StageState initNext();
         StageState bufferNext(Status* error);
         StageState advanceNext(WorkingSetID* toReturn);
 
@@ -156,6 +168,7 @@ namespace mongo {
 
         // A progressive search works in stages of buffering and then advancing
         enum SearchState {
+            SearchState_Initializing,
             SearchState_Buffering,
             SearchState_Advancing,
             SearchState_Finished
