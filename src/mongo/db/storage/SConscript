@@ -19,6 +19,7 @@ env.Library(
 env.Library(
     target='sorted_data_interface_test_harness',
     source=[
+        'sorted_data_interface_test_bulkbuilder.cpp',
         'sorted_data_interface_test_cursor.cpp',
         'sorted_data_interface_test_cursor_advanceto.cpp',
         'sorted_data_interface_test_cursor_locate.cpp',
