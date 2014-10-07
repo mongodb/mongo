@@ -929,26 +929,69 @@ __conn_single(WT_SESSION_IMPL *session, const char *cfg[])
 	WT_FH *fh;
 	size_t len;
 	wt_off_t size;
-	int created;
 	char buf[256];
 
 	conn = S2C(session);
 	fh = NULL;
 
+	__wt_spin_lock(session, &__wt_process.spinlock);
+
 	/*
-	 * Optionally create the WiredTiger lock file if it doesn't already
-	 * exist.  We don't actually care if we create it or not, the "am I
-	 * the only locker" tests are all that matter.
+	 * We first check for other threads of control holding a lock on this
+	 * database, because the byte-level locking functions are based on the
+	 * POSIX 1003.1 fcntl APIs, which require all locks associated with a
+	 * file for a given process are removed when any file descriptor for
+	 * the file is closed by that process. In other words, we can't open a
+	 * file handle on the lock file until we are certain that closing that
+	 * handle won't discard the owning thread's lock. Applications hopefully
+	 * won't open a database in multiple threads, but we don't want to have
+	 * it fail the first time, but succeed the second.
 	 */
-	WT_RET(__wt_config_gets(session, cfg, "create", &cval));
-	WT_RET(__wt_open(session,
-	    WT_SINGLETHREAD, cval.val == 0 ? 0 : 1, 0, 0, &conn->lock_fh));
+	TAILQ_FOREACH(t, &__wt_process.connqh, q)
+		if (t->home != NULL &&
+		    t != conn && strcmp(t->home, conn->home) == 0) {
+			ret = EBUSY;
+			break;
+		}
+	if (ret != 0)
+		WT_ERR_MSG(session, EBUSY,
+		    "WiredTiger database is already being managed by another "
+		    "thread in this process");
+
+	/*
+	 * !!!
+	 * Be careful changing this code.
+	 *
+	 * We locked the WiredTiger file before release 2.3.2; a separate lock
+	 * file was added after 2.3.1 because hot backup has to copy the the
+	 * WiredTiger file and system utilities on Windows can't copy locked
+	 * files.
+	 *
+	 * For this reason, we don't use the lock file's existence to decide if
+	 * we're creating the database or not, use the WiredTiger file instead,
+	 * it has existed in every version of WiredTiger.
+	 *
+	 * Additionally, avoid an upgrade race: a 2.3.1 release process might
+	 * have the WiredTiger file locked, and we're going to create the lock
+	 * file and lock it instead. For this reason, first acquire a lock on
+	 * the lock file and then a lock on the WiredTiger file, then release
+	 * the latter so hot backups can proceed.  (If someone were to run a
+	 * current release and subsequently a historic release, we could still
+	 * fail because the historic release will ignore our lock file and will
+	 * then successfully lock the WiredTiger file, but I can't think of any
+	 * way to fix that.)
+	 *
+	 * Open the WiredTiger lock file, creating it if it doesn't exist. (I'm
+	 * not removing the lock file if we create it and subsequently fail, it
+	 * isn't simple to detect that case, and there's no risk other than a
+	 * useless file being left in the directory.)
+	 */
+	WT_ERR(__wt_open(session, WT_SINGLETHREAD, 1, 0, 0, &conn->lock_fh));
 
 	/*
 	 * Lock a byte of the file: if we don't get the lock, some other process
-	 * is holding it, we're done.  Note the file may be zero-length length,
-	 * and that's OK, the underlying call supports acquisition of locks past
-	 * the end-of-file.
+	 * is holding it, we're done.  The file may be zero-length, and that's
+	 * OK, the underlying call supports locking past the end-of-file.
 	 */
 	if (__wt_bytelock(conn->lock_fh, (wt_off_t)0, 1) != 0)
 		WT_ERR_MSG(session, EBUSY,
@@ -956,74 +999,63 @@ __conn_single(WT_SESSION_IMPL *session, const char *cfg[])
 		    "process");
 
 	/*
-	 * The byte-lock protects against other processes, also check to see if
-	 * another thread of control in this process has this database open.
-	 */
-	__wt_spin_lock(session, &__wt_process.spinlock);
-	TAILQ_FOREACH(t, &__wt_process.connqh, q)
-		if (t->home != NULL &&
-		    t != conn && strcmp(t->home, conn->home) == 0) {
-			ret = EBUSY;
-			break;
-		}
-	__wt_spin_unlock(session, &__wt_process.spinlock);
-	if (ret != 0)
-		WT_ERR_MSG(session, EBUSY,
-		    "WiredTiger database is already being managed by another "
-		    "thread in this process");
-
-	/*
-	 * If the size of the file is 0, we created it (or we won a race with
-	 * the thread that created it, it doesn't matter).
+	 * If the size of the lock file is 0, we created it (or we won a locking
+	 * race with the thread that created it, it doesn't matter).
+	 *
+	 * Write something into the file, zero-length files make me nervous.
 	 */
 	WT_ERR(__wt_filesize(session, conn->lock_fh, &size));
 	if (size == 0) {
-		/*
-		 * Write the WiredTiger version/date file.
-		 */
-		WT_ERR(__wt_open(session, WT_WIREDTIGER, 1, 0, 0, &fh));
-		len = (size_t)snprintf(buf, sizeof(buf),
-		    "%s\n%s\n", WT_WIREDTIGER, WIREDTIGER_VERSION_STRING);
-		WT_ERR(__wt_write(session, fh, (wt_off_t)0, len, buf));
-		WT_ERR(__wt_close(session, fh));
-		fh = NULL;
-
-		/*
-		 * Write some bytes into the WiredTiger lock file. Technically
-		 * this isn't necessary, but zero-length files make me nervous.
-		 */
 #define	WT_SINGLETHREAD_STRING	"WiredTiger lock file\n"
 		WT_ERR(__wt_write(session, conn->lock_fh, (wt_off_t)0,
 		    strlen(WT_SINGLETHREAD_STRING), WT_SINGLETHREAD_STRING));
+	}
 
-		created = 1;
+	/* We own the lock file, optionally create the WiredTiger file. */
+	WT_ERR(__wt_config_gets(session, cfg, "create", &cval));
+	WT_ERR(__wt_open(session,
+	    WT_WIREDTIGER, cval.val == 0 ? 0 : 1, 0, 0, &fh));
+
+	/*
+	 * Lock the WiredTiger file (for backward compatibility reasons as
+	 * described above).  Immediately release the lock, it's just a test.
+	 */
+	if (__wt_bytelock(fh, (wt_off_t)0, 1) != 0) {
+		WT_ERR_MSG(session, EBUSY,
+		    "WiredTiger database is already being managed by another "
+		    "process");
+	}
+	WT_ERR(__wt_bytelock(fh, (wt_off_t)0, 0));
+
+	/*
+	 * If the size of the file is zero, we created it, fill it in. If the
+	 * size of the file is non-zero, fail if configured for exclusivity.
+	 */
+	WT_ERR(__wt_filesize(session, fh, &size));
+	if (size == 0) {
+		len = (size_t)snprintf(buf, sizeof(buf),
+		    "%s\n%s\n", WT_WIREDTIGER, WIREDTIGER_VERSION_STRING);
+		WT_ERR(__wt_write(session, fh, (wt_off_t)0, len, buf));
+
+		conn->is_new = 1;
 	} else {
 		WT_ERR(__wt_config_gets(session, cfg, "exclusive", &cval));
 		if (cval.val != 0)
 			WT_ERR_MSG(session, EEXIST,
 			    "WiredTiger database already exists and exclusive "
 			    "option configured");
-		created = 0;
+
+		conn->is_new = 0;
 	}
 
-	/*
-	 * If we found a zero-length WiredTiger lock file, and eventually ended
-	 * as the database owner, return that we created the database.  (There
-	 * is a theoretical chance that another process created the WiredTiger
-	 * lock file but we won the race to add the WT_CONNECTION_IMPL structure
-	 * to the process' list.  It doesn't much matter, only one thread will
-	 * be told it created the database.)
+err:	/*
+	 * We ignore the connection's lock file handle on error, it will be
+	 * closed when the connection structure is destroyed.
 	 */
-	conn->is_new = created;
+	if (fh != NULL)
+		WT_ERR(__wt_close(session, fh));
 
-	return (0);
-
-err:	if (fh != NULL)
-		WT_TRET(__wt_close(session, fh));
-	if (conn->lock_fh != NULL) {
-		WT_TRET(__wt_close(session, conn->lock_fh));
-		conn->lock_fh = NULL;
-	}
+	__wt_spin_unlock(session, &__wt_process.spinlock);
 	return (ret);
 }
 
