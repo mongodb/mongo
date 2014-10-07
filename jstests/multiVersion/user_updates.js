@@ -1,5 +1,5 @@
 // SERVER-15515
-// Mixed version replSet, 2.4 promary & 2.6 secondary
+// Mixed version replSet, 2.4 primary & 2.6 secondary
 // Updates to users are replicated
 
 var authSucceed = 1;
@@ -52,15 +52,12 @@ authUser(authSucceed, priTest, "user1", "user1");
 authUser(authSucceed, secTest, "user1", "user1");
 
 // Change password
-// Due to SERVER-15441 , must assign db
-db = priAdmin;
 priAdmin.changeUserPassword("admin2", "ADMIN2");
 authUser(authFail, priAdmin, "admin2", "admin2");
 authUser(authFail, secAdmin, "admin2", "admin2");
 authUser(authSucceed, priAdmin, "admin2", "ADMIN2");
 authUser(authSucceed, secAdmin, "admin2", "ADMIN2");
 
-db = priTest;
 priTest.changeUserPassword("user1", "USER1");
 authUser(authFail, priTest, "user1", "user1");
 authUser(authFail, secTest, "user1", "user1");
