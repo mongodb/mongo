@@ -35,10 +35,42 @@
 
 namespace mongo {
 
-    // Verify that calling touch() returns an OK status.
-    TEST( SortedDataInterface, Touch ) {
+    // Verify that calling touch() on an empty index returns an OK status.
+    TEST( SortedDataInterface, TouchEmpty ) {
         scoped_ptr<HarnessHelper> harnessHelper( newHarnessHelper() );
         scoped_ptr<SortedDataInterface> sorted( harnessHelper->newSortedDataInterface() );
+
+        {
+            scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
+            ASSERT_OK( sorted->touch( opCtx.get() ) );
+        }
+    }
+
+    // Verify that calling touch() on a nonempty index returns an OK status.
+    TEST( SortedDataInterface, TouchNonEmpty ) {
+        scoped_ptr<HarnessHelper> harnessHelper( newHarnessHelper() );
+        scoped_ptr<SortedDataInterface> sorted( harnessHelper->newSortedDataInterface() );
+
+        {
+            scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
+            ASSERT( sorted->isEmpty( opCtx.get() ) );
+        }
+
+        {
+            scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
+            {
+                WriteUnitOfWork uow( opCtx.get() );
+                ASSERT_OK( sorted->insert( opCtx.get(), key1, loc1, false ) );
+                ASSERT_OK( sorted->insert( opCtx.get(), key2, loc2, false ) );
+                ASSERT_OK( sorted->insert( opCtx.get(), key3, loc3, false ) );
+                uow.commit();
+            }
+        }
+
+        {
+            scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
+            ASSERT_EQUALS( 3, sorted->numEntries( opCtx.get() ) );
+        }
 
         {
             scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
