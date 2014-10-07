@@ -1047,6 +1047,7 @@ __wt_lsm_compact(WT_SESSION_IMPL *session, const char *name, int *skip)
 	/* Clear any merge throttle: compact throws out that calculation. */
 	lsm_tree->merge_throttle = 0;
 	lsm_tree->merge_aggressiveness = 0;
+	progress = lsm_tree->merge_progressing;
 
 	/* If another thread started a compact on this tree, we're done. */
 	if (F_ISSET(lsm_tree, WT_LSM_TREE_COMPACTING))
