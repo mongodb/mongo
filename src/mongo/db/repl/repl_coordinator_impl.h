@@ -298,6 +298,13 @@ namespace repl {
                 int myIndex);
 
         /**
+         * Helper method that removes entries from _slaveInfoMap if they correspond to a node
+         * with a member ID that is not in the current replica set config, and also guarantees that
+         * there is an entry in the map corresponding to ourself.
+         */
+        void _updateSlaveInfoMapFromConfig_inlock();
+
+        /**
          * Helper method for setting/unsetting maintenance mode.  Scheduled by setMaintenanceMode()
          * to run in a global write lock in the replication executor thread.
          */

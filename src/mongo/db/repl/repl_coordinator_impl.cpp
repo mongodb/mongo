@@ -1562,18 +1562,32 @@ namespace {
          }
 
          _updateCurrentMemberStateFromTopologyCoordinator_inlock();
-         SlaveInfo& mySlaveInfo = _slaveInfoMap[_getMyRID_inlock()];
-         if (myIndex >= 0) {
-             // Ensure that there's an entry in the _slaveInfoMap for ourself
-             mySlaveInfo.memberID = _rsConfig.getMemberAt(myIndex).getId();
-             mySlaveInfo.hostAndPort = _rsConfig.getMemberAt(myIndex).getHostAndPort();
-         }
-         else {
-             mySlaveInfo.memberID = -1;
-             mySlaveInfo.hostAndPort = HostAndPort();
-         }
+         _updateSlaveInfoMapFromConfig_inlock();
          _startHeartbeats();
      }
+
+    void ReplicationCoordinatorImpl::_updateSlaveInfoMapFromConfig_inlock() {
+        for (SlaveInfoMap::iterator it = _slaveInfoMap.begin(); it != _slaveInfoMap.end();) {
+            if (!_rsConfig.findMemberByID(it->second.memberID)) {
+                _slaveInfoMap.erase(it++);
+            }
+            else {
+                ++it;
+            }
+        }
+
+        SlaveInfo& mySlaveInfo = _slaveInfoMap[_getMyRID_inlock()];
+        if (_thisMembersConfigIndex >= 0) {
+            // Ensure that there's an entry in the _slaveInfoMap for ourself
+            const MemberConfig& selfConfig = _rsConfig.getMemberAt(_thisMembersConfigIndex);
+            mySlaveInfo.memberID = selfConfig.getId();
+            mySlaveInfo.hostAndPort = selfConfig.getHostAndPort();
+        }
+        else {
+            mySlaveInfo.memberID = -1;
+            mySlaveInfo.hostAndPort = HostAndPort();
+        }
+    }
 
     Status ReplicationCoordinatorImpl::processReplSetUpdatePosition(
             OperationContext* txn,
