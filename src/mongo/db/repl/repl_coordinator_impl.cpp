@@ -1323,7 +1323,7 @@ namespace {
             return Status(ErrorCodes::NotYetInitialized,
                           "Node not yet initialized; use the replSetInitiate command");
         case kConfigReplicationDisabled:
-            return Status(ErrorCodes::NoReplicationEnabled, "Node is not a replica set member");
+            invariant(false); // should be unreachable due to !_settings.usingReplSets() check above
         case kConfigInitiating:
         case kConfigReconfiguring:
         case kConfigHBReconfiguring:
@@ -1364,7 +1364,7 @@ namespace {
         if (!status.isOK()) {
             error() << "replSetReconfig got " << status << " while parsing " << newConfigObj <<
                 rsLog;
-            return status;
+            return Status(ErrorCodes::InvalidReplicaSetConfig, status.reason());;
         }
         if (newConfig.getReplSetName() != _settings.ourSetName()) {
             str::stream errmsg;
@@ -1372,7 +1372,7 @@ namespace {
                 newConfig.getReplSetName() << ", but command line reports " <<
                 _settings.ourSetName() << "; rejecting";
             error() << std::string(errmsg);
-            return Status(ErrorCodes::BadValue, errmsg);
+            return Status(ErrorCodes::InvalidReplicaSetConfig, errmsg);
         }
 
         StatusWith<int> myIndex = validateConfigForReconfig(
@@ -1383,7 +1383,8 @@ namespace {
         if (!myIndex.isOK()) {
             error() << "replSetReconfig got " << myIndex.getStatus() << " while validating " <<
                 newConfigObj << rsLog;
-            return myIndex.getStatus();
+            return Status(ErrorCodes::NewReplicaSetConfigurationIncompatible,
+                          myIndex.getStatus().reason());
         }
 
         log() << "replSetReconfig config object with " << newConfig.getNumMembers() <<

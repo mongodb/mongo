@@ -47,6 +47,7 @@ namespace repl {
           _lastOpTime(ErrorCodes::NoMatchingDocument, "No last oplog entry"),
          _canAcquireGlobalSharedLock(true),
          _storeLocalConfigDocumentStatus(Status::OK()),
+         _storeLocalConfigDocumentShouldHang(false),
          _connectionsClosed(false) {
     }
 
@@ -88,6 +89,12 @@ namespace repl {
     Status ReplicationCoordinatorExternalStateMock::storeLocalConfigDocument(
             OperationContext* txn,
             const BSONObj& config) {
+        {
+            boost::unique_lock<boost::mutex> lock(_shouldHangMutex);
+            while (_storeLocalConfigDocumentShouldHang) {
+                _shouldHangCondVar.wait(lock);
+            }
+        }
         if (_storeLocalConfigDocumentStatus.isOK()) {
             setLocalConfigDocument(StatusWith<BSONObj>(config));
             return Status::OK();
@@ -113,6 +120,14 @@ namespace repl {
 
     void ReplicationCoordinatorExternalStateMock::setStoreLocalConfigDocumentStatus(Status status) {
         _storeLocalConfigDocumentStatus = status;
+    }
+
+    void ReplicationCoordinatorExternalStateMock::setStoreLocalConfigDocumentToHang(bool hang) {
+        boost::unique_lock<boost::mutex> lock(_shouldHangMutex);
+        _storeLocalConfigDocumentShouldHang = hang;
+        if (!hang) {
+            _shouldHangCondVar.notify_all();
+        }
     }
 
     void ReplicationCoordinatorExternalStateMock::closeConnections() {

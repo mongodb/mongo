@@ -99,12 +99,22 @@ namespace repl {
          */ 
         void setStoreLocalConfigDocumentStatus(Status status);
 
+        /**
+         * Sets whether or not subsequent calls to storeLocalConfigDocument() should hang
+         * indefinitely or not based on the value of "hang".
+         */
+        void setStoreLocalConfigDocumentToHang(bool hang);
+
     private:
         StatusWith<BSONObj> _localRsConfigDocument;
         StatusWith<OpTime>  _lastOpTime;
         std::vector<HostAndPort> _selfHosts;
         bool _canAcquireGlobalSharedLock;
         Status _storeLocalConfigDocumentStatus;
+        // mutex and cond var for controlling stroeLocalConfigDocument()'s hanging
+        boost::mutex _shouldHangMutex;
+        boost::condition _shouldHangCondVar;
+        bool _storeLocalConfigDocumentShouldHang;
         bool _connectionsClosed;
         HostAndPort _clientHostAndPort;
     };

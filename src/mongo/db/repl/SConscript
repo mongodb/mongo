@@ -106,6 +106,7 @@ env.CppUnitTest('repl_coordinator_impl_test',
                     'repl_coordinator_impl_elect_test.cpp',
                     'repl_coordinator_impl_test.cpp',
                     'repl_coordinator_impl_heartbeat_test.cpp',
+                    'repl_coordinator_impl_reconfig_test.cpp',
                 ],
                 LIBDEPS=['repl_coordinator_test_fixture'])
 
@@ -142,6 +143,10 @@ env.CppUnitTest('repl_coordinator_impl_elect_test',
 
 env.CppUnitTest('repl_coordinator_impl_heartbeat_test',
                 'repl_coordinator_impl_heartbeat_test.cpp',
+                LIBDEPS=['repl_coordinator_test_fixture'])
+
+env.CppUnitTest('repl_coordinator_impl_reconfig_test',
+                'repl_coordinator_impl_reconfig_test.cpp',
                 LIBDEPS=['repl_coordinator_test_fixture'])
 
 env.Library('repl_coordinator_interface',

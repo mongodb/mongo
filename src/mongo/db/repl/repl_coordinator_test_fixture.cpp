@@ -67,6 +67,9 @@ namespace {
     }
 
     void ReplCoordTest::tearDown() {
+        if (_externalState) {
+            _externalState->setStoreLocalConfigDocumentToHang(false);
+        }
         if (_callShutdown) {
             shutdown();
         }
