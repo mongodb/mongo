@@ -32,8 +32,14 @@ func (self *KerberosDBConnector) Configure(opts options.ToolOptions) error {
 		Timeout: KERBEROS_DIAL_TIMEOUT,
 		Direct:  opts.Direct,
 
+		// Kerberos principal
 		Username: opts.Auth.Username,
-		// This should always be '$external', but legacy tools require this
+		// Note: Password is only used on Windows. SASL doesn't allow you to specify
+		// a password, so this field is ignored on Linux and OSX. Run the kinit
+		// command to get a ticket first.
+		Password: opts.Auth.Password,
+		// This should always be '$external', but legacy tools still allow you to
+		// specify a source DB
 		Source:      opts.Auth.Source,
 		Service:     opts.Kerberos.Service,
 		ServiceHost: opts.Kerberos.ServiceHost,

@@ -181,6 +181,9 @@ functions:
       tests:
         - dir: src/github.com/mongodb/mongo-tools/${package}
           args: ${coverage_args} ${args} ${build_tags}
+          environment_variables:
+            - ${library_path}
+            - MONGODB_KERBEROS_PASSWORD=${kerberos_password}
 
   "setup integration test":
     command: shell.exec
@@ -191,6 +194,9 @@ functions:
         then
           echo "${kerberos_password}" | kinit -p drivers@LDAPTEST.10GEN.CC;
         fi
+        if [ "Windows_NT" = "$OS" ]; then
+          cmd /c "REG ADD HKLM\SYSTEM\ControlSet001\Control\Lsa\Kerberos\Domains\LDAPTEST.10GEN.CC /v KdcNames /d ldaptest.10gen.cc /t REG_MULTI_SZ /f"
+        fi;
 
   "run tool tests":
     command: gotest.run
@@ -201,17 +207,35 @@ functions:
         # TODO mongodump needs tests
         # TODO mongotop needs tests
         - dir: src/github.com/mongodb/mongo-tools/mongoimport
-          args: ${coverage_args} ${args} ${build_tags} 2>&1 > /dev/null; MONGOSHIM=./mongoshim${extension} ${library_path} go test -v ${coverage_args} ${args} ${build_tags}
+          args: -v ${coverage_args} ${args} ${build_tags}
+          environment_variables:
+            - MONGOSHIM=./mongoshim${extension}
+            - ${library_path}
         - dir: src/github.com/mongodb/mongo-tools/mongoexport
-          args: ${coverage_args} ${args} ${build_tags} 2>&1 > /dev/null; MONGOSHIM=./mongoshim${extension} ${library_path} go test -v ${coverage_args} ${args} ${build_tags}
+          args: -v ${coverage_args} ${args} ${build_tags}
+          environment_variables:
+            - MONGOSHIM=./mongoshim${extension}
+            - ${library_path}
         - dir: src/github.com/mongodb/mongo-tools/mongostat
-          args: ${coverage_args} ${args} ${build_tags} 2>&1 > /dev/null; MONGOSHIM=./mongoshim${extension} ${library_path} go test -v ${coverage_args} ${args} ${build_tags}
+          args: -v ${coverage_args} ${args} ${build_tags}
+          environment_variables:
+            - MONGOSHIM=./mongoshim${extension}
+            - ${library_path}
         - dir: src/github.com/mongodb/mongo-tools/mongooplog
-          args: ${coverage_args} ${args} ${build_tags} 2>&1 > /dev/null; MONGOSHIM=./mongoshim${extension} ${library_path} go test -v ${coverage_args} ${args} ${build_tags}
+          args: -v ${coverage_args} ${args} ${build_tags}
+          environment_variables:
+            - MONGOSHIM=./mongoshim${extension}
+            - ${library_path}
         - dir: src/github.com/mongodb/mongo-tools/mongorestore
-          args: ${coverage_args} ${args} ${build_tags} 2>&1 > /dev/null; MONGOSHIM=./mongoshim${extension} ${library_path} go test -v ${coverage_args} ${args} ${build_tags}
+          args: -v ${coverage_args} ${args} ${build_tags}
+          environment_variables:
+            - MONGOSHIM=./mongoshim${extension}
+            - ${library_path}
         - dir: src/github.com/mongodb/mongo-tools/mongofiles
-          args: ${coverage_args} ${args} ${build_tags} 2>&1 > /dev/null; MONGOSHIM=./mongoshim${extension} ${library_path} go test -v ${coverage_args} ${args} ${build_tags}
+          args: -v ${coverage_args} ${args} ${build_tags}
+          environment_variables:
+            - MONGOSHIM=./mongoshim${extension}
+            - ${library_path}
 
   "setup credentials" :
     command: shell.exec
@@ -1004,7 +1028,7 @@ buildvariants:
     build_tags: -tags "ssl"
     edition: ssl
     extension: .exe
-    library_path: 'PATH="/cygdrive/c/mingw-w64/x86_64-4.9.1-posix-seh-rt_v3-rev1/mingw64/bin:/cygdrive/c/sasl/:$PATH" '
+    library_path: PATH="/cygdrive/c/mingw-w64/x86_64-4.9.1-posix-seh-rt_v3-rev1/mingw64/bin:/cygdrive/c/sasl/:$PATH"
     preproc_gpm: "perl -pi -e 's/\\r\\n/\\n/g' "
   tasks: *windows_64_ssl_tasks
 
@@ -1018,6 +1042,6 @@ buildvariants:
     build_tags: -tags "sasl ssl"
     edition: enterprise
     extension: .exe
-    library_path: 'PATH="/cygdrive/c/mingw-w64/x86_64-4.9.1-posix-seh-rt_v3-rev1/mingw64/bin:/cygdrive/c/sasl/:$PATH" '
+    library_path: PATH="/cygdrive/c/mingw-w64/x86_64-4.9.1-posix-seh-rt_v3-rev1/mingw64/bin:/cygdrive/c/sasl/:$PATH"
     preproc_gpm: "perl -pi -e 's/\\r\\n/\\n/g' "
   tasks: *windows_64_tasks
