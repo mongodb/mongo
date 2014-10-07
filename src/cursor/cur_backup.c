@@ -230,7 +230,7 @@ __backup_start(
 	WT_ERR(__wt_exist(session, WT_USERCONFIG, &exist));
 	if (exist)
 		WT_ERR(__backup_list_append(session, cb, WT_USERCONFIG));
-	WT_ERR(__backup_list_append(session, cb, WT_SINGLETHREAD));
+	WT_ERR(__backup_list_append(session, cb, WT_WIREDTIGER));
 
 err:	/* Close the hot backup file. */
 	if (cb->bfp != NULL) {
