@@ -30,10 +30,9 @@
 
 #include "mongo/platform/basic.h"
 
+#include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/collection_catalog_entry.h"
 #include "mongo/db/catalog/database.h"
-#include "mongo/db/catalog/database_catalog_entry.h"
-#include "mongo/db/catalog/database_holder.h"
 #include "mongo/db/client.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/storage/storage_engine.h"
@@ -67,21 +66,22 @@ namespace mongo {
                  BSONObjBuilder& result,
                  bool /*fromRepl*/) {
 
-            AutoGetDb autoDb(txn, dbname, newlm::MODE_S);
-            const Database* d = autoDb.getDb();
-            if ( !d ) {
+            const string ns = parseNs(dbname, cmdObj);
+
+            AutoGetCollectionForRead autoColl(txn, ns);
+            if (!autoColl.getDb()) {
                 return appendCommandStatus( result, Status( ErrorCodes::NamespaceNotFound,
                                                             "no database" ) );
             }
 
-            const string ns = parseNs(dbname, cmdObj);
-
-            const DatabaseCatalogEntry* dbEntry = d->getDatabaseCatalogEntry();
-            const CollectionCatalogEntry* cce = dbEntry->getCollectionCatalogEntry( txn, ns );
-            if ( !cce ) {
+            const Collection* collection = autoColl.getCollection();
+            if (!collection) {
                 return appendCommandStatus( result, Status( ErrorCodes::NamespaceNotFound,
                                                             "no collection" ) );
             }
+
+            const CollectionCatalogEntry* cce = collection->getCatalogEntry();
+            invariant(cce);
 
             vector<string> indexNames;
             cce->getAllIndexes( txn, &indexNames );
