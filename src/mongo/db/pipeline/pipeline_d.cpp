@@ -81,7 +81,6 @@ namespace {
             const intrusive_ptr<ExpressionContext>& pExpCtx) {
         // get the full "namespace" name
         const string& fullName = pExpCtx->ns.ns();
-        pExpCtx->opCtx->lockState()->assertAtLeastReadLocked(fullName);
 
         // We will be modifying the source vector as we go
         Pipeline::SourceContainer& sources = pPipeline->sources;

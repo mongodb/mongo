@@ -41,14 +41,12 @@ namespace mongo {
                                   typename BtreeLogic<OnDiskFormat>::Builder* builder)
             : _builder(builder), _trans(trans) { }
 
-        virtual ~BtreeBuilderInterfaceImpl() { }
-
         Status addKey(const BSONObj& key, const DiskLoc& loc) {
             return _builder->addKey(key, loc);
         }
 
     private:
-        typename BtreeLogic<OnDiskFormat>::Builder* _builder;
+        boost::scoped_ptr<typename BtreeLogic<OnDiskFormat>::Builder> _builder;
 
         // Not owned here.
         OperationContext* _trans;

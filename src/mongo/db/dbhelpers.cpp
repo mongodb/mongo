@@ -144,8 +144,8 @@ namespace mongo {
                            BSONObj& result,
                            bool* nsFound,
                            bool* indexFound) {
-        txn->lockState()->assertAtLeastReadLocked(ns);
-        invariant( database );
+
+        invariant(database);
 
         Collection* collection = database->getCollection( txn, ns );
         if ( !collection ) {

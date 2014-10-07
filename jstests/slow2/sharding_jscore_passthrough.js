@@ -126,6 +126,7 @@ files.forEach(function(x) {
         'top|' +
         'touch1|' +
         'dbcase|' + // undo after fixing SERVER-11735
+        'dbcase2|' + // undo after fixing SERVER-11735
         'stats' + // tests db.stats().dataFileVersion, which doesn't appear in sharded db.stats()
         ')\.js$');
 

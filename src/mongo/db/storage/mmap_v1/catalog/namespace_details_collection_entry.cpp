@@ -288,7 +288,7 @@ namespace mongo {
             setIndexIsMultikey( txn, toIdxNo, tempMultikey );
 
             idxNo = toIdxNo;
-            invariant( idxNo = _findIndexNumber( txn, indexName ) );
+            invariant( (idxNo = _findIndexNumber( txn, indexName )) );
         }
 
         txn->recoveryUnit()->writingInt( _details->indexBuildsInProgress ) -= 1;

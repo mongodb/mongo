@@ -63,6 +63,10 @@ namespace newlm {
 
         const ResourceId resourceIdLocalDB =
                                 ResourceId(RESOURCE_DATABASE, string("local"));
+
+        bool isSharedMode(newlm::LockMode mode) {
+            return (mode == newlm::MODE_IS || mode == newlm::MODE_S);
+        }
     }
 
 
@@ -96,6 +100,19 @@ namespace newlm {
         const newlm::ResourceId resIdNs(newlm::RESOURCE_DATABASE, db);
 
         return isLockHeldForMode(resIdNs, newlm::MODE_X);
+    }
+
+    bool LockerImpl::isDbLockedForMode(const StringData& dbName, newlm::LockMode mode) const {
+        DEV {
+            const NamespaceString nss(dbName);
+            dassert(nss.coll().empty());
+        };
+
+        if (isW()) return true;
+        if (isR() && isSharedMode(mode)) return true;
+
+        const newlm::ResourceId resIdDb(newlm::RESOURCE_DATABASE, dbName);
+        return isLockHeldForMode(resIdDb, mode);
     }
 
     bool LockerImpl::isAtLeastReadLocked(const StringData& ns) const {
@@ -136,15 +153,6 @@ namespace newlm {
             dump();
             msgasserted(
                 16105, mongoutils::str::stream() << "expected to be write locked for " << ns);
-        }
-    }
-
-    void LockerImpl::assertAtLeastReadLocked(const StringData& ns) const {
-        if (!isAtLeastReadLocked(ns)) {
-            log() << "error expected " << ns << " to be locked " << std::endl;
-            dump();
-            msgasserted(
-                16104, mongoutils::str::stream() << "expected to be read locked for " << ns);
         }
     }
 

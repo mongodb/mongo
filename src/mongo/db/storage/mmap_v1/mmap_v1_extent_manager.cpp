@@ -138,8 +138,13 @@ namespace mongo {
                                       int n,
                                       int sizeNeeded ,
                                       bool preallocateOnly) {
-        verify(this);
-        DEV txn->lockState()->assertAtLeastReadLocked( _dbname );
+
+        if (!txn->lockState()->isWriteLocked(_dbname)) {
+            log() << "error: getFile() called in a read lock, yet file to return is not yet open";
+            log() << "       getFile(" << n << ") _files.size:" 
+                  <<_files.size() << ' ' << fileName(n).string();
+            invariant(false);
+        }
 
         if ( n < 0 || n >= DiskLoc::MaxFiles ) {
             log() << "getFile(): n=" << n << endl;
@@ -151,22 +156,20 @@ namespace mongo {
                 log() << "getFile(): n=" << n << endl;
             }
         }
+
         DataFile* p = 0;
         if ( !preallocateOnly ) {
             while ( n >= (int) _files.size() ) {
-                verify(this);
-                if (!txn->lockState()->isWriteLocked(_dbname)) {
-                    log() << "error: getFile() called in a read lock, yet file to return is not yet open";
-                    log() << "       getFile(" << n << ") _files.size:" <<_files.size() << ' ' << fileName(n).string();
-                    invariant(false);
-                }
                 _files.push_back(0);
             }
             p = _files[n];
         }
+
         if ( p == 0 ) {
-            if ( n == 0 ) audit::logCreateDatabase( currentClient.get(), _dbname );
-            DEV txn->lockState()->assertWriteLocked( _dbname );
+            if (n == 0) {
+                audit::logCreateDatabase(currentClient.get(), _dbname);
+            }
+
             boost::filesystem::path fullName = fileName( n );
             string fullNameString = fullName.string();
             p = new DataFile(n);

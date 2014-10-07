@@ -99,11 +99,11 @@ namespace {
             _selfIndex = selfIndex;
 
             if (now == Date_t(-1)) {
-                getTopoCoord().updateConfig(config, selfIndex, _now++, OpTime(0,0));
+                getTopoCoord().updateConfig(config, selfIndex, _now++);
             }
             else {
                 invariant(now > _now);
-                getTopoCoord().updateConfig(config, selfIndex, now, OpTime(0,0));
+                getTopoCoord().updateConfig(config, selfIndex, now);
                 _now = now + 1;
             }
         }
@@ -694,7 +694,7 @@ namespace {
 
         BSONObjBuilder responseBuilder0;
         Status status0 = internalErrorStatus;
-        getTopoCoord().prepareFreshResponse(cbData(), args, ourOpTime, &responseBuilder0, &status0);
+        getTopoCoord().prepareFreshResponse(args, Date_t(), ourOpTime, &responseBuilder0, &status0);
         ASSERT_EQUALS(ErrorCodes::ReplicaSetNotFound, status0);
         ASSERT_TRUE(responseBuilder0.obj().isEmpty());
 
@@ -709,7 +709,7 @@ namespace {
 
         BSONObjBuilder responseBuilder1;
         Status status1 = internalErrorStatus;
-        getTopoCoord().prepareFreshResponse(cbData(), args, ourOpTime, &responseBuilder1, &status1);
+        getTopoCoord().prepareFreshResponse(args, Date_t(), ourOpTime, &responseBuilder1, &status1);
         ASSERT_OK(status1);
         BSONObj response1 = responseBuilder1.obj();
         ASSERT_EQUALS("config version stale", response1["info"].String());
@@ -725,7 +725,7 @@ namespace {
 
         BSONObjBuilder responseBuilder2;
         Status status2 = internalErrorStatus;
-        getTopoCoord().prepareFreshResponse(cbData(), args, ourOpTime, &responseBuilder2, &status2);
+        getTopoCoord().prepareFreshResponse(args, Date_t(), ourOpTime, &responseBuilder2, &status2);
         ASSERT_OK(status2);
         BSONObj response2 = responseBuilder2.obj();
         ASSERT_EQUALS(ourOpTime, OpTime(response2["opTime"].timestampValue()));
@@ -742,7 +742,7 @@ namespace {
 
         BSONObjBuilder responseBuilder3;
         Status status3 = internalErrorStatus;
-        getTopoCoord().prepareFreshResponse(cbData(), args, ourOpTime, &responseBuilder3, &status3);
+        getTopoCoord().prepareFreshResponse(args, Date_t(), ourOpTime, &responseBuilder3, &status3);
         ASSERT_OK(status3);
         BSONObj response3 = responseBuilder3.obj();
         ASSERT_FALSE(response3.hasField("info"));
@@ -760,7 +760,7 @@ namespace {
 
         BSONObjBuilder responseBuilder4;
         Status status4 = internalErrorStatus;
-        getTopoCoord().prepareFreshResponse(cbData(), args, ourOpTime, &responseBuilder4, &status4);
+        getTopoCoord().prepareFreshResponse(args, Date_t(), ourOpTime, &responseBuilder4, &status4);
         ASSERT_OK(status4);
         BSONObj response4 = responseBuilder4.obj();
         ASSERT_FALSE(response4.hasField("info"));
@@ -780,7 +780,7 @@ namespace {
 
         BSONObjBuilder responseBuilder5;
         Status status5 = internalErrorStatus;
-        getTopoCoord().prepareFreshResponse(cbData(), args, ourOpTime, &responseBuilder5, &status5);
+        getTopoCoord().prepareFreshResponse(args, Date_t(), ourOpTime, &responseBuilder5, &status5);
         ASSERT_OK(status5);
         BSONObj response5 = responseBuilder5.obj();
         ASSERT_FALSE(response5.hasField("info"));
@@ -799,7 +799,7 @@ namespace {
 
         BSONObjBuilder responseBuilder6;
         Status status6 = internalErrorStatus;
-        getTopoCoord().prepareFreshResponse(cbData(), args, ourOpTime, &responseBuilder6, &status6);
+        getTopoCoord().prepareFreshResponse(args, Date_t(), ourOpTime, &responseBuilder6, &status6);
         ASSERT_OK(status6);
         BSONObj response6 = responseBuilder6.obj();
         ASSERT_FALSE(response6.hasField("info"));
@@ -818,7 +818,7 @@ namespace {
 
         BSONObjBuilder responseBuilder7;
         Status status7 = internalErrorStatus;
-        getTopoCoord().prepareFreshResponse(cbData(), args, ourOpTime, &responseBuilder7, &status7);
+        getTopoCoord().prepareFreshResponse(args, Date_t(), ourOpTime, &responseBuilder7, &status7);
         ASSERT_OK(status7);
         BSONObj response7 = responseBuilder7.obj();
         ASSERT_FALSE(response7.hasField("info"));
@@ -835,7 +835,7 @@ namespace {
 
         BSONObjBuilder responseBuilder8;
         Status status8 = internalErrorStatus;
-        getTopoCoord().prepareFreshResponse(cbData(), args, ourOpTime, &responseBuilder8, &status8);
+        getTopoCoord().prepareFreshResponse(args, Date_t(), ourOpTime, &responseBuilder8, &status8);
         ASSERT_OK(status8);
         BSONObj response8 = responseBuilder8.obj();
         ASSERT_FALSE(response8.hasField("info"));
@@ -852,7 +852,7 @@ namespace {
 
         BSONObjBuilder responseBuilder9;
         Status status9 = internalErrorStatus;
-        getTopoCoord().prepareFreshResponse(cbData(), args, ourOpTime, &responseBuilder9, &status9);
+        getTopoCoord().prepareFreshResponse(args, Date_t(), ourOpTime, &responseBuilder9, &status9);
         ASSERT_OK(status9);
         BSONObj response9 = responseBuilder9.obj();
         ASSERT_FALSE(response9.hasField("info"));
@@ -875,7 +875,7 @@ namespace {
 
         BSONObjBuilder responseBuilder10;
         Status status10 = internalErrorStatus;
-        getTopoCoord().prepareFreshResponse(cbData(), args, ourOpTime, &responseBuilder10, &status10);
+        getTopoCoord().prepareFreshResponse(args, Date_t(), ourOpTime, &responseBuilder10, &status10);
         ASSERT_OK(status10);
         BSONObj response10 = responseBuilder10.obj();
         ASSERT_FALSE(response10.hasField("info"));
@@ -895,7 +895,7 @@ namespace {
         BSONObjBuilder responseBuilder11;
         Status status11 = internalErrorStatus;
         getTopoCoord().prepareFreshResponse(
-                cbData(), args, ourOpTime, &responseBuilder11, &status11);
+                args, Date_t(), ourOpTime, &responseBuilder11, &status11);
         ASSERT_OK(status11);
         BSONObj response11 = responseBuilder11.obj();
         ASSERT_FALSE(response11.hasField("info")) << response11.toString();
@@ -1976,7 +1976,7 @@ namespace {
         ASSERT_TRUE(getTopoCoord().voteForMyself(now()++));
 
         // now win election and ensure _electionId and _electionTime are set properly
-        getTopoCoord().processWinElection(now()++, round, lastOpTimeApplied, election);
+        getTopoCoord().processWinElection(round, election);
         ASSERT_EQUALS(round, getTopoCoord().getElectionId());
         ASSERT_EQUALS(election, getTopoCoord().getElectionTime());
         ASSERT_TRUE(TopologyCoordinator::Role::leader == getTopoCoord().getRole());
@@ -2042,7 +2042,7 @@ namespace {
         BSONObjBuilder freshResponseBuilder;
         Status result = Status(ErrorCodes::InternalError, "status not set by prepareElectResponse");
         getTopoCoord().prepareFreshResponse(
-                cbData(), freshArgs, lastOpTimeApplied, &freshResponseBuilder, &result);
+                freshArgs, now()++, lastOpTimeApplied, &freshResponseBuilder, &result);
         BSONObj response = freshResponseBuilder.obj();
         ASSERT_OK(result);
         ASSERT_EQUALS(lastOpTimeApplied, OpTime(response["opTime"].timestampValue()));
@@ -2065,7 +2065,7 @@ namespace {
         result = Status(ErrorCodes::InternalError, "status not set by prepareElectResponse");
         startCapturingLogMessages();
         getTopoCoord().prepareElectResponse(
-                cbData(), electArgs, now()++, &electResponseBuilder, &result);
+                electArgs, now()++, OpTime(), &electResponseBuilder, &result);
         stopCapturingLogMessages();
         response = electResponseBuilder.obj();
         ASSERT_OK(result);
@@ -2094,7 +2094,7 @@ namespace {
         ASSERT_EQUALS(originalElectionId, getTopoCoord().getElectionId());
 
         // now lose election and ensure _electionTime and _electionId are 0'd out 
-        getTopoCoord().processLoseElection(now()++, lastOpTimeApplied);
+        getTopoCoord().processLoseElection();
         ASSERT_EQUALS(OID(), getTopoCoord().getElectionId());
         ASSERT_EQUALS(OpTime(0,0), getTopoCoord().getElectionTime());
         ASSERT_TRUE(TopologyCoordinator::Role::follower == getTopoCoord().getRole());
@@ -2160,7 +2160,7 @@ namespace {
         BSONObjBuilder freshResponseBuilder;
         Status result = Status(ErrorCodes::InternalError, "status not set by prepareElectResponse");
         getTopoCoord().prepareFreshResponse(
-                cbData(), freshArgs, lastOpTimeApplied, &freshResponseBuilder, &result);
+                freshArgs, now()++, lastOpTimeApplied, &freshResponseBuilder, &result);
         BSONObj response = freshResponseBuilder.obj();
         ASSERT_OK(result);
         ASSERT_EQUALS(lastOpTimeApplied, OpTime(response["opTime"].timestampValue()));
@@ -2171,7 +2171,7 @@ namespace {
         // now voteForSelf as though we received all our fresh responses
         ASSERT_TRUE(getTopoCoord().voteForMyself(now()++));
         // now win election and ensure _electionId and _electionTime are set properly
-        getTopoCoord().processWinElection(now()++, round, lastOpTimeApplied, election);
+        getTopoCoord().processWinElection(round, election);
         ASSERT_EQUALS(round, getTopoCoord().getElectionId());
         ASSERT_EQUALS(election, getTopoCoord().getElectionTime());
         ASSERT_TRUE(TopologyCoordinator::Role::leader == getTopoCoord().getRole());
@@ -2188,7 +2188,7 @@ namespace {
         result = Status(ErrorCodes::InternalError, "status not set by prepareElectResponse");
         startCapturingLogMessages();
         getTopoCoord().prepareElectResponse(
-                cbData(), electArgs, now()++, &electResponseBuilder, &result);
+                electArgs, now()++, OpTime(), &electResponseBuilder, &result);
         stopCapturingLogMessages();
         response = electResponseBuilder.obj();
         ASSERT_OK(result);
@@ -2249,7 +2249,7 @@ namespace {
         // now voteForSelf as though we received all our fresh responses
         ASSERT_TRUE(getTopoCoord().voteForMyself(now()++));
         // now win election
-        getTopoCoord().processWinElection(now()++, round, lastOpTimeApplied, election);
+        getTopoCoord().processWinElection(round, election);
         ASSERT_EQUALS(0, getTopoCoord().getCurrentPrimaryIndex());
         ASSERT_TRUE(TopologyCoordinator::Role::leader == getTopoCoord().getRole());
 
@@ -2264,7 +2264,7 @@ namespace {
         BSONObjBuilder freshResponseBuilder;
         Status result = Status(ErrorCodes::InternalError, "status not set by prepareElectResponse");
         getTopoCoord().prepareFreshResponse(
-                cbData(), freshArgs, lastOpTimeApplied, &freshResponseBuilder, &result);
+                freshArgs, now()++, lastOpTimeApplied, &freshResponseBuilder, &result);
         BSONObj response = freshResponseBuilder.obj();
         ASSERT_OK(result);
         ASSERT_EQUALS(lastOpTimeApplied, OpTime(response["opTime"].timestampValue()));
@@ -2284,7 +2284,7 @@ namespace {
         result = Status(ErrorCodes::InternalError, "status not set by prepareElectResponse");
         startCapturingLogMessages();
         getTopoCoord().prepareElectResponse(
-                cbData(), electArgs, now()++, &electResponseBuilder, &result);
+                electArgs, now()++, OpTime(), &electResponseBuilder, &result);
         stopCapturingLogMessages();
         response = electResponseBuilder.obj();
         ASSERT_OK(result);
@@ -2425,7 +2425,7 @@ namespace {
         BSONObjBuilder responseBuilder;
         Status result = Status(ErrorCodes::InternalError, "status not set by prepareElectResponse");
         startCapturingLogMessages();
-        getTopoCoord().prepareElectResponse(cbData, args, now++, &responseBuilder, &result);
+        getTopoCoord().prepareElectResponse(args, now++, OpTime(), &responseBuilder, &result);
         stopCapturingLogMessages();
         BSONObj response = responseBuilder.obj();
         ASSERT_OK(result);
@@ -2438,7 +2438,7 @@ namespace {
         // Make sure nay votes, do not prevent subsequent yeas (the way a yea vote would)
         args.set = "rs0";
         BSONObjBuilder responseBuilder2;
-        getTopoCoord().prepareElectResponse(cbData, args, now++, &responseBuilder2, &result);
+        getTopoCoord().prepareElectResponse(args, now++, OpTime(), &responseBuilder2, &result);
         BSONObj response2 = responseBuilder2.obj();
         ASSERT_EQUALS(1, response2["vote"].Int());
         ASSERT_EQUALS(round, response2["round"].OID());
@@ -2455,7 +2455,7 @@ namespace {
         BSONObjBuilder responseBuilder;
         Status result = Status(ErrorCodes::InternalError, "status not set by prepareElectResponse");
         startCapturingLogMessages();
-        getTopoCoord().prepareElectResponse(cbData, args, now++, &responseBuilder, &result);
+        getTopoCoord().prepareElectResponse(args, now++, OpTime(), &responseBuilder, &result);
         stopCapturingLogMessages();
         BSONObj response = responseBuilder.obj();
         ASSERT_OK(result);
@@ -2467,7 +2467,7 @@ namespace {
         // Make sure nay votes, do not prevent subsequent yeas (the way a yea vote would)
         args.cfgver = 10;
         BSONObjBuilder responseBuilder2;
-        getTopoCoord().prepareElectResponse(cbData, args, now++, &responseBuilder2, &result);
+        getTopoCoord().prepareElectResponse(args, now++, OpTime(), &responseBuilder2, &result);
         BSONObj response2 = responseBuilder2.obj();
         ASSERT_EQUALS(1, response2["vote"].Int());
         ASSERT_EQUALS(round, response2["round"].OID());
@@ -2484,7 +2484,7 @@ namespace {
         BSONObjBuilder responseBuilder;
         Status result = Status(ErrorCodes::InternalError, "status not set by prepareElectResponse");
         startCapturingLogMessages();
-        getTopoCoord().prepareElectResponse(cbData, args, now++, &responseBuilder, &result);
+        getTopoCoord().prepareElectResponse(args, now++, OpTime(), &responseBuilder, &result);
         stopCapturingLogMessages();
         BSONObj response = responseBuilder.obj();
         ASSERT_OK(result);
@@ -2496,7 +2496,7 @@ namespace {
         // Make sure nay votes, do not prevent subsequent yeas (the way a yea vote would)
         args.cfgver = 10;
         BSONObjBuilder responseBuilder2;
-        getTopoCoord().prepareElectResponse(cbData, args, now++, &responseBuilder2, &result);
+        getTopoCoord().prepareElectResponse(args, now++, OpTime(), &responseBuilder2, &result);
         BSONObj response2 = responseBuilder2.obj();
         ASSERT_EQUALS(1, response2["vote"].Int());
         ASSERT_EQUALS(round, response2["round"].OID());
@@ -2513,7 +2513,7 @@ namespace {
         BSONObjBuilder responseBuilder;
         Status result = Status(ErrorCodes::InternalError, "status not set by prepareElectResponse");
         startCapturingLogMessages();
-        getTopoCoord().prepareElectResponse(cbData, args, now++, &responseBuilder, &result);
+        getTopoCoord().prepareElectResponse(args, now++, OpTime(), &responseBuilder, &result);
         stopCapturingLogMessages();
         BSONObj response = responseBuilder.obj();
         ASSERT_OK(result);
@@ -2524,7 +2524,7 @@ namespace {
         // Make sure nay votes, do not prevent subsequent yeas (the way a yea vote would)
         args.whoid = 1;
         BSONObjBuilder responseBuilder2;
-        getTopoCoord().prepareElectResponse(cbData, args, now++, &responseBuilder2, &result);
+        getTopoCoord().prepareElectResponse(args, now++, OpTime(), &responseBuilder2, &result);
         BSONObj response2 = responseBuilder2.obj();
         ASSERT_EQUALS(1, response2["vote"].Int());
         ASSERT_EQUALS(round, response2["round"].OID());
@@ -2543,7 +2543,7 @@ namespace {
         BSONObjBuilder responseBuilder;
         Status result = Status(ErrorCodes::InternalError, "status not set by prepareElectResponse");
         startCapturingLogMessages();
-        getTopoCoord().prepareElectResponse(cbData, args, now++, &responseBuilder, &result);
+        getTopoCoord().prepareElectResponse(args, now++, OpTime(), &responseBuilder, &result);
         stopCapturingLogMessages();
         BSONObj response = responseBuilder.obj();
         ASSERT_OK(result);
@@ -2554,7 +2554,7 @@ namespace {
         // Make sure nay votes, do not prevent subsequent yeas (the way a yea vote would)
         getTopoCoord()._setCurrentPrimaryForTest(-1);
         BSONObjBuilder responseBuilder2;
-        getTopoCoord().prepareElectResponse(cbData, args, now++, &responseBuilder2, &result);
+        getTopoCoord().prepareElectResponse(args, now++, OpTime(), &responseBuilder2, &result);
         BSONObj response2 = responseBuilder2.obj();
         ASSERT_EQUALS(1, response2["vote"].Int());
         ASSERT_EQUALS(round, response2["round"].OID());
@@ -2572,7 +2572,7 @@ namespace {
         BSONObjBuilder responseBuilder;
         Status result = Status(ErrorCodes::InternalError, "status not set by prepareElectResponse");
         startCapturingLogMessages();
-        getTopoCoord().prepareElectResponse(cbData, args, now++, &responseBuilder, &result);
+        getTopoCoord().prepareElectResponse(args, now++, OpTime(), &responseBuilder, &result);
         stopCapturingLogMessages();
         BSONObj response = responseBuilder.obj();
         ASSERT_OK(result);
@@ -2583,7 +2583,7 @@ namespace {
         // Make sure nay votes, do not prevent subsequent yeas (the way a yea vote would)
         getTopoCoord()._setCurrentPrimaryForTest(-1);
         BSONObjBuilder responseBuilder2;
-        getTopoCoord().prepareElectResponse(cbData, args, now++, &responseBuilder2, &result);
+        getTopoCoord().prepareElectResponse(args, now++, OpTime(), &responseBuilder2, &result);
         BSONObj response2 = responseBuilder2.obj();
         ASSERT_EQUALS(1, response2["vote"].Int());
         ASSERT_EQUALS(round, response2["round"].OID());
@@ -2602,7 +2602,7 @@ namespace {
         BSONObjBuilder responseBuilder;
         Status result = Status(ErrorCodes::InternalError, "status not set by prepareElectResponse");
         startCapturingLogMessages();
-        getTopoCoord().prepareElectResponse(cbData, args, now++, &responseBuilder, &result);
+        getTopoCoord().prepareElectResponse(args, now++, OpTime(), &responseBuilder, &result);
         stopCapturingLogMessages();
         BSONObj response = responseBuilder.obj();
         ASSERT_OK(result);
@@ -2613,7 +2613,7 @@ namespace {
         // Make sure nay votes, do not prevent subsequent yeas (the way a yea vote would)
         args.whoid = 3;
         BSONObjBuilder responseBuilder2;
-        getTopoCoord().prepareElectResponse(cbData, args, now++, &responseBuilder2, &result);
+        getTopoCoord().prepareElectResponse(args, now++, OpTime(), &responseBuilder2, &result);
         BSONObj response2 = responseBuilder2.obj();
         ASSERT_EQUALS(1, response2["vote"].Int());
         ASSERT_EQUALS(round, response2["round"].OID());
@@ -2634,7 +2634,7 @@ namespace {
         BSONObjBuilder responseBuilder;
         Status result = Status::OK();
         startCapturingLogMessages();
-        getTopoCoord().prepareElectResponse(cbData, args, now++, &responseBuilder, &result);
+        getTopoCoord().prepareElectResponse(args, now++, OpTime(), &responseBuilder, &result);
         stopCapturingLogMessages();
         BSONObj response = responseBuilder.obj();
         ASSERT_EQUALS(1, response["vote"].Int());
@@ -2653,7 +2653,7 @@ namespace {
         BSONObjBuilder responseBuilder1;
         Status result = Status(ErrorCodes::InternalError, "status not set by prepareElectResponse");
         startCapturingLogMessages();
-        getTopoCoord().prepareElectResponse(cbData, args, now++, &responseBuilder1, &result);
+        getTopoCoord().prepareElectResponse(args, now++, OpTime(), &responseBuilder1, &result);
         stopCapturingLogMessages();
         BSONObj response1 = responseBuilder1.obj();
         ASSERT_OK(result);
@@ -2666,7 +2666,7 @@ namespace {
 
         BSONObjBuilder responseBuilder2;
         startCapturingLogMessages();
-        getTopoCoord().prepareElectResponse(cbData, args, now++, &responseBuilder2, &result);
+        getTopoCoord().prepareElectResponse(args, now++, OpTime(), &responseBuilder2, &result);
         stopCapturingLogMessages();
         BSONObj response2 = responseBuilder2.obj();
         ASSERT_OK(result);
@@ -2680,7 +2680,7 @@ namespace {
 
         BSONObjBuilder responseBuilder3;
         startCapturingLogMessages();
-        getTopoCoord().prepareElectResponse(cbData, args, now++, &responseBuilder3, &result);
+        getTopoCoord().prepareElectResponse(args, now++, OpTime(), &responseBuilder3, &result);
         stopCapturingLogMessages();
         BSONObj response3 = responseBuilder3.obj();
         ASSERT_OK(result);
@@ -2804,30 +2804,6 @@ namespace {
         ASSERT_EQUALS(ErrorCodes::ShutdownInProgress, result);
         ASSERT_TRUE(response.obj().isEmpty());
 
-    }
-
-    TEST_F(ShutdownInProgressTest, ShutDownInProgressWhenCallbackCanceledFresh) {
-        Status result = Status::OK();
-        BSONObjBuilder response;
-        getTopoCoord().prepareFreshResponse(cbData(),
-                                            ReplicationCoordinator::ReplSetFreshArgs(),
-                                            OpTime(0,0),
-                                            &response,
-                                            &result);
-        ASSERT_EQUALS(ErrorCodes::ShutdownInProgress, result);
-        ASSERT_TRUE(response.obj().isEmpty());
-    }
-
-    TEST_F(ShutdownInProgressTest, ShutDownInProgressWhenCallbackCanceledElectCmd) {
-        Status result = Status::OK();
-        BSONObjBuilder response;
-        getTopoCoord().prepareElectResponse(cbData(),
-                                            ReplicationCoordinator::ReplSetElectArgs(),
-                                            Date_t(0),
-                                            &response,
-                                            &result);
-        ASSERT_EQUALS(ErrorCodes::ShutdownInProgress, result);
-        ASSERT_TRUE(response.obj().isEmpty());
     }
 
     TEST_F(ShutdownInProgressTest, ShutDownInProgressWhenCallbackCanceledStatus) {
@@ -3142,7 +3118,7 @@ namespace {
                             "members" << BSON_ARRAY(
                                 BSON("_id" << 1 << "host" << "hself" << "priority" << 0))));
 
-        getTopoCoord().updateConfig(cfg, 0, now()++, OpTime(0,0));
+        getTopoCoord().updateConfig(cfg, 0, now()++);
 
         // despite being the only node, we are unelectable, so we should not become primary
         ASSERT_TRUE(TopologyCoordinator::Role::follower == getTopoCoord().getRole());
@@ -3213,7 +3189,7 @@ namespace {
         ASSERT_EQUALS(MemberState::RS_STARTUP2, getTopoCoord().getMemberState().s);
 
         // win election and primary
-        getTopoCoord().processWinElection(now()++, OID::gen(), OpTime(0,0), OpTime(0,0));
+        getTopoCoord().processWinElection(OID::gen(), OpTime(0,0));
         ASSERT_TRUE(TopologyCoordinator::Role::leader == getTopoCoord().getRole());
         ASSERT_EQUALS(MemberState::RS_PRIMARY, getTopoCoord().getMemberState().s);
 
@@ -3241,7 +3217,7 @@ namespace {
         ASSERT_EQUALS(MemberState::RS_STARTUP2, getTopoCoord().getMemberState().s);
 
         // win election and primary
-        getTopoCoord().processWinElection(now()++, OID::gen(), OpTime(0,0), OpTime(0,0));
+        getTopoCoord().processWinElection(OID::gen(), OpTime(0,0));
         ASSERT_TRUE(TopologyCoordinator::Role::leader == getTopoCoord().getRole());
         ASSERT_EQUALS(MemberState::RS_PRIMARY, getTopoCoord().getMemberState().s);
 

@@ -854,11 +854,8 @@ namespace {
 
             log() << "replSet replSetInitiate all members seem up" << rsLog;
 
-            createOplog(txn);
-
             Lock::GlobalWrite lk(txn->lockState());
-            BSONObj comment = BSON( "msg" << "initiating set");
-            newConfig->saveConfigLocally(txn, comment);
+            newConfig->saveConfigLocally(txn, BSONObj());
             log() << "replSet replSetInitiate config now saved locally.  "
                 "Should come online in about a minute." << rsLog;
             resultObj->append("info",

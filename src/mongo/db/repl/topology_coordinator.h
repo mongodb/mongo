@@ -174,16 +174,16 @@ namespace repl {
                                              Status* result) = 0;
 
         // produce a reply to a replSetFresh command
-        virtual void prepareFreshResponse(const ReplicationExecutor::CallbackData& data,
-                                          const ReplicationCoordinator::ReplSetFreshArgs& args,
-                                          const OpTime& lastOpApplied,
+        virtual void prepareFreshResponse(const ReplicationCoordinator::ReplSetFreshArgs& args,
+                                          Date_t now,
+                                          OpTime lastOpApplied,
                                           BSONObjBuilder* response,
                                           Status* result) = 0;
 
         // produce a reply to a received electCmd
-        virtual void prepareElectResponse(const ReplicationExecutor::CallbackData& data,
-                                          const ReplicationCoordinator::ReplSetElectArgs& args,
-                                          const Date_t now,
+        virtual void prepareElectResponse(const ReplicationCoordinator::ReplSetElectArgs& args,
+                                          Date_t now,
+                                          OpTime lastOpApplied,
                                           BSONObjBuilder* response,
                                           Status* result) = 0;
 
@@ -233,8 +233,7 @@ namespace repl {
          */
         virtual void updateConfig(const ReplicaSetConfig& newConfig,
                                   int selfIndex,
-                                  Date_t now,
-                                  const OpTime& lastOpApplied) = 0;
+                                  Date_t now) = 0;
 
         /**
          * Prepares a heartbeat request appropriate for sending to "target", assuming the
@@ -300,11 +299,7 @@ namespace repl {
          * Exactly one of either processWinElection or processLoseElection must be called if
          * processHeartbeatResponse returns StartElection, to exit candidate mode.
          */
-        virtual void processWinElection(
-                Date_t now,
-                OID electionId,
-                OpTime myLastOpApplied,
-                OpTime electionOpTime) = 0;
+        virtual void processWinElection(OID electionId, OpTime electionOpTime) = 0;
 
         /**
          * Performs state updates associated with losing an election.
@@ -314,20 +309,12 @@ namespace repl {
          * Exactly one of either processWinElection or processLoseElection must be called if
          * processHeartbeatResponse returns StartElection, to exit candidate mode.
          */
-        virtual void processLoseElection(Date_t now, OpTime myLastOpApplied) = 0;
+        virtual void processLoseElection() = 0;
 
         /**
          * Changes the coordinator from the leader role to the follower role.
          */
         virtual void stepDown() = 0;
-
-        ////////////////////////////////////////////////////////////
-        //
-        // Testing interface
-        //
-        ////////////////////////////////////////////////////////////
-        virtual void changeMemberState_forTest(const MemberState& newState,
-                                               OpTime electionTime = OpTime(0,0)) = 0;
 
     protected:
         TopologyCoordinator() {}

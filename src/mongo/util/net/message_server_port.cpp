@@ -54,6 +54,10 @@
 # include <sys/resource.h>
 #endif
 
+#if !defined(__has_feature)
+#define __has_feature(x) 0
+#endif
+
 namespace mongo {
 
     class PortMessageServer : public MessageServer , public Listener {
@@ -98,9 +102,12 @@ namespace mongo {
                 struct rlimit limits;
                 verify(getrlimit(RLIMIT_STACK, &limits) == 0);
                 if (limits.rlim_cur > STACK_SIZE) {
-                    pthread_attr_setstacksize(&attrs, (DEBUG_BUILD
-                                                        ? (STACK_SIZE / 2)
-                                                        : STACK_SIZE));
+                    size_t stackSizeToSet = STACK_SIZE;
+#if !__has_feature(address_sanitizer)
+                    if (DEBUG_BUILD)
+                        stackSizeToSet /= 2;
+#endif
+                    pthread_attr_setstacksize(&attrs, stackSizeToSet);
                 } else if (limits.rlim_cur < 1024*1024) {
                     warning() << "Stack size set to " << (limits.rlim_cur/1024) << "KB. We suggest 1MB" << endl;
                 }

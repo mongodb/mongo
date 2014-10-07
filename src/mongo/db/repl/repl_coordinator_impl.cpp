@@ -129,9 +129,8 @@ namespace {
             return;
         }
 
-        // this is ok but micros or combo with some rand() and/or 64 bits might be better --
-        // imagine a restart and a clock correction simultaneously (very unlikely but possible...)
-        _rbid = static_cast<int>(_replExecutor.now().asInt64());
+        scoped_ptr<SecureRandom> rbidGenerator(SecureRandom::create());
+        _rbid = static_cast<int>(rbidGenerator->nextInt64());
     }
 
     ReplicationCoordinatorImpl::~ReplicationCoordinatorImpl() {}
@@ -308,6 +307,9 @@ namespace {
     Seconds ReplicationCoordinatorImpl::getSlaveDelaySecs() const {
         boost::lock_guard<boost::mutex> lk(_mutex);
         invariant(_rsConfig.isInitialized());
+        uassert(28524,
+                "Node not a member of the current set configuration",
+                _thisMembersConfigIndex != -1);
         return _rsConfig.getMemberAt(_thisMembersConfigIndex).getSlaveDelay();
     }
 
@@ -1464,11 +1466,10 @@ namespace {
 
         Status result(ErrorCodes::InternalError, "didn't set status in prepareFreshResponse");
         CBHStatus cbh = _replExecutor.scheduleWork(
-                stdx::bind(&TopologyCoordinator::prepareFreshResponse,
-                           _topCoord.get(),
+                stdx::bind(&ReplicationCoordinatorImpl::_processReplSetFresh_finish,
+                           this,
                            stdx::placeholders::_1,
                            args,
-                           _getLastOpApplied_inlock(),
                            resultObj,
                            &result));
         if (cbh.getStatus() == ErrorCodes::ShutdownInProgress) {
@@ -1479,16 +1480,29 @@ namespace {
         return result;
     }
 
+    void ReplicationCoordinatorImpl::_processReplSetFresh_finish(
+            const ReplicationExecutor::CallbackData& cbData,
+            const ReplSetFreshArgs& args,
+            BSONObjBuilder* response,
+            Status* result) {
+        if (cbData.status == ErrorCodes::CallbackCanceled) {
+            *result = Status(ErrorCodes::ShutdownInProgress, "replication shutdown in progress");
+            return;
+        }
+
+        _topCoord->prepareFreshResponse(
+                args, _replExecutor.now(), _getLastOpApplied(), response, result);
+    }
+
     Status ReplicationCoordinatorImpl::processReplSetElect(const ReplSetElectArgs& args,
-                                                           BSONObjBuilder* resultObj) {
+                                                           BSONObjBuilder* responseObj) {
         Status result = Status(ErrorCodes::InternalError, "status not set by callback");
         CBHStatus cbh = _replExecutor.scheduleWork(
-                stdx::bind(&TopologyCoordinator::prepareElectResponse,
-                           _topCoord.get(),
+                stdx::bind(&ReplicationCoordinatorImpl::_processReplSetElect_finish,
+                           this,
                            stdx::placeholders::_1,
                            args,
-                           _replExecutor.now(),
-                           resultObj,
+                           responseObj,
                            &result));
         if (cbh.getStatus() == ErrorCodes::ShutdownInProgress) {
             return Status(ErrorCodes::ShutdownInProgress, "replication shutdown in progress");
@@ -1496,6 +1510,20 @@ namespace {
         fassert(18657, cbh.getStatus());
         _replExecutor.wait(cbh.getValue());
         return result;
+    }
+
+    void ReplicationCoordinatorImpl::_processReplSetElect_finish(
+            const ReplicationExecutor::CallbackData& cbData,
+            const ReplSetElectArgs& args,
+            BSONObjBuilder* response,
+            Status* result) {
+        if (cbData.status == ErrorCodes::CallbackCanceled) {
+            *result = Status(ErrorCodes::ShutdownInProgress, "replication shutdown in progress");
+            return;
+        }
+
+        _topCoord->prepareElectResponse(
+                args, _replExecutor.now(), _getLastOpApplied(), response, result);
     }
 
     void ReplicationCoordinatorImpl::_setCurrentRSConfig(
@@ -1514,7 +1542,6 @@ namespace {
             const ReplicaSetConfig& newConfig,
             int myIndex) {
          invariant(_settings.usingReplSets());
-         const OpTime lastOpApplied(_getLastOpApplied_inlock());
          _cancelHeartbeats();
          _setConfigState_inlock(kConfigSteady);
          _rsConfig = newConfig;
@@ -1522,8 +1549,7 @@ namespace {
          _topCoord->updateConfig(
                  newConfig,
                  myIndex,
-                 _replExecutor.now(),
-                 lastOpApplied);
+                 _replExecutor.now());
 
          if (newConfig.getNumMembers() == 1 &&
              myIndex == 0 &&
@@ -1532,10 +1558,7 @@ namespace {
              // we're electable, we must short-circuit the election.  Elections are normally
              // triggered by incoming heartbeats, but with a one-node set there are no
              // heartbeats.
-             _topCoord->processWinElection(_replExecutor.now(),
-                                           OID::gen(),
-                                           lastOpApplied,
-                                           getNextGlobalOptime());
+             _topCoord->processWinElection(OID::gen(), getNextGlobalOptime());
          }
 
          _updateCurrentMemberStateFromTopologyCoordinator_inlock();

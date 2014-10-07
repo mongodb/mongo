@@ -47,13 +47,11 @@ namespace {
     public:
         LoseElectionGuard(
                 TopologyCoordinator* topCoord,
-                OpTime myLastOpApplied,
                 ReplicationExecutor* executor,
                 boost::scoped_ptr<FreshnessChecker>* freshnessChecker,
                 boost::scoped_ptr<ElectCmdRunner>* electCmdRunner,
                 ReplicationExecutor::EventHandle* electionFinishedEvent)
             : _topCoord(topCoord),
-              _myLastOpApplied(myLastOpApplied),
               _executor(executor),
               _freshnessChecker(freshnessChecker),
               _electCmdRunner(electCmdRunner),
@@ -65,7 +63,7 @@ namespace {
             if (_dismissed) {
                 return;
             }
-            _topCoord->processLoseElection(_executor->now(), _myLastOpApplied);
+            _topCoord->processLoseElection();
             _freshnessChecker->reset(NULL);
             _electCmdRunner->reset(NULL);
             if (_electionFinishedEvent->isValid()) {
@@ -77,7 +75,6 @@ namespace {
 
     private:
         TopologyCoordinator* const _topCoord;
-        const OpTime _myLastOpApplied;
         ReplicationExecutor* const _executor;
         boost::scoped_ptr<FreshnessChecker>* const _freshnessChecker;
         boost::scoped_ptr<ElectCmdRunner>* const _electCmdRunner;
@@ -114,7 +111,6 @@ namespace {
         fassert(18680, finishEvh.getStatus());
         _electionFinishedEvent = finishEvh.getValue();
         LoseElectionGuard lossGuard(_topCoord.get(),
-                                    _getLastOpApplied_inlock(),
                                     &_replExecutor,
                                     &_freshnessChecker,
                                     &_electCmdRunner,
@@ -149,7 +145,6 @@ namespace {
         invariant(_freshnessChecker);
         invariant(!_electCmdRunner);
         LoseElectionGuard lossGuard(_topCoord.get(),
-                                    _getLastOpApplied(),
                                     &_replExecutor,
                                     &_freshnessChecker,
                                     &_electCmdRunner,
@@ -205,7 +200,6 @@ namespace {
 
     void ReplicationCoordinatorImpl::_onElectCmdRunnerComplete() {
         LoseElectionGuard lossGuard(_topCoord.get(),
-                                    _getLastOpApplied(),
                                     &_replExecutor,
                                     &_freshnessChecker,
                                     &_electCmdRunner,
@@ -238,9 +232,7 @@ namespace {
         _electCmdRunner.reset(NULL);
         boost::lock_guard<boost::mutex> lk(_mutex);
         _electionID = OID::gen();
-        _topCoord->processWinElection(_replExecutor.now(),
-                                      _electionID,
-                                      _getLastOpApplied_inlock(),
+        _topCoord->processWinElection(_electionID,
                                       OpTime(Milliseconds(_replExecutor.now()).total_seconds(), 0));
         _updateCurrentMemberStateFromTopologyCoordinator_inlock();
         _isWaitingForDrainToComplete = true;

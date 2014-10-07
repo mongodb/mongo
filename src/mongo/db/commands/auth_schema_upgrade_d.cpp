@@ -95,8 +95,7 @@ namespace {
                               versionArray["0"] << '.' << versionArray["1"]);
             }
         }
-        return Status(ErrorCodes::InternalError,
-                      "Auth schema upgrade check for replica sets not implemented");
+        return Status::OK();
     }
 
     class CmdAuthSchemaUpgradeD : public CmdAuthSchemaUpgrade {
