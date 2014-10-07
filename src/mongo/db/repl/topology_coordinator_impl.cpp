@@ -1177,7 +1177,7 @@ namespace {
                 bb.append("uptime", selfUptime);
                 if (!_selfConfig().isArbiter()) {
                     bb.append("optime", lastOpApplied);
-                    bb.appendDate("optimeDate", lastOpApplied.asDate());
+                    bb.appendDate("optimeDate", Date_t(lastOpApplied.getSecs() * 1000ULL));
                 }
 
                 if (_maintenanceModeCalls) {
@@ -1190,7 +1190,7 @@ namespace {
 
                 if (state.primary()) {
                     bb.append("electionTime", _electionTime);
-                    bb.appendDate("electionDate", _electionTime.asDate());
+                    bb.appendDate("electionDate", Date_t(_electionTime.getSecs() * 1000ULL));
                 }
                 bb.append("self", true);
                 membersOut.push_back(bb.obj());
@@ -1223,7 +1223,7 @@ namespace {
                     bb.append("uptime", uptime);
                     if (!_currentConfig.getMemberAt(it->getConfigIndex()).isArbiter()) {
                         bb.append("optime", it->getOpTime());
-                        bb.appendDate("optimeDate", it->getOpTime().asDate());
+                        bb.appendDate("optimeDate", Date_t(it->getOpTime().getSecs() * 1000ULL));
                     }
                     bb.appendDate("lastHeartbeat", it->getLastHeartbeat());
                     bb.appendDate("lastHeartbeatRecv", it->getLastHeartbeatRecv());
@@ -1245,7 +1245,8 @@ namespace {
 
                     if (state == MemberState::RS_PRIMARY) {
                         bb.append("electionTime", it->getElectionTime());
-                        bb.appendDate("electionDate", it->getElectionTime().asDate());
+                        bb.appendDate("electionDate",
+                                      Date_t(it->getElectionTime().getSecs() * 1000ULL));
                     }
                 }
                 membersOut.push_back(bb.obj());
