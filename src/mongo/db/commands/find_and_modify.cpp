@@ -97,10 +97,7 @@ namespace mongo {
                 return false;
             }
 
-            Lock::DBWrite dbXLock(txn->lockState(), dbname);
-            Client::Context ctx(txn, ns);
-            
-            return runNoDirectClient( txn, ns , 
+            return runNoDirectClient( txn, ns ,
                                       query , fields , update , 
                                       upsert , returnNew , remove , 
                                       result , errmsg );
@@ -137,11 +134,8 @@ namespace mongo {
                                       BSONObjBuilder& result,
                                       string& errmsg) {
 
-            Lock::DBWrite lk(txn->lockState(), ns);
-            WriteUnitOfWork wunit(txn);
-            Client::Context cx(txn, ns);
-            
-            Collection* collection = cx.db()->getCollection( txn, ns );
+            Client::WriteContext cx(txn, ns);
+            Collection* collection = cx.getCollection();
 
             const WhereCallbackReal whereCallback = WhereCallbackReal(txn, StringData(ns));
 
@@ -265,7 +259,7 @@ namespace mongo {
 
                     if ( !collection ) {
                         // collection created by an upsert
-                        collection = cx.db()->getCollection( txn, ns );
+                        collection = cx.getCollection();
                     }
 
                     LOG(3) << "update result: "  << res ;
@@ -303,7 +297,7 @@ namespace mongo {
                     
                 }
             }
-            wunit.commit();
+            cx.commit();
             return true;
         }
         
@@ -335,7 +329,7 @@ namespace mongo {
                 }
             }
 
-            Lock::DBWrite dbXLock(txn->lockState(), dbname);
+            Lock::DBLock dbXLock(txn->lockState(), dbname, newlm::MODE_X);
             WriteUnitOfWork wunit(txn);
             Client::Context ctx(txn, ns);
 

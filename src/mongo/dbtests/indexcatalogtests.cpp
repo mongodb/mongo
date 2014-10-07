@@ -35,7 +35,7 @@ namespace IndexCatalogTests {
             OperationContextImpl txn;
             Client::WriteContext ctx(&txn, _ns);
 
-            _db = ctx.ctx().db();
+            _db = ctx.db();
             _coll = _db->createCollection(&txn, _ns);
             _catalog = _coll->getIndexCatalog();
             ctx.commit();

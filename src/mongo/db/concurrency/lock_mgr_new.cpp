@@ -168,9 +168,8 @@ namespace newlm {
 
 
     LockManager::LockManager() : _noCheckForLeakedLocksTestOnly(false) {
-        // TODO: Generate this based on the # of CPUs. For now, use 1 bucket to make debugging
-        // easier.
-        _numLockBuckets = 1;
+        //  Have more buckets than CPUs to reduce contention on lock and caches
+        _numLockBuckets = 128;
         _lockBuckets = new LockBucket[_numLockBuckets];
     }
 

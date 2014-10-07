@@ -157,8 +157,8 @@ namespace QueryStageAnd {
     public:
         void run() {
             Client::WriteContext ctx(&_txn, ns());
-            Database* db = ctx.ctx().db();
-            Collection* coll = db->getCollection(&_txn, ns());
+            Database* db = ctx.db();
+            Collection* coll = ctx.getCollection();
             if (!coll) {
                 coll = db->createCollection(&_txn, ns());
             }
@@ -259,8 +259,8 @@ namespace QueryStageAnd {
     public:
         void run() {
             Client::WriteContext ctx(&_txn, ns());
-            Database* db = ctx.ctx().db();
-            Collection* coll = db->getCollection(&_txn, ns());
+            Database* db = ctx.db();
+            Collection* coll = ctx.getCollection();
             if (!coll) {
                 coll = db->createCollection(&_txn, ns());
             }
@@ -345,8 +345,8 @@ namespace QueryStageAnd {
     public:
         void run() {
             Client::WriteContext ctx(&_txn, ns());
-            Database* db = ctx.ctx().db();
-            Collection* coll = db->getCollection(&_txn, ns());
+            Database* db = ctx.db();
+            Collection* coll = ctx.getCollection();
             if (!coll) {
                 coll = db->createCollection(&_txn, ns());
             }
@@ -394,8 +394,8 @@ namespace QueryStageAnd {
     public:
         void run() {
             Client::WriteContext ctx(&_txn, ns());
-            Database* db = ctx.ctx().db();
-            Collection* coll = db->getCollection(&_txn, ns());
+            Database* db = ctx.db();
+            Collection* coll = ctx.getCollection();
             if (!coll) {
                 coll = db->createCollection(&_txn, ns());
             }
@@ -446,8 +446,8 @@ namespace QueryStageAnd {
     public:
         void run() {
             Client::WriteContext ctx(&_txn, ns());
-            Database* db = ctx.ctx().db();
-            Collection* coll = db->getCollection(&_txn, ns());
+            Database* db = ctx.db();
+            Collection* coll = ctx.getCollection();
             if (!coll) {
                 coll = db->createCollection(&_txn, ns());
             }
@@ -497,8 +497,8 @@ namespace QueryStageAnd {
     public:
         void run() {
             Client::WriteContext ctx(&_txn, ns());
-            Database* db = ctx.ctx().db();
-            Collection* coll = db->getCollection(&_txn, ns());
+            Database* db = ctx.db();
+            Collection* coll = ctx.getCollection();
             if (!coll) {
                 coll = db->createCollection(&_txn, ns());
             }
@@ -558,8 +558,8 @@ namespace QueryStageAnd {
     public:
         void run() {
             Client::WriteContext ctx(&_txn, ns());
-            Database* db = ctx.ctx().db();
-            Collection* coll = db->getCollection(&_txn, ns());
+            Database* db = ctx.db();
+            Collection* coll = ctx.getCollection();
             if (!coll) {
                 coll = db->createCollection(&_txn, ns());
             }
@@ -617,8 +617,8 @@ namespace QueryStageAnd {
     public:
         void run() {
             Client::WriteContext ctx(&_txn, ns());
-            Database* db = ctx.ctx().db();
-            Collection* coll = db->getCollection(&_txn, ns());
+            Database* db = ctx.db();
+            Collection* coll = ctx.getCollection();
             if (!coll) {
                 coll = db->createCollection(&_txn, ns());
             }
@@ -676,8 +676,8 @@ namespace QueryStageAnd {
     public:
         void run() {
             Client::WriteContext ctx(&_txn, ns());
-            Database* db = ctx.ctx().db();
-            Collection* coll = db->getCollection(&_txn, ns());
+            Database* db = ctx.db();
+            Collection* coll = ctx.getCollection();
             if (!coll) {
                 coll = db->createCollection(&_txn, ns());
             }
@@ -724,8 +724,8 @@ namespace QueryStageAnd {
     public:
         void run() {
             Client::WriteContext ctx(&_txn, ns());
-            Database* db = ctx.ctx().db();
-            Collection* coll = db->getCollection(&_txn, ns());
+            Database* db = ctx.db();
+            Collection* coll = ctx.getCollection();
             if (!coll) {
                 coll = db->createCollection(&_txn, ns());
             }
@@ -776,8 +776,8 @@ namespace QueryStageAnd {
     public:
         void run() {
             Client::WriteContext ctx(&_txn, ns());
-            Database* db = ctx.ctx().db();
-            Collection* coll = db->getCollection(&_txn, ns());
+            Database* db = ctx.db();
+            Collection* coll = ctx.getCollection();
             if (!coll) {
                 coll = db->createCollection(&_txn, ns());
             }
@@ -834,8 +834,8 @@ namespace QueryStageAnd {
     public:
         void run() {
             Client::WriteContext ctx(&_txn, ns());
-            Database* db = ctx.ctx().db();
-            Collection* coll = db->getCollection(&_txn, ns());
+            Database* db = ctx.db();
+            Collection* coll = ctx.getCollection();
             if (!coll) {
                 coll = db->createCollection(&_txn, ns());
             }
@@ -897,8 +897,8 @@ namespace QueryStageAnd {
     public:
         void run() {
             Client::WriteContext ctx(&_txn, ns());
-            Database* db = ctx.ctx().db();
-            Collection* coll = db->getCollection(&_txn, ns());
+            Database* db = ctx.db();
+            Collection* coll = ctx.getCollection();
             if (!coll) {
                 coll = db->createCollection(&_txn, ns());
             }
@@ -1014,8 +1014,8 @@ namespace QueryStageAnd {
     public:
         void run() {
             Client::WriteContext ctx(&_txn, ns());
-            Database* db = ctx.ctx().db();
-            Collection* coll = db->getCollection(&_txn, ns());
+            Database* db = ctx.db();
+            Collection* coll = ctx.getCollection();
             if (!coll) {
                 coll = db->createCollection(&_txn, ns());
             }
@@ -1067,8 +1067,8 @@ namespace QueryStageAnd {
     public:
         void run() {
             Client::WriteContext ctx(&_txn, ns());
-            Database* db = ctx.ctx().db();
-            Collection* coll = db->getCollection(&_txn, ns());
+            Database* db = ctx.db();
+            Collection* coll = ctx.getCollection();
             if (!coll) {
                 coll = db->createCollection(&_txn, ns());
             }
@@ -1112,8 +1112,8 @@ namespace QueryStageAnd {
     public:
         void run() {
             Client::WriteContext ctx(&_txn, ns());
-            Database* db = ctx.ctx().db();
-            Collection* coll = db->getCollection(&_txn, ns());
+            Database* db = ctx.db();
+            Collection* coll = ctx.getCollection();
             if (!coll) {
                 coll = db->createCollection(&_txn, ns());
             }
@@ -1160,8 +1160,8 @@ namespace QueryStageAnd {
     public:
         void run() {
             Client::WriteContext ctx(&_txn, ns());
-            Database* db = ctx.ctx().db();
-            Collection* coll = db->getCollection(&_txn, ns());
+            Database* db = ctx.db();
+            Collection* coll = ctx.getCollection();
             if (!coll) {
                 coll = db->createCollection(&_txn, ns());
             }
@@ -1205,8 +1205,8 @@ namespace QueryStageAnd {
     public:
         void run() {
             Client::WriteContext ctx(&_txn, ns());
-            Database* db = ctx.ctx().db();
-            Collection* coll = db->getCollection(&_txn, ns());
+            Database* db = ctx.db();
+            Collection* coll = ctx.getCollection();
             if (!coll) {
                 coll = db->createCollection(&_txn, ns());
             }
@@ -1267,8 +1267,8 @@ namespace QueryStageAnd {
     public:
         void run() {
             Client::WriteContext ctx(&_txn, ns());
-            Database* db = ctx.ctx().db();
-            Collection* coll = db->getCollection(&_txn, ns());
+            Database* db = ctx.db();
+            Collection* coll = ctx.getCollection();
             if (!coll) {
                 coll = db->createCollection(&_txn, ns());
             }
@@ -1320,8 +1320,8 @@ namespace QueryStageAnd {
     public:
         void run() {
             Client::WriteContext ctx(&_txn, ns());
-            Database* db = ctx.ctx().db();
-            Collection* coll = db->getCollection(&_txn, ns());
+            Database* db = ctx.db();
+            Collection* coll = ctx.getCollection();
             if (!coll) {
                 coll = db->createCollection(&_txn, ns());
             }

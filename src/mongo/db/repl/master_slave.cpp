@@ -168,7 +168,8 @@ namespace repl {
         bool exists = Helpers::getSingleton(txn, "local.me", _me);
 
         if (!exists || !_me.hasField("host") || _me["host"].String() != myname) {
-            Client::WriteContext ctx(txn, "local");
+            Lock::DBLock dblk(txn->lockState(), "local", newlm::MODE_X);
+            WriteUnitOfWork wunit(txn);
             // clean out local.me
             Helpers::emptyCollection(txn, "local.me");
 
@@ -178,7 +179,7 @@ namespace repl {
             b.append("host", myname);
             _me = b.obj();
             Helpers::putSingleton(txn, "local.me", _me);
-            ctx.commit();
+            wunit.commit();
         }
         _me = _me.getOwned();
     }

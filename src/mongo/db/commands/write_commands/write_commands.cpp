@@ -31,6 +31,7 @@
 #include "mongo/base/init.h"
 #include "mongo/bson/mutable/document.h"
 #include "mongo/bson/mutable/element.h"
+#include "mongo/db/catalog/database_holder.h"
 #include "mongo/db/client.h"
 #include "mongo/db/commands/write_commands/batch_executor.h"
 #include "mongo/db/commands/write_commands/write_commands_common.h"
@@ -208,11 +209,12 @@ namespace mongo {
                 return prepStatus;
             }
 
-            // Explains of write commands are read-only, but we take a write lock so that timing
-            // info is more accurate.
-            Client::WriteContext ctx( txn, nsString );
+            // Explains of write commands are read-only, but we take an exclusive lock so
+            // that timing info is more accurate.
+            Lock::DBLock dlk(txn->lockState(), nsString.db(), newlm::MODE_X);
+            Client::Context ctx(txn, nsString);
 
-            Status prepInLockStatus = updateExecutor.prepareInLock( ctx.ctx().db() );
+            Status prepInLockStatus = updateExecutor.prepareInLock(ctx.db());
             if ( !prepInLockStatus.isOK() ) {
                 return prepInLockStatus;
             }
@@ -244,9 +246,10 @@ namespace mongo {
 
             // Explains of write commands are read-only, but we take a write lock so that timing
             // info is more accurate.
-            Client::WriteContext ctx( txn, nsString );
+            Lock::DBLock dlk(txn->lockState(), nsString.db(), newlm::MODE_X);
+            Client::Context ctx(txn, nsString);
 
-            Status prepInLockStatus = deleteExecutor.prepareInLock( ctx.ctx().db() );
+            Status prepInLockStatus = deleteExecutor.prepareInLock(ctx.db());
             if ( !prepInLockStatus.isOK()) {
                 return prepInLockStatus;
             }

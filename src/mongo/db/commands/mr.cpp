@@ -332,7 +332,9 @@ namespace mongo {
             if (_useIncremental) {
                 // We don't want to log the deletion of incLong as it isn't replicated. While
                 // harmless, this would lead to a scary looking warning on the secondaries.
-                Lock::DBWrite lk(_txn->lockState(), _config.incLong);
+                Lock::DBLock lk(_txn->lockState(),
+                                nsToDatabaseSubstring(_config.incLong),
+                                newlm::MODE_X);
                 if (Database* db = dbHolder().get(_txn, _config.incLong)) {
                     WriteUnitOfWork wunit(_txn);
                     db->dropCollection(_txn, _config.incLong);
@@ -356,13 +358,13 @@ namespace mongo {
                 // Create the inc collection and make sure we have index on "0" key.
                 // Intentionally not replicating the inc collection to secondaries.
                 Client::WriteContext incCtx(_txn, _config.incLong);
-                Collection* incColl = incCtx.ctx().db()->getCollection( _txn, _config.incLong );
+                Collection* incColl = incCtx.getCollection();
                 invariant(!incColl);
 
                 CollectionOptions options;
                 options.setNoIdIndex();
                 options.temp = true;
-                incColl = incCtx.ctx().db()->createCollection( _txn, _config.incLong, options );
+                incColl = incCtx.db()->createCollection(_txn, _config.incLong, options);
                 invariant(incColl);
 
                 BSONObj indexSpec = BSON( "key" << BSON( "0" << 1 ) << "ns" << _config.incLong
@@ -381,8 +383,7 @@ namespace mongo {
             {
                 // copy indexes into temporary storage
                 Client::WriteContext finalCtx(_txn, _config.outputOptions.finalNamespace);
-                Collection* finalColl =
-                    finalCtx.ctx().db()->getCollection(_txn, _config.outputOptions.finalNamespace);
+                Collection* const finalColl = finalCtx.getCollection();
                 if ( finalColl ) {
                     IndexCatalog::IndexIterator ii =
                         finalColl->getIndexCatalog()->getIndexIterator( _txn, true );
@@ -413,14 +414,12 @@ namespace mongo {
                 uassert(ErrorCodes::NotMaster, "no longer master", 
                         repl::getGlobalReplicationCoordinator()->
                         canAcceptWritesForDatabase(nsToDatabase(_config.tempNamespace.c_str())));
-                Collection* tempColl = tempCtx.ctx().db()->getCollection( _txn, _config.tempNamespace );
+                Collection* tempColl = tempCtx.getCollection();
                 invariant(!tempColl);
 
                 CollectionOptions options;
                 options.temp = true;
-                tempColl = tempCtx.ctx().db()->createCollection(_txn,
-                                                                _config.tempNamespace,
-                                                                options);
+                tempColl = tempCtx.db()->createCollection(_txn, _config.tempNamespace, options);
 
                 // Log the createCollection operation.
                 BSONObjBuilder b;
@@ -591,9 +590,11 @@ namespace mongo {
                 op->setMessage("m/r: merge post processing",
                                "M/R Merge Post Processing Progress",
                                _safeCount(_db, _config.tempNamespace, BSONObj()));
-                auto_ptr<DBClientCursor> cursor = _db.query( _config.tempNamespace , BSONObj() );
-                while ( cursor->more() ) {
-                    Lock::DBWrite lock(_txn->lockState(), _config.outputOptions.finalNamespace);
+                auto_ptr<DBClientCursor> cursor = _db.query(_config.tempNamespace , BSONObj());
+                while (cursor->more()) {
+                    Lock::DBLock lock(_txn->lockState(),
+                                      nsToDatabaseSubstring(_config.outputOptions.finalNamespace),
+                                      newlm::MODE_X);
                     WriteUnitOfWork wunit(_txn);
                     BSONObj o = cursor->nextSafe();
                     Helpers::upsert( _txn, _config.outputOptions.finalNamespace , o );
@@ -662,7 +663,7 @@ namespace mongo {
             uassert(ErrorCodes::NotMaster, "no longer master", 
                     repl::getGlobalReplicationCoordinator()->
                     canAcceptWritesForDatabase(nsToDatabase(ns.c_str())));
-            Collection* coll = getCollectionOrUassert(ctx.ctx().db(), ns);
+            Collection* coll = getCollectionOrUassert(ctx.db(), ns);
 
             class BSONObjBuilder b;
             if ( !o.hasField( "_id" ) ) {
@@ -685,7 +686,7 @@ namespace mongo {
             verify( _onDisk );
 
             Client::WriteContext ctx(_txn,  _config.incLong );
-            Collection* coll = getCollectionOrUassert(ctx.ctx().db(), _config.incLong);
+            Collection* coll = getCollectionOrUassert(ctx.db(), _config.incLong);
             coll->insertDocument( _txn, o, true );
             ctx.commit();
         }
@@ -964,7 +965,7 @@ namespace mongo {
 
             {
                 Client::WriteContext incCtx(_txn, _config.incLong );
-                Collection* incColl = getCollectionOrUassert(incCtx.ctx().db(), _config.incLong );
+                Collection* incColl = getCollectionOrUassert(incCtx.db(), _config.incLong );
 
                 bool foundIndex = false;
                 IndexCatalog::IndexIterator ii =
@@ -1110,7 +1111,9 @@ namespace mongo {
             if ( ! _onDisk )
                 return;
 
-            Lock::DBWrite kl(_txn->lockState(), _config.incLong);
+            Lock::DBLock kl(_txn->lockState(),
+                            nsToDatabaseSubstring(_config.incLong),
+                            newlm::MODE_X);
             WriteUnitOfWork wunit(_txn);
 
             for ( InMemory::iterator i=_temp->begin(); i!=_temp->end(); i++ ) {

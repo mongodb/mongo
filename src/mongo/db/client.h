@@ -36,6 +36,7 @@
 
 #pragma once
 
+#include "mongo/db/catalog/database.h"
 #include "mongo/db/client_basic.h"
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/lasterror.h"
@@ -180,15 +181,24 @@ namespace mongo {
 
         class WriteContext : boost::noncopyable {
         public:
-            WriteContext(OperationContext* opCtx, const std::string& ns, bool doVersion = true);
+            WriteContext(OperationContext* opCtx, const std::string& ns);
 
             /** Commit any writes done so far in this context. */
             void commit();
 
+            Database* db() const { return _c.db(); }
+
+            Collection* getCollection() const {
+                return _c.db()->getCollection(_txn, _nss.ns());
+            }
+
             Context& ctx() { return _c; }
 
         private:
-            Lock::DBWrite _lk;
+            OperationContext* _txn;
+            NamespaceString _nss;
+            Lock::DBLock _dblk;
+            Lock::CollectionLock _collk;
             WriteUnitOfWork _wunit;
             Context _c;
         };

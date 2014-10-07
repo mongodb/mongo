@@ -86,7 +86,7 @@ namespace QueryStageSubplan {
             CanonicalQuery* cq;
             ASSERT_OK(CanonicalQuery::canonicalize(ns(), query, &cq));
 
-            Collection* collection = ctx.ctx().db()->getCollection(&_txn, ns());
+            Collection* collection = ctx.getCollection();
 
             // Get planner params.
             QueryPlannerParams plannerParams;

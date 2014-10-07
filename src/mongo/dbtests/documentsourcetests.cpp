@@ -178,8 +178,7 @@ namespace DocumentSourceTests {
                 CanonicalQuery* cq;
                 uassertStatusOK(CanonicalQuery::canonicalize(ns, /*query=*/BSONObj(), &cq));
                 PlanExecutor* execBare;
-                uassertStatusOK(getExecutor(&_opCtx, ctx.ctx().db()->getCollection(&_opCtx, ns),
-                                            cq, &execBare));
+                uassertStatusOK(getExecutor(&_opCtx, ctx.getCollection(), cq, &execBare));
 
                 _exec.reset(execBare);
                 _exec->saveState();

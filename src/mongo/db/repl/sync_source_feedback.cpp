@@ -78,7 +78,9 @@ namespace repl {
     void SyncSourceFeedback::ensureMe(OperationContext* txn) {
         string myname = getHostName();
         {
-            Client::WriteContext ctx(txn, "local");
+            Lock::DBLock dlk(txn->lockState(), "local", newlm::MODE_X);
+            WriteUnitOfWork wunit(txn);
+            Client::Context ctx(txn, "local");
 
             // local.me is an identifier for a server for getLastError w:2+
             if (!Helpers::getSingleton(txn, "local.me", _me) ||
@@ -95,7 +97,7 @@ namespace repl {
                 _me = b.obj();
                 Helpers::putSingleton(txn, "local.me", _me);
             }
-            ctx.commit();
+            wunit.commit();
             // _me is used outside of a read lock, so we must copy it out of the mmap
             _me = _me.getOwned();
         }

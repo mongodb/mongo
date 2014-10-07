@@ -696,7 +696,7 @@ namespace mongo {
         /**
          * Gets the lock-holding object.  Only valid if hasLock().
          */
-        Lock::DBWrite& getLock() { return *_writeLock; }
+        Lock::DBLock& getLock() { return *_writeLock; }
 
         /**
          * Gets the target collection for the batch operation.  Value is undefined
@@ -721,7 +721,7 @@ namespace mongo {
         bool _lockAndCheckImpl(WriteOpResult* result);
 
         // Guard object for the write lock on the target database.
-        scoped_ptr<Lock::DBWrite> _writeLock;
+        scoped_ptr<Lock::DBLock> _writeLock;
 
         // Context object on the target database.  Must appear after writeLock, so that it is
         // destroyed in proper order.
@@ -921,7 +921,9 @@ namespace mongo {
         }
 
         invariant(!_context.get());
-        _writeLock.reset(new Lock::DBWrite(txn->lockState(), request->getNS()));
+        _writeLock.reset(new Lock::DBLock(txn->lockState(),
+                                          nsToDatabase(request->getNS()),
+                                          newlm::MODE_X));
         if (!checkIsMasterForDatabase(request->getNS(), result)) {
             return false;
         }
@@ -1109,10 +1111,11 @@ namespace mongo {
                              WriteOpResult* result ) {
 
         const NamespaceString nsString(updateItem.getRequest()->getNS());
+        const bool isMulti = updateItem.getUpdate()->getMulti();
         UpdateRequest request(txn, nsString);
         request.setQuery(updateItem.getUpdate()->getQuery());
         request.setUpdates(updateItem.getUpdate()->getUpdateExpr());
-        request.setMulti(updateItem.getUpdate()->getMulti());
+        request.setMulti(isMulti);
         request.setUpsert(updateItem.getUpdate()->getUpsert());
         request.setUpdateOpLog(true);
         UpdateLifecycleImpl updateLifecycle(true, request.getNamespaceString());
@@ -1126,7 +1129,10 @@ namespace mongo {
         }
 
         ///////////////////////////////////////////
-        Lock::DBWrite writeLock(txn->lockState(), nsString.ns());
+        Lock::DBLock dbLock(txn->lockState(), nsString.db(), newlm::MODE_IX);
+        Lock::CollectionLock colLock(txn->lockState(),
+                                     nsString.ns(),
+                                     isMulti ? newlm::MODE_X : newlm::MODE_IX);
         ///////////////////////////////////////////
 
         if (!checkShardVersion(txn, &shardingState, *updateItem.getRequest(), result))
@@ -1181,7 +1187,7 @@ namespace mongo {
         }
 
         ///////////////////////////////////////////
-        Lock::DBWrite writeLock(txn->lockState(), nss.ns());
+        Lock::DBLock writeLock(txn->lockState(), nss.db(), newlm::MODE_X);
         ///////////////////////////////////////////
 
         // Check version once we're locked
