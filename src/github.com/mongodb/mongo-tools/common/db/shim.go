@@ -247,7 +247,7 @@ func (shim *Shim) Run(command interface{}, out interface{}, database string) (er
 
 	commandRaw, err := bson.Marshal(command)
 	if err != nil {
-		return fmt.Errorf("Failed to encode document into BSON: %v", err)
+		return fmt.Errorf("failed to encode document into BSON: %v", err)
 	}
 	commandShim := StorageShim{
 		DBPath:         shim.DBPath,
@@ -264,7 +264,7 @@ func (shim *Shim) Run(command interface{}, out interface{}, database string) (er
 	}
 	bsonSource, bsonSink, err := commandShim.Open()
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to write command to shim: %v", err)
 	}
 
 	defer func() {
