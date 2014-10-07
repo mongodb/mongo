@@ -483,7 +483,7 @@ namespace newlm {
             // Can only be LOCK_TIMEOUT, because the lock manager does not return any other errors
             // at this point. Could be LOCK_DEADLOCK, when deadlock detection is implemented.
             invariant(result == LOCK_TIMEOUT);
-            invariant(_unlockAndUpdateRequestsList(resId, request));
+            _unlockAndUpdateRequestsList(resId, request);
         }
 
         return result;

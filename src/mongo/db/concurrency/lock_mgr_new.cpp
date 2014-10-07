@@ -40,51 +40,132 @@
 namespace mongo {
 namespace newlm {
 
-    /**
-     * Map of conflicts. 'LockConflictsTable[newMode] & existingMode != 0' means that a new request
-     * with the given 'newMode' conflicts with an existing request with mode 'existingMode'.
-     */
-    static const int LockConflictsTable[] = {
-        // MODE_NONE
-        0,
+    namespace {
 
-        // MODE_IS
-        (1 << MODE_X),
+        /**
+         * Map of conflicts. 'LockConflictsTable[newMode] & existingMode != 0' means that a new
+         * request with the given 'newMode' conflicts with an existing request with mode
+         * 'existingMode'.
+         */
+        static const int LockConflictsTable[] = {
+            // MODE_NONE
+            0,
 
-        // MODE_IX
-        (1 << MODE_S) | (1 << MODE_X),
+            // MODE_IS
+            (1 << MODE_X),
 
-        // MODE_S
-        (1 << MODE_IX) | (1 << MODE_X),
+            // MODE_IX
+            (1 << MODE_S) | (1 << MODE_X),
 
-        // MODE_X
-        (1 << MODE_S) | (1 << MODE_X) | (1 << MODE_IS) | (1 << MODE_IX),
-    };
+            // MODE_S
+            (1 << MODE_IX) | (1 << MODE_X),
 
-    /**
-     * Maps the mode id to a string.
-     */
-    static const char* LockNames[] = {
-        "NONE", "IS", "IX", "S", "X"
-    };
+            // MODE_X
+            (1 << MODE_S) | (1 << MODE_X) | (1 << MODE_IS) | (1 << MODE_IX),
+        };
 
-    // Helper functions for the lock modes
-    inline bool conflicts(LockMode newMode, uint32_t existingModesMask) {
-        return (LockConflictsTable[newMode] & existingModesMask) != 0;
-    }
+        /**
+         * Maps the mode id to a string.
+         */
+        static const char* LockNames[] = {
+            "NONE", "IS", "IX", "S", "X"
+        };
 
-    inline uint32_t modeMask(LockMode mode) {
-        return 1 << mode;
-    }
+        // Helper functions for the lock modes
+        inline bool conflicts(LockMode newMode, uint32_t existingModesMask) {
+            return (LockConflictsTable[newMode] & existingModesMask) != 0;
+        }
 
-    inline const char* modeName(LockMode mode) {
-        return LockNames[mode];
+        inline uint32_t modeMask(LockMode mode) {
+            return 1 << mode;
+        }
+
+        inline const char* modeName(LockMode mode) {
+            return LockNames[mode];
+        }
+
+        /**
+         * Maps the resource id to a human-readable string.
+         */
+        static const char* ResourceTypeNames[] = {
+            "Invalid",
+            "Global",
+            "MMAPV1Flush",
+            "Database",
+            "Collection",
+            "Document",
+        };
+
+        inline const char* resourceTypeName(ResourceType resourceType) {
+            return ResourceTypeNames[resourceType];
+        }
     }
 
 
     //
     // LockManager
     //
+
+    /**
+     * There is one of these objects per each resource which has a lock on it.
+     *
+     * Not thread-safe and should only be accessed under the LockManager's bucket lock.
+     */
+    struct LockHead {
+
+        LockHead(const ResourceId& resId);
+        ~LockHead();
+
+        // Increments the granted/requested counts and maintains the grantedModes/requestedModes
+        // masks respectively. The count argument can only be -1 or 1, because we always change the
+        // modes one at a time.
+        enum ChangeModeCountAction {
+            Increment = 1, Decrement = -1
+        };
+
+        void changeGrantedModeCount(LockMode mode, ChangeModeCountAction action);
+        void changeRequestedModeCount(LockMode mode, ChangeModeCountAction count);
+
+
+        // Id of the resource which this lock protects
+        const ResourceId resourceId;
+
+
+        //
+        // Granted queue
+        //
+
+        // The head of the doubly-linked list of granted or converting requests
+        LockRequest* grantedQueue;
+
+        // Counts the grants and coversion counts for each of the supported lock modes. These
+        // counts should exactly match the aggregated granted modes on the granted list.
+        uint32_t grantedCounts[LockModesCount];
+
+        // Bit-mask of the granted + converting modes on the granted queue. Maintained in lock-step
+        // with the grantedCounts array.
+        uint32_t grantedModes;
+
+
+        //
+        // Conflict queue
+        //
+
+        // Doubly-linked list of requests, which have not been granted yet because they conflict
+        // with the set of granted modes. The reason to have both begin and end pointers is to make
+        // the FIFO scheduling easier (queue at begin and take from the end).
+        LockRequest* conflictQueueBegin;
+        LockRequest* conflictQueueEnd;
+
+        // Counts the conflicting requests for each of the lock modes. These counts should exactly
+        // match the aggregated requested modes on the conflicts list.
+        uint32_t conflictCounts[LockModesCount];
+
+        // Bit-mask of the requested modes on the conflict queue. Maintained in lock-step with the
+        // conflictCounts array.
+        uint32_t conflictModes;
+    };
+
 
     LockManager::LockManager() : _noCheckForLeakedLocksTestOnly(false) {
         // TODO: Generate this based on the # of CPUs. For now, use 1 bucket to make debugging
@@ -492,6 +573,8 @@ namespace newlm {
     }
 
     void LockManager::dump() const {
+        log() << "Dumping LockManager @ " << static_cast<const void*>(this) << '\n';
+
         for (unsigned i = 0; i < _numLockBuckets; i++) {
             LockBucket* bucket = &_lockBuckets[i];
             scoped_spinlock scopedLock(bucket->mutex);
@@ -501,16 +584,17 @@ namespace newlm {
     }
 
     void LockManager::_dumpBucket(const LockBucket* bucket) const {
+        StringBuilder sb;
+
         LockHeadMap::const_iterator it = bucket->data.begin();
         while (it != bucket->data.end()) {
             const LockHead* lock = it->second;
-            StringBuilder sb;
-            sb << '\n' << "Lock " << lock << ": " << lock->resourceId.toString() << '\n';
+            sb << "Lock @ " << lock << ": " << lock->resourceId.toString() << '\n';
 
             sb << "GRANTED:\n";
             for (const LockRequest* iter = lock->grantedQueue; iter != NULL; iter = iter->next) {
                 sb << '\t'
-                    << iter->locker->getId() << " @ " << iter->locker << ": "
+                    << "LockRequest " << iter->locker->getId() << " @ " << iter->locker << ": "
                     << "Mode = " << modeName(iter->mode) << "; "
                     << "ConvertMode = " << modeName(iter->convertMode) << "; "
                     << '\n';
@@ -524,16 +608,18 @@ namespace newlm {
                  iter = iter->next) {
 
                 sb << '\t'
-                    << iter->locker->getId() << " @ " << iter->locker << ": "
+                    << "LockRequest " << iter->locker->getId() << " @ " << iter->locker << ": "
                     << "Mode = " << modeName(iter->mode) << "; "
                     << "ConvertMode = " << modeName(iter->convertMode) << "; "
                     << '\n';
             }
 
-            log() << sb.str();
+            sb << '\n';
 
             it++;
         }
+
+        log() << sb.str();
     }
 
 
@@ -564,7 +650,8 @@ namespace newlm {
 
     std::string ResourceId::toString() const {
         StringBuilder ss;
-        ss << "{" << _fullHash << ": " << _type << ", " << _hashId << ", " << _nsCopy << "}";
+        ss << "{" << _fullHash << ": " << resourceTypeName(static_cast<ResourceType>(_type))
+           << ", " << _hashId << ", " << _nsCopy << "}";
 
         return ss.str();
     }
