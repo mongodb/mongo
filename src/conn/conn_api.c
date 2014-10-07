@@ -963,7 +963,7 @@ __conn_single(WT_SESSION_IMPL *session, const char *cfg[])
 	 * Be careful changing this code.
 	 *
 	 * We locked the WiredTiger file before release 2.3.2; a separate lock
-	 * file was added after 2.3.1 because hot backup has to copy the the
+	 * file was added after 2.3.1 because hot backup has to copy the
 	 * WiredTiger file and system utilities on Windows can't copy locked
 	 * files.
 	 *
@@ -1053,7 +1053,7 @@ err:	/*
 	 * closed when the connection structure is destroyed.
 	 */
 	if (fh != NULL)
-		WT_ERR(__wt_close(session, fh));
+		WT_TRET(__wt_close(session, fh));
 
 	__wt_spin_unlock(session, &__wt_process.spinlock);
 	return (ret);
