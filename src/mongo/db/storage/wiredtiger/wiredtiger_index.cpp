@@ -467,45 +467,19 @@ namespace {
         ~WiredTigerBuilderImpl() { }
 
         Status addKey(const BSONObj& key, const DiskLoc& loc) {
-            // inserts should be in ascending (key, DiskLoc) order.
-            if ( key.objsize() >= TempKeyMaxSize ) {
-                return Status(ErrorCodes::KeyTooLong, "key too big");
-            }
-
-            invariant(!loc.isNull());
-            invariant(loc.isValid());
-            invariant(!hasFieldNames(key));
-
-            if (_lastKey.objsize()) {
-                if (key < _lastKey || (_dupsAllowed && key == _lastKey && loc < _lastLoc)) {
-                    return Status(ErrorCodes::InternalError,
-                                  "expected ascending (key, DiskLoc) order in bulk builder");
-                }
-                else if (!_dupsAllowed && key == _lastKey && loc != _lastLoc) {
-                    return dupKeyError(key);
-                }
-            }
-
             Status s = _idx.insert(_txn, key, loc, _dupsAllowed);
-            if (s.isOK()) {
-                _lastKey = key;
-                _lastLoc = loc;
+            if (s.isOK())
                 _count++;
-            }
             return s;
         }
 
-        void commit(bool mayInterrupt) {
-            WiredTigerRecoveryUnit::Get(_txn).commitUnitOfWork();
-        }
+        void commit(bool mayInterrupt) { }
 
     private:
         WiredTigerIndex &_idx;
         OperationContext *_txn;
         bool _dupsAllowed;
         unsigned long long _count;
-        BSONObj _lastKey;
-        DiskLoc _lastLoc;
     };
 
     SortedDataBuilderInterface* WiredTigerIndex::getBulkBuilder(
