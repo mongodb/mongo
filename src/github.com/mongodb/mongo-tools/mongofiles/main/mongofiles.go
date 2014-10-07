@@ -2,10 +2,11 @@ package main
 
 import (
 	"fmt"
+	"github.com/mongodb/mongo-tools/common/db"
+	"github.com/mongodb/mongo-tools/common/log"
 	commonOpts "github.com/mongodb/mongo-tools/common/options"
 	"github.com/mongodb/mongo-tools/mongofiles"
 	"github.com/mongodb/mongo-tools/mongofiles/options"
-	"github.com/mongodb/mongo-tools/common/log"
 	"os"
 )
 
@@ -56,21 +57,23 @@ func main() {
 
 	fileName, err := mongofiles.ValidateCommand(args)
 	if err != nil {
-		log.Logf(0, "Error: %v", err)
+		log.Logf(0, "error: %v", err)
 		printHelpAndExit()
 	}
 
-	mongofiles := mongofiles.MongoFiles{
-		ToolOptions:    opts,
-		StorageOptions: storageOpts,
-		Command:        args[0],
-		FileName:       fileName,
+	// create a session provider to connect to the db
+	sessionProvider, err := db.InitSessionProvider(*opts)
+	if err != nil {
+		log.Logf(0, "error initializing database session: %v\n", err)
+		os.Exit(1)
 	}
 
-	err = mongofiles.Init()
-	if err != nil {
-		log.Logf(0, "Error initializing mongofiles: %v", err)
-		os.Exit(1)
+	mongofiles := mongofiles.MongoFiles{
+		ToolOptions:     opts,
+		StorageOptions:  storageOpts,
+		SessionProvider: sessionProvider,
+		Command:         args[0],
+		FileName:        fileName,
 	}
 
 	output, err := mongofiles.Run(true)
