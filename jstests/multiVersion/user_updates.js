@@ -52,12 +52,15 @@ authUser(authSucceed, priTest, "user1", "user1");
 authUser(authSucceed, secTest, "user1", "user1");
 
 // Change password
+// Due to SERVER-15441 , must assign db
+db = priAdmin;
 priAdmin.changeUserPassword("admin2", "ADMIN2");
 authUser(authFail, priAdmin, "admin2", "admin2");
 authUser(authFail, secAdmin, "admin2", "admin2");
 authUser(authSucceed, priAdmin, "admin2", "ADMIN2");
 authUser(authSucceed, secAdmin, "admin2", "ADMIN2");
 
+db = priTest;
 priTest.changeUserPassword("user1", "USER1");
 authUser(authFail, priTest, "user1", "user1");
 authUser(authFail, secTest, "user1", "user1");
