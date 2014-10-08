@@ -106,11 +106,6 @@ namespace mongo {
 
         // used to construct RocksCursors
         const Ordering _order;
-
-        /**
-         * Creates an error code message out of a key
-         */
-        std::string dupKeyError(const BSONObj& key) const;
     };
 
 } // namespace mongo
