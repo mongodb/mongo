@@ -86,7 +86,8 @@ namespace {
         Heap1BtreeBuilderImpl(IndexSet* data, long long* currentKeySize, bool dupsAllowed)
                 : _data(data),
                   _currentKeySize( currentKeySize ),
-                  _dupsAllowed(dupsAllowed) {
+                  _dupsAllowed(dupsAllowed),
+                  _comparator(_data->key_comp()) {
             invariant(_data->empty());
         }
 
@@ -103,11 +104,13 @@ namespace {
             invariant(!hasFieldNames(key));
 
             if (!_data->empty()) {
-                if (key < _last->key || (_dupsAllowed && key == _last->key && loc < _last->loc)) {
+                // Compare specified key with last inserted key, ignoring its DiskLoc
+                int cmp = _comparator.compare(IndexKeyEntry(key, DiskLoc()), *_last);
+                if (cmp < 0 || (_dupsAllowed && cmp == 0 && loc < _last->loc)) {
                     return Status(ErrorCodes::InternalError,
                                   "expected ascending (key, DiskLoc) order in bulk builder");
                 }
-                else if (!_dupsAllowed && key == _last->key && loc != _last->loc) {
+                else if (!_dupsAllowed && cmp == 0 && loc != _last->loc) {
                     return dupKeyError(key);
                 }
             }
@@ -124,8 +127,8 @@ namespace {
         long long* _currentKeySize;
         const bool _dupsAllowed;
 
-        IndexSet::const_iterator _last;  // used by the bulk builder to detect duplicate keys
-                                         // or (key, DiskLoc) ordering violations
+        IndexEntryComparison _comparator;  // used by the bulk builder to detect duplicate keys
+        IndexSet::const_iterator _last;    // or (key, DiskLoc) ordering violations
     };
 
     class Heap1BtreeImpl : public SortedDataInterface {
