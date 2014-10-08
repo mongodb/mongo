@@ -85,6 +85,7 @@ namespace mongo {
     protected:
 
         virtual bool isCapped() const { return true; }
+        virtual bool shouldPadInserts() const { return false; }
 
         virtual void setCappedDeleteCallback( CappedDocumentDeleteCallback* cb ) {
             _deleteCallback = cb;

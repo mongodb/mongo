@@ -165,7 +165,8 @@ namespace mongo {
         void setMaxCappedDocs( OperationContext* txn, long long max );
 
         enum UserFlags {
-            Flag_UsePowerOf2Sizes = 1 << 0
+            Flag_UsePowerOf2Sizes = 1 << 0,
+            Flag_NoPadding = 1 << 1,
         };
 
         IndexDetails& idx(int idxNo, bool missingExpected = false );

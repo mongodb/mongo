@@ -69,6 +69,7 @@ namespace mongo {
 
     protected:
         virtual bool isCapped() const { return false; }
+        virtual bool shouldPadInserts() const { return !_details->isUserFlagSet(Flag_NoPadding); }
 
         virtual StatusWith<DiskLoc> allocRecord( OperationContext* txn,
                                                  int lengthWithHeaders,

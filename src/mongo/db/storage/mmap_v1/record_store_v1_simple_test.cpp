@@ -39,6 +39,32 @@
 using namespace mongo;
 
 namespace {
+    TEST(SimpleRecordStoreV1, ChangeNoPaddingSetting) {
+        OperationContextNoop txn;
+        DummyExtentManager em;
+        DummyRecordStoreV1MetaData* md = new DummyRecordStoreV1MetaData( false, 0 );
+
+        string myns = "test.foo";
+        SimpleRecordStoreV1 rs(&txn, myns, md, &em, false);
+
+        BSONObjBuilder info;
+
+        ASSERT_FALSE(md->isUserFlagSet(RecordStoreV1Base::Flag_NoPadding));
+
+        ASSERT_OK(rs.setCustomOption(&txn, BSON("noPadding" << true).firstElement(), &info));
+        ASSERT_TRUE(md->isUserFlagSet(RecordStoreV1Base::Flag_NoPadding));
+
+        ASSERT_OK(rs.setCustomOption(&txn, BSON("noPadding" << false).firstElement(), &info));
+        ASSERT_FALSE(md->isUserFlagSet(RecordStoreV1Base::Flag_NoPadding));
+
+        // duplicate names are expected since we reused the same builder.
+        const BSONObj expectedInfo = BSON("noPadding_old" << false
+                                       << "noPadding_new" << true
+                                       << "noPadding_old" << true
+                                       << "noPadding_new" << false
+                                       );
+        ASSERT_EQUALS(info.done(), expectedInfo);
+    }
 
     TEST( SimpleRecordStoreV1, quantizeAllocationSpaceSimple ) {
         ASSERT_EQUALS(RecordStoreV1Base::quantizeAllocationSpace(33), 64);
@@ -122,6 +148,40 @@ namespace {
 
         // The length of the allocated record is quantized.
         ASSERT_EQUALS( 512 , rs.dataFor( &txn, result.getValue() ).size() + Record::HeaderSize );
+    }
+
+    TEST(SimpleRecordStoreV1, AllocNonQuantized) {
+        OperationContextNoop txn;
+        DummyExtentManager em;
+        DummyRecordStoreV1MetaData* md = new DummyRecordStoreV1MetaData( false, 0 );
+        md->setUserFlag(&txn, RecordStoreV1Base::Flag_NoPadding);
+
+        string myns = "test.AllocQuantized";
+        SimpleRecordStoreV1 rs( &txn, myns, md, &em, false );
+
+        BSONObj obj = docForRecordSize( 300 );
+        StatusWith<DiskLoc> result = rs.insertRecord( &txn, obj.objdata(), obj.objsize(), false);
+        ASSERT( result.isOK() );
+
+        // The length of the allocated record is quantized.
+        ASSERT_EQUALS( 300 , rs.dataFor( &txn, result.getValue() ).size() + Record::HeaderSize );
+    }
+
+    TEST(SimpleRecordStoreV1, AllocNonQuantizedStillAligned) {
+        OperationContextNoop txn;
+        DummyExtentManager em;
+        DummyRecordStoreV1MetaData* md = new DummyRecordStoreV1MetaData( false, 0 );
+        md->setUserFlag(&txn, RecordStoreV1Base::Flag_NoPadding);
+
+        string myns = "test.AllocQuantized";
+        SimpleRecordStoreV1 rs( &txn, myns, md, &em, false );
+
+        BSONObj obj = docForRecordSize( 298 );
+        StatusWith<DiskLoc> result = rs.insertRecord( &txn, obj.objdata(), obj.objsize(), false);
+        ASSERT( result.isOK() );
+
+        // The length of the allocated record is quantized.
+        ASSERT_EQUALS( 300 , rs.dataFor( &txn, result.getValue() ).size() + Record::HeaderSize );
     }
 
     /** alloc() quantizes the requested size if DocWriter::addPadding() returns true. */

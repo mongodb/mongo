@@ -106,7 +106,8 @@ namespace mongo {
         static const int bucketSizes[];
 
         enum UserFlags {
-            Flag_UsePowerOf2Sizes = 1 << 0
+            Flag_UsePowerOf2Sizes = 1 << 0,
+            Flag_NoPadding = 1 << 1,
         };
 
         // ------------
@@ -205,6 +206,8 @@ namespace mongo {
         const DeletedRecord* deletedRecordFor( const DiskLoc& loc ) const;
 
         virtual bool isCapped() const = 0;
+
+        virtual bool shouldPadInserts() const = 0;
 
         virtual StatusWith<DiskLoc> allocRecord( OperationContext* txn,
                                                  int lengthWithHeaders,

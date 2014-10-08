@@ -352,7 +352,9 @@ namespace mongo {
                     unsigned allocationSize = minAllocationSize;
                     switch( compactOptions->paddingMode ) {
                     case CompactOptions::NONE: // default padding
-                        allocationSize = quantizeAllocationSpace(minAllocationSize);
+                        if (shouldPadInserts()) {
+                            allocationSize = quantizeAllocationSpace(minAllocationSize);
+                        }
                         break;
 
                     case CompactOptions::PRESERVE: // keep original padding

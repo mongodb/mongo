@@ -251,7 +251,7 @@ namespace mongo {
             return StatusWith<DiskLoc>( ErrorCodes::InvalidLength,
                                         "record has to be <= 16.5MB" );
         }
-        if (doc->addPadding() && !isCapped())
+        if (doc->addPadding() && shouldPadInserts())
             lenWHdr = quantizeAllocationSpace( lenWHdr );
 
         StatusWith<DiskLoc> loc = allocRecord( txn, lenWHdr, enforceQuota );
@@ -295,7 +295,7 @@ namespace mongo {
                                                           bool enforceQuota ) {
 
         int lenWHdr = len + Record::HeaderSize;
-        if (!isCapped())
+        if (shouldPadInserts())
             lenWHdr = quantizeAllocationSpace( lenWHdr );
         fassert( 17208, lenWHdr >= ( len + Record::HeaderSize ) );
 
@@ -917,20 +917,26 @@ namespace mongo {
     Status RecordStoreV1Base::setCustomOption( OperationContext* txn,
                                                const BSONElement& option,
                                                BSONObjBuilder* info ) {
-        if ( str::equals( "usePowerOf2Sizes", option.fieldName() ) ) {
-            bool oldPowerOf2 = _details->isUserFlagSet( Flag_UsePowerOf2Sizes );
-            bool newPowerOf2 = option.trueValue();
+        const StringData name = option.fieldNameStringData();
+        const int flag = (name == "usePowerOf2Sizes") ? Flag_UsePowerOf2Sizes :
+                         (name == "noPadding") ? Flag_NoPadding :
+                         0;
+        if (flag) {
+            bool oldSetting = _details->isUserFlagSet(flag);
+            bool newSetting = option.trueValue();
 
-            if ( oldPowerOf2 != newPowerOf2 ) {
+            if ( oldSetting != newSetting ) {
                 // change userFlags
-                info->appendBool( "usePowerOf2Sizes_old", oldPowerOf2 );
+                info->appendBool( name.toString() + "_old", oldSetting );
 
-                if ( newPowerOf2 )
-                    _details->setUserFlag( txn, Flag_UsePowerOf2Sizes );
+                if ( newSetting )
+                    _details->setUserFlag( txn, flag );
                 else
-                    _details->clearUserFlag( txn, Flag_UsePowerOf2Sizes );
+                    _details->clearUserFlag( txn, flag );
 
-                info->appendBool( "usePowerOf2Sizes_new", newPowerOf2 );
+                invariant(_details->isUserFlagSet(flag) == newSetting);
+
+                info->appendBool( name.toString() + "_new", newSetting );
             }
 
             return Status::OK();
