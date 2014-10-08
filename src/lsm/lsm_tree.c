@@ -118,7 +118,7 @@ __wt_lsm_tree_close_all(WT_SESSION_IMPL *session)
 		 * is no need to decrement the reference count since destroy
 		 * is unconditional.
 		 */
-		(void)WT_ATOMIC_ADD(lsm_tree->refcnt, 1);
+		(void)WT_ATOMIC_ADD4(lsm_tree->refcnt, 1);
 		WT_TRET(__lsm_tree_close(session, lsm_tree));
 		WT_TRET(__lsm_tree_discard(session, lsm_tree));
 	}
@@ -190,7 +190,7 @@ int
 __wt_lsm_tree_set_chunk_size(
     WT_SESSION_IMPL *session, WT_LSM_CHUNK *chunk)
 {
-	off_t size;
+	wt_off_t size;
 	const char *filename;
 
 	filename = chunk->uri;
@@ -340,10 +340,6 @@ __wt_lsm_tree_create(WT_SESSION_IMPL *session,
 	if (lsm_tree->merge_min > lsm_tree->merge_max)
 		WT_ERR_MSG(session, EINVAL,
 		    "LSM merge_min must be less than or equal to merge_max");
-	WT_ERR(__wt_config_gets(session, cfg, "lsm.merge_threads", &cval));
-	lsm_tree->merge_threads = (uint32_t)cval.val;
-	/* Sanity check that api_data.py is in sync with lsm.h */
-	WT_ASSERT(session, lsm_tree->merge_threads <= WT_LSM_MAX_WORKERS);
 
 	/*
 	 * Set up the config for each chunk.
@@ -398,9 +394,12 @@ __lsm_tree_open_check(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 	WT_RET(__wt_config_gets(session, cfg, "leaf_page_max", &cval));
 	maxleafpage = (uint64_t)cval.val;
 
-	/* Three chunks, plus one page for each participant in a merge. */
+	/*
+	 * Three chunks, plus one page for each participant in up to three
+	 * concurrent merges.
+	 */
 	required = 3 * lsm_tree->chunk_size +
-	    lsm_tree->merge_threads * (lsm_tree->merge_max * maxleafpage);
+	    3 * (lsm_tree->merge_max * maxleafpage);
 	if (S2C(session)->cache_size < required)
 		WT_RET_MSG(session, EINVAL,
 		    "The LSM configuration requires a cache size of at least %"
@@ -427,7 +426,7 @@ __lsm_tree_open(
 	WT_ASSERT(session, F_ISSET(session, WT_SESSION_SCHEMA_LOCKED));
 
 	/* Start the LSM manager thread if it isn't running. */
-	if (WT_ATOMIC_CAS(conn->lsm_manager.lsm_workers, 0, 1))
+	if (WT_ATOMIC_CAS4(conn->lsm_manager.lsm_workers, 0, 1))
 		WT_RET(__wt_lsm_manager_start(session));
 
 	/* Make sure no one beat us to it. */
@@ -509,12 +508,12 @@ __wt_lsm_tree_get(WT_SESSION_IMPL *session,
 
 			if (exclusive) {
 				F_SET_ATOMIC(lsm_tree, WT_LSM_TREE_EXCLUSIVE);
-				if (!WT_ATOMIC_CAS(lsm_tree->refcnt, 0, 1)) {
+				if (!WT_ATOMIC_CAS4(lsm_tree->refcnt, 0, 1)) {
 					F_CLR(lsm_tree, WT_LSM_TREE_EXCLUSIVE);
 					return (EBUSY);
 				}
 			} else
-				(void)WT_ATOMIC_ADD(lsm_tree->refcnt, 1);
+				(void)WT_ATOMIC_ADD4(lsm_tree->refcnt, 1);
 
 			/*
 			 * If we got a reference, but an exclusive reference
@@ -522,7 +521,7 @@ __wt_lsm_tree_get(WT_SESSION_IMPL *session,
 			 */
 			if (!exclusive &&
 			    F_ISSET_ATOMIC(lsm_tree, WT_LSM_TREE_EXCLUSIVE)) {
-				(void)WT_ATOMIC_SUB(lsm_tree->refcnt, 1);
+				(void)WT_ATOMIC_SUB4(lsm_tree->refcnt, 1);
 				return (EBUSY);
 			}
 			*treep = lsm_tree;
@@ -541,7 +540,7 @@ void
 __wt_lsm_tree_release(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 {
 	WT_ASSERT(session, lsm_tree->refcnt > 0);
-	(void)WT_ATOMIC_SUB(lsm_tree->refcnt, 1);
+	(void)WT_ATOMIC_SUB4(lsm_tree->refcnt, 1);
 	F_CLR_ATOMIC(lsm_tree, WT_LSM_TREE_EXCLUSIVE);
 }
 
@@ -549,7 +548,7 @@ __wt_lsm_tree_release(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 #define	WT_LSM_MERGE_THROTTLE_BUMP_PCT	(100 / lsm_tree->merge_max)
 /* Number of level 0 chunks that need to be present to throttle inserts */
 #define	WT_LSM_MERGE_THROTTLE_THRESHOLD					\
-	(lsm_tree->merge_threads * lsm_tree->merge_min)
+	(2 * lsm_tree->merge_min)
 /* Minimal throttling time */
 #define	WT_LSM_THROTTLE_START		20
 
@@ -663,12 +662,10 @@ __wt_lsm_tree_throttle(
 	/*
 	 * Merge throttling, based on the number of on-disk, level 0 chunks.
 	 *
-	 * Don't throttle if there is only a single merge thread - that thread
-	 * is likely busy creating bloom filters.  Similarly, don't throttle if
-	 * the tree has less than a single level's number of chunks.
+	 * Don't throttle if the tree has less than a single level's number
+	 * of chunks.
 	 */
-	if (lsm_tree->merge_threads < 2 ||
-	    lsm_tree->nchunks < lsm_tree->merge_max)
+	if (lsm_tree->nchunks < lsm_tree->merge_max)
 		lsm_tree->merge_throttle = 0;
 	else if (gen0_chunks < WT_LSM_MERGE_THROTTLE_THRESHOLD)
 		WT_LSM_MERGE_THROTTLE_DECREASE(lsm_tree->merge_throttle);
@@ -738,7 +735,7 @@ __wt_lsm_tree_switch(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 	/* Update the throttle time. */
 	__wt_lsm_tree_throttle(session, lsm_tree, 0);
 
-	new_id = WT_ATOMIC_ADD(lsm_tree->last, 1);
+	new_id = WT_ATOMIC_ADD4(lsm_tree->last, 1);
 
 	WT_ERR(__wt_realloc_def(session, &lsm_tree->chunk_alloc,
 	    nchunks + 1, &lsm_tree->chunk));
@@ -769,7 +766,7 @@ err:	WT_TRET(__wt_lsm_tree_unlock(session, lsm_tree));
 		WT_PANIC_RET(session, ret, "Failed doing LSM switch");
 	else if (!first_switch)
 		WT_RET(__wt_lsm_manager_push_entry(
-		    session, WT_LSM_WORK_FLUSH, lsm_tree));
+		    session, WT_LSM_WORK_FLUSH, 0, lsm_tree));
 	return (ret);
 }
 
@@ -928,7 +925,7 @@ __wt_lsm_tree_truncate(
 
 	/* Create the new chunk. */
 	WT_ERR(__wt_calloc_def(session, 1, &chunk));
-	chunk->id = WT_ATOMIC_ADD(lsm_tree->last, 1);
+	chunk->id = WT_ATOMIC_ADD4(lsm_tree->last, 1);
 	WT_ERR(__wt_lsm_tree_setup_chunk(session, lsm_tree, chunk));
 
 	/* Mark all chunks old. */
@@ -1007,6 +1004,7 @@ __wt_lsm_compact(WT_SESSION_IMPL *session, const char *name, int *skip)
 	WT_LSM_CHUNK *chunk;
 	WT_LSM_TREE *lsm_tree;
 	time_t begin, end;
+	uint64_t progress;
 	int i, compacting, flushing, locked, ref;
 
 	compacting = flushing = locked = ref = 0;
@@ -1049,6 +1047,7 @@ __wt_lsm_compact(WT_SESSION_IMPL *session, const char *name, int *skip)
 	/* Clear any merge throttle: compact throws out that calculation. */
 	lsm_tree->merge_throttle = 0;
 	lsm_tree->merge_aggressiveness = 0;
+	progress = lsm_tree->merge_progressing;
 
 	/* If another thread started a compact on this tree, we're done. */
 	if (F_ISSET(lsm_tree, WT_LSM_TREE_COMPACTING))
@@ -1067,7 +1066,7 @@ __wt_lsm_compact(WT_SESSION_IMPL *session, const char *name, int *skip)
 		 * If we have a chunk, we want to look for it to be on-disk.
 		 * So we need to add a reference to keep it available.
 		 */
-		(void)WT_ATOMIC_ADD(chunk->refcnt, 1);
+		(void)WT_ATOMIC_ADD4(chunk->refcnt, 1);
 		ref = 1;
 	}
 
@@ -1086,14 +1085,17 @@ __wt_lsm_compact(WT_SESSION_IMPL *session, const char *name, int *skip)
 		 * chunk if the tree is being used read-only now.
 		 */
 		WT_ERR(__wt_lsm_manager_push_entry(session,
-		    WT_LSM_WORK_FLUSH | WT_LSM_WORK_FORCE, lsm_tree));
+		    WT_LSM_WORK_FLUSH, WT_LSM_WORK_FORCE, lsm_tree));
 	} else {
 		/*
 		 * If there is no chunk to flush, go straight to the
 		 * compacting state.
 		 */
 		compacting = 1;
+		progress = lsm_tree->merge_progressing;
 		F_SET(lsm_tree, WT_LSM_TREE_COMPACTING);
+		WT_ERR(__wt_verbose(session, WT_VERB_LSM,
+		    "COMPACT: Start compacting %s", lsm_tree->name));
 	}
 
 	/* Wait for the work unit queues to drain. */
@@ -1108,18 +1110,21 @@ __wt_lsm_compact(WT_SESSION_IMPL *session, const char *name, int *skip)
 			if (F_ISSET(chunk, WT_LSM_CHUNK_ONDISK)) {
 				WT_ERR(__wt_verbose(session,
 				    WT_VERB_LSM,
-				    "Compact flush done %s chunk %u",
-				    name, chunk->id));
-				(void)WT_ATOMIC_SUB(chunk->refcnt, 1);
+				    "Compact flush done %s chunk %u.  "
+				    "Start compacting progress %" PRIu64,
+				    name, chunk->id,
+				    lsm_tree->merge_progressing));
+				(void)WT_ATOMIC_SUB4(chunk->refcnt, 1);
 				flushing = ref = 0;
 				compacting = 1;
 				F_SET(lsm_tree, WT_LSM_TREE_COMPACTING);
+				progress = lsm_tree->merge_progressing;
 			} else {
 				WT_ERR(__wt_verbose(session, WT_VERB_LSM,
 				    "Compact flush retry %s chunk %u",
 				    name, chunk->id));
 				WT_ERR(__wt_lsm_manager_push_entry(session,
-				    WT_LSM_WORK_FLUSH | WT_LSM_WORK_FORCE,
+				    WT_LSM_WORK_FLUSH, WT_LSM_WORK_FORCE,
 				    lsm_tree));
 			}
 		}
@@ -1131,7 +1136,10 @@ __wt_lsm_compact(WT_SESSION_IMPL *session, const char *name, int *skip)
 		 * span chunks with different generations.
 		 */
 		if (compacting && !F_ISSET(lsm_tree, WT_LSM_TREE_COMPACTING)) {
-			if (lsm_tree->merge_aggressiveness < 10) {
+			if (lsm_tree->merge_aggressiveness < 10 ||
+			    (progress < lsm_tree->merge_progressing) ||
+			    lsm_tree->merge_syncing) {
+				progress = lsm_tree->merge_progressing;
 				F_SET(lsm_tree, WT_LSM_TREE_COMPACTING);
 				lsm_tree->merge_aggressiveness = 10;
 			} else
@@ -1154,13 +1162,13 @@ __wt_lsm_compact(WT_SESSION_IMPL *session, const char *name, int *skip)
 			    i < COMPACT_PARALLEL_MERGES; i++) {
 				lsm_tree->merge_aggressiveness = 10;
 				WT_ERR(__wt_lsm_manager_push_entry(
-				    session, WT_LSM_WORK_MERGE, lsm_tree));
+				    session, WT_LSM_WORK_MERGE, 0, lsm_tree));
 			}
 	}
 err:
 	/* Ensure anything we set is cleared. */
 	if (ref)
-		(void)WT_ATOMIC_SUB(chunk->refcnt, 1);
+		(void)WT_ATOMIC_SUB4(chunk->refcnt, 1);
 	if (compacting) {
 		F_CLR(lsm_tree, WT_LSM_TREE_COMPACTING);
 		lsm_tree->merge_aggressiveness = 0;

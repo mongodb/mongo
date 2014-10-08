@@ -39,8 +39,8 @@ extra_cflags = [ '-w' ]
 
 dir = os.path.dirname(__file__)
 
-# Read the version information from the RELEASE file
-for l in open(os.path.join(dir, '..', '..', 'RELEASE')):
+# Read the version information from the RELEASE_INFO file
+for l in open(os.path.join(dir, '..', '..', 'RELEASE_INFO')):
     if re.match(r'WIREDTIGER_VERSION_(?:MAJOR|MINOR|PATCH)=', l):
         exec(l)
 

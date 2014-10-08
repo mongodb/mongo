@@ -122,7 +122,7 @@ __update_serial_func(WT_SESSION_IMPL *session,
 	 * and if it is, do a full-barrier to ensure the update's next pointer
 	 * is set before we update the linked list and try again.
 	 */
-	while (!WT_ATOMIC_CAS(*upd_entry, upd->next, upd)) {
+	while (!WT_ATOMIC_CAS8(*upd_entry, upd->next, upd)) {
 		WT_RET(__wt_txn_update_check(session, upd->next = *upd_entry));
 		WT_WRITE_BARRIER();
 	}

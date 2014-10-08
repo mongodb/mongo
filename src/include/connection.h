@@ -162,7 +162,7 @@ struct __wt_connection_impl {
 	WT_CONDVAR	*ckpt_cond;	/* Checkpoint wait mutex */
 	const char	*ckpt_config;	/* Checkpoint configuration */
 #define	WT_CKPT_LOGSIZE(conn)	((conn)->ckpt_logsize != 0)
-	off_t		 ckpt_logsize;	/* Checkpoint log size period */
+	wt_off_t		 ckpt_logsize;	/* Checkpoint log size period */
 	uint32_t	 ckpt_signalled; /* Checkpoint signalled */
 	long		 ckpt_usecs;	/* Checkpoint period */
 
@@ -234,7 +234,7 @@ struct __wt_connection_impl {
 	pthread_t	 arch_tid;	/* Log archive thread */
 	int		 arch_tid_set;	/* Log archive thread set */
 	WT_LOG		*log;		/* Logging structure */
-	off_t		log_file_max;	/* Log file max size */
+	wt_off_t	 log_file_max;	/* Log file max size */
 	const char	*log_path;	/* Logging path format */
 	uint32_t	txn_logsync;	/* Log sync configuration */
 
@@ -259,8 +259,8 @@ struct __wt_connection_impl {
 
 	uint32_t schema_gen;		/* Schema generation number */
 
-	off_t	 data_extend_len;	/* file_extend data length */
-	off_t	 log_extend_len;	/* file_extend log length */
+	wt_off_t data_extend_len;	/* file_extend data length */
+	wt_off_t log_extend_len;	/* file_extend log length */
 
 	uint32_t direct_io;		/* O_DIRECT file type flags */
 	int	 mmap;			/* mmap configuration */

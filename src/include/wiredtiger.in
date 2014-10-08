@@ -28,21 +28,7 @@ extern "C" {
 /*******************************************
  * Portable type names
  *******************************************/
-@int8_decl@
-@u_int8_decl@
-@int16_decl@
-@u_int16_decl@
-@int32_decl@
-@u_int32_decl@
-@int64_decl@
-@u_int64_decl@
-
-@u_char_decl@
-@u_short_decl@
-@u_int_decl@
-@u_long_decl@
-@u_quad_decl@
-
+@off_t_decl@
 @uintmax_t_decl@
 @uintptr_t_decl@
 
@@ -151,7 +137,7 @@ struct __wt_item {
  */
 struct __wt_lsn {
 	uint32_t        file;           /*!< Log file number */
-	off_t           offset;         /*!< Log file offset */
+	wt_off_t        offset;         /*!< Log file offset */
 };
 
 /*!
@@ -530,6 +516,11 @@ struct __wt_cursor {
 
 	WT_ITEM key, value;
 	int saved_err;			/* Saved error in set_{key,value}. */
+	/*
+	 * URI used internally, may differ from the URI provided by the
+	 * user on open.
+	 */
+	const char *internal_uri;
 
 #define	WT_CURSTD_APPEND	0x0001
 #define	WT_CURSTD_BULK		0x0002
@@ -978,7 +969,7 @@ struct __wt_session {
 	 * default)\, if the object exists\, check that its settings match the
 	 * specified configuration., a boolean flag; default \c false.}
 	 * @config{extractor, configure custom extractor for indices.  Value
-	 * must be an extractor name created with WT_CONNECTION::add_extractor.,
+	 * must be a extractor name created with WT_CONNECTION::add_extractor.,
 	 * a string; default empty.}
 	 * @config{format, the file format., a string\, chosen from the
 	 * following options: \c "btree"; default \c btree.}
@@ -1063,9 +1054,6 @@ struct __wt_session {
 	 * chunks to include in a merge operation.  If set to 0 or 1 half the
 	 * value of merge_max is used., an integer no more than 100; default \c
 	 * 0.}
-	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;merge_threads, the number of
-	 * threads to perform merge operations., an integer between 1 and 10;
-	 * default \c 2.}
 	 * @config{ ),,}
 	 * @config{memory_page_max, the maximum size a page can grow to in
 	 * memory before being reconciled to disk.  The specified size will be
@@ -1583,9 +1571,10 @@ struct __wt_connection {
 	 * list\, with values chosen from the following options: \c "api"\, \c
 	 * "block"\, \c "checkpoint"\, \c "compact"\, \c "evict"\, \c
 	 * "evictserver"\, \c "fileops"\, \c "log"\, \c "lsm"\, \c "metadata"\,
-	 * \c "mutex"\, \c "overflow"\, \c "read"\, \c "readserver"\, \c
-	 * "reconcile"\, \c "recovery"\, \c "salvage"\, \c "shared_cache"\, \c
-	 * "split"\, \c "verify"\, \c "version"\, \c "write"; default empty.}
+	 * \c "mutex"\, \c "overflow"\, \c "read"\, \c "reconcile"\, \c
+	 * "recovery"\, \c "salvage"\, \c "shared_cache"\, \c "split"\, \c
+	 * "temporary"\, \c "verify"\, \c "version"\, \c "write"; default
+	 * empty.}
 	 * @configend
 	 * @errors
 	 */
@@ -1966,8 +1955,8 @@ struct __wt_connection {
  * values chosen from the following options: \c "api"\, \c "block"\, \c
  * "checkpoint"\, \c "compact"\, \c "evict"\, \c "evictserver"\, \c "fileops"\,
  * \c "log"\, \c "lsm"\, \c "metadata"\, \c "mutex"\, \c "overflow"\, \c
- * "read"\, \c "readserver"\, \c "reconcile"\, \c "recovery"\, \c "salvage"\, \c
- * "shared_cache"\, \c "split"\, \c "verify"\, \c "version"\, \c "write";
+ * "read"\, \c "reconcile"\, \c "recovery"\, \c "salvage"\, \c "shared_cache"\,
+ * \c "split"\, \c "temporary"\, \c "verify"\, \c "version"\, \c "write";
  * default empty.}
  * @configend
  * Additionally, if files named \c WiredTiger.config or \c WiredTiger.basecfg
@@ -3187,50 +3176,58 @@ extern int wiredtiger_extension_terminate(WT_CONNECTION *connection);
 #define	WT_STAT_CONN_LSM_MERGE_THROTTLE			1078
 /*! rows merged in an LSM tree */
 #define	WT_STAT_CONN_LSM_ROWS_MERGED			1079
+/*! LSM App work units currently queued */
+#define	WT_STAT_CONN_LSM_WORK_QUEUE_APP			1080
+/*! LSM Merge work units currently queued */
+#define	WT_STAT_CONN_LSM_WORK_QUEUE_MANAGER		1081
+/*! LSM tree queue hit maximum */
+#define	WT_STAT_CONN_LSM_WORK_QUEUE_MAX			1082
+/*! LSM Switch work units currently queued */
+#define	WT_STAT_CONN_LSM_WORK_QUEUE_SWITCH		1083
 /*! LSM tree maintenance operations scheduled */
-#define	WT_STAT_CONN_LSM_WORK_UNITS_CREATED		1080
+#define	WT_STAT_CONN_LSM_WORK_UNITS_CREATED		1084
 /*! LSM tree maintenance operations discarded */
-#define	WT_STAT_CONN_LSM_WORK_UNITS_DISCARDED		1081
+#define	WT_STAT_CONN_LSM_WORK_UNITS_DISCARDED		1085
 /*! LSM tree maintenance operations executed */
-#define	WT_STAT_CONN_LSM_WORK_UNITS_DONE		1082
+#define	WT_STAT_CONN_LSM_WORK_UNITS_DONE		1086
 /*! memory allocations */
-#define	WT_STAT_CONN_MEMORY_ALLOCATION			1083
+#define	WT_STAT_CONN_MEMORY_ALLOCATION			1087
 /*! memory frees */
-#define	WT_STAT_CONN_MEMORY_FREE			1084
+#define	WT_STAT_CONN_MEMORY_FREE			1088
 /*! memory re-allocations */
-#define	WT_STAT_CONN_MEMORY_GROW			1085
+#define	WT_STAT_CONN_MEMORY_GROW			1089
 /*! total read I/Os */
-#define	WT_STAT_CONN_READ_IO				1086
+#define	WT_STAT_CONN_READ_IO				1090
 /*! page reconciliation calls */
-#define	WT_STAT_CONN_REC_PAGES				1087
+#define	WT_STAT_CONN_REC_PAGES				1091
 /*! page reconciliation calls for eviction */
-#define	WT_STAT_CONN_REC_PAGES_EVICTION			1088
+#define	WT_STAT_CONN_REC_PAGES_EVICTION			1092
 /*! reconciliation failed because an update could not be included */
-#define	WT_STAT_CONN_REC_SKIPPED_UPDATE			1089
+#define	WT_STAT_CONN_REC_SKIPPED_UPDATE			1093
 /*! split bytes currently awaiting free */
-#define	WT_STAT_CONN_REC_SPLIT_STASHED_BYTES		1090
+#define	WT_STAT_CONN_REC_SPLIT_STASHED_BYTES		1094
 /*! split objects currently awaiting free */
-#define	WT_STAT_CONN_REC_SPLIT_STASHED_OBJECTS		1091
+#define	WT_STAT_CONN_REC_SPLIT_STASHED_OBJECTS		1095
 /*! pthread mutex shared lock read-lock calls */
-#define	WT_STAT_CONN_RWLOCK_READ			1092
+#define	WT_STAT_CONN_RWLOCK_READ			1096
 /*! pthread mutex shared lock write-lock calls */
-#define	WT_STAT_CONN_RWLOCK_WRITE			1093
+#define	WT_STAT_CONN_RWLOCK_WRITE			1097
 /*! open cursor count */
-#define	WT_STAT_CONN_SESSION_CURSOR_OPEN		1094
+#define	WT_STAT_CONN_SESSION_CURSOR_OPEN		1098
 /*! transactions */
-#define	WT_STAT_CONN_TXN_BEGIN				1095
+#define	WT_STAT_CONN_TXN_BEGIN				1099
 /*! transaction checkpoints */
-#define	WT_STAT_CONN_TXN_CHECKPOINT			1096
+#define	WT_STAT_CONN_TXN_CHECKPOINT			1100
 /*! transaction checkpoint currently running */
-#define	WT_STAT_CONN_TXN_CHECKPOINT_RUNNING		1097
+#define	WT_STAT_CONN_TXN_CHECKPOINT_RUNNING		1101
 /*! transactions committed */
-#define	WT_STAT_CONN_TXN_COMMIT				1098
+#define	WT_STAT_CONN_TXN_COMMIT				1102
 /*! transaction failures due to cache overflow */
-#define	WT_STAT_CONN_TXN_FAIL_CACHE			1099
+#define	WT_STAT_CONN_TXN_FAIL_CACHE			1103
 /*! transactions rolled back */
-#define	WT_STAT_CONN_TXN_ROLLBACK			1100
+#define	WT_STAT_CONN_TXN_ROLLBACK			1104
 /*! total write I/Os */
-#define	WT_STAT_CONN_WRITE_IO				1101
+#define	WT_STAT_CONN_WRITE_IO				1105
 
 /*!
  * @}
@@ -3282,7 +3279,7 @@ extern int wiredtiger_extension_terminate(WT_CONNECTION *connection);
 #define	WT_STAT_DSRC_BTREE_COLUMN_VARIABLE		2020
 /*! pages rewritten by compaction */
 #define	WT_STAT_DSRC_BTREE_COMPACT_REWRITE		2021
-/*! total LSM, table or file object key/value pairs */
+/*! number of key/value pairs */
 #define	WT_STAT_DSRC_BTREE_ENTRIES			2022
 /*! fixed-record size */
 #define	WT_STAT_DSRC_BTREE_FIXED_LEN			2023

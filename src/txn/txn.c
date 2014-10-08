@@ -131,7 +131,7 @@ __wt_txn_refresh(WT_SESSION_IMPL *session, int get_snapshot, int pin_reads)
 		if ((count = txn_global->scan_count) < 0)
 			WT_PAUSE();
 	} while (count < 0 ||
-	    !WT_ATOMIC_CAS(txn_global->scan_count, count, count + 1));
+	    !WT_ATOMIC_CAS4(txn_global->scan_count, count, count + 1));
 
 	/* The oldest ID cannot change until the scan count goes to zero. */
 	prev_oldest_id = txn_global->oldest_id;
@@ -212,7 +212,7 @@ __wt_txn_refresh(WT_SESSION_IMPL *session, int get_snapshot, int pin_reads)
 	 */
 	if (TXNID_LT(prev_oldest_id, oldest_id) &&
 	    (!get_snapshot || oldest_id - prev_oldest_id > 100) &&
-	    WT_ATOMIC_CAS(txn_global->scan_count, 1, -1)) {
+	    WT_ATOMIC_CAS4(txn_global->scan_count, 1, -1)) {
 		WT_ORDERED_READ(session_cnt, conn->session_cnt);
 		for (i = 0, s = txn_global->states; i < session_cnt; i++, s++) {
 			if ((id = s->id) != WT_TXN_NONE &&
@@ -227,7 +227,7 @@ __wt_txn_refresh(WT_SESSION_IMPL *session, int get_snapshot, int pin_reads)
 		txn_global->scan_count = 0;
 	} else {
 		WT_ASSERT(session, txn_global->scan_count > 0);
-		(void)WT_ATOMIC_SUB(txn_global->scan_count, 1);
+		(void)WT_ATOMIC_SUB4(txn_global->scan_count, 1);
 	}
 
 	if (get_snapshot)

@@ -77,9 +77,6 @@ __wt_connection_close(WT_CONNECTION_IMPL *conn)
 	WT_DECL_RET;
 	WT_DLH *dlh;
 	WT_FH *fh;
-	WT_NAMED_COLLATOR *ncoll;
-	WT_NAMED_COMPRESSOR *ncomp;
-	WT_NAMED_DATA_SOURCE *ndsrc;
 	WT_SESSION_IMPL *s, *session;
 	WT_TXN_GLOBAL *txn_global;
 	u_int i;
@@ -133,17 +130,10 @@ __wt_connection_close(WT_CONNECTION_IMPL *conn)
 		WT_TRET(__wt_logmgr_destroy(session));
 	}
 
-	/* Free memory for collators */
-	while ((ncoll = TAILQ_FIRST(&conn->collqh)) != NULL)
-		WT_TRET(__wt_conn_remove_collator(session, ncoll));
-
-	/* Free memory for compressors */
-	while ((ncomp = TAILQ_FIRST(&conn->compqh)) != NULL)
-		WT_TRET(__wt_conn_remove_compressor(session, ncomp));
-
-	/* Free memory for data sources */
-	while ((ndsrc = TAILQ_FIRST(&conn->dsrcqh)) != NULL)
-		WT_TRET(__wt_conn_remove_data_source(session, ndsrc));
+	/* Free memory for collators, compressors, data sources. */
+	WT_TRET(__wt_conn_remove_collator(session));
+	WT_TRET(__wt_conn_remove_compressor(session));
+	WT_TRET(__wt_conn_remove_data_source(session));
 
 	/*
 	 * Complain if files weren't closed, ignoring the lock file, we'll

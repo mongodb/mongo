@@ -5,7 +5,11 @@
  * See the file LICENSE for redistribution information.
  */
 
-#define	WT_SINGLETHREAD		"WiredTiger"		/* Locking file */
+#define	WT_WIREDTIGER		"WiredTiger"		/* Version file */
+#define	WT_SINGLETHREAD		"WiredTiger.lock"	/* Locking file */
+
+#define	WT_BASECONFIG		"WiredTiger.basecfg"	/* Configuration */
+#define	WT_USERCONFIG		"WiredTiger.config"	/* Configuration */
 
 #define	WT_METADATA_BACKUP	"WiredTiger.backup"	/* Hot backup file */
 

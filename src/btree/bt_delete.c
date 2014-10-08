@@ -78,7 +78,7 @@ __wt_delete_page(WT_SESSION_IMPL *session, WT_REF *ref, int *skipp)
 	 * unclear optimizing for overlapping range deletes is worth the effort.
 	 */
 	if (ref->state != WT_REF_DISK ||
-	    !WT_ATOMIC_CAS(ref->state, WT_REF_DISK, WT_REF_LOCKED))
+	    !WT_ATOMIC_CAS4(ref->state, WT_REF_DISK, WT_REF_LOCKED))
 		return (0);
 
 	/*
@@ -161,7 +161,7 @@ __wt_delete_page_rollback(WT_SESSION_IMPL *session, WT_REF *ref)
 			 * If the page is still "deleted", it's as we left it,
 			 * reset the state.
 			 */
-			if (WT_ATOMIC_CAS(
+			if (WT_ATOMIC_CAS4(
 			    ref->state, WT_REF_DELETED, WT_REF_DISK))
 				return;
 			break;
@@ -224,7 +224,7 @@ __wt_delete_page_skip(WT_SESSION_IMPL *session, WT_REF *ref)
 	 * the page could switch to an in-memory state at any time.  Lock down
 	 * the structure, just to be safe.
 	 */
-	if (!WT_ATOMIC_CAS(ref->state, WT_REF_DELETED, WT_REF_LOCKED))
+	if (!WT_ATOMIC_CAS4(ref->state, WT_REF_DELETED, WT_REF_LOCKED))
 		return (0);
 
 	skip = ref->page_del == NULL ||

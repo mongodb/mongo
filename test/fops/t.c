@@ -188,9 +188,9 @@ static int
 handle_error(WT_EVENT_HANDLER *handler,
     WT_SESSION *session, int error, const char *errmsg)
 {
-	WT_UNUSED(handler);
-	WT_UNUSED(session);
-	WT_UNUSED(error);
+	(void)(handler);
+	(void)(session);
+	(void)(error);
 
 	/* Ignore complaints about missing files. */
 	if (error == ENOENT)
@@ -208,8 +208,8 @@ static int
 handle_message(WT_EVENT_HANDLER *handler,
     WT_SESSION *session, const char *message)
 {
-	WT_UNUSED(handler);
-	WT_UNUSED(session);
+	(void)(handler);
+	(void)(session);
 
 	if (logfp != NULL)
 		return (fprintf(logfp, "%s\n", message) < 0 ? -1 : 0);
@@ -224,7 +224,7 @@ handle_message(WT_EVENT_HANDLER *handler,
 static void
 onint(int signo)
 {
-	WT_UNUSED(signo);
+	(void)(signo);
 
 	shutdown();
 

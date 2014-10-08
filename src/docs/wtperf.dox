@@ -206,13 +206,15 @@ the tables. Default 1, maximum 99.
 @par threads (string, default=)
 workload configuration: each 'count' entry is the total number of
 threads, and the 'insert', 'read' and 'update' entries are the ratios
-of insert, read and update operations done by each worker thread;
-multiple workload configurations may be specified; for example, a more
-complex threads configuration might be
-'threads=((count=2,reads=1)(count=8,reads=1,inserts=2,updates=1))'
+of insert, read and update operations done by each worker thread; If a
+throttle value is provided each thread will do a maximum of that
+number of operations per second; multiple workload configurations may
+be specified; for example, a more complex threads configuration might
+be 'threads=((count=2,reads=1)(count=8,reads=1,inserts=2,updates=1))'
 which would create 2 threads doing nothing but reads and 8 threads
 each doing 50% inserts and 25% reads and updates.  Allowed
-configuration values are 'count', 'reads', 'inserts', 'updates'
+configuration values are 'count', 'throttle', 'reads', 'inserts',
+'updates'
 @par transaction_config (string, default=)
 transaction configuration string, relevant when populate_opts_per_txn
 is nonzero

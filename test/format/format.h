@@ -46,7 +46,6 @@
 #include <db.h>
 #endif
 #include <wiredtiger.h>
-#include <gcc.h>				/* WiredTiger internal */
 
 #include <wiredtiger_ext.h>
 extern WT_EXTENSION_API *wt_api;
@@ -172,8 +171,8 @@ typedef struct {
 	uint32_t c_leaf_page_max;
 	uint32_t c_leak_memory;
 	uint32_t c_logging;
+	uint32_t c_lsm_worker_threads;
 	uint32_t c_merge_max;
-	uint32_t c_merge_threads;
 	uint32_t c_mmap;
 	uint32_t c_ops;
 	uint32_t c_prefix_compression;

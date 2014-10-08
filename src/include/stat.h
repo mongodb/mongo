@@ -16,11 +16,11 @@ struct __wt_stats {
 #define	WT_STAT(stats, fld)						\
 	((stats)->fld.v)
 #define	WT_STAT_ATOMIC_DECRV(stats, fld, value) do {			\
-	(void)WT_ATOMIC_SUB(WT_STAT(stats, fld), (value));		\
+	(void)WT_ATOMIC_SUB8(WT_STAT(stats, fld), (value));		\
 } while (0)
 #define	WT_STAT_ATOMIC_DECR(stats, fld) WT_STAT_ATOMIC_DECRV(stats, fld, 1)
 #define	WT_STAT_ATOMIC_INCRV(stats, fld, value) do {			\
-	(void)WT_ATOMIC_ADD(WT_STAT(stats, fld), (value));		\
+	(void)WT_ATOMIC_ADD8(WT_STAT(stats, fld), (value));		\
 } while (0)
 #define	WT_STAT_ATOMIC_INCR(stats, fld) WT_ATOMIC_ADD(WT_STAT(stats, fld), 1)
 #define	WT_STAT_DECRV(stats, fld, value) do {				\
@@ -207,6 +207,10 @@ struct __wt_connection_stats {
 	WT_STATS lsm_checkpoint_throttle;
 	WT_STATS lsm_merge_throttle;
 	WT_STATS lsm_rows_merged;
+	WT_STATS lsm_work_queue_app;
+	WT_STATS lsm_work_queue_manager;
+	WT_STATS lsm_work_queue_max;
+	WT_STATS lsm_work_queue_switch;
 	WT_STATS lsm_work_units_created;
 	WT_STATS lsm_work_units_discarded;
 	WT_STATS lsm_work_units_done;

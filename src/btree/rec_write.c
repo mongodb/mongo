@@ -735,15 +735,15 @@ static void
 __rec_bnd_cleanup(WT_SESSION_IMPL *session, WT_RECONCILE *r, int destroy)
 {
 	WT_BOUNDARY *bnd;
-	uint32_t i;
+	uint32_t i, last_used;
 
 	if (r->bnd == NULL)
 		return;
 
 	/*
-	 * Destroy/re-initialize the boundary structures.  In the case of normal
-	 * cleanup, discard any memory we won't reuse after each reconciliation
-	 * completes.  In the case of destruction, discard everything.
+	 * Free the boundary structures' memory.  In the case of normal cleanup,
+	 * discard any memory we won't reuse in the next reconciliation; in the
+	 * case of destruction, discard everything.
 	 *
 	 * During some big-page evictions we have seen boundary arrays that have
 	 * millions of elements.  That should not be a normal event, but if the
@@ -761,26 +761,24 @@ __rec_bnd_cleanup(WT_SESSION_IMPL *session, WT_RECONCILE *r, int destroy)
 		__wt_free(session, r->bnd);
 		r->bnd_next = 0;
 		r->bnd_entries = r->bnd_allocated = 0;
-	} else
-		for (bnd = r->bnd, i = 0; i < r->bnd_next; ++bnd, ++i) {
-			bnd->start = NULL;
-			bnd->recno = 0;
-			bnd->entries = 0;
+	} else {
+		/*
+		 * The boundary-next field points to the next boundary structure
+		 * we were going to use, but there's no requirement that value
+		 * be incremented before reconciliation updates the structure it
+		 * points to, that is, there's no guarantee elements of the next
+		 * boundary structure are still unchanged. Be defensive, clean
+		 * up the "next" structure as well as the ones we know we used.
+		 */
+		last_used = r->bnd_next;
+		if (last_used < r->bnd_entries)
+			++last_used;
+		for (bnd = r->bnd, i = 0; i < last_used; ++bnd, ++i) {
 			__wt_free(session, bnd->addr.addr);
-			bnd->addr.size = 0;
-			bnd->addr.type = 0;
-			bnd->addr.reuse = 0;
-			bnd->cksum = 0;
 			__wt_free(session, bnd->dsk);
 			__wt_free(session, bnd->skip);
-			bnd->skip_next = 0;
-			bnd->skip_allocated = 0;
-			/*
-			 * Ignore the key, we re-use that memory during each
-			 * reconciliation.
-			 */
-			bnd->already_compressed = 0;
 		}
+	}
 }
 
 /*
@@ -1053,7 +1051,7 @@ __rec_child_modify(WT_SESSION_IMPL *session,
 			 * to see if the delete is visible to us.  Lock down the
 			 * structure.
 			 */
-			if (!WT_ATOMIC_CAS(
+			if (!WT_ATOMIC_CAS4(
 			    ref->state, WT_REF_DELETED, WT_REF_LOCKED))
 				break;
 			ret = __rec_child_deleted(session, r, ref, statep);
@@ -1494,6 +1492,33 @@ __rec_leaf_page_max(WT_SESSION_IMPL *session,  WT_RECONCILE *r)
 }
 
 /*
+ * __rec_split_bnd_init --
+ *	Initialize a single boundary structure.
+ */
+static void
+__rec_split_bnd_init(WT_SESSION_IMPL *session, WT_BOUNDARY *bnd)
+{
+	bnd->start = NULL;
+
+	bnd->recno = 0;
+	bnd->entries = 0;
+
+	__wt_free(session, bnd->addr.addr);
+	WT_CLEAR(bnd->addr);
+	bnd->size = 0;
+	bnd->cksum = 0;
+	__wt_free(session, bnd->dsk);
+
+	__wt_free(session, bnd->skip);
+	bnd->skip_next = 0;
+	bnd->skip_allocated = 0;
+
+	/* Ignore the key, we re-use that memory in each new reconciliation. */
+
+	bnd->already_compressed = 0;
+}
+
+/*
  * __rec_split_bnd_grow --
  *	Grow the boundary array as necessary.
  */
@@ -1501,14 +1526,19 @@ static int
 __rec_split_bnd_grow(WT_SESSION_IMPL *session, WT_RECONCILE *r)
 {
 	/*
-	 * Make sure there's enough room in which to save another boundary.  The
-	 * calculation is +2, because we save a start point one past the current
-	 * entry.
+	 * Make sure there's enough room for another boundary.  The calculation
+	 * is +2, because when filling in the current boundary's information,
+	 * we save the start point of the next boundary (for example, a record
+	 * number or key), in the (current + 1) slot.
+	 *
+	 * For the same reason, we're always initializing one ahead.
 	 */
 	WT_RET(__wt_realloc_def(
 	    session, &r->bnd_allocated, r->bnd_next + 2, &r->bnd));
-
 	r->bnd_entries = r->bnd_allocated / sizeof(r->bnd[0]);
+
+	__rec_split_bnd_init(session, &r->bnd[r->bnd_next + 1]);
+
 	return (0);
 }
 
@@ -1612,6 +1642,13 @@ __rec_split_init(WT_SESSION_IMPL *session,
 	}
 	r->first_free = WT_PAGE_HEADER_BYTE(btree, dsk);
 
+	/* Initialize the first boundary. */
+	r->bnd_next = 0;
+	WT_RET(__rec_split_bnd_grow(session, r));
+	__rec_split_bnd_init(session, &r->bnd[0]);
+	r->bnd[0].recno = recno;
+	r->bnd[0].start = WT_PAGE_HEADER_BYTE(btree, dsk);
+
 	/*
 	 * If the maximum page size is the same as the split page size, either
 	 * because of the object type or application configuration, there isn't
@@ -1626,16 +1663,10 @@ __rec_split_init(WT_SESSION_IMPL *session,
 	else
 		r->bnd_state = SPLIT_BOUNDARY;
 
-	/*
-	 * Initialize the array of boundary items and set the initial record
-	 * number and buffer address.
-	 */
-	r->bnd_next = 0;
-	WT_RET(__rec_split_bnd_grow(session, r));
-	r->bnd[0].recno = recno;
-	r->bnd[0].start = WT_PAGE_HEADER_BYTE(btree, dsk);
-
+	/* Initialize the entry counters. */
 	r->entries = r->total_entries = 0;
+
+	/* Initialize the starting record number. */
 	r->recno = recno;
 
 	/* New page, compression off. */
@@ -2231,7 +2262,7 @@ __rec_split_raw_worker(
 
 			/*
 			 * Mark it as uncompressed so the standard compression
-			 * function is called before the buffer is written..
+			 * function is called before the buffer is written.
 			 */
 			last->already_compressed = 0;
 		} else {
@@ -3108,7 +3139,7 @@ __rec_col_int(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 	    session, r, page, page->pg_intl_recno, btree->maxintlpage));
 
 	/* For each entry in the in-memory page... */
-	WT_INTL_FOREACH_BEGIN(page, ref) {
+	WT_INTL_FOREACH_BEGIN(session, page, ref) {
 		/* Update the starting record number in case we split. */
 		r->recno = ref->key.recno;
 
@@ -3903,7 +3934,7 @@ __rec_row_int(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 	r->cell_zero = 1;
 
 	/* For each entry in the in-memory page... */
-	WT_INTL_FOREACH_BEGIN(page, ref) {
+	WT_INTL_FOREACH_BEGIN(session, page, ref) {
 		/*
 		 * There are different paths if the key is an overflow item vs.
 		 * a straight-forward on-page value.   If an overflow item, we
@@ -4882,7 +4913,7 @@ err:			__wt_scr_free(&tkey);
 	if (!r->leave_dirty) {
 		mod->rec_max_txn = r->max_txn;
 
-		if (WT_ATOMIC_CAS(mod->write_gen, r->orig_write_gen, 0))
+		if (WT_ATOMIC_CAS4(mod->write_gen, r->orig_write_gen, 0))
 			__wt_cache_dirty_decr(session, page);
 	}
 

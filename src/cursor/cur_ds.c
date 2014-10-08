@@ -139,7 +139,7 @@ __curds_compare(WT_CURSOR *a, WT_CURSOR *b, int *cmpp)
 	 * Confirm both cursors refer to the same source and have keys, then
 	 * compare them.
 	 */
-	if (strcmp(a->uri, b->uri) != 0)
+	if (strcmp(a->internal_uri, b->internal_uri) != 0)
 		WT_ERR_MSG(session, EINVAL,
 		    "Cursors must reference the same object");
 
@@ -468,7 +468,7 @@ __wt_curds_open(
 	WT_DECL_RET;
 	const char *metaconf;
 
-	STATIC_ASSERT(offsetof(WT_CURSOR_DATA_SOURCE, iface) == 0);
+	WT_STATIC_ASSERT(offsetof(WT_CURSOR_DATA_SOURCE, iface) == 0);
 
 	data_source = NULL;
 	metaconf = NULL;

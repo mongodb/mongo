@@ -87,7 +87,7 @@ backup(void *arg)
 	int ret;
 	const char *key;
 
-	WT_UNUSED(arg);
+	(void)(arg);
 
 	conn = g.wts_conn;
 

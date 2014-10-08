@@ -41,9 +41,9 @@
  * and 1 if lsn0 > lsn1.
  */
 #define	LOG_CMP(lsn1, lsn2)						\
-	((lsn1)->file != (lsn2)->file ?                                 \
-	((lsn1)->file < (lsn2)->file ? -1 : 1) :                        \
-	((lsn1)->offset != (lsn2)->offset ?                             \
+	((lsn1)->file != (lsn2)->file ?					\
+	((lsn1)->file < (lsn2)->file ? -1 : 1) :			\
+	((lsn1)->offset != (lsn2)->offset ?				\
 	((lsn1)->offset < (lsn2)->offset ? -1 : 1) : 0))
 
 /*
@@ -65,30 +65,32 @@ typedef struct {
 	int32_t	 slot_error;		/* Error value */
 #define	SLOT_INVALID_INDEX	0xffffffff
 	uint32_t slot_index;		/* Active slot index */
-	off_t	 slot_start_offset;	/* Starting file offset */
+	wt_off_t slot_start_offset;	/* Starting file offset */
 	WT_LSN	slot_release_lsn;	/* Slot release LSN */
-	WT_LSN	slot_start_lsn;	/* Slot starting LSN */
-	WT_LSN	slot_end_lsn;	/* Slot ending LSN */
+	WT_LSN	slot_start_lsn;		/* Slot starting LSN */
+	WT_LSN	slot_end_lsn;		/* Slot ending LSN */
 	WT_FH	*slot_fh;		/* File handle for this group */
 	WT_ITEM slot_buf;		/* Buffer for grouped writes */
 	int32_t	slot_churn;		/* Active slots are scarce. */
+
 #define	SLOT_BUF_GROW	0x01			/* Grow buffer on release */
 #define	SLOT_BUFFERED	0x02			/* Buffer writes */
 #define	SLOT_CLOSEFH	0x04			/* Close old fh on release */
 #define	SLOT_SYNC	0x08			/* Needs sync on release */
-	uint32_t flags;		/* Flags */
+	uint32_t flags;			/* Flags */
 } WT_LOGSLOT WT_GCC_ATTRIBUTE((aligned(WT_CACHE_LINE_ALIGNMENT)));
 
 typedef struct {
 	WT_LOGSLOT	*slot;
-	off_t		 offset;
+	wt_off_t		 offset;
 } WT_MYSLOT;
 
-#define	LOG_FIRST_RECORD	log->allocsize	/* Offset of first record */
+					/* Offset of first record */
+#define	LOG_FIRST_RECORD	log->allocsize
 
 typedef struct {
 	uint32_t	allocsize;	/* Allocation alignment size */
-	off_t		log_written;	/* Amount of log written this period */
+	wt_off_t	log_written;	/* Amount of log written this period */
 	/*
 	 * Log file information
 	 */

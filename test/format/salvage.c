@@ -58,8 +58,8 @@ corrupt(void)
 {
 	FILE *fp;
 	struct stat sb;
-	off_t offset;
 	size_t len, nw;
+	wt_off_t offset;
 	int fd, ret;
 	char buf[8 * 1024], copycmd[2 * 1024];
 

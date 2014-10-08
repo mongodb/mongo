@@ -658,7 +658,7 @@ __wt_config_gets(WT_SESSION_IMPL *session,
  * __wt_config_getone --
  *	Get the value for a given key from a single config string.
  */
- int
+int
 __wt_config_getone(WT_SESSION_IMPL *session,
     const char *config, WT_CONFIG_ITEM *key, WT_CONFIG_ITEM *value)
 {
@@ -672,7 +672,7 @@ __wt_config_getone(WT_SESSION_IMPL *session,
  * __wt_config_getones --
  *	Get the value for a given string key from a single config string.
  */
- int
+int
 __wt_config_getones(WT_SESSION_IMPL *session,
     const char *config, const char *key, WT_CONFIG_ITEM *value)
 {
@@ -719,7 +719,7 @@ __wt_config_gets_def(WT_SESSION_IMPL *session,
  *	Get the value for a given key from a config string in a WT_CONFIG_ITEM.
  *	This is useful for dealing with nested structs in config strings.
  */
- int
+int
 __wt_config_subgetraw(WT_SESSION_IMPL *session,
     WT_CONFIG_ITEM *cfg, WT_CONFIG_ITEM *key, WT_CONFIG_ITEM *value)
 {
@@ -734,7 +734,7 @@ __wt_config_subgetraw(WT_SESSION_IMPL *session,
  *	Get the value for a given key from a config string in a WT_CONFIG_ITEM.
  *	This is useful for dealing with nested structs in config strings.
  */
- int
+int
 __wt_config_subgets(WT_SESSION_IMPL *session,
     WT_CONFIG_ITEM *cfg, const char *key, WT_CONFIG_ITEM *value)
 {

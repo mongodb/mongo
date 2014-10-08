@@ -31,8 +31,8 @@ static int
 handle_message(WT_EVENT_HANDLER *handler,
     WT_SESSION *session, const char *message)
 {
-	WT_UNUSED(handler);
-	WT_UNUSED(session);
+	(void)(handler);
+	(void)(session);
 
 	if (g.logfp != NULL)
 		return (fprintf(
@@ -49,8 +49,8 @@ static int
 handle_progress(WT_EVENT_HANDLER *handler,
     WT_SESSION *session, const char *operation, uint64_t progress)
 {
-	WT_UNUSED(handler);
-	WT_UNUSED(session);
+	(void)(handler);
+	(void)(session);
 
 	track(operation, progress, NULL);
 	return (0);
@@ -92,12 +92,14 @@ wts_open(const char *home, int set_api, WT_CONNECTION **connp)
 	if (snprintf(config, sizeof(config),
 	    "create,"
 	    "checkpoint_sync=false,cache_size=%" PRIu32 "MB,"
-	    "buffer_alignment=512,error_prefix=\"%s\","
+	    "buffer_alignment=512,lsm_manager=(worker_thread_max=%" PRIu32
+	    "),error_prefix=\"%s\","
 	    "%s,%s,%s,%s,%s"
 	    "extensions="
 	    "[\"%s\", \"%s\", \"%s\", \"%s\", \"%s\", \"%s\"],"
 	    "%s,%s",
 	    g.c_cache,
+	    g.c_lsm_worker_threads,
 	    g.progname,
 	    g.c_data_extend ? "file_extend=(data=8MB)" : "",
 	    g.c_logging ? "log=(enabled=true)" : "",
@@ -321,8 +323,6 @@ wts_create(void)
 		    "bloom_oldest=%s,", g.c_bloom_oldest ? "true" : "false");
 		p += snprintf(p, (size_t)(end - p),
 		    "merge_max=%" PRIu32 ",", g.c_merge_max);
-		p += snprintf(p, (size_t)(end - p),
-		    "merge_threads=%" PRIu32 ",", g.c_merge_threads);
 		p += snprintf(p, (size_t)(end - p), ",)");
 	}
 

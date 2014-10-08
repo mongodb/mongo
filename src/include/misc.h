@@ -5,6 +5,12 @@
  * See the file LICENSE for redistribution information.
  */
 
+/*
+ * Quiet compiler warnings about unused function parameters and variables,
+ * and unused function return values.
+ */
+#define	WT_UNUSED(var)		(void)(var)
+
 /* Basic constants. */
 #define	WT_MILLION	(1000000)
 #define	WT_BILLION	(1000000000)

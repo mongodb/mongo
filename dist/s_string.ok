@@ -107,6 +107,7 @@ FreeBSD
 FreeBSD's
 Freelist
 Fsync
+Ftruncate
 GCC
 GIDs
 Gcc
@@ -512,6 +513,7 @@ fileop
 fileops
 filesize
 filesystem
+fillms
 firstfit
 fixup
 flcs
@@ -690,6 +692,7 @@ namespace
 namespaces
 nbits
 nbsp
+nchunks
 nclr
 nd
 negint
@@ -762,6 +765,7 @@ ps
 pse
 psp
 pthread
+pushms
 putK
 putV
 pv

@@ -27,6 +27,14 @@
 	__wt_err(session, ret, __VA_ARGS__);				\
 	goto err;							\
 } while (0)
+#define	WT_ERR_BUSY_OK(a) do {						\
+	if ((ret = (a)) != 0) {						\
+		if (ret == EBUSY)					\
+			ret = 0;					\
+		else							\
+			goto err;					\
+	}								\
+} while (0)
 #define	WT_ERR_NOTFOUND_OK(a) do {					\
 	if ((ret = (a)) != 0) {						\
 		if (ret == WT_NOTFOUND)					\
@@ -57,6 +65,11 @@
 	__wt_err(session, __ret, __VA_ARGS__);				\
 	return (__ret);							\
 } while (0)
+#define	WT_RET_BUSY_OK(a) do {						\
+	int __ret;							\
+	if ((__ret = (a)) != 0 && __ret != EBUSY)			\
+		return (__ret);						\
+} while (0)
 #define	WT_RET_NOTFOUND_OK(a) do {					\
 	int __ret;							\
 	if ((__ret = (a)) != 0 && __ret != WT_NOTFOUND)			\
@@ -66,6 +79,13 @@
 #define	WT_TRET(a) do {							\
 	int __ret;							\
 	if ((__ret = (a)) != 0 &&					\
+	    (__ret == WT_PANIC ||					\
+	    ret == 0 || ret == WT_DUPLICATE_KEY || ret == WT_NOTFOUND))	\
+		ret = __ret;						\
+} while (0)
+#define	WT_TRET_BUSY_OK(a) do {						\
+	int __ret;							\
+	if ((__ret = (a)) != 0 && __ret != EBUSY &&			\
 	    (__ret == WT_PANIC ||					\
 	    ret == 0 || ret == WT_DUPLICATE_KEY || ret == WT_NOTFOUND))	\
 		ret = __ret;						\

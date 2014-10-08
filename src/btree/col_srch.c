@@ -22,7 +22,7 @@ __wt_col_search(WT_SESSION_IMPL *session,
 	WT_INSERT_HEAD *ins_head;
 	WT_PAGE *page;
 	WT_PAGE_INDEX *pindex;
-	WT_REF *child, *parent;
+	WT_REF *current, *descent;
 	uint32_t base, indx, limit;
 	int depth;
 
@@ -35,68 +35,66 @@ __wt_col_search(WT_SESSION_IMPL *session,
 	 * page, not a full tree.
 	 */
 	if (leaf != NULL) {
-		child = leaf;
+		current = leaf;
 		goto leaf_only;
 	}
 
 	/* Search the internal pages of the tree. */
-	parent = child = &btree->root;
+	current = &btree->root;
 	for (depth = 2;; ++depth) {
-restart:	page = parent->page;
+restart:	page = current->page;
 		if (page->type != WT_PAGE_COL_INT)
 			break;
 
-		WT_ASSERT(session, parent->key.recno == page->pg_intl_recno);
+		WT_ASSERT(session, current->key.recno == page->pg_intl_recno);
 
 		pindex = WT_INTL_INDEX_COPY(page);
 		base = pindex->entries;
-		child = pindex->index[base - 1];
+		descent = pindex->index[base - 1];
 
 		/* Fast path appends. */
-		if (recno >= child->key.recno)
+		if (recno >= descent->key.recno)
 			goto descend;
 
 		/* Binary search of internal pages. */
 		for (base = 0,
 		    limit = pindex->entries - 1; limit != 0; limit >>= 1) {
 			indx = base + (limit >> 1);
-			child = pindex->index[indx];
+			descent = pindex->index[indx];
 
-			if (recno == child->key.recno)
+			if (recno == descent->key.recno)
 				break;
-			if (recno < child->key.recno)
+			if (recno < descent->key.recno)
 				continue;
 			base = indx + 1;
 			--limit;
 		}
-descend:	WT_ASSERT(session, child != NULL);
-
-		/*
+descend:	/*
 		 * Reference the slot used for next step down the tree.
 		 *
 		 * Base is the smallest index greater than recno and may be the
 		 * (last + 1) index.  The slot for descent is the one before
 		 * base.
 		 */
-		if (recno != child->key.recno) {
+		if (recno != descent->key.recno) {
 			/*
 			 * We don't have to correct for base == 0 because the
 			 * only way for base to be 0 is if recno is the page's
 			 * starting recno.
 			 */
 			WT_ASSERT(session, base > 0);
-			child = pindex->index[base - 1];
+			descent = pindex->index[base - 1];
 		}
 
 		/*
-		 * Swap the parent page for the child page. If the page splits
-		 * while we're retrieving it, restart the search in the parent
+		 * Swap the current page for the child page. If the page splits
+		 * while we're retrieving it, restart the search in the current
 		 * page; otherwise return on error, the swap call ensures we're
 		 * holding nothing on failure.
 		 */
-		switch (ret = __wt_page_swap(session, parent, child, 0)) {
+		switch (ret = __wt_page_swap(session, current, descent, 0)) {
 		case 0:
-			parent = child;
+			current = descent;
 			break;
 		case WT_RESTART:
 			goto restart;
@@ -110,8 +108,8 @@ descend:	WT_ASSERT(session, child != NULL);
 		btree->maximum_depth = depth;
 
 leaf_only:
-	page = child->page;
-	cbt->ref = child;
+	page = current->page;
+	cbt->ref = current;
 	cbt->recno = recno;
 	cbt->compare = 0;
 

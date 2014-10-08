@@ -102,8 +102,8 @@ static const WT_CONFIG_CHECK confchk_connection_reconfigure[] = {
 	{ "verbose", "list",
 	    "choices=[\"api\",\"block\",\"checkpoint\",\"compact\",\"evict\""
 	    ",\"evictserver\",\"fileops\",\"log\",\"lsm\",\"metadata\","
-	    "\"mutex\",\"overflow\",\"read\",\"readserver\",\"reconcile\","
-	    "\"recovery\",\"salvage\",\"shared_cache\",\"split\",\"verify\","
+	    "\"mutex\",\"overflow\",\"read\",\"reconcile\",\"recovery\","
+	    "\"salvage\",\"shared_cache\",\"split\",\"temporary\",\"verify\","
 	    "\"version\",\"write\"]",
 	    NULL },
 	{ NULL, NULL, NULL, NULL }
@@ -193,7 +193,6 @@ static const WT_CONFIG_CHECK confchk_lsm_subconfigs[] = {
 	{ "chunk_size", "int", "min=512K,max=500MB", NULL },
 	{ "merge_max", "int", "min=2,max=100", NULL },
 	{ "merge_min", "int", "max=100", NULL },
-	{ "merge_threads", "int", "min=1,max=10", NULL },
 	{ NULL, NULL, NULL, NULL }
 };
 
@@ -346,8 +345,8 @@ static const WT_CONFIG_CHECK confchk_wiredtiger_open[] = {
 	{ "verbose", "list",
 	    "choices=[\"api\",\"block\",\"checkpoint\",\"compact\",\"evict\""
 	    ",\"evictserver\",\"fileops\",\"log\",\"lsm\",\"metadata\","
-	    "\"mutex\",\"overflow\",\"read\",\"readserver\",\"reconcile\","
-	    "\"recovery\",\"salvage\",\"shared_cache\",\"split\",\"verify\","
+	    "\"mutex\",\"overflow\",\"read\",\"reconcile\",\"recovery\","
+	    "\"salvage\",\"shared_cache\",\"split\",\"temporary\",\"verify\","
 	    "\"version\",\"write\"]",
 	    NULL },
 	{ NULL, NULL, NULL, NULL }
@@ -453,7 +452,7 @@ static const WT_CONFIG_ENTRY config_entries[] = {
 	  ",key_format=u,key_gap=10,leaf_item_max=0,leaf_page_max=32KB,"
 	  "lsm=(auto_throttle=,bloom=,bloom_bit_count=16,bloom_config=,"
 	  "bloom_hash_count=8,bloom_oldest=0,chunk_max=5GB,chunk_size=10MB,"
-	  "merge_max=15,merge_min=0,merge_threads=2),memory_page_max=5MB,"
+	  "merge_max=15,merge_min=0),memory_page_max=5MB,"
 	  "os_cache_dirty_max=0,os_cache_max=0,prefix_compression=0,"
 	  "prefix_compression_min=4,source=,split_pct=75,type=file,"
 	  "value_format=u",

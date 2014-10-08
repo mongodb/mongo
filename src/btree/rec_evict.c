@@ -211,7 +211,7 @@ __rec_discard_tree(
 	case WT_PAGE_COL_INT:
 	case WT_PAGE_ROW_INT:
 		/* For each entry in the page... */
-		WT_INTL_FOREACH_BEGIN(ref->page, child) {
+		WT_INTL_FOREACH_BEGIN(session, ref->page, child) {
 			if (child->state == WT_REF_DISK ||
 			    child->state == WT_REF_DELETED)
 				continue;
@@ -268,7 +268,7 @@ __rec_review(
 	 * pages after we've written them.
 	 */
 	if (WT_PAGE_IS_INTERNAL(page))
-		WT_INTL_FOREACH_BEGIN(page, child) {
+		WT_INTL_FOREACH_BEGIN(session, page, child) {
 			switch (child->state) {
 			case WT_REF_DISK:		/* On-disk */
 			case WT_REF_DELETED:		/* On-disk, deleted */
@@ -294,11 +294,13 @@ __rec_review(
 	mod = page->modify;
 
 	/*
-	 * If the tree was deepened, there's a special requirement that newly
-	 * created internal pages not be evicted until all threads are known
-	 * to have exited the original page index array.  During the split we
-	 * set a transaction value, once that's globally visible, we know we
-	 * can evict the created page.
+	 * If the tree was deepened, there's a requirement that newly created
+	 * internal pages not be evicted until all threads are known to have
+	 * exited the original page index array, because evicting an internal
+	 * page discards its WT_REF array, and a thread traversing the original
+	 * page index array might see an freed WT_REF.  During the split we set
+	 * a transaction value, once that's globally visible, we know we can
+	 * evict the created page.
 	 */
 	if (!exclusive && mod != NULL && WT_PAGE_IS_INTERNAL(page) &&
 	    !__wt_txn_visible_all(session, mod->mod_split_txn))
@@ -447,7 +449,7 @@ __hazard_exclusive(WT_SESSION_IMPL *session, WT_REF *ref, int top)
 	 * already be in the locked state, lock child pages in memory.
 	 * If another thread already has this page, give up.
 	 */
-	if (!top && !WT_ATOMIC_CAS(ref->state, WT_REF_MEM, WT_REF_LOCKED))
+	if (!top && !WT_ATOMIC_CAS4(ref->state, WT_REF_MEM, WT_REF_LOCKED))
 		return (EBUSY);	/* We couldn't change the state. */
 	WT_ASSERT(session, ref->state == WT_REF_LOCKED);
 

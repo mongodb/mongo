@@ -9,10 +9,6 @@
 
 #define	WT_BLOOM_TABLE_CONFIG "key_format=r,value_format=1t,exclusive=true"
 
-static int __bloom_init(
-    WT_SESSION_IMPL *, const char *, const char *, WT_BLOOM **);
-static int __bloom_setup(WT_BLOOM *, uint64_t, uint64_t, uint32_t, uint32_t);
-
 /*
  * __bloom_init --
  *	Allocate a WT_BLOOM handle.
@@ -25,8 +21,10 @@ __bloom_init(WT_SESSION_IMPL *session,
 	WT_DECL_RET;
 	size_t len;
 
-	bloom = NULL;
-	WT_ERR(__wt_calloc_def(session, 1, &bloom));
+	*bloomp = NULL;
+
+	WT_RET(__wt_calloc_def(session, 1, &bloom));
+
 	WT_ERR(__wt_strdup(session, uri, &bloom->uri));
 	len = strlen(WT_BLOOM_TABLE_CONFIG) + 2;
 	if (config != NULL)

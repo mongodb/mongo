@@ -18,7 +18,7 @@ __wt_session_dhandle_incr_use(WT_SESSION_IMPL *session)
 
 	dhandle = session->dhandle;
 
-	(void)WT_ATOMIC_ADD(dhandle->session_inuse, 1);
+	(void)WT_ATOMIC_ADD4(dhandle->session_inuse, 1);
 }
 
 /*
@@ -38,7 +38,7 @@ __wt_session_dhandle_decr_use(WT_SESSION_IMPL *session)
 	 * the last reference, set the time-of-death timestamp.
 	 */
 	WT_ASSERT(session, dhandle->session_inuse > 0);
-	if (WT_ATOMIC_SUB(dhandle->session_inuse, 1) == 0)
+	if (WT_ATOMIC_SUB4(dhandle->session_inuse, 1) == 0)
 		WT_TRET(__wt_seconds(session, &dhandle->timeofdeath));
 	return (0);
 }

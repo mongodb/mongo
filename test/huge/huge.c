@@ -32,7 +32,6 @@
 #include <unistd.h>
 
 #include <wiredtiger.h>
-#include <gcc.h>				/* WiredTiger internal */
 
 static const char *progname;			/* Program name */
 static uint8_t *big;				/* Big key/value buffer */

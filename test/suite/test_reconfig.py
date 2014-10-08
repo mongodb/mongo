@@ -25,7 +25,9 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 
+import time
 import wiredtiger, wttest
+from helper import simple_populate
 
 # test_reconfig.py
 #    Smoke-test the connection reconfiguration operations.
@@ -60,6 +62,24 @@ class test_reconfig(wttest.WiredTigerTestCase):
         # Async is off, turn it on.  Should end up with the
         # same ops_max of 512 and thread of 8.
         self.conn.reconfigure("async=(enabled=true)")
+
+    def test_reconfig_lsm_manager(self):
+        # We create and populate a tiny LSM so that we can start off with
+        # the LSM threads running and change the numbers of threads.
+        # Take all the defaults.
+        uri = "lsm:test_reconfig"
+        nrecs = 10
+        simple_populate(self, uri, 'key_format=S', nrecs)
+        # Sleep to make sure all threads are started.
+        time.sleep(2)
+        # Now that an LSM tree exists, reconfigure LSM manager threads.
+        # We start with the default, which is 4.  Configure more threads.
+        self.conn.reconfigure("lsm_manager=(worker_thread_max=10)")
+        # Generate some work
+        nrecs = 20
+        simple_populate(self, uri, 'key_format=S', nrecs)
+        # Now reconfigure fewer threads.
+        self.conn.reconfigure("lsm_manager=(worker_thread_max=3)")
 
     def test_reconfig_statistics(self):
         self.conn.reconfigure("statistics=(all)")

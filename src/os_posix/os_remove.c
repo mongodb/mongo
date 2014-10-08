@@ -11,7 +11,7 @@
  * __remove_file_check --
  *	Check if the file is currently open before removing it.
  */
-static inline void
+static void
 __remove_file_check(WT_SESSION_IMPL *session, const char *name)
 {
 #ifdef HAVE_DIAGNOSTIC

@@ -241,7 +241,7 @@ __curbulk_close(WT_CURSOR *cursor)
 	WT_TRET(__wt_session_release_btree(session));
 
 	/* The URI is owned by the btree handle. */
-	cursor->uri = NULL;
+	cursor->internal_uri = NULL;
 
 	WT_TRET(__wt_cursor_close(cursor));
 

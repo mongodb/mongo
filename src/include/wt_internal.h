@@ -251,8 +251,13 @@ struct __wt_update;
 /*******************************************
  * WiredTiger internal include files.
  *******************************************/
+#if defined(_lint)
+#include "lint.h"
+#elif defined(__GNUC__)
 #include "gcc.h"
+#endif
 #include "hardware.h"
+
 #include "misc.h"
 #include "mutex.h"
 #include "posix.h"
