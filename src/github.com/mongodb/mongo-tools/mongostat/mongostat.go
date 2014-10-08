@@ -50,6 +50,9 @@ type NodeMonitor struct {
 	host            string
 	sessionProvider *db.SessionProvider
 
+	//Enable/Disable collection of optional fields
+	All bool
+
 	//The previous result of the ServerStatus command used to calculate diffs.
 	LastStatus *ServerStatus
 
@@ -138,7 +141,7 @@ func (cluster *ClusterMonitor) Monitor(discover bool, maxRows int, done chan err
 
 //Utility constructor for NodeMonitor that copies the same connection settings
 //from an instance of ToolOptions, but for a different host name.
-func NewNodeMonitor(opts commonopts.ToolOptions, fullHost string) *NodeMonitor {
+func NewNodeMonitor(opts commonopts.ToolOptions, fullHost string, all bool) *NodeMonitor {
 	optsCopy := opts
 	host, port := parseHostPort(fullHost)
 	optsCopy.Connection = &commonopts.Connection{Host: host, Port: port}
@@ -149,6 +152,7 @@ func NewNodeMonitor(opts commonopts.ToolOptions, fullHost string) *NodeMonitor {
 		sessionProvider: sessionProvider,
 		LastStatus:      nil,
 		LastUpdate:      time.Now(),
+		All:             all,
 		Err:             nil,
 	}
 }
@@ -218,7 +222,7 @@ func (node *NodeMonitor) Watch(sleep time.Duration, discover chan string, out ch
 		cycle := uint64(0)
 		for {
 			//TODO hook up --all option here.
-			node.Report(discover, false, out, cycle%10 == 1)
+			node.Report(discover, node.All, out, cycle%10 == 1)
 			time.Sleep(sleep)
 			cycle++
 		}
@@ -240,7 +244,7 @@ func (mstat *MongoStat) AddNewNode(fullhost string) {
 
 	if _, hasKey := mstat.Nodes[fullhost]; !hasKey {
 		//Create a new node monitor for this host.
-		node := NewNodeMonitor(*mstat.Options, fullhost)
+		node := NewNodeMonitor(*mstat.Options, fullhost, mstat.StatOptions.All)
 		mstat.Nodes[fullhost] = node
 		node.Watch(mstat.SleepInterval, mstat.Discovered, mstat.Cluster.ReportChan)
 	}

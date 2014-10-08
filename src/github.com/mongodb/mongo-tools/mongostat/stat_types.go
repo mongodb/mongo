@@ -190,31 +190,36 @@ type StatHeader struct {
 	//Indicates that the column should only appear when some of the nodes being
 	//monitored are members of a replicaset.
 	ReplOnly bool
+
+	//Indicates that the column should only be displayed when the "all" option
+	//is provided
+	Optional bool
 }
 
 var StatHeaders = []StatHeader{
-	{"", true, false}, //placeholder for hostname column (blank header text)
-	{"insert", false, false},
-	{"query", false, false},
-	{"update", false, false},
-	{"delete", false, false},
-	{"getmore", false, false},
-	{"command", false, false},
-	{"flushes", false, false},
-	{"mapped", false, false},
-	{"vsize", false, false},
-	{"res", false, false},
-	{"faults", false, false},
-	{"    locked db", false, false},
-	{"idx miss %", false, false},
-	{"qr|qw", false, false},
-	{"ar|aw", false, false},
-	{"netIn", false, false},
-	{"netOut", false, false},
-	{"conn", false, false},
-	{"set", true, true},
-	{"repl", true, true},
-	{"time", false, false},
+	{"", true, false, false}, //placeholder for hostname column (blank header text)
+	{"insert", false, false, false},
+	{"query", false, false, false},
+	{"update", false, false, false},
+	{"delete", false, false, false},
+	{"getmore", false, false, false},
+	{"command", false, false, false},
+	{"flushes", false, false, false},
+	{"mapped", false, false, false},
+	{"vsize", false, false, false},
+	{"res", false, false, false},
+	{"non-mapped", false, false, true},
+	{"faults", false, false, false},
+	{"    locked db", false, false, false},
+	{"idx miss %", false, false, false},
+	{"qr|qw", false, false, false},
+	{"ar|aw", false, false, false},
+	{"netIn", false, false, false},
+	{"netOut", false, false, false},
+	{"conn", false, false, false},
+	{"set", true, true, false},
+	{"repl", true, true, false},
+	{"time", false, false, false},
 }
 
 type NamespacedLocks map[string]LockStatus
@@ -366,11 +371,15 @@ func FormatLines(lines []StatLine, includeHeader bool, discover bool) string {
 	}
 
 	repl := false
+	all := false
 	// if any of the nodes being monitored are part of a replset,
 	// enable the printing of replset-specific columns
 	for _, line := range lines {
 		if line.ReplSetName != "" || line.NodeType == "RTR" {
 			repl = true
+		}
+		if line.NonMapped >= 0 {
+			all = true
 		}
 	}
 
@@ -380,9 +389,12 @@ func FormatLines(lines []StatLine, includeHeader bool, discover bool) string {
 
 	//Print the columns that are enabled
 	for _, header := range StatHeaders {
+		if header.Optional && !all {
+			continue
+		}
 		if (!header.ReplOnly && !header.DiscoverOnly) || //Always enabled?
 			(repl && header.ReplOnly) || //Only show for repl, and in repl mode?
-			(discover && header.DiscoverOnly) { //Only show for discover, and in discover mode?
+			(discover && header.DiscoverOnly) {
 			if len(header.HeaderText) > 0 {
 				out.WriteCell(header.HeaderText)
 			}
@@ -416,6 +428,13 @@ func FormatLines(lines []StatLine, includeHeader bool, discover bool) string {
 		}
 		out.WriteCell(formatMegs(int64(line.Virtual)))
 		out.WriteCell(formatMegs(int64(line.Resident)))
+		if all {
+			if line.NonMapped >= 0 {
+				out.WriteCell(formatMegs(int64(line.NonMapped)))
+			} else {
+				out.WriteCell("")
+			}
+		}
 		out.WriteCell(fmt.Sprintf("%v", line.Faults))
 		if line.HighestLocked != nil && !line.IsMongos {
 			out.WriteCell(fmt.Sprintf("%v:%.1f%%", line.HighestLocked.DBName, line.HighestLocked.Percentage))
