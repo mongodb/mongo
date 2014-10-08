@@ -361,7 +361,7 @@ namespace mongo {
                     // Negative value means to clear log level of component.
                     if (newValue < 0) {
                         logger::globalLogDomain()->clearMinimumLoggedSeverity(component);
-                        return Status::OK();
+                        continue;
                     }
                     // Convert non-negative value to Log()/Debug(N).
                     typedef logger::LogSeverity LogSeverity;
