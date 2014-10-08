@@ -68,13 +68,14 @@ namespace repl {
 
         // gather all not-down nodes, get their fullnames(or hostandport's)
         // schedule fresh command for each node
-        const BSONObj replSetFreshCmd =
-            BSON("replSetFresh" << 1 <<
-                 "set" << _rsConfig.getReplSetName() <<
-                 "opTime" << Date_t(_lastOpTimeApplied.asDate()) <<
-                 "who" << selfConfig.getHostAndPort().toString() <<
-                 "cfgver" << _rsConfig.getConfigVersion() <<
-                 "id" << selfConfig.getId());
+        BSONObjBuilder freshCmdBuilder;
+        freshCmdBuilder.append("replSetFresh", 1);
+        freshCmdBuilder.append("set", _rsConfig.getReplSetName());
+        freshCmdBuilder.append("opTime", Date_t(_lastOpTimeApplied.asDate()));
+        freshCmdBuilder.append("who", selfConfig.getHostAndPort().toString());
+        freshCmdBuilder.appendIntOrLL("cfgver", _rsConfig.getConfigVersion());
+        freshCmdBuilder.append("id", selfConfig.getId());
+        const BSONObj replSetFreshCmd = freshCmdBuilder.obj();
 
         std::vector<ReplicationExecutor::RemoteCommandRequest> requests;
         for (std::vector<HostAndPort>::const_iterator it = _targets.begin();
