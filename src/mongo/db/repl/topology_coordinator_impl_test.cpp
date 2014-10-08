@@ -1597,7 +1597,7 @@ namespace {
                                         slightlyLessFreshLastOpTimeApplied,
                                         lastOpTimeApplied);
         ASSERT_EQUALS(HeartbeatResponseAction::StepDownRemotePrimary, nextAction.getAction());
-        ASSERT_EQUALS(-1, nextAction.getPrimaryConfigIndex());
+        ASSERT_EQUALS(1, nextAction.getPrimaryConfigIndex());
     }
 
     TEST_F(HeartbeatResponseTest, UpdateHeartbeatDataStepDownSelfForHighPriorityFreshNode) {

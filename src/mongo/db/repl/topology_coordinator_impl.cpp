@@ -890,9 +890,9 @@ namespace {
                         return _stepDownSelf();
                     }
                     else {
+                        int primaryIndex = _currentPrimaryIndex;
                         _currentPrimaryIndex = -1;
-                        return HeartbeatResponseAction::makeStepDownRemoteAction(
-                                _currentPrimaryIndex);
+                        return HeartbeatResponseAction::makeStepDownRemoteAction(primaryIndex);
                     }
                 }
             }
