@@ -1,4 +1,4 @@
-// record_data.h
+// record_store_test_updaterecord.h
 
 /**
  *    Copyright (C) 2014 MongoDB Inc.
@@ -30,41 +30,46 @@
 
 #pragma once
 
-#include <boost/shared_array.hpp>
+#include "mongo/db/diskloc.h"
+#include "mongo/db/storage/record_data.h"
+#include "mongo/db/storage/record_store.h"
+#include "mongo/unittest/unittest.h"
 
-#include "mongo/bson/bsonobj.h"
+using std::string;
 
 namespace mongo {
+namespace {
 
-    /**
-     * A replacement for the Record class. This class represents data in a record store.
-     * The _dataPtr attribute is used to manage memory ownership. If _dataPtr is NULL, then
-     * the memory pointed to by _data is owned by the RecordStore. If _dataPtr is not NULL, then
-     * it must point to the same array as _data.
-     */
-    class RecordData {
+    class UpdateMoveNotifierSpy : public UpdateMoveNotifier {
     public:
-        RecordData(const char* data, int size): _data(data), _size(size), _dataPtr() { }
+        UpdateMoveNotifierSpy( OperationContext* txn, const DiskLoc &loc,
+                               const char *buf, size_t size )
+                : _txn( txn ), _loc( loc ), _data( buf, size ), nCalls( 0 ) {
+        }
 
-        RecordData(const char* data, int size, const boost::shared_array<char>& dataPtr)
-            : _data(data), _size(size), _dataPtr(dataPtr) { }
+        ~UpdateMoveNotifierSpy() { }
 
-        const char* data() const { return _data; }
+        Status recordStoreGoingToMove( OperationContext *txn,
+                                       const DiskLoc &oldLocation,
+                                       const char *oldBuffer,
+                                       size_t oldSize ) {
+            nCalls++;
+            ASSERT_EQUALS( _txn, txn );
+            ASSERT_EQUALS( _loc, oldLocation );
+            ASSERT_EQUALS( _data.size() + 1, oldSize );
+            ASSERT_EQUALS( _data, oldBuffer );
+            return Status::OK();
+        }
 
-        int size() const { return _size; }
-
-        /**
-         * Returns true if this owns its own memory, and false otherwise
-         */
-        bool isOwned() const { return _dataPtr.get(); }
-
-        // TODO eliminate double-copying
-        BSONObj toBson() const { return isOwned() ? BSONObj(_data).getOwned() : BSONObj(_data); }
+        int getNumCalls() const { return nCalls; }
 
     private:
-        const char* _data;
-        int _size;
-        boost::shared_array<char> _dataPtr;
+        OperationContext *_txn;
+        DiskLoc _loc;
+        string _data;
+
+        int nCalls; // to verify that recordStoreGoingToMove() gets called once
     };
 
+} // namespace
 } // namespace mongo
