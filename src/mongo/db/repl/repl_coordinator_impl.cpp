@@ -451,10 +451,15 @@ namespace {
         SlaveInfo& slaveInfo = _slaveInfoMap[rid];
         if ((slaveInfo.memberID < 0) && (_getReplicationMode_inlock() == modeReplSet)) {
             if (rid != _getMyRID_inlock()) {
-                warning() << "Received replSetUpdatePosition for node with RID " << rid
+                std::string errmsg = str::stream()
+                          << "Received replSetUpdatePosition for node with RID " << rid
                           << ", but we haven't yet received a handshake for that node. Stored "
                           << "member ID: " << slaveInfo.memberID << ", stored member hostAndPort: "
-                          << slaveInfo.hostAndPort.toString() << ".  Our RID: " << _getMyRID_inlock();
+                          << slaveInfo.hostAndPort.toString() << ".  Our RID: " <<
+                          _getMyRID_inlock();
+                warning() << errmsg;
+                dassert(false);
+                return Status(ErrorCodes::NodeNotFound, errmsg);
             }
             else {
                 // If this member were part of the current configuration, we would have put an entry

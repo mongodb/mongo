@@ -38,6 +38,7 @@
 #include "mongo/db/auth/authorization_manager_global.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/auth/security_key.h"
+#include "mongo/db/commands.h"
 #include "mongo/db/dbhelpers.h"
 #include "mongo/db/operation_context_impl.h"
 #include "mongo/db/repl/bgsync.h"
@@ -188,39 +189,40 @@ namespace repl {
         _cond.notify_all();
     }
 
-    bool SyncSourceFeedback::updateUpstream(OperationContext* txn) {
+    Status SyncSourceFeedback::updateUpstream(OperationContext* txn) {
         ReplicationCoordinator* replCoord = getGlobalReplicationCoordinator();
         if (replCoord->getCurrentMemberState().primary()) {
             // primary has no one to update to
-            return true;
+            return Status::OK();
         }
         BSONObjBuilder cmd;
         {
             boost::unique_lock<boost::mutex> lock(_mtx);
             if (_handshakeNeeded) {
                 // Don't send updates if there are nodes that haven't yet been handshaked
-                return false;
+                return Status(ErrorCodes::NodeNotFound,
+                              "Need to send handshake before updating position upstream");
             }
             replCoord->prepareReplSetUpdatePositionCommand(txn, &cmd);
         }
         BSONObj res;
 
         LOG(2) << "Sending slave oplog progress to upstream updater: " << cmd.done();
-        bool ok;
         try {
-            ok = _connection->runCommand("admin", cmd.obj(), res);
+            _connection->runCommand("admin", cmd.obj(), res);
         }
         catch (const DBException& e) {
             log() << "SyncSourceFeedback error sending update: " << e.what() << endl;
             _resetConnection();
-            return false;
+            return e.toStatus();
         }
-        if (!ok) {
+
+        Status status = Command::getStatusFromCommandResult(res);
+        if (!status.isOK()) {
             log() << "SyncSourceFeedback error sending update, response: " << res.toString() <<endl;
             _resetConnection();
-            return false;
         }
-        return true;
+        return status;
     }
 
     void SyncSourceFeedback::shutdown() {
@@ -251,6 +253,9 @@ namespace repl {
                 handshakeNeeded = _handshakeNeeded;
                 _positionChanged = false;
                 _handshakeNeeded = false;
+                if (handshakeNeeded) {
+                    positionChanged = true; // Always update position after sending a handshake
+                }
             }
 
             MemberState state = replCoord->getCurrentMemberState();
@@ -283,9 +288,13 @@ namespace repl {
                 }
             }
             if (positionChanged) {
-                if (!updateUpstream(&txn)) {
+                Status status = updateUpstream(&txn);
+                if (!status.isOK()) {
                     boost::unique_lock<boost::mutex> lock(_mtx);
                     _positionChanged = true;
+                    if (status == ErrorCodes::NodeNotFound) {
+                        _handshakeNeeded = true;
+                    }
                 }
             }
         }
