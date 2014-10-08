@@ -374,7 +374,7 @@ namespace {
             BSONObjBuilder* response,
             Status* result) {
 
-        if (!_currentConfig.isInitialized()) {
+        if (_selfIndex == -1) {
             *result = Status(ErrorCodes::ReplicaSetNotFound,
                              "Cannot participate in elections because not initialized");
             return;
@@ -585,7 +585,7 @@ namespace {
                           "Our set name of " << ourSetName << " does not match name " << rshb <<
                           " reported by remote node");
         }
-        if (_currentConfig.isInitialized()) {
+        if (_selfIndex != -1) {
             invariant(_currentConfig.getReplSetName() == args.getSetName());
             if (args.getSenderId() == _selfConfig().getId()) {
                 return Status(ErrorCodes::BadValue,
@@ -1498,6 +1498,9 @@ namespace {
         }
         if (!_aMajoritySeemsToBeUp()) {
             return CannotSeeMajority;
+        }
+        else if (_selfIndex == -1) {
+            return NotInitialized;
         }
         else if (_selfConfig().isArbiter()) {
             return ArbiterIAm;
