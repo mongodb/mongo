@@ -396,14 +396,17 @@ namespace mongo {
 
         long long nrecords = 0;
         boost::scoped_ptr<RecordIterator> iter( getIterator( txn ) );
+        results->valid = true;
         while( !iter->isEOF() ) {
             ++nrecords;
-            RecordData data = dataFor( txn, iter->curr() );
-            if ( scanData ) {
-                BSONObj b( data.data() );
-                if ( !b.valid() ) {
-                    DiskLoc l = iter->curr();
-                    results->errors.push_back( l.toString() + " is corrupted" );
+            if ( full && scanData ) {
+                size_t dataSize;
+                DiskLoc loc = iter->curr();
+                RecordData data = dataFor( txn, loc );
+                Status status = adaptor->validate( data, &dataSize );
+                if ( !status.isOK() ) {
+                    results->valid = false;
+                    results->errors.push_back( loc.toString() + " is corrupted" );
                 }
             }
             iter->getNext();
@@ -446,7 +449,7 @@ namespace mongo {
         if ( optionName.compare( "verify_checksums" ) == 0 ) {
         }
         else
-            return Status( ErrorCodes::BadValue, "Invalid Option" );
+            return Status( ErrorCodes::InvalidOptions, "Invalid Option" );
 
         return Status::OK();
     }
