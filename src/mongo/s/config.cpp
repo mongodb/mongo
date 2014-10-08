@@ -1037,15 +1037,14 @@ namespace mongo {
     void ConfigServer::reloadSettings() {
         set<string> got;
 
-        ScopedDbConnection conn(_primary.getConnString(), 30.0);
-        
         try {
-            
-            auto_ptr<DBClientCursor> c = conn->query( SettingsType::ConfigNS , BSONObj() );
-            verify( c.get() );
-            while ( c->more() ) {
-                
-                BSONObj o = c->next();
+
+            ScopedDbConnection conn(_primary.getConnString(), 30.0);
+            auto_ptr<DBClientCursor> cursor = conn->query(SettingsType::ConfigNS, BSONObj());
+            verify(cursor.get());
+            while (cursor->more()) {
+
+                BSONObj o = cursor->nextSafe();
                 string name = o[SettingsType::key()].valuestrsafe();
                 got.insert( name );
                 if ( name == "chunksize" ) {
@@ -1070,10 +1069,11 @@ namespace mongo {
                     log() << "warning: unknown setting [" << name << "]" << endl;
                 }
             }
+
+            conn.done();
         }
-        catch ( DBException& e ) {
-            warning() << "couldn't load settings on config db: "
-                      << e.what() << endl;
+        catch (const DBException& ex) {
+            warning() << "couldn't load settings on config db" << causedBy(ex);
         }
 
         if ( ! got.count( "chunksize" ) ) {
@@ -1083,8 +1083,8 @@ namespace mongo {
                                                  SettingsType::chunksize(chunkSize)),
                                            WriteConcernOptions::AllConfigs,
                                            NULL );
-            if ( !result.isOK() ) {
-                warning() << "couldn't set chunkSize on config db: " << result.reason() << endl;
+            if (!result.isOK()) {
+                warning() << "couldn't set chunkSize on config db" << causedBy(result);
             }
         }
 
@@ -1095,9 +1095,8 @@ namespace mongo {
                                             WriteConcernOptions::AllConfigs,
                                             NULL );
 
-        if ( !result.isOK() ) {
-            warning() << "couldn't create ns_1_min_1 index on config db: "
-                      << result.reason() << endl;
+        if (!result.isOK()) {
+            warning() << "couldn't create ns_1_min_1 index on config db" << causedBy(result);
         }
 
         result = clusterCreateIndex( ChunkType::ConfigNS,
@@ -1108,9 +1107,9 @@ namespace mongo {
                                      WriteConcernOptions::AllConfigs,
                                      NULL );
 
-        if ( !result.isOK() ) {
-            warning() << "couldn't create ns_1_shard_1_min_1 index on config db: "
-                      << result.reason() << endl;
+        if (!result.isOK()) {
+            warning() << "couldn't create ns_1_shard_1_min_1 index on config db"
+                      << causedBy(result);
         }
 
         result = clusterCreateIndex( ChunkType::ConfigNS,
@@ -1120,9 +1119,8 @@ namespace mongo {
                                      WriteConcernOptions::AllConfigs,
                                      NULL );
 
-        if ( !result.isOK() ) {
-            warning() << "couldn't create ns_1_lastmod_1 index on config db: "
-                      << result.reason() << endl;
+        if (!result.isOK()) {
+            warning() << "couldn't create ns_1_lastmod_1 index on config db" << causedBy(result);
         }
 
         result = clusterCreateIndex( ShardType::ConfigNS,
@@ -1131,9 +1129,8 @@ namespace mongo {
                                      WriteConcernOptions::AllConfigs,
                                      NULL );
 
-        if ( !result.isOK() ) {
-            warning() << "couldn't create host_1 index on config db: "
-                      << result.reason() << endl;
+        if (!result.isOK()) {
+            warning() << "couldn't create host_1 index on config db" << causedBy(result);
         }
 
         result = clusterCreateIndex( LocksType::ConfigNS,
@@ -1142,9 +1139,8 @@ namespace mongo {
                                      WriteConcernOptions::AllConfigs,
                                      NULL );
 
-        if ( !result.isOK() ) {
-            warning() << "couldn't create lock id index on config db: "
-                      << result.reason() << endl;
+        if (!result.isOK()) {
+            warning() << "couldn't create lock id index on config db" << causedBy(result);
         }
 
         result = clusterCreateIndex( LocksType::ConfigNS,
@@ -1154,9 +1150,9 @@ namespace mongo {
                                      WriteConcernOptions::AllConfigs,
                                      NULL );
 
-        if ( !result.isOK() ) {
-            warning() << "couldn't create state and process id index on config db: "
-                      << result.reason() << endl;
+        if (!result.isOK()) {
+            warning() << "couldn't create state and process id index on config db"
+                      << causedBy(result);
         }
 
         result = clusterCreateIndex( LockpingsType::ConfigNS,
@@ -1165,9 +1161,9 @@ namespace mongo {
                                      WriteConcernOptions::AllConfigs,
                                      NULL );
 
-        if ( !result.isOK() ) {
-            warning() << "couldn't create lockping ping time index on config db: "
-                      << result.reason() << endl;
+        if (!result.isOK()) {
+            warning() << "couldn't create lockping ping time index on config db"
+                      << causedBy(result);
         }
     }
 
