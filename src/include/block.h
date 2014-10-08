@@ -193,6 +193,7 @@ struct __wt_bm {
 
 	void  *map;				/* Mapped region */
 	size_t maplen;
+	void *mappingcookie;
 
 	/*
 	 * There's only a single block manager handle that can be written, all
