@@ -402,6 +402,12 @@ namespace {
             const BSONObj& lastOp = ops.getDeque().back();
             handleSlaveDelay(lastOp);
 
+            if (replCoord->getCurrentMemberState().primary() && 
+                !replCoord->isWaitingForApplierToDrain()) {
+                severe() << "attempting to replicate ops while primary";
+                fassertFailed(28527);
+            }
+
             // Set minValid to the last op to be applied in this next batch.
             // This will cause this node to go into RECOVERING state
             // if we should crash and restart before updating the oplog
