@@ -392,7 +392,8 @@ skip_insert:			if (col_update(cursor, &key, &value, keyno))
 		} else {
 			++tinfo->search;
 			if (read_row(cursor, &key, keyno))
-				goto deadlock;
+				if (intxn)
+					goto deadlock;
 			continue;
 		}
 
