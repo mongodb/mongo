@@ -35,7 +35,6 @@
 #include "mongo/crypto/crypto.h"
 #include "mongo/platform/random.h"
 #include "mongo/util/base64.h"
-#include "mongo/util/log.h"
 
 namespace mongo {
 namespace scram {
@@ -87,34 +86,32 @@ namespace scram {
     }
 
     // Iterate the hash function to generate SaltedPassword
-    void generateSaltedPassword(const StringData& password,
+    void generateSaltedPassword(const StringData& hashedPassword,
                                 const unsigned char* salt,
                                 const int saltLen,
                                 const int iterationCount,
                                 unsigned char saltedPassword[hashSize]) {
-        // saltedPassword = Hi(password, salt)
-        HMACIteration(reinterpret_cast<const unsigned char*>(password.rawData()),
-                      password.size(),
+        // saltedPassword = Hi(hashedPassword, salt)
+        HMACIteration(reinterpret_cast<const unsigned char*>(hashedPassword.rawData()),
+                      hashedPassword.size(),
                       salt,
                       saltLen,
                       iterationCount,
                       saltedPassword);
     }
 
-    /* Compute the SCRAM secrets storedKey and serverKey
-     * as defined in RFC5802 */
-    static void computeProperties(const std::string& password,
-                                  const unsigned char salt[],
-                                  size_t saltLen,
-                                  size_t iterationCount,
-                                  unsigned char storedKey[hashSize],
-                                  unsigned char serverKey[hashSize]) {
+    void generateSecrets(const std::string& hashedPassword,
+                         const unsigned char salt[],
+                         size_t saltLen,
+                         size_t iterationCount,
+                         unsigned char storedKey[hashSize],
+                         unsigned char serverKey[hashSize]) {
 
         unsigned char saltedPassword[hashSize];
         unsigned char clientKey[hashSize];
         unsigned int hashLen = 0;
 
-        generateSaltedPassword(password,
+        generateSaltedPassword(hashedPassword,
                                salt,
                                saltLen,
                                iterationCount,
@@ -162,12 +159,12 @@ namespace scram {
         unsigned char storedKey[hashSize];
         unsigned char serverKey[hashSize];
 
-        computeProperties(hashedPassword,
-                          reinterpret_cast<unsigned char*>(userSalt),
-                          saltLenQWords*sizeof(uint64_t),
-                          iterationCount,
-                          storedKey,
-                          serverKey);
+        generateSecrets(hashedPassword,
+                        reinterpret_cast<unsigned char*>(userSalt),
+                        saltLenQWords*sizeof(uint64_t),
+                        iterationCount,
+                        storedKey,
+                        serverKey);
 
         std::string encodedStoredKey =
             base64::encode(reinterpret_cast<char*>(storedKey), hashSize);
@@ -182,11 +179,11 @@ namespace scram {
 
     std::string generateClientProof(const unsigned char saltedPassword[hashSize],
                                     const std::string& authMessage) {
-        
+
         // ClientKey := HMAC(saltedPassword, "Client Key")
         unsigned char clientKey[hashSize];
         unsigned int hashLen = 0;
-        fassert(18689, 
+        fassert(18689,
                 crypto::hmacSha1(saltedPassword,
                                  hashSize,
                                  reinterpret_cast<const unsigned char*>(clientKeyConst.data()),
@@ -221,11 +218,11 @@ namespace scram {
     bool verifyServerSignature(const unsigned char saltedPassword[hashSize],
                                const std::string& authMessage,
                                const std::string& receivedServerSignature) {
-        
+
         // ServerKey       := HMAC(SaltedPassword, "Server Key")
         unsigned int hashLen;
         unsigned char serverKey[hashSize];
-        fassert(18703, 
+        fassert(18703,
                 crypto::hmacSha1(saltedPassword,
                                  hashSize,
                                  reinterpret_cast<const unsigned char*>(serverKeyConst.data()),
