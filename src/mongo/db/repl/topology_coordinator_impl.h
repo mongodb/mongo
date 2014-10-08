@@ -224,7 +224,8 @@ namespace repl {
             NoPriority,
             StepDownPeriodActive,
             NoData,
-            NotInitialized
+            NotInitialized,
+            VotedTooRecently
         };
 
         // Returns the number of heartbeat pings which have occurred.

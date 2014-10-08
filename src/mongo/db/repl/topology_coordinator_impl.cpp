@@ -538,8 +538,7 @@ namespace {
                   << highestPriority->getHostAndPort().toString();
             vote = -10000;
         }
-        else if (_lastVote.when.millis > 0 &&
-                 _lastVote.when.millis + LastVote::leaseTime.total_milliseconds() >= now.millis &&
+        else if (_lastVote.when.millis + LastVote::leaseTime.total_milliseconds() >= now.millis &&
                  _lastVote.whoId != args.whoid) {
             log() << "replSet voting no for "
                   <<  hopeful->getHostAndPort().toString()
@@ -1493,49 +1492,61 @@ namespace {
     TopologyCoordinatorImpl::UnelectableReason TopologyCoordinatorImpl::_getMyUnelectableReason(
                                                                 const Date_t now,
                                                                 const OpTime lastApplied) const {
+        if (_lastVote.whoId != -1 &&
+                _lastVote.whoId !=_currentConfig.getMemberAt(_selfIndex).getId() &&
+                _lastVote.when.millis + LastVote::leaseTime.total_milliseconds() >= now.millis) {
+            return VotedTooRecently;
+        }
         if (lastApplied.isNull()) {
             return NoData;
         }
         if (!_aMajoritySeemsToBeUp()) {
             return CannotSeeMajority;
         }
-        else if (_selfIndex == -1) {
+        if (_selfIndex == -1) {
             return NotInitialized;
         }
-        else if (_selfConfig().isArbiter()) {
+        if (_selfConfig().isArbiter()) {
             return ArbiterIAm;
         }
-        else if (_selfConfig().getPriority() <= 0) {
+        if (_selfConfig().getPriority() <= 0) {
             return NoPriority;
         }
-        else if (_stepDownUntil > now) {
+        if (_stepDownUntil > now) {
             return StepDownPeriodActive;
         }
-        else if (!getMemberState().secondary()) {
+        if (!getMemberState().secondary()) {
             return NotSecondary;
         }
-        else if (!_isOpTimeCloseEnoughToLatestToElect(lastApplied, lastApplied)) {
+        if (!_isOpTimeCloseEnoughToLatestToElect(lastApplied, lastApplied)) {
             return NotCloseEnoughToLatestOptime;
         }
-        else {
-            return None;
-        }
+        return None;
     }
 
     std::string TopologyCoordinatorImpl::_getUnelectableReasonString(UnelectableReason ur) const {
         switch (ur) {
-            case NoData: return "node has no applied oplog entries";
-            case CannotSeeMajority: return "I cannot see a majority";
-            case ArbiterIAm: return "member is an arbiter";
-            case NoPriority: return "member has zero priority";
-            case StepDownPeriodActive:
-                return str::stream() << "I am still waiting for stepdown period to end at "
-                                     << _stepDownUntil;
-            case NotSecondary: return "member is not currently a secondary";
-            case NotCloseEnoughToLatestOptime:
-                return "member is more than 10 seconds behind the most up-to-date member";
-            default:
-                return "The MEMBER is electable! -- This should never be used! --";
+        case None:
+            invariant(false);
+        case NoData:
+            return "node has no applied oplog entries";
+        case VotedTooRecently:
+            return str::stream() << "I recently voted for " << _lastVote.whoHostAndPort.toString();
+        case CannotSeeMajority:
+            return "I cannot see a majority";
+        case ArbiterIAm:
+            return "member is an arbiter";
+        case NoPriority:
+            return "member has zero priority";
+        case StepDownPeriodActive:
+            return str::stream() << "I am still waiting for stepdown period to end at " <<
+                _stepDownUntil;
+        case NotSecondary:
+            return "member is not currently a secondary";
+        case NotCloseEnoughToLatestOptime:
+            return "member is more than 10 seconds behind the most up-to-date member";
+        case NotInitialized:
+            return "node is not a member of a valid replica set configuration";
         }
     }
 
@@ -1576,13 +1587,9 @@ namespace {
     }
 
     bool TopologyCoordinatorImpl::voteForMyself(Date_t now) {
-        // TODO(schwerin): We should refuse to vote for ourself if we do not think we're a
-        // candidate, but repl_coordinator_impl_elect_test depends on being able to run an election
-        // while not a candidate.  When that is fixed, we should reenable the following short
-        // circuit condition:
-        // if (_role != Role::candidate) {
-        //     return false;
-        // }
+        if (_role != Role::candidate) {
+            return false;
+        }
         int selfId = _currentConfig.getMemberAt(_selfIndex).getId();
         if ((_lastVote.when + LastVote::leaseTime.total_milliseconds() >= now) 
             && (_lastVote.whoId != selfId)) {
