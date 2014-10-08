@@ -49,8 +49,7 @@ __wt_lsm_merge_update_tree(WT_SESSION_IMPL *session,
  *	Merge a set of chunks of an LSM tree.
  */
 int
-__wt_lsm_merge(
-    WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree, u_int id)
+__wt_lsm_merge(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree, u_int id)
 {
 	WT_BLOOM *bloom;
 	WT_CURSOR *dest, *src;
