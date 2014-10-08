@@ -195,7 +195,7 @@ namespace repl {
 
             try {
 
-                if (memberState.primary()) {
+                if (memberState.primary() && !replCoord->isWaitingForApplierToDrain()) {
                     sleepsecs(1);
                     continue;
                 }

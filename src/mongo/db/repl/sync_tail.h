@@ -40,6 +40,7 @@ namespace mongo {
 
 namespace repl {
     class BackgroundSyncInterface;
+    class ReplicationCoordinator;
 
     /**
      * "Normal" replica set syncing
@@ -86,7 +87,7 @@ namespace repl {
 
         // returns true if we should continue waiting for BSONObjs, false if we should
         // stop waiting and apply the queue we have.  Only returns false if !ops.empty().
-        bool tryPopAndWaitForMore(OpQueue* ops);
+        bool tryPopAndWaitForMore(OpQueue* ops, ReplicationCoordinator* replCoord);
         
         // After ops have been written to db, call this
         // to update local oplog.rs, as well as notify the primary

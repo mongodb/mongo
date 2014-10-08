@@ -231,7 +231,7 @@ namespace repl {
             OpQueue ops;
             OperationContextImpl ctx;
 
-            while (!tryPopAndWaitForMore(&ops)) {
+            while (!tryPopAndWaitForMore(&ops, getGlobalReplicationCoordinator())) {
                 // nothing came back last time, so go again
                 if (ops.empty()) continue;
 
@@ -281,26 +281,26 @@ namespace repl {
     }
 
 namespace {
-    void tryToGoLiveAsASecondary(OperationContext* txn) {
+    void tryToGoLiveAsASecondary(OperationContext* txn, ReplicationCoordinator* replCoord) {
         Lock::GlobalRead readLock(txn->lockState());
 
-        if (getGlobalReplicationCoordinator()->getMaintenanceMode()) {
+        if (replCoord->getMaintenanceMode()) {
             // we're not actually going live
             return;
         }
 
         // Only state RECOVERING can transition to SECONDARY.
-        MemberState state(getGlobalReplicationCoordinator()->getCurrentMemberState());
+        MemberState state(replCoord->getCurrentMemberState());
         if (!state.recovering()) {
             return;
         }
 
         OpTime minvalid = getMinValid(txn);
-        if (minvalid > getGlobalReplicationCoordinator()->getMyLastOptime()) {
+        if (minvalid > replCoord->getMyLastOptime()) {
             return;
         }
 
-        getGlobalReplicationCoordinator()->setFollowerMode(MemberState::RS_SECONDARY);
+        replCoord->setFollowerMode(MemberState::RS_SECONDARY);
     }
 }
 
@@ -316,11 +316,6 @@ namespace {
             int lastTimeChecked = 0;
 
             do {
-                if (replCoord->getCurrentMemberState().primary()) {
-                    massert(16620, "there are ops to sync, but I'm primary", ops.empty());
-                    return;
-                }
-
                 int now = batchTimer.seconds();
 
                 // apply replication batch limits
@@ -353,7 +348,7 @@ namespace {
                     // can we become secondary?
                     // we have to check this before calling mgr, as we must be a secondary to
                     // become primary
-                    tryToGoLiveAsASecondary(&txn);
+                    tryToGoLiveAsASecondary(&txn, replCoord);
 
                     // TODO(emilkie): This can be removed once we switch over from legacy;
                     // this code is what moves 1-node sets to PRIMARY state.
@@ -390,8 +385,8 @@ namespace {
                     }
                 }
                 // keep fetching more ops as long as we haven't filled up a full batch yet
-            } while (!tryPopAndWaitForMore(&ops) && // tryPopAndWaitForMore returns true 
-                                                    // when we need to end a batch early
+            } while (!tryPopAndWaitForMore(&ops, replCoord) && // tryPopAndWaitForMore returns true 
+                                                               // when we need to end a batch early
                    (ops.getSize() < replBatchLimitBytes) &&
                    !inShutdown());
 
@@ -436,7 +431,7 @@ namespace {
     // This function also blocks 1 second waiting for new ops to appear in the bgsync
     // queue.  We can't block forever because there are maintenance things we need
     // to periodically check in the loop.
-    bool SyncTail::tryPopAndWaitForMore(SyncTail::OpQueue* ops) {
+    bool SyncTail::tryPopAndWaitForMore(SyncTail::OpQueue* ops, ReplicationCoordinator* replCoord) {
         BSONObj op;
         // Check to see if there are ops waiting in the bgsync queue
         bool peek_success = peek(&op);
@@ -444,6 +439,7 @@ namespace {
         if (!peek_success) {
             // if we don't have anything in the queue, wait a bit for something to appear
             if (ops->empty()) {
+                replCoord->signalDrainComplete();
                 // block up to 1 second
                 _networkQueue->waitForMore();
                 return false;
