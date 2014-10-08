@@ -37,6 +37,7 @@
 using std::string;
 
 namespace mongo {
+namespace {
 
     // Verify that calling validate() on an empty collection returns an OK status.
     // When either of `full` or `scanData` are false, the ValidateAdaptor
@@ -244,4 +245,5 @@ namespace mongo {
         }
     }
 
+} // namespace
 } // namespace mongo
