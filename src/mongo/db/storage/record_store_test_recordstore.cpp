@@ -1,4 +1,4 @@
-// record_data.h
+// record_store_test_recordstore.cpp
 
 /**
  *    Copyright (C) 2014 MongoDB Inc.
@@ -28,43 +28,42 @@
  *    it in the license file.
  */
 
-#pragma once
+#include "mongo/db/storage/record_store_test_harness.h"
 
-#include <boost/shared_array.hpp>
+#include "mongo/db/storage/record_store.h"
+#include "mongo/unittest/unittest.h"
 
-#include "mongo/bson/bsonobj.h"
+using std::string;
 
 namespace mongo {
 
-    /**
-     * A replacement for the Record class. This class represents data in a record store.
-     * The _dataPtr attribute is used to manage memory ownership. If _dataPtr is NULL, then
-     * the memory pointed to by _data is owned by the RecordStore. If _dataPtr is not NULL, then
-     * it must point to the same array as _data.
-     */
-    class RecordData {
-    public:
-        RecordData(const char* data, int size): _data(data), _size(size), _dataPtr() { }
+    // Verify that the name of the record store is not NULL and nonempty.
+    TEST ( RecordStoreTestHarness, RecordStoreName ) {
+        scoped_ptr<HarnessHelper> harnessHelper( newHarnessHelper() );
+        scoped_ptr<RecordStore> rs( harnessHelper->newNonCappedRecordStore() );
 
-        RecordData(const char* data, int size, const boost::shared_array<char>& dataPtr)
-            : _data(data), _size(size), _dataPtr(dataPtr) { }
+        {
+            const char *name = rs->name();
+            ASSERT( name != NULL && name[0] != '\0' );
+        }
+    }
 
-        const char* data() const { return _data; }
+    // Verify that the namespace of the record store is nonempty.
+    TEST( RecordStoreTestHarness, Namespace ) {
+        scoped_ptr<HarnessHelper> harnessHelper( newHarnessHelper() );
+        scoped_ptr<RecordStore> rs( harnessHelper->newNonCappedRecordStore() );
 
-        int size() const { return _size; }
+        {
+            string ns = rs->ns();
+            ASSERT( ns[0] != '\0' );
+        }
+    }
 
-        /**
-         * Returns true if this owns its own memory, and false otherwise
-         */
-        bool isOwned() const { return _dataPtr.get(); }
-
-        // TODO eliminate double-copying
-        BSONObj toBson() const { return isOwned() ? BSONObj(_data).getOwned() : BSONObj(_data); }
-
-    private:
-        const char* _data;
-        int _size;
-        boost::shared_array<char> _dataPtr;
-    };
+    // Call isCapped() on a non-capped collection and verify the result is false.
+    TEST( RecordStoreTestHarness, IsNotCapped ) {
+        scoped_ptr<HarnessHelper> harnessHelper( newHarnessHelper() );
+        scoped_ptr<RecordStore> rs( harnessHelper->newNonCappedRecordStore() );
+        ASSERT( !rs->isCapped() );
+    }
 
 } // namespace mongo

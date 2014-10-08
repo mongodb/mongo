@@ -74,7 +74,12 @@ namespace repl {
             parsedArgs.id = cmdObj["id"].Int();
             parsedArgs.setName = cmdObj["set"].checkAndGetStringData();
             parsedArgs.who = HostAndPort(cmdObj["who"].String());
-            parsedArgs.cfgver = cmdObj["cfgver"].Int();
+            BSONElement cfgverElement = cmdObj["cfgver"];
+            uassert(28525,
+                    str::stream() << "Expected cfgver argument to replSetFresh command to have "
+                    "numeric type, but found " << typeName(cfgverElement.type()),
+                    cfgverElement.isNumber());
+            parsedArgs.cfgver = cfgverElement.safeNumberLong();
             parsedArgs.opTime = OpTime(cmdObj["opTime"].Date());
 
             status = getGlobalReplicationCoordinator()->processReplSetFresh(parsedArgs, &result);
@@ -111,7 +116,12 @@ namespace repl {
             ReplicationCoordinator::ReplSetElectArgs parsedArgs;
             parsedArgs.set = cmdObj["set"].checkAndGetStringData();
             parsedArgs.whoid = cmdObj["whoid"].Int();
-            parsedArgs.cfgver = cmdObj["cfgver"].Int();
+            BSONElement cfgverElement = cmdObj["cfgver"];
+            uassert(28526,
+                    str::stream() << "Expected cfgver argument to replSetElect command to have "
+                    "numeric type, but found " << typeName(cfgverElement.type()),
+                    cfgverElement.isNumber());
+            parsedArgs.cfgver = cfgverElement.safeNumberLong();
             parsedArgs.round = cmdObj["round"].OID();
 
             status = getGlobalReplicationCoordinator()->processReplSetElect(parsedArgs, &result);

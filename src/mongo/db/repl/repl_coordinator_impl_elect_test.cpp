@@ -111,7 +111,8 @@ namespace {
 
     TEST_F(ReplCoordElectTest, ElectTooSoon) {
         logger::globalLogDomain()->setMinimumLoggedSeverity(logger::LogSeverity::Debug(3));
-        // Election fails because we haven't set a lastOpTimeApplied value yet, via a heartbeat.
+        // Election never starts because we haven't set a lastOpTimeApplied value yet, via a
+        // heartbeat.
         startCapturingLogMessages();
         assertStartSuccess(
             BSON("_id" << "mySet" <<
@@ -122,7 +123,7 @@ namespace {
         ASSERT(getReplCoord()->setFollowerMode(MemberState::RS_SECONDARY));
         simulateEnoughHeartbeatsForElectability();
         stopCapturingLogMessages();
-        ASSERT_EQUALS(1, countLogLinesContaining("do not yet have a complete set of data"));
+        ASSERT_EQUALS(1, countLogLinesContaining("node has no applied oplog entries"));
     }
 
     TEST_F(ReplCoordElectTest, Elect1NodeSuccess) {
@@ -134,7 +135,7 @@ namespace {
             HostAndPort("node1", 12345));
 
         OperationContextNoop txn;
-        getReplCoord()->setMyLastOptime(&txn, OpTime(1, 1));
+        getReplCoord()->setMyLastOptime(&txn, OpTime (100, 1));
 
         ASSERT(getReplCoord()->getCurrentMemberState().primary()) <<
             getReplCoord()->getCurrentMemberState().toString();
@@ -149,7 +150,7 @@ namespace {
                                 ));
         assertStartSuccess(configObj, HostAndPort("node1", 12345));
         OperationContextNoop txn;
-        getReplCoord()->setMyLastOptime(&txn, OpTime(1, 1));
+        getReplCoord()->setMyLastOptime(&txn, OpTime (100, 1));
         ASSERT(getReplCoord()->setFollowerMode(MemberState::RS_SECONDARY));
         startCapturingLogMessages();
         simulateSuccessfulElection();
@@ -171,7 +172,7 @@ namespace {
 
         OperationContextNoop txn;
         OID selfRID = getReplCoord()->getMyRID();
-        OpTime time1(1, 1);
+        OpTime time1(100, 1);
         getReplCoord()->setLastOptime(&txn, selfRID, time1);
         ASSERT(getReplCoord()->setFollowerMode(MemberState::RS_SECONDARY));
 
@@ -219,7 +220,7 @@ namespace {
 
         OperationContextNoop txn;
         OID selfRID = getReplCoord()->getMyRID();
-        OpTime time1(1, 1);
+        OpTime time1(100, 1);
         getReplCoord()->setLastOptime(&txn, selfRID, time1);
         ASSERT(getReplCoord()->setFollowerMode(MemberState::RS_SECONDARY));
 

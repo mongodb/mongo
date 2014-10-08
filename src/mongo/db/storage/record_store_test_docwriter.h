@@ -1,4 +1,4 @@
-// record_data.h
+// record_store_test_docwriter.h
 
 /**
  *    Copyright (C) 2014 MongoDB Inc.
@@ -30,41 +30,33 @@
 
 #pragma once
 
-#include <boost/shared_array.hpp>
+#include "mongo/db/storage/record_store.h"
 
-#include "mongo/bson/bsonobj.h"
+using std::string;
 
 namespace mongo {
+namespace {
 
-    /**
-     * A replacement for the Record class. This class represents data in a record store.
-     * The _dataPtr attribute is used to manage memory ownership. If _dataPtr is NULL, then
-     * the memory pointed to by _data is owned by the RecordStore. If _dataPtr is not NULL, then
-     * it must point to the same array as _data.
-     */
-    class RecordData {
+    class StringDocWriter : public DocWriter {
     public:
-        RecordData(const char* data, int size): _data(data), _size(size), _dataPtr() { }
+        StringDocWriter( const string &data, bool padding )
+            : _data( data ), _padding( padding ) {
+        }
 
-        RecordData(const char* data, int size, const boost::shared_array<char>& dataPtr)
-            : _data(data), _size(size), _dataPtr(dataPtr) { }
+        ~StringDocWriter() { }
 
-        const char* data() const { return _data; }
+        void writeDocument( char *buf ) const {
+            memcpy( buf, _data.c_str(), documentSize() );
+        }
 
-        int size() const { return _size; }
+        size_t documentSize() const { return _data.size() + 1; }
 
-        /**
-         * Returns true if this owns its own memory, and false otherwise
-         */
-        bool isOwned() const { return _dataPtr.get(); }
-
-        // TODO eliminate double-copying
-        BSONObj toBson() const { return isOwned() ? BSONObj(_data).getOwned() : BSONObj(_data); }
+        bool addPadding() const { return _padding; }
 
     private:
-        const char* _data;
-        int _size;
-        boost::shared_array<char> _dataPtr;
+        string _data;
+        bool _padding;
     };
 
+} // namespace
 } // namespace mongo

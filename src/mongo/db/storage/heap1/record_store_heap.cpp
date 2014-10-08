@@ -328,7 +328,7 @@ namespace mongo {
             return Status::OK();
         }
 
-        return Status( ErrorCodes::BadValue,
+        return Status( ErrorCodes::InvalidOptions,
                        mongoutils::str::stream()
                        << "unknown custom option to HeapRecordStore: "
                        << name );
@@ -462,7 +462,10 @@ namespace mongo {
             _it = _records.rbegin();
         }
         else {
-            _it = HeapRecordStore::Records::const_reverse_iterator(_records.find(start));
+            // The reverse iterator will point to the preceding element, so we
+            // increment the base iterator to make it point past the found element
+            HeapRecordStore::Records::const_iterator baseIt(++_records.find(start));
+            _it = HeapRecordStore::Records::const_reverse_iterator(baseIt);
             invariant(_it != _records.rend());
         }
     }

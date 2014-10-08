@@ -100,18 +100,6 @@ namespace {
                           BSONObj()));
     }
 
-    Status AuthzManagerExternalStateMock::getAllDatabaseNames(
-            OperationContext* txn,
-            std::vector<std::string>* dbnames) {
-        unordered_set<std::string> dbnameSet;
-        NamespaceDocumentMap::const_iterator it;
-        for (it = _documents.begin(); it != _documents.end(); ++it) {
-            dbnameSet.insert(it->first.db().toString());
-        }
-        *dbnames = std::vector<std::string>(dbnameSet.begin(), dbnameSet.end());
-        return Status::OK();
-    }
-
     Status AuthzManagerExternalStateMock::findOne(
             OperationContext* txn,
             const NamespaceString& collectionName,

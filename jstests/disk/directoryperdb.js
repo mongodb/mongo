@@ -40,20 +40,6 @@ var backupDir = dbpath + "/backup_repairDatabase_0/";
 checkDir( backupDir );
 assert.eq( 1, db[ baseName ].count() , "C" );
 
-// tool test
-stopMongod( port );
-
-externalPath = MongoRunner.dataPath + baseDir + "_external/";
-
-runMongoProgram( "mongodump", "--dbpath", dbpath, "--directoryperdb", "--out", externalPath );
-resetDbpath( dbpath );
-runMongoProgram( "mongorestore", "--dbpath", dbpath, "--directoryperdb", "--dir", externalPath );
-m = startMongodTest(port, baseDir, true, {directoryperdb : "", nohttpinterface : "", bind_ip : "127.0.0.1"});
-db = m.getDB( baseName );
-checkDir( dbpath );
-assert.eq( 1, db[ baseName ].count() , "C" );
-assert( m.getDBs().totalSize > 0, "bad size calc" );
-
 // drop db test
 db.dropDatabase();
 files = listFiles( dbpath );

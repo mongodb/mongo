@@ -41,7 +41,22 @@ env.Library(
 env.Library(
     target='record_store_test_harness',
     source=[
+        'record_store_test_customoption.cpp',
+        'record_store_test_datafor.cpp',
+        'record_store_test_datasize.cpp',
+        'record_store_test_deleterecord.cpp',
         'record_store_test_harness.cpp',
+        'record_store_test_insertrecord.cpp',
+        'record_store_test_manyiter.cpp',
+        'record_store_test_recorditer.cpp',
+        'record_store_test_recordstore.cpp',
+        'record_store_test_repairiter.cpp',
+        'record_store_test_storagesize.cpp',
+        'record_store_test_touch.cpp',
+        'record_store_test_truncate.cpp',
+        'record_store_test_updaterecord.cpp',
+        'record_store_test_updatewithdamages.cpp',
+        'record_store_test_validate.cpp',
         ],
     LIBDEPS=[]
     )

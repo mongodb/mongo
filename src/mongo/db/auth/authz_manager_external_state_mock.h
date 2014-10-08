@@ -58,9 +58,6 @@ namespace mongo {
         void setAuthorizationManager(AuthorizationManager* authzManager);
         void setAuthzVersion(int version);
 
-        virtual Status getAllDatabaseNames(
-                            OperationContext* txn, std::vector<std::string>* dbnames);
-
         virtual Status findOne(OperationContext* txn,
                                const NamespaceString& collectionName,
                                const BSONObj& query,

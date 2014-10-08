@@ -141,7 +141,11 @@ namespace mongo {
         VarMap _varMap;
 
         // evaluates a BSON element. This is internally called by the top level evaluate method.
-        Status _evalElem(BSONElement in, BSONObjBuilder& out);
+        Status _evalElem(const BSONElement in, BSONObjBuilder& out);
+
+        // evaluates a BSON object. This is internally called by the top level evaluate method
+        // and the _evalElem method.
+        Status _evalObj(const BSONObj& in, BSONObjBuilder& out);
 
         // An identifier for this template evaluator instance, which distinguishes it
         // from other evaluators. Useful for threaded benchruns which, say, want to insert

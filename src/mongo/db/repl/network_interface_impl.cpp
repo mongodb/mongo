@@ -26,6 +26,8 @@
  *    it in the license file.
  */
 
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kReplication
+
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/repl/network_interface_impl.h"
@@ -43,6 +45,7 @@
 #include "mongo/db/repl/oplogreader.h"  // For replAuthenticate
 #include "mongo/platform/unordered_map.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/log.h"
 #include "mongo/util/net/hostandport.h"
 #include "mongo/util/timer.h"
 
@@ -333,7 +336,10 @@ namespace repl {
             CommandData todo = _pending.front();
             _pending.pop_front();
             lk.unlock();
-            todo.onFinish(_runCommand(todo.request));
+            ResponseStatus result = _runCommand(todo.request);
+            LOG(2) << "Network status of sending " << todo.request.cmdObj.firstElementFieldName() <<
+                " to " << todo.request.target << " was " << result.getStatus();
+            todo.onFinish(result);
             lk.lock();
             _signalWorkAvailable_inlock();
         }
@@ -343,7 +349,9 @@ namespace repl {
             const ReplicationExecutor::CallbackHandle& cbHandle,
             const ReplicationExecutor::RemoteCommandRequest& request,
             const RemoteCommandCompletionFn& onFinish) {
-        boost::unique_lock<boost::mutex> lk(_mutex);
+        LOG(2) << "Scheduling " << request.cmdObj.firstElementFieldName() << " to " <<
+            request.target;
+        boost::lock_guard<boost::mutex> lk(_mutex);
         _pending.push_back(CommandData());
         CommandData& cd = _pending.back();
         cd.cbHandle = cbHandle;
@@ -366,6 +374,8 @@ namespace repl {
         const RemoteCommandCompletionFn onFinish = iter->onFinish;
         _pending.erase(iter);
         lk.unlock();
+        LOG(2) << "Canceled sending " << iter->request.cmdObj.firstElementFieldName() << " to " <<
+            iter->request.target;
         onFinish(ResponseStatus(ErrorCodes::CallbackCanceled, "Callback canceled"));
         lk.lock();
         _signalWorkAvailable_inlock();

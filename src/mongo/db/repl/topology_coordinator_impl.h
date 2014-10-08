@@ -222,7 +222,8 @@ namespace repl {
             ArbiterIAm,
             NotSecondary,
             NoPriority,
-            StepDownPeriodActive
+            StepDownPeriodActive,
+            NoData
         };
 
         // Returns the number of heartbeat pings which have occurred.
@@ -266,10 +267,10 @@ namespace repl {
         int _totalVotes() const;
 
         // Scans through all members that are 'up' and return the latest known optime.
-        OpTime _latestKnownOpTime(const OpTime& ourLastOpApplied) const;
+        OpTime _latestKnownOpTime(OpTime ourLastOpApplied) const;
 
         // Scans the electable set and returns the highest priority member index
-        int _getHighestPriorityElectableIndex(const Date_t& now, const OpTime& lastOpApplied) const;
+        int _getHighestPriorityElectableIndex(Date_t now, OpTime lastOpApplied) const;
 
         // Returns true if "one" member is higher priority than "two" member
         bool _isMemberHigherPriority(int memberOneIndex, int memberTwoIndex) const;

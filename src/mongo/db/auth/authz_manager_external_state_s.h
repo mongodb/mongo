@@ -65,8 +65,6 @@ namespace mongo {
                                                 bool showBuiltinRoles,
                                                 std::vector<BSONObj>* result);
 
-        virtual Status getAllDatabaseNames(OperationContext* txn, std::vector<std::string>* dbnames);
-
         /**
          * Implements findOne of the AuthzManagerExternalState interface
          *
