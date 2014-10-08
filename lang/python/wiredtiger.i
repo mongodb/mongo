@@ -813,7 +813,6 @@ typedef int int_void;
 %ignore __wt_data_source;
 %ignore __wt_event_handler;
 %ignore __wt_extractor;
-%ignore __wt_extractor_multiple;
 %ignore __wt_item;
 %ignore __wt_lsn;
 
