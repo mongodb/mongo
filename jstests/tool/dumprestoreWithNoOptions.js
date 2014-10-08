@@ -44,7 +44,7 @@ t.runTool( "restore" , "--dir" , t.ext , "--noOptionsRestore");
 
 assert.eq( 1, db.capped.count() , "wrong number of docs restored to capped" );
 assert(true !== db.capped.stats().capped, "restore options were not ignored");
-assert.eq(undefined, db.capped.exists().options,
+assert.eq( {}, db.capped.exists().options,
        "restore options not ignored: " + tojson( db.capped.exists() ) );
 
 // Dump/restore single DB
@@ -73,7 +73,8 @@ db = db.getSiblingDB(dbname2);
 
 assert.eq( 1, db.capped.count() , "wrong number of docs restored to capped" );
 assert(true !== db.capped.stats().capped, "restore options were not ignored");
-assert(undefined === db.capped.exists().options, "restore options not ignored");
+assert.eq( {}, db.capped.exists().options, 
+          "restore options not ignored: " + tojson( db.capped.exists() ) );
 
 // Dump/restore single collection
 
@@ -104,6 +105,7 @@ db = db.getSiblingDB(dbname);
 
 assert.eq( 1, db.capped.count() , "wrong number of docs restored to capped" );
 assert( true !== db.capped.stats().capped, "restore options were not ignored" );
-assert( undefined === db.capped.exists().options );
+assert.eq( {}, db.capped.exists().options, 
+          "restore options not ignored: " + tojson( db.capped.exists() ) );
 
 t.stop();
