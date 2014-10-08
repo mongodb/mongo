@@ -1114,6 +1114,7 @@ namespace mongo {
                 result.appendNumber("numExtents", 0);
                 result.appendNumber("indexes", 0);
                 result.appendNumber("indexSize", 0);
+                result.appendNumber("fileSize", 0);
             }
             else {
                 // TODO: Client::Context legacy, needs to be removed
