@@ -139,7 +139,7 @@ namespace mongo {
             ru->writeBatch()->NewIterator(_columnFamily));
         wb_iterator->Seek(key);
         if (wb_iterator->Valid() && wb_iterator->Entry().key == key) {
-            const auto& entry = wb_iterator->Entry();
+            auto& entry = wb_iterator->Entry();
             if (entry.type == rocksdb::WriteType::kDeleteRecord) {
                 return RecordData(nullptr, 0);
             }
