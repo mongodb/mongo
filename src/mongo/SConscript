@@ -515,6 +515,7 @@ coredbEnv.Library("coredb", [
                            '$BUILD_DIR/third_party/shim_snappy',
                            'server_options',
                            '$BUILD_DIR/mongo/util/cmdline_utils/cmdline_utils',
+                           '$BUILD_DIR/mongo/logger/parse_log_component_settings',
                            'clientdriver',
                            ])
 
