@@ -89,9 +89,20 @@ my_extract(WT_EXTRACTOR *extractor, WT_SESSION *session,
 	 * same year with different data.
 	 */
 	for (year = term_start; year <= term_end; ++year) {
-		result_cursor->set_key(result_cursor, term_start);
-		if ((ret = result_cursor->insert(result_cursor)) != 0)
+		result_cursor->set_key(result_cursor, year);
+		/*
+		 * Note that the extract callback is called for all operations
+		 * not just inserts.  The user sets the key and uses the
+		 * cursor->insert() method, but the underlying WT code will
+		 * perform the correct operation (such as a remove()).
+		 */
+		fprintf(stderr, "EXTRACTOR: index op for year %d: %s %s\n",
+		    year, first_name, last_name);
+		if ((ret = result_cursor->insert(result_cursor)) != 0) {
+			fprintf(stderr, "EXTRACTOR: op year %d: error %d\n",
+			    year, ret);
 			return (ret);
+		}
 	}
 	return (0);
 }
@@ -153,6 +164,34 @@ err:	cursor->close(cursor);
 }
 
 /*
+ * Remove some items from the primary table.
+ */
+static int
+remove_items(WT_SESSION *session)
+{
+	WT_CURSOR *cursor;
+	struct president_data p;
+	int i, ret;
+
+	/*
+	 * Removing items from the primary table will call the extractor
+	 * for the index and allow our custom extractor code to handle
+	 * each custom key.
+	 */
+	ret = session->open_cursor(
+	    session, "table:presidents", NULL, NULL, &cursor);
+	/*
+	 * Just remove the first few items.
+	 */
+	for (i = 0; example_data[i].last_name != NULL && i < 2; i++) {
+		p = example_data[i];
+		cursor->set_key(cursor, p.id);
+		ret = cursor->remove(cursor);
+	}
+	return (ret);
+}
+
+/*
  * Set up the table and index of the data.
  */
 static int
@@ -182,6 +221,9 @@ setup_table(WT_SESSION *session)
 		cursor->set_key(cursor, p.id);
 		cursor->set_value(cursor,
 		    p.last_name, p.first_name, p.term_start, p.term_end);
+		fprintf(stderr, "SETUP: table insert %d-%d: %s %s\n",
+		    p.term_start, p.term_end,
+		    p.first_name, p.last_name);
 		ret = cursor->insert(cursor);
 	}
 	return (ret);
@@ -210,6 +252,7 @@ main(void)
 
 	ret = setup_table(session);
 	ret = read_index(session);
+	ret = remove_items(session);
 
 	ret = conn->close(conn, NULL);
 
