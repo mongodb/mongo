@@ -1550,18 +1550,6 @@ namespace {
                 args, _replExecutor.now(), _getLastOpApplied(), response, result);
     }
 
-    void ReplicationCoordinatorImpl::_setCurrentRSConfig(
-            const ReplicationExecutor::CallbackData& cbData,
-            const ReplicaSetConfig& newConfig,
-            int myIndex) {
-        if (cbData.status == ErrorCodes::CallbackCanceled) {
-            return;
-        }
-
-        boost::lock_guard<boost::mutex> lk(_mutex);
-        _setCurrentRSConfig_inlock(newConfig, myIndex);
-    }
-
     void ReplicationCoordinatorImpl::_setCurrentRSConfig_inlock(
             const ReplicaSetConfig& newConfig,
             int myIndex) {
@@ -1738,7 +1726,10 @@ namespace {
 
     BSONObj ReplicationCoordinatorImpl::getGetLastErrorDefault() {
         boost::mutex::scoped_lock lock(_mutex);
-        return _rsConfig.getDefaultWriteConcern().toBSON();
+        if (_rsConfig.isInitialized()) {
+            return _rsConfig.getDefaultWriteConcern().toBSON();
+        }
+        return BSONObj();
     }
 
     Status ReplicationCoordinatorImpl::checkReplEnabledForCommand(BSONObjBuilder* result) {

@@ -289,10 +289,6 @@ namespace repl {
          * new heartbeats based on the new config.  Must *only* be called from within the
          * ReplicationExecutor context.
          */
-        void _setCurrentRSConfig(
-                const ReplicationExecutor::CallbackData& cbData,
-                const ReplicaSetConfig& newConfig,
-                int myIndex);
         void _setCurrentRSConfig_inlock(
                 const ReplicaSetConfig& newConfig,
                 int myIndex);
