@@ -1447,6 +1447,7 @@ namespace {
         const MemberState newState = _topCoord->getMemberState();
         if (newState != _currentState) {
             _currentState = newState;
+            log() << "transition to " << newState.toString();
         }
     }
 
