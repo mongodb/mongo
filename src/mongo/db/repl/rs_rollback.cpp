@@ -109,6 +109,8 @@ namespace {
     };
 
     struct DocID {
+        // ns and _id both point into ownedObj's buffer
+        BSONObj ownedObj;
         const char* ns;
         BSONElement _id;
         bool operator<(const DocID& other) const {
@@ -155,17 +157,17 @@ namespace {
             throw RSFatalException("rollback too large");
 
         DocID doc;
-        // NOTE The assigned ns value may become invalid if we yield.
-        doc.ns = ourObj.getStringField("ns");
+        doc.ownedObj = ourObj.getOwned();
+        doc.ns = doc.ownedObj.getStringField("ns");
         if (*doc.ns == '\0') {
             warning() << "replSet WARNING ignoring op on rollback no ns TODO : "
-                  << ourObj.toString() << rsLog;
+                  << doc.ownedObj.toString() << rsLog;
             return;
         }
 
-        BSONObj obj = ourObj.getObjectField(*op=='u' ? "o2" : "o");
+        BSONObj obj = doc.ownedObj.getObjectField(*op=='u' ? "o2" : "o");
         if (obj.isEmpty()) {
-            warning() << "replSet warning ignoring op on rollback : " << ourObj.toString() << rsLog;
+            warning() << "replSet warning ignoring op on rollback : " << doc.ownedObj.toString() << rsLog;
             return;
         }
 
@@ -235,7 +237,7 @@ namespace {
         doc._id = obj["_id"];
         if (doc._id.eoo()) {
             warning() << "replSet WARNING ignoring op on rollback no _id TODO : " << doc.ns << ' '
-                      << ourObj.toString() << rsLog;
+                      << doc.ownedObj.toString() << rsLog;
             return;
         }
 
