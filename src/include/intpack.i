@@ -53,10 +53,13 @@
 #ifdef __GNUC__
 #define	WT_LEADING_ZEROS(x, i)						\
 	(i = (x == 0) ? (int)sizeof (x) : __builtin_clzll(x) >> 3)
+#elif _MSC_VER
+#define	WT_LEADING_ZEROS(x, i)						\
+	(i = (x == 0) ? (int)sizeof (x) : __lzcnt64(x) >> 3)
 #else
 #define	WT_LEADING_ZEROS(x, i) do {					\
 	uint64_t __x = (x);						\
-	uint64_t __m = 0xff << 56;					\
+	uint64_t __m = (uint64_t)0xff << 56;					\
 	for (i = 0; !(__x & __m) && i != 8; i++)			\
 		__m >>= 8;						\
 } while (0)

@@ -37,7 +37,14 @@
  * We need to include the configuration file to detect whether this extension
  * is being built into the WiredTiger library.
  */
+#ifndef _WIN32
 #include "wiredtiger_config.h"
+#else
+#include "os_win_wiredtiger_config.h"
+#ifdef _MSC_VER
+#define inline __inline
+#endif
+#endif
 
 /* Local compressor structure. */
 typedef struct {

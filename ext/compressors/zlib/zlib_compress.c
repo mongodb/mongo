@@ -38,7 +38,14 @@
  * We need to include the configuration file to detect whether this extension
  * is being built into the WiredTiger library.
  */
+#ifndef _WIN32
 #include "wiredtiger_config.h"
+#else
+#include "os_win_wiredtiger_config.h"
+#ifdef _MSC_VER
+#define inline __inline
+#endif
+#endif
 
 /* Local compressor structure. */
 typedef struct {
@@ -80,7 +87,7 @@ zlib_error(
  *	Allocate a scratch buffer.
  */
 static void *
-zalloc(void *cookie, u_int number, u_int size)
+zalloc(void *cookie, uint32_t number, uint32_t size)
 {
 	ZLIB_OPAQUE *opaque;
 	WT_EXTENSION_API *wt_api;

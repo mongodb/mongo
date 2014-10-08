@@ -12,31 +12,49 @@ extern "C" {
 /*******************************************
  * WiredTiger public include file, and configuration control.
  *******************************************/
+#ifndef _WIN32
 #include "wiredtiger_config.h"
+#else
+#include "os_win_wiredtiger_config.h"
+#endif
 #include "wiredtiger_ext.h"
 
 /*******************************************
  * WiredTiger system include files.
  *******************************************/
+#ifndef _WIN32
 #include <sys/mman.h>
 #include <sys/stat.h>
 #include <sys/time.h>
 #include <sys/uio.h>
-
+#endif
 #include <ctype.h>
+#ifndef _WIN32
 #include <dlfcn.h>
+#endif
 #include <errno.h>
 #include <fcntl.h>
 #include <inttypes.h>
 #include <limits.h>
+#ifndef _WIN32
 #include <pthread.h>
+#endif
 #ifdef HAVE_PTHREAD_NP_H
 #include <pthread_np.h>
 #endif
 #include <stddef.h>
+#include <stdio.h>
+#include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
+#ifndef _WIN32
 #include <unistd.h>
+#endif
+#include <time.h>
+#ifdef _WIN32
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
+#endif
 
 /*******************************************
  * WiredTiger externally maintained include files.
@@ -255,10 +273,13 @@ struct __wt_update;
 #include "lint.h"
 #elif defined(__GNUC__)
 #include "gcc.h"
+#elif defined(_MSC_VER)
+#include "msvc.h"
 #endif
 #include "hardware.h"
 
 #include "misc.h"
+#include "os_windows.h"
 #include "mutex.h"
 #include "posix.h"
 

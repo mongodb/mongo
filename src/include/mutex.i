@@ -288,6 +288,80 @@ __wt_spin_unlock(WT_SESSION_IMPL *session, WT_SPINLOCK *t)
 	pthread_mutex_unlock(&t->lock);
 }
 
+#elif SPINLOCK_TYPE == SPINLOCK_MSVC
+
+#define	WT_DECL_SPINLOCK_ID(i)						\
+	static int i = WT_SPINLOCK_REGISTER
+#define	WT_SPINLOCK_REGISTER		-1
+#define	WT_SPINLOCK_REGISTER_FAILED	-2
+
+#define	__wt_spin_trylock(session, lock, idp)				\
+	__wt_spin_trylock_func(session, lock)
+
+/*
+ * __wt_spin_init --
+ *      Initialize a spinlock.
+ */
+static inline int
+__wt_spin_init(WT_SESSION_IMPL *session, WT_SPINLOCK *t, const char *name)
+{
+	WT_UNUSED(session);
+	WT_UNUSED(name);
+
+	InitializeCriticalSectionAndSpinCount(&t->lock, 4000);
+
+	return (0);
+}
+
+/*
+ * __wt_spin_destroy --
+ *      Destroy a spinlock.
+ */
+static inline void
+__wt_spin_destroy(WT_SESSION_IMPL *session, WT_SPINLOCK *t)
+{
+	WT_UNUSED(session);
+
+	DeleteCriticalSection(&t->lock);
+}
+
+/*
+ * __wt_spin_trylock_func --
+ *      Try to lock a spinlock or fail immediately if it is busy.
+ */
+static inline int
+__wt_spin_trylock_func(WT_SESSION_IMPL *session, WT_SPINLOCK *t)
+{
+	WT_UNUSED(session);
+
+	BOOL b = TryEnterCriticalSection(&t->lock);
+	return b == 0 ? EBUSY : 0;
+}
+
+/*
+ * __wt_spin_lock --
+ *      Spin until the lock is acquired.
+ */
+static inline void
+__wt_spin_lock(WT_SESSION_IMPL *session, WT_SPINLOCK *t)
+{
+	WT_UNUSED(session);
+
+	EnterCriticalSection(&t->lock);
+}
+
+/*
+ * __wt_spin_unlock --
+ *      Release the spinlock.
+ */
+static inline void
+__wt_spin_unlock(WT_SESSION_IMPL *session, WT_SPINLOCK *t)
+{
+	WT_UNUSED(session);
+
+	LeaveCriticalSection(&t->lock);
+}
+
 #else
 
 #error Unknown spinlock type
