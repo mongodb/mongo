@@ -77,7 +77,7 @@ func (sp *SessionProvider) FindDocs(DB, Collection string, Skip, Limit int, Quer
 		return nil, err
 	}
 	q := session.DB(DB).C(Collection).Find(Query).Sort(Sort...).Skip(Skip).Limit(Limit)
-	q = applyFlags(q, session, flags)
+	q = ApplyFlags(q, session, flags)
 	return &CursorDocSource{q.Iter(), session}, nil
 }
 
@@ -89,11 +89,11 @@ func (sp *SessionProvider) FindOne(DB, Collection string, Skip int, Query interf
 	defer session.Close()
 
 	q := session.DB(DB).C(Collection).Find(Query).Sort(Sort...).Skip(Skip)
-	q = applyFlags(q, session, flags)
+	q = ApplyFlags(q, session, flags)
 	return q.One(into)
 }
 
-func applyFlags(q *mgo.Query, session *mgo.Session, flags int) *mgo.Query {
+func ApplyFlags(q *mgo.Query, session *mgo.Session, flags int) *mgo.Query {
 	if flags&Snapshot > 0 {
 		q = q.Snapshot()
 	}

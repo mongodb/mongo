@@ -9,6 +9,7 @@ import (
 	commonopts "github.com/mongodb/mongo-tools/common/options"
 	"github.com/mongodb/mongo-tools/common/util"
 	"github.com/mongodb/mongo-tools/mongoexport/options"
+	"gopkg.in/mgo.v2"
 	"gopkg.in/mgo.v2/bson"
 	"io"
 	"os"
@@ -38,7 +39,6 @@ type MongoExport struct {
 	InputOpts *options.InputOptions
 
 	// for connecting to the db
-	cmdRunner       db.CommandRunner
 	SessionProvider *db.SessionProvider
 	ExportOutput    ExportOutput
 }
@@ -60,20 +60,6 @@ type ExportOutput interface {
 
 	// Flush writes any pending data to the underlying I/O stream.
 	Flush() error
-}
-
-func (exp *MongoExport) Init() error {
-	if exp.ToolOptions.Namespace.DBPath != "" {
-		exp.ToolOptions.Namespace.DBPath = util.ToUniversalPath(exp.ToolOptions.Namespace.DBPath)
-		shim, err := db.NewShim(exp.ToolOptions.Namespace.DBPath, exp.ToolOptions.DirectoryPerDB, exp.ToolOptions.Journal)
-		if err != nil {
-			return err
-		}
-		exp.cmdRunner = shim
-		return nil
-	}
-	exp.cmdRunner = db.NewSessionProvider(exp.ToolOptions)
-	return nil
 }
 
 // ValidateSettings returns an error if any settings specified on the command line
@@ -140,16 +126,20 @@ func (exp *MongoExport) getOutputWriter() (io.WriteCloser, error) {
 	return os.Stdout, nil
 }
 
-func getDocSource(exp MongoExport) (db.DocSource, error) {
+// getCursor returns a cursor that can be iterated over to get all the documents
+// to export, based on the options given to mongoexport. Also returns the
+// associated session, so that it can be closed once the cursor is used up.
+func (exp *MongoExport) getCursor() (*mgo.Iter, *mgo.Session, error) {
+
 	sortFields := []string{}
 	if exp.InputOpts != nil && exp.InputOpts.Sort != "" {
 		sortD, err := getSortFromArg(exp.InputOpts.Sort)
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 		sortFields, err = bsonutil.MakeSortString(sortD)
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 	}
 
@@ -158,24 +148,29 @@ func getDocSource(exp MongoExport) (db.DocSource, error) {
 		var err error
 		query, err = getObjectFromArg(exp.InputOpts.Query)
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 	}
 
 	flags := 0
-	if len(query) == 0 && exp.InputOpts != nil && exp.InputOpts.ForceTableScan != true && exp.InputOpts.Sort == "" {
+	if len(query) == 0 && exp.InputOpts != nil &&
+		exp.InputOpts.ForceTableScan != true && exp.InputOpts.Sort == "" {
 		flags = flags | db.Snapshot
 	}
 
-	return exp.cmdRunner.FindDocs(
-		exp.ToolOptions.Namespace.DB,
-		exp.ToolOptions.Namespace.Collection,
-		exp.InputOpts.Skip,
-		exp.InputOpts.Limit,
-		query,
-		sortFields,
-		flags,
-	)
+	session, err := exp.SessionProvider.GetSession()
+	if err != nil {
+		return nil, nil, fmt.Errorf("error getting database session: %v", err)
+	}
+
+	// build the query
+	q := session.DB(exp.ToolOptions.Namespace.DB).
+		C(exp.ToolOptions.Namespace.Collection).Find(query).Sort(sortFields...).
+		Skip(exp.InputOpts.Skip).Limit(exp.InputOpts.Limit)
+	q = db.ApplyFlags(q, session, flags)
+
+	return q.Iter(), session, nil
+
 }
 
 // Export executes the entire export operation. It returns an integer of the count
@@ -193,11 +188,13 @@ func (exp *MongoExport) Export() (int64, error) {
 		return 0, err
 	}
 
-	docSource, err := getDocSource(*exp)
+	cursor, session, err := exp.getCursor()
 	if err != nil {
 		return 0, err
 	}
-	defer docSource.Close()
+	defer session.Close()
+	defer cursor.Close()
+
 	connURL := exp.ToolOptions.Host
 	if connURL == "" {
 		connURL = util.DefaultHost
@@ -217,14 +214,14 @@ func (exp *MongoExport) Export() (int64, error) {
 
 	docsCount := int64(0)
 	// Write document content
-	for docSource.Next(&result) {
+	for cursor.Next(&result) {
 		err := exportOutput.ExportDocument(result)
 		if err != nil {
 			return docsCount, err
 		}
 		docsCount++
 	}
-	if err := docSource.Err(); err != nil {
+	if err := cursor.Err(); err != nil {
 		return docsCount, err
 	}
 

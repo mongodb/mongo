@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"github.com/mongodb/mongo-tools/common/db"
 	"github.com/mongodb/mongo-tools/common/log"
 	commonopts "github.com/mongodb/mongo-tools/common/options"
 	"github.com/mongodb/mongo-tools/mongoexport"
@@ -29,7 +30,7 @@ func main() {
 	}
 
 	log.SetVerbosity(opts.Verbosity)
-	
+
 	// print help, if specified
 	if opts.PrintHelp() {
 		return
@@ -41,20 +42,15 @@ func main() {
 	}
 
 	exporter := mongoexport.MongoExport{
-		ToolOptions: *opts,
-		OutputOpts:  outputOpts,
-		InputOpts:   inputOpts,
+		ToolOptions:     *opts,
+		OutputOpts:      outputOpts,
+		InputOpts:       inputOpts,
+		SessionProvider: db.NewSessionProvider(*opts),
 	}
 
 	err = exporter.ValidateSettings()
 	if err != nil {
 		log.Logf(0, "error validating settings: %v", err)
-		os.Exit(1)
-	}
-
-	err = exporter.Init()
-	if err != nil {
-		log.Logf(0, "error initializing mongoexport: %v", err)
 		os.Exit(1)
 	}
 
