@@ -17,7 +17,6 @@ for(var i = 0; i < 100; i++) {
 }
 
 x = runMongoProgram( "mongodump",
-                     "-vvvv",
                      "--db", baseName,
                      "--authenticationDatabase=admin",
                      "-u", "testuser",
