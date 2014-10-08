@@ -71,6 +71,7 @@ namespace {
                                                            bgsync)));
         _syncSourceFeedbackThread.reset(new boost::thread(stdx::bind(&SyncSourceFeedback::run,
                                                                      &_syncSourceFeedback)));
+        newReplUp();
     }
 
     void ReplicationCoordinatorExternalStateImpl::shutdown() {
