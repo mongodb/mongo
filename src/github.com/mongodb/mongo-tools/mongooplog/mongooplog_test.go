@@ -3,6 +3,7 @@ package mongooplog
 import (
 	"github.com/mongodb/mongo-tools/common/db"
 	commonopts "github.com/mongodb/mongo-tools/common/options"
+	"github.com/mongodb/mongo-tools/common/testutil"
 	"github.com/mongodb/mongo-tools/mongooplog/options"
 	. "github.com/smartystreets/goconvey/convey"
 	"gopkg.in/mgo.v2/bson"
@@ -10,6 +11,8 @@ import (
 )
 
 func TestBasicOps(t *testing.T) {
+	testutil.VerifyTestType(t, "integration")
+
 	var opts *commonopts.ToolOptions
 	var sourceOpts *options.SourceOptions
 
