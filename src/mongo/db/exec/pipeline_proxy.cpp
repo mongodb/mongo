@@ -90,16 +90,10 @@ namespace mongo {
 
     void PipelineProxyStage::saveState() {
         _pipeline->getContext()->opCtx = NULL;
-        if (boost::shared_ptr<PlanExecutor> exec = _childExec.lock()) {
-            exec->saveState();
-        }
     }
 
     void PipelineProxyStage::restoreState(OperationContext* opCtx) {
         _pipeline->getContext()->opCtx = opCtx;
-        if (boost::shared_ptr<PlanExecutor> exec = _childExec.lock()) {
-            exec->restoreState(opCtx);
-        }
     }
 
     void PipelineProxyStage::pushBack(const BSONObj& obj) {
