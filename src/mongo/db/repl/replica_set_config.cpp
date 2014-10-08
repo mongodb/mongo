@@ -444,7 +444,7 @@ namespace {
     BSONObj ReplicaSetConfig::toBSON() const {
         BSONObjBuilder configBuilder;
         configBuilder.append("_id", _replSetName);
-        configBuilder.append("version", _version);
+        configBuilder.appendIntOrLL("version", _version);
 
         BSONArrayBuilder members(configBuilder.subarrayStart("members"));
         for (MemberIterator mem = membersBegin(); mem != membersEnd(); mem++) {
