@@ -1008,14 +1008,8 @@ namespace mongo {
             verify(getExecutor(_txn, getCollectionOrUassert(ctx->getDb(), _config.incLong),
                                cq, &rawExec, QueryPlannerParams::NO_TABLE_SCAN).isOK());
 
-            auto_ptr<PlanExecutor> exec(rawExec);
-
-            // This registration is necessary because we may manually yield the read lock
-            // below (in order to acquire a write lock and dump some data to a temporary
-            // collection).
-            //
-            // TODO: don't do this in the future.
-            const ScopedExecutorRegistration safety(exec.get());
+            scoped_ptr<PlanExecutor> exec(rawExec);
+            exec->setYieldPolicy(PlanExecutor::YIELD_AUTO);
 
             // iterate over all sorted objects
             BSONObj o;
@@ -1366,10 +1360,8 @@ namespace mongo {
                             return 0;
                         }
 
-                        auto_ptr<PlanExecutor> exec(rawExec);
-
-                        // XXX: is this registration necessary?
-                        const ScopedExecutorRegistration safety(exec.get());
+                        scoped_ptr<PlanExecutor> exec(rawExec);
+                        exec->setYieldPolicy(PlanExecutor::YIELD_AUTO);
 
                         Timer mt;
 

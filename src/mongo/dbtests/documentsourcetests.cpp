@@ -171,7 +171,6 @@ namespace DocumentSourceTests {
             void createSource() {
                 // clean up first if this was called before
                 _source.reset();
-                _registration.reset();
                 _exec.reset();
 
                 Client::WriteContext ctx(&_opCtx, ns);
@@ -182,7 +181,7 @@ namespace DocumentSourceTests {
 
                 _exec.reset(execBare);
                 _exec->saveState();
-                _registration.reset(new ScopedExecutorRegistration(_exec.get()));
+                _exec->registerExec();
 
                 _source = DocumentSourceCursor::create(ns, _exec, _ctx);
             }
@@ -192,7 +191,6 @@ namespace DocumentSourceTests {
         private:
             // It is important that these are ordered to ensure correct destruction order.
             boost::shared_ptr<PlanExecutor> _exec;
-            boost::scoped_ptr<ScopedExecutorRegistration> _registration;
             intrusive_ptr<ExpressionContext> _ctx;
             intrusive_ptr<DocumentSourceCursor> _source;
         };

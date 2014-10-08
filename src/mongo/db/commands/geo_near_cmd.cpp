@@ -185,8 +185,8 @@ namespace mongo {
                 return false;
             }
 
-            auto_ptr<PlanExecutor> exec(rawExec);
-            const ScopedExecutorRegistration safety(exec.get());
+            scoped_ptr<PlanExecutor> exec(rawExec);
+            exec->setYieldPolicy(PlanExecutor::YIELD_AUTO);
 
             double totalDistance = 0;
             BSONObjBuilder resultBuilder(result.subarrayStart("results"));

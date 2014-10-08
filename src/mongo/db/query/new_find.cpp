@@ -442,8 +442,7 @@ namespace mongo {
         OplogStart* stage = new OplogStart(txn, collection, tsExpr, oplogws);
 
         // Takes ownership of ws and stage.
-        auto_ptr<PlanExecutor> exec(new PlanExecutor(txn, oplogws, stage, collection));
-        exec->registerExecInternalPlan();
+        scoped_ptr<PlanExecutor> exec(new PlanExecutor(txn, oplogws, stage, collection));
 
         // The stage returns a DiskLoc of where to start.
         DiskLoc startLoc;
@@ -596,6 +595,11 @@ namespace mongo {
         verify(NULL != rawExec);
         auto_ptr<PlanExecutor> exec(rawExec);
 
+        // We want the PlanExecutor to yield automatically, but we handle registration of the
+        // executor ourselves. We want to temporarily register the executor while we are generating
+        // this batch of results, and then unregister and re-register with ClientCursor for getmore.
+        exec->setYieldPolicy(PlanExecutor::YIELD_AUTO);
+
         // If it's actually an explain, do the explain and return rather than falling through
         // to the normal query execution loop.
         if (pq.isExplain()) {
@@ -676,9 +680,6 @@ namespace mongo {
         // Do we save the PlanExecutor in a ClientCursor for getMore calls later?
         bool saveClientCursor = false;
 
-        // The executor registers itself with the active executors list in ClientCursor.
-        auto_ptr<ScopedExecutorRegistration> safety(new ScopedExecutorRegistration(exec.get()));
-
         BSONObj obj;
         PlanExecutor::ExecState state;
         // uint64_t numMisplacedDocs = 0;
@@ -728,7 +729,7 @@ namespace mongo {
         // If we don't cache the executor later, we are deleting it, so it must be deregistered.
         //
         // So, no matter what, deregister the executor.
-        safety.reset();
+        exec->deregisterExec();
 
         // Caller expects exceptions thrown in certain cases.
         if (PlanExecutor::EXEC_ERROR == state) {

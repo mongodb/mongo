@@ -219,8 +219,8 @@ namespace mongo {
                 return prepInLockStatus;
             }
 
+            // Executor registration and yield policy is handled internally by the update executor.
             PlanExecutor* exec = updateExecutor.getPlanExecutor();
-            const ScopedExecutorRegistration safety( exec );
 
             // Explain the plan tree.
             return Explain::explainStages( txn, exec, verbosity, out );
@@ -254,8 +254,8 @@ namespace mongo {
                 return prepInLockStatus;
             }
 
+            // Executor registration and yield policy is handled internally by the delete executor.
             PlanExecutor* exec = deleteExecutor.getPlanExecutor();
-            const ScopedExecutorRegistration safety( exec );
 
             // Explain the plan tree.
             return Explain::explainStages( txn, exec, verbosity, out );

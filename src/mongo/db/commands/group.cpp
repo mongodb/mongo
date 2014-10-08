@@ -142,7 +142,9 @@ namespace mongo {
         if (!getExecStatus.isOK()) {
             return appendCommandStatus(out, getExecStatus);
         }
+
         scoped_ptr<PlanExecutor> planExecutor(rawPlanExecutor);
+        planExecutor->setYieldPolicy(PlanExecutor::YIELD_AUTO);
 
         // Group executors return ADVANCED exactly once, with the entire group result.
         BSONObj retval;
@@ -194,7 +196,9 @@ namespace mongo {
         if (!getExecStatus.isOK()) {
             return getExecStatus;
         }
+
         scoped_ptr<PlanExecutor> planExecutor(rawPlanExecutor);
+        planExecutor->setYieldPolicy(PlanExecutor::YIELD_AUTO);
 
         return Explain::explainStages(txn, planExecutor.get(), verbosity, out);
     }

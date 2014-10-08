@@ -439,7 +439,7 @@ namespace mongo {
             DeleteNotificationStage* dns = new DeleteNotificationStage();
             // Takes ownership of 'ws' and 'dns'.
             PlanExecutor* deleteNotifyExec = new PlanExecutor(txn, ws, dns, collection);
-            deleteNotifyExec->registerExecInternalPlan();
+            deleteNotifyExec->registerExec();
             _deleteNotifyExec.reset(deleteNotifyExec);
 
             // Allow multiKey based on the invariant that shard keys must be single-valued.
@@ -461,6 +461,9 @@ namespace mongo {
 
             auto_ptr<PlanExecutor> exec(
                 InternalPlanner::indexScan(txn, collection, idx, min, max, false));
+            // We can afford to yield here because any change to the base data that we might
+            // miss is already being queued and will migrate in the 'transferMods' stage.
+            exec->setYieldPolicy(PlanExecutor::YIELD_AUTO);
 
             // use the average object size to estimate how many objects a full chunk would carry
             // do that while traversing the chunk's range using the sharding index, below

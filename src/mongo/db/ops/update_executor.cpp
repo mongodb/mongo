@@ -39,7 +39,9 @@
 #include "mongo/db/ops/update_request.h"
 #include "mongo/db/query/canonical_query.h"
 #include "mongo/db/query/get_executor.h"
+#include "mongo/db/query/query_planner_common.h"
 #include "mongo/db/repl/oplog.h"
+#include "mongo/db/repl/repl_coordinator_global.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/fail_point_service.h"
 #include "mongo/util/log.h"
@@ -143,6 +145,17 @@ namespace mongo {
         // TODO: This seems a bit circuitious.
         _opDebug->updateobj = _request->getUpdates();
 
+        // If this is a user-issued update, then we want to return an error: you cannot perform
+        // writes on a secondary. If this is an update to a secondary from the replication system,
+        // however, then we make an exception and let the write proceed. In this case,
+        // shouldCallLogOp() will be false.
+        if (_request->shouldCallLogOp() &&
+            !repl::getGlobalReplicationCoordinator()->canAcceptWritesForDatabase(nsString.db())) {
+            return Status(ErrorCodes::NotMaster,
+                          str::stream() << "Not primary while performing update on "
+                                        << nsString.ns());
+        }
+
         if (lifecycle) {
             lifecycle->setCollection(collection);
             _driver.refreshIndexKeys(lifecycle->getIndexKeys(_request->getOpCtx()));
@@ -162,12 +175,26 @@ namespace mongo {
                                               &_driver, _opDebug, &rawExec);
         }
 
-        if (getExecStatus.isOK()) {
-            invariant(rawExec);
-            _exec.reset(rawExec);
+        if (!getExecStatus.isOK()) {
+            return getExecStatus;
         }
 
-        return getExecStatus;
+        invariant(rawExec);
+        _exec.reset(rawExec);
+
+        // If yielding is allowed for this plan, then set an auto yield policy. Otherwise set
+        // a manual yield policy.
+        const bool canYield = !_request->isGod() && (
+            _canonicalQuery.get() ?
+            !QueryPlannerCommon::hasNode(_canonicalQuery->root(), MatchExpression::ATOMIC) :
+            !LiteParsedQuery::isQueryIsolated(_request->getQuery()));
+
+        PlanExecutor::YieldPolicy policy = canYield ? PlanExecutor::YIELD_AUTO :
+                                                      PlanExecutor::YIELD_MANUAL;
+
+        _exec->setYieldPolicy(policy);
+
+        return Status::OK();
     }
 
     UpdateResult UpdateExecutor::execute(Database* db) {
@@ -181,9 +208,6 @@ namespace mongo {
                 "could not get executor " + _request->getQuery().toString()
                                          + "; " + causedBy(status),
                 status.isOK());
-
-        // Register executor with the collection cursor cache.
-        const ScopedExecutorRegistration safety(_exec.get());
 
         // Run the plan (don't need to collect results because UpdateStage always returns
         // NEED_TIME).

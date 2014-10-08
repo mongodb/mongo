@@ -151,6 +151,7 @@ namespace mongo {
             auto_ptr<PlanExecutor> exec(InternalPlanner::indexScan(txn, collection, idx,
                                                                    min, max, false,
                                                                    InternalPlanner::FORWARD));
+            exec->setYieldPolicy(PlanExecutor::YIELD_AUTO);
 
             // Find the 'missingField' value used to represent a missing document field in a key of
             // this index.
@@ -398,6 +399,7 @@ namespace mongo {
                 set<BSONObj> tooFrequentKeys;
                 splitKeys.push_back(prettyKey(idx->keyPattern(), currKey.getOwned()).extractFields( keyPattern ) );
 
+                exec->setYieldPolicy(PlanExecutor::YIELD_AUTO);
                 while ( 1 ) {
                     while (PlanExecutor::ADVANCED == state) {
                         currCount++;
@@ -443,6 +445,7 @@ namespace mongo {
                     exec.reset(InternalPlanner::indexScan(txn, collection, idx, min, max,
                                                             false, InternalPlanner::FORWARD));
 
+                    exec->setYieldPolicy(PlanExecutor::YIELD_AUTO);
                     state = exec->getNext(&currKey, NULL);
                 }
 

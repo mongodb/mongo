@@ -105,6 +105,11 @@ namespace mongo {
                 // Takes ownership of 'ws' and 'mis'.
                 auto_ptr<PlanExecutor> curExec(new PlanExecutor(txn, ws, mis, collection));
 
+                // Each of the plan executors should yield automatically. We pass "false" to
+                // indicate that 'curExec' should not register itself, as it will get registered
+                // by ClientCursor instead.
+                curExec->setYieldPolicy(PlanExecutor::YIELD_AUTO, false);
+
                 // Need to save state while yielding locks between now and newGetMore.
                 curExec->saveState();
 

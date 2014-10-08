@@ -42,25 +42,8 @@ namespace mongo {
     class PlanStage;
     class PlanExecutor;
     struct PlanStageStats;
+    class PlanYieldPolicy;
     class WorkingSet;
-
-    /**
-     * RAII approach to ensuring that plan executors are deregistered.
-     *
-     * While retrieving the first batch of results, newRunQuery manually registers the executor with
-     * ClientCursor.  Certain query execution paths, namely $where, can throw an exception.  If we
-     * fail to deregister the executor, we will call invalidate/kill on the
-     * still-registered-yet-deleted executor.
-     *
-     * For any subsequent calls to getMore, the executor is already registered with ClientCursor
-     * by virtue of being cached, so this exception-proofing is not required.
-     */
-    struct ScopedExecutorRegistration {
-        ScopedExecutorRegistration(PlanExecutor* exec);
-        ~ScopedExecutorRegistration();
-
-        PlanExecutor* const _exec;
-    };
 
     /**
      * A PlanExecutor is the abstraction that knows how to crank a tree of stages into execution.
@@ -101,7 +84,27 @@ namespace mongo {
             YIELD_AUTO,
 
             // Owner must yield manually if yields are requested.  How to yield yourself:
-            // XXX: go on about this
+            //
+            // 0. Let's say you have PlanExecutor* exec.
+            //
+            // 1. Register your PlanExecutor with ClientCursor. Registered executors are informed
+            // about DiskLoc deletions and namespace invalidation, as well as other important
+            // events. Do this either by  calling registerExec() on the executor. This can be done
+            // once you get your executor, or could be done per-yield.
+            //
+            // 2. Call exec->saveState() before you yield.
+            //
+            // 3. Call Yield::yieldAllLocks(), passing in the executor's OperationContext*. This
+            // causes the executor to give up its locks and block so that it goes to the back of
+            // the scheduler's queue.
+            //
+            // 4. Call exec->restoreState() before using the executor again.
+            //
+            // 5. The next call to exec->getNext() may return DEAD.
+            //
+            // 6. Make sure the executor gets deregistered from ClientCursor. PlanExecutor does
+            // this in an RAII fashion when it is destroyed, or you can explicity call
+            // unregisterExec() on the PlanExecutor.
             YIELD_MANUAL,
         };
 
@@ -251,14 +254,14 @@ namespace mongo {
          * receives notifications for events that happen while yielding any locks.
          *
          * Deregistration happens automatically when this plan executor is destroyed.
-         *
-         * Used for internal clients of the query system:
-         *  -- InternalPlanner::collectionScan(...) (see internal_plans.h)
-         *  -- InternalPlanner::indexScan(...) (see internal_plans.h)
-         *  -- getOplogStartHack(...) (see new_find.cpp)
-         *  -- storeCurrentLocs(...) (see d_migrate.cpp)
          */
-        void registerExecInternalPlan();
+        void registerExec();
+
+        /**
+         * Unregister this PlanExecutor. Normally you want the PlanExecutor to be registered
+         * for its lifetime, and you shouldn't have to call this explicitly.
+         */
+        void deregisterExec();
 
         /**
          * If we're yielding locks, the database we're operating over or any collection we're
@@ -281,17 +284,36 @@ namespace mongo {
         static std::string statestr(ExecState s);
 
         /**
-         * Change the yield policy of the PlanExecutor to 'policy'.
+         * Change the yield policy of the PlanExecutor to 'policy'. If 'registerExecutor' is true,
+         * and the yield policy is YIELD_AUTO, then the plan executor gets registered to receive
+         * notifications of events from other threads.
          *
-         * XXX: everybody who sets the policy to YIELD_AUTO really wants to call
-         * registerExecInternalPlan immediately after EXCEPT new_find.cpp...so we expose
-         * the ability to register (or not) via registerExecutor, rather than require
-         * all users to have yet another RAII object.  Only new_find.cpp should ever
-         * set registerExecutor to false.
+         * Everybody who sets the policy to YIELD_AUTO really wants to call registerExec()
+         * immediately after EXCEPT commands that create cursors...so we expose the ability to
+         * register (or not) here, rather than require all users to have yet another RAII object.
+         * Only cursor-creating things like new_find.cpp set registerExecutor to false.
          */
         void setYieldPolicy(YieldPolicy policy, bool registerExecutor = true);
 
     private:
+        /**
+         * RAII approach to ensuring that plan executors are deregistered.
+         *
+         * While retrieving the first batch of results, newRunQuery manually registers the executor
+         * with ClientCursor.  Certain query execution paths, namely $where, can throw an exception.
+         * If we fail to deregister the executor, we will call invalidate/kill on the
+         * still-registered-yet-deleted executor.
+         *
+         * For any subsequent calls to getMore, the executor is already registered with ClientCursor
+         * by virtue of being cached, so this exception-proofing is not required.
+         */
+        struct ScopedExecutorRegistration {
+            ScopedExecutorRegistration(PlanExecutor* exec);
+            ~ScopedExecutorRegistration();
+
+            PlanExecutor* const _exec;
+        };
+
         /**
          * Initialize the namespace using either the canonical query or the collection.
          */
@@ -319,6 +341,10 @@ namespace mongo {
         // Did somebody drop an index we care about or the namespace we're looking at?  If so,
         // we'll be killed.
         bool _killed;
+
+        // If the yield policy is YIELD_AUTO, this is used to enforce automatic yielding. The plan
+        // may yield on any call to getNext() if this is non-NULL.
+        boost::scoped_ptr<PlanYieldPolicy> _yieldPolicy;
     };
 
 }  // namespace mongo
