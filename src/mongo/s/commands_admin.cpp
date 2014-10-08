@@ -580,7 +580,8 @@ namespace mongo {
                 for ( list<BSONObj>::iterator it = indexes.begin(); it != indexes.end(); ++it ) {
                     BSONObj idx = *it;
                     BSONObj currentKey = idx["key"].embeddedObject();
-                    if( ! proposedShardKey.isUniqueIndexCompatible( currentKey ) ) {
+                    bool isUnique = idx["unique"].trueValue();
+                    if (isUnique && !proposedShardKey.isUniqueIndexCompatible(currentKey)) {
                         errmsg = str::stream() << "can't shard collection '" << ns << "' "
                                                << "with unique index on " << currentKey << " "
                                                << "and proposed shard key " << proposedKey << ". "
