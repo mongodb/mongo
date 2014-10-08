@@ -132,12 +132,6 @@ namespace mongo {
             std::atomic<long long>* _numEntries;
             bool _increase;
         };
-
-        /**
-         * Creates an error code message out of a key
-         */
-        std::string
-            dupKeyError(const BSONObj& key) const;
     };
 
 } // namespace mongo

@@ -93,6 +93,9 @@ namespace mongo {
             return IndexKeyEntry( key, loc );
         }
 
+        /**
+         * Creates an error code message out of a key
+         */
         string dupKeyError(const BSONObj& key) {
             stringstream ss;
             ss << "E11000 duplicate key error ";
@@ -363,7 +366,7 @@ namespace mongo {
 
     class WriteBufferCopyIntoHandler : public rocksdb::WriteBatch::Handler {
     public:
-        WriteBufferCopyIntoHandler(rocksdb::WriteBatch* outWriteBatch,
+        WriteBufferCopyIntoHandler(rocksdb::WriteBatchWithIndex* outWriteBatch,
                                    rocksdb::ColumnFamilyHandle* columnFamily) :
                 _OutWriteBatch(outWriteBatch),
                 _columnFamily(columnFamily) { }
@@ -376,7 +379,7 @@ namespace mongo {
         }
 
     private:
-        rocksdb::WriteBatch* _OutWriteBatch;
+        rocksdb::WriteBatchWithIndex* _OutWriteBatch;
         rocksdb::ColumnFamilyHandle* _columnFamily;
     };
 
