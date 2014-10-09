@@ -17,7 +17,6 @@ __wt_rename(WT_SESSION_IMPL *session, const char *from, const char *to)
 	WT_DECL_RET;
 	uint32_t lasterror;
 	char *from_path, *to_path;
-	int exists;
 
 	WT_RET(__wt_verbose(
 		session, WT_VERB_FILEOPS, "rename %s to %s", from, to));

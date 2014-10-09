@@ -15,10 +15,9 @@ int
 __wt_read(
     WT_SESSION_IMPL *session, WT_FH *fh, wt_off_t offset, size_t len, void *buf)
 {
-	size_t chunk;
-	size_t nr;
+	DWORD chunk;
+	DWORD nr;
 	uint8_t *addr;
-	BOOL ret;
 	OVERLAPPED overlapped = { 0 };
 
 	nr = 0;
@@ -40,7 +39,7 @@ __wt_read(
 
 	/* Break reads larger than 1GB into 1GB chunks. */
 	for (addr = buf; len > 0; addr += nr, len -= (size_t)nr, offset += nr) {
-		chunk = WT_MIN(len, WT_GIGABYTE);
+		chunk = (DWORD)WT_MIN(len, WT_GIGABYTE);
 		overlapped.Offset = UINT32_MAX & offset;
 		overlapped.OffsetHigh = UINT32_MAX & (offset >> 32);
 
@@ -61,8 +60,8 @@ int
 __wt_write(WT_SESSION_IMPL *session,
     WT_FH *fh, wt_off_t offset, size_t len, const void *buf)
 {
-	size_t chunk;
-	size_t nw;
+	DWORD chunk;
+	DWORD nw;
 	const uint8_t *addr;
 	OVERLAPPED overlapped = { 0 };
 
@@ -85,7 +84,7 @@ __wt_write(WT_SESSION_IMPL *session,
 
 	/* Break writes larger than 1GB into 1GB chunks. */
 	for (addr = buf; len > 0; addr += nw, len -= (size_t)nw, offset += nw) {
-		chunk = WT_MIN(len, WT_GIGABYTE);
+		chunk = (DWORD)WT_MIN(len, WT_GIGABYTE);
 		overlapped.Offset = UINT32_MAX & offset;
 		overlapped.OffsetHigh = UINT32_MAX & (offset >> 32);
 

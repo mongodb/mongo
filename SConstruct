@@ -16,7 +16,7 @@ AddOption("--enable-snappy", dest="snappy", type="string", nargs=1, action="stor
 
 env = Environment(
     CPPPATH = ["#/src/include/", "#/."],
-    CFLAGS = ["/Z7"],
+    CFLAGS = ["/Z7", "/wd4090"],
     LINKFLAGS = ["/DEBUG"],
 )
 
@@ -112,7 +112,6 @@ env.Program("wt", [
     "src/utilities/util_create.c",
     "src/utilities/util_drop.c",
     "src/utilities/util_dump.c",
-    "src/utilities/util_getopt.c",
     "src/utilities/util_list.c",
     "src/utilities/util_load.c",
     "src/utilities/util_loadtext.c",

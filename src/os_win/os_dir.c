@@ -23,7 +23,7 @@ __wt_dirlist(WT_SESSION_IMPL *session, const char *dir, const char *prefix,
 	u_int count, dirsz;
 	int match;
 	char **entries, *path;
-	int pathlen;
+	size_t pathlen;
 
 	count = 0;
 	*dirlist = NULL;

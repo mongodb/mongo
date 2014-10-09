@@ -16,7 +16,6 @@ __wt_cond_alloc(WT_SESSION_IMPL *session,
     const char *name, int is_signalled, WT_CONDVAR **condp)
 {
 	WT_CONDVAR *cond;
-	WT_DECL_RET;
 
 	/*
 	 * !!!
@@ -34,9 +33,6 @@ __wt_cond_alloc(WT_SESSION_IMPL *session,
 
 	*condp = cond;
 	return (0);
-
-err:	__wt_free(session, cond);
-	return (ret);
 }
 
 /*
@@ -86,15 +82,15 @@ __wt_cond_wait(WT_SESSION_IMPL *session, WT_CONDVAR *cond, long usecs)
 
 	if (ret == 0) {
 		lasterror = GetLastError();
-		if (lasterror = ERROR_TIMEOUT) {
+		if (lasterror == ERROR_TIMEOUT) {
 			ret = 1;
 		}
 	}
 
 	(void)WT_ATOMIC_SUB4(cond->waiters, 1);
 
-err:	if (locked)
-			LeaveCriticalSection(&cond->mtx);
+	if (locked)
+		LeaveCriticalSection(&cond->mtx);
 	if (ret != 0)
 		return (0);
 	WT_RET_MSG(session, ret, "SleepConditionVariableCS");
@@ -130,8 +126,8 @@ __wt_cond_signal(WT_SESSION_IMPL *session, WT_CONDVAR *cond)
 		WakeAllConditionVariable(&cond->cond);
 	}
 
-err:	if (locked)
-			LeaveCriticalSection(&cond->mtx);
+	if (locked)
+		LeaveCriticalSection(&cond->mtx);
 	if (ret == 0)
 		return (0);
 	WT_RET_MSG(session, ret, "WakeAllConditionVariable");
@@ -192,8 +188,6 @@ err:		__wt_free(session, rwlock);
 int
 __wt_readlock(WT_SESSION_IMPL *session, WT_RWLOCK *rwlock)
 {
-	WT_DECL_RET;
-
 	WT_RET(__wt_verbose(session, WT_VERB_MUTEX,
 	    "rwlock: readlock %s (%p)", rwlock->name, rwlock));
 	WT_STAT_FAST_CONN_INCR(session, rwlock_read);
@@ -231,8 +225,6 @@ __wt_try_writelock(WT_SESSION_IMPL *session, WT_RWLOCK *rwlock)
 int
 __wt_writelock(WT_SESSION_IMPL *session, WT_RWLOCK *rwlock)
 {
-	WT_DECL_RET;
-
 	WT_RET(__wt_verbose(session, WT_VERB_MUTEX,
 	    "rwlock: writelock %s (%p)", rwlock->name, rwlock));
 	WT_STAT_FAST_CONN_INCR(session, rwlock_write);
@@ -251,8 +243,6 @@ __wt_writelock(WT_SESSION_IMPL *session, WT_RWLOCK *rwlock)
 int
 __wt_rwunlock(WT_SESSION_IMPL *session, WT_RWLOCK *rwlock)
 {
-	WT_DECL_RET;
-
 	if (rwlock->exclusive_locked != 0) {
 		rwlock->exclusive_locked = 0;
 		ReleaseSRWLockExclusive(&rwlock->rwlock);
@@ -261,6 +251,8 @@ __wt_rwunlock(WT_SESSION_IMPL *session, WT_RWLOCK *rwlock)
 
 	WT_RET(__wt_verbose(session, WT_VERB_MUTEX,
 	    "rwlock: unlock %s (%p)", rwlock->name, rwlock));
+
+	return (0);
 }
 
 /*
@@ -270,7 +262,6 @@ __wt_rwunlock(WT_SESSION_IMPL *session, WT_RWLOCK *rwlock)
 int
 __wt_rwlock_destroy(WT_SESSION_IMPL *session, WT_RWLOCK **rwlockp)
 {
-	WT_DECL_RET;
 	WT_RWLOCK *rwlock;
 
 	rwlock = *rwlockp;		/* Clear our caller's reference. */
@@ -284,4 +275,5 @@ __wt_rwlock_destroy(WT_SESSION_IMPL *session, WT_RWLOCK **rwlockp)
 	    "rwlock: destroy %s (%p)", rwlock->name, rwlock));
 
 	__wt_free(session, rwlock);
+	return (0);
 }
