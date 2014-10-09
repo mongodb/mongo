@@ -103,7 +103,12 @@ namespace mongo {
                 WorkingSet* ws = new WorkingSet();
                 MultiIteratorStage* mis = new MultiIteratorStage(txn, ws, collection);
                 // Takes ownership of 'ws' and 'mis'.
-                execs.push_back(new PlanExecutor(txn, ws, mis, collection));
+                auto_ptr<PlanExecutor> curExec(new PlanExecutor(txn, ws, mis, collection));
+
+                // Need to save state while yielding locks between now and newGetMore.
+                curExec->saveState();
+
+                execs.push_back(curExec.release());
             }
 
             // transfer iterators to executors using a round-robin distribution.

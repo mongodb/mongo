@@ -149,6 +149,10 @@ namespace mongo {
             cursor->setOwnedRecoveryUnit(txn->releaseRecoveryUnit());
             StorageEngine* storageEngine = getGlobalEnvironment()->getGlobalStorageEngine();
             txn->setRecoveryUnit(storageEngine->newRecoveryUnit(txn));
+
+            // Cursor needs to be in a saved state while we yield locks for getmore. State
+            // will be restored in newGetMore().
+            exec->saveState();
         }
 
         BSONObjBuilder cursorObj(result.subobjStart("cursor"));

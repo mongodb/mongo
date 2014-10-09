@@ -159,9 +159,8 @@ namespace mongo {
     }
 
     bool PlanExecutor::restoreState(OperationContext* opCtx) {
-        // SERVER-15526
-        // invariant(NULL == _opCtx);
-        // invariant(opCtx);
+        invariant(NULL == _opCtx);
+        invariant(opCtx);
 
         _opCtx = opCtx;
 
