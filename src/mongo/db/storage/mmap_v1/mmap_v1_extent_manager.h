@@ -88,12 +88,6 @@ namespace mongo {
         int numFiles() const;
         long long fileSize() const;
 
-        // TODO: make private
-        DataFile* getFile( OperationContext* txn,
-                           int n,
-                           int sizeNeeded = 0,
-                           bool preallocateOnly = false );
-
         // must call Extent::reuse on the returned extent
         DiskLoc allocateExtent( OperationContext* txn,
                                 bool capped,
@@ -142,6 +136,7 @@ namespace mongo {
         Extent* getExtent( const DiskLoc& loc, bool doSanityCheck = true ) const;
 
         void getFileFormat( OperationContext* txn, int* major, int* minor ) const;
+        void setFileFormat(OperationContext* txn, int major, int minor);
 
         const DataFile* getOpenFile( int n ) const { return _getOpenFile( n ); }
 
@@ -168,7 +163,8 @@ namespace mongo {
         void _setFreeListStart( OperationContext* txn, DiskLoc loc );
         void _setFreeListEnd( OperationContext* txn, DiskLoc loc );
 
-        const DataFile* _getOpenFile( int n ) const;
+        const DataFile* _getOpenFile(int fileId) const;
+        DataFile* _getOpenFile(int fileId);
 
         DiskLoc _createExtentInFile( OperationContext* txn,
                                      int fileNo,

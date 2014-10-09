@@ -119,10 +119,6 @@ namespace mongo {
         invariant(txn->lockState()->isWriteLocked(name));
 
         try {
-            uassert(17507,
-                    "Cannot open or create database while out of disk space",
-                    !FileAllocator::get()->hasFailed());
-
             WriteUnitOfWork wunit(txn);
 
             Status s = _extentManager.init(txn);
@@ -475,9 +471,7 @@ namespace mongo {
 
         invariant( minor == PDFILE_VERSION_MINOR_22_AND_OLDER );
 
-        DataFile* df = _extentManager.getFile( opCtx, 0 );
-        opCtx->recoveryUnit()->writingInt(df->getHeader()->versionMinor) =
-            PDFILE_VERSION_MINOR_24_AND_NEWER;
+        _extentManager.setFileFormat(opCtx, major, PDFILE_VERSION_MINOR_24_AND_NEWER);
     }
 
     bool MMAPV1DatabaseCatalogEntry::currentFilesCompatible( OperationContext* opCtx ) const {
