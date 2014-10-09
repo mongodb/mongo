@@ -50,7 +50,11 @@ __wt_nfilename(
 	else {
 		len = strlen(conn->home) + 1 + namelen + 1;
 		WT_RET(__wt_calloc(session, 1, len, &buf));
+#ifdef _WIN32
+		snprintf(buf, len, "%s\\%.*s", conn->home, (int)namelen, name);
+#else
 		snprintf(buf, len, "%s/%.*s", conn->home, (int)namelen, name);
+#endif
 		*path = buf;
 	}
 

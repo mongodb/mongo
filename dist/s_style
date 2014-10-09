@@ -47,7 +47,8 @@ done
 
 for f in \
     `find bench examples ext src test -name '*.[chisy]' -o -name '*.in' |
-    sed '/Makefile.in/d'`; do
+    sed -e '/Makefile.in/d' \
+	-e '/os_win_wiredtiger_config.h/d'`; do
 	if grep "^[^}]*while (0);" $f > $t; then
 		echo "$f: while (0) has trailing semi-colon"
 		cat $t

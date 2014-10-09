@@ -51,7 +51,11 @@ struct __wt_fh {
 
 	WT_SPINLOCK lock;			/* Handle lock */
 
+#ifndef _WIN32
 	int	 fd;				/* POSIX file handle */
+#else
+	HANDLE filehandle;			/* Windows file handle */
+#endif
 	wt_off_t size;				/* File size */
 	wt_off_t extend_size;			/* File extended size */
 	wt_off_t extend_len;			/* File extend chunk size */
