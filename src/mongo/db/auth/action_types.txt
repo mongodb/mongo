@@ -17,6 +17,7 @@
 "changeOwnPassword",
 "changeOwnCustomData",
 "cleanupOrphaned",
+"closeAllDatabases",  # Deprecated, needs to stay around for backwards compatibility
 "collMod",
 "collStats",
 "compact",
