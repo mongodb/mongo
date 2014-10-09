@@ -88,7 +88,6 @@ namespace repl {
         SyncSourceFeedback syncSourceFeedback;
 
         OpTime lastOpTimeWritten;
-        OpTime getEarliestOpTimeWritten(OperationContext* txn) const;
 
         Status forceSyncFrom(const string& host, BSONObjBuilder* result);
         // Check if the current sync target is suboptimal. This must be called while holding a mutex

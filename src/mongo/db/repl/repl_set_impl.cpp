@@ -403,13 +403,6 @@ namespace {
         }
     }
 
-    OpTime ReplSetImpl::getEarliestOpTimeWritten(OperationContext* txn) const {
-        BSONObj o;
-        uassert(17347, "Problem reading earliest entry from oplog",
-                Helpers::getSingleton(txn, rsoplog, o));
-        return o["ts"]._opTime();
-    }
-
     // call after constructing to start - returns fairly quickly after launching its threads
     void ReplSetImpl::_go() {
         OperationContextImpl txn;
