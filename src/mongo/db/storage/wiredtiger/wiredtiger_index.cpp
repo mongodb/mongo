@@ -135,7 +135,7 @@ namespace {
             return 0;
     }
 
-    extern "C" int index_collator_extension(WT_CONNECTION *conn, WT_CONFIG_ARG *cfg) {
+    extern "C" MONGO_COMPILER_API_EXPORT int index_collator_extension(WT_CONNECTION *conn, WT_CONFIG_ARG *cfg) {
             static WT_COLLATOR idx_static;
 
             idx_static.customize = index_collator_customize;
