@@ -46,18 +46,18 @@ __wt_epoch(WT_SESSION_IMPL *session, struct timespec *tsp)
 
 /*
  * localtime_r --
- *	Return the current local time
+ *	Return the current local time.
  */
- struct tm *
+struct tm *
 localtime_r(const time_t * timer, struct tm * result)
 {
-    errno_t err;
+	errno_t err;
 
-    err = localtime_s(timer, result);
-    if (err != 0) {
-	    __wt_err(NULL, err, "localtime_s");
-	    return (NULL);
-    }
+	err = localtime_s(timer, result);
+	if (err != 0) {
+		__wt_err(NULL, err, "localtime_s");
+		return (NULL);
+	}
 
-    return (result);
+	return (result);
 }
