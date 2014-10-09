@@ -932,12 +932,38 @@ namespace mongo {
             uassertStatusOK(status);
         }
 
+        const int notMasterCodeForInsert = 10058; // This is different from ErrorCodes::NotMaster
+        {
+            const bool isIndexBuild = (nsToCollectionSubstring(ns) == "system.indexes");
+            const newlm::LockMode mode = isIndexBuild ? newlm::MODE_X : newlm::MODE_IX;
+            Lock::DBLock dbLock(txn->lockState(), nsString.db(), mode);
+            Lock::CollectionLock collLock(txn->lockState(), nsString.ns(), mode);
+
+            // CONCURRENCY TODO: is being read locked in big log sufficient here?
+            // writelock is used to synchronize stepdowns w/ writes
+            uassert(notMasterCodeForInsert, "not master",
+                    repl::getGlobalReplicationCoordinator()->canAcceptWritesForDatabase(nsString.db()));
+
+            Client::Context ctx(txn, ns);
+            if (mode == newlm::MODE_X || ctx.db()->getCollection(txn, nsString)) {
+                if (multi.size() > 1) {
+                    const bool keepGoing = d.reservedField() & InsertOption_ContinueOnError;
+                    insertMulti(txn, ctx, keepGoing, ns, multi, op);
+                } else {
+                    checkAndInsert(txn, ctx, ns, multi[0]);
+                    globalOpCounters.incInsertInWriteLock(1);
+                    op.debug().ninserted = 1;
+                }
+                return;
+            }
+        }
+
+        // Collection didn't exist so try again with MODE_X
         Lock::DBLock dbLock(txn->lockState(), nsString.db(), newlm::MODE_X);
-        // TODO(SERVER-14668): Use IX coll lock except for system.indexes or non-existing
 
         // CONCURRENCY TODO: is being read locked in big log sufficient here?
         // writelock is used to synchronize stepdowns w/ writes
-        uassert(10058 , "not master",
+        uassert(notMasterCodeForInsert, "not master",
                 repl::getGlobalReplicationCoordinator()->canAcceptWritesForDatabase(nsString.db()));
 
         Client::Context ctx(txn, ns);

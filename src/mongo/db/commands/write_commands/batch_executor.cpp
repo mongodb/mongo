@@ -718,10 +718,11 @@ namespace mongo {
         std::vector<StatusWith<BSONObj> > normalizedInserts;
 
     private:
-        bool _lockAndCheckImpl(WriteOpResult* result);
+        bool _lockAndCheckImpl(WriteOpResult* result, bool intentLock=true);
 
         // Guard object for the write lock on the target database.
         scoped_ptr<Lock::DBLock> _writeLock;
+        scoped_ptr<Lock::CollectionLock> _collLock;
 
         // Context object on the target database.  Must appear after writeLock, so that it is
         // destroyed in proper order.
@@ -912,7 +913,8 @@ namespace mongo {
         _collection(NULL) {
     }
 
-    bool WriteBatchExecutor::ExecInsertsState::_lockAndCheckImpl(WriteOpResult* result) {
+    bool WriteBatchExecutor::ExecInsertsState::_lockAndCheckImpl(WriteOpResult* result,
+                                                                 bool intentLock) {
         if (hasLock()) {
             // TODO: Client::Context legacy, needs to be removed
             txn->getCurOp()->enter(_context->ns(),
@@ -920,10 +922,16 @@ namespace mongo {
             return true;
         }
 
+        if (request->isInsertIndexRequest())
+            intentLock = false; // can't build indexes in intent mode
+
         invariant(!_context.get());
         _writeLock.reset(new Lock::DBLock(txn->lockState(),
                                           nsToDatabase(request->getNS()),
-                                          newlm::MODE_X));
+                                          intentLock ? newlm::MODE_IX : newlm::MODE_X));
+        _collLock.reset(new Lock::CollectionLock(txn->lockState(),
+                                                 request->getNS(),
+                                                 intentLock ? newlm::MODE_IX : newlm::MODE_X));
         if (!checkIsMasterForDatabase(request->getNS(), result)) {
             return false;
         }
@@ -940,6 +948,12 @@ namespace mongo {
         dassert(database);
         _collection = database->getCollection(txn, request->getTargetingNS());
         if (!_collection) {
+            if (intentLock) {
+                // try again with full X lock.
+                unlock();
+                return _lockAndCheckImpl(result, false);
+            }
+
             WriteUnitOfWork wunit (txn);
             // Implicitly create if it doesn't exist
             _collection = database->createCollection(txn, request->getTargetingNS());
@@ -969,6 +983,7 @@ namespace mongo {
     void WriteBatchExecutor::ExecInsertsState::unlock() {
         _collection = NULL;
         _context.reset();
+        _collLock.reset();
         _writeLock.reset();
     }
 
