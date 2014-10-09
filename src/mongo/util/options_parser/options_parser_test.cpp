@@ -2139,14 +2139,14 @@ namespace {
 
         ASSERT_OK(parser.run(testOpts, argv, env_map, &environment));
         ASSERT_TRUE(environment.count("port"));
-        int port;
         try {
+            int port;
             port = environment["port"].as<int>();
+            ASSERT_EQUALS(port, 5);
         }
         catch ( std::exception &e ) {
             FAIL(e.what());
         }
-        ASSERT_EQUALS(port, 5);
     }
 
     TEST(LegacyInterface, NotSpecified) {

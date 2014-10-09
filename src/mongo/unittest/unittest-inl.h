@@ -37,14 +37,5 @@ namespace mongo {
             Suite::getSuite(suiteName)->add<T>(testName);
         }
 
-        template<typename A, typename B>
-        std::string ComparisonAssertion::getComparisonFailureMessage(const std::string &theOperator,
-                                                                     const A &a, const B &b) {
-            std::ostringstream os;
-            os << "Expected " << _aexp << " " << theOperator << " " << _bexp
-               << " (" << a << " " << theOperator << " " << b << ")";
-            return os.str();
-        }
-
     }  // namespace mongo
 }  // namespace unittest

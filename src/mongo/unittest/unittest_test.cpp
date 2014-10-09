@@ -46,12 +46,12 @@ namespace {
         return value.find(pattern) != std::string::npos;
     }
 
-#define ASSERT_TEST_FAILS(TEST_EXPR)                                    \
-    ASSERT_THROWS((TEST_EXPR), mongo::unittest::TestAssertionFailureException)
+#define ASSERT_TEST_FAILS(TEST_STMT)                                    \
+    ASSERT_THROWS(TEST_STMT, mongo::unittest::TestAssertionFailureException)
 
-#define ASSERT_TEST_FAILS_MATCH(TEST_EXPR, PATTERN)                     \
+#define ASSERT_TEST_FAILS_MATCH(TEST_STMT, PATTERN)                     \
     ASSERT_THROWS_PRED(                                                 \
-            TEST_EXPR,                                                  \
+            TEST_STMT,                                                  \
             mongo::unittest::TestAssertionFailureException,             \
             stdx::bind(containsPattern,                                 \
                        PATTERN,                                         \
@@ -122,6 +122,12 @@ namespace {
         ASSERT_TEST_FAILS_MATCH(ASSERT_TRUE(false) << "Told you so", "Told you so");
         ASSERT_TEST_FAILS_MATCH(ASSERT(false) << "Told you so", "Told you so");
         ASSERT_TEST_FAILS_MATCH(ASSERT_FALSE(true) << "Told you so", "Told you so");
+        ASSERT_TEST_FAILS_MATCH(ASSERT_EQUALS(1, 2) << "Told you so", "Told you so");
+    }
+
+    TEST(UnitTestSelfTest, TestNoDoubleEvaluation) {
+        int i = 0;
+        ASSERT_TEST_FAILS_MATCH(ASSERT_EQ(0, ++i), "(0 == 1)");
     }
 
 }  // namespace

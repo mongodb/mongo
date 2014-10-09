@@ -371,37 +371,41 @@ namespace {
         TestAssertionFailure::TestAssertionFailure(const std::string& file,
                                                    unsigned line,
                                                    const std::string& message)
-            : _exception(file, line, message) {}
+            : _exception(file, line, message), _enabled(false) {}
+
+        TestAssertionFailure::TestAssertionFailure(const TestAssertionFailure& other) :
+            _exception(other._exception), _enabled(false) {
+
+            invariant(!other._enabled);
+        }
+
+        TestAssertionFailure& TestAssertionFailure::operator=(const TestAssertionFailure& other) {
+            invariant(!_enabled);
+            invariant(!other._enabled);
+            _exception = other._exception;
+            return *this;
+        }
 
         TestAssertionFailure::~TestAssertionFailure()
 #if __cplusplus >= 201103
         noexcept(false)
 #endif
         {
-            if (!_stream.str().empty())
+            if (!_enabled) {
+                invariant(_stream.str().empty());
+                return;
+            }
+            if (!_stream.str().empty()) {
                 _exception.setMessage(_exception.getMessage() + " " + _stream.str());
+            }
             throw _exception;
         }
 
         std::ostream& TestAssertionFailure::stream() {
+            invariant(!_enabled);
+            _enabled = true;
             return _stream;
         }
-
-        TestAssertion::TestAssertion( const char* file, unsigned line )
-            : _file( file ), _line( line ) {
-
-            ++Result::cur->_asserts;
-        }
-
-        TestAssertion::~TestAssertion() {}
-
-        void TestAssertion::fail( const std::string& message ) const {
-            throw TestAssertionFailureException( _file, _line, message );
-        }
-
-        ComparisonAssertion::ComparisonAssertion( const char* aexp, const char* bexp,
-                                                  const char* file, unsigned line )
-            : TestAssertion( file, line ), _aexp( aexp ), _bexp( bexp ) {}
 
         std::vector<std::string> getAllSuiteNames() {
             std::vector<std::string> result;
