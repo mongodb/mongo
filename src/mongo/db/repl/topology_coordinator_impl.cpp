@@ -1548,6 +1548,7 @@ namespace {
         case NotInitialized:
             return "node is not a member of a valid replica set configuration";
         }
+        invariant(false); // unreachable
     }
 
     int TopologyCoordinatorImpl::_getPing(const HostAndPort& host) {
