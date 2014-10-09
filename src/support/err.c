@@ -145,7 +145,11 @@ __wt_eventv(WT_SESSION_IMPL *session, int msg_event, int error,
 	WT_EVENT_HANDLER *handler;
 	WT_DECL_RET;
 	WT_SESSION *wt_session;
+#ifndef _WIN32
 	pthread_t self;
+#else
+	DWORD self;
+#endif
 	struct timespec ts;
 	size_t len, remain, wlen;
 	int prefix_cnt;
@@ -191,13 +195,22 @@ __wt_eventv(WT_SESSION_IMPL *session, int msg_event, int error,
 	prefix_cnt = 0;
 	if (__wt_epoch(session, &ts) == 0) {
 		remain = WT_PTRDIFF(end, p);
+#ifndef _WIN32
 		self = pthread_self();
+#else
+		self = GetCurrentThreadId();
+#endif
 		__wt_raw_to_hex_mem((const uint8_t *)&self, sizeof(self),
 		    tid, sizeof(tid));
 		wlen = (size_t)snprintf(p, remain,
 		    "[%" PRIuMAX ":%" PRIuMAX "][%" PRIu64 ":%s]",
 		    (uintmax_t)ts.tv_sec, (uintmax_t)ts.tv_nsec / 1000,
-		    (uint64_t)getpid(), tid);
+#ifndef _WIN32
+		    (uint64_t)getpid(),
+#else
+		    (uint64_t)GetCurrentProcessId(),
+#endif
+		    tid);
 		p = wlen >= remain ? end : p + wlen;
 		prefix_cnt = 1;
 	}
