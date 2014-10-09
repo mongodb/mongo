@@ -8,16 +8,6 @@
 #include "wt_internal.h"
 
 /*
- * __wt_absolute_path --
- *	Return if a filename is an absolute path.
- */
-int
-__wt_absolute_path(const char *path)
-{
-	return (path[0] == '/' ? 1 : 0);
-}
-
-/*
  * __wt_filename --
  *	Build a file name in a scratch buffer, automatically calculate the
  *	length of the file name.
@@ -50,11 +40,8 @@ __wt_nfilename(
 	else {
 		len = strlen(conn->home) + 1 + namelen + 1;
 		WT_RET(__wt_calloc(session, 1, len, &buf));
-#ifdef _WIN32
-		snprintf(buf, len, "%s\\%.*s", conn->home, (int)namelen, name);
-#else
-		snprintf(buf, len, "%s/%.*s", conn->home, (int)namelen, name);
-#endif
+		snprintf(buf, len, "%s%s%.*s",
+		    conn->home, __wt_path_separator(), (int)namelen, name);
 		*path = buf;
 	}
 
