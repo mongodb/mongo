@@ -222,7 +222,7 @@ func fileDirExists(name string) bool {
 }
 
 func TestMongoDumpValidateOptions(t *testing.T) {
-	testutil.VerifyTestType(t, "unit")
+	testutil.VerifyTestType(t, testutil.UNIT_TEST_TYPE)
 
 	Convey("With a MongoDump instance", t, func() {
 		md := simpleMongoDumpInstance()
@@ -258,7 +258,7 @@ func TestMongoDumpValidateOptions(t *testing.T) {
 }
 
 func TestMongoDumpBSON(t *testing.T) {
-	testutil.VerifyTestType(t, "integration")
+	testutil.VerifyTestType(t, testutil.INTEGRATION_TEST_TYPE)
 	log.SetWriter(ioutil.Discard)
 
 	Convey("With a MongoDump instance", t, func() {
@@ -476,7 +476,7 @@ func TestMongoDumpBSON(t *testing.T) {
 }
 
 func TestMongoDumpMetaData(t *testing.T) {
-	testutil.VerifyTestType(t, "integration")
+	testutil.VerifyTestType(t, testutil.INTEGRATION_TEST_TYPE)
 	log.SetWriter(ioutil.Discard)
 
 	Convey("With a MongoDump instance", t, func() {

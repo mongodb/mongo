@@ -2,6 +2,7 @@ package mongoimport
 
 import (
 	"bytes"
+	"github.com/mongodb/mongo-tools/common/testutil"
 	. "github.com/smartystreets/goconvey/convey"
 	"gopkg.in/mgo.v2/bson"
 	"io"
@@ -11,7 +12,7 @@ import (
 )
 
 func TestJSONArrayImportDocument(t *testing.T) {
-	testutil.VerifyTestType(t, "unit")
+	testutil.VerifyTestType(t, testutil.UNIT_TEST_TYPE)
 
 	Convey("With a JSON array import input", t, func() {
 		var err error
@@ -78,7 +79,7 @@ func TestJSONArrayImportDocument(t *testing.T) {
 }
 
 func TestJSONPlainImportDocument(t *testing.T) {
-	testutil.VerifyTestType(t, "unit")
+	testutil.VerifyTestType(t, testutil.UNIT_TEST_TYPE)
 
 	Convey("With a plain JSON import input", t, func() {
 		var err error
@@ -150,7 +151,7 @@ func TestJSONPlainImportDocument(t *testing.T) {
 }
 
 func TestReadJSONArraySeparator(t *testing.T) {
-	testutil.VerifyTestType(t, "unit")
+	testutil.VerifyTestType(t, testutil.UNIT_TEST_TYPE)
 
 	Convey("With an array JSON import input", t, func() {
 		var err error

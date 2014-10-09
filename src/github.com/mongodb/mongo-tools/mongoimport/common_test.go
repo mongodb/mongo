@@ -3,6 +3,7 @@ package mongoimport
 import (
 	"github.com/mongodb/mongo-tools/common/log"
 	"github.com/mongodb/mongo-tools/common/options"
+	"github.com/mongodb/mongo-tools/common/testutil"
 	. "github.com/smartystreets/goconvey/convey"
 	"gopkg.in/mgo.v2/bson"
 	"io"
@@ -19,7 +20,7 @@ func init() {
 }
 
 func TestValidateHeaders(t *testing.T) {
-	testutil.VerifyTestType(t, "unit")
+	testutil.VerifyTestType(t, testutil.UNIT_TEST_TYPE)
 
 	Convey("Given an import input, in validating the headers", t, func() {
 		fields := []string{"a", "b", "c"}
@@ -83,7 +84,7 @@ func TestValidateHeaders(t *testing.T) {
 }
 
 func TestGetUpsertValue(t *testing.T) {
-	testutil.VerifyTestType(t, "unit")
+	testutil.VerifyTestType(t, testutil.UNIT_TEST_TYPE)
 
 	Convey("Given a field and a BSON document, on calling getUpsertValue", t,
 		func() {
@@ -157,7 +158,7 @@ func TestConstructUpsertDocument(t *testing.T) {
 }
 
 func TestGetParsedValue(t *testing.T) {
-	testutil.VerifyTestType(t, "unit")
+	testutil.VerifyTestType(t, testutil.UNIT_TEST_TYPE)
 
 	Convey("Given a string token to parse", t, func() {
 		Convey("an int token should return the underlying int value", func() {
@@ -173,7 +174,7 @@ func TestGetParsedValue(t *testing.T) {
 }
 
 func TestSetNestedValue(t *testing.T) {
-	testutil.VerifyTestType(t, "unit")
+	testutil.VerifyTestType(t, testutil.UNIT_TEST_TYPE)
 
 	Convey("Given a field, its value, and an existing BSON document...", t, func() {
 		currentDocument := bson.M{

@@ -8,7 +8,7 @@ import (
 )
 
 func TestStatLine(t *testing.T) {
-	testutil.VerifyTestType(t, "unit")
+	testutil.VerifyTestType(t, testutil.UNIT_TEST_TYPE)
 
 	faultsOld := int64(10)
 	faultsNew := int64(15)

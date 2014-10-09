@@ -2,6 +2,7 @@ package mongoimport
 
 import (
 	"bytes"
+	"github.com/mongodb/mongo-tools/common/testutil"
 	. "github.com/smartystreets/goconvey/convey"
 	"gopkg.in/mgo.v2/bson"
 	"io"
@@ -13,7 +14,7 @@ import (
 
 // TODO: currently doesn't work for lines like `a, b, "cccc,cccc", d`
 func TestTSVImportDocument(t *testing.T) {
-	testutil.VerifyTestType(t, "unit")
+	testutil.VerifyTestType(t, testutil.UNIT_TEST_TYPE)
 
 	Convey("With a TSV import input", t, func() {
 		Convey("integer valued strings should be converted", func() {
@@ -126,7 +127,7 @@ func TestTSVImportDocument(t *testing.T) {
 }
 
 func TestTSVSetHeader(t *testing.T) {
-	testutil.VerifyTestType(t, "unit")
+	testutil.VerifyTestType(t, testutil.UNIT_TEST_TYPE)
 
 	var err error
 	var tsvFile, fileHandle *os.File

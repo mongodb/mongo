@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"github.com/mongodb/mongo-tools/common/log"
 	"github.com/mongodb/mongo-tools/common/options"
+	"github.com/mongodb/mongo-tools/common/testutil"
 	. "github.com/smartystreets/goconvey/convey"
 	"gopkg.in/mgo.v2/bson"
 	"io"
@@ -19,7 +20,7 @@ func init() {
 }
 
 func TestCSVImportDocument(t *testing.T) {
-	testutil.VerifyTestType(t, "unit")
+	testutil.VerifyTestType(t, testutil.UNIT_TEST_TYPE)
 
 	Convey("With a CSV import input", t, func() {
 		var err error
@@ -137,7 +138,7 @@ func TestCSVImportDocument(t *testing.T) {
 }
 
 func TestCSVSetHeader(t *testing.T) {
-	testutil.VerifyTestType(t, "unit")
+	testutil.VerifyTestType(t, testutil.UNIT_TEST_TYPE)
 
 	var err error
 	Convey("With a CSV import input", t, func() {

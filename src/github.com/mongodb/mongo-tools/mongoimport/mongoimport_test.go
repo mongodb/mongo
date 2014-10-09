@@ -42,7 +42,7 @@ var (
 )
 
 func TestMongoImportValidateSettings(t *testing.T) {
-	testutil.VerifyTestType(t, "unit")
+	testutil.VerifyTestType(t, testutil.UNIT_TEST_TYPE)
 
 	Convey("Given a mongoimport instance for validation, ", t, func() {
 		Convey("an error should be thrown if no database is given", func() {
@@ -242,7 +242,7 @@ func TestMongoImportValidateSettings(t *testing.T) {
 }
 
 func TestGetInputReader(t *testing.T) {
-	testutil.VerifyTestType(t, "unit")
+	testutil.VerifyTestType(t, testutil.UNIT_TEST_TYPE)
 
 	Convey("Given a mongoimport instance, on calling getInputReader", t,
 		func() {
@@ -283,7 +283,7 @@ func TestGetInputReader(t *testing.T) {
 }
 
 func TestRemoveBlankFields(t *testing.T) {
-	testutil.VerifyTestType(t, "unit")
+	testutil.VerifyTestType(t, testutil.UNIT_TEST_TYPE)
 
 	Convey("Given an unordered BSON document", t, func() {
 		Convey("the same document should be returned if there are no blanks",
@@ -304,7 +304,7 @@ func TestRemoveBlankFields(t *testing.T) {
 }
 
 func TestGetImportInput(t *testing.T) {
-	testutil.VerifyTestType(t, "unit")
+	testutil.VerifyTestType(t, testutil.UNIT_TEST_TYPE)
 
 	Convey("Given a io.Reader on calling getImportInput", t, func() {
 		Convey("no error should be thrown if neither --fields nor --fieldFile "+
@@ -385,7 +385,7 @@ func TestGetImportInput(t *testing.T) {
 }
 
 func TestImportDocuments(t *testing.T) {
-	testutil.VerifyTestType(t, "integration")
+	testutil.VerifyTestType(t, testutil.INTEGRATION_TEST_TYPE)
 
 	Convey("Given a mongoimport instance with which to import documents, on "+
 		"calling importDocuments", t, func() {

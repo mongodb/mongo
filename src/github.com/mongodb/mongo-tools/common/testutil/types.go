@@ -6,9 +6,14 @@ import (
 	"testing"
 )
 
+const (
+	INTEGRATION_TEST_TYPE = "integration"
+	UNIT_TEST_TYPE        = "unit"
+)
+
 var (
 	// the types of tests that should be run
-	testTypes = flag.String("test.types", "unit", "Comma-separated list of the"+
+	testTypes = flag.String("test.types", UNIT_TEST_TYPE, "Comma-separated list of the"+
 		" types of tests to be run")
 	// above, split on the comma
 	testTypesParsed []string

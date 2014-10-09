@@ -37,7 +37,7 @@ func TestCreateAllIntents(t *testing.T) {
 	var mr *MongoRestore
 	var buff bytes.Buffer
 
-	testutil.VerifyTestType(t, "unit")
+	testutil.VerifyTestType(t, testutil.UNIT_TEST_TYPE)
 
 	Convey("With a test MongoRestore", t, func() {
 		mr = &MongoRestore{

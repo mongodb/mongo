@@ -11,7 +11,7 @@ import (
 )
 
 func TestExtendedJSON(t *testing.T) {
-	testutil.VerifyTestType(t, "unit")
+	testutil.VerifyTestType(t, testutil.UNIT_TEST_TYPE)
 
 	Convey("Serializing a doc to extended JSON should work", t, func() {
 		x := bson.M{
