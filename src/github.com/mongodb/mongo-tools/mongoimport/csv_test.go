@@ -19,6 +19,8 @@ func init() {
 }
 
 func TestCSVImportDocument(t *testing.T) {
+	testutil.VerifyTestType(t, "unit")
+
 	Convey("With a CSV import input", t, func() {
 		var err error
 		Convey("badly encoded csv should result in a parsing error", func() {
@@ -135,6 +137,8 @@ func TestCSVImportDocument(t *testing.T) {
 }
 
 func TestCSVSetHeader(t *testing.T) {
+	testutil.VerifyTestType(t, "unit")
+
 	var err error
 	Convey("With a CSV import input", t, func() {
 		Convey("setting the header should read the first line of the CSV",

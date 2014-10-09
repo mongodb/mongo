@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"github.com/mongodb/mongo-tools/common/db"
 	commonOpts "github.com/mongodb/mongo-tools/common/options"
+	"github.com/mongodb/mongo-tools/common/testutil"
 	"github.com/mongodb/mongo-tools/mongoimport/options"
 	. "github.com/smartystreets/goconvey/convey"
 	"gopkg.in/mgo.v2/bson"
@@ -41,6 +42,8 @@ var (
 )
 
 func TestMongoImportValidateSettings(t *testing.T) {
+	testutil.VerifyTestType(t, "unit")
+
 	Convey("Given a mongoimport instance for validation, ", t, func() {
 		Convey("an error should be thrown if no database is given", func() {
 			namespace := &commonOpts.Namespace{}
@@ -239,6 +242,8 @@ func TestMongoImportValidateSettings(t *testing.T) {
 }
 
 func TestGetInputReader(t *testing.T) {
+	testutil.VerifyTestType(t, "unit")
+
 	Convey("Given a mongoimport instance, on calling getInputReader", t,
 		func() {
 			Convey("an error should be thrown if the given file referenced by "+
@@ -278,6 +283,8 @@ func TestGetInputReader(t *testing.T) {
 }
 
 func TestRemoveBlankFields(t *testing.T) {
+	testutil.VerifyTestType(t, "unit")
+
 	Convey("Given an unordered BSON document", t, func() {
 		Convey("the same document should be returned if there are no blanks",
 			func() {
@@ -297,6 +304,8 @@ func TestRemoveBlankFields(t *testing.T) {
 }
 
 func TestGetImportInput(t *testing.T) {
+	testutil.VerifyTestType(t, "unit")
+
 	Convey("Given a io.Reader on calling getImportInput", t, func() {
 		Convey("no error should be thrown if neither --fields nor --fieldFile "+
 			"is used", func() {
@@ -376,6 +385,8 @@ func TestGetImportInput(t *testing.T) {
 }
 
 func TestImportDocuments(t *testing.T) {
+	testutil.VerifyTestType(t, "integration")
+
 	Convey("Given a mongoimport instance with which to import documents, on "+
 		"calling importDocuments", t, func() {
 		Convey("no error should be thrown for CSV import on test data and all "+

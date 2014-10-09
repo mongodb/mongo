@@ -11,6 +11,8 @@ import (
 )
 
 func TestJSONArrayImportDocument(t *testing.T) {
+	testutil.VerifyTestType(t, "unit")
+
 	Convey("With a JSON array import input", t, func() {
 		var err error
 		var jsonFile, fileHandle *os.File
@@ -76,6 +78,8 @@ func TestJSONArrayImportDocument(t *testing.T) {
 }
 
 func TestJSONPlainImportDocument(t *testing.T) {
+	testutil.VerifyTestType(t, "unit")
+
 	Convey("With a plain JSON import input", t, func() {
 		var err error
 		var jsonFile, fileHandle *os.File
@@ -146,6 +150,8 @@ func TestJSONPlainImportDocument(t *testing.T) {
 }
 
 func TestReadJSONArraySeparator(t *testing.T) {
+	testutil.VerifyTestType(t, "unit")
+
 	Convey("With an array JSON import input", t, func() {
 		var err error
 		Convey("reading a JSON array separator should consume [",

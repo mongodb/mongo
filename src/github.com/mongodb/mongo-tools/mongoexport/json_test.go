@@ -2,14 +2,16 @@ package mongoexport
 
 import (
 	"bytes"
-	//"fmt"
 	"encoding/json"
+	"github.com/mongodb/mongo-tools/common/testutil"
 	. "github.com/smartystreets/goconvey/convey"
 	"gopkg.in/mgo.v2/bson"
 	"testing"
 )
 
 func TestWriteJSON(t *testing.T) {
+	testutil.VerifyTestType(t, "unit")
+
 	Convey("With a JSON export output", t, func() {
 		out := &bytes.Buffer{}
 
@@ -36,6 +38,8 @@ func TestWriteJSON(t *testing.T) {
 }
 
 func TestJSONArray(t *testing.T) {
+	testutil.VerifyTestType(t, "unit")
+
 	Convey("With a JSON export output in array mode", t, func() {
 		out := &bytes.Buffer{}
 		Convey("exporting a bunch of documents should produce valid json", func() {

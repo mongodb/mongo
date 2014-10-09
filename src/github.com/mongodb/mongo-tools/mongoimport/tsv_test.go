@@ -13,6 +13,8 @@ import (
 
 // TODO: currently doesn't work for lines like `a, b, "cccc,cccc", d`
 func TestTSVImportDocument(t *testing.T) {
+	testutil.VerifyTestType(t, "unit")
+
 	Convey("With a TSV import input", t, func() {
 		Convey("integer valued strings should be converted", func() {
 			contents := "1\t2\t3e\n"
@@ -124,6 +126,8 @@ func TestTSVImportDocument(t *testing.T) {
 }
 
 func TestTSVSetHeader(t *testing.T) {
+	testutil.VerifyTestType(t, "unit")
+
 	var err error
 	var tsvFile, fileHandle *os.File
 	Convey("With a TSV import input", t, func() {

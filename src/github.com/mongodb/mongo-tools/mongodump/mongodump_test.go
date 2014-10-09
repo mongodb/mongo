@@ -258,7 +258,7 @@ func TestMongoDumpValidateOptions(t *testing.T) {
 }
 
 func TestMongoDumpBSON(t *testing.T) {
-	testutil.VerifyTestType(t, "unit")
+	testutil.VerifyTestType(t, "integration")
 	log.SetWriter(ioutil.Discard)
 
 	Convey("With a MongoDump instance", t, func() {
@@ -476,7 +476,7 @@ func TestMongoDumpBSON(t *testing.T) {
 }
 
 func TestMongoDumpMetaData(t *testing.T) {
-	testutil.VerifyTestType(t, "unit")
+	testutil.VerifyTestType(t, "integration")
 	log.SetWriter(ioutil.Discard)
 
 	Convey("With a MongoDump instance", t, func() {

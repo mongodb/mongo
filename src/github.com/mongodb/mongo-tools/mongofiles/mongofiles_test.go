@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"github.com/mongodb/mongo-tools/common/db"
 	commonOpts "github.com/mongodb/mongo-tools/common/options"
+	"github.com/mongodb/mongo-tools/common/testutil"
+
 	"github.com/mongodb/mongo-tools/common/util"
 	"github.com/mongodb/mongo-tools/mongofiles/options"
 	. "github.com/smartystreets/goconvey/convey"
@@ -159,6 +161,8 @@ func fileExists(name string) bool {
 // Test that it works whenever valid arguments are passed in and that
 // it barfs whenever invalid ones are passed
 func TestValidArguments(t *testing.T) {
+	testutil.VerifyTestType(t, "unit")
+
 	Convey("With a MongoFiles instance", t, func() {
 
 		Convey("It should error out when no arguments fed", func() {
@@ -214,8 +218,9 @@ func TestValidArguments(t *testing.T) {
 
 // Test that the output from mongofiles is actually correct
 func TestMongoFilesCommands(t *testing.T) {
-	Convey("Testing the various commands:(get|put|delete|search|list). With a MongoDump instance", t, func() {
+	testutil.VerifyTestType(t, "integration")
 
+	Convey("Testing the various commands:(get|put|delete|search|list). With a MongoDump instance", t, func() {
 		bytesExpected, err := setUpGridFSTestData()
 		So(err, ShouldBeNil)
 

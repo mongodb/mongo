@@ -3,6 +3,7 @@ package mongoexport
 import (
 	"encoding/json"
 	"github.com/mongodb/mongo-tools/common/bsonutil"
+	"github.com/mongodb/mongo-tools/common/testutil"
 	. "github.com/smartystreets/goconvey/convey"
 	"gopkg.in/mgo.v2/bson"
 	"os"
@@ -10,6 +11,8 @@ import (
 )
 
 func TestExtendedJSON(t *testing.T) {
+	testutil.VerifyTestType(t, "unit")
+
 	Convey("Serializing a doc to extended JSON should work", t, func() {
 		x := bson.M{
 			"_id": bson.NewObjectId(),

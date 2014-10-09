@@ -1,12 +1,15 @@
 package mongostat
 
 import (
+	"github.com/mongodb/mongo-tools/common/testutil"
 	. "github.com/smartystreets/goconvey/convey"
 	"testing"
 	"time"
 )
 
 func TestStatLine(t *testing.T) {
+	testutil.VerifyTestType(t, "unit")
+
 	faultsOld := int64(10)
 	faultsNew := int64(15)
 	serverStatusOld := ServerStatus{

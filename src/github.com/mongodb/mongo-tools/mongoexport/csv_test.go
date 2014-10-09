@@ -2,13 +2,15 @@ package mongoexport
 
 import (
 	"bytes"
-	//"fmt"
+	"github.com/mongodb/mongo-tools/common/testutil"
 	. "github.com/smartystreets/goconvey/convey"
 	"gopkg.in/mgo.v2/bson"
 	"testing"
 )
 
 func TestWriteCSV(t *testing.T) {
+	testutil.VerifyTestType(t, "unit")
+
 	Convey("With a CSV export output", t, func() {
 		fields := []string{"_id", "x", " y", "z.1.a"}
 		out := &bytes.Buffer{}

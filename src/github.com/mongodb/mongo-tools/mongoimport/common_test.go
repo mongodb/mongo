@@ -19,6 +19,8 @@ func init() {
 }
 
 func TestValidateHeaders(t *testing.T) {
+	testutil.VerifyTestType(t, "unit")
+
 	Convey("Given an import input, in validating the headers", t, func() {
 		fields := []string{"a", "b", "c"}
 		contents := "headerLine1, headerLine2"
@@ -81,6 +83,8 @@ func TestValidateHeaders(t *testing.T) {
 }
 
 func TestGetUpsertValue(t *testing.T) {
+	testutil.VerifyTestType(t, "unit")
+
 	Convey("Given a field and a BSON document, on calling getUpsertValue", t,
 		func() {
 			Convey("the value of the key should be correct for unnested "+
@@ -111,6 +115,8 @@ func TestGetUpsertValue(t *testing.T) {
 }
 
 func TestConstructUpsertDocument(t *testing.T) {
+	testutil.VerifyTestType(t, "unit")
+
 	Convey("Given a set of upsert fields and a BSON document, on calling "+
 		"constructUpsertDocument", t, func() {
 		Convey("the key/value combination in the upsert document should be "+
@@ -151,6 +157,8 @@ func TestConstructUpsertDocument(t *testing.T) {
 }
 
 func TestGetParsedValue(t *testing.T) {
+	testutil.VerifyTestType(t, "unit")
+
 	Convey("Given a string token to parse", t, func() {
 		Convey("an int token should return the underlying int value", func() {
 			So(getParsedValue("3"), ShouldEqual, 3)
@@ -165,6 +173,8 @@ func TestGetParsedValue(t *testing.T) {
 }
 
 func TestSetNestedValue(t *testing.T) {
+	testutil.VerifyTestType(t, "unit")
+
 	Convey("Given a field, its value, and an existing BSON document...", t, func() {
 		currentDocument := bson.M{
 			"a": 3,
