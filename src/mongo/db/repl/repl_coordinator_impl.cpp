@@ -232,6 +232,13 @@ namespace {
             _myRID = _externalState->ensureMe(txn);
         }
 
+        if (!_settings.usingReplSets()) {
+            // Must be Master/Slave
+            invariant(_settings.master || _settings.slave);
+            _externalState->startMasterSlave();
+            return;
+        }
+
         _topCoordDriverThread.reset(new boost::thread(stdx::bind(&ReplicationExecutor::run,
                                                                  &_replExecutor)));
 
@@ -254,7 +261,7 @@ namespace {
         // * tell the ReplicationExecutor to shut down
         // * wait for the thread running the ReplicationExecutor to finish
 
-        if (!isReplEnabled()) {
+        if (!_settings.usingReplSets()) {
             return;
         }
 
@@ -413,6 +420,17 @@ namespace {
 
         boost::lock_guard<boost::mutex> lk(_mutex);
         _topCoord->setFollowerMode(newState.s);
+
+        // If the topCoord reports that we are a candidate now, the only possible scenario is that
+        // we transitioned to followerMode SECONDARY and are a one-node replica set.
+        if (_topCoord->getRole() == TopologyCoordinator::Role::candidate) {
+             // If our config describes a one-node replica set, we're the one member, and
+             // we're electable, we must short-circuit the election.  Elections are normally
+             // triggered by incoming heartbeats, but with a one-node set there are no
+             // heartbeats.
+             _topCoord->processWinElection(OID::gen(), getNextGlobalOptime());
+         }
+
         _updateCurrentMemberStateFromTopologyCoordinator_inlock();
         *success = true;
         _replExecutor.signalEvent(finishedSettingFollowerMode);
@@ -451,10 +469,15 @@ namespace {
         SlaveInfo& slaveInfo = _slaveInfoMap[rid];
         if ((slaveInfo.memberID < 0) && (_getReplicationMode_inlock() == modeReplSet)) {
             if (rid != _getMyRID_inlock()) {
-                warning() << "Received replSetUpdatePosition for node with RID " << rid
+                std::string errmsg = str::stream()
+                          << "Received replSetUpdatePosition for node with RID " << rid
                           << ", but we haven't yet received a handshake for that node. Stored "
                           << "member ID: " << slaveInfo.memberID << ", stored member hostAndPort: "
-                          << slaveInfo.hostAndPort.toString() << ".  Our RID: " << _getMyRID_inlock();
+                          << slaveInfo.hostAndPort.toString() << ".  Our RID: " <<
+                          _getMyRID_inlock();
+                warning() << errmsg;
+                dassert(false);
+                return Status(ErrorCodes::NodeNotFound, errmsg);
             }
             else {
                 // If this member were part of the current configuration, we would have put an entry
@@ -1447,6 +1470,7 @@ namespace {
         const MemberState newState = _topCoord->getMemberState();
         if (newState != _currentState) {
             _currentState = newState;
+            log() << "transition to " << newState.toString();
         }
     }
 
@@ -1526,18 +1550,6 @@ namespace {
                 args, _replExecutor.now(), _getLastOpApplied(), response, result);
     }
 
-    void ReplicationCoordinatorImpl::_setCurrentRSConfig(
-            const ReplicationExecutor::CallbackData& cbData,
-            const ReplicaSetConfig& newConfig,
-            int myIndex) {
-        if (cbData.status == ErrorCodes::CallbackCanceled) {
-            return;
-        }
-
-        boost::lock_guard<boost::mutex> lk(_mutex);
-        _setCurrentRSConfig_inlock(newConfig, myIndex);
-    }
-
     void ReplicationCoordinatorImpl::_setCurrentRSConfig_inlock(
             const ReplicaSetConfig& newConfig,
             int myIndex) {
@@ -1551,9 +1563,7 @@ namespace {
                  myIndex,
                  _replExecutor.now());
 
-         if (newConfig.getNumMembers() == 1 &&
-             myIndex == 0 &&
-             newConfig.getMemberAt(myIndex).isElectable()) {
+         if (_topCoord->getRole() == TopologyCoordinator::Role::candidate) {
              // If the new config describes a one-node replica set, we're the one member, and
              // we're electable, we must short-circuit the election.  Elections are normally
              // triggered by incoming heartbeats, but with a one-node set there are no
@@ -1562,18 +1572,32 @@ namespace {
          }
 
          _updateCurrentMemberStateFromTopologyCoordinator_inlock();
-         SlaveInfo& mySlaveInfo = _slaveInfoMap[_getMyRID_inlock()];
-         if (myIndex >= 0) {
-             // Ensure that there's an entry in the _slaveInfoMap for ourself
-             mySlaveInfo.memberID = _rsConfig.getMemberAt(myIndex).getId();
-             mySlaveInfo.hostAndPort = _rsConfig.getMemberAt(myIndex).getHostAndPort();
-         }
-         else {
-             mySlaveInfo.memberID = -1;
-             mySlaveInfo.hostAndPort = HostAndPort();
-         }
+         _updateSlaveInfoMapFromConfig_inlock();
          _startHeartbeats();
      }
+
+    void ReplicationCoordinatorImpl::_updateSlaveInfoMapFromConfig_inlock() {
+        for (SlaveInfoMap::iterator it = _slaveInfoMap.begin(); it != _slaveInfoMap.end();) {
+            if (!_rsConfig.findMemberByID(it->second.memberID)) {
+                _slaveInfoMap.erase(it++);
+            }
+            else {
+                ++it;
+            }
+        }
+
+        SlaveInfo& mySlaveInfo = _slaveInfoMap[_getMyRID_inlock()];
+        if (_thisMembersConfigIndex >= 0) {
+            // Ensure that there's an entry in the _slaveInfoMap for ourself
+            const MemberConfig& selfConfig = _rsConfig.getMemberAt(_thisMembersConfigIndex);
+            mySlaveInfo.memberID = selfConfig.getId();
+            mySlaveInfo.hostAndPort = selfConfig.getHostAndPort();
+        }
+        else {
+            mySlaveInfo.memberID = -1;
+            mySlaveInfo.hostAndPort = HostAndPort();
+        }
+    }
 
     Status ReplicationCoordinatorImpl::processReplSetUpdatePosition(
             OperationContext* txn,
@@ -1702,7 +1726,10 @@ namespace {
 
     BSONObj ReplicationCoordinatorImpl::getGetLastErrorDefault() {
         boost::mutex::scoped_lock lock(_mutex);
-        return _rsConfig.getDefaultWriteConcern().toBSON();
+        if (_rsConfig.isInitialized()) {
+            return _rsConfig.getDefaultWriteConcern().toBSON();
+        }
+        return BSONObj();
     }
 
     Status ReplicationCoordinatorImpl::checkReplEnabledForCommand(BSONObjBuilder* result) {

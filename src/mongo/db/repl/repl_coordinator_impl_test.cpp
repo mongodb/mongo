@@ -303,6 +303,46 @@ namespace {
         ASSERT_EQUALS(ReplicationCoordinator::modeNone, getReplCoord()->getReplicationMode());
     }
 
+    TEST_F(ReplCoordTest, InitiateFailsWithoutReplSetFlag) {
+        OperationContextNoop txn;
+        init("");
+        start(HostAndPort("node1", 12345));
+        ASSERT_EQUALS(ReplicationCoordinator::modeNone, getReplCoord()->getReplicationMode());
+
+        BSONObjBuilder result1;
+        ASSERT_EQUALS(
+                ErrorCodes::NoReplicationEnabled,
+                getReplCoord()->processReplSetInitiate(
+                        &txn,
+                        BSON("_id" << "mySet" <<
+                             "version" << 1 <<
+                             "members" << BSON_ARRAY(
+                                     BSON("_id" << 0 << "host" << "node1:12345"))),
+                        &result1));
+        ASSERT_EQUALS(ReplicationCoordinator::modeNone, getReplCoord()->getReplicationMode());
+    }
+
+    TEST_F(ReplCoordTest, InitiateFailsWhileStoringLocalConfigDocument) {
+        OperationContextNoop txn;
+        init("mySet");
+        start(HostAndPort("node1", 12345));
+        ASSERT_EQUALS(ReplicationCoordinator::modeNone, getReplCoord()->getReplicationMode());
+
+        BSONObjBuilder result1;
+        getExternalState()->setStoreLocalConfigDocumentStatus(Status(ErrorCodes::OutOfDiskSpace, 
+                                                                     "The test set this"));
+        ASSERT_EQUALS(
+                ErrorCodes::OutOfDiskSpace,
+                getReplCoord()->processReplSetInitiate(
+                        &txn,
+                        BSON("_id" << "mySet" <<
+                             "version" << 1 <<
+                             "members" << BSON_ARRAY(
+                                     BSON("_id" << 0 << "host" << "node1:12345"))),
+                        &result1));
+        ASSERT_EQUALS(ReplicationCoordinator::modeNone, getReplCoord()->getReplicationMode());
+    }
+
     TEST_F(ReplCoordTest, CheckReplEnabledForCommandNotRepl) {
         // pass in settings to avoid having a replSet
         ReplSettings settings;

@@ -234,6 +234,7 @@ namespace repl {
 
                 BSONObjBuilder b;
                 b.append("_id", name);
+                b.append("version", 1);
                 BSONObjBuilder members;
                 HostAndPort me = someHostAndPortForMe();
                 members.append("0", BSON( "_id" << 0 << "host" << me.toString() ));
@@ -246,6 +247,14 @@ namespace repl {
                 configObj = b.obj();
                 log() << "replSet created this configuration for initiation : " <<
                         configObj.toString() << rsLog;
+            }
+
+            if (configObj.getField("version").eoo()) {
+                // Missing version field defaults to version 1.
+                BSONObjBuilder builder;
+                builder.appendElements(configObj);
+                builder.append("version", 1);
+                configObj = builder.obj();
             }
 
             Status status = getGlobalReplicationCoordinator()->processReplSetInitiate(txn,

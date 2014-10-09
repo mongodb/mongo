@@ -6,7 +6,6 @@ Encapsulates all the nitty-gritty parameter conversion, database path setup, and
 
 import json
 import os
-import pymongo
 import shutil
 import time
 
@@ -164,6 +163,8 @@ class MongoD(ExternalProgram):
             self.logger().info("Connected to MongoD server at %s:%s." % (self.host, self.port))
 
     def client(self, **client_args):
+        # Import pymongo here, only when needed
+        import pymongo
         return pymongo.MongoClient(self.host, self.port, **client_args)
 
     def _wait_for_port(self, timeout_secs=10):

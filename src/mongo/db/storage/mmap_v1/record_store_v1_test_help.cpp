@@ -92,10 +92,10 @@ namespace mongo {
     }
 
     void DummyRecordStoreV1MetaData::setStats( OperationContext* txn,
-                                               long long dataSizeIncrement,
-                                               long long numRecordsIncrement ) {
-        _dataSize = dataSizeIncrement;
-        _numRecords = numRecordsIncrement;
+                                               long long dataSize,
+                                               long long numRecords ) {
+        _dataSize = dataSize;
+        _numRecords = numRecords;
     }
 
     namespace {
@@ -120,7 +120,8 @@ namespace mongo {
     }
 
     void DummyRecordStoreV1MetaData::orphanDeletedList(OperationContext* txn) {
-        invariant( false );
+        // They will be recreated on demand.
+        _deletedLists.clear();
     }
 
     const DiskLoc& DummyRecordStoreV1MetaData::firstExtent(OperationContext* txn) const {

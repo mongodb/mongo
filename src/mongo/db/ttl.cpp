@@ -121,7 +121,7 @@ namespace mongo {
                     const string ns = idx["ns"].String();
 
                     Client::WriteContext ctx(txn,  ns );
-                    Collection* collection = ctx.ctx().db()->getCollection( txn, ns );
+                    Collection* collection = ctx.getCollection();
                     if ( !collection ) {
                         // collection was dropped
                         continue;

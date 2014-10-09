@@ -92,6 +92,24 @@ namespace newlm {
         ASSERT(locker2.unlockAll());
     }
 
+    TEST(LockerImpl, ConflictUpgradeWithTimeout) {
+        const ResourceId resId(RESOURCE_COLLECTION, std::string("TestDB.collection"));
+
+        LockerImpl locker1(1);
+        ASSERT(LOCK_OK == locker1.lockGlobal(MODE_IS));
+        ASSERT(LOCK_OK == locker1.lock(resId, MODE_S));
+
+        LockerImpl locker2(2);
+        ASSERT(LOCK_OK == locker2.lockGlobal(MODE_IS));
+        ASSERT(LOCK_OK == locker2.lock(resId, MODE_S));
+
+        // Try upgrading locker 1, which should block and timeout
+        ASSERT(LOCK_TIMEOUT == locker1.lock(resId, MODE_X, 1));
+
+        locker1.unlockAll();
+        locker2.unlockAll();
+    }
+
     TEST(Locker, ReadTransaction) {
         LockerImpl locker(1);
 

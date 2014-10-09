@@ -133,12 +133,12 @@ namespace {
         invariant(isInitialized());
         BSONObjBuilder builder;
         builder.append("replSetHeartbeat", _setName);
-        builder.append("pv", _protocolVersion);
-        builder.append("v", _configVersion);
+        builder.appendIntOrLL("pv", _protocolVersion);
+        builder.appendIntOrLL("v", _configVersion);
         builder.append("from", _hasSenderHost ? _senderHost.toString() : "");
 
         if (_hasSenderId) {
-            builder.append("fromId", _senderId);
+            builder.appendIntOrLL("fromId", _senderId);
         }
         if (_hasCheckEmpty) {
             builder.append("checkEmpty", _checkEmpty);

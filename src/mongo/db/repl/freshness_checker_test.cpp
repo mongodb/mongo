@@ -475,6 +475,7 @@ namespace {
             }
         }
         FAIL(str::stream() << "No host named " << host.toString() << " in config");
+        invariant(false);
     }
 
     TEST_F(FreshnessCheckerTest, ElectNotElectingSelfWeAreNotFreshestManyNodes) {

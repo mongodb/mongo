@@ -191,7 +191,7 @@ namespace QueryPlanExecutor {
 
             BSONObj filterObj = fromjson("{_id: {$gt: 0}}");
 
-            Collection* coll = ctx.ctx().db()->getCollection(&_txn, ns());
+            Collection* coll = ctx.getCollection();
             scoped_ptr<PlanExecutor> exec(makeCollScanExec(coll, filterObj));
             registerExec(exec.get());
 
@@ -271,7 +271,7 @@ namespace QueryPlanExecutor {
             std::auto_ptr<WorkingSet> ws(new WorkingSet());
             std::auto_ptr<PipelineProxyStage> proxy(
                 new PipelineProxyStage(pipeline, innerExec, ws.get()));
-            Collection* collection = ctx.ctx().db()->getCollection(&_txn, ns());
+            Collection* collection = ctx.getCollection();
             boost::scoped_ptr<PlanExecutor> outerExec(
                 new PlanExecutor(&_txn, ws.release(), proxy.release(), collection));
 
@@ -343,7 +343,7 @@ namespace QueryPlanExecutor {
 
             BSONObj filterObj = fromjson("{a: {$gte: 2}}");
 
-            Collection* coll = ctx.ctx().db()->getCollection(&_txn, ns());
+            Collection* coll = ctx.getCollection();
             scoped_ptr<PlanExecutor> exec(makeCollScanExec(coll, filterObj));
 
             BSONObj objOut;
@@ -403,7 +403,7 @@ namespace QueryPlanExecutor {
 
                 BSONObj filterObj = fromjson("{_id: {$gt: 0}, b: {$gt: 0}}");
 
-                Collection* coll = ctx.ctx().db()->getCollection(&_txn, ns());
+                Collection* coll = ctx.getCollection();
                 PlanExecutor* exec = makeCollScanExec(coll,filterObj);
 
                 // Make a client cursor from the runner.
@@ -412,7 +412,7 @@ namespace QueryPlanExecutor {
                 // There should be one cursor before invalidation,
                 // and zero cursors after invalidation.
                 ASSERT_EQUALS(1U, numCursors());
-                ctx.ctx().db()->getCollection( &_txn, ns() )->cursorCache()->invalidateAll(false);
+                coll->cursorCache()->invalidateAll(false);
                 ASSERT_EQUALS(0U, numCursors());
                 ctx.commit();
             }
@@ -428,7 +428,7 @@ namespace QueryPlanExecutor {
                 Client::WriteContext ctx(&_txn, ns());
                 insert(BSON("a" << 1 << "b" << 1));
 
-                Collection* collection = ctx.ctx().db()->getCollection(&_txn, ns());
+                Collection* collection = ctx.getCollection();
 
                 BSONObj filterObj = fromjson("{_id: {$gt: 0}, b: {$gt: 0}}");
                 PlanExecutor* exec = makeCollScanExec(collection, filterObj);

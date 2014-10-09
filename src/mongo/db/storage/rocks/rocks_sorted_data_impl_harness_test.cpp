@@ -25,54 +25,46 @@
  *    exception statement from all source files in the program, then also delete
  *    it in the license file.
  */
-#pragma once
 
-#include <boost/scoped_ptr.hpp>
-#include <string>
+#include <boost/shared_ptr.hpp>
+#include <boost/filesystem/operations.hpp>
 
-#include "mongo/db/operation_context.h"
+#include <rocksdb/comparator.h>
+#include <rocksdb/db.h>
+#include <rocksdb/options.h>
+#include <rocksdb/slice.h>
 
+#include "mongo/db/storage/rocks/rocks_engine.h"
+#include "mongo/db/storage/sorted_data_interface_test_harness.h"
+#include "mongo/unittest/temp_dir.h"
+#include "mongo/unittest/unittest.h"
+#include "mongo/db/storage/rocks/rocks_sorted_data_impl.h"
+#include "mongo/db/storage/rocks/rocks_recovery_unit.h"
 
 namespace mongo {
 
-    class OperationContextImpl : public OperationContext  {
-    public:
-        OperationContextImpl();
+    class RocksHarnessHelper : public HarnessHelper {
+       public:
+        RocksHarnessHelper() : _order(Ordering::make(BSONObj())), _tempDir(_testNamespace) {
+            boost::filesystem::remove_all(_tempDir.path());
+            rocksdb::DB* db;
+            rocksdb::Status s = rocksdb::DB::Open(RocksEngine::dbOptions(), _tempDir.path(), &db);
+            ASSERT(s.ok());
+            _db.reset(db);
+        }
 
-        virtual ~OperationContextImpl();
+        virtual SortedDataInterface* newSortedDataInterface() {
+            return new RocksSortedDataImpl(_db.get(), _db->DefaultColumnFamily(), _order);
+        }
 
-        virtual RecoveryUnit* recoveryUnit() const;
+        virtual RecoveryUnit* newRecoveryUnit() { return new RocksRecoveryUnit(_db.get(), false); }
 
-        virtual RecoveryUnit* releaseRecoveryUnit();
-
-        virtual void setRecoveryUnit(RecoveryUnit* unit);
-
-        virtual Locker* lockState() const;
-
-        virtual ProgressMeter* setMessage(const char* msg,
-                                          const std::string& name,
-                                          unsigned long long progressMeterTotal,
-                                          int secondsBetween);
-
-        virtual bool isGod() const;
-
-        virtual string getNS() const;
-
-        virtual Client* getClient() const;
-
-        virtual CurOp* getCurOp() const;
-
-        virtual unsigned int getOpID() const;
-
-        virtual void checkForInterrupt(bool heedMutex = true) const;
-
-        virtual Status checkForInterruptNoAssert() const;
-
-        virtual bool isPrimaryFor( const StringData& ns );
-
-    private:
-        std::auto_ptr<RecoveryUnit> _recovery;
-        std::auto_ptr<Locker> _locker;
+       private:
+        Ordering _order;
+        string _testNamespace = "mongo-rocks-sorted-data-test";
+        unittest::TempDir _tempDir;
+        scoped_ptr<rocksdb::DB> _db;
     };
 
-}  // namespace mongo
+    HarnessHelper* newHarnessHelper() { return new RocksHarnessHelper(); }
+}

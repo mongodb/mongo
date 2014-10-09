@@ -46,6 +46,7 @@ namespace repl {
         ReplicationCoordinatorExternalStateImpl();
         virtual ~ReplicationCoordinatorExternalStateImpl();
         virtual void startThreads();
+        virtual void startMasterSlave();
         virtual void shutdown();
         virtual void forwardSlaveHandshake();
         virtual void forwardSlaveProgress();

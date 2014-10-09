@@ -33,6 +33,7 @@
 #include <map>
 #include <stack>
 #include <string>
+#include <vector>
 
 #include <boost/scoped_ptr.hpp>
 #include <boost/shared_ptr.hpp>
@@ -43,7 +44,8 @@
 namespace rocksdb {
     class DB;
     class Snapshot;
-    class WriteBatch;
+    class WriteBatchWithIndex;
+    class Comparator;
 }
 
 namespace mongo {
@@ -51,7 +53,7 @@ namespace mongo {
     class RocksRecoveryUnit : public RecoveryUnit {
         MONGO_DISALLOW_COPYING(RocksRecoveryUnit);
     public:
-        RocksRecoveryUnit( rocksdb::DB* db, bool defaultCommit );
+        RocksRecoveryUnit(rocksdb::DB* db, bool defaultCommit);
         virtual ~RocksRecoveryUnit();
 
         virtual void beginUnitOfWork();
@@ -69,19 +71,28 @@ namespace mongo {
 
         // local api
 
-        rocksdb::WriteBatch* writeBatch();
+        // we need to call this during cleanShutdown(), to make sure that the destructor doesn't try
+        // to commit (or rollback) the changes
+        void destroy();
+
+        rocksdb::WriteBatchWithIndex* writeBatch();
 
         const rocksdb::Snapshot* snapshot();
 
     private:
+        void _destroyInternal();
+
         rocksdb::DB* _db; // not owned
         bool _defaultCommit;
 
-        boost::scoped_ptr<rocksdb::WriteBatch> _writeBatch; // owned
-        int _depth;
+        boost::scoped_ptr<rocksdb::WriteBatchWithIndex> _writeBatch; // owned
 
         // bare because we need to call ReleaseSnapshot when we're done with this
         const rocksdb::Snapshot* _snapshot; // owned
+
+        std::vector<Change*> _changes;
+
+        bool _destroyed;
     };
 
 }

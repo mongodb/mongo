@@ -1,7 +1,7 @@
 // Tests for the mongos explain command.
 
 // Create a cluster with 3 shards.
-var st = new ShardingTest({shards: 3});
+var st = new ShardingTest({shards: 2});
 st.stopBalancer();
 
 var db = st.s.getDB("test");
@@ -119,8 +119,7 @@ assert.commandFailed(explain);
 
 // -------
 
-// Explain a delete operation, with just some basic verification that the command worked and
-// that it didn't do any writes.
+// Explain a delete operation and verify that it hits all shards without the shard key
 explain = db.runCommand({
     explain: {
         delete: collSharded.getName(),
@@ -130,9 +129,26 @@ explain = db.runCommand({
     },
     verbosity: "allPlansExecution"
 });
-printjson(explain);
-assert.commandWorked(explain);
+assert.commandWorked(explain, tojson(explain));
+assert.eq(explain.queryPlanner.winningPlan.stage, "SHARD_WRITE");
+assert.eq(explain.queryPlanner.winningPlan.shards.length, 2);
+assert.eq(explain.queryPlanner.winningPlan.shards[0].winningPlan.stage, "DELETE");
+assert.eq(explain.queryPlanner.winningPlan.shards[1].winningPlan.stage, "DELETE");
+// Check that the deletes didn't actually happen.
+assert.eq(3, collSharded.count({b: 1}));
 
+// Explain a delete operation and verify that it hits only one shard with the shard key
+explain = db.runCommand({
+    explain: {
+        delete: collSharded.getName(),
+        deletes: [
+            {q: {a: 1}, limit: 0}
+        ]
+    },
+    verbosity: "allPlansExecution"
+});
+assert.commandWorked(explain, tojson(explain));
+assert.eq(explain.queryPlanner.winningPlan.shards.length, 1);
 // Check that the deletes didn't actually happen.
 assert.eq(3, collSharded.count({b: 1}));
 
@@ -148,5 +164,45 @@ explain = db.runCommand({
     },
     verbosity: "allPlansExecution"
 });
-printjson(explain);
-assert.commandFailed(explain);
+assert.commandFailed(explain, tojson(explain));
+
+// Explain a multi upsert operation and verify that it hits all shards
+explain = db.runCommand({
+    explain: {
+        update: collSharded.getName(),
+        updates: [{q: {}, u: {$set: {b: 10}}, multi: true}]
+    },
+    verbosity: "allPlansExecution"
+});
+assert.commandWorked(explain, tojson(explain));
+assert.eq(explain.queryPlanner.winningPlan.shards.length, 2);
+assert.eq(explain.queryPlanner.winningPlan.stage, "SHARD_WRITE");
+assert.eq(explain.queryPlanner.winningPlan.shards.length, 2);
+assert.eq(explain.queryPlanner.winningPlan.shards[0].winningPlan.stage, "UPDATE");
+assert.eq(explain.queryPlanner.winningPlan.shards[1].winningPlan.stage, "UPDATE");
+// Check that the update didn't actually happen.
+assert.eq(0, collSharded.count({b: 10}));
+
+// Explain an upsert operation and verify that it hits only a single shard
+explain = db.runCommand({
+    explain: {
+        update: collSharded.getName(),
+        updates: [{q: {a: 10}, u: {a: 10}, upsert: true}]
+    },
+    verbosity: "allPlansExecution"
+});
+assert.commandWorked(explain, tojson(explain));
+assert.eq(explain.queryPlanner.winningPlan.shards.length, 1);
+// Check that the upsert didn't actually happen.
+assert.eq(0, collSharded.count({a: 10}));
+
+// Explain an upsert operation which cannot be targeted, ensure an error is thrown
+explain = db.runCommand({
+    explain: {
+        update: collSharded.getName(),
+        updates: [{q: {b: 10}, u: {b: 10}, upsert: true}]
+    },
+    verbosity: "allPlansExecution"
+});
+assert.commandFailed(explain, tojson(explain));
+

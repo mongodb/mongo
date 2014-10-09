@@ -38,6 +38,8 @@
 #include <rocksdb/options.h>
 #include <rocksdb/slice.h>
 #include <rocksdb/status.h>
+#include <rocksdb/comparator.h>
+#include <rocksdb/utilities/write_batch_with_index.h>
 
 #include "mongo/db/operation_context.h"
 #include "mongo/db/operation_context_noop.h"
@@ -53,8 +55,8 @@ namespace mongo {
 
     class MyOperationContext : public OperationContextNoop {
     public:
-        MyOperationContext( rocksdb::DB* db )
-            : OperationContextNoop( new RocksRecoveryUnit( db, false ) ) { }
+        MyOperationContext(rocksdb::DB* db)
+            : OperationContextNoop(new RocksRecoveryUnit(db, true)) {}
     };
 
     // to be used in testing
@@ -142,6 +144,7 @@ namespace mongo {
             ASSERT_EQUALS( value, "b" );
 
             ru.endUnitOfWork();
+            ru.commitUnitOfWork();
             value = "x";
             db->Get( rocksdb::ReadOptions(), "a", &value );
             ASSERT_EQUALS( value, "c" );
@@ -197,13 +200,14 @@ namespace mongo {
                 loc = res.getValue();
             }
 
-            ASSERT_EQUALS( s, rs.dataFor( NULL,  loc ).data() );
+            ASSERT_EQUALS(s, rs.dataFor(&opCtx, loc).data());
         }
 
         {
+            MyOperationContext opCtx(db.get());
             RocksRecordStore rs( "foo.bar", db.get(), cfh.get(), db->DefaultColumnFamily() );
-            ASSERT_EQUALS( 1, rs.numRecords( NULL ) );
-            ASSERT_EQUALS( size, rs.dataSize( NULL ) );
+            ASSERT_EQUALS(1, rs.numRecords(&opCtx));
+            ASSERT_EQUALS(size, rs.dataSize(&opCtx));
         }
     }
 
@@ -229,20 +233,23 @@ namespace mongo {
                     loc = res.getValue();
                 }
 
-                ASSERT_EQUALS( s, rs.dataFor( NULL,  loc ).data() );
-                ASSERT_EQUALS( 1, rs.numRecords( NULL ) );
-                ASSERT_EQUALS( static_cast<long long> ( s.length() + 1 ), rs.dataSize( NULL ) );
+                ASSERT_EQUALS(s, rs.dataFor(&opCtx, loc).data());
+                ASSERT_EQUALS(1, rs.numRecords(&opCtx));
+                ASSERT_EQUALS(static_cast<long long>(s.length() + 1), rs.dataSize(&opCtx));
             }
 
-            ASSERT( rs.dataFor( NULL,  loc ).data() != NULL );
+            {
+                MyOperationContext opCtx(db.get());
+                ASSERT(rs.dataFor(&opCtx, loc).data() != NULL);
+            }
 
             {
                 MyOperationContext opCtx( db.get() );
                 WriteUnitOfWork uow( &opCtx );
                 rs.deleteRecord( &opCtx, loc );
 
-                ASSERT_EQUALS( 0, rs.numRecords( NULL ) );
-                ASSERT_EQUALS( 0, rs.dataSize( NULL ) );
+                ASSERT_EQUALS(0, rs.numRecords(&opCtx));
+                ASSERT_EQUALS(0, rs.dataSize(&opCtx));
             }
         }
     }
@@ -270,24 +277,20 @@ namespace mongo {
                     loc = res.getValue();
                 }
 
-                ASSERT_EQUALS( s1, rs.dataFor( NULL,  loc ).data() );
+                ASSERT_EQUALS(s1, rs.dataFor(&opCtx, loc).data());
             }
 
             {
                 MyOperationContext opCtx( db.get() );
                 {
                     WriteUnitOfWork uow( &opCtx );
-                    StatusWith<DiskLoc> res = rs.updateRecord( &opCtx,
-                                                               loc,
-                                                               s2.c_str(),
-                                                               s2.size() + 1,
-                                                               -1,
-                                                               NULL );
+                    StatusWith<DiskLoc> res =
+                        rs.updateRecord(&opCtx, loc, s2.c_str(), s2.size() + 1, -1, NULL);
                     ASSERT_OK( res.getStatus() );
                     ASSERT( loc == res.getValue() );
                 }
 
-                ASSERT_EQUALS( s2, rs.dataFor( NULL,  loc ).data() );
+                ASSERT_EQUALS(s2, rs.dataFor(&opCtx, loc).data());
             }
 
         }
@@ -316,7 +319,7 @@ namespace mongo {
                     loc = res.getValue();
                 }
 
-                ASSERT_EQUALS( s1, rs.dataFor( NULL,  loc ).data() );
+                ASSERT_EQUALS(s1, rs.dataFor(&opCtx, loc).data());
             }
 
             {
@@ -335,7 +338,7 @@ namespace mongo {
                                                        dv );
                     ASSERT_OK( res );
                 }
-                ASSERT_EQUALS( s2, rs.dataFor( NULL,  loc ).data() );
+                ASSERT_EQUALS(s2, rs.dataFor(&opCtx, loc).data());
             }
 
         }
@@ -383,8 +386,11 @@ namespace mongo {
 
         ASSERT_EQUALS( a, b );
 
-        ASSERT_EQUALS( string("a"), rs1.dataFor( NULL,  a ).data() );
-        ASSERT_EQUALS( string("b"), rs2.dataFor( NULL,  b ).data() );
+        {
+            MyOperationContext opCtx(db.get());
+            ASSERT_EQUALS(string("a"), rs1.dataFor(&opCtx, a).data());
+            ASSERT_EQUALS(string("b"), rs2.dataFor(&opCtx, b).data());
+        }
 
         delete cf2;
         delete cf1;
@@ -408,7 +414,7 @@ namespace mongo {
                 loc = res.getValue();
             }
 
-            ASSERT_EQUALS( s, rs.dataFor( NULL,  loc ).data() );
+            ASSERT_EQUALS(s, rs.dataFor(&opCtx, loc).data());
         }
 
         {
@@ -442,7 +448,7 @@ namespace mongo {
                     loc = res.getValue();
                 }
 
-                ASSERT_EQUALS( origStr, rs.dataFor( NULL,  loc ).data() );
+                ASSERT_EQUALS(origStr, rs.dataFor(&opCtx, loc).data());
             }
         }
 
@@ -455,19 +461,22 @@ namespace mongo {
                                  dbAndCfh.second.get(),
                                  db->DefaultColumnFamily() );
 
-            ASSERT_EQUALS( static_cast<long long> ( origStr.size() + 1 ), rs.dataSize( NULL ) );
-            ASSERT_EQUALS( 1, rs.numRecords( NULL ) );
+            {
+                MyOperationContext opCtx(db.get());
+                ASSERT_EQUALS(static_cast<long long>(origStr.size() + 1), rs.dataSize(&opCtx));
+                ASSERT_EQUALS(1, rs.numRecords(&opCtx));
+            }
 
             {
                 MyOperationContext opCtx( db.get() );
                 {
                     WriteUnitOfWork uow( &opCtx );
-                    StatusWith<DiskLoc> res = rs.updateRecord( &opCtx, loc, newStr.c_str(),
-                                                               newStr.size() + 1, -1, NULL );
+                    StatusWith<DiskLoc> res =
+                        rs.updateRecord(&opCtx, loc, newStr.c_str(), newStr.size() + 1, -1, NULL);
                     ASSERT_OK( res.getStatus() );
                 }
 
-                ASSERT_EQUALS( newStr, rs.dataFor( NULL,  loc ).data() );
+                ASSERT_EQUALS(newStr, rs.dataFor(&opCtx, loc).data());
             }
         }
 
@@ -480,8 +489,11 @@ namespace mongo {
                                  dbAndCfh.second.get(),
                                  db->DefaultColumnFamily() );
 
-            ASSERT_EQUALS( static_cast<long long>( newStr.size() + 1 ), rs.dataSize( NULL ) );
-            ASSERT_EQUALS( 1, rs.numRecords( NULL ) );
+            {
+                MyOperationContext opCtx(db.get());
+                ASSERT_EQUALS(static_cast<long long>(newStr.size() + 1), rs.dataSize(&opCtx));
+                ASSERT_EQUALS(1, rs.numRecords(&opCtx));
+            }
 
             {
                 MyOperationContext opCtx( db.get() );
@@ -491,8 +503,11 @@ namespace mongo {
                 }
             }
 
-            ASSERT_EQUALS( 0, rs.dataSize( NULL ) );
-            ASSERT_EQUALS( 0, rs.numRecords( NULL ) );
+            {
+                MyOperationContext opCtx( db.get() );
+                ASSERT_EQUALS(0, rs.dataSize(&opCtx));
+                ASSERT_EQUALS(0, rs.numRecords(&opCtx));
+            }
         }
     }
 
@@ -535,7 +550,7 @@ namespace mongo {
                 }
             }
 
-            OperationContextNoop txn;
+            MyOperationContext txn(db.get());
 
             scoped_ptr<RecordIterator> iter( rs.getIterator( &txn ) );
 
@@ -595,7 +610,7 @@ namespace mongo {
                 }
             }
 
-            OperationContextNoop txn;
+            MyOperationContext txn(db.get());
             scoped_ptr<RecordIterator> iter( rs.getIterator( &txn, maxDiskLoc, false,
                                              CollectionScanParams::BACKWARD ) );
             ASSERT_EQUALS( false, iter->isEOF() );
@@ -648,8 +663,8 @@ namespace mongo {
                 Status stat = rs.truncate( &opCtx );
                 ASSERT_OK( stat );
 
-                ASSERT_EQUALS( 0, rs.numRecords( NULL ) );
-                ASSERT_EQUALS( 0, rs.dataSize( NULL ) );
+                ASSERT_EQUALS(0, rs.numRecords(&opCtx));
+                ASSERT_EQUALS(0, rs.dataSize(&opCtx));
             }
 
             // Test that truncate does not fail on an empty collection
@@ -659,9 +674,47 @@ namespace mongo {
                 Status stat = rs.truncate( &opCtx );
                 ASSERT_OK( stat );
 
-                ASSERT_EQUALS( 0, rs.numRecords( NULL ) );
-                ASSERT_EQUALS( 0, rs.dataSize( NULL ) );
+                ASSERT_EQUALS(0, rs.numRecords(&opCtx));
+                ASSERT_EQUALS(0, rs.dataSize(&opCtx));
             }
+        }
+    }
+
+    TEST( RocksRecordStoreTest, Snapshots1 ) {
+        unittest::TempDir td( _rocksRecordStoreTestDir );
+        scoped_ptr<rocksdb::DB> db( getDB( td.path() ) );
+        boost::shared_ptr<rocksdb::ColumnFamilyHandle> cfh = _createCfh( db.get() );
+
+        DiskLoc loc;
+        int size = -1;
+
+        {
+            RocksRecordStore rs( "foo.bar", db.get(), cfh.get(), db->DefaultColumnFamily() );
+            string s = "test string";
+            size = s.length() + 1;
+
+            MyOperationContext opCtx( db.get() );
+            {
+                WriteUnitOfWork uow( &opCtx );
+                StatusWith<DiskLoc> res = rs.insertRecord( &opCtx, s.c_str(), s.size() + 1, -1 );
+                ASSERT_OK( res.getStatus() );
+                loc = res.getValue();
+            }
+        }
+
+        {
+            MyOperationContext opCtx( db.get() );
+            MyOperationContext opCtx2( db.get() );
+
+            RocksRecordStore rs( "foo.bar", db.get(), cfh.get(), db->DefaultColumnFamily() );
+
+            rs.deleteRecord( &opCtx, loc );
+
+            RecordData recData = rs.dataFor(&opCtx, loc /*, &opCtx */);
+            ASSERT( !recData.data() && recData.size() == 0 );
+
+            RecordData recData2 = rs.dataFor(&opCtx2, loc);
+            ASSERT(recData2.data() && recData2.size() == size);
         }
     }
 }

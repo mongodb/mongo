@@ -89,8 +89,8 @@ namespace {
         }
         ASSERT_EQUALS(d.min(), 50u);
         ASSERT_EQUALS(d.max(), 100000u - 50u);
-        ASSERT_APPROX_EQUAL(d.mean(), 100000 / 2, 1e-15);
-        ASSERT_APPROX_EQUAL(d.stddev(), sqrt((static_cast<double>(count) * count - 1) / 12), 1e-15);
+        ASSERT_APPROX_EQUAL(d.mean(), 100000 / 2, 1e-5);
+        ASSERT_APPROX_EQUAL(d.stddev(), sqrt((static_cast<double>(count) * count - 1) / 12), 1e-5);
     }
 
     TEST(BasicEstimators, TestAppendBasicToBSONObjBuilder) {
@@ -123,8 +123,8 @@ namespace {
         }
         ASSERT_EQUALS(d.min(), -200);
         ASSERT_EQUALS(d.max(), 200);
-        ASSERT_APPROX_EQUAL(d.mean(), 0, 1e-15);
-        ASSERT_APPROX_EQUAL(d.icdf(.25), -100, 1e-15);
+        ASSERT_APPROX_EQUAL(d.mean(), 0, 1e-5);
+        ASSERT_APPROX_EQUAL(d.icdf(.25), -100, 1e-5);
     }
 
     TEST(SummaryEstimators, TestStatisticSummaryToBSONObj) {

@@ -121,7 +121,7 @@ namespace QueryStageCount {
 
             // Set up the count stage
             CountScanParams params;
-            params.descriptor = getIndex(ctx.ctx().db(), BSON("a" << 1));
+            params.descriptor = getIndex(ctx.db(), BSON("a" << 1));
             verify(params.descriptor);
             params.startKey = BSON("a" << 1);
             params.startKeyInclusive = true;
@@ -155,7 +155,7 @@ namespace QueryStageCount {
 
             // Set up the count stage
             CountScanParams params;
-            params.descriptor = getIndex(ctx.ctx().db(), BSON("a" << 1));
+            params.descriptor = getIndex(ctx.db(), BSON("a" << 1));
             params.startKey = BSON("" << 3);
             params.startKeyInclusive = true;
             params.endKey = BSON("" << 7);
@@ -188,7 +188,7 @@ namespace QueryStageCount {
 
             // Set up the count stage
             CountScanParams params;
-            params.descriptor = getIndex(ctx.ctx().db(), BSON("a" << 1));
+            params.descriptor = getIndex(ctx.db(), BSON("a" << 1));
             params.startKey = BSON("" << 3);
             params.startKeyInclusive = false;
             params.endKey = BSON("" << 7);
@@ -217,7 +217,7 @@ namespace QueryStageCount {
 
             // Set up count, and run
             CountScanParams params;
-            params.descriptor = getIndex(ctx.ctx().db(), BSON("a" << 1));
+            params.descriptor = getIndex(ctx.db(), BSON("a" << 1));
             params.startKey = BSON("" << 2);
             params.startKeyInclusive = false;
             params.endKey = BSON("" << 3);
@@ -247,7 +247,7 @@ namespace QueryStageCount {
 
             // Set up count, and run
             CountScanParams params;
-            params.descriptor = getIndex(ctx.ctx().db(), BSON("a" << 1));
+            params.descriptor = getIndex(ctx.db(), BSON("a" << 1));
             params.startKey = BSON("" << 2);
             params.startKeyInclusive = false;
             params.endKey = BSON("" << 3);
@@ -278,7 +278,7 @@ namespace QueryStageCount {
 
             // Set up count, and run
             CountScanParams params;
-            params.descriptor = getIndex(ctx.ctx().db(), BSON("a" << 1));
+            params.descriptor = getIndex(ctx.db(), BSON("a" << 1));
             params.startKey = BSON("" << 2);
             params.startKeyInclusive = false;
             params.endKey = BSON("" << 3);
@@ -602,7 +602,7 @@ namespace QueryStageCount {
 
             // Set up count stage
             CountScanParams params;
-            params.descriptor = getIndex(ctx.ctx().db(), BSON("a" << 1));
+            params.descriptor = getIndex(ctx.db(), BSON("a" << 1));
             params.startKey = BSON("" << 1);
             params.startKeyInclusive = true;
             params.endKey = BSON("" << 1);

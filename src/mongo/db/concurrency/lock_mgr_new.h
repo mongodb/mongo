@@ -223,67 +223,6 @@ namespace newlm {
 
 
     /**
-     * There is one of these objects per each resource which has a lock on it.
-     *
-     * Not thread-safe and should only be accessed under the LockManager's bucket lock.
-     */
-    struct LockHead {
-
-        LockHead(const ResourceId& resId);
-        ~LockHead();
-
-        // Increments the granted/requested counts and maintains the grantedModes/requestedModes
-        // masks respectively. The count argument can only be -1 or 1, because we always change the
-        // modes one at a time.
-        enum ChangeModeCountAction {
-            Increment = 1, Decrement = -1
-        };
-
-        void changeGrantedModeCount(LockMode mode, ChangeModeCountAction action);
-        void changeRequestedModeCount(LockMode mode, ChangeModeCountAction count);
-
-
-        // Id of the resource which this lock protects
-        const ResourceId resourceId;
-
-
-        //
-        // Granted queue
-        //
-
-        // The head of the doubly-linked list of granted or converting requests
-        LockRequest* grantedQueue;
-
-        // Counts the grants and coversion counts for each of the supported lock modes. These
-        // counts should exactly match the aggregated granted modes on the granted list.
-        uint32_t grantedCounts[LockModesCount];
-
-        // Bit-mask of the granted + converting modes on the granted queue. Maintained in lock-step
-        // with the grantedCounts array.
-        uint32_t grantedModes;
-
-
-        //
-        // Conflict queue
-        //
-
-        // Doubly-linked list of requests, which have not been granted yet because they conflict
-        // with the set of granted modes. The reason to have both begin and end pointers is to make
-        // the FIFO scheduling easier (queue at begin and take from the end).
-        LockRequest* conflictQueueBegin;
-        LockRequest* conflictQueueEnd;
-
-        // Counts the conflicting requests for each of the lock modes. These counts should exactly
-        // match the aggregated requested modes on the conflicts list.
-        uint32_t conflictCounts[LockModesCount];
-
-        // Bit-mask of the requested modes on the conflict queue. Maintained in lock-step with the
-        // conflictCounts array.
-        uint32_t conflictModes;
-    };
-
-
-    /**
      * Entry point for the lock manager scheduling functionality. Don't use it directly, but
      * instead go through the Locker interface.
      */

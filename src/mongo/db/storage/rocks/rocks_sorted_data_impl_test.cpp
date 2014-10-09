@@ -79,7 +79,7 @@ namespace mongo {
 
     const Ordering dummyOrdering = Ordering::make( BSONObj() );
 
-    TEST( RocksRecordStoreTest, BrainDead ) {
+    TEST( RocksSortedDataTest, BrainDead ) {
         unittest::TempDir td( _rocksSortedDataTestDir );
         scoped_ptr<rocksdb::DB> db( getDB( td.path() ) );
 
@@ -129,7 +129,7 @@ namespace mongo {
         }
     }
 
-    TEST( RocksRecordStoreTest, Locate1 ) {
+    TEST( RocksSortedDataTest, Locate1 ) {
         unittest::TempDir td( _rocksSortedDataTestDir );
         scoped_ptr<rocksdb::DB> db( getDB( td.path() ) );
 
@@ -166,7 +166,7 @@ namespace mongo {
         }
     }
 
-    TEST( RocksRecordStoreTest, Locate2 ) {
+    TEST( RocksSortedDataTest, Locate2 ) {
         unittest::TempDir td( _rocksSortedDataTestDir );
         scoped_ptr<rocksdb::DB> db( getDB( td.path() ) );
 
@@ -188,7 +188,7 @@ namespace mongo {
             {
                 MyOperationContext opCtx( db.get() );
                 scoped_ptr<SortedDataInterface::Cursor> cursor( sortedData.newCursor( &opCtx, 1 ) );
-                ASSERT( cursor->locate( BSON( "a" << 2 ), DiskLoc(0,0) ) );
+                ASSERT( !cursor->locate( BSON( "a" << 2 ), DiskLoc(0,0) ) );
                 ASSERT( !cursor->isEOF()  );
                 ASSERT_EQUALS( BSON( "" << 2 ), cursor->getKey() );
                 ASSERT_EQUALS( DiskLoc(1,2), cursor->getDiskLoc() );
@@ -214,7 +214,7 @@ namespace mongo {
         return boost::shared_ptr<rocksdb::ColumnFamilyHandle>( cfh );
     }
 
-    TEST( RocksRecordStoreTest, LocateInexact ) {
+    TEST( RocksSortedDataTest, LocateInexact ) {
         unittest::TempDir td( _rocksSortedDataTestDir );
         scoped_ptr<rocksdb::DB> db( getDB( td.path() ) );
 
@@ -245,7 +245,7 @@ namespace mongo {
         }
     }
 
-    TEST( RocksRecordStoreTest, Snapshots ) {
+    TEST( RocksSortedDataTest, Snapshots ) {
         unittest::TempDir td( _rocksSortedDataTestDir );
         scoped_ptr<rocksdb::DB> db( getDB( td.path() ) );
 
@@ -289,7 +289,7 @@ namespace mongo {
         }
     }
 
-    TEST( RocksRecordStoreTest, SaveAndRestorePositionSimple ) {
+    TEST( RocksSortedDataTest, SaveAndRestorePositionSimple ) {
         unittest::TempDir td( _rocksSortedDataTestDir );
         scoped_ptr<rocksdb::DB> db( getDB( td.path() ) );
 
@@ -311,7 +311,7 @@ namespace mongo {
             {
                 MyOperationContext opCtx( db.get() );
                 scoped_ptr<SortedDataInterface::Cursor> cursor( sortedData.newCursor( &opCtx, 1 ) );
-                ASSERT( cursor->locate( BSON( "a" << 1 ), DiskLoc(0,0) ) );
+                ASSERT( !cursor->locate( BSON( "a" << 1 ), DiskLoc(0,0) ) );
                 ASSERT( !cursor->isEOF()  );
                 ASSERT_EQUALS( BSON( "" << 1 ), cursor->getKey() );
                 ASSERT_EQUALS( DiskLoc(1,1), cursor->getDiskLoc() );
@@ -326,7 +326,7 @@ namespace mongo {
                 ASSERT_EQUALS( DiskLoc(1,1), cursor->getDiskLoc() );
 
                 // repeat, with a different value
-                ASSERT( cursor->locate( BSON( "a" << 2 ), DiskLoc(0,0) ) );
+                ASSERT( !cursor->locate( BSON( "a" << 2 ), DiskLoc(0,0) ) );
                 ASSERT( !cursor->isEOF()  );
                 ASSERT_EQUALS( BSON( "" << 2 ), cursor->getKey() );
                 ASSERT_EQUALS( DiskLoc(1,2), cursor->getDiskLoc() );
@@ -343,7 +343,7 @@ namespace mongo {
         }
     }
 
-    TEST( RocksRecordStoreTest, SaveAndRestorePositionEOF ) {
+    TEST( RocksSortedDataTest, SaveAndRestorePositionEOF ) {
         unittest::TempDir td( _rocksSortedDataTestDir );
         scoped_ptr<rocksdb::DB> db( getDB( td.path() ) );
 
@@ -365,7 +365,7 @@ namespace mongo {
             {
                 MyOperationContext opCtx( db.get() );
                 scoped_ptr<SortedDataInterface::Cursor> cursor( sortedData.newCursor( &opCtx, 1 ) );
-                ASSERT( cursor->locate( BSON( "a" << 1 ), DiskLoc(0,0) ) );
+                ASSERT( !cursor->locate( BSON( "a" << 1 ), DiskLoc(0,0) ) );
                 ASSERT( !cursor->isEOF()  );
                 ASSERT_EQUALS( BSON( "" << 1 ), cursor->getKey() );
                 ASSERT_EQUALS( DiskLoc(1,1), cursor->getDiskLoc() );
@@ -387,7 +387,7 @@ namespace mongo {
         }
     }
 
-    TEST( RocksRecordStoreTest, SaveAndRestorePositionInsert ) {
+    TEST( RocksSortedDataTest, SaveAndRestorePositionInsert ) {
         unittest::TempDir td( _rocksSortedDataTestDir );
         scoped_ptr<rocksdb::DB> db( getDB( td.path() ) );
 
@@ -409,7 +409,7 @@ namespace mongo {
             {
                 MyOperationContext opCtx( db.get() );
                 scoped_ptr<SortedDataInterface::Cursor> cursor( sortedData.newCursor( &opCtx, 1 ) );
-                ASSERT( cursor->locate( BSON( "" << 3 ), DiskLoc(0,0) ) );
+                ASSERT( !cursor->locate( BSON( "" << 3 ), DiskLoc(0,0) ) );
                 ASSERT( !cursor->isEOF()  );
                 ASSERT_EQUALS( BSON( "" << 3 ), cursor->getKey() );
                 ASSERT_EQUALS( DiskLoc(1,3), cursor->getDiskLoc() );
@@ -439,7 +439,7 @@ namespace mongo {
         }
     }
 
-    TEST( RocksRecordStoreTest, SaveAndRestorePositionDelete2 ) {
+    TEST( RocksSortedDataTest, SaveAndRestorePositionDelete2 ) {
         unittest::TempDir td( _rocksSortedDataTestDir );
         scoped_ptr<rocksdb::DB> db( getDB( td.path() ) );
 
@@ -461,7 +461,7 @@ namespace mongo {
             {
                 MyOperationContext opCtx( db.get() );
                 scoped_ptr<SortedDataInterface::Cursor> cursor( sortedData.newCursor( &opCtx, 1 ) );
-                ASSERT( cursor->locate( BSON( "" << 2 ), DiskLoc(0,0) ) );
+                ASSERT( !cursor->locate( BSON( "" << 2 ), DiskLoc(0,0) ) );
                 ASSERT( !cursor->isEOF()  );
                 ASSERT_EQUALS( BSON( "" << 2 ), cursor->getKey() );
                 ASSERT_EQUALS( DiskLoc(1,2), cursor->getDiskLoc() );
@@ -487,7 +487,7 @@ namespace mongo {
         }
     }
 
-    TEST( RocksRecordStoreTest, SaveAndRestorePositionDelete3 ) {
+    TEST( RocksSortedDataTest, SaveAndRestorePositionDelete3 ) {
         unittest::TempDir td( _rocksSortedDataTestDir );
         scoped_ptr<rocksdb::DB> db( getDB( td.path() ) );
 
@@ -509,7 +509,7 @@ namespace mongo {
             {
                 MyOperationContext opCtx( db.get() );
                 scoped_ptr<SortedDataInterface::Cursor> cursor( sortedData.newCursor( &opCtx, 1 ) );
-                ASSERT( cursor->locate( BSON( "" << 2 ), DiskLoc(0,0) ) );
+                ASSERT( !cursor->locate( BSON( "" << 2 ), DiskLoc(0,0) ) );
                 ASSERT( !cursor->isEOF()  );
                 ASSERT_EQUALS( BSON( "" << 2 ), cursor->getKey() );
                 ASSERT_EQUALS( DiskLoc(1,2), cursor->getDiskLoc() );
@@ -545,7 +545,7 @@ namespace mongo {
         }
     }
 
-    TEST( RocksRecordStoreTest, Locate1Reverse ) {
+    TEST( RocksSortedDataTest, Locate1Reverse ) {
         unittest::TempDir td( _rocksSortedDataTestDir );
         scoped_ptr<rocksdb::DB> db( getDB( td.path() ) );
 
@@ -581,7 +581,7 @@ namespace mongo {
         }
     }
 
-    TEST( RocksRecordStoreTest, LocateInexactReverse ) {
+    TEST( RocksSortedDataTest, LocateInexactReverse ) {
         unittest::TempDir td( _rocksSortedDataTestDir );
         scoped_ptr<rocksdb::DB> db( getDB( td.path() ) );
 
@@ -612,7 +612,7 @@ namespace mongo {
         }
     }
 
-    TEST( RocksRecordStoreTest, SaveAndRestorePositionReverseSimple ) {
+    TEST( RocksSortedDataTest, SaveAndRestorePositionReverseSimple ) {
         unittest::TempDir td( _rocksSortedDataTestDir );
         scoped_ptr<rocksdb::DB> db( getDB( td.path() ) );
 
@@ -634,7 +634,7 @@ namespace mongo {
             {
                 MyOperationContext opCtx( db.get() );
                 scoped_ptr<SortedDataInterface::Cursor> cursor( sortedData.newCursor( &opCtx, -1 ) );
-                ASSERT( cursor->locate( BSON( "a" << 1 ), DiskLoc(0,0) ) );
+                ASSERT( !cursor->locate( BSON( "a" << 1 ), DiskLoc(2,0) ) );
                 ASSERT( !cursor->isEOF()  );
                 ASSERT_EQUALS( BSON( "" << 1 ), cursor->getKey() );
                 ASSERT_EQUALS( DiskLoc(1,1), cursor->getDiskLoc() );
@@ -649,7 +649,7 @@ namespace mongo {
                 ASSERT_EQUALS( DiskLoc(1,1), cursor->getDiskLoc() );
 
                 // repeat, with a different value
-                ASSERT( cursor->locate( BSON( "a" << 2 ), DiskLoc(0,0) ) );
+                ASSERT( !cursor->locate( BSON( "a" << 2 ), DiskLoc(2,0) ) );
                 ASSERT( !cursor->isEOF()  );
                 ASSERT_EQUALS( BSON( "" << 2 ), cursor->getKey() );
                 ASSERT_EQUALS( DiskLoc(1,2), cursor->getDiskLoc() );
@@ -666,7 +666,7 @@ namespace mongo {
         }
     }
 
-    TEST( RocksRecordStoreTest, SaveAndRestorePositionEOFReverse ) {
+    TEST( RocksSortedDataTest, SaveAndRestorePositionEOFReverse ) {
         unittest::TempDir td( _rocksSortedDataTestDir );
         scoped_ptr<rocksdb::DB> db( getDB( td.path() ) );
 
@@ -710,7 +710,7 @@ namespace mongo {
         }
     }
 
-    TEST( RocksRecordStoreTest, SaveAndRestorePositionInsertReverse ) {
+    TEST( RocksSortedDataTest, SaveAndRestorePositionInsertReverse ) {
         unittest::TempDir td( _rocksSortedDataTestDir );
         scoped_ptr<rocksdb::DB> db( getDB( td.path() ) );
 
@@ -732,7 +732,7 @@ namespace mongo {
                 MyOperationContext opCtx( db.get() );
                 scoped_ptr<SortedDataInterface::Cursor> cursor( sortedData.newCursor( &opCtx,
                                                                                       -1 ) );
-                ASSERT( cursor->locate( BSON( "" << 3 ), DiskLoc(0,0) ) );
+                ASSERT( !cursor->locate( BSON( "" << 3 ), DiskLoc(2,0) ) );
                 ASSERT( !cursor->isEOF()  );
                 ASSERT_EQUALS( BSON( "" << 3 ), cursor->getKey() );
                 ASSERT_EQUALS( DiskLoc(1,3), cursor->getDiskLoc() );
@@ -767,7 +767,7 @@ namespace mongo {
         }
     }
 
-    TEST( RocksRecordStoreTest, SaveAndRestorePositionDelete1Reverse ) {
+    TEST( RocksSortedDataTest, SaveAndRestorePositionDelete1Reverse ) {
         unittest::TempDir td( _rocksSortedDataTestDir );
         scoped_ptr<rocksdb::DB> db( getDB( td.path() ) );
 
@@ -790,7 +790,7 @@ namespace mongo {
                 MyOperationContext opCtx( db.get() );
                 scoped_ptr<SortedDataInterface::Cursor> cursor( sortedData.newCursor( &opCtx,
                                                                                       -1 ) );
-                ASSERT( cursor->locate( BSON( "" << 3 ), DiskLoc(0,0) ) );
+                ASSERT( !cursor->locate( BSON( "" << 3 ), DiskLoc(2,0) ) );
                 ASSERT( !cursor->isEOF()  );
                 ASSERT_EQUALS( BSON( "" << 3 ), cursor->getKey() );
                 ASSERT_EQUALS( DiskLoc(1,3), cursor->getDiskLoc() );
@@ -817,7 +817,7 @@ namespace mongo {
         }
     }
 
-    TEST( RocksRecordStoreTest, SaveAndRestorePositionDelete2Reverse ) {
+    TEST( RocksSortedDataTest, SaveAndRestorePositionDelete2Reverse ) {
         unittest::TempDir td( _rocksSortedDataTestDir );
         scoped_ptr<rocksdb::DB> db( getDB( td.path() ) );
 
@@ -840,7 +840,7 @@ namespace mongo {
                 MyOperationContext opCtx( db.get() );
                 scoped_ptr<SortedDataInterface::Cursor> cursor( sortedData.newCursor( &opCtx,
                                                                                       -1 ) );
-                ASSERT( cursor->locate( BSON( "" << 2 ), DiskLoc(0,0) ) );
+                ASSERT( !cursor->locate( BSON( "" << 2 ), DiskLoc(2,0) ) );
                 ASSERT( !cursor->isEOF()  );
                 ASSERT_EQUALS( BSON( "" << 2 ), cursor->getKey() );
                 ASSERT_EQUALS( DiskLoc(1,2), cursor->getDiskLoc() );
@@ -866,7 +866,7 @@ namespace mongo {
         }
     }
 
-    TEST( RocksRecordStoreTest, SaveAndRestorePositionDelete3Reverse ) {
+    TEST( RocksSortedDataTest, SaveAndRestorePositionDelete3Reverse ) {
         unittest::TempDir td( _rocksSortedDataTestDir );
         scoped_ptr<rocksdb::DB> db( getDB( td.path() ) );
 
@@ -889,7 +889,7 @@ namespace mongo {
                 MyOperationContext opCtx( db.get() );
                 scoped_ptr<SortedDataInterface::Cursor> cursor( sortedData.newCursor( &opCtx,
                                                                                       -1 ) );
-                ASSERT( cursor->locate( BSON( "" << 2 ), DiskLoc(0,0) ) );
+                ASSERT( !cursor->locate( BSON( "" << 2 ), DiskLoc(2,0) ) );
                 ASSERT( !cursor->isEOF()  );
                 ASSERT_EQUALS( BSON( "" << 2 ), cursor->getKey() );
                 ASSERT_EQUALS( DiskLoc(1,2), cursor->getDiskLoc() );

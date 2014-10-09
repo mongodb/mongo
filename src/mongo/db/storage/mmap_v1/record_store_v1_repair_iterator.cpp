@@ -52,7 +52,7 @@ namespace mongo {
     DiskLoc RecordStoreV1RepairIterator::curr() { return _currRecord; }
 
     DiskLoc RecordStoreV1RepairIterator::getNext() {
-        DiskLoc retVal = _currRecord;
+        const DiskLoc retVal = _currRecord;
 
         const ExtentManager* em = _recordStore->_extentManager;
 
@@ -183,7 +183,15 @@ namespace mongo {
     }
 
     void RecordStoreV1RepairIterator::invalidate(const DiskLoc& dl) {
-        verify(!"Invalidate is not supported for RecordStoreV1RepairIterator.");
+        // If we see this record again it probably means it was reinserted rather than an infinite
+        // loop. If we do loop, we should quickly hit another seen record that hasn't been
+        // invalidated.
+        _seenInCurrentExtent.erase(dl);
+
+        if (_currRecord == dl) {
+            getNext();
+            invariant(_currRecord != dl);
+        }
     }
 
     RecordData RecordStoreV1RepairIterator::dataFor(const DiskLoc& loc) const {

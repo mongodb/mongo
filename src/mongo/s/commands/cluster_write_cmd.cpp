@@ -242,7 +242,6 @@ namespace mongo {
                                     const BSONObj& cmdObj,
                                     ExplainCommon::Verbosity verbosity,
                                     BSONObjBuilder* out) const {
-        const string fullns = parseNs(dbname, cmdObj);
 
         BatchedCommandRequest request(_writeType);
 
@@ -250,6 +249,10 @@ namespace mongo {
         if (!request.parseBSON(cmdObj, &errMsg) || !request.isValid(&errMsg)) {
             return Status(ErrorCodes::FailedToParse, errMsg);
         }
+
+        // Fixup the namespace to be a full ns internally
+        NamespaceString nss(dbname, request.getNS());
+        request.setNS(nss.ns());
 
         // We can only explain write batches of size 1.
         if (request.sizeWriteOps() != 1U) {
@@ -265,12 +268,12 @@ namespace mongo {
         // Target the command to the shards based on the singleton batch item.
         BatchItemRef targetingBatchItem(&request, 0);
         vector<Strategy::CommandResult> shardResults;
-        STRATEGY->commandOpWrite(dbname,
-                                 explainCmdBob.obj(),
-                                 0,
-                                 fullns,
-                                 targetingBatchItem,
-                                 &shardResults);
+        Status status = STRATEGY->commandOpWrite(dbname,
+                                                 explainCmdBob.obj(),
+                                                 targetingBatchItem,
+                                                 &shardResults);
+        if (!status.isOK())
+            return status;
 
         long long millisElapsed = timer.millis();
 

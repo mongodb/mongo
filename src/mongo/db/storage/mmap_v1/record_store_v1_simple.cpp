@@ -267,8 +267,38 @@ namespace mongo {
     }
 
     Status SimpleRecordStoreV1::truncate(OperationContext* txn) {
-        return Status( ErrorCodes::InternalError,
-                       "SimpleRecordStoreV1::truncate not implemented" );
+        const DiskLoc firstExtLoc = _details->firstExtent(txn);
+        if (firstExtLoc.isNull() || !firstExtLoc.isValid()) {
+            // Already empty
+            return Status::OK();
+        }
+
+        // Free all extents except the first.
+        Extent* firstExt = _extentManager->getExtent(firstExtLoc);
+        if (!firstExt->xnext.isNull()) {
+            const DiskLoc extNextLoc = firstExt->xnext;
+            const DiskLoc oldLastExtLoc = _details->lastExtent(txn);
+            Extent* const nextExt = _extentManager->getExtent(extNextLoc);
+
+            // Unlink other extents;
+            *txn->recoveryUnit()->writing(&nextExt->xprev) = DiskLoc();
+            *txn->recoveryUnit()->writing(&firstExt->xnext) = DiskLoc();
+            _details->setLastExtent(txn, firstExtLoc);
+            _details->setLastExtentSize(txn, firstExt->length);
+
+            _extentManager->freeExtents(txn, extNextLoc, oldLastExtLoc);
+        }
+
+        // Make the first (now only) extent a single large deleted record.
+        *txn->recoveryUnit()->writing(&firstExt->firstRecord) = DiskLoc();
+        *txn->recoveryUnit()->writing(&firstExt->lastRecord) = DiskLoc();
+        _details->orphanDeletedList(txn);
+        addDeletedRec(txn, _findFirstSpot(txn, firstExtLoc, firstExt));
+
+        // Make stats reflect that there are now no documents in this record store.
+        _details->setStats(txn, 0, 0);
+
+        return Status::OK();
     }
 
     void SimpleRecordStoreV1::addDeletedRec( OperationContext* txn, const DiskLoc& dloc ) {

@@ -364,7 +364,7 @@ namespace mongo {
             // Scoping for write lock.
             {
                 Client::WriteContext ctx(txn, ns);
-                Collection* collection = ctx.ctx().db()->getCollection( txn, ns );
+                Collection* collection = ctx.getCollection();
                 if ( !collection )
                     break;
 

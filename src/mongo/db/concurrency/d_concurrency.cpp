@@ -258,12 +258,12 @@ namespace mongo {
         TrackLockAcquireTime a(isRead ? 'r' : 'w');
 
         _lockState->lockGlobal(isRead ? newlm::MODE_IS : newlm::MODE_IX);
-
-        if (supportsDocLocking() || isRead) {
+        if (supportsDocLocking()) {
+            //  SERVER-14668: Make this branch unconditional when MMAPv1 has coll. locking
             _lockState->lock(_id, _mode);
         }
         else {
-            _lockState->lock(_id, newlm::MODE_X);
+            _lockState->lock(_id, isRead ? newlm::MODE_S : newlm::MODE_X);
         }
 
         resetTime();
@@ -291,18 +291,18 @@ namespace mongo {
                                               isRead ? newlm::MODE_IS : newlm::MODE_IX));
         if (supportsDocLocking()) {
             _lockState->lock(_id, mode);
-        }
-        else {
-            _lockState->lock(_id, isRead ? newlm::MODE_S : newlm::MODE_X);
+            // SERVER-14668: add when MMAPv1 ready for collection-level locking
+            // else { _lockState->lock(_id, isRead ? newlm::MODE_S : newlm::MODE_X); }
+            invariant(isRead || !isRead); // artificial use to silence warning.
         }
     }
 
     Lock::CollectionLock::~CollectionLock() {
-        _lockState->unlock(_id);
+        if (supportsDocLocking()) {
+            // SERVER-14668: Make unconditional when MMAPv1 has collection-level locking
+            _lockState->unlock(_id);
+        }
     }
-
-    Lock::DBWrite::DBWrite(Locker* lockState, const StringData& dbOrNs) :
-        DBLock(lockState, nsToDatabaseSubstring(dbOrNs), newlm::MODE_X) { }
 
     Lock::DBRead::DBRead(Locker* lockState, const StringData& dbOrNs) :
         DBLock(lockState, nsToDatabaseSubstring(dbOrNs), newlm::MODE_S) { }

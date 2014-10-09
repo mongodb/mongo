@@ -31,6 +31,7 @@
 #include "mongo/db/ops/update_executor.h"
 
 #include "mongo/db/catalog/database.h"
+#include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/exec/update.h"
 #include "mongo/db/ops/update.h"
 #include "mongo/db/ops/update_driver.h"
@@ -40,6 +41,7 @@
 #include "mongo/db/query/get_executor.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/fail_point_service.h"
 #include "mongo/util/log.h"
 
 namespace mongo {
@@ -92,6 +94,8 @@ namespace mongo {
         return _exec.get();
     }
 
+    MONGO_FP_DECLARE(implicitCollectionCreationDelay);
+
     Status UpdateExecutor::prepareInLock(Database* db) {
         // If we have a non-NULL PlanExecutor, then we've already done the in-lock preparation.
         if (_exec.get()) {
@@ -107,22 +111,32 @@ namespace mongo {
 
         // The update stage does not create its own collection.  As such, if the update is
         // an upsert, create the collection that the update stage inserts into beforehand.
-        if (_request->isUpsert()) {
-            if (!collection) {
-                OperationContext* const txn = _request->getOpCtx();
-                WriteUnitOfWork wuow(txn);
-                invariant(txn->lockState()->isWriteLocked());
-                invariant(db->createCollection(txn, nsString.ns()));
+        if (!collection && _request->isUpsert()) {
+            OperationContext* const txn = _request->getOpCtx();
 
-                if (!_request->isFromReplication()) {
-                    repl::logOp(txn,
-                                "c",
-                                (db->name() + ".$cmd").c_str(),
-                                BSON("create" << (nsString.coll())));
-                }
-                wuow.commit();
-                collection = db->getCollection(_request->getOpCtx(), nsString.ns());
+            //  Upgrade to an exclusive lock. While this may possibly lead to a deadlock,
+            //  collection creation is rare and a retry will definitively succeed in this
+            //  case. Add a fail point to allow reliably triggering the deadlock situation.
+
+            MONGO_FAIL_POINT_BLOCK(implicitCollectionCreationDelay, data) {
+                LOG(0) << "Sleeping for creation of collection " + nsString.ns();
+                sleepmillis(1000);
+                LOG(0) << "About to upgrade to exclusive lock on " + nsString.ns();
             }
+
+            Lock::DBLock lk(txn->lockState(), nsString.db(), newlm::MODE_X);
+
+            WriteUnitOfWork wuow(txn);
+            invariant(db->createCollection(txn, nsString.ns()));
+
+            if (!_request->isFromReplication()) {
+                repl::logOp(txn,
+                            "c",
+                            (db->name() + ".$cmd").c_str(),
+                            BSON("create" << (nsString.coll())));
+            }
+            wuow.commit();
+            collection = db->getCollection(_request->getOpCtx(), nsString.ns());
             invariant(collection);
         }
 

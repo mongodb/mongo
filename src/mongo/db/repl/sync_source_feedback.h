@@ -84,8 +84,10 @@ namespace repl {
 
         /* Inform the sync target of our current position in the oplog, as well as the positions
          * of all secondaries chained through us.
+         * ErrorCodes::NodeNotFound indicates that the caller should re-run replHandshake before
+         * calling this again.
          */
-        bool updateUpstream(OperationContext* txn);
+        Status updateUpstream(OperationContext* txn);
 
         bool hasConnection() {
             return _connection.get();

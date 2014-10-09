@@ -65,7 +65,7 @@ namespace IndexUpdateTests {
             getGlobalEnvironment()->unsetKillAllOperations();
         }
         Collection* collection() {
-            return _ctx.ctx().db()->getCollection( &_txn, _ns );
+            return _ctx.getCollection();
         }
     protected:
     // QUERY_MIGRATION
@@ -663,7 +663,9 @@ namespace IndexUpdateTests {
             memcpy( infoRecord->data(), indexInfo.objdata(), indexInfo.objsize() );
             addRecordToRecListInExtent( infoRecord, infoLoc );
 
-            return new IndexCatalog::IndexBuildBlock( _ctx.ctx().db()->getCollection( _ns )->getIndexCatalog(), name, infoLoc );
+            return new IndexCatalog::IndexBuildBlock( _ctx.getCollection()->getIndexCatalog(),
+                                                     name,
+                                                     infoLoc );
         }
     };
 #endif

@@ -31,7 +31,6 @@
 #include "mongo/db/storage/mmap_v1/record_store_v1_base.h"
 
 #include "mongo/db/catalog/collection.h"
-#include "mongo/db/concurrency/lock_mgr.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/storage/mmap_v1/extent.h"
 #include "mongo/db/storage/mmap_v1/extent_manager.h"

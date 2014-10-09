@@ -306,10 +306,12 @@ namespace mongo {
                 if ( ! m ) 
                     break;
 
-                if ( m->chunk.min["x"].numberInt() < 7 )
+                if ( m->chunk.min["x"].numberInt() < 7 ) {
                     ASSERT_EQUALS( "shard0" , m->to );
-                else
+                }
+                else {
                     ASSERT_EQUALS( "shard2" , m->to );
+                }
 
                 moveChunk( chunks, m );
             }

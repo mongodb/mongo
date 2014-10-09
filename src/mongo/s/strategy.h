@@ -63,6 +63,9 @@ namespace mongo {
          * collection in that database.
          *
          * This version should be used by internal commands when possible.
+         *
+         * TODO: Replace these methods and all other methods of command dispatch with a more general
+         * command op framework.
          */
         void commandOp( const std::string& db,
                         const BSONObj& command,
@@ -73,26 +76,23 @@ namespace mongo {
 
         /**
          * Executes a write command against a particular database, and targets the command based on
-         * a collection in that database.
+         * a write operation.
+         *
+         * Does *not* retry or retarget if the metadata is stale.
          *
          * Similar to commandOp() above, but the targeting rules are different for writes than for
          * reads.
-         *
-         * TODO: Currently this causes the command to be routed to all shards. The correct targeting
-         * rules still need to be implemented.
          */
-        void commandOpWrite(const std::string& db,
-                            const BSONObj& command,
-                            int options,
-                            const std::string& versionedNS,
-                            BatchItemRef targetingBatchItem,
-                            std::vector<CommandResult>* results);
+        Status commandOpWrite(const std::string& db,
+                              const BSONObj& command,
+                              BatchItemRef targetingBatchItem,
+                              std::vector<CommandResult>* results);
 
         /**
          * Some commands can only be run in a sharded configuration against a namespace that has
          * not been sharded. Use this method to execute such commands.
          *
-         * Returns a non-OK status if the namespace is sharded.
+         * Does *not* retry or retarget if the metadata is stale.
          *
          * On success, fills in 'shardResult' with output from the namespace's primary shard. This
          * output may itself indicate an error status on the shard.

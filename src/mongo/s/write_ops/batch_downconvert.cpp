@@ -418,52 +418,6 @@ namespace mongo {
         return builder.obj();
     }
 
-    namespace {
-
-        /**
-         * Trivial implementation of a BSON serializable object for backwards-compatibility.
-         *
-         * NOTE: This is not a good example of using BSONSerializable.  For anything more complex,
-         * create an implementation with fields defined.
-         */
-        class RawBSONSerializable : public BSONSerializable {
-        MONGO_DISALLOW_COPYING(RawBSONSerializable);
-        public:
-
-            RawBSONSerializable() {
-            }
-
-            RawBSONSerializable( const BSONObj& doc ) :
-                _doc( doc ) {
-            }
-
-            bool isValid( std::string* errMsg ) const {
-                return true;
-            }
-
-            BSONObj toBSON() const {
-                return _doc;
-            }
-
-            bool parseBSON( const BSONObj& source, std::string* errMsg ) {
-                _doc = source.getOwned();
-                return true;
-            }
-
-            void clear() {
-                _doc = BSONObj();
-            }
-
-            string toString() const {
-                return toBSON().toString();
-            }
-
-        private:
-
-            BSONObj _doc;
-        };
-    }
-
     // Adds a wOpTime and a wElectionId field to a set of gle options
     static BSONObj buildGLECmdWithOpTime( const BSONObj& gleOptions,
                                           const OpTime& opTime,

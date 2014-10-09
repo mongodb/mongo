@@ -44,6 +44,7 @@
 #include "mongo/db/repl/bgsync.h"
 #include "mongo/db/repl/connections.h"
 #include "mongo/db/repl/isself.h"
+#include "mongo/db/repl/master_slave.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/rs_sync.h"
 #include "mongo/stdx/functional.h"
@@ -57,7 +58,9 @@ namespace repl {
 
 namespace {
     const char configCollectionName[] = "local.system.replset";
+    const char configDatabaseName[] = "local";
     const char meCollectionName[] = "local.me";
+    const char meDatabaseName[] = "local";
     const char tsFieldName[] = "ts";
 }  // namespace
 
@@ -71,6 +74,11 @@ namespace {
                                                            bgsync)));
         _syncSourceFeedbackThread.reset(new boost::thread(stdx::bind(&SyncSourceFeedback::run,
                                                                      &_syncSourceFeedback)));
+        newReplUp();
+    }
+
+    void ReplicationCoordinatorExternalStateImpl::startMasterSlave() {
+        repl::startMasterSlave();
     }
 
     void ReplicationCoordinatorExternalStateImpl::shutdown() {
@@ -94,7 +102,7 @@ namespace {
         std::string myname = getHostName();
         OID myRID;
         {
-            Lock::DBWrite lock(txn->lockState(), meCollectionName);
+            Lock::DBLock lock(txn->lockState(), meDatabaseName, newlm::MODE_X);
 
             BSONObj me;
             // local.me is an identifier for a server for getLastError w:2+
@@ -140,7 +148,7 @@ namespace {
             OperationContext* txn,
             const BSONObj& config) {
         try {
-            Lock::DBWrite dbWriteLock(txn->lockState(), configCollectionName);
+            Lock::DBLock dbWriteLock(txn->lockState(), configDatabaseName, newlm::MODE_X);
             Helpers::putSingleton(txn, configCollectionName, config);
             return Status::OK();
         }

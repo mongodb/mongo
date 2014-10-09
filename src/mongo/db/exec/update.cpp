@@ -515,10 +515,6 @@ namespace mongo {
             else {
                 // The updates were not in place. Apply them through the file manager.
 
-                // XXX: With experimental document-level locking, we do not hold
-                // sufficient locks, so this would cause corruption.
-                fassert(18516, !useExperimentalDocLocking);
-
                 newObj = _doc.getObject();
                 uassert(17419,
                         str::stream() << "Resulting document after update is larger than "

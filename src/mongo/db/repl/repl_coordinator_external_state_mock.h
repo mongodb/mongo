@@ -49,6 +49,7 @@ namespace repl {
         ReplicationCoordinatorExternalStateMock();
         virtual ~ReplicationCoordinatorExternalStateMock();
         virtual void startThreads();
+        virtual void startMasterSlave();
         virtual void shutdown();
         virtual void forwardSlaveHandshake();
         virtual void forwardSlaveProgress();
@@ -90,11 +91,18 @@ namespace repl {
          */
         void setLastOpTime(const StatusWith<OpTime>& lastApplied);
 
+        /**
+         * Sets the return value for subsequent calls to storeLocalConfigDocument().
+         * If "status" is Status::OK(), the subsequent calls will call the underlying funtion.
+         */ 
+        void setStoreLocalConfigDocumentStatus(Status status);
+
     private:
         StatusWith<BSONObj> _localRsConfigDocument;
         StatusWith<OpTime>  _lastOpTime;
         std::vector<HostAndPort> _selfHosts;
         bool _canAcquireGlobalSharedLock;
+        Status _storeLocalConfigDocumentStatus;
         bool _connectionsClosed;
         HostAndPort _clientHostAndPort;
     };

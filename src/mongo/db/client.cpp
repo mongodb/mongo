@@ -257,12 +257,13 @@ namespace mongo {
     }
 
 
-    Client::WriteContext::WriteContext(
-                OperationContext* opCtx, const std::string& ns, bool doVersion)
-        : _lk(opCtx->lockState(), ns),
+    Client::WriteContext::WriteContext(OperationContext* opCtx, const std::string& ns)
+        : _txn(opCtx),
+          _nss(ns),
+          _dblk(opCtx->lockState(), _nss.db(), newlm::MODE_IX),
+          _collk(opCtx->lockState(), ns, newlm::MODE_IX),
           _wunit(opCtx),
-          _c(opCtx, ns, doVersion) {
-    }
+          _c(opCtx, ns) { }
 
     void Client::WriteContext::commit() {
         _wunit.commit();

@@ -65,13 +65,14 @@ namespace repl {
 
         const MemberConfig& selfConfig = _rsConfig.getMemberAt(_selfIndex);
         std::vector<ReplicationExecutor::RemoteCommandRequest> requests;
-        const BSONObj replSetElectCmd =
-            BSON("replSetElect" << 1 <<
-                 "set" << _rsConfig.getReplSetName() <<
-                 "who" << selfConfig.getHostAndPort().toString() <<
-                 "whoid" << selfConfig.getId() <<
-                 "cfgver" << _rsConfig.getConfigVersion() <<
-                 "round" << _round);
+        BSONObjBuilder electCmdBuilder;
+        electCmdBuilder.append("replSetElect", 1);
+        electCmdBuilder.append("set", _rsConfig.getReplSetName());
+        electCmdBuilder.append("who", selfConfig.getHostAndPort().toString());
+        electCmdBuilder.append("whoid", selfConfig.getId());
+        electCmdBuilder.appendIntOrLL("cfgver", _rsConfig.getConfigVersion());
+        electCmdBuilder.append("round", _round);
+        const BSONObj replSetElectCmd = electCmdBuilder.obj();
 
         // Schedule a RemoteCommandRequest for each non-DOWN node
         for (std::vector<HostAndPort>::const_iterator it = _targets.begin();

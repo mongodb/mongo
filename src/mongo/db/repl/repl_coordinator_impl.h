@@ -289,13 +289,16 @@ namespace repl {
          * new heartbeats based on the new config.  Must *only* be called from within the
          * ReplicationExecutor context.
          */
-        void _setCurrentRSConfig(
-                const ReplicationExecutor::CallbackData& cbData,
-                const ReplicaSetConfig& newConfig,
-                int myIndex);
         void _setCurrentRSConfig_inlock(
                 const ReplicaSetConfig& newConfig,
                 int myIndex);
+
+        /**
+         * Helper method that removes entries from _slaveInfoMap if they correspond to a node
+         * with a member ID that is not in the current replica set config, and also guarantees that
+         * there is an entry in the map corresponding to ourself.
+         */
+        void _updateSlaveInfoMapFromConfig_inlock();
 
         /**
          * Helper method for setting/unsetting maintenance mode.  Scheduled by setMaintenanceMode()

@@ -133,10 +133,10 @@ namespace mongo {
         ASSERT(ls.getLockMode(resIdDb) == newlm::MODE_S);
     }
 
-    TEST(DConcurrency, DBWriteTakesX) {
+    TEST(DConcurrency, DBLockTakesX) {
         LockState ls;
 
-        Lock::DBWrite dbWrite(&ls, "db");
+        Lock::DBLock dbWrite(&ls, "db", newlm::MODE_X);
 
         const newlm::ResourceId resIdDb(newlm::RESOURCE_DATABASE, string("db"));
         ASSERT(ls.getLockMode(resIdDb) == newlm::MODE_X);

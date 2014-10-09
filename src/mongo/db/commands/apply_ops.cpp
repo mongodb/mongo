@@ -126,26 +126,26 @@ namespace mongo {
 
                 string ns = temp["ns"].String();
 
-                // Run operations under a nested lock as a hack to prevent them from yielding.
+                // Run operations under a nested lock as a hack to prevent yielding.
                 //
-                // The list of operations is supposed to be applied atomically; yielding would break
-                // atomicity by allowing an interruption or a shutdown to occur after only some
-                // operations are applied.  We are already locked globally at this point, so taking
-                // a DBWrite on the namespace creates a nested lock, and yields are disallowed for
-                // operations that hold a nested lock.
+                // The list of operations is supposed to be applied atomically; yielding
+                // would break atomicity by allowing an interruption or a shutdown to occur
+                // after only some operations are applied.  We are already locked globally
+                // at this point, so taking a DBLock on the namespace creates a nested lock,
+                // and yields are disallowed for operations that hold a nested lock.
                 //
-                // We do not have a wrapping WriteUnitOfWork so it is possible for a journal commit
-                // to happen with a subset of ops applied.
+                // We do not have a wrapping WriteUnitOfWork so it is possible for a journal
+                // commit to happen with a subset of ops applied.
                 // TODO figure out what to do about this.
-                Lock::DBWrite lk(txn->lockState(), ns);
+                Lock::DBLock lk(txn->lockState(), nsToDatabaseSubstring(ns), newlm::MODE_X);
                 invariant(txn->lockState()->isRecursive());
 
                 Client::Context ctx(txn, ns);
                 bool failed = repl::applyOperation_inlock(txn,
-                                                             ctx.db(),
-                                                             temp,
-                                                             false,
-                                                             alwaysUpsert);
+                                                          ctx.db(),
+                                                          temp,
+                                                          false,
+                                                          alwaysUpsert);
                 ab.append(!failed);
                 if ( failed )
                     errors++;

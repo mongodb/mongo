@@ -696,7 +696,7 @@ namespace mongo {
         /**
          * Gets the lock-holding object.  Only valid if hasLock().
          */
-        Lock::DBWrite& getLock() { return *_writeLock; }
+        Lock::DBLock& getLock() { return *_writeLock; }
 
         /**
          * Gets the target collection for the batch operation.  Value is undefined
@@ -718,10 +718,11 @@ namespace mongo {
         std::vector<StatusWith<BSONObj> > normalizedInserts;
 
     private:
-        bool _lockAndCheckImpl(WriteOpResult* result);
+        bool _lockAndCheckImpl(WriteOpResult* result, bool intentLock=true);
 
         // Guard object for the write lock on the target database.
-        scoped_ptr<Lock::DBWrite> _writeLock;
+        scoped_ptr<Lock::DBLock> _writeLock;
+        scoped_ptr<Lock::CollectionLock> _collLock;
 
         // Context object on the target database.  Must appear after writeLock, so that it is
         // destroyed in proper order.
@@ -912,7 +913,8 @@ namespace mongo {
         _collection(NULL) {
     }
 
-    bool WriteBatchExecutor::ExecInsertsState::_lockAndCheckImpl(WriteOpResult* result) {
+    bool WriteBatchExecutor::ExecInsertsState::_lockAndCheckImpl(WriteOpResult* result,
+                                                                 bool intentLock) {
         if (hasLock()) {
             // TODO: Client::Context legacy, needs to be removed
             txn->getCurOp()->enter(_context->ns(),
@@ -920,8 +922,16 @@ namespace mongo {
             return true;
         }
 
+        if (request->isInsertIndexRequest())
+            intentLock = false; // can't build indexes in intent mode
+
         invariant(!_context.get());
-        _writeLock.reset(new Lock::DBWrite(txn->lockState(), request->getNS()));
+        _writeLock.reset(new Lock::DBLock(txn->lockState(),
+                                          nsToDatabase(request->getNS()),
+                                          intentLock ? newlm::MODE_IX : newlm::MODE_X));
+        _collLock.reset(new Lock::CollectionLock(txn->lockState(),
+                                                 request->getNS(),
+                                                 intentLock ? newlm::MODE_IX : newlm::MODE_X));
         if (!checkIsMasterForDatabase(request->getNS(), result)) {
             return false;
         }
@@ -938,6 +948,12 @@ namespace mongo {
         dassert(database);
         _collection = database->getCollection(txn, request->getTargetingNS());
         if (!_collection) {
+            if (intentLock) {
+                // try again with full X lock.
+                unlock();
+                return _lockAndCheckImpl(result, false);
+            }
+
             WriteUnitOfWork wunit (txn);
             // Implicitly create if it doesn't exist
             _collection = database->createCollection(txn, request->getTargetingNS());
@@ -967,6 +983,7 @@ namespace mongo {
     void WriteBatchExecutor::ExecInsertsState::unlock() {
         _collection = NULL;
         _context.reset();
+        _collLock.reset();
         _writeLock.reset();
     }
 
@@ -1109,10 +1126,11 @@ namespace mongo {
                              WriteOpResult* result ) {
 
         const NamespaceString nsString(updateItem.getRequest()->getNS());
+        const bool isMulti = updateItem.getUpdate()->getMulti();
         UpdateRequest request(txn, nsString);
         request.setQuery(updateItem.getUpdate()->getQuery());
         request.setUpdates(updateItem.getUpdate()->getUpdateExpr());
-        request.setMulti(updateItem.getUpdate()->getMulti());
+        request.setMulti(isMulti);
         request.setUpsert(updateItem.getUpdate()->getUpsert());
         request.setUpdateOpLog(true);
         UpdateLifecycleImpl updateLifecycle(true, request.getNamespaceString());
@@ -1126,7 +1144,10 @@ namespace mongo {
         }
 
         ///////////////////////////////////////////
-        Lock::DBWrite writeLock(txn->lockState(), nsString.ns());
+        Lock::DBLock dbLock(txn->lockState(), nsString.db(), newlm::MODE_IX);
+        Lock::CollectionLock colLock(txn->lockState(),
+                                     nsString.ns(),
+                                     isMulti ? newlm::MODE_X : newlm::MODE_IX);
         ///////////////////////////////////////////
 
         if (!checkShardVersion(txn, &shardingState, *updateItem.getRequest(), result))
@@ -1181,7 +1202,7 @@ namespace mongo {
         }
 
         ///////////////////////////////////////////
-        Lock::DBWrite writeLock(txn->lockState(), nss.ns());
+        Lock::DBLock writeLock(txn->lockState(), nss.db(), newlm::MODE_X);
         ///////////////////////////////////////////
 
         // Check version once we're locked

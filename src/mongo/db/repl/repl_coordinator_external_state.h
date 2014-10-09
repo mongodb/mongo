@@ -62,9 +62,14 @@ namespace repl {
         virtual ~ReplicationCoordinatorExternalState();
 
         /**
-         * Starts the background sync, producer, and sync source feedback threads.
+         * Starts the background sync, producer, and sync source feedback threads, and sets up logOp
          */
         virtual void startThreads() = 0;
+
+        /**
+         * Starts the Master/Slave threads and sets up logOp
+         */
+        virtual void startMasterSlave() = 0;
 
         /**
          * Performs any necessary external state specific shutdown tasks, such as cleaning up

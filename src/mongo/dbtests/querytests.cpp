@@ -250,15 +250,13 @@ namespace QueryTests {
 
             {
                 // Check internal server handoff to getmore.
-                Lock::DBWrite lk(_txn.lockState(), ns);
-                WriteUnitOfWork wunit(&_txn);
-                Client::Context ctx(&_txn,  ns );
-                ClientCursorPin clientCursor( ctx.db()->getCollection(&_txn, ns), cursorId );
+                Client::WriteContext ctx(&_txn,  ns);
+                ClientCursorPin clientCursor( ctx.getCollection(), cursorId );
                 // pq doesn't exist if it's a runner inside of the clientcursor.
                 // ASSERT( clientCursor.c()->pq );
                 // ASSERT_EQUALS( 2, clientCursor.c()->pq->getNumToReturn() );
                 ASSERT_EQUALS( 2, clientCursor.c()->pos() );
-                wunit.commit();
+                ctx.commit();
             }
             
             cursor = _client.getMore( ns, cursorId );
@@ -596,7 +594,7 @@ namespace QueryTests {
         }
         void run() {
             const char *ns = "unittests.querytests.OplogReplaySlaveReadTill";
-            Lock::DBWrite lk(_txn.lockState(), ns);
+            Lock::DBLock lk(_txn.lockState(), "unittests", newlm::MODE_X);
             WriteUnitOfWork wunit(&_txn);
             Client::Context ctx(&_txn,  ns );
 
@@ -1164,14 +1162,15 @@ namespace QueryTests {
         }
         void run() {
             string err;
-            Client::WriteContext ctx(&_txn,  "unittests" );
+            Client::WriteContext ctx(&_txn, ns());
 
-            // note that extents are always at least 4KB now - so this will get rounded up a bit.
-            ASSERT( userCreateNS( &_txn, ctx.ctx().db(), ns(),
-                                  fromjson( "{ capped : true, size : 2000 }" ), false ).isOK() );
-            for ( int i=0; i<200; i++ ) {
+            // note that extents are always at least 4KB now - so this will get rounded up
+            // a bit.
+            ASSERT( userCreateNS(&_txn, ctx.db(), ns(),
+                                 fromjson( "{ capped : true, size : 2000 }" ), false ).isOK() );
+            for (int i = 0; i < 200; i++) {
                 insertNext();
-                ASSERT( count() < 90 );
+                ASSERT(count() < 90);
             }
 
             int a = count();
@@ -1214,7 +1213,7 @@ namespace QueryTests {
         }
 
         void run() {
-            Client::WriteContext ctx(&_txn,  "unittests" );
+            Client::WriteContext ctx(&_txn,  ns());
 
             for ( int i=0; i<50; i++ ) {
                 insert( ns() , BSON( "_id" << i << "x" << i * 2 ) );
@@ -1224,8 +1223,8 @@ namespace QueryTests {
             ASSERT_EQUALS( 50 , count() );
 
             BSONObj res;
-            ASSERT( Helpers::findOne( &_txn, ctx.ctx().db()->getCollection( &_txn, ns() ),
-                                      BSON( "_id" << 20 ) , res , true ) );
+            ASSERT( Helpers::findOne(&_txn, ctx.getCollection(),
+                                     BSON("_id" << 20) , res , true));
             ASSERT_EQUALS( 40 , res["x"].numberInt() );
 
             ASSERT( Helpers::findById( &_txn, ctx.ctx().db(), ns() , BSON( "_id" << 20 ) , res ) );
@@ -1241,15 +1240,15 @@ namespace QueryTests {
             {
                 Timer t;
                 for ( int i=0; i<n; i++ ) {
-                    ASSERT( Helpers::findOne( &_txn, ctx.ctx().db()->getCollection(&_txn, ns()),
-                                              BSON( "_id" << 20 ), res, true ) );
+                    ASSERT( Helpers::findOne(&_txn, ctx.getCollection(),
+                                             BSON( "_id" << 20 ), res, true ) );
                 }
                 slow = t.micros();
             }
             {
                 Timer t;
                 for ( int i=0; i<n; i++ ) {
-                    ASSERT( Helpers::findById( &_txn, ctx.ctx().db(), ns() , BSON( "_id" << 20 ) , res ) );
+                    ASSERT( Helpers::findById(&_txn, ctx.db(), ns() , BSON( "_id" << 20 ) , res ) );
                 }
                 fast = t.micros();
             }
@@ -1266,7 +1265,7 @@ namespace QueryTests {
         }
 
         void run() {
-            Client::WriteContext ctx(&_txn,  "unittests" );
+            Client::WriteContext ctx(&_txn,  ns());
 
             for ( int i=0; i<1000; i++ ) {
                 insert( ns() , BSON( "_id" << i << "x" << i * 2 ) );
@@ -1278,7 +1277,7 @@ namespace QueryTests {
 
             BSONObj res;
             for ( int i=0; i<1000; i++ ) {
-                bool found = Helpers::findById( &_txn, ctx.ctx().db(), ns() , BSON( "_id" << i ) , res );
+                bool found = Helpers::findById( &_txn, ctx.db(), ns() , BSON( "_id" << i ) , res );
                 ASSERT_EQUALS( i % 2 , int(found) );
             }
 
@@ -1290,7 +1289,7 @@ namespace QueryTests {
         }
 
         void run() {
-            Client::WriteContext ctx(&_txn,  "unittests" );
+            Client::WriteContext ctx(&_txn, ns());
 
             for ( int i=0; i<1000; i++ ) {
                 insert( ns() , BSON( "_id" << i << "x" << i * 2 ) );
@@ -1406,12 +1405,12 @@ namespace QueryTests {
     public:
         CollectionInternalBase( const char *nsLeaf ) :
           CollectionBase( nsLeaf ),
-          _lk(_txn.lockState(), ns() ),
+          _lk(_txn.lockState(), "unittests", newlm::MODE_X),
           _ctx(&_txn, ns()) {
         }
 
     private:
-        Lock::DBWrite _lk;
+        Lock::DBLock _lk;
         Client::Context _ctx;
     };
     

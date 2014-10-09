@@ -46,11 +46,15 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/query/lite_parsed_query.h"
 #include "mongo/db/stats/counters.h"
+#include "mongo/s/bson_serializable.h"
+#include "mongo/s/chunk_manager_targeter.h"
 #include "mongo/s/client_info.h"
 #include "mongo/s/cluster_write.h"
 #include "mongo/s/chunk.h"
 #include "mongo/s/chunk_version.h"
 #include "mongo/s/cursors.h"
+#include "mongo/s/dbclient_shard_resolver.h"
+#include "mongo/s/dbclient_multi_command.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/request.h"
 #include "mongo/s/stale_exception.h"
@@ -451,14 +455,86 @@ namespace mongo {
 
     }
 
-    void Strategy::commandOpWrite(const std::string& db,
-                                  const BSONObj& command,
-                                  int options,
-                                  const std::string& versionedNS,
-                                  BatchItemRef targetingBatchItem,
-                                  std::vector<CommandResult>* results) {
-        // TODO: implement this to target correctly.
-        commandOp(db, command, options, versionedNS, BSONObj(), results);
+    Status Strategy::commandOpWrite(const std::string& dbName,
+                                    const BSONObj& command,
+                                    BatchItemRef targetingBatchItem,
+                                    std::vector<CommandResult>* results) {
+
+        // Note that this implementation will not handle targeting retries and does not completely
+        // emulate write behavior
+
+        ChunkManagerTargeter targeter;
+        Status status =
+            targeter.init(NamespaceString(targetingBatchItem.getRequest()->getTargetingNS()));
+        if (!status.isOK())
+            return status;
+
+        OwnedPointerVector<ShardEndpoint> endpointsOwned;
+        vector<ShardEndpoint*>& endpoints = endpointsOwned.mutableVector();
+
+        if (targetingBatchItem.getOpType() == BatchedCommandRequest::BatchType_Insert) {
+            ShardEndpoint* endpoint;
+            Status status = targeter.targetInsert(targetingBatchItem.getDocument(), &endpoint);
+            if (!status.isOK())
+                return status;
+            endpoints.push_back(endpoint);
+        }
+        else if (targetingBatchItem.getOpType() == BatchedCommandRequest::BatchType_Update) {
+            Status status = targeter.targetUpdate(*targetingBatchItem.getUpdate(), &endpoints);
+            if (!status.isOK())
+                return status;
+        }
+        else {
+            invariant(targetingBatchItem.getOpType() == BatchedCommandRequest::BatchType_Delete);
+            Status status = targeter.targetDelete(*targetingBatchItem.getDelete(), &endpoints);
+            if (!status.isOK())
+                return status;
+        }
+
+        DBClientShardResolver resolver;
+        DBClientMultiCommand dispatcher;
+
+        // Assemble requests
+        for (vector<ShardEndpoint*>::const_iterator it = endpoints.begin(); it != endpoints.end();
+            ++it) {
+
+            const ShardEndpoint* endpoint = *it;
+
+            ConnectionString host;
+            Status status = resolver.chooseWriteHost(endpoint->shardName, &host);
+            if (!status.isOK())
+                return status;
+
+            RawBSONSerializable request(command);
+            dispatcher.addCommand(host, dbName, request);
+        }
+
+        // Errors reported when recv'ing responses
+        dispatcher.sendAll();
+        Status dispatchStatus = Status::OK();
+
+        // Recv responses
+        while (dispatcher.numPending() > 0) {
+
+            ConnectionString host;
+            RawBSONSerializable response;
+
+            Status status = dispatcher.recvAny(&host, &response);
+            if (!status.isOK()) {
+                // We always need to recv() all the sent operations
+                dispatchStatus = status;
+                continue;
+            }
+
+            CommandResult result;
+            result.target = host;
+            result.shardTarget = Shard::make(host.toString());
+            result.result = response.toBSON();
+
+            results->push_back(result);
+        }
+
+        return dispatchStatus;
     }
 
     Status Strategy::commandOpUnsharded(const std::string& db,
@@ -466,6 +542,10 @@ namespace mongo {
                                         int options,
                                         const std::string& versionedNS,
                                         CommandResult* cmdResult) {
+
+        // Note that this implementation will not handle targeting retries and fails when the
+        // sharding metadata is too stale
+
         DBConfigPtr conf = grid.getDBConfig(db , false);
         if (!conf) {
             mongoutils::str::stream ss;

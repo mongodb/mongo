@@ -621,13 +621,30 @@ namespace mongo {
         UpdateExecutor executor(&request, &op.debug());
         uassertStatusOK(executor.prepare());
 
-        Lock::DBWrite lk(txn->lockState(), ns.ns());
-        Client::Context ctx(txn,  ns );
+        {
+            //  Tentatively take an intent lock, fix up if we need to create the collection
+            Lock::DBLock dbLock(txn->lockState(), ns.db(), newlm::MODE_IX);
+            Lock::CollectionLock colLock(txn->lockState(), ns.ns(), newlm::MODE_IX);
+            Client::Context ctx(txn, ns);
 
-        UpdateResult res = executor.execute(ctx.db());
+            //  The common case: no implicit collection creation
+            if (!upsert || ctx.db()->getCollection(txn, ns) != NULL) {
+                UpdateResult res = executor.execute(ctx.db());
 
-        // for getlasterror
-        lastError.getSafe()->recordUpdate( res.existing , res.numMatched , res.upserted );
+                // for getlasterror
+                lastError.getSafe()->recordUpdate( res.existing , res.numMatched , res.upserted );
+                return;
+            }
+        }
+
+        //  This is an upsert into a non-existing database, so need an exclusive lock
+        //  to avoid deadlock
+        {
+            Lock::DBLock dbLock(txn->lockState(), ns.db(), newlm::MODE_X);
+            Client::Context ctx(txn, ns);
+            UpdateResult res = executor.execute(ctx.db());
+            lastError.getSafe()->recordUpdate( res.existing , res.numMatched , res.upserted );
+        }
     }
 
     void receivedDelete(OperationContext* txn, Message& m, CurOp& op) {
@@ -655,7 +672,8 @@ namespace mongo {
         DeleteExecutor executor(&request);
         uassertStatusOK(executor.prepare());
 
-        Lock::DBWrite lk(txn->lockState(), ns.ns());
+        Lock::DBLock dbLocklk(txn->lockState(), ns.db(), newlm::MODE_IX);
+        Lock::CollectionLock colLock(txn->lockState(), ns.ns(), newlm::MODE_IX);
         Client::Context ctx(txn, ns);
 
         long long n = executor.execute(ctx.db());
@@ -914,11 +932,38 @@ namespace mongo {
             uassertStatusOK(status);
         }
 
-        Lock::DBWrite lk(txn->lockState(), ns);
+        const int notMasterCodeForInsert = 10058; // This is different from ErrorCodes::NotMaster
+        {
+            const bool isIndexBuild = (nsToCollectionSubstring(ns) == "system.indexes");
+            const newlm::LockMode mode = isIndexBuild ? newlm::MODE_X : newlm::MODE_IX;
+            Lock::DBLock dbLock(txn->lockState(), nsString.db(), mode);
+            Lock::CollectionLock collLock(txn->lockState(), nsString.ns(), mode);
+
+            // CONCURRENCY TODO: is being read locked in big log sufficient here?
+            // writelock is used to synchronize stepdowns w/ writes
+            uassert(notMasterCodeForInsert, "not master",
+                    repl::getGlobalReplicationCoordinator()->canAcceptWritesForDatabase(nsString.db()));
+
+            Client::Context ctx(txn, ns);
+            if (mode == newlm::MODE_X || ctx.db()->getCollection(txn, nsString)) {
+                if (multi.size() > 1) {
+                    const bool keepGoing = d.reservedField() & InsertOption_ContinueOnError;
+                    insertMulti(txn, ctx, keepGoing, ns, multi, op);
+                } else {
+                    checkAndInsert(txn, ctx, ns, multi[0]);
+                    globalOpCounters.incInsertInWriteLock(1);
+                    op.debug().ninserted = 1;
+                }
+                return;
+            }
+        }
+
+        // Collection didn't exist so try again with MODE_X
+        Lock::DBLock dbLock(txn->lockState(), nsString.db(), newlm::MODE_X);
 
         // CONCURRENCY TODO: is being read locked in big log sufficient here?
         // writelock is used to synchronize stepdowns w/ writes
-        uassert(10058 , "not master",
+        uassert(notMasterCodeForInsert, "not master",
                 repl::getGlobalReplicationCoordinator()->canAcceptWritesForDatabase(nsString.db()));
 
         Client::Context ctx(txn, ns);

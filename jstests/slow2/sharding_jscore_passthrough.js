@@ -112,6 +112,7 @@ files.forEach(function(x) {
         'loglong|' +
         'logpath|' +
         'notablescan|' +
+        'collection_truncate|' + // relies on emptycapped test command which isn't in mongos
         'compact.*|' +
         'check_shard_index|' +
         'bench_test.*|' +

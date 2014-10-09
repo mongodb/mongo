@@ -246,7 +246,7 @@ namespace QueryStageCollectionScan {
         void run() {
             Client::WriteContext ctx(&_txn, ns());
 
-            Collection* coll = ctx.ctx().db()->getCollection( &_txn, ns() );
+            Collection* coll = ctx.getCollection();
 
             // Get the DiskLocs that would be returned by an in-order scan.
             vector<DiskLoc> locs;
@@ -308,7 +308,7 @@ namespace QueryStageCollectionScan {
     public:
         void run() {
             Client::WriteContext ctx(&_txn, ns());
-            Collection* coll = ctx.ctx().db()->getCollection(&_txn, ns());
+            Collection* coll = ctx.getCollection();
 
             // Get the DiskLocs that would be returned by an in-order scan.
             vector<DiskLoc> locs;

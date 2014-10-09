@@ -56,8 +56,8 @@ namespace mongo {
                                      long long numRecordsIncrement );
 
         virtual void setStats( OperationContext* txn,
-                               long long dataSizeIncrement,
-                               long long numRecordsIncrement );
+                               long long dataSize,
+                               long long numRecords );
 
         virtual const DiskLoc& deletedListEntry( int bucket ) const;
         virtual void setDeletedListEntry( OperationContext* txn,

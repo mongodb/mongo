@@ -124,7 +124,7 @@ namespace repl {
             lk.reset(new Lock::GlobalWrite(txn->lockState()));
         } else {
             // DB level lock for this operation
-            lk.reset(new Lock::DBWrite(txn->lockState(), ns)); 
+            lk.reset(new Lock::DBLock(txn->lockState(), nsToDatabaseSubstring(ns), newlm::MODE_X));
         }
 
         Client::Context ctx(txn, ns);
@@ -231,7 +231,7 @@ namespace repl {
             OpQueue ops;
             OperationContextImpl ctx;
 
-            while (!tryPopAndWaitForMore(&ops)) {
+            while (!tryPopAndWaitForMore(&ops, getGlobalReplicationCoordinator())) {
                 // nothing came back last time, so go again
                 if (ops.empty()) continue;
 
@@ -281,26 +281,26 @@ namespace repl {
     }
 
 namespace {
-    void tryToGoLiveAsASecondary(OperationContext* txn) {
+    void tryToGoLiveAsASecondary(OperationContext* txn, ReplicationCoordinator* replCoord) {
         Lock::GlobalRead readLock(txn->lockState());
 
-        if (getGlobalReplicationCoordinator()->getMaintenanceMode()) {
+        if (replCoord->getMaintenanceMode()) {
             // we're not actually going live
             return;
         }
 
         // Only state RECOVERING can transition to SECONDARY.
-        MemberState state(getGlobalReplicationCoordinator()->getCurrentMemberState());
+        MemberState state(replCoord->getCurrentMemberState());
         if (!state.recovering()) {
             return;
         }
 
         OpTime minvalid = getMinValid(txn);
-        if (minvalid > getGlobalReplicationCoordinator()->getMyLastOptime()) {
+        if (minvalid > replCoord->getMyLastOptime()) {
             return;
         }
 
-        getGlobalReplicationCoordinator()->setFollowerMode(MemberState::RS_SECONDARY);
+        replCoord->setFollowerMode(MemberState::RS_SECONDARY);
     }
 }
 
@@ -316,11 +316,6 @@ namespace {
             int lastTimeChecked = 0;
 
             do {
-                if (replCoord->getCurrentMemberState().primary()) {
-                    massert(16620, "there are ops to sync, but I'm primary", ops.empty());
-                    return;
-                }
-
                 int now = batchTimer.seconds();
 
                 // apply replication batch limits
@@ -337,7 +332,7 @@ namespace {
                     BackgroundSync* bgsync = BackgroundSync::get();
                     if (bgsync->getInitialSyncRequestedFlag()) {
                         // got a resync command
-                        Lock::DBWrite lk(txn.lockState(), "local");
+                        Lock::DBLock lk(txn.lockState(), "local", newlm::MODE_X);
                         WriteUnitOfWork wunit(&txn);
                         Client::Context ctx(&txn, "local");
 
@@ -353,7 +348,7 @@ namespace {
                     // can we become secondary?
                     // we have to check this before calling mgr, as we must be a secondary to
                     // become primary
-                    tryToGoLiveAsASecondary(&txn);
+                    tryToGoLiveAsASecondary(&txn, replCoord);
 
                     // TODO(emilkie): This can be removed once we switch over from legacy;
                     // this code is what moves 1-node sets to PRIMARY state.
@@ -390,8 +385,8 @@ namespace {
                     }
                 }
                 // keep fetching more ops as long as we haven't filled up a full batch yet
-            } while (!tryPopAndWaitForMore(&ops) && // tryPopAndWaitForMore returns true 
-                                                    // when we need to end a batch early
+            } while (!tryPopAndWaitForMore(&ops, replCoord) && // tryPopAndWaitForMore returns true 
+                                                               // when we need to end a batch early
                    (ops.getSize() < replBatchLimitBytes) &&
                    !inShutdown());
 
@@ -406,6 +401,12 @@ namespace {
 
             const BSONObj& lastOp = ops.getDeque().back();
             handleSlaveDelay(lastOp);
+
+            if (replCoord->getCurrentMemberState().primary() && 
+                !replCoord->isWaitingForApplierToDrain()) {
+                severe() << "attempting to replicate ops while primary";
+                fassertFailed(28527);
+            }
 
             // Set minValid to the last op to be applied in this next batch.
             // This will cause this node to go into RECOVERING state
@@ -436,7 +437,7 @@ namespace {
     // This function also blocks 1 second waiting for new ops to appear in the bgsync
     // queue.  We can't block forever because there are maintenance things we need
     // to periodically check in the loop.
-    bool SyncTail::tryPopAndWaitForMore(SyncTail::OpQueue* ops) {
+    bool SyncTail::tryPopAndWaitForMore(SyncTail::OpQueue* ops, ReplicationCoordinator* replCoord) {
         BSONObj op;
         // Check to see if there are ops waiting in the bgsync queue
         bool peek_success = peek(&op);
@@ -444,6 +445,7 @@ namespace {
         if (!peek_success) {
             // if we don't have anything in the queue, wait a bit for something to appear
             if (ops->empty()) {
+                replCoord->signalDrainComplete();
                 // block up to 1 second
                 _networkQueue->waitForMore();
                 return false;
@@ -498,7 +500,7 @@ namespace {
         OpTime lastOpTime;
         {
             OperationContextImpl txn; // XXX?
-            Lock::DBWrite lk(txn.lockState(), "local");
+            Lock::DBLock lk(txn.lockState(), "local", newlm::MODE_X);
             WriteUnitOfWork wunit(&txn);
 
             while (!ops->empty()) {
