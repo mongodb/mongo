@@ -1527,8 +1527,7 @@ namespace {
                 _lastVote.when.millis + LastVote::leaseTime.total_milliseconds() >= now.millis) {
             return VotedTooRecently;
         }
-        MemberState state = getMemberState();
-        if (!state.secondary()) {
+        if (!getMemberState().secondary()) {
             return NotSecondary;
         }
         if (!_isOpTimeCloseEnoughToLatestToElect(lastApplied, lastApplied)) {

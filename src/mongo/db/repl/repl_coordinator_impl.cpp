@@ -1572,7 +1572,12 @@ namespace {
              _topCoord->processWinElection(OID::gen(), getNextGlobalOptime());
          }
 
+         MemberState previousState = _currentState;
          _updateCurrentMemberStateFromTopologyCoordinator_inlock();
+         if (previousState.primary() && !_currentState.primary()) {
+             // Close connections on stepdown
+             _externalState->closeClientConnections();
+         }
          _updateSlaveInfoMapFromConfig_inlock();
          _startHeartbeats();
      }
