@@ -41,5 +41,5 @@ _Check_return_opt_ int __cdecl _wt_vsnprintf(
 	    len = _vscprintf(_Format, _ArgList) + 1;
     }
 
-    return len;
+    return (len);
 }

@@ -218,7 +218,7 @@ __wt_try_writelock(WT_SESSION_IMPL *session, WT_RWLOCK *rwlock)
 
 	ret = TryAcquireSRWLockExclusive(&rwlock->rwlock);
 	if (ret == 0)
-		return EBUSY;
+		return (EBUSY);
 
 	rwlock->exclusive_locked = GetCurrentThreadId();
 	return (0);
@@ -241,7 +241,7 @@ __wt_writelock(WT_SESSION_IMPL *session, WT_RWLOCK *rwlock)
 
 	rwlock->exclusive_locked = GetCurrentThreadId();
 
-	return 0;
+	return (0);
 }
 
 /*

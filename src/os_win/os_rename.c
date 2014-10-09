@@ -32,7 +32,7 @@ __wt_rename(WT_SESSION_IMPL *session, const char *from, const char *to)
 	 * it exists.
 	 */
 	if ((ret = GetFileAttributes(to_path)) != INVALID_FILE_ATTRIBUTES) {
-		if ((ret = DeleteFile(to_path)) == FALSE){
+		if ((ret = DeleteFile(to_path)) == FALSE) {
 			lasterror = GetLastError();
 			goto err;
 		}

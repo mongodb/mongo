@@ -6,9 +6,9 @@
  */
 #include <intrin.h>
 
-#define inline __inline
+#define	inline __inline
 
-#define WT_GCC_ATTRIBUTE(x)
+#define	WT_GCC_ATTRIBUTE(x)
 #define	WT_GCC_FUNC_ATTRIBUTE(x)
 
 #define	WT_ATOMIC_ADD(v, val, n, s)					\

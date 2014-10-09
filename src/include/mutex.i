@@ -335,7 +335,7 @@ __wt_spin_trylock_func(WT_SESSION_IMPL *session, WT_SPINLOCK *t)
 	WT_UNUSED(session);
 
 	BOOL b = TryEnterCriticalSection(&t->lock);
-	return b == 0 ? EBUSY : 0;
+	return (b == 0 ? EBUSY : 0);
 }
 
 /*

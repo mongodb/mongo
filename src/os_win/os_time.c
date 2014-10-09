@@ -41,7 +41,7 @@ __wt_epoch(WT_SESSION_IMPL *session, struct timespec *tsp)
 	tsp->tv_sec = ns100 / 10000000;
 	tsp->tv_nsec = ns100 * 100;
 
-	return 0;
+	return (0);
 }
 
 /*
@@ -56,8 +56,8 @@ localtime_r(const time_t * timer, struct tm * result)
     err = localtime_s(timer, result);
     if (err != 0) {
 	    __wt_err(NULL, err, "localtime_s");
-	    return NULL;
+	    return (NULL);
     }
 
-    return result;
+    return (result);
 }

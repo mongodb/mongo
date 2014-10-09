@@ -24,7 +24,7 @@ struct timespec {
     long    tv_nsec;   /* nanoseconds */
 };
 
-#define strncasecmp _strnicmp
+#define	strncasecmp _strnicmp
 
 /*
  * Windows Portability stuff
@@ -37,7 +37,7 @@ typedef unsigned long u_long;
 
 /* < VS 2013 is not C99 compat */
 #if _MSC_VER < 1900
-#define snprintf _snprintf
+#define	snprintf _snprintf
 #endif
 
 /*
@@ -52,7 +52,7 @@ typedef int ssize_t;
  * Provide a custom version of vsnprintf that returns the
  * needed buffer length instead of -1 on truncation
  */
-#define vsnprintf _wt_vsnprintf
+#define	vsnprintf _wt_vsnprintf
 
 _Check_return_opt_ int __cdecl _wt_vsnprintf(
     _Out_writes_(_MaxCount) char * _DstBuf,

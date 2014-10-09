@@ -43,7 +43,7 @@
 #else
 #include "os_win_wiredtiger_config.h"
 #ifdef _MSC_VER
-#define inline __inline
+#define	inline __inline
 #endif
 #endif
 

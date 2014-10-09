@@ -21,7 +21,7 @@ BOOL CALLBACK _wt_init_once_callback(
 
 	init_routine();
 
-	return TRUE;
+	return (TRUE);
 }
 
 /*
