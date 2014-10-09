@@ -70,9 +70,6 @@
 /* Define to 1 if you have the <memory.h> header file. */
 /* #undef HAVE_MEMORY_H */
 
-/* Define if adaptive mutexes are supported. */
-/* #undef HAVE_MUTEX_ADAPTIVE */
-
 /* Define to 1 if you have the `posix_fadvise' function. */
 /* #undef HAVE_POSIX_FADVISE */
 
@@ -120,39 +117,6 @@
 
 /* Enable verbose message configuration. */
 /* #undef HAVE_VERBOSE */
-
-/* The size of `char', as computed by sizeof. */
-#define SIZEOF_CHAR 1
-
-/* The size of `char *', as computed by sizeof. */
-#define SIZEOF_CHAR_P 8
-
-/* The size of `int', as computed by sizeof. */
-#define SIZEOF_INT 4
-
-/* The size of `long', as computed by sizeof. */
-#define SIZEOF_LONG 8
-
-/* The size of `long long', as computed by sizeof. */
-#define SIZEOF_LONG_LONG 8
-
-/* The size of `short', as computed by sizeof. */
-#define SIZEOF_SHORT 2
-
-/* The size of `unsigned char', as computed by sizeof. */
-#define SIZEOF_UNSIGNED_CHAR 1
-
-/* The size of `unsigned int', as computed by sizeof. */
-#define SIZEOF_UNSIGNED_INT 4
-
-/* The size of `unsigned long', as computed by sizeof. */
-#define SIZEOF_UNSIGNED_LONG 8
-
-/* The size of `unsigned long long', as computed by sizeof. */
-#define SIZEOF_UNSIGNED_LONG_LONG 8
-
-/* The size of `unsigned short', as computed by sizeof. */
-#define SIZEOF_UNSIGNED_SHORT 2
 
 /* Spinlock type from mutex.h. */
 #define SPINLOCK_TYPE SPINLOCK_MSVC
