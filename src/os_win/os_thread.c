@@ -39,3 +39,24 @@ __wt_thread_join(WT_SESSION_IMPL *session, pthread_t tid)
 
 	WT_RET_MSG(session, ret, "WaitForSingleObject");
 }
+
+/*
+ * __wt_thread_id --
+ *	Fill in a printable version of the process and thread IDs.
+ */
+void
+__wt_thread_id(WT_SESSION_IMPL *session, char buf, size_t buflen)
+{
+	DWORD self;
+	size_t len;
+
+	WT_UNUSED(session);
+
+	len = (size_t)snprintf(
+	    buf, buflen, "%" PRIu64, (uint64_t)GetCurrentProcessId());
+	if (len < buflen) {
+		self = GetCurrentThreadId());
+		__wt_raw_to_hex_mem((const uint8_t *)&self,
+		    sizeof(self), (uint8_t *)buf + len, buflen - len);
+	}
+}
