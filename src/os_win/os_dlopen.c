@@ -57,7 +57,7 @@ __wt_dlsym(WT_SESSION_IMPL *session,
 	sym = GetProcAddress(dlh->handle, name);
 	if (sym == NULL && fail) {
 		WT_RET_MSG(session, __wt_errno(),
-		    "GetProceAddress(%s in %s): %s", name, dlh->name, 0);
+		    "GetProcAddress(%s in %s): %s", name, dlh->name, 0);
 	}
 
 	*(void **)sym_ret = sym;

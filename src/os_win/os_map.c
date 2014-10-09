@@ -85,7 +85,7 @@ __wt_munmap(WT_SESSION_IMPL *session, WT_FH *fh, void *map, size_t len,
 
 	if (UnmapViewOfFile(map) == 0) {
 		WT_RET_MSG(session, __wt_errno(),
-		    "%s UnmapViewofFile error: failed to unmap %"
+		    "%s UnmapViewOfFile error: failed to unmap %"
 		    PRIuMAX " bytes",
 		    fh->name, (uintmax_t)len);
 	}

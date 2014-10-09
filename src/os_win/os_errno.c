@@ -20,7 +20,7 @@ __wt_errno(void)
 	 */
 	DWORD err = GetLastError();
 
-	/* GLE should only be called if we hit an actual error */
+	/* GetLastError should only be called if we hit an actual error */
 	WT_ASSERT(NULL, err != ERROR_SUCCESS);
 
 	return (err == ERROR_SUCCESS ? WT_ERROR : err);
