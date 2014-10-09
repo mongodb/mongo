@@ -232,6 +232,13 @@ namespace {
             _myRID = _externalState->ensureMe(txn);
         }
 
+        if (!_settings.usingReplSets()) {
+            // Must be Master/Slave
+            invariant(_settings.master || _settings.slave);
+            _externalState->startMasterSlave();
+            return;
+        }
+
         _topCoordDriverThread.reset(new boost::thread(stdx::bind(&ReplicationExecutor::run,
                                                                  &_replExecutor)));
 
@@ -254,7 +261,7 @@ namespace {
         // * tell the ReplicationExecutor to shut down
         // * wait for the thread running the ReplicationExecutor to finish
 
-        if (!isReplEnabled()) {
+        if (!_settings.usingReplSets()) {
             return;
         }
 

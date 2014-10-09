@@ -44,6 +44,7 @@
 #include "mongo/db/repl/bgsync.h"
 #include "mongo/db/repl/connections.h"
 #include "mongo/db/repl/isself.h"
+#include "mongo/db/repl/master_slave.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/rs_sync.h"
 #include "mongo/stdx/functional.h"
@@ -72,6 +73,10 @@ namespace {
         _syncSourceFeedbackThread.reset(new boost::thread(stdx::bind(&SyncSourceFeedback::run,
                                                                      &_syncSourceFeedback)));
         newReplUp();
+    }
+
+    void ReplicationCoordinatorExternalStateImpl::startMasterSlave() {
+        repl::startMasterSlave();
     }
 
     void ReplicationCoordinatorExternalStateImpl::shutdown() {
