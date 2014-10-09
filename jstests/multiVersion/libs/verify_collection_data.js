@@ -119,6 +119,11 @@ function CollectionDataValidator() {
         delete newCollectionStats["primary"];
         delete newCollectionStats["sharded"];
 
+        // as of 2.7.8, we added maxSize
+        // TODO: when 2.6 is no longer tested, remove following two lines
+        delete newCollectionStats["maxSize"];
+        delete collectionStats["maxSize"];
+
         assert.docEq(collectionStats, newCollectionStats, "collection metadata not equal");
 
         // Get the indexes for this collection
