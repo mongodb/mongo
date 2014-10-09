@@ -91,12 +91,8 @@ def GenerateWiredTigerH(target, source, env):
 #
 # WiredTiger library
 #
-filelist = open("dist/filelist")
-distFiles = filelist.readlines()
-wtsources = [b.strip().replace("os_posix", "os_win")
-             for b in distFiles
-             if not b.startswith("#") and len(b) > 1]
-filelist.close()
+filelist = open("dist/filelist_win")
+wtsources = filelist.readlines()
 
 if useZlib:
     wtsources.append("ext/compressors/zlib/zlib_compress.c")

@@ -1,5 +1,5 @@
 # filelist --
-#	List of source files for WiredTiger POSIX library.
+#	List of source files for WiredTiger Windows library.
 
 src/async/async_api.c
 src/async/async_op.c
@@ -99,31 +99,32 @@ src/meta/meta_table.c
 src/meta/meta_track.c
 src/meta/meta_turtle.c
 src/os_posix/os_abort.c
-src/os_posix/os_alloc.c
-src/os_posix/os_dir.c
-src/os_posix/os_dlopen.c
-src/os_posix/os_errno.c
-src/os_posix/os_exist.c
-src/os_posix/os_fallocate.c
-src/os_posix/os_filesize.c
-src/os_posix/os_flock.c
-src/os_posix/os_fsync.c
-src/os_posix/os_ftruncate.c
 src/os_posix/os_getline.c
-src/os_posix/os_map.c
-src/os_posix/os_mtx.c
-src/os_posix/os_once.c
-src/os_posix/os_open.c
-src/os_posix/os_path.c
-src/os_posix/os_priv.c
-src/os_posix/os_remove.c
-src/os_posix/os_rename.c
-src/os_posix/os_rw.c
-src/os_posix/os_sleep.c
 src/os_posix/os_strtouq.c
-src/os_posix/os_thread.c
-src/os_posix/os_time.c
-src/os_posix/os_yield.c
+src/os_win/os_alloc.c
+src/os_win/os_dir.c
+src/os_win/os_dlopen.c
+src/os_win/os_errno.c
+src/os_win/os_exist.c
+src/os_win/os_fallocate.c
+src/os_win/os_filesize.c
+src/os_win/os_flock.c
+src/os_win/os_fsync.c
+src/os_win/os_ftruncate.c
+src/os_win/os_map.c
+src/os_win/os_mtx.c
+src/os_win/os_once.c
+src/os_win/os_open.c
+src/os_win/os_path.c
+src/os_win/os_priv.c
+src/os_win/os_remove.c
+src/os_win/os_rename.c
+src/os_win/os_rw.c
+src/os_win/os_sleep.c
+src/os_win/os_thread.c
+src/os_win/os_time.c
+src/os_win/os_vsnprintf.c
+src/os_win/os_yield.c
 src/packing/pack_api.c
 src/packing/pack_impl.c
 src/packing/pack_stream.c

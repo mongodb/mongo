@@ -157,7 +157,7 @@ __wt_realloc_aligned(WT_SESSION_IMPL *session,
 		return (0);
 	}
 
-    /*
+	/*
 	 * If there is no posix_memalign function, or no alignment configured,
 	 * fall back to realloc.
 	 */
