@@ -127,10 +127,16 @@ namespace repl {
         virtual HostAndPort getClientHostAndPort(const OperationContext* txn) = 0;
 
         /**
-         * Closes all client connections.
+         * Closes all connections except those marked with the keepOpen property, which should
+         * just be connections used for heartbeating.
          * This is used during stepdown, and transition out of primary.
          */
-        virtual void closeClientConnections() = 0;
+        virtual void closeConnections() = 0;
+
+        /**
+         * Notifies the bgsync and syncSourceFeedback threads to choose a new sync source.
+         */
+        virtual void signalApplierToChooseNewSyncSource() = 0;
 
         /**
          * Returns an instance of GlobalSharedLockAcquirer that can be used to acquire the global

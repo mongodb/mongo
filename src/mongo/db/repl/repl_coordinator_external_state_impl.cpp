@@ -198,8 +198,12 @@ namespace {
         return HostAndPort(txn->getClient()->clientAddress(true));
     }
 
-    void ReplicationCoordinatorExternalStateImpl::closeClientConnections() {
+    void ReplicationCoordinatorExternalStateImpl::closeConnections() {
         MessagingPort::closeAllSockets(ScopedConn::keepOpen);
+    }
+
+    void ReplicationCoordinatorExternalStateImpl::signalApplierToChooseNewSyncSource() {
+        BackgroundSync::get()->clearSyncTarget();
     }
 
     OperationContext* ReplicationCoordinatorExternalStateImpl::createOperationContext() {

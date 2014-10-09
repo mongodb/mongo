@@ -139,7 +139,6 @@ namespace repl {
                         replCoord->blacklistSyncSource(_syncTarget,
                                                        Date_t(curTimeMillis64() + 10*1000));
                         BackgroundSync::get()->clearSyncTarget();
-                        replCoord->chooseNewSyncSource();
                     }
 
                     _resetConnection();

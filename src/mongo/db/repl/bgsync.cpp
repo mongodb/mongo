@@ -340,7 +340,7 @@ namespace {
 
     bool BackgroundSync::shouldChangeSyncSource() {
         // is it even still around?
-        if (_syncSourceReader.getHost().empty()) {
+        if (getSyncTarget().empty() || _syncSourceReader.getHost().empty()) {
             return true;
         }
 

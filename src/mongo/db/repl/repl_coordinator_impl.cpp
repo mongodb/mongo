@@ -824,7 +824,7 @@ namespace {
         boost::unique_lock<boost::mutex> lk(_mutex);
         _updateCurrentMemberStateFromTopologyCoordinator_inlock();
         lk.unlock();
-        _externalState->closeClientConnections();
+        _externalState->closeConnections();
         // Wake up any threads blocked in awaitReplication
         for (std::vector<WaiterInfo*>::iterator it = _replicationWaiterList.begin();
                 it != _replicationWaiterList.end(); ++it) {
@@ -1576,7 +1576,12 @@ namespace {
          _updateCurrentMemberStateFromTopologyCoordinator_inlock();
          if (previousState.primary() && !_currentState.primary()) {
              // Close connections on stepdown
-             _externalState->closeClientConnections();
+             _externalState->closeConnections();
+             // Closing all connections will make the applier choose a new sync source, so we don't
+             // need to do that explicitly in this case.
+         }
+         else {
+             _externalState->signalApplierToChooseNewSyncSource();
          }
          _updateSlaveInfoMapFromConfig_inlock();
          _startHeartbeats();

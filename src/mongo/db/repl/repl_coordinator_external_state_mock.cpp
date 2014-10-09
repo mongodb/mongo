@@ -114,9 +114,11 @@ namespace repl {
         _storeLocalConfigDocumentStatus = status;
     }
 
-    void ReplicationCoordinatorExternalStateMock::closeClientConnections() {
+    void ReplicationCoordinatorExternalStateMock::closeConnections() {
         _connectionsClosed = true;
     }
+
+    void ReplicationCoordinatorExternalStateMock::signalApplierToChooseNewSyncSource() {}
 
     void ReplicationCoordinatorExternalStateMock::setCanAcquireGlobalSharedLock(bool canAcquire) {
         _canAcquireGlobalSharedLock = canAcquire;
