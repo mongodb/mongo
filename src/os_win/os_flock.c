@@ -24,9 +24,9 @@ __wt_bytelock(WT_FH *fhp, wt_off_t byte, int lock)
 	 * file for a given process are removed when any file descriptor for the
 	 * file is closed by the process, even if a lock was never requested for
 	 * that file descriptor.
-	 */
-	/*
-	 * http://msdn.microsoft.com/en-us/library/windows/desktop/aa365202%28v=vs.85%29.aspx
+	 *
+	 * http://msdn.microsoft.com/
+	 *    en-us/library/windows/desktop/aa365202%28v=vs.85%29.aspx
 	 *
 	 * You can lock bytes that are beyond the end of the current file.
 	 * This is useful to coordinate adding records to the end of a file.
@@ -34,9 +34,7 @@ __wt_bytelock(WT_FH *fhp, wt_off_t byte, int lock)
 	if (lock) {
 		ret = LockFile(fhp->filehandle, UINT32_MAX & byte,
 		    UINT32_MAX & (byte >> 32), 1, 0);
-	}
-	else
-	{
+	} else {
 		ret = UnlockFile(fhp->filehandle, UINT32_MAX & byte,
 		    UINT32_MAX & (byte >> 32), 1, 0);
 	}

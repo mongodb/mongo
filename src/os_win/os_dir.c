@@ -73,11 +73,11 @@ __wt_dirlist(WT_SESSION_IMPL *session, const char *dir, const char *prefix,
 				count++;
 				if (count > dirsz) {
 					dirsz += WT_DIR_ENTRY;
-					WT_ERR(__wt_realloc_def(
-					    session, &dirallocsz, dirsz, &entries));
+					WT_ERR(__wt_realloc_def(session,
+					    &dirallocsz, dirsz, &entries));
 				}
-				WT_ERR(__wt_strdup(
-				    session, finddata.cFileName, &entries[count - 1]));
+				WT_ERR(__wt_strdup(session,
+				    finddata.cFileName, &entries[count - 1]));
 			}
 		} while (FindNextFile(findhandle, &finddata) != 0);
 	}

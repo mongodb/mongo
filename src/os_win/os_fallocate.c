@@ -12,7 +12,8 @@
  *	Allocate space for a file handle.
  */
 int
-__wt_fallocate(WT_SESSION_IMPL *session, WT_FH *fh, wt_off_t offset, wt_off_t len)
+__wt_fallocate(
+    WT_SESSION_IMPL *session, WT_FH *fh, wt_off_t offset, wt_off_t len)
 {
 	WT_DECL_RET;
 

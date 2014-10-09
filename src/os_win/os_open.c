@@ -117,7 +117,8 @@ __wt_open(WT_SESSION_IMPL *session,
 			WT_ERR_MSG(session, __wt_errno(),
 			    direct_io ?
 			    "%s: open failed with direct I/O configured, some "
-			    "filesystem types do not support direct I/O" : "%s", path);
+			    "filesystem types do not support direct I/O" :
+			    "%s", path);
 	}
 
 	if (F_ISSET(conn, WT_CONN_CKPT_SYNC))

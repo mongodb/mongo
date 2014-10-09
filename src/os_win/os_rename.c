@@ -27,7 +27,10 @@ __wt_rename(WT_SESSION_IMPL *session, const char *from, const char *to)
 	WT_RET(__wt_filename(session, from, &from_path));
 	WT_TRET(__wt_filename(session, to, &to_path));
 
-	/* Check if file exists since Windows does not override the file if it exists */
+	/*
+	 * Check if file exists since Windows does not override the file if
+	 * it exists.
+	 */
 	if ((ret = GetFileAttributes(to_path)) != INVALID_FILE_ATTRIBUTES) {
 		if ((ret = DeleteFile(to_path)) == FALSE){
 			lasterror = GetLastError();

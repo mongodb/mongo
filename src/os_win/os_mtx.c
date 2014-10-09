@@ -72,12 +72,17 @@ __wt_cond_wait(WT_SESSION_IMPL *session, WT_CONDVAR *cond, long usecs)
 
 	if (usecs > 0) {
 		milliseconds = usecs / 1000;
-		/* 0 would mean the CV sleep becomes a TryCV which we do not want */
+		/*
+		 * 0 would mean the CV sleep becomes a TryCV which we do not
+		 * want
+		 */
 		if (milliseconds == 0)
 			milliseconds = 1;
-		ret = SleepConditionVariableCS(&cond->cond, &cond->mtx, milliseconds);
+		ret = SleepConditionVariableCS(
+		    &cond->cond, &cond->mtx, milliseconds);
 	} else
-		ret = SleepConditionVariableCS(&cond->cond, &cond->mtx, INFINITE);
+		ret = SleepConditionVariableCS(
+		    &cond->cond, &cond->mtx, INFINITE);
 
 	if (ret == 0) {
 		lasterror = GetLastError();

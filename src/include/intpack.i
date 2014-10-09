@@ -59,7 +59,7 @@
 #else
 #define	WT_LEADING_ZEROS(x, i) do {					\
 	uint64_t __x = (x);						\
-	uint64_t __m = (uint64_t)0xff << 56;					\
+	uint64_t __m = (uint64_t)0xff << 56;				\
 	for (i = 0; !(__x & __m) && i != 8; i++)			\
 		__m >>= 8;						\
 } while (0)

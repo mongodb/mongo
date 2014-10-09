@@ -20,7 +20,8 @@ __wt_fsync(WT_SESSION_IMPL *session, WT_FH *fh)
 	    fh->name));
 
 	if ((ret = FlushFileBuffers(fh->filehandle)) == FALSE)
-		WT_RET_MSG(session, __wt_errno(), "%s FlushFileBuffers error", fh->name);
+		WT_RET_MSG(session,
+		    __wt_errno(), "%s FlushFileBuffers error", fh->name);
 
 	return (0);
 }
@@ -34,5 +35,6 @@ __wt_fsync_async(WT_SESSION_IMPL *session, WT_FH *fh)
 {
 	WT_UNUSED(session);
 	WT_UNUSED(fh);
+
 	return (0);
 }
