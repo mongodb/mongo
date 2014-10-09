@@ -318,9 +318,14 @@ namespace mongo {
                                                                       const BSONObj& in,
                                                                       BSONObjBuilder& out) {
         // in = { #VARIABLE: "x" }
-        BSONElement varEle = btl->_varMap[in["#VARIABLE"].String()].firstElement();;
-        out.appendAs(varEle, fieldName);
-        return StatusSuccess;
+        BSONElement varEle = btl->_varMap[in["#VARIABLE"].String()].firstElement();
+        if ( !varEle.eoo() ) {
+           out.appendAs(varEle, fieldName);
+           return StatusSuccess;
+        }
+        else {
+            return StatusOpEvaluationError;
+        }
     }
 
 } // end namespace mongo
