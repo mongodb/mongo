@@ -134,8 +134,7 @@ namespace {
                  "members" << BSON_ARRAY(BSON("_id" << 1 << "host" << "node1:12345"))),
             HostAndPort("node1", 12345));
 
-        OperationContextNoop txn;
-        getReplCoord()->setMyLastOptime(&txn, OpTime (100, 1));
+        getReplCoord()->setFollowerMode(MemberState::RS_SECONDARY);
 
         ASSERT(getReplCoord()->getCurrentMemberState().primary()) <<
             getReplCoord()->getCurrentMemberState().toString();

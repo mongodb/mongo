@@ -3106,7 +3106,7 @@ namespace {
         ASSERT_EQUALS(HostAndPort("h2").toString(), response.getSyncingTo());
     }
 
-    TEST_F(TopoCoordTest, ReconfigToBeTheLoneNode) {
+    TEST_F(TopoCoordTest, SetFollowerSecondaryWhenLoneNode) {
         ASSERT_TRUE(TopologyCoordinator::Role::follower == getTopoCoord().getRole());
         ASSERT_EQUALS(MemberState::RS_STARTUP, getTopoCoord().getMemberState().s);
         updateConfig(BSON("_id" << "rs0" <<
@@ -3114,13 +3114,42 @@ namespace {
                           "members" << BSON_ARRAY(
                               BSON("_id" << 1 << "host" << "hself"))),
                      0);
-
-        // if we are the only node, we should become a candidate
-        ASSERT_TRUE(TopologyCoordinator::Role::candidate == getTopoCoord().getRole());
         ASSERT_EQUALS(MemberState::RS_STARTUP2, getTopoCoord().getMemberState().s);
+
+        // if we are the only node, we should become a candidate when we transition to SECONDARY
+        ASSERT_FALSE(TopologyCoordinator::Role::candidate == getTopoCoord().getRole());
+        getTopoCoord().setFollowerMode(MemberState::RS_SECONDARY);
+        ASSERT_TRUE(TopologyCoordinator::Role::candidate == getTopoCoord().getRole());
+        ASSERT_EQUALS(MemberState::RS_SECONDARY, getTopoCoord().getMemberState().s);
     }
 
-    TEST_F(TopoCoordTest, ReconfigToBeTheLoneUnelectableNode) {
+    TEST_F(TopoCoordTest, CandidateWhenLoneSecondaryNodeReconfig) {
+        ASSERT_TRUE(TopologyCoordinator::Role::follower == getTopoCoord().getRole());
+        ASSERT_EQUALS(MemberState::RS_STARTUP, getTopoCoord().getMemberState().s);
+        ReplicaSetConfig cfg;
+        cfg.initialize(BSON("_id" << "rs0" <<
+                            "version" << 1 <<
+                            "members" << BSON_ARRAY(
+                                BSON("_id" << 1 << "host" << "hself" << "priority" << 0))));
+        getTopoCoord().updateConfig(cfg, 0, now()++);
+        ASSERT_EQUALS(MemberState::RS_STARTUP2, getTopoCoord().getMemberState().s);
+
+        ASSERT_FALSE(TopologyCoordinator::Role::candidate == getTopoCoord().getRole());
+        getTopoCoord().setFollowerMode(MemberState::RS_SECONDARY);
+        ASSERT_FALSE(TopologyCoordinator::Role::candidate == getTopoCoord().getRole());
+        ASSERT_EQUALS(MemberState::RS_SECONDARY, getTopoCoord().getMemberState().s);
+
+        // we should become a candidate when we reconfig to become electable
+
+        updateConfig(BSON("_id" << "rs0" <<
+                          "version" << 1 <<
+                          "members" << BSON_ARRAY(
+                              BSON("_id" << 1 << "host" << "hself"))),
+                     0);
+        ASSERT_TRUE(TopologyCoordinator::Role::candidate == getTopoCoord().getRole());
+    }
+
+    TEST_F(TopoCoordTest, SetFollowerSecondaryWhenLoneUnelectableNode) {
         ASSERT_TRUE(TopologyCoordinator::Role::follower == getTopoCoord().getRole());
         ASSERT_EQUALS(MemberState::RS_STARTUP, getTopoCoord().getMemberState().s);
         ReplicaSetConfig cfg;
@@ -3130,10 +3159,13 @@ namespace {
                                 BSON("_id" << 1 << "host" << "hself" << "priority" << 0))));
 
         getTopoCoord().updateConfig(cfg, 0, now()++);
-
-        // despite being the only node, we are unelectable, so we should not become primary
-        ASSERT_TRUE(TopologyCoordinator::Role::follower == getTopoCoord().getRole());
         ASSERT_EQUALS(MemberState::RS_STARTUP2, getTopoCoord().getMemberState().s);
+
+        // despite being the only node, we are unelectable, so we should not become a candidate
+        ASSERT_FALSE(TopologyCoordinator::Role::candidate == getTopoCoord().getRole());
+        getTopoCoord().setFollowerMode(MemberState::RS_SECONDARY);
+        ASSERT_FALSE(TopologyCoordinator::Role::candidate == getTopoCoord().getRole());
+        ASSERT_EQUALS(MemberState::RS_SECONDARY, getTopoCoord().getMemberState().s);
     }
 
     TEST_F(TopoCoordTest, ReconfigToBeAddedToTheSet) {
@@ -3196,8 +3228,10 @@ namespace {
                           "members" << BSON_ARRAY(
                               BSON("_id" << 0 << "host" << "host1:27017"))),
                      0);
-        ASSERT_TRUE(TopologyCoordinator::Role::candidate == getTopoCoord().getRole());
+        ASSERT_FALSE(TopologyCoordinator::Role::candidate == getTopoCoord().getRole());
         ASSERT_EQUALS(MemberState::RS_STARTUP2, getTopoCoord().getMemberState().s);
+        getTopoCoord().setFollowerMode(MemberState::RS_SECONDARY);
+        ASSERT_TRUE(TopologyCoordinator::Role::candidate == getTopoCoord().getRole());
 
         // win election and primary
         getTopoCoord().processWinElection(OID::gen(), OpTime(0,0));
@@ -3224,15 +3258,17 @@ namespace {
                           "members" << BSON_ARRAY(
                               BSON("_id" << 0 << "host" << "host1:27017"))),
                      0);
-        ASSERT_TRUE(TopologyCoordinator::Role::candidate == getTopoCoord().getRole());
+        ASSERT_FALSE(TopologyCoordinator::Role::candidate == getTopoCoord().getRole());
         ASSERT_EQUALS(MemberState::RS_STARTUP2, getTopoCoord().getMemberState().s);
+        getTopoCoord().setFollowerMode(MemberState::RS_SECONDARY);
+        ASSERT_TRUE(TopologyCoordinator::Role::candidate == getTopoCoord().getRole());
 
         // win election and primary
         getTopoCoord().processWinElection(OID::gen(), OpTime(0,0));
         ASSERT_TRUE(TopologyCoordinator::Role::leader == getTopoCoord().getRole());
         ASSERT_EQUALS(MemberState::RS_PRIMARY, getTopoCoord().getMemberState().s);
 
-        // now lose primary due to lose of electability
+        // now lose primary due to loss of electability
         updateConfig(BSON("_id" << "rs0" <<
                           "version" << 2 <<
                           "members" << BSON_ARRAY(
@@ -3241,7 +3277,7 @@ namespace {
                               BSON("_id" << 2 << "host" << "host3:27017"))),
                      0);
         ASSERT_TRUE(TopologyCoordinator::Role::follower == getTopoCoord().getRole());
-        ASSERT_EQUALS(MemberState::RS_STARTUP2, getTopoCoord().getMemberState().s);
+        ASSERT_EQUALS(MemberState::RS_SECONDARY, getTopoCoord().getMemberState().s);
     }
 
 //     uncomment once primariness can be maintained through a reconfig

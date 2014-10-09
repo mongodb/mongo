@@ -1434,12 +1434,13 @@ namespace {
             }
         }
 
-        if (_currentConfig.getNumMembers() == 1 &&
+        if (_followerMode == MemberState::RS_SECONDARY &&
+            _currentConfig.getNumMembers() == 1 &&
             _selfIndex == 0 &&
             _currentConfig.getMemberAt(_selfIndex).isElectable()) {
-
-            // If the new config describes a one-node replica set, we're the one member, and
-            // we're electable, we must transition to candidate, in leiu of heartbeats.
+            // If the new config describes a one-node replica set, we're the one member,
+            // we're electable, and we are currently in followerMode SECONDARY, 
+            // we must transition to candidate, in leiu of heartbeats.
             _role = Role::candidate;
         }
     }
@@ -1658,6 +1659,20 @@ namespace {
             break;
         default:
             invariant(false);
+        }
+
+        if (_followerMode != MemberState::RS_SECONDARY) {
+            return;
+        }
+
+        // When a single node replica set transitions to SECONDARY, we must check if we should
+        // be a candidate here.  This is necessary because a single node replica set has no
+        // heartbeats that would normally change the role to candidate.
+
+        if (_currentConfig.getNumMembers() == 1 &&
+            _selfIndex == 0 &&
+            _currentConfig.getMemberAt(_selfIndex).isElectable()) {
+            _role = Role::candidate;
         }
     }
 

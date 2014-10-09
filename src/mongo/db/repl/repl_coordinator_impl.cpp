@@ -420,6 +420,17 @@ namespace {
 
         boost::lock_guard<boost::mutex> lk(_mutex);
         _topCoord->setFollowerMode(newState.s);
+
+        // If the topCoord reports that we are a candidate now, the only possible scenario is that
+        // we transitioned to followerMode SECONDARY and are a one-node replica set.
+        if (_topCoord->getRole() == TopologyCoordinator::Role::candidate) {
+             // If our config describes a one-node replica set, we're the one member, and
+             // we're electable, we must short-circuit the election.  Elections are normally
+             // triggered by incoming heartbeats, but with a one-node set there are no
+             // heartbeats.
+             _topCoord->processWinElection(OID::gen(), getNextGlobalOptime());
+         }
+
         _updateCurrentMemberStateFromTopologyCoordinator_inlock();
         *success = true;
         _replExecutor.signalEvent(finishedSettingFollowerMode);
@@ -1564,9 +1575,7 @@ namespace {
                  myIndex,
                  _replExecutor.now());
 
-         if (newConfig.getNumMembers() == 1 &&
-             myIndex == 0 &&
-             newConfig.getMemberAt(myIndex).isElectable()) {
+         if (_topCoord->getRole() == TopologyCoordinator::Role::candidate) {
              // If the new config describes a one-node replica set, we're the one member, and
              // we're electable, we must short-circuit the election.  Elections are normally
              // triggered by incoming heartbeats, but with a one-node set there are no
