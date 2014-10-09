@@ -32,18 +32,41 @@ __wt_fallocate(
 #if defined(HAVE_FALLOCATE)
 	WT_SYSCALL_RETRY(
 	    fallocate(fh->fd, FALLOC_FL_KEEP_SIZE, offset, len), ret);
-#elif defined(HAVE_POSIX_FALLOCATE)
-	WT_SYSCALL_RETRY(posix_fallocate(fh->fd, offset, len), ret);
 	if (ret != 0)
-		WT_RET_MSG(session, ret, "%s: posix_fallocate", fh->name);
-#elif defined(HAVE_FTRUNCATE)
+		WT_RET_MSG(session, ret, "%s: fallocate", fh->name);
+#else
+#if defined(HAVE_POSIX_FALLOCATE)
+	{
+		/*
+		 * Filesystems on Solaris return EINVAL if they don't support
+		 * posix_fallocate, catch the error and fall into ftruncate.
+		 */
+		static int einval_fail = 0;
+
+		if (!einval_fail) {
+			WT_SYSCALL_RETRY(
+			    posix_fallocate(fh->fd, offset, len), ret);
+			switch (ret) {
+			case 0:
+				return (0);
+			case EINVAL:
+				einval_fail = 1;
+				break;
+			default:
+				WT_RET_MSG(session,
+				    ret, "%s: posix_fallocate", fh->name);
+			}
+		}
+	}
+#endif
+#if defined(HAVE_FTRUNCATE)
 	WT_SYSCALL_RETRY(ftruncate(fh->fd, offset + len), ret);
 	if (ret != 0)
 		WT_RET_MSG(session, ret, "%s: ftruncate", fh->name);
-#else
-	WT_UNUSED(ret);
+#endif
+#endif
 	WT_UNUSED(offset);
 	WT_UNUSED(len);
-#endif
-	return (0);
+
+	return (ret);
 }
