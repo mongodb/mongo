@@ -220,6 +220,10 @@ namespace repl {
             Status status = getGlobalReplicationCoordinator()->processReplSetReconfig(txn,
                                                                                       parsedArgs,
                                                                                       &result);
+            if (status.isOK() && !parsedArgs.force) {
+                logOpInitiate(txn, BSON("msg" << "Reconfig set" << 
+                                        "version" << parsedArgs.newConfigObj["version"]));
+            }
             return appendCommandStatus(result, status);
         }
     } cmdReplSetReconfig;

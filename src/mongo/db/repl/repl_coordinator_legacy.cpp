@@ -769,7 +769,7 @@ namespace {
 
             log() << "replSet replSetReconfig [2]" << rsLog;
 
-            theReplSet->haveNewConfig(txn, *newConfig, true);
+            theReplSet->haveNewConfig(txn, *newConfig, false);
             ReplSet::startupStatusMsg.set("replSetReconfig'd");
         }
         catch(const DBException& e) {
