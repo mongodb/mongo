@@ -152,8 +152,16 @@ copy(const char *name, const char *directory)
 	if (ret != 0)
 		goto readerr;
 
+	/*
+	 * We need to know this file was successfully written, it's a backup.
+	 */
+#ifdef _WIN32
+	if (FlushFileBuffers(_get_osfhandle(fd)))
+		goto writerr;
+#else
 	if (fsync(ofd))
 		goto writerr;
+#endif
 	ret = close(ofd);
 	ofd = -1;
 	if (ret != 0)
