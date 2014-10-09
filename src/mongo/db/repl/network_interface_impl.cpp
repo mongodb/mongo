@@ -35,7 +35,6 @@
 #include <boost/thread.hpp>
 #include <memory>
 #include <sstream>
-#include <vector>
 
 #include "mongo/client/connpool.h"
 #include "mongo/db/client.h"
@@ -44,6 +43,7 @@
 #include "mongo/db/repl/connections.h"  // For ScopedConn::keepOpen
 #include "mongo/db/repl/oplogreader.h"  // For replAuthenticate
 #include "mongo/platform/unordered_map.h"
+#include "mongo/stdx/list.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/log.h"
 #include "mongo/util/net/hostandport.h"
@@ -52,8 +52,35 @@
 namespace mongo {
 namespace repl {
 
-    static const size_t kNumThreads = 8;
-    static Seconds kDefaultMaxIdleConnectionAge(60);
+namespace {
+    const size_t kNumThreads = 8;
+    Seconds kDefaultMaxIdleConnectionAge(60);
+
+    /**
+     * Information about a connection in the pool.
+     */
+    struct ConnectionInfo {
+        ConnectionInfo() : conn(NULL), lastEnteredPoolDate(0ULL) {}
+        ConnectionInfo(DBClientConnection* theConn, Date_t date) :
+            conn(theConn),
+            lastEnteredPoolDate(date) {}
+
+        /**
+         * Returns true if the connection entered the pool  "date".
+         */
+        bool isNotNewerThan(Date_t date) { return lastEnteredPoolDate <= date; }
+
+        // A connection in the pool.
+        DBClientConnection* conn;
+
+        // The date at which the connection "conn" was last put into the pool.
+        Date_t lastEnteredPoolDate;
+    };
+
+    typedef stdx::list<ConnectionInfo> ConnectionList;
+    typedef unordered_map<HostAndPort, ConnectionList> HostConnectionMap;
+
+}  // namespace
 
     /**
      * Private pool of connections used by the network interface.
@@ -93,25 +120,25 @@ namespace repl {
             ConnectionPtr(ConnectionPool* pool,
                           const HostAndPort& target,
                           Seconds timeout) :
-                _pool(pool), _conn(pool->acquireConnection(target, timeout)) {}
+                _pool(pool), _connInfo(pool->acquireConnection(target, timeout)) {}
 
             /**
              * Destructor reaps the connection if it wasn't already returned to the pool by calling
              * done().
              */
-            ~ConnectionPtr() { delete _conn; }
+            ~ConnectionPtr() { if (_pool) _pool->destroyConnection(_connInfo); }
 
             /**
              * Releases the connection back to the pool from which it was drawn.
              */
-            void done() { _pool->releaseConnection(_conn); _conn = NULL; }
+            void done() { _pool->releaseConnection(_connInfo); _pool = NULL; }
 
-            DBClientConnection& operator*() { return *_conn; }
-            DBClientConnection* operator->() { return _conn; }
+            DBClientConnection& operator*() { return *_connInfo->conn; }
+            DBClientConnection* operator->() { return _connInfo->conn; }
 
         private:
             ConnectionPool* _pool;
-            DBClientConnection* _conn;
+            const ConnectionList::iterator _connInfo;
         };
 
         /**
@@ -125,13 +152,27 @@ namespace repl {
          * Acquires a connection to "target" with the given "timeout", or throws a DBException.
          * Intended for use by ConnectionPtr.
          */
-        DBClientConnection* acquireConnection(const HostAndPort& target, Seconds timeout);
+        ConnectionList::iterator acquireConnection(const HostAndPort& target, Seconds timeout);
 
         /**
          * Releases a connection back into the pool.
          * Intended for use by ConnectionPtr.
+         * Call this for connections that can safely be reused.
          */
-        void releaseConnection(DBClientConnection* conn);
+        void releaseConnection(ConnectionList::iterator);
+
+        /**
+         * Destroys a connection previously acquired from the pool.
+         * Intended for use by ConnectionPtr.
+         * Call this for connections that cannot be reused.
+         */
+        void destroyConnection(ConnectionList::iterator);
+
+        /**
+         * Closes all connections currently in use, to ensure that the network threads
+         * terminate promptly during shutdown.
+         */
+        void closeAllInUseConnections();
 
         /**
          * Reap all connections in the pool that have been there continuously since before
@@ -141,30 +182,6 @@ namespace repl {
 
     private:
         /**
-         * Information about a connection in the pool.
-         */
-        struct ConnectionInfo {
-            ConnectionInfo() : conn(NULL), lastEnteredPoolDate(0ULL) {}
-            ConnectionInfo(DBClientConnection* theConn, Date_t date) :
-                conn(theConn),
-                lastEnteredPoolDate(date) {}
-
-            /**
-             * Returns true if the connection entered the pool  "date".
-             */
-            bool isNotNewerThan(Date_t date) { return lastEnteredPoolDate <= date; }
-
-            // A connection in the pool.
-            DBClientConnection* conn;
-
-            // The date at which the connection "conn" was last put into the pool.
-            Date_t lastEnteredPoolDate;
-        };
-
-        typedef std::vector<ConnectionInfo> ConnectionVector;
-        typedef unordered_map<HostAndPort, ConnectionVector> HostConnectionMap;
-
-        /**
          * Implementation of cleanUpOlderThan which assumes that _mutex is already held.
          */
         void cleanUpOlderThan_inlock(Date_t date);
@@ -173,13 +190,14 @@ namespace repl {
          * Reaps connections in "hostConns" that were already in the pool as of "date".  Expects
          * _mutex to be held.
          */
-        void cleanUpOlderThan_inlock(Date_t date, ConnectionVector* hostConns);
+        void cleanUpOlderThan_inlock(Date_t date, ConnectionList* hostConns);
 
         // Mutex guarding members of the connection pool
         boost::mutex _mutex;
 
         // Map from HostAndPort to free connections.
         HostConnectionMap _connections;
+        ConnectionList _inUseConnections;
 
         // Options with which this pool was configured.
         Options _options;
@@ -188,6 +206,7 @@ namespace repl {
     NetworkInterfaceImpl::ConnectionPool::~ConnectionPool() {
         cleanUpOlderThan(Date_t(~0ULL));
         invariant(_connections.empty());
+        invariant(_inUseConnections.empty());
     }
 
     void NetworkInterfaceImpl::ConnectionPool::cleanUpOlderThan(Date_t date) {
@@ -210,18 +229,31 @@ namespace repl {
 
     void NetworkInterfaceImpl::ConnectionPool::cleanUpOlderThan_inlock(
             Date_t date,
-            ConnectionVector* hostConns) {
-        const ConnectionVector::iterator newEnd = std::remove_if(
-                hostConns->begin(),
-                hostConns->end(),
-                stdx::bind(&ConnectionInfo::isNotNewerThan, stdx::placeholders::_1, date));
-        for (ConnectionVector::iterator iter = newEnd; iter != hostConns->end(); ++iter) {
-            delete iter->conn;
+            ConnectionList* hostConns) {
+        ConnectionList::iterator iter = hostConns->begin();
+        while (iter != hostConns->end()) {
+            if (iter->isNotNewerThan(date)) {
+                ConnectionList::iterator toDelete = iter++;
+                delete toDelete->conn;
+                hostConns->erase(toDelete);
+            }
+            else {
+                ++iter;
+            }
         }
-        hostConns->erase(newEnd, hostConns->end());
     }
 
-    DBClientConnection* NetworkInterfaceImpl::ConnectionPool::acquireConnection(
+    void NetworkInterfaceImpl::ConnectionPool::closeAllInUseConnections() {
+        boost::lock_guard<boost::mutex> lk(_mutex);
+        for (ConnectionList::iterator iter = _inUseConnections.begin();
+             iter != _inUseConnections.end();
+             ++iter) {
+
+            iter->conn->port().shutdown();
+        }
+    }
+
+    ConnectionList::iterator NetworkInterfaceImpl::ConnectionPool::acquireConnection(
             const HostAndPort& target,
             Seconds timeout) {
         boost::unique_lock<boost::mutex> lk(_mutex);
@@ -241,23 +273,36 @@ namespace repl {
                     str::stream() << "Failed to authenticate as cluster member to " <<
                     target.toString(),
                     replAuthenticate(conn.get()));
-            return conn.release();
+            lk.lock();
+            return _inUseConnections.insert(
+                    _inUseConnections.begin(),
+                    ConnectionInfo(conn.release(), Date_t(0)));
         }
-        DBClientConnection* result = hostConns->second.back().conn;
-        hostConns->second.pop_back();
+        ConnectionList::iterator result = hostConns->second.begin();
+        _inUseConnections.splice(_inUseConnections.begin(), hostConns->second, result);
+        if (hostConns->second.empty()) {
+            _connections.erase(hostConns);
+        }
         lk.unlock();
-        result->setSoTimeout(timeout.total_seconds());
+        result->conn->setSoTimeout(timeout.total_seconds());
         return result;
     }
 
-    void NetworkInterfaceImpl::ConnectionPool::releaseConnection(DBClientConnection* conn) {
+    void NetworkInterfaceImpl::ConnectionPool::releaseConnection(ConnectionList::iterator iter) {
         const Date_t now(curTimeMillis64());
         boost::lock_guard<boost::mutex> lk(_mutex);
-        ConnectionVector& hostConns = _connections[conn->getServerHostAndPort()];
+        ConnectionList& hostConns = _connections[iter->conn->getServerHostAndPort()];
         cleanUpOlderThan_inlock(
                 now - _options.maxIdleConnectionAge.total_seconds(),
                 &hostConns);
-        hostConns.push_back(ConnectionInfo(conn, now));
+        iter->lastEnteredPoolDate = now;
+        hostConns.splice(hostConns.begin(), _inUseConnections, iter);
+    }
+
+    void NetworkInterfaceImpl::ConnectionPool::destroyConnection(ConnectionList::iterator iter) {
+        boost::lock_guard<boost::mutex> lk(_mutex);
+        delete iter->conn;
+        _inUseConnections.erase(iter);
     }
 
     NetworkInterfaceImpl::NetworkInterfaceImpl() :
@@ -289,6 +334,7 @@ namespace repl {
         _inShutdown = true;
         _hasPending.notify_all();
         lk.unlock();
+        _connPool->closeAllInUseConnections();
         std::for_each(_threads.begin(),
                       _threads.end(),
                       stdx::bind(&boost::thread::join, stdx::placeholders::_1));
