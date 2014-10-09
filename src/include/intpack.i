@@ -50,10 +50,10 @@
 	WT_RET_TEST((maxl) != 0 && (size_t)(l) > (maxl), ENOMEM)
 
 /* Count the leading zero bytes. */
-#ifdef __GNUC__
+#if defined(__GNUC__)
 #define	WT_LEADING_ZEROS(x, i)						\
 	(i = (x == 0) ? (int)sizeof (x) : __builtin_clzll(x) >> 3)
-#elif _MSC_VER
+#elif defined(_MSC_VER)
 #define	WT_LEADING_ZEROS(x, i)						\
 	(i = (x == 0) ? (int)sizeof (x) : __lzcnt64(x) >> 3)
 #else
