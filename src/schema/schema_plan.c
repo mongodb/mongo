@@ -196,8 +196,8 @@ __wt_struct_plan(WT_SESSION_IMPL *session, WT_TABLE *table,
 	for (i = 0; (ret = __wt_config_next(&conf, &k, &v)) == 0; i++) {
 		have_it = 0;
 
-		while (__find_next_col(session, table,
-		    &k, &cg, &col, &coltype) == 0 &&
+		while ((ret = __find_next_col(session, table,
+		    &k, &cg, &col, &coltype) == 0) &&
 		    (!have_it || cg != start_cg || col != start_col)) {
 			/*
 			 * First we move to the column.  If that is in a
@@ -247,6 +247,17 @@ __wt_struct_plan(WT_SESSION_IMPL *session, WT_TABLE *table,
 				    plan, "%c", WT_PROJ_REUSE));
 			current_col = col + 1;
 		}
+		/*
+		 * We may fail to find a column if it is a custom extractor.
+		 * In that case, just skip it: there is nothing we can do.
+		 *
+		 * TODO handle properly: add a step to the plan to skip over
+		 * the column.
+		 */
+		if (ret == WT_NOTFOUND)
+			fprintf(stderr,
+			    "__wt_schema_plan: column '%.*s' not found\n",
+			    (int)k.len, k.str);
 	}
 	WT_RET_TEST(ret != WT_NOTFOUND, ret);
 

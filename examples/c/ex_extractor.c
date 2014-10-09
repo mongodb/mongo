@@ -123,7 +123,9 @@ add_extractor(WT_CONNECTION *conn)
 {
 	int ret;
 
-	static WT_EXTRACTOR my_extractor = {my_extract, my_extract_terminate};
+	static WT_EXTRACTOR my_extractor = {
+	    my_extract, NULL, my_extract_terminate
+	};
 	ret = conn->add_extractor(conn, "my_extractor", &my_extractor, NULL);
 
 	return (ret);
@@ -210,9 +212,12 @@ setup_table(WT_SESSION *session)
 	 * Create the index that is generated with an extractor. The index
 	 * will generate an entry in the index for each year a president
 	 * was in office.
+	 *
+	 * TODO: switch column name to "term" -- the schema layer currently
+	 * requires that all columns are found in the table.
 	 */
 	ret = session->create(session, "index:presidents:termindex",
-	    "key_format=HSS,columns=(term),extractor=my_extractor");
+	    "key_format=H,columns=(term_begin),extractor=my_extractor");
 
 	ret = session->open_cursor(
 	    session, "table:presidents", NULL, NULL, &cursor);

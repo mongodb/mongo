@@ -223,6 +223,8 @@ extern int __wt_collator_config(WT_SESSION_IMPL *session, const char **cfg, WT_C
 extern int __wt_conn_remove_collator(WT_SESSION_IMPL *session);
 extern int __wt_conn_remove_compressor(WT_SESSION_IMPL *session);
 extern int __wt_conn_remove_data_source(WT_SESSION_IMPL *session);
+extern int __wt_extractor_config(WT_SESSION_IMPL *session, const char *config, WT_EXTRACTOR **extractorp, int *ownp);
+extern int __wt_conn_remove_extractor(WT_SESSION_IMPL *session);
 extern int __wt_verbose_config(WT_SESSION_IMPL *session, const char *cfg[]);
 extern int __wt_cache_config(WT_SESSION_IMPL *session, const char *cfg[]);
 extern int __wt_cache_create(WT_SESSION_IMPL *session, const char *cfg[]);
@@ -484,7 +486,7 @@ extern int __wt_schema_drop(WT_SESSION_IMPL *session, const char *uri, const cha
 extern int __wt_schema_get_table(WT_SESSION_IMPL *session, const char *name, size_t namelen, int ok_incomplete, WT_TABLE **tablep);
 extern void __wt_schema_release_table(WT_SESSION_IMPL *session, WT_TABLE *table);
 extern void __wt_schema_destroy_colgroup(WT_SESSION_IMPL *session, WT_COLGROUP *colgroup);
-extern void __wt_schema_destroy_index(WT_SESSION_IMPL *session, WT_INDEX *idx);
+extern int __wt_schema_destroy_index(WT_SESSION_IMPL *session, WT_INDEX *idx);
 extern void __wt_schema_destroy_table(WT_SESSION_IMPL *session, WT_TABLE *table);
 extern void __wt_schema_remove_table( WT_SESSION_IMPL *session, WT_TABLE *table);
 extern void __wt_schema_close_tables(WT_SESSION_IMPL *session);

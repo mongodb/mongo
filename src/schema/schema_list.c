@@ -128,9 +128,16 @@ __wt_schema_destroy_colgroup(WT_SESSION_IMPL *session, WT_COLGROUP *colgroup)
  * __wt_schema_destroy_index --
  *	Free an index handle.
  */
-void
+int
 __wt_schema_destroy_index(WT_SESSION_IMPL *session, WT_INDEX *idx)
 {
+	WT_DECL_RET;
+
+	/* If there is a custom extractor configured, terminate it. */
+	if (idx->extractor != NULL && idx->extractor->terminate != NULL)
+		WT_TRET(idx->extractor->terminate(
+		    idx->extractor, &session->iface));
+
 	__wt_free(session, idx->name);
 	__wt_free(session, idx->source);
 	__wt_free(session, idx->config);
@@ -139,6 +146,8 @@ __wt_schema_destroy_index(WT_SESSION_IMPL *session, WT_INDEX *idx)
 	__wt_free(session, idx->value_plan);
 	__wt_free(session, idx->idxkey_format);
 	__wt_free(session, idx);
+
+	return (ret);
 }
 
 /*

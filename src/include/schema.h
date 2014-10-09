@@ -28,6 +28,7 @@ struct __wt_index {
 	WT_CONFIG_ITEM colconf;		/* List of columns from config */
 
 	WT_EXTRACTOR *extractor;	/* Custom key extractor */
+	int extractor_owned;		/* Extractor is owned by this index */
 
 	const char *idxkey_format;	/* Index key format (hides primary) */
 	const char *key_format;		/* Key format */

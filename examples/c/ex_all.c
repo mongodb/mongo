@@ -795,7 +795,7 @@ add_extractor(WT_CONNECTION *conn)
 	int ret;
 
 	/*! [WT_EXTRACTOR register] */
-	static WT_EXTRACTOR my_extractor = {my_extract, NULL};
+	static WT_EXTRACTOR my_extractor = {my_extract, NULL, NULL};
 
 	ret = conn->add_extractor(conn, "my_extractor", &my_extractor, NULL);
 	/*! [WT_EXTRACTOR register] */

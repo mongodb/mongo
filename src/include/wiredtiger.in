@@ -2966,6 +2966,14 @@ struct __wt_extractor {
 	    WT_CURSOR *result_cursor);
 
 	/*!
+	 * If non-NULL, this callback is called to customize the extractor for
+	 * each index.  If the callback returns a non-NULL extractor, that
+	 * instance is used instead of this one for all comparisons.
+	 */
+	int (*customize)(WT_EXTRACTOR *extractor, WT_SESSION *session,
+	    const char *uri, WT_CONFIG_ITEM *appcfg, WT_EXTRACTOR **customp);
+
+	/*!
 	 * If non-NULL, a callback performed when the database is closed.
 	 *
 	 * The WT_EXTRACTOR::terminate callback is intended to allow cleanup,
