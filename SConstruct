@@ -67,13 +67,11 @@ def GenerateWiredTigerH(target, source, env):
         '@uintmax_t_decl@': "",
         '@uintptr_t_decl@': "",
         '@off_t_decl@' : 'typedef int64_t wt_off_t;',
-        '@wiredtiger_includes_decl@': 
-        """
-#include <sys/types.h>
+        '@wiredtiger_includes_decl@':
+        """#include <sys/types.h>
 #include <stdarg.h>
 #include <stdint.h>
-#include <stdio.h>"
-        """
+#include <stdio.h>"""
         }
 
     wt = open("src/include/wiredtiger.in")
@@ -91,16 +89,17 @@ def GenerateWiredTigerH(target, source, env):
 #
 # WiredTiger library
 #
-filelist = open("dist/filelist_win")
-wtsources = filelist.readlines()
+filelist = open(r"dist\filelist.win")
+wtsources = [line.strip()
+             for line in filelist
+             if not line.startswith("#") and len(line) > 1]
+filelist.close()
 
 if useZlib:
     wtsources.append("ext/compressors/zlib/zlib_compress.c")
 
 if useSnappy:
     wtsources.append("ext/compressors/snappy/snappy_compress.c")
-
-#wtsources.append("wiredtiger.h")
 
 env.Command('wiredtiger.h', 'src/include/wiredtiger.in', GenerateWiredTigerH)
 
