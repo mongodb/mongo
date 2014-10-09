@@ -175,7 +175,7 @@ func (node *NodeMonitor) Report(discover chan string, all bool, out chan StatLin
 	s.SetMode(mgo.Eventual, true)
 	defer s.Close()
 
-	err = s.DB("admin").Run(bson.D{{"serverStatus", 1}}, result)
+	err = s.DB("admin").Run(bson.D{{"serverStatus", 1}, {"recordStats", 0}}, result)
 	if err != nil {
 		result = nil
 		out <- StatLine{Host: node.host, Error: err}
