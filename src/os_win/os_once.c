@@ -1,16 +1,16 @@
 /*-
-* Copyright (c) 2008-2014 WiredTiger, Inc.
-*	All rights reserved.
-*
-* See the file LICENSE for redistribution information.
-*/
+ * Copyright (c) 2008-2014 WiredTiger, Inc.
+ *	All rights reserved.
+ *
+ * See the file LICENSE for redistribution information.
+ */
 
 #include "wt_internal.h"
 
 /*
-* __wt_init_once_callback --
-*	Global initialization, run once.
-*/
+ * __wt_init_once_callback --
+ *	Global initialization, run once.
+ */
 BOOL CALLBACK _wt_init_once_callback(
     _Inout_      PINIT_ONCE InitOnce,
     _Inout_opt_  PVOID Parameter,
@@ -25,9 +25,9 @@ BOOL CALLBACK _wt_init_once_callback(
 }
 
 /*
-* __wt_library_init --
-*	Some things to do, before we do anything else.
-*/
+ * __wt_library_init --
+ *	Some things to do, before we do anything else.
+ */
 int
 __wt_once(void(*init_routine)(void))
 {

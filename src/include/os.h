@@ -1,4 +1,3 @@
-
 /*-
  * Copyright (c) 2008-2014 WiredTiger, Inc.
  *	All rights reserved.
