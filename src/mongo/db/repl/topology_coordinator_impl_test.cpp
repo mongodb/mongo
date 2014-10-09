@@ -91,7 +91,10 @@ namespace {
         }
         // Update config and set selfIndex
         // If "now" is passed in, set _now to now+1
-        void updateConfig(BSONObj cfg, int selfIndex, Date_t now = Date_t(-1)) {
+        void updateConfig(BSONObj cfg,
+                          int selfIndex,
+                          Date_t now = Date_t(-1),
+                          OpTime lastOp = OpTime()) {
             ReplicaSetConfig config;
             ASSERT_OK(config.initialize(cfg));
             ASSERT_OK(config.validate());
@@ -99,11 +102,11 @@ namespace {
             _selfIndex = selfIndex;
 
             if (now == Date_t(-1)) {
-                getTopoCoord().updateConfig(config, selfIndex, _now++);
+                getTopoCoord().updateConfig(config, selfIndex, _now++, lastOp);
             }
             else {
                 invariant(now > _now);
-                getTopoCoord().updateConfig(config, selfIndex, now);
+                getTopoCoord().updateConfig(config, selfIndex, now, lastOp);
                 _now = now + 1;
             }
         }
@@ -3131,7 +3134,7 @@ namespace {
                             "version" << 1 <<
                             "members" << BSON_ARRAY(
                                 BSON("_id" << 1 << "host" << "hself" << "priority" << 0))));
-        getTopoCoord().updateConfig(cfg, 0, now()++);
+        getTopoCoord().updateConfig(cfg, 0, now()++, OpTime());
         ASSERT_EQUALS(MemberState::RS_STARTUP2, getTopoCoord().getMemberState().s);
 
         ASSERT_FALSE(TopologyCoordinator::Role::candidate == getTopoCoord().getRole());
@@ -3158,7 +3161,7 @@ namespace {
                             "members" << BSON_ARRAY(
                                 BSON("_id" << 1 << "host" << "hself" << "priority" << 0))));
 
-        getTopoCoord().updateConfig(cfg, 0, now()++);
+        getTopoCoord().updateConfig(cfg, 0, now()++, OpTime());
         ASSERT_EQUALS(MemberState::RS_STARTUP2, getTopoCoord().getMemberState().s);
 
         // despite being the only node, we are unelectable, so we should not become a candidate

@@ -1561,7 +1561,8 @@ namespace {
          _topCoord->updateConfig(
                  newConfig,
                  myIndex,
-                 _replExecutor.now());
+                 _replExecutor.now(),
+                 _getLastOpApplied_inlock());
 
          if (_topCoord->getRole() == TopologyCoordinator::Role::candidate) {
              // If the new config describes a one-node replica set, we're the one member, and

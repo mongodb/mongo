@@ -1089,7 +1089,8 @@ namespace {
             updateConfig(
                     ReplicaSetConfig(),
                     -1,
-                    Date_t());
+                    Date_t(),
+                    OpTime());
             break;
         default:
             severe() << "Cannot switch to state " << newMemberState;
@@ -1375,30 +1376,21 @@ namespace {
         return _stepDownUntil;
     }
 
-    // This function installs a new config object and recreates MemberHeartbeatData objects
-    // that reflect the new config.
-    void TopologyCoordinatorImpl::updateConfig(const ReplicaSetConfig& newConfig,
-                                               int selfIndex,
-                                               Date_t now) {
-        invariant(_role != Role::candidate);
-        invariant(selfIndex < newConfig.getNumMembers());
-
-        _currentConfig = newConfig;
-
-        _hbdata.clear();
-        _role = Role::follower;
-        _currentPrimaryIndex = -1;
-        _forceSyncSourceIndex = -1;
-        _selfIndex = selfIndex;
+    void TopologyCoordinatorImpl::_updateHeartbeatDataForReconfig(const ReplicaSetConfig& newConfig,
+                                                                  int selfIndex,
+                                                                  Date_t now) {
+        std::vector<MemberHeartbeatData> oldHeartbeats;
+        _hbdata.swap(oldHeartbeats);
 
         int index = 0;
-        for (ReplicaSetConfig::MemberIterator it = _currentConfig.membersBegin();
-             it != _currentConfig.membersEnd();
-             ++it, ++index) {
-            // C++11: use emplace_back()
+        for (ReplicaSetConfig::MemberIterator it = newConfig.membersBegin();
+                it != newConfig.membersEnd();
+                ++it, ++index) {
+            const MemberConfig& newMemberConfig = *it;
+            // TODO: C++11: use emplace_back()
             if (index == selfIndex) {
                 // Insert placeholder for ourself, though we will never consult it.
-                MemberHeartbeatData self = MemberHeartbeatData(index);
+                MemberHeartbeatData self(index);
                 self.setUpValues(
                         now,
                         MemberState::RS_UNKNOWN,
@@ -1409,14 +1401,54 @@ namespace {
                 _hbdata.push_back(self);
             }
             else {
-                _hbdata.push_back(MemberHeartbeatData(index));
+                MemberHeartbeatData newHeartbeatData(index);
+                for (int oldIndex = 0; oldIndex < _currentConfig.getNumMembers(); ++oldIndex) {
+                    const MemberConfig& oldMemberConfig = _currentConfig.getMemberAt(oldIndex);
+                    if (oldMemberConfig.getId() == newMemberConfig.getId() &&
+                            oldMemberConfig.getHostAndPort() == newMemberConfig.getHostAndPort()) {
+                        // This member existed in the old config with the same member ID and
+                        // HostAndPort, so copy its heartbeat data over.
+                        newHeartbeatData.updateFrom(oldHeartbeats[oldIndex]);
+                    }
+                }
+                _hbdata.push_back(newHeartbeatData);
             }
         }
+    }
+
+    // This function installs a new config object and recreates MemberHeartbeatData objects
+    // that reflect the new config.
+    void TopologyCoordinatorImpl::updateConfig(const ReplicaSetConfig& newConfig,
+                                               int selfIndex,
+                                               Date_t now,
+                                               OpTime lastOpApplied) {
+        invariant(_role != Role::candidate);
+        invariant(selfIndex < newConfig.getNumMembers());
+
+        _updateHeartbeatDataForReconfig(newConfig, selfIndex, now);
+        _currentConfig = newConfig;
+        _selfIndex = selfIndex;
+        _forceSyncSourceIndex = -1;
+
+        if (_role == Role::leader) {
+            UnelectableReason reason = _getMyUnelectableReason(now, lastOpApplied);
+            if (reason == None || reason == NotSecondary) {
+                // Don't stepdown if you don't have to.
+                _currentPrimaryIndex = _selfIndex;
+                return;
+            }
+            log() << "Could not remain primary across reconfig because "
+                  << _getUnelectableReasonString(reason);
+            _role = Role::follower;
+        }
+
+        // By this point we know we are in Role::follower
+        _currentPrimaryIndex = -1; // force secondaries to re-detect who the primary is
 
         if (_followerMode == MemberState::RS_SECONDARY &&
-            _currentConfig.getNumMembers() == 1 &&
-            _selfIndex == 0 &&
-            _currentConfig.getMemberAt(_selfIndex).isElectable()) {
+                _currentConfig.getNumMembers() == 1 &&
+                _selfIndex == 0 &&
+                _currentConfig.getMemberAt(_selfIndex).isElectable()) {
             // If the new config describes a one-node replica set, we're the one member,
             // we're electable, and we are currently in followerMode SECONDARY, 
             // we must transition to candidate, in leiu of heartbeats.
@@ -1472,11 +1504,6 @@ namespace {
     TopologyCoordinatorImpl::UnelectableReason TopologyCoordinatorImpl::_getMyUnelectableReason(
                                                                 const Date_t now,
                                                                 const OpTime lastApplied) const {
-        if (_lastVote.whoId != -1 &&
-                _lastVote.whoId !=_currentConfig.getMemberAt(_selfIndex).getId() &&
-                _lastVote.when.millis + LastVote::leaseTime.total_milliseconds() >= now.millis) {
-            return VotedTooRecently;
-        }
         if (lastApplied.isNull()) {
             return NoData;
         }
@@ -1495,7 +1522,13 @@ namespace {
         if (_stepDownUntil > now) {
             return StepDownPeriodActive;
         }
-        if (!getMemberState().secondary()) {
+        if (_lastVote.whoId != -1 &&
+                _lastVote.whoId !=_currentConfig.getMemberAt(_selfIndex).getId() &&
+                _lastVote.when.millis + LastVote::leaseTime.total_milliseconds() >= now.millis) {
+            return VotedTooRecently;
+        }
+        MemberState state = getMemberState();
+        if (!state.secondary()) {
             return NotSecondary;
         }
         if (!_isOpTimeCloseEnoughToLatestToElect(lastApplied, lastApplied)) {
@@ -1592,6 +1625,7 @@ namespace {
             return MemberState::RS_STARTUP;
         }
         if (_role == Role::leader) {
+            invariant(_currentPrimaryIndex == _selfIndex);
             return MemberState::RS_PRIMARY;
         }
         const MemberConfig& myConfig = _selfConfig();
