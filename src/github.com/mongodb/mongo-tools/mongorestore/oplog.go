@@ -2,11 +2,11 @@ package mongorestore
 
 import (
 	"fmt"
-	"github.com/mongodb/mongo-tools/common/bsonutil"
 	"github.com/mongodb/mongo-tools/common/db"
 	"github.com/mongodb/mongo-tools/common/log"
 	"github.com/mongodb/mongo-tools/common/progress"
 	"github.com/mongodb/mongo-tools/common/util"
+	"gopkg.in/mgo.v2"
 	"gopkg.in/mgo.v2/bson"
 	"os"
 	"time"
@@ -62,6 +62,12 @@ func (restore *MongoRestore) RestoreOplog() error {
 	bar.Start()
 	defer bar.Stop()
 
+	session, err := restore.SessionProvider.GetSession()
+	if err != nil {
+		return fmt.Errorf("error establishing connection: %v", err)
+	}
+	defer session.Close()
+
 	// To restore the oplog, we iterate over the oplog entries,
 	// filling up a buffer. Once the buffer reaches max document size,
 	// apply the current buffered ops and reset the buffer.
@@ -69,7 +75,7 @@ func (restore *MongoRestore) RestoreOplog() error {
 	for bsonSource.Next(rawOplogEntry) {
 		entrySize = len(rawOplogEntry.Data)
 		if bufferedBytes+entrySize > OplogMaxCommandSize {
-			err = restore.ApplyOps(entryArray)
+			err = restore.ApplyOps(session, entryArray)
 			if err != nil {
 				return fmt.Errorf("error applying oplog: %v", err)
 			}
@@ -89,7 +95,7 @@ func (restore *MongoRestore) RestoreOplog() error {
 	}
 	// finally, flush the remaining entries
 	if len(entryArray) > 0 {
-		err = restore.ApplyOps(entryArray)
+		err = restore.ApplyOps(session, entryArray)
 		if err != nil {
 			return fmt.Errorf("error applying oplog: %v", err)
 		}
@@ -99,18 +105,11 @@ func (restore *MongoRestore) RestoreOplog() error {
 
 }
 
-// ApplyOps is a wrapper for the applyOps database command
-func (restore *MongoRestore) ApplyOps(entries []interface{}) error {
+// ApplyOps is a wrapper for the applyOps database command, we pass in
+// a session to avoid opening a new connection for a few inserts at a time
+func (restore *MongoRestore) ApplyOps(session *mgo.Session, entries []interface{}) error {
 	res := bson.M{}
-
-	jsonCommand, err := bsonutil.ConvertBSONValueToJSON(
-		bson.M{"applyOps": entries},
-	)
-	if err != nil {
-		return err
-	}
-
-	err = restore.cmdRunner.Run(jsonCommand, &res, "admin")
+	err := session.Run(bson.D{{"applyOps", entries}}, &res)
 	if err != nil {
 		return fmt.Errorf("applyOps: %v", err)
 	}

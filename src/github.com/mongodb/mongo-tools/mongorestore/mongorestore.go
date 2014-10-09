@@ -14,7 +14,7 @@ type MongoRestore struct {
 	InputOptions  *options.InputOptions
 	OutputOptions *options.OutputOptions
 
-	cmdRunner db.CommandRunner
+	SessionProvider *db.SessionProvider
 
 	TargetDirectory string
 
@@ -25,19 +25,6 @@ type MongoRestore struct {
 	manager  *IntentManager
 	safety   *mgo.Safe
 	objCheck bool
-}
-
-func (restore *MongoRestore) Init() error {
-	if restore.ToolOptions.Namespace.DBPath != "" {
-		shim, err := db.NewShim(restore.ToolOptions.Namespace.DBPath, restore.ToolOptions.DirectoryPerDB, restore.ToolOptions.Journal)
-		if err != nil {
-			return err
-		}
-		restore.cmdRunner = shim
-		return nil
-	}
-	restore.cmdRunner = db.NewSessionProvider(*restore.ToolOptions)
-	return nil
 }
 
 func (restore *MongoRestore) ParseAndValidateOptions() error {

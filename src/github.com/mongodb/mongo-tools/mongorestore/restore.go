@@ -47,7 +47,13 @@ func (restore *MongoRestore) RestoreIntent(intent *Intent) error {
 				log.Logf(0, "cannot drop system collection %v, skipping", intent.Key())
 			} else {
 				log.Logf(1, "dropping collection %v before restoring", intent.Key())
-				err = restore.cmdRunner.Run(bson.M{"drop": intent.C}, &bson.M{}, intent.DB) //TODO check result?
+				// TODO(erf) maybe encapsulate this so that the session is closed sooner
+				session, err := restore.SessionProvider.GetSession()
+				if err != nil {
+					return fmt.Errorf("error establishing connection: %v", err)
+				}
+				defer session.Close()
+				err = session.DB(intent.DB).C(intent.C).DropCollection()
 				if err != nil {
 					return fmt.Errorf("error dropping collection: %v", err)
 				}
@@ -146,11 +152,14 @@ func (restore *MongoRestore) RestoreIntent(intent *Intent) error {
 func (restore *MongoRestore) RestoreCollectionToDB(dbName, colName string,
 	bsonSource *db.DecodedBSONSource, fileSize int64) error {
 
-	insertStream, err := restore.cmdRunner.OpenInsertStream(dbName, colName, restore.safety)
+	session, err := restore.SessionProvider.GetSession()
 	if err != nil {
-		return fmt.Errorf("error opening insert connection: %v", err)
+		return fmt.Errorf("error establishing connection: %v", err)
 	}
-	defer insertStream.Close()
+	session.SetSafe(restore.safety)
+	defer session.Close()
+
+	collection := session.DB(dbName).C(colName)
 
 	//progress bar handler
 	bytesRead := 0
@@ -175,7 +184,7 @@ func (restore *MongoRestore) RestoreCollectionToDB(dbName, colName string,
 				break
 			}
 		}
-		err := insertStream.WriteDoc(doc)
+		err := collection.Insert(doc)
 		if err != nil {
 			return err
 		}

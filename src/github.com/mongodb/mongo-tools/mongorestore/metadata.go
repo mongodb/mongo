@@ -96,7 +96,12 @@ func stripDBFromNS(ns string) string {
 func (restore *MongoRestore) DBHasCollection(intent *Intent) (bool, error) {
 	collectionNS := intent.Key()
 	result := bson.M{}
-	err := restore.cmdRunner.FindOne(intent.DB, "system.namespaces", 0, bson.M{"name": collectionNS}, nil, &result, 0)
+	session, err := restore.SessionProvider.GetSession()
+	if err != nil {
+		return false, fmt.Errorf("error establishing connection: %v", err)
+	}
+	defer session.Close()
+	err = session.DB(intent.DB).C("system.namespaces").Find(bson.M{"name": collectionNS}).One(&result)
 	if err != nil {
 		// handle case when using db connection
 		if err == mgo.ErrNotFound {
@@ -118,18 +123,21 @@ func (restore *MongoRestore) InsertIndex(intent *Intent, index IndexDocument) er
 	index.Options["ns"] = intent.Key()
 
 	// remove the index version, forcing an update,
-	// unless we specifically want to keey it
+	// unless we specifically want to keep it
 	if !restore.OutputOptions.KeepIndexVersion {
 		delete(index.Options, "v")
 	}
 
-	// overwrite safety to make sure we catch errors
-	insertStream, err := restore.cmdRunner.OpenInsertStream(intent.DB, "system.indexes", &mgo.Safe{})
+	session, err := restore.SessionProvider.GetSession()
 	if err != nil {
-		return fmt.Errorf("error opening insert connection: %v", err)
+		return fmt.Errorf("error establishing connection: %v", err)
 	}
-	defer insertStream.Close()
-	err = insertStream.WriteDoc(index)
+	defer session.Close()
+
+	// overwrite safety to make sure we catch errors
+	session.SetSafe(&mgo.Safe{})
+	indexCollection := session.DB(intent.DB).C("system.indexes")
+	err = indexCollection.Insert(index)
 	if err != nil {
 		return fmt.Errorf("insert error: %v", err)
 		//TODO, more error checking? Audit this...
@@ -146,8 +154,14 @@ func (restore *MongoRestore) CreateCollection(intent *Intent, options bson.D) er
 		return err
 	}
 
+	session, err := restore.SessionProvider.GetSession()
+	if err != nil {
+		return fmt.Errorf("error establishing connection: %v", err)
+	}
+	defer session.Close()
+
 	res := bson.M{}
-	err = restore.cmdRunner.Run(jsonCommand, &res, intent.DB)
+	err = session.DB(intent.DB).Run(jsonCommand, &res)
 	if err != nil {
 		return fmt.Errorf("error running create command: %v", err)
 	}
@@ -160,18 +174,16 @@ func (restore *MongoRestore) CreateCollection(intent *Intent, options bson.D) er
 func (restore *MongoRestore) RestoreUsersOrRoles(collectionType string, intent *Intent) error {
 	log.Logf(0, "restoring %v from %v", collectionType, intent.BSONPath)
 
-	var tempCol, tempColCommandField, collectionName string
+	var tempCol, tempColCommandField string
 	switch collectionType {
 	case Users:
 		tempCol = restore.tempUsersCol
 		tempColCommandField = "tempUsersCollection"
-		collectionName = "system.users"
 	case Roles:
 		tempCol = restore.tempRolesCol
 		tempColCommandField = "tempRolesCollection"
-		collectionName = "system.roles"
 	default:
-		// panic should be fine here, since this is a programmer (not user) error
+		// panic should be fine here, since this implies a programmer (not user) error
 		util.Panicf("cannot use %v as a collection type in RestoreUsersOrRoles", collectionType)
 	}
 
@@ -181,55 +193,6 @@ func (restore *MongoRestore) RestoreUsersOrRoles(collectionType string, intent *
 	}
 	bsonSource := db.NewDecodedBSONSource(db.NewBSONSource(rawFile))
 	defer bsonSource.Close()
-
-	// branch here, using a temporary collection if the db is live and simple inserts if it's the shim
-	// TODO nicer encapsulation of logic
-	if _, ok := restore.cmdRunner.(*db.Shim); ok {
-		log.Logf(2, "using the shim, restoring %v directly", collectionType)
-
-		// first, drop all db-related users/roles if drop is enabled
-		if restore.OutputOptions.Drop {
-			if intent.DB != "admin" {
-				log.Logf(2, "removing all %v for database %v from admin db", collectionType, intent.DB)
-				err := restore.cmdRunner.Remove("admin", collectionName, bson.M{"db": intent.DB})
-				if err != nil {
-					return fmt.Errorf("error dropping all %v for database %v: %v", collectionType, intent.DB, err)
-				}
-			} else {
-				log.Logf(2, "removing all %v from admin db", collectionType)
-				err := restore.cmdRunner.Remove("admin", collectionName, bson.M{})
-				if err != nil {
-					return fmt.Errorf("error dropping all %v from admin db", collectionType, intent.DB, err)
-				}
-			}
-		}
-
-		// then iterate through all entries, updating their "db" and inserting them
-		insertStream, err := restore.cmdRunner.OpenInsertStream("admin", collectionName, restore.safety)
-		if err != nil {
-			return fmt.Errorf("error opening insert connection: %v", err)
-		}
-		defer insertStream.Close()
-		doc := bson.M{}
-
-		log.Logf(0, "restoring %v for database %v into admin.%v", collectionType, intent.DB, collectionName)
-		for bsonSource.Next(&doc) {
-			if restore.ToolOptions.DB != "" && intent.DB != "admin" {
-				// update the db field if we're restoring with a db option
-				// TODO: confirm we should do this?
-				doc["db"] = restore.ToolOptions.DB
-			}
-			err := insertStream.WriteDoc(doc)
-			if err != nil {
-				return fmt.Errorf("error inserting %v: %v", collectionType, err)
-			}
-		}
-		if bsonSource.Err() != nil {
-			return fmt.Errorf("error reading %v: %v", intent.BSONPath, bsonSource.Err())
-		}
-
-		return nil
-	}
 
 	tempColExists, err := restore.DBHasCollection(&Intent{DB: "admin", C: tempCol})
 	if err != nil {
@@ -247,8 +210,16 @@ func (restore *MongoRestore) RestoreUsersOrRoles(collectionType string, intent *
 
 	// make sure we always drop the temporary collection
 	defer func() {
-		log.Logf(3, "dropping temporary collection %v", tempCol) //TODO(erf) increase verbosity here
-		err = restore.cmdRunner.Run(bson.M{"drop": tempCol}, &bson.M{}, "admin")
+		session, err := restore.SessionProvider.GetSession()
+		if err != nil {
+			// logging errors here because this has no way of returning that doesn't mask other errors
+			// TODO(erf) make this a proper return value
+			log.Logf(0, "error establishing connection to drop temporary collection %v: %v", tempCol, err)
+			return
+		}
+		defer session.Close()
+		log.Logf(3, "dropping temporary collection %v", tempCol)
+		err = session.DB("admin").C(tempCol).DropCollection()
 		if err != nil {
 			log.Logf(0, "error dropping temporary collection %v: %v", tempCol, err)
 		}
@@ -268,9 +239,15 @@ func (restore *MongoRestore) RestoreUsersOrRoles(collectionType string, intent *
 		{"db", userTargetDB},
 	}
 
+	session, err := restore.SessionProvider.GetSession()
+	if err != nil {
+		return fmt.Errorf("error establishing connection: %v", err)
+	}
+	defer session.Close()
+
 	log.Logf(2, "merging %v from temp collection", collectionType)
 	res := bson.M{}
-	err = restore.cmdRunner.Run(command, &res, "admin")
+	err = session.Run(command, &res)
 	if err != nil {
 		return fmt.Errorf("error running merge command: %v", err)
 	}
@@ -278,5 +255,4 @@ func (restore *MongoRestore) RestoreUsersOrRoles(collectionType string, intent *
 		return fmt.Errorf("_mergeAuthzCollections command: %v", res["errmsg"])
 	}
 	return nil
-
 }

@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"github.com/mongodb/mongo-tools/common/db"
 	"github.com/mongodb/mongo-tools/common/log"
 	commonopts "github.com/mongodb/mongo-tools/common/options"
 	"github.com/mongodb/mongo-tools/common/util"
@@ -61,11 +62,7 @@ func main() {
 		OutputOptions:   outputOpts,
 		InputOptions:    inputOpts,
 		TargetDirectory: targetDir,
-	}
-
-	err = restore.Init()
-	if err != nil {
-		util.Exitf(1, "%v", err)
+		SessionProvider: db.NewSessionProvider(*opts),
 	}
 
 	err = restore.Restore()
