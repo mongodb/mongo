@@ -278,8 +278,11 @@ struct __wt_update;
 #endif
 #include "hardware.h"
 
-#include "misc.h"
+#ifdef _WIN32
 #include "os_windows.h"
+#endif
+
+#include "misc.h"
 #include "mutex.h"
 #include "posix.h"
 

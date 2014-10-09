@@ -6,7 +6,7 @@
  */
 
 /*
- * Windows does use support Posix Threads
+ * Windows does not support Posix Threads
  * WT needs it so we mock it up with the Windows concurrency primitives
  * Assumes Windows 7+/2008 R2+
  */
@@ -18,7 +18,7 @@ typedef SRWLOCK pthread_rwlock_t;
 
 typedef HANDLE pthread_t;
 
-/* Timespec is a POSIX structure not defined in Windows*/
+/* Timespec is a POSIX structure not defined in Windows */
 struct timespec {
     time_t  tv_sec;    /* seconds */
     long    tv_nsec;   /* nanoseconds */
