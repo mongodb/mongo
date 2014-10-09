@@ -2449,7 +2449,7 @@ namespace {
         // Make sure nay votes, do not prevent subsequent yeas (the way a yea vote would)
         args.set = "rs0";
         BSONObjBuilder responseBuilder2;
-        getTopoCoord().prepareElectResponse(args, now += 60000, OpTime(), &responseBuilder2, &result);
+        getTopoCoord().prepareElectResponse(args, now++, OpTime(), &responseBuilder2, &result);
         BSONObj response2 = responseBuilder2.obj();
         ASSERT_EQUALS(1, response2["vote"].Int());
         ASSERT_EQUALS(round, response2["round"].OID());
@@ -2478,7 +2478,7 @@ namespace {
         // Make sure nay votes, do not prevent subsequent yeas (the way a yea vote would)
         args.cfgver = 10;
         BSONObjBuilder responseBuilder2;
-        getTopoCoord().prepareElectResponse(args, now += 60000, OpTime(), &responseBuilder2, &result);
+        getTopoCoord().prepareElectResponse(args, now++, OpTime(), &responseBuilder2, &result);
         BSONObj response2 = responseBuilder2.obj();
         ASSERT_EQUALS(1, response2["vote"].Int());
         ASSERT_EQUALS(round, response2["round"].OID());
@@ -2507,7 +2507,7 @@ namespace {
         // Make sure nay votes, do not prevent subsequent yeas (the way a yea vote would)
         args.cfgver = 10;
         BSONObjBuilder responseBuilder2;
-        getTopoCoord().prepareElectResponse(args, now += 60000, OpTime(), &responseBuilder2, &result);
+        getTopoCoord().prepareElectResponse(args, now++, OpTime(), &responseBuilder2, &result);
         BSONObj response2 = responseBuilder2.obj();
         ASSERT_EQUALS(1, response2["vote"].Int());
         ASSERT_EQUALS(round, response2["round"].OID());
@@ -2535,7 +2535,7 @@ namespace {
         // Make sure nay votes, do not prevent subsequent yeas (the way a yea vote would)
         args.whoid = 1;
         BSONObjBuilder responseBuilder2;
-        getTopoCoord().prepareElectResponse(args, now += 60000, OpTime(), &responseBuilder2, &result);
+        getTopoCoord().prepareElectResponse(args, now++, OpTime(), &responseBuilder2, &result);
         BSONObj response2 = responseBuilder2.obj();
         ASSERT_EQUALS(1, response2["vote"].Int());
         ASSERT_EQUALS(round, response2["round"].OID());
@@ -2565,7 +2565,7 @@ namespace {
         // Make sure nay votes, do not prevent subsequent yeas (the way a yea vote would)
         getTopoCoord()._setCurrentPrimaryForTest(-1);
         BSONObjBuilder responseBuilder2;
-        getTopoCoord().prepareElectResponse(args, now += 60000, OpTime(), &responseBuilder2, &result);
+        getTopoCoord().prepareElectResponse(args, now++, OpTime(), &responseBuilder2, &result);
         BSONObj response2 = responseBuilder2.obj();
         ASSERT_EQUALS(1, response2["vote"].Int());
         ASSERT_EQUALS(round, response2["round"].OID());
@@ -2594,7 +2594,7 @@ namespace {
         // Make sure nay votes, do not prevent subsequent yeas (the way a yea vote would)
         getTopoCoord()._setCurrentPrimaryForTest(-1);
         BSONObjBuilder responseBuilder2;
-        getTopoCoord().prepareElectResponse(args, now += 60000, OpTime(), &responseBuilder2, &result);
+        getTopoCoord().prepareElectResponse(args, now++, OpTime(), &responseBuilder2, &result);
         BSONObj response2 = responseBuilder2.obj();
         ASSERT_EQUALS(1, response2["vote"].Int());
         ASSERT_EQUALS(round, response2["round"].OID());
@@ -2624,7 +2624,7 @@ namespace {
         // Make sure nay votes, do not prevent subsequent yeas (the way a yea vote would)
         args.whoid = 3;
         BSONObjBuilder responseBuilder2;
-        getTopoCoord().prepareElectResponse(args, now += 60000, OpTime(), &responseBuilder2, &result);
+        getTopoCoord().prepareElectResponse(args, now++, OpTime(), &responseBuilder2, &result);
         BSONObj response2 = responseBuilder2.obj();
         ASSERT_EQUALS(1, response2["vote"].Int());
         ASSERT_EQUALS(round, response2["round"].OID());
@@ -2687,11 +2687,11 @@ namespace {
                 "voted for h2:27017 0 secs ago"));
 
         // Test that after enough time passes the same vote can proceed
-        now = Date_t(now.millis + 3 * 1000); // 3 seconds later
+        now += 3 * 1001; // just over 3 seconds later
 
         BSONObjBuilder responseBuilder3;
         startCapturingLogMessages();
-        getTopoCoord().prepareElectResponse(args, now += 60000, OpTime(), &responseBuilder3, &result);
+        getTopoCoord().prepareElectResponse(args, now++, OpTime(), &responseBuilder3, &result);
         stopCapturingLogMessages();
         BSONObj response3 = responseBuilder3.obj();
         ASSERT_OK(result);
