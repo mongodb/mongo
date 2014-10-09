@@ -55,7 +55,7 @@ __wt_thread_id(WT_SESSION_IMPL *session, char buf, size_t buflen)
 	len = (size_t)snprintf(
 	    buf, buflen, "%" PRIu64, (uint64_t)GetCurrentProcessId());
 	if (len < buflen) {
-		self = GetCurrentThreadId());
+		self = GetCurrentThreadId();
 		__wt_raw_to_hex_mem((const uint8_t *)&self,
 		    sizeof(self), (uint8_t *)buf + len, buflen - len);
 	}
