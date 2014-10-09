@@ -56,4 +56,3 @@ static inline void WT_FULL_BARRIER(void) { _mm_mfence(); }
 static inline void WT_PAUSE(void) { _mm_pause(); }
 static inline void WT_READ_BARRIER(void) { _mm_lfence(); }
 static inline void WT_WRITE_BARRIER(void) { _mm_sfence(); }
-

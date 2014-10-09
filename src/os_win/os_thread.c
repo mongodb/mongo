@@ -22,7 +22,6 @@ __wt_thread_create(WT_SESSION_IMPL *session,
 	if (*tidret != NULL)
 		return (0);
 
-
 	WT_RET_MSG(session, __wt_errno(), "CreateThread");
 }
 

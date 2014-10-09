@@ -21,7 +21,7 @@ __wt_fallocate(
 	    session, WT_VERB_FILEOPS, "%s: fallocate", fh->name));
 
 	ret = 0;
-	
+
 	if (ret != 0)
 		WT_RET_MSG(session, __wt_errno(), "%s: ftruncate", fh->name);
 

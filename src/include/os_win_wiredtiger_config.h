@@ -154,13 +154,11 @@
 /* The size of `unsigned short', as computed by sizeof. */
 #define SIZEOF_UNSIGNED_SHORT 2
 
-
 /* Spinlock type from mutex.h. */
 #define SPINLOCK_TYPE SPINLOCK_MSVC
 
 /* Define to 1 if you have the ANSI C header files. */
 #define STDC_HEADERS 1
-
 
 /* Define WORDS_BIGENDIAN to 1 if your processor stores words with the most
    significant byte first (like Motorola and SPARC, unlike Intel). */
