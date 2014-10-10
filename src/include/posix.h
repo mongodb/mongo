@@ -15,3 +15,6 @@
 #ifndef	LLONG_MIN
 #define	LLONG_MIN	(-0x7fffffffffffffffLL - 1)
 #endif
+
+/* Define O_BINARY for Posix systems */
+#define	O_BINARY 	0
