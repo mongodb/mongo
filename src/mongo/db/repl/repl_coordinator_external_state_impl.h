@@ -61,6 +61,7 @@ namespace repl {
         virtual ReplicationCoordinatorExternalState::GlobalSharedLockAcquirer*
                 getGlobalSharedLockAcquirer();
         virtual OperationContext* createOperationContext();
+        virtual void dropAllTempCollections(OperationContext* txn);
 
     private:
 

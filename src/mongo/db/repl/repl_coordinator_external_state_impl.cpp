@@ -36,9 +36,11 @@
 
 #include "mongo/base/status_with.h"
 #include "mongo/bson/oid.h"
+#include "mongo/db/catalog/database_holder.h"
 #include "mongo/db/client.h"
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/dbhelpers.h"
+#include "mongo/db/global_environment_experiment.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/operation_context_impl.h"
 #include "mongo/db/repl/bgsync.h"
@@ -47,7 +49,9 @@
 #include "mongo/db/repl/master_slave.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/rs_sync.h"
+#include "mongo/db/storage/storage_engine.h"
 #include "mongo/stdx/functional.h"
+#include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
 #include "mongo/util/net/hostandport.h"
 #include "mongo/util/net/message_port.h"
@@ -211,6 +215,22 @@ namespace {
         sb << "repl" << boost::this_thread::get_id();
         Client::initThreadIfNotAlready(sb.str().c_str());
         return new OperationContextImpl;
+    }
+
+    void ReplicationCoordinatorExternalStateImpl::dropAllTempCollections(OperationContext* txn) {
+        std::vector<std::string> dbNames;
+        StorageEngine* storageEngine = getGlobalEnvironment()->getGlobalStorageEngine();
+        storageEngine->listDatabases(&dbNames);
+
+        for (std::vector<std::string>::iterator it = dbNames.begin(); it != dbNames.end(); ++it) {
+            // The local db is special because it isn't replicated. It is cleared at startup even on
+            // replica set members.
+            if (*it == "local")
+                continue;
+            LOG(2) << "Removing temporary collections from " << *it;
+            Database* db = dbHolder().get(txn, *it);
+            db->clearTmpCollections(txn);
+        }
     }
 
 namespace {

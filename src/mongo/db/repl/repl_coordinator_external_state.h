@@ -149,6 +149,14 @@ namespace repl {
          * the same instance that require an OperationContext.
          */
         virtual OperationContext* createOperationContext() = 0;
+
+        /**
+         * Drops all temporary collections on all databases except "local".
+         *
+         * The implementation may assume that the caller has acquired the global exclusive lock
+         * for "txn".
+         */
+        virtual void dropAllTempCollections(OperationContext* txn) = 0;
     };
 
     /**
