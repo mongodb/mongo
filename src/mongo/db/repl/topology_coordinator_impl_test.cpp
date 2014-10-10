@@ -111,19 +111,6 @@ namespace {
             }
         }
 
-        HeartbeatResponseAction downMember(const HostAndPort& member,
-                                           const std::string& setName,
-                                           OpTime lastOpTimeReceiver = OpTime()) {
-            StatusWith<ReplSetHeartbeatResponse> hbResponse =
-                    StatusWith<ReplSetHeartbeatResponse>(Status(ErrorCodes::HostUnreachable, ""));
-            getTopoCoord().prepareHeartbeatRequest(_now++, setName, member);
-            return getTopoCoord().processHeartbeatResponse(_now++,
-                                                           Milliseconds(0),
-                                                           member,
-                                                           hbResponse,
-                                                           lastOpTimeReceiver);
-        }
-
         HeartbeatResponseAction authErrorMember(const HostAndPort& member,
                                                 OpTime lastOpTimeReceiver = OpTime()) {
             StatusWith<ReplSetHeartbeatResponse> hbResponse =
@@ -134,28 +121,6 @@ namespace {
                                                            member,
                                                            hbResponse,
                                                            lastOpTimeReceiver);
-        }
-
-        void heartbeatFromMember(const HostAndPort& member,
-                                 const std::string& setName,
-                                 MemberState memberState,
-                                 OpTime opTime,
-                                 Milliseconds roundTripTime = Milliseconds(0)) {
-            ReplSetHeartbeatResponse hb;
-            hb.initialize(BSON("ok" << 1 <<
-                               "v" << 1 <<
-                               "state" << memberState.s));
-            hb.setOpTime(opTime);
-            StatusWith<ReplSetHeartbeatResponse> hbResponse =
-                    StatusWith<ReplSetHeartbeatResponse>(hb);
-            getTopoCoord().prepareHeartbeatRequest(_now++,
-                                                   setName,
-                                                   member);
-            getTopoCoord().processHeartbeatResponse(_now++,
-                                                    roundTripTime,
-                                                    member,
-                                                    hbResponse,
-                                                    OpTime(0,0));
         }
 
         void heartbeatFromMember(const HostAndPort& member,
@@ -171,6 +136,76 @@ namespace {
                                                     member,
                                                     hbResponse,
                                                     OpTime(0,0));
+        }
+
+        HeartbeatResponseAction receiveUpHeartbeat(
+                const HostAndPort& member,
+                const std::string& setName,
+                MemberState memberState,
+                OpTime electionTime,
+                OpTime lastOpTimeSender,
+                OpTime lastOpTimeReceiver) {
+            return _receiveHeartbeatHelper(member,
+                                           setName,
+                                           memberState,
+                                           electionTime,
+                                           lastOpTimeSender,
+                                           lastOpTimeReceiver,
+                                           Milliseconds(0));
+        }
+
+        HeartbeatResponseAction receiveDownHeartbeat(const HostAndPort& member,
+                                                     const std::string& setName,
+                                                     OpTime lastOpTimeReceiver) {
+            StatusWith<ReplSetHeartbeatResponse> hbResponse =
+                    StatusWith<ReplSetHeartbeatResponse>(Status(ErrorCodes::HostUnreachable, ""));
+            getTopoCoord().prepareHeartbeatRequest(_now++, setName, member);
+            return getTopoCoord().processHeartbeatResponse(_now++,
+                                                           Milliseconds(0),
+                                                           member,
+                                                           hbResponse,
+                                                           lastOpTimeReceiver);
+        }
+
+        HeartbeatResponseAction heartbeatFromMember(const HostAndPort& member,
+                                                    const std::string& setName,
+                                                    MemberState memberState,
+                                                    OpTime lastOpTimeSender,
+                                                    Milliseconds roundTripTime = Milliseconds(0)) {
+            return _receiveHeartbeatHelper(member,
+                                           setName,
+                                           memberState,
+                                           OpTime(),
+                                           lastOpTimeSender,
+                                           OpTime(),
+                                           roundTripTime);
+        }
+
+    private:
+
+        HeartbeatResponseAction _receiveHeartbeatHelper(const HostAndPort& member,
+                                                        const std::string& setName,
+                                                        MemberState memberState,
+                                                        OpTime electionTime,
+                                                        OpTime lastOpTimeSender,
+                                                        OpTime lastOpTimeReceiver,
+                                                        Milliseconds roundTripTime) {
+            ReplSetHeartbeatResponse hb;
+            hb.initialize(BSON("ok" << 1 <<
+                               "v" << 1 <<
+                               "state" << memberState.s));
+            hb.setOpTime(lastOpTimeSender);
+            hb.setElectionTime(electionTime);
+            StatusWith<ReplSetHeartbeatResponse> hbResponse =
+                    StatusWith<ReplSetHeartbeatResponse>(hb);
+            getTopoCoord().prepareHeartbeatRequest(now()++,
+                                                   setName,
+                                                   member);
+            return getTopoCoord().processHeartbeatResponse(now()++,
+                                                           roundTripTime,
+                                                           member,
+                                                           hbResponse,
+                                                           lastOpTimeReceiver);
         }
 
     private:
@@ -227,7 +262,7 @@ namespace {
         ASSERT_EQUALS(HostAndPort("h3"), getTopoCoord().getSyncSourceAddress());
 
         // h3 goes down
-        downMember(HostAndPort("h3"), "rs0");
+        receiveDownHeartbeat(HostAndPort("h3"), "rs0", OpTime());
         getTopoCoord().chooseNewSyncSource(now()++, OpTime(0,0));
         ASSERT_EQUALS(HostAndPort("h2"), getTopoCoord().getSyncSourceAddress());
 
@@ -308,29 +343,29 @@ namespace {
         ASSERT_EQUALS(HostAndPort("h4"), getTopoCoord().getSyncSourceAddress());
         
         // h4 goes down; should choose h1
-        downMember(HostAndPort("h4"), "rs0");
+        receiveDownHeartbeat(HostAndPort("h4"), "rs0", OpTime());
         getTopoCoord().chooseNewSyncSource(now()++, lastOpTimeWeApplied);
         ASSERT_EQUALS(HostAndPort("h1"), getTopoCoord().getSyncSourceAddress());
 
         // Primary and h1 go down; should choose h6 
-        downMember(HostAndPort("h1"), "rs0");
-        downMember(HostAndPort("hprimary"), "rs0");
+        receiveDownHeartbeat(HostAndPort("h1"), "rs0", OpTime());
+        receiveDownHeartbeat(HostAndPort("hprimary"), "rs0", OpTime());
         ASSERT_EQUALS(-1, getCurrentPrimaryIndex());
         getTopoCoord().chooseNewSyncSource(now()++, lastOpTimeWeApplied);
         ASSERT_EQUALS(HostAndPort("h6"), getTopoCoord().getSyncSourceAddress());
 
         // h6 goes down; should choose h5
-        downMember(HostAndPort("h6"), "rs0");
+        receiveDownHeartbeat(HostAndPort("h6"), "rs0", OpTime());
         getTopoCoord().chooseNewSyncSource(now()++, lastOpTimeWeApplied);
         ASSERT_EQUALS(HostAndPort("h5"), getTopoCoord().getSyncSourceAddress());
 
         // h5 goes down; should choose h3
-        downMember(HostAndPort("h5"), "rs0");
+        receiveDownHeartbeat(HostAndPort("h5"), "rs0", OpTime());
         getTopoCoord().chooseNewSyncSource(now()++, lastOpTimeWeApplied);
         ASSERT_EQUALS(HostAndPort("h3"), getTopoCoord().getSyncSourceAddress());
 
         // h3 goes down; no sync source candidates remain
-        downMember(HostAndPort("h3"), "rs0");
+        receiveDownHeartbeat(HostAndPort("h3"), "rs0", OpTime());
         getTopoCoord().chooseNewSyncSource(now()++, lastOpTimeWeApplied);
         ASSERT(getTopoCoord().getSyncSourceAddress().empty());
     }
@@ -558,7 +593,7 @@ namespace {
                       result.reason());
 
         // Try to sync from a member that is down
-        downMember(HostAndPort("h4"), "rs0");
+        receiveDownHeartbeat(HostAndPort("h4"), "rs0", OpTime());
 
         BSONObjBuilder response7;
         getTopoCoord().prepareSyncFromResponse(
@@ -600,7 +635,7 @@ namespace {
         BSONObj response10Obj = response10.obj();
         ASSERT_FALSE(response10Obj.hasField("warning"));
         ASSERT_EQUALS(HostAndPort("h6").toString(), response10Obj["prevSyncTarget"].String());
-        downMember(HostAndPort("h6"), "rs0");
+        receiveDownHeartbeat(HostAndPort("h6"), "rs0", OpTime());
         HostAndPort syncSource = getTopoCoord().chooseNewSyncSource(now()++, OpTime(0,0));
         ASSERT_EQUALS(HostAndPort("h6"), syncSource);
 
@@ -624,8 +659,6 @@ namespace {
         ASSERT_OK(result);
         syncSource = getTopoCoord().chooseNewSyncSource(now()++, OpTime(0,0));
         ASSERT_EQUALS(HostAndPort("h6"), syncSource);
-
-
     }
 
     TEST_F(TopoCoordTest, ReplSetGetStatus) {
@@ -891,7 +924,7 @@ namespace {
         args.id = 40;
         args.who = HostAndPort("h3");
 
-        downMember(HostAndPort("h3"), "rs0");
+        receiveDownHeartbeat(HostAndPort("h3"), "rs0", OpTime());
 
         BSONObjBuilder responseBuilder6;
         Status status6 = internalErrorStatus;
@@ -985,7 +1018,7 @@ namespace {
         args.id = 40;
         args.who = HostAndPort("h3");
 
-        downMember(HostAndPort("h2"), "rs0");
+        receiveDownHeartbeat(HostAndPort("h2"), "rs0", OpTime());
         heartbeatFromMember(HostAndPort("h3"), "rs0", MemberState::RS_SECONDARY, ourOpTime);
 
         BSONObjBuilder responseBuilder11;
@@ -1016,36 +1049,6 @@ namespace {
                          0);
         }
 
-        HeartbeatResponseAction receiveUpHeartbeat(
-                const HostAndPort& member,
-                const std::string& setName,
-                MemberState memberState,
-                OpTime electionTime,
-                OpTime lastOpTimeSender,
-                OpTime lastOpTimeReceiver) {
-            ReplSetHeartbeatResponse hb;
-            hb.initialize(BSON("ok" << 1 <<
-                               "v" << 1 <<
-                               "state" << memberState.s));
-            hb.setOpTime(lastOpTimeSender);
-            hb.setElectionTime(electionTime);
-            StatusWith<ReplSetHeartbeatResponse> hbResponse =
-                    StatusWith<ReplSetHeartbeatResponse>(hb);
-            getTopoCoord().prepareHeartbeatRequest(now()++,
-                                                   setName,
-                                                   member);
-            return getTopoCoord().processHeartbeatResponse(now()++,
-                                                           Milliseconds(0),
-                                                           member,
-                                                           hbResponse,
-                                                           lastOpTimeReceiver);
-        }
-
-        HeartbeatResponseAction receiveDownHeartbeat(const HostAndPort& member,
-                                                     const std::string& setName,
-                                                     OpTime lastOpTimeReceiver) {
-            return downMember(member, setName, lastOpTimeReceiver);
-        }
     };
 
     class HeartbeatResponseTestOneRetry : public HeartbeatResponseTest {
@@ -2731,8 +2734,8 @@ namespace {
         args.cfgver = 10;
         args.whoid = 1;
 
-        downMember(HostAndPort("h3"), "rs0");
-        downMember(HostAndPort("h2"), "rs0");
+        receiveDownHeartbeat(HostAndPort("h3"), "rs0", OpTime());
+        receiveDownHeartbeat(HostAndPort("h2"), "rs0", OpTime());
 
         BSONObjBuilder responseBuilder;
         Status result = Status::OK();
@@ -3372,29 +3375,54 @@ namespace {
         ASSERT_EQUALS(MemberState::RS_SECONDARY, getTopoCoord().getMemberState().s);
     }
 
-//     uncomment once primariness can be maintained through a reconfig
-//     TEST_F(TopoCoordTest, ReconfigContinueToBePrimary) {
-//         ASSERT_TRUE(TopologyCoordinator::Role::follower == getTopoCoord().getRole());
-//         ASSERT_EQUALS(MemberState::RS_STARTUP, getTopoCoord().getMemberState().s);
-//         updateConfig(BSON("_id" << "rs0" <<
-//                           "version" << 1 <<
-//                           "members" << BSON_ARRAY(
-//                               BSON("_id" << 1 << "host" << "host1:27017"))),
-//                      0);
-//         ASSERT_TRUE(TopologyCoordinator::Role::leader == getTopoCoord().getRole());
-//         ASSERT_EQUALS(MemberState::RS_PRIMARY, getTopoCoord().getMemberState().s);
-// 
-//         // reconfig in a manner that leaves us electable and ensure we are still the primary
-//         updateConfig(BSON("_id" << "rs0" <<
-//                           "version" << 2 <<
-//                           "members" << BSON_ARRAY(
-//                               BSON("_id" << 0 << "host" << "host1:27017") <<
-//                               BSON("_id" << 1 << "host" << "host2:27017") <<
-//                               BSON("_id" << 2 << "host" << "host3:27017"))),
-//                      0);
-//         ASSERT_TRUE(TopologyCoordinator::Role::leader == getTopoCoord().getRole());
-//         ASSERT_EQUALS(MemberState::RS_PRIMARY, getTopoCoord().getMemberState().s);
-//     }
+     TEST_F(TopoCoordTest, ReconfigContinueToBePrimary) {
+         ASSERT_TRUE(TopologyCoordinator::Role::follower == getTopoCoord().getRole());
+         ASSERT_EQUALS(MemberState::RS_STARTUP, getTopoCoord().getMemberState().s);
+         updateConfig(BSON("_id" << "rs0" <<
+                           "version" << 1 <<
+                           "members" << BSON_ARRAY(
+                               BSON("_id" << 0 << "host" << "host1:27017"))),
+                      0);
+
+         ASSERT_FALSE(TopologyCoordinator::Role::candidate == getTopoCoord().getRole());
+         ASSERT_EQUALS(MemberState::RS_STARTUP2, getTopoCoord().getMemberState().s);
+         getTopoCoord().setFollowerMode(MemberState::RS_SECONDARY);
+         ASSERT_TRUE(TopologyCoordinator::Role::candidate == getTopoCoord().getRole());
+
+         // win election and primary
+         getTopoCoord().processWinElection(OID::gen(), OpTime(0,0));
+         ASSERT_TRUE(TopologyCoordinator::Role::leader == getTopoCoord().getRole());
+         ASSERT_EQUALS(MemberState::RS_PRIMARY, getTopoCoord().getMemberState().s);
+
+         // Now reconfig in ways that leave us electable and ensure we are still the primary.
+         // Add hosts
+         updateConfig(BSON("_id" << "rs0" <<
+                           "version" << 2 <<
+                           "members" << BSON_ARRAY(
+                               BSON("_id" << 0 << "host" << "host1:27017") <<
+                               BSON("_id" << 1 << "host" << "host2:27017") <<
+                               BSON("_id" << 2 << "host" << "host3:27017"))),
+                      0,
+                      Date_t(-1),
+                      OpTime(10,0));
+         ASSERT_TRUE(TopologyCoordinator::Role::leader == getTopoCoord().getRole());
+         ASSERT_EQUALS(MemberState::RS_PRIMARY, getTopoCoord().getMemberState().s);
+
+         // Change priorities and tags
+         updateConfig(BSON("_id" << "rs0" <<
+                           "version" << 2 <<
+                           "members" << BSON_ARRAY(
+                               BSON("_id" << 0 << "host" << "host1:27017" << "priority" << 10) <<
+                               BSON("_id" << 1 <<
+                                    "host" << "host2:27017" <<
+                                    "priority" << 5 <<
+                                    "tags" <<  BSON("dc" << "NA" << "rack" << "rack1")))),
+                      0,
+                      Date_t(-1),
+                      OpTime(10,0));
+         ASSERT_TRUE(TopologyCoordinator::Role::leader == getTopoCoord().getRole());
+         ASSERT_EQUALS(MemberState::RS_PRIMARY, getTopoCoord().getMemberState().s);
+     }
 
     TEST_F(TopoCoordTest, ReconfigKeepSecondary) {
         updateConfig(BSON("_id" << "rs0" <<
