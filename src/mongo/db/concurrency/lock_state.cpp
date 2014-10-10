@@ -43,10 +43,8 @@ namespace mongo {
         // Dispenses unique Locker instance identifiers
         AtomicUInt64 idCounter(0);
 
-        // Global lock manager instance. We have a pointer an an instance so that they can be
-        // changed and restored for unit-tests.
-        LockManager globalLockManagerInstance;
-        LockManager* globalLockManagerPtr = &globalLockManagerInstance;
+        // Global lock manager instance.
+        LockManager globalLockManager;
 
         // Global lock. Every server operation, which uses the Locker must acquire this lock at
         // least once. See comments in the header file (begin/endTransaction) for more information
@@ -367,13 +365,13 @@ namespace mongo {
             return globalLockResult;
         }
 
-        // Obey the requested timeout
-        const unsigned elapsedTimeMs = timer.millis();
-        const unsigned remainingTimeMs =
-            elapsedTimeMs < timeoutMs ? (timeoutMs - elapsedTimeMs) : 0;
-
+        // Special-handling for MMAP V1 concurrency control
         if (request == NULL) {
-            // Special-handling for MMAP V1.
+            // Obey the requested timeout
+            const unsigned elapsedTimeMs = timer.millis();
+            const unsigned remainingTimeMs =
+                elapsedTimeMs < timeoutMs ? (timeoutMs - elapsedTimeMs) : 0;
+
             LockResult flushLockResult =
                 lock(resourceIdMMAPV1Flush, getLockMode(resourceIdGlobal), remainingTimeMs);
 
@@ -402,8 +400,8 @@ namespace mongo {
         invariant(flushLockRequest->mode == MODE_X);
         invariant(flushLockRequest->recursiveCount == 1);
 
-        globalLockManagerPtr->downgrade(globalLockRequest, MODE_S);
-        globalLockManagerPtr->downgrade(flushLockRequest, MODE_S);
+        globalLockManager.downgrade(globalLockRequest, MODE_S);
+        globalLockManager.downgrade(flushLockRequest, MODE_S);
     }
 
     bool LockerImpl::unlockAll() {
@@ -466,17 +464,14 @@ namespace mongo {
     LockResult LockerImpl::lock(const ResourceId& resId, LockMode mode, unsigned timeoutMs) {
         _notify.clear();
 
-        _lock.lock();
         LockRequest* request = _find(resId);
+
+        _lock.lock();
         if (request == NULL) {
             request = new LockRequest();
             request->initNew(this, &_notify);
 
             _requests.insert(LockRequestsPair(resId, request));
-        }
-        else {
-            invariant(request->recursiveCount > 0);
-            request->notify = &_notify;
         }
         _lock.unlock();
 
@@ -485,7 +480,7 @@ namespace mongo {
         // state of the request is deadlock detection, which however would synchronize on the
         // LockManager calls.
 
-        LockResult result = globalLockManagerPtr->lock(resId, request, mode);
+        LockResult result = globalLockManager.lock(resId, request, mode);
         if (result == LOCK_WAITING) {
             // Under MMAP V1 engine a deadlock can occur if a thread goes to sleep waiting on DB
             // lock, while holding the flush lock, so it has to be released. This is only correct
@@ -516,7 +511,10 @@ namespace mongo {
             // Can only be LOCK_TIMEOUT, because the lock manager does not return any other errors
             // at this point. Could be LOCK_DEADLOCK, when deadlock detection is implemented.
             invariant(result == LOCK_TIMEOUT);
-            _unlockAndUpdateRequestsList(resId, request);
+
+            if (globalLockManager.unlock(request)) {
+                _freeRequest(resId, request);
+            }
         }
 
         return result;
@@ -538,7 +536,12 @@ namespace mongo {
             return false;
         }
 
-        return _unlockAndUpdateRequestsList(resId, request);
+        if (globalLockManager.unlock(request)) {
+            _freeRequest(resId, request);
+            return true;
+        }
+
+        return false;
     }
 
     LockMode LockerImpl::getLockMode(const ResourceId& resId) const {
@@ -664,11 +667,6 @@ namespace mongo {
         }
     }
 
-    // Static
-    void LockerImpl::dumpGlobalLockManager() {
-        globalLockManagerPtr->dump();
-    }
-
     LockRequest* LockerImpl::_find(const ResourceId& resId) const {
         LockRequestsMap::const_iterator it = _requests.find(resId);
 
@@ -676,26 +674,17 @@ namespace mongo {
         return it->second;
     }
 
-    bool LockerImpl::_unlockAndUpdateRequestsList(const ResourceId& resId, LockRequest* request) {
-        globalLockManagerPtr->unlock(request);
+    void LockerImpl::_freeRequest(const ResourceId& resId, LockRequest* request) {
+        _lock.lock();
+        const int numErased = _requests.erase(resId);
+        _lock.unlock();
 
-        const int recursiveCount = request->recursiveCount;
+        invariant(numErased == 1);
 
-        if (recursiveCount == 0) {
-            _lock.lock();
-
-            const int numErased = _requests.erase(resId);
-            invariant(numErased == 1);
-
-            _lock.unlock();
-
-            // TODO: At some point we might want to cache a couple of these at least for the locks
-            // which are acquired frequently (Global/Flush/DB) in order to reduce the number of
-            // memory allocations.
-            delete request;
-        }
-
-        return recursiveCount == 0;
+        // TODO: At some point we might want to cache a couple of these at least for the locks
+        // which are acquired frequently (Global/Flush/DB) in order to reduce the number of
+        // memory allocations.
+        delete request;
     }
 
     void LockerImpl::_yieldFlushLockForMMAPV1() {
@@ -703,16 +692,6 @@ namespace mongo {
             invariant(unlock(resourceIdMMAPV1Flush));
             invariant(LOCK_OK ==
                 lock(resourceIdMMAPV1Flush, getLockMode(resourceIdGlobal), UINT_MAX));
-        }
-    }
-
-    // Static
-    void LockerImpl::changeGlobalLockManagerForTestingOnly(LockManager* newLockMgr) {
-        if (newLockMgr != NULL) {
-            globalLockManagerPtr = newLockMgr;
-        }
-        else {
-            globalLockManagerPtr = &globalLockManagerInstance;
         }
     }
 
@@ -742,6 +721,15 @@ namespace mongo {
 
     AutoAcquireFlushLockForMMAPV1Commit::~AutoAcquireFlushLockForMMAPV1Commit() {
         invariant(_locker->unlock(resourceIdMMAPV1Flush));
+    }
+
+
+    //
+    // Standalone functions
+    //
+
+    LockManager* getGlobalLockManager() {
+        return &globalLockManager;
     }
 
 } // namespace mongo
