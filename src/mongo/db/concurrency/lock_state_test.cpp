@@ -169,7 +169,7 @@ namespace mongo {
     }
 
     /**
-     * Test that saveLockState works by examining the output.
+     * Test that saveLockerImpl works by examining the output.
      */
     TEST(Locker, saveAndRestoreGlobal) {
         Locker::LockSnapshot lockInfo;
@@ -223,7 +223,7 @@ namespace mongo {
     }
 
     /**
-     * Tests that restoreLockState works by locking a db and collection and saving + restoring.
+     * Tests that restoreLockerImpl works by locking a db and collection and saving + restoring.
      */
     TEST(Locker, saveAndRestoreDBAndCollection) {
         Locker::LockSnapshot lockInfo;

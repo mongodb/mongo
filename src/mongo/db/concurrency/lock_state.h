@@ -296,14 +296,4 @@ namespace mongo {
         Locker* _locker;
     };
 
-
-    /**
-     * This will go away as a separate step.
-     */
-    class LockState : public LockerImpl {
-    public:
-        LockState() { }
-
-    };
-
 } // namespace mongo

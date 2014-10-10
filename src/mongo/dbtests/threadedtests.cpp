@@ -113,7 +113,7 @@ namespace ThreadedTests {
         virtual void subthread(int tnumber) {
             Client::initThread("mongomutextest");
 
-            LockState lockState;
+            LockerImpl lockState;
             mongo::unittest::log().stream() 
                 << "Thread "
                 << boost::this_thread::get_id()
@@ -234,11 +234,11 @@ namespace ThreadedTests {
 
         virtual void validate() {
             {
-                LockState ls;
+                LockerImpl ls;
                 Lock::GlobalWrite w(&ls);
             }
             {
-                LockState ls;
+                LockerImpl ls;
                 Lock::GlobalRead r(&ls);
             }
         }
@@ -329,7 +329,7 @@ namespace ThreadedTests {
             counter.fetchAndAdd(1);
             ASSERT_EQUALS(counter.load(), 0U);
 
-            LockState lockState;
+            LockerImpl lockState;
             writelocktry lk(&lockState, 0);
 
             ASSERT( lk.got() );

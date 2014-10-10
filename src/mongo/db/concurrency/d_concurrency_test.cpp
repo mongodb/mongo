@@ -41,19 +41,19 @@
 namespace mongo {
 
     TEST(DConcurrency, GlobalRead) {
-        LockState ls;
+        LockerImpl ls;
         Lock::GlobalRead globalRead(&ls);
         ASSERT(ls.isR());
     }
 
     TEST(DConcurrency, GlobalWrite) {
-        LockState ls;
+        LockerImpl ls;
         Lock::GlobalWrite globalWrite(&ls);
         ASSERT(ls.isW());
     }
 
     TEST(DConcurrency, GlobalWriteAndGlobalRead) {
-        LockState ls;
+        LockerImpl ls;
 
         Lock::GlobalWrite globalWrite(&ls);
         ASSERT(ls.isW());
@@ -67,35 +67,35 @@ namespace mongo {
     }
 
     TEST(DConcurrency, readlocktryTimeout) {
-        LockState ls;
+        LockerImpl ls;
         writelocktry globalWrite(&ls, 0);
         ASSERT(globalWrite.got());
 
         {
-            LockState lsTry;
+            LockerImpl lsTry;
             readlocktry lockTry(&lsTry, 1);
             ASSERT(!lockTry.got());
         }
     }
 
     TEST(DConcurrency, writelocktryTimeout) {
-        LockState ls;
+        LockerImpl ls;
         writelocktry globalWrite(&ls, 0);
         ASSERT(globalWrite.got());
 
         {
-            LockState lsTry;
+            LockerImpl lsTry;
             writelocktry lockTry(&lsTry, 1);
             ASSERT(!lockTry.got());
         }
     }
 
     TEST(DConcurrency, readlocktryTimeoutDueToFlushLock) {
-        LockState ls;
+        LockerImpl ls;
         AutoAcquireFlushLockForMMAPV1Commit autoFlushLock(&ls);
 
         {
-            LockState lsTry;
+            LockerImpl lsTry;
             readlocktry lockTry(&lsTry, 1);
 
             ASSERT(!lockTry.got());
@@ -103,18 +103,18 @@ namespace mongo {
     }
 
     TEST(DConcurrency, writelocktryTimeoutDueToFlushLock) {
-        LockState ls;
+        LockerImpl ls;
         AutoAcquireFlushLockForMMAPV1Commit autoFlushLock(&ls);
 
         {
-            LockState lsTry;
+            LockerImpl lsTry;
             writelocktry lockTry(&lsTry, 1);
             ASSERT(!lockTry.got());
         }
     }
 
     TEST(DConcurrency, TempReleaseGlobalWrite) {
-        LockState ls;
+        LockerImpl ls;
         Lock::GlobalWrite globalWrite(&ls);
 
         {
@@ -126,7 +126,7 @@ namespace mongo {
     }
 
     TEST(DConcurrency, DBReadTakesS) {
-        LockState ls;
+        LockerImpl ls;
 
         Lock::DBRead dbRead(&ls, "db");
 
@@ -135,7 +135,7 @@ namespace mongo {
     }
 
     TEST(DConcurrency, DBLockTakesX) {
-        LockState ls;
+        LockerImpl ls;
 
         Lock::DBLock dbWrite(&ls, "db", MODE_X);
 
@@ -144,7 +144,7 @@ namespace mongo {
     }
 
     TEST(DConcurrency, MultipleWriteDBLocksOnSameThread) {
-        LockState ls;
+        LockerImpl ls;
 
         Lock::DBLock r1(&ls, "db1", MODE_X);
         Lock::DBLock r2(&ls, "db1", MODE_X);
@@ -153,7 +153,7 @@ namespace mongo {
     }
 
     TEST(DConcurrency, MultipleConflictingDBLocksOnSameThread) {
-        LockState ls;
+        LockerImpl ls;
 
         Lock::DBLock r1(&ls, "db1", MODE_X);
         Lock::DBRead r2(&ls, "db1");
@@ -162,7 +162,8 @@ namespace mongo {
     }
 
     TEST(DConcurrenty, IntentCollectionLock) {
-        LockState ls;
+        LockerImpl ls;
+
         const std::string ns("db1.coll");
         const ResourceId id(RESOURCE_COLLECTION, ns);
         Lock::DBLock r1(&ls, "db1", MODE_X);

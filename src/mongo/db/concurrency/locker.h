@@ -190,7 +190,7 @@ namespace mongo {
          * This functionality is also used for releasing locks on databases and collections
          * when cursors are dormant and waiting for a getMore request.
          *
-         * Returns true if locks are released.  It is expected that restoreLockState will be called
+         * Returns true if locks are released.  It is expected that restoreLockerImpl will be called
          * in the future.
          *
          * Returns false if locks are not released.  restoreLockState(...) does not need to be
@@ -204,7 +204,7 @@ namespace mongo {
         virtual void restoreLockState(const LockSnapshot& stateToRestore) = 0;
 
         //
-        // These methods are legacy from LockState and will eventually go away or be converted to
+        // These methods are legacy from LockerImpl and will eventually go away or be converted to
         // calls into the Locker methods
         //
 
