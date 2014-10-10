@@ -665,6 +665,7 @@ namespace mongo {
     void WiredTigerRecordStore::temp_cappedTruncateAfter( OperationContext* txn,
                                                      DiskLoc end,
                                                      bool inclusive ) {
+        WriteUnitOfWork wuow(txn);
         boost::scoped_ptr<RecordIterator> iter( getIterator( txn ) );
         if ( iter->isEOF() )
             return;
@@ -673,5 +674,6 @@ namespace mongo {
             if ( end < loc || ( inclusive && end == loc ) )
                 deleteRecord( txn, loc );
         }
+        wuow.commit();
     }
 }
