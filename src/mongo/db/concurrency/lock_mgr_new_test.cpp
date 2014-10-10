@@ -610,6 +610,9 @@ namespace mongo {
         else {
             ASSERT_EQUALS(LOCK_OK, result);
         }
+
+        lockMgr.unlock(&requestNew);
+        lockMgr.unlock(&requestExisting);
     }
 
     TEST(LockManager, ValidateConflictMatrix) {

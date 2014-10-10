@@ -161,7 +161,7 @@ namespace mongo {
         ASSERT(ls.isWriteLocked("db1"));
     }
 
-    TEST(DConcurrenty, IntentCollectionLock) {
+    TEST(DConcurrency, IntentCollectionLock) {
         LockerImpl ls;
 
         const std::string ns("db1.coll");
