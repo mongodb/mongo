@@ -385,10 +385,12 @@ namespace mongo {
                                       RecordStoreCompactAdaptor* adaptor,
                                       const CompactOptions* options,
                                       CompactStats* stats ) {
-        WiredTigerSession* session = WiredTigerRecoveryUnit::Get(txn).getSession();
+        WiredTigerSessionCache* cache = WiredTigerRecoveryUnit::Get(txn).getSessionCache();
+        WiredTigerSession* session = cache->getSession();
         WT_SESSION *s = session->getSession();
         int ret = s->compact(s, GetURI().c_str(), NULL);
         invariantWTOK(ret);
+        cache->releaseSession(session);
         return Status::OK();
     }
 
@@ -665,6 +667,7 @@ namespace mongo {
     void WiredTigerRecordStore::temp_cappedTruncateAfter( OperationContext* txn,
                                                      DiskLoc end,
                                                      bool inclusive ) {
+        WriteUnitOfWork wuow(txn);
         boost::scoped_ptr<RecordIterator> iter( getIterator( txn ) );
         if ( iter->isEOF() )
             return;
@@ -673,5 +676,6 @@ namespace mongo {
             if ( end < loc || ( inclusive && end == loc ) )
                 deleteRecord( txn, loc );
         }
+        wuow.commit();
     }
 }
