@@ -48,7 +48,6 @@ namespace optionenvironment {
         std::string hostName;
         std::string serviceName;
         std::string authdPath;
-        int scramIterationCount;
 
         SASLGlobalParams();
     };

@@ -169,7 +169,8 @@ namespace repl {
                                            Status* result);
         virtual void updateConfig(const ReplicaSetConfig& newConfig,
                                   int selfIndex,
-                                  Date_t now);
+                                  Date_t now,
+                                  OpTime lastOpApplied);
         virtual std::pair<ReplSetHeartbeatArgs, Milliseconds> prepareHeartbeatRequest(
                 Date_t now,
                 const std::string& ourSetName,
@@ -287,6 +288,16 @@ namespace repl {
                 int updatedConfigIndex,
                 Date_t now,
                 const OpTime& lastOpApplied);
+
+        /**
+         * Updates _hbdata based on the newConfig, ensuring that every member in the newConfig
+         * has an entry in _hbdata.  If any nodes in the newConfig are also present in
+         * _currentConfig, copies their heartbeat info into the corresponding entry in the updated
+         * _hbdata vector.
+         */
+        void _updateHeartbeatDataForReconfig(const ReplicaSetConfig& newConfig,
+                                             int selfIndex,
+                                             Date_t now);
 
         HeartbeatResponseAction _stepDownSelf();
         HeartbeatResponseAction _stepDownSelfAndReplaceWith(int newPrimary);

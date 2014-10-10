@@ -59,7 +59,8 @@ namespace repl {
         virtual StatusWith<BSONObj> loadLocalConfigDocument(OperationContext* txn);
         virtual Status storeLocalConfigDocument(OperationContext* txn, const BSONObj& config);
         virtual StatusWith<OpTime> loadLastOpTime(OperationContext* txn);
-        virtual void closeClientConnections();
+        virtual void closeConnections();
+        virtual void signalApplierToChooseNewSyncSource();
         virtual ReplicationCoordinatorExternalState::GlobalSharedLockAcquirer*
                 getGlobalSharedLockAcquirer();
         virtual OperationContext* createOperationContext();

@@ -278,7 +278,7 @@ namespace {
         boost::unique_lock<boost::mutex> lk(_mutex);
         _updateCurrentMemberStateFromTopologyCoordinator_inlock();
         lk.unlock();
-        _externalState->closeClientConnections();
+        _externalState->closeConnections();
     }
 
     void ReplicationCoordinatorImpl::_scheduleHeartbeatReconfig(const ReplicaSetConfig& newConfig) {
