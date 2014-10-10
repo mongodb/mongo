@@ -105,11 +105,15 @@ namespace {
     WriteConcernOptions getDefaultWriteConcern() {
         ReplicationCoordinator* replCoordinator =
                 mongo::repl::getGlobalReplicationCoordinator();
-        mongo::Status status =
+
+        if (replCoordinator->getReplicationMode() ==
+                mongo::repl::ReplicationCoordinator::modeReplSet) {
+            mongo::Status status =
                 replCoordinator->checkIfWriteConcernCanBeSatisfied(DefaultWriteConcern);
 
-        if (status.isOK()) {
-            return DefaultWriteConcern;
+            if (status.isOK()) {
+              return DefaultWriteConcern;
+            }
         }
 
         return WriteConcernOptions(1, WriteConcernOptions::NONE, 0);
@@ -879,6 +883,15 @@ namespace mongo {
             else {
                 repl::ReplicationCoordinator* replCoordinator =
                         repl::getGlobalReplicationCoordinator();
+
+                if (replCoordinator->getReplicationMode() ==
+                        repl::ReplicationCoordinator::modeMasterSlave &&
+                    writeConcern.shouldWaitForOtherNodes()) {
+                    warning() << "moveChunk cannot check if secondary throttle setting "
+                              << writeConcern.toBSON()
+                              << " can be enforced in a master slave configuration";
+                }
+
                 Status status = replCoordinator->checkIfWriteConcernCanBeSatisfied(writeConcern);
                 if (!status.isOK() && status != ErrorCodes::NoReplicationEnabled) {
                     warning() << status.toString() << endl;
@@ -1962,7 +1975,7 @@ namespace mongo {
                             return;
                         }
                         
-                        if (opReplicatedEnough(txn, lastOpApplied))
+                        if (opReplicatedEnough(txn, lastOpApplied, writeConcern))
                             break;
                         
                         if ( i > 100 ) {
@@ -2000,7 +2013,7 @@ namespace mongo {
 
                     log() << "Waiting for replication to catch up before entering critical section"
                           << endl;
-                    if ( flushPendingWrites(txn, lastOpApplied ) )
+                    if (flushPendingWrites(txn, lastOpApplied, writeConcern))
                         break;
                     sleepsecs(1);
                 }
@@ -2047,7 +2060,7 @@ namespace mongo {
                     // 1) The from side has told us that it has locked writes (COMMIT_START)
                     // 2) We've checked at least one more time for un-transmitted mods
                     if ( getState() == COMMIT_START && transferAfterCommit == true ) {
-                        if ( flushPendingWrites(txn, lastOpApplied ) )
+                        if (flushPendingWrites(txn, lastOpApplied, writeConcern))
                             break;
                     }
                     
@@ -2190,19 +2203,38 @@ namespace mongo {
             return false;
         }
 
-        bool opReplicatedEnough(const OperationContext* txn, const ReplTime& lastOpApplied) {
-            // if replication is on, try to force enough secondaries to catch up
-            // TODO opReplicatedEnough should eventually honor priorities and geo-awareness
-            //      for now, we try to replicate to a sensible number of secondaries
-            WriteConcernOptions writeConcern;
-            writeConcern.wTimeout = -1;
-            writeConcern.wMode = "majority";
-            return repl::getGlobalReplicationCoordinator()->awaitReplication(txn, lastOpApplied,
-                    writeConcern).status.isOK();
+        /**
+         * Returns true if the majority of the nodes and the nodes corresponding to the given
+         * writeConcern (if not empty) have applied till the specified lastOp.
+         */
+        bool opReplicatedEnough(const OperationContext* txn,
+                                const ReplTime& lastOpApplied,
+                                const WriteConcernOptions& writeConcern) {
+            WriteConcernOptions majorityWriteConcern;
+            majorityWriteConcern.wTimeout = -1;
+            majorityWriteConcern.wMode = "majority";
+            Status majorityStatus = repl::getGlobalReplicationCoordinator()->awaitReplication(
+                    txn, lastOpApplied, majorityWriteConcern).status;
+
+            if (!writeConcern.shouldWaitForOtherNodes()) {
+                return majorityStatus.isOK();
+            }
+
+            // Also enforce the user specified write concern after "majority" so it covers
+            // the union of the 2 write concerns.
+
+            WriteConcernOptions userWriteConcern(writeConcern);
+            userWriteConcern.wTimeout = -1;
+            Status userStatus = repl::getGlobalReplicationCoordinator()->awaitReplication(
+                    txn, lastOpApplied, userWriteConcern).status;
+
+            return majorityStatus.isOK() && userStatus.isOK();
         }
 
-        bool flushPendingWrites(OperationContext* txn, const ReplTime& lastOpApplied ) {
-            if (!opReplicatedEnough(txn, lastOpApplied)) {
+        bool flushPendingWrites(OperationContext* txn,
+                                const ReplTime& lastOpApplied,
+                                const WriteConcernOptions& writeConcern) {
+            if (!opReplicatedEnough(txn, lastOpApplied, writeConcern)) {
                 OpTime op( lastOpApplied );
                 OCCASIONALLY warning() << "migrate commit waiting for a majority of slaves for '"
                                        << ns << "' " << min << " -> " << max
@@ -2438,6 +2470,15 @@ namespace mongo {
             else {
                 repl::ReplicationCoordinator* replCoordinator =
                         repl::getGlobalReplicationCoordinator();
+
+                if (replCoordinator->getReplicationMode() ==
+                        repl::ReplicationCoordinator::modeMasterSlave &&
+                    writeConcern.shouldWaitForOtherNodes()) {
+                    warning() << "recvChunk cannot check if secondary throttle setting "
+                              << writeConcern.toBSON()
+                              << " can be enforced in a master slave configuration";
+                }
+
                 Status status = replCoordinator->checkIfWriteConcernCanBeSatisfied(writeConcern);
                 if (!status.isOK() && status != ErrorCodes::NoReplicationEnabled) {
                     warning() << status.toString() << endl;
