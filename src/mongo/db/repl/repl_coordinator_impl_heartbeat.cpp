@@ -158,12 +158,10 @@ namespace {
         BSONObj resp;
         if (responseStatus.isOK()) {
             resp = cbData.response.getValue().data;
-            responseStatus = getStatusFromCommandResult(resp);
-        }
-        if (responseStatus.isOK()) {
             responseStatus = hbResponse.initialize(resp);
         }
-        if (!responseStatus.isOK()) {
+        const bool unauthorized = responseStatus.code() == ErrorCodes::Unauthorized;
+        if (!responseStatus.isOK() && !unauthorized) {
             LOG(1) << "Error in heartbeat request to " << target << ";" << responseStatus;
             if (!resp.isEmpty()) {
                 LOG(3) << "heartbeat response: " << resp;
@@ -173,8 +171,13 @@ namespace {
         const OpTime lastApplied = _getLastOpApplied();  // Locks and unlocks _mutex.
         Milliseconds networkTime(0);
         StatusWith<ReplSetHeartbeatResponse> hbStatusResponse(hbResponse);
+
         if (cbData.response.isOK()) {
             networkTime = cbData.response.getValue().elapsedMillis;
+        }
+        else if (unauthorized) {
+            networkTime = cbData.response.getValue().elapsedMillis;
+            hbStatusResponse = StatusWith<ReplSetHeartbeatResponse>(responseStatus);
         }
         else {
             hbStatusResponse = StatusWith<ReplSetHeartbeatResponse>(responseStatus);

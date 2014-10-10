@@ -124,6 +124,18 @@ namespace {
                                                            lastOpTimeReceiver);
         }
 
+        HeartbeatResponseAction authErrorMember(const HostAndPort& member,
+                                                OpTime lastOpTimeReceiver = OpTime()) {
+            StatusWith<ReplSetHeartbeatResponse> hbResponse =
+                    StatusWith<ReplSetHeartbeatResponse>(Status(ErrorCodes::Unauthorized, ""));
+            getTopoCoord().prepareHeartbeatRequest(_now++, "", member);
+            return getTopoCoord().processHeartbeatResponse(_now++,
+                                                           Milliseconds(0),
+                                                           member,
+                                                           hbResponse,
+                                                           lastOpTimeReceiver);
+        }
+
         void heartbeatFromMember(const HostAndPort& member,
                                  const std::string& setName,
                                  MemberState memberState,
@@ -138,6 +150,21 @@ namespace {
                     StatusWith<ReplSetHeartbeatResponse>(hb);
             getTopoCoord().prepareHeartbeatRequest(_now++,
                                                    setName,
+                                                   member);
+            getTopoCoord().processHeartbeatResponse(_now++,
+                                                    roundTripTime,
+                                                    member,
+                                                    hbResponse,
+                                                    OpTime(0,0));
+        }
+
+        void heartbeatFromMember(const HostAndPort& member,
+                                 Status status,
+                                 Milliseconds roundTripTime = Milliseconds(0)) {
+            StatusWith<ReplSetHeartbeatResponse> hbResponse =
+                    StatusWith<ReplSetHeartbeatResponse>(status);
+            getTopoCoord().prepareHeartbeatRequest(_now++,
+                                                   "",
                                                    member);
             getTopoCoord().processHeartbeatResponse(_now++,
                                                     roundTripTime,
@@ -413,6 +440,45 @@ namespace {
         ASSERT_EQUALS(HostAndPort("h3"), getTopoCoord().getSyncSourceAddress());
     }
 
+    TEST_F(TopoCoordTest, OnlyUnauthorizedUpCausesRecovering) {
+        updateConfig(BSON("_id" << "rs0" <<
+                          "version" << 1 <<
+                          "members" << BSON_ARRAY(
+                              BSON("_id" << 10 << "host" << "hself") <<
+                              BSON("_id" << 20 << "host" << "h2") <<
+                              BSON("_id" << 30 << "host" << "h3"))),
+                     0);
+
+        setSelfMemberState(MemberState::RS_SECONDARY);
+
+        // Generate enough heartbeats to select a sync source below
+        heartbeatFromMember(HostAndPort("h2"), "rs0", MemberState::RS_SECONDARY,
+                            OpTime(1, 0), Milliseconds(300));
+        heartbeatFromMember(HostAndPort("h2"), "rs0", MemberState::RS_SECONDARY,
+                            OpTime(1, 0), Milliseconds(300));
+        heartbeatFromMember(HostAndPort("h3"), "rs0", MemberState::RS_SECONDARY,
+                            OpTime(2, 0), Milliseconds(100));
+        heartbeatFromMember(HostAndPort("h3"), "rs0", MemberState::RS_SECONDARY,
+                            OpTime(2, 0), Milliseconds(100));
+
+        ASSERT_EQUALS(HostAndPort("h3"),
+                      getTopoCoord().chooseNewSyncSource(now()++, OpTime(0,0)));
+        ASSERT_EQUALS(MemberState::RS_SECONDARY, getTopoCoord().getMemberState().s);
+        // Good state setup done
+
+        // Mark nodes down, ensure that we have no source and are secondary
+        heartbeatFromMember(HostAndPort("h2"), Status(ErrorCodes::NetworkTimeout, ""));
+        heartbeatFromMember(HostAndPort("h3"), Status(ErrorCodes::NetworkTimeout, ""));
+        ASSERT_TRUE(getTopoCoord().chooseNewSyncSource(now()++, OpTime(0,0)).empty());
+        ASSERT_EQUALS(MemberState::RS_SECONDARY, getTopoCoord().getMemberState().s);
+
+        // Mark nodes down + unauth, ensure that we have no source and are secondary
+        heartbeatFromMember(HostAndPort("h2"), Status(ErrorCodes::NetworkTimeout, ""));
+        heartbeatFromMember(HostAndPort("h3"), Status(ErrorCodes::Unauthorized, ""));
+        ASSERT_TRUE(getTopoCoord().chooseNewSyncSource(now()++, OpTime(0,0)).empty());
+        ASSERT_EQUALS(MemberState::RS_RECOVERING, getTopoCoord().getMemberState().s);
+    }
+
     TEST_F(TopoCoordTest, PrepareSyncFromResponse) {
         // Test trying to sync from another node when we are an arbiter
         updateConfig(BSON("_id" << "rs0" <<
@@ -535,8 +601,31 @@ namespace {
         ASSERT_FALSE(response10Obj.hasField("warning"));
         ASSERT_EQUALS(HostAndPort("h6").toString(), response10Obj["prevSyncTarget"].String());
         downMember(HostAndPort("h6"), "rs0");
-        getTopoCoord().chooseNewSyncSource(now()++, OpTime(0,0));
-        ASSERT_EQUALS(HostAndPort("h6"), getTopoCoord().getSyncSourceAddress());
+        HostAndPort syncSource = getTopoCoord().chooseNewSyncSource(now()++, OpTime(0,0));
+        ASSERT_EQUALS(HostAndPort("h6"), syncSource);
+
+        // Try to sync from a member that is unauth'd
+        authErrorMember(HostAndPort("h5"));
+
+        BSONObjBuilder response11;
+        getTopoCoord().prepareSyncFromResponse(
+                cbData(), HostAndPort("h5"), ourOpTime, &response11, &result);
+        ASSERT_NOT_OK(result);
+        ASSERT_EQUALS(ErrorCodes::Unauthorized, result.code());
+        ASSERT_EQUALS("not authorized to communicate with h5:27017",
+                      result.reason());
+
+        // Sync successfully from an up-to-date member.
+        heartbeatFromMember(HostAndPort("h6"), "rs0", MemberState::RS_SECONDARY,
+                            ourOpTime, Milliseconds(100));
+        BSONObjBuilder response12;
+        getTopoCoord().prepareSyncFromResponse(
+                cbData(), HostAndPort("h6"), ourOpTime, &response12, &result);
+        ASSERT_OK(result);
+        syncSource = getTopoCoord().chooseNewSyncSource(now()++, OpTime(0,0));
+        ASSERT_EQUALS(HostAndPort("h6"), syncSource);
+
+
     }
 
     TEST_F(TopoCoordTest, ReplSetGetStatus) {

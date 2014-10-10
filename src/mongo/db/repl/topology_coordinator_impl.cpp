@@ -61,6 +61,31 @@ namespace {
     // Maximum number of retries for a failed heartbeat.
     const int kMaxHeartbeatRetries = 2;
 
+    /**
+     * Returns true if the only up heartbeats are auth errors.
+     */
+    bool _hasOnlyAuthErrorUpHeartbeats(const std::vector<MemberHeartbeatData>& hbdata,
+                                       const int selfIndex) {
+        bool foundAuthError = false;
+        for (std::vector<MemberHeartbeatData>::const_iterator it = hbdata.begin();
+             it != hbdata.end();
+             ++it) {
+            if (it->getConfigIndex() == selfIndex) {
+                continue;
+            }
+
+            if (it->up()) {
+                return false;
+            }
+
+            if (it->hasAuthIssue()) {
+                foundAuthError = true;
+            }
+        }
+
+        return foundAuthError;
+    }
+
 }  // namespace
 
     PingStats::PingStats() :
@@ -117,6 +142,7 @@ namespace {
 
         // If we are not a member of the current replica set configuration, no sync source is valid.
         if (_selfIndex == -1) {
+            LOG(2) << "Cannot sync from any members because we are not in the replica set config";
             return HostAndPort();
         }
 
@@ -143,11 +169,14 @@ namespace {
         // If we are only allowed to sync from the primary, set that
         if (!_currentConfig.isChainingAllowed()) {
             if (_currentPrimaryIndex == -1) {
+                LOG(1) << "Cannot select sync source because chaining is"
+                          " not allowed and primary is unknown/down";
                 _syncSource = HostAndPort();
                 return _syncSource;
             }
             else {
                 _syncSource = _currentConfig.getMemberAt(_currentPrimaryIndex).getHostAndPort();
+                _sethbmsg(str::stream() << "syncing from primary: " << _syncSource.toString(), 0);
                 return _syncSource;
             }
         }
@@ -254,6 +283,8 @@ namespace {
 
         if (closestIndex == -1) {
             // Did not find any members to sync from
+            _sethbmsg(str::stream() << "could not find member to sync from", 0);
+
             _syncSource = HostAndPort();
             return _syncSource;
         }
@@ -725,19 +756,25 @@ namespace {
             }
         }
 
+        const bool unauthorized = hbResponse.getStatus().code() == ErrorCodes::Unauthorized;
+
         Milliseconds alreadyElapsed(now.asInt64() - hbStats.getLastHeartbeatStartDate().asInt64());
         Date_t nextHeartbeatStartDate;
         if (_currentConfig.isInitialized() &&
             (hbStats.getNumFailuresSinceLastStart() <= kMaxHeartbeatRetries) &&
             (alreadyElapsed < _currentConfig.getHeartbeatTimeoutPeriodMillis())) {
 
-            if (!hbResponse.isOK()) {
+            if (!hbResponse.isOK() && !unauthorized) {
                 LOG(1) << "Bad heartbeat response from " << target <<
                     "; trying again; Retries left: " <<
                     (kMaxHeartbeatRetries - hbStats.getNumFailuresSinceLastStart()) <<
                     "; " << alreadyElapsed.total_milliseconds() << "ms have already elapsed";
             }
-            nextHeartbeatStartDate = now;
+            if (unauthorized) {
+                nextHeartbeatStartDate = now + kHeartbeatInterval.total_milliseconds();
+            } else {
+                nextHeartbeatStartDate = now;
+            }
         }
         else {
             nextHeartbeatStartDate = now + kHeartbeatInterval.total_milliseconds();
@@ -792,7 +829,11 @@ namespace {
 
         MemberHeartbeatData& hbData = _hbdata[memberIndex];
         if (!hbResponse.isOK()) {
-            hbData.setDownValues(now, hbResponse.getStatus().reason());
+            if (unauthorized) {
+                hbData.setAuthIssue(now);
+            } else {
+                hbData.setDownValues(now, hbResponse.getStatus().reason());
+            }
         }
         else {
             const ReplSetHeartbeatResponse& hbr = hbResponse.getValue();
@@ -1631,7 +1672,8 @@ namespace {
         if (myConfig.isArbiter()) {
             return MemberState::RS_ARBITER;
         }
-        if ((_maintenanceModeCalls > 0) && (_followerMode == MemberState::RS_SECONDARY)) {
+        if (((_maintenanceModeCalls > 0) || (_hasOnlyAuthErrorUpHeartbeats(_hbdata, _selfIndex)))
+            && (_followerMode == MemberState::RS_SECONDARY)) {
             return MemberState::RS_RECOVERING;
         }
         return _followerMode;
