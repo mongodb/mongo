@@ -329,7 +329,7 @@ namespace mongo {
                 }
             }
 
-            Lock::DBLock dbXLock(txn->lockState(), dbname, newlm::MODE_X);
+            Lock::DBLock dbXLock(txn->lockState(), dbname, MODE_X);
             WriteUnitOfWork wunit(txn);
             Client::Context ctx(txn, ns);
 

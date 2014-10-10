@@ -171,10 +171,10 @@ namespace scram {
         std::string encodedServerKey =
             base64::encode(reinterpret_cast<char*>(serverKey), hashSize);
 
-        return BSON("iterationCount" << iterationCount <<
-                    "salt" << encodedUserSalt <<
-                    "storedKey" << encodedStoredKey <<
-                    "serverKey" << encodedServerKey);
+        return BSON(iterationCountFieldName << iterationCount <<
+                    saltFieldName << encodedUserSalt <<
+                    storedKeyFieldName << encodedStoredKey <<
+                    serverKeyFieldName << encodedServerKey);
     }
 
     std::string generateClientProof(const unsigned char saltedPassword[hashSize],

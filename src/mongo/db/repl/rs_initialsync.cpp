@@ -84,7 +84,7 @@ namespace {
             options.syncIndexes = ! dataPass;
 
             // Make database stable
-            Lock::DBLock dbWrite(txn->lockState(), db, newlm::MODE_X);
+            Lock::DBLock dbWrite(txn->lockState(), db, MODE_X);
 
             if (!cloner.go(txn, db, host, options, NULL, err, &errCode)) {
                 log() << "initial sync: error while "
@@ -280,7 +280,7 @@ namespace {
         log() << "initial sync finishing up";
 
         {
-            AutoGetDb autodb(&txn, "local", newlm::MODE_X);
+            AutoGetDb autodb(&txn, "local", MODE_X);
             WriteUnitOfWork wunit(&txn);
             OpTime lastOpTimeWritten(getGlobalReplicationCoordinator()->getMyLastOptime());
             log() << "replSet set minValid=" << lastOpTimeWritten << rsLog;

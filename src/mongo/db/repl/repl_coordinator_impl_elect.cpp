@@ -156,29 +156,36 @@ namespace {
         }
 
         const Date_t now(_replExecutor.now());
-        bool weAreFreshest;
-        bool tied;
-        _freshnessChecker->getResults(&weAreFreshest, &tied);
+        const FreshnessChecker::ElectionAbortReason abortReason =
+                                                        _freshnessChecker->shouldAbortElection();
 
         // need to not sleep after last time sleeping,
-        if (tied) {
-            if ((_thisMembersConfigIndex != 0) && !_sleptLastElection) {
-                long long ms = _replExecutor.nextRandomInt64(1000) + 50;
-                log() << "replSet possible election tie; sleeping a little " << ms << "ms";
-                _topCoord->setStepDownTime(now + ms);
-                _sleptLastElection = true;
+        switch(abortReason) {
+            case FreshnessChecker::None:
+                break;
+            case FreshnessChecker::FreshnessTie:
+                if ((_thisMembersConfigIndex != 0) && !_sleptLastElection) {
+                    long long ms = _replExecutor.nextRandomInt64(1000) + 50;
+                    log() << "replSet possible election tie; sleeping a little " << ms << "ms";
+                    _topCoord->setStepDownTime(now + ms);
+                    _sleptLastElection = true;
+                    return;
+                }
+                _sleptLastElection = false;
+                break;
+            case FreshnessChecker::FresherNodeFound:
+                log() << "not electing self, we are not freshest";
                 return;
-            }
-            _sleptLastElection = false;
-        }
-
-        if (!weAreFreshest) {
-            log() << "not electing self, we are not freshest";
-            return;
+            case FreshnessChecker::QuorumUnreachable:
+                log() << "not electing self, we could not contact enough voting members";
+                return;
+            default:
+                log() << "not electing self due to election abort message :"
+                      << static_cast<int>(abortReason);
+                return;
         }
 
         log() << "replSet info electSelf";
-
         // Secure our vote for ourself first
         if (!_topCoord->voteForMyself(now)) {
             return;

@@ -35,7 +35,6 @@
 
 
 namespace mongo {
-namespace newlm {
     
     TEST(LockerImpl, LockNoConflict) {
         const ResourceId resId(RESOURCE_COLLECTION, std::string("TestDB.collection"));
@@ -153,12 +152,12 @@ namespace newlm {
             locker.endWriteUnitOfWork();
 
             {
-                newlm::AutoYieldFlushLockForMMAPV1Commit flushLockYield(&locker);
+                AutoYieldFlushLockForMMAPV1Commit flushLockYield(&locker);
 
                 // This block simulates the flush/remap thread
                 {
                     LockerImpl flushLocker(2);
-                    newlm::AutoAcquireFlushLockForMMAPV1Commit flushLockAcquire(&flushLocker);
+                    AutoAcquireFlushLockForMMAPV1Commit flushLockAcquire(&flushLocker);
                 }
             }
 
@@ -170,7 +169,7 @@ namespace newlm {
     }
 
     /**
-     * Test that saveLockState works by examining the output.
+     * Test that saveLockerImpl works by examining the output.
      */
     TEST(Locker, saveAndRestoreGlobal) {
         Locker::LockSnapshot lockInfo;
@@ -224,7 +223,7 @@ namespace newlm {
     }
 
     /**
-     * Tests that restoreLockState works by locking a db and collection and saving + restoring.
+     * Tests that restoreLockerImpl works by locking a db and collection and saving + restoring.
      */
     TEST(Locker, saveAndRestoreDBAndCollection) {
         Locker::LockSnapshot lockInfo;
@@ -254,5 +253,4 @@ namespace newlm {
         locker.unlockAll();
     }
 
-} // namespace newlm
 } // namespace mongo

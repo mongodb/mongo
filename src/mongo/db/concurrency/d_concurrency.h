@@ -128,7 +128,7 @@ namespace mongo {
          *
          * Allows exclusive write access to all databases and collections, blocking all other
          * access. Allows further (recursive) acquisition of the global lock in any mode,
-         * see newlm::LockMode.
+         * see LockMode.
          */
         class GlobalWrite : public ScopedLock {
         protected:
@@ -145,7 +145,7 @@ namespace mongo {
          *
          * Allows concurrent read access to all databases and collections, blocking any writers.
          * Allows further (recursive) acquisition of the global lock in shared (S) or intent-shared
-         * (IS) mode, see newlm::LockMode.
+         * (IS) mode, see LockMode.
          */
         class GlobalRead : public ScopedLock {
         public:
@@ -157,7 +157,7 @@ namespace mongo {
         /**
          * Database lock with support for collection- and document-level locking
          *
-         * This lock supports four modes (see newlm::Lock_Mode):
+         * This lock supports four modes (see Lock_Mode):
          *   MODE_IS: concurrent database access, requiring further collection read locks
          *   MODE_IX: concurrent database access, requiring further collection read or write locks
          *   MODE_S:  shared read access to the database, blocking any writers
@@ -170,15 +170,15 @@ namespace mongo {
          */
         class DBLock : public ScopedLock {
         public:
-            DBLock(Locker* lockState, const StringData& db, const newlm::LockMode mode);
+            DBLock(Locker* lockState, const StringData& db, const LockMode mode);
             virtual ~DBLock();
 
         private:
             void lockDB();
             void unlockDB();
 
-            const newlm::ResourceId _id;
-            const newlm::LockMode _mode;
+            const ResourceId _id;
+            const LockMode _mode;
 
         protected:
             // Still need to override these for ScopedLock::tempRelease() and relock().
@@ -190,7 +190,7 @@ namespace mongo {
         /**
          * Collection lock with support for document-level locking
          *
-         * This lock supports four modes (see newlm::Lock_Mode):
+         * This lock supports four modes (see Lock_Mode):
          *   MODE_IS: concurrent collection access, requiring document level locking read locks
          *   MODE_IX: concurrent collection access, requiring document level read or write locks
          *   MODE_S:  shared read access to the collection, blocking any writers
@@ -203,10 +203,10 @@ namespace mongo {
          */
         class CollectionLock : boost::noncopyable {
         public:
-            CollectionLock (Locker* lockState, const StringData& ns, const newlm::LockMode);
+            CollectionLock (Locker* lockState, const StringData& ns, const LockMode);
             virtual ~CollectionLock();
         private:
-            const newlm::ResourceId _id;
+            const ResourceId _id;
             Locker* _lockState;
         };
 

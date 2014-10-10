@@ -323,7 +323,9 @@ namespace {
         SaslAuthenticationSession* session =
             static_cast<SaslAuthenticationSession*>(sessionGuard.get());
 
-        if (session->getAuthenticationDatabase() != db) {
+        // Authenticating the __system@local user to the admin database on mongos is required
+        // by the auth passthrough test suite.
+        if (session->getAuthenticationDatabase() != db && !Command::testCommandsEnabled) {
             addStatus(Status(ErrorCodes::ProtocolError,
                              "Attempt to switch database target during SASL authentication."),
                       &result);
@@ -348,18 +350,18 @@ namespace {
 
         return status.isOK();
     }
-    
+
     // The CyrusSaslCommands Enterprise initializer is dependent on PreSaslCommands
     MONGO_INITIALIZER_WITH_PREREQUISITES(PreSaslCommands,
                                          ("NativeSaslServerCore"))
         (InitializerContext*) {
- 
+
         if (!sequenceContains(saslGlobalParams.authenticationMechanisms, "MONGODB-CR"))
             CmdAuthenticate::disableAuthMechanism("MONGODB-CR");
-        
+
         if (!sequenceContains(saslGlobalParams.authenticationMechanisms, "MONGODB-X509"))
             CmdAuthenticate::disableAuthMechanism("MONGODB-X509");
-        
+
         return Status::OK();
     }
 

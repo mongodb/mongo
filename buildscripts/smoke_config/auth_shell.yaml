@@ -8,14 +8,14 @@ executor:
     shell_globals:
       TestData:
         auth: true
-        authMechanism: MONGODB-CR
+        authMechanism: SCRAM-SHA-1
         keyFile: ./jstests/lib/authTestsKey
         keyFileData: Thiskeyisonlyforrunningthesuitewithauthenticationdontuseitinanytestsdirectly
   testers:
     js_test:
       shell_options:
         authenticationDatabase: local
-        authenticationMechanism: MONGODB-CR
+        authenticationMechanism: SCRAM-SHA-1
         password: Thiskeyisonlyforrunningthesuitewithauthenticationdontuseitinanytestsdirectly
         username: __system
 

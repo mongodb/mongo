@@ -399,6 +399,24 @@ namespace {
         return NULL;
     }
 
+    const int ReplicaSetConfig::findMemberIndexByHostAndPort(const HostAndPort& hap) const {
+        int x = 0;
+        for (std::vector<MemberConfig>::const_iterator it = _members.begin();
+                it != _members.end(); ++it) {
+
+            if (it->getHostAndPort() == hap) {
+                return x;
+            }
+            ++x;
+        }
+        return -1;
+    }
+
+    const MemberConfig* ReplicaSetConfig::findMemberByHostAndPort(const HostAndPort& hap) const {
+        int idx = findMemberIndexByHostAndPort(hap);
+        return idx != -1 ? &getMemberAt(idx) : NULL;
+    }
+
     ReplicaSetTag ReplicaSetConfig::findTag(const StringData& key, const StringData& value) const {
         return _tagConfig.findTag(key, value);
     }
@@ -437,7 +455,7 @@ namespace {
                 _members.begin(),
                 _members.end(),
                 stdx::bind(&MemberConfig::isVoter, stdx::placeholders::_1));
-
+        _totalVotingMembers = voters;
         _majorityVoteCount = voters / 2 + 1;
     }
 

@@ -84,7 +84,7 @@ namespace {
             const NamespaceString systemUsers("admin", "system.users");
 
             // Make sure the old unique index from v2.4 on system.users doesn't exist.
-            AutoGetDb autoDb(txn, systemUsers.db(), newlm::MODE_X);
+            AutoGetDb autoDb(txn, systemUsers.db(), MODE_X);
             if (!autoDb.getDb()) {
                 return;
             }

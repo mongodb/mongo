@@ -32,7 +32,6 @@
 #include "mongo/db/concurrency/lock_state.h"
 
 namespace mongo {
-namespace newlm {
 
     class TrackingLockGrantNotification : public LockGrantNotification {
     public:
@@ -53,5 +52,4 @@ namespace newlm {
         LockResult lastResult;
     };
 
-} // namespace newlm
 } // namespace mongo

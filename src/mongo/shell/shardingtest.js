@@ -386,7 +386,7 @@ ShardingTest = function( testName , numShards , verboseLevel , numMongos , other
         if (keyFile) {
             authutil.assertAuthenticate(this._mongos, 'admin', {
                 user: '__system',
-                mechanism: 'MONGODB-CR',
+                mechanism: 'SCRAM-SHA-1',
                 pwd: cat(keyFile).replace(/[\011-\015\040]/g, '')
             });
 

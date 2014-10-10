@@ -36,7 +36,10 @@
 #include <string>
 #include <vector>
 
+#include "mongo/bson/mutable/document.h"
+#include "mongo/bson/mutable/element.h"
 #include "mongo/client/sasl_client_authenticate.h"
+#include "mongo/crypto/mechanism_scram.h"
 #include "mongo/db/auth/action_set.h"
 #include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/authorization_manager.h"
@@ -47,15 +50,22 @@
 #include "mongo/util/password_digest.h"
 
 namespace mongo {
+    namespace mmb = mongo::mutablebson;
+
     // not guarded by the authParams mutex never changed in
     // multi-threaded operation
     static bool authParamsSet = false;
+
+    // Store default authentication parameters for internal authentication to cluster members,
     // guarded by the authParams mutex
     static BSONObj authParams;
-    static boost::mutex authParamMutex; 
+
+    // Store MONGODB-CR authentication parameters to use as fallback for mixed 2.6/28 clusters
+    static BSONObj authParamsCR;
+    static boost::mutex authParamMutex;
 
     bool isInternalAuthSet() {
-       return authParamsSet; 
+       return authParamsSet;
     }
 
     void setInternalUserAuthParams(const BSONObj& authParamsIn) {
@@ -64,20 +74,45 @@ namespace mongo {
         }
         boost::mutex::scoped_lock lk(authParamMutex);
         authParams = authParamsIn.copy();
+
+        // Create authParams for legacy MONGODB-CR authentication if applicable.
+        if (authParams["mechanism"].String() == "SCRAM-SHA-1") {
+            mmb::Document doc(authParams);
+            doc.root().findFirstChildNamed("mechanism").setValueString("MONGODB-CR");
+            authParamsCR = doc.getObject().copy();
+        }
     }
- 
+
     bool authenticateInternalUser(DBClientWithCommands* conn){
         if (!isInternalAuthSet()) {
             log() << "ERROR: No authentication parameters set for internal user" << endl;
             return false;
         }
-        try { 
-            BSONObj outgoingAuthParams;
-            {
-                boost::mutex::scoped_lock lk(authParamMutex);
-                outgoingAuthParams = authParams.copy();
-            }                
-            conn->auth(outgoingAuthParams);
+
+        BSONObj authParamsCopy;
+        BSONObj authParamsCRCopy;
+        {
+            boost::mutex::scoped_lock lk(authParamMutex);
+            authParamsCopy = authParams.copy();
+            authParamsCRCopy = authParamsCR.copy();
+        }
+
+        try {
+            conn->auth(authParamsCopy);
+            return true;
+        } catch(const UserException& ex) {
+            if (ex.getCode() != ErrorCodes::BadValue &&
+                ex.getCode() != ErrorCodes::CommandNotFound) {
+                log() << "can't authenticate to " << conn->toString() <<
+                            " as internal user, error: "<< ex.what() << endl;
+                return false;
+            }
+        }
+
+        // BadValue indicates unsupported auth mechanism so fall back to
+        // MONGODB-CR for 2.6 compatibility.
+        try {
+            conn->auth(authParamsCRCopy);
             return true;
         } catch(const UserException& ex) {
             log() << "can't authenticate to " << conn->toString() << " as internal user, error: "
@@ -148,16 +183,24 @@ namespace mongo {
             return false;
         }
 
+        // Generate MONGODB-CR and SCRAM credentials for the internal user based on the keyfile.
         User::CredentialData credentials;
         credentials.password = mongo::createPasswordDigest(
                 internalSecurity.user->getName().getUser().toString(), str);
+
+        BSONObj creds = scram::generateCredentials(credentials.password);
+        credentials.scram.iterationCount = creds[scram::iterationCountFieldName].Int();
+        credentials.scram.salt = creds[scram::saltFieldName].String();
+        credentials.scram.storedKey = creds[scram::storedKeyFieldName].String();
+        credentials.scram.serverKey = creds[scram::serverKeyFieldName].String();
+
         internalSecurity.user->setCredentials(credentials);
 
         int clusterAuthMode = serverGlobalParams.clusterAuthMode.load();
         if (clusterAuthMode == ServerGlobalParams::ClusterAuthMode_keyFile ||
             clusterAuthMode == ServerGlobalParams::ClusterAuthMode_sendKeyFile) {
             setInternalUserAuthParams(
-                    BSON(saslCommandMechanismFieldName << "MONGODB-CR" <<
+                    BSON(saslCommandMechanismFieldName << "SCRAM-SHA-1" <<
                          saslCommandUserDBFieldName <<
                          internalSecurity.user->getName().getDB() <<
                          saslCommandUserFieldName << internalSecurity.user->getName().getUser() <<

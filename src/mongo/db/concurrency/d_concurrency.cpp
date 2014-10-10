@@ -197,7 +197,7 @@ namespace mongo {
         invariant(!_lockState->isLocked());
 
         TrackLockAcquireTime a('W');
-        _lockState->lockGlobal(newlm::MODE_X);
+        _lockState->lockGlobal(MODE_X);
         resetTime();
     }
 
@@ -206,8 +206,8 @@ namespace mongo {
 
         TrackLockAcquireTime a('W');
 
-        newlm::LockResult result = _lockState->lockGlobal(newlm::MODE_X, timeoutms);
-        if (result == newlm::LOCK_TIMEOUT) {
+        LockResult result = _lockState->lockGlobal(MODE_X, timeoutms);
+        if (result == LOCK_TIMEOUT) {
             throw DBTryLockTimeoutException();
         }
 
@@ -227,8 +227,8 @@ namespace mongo {
 
         TrackLockAcquireTime a('R');
 
-        newlm::LockResult result = _lockState->lockGlobal(newlm::MODE_S, timeoutms);
-        if (result == newlm::LOCK_TIMEOUT) {
+        LockResult result = _lockState->lockGlobal(MODE_S, timeoutms);
+        if (result == LOCK_TIMEOUT) {
             throw DBTryLockTimeoutException();
         }
 
@@ -240,9 +240,9 @@ namespace mongo {
         recordTime();
     }
 
-    Lock::DBLock::DBLock(Locker* lockState, const StringData& db, const newlm::LockMode mode)
-        : ScopedLock(lockState, mode == newlm::MODE_S || mode == newlm::MODE_IS ? 'r' : 'w'),
-          _id(newlm::RESOURCE_DATABASE, db),
+    Lock::DBLock::DBLock(Locker* lockState, const StringData& db, const LockMode mode)
+        : ScopedLock(lockState, mode == MODE_S || mode == MODE_IS ? 'r' : 'w'),
+          _id(RESOURCE_DATABASE, db),
           _mode(mode) {
         dassert(!db.empty());
         dassert(!nsIsFull(db));
@@ -254,16 +254,16 @@ namespace mongo {
     }
 
     void Lock::DBLock::lockDB() {
-        const bool isRead = (_mode == newlm::MODE_S || _mode == newlm::MODE_IS);
+        const bool isRead = (_mode == MODE_S || _mode == MODE_IS);
         TrackLockAcquireTime a(isRead ? 'r' : 'w');
 
-        _lockState->lockGlobal(isRead ? newlm::MODE_IS : newlm::MODE_IX);
+        _lockState->lockGlobal(isRead ? MODE_IS : MODE_IX);
         if (supportsDocLocking()) {
             //  SERVER-14668: Make this branch unconditional when MMAPv1 has coll. locking
             _lockState->lock(_id, _mode);
         }
         else {
-            _lockState->lock(_id, isRead ? newlm::MODE_S : newlm::MODE_X);
+            _lockState->lock(_id, isRead ? MODE_S : MODE_X);
         }
 
         resetTime();
@@ -280,19 +280,19 @@ namespace mongo {
 
     Lock::CollectionLock::CollectionLock(Locker* lockState,
                                          const StringData& ns,
-                                         newlm::LockMode mode)
-        : _id(newlm::RESOURCE_COLLECTION, ns),
+                                         LockMode mode)
+        : _id(RESOURCE_COLLECTION, ns),
           _lockState(lockState) {
-        const bool isRead = (mode == newlm::MODE_S || mode == newlm::MODE_IS);
+        const bool isRead = (mode == MODE_S || mode == MODE_IS);
         dassert(!ns.empty());
         dassert(nsIsFull(ns));
-        dassert(_lockState->isLockHeldForMode(newlm::ResourceId(newlm::RESOURCE_DATABASE,
+        dassert(_lockState->isLockHeldForMode(ResourceId(RESOURCE_DATABASE,
                                                                 nsToDatabaseSubstring(ns)),
-                                              isRead ? newlm::MODE_IS : newlm::MODE_IX));
+                                              isRead ? MODE_IS : MODE_IX));
         if (supportsDocLocking()) {
             _lockState->lock(_id, mode);
             // SERVER-14668: add when MMAPv1 ready for collection-level locking
-            // else { _lockState->lock(_id, isRead ? newlm::MODE_S : newlm::MODE_X); }
+            // else { _lockState->lock(_id, isRead ? MODE_S : MODE_X); }
             invariant(isRead || !isRead); // artificial use to silence warning.
         }
     }
@@ -305,7 +305,7 @@ namespace mongo {
     }
 
     Lock::DBRead::DBRead(Locker* lockState, const StringData& dbOrNs) :
-        DBLock(lockState, nsToDatabaseSubstring(dbOrNs), newlm::MODE_S) { }
+        DBLock(lockState, nsToDatabaseSubstring(dbOrNs), MODE_S) { }
 
     writelocktry::writelocktry(Locker* lockState, int tryms) :
         _got( false ),

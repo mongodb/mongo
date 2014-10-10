@@ -595,7 +595,7 @@ namespace mongo {
         {
             // DBLock needed since we're now potentially changing the metadata, and don't want
             // reads/writes to be ongoing.
-            Lock::DBLock writeLk(txn->lockState(), nsToDatabaseSubstring(ns), newlm::MODE_X);
+            Lock::DBLock writeLk(txn->lockState(), nsToDatabaseSubstring(ns), MODE_X);
 
             //
             // Get the metadata now that the load has completed
@@ -1298,7 +1298,7 @@ namespace mongo {
         }
 
         bool run(OperationContext* txn, const string& dbname, BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool) {
-            Lock::DBLock dbXLock(txn->lockState(), dbname, newlm::MODE_X);
+            Lock::DBLock dbXLock(txn->lockState(), dbname, MODE_X);
             Client::Context ctx(txn, dbname);
 
             shardingState.appendInfo( result );

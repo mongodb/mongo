@@ -308,7 +308,7 @@ namespace mongo {
         const NamespaceString nss(ns);
         const string dbname = nss.db().toString();
 
-        Lock::DBLock dbWrite(txn->lockState(), dbname, newlm::MODE_X);
+        Lock::DBLock dbWrite(txn->lockState(), dbname, MODE_X);
 
         Database* db = dbHolder().openDb(txn, dbname);
 
