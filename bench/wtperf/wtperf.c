@@ -1918,6 +1918,9 @@ err:		if (ret == 0)
 int
 main(int argc, char *argv[])
 {
+	extern char *__wt_optarg;
+	extern int __wt_optind, __wt_optreset;
+	extern int __wt_getopt(const char *, int, char * const *, const char *);
 	CONFIG *cfg, _cfg;
 	size_t req_len;
 	int ch, monitor_set, ret;
@@ -1936,39 +1939,41 @@ main(int argc, char *argv[])
 		goto err;
 
 	/* Do a basic validation of options, and home is needed before open. */
-	while ((ch = getopt(argc, argv, opts)) != EOF)
+	while ((ch = __wt_getopt("wtperf", argc, argv, opts)) != EOF)
 		switch (ch) {
 		case 'C':
 			if (user_cconfig == NULL)
-				user_cconfig = strdup(optarg);
+				user_cconfig = strdup(__wt_optarg);
 			else {
 				user_cconfig = realloc(user_cconfig,
-				    strlen(user_cconfig) + strlen(optarg) + 2);
+				    strlen(user_cconfig) +
+				    strlen(__wt_optarg) + 2);
 				strcat(user_cconfig, ",");
-				strcat(user_cconfig, optarg);
+				strcat(user_cconfig, __wt_optarg);
 			}
 			break;
 		case 'H':
-			cfg->helium_mount = optarg;
+			cfg->helium_mount = __wt_optarg;
 			break;
 		case 'O':
-			config_opts = optarg;
+			config_opts = __wt_optarg;
 			break;
 		case 'T':
 			if (user_tconfig == NULL)
-				user_tconfig = strdup(optarg);
+				user_tconfig = strdup(__wt_optarg);
 			else {
 				user_tconfig = realloc(user_tconfig,
-				    strlen(user_tconfig) + strlen(optarg) + 2);
+				    strlen(user_tconfig) +
+				    strlen(__wt_optarg) + 2);
 				strcat(user_tconfig, ",");
-				strcat(user_tconfig, optarg);
+				strcat(user_tconfig, __wt_optarg);
 			}
 			break;
 		case 'h':
-			cfg->home = optarg;
+			cfg->home = __wt_optarg;
 			break;
 		case 'm':
-			cfg->monitor_dir = optarg;
+			cfg->monitor_dir = __wt_optarg;
 			monitor_set = 1;
 			break;
 		case '?':
@@ -1989,12 +1994,12 @@ main(int argc, char *argv[])
 		goto einval;
 
 	/* Parse options that override values set via a configuration file. */
-	optind = 1;
-	while ((ch = getopt(argc, argv, opts)) != EOF)
+	__wt_optreset = __wt_optind = 1;
+	while ((ch = __wt_getopt("wtperf", argc, argv, opts)) != EOF)
 		switch (ch) {
 		case 'o':
 			/* Allow -o key=value */
-			if (config_opt_line(cfg, optarg) != 0)
+			if (config_opt_line(cfg, __wt_optarg) != 0)
 				goto einval;
 			break;
 		}

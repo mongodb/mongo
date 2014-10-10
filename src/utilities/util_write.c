@@ -20,7 +20,7 @@ util_write(WT_SESSION *session, int argc, char *argv[])
 	char config[100];
 
 	append = overwrite = 0;
-	while ((ch = util_getopt(argc, argv, "ao")) != EOF)
+	while ((ch = __wt_getopt(progname, argc, argv, "ao")) != EOF)
 		switch (ch) {
 		case 'a':
 			append = 1;
@@ -32,8 +32,8 @@ util_write(WT_SESSION *session, int argc, char *argv[])
 		default:
 			return (usage());
 		}
-	argc -= util_optind;
-	argv += util_optind;
+	argc -= __wt_optind;
+	argv += __wt_optind;
 
 	/*
 	 * The remaining arguments are a uri followed by a list of values (if

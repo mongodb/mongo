@@ -53,13 +53,13 @@ main(int argc, char *argv[])
 
 	/* Check for standard options. */
 	cmd_config = config = NULL;
-	while ((ch = util_getopt(argc, argv, "C:h:Vv")) != EOF)
+	while ((ch = __wt_getopt(progname, argc, argv, "C:h:Vv")) != EOF)
 		switch (ch) {
 		case 'C':			/* wiredtiger_open config */
-			cmd_config = util_optarg;
+			cmd_config = __wt_optarg;
 			break;
 		case 'h':			/* home directory */
-			home = util_optarg;
+			home = __wt_optarg;
 			break;
 		case 'V':			/* version */
 			printf("%s\n", wiredtiger_version(NULL, NULL, NULL));
@@ -71,8 +71,8 @@ main(int argc, char *argv[])
 		default:
 			return (usage());
 		}
-	argc -= util_optind;
-	argv += util_optind;
+	argc -= __wt_optind;
+	argv += __wt_optind;
 
 	/* The next argument is the command name. */
 	if (argc < 1)
@@ -80,8 +80,7 @@ main(int argc, char *argv[])
 	command = argv[0];
 
 	/* Reset getopt. */
-	util_optreset = 1;
-	util_optind = 1;
+	__wt_optreset = __wt_optind = 1;
 
 	func = NULL;
 	switch (command[0]) {

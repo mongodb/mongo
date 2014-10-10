@@ -46,6 +46,9 @@ static void wt_shutdown(void);
 int
 main(int argc, char *argv[])
 {
+	extern char *__wt_optarg;
+	extern int __wt_optind;
+	extern int __wt_getopt(const char *, int, char * const *, const char *);
 	static struct config {
 		const char *uri;
 		const char *desc;
@@ -73,33 +76,33 @@ main(int argc, char *argv[])
 	nthreads = 10;
 	runs = 1;
 
-	while ((ch = getopt(argc, argv, "C:l:n:r:t:")) != EOF)
+	while ((ch = __wt_getopt(progname, argc, argv, "C:l:n:r:t:")) != EOF)
 		switch (ch) {
 		case 'C':			/* wiredtiger_open config */
-			config_open = optarg;
+			config_open = __wt_optarg;
 			break;
 		case 'l':			/* log */
-			if ((logfp = fopen(optarg, "w")) == NULL) {
+			if ((logfp = fopen(__wt_optarg, "w")) == NULL) {
 				fprintf(stderr,
-				    "%s: %s\n", optarg, strerror(errno));
+				    "%s: %s\n", __wt_optarg, strerror(errno));
 				return (EXIT_FAILURE);
 			}
 			break;
 		case 'n':			/* operations */
-			nops = (u_int)atoi(optarg);
+			nops = (u_int)atoi(__wt_optarg);
 			break;
 		case 'r':			/* runs */
-			runs = atoi(optarg);
+			runs = atoi(__wt_optarg);
 			break;
 		case 't':
-			nthreads = (u_int)atoi(optarg);
+			nthreads = (u_int)atoi(__wt_optarg);
 			break;
 		default:
 			return (usage());
 		}
 
-	argc -= optind;
-	argv += optind;
+	argc -= __wt_optind;
+	argv += __wt_optind;
 	if (argc != 0)
 		return (usage());
 

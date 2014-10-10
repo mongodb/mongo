@@ -35,6 +35,9 @@ static void usage(void);
 int
 main(int argc, char *argv[])
 {
+	extern char *__wt_optarg;
+	extern int __wt_optind;
+	extern int __wt_getopt(const char *, int, char * const *, const char *);
 	int ch, reps, ret;
 	const char *config, *home;
 
@@ -59,22 +62,23 @@ main(int argc, char *argv[])
 
 	/* Set values from the command line. */
 	home = NULL;
-	while ((ch = getopt(argc, argv, "1C:c:H:h:Llqrt:")) != EOF)
+	while ((ch = __wt_getopt(
+	    g.progname, argc, argv, "1C:c:H:h:Llqrt:")) != EOF)
 		switch (ch) {
 		case '1':			/* One run */
 			g.c_runs = 1;
 			break;
 		case 'C':			/* wiredtiger_open config */
-			g.config_open = optarg;
+			g.config_open = __wt_optarg;
 			break;
 		case 'c':			/* Configuration from a file */
-			config = optarg;
+			config = __wt_optarg;
 			break;
 		case 'H':
-			g.helium_mount = optarg;
+			g.helium_mount = __wt_optarg;
 			break;
 		case 'h':
-			home = optarg;
+			home = __wt_optarg;
 			break;
 		case 'L':			/* Re-direct output to a log */
 			/*
@@ -96,8 +100,8 @@ main(int argc, char *argv[])
 		default:
 			usage();
 		}
-	argc -= optind;
-	argv += optind;
+	argc -= __wt_optind;
+	argv += __wt_optind;
 
 	/* Set up paths. */
 	path_setup(home);

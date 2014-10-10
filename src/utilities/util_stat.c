@@ -21,7 +21,7 @@ util_stat(WT_SESSION *session, int argc, char *argv[])
 
 	all = objname_free = 0;
 	objname = uri = NULL;
-	while ((ch = util_getopt(argc, argv, "a")) != EOF)
+	while ((ch = __wt_getopt(progname, argc, argv, "a")) != EOF)
 		switch (ch) {
 		case 'a':
 			all = 1;
@@ -30,8 +30,8 @@ util_stat(WT_SESSION *session, int argc, char *argv[])
 		default:
 			return (usage());
 		}
-	argc -= util_optind;
-	argv += util_optind;
+	argc -= __wt_optind;
+	argv += __wt_optind;
 
 	/*
 	 * If there are no arguments, the statistics cursor operates on the

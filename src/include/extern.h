@@ -440,6 +440,7 @@ extern int __wt_fsync(WT_SESSION_IMPL *session, WT_FH *fh);
 extern int __wt_fsync_async(WT_SESSION_IMPL *session, WT_FH *fh);
 extern int __wt_ftruncate(WT_SESSION_IMPL *session, WT_FH *fh, wt_off_t len);
 extern int __wt_getline(WT_SESSION_IMPL *session, WT_ITEM *buf, FILE *fp);
+extern int __wt_getopt( const char *progname, int nargc, char *const *nargv, const char *ostr);
 extern int __wt_mmap(WT_SESSION_IMPL *session, WT_FH *fh, void *mapp, size_t *lenp, void **mappingcookie);
 extern int __wt_mmap_preload(WT_SESSION_IMPL *session, const void *p, size_t size);
 extern int __wt_mmap_discard(WT_SESSION_IMPL *session, void *p, size_t size);

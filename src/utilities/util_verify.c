@@ -30,15 +30,15 @@ util_verify(WT_SESSION *session, int argc, char *argv[])
 
 	dump_address = dump_blocks = dump_pages = 0;
 	config = dump_offsets = name = NULL;
-	while ((ch = util_getopt(argc, argv, OPT_ARGS)) != EOF)
+	while ((ch = __wt_getopt(progname, argc, argv, OPT_ARGS)) != EOF)
 		switch (ch) {
 		case 'd':
-			if (strcmp(util_optarg, "dump_address") == 0)
+			if (strcmp(__wt_optarg, "dump_address") == 0)
 				dump_address = 1;
-			else if (strcmp(util_optarg, "dump_blocks") == 0)
+			else if (strcmp(__wt_optarg, "dump_blocks") == 0)
 				dump_blocks = 1;
 			else if (
-			    WT_PREFIX_MATCH(util_optarg, "dump_offsets=")) {
+			    WT_PREFIX_MATCH(__wt_optarg, "dump_offsets=")) {
 				if (dump_offsets != NULL) {
 					fprintf(stderr,
 					    "%s: only a single 'dump_offsets' "
@@ -46,8 +46,8 @@ util_verify(WT_SESSION *session, int argc, char *argv[])
 					return (usage());
 				}
 				dump_offsets =
-				    util_optarg + strlen("dump_offsets=");
-			} else if (strcmp(util_optarg, "dump_pages") == 0)
+				    __wt_optarg + strlen("dump_offsets=");
+			} else if (strcmp(__wt_optarg, "dump_pages") == 0)
 				dump_pages = 1;
 			else
 				return (usage());
@@ -56,8 +56,8 @@ util_verify(WT_SESSION *session, int argc, char *argv[])
 		default:
 			return (usage());
 		}
-	argc -= util_optind;
-	argv += util_optind;
+	argc -= __wt_optind;
+	argv += __wt_optind;
 
 	/* The remaining argument is the table name. */
 	if (argc != 1)

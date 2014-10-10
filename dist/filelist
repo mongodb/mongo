@@ -110,6 +110,7 @@ src/os_posix/os_flock.c
 src/os_posix/os_fsync.c
 src/os_posix/os_ftruncate.c
 src/os_posix/os_getline.c
+src/os_posix/os_getopt.c
 src/os_posix/os_map.c
 src/os_posix/os_mtx.c
 src/os_posix/os_once.c

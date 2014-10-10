@@ -55,18 +55,18 @@ util_backup(WT_SESSION *session, int argc, char *argv[])
 	const char *directory, *name;
 
 	config = NULL;
-	while ((ch = util_getopt(argc, argv, "t:")) != EOF)
+	while ((ch = __wt_getopt(progname, argc, argv, "t:")) != EOF)
 		switch (ch) {
 		case 't':
-			if (append_target(util_optarg, &config))
+			if (append_target(__wt_optarg, &config))
 				return (1);
 			break;
 		case '?':
 		default:
 			return (usage());
 		}
-	argc -= util_optind;
-	argv += util_optind;
+	argc -= __wt_optind;
+	argv += __wt_optind;
 
 	if (argc != 1) {
 		(void)usage();
