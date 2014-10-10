@@ -1,0 +1,7 @@
+# -*- mode: python -*-
+
+Import("env")
+
+env.CppUnitTest('str_test',
+                'str_test.cpp',
+                LIBDEPS=['$BUILD_DIR/mongo/unittest/unittest'])
