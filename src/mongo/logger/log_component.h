@@ -46,6 +46,8 @@ namespace logger {
             kDefault = 0,
             kAccessControl,
             kCommands,
+            kControl,
+            kGeo,
             kIndexing,
             kNetworking,
             kQuery,
@@ -54,7 +56,6 @@ namespace logger {
             kStorage,
             kJournaling,
             kWrites,
-            kGeo,
             kNumLogComponents
         };
 
