@@ -163,7 +163,7 @@ namespace mongo {
     StatusWith<DiskLoc> Collection::insertDocument( OperationContext* txn,
                                                     const DocWriter* doc,
                                                     bool enforceQuota ) {
-        verify( _indexCatalog.numIndexesTotal( txn ) == 0 ); // eventually can implement, just not done
+        invariant( !_indexCatalog.haveAnyIndexes() ); // eventually can implement, just not done
 
         StatusWith<DiskLoc> loc = _recordStore->insertRecord( txn,
                                                               doc,
