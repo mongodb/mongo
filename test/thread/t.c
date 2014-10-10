@@ -45,12 +45,13 @@ static int  usage(void);
 static void wt_connect(char *);
 static void wt_shutdown(void);
 
+extern int __wt_optind;
+extern int __wt_getopt(const char *, int, char * const *, const char *);
+extern char *__wt_optarg;
+
 int
 main(int argc, char *argv[])
 {
-	extern char *__wt_optarg;
-	extern int __wt_optind;
-	extern int __wt_getopt(const char *, int, char * const *, const char *);
 	u_int readers, writers;
 	int ch, cnt, runs;
 	char *config_open;

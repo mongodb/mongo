@@ -32,12 +32,13 @@ GLOBAL g;
 static void startup(void);
 static void usage(void);
 
+extern int __wt_optind;
+extern int __wt_getopt(const char *, int, char * const *, const char *);
+extern char *__wt_optarg;
+
 int
 main(int argc, char *argv[])
 {
-	extern char *__wt_optarg;
-	extern int __wt_optind;
-	extern int __wt_getopt(const char *, int, char * const *, const char *);
 	int ch, reps, ret;
 	const char *config, *home;
 

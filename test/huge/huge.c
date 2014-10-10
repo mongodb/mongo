@@ -170,11 +170,12 @@ run(CONFIG *cp, int bigkey, size_t bytes)
 	big[bytes - 1] = 'a';
 }
 
+extern int __wt_optind;
+extern int __wt_getopt(const char *, int, char * const *, const char *);
+
 int
 main(int argc, char *argv[])
 {
-	extern int __wt_optind;
-	extern int __wt_getopt(const char *, int, char * const *, const char *);
 	CONFIG *cp;
 	size_t len, *lp;
 	int ch, ret, small;

@@ -43,12 +43,13 @@ static int  usage(void);
 static void wt_startup(char *);
 static void wt_shutdown(void);
 
+extern int __wt_optind;
+extern int __wt_getopt(const char *, int, char * const *, const char *);
+extern char *__wt_optarg;
+
 int
 main(int argc, char *argv[])
 {
-	extern char *__wt_optarg;
-	extern int __wt_optind;
-	extern int __wt_getopt(const char *, int, char * const *, const char *);
 	static struct config {
 		const char *uri;
 		const char *desc;

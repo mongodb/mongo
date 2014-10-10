@@ -1915,12 +1915,13 @@ err:		if (ret == 0)
 	return (ret);
 }
 
+extern int __wt_optind, __wt_optreset;
+extern int __wt_getopt(const char *, int, char * const *, const char *);
+extern char *__wt_optarg;
+
 int
 main(int argc, char *argv[])
 {
-	extern char *__wt_optarg;
-	extern int __wt_optind, __wt_optreset;
-	extern int __wt_getopt(const char *, int, char * const *, const char *);
 	CONFIG *cfg, _cfg;
 	size_t req_len;
 	int ch, monitor_set, ret;

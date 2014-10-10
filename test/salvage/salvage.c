@@ -53,12 +53,13 @@ static u_int	 page_type;			/* File types */
 static int	 value_unique;			/* Values are unique */
 static int	 verbose;			/* -v flag */
 
+extern int __wt_optind;
+extern int __wt_getopt(const char *, int, char * const *, const char *);
+extern char *__wt_optarg;
+
 int
 main(int argc, char *argv[])
 {
-	extern char *__wt_optarg;
-	extern int __wt_optind;
-	extern int __wt_getopt(const char *, int, char * const *, const char *);
 	u_int ptype;
 	int ch, r;
 
