@@ -56,30 +56,6 @@ namespace {
     const size_t kNumThreads = 8;
     Seconds kDefaultMaxIdleConnectionAge(60);
 
-    /**
-     * Information about a connection in the pool.
-     */
-    struct ConnectionInfo {
-        ConnectionInfo() : conn(NULL), lastEnteredPoolDate(0ULL) {}
-        ConnectionInfo(DBClientConnection* theConn, Date_t date) :
-            conn(theConn),
-            lastEnteredPoolDate(date) {}
-
-        /**
-         * Returns true if the connection entered the pool  "date".
-         */
-        bool isNotNewerThan(Date_t date) { return lastEnteredPoolDate <= date; }
-
-        // A connection in the pool.
-        DBClientConnection* conn;
-
-        // The date at which the connection "conn" was last put into the pool.
-        Date_t lastEnteredPoolDate;
-    };
-
-    typedef stdx::list<ConnectionInfo> ConnectionList;
-    typedef unordered_map<HostAndPort, ConnectionList> HostConnectionMap;
-
 }  // namespace
 
     /**
@@ -90,6 +66,8 @@ namespace {
     class NetworkInterfaceImpl::ConnectionPool {
         MONGO_DISALLOW_COPYING(ConnectionPool);
     public:
+        struct ConnectionInfo;
+
         /**
          * Options for configuring the pool.
          */
@@ -100,6 +78,9 @@ namespace {
             // before it is reaped.
             Seconds maxIdleConnectionAge;
         };
+
+        typedef stdx::list<ConnectionInfo> ConnectionList;
+        typedef unordered_map<HostAndPort, ConnectionList> HostConnectionMap;
 
         /**
          * RAII class for connections from the pool.  To use the connection pool, instantiate one of
@@ -133,8 +114,8 @@ namespace {
              */
             void done() { _pool->releaseConnection(_connInfo); _pool = NULL; }
 
-            DBClientConnection& operator*() { return *_connInfo->conn; }
-            DBClientConnection* operator->() { return _connInfo->conn; }
+            DBClientConnection& operator*();
+            DBClientConnection* operator->();
 
         private:
             ConnectionPool* _pool;
@@ -144,7 +125,7 @@ namespace {
         /**
          * Constructs a new connection pool, configured with the given options.
          */
-        explicit ConnectionPool(const Options& options) : _options(options) {}
+        explicit ConnectionPool(const Options& options);
 
         ~ConnectionPool();
 
@@ -203,6 +184,38 @@ namespace {
         Options _options;
     };
 
+    /**
+     * Information about a connection in the pool.
+     */
+    struct NetworkInterfaceImpl::ConnectionPool::ConnectionInfo {
+        ConnectionInfo() : conn(NULL), lastEnteredPoolDate(0ULL) {}
+        ConnectionInfo(DBClientConnection* theConn, Date_t date) :
+            conn(theConn),
+            lastEnteredPoolDate(date) {}
+
+        /**
+         * Returns true if the connection entered the pool  "date".
+         */
+        bool isNotNewerThan(Date_t date) { return lastEnteredPoolDate <= date; }
+
+        // A connection in the pool.
+        DBClientConnection* conn;
+
+        // The date at which the connection "conn" was last put into the pool.
+        Date_t lastEnteredPoolDate;
+    };
+
+    DBClientConnection& NetworkInterfaceImpl::ConnectionPool::ConnectionPtr::operator*() {
+        return *_connInfo->conn;
+    }
+
+    DBClientConnection* NetworkInterfaceImpl::ConnectionPool::ConnectionPtr::operator->() {
+        return _connInfo->conn;
+    }
+
+    NetworkInterfaceImpl::ConnectionPool::ConnectionPool(const Options& options) :
+        _options(options) {}
+
     NetworkInterfaceImpl::ConnectionPool::~ConnectionPool() {
         cleanUpOlderThan(Date_t(~0ULL));
         invariant(_connections.empty());
@@ -253,7 +266,8 @@ namespace {
         }
     }
 
-    ConnectionList::iterator NetworkInterfaceImpl::ConnectionPool::acquireConnection(
+    NetworkInterfaceImpl::ConnectionPool::ConnectionList::iterator
+    NetworkInterfaceImpl::ConnectionPool::acquireConnection(
             const HostAndPort& target,
             Seconds timeout) {
         boost::unique_lock<boost::mutex> lk(_mutex);
