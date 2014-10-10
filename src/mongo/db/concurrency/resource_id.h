@@ -104,9 +104,11 @@ namespace mongo {
             uint64_t _fullHash;
         };
 
+#ifdef _DEBUG
         // Keep the complete namespace name for debugging purposes (TODO: this will be removed once
         // we are confident in the robustness of the lock manager).
         std::string _nsCopy;
+#endif
     };
 
     // Treat the resource ids as 64-bit integers. Commented out for now - we will keep the full

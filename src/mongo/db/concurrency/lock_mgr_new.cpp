@@ -558,14 +558,18 @@ namespace mongo {
         _type = type;
         _hashId = stringDataHashFunction(ns) % 0x1fffffffffffffffULL;
 
+#ifdef _DEBUG
         _nsCopy = ns.toString();
+#endif
     }
 
     ResourceId::ResourceId(ResourceType type, const std::string& ns) {
         _type = type;
         _hashId = stringDataHashFunction(ns) % 0x1fffffffffffffffULL;
 
+#ifdef _DEBUG
         _nsCopy = ns;
+#endif
     }
 
     ResourceId::ResourceId(ResourceType type, uint64_t hashId) {
@@ -576,7 +580,13 @@ namespace mongo {
     string ResourceId::toString() const {
         StringBuilder ss;
         ss << "{" << _fullHash << ": " << resourceTypeName(static_cast<ResourceType>(_type))
-           << ", " << _hashId << ", " << _nsCopy << "}";
+           << ", " << _hashId;
+
+#ifdef _DEBUG
+        ss << ", " << _nsCopy;
+#endif
+
+        ss << "}";
 
         return ss.str();
     }

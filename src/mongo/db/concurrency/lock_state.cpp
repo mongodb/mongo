@@ -51,17 +51,15 @@ namespace mongo {
         // Global lock. Every server operation, which uses the Locker must acquire this lock at
         // least once. See comments in the header file (begin/endTransaction) for more information
         // on its use.
-        const ResourceId resourceIdGlobal = ResourceId(RESOURCE_GLOBAL, string("GlobalLock"));
+        const ResourceId resourceIdGlobal = ResourceId(RESOURCE_GLOBAL, 1ULL);
 
         // Flush lock. This is only used for the MMAP V1 storage engine and synchronizes the
         // application of journal writes to the shared view and remaps. See the comments in the
         // header for _acquireFlushLockForMMAPV1/_releaseFlushLockForMMAPV1 for more information
         // on its use.
-        const ResourceId resourceIdMMAPV1Flush =
-                                ResourceId(RESOURCE_MMAPV1_FLUSH, string("FlushLock"));
+        const ResourceId resourceIdMMAPV1Flush = ResourceId(RESOURCE_MMAPV1_FLUSH, 2ULL);
 
-        const ResourceId resourceIdLocalDB =
-                                ResourceId(RESOURCE_DATABASE, string("local"));
+        const ResourceId resourceIdLocalDB = ResourceId(RESOURCE_DATABASE, string("local"));
 
         /**
          * Returns whether the passed in mode is S or IS. Used for validation checks.
