@@ -108,8 +108,6 @@ int
 __wt_realloc_aligned(WT_SESSION_IMPL *session,
     size_t *bytes_allocated_ret, size_t bytes_to_allocate, void *retp)
 {
-	WT_DECL_RET;
-
 	/*
 	 * !!!
 	 * This function MUST handle a NULL WT_SESSION_IMPL handle.
