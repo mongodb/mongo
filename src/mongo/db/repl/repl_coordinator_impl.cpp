@@ -1331,7 +1331,7 @@ namespace {
             }
         }
 
-        status = _externalState->storeLocalConfigDocument(txn, args.newConfigObj);
+        status = _externalState->storeLocalConfigDocument(txn, newConfig.toBSON());
         if (!status.isOK()) {
             error() << "replSetReconfig failed to store config document; " << status;
             return status;
@@ -1427,7 +1427,7 @@ namespace {
             return status;
         }
 
-        status = _externalState->storeLocalConfigDocument(txn, configObj);
+        status = _externalState->storeLocalConfigDocument(txn, newConfig.toBSON());
         if (!status.isOK()) {
             error() << "replSet replSetInitiate failed to store config document; " << status;
             return status;
