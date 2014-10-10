@@ -48,7 +48,6 @@
 #include "mongo/db/auth/authz_manager_external_state.h"
 #include "mongo/db/auth/privilege.h"
 #include "mongo/db/auth/role_graph.h"
-#include "mongo/db/auth/sasl_options.h"
 #include "mongo/db/auth/user.h"
 #include "mongo/db/auth/user_document_parser.h"
 #include "mongo/db/auth/user_name.h"
@@ -779,8 +778,7 @@ namespace {
         {
             BSONObjBuilder toSetBuilder(updateBuilder.subobjStart("$set"));
             toSetBuilder << "credentials" <<
-                            BSON("SCRAM-SHA-1" << scram::generateCredentials(hashedPassword,
-                                        saslGlobalParams.scramIterationCount));
+                            BSON("SCRAM-SHA-1" << scram::generateCredentials(hashedPassword));
         }
 
         uassertStatusOK(externalState->updateOne(txn,
