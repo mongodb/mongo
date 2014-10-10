@@ -15,8 +15,6 @@ int
 __wt_thread_create(WT_SESSION_IMPL *session,
     pthread_t *tidret, void *(*func)(void *), void *arg)
 {
-	WT_DECL_RET;
-
 	/* Spawn a new thread of control. */
 	*tidret = CreateThread(NULL, 0, func, arg, 0, NULL);
 	if (*tidret != NULL)
@@ -45,7 +43,7 @@ __wt_thread_join(WT_SESSION_IMPL *session, pthread_t tid)
  *	Fill in a printable version of the process and thread IDs.
  */
 void
-__wt_thread_id(WT_SESSION_IMPL *session, char buf, size_t buflen)
+__wt_thread_id(WT_SESSION_IMPL *session, char* buf, size_t buflen)
 {
 	DWORD self;
 	size_t len;

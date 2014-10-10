@@ -157,7 +157,7 @@ copy(const char *name, const char *directory)
 	 * We need to know this file was successfully written, it's a backup.
 	 */
 #ifdef _WIN32
-	if (FlushFileBuffers(_get_osfhandle(fd)) == 0) {
+	if (FlushFileBuffers((HANDLE)_get_osfhandle(ofd)) == 0) {
 		DWORD err = GetLastError();
 		ret = err;
 		goto writerr;

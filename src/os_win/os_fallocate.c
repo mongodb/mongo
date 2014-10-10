@@ -16,14 +16,22 @@ __wt_fallocate(
     WT_SESSION_IMPL *session, WT_FH *fh, wt_off_t offset, wt_off_t len)
 {
 	WT_DECL_RET;
+	LARGE_INTEGER largeint;
 
 	WT_RET(__wt_verbose(
 	    session, WT_VERB_FILEOPS, "%s: fallocate", fh->name));
 
-	ret = 0;
+	largeint.QuadPart = offset + len;
 
-	if (ret != 0)
-		WT_RET_MSG(session, __wt_errno(), "%s: ftruncate", fh->name);
+	if ((ret = SetFilePointerEx(
+			fh->filehandle, largeint, NULL, FILE_BEGIN)) == FALSE)
+		WT_RET_MSG(session, __wt_errno(), "%s SetFilePointerEx error",
+		    fh->name);
 
-	return (0);
+	if ((ret = SetEndOfFile(fh->filehandle)) != FALSE) {
+		fh->size = fh->extend_size = len;
+		return (0);
+	}
+
+	WT_RET_MSG(session, __wt_errno(), "%s SetEndofFile error", fh->name);
 }

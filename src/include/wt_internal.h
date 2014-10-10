@@ -284,7 +284,9 @@ struct __wt_update;
 
 #include "misc.h"
 #include "mutex.h"
+#ifndef _WIN32
 #include "posix.h"
+#endif
 
 #include "stat.h"			/* required by dhandle.h */
 #include "dhandle.h"			/* required by btree.h */
