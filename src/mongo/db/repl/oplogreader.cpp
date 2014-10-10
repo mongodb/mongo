@@ -85,7 +85,8 @@ namespace repl {
     }
 
     bool OplogReader::connect(const HostAndPort& host) {
-        if (conn() == NULL) {
+        if (conn() == NULL || _host != host) {
+            resetConnection();
             _conn = shared_ptr<DBClientConnection>(new DBClientConnection(false,
                                                                           0,
                                                                           tcp_timeout));

@@ -824,7 +824,7 @@ namespace {
         boost::unique_lock<boost::mutex> lk(_mutex);
         _updateCurrentMemberStateFromTopologyCoordinator_inlock();
         lk.unlock();
-        _externalState->closeClientConnections();
+        _externalState->closeConnections();
         // Wake up any threads blocked in awaitReplication
         for (std::vector<WaiterInfo*>::iterator it = _replicationWaiterList.begin();
                 it != _replicationWaiterList.end(); ++it) {
@@ -1331,7 +1331,7 @@ namespace {
             }
         }
 
-        status = _externalState->storeLocalConfigDocument(txn, args.newConfigObj);
+        status = _externalState->storeLocalConfigDocument(txn, newConfig.toBSON());
         if (!status.isOK()) {
             error() << "replSetReconfig failed to store config document; " << status;
             return status;
@@ -1427,7 +1427,7 @@ namespace {
             return status;
         }
 
-        status = _externalState->storeLocalConfigDocument(txn, configObj);
+        status = _externalState->storeLocalConfigDocument(txn, newConfig.toBSON());
         if (!status.isOK()) {
             error() << "replSet replSetInitiate failed to store config document; " << status;
             return status;
@@ -1561,7 +1561,8 @@ namespace {
          _topCoord->updateConfig(
                  newConfig,
                  myIndex,
-                 _replExecutor.now());
+                 _replExecutor.now(),
+                 _getLastOpApplied_inlock());
 
          if (_topCoord->getRole() == TopologyCoordinator::Role::candidate) {
              // If the new config describes a one-node replica set, we're the one member, and
@@ -1571,7 +1572,17 @@ namespace {
              _topCoord->processWinElection(OID::gen(), getNextGlobalOptime());
          }
 
+         MemberState previousState = _currentState;
          _updateCurrentMemberStateFromTopologyCoordinator_inlock();
+         if (previousState.primary() && !_currentState.primary()) {
+             // Close connections on stepdown
+             _externalState->closeConnections();
+             // Closing all connections will make the applier choose a new sync source, so we don't
+             // need to do that explicitly in this case.
+         }
+         else {
+             _externalState->signalApplierToChooseNewSyncSource();
+         }
          _updateSlaveInfoMapFromConfig_inlock();
          _startHeartbeats();
      }

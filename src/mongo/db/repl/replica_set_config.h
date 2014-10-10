@@ -129,6 +129,18 @@ namespace repl {
         const MemberConfig* findMemberByID(int id) const;
 
         /**
+         * Returns a pointer to the MemberConfig corresponding to the member with the given
+         * HostAndPort in the config, or NULL if there is no member with that address.
+         */
+        const MemberConfig* findMemberByHostAndPort(const HostAndPort& hap) const;
+
+        /**
+         * Returns a MemberConfig index position corresponding to the member with the given
+         * HostAndPort in the config, or -1 if there is no member with that address.
+         */
+        const int findMemberIndexByHostAndPort(const HostAndPort& hap) const;
+
+        /**
          * Gets the default write concern for the replica set described by this configuration.
          */
         const WriteConcernOptions& getDefaultWriteConcern() const { return _defaultWriteConcern; }
@@ -158,6 +170,11 @@ namespace repl {
          * Gets the number of votes required to win an election.
          */
         int getMajorityVoteCount() const { return _majorityVoteCount; }
+
+        /**
+         * Gets the number of voters.
+         */
+        int getTotalVotingMembers() const { return _totalVotingMembers; }
 
         /**
          * Returns true if automatic (not explicitly set) chaining is allowed.
@@ -216,6 +233,7 @@ namespace repl {
         bool _chainingAllowed;
         int _majorityNumber;
         int _majorityVoteCount;
+        int _totalVotingMembers;
         ReplicaSetTagConfig _tagConfig;
         StringMap<ReplicaSetTagPattern> _customWriteConcernModes;
     };

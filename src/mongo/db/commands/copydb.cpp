@@ -188,7 +188,7 @@ namespace mongo {
                 return cloner.go(txn, todb, fromhost, cloneOptions, NULL, errmsg);
             }
 
-            Lock::DBLock lk (txn->lockState(), todb, newlm::MODE_X);
+            Lock::DBLock lk (txn->lockState(), todb, MODE_X);
             return cloner.go(txn, todb, fromhost, cloneOptions, NULL, errmsg);
         }
 

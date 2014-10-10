@@ -36,8 +36,14 @@
 namespace mongo {
 namespace scram {
     const unsigned int hashSize = 20;
+
     const std::string serverKeyConst = "Server Key";
     const std::string clientKeyConst = "Client Key";
+
+    const std::string iterationCountFieldName = "iterationCount";
+    const std::string saltFieldName = "salt";
+    const std::string storedKeyFieldName = "storedKey";
+    const std::string serverKeyFieldName = "serverKey";
 
     /*
      * Computes the SaltedPassword from password, salt and iterationCount.

@@ -35,8 +35,7 @@
 
 
 namespace mongo {
-namespace newlm {
-    
+
     /**
      * Notfication callback, which stores the last notification result and signals a condition
      * variable, which can be waited on.
@@ -217,7 +216,7 @@ namespace newlm {
         virtual bool isLocked() const;
         virtual bool isWriteLocked() const;
         virtual bool isWriteLocked(const StringData& ns) const;
-        virtual bool isDbLockedForMode(const StringData& dbName, newlm::LockMode mode) const;
+        virtual bool isDbLockedForMode(const StringData& dbName, LockMode mode) const;
         virtual bool isAtLeastReadLocked(const StringData& ns) const;
         virtual bool isRecursive() const;
 
@@ -295,18 +294,6 @@ namespace newlm {
 
     private:
         Locker* _locker;
-    };
-    
-} // namespace newlm
-
-
-    /**
-     * This will go away as a separate step.
-     */
-    class LockState : public newlm::LockerImpl {
-    public:
-        LockState() { }
-
     };
 
 } // namespace mongo

@@ -37,7 +37,6 @@
 
 
 namespace mongo {
-namespace newlm {
 
     /**
      * Hierarchy of resource types. The lock manager knows nothing about this hierarchy, it is
@@ -105,9 +104,11 @@ namespace newlm {
             uint64_t _fullHash;
         };
 
+#ifdef _DEBUG
         // Keep the complete namespace name for debugging purposes (TODO: this will be removed once
         // we are confident in the robustness of the lock manager).
         std::string _nsCopy;
+#endif
     };
 
     // Treat the resource ids as 64-bit integers. Commented out for now - we will keep the full
@@ -115,13 +116,12 @@ namespace newlm {
     //
     // BOOST_STATIC_ASSERT(sizeof(ResourceId) == sizeof(uint64_t));
 
-} // namespace newlm
 } // namespace mongo
 
 
 MONGO_HASH_NAMESPACE_START
-    template <> struct hash<mongo::newlm::ResourceId> {
-        size_t operator()(const mongo::newlm::ResourceId& resource) const {
+    template <> struct hash<mongo::ResourceId> {
+        size_t operator()(const mongo::ResourceId& resource) const {
             return resource;
         }
     };

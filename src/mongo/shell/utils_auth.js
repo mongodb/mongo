@@ -71,7 +71,7 @@ var authutil;
         var ex;
         authutil.assertAuthenticate(conn, 'local', {
             user: '__system',
-            mechanism: 'MONGODB-CR',
+            mechanism: 'SCRAM-SHA-1',
             pwd: cat(keyfile).replace(/[\011-\015\040]/g, '')
         });
 

@@ -524,7 +524,7 @@ namespace NamespaceTests {
 
                 OperationContextImpl txn;
 
-                Lock::DBLock lk(txn.lockState(), dbName, newlm::MODE_X);
+                Lock::DBLock lk(txn.lockState(), dbName, MODE_X);
 
                 bool justCreated;
                 Database* db = dbHolder().openDb(&txn, dbName, &justCreated);
@@ -567,7 +567,7 @@ namespace NamespaceTests {
 
                 OperationContextImpl txn;
 
-                Lock::DBLock lk(txn.lockState(), dbName, newlm::MODE_X);
+                Lock::DBLock lk(txn.lockState(), dbName, MODE_X);
 
                 bool justCreated;
                 Database* db = dbHolder().openDb(&txn, dbName, &justCreated);

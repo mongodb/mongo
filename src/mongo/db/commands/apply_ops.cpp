@@ -137,7 +137,7 @@ namespace mongo {
                 // We do not have a wrapping WriteUnitOfWork so it is possible for a journal
                 // commit to happen with a subset of ops applied.
                 // TODO figure out what to do about this.
-                Lock::DBLock lk(txn->lockState(), nsToDatabaseSubstring(ns), newlm::MODE_X);
+                Lock::DBLock lk(txn->lockState(), nsToDatabaseSubstring(ns), MODE_X);
                 invariant(txn->lockState()->isRecursive());
 
                 Client::Context ctx(txn, ns);

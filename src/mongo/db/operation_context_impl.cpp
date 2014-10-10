@@ -48,7 +48,7 @@ namespace mongo {
         invariant(storageEngine);
         _recovery.reset(storageEngine->newRecoveryUnit(this));
 
-        _locker.reset(new newlm::LockerImpl());
+        _locker.reset(new LockerImpl());
 
         getGlobalEnvironment()->registerOperationContext(this);
     }

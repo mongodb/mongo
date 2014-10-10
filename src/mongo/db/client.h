@@ -218,7 +218,7 @@ namespace mongo {
     class AutoGetDb {
         MONGO_DISALLOW_COPYING(AutoGetDb);
     public:
-        AutoGetDb(OperationContext* txn, const StringData& ns, newlm::LockMode mode);
+        AutoGetDb(OperationContext* txn, const StringData& ns, LockMode mode);
 
         Database* getDb() const {
             return _db;

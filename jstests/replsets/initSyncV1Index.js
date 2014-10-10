@@ -17,7 +17,9 @@ rs.reInitiate(60000);
 var db2 = r2.getDB('test');
 r2.setSlaveOk();
 
-var idx = db2.system.indexes.findOne( {key: {x:1}} );
+var idx = db2.foo.getIndexes().filter(function(idx) {
+    return friendlyEqual(idx.key, {x: 1});
+})[0];
 assert.eq (idx.v, 1, 'expected all indexes generated on Mongo version >= 2.0 to be {v:1}. See SERVER-3852');
 
 // add another new node, make sure ports _aren't_ closed SERVER-4315

@@ -188,7 +188,7 @@ namespace mongo {
     }
 
 
-    AutoGetDb::AutoGetDb(OperationContext* txn, const StringData& ns, newlm::LockMode mode)
+    AutoGetDb::AutoGetDb(OperationContext* txn, const StringData& ns, LockMode mode)
             : _dbLock(txn->lockState(), ns, mode),
               _db(dbHolder().get(txn, ns)) {
 
@@ -199,7 +199,7 @@ namespace mongo {
                                                        const std::string& ns)
             : _txn(txn),
               _nss(ns),
-              _dbLock(_txn->lockState(), _nss.db(), newlm::MODE_IS),
+              _dbLock(_txn->lockState(), _nss.db(), MODE_IS),
               _db(NULL),
               _coll(NULL) {
 
@@ -210,7 +210,7 @@ namespace mongo {
                                                        const NamespaceString& nss)
             : _txn(txn),
               _nss(nss),
-              _dbLock(_txn->lockState(), _nss.db(), newlm::MODE_IS),
+              _dbLock(_txn->lockState(), _nss.db(), MODE_IS),
               _db(NULL),
               _coll(NULL) {
 
@@ -226,10 +226,10 @@ namespace mongo {
 
         // Lock both the DB and the collection (DB is locked in the constructor), because this is
         // necessary in order to to shard version checking.
-        const newlm::ResourceId resId(newlm::RESOURCE_COLLECTION, _nss);
-        const newlm::LockMode collLockMode = supportsDocLocking() ? newlm::MODE_IS : newlm::MODE_S;
+        const ResourceId resId(RESOURCE_COLLECTION, _nss);
+        const LockMode collLockMode = supportsDocLocking() ? MODE_IS : MODE_S;
 
-        invariant(newlm::LOCK_OK == _txn->lockState()->lock(resId, collLockMode));
+        invariant(LOCK_OK == _txn->lockState()->lock(resId, collLockMode));
 
         // Shard version check needs to be performed under the collection lock
         ensureShardVersionOKOrThrow(_nss);
@@ -248,7 +248,7 @@ namespace mongo {
     AutoGetCollectionForRead::~AutoGetCollectionForRead() {
         // If the database is NULL, we would never have tried to lock the collection resource
         if (_db) {
-            const newlm::ResourceId resId(newlm::RESOURCE_COLLECTION, _nss);
+            const ResourceId resId(RESOURCE_COLLECTION, _nss);
             _txn->lockState()->unlock(resId);
         }
 
@@ -260,8 +260,8 @@ namespace mongo {
     Client::WriteContext::WriteContext(OperationContext* opCtx, const std::string& ns)
         : _txn(opCtx),
           _nss(ns),
-          _dblk(opCtx->lockState(), _nss.db(), newlm::MODE_IX),
-          _collk(opCtx->lockState(), ns, newlm::MODE_IX),
+          _dblk(opCtx->lockState(), _nss.db(), MODE_IX),
+          _collk(opCtx->lockState(), ns, MODE_IX),
           _wunit(opCtx),
           _c(opCtx, ns) { }
 

@@ -49,7 +49,7 @@ Operation Context
 How can I find the information for it?  
 **A**: You can find the documentation and source code for this in
 src/mongo/db/operation_context.h and src/mongo/db/operation_context_impl.cpp,
-respectively.  OperationContext contains many classes, in particular LockState
+respectively.  OperationContext contains many classes, in particular the Locker
 and RecoveryUnit, which have their own definitions.
 
 **Q**: In the RecordStore::getIterator() interface, the first parameter is a

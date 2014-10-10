@@ -233,7 +233,8 @@ namespace repl {
          */
         virtual void updateConfig(const ReplicaSetConfig& newConfig,
                                   int selfIndex,
-                                  Date_t now) = 0;
+                                  Date_t now,
+                                  OpTime lastOpApplied) = 0;
 
         /**
          * Prepares a heartbeat request appropriate for sending to "target", assuming the

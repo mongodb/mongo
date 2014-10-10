@@ -216,7 +216,7 @@ namespace {
         if (!status.isOK())
             return status;
 
-        
+
         if (!sequenceContains(saslGlobalParams.authenticationMechanisms, mechanism)) {
             result->append(saslCommandMechanismListFieldName,
                            saslGlobalParams.authenticationMechanisms);
@@ -272,10 +272,10 @@ namespace {
         if (!extractMechanism(cmdObj, &mechanism).isOK()) {
             return false;
         }
-        
-        SaslAuthenticationSession* session = 
+
+        SaslAuthenticationSession* session =
             SaslAuthenticationSession::create(client->getAuthorizationSession(), mechanism);
-        
+
         boost::scoped_ptr<AuthenticationSession> sessionGuard(session);
 
         session->setOpCtxt(txn);
@@ -323,7 +323,9 @@ namespace {
         SaslAuthenticationSession* session =
             static_cast<SaslAuthenticationSession*>(sessionGuard.get());
 
-        if (session->getAuthenticationDatabase() != db) {
+        // Authenticating the __system@local user to the admin database on mongos is required
+        // by the auth passthrough test suite.
+        if (session->getAuthenticationDatabase() != db && !Command::testCommandsEnabled) {
             addStatus(Status(ErrorCodes::ProtocolError,
                              "Attempt to switch database target during SASL authentication."),
                       &result);
@@ -348,18 +350,25 @@ namespace {
 
         return status.isOK();
     }
-    
+
     // The CyrusSaslCommands Enterprise initializer is dependent on PreSaslCommands
     MONGO_INITIALIZER_WITH_PREREQUISITES(PreSaslCommands,
                                          ("NativeSaslServerCore"))
         (InitializerContext*) {
- 
+
         if (!sequenceContains(saslGlobalParams.authenticationMechanisms, "MONGODB-CR"))
             CmdAuthenticate::disableAuthMechanism("MONGODB-CR");
-        
+
         if (!sequenceContains(saslGlobalParams.authenticationMechanisms, "MONGODB-X509"))
             CmdAuthenticate::disableAuthMechanism("MONGODB-X509");
-        
+
+        // For backwards compatibility, in 2.8 we are letting MONGODB-CR imply general
+        // challenge-response auth and hence SCRAM-SHA-1 is enabled by either specifying
+        // SCRAM-SHA-1 or MONGODB-CR in the authenticationMechanism server parameter.
+        if (!sequenceContains(saslGlobalParams.authenticationMechanisms, "SCRAM-SHA-1") &&
+            sequenceContains(saslGlobalParams.authenticationMechanisms, "MONGODB-CR"))
+            saslGlobalParams.authenticationMechanisms.push_back("SCRAM-SHA-1");
+
         return Status::OK();
     }
 

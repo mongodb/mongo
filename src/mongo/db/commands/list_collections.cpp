@@ -67,7 +67,7 @@ namespace mongo {
                  BSONObjBuilder& result,
                  bool /*fromRepl*/) {
 
-            AutoGetDb autoDb(txn, dbname, newlm::MODE_S);
+            AutoGetDb autoDb(txn, dbname, MODE_S);
 
             const Database* d = autoDb.getDb();
             const DatabaseCatalogEntry* dbEntry = NULL;

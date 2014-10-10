@@ -928,10 +928,10 @@ namespace mongo {
         invariant(!_context.get());
         _writeLock.reset(new Lock::DBLock(txn->lockState(),
                                           nsToDatabase(request->getNS()),
-                                          intentLock ? newlm::MODE_IX : newlm::MODE_X));
+                                          intentLock ? MODE_IX : MODE_X));
         _collLock.reset(new Lock::CollectionLock(txn->lockState(),
                                                  request->getNS(),
-                                                 intentLock ? newlm::MODE_IX : newlm::MODE_X));
+                                                 intentLock ? MODE_IX : MODE_X));
         if (!checkIsMasterForDatabase(request->getNS(), result)) {
             return false;
         }
@@ -1144,10 +1144,10 @@ namespace mongo {
         }
 
         ///////////////////////////////////////////
-        Lock::DBLock dbLock(txn->lockState(), nsString.db(), newlm::MODE_IX);
+        Lock::DBLock dbLock(txn->lockState(), nsString.db(), MODE_IX);
         Lock::CollectionLock colLock(txn->lockState(),
                                      nsString.ns(),
-                                     isMulti ? newlm::MODE_X : newlm::MODE_IX);
+                                     isMulti ? MODE_X : MODE_IX);
         ///////////////////////////////////////////
 
         if (!checkShardVersion(txn, &shardingState, *updateItem.getRequest(), result))
@@ -1202,7 +1202,7 @@ namespace mongo {
         }
 
         ///////////////////////////////////////////
-        Lock::DBLock writeLock(txn->lockState(), nss.db(), newlm::MODE_X);
+        Lock::DBLock writeLock(txn->lockState(), nss.db(), MODE_X);
         ///////////////////////////////////////////
 
         // Check version once we're locked

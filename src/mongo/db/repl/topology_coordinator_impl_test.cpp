@@ -91,7 +91,10 @@ namespace {
         }
         // Update config and set selfIndex
         // If "now" is passed in, set _now to now+1
-        void updateConfig(BSONObj cfg, int selfIndex, Date_t now = Date_t(-1)) {
+        void updateConfig(BSONObj cfg,
+                          int selfIndex,
+                          Date_t now = Date_t(-1),
+                          OpTime lastOp = OpTime()) {
             ReplicaSetConfig config;
             ASSERT_OK(config.initialize(cfg));
             ASSERT_OK(config.validate());
@@ -99,11 +102,11 @@ namespace {
             _selfIndex = selfIndex;
 
             if (now == Date_t(-1)) {
-                getTopoCoord().updateConfig(config, selfIndex, _now++);
+                getTopoCoord().updateConfig(config, selfIndex, _now++, lastOp);
             }
             else {
                 invariant(now > _now);
-                getTopoCoord().updateConfig(config, selfIndex, now);
+                getTopoCoord().updateConfig(config, selfIndex, now, lastOp);
                 _now = now + 1;
             }
         }
@@ -2449,7 +2452,7 @@ namespace {
         // Make sure nay votes, do not prevent subsequent yeas (the way a yea vote would)
         args.set = "rs0";
         BSONObjBuilder responseBuilder2;
-        getTopoCoord().prepareElectResponse(args, now += 60000, OpTime(), &responseBuilder2, &result);
+        getTopoCoord().prepareElectResponse(args, now++, OpTime(), &responseBuilder2, &result);
         BSONObj response2 = responseBuilder2.obj();
         ASSERT_EQUALS(1, response2["vote"].Int());
         ASSERT_EQUALS(round, response2["round"].OID());
@@ -2478,7 +2481,7 @@ namespace {
         // Make sure nay votes, do not prevent subsequent yeas (the way a yea vote would)
         args.cfgver = 10;
         BSONObjBuilder responseBuilder2;
-        getTopoCoord().prepareElectResponse(args, now += 60000, OpTime(), &responseBuilder2, &result);
+        getTopoCoord().prepareElectResponse(args, now++, OpTime(), &responseBuilder2, &result);
         BSONObj response2 = responseBuilder2.obj();
         ASSERT_EQUALS(1, response2["vote"].Int());
         ASSERT_EQUALS(round, response2["round"].OID());
@@ -2507,7 +2510,7 @@ namespace {
         // Make sure nay votes, do not prevent subsequent yeas (the way a yea vote would)
         args.cfgver = 10;
         BSONObjBuilder responseBuilder2;
-        getTopoCoord().prepareElectResponse(args, now += 60000, OpTime(), &responseBuilder2, &result);
+        getTopoCoord().prepareElectResponse(args, now++, OpTime(), &responseBuilder2, &result);
         BSONObj response2 = responseBuilder2.obj();
         ASSERT_EQUALS(1, response2["vote"].Int());
         ASSERT_EQUALS(round, response2["round"].OID());
@@ -2535,7 +2538,7 @@ namespace {
         // Make sure nay votes, do not prevent subsequent yeas (the way a yea vote would)
         args.whoid = 1;
         BSONObjBuilder responseBuilder2;
-        getTopoCoord().prepareElectResponse(args, now += 60000, OpTime(), &responseBuilder2, &result);
+        getTopoCoord().prepareElectResponse(args, now++, OpTime(), &responseBuilder2, &result);
         BSONObj response2 = responseBuilder2.obj();
         ASSERT_EQUALS(1, response2["vote"].Int());
         ASSERT_EQUALS(round, response2["round"].OID());
@@ -2565,7 +2568,7 @@ namespace {
         // Make sure nay votes, do not prevent subsequent yeas (the way a yea vote would)
         getTopoCoord()._setCurrentPrimaryForTest(-1);
         BSONObjBuilder responseBuilder2;
-        getTopoCoord().prepareElectResponse(args, now += 60000, OpTime(), &responseBuilder2, &result);
+        getTopoCoord().prepareElectResponse(args, now++, OpTime(), &responseBuilder2, &result);
         BSONObj response2 = responseBuilder2.obj();
         ASSERT_EQUALS(1, response2["vote"].Int());
         ASSERT_EQUALS(round, response2["round"].OID());
@@ -2594,7 +2597,7 @@ namespace {
         // Make sure nay votes, do not prevent subsequent yeas (the way a yea vote would)
         getTopoCoord()._setCurrentPrimaryForTest(-1);
         BSONObjBuilder responseBuilder2;
-        getTopoCoord().prepareElectResponse(args, now += 60000, OpTime(), &responseBuilder2, &result);
+        getTopoCoord().prepareElectResponse(args, now++, OpTime(), &responseBuilder2, &result);
         BSONObj response2 = responseBuilder2.obj();
         ASSERT_EQUALS(1, response2["vote"].Int());
         ASSERT_EQUALS(round, response2["round"].OID());
@@ -2624,7 +2627,7 @@ namespace {
         // Make sure nay votes, do not prevent subsequent yeas (the way a yea vote would)
         args.whoid = 3;
         BSONObjBuilder responseBuilder2;
-        getTopoCoord().prepareElectResponse(args, now += 60000, OpTime(), &responseBuilder2, &result);
+        getTopoCoord().prepareElectResponse(args, now++, OpTime(), &responseBuilder2, &result);
         BSONObj response2 = responseBuilder2.obj();
         ASSERT_EQUALS(1, response2["vote"].Int());
         ASSERT_EQUALS(round, response2["round"].OID());
@@ -2687,11 +2690,11 @@ namespace {
                 "voted for h2:27017 0 secs ago"));
 
         // Test that after enough time passes the same vote can proceed
-        now = Date_t(now.millis + 3 * 1000); // 3 seconds later
+        now += 3 * 1001; // just over 3 seconds later
 
         BSONObjBuilder responseBuilder3;
         startCapturingLogMessages();
-        getTopoCoord().prepareElectResponse(args, now += 60000, OpTime(), &responseBuilder3, &result);
+        getTopoCoord().prepareElectResponse(args, now++, OpTime(), &responseBuilder3, &result);
         stopCapturingLogMessages();
         BSONObj response3 = responseBuilder3.obj();
         ASSERT_OK(result);
@@ -3131,7 +3134,7 @@ namespace {
                             "version" << 1 <<
                             "members" << BSON_ARRAY(
                                 BSON("_id" << 1 << "host" << "hself" << "priority" << 0))));
-        getTopoCoord().updateConfig(cfg, 0, now()++);
+        getTopoCoord().updateConfig(cfg, 0, now()++, OpTime());
         ASSERT_EQUALS(MemberState::RS_STARTUP2, getTopoCoord().getMemberState().s);
 
         ASSERT_FALSE(TopologyCoordinator::Role::candidate == getTopoCoord().getRole());
@@ -3158,7 +3161,7 @@ namespace {
                             "members" << BSON_ARRAY(
                                 BSON("_id" << 1 << "host" << "hself" << "priority" << 0))));
 
-        getTopoCoord().updateConfig(cfg, 0, now()++);
+        getTopoCoord().updateConfig(cfg, 0, now()++, OpTime());
         ASSERT_EQUALS(MemberState::RS_STARTUP2, getTopoCoord().getMemberState().s);
 
         // despite being the only node, we are unelectable, so we should not become a candidate

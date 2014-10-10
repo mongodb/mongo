@@ -62,7 +62,7 @@ namespace mongo {
 
             {
                 // Remove _id range [_min, _max).
-                Lock::DBLock lk(txn.lockState(), nsToDatabaseSubstring(ns), newlm::MODE_X);
+                Lock::DBLock lk(txn.lockState(), nsToDatabaseSubstring(ns), MODE_X);
                 WriteUnitOfWork wunit(&txn);
                 Client::Context ctx(&txn,  ns );
 

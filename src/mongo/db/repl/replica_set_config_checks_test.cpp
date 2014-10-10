@@ -337,8 +337,8 @@ namespace {
                                                 illegalNewConfigReusingHost,
                                                 false).getStatus());
         //
-        // Here, the new config is invalid because we've reused _id 2 with
-        // new host name "h4".
+        // Here, the new config is valid, because all we've changed is the name of
+        // the host representing _id 2.
         //
         ASSERT_OK(illegalNewConfigReusingId.initialize(
                           BSON("_id" << "rs0" <<
@@ -348,11 +348,10 @@ namespace {
                                        BSON("_id" << 2 << "host" << "h4") <<
                                        BSON("_id" << 3 << "host" << "h3")))));
         ASSERT_OK(illegalNewConfigReusingId.validate());
-        ASSERT_EQUALS(ErrorCodes::NewReplicaSetConfigurationIncompatible,
-                      validateConfigForReconfig(&externalState,
-                                                oldConfig,
-                                                illegalNewConfigReusingId,
-                                                false).getStatus());
+        ASSERT_OK(validateConfigForReconfig(&externalState,
+                                            oldConfig,
+                                            illegalNewConfigReusingId,
+                                            false).getStatus());
     }
 
     TEST(ValidateConfigForReconfig, MustFindSelf) {

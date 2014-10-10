@@ -124,7 +124,7 @@ namespace mongo {
                 LOG(0) << "About to upgrade to exclusive lock on " + nsString.ns();
             }
 
-            Lock::DBLock lk(txn->lockState(), nsString.db(), newlm::MODE_X);
+            Lock::DBLock lk(txn->lockState(), nsString.db(), MODE_X);
 
             WriteUnitOfWork wuow(txn);
             invariant(db->createCollection(txn, nsString.ns()));

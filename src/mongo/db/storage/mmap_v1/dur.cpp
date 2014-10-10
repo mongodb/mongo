@@ -231,7 +231,7 @@ namespace mongo {
 
             NotifyAll::When when = commitJob._notify.now();
 
-            newlm::AutoYieldFlushLockForMMAPV1Commit flushLockYield(txn->lockState());
+            AutoYieldFlushLockForMMAPV1Commit flushLockYield(txn->lockState());
 
             // There is always just one waiting anyways
             flushRequested.notify_one();
@@ -653,7 +653,7 @@ namespace mongo {
 
                     // Waits for all active operations to drain and won't let new ones start. This
                     // should be optimized to allow readers in (see SERVER-15262).
-                    newlm::AutoAcquireFlushLockForMMAPV1Commit flushLock(txn.lockState());
+                    AutoAcquireFlushLockForMMAPV1Commit flushLock(txn.lockState());
 
                     groupCommit();
                     remapPrivateView();

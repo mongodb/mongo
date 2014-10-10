@@ -43,7 +43,7 @@ namespace CountTests {
 
     class Base {
     public:
-        Base() : _lk(_txn.lockState(), nsToDatabaseSubstring(ns()), newlm::MODE_X),
+        Base() : _lk(_txn.lockState(), nsToDatabaseSubstring(ns()), MODE_X),
                  _context(&_txn, ns()),
                  _client(&_txn) {
             _database = _context.db();
