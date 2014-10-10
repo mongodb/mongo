@@ -409,33 +409,20 @@ namespace mongo {
             return false;
         }
 
-        // Unlock all non-flush locks.
         LockRequestsMap::const_iterator it = _requests.begin();
         while (it != _requests.end()) {
             const ResourceId& resId = it->first;
 
-            if (resourceIdMMAPV1Flush == resId) {
-                // The flush lock is the last lock to be released, so hold on to it for now.
-                it++;
-            }
-            else {
-                // It's a non-flush lock, so release it.
-                // If we're here we should only have one reference to this lock.
-                // Even if we're in DBDirectClient or some other nested scope, we would
-                // have to release the global lock fully before we get here.
-                // Therefore we're not here unless we've unlocked the global lock, in which
-                // case it's a programming error to have >1 reference to this lock.
-                invariant(unlock(resId));
+            // If we're here we should only have one reference to any lock.  Even if we're in
+            // DBDirectClient or some other nested scope, we would have to release the global lock
+            // fully before we get here. Therefore we're not here unless we've unlocked the global
+            // lock, in which case it's a programming error to have > 1 reference.
+            invariant(unlock(resId));
 
-                // Unlocking modifies the state of _requests, but we're iterating over it, so we
-                // have to start from the beginning every time we unlock something.
-                it = _requests.begin();
-            }
+            // Unlocking modifies the state of _requests, but we're iterating over it, so we
+            // have to start from the beginning every time we unlock something.
+            it = _requests.begin();
         }
-
-        // Need to unlock the MMAPV1 flush lock, which should be the last lock held
-        invariant(unlock(resourceIdMMAPV1Flush));
-        invariant(_requests.empty());
 
         return true;
     }
