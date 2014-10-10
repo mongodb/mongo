@@ -35,7 +35,6 @@
 
 
 namespace mongo {
-namespace newlm {
     
     TEST(LockerImpl, LockNoConflict) {
         const ResourceId resId(RESOURCE_COLLECTION, std::string("TestDB.collection"));
@@ -153,12 +152,12 @@ namespace newlm {
             locker.endWriteUnitOfWork();
 
             {
-                newlm::AutoYieldFlushLockForMMAPV1Commit flushLockYield(&locker);
+                AutoYieldFlushLockForMMAPV1Commit flushLockYield(&locker);
 
                 // This block simulates the flush/remap thread
                 {
                     LockerImpl flushLocker(2);
-                    newlm::AutoAcquireFlushLockForMMAPV1Commit flushLockAcquire(&flushLocker);
+                    AutoAcquireFlushLockForMMAPV1Commit flushLockAcquire(&flushLocker);
                 }
             }
 
@@ -254,5 +253,4 @@ namespace newlm {
         locker.unlockAll();
     }
 
-} // namespace newlm
 } // namespace mongo

@@ -187,7 +187,7 @@ namespace ThreadedTests {
                                 Lock::DBRead x(&lockState, "local");
                             }
                             {
-                                Lock::DBLock x(&lockState, "local", newlm::MODE_X);
+                                Lock::DBLock x(&lockState, "local", MODE_X);
                                 //  No actual writing here, so no WriteUnitOfWork
                                 if( sometimes ) {
                                     Lock::TempRelease t(&lockState);
@@ -199,11 +199,11 @@ namespace ThreadedTests {
                             }
 
                             { 
-                                Lock::DBLock x(&lockState, "admin", newlm::MODE_X);
+                                Lock::DBLock x(&lockState, "admin", MODE_X);
                             }
                         }
                         else if( q == 3 ) {
-                            Lock::DBLock x(&lockState, "foo", newlm::MODE_X);
+                            Lock::DBLock x(&lockState, "foo", MODE_X);
                             Lock::DBRead y(&lockState, "admin");
                         }
                         else if( q == 4 ) { 
@@ -211,7 +211,7 @@ namespace ThreadedTests {
                             Lock::DBRead y(&lockState, "admin");
                         }
                         else { 
-                            Lock::DBLock w(&lockState, "foo", newlm::MODE_X);
+                            Lock::DBLock w(&lockState, "foo", MODE_X);
 
                             {
                                 Lock::TempRelease t(&lockState);

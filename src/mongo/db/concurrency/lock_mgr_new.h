@@ -47,9 +47,6 @@
 namespace mongo {
 
     class Locker;
-
-namespace newlm {
-
     struct LockHead;
 
     /**
@@ -76,9 +73,6 @@ namespace newlm {
         // Counts the entries in the LockMode enumeration. Used for array size allocations, etc.
         LockModesCount   = 5,
     };
-
-    // To ensure lock modes are not added without updating the counts
-    BOOST_STATIC_ASSERT(LockModesCount == MODE_X + 1);
 
 
     /**
@@ -343,5 +337,4 @@ namespace newlm {
         bool _noCheckForLeakedLocksTestOnly;
     };
 
-} // namespace newlm
 } // namespace mongo

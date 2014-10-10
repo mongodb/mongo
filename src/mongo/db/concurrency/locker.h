@@ -75,7 +75,7 @@ namespace mongo {
          *          acquired within the specified time bound. Otherwise, the respective failure
          *          code and neither lock will be acquired.
          */
-        virtual newlm::LockResult lockGlobal(newlm::LockMode mode,
+        virtual LockResult lockGlobal(LockMode mode,
                                              unsigned timeoutMs = UINT_MAX) = 0;
 
         /**
@@ -127,8 +127,8 @@ namespace mongo {
          *
          * @return All LockResults except for LOCK_WAITING, because it blocks.
          */
-        virtual newlm::LockResult lock(const newlm::ResourceId& resId,
-                                       newlm::LockMode mode,
+        virtual LockResult lock(const ResourceId& resId,
+                                       LockMode mode,
                                        unsigned timeoutMs = UINT_MAX) = 0;
 
         /**
@@ -138,7 +138,7 @@ namespace mongo {
          * @return true if the lock was actually released; false if only the reference count was 
          *              decremented, but the lock is still held.
          */
-        virtual bool unlock(const newlm::ResourceId& resId) = 0;
+        virtual bool unlock(const ResourceId& resId) = 0;
 
         /**
          * Retrieves the mode in which a lock is held or checks whether the lock held for a
@@ -147,9 +147,9 @@ namespace mongo {
          * For example isLockHeldForMode will return true for MODE_S, if MODE_X is already held,
          * because MODE_X covers MODE_S.
          */
-        virtual newlm::LockMode getLockMode(const newlm::ResourceId& resId) const = 0;
-        virtual bool isLockHeldForMode(const newlm::ResourceId& resId,
-                                       newlm::LockMode mode) const = 0;
+        virtual LockMode getLockMode(const ResourceId& resId) const = 0;
+        virtual bool isLockHeldForMode(const ResourceId& resId,
+                                       LockMode mode) const = 0;
 
         /**
          * LockSnapshot captures the state of all resources that are locked, what modes they're
@@ -157,17 +157,17 @@ namespace mongo {
          */
         struct LockSnapshot {
             // The global lock is handled differently from all other locks.
-            newlm::LockMode globalMode;
+            LockMode globalMode;
 
             // One can acquire the global lock repeatedly.
             unsigned globalRecursiveCount;
 
             struct OneLock {
                 // What lock resource is held?
-                newlm::ResourceId resourceId;
+                ResourceId resourceId;
 
                 // In what mode is it held?
-                newlm::LockMode mode;
+                LockMode mode;
 
                 // What's the recursive count of this lock?  Note that we don't store any state
                 // about how we got this lock (eg upgrade), just how many times we've locked it
@@ -222,7 +222,7 @@ namespace mongo {
         virtual bool isLocked() const = 0;
         virtual bool isWriteLocked() const = 0;
         virtual bool isWriteLocked(const StringData& ns) const = 0;
-        virtual bool isDbLockedForMode(const StringData& dbName, newlm::LockMode mode) const = 0;
+        virtual bool isDbLockedForMode(const StringData& dbName, LockMode mode) const = 0;
         virtual bool isAtLeastReadLocked(const StringData& ns) const = 0;
         virtual bool isRecursive() const = 0;
 

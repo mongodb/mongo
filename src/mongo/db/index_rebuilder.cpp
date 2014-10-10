@@ -64,7 +64,7 @@ namespace {
 
             // This write lock is held throughout the index building process
             // for this namespace.
-            Lock::DBLock lk(txn->lockState(), nsToDatabaseSubstring(ns), newlm::MODE_X);
+            Lock::DBLock lk(txn->lockState(), nsToDatabaseSubstring(ns), MODE_X);
             Client::Context ctx(txn, ns);
 
             Collection* collection = ctx.db()->getCollection(txn, ns);
@@ -147,7 +147,7 @@ namespace {
             for (std::vector<std::string>::const_iterator dbName = dbNames.begin();
                  dbName < dbNames.end();
                  ++dbName) {
-                AutoGetDb autoDb(txn, *dbName, newlm::MODE_S);
+                AutoGetDb autoDb(txn, *dbName, MODE_S);
 
                 Database* db = autoDb.getDb();
                 db->getDatabaseCatalogEntry()->getCollectionNamespaces(&collNames);

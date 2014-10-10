@@ -168,7 +168,7 @@ namespace repl {
         bool exists = Helpers::getSingleton(txn, "local.me", _me);
 
         if (!exists || !_me.hasField("host") || _me["host"].String() != myname) {
-            Lock::DBLock dblk(txn->lockState(), "local", newlm::MODE_X);
+            Lock::DBLock dblk(txn->lockState(), "local", MODE_X);
             WriteUnitOfWork wunit(txn);
             // clean out local.me
             Helpers::emptyCollection(txn, "local.me");

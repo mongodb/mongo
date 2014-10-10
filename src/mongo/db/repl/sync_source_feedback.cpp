@@ -78,7 +78,7 @@ namespace repl {
     void SyncSourceFeedback::ensureMe(OperationContext* txn) {
         string myname = getHostName();
         {
-            Lock::DBLock dlk(txn->lockState(), "local", newlm::MODE_X);
+            Lock::DBLock dlk(txn->lockState(), "local", MODE_X);
             WriteUnitOfWork wunit(txn);
             Client::Context ctx(txn, "local");
 

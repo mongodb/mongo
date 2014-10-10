@@ -594,7 +594,7 @@ namespace QueryTests {
         }
         void run() {
             const char *ns = "unittests.querytests.OplogReplaySlaveReadTill";
-            Lock::DBLock lk(_txn.lockState(), "unittests", newlm::MODE_X);
+            Lock::DBLock lk(_txn.lockState(), "unittests", MODE_X);
             WriteUnitOfWork wunit(&_txn);
             Client::Context ctx(&_txn,  ns );
 
@@ -1405,7 +1405,7 @@ namespace QueryTests {
     public:
         CollectionInternalBase( const char *nsLeaf ) :
           CollectionBase( nsLeaf ),
-          _lk(_txn.lockState(), "unittests", newlm::MODE_X),
+          _lk(_txn.lockState(), "unittests", MODE_X),
           _ctx(&_txn, ns()) {
         }
 

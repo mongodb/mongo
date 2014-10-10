@@ -38,7 +38,6 @@
 
 
 namespace mongo {
-namespace newlm {
 
     namespace {
 
@@ -733,5 +732,4 @@ namespace newlm {
         recursiveCount = 0;
     }
 
-} // namespace newlm
 } // namespace mongo

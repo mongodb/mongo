@@ -37,7 +37,6 @@
 
 
 namespace mongo {
-namespace newlm {
 
     namespace {
 
@@ -64,8 +63,44 @@ namespace newlm {
         const ResourceId resourceIdLocalDB =
                                 ResourceId(RESOURCE_DATABASE, string("local"));
 
-        bool isSharedMode(newlm::LockMode mode) {
-            return (mode == newlm::MODE_IS || mode == newlm::MODE_S);
+        /**
+         * Returns whether the passed in mode is S or IS. Used for validation checks.
+         */
+        bool isSharedMode(LockMode mode) {
+            return (mode == MODE_IS || mode == MODE_S);
+        }
+
+        /**
+         * Whether the particular lock's release should be held until the end of the operation.
+         */
+        bool shouldDelayUnlock(const ResourceId& resId, LockMode mode) {
+            // Global and flush lock are not used to protect transactional resources and as such, they
+            // need to be acquired and released when requested.
+            if (resId == resourceIdGlobal) {
+                return false;
+            }
+
+            if (resId == resourceIdMMAPV1Flush) {
+                return false;
+            }
+
+            switch (mode) {
+                // unlocks of exclusive locks are delayed to the end of the WUOW
+            case MODE_X:
+            case MODE_IX:
+                return true;
+
+                // nothing else should be
+            case MODE_IS:
+            case MODE_S:
+                return false;
+
+                // these should never be passed in
+            case MODE_NONE:
+                invariant(false);
+            }
+
+            invariant(false);
         }
     }
 
@@ -97,12 +132,12 @@ namespace newlm {
         }
 
         const StringData db = nsToDatabaseSubstring(ns);
-        const newlm::ResourceId resIdNs(newlm::RESOURCE_DATABASE, db);
+        const ResourceId resIdNs(RESOURCE_DATABASE, db);
 
-        return isLockHeldForMode(resIdNs, newlm::MODE_X);
+        return isLockHeldForMode(resIdNs, MODE_X);
     }
 
-    bool LockerImpl::isDbLockedForMode(const StringData& dbName, newlm::LockMode mode) const {
+    bool LockerImpl::isDbLockedForMode(const StringData& dbName, LockMode mode) const {
         DEV {
             const NamespaceString nss(dbName);
             dassert(nss.coll().empty());
@@ -111,7 +146,7 @@ namespace newlm {
         if (isW()) return true;
         if (isR() && isSharedMode(mode)) return true;
 
-        const newlm::ResourceId resIdDb(newlm::RESOURCE_DATABASE, dbName);
+        const ResourceId resIdDb(RESOURCE_DATABASE, dbName);
         return isLockHeldForMode(resIdDb, mode);
     }
 
@@ -124,20 +159,20 @@ namespace newlm {
         }
 
         const StringData db = nsToDatabaseSubstring(ns);
-        const newlm::ResourceId resIdDb(newlm::RESOURCE_DATABASE, db);
+        const ResourceId resIdDb(RESOURCE_DATABASE, db);
 
         // S on the database means we don't need to check further down the hierarchy
-        if (isLockHeldForMode(resIdDb, newlm::MODE_S)) {
+        if (isLockHeldForMode(resIdDb, MODE_S)) {
             return true;
         }
 
-        if (!isLockHeldForMode(resIdDb, newlm::MODE_IS)) {
+        if (!isLockHeldForMode(resIdDb, MODE_IS)) {
             return false;
         }
 
         if (nsIsFull(ns)) {
-            const newlm::ResourceId resIdColl(newlm::RESOURCE_DATABASE, ns);
-            return isLockHeldForMode(resIdColl, newlm::MODE_IS);
+            const ResourceId resIdColl(RESOURCE_DATABASE, ns);
+            return isLockHeldForMode(resIdColl, MODE_IS);
         }
 
         // We're just asking about a database, so IS on the db is enough.
@@ -489,38 +524,6 @@ namespace newlm {
         return result;
     }
 
-namespace {
-    bool shouldDelayUnlock(const ResourceId& resId, LockMode mode) {
-        // Global and flush lock are not used to protect transactional resources and as such, they
-        // need to be acquired and released when requested.
-        if (resId == resourceIdGlobal) {
-            return false;
-        }
-
-        if (resId == resourceIdMMAPV1Flush) {
-            return false;
-        }
-
-        switch (mode) {
-        // unlocks of exclusive locks are delayed to the end of the WUOW
-        case MODE_X:
-        case MODE_IX:
-            return true;
-
-        // nothing else should be
-        case MODE_IS:
-        case MODE_S:
-            return false;
-
-        // these should never be passed in
-        case MODE_NONE:
-            invariant(false);
-        }
-
-        invariant(false);
-    }
-} // namespace
-
     bool LockerImpl::unlock(const ResourceId& resId) {
         LockRequest* request = _find(resId);
 
@@ -743,5 +746,4 @@ namespace {
         invariant(_locker->unlock(resourceIdMMAPV1Flush));
     }
 
-} // namespace newlm
 } // namespace mongo

@@ -37,7 +37,6 @@
 
 
 namespace mongo {
-namespace newlm {
 
     /**
      * Hierarchy of resource types. The lock manager knows nothing about this hierarchy, it is
@@ -115,13 +114,12 @@ namespace newlm {
     //
     // BOOST_STATIC_ASSERT(sizeof(ResourceId) == sizeof(uint64_t));
 
-} // namespace newlm
 } // namespace mongo
 
 
 MONGO_HASH_NAMESPACE_START
-    template <> struct hash<mongo::newlm::ResourceId> {
-        size_t operator()(const mongo::newlm::ResourceId& resource) const {
+    template <> struct hash<mongo::ResourceId> {
+        size_t operator()(const mongo::ResourceId& resource) const {
             return resource;
         }
     };

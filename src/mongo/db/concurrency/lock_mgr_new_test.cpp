@@ -31,7 +31,6 @@
 
 
 namespace mongo {
-namespace newlm {
 
     TEST(ResourceId, Semantics) {
         ResourceId resIdDb(RESOURCE_DATABASE, 324334234);
@@ -635,5 +634,4 @@ namespace newlm {
         checkConflict(MODE_X, MODE_X, true);
     }
 
-} // namespace newlm
 } // namespace mongo

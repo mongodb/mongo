@@ -53,7 +53,7 @@ namespace mongo {
      * Example usage: 
      * beforeMetadata = <get latest local metadata>;
      * remoteMetadata = makeCollectionMetadata( beforeMetadata, remoteMetadata );
-     * DBLock lock(txn, dbname, newlm::MODE_X);
+     * DBLock lock(txn, dbname, MODE_X);
      * afterMetadata = <get latest local metadata>;
      * promotePendingChunks( afterMetadata, remoteMetadata );
      *

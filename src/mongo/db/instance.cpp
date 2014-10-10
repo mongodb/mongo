@@ -623,8 +623,8 @@ namespace mongo {
 
         {
             //  Tentatively take an intent lock, fix up if we need to create the collection
-            Lock::DBLock dbLock(txn->lockState(), ns.db(), newlm::MODE_IX);
-            Lock::CollectionLock colLock(txn->lockState(), ns.ns(), newlm::MODE_IX);
+            Lock::DBLock dbLock(txn->lockState(), ns.db(), MODE_IX);
+            Lock::CollectionLock colLock(txn->lockState(), ns.ns(), MODE_IX);
             Client::Context ctx(txn, ns);
 
             //  The common case: no implicit collection creation
@@ -640,7 +640,7 @@ namespace mongo {
         //  This is an upsert into a non-existing database, so need an exclusive lock
         //  to avoid deadlock
         {
-            Lock::DBLock dbLock(txn->lockState(), ns.db(), newlm::MODE_X);
+            Lock::DBLock dbLock(txn->lockState(), ns.db(), MODE_X);
             Client::Context ctx(txn, ns);
             UpdateResult res = executor.execute(ctx.db());
             lastError.getSafe()->recordUpdate( res.existing , res.numMatched , res.upserted );
@@ -672,8 +672,8 @@ namespace mongo {
         DeleteExecutor executor(&request);
         uassertStatusOK(executor.prepare());
 
-        Lock::DBLock dbLocklk(txn->lockState(), ns.db(), newlm::MODE_IX);
-        Lock::CollectionLock colLock(txn->lockState(), ns.ns(), newlm::MODE_IX);
+        Lock::DBLock dbLocklk(txn->lockState(), ns.db(), MODE_IX);
+        Lock::CollectionLock colLock(txn->lockState(), ns.ns(), MODE_IX);
         Client::Context ctx(txn, ns);
 
         long long n = executor.execute(ctx.db());
@@ -935,7 +935,7 @@ namespace mongo {
         const int notMasterCodeForInsert = 10058; // This is different from ErrorCodes::NotMaster
         {
             const bool isIndexBuild = (nsToCollectionSubstring(ns) == "system.indexes");
-            const newlm::LockMode mode = isIndexBuild ? newlm::MODE_X : newlm::MODE_IX;
+            const LockMode mode = isIndexBuild ? MODE_X : MODE_IX;
             Lock::DBLock dbLock(txn->lockState(), nsString.db(), mode);
             Lock::CollectionLock collLock(txn->lockState(), nsString.ns(), mode);
 
@@ -945,7 +945,7 @@ namespace mongo {
                     repl::getGlobalReplicationCoordinator()->canAcceptWritesForDatabase(nsString.db()));
 
             Client::Context ctx(txn, ns);
-            if (mode == newlm::MODE_X || ctx.db()->getCollection(txn, nsString)) {
+            if (mode == MODE_X || ctx.db()->getCollection(txn, nsString)) {
                 if (multi.size() > 1) {
                     const bool keepGoing = d.reservedField() & InsertOption_ContinueOnError;
                     insertMulti(txn, ctx, keepGoing, ns, multi, op);
@@ -959,7 +959,7 @@ namespace mongo {
         }
 
         // Collection didn't exist so try again with MODE_X
-        Lock::DBLock dbLock(txn->lockState(), nsString.db(), newlm::MODE_X);
+        Lock::DBLock dbLock(txn->lockState(), nsString.db(), MODE_X);
 
         // CONCURRENCY TODO: is being read locked in big log sufficient here?
         // writelock is used to synchronize stepdowns w/ writes

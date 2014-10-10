@@ -149,7 +149,7 @@ namespace mongo {
 
         // We lock the entire database in S-mode in order to ensure that the contents will not
         // change for the snapshot.
-        AutoGetDb autoDb(txn, ns, newlm::MODE_S);
+        AutoGetDb autoDb(txn, ns, MODE_S);
         Database* db = autoDb.getDb();
         if (db) {
             db->getDatabaseCatalogEntry()->getCollectionNamespaces(&colls);
