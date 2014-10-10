@@ -78,11 +78,6 @@ namespace repl {
                 return true;
             }
 
-            if (cmdObj.hasElement("sethbmsg")) {
-                sethbmsg(cmdObj["sethbmsg"].String());
-                return true;
-            }
-
             return false;
         }
     };

@@ -130,11 +130,5 @@ assert.writeOK(bulk.execute());
 print("11. Everyone happy eventually");
 replTest.awaitReplication(300000);
 
-
-print("13. Check hbmsg");
-master.getDB("admin").runCommand({replSetTest:1, sethbmsg:"foo bar baz"});
-var status = master.getDB("admin").runCommand({replSetGetStatus:1});
-printjson(status);
-assert.eq(status.members[0].infoMessage, "foo bar baz");
 stopMongod(ports[2]);
 replTest.stopSet();
