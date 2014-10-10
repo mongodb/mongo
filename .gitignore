@@ -2,17 +2,18 @@
 *.exe
 
 bin/
-pkg/
 
-src/code.google.com/
-src/github.com/3rf/
-src/github.com/golang/
-src/github.com/jacobsa/
-src/github.com/jessevdk/
-src/github.com/ogier/
-src/github.com/smartystreets/
-src/github.com/spacemonkeygo/
-src/gopkg.in
-src/labix.org
+vendor/pkg
 
+bsondump/main/bsondump
+mongodump/main/mongodump
+mongoexport/main/mongoexport
+mongofiles/main/mongofiles
+mongoimport/main/mongoimport
+mongooplog/main/mongooplog
+mongorestore/main/mongorestore
+mongotop/main/mongotop
+mongostat/main/mongostat
+
+.gopath
 .godeps

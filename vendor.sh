@@ -2,37 +2,24 @@
 
 set -eu
 
+# Make sure we're in the directory where the script lives
+SCRIPT_DIR="$(cd "$(dirname ${BASH_SOURCE[0]})" && pwd)"
+cd $SCRIPT_DIR
+echo "Installing dependencies..."
+
+# Set the $GOPATH appropriately so that the dependencies are 
+# installed into the vendor directory
+export GOPATH=`pwd`/vendor
+
 ## Functions/
 usage() {
 cat << EOF
-SYNOPSIS
-
-    gpm leverages the power of the go get command and the underlying version
-    control systems used by it to set your Go dependencies to desired versions,
-    thus allowing easily reproducible builds in your Go projects.
-
-    A Godeps file in the root of your Go application is expected containing
-    the import paths of your packages and a specific tag or commit hash
-    from its version control system, an example Godeps file looks like this:
-
-    $ cat Godeps
-    # This is a comment
-    github.com/nu7hatch/gotrail         v0.0.2
-    github.com/replicon/fast-archiver   v1.02   #This is another comment!
-    github.com/nu7hatch/gotrail         2eb79d1f03ab24bacbc32b15b75769880629a865
-    # pull in gopkg.in/mgo.v2 from an alternate location
-    gopkg.in/mgo.v2                     c9fd3712fbf3e92924c974dce16da2d322508fe2          github.com/go-mgo/mgo
-
-    gpm has a companion tool, called [gvp](https://github.com/pote/gvp) which
-    provides vendoring functionalities, it alters your GOPATH so every project
-    has its own isolated dependency directory, its usage is recommended.
-
 USAGE
-      $ gpm             # Same as 'install'.
-      $ gpm install     # Parses the Godeps file, installs dependencies and sets
-                        # them to the appropriate version.
-      $ gpm version     # Outputs version information
-      $ gpm help        # Prints this message
+      $ vendor.sh             # Same as 'install'.
+      $ vendor.sh install     # Parses the Godeps file, installs dependencies and sets
+                              # them to the appropriate version.
+      $ vendor.sh version     # Outputs the version of gpm used
+      $ vendor.sh help        # Prints this message
 EOF
 }
 

@@ -13,7 +13,6 @@ mongo_tools_variables:
     rhel55_32: &mongo_url_rhell55_32
       mongo_url: "https://fastdl.mongodb.org/linux/mongodb-linux-i686-latest.tgz"
     linux_64_bit: &mongo_url_ubuntu1204
-      # 10/02/2014: shim not present in http://downloads.10gen.com/linux/mongodb-linux-x86_64-latest.tgz
       mongo_url: "http://downloads.10gen.com/linux/mongodb-linux-x86_64-enterprise-ubuntu1204-latest.tgz"
     linux_64_bit_enterprise: &mongo_url_ubuntu1204_enterprise
       mongo_url: "http://downloads.10gen.com/linux/mongodb-linux-x86_64-enterprise-ubuntu1204-latest.tgz"
@@ -23,7 +22,6 @@ mongo_tools_variables:
       mongo_url: "https://fastdl.mongodb.org/win32/mongodb-win32-x86_64-2008plus-latest.zip"
     windows_64_bit_enterprise: &mongo_url_windows64_enterprise
       mongo_url: "http://downloads.10gen.com/win32/mongodb-win32-x86_64-enterprise-windows-64-latest.zip"
-
 
 ## List of tests to run on each buildvariant
   mongo_tools_task_lists:
@@ -84,7 +82,7 @@ mongo_tools_variables:
     default: &mongodb_default_startup_args
       mongodb_args: &default_startup_args_string "--dbpath mongodb/db_files --port 27017 --setParameter=enableTestCommands=1 &"
     ssl: &mongodb_ssl_startup_args
-      mongodb_args: "--sslMode requireSSL --sslCAFile src/github.com/mongodb/mongo-tools/common/db/openssl/testdata/ca.pem --sslPEMKeyFile src/github.com/mongodb/mongo-tools/common/db/openssl/testdata/server.pem --dbpath mongodb/db_files --port 27017 --setParameter=enableTestCommands=1 &"
+      mongodb_args: "--sslMode requireSSL --sslCAFile common/db/openssl/testdata/ca.pem --sslPEMKeyFile common/db/openssl/testdata/server.pem --dbpath mongodb/db_files --port 27017 --setParameter=enableTestCommands=1 &"
     auth: &mongodb_auth_startup_args
       mongodb_args: "--auth --dbpath mongodb/db_files --port 27017 --setParameter=enableTestCommands=1 &"
 
@@ -105,14 +103,9 @@ functions:
     params:
       working_dir: src
       script: |
-        set -o verbose
-        if [ "Windows_NT" = "$OS" ]; then
-          export GOPATH=$(cygpath -w $(pwd));
-        else
-          export GOPATH=`pwd`;
-        fi;
         echo "Building ${tool}..."
-        ${library_path} go build ${args} ${build_tags} -o ${tool} github.com/mongodb/mongo-tools/${tool}/main
+        source ./set_gopath.sh
+        ${library_path} go build ${args} ${build_tags} -o ${tool} ${tool}/main
 
   "download mongod":
     command: shell.exec
@@ -143,12 +136,8 @@ functions:
       working_dir: src
       script: |
         set -o verbose
-        if [ "Windows_NT" = "$OS" ]; then
-          export GOPATH=$(cygpath -w $(pwd));
-        else
-          export GOPATH=`pwd`;
-        fi;
         if [ "${coverage}" = "true" ]; then
+          source ./set_gopath.sh
           go tool cover -html=coverage.out -o coverage.html
           go tool cover -func=coverage.out -o coverage.txt
         fi;
@@ -165,25 +154,21 @@ functions:
       working_dir: src
       script: |
         set -o verbose
-        if [ "Windows_NT" = "$OS" ]; then
-          export GOPATH=$(cygpath -w $(pwd));
-        else
-          export GOPATH=`pwd`;
-        fi;
         if [ "${coverage}" = "true" ]; then
-          mv src/github.com/mongodb/mongo-tools/${package}/coverage.out $GOPATH
+          mv ${package}/coverage.out . 
         fi;
 
   "run unit test":
-    command: gotest.run
+    command: shell.exec 
     params:
       working_dir: src
-      tests:
-        - dir: src/github.com/mongodb/mongo-tools/${package}
-          args: ${coverage_args} ${args} ${build_tags}
-          environment_variables:
-            - ${library_path}
-            - MONGODB_KERBEROS_PASSWORD=${kerberos_password}
+      script: |
+        source ./set_gopath.sh
+        if [ "${library_path}" != "" ] then
+            export ${library_path}
+        fi;
+        export MONGODB_KERBEROS_PASSWORD=${kerberos_password}
+        go test ${coverage_args} ${args} ${build_tags}
 
   "setup integration test":
     command: shell.exec
@@ -200,44 +185,57 @@ functions:
           cmd /c "REG ADD HKLM\SYSTEM\ControlSet001\Control\Lsa\Kerberos\Domains\LDAPTEST.10GEN.CC /v KdcNames /d ldaptest.10gen.cc /t REG_MULTI_SZ /f"
         fi;
 
-  "run tool tests":
-    command: gotest.run
+  "setup permissions":
+    command: shell.exec
     params:
       working_dir: src
-      tests:
+      script: |
+        chmod 700 go.sh
+        chmod 700 set_gopath.sh
+
+  "run tool tests":
+    command: shell.exec 
+    params:
+      working_dir: src
+      script: | 
+        source ./set_gopath.sh
+        if [ "${library_path}" != "" ] then
+            export ${library_path}
+        fi;
+
         # TODO bsondump needs tests
         # TODO mongodump needs tests
         # TODO mongotop needs tests
-        - dir: src/github.com/mongodb/mongo-tools/mongoimport
-          args: ${coverage_args} ${args} ${build_tags}
-          environment_variables:
-            - MONGOSHIM=./mongoshim${extension}
-            - ${library_path}
-        - dir: src/github.com/mongodb/mongo-tools/mongoexport
-          args: ${coverage_args} ${args} ${build_tags}
-          environment_variables:
-            - MONGOSHIM=./mongoshim${extension}
-            - ${library_path}
-        - dir: src/github.com/mongodb/mongo-tools/mongostat
-          args: ${coverage_args} ${args} ${build_tags}
-          environment_variables:
-            - MONGOSHIM=./mongoshim${extension}
-            - ${library_path}
-        - dir: src/github.com/mongodb/mongo-tools/mongooplog
-          args: ${coverage_args} ${args} ${build_tags}
-          environment_variables:
-            - MONGOSHIM=./mongoshim${extension}
-            - ${library_path}
-        - dir: src/github.com/mongodb/mongo-tools/mongorestore
-          args: ${coverage_args} ${args} ${build_tags}
-          environment_variables:
-            - MONGOSHIM=./mongoshim${extension}
-            - ${library_path}
-        - dir: src/github.com/mongodb/mongo-tools/mongofiles
-          args: ${coverage_args} ${args} ${build_tags}
-          environment_variables:
-            - MONGOSHIM=./mongoshim${extension}
-            - ${library_path}
+
+        # mongoimport
+        cd mongoimport
+        go test ${coverage_args} ${args} ${build_tags}
+        cd ..
+
+        # mongoexport
+        cd mongoexport
+        go test ${coverage_args} ${args} ${build_tags}
+        cd ..
+
+        # mongostat
+        cd mongostat
+        go test ${coverage_args} ${args} ${build_tags}
+        cd ..
+
+        # mongooplog
+        cd mongooplog
+        go test ${coverage_args} ${args} ${build_tags}
+        cd ..
+
+        # mongorestore
+        cd mongorestore
+        go test ${coverage_args} ${args} ${build_tags}
+        cd ..
+
+        # mongofiles
+        cd mongofiles
+        go test ${coverage_args} ${args} ${build_tags}
+        cd ..
 
   "setup credentials" :
     command: shell.exec
@@ -249,20 +247,6 @@ functions:
         slavename='${slave}'
         passwd='${passwd}'
         END_OF_CREDS
-
-  "setup go env":
-    command: shell.exec
-    params:
-      working_dir: src
-      script: |
-        set -o verbose
-        if [ "Windows_NT" = "$OS" ]; then
-          export GOPATH=$(cygpath -w $(pwd));
-        else
-          export GOPATH=`pwd`;
-        fi;
-        ${preproc_gpm|echo} ./gpm
-        ./gpm install
 
   "start mongod":
     command: shell.exec
@@ -376,7 +360,6 @@ tasks:
     - command: git.apply_patch
       params:
         directory: src
-    - func: "setup go env"
     - command: expansions.update
       params:
         updates:
@@ -400,7 +383,6 @@ tasks:
     - command: git.apply_patch
       params:
         directory: src
-    - func: "setup go env"
     - command: expansions.update
       params:
         updates:
@@ -432,7 +414,11 @@ tasks:
     - command: git.apply_patch
       params:
         directory: src
-    - func: "setup go env"
+    - command: shell.exec
+      params:
+        working_dir: src
+        script: |
+          ./vendor.sh
     # bsondump
     - func: "build tool"
       vars:
@@ -532,7 +518,6 @@ tasks:
     - command: git.apply_patch
       params:
         directory: src
-    - func: "setup go env"
     - command: expansions.update
       params:
         updates:
@@ -558,7 +543,6 @@ tasks:
     - command: git.apply_patch
       params:
         directory: src
-    - func: "setup go env"
     - func: "get buildnumber"
     - func: "setup credentials"
     - func: "download mongod"
@@ -590,7 +574,7 @@ tasks:
           mv ./mongodb/mongod${extension} .
           mv ./mongodb/mongo${extension} .
           mv ./mongodb/mongoshim${extension} .
-          mv src/github.com/mongodb/mongo-tools/legacy/* .
+          mv legacy/* .
           chmod +x mongo*
           python buildscripts/smoke.py --nopreallocj --with-cleanbb --mongod ./mongod --mongo ./mongo --report-file report.json --continue-on-failure --buildlogger-builder MCI_${build_variant} --buildlogger-buildnum ${builder_num|} --buildlogger-credentials ./mci.buildlogger --buildlogger-phase ${task_name}_${execution} tool
           echo $? > retVal
@@ -612,19 +596,12 @@ tasks:
     - command: git.apply_patch
       params:
         directory: src
-    - func: "setup go env"
     - command: shell.exec
       params:
-        working_dir: src
         script: |
           set -o errexit
           set -o verbose
-          if [ "Windows_NT" = "$OS" ]; then
-            export GOPATH=$(cygpath -w $(pwd));
-          else
-            export GOPATH=`pwd`;
-          fi;
-          retVal=$(go run src/github.com/3rf/mongo-lint/golint/golint.go src/github.com/mongodb/mongo-tools/);
+          retVal=$(./go.sh run src/github.com/3rf/mongo-lint/golint/golint.go src);
           if [ "$retVal" = "" ]; then exit 0; else echo $retVal; exit 1; fi;
 
 - name: log
@@ -635,7 +612,6 @@ tasks:
     - command: git.apply_patch
       params:
         directory: src
-    - func: "setup go env"
     - command: expansions.update
       params:
         updates:
@@ -659,7 +635,6 @@ tasks:
     - command: git.apply_patch
       params:
         directory: src
-    - func: "setup go env"
     - command: expansions.update
       params:
         updates:
@@ -683,7 +658,6 @@ tasks:
     - command: git.apply_patch
       params:
         directory: src
-    - func: "setup go env"
     - command: expansions.update
       params:
         updates:
@@ -707,7 +681,6 @@ tasks:
     - command: git.apply_patch
       params:
         directory: src
-    - func: "setup go env"
     - command: expansions.update
       params:
         updates:
@@ -731,7 +704,6 @@ tasks:
     - command: git.apply_patch
       params:
         directory: src
-    - func: "setup go env"
     - func: "download mongod"
     - command: shell.exec
       params:
@@ -750,14 +722,13 @@ tasks:
     - command: git.apply_patch
       params:
         directory: src
-    - func: "setup go env"
     - func: "download mongod"
     - command: shell.exec
       params:
         working_dir: src
         script: |
           set -o verbose
-          cp ./mongodb/mongoshim${extension} src/github.com/mongodb/mongo-tools/mongofiles
+          cp ./mongodb/mongoshim${extension} mongofiles
     - func: "start mongod"
     - func: "run tool tests"
 
@@ -877,7 +848,6 @@ tasks:
     - command: git.apply_patch
       params:
         directory: src
-    - func: "setup go env"
     - command: expansions.update
       params:
         updates:
@@ -901,18 +871,12 @@ tasks:
     - command: git.apply_patch
       params:
         directory: src
-    - func: "setup go env"
     - command: shell.exec
       params:
         working_dir: src
         script: |
           set -o verbose
-          if [ "Windows_NT" = "$OS" ]; then
-            export GOPATH=$(cygpath -w $(pwd));
-          else
-            export GOPATH=`pwd`;
-          fi;
-          retVal=$(go tool vet src/github.com/mongodb/mongo-tools/); if [ "$retVal" = "" ]; then exit 0; else exit 1; fi;
+          retVal=$(./go.sh tool vet .); if [ "$retVal" = "" ]; then exit 0; else exit 1; fi;
 
 buildvariants:
 #######################################
