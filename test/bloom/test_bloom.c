@@ -55,11 +55,12 @@ static int run(void);
 static int setup(void);
 static void usage(void);
 
+extern char *__wt_optarg;
+extern int __wt_optind;
+
 int
 main(int argc, char *argv[])
 {
-	extern char *__wt_optarg;
-	extern int __wt_optind;
 	int ch;
 
 	if ((g.progname = strrchr(argv[0], '/')) == NULL)

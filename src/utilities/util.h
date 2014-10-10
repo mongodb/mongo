@@ -24,7 +24,6 @@ extern int   __wt_optind;		/* index into parent argv vector */
 extern int   __wt_optopt;		/* character checked for validity */
 extern int   __wt_optreset;		/* reset getopt */
 extern char *__wt_optarg;		/* argument associated with option */
-extern int __wt_getopt(const char *, int, char * const *, const char *);
 
 int	 util_backup(WT_SESSION *, int, char *[]);
 int	 util_cerr(const char *, const char *, int);

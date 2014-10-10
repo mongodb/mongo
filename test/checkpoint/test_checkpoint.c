@@ -39,7 +39,6 @@ static int  wt_connect(const char *);
 static int  wt_shutdown(void);
 
 extern int __wt_optind;
-extern int __wt_getopt(const char *, int, char * const *, const char *);
 extern char *__wt_optarg;
 
 int

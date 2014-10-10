@@ -54,7 +54,6 @@ static int	 value_unique;			/* Values are unique */
 static int	 verbose;			/* -v flag */
 
 extern int __wt_optind;
-extern int __wt_getopt(const char *, int, char * const *, const char *);
 extern char *__wt_optarg;
 
 int
