@@ -1258,7 +1258,6 @@ __wt_cksum_hw(const void *chunk, size_t len)
 }
 #endif
 
-
 /*
  * __wt_cksum --
  *	Return a checksum for a chunk of memory using the fastest method
