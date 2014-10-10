@@ -57,7 +57,8 @@ assert.soon(function() {
             {_id : 0, tags : ["member0"]}
         ]}});
         printjson(result);
-        return result.errmsg.match(/bad or missing host field/);
+        return (result.errmsg.match(/bad or missing host field/) ||
+                result.errmsg.match(/Missing expected field \"host\"/));
     }
     catch (e) {
         print(e);
