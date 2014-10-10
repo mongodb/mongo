@@ -1,0 +1,12 @@
+Import("env")
+
+env.Library(
+    target='storage_devnull',
+    source=[
+        'devnull_init.cpp',
+        'devnull_kv_engine.cpp',
+        ],
+    LIBDEPS=['$BUILD_DIR/mongo/db/storage/kv/kv_engine',
+             ]
+    )
+

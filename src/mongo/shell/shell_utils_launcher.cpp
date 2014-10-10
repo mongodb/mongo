@@ -375,7 +375,7 @@ namespace mongo {
                     ss << '"';
                     // escape all embedded quotes
                     for (size_t j=0; j<_argv[i].size(); ++j) {
-                        if (_argv[i][j]=='"') ss << '"';
+                        if (_argv[i][j]=='"') ss << '\\';
                         ss << _argv[i][j];
                     }
                     ss << '"';

@@ -62,6 +62,7 @@ namespace mongo {
 
         // ---- accessors -----
 
+        bool haveAnyIndexes() const;
         int numIndexesTotal( OperationContext* txn ) const;
         int numIndexesReady( OperationContext* txn ) const;
         int numIndexesInProgress( OperationContext* txn  ) const {

@@ -125,88 +125,74 @@ namespace mongo {
         return Status::OK();
     }
 
-    const DataFile* MmapV1ExtentManager::_getOpenFile( int n ) const {
-        if ( n < 0 || n >= static_cast<int>(_files.size()) )
-            log() << "uh oh: " << n;
-        invariant(n >= 0 && n < static_cast<int>(_files.size()));
-        return _files[n];
-    }
-
-
-    // todo: this is called a lot. streamline the common case
-    DataFile* MmapV1ExtentManager::getFile( OperationContext* txn,
-                                      int n,
-                                      int sizeNeeded ,
-                                      bool preallocateOnly) {
-
-        if (!txn->lockState()->isWriteLocked(_dbname)) {
-            log() << "error: getFile() called in a read lock, yet file to return is not yet open";
-            log() << "       getFile(" << n << ") _files.size:" 
-                  <<_files.size() << ' ' << fileName(n).string();
+    const DataFile* MmapV1ExtentManager::_getOpenFile(int fileId) const {
+        if (fileId < 0 || fileId >= static_cast<int>(_files.size())) {
+            log() << "_getOpenFile() invalid file index requested " << fileId;
             invariant(false);
         }
 
-        if ( n < 0 || n >= DiskLoc::MaxFiles ) {
-            log() << "getFile(): n=" << n << endl;
-            massert( 10295 , "getFile(): bad file number value (corrupt db?)."
-                    " See http://dochub.mongodb.org/core/data-recovery", false);
-        }
-        DEV {
-            if ( n > 100 ) {
-                log() << "getFile(): n=" << n << endl;
-            }
-        }
-
-        DataFile* p = 0;
-        if ( !preallocateOnly ) {
-            while ( n >= (int) _files.size() ) {
-                _files.push_back(0);
-            }
-            p = _files[n];
-        }
-
-        if ( p == 0 ) {
-            if (n == 0) {
-                audit::logCreateDatabase(currentClient.get(), _dbname);
-            }
-
-            boost::filesystem::path fullName = fileName( n );
-            string fullNameString = fullName.string();
-            p = new DataFile(n);
-            int minSize = 0;
-            if ( n != 0 && _files[ n - 1 ] )
-                minSize = _files[ n - 1 ]->getHeader()->fileLength;
-            if ( sizeNeeded + DataFileHeader::HeaderSize > minSize )
-                minSize = sizeNeeded + DataFileHeader::HeaderSize;
-            try {
-                Timer t;
-                p->open( txn, fullNameString.c_str(), minSize, preallocateOnly );
-                if ( t.seconds() > 1 ) {
-                    log() << "MmapV1ExtentManager took " << t.seconds()
-                          << " seconds to open: " << fullNameString;
-                }
-            }
-            catch ( AssertionException& ) {
-                delete p;
-                throw;
-            }
-            if ( preallocateOnly )
-                delete p;
-            else
-                _files[n] = p;
-        }
-        return preallocateOnly ? 0 : p;
+        return _files[fileId];
     }
 
-    DataFile* MmapV1ExtentManager::_addAFile( OperationContext* txn,
-                                        int sizeNeeded,
-                                        bool preallocateNextFile ) {
-        DEV txn->lockState()->assertWriteLocked(_dbname);
-        int n = (int) _files.size();
-        DataFile *ret = getFile( txn, n, sizeNeeded );
-        if ( preallocateNextFile )
-            getFile( txn, numFiles() , 0, true ); // preallocate a file
-        return ret;
+    DataFile* MmapV1ExtentManager::_getOpenFile(int fileId) {
+        if (fileId < 0 || fileId >= static_cast<int>(_files.size())) {
+            log() << "_getOpenFile() invalid file index requested " << fileId;
+            invariant(false);
+        }
+
+        return _files[fileId];
+    }
+
+    DataFile* MmapV1ExtentManager::_addAFile(OperationContext* txn,
+                                             int sizeNeeded,
+                                             bool preallocateNextFile) {
+
+        invariant(txn->lockState()->isWriteLocked(_dbname));
+
+        const int allocFileId = _files.size();
+        if (allocFileId == 0) {
+            // TODO: Does this auditing have to be done here?
+            audit::logCreateDatabase(currentClient.get(), _dbname);
+        }
+
+        int minSize = 0;
+        if (allocFileId > 0) {
+            // Make the next file at least as large as the previous
+            minSize = _files[allocFileId - 1]->getHeader()->fileLength;
+        }
+
+        if (minSize < sizeNeeded + DataFileHeader::HeaderSize) {
+            minSize = sizeNeeded + DataFileHeader::HeaderSize;
+        }
+
+        {
+            auto_ptr<DataFile> allocFile(new DataFile(allocFileId));
+            const string allocFileName = fileName(allocFileId).string();
+
+            Timer t;
+
+            allocFile->open(txn, allocFileName.c_str(), minSize, false);
+            if (t.seconds() > 1) {
+                log() << "MmapV1ExtentManager took "
+                      << t.seconds()
+                      << " seconds to open: "
+                      << allocFileName;
+            }
+
+            // It's all good
+            _files.push_back(allocFile.release());
+        }
+
+        // Preallocate is asynchronous
+        if (preallocateNextFile) {
+            auto_ptr<DataFile> nextFile(new DataFile(allocFileId + 1));
+            const string nextFileName = fileName(allocFileId + 1).string();
+
+            nextFile->open(txn, nextFileName.c_str(), minSize, false);
+        }
+
+        // Returns the last file added
+        return *_files.rbegin();
     }
 
     int MmapV1ExtentManager::numFiles() const {
@@ -305,7 +291,9 @@ namespace mongo {
         verify( size < DataFile::maxSize() );
 
         for ( int i = numFiles() - 1; i >= 0; i-- ) {
-            DataFile* f = getFile( txn, i );
+            DataFile* f = _getOpenFile(i);
+            invariant(f);
+
             if ( f->getHeader()->unusedLength >= size ) {
                 return _createExtentInFile( txn, i, f, size, enforceQuota );
             }
@@ -577,5 +565,15 @@ namespace mongo {
             error() << "corrupt pdfile version? major: " << *major << " minor: " << *minor;
             fassertFailed( 14026 );
         }
+    }
+
+    void MmapV1ExtentManager::setFileFormat(OperationContext* txn, int major, int minor) {
+        invariant(numFiles() > 0);
+
+        DataFile* df = _getOpenFile(0);
+        invariant(df);
+
+        txn->recoveryUnit()->writingInt(df->getHeader()->version) = major;
+        txn->recoveryUnit()->writingInt(df->getHeader()->versionMinor) = minor;
     }
 }

@@ -42,11 +42,22 @@ namespace scram {
     /*
      * Computes the SaltedPassword from password, salt and iterationCount.
      */
-    void generateSaltedPassword(const StringData& password,
+    void generateSaltedPassword(const StringData& hashedPassword,
                                 const unsigned char* salt,
                                 const int saltLen,
                                 const int iterationCount,
                                 unsigned char saltedPassword[hashSize]);
+
+    /*
+     * Computes the SCRAM secrets storedKey and serverKey using the salt 'salt'
+     * and iteration count 'iterationCount' as defined in RFC5802 (server side). 
+     */
+    void generateSecrets(const std::string& hashedPassword,
+                         const unsigned char salt[],
+                         size_t saltLen,
+                         size_t iterationCount,
+                         unsigned char storedKey[hashSize],
+                         unsigned char serverKey[hashSize]); 
 
     /*
      * Generates the user salt and the SCRAM secrets storedKey and serverKey as
@@ -59,6 +70,15 @@ namespace scram {
      */
     std::string generateClientProof(const unsigned char saltedPassword[hashSize],
                                     const std::string& authMessage);
+
+    /*
+     * Validates that the provided password 'hashedPassword' generates the serverKey
+     * 'serverKey' given iteration count 'iterationCount' and salt 'salt'.
+     */
+    bool validatePassword(const std::string& hashedPassword,
+                          int iterationCount,
+                          const std::string& salt,
+                          const std::string& storedKey);
 
     /*
      * Verifies ServerSignature (client side).

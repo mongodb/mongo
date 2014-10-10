@@ -608,6 +608,31 @@ namespace mongo {
             ASSERT_EQUALS(obj2.firstElement().str().length(), 19U);
         }
 
+        // Test #VARIABLE
+        TEST(BSONTemplateEvaluatorTest, VARIABLE) {
+            BsonTemplateEvaluator *t = new BsonTemplateEvaluator();
+            int value1;
+
+            // Test failure when the variable has not been set
+            // {id: { #VARIABLE: "foo" } }
+            BSONObjBuilder builder1;
+            BSONObj innerObj = BSON( "#VARIABLE" << "foo" );
+            ASSERT_EQUALS( BsonTemplateEvaluator::StatusOpEvaluationError,
+                           t->evaluate(BSON("id" << innerObj), builder1) );
+
+            // Test success when the variable has been set
+            // test2 := 42
+            // {id: { #VARIABLE: "test2" } }
+            t->setVariable("test2", BSON( "test2" << 42 ).getField("test2") );
+            BSONObjBuilder builder2;
+            innerObj = BSON( "#VARIABLE" << "test2" );
+            ASSERT_EQUALS( BsonTemplateEvaluator::StatusSuccess,
+                           t->evaluate(BSON("id" << innerObj), builder2) );
+            BSONObj obj2 = builder2.obj();
+            value1 = obj2["id"].numberInt();
+            ASSERT_EQUALS(value1, 42);
+        }
+
         // Test template recursion and other general features
         TEST(BSONTemplateEvaluatorTest, NESTING) {
 

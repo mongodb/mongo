@@ -54,6 +54,8 @@
 #include "mongo/platform/posix_fadvise.h"
 #include "mongo/stdx/functional.h"
 #include "mongo/util/concurrency/thread_name.h"
+#include "mongo/util/fail_point.h"
+#include "mongo/util/fail_point_service.h"
 #include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
 #include "mongo/util/paths.h"
@@ -72,6 +74,8 @@ namespace mongo {
     // unique number for temporary file names
     unsigned long long FileAllocator::_uniqueNumber = 0;
     static SimpleMutex _uniqueNumberMutex( "uniqueNumberMutex" );
+
+    MONGO_FP_DECLARE(allocateDiskFull);
 
     /**
      * Aliases for Win32 CRT functions
@@ -121,6 +125,11 @@ namespace mongo {
 
     void FileAllocator::allocateAsap( const string &name, unsigned long long &size ) {
         scoped_lock lk( _pendingMutex );
+
+        // In case the allocator is in failed state, check once before starting so that subsequent
+        // requests for the same database would fail fast after the first one has failed.
+        checkFailure();
+
         long oldSize = prevSize( name );
         if ( oldSize != -1 ) {
             size = oldSize;
@@ -184,6 +193,11 @@ namespace mongo {
     }
 
     void FileAllocator::ensureLength(int fd , long size) {
+        // Test running out of disk scenarios
+        if (MONGO_FAIL_POINT(allocateDiskFull)) {
+            uasserted( 10444 , "File allocation failed due to failpoint.");
+        }
+
 #if !defined(_WIN32)
         if (useSparseFiles(fd)) {
             LOG(1) << "using ftruncate to create a sparse file" << endl;
@@ -240,10 +254,6 @@ namespace mongo {
                 left -= written;
             }
         }
-    }
-
-    bool FileAllocator::hasFailed() const {
-        return _failed;
     }
 
     void FileAllocator::checkFailure() {
@@ -378,10 +388,14 @@ namespace mongo {
                     } catch ( const std::exception& e ) {
                         log() << "error removing files: " << e.what() << endl;
                     }
-                    scoped_lock lk( fa->_pendingMutex );
-                    fa->_failed = true;
-                    // not erasing from pending
-                    fa->_pendingUpdated.notify_all();
+
+                    {
+                        scoped_lock lk(fa->_pendingMutex);
+                        fa->_failed = true;
+
+                        // TODO: Should we remove the file from pending?
+                        fa->_pendingUpdated.notify_all();
+                    }
                     
                     
                     sleepsecs(10);

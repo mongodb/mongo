@@ -28,7 +28,9 @@
 
 #include "mongo/db/auth/sasl_plain_server_conversation.h"
 
+#include "mongo/crypto/mechanism_scram.h"
 #include "mongo/db/auth/sasl_authentication_session.h"
+#include "mongo/util/base64.h"
 #include "mongo/util/password_digest.h"
 #include "mongo/util/text.h"
 
@@ -73,9 +75,29 @@ namespace mongo {
 
         std::string authDigest = createPasswordDigest(_user, pwd);
 
-        if (authDigest != creds.password) {
-            return StatusWith<bool>(ErrorCodes::AuthenticationFailed,
-                mongoutils::str::stream() << "Incorrect user name or password");
+        if (!creds.password.empty()) {
+            // Handle schemaVersion26Final (MONGODB-CR/SCRAM mixed mode)
+            if (authDigest != creds.password) {
+                return StatusWith<bool>(ErrorCodes::AuthenticationFailed,
+                    mongoutils::str::stream() << "Incorrect user name or password");
+            }
+        }
+        else {
+            // Handle schemaVersion28SCRAM (SCRAM only mode)
+            unsigned char storedKey[scram::hashSize];
+            unsigned char serverKey[scram::hashSize];
+
+            scram::generateSecrets(authDigest,
+                reinterpret_cast<const unsigned char*>(base64::decode(creds.scram.salt).c_str()),
+                16,
+                creds.scram.iterationCount,
+                storedKey,
+                serverKey);
+            if (creds.scram.storedKey != base64::encode(reinterpret_cast<const char*>(storedKey),
+                                                        scram::hashSize)){
+                return StatusWith<bool>(ErrorCodes::AuthenticationFailed,
+                    mongoutils::str::stream() << "Incorrect user name or password");
+            }
         }
 
         *outputData = "";

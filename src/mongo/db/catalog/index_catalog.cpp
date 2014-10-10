@@ -818,6 +818,10 @@ namespace {
 
     // ---------------------------
 
+    bool IndexCatalog::haveAnyIndexes() const {
+        return _entries.size() != 0;
+    }
+
     int IndexCatalog::numIndexesTotal( OperationContext* txn ) const {
         return _collection->getCatalogEntry()->getTotalIndexCount( txn );
     }

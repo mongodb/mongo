@@ -65,8 +65,6 @@ namespace mongo {
         void allocateAsap( const std::string &name, unsigned long long &size );
 
         void waitUntilFinished() const;
-        
-        bool hasFailed() const;
 
         static void ensureLength(int fd, long size);
 
