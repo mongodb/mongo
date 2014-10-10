@@ -48,7 +48,12 @@ namespace mongo {
         invariant(storageEngine);
         _recovery.reset(storageEngine->newRecoveryUnit(this));
 
-        _locker.reset(new LockerImpl());
+        if (storageEngine->supportsDocLocking()) {
+            _locker.reset(new LockerImpl<false>());
+        }
+        else {
+            _locker.reset(new LockerImpl<true>());
+        }
 
         getGlobalEnvironment()->registerOperationContext(this);
     }

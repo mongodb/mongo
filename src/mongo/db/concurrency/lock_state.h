@@ -77,7 +77,11 @@ namespace mongo {
      * Lock/unlock methods must always be called from a single thread.
      *
      * All instances reference a single global lock manager.
+     *
+     * @param IsForMMAPV1 Whether to compile-in the flush lock functionality, which is specific to
+     *          the way the MMAP V1 (legacy) storag engine does commit concurrency control.
      */
+    template<bool IsForMMAPV1>
     class LockerImpl : public Locker {
     public:
 
