@@ -28,14 +28,6 @@
 #include "wt_internal.h"
 
 /*
- * This file contains two implementations for computing CRC: one that uses
- * hardware CRC instructions, available on newer x86_64/amd64, and one that uses
- * a fast software algorithm.  __wt_cksum() provides a common entry point that
- * indirects to one of these two methods.
- */
-static uint32_t (*__wt_cksum_func)(const void *chunk, size_t len);
-
-/*
  * The CRC slicing tables are used by __wt_cksum_sw.
  */
 static const uint32_t g_crc_slicing[8][256] = {
@@ -1259,6 +1251,15 @@ __wt_cksum_hw(const void *chunk, size_t len)
 #endif
 
 /*
+ * This file contains two implementations for computing CRC: one that uses
+ * hardware CRC instructions, available on newer x86_64/amd64, and one that uses
+ * a fast software algorithm.  __wt_cksum() provides a common entry point that
+ * indirects to one of these two methods.
+ */
+static uint32_t
+    (*__wt_cksum_func)(const void *chunk, size_t len) = __wt_cksum_sw;
+
+/*
  * __wt_cksum --
  *	Return a checksum for a chunk of memory using the fastest method
  * available.
@@ -1276,8 +1277,6 @@ __wt_cksum(const void *chunk, size_t len)
 void
 __wt_cksum_init(void)
 {
-#define	CPUID_ECX_HAS_SSE42	(1 << 20)
-
 #if (defined(__amd64) || defined(__x86_64))
 	unsigned int eax, ebx, ecx, edx;
 
@@ -1286,21 +1285,17 @@ __wt_cksum_init(void)
 			      : "=a" (eax), "=b" (ebx), "=c" (ecx), "=d" (edx)
 			      : "a" (1));
 
+#define	CPUID_ECX_HAS_SSE42	(1 << 20)
 	if (ecx & CPUID_ECX_HAS_SSE42)
 		__wt_cksum_func = __wt_cksum_hw;
-	else
-		__wt_cksum_func = __wt_cksum_sw;
 
 #elif defined(_M_AMD64aaa)
 	int cpuInfo[4];
 
 	__cpuid(cpuInfo, 1);
 
+#define	CPUID_ECX_HAS_SSE42	(1 << 20)
 	if (cpuInfo[2] & CPUID_ECX_HAS_SSE42)
 		__wt_cksum_func = __wt_cksum_hw;
-	else
-		__wt_cksum_func = __wt_cksum_sw;
-#else
-	__wt_cksum_func = __wt_cksum_sw;
 #endif
 }
