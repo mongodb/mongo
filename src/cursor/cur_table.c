@@ -34,26 +34,26 @@ typedef struct {
 static int
 __curextract_insert(WT_CURSOR *cursor) {
 	WT_CURSOR_EXTRACTOR *cextract;
-	WT_ITEM *key, ikey, pkey;
+	WT_ITEM *key, *ikey, pkey;
 	WT_SESSION_IMPL *session;
 
 	cextract = (WT_CURSOR_EXTRACTOR *)cursor;
 	session = (WT_SESSION_IMPL *)cursor->session;
 
-	WT_RET(__wt_cursor_get_raw_key(cursor, &ikey));
+	ikey = &cursor->key;
 	WT_RET(__wt_cursor_get_raw_key(cextract->ctable->cg_cursors[0], &pkey));
 
 	/*
 	 * TODO properly append primary key columns to the index key, taking
-	 * existing columns into account.
+	 * the index key format into account.
 	 */
-	__wt_cursor_set_raw_key(cextract->idxc, &ikey);
 	key = &cextract->idxc->key;
-	WT_RET(__wt_buf_grow(session, key, key->size + pkey.size));
-	memcpy((uint8_t *)key->mem + key->size, pkey.data, pkey.size);
-	key->size += pkey.size;
+	WT_RET(__wt_buf_grow(session, key, ikey->size + pkey.size));
+	memcpy((uint8_t *)key->mem, ikey->data, ikey->size);
+	memcpy((uint8_t *)key->mem + ikey->size, pkey.data, pkey.size);
+	key->size = ikey->size + pkey.size;
 
-	F_SET(cextract->idxc, WT_CURSTD_VALUE_EXT);
+	F_SET(cextract->idxc, WT_CURSTD_KEY_EXT | WT_CURSTD_VALUE_EXT);
 
 	/* Call the underlying cursor function to update the index. */
 	return (cextract->f(cextract->idxc));

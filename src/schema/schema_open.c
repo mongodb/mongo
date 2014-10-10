@@ -131,7 +131,7 @@ __open_index(WT_SESSION_IMPL *session, WT_TABLE *table, WT_INDEX *idx)
 	WT_DECL_ITEM(buf);
 	WT_DECL_ITEM(plan);
 	WT_DECL_RET;
-	u_int cursor_key_cols, i;
+	u_int npublic_cols, i;
 
 	WT_ERR(__wt_scr_alloc(session, 0, &buf));
 
@@ -162,21 +162,31 @@ __open_index(WT_SESSION_IMPL *session, WT_TABLE *table, WT_INDEX *idx)
 	WT_ERR(__wt_config_getones(
 	    session, idx->config, "columns", &idx->colconf));
 
-	/*
-	 * TODO For custom extractors, not all keys may exist in table.  We
-	 * need to count them regardless, and create a plan that skips them.
-	 */
-
 	/* Start with the declared index columns. */
 	WT_ERR(__wt_config_subinit(session, &colconf, &idx->colconf));
-	cursor_key_cols = 0;
+	npublic_cols = 0;
 	while ((ret = __wt_config_next(&colconf, &ckey, &cval)) == 0) {
 		WT_ERR(__wt_buf_catfmt(
 		    session, buf, "%.*s,", (int)ckey.len, ckey.str));
-		++cursor_key_cols;
+		++npublic_cols;
 	}
 	if (ret != 0 && ret != WT_NOTFOUND)
 		goto err;
+
+	/*
+	 * If we didn't find any columns, the index must have an extractor.
+	 * We don't rely on this unconditionally because it was only added to
+	 * the metadata after version 2.3.1.
+	 */
+	if (npublic_cols == 0) {
+		WT_ERR(__wt_config_getones(
+		    session, idx->config, "index_key_columns", &cval));
+		npublic_cols = cval.val;
+		WT_ASSERT(session, npublic_cols != 0);
+		for (i = 0; i < npublic_cols; i++)
+			WT_ERR(__wt_buf_catfmt(
+			    session, buf, "\"bad col\","));
+	}
 
 	/*
 	 * Now add any primary key columns from the table that are not
@@ -206,7 +216,7 @@ __open_index(WT_SESSION_IMPL *session, WT_TABLE *table, WT_INDEX *idx)
 	/* Set up the cursor key format (the visible columns). */
 	WT_ERR(__wt_buf_init(session, buf, 0));
 	WT_ERR(__wt_struct_truncate(session,
-	    idx->key_format, cursor_key_cols, buf));
+	    idx->key_format, npublic_cols, buf));
 	WT_ERR(__wt_strndup(
 	    session, buf->data, buf->size, &idx->idxkey_format));
 

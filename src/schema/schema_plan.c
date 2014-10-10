@@ -197,7 +197,7 @@ __wt_struct_plan(WT_SESSION_IMPL *session, WT_TABLE *table,
 		have_it = 0;
 
 		while ((ret = __find_next_col(session, table,
-		    &k, &cg, &col, &coltype) == 0) &&
+		    &k, &cg, &col, &coltype)) == 0 &&
 		    (!have_it || cg != start_cg || col != start_col)) {
 			/*
 			 * First we move to the column.  If that is in a
@@ -249,15 +249,17 @@ __wt_struct_plan(WT_SESSION_IMPL *session, WT_TABLE *table,
 		}
 		/*
 		 * We may fail to find a column if it is a custom extractor.
-		 * In that case, just skip it: there is nothing we can do.
-		 *
-		 * TODO handle properly: add a step to the plan to skip over
-		 * the column.
+		 * In that case, treat it as the first value column: we only
+		 * ever use such plans to extract the primary key from the
+		 * index.
 		 */
-		if (ret == WT_NOTFOUND)
+		if (ret == WT_NOTFOUND) {
 			fprintf(stderr,
 			    "__wt_schema_plan: column '%.*s' not found\n",
 			    (int)k.len, k.str);
+			WT_RET(__wt_buf_catfmt(session, plan,
+			    "0%c%c", WT_PROJ_VALUE, WT_PROJ_NEXT));
+		}
 	}
 	WT_RET_TEST(ret != WT_NOTFOUND, ret);
 
@@ -331,9 +333,14 @@ __wt_struct_reformat(WT_SESSION_IMPL *session, WT_TABLE *table,
 	 */
 	WT_RET_NOTFOUND_OK(ret = __wt_config_next(&config, &next_k, &next_v));
 	if (ret == WT_NOTFOUND) {
-		if (format->size == 0)
+		if (extra_cols != NULL) {
+			WT_RET(
+			    __wt_config_init(session, &config, extra_cols));
+			WT_RET(__wt_config_next(&config, &next_k, &next_v));
+		} else if (format->size == 0) {
 			WT_RET(__wt_buf_set(session, format, "", 1));
-		return (0);
+			return (0);
+		}
 	}
 	do {
 		k = next_k;

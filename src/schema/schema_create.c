@@ -312,10 +312,12 @@ static int
 __create_index(WT_SESSION_IMPL *session,
     const char *name, int exclusive, const char *config)
 {
-	WT_CONFIG pkcols;
-	WT_CONFIG_ITEM ckey, cval, icols;
+	WT_CONFIG kcols, pkcols;
+	WT_CONFIG_ITEM ckey, cval, icols, kval;
+	WT_DECL_PACK_VALUE(pv);
 	WT_DECL_RET;
 	WT_ITEM confbuf, extra_cols, fmt, namebuf;
+	WT_PACK pack;
 	WT_TABLE *table;
 	const char *cfg[4] =
 	    { WT_CONFIG_BASE(session, index_meta), NULL, NULL, NULL };
@@ -324,7 +326,7 @@ __create_index(WT_SESSION_IMPL *session,
 	const char *tablename;
 	size_t tlen;
 	int have_extractor;
-	u_int i;
+	u_int i, npublic_cols;
 
 	idxconf = sourceconf = NULL;
 	WT_CLEAR(confbuf);
@@ -363,14 +365,35 @@ __create_index(WT_SESSION_IMPL *session,
 	}
 
 	if (__wt_config_getones(session, config, "extractor", &cval) == 0 &&
-	    cval.len != 0)
+	    cval.len != 0) {
 		have_extractor = 1;
+		/* Custom extractors must supply a key format. */
+		WT_ERR(__wt_config_getones(
+		    session, config, "key_format", &kval));
+	}
 
 	/* Calculate the key/value formats. */
 	if (__wt_config_getones(session, config, "columns", &icols) != 0 &&
 	    !have_extractor)
 		WT_ERR_MSG(session, EINVAL,
 		    "No 'columns' configuration for '%s'", name);
+
+	/*
+	 * Count the public columns using the declared columns for normal
+	 * indices or the key format for custom extractors.
+	 */
+	npublic_cols = 0;
+	if (!have_extractor) {
+		WT_ERR(__wt_config_subinit(session, &kcols, &icols));
+		while ((ret = __wt_config_next(&kcols, &ckey, &cval)) == 0)
+			++npublic_cols;
+		WT_ERR_NOTFOUND_OK(ret);
+	} else {
+		WT_ERR(__pack_initn(session, &pack, kval.str, kval.len));
+		while ((ret = __pack_next(&pack, &pv)) == 0)
+			++npublic_cols;
+		WT_ERR_NOTFOUND_OK(ret);
+	}
 
 	/*
 	 * The key format for an index is somewhat subtle: the application
@@ -399,12 +422,9 @@ __create_index(WT_SESSION_IMPL *session,
 	/* Index values are empty: all columns are packed into the index key. */
 	WT_ERR(__wt_buf_fmt(session, &fmt, "value_format=,key_format="));
 
-	/* Custom extractors must supply a key format. */
 	if (have_extractor) {
-		WT_ERR(
-		    __wt_config_getones(session, config, "key_format", &cval));
 		WT_ERR(__wt_buf_catfmt(session, &fmt, "%.*s",
-		    (int)cval.len, cval.str));
+		    (int)kval.len, kval.str));
 		WT_CLEAR(icols);
 	}
 
@@ -421,6 +441,9 @@ __create_index(WT_SESSION_IMPL *session,
 		WT_ERR_MSG(session, EINVAL,
 		    "column-store index may not use the record number as its "
 		    "index key");
+
+	WT_ERR(__wt_buf_catfmt(
+	    session, &fmt, ",index_key_columns=%u", npublic_cols));
 
 	sourcecfg[1] = fmt.data;
 	WT_ERR(__wt_config_concat(session, sourcecfg, &sourceconf));

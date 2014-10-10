@@ -89,7 +89,6 @@ my_extract(WT_EXTRACTOR *extractor, WT_SESSION *session,
 	 * same year with different data.
 	 */
 	for (year = term_start; year <= term_end; ++year) {
-		result_cursor->set_key(result_cursor, year);
 		/*
 		 * Note that the extract callback is called for all operations
 		 * not just inserts.  The user sets the key and uses the
@@ -98,6 +97,7 @@ my_extract(WT_EXTRACTOR *extractor, WT_SESSION *session,
 		 */
 		fprintf(stderr, "EXTRACTOR: index op for year %d: %s %s\n",
 		    year, first_name, last_name);
+		result_cursor->set_key(result_cursor, year);
 		if ((ret = result_cursor->insert(result_cursor)) != 0) {
 			fprintf(stderr, "EXTRACTOR: op year %d: error %d\n",
 			    year, ret);
@@ -217,7 +217,7 @@ setup_table(WT_SESSION *session)
 	 * requires that all columns are found in the table.
 	 */
 	ret = session->create(session, "index:presidents:termindex",
-	    "key_format=H,columns=(term_begin),extractor=my_extractor");
+	    "key_format=H,columns=(term),extractor=my_extractor");
 
 	ret = session->open_cursor(
 	    session, "table:presidents", NULL, NULL, &cursor);
