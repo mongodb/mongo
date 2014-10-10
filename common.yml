@@ -46,6 +46,7 @@ mongo_tools_variables:
       - name: bsonutil
       - name: db
       - name: dist
+      - name: integration
       - name: json
       - name: legacy
       - name: lint
@@ -56,6 +57,7 @@ mongo_tools_variables:
       - name: util
       - name: vet
     ubuntu1204_ssl_task_list: &ubuntu1204_ssl_tasks
+      - name: integration
       - name: dist
     windows_32_task_list: &windows_32_tasks
       - name: db
@@ -203,8 +205,8 @@ functions:
         chmod 700 go.sh
         chmod 700 ${set_gopath|set_gopath.sh}
 
-  "run tool tests":
-    command: shell.exec 
+  "run tool unit tests":
+    command: gotest.run
     params:
       working_dir: src
       script: | 
@@ -249,6 +251,17 @@ functions:
         cd mongofiles
         go test ${coverage_args} ${args} ${build_tags}
         cd ..
+
+  "run tool integration tests":
+    command: gotest.run
+    params:
+      working_dir: src
+      tests:
+        # TODO: other tools need integration tests
+        - dir: src/github.com/mongodb/mongo-tools/mongodump
+          args: ${coverage_args} ${args} ${build_tags}
+          environment_variables:
+            - ${library_path}
 
   "setup credentials" :
     command: shell.exec
@@ -508,6 +521,24 @@ tasks:
       vars:
         tool: mongotop
 
+- name: integration
+  commands:
+    - command: git.get_project
+      params:
+        directory: src
+    - command: git.apply_patch
+      params:
+        directory: src
+    - func: "setup go env"
+    - command: expansions.update
+      params:
+        updates:
+          - key: "args"
+            value: "-test.types=integration"
+    - func: "download mongod"
+    - func: "start mongod"
+    - func: "run tool integration tests"
+
 - name: json
   commands:
     - command: git.get_project
@@ -661,9 +692,7 @@ tasks:
     - command: git.apply_patch
       params:
         directory: src
-    - func: "download mongod"
-    - func: "start mongod"
-    - func: "run tool tests"
+    - func: "run tool unit tests"
 
 - name: unit-coverage
   commands:
@@ -673,9 +702,7 @@ tasks:
     - command: git.apply_patch
       params:
         directory: src
-    - func: "download mongod"
-    - func: "start mongod"
-    - func: "run tool tests"
+    - func: "run tool unit tests"
 
 - name: util
   commands:
@@ -760,7 +787,9 @@ buildvariants:
   run_on:
   - ubuntu1204-test
   expansions:
-    build_tags: -tags "ssl"
+    <<: *mongo_url_ubuntu1204_enterprise
+    <<: *mongodb_ssl_startup_args
+    build_tags: -tags "ssl ssltest"
     edition: ssl
   tasks: *ubuntu1204_ssl_tasks
 
@@ -769,8 +798,6 @@ buildvariants:
   run_on:
   - ubuntu1204-test
   expansions:
-    <<: *mongo_url_ubuntu1204_enterprise
-    <<: *mongodb_ssl_startup_args
     build_tags: -tags "ssl sasl"
     edition: enterprise
     run_kinit: true
