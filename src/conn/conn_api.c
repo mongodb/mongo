@@ -718,22 +718,32 @@ __conn_config_append(const char *cfg[], const char *config)
  *	Read WiredTiger config files from the home directory.
  */
 static int
-__conn_config_file(WT_SESSION_IMPL *session, const char *filename,
-    const WT_CONFIG_ENTRY *test_cfg, const char **cfg, WT_ITEM *cbuf)
+__conn_config_file(WT_SESSION_IMPL *session,
+    const char *filename, int is_user, const char **cfg, WT_ITEM *cbuf)
 {
+	WT_CONNECTION_IMPL *conn;
 	WT_DECL_RET;
 	WT_FH *fh;
 	size_t len;
 	wt_off_t size;
 	int exist, quoted;
-	uint8_t *p, *t;
+	char *p, *t;
 
+	conn = S2C(session);
 	fh = NULL;
 
-	/* Check for an optional configuration file. */
+	/* Configuration files are always optional. */
 	WT_RET(__wt_exist(session, filename, &exist));
 	if (!exist)
 		return (0);
+
+	/*
+	 * The base configuration should not exist if we are creating this
+	 * database.
+	 */
+	if (!is_user && conn->is_new)
+		WT_RET_MSG(session, EINVAL,
+		    "%s exists before database creation", filename);
 
 	/* Open the configuration file. */
 	WT_RET(__wt_open(session, filename, 0, 0, 0, &fh));
@@ -833,11 +843,13 @@ __conn_config_file(WT_SESSION_IMPL *session, const char *filename,
 	*t = '\0';
 
 #if 0
-	fprintf(stderr, "file config: {%s}\n", (const char *)cbuf->data);
+	fprintf(stderr, "%s config: {%s}\n", filename, (const char *)buf);
 #endif
 
-	/* Check the configuration string. */
-	WT_ERR(__wt_config_check(session, test_cfg, cbuf->data, 0));
+	/* Check the configuration information. */
+	WT_ERR(__wt_config_check(session, is_user ?
+	    WT_CONFIG_REF(session, wiredtiger_open_usercfg) :
+	    WT_CONFIG_REF(session, wiredtiger_open_basecfg), cbuf->data, 0));
 
 	/* Append it to the stack. */
 	__conn_config_append(cfg, cbuf->data);
@@ -1188,7 +1200,7 @@ __wt_verbose_config(WT_SESSION_IMPL *session, const char *cfg[])
  */
 static int
 __conn_write_config(
-    WT_SESSION_IMPL *session, const char *filename, const char *config)
+    WT_SESSION_IMPL *session, const char *filename, const char *cfg[])
 {
 	FILE *fp;
 	WT_CONFIG parser;
@@ -1196,8 +1208,24 @@ __conn_write_config(
 	WT_DECL_RET;
 	char *path;
 
-	/* If there is no configuration, don't bother creating an empty file. */
-	if (config == NULL)
+	/*
+	 * We were passed an array of configuration strings where slot 0 is all
+	 * all possible values and the second and subsequent slots are changes
+	 * specified by the application during open (using the wiredtiger_open
+	 * configuration string, an environment variable, or user-configuration
+	 * file). The base configuration file contains all changes to default
+	 * settings made at create, and we include the user-configuration file
+	 * in that list, even though we don't expect it to change. Of course,
+	 * an application could leave that file as it is right now and not
+	 * remove a configuration we need, but applications can also guarantee
+	 * all database users specify consistent environment variables and
+	 * wiredtiger_open configuration arguments, and if we protect against
+	 * those problems, might as well include the application's configuration
+	 * file as well.
+	 *
+	 * If there is no configuration, don't bother creating an empty file.
+	 */
+	if (cfg[1] == NULL)
 		return (0);
 
 	WT_RET(__wt_filename(session, filename, &path));
@@ -1220,26 +1248,35 @@ __conn_write_config(
 
 	/*
 	 * We want the list of defaults that have been changed, that is, if the
-	 * application didn't configure a setting, we don't write out a default
-	 * value, so future releases may silently migrate to new default values.
+	 * application didn't somehow configure a setting, we don't write out a
+	 * default value, so future releases may silently migrate to new default
+	 * values.
 	 */
-	WT_ERR(__wt_config_init( session,
-	    &parser, WT_CONFIG_BASE(session, wiredtiger_open_basecfg)));
-	while ((ret = __wt_config_next(&parser, &k, &v)) == 0) {
-		if ((ret = __wt_config_getone(session, config, &k, &v)) == 0) {
-			/* Fix quoting for non-trivial settings. */
-			if (v.type == WT_CONFIG_ITEM_STRING) {
-				--v.str;
-				v.len += 2;
+	while (*++cfg != NULL) {
+		WT_ERR(__wt_config_init( session,
+		    &parser, WT_CONFIG_BASE(session, wiredtiger_open_basecfg)));
+		while ((ret = __wt_config_next(&parser, &k, &v)) == 0) {
+			if ((ret =
+			    __wt_config_getone(session, *cfg, &k, &v)) == 0) {
+				/* Fix quoting for non-trivial settings. */
+				if (v.type == WT_CONFIG_ITEM_STRING) {
+					--v.str;
+					v.len += 2;
+				}
+				fprintf(fp, "%.*s=%.*s\n",
+				    (int)k.len, k.str, (int)v.len, v.str);
 			}
-			fprintf(fp, "%.*s=%.*s\n",
-			    (int)k.len, k.str, (int)v.len, v.str);
+			WT_ERR_NOTFOUND_OK(ret);
 		}
 		WT_ERR_NOTFOUND_OK(ret);
 	}
-	WT_ERR_NOTFOUND_OK(ret);
 
 err:	WT_TRET(fclose(fp));
+
+	/* Don't leave a damaged file in place. */
+	if (ret != 0)
+		(void)__wt_remove(session, filename);
+
 	return (ret);
 }
 
@@ -1281,7 +1318,6 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
 	WT_ITEM cbbuf, cubuf;
 	const WT_NAME_FLAG *ft;
 	WT_SESSION_IMPL *session;
-	int exist;
 
 	/* Leave space for optional additional configuration. */
 	const char *cfg[] = { NULL, NULL, NULL, NULL, NULL, NULL };
@@ -1316,13 +1352,13 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
 	/* Remaining basic initialization of the connection structure. */
 	WT_ERR(__wt_connection_init(conn));
 
-	/* Check/set the configuration strings. */
+	/* Check/set the application-specified configuration string. */
 	WT_ERR(__wt_config_check(session,
 	    WT_CONFIG_REF(session, wiredtiger_open), config, 0));
 	cfg[0] = WT_CONFIG_BASE(session, wiredtiger_open);
 	cfg[1] = config;
 
-	/* Finish configuring error messages so we get them right early. */
+	/* Configure error messages so we get them right early. */
 	WT_ERR(__wt_config_gets(session, cfg, "error_prefix", &cval));
 	if (cval.len != 0)
 		WT_ERR(__wt_strndup(
@@ -1344,37 +1380,14 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
 	 * 4. user configuration file (optional)
 	 * 5. environment variable settings (optional)
 	 *
-	 * Clear the entry we added to the stack, we're going to build it in
+	 * Clear the entries we added to the stack, we're going to build it in
 	 * order.
 	 */
 	cfg[0] = WT_CONFIG_BASE(session, wiredtiger_open_all);
 	cfg[1] = NULL;
-
-	/*
-	 * The base configuration should not exist if we are creating this
-	 * database.
-	 */
-	exist = 0;
-	if (conn->is_new) {
-		WT_ERR(__wt_exist(session, WT_BASECONFIG, &exist));
-		if (exist)
-			WT_ERR_MSG(session, EINVAL,
-			    "%s exists on creation", WT_BASECONFIG);
-	} else
-		WT_ERR(__conn_config_file(session,
-		    WT_BASECONFIG,
-		    WT_CONFIG_REF(session, wiredtiger_open_basecfg),
-		    cfg, &cbbuf));
-
-	/* Add the config string passed in by the application. */
+	WT_ERR(__conn_config_file(session, WT_BASECONFIG, 0, cfg, &cbbuf));
 	__conn_config_append(cfg, config);
-
-	/*
-	 * Read in user's config file and the config environment variable.
-	 */
-	WT_ERR(__conn_config_file(session,
-	    WT_USERCONFIG, WT_CONFIG_REF(session, wiredtiger_open_usercfg),
-	    cfg, &cubuf));
+	WT_ERR(__conn_config_file(session, WT_USERCONFIG, 1, cfg, &cubuf));
 	WT_ERR(__conn_config_env(session, cfg));
 
 	/*
@@ -1382,7 +1395,18 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
 	 *
 	 * We can't open sessions yet, so any configurations that cause
 	 * sessions to be opened must be handled inside __wt_connection_open.
+	 *
+	 * The error message configuration might have changed (if set in a
+	 * configuration file, and not in the application's configuration
+	 * string), get it again. Do it first, make error messages correct.
 	 */
+	WT_ERR(__wt_config_gets(session, cfg, "error_prefix", &cval));
+	if (cval.len != 0) {
+		__wt_free(session, conn->error_prefix);
+		WT_ERR(__wt_strndup(
+		    session, cval.str, cval.len, &conn->error_prefix));
+	}
+
 	WT_ERR(__wt_config_gets(session, cfg, "hazard_max", &cval));
 	conn->hazard_max = (uint32_t)cval.val;
 
@@ -1437,10 +1461,6 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
 	WT_ERR(__wt_lsm_manager_config(session, cfg));
 	WT_ERR(__wt_verbose_config(session, cfg));
 
-	/* Write the base configuration file, if we're creating the database. */
-	if (conn->is_new)
-		WT_ERR(__conn_write_config(session, WT_BASECONFIG, config));
-
 	/* Now that we know if verbose is configured, output the version. */
 	WT_ERR(__wt_verbose(
 	    session, WT_VERB_VERSION, "%s", WIREDTIGER_VERSION_STRING));
@@ -1469,6 +1489,13 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
 	WT_ERR(__conn_load_extensions(session, cfg));
 
 	/*
+	 * We've completed configuration, write the base configuration file if
+	 * we're creating the database.
+	 */
+	if (conn->is_new)
+		WT_ERR(__conn_write_config(session, WT_BASECONFIG, cfg));
+
+	/*
 	 * Start the worker threads last.
 	 */
 	WT_ERR(__wt_connection_workers(session, cfg));
@@ -1479,7 +1506,8 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
 	WT_STATIC_ASSERT(offsetof(WT_CONNECTION_IMPL, iface) == 0);
 	*wt_connp = &conn->iface;
 
-err:	__wt_buf_free(session, &cbbuf);
+err:	/* Discard the configuration strings. */
+	__wt_buf_free(session, &cbbuf);
 	__wt_buf_free(session, &cubuf);
 
 	if (ret != 0 && conn != NULL)
