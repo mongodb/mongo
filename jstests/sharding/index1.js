@@ -130,7 +130,7 @@ for ( var i = 0; i < 19; i++ ) {
         printjson( coll.getIndexes() )
         
         // Make sure the index created is unique!
-        assert.eq( 1, coll.getDB().getCollection( "system.indexes" ).find( { ns : "" + coll, key : { num : 1 }, unique : true } ).itcount() )
+        assert.eq( 1, coll.getIndexes().filter( function(z) { return friendlyEqual( z.key, { num : 1 } ) && z.unique; } ).length );
         
     }
     if ( i == 7 ) {
@@ -166,7 +166,7 @@ for ( var i = 0; i < 19; i++ ) {
         printjson( coll.getIndexes() )
         
         // Make sure the index created is unique!
-        assert.eq( 1, coll.getDB().getCollection( "system.indexes" ).find( { ns : "" + coll, key : { num : 1 }, unique : true } ).itcount() )
+        assert.eq( 1, coll.getIndexes().filter( function(z) { return friendlyEqual( z.key, { num : 1 } ) && z.unique; } ).length );
     }
     if ( i == 9 ) {
 

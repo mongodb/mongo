@@ -9,6 +9,10 @@ setupMoveChunkTest(st);
 
 var dbpath = st.shard1.adminCommand("getCmdLineOpts").parsed.storage.dbPath;
 var hasMoveChunkDir = 0 != ls(dbpath).filter(function(a) {return null != a.match("moveChunk")}).length
-assert(hasMoveChunkDir, dbpath + ": does not has MoveChunk directory + " + ls(dbpath))
+if ( !hasMoveChunkDir ) {
+    dbpath = st.shard0.adminCommand("getCmdLineOpts").parsed.storage.dbPath;
+    hasMoveChunkDir = 0 != ls(dbpath).filter(function(a) {return null != a.match("moveChunk")}).length
+    assert(hasMoveChunkDir, dbpath + ": does not has MoveChunk directory + " + ls(dbpath))
+}
 
 st.stop()
