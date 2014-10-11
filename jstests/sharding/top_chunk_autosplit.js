@@ -35,7 +35,7 @@ var largeStr = new Array(1024).join('x');
 
 // The inserts should be bulked as one so the auto-split will only be triggered once.
 var bulk = testDB.user.initializeUnorderedBulkOp();
-for (var x = 100; x < 1000; x++) {
+for (var x = 100; x < 2000; x++) {
     bulk.insert({ x: x, val: largeStr });
 }
 bulk.execute();
@@ -77,7 +77,7 @@ sh.addTagRange('test.user', { x: -100 }, { x: MaxKey }, 'A');
 
 // The inserts should be bulked as one so the auto-split will only be triggered once.
 bulk = testDB.user.initializeUnorderedBulkOp();
-for (var x = 100; x < 1000; x++) {
+for (var x = 100; x < 2000; x++) {
     bulk.insert({ x: x, val: largeStr });
 }
 bulk.execute();

@@ -26,5 +26,6 @@ a.foo.remove( { _id : { $gt : 50 } } );
 assert.eq( 51 , a.foo.find().itcount() , "B1" )
 assert.eq( 100 , b.foo.find().itcount() , "B2" )
 
-assert.eq( 59 , x.itcount() , "C1" ) 
+xCount = x.itcount();
+assert( xCount == 59 || xCount == 99, "C1 : " + xCount ); // snapshot or not is ok
 assert.eq( 99 , y.itcount() , "C2" );  // this was asserting because ClientCursor byLoc doesn't take db into consideration
