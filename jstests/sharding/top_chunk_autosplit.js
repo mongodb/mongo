@@ -58,7 +58,7 @@ testDB.adminCommand({ split: 'test.user', middle: { x: 0 }});
 assert.commandWorked(
     testDB.adminCommand({ moveChunk: 'test.user', find: { x: 0 }, to: 'shard0000' }));
 
-for (var x = -100; x < 100; x+= 10) {
+for (var x = -20; x < 100; x+= 10) {
     testDB.adminCommand({ split: 'test.user', middle: { x: x }});
 }
 
