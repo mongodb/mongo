@@ -34,6 +34,7 @@
 #include "mongo/base/init.h"
 #include "mongo/db/global_environment_experiment.h"
 #include "mongo/db/storage_options.h"
+#include "mongo/db/storage/kv/kv_storage_engine.h"
 
 namespace mongo {
 
@@ -42,7 +43,7 @@ namespace mongo {
         public:
             virtual ~RocksFactory(){}
             virtual StorageEngine* create( const StorageGlobalParams& params ) const {
-                return new RocksEngine( params.dbpath );
+                return new KVStorageEngine(new RocksEngine(params.dbpath));
             }
         };
     } // namespace

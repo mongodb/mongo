@@ -46,14 +46,20 @@ namespace rocksdb {
     class Snapshot;
     class WriteBatchWithIndex;
     class Comparator;
+    struct Status;
+    class ColumnFamilyHandle;
+    class Slice;
+    class Iterator;
 }
 
 namespace mongo {
 
+    class OperationContext;
+
     class RocksRecoveryUnit : public RecoveryUnit {
         MONGO_DISALLOW_COPYING(RocksRecoveryUnit);
     public:
-        RocksRecoveryUnit(rocksdb::DB* db, bool defaultCommit);
+        RocksRecoveryUnit(rocksdb::DB* db, bool defaultCommit = false);
         virtual ~RocksRecoveryUnit();
 
         virtual void beginUnitOfWork();
@@ -78,6 +84,16 @@ namespace mongo {
         rocksdb::WriteBatchWithIndex* writeBatch();
 
         const rocksdb::Snapshot* snapshot();
+
+        // to support tailable cursors
+        void releaseSnapshot();
+
+        rocksdb::Status Get(rocksdb::ColumnFamilyHandle* columnFamily, const rocksdb::Slice& key,
+                            std::string* value);
+
+        rocksdb::Iterator* NewIterator(rocksdb::ColumnFamilyHandle* columnFamily);
+
+        static RocksRecoveryUnit* getRocksRecoveryUnit(OperationContext* opCtx);
 
     private:
         void _destroyInternal();
