@@ -33,27 +33,32 @@
 #include "mongo/db/storage/wiredtiger/wiredtiger_session_cache.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_util.h"
 #include "mongo/util/log.h"
+#include "mongo/util/stacktrace.h"
 
 namespace mongo {
 
     WiredTigerRecoveryUnit::WiredTigerRecoveryUnit(WiredTigerSessionCache* sc) :
         _sessionCache( sc ),
         _session( NULL ),
-        _depth(0) {
+        _depth(0),
+        _active( false ) {
     }
 
     WiredTigerRecoveryUnit::~WiredTigerRecoveryUnit() {
         invariant( _depth == 0 );
         _abort();
+        if ( _session ) {
+            _sessionCache->releaseSession( _session );
+            _session = NULL;
+        }
     }
 
     void WiredTigerRecoveryUnit::_commit() {
-        if ( _session ) {
+        if ( _session && _active ) {
             WT_SESSION *s = _session->getSession();
             int ret = s->commit_transaction(s, NULL);
             invariantWTOK(ret);
-            _sessionCache->releaseSession( _session );
-            _session = NULL;
+            _active = false;
         }
 
         for (Changes::iterator it = _changes.begin(), end = _changes.end(); it != end; ++it) {
@@ -63,12 +68,11 @@ namespace mongo {
     }
 
     void WiredTigerRecoveryUnit::_abort() {
-        if ( _session ) {
+        if ( _session && _active ) {
             WT_SESSION *s = _session->getSession();
             int ret = s->rollback_transaction(s, NULL);
             invariantWTOK(ret);
-            _sessionCache->releaseSession( _session );
-            _session = NULL;
+            _active = false;
         }
 
         for (Changes::reverse_iterator it = _changes.rbegin(), end = _changes.rend();
@@ -116,37 +120,40 @@ namespace mongo {
             WT_SESSION *s = _session->getSession();
             int ret = s->begin_transaction(s, NULL);
             invariantWTOK(ret);
+            _active = true;
         }
         return _session;
     }
 
     // ---------------------
 
+    WiredTigerCursor::WiredTigerCursor(const std::string* uri, WiredTigerRecoveryUnit* ru) {
+        _init( uri, ru );
+    }
 
-    namespace {
-        void _checkCursor( const std::string* uri, WT_CURSOR* c ) {
-            if ( c )
-                return;
+    WiredTigerCursor::WiredTigerCursor(const std::string* uri, OperationContext* txn) {
+        _init( uri, &WiredTigerRecoveryUnit::Get( txn ) );
+    }
+
+    void WiredTigerCursor::_init( const std::string* uri, WiredTigerRecoveryUnit* ru ) {
+        _uri = uri;
+        _ru = ru;
+        _session = _ru->getSession();
+        _cursor = _session->getCursor( *uri );
+        if ( !_cursor ) {
             error() << "no cursor for uri: " << *uri;
         }
     }
 
-    WiredTigerCursor::WiredTigerCursor(const std::string* uri, WiredTigerRecoveryUnit* ru)
-        : _uri( uri ), _ru( ru ),
-          _cursor( ru->getSession()->getCursor( *uri ) ) {
-        _checkCursor( uri, _cursor );
-    }
-
-    WiredTigerCursor::WiredTigerCursor(const std::string* uri, OperationContext* txn)
-        : _uri( uri ), _ru( &WiredTigerRecoveryUnit::Get( txn ) ),
-          _cursor( _ru->getSession()->getCursor( *uri ) ) {
-        _checkCursor( uri, _cursor );
-    }
-
     WiredTigerCursor::~WiredTigerCursor() {
-        _ru->getSession()->releaseCursor( *_uri, _cursor );
+        invariant( _session == _ru->getSession() );
+        _session->releaseCursor( *_uri, _cursor );
         _cursor = NULL;
     }
 
+    WT_CURSOR* WiredTigerCursor::get() const {
+        invariant( _session == _ru->getSession() );
+        return _cursor;
+    }
 
 }

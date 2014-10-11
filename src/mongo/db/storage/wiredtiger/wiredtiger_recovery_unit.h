@@ -82,6 +82,7 @@ namespace mongo {
         WiredTigerSession* _session; // owned, but from pool
         bool _defaultCommit;
         int _depth;
+        bool _active;
 
         typedef boost::shared_ptr<Change> ChangePtr;
         typedef std::vector<ChangePtr> Changes;
@@ -97,12 +98,15 @@ namespace mongo {
         WiredTigerCursor(const std::string* uri, WiredTigerRecoveryUnit* ru);
         ~WiredTigerCursor();
 
-        WT_CURSOR* get() const { return _cursor; }
-        WT_CURSOR* operator->() const { return _cursor; }
+        WT_CURSOR* get() const;
+        WT_CURSOR* operator->() const { return get(); }
 
     private:
+        void _init( const std::string* uri, WiredTigerRecoveryUnit* ru );
+
         const std::string* _uri;
         WiredTigerRecoveryUnit* _ru; // not owned
+        WiredTigerSession* _session;
         WT_CURSOR* _cursor; // owned, but pulled
     };
 
