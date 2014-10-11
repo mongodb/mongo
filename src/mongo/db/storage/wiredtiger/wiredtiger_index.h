@@ -87,6 +87,7 @@ namespace mongo {
         virtual Status initAsEmpty(OperationContext* txn);
 
         const std::string &GetURI() const;
+        uint64_t instanceId() const { return _instanceId; }
 
         private:
             class IndexCursor : public SortedDataInterface::Cursor {
@@ -146,5 +147,6 @@ namespace mongo {
         };
 
         std::string _uri;
+        uint64_t _instanceId;
     };
 } // namespace

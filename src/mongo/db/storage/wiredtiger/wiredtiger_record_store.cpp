@@ -60,7 +60,6 @@ namespace mongo {
         return ss.str();
     }
 
-
     WiredTigerRecordStore::WiredTigerRecordStore( OperationContext* ctx,
                                                   const StringData& ns,
                                                   const StringData& uri,
@@ -70,6 +69,7 @@ namespace mongo {
                                                   CappedDocumentDeleteCallback* cappedDeleteCallback )
         : RecordStore( ns ),
           _uri( uri.toString() ),
+          _instanceId( WiredTigerSession::genCursorId() ),
           _isCapped( isCapped ),
           _cappedMaxSize( cappedMaxSize ),
           _cappedMaxDocs( cappedMaxDocs ),
@@ -156,7 +156,7 @@ namespace mongo {
 
     RecordData WiredTigerRecordStore::dataFor(OperationContext* txn, const DiskLoc& loc) const {
         // ownership passes to the shared_array created below
-        WiredTigerCursor curwrap(&_uri, txn);
+        WiredTigerCursor curwrap( _uri, _instanceId, txn);
         WT_CURSOR *c = curwrap.get();
         invariant( c );
         c->set_key(c, _makeKey(loc));
@@ -167,7 +167,7 @@ namespace mongo {
     }
 
     void WiredTigerRecordStore::deleteRecord( OperationContext* txn, const DiskLoc& loc ) {
-        WiredTigerCursor cursor( &_uri, txn );
+        WiredTigerCursor cursor( _uri, _instanceId, txn );
         WT_CURSOR *c = cursor.get();
         c->set_key(c, _makeKey(loc));
         int ret = c->search(c);
@@ -203,7 +203,7 @@ namespace mongo {
         if (!cappedAndNeedDelete(txn))
             return;
 
-        WiredTigerCursor curwrap(&_uri, txn);
+        WiredTigerCursor curwrap( _uri, _instanceId, txn);
         WT_CURSOR *c = curwrap.get();
         int ret = c->next(c);
         while ( ret == 0 && cappedAndNeedDelete(txn) ) {
@@ -233,7 +233,7 @@ namespace mongo {
                                        "object to insert exceeds cappedMaxSize" );
         }
 
-        WiredTigerCursor curwrap(&_uri, txn);
+        WiredTigerCursor curwrap( _uri, _instanceId, txn);
         WT_CURSOR *c = curwrap.get();
         invariant( c );
         DiskLoc loc = _nextId();
@@ -264,7 +264,7 @@ namespace mongo {
         boost::shared_array<char> buf( new char[len] );
         doc->writeDocument( buf.get() );
 
-        WiredTigerCursor curwrap(&_uri, txn);
+        WiredTigerCursor curwrap( _uri, _instanceId, txn);
         WT_CURSOR *c = curwrap.get();
         DiskLoc loc = _nextId();
         c->set_key(c, _makeKey(loc));
@@ -287,7 +287,7 @@ namespace mongo {
                                                         int len,
                                                         bool enforceQuota,
                                                         UpdateMoveNotifier* notifier ) {
-        WiredTigerCursor curwrap(&_uri, txn);
+        WiredTigerCursor curwrap( _uri, _instanceId, txn);
         WT_CURSOR *c = curwrap.get();
         c->set_key(c, _makeKey(loc));
         int ret = c->search(c);
@@ -317,7 +317,7 @@ namespace mongo {
                                                 const char* damangeSource,
                                                 const mutablebson::DamageVector& damages ) {
         // get original value
-        WiredTigerCursor curwrap(&_uri, txn);
+        WiredTigerCursor curwrap( _uri, _instanceId, txn);
         WT_CURSOR *c = curwrap.get();
         c->set_key(c, _makeKey(loc));
         int ret = c->search(c);
@@ -510,7 +510,7 @@ namespace mongo {
           _txn( txn ),
           _tailable( tailable ),
           _dir( dir ),
-          _cursor( new WiredTigerCursor( &rs.GetURI(), txn ) ) {
+          _cursor( new WiredTigerCursor( rs.GetURI(), rs.instanceId(), txn ) ) {
         RS_ITERATOR_TRACE("start");
         _locate(start, true);
     }
@@ -643,7 +643,7 @@ namespace mongo {
         // OperationContext on restore - update the iterators context in that
         // case
         _txn = txn;
-        _cursor.reset( new WiredTigerCursor(&_rs.GetURI(), txn) );
+        _cursor.reset( new WiredTigerCursor(_rs.GetURI(), _rs.instanceId(), txn) );
         if (_savedLoc.isNull())
             _eof = true;
         else

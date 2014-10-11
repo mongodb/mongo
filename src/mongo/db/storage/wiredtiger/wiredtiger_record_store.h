@@ -145,6 +145,7 @@ namespace mongo {
         int64_t cappedMaxSize() const;
 
         const std::string& GetURI() const { return _uri; }
+        uint64_t instanceId() const { return _instanceId; }
 
     private:
 
@@ -200,6 +201,7 @@ namespace mongo {
         RecordData _getData( const WiredTigerCursor& cursor) const;
 
         std::string _uri;
+        uint64_t _instanceId; // not persisted
 
         // The capped settings should not be updated once operations have started
         bool _isCapped;

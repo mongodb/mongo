@@ -21,9 +21,9 @@ namespace mongo {
         }
     }
 
-    WT_CURSOR* WiredTigerSession::getCursor(const std::string& uri) {
+    WT_CURSOR* WiredTigerSession::getCursor(const std::string& uri, uint64_t id) {
         {
-            Cursors& cursors = _curmap[uri];
+            Cursors& cursors = _curmap[id];
             if ( !cursors.empty() ) {
                 WT_CURSOR* save = cursors.back();
                 cursors.pop_back();
@@ -36,11 +36,11 @@ namespace mongo {
         return c;
     }
 
-    void WiredTigerSession::releaseCursor(const std::string& uri, WT_CURSOR *cursor) {
+    void WiredTigerSession::releaseCursor(uint64_t id, WT_CURSOR *cursor) {
         invariant( _session );
         invariant( cursor );
 
-        Cursors& cursors = _curmap[uri];
+        Cursors& cursors = _curmap[id];
         if ( cursors.size() > 10u ) {
             invariantWTOK( cursor->close(cursor) );
         }
@@ -65,6 +65,13 @@ namespace mongo {
         _curmap.clear();
     }
 
+    namespace {
+        AtomicUInt64 nextCursorId(1);
+    }
+    // static
+    uint64_t WiredTigerSession::genCursorId() {
+        return nextCursorId.fetchAndAdd(1);
+    }
 
     // -----------------------
 
