@@ -37,6 +37,7 @@
 #include "mongo/db/catalog/database.h"
 #include "mongo/db/catalog/database_holder.h"
 #include "mongo/db/client.h"
+#include "mongo/db/global_environment_experiment.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/query/plan_executor.h"
 #include "mongo/platform/random.h"
@@ -347,6 +348,12 @@ namespace mongo {
 
     void CollectionCursorCache::invalidateDocument( const DiskLoc& dl,
                                                     InvalidationType type ) {
+        if ( supportsDocLocking() ) {
+            // If a storage engine supports doc locking, then we do not need to invalidate.
+            // The transactional boundaries of the operation protect us.
+            return;
+        }
+
         SimpleMutex::scoped_lock lk( _mutex );
 
         for ( ExecSet::iterator it = _nonCachedExecutors.begin();
