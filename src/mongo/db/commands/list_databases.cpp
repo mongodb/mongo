@@ -81,16 +81,27 @@ namespace mongo {
             set<string> seen;
             intmax_t totalSize = 0;
             for ( vector< string >::iterator i = dbNames.begin(); i != dbNames.end(); ++i ) {
+                const string& dbname = *i;
+
                 BSONObjBuilder b;
-                b.append( "name", *i );
+                b.append( "name", dbname );
 
-                // TODO: The dbSize function is MMAP V1 specific and will need to be pulled in the
-                // storage engine.
-                intmax_t size = dbSize( i->c_str() );
-                b.append( "sizeOnDisk", (double) size );
-                totalSize += size;
+                {
+                    Lock::DBLock dbLock(txn->lockState(), dbname, MODE_IS);
 
-                b.appendBool("empty", size == 0);
+                    Database* db = dbHolder().get( txn, dbname );
+                    if ( !db )
+                        continue;
+
+                    const DatabaseCatalogEntry* entry = db->getDatabaseCatalogEntry();
+                    invariant( entry );
+
+                    int64_t size = entry->sizeOnDisk( txn );
+                    b.append( "sizeOnDisk", static_cast<double>( size ) );
+                    totalSize += size;
+
+                    b.appendBool("empty", size == 0);
+                }
 
                 dbInfos.push_back( b.obj() );
 

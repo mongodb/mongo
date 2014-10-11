@@ -53,6 +53,10 @@ namespace mongo {
         return _entryMap.empty();
     }
 
+    int64_t Heap1DatabaseCatalogEntry::sizeOnDisk( OperationContext* opCtx ) const {
+        return isEmpty() ? 0 : 1;
+    }
+
     void Heap1DatabaseCatalogEntry::appendExtraStats( OperationContext* opCtx,
                                                       BSONObjBuilder* out,
                                                       double scale ) const {

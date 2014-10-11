@@ -51,6 +51,8 @@ namespace mongo {
         virtual bool exists() const;
         virtual bool isEmpty() const;
 
+        virtual int64_t sizeOnDisk( OperationContext* opCtx ) const;
+
         virtual void appendExtraStats( OperationContext* opCtx,
                                        BSONObjBuilder* out,
                                        double scale ) const;
