@@ -572,6 +572,7 @@ namespace mongo {
             return DiskLoc();
 
         WT_CURSOR *c = _cursor->get();
+        invariant( c );
         uint64_t key;
         int ret = c->get_key(c, &key);
         invariantWTOK(ret);
@@ -627,6 +628,7 @@ namespace mongo {
 
         // Reset the cursor so it doesn't keep any resources pinned.
         _cursor.reset( NULL );
+        _txn = NULL;
     }
 
     bool WiredTigerRecordStore::Iterator::restoreState( OperationContext *txn ) {
