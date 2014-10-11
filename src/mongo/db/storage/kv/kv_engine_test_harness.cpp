@@ -115,6 +115,7 @@ namespace mongo {
 
         {
             MyOperationContext opCtx( engine );
+            rs.reset( engine->getRecordStore( &opCtx, ns, ns, CollectionOptions() ) );
             ASSERT_EQUALS( string("abc"), rs->dataFor( &opCtx, loc ).data() );
         }
 
