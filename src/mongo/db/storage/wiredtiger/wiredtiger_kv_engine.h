@@ -51,6 +51,7 @@ namespace mongo {
         string _uri( const StringData& ident ) const;
 
         WT_CONNECTION* _conn;
+        WT_EVENT_HANDLER _eventHandler;
         boost::scoped_ptr<WiredTigerSessionCache> _sessionCache;
 
         string _rsOptions;

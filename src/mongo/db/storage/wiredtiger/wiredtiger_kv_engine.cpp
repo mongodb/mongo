@@ -1,5 +1,7 @@
 // wiredtiger_kv_engine.cpp
 
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kStorage
+
 #include "mongo/db/storage/wiredtiger/wiredtiger_kv_engine.h"
 
 #include "mongo/db/storage/wiredtiger/wiredtiger_index.h"
@@ -11,8 +13,41 @@
 
 namespace mongo {
 
+    namespace {
+        int mdb_handle_error(WT_EVENT_HANDLER *handler, WT_SESSION *session,
+                             int errorCode, const char *message) {
+            error() << "WiredTiger (" << errorCode << ") " << message;
+            return 0;
+        }
+
+        int mdb_handle_message( WT_EVENT_HANDLER *handler, WT_SESSION *session,
+                                const char *message) {
+            log() << "WiredTiger " << message;
+            return 0;
+        }
+
+        int mdb_handle_progress( WT_EVENT_HANDLER *handler, WT_SESSION *session,
+                                 const char *operation, uint64_t progress) {
+            log() << "WiredTiger progress " << operation << " " << progress;
+            return 0;
+        }
+
+        int mdb_handle_close( WT_EVENT_HANDLER *handler, WT_SESSION *session,
+                              WT_CURSOR *cursor) {
+            // no-op?
+            return 0;
+        }
+
+    }
+
     WiredTigerKVEngine::WiredTigerKVEngine( const std::string& path,
                                             const std::string& extraOpenOptions ) {
+
+        _eventHandler.handle_error = mdb_handle_error;
+        _eventHandler.handle_message = mdb_handle_message;
+        _eventHandler.handle_progress = mdb_handle_progress;
+        _eventHandler.handle_close = mdb_handle_close;
+
         std::stringstream ss;
         ss << "create,";
         ss << "cache_size=1G,";
@@ -20,8 +55,7 @@ namespace mongo {
         ss << "log=(enabled),";
         ss << extraOpenOptions;
         string config = ss.str();
-        invariantWTOK(wiredtiger_open(path.c_str(), NULL, config.c_str(), &_conn));
-
+        invariantWTOK(wiredtiger_open(path.c_str(), &_eventHandler, config.c_str(), &_conn));
         _sessionCache.reset( new WiredTigerSessionCache( _conn ) );
     }
 
