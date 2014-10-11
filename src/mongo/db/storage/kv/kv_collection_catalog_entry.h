@@ -77,6 +77,7 @@ namespace mongo {
                                        long long newExpireSeconds );
 
         RecordStore* getRecordStore() { return _recrodStore.get(); }
+        const RecordStore* getRecordStore() const { return _recrodStore.get(); }
 
     protected:
         virtual MetaData _getMetaData( OperationContext* txn ) const;
