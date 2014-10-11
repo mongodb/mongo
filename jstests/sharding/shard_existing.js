@@ -21,14 +21,13 @@ for (i=0; i<numDocs; i++) {
 }
 assert.writeOK(bulk.execute());
 
-assert.lt(totalSize, db.data.stats().size);
-
 s.adminCommand( { enablesharding : "test" } );
 res = s.adminCommand( { shardcollection : "test.data" , key : { _id : 1 } } );
 printjson(res);
 
 // number of chunks should be approx equal to the total data size / half the chunk size
-assert.eq(Math.ceil(totalSize / (512 * 1024)), s.config.chunks.find().itcount(),
-          "not right number of chunks" );
+var numChunks = s.config.chunks.find().itcount();
+var guess = Math.ceil(totalSize / (512 * 1024));
+assert( Math.abs( numChunks - guess ) < 2, "not right number of chunks" );
 
 s.stop();

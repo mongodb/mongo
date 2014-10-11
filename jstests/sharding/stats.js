@@ -64,6 +64,8 @@ assert.eq( b.stats().objects , x.raw[shards[1]].objects , "db count on shard0001
 /* Helper functions */
 function statComp(stat, stat_scaled, scale) {
     /* Because of loss of floating point precision, do not check exact equality */
+    if ( stat == stat_scaled )
+        return true;
     assert(((stat_scaled - 2) <= (stat / scale)) &&
            ((stat / scale) <= (stat_scaled + 2)));
 }

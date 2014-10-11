@@ -142,7 +142,8 @@ assert( db.foo4a.isCapped() , "ca8" );
 
 db.createCollection("foo5", {capped:true, size:30000});
 assert( db.foo5.isCapped() , "cb1" );
-assert( ! s.admin.runCommand( { shardcollection : "test.foo5" , key : { num : 1 } } ).ok , "shard capped" );
+var res = s.admin.runCommand( { shardcollection : "test.foo5" , key : { num : 1 } } );
+assert( !res.ok , "shard capped: " + tojson( res ) );
 
 
 // ----- group ----
@@ -193,7 +194,7 @@ assert( ! s.admin.runCommand( { shardcollection : "test.foo9" , key : { a : 1 } 
 
 r = db.getMongo().getDBs()
 assert.eq( 3 , r.databases.length , "listDatabases 1 : " + tojson( r ) )
-assert.lt( 10000 , r.totalSize , "listDatabases 2 : " + tojson( r ) );
+assert.eq( "number", typeof(r.totalSize) , "listDatabases 2 : " + tojson( r ) );
 
 s.stop()
 
