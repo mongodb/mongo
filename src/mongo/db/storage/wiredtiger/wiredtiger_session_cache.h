@@ -24,14 +24,15 @@ namespace mongo {
 
         WT_SESSION* getSession() const { return _session; }
 
-        WT_CURSOR* getCursor(const std::string &uri);
-        void releaseCursor(WT_CURSOR *cursor);
+        WT_CURSOR* getCursor(const std::string& uri);
+        void releaseCursor(const std::string& uri, WT_CURSOR *cursor);
 
         void closeAllCursors();
 
     private:
         WT_SESSION* _session; // owned
-        typedef std::map<const std::string, WT_CURSOR *> CursorMap;
+        typedef std::vector<WT_CURSOR*> Cursors;
+        typedef std::map<const std::string, Cursors> CursorMap;
         CursorMap _curmap; // owned
     };
 

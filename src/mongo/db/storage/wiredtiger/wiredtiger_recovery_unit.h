@@ -93,14 +93,15 @@ namespace mongo {
      */
     class WiredTigerCursor {
     public:
-        WiredTigerCursor(const std::string& uri, OperationContext* txn);
-        WiredTigerCursor(const std::string& uri, WiredTigerRecoveryUnit* ru);
+        WiredTigerCursor(const std::string* uri, OperationContext* txn);
+        WiredTigerCursor(const std::string* uri, WiredTigerRecoveryUnit* ru);
         ~WiredTigerCursor();
 
         WT_CURSOR* get() const { return _cursor; }
         WT_CURSOR* operator->() const { return _cursor; }
 
     private:
+        const std::string* _uri;
         WiredTigerRecoveryUnit* _ru; // not owned
         WT_CURSOR* _cursor; // owned, but pulled
     };

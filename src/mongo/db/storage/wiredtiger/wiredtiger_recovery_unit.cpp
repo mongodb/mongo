@@ -124,27 +124,27 @@ namespace mongo {
 
 
     namespace {
-        void _checkCursor( const std::string& uri, WT_CURSOR* c ) {
+        void _checkCursor( const std::string* uri, WT_CURSOR* c ) {
             if ( c )
                 return;
-            error() << "no cursor for uri: " << uri;
+            error() << "no cursor for uri: " << *uri;
         }
     }
 
-    WiredTigerCursor::WiredTigerCursor(const std::string& uri, WiredTigerRecoveryUnit* ru)
-        : _ru( ru ),
-          _cursor( ru->getSession()->getCursor( uri ) ) {
+    WiredTigerCursor::WiredTigerCursor(const std::string* uri, WiredTigerRecoveryUnit* ru)
+        : _uri( uri ), _ru( ru ),
+          _cursor( ru->getSession()->getCursor( *uri ) ) {
         _checkCursor( uri, _cursor );
     }
 
-    WiredTigerCursor::WiredTigerCursor(const std::string& uri, OperationContext* txn)
-        : _ru( &WiredTigerRecoveryUnit::Get( txn ) ),
-          _cursor( _ru->getSession()->getCursor( uri ) ) {
+    WiredTigerCursor::WiredTigerCursor(const std::string* uri, OperationContext* txn)
+        : _uri( uri ), _ru( &WiredTigerRecoveryUnit::Get( txn ) ),
+          _cursor( _ru->getSession()->getCursor( *uri ) ) {
         _checkCursor( uri, _cursor );
     }
 
     WiredTigerCursor::~WiredTigerCursor() {
-        _ru->getSession()->releaseCursor( _cursor );
+        _ru->getSession()->releaseCursor( *_uri, _cursor );
         _cursor = NULL;
     }
 

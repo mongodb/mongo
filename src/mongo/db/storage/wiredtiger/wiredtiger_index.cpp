@@ -188,7 +188,7 @@ namespace {
             return Status(ErrorCodes::KeyTooLong, msg);
         }
 
-        WiredTigerCursor curwrap(GetURI(), txn);
+        WiredTigerCursor curwrap(&_uri, txn);
         WT_CURSOR *c = curwrap.get();
 
         if (!dupsAllowed && isDup(c, key, loc))
@@ -209,9 +209,9 @@ namespace {
         invariant(loc.isValid());
         invariant(!hasFieldNames(key));
 
-        WiredTigerCursor curwrap(GetURI(), txn);
+        WiredTigerCursor curwrap(&_uri, txn);
         WT_CURSOR *c = curwrap.get();
-
+        invariant( c );
         // TODO: can we avoid a search?
         boost::scoped_array<char> data;
         WiredTigerItem item = _toItem( key, loc, &data);
@@ -228,7 +228,7 @@ namespace {
 
     void WiredTigerIndex::fullValidate(OperationContext* txn, long long *numKeysOut) const {
         // TODO check invariants?
-        WiredTigerCursor curwrap(GetURI(), txn);
+        WiredTigerCursor curwrap(&_uri, txn);
         WT_CURSOR *c = curwrap.get();
         if (!c)
             return;
@@ -242,7 +242,7 @@ namespace {
     Status WiredTigerIndex::dupKeyCheck(
             OperationContext* txn, const BSONObj& key, const DiskLoc& loc) {
         invariant(!hasFieldNames(key));
-        WiredTigerCursor curwrap(GetURI(), txn);
+        WiredTigerCursor curwrap(&_uri, txn);
         WT_CURSOR *c = curwrap.get();
 
         if (isDup(c, key, loc))
@@ -251,7 +251,7 @@ namespace {
     }
 
     bool WiredTigerIndex::isEmpty(OperationContext* txn) {
-        WiredTigerCursor curwrap(GetURI(), txn);
+        WiredTigerCursor curwrap(&_uri, txn);
         WT_CURSOR *c = curwrap.get();
         if (!c)
             return true;
@@ -295,7 +295,7 @@ namespace {
          _forward(forward),
          _eof(true),
          _savedAtEnd(false) {
-         _cursor = new WiredTigerCursor(_idx.GetURI(), txn);
+         _cursor = new WiredTigerCursor(&_idx.GetURI(), txn);
     }
 
     WiredTigerIndex::IndexCursor::~IndexCursor() {
@@ -433,12 +433,13 @@ namespace {
         }
         delete _cursor;
         _cursor = NULL;
+        _txn = NULL;
     }
 
     void WiredTigerIndex::IndexCursor::restorePosition( OperationContext *txn ) {
         // Update the session handle with our new operation context.
         _txn = txn;
-        _cursor = new WiredTigerCursor(_idx.GetURI(), txn );
+        _cursor = new WiredTigerCursor(&_idx.GetURI(), txn );
         if (_savedAtEnd)
             _eof = true;
         else

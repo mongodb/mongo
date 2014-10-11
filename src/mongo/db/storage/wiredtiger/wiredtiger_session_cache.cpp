@@ -3,6 +3,7 @@
 #include "mongo/db/storage/wiredtiger/wiredtiger_session_cache.h"
 
 #include "mongo/db/storage/wiredtiger/wiredtiger_util.h"
+#include "mongo/util/log.h"
 
 namespace mongo {
 
@@ -16,45 +17,49 @@ namespace mongo {
         if (_session) {
             int ret = _session->close(_session, NULL);
             invariantWTOK(ret);
+            _session = NULL;
         }
     }
 
-    WT_CURSOR* WiredTigerSession::getCursor(const std::string &uri) {
+    WT_CURSOR* WiredTigerSession::getCursor(const std::string& uri) {
         {
-            WT_CURSOR*& c = _curmap[uri];
-            if (c) {
-                WT_CURSOR* save = c;
-                c = NULL;
+            Cursors& cursors = _curmap[uri];
+            if ( !cursors.empty() ) {
+                WT_CURSOR* save = cursors.back();
+                cursors.pop_back();
                 return save;
             }
         }
-        WT_CURSOR* c;
+        WT_CURSOR* c = NULL;
         int ret = _session->open_cursor(_session, uri.c_str(), NULL, NULL, &c);
         if (ret != ENOENT) invariantWTOK(ret);
         return c;
     }
 
-    void WiredTigerSession::releaseCursor(WT_CURSOR *cursor) {
-        const std::string uri(cursor->uri);
-        WT_CURSOR*& old = _curmap[uri];
-        if ( old ) {
-            // todo: keep vector
-            int ret = cursor->close(cursor);
-            invariantWTOK(ret);
+    void WiredTigerSession::releaseCursor(const std::string& uri, WT_CURSOR *cursor) {
+        invariant( _session );
+        invariant( cursor );
+
+        Cursors& cursors = _curmap[uri];
+        if ( cursors.size() > 10u ) {
+            invariantWTOK( cursor->close(cursor) );
         }
         else {
-            int ret = cursor->reset(cursor);
-            invariantWTOK(ret);
-            old = cursor;
+            invariantWTOK( cursor->reset( cursor ) );
+            cursors.push_back( cursor );
         }
     }
 
     void WiredTigerSession::closeAllCursors() {
+        invariant( _session );
         for (CursorMap::iterator i = _curmap.begin(); i != _curmap.end(); ++i ) {
-            WT_CURSOR *cursor = i->second;
-            if (cursor) {
-                int ret = cursor->close(cursor);
-                invariantWTOK(ret);
+            Cursors& cursors = i->second;
+            for ( size_t j = 0; j < cursors.size(); j++ ) {
+                WT_CURSOR *cursor = cursors[j];
+                if (cursor) {
+                    int ret = cursor->close(cursor);
+                    invariantWTOK(ret);
+                }
             }
         }
         _curmap.clear();
