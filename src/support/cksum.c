@@ -1256,8 +1256,7 @@ __wt_cksum_hw(const void *chunk, size_t len)
  * a fast software algorithm.  __wt_cksum() provides a common entry point that
  * indirects to one of these two methods.
  */
-static uint32_t
-    (*__wt_cksum_func)(const void *chunk, size_t len) = __wt_cksum_sw;
+static uint32_t (*__wt_cksum_func)(const void *chunk, size_t len);
 
 /*
  * __wt_cksum --
@@ -1277,6 +1276,8 @@ __wt_cksum(const void *chunk, size_t len)
 void
 __wt_cksum_init(void)
 {
+	__wt_cksum_func = __wt_cksum_sw;
+
 #if (defined(__amd64) || defined(__x86_64))
 	unsigned int eax, ebx, ecx, edx;
 
