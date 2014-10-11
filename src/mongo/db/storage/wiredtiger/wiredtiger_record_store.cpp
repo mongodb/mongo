@@ -100,9 +100,17 @@ namespace mongo {
             uint64_t max = _makeKey( iterator->curr() );
             _nextIdNum.store( 1 + max );
 
-            // todo: this is all wrong and bad
-            _numRecords = max;
-            _dataSize = _numRecords * 10; // More-or-less random value
+            // todo: this is bad
+            _numRecords = 0;
+            _dataSize = 0;
+
+            while( !iterator->isEOF() ) {
+                DiskLoc loc = iterator->getNext();
+                RecordData data = iterator->dataFor( loc );
+                _numRecords++;
+                _dataSize += data.size();
+            }
+
         }
 
     }
