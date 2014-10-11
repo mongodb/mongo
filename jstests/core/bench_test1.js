@@ -10,7 +10,7 @@ ops = [
     { op : "update" , ns : t.getFullName() , query : { _id : 1 } , update : { $inc : { x : 1 } } }
 ]
 
-seconds = .7
+seconds = 2;
 
 benchArgs =  { ops : ops , parallel : 2 , seconds : seconds , host : db.getMongo().host };
 
@@ -21,7 +21,7 @@ if (jsTest.options().auth) {
 }
 res = benchRun( benchArgs );
 
-assert.lte( seconds * res.update , t.findOne( { _id : 1 } ).x * 1.05 , "A1" )
+assert.lte( seconds * res.update , t.findOne( { _id : 1 } ).x * 1.2 , "A1" )
 
 
 assert.eq( 1 , t.getIndexes().length , "B1" )
