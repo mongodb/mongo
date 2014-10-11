@@ -63,7 +63,7 @@ namespace MMapTests {
             try { boost::filesystem::remove(fn); }
             catch(...) { }
 
-            LockerImpl lockState;
+            LockerImpl<true> lockState;
             Lock::GlobalWrite lk(&lockState);
 
             {
