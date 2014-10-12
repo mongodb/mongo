@@ -714,6 +714,35 @@ __conn_config_append(const char *cfg[], const char *config)
 }
 
 /*
+ * __conn_config_check_version --
+ *	Check if a configuration version isn't compatible.
+ */
+static int
+__conn_config_check_version(WT_SESSION_IMPL *session, const char *config)
+{
+	WT_CONFIG_ITEM vmajor, vminor;
+
+	/*
+	 * Version numbers aren't included in all configuration strings, but
+	 * we check all of them just in case. Ignore configurations without
+	 * a version.
+	 */
+	 if (__wt_config_getones(
+	     session, config, "version.major", &vmajor) == WT_NOTFOUND)
+		return (0);
+	 WT_RET(__wt_config_getones(session, config, "version.minor", &vminor));
+
+	 if (vmajor.val > WIREDTIGER_VERSION_MAJOR ||
+	     (vmajor.val == WIREDTIGER_VERSION_MAJOR &&
+	     vminor.val > WIREDTIGER_VERSION_MINOR))
+		WT_RET_MSG(session, ENOTSUP,
+		    "WiredTiger configuration is from an incompatible release "
+		    "of the WiredTiger engine");
+
+	return (0);
+}
+
+/*
  * __conn_config_file --
  *	Read WiredTiger config files from the home directory.
  */
@@ -845,6 +874,8 @@ __conn_config_file(WT_SESSION_IMPL *session,
 #if 0
 	fprintf(stderr, "%s config: {%s}\n", filename, (const char *)buf);
 #endif
+	/* Check any version. */
+	WT_ERR(__conn_config_check_version(session, cbuf->data));
 
 	/* Check the configuration information. */
 	WT_ERR(__wt_config_check(session, is_user ?
@@ -884,6 +915,9 @@ __conn_config_env(WT_SESSION_IMPL *session, const char *cfg[])
 		WT_RET_MSG(session, WT_ERROR, "%s",
 		    "WIREDTIGER_CONFIG environment variable set but process "
 		    "lacks privileges to use that environment variable");
+
+	/* Check any version. */
+	WT_RET(__conn_config_check_version(session, env_config));
 
 	/* Check the configuration string. */
 	WT_RET(__wt_config_check(session,
