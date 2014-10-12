@@ -202,8 +202,14 @@ extend_truncate:	/*
 				__wt_spin_lock(session, &block->live_lock);
 				local_locked = 1;
 			}
-			ret = __wt_ftruncate(
-			    session, fh, offset + fh->extend_len * 2);
+			/*
+			 * The truncate might fail if there's a file mapping
+			 * (if there's an open checkpoint on the file), that's
+			 * OK.
+			 */
+			if ((ret = __wt_ftruncate(
+			    session, fh, offset + fh->extend_len * 2)) == EBUSY)
+				ret = 0;
 		}
 	}
 	/* Release any locally acquired lock. */

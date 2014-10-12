@@ -47,9 +47,6 @@ struct __wt_fh {
 	TAILQ_ENTRY(__wt_fh) q;			/* List of open handles */
 
 	u_int	ref;				/* Reference count */
-	u_int	ref_mapped;			/* Mapped reference count */
-
-	WT_SPINLOCK lock;			/* Handle lock */
 
 #ifndef _WIN32
 	int	 fd;				/* POSIX file handle */
