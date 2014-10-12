@@ -148,7 +148,7 @@ namespace mongo {
     int64_t WiredTigerRecordStore::storageSize( OperationContext* txn,
                                            BSONObjBuilder* extraInfo,
                                            int infoLevel ) const {
-        return dataSize(txn); // todo: this isn't very good
+        return 1 + dataSize(txn); // todo: this isn't very good
     }
 
     // Retrieve the value from a positioned cursor.
@@ -297,6 +297,7 @@ namespace mongo {
                                                         UpdateMoveNotifier* notifier ) {
         WiredTigerCursor curwrap( _uri, _instanceId, txn);
         WT_CURSOR *c = curwrap.get();
+        invariant( c );
         c->set_key(c, _makeKey(loc));
         int ret = c->search(c);
         invariantWTOK(ret);
