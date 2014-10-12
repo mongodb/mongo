@@ -472,7 +472,14 @@ namespace QueryTests {
             ASSERT( !c->more() );
             insert( ns, BSON( "a" << 2 ) );
             insert( ns, BSON( "a" << 3 ) );
-            ASSERT( !c->more() );
+
+            // This can either have been killed, or jumped to the right thing.
+            // Key is that it can't skip.
+            if ( c->more() ) {
+                BSONObj x = c->next();
+                ASSERT_EQUALS( 2, x["a"].numberInt() );
+            }
+
             // Inserting a document into a capped collection can force another document out.
             // In this case, the capped collection has 2 documents, so inserting two more clobbers
             // whatever DiskLoc that the underlying cursor had as its state.
@@ -487,6 +494,34 @@ namespace QueryTests {
             // ASSERT_EQUALS( 0, c->getCursorId() );
         }
     };
+
+    class TailableDelete2 : public ClientBase {
+    public:
+        ~TailableDelete2() {
+            _client.dropCollection( "unittests.querytests.TailableDelete" );
+        }
+        void run() {
+            const char *ns = "unittests.querytests.TailableDelete";
+            _client.createCollection( ns, 8192, true, 2 );
+            insert( ns, BSON( "a" << 0 ) );
+            insert( ns, BSON( "a" << 1 ) );
+            auto_ptr< DBClientCursor > c = _client.query( ns, Query().hint( BSON( "$natural" << 1 ) ), 2, 0, 0, QueryOption_CursorTailable );
+            c->next();
+            c->next();
+            ASSERT( !c->more() );
+            insert( ns, BSON( "a" << 2 ) );
+            insert( ns, BSON( "a" << 3 ) );
+            insert( ns, BSON( "a" << 4 ) );
+
+            // This can either have been killed, or jumped to the right thing.
+            // Key is that it can't skip.
+            if ( c->more() ) {
+                BSONObj x = c->next();
+                ASSERT_EQUALS( 2, x["a"].numberInt() );
+            }
+        }
+    };
+
 
     class TailableInsertDelete : public ClientBase {
     public:
@@ -1193,7 +1228,6 @@ namespace QueryTests {
             ctx.commit();
 
             while ( c->more() ) { c->next(); }
-            ASSERT( c->isDead() );
         }
 
         void insertNext() {
@@ -1559,6 +1593,7 @@ namespace QueryTests {
             add< TailNotAtEnd >();
             add< EmptyTail >();
             add< TailableDelete >();
+            add< TailableDelete2 >();
             add< TailableInsertDelete >();
             add< TailCappedOnly >();
             add< TailableQueryOnId >();

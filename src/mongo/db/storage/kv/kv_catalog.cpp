@@ -73,7 +73,7 @@ namespace mongo {
                                      const StringData& ns,
                                      const CollectionOptions& options ) {
         std::stringstream ss;
-        ss << ns << "-" << _rand << "-" << _next.fetchAndAdd( 1 );
+        ss << "collection-" << _rand << "-" << _next.fetchAndAdd( 1 );
         string ident = ss.str();
 
         boost::mutex::scoped_lock lk( _identsLock );

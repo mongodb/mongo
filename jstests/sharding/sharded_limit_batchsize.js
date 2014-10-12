@@ -58,7 +58,7 @@ unshardedCol.drop();
 
 // Enable sharding and pre-split the sharded collection.
 assert.commandWorked(db.adminCommand({enableSharding: db.getName()}));
-assert.commandWorked(db.adminCommand({movePrimary: db.getName(), to: "shard0000"}));
+db.adminCommand({movePrimary: db.getName(), to: "shard0000"});
 db.adminCommand({shardCollection: shardedCol.getFullName(), key: {_id: 1}});
 assert.commandWorked(db.adminCommand({split: shardedCol.getFullName(), middle: {_id: 0}}));
 assert.commandWorked(db.adminCommand({moveChunk: shardedCol.getFullName(),

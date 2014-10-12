@@ -1069,7 +1069,20 @@ DB.prototype.__pwHash = function( nonce, username, pass ) {
     return hex_md5(nonce + username + _hashPassword(username, pass));
 }
 
-DB.prototype._defaultAuthenticationMechanism = "SCRAM-SHA-1";
+DB.prototype._defaultAuthenticationMechanism = null;
+
+DB.prototype._getDefaultAuthenticationMechanism = function() {
+    // Use the default auth mechanism if set on the command line.
+    if (this._defaultAuthenticationMechanism != null)
+        return this._defaultAuthenticationMechanism;
+
+    // Use MONGODB-CR for v2.6 and earlier.
+    if (this.isMaster().maxWireVersion < 3) {
+        return "MONGODB-CR";
+    }
+    return "SCRAM-SHA-1";
+}
+
 DB.prototype._defaultGssapiServiceName = null;
 
 DB.prototype._authOrThrow = function () {
@@ -1088,7 +1101,7 @@ DB.prototype._authOrThrow = function () {
     }
 
     if (params.mechanism === undefined)
-        params.mechanism = this._defaultAuthenticationMechanism;
+        params.mechanism = this._getDefaultAuthenticationMechanism();
 
     if (params.db !== undefined) {
         throw Error("Do not override db field on db.auth(). Use getMongo().auth(), instead.");

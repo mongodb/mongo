@@ -64,7 +64,8 @@ namespace mongo {
     class RocksSortedDataImpl : public SortedDataInterface {
         MONGO_DISALLOW_COPYING( RocksSortedDataImpl );
     public:
-        RocksSortedDataImpl( rocksdb::DB* db, rocksdb::ColumnFamilyHandle* cf, Ordering order );
+        RocksSortedDataImpl(rocksdb::DB* db, boost::shared_ptr<rocksdb::ColumnFamilyHandle> cf,
+                            Ordering order);
 
         virtual SortedDataBuilderInterface* getBulkBuilder(OperationContext* txn, bool dupsAllowed);
 
@@ -100,13 +101,11 @@ namespace mongo {
     private:
         typedef DiskLoc RecordId;
 
-        RocksRecoveryUnit* _getRecoveryUnit( OperationContext* opCtx ) const;
-
         rocksdb::DB* _db; // not owned
 
         // Each index is stored as a single column family, so this stores the handle to the
         // relevant column family
-        rocksdb::ColumnFamilyHandle* _columnFamily; // not owned
+        boost::shared_ptr<rocksdb::ColumnFamilyHandle> _columnFamily;
 
         // used to construct RocksCursors
         const Ordering _order;

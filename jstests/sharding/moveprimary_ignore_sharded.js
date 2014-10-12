@@ -76,9 +76,18 @@ assert.neq( null, collsFooB[0].findOne() )
 assert.neq( null, collsFooB[1].findOne() )
 assert.neq( null, collsFooB[2].findOne() )
 
-// All indexes sane
-assert.eq( 2, new Mongo( fooPrimaryShard.host ).getCollection( collsFooA[0].getDB() + ".system.indexes" ).find().count() )
-assert.eq( 1, new Mongo( fooOtherShard.host ).getCollection( collsFooA[0].getDB() + ".system.indexes" ).find().count() )
+function realCollectionCount( mydb ) {
+    var num = 0;
+    mydb.getCollectionNames().forEach( function(z) {
+        if ( z.startsWith( "coll" ) )
+            num++;
+    } );
+    return num;
+}
+
+// All collections sane
+assert.eq( 2, realCollectionCount( new Mongo( fooPrimaryShard.host ).getDB( collsFooA[0].getDB() ) ) );
+assert.eq( 1, realCollectionCount( new Mongo( fooOtherShard.host ).getDB( collsFooA[0].getDB() ) ) );
 
 jsTest.log( "Running movePrimary for bar through mongosB ..." )
 
@@ -100,9 +109,9 @@ assert.neq( null, collsBarB[0].findOne() )
 assert.neq( null, collsBarB[1].findOne() )
 assert.neq( null, collsBarB[2].findOne() )
 
-// All indexes sane
-assert.eq( 2, new Mongo( barPrimaryShard.host ).getCollection( collsBarA[0].getDB() + ".system.indexes" ).find().count() )
-assert.eq( 1, new Mongo( barOtherShard.host ).getCollection( collsBarA[0].getDB() + ".system.indexes" ).find().count() )
+// All collections sane
+assert.eq( 2, realCollectionCount( new Mongo( barPrimaryShard.host ).getDB( collsBarA[0].getDB() ) ) );
+assert.eq( 1, realCollectionCount( new Mongo( barOtherShard.host ).getDB( collsBarA[0].getDB() ) ) );
 
 st.stop()
 

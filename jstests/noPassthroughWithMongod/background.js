@@ -18,7 +18,7 @@ for( var i = 0; i < 100000; i++ ) {
 }
 
 // start bg indexing
-a.system.indexes.insert({ns:"test.bg1", key:{i:1}, name:"i_1", background:true});
+a.bg1.ensureIndex({i:1}, {name:"i_1", background:true});
 
 // add more data
 bulk = t.initializeUnorderedBulkOp();

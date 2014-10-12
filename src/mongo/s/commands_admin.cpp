@@ -537,8 +537,15 @@ namespace mongo {
                 ScopedDbConnection conn(config->getPrimary().getConnString());
 
                 //check that collection is not capped
-                BSONObj res = conn->findOne( config->getName() + ".system.namespaces",
-                                             BSON( "name" << ns ) );
+                BSONObj res;
+                {
+                    std::list<BSONObj> all = conn->getCollectionInfos( config->getName(),
+                                                                       BSON( "name" << nsToCollectionSubstring( ns ) ) );
+                    if ( !all.empty() ) {
+                        res = all.front().getOwned();
+                    }
+                }
+
                 if ( res["options"].type() == Object &&
                      res["options"].embeddedObject()["capped"].trueValue() ) {
                     errmsg = "can't shard capped collection";

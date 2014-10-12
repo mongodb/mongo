@@ -113,7 +113,7 @@ namespace ThreadedTests {
         virtual void subthread(int tnumber) {
             Client::initThread("mongomutextest");
 
-            LockerImpl lockState;
+            LockerImpl<true> lockState;
             mongo::unittest::log().stream() 
                 << "Thread "
                 << boost::this_thread::get_id()
@@ -234,11 +234,11 @@ namespace ThreadedTests {
 
         virtual void validate() {
             {
-                LockerImpl ls;
+                LockerImpl<true> ls;
                 Lock::GlobalWrite w(&ls);
             }
             {
-                LockerImpl ls;
+                LockerImpl<true> ls;
                 Lock::GlobalRead r(&ls);
             }
         }
@@ -317,23 +317,6 @@ namespace ThreadedTests {
             tp.join();
 
             ASSERT_EQUALS(counter.load(), iterations * 2);
-        }
-    };
-
-    class LockTest {
-    public:
-        void run() {
-            // quick atomicint wrap test
-            // MSGID likely assumes this semantic
-            AtomicUInt32 counter(0xffffffff);
-            counter.fetchAndAdd(1);
-            ASSERT_EQUALS(counter.load(), 0U);
-
-            LockerImpl lockState;
-            writelocktry lk(&lockState, 0);
-
-            ASSERT( lk.got() );
-            ASSERT( lockState.isW() );
         }
     };
 
@@ -901,8 +884,6 @@ namespace ThreadedTests {
             add< IsAtomicWordAtomic<AtomicUInt64> >();
             add< MVarTest >();
             add< ThreadPoolTest >();
-            add< LockTest >();
-
 
             add< RWLockTest1 >();
             add< RWLockTest2 >();

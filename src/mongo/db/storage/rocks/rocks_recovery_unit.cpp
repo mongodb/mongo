@@ -32,11 +32,13 @@
 
 #include <rocksdb/comparator.h>
 #include <rocksdb/db.h>
+#include <rocksdb/iterator.h>
 #include <rocksdb/slice.h>
 #include <rocksdb/options.h>
 #include <rocksdb/write_batch.h>
 #include <rocksdb/utilities/write_batch_with_index.h>
 
+#include "mongo/db/operation_context.h"
 #include "mongo/util/log.h"
 
 namespace mongo {
@@ -50,7 +52,7 @@ namespace mongo {
 
     RocksRecoveryUnit::~RocksRecoveryUnit() {
         if (!_destroyed) {
-            _destroyInternal();
+            destroy();
         }
     }
 
@@ -105,7 +107,8 @@ namespace mongo {
         if (!_writeBatch) {
             // this assumes that default column family uses default comparator. change this if you
             // change default column family's comparator
-            _writeBatch.reset(new rocksdb::WriteBatchWithIndex(rocksdb::BytewiseComparator()));
+            _writeBatch.reset(
+                new rocksdb::WriteBatchWithIndex(rocksdb::BytewiseComparator(), 0, true));
         }
 
         return _writeBatch.get();
@@ -114,8 +117,19 @@ namespace mongo {
     void RocksRecoveryUnit::registerChange(Change* change) { _changes.emplace_back(change); }
 
     void RocksRecoveryUnit::destroy() {
+        if (_defaultCommit) {
+            commitUnitOfWork();
+        }
+
+        if (_writeBatch && _writeBatch->GetWriteBatch()->Count() > 0) {
+            for (auto& change : _changes) {
+                change->rollback();
+                delete change;
+            }
+        }
+
+        releaseSnapshot();
         _destroyed = true;
-        _destroyInternal();
     }
 
     // XXX lazily initialized for now
@@ -131,18 +145,46 @@ namespace mongo {
         return _snapshot;
     }
 
-    void RocksRecoveryUnit::_destroyInternal() {
-        if (_defaultCommit) {
-            commitUnitOfWork();
-        }
-
-        for (auto& change : _changes) {
-            change->rollback();
-            delete change;
-        }
-
+    void RocksRecoveryUnit::releaseSnapshot() {
         if (_snapshot) {
             _db->ReleaseSnapshot(_snapshot);
+            _snapshot = nullptr;
         }
     }
+
+    rocksdb::Status RocksRecoveryUnit::Get(rocksdb::ColumnFamilyHandle* columnFamily,
+                                           const rocksdb::Slice& key, std::string* value) {
+        if (_writeBatch && _writeBatch->GetWriteBatch()->Count() > 0) {
+            boost::scoped_ptr<rocksdb::WBWIIterator> wb_iterator(
+                _writeBatch->NewIterator(columnFamily));
+            wb_iterator->Seek(key);
+            if (wb_iterator->Valid() && wb_iterator->Entry().key == key) {
+                const auto& entry = wb_iterator->Entry();
+                if (entry.type == rocksdb::WriteType::kDeleteRecord) {
+                    return rocksdb::Status::NotFound();
+                }
+                // TODO avoid double copy
+                *value = std::string(entry.value.data(), entry.value.size());
+                return rocksdb::Status::OK();
+            }
+        }
+        rocksdb::ReadOptions options;
+        options.snapshot = snapshot();
+        return _db->Get(options, columnFamily, key, value);
+    }
+
+    rocksdb::Iterator* RocksRecoveryUnit::NewIterator(rocksdb::ColumnFamilyHandle* columnFamily) {
+        rocksdb::ReadOptions options;
+        options.snapshot = snapshot();
+        auto iterator = _db->NewIterator(options, columnFamily);
+        if (_writeBatch && _writeBatch->GetWriteBatch()->Count() > 0) {
+            iterator = _writeBatch->NewIteratorWithBase(columnFamily, iterator);
+        }
+        return iterator;
+    }
+
+    RocksRecoveryUnit* RocksRecoveryUnit::getRocksRecoveryUnit(OperationContext* opCtx) {
+        return dynamic_cast<RocksRecoveryUnit*>(opCtx->recoveryUnit());
+    }
+
 }

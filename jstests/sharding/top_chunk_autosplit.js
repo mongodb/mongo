@@ -35,7 +35,7 @@ var largeStr = new Array(1024).join('x');
 
 // The inserts should be bulked as one so the auto-split will only be triggered once.
 var bulk = testDB.user.initializeUnorderedBulkOp();
-for (var x = 100; x < 1000; x++) {
+for (var x = 100; x < 2000; x++) {
     bulk.insert({ x: x, val: largeStr });
 }
 bulk.execute();
@@ -58,7 +58,7 @@ testDB.adminCommand({ split: 'test.user', middle: { x: 0 }});
 assert.commandWorked(
     testDB.adminCommand({ moveChunk: 'test.user', find: { x: 0 }, to: 'shard0000' }));
 
-for (var x = -100; x < 100; x+= 10) {
+for (var x = -20; x < 100; x+= 10) {
     testDB.adminCommand({ split: 'test.user', middle: { x: x }});
 }
 
@@ -77,7 +77,7 @@ sh.addTagRange('test.user', { x: -100 }, { x: MaxKey }, 'A');
 
 // The inserts should be bulked as one so the auto-split will only be triggered once.
 bulk = testDB.user.initializeUnorderedBulkOp();
-for (var x = 100; x < 1000; x++) {
+for (var x = 100; x < 2000; x++) {
     bulk.insert({ x: x, val: largeStr });
 }
 bulk.execute();

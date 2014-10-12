@@ -195,6 +195,12 @@ namespace mongo {
         _collections.clear();
     }
 
+    intmax_t dbSize( const string& database ); // from repair_database.cpp
+
+    int64_t MMAPV1DatabaseCatalogEntry::sizeOnDisk( OperationContext* opCtx ) const {
+        return static_cast<int64_t>( dbSize( name() ) );
+    }
+
     void MMAPV1DatabaseCatalogEntry::_removeFromCache(RecoveryUnit* ru,
                                                       const StringData& ns) {
         boost::mutex::scoped_lock lk(_collectionsLock);

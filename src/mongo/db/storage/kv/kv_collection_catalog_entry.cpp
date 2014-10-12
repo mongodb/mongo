@@ -45,7 +45,7 @@ namespace mongo {
           _engine( engine ),
           _catalog( catalog ),
           _ident( ident.toString() ),
-          _recrodStore( rs ) {
+          _recordStore( rs ) {
     }
 
     KVCollectionCatalogEntry::~KVCollectionCatalogEntry() {

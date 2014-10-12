@@ -19,7 +19,7 @@ s.adminCommand( { shardcollection : "test.limit_push" , key : { x : 1 } } );
 
 // Now split the and move the data between the shards
 s.adminCommand( { split : "test.limit_push", middle : { x : 50 }} ); 
-s.adminCommand( { moveChunk: "test.limit_push", find : { x : 51}, to : "shard0000", _waitForDelete : true }) 
+s.adminCommand( { moveChunk: "test.limit_push", find : { x : 51}, to : s.getOther( s.getServer( "test" ) ).name, _waitForDelete : true }) 
 
 // Check that the chunck have split correctly
 assert.eq( 2 , s.config.chunks.count() , "wrong number of chunks");

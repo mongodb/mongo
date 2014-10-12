@@ -21,8 +21,8 @@ function getIndexBuildOpId() {
     debug( inprog );
     indexBuildOpId = -1;
     inprog.forEach( function( op ) {
-                        // Identify the index build as an insert into the 'test.system.indexes'
-                        // namespace.  It is assumed that no other clients are concurrently
+                        // Identify the index build as the createIndex command
+                        // It is assumed that no other clients are concurrently
                         // accessing the 'test' database.
                         if ( op.op == 'query' && 'createIndexes' in op.query ) {
                             debug( op.opid );

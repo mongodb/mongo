@@ -44,7 +44,6 @@ assert.eq(numDocs, x.count, "total count");
 assert.eq(numDocs / 2, x.shards.shard0000.count, "count on shard0000");
 assert.eq(numDocs / 2, x.shards.shard0001.count, "count on shard0001");
 assert(x.totalIndexSize > 0);
-assert(x.numExtents > 0);
 
 // insert one doc into a non-sharded collection
 db.bar.insert({x: 1});
@@ -150,7 +149,10 @@ assert(x.code == 13,
 
 // test fsync on admin db
 x = db._adminCommand("fsync");
-assert(x.ok == 1 && x.numFiles > 0, "fsync failed: " + tojson(x));
+assert(x.ok == 1, "fsync failed: " + tojson(x));
+if ( x.all.shard0000 > 0 ) {
+    assert(x.numFiles > 0, "fsync failed: " + tojson(x));
+}
 
 // test fsync+lock on admin db
 x = db._adminCommand({"fsync" :1, lock:true});

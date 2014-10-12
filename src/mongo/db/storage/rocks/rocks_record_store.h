@@ -29,7 +29,10 @@
 *    it in the license file.
 */
 
+#pragma once
+
 #include <string>
+#include <memory>
 
 #include <rocksdb/options.h>
 
@@ -50,14 +53,11 @@ namespace mongo {
 
     class RocksRecordStore : public RecordStore {
     public:
-        RocksRecordStore( const StringData& ns,
-                          rocksdb::DB* db,
-                          rocksdb::ColumnFamilyHandle* columnFamily,
-                          rocksdb::ColumnFamilyHandle* metadataColumnFamily,
-                          bool isCapped = false,
-                          int64_t cappedMaxSize = -1,
-                          int64_t cappedMaxDocs = -1,
-                          CappedDocumentDeleteCallback* cappedDeleteCallback = NULL );
+        RocksRecordStore(const StringData& ns, const StringData& id, rocksdb::DB* db,
+                         boost::shared_ptr<rocksdb::ColumnFamilyHandle> columnFamily,
+                         bool isCapped = false, int64_t cappedMaxSize = -1,
+                         int64_t cappedMaxDocs = -1,
+                         CappedDocumentDeleteCallback* cappedDeleteCallback = NULL);
 
         virtual ~RocksRecordStore() { }
 
@@ -153,12 +153,12 @@ namespace mongo {
         static rocksdb::Comparator* newRocksCollectionComparator();
     private:
 
+        // NOTE: RecordIterator might outlive the RecordStore
         class Iterator : public RecordIterator {
         public:
-            Iterator( OperationContext* txn,
-                      const RocksRecordStore* rs,
-                      const CollectionScanParams::Direction& dir,
-                      const DiskLoc& start );
+            Iterator(OperationContext* txn, rocksdb::DB* db,
+                     boost::shared_ptr<rocksdb::ColumnFamilyHandle> columnFamily, bool tailable,
+                     const CollectionScanParams::Direction& dir, const DiskLoc& start);
 
             virtual bool isEOF();
             virtual DiskLoc curr();
@@ -169,14 +169,18 @@ namespace mongo {
             virtual RecordData dataFor( const DiskLoc& loc ) const;
 
         private:
+            void _locate(const DiskLoc& loc);
+            DiskLoc _decodeCurr() const;
             bool _forward() const;
             void _checkStatus();
 
             OperationContext* _txn;
-            const RocksRecordStore* _rs;
+            rocksdb::DB* _db; // not owned
+            boost::shared_ptr<rocksdb::ColumnFamilyHandle> _cf;
+            bool _tailable;
             CollectionScanParams::Direction _dir;
-            bool _reseekKeyValid;
-            std::string _reseekKey;
+            bool _eof;
+            DiskLoc _curr;
             boost::scoped_ptr<rocksdb::Iterator> _iterator;
         };
 
@@ -184,11 +188,12 @@ namespace mongo {
          * Returns a new ReadOptions struct, containing the snapshot held in opCtx, if opCtx is not
          * null
          */
-        rocksdb::ReadOptions _readOptions( OperationContext* opCtx = NULL ) const;
-
-        static RocksRecoveryUnit* _getRecoveryUnit( OperationContext* opCtx );
+        static rocksdb::ReadOptions _readOptions(OperationContext* opCtx = NULL);
 
         static DiskLoc _makeDiskLoc( const rocksdb::Slice& slice );
+
+        static RecordData _getDataFor(rocksdb::DB* db, rocksdb::ColumnFamilyHandle* cf,
+                                      OperationContext* txn, const DiskLoc& loc);
 
         DiskLoc _nextId();
         bool cappedAndNeedDelete() const;
@@ -201,8 +206,7 @@ namespace mongo {
         void _increaseDataSize(OperationContext* txn, int amount);
 
         rocksdb::DB* _db; // not owned
-        rocksdb::ColumnFamilyHandle* _columnFamily; // not owned
-        rocksdb::ColumnFamilyHandle* _metadataColumnFamily; // not owned
+        boost::shared_ptr<rocksdb::ColumnFamilyHandle> _columnFamily;
 
         const bool _isCapped;
         const int64_t _cappedMaxSize;

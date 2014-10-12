@@ -65,6 +65,8 @@ namespace mongo {
         bool exists() const { return _namespaceIndex.pathExists(); }
         bool isEmpty() const { return !_namespaceIndex.allocated(); }
 
+        virtual int64_t sizeOnDisk( OperationContext* opCtx ) const;
+
         virtual bool isOlderThan24( OperationContext* opCtx ) const;
         virtual void markIndexSafe24AndUp( OperationContext* opCtx );
 
