@@ -51,6 +51,7 @@ namespace mongo {
         std::stringstream ss;
         ss << "create,";
         ss << "cache_size=1G,";
+        ss << "session_max=20000,";
         ss << "extensions=[local=(entry=index_collator_extension)],";
         ss << "log=(enabled),";
         ss << extraOpenOptions;
