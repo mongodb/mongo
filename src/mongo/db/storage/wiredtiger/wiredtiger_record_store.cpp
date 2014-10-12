@@ -39,8 +39,8 @@
 #include "mongo/db/storage/wiredtiger/wiredtiger_util.h"
 
 #include "mongo/util/log.h"
-//#define RS_ITERATOR_TRACE(x) log() << "WTRS::Iterator " << (const void*)(_cursor->get()) << " " << x;
 
+//#define RS_ITERATOR_TRACE(x) log() << "WTRS::Iterator " << x;
 #define RS_ITERATOR_TRACE(x)
 
 namespace mongo {
@@ -566,10 +566,25 @@ namespace mongo {
     }
 
     bool WiredTigerRecordStore::Iterator::isEOF() {
+        RS_ITERATOR_TRACE( "isEOF start " << _eof );
         if (_eof && _tailable && !_lastLoc.isNull()) {
-            _locate(_lastLoc, false);
-            _getNext();
+            DiskLoc saved = _lastLoc;
+            _locate(_lastLoc, true);
+            if ( _eof ) {
+                _lastLoc = DiskLoc();
+            }
+            else if ( _curr() != saved ) {
+                // wrapped around :(
+                _lastLoc = DiskLoc();
+                _eof = true;
+            }
+            else {
+                // we found where we left off!
+                // now we advance to the next one
+                _getNext();
+            }
         }
+        RS_ITERATOR_TRACE( "isEOF end " << _eof );
         return _eof;
     }
 
@@ -614,8 +629,7 @@ namespace mongo {
         RS_ITERATOR_TRACE( "getNext toReturn: " << toReturn );
         _getNext();
         RS_ITERATOR_TRACE( " ----" );
-        if (_tailable && _eof)
-            _lastLoc = toReturn;
+        _lastLoc = toReturn;
         return toReturn;
     }
 
