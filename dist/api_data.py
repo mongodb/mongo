@@ -356,6 +356,9 @@ connection_runtime_config = [
 	        merge LSM chunks where possible''',
 	        type='boolean')
 		]),
+	Config('lsm_merge', 'true', r'''
+	    merge LSM chunks where possible (deprecated)''',
+	    type='boolean', undoc=True),
 	Config('eviction', '', r'''
 	    eviction configuration options.''',
 	    type='category', subconfig=[
