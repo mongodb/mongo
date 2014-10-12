@@ -279,7 +279,7 @@ STRTOUQ
 STRUCT
 SYS
 Scalability
-SetEndofFile
+SetEndOfFile
 SetFilePointerEx
 Sevii
 SiH

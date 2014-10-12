@@ -35,5 +35,5 @@ __wt_ftruncate(WT_SESSION_IMPL *session, WT_FH *fh, wt_off_t len)
 	if (lasterror = ERROR_USER_MAPPED_FILE)
 		return (EBUSY);
 
-	WT_RET_MSG(session, lasterror, "%s SetEndofFile error", fh->name);
+	WT_RET_MSG(session, lasterror, "%s SetEndOfFile error", fh->name);
 }

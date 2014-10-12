@@ -72,7 +72,7 @@ extern int __wt_block_verify_addr(WT_SESSION_IMPL *session, WT_BLOCK *block, con
 extern u_int __wt_block_header(WT_BLOCK *block);
 extern int __wt_block_write_size(WT_SESSION_IMPL *session, WT_BLOCK *block, size_t *sizep);
 extern int __wt_block_write(WT_SESSION_IMPL *session, WT_BLOCK *block, WT_ITEM *buf, uint8_t *addr, size_t *addr_sizep, int data_cksum);
-extern int __wt_block_write_off(WT_SESSION_IMPL *session, WT_BLOCK *block, WT_ITEM *buf, wt_off_t *offsetp, uint32_t *sizep, uint32_t *cksump, int data_cksum, int locked);
+extern int __wt_block_write_off(WT_SESSION_IMPL *session, WT_BLOCK *block, WT_ITEM *buf, wt_off_t *offsetp, uint32_t *sizep, uint32_t *cksump, int data_cksum, int caller_locked);
 extern int __wt_bloom_create( WT_SESSION_IMPL *session, const char *uri, const char *config, uint64_t count, uint32_t factor, uint32_t k, WT_BLOOM **bloomp);
 extern int __wt_bloom_open(WT_SESSION_IMPL *session, const char *uri, uint32_t factor, uint32_t k, WT_CURSOR *owner, WT_BLOOM **bloomp);
 extern int __wt_bloom_insert(WT_BLOOM *bloom, WT_ITEM *key);
@@ -432,6 +432,7 @@ extern int __wt_dlsym(WT_SESSION_IMPL *session, WT_DLH *dlh, const char *name, i
 extern int __wt_dlclose(WT_SESSION_IMPL *session, WT_DLH *dlh);
 extern int __wt_errno(void);
 extern int __wt_exist(WT_SESSION_IMPL *session, const char *filename, int *existp);
+extern void __wt_fallocate_config(WT_SESSION_IMPL *session, WT_FH *fh);
 extern int __wt_fallocate( WT_SESSION_IMPL *session, WT_FH *fh, wt_off_t offset, wt_off_t len);
 extern int __wt_filesize(WT_SESSION_IMPL *session, WT_FH *fh, wt_off_t *sizep);
 extern int __wt_filesize_name( WT_SESSION_IMPL *session, const char *filename, wt_off_t *sizep);

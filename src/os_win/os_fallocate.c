@@ -8,6 +8,29 @@
 #include "wt_internal.h"
 
 /*
+ * __wt_fallocate_config --
+ *	Configure fallocate behavior for a file handle.
+ */
+int
+__wt_fallocate_config(WT_SESSION_IMPL *session, WT_FH *fh)
+{
+	fh->fallocate_available = 1;
+
+	/*
+	 * Microsoft documentation says:
+	 *
+	 *      The SetEndOfFile function can be used to truncate or extend a
+	 * file. If the file is extended, the contents of the file between the
+	 * old end of the file and the new end of the file are not defined.
+	 *
+	 * I'm reading that to imply that Windows does not overwrite the file
+	 * contents in any way, and so there's no requirement we lock writers
+	 * out of the file when extending it.
+	 */
+	fh->fallocate_requires_locking = 0;
+}
+
+/*
  * __wt_fallocate --
  *	Allocate space for a file handle.
  */
@@ -33,5 +56,5 @@ __wt_fallocate(
 		return (0);
 	}
 
-	WT_RET_MSG(session, __wt_errno(), "%s SetEndofFile error", fh->name);
+	WT_RET_MSG(session, __wt_errno(), "%s SetEndOfFile error", fh->name);
 }

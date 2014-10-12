@@ -61,4 +61,7 @@ struct __wt_fh {
 	wt_off_t extend_len;			/* File extend chunk size */
 
 	int	direct_io;			/* O_DIRECT configured */
+
+	int	fallocate_available;		/* fallocate/posix_fallocate */
+	int	fallocate_requires_locking;
 };

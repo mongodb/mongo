@@ -182,6 +182,9 @@ __wt_open(WT_SESSION_IMPL *session,
 	    dio_type == WT_FILE_TYPE_CHECKPOINT)
 		fh->extend_len = conn->data_extend_len;
 
+	/* Configure fallocate/posix_fallocate calls. */
+	__wt_fallocate_config(session, fh);
+
 	/*
 	 * Repeat the check for a match, but then link onto the database's list
 	 * of files.
