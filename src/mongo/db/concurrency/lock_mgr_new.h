@@ -327,11 +327,8 @@ namespace mongo {
          * MUST be called under the lock bucket's spin lock.
          *
          * @param lock Lock whose grant state should be recalculated.
-         * @param checkConflictQueue Whether to go through the conflict queue. This is an
-         *          optimisation in that we only need to check the conflict queue if one of the
-         *          granted modes, which was conflicting before became zero.
          */
-        void _onLockModeChanged(LockHead* lock, bool checkConflictQueue);
+        void _onLockModeChanged(LockHead* lock);
 
         unsigned _numLockBuckets;
         LockBucket* _lockBuckets;

@@ -165,18 +165,6 @@ namespace mongo {
         // Bit-mask of the conflict modes on the conflict queue. Maintained in lock-step with the
         // conflictCounts array.
         uint32_t conflictModes;
-
-
-        //
-        // Conversion
-        //
-
-        // Counts the number of requests on the granted queue, which have requested any kind of
-        // conflicting conversion and are blocked (i.e. all requests which are currently
-        // STATUS_CONVERTING). This is an optimization for unlocking in that we do not need to
-        // check the granted queue for requests in STATUS_CONVERTING if this count is zero. This
-        // saves cycles in the regular case and only burdens the less-frequent lock upgrade case.
-        uint32_t conversionsCount;
     };
 
 
@@ -308,7 +296,6 @@ namespace mongo {
                 request->status = LockRequest::STATUS_CONVERTING;
                 request->convertMode = mode;
 
-                lock->conversionsCount++;
                 lock->changeGrantedModeCount(request->convertMode, LockHead::Increment);
 
                 return LOCK_WAITING;
@@ -358,12 +345,11 @@ namespace mongo {
             // brings it back to the previous granted mode.
             request->status = LockRequest::STATUS_GRANTED;
 
-            lock->conversionsCount--;
             lock->changeGrantedModeCount(request->convertMode, LockHead::Decrement);
 
             request->convertMode = MODE_NONE;
 
-            _onLockModeChanged(lock, lock->grantedCounts[request->convertMode] == 0);
+            _onLockModeChanged(lock);
         }
         else if (request->status == LockRequest::STATUS_GRANTED) {
             // This releases a currently held lock and is the most common path, so it should be
@@ -374,7 +360,7 @@ namespace mongo {
             lock->removeFromGrantedQueue(request);
             lock->changeGrantedModeCount(request->mode, LockHead::Decrement);
 
-            _onLockModeChanged(lock, lock->grantedCounts[request->mode] == 0);
+            _onLockModeChanged(lock);
         }
         else {
             // Invalid request status
@@ -406,7 +392,7 @@ namespace mongo {
         lock->changeGrantedModeCount(request->mode, LockHead::Decrement);
         request->mode = newMode;
 
-        _onLockModeChanged(lock, true);
+        _onLockModeChanged(lock);
     }
 
     void LockManager::cleanupUnusedLocks() {
@@ -437,13 +423,10 @@ namespace mongo {
         _noCheckForLeakedLocksTestOnly = newValue;
     }
 
-    void LockManager::_onLockModeChanged(LockHead* lock, bool checkConflictQueue) {
+    void LockManager::_onLockModeChanged(LockHead* lock) {
         // Unblock any converting requests (because conversions are still counted as granted and
         // are on the granted queue).
-        for (LockRequest* iter = lock->grantedQueue;
-            (iter != NULL) && (lock->conversionsCount > 0);
-            iter = iter->next) {
-
+        for (LockRequest* iter = lock->grantedQueue; iter != NULL; iter = iter->next) {
             // Conversion requests are going in a separate queue
             if (iter->status == LockRequest::STATUS_CONVERTING) {
                 invariant(iter->convertMode != 0);
@@ -470,7 +453,6 @@ namespace mongo {
                 }
 
                 if (!conflicts(iter->convertMode, grantedModesWithoutCurrentRequest)) {
-                    lock->conversionsCount--;
                     lock->changeGrantedModeCount(iter->convertMode, LockHead::Increment);
                     lock->changeGrantedModeCount(iter->mode, LockHead::Decrement);
                     iter->mode = iter->convertMode;
@@ -486,10 +468,7 @@ namespace mongo {
         // Grant any conflicting requests, which might now be unblocked
         LockRequest* iterNext = NULL;
 
-        for (LockRequest* iter = lock->conflictQueueBegin;
-             (iter != NULL) && checkConflictQueue;
-             iter = iterNext) {
-
+        for (LockRequest* iter = lock->conflictQueueBegin; iter != NULL; iter = iterNext) {
             invariant(iter->status == LockRequest::STATUS_WAITING);
 
             // Store the actual next pointer, because we muck with the iter below and move it to
@@ -623,8 +602,7 @@ namespace mongo {
           grantedModes(0),
           conflictQueueBegin(NULL),
           conflictQueueEnd(NULL),
-          conflictModes(0),
-          conversionsCount(0) {
+          conflictModes(0) {
 
         memset(grantedCounts, 0, sizeof(grantedCounts));
         memset(conflictCounts, 0, sizeof(conflictCounts));

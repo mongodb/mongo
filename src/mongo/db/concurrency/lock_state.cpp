@@ -101,33 +101,28 @@ namespace mongo {
     }
 
 
-    template<bool IsForMMAPV1>
-    bool LockerImpl<IsForMMAPV1>::isW() const {
+
+    bool LockerImpl::isW() const {
         return getLockMode(resourceIdGlobal) == MODE_X;
     }
 
-    template<bool IsForMMAPV1>
-    bool LockerImpl<IsForMMAPV1>::isR() const {
+    bool LockerImpl::isR() const {
         return getLockMode(resourceIdGlobal) == MODE_S;
     }
 
-    template<bool IsForMMAPV1>
-    bool LockerImpl<IsForMMAPV1>::hasAnyReadLock() const {
+    bool LockerImpl::hasAnyReadLock() const {
         return isLockHeldForMode(resourceIdGlobal, MODE_IS);
     }
 
-    template<bool IsForMMAPV1>
-    bool LockerImpl<IsForMMAPV1>::isLocked() const {
+    bool LockerImpl::isLocked() const {
         return getLockMode(resourceIdGlobal) != MODE_NONE;
     }
 
-    template<bool IsForMMAPV1>
-    bool LockerImpl<IsForMMAPV1>::isWriteLocked() const {
+    bool LockerImpl::isWriteLocked() const {
         return isLockHeldForMode(resourceIdGlobal, MODE_IX);
     }
 
-    template<bool IsForMMAPV1>
-    bool LockerImpl<IsForMMAPV1>::isWriteLocked(const StringData& ns) const {
+    bool LockerImpl::isWriteLocked(const StringData& ns) const {
         if (isWriteLocked()) {
             return true;
         }
@@ -138,8 +133,7 @@ namespace mongo {
         return isLockHeldForMode(resIdNs, MODE_X);
     }
 
-    template<bool IsForMMAPV1>
-    bool LockerImpl<IsForMMAPV1>::isDbLockedForMode(const StringData& dbName, LockMode mode) const {
+    bool LockerImpl::isDbLockedForMode(const StringData& dbName, LockMode mode) const {
         DEV {
             const NamespaceString nss(dbName);
             dassert(nss.coll().empty());
@@ -152,8 +146,7 @@ namespace mongo {
         return isLockHeldForMode(resIdDb, mode);
     }
 
-    template<bool IsForMMAPV1>
-    bool LockerImpl<IsForMMAPV1>::isAtLeastReadLocked(const StringData& ns) const {
+    bool LockerImpl::isAtLeastReadLocked(const StringData& ns) const {
         if (threadState() == 'R' || threadState() == 'W') {
             return true; // global
         }
@@ -182,13 +175,11 @@ namespace mongo {
         return true;
     }
 
-    template<bool IsForMMAPV1>
-    bool LockerImpl<IsForMMAPV1>::isRecursive() const {
+    bool LockerImpl::isRecursive() const {
         return recursiveCount() > 1;
     }
 
-    template<bool IsForMMAPV1>
-    void LockerImpl<IsForMMAPV1>::assertWriteLocked(const StringData& ns) const {
+    void LockerImpl::assertWriteLocked(const StringData& ns) const {
         if (!isWriteLocked(ns)) {
             dump();
             msgasserted(
@@ -196,8 +187,7 @@ namespace mongo {
         }
     }
 
-    template<bool IsForMMAPV1>
-    BSONObj LockerImpl<IsForMMAPV1>::reportState() {
+    BSONObj LockerImpl::reportState() {
         BSONObjBuilder b;
         reportState(&b);
 
@@ -208,8 +198,7 @@ namespace mongo {
               thread. So be careful about thread safety here. For example reading 
               this->otherName would not be safe as-is!
     */
-    template<bool IsForMMAPV1>
-    void LockerImpl<IsForMMAPV1>::reportState(BSONObjBuilder* res) {
+    void LockerImpl::reportState(BSONObjBuilder* res) {
         BSONObjBuilder b;
         if (threadState()) {
             char buf[2];
@@ -227,8 +216,7 @@ namespace mongo {
         res->append("waitingForLock", _lockPending);
     }
 
-    template<bool IsForMMAPV1>
-    char LockerImpl<IsForMMAPV1>::threadState() const {
+    char LockerImpl::threadState() const {
         switch (getLockMode(resourceIdGlobal)) {
         case MODE_IS:
             return 'r';
@@ -245,8 +233,7 @@ namespace mongo {
         invariant(false);
     }
 
-    template<bool IsForMMAPV1>
-    void LockerImpl<IsForMMAPV1>::dump() const {
+    void LockerImpl::dump() const {
         StringBuilder ss;
         ss << "lock status: ";
 
@@ -267,8 +254,7 @@ namespace mongo {
         log() << ss.str() << std::endl;
     }
 
-    template<bool IsForMMAPV1>
-    void LockerImpl<IsForMMAPV1>::enterScopedLock(Lock::ScopedLock* lock) {
+    void LockerImpl::enterScopedLock(Lock::ScopedLock* lock) {
         _recursive++;
         if (_recursive == 1) {
             invariant(_scopedLk == NULL);
@@ -276,14 +262,12 @@ namespace mongo {
         }
     }
 
-    template<bool IsForMMAPV1>
-    Lock::ScopedLock* LockerImpl<IsForMMAPV1>::getCurrentScopedLock() const {
+    Lock::ScopedLock* LockerImpl::getCurrentScopedLock() const {
         invariant(_recursive == 1);
         return _scopedLk;
     }
 
-    template<bool IsForMMAPV1>
-    void LockerImpl<IsForMMAPV1>::leaveScopedLock(Lock::ScopedLock* lock) {
+    void LockerImpl::leaveScopedLock(Lock::ScopedLock* lock) {
         if (_recursive == 1) {
             // Sanity check we are releasing the same lock
             invariant(_scopedLk == lock);
@@ -330,8 +314,7 @@ namespace mongo {
     // Locker
     //
 
-    template<bool IsForMMAPV1>
-    LockerImpl<IsForMMAPV1>::LockerImpl(uint64_t id) 
+    LockerImpl::LockerImpl(uint64_t id) 
         : _id(id),
           _wuowNestingLevel(0),
           _batchWriter(false),
@@ -342,8 +325,7 @@ namespace mongo {
 
     }
 
-    template<bool IsForMMAPV1>
-    LockerImpl<IsForMMAPV1>::LockerImpl() 
+    LockerImpl::LockerImpl() 
         : _id(idCounter.addAndFetch(1)),
           _wuowNestingLevel(0),
           _batchWriter(false),
@@ -354,8 +336,7 @@ namespace mongo {
 
     }
 
-    template<bool IsForMMAPV1>
-    LockerImpl<IsForMMAPV1>::~LockerImpl() {
+    LockerImpl::~LockerImpl() {
         // Cannot delete the Locker while there are still outstanding requests, because the
         // LockManager may attempt to access deleted memory. Besides it is probably incorrect
         // to delete with unaccounted locks anyways.
@@ -364,8 +345,7 @@ namespace mongo {
         invariant(_requests.empty());
     }
 
-    template<bool IsForMMAPV1>
-    LockResult LockerImpl<IsForMMAPV1>::lockGlobal(LockMode mode, unsigned timeoutMs) {
+    LockResult LockerImpl::lockGlobal(LockMode mode, unsigned timeoutMs) {
         LockRequest* request = _find(resourceIdGlobal);
         if (request != NULL) {
             // No upgrades on the GlobalLock are allowed until we can handle deadlocks.
@@ -386,7 +366,7 @@ namespace mongo {
         }
 
         // Special-handling for MMAP V1 concurrency control
-        if (IsForMMAPV1 && (request == NULL)) {
+        if (request == NULL) {
             // Obey the requested timeout
             const unsigned elapsedTimeMs = timer.millis();
             const unsigned remainingTimeMs =
@@ -406,62 +386,65 @@ namespace mongo {
         return LOCK_OK;
     }
 
-    template<bool IsForMMAPV1>
-    void LockerImpl<IsForMMAPV1>::downgradeGlobalXtoSForMMAPV1() {
+    void LockerImpl::downgradeGlobalXtoSForMMAPV1() {
         invariant(!inAWriteUnitOfWork());
 
         // Only Global and Flush lock could be held at this point.
-        if ( IsForMMAPV1 ) {
-            invariant(_requests.size() == 2);
-        }
-        else {
-            invariant(_requests.size() == 1);
-        }
+        invariant(_requests.size() == 2);
 
         LockRequest* globalLockRequest = _find(resourceIdGlobal);
+        LockRequest* flushLockRequest = _find(resourceIdMMAPV1Flush);
+
         invariant(globalLockRequest->mode == MODE_X);
         invariant(globalLockRequest->recursiveCount == 1);
-        globalLockManager.downgrade(globalLockRequest, MODE_S);
+        invariant(flushLockRequest->mode == MODE_X);
+        invariant(flushLockRequest->recursiveCount == 1);
 
-        if (IsForMMAPV1) {
-            LockRequest* flushLockRequest = _find(resourceIdMMAPV1Flush);
-            invariant(flushLockRequest->mode == MODE_X);
-            invariant(flushLockRequest->recursiveCount == 1);
-            globalLockManager.downgrade(flushLockRequest, MODE_S);
-        }
+        globalLockManager.downgrade(globalLockRequest, MODE_S);
+        globalLockManager.downgrade(flushLockRequest, MODE_S);
     }
 
-    template<bool IsForMMAPV1>
-    bool LockerImpl<IsForMMAPV1>::unlockAll() {
+    bool LockerImpl::unlockAll() {
         if (!unlock(resourceIdGlobal)) {
             return false;
         }
 
+        // Unlock all non-flush locks.
         LockRequestsMap::const_iterator it = _requests.begin();
         while (it != _requests.end()) {
             const ResourceId& resId = it->first;
 
-            // If we're here we should only have one reference to any lock.  Even if we're in
-            // DBDirectClient or some other nested scope, we would have to release the global lock
-            // fully before we get here. Therefore we're not here unless we've unlocked the global
-            // lock, in which case it's a programming error to have > 1 reference.
-            invariant(unlock(resId));
+            if (resourceIdMMAPV1Flush == resId) {
+                // The flush lock is the last lock to be released, so hold on to it for now.
+                it++;
+            }
+            else {
+                // It's a non-flush lock, so release it.
+                // If we're here we should only have one reference to this lock.
+                // Even if we're in DBDirectClient or some other nested scope, we would
+                // have to release the global lock fully before we get here.
+                // Therefore we're not here unless we've unlocked the global lock, in which
+                // case it's a programming error to have >1 reference to this lock.
+                invariant(unlock(resId));
 
-            // Unlocking modifies the state of _requests, but we're iterating over it, so we
-            // have to start from the beginning every time we unlock something.
-            it = _requests.begin();
+                // Unlocking modifies the state of _requests, but we're iterating over it, so we
+                // have to start from the beginning every time we unlock something.
+                it = _requests.begin();
+            }
         }
+
+        // Need to unlock the MMAPV1 flush lock, which should be the last lock held
+        invariant(unlock(resourceIdMMAPV1Flush));
+        invariant(_requests.empty());
 
         return true;
     }
 
-    template<bool IsForMMAPV1>
-    void LockerImpl<IsForMMAPV1>::beginWriteUnitOfWork() {
+    void LockerImpl::beginWriteUnitOfWork() {
         _wuowNestingLevel++;
     }
 
-    template<bool IsForMMAPV1>
-    void LockerImpl<IsForMMAPV1>::endWriteUnitOfWork() {
+    void LockerImpl::endWriteUnitOfWork() {
         _wuowNestingLevel--;
         if (_wuowNestingLevel > 0) {
             // Don't do anything unless leaving outermost WUOW.
@@ -475,16 +458,10 @@ namespace mongo {
             _resourcesToUnlockAtEndOfUnitOfWork.pop();
         }
 
-        if (IsForMMAPV1) {
-            _yieldFlushLockForMMAPV1();
-        }
+        _yieldFlushLockForMMAPV1();
     }
 
-    template<bool IsForMMAPV1>
-    LockResult LockerImpl<IsForMMAPV1>::lock(const ResourceId& resId,
-                                             LockMode mode,
-                                             unsigned timeoutMs) {
-
+    LockResult LockerImpl::lock(const ResourceId& resId, LockMode mode, unsigned timeoutMs) {
         _notify.clear();
 
         LockRequest* request = _find(resId);
@@ -505,32 +482,28 @@ namespace mongo {
 
         LockResult result = globalLockManager.lock(resId, request, mode);
         if (result == LOCK_WAITING) {
-            if (IsForMMAPV1) {
-                // Under MMAP V1 engine a deadlock can occur if a thread goes to sleep waiting on
-                // DB lock, while holding the flush lock, so it has to be released. This is only
-                // correct to do if not in a write unit of work.
-                bool unlockedFlushLock = false;
+            // Under MMAP V1 engine a deadlock can occur if a thread goes to sleep waiting on DB
+            // lock, while holding the flush lock, so it has to be released. This is only correct
+            // to do if not in a write unit of work.
+            bool unlockedFlushLock = false;
 
-                if (!inAWriteUnitOfWork() &&
-                    (resId != resourceIdGlobal) &&
-                    (resId != resourceIdMMAPV1Flush) &&
-                    (resId != resourceIdLocalDB)) {
+            if (!inAWriteUnitOfWork() &&
+                (resId != resourceIdGlobal) &&
+                (resId != resourceIdMMAPV1Flush) &&
+                (resId != resourceIdLocalDB)) {
 
-                    invariant(unlock(resourceIdMMAPV1Flush));
-                    unlockedFlushLock = true;
-                }
-
-                result = _notify.wait(timeoutMs);
-
-                if (unlockedFlushLock) {
-                    // We cannot obey the timeout here, because it is not correct to return from
-                    // the lock request with the flush lock released.
-                    invariant(LOCK_OK ==
-                        lock(resourceIdMMAPV1Flush, getLockMode(resourceIdGlobal), UINT_MAX));
-                }
+                invariant(unlock(resourceIdMMAPV1Flush));
+                unlockedFlushLock = true;
             }
-            else {
-                result = _notify.wait(timeoutMs);
+
+            // Do the blocking outside of the flush lock (if not in a write unit of work)
+            result = _notify.wait(timeoutMs);
+
+            if (unlockedFlushLock) {
+                // We cannot obey the timeout here, because it is not correct to return from the
+                // lock request with the flush lock released.
+                invariant(LOCK_OK ==
+                    lock(resourceIdMMAPV1Flush, getLockMode(resourceIdGlobal), UINT_MAX));
             }
         }
 
@@ -547,8 +520,7 @@ namespace mongo {
         return result;
     }
 
-    template<bool IsForMMAPV1>
-    bool LockerImpl<IsForMMAPV1>::unlock(const ResourceId& resId) {
+    bool LockerImpl::unlock(const ResourceId& resId) {
         LockRequest* request = _find(resId);
 
         invariant(request);
@@ -572,8 +544,7 @@ namespace mongo {
         return false;
     }
 
-    template<bool IsForMMAPV1>
-    LockMode LockerImpl<IsForMMAPV1>::getLockMode(const ResourceId& resId) const {
+    LockMode LockerImpl::getLockMode(const ResourceId& resId) const {
         scoped_spinlock scopedLock(_lock);
 
         const LockRequest* request = _find(resId);
@@ -582,8 +553,7 @@ namespace mongo {
         return request->mode;
     }
 
-    template<bool IsForMMAPV1>
-    bool LockerImpl<IsForMMAPV1>::isLockHeldForMode(const ResourceId& resId, LockMode mode) const {
+    bool LockerImpl::isLockHeldForMode(const ResourceId& resId, LockMode mode) const {
         return getLockMode(resId) >= mode;
     }
 
@@ -602,8 +572,7 @@ namespace mongo {
         };
     }
 
-    template<bool IsForMMAPV1>
-    bool LockerImpl<IsForMMAPV1>::saveLockStateAndUnlock(Locker::LockSnapshot* stateOut) {
+    bool LockerImpl::saveLockStateAndUnlock(Locker::LockSnapshot* stateOut) {
         // Clear out whatever is in stateOut.
         stateOut->locks.clear();
         stateOut->globalMode = MODE_NONE;
@@ -643,7 +612,7 @@ namespace mongo {
             }
 
             // This is an internal lock that is obtained when the global lock is locked.
-            if (IsForMMAPV1 && (resourceIdMMAPV1Flush == resId)) {
+            if (resourceIdMMAPV1Flush == resId) {
                 continue;
             }
 
@@ -679,14 +648,11 @@ namespace mongo {
 
         // Step 3: Unlock flush.  It's only acquired on the first global lock acquisition
         // so we only unlock it once.
-        if (IsForMMAPV1) {
-            invariant(unlock(resourceIdMMAPV1Flush));
-        }
+        invariant(unlock(resourceIdMMAPV1Flush));
         return true;
     }
 
-    template<bool IsForMMAPV1>
-    void LockerImpl<IsForMMAPV1>::restoreLockState(const Locker::LockSnapshot& state) {
+    void LockerImpl::restoreLockState(const Locker::LockSnapshot& state) {
         // We expect to be able to unlock each lock 'recursiveCount' number of times.
         // So, we relock each lock that number of times.
 
@@ -701,16 +667,14 @@ namespace mongo {
         }
     }
 
-    template<bool IsForMMAPV1>
-    LockRequest* LockerImpl<IsForMMAPV1>::_find(const ResourceId& resId) const {
+    LockRequest* LockerImpl::_find(const ResourceId& resId) const {
         LockRequestsMap::const_iterator it = _requests.find(resId);
 
         if (it == _requests.end()) return NULL;
         return it->second;
     }
 
-    template<bool IsForMMAPV1>
-    void LockerImpl<IsForMMAPV1>::_freeRequest(const ResourceId& resId, LockRequest* request) {
+    void LockerImpl::_freeRequest(const ResourceId& resId, LockRequest* request) {
         _lock.lock();
         const int numErased = _requests.erase(resId);
         _lock.unlock();
@@ -723,8 +687,7 @@ namespace mongo {
         delete request;
     }
 
-    template<bool IsForMMAPV1>
-    void LockerImpl<IsForMMAPV1>::_yieldFlushLockForMMAPV1() {
+    void LockerImpl::_yieldFlushLockForMMAPV1() {
         if (!inAWriteUnitOfWork()) {
             invariant(unlock(resourceIdMMAPV1Flush));
             invariant(LOCK_OK ==
@@ -768,11 +731,5 @@ namespace mongo {
     LockManager* getGlobalLockManager() {
         return &globalLockManager;
     }
-
-    
-    // Ensures that there are two instances compiled for LockerImpl for the two values of the
-    // template argument.
-    template class LockerImpl<true>;
-    template class LockerImpl<false>;
 
 } // namespace mongo
