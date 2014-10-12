@@ -141,7 +141,7 @@ namespace mongo {
         _session = _ru->getSession();
         _cursor = _session->getCursor( uri, id );
         if ( !_cursor ) {
-            error() << "no cursor for uri";
+            error() << "no cursor for uri: " << uri;
         }
     }
 
