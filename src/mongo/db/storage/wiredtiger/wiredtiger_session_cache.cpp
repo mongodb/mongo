@@ -9,7 +9,7 @@ namespace mongo {
 
     WiredTigerSession::WiredTigerSession( WT_CONNECTION* conn ) {
         _session = NULL;
-        int ret = conn->open_session(conn, NULL, "isolation=read-uncommitted", &_session);
+        int ret = conn->open_session(conn, NULL, "isolation=snapshot", &_session);
         invariantWTOK(ret);
     }
 

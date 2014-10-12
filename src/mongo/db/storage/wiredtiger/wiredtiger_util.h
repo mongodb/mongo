@@ -33,6 +33,7 @@
 
 #include <wiredtiger.h>
 
+#include "mongo/db/concurrency/deadlock.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/mongoutils/str.h"
 
@@ -44,6 +45,10 @@ namespace mongo {
     inline Status wtRCToStatus(int retCode) {
         if (MONGO_likely(retCode == 0))
             return Status::OK();
+
+
+        if ( retCode == WT_DEADLOCK )
+            throw DeadLockException();
 
         // TODO convert specific codes rather than just using INTERNAL_ERROR for everything.
         return Status(ErrorCodes::InternalError,

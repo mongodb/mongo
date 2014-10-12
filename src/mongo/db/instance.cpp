@@ -44,6 +44,7 @@
 #include "mongo/db/clientcursor.h"
 #include "mongo/db/commands/fsync.h"
 #include "mongo/db/concurrency/d_concurrency.h"
+#include "mongo/db/concurrency/deadlock.h"
 #include "mongo/db/db.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/dbhelpers.h"
@@ -466,6 +467,7 @@ namespace mongo {
             dbresponse.responseTo = m.header().getId();
         }
         else {
+            while(1) {
             try {
                 // The following operations all require authorization.
                 // dbInsert, dbUpdate and dbDelete can be easily pre-authorized,
@@ -511,6 +513,7 @@ namespace mongo {
                         invariant(false);
                     }
                 }
+                break;
              }
             catch (const UserException& ue) {
                 setLastError(ue.getCode(), ue.getInfo().msg.c_str());
@@ -518,6 +521,7 @@ namespace mongo {
                        << " Caught Assertion in " << opToString(op) << ", continuing "
                        << ue.toString() << endl;
                 debug.exceptionInfo = ue.getInfo();
+                break;
             }
             catch (const AssertionException& e) {
                 setLastError(e.getCode(), e.getInfo().msg.c_str());
@@ -526,6 +530,10 @@ namespace mongo {
                        << e.toString() << endl;
                 debug.exceptionInfo = e.getInfo();
                 shouldLog = true;
+                break;
+            }
+            catch (const DeadLockException& dle ) {
+            }
             }
         }
         currentOp.ensureStarted();

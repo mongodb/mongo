@@ -50,9 +50,10 @@ namespace mongo {
         // Separate out a prefix and suffix in the default string. User configuration will
         // override values in the prefix, but not values in the suffix.
         std::stringstream ss;
-        ss << "type=file,";
-        ss << "leaf_page_max=512k,";
-        ss << "memory_page_max=10m,";
+        //ss << "type=file,";
+        //ss << "leaf_page_max=512k,";
+        //ss << "memory_page_max=10m,";
+        ss << "type=lsm";
 
         ss << extraStrings << ",";
 
