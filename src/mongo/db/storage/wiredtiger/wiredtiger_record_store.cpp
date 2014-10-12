@@ -148,7 +148,12 @@ namespace mongo {
     int64_t WiredTigerRecordStore::storageSize( OperationContext* txn,
                                            BSONObjBuilder* extraInfo,
                                            int infoLevel ) const {
-        return 1 + dataSize(txn); // todo: this isn't very good
+        int64_t size = dataSize(txn);
+        if ( size == 0 && _isCapped ) {
+            // Many things assume anempty capped collection still takes up space.
+            return 1;
+        }
+        return size;
     }
 
     // Retrieve the value from a positioned cursor.
