@@ -76,7 +76,7 @@ namespace mongo {
                                        const StringData& idxName,
                                        long long newExpireSeconds );
 
-        RecordStore* getRecordStore() { return _recrodStore.get(); }
+        RecordStore* getRecordStore() { return _recordStore.get(); }
 
     protected:
         virtual MetaData _getMetaData( OperationContext* txn ) const;
@@ -85,7 +85,7 @@ namespace mongo {
         KVEngine* _engine; // not owned
         KVCatalog* _catalog; // not owned
         std::string _ident;
-        boost::scoped_ptr<RecordStore> _recrodStore; // owned
+        boost::scoped_ptr<RecordStore> _recordStore; // owned
     };
 
 }
