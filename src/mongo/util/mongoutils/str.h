@@ -214,12 +214,24 @@ namespace mongoutils {
         /** remove trailing chars in place */
         inline void stripTrailing(std::string& s, const char *chars) {
             std::string::iterator i = s.end();
-            while( s.begin() != i ) {
+            bool isInEraseRange = false;
+            std::string::iterator to = s.end();
+            while (s.begin() != i) {
                 i--;
-                if( contains(chars, *i) ) {
-                    s.erase(i);
+                if (contains(chars, *i)) {
+                    if (!isInEraseRange) {
+                        isInEraseRange = true;
+                        to = i;
+                    }
+                }
+                else {
+                    if (isInEraseRange) {
+                        isInEraseRange = false;
+                        s.erase(i + 1, to + 1);
+                    }
                 }
             }
+            if (isInEraseRange) s.erase(s.begin(), to + 1);
         }
 
     }  // namespace str

@@ -32,6 +32,7 @@
 #include "mongo/util/mongoutils/str.h"
 
 namespace {
+    namespace str = mongoutils::str;
 
     TEST(StripTrailingTests, RemoveFromHead) {
         std::string data("remove from head");
