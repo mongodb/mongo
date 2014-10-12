@@ -46,11 +46,11 @@ assert.writeOK(bulk.execute());
 
 jsTest.log("Starting background indexing");
 masterDB.jstests_bgsec.ensureIndex( {i:1}, {background:true} );
-assert.eq(2, masterDB.system.indexes.count( {ns:"bgIndexSec.jstests_bgsec"} ) );
+assert.eq(2, masterDB.jstests_bgsec.getIndexes().length);
 
 // Wait for the secondary to get the index entry
 assert.soon( function() { 
-    return 2 == secondDB.system.indexes.count( {ns:"bgIndexSec.jstests_bgsec"} ); }, 
+    return 2 == secondDB.jstests_bgsec.getIndexes().length; },
              "index not created on secondary (prior to restart)", 240000 );
 
 // restart secondary and reconnect
@@ -60,7 +60,7 @@ replTest.restart(secondId, {},  /*wait=*/true);
 // Make sure secondary comes back
 assert.soon( function() { 
     try {
-        secondDB.system.namespaces.count(); // trigger a reconnect if needed
+        secondDB.jstests_bgsec.getIndexes().length; // trigger a reconnect if needed
         return true; 
     } catch (e) {
         return false; 
@@ -68,7 +68,7 @@ assert.soon( function() {
 } , "secondary didn't restart", 30000, 1000);
 
 assert.soon( function() { 
-    return 2 == secondDB.system.indexes.count( {ns:"bgIndexSec.jstests_bgsec"} ); }, 
+    return 2 == secondDB.jstests_bgsec.getIndexes().length; },
              "Index build not resumed after restart", 30000, 50 );
 
 jsTest.log("indexbg-restart-secondary.js complete");
