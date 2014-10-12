@@ -390,7 +390,12 @@ namespace mongo {
         invariant(!inAWriteUnitOfWork());
 
         // Only Global and Flush lock could be held at this point.
-        invariant(_requests.size() == 2);
+        if ( IsForMMAPV1 ) {
+            invariant(_requests.size() == 2);
+        }
+        else {
+            invariant(_requests.size() == 1);
+        }
 
         LockRequest* globalLockRequest = _find(resourceIdGlobal);
         LockRequest* flushLockRequest = _find(resourceIdMMAPV1Flush);

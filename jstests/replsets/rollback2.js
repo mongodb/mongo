@@ -52,8 +52,8 @@ function wait(f) {
 function dbs_match(a, b) {
     print("dbs_match");
 
-    var ac = a.system.namespaces.find().sort({name:1}).toArray();
-    var bc = b.system.namespaces.find().sort({name:1}).toArray();
+    var ac = a.getCollectionNames();
+    var bc = b.getCollectionNames();
     if (!friendlyEqual(ac, bc)) {
         print("dbs_match: namespaces don't match");
         print("\n\n");
@@ -183,7 +183,6 @@ doTest = function (signal) {
         return status.members[1].state == 2;
       });
 
-    
     A.runCommand({ replSetTest: 1, blind: true });
     reconnect(a, b);
     

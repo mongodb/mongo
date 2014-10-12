@@ -638,9 +638,10 @@ namespace {
                         // exists on the source.
                         if (collection->numRecords(txn) == 0) {
                             try {
-                                string sys = ctx.db()->name() + ".system.namespaces";
-                                BSONObj nsResult = them->findOne(sys, QUERY("name" << doc.ns));
-                                if (nsResult.isEmpty()) {
+                                std::list<BSONObj> lst =
+                                    them->getCollectionInfos( ctx.db()->name(),
+                                                              BSON( "name" << nsToCollectionSubstring( doc.ns ) ) );
+                                if (lst.empty()) {
                                     // we should drop
                                     WriteUnitOfWork wunit(txn);
                                     ctx.db()->dropCollection(txn, doc.ns);
