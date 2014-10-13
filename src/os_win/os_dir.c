@@ -91,8 +91,9 @@ __wt_dirlist(WT_SESSION_IMPL *session, const char *dir, const char *prefix,
 	if (count > 0)
 		*dirlist = entries;
 	*countp = count;
+
 err:
-	if (findhandle != NULL)
+	if (findhandle != INVALID_HANDLE_VALUE)
 		(void)FindClose(findhandle);
 	__wt_free(session, path);
 	__wt_buf_free(session, pathbuf);
