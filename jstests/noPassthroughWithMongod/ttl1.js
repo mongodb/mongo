@@ -51,9 +51,7 @@ var msg = RegExp("ttl indexes require the expireAfterSeconds" +
 assertEntryMatches(log, msg);
 
 // Part 2
-assert.eq( 0, t.stats().userFlags );
 t.ensureIndex( { x : 1 } , { expireAfterSeconds : 20000 } );
-assert.eq( 1, t.stats().userFlags );
 
 assert.soon(
     function() {
