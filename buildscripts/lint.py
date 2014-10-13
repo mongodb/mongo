@@ -21,7 +21,6 @@ def run_lint( paths, nudgeOn=False ):
     nudge.append( '-build/include_order' ) # errors found: 511
     nudge.append( '-build/include_what_you_use' ) # errors found: 986
     nudge.append( '-build/namespaces' ) # errors found: 131
-    nudge.append( '-build/storage_class' ) # conflicts with c++11 auto in rocks
     never.append( '-readability/braces' ) # errors found: 880
     later.append( '-readability/casting' ) # errors found: 748
     nudge.append( '-readability/function' ) # errors found: 49
