@@ -313,16 +313,20 @@ namespace mongo {
         Database* db = dbHolder().openDb(txn, dbname);
 
         // config
-        string temp = dbname + ".system.namespaces";
-        BSONObj config = _conn->findOne(temp , BSON("name" << ns));
-        if (config["options"].isABSONObj()) {
-            WriteUnitOfWork wunit(txn);
-            Status status = userCreateNS(txn, db, ns, config["options"].Obj(), logForRepl, 0);
-            if ( !status.isOK() ) {
-                errmsg = status.toString();
-                return false;
+        BSONObj filter = BSON("name" << nss.coll().toString());
+        list<BSONObj> collList = _conn->getCollectionInfos( dbname, filter);
+        if (!collList.empty()) {
+            invariant(collList.size() <= 1);
+            BSONObj col = collList.front();
+            if (col["options"].isABSONObj()) {
+                WriteUnitOfWork wunit(txn);
+                Status status = userCreateNS(txn, db, ns, col["options"].Obj(), logForRepl, 0);
+                if ( !status.isOK() ) {
+                    errmsg = status.toString();
+                    return false;
+                }
+                wunit.commit();
             }
-            wunit.commit();
         }
 
         // main data
