@@ -6,7 +6,6 @@ import (
 	"github.com/mongodb/mongo-tools/common/db"
 	commonOpts "github.com/mongodb/mongo-tools/common/options"
 	"github.com/mongodb/mongo-tools/common/testutil"
-
 	"github.com/mongodb/mongo-tools/common/util"
 	"github.com/mongodb/mongo-tools/mongofiles/options"
 	. "github.com/smartystreets/goconvey/convey"
@@ -23,9 +22,7 @@ var (
 	testServer = "localhost"
 	testPort   = "27017"
 
-	ssl = &commonOpts.SSL{
-		UseSSL: false,
-	}
+	ssl       = &testutil.SSL_TEST_OPTIONS
 	namespace = &commonOpts.Namespace{
 		DB: testDB,
 	}
