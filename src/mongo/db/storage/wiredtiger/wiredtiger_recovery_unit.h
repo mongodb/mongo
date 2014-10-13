@@ -71,7 +71,11 @@ namespace mongo {
         WiredTigerSession* getSession();
         WiredTigerSessionCache* getSessionCache() { return _sessionCache; }
 
-        static WiredTigerRecoveryUnit& Get(OperationContext *txn);
+        bool everStartedWrite() const { return _everStartedWrite; }
+
+        void restartTransaction();
+
+        static WiredTigerRecoveryUnit* get(OperationContext *txn);
 
     private:
 
@@ -83,6 +87,7 @@ namespace mongo {
         bool _defaultCommit;
         int _depth;
         bool _active;
+        bool _everStartedWrite;
 
         typedef boost::shared_ptr<Change> ChangePtr;
         typedef std::vector<ChangePtr> Changes;

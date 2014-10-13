@@ -156,7 +156,7 @@ namespace {
                                 const std::string& uri,
                                 const std::string& extraConfig,
                                 const IndexDescriptor* desc ) {
-        WT_SESSION* s = WiredTigerRecoveryUnit::Get( txn ).getSession()->getSession();
+        WT_SESSION* s = WiredTigerRecoveryUnit::get( txn )->getSession()->getSession();
 
         // Separate out a prefix and suffix in the default string. User configuration will
         // override values in the prefix, but not values in the suffix.
@@ -292,15 +292,13 @@ namespace {
             OperationContext *txn,
             bool forward)
        : _txn(txn),
+         _cursor(idx.GetURI(), idx.instanceId(), txn ),
          _idx(idx),
          _forward(forward),
-         _eof(true),
-         _savedAtEnd(false) {
-        _cursor = new WiredTigerCursor(_idx.GetURI(), _idx.instanceId(), txn);
+         _eof(true) {
     }
 
     WiredTigerIndex::IndexCursor::~IndexCursor() {
-        delete _cursor;
     }
 
     int WiredTigerIndex::IndexCursor::getDirection() const { return _forward ? 1 : -1; }
@@ -312,12 +310,11 @@ namespace {
         const WiredTigerIndex::IndexCursor &other =
             dynamic_cast<const WiredTigerIndex::IndexCursor &>(genother);
 
-        invariant( _cursor != NULL && other._cursor != NULL);
         if ( _eof && other._eof )
             return true;
         else if ( _eof || other._eof )
             return false;
-        WT_CURSOR *c = _cursor->get(), *otherc = other._cursor->get();
+        WT_CURSOR *c = _cursor.get(), *otherc = other._cursor.get();
         int cmp, ret = c->compare(c, otherc, &cmp);
         invariantWTOK(ret);
         return cmp == 0;
@@ -353,7 +350,7 @@ namespace {
 
 
     bool WiredTigerIndex::IndexCursor::_locate(const BSONObj &key, const DiskLoc& loc) {
-        WT_CURSOR *c = _cursor->get();
+        WT_CURSOR *c = _cursor.get();
         _eof = !WiredTigerIndex::_search(c, key, loc, _forward);
         if ( _eof )
             return false;
@@ -361,8 +358,6 @@ namespace {
     }
 
     bool WiredTigerIndex::IndexCursor::locate(const BSONObj &key, const DiskLoc& loc) {
-        invariant( _cursor != NULL );
-
         const BSONObj finalKey = stripFieldNames(key);
         bool result = _locate(finalKey, loc);
 
@@ -378,7 +373,6 @@ namespace {
            const vector<const BSONElement*>& keyEnd,
            const vector<bool>& keyEndInclusive) {
 
-        invariant( _cursor != NULL );
         BSONObj key = IndexEntryComparison::makeQueryObject(
                          keyBegin, keyBeginLen,
                          afterKey, keyEnd, keyEndInclusive, getDirection() );
@@ -395,8 +389,7 @@ namespace {
     }
 
     BSONObj WiredTigerIndex::IndexCursor::getKey() const {
-        invariant( _cursor != NULL );
-        WT_CURSOR *c = _cursor->get();
+        WT_CURSOR *c = _cursor.get();
         WT_ITEM keyItem;
         int ret = c->get_key(c, &keyItem);
         invariantWTOK(ret);
@@ -404,8 +397,7 @@ namespace {
     }
 
     DiskLoc WiredTigerIndex::IndexCursor::getDiskLoc() const {
-        invariant( _cursor != NULL );
-        WT_CURSOR *c = _cursor->get();
+        WT_CURSOR *c = _cursor.get();
         WT_ITEM keyItem;
         int ret = c->get_key(c, &keyItem);
         invariantWTOK(ret);
@@ -414,10 +406,9 @@ namespace {
 
     void WiredTigerIndex::IndexCursor::advance() {
         // Advance on a cursor at the end is a no-op
-        invariant( _cursor != NULL );
         if ( _eof )
             return;
-        WT_CURSOR *c = _cursor->get();
+        WT_CURSOR *c = _cursor.get();
         int ret = _forward ? c->next(c) : c->prev(c);
         if (ret == WT_NOTFOUND)
             _eof = true;
@@ -428,23 +419,14 @@ namespace {
     }
 
     void WiredTigerIndex::IndexCursor::savePosition() {
-        if ((_savedAtEnd = isEOF()) == false) {
-            _savedKey = getKey().getOwned();
-            _savedLoc = getDiskLoc();
-        }
-        delete _cursor;
-        _cursor = NULL;
+        _savedForCheck = _txn->recoveryUnit();
         _txn = NULL;
     }
 
     void WiredTigerIndex::IndexCursor::restorePosition( OperationContext *txn ) {
         // Update the session handle with our new operation context.
         _txn = txn;
-        _cursor = new WiredTigerCursor(_idx.GetURI(), _idx.instanceId(), txn );
-        if (_savedAtEnd)
-            _eof = true;
-        else
-            (void)_locate(_savedKey, _savedLoc);
+        invariant( _savedForCheck == txn->recoveryUnit() );
     }
 
     SortedDataInterface::Cursor* WiredTigerIndex::newCursor(

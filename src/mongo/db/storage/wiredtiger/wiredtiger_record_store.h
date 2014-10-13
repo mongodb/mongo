@@ -176,15 +176,13 @@ namespace mongo {
 
             const WiredTigerRecordStore& _rs;
             OperationContext* _txn;
+            RecoveryUnit* _savedRecoveryUnit; // only used to sanity check between save/restore
             bool _tailable;
             CollectionScanParams::Direction _dir;
             scoped_ptr<WiredTigerCursor> _cursor;
             bool _eof;
 
-            // Position for save/restore
-            DiskLoc _lastLoc;
-            DiskLoc _savedLoc;
-            bool _savedAtEnd, _savedInvalidated;
+            DiskLoc _lastLoc; // the last thing returned from getNext()
         };
 
         static WiredTigerRecoveryUnit* _getRecoveryUnit( OperationContext* txn );

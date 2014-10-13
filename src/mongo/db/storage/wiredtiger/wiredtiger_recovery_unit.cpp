@@ -41,7 +41,8 @@ namespace mongo {
         _sessionCache( sc ),
         _session( NULL ),
         _depth(0),
-        _active( false ) {
+        _active( false ),
+        _everStartedWrite( false ) {
     }
 
     WiredTigerRecoveryUnit::~WiredTigerRecoveryUnit() {
@@ -84,6 +85,7 @@ namespace mongo {
 
     void WiredTigerRecoveryUnit::beginUnitOfWork() {
         _depth++;
+        _everStartedWrite = true;
     }
 
     void WiredTigerRecoveryUnit::commitUnitOfWork() {
@@ -109,9 +111,9 @@ namespace mongo {
         _changes.push_back(ChangePtr(change));
     }
 
-    WiredTigerRecoveryUnit& WiredTigerRecoveryUnit::Get(OperationContext *txn) {
+    WiredTigerRecoveryUnit* WiredTigerRecoveryUnit::get(OperationContext *txn) {
         invariant( txn );
-        return *dynamic_cast<WiredTigerRecoveryUnit*>(txn->recoveryUnit());
+        return dynamic_cast<WiredTigerRecoveryUnit*>(txn->recoveryUnit());
     }
 
     WiredTigerSession* WiredTigerRecoveryUnit::getSession() {
@@ -125,6 +127,16 @@ namespace mongo {
         return _session;
     }
 
+    void WiredTigerRecoveryUnit::restartTransaction() {
+        invariant( !_everStartedWrite );
+        invariant( _changes.empty() );
+        invariant( _active );
+
+        WT_SESSION *s = _session->getSession();
+        invariantWTOK( s->commit_transaction(s, NULL) );
+        invariantWTOK( s->begin_transaction(s, NULL) );
+    }
+
     // ---------------------
 
     WiredTigerCursor::WiredTigerCursor(const std::string& uri, uint64_t id, WiredTigerRecoveryUnit* ru) {
@@ -132,7 +144,7 @@ namespace mongo {
     }
 
     WiredTigerCursor::WiredTigerCursor(const std::string& uri, uint64_t id, OperationContext* txn) {
-        _init( uri, id, &WiredTigerRecoveryUnit::Get( txn ) );
+        _init( uri, id, WiredTigerRecoveryUnit::get( txn ) );
     }
 
     void WiredTigerCursor::_init( const std::string& uri, uint64_t id, WiredTigerRecoveryUnit* ru ) {

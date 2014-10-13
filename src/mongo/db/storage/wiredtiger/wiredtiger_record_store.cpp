@@ -401,7 +401,7 @@ namespace mongo {
                                       RecordStoreCompactAdaptor* adaptor,
                                       const CompactOptions* options,
                                       CompactStats* stats ) {
-        WiredTigerSessionCache* cache = WiredTigerRecoveryUnit::Get(txn).getSessionCache();
+        WiredTigerSessionCache* cache = WiredTigerRecoveryUnit::get(txn)->getSessionCache();
         WiredTigerSession* session = cache->getSession();
         WT_SESSION *s = session->getSession();
         int ret = s->compact(s, GetURI().c_str(), NULL);
@@ -575,6 +575,10 @@ namespace mongo {
     bool WiredTigerRecordStore::Iterator::isEOF() {
         RS_ITERATOR_TRACE( "isEOF start " << _eof );
         if (_eof && _tailable && !_lastLoc.isNull()) {
+            WiredTigerRecoveryUnit* ru = WiredTigerRecoveryUnit::get( _txn );
+            invariant( !ru->everStartedWrite() );
+            ru->restartTransaction();
+
             DiskLoc saved = _lastLoc;
             _locate(_lastLoc, true);
             if ( _eof ) {
@@ -641,44 +645,25 @@ namespace mongo {
     }
 
     void WiredTigerRecordStore::Iterator::invalidate( const DiskLoc& dl ) {
-        if ( _savedLoc == dl )
-            _savedInvalidated = true;
-
-        // This is the case where a capped collection wraps around completely while a tailable
-        // cursor was at the old end.
-        if (_tailable && _savedLoc.isNull() && dl == _lastLoc)
-            _savedInvalidated = true;
+        // this should never be called
     }
 
     void WiredTigerRecordStore::Iterator::saveState() {
         RS_ITERATOR_TRACE("saveState");
-        _savedLoc = curr();
-        _savedInvalidated = false;
 
-        // Reset the cursor so it doesn't keep any resources pinned.
-        _cursor.reset( NULL );
+        // the cursor and recoveryUnit are valid on restore
+        // so we just record the recoveryUnit to make sure
+        _savedRecoveryUnit = _txn->recoveryUnit();
         _txn = NULL;
     }
 
     bool WiredTigerRecordStore::Iterator::restoreState( OperationContext *txn ) {
-        // Iterators over capped collections cannot be restored if they are invalidated. We want to
-        // signal an error if the deletion of old records catches up to the cursor rather than
-        // silently dropping results.
-        if (_savedInvalidated && _rs.isCapped()) {
-            return false;
-        }
 
         // This is normally already the case, but sometimes we are given a new
         // OperationContext on restore - update the iterators context in that
         // case
         _txn = txn;
-        _cursor.reset( new WiredTigerCursor(_rs.GetURI(), _rs.instanceId(), txn) );
-        if (_savedLoc.isNull())
-            _eof = true;
-        else
-            _locate(_savedLoc, !_savedInvalidated);
-        if (_savedInvalidated)
-            _getNext();
+        invariant( _savedRecoveryUnit == txn->recoveryUnit() );
         return true;
     }
 

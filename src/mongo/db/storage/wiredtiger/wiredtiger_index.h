@@ -76,7 +76,7 @@ namespace mongo {
         virtual bool isEmpty(OperationContext* txn);
 
         virtual Status touch(OperationContext* txn) const;
-        
+
         virtual long long getSpaceUsedBytes( OperationContext* txn ) const;
 
         bool isDup(WT_CURSOR *c, const BSONObj& key, const DiskLoc& loc );
@@ -135,16 +135,14 @@ namespace mongo {
 
             private:
                 OperationContext *_txn;
-                WiredTigerCursor *_cursor;
+                WiredTigerCursor _cursor;
                 const WiredTigerIndex &_idx;    // Someone else owns this.
                 bool _forward;
                 bool _eof;
 
-                // For save/restorePosition since _it may be invalidated durring a yield.
-                bool _savedAtEnd;
-                BSONObj _savedKey;
-                DiskLoc _savedLoc;
-        };
+                // For save/restorePosition check
+                RecoveryUnit* _savedForCheck;
+            };
 
         std::string _uri;
         uint64_t _instanceId;
