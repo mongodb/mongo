@@ -16,6 +16,7 @@ def run_lint( paths, nudgeOn=False ):
     later = [] # things that are unlikely anytime soon, so meh
     never = [] # things we totally disagree with
 
+    nudge.append( '-build/c++11' ) # errors found: 6
     never.append( '-build/header_guard' ) # errors found: 345
     nudge.append( '-build/include' ) # errors found: 924
     nudge.append( '-build/include_order' ) # errors found: 511
@@ -23,25 +24,28 @@ def run_lint( paths, nudgeOn=False ):
     nudge.append( '-build/namespaces' ) # errors found: 131
     never.append( '-readability/braces' ) # errors found: 880
     later.append( '-readability/casting' ) # errors found: 748
+    nudge.append( '-readability/check' ) # errors found: 7
     nudge.append( '-readability/function' ) # errors found: 49
+    nudge.append( '-readability/inheritance' ) # errors found: 7
+    later.append( '-readability/namespace' ) # errors found: 876
     later.append( '-readability/streams' ) # errors found: 72
     later.append( '-readability/todo' ) # errors found: 309
     nudge.append( '-runtime/arrays' ) # errors found: 5
     later.append( '-runtime/explicit' ) # errors found: 322
+    never.append( '-runtime/indentation_namespace') # errors found: 4601
     later.append( '-runtime/int' ) # errors found: 1420
     later.append( '-runtime/printf' ) # errors found: 29
     nudge.append( '-runtime/references' ) # errors found: 1338
-    nudge.append( '-runtime/rtti' ) # errors found: 36
-    nudge.append( '-runtime/sizeof' ) # errors found: 57
     nudge.append( '-runtime/string' ) # errors found: 6
     nudge.append( '-runtime/threadsafe_fn' ) # errors found: 46
     never.append( '-whitespace/blank_line' ) # errors found: 2080
     never.append( '-whitespace/braces' ) # errors found: 962
     later.append( '-whitespace/comma' ) # errors found: 621
     later.append( '-whitespace/comments' ) # errors found: 2189
+    nudge.append( '-whitespace/empty_loop_body' ) # errors found: 19
     later.append( '-whitespace/end_of_line' ) # errors found: 4340
-    later.append( '-whitespace/labels' ) # errors found: 58
     later.append( '-whitespace/line_length' ) # errors found: 14500
+    never.append( '-whitespace/indent' ) # errors found: 4108
     later.append( '-whitespace/newline' ) # errors found: 1520
     nudge.append( '-whitespace/operators' ) # errors found: 2297
     never.append( '-whitespace/parens' ) # errors found: 49058
@@ -58,7 +62,9 @@ def run_lint( paths, nudgeOn=False ):
         utils.getAllSourceFiles( sourceFiles, x )
 
 
-    args = [ "--filter=" + ",".join( filters ) , "--counting=detailed" ] + sourceFiles
+    args = ["--linelength=100",
+            "--filter=" + ",".join( filters ),
+            "--counting=detailed" ] + sourceFiles
     filenames = cpplint.ParseArguments( args  )
 
     def _ourIsTestFilename(fn):
