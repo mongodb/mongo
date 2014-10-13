@@ -111,33 +111,6 @@ namespace {
             }
         }
 
-        HeartbeatResponseAction authErrorMember(const HostAndPort& member,
-                                                OpTime lastOpTimeReceiver = OpTime()) {
-            StatusWith<ReplSetHeartbeatResponse> hbResponse =
-                    StatusWith<ReplSetHeartbeatResponse>(Status(ErrorCodes::Unauthorized, ""));
-            getTopoCoord().prepareHeartbeatRequest(_now++, "", member);
-            return getTopoCoord().processHeartbeatResponse(_now++,
-                                                           Milliseconds(0),
-                                                           member,
-                                                           hbResponse,
-                                                           lastOpTimeReceiver);
-        }
-
-        void heartbeatFromMember(const HostAndPort& member,
-                                 Status status,
-                                 Milliseconds roundTripTime = Milliseconds(0)) {
-            StatusWith<ReplSetHeartbeatResponse> hbResponse =
-                    StatusWith<ReplSetHeartbeatResponse>(status);
-            getTopoCoord().prepareHeartbeatRequest(_now++,
-                                                   "",
-                                                   member);
-            getTopoCoord().processHeartbeatResponse(_now++,
-                                                    roundTripTime,
-                                                    member,
-                                                    hbResponse,
-                                                    OpTime(0,0));
-        }
-
         HeartbeatResponseAction receiveUpHeartbeat(
                 const HostAndPort& member,
                 const std::string& setName,
@@ -145,7 +118,8 @@ namespace {
                 OpTime electionTime,
                 OpTime lastOpTimeSender,
                 OpTime lastOpTimeReceiver) {
-            return _receiveHeartbeatHelper(member,
+            return _receiveHeartbeatHelper(Status::OK(),
+                                           member,
                                            setName,
                                            memberState,
                                            electionTime,
@@ -154,17 +128,19 @@ namespace {
                                            Milliseconds(0));
         }
 
-        HeartbeatResponseAction receiveDownHeartbeat(const HostAndPort& member,
-                                                     const std::string& setName,
-                                                     OpTime lastOpTimeReceiver) {
-            StatusWith<ReplSetHeartbeatResponse> hbResponse =
-                    StatusWith<ReplSetHeartbeatResponse>(Status(ErrorCodes::HostUnreachable, ""));
-            getTopoCoord().prepareHeartbeatRequest(_now++, setName, member);
-            return getTopoCoord().processHeartbeatResponse(_now++,
-                                                           Milliseconds(0),
-                                                           member,
-                                                           hbResponse,
-                                                           lastOpTimeReceiver);
+        HeartbeatResponseAction receiveDownHeartbeat(
+                const HostAndPort& member,
+                const std::string& setName,
+                OpTime lastOpTimeReceiver,
+                ErrorCodes::Error errcode = ErrorCodes::HostUnreachable) {
+            return _receiveHeartbeatHelper(Status(errcode, ""),
+                                           member,
+                                           setName,
+                                           MemberState::RS_UNKNOWN,
+                                           OpTime(),
+                                           OpTime(),
+                                           lastOpTimeReceiver,
+                                           Milliseconds(0));
         }
 
         HeartbeatResponseAction heartbeatFromMember(const HostAndPort& member,
@@ -172,7 +148,8 @@ namespace {
                                                     MemberState memberState,
                                                     OpTime lastOpTimeSender,
                                                     Milliseconds roundTripTime = Milliseconds(0)) {
-            return _receiveHeartbeatHelper(member,
+            return _receiveHeartbeatHelper(Status::OK(),
+                                           member,
                                            setName,
                                            memberState,
                                            OpTime(),
@@ -183,21 +160,26 @@ namespace {
 
     private:
 
-        HeartbeatResponseAction _receiveHeartbeatHelper(const HostAndPort& member,
+        HeartbeatResponseAction _receiveHeartbeatHelper(Status responseStatus,
+                                                        const HostAndPort& member,
                                                         const std::string& setName,
                                                         MemberState memberState,
                                                         OpTime electionTime,
                                                         OpTime lastOpTimeSender,
                                                         OpTime lastOpTimeReceiver,
                                                         Milliseconds roundTripTime) {
-            ReplSetHeartbeatResponse hb;
-            hb.initialize(BSON("ok" << 1 <<
-                               "v" << 1 <<
-                               "state" << memberState.s));
-            hb.setOpTime(lastOpTimeSender);
-            hb.setElectionTime(electionTime);
             StatusWith<ReplSetHeartbeatResponse> hbResponse =
-                    StatusWith<ReplSetHeartbeatResponse>(hb);
+                    StatusWith<ReplSetHeartbeatResponse>(responseStatus);
+
+            if (responseStatus.isOK()) {
+                ReplSetHeartbeatResponse hb;
+                hb.initialize(BSON("ok" << 1 <<
+                                   "v" << 1 <<
+                                   "state" << memberState.s));
+                hb.setOpTime(lastOpTimeSender);
+                hb.setElectionTime(electionTime);
+                hbResponse = StatusWith<ReplSetHeartbeatResponse>(hb);
+            }
             getTopoCoord().prepareHeartbeatRequest(now()++,
                                                    setName,
                                                    member);
@@ -502,14 +484,14 @@ namespace {
         // Good state setup done
 
         // Mark nodes down, ensure that we have no source and are secondary
-        heartbeatFromMember(HostAndPort("h2"), Status(ErrorCodes::NetworkTimeout, ""));
-        heartbeatFromMember(HostAndPort("h3"), Status(ErrorCodes::NetworkTimeout, ""));
+        receiveDownHeartbeat(HostAndPort("h2"), "rs0", OpTime(), ErrorCodes::NetworkTimeout);
+        receiveDownHeartbeat( HostAndPort("h3"), "rs0", OpTime(), ErrorCodes::NetworkTimeout);
         ASSERT_TRUE(getTopoCoord().chooseNewSyncSource(now()++, OpTime(0,0)).empty());
         ASSERT_EQUALS(MemberState::RS_SECONDARY, getTopoCoord().getMemberState().s);
 
         // Mark nodes down + unauth, ensure that we have no source and are secondary
-        heartbeatFromMember(HostAndPort("h2"), Status(ErrorCodes::NetworkTimeout, ""));
-        heartbeatFromMember(HostAndPort("h3"), Status(ErrorCodes::Unauthorized, ""));
+        receiveDownHeartbeat(HostAndPort("h2"), "rs0", OpTime(), ErrorCodes::NetworkTimeout);
+        receiveDownHeartbeat(HostAndPort("h3"), "rs0", OpTime(), ErrorCodes::Unauthorized);
         ASSERT_TRUE(getTopoCoord().chooseNewSyncSource(now()++, OpTime(0,0)).empty());
         ASSERT_EQUALS(MemberState::RS_RECOVERING, getTopoCoord().getMemberState().s);
     }
@@ -640,7 +622,7 @@ namespace {
         ASSERT_EQUALS(HostAndPort("h6"), syncSource);
 
         // Try to sync from a member that is unauth'd
-        authErrorMember(HostAndPort("h5"));
+        receiveDownHeartbeat(HostAndPort("h5"), "rs0", OpTime(), ErrorCodes::Unauthorized);
 
         BSONObjBuilder response11;
         getTopoCoord().prepareSyncFromResponse(
