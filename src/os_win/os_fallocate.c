@@ -47,11 +47,11 @@ __wt_fallocate(
 	largeint.QuadPart = offset + len;
 
 	if ((ret = SetFilePointerEx(
-	    fh->filehandletrunc, largeint, NULL, FILE_BEGIN)) == FALSE)
+	    fh->filehandle_secondary, largeint, NULL, FILE_BEGIN)) == FALSE)
 		WT_RET_MSG(session,
 		    __wt_errno(), "%s SetFilePointerEx error", fh->name);
 
-	if ((ret = SetEndOfFile(fh->filehandletrunc)) != FALSE) {
+	if ((ret = SetEndOfFile(fh->filehandle_secondary)) != FALSE) {
 		fh->size = fh->extend_size = len;
 		return (0);
 	}

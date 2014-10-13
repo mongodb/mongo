@@ -35,12 +35,13 @@ __wt_open(WT_SESSION_IMPL *session,
 	DWORD dwCreationDisposition;
 	char *path;
 	HANDLE filehandle;
-	HANDLE filehandletrunc;
+	HANDLE filehandle_secondary;
 
 	conn = S2C(session);
 	fh = NULL;
 	path = NULL;
 	filehandle = INVALID_HANDLE_VALUE;
+	filehandle_secondary = INVALID_HANDLE_VALUE;
 
 	WT_RET(__wt_verbose(session, WT_VERB_FILEOPS, "%s: open", name));
 
@@ -127,13 +128,15 @@ __wt_open(WT_SESSION_IMPL *session,
 	 * concurrently with reads on the file. Writes would also move the file
 	 * pointer.
 	 */
-	filehandletrunc = CreateFile(path,
+	filehandle_secondary = CreateFile(path,
 	    (GENERIC_READ | GENERIC_WRITE),
 	    share_mode,
 	    NULL,
 	    OPEN_EXISTING,
 	    f,
 	    NULL);
+	WT_ERR_MSG(session, __wt_errno(),
+	    "open failed for secondary handle: %s", path);
 
 	if (F_ISSET(conn, WT_CONN_CKPT_SYNC))
 		WT_ERR(__open_directory_sync(session, path));
@@ -141,7 +144,7 @@ __wt_open(WT_SESSION_IMPL *session,
 	WT_ERR(__wt_calloc(session, 1, sizeof(WT_FH), &fh));
 	WT_ERR(__wt_strdup(session, name, &fh->name));
 	fh->filehandle = filehandle;
-	fh->filehandletrunc = filehandletrunc;
+	fh->filehandle_secondary = filehandle_secondary;
 	fh->ref = 1;
 	fh->direct_io = direct_io;
 
@@ -183,6 +186,8 @@ err:		if (fh != NULL) {
 		}
 		if (filehandle != INVALID_HANDLE_VALUE)
 			(void)CloseHandle(filehandle);
+		if (filehandle != INVALID_HANDLE_VALUE)
+			(void)CloseHandle(filehandle_secondary);
 	}
 
 	__wt_free(session, path);
@@ -219,7 +224,7 @@ __wt_close(WT_SESSION_IMPL *session, WT_FH *fh)
 		__wt_err(session, ret, "%s", fh->name);
 	}
 
-	if (!CloseHandle(fh->filehandletrunc) != 0) {
+	if (!CloseHandle(fh->filehandle_secondary) != 0) {
 		ret = __wt_errno();
 		__wt_err(session, ret, "%s", fh->name);
 	}
