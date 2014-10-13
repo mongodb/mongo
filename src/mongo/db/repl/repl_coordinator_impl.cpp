@@ -75,6 +75,30 @@ namespace {
         }
         fn();
     }
+
+    /**
+     * Implements the force-reconfig behavior of incrementing config version by a large random
+     * number.
+     */
+    BSONObj incrementConfigVersionByRandom(BSONObj config) {
+        BSONObjBuilder builder;
+        for (BSONObjIterator iter(config); iter.more(); iter.next()) {
+            BSONElement elem = *iter;
+            if (elem.fieldNameStringData() == ReplicaSetConfig::kVersionFieldName &&
+                elem.isNumber()) {
+
+                boost::scoped_ptr<SecureRandom> generator(SecureRandom::create());
+                const int random = std::abs(static_cast<int>(generator->nextInt64()) % 100000);
+                builder.appendIntOrLL(ReplicaSetConfig::kVersionFieldName,
+                                      elem.numberLong() + 10000 + random);
+            }
+            else {
+                builder.append(elem);
+            }
+        }
+        return builder.obj();
+    }
+
 } //namespace
 
     struct ReplicationCoordinatorImpl::WaiterInfo {
@@ -129,7 +153,7 @@ namespace {
             return;
         }
 
-        scoped_ptr<SecureRandom> rbidGenerator(SecureRandom::create());
+        boost::scoped_ptr<SecureRandom> rbidGenerator(SecureRandom::create());
         _rbid = static_cast<int>(rbidGenerator->nextInt64());
     }
 
@@ -1326,9 +1350,13 @@ namespace {
         lk.unlock();
 
         ReplicaSetConfig newConfig;
-        Status status = newConfig.initialize(args.newConfigObj);
+        BSONObj newConfigObj = args.newConfigObj;
+        if (args.force) {
+            newConfigObj = incrementConfigVersionByRandom(newConfigObj);
+        }
+        Status status = newConfig.initialize(newConfigObj);
         if (!status.isOK()) {
-            error() << "replSetReconfig got " << status << " while parsing " << args.newConfigObj <<
+            error() << "replSetReconfig got " << status << " while parsing " << newConfigObj <<
                 rsLog;
             return status;
         }
@@ -1348,7 +1376,7 @@ namespace {
                 args.force);
         if (!myIndex.isOK()) {
             error() << "replSetReconfig got " << myIndex.getStatus() << " while validating " <<
-                args.newConfigObj << rsLog;
+                newConfigObj << rsLog;
             return myIndex.getStatus();
         }
 

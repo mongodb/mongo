@@ -128,6 +128,6 @@ assert.soon(function() {
 
 config = master.getDB("local").system.replset.findOne();
 printjson(config);
-assert(config.version > 4);
+assert.gt(config.version, 4);
 
 replTest.stopSet();
