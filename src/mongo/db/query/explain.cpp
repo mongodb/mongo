@@ -39,7 +39,6 @@
 #include "mongo/db/server_options.h"
 #include "mongo/db/server_parameters.h"
 #include "mongo/util/mongoutils/str.h"
-#include "mongo/util/processinfo.h"
 #include "mongo/util/version.h"
 
 namespace {
@@ -547,14 +546,6 @@ namespace mongo {
         out->appendNumber("port", serverGlobalParams.port);
         out->append("version", versionString);
         out->append("gitVersion", gitVersion());
-
-        ProcessInfo p;
-        BSONObjBuilder bOs;
-        bOs.append("type", p.getOsType());
-        bOs.append("name", p.getOsName());
-        bOs.append("version", p.getOsVersion());
-        serverBob.append(StringData("os"), bOs.obj());
-
         serverBob.doneFast();
     }
 
