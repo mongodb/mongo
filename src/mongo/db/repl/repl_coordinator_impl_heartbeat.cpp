@@ -381,7 +381,7 @@ namespace {
                   _rsConfig.getConfigVersion() < newConfig.getConfigVersion());
         if (!myIndex.isOK()) {
             switch (myIndex.getStatus().code()) {
-            case ErrorCodes::NoSuchKey:
+            case ErrorCodes::NodeNotFound:
                 log() << "Cannot find self in new replica set configuration; I must be removed; " <<
                     myIndex.getStatus();
                 break;

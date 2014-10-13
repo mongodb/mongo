@@ -1477,14 +1477,17 @@ namespace {
         _forceSyncSourceIndex = -1;
 
         if (_role == Role::leader) {
-            UnelectableReason reason = _getMyUnelectableReason(now, lastOpApplied);
-            if (reason == None || reason == NotSecondary) {
+            if (_selfIndex == -1) {
+                log() << "Could not remain primary because no longer a member of the replica set";
+            }
+            else if (!_selfConfig().isElectable()) {
+                log() <<" Could not remain primary because no longer electable";
+            }
+            else {
                 // Don't stepdown if you don't have to.
                 _currentPrimaryIndex = _selfIndex;
                 return;
             }
-            log() << "Could not remain primary across reconfig because "
-                  << _getUnelectableReasonString(reason);
             _role = Role::follower;
         }
 
