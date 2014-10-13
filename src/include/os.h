@@ -47,9 +47,6 @@ struct __wt_fh {
 	TAILQ_ENTRY(__wt_fh) q;			/* List of open handles */
 
 	u_int	ref;				/* Reference count */
-	u_int	ref_mapped;			/* Mapped reference count */
-
-	WT_SPINLOCK lock;			/* Handle lock */
 
 #ifndef _WIN32
 	int	 fd;				/* POSIX file handle */
@@ -61,4 +58,7 @@ struct __wt_fh {
 	wt_off_t extend_len;			/* File extend chunk size */
 
 	int	direct_io;			/* O_DIRECT configured */
+
+	int	fallocate_available;		/* fallocate/posix_fallocate */
+	int	fallocate_requires_locking;
 };
