@@ -122,10 +122,10 @@ namespace mongo {
            return Status(ErrorCodes::InternalError, "no shards found for explain");
         }
 
-        // Count up the number of shards that have execution stats and rejected plans
+        // Count up the number of shards that have execution stats and all plans
         // execution level information.
         size_t numShardsExecStats = 0;
-        size_t numShardsRejectedExecStats = 0;
+        size_t numShardsAllPlansStats = 0;
 
         // Check that the result from each shard has a true value for "ok" and has
         // the expected "queryPlanner" field.
@@ -140,8 +140,8 @@ namespace mongo {
             if (shardResults[i].result.hasField("executionStats")) {
                 numShardsExecStats++;
                 BSONObj execStats = shardResults[i].result["executionStats"].Obj();
-                if (execStats.hasField("rejectedPlansExecution")) {
-                    numShardsRejectedExecStats++;
+                if (execStats.hasField("allPlansExecution")) {
+                    numShardsAllPlansStats++;
                 }
             }
         }
@@ -154,10 +154,10 @@ namespace mongo {
                                         << " had executionStats explain information.");
         }
 
-        // Either all shards should have rejected plans execution stats, or none should.
-        if (0 != numShardsRejectedExecStats && shardResults.size() != numShardsRejectedExecStats) {
+        // Either all shards should have all plans execution stats, or none should.
+        if (0 != numShardsAllPlansStats && shardResults.size() != numShardsAllPlansStats) {
             return Status(ErrorCodes::InternalError,
-                          str::stream() << "Only " << numShardsRejectedExecStats
+                          str::stream() << "Only " << numShardsAllPlansStats
                                         << "/" << shardResults.size()
                                         << " had allPlansExecution explain information.");
         }
@@ -278,32 +278,32 @@ namespace mongo {
 
         executionStagesBob.doneFast();
 
-        if (!shardResults[0].result["executionStats"].Obj().hasField("rejectedPlansExecution")) {
-            // The shards don't have execution stats for rejected plans, so we're done.
+        if (!shardResults[0].result["executionStats"].Obj().hasField("allPlansExecution")) {
+            // The shards don't have execution stats for all plans, so we're done.
             executionStatsBob.doneFast();
             return;
         }
 
-        // Add the rejected plans from each shard.
-        BSONArrayBuilder rejectedPlansExecBob(
-            executionStatsBob.subarrayStart("rejectedPlansExecution"));
+        // Add the allPlans stats from each shard.
+        BSONArrayBuilder allPlansExecBob(
+            executionStatsBob.subarrayStart("allPlansExecution"));
         for (size_t i = 0; i < shardResults.size(); i++) {
             BSONObjBuilder singleShardBob(execShardsBuilder.subobjStart());
 
             singleShardBob.append("shardName", shardResults[i].shardTarget.getName());
 
             BSONObj execStats = shardResults[i].result["executionStats"].Obj();
-            vector<BSONElement> rejectedPlans = execStats["rejectedPlansExecution"].Array();
+            vector<BSONElement> allPlans = execStats["allPlansExecution"].Array();
 
-            BSONArrayBuilder innerArrayBob(singleShardBob.subarrayStart("rejectedPlans"));
-            for (size_t j = 0; j < rejectedPlans.size(); j++) {
-                appendToArrayIfRoom(&innerArrayBob, rejectedPlans[j]);
+            BSONArrayBuilder innerArrayBob(singleShardBob.subarrayStart("allPlans"));
+            for (size_t j = 0; j < allPlans.size(); j++) {
+                appendToArrayIfRoom(&innerArrayBob, allPlans[j]);
             }
             innerArrayBob.done();
 
             singleShardBob.doneFast();
         }
-        rejectedPlansExecBob.doneFast();
+        allPlansExecBob.doneFast();
 
         executionStatsBob.doneFast();
     }

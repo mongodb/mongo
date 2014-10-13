@@ -35,14 +35,14 @@ explain = t.explain(true).find().finish();
 assert.commandWorked(explain);
 assert("queryPlanner" in explain);
 assert("executionStats" in explain);
-assert("rejectedPlansExecution" in explain.executionStats);
+assert("allPlansExecution" in explain.executionStats);
 
 // .explain(true) after .find().
 explain = t.find().explain(true);
 assert.commandWorked(explain);
 assert("queryPlanner" in explain);
 assert("executionStats" in explain);
-assert("rejectedPlansExecution" in explain.executionStats);
+assert("allPlansExecution" in explain.executionStats);
 
 //
 // Test verbosity specifiers.
@@ -63,24 +63,24 @@ explain = t.explain("executionStats").find().finish();
 assert.commandWorked(explain);
 assert("queryPlanner" in explain);
 assert("executionStats" in explain);
-assert(!("rejectedPlansExecution" in explain.executionStats));
+assert(!("allPlansExecution" in explain.executionStats));
 explain = t.find().explain("executionStats");
 assert.commandWorked(explain);
 assert("queryPlanner" in explain);
 assert("executionStats" in explain);
-assert(!("rejectedPlansExecution" in explain.executionStats));
+assert(!("allPlansExecution" in explain.executionStats));
 
 // "allPlansExecution"
 explain = t.explain("allPlansExecution").find().finish();
 assert.commandWorked(explain);
 assert("queryPlanner" in explain);
 assert("executionStats" in explain);
-assert("rejectedPlansExecution" in explain.executionStats);
+assert("allPlansExecution" in explain.executionStats);
 explain = t.find().explain("allPlansExecution");
 assert.commandWorked(explain);
 assert("queryPlanner" in explain);
 assert("executionStats" in explain);
-assert("rejectedPlansExecution" in explain.executionStats);
+assert("allPlansExecution" in explain.executionStats);
 
 //
 // Tests for DBExplainQuery helpers.
