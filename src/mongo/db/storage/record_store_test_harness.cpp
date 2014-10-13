@@ -64,6 +64,13 @@ namespace mongo {
             scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
             ASSERT_EQUALS( s, rs->dataFor( opCtx.get(), loc1 ).data() );
             ASSERT_EQUALS( 1, rs->numRecords( opCtx.get() ) );
+
+            RecordData rd;
+            ASSERT( !rs->findRecord( opCtx.get(), DiskLoc(17,17), &rd ) );
+            ASSERT( rd.data() == NULL );
+
+            ASSERT( rs->findRecord( opCtx.get(), loc1, &rd ) );
+            ASSERT_EQUALS( s, rd.data() );
         }
 
         {

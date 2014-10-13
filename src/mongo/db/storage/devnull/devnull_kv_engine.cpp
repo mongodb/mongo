@@ -76,6 +76,10 @@ namespace mongo {
             return RecordData( _dummy.objdata(), _dummy.objsize() );
         }
 
+        virtual bool findRecord( OperationContext* txn, const DiskLoc& loc, RecordData* rd ) const {
+            return false;
+        }
+
         virtual void deleteRecord( OperationContext* txn, const DiskLoc& dl ) {}
 
         virtual StatusWith<DiskLoc> insertRecord( OperationContext* txn,

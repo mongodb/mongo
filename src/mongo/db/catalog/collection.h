@@ -130,6 +130,12 @@ namespace mongo {
 
         BSONObj docFor(OperationContext* txn, const DiskLoc& loc) const;
 
+        /**
+         * @param out - contents set to the right docs if exists, or nothing.
+         * @return true iff loc exists
+         */
+        bool findDoc(OperationContext* txn, const DiskLoc& loc, BSONObj* out) const;
+
         // ---- things that should move to a CollectionAccessMethod like thing
         /**
          * canonical to get all would be

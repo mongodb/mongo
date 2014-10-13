@@ -133,6 +133,8 @@ namespace mongo {
 
         virtual RecordData dataFor( OperationContext* txn, const DiskLoc& loc ) const;
 
+        virtual bool findRecord( OperationContext* txn, const DiskLoc& loc, RecordData* rd ) const;
+
         void deleteRecord( OperationContext* txn,
                            const DiskLoc& dl );
 

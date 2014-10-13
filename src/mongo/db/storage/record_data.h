@@ -44,6 +44,7 @@ namespace mongo {
      */
     class RecordData {
     public:
+        RecordData() : _data( NULL ), _size( 0 ) {}
         RecordData(const char* data, int size): _data(data), _size(size), _dataPtr() { }
 
         RecordData(const char* data, int size, const boost::shared_array<char>& dataPtr)

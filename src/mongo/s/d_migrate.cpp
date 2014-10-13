@@ -549,7 +549,11 @@ namespace mongo {
                     invariant( collection );
 
                     DiskLoc dl = *i;
-                    BSONObj o = collection->docFor( txn, dl );
+                    BSONObj o;
+                    if ( !collection->findDoc( txn, dl, &o ) ) {
+                        // doc was deleted
+                        continue;
+                    }
 
                     // use the builder size instead of accumulating 'o's size so that we take into consideration
                     // the overhead of BSONArray indices, and *always* append one doc
@@ -573,10 +577,13 @@ namespace mongo {
         }
 
         void aboutToDelete( const DiskLoc& dl ) {
-            // not needed right now
-            // but trying to prevent a future bug
-            scoped_spinlock lk( _trackerLocks ); 
+            // Even though above we call findDoc to check for existance
+            // that check only works for non-mmapv1 engines, and this is needed
+            // for mmapv1.
 
+            // lock not needed right now
+            // but trying to prevent a future bug
+            scoped_spinlock lk( _trackerLocks );
             _cloneLocs.erase( dl );
         }
 

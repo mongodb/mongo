@@ -160,6 +160,14 @@ namespace mongo {
         return  _recordStore->dataFor( txn, loc ).toBson();
     }
 
+    bool Collection::findDoc(OperationContext* txn, const DiskLoc& loc, BSONObj* out) const {
+        RecordData rd;
+        if ( !_recordStore->findRecord( txn, loc, &rd ) )
+            return false;
+        *out = rd.toBson();
+        return true;
+    }
+
     StatusWith<DiskLoc> Collection::insertDocument( OperationContext* txn,
                                                     const DocWriter* doc,
                                                     bool enforceQuota ) {
