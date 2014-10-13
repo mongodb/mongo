@@ -3,11 +3,6 @@
 t=__wt.$$
 trap 'rm -f $t' 0 1 2 3 13 15
 
-! test -s ../build_posix/config.hin && {
-    echo "skipped, build_posix/config.hin does exist"
-    exit 1
-}
-
 egrep '#define|#undef' \
     ../build_posix/config.hin \
     ../build_win/wiredtiger_config.h |
