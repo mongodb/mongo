@@ -16,19 +16,20 @@ int
 __wt_dirlist(WT_SESSION_IMPL *session, const char *dir, const char *prefix,
     uint32_t flags, char ***dirlist, u_int *countp)
 {
-	WT_DECL_RET;
+	HANDLE findhandle;
 	WIN32_FIND_DATA finddata;
 	WT_DECL_ITEM(pathbuf);
-	HANDLE findhandle = INVALID_HANDLE_VALUE;
-	size_t dirallocsz;
+	WT_DECL_RET;
+	size_t dirallocsz, pathlen;
 	u_int count, dirsz;
 	int match;
 	char **entries, *path;
-	size_t pathlen;
 
-	count = 0;
 	*dirlist = NULL;
 	*countp = 0;
+
+	findhandle = INVALID_HANDLE_VALUE;
+	count = 0;
 
 	WT_RET(__wt_filename(session, dir, &path));
 
