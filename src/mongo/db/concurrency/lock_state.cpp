@@ -410,14 +410,6 @@ namespace mongo {
     void LockerImpl<IsForMMAPV1>::downgradeGlobalXtoSForMMAPV1() {
         invariant(!inAWriteUnitOfWork());
 
-        // Only Global and Flush lock could be held at this point.
-        if ( IsForMMAPV1 ) {
-            invariant(_requests.size() == 2);
-        }
-        else {
-            invariant(_requests.size() == 1);
-        }
-
         LockRequest* globalLockRequest = _find(resourceIdGlobal);
         invariant(globalLockRequest->mode == MODE_X);
         invariant(globalLockRequest->recursiveCount == 1);

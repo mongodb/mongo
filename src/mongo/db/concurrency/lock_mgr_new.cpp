@@ -418,10 +418,12 @@ namespace mongo {
             while (it != bucket->data.end()) {
                 LockHead* lock = it->second;
                 if (lock->grantedModes == 0) {
+                    invariant(lock->grantedModes == 0);
                     invariant(lock->grantedQueue == NULL);
                     invariant(lock->conflictModes == 0);
                     invariant(lock->conflictQueueBegin == NULL);
                     invariant(lock->conflictQueueEnd == NULL);
+                    invariant(lock->conversionsCount == 0);
 
                     bucket->data.erase(it++);
                     delete lock;
@@ -471,15 +473,13 @@ namespace mongo {
 
                 if (!conflicts(iter->convertMode, grantedModesWithoutCurrentRequest)) {
                     lock->conversionsCount--;
-                    lock->changeGrantedModeCount(iter->convertMode, LockHead::Increment);
                     lock->changeGrantedModeCount(iter->mode, LockHead::Decrement);
+                    iter->status = LockRequest::STATUS_GRANTED;
                     iter->mode = iter->convertMode;
+                    iter->convertMode = MODE_NONE;
 
                     iter->notify->notify(lock->resourceId, LOCK_OK);
                 }
-            }
-            else {
-                invariant(iter->status == LockRequest::STATUS_GRANTED);
             }
         }
 
@@ -509,9 +509,10 @@ namespace mongo {
             iter->notify->notify(lock->resourceId, LOCK_OK);
         }
 
-        // If some locks have been granted then there should be something on the grantedQueue and
-        // vice versa (sanity check that either one or the other is true).
+        // This is a convenient place to check that the state of the two request queues is in sync
+        // with the bitmask on the modes.
         invariant((lock->grantedModes == 0) ^ (lock->grantedQueue != NULL));
+        invariant((lock->conflictModes == 0) ^ (lock->conflictQueueBegin != NULL));
     }
 
     LockManager::LockBucket* LockManager::_getBucket(const ResourceId& resId) {
