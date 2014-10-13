@@ -12,9 +12,12 @@
  *	Upgrade a configuration string by appended the replacement version.
  */
 int
-__wt_config_upgrade(WT_SESSION_IMPL *session, const char *config, WT_ITEM *buf)
+__wt_config_upgrade(WT_SESSION_IMPL *session, WT_ITEM *buf)
 {
 	WT_CONFIG_ITEM v;
+	const char *config;
+
+	config = buf->data;
 
 	/*
 	 * wiredtiger_open:

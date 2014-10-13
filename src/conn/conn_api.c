@@ -876,7 +876,7 @@ __conn_config_file(WT_SESSION_IMPL *session,
 	WT_ERR(__conn_config_check_version(session, cbuf->data));
 
 	/* Upgrade the configuration string. */
-	WT_ERR(__wt_config_upgrade(session, cbuf->data, cbuf));
+	WT_ERR(__wt_config_upgrade(session, cbuf));
 
 	/* Check the configuration information. */
 	WT_ERR(__wt_config_check(session, is_user ?
@@ -925,7 +925,7 @@ __conn_config_env(WT_SESSION_IMPL *session, const char *cfg[], WT_ITEM *cbuf)
 	WT_RET(__conn_config_check_version(session, env_config));
 
 	/* Upgrade the configuration string. */
-	WT_RET(__wt_config_upgrade(session, cbuf->data, cbuf));
+	WT_RET(__wt_config_upgrade(session, cbuf));
 
 	/* Check the configuration information. */
 	WT_RET(__wt_config_check(session,
