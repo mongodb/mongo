@@ -33,7 +33,6 @@
 #include "mongo/db/storage/wiredtiger/wiredtiger_session_cache.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_util.h"
 #include "mongo/util/log.h"
-#include "mongo/util/stacktrace.h"
 
 namespace mongo {
 
@@ -119,6 +118,9 @@ namespace mongo {
     WiredTigerSession* WiredTigerRecoveryUnit::getSession() {
         if ( !_session ) {
             _session = _sessionCache->getSession();
+        }
+
+        if ( !_active ) {
             WT_SESSION *s = _session->getSession();
             int ret = s->begin_transaction(s, NULL);
             invariantWTOK(ret);
