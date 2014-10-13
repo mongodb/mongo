@@ -15,7 +15,7 @@ AddOption("--enable-snappy", dest="snappy", type="string", nargs=1, action="stor
           help="Use snappy compression")
 
 env = Environment(
-    CPPPATH = ["#/src/include/", "#/."],
+    CPPPATH = ["#/src/include/", "#/build_win", "#/."],
     CFLAGS = ["/Z7", "/wd4090"],
     LINKFLAGS = ["/DEBUG"],
 )

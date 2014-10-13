@@ -77,6 +77,7 @@ run "sh ./s_style" "checking style (pass 2)"
 run "sh ./s_symbols" "checking external symbol names"
 run "sh ./s_typedef -c" "checking for unused typedefs"
 run "sh ./s_whitespace" "checking whitespace"
+run "sh ./s_win" "checking windows config"
 
 run "sh ./s_docs" "generating documentation"
 
