@@ -69,6 +69,8 @@ namespace repl {
          */
         const std::string toString() const { return toBSON().toString(); }
 
+        bool hasDataSet() const { return _hasDataSet; }
+        bool hasData() const { return _hasData; }
         bool isMismatched() const { return _mismatch; }
         bool isReplSet() const { return _isReplSet; }
         bool isStateDisagreement() const { return _stateDisagreement; }
@@ -103,6 +105,11 @@ namespace repl {
          * Sets _stateDisagreement to true.
          */
         void noteStateDisagreement() { _stateDisagreement = true; }
+
+        /**
+         * Sets _hasData to true, and _hasDataSet to true to indicate _hasData has been modified
+         */
+        void noteHasData() { _hasDataSet = _hasData = true;}
 
         /**
          * Sets _setName to "name".
@@ -169,6 +176,9 @@ namespace repl {
 
         bool _electableSet;
         bool _electable;
+
+        bool _hasDataSet;
+        bool _hasData;
 
         bool _mismatch;
         bool _isReplSet;

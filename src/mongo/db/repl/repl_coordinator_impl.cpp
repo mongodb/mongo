@@ -75,6 +75,30 @@ namespace {
         }
         fn();
     }
+
+    /**
+     * Implements the force-reconfig behavior of incrementing config version by a large random
+     * number.
+     */
+    BSONObj incrementConfigVersionByRandom(BSONObj config) {
+        BSONObjBuilder builder;
+        for (BSONObjIterator iter(config); iter.more(); iter.next()) {
+            BSONElement elem = *iter;
+            if (elem.fieldNameStringData() == ReplicaSetConfig::kVersionFieldName &&
+                elem.isNumber()) {
+
+                boost::scoped_ptr<SecureRandom> generator(SecureRandom::create());
+                const int random = std::abs(static_cast<int>(generator->nextInt64()) % 100000);
+                builder.appendIntOrLL(ReplicaSetConfig::kVersionFieldName,
+                                      elem.numberLong() + 10000 + random);
+            }
+            else {
+                builder.append(elem);
+            }
+        }
+        return builder.obj();
+    }
+
 } //namespace
 
     struct ReplicationCoordinatorImpl::WaiterInfo {
@@ -129,7 +153,7 @@ namespace {
             return;
         }
 
-        scoped_ptr<SecureRandom> rbidGenerator(SecureRandom::create());
+        boost::scoped_ptr<SecureRandom> rbidGenerator(SecureRandom::create());
         _rbid = static_cast<int>(rbidGenerator->nextInt64());
     }
 
@@ -509,8 +533,7 @@ namespace {
                           << "member ID: " << slaveInfo.memberID << ", stored member hostAndPort: "
                           << slaveInfo.hostAndPort.toString() << ".  Our RID: " <<
                           _getMyRID_inlock();
-                warning() << errmsg;
-                dassert(false);
+                LOG(1) << errmsg;
                 return Status(ErrorCodes::NodeNotFound, errmsg);
             }
             else {
@@ -579,11 +602,12 @@ namespace {
     }
 
     bool ReplicationCoordinatorImpl::_doneWaitingForReplication_inlock(
-            const OpTime& opTime, const WriteConcernOptions& writeConcern) {
+        const OpTime& opTime, const WriteConcernOptions& writeConcern) {
+
         if (!writeConcern.wMode.empty()) {
             if (writeConcern.wMode == "majority") {
-                return _doneWaitingForReplication_numNodes_inlock(opTime,
-                                                                  _rsConfig.getMajorityNumber());
+                return _haveNumNodesReachedOpTime_inlock(opTime,
+                                                         _rsConfig.getMajorityVoteCount());
             }
             else {
                 StatusWith<ReplicaSetTagPattern> tagPattern =
@@ -591,29 +615,30 @@ namespace {
                 if (!tagPattern.isOK()) {
                     return true;
                 }
-                return _doneWaitingForReplication_gleMode_inlock(opTime, tagPattern.getValue());
+                return _haveTaggedNodesReachedOpTime_inlock(opTime, tagPattern.getValue());
             }
         }
         else {
-            return _doneWaitingForReplication_numNodes_inlock(opTime, writeConcern.wNumNodes);
+            return _haveNumNodesReachedOpTime_inlock(opTime, writeConcern.wNumNodes);
         }
     }
 
-    bool ReplicationCoordinatorImpl::_doneWaitingForReplication_numNodes_inlock(
-            const OpTime& opTime, int numNodes) {
+    bool ReplicationCoordinatorImpl::_haveNumNodesReachedOpTime_inlock(const OpTime& opTime, 
+                                                                       int numNodes) {
+        if (_getLastOpApplied_inlock() < opTime) {
+            // Secondaries that are for some reason ahead of us should not allow us to
+            // satisfy a write concern if we aren't caught up ourselves.
+            return false;
+        }
+
         for (SlaveInfoMap::iterator it = _slaveInfoMap.begin();
                 it != _slaveInfoMap.end(); ++it) {
+
             const OpTime& slaveTime = it->second.opTime;
             if (slaveTime >= opTime) {
                 --numNodes;
             }
-            else {
-                if (it->first == _getMyRID_inlock()) {
-                    // Secondaries that are for some reason ahead of us should not allow us to
-                    // satisfy a write concern if we aren't caught up ourself.
-                    return false;
-                }
-            }
+
             if (numNodes <= 0) {
                 return true;
             }
@@ -621,11 +646,13 @@ namespace {
         return false;
     }
 
-    bool ReplicationCoordinatorImpl::_doneWaitingForReplication_gleMode_inlock(
-            const OpTime& opTime, const ReplicaSetTagPattern& tagPattern) {
+    bool ReplicationCoordinatorImpl::_haveTaggedNodesReachedOpTime_inlock(
+        const OpTime& opTime, const ReplicaSetTagPattern& tagPattern) {
+
         ReplicaSetTagMatch matcher(tagPattern);
         for (SlaveInfoMap::iterator it = _slaveInfoMap.begin();
                 it != _slaveInfoMap.end(); ++it) {
+
             const OpTime& slaveTime = it->second.opTime;
             if (slaveTime >= opTime) {
                 // This node has reached the desired optime, now we need to check if it is a part
@@ -782,7 +809,8 @@ namespace {
         }
 
         WriteConcernOptions writeConcern;
-        writeConcern.wNumNodes = 2; // Make sure at least 1 other node is caught up
+        // Make sure at least 1 other *electable* node is caught up
+        writeConcern.wMode = ReplicaSetConfig::kStepDownCheckWriteConcernModeName;
         {
             // Figure out how long to wait.  Take the specified wait time unless waiting that long
             // would put us past the time we were supposed to step down until.
@@ -857,8 +885,6 @@ namespace {
         _topCoord->stepDown();
         boost::unique_lock<boost::mutex> lk(_mutex);
         _updateCurrentMemberStateFromTopologyCoordinator_inlock();
-        lk.unlock();
-        _externalState->closeConnections();
         // Wake up any threads blocked in awaitReplication
         for (std::vector<WaiterInfo*>::iterator it = _replicationWaiterList.begin();
                 it != _replicationWaiterList.end(); ++it) {
@@ -866,6 +892,8 @@ namespace {
             info->master = false;
             info->condVar->notify_all();
         }
+        lk.unlock();
+        _externalState->closeConnections();
         *result = Status::OK();
     }
 
@@ -1326,9 +1354,13 @@ namespace {
         lk.unlock();
 
         ReplicaSetConfig newConfig;
-        Status status = newConfig.initialize(args.newConfigObj);
+        BSONObj newConfigObj = args.newConfigObj;
+        if (args.force) {
+            newConfigObj = incrementConfigVersionByRandom(newConfigObj);
+        }
+        Status status = newConfig.initialize(newConfigObj);
         if (!status.isOK()) {
-            error() << "replSetReconfig got " << status << " while parsing " << args.newConfigObj <<
+            error() << "replSetReconfig got " << status << " while parsing " << newConfigObj <<
                 rsLog;
             return status;
         }
@@ -1348,7 +1380,7 @@ namespace {
                 args.force);
         if (!myIndex.isOK()) {
             error() << "replSetReconfig got " << myIndex.getStatus() << " while validating " <<
-                args.newConfigObj << rsLog;
+                newConfigObj << rsLog;
             return myIndex.getStatus();
         }
 
@@ -1609,8 +1641,8 @@ namespace {
 
          MemberState previousState = _currentState;
          _updateCurrentMemberStateFromTopologyCoordinator_inlock();
-         if (previousState.primary() && !_currentState.primary()) {
-             // Close connections on stepdown
+         if (_currentState.removed() || (previousState.primary() && !_currentState.primary())) {
+             // Close connections on stepdown or when removed from the replica set.
              _externalState->closeConnections();
              // Closing all connections will make the applier choose a new sync source, so we don't
              // need to do that explicitly in this case.
@@ -1760,7 +1792,7 @@ namespace {
         if (_getReplicationMode_inlock() == modeMasterSlave) {
             if (!writeConcern.wMode.empty()) {
                 return Status(ErrorCodes::UnknownReplWriteConcern,
-                              "Cannot used named write concern modes in master-slave");
+                              "Cannot use named write concern modes in master-slave");
             }
             // No way to know how many slaves there are, so assume any numeric mode is possible.
             return Status::OK();

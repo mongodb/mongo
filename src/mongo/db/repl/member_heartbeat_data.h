@@ -101,7 +101,7 @@ namespace repl {
          * Sets values in this object that indicate there was an auth issue on the last heartbeat
          * command.
          */
-        MemberHeartbeatData& setAuthIssue();
+        MemberHeartbeatData& setAuthIssue(Date_t now);
 
     private:
         // This member's index into the ReplicaSetConfig

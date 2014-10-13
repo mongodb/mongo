@@ -178,13 +178,7 @@ namespace mongo {
         }
 
         DBClientBase * get( const string& addr , const string& ns ) {
-
-            {
-                // We want to report ns stats
-                scoped_spinlock lock(_lock);
-                if (ns.size() > 0)
-                    _seenNS.insert(ns);
-            }
+            _check( ns );
 
             Status* s = _getStatus( addr );
 
@@ -290,6 +284,19 @@ namespace mongo {
             shardConnectionPool.release( addr , conn );
         }
 
+        void _check( const string& ns ) {
+
+            {
+                // We want to report ns stats too
+                scoped_spinlock lock( _lock );
+                if ( ns.size() == 0 || _seenNS.count( ns ) )
+                    return;
+                _seenNS.insert( ns );
+            }
+
+            checkVersions( ns );
+        }
+        
         /**
          * Appends info about the client connection pool to a BOBuilder
          * Safe to call with activeClientConnections lock

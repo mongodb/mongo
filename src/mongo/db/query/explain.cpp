@@ -639,6 +639,11 @@ namespace mongo {
     }
 
     // static
+    string Explain::getPlanSummary(PlanExecutor* exec) {
+         return getPlanSummary(exec->getRootStage());
+    }
+
+    // static
     string Explain::getPlanSummary(PlanStage* root) {
         vector<PlanStage*> stages;
         flattenExecTree(root, &stages);

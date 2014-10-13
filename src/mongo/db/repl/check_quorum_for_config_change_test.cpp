@@ -36,6 +36,7 @@
 #include "mongo/db/repl/check_quorum_for_config_change.h"
 #include "mongo/db/repl/network_interface_mock.h"
 #include "mongo/db/repl/repl_set_heartbeat_args.h"
+#include "mongo/db/repl/repl_set_heartbeat_response.h"
 #include "mongo/db/repl/replica_set_config.h"
 #include "mongo/db/repl/replication_executor.h"
 #include "mongo/platform/unordered_set.h"
@@ -488,6 +489,60 @@ namespace {
         ASSERT_REASON_CONTAINS(status, "h5:1");
     }
 
+    TEST_F(CheckQuorumForInitiate, QuorumCheckFailedDueToNodeWithData) {
+        // In this test, "we" are host "h3:1".  Only node "h5" responds before the test completes,
+        // and quorum check fails because "h5" declares that it has data already.
+
+        const ReplicaSetConfig rsConfig = assertMakeRSConfig(
+                BSON("_id" << "rs0" <<
+                     "version" << 1 <<
+                     "members" << BSON_ARRAY(
+                             BSON("_id" << 1 << "host" << "h1:1") <<
+                             BSON("_id" << 2 << "host" << "h2:1") <<
+                             BSON("_id" << 3 << "host" << "h3:1") <<
+                             BSON("_id" << 4 << "host" << "h4:1") <<
+                             BSON("_id" << 5 << "host" << "h5:1"))));
+        const int myConfigIndex = 2;
+        const BSONObj hbRequest = makeHeartbeatRequest(rsConfig, myConfigIndex);
+
+        startQuorumCheck(rsConfig, myConfigIndex);
+        const Date_t startDate = _net->now();
+        const int numCommandsExpected = rsConfig.getNumMembers() - 1;
+        unordered_set<HostAndPort> seenHosts;
+        _net->enterNetwork();
+        for (int i = 0; i < numCommandsExpected; ++i) {
+            const NetworkInterfaceMock::NetworkOperationIterator noi = _net->getNextReadyRequest();
+            const ReplicationExecutor::RemoteCommandRequest& request = noi->getRequest();
+            ASSERT_EQUALS("admin", request.dbname);
+            ASSERT_EQUALS(hbRequest, request.cmdObj);
+            ASSERT(seenHosts.insert(request.target).second) <<
+                "Already saw " << request.target.toString();
+            ReplSetHeartbeatResponse hbResp;
+            hbResp.setVersion(0);
+            hbResp.noteHasData();
+            if (request.target == HostAndPort("h5", 1)) {
+                _net->scheduleResponse(noi,
+                                       startDate + 10,
+                                       ResponseStatus(ReplicationExecutor::RemoteCommandResponse(
+                                                              hbResp.toBSON(),
+                                                              Milliseconds(8))));
+            }
+            else {
+                _net->blackHole(noi);
+            }
+        }
+        _net->runUntil(startDate + 10);
+        _net->exitNetwork();
+        Status status = waitForQuorumCheck();
+        ASSERT_EQUALS(ErrorCodes::CannotInitializeNodeWithData, status);
+        ASSERT_REASON_CONTAINS(
+                status, "has data already");
+        ASSERT_NOT_REASON_CONTAINS(status, "h1:1");
+        ASSERT_NOT_REASON_CONTAINS(status, "h2:1");
+        ASSERT_NOT_REASON_CONTAINS(status, "h3:1");
+        ASSERT_NOT_REASON_CONTAINS(status, "h4:1");
+        ASSERT_REASON_CONTAINS(status, "h5:1");
+    }
     TEST_F(CheckQuorumForReconfig, QuorumCheckVetoedDueToHigherConfigVersion) {
         // In this test, "we" are host "h3:1".  The request to "h2" does not arrive before the end
         // of the test, and the request to "h1" comes back indicating a higher config version.

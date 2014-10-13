@@ -94,7 +94,8 @@ namespace repl {
         return *this;
     }
 
-    MemberHeartbeatData& MemberHeartbeatData::setAuthIssue() {
+    MemberHeartbeatData& MemberHeartbeatData::setAuthIssue(Date_t now) {
+        _lastHeartbeat = now;
         _state = MemberState::RS_UNKNOWN;
         _health = 0; // set health to 0 so that this doesn't count towards majority.
         _authIssue = true;

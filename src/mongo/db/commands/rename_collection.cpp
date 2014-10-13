@@ -140,6 +140,12 @@ namespace mongo {
                 }
             }
 
+            if (NamespaceString(source).coll() == "system.indexes"
+                || NamespaceString(target).coll() == "system.indexes") {
+                errmsg = "renaming system.indexes is not allowed";
+                return false;
+            }
+
             Database* const sourceDB = dbHolder().get(txn, nsToDatabase(source));
             Collection* const sourceColl = sourceDB ? sourceDB->getCollection(txn, source)
                                                     : NULL;

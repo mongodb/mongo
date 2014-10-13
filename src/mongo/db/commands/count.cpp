@@ -117,9 +117,7 @@ namespace mongo {
 
             // Store the plan summary string in CurOp.
             if (NULL != txn->getCurOp()) {
-                PlanSummaryStats stats;
-                Explain::getSummaryStats(exec.get(), &stats);
-                txn->getCurOp()->debug().planSummary = stats.summaryStr.c_str();
+                txn->getCurOp()->debug().planSummary = Explain::getPlanSummary(exec.get());
             }
 
             const ScopedExecutorRegistration safety(exec.get());
@@ -268,9 +266,7 @@ namespace mongo {
 
         // Store the plan summary string in CurOp.
         if (NULL != txn->getCurOp()) {
-            PlanSummaryStats stats;
-            Explain::getSummaryStats(exec.get(), &stats);
-            txn->getCurOp()->debug().planSummary = stats.summaryStr.c_str();
+            txn->getCurOp()->debug().planSummary = Explain::getPlanSummary(exec.get());
         }
 
         const ScopedExecutorRegistration safety(exec.get());

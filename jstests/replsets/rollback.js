@@ -1,55 +1,25 @@
-// test rollback in replica sets
+/*
+ * Basic test of successful rollback in replica sets.
+ *
+ * This test sets up a 3-node set, with an arbiyer and 2 data-bearing nodes, A and B.
+ * A is the initial primary node.
+ *
+ * The test inserts 3 documents into A, and waits for them to replicate to B.  Then, it partitions A
+ * from the other nodes, causing it to step down and causing B to be elected primary.
+ *
+ * Next, 3 more documents inserted into B, and B is partitioned from the arbiter.
+ *
+ * Next, A is allowed to connect to the arbiter again, and gets reelected primary.  Because the
+ * arbiter doesn't know about the writes that B accepted, A becomes primary and we insert 3 new
+ * documents.  Now, A and B have diverged.  We heal the remaining network partition, bringing B back
+ * into the network.
+ *
+ * Finally, we expect either A or B to roll back its 3 divergent documents and acquire the other
+ * node's.
+ */
 
-// try running as :
-//
-//   mongo --nodb rollback.js | tee out | grep -v ^m31
-//
-
-var debugging = 0;
-
-function ifReady(db, f) {
-    var stats = db.adminCommand({ replSetGetStatus: 1 });
-
-
-    // only eval if state isn't recovery
-    if (stats && stats.myState != 3) {
-        return f();
-    }
-
-    return false;
-}
-
-function pause(s) {
-    print(s);
-    while (debugging) {
-        sleep(3000);
-        print(s);
-    }
-}
-
-function deb(obj) {
-    if( debugging ) {
-        print("\n\n\n" + obj + "\n\n");
-    }
-}
-
-w = 0;
-
-function wait(f) {
-    w++;
-    var n = 0;
-    while (!f()) {
-        if( n % 4 == 0 )
-            print("rollback.js waiting " + w);
-        if (++n == 4) {
-            print("" + f);
-        }
-        assert(n < 200, 'tried 200 times, giving up');
-        sleep(1000);
-    }
-}
-
-doTest = function (signal) {
+(function () {
+    "use strict";
 
     var replTest = new ReplSetTest({ name: 'unicomplex', nodes: 3, oplogSize: 1 });
     var nodes = replTest.nodeList();
@@ -62,25 +32,20 @@ doTest = function (signal) {
                              { "_id": 1, "host": nodes[1] },
                              { "_id": 2, "host": nodes[2], arbiterOnly: true}]
     });
+    replTest.awaitReplication();
+    replTest.bridge();
+    replTest.waitForMaster();
 
     // Make sure we have a master
     var master = replTest.getMaster();
-    a_conn = conns[0];
-    A = a_conn.getDB("admin");
-    b_conn = conns[1];
+    var a_conn = conns[0];
+    var A = a_conn.getDB("admin");
+    var b_conn = conns[1];
     a_conn.setSlaveOk();
     b_conn.setSlaveOk();
-    B = b_conn.getDB("admin");
+    var B = b_conn.getDB("admin");
     assert(master == conns[0], "conns[0] assumed to be master");
     assert(a_conn == master);
-
-    //deb(master);
-
-    // Make sure we have an arbiter
-    assert.soon(function () {
-        res = conns[2].getDB("admin").runCommand({ replSetGetStatus: 1 });
-        return res.myState == 7;
-    }, "Arbiter failed to initialize.");
 
     // Wait for initial replication
     var a = a_conn.getDB("foo");
@@ -114,42 +79,31 @@ doTest = function (signal) {
         print("NO ROLL");
     }
 
-    a.bar.insert({ q: 1, a: "foo" });
-    a.bar.insert({ q: 2, a: "foo", x: 1 });
-    a.bar.insert({ q: 3, bb: 9, a: "foo" });
+    assert.writeOK(a.bar.insert({ q: 1, a: "foo" }));
+    assert.writeOK(a.bar.insert({ q: 2, a: "foo", x: 1 }));
+    assert.writeOK(a.bar.insert({ q: 3, bb: 9, a: "foo" }, { writeConcern: { w: 2 } }));
 
-    assert(a.bar.count() == 3, "t.count");
+    assert.eq(a.bar.count(), 3, "a.count");
+    assert.eq(b.bar.count(), 3, "b.count");
 
-    // wait for secondary to get this data
-    wait(function () { return ifReady(b, function() { return b.bar.count() == 3 }); });
-
-    A.runCommand({ replSetTest: 1, blind: true });
-    reconnect(a,b);
-    wait(function () { return B.isMaster().ismaster; });
+    replTest.partition(0, 1);
+    replTest.partition(0, 2);
+    assert.soon(function () { try { return B.isMaster().ismaster; } catch(e) { return false; } });
 
     b.bar.insert({ q: 4 });
     b.bar.insert({ q: 5 });
     b.bar.insert({ q: 6 });
     assert(b.bar.count() == 6, "u.count");
 
-    // a should not have the new data as it was in blind state.
-    B.runCommand({ replSetTest: 1, blind: true });
+    // a should not have the new data as it was partitioned.
+    replTest.partition(1, 2);
     print("*************** wait for server to reconnect ****************");
-    reconnect(a,b);
-    A.runCommand({ replSetTest: 1, blind: false });
-    reconnect(a,b);
+    replTest.unPartition(0, 2);
 
     print("*************** B ****************");
-    wait(function () { try { return !B.isMaster().ismaster; } catch(e) { return false; } });
+    assert.soon(function () { try { return !B.isMaster().ismaster; } catch(e) { return false; } });
     print("*************** A ****************");
-    reconnect(a,b);
-    wait(function () {
-        try {
-          return A.isMaster().ismaster;
-        } catch(e) {
-          return false;
-        }
-      });
+    assert.soon(function () { try { return A.isMaster().ismaster; } catch(e) { return false; } });
 
     assert(a.bar.count() == 3, "t is 3");
     a.bar.insert({ q: 7 });
@@ -168,40 +122,15 @@ doTest = function (signal) {
     // B is 1 2 3 4 5 6
 
     // bring B back online
-    B.runCommand({ replSetTest: 1, blind: false });
-    reconnect(a,b);
-
-    assert.soon(function() {
-        return (A.isMaster().ismaster || A.isMaster().secondary) &&
-            (B.isMaster().ismaster || B.isMaster().secondary);
-    });
-
+    replTest.unPartition(0, 1);
+    replTest.unPartition(1, 2);
+    replTest.awaitSecondaryNodes();
     replTest.awaitReplication();
 
-    assert.soon(function() {
-        return (A.isMaster().ismaster || A.isMaster().secondary) &&
-            (B.isMaster().ismaster || B.isMaster().secondary);
-    });
+    friendlyEqual(a.bar.find().sort({ _id: 1 }).toArray(),
+                  b.bar.find().sort({ _id: 1 }).toArray(),
+                  "server data sets do not match");
 
-    friendlyEqual(a.bar.find().sort({ _id: 1 }).toArray(), b.bar.find().sort({ _id: 1 }).toArray(), "server data sets do not match");
+    replTest.stopSet(15);
+}());
 
-    pause("rollback.js SUCCESS");
-    replTest.stopSet(signal);
-};
-
-
-var reconnect = function(a,b) {
-  wait(function() {
-      try {
-        a.bar.stats();
-        b.bar.stats();
-        return true;
-      } catch(e) {
-        print(e);
-        return false;
-      }
-    });
-};
-
-print("rollback.js");
-doTest( 15 );
