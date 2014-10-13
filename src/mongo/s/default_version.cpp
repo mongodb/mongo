@@ -45,6 +45,10 @@ namespace mongo {
         return false;
     }
 
+    bool VersionManager::initShardVersionCB( DBClientBase * conn_in, BSONObj& result ){
+        return false;
+    }
+
     bool VersionManager::forceRemoteCheckShardVersionCB( const string& ns ){
         return true;
     }
