@@ -123,7 +123,7 @@ TRACEBUF
 TRASHIT
 _DB_QUEUE_H_
 
-# List of os_win_wiredtiger_config.h #defines that are "unused", but it's OK.
+# List of build_win/wiredtiger_config.h #defines that are "unused", but it's OK.
 HAVE_INTTYPES_H
 HAVE_STDINT_H
 HAVE_STDLIB_H
