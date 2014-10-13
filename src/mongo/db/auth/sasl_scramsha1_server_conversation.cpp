@@ -160,7 +160,11 @@ namespace mongo {
 
         // Generate SCRAM credentials on the fly for mixed MONGODB-CR/SCRAM mode.
         if (_creds.scram.salt.empty() && !_creds.password.empty()) {
-            BSONObj scramCreds = scram::generateCredentials(_creds.password);
+            // Use a default value of 5000 for the scramIterationCount when in mixed mode,
+            // overriding the default value (10000) used for SCRAM mode or the user-given value.
+            const int mixedModeScramIterationCount = 5000;
+            BSONObj scramCreds = scram::generateCredentials(_creds.password,
+                                                            mixedModeScramIterationCount);
             _creds.scram.iterationCount = scramCreds[scram::iterationCountFieldName].Int();
             _creds.scram.salt = scramCreds[scram::saltFieldName].String();
             _creds.scram.storedKey = scramCreds[scram::storedKeyFieldName].String();

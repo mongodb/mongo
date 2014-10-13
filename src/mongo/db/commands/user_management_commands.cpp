@@ -51,6 +51,7 @@
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/auth/privilege.h"
 #include "mongo/db/auth/resource_pattern.h"
+#include "mongo/db/auth/sasl_options.h"
 #include "mongo/db/auth/user.h"
 #include "mongo/db/auth/user_document_parser.h"
 #include "mongo/db/auth/user_management_commands_parser.h"
@@ -438,7 +439,9 @@ namespace mongo {
 
                 // Add SCRAM credentials for appropriate authSchemaVersions.
                 if (authzVersion > AuthorizationManager::schemaVersion26Final) {
-                    BSONObj scramCred = scram::generateCredentials(args.hashedPassword);
+                    BSONObj scramCred = scram::generateCredentials(
+                            args.hashedPassword,
+                            saslGlobalParams.scramIterationCount);
                     credentialsBuilder.append("SCRAM-SHA-1", scramCred);
                 }
                 else { // Otherwise default to MONGODB-CR.
@@ -612,7 +615,9 @@ namespace mongo {
 
                 // Add SCRAM credentials for appropriate authSchemaVersions
                 if (authzVersion > AuthorizationManager::schemaVersion26Final) {
-                    BSONObj scramCred = scram::generateCredentials(args.hashedPassword);
+                    BSONObj scramCred = scram::generateCredentials(
+                            args.hashedPassword,
+                            saslGlobalParams.scramIterationCount);
                     credentialsBuilder.append("SCRAM-SHA-1",scramCred);
                 }
                 else { // Otherwise default to MONGODB-CR
