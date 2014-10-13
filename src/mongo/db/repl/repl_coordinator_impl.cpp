@@ -880,8 +880,6 @@ namespace {
         _topCoord->stepDown();
         boost::unique_lock<boost::mutex> lk(_mutex);
         _updateCurrentMemberStateFromTopologyCoordinator_inlock();
-        lk.unlock();
-        _externalState->closeConnections();
         // Wake up any threads blocked in awaitReplication
         for (std::vector<WaiterInfo*>::iterator it = _replicationWaiterList.begin();
                 it != _replicationWaiterList.end(); ++it) {
@@ -889,6 +887,8 @@ namespace {
             info->master = false;
             info->condVar->notify_all();
         }
+        lk.unlock();
+        _externalState->closeConnections();
         *result = Status::OK();
     }
 
