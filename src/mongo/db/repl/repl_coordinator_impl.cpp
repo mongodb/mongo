@@ -533,8 +533,7 @@ namespace {
                           << "member ID: " << slaveInfo.memberID << ", stored member hostAndPort: "
                           << slaveInfo.hostAndPort.toString() << ".  Our RID: " <<
                           _getMyRID_inlock();
-                warning() << errmsg;
-                dassert(false);
+                LOG(1) << errmsg;
                 return Status(ErrorCodes::NodeNotFound, errmsg);
             }
             else {
@@ -1637,8 +1636,8 @@ namespace {
 
          MemberState previousState = _currentState;
          _updateCurrentMemberStateFromTopologyCoordinator_inlock();
-         if (previousState.primary() && !_currentState.primary()) {
-             // Close connections on stepdown
+         if (_currentState.removed() || (previousState.primary() && !_currentState.primary())) {
+             // Close connections on stepdown or when removed from the replica set.
              _externalState->closeConnections();
              // Closing all connections will make the applier choose a new sync source, so we don't
              // need to do that explicitly in this case.
