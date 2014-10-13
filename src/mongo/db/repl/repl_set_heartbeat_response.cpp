@@ -60,6 +60,7 @@ namespace {
     const std::string kHbMessageFieldName = "hbmsg";
     const std::string kReplSetFieldName = "set";
     const std::string kSyncSourceFieldName = "syncingTo";
+    const std::string kHasDataFieldName = "hasData";
 
 }  // namespace
 
@@ -120,6 +121,9 @@ namespace {
         if (!_syncingTo.empty()) {
             *builder << kSyncSourceFieldName << _syncingTo;
         }
+        if (_hasDataSet) {
+            builder->append(kHasDataFieldName, _hasData);
+        }
     }
 
     BSONObj ReplSetHeartbeatResponse::toBSON() const {
@@ -163,6 +167,10 @@ namespace {
             }
             return Status(ErrorCodes::UnknownError, errMsg);
         }
+
+        const BSONElement hasDataElement = doc[kHasDataFieldName];
+        _hasDataSet = !hasDataElement.eoo();
+        _hasData = hasDataElement.trueValue();
 
         const BSONElement electionTimeElement = doc[kElectionTimeFieldName];
         if (electionTimeElement.eoo()) {

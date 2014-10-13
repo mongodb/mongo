@@ -180,6 +180,15 @@ namespace repl {
             warning() << message;
             return;
         }
+
+        if (!hbStatus.isOK()) {
+            warning() << "Got error (" << hbStatus
+                      << ") response on heartbeat request to " << request.target
+                      << "; " << hbResp;
+            _down.push_back(request.target);
+            return;
+        }
+
         if (!hbResp.getReplicaSetName().empty()) {
             if (hbResp.getVersion() >= _rsConfig->getConfigVersion()) {
                 std::string message = str::stream() << "Our config version of " <<
@@ -191,11 +200,13 @@ namespace repl {
                 return;
             }
         }
-        if (!hbStatus.isOK()) {
-            warning() << "Got error (" << hbStatus
-                      << ") response on heartbeat request to " << request.target
-                      << "; " << hbResp;
-            _down.push_back(request.target);
+
+        const bool isInitialConfig = _rsConfig->getConfigVersion() == 1;
+        if (isInitialConfig && hbResp.hasData()) {
+            std::string message = str::stream() << "'" << request.target.toString()
+                                                <<  "' has data already, cannot initiate set.";
+            _vetoStatus = Status(ErrorCodes::CannotInitializeNodeWithData, message);
+            warning() << message;
             return;
         }
 
