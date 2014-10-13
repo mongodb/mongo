@@ -22,7 +22,7 @@ var (
 	testServer = "localhost"
 	testPort   = "27017"
 
-	ssl       = &testutil.SSL_TEST_OPTIONS
+	ssl       = testutil.GetSSLOptions()
 	namespace = &commonOpts.Namespace{
 		DB: testDB,
 	}
@@ -31,7 +31,7 @@ var (
 		Port: testPort,
 	}
 	toolOptions = &commonOpts.ToolOptions{
-		SSL:        ssl,
+		SSL:        &ssl,
 		Namespace:  namespace,
 		Connection: connection,
 		Auth:       &commonOpts.Auth{},

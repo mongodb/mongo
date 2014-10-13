@@ -33,7 +33,7 @@ var (
 )
 
 func simpleMongoDumpInstance() *MongoDump {
-	ssl := &testutil.SSL_TEST_OPTIONS
+	ssl := testutil.GetSSLOptions()
 	namespace := &commonOpts.Namespace{
 		DB: testDB,
 	}
@@ -42,7 +42,7 @@ func simpleMongoDumpInstance() *MongoDump {
 		Port: testPort,
 	}
 	toolOptions := &commonOpts.ToolOptions{
-		SSL:        ssl,
+		SSL:        &ssl,
 		Namespace:  namespace,
 		Connection: connection,
 		Auth:       &commonOpts.Auth{},
@@ -61,13 +61,14 @@ func simpleMongoDumpInstance() *MongoDump {
 }
 
 func getBareSession() (*mgo.Session, error) {
+	ssl := testutil.GetSSLOptions(),
 	sessionProvider, err := db.InitSessionProvider(commonOpts.ToolOptions{
 		Connection: &commonOpts.Connection{
 			Host: testServer,
 			Port: testPort,
 		},
 		Auth: &commonOpts.Auth{},
-		SSL:  &testutil.SSL_TEST_OPTIONS,
+		SSL:  &ssl,
 	})
 	if err != nil {
 		return nil, err

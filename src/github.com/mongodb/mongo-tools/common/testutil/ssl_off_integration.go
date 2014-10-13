@@ -1,13 +1,13 @@
 // +build !ssltest
 
-package mongofiles
+package testutil
 
 import (
 	commonOpts "github.com/mongodb/mongo-tools/common/options"
 )
 
-var (
-	SSL_TEST_OPTIONS = commonOpts.SSL{
+func GetSSLOptions() commonOpts.SSL {
+	return commonOpts.SSL{
 		UseSSL: false,
 	}
-)
+}
