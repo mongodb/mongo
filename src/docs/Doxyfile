@@ -209,6 +209,7 @@ ALIASES                = "notyet{1}=Note: <b>"\1"</b> not yet supported in Wired
                          "errors=@returns zero on success and a non-zero error code on failure.  See @ref error_returns \"Error Returns\" for details." \
                          "ebusy_errors=@returns zero on success, EBUSY if there are open cursors on the object and a non-zero error code on failure.  See @ref error_returns \"Error Returns\" for details." \
                          "ex_ref{1}=@ref \1 \"\1\"" \
+                         "ref_single=@ref" \
                          "hrow{1}=<tr><th>\1</th></tr>" \
                          "hrow{2}=<tr><th>\1</th><th>\2</th></tr>" \
                          "hrow{3}=<tr><th>\1</th><th>\2</th><th>\3</th></tr>" \

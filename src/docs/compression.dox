@@ -102,6 +102,6 @@ code can correctly decompress old and new blocks.
 @section compression_custom Custom compression engines
 
 WiredTiger may be extended by adding custom compression engines; see
-@ref WT_COMPRESSOR for more information.
+WT_COMPRESSOR for more information.
 
  */

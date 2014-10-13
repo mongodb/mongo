@@ -89,11 +89,15 @@ def process_lang(lang, lines):
 	mendif_pat = re.compile('^\s*@m_endif\s*$')
 	mpage_pat = re.compile('@m_page{{([^}]*)},([^,}]*),([^}]*)}')
 	mpage_rep = r'@page \2' + lang_suffix + r' \3 ' + lang_desc
-	snip_pat = re.compile('@snippet ex_([^.]*)[.]c\s*(.*)')
+	ref_pat = re.compile('@ref\s+(\w*)')
+	ref_rep = r'@ref \1' + lang_suffix
+	snip_pat = re.compile('@snippet ex_([^.]*)[.]c\s+(.*)')
 	snip_rep = r'@snippet ex_\1' + lang_ext + r' \2'
-	subpage_pat = re.compile('@subpage\s*([^\s]*)')
+	section_pat = re.compile('(^@\w*section)\s+(\w*)')
+	section_rep = r'\1 \2' + lang_suffix
+	subpage_pat = re.compile('@subpage\s+(\w*)')
 	subpage_rep = r'@subpage \1' + lang_suffix
-	msinglesubpage_pat = re.compile('@m_single_subpage\s*([^\s]*)')
+	msinglesubpage_pat = re.compile('@m_single_subpage\s+(\w*)')
 	msinglesubpage_rep = r'\\subpage \1'
 	exref_pat = re.compile('@ex_ref{ex_([^.]*)[.]c}')
 	if lang == 'c':
@@ -110,8 +114,10 @@ def process_lang(lang, lines):
 	for line in lines:
 		linenum += 1
 		if lang != 'c':
-			line = re.sub(snip_pat, snip_rep, line)
 			line = re.sub(exref_pat, exref_rep, line)
+			line = re.sub(ref_pat, ref_rep, line)
+			line = re.sub(section_pat, section_rep, line)
+			line = re.sub(snip_pat, snip_rep, line)
 		line = re.sub(mpage_pat, mpage_rep, line)
 		line = re.sub(subpage_pat, subpage_rep, line)
 		# msinglesubpage must be performed after subpage

@@ -199,8 +199,8 @@ successive calls to \c Cursor.getKey* methods:
 @snippet ex_all.c Get the cursor's composite key
 
 Cursors for a table have the same value format as the table, unless a
-projection is configured with WT_SESSION::open_cursor.  See @ref
-cursor_projections for more information.
+projection is configured with WT_SESSION::open_cursor.  See
+@ref cursor_projections for more information.
 
 @m_if{c}
 WT_CURSOR::set_value is used to set value columns, and
@@ -341,8 +341,8 @@ WT_CURSOR::get_value
 \c Cursor.getValue
 @m_endif
 by appending a list of columns to the \c uri parameter of the
-WT_SESSION::open_cursor call.  This is called a \em projection, see @ref
-cursor_projections for more details.
+WT_SESSION::open_cursor call.  This is called a \em projection, see
+@ref cursor_projections for more details.
 
 In the case of index cursors, a projection can be used to avoid lookups
 in column groups that do not hold columns relevant to the operation.

@@ -66,7 +66,7 @@ example:
 
 @section backup_util Backup from the command line
 
-The @ref util_backup command may also be used to create backups:
+The @ref_single util_backup command may also be used to create backups:
 
 @code
 rm -rf /path/database.backup &&

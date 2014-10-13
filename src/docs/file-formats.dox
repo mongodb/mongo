@@ -45,11 +45,12 @@ columns in separate files, or the underlying data is a set of bits,
 column-store format may be a better choice.
 
 Both row- and column-store formats can maintain high volumes of writes,
-but for data sets requiring sustained, extreme write throughput, @ref
-lsm are usually a better choice.  For applications that do not require
-extreme write throughput, row- or column-store is likely to be a better
-choice because the read throughput is better than with LSM trees (an
-effect that becomes more pronounced as additional read threads are added).
+but for data sets requiring sustained, extreme write throughput,
+@ref lsm are usually a better choice.  For applications that do not
+require extreme write throughput, row- or column-store is likely to be
+a better choice because the read throughput is better than with LSM trees
+(an effect that becomes more pronounced as additional read threads are
+added).
 
 Applications with complex schemas may also benefit from using multiple
 storage formats, that is, using a combination of different formats in
@@ -137,7 +138,7 @@ and on-disk objects by compressing individual value items.  The cost is
 additional CPU and memory use when returning values from the in-memory
 tree and when writing pages to disk.  Note the additional CPU cost of
 Huffman encoding can be high, and should be considered.
-(See @ref huffman for details.)
+(See @ref_single huffman for details.)
 
   Huffman encoding is disabled by default.
 

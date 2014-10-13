@@ -34,7 +34,7 @@ raw byte arrays accessed using a WT_ITEM structure.
 raw byte arrays.
 @m_endif
 Keys and values may be up to (4GB - 512B) bytes in size, but depending
-on how @ref WT_SESSION::create "maximum item sizes" are configured,
+on how WT_SESSION::create "maximum item sizes" are configured,
 large key and value items will be stored on overflow pages.
 
 WiredTiger also supports a @ref schema "schema layer" so that keys and
