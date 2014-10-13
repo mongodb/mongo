@@ -11,7 +11,7 @@
  * __wt_fallocate_config --
  *	Configure fallocate behavior for a file handle.
  */
-int
+void
 __wt_fallocate_config(WT_SESSION_IMPL *session, WT_FH *fh)
 {
 	fh->fallocate_available = 1;
@@ -47,11 +47,11 @@ __wt_fallocate(
 	largeint.QuadPart = offset + len;
 
 	if ((ret = SetFilePointerEx(
-	    fh->filehandle, largeint, NULL, FILE_BEGIN)) == FALSE)
+	    fh->filehandletrunc, largeint, NULL, FILE_BEGIN)) == FALSE)
 		WT_RET_MSG(session,
 		    __wt_errno(), "%s SetFilePointerEx error", fh->name);
 
-	if ((ret = SetEndOfFile(fh->filehandle)) != FALSE) {
+	if ((ret = SetEndOfFile(fh->filehandletrunc)) != FALSE) {
 		fh->size = fh->extend_size = len;
 		return (0);
 	}

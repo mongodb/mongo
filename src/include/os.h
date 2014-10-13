@@ -52,6 +52,8 @@ struct __wt_fh {
 	int	 fd;				/* POSIX file handle */
 #else
 	HANDLE filehandle;			/* Windows file handle */
+	HANDLE filehandletrunc;			/* Windows file handle
+						   for truncation */
 #endif
 	wt_off_t size;				/* File size */
 	wt_off_t extend_size;			/* File extended size */

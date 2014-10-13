@@ -35,6 +35,7 @@ __wt_open(WT_SESSION_IMPL *session,
 	DWORD dwCreationDisposition;
 	char *path;
 	HANDLE filehandle;
+	HANDLE filehandletrunc;
 
 	conn = S2C(session);
 	fh = NULL;
@@ -121,12 +122,26 @@ __wt_open(WT_SESSION_IMPL *session,
 			    "%s", path);
 	}
 
+	/*
+	 * Open a second handle to file to support allocation/truncation
+	 * concurrently with reads on the file. Writes would also move the file
+	 * pointer.
+	 */
+	filehandletrunc = CreateFile(path,
+	    (GENERIC_READ | GENERIC_WRITE),
+	    share_mode,
+	    NULL,
+	    OPEN_EXISTING,
+	    f,
+	    NULL);
+
 	if (F_ISSET(conn, WT_CONN_CKPT_SYNC))
 		WT_ERR(__open_directory_sync(session, path));
 
 	WT_ERR(__wt_calloc(session, 1, sizeof(WT_FH), &fh));
 	WT_ERR(__wt_strdup(session, name, &fh->name));
 	fh->filehandle = filehandle;
+	fh->filehandletrunc = filehandletrunc;
 	fh->ref = 1;
 	fh->direct_io = direct_io;
 
@@ -200,6 +215,11 @@ __wt_close(WT_SESSION_IMPL *session, WT_FH *fh)
 
 	/* Discard the memory. */
 	if (!CloseHandle(fh->filehandle) != 0) {
+		ret = __wt_errno();
+		__wt_err(session, ret, "%s", fh->name);
+	}
+
+	if (!CloseHandle(fh->filehandletrunc) != 0) {
 		ret = __wt_errno();
 		__wt_err(session, ret, "%s", fh->name);
 	}
