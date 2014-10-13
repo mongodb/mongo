@@ -796,11 +796,18 @@ methods = {
 
 'session.reconfigure' : Method(session_config),
 
-# There are 4 variants of the wiredtiger_open configurations:
-#	wiredtiger_open: valid application configuration
-#	wiredtiger_open_basecfg: valid basecfg configuration
-#	wiredtiger_open_usercfg: valid user configuration
-#	wiredtiger_open_all: the combined set
+# There are 4 variants of the wiredtiger_open configurations.
+# wiredtiger_open:
+#	Configuration values allowed in the application's configuration
+#	argument to the wiredtiger_open call.
+# wiredtiger_open_basecfg:
+#	Configuration values allowed in the WiredTiger.basecfg file (remove
+# creation-specific configuration strings and add a version string).
+# wiredtiger_open_usercfg:
+#	Configuration values allowed in the WiredTiger.config file (remove
+# creation-specific configuration strings).
+# wiredtiger_open_all:
+#	All of the above configuration values combined
 'wiredtiger_open' : Method(
 	connection_runtime_config +
 	common_wiredtiger_open + [
