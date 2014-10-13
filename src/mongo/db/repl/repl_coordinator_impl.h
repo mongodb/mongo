@@ -151,6 +151,8 @@ namespace repl {
 
         virtual void signalDrainComplete();
 
+        virtual void signalUpstreamUpdater();
+
         virtual void prepareReplSetUpdatePositionCommand(OperationContext* txn,
                                                          BSONObjBuilder* cmdBuilder);
 
