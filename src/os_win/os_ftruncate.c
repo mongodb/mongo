@@ -28,6 +28,7 @@ __wt_ftruncate(WT_SESSION_IMPL *session, WT_FH *fh, wt_off_t len)
 	ret = SetEndOfFile(fh->filehandle);
 	if (ret != FALSE) {
 		fh->size = fh->extend_size = len;
+		return (0);
 	}
 
 	lasterror = GetLastError();

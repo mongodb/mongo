@@ -1291,7 +1291,7 @@ __wt_cksum_init(void)
 	else
 		__wt_cksum_func = __wt_cksum_sw;
 
-#elif defined(_M_AMD64aaa)
+#elif defined(_M_AMD64)
 	int cpuInfo[4];
 
 	__cpuid(cpuInfo, 1);
