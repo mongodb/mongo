@@ -684,9 +684,7 @@ namespace mongo {
         // uint64_t numMisplacedDocs = 0;
 
         // Get summary info about which plan the executor is using.
-        PlanSummaryStats stats;
-        Explain::getSummaryStats(exec.get(), &stats);
-        curop.debug().planSummary = stats.summaryStr.c_str();
+        curop.debug().planSummary = Explain::getPlanSummary(exec.get());
 
         while (PlanExecutor::ADVANCED == (state = exec->getNext(&obj, NULL))) {
             // Add result to output buffer.

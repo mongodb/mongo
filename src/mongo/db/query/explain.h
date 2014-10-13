@@ -122,6 +122,7 @@ namespace mongo {
         /**
          * Returns a short plan summary std::string describing the leaves of the query plan.
          */
+        static std::string getPlanSummary(PlanExecutor* exec);
         static std::string getPlanSummary(PlanStage* root);
 
         /**
