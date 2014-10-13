@@ -6,9 +6,12 @@ import (
 	"github.com/mongodb/mongo-tools/common/bsonutil"
 	"github.com/mongodb/mongo-tools/common/db"
 	"github.com/mongodb/mongo-tools/common/log"
+	commonOpts "github.com/mongodb/mongo-tools/common/options"
 	"github.com/mongodb/mongo-tools/common/testutil"
 	"github.com/mongodb/mongo-tools/common/util"
+	"github.com/mongodb/mongo-tools/mongodump/options"
 	. "github.com/smartystreets/goconvey/convey"
+	"gopkg.in/mgo.v2"
 	"gopkg.in/mgo.v2/bson"
 	"io/ioutil"
 	"os"
@@ -28,6 +31,53 @@ var (
 	testServer = "localhost"
 	testPort   = "27017"
 )
+
+func simpleMongoDumpInstance() *MongoDump {
+	ssl := &SSL_TEST_OPTIONS
+	namespace := &commonOpts.Namespace{
+		DB: testDB,
+	}
+	connection := &commonOpts.Connection{
+		Host: testServer,
+		Port: testPort,
+	}
+	toolOptions := &commonOpts.ToolOptions{
+		SSL:        ssl,
+		Namespace:  namespace,
+		Connection: connection,
+		Auth:       &commonOpts.Auth{},
+		Verbosity:  &commonOpts.Verbosity{},
+	}
+	outputOptions := &options.OutputOptions{}
+	inputOptions := &options.InputOptions{}
+
+	log.SetVerbosity(toolOptions.Verbosity)
+
+	return &MongoDump{
+		ToolOptions:   toolOptions,
+		InputOptions:  inputOptions,
+		OutputOptions: outputOptions,
+	}
+}
+
+func getBareSession() (*mgo.Session, error) {
+	sessionProvider, err := db.InitSessionProvider(commonOpts.ToolOptions{
+		Connection: &commonOpts.Connection{
+			Host: testServer,
+			Port: testPort,
+		},
+		Auth: &commonOpts.Auth{},
+		SSL:  &SSL_TEST_OPTIONS,
+	})
+	if err != nil {
+		return nil, err
+	}
+	session, err := sessionProvider.GetSession()
+	if err != nil {
+		return nil, err
+	}
+	return session, nil
+}
 
 // returns the number of .bson files in a directory
 // excluding system.indexes.bson
