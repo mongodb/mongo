@@ -245,10 +245,14 @@ ops(void *arg)
 				die(ret, "connection.open_session");
 
 			/*
-			 * 10% of the time, do a few read-only operations from
-			 * a checkpoint.
+			 * 10% of the time (if we're not single-threaded, doing
+			 * checks against a Berkeley DB database, because that
+			 * won't work because the Berkeley DB database records
+			 * won't match the checkpoint), perform some read-only
+			 * operations from a checkpoint.
 			 */
-			if (ckpt_available && MMRAND(1, 10) == 1) {
+			if (!SINGLETHREADED &&
+			    ckpt_available && MMRAND(1, 10) == 1) {
 				if ((ret = session->open_cursor(session,
 				    g.uri, NULL, ckpt_name, &cursor)) != 0)
 					die(ret, "session.open_cursor");
