@@ -76,6 +76,16 @@ namespace mongo {
         return reinterpret_cast<HeapRecord*>(it->second.get());
     }
 
+    bool HeapRecordStore::findRecord( OperationContext* txn,
+                                      const DiskLoc& loc, RecordData* rd ) const {
+        Records::const_iterator it = _records.find(loc);
+        if ( it == _records.end() ) {
+            return false;
+        }
+        *rd = reinterpret_cast<HeapRecord*>(it->second.get())->toRecordData();
+        return true;
+    }
+
     void HeapRecordStore::deleteRecord(OperationContext* txn, const DiskLoc& loc) {
         HeapRecord* rec = recordFor(loc);
         _dataSize -= rec->netLength();

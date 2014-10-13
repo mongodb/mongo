@@ -147,6 +147,14 @@ namespace mongo {
 
         virtual RecordData dataFor( OperationContext* txn, const DiskLoc& loc) const = 0;
 
+        /**
+         * @param out - If the record exists, the contents of this are set.
+         * @return true iff there is a Record for loc
+         */
+        virtual bool findRecord( OperationContext* txn,
+                                 const DiskLoc& loc,
+                                 RecordData* out ) const = 0;
+
         virtual void deleteRecord( OperationContext* txn, const DiskLoc& dl ) = 0;
 
         virtual StatusWith<DiskLoc> insertRecord( OperationContext* txn,

@@ -45,6 +45,16 @@ namespace mongo {
         return RecordData(rec.data.get(), rec.dataSize);
     }
 
+    bool HeapRecordStoreBtree::findRecord(OperationContext* txn,
+                                          const DiskLoc& loc, RecordData* out) const {
+        Records::const_iterator it = _records.find(loc);
+        if ( it == _records.end() )
+            return false;
+        const Record& rec = it->second;
+        *out = RecordData(rec.data.get(), rec.dataSize);
+        return true;
+    }
+
     void HeapRecordStoreBtree::deleteRecord(OperationContext* txn, const DiskLoc& loc) {
         invariant(_records.erase(loc) == 1);
     }

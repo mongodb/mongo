@@ -20,10 +20,13 @@ assert.commandWorked(admin.runCommand({ enableSharding : coll.getDB() + "" }));
 printjson(admin.runCommand({ movePrimary : coll.getDB() + "", to : shards[0]._id }));
 assert.commandWorked(admin.runCommand({ shardCollection : collSharded.toString(),
                                         key : { _id : 1 } }));
+assert.commandWorked(admin.runCommand({ moveChunk : collSharded.toString(),
+                                        find : { _id : 0 },
+                                        to : shards[1]._id }));
 
 assert.writeOK(coll.insert({ some : "data" }));
 assert.writeOK(collSharded.insert({ some : "data" }));
-assert.eq(1, mongos.adminCommand({ getShardVersion : collSharded.toString() }).version.t);
+assert.eq(2, mongos.adminCommand({ getShardVersion : collSharded.toString() }).version.t);
 
 st.printShardingStatus();
 
@@ -56,9 +59,9 @@ assert.eq("",
 
 //
 //
-// Sharding data not initialized when shards are hit by an unsharded query
+// Sharding data initialized when shards are hit by an unsharded query
 assert.neq(null, coll.findOne({}));
-assert.eq("",
+assert.neq("",
           st.rs0.getPrimary().adminCommand({ getShardVersion : coll.toString() }).configServer);
 assert.eq("",
           st.rs1.getPrimary().adminCommand({ getShardVersion : coll.toString() }).configServer);
@@ -69,8 +72,8 @@ assert.eq("",
 assert.neq(null, collSharded.findOne({}));
 assert.neq("",
            st.rs0.getPrimary().adminCommand({ getShardVersion : coll.toString() }).configServer);
-assert.eq("",
-          st.rs1.getPrimary().adminCommand({ getShardVersion : coll.toString() }).configServer);
+assert.neq("",
+           st.rs1.getPrimary().adminCommand({ getShardVersion : coll.toString() }).configServer);
 
 
 // Stepdown both primaries to reset our sharding data
@@ -124,16 +127,16 @@ assert.eq("",
 //
 // Metadata commands should enable sharding data implicitly
 assert.commandWorked(mongos.adminCommand({ split : collSharded.toString(), middle : { _id : 0 }}));
-assert.neq("",
-           st.rs0.getPrimary().adminCommand({ getShardVersion : coll.toString() }).configServer);
 assert.eq("",
+           st.rs0.getPrimary().adminCommand({ getShardVersion : coll.toString() }).configServer);
+assert.neq("",
           st.rs1.getPrimary().adminCommand({ getShardVersion : coll.toString() }).configServer);
 
 //
 //
 // MoveChunk command should enable sharding data implicitly on TO-shard
 assert.commandWorked(mongos.adminCommand({ moveChunk : collSharded.toString(), find : { _id : 0 },
-                                           to : shards[1]._id }));
+                                           to : shards[0]._id }));
 assert.neq("",
            st.rs0.getPrimary().adminCommand({ getShardVersion : coll.toString() }).configServer);
 assert.neq("",

@@ -35,6 +35,7 @@
 #include "mongo/db/client.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/operation_context_noop.h"
+#include "mongo/db/repl/operation_context_repl_mock.h"
 #include "mongo/util/net/hostandport.h"
 #include "mongo/util/sequence_util.h"
 
@@ -142,7 +143,10 @@ namespace repl {
     }
 
     OperationContext* ReplicationCoordinatorExternalStateMock::createOperationContext() {
-        return new OperationContextNoop;
+        return new OperationContextReplMock;
     }
+
+    void ReplicationCoordinatorExternalStateMock::dropAllTempCollections(OperationContext* txn) {}
+
 } // namespace repl
 } // namespace mongo

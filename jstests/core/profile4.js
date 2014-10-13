@@ -1,3 +1,4 @@
+if (0) { // TODO SERVER-15614 reenable
 // Check debug information recorded for a query.
 
 // special db so that it can be run in parallel tests
@@ -117,4 +118,5 @@ try {
 finally {
     db.setProfilingLevel(0);
     db = stddb;
+}
 }

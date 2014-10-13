@@ -481,6 +481,15 @@ namespace mongo {
         return reinterpret_cast<const DiskLoc*>( slice.data() )[0];
     }
 
+    bool RocksRecordStore::findRecord( OperationContext* txn,
+                                       const DiskLoc& loc, RecordData* out ) const {
+        RecordData rd = _getDataFor(_db, _columnFamily.get(), txn, loc);
+        if ( rd.data() == NULL )
+            return false;
+        *out = rd;
+        return true;
+    }
+
     RecordData RocksRecordStore::_getDataFor(rocksdb::DB* db, rocksdb::ColumnFamilyHandle* cf,
                                              OperationContext* txn, const DiskLoc& loc) {
         rocksdb::Slice value;

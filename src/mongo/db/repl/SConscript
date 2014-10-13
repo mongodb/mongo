@@ -155,10 +155,14 @@ env.Library('repl_coordinator_global',
             LIBDEPS=['repl_coordinator_interface'])
 
 env.Library('replmocks',
-            ['repl_coordinator_mock.cpp',
-             'repl_coordinator_external_state_mock.cpp',
-             'network_interface_mock.cpp'],
+            [
+                'network_interface_mock.cpp',
+                'operation_context_repl_mock.cpp',
+                'repl_coordinator_external_state_mock.cpp',
+                'repl_coordinator_mock.cpp',
+            ],
             LIBDEPS=[
+                '$BUILD_DIR/mongo/db/concurrency/lock_mgr',
                 'repl_coordinator_interface',
                 'replication_executor',
             ])

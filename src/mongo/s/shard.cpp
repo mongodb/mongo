@@ -480,6 +480,9 @@ namespace mongo {
     }
 
     void ShardingConnectionHook::onCreate( DBClientBase * conn ) {
+
+        // Authenticate as the first thing we do
+        // NOTE: Replica set authentication allows authentication against *any* online host
         if(getGlobalAuthorizationManager()->isAuthEnabled()) {
             LOG(2) << "calling onCreate auth for " << conn->toString() << endl;
 
@@ -490,33 +493,23 @@ namespace mongo {
                      result );
         }
 
+        // Initialize the wire version of single connections
+        if (conn->type() == ConnectionString::MASTER) {
+
+            LOG(2) << "checking wire version of new connection " << conn->toString();
+
+            // Initialize the wire protocol version of the connection to find out if we
+            // can send write commands to this connection.
+            string errMsg;
+            if (!initWireVersion(conn, &errMsg)) {
+                uasserted(17363, errMsg);
+            }
+        }
+
         if ( _shardedConnections ) {
-            if ( versionManager.isVersionableCB( conn )) {
-                // We must initialize sharding on all connections, so that we get exceptions
-                // if sharding is enabled on the collection.
-                BSONObj result;
-                bool ok = versionManager.initShardVersionCB( conn, result );
-
-                // assert that we actually successfully setup sharding
-                uassert( 15907,
-                         str::stream() << "could not initialize sharding on connection "
-                             << conn->toString() << ( result["errmsg"].type() == String ?
-                                  causedBy( result["errmsg"].String() ) :
-                                  causedBy( (string)"unknown failure : " + result.toString() ) ),
-                         ok );
-            }
-            else {
-                // Initialize the wire protocol version of the connection to find out if we
-                // can send write commands to this connection.
-                string errMsg;
-                if ( !initWireVersion( conn, &errMsg )) {
-                    uasserted( 17363, errMsg );
-                }
-            }
-
             // For every DBClient created by mongos, add a hook that will capture the response from
-            // commands, so that we can target the correct node when subsequent getLastError calls
-            // are made by mongos.
+            // commands we pass along from the client, so that we can target the correct node when
+            // subsequent getLastError calls are made by mongos.
             conn->setPostRunCommandHook(stdx::bind(&saveGLEStats, stdx::placeholders::_1, stdx::placeholders::_2));
         }
 

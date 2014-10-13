@@ -373,8 +373,41 @@ namespace {
     }
 
     void ReplicationCoordinatorImpl::signalDrainComplete() {
-        boost::lock_guard<boost::mutex> lk(_mutex);
+        // This logic is a little complicated in order to avoid acquiring the global exclusive lock
+        // unnecessarily.  This is important because the applier may call signalDrainComplete()
+        // whenever it wants, not only when the ReplicationCoordinator is expecting it.
+        //
+        // The steps are:
+        // 1.) Check to see if we're waiting for this signal.  If not, return early.
+        // 2.) Otherwise, release the mutex while acquiring the global exclusive lock,
+        //     since that might take a while (NB there's a deadlock cycle otherwise, too).
+        // 3.) Re-check to see if we've somehow left drain mode.  If we are, clear
+        //     _isWaitingForDrainToComplete and drop the mutex.  At this point, no writes
+        //     can occur from other threads, due to the global exclusive lock.
+        // 4.) Drop all temp collections.
+        // 5.) Drop the global exclusive lock.
+        //
+        // Because replicatable writes are forbidden while in drain mode, and we don't exit drain
+        // mode until we have the global exclusive lock, which forbids all other threads from making
+        // writes, we know that from the time that _isWaitingForDrainToComplete is set after calls
+        // to _topCoord->processWinElection() until this method returns, no external writes will be
+        // processed.  This is important so that a new temp collection isn't introduced on the new
+        // primary before we drop all the temp collections.
+
+        boost::unique_lock<boost::mutex> lk(_mutex);
+        if (!_isWaitingForDrainToComplete) {
+            return;
+        }
+        lk.unlock();
+        boost::scoped_ptr<OperationContext> txn(_externalState->createOperationContext());
+        Lock::GlobalWrite globalWriteLock(txn->lockState());
+        lk.lock();
+        if (!_isWaitingForDrainToComplete) {
+            return;
+        }
         _isWaitingForDrainToComplete = false;
+        lk.unlock();
+        _externalState->dropAllTempCollections(txn.get());
     }
 
     void ReplicationCoordinatorImpl::_setFollowerModeFinish(
@@ -429,6 +462,7 @@ namespace {
              // triggered by incoming heartbeats, but with a one-node set there are no
              // heartbeats.
              _topCoord->processWinElection(OID::gen(), getNextGlobalOptime());
+             _isWaitingForDrainToComplete = true;
          }
 
         _updateCurrentMemberStateFromTopologyCoordinator_inlock();
@@ -1570,6 +1604,7 @@ namespace {
              // triggered by incoming heartbeats, but with a one-node set there are no
              // heartbeats.
              _topCoord->processWinElection(OID::gen(), getNextGlobalOptime());
+             _isWaitingForDrainToComplete = true;
          }
 
          MemberState previousState = _currentState;

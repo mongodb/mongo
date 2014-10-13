@@ -1,5 +1,3 @@
-// record_data.h
-
 /**
  *    Copyright (C) 2014 MongoDB Inc.
  *
@@ -30,42 +28,29 @@
 
 #pragma once
 
-#include <boost/shared_array.hpp>
+#include <boost/scoped_ptr.hpp>
 
-#include "mongo/bson/bsonobj.h"
+#include "mongo/db/operation_context_noop.h"
 
 namespace mongo {
 
+    class Locker;
+
+namespace repl {
+
     /**
-     * A replacement for the Record class. This class represents data in a record store.
-     * The _dataPtr attribute is used to manage memory ownership. If _dataPtr is NULL, then
-     * the memory pointed to by _data is owned by the RecordStore. If _dataPtr is not NULL, then
-     * it must point to the same array as _data.
+     * Mock implementation of OperationContext that can be used with real instances of LockManager.
      */
-    class RecordData {
+    class OperationContextReplMock : public OperationContextNoop {
     public:
-        RecordData() : _data( NULL ), _size( 0 ) {}
-        RecordData(const char* data, int size): _data(data), _size(size), _dataPtr() { }
+        OperationContextReplMock();
+        virtual ~OperationContextReplMock();
 
-        RecordData(const char* data, int size, const boost::shared_array<char>& dataPtr)
-            : _data(data), _size(size), _dataPtr(dataPtr) { }
-
-        const char* data() const { return _data; }
-
-        int size() const { return _size; }
-
-        /**
-         * Returns true if this owns its own memory, and false otherwise
-         */
-        bool isOwned() const { return _dataPtr.get(); }
-
-        // TODO eliminate double-copying
-        BSONObj toBson() const { return isOwned() ? BSONObj(_data).getOwned() : BSONObj(_data); }
+        virtual Locker* lockState() const { return _lockState.get(); }
 
     private:
-        const char* _data;
-        int _size;
-        boost::shared_array<char> _dataPtr;
+        boost::scoped_ptr<Locker> _lockState;
     };
 
-} // namespace mongo
+}  // namespace repl
+}  // namespace mongo

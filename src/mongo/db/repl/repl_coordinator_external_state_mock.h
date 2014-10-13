@@ -64,6 +64,7 @@ namespace repl {
         virtual ReplicationCoordinatorExternalState::GlobalSharedLockAcquirer*
                 getGlobalSharedLockAcquirer();
         virtual OperationContext* createOperationContext();
+        virtual void dropAllTempCollections(OperationContext* txn);
 
         /**
          * Adds "host" to the list of hosts that this mock will match when responding to "isSelf"

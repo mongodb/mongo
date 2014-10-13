@@ -1,5 +1,3 @@
-// record_data.h
-
 /**
  *    Copyright (C) 2014 MongoDB Inc.
  *
@@ -28,44 +26,18 @@
  *    it in the license file.
  */
 
-#pragma once
+#include "mongo/platform/basic.h"
 
-#include <boost/shared_array.hpp>
+#include "mongo/db/repl/operation_context_repl_mock.h"
 
-#include "mongo/bson/bsonobj.h"
+#include "mongo/db/concurrency/lock_state.h"
+#include "mongo/db/concurrency/locker.h"
 
 namespace mongo {
+namespace repl {
 
-    /**
-     * A replacement for the Record class. This class represents data in a record store.
-     * The _dataPtr attribute is used to manage memory ownership. If _dataPtr is NULL, then
-     * the memory pointed to by _data is owned by the RecordStore. If _dataPtr is not NULL, then
-     * it must point to the same array as _data.
-     */
-    class RecordData {
-    public:
-        RecordData() : _data( NULL ), _size( 0 ) {}
-        RecordData(const char* data, int size): _data(data), _size(size), _dataPtr() { }
+    OperationContextReplMock::OperationContextReplMock() : _lockState(new LockerImpl<true>) {}
+    OperationContextReplMock::~OperationContextReplMock() {}
 
-        RecordData(const char* data, int size, const boost::shared_array<char>& dataPtr)
-            : _data(data), _size(size), _dataPtr(dataPtr) { }
-
-        const char* data() const { return _data; }
-
-        int size() const { return _size; }
-
-        /**
-         * Returns true if this owns its own memory, and false otherwise
-         */
-        bool isOwned() const { return _dataPtr.get(); }
-
-        // TODO eliminate double-copying
-        BSONObj toBson() const { return isOwned() ? BSONObj(_data).getOwned() : BSONObj(_data); }
-
-    private:
-        const char* _data;
-        int _size;
-        boost::shared_array<char> _dataPtr;
-    };
-
-} // namespace mongo
+}  // namespace repl
+}  // namespace mongo
