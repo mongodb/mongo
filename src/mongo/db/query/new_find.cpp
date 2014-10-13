@@ -763,20 +763,20 @@ namespace mongo {
         const logger::LogComponent queryLogComponent = logger::LogComponent::kQuery;
         const logger::LogSeverity logLevelOne = logger::LogSeverity::Debug(1);
 
+        PlanSummaryStats summaryStats;
+        Explain::getSummaryStats(exec.get(), &summaryStats);
+
+        curop.debug().ntoskip = pq.getSkip();
+        curop.debug().nreturned = numResults;
+        curop.debug().scanAndOrder = summaryStats.hasSortStage;
+        curop.debug().nscanned = summaryStats.totalKeysExamined;
+        curop.debug().nscannedObjects = summaryStats.totalDocsExamined;
+        curop.debug().idhack = summaryStats.isIdhack;
+
         // Set debug information for consumption by the profiler.
         if (dbProfilingLevel > 0 ||
             curop.elapsedMillis() > serverGlobalParams.slowMS ||
             logger::globalLogDomain()->shouldLog(queryLogComponent, logLevelOne)) {
-            PlanSummaryStats newStats;
-            Explain::getSummaryStats(exec.get(), &newStats);
-
-            curop.debug().ntoskip = pq.getSkip();
-            curop.debug().nreturned = numResults;
-            curop.debug().scanAndOrder = newStats.hasSortStage;
-            curop.debug().nscanned = newStats.totalKeysExamined;
-            curop.debug().nscannedObjects = newStats.totalDocsExamined;
-            curop.debug().idhack = newStats.isIdhack;
-
             // Get BSON stats.
             scoped_ptr<PlanStageStats> execStats(exec->getStats());
             BSONObjBuilder statsBob;
