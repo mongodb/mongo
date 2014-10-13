@@ -1444,10 +1444,6 @@ namespace {
 
         boost::unique_lock<boost::mutex> lk(_mutex);
 
-        if (!_settings.usingReplSets()) {
-            return Status(ErrorCodes::NoReplicationEnabled, "server is not running with --replSet");
-        }
-
         while (_rsConfigState == kConfigPreStart || _rsConfigState == kConfigStartingUp) {
             _rsConfigStateChange.wait(lk);
         }

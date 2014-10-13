@@ -724,21 +724,6 @@ namespace {
                                                                 const ReplSetReconfigArgs& args,
                                                                 BSONObjBuilder* resultObj) {
 
-        if( args.force && !theReplSet ) {
-            _settings.reconfig = args.newConfigObj.getOwned();
-            resultObj->append("msg",
-                              "will try this config momentarily, try running rs.conf() again in a "
-                                      "few seconds");
-            return Status::OK();
-        }
-
-        // TODO(dannenberg) once reconfig processing has been figured out in the impl, this should
-        // be moved out of processReplSetReconfig and into the command body like all other cmds
-        Status status = checkReplEnabledForCommand(resultObj);
-        if (!status.isOK()) {
-            return status;
-        }
-
         if( !args.force && !theReplSet->box.getState().primary() ) {
             return Status(ErrorCodes::NotMaster,
                           "replSetReconfig command must be sent to the current replica set "

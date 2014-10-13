@@ -50,18 +50,6 @@ namespace {
     typedef ReplicationCoordinator::ReplSetReconfigArgs ReplSetReconfigArgs;
     typedef ReplicationExecutor::RemoteCommandRequest RemoteCommandRequest;
 
-    TEST_F(ReplCoordTest, ReconfigWhileNotReplSet) {
-        // start up with settings.replSet empty
-        OperationContextNoop txn;
-        init("");
-        BSONObjBuilder result;
-        ReplSetReconfigArgs args;
-
-        ASSERT_EQUALS(ErrorCodes::NoReplicationEnabled,
-                      getReplCoord()->processReplSetReconfig(&txn, args, &result));
-        ASSERT_TRUE(result.obj().isEmpty());
-    }
-
     TEST_F(ReplCoordTest, ReconfigBeforeInitialized) {
         // start up but do not initiate
         OperationContextNoop txn;
