@@ -625,19 +625,18 @@ namespace {
 
     bool ReplicationCoordinatorImpl::_haveNumNodesReachedOpTime_inlock(const OpTime& opTime, 
                                                                        int numNodes) {
+        if (_getLastOpApplied_inlock() < opTime) {
+            // Secondaries that are for some reason ahead of us should not allow us to
+            // satisfy a write concern if we aren't caught up ourselves.
+            return false;
+        }
+
         for (SlaveInfoMap::iterator it = _slaveInfoMap.begin();
                 it != _slaveInfoMap.end(); ++it) {
 
             const OpTime& slaveTime = it->second.opTime;
             if (slaveTime >= opTime) {
                 --numNodes;
-            }
-            else {
-                if (_getLastOpApplied_inlock() < opTime) {
-                    // Secondaries that are for some reason ahead of us should not allow us to
-                    // satisfy a write concern if we aren't caught up ourselves.
-                    return false;
-                }
             }
 
             if (numNodes <= 0) {

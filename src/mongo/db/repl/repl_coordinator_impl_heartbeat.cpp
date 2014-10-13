@@ -262,7 +262,7 @@ namespace {
     }
 
     void ReplicationCoordinatorImpl::_heartbeatStepDownStart() {
-        log() << "Stepping down from primary in repsonse to heartbeat";
+        log() << "Stepping down from primary in response to heartbeat";
         _replExecutor.scheduleWorkWithGlobalExclusiveLock(
                 stdx::bind(&ReplicationCoordinatorImpl::_heartbeatStepDownFinish,
                            this,
