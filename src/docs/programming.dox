@@ -27,10 +27,11 @@ each of which is ordered by one or more columns.
 - @subpage namespace
 - @subpage signals
 
-<h2>Advanced features</h2>
+<h2>Advanced topics</h2>
 - @subpage checkpoint
 - @subpage durability
 - @subpage backup
+- @subpage upgrade
 - @subpage async
 - @subpage compact
 - @subpage statistics

@@ -1,0 +1,41 @@
+/*! @page upgrade Upgrading WiredTiger databases
+
+There are two parts to upgrading WiredTiger installations, upgrading the
+application itself and upgrading the underlying files used in the
+database.
+
+As part of each WiredTiger release, a new @ref upgrading documentation
+section is created for the release, describing changes in the behavior
+of the WiredTiger library as well as any changes to the WiredTiger API
+or the format of the underlying database files that are not backward
+compatible.
+
+Changes to the format of the underlying files are rare, changes in the
+WiredTiger API and the behavior of the WiredTiger library are far more
+common.
+
+To upgrade a WiredTiger application and database, review the information
+for each release since the WiredTiger release you're currently using and
+the release to which you're upgrading. You do not need to upgrade to
+each new release separately, you can skip intermediate releases and
+upgrade directly to the final release you plan to use.
+
+Changes to the WiredTiger API are usually backward compatible, that is,
+you can continue to use the same configuration strings used previously
+(although it will likely enhance program readability to switch to the
+new version of the configuration string).
+
+In some cases, application APIs or logic will have to change. If at all
+possible, we make such changes compile-time errors so it's not possible
+to miss a required change.
+
+If the underlying file formats change in ways that are not backward
+compatible, or if the upgrade is sufficiently complicated or lengthy
+that a separate upgrade step makes the most sense, files must be
+upgraded using the WT_SESSION::upgrade method. This method can be called
+for any WiredTiger object. The WT_SESSION::upgrade method returns
+immediately if there is no upgrade work to be done, so it can be called
+whenever an object is about to be used in applications that want to
+upgrade automatically.
+
+*/
