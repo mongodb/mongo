@@ -50,6 +50,7 @@ namespace mongo {
         PlanSummaryStats() : nReturned(0),
                              totalKeysExamined(0),
                              totalDocsExamined(0),
+                             executionTimeMillis(0),
                              isIdhack(false),
                              hasSortStage(false),
                              summaryStr("") { }
