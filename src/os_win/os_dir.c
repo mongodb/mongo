@@ -18,6 +18,7 @@ __wt_dirlist(WT_SESSION_IMPL *session, const char *dir, const char *prefix,
 {
 	WT_DECL_RET;
 	WIN32_FIND_DATA finddata;
+	WT_DECL_ITEM(pathbuf);
 	HANDLE findhandle = INVALID_HANDLE_VALUE;
 	size_t dirallocsz;
 	u_int count, dirsz;
@@ -36,6 +37,9 @@ __wt_dirlist(WT_SESSION_IMPL *session, const char *dir, const char *prefix,
 		path[pathlen - 1] = '\0';
 	}
 
+	WT_ERR(__wt_scr_alloc(session, 0, &pathbuf));
+	WT_ERR(__wt_buf_fmt(session, pathbuf, "%s\\*", path));
+
 	dirallocsz = 0;
 	dirsz = 0;
 	entries = NULL;
@@ -44,13 +48,14 @@ __wt_dirlist(WT_SESSION_IMPL *session, const char *dir, const char *prefix,
 
 	WT_ERR(__wt_verbose(session, WT_VERB_FILEOPS,
 	    "wt_dirlist of %s %s prefix %s",
-	    path, LF_ISSET(WT_DIRLIST_INCLUDE) ? "include" : "exclude",
+	    pathbuf->data, LF_ISSET(WT_DIRLIST_INCLUDE) ? "include" : "exclude",
 	    prefix == NULL ? "all" : prefix));
 
-	findhandle = FindFirstFile(path, &finddata);
+	findhandle = FindFirstFile(pathbuf->data, &finddata);
 
 	if (INVALID_HANDLE_VALUE == findhandle)
-		WT_ERR_MSG(session, __wt_errno(), "%s: FindFirstFile", path);
+		WT_ERR_MSG(session, __wt_errno(), "%s: FindFirstFile",
+		    pathbuf->data);
 	else {
 		do {
 			/*
@@ -89,6 +94,7 @@ err:
 	if (findhandle != NULL)
 		(void)FindClose(findhandle);
 	__wt_free(session, path);
+	__wt_buf_free(session, pathbuf);
 
 	if (ret == 0)
 		return (0);
