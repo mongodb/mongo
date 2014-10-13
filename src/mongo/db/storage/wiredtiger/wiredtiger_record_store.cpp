@@ -180,6 +180,20 @@ namespace mongo {
         return _getData(curwrap);
     }
 
+    bool WiredTigerRecordStore::findRecord( OperationContext* txn,
+                                            const DiskLoc& loc, RecordData* out ) const {
+        WiredTigerCursor curwrap( _uri, _instanceId, txn);
+        WT_CURSOR *c = curwrap.get();
+        invariant( c );
+        c->set_key(c, _makeKey(loc));
+        int ret = c->search(c);
+        if ( ret == WT_NOTFOUND )
+            return false;
+        invariantWTOK(ret);
+        *out = _getData(curwrap);
+        return true;
+    }
+
     void WiredTigerRecordStore::deleteRecord( OperationContext* txn, const DiskLoc& loc ) {
         WiredTigerCursor cursor( _uri, _instanceId, txn );
         WT_CURSOR *c = cursor.get();
