@@ -56,6 +56,8 @@ namespace repl {
         static const std::string kVersionFieldName;
         static const std::string kMembersFieldName;
         static const std::string kSettingsFieldName;
+        static const std::string kMajorityWriteConcernModeName;
+        static const std::string kStepDownCheckWriteConcernModeName;
 
         static const size_t kMaxMembers = 12;
         static const size_t kMaxVotingMembers = 7;
@@ -223,6 +225,11 @@ namespace repl {
          * electing a primary (_majorityVoteCount).
          */
         void _calculateMajorities();
+
+        /**
+         * Adds internal write concern modes to the getLastErrorModes list.
+         */
+        void _addInternalWriteConcernModes();
 
         bool _isInitialized;
         long long _version;

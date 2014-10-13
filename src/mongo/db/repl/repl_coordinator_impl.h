@@ -369,14 +369,14 @@ namespace repl {
         /**
          * Helper for _doneWaitingForReplication_inlock that takes an integer write concern.
          */
-        bool _doneWaitingForReplication_numNodes_inlock(const OpTime& opTime, int numNodes);
+        bool _haveNumNodesReachedOpTime_inlock(const OpTime& opTime, int numNodes);
 
         /**
          * Helper for _doneWaitingForReplication_inlock that takes a tag pattern representing a
          * named write concern mode.
          */
-        bool _doneWaitingForReplication_gleMode_inlock(const OpTime& opTime,
-                                                       const ReplicaSetTagPattern& tagPattern);
+        bool _haveTaggedNodesReachedOpTime_inlock(const OpTime& opTime,
+                                                  const ReplicaSetTagPattern& tagPattern);
 
         Status _checkIfWriteConcernCanBeSatisfied_inlock(
                 const WriteConcernOptions& writeConcern) const;

@@ -58,6 +58,9 @@ namespace repl {
         static const std::string kArbiterOnlyFieldName;
         static const std::string kBuildIndexesFieldName;
         static const std::string kTagsFieldName;
+        static const std::string kInternalVoterTagName;
+        static const std::string kInternalElectableTagName;
+        static const std::string kInternalAllTagName;
 
         /**
          * Default constructor, produces a MemberConfig in an undefined state.
@@ -130,9 +133,15 @@ namespace repl {
         bool shouldBuildIndexes() const { return _buildIndexes; }
 
         /**
-         * Gets the number of replica set tags for this member.
+         * Gets the number of replica set tags, including internal '$' tags, for this member.
          */
         size_t getNumTags() const { return _tags.size(); }
+
+        /**
+         * Returns true if this MemberConfig has any non-internal tags, using "tagConfig" to
+         * determine the internal property of the tags.
+         */
+        bool hasTags(const ReplicaSetTagConfig& tagConfig) const;
 
         /**
          * Gets a begin iterator over the tags for this member.

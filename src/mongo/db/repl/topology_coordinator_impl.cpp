@@ -1355,11 +1355,16 @@ namespace {
         if (!selfConfig.shouldBuildIndexes()) {
             response->setShouldBuildIndexes(false);
         }
-        if (selfConfig.getNumTags()) {
-            const ReplicaSetTagConfig tagConfig = _currentConfig.getTagConfig();
+        const ReplicaSetTagConfig tagConfig = _currentConfig.getTagConfig();
+        if (selfConfig.hasTags(tagConfig)) {
             for (MemberConfig::TagIterator tag = selfConfig.tagsBegin();
                     tag != selfConfig.tagsEnd(); ++tag) {
-                response->addTag(tagConfig.getTagKey(*tag), tagConfig.getTagValue(*tag));
+                std::string tagKey = tagConfig.getTagKey(*tag);
+                if (tagKey[0] == '$') {
+                    // Filter out internal tags
+                    continue;
+                }
+                response->addTag(tagKey, tagConfig.getTagValue(*tag));
             }
         }
         response->setMe(selfConfig.getHostAndPort());
