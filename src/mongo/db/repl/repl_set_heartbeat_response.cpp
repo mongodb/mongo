@@ -71,6 +71,8 @@ namespace {
             _opTimeSet(false),
             _electableSet(false),
             _electable(false),
+            _hasDataSet(false),
+            _hasData(false),
             _mismatch(false),
             _isReplSet(false),
             _stateDisagreement(false),
