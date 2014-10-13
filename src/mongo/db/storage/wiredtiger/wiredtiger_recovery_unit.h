@@ -72,6 +72,7 @@ namespace mongo {
         WiredTigerSessionCache* getSessionCache() { return _sessionCache; }
 
         bool everStartedWrite() const { return _everStartedWrite; }
+        int depth() const { return _depth; }
 
         void restartTransaction();
 
