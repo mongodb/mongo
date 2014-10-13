@@ -262,6 +262,10 @@ functions:
           args: ${coverage_args} ${args} ${build_tags}
           environment_variables:
             - ${library_path}
+        - dir: src/github.com/mongodb/mongo-tools/mongofiles
+          args: ${coverage_args} ${args} ${build_tags}
+          environment_variables:
+            - ${library_path}
 
   "setup credentials" :
     command: shell.exec
