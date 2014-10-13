@@ -14,9 +14,7 @@ env.Library(
     LIBDEPS=[
         '$BUILD_DIR/mongo/base/base',
         '$BUILD_DIR/mongo/foundation',
-        '$BUILD_DIR/mongo/global_environment_experiment',
-        '$BUILD_DIR/mongo/mongocommon',
-        '$BUILD_DIR/mongo/server_parameters',
+        '$BUILD_DIR/mongo/spin_lock',
         '$BUILD_DIR/third_party/shim_boost',
     ],
 )
