@@ -53,7 +53,7 @@ struct __wt_fh {
 #else
 	HANDLE filehandle;			/* Windows file handle */
 	HANDLE filehandle_secondary;		/* Windows file handle
-						   for truncation */
+						   for file size changes */
 #endif
 	wt_off_t size;				/* File size */
 	wt_off_t extend_size;			/* File extended size */

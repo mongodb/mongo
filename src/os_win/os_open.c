@@ -27,15 +27,13 @@ int
 __wt_open(WT_SESSION_IMPL *session,
     const char *name, int ok_create, int exclusive, int dio_type, WT_FH **fhp)
 {
+	DWORD dwCreationDisposition;
+	HANDLE filehandle, filehandle_secondary;
 	WT_CONNECTION_IMPL *conn;
 	WT_DECL_RET;
 	WT_FH *fh, *tfh;
-	int direct_io, f, matched;
-	int share_mode;
-	DWORD dwCreationDisposition;
+	int direct_io, f, matched, share_mode;
 	char *path;
-	HANDLE filehandle;
-	HANDLE filehandle_secondary;
 
 	conn = S2C(session);
 	fh = NULL;

@@ -17,15 +17,8 @@ __wt_fallocate_config(WT_SESSION_IMPL *session, WT_FH *fh)
 	fh->fallocate_available = 1;
 
 	/*
-	 * Microsoft documentation says:
-	 *
-	 *      The SetEndOfFile function can be used to truncate or extend a
-	 * file. If the file is extended, the contents of the file between the
-	 * old end of the file and the new end of the file are not defined.
-	 *
-	 * I'm reading that to imply that Windows does not overwrite the file
-	 * contents in any way, and so there's no requirement we lock writers
-	 * out of the file when extending it.
+	 * We use a separate handle for file size changes, so there's no need
+	 * for locking.
 	 */
 	fh->fallocate_requires_locking = 0;
 }
