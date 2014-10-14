@@ -8,18 +8,6 @@
 #include "wt_internal.h"
 
 /*
- * __open_directory_sync --
- *	Fsync the directory in which we created the file.
- */
-static int
-__open_directory_sync(WT_SESSION_IMPL *session, char *path)
-{
-	WT_UNUSED(session);
-	WT_UNUSED(path);
-	return (0);
-}
-
-/*
  * __wt_open --
  *	Open a file handle.
  */
@@ -135,9 +123,6 @@ __wt_open(WT_SESSION_IMPL *session,
 	    NULL);
 	WT_ERR_MSG(session, __wt_errno(),
 	    "open failed for secondary handle: %s", path);
-
-	if (F_ISSET(conn, WT_CONN_CKPT_SYNC))
-		WT_ERR(__open_directory_sync(session, path));
 
 	WT_ERR(__wt_calloc(session, 1, sizeof(WT_FH), &fh));
 	WT_ERR(__wt_strdup(session, name, &fh->name));
