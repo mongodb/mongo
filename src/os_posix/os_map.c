@@ -33,11 +33,6 @@ __wt_mmap(WT_SESSION_IMPL *session, WT_FH *fh, void *mapp, size_t *lenp,
 		    fh->name, (uintmax_t)fh->size);
 	}
 
-	/* Ftruncate and mapped memory aren't compatible, lock. */
-	__wt_spin_lock(session, &fh->lock);
-	++fh->ref_mapped;
-	__wt_spin_unlock(session, &fh->lock);
-
 	*(void **)mapp = map;
 	*lenp = (size_t)fh->size;
 	return (0);
@@ -121,11 +116,6 @@ __wt_munmap(WT_SESSION_IMPL *session, WT_FH *fh, void *map, size_t len,
 	WT_UNUSED(mappingcookie);
 	WT_RET(__wt_verbose(session, WT_VERB_FILEOPS,
 	    "%s: unmap %" PRIuMAX " bytes", fh->name, (uintmax_t)len));
-
-	/* Ftruncate and mapped memory aren't compatible, lock. */
-	__wt_spin_lock(session, &fh->lock);
-	--fh->ref_mapped;
-	__wt_spin_unlock(session, &fh->lock);
 
 	if (munmap(map, len) == 0)
 		return (0);

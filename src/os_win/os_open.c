@@ -8,18 +8,6 @@
 #include "wt_internal.h"
 
 /*
- * __open_directory_sync --
- *	Fsync the directory in which we created the file.
- */
-static int
-__open_directory_sync(WT_SESSION_IMPL *session, char *path)
-{
-	WT_UNUSED(session);
-	WT_UNUSED(path);
-	return (0);
-}
-
-/*
  * __wt_open --
  *	Open a file handle.
  */
@@ -27,19 +15,19 @@ int
 __wt_open(WT_SESSION_IMPL *session,
     const char *name, int ok_create, int exclusive, int dio_type, WT_FH **fhp)
 {
+	DWORD dwCreationDisposition;
+	HANDLE filehandle, filehandle_secondary;
 	WT_CONNECTION_IMPL *conn;
 	WT_DECL_RET;
 	WT_FH *fh, *tfh;
-	int direct_io, f, matched;
-	int share_mode;
-	DWORD dwCreationDisposition;
+	int direct_io, f, matched, share_mode;
 	char *path;
-	HANDLE filehandle;
 
 	conn = S2C(session);
 	fh = NULL;
 	path = NULL;
 	filehandle = INVALID_HANDLE_VALUE;
+	filehandle_secondary = INVALID_HANDLE_VALUE;
 
 	WT_RET(__wt_verbose(session, WT_VERB_FILEOPS, "%s: open", name));
 
@@ -121,12 +109,25 @@ __wt_open(WT_SESSION_IMPL *session,
 			    "%s", path);
 	}
 
-	if (F_ISSET(conn, WT_CONN_CKPT_SYNC))
-		WT_ERR(__open_directory_sync(session, path));
+	/*
+	 * Open a second handle to file to support allocation/truncation
+	 * concurrently with reads on the file. Writes would also move the file
+	 * pointer.
+	 */
+	filehandle_secondary = CreateFile(path,
+	    (GENERIC_READ | GENERIC_WRITE),
+	    share_mode,
+	    NULL,
+	    OPEN_EXISTING,
+	    f,
+	    NULL);
+	WT_ERR_MSG(session, __wt_errno(),
+	    "open failed for secondary handle: %s", path);
 
 	WT_ERR(__wt_calloc(session, 1, sizeof(WT_FH), &fh));
 	WT_ERR(__wt_strdup(session, name, &fh->name));
 	fh->filehandle = filehandle;
+	fh->filehandle_secondary = filehandle_secondary;
 	fh->ref = 1;
 	fh->direct_io = direct_io;
 
@@ -137,6 +138,9 @@ __wt_open(WT_SESSION_IMPL *session,
 	if (dio_type == WT_FILE_TYPE_DATA ||
 	    dio_type == WT_FILE_TYPE_CHECKPOINT)
 		fh->extend_len = conn->data_extend_len;
+
+	/* Configure fallocate/posix_fallocate calls. */
+	__wt_fallocate_config(session, fh);
 
 	/*
 	 * Repeat the check for a match, but then link onto the database's list
@@ -165,6 +169,8 @@ err:		if (fh != NULL) {
 		}
 		if (filehandle != INVALID_HANDLE_VALUE)
 			(void)CloseHandle(filehandle);
+		if (filehandle_secondary != INVALID_HANDLE_VALUE)
+			(void)CloseHandle(filehandle_secondary);
 	}
 
 	__wt_free(session, path);
@@ -197,6 +203,11 @@ __wt_close(WT_SESSION_IMPL *session, WT_FH *fh)
 
 	/* Discard the memory. */
 	if (!CloseHandle(fh->filehandle) != 0) {
+		ret = __wt_errno();
+		__wt_err(session, ret, "%s", fh->name);
+	}
+
+	if (!CloseHandle(fh->filehandle_secondary) != 0) {
 		ret = __wt_errno();
 		__wt_err(session, ret, "%s", fh->name);
 	}

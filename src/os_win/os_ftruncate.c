@@ -21,13 +21,14 @@ __wt_ftruncate(WT_SESSION_IMPL *session, WT_FH *fh, wt_off_t len)
 	largeint.QuadPart = len;
 
 	if ((ret = SetFilePointerEx(
-	    fh->filehandle, largeint, NULL, FILE_BEGIN)) == FALSE)
+	    fh->filehandle_secondary, largeint, NULL, FILE_BEGIN)) == FALSE)
 		WT_RET_MSG(session, __wt_errno(), "%s SetFilePointerEx error",
 		    fh->name);
 
-	ret = SetEndOfFile(fh->filehandle);
+	ret = SetEndOfFile(fh->filehandle_secondary);
 	if (ret != FALSE) {
 		fh->size = fh->extend_size = len;
+		return (0);
 	}
 
 	lasterror = GetLastError();
@@ -35,5 +36,5 @@ __wt_ftruncate(WT_SESSION_IMPL *session, WT_FH *fh, wt_off_t len)
 	if (lasterror = ERROR_USER_MAPPED_FILE)
 		return (EBUSY);
 
-	WT_RET_MSG(session, lasterror, "%s SetEndofFile error", fh->name);
+	WT_RET_MSG(session, lasterror, "%s SetEndOfFile error", fh->name);
 }

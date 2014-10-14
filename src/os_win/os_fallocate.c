@@ -8,6 +8,22 @@
 #include "wt_internal.h"
 
 /*
+ * __wt_fallocate_config --
+ *	Configure fallocate behavior for a file handle.
+ */
+void
+__wt_fallocate_config(WT_SESSION_IMPL *session, WT_FH *fh)
+{
+	fh->fallocate_available = 1;
+
+	/*
+	 * We use a separate handle for file size changes, so there's no need
+	 * for locking.
+	 */
+	fh->fallocate_requires_locking = 0;
+}
+
+/*
  * __wt_fallocate --
  *	Allocate space for a file handle.
  */
@@ -24,14 +40,14 @@ __wt_fallocate(
 	largeint.QuadPart = offset + len;
 
 	if ((ret = SetFilePointerEx(
-	    fh->filehandle, largeint, NULL, FILE_BEGIN)) == FALSE)
+	    fh->filehandle_secondary, largeint, NULL, FILE_BEGIN)) == FALSE)
 		WT_RET_MSG(session,
 		    __wt_errno(), "%s SetFilePointerEx error", fh->name);
 
-	if ((ret = SetEndOfFile(fh->filehandle)) != FALSE) {
+	if ((ret = SetEndOfFile(fh->filehandle_secondary)) != FALSE) {
 		fh->size = fh->extend_size = len;
 		return (0);
 	}
 
-	WT_RET_MSG(session, __wt_errno(), "%s SetEndofFile error", fh->name);
+	WT_RET_MSG(session, __wt_errno(), "%s SetEndOfFile error", fh->name);
 }

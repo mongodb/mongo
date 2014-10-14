@@ -12,11 +12,7 @@ extern "C" {
 /*******************************************
  * WiredTiger public include file, and configuration control.
  *******************************************/
-#ifndef _WIN32
 #include "wiredtiger_config.h"
-#else
-#include "os_win_wiredtiger_config.h"
-#endif
 #include "wiredtiger_ext.h"
 
 /*******************************************
