@@ -173,9 +173,8 @@ namespace {
 
             if (responseStatus.isOK()) {
                 ReplSetHeartbeatResponse hb;
-                hb.initialize(BSON("ok" << 1 <<
-                                   "v" << 1 <<
-                                   "state" << memberState.s));
+                hb.setVersion(1);
+                hb.setState(memberState);
                 hb.setOpTime(lastOpTimeSender);
                 hb.setElectionTime(electionTime);
                 hbResponse = StatusWith<ReplSetHeartbeatResponse>(hb);
@@ -485,7 +484,7 @@ namespace {
 
         // Mark nodes down, ensure that we have no source and are secondary
         receiveDownHeartbeat(HostAndPort("h2"), "rs0", OpTime(), ErrorCodes::NetworkTimeout);
-        receiveDownHeartbeat( HostAndPort("h3"), "rs0", OpTime(), ErrorCodes::NetworkTimeout);
+        receiveDownHeartbeat(HostAndPort("h3"), "rs0", OpTime(), ErrorCodes::NetworkTimeout);
         ASSERT_TRUE(getTopoCoord().chooseNewSyncSource(now()++, OpTime(0,0)).empty());
         ASSERT_EQUALS(MemberState::RS_SECONDARY, getTopoCoord().getMemberState().s);
 
