@@ -128,7 +128,7 @@ namespace mongo {
         IdentColumnFamilyMap _identColumnFamilyMap;
 
         static const std::string kOrderingPrefix;
-        static const Slice kCollectionPrefix;
+        static const std::string kCollectionPrefix;
     };
 
     Status toMongoStatus( rocksdb::Status s );
