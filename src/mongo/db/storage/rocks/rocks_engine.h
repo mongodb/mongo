@@ -126,6 +126,9 @@ namespace mongo {
         mutable boost::mutex _identColumnFamilyMapMutex;
         typedef StringMap<boost::shared_ptr<rocksdb::ColumnFamilyHandle> > IdentColumnFamilyMap;
         IdentColumnFamilyMap _identColumnFamilyMap;
+
+        static const std::string kOrderingPrefix;
+        static const Slice kCollectionPrefix;
     };
 
     Status toMongoStatus( rocksdb::Status s );

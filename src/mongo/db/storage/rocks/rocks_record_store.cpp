@@ -497,7 +497,6 @@ namespace mongo {
         rocksdb::Slice value;
 
         RocksRecoveryUnit* ru = RocksRecoveryUnit::getRocksRecoveryUnit(txn);
-        auto key = _makeKey(loc);
         boost::shared_array<char> data;
 
         std::string value_storage;
