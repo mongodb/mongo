@@ -156,7 +156,7 @@ functions:
         set -o verbose
         if [ "${coverage}" = "true" ]; then
           mv ${package}/coverage.out . 
-        fi;
+        fi
 
   "run unit test":
     command: shell.exec 
@@ -164,9 +164,9 @@ functions:
       working_dir: src
       script: |
         . ./set_gopath.sh
-        if [ "${library_path}" != "" ] then
+        if [ "${library_path}" != "" ]; then
             export ${library_path}
-        fi;
+        fi
         export MONGODB_KERBEROS_PASSWORD=${kerberos_password}
         go test ${coverage_args} ${args} ${build_tags}
 
