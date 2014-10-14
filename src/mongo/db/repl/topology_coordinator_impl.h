@@ -132,6 +132,7 @@ namespace repl {
         virtual void blacklistSyncSource(const HostAndPort& host, Date_t until);
         virtual void clearSyncSourceBlacklist();
         virtual bool shouldChangeSyncSource(const HostAndPort& currentSource) const;
+        virtual bool becomeCandidateIfStepdownPeriodOverAndSingleNodeSet(Date_t now);
         virtual void setStepDownTime(Date_t newTime);
         virtual void setFollowerMode(MemberState::MS newMode);
         virtual void adjustMaintenanceCountBy(int inc);

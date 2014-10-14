@@ -137,6 +137,13 @@ namespace repl {
         virtual bool shouldChangeSyncSource(const HostAndPort& currentSource) const = 0;
 
         /**
+         * Checks whether we are a single node set and we are not in a stepdown period.  If so,
+         * puts us into candidate mode, otherwise does nothing.  This is used to ensure that
+         * nodes in a single node replset become primary again when their stepdown period ends.
+         */
+        virtual bool becomeCandidateIfStepdownPeriodOverAndSingleNodeSet(Date_t now) = 0;
+
+        /**
          * Sets the earliest time the current node will stand for election to "newTime".
          *
          * Does not affect the node's state or the process of any elections in flight.

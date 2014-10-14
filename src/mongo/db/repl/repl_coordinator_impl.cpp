@@ -885,6 +885,12 @@ namespace {
 
         _topCoord->setStepDownTime(stepdownUntil);
         _topCoord->stepDown();
+        // Schedule work to (potentially) step back up once the stepdown period has ended.
+        _replExecutor.scheduleWorkAt(stepdownUntil,
+                                     stdx::bind(&ReplicationCoordinatorImpl::_handleTimePassing,
+                                                this,
+                                                stdx::placeholders::_1));
+
         boost::unique_lock<boost::mutex> lk(_mutex);
         _updateCurrentMemberStateFromTopologyCoordinator_inlock();
         // Wake up any threads blocked in awaitReplication
@@ -898,6 +904,21 @@ namespace {
         _externalState->closeConnections();
         _externalState->clearShardingState();
         *result = Status::OK();
+    }
+
+    void ReplicationCoordinatorImpl::_handleTimePassing(
+            const ReplicationExecutor::CallbackData& cbData) {
+        if (!cbData.status.isOK()) {
+            return;
+        }
+
+        if (_topCoord->becomeCandidateIfStepdownPeriodOverAndSingleNodeSet(_replExecutor.now())) {
+            _topCoord->processWinElection(OID::gen(), getNextGlobalOptime());
+            _isWaitingForDrainToComplete = true;
+
+            boost::lock_guard<boost::mutex> lock(_mutex);
+            _updateCurrentMemberStateFromTopologyCoordinator_inlock();
+        }
     }
 
     bool ReplicationCoordinatorImpl::isMasterForReportingPurposes() {
@@ -1648,6 +1669,8 @@ namespace {
             const ReplicaSetConfig& newConfig,
             int myIndex) {
          invariant(_settings.usingReplSets());
+         const MemberState previousState = _currentState;
+
          _cancelHeartbeats();
          _setConfigState_inlock(kConfigSteady);
          _rsConfig = newConfig;
@@ -1667,7 +1690,6 @@ namespace {
              _isWaitingForDrainToComplete = true;
          }
 
-         MemberState previousState = _currentState;
          _updateCurrentMemberStateFromTopologyCoordinator_inlock();
          if (_currentState.removed() || (previousState.primary() && !_currentState.primary())) {
              // Close connections on stepdown or when removed from the replica set.

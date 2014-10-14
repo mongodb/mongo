@@ -1405,6 +1405,24 @@ namespace {
         }
     }
 
+    bool TopologyCoordinatorImpl::becomeCandidateIfStepdownPeriodOverAndSingleNodeSet(Date_t now) {
+        if (_stepDownUntil > now) {
+            return false;
+        }
+
+        if (_followerMode == MemberState::RS_SECONDARY &&
+                _currentConfig.getNumMembers() == 1 &&
+                _selfIndex == 0 &&
+                _currentConfig.getMemberAt(_selfIndex).isElectable()) {
+            // If the new config describes a one-node replica set, we're the one member,
+            // we're electable, and we are currently in followerMode SECONDARY,
+            // we must transition to candidate, in leiu of heartbeats.
+            _role = Role::candidate;
+            return true;
+        }
+        return false;
+    }
+
     void TopologyCoordinatorImpl::setStepDownTime(Date_t newTime) {
         invariant(newTime > _stepDownUntil);
         _stepDownUntil = newTime;
