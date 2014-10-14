@@ -145,8 +145,6 @@ namespace repl {
 
         /**
          * Sets the earliest time the current node will stand for election to "newTime".
-         *
-         * Does not affect the node's state or the process of any elections in flight.
          */
         virtual void setStepDownTime(Date_t newTime) = 0;
 

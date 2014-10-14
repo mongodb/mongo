@@ -160,7 +160,7 @@ namespace {
                                                         _freshnessChecker->shouldAbortElection();
 
         // need to not sleep after last time sleeping,
-        switch(abortReason) {
+        switch (abortReason) {
             case FreshnessChecker::None:
                 break;
             case FreshnessChecker::FreshnessTie:
