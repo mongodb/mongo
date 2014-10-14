@@ -607,8 +607,7 @@ namespace mongo {
             bb.skip(sizeof(QueryResult::Value));
 
             BSONObjBuilder explainBob;
-            Status explainStatus = Explain::explainStages(txn,
-                                                          exec.get(),
+            Status explainStatus = Explain::explainStages(exec.get(),
                                                           ExplainCommon::EXEC_ALL_PLANS,
                                                           &explainBob);
             if (!explainStatus.isOK()) {

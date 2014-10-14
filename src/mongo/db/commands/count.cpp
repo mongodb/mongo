@@ -91,7 +91,7 @@ namespace mongo {
             scoped_ptr<PlanExecutor> exec(rawExec);
             exec->setYieldPolicy(PlanExecutor::YIELD_AUTO);
 
-            return Explain::explainStages(txn, exec.get(), verbosity, out);
+            return Explain::explainStages(exec.get(), verbosity, out);
         }
 
         virtual bool run(OperationContext* txn,

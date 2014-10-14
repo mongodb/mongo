@@ -223,7 +223,7 @@ namespace mongo {
             PlanExecutor* exec = updateExecutor.getPlanExecutor();
 
             // Explain the plan tree.
-            return Explain::explainStages( txn, exec, verbosity, out );
+            return Explain::explainStages( exec, verbosity, out );
         }
         else {
             invariant( BatchedCommandRequest::BatchType_Delete == _writeType );
@@ -258,7 +258,7 @@ namespace mongo {
             PlanExecutor* exec = deleteExecutor.getPlanExecutor();
 
             // Explain the plan tree.
-            return Explain::explainStages( txn, exec, verbosity, out );
+            return Explain::explainStages( exec, verbosity, out );
         }
     }
 

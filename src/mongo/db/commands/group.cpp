@@ -200,7 +200,7 @@ namespace mongo {
         scoped_ptr<PlanExecutor> planExecutor(rawPlanExecutor);
         planExecutor->setYieldPolicy(PlanExecutor::YIELD_AUTO);
 
-        return Explain::explainStages(txn, planExecutor.get(), verbosity, out);
+        return Explain::explainStages(planExecutor.get(), verbosity, out);
     }
 
 }  // namespace mongo

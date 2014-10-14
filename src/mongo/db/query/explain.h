@@ -94,8 +94,7 @@ namespace mongo {
          *
          * Does not take ownership of its arguments.
          */
-        static Status explainStages(OperationContext* opCtx,
-                                    PlanExecutor* exec,
+        static Status explainStages(PlanExecutor* exec,
                                     ExplainCommon::Verbosity verbosity,
                                     BSONObjBuilder* out);
 

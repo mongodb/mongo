@@ -114,7 +114,7 @@ namespace mongo {
         exec->setYieldPolicy(PlanExecutor::YIELD_AUTO);
 
         // Got the execution tree. Explain it.
-        return Explain::explainStages(txn, exec.get(), verbosity, out);
+        return Explain::explainStages(exec.get(), verbosity, out);
     }
 
     bool FindCmd::run(OperationContext* txn,

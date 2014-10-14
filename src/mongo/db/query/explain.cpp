@@ -535,8 +535,7 @@ namespace mongo {
     }
 
     // static
-    Status Explain::explainStages(OperationContext* opCtx,
-                                  PlanExecutor* exec,
+    Status Explain::explainStages(PlanExecutor* exec,
                                   ExplainCommon::Verbosity verbosity,
                                   BSONObjBuilder* out) {
         //
@@ -588,6 +587,7 @@ namespace mongo {
             BSONObjBuilder execBob(out->subobjStart("executionStats"));
 
             // Generate exec stats BSON for the winning plan.
+            OperationContext* opCtx = exec->getOpCtx();
             long long totalTimeMillis = opCtx->getCurOp()->elapsedMillis();
             generateExecStats(winningStats.get(), verbosity, &execBob, totalTimeMillis);
 
