@@ -104,21 +104,21 @@ namespace mongo {
          * explain information.
          *
          * Generates the BSON stats at a verbosity specified by 'verbosity'. Defaults
-         * to the highest verbosity (FULL).
+         * to execution stats verbosity.
          */
         static BSONObj statsToBSON(const PlanStageStats& stats,
-                                   ExplainCommon::Verbosity verbosity = ExplainCommon::FULL);
+                                   ExplainCommon::Verbosity verbosity = ExplainCommon::EXEC_STATS);
 
         /**
          * This version of stats tree to BSON conversion returns the result through the
          * out-parameter 'bob' rather than returning a BSONObj.
          *
          * Generates the BSON stats at a verbosity specified by 'verbosity'. Defaults
-         * to the highest verbosity (FULL).
+         * to execution stats verbosity.
          */
         static void statsToBSON(const PlanStageStats& stats,
                                 BSONObjBuilder* bob,
-                                ExplainCommon::Verbosity verbosity = ExplainCommon::FULL);
+                                ExplainCommon::Verbosity verbosity = ExplainCommon::EXEC_STATS);
 
         /**
          * Returns a short plan summary std::string describing the leaves of the query plan.

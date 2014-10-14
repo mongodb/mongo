@@ -43,8 +43,6 @@ namespace mongo {
             return "executionStats";
         case EXEC_ALL_PLANS:
             return "allPlansExecution";
-        case FULL:
-            return "full";
         default:
             invariant(0);
             return "unknown";
@@ -65,9 +63,6 @@ namespace mongo {
             }
             else if (mongoutils::str::equals(verbStr, "allPlansExecution")) {
                 *verbosity = ExplainCommon::EXEC_ALL_PLANS;
-            }
-            else if (mongoutils::str::equals(verbStr, "full")) {
-                *verbosity = ExplainCommon::FULL;
             }
             else if (!mongoutils::str::equals(verbStr, "executionStats")) {
                 return Status(ErrorCodes::BadValue, "verbosity string must be one of "

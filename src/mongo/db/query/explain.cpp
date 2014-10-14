@@ -221,13 +221,11 @@ namespace mongo {
         if (verbosity >= ExplainCommon::EXEC_STATS) {
             bob->appendNumber("nReturned", stats.common.advanced);
             bob->appendNumber("executionTimeMillisEstimate", stats.common.executionTimeMillis);
-        }
-
-        // At full verbosity, we add some extra common details.
-        if (verbosity == ExplainCommon::FULL) {
             bob->appendNumber("works", stats.common.works);
             bob->appendNumber("advanced", stats.common.advanced);
             bob->appendNumber("needTime", stats.common.needTime);
+            bob->appendNumber("saveState", stats.common.yields);
+            bob->appendNumber("restoreState", stats.common.unyields);
             bob->appendNumber("isEOF", stats.common.isEOF);
             bob->appendNumber("invalidates", stats.common.invalidates);
         }
@@ -239,10 +237,7 @@ namespace mongo {
             if (verbosity >= ExplainCommon::EXEC_STATS) {
                 bob->appendNumber("memUsage", spec->memUsage);
                 bob->appendNumber("memLimit", spec->memLimit);
-            }
 
-            // Extra info at full verbosity.
-            if (verbosity == ExplainCommon::FULL) {
                 bob->appendNumber("flaggedButPassed", spec->flaggedButPassed);
                 bob->appendNumber("flaggedInProgress", spec->flaggedInProgress);
                 for (size_t i = 0; i < spec->mapAfterChild.size(); ++i) {
@@ -254,8 +249,7 @@ namespace mongo {
         else if (STAGE_AND_SORTED == stats.stageType) {
             AndSortedStats* spec = static_cast<AndSortedStats*>(stats.specific.get());
 
-            // Extra info at full verbosity.
-            if (verbosity == ExplainCommon::FULL) {
+            if (verbosity >= ExplainCommon::EXEC_STATS) {
                 bob->appendNumber("flagged", spec->flagged);
                 bob->appendNumber("matchTested", spec->matchTested);
                 for (size_t i = 0; i < spec->failedAnd.size(); ++i) {
@@ -300,10 +294,6 @@ namespace mongo {
             FetchStats* spec = static_cast<FetchStats*>(stats.specific.get());
             if (verbosity >= ExplainCommon::EXEC_STATS) {
                 bob->appendNumber("docsExamined", spec->docsExamined);
-            }
-
-            // Extra info at full verbosity.
-            if (verbosity == ExplainCommon::FULL) {
                 bob->appendNumber("alreadyHasObj", spec->alreadyHasObj);
             }
         }
@@ -323,10 +313,6 @@ namespace mongo {
         else if (STAGE_IXSCAN == stats.stageType) {
             IndexScanStats* spec = static_cast<IndexScanStats*>(stats.specific.get());
 
-            if (verbosity >= ExplainCommon::EXEC_STATS) {
-                bob->appendNumber("keysExamined", spec->keysExamined);
-            }
-
             bob->append("keyPattern", spec->keyPattern);
             bob->appendBool("isMultiKey", spec->isMultiKey);
             bob->append("direction", spec->direction > 0 ? "forward" : "backward");
@@ -335,8 +321,8 @@ namespace mongo {
             static const int kMaxBoundsSize = 1024 * 1024;
             bob->append("indexBounds", spec->indexBoundsVerbose.substr(0, kMaxBoundsSize));
 
-            // Extra info at full verbosity.
-            if (verbosity == ExplainCommon::FULL) {
+            if (verbosity >= ExplainCommon::EXEC_STATS) {
+                bob->appendNumber("keysExamined", spec->keysExamined);
                 bob->appendNumber("dupsTested", spec->dupsTested);
                 bob->appendNumber("dupsDropped", spec->dupsDropped);
                 bob->appendNumber("seenInvalidated", spec->seenInvalidated);
@@ -346,8 +332,7 @@ namespace mongo {
         else if (STAGE_OR == stats.stageType) {
             OrStats* spec = static_cast<OrStats*>(stats.specific.get());
 
-            // Extra info at full verbosity.
-            if (verbosity == ExplainCommon::FULL) {
+            if (verbosity >= ExplainCommon::EXEC_STATS) {
                 bob->appendNumber("dupsTested", spec->dupsTested);
                 bob->appendNumber("dupsDropped", spec->dupsDropped);
                 bob->appendNumber("locsForgotten", spec->locsForgotten);
@@ -393,8 +378,7 @@ namespace mongo {
             MergeSortStats* spec = static_cast<MergeSortStats*>(stats.specific.get());
             bob->append("sortPattern", spec->sortPattern);
 
-            // Extra info at full verbosity.
-            if (verbosity == ExplainCommon::FULL) {
+            if (verbosity >= ExplainCommon::EXEC_STATS) {
                 bob->appendNumber("dupsTested", spec->dupsTested);
                 bob->appendNumber("dupsDropped", spec->dupsDropped);
             }
@@ -419,7 +403,7 @@ namespace mongo {
                 bob->appendBool("wouldInsert", spec->inserted);
             }
 
-            if (verbosity == ExplainCommon::FULL) {
+            if (verbosity >= ExplainCommon::EXEC_STATS) {
                 bob->appendBool("fastmod", spec->fastmod);
                 bob->appendBool("fastmodinsert", spec->fastmodinsert);
             }
