@@ -19,7 +19,7 @@ func (b BinData) String() string {
 	return fmt.Sprintf("%X", data) // use uppercase hexadecimal
 }
 
-func (js Javascript) String() string {
+func (js JavaScript) String() string {
 	return js.Code
 }
 
@@ -37,6 +37,11 @@ func (d Date) String() string {
 func (d DBRef) String() string {
 	return fmt.Sprintf(`{ "$ref": "%v", "$id": %v, "$db": "%v" }`,
 		d.Collection, d.Id, d.Database)
+}
+
+func (d DBPointer) String() string {
+	return fmt.Sprintf(`{ "$ref": "%v", "$id": %v }`,
+		d.Namespace, d.Id)
 }
 
 func (f Float) String() string {

@@ -22,6 +22,13 @@ type DBRef struct {
 	Database   string // optional
 }
 
+// Refers to a document in some namespace by wrapping a string containing the namespace
+// and the objectId in which the _id of the document is contained
+type DBPointer struct {
+	Namespace string
+	Id        bson.ObjectId
+}
+
 // Represents the literal MinKey.
 type MinKey struct{}
 
@@ -48,7 +55,7 @@ type Timestamp struct {
 	Increment uint32
 }
 
-type Javascript struct {
+type JavaScript struct {
 	Code  string
 	Scope interface{}
 }

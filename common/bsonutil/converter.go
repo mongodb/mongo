@@ -11,7 +11,6 @@ import (
 	"time"
 )
 
-
 // ConvertJSONValueToBSON walks through a document or an array and
 // replaces any extended JSON value with its corresponding BSON type.
 func ConvertJSONValueToBSON(x interface{}) (interface{}, error) {
@@ -52,7 +51,7 @@ func ConvertJSONValueToBSON(x interface{}) (interface{}, error) {
 
 	case json.Date: // Date
 		n := int64(v)
-		return time.Unix(n/1e3, n%1e3 * 1e6), nil
+		return time.Unix(n/1e3, n%1e3*1e6), nil
 
 	case json.NumberLong: // NumberLong
 		return int64(v), nil
@@ -70,12 +69,18 @@ func ConvertJSONValueToBSON(x interface{}) (interface{}, error) {
 	case json.DBRef: // DBRef
 		return mgo.DBRef{v.Collection, v.Id, v.Database}, nil
 
+	case json.DBPointer: // DBPointer, for backwards compatibility
+		return bson.DBPointer{v.Namespace, v.Id}, nil
+
 	case json.RegExp: // RegExp
 		return bson.RegEx{v.Pattern, v.Options}, nil
 
 	case json.Timestamp: // Timestamp
 		ts := (int64(v.Seconds) << 32) | int64(v.Increment)
 		return bson.MongoTimestamp(ts), nil
+
+	case json.JavaScript: // Javascript
+		return bson.JavaScript{v.Code, v.Scope}, nil
 
 	case json.MinKey: // MinKey
 		return bson.MinKey, nil
@@ -85,6 +90,7 @@ func ConvertJSONValueToBSON(x interface{}) (interface{}, error) {
 
 	case json.Undefined: // undefined
 		return bson.Undefined, nil
+
 	default:
 		return nil, fmt.Errorf("Conversion of JSON type '%v' unsupported", v)
 	}
@@ -151,7 +157,7 @@ func ConvertBSONValueToJSON(x interface{}) (interface{}, error) {
 		return json.ObjectId(v.Hex()), nil
 
 	case time.Time: // Date
-		return json.Date(v.UnixNano()/1e6), nil
+		return json.Date(v.UnixNano() / 1e6), nil
 
 	case int64: // NumberLong
 		return json.NumberLong(v), nil
@@ -176,6 +182,9 @@ func ConvertBSONValueToJSON(x interface{}) (interface{}, error) {
 	case mgo.DBRef: // DBRef
 		return json.DBRef{v.Collection, v.Id, v.Database}, nil
 
+	case bson.DBPointer: // DBPointer
+		return json.DBPointer{v.Namespace, v.Id}, nil
+
 	case bson.RegEx: // RegExp
 		return json.RegExp{v.Pattern, v.Options}, nil
 
@@ -185,9 +194,9 @@ func ConvertBSONValueToJSON(x interface{}) (interface{}, error) {
 			Seconds:   uint32(timestamp >> 32),
 			Increment: uint32(timestamp),
 		}, nil
-	case bson.JavaScript:
-		//TODO handle code with scope
-		return json.Javascript{v.Code, nil}, nil
+
+	case bson.JavaScript: // JavaScript
+		return json.JavaScript{v.Code, v.Scope}, nil
 
 	default:
 		switch x {

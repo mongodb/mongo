@@ -13,7 +13,7 @@ func (b BinData) MarshalJSON() ([]byte, error) {
 	return []byte(data), nil
 }
 
-func (js Javascript) MarshalJSON() ([]byte, error) {
+func (js JavaScript) MarshalJSON() ([]byte, error) {
 	return []byte(js.Code), nil
 }
 
@@ -43,8 +43,9 @@ func (d DBRef) MarshalJSON() ([]byte, error) {
 
 	var dbChunk []byte
 	if d.Database != "" {
-		dbChunk = []byte(fmt.Sprintf(`, "$db": "%v" }`, d.Database))
+		dbChunk = []byte(fmt.Sprintf(`, "$db": "%v" `, d.Database))
 	}
+	dbChunk = append(dbChunk, '}')
 
 	data := make([]byte, len(refChunk)+len(idChunk)+len(dbChunk))
 	copy(data, refChunk)
@@ -52,6 +53,17 @@ func (d DBRef) MarshalJSON() ([]byte, error) {
 	copy(data[len(refChunk)+len(idChunk):], dbChunk)
 
 	return data, nil
+}
+
+func (d DBPointer) MarshalJSON() ([]byte, error) {
+	// Convert the $id field to JSON
+	idChunk, err := Marshal(d.Id)
+	if err != nil {
+		return nil, err
+	}
+
+	data := append([]byte(fmt.Sprintf(`{ "$ref": "%v", "$id": `, d.Namespace)), idChunk...)
+	return append(data, '}'), nil
 }
 
 func (_ MinKey) MarshalJSON() ([]byte, error) {
