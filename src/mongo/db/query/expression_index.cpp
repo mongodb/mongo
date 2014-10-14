@@ -54,7 +54,7 @@ namespace mongo {
 
             const GeoHash& geoHash = *it;
 
-            result += hashConverter.unhashToBox(geoHash).toString();
+            result += hashConverter.unhashToBoxCovering(geoHash).toString();
             result += " (" + geoHash.toStringHex1() + ")";
         }
 

@@ -134,7 +134,7 @@ namespace mongo {
     // Caller owns the returned pointer
     R2RegionCoverer::Candidate* R2RegionCoverer::newCandidate( const GeoHash& cell ) {
         // Exclude the cell that doesn't intersect with the geometry.
-        Box box = _hashConverter->unhashToBox(cell);
+        Box box = _hashConverter->unhashToBoxCovering(cell);
 
         if (_region->fastDisjoint(box)) {
             return NULL;
