@@ -258,8 +258,10 @@ namespace mongo {
     }
 
     Record* DummyExtentManager::recordForV1( const DiskLoc& loc ) const {
-        invariant( static_cast<size_t>( loc.a() ) < _extents.size() );
-        invariant( static_cast<size_t>( loc.getOfs() ) < _extents[loc.a()].length );
+        if ( static_cast<size_t>( loc.a() ) >= _extents.size() )
+            return NULL;
+        if ( static_cast<size_t>( loc.getOfs() ) >= _extents[loc.a()].length )
+            return NULL;
         char* root = _extents[loc.a()].data;
         return reinterpret_cast<Record*>( root + loc.getOfs() );
     }

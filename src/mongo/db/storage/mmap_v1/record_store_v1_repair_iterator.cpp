@@ -139,7 +139,7 @@ namespace mongo {
 
             // Sanity checks for the extent's disk location
             //
-            if (hasNextExtent && (!_currExtent.isValid() || (_currExtent.getOfs() <= 0))) {
+            if (hasNextExtent && (!_currExtent.isValid() || (_currExtent.getOfs() < 0))) {
                 error() << "Invalid extent location: " << _currExtent << endl;
 
                 // Switch the direction of scan

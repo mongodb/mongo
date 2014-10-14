@@ -26,6 +26,8 @@
  *    it in the license file.
  */
 
+#pragma once
+
 #include "mongo/db/storage/recovery_unit.h"
 
 namespace mongo {

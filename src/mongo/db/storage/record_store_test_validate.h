@@ -53,7 +53,7 @@ namespace {
         ~ValidateAdaptorSpy() { }
 
         Status validate( const RecordData &recordData, size_t *dataSize ) {
-            string s( recordData.data(), recordData.size() - 1 );
+            string s( recordData.data() );
             ASSERT( 1 == _remain.erase( s ) );
 
             *dataSize = recordData.size();
