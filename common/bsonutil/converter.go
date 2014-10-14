@@ -11,6 +11,7 @@ import (
 	"time"
 )
 
+
 // ConvertJSONValueToBSON walks through a document or an array and
 // replaces any extended JSON value with its corresponding BSON type.
 func ConvertJSONValueToBSON(x interface{}) (interface{}, error) {
@@ -51,7 +52,7 @@ func ConvertJSONValueToBSON(x interface{}) (interface{}, error) {
 
 	case json.Date: // Date
 		n := int64(v)
-		return time.Unix(n/1e3, n%1e3*1e6), nil
+		return time.Unix(n/1e3, n%1e3 * 1e6), nil
 
 	case json.NumberLong: // NumberLong
 		return int64(v), nil
@@ -89,7 +90,7 @@ func ConvertJSONValueToBSON(x interface{}) (interface{}, error) {
 	}
 }
 
-func convertKeys(v bson.M) (bson.M, error) {
+func convertKeys(v bson.M) (map[string]interface{}, error) {
 	for key, value := range v {
 		jsonValue, err := ConvertBSONValueToJSON(value)
 		if err != nil {
@@ -150,7 +151,7 @@ func ConvertBSONValueToJSON(x interface{}) (interface{}, error) {
 		return json.ObjectId(v.Hex()), nil
 
 	case time.Time: // Date
-		return json.Date(v.Unix()*1000 + int64(v.Nanosecond()/1e6)), nil
+		return json.Date(v.UnixNano()/1e6), nil
 
 	case int64: // NumberLong
 		return json.NumberLong(v), nil
