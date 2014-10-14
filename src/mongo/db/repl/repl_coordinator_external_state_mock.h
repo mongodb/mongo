@@ -60,6 +60,7 @@ namespace repl {
         virtual Status storeLocalConfigDocument(OperationContext* txn, const BSONObj& config);
         virtual StatusWith<OpTime> loadLastOpTime(OperationContext* txn);
         virtual void closeConnections();
+        virtual void clearShardingState();
         virtual void signalApplierToChooseNewSyncSource();
         virtual ReplicationCoordinatorExternalState::GlobalSharedLockAcquirer*
                 getGlobalSharedLockAcquirer();

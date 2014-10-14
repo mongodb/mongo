@@ -282,6 +282,7 @@ namespace {
         _updateCurrentMemberStateFromTopologyCoordinator_inlock();
         lk.unlock();
         _externalState->closeConnections();
+        _externalState->clearShardingState();
     }
 
     void ReplicationCoordinatorImpl::_scheduleHeartbeatReconfig(const ReplicaSetConfig& newConfig) {

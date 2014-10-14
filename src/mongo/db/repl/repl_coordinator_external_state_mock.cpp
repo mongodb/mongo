@@ -134,6 +134,8 @@ namespace repl {
         _connectionsClosed = true;
     }
 
+    void ReplicationCoordinatorExternalStateMock::clearShardingState() {}
+
     void ReplicationCoordinatorExternalStateMock::signalApplierToChooseNewSyncSource() {}
 
     void ReplicationCoordinatorExternalStateMock::setCanAcquireGlobalSharedLock(bool canAcquire) {

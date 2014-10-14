@@ -896,6 +896,7 @@ namespace {
         }
         lk.unlock();
         _externalState->closeConnections();
+        _externalState->clearShardingState();
         *result = Status::OK();
     }
 
@@ -1671,6 +1672,7 @@ namespace {
          if (_currentState.removed() || (previousState.primary() && !_currentState.primary())) {
              // Close connections on stepdown or when removed from the replica set.
              _externalState->closeConnections();
+             _externalState->clearShardingState();
              // Closing all connections will make the applier choose a new sync source, so we don't
              // need to do that explicitly in this case.
          }
