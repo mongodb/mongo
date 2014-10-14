@@ -169,7 +169,7 @@ err:		if (fh != NULL) {
 		}
 		if (filehandle != INVALID_HANDLE_VALUE)
 			(void)CloseHandle(filehandle);
-		if (filehandle != INVALID_HANDLE_VALUE)
+		if (filehandle_secondary != INVALID_HANDLE_VALUE)
 			(void)CloseHandle(filehandle_secondary);
 	}
 
