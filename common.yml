@@ -925,8 +925,8 @@ buildvariants:
   expansions:
     <<: *mongo_url_ubuntu1204
     <<: *mongodb_default_startup_args
-    coverage: false
-    #coverage_args: "-coverprofile=coverage.out"
+    coverage: true
+    coverage_args: "-coverprofile=coverage.out"
   tasks: *ubuntu1204_tasks
 
 - name: ubuntu-ssl
