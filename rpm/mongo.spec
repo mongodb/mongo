@@ -1,7 +1,7 @@
 Name: mongo-10gen
 Conflicts: mongo, mongo-10gen-unstable
 Obsoletes: mongo-stable
-Version: 2.4.12-rc1-pre-
+Version: 2.4.12
 Release: mongodb_1%{?dist}
 Summary: mongo client shell and tools
 License: AGPL 3.0
