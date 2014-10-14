@@ -250,10 +250,12 @@ namespace {
         }
 
         {
+            OID rid = _externalState->ensureMe(txn);
+
             boost::lock_guard<boost::mutex> lk(_mutex);
             fassert(18822, !_inShutdown);
             _setConfigState_inlock(kConfigStartingUp);
-            _myRID = _externalState->ensureMe(txn);
+            _myRID = rid;
         }
 
         if (!_settings.usingReplSets()) {
