@@ -21,24 +21,7 @@ var (
 	testServer     = "localhost"
 	testPort       = "27017"
 
-	ssl = &commonOpts.SSL{
-		UseSSL: false,
-	}
-	namespace = &commonOpts.Namespace{
-		DB:         testDB,
-		Collection: testCollection,
-	}
-	connection = &commonOpts.Connection{
-		Host: testServer,
-		Port: testPort,
-	}
-	toolOptions = &commonOpts.ToolOptions{
-		SSL:        ssl,
-		Namespace:  namespace,
-		Connection: connection,
-		Auth:       &commonOpts.Auth{},
-	}
-	sessionProvider = db.NewSessionProvider(*toolOptions)
+	sessionProvider *db.SessionProvider
 )
 
 func TestMongoImportValidateSettings(t *testing.T) {
@@ -398,7 +381,9 @@ func TestImportDocuments(t *testing.T) {
 				Fields: "a,b,c",
 			}
 			ingestOptions := &options.IngestOptions{}
-			sessionProvider, err := db.InitSessionProvider(*toolOptions)
+
+			var err error
+			sessionProvider, err = db.InitSessionProvider(*toolOptions)
 			So(err, ShouldBeNil)
 			mongoImport := MongoImport{
 				ToolOptions:     toolOptions,
@@ -420,7 +405,9 @@ func TestImportDocuments(t *testing.T) {
 			ingestOptions := &options.IngestOptions{
 				IgnoreBlanks: true,
 			}
-			sessionProvider, err := db.InitSessionProvider(*toolOptions)
+
+			var err error
+			sessionProvider, err = db.InitSessionProvider(*toolOptions)
 			So(err, ShouldBeNil)
 			mongoImport := MongoImport{
 				ToolOptions:     toolOptions,
@@ -444,7 +431,9 @@ func TestImportDocuments(t *testing.T) {
 				ingestOptions := &options.IngestOptions{
 					IgnoreBlanks: true,
 				}
-				sessionProvider, err := db.InitSessionProvider(*toolOptions)
+
+				var err error
+				sessionProvider, err = db.InitSessionProvider(*toolOptions)
 				So(err, ShouldBeNil)
 				mongoImport := MongoImport{
 					ToolOptions:     toolOptions,
@@ -472,7 +461,9 @@ func TestImportDocuments(t *testing.T) {
 					Fields: "_id,b,c",
 				}
 				ingestOptions := &options.IngestOptions{}
-				sessionProvider, err := db.InitSessionProvider(*toolOptions)
+
+				var err error
+				sessionProvider, err = db.InitSessionProvider(*toolOptions)
 				So(err, ShouldBeNil)
 				mongoImport := MongoImport{
 					ToolOptions:     toolOptions,
@@ -501,7 +492,9 @@ func TestImportDocuments(t *testing.T) {
 			ingestOptions := &options.IngestOptions{
 				Upsert: true,
 			}
-			sessionProvider, err := db.InitSessionProvider(*toolOptions)
+
+			var err error
+			sessionProvider, err = db.InitSessionProvider(*toolOptions)
 			So(err, ShouldBeNil)
 			mongoImport := MongoImport{
 				ToolOptions:     toolOptions,
@@ -531,7 +524,9 @@ func TestImportDocuments(t *testing.T) {
 				ingestOptions := &options.IngestOptions{
 					StopOnError: true,
 				}
-				sessionProvider, err := db.InitSessionProvider(*toolOptions)
+
+				var err error
+				sessionProvider, err = db.InitSessionProvider(*toolOptions)
 				So(err, ShouldBeNil)
 				mongoImport := MongoImport{
 					ToolOptions:     toolOptions,
@@ -558,7 +553,9 @@ func TestImportDocuments(t *testing.T) {
 				Fields: "_id,b,c",
 			}
 			ingestOptions := &options.IngestOptions{}
-			sessionProvider, err := db.InitSessionProvider(*toolOptions)
+
+			var err error
+			sessionProvider, err = db.InitSessionProvider(*toolOptions)
 			So(err, ShouldBeNil)
 			mongoImport := MongoImport{
 				ToolOptions:     toolOptions,
@@ -588,7 +585,9 @@ func TestImportDocuments(t *testing.T) {
 			ingestOptions := &options.IngestOptions{
 				Drop: true,
 			}
-			sessionProvider, err := db.InitSessionProvider(*toolOptions)
+
+			var err error
+			sessionProvider, err = db.InitSessionProvider(*toolOptions)
 			So(err, ShouldBeNil)
 			mongoImport := MongoImport{
 				ToolOptions:     toolOptions,
@@ -615,7 +614,9 @@ func TestImportDocuments(t *testing.T) {
 				HeaderLine: true,
 			}
 			ingestOptions := &options.IngestOptions{}
-			sessionProvider, err := db.InitSessionProvider(*toolOptions)
+
+			var err error
+			sessionProvider, err = db.InitSessionProvider(*toolOptions)
 			So(err, ShouldBeNil)
 			mongoImport := MongoImport{
 				ToolOptions:     toolOptions,
@@ -639,7 +640,8 @@ func TestImportDocuments(t *testing.T) {
 				HeaderLine: true,
 			}
 			ingestOptions := &options.IngestOptions{}
-			sessionProvider, err := db.InitSessionProvider(*toolOptions)
+
+			sessionProvider, err = db.InitSessionProvider(*toolOptions)
 			So(err, ShouldBeNil)
 			mongoImport := MongoImport{
 				ToolOptions:     toolOptions,
@@ -663,7 +665,9 @@ func TestImportDocuments(t *testing.T) {
 				Upsert:       true,
 				UpsertFields: "_id",
 			}
-			sessionProvider, err := db.InitSessionProvider(*toolOptions)
+
+			var err error
+			sessionProvider, err = db.InitSessionProvider(*toolOptions)
 			So(err, ShouldBeNil)
 			mongoImport := MongoImport{
 				ToolOptions:     toolOptions,
@@ -694,7 +698,9 @@ func TestImportDocuments(t *testing.T) {
 				UpsertFields: "_id",
 			}
 			toolOptions := getBasicToolOptions()
-			sessionProvider, err := db.InitSessionProvider(*toolOptions)
+
+			var err error
+			sessionProvider, err = db.InitSessionProvider(*toolOptions)
 			So(err, ShouldBeNil)
 			mongoImport := MongoImport{
 				ToolOptions:     toolOptions,
@@ -724,7 +730,9 @@ func TestImportDocuments(t *testing.T) {
 			ingestOptions := &options.IngestOptions{
 				StopOnError: true,
 			}
-			sessionProvider, err := db.InitSessionProvider(*toolOptions)
+
+			var err error
+			sessionProvider, err = db.InitSessionProvider(*toolOptions)
 			So(err, ShouldBeNil)
 			mongoImport := MongoImport{
 				ToolOptions:     toolOptions,
@@ -751,7 +759,9 @@ func TestImportDocuments(t *testing.T) {
 				}
 				toolOptions := getBasicToolOptions()
 				ingestOptions := &options.IngestOptions{}
-				sessionProvider, err := db.InitSessionProvider(*toolOptions)
+
+				var err error
+				sessionProvider, err = db.InitSessionProvider(*toolOptions)
 				So(err, ShouldBeNil)
 				mongoImport := MongoImport{
 					ToolOptions:     toolOptions,
@@ -810,9 +820,8 @@ func checkOnlyHasDocuments(expectedDocuments []bson.M) error {
 // getBasicToolOptions returns a test helper to instantiate the session provider
 // for calls to ImportDocument
 func getBasicToolOptions() *commonOpts.ToolOptions {
-	ssl := &commonOpts.SSL{
-		UseSSL: false,
-	}
+	ssl := testutil.GetSSLOptions()
+
 	namespace := &commonOpts.Namespace{
 		DB:         testDB,
 		Collection: testCollection,
@@ -822,7 +831,7 @@ func getBasicToolOptions() *commonOpts.ToolOptions {
 		Port: testPort,
 	}
 	return &commonOpts.ToolOptions{
-		SSL:        ssl,
+		SSL:        &ssl,
 		Namespace:  namespace,
 		Connection: connection,
 		Auth:       &commonOpts.Auth{},
