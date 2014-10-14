@@ -99,6 +99,7 @@ namespace repl {
         _lastHeartbeat = now;
         _lastHeartbeatMsg = heartbeatMessage;
         _authIssue = false;
+        _syncSource = "";
         return *this;
     }
 
@@ -107,10 +108,8 @@ namespace repl {
                   " issue for member _id:"
                << _configIndex;
 
-        if (_upSince == 0) {
-            _upSince = now;
-        }
-
+        _syncSource = "";
+        _upSince = 0;
         _lastHeartbeat = now;
         _state = MemberState::RS_UNKNOWN;
         _health = 0; // set health to 0 so that this doesn't count towards majority.

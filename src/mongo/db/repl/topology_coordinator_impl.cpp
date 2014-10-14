@@ -1245,13 +1245,15 @@ namespace {
             }
             else {
                 // add non-self member
+                const MemberConfig member = _currentConfig.getMemberAt(it->getConfigIndex());
+
                 BSONObjBuilder bb;
-                bb.append("_id", _currentConfig.getMemberAt(it->getConfigIndex()).getId());
-                bb.append("name", _currentConfig.getMemberAt(it->getConfigIndex())
-                          .getHostAndPort().toString());
-                double h = it->getHealth();
+                bb.append("_id", member.getId());
+                const HostAndPort host = member.getHostAndPort();
+                bb.append("name", host.toString());
+                const double h = it->getHealth();
                 bb.append("health", h);
-                MemberState state = it->getState();
+                const MemberState state = it->getState();
                 bb.append("state", static_cast<int>(state.s));
                 if( h == 0 ) {
                     // if we can't connect the state info is from the past
@@ -1261,41 +1263,34 @@ namespace {
                 else {
                     bb.append("stateStr", it->getState().toString());
                 }
-
-                if (state != MemberState::RS_UNKNOWN) {
-                    // If state is UNKNOWN we haven't received any heartbeats and thus don't have
-                    // meaningful values for these fields
-
-                    unsigned int uptime = static_cast<unsigned int> ((it->getUpSince() ?
-                            (now - it->getUpSince()) / 1000 /* convert millis to secs */ : 0));
-                    bb.append("uptime", uptime);
-                    if (!_currentConfig.getMemberAt(it->getConfigIndex()).isArbiter()) {
-                        bb.append("optime", it->getOpTime());
-                        bb.appendDate("optimeDate", Date_t(it->getOpTime().getSecs() * 1000ULL));
-                    }
-                    bb.appendDate("lastHeartbeat", it->getLastHeartbeat());
-                    bb.appendDate("lastHeartbeatRecv", it->getLastHeartbeatRecv());
-                    bb.append("pingMs",
-                              _getPing(_currentConfig.getMemberAt(
-                                      it->getConfigIndex()).getHostAndPort()));
+                const unsigned int uptime = static_cast<unsigned int> ((it->getUpSince() ?
+                        (now - it->getUpSince()) / 1000 /* convert millis to secs */ : 0));
+                bb.append("uptime", uptime);
+                if (!member.isArbiter()) {
+                    bb.append("optime", it->getOpTime());
+                    bb.appendDate("optimeDate", Date_t(it->getOpTime().getSecs() * 1000ULL));
+                }
+                bb.appendDate("lastHeartbeat", it->getLastHeartbeat());
+                bb.appendDate("lastHeartbeatRecv", it->getLastHeartbeatRecv());
+                const int ping = _getPing(host);
+                if (ping != -1) {
+                    bb.append("pingMs", ping);
                     std::string s = it->getLastHeartbeatMsg();
                     if( !s.empty() )
                         bb.append("lastHeartbeatMessage", s);
+                }
+                if (it->hasAuthIssue()) {
+                    bb.append("authenticated", false);
+                }
+                const std::string syncSource = it->getSyncSource();
+                if (!syncSource.empty()) {
+                    bb.append("syncingTo", syncSource);
+                }
 
-                    if (it->hasAuthIssue()) {
-                        bb.append("authenticated", false);
-                    }
-
-                    std::string syncSource = it->getSyncSource();
-                    if (!syncSource.empty()) {
-                        bb.append("syncingTo", syncSource);
-                    }
-
-                    if (state == MemberState::RS_PRIMARY) {
-                        bb.append("electionTime", it->getElectionTime());
-                        bb.appendDate("electionDate",
-                                      Date_t(it->getElectionTime().getSecs() * 1000ULL));
-                    }
+                if (state == MemberState::RS_PRIMARY) {
+                    bb.append("electionTime", it->getElectionTime());
+                    bb.appendDate("electionDate",
+                                  Date_t(it->getElectionTime().getSecs() * 1000ULL));
                 }
                 membersOut.push_back(bb.obj());
             }

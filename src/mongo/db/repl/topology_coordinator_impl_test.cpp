@@ -682,11 +682,10 @@ namespace {
 
         member = HostAndPort("test1:1234");
         ReplSetHeartbeatResponse hb;
-        hb.initialize(BSON("ok" << 1 <<
-                           "v" << 1 <<
-                           "state" << MemberState::RS_SECONDARY <<
-                           "electionTime" << electionTime <<
-                           "hbmsg" << "READY"));
+        hb.setVersion(1);
+        hb.setState(MemberState::RS_SECONDARY);
+        hb.setElectionTime(electionTime);
+        hb.setHbMsg("READY");
         hb.setOpTime(oplogProgress);
         hbResponse = StatusWith<ReplSetHeartbeatResponse>(hb);
         getTopoCoord().prepareHeartbeatRequest(startupTime + 2,
@@ -721,58 +720,61 @@ namespace {
         BSONObj member2Status = memberArray[2].Obj();
 
         // Test member 0, the node that's DOWN
-        ASSERT_EQUALS(0, member0Status["_id"].Int());
-        ASSERT_EQUALS("test0:1234", member0Status["name"].String());
-        ASSERT_EQUALS(0, member0Status["health"].Double());
-        ASSERT_EQUALS(MemberState::RS_DOWN, member0Status["state"].Int());
-        ASSERT_EQUALS("(not reachable/healthy)", member0Status["stateStr"].String());
-        ASSERT_EQUALS(0, member0Status["uptime"].Int());
+        ASSERT_EQUALS(0, member0Status["_id"].numberInt());
+        ASSERT_EQUALS("test0:1234", member0Status["name"].str());
+        ASSERT_EQUALS(0, member0Status["health"].numberDouble());
+        ASSERT_EQUALS(MemberState::RS_DOWN, member0Status["state"].numberInt());
+        ASSERT_EQUALS("(not reachable/healthy)", member0Status["stateStr"].str());
+        ASSERT_EQUALS(0, member0Status["uptime"].numberInt());
         ASSERT_EQUALS(OpTime(), OpTime(member0Status["optime"].timestampValue()));
+        ASSERT_TRUE(member0Status.hasField("optimeDate"));
         ASSERT_EQUALS(Date_t(OpTime().getSecs() * 1000ULL),
                       member0Status["optimeDate"].Date().millis);
-        ASSERT_EQUALS(heartbeatTime, member0Status["lastHeartbeat"].Date());
-        ASSERT_EQUALS(Date_t(), member0Status["lastHeartbeatRecv"].Date());
+        ASSERT_EQUALS(heartbeatTime, member0Status["lastHeartbeat"].date());
+        ASSERT_EQUALS(Date_t(), member0Status["lastHeartbeatRecv"].date());
 
         // Test member 1, the node that's SECONDARY
         ASSERT_EQUALS(1, member1Status["_id"].Int());
         ASSERT_EQUALS("test1:1234", member1Status["name"].String());
         ASSERT_EQUALS(1, member1Status["health"].Double());
-        ASSERT_EQUALS(MemberState::RS_SECONDARY, member1Status["state"].Int());
+        ASSERT_EQUALS(MemberState::RS_SECONDARY, member1Status["state"].numberInt());
         ASSERT_EQUALS(MemberState(MemberState::RS_SECONDARY).toString(),
                       member1Status["stateStr"].String());
-        ASSERT_EQUALS(uptimeSecs.total_seconds(), member1Status["uptime"].Int());
+        ASSERT_EQUALS(uptimeSecs.total_seconds(), member1Status["uptime"].numberInt());
         ASSERT_EQUALS(oplogProgress, OpTime(member1Status["optime"].timestampValue()));
+        ASSERT_TRUE(member1Status.hasField("optimeDate"));
         ASSERT_EQUALS(Date_t(oplogProgress.getSecs() * 1000ULL),
                       member1Status["optimeDate"].Date().millis);
-        ASSERT_EQUALS(heartbeatTime, member1Status["lastHeartbeat"].Date());
-        ASSERT_EQUALS(Date_t(), member1Status["lastHeartbeatRecv"].Date());
-        ASSERT_EQUALS("READY", member1Status["lastHeartbeatMessage"].String());
+        ASSERT_EQUALS(heartbeatTime, member1Status["lastHeartbeat"].date());
+        ASSERT_EQUALS(Date_t(), member1Status["lastHeartbeatRecv"].date());
+        ASSERT_EQUALS("READY", member1Status["lastHeartbeatMessage"].str());
 
         // Test member 2, the node that's UNKNOWN
-        ASSERT_EQUALS(2, member2Status["_id"].Int());
-        ASSERT_EQUALS("test2:1234", member2Status["name"].String());
-        ASSERT_EQUALS(-1, member2Status["health"].Double());
-        ASSERT_EQUALS(MemberState::RS_UNKNOWN, member2Status["state"].Int());
+        ASSERT_EQUALS(2, member2Status["_id"].numberInt());
+        ASSERT_EQUALS("test2:1234", member2Status["name"].str());
+        ASSERT_EQUALS(-1, member2Status["health"].numberDouble());
+        ASSERT_EQUALS(MemberState::RS_UNKNOWN, member2Status["state"].numberInt());
         ASSERT_EQUALS(MemberState(MemberState::RS_UNKNOWN).toString(),
-                      member2Status["stateStr"].String());
-        ASSERT_FALSE(member2Status.hasField("uptime"));
-        ASSERT_FALSE(member2Status.hasField("optime"));
-        ASSERT_FALSE(member2Status.hasField("optimeDate"));
+                      member2Status["stateStr"].str());
+        ASSERT_TRUE(member2Status.hasField("uptime"));
+        ASSERT_TRUE(member2Status.hasField("optime"));
+        ASSERT_TRUE(member2Status.hasField("optimeDate"));
         ASSERT_FALSE(member2Status.hasField("lastHearbeat"));
         ASSERT_FALSE(member2Status.hasField("lastHearbeatRecv"));
 
         // Now test results for ourself, the PRIMARY
-        ASSERT_EQUALS(MemberState::RS_PRIMARY, rsStatus["myState"].Int());
+        ASSERT_EQUALS(MemberState::RS_PRIMARY, rsStatus["myState"].numberInt());
         BSONObj selfStatus = memberArray[3].Obj();
-        ASSERT_TRUE(selfStatus["self"].Bool());
-        ASSERT_EQUALS(3, selfStatus["_id"].Int());
-        ASSERT_EQUALS("test3:1234", selfStatus["name"].String());
-        ASSERT_EQUALS(1, selfStatus["health"].Double());
-        ASSERT_EQUALS(MemberState::RS_PRIMARY, selfStatus["state"].Int());
+        ASSERT_TRUE(selfStatus["self"].boolean());
+        ASSERT_EQUALS(3, selfStatus["_id"].numberInt());
+        ASSERT_EQUALS("test3:1234", selfStatus["name"].str());
+        ASSERT_EQUALS(1, selfStatus["health"].numberDouble());
+        ASSERT_EQUALS(MemberState::RS_PRIMARY, selfStatus["state"].numberInt());
         ASSERT_EQUALS(MemberState(MemberState::RS_PRIMARY).toString(),
-                      selfStatus["stateStr"].String());
-        ASSERT_EQUALS(uptimeSecs.total_seconds(), selfStatus["uptime"].Int());
+                      selfStatus["stateStr"].str());
+        ASSERT_EQUALS(uptimeSecs.total_seconds(), selfStatus["uptime"].numberInt());
         ASSERT_EQUALS(oplogProgress, OpTime(selfStatus["optime"].timestampValue()));
+        ASSERT_TRUE(selfStatus.hasField("optimeDate"));
         ASSERT_EQUALS(Date_t(oplogProgress.getSecs() * 1000ULL),
                       selfStatus["optimeDate"].Date().millis);
 
