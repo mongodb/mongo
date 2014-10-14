@@ -730,7 +730,11 @@ namespace {
          *
          *  also, this is better for status reporting - we know what is happening.
          */
-        replCoord->setFollowerMode(MemberState::RS_ROLLBACK);
+        if (!replCoord->setFollowerMode(MemberState::RS_ROLLBACK)) {
+            log() << "Cannot transition from " << replCoord->getCurrentMemberState() << " to " <<
+                MemberState(MemberState::RS_ROLLBACK);
+            return 0;
+        }
 
         FixUpInfo how;
         log() << "rollback 1";
@@ -778,7 +782,11 @@ namespace {
 
         // success - leave "ROLLBACK" state
         // can go to SECONDARY once minvalid is achieved
-        replCoord->setFollowerMode(MemberState::RS_RECOVERING);
+        if (!replCoord->setFollowerMode(MemberState::RS_RECOVERING)) {
+            warning() << "Failed to transition into " << MemberState(MemberState::RS_RECOVERING) <<
+                "; expected to be in state " << MemberState(MemberState::RS_ROLLBACK) <<
+                "but found self in " << replCoord->getCurrentMemberState();
+        }
 
         return 0;
     }
