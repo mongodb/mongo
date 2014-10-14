@@ -3,12 +3,7 @@
 # exit on error
 set -e
 
-# make sure the working directory is the root of
-# the repo
 setgopath() {
-    local SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-    cd $SCRIPT_DIR
-
     local SOURCE_GOPATH=`pwd`.gopath
     local VENDOR_GOPATH=`pwd`/vendor
     if [ "Windows_NT" = "$OS" ]; then
