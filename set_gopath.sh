@@ -14,7 +14,7 @@ setgopath() {
     if [ "Windows_NT" = "$OS" ]; then
         SOURCE_GOPATH=$(cygpath -w $(SOURCE_GOPATH));
         VENDOR_GOPATH=$(cygpath -w $(VENDOR_GOPATH));
-    fi
+    fi;
 
     # set up the $GOPATH to use the vendored dependencies as
     # well as the source for the mongo tools

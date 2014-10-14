@@ -104,7 +104,7 @@ functions:
       working_dir: src
       script: |
         echo "Building ${tool}..."
-        source ./set_gopath.sh
+        . ./set_gopath.sh
         ${library_path} go build ${args} ${build_tags} -o ${tool} ${tool}/main
 
   "download mongod":
@@ -137,7 +137,7 @@ functions:
       script: |
         set -o verbose
         if [ "${coverage}" = "true" ]; then
-          source ./set_gopath.sh
+          . ./set_gopath.sh
           go tool cover -html=coverage.out -o coverage.html
           go tool cover -func=coverage.out -o coverage.txt
         fi;
@@ -163,7 +163,7 @@ functions:
     params:
       working_dir: src
       script: |
-        source ./set_gopath.sh
+        . ./set_gopath.sh
         if [ "${library_path}" != "" ] then
             export ${library_path}
         fi;
@@ -198,7 +198,7 @@ functions:
     params:
       working_dir: src
       script: | 
-        source ./set_gopath.sh
+        . ./set_gopath.sh
         if [ "${library_path}" != "" ] then
             export ${library_path}
         fi;
