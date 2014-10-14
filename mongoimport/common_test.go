@@ -116,7 +116,7 @@ func TestGetUpsertValue(t *testing.T) {
 }
 
 func TestConstructUpsertDocument(t *testing.T) {
-	testutil.VerifyTestType(t, "unit")
+	testutil.VerifyTestType(t, testutil.UNIT_TEST_TYPE)
 
 	Convey("Given a set of upsert fields and a BSON document, on calling "+
 		"constructUpsertDocument", t, func() {
