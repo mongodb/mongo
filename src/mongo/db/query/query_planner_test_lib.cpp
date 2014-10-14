@@ -53,9 +53,9 @@ namespace {
         if (!swme.isOK()) {
             return false;
         }
-        MatchExpression* root = swme.getValue();
-        CanonicalQuery::sortTree(root);
-        return trueFilterNode->filter->equivalent(root);
+        const boost::scoped_ptr<MatchExpression> root(swme.getValue());
+        CanonicalQuery::sortTree(root.get());
+        return trueFilterNode->filter->equivalent(root.get());
     }
 
     void appendIntervalBound(BSONObjBuilder& bob, BSONElement& el) {

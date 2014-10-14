@@ -587,7 +587,6 @@ namespace mongo {
 
     static void checkConflict(LockMode existingMode, LockMode newMode, bool hasConflict) {
         LockManager lockMgr;
-        lockMgr.setNoCheckForLeakedLocksTestOnly(true);
 
         const ResourceId resId(RESOURCE_COLLECTION, std::string("TestDB.collection"));
 

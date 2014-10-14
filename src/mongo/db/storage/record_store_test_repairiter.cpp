@@ -60,6 +60,8 @@ namespace mongo {
             ASSERT_EQUALS( DiskLoc(), it->getNext() );
             ASSERT( it->isEOF() );
             ASSERT_EQUALS( DiskLoc(), it->curr() );
+
+            delete it;
         }
     }
 
@@ -114,6 +116,8 @@ namespace mongo {
             ASSERT_EQUALS( DiskLoc(), it->getNext() );
             ASSERT( it->isEOF() );
             ASSERT_EQUALS( DiskLoc(), it->curr() );
+
+            delete it;
         }
     }
 

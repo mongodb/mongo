@@ -335,9 +335,6 @@ namespace mongo {
 
         unsigned _numLockBuckets;
         LockBucket* _lockBuckets;
-
-        // This is for tests only and removes the validation for leaked locks in the destructor
-        bool _noCheckForLeakedLocksTestOnly;
     };
 
 } // namespace mongo

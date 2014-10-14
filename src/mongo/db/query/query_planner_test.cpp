@@ -54,6 +54,7 @@ namespace {
     class QueryPlannerTest : public mongo::unittest::Test {
     protected:
         void setUp() {
+            cq = NULL;
             internalQueryPlannerEnableHashIntersection = true;
             params.options = QueryPlannerParams::INCLUDE_COLLSCAN;
             addIndex(BSON("_id" << 1));
@@ -148,6 +149,15 @@ namespace {
                           const BSONObj& minObj,
                           const BSONObj& maxObj,
                           bool snapshot) {
+
+            // Clean up any previous state from a call to runQueryFull
+            delete cq;
+            cq = NULL;
+
+            for (vector<QuerySolution*>::iterator it = solns.begin(); it != solns.end(); ++it) {
+                delete *it;
+            }
+
             solns.clear();
             Status s = CanonicalQuery::canonicalize(ns, query, sort, proj, skip, limit, hint,
                                                     minObj, maxObj, snapshot,
@@ -200,6 +210,13 @@ namespace {
                                  const BSONObj& minObj,
                                  const BSONObj& maxObj,
                                  bool snapshot) {
+            delete cq;
+            cq = NULL;
+
+            for (vector<QuerySolution*>::iterator it = solns.begin(); it != solns.end(); ++it) {
+                delete *it;
+            }
+
             solns.clear();
             Status s = CanonicalQuery::canonicalize(ns, query, sort, proj, skip, limit, hint,
                                                     minObj, maxObj, snapshot,
@@ -4996,13 +5013,13 @@ namespace {
         ASSERT_OK(cqStatus);
         boost::scoped_ptr<CanonicalQuery> scopedCq(cq);
 
-        PlanCacheIndexTree* indexTree = new PlanCacheIndexTree();
+        boost::scoped_ptr<PlanCacheIndexTree> indexTree(new PlanCacheIndexTree());
         indexTree->setIndexEntry(IndexEntry(BSON("a" << 1)));
 
         map<BSONObj, size_t> indexMap;
 
         // Null filter.
-        Status s = QueryPlanner::tagAccordingToCache(NULL, indexTree, indexMap);
+        Status s = QueryPlanner::tagAccordingToCache(NULL, indexTree.get(), indexMap);
         ASSERT_NOT_OK(s);
 
         // Null indexTree.
@@ -5010,12 +5027,12 @@ namespace {
         ASSERT_NOT_OK(s);
 
         // Index not found.
-        s = QueryPlanner::tagAccordingToCache(scopedCq->root(), indexTree, indexMap);
+        s = QueryPlanner::tagAccordingToCache(scopedCq->root(), indexTree.get(), indexMap);
         ASSERT_NOT_OK(s);
 
         // Index found once added to the map.
         indexMap[BSON("a" << 1)] = 0;
-        s = QueryPlanner::tagAccordingToCache(scopedCq->root(), indexTree, indexMap);
+        s = QueryPlanner::tagAccordingToCache(scopedCq->root(), indexTree.get(), indexMap);
         ASSERT_OK(s);
 
         // Regenerate canonical query in order to clear tags.
@@ -5027,7 +5044,7 @@ namespace {
         PlanCacheIndexTree* child = new PlanCacheIndexTree();
         child->setIndexEntry(IndexEntry(BSON("a" << 1)));
         indexTree->children.push_back(child);
-        s = QueryPlanner::tagAccordingToCache(scopedCq->root(), indexTree, indexMap);
+        s = QueryPlanner::tagAccordingToCache(scopedCq->root(), indexTree.get(), indexMap);
         ASSERT_NOT_OK(s);
     }
 

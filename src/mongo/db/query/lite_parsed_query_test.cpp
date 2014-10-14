@@ -48,6 +48,7 @@ namespace {
                                               false, // explain
                                               &lpq);
         ASSERT_OK(result);
+        delete lpq;
     }
 
     TEST(LiteParsedQueryTest, InitSortOrderString) {
@@ -71,6 +72,7 @@ namespace {
                                               &lpq);
         ASSERT_OK(result);
         ASSERT_EQUALS(BSON("x" << 5 ), lpq->getFilter());
+        delete lpq;
     }
 
     TEST(LiteParsedQueryTest, NumToReturn) {
@@ -84,6 +86,7 @@ namespace {
         ASSERT_OK(result);
         ASSERT_EQUALS(6, lpq->getNumToReturn());
         ASSERT(lpq->wantMore());
+        delete lpq;
 
         lpq = NULL;
         result = LiteParsedQuery::make("testns", 5, -6, 9, BSON( "x" << 5 ), BSONObj(),
@@ -95,6 +98,7 @@ namespace {
         ASSERT_OK(result);
         ASSERT_EQUALS(6, lpq->getNumToReturn());
         ASSERT(!lpq->wantMore());
+        delete lpq;
     }
 
     TEST(LiteParsedQueryTest, MinFieldsNotPrefixOfMax) {

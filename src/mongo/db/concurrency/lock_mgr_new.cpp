@@ -186,7 +186,7 @@ namespace mongo {
     // LockManager
     //
 
-    LockManager::LockManager() : _noCheckForLeakedLocksTestOnly(false) {
+    LockManager::LockManager() {
         //  Have more buckets than CPUs to reduce contention on lock and caches
         _numLockBuckets = 128;
         _lockBuckets = new LockBucket[_numLockBuckets];
@@ -199,9 +199,7 @@ namespace mongo {
             LockBucket* bucket = &_lockBuckets[i];
 
             // TODO: dump more information about the non-empty bucket to see what locks were leaked
-            if (!_noCheckForLeakedLocksTestOnly) {
-                invariant(bucket->data.empty());
-            }
+            invariant(bucket->data.empty());
         }
 
         delete[] _lockBuckets;
@@ -437,10 +435,6 @@ namespace mongo {
                 }
             }
         }
-    }
-
-    void LockManager::setNoCheckForLeakedLocksTestOnly(bool newValue) {
-        _noCheckForLeakedLocksTestOnly = newValue;
     }
 
     void LockManager::_onLockModeChanged(LockHead* lock, bool checkConflictQueue) {
