@@ -27,6 +27,8 @@
  *    then also delete it in the license file.
  */
 
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kDefault
+
 #if defined(_WIN32)
 
 #include "mongo/platform/basic.h"

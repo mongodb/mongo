@@ -26,6 +26,8 @@
  *    it in the license file.
  */
 
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kAccessControl
+
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/auth/sasl_scramsha1_server_conversation.h"

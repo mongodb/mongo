@@ -26,6 +26,8 @@
  *    it in the license file.
  */
 
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kStorage
+
 #include "mongo/db/storage/heap1/heap1_database_catalog_entry.h"
 
 #include "mongo/db/index/2d_access_method.h"

@@ -28,6 +28,8 @@
  *    then also delete it in the license file.
  */
 
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kDefault
+
 #include "mongo/platform/basic.h"
 
 #include "mongo/client/dbclientmockcursor.h"

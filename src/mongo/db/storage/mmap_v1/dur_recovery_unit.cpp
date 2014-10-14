@@ -26,6 +26,8 @@
  *    it in the license file.
  */
 
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kStorage
+
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/storage/mmap_v1/dur_recovery_unit.h"

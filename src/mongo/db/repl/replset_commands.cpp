@@ -26,6 +26,8 @@
 *    it in the license file.
 */
 
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kCommands
+
 #include "mongo/pch.h"
 
 #include "mongo/base/init.h"

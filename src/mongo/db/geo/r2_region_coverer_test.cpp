@@ -26,6 +26,8 @@
  *    it in the license file.
  */
 
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kGeo
+
 #include "mongo/db/geo/r2_region_coverer.h"
 
 #include "mongo/unittest/unittest.h"

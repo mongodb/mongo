@@ -28,6 +28,8 @@
  *    it in the license file.
  */
 
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kDefault
+
 #include "mongo/unittest/unittest.h"
 
 #include "mongo/db/matcher/expression_parser.h"

@@ -26,6 +26,8 @@
  *    then also delete it in the license file.
  */
 
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kSharding
+
 #include "mongo/db/json.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/query/interval.h"

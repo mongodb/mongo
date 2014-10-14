@@ -25,6 +25,8 @@
  *    then also delete it in the license file.
  */
 
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kDefault
+
 #include "mongo/base/owned_pointer_map.h"
 #include "mongo/platform/random.h"
 #include "mongo/s/balancer_policy.h"

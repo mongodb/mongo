@@ -25,6 +25,8 @@
  *    then also delete it in the license file.
  */
 
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kDefault
+
 #include "mongo/scripting/v8-3.25_profiler.h"
 
 #include "mongo/util/log.h"

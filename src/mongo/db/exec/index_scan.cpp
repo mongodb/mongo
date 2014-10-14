@@ -26,6 +26,8 @@
  *    it in the license file.
  */
 
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kQuery
+
 #include "mongo/db/exec/index_scan.h"
 
 #include "mongo/db/exec/filter.h"

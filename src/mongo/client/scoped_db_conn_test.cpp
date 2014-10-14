@@ -25,6 +25,8 @@
  *    then also delete it in the license file.
  */
 
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kDefault
+
 #include "mongo/base/init.h"
 #include "mongo/client/connpool.h"
 #include "mongo/platform/cstdint.h"
