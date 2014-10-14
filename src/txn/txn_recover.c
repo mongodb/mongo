@@ -234,7 +234,7 @@ __txn_op_apply(
 
 	/* Reset the cursor so it doesn't block eviction. */
 	if (cursor != NULL)
-		WT_ERR(cursor->remove(cursor));
+		WT_ERR(cursor->reset(cursor));
 
 	r->modified = 1;
 
