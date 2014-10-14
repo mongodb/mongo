@@ -367,14 +367,6 @@ tasks:
           - key: "package"
             value: "common/bsonutil"
     - func: "run unit test"
-    - func: "move coverage data"
-    - func: "generate coverage html + text"
-    - func: "upload coverage report"
-    - func: "upload coverage report"
-      vars:
-        format: "html"
-        content_type: "text/html"
-    - func: "attach coverage reports"
 
 - name: db
   commands:
@@ -397,14 +389,6 @@ tasks:
     - func: "start mongod"
     - func: "setup integration test"
     - func: "run unit test"
-    - func: "move coverage data"
-    - func: "generate coverage html + text"
-    - func: "upload coverage report"
-    - func: "upload coverage report"
-      vars:
-        format: "html"
-        content_type: "text/html"
-    - func: "attach coverage reports"
 
 - name: dist
   depends_on:
@@ -525,14 +509,6 @@ tasks:
           - key: "package"
             value: "common/json"
     - func: "run unit test"
-    - func: "move coverage data"
-    - func: "generate coverage html + text"
-    - func: "upload coverage report"
-    - func: "upload coverage report"
-      vars:
-        format: "html"
-        content_type: "text/html"
-    - func: "attach coverage reports"
 
 - name: legacy
   depends_on:
@@ -619,14 +595,6 @@ tasks:
           - key: "package"
             value: "common/log"
     - func: "run unit test"
-    - func: "move coverage data"
-    - func: "generate coverage html + text"
-    - func: "upload coverage report"
-    - func: "upload coverage report"
-      vars:
-        format: "html"
-        content_type: "text/html"
-    - func: "attach coverage reports"
 
 - name: pool
   commands:
@@ -642,14 +610,6 @@ tasks:
           - key: "package"
             value: "common/pool"
     - func: "run unit test"
-    - func: "move coverage data"
-    - func: "generate coverage html + text"
-    - func: "upload coverage report"
-    - func: "upload coverage report"
-      vars:
-        format: "html"
-        content_type: "text/html"
-    - func: "attach coverage reports"
 
 - name: progress
   commands:
@@ -665,14 +625,6 @@ tasks:
           - key: "package"
             value: "common/progress"
     - func: "run unit test"
-    - func: "move coverage data"
-    - func: "generate coverage html + text"
-    - func: "upload coverage report"
-    - func: "upload coverage report"
-      vars:
-        format: "html"
-        content_type: "text/html"
-    - func: "attach coverage reports"
 
 - name: text
   commands:
@@ -688,14 +640,6 @@ tasks:
           - key: "package"
             value: "common/text"
     - func: "run unit test"
-    - func: "move coverage data"
-    - func: "generate coverage html + text"
-    - func: "upload coverage report"
-    - func: "upload coverage report"
-      vars:
-        format: "html"
-        content_type: "text/html"
-    - func: "attach coverage reports"
 
 - name: unit
   commands:
@@ -733,114 +677,6 @@ tasks:
     - func: "start mongod"
     - func: "run tool tests"
 
-    # mongoimport
-    - command: expansions.update
-      params:
-        updates:
-          - key: "package"
-            value: "mongoimport"
-    - func: "move coverage data"
-    - func: "generate coverage html + text"
-    - func: "upload coverage report"
-      vars:
-        format: "txt"
-        content_type: "text/plain"
-    - func: "upload coverage report"
-      vars:
-        format: "html"
-        content_type: "text/html"
-    - func: "attach coverage reports"
-
-    # mongoexport
-    - command: expansions.update
-      params:
-        updates:
-          - key: "package"
-            value: "mongoexport"
-    - func: "move coverage data"
-    - func: "generate coverage html + text"
-    - func: "upload coverage report"
-      vars:
-        format: "txt"
-        content_type: "text/plain"
-    - func: "upload coverage report"
-      vars:
-        format: "html"
-        content_type: "text/html"
-    - func: "attach coverage reports"
-
-    # mongostat
-    - command: expansions.update
-      params:
-        updates:
-          - key: "package"
-            value: "mongostat"
-    - func: "move coverage data"
-    - func: "generate coverage html + text"
-    - func: "upload coverage report"
-      vars:
-        format: "txt"
-        content_type: "text/plain"
-    - func: "upload coverage report"
-      vars:
-        format: "html"
-        content_type: "text/html"
-    - func: "attach coverage reports"
-
-    # mongooplog
-    - command: expansions.update
-      params:
-        updates:
-          - key: "package"
-            value: "mongooplog"
-    - func: "move coverage data"
-    - func: "generate coverage html + text"
-    - func: "upload coverage report"
-      vars:
-        format: "txt"
-        content_type: "text/plain"
-    - func: "upload coverage report"
-      vars:
-        format: "html"
-        content_type: "text/html"
-    - func: "attach coverage reports"
-
-    # mongorestore
-    - command: expansions.update
-      params:
-        updates:
-          - key: "package"
-            value: "mongorestore"
-    - func: "move coverage data"
-    - func: "generate coverage html + text"
-    - func: "upload coverage report"
-      vars:
-        format: "txt"
-        content_type: "text/plain"
-    - func: "upload coverage report"
-      vars:
-        format: "html"
-        content_type: "text/html"
-    - func: "attach coverage reports"
-
-    # mongofiles
-    - command: expansions.update
-      params:
-        updates:
-          - key: "package"
-            value: "mongofiles"
-    - func: "move coverage data"
-    - func: "generate coverage html + text"
-    - func: "upload coverage report"
-      vars:
-        format: "txt"
-        content_type: "text/plain"
-    - func: "upload coverage report"
-      vars:
-        format: "html"
-        content_type: "text/html"
-    - func: "attach coverage reports"
-
 - name: util
   commands:
     - command: git.get_project
@@ -855,14 +691,6 @@ tasks:
           - key: "package"
             value: "common/util"
     - func: "run unit test"
-    - func: "move coverage data"
-    - func: "generate coverage html + text"
-    - func: "upload coverage report"
-    - func: "upload coverage report"
-      vars:
-        format: "html"
-        content_type: "text/html"
-    - func: "attach coverage reports"
 
 - name: vet
   commands:
@@ -925,8 +753,6 @@ buildvariants:
   expansions:
     <<: *mongo_url_ubuntu1204
     <<: *mongodb_default_startup_args
-    coverage: true
-    coverage_args: "-coverprofile=coverage.out"
   tasks: *ubuntu1204_tasks
 
 - name: ubuntu-ssl
@@ -946,8 +772,6 @@ buildvariants:
     <<: *mongo_url_ubuntu1204_enterprise
     <<: *mongodb_ssl_startup_args
     build_tags: -tags "ssl sasl"
-    coverage: true
-    coverage_args: "-coverprofile=coverage.out"
     edition: enterprise
     run_kinit: true
   tasks: *ubuntu1204_tasks
