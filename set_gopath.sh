@@ -1,8 +1,5 @@
 #!/bin/bash
 
-# exit on error
-set -e
-
 TOOLS_PKG='github.com/mongodb/mongo-tools'
 
 setgopath() {
