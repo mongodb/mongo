@@ -1238,7 +1238,7 @@ __wt_cksum_hw(const void *chunk, size_t len)
 	for (p = chunk;
 	    ((uintptr_t)p & (sizeof(uint32_t) - 1)) != 0 &&
 		 len > 0; ++p, --len) {
-		crc = _mm_crc32_u32(crc, *p);
+		crc = _mm_crc32_u8(crc, *p);
 	}
 
 	p64 = (const uint64_t *)p;
