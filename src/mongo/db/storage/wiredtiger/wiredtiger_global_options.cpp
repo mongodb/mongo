@@ -28,7 +28,9 @@
  *    exception statement from all source files in the program, then also delete
  *    it in the license file.
  */
- 
+
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kStorage
+
 #include "mongo/base/status.h"
 #include "mongo/util/log.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_global_options.h"
