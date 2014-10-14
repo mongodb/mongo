@@ -3,6 +3,8 @@
 # exit on error
 set -e
 
+TOOLS_PKG='github.com/mongodb/mongo-tools'
+
 setgopath() {
     local SOURCE_GOPATH=`pwd`.gopath
     local VENDOR_GOPATH=`pwd`/vendor
