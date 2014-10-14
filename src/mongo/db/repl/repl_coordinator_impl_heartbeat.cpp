@@ -160,28 +160,28 @@ namespace {
             resp = cbData.response.getValue().data;
             responseStatus = hbResponse.initialize(resp);
         }
-        const bool unauthorized = responseStatus.code() == ErrorCodes::Unauthorized;
-        if (!responseStatus.isOK() && !unauthorized) {
-            LOG(1) << "Error in heartbeat request to " << target << ";" << responseStatus;
-            if (!resp.isEmpty()) {
-                LOG(3) << "heartbeat response: " << resp;
-            }
-        }
+        const bool isUnauthorized = (responseStatus.code() == ErrorCodes::Unauthorized) ||
+                                    (responseStatus.code() == ErrorCodes::AuthenticationFailed);
         const Date_t now = _replExecutor.now();
         const OpTime lastApplied = _getLastOpApplied();  // Locks and unlocks _mutex.
         Milliseconds networkTime(0);
         StatusWith<ReplSetHeartbeatResponse> hbStatusResponse(hbResponse);
 
-        if (cbData.response.isOK()) {
+        if (responseStatus.isOK()) {
             networkTime = cbData.response.getValue().elapsedMillis;
-        }
-        else if (unauthorized) {
-            networkTime = cbData.response.getValue().elapsedMillis;
-            hbStatusResponse = StatusWith<ReplSetHeartbeatResponse>(responseStatus);
         }
         else {
+            LOG(1) << "Error in heartbeat request to " << target << "; " << responseStatus;
+            if (!resp.isEmpty()) {
+                LOG(3) << "heartbeat response: " << resp;
+            }
+
+            if (isUnauthorized) {
+                networkTime = cbData.response.getValue().elapsedMillis;
+            }
             hbStatusResponse = StatusWith<ReplSetHeartbeatResponse>(responseStatus);
         }
+
         HeartbeatResponseAction action =
             _topCoord->processHeartbeatResponse(
                     now,

@@ -26,11 +26,14 @@
 *    it in the license file.
 */
 
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kReplication
+
 #include "mongo/platform/basic.h"
 
 #include <climits>
 
 #include "mongo/db/repl/member_heartbeat_data.h"
+#include "mongo/util/log.h"
 
 namespace mongo {
 namespace repl {
@@ -69,6 +72,9 @@ namespace repl {
                                           OpTime optime,
                                           const std::string& syncingTo,
                                           const std::string& heartbeatMessage) {
+        LOG(3) << "setUpValues: heartbeat response good for member _id:"
+               << _configIndex << ", msg:  "<< heartbeatMessage;
+
         _state = state;
         _health = 1;
         if (_upSince == 0) {
@@ -85,6 +91,8 @@ namespace repl {
 
     MemberHeartbeatData& MemberHeartbeatData::setDownValues(Date_t now,
                                             const std::string& heartbeatMessage) {
+        LOG(3) << "setDownValues: heartbeat response failed for member _id:"
+               << _configIndex << ", msg:  "<< heartbeatMessage;
         _state = MemberState::RS_DOWN;
         _health = 0;
         _upSince = 0;
@@ -95,6 +103,14 @@ namespace repl {
     }
 
     MemberHeartbeatData& MemberHeartbeatData::setAuthIssue(Date_t now) {
+        LOG(3) << "setAuthIssue: heartbeat response failed due to authentication"
+                  " issue for member _id:"
+               << _configIndex;
+
+        if (_upSince == 0) {
+            _upSince = now;
+        }
+
         _lastHeartbeat = now;
         _state = MemberState::RS_UNKNOWN;
         _health = 0; // set health to 0 so that this doesn't count towards majority.

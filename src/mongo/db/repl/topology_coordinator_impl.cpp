@@ -756,7 +756,9 @@ namespace {
             }
         }
 
-        const bool unauthorized = hbResponse.getStatus().code() == ErrorCodes::Unauthorized;
+        const bool isUnauthorized =
+                            (hbResponse.getStatus().code() == ErrorCodes::Unauthorized) ||
+                            (hbResponse.getStatus().code() == ErrorCodes::AuthenticationFailed);
 
         Milliseconds alreadyElapsed(now.asInt64() - hbStats.getLastHeartbeatStartDate().asInt64());
         Date_t nextHeartbeatStartDate;
@@ -764,13 +766,13 @@ namespace {
             (hbStats.getNumFailuresSinceLastStart() <= kMaxHeartbeatRetries) &&
             (alreadyElapsed < _currentConfig.getHeartbeatTimeoutPeriodMillis())) {
 
-            if (!hbResponse.isOK() && !unauthorized) {
+            if (!hbResponse.isOK() && !isUnauthorized) {
                 LOG(1) << "Bad heartbeat response from " << target <<
                     "; trying again; Retries left: " <<
                     (kMaxHeartbeatRetries - hbStats.getNumFailuresSinceLastStart()) <<
                     "; " << alreadyElapsed.total_milliseconds() << "ms have already elapsed";
             }
-            if (unauthorized) {
+            if (isUnauthorized) {
                 nextHeartbeatStartDate = now + kHeartbeatInterval.total_milliseconds();
             } else {
                 nextHeartbeatStartDate = now;
@@ -829,7 +831,7 @@ namespace {
 
         MemberHeartbeatData& hbData = _hbdata[memberIndex];
         if (!hbResponse.isOK()) {
-            if (unauthorized) {
+            if (isUnauthorized) {
                 hbData.setAuthIssue(now);
             } else {
                 hbData.setDownValues(now, hbResponse.getStatus().reason());
