@@ -162,11 +162,7 @@ namespace repl {
                                            BSONObjBuilder* response,
                                            Status* result);
         virtual void fillIsMasterForReplSet(IsMasterResponse* response);
-        virtual void prepareFreezeResponse(const ReplicationExecutor::CallbackData& data,
-                                           Date_t now,
-                                           int secs,
-                                           BSONObjBuilder* response,
-                                           Status* result);
+        virtual void prepareFreezeResponse(Date_t now, int secs, BSONObjBuilder* response);
         virtual void updateConfig(const ReplicaSetConfig& newConfig,
                                   int selfIndex,
                                   Date_t now,

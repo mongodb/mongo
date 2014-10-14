@@ -1373,20 +1373,23 @@ namespace {
     }
 
     void TopologyCoordinatorImpl::prepareFreezeResponse(
-            const ReplicationExecutor::CallbackData& data,
-            Date_t now,
-            int secs,
-            BSONObjBuilder* response,
-            Status* result) {
-        if (data.status == ErrorCodes::CallbackCanceled) {
-            *result = Status(ErrorCodes::ShutdownInProgress, "replication system is shutting down");
-            return;
-        }
+            Date_t now, int secs, BSONObjBuilder* response) {
 
         if (secs == 0) {
             _stepDownUntil = now;
             log() << "replSet info 'unfreezing'";
             response->append("info", "unfreezing");
+
+            if (_followerMode == MemberState::RS_SECONDARY &&
+                    _currentConfig.getNumMembers() == 1 &&
+                    _selfIndex == 0 &&
+                    _currentConfig.getMemberAt(_selfIndex).isElectable()) {
+                // If we are a one-node replica set, we're the one member,
+                // we're electable, and we are currently in followerMode SECONDARY,
+                // we must transition to candidate now that our stepdown period
+                // is no longer active, in leiu of heartbeats.
+                _role = Role::candidate;
+            }
         }
         else {
             if ( secs == 1 )
@@ -1400,7 +1403,6 @@ namespace {
                 log() << "replSet info received freeze command but we are primary";
             }
         }
-        *result = Status::OK();
     }
 
     void TopologyCoordinatorImpl::setStepDownTime(Date_t newTime) {

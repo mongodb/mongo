@@ -337,7 +337,13 @@ namespace repl {
                                          BSONObjBuilder* response,
                                          Status* result);
 
-
+        /**
+         * Bottom half of processReplSetFreeze.
+         */
+        void _processReplSetFreeze_finish(const ReplicationExecutor::CallbackData& cbData,
+                                          int secs,
+                                          BSONObjBuilder* response,
+                                          Status* result);
         /*
          * Bottom half of clearSyncSourceBlacklist
          */

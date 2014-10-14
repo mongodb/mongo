@@ -1230,19 +1230,43 @@ namespace {
     Status ReplicationCoordinatorImpl::processReplSetFreeze(int secs, BSONObjBuilder* resultObj) {
         Status result(ErrorCodes::InternalError, "didn't set status in prepareFreezeResponse");
         CBHStatus cbh = _replExecutor.scheduleWork(
-            stdx::bind(&TopologyCoordinator::prepareFreezeResponse,
-                       _topCoord.get(),
+            stdx::bind(&ReplicationCoordinatorImpl::_processReplSetFreeze_finish,
+                       this,
                        stdx::placeholders::_1,
-                       _replExecutor.now(),
                        secs,
                        resultObj,
                        &result));
         if (cbh.getStatus() == ErrorCodes::ShutdownInProgress) {
-            return Status(ErrorCodes::ShutdownInProgress, "replication shutdown in progress");
+            return cbh.getStatus();
         }
         fassert(18641, cbh.getStatus());
         _replExecutor.wait(cbh.getValue());
         return result;
+    }
+
+    void ReplicationCoordinatorImpl::_processReplSetFreeze_finish(
+            const ReplicationExecutor::CallbackData& cbData,
+            int secs,
+            BSONObjBuilder* response,
+            Status* result) {
+        if (cbData.status == ErrorCodes::CallbackCanceled) {
+            *result = Status(ErrorCodes::ShutdownInProgress, "replication system is shutting down");
+            return;
+        }
+
+        _topCoord->prepareFreezeResponse(_replExecutor.now(), secs, response);
+
+        if (_topCoord->getRole() == TopologyCoordinator::Role::candidate) {
+            // If we just unfroze and ended our stepdown period and we are a one node replica set,
+            // the topology coordinator will have gone into the candidate role to signal that we
+            // need to elect ourself.
+            _topCoord->processWinElection(OID::gen(), getNextGlobalOptime());
+            _isWaitingForDrainToComplete = true;
+
+            boost::lock_guard<boost::mutex> lock(_mutex);
+            _updateCurrentMemberStateFromTopologyCoordinator_inlock();
+        }
+        *result = Status::OK();
     }
 
     Status ReplicationCoordinatorImpl::processHeartbeat(const ReplSetHeartbeatArgs& args,

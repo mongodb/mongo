@@ -207,11 +207,7 @@ namespace repl {
         virtual void fillIsMasterForReplSet(IsMasterResponse* response) = 0;
 
         // produce a reply to a freeze request
-        virtual void prepareFreezeResponse(const ReplicationExecutor::CallbackData& data,
-                                           Date_t now,
-                                           int secs,
-                                           BSONObjBuilder* response,
-                                           Status* result) = 0;
+        virtual void prepareFreezeResponse(Date_t now, int secs, BSONObjBuilder* response) = 0;
 
         ////////////////////////////////////////////////////////////
         //

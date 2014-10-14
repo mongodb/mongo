@@ -1922,9 +1922,8 @@ namespace {
         ASSERT_NO_ACTION(nextAction.getAction());
 
         // freeze node to set stepdown wait
-        Status result = Status::OK();
         BSONObjBuilder response;
-        getTopoCoord().prepareFreezeResponse(cbData(), now()++, 20, &response, &result);
+        getTopoCoord().prepareFreezeResponse(now()++, 20, &response);
 
         nextAction = receiveDownHeartbeat(HostAndPort("host2"), "rs0", lastOpTimeApplied);
         ASSERT_EQUALS(-1, getCurrentPrimaryIndex());
@@ -2789,20 +2788,17 @@ namespace {
                          0);
         }
 
-        BSONObj prepareFreezeResponse(int duration,
-                                      Status& result) {
+        BSONObj prepareFreezeResponse(int duration) {
             BSONObjBuilder response;
             startCapturingLogMessages();
-            getTopoCoord().prepareFreezeResponse(cbData(), now()++, duration, &response, &result);
+            getTopoCoord().prepareFreezeResponse(now()++, duration, &response);
             stopCapturingLogMessages();
             return response.obj();
         }
     };
 
     TEST_F(PrepareFreezeResponseTest, UnfreezeEvenWhenNotFrozen) {
-        Status result = Status(ErrorCodes::InternalError, "");
-        BSONObj response = prepareFreezeResponse(0, result);
-        ASSERT_EQUALS(Status::OK(), result);
+        BSONObj response = prepareFreezeResponse(0);
         ASSERT_EQUALS("unfreezing", response["info"].String());
         ASSERT_EQUALS(1, countLogLinesContaining("replSet info 'unfreezing'"));
         // 1 instead of 0 because it assigns to "now" in this case
@@ -2810,9 +2806,7 @@ namespace {
     }
 
     TEST_F(PrepareFreezeResponseTest, FreezeForOneSecond) {
-        Status result = Status(ErrorCodes::InternalError, "");
-        BSONObj response = prepareFreezeResponse(1, result);
-        ASSERT_EQUALS(Status::OK(), result);
+        BSONObj response = prepareFreezeResponse(1);
         ASSERT_EQUALS("you really want to freeze for only 1 second?",
                       response["warning"].String());
         ASSERT_EQUALS(1, countLogLinesContaining("replSet info 'freezing' for 1 seconds"));
@@ -2821,9 +2815,7 @@ namespace {
     }
 
     TEST_F(PrepareFreezeResponseTest, FreezeForManySeconds) {
-        Status result = Status(ErrorCodes::InternalError, "");
-        BSONObj response = prepareFreezeResponse(20, result);
-        ASSERT_EQUALS(Status::OK(), result);
+        BSONObj response = prepareFreezeResponse(20);
         ASSERT_TRUE(response.isEmpty());
         ASSERT_EQUALS(1, countLogLinesContaining("replSet info 'freezing' for 20 seconds"));
         // 20001 because "now" was incremented once during initialization + 20000 ms wait
@@ -2832,9 +2824,7 @@ namespace {
 
     TEST_F(PrepareFreezeResponseTest, UnfreezeEvenWhenNotFrozenWhilePrimary) {
         makeSelfPrimary();
-        Status result = Status(ErrorCodes::InternalError, "");
-        BSONObj response = prepareFreezeResponse(0, result);
-        ASSERT_EQUALS(Status::OK(), result);
+        BSONObj response = prepareFreezeResponse(0);
         ASSERT_EQUALS("unfreezing", response["info"].String());
         // doesn't mention being primary in this case for some reason
         ASSERT_EQUALS(0, countLogLinesContaining(
@@ -2845,9 +2835,7 @@ namespace {
 
     TEST_F(PrepareFreezeResponseTest, FreezeForOneSecondWhilePrimary) {
         makeSelfPrimary();
-        Status result = Status(ErrorCodes::InternalError, "");
-        BSONObj response = prepareFreezeResponse(1, result);
-        ASSERT_EQUALS(Status::OK(), result);
+        BSONObj response = prepareFreezeResponse(1);
         ASSERT_EQUALS("you really want to freeze for only 1 second?",
                       response["warning"].String());
         ASSERT_EQUALS(1, countLogLinesContaining(
@@ -2857,9 +2845,7 @@ namespace {
 
     TEST_F(PrepareFreezeResponseTest, FreezeForManySecondsWhilePrimary) {
         makeSelfPrimary();
-        Status result = Status(ErrorCodes::InternalError, "");
-        BSONObj response = prepareFreezeResponse(20, result);
-        ASSERT_EQUALS(Status::OK(), result);
+        BSONObj response = prepareFreezeResponse(20);
         ASSERT_TRUE(response.isEmpty());
         ASSERT_EQUALS(1, countLogLinesContaining(
                 "replSet info received freeze command but we are primary"));
@@ -2900,18 +2886,6 @@ namespace {
                                              Date_t(0),
                                              0,
                                              OpTime(0,0),
-                                             &response,
-                                             &result);
-        ASSERT_EQUALS(ErrorCodes::ShutdownInProgress, result);
-        ASSERT_TRUE(response.obj().isEmpty());
-    }
-
-    TEST_F(ShutdownInProgressTest, ShutDownInProgressWhenCallbackCanceledFreeze) {
-        Status result = Status::OK();
-        BSONObjBuilder response;
-        getTopoCoord().prepareFreezeResponse(cbData(),
-                                             Date_t(0),
-                                             0,
                                              &response,
                                              &result);
         ASSERT_EQUALS(ErrorCodes::ShutdownInProgress, result);
