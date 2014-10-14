@@ -88,6 +88,7 @@ __wt_fallocate(
 	WT_UNUSED(fh);
 	WT_UNUSED(offset);
 	WT_UNUSED(len);
+	WT_UNUSED(ret);
 #endif
 
 	fh->fallocate_available = 0;
