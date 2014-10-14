@@ -163,6 +163,7 @@ functions:
     params:
       working_dir: src
       script: |
+        ./vendor.sh
         . ./set_gopath.sh
         if [ "${library_path}" != "" ]; then
             export ${library_path}
