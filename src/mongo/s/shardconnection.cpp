@@ -340,6 +340,7 @@ namespace mongo {
                 if (iter->second->avail != NULL) {
                     delete iter->second->avail;
                 }
+                delete iter->second;
             }
 
             _hosts.clear();
