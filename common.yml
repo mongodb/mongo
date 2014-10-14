@@ -168,6 +168,7 @@ functions:
             export ${library_path}
         fi
         export MONGODB_KERBEROS_PASSWORD=${kerberos_password}
+        cd ${package}
         go test ${coverage_args} ${args} ${build_tags}
 
   "setup integration test":
