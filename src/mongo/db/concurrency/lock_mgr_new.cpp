@@ -203,6 +203,8 @@ namespace mongo {
                 invariant(bucket->data.empty());
             }
         }
+
+        delete[] _lockBuckets;
     }
 
     LockResult LockManager::lock(const ResourceId& resId, LockRequest* request, LockMode mode) {
