@@ -365,10 +365,10 @@ namespace mongo {
         {
             boost_unique_lock lk(parentMutex);
 
-            if (!parentOp)
-                return;
-
-            parentOp->noteResult(host, result);
+            if (parentOp)
+                parentOp->noteResult(host, result);
+            else if(result.isOK())
+                delete result.getValue();
         }
     }
 
