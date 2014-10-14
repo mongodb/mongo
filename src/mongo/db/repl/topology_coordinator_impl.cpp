@@ -1296,11 +1296,6 @@ namespace {
         }
 
         response->append("members", membersOut);
-        /* TODO: decide where this lands
-        if( replSetBlind )
-            result.append("blind",true); // to avoid confusion if set...
-                                         // normally never set except for testing.
-        */
         *result = Status::OK();
     }
 

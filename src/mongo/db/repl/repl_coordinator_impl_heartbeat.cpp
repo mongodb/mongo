@@ -61,8 +61,6 @@ namespace {
 
 }  //namespace
 
-    MONGO_FP_DECLARE(rsHeartbeatRequestNoopByMember);
-
     void ReplicationCoordinatorImpl::_doMemberHeartbeat(ReplicationExecutor::CallbackData cbData,
                                                         const HostAndPort& target) {
 
@@ -71,51 +69,12 @@ namespace {
             return;
         }
 
-        // Are we blind, or do we have a failpoint setup to ignore this member?
-        bool dontHeartbeatMember = false; // TODO: replSetBlind should be here as the default
-
-        MONGO_FAIL_POINT_BLOCK(rsHeartbeatRequestNoopByMember, member) {
-            const StringData& stopMember = member.getData()["member"].valueStringData();
-            HostAndPort ignoreHAP;
-            Status status = ignoreHAP.initialize(stopMember);
-            // Ignore
-            if (status.isOK()) {
-                if (target == ignoreHAP) {
-                    dontHeartbeatMember = true;
-                }
-            }
-            else {
-                log() << "replset: Bad member for rsHeartbeatRequestNoopByMember failpoint "
-                       <<  member.getData() << ". 'member' failed to parse into HostAndPort -- "
-                       << status;
-            }
-        }
-
         const Date_t now = _replExecutor.now();
         const std::pair<ReplSetHeartbeatArgs, Milliseconds> hbRequest =
             _topCoord->prepareHeartbeatRequest(
                     now,
                     _settings.ourSetName(),
                     target);
-        if (dontHeartbeatMember) {
-            // Don't issue real heartbeats, just call start again after the timeout.
-            const StatusWith<ReplSetHeartbeatResponse> responseStatus(
-                    ErrorCodes::UnknownError,
-                    str::stream() << "Failure forced for heartbeat to " <<
-                    target.toString() << " due to failpoint.");
-            const HeartbeatResponseAction action =
-                _topCoord->processHeartbeatResponse(
-                        now,
-                        Milliseconds(0),
-                        target,
-                        responseStatus,
-                        _getLastOpApplied());
-            _scheduleHeartbeatToTarget(
-                    target,
-                    action.getNextHeartbeatStartDate());
-            _handleHeartbeatResponseAction(action, responseStatus);
-            return;
-        }
 
         const CmdRequest request(target, "admin", hbRequest.first.toBSON(), hbRequest.second);
         const ReplicationExecutor::RemoteCommandCallbackFn callback = stdx::bind(

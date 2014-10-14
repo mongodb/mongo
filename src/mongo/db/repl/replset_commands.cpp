@@ -49,7 +49,6 @@
 namespace mongo {
 namespace repl {
 
-    bool replSetBlind = false;
     unsigned replSetForceInitialSyncFailure = 0;
 
     // Testing only, enabled via command-line.
@@ -74,11 +73,6 @@ namespace repl {
             Status status = getGlobalReplicationCoordinator()->checkReplEnabledForCommand(&result);
             if (!status.isOK())
                 return appendCommandStatus(result, status);
-
-            if( cmdObj.hasElement("blind") ) {
-                replSetBlind = cmdObj.getBoolField("blind");
-                return true;
-            }
 
             return false;
         }
