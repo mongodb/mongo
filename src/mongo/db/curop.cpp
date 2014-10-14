@@ -170,7 +170,9 @@ namespace mongo {
 
         builder->append( "op" , opToString( _op ) );
 
-        builder->append("ns", _ns.toString());
+        // Fill out "ns" from our namespace member (and if it's not available, fall back to the
+        // OpDebug namespace member).
+        builder->append("ns", !_ns.empty() ? _ns.toString() : _debug.ns.toString());
 
         if (_op == dbInsert) {
             _query.append(*builder, "insert");
@@ -214,7 +216,11 @@ namespace mongo {
         bool a = _active && _start;
         bob.append("active", a);
         bob.append( "op" , opToString( _op ) );
-        bob.append("ns", _ns.toString());
+
+        // Fill out "ns" from our namespace member (and if it's not available, fall back to the
+        // OpDebug namespace member).
+        bob.append("ns", !_ns.empty() ? _ns.toString() : _debug.ns.toString());
+
         if (_op == dbInsert) {
             _query.append(bob, "insert");
         }
