@@ -232,14 +232,15 @@ namespace {
                     }
                 }
 
-                if (it->getState() == MemberState::RS_SECONDARY) {
-                    // only consider secondaries that are ahead of where we are
-                    if (it->getOpTime() <= lastOpApplied)
-                        continue;
-                    // omit secondaries that are excessively behind, on the first attempt at least.
-                    if (attempts == 0 &&
-                        it->getOpTime() < oldestSyncOpTime)
-                        continue;
+                // only consider candidates that are ahead of where we are
+                if (it->getOpTime() <= lastOpApplied) {
+                    continue;
+                }
+
+                // omit candidates that are excessively behind, on the first attempt at least.
+                if (attempts == 0 &&
+                    it->getOpTime() < oldestSyncOpTime) {
+                    continue;
                 }
 
                 // omit nodes that are more latent than anything we've already considered

@@ -239,7 +239,7 @@ namespace {
         boost::unique_lock<boost::mutex> lk(_mutex);
         invariant(_rsConfigState == kConfigStartingUp);
         _setCurrentRSConfig_inlock(localConfig, myIndex.getValue());
-        _setLastOptime_inlock(&lk, _getMyRID_inlock(), lastOpTime);
+        _setMyLastOptime_inlock(&lk, lastOpTime);
     }
 
     void ReplicationCoordinatorImpl::startReplication(OperationContext* txn) {
@@ -509,7 +509,16 @@ namespace {
 
     Status ReplicationCoordinatorImpl::setMyLastOptime(OperationContext* txn, const OpTime& ts) {
         boost::unique_lock<boost::mutex> lock(_mutex);
-        return _setLastOptime_inlock(&lock, _getMyRID_inlock(), ts);
+        _setMyLastOptime_inlock(&lock, ts);
+        return Status::OK();
+    }
+
+    void ReplicationCoordinatorImpl::_setMyLastOptime_inlock(
+        boost::unique_lock<boost::mutex>* lock, const OpTime& ts) {
+
+        invariant(lock->owns_lock());
+        SlaveInfo& slaveInfo = _slaveInfoMap[_getMyRID_inlock()];
+        _updateOptimeInMap_inlock(lock, &slaveInfo, ts);
     }
 
     OpTime ReplicationCoordinatorImpl::getMyLastOptime() const {
@@ -550,32 +559,42 @@ namespace {
         }
 
         LOG(3) << "Node with RID " << rid << " currently has optime " << slaveInfo.opTime <<
-                "; updating to " << ts;
+            "; updating to " << ts;
 
-        // Only update optimes if they increase.  Exception: this own node's last applied optime,
-        // which may rewind if we roll back.
-        if ((slaveInfo.opTime < ts) || (rid == _myRID)) {
-            slaveInfo.opTime = ts;
-
-            // Wake up any threads waiting for replication that now have their replication
-            // check satisfied
-            for (std::vector<WaiterInfo*>::iterator it = _replicationWaiterList.begin();
-                    it != _replicationWaiterList.end(); ++it) {
-                WaiterInfo* info = *it;
-                if (_doneWaitingForReplication_inlock(*info->opTime, *info->writeConcern)) {
-                    info->condVar->notify_all();
-                }
-            }
-
-            if (_getReplicationMode_inlock() == modeReplSet &&
-                    !_getCurrentMemberState_inlock().primary()) {
-                // pass along if we are not primary
-                lock->unlock();
-                _externalState->forwardSlaveProgress(); // Must do this outside _mutex
-            }
+        // Only update remote optimes if they increase.
+        if (slaveInfo.opTime < ts) {
+            _updateOptimeInMap_inlock(lock, &slaveInfo, ts);
         }
         return Status::OK();
     }
+
+    void ReplicationCoordinatorImpl::_updateOptimeInMap_inlock(
+        boost::unique_lock<boost::mutex>* lock,
+        SlaveInfo* slaveInfo,
+        OpTime ts) {
+
+        invariant(lock->owns_lock());
+
+        slaveInfo->opTime = ts;
+
+        // Wake up any threads waiting for replication that now have their replication
+        // check satisfied
+        for (std::vector<WaiterInfo*>::iterator it = _replicationWaiterList.begin();
+             it != _replicationWaiterList.end(); ++it) {
+            WaiterInfo* info = *it;
+            if (_doneWaitingForReplication_inlock(*info->opTime, *info->writeConcern)) {
+                info->condVar->notify_all();
+            }
+        }
+
+        if (_getReplicationMode_inlock() == modeReplSet &&
+            !_getCurrentMemberState_inlock().primary()) {
+            // pass along if we are not primary
+            lock->unlock();
+            _externalState->forwardSlaveProgress(); // Must do this outside _mutex
+        }
+    }
+
 
     OpTime ReplicationCoordinatorImpl::_getLastOpApplied() {
         boost::lock_guard<boost::mutex> lk(_mutex);
@@ -1943,8 +1962,7 @@ namespace {
         else {
             lastOpTime = lastOpTimeStatus.getValue();
         }
-        boost::unique_lock<boost::mutex> lk(_mutex);
-        _setLastOptime_inlock(&lk, _getMyRID_inlock(), lastOpTime);
+        setMyLastOptime(txn, lastOpTime);
     }
 
     void ReplicationCoordinatorImpl::_shouldChangeSyncSource(

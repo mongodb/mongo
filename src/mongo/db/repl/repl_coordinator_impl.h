@@ -425,7 +425,7 @@ namespace repl {
                 bool* success);
 
         /**
-         * Helper method for setLastOptime and setMyLastOptime that takes in a unique lock on
+         * Helper method for setLastOptime that takes in a unique lock on
          * _mutex.  The passed in lock must already be locked.  It is unknown what state the lock
          * will be in after this method finishes.
          */
@@ -433,6 +433,21 @@ namespace repl {
                                      const OID& rid,
                                      const OpTime& ts);
 
+        /**
+         * Helper method for setMyLastOptime that takes in a unique lock on
+         * _mutex.  The passed in lock must already be locked.  It is unknown what state the lock
+         * will be in after this method finishes.
+         */
+        void _setMyLastOptime_inlock(boost::unique_lock<boost::mutex>* lock, const OpTime& ts);
+
+        /**
+         * Helper method for _setLastOptime_inlock and _setMyLastOptime_inlock that takes in a
+         * unique lock on _mutex.  The passed in lock must already be locked.  It is unknown what
+         * state the lock will be in after this method finishes.
+         */
+        void _updateOptimeInMap_inlock(boost::unique_lock<boost::mutex>* lock,
+                                       SlaveInfo* slaveInfo,
+                                       OpTime ts);
         /**
          * Schedules a heartbeat to be sent to "target" at "when".
          */
