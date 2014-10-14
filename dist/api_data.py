@@ -811,6 +811,10 @@ methods = {
 'wiredtiger_open' : Method(
 	connection_runtime_config +
 	common_wiredtiger_open + [
+	Config('config_base', 'true', r'''
+	    write the base configuration file if creating the database,
+	    see @ref config_base for more information''',
+	    type='boolean'),
 	Config('create', 'false', r'''
 	    create the database if it does not exist''',
 	    type='boolean'),
@@ -837,6 +841,10 @@ methods = {
 'wiredtiger_open_all' : Method(
 	connection_runtime_config +
 	common_wiredtiger_open + [
+	Config('config_base', 'true', r'''
+	    write the base configuration file if creating the database,
+	    see @ref config_base for more information''',
+	    type='boolean'),
 	Config('create', 'false', r'''
 	    create the database if it does not exist''',
 	    type='boolean'),

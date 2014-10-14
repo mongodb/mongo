@@ -1542,8 +1542,12 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
 	 * We've completed configuration, write the base configuration file if
 	 * we're creating the database.
 	 */
-	if (conn->is_new)
-		WT_ERR(__conn_write_config(session, WT_BASECONFIG, cfg));
+	if (conn->is_new) {
+		WT_ERR(__wt_config_gets(session, cfg, "config_base", &cval));
+		if (cval.val)
+			WT_ERR(
+			    __conn_write_config(session, WT_BASECONFIG, cfg));
+	}
 
 	/*
 	 * Start the worker threads last.

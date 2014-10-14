@@ -25,10 +25,11 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 
+import os
 import wiredtiger, wttest
 
-# test_isnew.py
-#    connection level is-new operation.
+# test_isnew
+#    database is-new method
 class test_isnew(wttest.WiredTigerTestCase):
 
     # Test is-new of a connection.
@@ -40,6 +41,36 @@ class test_isnew(wttest.WiredTigerTestCase):
         self.conn.close()
         self.conn = self.setUpConnectionOpen(".")
         self.assertEquals(self.conn.is_new(), False)
+
+
+# test_gethome
+#    database get-home method
+class test_gethome(wttest.WiredTigerTestCase):
+
+    # Test gethome of a connection, the initially created one is ".".
+    def test_gethome_default(self):
+        self.assertEquals(self.conn.get_home(), '.')
+
+    # Create a new database directory, open it and check its name.
+    def test_gethome_new(self):
+        name = 'new_database'
+        os.mkdir(name)
+        self.conn.close()
+        self.conn = self.setUpConnectionOpen(name)
+        self.assertEquals(self.conn.get_home(), name)
+
+
+# test_base_config
+#       test base configuration file config.
+class test_base_config(wttest.WiredTigerTestCase):
+    def test_base_config(self):
+        # We just created a database, there should be a base configuration file.
+        self.assertTrue(os.path.exists("./WiredTiger.basecfg"))
+
+        # Open up another database, configure without base configuration.
+        os.mkdir("A")
+        conn = wiredtiger.wiredtiger_open("A", "create,config_base=false")
+        self.assertFalse(os.path.exists("A/WiredTiger.basecfg"))
 
 
 if __name__ == '__main__':

@@ -31,12 +31,12 @@ each of which is ordered by one or more columns.
 - @subpage checkpoint
 - @subpage durability
 - @subpage backup
-- @subpage upgrade
 - @subpage async
 - @subpage compact
 - @subpage statistics
 - @subpage shared_cache
 - @subpage cursor_log
+- @subpage upgrade
 
 <h2>Extending WiredTiger</h2>
 - @subpage extensions
