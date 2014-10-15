@@ -268,7 +268,7 @@ namespace {
                     if (vetoed->second > now) {
                         if (now % 5 == 0) {
                             log() << "replSet not trying to sync from " << vetoed->first
-                                  << ", it is vetoed for " << (vetoed->second - now) 
+                                  << ", it is vetoed for " << (vetoed->second - now)/1000
                                   << " more seconds";
                         }
                         continue;
