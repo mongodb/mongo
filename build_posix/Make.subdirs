@@ -16,8 +16,8 @@ ext/test/kvs_bdb HAVE_BERKELEY_DB
 api/leveldb LEVELDB
 bench/wtperf
 examples/c
-examples/java JAVA
 lang/java JAVA
+examples/java JAVA
 lang/python PYTHON
 test/bloom
 test/checkpoint
