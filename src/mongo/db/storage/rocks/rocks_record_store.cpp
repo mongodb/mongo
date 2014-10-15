@@ -128,7 +128,7 @@ namespace mongo {
         RocksRecoveryUnit* ru = RocksRecoveryUnit::getRocksRecoveryUnit( txn );
 
         std::string oldValue;
-        _db->Get(_readOptions(txn), _columnFamily.get(), _makeKey(dl), &oldValue);
+        ru->Get(_columnFamily.get(), _makeKey(dl), &oldValue);
         int oldLength = oldValue.size();
 
         ru->writeBatch()->Delete(_columnFamily.get(), _makeKey(dl));
@@ -249,7 +249,7 @@ namespace mongo {
         // get original value
         std::string value;
         rocksdb::Status status;
-        status = _db->Get(_readOptions(txn), _columnFamily.get(), key, &value);
+        status = ru->Get(_columnFamily.get(), key, &value);
 
         if ( !status.ok() ) {
             if ( status.IsNotFound() )
@@ -370,6 +370,7 @@ namespace mongo {
 
     Status RocksRecordStore::touch(OperationContext* txn, BSONObjBuilder* output) const {
         Timer t;
+        // no need to use snapshot here, since we're just loading records into memory
         boost::scoped_ptr<rocksdb::Iterator> itr(
             _db->NewIterator(_readOptions(), _columnFamily.get()));
         itr->SeekToFirst();
