@@ -161,7 +161,7 @@ namespace mongo {
                         warning() << ss.ss.str() << "; skipping";
                         continue;
                     }
-                    uasserted(28530, ss);
+                    uasserted(28531, ss);
                 }
 
                 ++numSeen;
