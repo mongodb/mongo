@@ -125,6 +125,8 @@ namespace repl {
 
         virtual void fillIsMasterForReplSet(IsMasterResponse* result);
 
+        virtual void appendSlaveInfoData(BSONObjBuilder* result);
+
         virtual void processReplSetGetConfig(BSONObjBuilder* result);
 
         virtual Status setMaintenanceMode(OperationContext* txn, bool activate);

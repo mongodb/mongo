@@ -181,6 +181,8 @@ namespace repl {
 
     void ReplicationCoordinatorMock::fillIsMasterForReplSet(IsMasterResponse* result) {}
 
+    void ReplicationCoordinatorMock::appendSlaveInfoData(BSONObjBuilder* result) {}
+
     Status ReplicationCoordinatorMock::setMaintenanceMode(OperationContext* txn, bool activate) {
         return Status::OK();
     }

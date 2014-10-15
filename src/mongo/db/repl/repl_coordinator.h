@@ -350,6 +350,12 @@ namespace repl {
         virtual void fillIsMasterForReplSet(IsMasterResponse* result) = 0;
 
         /**
+         * Adds to "result" a description of the slaveInfo data structure used to map RIDs to their
+         * last known optimes.
+         */
+        virtual void appendSlaveInfoData(BSONObjBuilder* result) = 0;
+
+        /**
          * Handles an incoming replSetGetConfig command. Adds BSON to 'result'.
          */
         virtual void processReplSetGetConfig(BSONObjBuilder* result) = 0;

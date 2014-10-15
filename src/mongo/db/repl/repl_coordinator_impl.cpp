@@ -1378,6 +1378,26 @@ namespace {
         _topCoord->fillIsMasterForReplSet(response);
     }
 
+    void ReplicationCoordinatorImpl::appendSlaveInfoData(BSONObjBuilder* result) {
+        boost::lock_guard<boost::mutex> lock(_mutex);
+        BSONArrayBuilder slaves(result->subarrayStart("slaves"));
+        {
+            for (SlaveInfoVector::const_iterator itr = _slaveInfo.begin();
+                    itr != _slaveInfo.end(); ++itr) {
+                BSONObjBuilder entry(slaves.subobjStart());
+                entry.append("rid", itr->rid);
+                entry.append("optime", itr->opTime);
+                entry.append("host", itr->hostAndPort.toString());
+                if (_getReplicationMode_inlock() == modeReplSet) {
+                    if (_thisMembersConfigIndex == -1) {
+                        continue;
+                    }
+                    invariant(itr->memberID >= 0);
+                    entry.append("memberID", itr->memberID);
+                }
+            }
+        }
+    }
 
     void ReplicationCoordinatorImpl::processReplSetGetConfig(BSONObjBuilder* result) {
         boost::lock_guard<boost::mutex> lock(_mutex);

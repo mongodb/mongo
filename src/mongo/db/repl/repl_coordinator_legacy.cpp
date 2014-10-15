@@ -576,6 +576,25 @@ namespace {
         }
     }
 
+    void LegacyReplicationCoordinator::appendSlaveInfoData(BSONObjBuilder* result) {
+        boost::lock_guard<boost::mutex> lock(_mutex);
+        BSONArrayBuilder slaves(result->subarrayStart("slaves"));
+        {
+            for (SlaveOpTimeMap::const_iterator itr = _slaveOpTimeMap.begin();
+                    itr != _slaveOpTimeMap.end(); ++itr) {
+                BSONObjBuilder entry(slaves.subobjStart());
+                entry.append("rid", itr->first);
+                entry.append("optime", itr->second);
+                if (getReplicationMode() == modeReplSet) {
+                    Member* member = _ridMemberMap[itr->first];
+                    invariant(member);
+                    entry.append("host", member->h().toString());
+                    entry.append("memberID", member->id());
+                }
+            }
+        }
+    }
+
     void LegacyReplicationCoordinator::processReplSetGetConfig(BSONObjBuilder* result) {
         result->append("config", theReplSet->config().asBson());
     }
