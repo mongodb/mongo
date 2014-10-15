@@ -173,7 +173,7 @@ namespace mongo {
                         warning() << ss.ss.str() << "; skipping";
                         continue;
                     }
-                    uasserted(28531, ss);
+                    msgasserted(28531, ss);
                 }
 
                 ++numSeen;
