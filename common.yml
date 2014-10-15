@@ -181,7 +181,7 @@ functions:
         if [ '${run_kinit}' = 'true' ]
         then
           echo "${kerberos_password}" | kinit -p drivers@LDAPTEST.10GEN.CC;
-        fi
+        fi;
         if [ "Windows_NT" = "$OS" ]; then
           cmd /c "REG ADD HKLM\SYSTEM\ControlSet001\Control\Lsa\Kerberos\Domains\LDAPTEST.10GEN.CC /v KdcNames /d ldaptest.10gen.cc /t REG_MULTI_SZ /f"
         fi;
@@ -200,7 +200,7 @@ functions:
       working_dir: src
       script: | 
         . ./set_gopath.sh
-        if [ "${library_path}" != "" ] then
+        if [ "${library_path}" != "" ]; then
             export ${library_path}
         fi;
 
@@ -550,7 +550,6 @@ tasks:
         script: |
           mv ./mongodb/mongod${extension} .
           mv ./mongodb/mongo${extension} .
-          mv ./mongodb/mongoshim${extension} .
           mv legacy/* .
           chmod +x mongo*
           python buildscripts/smoke.py --nopreallocj --with-cleanbb --mongod ./mongod --mongo ./mongo --report-file report.json --continue-on-failure --buildlogger-builder MCI_${build_variant} --buildlogger-buildnum ${builder_num|} --buildlogger-credentials ./mci.buildlogger --buildlogger-phase ${task_name}_${execution} tool
@@ -650,12 +649,6 @@ tasks:
       params:
         directory: src
     - func: "download mongod"
-    - command: shell.exec
-      params:
-        working_dir: src
-        script: |
-          set -o verbose
-          cp ./mongodb/mongoshim${extension} src/github.com/mongodb/mongo-tools/mongofiles
     - func: "start mongod"
     - func: "run tool tests"
 
@@ -668,12 +661,6 @@ tasks:
       params:
         directory: src
     - func: "download mongod"
-    - command: shell.exec
-      params:
-        working_dir: src
-        script: |
-          set -o verbose
-          cp ./mongodb/mongoshim${extension} mongofiles
     - func: "start mongod"
     - func: "run tool tests"
 
