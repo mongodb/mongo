@@ -52,10 +52,13 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/repl/isself.h"
 #include "mongo/db/repl/oplog.h"
+#include "mongo/db/server_parameters.h"
 #include "mongo/db/storage_options.h"
 #include "mongo/util/log.h"
 
 namespace mongo {
+
+    MONGO_EXPORT_SERVER_PARAMETER(skipCorruptDocumentsWhenCloning, bool, false);
 
     BSONElement getErrField(const BSONObj& o);
 
@@ -151,9 +154,14 @@ namespace mongo {
                 /* assure object is valid.  note this will slow us down a little. */
                 const Status status = validateBSON(tmp.objdata(), tmp.objsize());
                 if (!status.isOK()) {
-                    log() << "Cloner: skipping corrupt object from " << from_collection
+                    str::stream ss;
+                    ss << "Cloner: found corrupt document in " << from_collection.toString()
                           << ": " << status.reason();
-                    continue;
+                    if (skipCorruptDocumentsWhenCloning) {
+                        warning() << ss.ss.str() << "; skipping";
+                        continue;
+                    }
+                    uasserted(28530, ss);
                 }
 
                 ++numSeen;
