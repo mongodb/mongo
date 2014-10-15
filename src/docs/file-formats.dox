@@ -102,7 +102,7 @@ additional CPU and memory use when searching the in-memory tree (if keys
 are encoded), and additional CPU and memory use when returning values
 from the in-memory tree and when writing pages to disk.  Note the
 additional CPU cost of Huffman encoding can be high, and should be
-considered.  (See @m_single_subpage huffman for details.)
+considered.  (See @subpage_single huffman for details.)
 
   Huffman encoding is disabled by default.
 

@@ -57,7 +57,7 @@ Key and value types may also be chosen from a list, or composed of multiple
 columns with any combination of types.  Keys and values may be up to
 (<code>4GB - 512B</code>) bytes in size.
 
-See @m_single_subpage keyvalue for more details on raw key / value items.
+See @subpage_single keyvalue for more details on raw key / value items.
 
 @section schema_format_types Format types
 

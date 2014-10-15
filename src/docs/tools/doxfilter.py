@@ -97,8 +97,6 @@ def process_lang(lang, lines):
 	section_rep = r'\1 \2' + lang_suffix
 	subpage_pat = re.compile('@subpage\s+(\w*)')
 	subpage_rep = r'@subpage \1' + lang_suffix
-	msinglesubpage_pat = re.compile('@m_single_subpage\s+(\w*)')
-	msinglesubpage_rep = r'\\subpage \1'
 	exref_pat = re.compile('@ex_ref{ex_([^.]*)[.]c}')
 	if lang == 'c':
 		exref_rep = r'@ex_ref{ex_\1' + lang_ext + '}'
@@ -120,8 +118,6 @@ def process_lang(lang, lines):
 			line = re.sub(snip_pat, snip_rep, line)
 		line = re.sub(mpage_pat, mpage_rep, line)
 		line = re.sub(subpage_pat, subpage_rep, line)
-		# msinglesubpage must be performed after subpage
-		line = re.sub(msinglesubpage_pat, msinglesubpage_rep, line)
 		if '@m_if' in line:
 			m = re.search(mif_pat, line)
 			if not m:
