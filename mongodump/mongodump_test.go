@@ -61,7 +61,7 @@ func simpleMongoDumpInstance() *MongoDump {
 }
 
 func getBareSession() (*mgo.Session, error) {
-	ssl := testutil.GetSSLOptions(),
+	ssl := testutil.GetSSLOptions()
 	sessionProvider, err := db.InitSessionProvider(commonOpts.ToolOptions{
 		Connection: &commonOpts.Connection{
 			Host: testServer,
