@@ -96,6 +96,12 @@ die(int e, const char *fmt, ...)
 	exit(EXIT_FAILURE);
 }
 
+#ifndef _WIN32
+#define	SIZET_FMT	"%zu"			/* size_t format string */
+#else
+#define	SIZET_FMT	"%Iu"			/* size_t format string */
+#endif
+
 static void
 run(CONFIG *cp, int bigkey, size_t bytes)
 {
@@ -108,7 +114,7 @@ run(CONFIG *cp, int bigkey, size_t bytes)
 
 	big[bytes - 1] = '\0';
 
-	printf("%zu" "%s%s: %s %s big %s\n",
+	printf(SIZET_FMT "%s%s: %s %s big %s\n",
 	    bytes < MEGABYTE ? bytes :
 	    (bytes < GIGABYTE ? bytes / MEGABYTE : bytes / GIGABYTE),
 	    bytes < MEGABYTE ? "" :

@@ -64,3 +64,9 @@ struct __wt_fh {
 	int	fallocate_available;		/* fallocate/posix_fallocate */
 	int	fallocate_requires_locking;
 };
+
+#ifndef _WIN32
+#define	WT_SIZET_FMT	"%zu"			/* size_t format string */
+#else
+#define	WT_SIZET_FMT	"%Iu"			/* size_t format string */
+#endif

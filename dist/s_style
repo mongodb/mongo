@@ -59,6 +59,14 @@ for f in \
 		cat $t
 	fi
 
+	if ! expr "$f" : 'examples/c/.*' > /dev/null &&
+	   ! expr "$f" : 'ext/datasources/helium/helium.c' > /dev/null &&
+	   ! expr "$f" : 'src/include/os.h' > /dev/null &&
+	    grep "%zu" $f | grep -v 'SIZET_FMT' > $t; then
+		echo "$f: %zu needs to be fixed for Windows"
+		cat $t
+	fi
+
 	egrep -w 'off_t' $f > $t
 	test -s $t && {
 		echo "$f: off_t type declaration, use wt_off_t"
