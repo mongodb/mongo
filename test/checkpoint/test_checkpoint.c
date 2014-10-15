@@ -38,6 +38,9 @@ static int  usage(void);
 static int  wt_connect(const char *);
 static int  wt_shutdown(void);
 
+extern int __wt_optind;
+extern char *__wt_optarg;
+
 int
 main(int argc, char *argv[])
 {
@@ -61,35 +64,36 @@ main(int argc, char *argv[])
 	g.nworkers = 1;
 	runs = 1;
 
-	while ((ch = getopt(argc, argv, "c:C:h:k:l:n:r:t:T:W:")) != EOF)
+	while ((ch = __wt_getopt(
+	    g.progname, argc, argv, "c:C:h:k:l:n:r:t:T:W:")) != EOF)
 		switch (ch) {
 		case 'c':
-			g.checkpoint_name = optarg;
+			g.checkpoint_name = __wt_optarg;
 			break;
 		case 'C':			/* wiredtiger_open config */
-			config_open = optarg;
+			config_open = __wt_optarg;
 			break;
 		case 'h':			/* wiredtiger_open config */
-			home = optarg;
+			home = __wt_optarg;
 			break;
 		case 'k':			/* rows */
-			g.nkeys = (u_int)atoi(optarg);
+			g.nkeys = (u_int)atoi(__wt_optarg);
 			break;
 		case 'l':			/* log */
-			if ((g.logfp = fopen(optarg, "w")) == NULL) {
+			if ((g.logfp = fopen(__wt_optarg, "w")) == NULL) {
 				fprintf(stderr,
-				    "%s: %s\n", optarg, strerror(errno));
+				    "%s: %s\n", __wt_optarg, strerror(errno));
 				return (EXIT_FAILURE);
 			}
 			break;
 		case 'n':			/* operations */
-			g.nops = (u_int)atoi(optarg);
+			g.nops = (u_int)atoi(__wt_optarg);
 			break;
 		case 'r':			/* runs */
-			runs = atoi(optarg);
+			runs = atoi(__wt_optarg);
 			break;
 		case 't':
-			switch (optarg[0]) {
+			switch (__wt_optarg[0]) {
 			case 'c':
 				ttype = COL;
 				break;
@@ -107,16 +111,16 @@ main(int argc, char *argv[])
 			}
 			break;
 		case 'T':
-			g.ntables = atoi(optarg);
+			g.ntables = atoi(__wt_optarg);
 			break;
 		case 'W':
-			g.nworkers = atoi(optarg);
+			g.nworkers = atoi(__wt_optarg);
 			break;
 		default:
 			return (usage());
 		}
 
-	argc -= optind;
+	argc -= __wt_optind;
 	if (argc != 0)
 		return (usage());
 

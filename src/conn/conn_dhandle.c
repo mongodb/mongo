@@ -104,7 +104,7 @@ __conn_dhandle_get(WT_SESSION_IMPL *session,
 		    strcmp(ckpt, dhandle->checkpoint) == 0))) {
 			WT_RET(__conn_dhandle_open_lock(
 			    session, dhandle, flags));
-			(void)WT_ATOMIC_ADD(dhandle->session_ref, 1);
+			(void)WT_ATOMIC_ADD4(dhandle->session_ref, 1);
 			session->dhandle = dhandle;
 			return (0);
 		}
@@ -503,7 +503,7 @@ err:	session->dhandle = saved_dhandle;
 void
 __wt_conn_btree_close(WT_SESSION_IMPL *session)
 {
-	(void)WT_ATOMIC_SUB(session->dhandle->session_ref, 1);
+	(void)WT_ATOMIC_SUB4(session->dhandle->session_ref, 1);
 }
 
 /*

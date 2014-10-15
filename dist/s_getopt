@@ -1,6 +1,16 @@
 #! /bin/sh
 
-# Complain if someone breaks getopt usage in the wt utility.
-egrep -w 'opterr|optind|optopt|optreset|optarg' ../src/utilities/*.c
+t=__wt.$$
+trap 'rm -f $t' 0 1 2 3 13 15
 
+# Complain if someone uses the wrong getopt.
+find ../src ../test ../bench -name '*.c' | xargs egrep '[^a-z_]getopt\(' > $t
+
+test -s $t && {
+	echo "=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-="
+	echo 'Calls to the C library version of getopt.'
+	echo "=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-="
+	cat $t
+	exit 1
+}
 exit 0

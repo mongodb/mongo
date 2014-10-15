@@ -255,7 +255,7 @@ err:			if ((pindex = WT_INTL_INDEX_COPY(page)) != NULL) {
 
 	/* Increment the cache statistics. */
 	__wt_cache_page_inmem_incr(session, page, size);
-	(void)WT_ATOMIC_ADD(cache->pages_inmem, 1);
+	(void)WT_ATOMIC_ADD8(cache->pages_inmem, 1);
 
 	*pagep = page;
 	return (0);
@@ -492,7 +492,8 @@ __inmem_col_var(WT_SESSION_IMPL *session, WT_PAGE *page, size_t *sizep)
 	cip = page->pg_var_d;
 	WT_CELL_FOREACH(btree, dsk, cell, unpack, i) {
 		__wt_cell_unpack(cell, unpack);
-		(cip++)->__value = WT_PAGE_DISK_OFFSET(page, cell);
+		WT_COL_PTR_SET(cip, WT_PAGE_DISK_OFFSET(page, cell));
+		cip++;
 
 		/*
 		 * Add records with repeat counts greater than 1 to an array we

@@ -29,17 +29,17 @@ util_load(WT_SESSION *session, int argc, char *argv[])
 	flags = 0;
 
 	filename = "<stdin>";
-	while ((ch = util_getopt(argc, argv, "af:jnr:")) != EOF)
+	while ((ch = __wt_getopt(progname, argc, argv, "af:jnr:")) != EOF)
 		switch (ch) {
 		case 'a':	/* append (ignore record number keys) */
 			append = 1;
 			break;
 		case 'f':	/* input file */
-			if (freopen(util_optarg, "r", stdin) == NULL)
+			if (freopen(__wt_optarg, "r", stdin) == NULL)
 				return (
-				    util_err(errno, "%s: reopen", util_optarg));
+				    util_err(errno, "%s: reopen", __wt_optarg));
 			else
-				filename = util_optarg;
+				filename = __wt_optarg;
 			break;
 		case 'j':	/* input is JSON */
 			json = 1;
@@ -48,14 +48,14 @@ util_load(WT_SESSION *session, int argc, char *argv[])
 			no_overwrite = 1;
 			break;
 		case 'r':	/* rename */
-			cmdname = util_optarg;
+			cmdname = __wt_optarg;
 			break;
 		case '?':
 		default:
 			return (usage());
 		}
-	argc -= util_optind;
-	argv += util_optind;
+	argc -= __wt_optind;
+	argv += __wt_optind;
 
 	/* -a and -o are mutually exclusive. */
 	if (append == 1 && no_overwrite == 1)

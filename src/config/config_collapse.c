@@ -205,7 +205,7 @@ err:	__wt_scr_free(&kb);
  * __strip_comma --
  *	Strip a trailing comma.
  */
-static inline void
+static void
 __strip_comma(WT_ITEM *buf)
 {
 	if (buf->size != 0 && ((char *)buf->data)[buf->size - 1] == ',')

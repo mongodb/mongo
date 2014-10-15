@@ -308,7 +308,7 @@ __log_fill(WT_SESSION_IMPL *session,
 	WT_STAT_FAST_CONN_INCRV(session, log_bytes_written, logrec->len);
 	if (lsnp != NULL) {
 		*lsnp = myslot->slot->slot_start_lsn;
-		lsnp->offset += (off_t)myslot->offset;
+		lsnp->offset += (wt_off_t)myslot->offset;
 	}
 err:
 	if (ret != 0 && myslot->slot->slot_error == 0)
@@ -326,7 +326,7 @@ __log_size_fit(WT_SESSION_IMPL *session, WT_LSN *lsn, uint64_t recsize)
 	WT_CONNECTION_IMPL *conn;
 
 	conn = S2C(session);
-	return (lsn->offset + (off_t)recsize < conn->log_file_max);
+	return (lsn->offset + (wt_off_t)recsize < conn->log_file_max);
 }
 
 /*
@@ -399,14 +399,14 @@ err:	if (log_fh != NULL)
  *	Returns an estimate of the real end of log file.
  */
 static int
-__log_filesize(WT_SESSION_IMPL *session, WT_FH *fh, off_t *eof)
+__log_filesize(WT_SESSION_IMPL *session, WT_FH *fh, wt_off_t *eof)
 {
 	WT_CONNECTION_IMPL *conn;
 	WT_DECL_RET;
 	WT_LOG *log;
+	wt_off_t log_size, off, off1;
 	uint64_t rec;
 	uint32_t allocsize, bufsz;
-	off_t log_size, off, off1;
 	char *buf, *zerobuf;
 
 	conn = S2C(session);
@@ -439,9 +439,9 @@ __log_filesize(WT_SESSION_IMPL *session, WT_FH *fh, off_t *eof)
 	 * we reach the beginning or we find a chunk that contains any non-zero
 	 * bytes.  Compare against a known zero byte chunk.
 	 */
-	for (off = log_size - (off_t)bufsz;
+	for (off = log_size - (wt_off_t)bufsz;
 	    off >= 0;
-	    off -= (off_t)bufsz) {
+	    off -= (wt_off_t)bufsz) {
 		WT_ERR(__wt_read(session, fh, off, bufsz, buf));
 		if (memcmp(buf, zerobuf, bufsz) != 0)
 			break;
@@ -466,7 +466,7 @@ __log_filesize(WT_SESSION_IMPL *session, WT_FH *fh, off_t *eof)
 	 * an estimate of the log file size.
 	 */
 	for (off1 = bufsz - allocsize;
-	    off1 > 0; off1 -= (off_t)allocsize) {
+	    off1 > 0; off1 -= (wt_off_t)allocsize) {
 		rec = (uint64_t)buf[off1];
 		if (rec != 0)
 			break;
@@ -476,7 +476,7 @@ __log_filesize(WT_SESSION_IMPL *session, WT_FH *fh, off_t *eof)
 	/*
 	 * Set EOF to the last zero-filled record we saw.
 	 */
-	*eof = off + (off_t)allocsize;
+	*eof = off + (wt_off_t)allocsize;
 err:
 	if (buf != NULL)
 		__wt_free(session, buf);
@@ -494,6 +494,7 @@ static int
 __log_acquire(WT_SESSION_IMPL *session, uint64_t recsize, WT_LOGSLOT *slot)
 {
 	WT_CONNECTION_IMPL *conn;
+	WT_DECL_RET;
 	WT_LOG *log;
 
 	conn = S2C(session);
@@ -519,7 +520,7 @@ __log_acquire(WT_SESSION_IMPL *session, uint64_t recsize, WT_LOGSLOT *slot)
 	 * condition.
 	 */
 	if (WT_CKPT_LOGSIZE(conn)) {
-		log->log_written += (off_t)recsize;
+		log->log_written += (wt_off_t)recsize;
 		WT_RET(__wt_checkpoint_signal(session, log->log_written));
 	}
 
@@ -532,10 +533,16 @@ __log_acquire(WT_SESSION_IMPL *session, uint64_t recsize, WT_LOGSLOT *slot)
 	/*
 	 * Pre-allocate on the first real write into the log file.
 	 */
-	if (log->alloc_lsn.offset == LOG_FIRST_RECORD)
-		WT_RET(__wt_fallocate(session,
-		    log->log_fh, LOG_FIRST_RECORD, conn->log_file_max));
-	log->alloc_lsn.offset += (off_t)recsize;
+	if (log->alloc_lsn.offset == LOG_FIRST_RECORD) {
+		if (!log->log_fh->fallocate_available ||
+		    (ret = __wt_fallocate(session, log->log_fh,
+		    LOG_FIRST_RECORD, conn->log_file_max)) == ENOTSUP)
+			ret = __wt_ftruncate(session, log->log_fh,
+			    LOG_FIRST_RECORD + conn->log_file_max);
+		WT_RET(ret);
+	}
+
+	log->alloc_lsn.offset += (wt_off_t)recsize;
 	slot->slot_end_lsn = log->alloc_lsn;
 	slot->slot_error = 0;
 	slot->slot_fh = log->log_fh;
@@ -792,13 +799,13 @@ __wt_log_scan(WT_SESSION_IMPL *session, WT_LSN *lsnp, uint32_t flags,
     WT_ITEM *record, WT_LSN *lsnp, void *cookie), void *cookie)
 {
 	WT_CONNECTION_IMPL *conn;
-	WT_ITEM buf;
 	WT_DECL_RET;
 	WT_FH *log_fh;
+	WT_ITEM buf;
 	WT_LOG *log;
 	WT_LOG_RECORD *logrec;
 	WT_LSN end_lsn, rd_lsn, start_lsn;
-	off_t log_size;
+	wt_off_t log_size;
 	uint32_t allocsize, cksum, firstlog, lastlog, lognum, rdup_len, reclen;
 	u_int i, logcount;
 	int eol;
@@ -989,7 +996,7 @@ advance:
 			if (LF_ISSET(WT_LOGSCAN_ONE))
 				break;
 		}
-		rd_lsn.offset += (off_t)rdup_len;
+		rd_lsn.offset += (wt_off_t)rdup_len;
 	}
 
 	/* Truncate if we're in recovery. */

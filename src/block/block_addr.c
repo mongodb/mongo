@@ -14,7 +14,7 @@
  */
 static int
 __block_buffer_to_addr(WT_BLOCK *block,
-    const uint8_t **pp, off_t *offsetp, uint32_t *sizep, uint32_t *cksump)
+    const uint8_t **pp, wt_off_t *offsetp, uint32_t *sizep, uint32_t *cksump)
 {
 	uint64_t o, s, c;
 
@@ -38,7 +38,7 @@ __block_buffer_to_addr(WT_BLOCK *block,
 		*offsetp = 0;
 		*sizep = *cksump = 0;
 	} else {
-		*offsetp = (off_t)(o + 1) * block->allocsize;
+		*offsetp = (wt_off_t)(o + 1) * block->allocsize;
 		*sizep = (uint32_t)s * block->allocsize;
 		*cksump = (uint32_t)c;
 	}
@@ -51,7 +51,7 @@ __block_buffer_to_addr(WT_BLOCK *block,
  */
 int
 __wt_block_addr_to_buffer(WT_BLOCK *block,
-    uint8_t **pp, off_t offset, uint32_t size, uint32_t cksum)
+    uint8_t **pp, wt_off_t offset, uint32_t size, uint32_t cksum)
 {
 	uint64_t o, s, c;
 
@@ -77,7 +77,7 @@ __wt_block_addr_to_buffer(WT_BLOCK *block,
  */
 int
 __wt_block_buffer_to_addr(WT_BLOCK *block,
-    const uint8_t *p, off_t *offsetp, uint32_t *sizep, uint32_t *cksump)
+    const uint8_t *p, wt_off_t *offsetp, uint32_t *sizep, uint32_t *cksump)
 {
 	return (__block_buffer_to_addr(block, &p, offsetp, sizep, cksump));
 }
@@ -90,7 +90,7 @@ int
 __wt_block_addr_valid(WT_SESSION_IMPL *session,
     WT_BLOCK *block, const uint8_t *addr, size_t addr_size)
 {
-	off_t offset;
+	wt_off_t offset;
 	uint32_t cksum, size;
 
 	WT_UNUSED(session);
@@ -111,7 +111,7 @@ int
 __wt_block_addr_string(WT_SESSION_IMPL *session,
     WT_BLOCK *block, WT_ITEM *buf, const uint8_t *addr, size_t addr_size)
 {
-	off_t offset;
+	wt_off_t offset;
 	uint32_t cksum, size;
 
 	WT_UNUSED(addr_size);
@@ -152,7 +152,7 @@ __wt_block_buffer_to_ckpt(WT_SESSION_IMPL *session,
 	WT_RET(__block_buffer_to_addr(block, pp,
 	    &ci->discard.offset, &ci->discard.size, &ci->discard.cksum));
 	WT_RET(__wt_vunpack_uint(pp, 0, &a));
-	ci->file_size = (off_t)a;
+	ci->file_size = (wt_off_t)a;
 	WT_RET(__wt_vunpack_uint(pp, 0, &a));
 	ci->ckpt_size = a;
 

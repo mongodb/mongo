@@ -17,19 +17,19 @@ util_loadtext(WT_SESSION *session, int argc, char *argv[])
 	int ch;
 	const char *uri;
 
-	while ((ch = util_getopt(argc, argv, "f:")) != EOF)
+	while ((ch = __wt_getopt(progname, argc, argv, "f:")) != EOF)
 		switch (ch) {
 		case 'f':	/* input file */
-			if (freopen(util_optarg, "r", stdin) == NULL)
+			if (freopen(__wt_optarg, "r", stdin) == NULL)
 				return (
-				    util_err(errno, "%s: reopen", util_optarg));
+				    util_err(errno, "%s: reopen", __wt_optarg));
 			break;
 		case '?':
 		default:
 			return (usage());
 		}
-	argc -= util_optind;
-	argv += util_optind;
+	argc -= __wt_optind;
+	argv += __wt_optind;
 
 	/* The remaining argument is the uri. */
 	if (argc != 1)

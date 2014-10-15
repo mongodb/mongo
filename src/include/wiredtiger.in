@@ -28,21 +28,7 @@ extern "C" {
 /*******************************************
  * Portable type names
  *******************************************/
-@int8_decl@
-@u_int8_decl@
-@int16_decl@
-@u_int16_decl@
-@int32_decl@
-@u_int32_decl@
-@int64_decl@
-@u_int64_decl@
-
-@u_char_decl@
-@u_short_decl@
-@u_int_decl@
-@u_long_decl@
-@u_quad_decl@
-
+@off_t_decl@
 @uintmax_t_decl@
 @uintptr_t_decl@
 
@@ -151,7 +137,7 @@ struct __wt_item {
  */
 struct __wt_lsn {
 	uint32_t        file;           /*!< Log file number */
-	off_t           offset;         /*!< Log file offset */
+	wt_off_t        offset;         /*!< Log file offset */
 };
 
 /*!
@@ -3271,7 +3257,7 @@ extern int wiredtiger_extension_terminate(WT_CONNECTION *connection);
 #define	WT_STAT_DSRC_BTREE_COLUMN_VARIABLE		2020
 /*! pages rewritten by compaction */
 #define	WT_STAT_DSRC_BTREE_COMPACT_REWRITE		2021
-/*! total LSM, table or file object key/value pairs */
+/*! number of key/value pairs */
 #define	WT_STAT_DSRC_BTREE_ENTRIES			2022
 /*! fixed-record size */
 #define	WT_STAT_DSRC_BTREE_FIXED_LEN			2023

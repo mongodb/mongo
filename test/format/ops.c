@@ -56,6 +56,10 @@ wts_ops(void)
 
 	conn = g.wts_conn;
 
+	session = NULL;			/* -Wconditional-uninitialized */
+					/* -Wconditional-uninitialized */
+	memset(&compact_tid, 0, sizeof(compact_tid));
+
 	/*
 	 * We support replay of threaded runs, but don't log random numbers
 	 * after threaded operations start, there's no point.
@@ -186,13 +190,14 @@ ops(void *arg)
 	uint32_t op;
 	uint8_t *keybuf, *valbuf;
 	u_int np;
-	int dir, insert, intxn, notfound, ret;
-	char *ckpt_config, config[64];
+	int ckpt_available, dir, insert, intxn, notfound, readonly, ret;
+	char *ckpt_config, ckpt_name[64];
 
 	tinfo = arg;
 
 	conn = g.wts_conn;
 	keybuf = valbuf = NULL;
+	readonly = 0;			/* -Wconditional-uninitialized */
 
 	/* Set up the default key and value buffers. */
 	key_gen_setup(&keybuf);
@@ -204,15 +209,15 @@ ops(void *arg)
 	 */
 	thread_ops = 100 + g.c_ops / g.c_threads;
 
-	/*
-	 * Select the first operation where we'll create sessions and cursors,
-	 * perform checkpoint operations.
-	 */
-	ckpt_op = g.c_checkpoints ? MMRAND(1, thread_ops) : 0;
+	/* Set the first operation where we'll create sessions and cursors. */
 	session_op = 0;
-
 	session = NULL;
 	cursor = cursor_insert = NULL;
+
+	/* Set the first operation where we'll perform checkpoint operations. */
+	ckpt_op = g.c_checkpoints ? MMRAND(1, thread_ops) : 0;
+	ckpt_available = 0;
+
 	for (intxn = 0, cnt = 0; cnt < thread_ops; ++cnt) {
 		if (SINGLETHREADED && cnt % 100 == 0)
 			track("ops", 0ULL, tinfo);
@@ -240,44 +245,73 @@ ops(void *arg)
 				die(ret, "connection.open_session");
 
 			/*
-			 * Open two cursors: one configured for overwriting and
-			 * one configured for append if we're dealing with a
-			 * column-store.
+			 * 10% of the time, perform some read-only operations
+			 * from a checkpoint.
 			 *
-			 * The reason is when testing with existing records, we
-			 * don't track if a record was deleted or not, which
-			 * means we must use cursor->insert with overwriting
-			 * configured.  But, in column-store files where we're
-			 * testing with new, appended records, we don't want to
-			 * have to specify the record number, which requires an
-			 * append configuration.
+			 * Skip that if we single-threaded and doing checks
+			 * against a Berkeley DB database, because that won't
+			 * work because the Berkeley DB database records won't
+			 * match the checkpoint.  Also skip if we are using
+			 * LSM, because it doesn't support reads from
+			 * checkpoints.
 			 */
-			if ((ret = session->open_cursor(session,
-			    g.uri, NULL, "overwrite", &cursor)) != 0)
-				die(ret, "session.open_cursor");
-			if ((g.type == FIX || g.type == VAR) &&
-			    (ret = session->open_cursor(session,
-			    g.uri, NULL, "append", &cursor_insert)) != 0)
-				die(ret, "session.open_cursor");
+			if (!SINGLETHREADED && !DATASOURCE("lsm") &&
+			    ckpt_available && MMRAND(1, 10) == 1) {
+				if ((ret = session->open_cursor(session,
+				    g.uri, NULL, ckpt_name, &cursor)) != 0)
+					die(ret, "session.open_cursor");
 
-			/* Pick the next session/cursor close/open. */
-			session_op += SINGLETHREADED ?
-			    MMRAND(1, thread_ops) : 100 * MMRAND(1, 50);
+				/* Pick the next session/cursor close/open. */
+				session_op += 250;
+
+				/* Checkpoints are read-only. */
+				readonly = 1;
+			} else {
+				/*
+				 * Open two cursors: one for overwriting and one
+				 * for append (if it's a column-store).
+				 *
+				 * The reason is when testing with existing
+				 * records, we don't track if a record was
+				 * deleted or not, which means we must use
+				 * cursor->insert with overwriting configured.
+				 * But, in column-store files where we're
+				 * testing with new, appended records, we don't
+				 * want to have to specify the record number,
+				 * which requires an append configuration.
+				 */
+				if ((ret = session->open_cursor(session, g.uri,
+				    NULL, "overwrite", &cursor)) != 0)
+					die(ret, "session.open_cursor");
+				if ((g.type == FIX || g.type == VAR) &&
+				    (ret = session->open_cursor(session, g.uri,
+				    NULL, "append", &cursor_insert)) != 0)
+					die(ret, "session.open_cursor");
+
+				/* Pick the next session/cursor close/open. */
+				session_op += SINGLETHREADED ?
+				    MMRAND(1, thread_ops) : 100 * MMRAND(1, 50);
+
+				/* Updates supported. */
+				readonly = 0;
+			}
 		}
 
 		/* Checkpoint the database. */
 		if (cnt == ckpt_op && g.c_checkpoints) {
 			/*
 			 * LSM and data-sources don't support named checkpoints,
-			 * else 25% of the time we name the checkpoint.
+			 * and we can't drop a named checkpoint while there's a
+			 * cursor open on it, otherwise 20% of the time name the
+			 * checkpoint.
 			 */
-			if (DATASOURCE("lsm") || DATASOURCE("helium") ||
-			    DATASOURCE("kvsbdb") || MMRAND(1, 4) == 1)
+			if (DATASOURCE("helium") || DATASOURCE("kvsbdb") ||
+			    DATASOURCE("lsm") || readonly || MMRAND(1, 5) == 1)
 				ckpt_config = NULL;
 			else {
-				(void)snprintf(config, sizeof(config),
+				(void)snprintf(ckpt_name, sizeof(ckpt_name),
 				    "name=thread-%d", tinfo->id);
-				ckpt_config = config;
+				ckpt_config = ckpt_name;
 			}
 
 			/* Named checkpoints lock out backups */
@@ -296,6 +330,15 @@ ops(void *arg)
 			    (ret = pthread_rwlock_unlock(&g.backup_lock)) != 0)
 				die(ret,
 				    "pthread_rwlock_wrlock: backup lock");
+
+			/* Rephrase the checkpoint name for cursor open. */
+			if (ckpt_config == NULL)
+				strcpy(ckpt_name,
+				    "checkpoint=WiredTigerCheckpoint");
+			else
+				(void)snprintf(ckpt_name, sizeof(ckpt_name),
+				    "checkpoint=thread-%d", tinfo->id);
+			ckpt_available = 1;
 
 			/*
 			 * Pick the next checkpoint operation, try for roughly
@@ -328,7 +371,7 @@ ops(void *arg)
 		 * of deletes will mean fewer inserts and writes.  Modifications
 		 * are always followed by a read to confirm it worked.
 		 */
-		op = (uint32_t)(rng() % 100);
+		op = readonly ? UINT32_MAX : (uint32_t)(rng() % 100);
 		if (op < g.c_delete_pct) {
 			++tinfo->remove;
 			switch (g.type) {
@@ -392,7 +435,8 @@ skip_insert:			if (col_update(cursor, &key, &value, keyno))
 		} else {
 			++tinfo->search;
 			if (read_row(cursor, &key, keyno))
-				goto deadlock;
+				if (intxn)
+					goto deadlock;
 			continue;
 		}
 
@@ -411,7 +455,7 @@ skip_insert:			if (col_update(cursor, &key, &value, keyno))
 			}
 		}
 
-		/* Read the value we modified to confirm the operation. */
+		/* Read to confirm the operation. */
 		++tinfo->search;
 		if (read_row(cursor, &key, keyno))
 			goto deadlock;

@@ -82,7 +82,7 @@ __wt_open(WT_SESSION_IMPL *session,
 	__wt_spin_lock(session, &conn->fh_lock);
 	TAILQ_FOREACH(tfh, &conn->fhqh, q)
 		if (strcmp(name, tfh->name) == 0) {
-			++tfh->refcnt;
+			++tfh->ref;
 			*fhp = tfh;
 			matched = 1;
 			break;
@@ -170,7 +170,7 @@ __wt_open(WT_SESSION_IMPL *session,
 	WT_ERR(__wt_calloc(session, 1, sizeof(WT_FH), &fh));
 	WT_ERR(__wt_strdup(session, name, &fh->name));
 	fh->fd = fd;
-	fh->refcnt = 1;
+	fh->ref = 1;
 	fh->direct_io = direct_io;
 
 	/* Set the file's size. */
@@ -181,6 +181,9 @@ __wt_open(WT_SESSION_IMPL *session,
 	    dio_type == WT_FILE_TYPE_CHECKPOINT)
 		fh->extend_len = conn->data_extend_len;
 
+	/* Configure fallocate/posix_fallocate calls. */
+	__wt_fallocate_config(session, fh);
+
 	/*
 	 * Repeat the check for a match, but then link onto the database's list
 	 * of files.
@@ -189,7 +192,7 @@ __wt_open(WT_SESSION_IMPL *session,
 	__wt_spin_lock(session, &conn->fh_lock);
 	TAILQ_FOREACH(tfh, &conn->fhqh, q)
 		if (strcmp(name, tfh->name) == 0) {
-			++tfh->refcnt;
+			++tfh->ref;
 			*fhp = tfh;
 			matched = 1;
 			break;
@@ -227,7 +230,7 @@ __wt_close(WT_SESSION_IMPL *session, WT_FH *fh)
 	conn = S2C(session);
 
 	__wt_spin_lock(session, &conn->fh_lock);
-	if (fh == NULL || fh->refcnt == 0 || --fh->refcnt > 0) {
+	if (fh == NULL || fh->ref == 0 || --fh->ref > 0) {
 		__wt_spin_unlock(session, &conn->fh_lock);
 		return (0);
 	}

@@ -404,20 +404,34 @@ struct __wt_page {
 #undef	pg_intl_recno
 #define	pg_intl_recno			u.intl.recno
 #define	pg_intl_parent_ref		u.intl.parent_ref
+
+	/*
+	 * Macros to copy/set the index because the name is obscured to ensure
+	 * the field isn't read multiple times.
+	 */
 #define	WT_INTL_INDEX_COPY(page)	((page)->u.intl.__index)
 #define	WT_INTL_INDEX_SET(page, v) do {					\
 	WT_WRITE_BARRIER();						\
 	((page)->u.intl.__index) = (v);					\
 } while (0)
-#define	WT_INTL_FOREACH_BEGIN(page, ref) do {				\
+
+	/*
+	 * Macro to walk the list of references in an internal page.
+	 */
+#define	WT_INTL_FOREACH_BEGIN(session, page, ref) do {			\
 	WT_PAGE_INDEX *__pindex;					\
 	WT_REF **__refp;						\
+	WT_SESSION_IMPL *__session = (session);				\
 	uint32_t __entries;						\
+	WT_ENTER_PAGE_INDEX(session);					\
 	for (__pindex = WT_INTL_INDEX_COPY(page),			\
 	    __refp = __pindex->index,					\
 	    __entries = __pindex->entries; __entries > 0; --__entries) {\
 		(ref) = *__refp++;
-#define	WT_INTL_FOREACH_END	} } while (0)
+#define	WT_INTL_FOREACH_END						\
+		}							\
+		WT_LEAVE_PAGE_INDEX(__session);				\
+	} while (0)
 
 		/* Row-store leaf page. */
 		struct {
@@ -729,10 +743,10 @@ struct __wt_col {
 	 *
 	 * If the value is 0, it's a single, deleted record.
 	 *
-	 * Obscure the field name, code shouldn't use WT_COL->value, the public
-	 * interface is WT_COL_PTR.
+	 * Obscure the field name, code shouldn't use WT_COL->__col_value, the
+	 * public interface is WT_COL_PTR and WT_COL_PTR_SET.
 	 */
-	uint32_t __value;
+	uint32_t __col_value;
 };
 
 /*
@@ -748,12 +762,15 @@ struct __wt_col_rle {
 } WT_GCC_ATTRIBUTE((packed));
 
 /*
- * WT_COL_PTR --
- *	Return a pointer corresponding to the data offset -- if the item doesn't
- * exist on the page, return a NULL.
+ * WT_COL_PTR, WT_COL_PTR_SET --
+ *	Return/Set a pointer corresponding to the data offset. (If the item does
+ * not exist on the page, return a NULL.)
  */
 #define	WT_COL_PTR(page, cip)						\
-	((cip)->__value == 0 ? NULL : WT_PAGE_REF_OFFSET(page, (cip)->__value))
+	((cip)->__col_value == 0 ?					\
+	    NULL : WT_PAGE_REF_OFFSET(page, (cip)->__col_value))
+#define	WT_COL_PTR_SET(cip, value)					\
+	(cip)->__col_value = (value)
 
 /*
  * WT_COL_FOREACH --
@@ -894,7 +911,7 @@ struct __wt_insert {
 #define	WT_PAGE_ALLOC_AND_SWAP(s, page, dest, v, count)	do {		\
 	if (((v) = (dest)) == NULL) {					\
 		WT_ERR(__wt_calloc_def(s, count, &(v)));		\
-		if (WT_ATOMIC_CAS(dest, NULL, v))			\
+		if (WT_ATOMIC_CAS8(dest, NULL, v))			\
 			__wt_cache_page_inmem_incr(			\
 			    s, page, (count) * sizeof(*(v)));		\
 		else							\
@@ -982,17 +999,17 @@ struct __wt_insert_head {
  * an index, we don't want the oldest split generation to move forward and
  * potentially free it.
  */
-#define	WT_ENTER_PAGE_INDEX(session) do {                               \
-	uint64_t prev_split_gen = session->split_gen;                   \
-	if (prev_split_gen == 0)                                        \
-		WT_PUBLISH(session->split_gen, S2C(session)->split_gen)
+#define	WT_ENTER_PAGE_INDEX(session) do {				\
+	uint64_t __prev_split_gen = (session)->split_gen;		\
+	if (__prev_split_gen == 0)					\
+		WT_PUBLISH((session)->split_gen, S2C(session)->split_gen)
 
-#define	WT_LEAVE_PAGE_INDEX(session)                                    \
-	if (prev_split_gen == 0)                                        \
-		session->split_gen = 0;                                 \
+#define	WT_LEAVE_PAGE_INDEX(session)					\
+	if (__prev_split_gen == 0)					\
+		(session)->split_gen = 0;				\
 	} while (0)
 
-#define	WT_WITH_PAGE_INDEX(session, e)                                  \
-	WT_ENTER_PAGE_INDEX(session);                                   \
-	(e);                                                            \
+#define	WT_WITH_PAGE_INDEX(session, e)					\
+	WT_ENTER_PAGE_INDEX(session);					\
+	(e);								\
 	WT_LEAVE_PAGE_INDEX(session)

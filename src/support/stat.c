@@ -35,8 +35,7 @@ __wt_stat_init_dsrc_stats(WT_DSRC_STATS *stats)
 	stats->btree_column_variable.desc =
 	    "column-store variable-size leaf pages";
 	stats->btree_compact_rewrite.desc = "pages rewritten by compaction";
-	stats->btree_entries.desc =
-	    "total LSM, table or file object key/value pairs";
+	stats->btree_entries.desc = "number of key/value pairs";
 	stats->btree_fixed_len.desc = "fixed-record size";
 	stats->btree_maximum_depth.desc = "maximum tree depth";
 	stats->btree_maxintlitem.desc = "maximum internal page item size";

@@ -121,7 +121,7 @@ __wt_curbackup_open(WT_SESSION_IMPL *session,
 	WT_CURSOR_BACKUP *cb;
 	WT_DECL_RET;
 
-	STATIC_ASSERT(offsetof(WT_CURSOR_BACKUP, iface) == 0);
+	WT_STATIC_ASSERT(offsetof(WT_CURSOR_BACKUP, iface) == 0);
 
 	cb = NULL;
 
@@ -162,7 +162,7 @@ __backup_start(
 	WT_CONNECTION_IMPL *conn;
 	WT_DECL_RET;
 	u_int i, logcount;
-	int target_list;
+	int exist, target_list;
 	char **logfiles;
 
 	conn = S2C(session);
@@ -222,9 +222,15 @@ __backup_start(
 		WT_ERR(__backup_all(session, cb));
 	}
 
-	/* Add the hot backup and single-threading file to the list. */
+	/* Add the hot backup and standard WiredTiger files to the list. */
 	WT_ERR(__backup_list_append(session, cb, WT_METADATA_BACKUP));
-	WT_ERR(__backup_list_append(session, cb, WT_SINGLETHREAD));
+	WT_ERR(__wt_exist(session, WT_BASECONFIG, &exist));
+	if (exist)
+		WT_ERR(__backup_list_append(session, cb, WT_BASECONFIG));
+	WT_ERR(__wt_exist(session, WT_USERCONFIG, &exist));
+	if (exist)
+		WT_ERR(__backup_list_append(session, cb, WT_USERCONFIG));
+	WT_ERR(__backup_list_append(session, cb, WT_WIREDTIGER));
 
 err:	/* Close the hot backup file. */
 	if (cb->bfp != NULL) {

@@ -47,7 +47,8 @@ done
 
 for f in \
     `find bench examples ext src test -name '*.[chisy]' -o -name '*.in' |
-    sed '/Makefile.in/d'`; do
+    sed -e '/Makefile.in/d' \
+	-e '/build_win\/wiredtiger_config.h/d'`; do
 	if grep "^[^}]*while (0);" $f > $t; then
 		echo "$f: while (0) has trailing semi-colon"
 		cat $t
@@ -58,9 +59,9 @@ for f in \
 		cat $t
 	fi
 
-	egrep 'u_quad' $f | sed '/@u_quad_decl@/d' > $t
+	egrep -w 'off_t' $f > $t
 	test -s $t && {
-		echo "$f: old-style type declaration: u_XXX_t or u_quad"
+		echo "$f: off_t type declaration, use wt_off_t"
 		cat $t
 	}
 
@@ -130,6 +131,7 @@ for f in \
 	    -e 's/\([	 ,]\)u_int16_t\([	 ,]\)/\1uint16_t\2/g' \
 	    -e 's/\([	 ,]\)u_int32_t\([	 ,]\)/\1uint32_t\2/g' \
 	    -e 's/\([	 ,]\)u_int64_t\([	 ,]\)/\1uint64_t\2/g' \
+	    -e 's/\([	 ,]\)u_quad\([	 ,]\)/\1uint64_t\2/g' \
 	    -e 's/\([|&=+-]\)  *\([^*]\)/\1 \2/' \
 	    -e 's/(void) \([a-zA-Z_]\)/(void)\1/' \
 	    -e '/for /!s/;;$/;/' \

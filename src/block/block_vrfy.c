@@ -7,19 +7,20 @@
 
 #include "wt_internal.h"
 
-static int __verify_ckptfrag_add(WT_SESSION_IMPL *, WT_BLOCK *, off_t, off_t);
+static int __verify_ckptfrag_add(
+	WT_SESSION_IMPL *, WT_BLOCK *, wt_off_t, wt_off_t);
 static int __verify_ckptfrag_chk(WT_SESSION_IMPL *, WT_BLOCK *);
 static int __verify_filefrag_add(
-	WT_SESSION_IMPL *, WT_BLOCK *, const char *, off_t, off_t, int);
+	WT_SESSION_IMPL *, WT_BLOCK *, const char *, wt_off_t, wt_off_t, int);
 static int __verify_filefrag_chk(WT_SESSION_IMPL *, WT_BLOCK *);
 static int __verify_last_avail(WT_SESSION_IMPL *, WT_BLOCK *, WT_CKPT *);
 static int __verify_last_truncate(WT_SESSION_IMPL *, WT_BLOCK *, WT_CKPT *);
 
 /* The bit list ignores the first block: convert to/from a frag/offset. */
-#define	WT_OFF_TO_FRAG(block, off)					\
+#define	WT_wt_off_tO_FRAG(block, off)					\
 	((off) / (block)->allocsize - 1)
 #define	WT_FRAG_TO_OFF(block, frag)					\
-	(((off_t)(frag + 1)) * (block)->allocsize)
+	(((wt_off_t)(frag + 1)) * (block)->allocsize)
 
 /*
  * __wt_block_verify_start --
@@ -30,7 +31,7 @@ __wt_block_verify_start(
     WT_SESSION_IMPL *session, WT_BLOCK *block, WT_CKPT *ckptbase)
 {
 	WT_CKPT *ckpt;
-	off_t size;
+	wt_off_t size;
 
 	/*
 	 * Find the last checkpoint in the list: if there are none, or the only
@@ -80,7 +81,7 @@ __wt_block_verify_start(
 	 * verify many non-contiguous blocks creating too many entries on the
 	 * list to fit into memory.
 	 */
-	block->frags = (uint64_t)WT_OFF_TO_FRAG(block, size);
+	block->frags = (uint64_t)WT_wt_off_tO_FRAG(block, size);
 	WT_RET(__bit_alloc(session, block->frags, &block->fragfile));
 
 	/*
@@ -193,18 +194,17 @@ __wt_verify_ckpt_load(
 	 * the list of blocks we've "seen" from the file.
 	 */
 	if (ci->root_offset != WT_BLOCK_INVALID_OFFSET)
-		WT_RET(__verify_filefrag_add(session, block,
-		    "checkpoint", ci->root_offset, (off_t)ci->root_size, 1));
+		WT_RET(__verify_filefrag_add(session, block, "checkpoint",
+		    ci->root_offset, (wt_off_t)ci->root_size, 1));
 	if (ci->alloc.offset != WT_BLOCK_INVALID_OFFSET)
-		WT_RET(__verify_filefrag_add(session, block,
-		    "alloc list", ci->alloc.offset, (off_t)ci->alloc.size, 1));
+		WT_RET(__verify_filefrag_add(session, block, "alloc list",
+		    ci->alloc.offset, (wt_off_t)ci->alloc.size, 1));
 	if (ci->avail.offset != WT_BLOCK_INVALID_OFFSET)
-		WT_RET(__verify_filefrag_add(session, block,
-		    "avail list", ci->avail.offset, (off_t)ci->avail.size, 1));
+		WT_RET(__verify_filefrag_add(session, block, "avail list",
+		    ci->avail.offset, (wt_off_t)ci->avail.size, 1));
 	if (ci->discard.offset != WT_BLOCK_INVALID_OFFSET)
-		WT_RET(__verify_filefrag_add(session, block,
-		    "discard list",
-		    ci->discard.offset, (off_t)ci->discard.size, 1));
+		WT_RET(__verify_filefrag_add(session, block, "discard list",
+		    ci->discard.offset, (wt_off_t)ci->discard.size, 1));
 
 	/*
 	 * Checkpoint verification is similar to deleting checkpoints.  As we
@@ -252,7 +252,7 @@ __wt_verify_ckpt_load(
 	WT_RET(__bit_alloc(session, block->frags, &block->fragckpt));
 	el = &block->verify_alloc;
 	WT_EXT_FOREACH(ext, el->off) {
-		frag = (uint64_t)WT_OFF_TO_FRAG(block, ext->off);
+		frag = (uint64_t)WT_wt_off_tO_FRAG(block, ext->off);
 		frags = (uint64_t)(ext->size / block->allocsize);
 		__bit_nset(block->fragckpt, frag, frag + (frags - 1));
 	}
@@ -286,7 +286,7 @@ int
 __wt_block_verify_addr(WT_SESSION_IMPL *session,
     WT_BLOCK *block, const uint8_t *addr, size_t addr_size)
 {
-	off_t offset;
+	wt_off_t offset;
 	uint32_t cksum, size;
 
 	WT_UNUSED(addr_size);
@@ -324,7 +324,7 @@ __wt_block_verify_addr(WT_SESSION_IMPL *session,
  */
 static int
 __verify_filefrag_add(WT_SESSION_IMPL *session, WT_BLOCK *block,
-    const char *type, off_t offset, off_t size, int nodup)
+    const char *type, wt_off_t offset, wt_off_t size, int nodup)
 {
 	uint64_t f, frag, frags, i;
 
@@ -342,7 +342,7 @@ __verify_filefrag_add(WT_SESSION_IMPL *session, WT_BLOCK *block,
 		    "non-existent file blocks",
 		    (uintmax_t)offset, (uintmax_t)(offset + size));
 
-	frag = (uint64_t)WT_OFF_TO_FRAG(block, offset);
+	frag = (uint64_t)WT_wt_off_tO_FRAG(block, offset);
 	frags = (uint64_t)(size / block->allocsize);
 
 	/* It may be illegal to reference a particular chunk more than once. */
@@ -427,7 +427,7 @@ __verify_filefrag_chk(WT_SESSION_IMPL *session, WT_BLOCK *block)
  */
 static int
 __verify_ckptfrag_add(
-    WT_SESSION_IMPL *session, WT_BLOCK *block, off_t offset, off_t size)
+    WT_SESSION_IMPL *session, WT_BLOCK *block, wt_off_t offset, wt_off_t size)
 {
 	uint64_t f, frag, frags, i;
 
@@ -445,7 +445,7 @@ __verify_ckptfrag_add(
 		    "file blocks outside the checkpoint",
 		    (uintmax_t)offset, (uintmax_t)(offset + size));
 
-	frag = (uint64_t)WT_OFF_TO_FRAG(block, offset);
+	frag = (uint64_t)WT_wt_off_tO_FRAG(block, offset);
 	frags = (uint64_t)(size / block->allocsize);
 
 	/* It is illegal to reference a particular chunk more than once. */

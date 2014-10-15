@@ -1218,10 +1218,50 @@ __wt_cksum_hw(const void *chunk, size_t len)
 }
 #endif
 
+#if defined(_M_AMD64)
+/*
+ * __wt_cksum_hw --
+ *	Return a checksum for a chunk of memory, computed in hardware
+ *	using 8 byte steps.
+ */
+static uint32_t
+__wt_cksum_hw(const void *chunk, size_t len)
+{
+	uint32_t crc;
+	size_t nqwords;
+	const uint8_t *p;
+	const uint64_t *p64;
+
+	crc = 0xffffffff;
+
+	/* Checksum one byte at a time to the first 4B boundary. */
+	for (p = chunk;
+	    ((uintptr_t)p & (sizeof(uint32_t) - 1)) != 0 &&
+	    len > 0; ++p, --len) {
+		crc = _mm_crc32_u8(crc, *p);
+	}
+
+	p64 = (const uint64_t *)p;
+	/* Checksum in 8B chunks. */
+	for (nqwords = len / sizeof(uint64_t); nqwords; nqwords--) {
+		crc = (uint32_t)_mm_crc32_u64(crc, *p64);
+		p64++;
+	}
+
+	/* Checksum trailing bytes one byte at a time. */
+	p = (const uint8_t *)p64;
+	for (len &= 0x7; len > 0; ++p, len--) {
+		crc = _mm_crc32_u8(crc, *p);
+	}
+
+	return (~crc);
+}
+#endif
+
 /*
  * __wt_cksum --
- *	Return a checksum for a chunk of memory
- *	using the fastest method available.
+ *	Return a checksum for a chunk of memory using the fastest method
+ * available.
  */
 uint32_t
 __wt_cksum(const void *chunk, size_t len)
@@ -1231,12 +1271,13 @@ __wt_cksum(const void *chunk, size_t len)
 
 /*
  * __wt_cksum_init --
- *	Detect CRC hardware if possible, and return one of
- *	CRC_HARDWARE_PRESENT or CRC_HARDWARE_ABSENT.
+ *	Detect CRC hardware and set the checksum function.
  */
 void
 __wt_cksum_init(void)
 {
+#define	CPUID_ECX_HAS_SSE42	(1 << 20)
+
 #if (defined(__amd64) || defined(__x86_64))
 	unsigned int eax, ebx, ecx, edx;
 
@@ -1245,13 +1286,20 @@ __wt_cksum_init(void)
 			      : "=a" (eax), "=b" (ebx), "=c" (ecx), "=d" (edx)
 			      : "a" (1));
 
-#define	CPUID_ECX_HAS_SSE42	(1 << 20)
-
 	if (ecx & CPUID_ECX_HAS_SSE42)
 		__wt_cksum_func = __wt_cksum_hw;
 	else
 		__wt_cksum_func = __wt_cksum_sw;
 
+#elif defined(_M_AMD64)
+	int cpuInfo[4];
+
+	__cpuid(cpuInfo, 1);
+
+	if (cpuInfo[2] & CPUID_ECX_HAS_SSE42)
+		__wt_cksum_func = __wt_cksum_hw;
+	else
+		__wt_cksum_func = __wt_cksum_sw;
 #else
 	__wt_cksum_func = __wt_cksum_sw;
 #endif

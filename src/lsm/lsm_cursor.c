@@ -1496,7 +1496,7 @@ __wt_clsm_open(WT_SESSION_IMPL *session,
 	 */
 	clsm->dsk_gen = 0;
 
-	STATIC_ASSERT(offsetof(WT_CURSOR_LSM, iface) == 0);
+	WT_STATIC_ASSERT(offsetof(WT_CURSOR_LSM, iface) == 0);
 	WT_ERR(__wt_cursor_init(cursor, cursor->uri, owner, cfg, cursorp));
 
 	if (0) {

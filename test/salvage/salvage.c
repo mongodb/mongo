@@ -53,6 +53,9 @@ static u_int	 page_type;			/* File types */
 static int	 value_unique;			/* Values are unique */
 static int	 verbose;			/* -v flag */
 
+extern int __wt_optind;
+extern char *__wt_optarg;
+
 int
 main(int argc, char *argv[])
 {
@@ -66,19 +69,19 @@ main(int argc, char *argv[])
 
 	r = 0;
 	ptype = 0;
-	while ((ch = getopt(argc, argv, "r:t:v")) != EOF)
+	while ((ch = __wt_getopt(progname, argc, argv, "r:t:v")) != EOF)
 		switch (ch) {
 		case 'r':
-			r = atoi(optarg);
+			r = atoi(__wt_optarg);
 			if (r == 0)
 				return (usage());
 			break;
 		case 't':
-			if (strcmp(optarg, "fix") == 0)
+			if (strcmp(__wt_optarg, "fix") == 0)
 				ptype = WT_PAGE_COL_FIX;
-			else if (strcmp(optarg, "var") == 0)
+			else if (strcmp(__wt_optarg, "var") == 0)
 				ptype = WT_PAGE_COL_VAR;
-			else if (strcmp(optarg, "row") == 0)
+			else if (strcmp(__wt_optarg, "row") == 0)
 				ptype = WT_PAGE_ROW_LEAF;
 			else
 				return (usage());
@@ -90,8 +93,8 @@ main(int argc, char *argv[])
 		default:
 			return (usage());
 		}
-	argc -= optind;
-	argv += optind;
+	argc -= __wt_optind;
+	argv += __wt_optind;
 	if (argc != 0)
 		return (usage());
 

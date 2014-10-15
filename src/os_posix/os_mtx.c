@@ -54,7 +54,7 @@ __wt_cond_wait(WT_SESSION_IMPL *session, WT_CONDVAR *cond, long usecs)
 	WT_ASSERT(session, usecs >= 0);
 
 	/* Fast path if already signalled. */
-	if (WT_ATOMIC_ADD(cond->waiters, 1) == 0)
+	if (WT_ATOMIC_ADD4(cond->waiters, 1) == 0)
 		return (0);
 
 	/*
@@ -89,7 +89,7 @@ __wt_cond_wait(WT_SESSION_IMPL *session, WT_CONDVAR *cond, long usecs)
 	    ret == ETIMEDOUT)
 		ret = 0;
 
-	(void)WT_ATOMIC_SUB(cond->waiters, 1);
+	(void)WT_ATOMIC_SUB4(cond->waiters, 1);
 
 err:	if (locked)
 		WT_TRET(pthread_mutex_unlock(&cond->mtx));
@@ -122,7 +122,7 @@ __wt_cond_signal(WT_SESSION_IMPL *session, WT_CONDVAR *cond)
 	if (cond->waiters == -1)
 		return (0);
 
-	if (cond->waiters > 0 || !WT_ATOMIC_CAS(cond->waiters, 0, -1)) {
+	if (cond->waiters > 0 || !WT_ATOMIC_CAS4(cond->waiters, 0, -1)) {
 		WT_ERR(pthread_mutex_lock(&cond->mtx));
 		locked = 1;
 		WT_ERR(pthread_cond_broadcast(&cond->cond));
@@ -195,7 +195,12 @@ __wt_readlock(WT_SESSION_IMPL *session, WT_RWLOCK *rwlock)
 	    "rwlock: readlock %s (%p)", rwlock->name, rwlock));
 	WT_STAT_FAST_CONN_INCR(session, rwlock_read);
 
-	if ((ret = pthread_rwlock_rdlock(&rwlock->rwlock)) == 0)
+	/*
+	 * The read-lock call can fail with EAGAIN under load:
+	 * retry in that case.
+	 */
+	WT_SYSCALL_RETRY(pthread_rwlock_rdlock(&rwlock->rwlock), ret);
+	if (ret == 0)
 		return (0);
 	WT_RET_MSG(session, ret, "pthread_rwlock_rdlock: %s", rwlock->name);
 }

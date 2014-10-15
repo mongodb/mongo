@@ -182,6 +182,7 @@ struct __wt_lsm_tree {
 	struct timespec last_flush_ts;	/* Timestamp last flush finished */
 	struct timespec work_push_ts;	/* Timestamp last work unit added */
 	uint64_t merge_progressing;	/* Bumped when merges are active */
+	uint32_t merge_syncing;		/* Bumped when merges are syncing */
 
 	/* Configuration parameters */
 	uint32_t bloom_bit_count;
@@ -217,7 +218,7 @@ struct __wt_lsm_tree {
 	uint32_t flags;
 
 #define	WT_LSM_TREE_EXCLUSIVE	0x01	/* Tree is opened exclusively */
-	uint32_t flags_atomic;
+	uint8_t flags_atomic;
 };
 
 /*

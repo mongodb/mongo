@@ -60,7 +60,7 @@ __logmgr_config(WT_SESSION_IMPL *session, const char **cfg, int *runp)
 	conn->archive = cval.val != 0;
 
 	WT_RET(__wt_config_gets(session, cfg, "log.file_max", &cval));
-	conn->log_file_max = (off_t)cval.val;
+	conn->log_file_max = (wt_off_t)cval.val;
 	WT_STAT_FAST_CONN_SET(session, log_max_filesize, conn->log_file_max);
 
 	WT_RET(__wt_config_gets(session, cfg, "log.path", &cval));

@@ -32,7 +32,7 @@ __ckpt_server_config(WT_SESSION_IMPL *session, const char **cfg, int *startp)
 	WT_RET(__wt_config_gets(session, cfg, "checkpoint.wait", &cval));
 	conn->ckpt_usecs = (long)cval.val * 1000000;
 	WT_RET(__wt_config_gets(session, cfg, "checkpoint.log_size", &cval));
-	conn->ckpt_logsize = (off_t)cval.val;
+	conn->ckpt_logsize = (wt_off_t)cval.val;
 	__wt_log_written_reset(session);
 	if ((conn->ckpt_usecs == 0 && conn->ckpt_logsize == 0) ||
 	    (conn->ckpt_logsize && !conn->logging && conn->ckpt_usecs == 0)) {
@@ -214,7 +214,7 @@ __wt_checkpoint_server_destroy(WT_SESSION_IMPL *session)
  *	Return 1 if this signals the checkpoint thread, 0 otherwise.
  */
 int
-__wt_checkpoint_signal(WT_SESSION_IMPL *session, off_t logsize)
+__wt_checkpoint_signal(WT_SESSION_IMPL *session, wt_off_t logsize)
 {
 	WT_CONNECTION_IMPL *conn;
 

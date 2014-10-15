@@ -977,7 +977,7 @@ __wt_open_session(WT_CONNECTION_IMPL *conn,
 	 */
 	WT_PUBLISH(session_ret->active, 1);
 
-	STATIC_ASSERT(offsetof(WT_SESSION_IMPL, iface) == 0);
+	WT_STATIC_ASSERT(offsetof(WT_SESSION_IMPL, iface) == 0);
 	*sessionp = session_ret;
 
 err:	__wt_spin_unlock(session, &conn->api_lock);

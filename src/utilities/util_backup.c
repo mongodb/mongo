@@ -55,18 +55,18 @@ util_backup(WT_SESSION *session, int argc, char *argv[])
 	const char *directory, *name;
 
 	config = NULL;
-	while ((ch = util_getopt(argc, argv, "t:")) != EOF)
+	while ((ch = __wt_getopt(progname, argc, argv, "t:")) != EOF)
 		switch (ch) {
 		case 't':
-			if (append_target(util_optarg, &config))
+			if (append_target(__wt_optarg, &config))
 				return (1);
 			break;
 		case '?':
 		default:
 			return (usage());
 		}
-	argc -= util_optind;
-	argv += util_optind;
+	argc -= __wt_optind;
+	argv += __wt_optind;
 
 	if (argc != 1) {
 		(void)usage();
@@ -127,13 +127,14 @@ copy(const char *name, const char *directory)
 	/* Open the read file. */
 	if (snprintf(cbuf, CBUF_LEN, "%s/%s", home, name) >= CBUF_LEN)
 		goto memerr;
-	if ((ifd = open(cbuf, O_RDONLY, 0)) < 0)
+	if ((ifd = open(cbuf, O_BINARY | O_RDONLY, 0)) < 0)
 		goto readerr;
 
 	/* Open the write file. */
 	if (snprintf(cbuf, CBUF_LEN, "%s/%s", directory, name) >= CBUF_LEN)
 		goto memerr;
-	if ((ofd = open(cbuf, O_CREAT | O_WRONLY | O_TRUNC, 0666)) < 0)
+	if ((ofd = open(
+	    cbuf, O_BINARY | O_CREAT | O_WRONLY | O_TRUNC, 0666)) < 0)
 		goto writerr;
 
 	/* Copy the file. */
@@ -152,8 +153,19 @@ copy(const char *name, const char *directory)
 	if (ret != 0)
 		goto readerr;
 
+	/*
+	 * We need to know this file was successfully written, it's a backup.
+	 */
+#ifdef _WIN32
+	if (FlushFileBuffers((HANDLE)_get_osfhandle(ofd)) == 0) {
+		DWORD err = GetLastError();
+		ret = err;
+		goto writerr;
+	}
+#else
 	if (fsync(ofd))
 		goto writerr;
+#endif
 	ret = close(ofd);
 	ofd = -1;
 	if (ret != 0)

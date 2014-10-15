@@ -32,7 +32,6 @@
 #include <unistd.h>
 
 #include <wiredtiger.h>
-#include <gcc.h>				/* WiredTiger internal */
 
 static const char *progname;			/* Program name */
 static uint8_t *big;				/* Big key/value buffer */
@@ -171,6 +170,9 @@ run(CONFIG *cp, int bigkey, size_t bytes)
 	big[bytes - 1] = 'a';
 }
 
+extern int __wt_optind;
+extern int __wt_getopt(const char *, int, char * const *, const char *);
+
 int
 main(int argc, char *argv[])
 {
@@ -184,7 +186,7 @@ main(int argc, char *argv[])
 		++progname;
 
 	small = 0;
-	while ((ch = getopt(argc, argv, "s")) != EOF)
+	while ((ch = __wt_getopt(progname, argc, argv, "s")) != EOF)
 		switch (ch) {
 		case 's':			/* Gigabytes */
 			small = 1;
@@ -192,6 +194,10 @@ main(int argc, char *argv[])
 		default:
 			usage();
 		}
+	argc -= __wt_optind;
+	argv += __wt_optind;
+	if (argc != 0)
+		usage();
 
 	/* Allocate a buffer to use. */
 	len = small ? ((size_t)SMALL_MAX) : ((size_t)4 * GIGABYTE);

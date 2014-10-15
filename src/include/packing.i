@@ -231,8 +231,8 @@ next:	if (pack->cur == pack->end)
 	case 'R':							\
 		pv.u.u = va_arg(ap, uint64_t);				\
 		break;							\
-	/* User format strings have already been validated. */          \
-	WT_ILLEGAL_VALUE(session);                                      \
+	/* User format strings have already been validated. */		\
+	WT_ILLEGAL_VALUE(session);					\
 	}								\
 } while (0)
 
@@ -535,19 +535,19 @@ __unpack_read(WT_SESSION_IMPL *session,
 		*va_arg(ap, uint8_t *) = (uint8_t)pv.u.u;		\
 		break;							\
 	case 'H':							\
-		*va_arg(ap, uint16_t *) = (uint16_t)pv.u.u;             \
+		*va_arg(ap, uint16_t *) = (uint16_t)pv.u.u;		\
 		break;							\
 	case 'I':							\
 	case 'L':							\
-		*va_arg(ap, uint32_t *) = (uint32_t)pv.u.u;	        \
+		*va_arg(ap, uint32_t *) = (uint32_t)pv.u.u;		\
 		break;							\
 	case 'Q':							\
 	case 'r':							\
 	case 'R':							\
 		*va_arg(ap, uint64_t *) = pv.u.u;			\
 		break;							\
-	/* User format strings have already been validated. */          \
-	WT_ILLEGAL_VALUE(session);                                      \
+	/* User format strings have already been validated. */		\
+	WT_ILLEGAL_VALUE(session);					\
 	}								\
 } while (0)
 

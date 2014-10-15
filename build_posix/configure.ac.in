@@ -7,7 +7,7 @@ m4_include([build_posix/aclocal/version-set.m4])
 
 AC_CONFIG_AUX_DIR([build_posix/gnu-support])
 AC_CONFIG_MACRO_DIR([build_posix/aclocal])
-AC_CONFIG_SRCDIR([RELEASE])
+AC_CONFIG_SRCDIR([RELEASE_INFO])
 
 # If CFLAGS/CXXFLAGS were not set on entry, default to "-O3 -g"
 : ${CFLAGS=-O3 -g}

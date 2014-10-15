@@ -1051,7 +1051,7 @@ __rec_child_modify(WT_SESSION_IMPL *session,
 			 * to see if the delete is visible to us.  Lock down the
 			 * structure.
 			 */
-			if (!WT_ATOMIC_CAS(
+			if (!WT_ATOMIC_CAS4(
 			    ref->state, WT_REF_DELETED, WT_REF_LOCKED))
 				break;
 			ret = __rec_child_deleted(session, r, ref, statep);
@@ -3139,7 +3139,7 @@ __rec_col_int(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 	    session, r, page, page->pg_intl_recno, btree->maxintlpage));
 
 	/* For each entry in the in-memory page... */
-	WT_INTL_FOREACH_BEGIN(page, ref) {
+	WT_INTL_FOREACH_BEGIN(session, page, ref) {
 		/* Update the starting record number in case we split. */
 		r->recno = ref->key.recno;
 
@@ -3934,7 +3934,7 @@ __rec_row_int(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 	r->cell_zero = 1;
 
 	/* For each entry in the in-memory page... */
-	WT_INTL_FOREACH_BEGIN(page, ref) {
+	WT_INTL_FOREACH_BEGIN(session, page, ref) {
 		/*
 		 * There are different paths if the key is an overflow item vs.
 		 * a straight-forward on-page value.   If an overflow item, we
@@ -4913,7 +4913,7 @@ err:			__wt_scr_free(&tkey);
 	if (!r->leave_dirty) {
 		mod->rec_max_txn = r->max_txn;
 
-		if (WT_ATOMIC_CAS(mod->write_gen, r->orig_write_gen, 0))
+		if (WT_ATOMIC_CAS4(mod->write_gen, r->orig_write_gen, 0))
 			__wt_cache_dirty_decr(session, page);
 	}
 

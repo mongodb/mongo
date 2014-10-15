@@ -37,15 +37,15 @@ util_dump(WT_SESSION *session, int argc, char *argv[])
 
 	hex = json = reverse = 0;
 	checkpoint = config = name = NULL;
-	while ((ch = util_getopt(argc, argv, "c:f:jrx")) != EOF)
+	while ((ch = __wt_getopt(progname, argc, argv, "c:f:jrx")) != EOF)
 		switch (ch) {
 		case 'c':
-			checkpoint = util_optarg;
+			checkpoint = __wt_optarg;
 			break;
 		case 'f':			/* output file */
-			if (freopen(util_optarg, "w", stdout) == NULL)
+			if (freopen(__wt_optarg, "w", stdout) == NULL)
 				return (
-				    util_err(errno, "%s: reopen", util_optarg));
+				    util_err(errno, "%s: reopen", __wt_optarg));
 			break;
 		case 'j':
 			json = 1;
@@ -60,8 +60,8 @@ util_dump(WT_SESSION *session, int argc, char *argv[])
 		default:
 			return (usage());
 		}
-	argc -= util_optind;
-	argv += util_optind;
+	argc -= __wt_optind;
+	argv += __wt_optind;
 
 	/* -j and -x are incompatible. */
 	if (hex && json) {

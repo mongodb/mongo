@@ -79,10 +79,10 @@ __wt_btree_open(WT_SESSION_IMPL *session, const char *op_cfg[])
 	 * sized address cookie that a block manager will ever return.  There's
 	 * a limit of WT_BTREE_MAX_ADDR_COOKIE, but at 255B, it's too large for
 	 * a Btree with 512B internal pages.  The default block manager packs
-	 * an off_t and 2 uint32_t's into its cookie, so there's no problem now,
-	 * but when we create a block manager extension API, we need some way to
-	 * consider the block manager's maximum cookie size versus the minimum
-	 * Btree internal node size.
+	 * a wt_off_t and 2 uint32_t's into its cookie, so there's no problem
+	 * now, but when we create a block manager extension API, we need some
+	 * way to consider the block manager's maximum cookie size versus the
+	 * minimum Btree internal node size.
 	 */
 	btree->block_header = bm->block_header(bm);
 
@@ -568,7 +568,7 @@ __btree_preload(WT_SESSION_IMPL *session)
 	bm = btree->bm;
 
 	/* Pre-load the second-level internal pages. */
-	WT_INTL_FOREACH_BEGIN(btree->root.page, ref) {
+	WT_INTL_FOREACH_BEGIN(session, btree->root.page, ref) {
 		WT_RET(__wt_ref_info(session, ref, &addr, &addr_size, NULL));
 		if (addr != NULL)
 			WT_RET(bm->preload(bm, session, addr, addr_size));

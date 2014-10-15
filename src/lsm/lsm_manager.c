@@ -223,7 +223,7 @@ __wt_lsm_manager_free_work_unit(
 	if (entry != NULL) {
 		WT_ASSERT(session, entry->lsm_tree->queue_ref > 0);
 
-		(void)WT_ATOMIC_SUB(entry->lsm_tree->queue_ref, 1);
+		(void)WT_ATOMIC_SUB4(entry->lsm_tree->queue_ref, 1);
 		__wt_free(session, entry);
 	}
 }
@@ -283,19 +283,16 @@ __wt_lsm_manager_destroy(WT_SESSION_IMPL *session)
 			++removed;
 			__wt_lsm_manager_free_work_unit(session, current);
 		}
+
+		/* Close all LSM worker sessions. */
+		for (i = 0; i < WT_LSM_MAX_WORKERS; i++) {
+			wt_session =
+			    &manager->lsm_worker_cookies[i].session->iface;
+			WT_TRET(wt_session->close(wt_session, NULL));
+		}
 	}
 	WT_STAT_FAST_CONN_INCRV(session,
 	    lsm_work_units_discarded, removed);
-
-	/*
-	 * Close all LSM worker sessions.  Start at 1 because we already
-	 * shut down the main LSM manager thread.
-	 */
-	for (i = 1; i < manager->lsm_workers; i++) {
-		wt_session =
-		    &manager->lsm_worker_cookies[i].session->iface;
-		WT_TRET(wt_session->close(wt_session, NULL));
-	}
 
 	/* Free resources that are allocated in connection initialize */
 	__wt_spin_destroy(session, &manager->switch_lock);
@@ -651,7 +648,7 @@ __wt_lsm_manager_push_entry(WT_SESSION_IMPL *session,
 	entry->type = type;
 	entry->flags = flags;
 	entry->lsm_tree = lsm_tree;
-	(void)WT_ATOMIC_ADD(lsm_tree->queue_ref, 1);
+	(void)WT_ATOMIC_ADD4(lsm_tree->queue_ref, 1);
 	WT_STAT_FAST_CONN_INCR(session, lsm_work_units_created);
 
 	if (type == WT_LSM_WORK_SWITCH)

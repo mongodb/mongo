@@ -22,7 +22,7 @@ __curlog_logrec(
 	/* Set up the LSNs and take a copy of the log record for the cursor. */
 	*cl->cur_lsn = *lsnp;
 	*cl->next_lsn = *lsnp;
-	cl->next_lsn->offset += (off_t)logrec->size;
+	cl->next_lsn->offset += (wt_off_t)logrec->size;
 	WT_RET(__wt_buf_set(session, cl->logrec, logrec->data, logrec->size));
 
 	/*
@@ -327,7 +327,7 @@ __wt_curlog_open(WT_SESSION_IMPL *session,
 	WT_DECL_RET;
 	WT_LOG *log;
 
-	STATIC_ASSERT(offsetof(WT_CURSOR_LOG, iface) == 0);
+	WT_STATIC_ASSERT(offsetof(WT_CURSOR_LOG, iface) == 0);
 	conn = S2C(session);
 	if (!conn->logging)
 		WT_RET_MSG(session, EINVAL,

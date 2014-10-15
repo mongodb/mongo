@@ -498,7 +498,7 @@ __wt_curstat_open(WT_SESSION_IMPL *session,
 	WT_CURSOR_STAT *cst;
 	WT_DECL_RET;
 
-	STATIC_ASSERT(offsetof(WT_CURSOR_STAT, iface) == 0);
+	WT_STATIC_ASSERT(offsetof(WT_CURSOR_STAT, iface) == 0);
 
 	conn = S2C(session);
 

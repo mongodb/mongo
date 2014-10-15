@@ -50,7 +50,7 @@ struct __wt_extlist {
 	uint64_t bytes;				/* Byte count */
 	uint32_t entries;			/* Entry count */
 
-	off_t	 offset;			/* Written extent offset */
+	wt_off_t offset;			/* Written extent offset */
 	uint32_t cksum, size;			/* Written extent cksum, size */
 
 	int	track_size;			/* Maintain per-size skiplist */
@@ -67,8 +67,8 @@ struct __wt_extlist {
  * checkpoint.
  */
 struct __wt_ext {
-	off_t	 off;				/* Extent's file offset */
-	off_t	 size;				/* Extent's Size */
+	wt_off_t  off;				/* Extent's file offset */
+	wt_off_t  size;				/* Extent's Size */
 
 	uint8_t	 depth;				/* Skip list depth */
 
@@ -85,7 +85,7 @@ struct __wt_ext {
  *	Encapsulation of a block size skiplist entry.
  */
 struct __wt_size {
-	off_t	 size;				/* Size */
+	wt_off_t size;				/* Size */
 
 	uint8_t	 depth;				/* Skip list depth */
 
@@ -126,14 +126,14 @@ struct __wt_size {
 struct __wt_block_ckpt {
 	uint8_t	 version;			/* Version */
 
-	off_t	 root_offset;			/* The root */
+	wt_off_t root_offset;			/* The root */
 	uint32_t root_cksum, root_size;
 
 	WT_EXTLIST alloc;			/* Extents allocated */
 	WT_EXTLIST avail;			/* Extents available */
 	WT_EXTLIST discard;			/* Extents discarded */
 
-	off_t	   file_size;			/* Checkpoint file size */
+	wt_off_t   file_size;			/* Checkpoint file size */
 	uint64_t   ckpt_size;			/* Checkpoint byte count */
 
 	WT_EXTLIST ckpt_avail;			/* Checkpoint free'd extents */
@@ -193,6 +193,7 @@ struct __wt_bm {
 
 	void  *map;				/* Mapped region */
 	size_t maplen;
+	void *mappingcookie;
 
 	/*
 	 * There's only a single block manager handle that can be written, all
@@ -236,11 +237,11 @@ struct __wt_block {
 	int		ckpt_inprogress;/* Live checkpoint in progress */
 
 				/* Salvage support */
-	off_t	slvg_off;		/* Salvage file offset */
+	wt_off_t	slvg_off;	/* Salvage file offset */
 
 				/* Verification support */
 	int	   verify;		/* If performing verification */
-	off_t	   verify_size;		/* Checkpoint's file size */
+	wt_off_t   verify_size;		/* Checkpoint's file size */
 	WT_EXTLIST verify_alloc;	/* Verification allocation list */
 	uint64_t   frags;		/* Maximum frags in the file */
 	uint8_t   *fragfile;		/* Per-file frag tracking list */

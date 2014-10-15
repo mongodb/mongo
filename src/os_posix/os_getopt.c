@@ -56,91 +56,95 @@
  * SUCH DAMAGE.
  */
 
-#include "util.h"
+#include "wt_internal.h"
 
-int	util_opterr = 1,	/* if error message should be printed */
-	util_optind = 1,	/* index into parent argv vector */
-	util_optopt,		/* character checked for validity */
-	util_optreset;		/* reset getopt */
-char	*util_optarg;		/* argument associated with option */
+extern int __wt_opterr, __wt_optind, __wt_optopt, __wt_optreset;
+int	__wt_opterr = 1,	/* if error message should be printed */
+	__wt_optind = 1,	/* index into parent argv vector */
+	__wt_optopt,		/* character checked for validity */
+	__wt_optreset;		/* reset getopt */
+
+extern char *__wt_optarg;
+char	*__wt_optarg;		/* argument associated with option */
 
 #define	BADCH	(int)'?'
 #define	BADARG	(int)':'
 #define	EMSG	""
 
 /*
- * getopt --
+ * __wt_getopt --
  *	Parse argc/argv argument vector.
  */
 int
-util_getopt(int nargc, char * const *nargv, const char *ostr)
+__wt_getopt(
+    const char *progname, int nargc, char * const *nargv, const char *ostr)
 {
 	static const char *place = EMSG;	/* option letter processing */
 	const char *oli;			/* option letter list index */
 
-	if (util_optreset || *place == 0) {	/* update scanning pointer */
-		util_optreset = 0;
-		place = nargv[util_optind];
-		if (util_optind >= nargc || *place++ != '-') {
+	if (__wt_optreset || *place == 0) {	/* update scanning pointer */
+		__wt_optreset = 0;
+		place = nargv[__wt_optind];
+		if (__wt_optind >= nargc || *place++ != '-') {
 			/* Argument is absent or is not an option */
 			place = EMSG;
 			return (-1);
 		}
-		util_optopt = *place++;
-		if (util_optopt == '-' && *place == 0) {
+		__wt_optopt = *place++;
+		if (__wt_optopt == '-' && *place == 0) {
 			/* "--" => end of options */
-			++util_optind;
+			++__wt_optind;
 			place = EMSG;
 			return (-1);
 		}
-		if (util_optopt == 0) {
+		if (__wt_optopt == 0) {
 			/* Solitary '-', treat as a '-' option
 			   if the program (eg su) is looking for it. */
 			place = EMSG;
 			if (strchr(ostr, '-') == NULL)
 				return (-1);
-			util_optopt = '-';
+			__wt_optopt = '-';
 		}
 	} else
-		util_optopt = *place++;
+		__wt_optopt = *place++;
 
 	/* See if option letter is one the caller wanted... */
-	if (util_optopt == ':' || (oli = strchr(ostr, util_optopt)) == NULL) {
+	if (__wt_optopt == ':' || (oli = strchr(ostr, __wt_optopt)) == NULL) {
 		if (*place == 0)
-			++util_optind;
-		if (util_opterr && *ostr != ':')
+			++__wt_optind;
+		if (__wt_opterr && *ostr != ':')
 			(void)fprintf(stderr,
 			    "%s: illegal option -- %c\n", progname,
-			    util_optopt);
+			    __wt_optopt);
 		return (BADCH);
 	}
 
 	/* Does this option need an argument? */
 	if (oli[1] != ':') {
 		/* don't need argument */
-		util_optarg = NULL;
+		__wt_optarg = NULL;
 		if (*place == 0)
-			++util_optind;
+			++__wt_optind;
 	} else {
 		/* Option-argument is either the rest of this argument or the
 		   entire next argument. */
 		if (*place)
-			util_optarg = (char *)place;
-		else if (nargc > ++util_optind)
-			util_optarg = nargv[util_optind];
+			__wt_optarg = (char *)place;
+		else if (nargc > ++__wt_optind)
+			__wt_optarg = nargv[__wt_optind];
 		else {
 			/* option-argument absent */
 			place = EMSG;
 			if (*ostr == ':')
 				return (BADARG);
-			if (util_opterr)
+			if (__wt_opterr)
 				(void)fprintf(stderr,
 				    "%s: option requires an argument -- %c\n",
-				    progname, util_optopt);
+				    progname, __wt_optopt);
 			return (BADCH);
 		}
 		place = EMSG;
-		++util_optind;
+		++__wt_optind;
 	}
-	return (util_optopt);			/* return option letter */
+	return (__wt_optopt);			/* return option letter */
 }

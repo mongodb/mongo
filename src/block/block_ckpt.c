@@ -129,9 +129,14 @@ __wt_block_checkpoint_load(WT_SESSION_IMPL *session, WT_BLOCK *block,
 	 * enough I don't bother).
 	 */
 	if (!checkpoint) {
+		/*
+		 * The truncate might fail if there's a file mapping (if there's
+		 * an open checkpoint on the file), that's OK.
+		 */
 		WT_ERR(__wt_verbose(session, WT_VERB_CHECKPOINT,
 		    "truncate file to %" PRIuMAX, (uintmax_t)ci->file_size));
-		WT_ERR(__wt_ftruncate(session, block->fh, ci->file_size));
+		WT_ERR_BUSY_OK(
+		    __wt_ftruncate(session, block->fh, ci->file_size));
 	}
 
 	if (0) {
@@ -174,7 +179,12 @@ __wt_block_checkpoint_unload(
 	 * other checkpoints.
 	 */
 	if (!checkpoint) {
-		WT_TRET(__wt_ftruncate(session, block->fh, block->fh->size));
+		/*
+		 * The truncate might fail if there's a file mapping (if there's
+		 * an open checkpoint on the file), that's OK.
+		 */
+		WT_TRET_BUSY_OK(
+		    __wt_ftruncate(session, block->fh, block->fh->size));
 
 		__wt_spin_lock(session, &block->live_lock);
 		__wt_block_ckpt_destroy(session, &block->live);
@@ -283,7 +293,7 @@ __ckpt_extlist_read(WT_SESSION_IMPL *session, WT_BLOCK *block, WT_CKPT *ckpt)
  * __ckpt_extlist_fblocks --
  *	If a checkpoint's extent list is going away, free its blocks.
  */
-static inline int
+static int
 __ckpt_extlist_fblocks(
     WT_SESSION_IMPL *session, WT_BLOCK *block, WT_EXTLIST *el)
 {

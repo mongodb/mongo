@@ -52,7 +52,7 @@ __lsm_copy_chunks(WT_SESSION_IMPL *session,
 	 * it's safe.
 	 */
 	for (i = 0; i < nchunks; i++)
-		(void)WT_ATOMIC_ADD(cookie->chunk_array[i]->refcnt, 1);
+		(void)WT_ATOMIC_ADD4(cookie->chunk_array[i]->refcnt, 1);
 
 err:	WT_TRET(__wt_lsm_tree_unlock(session, lsm_tree));
 
@@ -86,7 +86,7 @@ __wt_lsm_get_chunk_to_flush(WT_SESSION_IMPL *session,
 	end = force ? lsm_tree->nchunks : lsm_tree->nchunks - 1;
 	for (i = 0; i < end; i++) {
 		if (!F_ISSET(lsm_tree->chunk[i], WT_LSM_CHUNK_ONDISK)) {
-			(void)WT_ATOMIC_ADD(lsm_tree->chunk[i]->refcnt, 1);
+			(void)WT_ATOMIC_ADD4(lsm_tree->chunk[i]->refcnt, 1);
 			WT_RET(__wt_verbose(session, WT_VERB_LSM,
 			    "Flush%s: return chunk %u of %u: %s",
 			    force ? " w/ force" : "", i, end - 1,
@@ -115,7 +115,7 @@ __lsm_unpin_chunks(WT_SESSION_IMPL *session, WT_LSM_WORKER_COOKIE *cookie)
 		if (cookie->chunk_array[i] == NULL)
 			continue;
 		WT_ASSERT(session, cookie->chunk_array[i]->refcnt > 0);
-		(void)WT_ATOMIC_SUB(cookie->chunk_array[i]->refcnt, 1);
+		(void)WT_ATOMIC_SUB4(cookie->chunk_array[i]->refcnt, 1);
 	}
 	/* Ensure subsequent calls don't double decrement. */
 	cookie->nchunks = 0;
@@ -186,7 +186,7 @@ __wt_lsm_work_bloom(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 		 * See if we win the race to switch on the "busy" flag and
 		 * recheck that the chunk still needs a Bloom filter.
 		 */
-		if (WT_ATOMIC_CAS(chunk->bloom_busy, 0, 1)) {
+		if (WT_ATOMIC_CAS4(chunk->bloom_busy, 0, 1)) {
 			if (!F_ISSET(chunk, WT_LSM_CHUNK_BLOOM)) {
 				ret = __lsm_bloom_create(
 				    session, lsm_tree, chunk, (u_int)i);
@@ -480,6 +480,7 @@ __lsm_drop_file(WT_SESSION_IMPL *session, const char *uri)
 
 	if (ret == 0)
 		ret = __wt_remove(session, uri + strlen("file:"));
+	WT_RET(__wt_verbose(session, WT_VERB_LSM, "Dropped %s", uri));
 
 	return (ret);
 }
@@ -504,7 +505,7 @@ __wt_lsm_free_chunks(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 	 * Make sure only a single thread is freeing the old chunk array
 	 * at any time.
 	 */
-	if (!WT_ATOMIC_CAS(lsm_tree->freeing_old_chunks, 0, 1))
+	if (!WT_ATOMIC_CAS4(lsm_tree->freeing_old_chunks, 0, 1))
 		return (0);
 	/*
 	 * Take a copy of the current state of the LSM tree and look for chunks

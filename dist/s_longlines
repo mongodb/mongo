@@ -8,7 +8,8 @@ l=`(cd .. &&
     find bench/wtperf examples ext src test -name '*.[chisy]' &&
     find dist -name '*.py' &&
     find src -name '*.in') |
-    grep -v 'support/stat\.c'`
+    sed -e '/include\/extern\.h/d'\
+	-e '/support\/stat\.c/d'`
 
 for f in $l ; do
 	expand -t8 < ../$f | awk -- \

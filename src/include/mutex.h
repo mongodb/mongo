@@ -31,6 +31,10 @@ struct __wt_rwlock {
 	const char *name;		/* Lock name for debugging */
 
 	pthread_rwlock_t rwlock;	/* Read/write lock */
+
+#ifdef _WIN32
+    uint32_t exclusive_locked;
+#endif
 };
 
 /*
@@ -44,6 +48,7 @@ struct __wt_rwlock {
 #define	SPINLOCK_PTHREAD_MUTEX		1
 #define	SPINLOCK_PTHREAD_MUTEX_ADAPTIVE	2
 #define	SPINLOCK_PTHREAD_MUTEX_LOGGING	3
+#define	SPINLOCK_MSVC			4
 
 #if SPINLOCK_TYPE == SPINLOCK_GCC
 
@@ -52,6 +57,7 @@ typedef volatile int
 
 #elif SPINLOCK_TYPE == SPINLOCK_PTHREAD_MUTEX ||\
 	SPINLOCK_TYPE == SPINLOCK_PTHREAD_MUTEX_ADAPTIVE ||\
+	SPINLOCK_TYPE == SPINLOCK_MSVC ||\
 	SPINLOCK_TYPE == SPINLOCK_PTHREAD_MUTEX_LOGGING
 
 typedef struct {

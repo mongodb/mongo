@@ -14,7 +14,7 @@
 int
 __wt_block_salvage_start(WT_SESSION_IMPL *session, WT_BLOCK *block)
 {
-	off_t len;
+	wt_off_t len;
 	uint32_t allocsize;
 
 	allocsize = block->allocsize;
@@ -73,7 +73,7 @@ __wt_block_salvage_end(WT_SESSION_IMPL *session, WT_BLOCK *block)
  *	Return if the block offset is insane.
  */
 int
-__wt_block_offset_invalid(WT_BLOCK *block, off_t offset, uint32_t size)
+__wt_block_offset_invalid(WT_BLOCK *block, wt_off_t offset, uint32_t size)
 {
 	if (size == 0)				/* < minimum page size */
 		return (1);
@@ -82,7 +82,7 @@ __wt_block_offset_invalid(WT_BLOCK *block, off_t offset, uint32_t size)
 	if (size > WT_BTREE_PAGE_SIZE_MAX)	/* > maximum page size */
 		return (1);
 						/* past end-of-file */
-	if (offset + (off_t)size > block->fh->size)
+	if (offset + (wt_off_t)size > block->fh->size)
 		return (1);
 	return (0);
 }
@@ -99,7 +99,7 @@ __wt_block_salvage_next(WT_SESSION_IMPL *session,
 	WT_DECL_ITEM(tmp);
 	WT_DECL_RET;
 	WT_FH *fh;
-	off_t max, offset;
+	wt_off_t max, offset;
 	uint32_t allocsize, cksum, size;
 	uint8_t *endp;
 
@@ -144,7 +144,7 @@ __wt_block_salvage_next(WT_SESSION_IMPL *session,
 		    "skipping %" PRIu32 "B at file offset %" PRIuMAX,
 		    allocsize, (uintmax_t)offset));
 		WT_ERR(__wt_block_off_free(
-		    session, block, offset, (off_t)allocsize));
+		    session, block, offset, (wt_off_t)allocsize));
 		block->slvg_off += allocsize;
 	}
 
@@ -166,7 +166,7 @@ int
 __wt_block_salvage_valid(WT_SESSION_IMPL *session,
     WT_BLOCK *block, uint8_t *addr, size_t addr_size, int valid)
 {
-	off_t offset;
+	wt_off_t offset;
 	uint32_t size, cksum;
 
 	WT_UNUSED(session);
@@ -182,7 +182,7 @@ __wt_block_salvage_valid(WT_SESSION_IMPL *session,
 		block->slvg_off = offset + size;
 	else {
 		WT_RET(__wt_block_off_free(
-		    session, block, offset, (off_t)block->allocsize));
+		    session, block, offset, (wt_off_t)block->allocsize));
 		block->slvg_off = offset + block->allocsize;
 	}
 

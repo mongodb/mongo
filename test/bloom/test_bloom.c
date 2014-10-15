@@ -55,6 +55,9 @@ static int run(void);
 static int setup(void);
 static void usage(void);
 
+extern char *__wt_optarg;
+extern int __wt_optind;
+
 int
 main(int argc, char *argv[])
 {
@@ -74,29 +77,29 @@ main(int argc, char *argv[])
 	g.c_srand = 3233456;
 
 	/* Set values from the command line. */
-	while ((ch = getopt(argc, argv, "c:f:k:o:s:")) != EOF)
+	while ((ch = __wt_getopt(g.progname, argc, argv, "c:f:k:o:s:")) != EOF)
 		switch (ch) {
 		case 'c':			/* Cache size */
-			g.c_cache = (u_int)atoi(optarg);
+			g.c_cache = (u_int)atoi(__wt_optarg);
 			break;
 		case 'f':			/* Factor */
-			g.c_factor = (u_int)atoi(optarg);
+			g.c_factor = (u_int)atoi(__wt_optarg);
 			break;
 		case  'k':			/* Number of hash functions */
-			g.c_k = (u_int)atoi(optarg);
+			g.c_k = (u_int)atoi(__wt_optarg);
 			break;
 		case 'o':			/* Number of ops */
-			g.c_ops = (u_int)atoi(optarg);
+			g.c_ops = (u_int)atoi(__wt_optarg);
 			break;
 		case 's':			/* Number of ops */
-			g.c_srand = (u_int)atoi(optarg);
+			g.c_srand = (u_int)atoi(__wt_optarg);
 			break;
 		default:
 			usage();
 		}
 
-	argc -= optind;
-	argv += optind;
+	argc -= __wt_optind;
+	argv += __wt_optind;
 
 	setup();
 	run();

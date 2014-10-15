@@ -67,7 +67,7 @@ __split_stash_add(WT_SESSION_IMPL *session, void *p, size_t len)
 	    session->split_stash_cnt + 1, &session->split_stash));
 
 	stash = session->split_stash + session->split_stash_cnt++;
-	stash->split_gen = WT_ATOMIC_ADD(S2C(session)->split_gen, 1);
+	stash->split_gen = WT_ATOMIC_ADD8(S2C(session)->split_gen, 1);
 	stash->p = p;
 	stash->len = len;
 
@@ -103,9 +103,8 @@ __wt_split_stash_discard(WT_SESSION_IMPL *session)
 		else if (stash->split_gen >= oldest)
 			break;
 		/*
-		 * It's a bad thing if another thread is in this memory
-		 * after we free it, make sure nothing good happens to
-		 * that thread.
+		 * It's a bad thing if another thread is in this memory after
+		 * we free it, make sure nothing good happens to that thread.
 		 */
 		WT_STAT_FAST_CONN_ATOMIC_DECRV(
 		    session, rec_split_stashed_bytes, stash->len);
@@ -345,7 +344,7 @@ __split_verify_intl_key_order(WT_SESSION_IMPL *session, WT_PAGE *page)
 	switch (page->type) {
 	case WT_PAGE_COL_INT:
 		recno = 0;
-		WT_INTL_FOREACH_BEGIN(page, ref) {
+		WT_INTL_FOREACH_BEGIN(session, page, ref) {
 			WT_ASSERT(session, ref->key.recno > recno);
 			recno = ref->key.recno;
 		} WT_INTL_FOREACH_END;
@@ -357,7 +356,7 @@ __split_verify_intl_key_order(WT_SESSION_IMPL *session, WT_PAGE *page)
 		WT_CLEAR(_last);
 
 		first = 1;
-		WT_INTL_FOREACH_BEGIN(page, ref) {
+		WT_INTL_FOREACH_BEGIN(session, page, ref) {
 			__wt_ref_key(page, ref, &next->data, &next->size);
 			if (last->size == 0) {
 				if (first)
@@ -486,14 +485,11 @@ __split_deepen(WT_SESSION_IMPL *session, WT_PAGE *parent)
 		__wt_page_only_modify_set(session, child);
 
 		/*
-		 * Once the split goes live, the newly created children can be
-		 * evicted and their WT_REF structures freed.  If the child
+		 * Once the split goes live, the newly created internal pages
+		 * might be evicted and their WT_REF structures freed.  If those
 		 * pages are evicted before threads exit the previous page index
 		 * array, a thread might see a freed WT_REF.  Set the eviction
-		 * transaction requirement for split pages.  (Note, we're about
-		 * to process those pages below, too, without holding hazard
-		 * references; this "pin" based on the current transaction makes
-		 * that safe as well.)
+		 * transaction requirement for the newly created internal pages.
 		 */
 		child->modify->mod_split_txn = __wt_txn_new_id(session);
 
@@ -513,8 +509,8 @@ __split_deepen(WT_SESSION_IMPL *session, WT_PAGE *parent)
 			    parent, *parent_refp, &parent_decr, &child_incr));
 			*child_refp++ = *parent_refp++;
 
-			WT_MEMSIZE_TRANSFER(parent_decr, child_incr,
-			    sizeof(WT_REF));
+			WT_MEMSIZE_TRANSFER(
+			    parent_decr, child_incr, sizeof(WT_REF));
 		}
 		__wt_cache_page_inmem_incr(session, child, child_incr);
 	}
@@ -552,6 +548,9 @@ __split_deepen(WT_SESSION_IMPL *session, WT_PAGE *parent)
 	 * When that failure happens, the thread waits for the reference's home
 	 * page to be updated, which we do here: walk the children and fix them
 	 * up.
+	 *
+	 * We're not acquiring hazard pointers on these pages, they cannot be
+	 * evicted because of the eviction transaction value set above.
 	 */
 	for (parent_refp = alloc_index->index,
 	    i = alloc_index->entries; i > 0; ++parent_refp, --i) {
@@ -571,7 +570,7 @@ __split_deepen(WT_SESSION_IMPL *session, WT_PAGE *parent)
 #ifdef HAVE_DIAGNOSTIC
 		__split_verify_intl_key_order(session, child);
 #endif
-		WT_INTL_FOREACH_BEGIN(child, child_ref) {
+		WT_INTL_FOREACH_BEGIN(session, child, child_ref) {
 			/*
 			 * The page's parent reference may not be wrong, as we
 			 * opened up access from the top of the tree already,
@@ -869,8 +868,6 @@ __wt_split_evict(WT_SESSION_IMPL *session, WT_REF *ref, int exclusive)
 			F_CLR_ATOMIC(parent, WT_PAGE_SPLITTING);
 			continue;
 		}
-		if (ret != EBUSY)
-			goto err;
 		__wt_yield();
 	}
 	locked = 1;

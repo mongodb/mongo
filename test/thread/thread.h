@@ -38,7 +38,6 @@
 #include <unistd.h>
 
 #include <wiredtiger.h>
-#include <gcc.h>				/* WiredTiger internal */
 
 #define	FNAME		"file:wt.%03d"		/* File name */
 #define	FNAME_STAT	"__stats"		/* File name for statistics */
@@ -54,8 +53,13 @@ extern u_int nkeys;				/* Keys to load */
 extern u_int nops;				/* Operations per thread */
 extern int   session_per_op;			/* New session per operation */
 
-void die(const char *, int) WT_GCC_ATTRIBUTE((noreturn));
 void load(const char *);
 int  rw_start(u_int, u_int);
 void stats(void);
 void verify(const char *);
+
+void die(const char *, int)
+#if defined(__GNUC__)
+__attribute__((noreturn))
+#endif
+;

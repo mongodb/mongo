@@ -695,7 +695,7 @@ __wt_curtable_open(WT_SESSION_IMPL *session,
 	int cfg_cnt;
 	const char *tablename, *columns;
 
-	STATIC_ASSERT(offsetof(WT_CURSOR_TABLE, iface) == 0);
+	WT_STATIC_ASSERT(offsetof(WT_CURSOR_TABLE, iface) == 0);
 
 	ctable = NULL;
 
