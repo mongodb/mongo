@@ -157,7 +157,7 @@ struct __wt_connection_impl {
 	int hot_backup;
 
 	WT_SESSION_IMPL *ckpt_session;	/* Checkpoint thread session */
-	pthread_t	 ckpt_tid;	/* Checkpoint thread */
+	_wt_thread_t	 ckpt_tid;	/* Checkpoint thread */
 	int		 ckpt_tid_set;	/* Checkpoint thread set */
 	WT_CONDVAR	*ckpt_cond;	/* Checkpoint wait mutex */
 	const char	*ckpt_config;	/* Checkpoint configuration */
@@ -208,7 +208,7 @@ struct __wt_connection_impl {
 	WT_LSM_MANAGER	lsm_manager;	/* LSM worker thread information */
 
 	WT_SESSION_IMPL *evict_session; /* Eviction server sessions */
-	pthread_t	 evict_tid;	/* Eviction server thread ID */
+	_wt_thread_t	 evict_tid;	/* Eviction server thread ID */
 	int		 evict_tid_set;	/* Eviction server thread ID set */
 
 	uint32_t	 evict_workers_max;/* Max eviction workers */
@@ -217,7 +217,7 @@ struct __wt_connection_impl {
 	WT_EVICT_WORKER	*evict_workctx;	/* Eviction worker context */
 
 	WT_SESSION_IMPL *stat_session;	/* Statistics log session */
-	pthread_t	 stat_tid;	/* Statistics log thread */
+	_wt_thread_t	 stat_tid;	/* Statistics log thread */
 	int		 stat_tid_set;	/* Statistics log thread set */
 	WT_CONDVAR	*stat_cond;	/* Statistics log wait mutex */
 	const char	*stat_format;	/* Statistics log timestamp format */
@@ -231,7 +231,7 @@ struct __wt_connection_impl {
 	int		 archive;	/* Global archive configuration */
 	WT_CONDVAR	*arch_cond;	/* Log archive wait mutex */
 	WT_SESSION_IMPL *arch_session;	/* Log archive session */
-	pthread_t	 arch_tid;	/* Log archive thread */
+	_wt_thread_t	 arch_tid;	/* Log archive thread */
 	int		 arch_tid_set;	/* Log archive thread set */
 	WT_LOG		*log;		/* Logging structure */
 	wt_off_t	 log_file_max;	/* Log file max size */
@@ -239,7 +239,7 @@ struct __wt_connection_impl {
 	uint32_t	txn_logsync;	/* Log sync configuration */
 
 	WT_SESSION_IMPL *sweep_session;	/* Handle sweep session */
-	pthread_t	 sweep_tid;	/* Handle sweep thread */
+	_wt_thread_t	 sweep_tid;	/* Handle sweep thread */
 	int		 sweep_tid_set;	/* Handle sweep thread set */
 	WT_CONDVAR	*sweep_cond;	/* Handle sweep wait mutex */
 

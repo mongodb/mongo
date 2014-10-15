@@ -100,7 +100,7 @@ struct __wt_async {
 #define	WT_ASYNC_MAX_WORKERS	20
 	WT_SESSION_IMPL		*worker_sessions[WT_ASYNC_MAX_WORKERS];
 					/* Async worker threads */
-	pthread_t		 worker_tids[WT_ASYNC_MAX_WORKERS];
+	_wt_thread_t		 worker_tids[WT_ASYNC_MAX_WORKERS];
 
 	uint32_t		 flags;	/* Currently unused. */
 };

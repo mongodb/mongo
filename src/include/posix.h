@@ -18,3 +18,14 @@
 
 /* Define O_BINARY for Posix systems */
 #define	O_BINARY 	0
+
+/*
+ * Define WT threading and concurrency primitives
+ */
+typedef pthread_mutex_t  _wt_mutex_t;
+
+typedef pthread_cond_t _wt_cond_t;
+
+typedef pthread_rwlock_t _wt_rwlock_t;
+
+typedef pthread_t _wt_thread_t;

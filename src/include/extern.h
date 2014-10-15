@@ -473,8 +473,8 @@ extern int __wt_read( WT_SESSION_IMPL *session, WT_FH *fh, wt_off_t offset, size
 extern int __wt_write(WT_SESSION_IMPL *session, WT_FH *fh, wt_off_t offset, size_t len, const void *buf);
 extern void __wt_sleep(long seconds, long micro_seconds);
 extern uint64_t __wt_strtouq(const char *nptr, char **endptr, int base);
-extern int __wt_thread_create(WT_SESSION_IMPL *session, pthread_t *tidret, void *(*func)(void *), void *arg);
-extern int __wt_thread_join(WT_SESSION_IMPL *session, pthread_t tid);
+extern int __wt_thread_create(WT_SESSION_IMPL *session, _wt_thread_t *tidret, void *(*func)(void *), void *arg);
+extern int __wt_thread_join(WT_SESSION_IMPL *session, _wt_thread_t tid);
 extern void __wt_thread_id(WT_SESSION_IMPL *session, char *buf, size_t buflen);
 extern int __wt_seconds(WT_SESSION_IMPL *session, time_t *timep);
 extern int __wt_epoch(WT_SESSION_IMPL *session, struct timespec *tsp);

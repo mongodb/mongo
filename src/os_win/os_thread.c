@@ -13,7 +13,7 @@
  */
 int
 __wt_thread_create(WT_SESSION_IMPL *session,
-    pthread_t *tidret, void *(*func)(void *), void *arg)
+    _wt_thread_t *tidret, void *(*func)(void *), void *arg)
 {
 	/* Spawn a new thread of control. */
 	*tidret = CreateThread(NULL, 0, func, arg, 0, NULL);
@@ -28,7 +28,7 @@ __wt_thread_create(WT_SESSION_IMPL *session,
  *	Wait for a thread of control to exit.
  */
 int
-__wt_thread_join(WT_SESSION_IMPL *session, pthread_t tid)
+__wt_thread_join(WT_SESSION_IMPL *session, _wt_thread_t tid)
 {
 	WT_DECL_RET;
 
