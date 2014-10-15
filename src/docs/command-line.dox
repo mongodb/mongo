@@ -152,8 +152,8 @@ Load a table or file from dump output.
 
 The \c load command reads the standard input for data and loads it into
 a table or file, creating the table or file if it does not yet exist.
-The data should be the format produced by the \c dump command; see @ref
-dump_formats for details.
+The data should be the format produced by the \c dump command; see
+@ref dump_formats for details.
 
 By default, if the table or file already exists, data in the file or
 table will be overwritten by the new data (use the \c -n option to

@@ -1,4 +1,4 @@
-/*! @page error_handling Error handling
+/*! @m_page{{c,java},error_handling,Error handling}
 
 WiredTiger operations return a value of 0 on success and a non-zero
 value on error.  Error codes may be either positive or negative:
@@ -9,7 +9,18 @@ are WiredTiger-specific (for example, WT_DEADLOCK).
 WiredTiger-specific error codes always appear in the -31,800 to -31,999
 range.
 
+@m_if{java}
+Informational return values, like <code>wiredtiger.WT_NOTFOUND</code>
+or <code>wiredtiger.WT_DUPLICATE_KEY</code> or 0 (success),
+are directly returned by APIs.  More severe errors
+are thrown as \c WiredTigerException, which must be caught by the
+application.
+
+The following is a complete list of possible WiredTiger-specific
+return values, all constants defined in the com.wiredtiger.db.wiredtiger class:
+@m_else
 The following is a list of possible WiredTiger-specific errors:
+@m_endif
 
 @if IGNORE_BUILT_BY_API_ERR_BEGIN
 @endif
@@ -37,7 +48,9 @@ associated with any WiredTiger, ISO C99, or POSIX 1003.1-2001 function:
 
 @snippet ex_all.c Display an error
 
+@m_if{c}
 More complex error handling can be configured by passing an implementation
 of WT_EVENT_HANDLER to ::wiredtiger_open or WT_CONNECTION::open_session.
+@m_endif
 
 */

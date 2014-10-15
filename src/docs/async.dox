@@ -1,4 +1,4 @@
-/*! @page async Asynchronous operations
+/*! @m_page{{c,java},async,Asynchronous operations}
 
 WiredTiger supports asynchronous operations; as an example of where this
 can be useful, a server application handling requests from a network as
@@ -80,6 +80,10 @@ Here is a complete example callback function implementation, from
 the example program @ex_ref{ex_async.c}:
 
 @snippet ex_async.c async example callback implementation
+
+@m_if{java}
+@snippet ex_async.c async example callback implementation part 2
+@m_endif
 
 @section async_operations Executing asynchronous operations
 
