@@ -229,7 +229,7 @@ namespace mongo {
         scoped_ptr<BackgroundOperation> backgroundOperation;
         bool doInBackground = false;
 
-        if ( idxInfo["background"].trueValue() && !inDBRepair ) {
+        if ( idxInfo["background"].trueValue() && !inDBRepair && mayInterrupt ) {
             doInBackground = true;
             backgroundOperation.reset( new BackgroundOperation(ns) );
             uassert( 13130,
