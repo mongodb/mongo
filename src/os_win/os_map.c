@@ -17,10 +17,6 @@ __wt_mmap(WT_SESSION_IMPL *session, WT_FH *fh, void *mapp, size_t *lenp,
 {
 	void *map;
 
-	WT_RET(__wt_verbose(session, WT_VERB_FILEOPS,
-	    "%s: MapViewOfFile %" PRIuMAX " bytes",
-	    fh->name, (uintmax_t)fh->size));
-
 	*mappingcookie =
 	    CreateFileMapping(fh->filehandle, NULL, PAGE_READONLY, 0, 0, NULL);
 	if (*mappingcookie == NULL)
@@ -38,6 +34,9 @@ __wt_mmap(WT_SESSION_IMPL *session, WT_FH *fh, void *mapp, size_t *lenp,
 		    "%s map error: failed to map %" PRIuMAX " bytes",
 		    fh->name, (uintmax_t)fh->size);
 	}
+	(void)__wt_verbose(session, WT_VERB_FILEOPS,
+	    "%s: MapViewOfFile %p: %" PRIuMAX " bytes",
+	    fh->name, map, (uintmax_t)fh->size);
 
 	*(void **)mapp = map;
 	*lenp = (size_t)fh->size;
@@ -80,8 +79,8 @@ __wt_munmap(WT_SESSION_IMPL *session, WT_FH *fh, void *map, size_t len,
    void** mappingcookie)
 {
 	WT_RET(__wt_verbose(session, WT_VERB_FILEOPS,
-	    "%s: UnmapViewOfFile %" PRIuMAX " bytes",
-	    fh->name, (uintmax_t)len));
+	    "%s: UnmapViewOfFile %p: %" PRIuMAX " bytes",
+	    fh->name, map, (uintmax_t)len));
 
 	if (UnmapViewOfFile(map) == 0) {
 		WT_RET_MSG(session, __wt_errno(),
