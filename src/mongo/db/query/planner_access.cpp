@@ -408,11 +408,13 @@ namespace mongo {
                 MatchExpression* child = amExpr->getChild(curChild);
                 IndexTag* ixtag = static_cast<IndexTag*>(child->getTag());
                 invariant(NULL != ixtag);
-                // Only want prefixes.
-                if (ixtag->pos >= prefixEnd) {
+                // Skip this child if it's not part of a prefix, or if we've already assigned a
+                // predicate to this prefix position.
+                if (ixtag->pos >= prefixEnd || prefixExprs[ixtag->pos] != NULL) {
                     ++curChild;
                     continue;
                 }
+                // prefixExprs takes ownership of 'child'.
                 prefixExprs[ixtag->pos] = child;
                 amExpr->getChildVector()->erase(amExpr->getChildVector()->begin() + curChild);
                 // Don't increment curChild.

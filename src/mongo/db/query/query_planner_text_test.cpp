@@ -466,6 +466,17 @@ namespace {
         assertSolutionExists("{text: {prefix: {a:3}, search: 'foo'}}");
     }
 
+    // SERVER-15639: Test that predicates on index prefix fields which are not assigned to the index
+    // prefix are correctly included in the solution node filter.
+    TEST_F(QueryPlannerTest, TextInsideAndWithCompoundIndexAndMultiplePredsOnIndexPrefix) {
+        params.options = QueryPlannerParams::NO_TABLE_SCAN;
+        addIndex(BSON("a" << 1 << "_fts" << "text" << "_ftsx" << 1));
+        runQuery(fromjson("{$and: [{a: 1}, {a: 2}, {$text: {$search: 'foo'}}]}"));
+
+        assertNumSolutions(1U);
+        assertSolutionExists("{text: {prefix: {a: 1}, search: 'foo', filter: {a: 2}}}");
+    }
+
     // SERVER-13039: Test that we don't generate invalid solutions when the TEXT node
     // is buried beneath a logical node.
     TEST_F(QueryPlannerTest, TextInsideOrBasic) {
