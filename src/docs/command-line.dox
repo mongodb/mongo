@@ -175,6 +175,10 @@ column store.
 By default, the \c load command reads from the standard input; the \c
 -f option reads the input from the specified file.
 
+@par <code>-j</code>
+Load input in the JSON (<a href="http://www.json.org">JavaScript Object
+Notation</a>) format that was created by the <code>dump -j</code> command.
+
 @par <code>-n</code>
 By default, input data will overwrite existing data where the key/value
 pair already exists in the data source; the \c -n option causes the \c

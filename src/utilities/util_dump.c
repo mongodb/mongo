@@ -251,7 +251,7 @@ dump_json_table_begin(WT_CURSOR *cursor, const char *uri, const char *config)
 		    dump_json_table_cg(cursor, uri, name, "index:", "indices");
 	}
 
-	if (printf("\n        },\n        [") < 0)
+	if (printf("\n        },\n        {\n            \"data\" : [") < 0)
 		goto eio;
 
 	if (0) {
@@ -422,7 +422,7 @@ dump_json_table_config(WT_SESSION *session, const char *uri)
 static int
 dump_json_table_end(void)
 {
-	if (printf("        ]\n    ]") < 0)
+	if (printf("            ]\n        }\n    ]") < 0)
 		return (util_err(EIO, NULL));
 	return (0);
 }
@@ -595,9 +595,9 @@ dump_record(WT_CURSOR *cursor, const char *name, int reverse, int json)
 
 	once = 0;
 	if (json) {
-		prefix = "\n            {\n";
+		prefix = "\n{\n";
 		infix = ",\n";
-		suffix = "\n            }";
+		suffix = "\n}";
 	} else {
 		prefix = "";
 		infix = "\n";

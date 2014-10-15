@@ -532,11 +532,10 @@ methods = {
 	Config('dump', '', r'''
 	    configure the cursor for dump format inputs and outputs: "hex"
 	    selects a simple hexadecimal format, "json" selects a JSON format
-	    with each record formats as fields named by column names if
+	    with each record formatted as fields named by column names if
 	    available, and "print" selects a format where only non-printing
-	    characters are hexadecimal encoded, and "json" produces a JSON
-	    encoding of the data.  The "hex" and "print" dump format are
-	    compatible with the @ref util_dump and @ref util_load commands''',
+	    characters are hexadecimal encoded.  These formats are compatible
+	    with the @ref util_dump and @ref util_load commands''',
 	    choices=['hex', 'json', 'print']),
 	Config('next_random', 'false', r'''
 	    configure the cursor to return a pseudo-random record from

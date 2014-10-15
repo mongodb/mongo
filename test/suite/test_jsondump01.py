@@ -63,12 +63,11 @@ class FakeCursor:
             return tup
 
 # test_jsondump.py
-#    Utilities: wt jsondump
-# Test the jsondump utility (I'm not testing the 'json' cursors,
-# that's what the utility uses underneath).
+#    Utilities: wt dump
+# Test the dump utility with the -j option.
 class test_jsondump01(wttest.WiredTigerTestCase, suite_subprocess):
-
     name = 'test_jsondump01'
+    name2 = 'test_jsondump01b'
     nentries = 2500
 
     keyfmt = [
@@ -109,7 +108,7 @@ class test_jsondump01(wttest.WiredTigerTestCase, suite_subprocess):
 
         # spot check
         configs = tables[uri][0]
-        data = tables[uri][1]
+        data = tables[uri][1]["data"]
         d = data[24]
         if 'column5' in d:
             self.assertEqual(d['column5'], '25: abcde')
@@ -122,6 +121,25 @@ class test_jsondump01(wttest.WiredTigerTestCase, suite_subprocess):
         fake = FakeCursor(cursor.key_format, cursor.value_format, data)
         cursor.close()
         self.populate_check(self, fake, self.nentries)
+
+    # Dump using util, re-load using python's JSON, and do a content comparison.
+    def test_jsonload_util(self):
+        # Create the object.
+        uri = self.type + self.name
+        uri2 = self.type + self.name2
+        self.populate(self, uri, 'key_format=' + self.keyfmt, self.nentries)
+
+        # Dump the object.
+        self.runWt(['dump', '-j', uri], outfilename='jsondump.out')
+
+        loadcmd = ['load', '-jf', 'jsondump.out', '-r', self.name2]
+        if self.keyfmt == 'r':
+            loadcmd.append('-a')
+        self.runWt(loadcmd)
+
+        # check the contents of the data we read.
+        cursor = self.session.open_cursor(uri2, None)
+        self.populate_check(self, cursor, self.nentries)
 
 if __name__ == '__main__':
     wttest.run()

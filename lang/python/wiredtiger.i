@@ -388,7 +388,9 @@ COMPARE_OK(__wt_cursor::search_near)
 %exception __wt_async_op::_set_key;
 %exception __wt_async_op::_set_value;
 %exception __wt_cursor::_set_key;
+%exception __wt_cursor::_set_key_str;
 %exception __wt_cursor::_set_value;
+%exception __wt_cursor::_set_value_str;
 %exception wiredtiger_strerror;
 %exception wiredtiger_version;
 
@@ -577,6 +579,11 @@ typedef int int_void;
 		$self->set_key($self, &k);
 	}
 
+	/* Get / set keys and values */
+	void _set_key_str(char *str) {
+		$self->set_key($self, str);
+	}
+
 	int_void _set_recno(uint64_t recno) {
 		WT_ITEM k;
 		uint8_t recno_buf[20];
@@ -599,6 +606,11 @@ typedef int int_void;
 		v.data = data;
 		v.size = (uint32_t)size;
 		$self->set_value($self, &v);
+	}
+
+	/* Get / set keys and values */
+	void _set_value_str(char *str) {
+		$self->set_value($self, str);
 	}
 
 	/* Don't return values, just throw exceptions on failure. */
@@ -739,6 +751,8 @@ typedef int int_void;
 			args = args[0]
 		if self.is_column:
 			self._set_recno(long(args[0]))
+		elif self.is_json:
+			self._set_key_str(args[0])
 		else:
 			# Keep the Python string pinned
 			self._key = pack(self.key_format, *args)
@@ -748,11 +762,14 @@ typedef int int_void;
 		'''set_value(self) -> None
 		
 		@copydoc WT_CURSOR::set_value'''
-		if len(args) == 1 and type(args[0]) == tuple:
-			args = args[0]
-		# Keep the Python string pinned
-		self._value = pack(self.value_format, *args)
-		self._set_value(self._value)
+		if self.is_json:
+			self._set_value_str(args[0])
+		else:
+			if len(args) == 1 and type(args[0]) == tuple:
+				args = args[0]
+			# Keep the Python string pinned
+			self._value = pack(self.value_format, *args)
+			self._set_value(self._value)
 
 	def __iter__(self):
 		'''Cursor objects support iteration, equivalent to calling

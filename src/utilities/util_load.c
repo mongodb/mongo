@@ -6,26 +6,30 @@
  */
 
 #include "util.h"
+#include "util_load.h"
 
 static int format(void);
 static int insert(WT_CURSOR *, const char *);
 static int load_dump(WT_SESSION *);
-static int config_read(char ***, int *);
-static int config_rename(char **, const char *);
-static int config_update(WT_SESSION *, char **);
 static int usage(void);
 
 static int	append;		/* -a append (ignore record number keys) */
 static char    *cmdname;	/* -r rename */
 static char   **cmdconfig;	/* configuration pairs */
+static int	json;		/* -j input is JSON format */
 static int	no_overwrite;	/* -n don't overwrite existing data */
 
 int
 util_load(WT_SESSION *session, int argc, char *argv[])
 {
 	int ch;
+	const char *filename;
+	uint32_t flags;
 
-	while ((ch = __wt_getopt(progname, argc, argv, "af:nr:")) != EOF)
+	flags = 0;
+
+	filename = "<stdin>";
+	while ((ch = __wt_getopt(progname, argc, argv, "af:jnr:")) != EOF)
 		switch (ch) {
 		case 'a':	/* append (ignore record number keys) */
 			append = 1;
@@ -34,6 +38,11 @@ util_load(WT_SESSION *session, int argc, char *argv[])
 			if (freopen(__wt_optarg, "r", stdin) == NULL)
 				return (
 				    util_err(errno, "%s: reopen", __wt_optarg));
+			else
+				filename = __wt_optarg;
+			break;
+		case 'j':	/* input is JSON */
+			json = 1;
 			break;
 		case 'n':	/* don't overwrite existing data */
 			no_overwrite = 1;
@@ -61,7 +70,14 @@ util_load(WT_SESSION *session, int argc, char *argv[])
 		cmdconfig = argv;
 	}
 
-	return (load_dump(session));
+	if (json) {
+		if (append)
+			flags |= LOAD_JSON_APPEND;
+		if (no_overwrite)
+			flags |= LOAD_JSON_NO_OVERWRITE;
+		return (util_load_json(session, filename, flags));
+	} else
+		return (load_dump(session));
 }
 
 /*
@@ -74,7 +90,7 @@ load_dump(WT_SESSION *session)
 	WT_CURSOR *cursor;
 	WT_DECL_RET;
 	int hex, tret;
-	char **entry, **list, *p, **tlist, *uri, config[64];
+	char **list, **tlist, *uri, config[64];
 
 	cursor = NULL;
 	list = NULL;		/* -Wuninitialized */
@@ -85,48 +101,18 @@ load_dump(WT_SESSION *session)
 	if ((ret = config_read(&list, &hex)) != 0)
 		return (ret);
 
-	/*
-	 * Search for a table name -- if we find one, then it's table dump,
-	 * otherwise, it's a single file dump.
-	 */
-	for (entry = list; *entry != NULL; ++entry)
-		if (WT_PREFIX_MATCH(*entry, "table:"))
-			break;
-	if (*entry == NULL) {
-		/*
-		 * Single file dumps can only have two lines, the file name and
-		 * the configuration information.
-		 */
-		if ((list[0] == NULL || list[1] == NULL || list[2] != NULL) ||
-		    (WT_PREFIX_MATCH(list[0], "file:") &&
-		    WT_PREFIX_MATCH(list[0], "lsm:"))) {
-			ret = format();
-			goto err;
-		}
-
-		entry = list;
-	}
-
-	/*
-	 * Make sure the table key/value pair comes first, then we can just
-	 * run through the array in order.  (We already checked that we had
-	 * a multiple of 2 entries, so this is safe.)
-	 */
-	if (entry != list) {
-		p = list[0]; list[0] = entry[0]; entry[0] = p;
-		p = list[1]; list[1] = entry[1]; entry[1] = p;
-	}
+	/* Reorder and check the list. */
+	if ((ret = config_reorder(list)) != 0)
+		return (ret);
 
 	/* Update the config based on any command-line configuration. */
 	if ((ret = config_update(session, list)) != 0)
 		goto err;
 
 	uri = list[0];
-	for (entry = list; *entry != NULL; entry += 2)
-		if ((ret = session->create(session, entry[0], entry[1])) != 0) {
-			ret = util_err(ret, "%s: session.create", entry[0]);
-			goto err;
-		}
+	/* Create the items in the list. */
+	if ((ret = config_exec(session, list)) != 0)
+		goto err;
 
 	/* Open the insert cursor. */
 	(void)snprintf(config, sizeof(config),
@@ -173,10 +159,51 @@ err:	/*
 }
 
 /*
+ * config_exec --
+ *	Create the tables/indices/colgroups implied by the list.
+ */
+int
+config_exec(WT_SESSION *session, char **list)
+{
+	WT_DECL_RET;
+
+	for (; *list != NULL; list += 2)
+		if ((ret = session->create(session, list[0], list[1])) != 0)
+			return (util_err(ret, "%s: session.create", list[0]));
+	return (0);
+}
+
+int
+config_list_add(CONFIG_LIST *clp, char *val)
+{
+	if (clp->entry + 1 >= clp->max_entry)
+		if ((clp->list = realloc(clp->list, (size_t)
+		    (clp->max_entry += 100) * sizeof(char *))) == NULL)
+			/* List already freed by realloc. */
+			return (util_err(errno, NULL));
+
+	clp->list[clp->entry++] = val;
+	clp->list[clp->entry] = NULL;
+	return (0);
+}
+
+void
+config_list_free(CONFIG_LIST *clp)
+{
+	char **entry;
+
+	if (clp->list != NULL)
+		for (entry = &clp->list[0]; *entry != NULL; entry++)
+			free(*entry);
+	free(clp->list);
+	clp->list = NULL;
+}
+
+/*
  * config_read --
  *	Read the config lines and do some basic validation.
  */
-static int
+int
 config_read(char ***listp, int *hexp)
 {
 	ULINE l;
@@ -260,16 +287,62 @@ err:	if (list != NULL) {
 }
 
 /*
+ * config_reorder --
+ *	For table dumps, reorder the list so tables are first.
+ *	For other dumps, make any needed checks.
+ */
+int
+config_reorder(char **list)
+{
+	char **entry, *p;
+
+	/*
+	 * Search for a table name -- if we find one, then it's table dump,
+	 * otherwise, it's a single file dump.
+	 */
+	for (entry = list; *entry != NULL; ++entry)
+		if (WT_PREFIX_MATCH(*entry, "table:"))
+			break;
+	if (*entry == NULL) {
+		/*
+		 * Single file dumps can only have two lines, the file name and
+		 * the configuration information.
+		 */
+		if ((list[0] == NULL || list[1] == NULL || list[2] != NULL) ||
+		    (WT_PREFIX_MATCH(list[0], "file:") &&
+		    WT_PREFIX_MATCH(list[0], "lsm:")))
+			return (format());
+
+		entry = list;
+	}
+
+	/*
+	 * Make sure the table key/value pair comes first, then we can just
+	 * run through the array in order.  (We already checked that we had
+	 * a multiple of 2 entries, so this is safe.)
+	 */
+	if (entry != list) {
+		p = list[0]; list[0] = entry[0]; entry[0] = p;
+		p = list[1]; list[1] = entry[1]; entry[1] = p;
+	}
+	return (0);
+}
+
+/*
  * config_update --
  *	Reconcile and update the command line configuration against the
- * config we found.
+ *	config we found.
  */
-static int
+int
 config_update(WT_SESSION *session, char **list)
 {
 	int found;
 	const char *cfg[] = { NULL, NULL, NULL };
-	char **configp, **listp, *p, *t;
+	char **configp, **listp;
+	const char **rm;
+	static const char *rmnames[] = {
+		"filename", "id", "checkpoint",	"checkpoint_lsn",
+		"version", "source", NULL };
 
 	/*
 	 * If the object has been renamed, replace all of the column group,
@@ -296,16 +369,14 @@ config_update(WT_SESSION *session, char **list)
 	}
 
 	/*
-	 * Remove all "filename=" configurations from the values, new filenames
-	 * are chosen as part of table load.
+	 * Remove all "filename=", "source=" and other configurations
+	 * that foil loading from the values. New filenames are chosen
+	 * as part of table load.
 	 */
 	for (listp = list; *listp != NULL; listp += 2)
-		if ((p = strstr(listp[1], "filename=")) != NULL) {
-			if ((t = strchr(p, ',')) == NULL)
-				*p = '\0';
-			else
-				memmove(p, t + 1, strlen(t + 1) + 1);
-		}
+		for (rm = rmnames; *rm != NULL; rm++)
+			if (strstr(listp[1], *rm) != NULL)
+				config_remove(listp[1], *rm);
 
 	/*
 	 * It's possible to update everything except the key/value formats.
@@ -375,7 +446,7 @@ config_update(WT_SESSION *session, char **list)
  * config_rename --
  *	Update the URI name.
  */
-static int
+int
 config_rename(char **urip, const char *name)
 {
 	size_t len;
@@ -400,6 +471,46 @@ config_rename(char **urip, const char *name)
 	*urip = buf;
 
 	return (0);
+}
+
+/*
+ * config_remove --
+ *	Remove a single config key and its value.
+ */
+void
+config_remove(char *config, const char *ckey)
+{
+	int parens, quoted;
+	char *begin, match[100], *next, *p;
+
+	snprintf(match, sizeof(match), "%s=", ckey);
+	if ((begin = strstr(config, match)) != NULL) {
+		parens = 0;
+		quoted = 0;
+		next = NULL;
+		for (p = begin + strlen(match); !next && *p; p++)
+			switch (*p) {
+			case '(':
+				if (!quoted)
+					parens++;
+				break;
+			case ')':
+				if (!quoted)
+					parens--;
+				break;
+			case '"':
+				quoted = !quoted;
+				break;
+			case ',':
+				if (!quoted && parens == 0)
+					next = p + 1;
+				break;
+			}
+		if (next)
+			memmove(begin, next, strlen(next) + 1);
+		else
+			*begin = '\0';
+	}
 }
 
 /*
