@@ -18,10 +18,10 @@ func TestNumberIntValue(t *testing.T) {
 
 			err := ConvertJSONDocumentToBSON(jsonMap)
 			So(err, ShouldBeNil)
-			So(jsonMap[key], ShouldEqual, int64(42))
+			So(jsonMap[key], ShouldEqual, int32(42))
 		})
 
-		Convey(`fails for NumberInt document ('{ "$numberInt": "42" }')`, func() {
+		Convey(`works for NumberInt document ('{ "$numberInt": "42" }')`, func() {
 			key := "key"
 			jsonMap := map[string]interface{}{
 				key: map[string]interface{}{
@@ -31,7 +31,7 @@ func TestNumberIntValue(t *testing.T) {
 
 			err := ConvertJSONDocumentToBSON(jsonMap)
 			So(err, ShouldBeNil)
-			So(jsonMap[key], ShouldEqual, int64(42))
+			So(jsonMap[key], ShouldEqual, int32(42))
 		})
 	})
 }
