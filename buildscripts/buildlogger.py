@@ -47,7 +47,6 @@ import time
 import traceback
 import urllib2
 import utils
-import tempfile
 
 # suppress deprecation warnings that happen when
 # we import the 'buildbot.tac' file below
@@ -91,9 +90,6 @@ for path in possible_paths:
             pass
 
 
-# Size in bytes of each batch to be sent to the buildlogger server
-# Defaults to 1MB
-BATCH_SIZE = int(os.environ.get('BUILDLOGGER_BATCH_SIZE', '1048576'))
 URL_ROOT = os.environ.get('BUILDLOGGER_URL', 'http://buildlogs.mongodb.org/')
 TIMEOUT_SECONDS = 10
 socket.setdefaulttimeout(TIMEOUT_SECONDS)
@@ -255,11 +251,12 @@ def run_and_echo(command):
     return proc.returncode
 
 class LogAppender(object):
-    def __init__(self, callback, args):
+    def __init__(self, callback, args, send_after_lines=2000, send_after_seconds=10):
         self.callback = callback
         self.callback_args = args
 
-        self.cur_buf_size = 0
+        self.send_after_lines = send_after_lines
+        self.send_after_seconds = send_after_seconds
 
         self.buf = []
         self.retrybuf = []
@@ -267,9 +264,9 @@ class LogAppender(object):
 
     def __call__(self, line):
         self.buf.append((time.time(), line))
-        self.cur_buf_size += len(line)
 
-        if self.cur_buf_size > BATCH_SIZE:
+        delay = time.time() - self.last_sent
+        if len(self.buf) >= self.send_after_lines or delay >= self.send_after_seconds:
             self.submit()
 
         # no return value is expected
@@ -281,10 +278,11 @@ class LogAppender(object):
         args = list(self.callback_args)
         args.append(list(self.buf) + self.retrybuf)
 
+        self.last_sent = time.time()
+
         if self.callback(*args):
             self.buf = []
             self.retrybuf = []
-            self.cur_buf_size = 0
             return True
         else:
             self.retrybuf += self.buf
@@ -295,8 +293,8 @@ class LogAppender(object):
 def wrap_test(command):
     """
     call the given command, intercept its stdout and stderr,
-    and send results in batches of BUILDLOGGER_BATCH_SIZE to
-    buildlogger server
+    and send results in batches of 100 lines or 10s to the 
+    buildlogger webapp
     """
 
     # get builder name and build number from environment
@@ -362,7 +360,7 @@ def wrap_test(command):
 def wrap_global(command):
     """
     call the given command, intercept its stdout and stderr,
-    and send results in batches of BUILDLOGGER_BATCH_SIZE bytes to the
+    and send results in batches of 100 lines or 10s to the
     buildlogger webapp. see :func:`append_global_logs` for the
     difference between "global" and "test" log output.
     """
@@ -407,14 +405,13 @@ def wrap_global(command):
 def loop_and_callback(command, callback):
     """
     run the given command (a sequence of arguments, ordinarily
-    from sys.argv), wait for it to exit, and call the given callback
-    with each line of stdout or stderr encountered.
+    from sys.argv), and call the given callback with each line
+    of stdout or stderr encountered. after the command is finished,
+    callback is called once more with None instead of a string.
     """
-
-    stdoutfp = tempfile.TemporaryFile(prefix='buildlogger-')
     proc = subprocess.Popen(
         command,
-        stdout=stdoutfp,
+        stdout=subprocess.PIPE,
         stderr=subprocess.STDOUT,
     )
 
@@ -428,27 +425,23 @@ def loop_and_callback(command, callback):
     # to the child process
     orig_handler = signal.signal(signal.SIGTERM, handle_sigterm)
 
-    # wait for the test to run. Its output will be stored in
-    # the stdout temporary file
-    while proc.returncode is None:
+    while proc.poll() is None:
         try:
-            proc.wait()
-        # Catch interrupts (EINTR) and retry.
-        except OSError as e:
-            if e.errno == 4:
-                continue
-            raise e
+            line = proc.stdout.readline().strip('\r\n')
+            line = utils.unicode_dammit(line)
+            callback(line)
+        except IOError:
+            # if the signal handler is called while
+            # we're waiting for readline() to return,
+            # don't show a traceback
+            break
 
+    # There may be additional buffered output
+    for line in proc.stdout.readlines():
+        callback(line.strip('\r\n'))
 
     # restore the original signal handler, if any
     signal.signal(signal.SIGTERM, orig_handler)
-
-    # rewind the temp file and read through all its lines
-    stdoutfp.seek(0)
-    for line in stdoutfp:
-        callback(utils.unicode_dammit(line.strip('\r\n')))
-    stdoutfp.close()
-
     return proc.returncode
 
 
