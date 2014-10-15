@@ -260,12 +260,16 @@ namespace mongo {
             // SERVER-14978: Dump lock stats information
         }
 
-        _lock.lock();
         ss << " requests:";
-        for (LockRequestsMap::const_iterator it = _requests.begin(); it != _requests.end(); ++it) {
-            ss << " " << it->first.toString();
+
+        _lock.lock();
+        LockRequestsMap::ConstIterator it = _requests.begin();
+        while (!it.finished()) {
+            ss << " " << it.key().toString();
+            it.next();
         }
         _lock.unlock();
+
         log() << ss.str() << std::endl;
     }
 
@@ -368,14 +372,14 @@ namespace mongo {
 
     template<bool IsForMMAPV1>
     LockResult LockerImpl<IsForMMAPV1>::lockGlobal(LockMode mode, unsigned timeoutMs) {
-        LockRequest* request = _find(resourceIdGlobal);
-        if (request != NULL) {
-            // No upgrades on the GlobalLock are allowed until we can handle deadlocks.
-            invariant(request->mode >= mode);
+        LockRequestsMap::Iterator it = _requests.find(resourceIdGlobal);
+        if (!it) {
+            // Global lock should be the first lock on any operation
+            invariant(_requests.empty());
         }
         else {
-            // Global lock should be the first lock on the operation
-            invariant(_requests.empty());
+            // No upgrades on the GlobalLock are allowed until we can handle deadlocks
+            invariant(it->mode >= mode);
         }
 
         Timer timer;
@@ -388,15 +392,13 @@ namespace mongo {
         }
 
         // Special-handling for MMAP V1 concurrency control
-        if (IsForMMAPV1 && (request == NULL)) {
+        if (IsForMMAPV1 && !it) {
             // Obey the requested timeout
             const unsigned elapsedTimeMs = timer.millis();
             const unsigned remainingTimeMs =
                 elapsedTimeMs < timeoutMs ? (timeoutMs - elapsedTimeMs) : 0;
 
-            LockResult flushLockResult =
-                lock(resourceIdMMAPV1Flush, getLockMode(resourceIdGlobal), remainingTimeMs);
-
+            LockResult flushLockResult = lock(resourceIdMMAPV1Flush, mode, remainingTimeMs);
             if (flushLockResult != LOCK_OK) {
                 invariant(flushLockResult == LOCK_TIMEOUT);
                 invariant(unlock(resourceIdGlobal));
@@ -412,13 +414,13 @@ namespace mongo {
     void LockerImpl<IsForMMAPV1>::downgradeGlobalXtoSForMMAPV1() {
         invariant(!inAWriteUnitOfWork());
 
-        LockRequest* globalLockRequest = _find(resourceIdGlobal);
+        LockRequest* globalLockRequest = _requests.find(resourceIdGlobal).objAddr();
         invariant(globalLockRequest->mode == MODE_X);
         invariant(globalLockRequest->recursiveCount == 1);
         globalLockManager.downgrade(globalLockRequest, MODE_S);
 
         if (IsForMMAPV1) {
-            LockRequest* flushLockRequest = _find(resourceIdMMAPV1Flush);
+            LockRequest* flushLockRequest = _requests.find(resourceIdMMAPV1Flush).objAddr();
             invariant(flushLockRequest->mode == MODE_X);
             invariant(flushLockRequest->recursiveCount == 1);
             globalLockManager.downgrade(flushLockRequest, MODE_S);
@@ -431,19 +433,12 @@ namespace mongo {
             return false;
         }
 
-        LockRequestsMap::const_iterator it = _requests.begin();
-        while (it != _requests.end()) {
-            const ResourceId& resId = it->first;
-
-            // If we're here we should only have one reference to any lock.  Even if we're in
-            // DBDirectClient or some other nested scope, we would have to release the global lock
-            // fully before we get here. Therefore we're not here unless we've unlocked the global
-            // lock, in which case it's a programming error to have > 1 reference.
-            invariant(unlock(resId));
-
-            // Unlocking modifies the state of _requests, but we're iterating over it, so we
-            // have to start from the beginning every time we unlock something.
-            it = _requests.begin();
+        LockRequestsMap::Iterator it = _requests.begin();
+        while (!it.finished()) {
+            // If we're here we should only have one reference to any lock. It is a programming
+            // error for any lock to have more references than the global lock, because every
+            // scope starts by calling lockGlobal.
+            invariant(_unlockImpl(it));
         }
 
         return true;
@@ -479,24 +474,27 @@ namespace mongo {
                                              LockMode mode,
                                              unsigned timeoutMs) {
 
-        _notify.clear();
+        LockRequest* request;
+        {
+            LockRequestsMap::Iterator it = _requests.find(resId);
+            if (!it) {
+                scoped_spinlock scopedLock(_lock);
+                LockRequestsMap::Iterator itNew = _requests.insert(resId);
+                itNew->initNew(this, &_notify);
 
-        LockRequest* request = _find(resId);
-
-        _lock.lock();
-        if (request == NULL) {
-            request = new LockRequest();
-            request->initNew(this, &_notify);
-
-            _requests.insert(LockRequestsPair(resId, request));
+                request = itNew.objAddr();
+            }
+            else {
+                request = it.objAddr();
+            }
         }
-        _lock.unlock();
 
         // Methods on the Locker class are always called single-threadly, so it is safe to release
         // the spin lock, which protects the Locker here. The only thing which could alter the
         // state of the request is deadlock detection, which however would synchronize on the
         // LockManager calls.
 
+        _notify.clear();
         LockResult result = globalLockManager.lock(resId, request, mode);
         if (result == LOCK_WAITING) {
             if (IsForMMAPV1) {
@@ -534,7 +532,8 @@ namespace mongo {
             invariant(result == LOCK_TIMEOUT);
 
             if (globalLockManager.unlock(request)) {
-                _freeRequest(resId, request);
+                scoped_spinlock scopedLock(_lock);
+                _requests.find(resId).remove();
             }
         }
 
@@ -543,37 +542,18 @@ namespace mongo {
 
     template<bool IsForMMAPV1>
     bool LockerImpl<IsForMMAPV1>::unlock(const ResourceId& resId) {
-        LockRequest* request = _find(resId);
-
-        invariant(request);
-        invariant(request->mode != MODE_NONE);
-
-        // Methods on the Locker class are always called single-threadly, so it is safe to release
-        // the spin lock, which protects the Locker here. The only thing which could alter the
-        // state of the request is deadlock detection, which however would synchronize on the
-        // LockManager calls.
-
-        if (inAWriteUnitOfWork() && shouldDelayUnlock(resId, request->mode)) {
-            _resourcesToUnlockAtEndOfUnitOfWork.push(resId);
-            return false;
-        }
-
-        if (globalLockManager.unlock(request)) {
-            _freeRequest(resId, request);
-            return true;
-        }
-
-        return false;
+        LockRequestsMap::Iterator it = _requests.find(resId);
+        return _unlockImpl(it);
     }
 
     template<bool IsForMMAPV1>
     LockMode LockerImpl<IsForMMAPV1>::getLockMode(const ResourceId& resId) const {
         scoped_spinlock scopedLock(_lock);
 
-        const LockRequest* request = _find(resId);
-        if (request == NULL) return MODE_NONE;
+        const LockRequestsMap::ConstIterator it = _requests.find(resId);
+        if (!it) return MODE_NONE;
 
-        return request->mode;
+        return it->mode;
     }
 
     template<bool IsForMMAPV1>
@@ -605,8 +585,8 @@ namespace mongo {
 
         // First, we look at the global lock.  There is special handling for this (as the flush
         // lock goes along with it) so we store it separately from the more pedestrian locks.
-        LockRequest* globalRequest = _find(resourceIdGlobal);
-        if (NULL == globalRequest) {
+        LockRequestsMap::Iterator globalRequest = _requests.find(resourceIdGlobal);
+        if (!globalRequest) {
             // If there's no global lock there isn't really anything to do.
             invariant(_requests.empty());
             return false;
@@ -627,9 +607,8 @@ namespace mongo {
         // Flush lock state is inferred from the global state so we don't bother to store it.
 
         // Next, the non-global locks.
-        for (LockRequestsMap::const_iterator it = _requests.begin(); it != _requests.end(); it++) {
-            const ResourceId& resId = it->first;
-            const LockRequest* request = it->second;
+        for (LockRequestsMap::Iterator it = _requests.begin(); !it.finished(); it.next()) {
+            const ResourceId& resId = it.key();
 
             // This is handled separately from normal locks as mentioned above.
             if (resourceIdGlobal == resId) {
@@ -648,8 +627,8 @@ namespace mongo {
             // And, stuff the info into the out parameter.
             Locker::LockSnapshot::OneLock info;
             info.resourceId = resId;
-            info.mode = request->mode;
-            info.recursiveCount = request->recursiveCount;
+            info.mode = it->mode;
+            info.recursiveCount = it->recursiveCount;
 
             stateOut->locks.push_back(info);
         }
@@ -696,25 +675,27 @@ namespace mongo {
     }
 
     template<bool IsForMMAPV1>
-    LockRequest* LockerImpl<IsForMMAPV1>::_find(const ResourceId& resId) const {
-        LockRequestsMap::const_iterator it = _requests.find(resId);
+    bool LockerImpl<IsForMMAPV1>::_unlockImpl(LockRequestsMap::Iterator& it) {
+        invariant(it->mode != MODE_NONE);
 
-        if (it == _requests.end()) return NULL;
-        return it->second;
-    }
+        // Methods on the Locker class are always called single-threadly, so it is safe to release
+        // the spin lock, which protects the Locker here. The only thing which could alter the
+        // state of the request is deadlock detection, which however would synchronize on the
+        // LockManager calls.
 
-    template<bool IsForMMAPV1>
-    void LockerImpl<IsForMMAPV1>::_freeRequest(const ResourceId& resId, LockRequest* request) {
-        _lock.lock();
-        const int numErased = _requests.erase(resId);
-        _lock.unlock();
+        if (inAWriteUnitOfWork() && shouldDelayUnlock(it.key(), it->mode)) {
+            _resourcesToUnlockAtEndOfUnitOfWork.push(it.key());
+            return false;
+        }
 
-        invariant(numErased == 1);
+        if (globalLockManager.unlock(it.objAddr())) {
+            scoped_spinlock scopedLock(_lock);
+            it.remove();
 
-        // TODO: At some point we might want to cache a couple of these at least for the locks
-        // which are acquired frequently (Global/Flush/DB) in order to reduce the number of
-        // memory allocations.
-        delete request;
+            return true;
+        }
+
+        return false;
     }
 
     template<bool IsForMMAPV1>

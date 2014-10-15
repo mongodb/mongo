@@ -124,7 +124,7 @@ namespace mongo {
         locker.unlockAll();
     }
 
-    TEST(Locker, WriteTransactionWithCommit) {
+    TEST(LockerImpl, WriteTransactionWithCommit) {
         const ResourceId resIdCollection(RESOURCE_COLLECTION, std::string("TestDB.collection"));
         const ResourceId resIdRecordS(RESOURCE_DOCUMENT, 1);
         const ResourceId resIdRecordX(RESOURCE_DOCUMENT, 2);
@@ -171,7 +171,7 @@ namespace mongo {
     /**
      * Test that saveLockerImpl<true> works by examining the output.
      */
-    TEST(Locker, saveAndRestoreGlobal) {
+    TEST(LockerImpl, saveAndRestoreGlobal) {
         Locker::LockSnapshot lockInfo;
 
         LockerImpl<true> locker(1);
@@ -199,7 +199,7 @@ namespace mongo {
     /**
      * Test that we don't unlock when we have the global lock more than once.
      */
-    TEST(Locker, saveAndRestoreGlobalAcquiredTwice) {
+    TEST(LockerImpl, saveAndRestoreGlobalAcquiredTwice) {
         Locker::LockSnapshot lockInfo;
 
         LockerImpl<true> locker(1);
@@ -225,7 +225,7 @@ namespace mongo {
     /**
      * Tests that restoreLockerImpl<true> works by locking a db and collection and saving + restoring.
      */
-    TEST(Locker, saveAndRestoreDBAndCollection) {
+    TEST(LockerImpl, saveAndRestoreDBAndCollection) {
         Locker::LockSnapshot lockInfo;
 
         LockerImpl<true> locker(1);
