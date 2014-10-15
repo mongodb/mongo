@@ -49,7 +49,7 @@ type ToolOptions struct {
 
 type Namespace struct {
 	// Specified database and collection
-	DB         string `short:"d" long:"db" description:"database to use"`
+	DB         string `short:"d" long:"db" default:"test" description:"database to use"`
 	Collection string `short:"c" long:"collection" description:"collection to use"`
 
 	// DBPath for direct-storage interface

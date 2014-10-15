@@ -22,8 +22,6 @@ const (
 	Put    = "put"
 	Get    = "get"
 	Delete = "delete"
-
-	GridFSPrefix = "fs"
 )
 
 type MongoFiles struct {
@@ -199,8 +197,16 @@ func (self *MongoFiles) Run(displayConnUrl bool) (string, error) {
 	}
 	defer session.Close()
 
+	// first validate the namespaces we'll be using: <db>.<prefix>.files and <db>.<prefix>.chunks
+	// it's ok to validate only <db>.<prefix>.chunks (the longer one)
+	err = util.ValidateFullNamespace(fmt.Sprintf("%s.%s.chunks", self.ToolOptions.Namespace.DB, 
+		self.StorageOptions.GridFSPrefix))
+	
+	if err != nil {
+		return "", err
+	}
 	// get GridFS handle
-	gfs := session.DB(self.ToolOptions.Namespace.DB).GridFS(GridFSPrefix)
+	gfs := session.DB(self.ToolOptions.Namespace.DB).GridFS(self.StorageOptions.GridFSPrefix)
 
 	var output string
 
