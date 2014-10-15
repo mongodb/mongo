@@ -812,6 +812,7 @@ __wt_json_to_item(WT_SESSION_IMPL *session, const char *jstr,
     const char *format, WT_CURSOR_JSON *json, int iskey, WT_ITEM *item)
 {
 	size_t sz;
+	sz = 0; /* Initialize because GCC 4.1 is paranoid */
 
 	WT_RET(__json_pack_size(session, format,
 	    iskey ? &json->key_names : &json->value_names, iskey, jstr, &sz));
