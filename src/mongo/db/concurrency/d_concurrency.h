@@ -201,10 +201,26 @@ namespace mongo {
          */
         class CollectionLock : boost::noncopyable {
         public:
-            CollectionLock (Locker* lockState, const StringData& ns, const LockMode);
+            CollectionLock(Locker* lockState, const StringData& ns, const LockMode);
             virtual ~CollectionLock();
         private:
             const ResourceId _id;
+            Locker* _lockState;
+        };
+
+        /**
+         * General purpose RAII wrapper for a resource managed by the lock manager
+         *
+         * See LockMode for the supported modes. Unlike DBLock/Collection lock, this will not do
+         * any additional checks/upgrades or global locking. Use ResourceLock for locking
+         * resources other than RESOURCE_GLOBAL, RESOURCE_DATABASE and RESOURCE_COLLECTION.
+         */
+        class ResourceLock : boost::noncopyable {
+        public:
+            ResourceLock(Locker* lockState, const ResourceId rid, const LockMode);
+            virtual ~ResourceLock();
+        private:
+            const ResourceId _rid;
             Locker* _lockState;
         };
 

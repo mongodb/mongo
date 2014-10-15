@@ -2114,26 +2114,26 @@ namespace mongo {
             bool didAnything = false;
 
             if ( xfer["deleted"].isABSONObj() ) {
+                Lock::DBLock dlk(txn->lockState(), nsToDatabaseSubstring(ns), MODE_IX);
                 Helpers::RemoveSaver rs( "moveChunk" , ns , "removedDuring" );
 
                 BSONObjIterator i( xfer["deleted"].Obj() );
                 while ( i.more() ) {
-                    Client::WriteContext cx(txn, ns);
+                    Lock::CollectionLock clk(txn->lockState(), ns, MODE_X);
+                    WriteUnitOfWork wunit(txn);
+                    Client::Context ctx(txn, ns);
 
                     BSONObj id = i.next().Obj();
 
                     // do not apply deletes if they do not belong to the chunk being migrated
                     BSONObj fullObj;
-                    if ( Helpers::findById( txn, cx.ctx().db(), ns.c_str(), id, fullObj ) ) {
-                        if ( ! isInRange( fullObj , min , max , shardKeyPattern ) ) {
+                    if (Helpers::findById(txn, ctx.db(), ns.c_str(), id, fullObj)) {
+                        if (!isInRange(fullObj , min , max , shardKeyPattern)) {
                             log() << "not applying out of range deletion: " << fullObj << migrateLog;
 
                             continue;
                         }
                     }
-
-                    Lock::DBLock lk(txn->lockState(), nsToDatabaseSubstring(ns), MODE_X);
-                    Client::Context ctx(txn, ns);
 
                     if (serverGlobalParams.moveParanoia) {
                         rs.goingToDelete(fullObj);
@@ -2148,8 +2148,8 @@ namespace mongo {
                                   false /* god */,
                                   true /* fromMigrate */);
 
-                    *lastOpApplied = cx.ctx().getClient()->getLastOp().asDate();
-                    cx.commit();
+                    *lastOpApplied = ctx.getClient()->getLastOp().asDate();
+                    wunit.commit();
                     didAnything = true;
                 }
             }

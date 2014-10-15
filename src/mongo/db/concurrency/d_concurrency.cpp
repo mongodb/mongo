@@ -270,6 +270,16 @@ namespace mongo {
         }
     }
 
+    Lock::ResourceLock::ResourceLock(Locker* lockState, ResourceId rid, LockMode mode)
+            : _rid(rid),
+              _lockState(lockState) {
+        _lockState->lock(_rid, mode);
+    }
+
+    Lock::ResourceLock::~ResourceLock() {
+        _lockState->unlock(_rid);
+    }
+
     Lock::DBRead::DBRead(Locker* lockState, const StringData& dbOrNs) :
         DBLock(lockState, nsToDatabaseSubstring(dbOrNs), MODE_S) { }
 
