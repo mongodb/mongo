@@ -426,8 +426,8 @@ namespace repl {
 
         /**
          * Helper method for setLastOptime that takes in a unique lock on
-         * _mutex.  The passed in lock must already be locked.  It is unknown what state the lock
-         * will be in after this method finishes.
+         * _mutex.  The passed in lock must already be locked.  It is unspecified what state the 
+         * lock will be in after this method finishes.
          */
         Status _setLastOptime_inlock(boost::unique_lock<boost::mutex>* lock,
                                      const OID& rid,
@@ -435,15 +435,15 @@ namespace repl {
 
         /**
          * Helper method for setMyLastOptime that takes in a unique lock on
-         * _mutex.  The passed in lock must already be locked.  It is unknown what state the lock
-         * will be in after this method finishes.
+         * _mutex.  The passed in lock must already be locked.  It is unspecified what state the
+         * lock will be in after this method finishes.
          */
         void _setMyLastOptime_inlock(boost::unique_lock<boost::mutex>* lock, const OpTime& ts);
 
         /**
          * Helper method for _setLastOptime_inlock and _setMyLastOptime_inlock that takes in a
-         * unique lock on _mutex.  The passed in lock must already be locked.  It is unknown what
-         * state the lock will be in after this method finishes.
+         * unique lock on _mutex.  The passed in lock must already be locked.  It is unspecified
+         * what state the lock will be in after this method finishes.
          */
         void _updateOptimeInMap_inlock(boost::unique_lock<boost::mutex>* lock,
                                        SlaveInfo* slaveInfo,
