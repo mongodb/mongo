@@ -19,8 +19,11 @@ __wt_mmap(WT_SESSION_IMPL *session, WT_FH *fh, void *mapp, size_t *lenp,
 	size_t orig_size;
 
 	/*
-	 * Record the current size and only mmap that and set that as the
-	 * length.  It could change between mmap and when we set the lenp.
+	 * Record the current size and only map and set that as the length, it
+	 * could change between the map call and when we set the return length.
+	 * For the same reason we could actually map past the end of the file;
+	 * we don't read bytes past the end of the file though, so as long as
+	 * the map call succeeds, it's all OK.
 	 */
 	orig_size = (size_t)fh->size;
 	*mappingcookie =
