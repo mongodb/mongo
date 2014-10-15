@@ -16,10 +16,16 @@ __wt_mmap(WT_SESSION_IMPL *session,
     WT_FH *fh, void *mapp, size_t *lenp, void **mappingcookie)
 {
 	void *map;
+	size_t orig_size;
 
 	WT_UNUSED(mappingcookie);
 
-	if ((map = mmap(NULL, (size_t)fh->size,
+	/*
+	 * Record the current size and only mmap that and set that as the
+	 * length.  It could change between mmap and when we set the lenp.
+	 */
+	orig_size = (size_t)fh->size;
+	if ((map = mmap(NULL, orig_size,
 	    PROT_READ,
 #ifdef MAP_NOCORE
 	    MAP_NOCORE |
@@ -28,14 +34,14 @@ __wt_mmap(WT_SESSION_IMPL *session,
 	    fh->fd, (wt_off_t)0)) == MAP_FAILED) {
 		WT_RET_MSG(session, __wt_errno(),
 		    "%s map error: failed to map %" PRIuMAX " bytes",
-		    fh->name, (uintmax_t)fh->size);
+		    fh->name, (uintmax_t)orig_size);
 	}
 	(void)__wt_verbose(session, WT_VERB_FILEOPS,
 	    "%s: map %p: %" PRIuMAX " bytes",
-	    fh->name, map, (uintmax_t)fh->size);
+	    fh->name, map, (uintmax_t)orig_size);
 
 	*(void **)mapp = map;
-	*lenp = (size_t)fh->size;
+	*lenp = orig_size;
 	return (0);
 }
 

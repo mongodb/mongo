@@ -16,30 +16,36 @@ __wt_mmap(WT_SESSION_IMPL *session, WT_FH *fh, void *mapp, size_t *lenp,
    void** mappingcookie)
 {
 	void *map;
+	size_t orig_size;
 
+	/*
+	 * Record the current size and only mmap that and set that as the
+	 * length.  It could change between mmap and when we set the lenp.
+	 */
+	orig_size = (size_t)fh->size;
 	*mappingcookie =
 	    CreateFileMapping(fh->filehandle, NULL, PAGE_READONLY, 0, 0, NULL);
 	if (*mappingcookie == NULL)
 		WT_RET_MSG(session, __wt_errno(),
 			"%s CreateFileMapping error: failed to map %"
 			PRIuMAX " bytes",
-			fh->name, (uintmax_t)fh->size);
+			fh->name, (uintmax_t)orig_size);
 
 	if ((map = MapViewOfFile(
-	    *mappingcookie, FILE_MAP_READ, 0, 0, fh->size)) == NULL) {
+	    *mappingcookie, FILE_MAP_READ, 0, 0, orig_size)) == NULL) {
 		CloseHandle(*mappingcookie);
 		*mappingcookie = NULL;
 
 		WT_RET_MSG(session, __wt_errno(),
 		    "%s map error: failed to map %" PRIuMAX " bytes",
-		    fh->name, (uintmax_t)fh->size);
+		    fh->name, (uintmax_t)orig_size);
 	}
 	(void)__wt_verbose(session, WT_VERB_FILEOPS,
 	    "%s: MapViewOfFile %p: %" PRIuMAX " bytes",
-	    fh->name, map, (uintmax_t)fh->size);
+	    fh->name, map, (uintmax_t)orig_size);
 
 	*(void **)mapp = map;
-	*lenp = (size_t)fh->size;
+	*lenp = orig_size;
 	return (0);
 }
 
