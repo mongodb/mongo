@@ -9,6 +9,7 @@ import (
 const (
 	INTEGRATION_TEST_TYPE = "integration"
 	UNIT_TEST_TYPE        = "unit"
+	SSL_TEST_TYPE         = "ssl"
 )
 
 var (
@@ -19,9 +20,7 @@ var (
 	testTypesParsed []string
 )
 
-// Skip the test if the specified type is not being run.
-func VerifyTestType(t *testing.T, testType string) {
-
+func HasTestType(testType string) bool {
 	// parse if necessary
 	if testTypesParsed == nil {
 		testTypesParsed = strings.Split(*testTypes, ",")
@@ -30,9 +29,15 @@ func VerifyTestType(t *testing.T, testType string) {
 	// skip the test if the passed-in type is not being run
 	for _, typ := range testTypesParsed {
 		if typ == testType {
-			return
+			return true
 		}
 	}
-	t.SkipNow()
+	return false
+}
 
+// Skip the test if the specified type is not being run.
+func VerifyTestType(t *testing.T, testType string) {
+	if !HasTestType(testType) {
+		t.SkipNow()
+	}
 }
