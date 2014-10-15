@@ -10,7 +10,7 @@ The \c wt tool is a command-line utility that provides access to
 various pieces of the WiredTiger functionality.
 
 @section util_global_options Options
-There are three global options:
+There are four global options:
 
 @par <code>-C config</code>
 Specify configuration strings for the ::wiredtiger_open function.
