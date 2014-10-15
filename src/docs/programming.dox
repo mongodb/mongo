@@ -33,7 +33,7 @@ each of which is ordered by one or more columns.
 - @subpage signals
 @m_endif
 
-<h2>Advanced features</h2>
+<h2>Advanced topics</h2>
 - @subpage checkpoint
 - @subpage durability
 - @subpage backup
@@ -42,6 +42,7 @@ each of which is ordered by one or more columns.
 - @subpage statistics
 - @subpage shared_cache
 - @subpage cursor_log
+- @subpage upgrade
 
 @m_if{c}
 <h2>Extending WiredTiger</h2>

@@ -1805,6 +1805,9 @@ struct __wt_connection {
  * @config{ ),,}
  * @config{checkpoint_sync, flush files to stable storage when closing or
  * writing checkpoints., a boolean flag; default \c true.}
+ * @config{config_base, write the base configuration file if creating the
+ * database\, see @ref config_base for more information., a boolean flag;
+ * default \c true.}
  * @config{create, create the database if it does not exist., a boolean flag;
  * default \c false.}
  * @config{direct_io, Use \c O_DIRECT to access files.  Options are given as a
