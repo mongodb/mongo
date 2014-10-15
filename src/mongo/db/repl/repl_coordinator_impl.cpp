@@ -293,6 +293,7 @@ namespace {
 
         {
             boost::lock_guard<boost::mutex> lk(_mutex);
+            fassert(28533, !_inShutdown);
             _inShutdown = true;
             if (_rsConfigState == kConfigPreStart) {
                 warning() << "ReplicationCoordinatorImpl::shutdown() called before "
@@ -494,6 +495,7 @@ namespace {
         _isWaitingForDrainToComplete = false;
         lk.unlock();
         _externalState->dropAllTempCollections(txn.get());
+        log() << "transition to primary complete; database writes are now permitted";
     }
 
     void ReplicationCoordinatorImpl::signalUpstreamUpdater() {
