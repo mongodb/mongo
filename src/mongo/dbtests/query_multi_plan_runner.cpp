@@ -203,6 +203,7 @@ namespace QueryMultiPlanRunner {
                                                 BSONObj(), // proj
                                                 &cq).isOK());
             ASSERT(NULL != cq);
+            boost::scoped_ptr<CanonicalQuery> killCq(cq);
 
             // Force index intersection.
             bool forceIxisectOldValue = internalQueryForceIntersectionPlans;

@@ -195,10 +195,12 @@ namespace QueryTests {
     class ClientBase {
     public:
         ClientBase() : _client(&_txn) {
+            _prevError = mongo::lastError._get( false );
+            mongo::lastError.release();
             mongo::lastError.reset( new LastError() );
         }
-        ~ClientBase() {
-
+        virtual ~ClientBase() {
+            mongo::lastError.reset( _prevError );
         }
 
     protected:
@@ -214,6 +216,9 @@ namespace QueryTests {
 
         OperationContextImpl _txn;
         DBDirectClient _client;
+
+    private:
+        LastError* _prevError;
     };
 
     class BoundedKey : public ClientBase {

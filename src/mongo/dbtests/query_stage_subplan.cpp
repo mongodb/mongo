@@ -85,6 +85,7 @@ namespace QueryStageSubplan {
 
             CanonicalQuery* cq;
             ASSERT_OK(CanonicalQuery::canonicalize(ns(), query, &cq));
+            boost::scoped_ptr<CanonicalQuery> killCq(cq);
 
             Collection* collection = ctx.getCollection();
 
