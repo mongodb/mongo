@@ -513,7 +513,7 @@ namespace {
         ReplicationCoordinator::StatusAndDuration statusAndDur =
                                         getReplCoord()->awaitReplication(&txn, time1, writeConcern);
         ASSERT_EQUALS(ErrorCodes::ExceededTimeLimit, statusAndDur.status);
-        ASSERT_OK(getReplCoord()->setLastOptime(&txn, myOID, time1));
+        ASSERT_OK(getReplCoord()->setMyLastOptime(&txn, time1));
         statusAndDur = getReplCoord()->awaitReplication(&txn, time1, writeConcern);
         ASSERT_OK(statusAndDur.status);
 
@@ -521,17 +521,17 @@ namespace {
         writeConcern.wNumNodes = 2;
         statusAndDur = getReplCoord()->awaitReplication(&txn, time1, writeConcern);
         ASSERT_EQUALS(ErrorCodes::ExceededTimeLimit, statusAndDur.status);
-        ASSERT_OK(getReplCoord()->setLastOptime(&txn, client1, time1));
+        ASSERT_OK(getReplCoord()->setLastOptime_forTest(client1, time1));
         statusAndDur = getReplCoord()->awaitReplication(&txn, time1, writeConcern);
         ASSERT_OK(statusAndDur.status);
 
         // 2 nodes waiting for time2
         statusAndDur = getReplCoord()->awaitReplication(&txn, time2, writeConcern);
         ASSERT_EQUALS(ErrorCodes::ExceededTimeLimit, statusAndDur.status);
-        ASSERT_OK(getReplCoord()->setLastOptime(&txn, myOID, time2));
+        ASSERT_OK(getReplCoord()->setMyLastOptime(&txn, time2));
         statusAndDur = getReplCoord()->awaitReplication(&txn, time2, writeConcern);
         ASSERT_EQUALS(ErrorCodes::ExceededTimeLimit, statusAndDur.status);
-        ASSERT_OK(getReplCoord()->setLastOptime(&txn, client3, time2));
+        ASSERT_OK(getReplCoord()->setLastOptime_forTest(client3, time2));
         statusAndDur = getReplCoord()->awaitReplication(&txn, time2, writeConcern);
         ASSERT_OK(statusAndDur.status);
 
@@ -539,7 +539,7 @@ namespace {
         writeConcern.wNumNodes = 3;
         statusAndDur = getReplCoord()->awaitReplication(&txn, time2, writeConcern);
         ASSERT_EQUALS(ErrorCodes::ExceededTimeLimit, statusAndDur.status);
-        ASSERT_OK(getReplCoord()->setLastOptime(&txn, client2, time2));
+        ASSERT_OK(getReplCoord()->setLastOptime_forTest(client2, time2));
         statusAndDur = getReplCoord()->awaitReplication(&txn, time2, writeConcern);
         ASSERT_OK(statusAndDur.status);
     }
@@ -623,7 +623,7 @@ namespace {
 
 
         // Nothing satisfied
-        getReplCoord()->setLastOptime(&txn, selfRID, time1);
+        getReplCoord()->setMyLastOptime(&txn, time1);
         statusAndDur = getReplCoord()->awaitReplication(&txn, time1, majorityWriteConcern);
         ASSERT_EQUALS(ErrorCodes::ExceededTimeLimit, statusAndDur.status);
         statusAndDur = getReplCoord()->awaitReplication(&txn, time1, multiDCWriteConcern);
@@ -632,8 +632,8 @@ namespace {
         ASSERT_EQUALS(ErrorCodes::ExceededTimeLimit, statusAndDur.status);
 
         // Majority satisfied but not either custom mode
-        getReplCoord()->setLastOptime(&txn, clientRID1, time1);
-        getReplCoord()->setLastOptime(&txn, clientRID2, time1);
+        getReplCoord()->setLastOptime_forTest(clientRID1, time1);
+        getReplCoord()->setLastOptime_forTest(clientRID2, time1);
 
         statusAndDur = getReplCoord()->awaitReplication(&txn, time1, majorityWriteConcern);
         ASSERT_OK(statusAndDur.status);
@@ -643,7 +643,7 @@ namespace {
         ASSERT_EQUALS(ErrorCodes::ExceededTimeLimit, statusAndDur.status);
 
         // All modes satisfied
-        getReplCoord()->setLastOptime(&txn, clientRID3, time1);
+        getReplCoord()->setLastOptime_forTest(clientRID3, time1);
 
         statusAndDur = getReplCoord()->awaitReplication(&txn, time1, majorityWriteConcern);
         ASSERT_OK(statusAndDur.status);
@@ -653,8 +653,8 @@ namespace {
         ASSERT_OK(statusAndDur.status);
 
         // multiDC satisfied but not majority or multiRack
-        getReplCoord()->setLastOptime(&txn, selfRID, time2);
-        getReplCoord()->setLastOptime(&txn, clientRID3, time2);
+        getReplCoord()->setMyLastOptime(&txn, time2);
+        getReplCoord()->setLastOptime_forTest(clientRID3, time2);
 
         statusAndDur = getReplCoord()->awaitReplication(&txn, time2, majorityWriteConcern);
         ASSERT_EQUALS(ErrorCodes::ExceededTimeLimit, statusAndDur.status);
@@ -760,8 +760,8 @@ namespace {
         awaiter.setOpTime(time1);
         awaiter.setWriteConcern(writeConcern);
         awaiter.start(&txn);
-        ASSERT_OK(getReplCoord()->setLastOptime(&txn, selfRID, time1));
-        ASSERT_OK(getReplCoord()->setLastOptime(&txn, client1, time1));
+        ASSERT_OK(getReplCoord()->setMyLastOptime(&txn, time1));
+        ASSERT_OK(getReplCoord()->setLastOptime_forTest(client1, time1));
         ReplicationCoordinator::StatusAndDuration statusAndDur = awaiter.getResult();
         ASSERT_OK(statusAndDur.status);
         awaiter.reset();
@@ -769,8 +769,8 @@ namespace {
         // 2 nodes waiting for time2
         awaiter.setOpTime(time2);
         awaiter.start(&txn);
-        ASSERT_OK(getReplCoord()->setLastOptime(&txn, selfRID, time2));
-        ASSERT_OK(getReplCoord()->setLastOptime(&txn, client1, time2));
+        ASSERT_OK(getReplCoord()->setMyLastOptime(&txn, time2));
+        ASSERT_OK(getReplCoord()->setLastOptime_forTest(client1, time2));
         statusAndDur = awaiter.getResult();
         ASSERT_OK(statusAndDur.status);
         awaiter.reset();
@@ -779,7 +779,7 @@ namespace {
         writeConcern.wNumNodes = 3;
         awaiter.setWriteConcern(writeConcern);
         awaiter.start(&txn);
-        ASSERT_OK(getReplCoord()->setLastOptime(&txn, client2, time2));
+        ASSERT_OK(getReplCoord()->setLastOptime_forTest(client2, time2));
         statusAndDur = awaiter.getResult();
         ASSERT_OK(statusAndDur.status);
         awaiter.reset();
@@ -817,8 +817,8 @@ namespace {
         awaiter.setOpTime(time2);
         awaiter.setWriteConcern(writeConcern);
         awaiter.start(&txn);
-        ASSERT_OK(getReplCoord()->setLastOptime(&txn, selfRID, time2));
-        ASSERT_OK(getReplCoord()->setLastOptime(&txn, client, time1));
+        ASSERT_OK(getReplCoord()->setMyLastOptime(&txn, time2));
+        ASSERT_OK(getReplCoord()->setLastOptime_forTest(client, time1));
         ReplicationCoordinator::StatusAndDuration statusAndDur = awaiter.getResult();
         ASSERT_EQUALS(ErrorCodes::ExceededTimeLimit, statusAndDur.status);
         awaiter.reset();
@@ -859,8 +859,8 @@ namespace {
         awaiter.setOpTime(time2);
         awaiter.setWriteConcern(writeConcern);
         awaiter.start(&txn);
-        ASSERT_OK(getReplCoord()->setLastOptime(&txn, client1, time1));
-        ASSERT_OK(getReplCoord()->setLastOptime(&txn, client2, time1));
+        ASSERT_OK(getReplCoord()->setLastOptime_forTest(client1, time1));
+        ASSERT_OK(getReplCoord()->setLastOptime_forTest(client2, time1));
         shutdown();
         ReplicationCoordinator::StatusAndDuration statusAndDur = awaiter.getResult();
         ASSERT_EQUALS(ErrorCodes::ShutdownInProgress, statusAndDur.status);
@@ -904,8 +904,8 @@ namespace {
         awaiter.setOpTime(time2);
         awaiter.setWriteConcern(writeConcern);
         awaiter.start(&txn);
-        ASSERT_OK(getReplCoord()->setLastOptime(&txn, client1, time1));
-        ASSERT_OK(getReplCoord()->setLastOptime(&txn, client2, time1));
+        ASSERT_OK(getReplCoord()->setLastOptime_forTest(client1, time1));
+        ASSERT_OK(getReplCoord()->setLastOptime_forTest(client2, time1));
         getReplCoord()->stepDown(&txn, true, Milliseconds(0), Milliseconds(1000));
         ReplicationCoordinator::StatusAndDuration statusAndDur = awaiter.getResult();
         ASSERT_EQUALS(ErrorCodes::NotMaster, statusAndDur.status);
@@ -985,8 +985,8 @@ namespace {
         awaiter.setOpTime(time2);
         awaiter.setWriteConcern(writeConcern);
         awaiter.start(&txn);
-        ASSERT_OK(getReplCoord()->setLastOptime(&txn, client1, time1));
-        ASSERT_OK(getReplCoord()->setLastOptime(&txn, client2, time1));
+        ASSERT_OK(getReplCoord()->setLastOptime_forTest(client1, time1));
+        ASSERT_OK(getReplCoord()->setLastOptime_forTest(client2, time1));
 
         txn.setInterruptOp(true);
         getReplCoord()->interrupt(opID);
@@ -997,7 +997,7 @@ namespace {
 
     class StepDownTest : public ReplCoordTest {
     protected:
-        OID rid1;
+        OID myRid;
         OID rid2;
         OID rid3;
 
@@ -1014,7 +1014,7 @@ namespace {
                                                  BSON("_id" << 2 << "host" << "test3:1234"))),
                     HostAndPort("test1", 1234));
             ASSERT(getReplCoord()->setFollowerMode(MemberState::RS_SECONDARY));
-            rid1 = getReplCoord()->getMyRID();
+            myRid = getReplCoord()->getMyRID();
             rid2 = OID::gen();
             rid3 = OID::gen();
             HandshakeArgs handshake2;
@@ -1035,9 +1035,9 @@ namespace {
         OperationContextNoop txn;
         OpTime optime1(100, 1);
         // All nodes are caught up
-        ASSERT_OK(getReplCoord()->setLastOptime(&txn, rid1, optime1));
-        ASSERT_OK(getReplCoord()->setLastOptime(&txn, rid2, optime1));
-        ASSERT_OK(getReplCoord()->setLastOptime(&txn, rid3, optime1));
+        ASSERT_OK(getReplCoord()->setMyLastOptime(&txn, optime1));
+        ASSERT_OK(getReplCoord()->setLastOptime_forTest(rid2, optime1));
+        ASSERT_OK(getReplCoord()->setLastOptime_forTest(rid3, optime1));
 
         Status status = getReplCoord()->stepDown(&txn, false, Milliseconds(0), Milliseconds(0));
         ASSERT_EQUALS(ErrorCodes::NotMaster, status);
@@ -1048,9 +1048,9 @@ namespace {
         OperationContextNoop txn;
         OpTime optime1(100, 1);
         // All nodes are caught up
-        ASSERT_OK(getReplCoord()->setLastOptime(&txn, rid1, optime1));
-        ASSERT_OK(getReplCoord()->setLastOptime(&txn, rid2, optime1));
-        ASSERT_OK(getReplCoord()->setLastOptime(&txn, rid3, optime1));
+        ASSERT_OK(getReplCoord()->setMyLastOptime(&txn, optime1));
+        ASSERT_OK(getReplCoord()->setLastOptime_forTest(rid2, optime1));
+        ASSERT_OK(getReplCoord()->setLastOptime_forTest(rid3, optime1));
 
         simulateSuccessfulElection();
 
@@ -1064,9 +1064,9 @@ namespace {
         OperationContextNoop txn;
         OpTime optime1(100, 1);
         // All nodes are caught up
-        ASSERT_OK(getReplCoord()->setLastOptime(&txn, rid1, optime1));
-        ASSERT_OK(getReplCoord()->setLastOptime(&txn, rid2, optime1));
-        ASSERT_OK(getReplCoord()->setLastOptime(&txn, rid3, optime1));
+        ASSERT_OK(getReplCoord()->setMyLastOptime(&txn, optime1));
+        ASSERT_OK(getReplCoord()->setLastOptime_forTest(rid2, optime1));
+        ASSERT_OK(getReplCoord()->setLastOptime_forTest(rid3, optime1));
 
         simulateSuccessfulElection();
 
@@ -1201,9 +1201,9 @@ namespace {
         OpTime optime1(100, 1);
         OpTime optime2(100, 2);
         // No secondary is caught up
-        ASSERT_OK(getReplCoord()->setLastOptime(&txn, rid1, optime2));
-        ASSERT_OK(getReplCoord()->setLastOptime(&txn, rid2, optime1));
-        ASSERT_OK(getReplCoord()->setLastOptime(&txn, rid3, optime1));
+        ASSERT_OK(getReplCoord()->setMyLastOptime(&txn, optime2));
+        ASSERT_OK(getReplCoord()->setLastOptime_forTest(rid2, optime1));
+        ASSERT_OK(getReplCoord()->setLastOptime_forTest(rid3, optime1));
 
         // Try to stepDown but time out because no secondaries are caught up
         StepDownRunner runner(getReplCoord());
@@ -1243,9 +1243,9 @@ namespace {
         OpTime optime1(100, 1);
         OpTime optime2(100, 2);
         // No secondary is caught up
-        ASSERT_OK(getReplCoord()->setLastOptime(&txn, rid1, optime2));
-        ASSERT_OK(getReplCoord()->setLastOptime(&txn, rid2, optime1));
-        ASSERT_OK(getReplCoord()->setLastOptime(&txn, rid3, optime1));
+        ASSERT_OK(getReplCoord()->setMyLastOptime(&txn, optime2));
+        ASSERT_OK(getReplCoord()->setLastOptime_forTest(rid2, optime1));
+        ASSERT_OK(getReplCoord()->setLastOptime_forTest(rid3, optime1));
 
         // stepDown where the secondary actually has to catch up before the stepDown can succeed
         StepDownRunner runner(getReplCoord());
@@ -1334,7 +1334,7 @@ namespace {
                                              BSON("_id" << 1 << "host" << "test2:1234") <<
                                              BSON("_id" << 2 << "host" << "test3:1234"))),
                 HostAndPort("test1", 1234));
-        OID rid1 = getReplCoord()->getMyRID();
+        OID myRid = getReplCoord()->getMyRID();
         OID rid2 = OID::gen();
         OID rid3 = OID::gen();
         HandshakeArgs handshake2;
@@ -1350,9 +1350,9 @@ namespace {
         OpTime optime1(100, 1);
         OpTime optime2(100, 2);
         OpTime optime3(2, 1);
-        ASSERT_OK(getReplCoord()->setLastOptime(&txn, rid1, optime1));
-        ASSERT_OK(getReplCoord()->setLastOptime(&txn, rid2, optime2));
-        ASSERT_OK(getReplCoord()->setLastOptime(&txn, rid3, optime3));
+        ASSERT_OK(getReplCoord()->setMyLastOptime(&txn, optime1));
+        ASSERT_OK(getReplCoord()->setLastOptime_forTest(rid2, optime2));
+        ASSERT_OK(getReplCoord()->setLastOptime_forTest(rid3, optime3));
 
         // Check that the proper BSON is generated for the replSetUpdatePositionCommand
         BSONObjBuilder cmdBuilder;
@@ -1367,7 +1367,7 @@ namespace {
             BSONObj entry = entryElement.Obj();
             OID rid = entry["_id"].OID();
             rids.insert(rid);
-            if (rid == rid1) {
+            if (rid == myRid) {
                 ASSERT_EQUALS(optime1, entry["optime"]._opTime());
             } else if (rid == rid2) {
                 ASSERT_EQUALS(optime2, entry["optime"]._opTime());
@@ -1546,14 +1546,14 @@ namespace {
         ASSERT_OK(handshake2.initialize(BSON("handshake" << client2 << "member" << 2)));
         ASSERT_OK(getReplCoord()->processHandshake(&txn, handshake2));
 
-        ASSERT_OK(getReplCoord()->setLastOptime(&txn, myRID, time2));
-        ASSERT_OK(getReplCoord()->setLastOptime(&txn, client1, time1));
+        ASSERT_OK(getReplCoord()->setMyLastOptime(&txn, time2));
+        ASSERT_OK(getReplCoord()->setLastOptime_forTest(client1, time1));
 
         std::vector<HostAndPort> caughtUpHosts = getReplCoord()->getHostsWrittenTo(time2);
         ASSERT_EQUALS(1U, caughtUpHosts.size());
         ASSERT_EQUALS(myHost, caughtUpHosts[0]);
 
-        ASSERT_OK(getReplCoord()->setLastOptime(&txn, client2, time2));
+        ASSERT_OK(getReplCoord()->setLastOptime_forTest(client2, time2));
         caughtUpHosts = getReplCoord()->getHostsWrittenTo(time2);
         ASSERT_EQUALS(2U, caughtUpHosts.size());
         if (myHost == caughtUpHosts[0]) {
@@ -1582,13 +1582,13 @@ namespace {
         ASSERT_OK(handshake.initialize(BSON("handshake" << client)));
         ASSERT_OK(getReplCoord()->processHandshake(&txn, handshake));
 
-        ASSERT_OK(getReplCoord()->setLastOptime(&txn, myRID, time2));
-        ASSERT_OK(getReplCoord()->setLastOptime(&txn, client, time1));
+        ASSERT_OK(getReplCoord()->setMyLastOptime(&txn, time2));
+        ASSERT_OK(getReplCoord()->setLastOptimeForSlave(&txn, client, time1));
 
         std::vector<HostAndPort> caughtUpHosts = getReplCoord()->getHostsWrittenTo(time2);
         ASSERT_EQUALS(0U, caughtUpHosts.size()); // self doesn't get included in master-slave
 
-        ASSERT_OK(getReplCoord()->setLastOptime(&txn, client, time2));
+        ASSERT_OK(getReplCoord()->setLastOptimeForSlave(&txn, client, time2));
         caughtUpHosts = getReplCoord()->getHostsWrittenTo(time2);
         ASSERT_EQUALS(1U, caughtUpHosts.size());
         ASSERT_EQUALS(clientHost, caughtUpHosts[0]);

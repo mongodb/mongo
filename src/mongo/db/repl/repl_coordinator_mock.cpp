@@ -122,9 +122,9 @@ namespace repl {
         return false;
     }
 
-    Status ReplicationCoordinatorMock::setLastOptime(OperationContext* txn,
-                                                     const OID& rid,
-                                                     const OpTime& ts) {
+    Status ReplicationCoordinatorMock::setLastOptimeForSlave(OperationContext* txn,
+                                                             const OID& rid,
+                                                             const OpTime& ts) {
         return Status::OK();
     }
     

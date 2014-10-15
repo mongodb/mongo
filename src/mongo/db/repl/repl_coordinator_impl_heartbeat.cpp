@@ -184,9 +184,8 @@ namespace {
             const OID& rid = it->first;
             const SlaveInfo& slaveInfo = it->second;
             if (slaveInfo.memberID == targetId) {
-                Status status = _setLastOptime_inlock(&lk, 
-                                                      rid, 
-                                                      optime);
+                const UpdatePositionArgs::UpdateInfo update(rid, optime, -1, -1);
+                Status status = _setLastOptime_inlock(&lk, update);
                 if (!status.isOK()) {
                     LOG(1) << "Could not update optime from node " << target.toString() <<
                         ": " << status;

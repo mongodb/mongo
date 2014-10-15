@@ -42,6 +42,7 @@
 #include "mongo/db/repl/repl_coordinator_external_state.h"
 #include "mongo/db/repl/replica_set_config.h"
 #include "mongo/db/repl/replication_executor.h"
+#include "mongo/db/repl/update_position_args.h"
 #include "mongo/platform/unordered_map.h"
 #include "mongo/platform/unordered_set.h"
 #include "mongo/util/net/hostandport.h"
@@ -133,7 +134,8 @@ namespace repl {
 
         virtual bool shouldIgnoreUniqueIndex(const IndexDescriptor* idx);
 
-        virtual Status setLastOptime(OperationContext* txn, const OID& rid, const OpTime& ts);
+        virtual Status setLastOptimeForSlave(
+                OperationContext* txn, const OID& rid, const OpTime& ts);
 
         virtual Status setMyLastOptime(OperationContext* txn, const OpTime& ts);
 
@@ -235,6 +237,11 @@ namespace repl {
          * Gets the replica set configuration in use by the node.
          */
         ReplicaSetConfig getReplicaSetConfig_forTest();
+
+        /**
+         * Simple wrapper around _setLastOptime_inlock to make it easier to test.
+         */
+        Status setLastOptime_forTest(const OID& rid, const OpTime& ts);
 
     private:
 
@@ -446,13 +453,13 @@ namespace repl {
                 bool* success);
 
         /**
-         * Helper method for setLastOptime that takes in a unique lock on
-         * _mutex.  The passed in lock must already be locked.  It is unspecified what state the 
-         * lock will be in after this method finishes.
+         * Helper method for updating our tracking of the last optime applied by a given node that
+         * takes in a unique lock on _mutex. The passed in lock must already be locked.
+         * It is unspecified what state the lock will be in after this method finishes.
+         * This is only valid to call on replica sets.
          */
         Status _setLastOptime_inlock(boost::unique_lock<boost::mutex>* lock,
-                                     const OID& rid,
-                                     const OpTime& ts);
+                                     const UpdatePositionArgs::UpdateInfo& args);
 
         /**
          * Helper method for setMyLastOptime that takes in a unique lock on

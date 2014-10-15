@@ -247,22 +247,15 @@ namespace repl {
         virtual bool shouldIgnoreUniqueIndex(const IndexDescriptor* idx) = 0;
 
         /**
-         * Updates our internal tracking of the last OpTime applied for the given member of the set
-         * identified by "rid".  Also updates all bookkeeping related to tracking what the last
-         * OpTime applied by all tag groups that "rid" is a part of.  This is called when
-         * secondaries notify the member they are syncing from of their progress in replication.
-         * This information is used by awaitReplication to satisfy write concerns.  It is *not* used
-         * in elections, we maintain a separate view of member optimes in the topology coordinator
-         * based on incoming heartbeat messages, which is used in elections.
-         *
-         * @returns ErrorCodes::NodeNotFound if the member cannot be found in sync progress tracking
-         * @returns Status::OK() otherwise
+         * Updates our internal tracking of the last OpTime applied for the given slave
+         * identified by "rid".  Only valid to call in master/slave mode
          * TODO(spencer): Remove txn argument and make into a void function when legacy is gone.
          */
-        virtual Status setLastOptime(OperationContext* txn, const OID& rid, const OpTime& ts) = 0;
+        virtual Status setLastOptimeForSlave(
+                OperationContext* txn, const OID& rid, const OpTime& ts) = 0;
 
         /**
-         * Delegates to setLastOptime using our RID as the rid argument.
+         * Updates our internal tracking of the last OpTime applied to this node.
          */
         virtual Status setMyLastOptime(OperationContext* txn, const OpTime& ts) = 0;
 
