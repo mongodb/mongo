@@ -549,6 +549,8 @@ namespace {
 
     Status LegacyReplicationCoordinator::processReplSetGetStatus(BSONObjBuilder* result) {
         theReplSet->summarizeStatus(*result);
+        // NOTE: The following field is for debugging only and not part of the interface.
+        result->append("replCoord", "legacy");
         return Status::OK();
     }
 
