@@ -39,6 +39,72 @@
 namespace mongo {
 
     /**
+     * Lock modes.
+     *
+     * Compatibility Matrix
+     *                                          Granted mode
+     *   ---------------.--------------------------------------------------------.
+     *   Requested Mode | MODE_NONE  MODE_IS   MODE_IX  MODE_S   MODE_X  |
+     *     MODE_IS      |      +        +         +        +        -    |
+     *     MODE_IX      |      +        +         +        -        -    |
+     *     MODE_S       |      +        +         -        +        -    |
+     *     MODE_X       |      +        -         -        -        -    |
+     */
+    enum LockMode {
+        MODE_NONE       = 0,
+        MODE_IS         = 1,
+        MODE_IX         = 2,
+        MODE_S          = 3,
+        MODE_X          = 4,
+
+        // Counts the lock modes. Used for array size allocations, etc. Always insert new lock
+        // modes above this entry.
+        LockModesCount
+    };
+
+
+    /**
+     * Return values for the locking functions of the lock manager.
+     */
+    enum LockResult {
+
+        /**
+         * The lock request was granted and is now on the granted list for the specified resource.
+         */
+        LOCK_OK,
+
+        /**
+         * The lock request was not granted because of conflict. If this value is returned, the
+         * request was placed on the conflict queue of the specified resource and a call to the
+         * LockGrantNotification::notify callback should be expected with the resource whose lock
+         * was requested.
+         */
+        LOCK_WAITING,
+
+        /**
+         * The lock request waited, but timed out before it could be granted. This value is never
+         * returned by the LockManager methods here, but by the Locker class, which offers
+         * capability to block while waiting for locks.
+         */
+        LOCK_TIMEOUT,
+
+        /**
+         * The lock request was not granted because it would result in a deadlock. No changes to
+         * the state of the Locker would be made if this value is returned (i.e., it will not be
+         * killed due to deadlock). It is up to the caller to decide how to recover from this
+         * return value - could be either release some locks and try again, or just bail with an
+         * error and have some upper code handle it.
+         */
+        LOCK_DEADLOCK,
+
+        /**
+         * This is used as an initialiser value. Should never be returned.
+         */
+        LOCK_INVALID
+    };
+
+
+    /**
      * Hierarchy of resource types. The lock manager knows nothing about this hierarchy, it is
      * purely logical. I.e., acquiring a RESOURCE_GLOBAL and then a RESOURCE_DATABASE won't block
      * at the level of the lock manager.
@@ -54,12 +120,12 @@ namespace mongo {
         RESOURCE_COLLECTION,
         RESOURCE_DOCUMENT,
 
-        // Must bound the max resource id
-        RESOURCE_LAST
+        // Counts the rest. Always insert new resource types above this entry.
+        ResourceTypesCount
     };
 
     // We only use 3 bits for the resource type in the ResourceId hash
-    BOOST_STATIC_ASSERT(RESOURCE_LAST < 8);
+    BOOST_STATIC_ASSERT(ResourceTypesCount < 8);
 
 
     /**
@@ -111,10 +177,11 @@ namespace mongo {
 #endif
     };
 
-    // Treat the resource ids as 64-bit integers. Commented out for now - we will keep the full
-    // resource content in there for debugging purposes.
-    //
-    // BOOST_STATIC_ASSERT(sizeof(ResourceId) == sizeof(uint64_t));
+#ifndef _DEBUG
+    // Treat the resource ids as 64-bit integers in release mode in order to ensure we do not
+    // spend too much time doing comparisons for hashing.
+    BOOST_STATIC_ASSERT(sizeof(ResourceId) == sizeof(uint64_t));
+#endif
 
 } // namespace mongo
 

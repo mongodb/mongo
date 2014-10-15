@@ -31,7 +31,7 @@
 #include <boost/thread/condition_variable.hpp>
 #include <boost/thread/mutex.hpp>
 
-#include "mongo/db/concurrency/resource_id.h"
+#include "mongo/db/concurrency/lock_mgr_defs.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/platform/compiler.h"
 #include "mongo/platform/cstdint.h"
@@ -48,73 +48,6 @@ namespace mongo {
 
     class Locker;
     struct LockHead;
-
-    /**
-     * Lock modes.
-     *
-     * Compatibility Matrix
-     *                                          Granted mode
-     *   ---------------.--------------------------------------------------------.
-     *   Requested Mode | MODE_NONE  MODE_IS   MODE_IX  MODE_S   MODE_X  |
-     *     MODE_IS      |      +        +         +        +        -    |
-     *     MODE_IX      |      +        +         +        -        -    |
-     *     MODE_S       |      +        +         -        +        -    |
-     *     MODE_X       |      +        -         -        -        -    |
-     */
-    enum LockMode {
-        MODE_NONE       = 0,
-        MODE_IS         = 1,
-        MODE_IX         = 2,
-        MODE_S          = 3,
-        MODE_X          = 4,
-    };
-
-    enum {
-        // Counts the entries in the LockMode enumeration. Used for array size allocations, etc.
-        LockModesCount   = 5,
-    };
-
-
-    /**
-     * Return values for the locking functions of the lock manager.
-     */
-    enum LockResult {
-
-        /**
-         * The lock request was granted and is now on the granted list for the specified resource.
-         */
-        LOCK_OK,
-
-        /**
-         * The lock request was not granted because of conflict. If this value is returned, the
-         * request was placed on the conflict queue of the specified resource and a call to the
-         * LockGrantNotification::notify callback should be expected with the resource whose lock
-         * was requested.
-         */
-        LOCK_WAITING,
-
-        /**
-         * The lock request waited, but timed out before it could be granted. This value is never
-         * returned by the LockManager methods here, but by the Locker class, which offers
-         * capability to block while waiting for locks.
-         */
-        LOCK_TIMEOUT,
-
-        /**
-         * The lock request was not granted because it would result in a deadlock. No changes to
-         * the state of the Locker would be made if this value is returned (i.e., it will not be
-         * killed due to deadlock). It is up to the caller to decide how to recover from this
-         * return value - could be either release some locks and try again, or just bail with an
-         * error and have some upper code handle it.
-         */
-        LOCK_DEADLOCK,
-
-        /**
-         * This is used as an initialiser value. Should never be returned.
-         */
-        LOCK_INVALID
-    };
-
 
     /**
      * Interface on which granted lock requests will be notified. See the contract for the notify

@@ -109,7 +109,7 @@ namespace mongo {
         locker2.unlockAll();
     }
 
-    TEST(Locker, ReadTransaction) {
+    TEST(LockerImpl, ReadTransaction) {
         LockerImpl<true> locker(1);
 
         locker.lockGlobal(MODE_IS);

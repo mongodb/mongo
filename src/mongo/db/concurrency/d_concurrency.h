@@ -35,12 +35,10 @@
 #include <climits> // For UINT_MAX
 
 #include "mongo/base/string_data.h"
-#include "mongo/db/concurrency/lock_mgr_new.h"
-#include "mongo/db/concurrency/lock_stat.h"
+#include "mongo/db/concurrency/lock_mgr_defs.h"
 #include "mongo/util/concurrency/mutex.h"
 #include "mongo/util/concurrency/rwlock.h"
 #include "mongo/util/timer.h"
-
 
 namespace mongo {
 

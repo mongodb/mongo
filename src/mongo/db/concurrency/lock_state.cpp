@@ -69,7 +69,9 @@ namespace mongo {
         }
 
         /**
-         * Whether the particular lock's release should be held until the end of the operation.
+         * Whether the particular lock's release should be held until the end of the operation. We
+         * delay releases for exclusive locks (locks that are for write operations) in order to
+         * ensure that the data they protect is committed successfully.
          */
         bool shouldDelayUnlock(const ResourceId& resId, LockMode mode) {
             // Global and flush lock are not used to protect transactional resources and as such, they
@@ -83,22 +85,17 @@ namespace mongo {
             }
 
             switch (mode) {
-                // unlocks of exclusive locks are delayed to the end of the WUOW
             case MODE_X:
             case MODE_IX:
                 return true;
 
-                // nothing else should be
             case MODE_IS:
             case MODE_S:
                 return false;
 
-                // these should never be passed in
-            case MODE_NONE:
+            default:
                 invariant(false);
             }
-
-            invariant(false);
         }
     }
 
@@ -232,19 +229,15 @@ namespace mongo {
     template<bool IsForMMAPV1>
     char LockerImpl<IsForMMAPV1>::threadState() const {
         switch (getLockMode(resourceIdGlobal)) {
-        case MODE_IS:
-            return 'r';
-        case MODE_IX:
-            return 'w';
-        case MODE_S:
-            return 'R';
-        case MODE_X:
-            return 'W';
-        case MODE_NONE:
-            return '\0';
-        }
+        case MODE_IS: return 'r';
+        case MODE_IX: return 'w';
+        case MODE_S: return 'R';
+        case MODE_X: return 'W';
+        case MODE_NONE: return '\0';
 
-        invariant(false);
+        default:
+            invariant(false);
+        }
     }
 
     template<bool IsForMMAPV1>

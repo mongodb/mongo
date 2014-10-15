@@ -30,7 +30,7 @@
 #include <string>
 
 #include "mongo/db/concurrency/fast_map_noalloc.h"
-#include "mongo/db/concurrency/resource_id.h"
+#include "mongo/db/concurrency/lock_mgr_defs.h"
 #include "mongo/unittest/unittest.h"
 
 

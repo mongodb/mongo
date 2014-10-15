@@ -136,6 +136,7 @@ namespace mongo {
         void _yieldFlushLockForMMAPV1();
 
 
+        // Used to disambiguate different lockers
         const uint64_t _id;
 
         // The only reason we have this spin lock here is for the diagnostic tools, which could
@@ -146,10 +147,14 @@ namespace mongo {
         mutable SpinLock _lock;
         LockRequestsMap _requests;
 
+        // Reuse the notification object across requests so we don't have to create a new mutex
+        // and condition variable every time.
         CondVarLockGrantNotification _notify;
 
+        // Delays release of exclusive/intent-exclusive locked resources until the write unit of
+        // work completes. Value of 0 means we are not inside a write unit of work.
+        int _wuowNestingLevel;
         std::queue<ResourceId> _resourcesToUnlockAtEndOfUnitOfWork;
-        int _wuowNestingLevel; // if > 0 we are inside of a WriteUnitOfWork
 
 
         //////////////////////////////////////////////////////////////////////////////////////////
