@@ -254,9 +254,6 @@ namespace repl {
                 handshakeNeeded = _handshakeNeeded;
                 _positionChanged = false;
                 _handshakeNeeded = false;
-                if (handshakeNeeded) {
-                    positionChanged = true; // Always update position after sending a handshake
-                }
             }
 
             MemberState state = replCoord->getCurrentMemberState();
@@ -282,6 +279,7 @@ namespace repl {
                 handshakeNeeded = true;
             }
             if (handshakeNeeded) {
+                positionChanged = true;
                 if (!replHandshake(&txn)) {
                     boost::unique_lock<boost::mutex> lock(_mtx);
                     _handshakeNeeded = true;

@@ -528,7 +528,7 @@ namespace {
 
         SlaveInfo& slaveInfo = _slaveInfoMap[rid];
         if (ts > slaveInfo.opTime) {
-            _updateOptimeInMap_inlock(&lock, &slaveInfo, ts);
+            _updateOptimeInMap_inlock(&slaveInfo, ts);
         }
         return Status::OK();
     }
@@ -544,7 +544,14 @@ namespace {
 
         invariant(lock->owns_lock());
         SlaveInfo& slaveInfo = _slaveInfoMap[_getMyRID_inlock()];
-        _updateOptimeInMap_inlock(lock, &slaveInfo, ts);
+        _updateOptimeInMap_inlock(&slaveInfo, ts);
+        invariant(lock->owns_lock());
+
+        if (_getReplicationMode_inlock() == modeReplSet) {
+            lock->unlock();
+            _externalState->forwardSlaveProgress(); // Must do this outside _mutex
+        }
+
     }
 
     OpTime ReplicationCoordinatorImpl::getMyLastOptime() const {
@@ -558,16 +565,15 @@ namespace {
     }
 
     Status ReplicationCoordinatorImpl::setLastOptime_forTest(const OID& rid, const OpTime& ts) {
-        boost::unique_lock<boost::mutex> lock(_mutex);
+        boost::lock_guard<boost::mutex> lock(_mutex);
         invariant(_getReplicationMode_inlock() == modeReplSet);
 
         const UpdatePositionArgs::UpdateInfo update(rid, ts, -1, -1);
-        return _setLastOptime_inlock(&lock, update);
+        return _setLastOptime_inlock(update);
     }
 
     Status ReplicationCoordinatorImpl::_setLastOptime_inlock(
-            boost::unique_lock<boost::mutex>* lock, const UpdatePositionArgs::UpdateInfo& args) {
-        invariant(lock->owns_lock());
+            const UpdatePositionArgs::UpdateInfo& args) {
 
         LOG(2) << "received notification that node with RID " << args.rid <<
                 " has reached optime: " << args.ts;
@@ -602,16 +608,12 @@ namespace {
 
         // Only update remote optimes if they increase.
         if (slaveInfo.opTime < args.ts) {
-            _updateOptimeInMap_inlock(lock, &slaveInfo, args.ts);
+            _updateOptimeInMap_inlock(&slaveInfo, args.ts);
         }
         return Status::OK();
     }
 
-    void ReplicationCoordinatorImpl::_updateOptimeInMap_inlock(
-            boost::unique_lock<boost::mutex>* lock,
-            SlaveInfo* slaveInfo,
-            OpTime ts) {
-        invariant(lock->owns_lock());
+    void ReplicationCoordinatorImpl::_updateOptimeInMap_inlock(SlaveInfo* slaveInfo, OpTime ts) {
 
         slaveInfo->opTime = ts;
 
@@ -623,13 +625,6 @@ namespace {
             if (_doneWaitingForReplication_inlock(*info->opTime, *info->writeConcern)) {
                 info->condVar->notify_all();
             }
-        }
-
-        if (_getReplicationMode_inlock() == modeReplSet &&
-                !_getCurrentMemberState_inlock().primary()) {
-            // pass along if we are not primary
-            lock->unlock();
-            _externalState->forwardSlaveProgress(); // Must do this outside _mutex
         }
     }
 
@@ -1871,16 +1866,24 @@ namespace {
             OperationContext* txn,
             const UpdatePositionArgs& updates) {
 
+        boost::unique_lock<boost::mutex> lock(_mutex);
+        Status status = Status::OK();
+        bool somethingChanged = false;
         for (UpdatePositionArgs::UpdateIterator update = updates.updatesBegin();
                 update != updates.updatesEnd();
                 ++update) {
-            boost::unique_lock<boost::mutex> lock(_mutex);
-            Status status = _setLastOptime_inlock(&lock, *update);
+            status = _setLastOptime_inlock(*update);
             if (!status.isOK()) {
-                return status;
+                break;
             }
+            somethingChanged = true;
         }
-        return Status::OK();
+
+        if (somethingChanged) {
+            lock.unlock();
+            _externalState->forwardSlaveProgress(); // Must do this outside _mutex
+        }
+        return status;
     }
 
     Status ReplicationCoordinatorImpl::processHandshake(const OperationContext* txn,

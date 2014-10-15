@@ -453,13 +453,10 @@ namespace repl {
                 bool* success);
 
         /**
-         * Helper method for updating our tracking of the last optime applied by a given node that
-         * takes in a unique lock on _mutex. The passed in lock must already be locked.
-         * It is unspecified what state the lock will be in after this method finishes.
+         * Helper method for updating our tracking of the last optime applied by a given node.
          * This is only valid to call on replica sets.
          */
-        Status _setLastOptime_inlock(boost::unique_lock<boost::mutex>* lock,
-                                     const UpdatePositionArgs::UpdateInfo& args);
+        Status _setLastOptime_inlock(const UpdatePositionArgs::UpdateInfo& args);
 
         /**
          * Helper method for setMyLastOptime that takes in a unique lock on
@@ -469,13 +466,10 @@ namespace repl {
         void _setMyLastOptime_inlock(boost::unique_lock<boost::mutex>* lock, const OpTime& ts);
 
         /**
-         * Helper method for _setLastOptime_inlock and _setMyLastOptime_inlock that takes in a
-         * unique lock on _mutex.  The passed in lock must already be locked.  It is unspecified
-         * what state the lock will be in after this method finishes.
+         * Helper method for _setLastOptime_inlock and _setMyLastOptime_inlock.
          */
-        void _updateOptimeInMap_inlock(boost::unique_lock<boost::mutex>* lock,
-                                       SlaveInfo* slaveInfo,
-                                       OpTime ts);
+        void _updateOptimeInMap_inlock(SlaveInfo* slaveInfo, OpTime ts);
+
         /**
          * Schedules a heartbeat to be sent to "target" at "when".
          */
