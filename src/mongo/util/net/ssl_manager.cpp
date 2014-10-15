@@ -581,8 +581,9 @@ namespace mongo {
                 context);
 
         // SSL_OP_ALL - Activate all bug workaround options, to support buggy client SSL's.
-        // SSL_OP_NO_SSLv2 - Disable SSL v2 support 
-        SSL_CTX_set_options(*context, SSL_OP_ALL|SSL_OP_NO_SSLv2);
+        // SSL_OP_NO_SSLv2 - Disable SSL v2 support
+        // SSL_OP_NO_SSLv3 - Disable SSL v3 support
+        SSL_CTX_set_options(*context, SSL_OP_ALL|SSL_OP_NO_SSLv2|SSL_OP_NO_SSLv3);
 
         // HIGH - Enable strong ciphers
         // !EXPORT - Disable export ciphers (40/56 bit) 
