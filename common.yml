@@ -106,7 +106,7 @@ functions:
         if [ "Windows_NT" = "$OS" ]; then
             set -o igncr
         fi;
-        . ./set_gopath.sh
+        . ./${set_gopath|set_gopath.sh}
         ${library_path} go build ${args} ${build_tags} -o bin/${tool} ${tool}/main/${tool}.go
 
   "download mongod":
@@ -142,7 +142,7 @@ functions:
           if [ "Windows_NT" = "$OS" ]; then
             set -o igncr
           fi;
-          . ./set_gopath.sh
+          . ./${set_gopath|set_gopath.sh}
           go tool cover -html=coverage.out -o coverage.html
           go tool cover -func=coverage.out -o coverage.txt
         fi;
@@ -172,7 +172,7 @@ functions:
         if [ "Windows_NT" = "$OS" ]; then
             set -o igncr
         fi;
-        . ./set_gopath.sh
+        . ./${set_gopath|set_gopath.sh}
         if [ "${library_path}" != "" ]; then
             export ${library_path}
         fi
@@ -201,7 +201,7 @@ functions:
       working_dir: src
       script: |
         chmod 700 go.sh
-        chmod 700 set_gopath.sh
+        chmod 700 ${set_gopath|set_gopath.sh}
 
   "run tool tests":
     command: shell.exec 
@@ -211,7 +211,7 @@ functions:
         if [ "Windows_NT" = "$OS" ]; then
             set -o igncr
         fi;
-        . ./set_gopath.sh
+        . ./${set_gopath|set_gopath.sh}
         if [ "${library_path}" != "" ]; then
             export ${library_path}
         fi;
@@ -800,6 +800,7 @@ buildvariants:
     <<: *mongodb_default_startup_args
     extension: .exe
     preproc_gpm: "perl -pi -e 's/\\r\\n/\\n/g' "
+    set_gopath: set_gopath_windows.sh
   tasks: *windows_32_tasks
 
 - name: windows-64
@@ -811,6 +812,7 @@ buildvariants:
     <<: *mongodb_default_startup_args
     extension: .exe
     preproc_gpm: "perl -pi -e 's/\\r\\n/\\n/g' "
+    set_gopath: set_gopath_windows.sh
   tasks: *windows_64_tasks
 
 - name: windows-64-ssl
@@ -823,6 +825,7 @@ buildvariants:
     extension: .exe
     library_path: PATH="/cygdrive/c/mingw-w64/x86_64-4.9.1-posix-seh-rt_v3-rev1/mingw64/bin:/cygdrive/c/sasl/:$PATH"
     preproc_gpm: "perl -pi -e 's/\\r\\n/\\n/g' "
+    set_gopath: set_gopath_windows.sh
   tasks: *windows_64_ssl_tasks
 
 - name: windows-64-enterprise
@@ -837,4 +840,5 @@ buildvariants:
     extension: .exe
     library_path: PATH="/cygdrive/c/mingw-w64/x86_64-4.9.1-posix-seh-rt_v3-rev1/mingw64/bin:/cygdrive/c/sasl/:$PATH"
     preproc_gpm: "perl -pi -e 's/\\r\\n/\\n/g' "
+    set_gopath: set_gopath_windows.sh
   tasks: *windows_64_tasks

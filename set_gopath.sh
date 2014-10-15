@@ -3,12 +3,8 @@
 TOOLS_PKG='github.com/mongodb/mongo-tools'
 
 setgopath() {
-    local SOURCE_GOPATH=`pwd`.gopath
-    local VENDOR_GOPATH=`pwd`/vendor
-    if [ "Windows_NT" = "$OS" ]; then
-        SOURCE_GOPATH=$(cygpath -w $SOURCE_GOPATH);
-        VENDOR_GOPATH=$(cygpath -w $VENDOR_GOPATH);
-    fi;
+    SOURCE_GOPATH=`pwd`.gopath
+    VENDOR_GOPATH=`pwd`/vendor
 
     # set up the $GOPATH to use the vendored dependencies as
     # well as the source for the mongo tools
