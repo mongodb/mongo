@@ -79,6 +79,7 @@ Za
 aR
 abstime
 ack'ed
+ajn
 alloc
 allocator
 allocsize
@@ -89,9 +90,9 @@ ar
 archiver
 arg
 async
-autogen
 atomicity
 autoconf
+autogen
 automake
 basecfg
 basho
