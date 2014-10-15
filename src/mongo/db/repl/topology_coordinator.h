@@ -318,6 +318,12 @@ namespace repl {
          */
         virtual void stepDown() = 0;
 
+        /**
+         * Considers whether or not this node should stand for election, and returns true
+         * if the node has transitioned to candidate role as a result of the call.
+         */
+        virtual bool checkShouldStandForElection(Date_t now, const OpTime& lastOpApplied) = 0;
+
     protected:
         TopologyCoordinator() {}
     };

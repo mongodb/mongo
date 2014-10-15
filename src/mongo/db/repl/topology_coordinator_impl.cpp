@@ -1006,28 +1006,40 @@ namespace {
 
         // At this point, there is no primary anywhere.  Check to see if we should become a
         // candidate.
+        if (!checkShouldStandForElection(now, lastOpApplied)) {
+            return HeartbeatResponseAction::makeNoAction();
+        }
+        return HeartbeatResponseAction::makeElectAction();
+    }
+
+    bool TopologyCoordinatorImpl::checkShouldStandForElection(
+            Date_t now, const OpTime& lastOpApplied) {
+        if (_currentPrimaryIndex != -1) {
+            return false;
+        }
+        invariant (_role != Role::leader);
 
         if (_role == Role::candidate) {
             LOG(2) << "Not standing for election again; already candidate";
-            return HeartbeatResponseAction::makeNoAction();
+            return false;
         }
 
-        UnelectableReason unelectableReason = _getMyUnelectableReason(now, lastOpApplied);
+        const UnelectableReason unelectableReason = _getMyUnelectableReason(now, lastOpApplied);
         if (NotCloseEnoughToLatestOptime == unelectableReason) {
             LOG(2) << "Not standing for election because " <<
                 _getUnelectableReasonString(unelectableReason) << "; my last optime is " <<
                 lastOpApplied << " and the newest is " << _latestKnownOpTime(lastOpApplied);
-            return HeartbeatResponseAction::makeNoAction();
+            return false;
         }
         if (None != unelectableReason) {
             LOG(2) << "Not standing for election because " <<
                 _getUnelectableReasonString(unelectableReason);
-            return HeartbeatResponseAction::makeNoAction();
+            return false;
         }
 
         // All checks passed, become a candidate and start election proceedings.
         _role = Role::candidate;
-        return HeartbeatResponseAction::makeElectAction();
+        return true;
     }
 
     bool TopologyCoordinatorImpl::_aMajoritySeemsToBeUp() const {
@@ -1619,7 +1631,7 @@ namespace {
             return "member has zero priority";
         case StepDownPeriodActive:
             return str::stream() << "I am still waiting for stepdown period to end at " <<
-                _stepDownUntil;
+                dateToISOStringLocal(_stepDownUntil);
         case NotSecondary:
             return "member is not currently a secondary";
         case NotCloseEnoughToLatestOptime:

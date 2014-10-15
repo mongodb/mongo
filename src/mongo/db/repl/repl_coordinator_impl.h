@@ -563,6 +563,11 @@ namespace repl {
         void _onElectCmdRunnerComplete();
 
         /**
+         * Callback called after a random delay, to prevent repeated election ties.
+         */
+        void _recoverFromElectionTie(const ReplicationExecutor::CallbackData& cbData);
+
+        /**
          * Chooses a new sync source.  Must be scheduled as a callback.
          *
          * Calls into the Topology Coordinator, which uses its current view of the set to choose

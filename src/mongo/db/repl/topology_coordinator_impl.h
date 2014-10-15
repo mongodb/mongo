@@ -181,6 +181,7 @@ namespace repl {
         virtual bool voteForMyself(Date_t now);
         virtual void processWinElection(OID electionId, OpTime electionOpTime);
         virtual void processLoseElection();
+        virtual bool checkShouldStandForElection(Date_t now, const OpTime& lastOpApplied);
         virtual void stepDown();
         virtual Date_t getStepDownTime() const;
 

@@ -165,9 +165,16 @@ namespace {
                 break;
             case FreshnessChecker::FreshnessTie:
                 if ((_thisMembersConfigIndex != 0) && !_sleptLastElection) {
-                    long long ms = _replExecutor.nextRandomInt64(1000) + 50;
-                    log() << "replSet possible election tie; sleeping a little " << ms << "ms";
-                    _topCoord->setStepDownTime(now + ms);
+                    const long long ms = _replExecutor.nextRandomInt64(1000) + 50;
+                    const Date_t nextCandidateTime = now + ms;
+                    log() << "replSet possible election tie; sleeping " << ms << "ms until " <<
+                        dateToISOStringLocal(nextCandidateTime);
+                    _topCoord->setStepDownTime(nextCandidateTime);
+                    _replExecutor.scheduleWorkAt(
+                            nextCandidateTime,
+                            stdx::bind(&ReplicationCoordinatorImpl::_recoverFromElectionTie,
+                                       this,
+                                       stdx::placeholders::_1));
                     _sleptLastElection = true;
                     return;
                 }
@@ -244,6 +251,16 @@ namespace {
         _updateCurrentMemberStateFromTopologyCoordinator_inlock();
         _isWaitingForDrainToComplete = true;
         _replExecutor.signalEvent(_electionFinishedEvent);
+    }
+
+    void ReplicationCoordinatorImpl::_recoverFromElectionTie(
+            const ReplicationExecutor::CallbackData& cbData) {
+        if (!cbData.status.isOK()) {
+            return;
+        }
+        if (_topCoord->checkShouldStandForElection(_replExecutor.now(), getMyLastOptime())) {
+            _startElectSelf();
+        }
     }
 
 }  // namespace repl
