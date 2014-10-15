@@ -161,6 +161,15 @@ assert.repeat = function(f, msg, timeout, interval) {
 assert.soon = function(f, msg, timeout /*ms*/, interval) {
     if (assert._debug && msg) print("in assert for: " + msg);
 
+    if (msg) {
+        if (typeof(msg) != "function") {
+            msg = "assert.soon failed, msg:" + msg;
+        }
+    }
+    else {
+        msg = "assert.soon failed: " + f;
+    }
+
     var start = new Date();
     timeout = timeout || 30000;
     interval = interval || 200;
@@ -177,8 +186,7 @@ assert.soon = function(f, msg, timeout /*ms*/, interval) {
 
         diff = (new Date()).getTime() - start.getTime();
         if (diff > timeout) {
-            doassert(msg ? "assert.soon failed, msg:" + msg :
-                           "assert.soon failed: " + f);
+            doassert(msg);
         }
         sleep(interval);
     }
