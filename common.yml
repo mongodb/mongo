@@ -53,7 +53,6 @@ mongo_tools_variables:
       - name: pool
       - name: progress
       - name: text
-      - name: unit-coverage
       - name: util
       - name: vet
     ubuntu1204_ssl_task_list: &ubuntu1204_ssl_tasks
@@ -104,8 +103,11 @@ functions:
       working_dir: src
       script: |
         echo "Building ${tool}..."
+        if [ "Windows_NT" = "$OS" ]; then
+            set -o igncr
+        fi;
         . ./set_gopath.sh
-        ${library_path} go build ${args} ${build_tags} -o ${tool} ${tool}/main
+        ${library_path} go build ${args} ${build_tags} -o bin/${tool} ${tool}/main/${tool}.go
 
   "download mongod":
     command: shell.exec
@@ -137,6 +139,9 @@ functions:
       script: |
         set -o verbose
         if [ "${coverage}" = "true" ]; then
+          if [ "Windows_NT" = "$OS" ]; then
+            set -o igncr
+          fi;
           . ./set_gopath.sh
           go tool cover -html=coverage.out -o coverage.html
           go tool cover -func=coverage.out -o coverage.txt
@@ -163,6 +168,10 @@ functions:
     params:
       working_dir: src
       script: |
+        set -e
+        if [ "Windows_NT" = "$OS" ]; then
+            set -o igncr
+        fi;
         . ./set_gopath.sh
         if [ "${library_path}" != "" ]; then
             export ${library_path}
@@ -199,6 +208,9 @@ functions:
     params:
       working_dir: src
       script: | 
+        if [ "Windows_NT" = "$OS" ]; then
+            set -o igncr
+        fi;
         . ./set_gopath.sh
         if [ "${library_path}" != "" ]; then
             export ${library_path}
@@ -278,7 +290,7 @@ functions:
     params:
       aws_key: ${aws_key}
       aws_secret: ${aws_secret}
-      local_file: src/${tool}
+      local_file: src/bin/${tool}
       remote_file: mongo-tools/binaries/${build_id}/${edition|community}/${tool}${extension}
       bucket: mciuploads
       permissions: public-read
@@ -403,7 +415,8 @@ tasks:
       params:
         working_dir: src
         script: |
-          ./vendor.sh
+          rm -rf bin/
+          mkdir bin
     # bsondump
     - func: "build tool"
       vars:
@@ -560,9 +573,8 @@ tasks:
     - command: shell.exec
       params:
         script: |
-          set -o errexit
           ${killall_mci|pkill -9 mongo; pkill -9 mongodump; pkill -9 mongoexport; pkill -9 mongoimport; pkill -9 mongofiles; pkill -9 mongooplog; pkill -9 mongorestore; pkill -9 mongostat; pkill -9 mongotop; pkill -9 mongod; pkill -9 mongos; pkill -f buildlogger.py; pkill -f smoke.py}
-          exit $(cat retVal)
+          exit 0
 
 - name: lint
   commands:
@@ -574,10 +586,11 @@ tasks:
         directory: src
     - command: shell.exec
       params:
+        working_dir: src
         script: |
           set -o errexit
           set -o verbose
-          retVal=$(./go.sh run src/github.com/3rf/mongo-lint/golint/golint.go src);
+          retVal=$(./go.sh run vendor/src/github.com/3rf/mongo-lint/golint/golint.go src);
           if [ "$retVal" = "" ]; then exit 0; else echo $retVal; exit 1; fi;
 
 - name: log

@@ -6,8 +6,8 @@ setgopath() {
     local SOURCE_GOPATH=`pwd`.gopath
     local VENDOR_GOPATH=`pwd`/vendor
     if [ "Windows_NT" = "$OS" ]; then
-        SOURCE_GOPATH=$(cygpath -w $(SOURCE_GOPATH));
-        VENDOR_GOPATH=$(cygpath -w $(VENDOR_GOPATH));
+        SOURCE_GOPATH=$(cygpath -w $SOURCE_GOPATH);
+        VENDOR_GOPATH=$(cygpath -w $VENDOR_GOPATH);
     fi;
 
     # set up the $GOPATH to use the vendored dependencies as
