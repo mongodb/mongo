@@ -160,7 +160,7 @@ table will be overwritten by the new data (use the \c -n option to
 make an attempt to overwrite existing data return an error).
 
 @subsection util_load_synopsis Synopsis
-<code>wt [-Vv] [-C config] [-h directory] load [-an] [-f input] [-r name] [uri configuration ...]</code>
+<code>wt [-Vv] [-C config] [-h directory] load [-ajn] [-f input] [-r name] [uri configuration ...]</code>
 
 @subsection util_load_options Options
 The following are command-specific options for the \c load command:
