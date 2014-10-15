@@ -163,12 +163,6 @@ namespace repl {
         }
 
         /**
-         * Gets the number of nodes that constitutes a "majority" in this replica set,
-         * for purposes of replicating data.
-         */
-        int getMajorityNumber() const { return _majorityNumber; }
-
-        /**
          * Gets the number of votes required to win an election.
          */
         int getMajorityVoteCount() const { return _majorityVoteCount; }
@@ -221,10 +215,9 @@ namespace repl {
         Status _parseSettingsSubdocument(const BSONObj& settings);
 
         /**
-         * Calculates and stores the majorities for replicating data (_majorityNumber) and for
-         * electing a primary (_majorityVoteCount).
+         * Calculates and stores the majority for electing a primary (_majorityVoteCount).
          */
-        void _calculateMajorities();
+        void _calculateMajorityVoteCount();
 
         /**
          * Adds internal write concern modes to the getLastErrorModes list.
@@ -238,7 +231,6 @@ namespace repl {
         WriteConcernOptions _defaultWriteConcern;
         Seconds _heartbeatTimeoutPeriod;
         bool _chainingAllowed;
-        int _majorityNumber;
         int _majorityVoteCount;
         int _totalVotingMembers;
         ReplicaSetTagConfig _tagConfig;

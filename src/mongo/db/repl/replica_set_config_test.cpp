@@ -51,7 +51,6 @@ namespace {
         ASSERT_EQUALS(1, config.getDefaultWriteConcern().wNumNodes);
         ASSERT_EQUALS("", config.getDefaultWriteConcern().wMode);
         ASSERT_EQUALS(10, config.getHeartbeatTimeoutPeriod().total_seconds());
-        ASSERT_EQUALS(1, config.getMajorityNumber());
         ASSERT_TRUE(config.isChainingAllowed());
     }
 
@@ -67,7 +66,6 @@ namespace {
                                        BSON("_id" << 4 << "host" << "h4:1" << "votes" << 0) <<
                                        BSON("_id" << 5 << "host" << "h5:1" << "votes" << 0)))));
         ASSERT_OK(config.validate());
-        ASSERT_EQUALS(3, config.getMajorityNumber());
         ASSERT_EQUALS(2, config.getMajorityVoteCount());
     }
 
@@ -617,7 +615,6 @@ namespace {
                 a.getConfigVersion() == b.getConfigVersion() &&
                 a.getNumMembers() == b.getNumMembers() &&
                 a.getHeartbeatTimeoutPeriod() == b.getHeartbeatTimeoutPeriod() &&
-                a.getMajorityNumber() == b.getMajorityNumber() &&
                 a.isChainingAllowed() == b.isChainingAllowed() &&
                 a.getDefaultWriteConcern().wNumNodes == b.getDefaultWriteConcern().wNumNodes &&
                 a.getDefaultWriteConcern().wMode == b.getDefaultWriteConcern().wMode;
