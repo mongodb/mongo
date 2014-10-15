@@ -20,7 +20,7 @@ func TestIntentManager(t *testing.T) {
 			manager.Put(&Intent{DB: "1", C: "2", BSONPath: "/b2/"})
 			manager.Put(&Intent{DB: "1", C: "3", BSONPath: "/b3/"})
 			manager.Put(&Intent{DB: "2", C: "1", BSONPath: "/b4/"})
-			So(len(manager.queue), ShouldEqual, 4)
+			So(len(manager.intentsByDiscoveryOrder), ShouldEqual, 4)
 			So(len(manager.intents), ShouldEqual, 4)
 
 			Convey("and then some matching metadata intents", func() {
@@ -30,11 +30,12 @@ func TestIntentManager(t *testing.T) {
 				manager.Put(&Intent{DB: "1", C: "2", MetadataPath: "/2m/"})
 
 				Convey("the size of the queue should be unchanged", func() {
-					So(len(manager.queue), ShouldEqual, 4)
+					So(len(manager.intentsByDiscoveryOrder), ShouldEqual, 4)
 					So(len(manager.intents), ShouldEqual, 4)
 				})
 
 				Convey("popping them from the IntentManager", func() {
+					manager.Finalize(Legacy)
 					it0 := manager.Pop()
 					it1 := manager.Pop()
 					it2 := manager.Pop()
@@ -60,7 +61,7 @@ func TestIntentManager(t *testing.T) {
 				manager.Put(&Intent{DB: "27", C: "B", MetadataPath: "/6/"})
 
 				Convey("should increase the size, because they are not merged in", func() {
-					So(len(manager.queue), ShouldEqual, 6)
+					So(len(manager.intentsByDiscoveryOrder), ShouldEqual, 6)
 					So(len(manager.intents), ShouldEqual, 6)
 				})
 			})

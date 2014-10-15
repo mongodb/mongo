@@ -63,6 +63,7 @@ func (restore *MongoRestore) CreateAllIntents(fullpath string) error {
 				restore.manager.Put(&Intent{
 					C:        "oplog", //TODO make this a helper in intent
 					BSONPath: filepath.Join(fullpath, entry.Name()),
+					BSONSize: entry.Size(),
 				})
 			} else {
 				log.Logf(0, `don't know what to do with file "%v", skipping...`,
@@ -104,6 +105,7 @@ func (restore *MongoRestore) CreateIntentsForDB(db, fullpath string) error {
 				intent := &Intent{
 					DB:       db,
 					C:        collection,
+					BSONSize: entry.Size(),
 					BSONPath: filepath.Join(fullpath, entry.Name()),
 				}
 				log.Logf(1, "found collection %v bson to restore", intent.Key())
@@ -160,6 +162,7 @@ func (restore *MongoRestore) CreateIntentForCollection(
 		DB:       db,
 		C:        collection,
 		BSONPath: fullpath,
+		BSONSize: file.Size(),
 	}
 
 	// finally, check if it has a .metadata.json file in its folder

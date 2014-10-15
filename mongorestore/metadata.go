@@ -100,6 +100,7 @@ func (restore *MongoRestore) DBHasCollection(intent *Intent) (bool, error) {
 	if err != nil {
 		return false, fmt.Errorf("error establishing connection: %v", err)
 	}
+	session.SetSocketTimeout(0)
 	defer session.Close()
 	err = session.DB(intent.DB).C("system.namespaces").Find(bson.M{"name": collectionNS}).One(&result)
 	if err != nil {
@@ -173,6 +174,7 @@ func (restore *MongoRestore) LegacyInsertIndex(intent *Intent, index IndexDocume
 	if err != nil {
 		return fmt.Errorf("error establishing connection: %v", err)
 	}
+	session.SetSocketTimeout(0)
 	defer session.Close()
 
 	// overwrite safety to make sure we catch errors
@@ -199,6 +201,7 @@ func (restore *MongoRestore) CreateCollection(intent *Intent, options bson.D) er
 	if err != nil {
 		return fmt.Errorf("error establishing connection: %v", err)
 	}
+	session.SetSocketTimeout(0)
 	defer session.Close()
 
 	res := bson.M{}
@@ -258,6 +261,7 @@ func (restore *MongoRestore) RestoreUsersOrRoles(collectionType string, intent *
 			log.Logf(0, "error establishing connection to drop temporary collection %v: %v", tempCol, err)
 			return
 		}
+		session.SetSocketTimeout(0)
 		defer session.Close()
 		log.Logf(3, "dropping temporary collection %v", tempCol)
 		err = session.DB("admin").C(tempCol).DropCollection()
@@ -281,6 +285,7 @@ func (restore *MongoRestore) RestoreUsersOrRoles(collectionType string, intent *
 	}
 
 	session, err := restore.SessionProvider.GetSession()
+	session.SetSocketTimeout(0)
 	if err != nil {
 		return fmt.Errorf("error establishing connection: %v", err)
 	}

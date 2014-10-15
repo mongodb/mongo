@@ -19,6 +19,7 @@ type OutputOptions struct {
 	NoIndexRestore   bool `long:"noIndexRestore" description:"Don't restore indexes"`
 	NoOptionsRestore bool `long:"noOptionsRestore" description:"Don't restore options"`
 	KeepIndexVersion bool `long:"keepIndexVersion" description:"Don't update index version"`
+	JobThreads       int  `long:"jobThreads" short:"j" description:"TODO"`
 }
 
 func (self *OutputOptions) Name() string {

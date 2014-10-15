@@ -17,11 +17,54 @@ const ProgressBarLength = 24
 // RestoreIntents iterates through all of the normal intents
 // stored in the IntentManager, and restores them.
 func (restore *MongoRestore) RestoreIntents() error {
+
+	if restore.OutputOptions.JobThreads > 0 {
+		errChan := make(chan error)
+		doneChan := make(chan struct{})
+		doneCount := 0
+
+		// start a goroutine for each job thread
+		for i := 0; i < restore.OutputOptions.JobThreads; i++ {
+			go func(id int) {
+				log.Logf(3, "starting restore routine with id=%v", id)
+				for {
+					intent := restore.manager.Pop()
+					if intent == nil {
+						break
+					}
+					err := restore.RestoreIntent(intent)
+					if err != nil {
+						errChan <- err
+						return
+					}
+					restore.manager.Finish(intent)
+				}
+				log.Logf(3, "ending restore routine with id=%v, no more work to do", id)
+				doneChan <- struct{}{}
+			}(i)
+		}
+
+		// wait until all goroutines are done or one of them errors out
+		for {
+			select {
+			case err := <-errChan:
+				return err
+			case <-doneChan:
+				doneCount++
+				if doneCount == restore.OutputOptions.JobThreads {
+					return nil
+				}
+			}
+		}
+	}
+
+	// single-threaded
 	for intent := restore.manager.Pop(); intent != nil; intent = restore.manager.Pop() {
 		err := restore.RestoreIntent(intent)
 		if err != nil {
 			return err
 		}
+		restore.manager.Finish(intent)
 	}
 	return nil
 }
@@ -49,6 +92,7 @@ func (restore *MongoRestore) RestoreIntent(intent *Intent) error {
 				log.Logf(1, "dropping collection %v before restoring", intent.Key())
 				// TODO(erf) maybe encapsulate this so that the session is closed sooner
 				session, err := restore.SessionProvider.GetSession()
+				session.SetSocketTimeout(0)
 				if err != nil {
 					return fmt.Errorf("error establishing connection: %v", err)
 				}
@@ -172,12 +216,13 @@ func (restore *MongoRestore) RestoreCollectionToDB(dbName, colName string,
 	bar.Start()
 	defer bar.Stop()
 
+	//TODO use a goroutine here
 	doc := &bson.Raw{}
 	for bsonSource.Next(doc) {
 		bytesRead += len(doc.Data)
 		if restore.objCheck {
 			//TODO encapsulate to reuse bson obj??
-			err := bson.Unmarshal(doc.Data, &bson.M{})
+			err := bson.Unmarshal(doc.Data, &bson.D{})
 			if err != nil {
 				return err
 				break

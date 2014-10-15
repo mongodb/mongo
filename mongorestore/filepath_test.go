@@ -47,6 +47,7 @@ func TestCreateAllIntents(t *testing.T) {
 
 		Convey("running CreateAllIntents should succeed", func() {
 			So(mr.CreateAllIntents("testdata/testdirs/"), ShouldBeNil)
+			mr.manager.Finalize(Legacy)
 
 			//TODO handle oplog!
 			Convey("and reading the intents should show alphabetical order", func() {
@@ -112,6 +113,7 @@ func TestCreateIntentsForDB(t *testing.T) {
 		Convey("running CreateIntentsForDB should succeed", func() {
 			err := mr.CreateIntentsForDB("myDB", "testdata/testdirs/db1")
 			So(err, ShouldBeNil)
+			mr.manager.Finalize(Legacy)
 
 			Convey("and reading the intents should show alphabetical order", func() {
 				i0 := mr.manager.Pop()
@@ -164,6 +166,7 @@ func TestCreateIntentsForCollection(t *testing.T) {
 			err := mr.CreateIntentForCollection(
 				"myDB", "myC", util.ToUniversalPath("testdata/testdirs/db1/c2.bson"))
 			So(err, ShouldBeNil)
+			mr.manager.Finalize(Legacy)
 
 			Convey("should create one intent with 'myDb' and 'myC' fields", func() {
 				i0 := mr.manager.Pop()
@@ -186,6 +189,7 @@ func TestCreateIntentsForCollection(t *testing.T) {
 			err := mr.CreateIntentForCollection(
 				"myDB", "myC", util.ToUniversalPath("testdata/testdirs/db1/c1.bson"))
 			So(err, ShouldBeNil)
+			mr.manager.Finalize(Legacy)
 
 			Convey("should create one intent with 'myDb' and 'myC' fields", func() {
 				i0 := mr.manager.Pop()

@@ -101,6 +101,12 @@ func (restore *MongoRestore) Restore() error {
 	}
 
 	// 2. Restore them...
+	if restore.OutputOptions.JobThreads > 0 {
+		restore.manager.Finalize(MultiDatabaseLTF)
+	} else {
+		// use legacy restoration order if we are single-threaded
+		restore.manager.Finalize(Legacy)
+	}
 	err = restore.RestoreIntents()
 	if err != nil {
 		return fmt.Errorf("restore error: %v", err)
