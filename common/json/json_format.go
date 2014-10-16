@@ -65,8 +65,7 @@ func (_ MaxKey) MarshalJSON() ([]byte, error) {
 }
 
 func (n NumberInt) MarshalJSON() ([]byte, error) {
-	data := fmt.Sprintf(`{ "$numberInt": "%v" }`, int32(n))
-	return []byte(data), nil
+	return []byte(fmt.Sprintf("%d", int32(n))), nil
 }
 
 func (n NumberLong) MarshalJSON() ([]byte, error) {
