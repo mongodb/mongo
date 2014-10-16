@@ -42,7 +42,7 @@ namespace mongo {
     // order by DiskLoc.
     TEST( SortedDataInterface, AdvanceTo ) {
         scoped_ptr<HarnessHelper> harnessHelper( newHarnessHelper() );
-        scoped_ptr<SortedDataInterface> sorted( harnessHelper->newSortedDataInterface() );
+        scoped_ptr<SortedDataInterface> sorted( harnessHelper->newSortedDataInterface( true ) );
 
         {
             scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
@@ -121,7 +121,7 @@ namespace mongo {
     // order by DiskLoc.
     TEST( SortedDataInterface, AdvanceToReversed ) {
         scoped_ptr<HarnessHelper> harnessHelper( newHarnessHelper() );
-        scoped_ptr<SortedDataInterface> sorted( harnessHelper->newSortedDataInterface() );
+        scoped_ptr<SortedDataInterface> sorted( harnessHelper->newSortedDataInterface( true ) );
 
         {
             scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
@@ -198,7 +198,7 @@ namespace mongo {
     // before the current position of the cursor.
     TEST( SortedDataInterface, AdvanceToKeyBeforeCursorPosition ) {
         scoped_ptr<HarnessHelper> harnessHelper( newHarnessHelper() );
-        scoped_ptr<SortedDataInterface> sorted( harnessHelper->newSortedDataInterface() );
+        scoped_ptr<SortedDataInterface> sorted( harnessHelper->newSortedDataInterface( false ) );
 
         {
             scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
@@ -209,8 +209,8 @@ namespace mongo {
             scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
             {
                 WriteUnitOfWork uow( opCtx.get() );
-                ASSERT_OK( sorted->insert( opCtx.get(), key1, loc1, false ) );
-                ASSERT_OK( sorted->insert( opCtx.get(), key2, loc2, false ) );
+                ASSERT_OK( sorted->insert( opCtx.get(), key1, loc1, true ) );
+                ASSERT_OK( sorted->insert( opCtx.get(), key2, loc2, true ) );
                 uow.commit();
             }
         }
@@ -266,7 +266,7 @@ namespace mongo {
     // after the current position of the cursor.
     TEST( SortedDataInterface, AdvanceToKeyAfterCursorPositionReversed ) {
         scoped_ptr<HarnessHelper> harnessHelper( newHarnessHelper() );
-        scoped_ptr<SortedDataInterface> sorted( harnessHelper->newSortedDataInterface() );
+        scoped_ptr<SortedDataInterface> sorted( harnessHelper->newSortedDataInterface( false ) );
 
         {
             scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
@@ -277,8 +277,8 @@ namespace mongo {
             scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
             {
                 WriteUnitOfWork uow( opCtx.get() );
-                ASSERT_OK( sorted->insert( opCtx.get(), key1, loc1, false ) );
-                ASSERT_OK( sorted->insert( opCtx.get(), key2, loc2, false ) );
+                ASSERT_OK( sorted->insert( opCtx.get(), key1, loc1, true ) );
+                ASSERT_OK( sorted->insert( opCtx.get(), key2, loc2, true ) );
                 uow.commit();
             }
         }
@@ -336,7 +336,7 @@ namespace mongo {
     // or inclusive mode.
     TEST( SortedDataInterface, AdvanceToKeyAtCursorPosition ) {
         scoped_ptr<HarnessHelper> harnessHelper( newHarnessHelper() );
-        scoped_ptr<SortedDataInterface> sorted( harnessHelper->newSortedDataInterface() );
+        scoped_ptr<SortedDataInterface> sorted( harnessHelper->newSortedDataInterface( false ) );
 
         {
             scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
@@ -347,7 +347,7 @@ namespace mongo {
             scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
             {
                 WriteUnitOfWork uow( opCtx.get() );
-                ASSERT_OK( sorted->insert( opCtx.get(), key1, loc1, false ) );
+                ASSERT_OK( sorted->insert( opCtx.get(), key1, loc1, true ) );
                 uow.commit();
             }
         }
@@ -401,7 +401,7 @@ namespace mongo {
     // or inclusive mode.
     TEST( SortedDataInterface, AdvanceToKeyAtCursorPositionReversed ) {
         scoped_ptr<HarnessHelper> harnessHelper( newHarnessHelper() );
-        scoped_ptr<SortedDataInterface> sorted( harnessHelper->newSortedDataInterface() );
+        scoped_ptr<SortedDataInterface> sorted( harnessHelper->newSortedDataInterface( false ) );
 
         {
             scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
@@ -412,7 +412,7 @@ namespace mongo {
             scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
             {
                 WriteUnitOfWork uow( opCtx.get() );
-                ASSERT_OK( sorted->insert( opCtx.get(), key1, loc1, false ) );
+                ASSERT_OK( sorted->insert( opCtx.get(), key1, loc1, true ) );
                 uow.commit();
             }
         }
@@ -465,7 +465,7 @@ namespace mongo {
     // positioned at the key that comes after the one specified.
     TEST( SortedDataInterface, AdvanceToExclusive ) {
         scoped_ptr<HarnessHelper> harnessHelper( newHarnessHelper() );
-        scoped_ptr<SortedDataInterface> sorted( harnessHelper->newSortedDataInterface() );
+        scoped_ptr<SortedDataInterface> sorted( harnessHelper->newSortedDataInterface( true ) );
 
         {
             scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
@@ -542,7 +542,7 @@ namespace mongo {
     // positioned at the key that comes before the one specified.
     TEST( SortedDataInterface, AdvanceToExclusiveReversed ) {
         scoped_ptr<HarnessHelper> harnessHelper( newHarnessHelper() );
-        scoped_ptr<SortedDataInterface> sorted( harnessHelper->newSortedDataInterface() );
+        scoped_ptr<SortedDataInterface> sorted( harnessHelper->newSortedDataInterface( true ) );
 
         {
             scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
@@ -618,7 +618,7 @@ namespace mongo {
     // exact key and the current position of the cursor.
     TEST( SortedDataInterface, AdvanceToIndirect ) {
         scoped_ptr<HarnessHelper> harnessHelper( newHarnessHelper() );
-        scoped_ptr<SortedDataInterface> sorted( harnessHelper->newSortedDataInterface() );
+        scoped_ptr<SortedDataInterface> sorted( harnessHelper->newSortedDataInterface( false ) );
 
         BSONObj unusedKey = key6; // larger than any inserted key
 
@@ -631,9 +631,9 @@ namespace mongo {
             scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
             {
                 WriteUnitOfWork uow( opCtx.get() );
-                ASSERT_OK( sorted->insert( opCtx.get(), key1, loc1, false ) );
-                ASSERT_OK( sorted->insert( opCtx.get(), key3, loc2, false ) );
-                ASSERT_OK( sorted->insert( opCtx.get(), key5, loc3, false ) );
+                ASSERT_OK( sorted->insert( opCtx.get(), key1, loc1, true ) );
+                ASSERT_OK( sorted->insert( opCtx.get(), key3, loc2, true ) );
+                ASSERT_OK( sorted->insert( opCtx.get(), key5, loc3, true ) );
                 uow.commit();
             }
         }
@@ -684,7 +684,7 @@ namespace mongo {
     // exact key and the current position of the cursor.
     TEST( SortedDataInterface, AdvanceToIndirectReversed ) {
         scoped_ptr<HarnessHelper> harnessHelper( newHarnessHelper() );
-        scoped_ptr<SortedDataInterface> sorted( harnessHelper->newSortedDataInterface() );
+        scoped_ptr<SortedDataInterface> sorted( harnessHelper->newSortedDataInterface( false ) );
 
         BSONObj unusedKey = key0; // smaller than any inserted key
 
@@ -697,9 +697,9 @@ namespace mongo {
             scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
             {
                 WriteUnitOfWork uow( opCtx.get() );
-                ASSERT_OK( sorted->insert( opCtx.get(), key1, loc1, false ) );
-                ASSERT_OK( sorted->insert( opCtx.get(), key3, loc2, false ) );
-                ASSERT_OK( sorted->insert( opCtx.get(), key5, loc3, false ) );
+                ASSERT_OK( sorted->insert( opCtx.get(), key1, loc1, true ) );
+                ASSERT_OK( sorted->insert( opCtx.get(), key3, loc2, true ) );
+                ASSERT_OK( sorted->insert( opCtx.get(), key5, loc3, true ) );
                 uow.commit();
             }
         }
@@ -752,7 +752,7 @@ namespace mongo {
     // that comes after the one specified.
     TEST( SortedDataInterface, AdvanceToIndirectExclusive ) {
         scoped_ptr<HarnessHelper> harnessHelper( newHarnessHelper() );
-        scoped_ptr<SortedDataInterface> sorted( harnessHelper->newSortedDataInterface() );
+        scoped_ptr<SortedDataInterface> sorted( harnessHelper->newSortedDataInterface( false ) );
 
         BSONObj unusedKey = key6; // larger than any inserted key
 
@@ -765,9 +765,9 @@ namespace mongo {
             scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
             {
                 WriteUnitOfWork uow( opCtx.get() );
-                ASSERT_OK( sorted->insert( opCtx.get(), key1, loc1, false ) );
-                ASSERT_OK( sorted->insert( opCtx.get(), key3, loc2, false ) );
-                ASSERT_OK( sorted->insert( opCtx.get(), key5, loc3, false ) );
+                ASSERT_OK( sorted->insert( opCtx.get(), key1, loc1, true ) );
+                ASSERT_OK( sorted->insert( opCtx.get(), key3, loc2, true ) );
+                ASSERT_OK( sorted->insert( opCtx.get(), key5, loc3, true ) );
                 uow.commit();
             }
         }
@@ -845,7 +845,7 @@ namespace mongo {
     // that comes before the one specified.
     TEST( SortedDataInterface, AdvanceToIndirectExclusiveReversed ) {
         scoped_ptr<HarnessHelper> harnessHelper( newHarnessHelper() );
-        scoped_ptr<SortedDataInterface> sorted( harnessHelper->newSortedDataInterface() );
+        scoped_ptr<SortedDataInterface> sorted( harnessHelper->newSortedDataInterface( false ) );
 
         BSONObj unusedKey = key0; // smaller than any inserted key
 
@@ -858,9 +858,9 @@ namespace mongo {
             scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
             {
                 WriteUnitOfWork uow( opCtx.get() );
-                ASSERT_OK( sorted->insert( opCtx.get(), key1, loc1, false ) );
-                ASSERT_OK( sorted->insert( opCtx.get(), key3, loc2, false ) );
-                ASSERT_OK( sorted->insert( opCtx.get(), key5, loc3, false ) );
+                ASSERT_OK( sorted->insert( opCtx.get(), key1, loc1, true ) );
+                ASSERT_OK( sorted->insert( opCtx.get(), key3, loc2, true ) );
+                ASSERT_OK( sorted->insert( opCtx.get(), key5, loc3, true ) );
                 uow.commit();
             }
         }

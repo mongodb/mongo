@@ -41,7 +41,7 @@ namespace mongo {
             : _order( Ordering::make( BSONObj() ) ) {
         }
 
-        virtual SortedDataInterface* newSortedDataInterface() {
+        virtual SortedDataInterface* newSortedDataInterface( bool unique ) {
             return getHeap1BtreeImpl(_order, &_data);
         }
 

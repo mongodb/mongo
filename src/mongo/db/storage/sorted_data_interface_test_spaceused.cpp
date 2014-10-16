@@ -38,7 +38,7 @@ namespace mongo {
     // Verify that an empty index takes up no space.
     TEST( SortedDataInterface, GetSpaceUsedBytesEmpty ) {
         scoped_ptr<HarnessHelper> harnessHelper( newHarnessHelper() );
-        scoped_ptr<SortedDataInterface> sorted( harnessHelper->newSortedDataInterface() );
+        scoped_ptr<SortedDataInterface> sorted( harnessHelper->newSortedDataInterface( false ) );
 
         {
             scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
@@ -56,7 +56,7 @@ namespace mongo {
     // Verify that a nonempty index takes up some space.
     TEST( SortedDataInterface, GetSpaceUsedBytesNonEmpty ) {
         scoped_ptr<HarnessHelper> harnessHelper( newHarnessHelper() );
-        scoped_ptr<SortedDataInterface> sorted( harnessHelper->newSortedDataInterface() );
+        scoped_ptr<SortedDataInterface> sorted( harnessHelper->newSortedDataInterface( false ) );
 
         {
             scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
@@ -70,7 +70,7 @@ namespace mongo {
                 WriteUnitOfWork uow( opCtx.get() );
                 BSONObj key = BSON( "" << i );
                 DiskLoc loc( 42, i * 2 );
-                ASSERT_OK( sorted->insert( opCtx.get(), key, loc, false ) );
+                ASSERT_OK( sorted->insert( opCtx.get(), key, loc, true ) );
                 uow.commit();
             }
         }

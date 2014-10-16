@@ -170,7 +170,10 @@ namespace {
             return Status::OK();
         }
 
-        virtual bool unindex(OperationContext* txn, const BSONObj& key, const DiskLoc& loc) {
+        virtual bool unindex(OperationContext* txn,
+                             const BSONObj& key,
+                             const DiskLoc& loc,
+                             bool dupsAllowed) {
             invariant(!loc.isNull());
             invariant(loc.isValid());
             invariant(!hasFieldNames(key));

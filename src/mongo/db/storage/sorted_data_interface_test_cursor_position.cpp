@@ -39,7 +39,7 @@ namespace mongo {
     // to point to the same place.
     TEST( SortedDataInterface, CursorsPointToSamePlaceIfEOF ) {
         scoped_ptr<HarnessHelper> harnessHelper( newHarnessHelper() );
-        scoped_ptr<SortedDataInterface> sorted( harnessHelper->newSortedDataInterface() );
+        scoped_ptr<SortedDataInterface> sorted( harnessHelper->newSortedDataInterface( false ) );
 
         {
             scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
@@ -64,7 +64,7 @@ namespace mongo {
     // to point to the same place.
     TEST( SortedDataInterface, CursorsPointToSamePlaceIfEOFReversed ) {
         scoped_ptr<HarnessHelper> harnessHelper( newHarnessHelper() );
-        scoped_ptr<SortedDataInterface> sorted( harnessHelper->newSortedDataInterface() );
+        scoped_ptr<SortedDataInterface> sorted( harnessHelper->newSortedDataInterface( false ) );
 
         {
             scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
@@ -89,7 +89,7 @@ namespace mongo {
     // to point to the same place.
     TEST( SortedDataInterface, CursorsPointToSamePlace ) {
         scoped_ptr<HarnessHelper> harnessHelper( newHarnessHelper() );
-        scoped_ptr<SortedDataInterface> sorted( harnessHelper->newSortedDataInterface() );
+        scoped_ptr<SortedDataInterface> sorted( harnessHelper->newSortedDataInterface( true ) );
 
         {
             scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
@@ -137,7 +137,7 @@ namespace mongo {
     // to point to the same place.
     TEST( SortedDataInterface, CursorsPointToSamePlaceReversed ) {
         scoped_ptr<HarnessHelper> harnessHelper( newHarnessHelper() );
-        scoped_ptr<SortedDataInterface> sorted( harnessHelper->newSortedDataInterface() );
+        scoped_ptr<SortedDataInterface> sorted( harnessHelper->newSortedDataInterface( false ) );
 
         {
             scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
@@ -148,8 +148,8 @@ namespace mongo {
             scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
             {
                 WriteUnitOfWork uow( opCtx.get() );
-                ASSERT_OK( sorted->insert( opCtx.get(), key1, loc1, false ) );
-                ASSERT_OK( sorted->insert( opCtx.get(), key2, loc2, false ) );
+                ASSERT_OK( sorted->insert( opCtx.get(), key1, loc1, true ) );
+                ASSERT_OK( sorted->insert( opCtx.get(), key2, loc2, true ) );
                 uow.commit();
             }
         }
@@ -185,7 +185,7 @@ namespace mongo {
     // to point to the same place.
     TEST( SortedDataInterface, CursorsPointToDifferentKeys ) {
         scoped_ptr<HarnessHelper> harnessHelper( newHarnessHelper() );
-        scoped_ptr<SortedDataInterface> sorted( harnessHelper->newSortedDataInterface() );
+        scoped_ptr<SortedDataInterface> sorted( harnessHelper->newSortedDataInterface( false ) );
 
         {
             scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
@@ -196,8 +196,8 @@ namespace mongo {
             scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
             {
                 WriteUnitOfWork uow( opCtx.get() );
-                ASSERT_OK( sorted->insert( opCtx.get(), key1, loc1, false ) );
-                ASSERT_OK( sorted->insert( opCtx.get(), key2, loc2, false ) );
+                ASSERT_OK( sorted->insert( opCtx.get(), key1, loc1, true ) );
+                ASSERT_OK( sorted->insert( opCtx.get(), key2, loc2, true ) );
                 uow.commit();
             }
         }
@@ -223,7 +223,7 @@ namespace mongo {
     // to point to the same place.
     TEST( SortedDataInterface, CursorsPointToDifferentKeysReversed ) {
         scoped_ptr<HarnessHelper> harnessHelper( newHarnessHelper() );
-        scoped_ptr<SortedDataInterface> sorted( harnessHelper->newSortedDataInterface() );
+        scoped_ptr<SortedDataInterface> sorted( harnessHelper->newSortedDataInterface( false ) );
 
         {
             scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
@@ -234,8 +234,8 @@ namespace mongo {
             scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
             {
                 WriteUnitOfWork uow( opCtx.get() );
-                ASSERT_OK( sorted->insert( opCtx.get(), key1, loc1, false ) );
-                ASSERT_OK( sorted->insert( opCtx.get(), key2, loc2, false ) );
+                ASSERT_OK( sorted->insert( opCtx.get(), key1, loc1, true ) );
+                ASSERT_OK( sorted->insert( opCtx.get(), key2, loc2, true ) );
                 uow.commit();
             }
         }
@@ -261,7 +261,7 @@ namespace mongo {
     // different DiskLocs are not considered to point to the same place.
     TEST( SortedDataInterface, CursorsPointToDifferentDiskLocs ) {
         scoped_ptr<HarnessHelper> harnessHelper( newHarnessHelper() );
-        scoped_ptr<SortedDataInterface> sorted( harnessHelper->newSortedDataInterface() );
+        scoped_ptr<SortedDataInterface> sorted( harnessHelper->newSortedDataInterface( true ) );
 
         {
             scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
@@ -299,7 +299,7 @@ namespace mongo {
     // different DiskLocs are not considered to point to the same place.
     TEST( SortedDataInterface, CursorsPointToDifferentDiskLocsReversed ) {
         scoped_ptr<HarnessHelper> harnessHelper( newHarnessHelper() );
-        scoped_ptr<SortedDataInterface> sorted( harnessHelper->newSortedDataInterface() );
+        scoped_ptr<SortedDataInterface> sorted( harnessHelper->newSortedDataInterface( true ) );
 
         {
             scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
@@ -337,7 +337,7 @@ namespace mongo {
     // are considered to point to the same place.
     TEST( SortedDataInterface, CursorPointsToSamePlaceRegardlessOfDirection ) {
         scoped_ptr<HarnessHelper> harnessHelper( newHarnessHelper() );
-        scoped_ptr<SortedDataInterface> sorted( harnessHelper->newSortedDataInterface() );
+        scoped_ptr<SortedDataInterface> sorted( harnessHelper->newSortedDataInterface( true ) );
 
         {
             scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
@@ -397,7 +397,7 @@ namespace mongo {
     // Verify that a forward cursor always points to the same place as itself.
     TEST( SortedDataInterface, CursorPointsToSamePlaceAsItself ) {
         scoped_ptr<HarnessHelper> harnessHelper( newHarnessHelper() );
-        scoped_ptr<SortedDataInterface> sorted( harnessHelper->newSortedDataInterface() );
+        scoped_ptr<SortedDataInterface> sorted( harnessHelper->newSortedDataInterface( false ) );
 
         {
             scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
@@ -411,7 +411,7 @@ namespace mongo {
                 WriteUnitOfWork uow( opCtx.get() );
                 BSONObj key = BSON( "" << i );
                 DiskLoc loc( 42, i * 2 );
-                ASSERT_OK( sorted->insert( opCtx.get(), key, loc, false ) );
+                ASSERT_OK( sorted->insert( opCtx.get(), key, loc, true ) );
                 uow.commit();
             }
         }
@@ -437,7 +437,7 @@ namespace mongo {
     // Verify that a reverse cursor always points to the same place as itself.
     TEST( SortedDataInterface, CursorPointsToSamePlaceAsItselfReversed ) {
         scoped_ptr<HarnessHelper> harnessHelper( newHarnessHelper() );
-        scoped_ptr<SortedDataInterface> sorted( harnessHelper->newSortedDataInterface() );
+        scoped_ptr<SortedDataInterface> sorted( harnessHelper->newSortedDataInterface( false ) );
 
         {
             scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
@@ -451,7 +451,7 @@ namespace mongo {
                 WriteUnitOfWork uow( opCtx.get() );
                 BSONObj key = BSON( "" << i );
                 DiskLoc loc( 42, i * 2 );
-                ASSERT_OK( sorted->insert( opCtx.get(), key, loc, false ) );
+                ASSERT_OK( sorted->insert( opCtx.get(), key, loc, true ) );
                 uow.commit();
             }
         }
