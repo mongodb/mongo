@@ -65,7 +65,7 @@ namespace {
 
     bool getInitialSyncFlag() {
         OperationContextImpl txn;
-
+        Lock::DBLock lk(txn.lockState(), "local", MODE_X);
         WriteUnitOfWork uow( &txn );
         BSONObj mv;
         bool found = Helpers::getSingleton( &txn, minvalidNS, mv);

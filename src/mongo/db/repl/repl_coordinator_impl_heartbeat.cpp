@@ -149,11 +149,43 @@ namespace {
                     hbStatusResponse,
                     lastApplied);
 
+        if (action.getAction() == HeartbeatResponseAction::NoAction &&
+            hbStatusResponse.isOK() &&
+            hbStatusResponse.getValue().hasOpTime()) {
+            _updateOpTimeFromHeartbeat(target, hbStatusResponse.getValue().getOpTime());
+        }
+
         _scheduleHeartbeatToTarget(
                 target,
                 std::max(now, action.getNextHeartbeatStartDate()));
 
         _handleHeartbeatResponseAction(action, hbStatusResponse);
+    }
+
+    void ReplicationCoordinatorImpl::_updateOpTimeFromHeartbeat(const HostAndPort& target, 
+                                                                OpTime optime) {
+        boost::unique_lock<boost::mutex> lk(_mutex);
+        const MemberConfig* targetMember = _rsConfig.findMemberByHostAndPort(target);
+        if (!targetMember) {
+            return;
+        }
+        int targetId = targetMember->getId();
+        // Find targetId in map
+        for (SlaveInfoMap::const_iterator it = _slaveInfoMap.begin();
+             it != _slaveInfoMap.end(); ++it) {
+            const OID& rid = it->first;
+            const SlaveInfo& slaveInfo = it->second;
+            if (slaveInfo.memberID == targetId) {
+                Status status = _setLastOptime_inlock(&lk, 
+                                                      rid, 
+                                                      optime);
+                if (!status.isOK()) {
+                    LOG(1) << "Could not update optime from node " << target.toString() <<
+                        ": " << status;
+                }
+                return;
+            }
+        }
     }
 
     void ReplicationCoordinatorImpl::_handleHeartbeatResponseAction(

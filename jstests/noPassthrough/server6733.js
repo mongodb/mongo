@@ -17,7 +17,7 @@ replSet.initiate(
 
 // Do an initial write
 var master = replSet.getMaster();
-master.getDB("foo").bar.insert({x:1});
+assert.writeOK(master.getDB("foo").bar.insert({x:1}));
 replSet.awaitReplication();
 
 var primary = master.getDB("foo");
@@ -39,21 +39,22 @@ assert.soon(
     }, "A refused to sync from B", 30*1000, 1000
 );
 
-print("Black-hole B");
+print("Black-hole and freeze B");
 B.runCommand({configureFailPoint: 'rsStopGetMore', mode: 'alwaysOn'});
+B.runCommand({configureFailPoint: 'rsSyncApplyStop', mode: 'alwaysOn'});
 
-print("Check that A switches sync targets after 30 seconds");
-sleep(30000);
+// Do another write, to make node 0 a viable sync source
+assert.writeOK(master.getDB("foo").bar.insert({x:2}));
+
+print("Check that A switches sync targets after 30 second socket timeout");
 
 assert.soon(
     function() {
         return A.runCommand({replSetGetStatus : 1}).syncingTo === primaryAddress;
-    }
-);
+    }, "did not switch sync sources", 60000);
 
 print("Un-black-hole B and make sure nothing stupid happens");
 B.runCommand({configureFailPoint: 'rsStopGetMore', mode: 'off'});
-
-sleep(10000);
-
+B.runCommand({configureFailPoint: 'rsSyncApplyStop', mode: 'off'});
+replSet.awaitReplication();
 replSet.stopSet();

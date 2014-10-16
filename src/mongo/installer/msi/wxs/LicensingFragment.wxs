@@ -26,12 +26,19 @@
         <File Id="f_Readme" Name="README" Source="$(var.LicenseSource)\README"
               DiskId ="1" />
       </Component>
+          <Component Id="c_InstallKey" Guid="31635E6D-CCE1-43AD-8AB3-4F5607D75755">
+            <RegistryKey Root="HKLM"
+                Key="Software\MongoDB\Server\$(var.MongoDBMajorVersion)">
+                <RegistryValue Type="string" Name="Edition" Value="!(wix.ProductMajorName)" KeyPath="yes"/>
+            </RegistryKey>
+        </Component> 
     </DirectoryRef>
 
     <ComponentGroup Id="cg_License">
       <ComponentRef Id="c_Readme"/>
       <ComponentRef Id="c_Thirdparty"/>
       <ComponentRef Id="c_License"/>
+      <ComponentRef Id="c_InstallKey"/>
     </ComponentGroup>
 
     <?if $(var.Edition) = Enterprise ?>

@@ -308,9 +308,7 @@ namespace {
 
         {
             OperationContextImpl txn;
-            WriteUnitOfWork uow( &txn );
             createOplog(&txn);
-            uow.commit();
         }
 
         int failedAttempts = 0;

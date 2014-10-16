@@ -41,6 +41,7 @@
 #include "mongo/db/index_names.h"
 #include "mongo/db/lasterror.h"
 #include "mongo/db/write_concern.h"
+#include "mongo/db/server_parameters.h"
 #include "mongo/platform/random.h"
 #include "mongo/s/balancer_policy.h"
 #include "mongo/s/chunk_diff.h"
@@ -78,11 +79,15 @@ namespace mongo {
 
     // -------  Shard --------
 
-    int Chunk::MaxChunkSize = 1024 * 1024 * 64;
+    long long Chunk::MaxChunkSize = 1024 * 1024 * 64;
     int Chunk::MaxObjectPerChunk = 250000;
 
     // Can be overridden from command line
     bool Chunk::ShouldAutoSplit = true;
+
+    // Maximum number of resulting chunks a chunk will be split into per operation.
+    // Note: this is only temporarily tunable, this can become fixed in the future.
+    MONGO_EXPORT_SERVER_PARAMETER(internalShardingMaxSplitPointsPerOperation, int, 10);
 
     /**
      * Attempts to move the given chunk to another shard.
@@ -271,7 +276,10 @@ namespace mongo {
         conn.done();
     }
 
-    void Chunk::pickSplitVector( vector<BSONObj>& splitPoints , int chunkSize /* bytes */, int maxPoints, int maxObjs ) const {
+    void Chunk::pickSplitVector(vector<BSONObj>& splitPoints,
+                                long long chunkSize /* bytes */,
+                                int maxPoints,
+                                int maxObjs) const {
         // Ask the mongod holding this chunk to figure out the split points.
         ScopedDbConnection conn(getShard().getConnString());
         BSONObj result;
@@ -310,7 +318,21 @@ namespace mongo {
                 splitPoints->push_back( medianKey );
         }
         else {
-            pickSplitVector( *splitPoints, Chunk::MaxChunkSize, 0, MaxObjectPerChunk );
+            long long chunkSize = _manager->getCurrentDesiredChunkSize();
+
+            // Note: One split point for every 1/2 chunk size.
+            const int estNumSplitPoints = _dataWritten / chunkSize * 2;
+            if (estNumSplitPoints > internalShardingMaxSplitPointsPerOperation) {
+                // The current desired chunk size will split the chunk into lots of small chunks
+                // (At the worst case, this can result into thousands of chunks); so use a
+                // bigger value.
+
+                const long long newSize = _dataWritten /
+                        (internalShardingMaxSplitPointsPerOperation / 2);
+                chunkSize = min(newSize, Chunk::MaxChunkSize);
+            }
+
+            pickSplitVector(*splitPoints, chunkSize, 0, MaxObjectPerChunk);
 
             if ( splitPoints->size() <= 1 ) {
                 // no split points means there isn't enough data to split on
@@ -1633,7 +1655,7 @@ namespace mongo {
 
         return splitThreshold;
     }
-    
+
     /** This is for testing only, just setting up minimal basic defaults. */
     ChunkManager::ChunkManager() :
     _unique(),

@@ -183,7 +183,6 @@ namespace mongo {
             else {
                 log() << e.what() << endl;
             }
-            _extentManager.reset();
             throw;
         }
     }
@@ -426,7 +425,7 @@ namespace mongo {
 
             int freeListSize = 0;
             int64_t freeListSpace = 0;
-            _extentManager.freeListStats( &freeListSize, &freeListSpace );
+            _extentManager.freeListStats(opCtx, &freeListSize, &freeListSpace);
 
             BSONObjBuilder extentFreeList( output->subobjStart( "extentFreeList" ) );
             extentFreeList.append( "num", freeListSize );

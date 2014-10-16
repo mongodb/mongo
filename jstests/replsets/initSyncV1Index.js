@@ -16,11 +16,16 @@ rs.reInitiate(60000);
 
 var db2 = r2.getDB('test');
 r2.setSlaveOk();
-
-var idx = db2.foo.getIndexes().filter(function(idx) {
+rs.awaitSecondaryNodes();
+rs.awaitReplication();
+var idxes = db2.foo.getIndexes();
+assert.gt(idxes.length, 0, "Secondary reported no indexes on collection " + db2.foo);
+var idx = idxes.filter(function(idx) {
     return friendlyEqual(idx.key, {x: 1});
 })[0];
-assert.eq (idx.v, 1, 'expected all indexes generated on Mongo version >= 2.0 to be {v:1}. See SERVER-3852');
+assert(idx, "expected to find an index with key {x: 1} on the secondary's collection " + db2.foo);
+assert.eq (idx.v, 1,
+           'expected all indexes generated on Mongo version >= 2.0 to be {v:1}. See SERVER-3852');
 
 // add another new node, make sure ports _aren't_ closed SERVER-4315
 r1 = rs.getMaster();

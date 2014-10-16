@@ -465,6 +465,13 @@ namespace repl {
         void _untrackHeartbeatHandle(const ReplicationExecutor::CallbackHandle& handle);
 
         /**
+         * Helper for _handleHeartbeatResponse.
+         *
+         * Looks up target in the slave map and updates its optime if found.
+         */
+        void _updateOpTimeFromHeartbeat(const HostAndPort& target, OpTime optime);
+
+        /**
          * Starts a heartbeat for each member in the current config.  Called within the executor
          * context.
          */

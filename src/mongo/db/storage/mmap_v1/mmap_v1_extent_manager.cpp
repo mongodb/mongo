@@ -47,23 +47,13 @@
 
 namespace mongo {
 
-    MmapV1ExtentManager::MmapV1ExtentManager( const StringData& dbname,
-                                  const StringData& path,
-                                  bool directoryPerDB )
-        : _dbname( dbname.toString() ),
-          _path( path.toString() ),
-          _directoryPerDB( directoryPerDB ) {
-    }
-
-    MmapV1ExtentManager::~MmapV1ExtentManager() {
-        reset();
-    }
-
-    void MmapV1ExtentManager::reset() {
-        for ( size_t i = 0; i < _files.size(); i++ ) {
-            delete _files[i];
-        }
-        _files.clear();
+    MmapV1ExtentManager::MmapV1ExtentManager(const StringData& dbname,
+                                             const StringData& path,
+                                             bool directoryPerDB)
+        : _dbname(dbname.toString()),
+          _path(path.toString()),
+          _directoryPerDB(directoryPerDB),
+          _rid(RESOURCE_MMAPv1_EXTENT_MANAGER, dbname) {
     }
 
     boost::filesystem::path MmapV1ExtentManager::fileName( int n ) const {
@@ -78,7 +68,7 @@ namespace mongo {
 
 
     Status MmapV1ExtentManager::init(OperationContext* txn) {
-        verify( _files.size() == 0 );
+        verify(_files.empty());
 
         for ( int n = 0; n < DiskLoc::MaxFiles; n++ ) {
             boost::filesystem::path fullName = fileName( n );
@@ -126,7 +116,7 @@ namespace mongo {
     }
 
     const DataFile* MmapV1ExtentManager::_getOpenFile(int fileId) const {
-        if (fileId < 0 || fileId >= static_cast<int>(_files.size())) {
+        if (fileId < 0 || fileId >= _files.size()) {
             log() << "_getOpenFile() invalid file index requested " << fileId;
             invariant(false);
         }
@@ -135,7 +125,7 @@ namespace mongo {
     }
 
     DataFile* MmapV1ExtentManager::_getOpenFile(int fileId) {
-        if (fileId < 0 || fileId >= static_cast<int>(_files.size())) {
+        if (fileId < 0 || fileId >= _files.size()) {
             log() << "_getOpenFile() invalid file index requested " << fileId;
             invariant(false);
         }
@@ -192,11 +182,11 @@ namespace mongo {
         }
 
         // Returns the last file added
-        return *_files.rbegin();
+        return _files[allocFileId];
     }
 
     int MmapV1ExtentManager::numFiles() const {
-        return static_cast<int>( _files.size() );
+        return _files.size();
     }
 
     long long MmapV1ExtentManager::fileSize() const {
@@ -401,11 +391,11 @@ namespace mongo {
         return best->myLoc;
     }
 
-    DiskLoc MmapV1ExtentManager::allocateExtent( OperationContext* txn,
-                                           bool capped,
-                                           int size,
-                                           bool enforceQuota ) {
-
+    DiskLoc MmapV1ExtentManager::allocateExtent(OperationContext* txn,
+                                                bool capped,
+                                                int size,
+                                                bool enforceQuota) {
+        Lock::ResourceLock rlk(txn->lockState(), _rid, MODE_X);
         bool fromFreeList = true;
         DiskLoc eloc = _allocFromFreeList( txn, size, capped );
         if ( eloc.isNull() ) {
@@ -425,6 +415,7 @@ namespace mongo {
     }
 
     void MmapV1ExtentManager::freeExtent(OperationContext* txn, DiskLoc firstExt ) {
+        Lock::ResourceLock rlk(txn->lockState(), _rid, MODE_X);
         Extent* e = getExtent( firstExt );
         txn->recoveryUnit()->writing( &e->xnext )->Null();
         txn->recoveryUnit()->writing( &e->xprev )->Null();
@@ -447,6 +438,7 @@ namespace mongo {
     }
 
     void MmapV1ExtentManager::freeExtents(OperationContext* txn, DiskLoc firstExt, DiskLoc lastExt) {
+        Lock::ResourceLock rlk(txn->lockState(), _rid, MODE_X);
 
         if ( firstExt.isNull() && lastExt.isNull() )
             return;
@@ -472,7 +464,6 @@ namespace mongo {
             *txn->recoveryUnit()->writing( &getExtent( lastExt )->xnext ) = a;
             _setFreeListStart( txn, firstExt );
         }
-
     }
 
     DiskLoc MmapV1ExtentManager::_getFreeListStart() const {
@@ -501,18 +492,22 @@ namespace mongo {
         *txn->recoveryUnit()->writing( &file->header()->freeListEnd ) = loc;
     }
 
-    void MmapV1ExtentManager::freeListStats( int* numExtents, int64_t* totalFreeSize ) const {
-        invariant( numExtents );
-        invariant( totalFreeSize );
+    void MmapV1ExtentManager::freeListStats(OperationContext* txn,
+                                            int* numExtents,
+                                            int64_t* totalFreeSizeBytes) const {
+        Lock::ResourceLock rlk(txn->lockState(), _rid, MODE_S);
+
+        invariant(numExtents);
+        invariant(totalFreeSizeBytes);
 
         *numExtents = 0;
-        *totalFreeSize = 0;
+        *totalFreeSizeBytes = 0;
 
         DiskLoc a = _getFreeListStart();
         while( !a.isNull() ) {
             Extent *e = getExtent( a );
             (*numExtents)++;
-            (*totalFreeSize) += e->length;
+            (*totalFreeSizeBytes) += e->length;
             a = e->xnext;
         }
 
@@ -551,6 +546,21 @@ namespace mongo {
         return new CacheHintMadvise( reinterpret_cast<void*>( e ),
                                      e->length,
                                      MAdvise::Sequential );
+    }
+
+    MmapV1ExtentManager::FilesArray::~FilesArray() {
+        for (int i = 0; i < size(); i++) {
+            delete _files[i];
+        }
+    }
+
+    void MmapV1ExtentManager::FilesArray::push_back(DataFile* val) {
+        scoped_lock lk(_writersMutex);
+        const int n = _size.load();
+        invariant(n < DiskLoc::MaxFiles);
+        // Note ordering: _size update must come after updating the _files array
+        _files[n] = val;
+        _size.store(n + 1);
     }
 
     void MmapV1ExtentManager::getFileFormat( OperationContext* txn, int* major, int* minor ) const {

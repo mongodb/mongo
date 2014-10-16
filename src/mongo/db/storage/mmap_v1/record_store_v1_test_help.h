@@ -129,7 +129,9 @@ namespace mongo {
 
         virtual void freeExtent( OperationContext* txn, DiskLoc extent );
 
-        virtual void freeListStats( int* numExtents, int64_t* totalFreeSize ) const;
+        virtual void freeListStats(OperationContext* txn,
+                                   int* numExtents,
+                                   int64_t* totalFreeSizeBytes) const;
 
         virtual Record* recordForV1( const DiskLoc& loc ) const;
 

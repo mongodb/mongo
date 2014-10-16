@@ -1,5 +1,5 @@
 // test that a rollback of an op more than 1800 secs newer than the new master causes fatal shutdown
-
+if (false) {  // SERVER-15695
 // set up a set and grab things for later
 var name = "rollback_too_new";
 var replTest = new ReplSetTest({name: name, nodes: 3});
@@ -55,3 +55,4 @@ assert.soon(function() {
 }, "B failed to fassert");
 
 replTest.stopSet();
+}

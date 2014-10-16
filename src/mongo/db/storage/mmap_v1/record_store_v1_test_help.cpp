@@ -253,8 +253,10 @@ namespace mongo {
     void DummyExtentManager::freeExtent( OperationContext* txn, DiskLoc extent ) {
         // XXX
     }
-    void DummyExtentManager::freeListStats( int* numExtents, int64_t* totalFreeSize ) const {
-        invariant( false );
+    void DummyExtentManager::freeListStats(OperationContext* txn,
+                                           int* numExtents,
+                                           int64_t* totalFreeSizeBytes) const {
+        invariant(false);
     }
 
     Record* DummyExtentManager::recordForV1( const DiskLoc& loc ) const {

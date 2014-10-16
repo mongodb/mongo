@@ -460,6 +460,7 @@ namespace {
         // reset _last fields with current oplog data
         _lastOpTimeFetched = _replCoord->getMyLastOptime();
         {
+            Lock::DBLock lk(txn->lockState(), "local", MODE_X);
             WriteUnitOfWork uow(txn);
             loadLastAppliedHash(txn);
             uow.commit();

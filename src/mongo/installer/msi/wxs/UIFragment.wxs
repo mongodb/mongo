@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Wix xmlns="http://schemas.microsoft.com/wix/2006/wi"  xmlns:util="http://schemas.microsoft.com/wix/UtilExtension">
+    <Fragment>
+        <UI Id="MongoWixUI">
+            <!-- Base our MSI on the FeatureTree based Wix set, and add our custom dialog boxes -->
+            <UIRef Id="WixUI_FeatureTree" />
+
+            <Publish Event="NewDialog" Value="MongoSetupTypeDlg" Dialog="LicenseAgreementDlg" Control="Next">LicenseAccepted = "1"</Publish>
+            <Publish Event="NewDialog" Value="MongoSetupTypeDlg" Dialog="VerifyReadyDlg" Control="Back">WixUI_InstallMode = "InstallTypical" OR WixUI_InstallMode = "InstallComplete"</Publish>
+            <Publish Event="NewDialog" Value="MongoSetupTypeDlg" Dialog="CustomizeDlg" Control="Back">WixUI_InstallMode = "InstallCustom"</Publish>
+
+            <!-- A custom setup type dialog box with only Complete and Custom buttons -->
+            <Dialog Id="MongoSetupTypeDlg" X="50" Y="50" Width="370" Height="270" Title="[ProductName] Setup">
+                <Control Id="CompleteButton" Type="PushButton" X="40" Y="65" Width="80" Height="17" Text="C&amp;omplete" ToolTip="Complete Installation" TabSkip="no" Default="yes">
+                    <Publish Property="WixUI_InstallMode" Value="InstallComplete">1</Publish>
+                    <Publish Event="NewDialog" Value="VerifyReadyDlg">1</Publish>
+                    <Publish Event="SetInstallLevel" Value="1000">1</Publish>
+                </Control>
+                <Control Id="CustomButton" Type="PushButton" X="40" Y="118" Width="80" Height="17" Text="C&amp;ustom" ToolTip="Custom Installation" TabSkip="no">
+                    <Publish Property="WixUI_InstallMode" Value="InstallCustom">1</Publish>
+                    <Publish Event="NewDialog" Value="CustomizeDlg">1</Publish>
+                </Control>
+                <Control Id="Back" Type="PushButton" X="180" Y="243" Width="56" Height="17" Text="&amp;Back" TabSkip="no">
+                    <Publish Event="NewDialog" Value="LicenseAgreementDlg">1</Publish>
+                </Control>
+                <Control Id="Next" Type="PushButton" X="236" Y="243" Width="56" Height="17" Text="&amp;Next" TabSkip="no" Disabled="yes" />
+                <Control Id="Cancel" Type="PushButton" X="304" Y="243" Width="56" Height="17" Text="Cancel" TabSkip="no" Cancel="yes">
+                    <Publish Event="SpawnDialog" Value="CancelDlg">1</Publish>
+                </Control>
+                <Control Id="BannerBitmap" Type="Bitmap" X="0" Y="0" Width="370" Height="44" Text="WixUI_Bmp_Banner" TabSkip="no" Disabled="yes" />
+                <Control Id="Description" Type="Text" X="25" Y="23" Width="280" Height="15" Text="Choose the setup type that best suits your needs" TabSkip="yes" Transparent="yes" NoPrefix="yes" />
+                <Control Id="Title" Type="Text" X="15" Y="6" Width="200" Height="15" Text="{\WixUI_Font_Title}Choose Setup Type" TabSkip="yes" Transparent="yes" NoPrefix="yes" />
+                <Control Id="BottomLine" Type="Line" X="0" Y="234" Width="370" Height="0" TabSkip="yes" Disabled="yes" />
+                <Control Id="BannerLine" Type="Line" X="0" Y="44" Width="370" Height="0" TabSkip="yes" Disabled="yes" />
+                <Control Id="TypicalText" Type="Text" X="60" Y="85" Width="280" Height="20" Text="All program features will be installed. Requires the most disk space. Recommended for most users." TabSkip="yes" />
+                <Control Id="CustomText" Type="Text" X="60" Y="138" Width="280" Height="30" Text="Allows users to choose which program features will be installed and where they will be installed. Recommended for advanced users." TabSkip="yes" />
+            </Dialog>
+
+        </UI>
+    </Fragment>
+</Wix>
+

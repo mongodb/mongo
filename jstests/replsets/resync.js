@@ -29,13 +29,28 @@ assert(a_conn.host == master.host);
 assert.writeOK( A.foo.insert({ x: 1 }, { writeConcern: { w: 3, wtimeout: 60000 }}));
 replTest.stop(BID);
 
-// insert enough to cycle oplog
-var bulk = A.foo.initializeUnorderedBulkOp();
-for (i=2; i < 10000; i++) {
-    bulk.insert({x:i});
+function hasCycled() {
+    var oplog = a_conn.getDB("local").oplog.rs;
+    return oplog.find( { "o.x" : 1 } ).sort( { $natural : 1 } )._addSpecial( "$maxScan" , 10 ).itcount() == 0;
 }
-// wait for secondary to also have its oplog cycle
-assert.writeOK(bulk.execute({ w: 2, wtimeout : 60000 }));
+
+for ( var cycleNumber = 0; cycleNumber < 10; cycleNumber++ ) {
+    // insert enough to cycle oplog
+    var bulk = A.foo.initializeUnorderedBulkOp();
+    for (i=2; i < 10000; i++) {
+        bulk.insert({x:i});
+    }
+
+    // wait for secondary to also have its oplog cycle
+    assert.writeOK(bulk.execute({ w: 2, wtimeout : 60000 }));
+
+    if ( hasCycled() )
+        break;
+}
+
+assert( hasCycled() );
+
+
 
 // bring node B and it will enter recovery mode because its newest oplog entry is too old
 replTest.restart(BID);

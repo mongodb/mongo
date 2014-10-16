@@ -336,9 +336,17 @@ namespace {
                         WriteUnitOfWork wunit(&txn);
                         Client::Context ctx(&txn, "local");
 
-                        bgsync->stop();
                         ctx.db()->dropCollection(&txn, "local.oplog.rs");
+
+                        // Note: the following order is important.
+                        // The bgsync thread uses an empty optime as a sentinel to know to wait
+                        // for initial sync (done in this thread after we return); thus, we must
+                        // ensure the lastAppliedOptime is empty before pausing the bgsync thread
+                        // via stop().
+                        // We must clear the sync source blacklist after calling stop()
+                        // because the bgsync thread, while running, may update the blacklist.
                         replCoord->setMyLastOptime(&txn, OpTime());
+                        bgsync->stop();
                         replCoord->clearSyncSourceBlacklist();
 
                         wunit.commit();
