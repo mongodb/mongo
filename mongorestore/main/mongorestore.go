@@ -27,7 +27,7 @@ func main() {
 	}
 
 	// print help or version info, if specified
-	if opts.PrintHelp() {
+	if opts.PrintHelp(false) {
 		return
 	}
 	if opts.PrintVersion() {

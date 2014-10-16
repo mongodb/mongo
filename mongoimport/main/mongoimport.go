@@ -31,7 +31,7 @@ func main() {
 	log.SetVerbosity(opts.Verbosity)
 	
 	// print help, if specified
-	if opts.PrintHelp() {
+	if opts.PrintHelp(false) {
 		return
 	}
 

@@ -24,11 +24,6 @@ const (
         `
 )
 
-func printHelpAndExit() {
-	fmt.Println("try 'mongofiles --help' for more information")
-	os.Exit(1)
-}
-
 func main() {
 
 	// initialize command-line opts
@@ -40,11 +35,12 @@ func main() {
 	args, err := opts.Parse()
 	if err != nil {
 		log.Logf(0, "error parsing command line options: %v", err)
-		printHelpAndExit()
+		opts.PrintHelp(true)
+		os.Exit(1)
 	}
 
 	// print help, if specified
-	if opts.PrintHelp() {
+	if opts.PrintHelp(false) {
 		return
 	}
 
@@ -58,7 +54,8 @@ func main() {
 	fileName, err := mongofiles.ValidateCommand(args)
 	if err != nil {
 		log.Logf(0, "error: %v", err)
-		printHelpAndExit()
+		opts.PrintHelp(true)
+		os.Exit(1)
 	}
 
 	// create a session provider to connect to the db

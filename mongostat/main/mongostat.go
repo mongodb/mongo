@@ -22,7 +22,7 @@ func main() {
 	extra, err := opts.Parse()
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Invalid options: %v\n", err)
-		opts.PrintHelp()
+		opts.PrintHelp(true)
 		util.ExitFail()
 		return
 	}
@@ -31,7 +31,7 @@ func main() {
 	if len(extra) > 0 {
 		if len(extra) != 1 {
 			fmt.Fprintf(os.Stderr, "Too many positional operators\n")
-			opts.PrintHelp()
+			opts.PrintHelp(true)
 			util.ExitFail()
 			return
 		}
@@ -49,7 +49,7 @@ func main() {
 	}
 
 	// print help, if specified
-	if opts.PrintHelp() {
+	if opts.PrintHelp(false) {
 		return
 	}
 

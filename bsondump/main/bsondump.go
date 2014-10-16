@@ -22,7 +22,7 @@ func main() {
 	}
 
 	// print help, if specified
-	if opts.PrintHelp() {
+	if opts.PrintHelp(false) {
 		return
 	}
 
@@ -34,17 +34,17 @@ func main() {
 	// pull out the filename
 	filename := ""
 	if len(extra) == 0 {
-		opts.PrintHelp()
+		opts.PrintHelp(true)
 		return
 	} else if len(extra) > 1 {
 		fmt.Fprintln(os.Stderr, "Too many positional operators.")
-		opts.PrintHelp()
+		opts.PrintHelp(true)
 		os.Exit(1)
 	} else {
 		filename = extra[0]
 		if filename == "" {
 			fmt.Fprintln(os.Stderr, "Filename must not be blank.")
-			opts.PrintHelp()
+			opts.PrintHelp(true)
 			os.Exit(1)
 		}
 	}
