@@ -453,6 +453,7 @@ namespace repl {
 
     void createOplog(OperationContext* txn) {
         Lock::GlobalWrite lk(txn->lockState());
+        WriteUnitOfWork uow( txn );
 
         const char * ns = "local.oplog.$main";
 
@@ -480,9 +481,9 @@ namespace repl {
                 }
             }
 
-            if( rs ) return;
-
-            initOpTimeFromOplog(txn, ns);
+            if ( !rs )
+                initOpTimeFromOplog(txn, ns);
+            uow.commit();
             return;
         }
 
@@ -521,11 +522,10 @@ namespace repl {
         options.cappedSize = sz;
         options.autoIndexId = CollectionOptions::NO;
 
-        WriteUnitOfWork wunit(txn);
         invariant(ctx.db()->createCollection(txn, ns, options));
         if( !rs )
             logOp(txn, "n", "", BSONObj() );
-        wunit.commit();
+        uow.commit();
 
         /* sync here so we don't get any surprising lag later when we try to sync */
         StorageEngine* storageEngine = getGlobalEnvironment()->getGlobalStorageEngine();

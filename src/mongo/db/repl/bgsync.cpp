@@ -459,7 +459,12 @@ namespace {
 
         // reset _last fields with current oplog data
         _lastOpTimeFetched = _replCoord->getMyLastOptime();
-        loadLastAppliedHash(txn);
+        {
+            Lock::DBLock lk(txn->lockState(), "local", MODE_X);
+            WriteUnitOfWork uow(txn);
+            loadLastAppliedHash(txn);
+            uow.commit();
+        }
         _lastFetchedHash = _lastAppliedHash;
 
         LOG(1) << "replset bgsync fetch queue set to: " << _lastOpTimeFetched << 

@@ -223,6 +223,10 @@ namespace repl {
                 log() << "Received exception while syncing: " << e.toString();
                 sleepsecs(10);
             }
+            catch(const std::exception& e) {
+                log() << "Received exception while syncing: " << e.what();
+                sleepsecs(10);
+            }
             catch(...) {
                 sethbmsg("unexpected exception in syncThread()");
                 // TODO : SET NOT SECONDARY here?

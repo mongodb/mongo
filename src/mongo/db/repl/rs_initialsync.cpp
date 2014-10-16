@@ -306,8 +306,10 @@ namespace {
     void syncDoInitialSync() {
         static const int maxFailedAttempts = 10;
 
-        OperationContextImpl txn;
-        createOplog(&txn);
+        {
+            OperationContextImpl txn;
+            createOplog(&txn);
+        }
 
         int failedAttempts = 0;
         while ( failedAttempts < maxFailedAttempts ) {

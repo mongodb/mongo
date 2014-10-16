@@ -38,6 +38,7 @@
 #include "mongo/db/jsobj.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/operation_context_impl.h"
+#include "mongo/util/log.h"
 
 namespace mongo {
 namespace repl {
@@ -63,9 +64,14 @@ namespace {
     }
 
     bool getInitialSyncFlag() {
-        OperationContextImpl txn; // XXX?
+        OperationContextImpl txn;
+        Lock::DBLock lk(txn.lockState(), "local", MODE_X);
+        WriteUnitOfWork uow( &txn );
         BSONObj mv;
-        if (Helpers::getSingleton(&txn, minvalidNS, mv)) {
+        bool found = Helpers::getSingleton( &txn, minvalidNS, mv);
+        uow.commit();
+
+        if (found) {
             return mv[initialSyncFlagString].trueValue();
         }
         return false;
@@ -73,14 +79,19 @@ namespace {
 
     void setMinValid(OperationContext* ctx, OpTime ts) {
         Lock::DBLock lk(ctx->lockState(), "local", MODE_X);
-        WriteUnitOfWork wunit(ctx);
-        Helpers::putSingleton(ctx, minvalidNS, BSON("$set" << BSON("ts" << ts)));
-        wunit.commit();
+        {
+            WriteUnitOfWork wunit(ctx);
+            Helpers::putSingleton(ctx, minvalidNS, BSON("$set" << BSON("ts" << ts)));
+            wunit.commit();
+        }
     }
 
     OpTime getMinValid(OperationContext* txn) {
+        WriteUnitOfWork wunit(txn);
         BSONObj mv;
-        if (Helpers::getSingleton(txn, minvalidNS, mv)) {
+        bool found = Helpers::getSingleton(txn, minvalidNS, mv);
+        wunit.commit();
+        if (found) {
             return mv["ts"]._opTime();
         }
         return OpTime();
