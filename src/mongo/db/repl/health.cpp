@@ -366,6 +366,7 @@ namespace repl {
         verify( _self );
 
         MemberState myState = box.getState();
+        const HostAndPort syncTarget = BackgroundSync::get()->getSyncTarget();
 
         // add self
         {
@@ -384,6 +385,12 @@ namespace repl {
             int maintenance = _maintenanceMode;
             if (maintenance) {
                 bb.append("maintenanceMode", maintenance);
+            }
+
+            if ( !syncTarget.empty() &&
+                (myState != MemberState::RS_PRIMARY) &&
+                (myState != MemberState::RS_REMOVED) ) {
+                bb.append("syncingTo", syncTarget.toString());
             }
 
             if (theReplSet) {
@@ -448,7 +455,6 @@ namespace repl {
         b.append("set", name());
         b.appendTimeT("date", time(0));
         b.append("myState", myState.s);
-        const HostAndPort syncTarget = BackgroundSync::get()->getSyncTarget();
         if ( !syncTarget.empty() &&
             (myState != MemberState::RS_PRIMARY) &&
             (myState != MemberState::RS_REMOVED) ) {

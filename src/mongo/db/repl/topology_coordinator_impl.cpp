@@ -1228,6 +1228,10 @@ namespace {
                     bb.appendDate("optimeDate", Date_t(lastOpApplied.getSecs() * 1000ULL));
                 }
 
+                if (!_syncSource.empty()) {
+                    bb.append("syncingTo", _syncSource.toString());
+                }
+
                 if (_maintenanceModeCalls) {
                     bb.append("maintenanceMode", _maintenanceModeCalls);
                 }
