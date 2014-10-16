@@ -135,7 +135,7 @@ namespace mongo {
 
     TEST(FastMapNoAlloc, RemoveAll) {
         TestFastMapNoAlloc map;
-        std::unordered_map<ResourceId, TestStruct> checkMap;
+        unordered_map<ResourceId, TestStruct> checkMap;
 
         for (int i = 1; i <= 6; i++) {
             map.insert(ResourceId(RESOURCE_DOCUMENT, i))->initNew(
