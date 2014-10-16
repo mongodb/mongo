@@ -27,6 +27,8 @@
  *    it in the license file.
  */
 
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kStorage
+
 #include "mongo/db/storage/heap1/record_store_heap.h"
 
 #include "mongo/util/log.h"
@@ -74,6 +76,16 @@ namespace mongo {
         }
         invariant(it != _records.end());
         return reinterpret_cast<HeapRecord*>(it->second.get());
+    }
+
+    bool HeapRecordStore::findRecord( OperationContext* txn,
+                                      const DiskLoc& loc, RecordData* rd ) const {
+        Records::const_iterator it = _records.find(loc);
+        if ( it == _records.end() ) {
+            return false;
+        }
+        *rd = reinterpret_cast<HeapRecord*>(it->second.get())->toRecordData();
+        return true;
     }
 
     void HeapRecordStore::deleteRecord(OperationContext* txn, const DiskLoc& loc) {

@@ -50,6 +50,7 @@ namespace mongo {
         PlanSummaryStats() : nReturned(0),
                              totalKeysExamined(0),
                              totalDocsExamined(0),
+                             executionTimeMillis(0),
                              isIdhack(false),
                              hasSortStage(false),
                              summaryStr("") { }
@@ -93,8 +94,7 @@ namespace mongo {
          *
          * Does not take ownership of its arguments.
          */
-        static Status explainStages(OperationContext* opCtx,
-                                    PlanExecutor* exec,
+        static Status explainStages(PlanExecutor* exec,
                                     ExplainCommon::Verbosity verbosity,
                                     BSONObjBuilder* out);
 
@@ -103,25 +103,26 @@ namespace mongo {
          * explain information.
          *
          * Generates the BSON stats at a verbosity specified by 'verbosity'. Defaults
-         * to the highest verbosity (FULL).
+         * to execution stats verbosity.
          */
         static BSONObj statsToBSON(const PlanStageStats& stats,
-                                   ExplainCommon::Verbosity verbosity = ExplainCommon::FULL);
+                                   ExplainCommon::Verbosity verbosity = ExplainCommon::EXEC_STATS);
 
         /**
          * This version of stats tree to BSON conversion returns the result through the
          * out-parameter 'bob' rather than returning a BSONObj.
          *
          * Generates the BSON stats at a verbosity specified by 'verbosity'. Defaults
-         * to the highest verbosity (FULL).
+         * to execution stats verbosity.
          */
         static void statsToBSON(const PlanStageStats& stats,
                                 BSONObjBuilder* bob,
-                                ExplainCommon::Verbosity verbosity = ExplainCommon::FULL);
+                                ExplainCommon::Verbosity verbosity = ExplainCommon::EXEC_STATS);
 
         /**
          * Returns a short plan summary std::string describing the leaves of the query plan.
          */
+        static std::string getPlanSummary(PlanExecutor* exec);
         static std::string getPlanSummary(PlanStage* root);
 
         /**

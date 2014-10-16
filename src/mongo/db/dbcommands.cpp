@@ -652,10 +652,6 @@ namespace mongo {
 
             auto_ptr<PlanExecutor> exec(rawExec);
 
-            // The executor must be registered to be informed of DiskLoc deletions and NS dropping
-            // when we yield the lock below.
-            const ScopedExecutorRegistration safety(exec.get());
-
             const ChunkVersion shardVersionAtStart = shardingState.getVersion(ns);
 
             BSONObj obj;

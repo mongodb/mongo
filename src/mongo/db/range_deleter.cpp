@@ -187,6 +187,13 @@ namespace mongo {
             ++it) {
             delete (*it);
         }
+
+        for(std::deque<DeleteJobStats*>::iterator it = _statsHistory.begin();
+            it != _statsHistory.end();
+            ++it) {
+            delete (*it);
+        }
+
     }
 
     void RangeDeleter::startWorkers() {

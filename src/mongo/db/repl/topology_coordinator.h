@@ -137,9 +137,14 @@ namespace repl {
         virtual bool shouldChangeSyncSource(const HostAndPort& currentSource) const = 0;
 
         /**
+         * Checks whether we are a single node set and we are not in a stepdown period.  If so,
+         * puts us into candidate mode, otherwise does nothing.  This is used to ensure that
+         * nodes in a single node replset become primary again when their stepdown period ends.
+         */
+        virtual bool becomeCandidateIfStepdownPeriodOverAndSingleNodeSet(Date_t now) = 0;
+
+        /**
          * Sets the earliest time the current node will stand for election to "newTime".
-         *
-         * Does not affect the node's state or the process of any elections in flight.
          */
         virtual void setStepDownTime(Date_t newTime) = 0;
 
@@ -207,11 +212,7 @@ namespace repl {
         virtual void fillIsMasterForReplSet(IsMasterResponse* response) = 0;
 
         // produce a reply to a freeze request
-        virtual void prepareFreezeResponse(const ReplicationExecutor::CallbackData& data,
-                                           Date_t now,
-                                           int secs,
-                                           BSONObjBuilder* response,
-                                           Status* result) = 0;
+        virtual void prepareFreezeResponse(Date_t now, int secs, BSONObjBuilder* response) = 0;
 
         ////////////////////////////////////////////////////////////
         //
@@ -316,6 +317,12 @@ namespace repl {
          * Changes the coordinator from the leader role to the follower role.
          */
         virtual void stepDown() = 0;
+
+        /**
+         * Considers whether or not this node should stand for election, and returns true
+         * if the node has transitioned to candidate role as a result of the call.
+         */
+        virtual bool checkShouldStandForElection(Date_t now, const OpTime& lastOpApplied) = 0;
 
     protected:
         TopologyCoordinator() {}

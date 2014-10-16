@@ -283,7 +283,7 @@ namespace {
                     errmsg,
                     conn->connect(target, errmsg));
             conn->port().tag |= ScopedConn::keepOpen;
-            uassert(18916,
+            uassert(ErrorCodes::AuthenticationFailed,
                     str::stream() << "Failed to authenticate as cluster member to " <<
                     target.toString(),
                     replAuthenticate(conn.get()));

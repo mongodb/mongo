@@ -139,10 +139,10 @@ namespace QueryStageKeep {
 
             // Create a KeepMutations stage to merge in the 10 flagged objects.
             // Takes ownership of 'cs'
-            KeepMutationsStage* keep = new KeepMutationsStage(NULL, &ws, cs);
+            std::auto_ptr<KeepMutationsStage> keep(new KeepMutationsStage(NULL, &ws, cs));
 
             for (size_t i = 0; i < 10; ++i) {
-                WorkingSetID id = getNextResult(keep);
+                WorkingSetID id = getNextResult(keep.get());
                 WorkingSetMember* member = ws.get(id);
                 ASSERT_FALSE(ws.isFlagged(id));
                 ASSERT_EQUALS(member->obj["x"].numberInt(), 1);
@@ -152,7 +152,7 @@ namespace QueryStageKeep {
 
             // Flagged results *must* be at the end.
             for (size_t i = 0; i < 10; ++i) {
-                WorkingSetID id = getNextResult(keep);
+                WorkingSetID id = getNextResult(keep.get());
                 WorkingSetMember* member = ws.get(id);
                 ASSERT(ws.isFlagged(id));
                 ASSERT_EQUALS(member->obj["x"].numberInt(), 2);

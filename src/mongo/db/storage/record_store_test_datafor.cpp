@@ -51,7 +51,7 @@ namespace mongo {
             ASSERT_EQUALS( 0, rs->numRecords( opCtx.get() ) );
         }
 
-        string data = "my record";
+        string data = "record-";
         DiskLoc loc;
         {
             scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
@@ -99,7 +99,7 @@ namespace mongo {
             scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
             {
                 stringstream ss;
-                ss << "record " << i;
+                ss << "record----" << i;
                 string data = ss.str();
 
                 WriteUnitOfWork uow( opCtx.get() );
@@ -122,7 +122,7 @@ namespace mongo {
             scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
             {
                 stringstream ss;
-                ss << "record " << i;
+                ss << "record----" << i;
                 string data = ss.str();
 
                 RecordData record = rs->dataFor( opCtx.get(), locs[i] );

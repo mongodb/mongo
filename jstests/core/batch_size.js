@@ -63,15 +63,15 @@ assert.eq(15, t.find({a: {$gte: 85}}).sort({b: 1}).hint({b: 1}).batchSize(2).itc
 assert.eq(6, t.find({a: {$gte: 85}}).sort({b: 1}).hint({b: 1}).limit(6).itcount(), 'P');
 
 // With explain.
-var explain = t.find({a: {$gte: 85}}).sort({b: 1}).batchSize(2).explain();
+var explain = t.find({a: {$gte: 85}}).sort({b: 1}).batchSize(2).explain("executionStats");
 assert.eq(15, explain.executionStats.nReturned, 'Q');
-explain = t.find({a: {$gte: 85}}).sort({b: 1}).limit(6).explain();
+explain = t.find({a: {$gte: 85}}).sort({b: 1}).limit(6).explain("executionStats");
 assert.eq(6, explain.executionStats.nReturned, 'R');
 
 // Double check that we're not scanning more stuff than we have to.
 // In order to get the sort using index 'a', we should need to scan
 // about 50 keys and 50 documents.
-var explain = t.find({a: {$gte: 50}}).sort({b: 1}).hint({a: 1}).limit(6).explain();
+var explain = t.find({a: {$gte: 50}}).sort({b: 1}).hint({a: 1}).limit(6).explain("executionStats");
 assert.lte(explain.executionStats.totalKeysExamined, 60, 'S');
 assert.lte(explain.executionStats.totalDocsExamined, 60, 'T');
 assert.eq(explain.executionStats.nReturned, 6, 'U');

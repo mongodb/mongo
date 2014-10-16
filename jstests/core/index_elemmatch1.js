@@ -34,7 +34,7 @@ function nscannedForCursor( explain, cursor ) {
     return -1;
 }
 
-var explain = t.find(q).hint( { "arr.x" : 1 , a : 1 } ).explain();
+var explain = t.find(q).hint( { "arr.x" : 1 , a : 1 } ).explain("executionStats");
 assert.eq( t.find(q).itcount(), explain.executionStats.totalKeysExamined );
 
 printjson(t.find(q).explain());

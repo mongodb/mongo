@@ -29,6 +29,8 @@
  *    then also delete it in the license file.
  */
 
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kDefault
+
 #include "mongo/pch.h"
 
 #include "mongo/bson/mutable/document.h"
@@ -58,12 +60,13 @@ namespace ReplTests {
 
     class Base {
     protected:
+        repl::ReplicationCoordinator* _prevGlobGoordinator;
         mutable OperationContextImpl _txn;
         mutable DBDirectClient _client;
 
     public:
-        Base() : _client(&_txn) {
-
+        Base() : _prevGlobGoordinator(getGlobalReplicationCoordinator())
+               , _client(&_txn) {
             ReplSettings replSettings;
             replSettings.oplogSize = 5 * 1024 * 1024;
             replSettings.master = true;
@@ -85,10 +88,9 @@ namespace ReplTests {
         }
         ~Base() {
             try {
-                ReplSettings replSettings;
-                replSettings.oplogSize = 10 * 1024 * 1024;
                 delete getGlobalReplicationCoordinator();
-                setGlobalReplicationCoordinator(new ReplicationCoordinatorMock(replSettings));
+                setGlobalReplicationCoordinator(_prevGlobGoordinator);
+                _prevGlobGoordinator = NULL;
 
                 deleteAll( ns() );
                 deleteAll( cllNS() );

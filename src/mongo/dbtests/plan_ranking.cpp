@@ -117,13 +117,13 @@ namespace PlanRankingTests {
 
             // Fill out the MPR.
             _mps.reset(new MultiPlanStage(&_txn, collection, cq));
-            WorkingSet* ws = new WorkingSet();
+            boost::scoped_ptr<WorkingSet> ws(new WorkingSet());
             // Put each solution from the planner into the MPR.
             for (size_t i = 0; i < solutions.size(); ++i) {
                 PlanStage* root;
-                ASSERT(StageBuilder::build(&_txn, collection, *solutions[i], ws, &root));
-                // Takes ownership of all arguments.
-                _mps->addPlan(solutions[i], root, ws);
+                ASSERT(StageBuilder::build(&_txn, collection, *solutions[i], ws.get(), &root));
+                // Takes ownership of all (actually some) arguments.
+                _mps->addPlan(solutions[i], root, ws.get());
             }
 
             _mps->pickBestPlan(); // This is what sets a backup plan, should we test for it.
@@ -188,6 +188,7 @@ namespace PlanRankingTests {
             CanonicalQuery* cq;
             verify(CanonicalQuery::canonicalize(ns, BSON("a" << 100 << "b" << 1), &cq).isOK());
             ASSERT(NULL != cq);
+            boost::scoped_ptr<CanonicalQuery> killCq(cq);
 
             // {a:100} is super selective so choose that.
             // Takes ownership of cq.
@@ -202,6 +203,7 @@ namespace PlanRankingTests {
 
             // And run the same query again.
             ASSERT(CanonicalQuery::canonicalize(ns, BSON("a" << 100 << "b" << 1), &cq).isOK());
+            boost::scoped_ptr<CanonicalQuery> killCq2(cq);
 
             // With the "ranking picks ixisect always" option we pick an intersection plan that uses
             // both the {a:1} and {b:1} indices even though it performs poorly.
@@ -236,6 +238,7 @@ namespace PlanRankingTests {
             verify(CanonicalQuery::canonicalize(ns, BSON("a" << 1 << "b" << BSON("$gt" << 1)),
                                                 &cq).isOK());
             ASSERT(NULL != cq);
+            boost::scoped_ptr<CanonicalQuery> killCq(cq);
 
             // Turn on the "force intersect" option.
             // This will be reverted by PlanRankingTestBase's destructor when the test completes.
@@ -278,6 +281,7 @@ namespace PlanRankingTests {
                                                 BSON("_id" << 0 << "a" << 1 << "b" << 1),
                                                 &cq).isOK());
             ASSERT(NULL != cq);
+            boost::scoped_ptr<CanonicalQuery> killCq(cq);
 
             // Takes ownership of cq.
             QuerySolution* soln = pickBestPlan(cq);
@@ -311,6 +315,7 @@ namespace PlanRankingTests {
             BSONObj queryObj = BSON("a" << 1 << "b" << 1 << "c" << 99);
             ASSERT(CanonicalQuery::canonicalize(ns, queryObj, &cq).isOK());
             ASSERT(NULL != cq);
+            boost::scoped_ptr<CanonicalQuery> killCq(cq);
 
             // Takes ownership of cq.
             QuerySolution* soln = pickBestPlan(cq);
@@ -353,6 +358,7 @@ namespace PlanRankingTests {
                                                 BSON("_id" << 0 << "a" << 1 << "b" << 1),
                                                 &cq).isOK());
             ASSERT(NULL != cq);
+            boost::scoped_ptr<CanonicalQuery> killCq(cq);
 
             // Takes ownership of cq.
             QuerySolution* soln = pickBestPlan(cq);
@@ -384,6 +390,7 @@ namespace PlanRankingTests {
             CanonicalQuery* cq;
             verify(CanonicalQuery::canonicalize(ns, BSON("a" << N + 1 << "b" << 1), &cq).isOK());
             ASSERT(NULL != cq);
+            boost::scoped_ptr<CanonicalQuery> killCq(cq);
 
             // {a: 100} is super selective so choose that.
             // Takes ownership of cq.
@@ -420,6 +427,7 @@ namespace PlanRankingTests {
             verify(CanonicalQuery::canonicalize(ns, BSON("a" << BSON("$gte" << N + 1)
                                                              << "b" << 1), &cq).isOK());
             ASSERT(NULL != cq);
+            boost::scoped_ptr<CanonicalQuery> killCq(cq);
 
             // {a: 100} is super selective so choose that.
             // Takes ownership of cq.
@@ -454,6 +462,7 @@ namespace PlanRankingTests {
                                                 sortObj,
                                                 projObj,
                                                 &cq).isOK());
+            boost::scoped_ptr<CanonicalQuery> killCq(cq);
 
             // Takes ownership of cq.
             QuerySolution* soln = pickBestPlan(cq);
@@ -482,6 +491,7 @@ namespace PlanRankingTests {
             CanonicalQuery* cq;
             verify(CanonicalQuery::canonicalize(ns, BSON("foo" << 2001), &cq).isOK());
             ASSERT(NULL != cq);
+            boost::scoped_ptr<CanonicalQuery> killCq(cq);
 
             // Takes ownership of cq.
             QuerySolution* soln = pickBestPlan(cq);
@@ -518,6 +528,7 @@ namespace PlanRankingTests {
                                                 BSON("_id" << 0 << "a" << 1 << "b" << 1),
                                                 &cq).isOK());
             ASSERT(NULL != cq);
+            boost::scoped_ptr<CanonicalQuery> killCq(cq);
 
             // We should choose an ixisect plan because it requires fewer fetches.
             // Takes ownership of cq.
@@ -554,6 +565,7 @@ namespace PlanRankingTests {
                                                 BSON("a" << 1 << "b" << 1),
                                                 &cq).isOK());
             ASSERT(NULL != cq);
+            boost::scoped_ptr<CanonicalQuery> killCq(cq);
 
             // The intersection is large, and ixisect does not make the
             // query covered. We should NOT choose an intersection plan.
@@ -605,6 +617,7 @@ namespace PlanRankingTests {
                                                 fromjson("{a: 1, b: 1}"),
                                                 &cq).isOK());
             ASSERT(NULL != cq);
+            boost::scoped_ptr<CanonicalQuery> killCq(cq);
 
             QuerySolution* soln = pickBestPlan(cq);
             ASSERT(QueryPlannerTestLib::solutionMatches(
@@ -645,6 +658,7 @@ namespace PlanRankingTests {
                                                 fromjson("{a: 1, b: 1}"),
                                                 &cq).isOK());
             ASSERT(NULL != cq);
+            boost::scoped_ptr<CanonicalQuery> killCq(cq);
 
             // Choose the index intersection plan.
             QuerySolution* soln = pickBestPlan(cq);
@@ -687,6 +701,7 @@ namespace PlanRankingTests {
                                                 fromjson("{a: 1, b: 1, c: 1}"),
                                                 &cq).isOK());
             ASSERT(NULL != cq);
+            boost::scoped_ptr<CanonicalQuery> killCq(cq);
 
             // Intersection between 'b' and 'c' should hit EOF while the
             // other plans are busy fetching documents.
@@ -724,6 +739,7 @@ namespace PlanRankingTests {
                                                 BSONObj(), // projection
                                                 &cq).isOK());
             ASSERT(NULL != cq);
+            boost::scoped_ptr<CanonicalQuery> killCq(cq);
 
             // No results will be returned during the trial period,
             // so we expect to choose {d: 1, e: 1}, as it allows us
@@ -760,6 +776,7 @@ namespace PlanRankingTests {
                                                 fromjson("{a: 1, b: 1, c: {$gte: 5000}}"),
                                                 &cq).isOK());
             ASSERT(NULL != cq);
+            boost::scoped_ptr<CanonicalQuery> killCq(cq);
 
             // Use index on 'b'.
             QuerySolution* soln = pickBestPlan(cq);
@@ -793,6 +810,7 @@ namespace PlanRankingTests {
                                                 fromjson("{a: 9, b: {$ne: 10}, c: 9}"),
                                                 &cq).isOK());
             ASSERT(NULL != cq);
+            boost::scoped_ptr<CanonicalQuery> killCq(cq);
 
             // Expect to use index {a: 1, b: 1}.
             QuerySolution* soln = pickBestPlan(cq);

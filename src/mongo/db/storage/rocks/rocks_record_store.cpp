@@ -29,6 +29,8 @@
  *    it in the license file.
  */
 
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kStorage
+
 #include "mongo/db/storage/rocks/rocks_record_store.h"
 
 #include <memory>
@@ -481,12 +483,20 @@ namespace mongo {
         return reinterpret_cast<const DiskLoc*>( slice.data() )[0];
     }
 
+    bool RocksRecordStore::findRecord( OperationContext* txn,
+                                       const DiskLoc& loc, RecordData* out ) const {
+        RecordData rd = _getDataFor(_db, _columnFamily.get(), txn, loc);
+        if ( rd.data() == NULL )
+            return false;
+        *out = rd;
+        return true;
+    }
+
     RecordData RocksRecordStore::_getDataFor(rocksdb::DB* db, rocksdb::ColumnFamilyHandle* cf,
                                              OperationContext* txn, const DiskLoc& loc) {
         rocksdb::Slice value;
 
         RocksRecoveryUnit* ru = RocksRecoveryUnit::getRocksRecoveryUnit(txn);
-        auto key = _makeKey(loc);
         boost::shared_array<char> data;
 
         std::string value_storage;

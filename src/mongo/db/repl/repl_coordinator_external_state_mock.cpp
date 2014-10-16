@@ -35,6 +35,7 @@
 #include "mongo/db/client.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/operation_context_noop.h"
+#include "mongo/db/repl/operation_context_repl_mock.h"
 #include "mongo/util/net/hostandport.h"
 #include "mongo/util/sequence_util.h"
 
@@ -46,6 +47,7 @@ namespace repl {
           _lastOpTime(ErrorCodes::NoMatchingDocument, "No last oplog entry"),
          _canAcquireGlobalSharedLock(true),
          _storeLocalConfigDocumentStatus(Status::OK()),
+         _storeLocalConfigDocumentShouldHang(false),
          _connectionsClosed(false) {
     }
 
@@ -87,6 +89,12 @@ namespace repl {
     Status ReplicationCoordinatorExternalStateMock::storeLocalConfigDocument(
             OperationContext* txn,
             const BSONObj& config) {
+        {
+            boost::unique_lock<boost::mutex> lock(_shouldHangMutex);
+            while (_storeLocalConfigDocumentShouldHang) {
+                _shouldHangCondVar.wait(lock);
+            }
+        }
         if (_storeLocalConfigDocumentStatus.isOK()) {
             setLocalConfigDocument(StatusWith<BSONObj>(config));
             return Status::OK();
@@ -114,9 +122,19 @@ namespace repl {
         _storeLocalConfigDocumentStatus = status;
     }
 
+    void ReplicationCoordinatorExternalStateMock::setStoreLocalConfigDocumentToHang(bool hang) {
+        boost::unique_lock<boost::mutex> lock(_shouldHangMutex);
+        _storeLocalConfigDocumentShouldHang = hang;
+        if (!hang) {
+            _shouldHangCondVar.notify_all();
+        }
+    }
+
     void ReplicationCoordinatorExternalStateMock::closeConnections() {
         _connectionsClosed = true;
     }
+
+    void ReplicationCoordinatorExternalStateMock::clearShardingState() {}
 
     void ReplicationCoordinatorExternalStateMock::signalApplierToChooseNewSyncSource() {}
 
@@ -142,7 +160,10 @@ namespace repl {
     }
 
     OperationContext* ReplicationCoordinatorExternalStateMock::createOperationContext() {
-        return new OperationContextNoop;
+        return new OperationContextReplMock;
     }
+
+    void ReplicationCoordinatorExternalStateMock::dropAllTempCollections(OperationContext* txn) {}
+
 } // namespace repl
 } // namespace mongo

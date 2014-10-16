@@ -455,8 +455,6 @@ namespace repl {
             b.append("syncingTo", syncTarget.toString());
         }
         b.append("members", v);
-        if( replSetBlind )
-            b.append("blind",true); // to avoid confusion if set...normally never set except for testing.
     }
 } // namespace repl
 } // namespace mongo

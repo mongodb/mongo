@@ -172,7 +172,20 @@ namespace repl {
         }
         OpTime remoteTime(res["opTime"].date());
         if (remoteTime == _lastOpTimeApplied) {
-            _abortReason = FreshnessTie;
+            const MemberConfig* targetConfig = _rsConfig.findMemberByHostAndPort(request.target);
+            invariant(targetConfig);
+            const double ourPriority = _rsConfig.getMemberAt(_selfIndex).getPriority();
+            // If we are equal priority with the responding node, respond with a freshness tie.
+            // Note: comparing two floating point values for approximate equality here.
+            if (std::abs(ourPriority - targetConfig->getPriority()) < 1e-4) {
+                _abortReason = FreshnessTie;
+            }
+            // If we are lesser priority, respond that we are not freshest.
+            else if (ourPriority < targetConfig->getPriority()) {
+                log() << "not electing self, we are not highest priority";
+                _abortReason = FresherNodeFound;
+            }
+            // Otherwise, keep going, as we are higher priority than the responding node.
         }
         if (remoteTime > _lastOpTimeApplied) {
             // something really wrong (rogue command?)

@@ -2641,7 +2641,7 @@ namespace mongo {
                 string ns = parseNs( dbname, cmdObj );
                 ActionSet actions;
                 actions.addAction(ActionType::listIndexes);
-                out->push_back(Privilege(ResourcePattern::forCollectionName( ns ), actions));
+                out->push_back(Privilege(parseResourcePattern(dbname, cmdObj), actions));
             }
 
             bool run(OperationContext* txn, const string& dbName,

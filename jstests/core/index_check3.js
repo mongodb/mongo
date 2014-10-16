@@ -29,9 +29,9 @@ for ( var i=0; i<100; i++ ){
 
 t.ensureIndex( { foo : 1 } );
 
-var explain = t.find( { foo : { $lt : 50 } } ).explain();
+var explain = t.find( { foo : { $lt : 50 } } ).explain("executionStats");
 assert.gt( 30 , explain.executionStats.totalKeysExamined , "lt" );
-var explain = t.find( { foo : { $gt : 50 } } ).explain();
+var explain = t.find( { foo : { $gt : 50 } } ).explain("executionStats");
 assert.gt( 30 , explain.executionStats.totalKeysExamined , "gt" );
 
 
@@ -43,11 +43,11 @@ for( var i=0; i < 10; ++i ) {
 
 t.ensureIndex( { i : 1 } );
 
-var explain = t.find( { i : { $lte : 'a' } } ).explain();
+var explain = t.find( { i : { $lte : 'a' } } ).explain("executionStats");
 assert.gt( 3 , explain.executionStats.totalKeysExamined , "lte" );
 //printjson( t.find( { i : { $gte : 'a' } } ).explain() );
 // bug SERVER-99
-var explain = t.find( { i : { $gte : 'a' } } ).explain();
+var explain = t.find( { i : { $gte : 'a' } } ).explain("executionStats");
 assert.gt( 3 , explain.executionStats.totalKeysExamined , "gte" );
 assert.eq( 1 , t.find( { i : { $gte : 'a' } } ).count() , "gte a" );
 assert.eq( 1 , t.find( { i : { $gte : 'a' } } ).itcount() , "gte b" );
@@ -56,7 +56,7 @@ assert.eq( 1 , t.find( { i : { $gte : 'a' } } ).sort( { i : 1 } ).itcount() , "g
 
 t.save( { i : "b" } );
 
-var explain = t.find( { i : { $gte : 'a' } } ).explain();
+var explain = t.find( { i : { $gte : 'a' } } ).explain("executionStats");
 assert.gt( 3 , explain.executionStats.totalKeysExamined , "gte" );
 assert.eq( 2 , t.find( { i : { $gte : 'a' } } ).count() , "gte a2" );
 assert.eq( 2 , t.find( { i : { $gte : 'a' } } ).itcount() , "gte b2" );

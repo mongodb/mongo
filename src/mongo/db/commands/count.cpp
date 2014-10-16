@@ -26,6 +26,8 @@
  *    it in the license file.
  */
 
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kCommands
+
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/catalog/database.h"
@@ -85,11 +87,11 @@ namespace mongo {
             if (!getExecStatus.isOK()) {
                 return getExecStatus;
             }
+
             scoped_ptr<PlanExecutor> exec(rawExec);
+            exec->setYieldPolicy(PlanExecutor::YIELD_AUTO);
 
-            const ScopedExecutorRegistration safety(exec.get());
-
-            return Explain::explainStages(txn, exec.get(), verbosity, out);
+            return Explain::explainStages(exec.get(), verbosity, out);
         }
 
         virtual bool run(OperationContext* txn,
@@ -113,16 +115,14 @@ namespace mongo {
             if (!getExecStatus.isOK()) {
                 return appendCommandStatus(result, getExecStatus);
             }
+
             scoped_ptr<PlanExecutor> exec(rawExec);
+            exec->setYieldPolicy(PlanExecutor::YIELD_AUTO);
 
             // Store the plan summary string in CurOp.
             if (NULL != txn->getCurOp()) {
-                PlanSummaryStats stats;
-                Explain::getSummaryStats(exec.get(), &stats);
-                txn->getCurOp()->debug().planSummary = stats.summaryStr.c_str();
+                txn->getCurOp()->debug().planSummary = Explain::getPlanSummary(exec.get());
             }
-
-            const ScopedExecutorRegistration safety(exec.get());
 
             Status execPlanStatus = exec->executePlan();
             if (!execPlanStatus.isOK()) {
@@ -264,16 +264,14 @@ namespace mongo {
             errCode = parseStatus.code();
             return -1;
         }
+
         scoped_ptr<PlanExecutor> exec(rawExec);
+        exec->setYieldPolicy(PlanExecutor::YIELD_AUTO);
 
         // Store the plan summary string in CurOp.
         if (NULL != txn->getCurOp()) {
-            PlanSummaryStats stats;
-            Explain::getSummaryStats(exec.get(), &stats);
-            txn->getCurOp()->debug().planSummary = stats.summaryStr.c_str();
+            txn->getCurOp()->debug().planSummary = Explain::getPlanSummary(exec.get());
         }
-
-        const ScopedExecutorRegistration safety(exec.get());
 
         Status execPlanStatus = exec->executePlan();
         if (!execPlanStatus.isOK()) {

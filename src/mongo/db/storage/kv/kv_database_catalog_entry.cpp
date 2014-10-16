@@ -28,6 +28,8 @@
  *    it in the license file.
  */
 
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kStorage
+
 #include "mongo/db/storage/kv/kv_database_catalog_entry.h"
 
 #include "mongo/db/catalog/index_catalog_entry.h"

@@ -295,24 +295,45 @@ DBCollection.prototype._validateRemoveDoc = function(doc) {
     }
 };
 
-DBCollection.prototype.remove = function( t , justOne ){
-    if (t == undefined) throw Error("remove needs a query");
-    var result = undefined;
-    var startTime = (typeof(_verboseShell) === 'undefined' ||
-                     !_verboseShell) ? 0 : new Date().getTime();
+/**
+ * Does validation of the remove args. Throws if the parse is not successful, otherwise
+ * returns a document {query: <query>, justOne: <limit>, wc: <writeConcern>}.
+ */
+DBCollection.prototype._parseRemove = function( t , justOne ) {
+    if (undefined === t) throw Error("remove needs a query");
+
+    var query = this._massageObject(t);
 
     var wc = undefined;
-    if ( typeof(justOne) === 'object' ) {
+    if (typeof(justOne) === "object") {
         var opts = justOne;
         wc = opts.writeConcern;
         justOne = opts.justOne;
     }
 
-    if (!wc)
+    // Normalize "justOne" to a bool.
+    justOne = justOne ? true : false;
+
+    // Handle write concern.
+    if (!wc) {
         wc = this.getWriteConcern();
+    }
+
+    return {"query": query, "justOne": justOne, "wc": wc};
+}
+
+DBCollection.prototype.remove = function( t , justOne ){
+    var parsed = this._parseRemove(t, justOne);
+    var query = parsed.query;
+    var justOne = parsed.justOne;
+    var wc = parsed.wc;
+
+    var result = undefined;
+    var startTime = (typeof(_verboseShell) === 'undefined' ||
+                     !_verboseShell) ? 0 : new Date().getTime();
+
 
     if ( this.getMongo().writeMode() != "legacy" ) {
-        var query = (typeof(t) == 'undefined')? {} : this._massageObject(t);
         var bulk = this.initializeOrderedBulkOp();
         var removeOp = bulk.find(query);
 
@@ -338,8 +359,8 @@ DBCollection.prototype.remove = function( t , justOne ){
     }
     else {
         this._validateRemoveDoc(t);
-        this.getMongo().remove(this._fullName, this._massageObject(t), justOne ? true : false );
-        
+        this.getMongo().remove(this._fullName, query, justOne );
+
         // enforce write concern, if required
         if (wc)
             result = this.runCommand("getLastError", wc instanceof WriteConcern ? wc.toJSON() : wc);
@@ -366,15 +387,23 @@ DBCollection.prototype._validateUpdateDoc = function(doc) {
     }
 };
 
-DBCollection.prototype.update = function( query , obj , upsert , multi ){
-    assert( query , "need a query" );
-    assert( obj , "need an object" );
+/**
+ * Does validation of the update args. Throws if the parse is not successful, otherwise
+ * returns a document containing fields for query, obj, upsert, multi, and wc.
+ *
+ * Throws if the arguments are invalid.
+ */
+DBCollection.prototype._parseUpdate = function( query , obj , upsert , multi ){
+    if (!query) throw Error("need a query");
+    if (!obj) throw Error("need an object");
 
     var wc = undefined;
     // can pass options via object for improved readability
-    if ( typeof(upsert) === 'object' ) {
-        assert( multi === undefined, 
-                "Fourth argument must be empty when specifying upsert and multi with an object." );
+    if ( typeof(upsert) === "object" ) {
+        if (multi) {
+            throw Error("Fourth argument must be empty when specifying " +
+                        "upsert and multi with an object.");
+        }
 
         var opts = upsert;
         multi = opts.multi;
@@ -382,13 +411,33 @@ DBCollection.prototype.update = function( query , obj , upsert , multi ){
         upsert = opts.upsert;
     }
 
+    // Normalize 'upsert' and 'multi' to booleans.
+    upsert = upsert ? true : false;
+    multi = multi ? true : false;
+
+    if (!wc) {
+        wc = this.getWriteConcern();
+    }
+
+    return {"query": query,
+            "obj": obj,
+            "upsert": upsert,
+            "multi": multi,
+            "wc": wc};
+}
+
+DBCollection.prototype.update = function( query , obj , upsert , multi ){
+    var parsed = this._parseUpdate(query, obj, upsert, multi);
+    var query = parsed.query;
+    var obj = parsed.obj;
+    var upsert = parsed.upsert;
+    var multi = parsed.multi;
+    var wc = parsed.wc;
+
     var result = undefined;
     var startTime = (typeof(_verboseShell) === 'undefined' ||
                      !_verboseShell) ? 0 : new Date().getTime();
 
-    if (!wc)
-        wc = this.getWriteConcern();
-    
     if ( this.getMongo().writeMode() != "legacy" ) {
         var bulk = this.initializeOrderedBulkOp();
         var updateOp = bulk.find(query);
@@ -419,8 +468,7 @@ DBCollection.prototype.update = function( query , obj , upsert , multi ){
     }
     else {
         this._validateUpdateDoc(obj);
-        this.getMongo().update(this._fullName, query, obj,
-                           upsert ? true : false, multi ? true : false );
+        this.getMongo().update(this._fullName, query, obj, upsert, multi);
 
         // enforce write concern, if required
         if (wc)

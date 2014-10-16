@@ -34,6 +34,8 @@
  *    then also delete it in the license file.
  */
 
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kDefault
+
 #include "mongo/platform/basic.h"
 
 #include <boost/filesystem/operations.hpp>
@@ -71,13 +73,15 @@ namespace PerfTests {
 
     class ClientBase {
     public:
-        // NOTE: Not bothering to backup the old error record.
         ClientBase() : _client(&_txn) {
-            mongo::lastError.reset(new LastError());
+            _prevError = mongo::lastError._get( false );
+            mongo::lastError.release();
+            mongo::lastError.reset( new LastError() );
         }
         virtual ~ClientBase() {
-
+            mongo::lastError.reset( _prevError );
         }
+
     protected:
         void insert( const char *ns, BSONObj o ) {
             _client.insert( ns, o );
@@ -92,6 +96,7 @@ namespace PerfTests {
         DBClientBase* client() { return &_client; }
 
     private:
+        LastError* _prevError;
         OperationContextImpl _txn;
         DBDirectClient _client;
     };

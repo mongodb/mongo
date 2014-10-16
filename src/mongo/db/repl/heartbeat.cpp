@@ -112,11 +112,6 @@ namespace {
                 return false;
             }
 
-            if ( replSetBlind ) {
-                errmsg = str::stream() << "node is blind";
-                return false;
-            }
-
             /* we want to keep heartbeat connections open when relinquishing primary.  
                tag them here. */
             {
@@ -153,10 +148,6 @@ namespace {
                           int myCfgVersion,
                           int& theirCfgVersion,
                           bool checkEmpty) {
-        if( replSetBlind ) {
-            return false;
-        }
-
         MONGO_FAIL_POINT_BLOCK(rsStopHeartbeatRequest, member) {
             const BSONObj& data = member.getData();
             const std::string& stopMember = data["member"].str();

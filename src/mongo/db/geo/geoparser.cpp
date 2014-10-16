@@ -26,6 +26,8 @@
  *    it in the license file.
  */
 
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kGeo
+
 #include "mongo/db/geo/geoparser.h"
 
 #include <string>
@@ -468,8 +470,8 @@ namespace mongo {
         if (Array != coordElt.type())
             return BAD_VALUE("MultiLineString coordinates must be an array");
 
+        out->lines.clear();
         vector<S2Polyline*>& lines = out->lines.mutableVector();
-        lines.clear();
 
         BSONObjIterator it(coordElt.Obj());
 
@@ -494,8 +496,8 @@ namespace mongo {
         if (Array != coordElt.type())
             return BAD_VALUE("MultiPolygon coordinates must be an array");
 
+        out->polygons.clear();
         vector<S2Polygon*>& polygons = out->polygons.mutableVector();
-        polygons.clear();
 
         BSONObjIterator it(coordElt.Obj());
         // Iterate array

@@ -27,6 +27,8 @@
  *    then also delete it in the license file.
  */
 
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kDefault
+
 #include "mongo/platform/basic.h"
 
 #include "mongo/scripting/engine.h"
@@ -262,6 +264,8 @@ namespace {
     namespace JSFiles {
         extern const JSFile collection;
         extern const JSFile db;
+        extern const JSFile explain_query;
+        extern const JSFile explainable;
         extern const JSFile mongo;
         extern const JSFile mr;
         extern const JSFile query;
@@ -282,6 +286,8 @@ namespace {
         execSetup(JSFiles::query);
         execSetup(JSFiles::bulk_api);
         execSetup(JSFiles::collection);
+        execSetup(JSFiles::explain_query);
+        execSetup(JSFiles::explainable);
         execSetup(JSFiles::upgrade_check);
     }
 

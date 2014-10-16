@@ -29,6 +29,8 @@
  *    it in the license file.
  */
 
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kStorage
+
 #include "mongo/db/storage/mmap_v1/heap_record_store_btree.h"
 
 #include "mongo/db/operation_context.h"
@@ -43,6 +45,16 @@ namespace mongo {
         const Record& rec = it->second;
 
         return RecordData(rec.data.get(), rec.dataSize);
+    }
+
+    bool HeapRecordStoreBtree::findRecord(OperationContext* txn,
+                                          const DiskLoc& loc, RecordData* out) const {
+        Records::const_iterator it = _records.find(loc);
+        if ( it == _records.end() )
+            return false;
+        const Record& rec = it->second;
+        *out = RecordData(rec.data.get(), rec.dataSize);
+        return true;
     }
 
     void HeapRecordStoreBtree::deleteRecord(OperationContext* txn, const DiskLoc& loc) {

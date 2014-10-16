@@ -61,8 +61,6 @@ namespace {
 
 }  //namespace
 
-    MONGO_FP_DECLARE(rsHeartbeatRequestNoopByMember);
-
     void ReplicationCoordinatorImpl::_doMemberHeartbeat(ReplicationExecutor::CallbackData cbData,
                                                         const HostAndPort& target) {
 
@@ -71,51 +69,12 @@ namespace {
             return;
         }
 
-        // Are we blind, or do we have a failpoint setup to ignore this member?
-        bool dontHeartbeatMember = false; // TODO: replSetBlind should be here as the default
-
-        MONGO_FAIL_POINT_BLOCK(rsHeartbeatRequestNoopByMember, member) {
-            const StringData& stopMember = member.getData()["member"].valueStringData();
-            HostAndPort ignoreHAP;
-            Status status = ignoreHAP.initialize(stopMember);
-            // Ignore
-            if (status.isOK()) {
-                if (target == ignoreHAP) {
-                    dontHeartbeatMember = true;
-                }
-            }
-            else {
-                log() << "replset: Bad member for rsHeartbeatRequestNoopByMember failpoint "
-                       <<  member.getData() << ". 'member' failed to parse into HostAndPort -- "
-                       << status;
-            }
-        }
-
         const Date_t now = _replExecutor.now();
         const std::pair<ReplSetHeartbeatArgs, Milliseconds> hbRequest =
             _topCoord->prepareHeartbeatRequest(
                     now,
                     _settings.ourSetName(),
                     target);
-        if (dontHeartbeatMember) {
-            // Don't issue real heartbeats, just call start again after the timeout.
-            const StatusWith<ReplSetHeartbeatResponse> responseStatus(
-                    ErrorCodes::UnknownError,
-                    str::stream() << "Failure forced for heartbeat to " <<
-                    target.toString() << " due to failpoint.");
-            const HeartbeatResponseAction action =
-                _topCoord->processHeartbeatResponse(
-                        now,
-                        Milliseconds(0),
-                        target,
-                        responseStatus,
-                        _getLastOpApplied());
-            _scheduleHeartbeatToTarget(
-                    target,
-                    action.getNextHeartbeatStartDate());
-            _handleHeartbeatResponseAction(action, responseStatus);
-            return;
-        }
 
         const CmdRequest request(target, "admin", hbRequest.first.toBSON(), hbRequest.second);
         const ReplicationExecutor::RemoteCommandCallbackFn callback = stdx::bind(
@@ -158,27 +117,30 @@ namespace {
         BSONObj resp;
         if (responseStatus.isOK()) {
             resp = cbData.response.getValue().data;
-            responseStatus = getStatusFromCommandResult(resp);
-        }
-        if (responseStatus.isOK()) {
             responseStatus = hbResponse.initialize(resp);
         }
-        if (!responseStatus.isOK()) {
-            LOG(1) << "Error in heartbeat request to " << target << ";" << responseStatus;
-            if (!resp.isEmpty()) {
-                LOG(3) << "heartbeat response: " << resp;
-            }
-        }
+        const bool isUnauthorized = (responseStatus.code() == ErrorCodes::Unauthorized) ||
+                                    (responseStatus.code() == ErrorCodes::AuthenticationFailed);
         const Date_t now = _replExecutor.now();
         const OpTime lastApplied = _getLastOpApplied();  // Locks and unlocks _mutex.
         Milliseconds networkTime(0);
         StatusWith<ReplSetHeartbeatResponse> hbStatusResponse(hbResponse);
-        if (cbData.response.isOK()) {
+
+        if (responseStatus.isOK()) {
             networkTime = cbData.response.getValue().elapsedMillis;
         }
         else {
+            LOG(1) << "Error in heartbeat request to " << target << "; " << responseStatus;
+            if (!resp.isEmpty()) {
+                LOG(3) << "heartbeat response: " << resp;
+            }
+
+            if (isUnauthorized) {
+                networkTime = cbData.response.getValue().elapsedMillis;
+            }
             hbStatusResponse = StatusWith<ReplSetHeartbeatResponse>(responseStatus);
         }
+
         HeartbeatResponseAction action =
             _topCoord->processHeartbeatResponse(
                     now,
@@ -259,7 +221,7 @@ namespace {
     }
 
     void ReplicationCoordinatorImpl::_heartbeatStepDownStart() {
-        log() << "Stepping down from primary in repsonse to heartbeat";
+        log() << "Stepping down from primary in response to heartbeat";
         _replExecutor.scheduleWorkWithGlobalExclusiveLock(
                 stdx::bind(&ReplicationCoordinatorImpl::_heartbeatStepDownFinish,
                            this,
@@ -279,6 +241,7 @@ namespace {
         _updateCurrentMemberStateFromTopologyCoordinator_inlock();
         lk.unlock();
         _externalState->closeConnections();
+        _externalState->clearShardingState();
     }
 
     void ReplicationCoordinatorImpl::_scheduleHeartbeatReconfig(const ReplicaSetConfig& newConfig) {
@@ -378,7 +341,7 @@ namespace {
                   _rsConfig.getConfigVersion() < newConfig.getConfigVersion());
         if (!myIndex.isOK()) {
             switch (myIndex.getStatus().code()) {
-            case ErrorCodes::NoSuchKey:
+            case ErrorCodes::NodeNotFound:
                 log() << "Cannot find self in new replica set configuration; I must be removed; " <<
                     myIndex.getStatus();
                 break;

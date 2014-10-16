@@ -66,7 +66,18 @@ namespace mongo {
                  BSONObjBuilder& result,
                  bool /*fromRepl*/) {
 
-            const string ns = parseNs(dbname, cmdObj);
+            BSONElement first = cmdObj.firstElement();
+            uassert(
+                28528,
+                str::stream() << "Argument to listIndexes must be of type String, not "
+                              << typeName(first.type()),
+                first.type() == String);
+            const NamespaceString ns(parseNs(dbname, cmdObj));
+            uassert(
+                28529,
+                str::stream() << "Argument to listIndexes must be a collection name, "
+                              << "not the empty string",
+                !ns.coll().empty());
 
             AutoGetCollectionForRead autoColl(txn, ns);
             if (!autoColl.getDb()) {

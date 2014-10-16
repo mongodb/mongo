@@ -91,6 +91,18 @@ env.CppUnitTest(
         ]
     )
 
+
+env.CppUnitTest(
+    target='record_store_v1_test',
+    source=['mmap_v1_record_store_test.cpp',
+            ],
+    LIBDEPS=[
+        'record_store_v1_test_help',
+        '$BUILD_DIR/mongo/db/storage/record_store_test_harness'
+        ]
+    )
+
+
 env.Library(
     target= 'btree',
     source= [

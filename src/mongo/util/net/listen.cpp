@@ -624,12 +624,14 @@ namespace mongo {
             log() << "closing listening socket: " << sock << std::endl;
             closesocket( sock );
         }
+        delete sockets;
 
         for ( std::set<std::string>::iterator i=paths->begin(); i!=paths->end(); i++ ) {
             std::string path = *i;
             log() << "removing socket file: " << path << std::endl;
             ::remove( path.c_str() );
         }
+        delete paths;
     }
 
 }

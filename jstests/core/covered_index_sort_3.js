@@ -12,7 +12,9 @@ coll.insert
 coll.ensureIndex({a:1,b:-1,c:1})
 
 // Test no query, sort on all fields in index order
-var plan = coll.find({}, {b:1, c:1, _id:0}).sort({a:1,b:-1,c:1}).hint({a:1, b:-1, c:1}).explain()
+var plan = coll.find({}, {b:1, c:1, _id:0}).sort({a:1,b:-1,c:1})
+                                           .hint({a:1, b:-1, c:1})
+                                           .explain("executionStats");
 assert(isIndexOnly(plan.queryPlanner.winningPlan),
        "sort.3.1 - indexOnly should be true on covered query")
 assert.eq(0, plan.executionStats.totalDocsExamined,

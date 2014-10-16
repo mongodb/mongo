@@ -26,22 +26,11 @@ function testSelectWithSkip(coll){
     }
 
     // Run a query which only requires 5 results from a single shard
-    var explain = coll.find({ _id : { $gt : 1 }}).sort({ _id : 1 }).skip(90).limit(5).explain();
-    printjson(explain);
+    var explain = coll.find({ _id : { $gt : 1 }}).sort({ _id : 1 })
+                                                 .skip(90)
+                                                 .limit(5)
+                                                 .explain("executionStats");
 
-    if (explain.shards) {
-        // We can't use Object.keys here, so a bit awkward to get the first key
-        var shardEntry = null;
-        var numEntries = 0;
-        for (shardEntry in explain.shards) numEntries++;
-        assert.eq(numEntries, 1);
-
-        var shardExplain = explain.shards[shardEntry];
-        assert.eq(shardExplain.length, 1);
-        explain = shardExplain[0];
-    }
-
-    // What we're actually testing
     assert.lt(explain.executionStats.nReturned, 90);
 }
 
@@ -50,4 +39,3 @@ testSelectWithSkip(collUnSharded);
 
 jsTest.log("DONE!");
 st.stop();
-

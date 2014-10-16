@@ -32,9 +32,9 @@ assert( isIxscan(t.find(q1).explain().queryPlanner.winningPlan) , "e1" );
 assert( isIxscan(t.find(q2).explain().queryPlanner.winningPlan) , "e2" );
 assert( isIxscan(t.find(q3).explain().queryPlanner.winningPlan) , "e3" );
 
-scanned1 = t.find(q1).explain().executionStats.totalKeysExamined;
-scanned2 = t.find(q2).explain().executionStats.totalKeysExamined;
-scanned3 = t.find(q3).explain().executionStats.totalKeysExamined;
+scanned1 = t.find(q1).explain("executionStats").executionStats.totalKeysExamined;
+scanned2 = t.find(q2).explain("executionStats").executionStats.totalKeysExamined;
+scanned3 = t.find(q3).explain("executionStats").executionStats.totalKeysExamined;
 
 //print( "scanned1: " + scanned1 + " scanned2: " + scanned2 + " scanned3: " + scanned3 );
 

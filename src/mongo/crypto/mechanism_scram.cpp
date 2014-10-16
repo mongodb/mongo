@@ -139,10 +139,8 @@ namespace scram {
                                  &hashLen));
     }
 
-    BSONObj generateCredentials(const std::string& hashedPassword) {
+    BSONObj generateCredentials(const std::string& hashedPassword, int iterationCount) {
 
-        // TODO: configure the default iteration count via setParameter
-        const int iterationCount = 10;
         const int saltLenQWords = 2;
 
         // Generate salt

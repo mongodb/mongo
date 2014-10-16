@@ -810,12 +810,11 @@ var _bulk_api_module = (function() {
         bulkResult.writeConcernErrors.push(new WriteConcernError(result.writeConcernError));
       }
     }
-    
+
     //
-    // Execute the batch
-    var executeBatch = function(batch) {
+    // Constructs the write batch command.
+    var buildBatchCmd = function(batch) {
       var cmd = null;
-      var result = null;
 
       // Generate the right update
       if(batch.batchType == UPDATE) {
@@ -836,6 +835,15 @@ var _bulk_api_module = (function() {
       if(writeConcern) {
         cmd.writeConcern = writeConcern;
       }
+
+      return cmd;
+    }
+
+    //
+    // Execute the batch
+    var executeBatch = function(batch) {
+      var result = null;
+      var cmd = buildBatchCmd(batch);
 
       // Run the command (may throw)
 
@@ -1155,6 +1163,24 @@ var _bulk_api_module = (function() {
       }
 
       return typedResult;
+    }
+
+    // Generate an explain command for the bulk operation. Currently we only support single batches
+    // of size 1, which must be either delete or update.
+    this.convertToExplainCmd = function(verbosity) {
+      // If we have current batch
+      if (currentBatch) {
+        batches.push(currentBatch);
+      }
+
+      // We can only explain singleton batches.
+      if (batches.length !== 1) {
+        throw Error("Explained bulk operations must consist of exactly 1 batch");
+      }
+
+      var explainBatch = batches[0];
+      var writeCmd = buildBatchCmd(explainBatch);
+      return {"explain": writeCmd, "verbosity": verbosity};
     }
   }
 

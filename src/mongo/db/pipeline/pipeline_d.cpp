@@ -208,7 +208,10 @@ namespace {
         }
 
 
-        // DocumentSourceCursor expects a yielding PlanExecutor that has had its state saved.
+        // DocumentSourceCursor expects a yielding PlanExecutor that has had its state saved. We
+        // pass "false" here to indicate that the PlanExecutor should not register itself: instead
+        // the output PlanExecutor will get registered with a ClientCursor.
+        exec->setYieldPolicy(PlanExecutor::YIELD_AUTO, false);
         exec->saveState();
 
         // Put the PlanExecutor into a DocumentSourceCursor and add it to the front of the pipeline.

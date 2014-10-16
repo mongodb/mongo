@@ -43,9 +43,16 @@ namespace DirectClientTests {
 
     class ClientBase {
     public:
-        // NOTE: Not bothering to backup the old error record.
-        ClientBase() {  mongo::lastError.reset( new LastError() );  }
-        virtual ~ClientBase() { }
+        ClientBase() {
+            _prevError = mongo::lastError._get( false );
+            mongo::lastError.release();
+            mongo::lastError.reset( new LastError() );
+        }
+        virtual ~ClientBase() {
+            mongo::lastError.reset( _prevError );
+        }
+    private:
+        LastError* _prevError;
     };
 
     const char *ns = "a.b";

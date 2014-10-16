@@ -362,16 +362,13 @@ namespace mongo {
     */
     class ChunkManager {
     public:
-        typedef std::map<Shard,ChunkVersion> ShardVersionMap;
+        typedef std::map<std::string, ChunkVersion> ShardVersionMap;
 
         // Loads a new chunk manager from a collection document
         ChunkManager( const BSONObj& collDoc );
 
         // Creates an empty chunk manager for the namespace
         ChunkManager( const std::string& ns, const ShardKeyPattern& pattern, bool unique );
-
-        // Updates a chunk manager based on an older manager
-        ChunkManager( ChunkManagerPtr oldManager );
 
         std::string getns() const { return _ns; }
 
@@ -400,7 +397,7 @@ namespace mongo {
                                 const std::vector<Shard>* initShards );
 
         // Loads existing ranges based on info in chunk manager
-        void loadExistingRanges( const std::string& config );
+        void loadExistingRanges(const std::string& config, const ChunkManager* oldManager);
 
 
         // Helpers for load
@@ -465,16 +462,14 @@ namespace mongo {
         /**
          * Returns true if, for this shard, the chunks are identical in both chunk managers
          */
-        bool compatibleWith( const ChunkManager& other, const Shard& shard ) const;
-        bool compatibleWith( ChunkManagerPtr other, const Shard& shard ) const { if( ! other ) return false; return compatibleWith( *other, shard ); }
+        bool compatibleWith(const ChunkManager& other, const std::string& shard) const;
 
         bool compatibleWith( const Chunk& other ) const;
         bool compatibleWith( ChunkPtr other ) const { if( ! other ) return false; return compatibleWith( *other ); }
 
         std::string toString() const;
 
-        ChunkVersion getVersion( const StringData& shardName ) const;
-        ChunkVersion getVersion( const Shard& shard ) const;
+        ChunkVersion getVersion(const std::string& shardName) const;
         ChunkVersion getVersion() const;
 
         void getInfo( BSONObjBuilder& b ) const;
@@ -498,8 +493,11 @@ namespace mongo {
         // helpers for loading
 
         // returns true if load was consistent
-        bool _load( const std::string& config, ChunkMap& chunks, std::set<Shard>& shards,
-                                    ShardVersionMap& shardVersions, ChunkManagerPtr oldManager);
+        bool _load(const std::string& config,
+                   ChunkMap& chunks,
+                   std::set<Shard>& shards,
+                   ShardVersionMap& shardVersions,
+                   const ChunkManager* oldManager);
         static bool _isValid(const ChunkMap& chunks);
 
         // end helpers
@@ -518,10 +516,6 @@ namespace mongo {
 
         // max version of any chunk
         ChunkVersion _version;
-
-        // the previous manager this was based on
-        // cleared after loading chunks
-        ChunkManagerPtr _oldManager;
 
         mutable mutex _mutex; // only used with _nsLock
 

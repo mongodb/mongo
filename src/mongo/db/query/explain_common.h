@@ -56,14 +56,6 @@ namespace mongo {
             // At this second-highest verbosity level, we generate the execution stats for each
             // rejected plan as well as the winning plan. String alias is "allPlansExecution".
             EXEC_ALL_PLANS = 2,
-
-            // This is the highest verbosity level. It has the same behavior as EXEC_ALL_PLANS,
-            // except it includes more detailed stats. String alias is "full".
-            //
-            // The FULL verbosity level is used to generate detailed debug information for the
-            // plan cache and for logging. It includes metrics like "works", "isEOF", and "advanced"
-            // that are omitted at lesser verbosities.
-            FULL = 3,
         };
 
         /**

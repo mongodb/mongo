@@ -58,6 +58,9 @@
 
 namespace mongo {
 
+    const std::string RocksEngine::kOrderingPrefix("indexordering-");
+    const std::string RocksEngine::kCollectionPrefix("collection-");
+
     // TODO make create/drop operations support rollback?
 
     RocksEngine::RocksEngine(const std::string& path)
@@ -99,7 +102,9 @@ namespace mongo {
             } else if (isCollection) {
                 columnFamilies.emplace_back(cf, _collectionOptions());
             } else {
-                // this can happen because write and createColumnFamily are not atomic
+                // TODO support this from inside of rocksdb, by using
+                // Options::drop_unopened_column_families.
+                // This can happen because write and createColumnFamily are not atomic
                 toDropColumnFamily.insert(cf);
                 columnFamilies.emplace_back(cf, _collectionOptions());
             }
@@ -136,7 +141,7 @@ namespace mongo {
         if (_existsColumnFamily(ident)) {
             return Status::OK();
         }
-        _db->Put(rocksdb::WriteOptions(), "collection-" + ident.toString(), rocksdb::Slice());
+        _db->Put(rocksdb::WriteOptions(), kCollectionPrefix + ident.toString(), rocksdb::Slice());
         return _createColumnFamily(_collectionOptions(), ident);
     }
 
@@ -155,7 +160,7 @@ namespace mongo {
     }
 
     Status RocksEngine::dropRecordStore(OperationContext* opCtx, const StringData& ident) {
-        _db->Delete(rocksdb::WriteOptions(), "collection-" + ident.toString());
+        _db->Delete(rocksdb::WriteOptions(), kCollectionPrefix + ident.toString());
         return _dropColumnFamily(ident);
     }
 
@@ -166,7 +171,7 @@ namespace mongo {
         }
         auto keyPattern = desc->keyPattern();
 
-        _db->Put(rocksdb::WriteOptions(), "indexordering-" + ident.toString(),
+        _db->Put(rocksdb::WriteOptions(), kOrderingPrefix + ident.toString(),
                  rocksdb::Slice(keyPattern.objdata(), keyPattern.objsize()));
         return _createColumnFamily(_indexOptions(Ordering::make(keyPattern)), ident);
     }
@@ -179,7 +184,7 @@ namespace mongo {
     }
 
     Status RocksEngine::dropSortedDataInterface(OperationContext* opCtx, const StringData& ident) {
-        _db->Delete(rocksdb::WriteOptions(), "indexordering-" + ident.toString());
+        _db->Delete(rocksdb::WriteOptions(), kOrderingPrefix + ident.toString());
         return _dropColumnFamily(ident);
     }
 
@@ -235,7 +240,6 @@ namespace mongo {
 
     std::unordered_map<std::string, Ordering> RocksEngine::_loadOrderingMetaData(
         rocksdb::Iterator* itr) {
-        const rocksdb::Slice kOrderingPrefix("ordering-");
         std::unordered_map<std::string, Ordering> orderings;
         for (itr->Seek(kOrderingPrefix); itr->Valid(); itr->Next()) {
             rocksdb::Slice key(itr->key());
@@ -251,7 +255,6 @@ namespace mongo {
     }
 
     std::set<std::string> RocksEngine::_loadCollections(rocksdb::Iterator* itr) {
-        const rocksdb::Slice kCollectionPrefix("collection-");
         std::set<std::string> collections;
         for (itr->Seek(kCollectionPrefix); itr->Valid() ; itr->Next()) {
             rocksdb::Slice key(itr->key());

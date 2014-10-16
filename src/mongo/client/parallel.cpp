@@ -660,7 +660,9 @@ namespace mongo {
                         warning() << "Weird shift of primary detected" << endl;
 
                     compatiblePrimary = primary && state->primary && primary == state->primary;
-                    compatibleManager = manager && state->manager && manager->compatibleWith( state->manager, shard );
+                    compatibleManager = manager &&
+                                        state->manager &&
+                                        manager->compatibleWith(*state->manager, shard.getName());
 
                     if( compatiblePrimary || compatibleManager ){
                         // If we're compatible, don't need to retry unless forced

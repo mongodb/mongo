@@ -75,6 +75,30 @@ namespace {
         }
         fn();
     }
+
+    /**
+     * Implements the force-reconfig behavior of incrementing config version by a large random
+     * number.
+     */
+    BSONObj incrementConfigVersionByRandom(BSONObj config) {
+        BSONObjBuilder builder;
+        for (BSONObjIterator iter(config); iter.more(); iter.next()) {
+            BSONElement elem = *iter;
+            if (elem.fieldNameStringData() == ReplicaSetConfig::kVersionFieldName &&
+                elem.isNumber()) {
+
+                boost::scoped_ptr<SecureRandom> generator(SecureRandom::create());
+                const int random = std::abs(static_cast<int>(generator->nextInt64()) % 100000);
+                builder.appendIntOrLL(ReplicaSetConfig::kVersionFieldName,
+                                      elem.numberLong() + 10000 + random);
+            }
+            else {
+                builder.append(elem);
+            }
+        }
+        return builder.obj();
+    }
+
 } //namespace
 
     struct ReplicationCoordinatorImpl::WaiterInfo {
@@ -129,7 +153,7 @@ namespace {
             return;
         }
 
-        scoped_ptr<SecureRandom> rbidGenerator(SecureRandom::create());
+        boost::scoped_ptr<SecureRandom> rbidGenerator(SecureRandom::create());
         _rbid = static_cast<int>(rbidGenerator->nextInt64());
     }
 
@@ -215,7 +239,7 @@ namespace {
         boost::unique_lock<boost::mutex> lk(_mutex);
         invariant(_rsConfigState == kConfigStartingUp);
         _setCurrentRSConfig_inlock(localConfig, myIndex.getValue());
-        _setLastOptime_inlock(&lk, _getMyRID_inlock(), lastOpTime);
+        _setMyLastOptime_inlock(&lk, lastOpTime);
     }
 
     void ReplicationCoordinatorImpl::startReplication(OperationContext* txn) {
@@ -226,10 +250,12 @@ namespace {
         }
 
         {
+            OID rid = _externalState->ensureMe(txn);
+
             boost::lock_guard<boost::mutex> lk(_mutex);
             fassert(18822, !_inShutdown);
             _setConfigState_inlock(kConfigStartingUp);
-            _myRID = _externalState->ensureMe(txn);
+            _myRID = rid;
         }
 
         if (!_settings.usingReplSets()) {
@@ -267,6 +293,7 @@ namespace {
 
         {
             boost::lock_guard<boost::mutex> lk(_mutex);
+            fassert(28533, !_inShutdown);
             _inShutdown = true;
             if (_rsConfigState == kConfigPreStart) {
                 warning() << "ReplicationCoordinatorImpl::shutdown() called before "
@@ -367,16 +394,6 @@ namespace {
         return success;
     }
 
-    bool ReplicationCoordinatorImpl::isWaitingForApplierToDrain() {
-        boost::lock_guard<boost::mutex> lk(_mutex);
-        return _isWaitingForDrainToComplete;
-    }
-
-    void ReplicationCoordinatorImpl::signalDrainComplete() {
-        boost::lock_guard<boost::mutex> lk(_mutex);
-        _isWaitingForDrainToComplete = false;
-    }
-
     void ReplicationCoordinatorImpl::_setFollowerModeFinish(
             const ReplicationExecutor::CallbackData& cbData,
             const MemberState& newState,
@@ -429,11 +446,60 @@ namespace {
              // triggered by incoming heartbeats, but with a one-node set there are no
              // heartbeats.
              _topCoord->processWinElection(OID::gen(), getNextGlobalOptime());
+             _isWaitingForDrainToComplete = true;
          }
 
         _updateCurrentMemberStateFromTopologyCoordinator_inlock();
         *success = true;
         _replExecutor.signalEvent(finishedSettingFollowerMode);
+    }
+
+    bool ReplicationCoordinatorImpl::isWaitingForApplierToDrain() {
+        boost::lock_guard<boost::mutex> lk(_mutex);
+        return _isWaitingForDrainToComplete;
+    }
+
+    void ReplicationCoordinatorImpl::signalDrainComplete() {
+        // This logic is a little complicated in order to avoid acquiring the global exclusive lock
+        // unnecessarily.  This is important because the applier may call signalDrainComplete()
+        // whenever it wants, not only when the ReplicationCoordinator is expecting it.
+        //
+        // The steps are:
+        // 1.) Check to see if we're waiting for this signal.  If not, return early.
+        // 2.) Otherwise, release the mutex while acquiring the global exclusive lock,
+        //     since that might take a while (NB there's a deadlock cycle otherwise, too).
+        // 3.) Re-check to see if we've somehow left drain mode.  If we are, clear
+        //     _isWaitingForDrainToComplete and drop the mutex.  At this point, no writes
+        //     can occur from other threads, due to the global exclusive lock.
+        // 4.) Drop all temp collections.
+        // 5.) Drop the global exclusive lock.
+        //
+        // Because replicatable writes are forbidden while in drain mode, and we don't exit drain
+        // mode until we have the global exclusive lock, which forbids all other threads from making
+        // writes, we know that from the time that _isWaitingForDrainToComplete is set after calls
+        // to _topCoord->processWinElection() until this method returns, no external writes will be
+        // processed.  This is important so that a new temp collection isn't introduced on the new
+        // primary before we drop all the temp collections.
+
+        boost::unique_lock<boost::mutex> lk(_mutex);
+        if (!_isWaitingForDrainToComplete) {
+            return;
+        }
+        lk.unlock();
+        boost::scoped_ptr<OperationContext> txn(_externalState->createOperationContext());
+        Lock::GlobalWrite globalWriteLock(txn->lockState());
+        lk.lock();
+        if (!_isWaitingForDrainToComplete) {
+            return;
+        }
+        _isWaitingForDrainToComplete = false;
+        lk.unlock();
+        _externalState->dropAllTempCollections(txn.get());
+        log() << "transition to primary complete; database writes are now permitted";
+    }
+
+    void ReplicationCoordinatorImpl::signalUpstreamUpdater() {
+        _externalState->forwardSlaveHandshake();
     }
 
     Status ReplicationCoordinatorImpl::setLastOptime(OperationContext* txn,
@@ -445,7 +511,16 @@ namespace {
 
     Status ReplicationCoordinatorImpl::setMyLastOptime(OperationContext* txn, const OpTime& ts) {
         boost::unique_lock<boost::mutex> lock(_mutex);
-        return _setLastOptime_inlock(&lock, _getMyRID_inlock(), ts);
+        _setMyLastOptime_inlock(&lock, ts);
+        return Status::OK();
+    }
+
+    void ReplicationCoordinatorImpl::_setMyLastOptime_inlock(
+        boost::unique_lock<boost::mutex>* lock, const OpTime& ts) {
+
+        invariant(lock->owns_lock());
+        SlaveInfo& slaveInfo = _slaveInfoMap[_getMyRID_inlock()];
+        _updateOptimeInMap_inlock(lock, &slaveInfo, ts);
     }
 
     OpTime ReplicationCoordinatorImpl::getMyLastOptime() const {
@@ -475,8 +550,7 @@ namespace {
                           << "member ID: " << slaveInfo.memberID << ", stored member hostAndPort: "
                           << slaveInfo.hostAndPort.toString() << ".  Our RID: " <<
                           _getMyRID_inlock();
-                warning() << errmsg;
-                dassert(false);
+                LOG(1) << errmsg;
                 return Status(ErrorCodes::NodeNotFound, errmsg);
             }
             else {
@@ -487,32 +561,42 @@ namespace {
         }
 
         LOG(3) << "Node with RID " << rid << " currently has optime " << slaveInfo.opTime <<
-                "; updating to " << ts;
+            "; updating to " << ts;
 
-        // Only update optimes if they increase.  Exception: this own node's last applied optime,
-        // which may rewind if we roll back.
-        if ((slaveInfo.opTime < ts) || (rid == _myRID)) {
-            slaveInfo.opTime = ts;
-
-            // Wake up any threads waiting for replication that now have their replication
-            // check satisfied
-            for (std::vector<WaiterInfo*>::iterator it = _replicationWaiterList.begin();
-                    it != _replicationWaiterList.end(); ++it) {
-                WaiterInfo* info = *it;
-                if (_doneWaitingForReplication_inlock(*info->opTime, *info->writeConcern)) {
-                    info->condVar->notify_all();
-                }
-            }
-
-            if (_getReplicationMode_inlock() == modeReplSet &&
-                    !_getCurrentMemberState_inlock().primary()) {
-                // pass along if we are not primary
-                lock->unlock();
-                _externalState->forwardSlaveProgress(); // Must do this outside _mutex
-            }
+        // Only update remote optimes if they increase.
+        if (slaveInfo.opTime < ts) {
+            _updateOptimeInMap_inlock(lock, &slaveInfo, ts);
         }
         return Status::OK();
     }
+
+    void ReplicationCoordinatorImpl::_updateOptimeInMap_inlock(
+        boost::unique_lock<boost::mutex>* lock,
+        SlaveInfo* slaveInfo,
+        OpTime ts) {
+
+        invariant(lock->owns_lock());
+
+        slaveInfo->opTime = ts;
+
+        // Wake up any threads waiting for replication that now have their replication
+        // check satisfied
+        for (std::vector<WaiterInfo*>::iterator it = _replicationWaiterList.begin();
+             it != _replicationWaiterList.end(); ++it) {
+            WaiterInfo* info = *it;
+            if (_doneWaitingForReplication_inlock(*info->opTime, *info->writeConcern)) {
+                info->condVar->notify_all();
+            }
+        }
+
+        if (_getReplicationMode_inlock() == modeReplSet &&
+            !_getCurrentMemberState_inlock().primary()) {
+            // pass along if we are not primary
+            lock->unlock();
+            _externalState->forwardSlaveProgress(); // Must do this outside _mutex
+        }
+    }
+
 
     OpTime ReplicationCoordinatorImpl::_getLastOpApplied() {
         boost::lock_guard<boost::mutex> lk(_mutex);
@@ -545,11 +629,12 @@ namespace {
     }
 
     bool ReplicationCoordinatorImpl::_doneWaitingForReplication_inlock(
-            const OpTime& opTime, const WriteConcernOptions& writeConcern) {
+        const OpTime& opTime, const WriteConcernOptions& writeConcern) {
+
         if (!writeConcern.wMode.empty()) {
             if (writeConcern.wMode == "majority") {
-                return _doneWaitingForReplication_numNodes_inlock(opTime,
-                                                                  _rsConfig.getMajorityNumber());
+                return _haveNumNodesReachedOpTime_inlock(opTime,
+                                                         _rsConfig.getMajorityVoteCount());
             }
             else {
                 StatusWith<ReplicaSetTagPattern> tagPattern =
@@ -557,29 +642,30 @@ namespace {
                 if (!tagPattern.isOK()) {
                     return true;
                 }
-                return _doneWaitingForReplication_gleMode_inlock(opTime, tagPattern.getValue());
+                return _haveTaggedNodesReachedOpTime_inlock(opTime, tagPattern.getValue());
             }
         }
         else {
-            return _doneWaitingForReplication_numNodes_inlock(opTime, writeConcern.wNumNodes);
+            return _haveNumNodesReachedOpTime_inlock(opTime, writeConcern.wNumNodes);
         }
     }
 
-    bool ReplicationCoordinatorImpl::_doneWaitingForReplication_numNodes_inlock(
-            const OpTime& opTime, int numNodes) {
+    bool ReplicationCoordinatorImpl::_haveNumNodesReachedOpTime_inlock(const OpTime& opTime, 
+                                                                       int numNodes) {
+        if (_getLastOpApplied_inlock() < opTime) {
+            // Secondaries that are for some reason ahead of us should not allow us to
+            // satisfy a write concern if we aren't caught up ourselves.
+            return false;
+        }
+
         for (SlaveInfoMap::iterator it = _slaveInfoMap.begin();
                 it != _slaveInfoMap.end(); ++it) {
+
             const OpTime& slaveTime = it->second.opTime;
             if (slaveTime >= opTime) {
                 --numNodes;
             }
-            else {
-                if (it->first == _getMyRID_inlock()) {
-                    // Secondaries that are for some reason ahead of us should not allow us to
-                    // satisfy a write concern if we aren't caught up ourself.
-                    return false;
-                }
-            }
+
             if (numNodes <= 0) {
                 return true;
             }
@@ -587,11 +673,13 @@ namespace {
         return false;
     }
 
-    bool ReplicationCoordinatorImpl::_doneWaitingForReplication_gleMode_inlock(
-            const OpTime& opTime, const ReplicaSetTagPattern& tagPattern) {
+    bool ReplicationCoordinatorImpl::_haveTaggedNodesReachedOpTime_inlock(
+        const OpTime& opTime, const ReplicaSetTagPattern& tagPattern) {
+
         ReplicaSetTagMatch matcher(tagPattern);
         for (SlaveInfoMap::iterator it = _slaveInfoMap.begin();
                 it != _slaveInfoMap.end(); ++it) {
+
             const OpTime& slaveTime = it->second.opTime;
             if (slaveTime >= opTime) {
                 // This node has reached the desired optime, now we need to check if it is a part
@@ -748,7 +836,8 @@ namespace {
         }
 
         WriteConcernOptions writeConcern;
-        writeConcern.wNumNodes = 2; // Make sure at least 1 other node is caught up
+        // Make sure at least 1 other *electable* node is caught up
+        writeConcern.wMode = ReplicaSetConfig::kStepDownCheckWriteConcernModeName;
         {
             // Figure out how long to wait.  Take the specified wait time unless waiting that long
             // would put us past the time we were supposed to step down until.
@@ -821,10 +910,14 @@ namespace {
 
         _topCoord->setStepDownTime(stepdownUntil);
         _topCoord->stepDown();
+        // Schedule work to (potentially) step back up once the stepdown period has ended.
+        _replExecutor.scheduleWorkAt(stepdownUntil,
+                                     stdx::bind(&ReplicationCoordinatorImpl::_handleTimePassing,
+                                                this,
+                                                stdx::placeholders::_1));
+
         boost::unique_lock<boost::mutex> lk(_mutex);
         _updateCurrentMemberStateFromTopologyCoordinator_inlock();
-        lk.unlock();
-        _externalState->closeConnections();
         // Wake up any threads blocked in awaitReplication
         for (std::vector<WaiterInfo*>::iterator it = _replicationWaiterList.begin();
                 it != _replicationWaiterList.end(); ++it) {
@@ -832,7 +925,25 @@ namespace {
             info->master = false;
             info->condVar->notify_all();
         }
+        lk.unlock();
+        _externalState->closeConnections();
+        _externalState->clearShardingState();
         *result = Status::OK();
+    }
+
+    void ReplicationCoordinatorImpl::_handleTimePassing(
+            const ReplicationExecutor::CallbackData& cbData) {
+        if (!cbData.status.isOK()) {
+            return;
+        }
+
+        if (_topCoord->becomeCandidateIfStepdownPeriodOverAndSingleNodeSet(_replExecutor.now())) {
+            _topCoord->processWinElection(OID::gen(), getNextGlobalOptime());
+            _isWaitingForDrainToComplete = true;
+
+            boost::lock_guard<boost::mutex> lock(_mutex);
+            _updateCurrentMemberStateFromTopologyCoordinator_inlock();
+        }
     }
 
     bool ReplicationCoordinatorImpl::isMasterForReportingPurposes() {
@@ -1166,19 +1277,43 @@ namespace {
     Status ReplicationCoordinatorImpl::processReplSetFreeze(int secs, BSONObjBuilder* resultObj) {
         Status result(ErrorCodes::InternalError, "didn't set status in prepareFreezeResponse");
         CBHStatus cbh = _replExecutor.scheduleWork(
-            stdx::bind(&TopologyCoordinator::prepareFreezeResponse,
-                       _topCoord.get(),
+            stdx::bind(&ReplicationCoordinatorImpl::_processReplSetFreeze_finish,
+                       this,
                        stdx::placeholders::_1,
-                       _replExecutor.now(),
                        secs,
                        resultObj,
                        &result));
         if (cbh.getStatus() == ErrorCodes::ShutdownInProgress) {
-            return Status(ErrorCodes::ShutdownInProgress, "replication shutdown in progress");
+            return cbh.getStatus();
         }
         fassert(18641, cbh.getStatus());
         _replExecutor.wait(cbh.getValue());
         return result;
+    }
+
+    void ReplicationCoordinatorImpl::_processReplSetFreeze_finish(
+            const ReplicationExecutor::CallbackData& cbData,
+            int secs,
+            BSONObjBuilder* response,
+            Status* result) {
+        if (cbData.status == ErrorCodes::CallbackCanceled) {
+            *result = Status(ErrorCodes::ShutdownInProgress, "replication system is shutting down");
+            return;
+        }
+
+        _topCoord->prepareFreezeResponse(_replExecutor.now(), secs, response);
+
+        if (_topCoord->getRole() == TopologyCoordinator::Role::candidate) {
+            // If we just unfroze and ended our stepdown period and we are a one node replica set,
+            // the topology coordinator will have gone into the candidate role to signal that we
+            // need to elect ourself.
+            _topCoord->processWinElection(OID::gen(), getNextGlobalOptime());
+            _isWaitingForDrainToComplete = true;
+
+            boost::lock_guard<boost::mutex> lock(_mutex);
+            _updateCurrentMemberStateFromTopologyCoordinator_inlock();
+        }
+        *result = Status::OK();
     }
 
     Status ReplicationCoordinatorImpl::processHeartbeat(const ReplSetHeartbeatArgs& args,
@@ -1259,7 +1394,7 @@ namespace {
             return Status(ErrorCodes::NotYetInitialized,
                           "Node not yet initialized; use the replSetInitiate command");
         case kConfigReplicationDisabled:
-            return Status(ErrorCodes::NoReplicationEnabled, "Node is not a replica set member");
+            invariant(false); // should be unreachable due to !_settings.usingReplSets() check above
         case kConfigInitiating:
         case kConfigReconfiguring:
         case kConfigHBReconfiguring:
@@ -1292,11 +1427,15 @@ namespace {
         lk.unlock();
 
         ReplicaSetConfig newConfig;
-        Status status = newConfig.initialize(args.newConfigObj);
+        BSONObj newConfigObj = args.newConfigObj;
+        if (args.force) {
+            newConfigObj = incrementConfigVersionByRandom(newConfigObj);
+        }
+        Status status = newConfig.initialize(newConfigObj);
         if (!status.isOK()) {
-            error() << "replSetReconfig got " << status << " while parsing " << args.newConfigObj <<
+            error() << "replSetReconfig got " << status << " while parsing " << newConfigObj <<
                 rsLog;
-            return status;
+            return Status(ErrorCodes::InvalidReplicaSetConfig, status.reason());;
         }
         if (newConfig.getReplSetName() != _settings.ourSetName()) {
             str::stream errmsg;
@@ -1304,7 +1443,7 @@ namespace {
                 newConfig.getReplSetName() << ", but command line reports " <<
                 _settings.ourSetName() << "; rejecting";
             error() << std::string(errmsg);
-            return Status(ErrorCodes::BadValue, errmsg);
+            return Status(ErrorCodes::InvalidReplicaSetConfig, errmsg);
         }
 
         StatusWith<int> myIndex = validateConfigForReconfig(
@@ -1314,8 +1453,9 @@ namespace {
                 args.force);
         if (!myIndex.isOK()) {
             error() << "replSetReconfig got " << myIndex.getStatus() << " while validating " <<
-                args.newConfigObj << rsLog;
-            return myIndex.getStatus();
+                newConfigObj << rsLog;
+            return Status(ErrorCodes::NewReplicaSetConfigurationIncompatible,
+                          myIndex.getStatus().reason());
         }
 
         log() << "replSetReconfig config object with " << newConfig.getNumMembers() <<
@@ -1554,6 +1694,8 @@ namespace {
             const ReplicaSetConfig& newConfig,
             int myIndex) {
          invariant(_settings.usingReplSets());
+         const MemberState previousState = _currentState;
+
          _cancelHeartbeats();
          _setConfigState_inlock(kConfigSteady);
          _rsConfig = newConfig;
@@ -1570,13 +1712,14 @@ namespace {
              // triggered by incoming heartbeats, but with a one-node set there are no
              // heartbeats.
              _topCoord->processWinElection(OID::gen(), getNextGlobalOptime());
+             _isWaitingForDrainToComplete = true;
          }
 
-         MemberState previousState = _currentState;
          _updateCurrentMemberStateFromTopologyCoordinator_inlock();
-         if (previousState.primary() && !_currentState.primary()) {
-             // Close connections on stepdown
+         if (_currentState.removed() || (previousState.primary() && !_currentState.primary())) {
+             // Close connections on stepdown or when removed from the replica set.
              _externalState->closeConnections();
+             _externalState->clearShardingState();
              // Closing all connections will make the applier choose a new sync source, so we don't
              // need to do that explicitly in this case.
          }
@@ -1725,7 +1868,7 @@ namespace {
         if (_getReplicationMode_inlock() == modeMasterSlave) {
             if (!writeConcern.wMode.empty()) {
                 return Status(ErrorCodes::UnknownReplWriteConcern,
-                              "Cannot used named write concern modes in master-slave");
+                              "Cannot use named write concern modes in master-slave");
             }
             // No way to know how many slaves there are, so assume any numeric mode is possible.
             return Status::OK();
@@ -1821,8 +1964,7 @@ namespace {
         else {
             lastOpTime = lastOpTimeStatus.getValue();
         }
-        boost::unique_lock<boost::mutex> lk(_mutex);
-        _setLastOptime_inlock(&lk, _getMyRID_inlock(), lastOpTime);
+        setMyLastOptime(txn, lastOpTime);
     }
 
     void ReplicationCoordinatorImpl::_shouldChangeSyncSource(

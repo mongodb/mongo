@@ -26,6 +26,8 @@
  *    it in the license file.
  */
 
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kDefault
+
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/ops/delete_executor.h"
@@ -36,6 +38,7 @@
 #include "mongo/db/ops/delete_request.h"
 #include "mongo/db/query/canonical_query.h"
 #include "mongo/db/query/get_executor.h"
+#include "mongo/db/query/query_planner_common.h"
 #include "mongo/db/repl/repl_coordinator_global.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/log.h"
@@ -149,12 +152,26 @@ namespace mongo {
                                               &rawExec);
         }
 
-        if (getExecStatus.isOK()) {
-            invariant(rawExec);
-            _exec.reset(rawExec);
+        if (!getExecStatus.isOK()) {
+            return getExecStatus;
         }
 
-        return getExecStatus;
+        invariant(rawExec);
+        _exec.reset(rawExec);
+
+        // If yielding is allowed for this plan, then set an auto yield policy. Otherwise set
+        // a manual yield policy.
+        const bool canYield = !_request->isGod() && (
+            _canonicalQuery.get() ?
+            !QueryPlannerCommon::hasNode(_canonicalQuery->root(), MatchExpression::ATOMIC) :
+            !LiteParsedQuery::isQueryIsolated(_request->getQuery()));
+
+        PlanExecutor::YieldPolicy policy = canYield ? PlanExecutor::YIELD_AUTO :
+                                                      PlanExecutor::YIELD_MANUAL;
+
+        _exec->setYieldPolicy(policy);
+
+        return Status::OK();
     }
 
     long long DeleteExecutor::execute(Database* db) {
@@ -163,9 +180,6 @@ namespace mongo {
         // If we've already done the in-lock preparation, this is a no-op.
         uassertStatusOK(prepareInLock(db));
         invariant(_exec.get());
-
-        // Concurrently mutating state (by us) so we need to register 'exec'.
-        const ScopedExecutorRegistration safety(_exec.get());
 
         uassertStatusOK(_exec->executePlan());
 

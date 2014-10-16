@@ -47,6 +47,7 @@
 #include "mongo/db/repl/repl_settings.h"
 #include "mongo/db/repl/replica_set_config.h"
 #include "mongo/db/repl/topology_coordinator_impl.h"
+#include "mongo/db/server_options.h"
 #include "mongo/db/write_concern_options.h"
 #include "mongo/stdx/functional.h"
 #include "mongo/unittest/unittest.h"
@@ -1069,12 +1070,41 @@ namespace {
 
         simulateSuccessfulElection();
 
-        ASSERT_TRUE(getTopoCoord().getMemberState().primary());
         ASSERT_TRUE(getReplCoord()->getCurrentMemberState().primary());
         ASSERT_OK(getReplCoord()->stepDown(&txn, false, Milliseconds(0), Milliseconds(1000)));
+        enterNetwork(); // So we can safely inspect the topology coordinator
         ASSERT_EQUALS(Date_t(getNet()->now().millis + 1000), getTopoCoord().getStepDownTime());
         ASSERT_TRUE(getTopoCoord().getMemberState().secondary());
+        exitNetwork();
         ASSERT_TRUE(getReplCoord()->getCurrentMemberState().secondary());
+    }
+
+    TEST_F(ReplCoordTest, StepDownAndBackUpSingleNode) {
+        init("mySet");
+
+        assertStartSuccess(
+                BSON("_id" << "mySet" <<
+                     "version" << 1 <<
+                     "members" << BSON_ARRAY(BSON("_id" << 0 << "host" << "test1:1234"))),
+                HostAndPort("test1", 1234));
+        OperationContextNoop txn;
+        getReplCoord()->setFollowerMode(MemberState::RS_SECONDARY);
+
+        ASSERT_TRUE(getReplCoord()->getCurrentMemberState().primary());
+        ASSERT_OK(getReplCoord()->stepDown(&txn, false, Milliseconds(0), Milliseconds(1000)));
+        getNet()->enterNetwork(); // Must do this before inspecting the topocoord
+        Date_t stepdownUntil = Date_t(getNet()->now().millis + 1000);
+        ASSERT_EQUALS(stepdownUntil, getTopoCoord().getStepDownTime());
+        ASSERT_TRUE(getTopoCoord().getMemberState().secondary());
+        ASSERT_TRUE(getReplCoord()->getCurrentMemberState().secondary());
+
+        // Now run time forward and make sure that the node becomes primary again when the stepdown
+        // period ends.
+        getNet()->runUntil(stepdownUntil);
+        ASSERT_EQUALS(stepdownUntil, getNet()->now());
+        ASSERT_TRUE(getTopoCoord().getMemberState().primary());
+        getNet()->exitNetwork();
+        ASSERT_TRUE(getReplCoord()->getCurrentMemberState().primary());
     }
 
     /**
@@ -1621,6 +1651,14 @@ namespace {
         ASSERT_OK(roundTripped.initialize(response.toBSON()));
     }
 
+    TEST_F(ReplCoordTest, ShutDownBeforeStartUpFinished) {
+        init();
+        startCapturingLogMessages();
+        getReplCoord()->shutdown();
+        stopCapturingLogMessages();
+        ASSERT_EQUALS(1,
+                countLogLinesContaining("shutdown() called before startReplication() finished"));
+    }
     // TODO(schwerin): Unit test election id updating
 
 }  // namespace

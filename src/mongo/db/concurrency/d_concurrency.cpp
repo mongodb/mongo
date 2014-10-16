@@ -26,15 +26,13 @@
  *    it in the license file.
  */
 
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kDefault
+
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/concurrency/d_concurrency.h"
 
-#include "mongo/db/client.h"
-#include "mongo/db/curop.h"
 #include "mongo/db/concurrency/locker.h"
-#include "mongo/db/concurrency/lock_stat.h"
-#include "mongo/db/concurrency/lock_state.h"
 #include "mongo/db/global_environment_experiment.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/util/assert_util.h"
@@ -52,29 +50,6 @@ namespace mongo {
 
     DBTryLockTimeoutException::DBTryLockTimeoutException() {}
     DBTryLockTimeoutException::~DBTryLockTimeoutException() throw() { }
-
-    /**
-     * SERVER-14978: This class is temporary and is used to aggregate the per-operation lock
-     * acquisition times. It will go away once we have figured out the lock stats reporting story.
-     */
-    class TrackLockAcquireTime {
-        MONGO_DISALLOW_COPYING(TrackLockAcquireTime);
-    public:
-        TrackLockAcquireTime(char type) : _type(type) {
-
-        }
-
-        ~TrackLockAcquireTime() {
-            if (haveClient()) {
-                cc().curop()->lockStat().recordAcquireTimeMicros(_type, _timer.micros());
-            }
-        }
-
-    private:
-        char _type;
-        Timer _timer;
-    };
-
 
     class AcquiringParallelWriter {
     public:
@@ -141,9 +116,6 @@ namespace mongo {
     }
 
     void Lock::ScopedLock::recordTime() {
-        if (haveClient()) {
-            cc().curop()->lockStat().recordLockTimeMicros(_type, _timer.micros());
-        }
     }
 
     void Lock::ScopedLock::_tempRelease() {
@@ -196,15 +168,12 @@ namespace mongo {
     void Lock::GlobalWrite::_relock() { 
         invariant(!_lockState->isLocked());
 
-        TrackLockAcquireTime a('W');
         _lockState->lockGlobal(MODE_X);
         resetTime();
     }
 
     Lock::GlobalWrite::GlobalWrite(Locker* lockState, unsigned timeoutms)
         : ScopedLock(lockState, 'W') {
-
-        TrackLockAcquireTime a('W');
 
         LockResult result = _lockState->lockGlobal(MODE_X, timeoutms);
         if (result == LOCK_TIMEOUT) {
@@ -224,8 +193,6 @@ namespace mongo {
 
     Lock::GlobalRead::GlobalRead(Locker* lockState, unsigned timeoutms)
         : ScopedLock(lockState, 'R') {
-
-        TrackLockAcquireTime a('R');
 
         LockResult result = _lockState->lockGlobal(MODE_S, timeoutms);
         if (result == LOCK_TIMEOUT) {
@@ -255,7 +222,6 @@ namespace mongo {
 
     void Lock::DBLock::lockDB() {
         const bool isRead = (_mode == MODE_S || _mode == MODE_IS);
-        TrackLockAcquireTime a(isRead ? 'r' : 'w');
 
         _lockState->lockGlobal(isRead ? MODE_IS : MODE_IX);
         if (supportsDocLocking()) {

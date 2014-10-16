@@ -248,6 +248,15 @@ namespace mongo {
                 repl::ReplicationCoordinator* replCoordinator =
                         repl::getGlobalReplicationCoordinator();
                 Status status = replCoordinator->checkIfWriteConcernCanBeSatisfied(writeConcern);
+
+                if (replCoordinator->getReplicationMode() ==
+                        repl::ReplicationCoordinator::modeMasterSlave &&
+                    writeConcern.shouldWaitForOtherNodes()) {
+                    warning() << "cleanupOrphaned cannot check if write concern setting "
+                              << writeConcern.toBSON()
+                              << " can be enforced in a master slave configuration";
+                }
+
                 if (!status.isOK() && status != ErrorCodes::NoReplicationEnabled) {
                     return appendCommandStatus(result, status);
                 }

@@ -78,8 +78,7 @@ namespace mongo {
                                           const std::string &name,
                                           unsigned long long progressMeterTotal,
                                           int secondsBetween) {
-            invariant(false);
-            return NULL;
+            return &_pm;
         }
 
         virtual void checkForInterrupt(bool heedMutex = true) const { }
@@ -106,6 +105,7 @@ namespace mongo {
 
     private:
         std::auto_ptr<RecoveryUnit> _recoveryUnit;
+        ProgressMeter _pm;
     };
 
 }  // namespace mongo

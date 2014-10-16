@@ -28,6 +28,8 @@
 *    it in the license file.
 */
 
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kDefault
+
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/dbhelpers.h"
@@ -377,6 +379,7 @@ namespace mongo {
                                                                        maxInclusive,
                                                                        InternalPlanner::FORWARD,
                                                                        InternalPlanner::IXSCAN_FETCH));
+                exec->setYieldPolicy(PlanExecutor::YIELD_AUTO);
 
                 DiskLoc rloc;
                 BSONObj obj;
@@ -542,6 +545,7 @@ namespace mongo {
             InternalPlanner::indexScan(txn, collection, idx, min, max, false));
         // we can afford to yield here because any change to the base data that we might miss  is
         // already being queued and will be migrated in the 'transferMods' stage
+        exec->setYieldPolicy(PlanExecutor::YIELD_AUTO);
 
         DiskLoc loc;
         PlanExecutor::ExecState state;

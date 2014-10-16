@@ -9,7 +9,7 @@ for ( var i=0; i<10000; i++ ){
 assert.eq( 10 , t.distinct("x").length , "A1" );
 
 function fast(){
-    t.find().explain().executionStats.executionTimeMillis;
+    t.find().explain("executionStats").executionStats.executionTimeMillis;
 }
 
 function slow(){

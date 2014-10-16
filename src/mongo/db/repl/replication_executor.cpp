@@ -359,12 +359,13 @@ namespace {
     }
 
     void ReplicationExecutor::cancel(const CallbackHandle& cbHandle) {
-        boost::lock_guard<boost::mutex> lk(_mutex);
+        boost::unique_lock<boost::mutex> lk(_mutex);
         if (cbHandle._iter->generation  != cbHandle._generation) {
             return;
         }
         cbHandle._iter->isCanceled = true;
         if (cbHandle._iter->isNetworkOperation) {
+            lk.unlock();
             _networkInterface->cancelCommand(cbHandle);
         }
     }

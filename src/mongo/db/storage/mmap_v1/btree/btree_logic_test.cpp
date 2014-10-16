@@ -32,6 +32,8 @@
 // This file contains simple single-threaded tests, which check various aspects of the Btree logic
 //
 
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kStorage
+
 #include "mongo/db/instance.h"
 #include "mongo/db/operation_context_noop.h"
 #include "mongo/db/storage/mmap_v1/btree/btree_test_help.h"

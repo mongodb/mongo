@@ -72,6 +72,9 @@ namespace mongo {
         bool flagsSet;
 
         bool temp;
+
+        // Storage engine collection options. Always owned or empty.
+        BSONObj storageEngine;
     };
 
 }

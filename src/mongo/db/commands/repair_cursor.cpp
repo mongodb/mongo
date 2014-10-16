@@ -79,12 +79,18 @@ namespace mongo {
                                                                            collection));
             stage->addIterator(iter.release());
 
-            // ClientCursors' constructor inserts them into a global map than manages their
+            std::auto_ptr<PlanExecutor> exec(new PlanExecutor(txn,
+                                                              ws.release(),
+                                                              stage.release(),
+                                                              collection));
+
+            // 'exec' will be used in newGetMore(). Set its yield policy and save its state.
+            exec->setYieldPolicy(PlanExecutor::YIELD_AUTO);
+            exec->saveState();
+
+            // ClientCursors' constructor inserts them into a global map that manages their
             // lifetimes. That is why the next line isn't leaky.
-            ClientCursor* cc = new ClientCursor(collection, new PlanExecutor(txn,
-                                                                             ws.release(),
-                                                                             stage.release(),
-                                                                             collection));
+            ClientCursor* cc = new ClientCursor(collection, exec.release());
 
             BSONObjBuilder cursorObj(result.subobjStart("cursor"));
             cursorObj.append("id", cc->cursorid());

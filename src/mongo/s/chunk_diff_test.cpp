@@ -64,7 +64,6 @@ namespace {
         }
 
         virtual string shardFor(const string& name) const { return name; }
-        virtual string nameFrom(const string& shard) const { return shard; }
     };
 
     TEST(Basics, Simple) {

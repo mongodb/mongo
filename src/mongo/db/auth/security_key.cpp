@@ -44,6 +44,7 @@
 #include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/auth/privilege.h"
+#include "mongo/db/auth/sasl_options.h"
 #include "mongo/db/auth/user.h"
 #include "mongo/db/server_options.h"
 #include "mongo/util/log.h"
@@ -188,7 +189,8 @@ namespace mongo {
         credentials.password = mongo::createPasswordDigest(
                 internalSecurity.user->getName().getUser().toString(), str);
 
-        BSONObj creds = scram::generateCredentials(credentials.password);
+        BSONObj creds = scram::generateCredentials(credentials.password,
+                                                   saslGlobalParams.scramIterationCount);
         credentials.scram.iterationCount = creds[scram::iterationCountFieldName].Int();
         credentials.scram.salt = creds[scram::saltFieldName].String();
         credentials.scram.storedKey = creds[scram::storedKeyFieldName].String();

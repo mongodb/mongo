@@ -33,6 +33,7 @@
 #include "mongo/base/status.h"
 #include "mongo/db/server_parameters.h"
 #include "mongo/util/log.h"
+#include "mongo/util/mongoutils/str.h"
 #include "mongo/util/options_parser/startup_option_init.h"
 #include "mongo/util/options_parser/startup_options.h"
 
@@ -40,11 +41,16 @@ namespace mongo {
 
     SASLGlobalParams saslGlobalParams;
 
-    // Authentication mechanisms supported by default
+    const int defaultScramIterationCount = 10000;
+    const int minimumScramIterationCount = 5000;
+
     SASLGlobalParams::SASLGlobalParams() {
+        // Authentication mechanisms supported by default.
         authenticationMechanisms.push_back("MONGODB-CR");
         authenticationMechanisms.push_back("MONGODB-X509");
         authenticationMechanisms.push_back("SCRAM-SHA-1");
+        // Default iteration count for SCRAM authentication.
+        scramIterationCount = defaultScramIterationCount;
     }
 
     Status addSASLOptions(moe::OptionSection* options) {
@@ -83,6 +89,7 @@ namespace mongo {
         bool haveHostName = false;
         bool haveServiceName = false;
         bool haveAuthdPath = false;
+        bool haveScramIterationCount = false;
 
         // Check our setParameter options first so that these values can be properly overridden via
         // the command line even though the options have different names.
@@ -103,6 +110,9 @@ namespace mongo {
                 else if (parametersIt->first == "saslauthdPath") {
                     haveAuthdPath = true;
                 }
+                else if (parametersIt->first == "scramIterationCount") {
+                    haveScramIterationCount = true;
+                }
             }
         }
 
@@ -122,6 +132,10 @@ namespace mongo {
         if (params.count("security.sasl.saslauthdSocketPath") && !haveAuthdPath) {
             saslGlobalParams.authdPath =
                 params["security.sasl.saslauthdSocketPath"].as<std::string>();
+        }
+        if (params.count("security.sasl.scramIterationCount") && !haveScramIterationCount) {
+            saslGlobalParams.scramIterationCount =
+                params["security.sasl.scramIterationCount"].as<int>();
         }
 
         return Status::OK();
@@ -161,5 +175,26 @@ namespace mongo {
                                                               &saslGlobalParams.authdPath,
                                                               true, // Change at startup
                                                               false); // Change at runtime
+
+    const std::string scramIterationCountServerParameter = "scramIterationCount";
+    class ExportedScramIterationCountParameter : public ExportedServerParameter<int> {
+    public:
+        ExportedScramIterationCountParameter():
+            ExportedServerParameter<int>(ServerParameterSet::getGlobal(),
+                                         scramIterationCountServerParameter,
+                                         &saslGlobalParams.scramIterationCount,
+                                         true,    // Change at startup
+                                         true) {} // Change at runtime
+
+        virtual Status validate(const int& newValue) {
+            if (newValue < minimumScramIterationCount) {
+                return Status(ErrorCodes::BadValue, mongoutils::str::stream() <<
+                              "Invalid value for SCRAM iteration count: " << newValue <<
+                              " is less than the minimum SCRAM iteration count, " <<
+                              minimumScramIterationCount);
+            }
+            return Status::OK();
+        }
+    } scramIterationCountParam;
 
 } // namespace mongo

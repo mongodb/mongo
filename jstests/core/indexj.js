@@ -10,7 +10,7 @@ function keysExamined(query, hint, sort) {
     if (!sort) {
         sort = {};
     }
-    var explain = t.find(query).sort(sort).hint(hint).explain();
+    var explain = t.find(query).sort(sort).hint(hint).explain("executionStats");
     return explain.executionStats.totalKeysExamined;
 }
 

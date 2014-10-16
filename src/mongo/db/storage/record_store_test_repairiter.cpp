@@ -60,6 +60,8 @@ namespace mongo {
             ASSERT_EQUALS( DiskLoc(), it->getNext() );
             ASSERT( it->isEOF() );
             ASSERT_EQUALS( DiskLoc(), it->curr() );
+
+            delete it;
         }
     }
 
@@ -105,9 +107,8 @@ namespace mongo {
             RecordIterator *it = rs->getIteratorForRepair( opCtx.get() );
 
             while ( !it->isEOF() ) {
-                DiskLoc loc = it->curr();
-                ASSERT( 1 == remain.erase( loc ) );
-                ASSERT_EQUALS( loc, it->getNext() );
+                DiskLoc loc = it->getNext();
+                remain.erase( loc ); // can happen more than once per doc
             }
             ASSERT( remain.empty() );
 
@@ -115,6 +116,8 @@ namespace mongo {
             ASSERT_EQUALS( DiskLoc(), it->getNext() );
             ASSERT( it->isEOF() );
             ASSERT_EQUALS( DiskLoc(), it->curr() );
+
+            delete it;
         }
     }
 

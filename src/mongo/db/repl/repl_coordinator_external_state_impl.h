@@ -57,10 +57,12 @@ namespace repl {
         virtual StatusWith<OpTime> loadLastOpTime(OperationContext* txn);
         virtual HostAndPort getClientHostAndPort(const OperationContext* txn);
         virtual void closeConnections();
+        virtual void clearShardingState();
         virtual void signalApplierToChooseNewSyncSource();
         virtual ReplicationCoordinatorExternalState::GlobalSharedLockAcquirer*
                 getGlobalSharedLockAcquirer();
         virtual OperationContext* createOperationContext();
+        virtual void dropAllTempCollections(OperationContext* txn);
 
     private:
 

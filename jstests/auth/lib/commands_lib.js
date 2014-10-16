@@ -1397,6 +1397,77 @@ var authCommandsLib = {
             ]
         },
         {
+            testname: "listCollections",
+            command: {listCollections: 1},
+            setup: function (db) {
+                db.x.insert({_id: 5});
+                db.y.insert({_id: 6});
+            },
+            teardown: function (db) {
+                db.x.drop();
+                db.y.drop();
+            },
+            testcases: [
+                {
+                    runOnDb: firstDbName,
+                    roles: {
+                        read: 1,
+                        readAnyDatabase: 1,
+                        readWrite: 1,
+                        readWriteAnyDatabase: 1,
+                        clusterAdmin: 1,
+                        clusterMonitor: 1,
+                        clusterManager: 1,
+                        dbAdmin: 1,
+                        dbAdminAnyDatabase: 1,
+                        dbOwner: 1,
+                        backup: 1,
+                        restore: 1,
+                        root: 1,
+                        __system: 1
+                    },
+                    privileges: [
+                        {
+                            resource: {db: firstDbName, collection: ""},
+                            actions: ["listCollections"]
+                        }
+                    ]
+                }
+            ]
+        },
+        {
+            testname: "listIndexes",
+            command: {listIndexes: "x"},
+            setup: function (db) {
+                db.x.insert({_id: 5});
+                db.x.insert({_id: 6});
+            },
+            teardown: function (db) { db.x.drop(); },
+            testcases: [
+                {
+                    runOnDb: firstDbName,
+                    roles: {
+                        read: 1,
+                        readAnyDatabase: 1,
+                        readWrite: 1,
+                        readWriteAnyDatabase: 1,
+                        dbAdmin: 1,
+                        dbAdminAnyDatabase: 1,
+                        dbOwner: 1,
+                        backup: 1,
+                        root: 1,
+                        __system: 1
+                    },
+                    privileges: [
+                        {
+                            resource: {db: firstDbName, collection: ""},
+                            actions: ["listIndexes"]
+                        }
+                    ]
+                }
+            ]
+        },
+        {
             testname: "listShards",
             command: {listShards: 1},
             skipStandalone: true,

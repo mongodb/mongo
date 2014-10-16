@@ -785,9 +785,6 @@ static int mongoDbMain(int argc, char* argv[], char **envp) {
         }
     }
 
-    if( argc == 1 )
-        cout << dbExecCommand << " --help for help and startup options" << endl;
-
     Status status = mongo::runGlobalInitializers(argc, argv, envp);
     if (!status.isOK()) {
         severe(LogComponent::kDefault) << "Failed global initialization: " << status;

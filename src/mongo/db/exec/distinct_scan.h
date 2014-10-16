@@ -79,6 +79,24 @@ namespace mongo {
      */
     class DistinctScan : public PlanStage {
     public:
+        /**
+         * Keeps track of what this distinct scan is currently doing so that it
+         * can do the right thing on the next call to work().
+         */
+        enum ScanState {
+            // Need to initialize the underlying index traversal machinery.
+            INITIALIZING,
+
+            // Skipping keys in order to check whether we have reached the end.
+            CHECKING_END,
+
+            // Retrieving the next key, and applying the filter if necessary.
+            GETTING_NEXT,
+
+            // The index scan is finished.
+            HIT_END
+        };
+
         DistinctScan(OperationContext* txn, const DistinctParams& params, WorkingSet* workingSet);
         virtual ~DistinctScan() { }
 
@@ -122,8 +140,8 @@ namespace mongo {
         // The cursor we use to navigate the tree.
         boost::scoped_ptr<BtreeIndexCursor> _btreeCursor;
 
-        // Have we hit the end of the index scan?
-        bool _hitEnd;
+        // Keeps track of what work we need to do next.
+        ScanState _scanState;
 
         // For yielding.
         BSONObj _savedKey;

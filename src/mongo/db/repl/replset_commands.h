@@ -37,7 +37,6 @@
 namespace mongo {
 namespace repl {
 
-    extern bool replSetBlind;
     extern unsigned replSetForceInitialSyncFailure;
 
     /**

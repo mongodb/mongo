@@ -134,6 +134,13 @@ namespace repl {
         virtual void closeConnections() = 0;
 
         /**
+         * Clears all cached sharding metadata on this server.  This is called after stepDown to
+         * ensure that if the node becomes primary again in the future it will reload an up-to-date
+         * version of the sharding data.
+         */
+        virtual void clearShardingState() = 0;
+
+        /**
          * Notifies the bgsync and syncSourceFeedback threads to choose a new sync source.
          */
         virtual void signalApplierToChooseNewSyncSource() = 0;
@@ -149,6 +156,14 @@ namespace repl {
          * the same instance that require an OperationContext.
          */
         virtual OperationContext* createOperationContext() = 0;
+
+        /**
+         * Drops all temporary collections on all databases except "local".
+         *
+         * The implementation may assume that the caller has acquired the global exclusive lock
+         * for "txn".
+         */
+        virtual void dropAllTempCollections(OperationContext* txn) = 0;
     };
 
     /**

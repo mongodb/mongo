@@ -90,10 +90,8 @@ namespace mongo {
             }
 
             CollectionScan* cs = new CollectionScan(txn, params, ws, NULL);
-            PlanExecutor* exec = new PlanExecutor(txn, ws, cs, collection);
-            // 'exec' will be registered until it is destroyed.
-            exec->registerExecInternalPlan();
-            return exec;
+            // Takes ownership of 'ws' and 'cs'.
+            return new PlanExecutor(txn, ws, cs, collection);
         }
 
         /**
@@ -125,10 +123,7 @@ namespace mongo {
                 root = new FetchStage(txn, ws, root, NULL, collection);
             }
 
-            PlanExecutor* exec = new PlanExecutor(txn, ws, root, collection);
-            // 'exec' will be registered until it is destroyed.
-            exec->registerExecInternalPlan();
-            return exec;
+            return new PlanExecutor(txn, ws, root, collection);
         }
     };
 

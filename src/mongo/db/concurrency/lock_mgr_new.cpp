@@ -26,6 +26,8 @@
  *    it in the license file.
  */
 
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kDefault
+
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/concurrency/lock_mgr_new.h"
@@ -184,7 +186,7 @@ namespace mongo {
     // LockManager
     //
 
-    LockManager::LockManager() : _noCheckForLeakedLocksTestOnly(false) {
+    LockManager::LockManager() {
         //  Have more buckets than CPUs to reduce contention on lock and caches
         _numLockBuckets = 128;
         _lockBuckets = new LockBucket[_numLockBuckets];
@@ -197,10 +199,10 @@ namespace mongo {
             LockBucket* bucket = &_lockBuckets[i];
 
             // TODO: dump more information about the non-empty bucket to see what locks were leaked
-            if (!_noCheckForLeakedLocksTestOnly) {
-                invariant(bucket->data.empty());
-            }
+            invariant(bucket->data.empty());
         }
+
+        delete[] _lockBuckets;
     }
 
     LockResult LockManager::lock(const ResourceId& resId, LockRequest* request, LockMode mode) {
@@ -418,10 +420,12 @@ namespace mongo {
             while (it != bucket->data.end()) {
                 LockHead* lock = it->second;
                 if (lock->grantedModes == 0) {
+                    invariant(lock->grantedModes == 0);
                     invariant(lock->grantedQueue == NULL);
                     invariant(lock->conflictModes == 0);
                     invariant(lock->conflictQueueBegin == NULL);
                     invariant(lock->conflictQueueEnd == NULL);
+                    invariant(lock->conversionsCount == 0);
 
                     bucket->data.erase(it++);
                     delete lock;
@@ -431,10 +435,6 @@ namespace mongo {
                 }
             }
         }
-    }
-
-    void LockManager::setNoCheckForLeakedLocksTestOnly(bool newValue) {
-        _noCheckForLeakedLocksTestOnly = newValue;
     }
 
     void LockManager::_onLockModeChanged(LockHead* lock, bool checkConflictQueue) {
@@ -471,15 +471,13 @@ namespace mongo {
 
                 if (!conflicts(iter->convertMode, grantedModesWithoutCurrentRequest)) {
                     lock->conversionsCount--;
-                    lock->changeGrantedModeCount(iter->convertMode, LockHead::Increment);
                     lock->changeGrantedModeCount(iter->mode, LockHead::Decrement);
+                    iter->status = LockRequest::STATUS_GRANTED;
                     iter->mode = iter->convertMode;
+                    iter->convertMode = MODE_NONE;
 
                     iter->notify->notify(lock->resourceId, LOCK_OK);
                 }
-            }
-            else {
-                invariant(iter->status == LockRequest::STATUS_GRANTED);
             }
         }
 
@@ -509,9 +507,10 @@ namespace mongo {
             iter->notify->notify(lock->resourceId, LOCK_OK);
         }
 
-        // If some locks have been granted then there should be something on the grantedQueue and
-        // vice versa (sanity check that either one or the other is true).
+        // This is a convenient place to check that the state of the two request queues is in sync
+        // with the bitmask on the modes.
         invariant((lock->grantedModes == 0) ^ (lock->grantedQueue != NULL));
+        invariant((lock->conflictModes == 0) ^ (lock->conflictQueueBegin != NULL));
     }
 
     LockManager::LockBucket* LockManager::_getBucket(const ResourceId& resId) {

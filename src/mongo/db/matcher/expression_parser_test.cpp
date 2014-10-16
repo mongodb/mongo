@@ -46,6 +46,8 @@ namespace mongo {
 
         ASSERT( result.getValue()->matchesBSON( BSON( "x" << 2 ) ) );
         ASSERT( !result.getValue()->matchesBSON( BSON( "x" << 3 ) ) );
+
+        delete result.getValue();
     }
 
     TEST( MatchExpressionParserTest, Multiple1 ) {
@@ -58,16 +60,20 @@ namespace mongo {
         ASSERT( !result.getValue()->matchesBSON( BSON( "x" << 6 << "y" << 7 ) ) );
         ASSERT( !result.getValue()->matchesBSON( BSON( "x" << 5 << "y" << 9 ) ) );
         ASSERT( !result.getValue()->matchesBSON( BSON( "x" << 5 << "y" << 4 ) ) );
+
+        delete result.getValue();
     }
 
     TEST( AtomicMatchExpressionTest, Simple1 ) {
         BSONObj query = BSON( "x" << 5 << "$atomic" << BSON( "$gt" << 5 << "$lt" << 8 ) );
         StatusWithMatchExpression result = MatchExpressionParser::parse( query );
         ASSERT_TRUE( result.isOK() );
+        delete result.getValue();
 
         query = BSON( "x" << 5 << "$isolated" << 1 );
         result = MatchExpressionParser::parse( query );
         ASSERT_TRUE( result.isOK() );
+        delete result.getValue();
 
         query = BSON( "x" << 5 << "y" << BSON( "$isolated" << 1 ) );
         result = MatchExpressionParser::parse( query );

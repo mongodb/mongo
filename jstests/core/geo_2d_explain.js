@@ -20,7 +20,7 @@ for (var i = 0; i < n; i++) {
     t.save({_id: i, a: a, loc: loc}); 
 }
 
-var explain = t.find({loc: {$near: [40, 40]}, _id: {$lt: 50}}).explain();
+var explain = t.find({loc: {$near: [40, 40]}, _id: {$lt: 50}}).explain("executionStats");
 
 print('explain = ' + tojson(explain));
 

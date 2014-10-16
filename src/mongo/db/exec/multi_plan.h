@@ -111,18 +111,10 @@ namespace mongo {
         //
 
         /**
-         * Gathers execution stats for all losing plans.
+         * Gathers execution stats for all losing plans. Caller takes ownership of
+         * all pointers in the returned vector.
          */
         vector<PlanStageStats*> generateCandidateStats();
-
-        /**
-         * Runs the candidate plans until each has either hit EOF or returned DEAD. Results
-         * from the plans are thrown out, but execution stats are gathered.
-         *
-         * You should call this after calling pickBestPlan(...). It expects that a winning plan
-         * has already been selected.
-         */
-        Status executeAllPlans();
 
         static const char* kStageType;
 
@@ -155,9 +147,6 @@ namespace mongo {
         // are owned here. Ownership of all QuerySolutions is retained here, and will *not* be
         // tranferred to the PlanExecutor that wraps this stage.
         std::vector<CandidatePlan> _candidates;
-
-        // Candidate plans' stats. Owned here.
-        std::vector<PlanStageStats*> _candidateStats;
 
         // index into _candidates, of the winner of the plan competition
         // uses -1 / kNoSuchPlan when best plan is not (yet) known

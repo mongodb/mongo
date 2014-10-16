@@ -161,6 +161,8 @@ namespace {
             << ActionType::createIndex
             << ActionType::indexStats
             << ActionType::enableProfiler
+            << ActionType::listCollections
+            << ActionType::listIndexes
             << ActionType::planCacheIndexFilter
             << ActionType::planCacheRead
             << ActionType::planCacheWrite
@@ -491,6 +493,9 @@ namespace {
         Privilege::addPrivilegeToPrivilegeVector(
                 privileges,
                 Privilege(ResourcePattern::forAnyResource(), ActionType::listCollections));
+        Privilege::addPrivilegeToPrivilegeVector(
+                privileges,
+                Privilege(ResourcePattern::forAnyResource(), ActionType::listIndexes));
 
         ActionSet clusterActions;
         clusterActions << ActionType::getParameter // To check authSchemaVersion
