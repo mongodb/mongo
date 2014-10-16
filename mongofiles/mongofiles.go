@@ -197,6 +197,10 @@ func (self *MongoFiles) Run(displayConnUrl bool) (string, error) {
 	}
 	defer session.Close()
 
+	if self.ToolOptions.Namespace.DB == "" {
+		self.ToolOptions.Namespace.DB = "test"
+	}
+
 	// first validate the namespaces we'll be using: <db>.<prefix>.files and <db>.<prefix>.chunks
 	// it's ok to validate only <db>.<prefix>.chunks (the longer one)
 	err = util.ValidateFullNamespace(fmt.Sprintf("%s.%s.chunks", self.ToolOptions.Namespace.DB, 
