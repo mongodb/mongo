@@ -48,6 +48,9 @@ namespace mongo {
 
         virtual void reportState( BSONObjBuilder* b ) const { }
 
+        virtual void beingReleasedFromOperationContext() {}
+        virtual void beingSetOnOperationContext() {}
+
         /**
          * These should be called through WriteUnitOfWork rather than directly.
          *
