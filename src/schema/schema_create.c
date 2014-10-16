@@ -350,6 +350,10 @@ __create_index(WT_SESSION_IMPL *session,
 		    "Can't create an index for a non-existent table: %.*s",
 		    (int)tlen, tablename);
 
+	if (table->is_simple)
+		WT_RET_MSG(session, EINVAL,
+		    "%s requires a table with named columns", name);
+
 	if (__wt_config_getones(session, config, "source", &cval) == 0) {
 		WT_ERR(__wt_buf_fmt(session, &namebuf,
 		    "%.*s", (int)cval.len, cval.str));
@@ -368,15 +372,20 @@ __create_index(WT_SESSION_IMPL *session,
 	    cval.len != 0) {
 		have_extractor = 1;
 		/* Custom extractors must supply a key format. */
-		WT_ERR(__wt_config_getones(
-		    session, config, "key_format", &kval));
+		if ((ret = __wt_config_getones(
+		    session, config, "key_format", &kval)) != 0)
+			WT_ERR_MSG(session, EINVAL,
+			    "%s: custom extractors require a key_format", name);
 	}
 
 	/* Calculate the key/value formats. */
-	if (__wt_config_getones(session, config, "columns", &icols) != 0 &&
-	    !have_extractor)
-		WT_ERR_MSG(session, EINVAL,
-		    "No 'columns' configuration for '%s'", name);
+	if (__wt_config_getones(session, config, "columns", &icols) != 0) {
+		if (have_extractor)
+			WT_CLEAR(icols);
+		else
+			WT_ERR_MSG(session, EINVAL,
+			    "%s: requires 'columns' configuration", name);
+	}
 
 	/*
 	 * Count the public columns using the declared columns for normal

@@ -420,6 +420,10 @@ __wt_schema_open_table(WT_SESSION_IMPL *session,
 	if (ret != WT_NOTFOUND)
 		goto err;
 
+	if (table->ncolgroups > 0 && table->is_simple)
+		WT_RET_MSG(session, EINVAL,
+		    "%s requires a table with named columns", tablename);
+
 	WT_ERR(__wt_calloc_def(session, WT_COLGROUPS(table), &table->cgroups));
 	WT_ERR(__wt_schema_open_colgroups(session, table));
 	*tablep = table;
