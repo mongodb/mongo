@@ -64,17 +64,6 @@ static const CONFIG default_cfg = {
 static const char * const debug_cconfig = "";
 static const char * const debug_tconfig = "";
 
-/*
- * Atomic update where needed.
- */
-#if defined(_lint)
-#define	ATOMIC_ADD(v, val)	((v) += (val), (v))
-#define	ATOMIC_ADD_PTR(p, val)	((*p) += (val), (*p))
-#else
-#define	ATOMIC_ADD(v, val)	__sync_add_and_fetch(&(v), val)
-#define	ATOMIC_ADD_PTR(p, val)	__sync_add_and_fetch((p), val)
-#endif
-
 static void	*checkpoint_worker(void *);
 static int	 create_tables(CONFIG *);
 static int	 create_uris(CONFIG *);
@@ -104,7 +93,6 @@ static uint64_t	 wtperf_value_range(CONFIG *);
  * wtperf uses internal WiredTiger library routines for timing and generating
  * random numbers.
  */
-extern int	__wt_epoch(void *, struct timespec *);
 extern uint32_t	__wt_random(uint32_t *);
 extern void	__wt_random_init(uint32_t *);
 
@@ -112,14 +100,7 @@ extern void	__wt_random_init(uint32_t *);
 static inline uint64_t
 get_next_incr(CONFIG *cfg)
 {
-	return (ATOMIC_ADD(cfg->insert_key, 1));
-}
-
-/* Count number of async inserts completed. */
-static inline uint64_t
-async_next_incr(uint64_t *val)
-{
-	return (ATOMIC_ADD_PTR(val, 1));
+	return (WT_ATOMIC_ADD8(cfg->insert_key, 1));
 }
 
 static inline void
@@ -179,7 +160,7 @@ cb_asyncop(WT_ASYNC_CALLBACK *cb, WT_ASYNC_OP *op, int ret, uint32_t flags)
 	switch (type) {
 	case WT_AOP_COMPACT:
 		tables = (uint32_t *)op->app_private;
-		ATOMIC_ADD(*tables, (uint32_t)-1);
+		WT_ATOMIC_ADD4(*tables, (uint32_t)-1);
 		break;
 	case WT_AOP_INSERT:
 		trk = &thread->insert;
@@ -214,7 +195,7 @@ cb_asyncop(WT_ASYNC_CALLBACK *cb, WT_ASYNC_OP *op, int ret, uint32_t flags)
 		return (0);
 	if (ret == 0 || (ret == WT_NOTFOUND && type != WT_AOP_INSERT)) {
 		if (!cfg->in_warmup)
-			(void)async_next_incr(&trk->ops);
+			(void)WT_ATOMIC_ADD8(trk->ops, 1);
 		return (0);
 	}
 err:
@@ -821,7 +802,7 @@ populate_thread(void *arg)
 		 */
 		cursor = cursors[op % cfg->table_count];
 		generate_key(cfg, key_buf, op);
-		measure_latency = 
+		measure_latency =
 		    cfg->sample_interval != 0 && trk->ops != 0 && (
 		    trk->ops % cfg->sample_rate == 0);
 		if (measure_latency &&
@@ -933,7 +914,7 @@ populate_async(void *arg)
 	 * will measure the time it takes to do all of them, including
 	 * the time to process by workers.
 	 */
-	measure_latency = 
+	measure_latency =
 	    cfg->sample_interval != 0 && trk->ops != 0 && (
 	    trk->ops % cfg->sample_rate == 0);
 	if (measure_latency &&
@@ -1300,7 +1281,7 @@ execute_populate(CONFIG *cfg)
 	msecs = ns_to_ms(WT_TIMEDIFF(stop, start));
 	lprintf(cfg, 0, 1,
 	    "Load time: %.2f\n" "load ops/sec: %" PRIu64,
-	    (double)msecs / (double)MSEC_PER_SEC, 
+	    (double)msecs / (double)MSEC_PER_SEC,
 	    (uint64_t)((cfg->icount / msecs) / MSEC_PER_SEC));
 
 	/*
@@ -1404,7 +1385,7 @@ execute_workload(CONFIG *cfg)
 
 	last_ckpts = last_inserts = last_reads = last_updates = 0;
 	ret = 0;
-	
+
 	if (cfg->warmup != 0)
 		cfg->in_warmup = 1;
 
@@ -1514,7 +1495,7 @@ err:	cfg->stop = 1;
 }
 
 /*
- * Ensure that icount matches the number of records in the 
+ * Ensure that icount matches the number of records in the
  * existing table.
  */
 static int
@@ -2047,7 +2028,7 @@ main(int argc, char *argv[])
 	    cfg->table_name);
 
 	/* Make stdout line buffered, so verbose output appears quickly. */
-	(void)setvbuf(stdout, NULL, _IOLBF, 0);
+	(void)setvbuf(stdout, NULL, _IOLBF, 32);
 
 	/* Concatenate non-default configuration strings. */
 	if (cfg->verbose > 1 || user_cconfig != NULL ||
@@ -2239,7 +2220,7 @@ worker_throttle(int64_t throttle, int64_t *ops, struct timespec *interval)
 	if (__wt_epoch(NULL, &now) != 0)
 		return;
 
-	/* 
+	/*
 	 * If we've completed enough operations, reset the counters.
 	 * If we did enough operations in less than a second, sleep for
 	 * the rest of the second.

@@ -1,6 +1,7 @@
 # -*- mode: python; -*-
 import re
 import os
+import distutils.sysconfig
 
 EnsureSConsVersion( 2, 0, 0 )
 
@@ -8,20 +9,67 @@ if not os.sys.platform == "win32":
     print ("SConstruct is only supported for Windows, use build_posix for other platforms")
     Exit(1)
 
+AddOption("--with-berkeley-db", dest="bdb", type="string", nargs=1, action="store",
+          help="Berkeley DB install path, ie, /usr/local")
+
 AddOption("--enable-zlib", dest="zlib", type="string", nargs=1, action="store",
           help="Use zlib compression")
 
 AddOption("--enable-snappy", dest="snappy", type="string", nargs=1, action="store",
           help="Use snappy compression")
 
+AddOption("--enable-swig", dest="swig", type="string", nargs=1, action="store",
+          help="Build python extension, specify location of swig.exe binary")
+
 env = Environment(
-    CPPPATH = ["#/src/include/", "#/build_win", "#/."],
-    CFLAGS = ["/Z7", "/wd4090"],
-    LINKFLAGS = ["/DEBUG"],
+    CPPPATH = ["#/src/include/",
+               "#/build_win",
+               "#/test/windows",
+               "#/.",
+               distutils.sysconfig.get_python_inc()
+           ],
+    CPPDEFINES = ["HAVE_DIAGNOSTIC"],
+    CFLAGS = [
+        #"/Zi",
+        "/Z7", # Generate debugging symbols
+        "/wd4090", # Ignore warning about mismatched const qualifiers
+        "/wd4996", 
+        "/W3", # Warning level 3
+        "/we4013", # Error on undefined functions
+        "/TC", # Compile as C code
+        #"/Od", # Disable optimization
+        "/Ob1", # inline expansion
+        "/O2", # optimize for speed
+        "/GF", # enable string pooling
+        "/EHsc", # extern "C" does not throw
+        #"/RTC1", # enable stack checks
+        "/GS", # enable secrutiy checks
+        "/Gy", # separate functions for linker
+        "/Zc:wchar_t",
+        "/Gd",
+        "/MD",
+        ],
+    LINKFLAGS = [
+        "/DEBUG", # Generate debug symbols
+        "/INCREMENTAL:NO", # Disable incremental linking
+        "/OPT:REF", # Remove dead code
+        "/DYNAMICBASE",
+        "/NXCOMPAT",
+        ],
+    LIBPATH=[ distutils.sysconfig.PREFIX + r"\libs"],
+    tools=["default", "swig"],
+    SWIGFLAGS=['-python',
+               "-threads",
+               "-O",
+               "-nodefaultctor",
+               "-nodefaultdtor"
+    ],
+    SWIG=GetOption("swig")
 )
 
 useZlib = GetOption("zlib")
 useSnappy = GetOption("snappy")
+useBdb = GetOption("bdb")
 wtlibs = []
 
 conf = Configure(env)
@@ -30,7 +78,7 @@ if not conf.CheckCHeader('stdlib.h'):
     Exit(1)
 
 if useZlib:
-    conf.emv.Append(CPPPATH=[useZlib + "/include"])
+    conf.env.Append(CPPPATH=[useZlib + "/include"])
     conf.env.Append(LIBPATH=[useZlib + "/lib"])
     if conf.CheckCHeader('zlib.h'):
         conf.env.Append(CPPDEFINES=["HAVE_BUILTIN_EXTENSION_ZLIB"])
@@ -47,6 +95,13 @@ if useSnappy:
         wtlibs.append("snappy")
     else:
         print 'snappy-c.h must be installed!'
+        Exit(1)
+
+if useBdb:
+    conf.env.Append(CPPPATH=[useBdb+ "/include"])
+    conf.env.Append(LIBPATH=[useBdb+ "/lib"])
+    if not conf.CheckCHeader('db.h'):
+        print 'db.h must be installed!'
         Exit(1)
 
 env = conf.Finish()
@@ -128,3 +183,98 @@ env.Program("wt", [
     "src/utilities/util_verify.c",
     "src/utilities/util_write.c"],
     LIBS=[wtlib] + wtlibs)
+
+if GetOption("swig"):
+    env.SharedLibrary('_wiredtiger',
+                      [ 'lang\python\wiredtiger.i'],
+                      SHLIBSUFFIX=".pyd",
+                      LIBS=[wtlib])
+
+# Shim library of functions to emulate POSIX on Windows
+shim = env.Library("window_shim",
+        ["test/windows/windows_shim.c"])
+
+env.Program("t_bloom",
+    "test/bloom/test_bloom.c",
+    LIBS=[wtlib])
+
+#env.Program("t_checkpoint",
+    #["test/checkpoint/checkpointer.c",
+    #"test/checkpoint/test_checkpoint.c",
+    #"test/checkpoint/workers.c"],
+    #LIBS=[wtlib])
+
+env.Program("t_huge",
+    "test/huge/huge.c",
+    LIBS=[wtlib])
+
+#env.Program("t_fops",
+    #["test/fops/file.c",
+    #"test/fops/fops.c",
+    #"test/fops/t.c"],
+    #LIBS=[wtlib])
+
+if useBdb:
+    benv = env.Clone()
+
+    benv.Append(CPPDEFINES=['BERKELEY_DB_PATH=\\"' + useBdb.replace("\\", "\\\\") + '\\"'])
+
+    benv.Program("t_format",
+        ["test/format/backup.c",
+        "test/format/bdb.c",
+        "test/format/bulk.c",
+        "test/format/compact.c",
+        "test/format/config.c",
+        "test/format/ops.c",
+        "test/format/salvage.c",
+        "test/format/t.c",
+        "test/format/util.c",
+        "test/format/wts.c"],
+         LIBS=[wtlib, shim, "libdb61"])
+
+#env.Program("t_thread",
+    #["test/thread/file.c",
+    #"test/thread/rw.c",
+    #"test/thread/stats.c",
+    #"test/thread/t.c"],
+    #LIBS=[wtlib])
+
+#env.Program("t_salvage",
+    #["test/salvage/salvage.c"],
+    #LIBS=[wtlib])
+
+env.Program("wtperf", [
+    "bench/wtperf/config.c",
+    "bench/wtperf/misc.c",
+    "bench/wtperf/track.c",
+    "bench/wtperf/wtperf.c",
+    ],
+    LIBS=[wtlib, shim] )
+
+examples = [
+    "ex_access",
+    "ex_all",
+    "ex_async",
+    "ex_call_center",
+    "ex_config",
+    "ex_config_parse",
+    "ex_cursor",
+    "ex_data_source",
+    "ex_extending",
+    "ex_file",
+    "ex_hello",
+    "ex_log",
+    "ex_pack",
+    "ex_process",
+    "ex_schema",
+    "ex_scope",
+    "ex_stat",
+    "ex_thread",
+    ]
+
+for ex in examples:
+    if(ex in ['ex_async', 'ex_thread']):
+        env.Program(ex, "examples/c/" + ex + ".c", LIBS=[wtlib, shim])
+    else:
+        env.Program(ex, "examples/c/" + ex + ".c", LIBS=[wtlib])
+

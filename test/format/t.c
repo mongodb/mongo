@@ -59,7 +59,7 @@ main(int argc, char *argv[])
 #endif
 
 	/* Track progress unless we're re-directing output to a file. */
-	g.track = isatty(STDOUT_FILENO) ? 1 : 0;
+	g.track = isatty(1) ? 1 : 0;
 
 	/* Set values from the command line. */
 	home = NULL;
@@ -151,7 +151,7 @@ main(int argc, char *argv[])
 		g.c_runs = 1;
 
 	/* Use line buffering on stdout so status updates aren't buffered. */
-	(void)setvbuf(stdout, NULL, _IOLBF, 0);
+	(void)setvbuf(stdout, NULL, _IOLBF, 32);
 
 	/*
 	 * Initialize locks to single-thread named checkpoints and backups, and
@@ -301,7 +301,7 @@ startup(void)
 	 */
 	if ((g.rand_log = fopen(g.home_rand, g.replay ? "r" : "w")) == NULL)
 		die(errno, "%s", g.home_rand);
-	(void)setvbuf(g.rand_log, NULL, _IOLBF, 0);
+	(void)setvbuf(g.rand_log, NULL, _IOLBF, 32);
 }
 
 /*
