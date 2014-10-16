@@ -439,6 +439,7 @@ tasks:
     - func: "run unit test"
 
 - name: dist
+  depends_on:
   commands:
     - command: git.get_project
       params:
@@ -446,20 +447,102 @@ tasks:
     - command: git.apply_patch
       params:
         directory: src
-    - command: expansions.update
-      params:
-        updates:
-          - key: "args"
-            value: "-test.types=${integration_test_args}"
-    - func: "download mongod"
-    - func: "start mongod"
     - command: shell.exec
       params:
-        directory: src
+        working_dir: src
         script: |
-          # Give mongod a chance to stop
-          sleep 2s
-    - func: "run tool integration tests"
+          rm -rf bin/
+          mkdir bin
+    # bsondump
+    - func: "build tool"
+      vars:
+        tool: bsondump
+    - func: "upload tool"
+      vars:
+        tool: bsondump
+    - func: "attach tool"
+      vars:
+        tool: bsondump
+    # mongodump
+    - func: "build tool"
+      vars:
+        tool: mongodump
+    - func: "upload tool"
+      vars:
+        tool: mongodump
+    - func: "attach tool"
+      vars:
+        tool: mongodump
+    # mongoexport
+    - func: "build tool"
+      vars:
+        tool: mongoexport
+    - func: "upload tool"
+      vars:
+        tool: mongoexport
+    - func: "attach tool"
+      vars:
+        tool: mongoexport
+    # mongofiles
+    - func: "build tool"
+      vars:
+        tool: mongofiles
+    - func: "upload tool"
+      vars:
+        tool: mongofiles
+    - func: "attach tool"
+      vars:
+        tool: mongofiles
+    # mongoimport
+    - func: "build tool"
+      vars:
+        tool: mongoimport
+    - func: "upload tool"
+      vars:
+        tool: mongoimport
+    - func: "attach tool"
+      vars:
+        tool: mongoimport
+    # mongooplog
+    - func: "build tool"
+      vars:
+        tool: mongooplog
+    - func: "upload tool"
+      vars:
+        tool: mongooplog
+    - func: "attach tool"
+      vars:
+        tool: mongooplog
+    # mongorestore
+    - func: "build tool"
+      vars:
+        tool: mongorestore
+    - func: "upload tool"
+      vars:
+        tool: mongorestore
+    - func: "attach tool"
+      vars:
+        tool: mongorestore
+    # mongostat
+    - func: "build tool"
+      vars:
+        tool: mongostat
+    - func: "upload tool"
+      vars:
+        tool: mongostat
+    - func: "attach tool"
+      vars:
+        tool: mongostat
+    # mongotop
+    - func: "build tool"
+      vars:
+        tool: mongotop
+    - func: "upload tool"
+      vars:
+        tool: mongotop
+    - func: "attach tool"
+      vars:
+        tool: mongotop
 
 - name: integration
   commands:
