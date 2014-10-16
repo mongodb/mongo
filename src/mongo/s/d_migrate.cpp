@@ -432,6 +432,7 @@ namespace mongo {
                               string& errmsg,
                               BSONObjBuilder& result ) {
             AutoGetCollectionForRead ctx(txn, _ns);
+            WriteUnitOfWork uow(txn);
             Collection* collection = ctx.getCollection();
             if ( !collection ) {
                 errmsg = "ns not found, should be impossible";
