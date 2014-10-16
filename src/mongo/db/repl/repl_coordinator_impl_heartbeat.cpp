@@ -278,6 +278,10 @@ namespace {
 
     void ReplicationCoordinatorImpl::_scheduleHeartbeatReconfig(const ReplicaSetConfig& newConfig) {
         boost::lock_guard<boost::mutex> lk(_mutex);
+        if (_inShutdown) {
+            return;
+        }
+
         switch (_rsConfigState) {
         case kConfigStartingUp:
             LOG(1) << "Ignoring new configuration with version " << newConfig.getConfigVersion() <<
@@ -315,9 +319,11 @@ namespace {
                                newConfig));
             return;
         }
-        boost::thread(stdx::bind(&ReplicationCoordinatorImpl::_heartbeatReconfigStore,
-                                 this,
-                                 newConfig)).detach();
+        invariant(!_heartbeatReconfigThread.get());
+        _heartbeatReconfigThread.reset(
+                new boost::thread(stdx::bind(&ReplicationCoordinatorImpl::_heartbeatReconfigStore,
+                                             this,
+                                             newConfig)));;
     }
 
     void ReplicationCoordinatorImpl::_heartbeatReconfigAfterElectionCanceled(
@@ -327,9 +333,16 @@ namespace {
             return;
         }
         fassert(18911, cbData.status);
-        boost::thread(stdx::bind(&ReplicationCoordinatorImpl::_heartbeatReconfigStore,
-                                 this,
-                                 newConfig)).detach();
+        boost::lock_guard<boost::mutex> lk(_mutex);
+        if (_inShutdown) {
+            return;
+        }
+
+        invariant(!_heartbeatReconfigThread.get());
+        _heartbeatReconfigThread.reset(
+                new boost::thread(stdx::bind(&ReplicationCoordinatorImpl::_heartbeatReconfigStore,
+                                             this,
+                                             newConfig)));
     }
 
     void ReplicationCoordinatorImpl::_heartbeatReconfigStore(const ReplicaSetConfig& newConfig) {
@@ -341,6 +354,10 @@ namespace {
                     " write it to stable storage; " << status;
                 boost::lock_guard<boost::mutex> lk(_mutex);
                 invariant(_rsConfigState == kConfigHBReconfiguring);
+                if (_inShutdown) {
+                    return;
+                }
+
                 if (_rsConfig.isInitialized()) {
                     _setConfigState_inlock(kConfigSteady);
                 }
@@ -349,6 +366,9 @@ namespace {
                     // kConfigHBReconfiguring.
                     _setConfigState_inlock(kConfigUninitialized);
                 }
+
+                _heartbeatReconfigThread->detach();
+                _heartbeatReconfigThread.reset(NULL);
                 return;
             }
         }
@@ -360,12 +380,21 @@ namespace {
                                               stdx::placeholders::_1,
                                               newConfig,
                                               myIndex));
+
+        boost::lock_guard<boost::mutex> lk(_mutex);
+        if (!_inShutdown) {
+            _heartbeatReconfigThread->detach();
+            _heartbeatReconfigThread.reset(NULL);
+        }
     }
 
     void ReplicationCoordinatorImpl::_heartbeatReconfigFinish(
             const ReplicationExecutor::CallbackData& cbData,
             const ReplicaSetConfig& newConfig,
             StatusWith<int> myIndex) {
+        if (cbData.status == ErrorCodes::CallbackCanceled) {
+            return;
+        }
 
         boost::lock_guard<boost::mutex> lk(_mutex);
         invariant(_rsConfigState == kConfigHBReconfiguring);
