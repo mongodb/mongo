@@ -121,8 +121,9 @@ __wt_open(WT_SESSION_IMPL *session,
 	    OPEN_EXISTING,
 	    f,
 	    NULL);
-	WT_ERR_MSG(session, __wt_errno(),
-	    "open failed for secondary handle: %s", path);
+	if (filehandle == INVALID_HANDLE_VALUE)
+		WT_ERR_MSG(session, __wt_errno(),
+		    "open failed for secondary handle: %s", path);
 
 	WT_ERR(__wt_calloc(session, 1, sizeof(WT_FH), &fh));
 	WT_ERR(__wt_strdup(session, name, &fh->name));

@@ -109,55 +109,8 @@ __wt_realloc_aligned(WT_SESSION_IMPL *session,
     size_t *bytes_allocated_ret, size_t bytes_to_allocate, void *retp)
 {
 	/*
-	 * !!!
-	 * This function MUST handle a NULL WT_SESSION_IMPL handle.
-	 */
-	if (session != NULL && S2C(session)->buffer_alignment > 0) {
-		void *p, *newp;
-		size_t bytes_allocated;
-
-		/*
-		 * Sometimes we're allocating memory and we don't care about the
-		 * final length -- bytes_allocated_ret may be NULL.
-		 */
-		p = *(void **)retp;
-		bytes_allocated =
-		    (bytes_allocated_ret == NULL) ? 0 : *bytes_allocated_ret;
-		WT_ASSERT(session,
-		    (p == NULL && bytes_allocated == 0) ||
-		    (p != NULL &&
-		    (bytes_allocated_ret == NULL || bytes_allocated != 0)));
-		WT_ASSERT(session, bytes_to_allocate != 0);
-		WT_ASSERT(session, bytes_allocated < bytes_to_allocate);
-
-		if (session != NULL)
-			WT_STAT_FAST_CONN_INCR(session, memory_allocation);
-
-		if ((newp = _aligned_malloc(
-		    S2C(session)->buffer_alignment,
-		    bytes_to_allocate)) != 0)
-			WT_RET_MSG(session, errno, "memory allocation");
-
-		if (p != NULL)
-			memcpy(newp, p, bytes_allocated);
-		__wt_free(session, p);
-		p = newp;
-
-		/* Clear the allocated memory (see above). */
-		memset((uint8_t *)p + bytes_allocated, 0,
-		    bytes_to_allocate - bytes_allocated);
-
-		/* Update caller's bytes allocated value. */
-		if (bytes_allocated_ret != NULL)
-			*bytes_allocated_ret = bytes_to_allocate;
-
-		*(void **)retp = p;
-		return (0);
-	}
-
-	/*
-	 * If there is no posix_memalign function, or no alignment configured,
-	 * fall back to realloc.
+	 * Visual C CRT memalign does not match posix behavior
+	 * and would also double each allocation so it is bad for memory use
 	 */
 	return (__wt_realloc(
 	    session, bytes_allocated_ret, bytes_to_allocate, retp));
