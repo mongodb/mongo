@@ -86,7 +86,6 @@ func (bd *BSONDump) Debug() error {
 		if !hasDoc {
 			break
 		}
-		result.Kind = reusableBuf[0]
 		result.Data = reusableBuf[0:docSize]
 		err = DebugBSON(result, 0, os.Stdout)
 		if err != nil {
@@ -103,6 +102,7 @@ func DebugBSON(raw bson.Raw, indentLevel int, out io.Writer) error {
 	indent := strings.Repeat("\t", indentLevel)
 	fmt.Fprintf(out, "%v--- new object ---\n", indent)
 	fmt.Fprintf(out, "%v\tsize : %v\n", indent, len(raw.Data))
+
 	//Convert raw into an array of RawD we can iterate over.
 	var rawD bson.RawD
 	err := bson.Unmarshal(raw.Data, &rawD)
@@ -111,12 +111,22 @@ func DebugBSON(raw bson.Raw, indentLevel int, out io.Writer) error {
 	}
 	for _, rawElem := range rawD {
 		fmt.Fprintf(out, "%v\t\t%v\n", indent, rawElem.Name)
-		//TODO this could be improved.
+
+		// the size of an element is the combined size of the following:
+		// 1. 1 byte for the BSON type
+		// 2. 'e_name' : the BSON key, which is a null-terminated cstring
+		// 3. The BSON value
+		// So size == 1 [size of type byte] +  1 [null byte for cstring key] + len(bson key) + len(bson value)
+		// see http://bsonspec.org/spec.html for more details
 		fmt.Fprintf(out, "%v\t\t\ttype: %4v size: %v\n", indent, rawElem.Value.Kind,
-			len(rawElem.Value.Data)+len([]byte(rawElem.Name))-2)
+			2 + len(rawElem.Name) + len(rawElem.Value.Data) )
+
 		//For nested objects or arrays, recurse.
 		if rawElem.Value.Kind == 0x03 || rawElem.Value.Kind == 0x04 {
-			return DebugBSON(rawElem.Value, indentLevel+3, out)
+			err = DebugBSON(rawElem.Value, indentLevel+3, out)
+			if err != nil {
+				return err
+			}
 		}
 	}
 	return nil
