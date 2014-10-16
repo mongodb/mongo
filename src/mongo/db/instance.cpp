@@ -87,7 +87,7 @@
 #include "mongo/util/time_support.h"
 
 namespace mongo {
-    
+
     using logger::LogComponent;
 
     // for diaglog
@@ -1003,7 +1003,11 @@ namespace mongo {
     }
 
     void exitCleanly( ExitCode code, OperationContext* txn ) {
-        shutdownInProgress.store(1);
+        if (shutdownInProgress.fetchAndAdd(1) != 0) {
+            while (true) {
+                sleepsecs(1000);
+            }
+        }
 
         // Global storage engine may not be started in all cases before we exit
         if (getGlobalEnvironment()->getGlobalStorageEngine() != NULL) {
