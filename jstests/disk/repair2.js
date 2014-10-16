@@ -32,16 +32,14 @@ check();
 stopMongod( port );
 
 resetDbpath( repairpath );
-rc = runMongoProgram( "mongod", "--repair", "--directoryperdb", "--port", port, "--dbpath", dbpath, "--repairpath", repairpath, "--nohttpinterface", "--bind_ip", "127.0.0.1" );
-assert.eq.automsg( "0", "rc" );
+runMongoProgram( "mongod", "--repair", "--directoryperdb", "--port", port, "--dbpath", dbpath, "--repairpath", repairpath, "--nohttpinterface", "--bind_ip", "127.0.0.1" );
 m = startMongoProgram( "mongod", "--directoryperdb", "--port", port, "--dbpath", dbpath, "--repairpath", repairpath, "--nohttpinterface", "--bind_ip", "127.0.0.1" );
 db = m.getDB( baseName );
 check();
 stopMongod( port );
 
 resetDbpath( repairpath );
-rc = runMongoProgram( "mongod", "--repair", "--directoryperdb", "--port", port, "--dbpath", dbpath, "--nohttpinterface", "--bind_ip", "127.0.0.1" );
-assert.eq.automsg( "0", "rc" );
+runMongoProgram( "mongod", "--repair", "--directoryperdb", "--port", port, "--dbpath", dbpath, "--nohttpinterface", "--bind_ip", "127.0.0.1" );
 m = startMongoProgram( "mongod", "--directoryperdb", "--port", port, "--dbpath", dbpath, "--nohttpinterface", "--bind_ip", "127.0.0.1" );
 db = m.getDB( baseName );
 check();
