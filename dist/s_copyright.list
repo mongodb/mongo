@@ -14,6 +14,8 @@ skip	dist/stat.py
 skip	dist/stat_data.py
 skip	dist/style.py
 skip	lang/java/java_doc.i
+skip	lang/java/src/com/wiredtiger/db/AsyncOp.java
+skip	lang/java/src/com/wiredtiger/db/AsyncOpType.java
 skip	lang/java/src/com/wiredtiger/db/Connection.java
 skip	lang/java/src/com/wiredtiger/db/Cursor.java
 skip	lang/java/src/com/wiredtiger/db/SearchStatus.java
