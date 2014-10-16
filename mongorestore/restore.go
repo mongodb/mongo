@@ -100,7 +100,7 @@ func (restore *MongoRestore) RestoreIntent(intent *Intent) error {
 					log.Logf(1, "collection %v already exists", intent.Key())
 				}
 			} else {
-				log.Log(1, "no options to restore")
+				log.Log(1, "no collection options to restore")
 			}
 		} else {
 			log.Log(1, "skipping options restoration")
@@ -135,12 +135,10 @@ func (restore *MongoRestore) RestoreIntent(intent *Intent) error {
 	// finally, add indexes
 	if len(indexes) > 0 && !restore.OutputOptions.NoIndexRestore {
 		log.Logf(0, "restoring indexes for collection %v from metadata", intent.Key())
-		for _, idx := range indexes {
-			log.Logf(0, "\tcreating index %v", idx.Options["name"])
-			err = restore.InsertIndex(intent, idx)
-			if err != nil {
-				return fmt.Errorf("error creating index %v: %v", idx.Options["name"], err)
-			}
+		//TODO better logging
+		err = restore.CreateIndexes(intent, indexes)
+		if err != nil {
+			return fmt.Errorf("error creating indexes: %v", err)
 		}
 	} else {
 		log.Log(0, "no indexes to restore")
@@ -157,6 +155,7 @@ func (restore *MongoRestore) RestoreCollectionToDB(dbName, colName string,
 		return fmt.Errorf("error establishing connection: %v", err)
 	}
 	session.SetSafe(restore.safety)
+	session.SetSocketTimeout(0)
 	defer session.Close()
 
 	collection := session.DB(dbName).C(colName)

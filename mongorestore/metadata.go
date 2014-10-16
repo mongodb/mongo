@@ -118,16 +118,57 @@ func (restore *MongoRestore) DBHasCollection(intent *Intent) (bool, error) {
 	return false, nil
 }
 
-func (restore *MongoRestore) InsertIndex(intent *Intent, index IndexDocument) error {
-	// first, update the namespace of the index before inserting
-	index.Options["ns"] = intent.Key()
+// CreateIndexes takes in an intent and an array of index documents and
+// attempts to create them using the createIndexes command. If that command
+// fails, we fall back to individual index creation.
+func (restore *MongoRestore) CreateIndexes(intent *Intent, indexes []IndexDocument) error {
+	// first, sanitize the indexes
+	for _, index := range indexes {
+		// update the namespace of the index before inserting
+		index.Options["ns"] = intent.Key()
 
-	// remove the index version, forcing an update,
-	// unless we specifically want to keep it
-	if !restore.OutputOptions.KeepIndexVersion {
-		delete(index.Options, "v")
+		// remove the index version, forcing an update,
+		// unless we specifically want to keep it
+		if !restore.OutputOptions.KeepIndexVersion {
+			delete(index.Options, "v")
+		}
 	}
 
+	session, err := restore.SessionProvider.GetSession()
+	if err != nil {
+		return fmt.Errorf("error establishing connection: %v", err)
+	}
+	session.SetSafe(&mgo.Safe{})
+	session.SetSocketTimeout(0)
+	defer session.Close()
+
+	// then attempt the createIndexes command
+	rawCommand := bson.D{
+		{"createIndexes", intent.C},
+		{"indexes", indexes},
+	}
+	results := bson.M{}
+	err = session.DB(intent.DB).Run(rawCommand, &results)
+	if err == nil {
+		return nil
+	}
+	if err.Error() != "no such cmd: createIndexes" {
+		return fmt.Errorf("createIndex error: %v", err)
+	}
+
+	// if we're here, the connected server does not support the command, so we fall back
+	log.Log(1, "\tcreateIndexes command not supported, attemping legacy index insertion")
+	for _, idx := range indexes {
+		log.Logf(1, "\tmanually creating index %v", idx.Options["name"])
+		err = restore.LegacyInsertIndex(intent, idx)
+		if err != nil {
+			return fmt.Errorf("error creating index %v: %v", idx.Options["name"], err)
+		}
+	}
+	return nil
+}
+
+func (restore *MongoRestore) LegacyInsertIndex(intent *Intent, index IndexDocument) error {
 	session, err := restore.SessionProvider.GetSession()
 	if err != nil {
 		return fmt.Errorf("error establishing connection: %v", err)
