@@ -40,7 +40,7 @@ namespace mongo {
     // restorePosition() in succession.
     TEST( SortedDataInterface, SaveAndRestorePositionWhileIterateCursor ) {
         scoped_ptr<HarnessHelper> harnessHelper( newHarnessHelper() );
-        scoped_ptr<SortedDataInterface> sorted( harnessHelper->newSortedDataInterface() );
+        scoped_ptr<SortedDataInterface> sorted( harnessHelper->newSortedDataInterface( false ) );
 
         {
             scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
@@ -54,7 +54,7 @@ namespace mongo {
                 WriteUnitOfWork uow( opCtx.get() );
                 BSONObj key = BSON( "" << i );
                 DiskLoc loc( 42, i * 2 );
-                ASSERT_OK( sorted->insert( opCtx.get(), key, loc, false ) );
+                ASSERT_OK( sorted->insert( opCtx.get(), key, loc, true ) );
                 uow.commit();
             }
         }
@@ -85,7 +85,7 @@ namespace mongo {
     // restorePosition() in succession.
     TEST( SortedDataInterface, SaveAndRestorePositionWhileIterateCursorReversed ) {
         scoped_ptr<HarnessHelper> harnessHelper( newHarnessHelper() );
-        scoped_ptr<SortedDataInterface> sorted( harnessHelper->newSortedDataInterface() );
+        scoped_ptr<SortedDataInterface> sorted( harnessHelper->newSortedDataInterface( false ) );
 
         {
             scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
@@ -99,7 +99,7 @@ namespace mongo {
                 WriteUnitOfWork uow( opCtx.get() );
                 BSONObj key = BSON( "" << i );
                 DiskLoc loc( 42, i * 2 );
-                ASSERT_OK( sorted->insert( opCtx.get(), key, loc, false ) );
+                ASSERT_OK( sorted->insert( opCtx.get(), key, loc, true ) );
                 uow.commit();
             }
         }
@@ -131,7 +131,7 @@ namespace mongo {
     // as part of the current position of the cursor.
     TEST( SortedDataInterface, SaveAndRestorePositionWhileIterateCursorWithDupKeys ) {
         scoped_ptr<HarnessHelper> harnessHelper( newHarnessHelper() );
-        scoped_ptr<SortedDataInterface> sorted( harnessHelper->newSortedDataInterface() );
+        scoped_ptr<SortedDataInterface> sorted( harnessHelper->newSortedDataInterface( false ) );
 
         {
             scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
@@ -176,7 +176,7 @@ namespace mongo {
     // as part of the current position of the cursor.
     TEST( SortedDataInterface, SaveAndRestorePositionWhileIterateCursorWithDupKeysReversed ) {
         scoped_ptr<HarnessHelper> harnessHelper( newHarnessHelper() );
-        scoped_ptr<SortedDataInterface> sorted( harnessHelper->newSortedDataInterface() );
+        scoped_ptr<SortedDataInterface> sorted( harnessHelper->newSortedDataInterface( false ) );
 
         {
             scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
@@ -219,7 +219,7 @@ namespace mongo {
     // May be useful to run this test under valgrind to verify there are no leaks.
     TEST( SortedDataInterface, SavePositionWithoutRestore ) {
         scoped_ptr<HarnessHelper> harnessHelper( newHarnessHelper() );
-        scoped_ptr<SortedDataInterface> sorted( harnessHelper->newSortedDataInterface() );
+        scoped_ptr<SortedDataInterface> sorted( harnessHelper->newSortedDataInterface( true ) );
 
         {
             scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
@@ -251,7 +251,7 @@ namespace mongo {
     // May be useful to run this test under valgrind to verify there are no leaks.
     TEST( SortedDataInterface, SavePositionWithoutRestoreReversed ) {
         scoped_ptr<HarnessHelper> harnessHelper( newHarnessHelper() );
-        scoped_ptr<SortedDataInterface> sorted( harnessHelper->newSortedDataInterface() );
+        scoped_ptr<SortedDataInterface> sorted( harnessHelper->newSortedDataInterface( false ) );
 
         {
             scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
@@ -262,7 +262,7 @@ namespace mongo {
             scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
             {
                 WriteUnitOfWork uow( opCtx.get() );
-                ASSERT_OK( sorted->insert( opCtx.get(), key1, loc1, false ) );
+                ASSERT_OK( sorted->insert( opCtx.get(), key1, loc1, true ) );
                 uow.commit();
             }
         }

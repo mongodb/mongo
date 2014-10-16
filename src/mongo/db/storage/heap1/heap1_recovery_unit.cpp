@@ -65,7 +65,7 @@ namespace mongo {
             const IndexInfo& ii = frame.indexMods[i-1];
             SortedDataInterface* idx = ii.idx;
             if ( ii.insert )
-                idx->unindex( NULL, ii.obj, ii.loc );
+                idx->unindex( NULL, ii.obj, ii.loc, true );
             else
                 idx->insert( NULL, ii.obj, ii.loc, true );
         }

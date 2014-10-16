@@ -73,7 +73,7 @@ namespace mongo {
         HarnessHelper(){}
         virtual ~HarnessHelper(){}
 
-        virtual SortedDataInterface* newSortedDataInterface() = 0;
+        virtual SortedDataInterface* newSortedDataInterface( bool unique ) = 0;
         virtual RecoveryUnit* newRecoveryUnit() = 0;
 
         virtual OperationContext* newOperationContext() {

@@ -38,7 +38,7 @@ namespace mongo {
     // Call getDirection() on a forward cursor and verify the result equals +1.
     TEST( SortedDataInterface, GetCursorDirection ) {
         scoped_ptr<HarnessHelper> harnessHelper( newHarnessHelper() );
-        scoped_ptr<SortedDataInterface> sorted( harnessHelper->newSortedDataInterface() );
+        scoped_ptr<SortedDataInterface> sorted( harnessHelper->newSortedDataInterface( false ) );
 
         {
             scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
@@ -50,7 +50,7 @@ namespace mongo {
     // Call getDirection() on a reverse cursor and verify the result equals -1.
     TEST( SortedDataInterface, GetCursorDirectionReversed ) {
         scoped_ptr<HarnessHelper> harnessHelper( newHarnessHelper() );
-        scoped_ptr<SortedDataInterface> sorted( harnessHelper->newSortedDataInterface() );
+        scoped_ptr<SortedDataInterface> sorted( harnessHelper->newSortedDataInterface( false ) );
 
         {
             scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
@@ -62,7 +62,7 @@ namespace mongo {
     // Verify that a forward cursor is positioned at EOF when the index is empty.
     TEST( SortedDataInterface, CursorIsEOFWhenEmpty ) {
         scoped_ptr<HarnessHelper> harnessHelper( newHarnessHelper() );
-        scoped_ptr<SortedDataInterface> sorted( harnessHelper->newSortedDataInterface() );
+        scoped_ptr<SortedDataInterface> sorted( harnessHelper->newSortedDataInterface( false ) );
 
         {
             scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
@@ -85,7 +85,7 @@ namespace mongo {
     // Verify that a reverse cursor is positioned at EOF when the index is empty.
     TEST( SortedDataInterface, CursorIsEOFWhenEmptyReversed ) {
         scoped_ptr<HarnessHelper> harnessHelper( newHarnessHelper() );
-        scoped_ptr<SortedDataInterface> sorted( harnessHelper->newSortedDataInterface() );
+        scoped_ptr<SortedDataInterface> sorted( harnessHelper->newSortedDataInterface( false ) );
 
         {
             scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
@@ -109,7 +109,7 @@ namespace mongo {
     // When a cursor positioned at EOF is advanced, it stays at EOF.
     TEST( SortedDataInterface, ExhaustCursor ) {
         scoped_ptr<HarnessHelper> harnessHelper( newHarnessHelper() );
-        scoped_ptr<SortedDataInterface> sorted( harnessHelper->newSortedDataInterface() );
+        scoped_ptr<SortedDataInterface> sorted( harnessHelper->newSortedDataInterface( false ) );
 
         {
             scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
@@ -123,7 +123,7 @@ namespace mongo {
                 WriteUnitOfWork uow( opCtx.get() );
                 BSONObj key = BSON( "" << i );
                 DiskLoc loc( 42, i * 2 );
-                ASSERT_OK( sorted->insert( opCtx.get(), key, loc, false ) );
+                ASSERT_OK( sorted->insert( opCtx.get(), key, loc, true ) );
                 uow.commit();
             }
         }
@@ -155,7 +155,7 @@ namespace mongo {
     // When a cursor positioned at EOF is advanced, it stays at EOF.
     TEST( SortedDataInterface, ExhaustCursorReversed ) {
         scoped_ptr<HarnessHelper> harnessHelper( newHarnessHelper() );
-        scoped_ptr<SortedDataInterface> sorted( harnessHelper->newSortedDataInterface() );
+        scoped_ptr<SortedDataInterface> sorted( harnessHelper->newSortedDataInterface( false ) );
 
         {
             scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
@@ -169,7 +169,7 @@ namespace mongo {
                 WriteUnitOfWork uow( opCtx.get() );
                 BSONObj key = BSON( "" << i );
                 DiskLoc loc( 42, i * 2 );
-                ASSERT_OK( sorted->insert( opCtx.get(), key, loc, false ) );
+                ASSERT_OK( sorted->insert( opCtx.get(), key, loc, true ) );
                 uow.commit();
             }
         }

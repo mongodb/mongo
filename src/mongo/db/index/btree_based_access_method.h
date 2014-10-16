@@ -134,7 +134,8 @@ namespace mongo {
     private:
         bool removeOneKey(OperationContext* txn,
                           const BSONObj& key,
-                          const DiskLoc& loc);
+                          const DiskLoc& loc,
+                          bool dupsAllowed);
 
         scoped_ptr<SortedDataInterface> _newInterface;
     };
