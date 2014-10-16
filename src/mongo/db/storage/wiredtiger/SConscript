@@ -29,6 +29,7 @@ if has_option("wiredtiger"):
             'wiredtiger_global_options.cpp',
             'wiredtiger_init.cpp',
             'wiredtiger_options_init.cpp',
+            'wiredtiger_server_status.cpp',
             ],
         LIBDEPS=['storage_wiredtiger_core',
                  '$BUILD_DIR/mongo/db/storage/kv/kv_engine',

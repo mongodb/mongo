@@ -1,4 +1,4 @@
-// wiredtiger_init.cpp
+// wiredtiger_server_status.h
 
 /**
  *    Copyright (C) 2014 MongoDB Inc.
@@ -7,7 +7,6 @@
  *    This program is free software: you can redistribute it and/or  modify
  *    it under the terms of the GNU Affero General Public License, version 3,
  *    as published by the Free Software Foundation.
- *
  *
  *    This program is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -30,39 +29,24 @@
  *    it in the license file.
  */
 
-#include "mongo/base/init.h"
-#include "mongo/db/global_environment_d.h"
-#include "mongo/db/global_environment_experiment.h"
-#include "mongo/db/storage/kv/kv_storage_engine.h"
-#include "mongo/db/storage/wiredtiger/wiredtiger_kv_engine.h"
-#include "mongo/db/storage/wiredtiger/wiredtiger_global_options.h"
-#include "mongo/db/storage/wiredtiger/wiredtiger_server_status.h"
-#include "mongo/db/storage_options.h"
+#pragma once
+
+#include "mongo/db/commands/server_status.h"
 
 namespace mongo {
 
-    namespace {
-        class WiredTigerFactory : public StorageEngine::Factory {
-        public:
-            virtual ~WiredTigerFactory(){}
-            virtual StorageEngine* create( const StorageGlobalParams& params ) const {
-                WiredTigerKVEngine* kv = new WiredTigerKVEngine( params.dbpath,
-                                                                 wiredTigerGlobalOptions.databaseConfig );
-                kv->setRecordStoreExtraOptions( wiredTigerGlobalOptions.collectionConfig );
-                kv->setSortedDataInterfaceExtraOptions( wiredTigerGlobalOptions.indexConfig );
-                // Intentionally leaked.
-                new WiredTigerServerStatusSection(kv);
-                return new KVStorageEngine( kv );
-            }
-        };
-    } // namespace
+    class WiredTigerKVEngine;
 
-    MONGO_INITIALIZER_WITH_PREREQUISITES(WiredTigerEngineInit,
-                                         ("SetGlobalEnvironment"))
-        (InitializerContext* context ) {
-        getGlobalEnvironment()->registerStorageEngine("wiredtiger", new WiredTigerFactory() );
-        return Status::OK();
-    }
+    /**
+     * Adds "wiredtiger" to the results of db.serverStatus().
+     */
+    class WiredTigerServerStatusSection : public ServerStatusSection {
+    public:
+        WiredTigerServerStatusSection(WiredTigerKVEngine* engine);
+        virtual bool includeByDefault() const;
+        virtual BSONObj generateSection(const BSONElement& configElement) const;
+    private:
+        WiredTigerKVEngine* _engine;
+    };
 
-}
-
+}  // namespace mongo

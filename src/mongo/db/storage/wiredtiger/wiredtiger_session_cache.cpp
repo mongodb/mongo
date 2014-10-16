@@ -1,5 +1,7 @@
 // wiredtiger_session_cache.cpp
 
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kStorage
+
 #include "mongo/db/storage/wiredtiger/wiredtiger_session_cache.h"
 
 #include "mongo/db/storage/wiredtiger/wiredtiger_util.h"

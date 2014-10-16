@@ -30,6 +30,8 @@
  *    it in the license file.
  */
 
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kStorage
+
 #include <wiredtiger.h>
 
 #include "mongo/db/operation_context.h"
@@ -37,8 +39,9 @@
 #include "mongo/db/storage/wiredtiger/wiredtiger_recovery_unit.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_session_cache.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_util.h"
-
+#include "mongo/util/assert_util.h"
 #include "mongo/util/log.h"
+#include "mongo/util/scopeguard.h"
 
 //#define RS_ITERATOR_TRACE(x) log() << "WTRS::Iterator " << x
 #define RS_ITERATOR_TRACE(x)
@@ -463,6 +466,28 @@ namespace mongo {
         if ( _isCapped ) {
             result->appendIntOrLL( "max", _cappedMaxDocs );
             result->appendIntOrLL( "maxSize", _cappedMaxSize );
+        }
+        WiredTigerSession* session = WiredTigerRecoveryUnit::get(txn)->getSession();
+        WT_SESSION* s = session->getSession();
+        invariant(s);
+        WT_CURSOR* c = NULL;
+        int ret;
+        BSONObjBuilder bob(result->subobjStart("wiredtiger"));
+        const string uri = "statistics:" + GetURI();
+        bob.append("uri", uri);
+        if ((ret = s->open_cursor(s, uri.c_str(), NULL, "statistics=(fast)", &c)) != 0) {
+            bob.append("error", "unable to retrieve statistics");
+            bob.append("message", wiredtiger_strerror(ret));
+        }
+        else {
+            invariant(c);
+            ON_BLOCK_EXIT(c->close, c);
+            const char *desc, *pvalue;
+            uint64_t value;
+            while (c->next(c) == 0 &&
+                   c->get_value(c, &desc, &pvalue, &value) == 0) {
+                bob.append(desc, pvalue);
+            }
         }
     }
 
