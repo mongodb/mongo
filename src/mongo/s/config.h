@@ -103,7 +103,11 @@ namespace mongo {
 
         DBConfig( std::string name )
             : _name( name ) ,
-              _primary("config","") ,
+              _primary("config",
+                       "",
+                       0 /* maxSize */,
+                       false /* draining */,
+                       BSONArray() /* tags */),
               _shardingEnabled(false),
               _lock("DBConfig") ,
               _hitConfigServerLock( "DBConfig::_hitConfigServerLock" ) {

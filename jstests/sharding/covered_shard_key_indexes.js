@@ -28,35 +28,31 @@ st.printShardingStatus();
 // Insert some data
 assert.writeOK(coll.insert({ _id : true, a : true, b : true }));
 
-var shardExplain = function(mongosExplainDoc) {
-    var explainDoc = mongosExplainDoc.shards[shards[0].host][0];
-    printjson(explainDoc);
-    return explainDoc.executionStats;
-};
-
 assert.commandWorked(st.shard0.adminCommand({ setParameter: 1,
                                               logComponentVerbosity: { query: { verbosity: 5 }}}));
 
 //
 // Index without shard key query - not covered
 assert.commandWorked(coll.ensureIndex({ a : 1 }));
-assert.eq(1, shardExplain(coll.find({ a : true }).explain()).totalDocsExamined);
-assert.eq(1, shardExplain(coll.find({ a : true }, { _id : 1, a : 1 }).explain()).totalDocsExamined);
+assert.eq(1, coll.find({ a : true }).explain(true).executionStats.totalDocsExamined);
+assert.eq(1, coll.find({ a : true }, { _id : 1, a : 1 })
+                 .explain(true).executionStats.totalDocsExamined);
 
 //
 // Index with shard key query - covered when projecting
 assert.commandWorked(coll.dropIndexes());
 assert.commandWorked(coll.ensureIndex({ a : 1, _id : 1 }));
-assert.eq(1, shardExplain(coll.find({ a : true }).explain()).totalDocsExamined);
-assert.eq(0, shardExplain(coll.find({ a : true }, { _id : 1, a : 1 }).explain()).totalDocsExamined);
+assert.eq(1, coll.find({ a : true }).explain(true).executionStats.totalDocsExamined);
+assert.eq(0, coll.find({ a : true }, { _id : 1, a : 1 })
+                 .explain(true).executionStats.totalDocsExamined);
 
 //
 // Compound index with shard key query - covered when projecting
 assert.commandWorked(coll.dropIndexes());
 assert.commandWorked(coll.ensureIndex({ a : 1, b : 1, _id : 1 }));
-assert.eq(1, shardExplain(coll.find({ a : true, b : true }).explain()).totalDocsExamined);
-assert.eq(0, shardExplain(coll.find({ a : true, b : true }, { _id : 1, a : 1 })
-                          .explain()).totalDocsExamined);
+assert.eq(1, coll.find({ a : true, b : true }).explain(true).executionStats.totalDocsExamined);
+assert.eq(0, coll.find({ a : true, b : true }, { _id : 1, a : 1 })
+                 .explain(true).executionStats.totalDocsExamined);
 
 //
 //
@@ -71,14 +67,16 @@ assert.writeOK(coll.insert({ _id : true, a : true, b : true }));
 //
 // Index without shard key query - not covered
 assert.commandWorked(coll.ensureIndex({ a : 1 }));
-assert.eq(1, shardExplain(coll.find({ a : true }).explain()).totalDocsExamined);
-assert.eq(1, shardExplain(coll.find({ a : true }, { _id : 0, a : 1 }).explain()).totalDocsExamined);
+assert.eq(1, coll.find({ a : true }).explain(true).executionStats.totalDocsExamined);
+assert.eq(1, coll.find({ a : true }, { _id : 0, a : 1 })
+                 .explain(true).executionStats.totalDocsExamined);
 
 //
 // Index with shard key query - can't be covered since hashed index
 assert.commandWorked(coll.dropIndex({ a : 1 }));
-assert.eq(1, shardExplain(coll.find({ _id : true }).explain()).totalDocsExamined);
-assert.eq(1, shardExplain(coll.find({ _id : true }, { _id : 0 }).explain()).totalDocsExamined);
+assert.eq(1, coll.find({ _id : true }).explain(true).executionStats.totalDocsExamined);
+assert.eq(1, coll.find({ _id : true }, { _id : 0 })
+                 .explain(true).executionStats.totalDocsExamined);
 
 //
 //
@@ -93,25 +91,25 @@ assert.writeOK(coll.insert({ _id : true, a : true, b : true, c : true, d : true 
 //
 // Index without shard key query - not covered
 assert.commandWorked(coll.ensureIndex({ c : 1 }));
-assert.eq(1, shardExplain(coll.find({ c : true }).explain()).totalDocsExamined);
-assert.eq(1, shardExplain(coll.find({ c : true }, { _id : 0, a : 1, b : 1, c : 1 })
-                          .explain()).totalDocsExamined);
+assert.eq(1, coll.find({ c : true }).explain(true).executionStats.totalDocsExamined);
+assert.eq(1, coll.find({ c : true }, { _id : 0, a : 1, b : 1, c : 1 })
+                 .explain(true).executionStats.totalDocsExamined);
 
 //
 // Index with shard key query - covered when projecting
 assert.commandWorked(coll.dropIndex({ c : 1 }));
 assert.commandWorked(coll.ensureIndex({ c : 1, b : 1, a : 1 }));
-assert.eq(1, shardExplain(coll.find({ c : true }).explain()).totalDocsExamined);
-assert.eq(0, shardExplain(coll.find({ c : true }, { _id : 0, a : 1, b : 1, c : 1 })
-                          .explain()).totalDocsExamined);
+assert.eq(1, coll.find({ c : true }).explain(true).executionStats.totalDocsExamined);
+assert.eq(0, coll.find({ c : true }, { _id : 0, a : 1, b : 1, c : 1 })
+                 .explain(true).executionStats.totalDocsExamined);
 
 //
 // Compound index with shard key query - covered when projecting
 assert.commandWorked(coll.dropIndex({ c : 1, b : 1, a : 1 }));
 assert.commandWorked(coll.ensureIndex({ c : 1, d : 1, a : 1, b : 1, _id : 1 }));
-assert.eq(1, shardExplain(coll.find({ c : true, d : true }).explain()).totalDocsExamined);
-assert.eq(0, shardExplain(coll.find({ c : true, d : true }, { a : 1, b : 1, c : 1, d : 1 })
-                          .explain()).totalDocsExamined);
+assert.eq(1, coll.find({ c : true, d : true }).explain(true).executionStats.totalDocsExamined);
+assert.eq(0, coll.find({ c : true, d : true }, { a : 1, b : 1, c : 1, d : 1 })
+                 .explain(true).executionStats.totalDocsExamined);
 
 //
 //
@@ -126,17 +124,17 @@ assert.writeOK(coll.insert({ _id : true, a : { b : true }, c : true }));
 //
 // Index without shard key query - not covered
 assert.commandWorked(coll.ensureIndex({ c : 1 }));
-assert.eq(1, shardExplain(coll.find({ c : true }).explain()).totalDocsExamined);
-assert.eq(1, shardExplain(coll.find({ c : true }, { _id : 0, 'a.b' : 1, c : 1 })
-                          .explain()).totalDocsExamined);
+assert.eq(1, coll.find({ c : true }).explain(true).executionStats.totalDocsExamined);
+assert.eq(1, coll.find({ c : true }, { _id : 0, 'a.b' : 1, c : 1 })
+                 .explain(true).executionStats.totalDocsExamined);
 
 //
 // Index with shard key query - nested query not covered even when projecting
 assert.commandWorked(coll.dropIndex({ c : 1 }));
 assert.commandWorked(coll.ensureIndex({ c : 1, 'a.b' : 1 }));
-assert.eq(1, shardExplain(coll.find({ c : true }).explain()).totalDocsExamined);
-assert.eq(1, shardExplain(coll.find({ c : true }, { _id : 0, 'a.b' : 1, c : 1 })
-                          .explain()).totalDocsExamined);
+assert.eq(1, coll.find({ c : true }).explain(true).executionStats.totalDocsExamined);
+assert.eq(1, coll.find({ c : true }, { _id : 0, 'a.b' : 1, c : 1 })
+                 .explain(true).executionStats.totalDocsExamined);
 
 //
 //
@@ -151,10 +149,10 @@ assert.writeOK(st.shard0.getCollection(coll.toString()).insert({ _id : "bad data
 //
 // Index without shard key query - not covered but succeeds
 assert.commandWorked(coll.ensureIndex({ c : 1 }));
-var explain = shardExplain(coll.find({ c : true }).explain());
+var explain = coll.find({ c : true }).explain(true).executionStats;
 assert.eq(0, explain.nReturned);
 assert.eq(1, explain.totalDocsExamined);
-assert.eq(1, getChunkSkips(explain.executionStages));
+assert.eq(1, getChunkSkips(explain.executionStages.shards[0].executionStages));
 
 //
 // Index with shard key query - covered and succeeds and returns result
@@ -162,10 +160,10 @@ assert.eq(1, getChunkSkips(explain.executionStages));
 // value for indexes
 assert.commandWorked(coll.ensureIndex({ c : 1, a : 1 }));
 jsTest.log(tojson(coll.find({ c : true }, { _id : 0, a : 1, c : 1 }).toArray()));
-var explain = shardExplain(coll.find({ c : true }, { _id : 0, a : 1, c : 1 }).explain());
+var explain = coll.find({ c : true }, { _id : 0, a : 1, c : 1 }).explain(true).executionStats;
 assert.eq(1, explain.nReturned);
 assert.eq(0, explain.totalDocsExamined);
-assert.eq(0, getChunkSkips(explain.executionStages));
+assert.eq(0, getChunkSkips(explain.executionStages.shards[0].executionStages));
 
 jsTest.log("DONE!");
 st.stop();

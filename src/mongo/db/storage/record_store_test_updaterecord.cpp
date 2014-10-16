@@ -72,7 +72,7 @@ namespace mongo {
             ASSERT_EQUALS( 1, rs->numRecords( opCtx.get() ) );
         }
 
-        data = "my updated record";
+        data = "updated record-";
         {
             scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
             {
@@ -138,7 +138,7 @@ namespace mongo {
             scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
             {
                 stringstream ss;
-                ss << "updated record " << i;
+                ss << "update record-" << i;
                 string data = ss.str();
 
                 WriteUnitOfWork uow( opCtx.get() );
@@ -158,7 +158,7 @@ namespace mongo {
             scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
             {
                 stringstream ss;
-                ss << "updated record " << i;
+                ss << "update record-" << i;
                 string data = ss.str();
 
                 RecordData record = rs->dataFor( opCtx.get(), locs[i] );
@@ -199,7 +199,7 @@ namespace mongo {
             ASSERT_EQUALS( 1, rs->numRecords( opCtx.get() ) );
         }
 
-        string newData = "my updated record";
+        string newData = "my updated record--";
         {
             scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
             {

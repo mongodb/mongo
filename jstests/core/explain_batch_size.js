@@ -16,4 +16,4 @@ var q = {};
 
 assert.eq( n , t.find( q ).count() , "A" );
 assert.eq( n , t.find( q ).itcount() , "B" );
-assert.eq( n , t.find( q ).batchSize(1).explain().executionStats.nReturned , "C" );
+assert.eq( n , t.find( q ).batchSize(1).explain("executionStats").executionStats.nReturned , "C" );

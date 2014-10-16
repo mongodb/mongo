@@ -26,6 +26,8 @@
  *    it in the license file.
  */
 
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kQuery
+
 #include "mongo/db/exec/index_scan.h"
 
 #include "mongo/db/exec/filter.h"
@@ -135,7 +137,7 @@ namespace mongo {
             }
         }
 
-        // This method may throw an execption while it's doing intialization. If we've gotten
+        // This method may throw an exception while it's doing initialization. If we've gotten
         // here, then we've done all the initialization without an exception being thrown. This
         // means it is safe to transition to the CHECKING_END state. In error cases, we transition
         // to HIT_END, so we should not change state again here.

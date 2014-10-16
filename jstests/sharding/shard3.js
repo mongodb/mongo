@@ -66,15 +66,15 @@ function doCounts( name , total , onlyItCounts ){
 var total = doCounts( "before wrong save" )
 assert.writeOK(secondary.insert( { _id : 111 , num : -3 } ));
 doCounts( "after wrong save" , total , true )
-e = a.find().explain();
+e = a.find().explain("executionStats").executionStats;
 assert.eq( 3 , e.nReturned , "ex1" )
 assert.eq( 0 , e.totalKeysExamined , "ex2" )
 assert.eq( 4 , e.totalDocsExamined , "ex3" )
 
 var chunkSkips = 0;
-for (var shard in e.shards) {
-    var theShard = e.shards[shard][0];
-    chunkSkips += getChunkSkips(theShard.executionStats.executionStages);
+for (var shard in e.executionStages.shards) {
+    var theShard = e.executionStages.shards[shard];
+    chunkSkips += getChunkSkips(theShard.executionStages);
 }
 assert.eq( 1 , chunkSkips , "ex4" )
 

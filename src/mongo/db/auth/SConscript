@@ -70,12 +70,21 @@ env.Library('authmocks',
             LIBDEPS=['$BUILD_DIR/mongo/db/ops/update_driver',
                      '$BUILD_DIR/mongo/expressions'])
 
-env.CppUnitTest('action_set_test', 'action_set_test.cpp', LIBDEPS=['authcore'])
-env.CppUnitTest('privilege_parser_test', 'privilege_parser_test.cpp', LIBDEPS=['authcore'])
-env.CppUnitTest('role_graph_test', 'role_graph_test.cpp', LIBDEPS=['authcore'])
-env.CppUnitTest('user_document_parser_test', 'user_document_parser_test.cpp', LIBDEPS=['authcore'])
-env.CppUnitTest('user_set_test', 'user_set_test.cpp', LIBDEPS=['authcore'])
+env.Library('sasltestcrutch',
+            ['sasl_test_crutch.cpp'],
+            LIBDEPS=[])
+
+env.CppUnitTest('action_set_test', 'action_set_test.cpp',
+                LIBDEPS=['authcore', 'authmocks', 'saslauth', 'sasltestcrutch'])
+env.CppUnitTest('privilege_parser_test', 'privilege_parser_test.cpp',
+                LIBDEPS=['authcore', 'authmocks', 'saslauth', 'sasltestcrutch'])
+env.CppUnitTest('role_graph_test', 'role_graph_test.cpp',
+                LIBDEPS=['authcore', 'authmocks', 'saslauth', 'sasltestcrutch'])
+env.CppUnitTest('user_document_parser_test', 'user_document_parser_test.cpp',
+                LIBDEPS=['authcore', 'authmocks', 'saslauth', 'sasltestcrutch'])
+env.CppUnitTest('user_set_test', 'user_set_test.cpp',
+                LIBDEPS=['authcore', 'authmocks', 'saslauth', 'sasltestcrutch'])
 env.CppUnitTest('authorization_manager_test', 'authorization_manager_test.cpp',
-                LIBDEPS=['authcore', 'authmocks'])
+                LIBDEPS=['authcore', 'authmocks', 'saslauth', 'sasltestcrutch'])
 env.CppUnitTest('authorization_session_test', 'authorization_session_test.cpp',
-                LIBDEPS=['authcore', 'authmocks'])
+                LIBDEPS=['authcore', 'authmocks', 'saslauth', 'sasltestcrutch'])

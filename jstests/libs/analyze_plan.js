@@ -20,6 +20,13 @@ function planHasStage(root, stage) {
             }
         }
     }
+    else if ("shards" in root) {
+        for (var i = 0; i < root.shards.length; i++) {
+            if (planHasStage(root.shards[i].winningPlan, stage)) {
+                return true;
+            }
+        }
+    }
 
     return false;
 }

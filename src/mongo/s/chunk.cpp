@@ -770,22 +770,7 @@ namespace mongo {
         _version = ChunkVersion::fromBSON( collDoc );
     }
 
-    ChunkManager::ChunkManager( ChunkManagerPtr oldManager ) :
-        _ns( oldManager->getns() ),
-        _key( oldManager->getShardKey() ),
-        _unique( oldManager->isUnique() ),
-        _chunkRanges(),
-        _mutex("ChunkManager"),
-        _sequenceNumber(NextSequenceNumber.addAndFetch(1))
-    {
-        //
-        // Sets up a chunk manager based on an older manager
-        //
-
-        _oldManager = oldManager;
-    }
-
-    void ChunkManager::loadExistingRanges( const string& config ){
+    void ChunkManager::loadExistingRanges(const string& config, const ChunkManager* oldManager){
 
         int tries = 3;
         while (tries--) {
@@ -794,7 +779,7 @@ namespace mongo {
             ShardVersionMap shardVersions;
             Timer t;
 
-            bool success = _load( config, chunkMap, shards, shardVersions, _oldManager );
+            bool success = _load(config, chunkMap, shards, shardVersions, oldManager);
 
             if( success ){
                 {
@@ -803,7 +788,7 @@ namespace mongo {
                           << " sequenceNumber: " << _sequenceNumber
                           << " version: " << _version.toString()
                           << " based on: " <<
-                           ( _oldManager.get() ? _oldManager->getVersion().toString() : "(empty)" )
+                           (oldManager ? oldManager->getVersion().toString() : "(empty)")
                           << endl;
                 }
 
@@ -816,9 +801,6 @@ namespace mongo {
                     const_cast<set<Shard>&>(_shards).swap(shards);
                     const_cast<ShardVersionMap&>(_shardVersions).swap(shardVersions);
                     const_cast<ChunkRangeManager&>(_chunkRanges).reloadAll(_chunkMap);
-
-                    // Once we load data, clear reference to old manager
-                    _oldManager.reset();
 
                     return;
                 }
@@ -845,7 +827,7 @@ namespace mongo {
      *
      * The mongos adapter here tracks all shards, and stores ranges by (max, Chunk) in the map.
      */
-    class CMConfigDiffTracker : public ConfigDiffTracker<ChunkPtr,Shard> {
+    class CMConfigDiffTracker : public ConfigDiffTracker<ChunkPtr, std::string> {
     public:
         CMConfigDiffTracker( ChunkManager* manager ) : _manager( manager ) {}
 
@@ -865,11 +847,8 @@ namespace mongo {
             return make_pair( max, c );
         }
 
-        virtual Shard shardFor( const string& name ) const {
-            return Shard::make( name );
-        }
-
-        virtual string nameFrom( const Shard& shard ) const {
+        virtual string shardFor(const string& hostName) const {
+            Shard shard = Shard::make(hostName);
             return shard.getName();
         }
 
@@ -877,11 +856,11 @@ namespace mongo {
 
     };
 
-    bool ChunkManager::_load( const string& config,
-                              ChunkMap& chunkMap,
-                              set<Shard>& shards,
-                              ShardVersionMap& shardVersions,
-                              ChunkManagerPtr oldManager)
+    bool ChunkManager::_load(const string& config,
+                             ChunkMap& chunkMap,
+                             set<Shard>& shards,
+                             ShardVersionMap& shardVersions,
+                             const ChunkManager* oldManager)
     {
 
         // Reset the max version, but not the epoch, when we aren't loading from the oldManager
@@ -1410,11 +1389,10 @@ namespace mongo {
         return bounds;
     }
 
-    bool ChunkManager::compatibleWith( const ChunkManager& other, const Shard& shard ) const {
+    bool ChunkManager::compatibleWith(const ChunkManager& other, const string& shardName) const {
         // Return true if the shard version is the same in the two chunk managers
         // TODO: This doesn't need to be so strong, just major vs
-        return other.getVersion( shard ).equals( getVersion( shard ) );
-
+        return other.getVersion(shardName).equals(getVersion(shardName));
     }
 
     bool ChunkManager::compatibleWith( const Chunk& other ) const {
@@ -1529,13 +1507,8 @@ namespace mongo {
         configServer.logChange( "dropCollection" , _ns , BSONObj() );
     }
 
-    ChunkVersion ChunkManager::getVersion( const StringData& shardName ) const {
-        // NOTE: The empty-address Shard constructor is needed to avoid triggering a reload
-        return getVersion( Shard( shardName.toString(), "" ) );
-    }
-
-    ChunkVersion ChunkManager::getVersion( const Shard& shard ) const {
-        ShardVersionMap::const_iterator i = _shardVersions.find( shard );
+    ChunkVersion ChunkManager::getVersion(const std::string& shardName) const {
+        ShardVersionMap::const_iterator i = _shardVersions.find(shardName);
         if ( i == _shardVersions.end() ) {
             // Shards without explicitly tracked shard versions (meaning they have
             // no chunks) always have a version of (0, 0, epoch).  Note this is

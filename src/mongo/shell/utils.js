@@ -1003,7 +1003,7 @@ rs.conf = function () {
     var resp = db._adminCommand({replSetGetConfig:1});
     if (resp.ok && !(resp.errmsg) && resp.config)
         return resp.config;
-    else if(res.errmsg && res.errmsg.startsWith( "no such cmd" ))
+    else if (resp.errmsg && resp.errmsg.startsWith("no such cmd"))
         return db.getSisterDB("local").system.replset.findOne(); 
     throw new Error("Could not retrieve replica set config: " + tojson(resp));
 }

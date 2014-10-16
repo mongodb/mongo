@@ -11,7 +11,9 @@ for( i = 0; i < 1000; ++i ) {
 }
 
 // Query with an initial set of documents.
-var explain1 = t.find( { a:{ $gte:0 }, b:2 } ).sort( { a:1 } ).hint( { a:1 } ).explain();
+var explain1 = t.find( { a:{ $gte:0 }, b:2 } ).sort( { a:1 } )
+                                              .hint( { a:1 } )
+                                              .explain("executionStats");
 printjson(explain1);
 var stats1 = explain1.executionStats;
 assert.eq( 333, stats1.nReturned, 'wrong nReturned for explain1' );
@@ -22,7 +24,9 @@ for( i = 1000; i < 2000; ++i ) {
 }
 
 // Query with some additional documents.
-var explain2 = t.find( { a:{ $gte:0 }, b:2 } ).sort( { a:1 } ).hint ( { a:1 } ).explain();
+var explain2 = t.find( { a:{ $gte:0 }, b:2 } ).sort( { a:1 } )
+                                              .hint ( { a:1 } )
+                                              .explain("executionStats");
 printjson(explain2);
 var stats2 = explain2.executionStats;
 assert.eq( 666, stats2.nReturned, 'wrong nReturned for explain2' );

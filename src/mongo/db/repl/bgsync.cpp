@@ -234,6 +234,7 @@ namespace {
             }
             lastOpTimeFetched = _lastOpTimeFetched;
             _syncSourceHost = _syncSourceReader.getHost();
+            _replCoord->signalUpstreamUpdater();
         }
 
         _syncSourceReader.tailingQueryGTE(rsoplog, lastOpTimeFetched);

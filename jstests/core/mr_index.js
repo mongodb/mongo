@@ -24,7 +24,7 @@ r = function( k , vs ){
 }
 
 ex = function(){
-    return out.find().sort( { value : 1 } ).explain()
+    return out.find().sort( { value : 1 } ).explain("executionStats")
 }
 
 res = t.mapReduce(  m , r , { out : outName } )

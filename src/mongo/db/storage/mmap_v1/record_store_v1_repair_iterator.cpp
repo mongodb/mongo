@@ -26,6 +26,8 @@
  *    it in the license file.
  */
 
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kStorage
+
 #include "mongo/db/storage/mmap_v1/record_store_v1_repair_iterator.h"
 
 #include "mongo/db/catalog/collection.h"
@@ -137,7 +139,7 @@ namespace mongo {
 
             // Sanity checks for the extent's disk location
             //
-            if (hasNextExtent && (!_currExtent.isValid() || (_currExtent.getOfs() <= 0))) {
+            if (hasNextExtent && (!_currExtent.isValid() || (_currExtent.getOfs() < 0))) {
                 error() << "Invalid extent location: " << _currExtent << endl;
 
                 // Switch the direction of scan

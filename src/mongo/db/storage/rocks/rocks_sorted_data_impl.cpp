@@ -28,6 +28,8 @@
  *    it in the license file.
  */
 
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kStorage
+
 #include "mongo/db/storage/rocks/rocks_sorted_data_impl.h"
 
 #include <cstdlib>
@@ -544,7 +546,6 @@ namespace mongo {
     SortedDataInterface::Cursor* RocksSortedDataImpl::newCursor(OperationContext* txn,
                                                                 int direction) const {
         invariant( ( direction == 1 || direction == -1 ) && "invalid value for direction" );
-        rocksdb::ReadOptions options = RocksEngine::readOptionsWithSnapshot( txn );
         return new RocksCursor(txn, _db, _columnFamily, direction == 1, _order);
     }
 

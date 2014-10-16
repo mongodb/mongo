@@ -32,6 +32,8 @@
    to an open socket (or logical connection if pooling on sockets) from a client.
 */
 
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kDefault
+
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/client.h"

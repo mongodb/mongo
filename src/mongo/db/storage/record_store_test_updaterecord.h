@@ -56,7 +56,6 @@ namespace {
             nCalls++;
             ASSERT_EQUALS( _txn, txn );
             ASSERT_EQUALS( _loc, oldLocation );
-            ASSERT_EQUALS( _data.size() + 1, oldSize );
             ASSERT_EQUALS( _data, oldBuffer );
             return Status::OK();
         }

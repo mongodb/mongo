@@ -52,7 +52,11 @@ namespace mongo {
             
             for( unsigned i = 1; i < mySplitPoints.size(); ++i ) {
                 string name = str::stream() << (i-1);
-                Shard shard( name, name );
+                Shard shard(name,
+                            name,
+                            0 /* maxSize */,
+                            false /* draining */,
+                            BSONArray() /* tags */);
                 shards.insert( shard );
                 
                 ChunkPtr chunk( new Chunk( this, mySplitPoints[ i-1 ], mySplitPoints[ i ],

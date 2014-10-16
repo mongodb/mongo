@@ -176,7 +176,7 @@ namespace mongo {
                     return status;
                 }
 
-                pq->_wantMore = el.boolean();
+                pq->_wantMore = !el.boolean();
             }
             else if (mongoutils::str::equals(fieldName, "options")) {
                 Status status = checkFieldType(el, Object);
@@ -188,6 +188,9 @@ namespace mongo {
                 if (!parseStatus.isOK()) {
                     return parseStatus;
                 }
+            }
+            else if (mongoutils::str::equals(fieldName, "$readPreference")) {
+                pq->_options.hasReadPref = true;
             }
             else {
                 mongoutils::str::stream ss;

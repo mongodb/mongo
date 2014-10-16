@@ -34,6 +34,7 @@
 #include "mongo/db/exec/plan_stats.h"
 #include "mongo/db/exec/working_set.h"
 #include "mongo/db/exec/working_set_common.h"
+#include "mongo/db/query/plan_yield_policy.h"
 
 #include "mongo/util/stacktrace.h"
 
@@ -251,8 +252,12 @@ namespace mongo {
         return _killed || _root->isEOF();
     }
 
-    void PlanExecutor::registerExecInternalPlan() {
+    void PlanExecutor::registerExec() {
         _safety.reset(new ScopedExecutorRegistration(this));
+    }
+
+    void PlanExecutor::deregisterExec() {
+        _safety.reset();
     }
 
     void PlanExecutor::kill() {
@@ -298,24 +303,40 @@ namespace mongo {
     }
 
     void PlanExecutor::setYieldPolicy(YieldPolicy policy, bool registerExecutor) {
-        // TODO: implement.
+        if (PlanExecutor::YIELD_MANUAL == policy) {
+            _yieldPolicy.reset();
+        }
+        else {
+            invariant(PlanExecutor::YIELD_AUTO == policy);
+            _yieldPolicy.reset(new PlanYieldPolicy());
+
+            // Runners that yield automatically generally need to be registered so that
+            // after yielding, they receive notifications of events like deletions and
+            // index drops. The only exception is that a few PlanExecutors get registered
+            // by ClientCursor instead of being registered here.
+            if (registerExecutor) {
+                this->registerExec();
+            }
+        }
     }
 
     //
     // ScopedExecutorRegistration
     //
 
-    ScopedExecutorRegistration::ScopedExecutorRegistration(PlanExecutor* exec)
+    PlanExecutor::ScopedExecutorRegistration::ScopedExecutorRegistration(PlanExecutor* exec)
         : _exec(exec) {
         // Collection can be null for an EOFStage plan, or other places where registration
         // is not needed.
-        if ( _exec->collection() )
-            _exec->collection()->cursorCache()->registerExecutor( exec );
+        if (_exec->collection()) {
+            _exec->collection()->cursorCache()->registerExecutor(exec);
+        }
     }
 
-    ScopedExecutorRegistration::~ScopedExecutorRegistration() {
-        if ( _exec->collection() )
-            _exec->collection()->cursorCache()->deregisterExecutor( _exec );
+    PlanExecutor::ScopedExecutorRegistration::~ScopedExecutorRegistration() {
+        if (_exec->collection()) {
+            _exec->collection()->cursorCache()->deregisterExecutor(_exec);
+        }
     }
 
 } // namespace mongo

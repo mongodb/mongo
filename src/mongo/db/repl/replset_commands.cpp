@@ -26,6 +26,8 @@
 *    it in the license file.
 */
 
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kCommands
+
 #include "mongo/pch.h"
 
 #include "mongo/base/init.h"
@@ -47,7 +49,6 @@
 namespace mongo {
 namespace repl {
 
-    bool replSetBlind = false;
     unsigned replSetForceInitialSyncFailure = 0;
 
     // Testing only, enabled via command-line.
@@ -72,11 +73,6 @@ namespace repl {
             Status status = getGlobalReplicationCoordinator()->checkReplEnabledForCommand(&result);
             if (!status.isOK())
                 return appendCommandStatus(result, status);
-
-            if( cmdObj.hasElement("blind") ) {
-                replSetBlind = cmdObj.getBoolField("blind");
-                return true;
-            }
 
             return false;
         }

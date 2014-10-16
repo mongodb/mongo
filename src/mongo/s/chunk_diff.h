@@ -124,7 +124,6 @@ namespace mongo {
 
         virtual std::pair<BSONObj,ValType> rangeFor( const BSONObj& chunkDoc, const BSONObj& min, const BSONObj& max ) const = 0;
         virtual ShardType shardFor( const std::string& name ) const = 0;
-        virtual std::string nameFrom( const ShardType& shard ) const = 0;
 
         ///
         /// End adapter functions

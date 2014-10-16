@@ -480,6 +480,10 @@ namespace {
         // nothing further to do
     }
 
+    void LegacyReplicationCoordinator::signalUpstreamUpdater() {
+        theReplSet->syncSourceFeedback.forwardSlaveHandshake();
+    }
+
     void LegacyReplicationCoordinator::prepareReplSetUpdatePositionCommand(
             OperationContext* txn,
             BSONObjBuilder* cmdBuilder) {

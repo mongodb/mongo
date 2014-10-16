@@ -26,6 +26,8 @@
  *    it in the license file.
  */
 
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kReplication
+
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/repl/repl_coordinator_external_state_impl.h"
@@ -50,6 +52,7 @@
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/rs_sync.h"
 #include "mongo/db/storage/storage_engine.h"
+#include "mongo/s/d_state.h"
 #include "mongo/stdx/functional.h"
 #include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
@@ -204,6 +207,10 @@ namespace {
 
     void ReplicationCoordinatorExternalStateImpl::closeConnections() {
         MessagingPort::closeAllSockets(ScopedConn::keepOpen);
+    }
+
+    void ReplicationCoordinatorExternalStateImpl::clearShardingState() {
+        shardingState.resetShardingState();
     }
 
     void ReplicationCoordinatorExternalStateImpl::signalApplierToChooseNewSyncSource() {

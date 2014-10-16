@@ -949,16 +949,18 @@ ShardingTest.prototype.getShards = function( coll, query, includeEmpty ){
     if( ! coll.getDB )
         coll = this.s.getCollection( coll )
 
-    var explain = coll.find( query ).explain()
+    var explain = coll.find( query ).explain("executionStats")
     var shards = []
 
-    if( explain.shards ){
-        for( var shardName in explain.shards ){
-            for( var i = 0; i < explain.shards[shardName].length; i++ ){
-                var hasResults = explain.shards[shardName][i].executionStats.nReturned &&
-                                 explain.shards[shardName][i].executionStats.nReturned > 0;
-                if( includeEmpty || hasResults )
-                    shards.push( shardName )
+    var execStages = explain.executionStats.executionStages;
+    var plannerShards = explain.queryPlanner.winningPlan.shards;
+
+    if( execStages.shards ){
+        for( var i = 0; i < execStages.shards.length; i++ ){
+            var hasResults = execStages.shards[i].executionStages.nReturned &&
+                             execStages.shards[i].executionStages.nReturned > 0;
+            if( includeEmpty || hasResults ){
+                shards.push(plannerShards[i].connectionString);
             }
         }
     }

@@ -66,7 +66,7 @@ namespace mongo {
             ASSERT_EQUALS( 1, rs->numRecords( opCtx.get() ) );
 
             RecordData rd;
-            ASSERT( !rs->findRecord( opCtx.get(), DiskLoc(17,17), &rd ) );
+            ASSERT( !rs->findRecord( opCtx.get(), DiskLoc(111,17), &rd ) );
             ASSERT( rd.data() == NULL );
 
             ASSERT( rs->findRecord( opCtx.get(), loc1, &rd ) );
@@ -255,7 +255,7 @@ namespace mongo {
                                                            s2.c_str(), s2.size() + 1,
                                                            false, NULL );
                 ASSERT_OK( res.getStatus() );
-                ASSERT_EQUALS( loc, res.getValue() );
+                loc = res.getValue();
                 uow.commit();
             }
 

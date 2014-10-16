@@ -239,7 +239,7 @@ namespace {
         boost::unique_lock<boost::mutex> lk(_mutex);
         invariant(_rsConfigState == kConfigStartingUp);
         _setCurrentRSConfig_inlock(localConfig, myIndex.getValue());
-        _setLastOptime_inlock(&lk, _getMyRID_inlock(), lastOpTime);
+        _setMyLastOptime_inlock(&lk, lastOpTime);
     }
 
     void ReplicationCoordinatorImpl::startReplication(OperationContext* txn) {
@@ -250,10 +250,12 @@ namespace {
         }
 
         {
+            OID rid = _externalState->ensureMe(txn);
+
             boost::lock_guard<boost::mutex> lk(_mutex);
             fassert(18822, !_inShutdown);
             _setConfigState_inlock(kConfigStartingUp);
-            _myRID = _externalState->ensureMe(txn);
+            _myRID = rid;
         }
 
         if (!_settings.usingReplSets()) {
@@ -291,6 +293,7 @@ namespace {
 
         {
             boost::lock_guard<boost::mutex> lk(_mutex);
+            fassert(28533, !_inShutdown);
             _inShutdown = true;
             if (_rsConfigState == kConfigPreStart) {
                 warning() << "ReplicationCoordinatorImpl::shutdown() called before "
@@ -391,49 +394,6 @@ namespace {
         return success;
     }
 
-    bool ReplicationCoordinatorImpl::isWaitingForApplierToDrain() {
-        boost::lock_guard<boost::mutex> lk(_mutex);
-        return _isWaitingForDrainToComplete;
-    }
-
-    void ReplicationCoordinatorImpl::signalDrainComplete() {
-        // This logic is a little complicated in order to avoid acquiring the global exclusive lock
-        // unnecessarily.  This is important because the applier may call signalDrainComplete()
-        // whenever it wants, not only when the ReplicationCoordinator is expecting it.
-        //
-        // The steps are:
-        // 1.) Check to see if we're waiting for this signal.  If not, return early.
-        // 2.) Otherwise, release the mutex while acquiring the global exclusive lock,
-        //     since that might take a while (NB there's a deadlock cycle otherwise, too).
-        // 3.) Re-check to see if we've somehow left drain mode.  If we are, clear
-        //     _isWaitingForDrainToComplete and drop the mutex.  At this point, no writes
-        //     can occur from other threads, due to the global exclusive lock.
-        // 4.) Drop all temp collections.
-        // 5.) Drop the global exclusive lock.
-        //
-        // Because replicatable writes are forbidden while in drain mode, and we don't exit drain
-        // mode until we have the global exclusive lock, which forbids all other threads from making
-        // writes, we know that from the time that _isWaitingForDrainToComplete is set after calls
-        // to _topCoord->processWinElection() until this method returns, no external writes will be
-        // processed.  This is important so that a new temp collection isn't introduced on the new
-        // primary before we drop all the temp collections.
-
-        boost::unique_lock<boost::mutex> lk(_mutex);
-        if (!_isWaitingForDrainToComplete) {
-            return;
-        }
-        lk.unlock();
-        boost::scoped_ptr<OperationContext> txn(_externalState->createOperationContext());
-        Lock::GlobalWrite globalWriteLock(txn->lockState());
-        lk.lock();
-        if (!_isWaitingForDrainToComplete) {
-            return;
-        }
-        _isWaitingForDrainToComplete = false;
-        lk.unlock();
-        _externalState->dropAllTempCollections(txn.get());
-    }
-
     void ReplicationCoordinatorImpl::_setFollowerModeFinish(
             const ReplicationExecutor::CallbackData& cbData,
             const MemberState& newState,
@@ -494,6 +454,54 @@ namespace {
         _replExecutor.signalEvent(finishedSettingFollowerMode);
     }
 
+    bool ReplicationCoordinatorImpl::isWaitingForApplierToDrain() {
+        boost::lock_guard<boost::mutex> lk(_mutex);
+        return _isWaitingForDrainToComplete;
+    }
+
+    void ReplicationCoordinatorImpl::signalDrainComplete() {
+        // This logic is a little complicated in order to avoid acquiring the global exclusive lock
+        // unnecessarily.  This is important because the applier may call signalDrainComplete()
+        // whenever it wants, not only when the ReplicationCoordinator is expecting it.
+        //
+        // The steps are:
+        // 1.) Check to see if we're waiting for this signal.  If not, return early.
+        // 2.) Otherwise, release the mutex while acquiring the global exclusive lock,
+        //     since that might take a while (NB there's a deadlock cycle otherwise, too).
+        // 3.) Re-check to see if we've somehow left drain mode.  If we are, clear
+        //     _isWaitingForDrainToComplete and drop the mutex.  At this point, no writes
+        //     can occur from other threads, due to the global exclusive lock.
+        // 4.) Drop all temp collections.
+        // 5.) Drop the global exclusive lock.
+        //
+        // Because replicatable writes are forbidden while in drain mode, and we don't exit drain
+        // mode until we have the global exclusive lock, which forbids all other threads from making
+        // writes, we know that from the time that _isWaitingForDrainToComplete is set after calls
+        // to _topCoord->processWinElection() until this method returns, no external writes will be
+        // processed.  This is important so that a new temp collection isn't introduced on the new
+        // primary before we drop all the temp collections.
+
+        boost::unique_lock<boost::mutex> lk(_mutex);
+        if (!_isWaitingForDrainToComplete) {
+            return;
+        }
+        lk.unlock();
+        boost::scoped_ptr<OperationContext> txn(_externalState->createOperationContext());
+        Lock::GlobalWrite globalWriteLock(txn->lockState());
+        lk.lock();
+        if (!_isWaitingForDrainToComplete) {
+            return;
+        }
+        _isWaitingForDrainToComplete = false;
+        lk.unlock();
+        _externalState->dropAllTempCollections(txn.get());
+        log() << "transition to primary complete; database writes are now permitted";
+    }
+
+    void ReplicationCoordinatorImpl::signalUpstreamUpdater() {
+        _externalState->forwardSlaveHandshake();
+    }
+
     Status ReplicationCoordinatorImpl::setLastOptime(OperationContext* txn,
                                                      const OID& rid,
                                                      const OpTime& ts) {
@@ -503,7 +511,16 @@ namespace {
 
     Status ReplicationCoordinatorImpl::setMyLastOptime(OperationContext* txn, const OpTime& ts) {
         boost::unique_lock<boost::mutex> lock(_mutex);
-        return _setLastOptime_inlock(&lock, _getMyRID_inlock(), ts);
+        _setMyLastOptime_inlock(&lock, ts);
+        return Status::OK();
+    }
+
+    void ReplicationCoordinatorImpl::_setMyLastOptime_inlock(
+        boost::unique_lock<boost::mutex>* lock, const OpTime& ts) {
+
+        invariant(lock->owns_lock());
+        SlaveInfo& slaveInfo = _slaveInfoMap[_getMyRID_inlock()];
+        _updateOptimeInMap_inlock(lock, &slaveInfo, ts);
     }
 
     OpTime ReplicationCoordinatorImpl::getMyLastOptime() const {
@@ -544,32 +561,42 @@ namespace {
         }
 
         LOG(3) << "Node with RID " << rid << " currently has optime " << slaveInfo.opTime <<
-                "; updating to " << ts;
+            "; updating to " << ts;
 
-        // Only update optimes if they increase.  Exception: this own node's last applied optime,
-        // which may rewind if we roll back.
-        if ((slaveInfo.opTime < ts) || (rid == _myRID)) {
-            slaveInfo.opTime = ts;
-
-            // Wake up any threads waiting for replication that now have their replication
-            // check satisfied
-            for (std::vector<WaiterInfo*>::iterator it = _replicationWaiterList.begin();
-                    it != _replicationWaiterList.end(); ++it) {
-                WaiterInfo* info = *it;
-                if (_doneWaitingForReplication_inlock(*info->opTime, *info->writeConcern)) {
-                    info->condVar->notify_all();
-                }
-            }
-
-            if (_getReplicationMode_inlock() == modeReplSet &&
-                    !_getCurrentMemberState_inlock().primary()) {
-                // pass along if we are not primary
-                lock->unlock();
-                _externalState->forwardSlaveProgress(); // Must do this outside _mutex
-            }
+        // Only update remote optimes if they increase.
+        if (slaveInfo.opTime < ts) {
+            _updateOptimeInMap_inlock(lock, &slaveInfo, ts);
         }
         return Status::OK();
     }
+
+    void ReplicationCoordinatorImpl::_updateOptimeInMap_inlock(
+        boost::unique_lock<boost::mutex>* lock,
+        SlaveInfo* slaveInfo,
+        OpTime ts) {
+
+        invariant(lock->owns_lock());
+
+        slaveInfo->opTime = ts;
+
+        // Wake up any threads waiting for replication that now have their replication
+        // check satisfied
+        for (std::vector<WaiterInfo*>::iterator it = _replicationWaiterList.begin();
+             it != _replicationWaiterList.end(); ++it) {
+            WaiterInfo* info = *it;
+            if (_doneWaitingForReplication_inlock(*info->opTime, *info->writeConcern)) {
+                info->condVar->notify_all();
+            }
+        }
+
+        if (_getReplicationMode_inlock() == modeReplSet &&
+            !_getCurrentMemberState_inlock().primary()) {
+            // pass along if we are not primary
+            lock->unlock();
+            _externalState->forwardSlaveProgress(); // Must do this outside _mutex
+        }
+    }
+
 
     OpTime ReplicationCoordinatorImpl::_getLastOpApplied() {
         boost::lock_guard<boost::mutex> lk(_mutex);
@@ -883,6 +910,12 @@ namespace {
 
         _topCoord->setStepDownTime(stepdownUntil);
         _topCoord->stepDown();
+        // Schedule work to (potentially) step back up once the stepdown period has ended.
+        _replExecutor.scheduleWorkAt(stepdownUntil,
+                                     stdx::bind(&ReplicationCoordinatorImpl::_handleTimePassing,
+                                                this,
+                                                stdx::placeholders::_1));
+
         boost::unique_lock<boost::mutex> lk(_mutex);
         _updateCurrentMemberStateFromTopologyCoordinator_inlock();
         // Wake up any threads blocked in awaitReplication
@@ -894,7 +927,23 @@ namespace {
         }
         lk.unlock();
         _externalState->closeConnections();
+        _externalState->clearShardingState();
         *result = Status::OK();
+    }
+
+    void ReplicationCoordinatorImpl::_handleTimePassing(
+            const ReplicationExecutor::CallbackData& cbData) {
+        if (!cbData.status.isOK()) {
+            return;
+        }
+
+        if (_topCoord->becomeCandidateIfStepdownPeriodOverAndSingleNodeSet(_replExecutor.now())) {
+            _topCoord->processWinElection(OID::gen(), getNextGlobalOptime());
+            _isWaitingForDrainToComplete = true;
+
+            boost::lock_guard<boost::mutex> lock(_mutex);
+            _updateCurrentMemberStateFromTopologyCoordinator_inlock();
+        }
     }
 
     bool ReplicationCoordinatorImpl::isMasterForReportingPurposes() {
@@ -1228,19 +1277,43 @@ namespace {
     Status ReplicationCoordinatorImpl::processReplSetFreeze(int secs, BSONObjBuilder* resultObj) {
         Status result(ErrorCodes::InternalError, "didn't set status in prepareFreezeResponse");
         CBHStatus cbh = _replExecutor.scheduleWork(
-            stdx::bind(&TopologyCoordinator::prepareFreezeResponse,
-                       _topCoord.get(),
+            stdx::bind(&ReplicationCoordinatorImpl::_processReplSetFreeze_finish,
+                       this,
                        stdx::placeholders::_1,
-                       _replExecutor.now(),
                        secs,
                        resultObj,
                        &result));
         if (cbh.getStatus() == ErrorCodes::ShutdownInProgress) {
-            return Status(ErrorCodes::ShutdownInProgress, "replication shutdown in progress");
+            return cbh.getStatus();
         }
         fassert(18641, cbh.getStatus());
         _replExecutor.wait(cbh.getValue());
         return result;
+    }
+
+    void ReplicationCoordinatorImpl::_processReplSetFreeze_finish(
+            const ReplicationExecutor::CallbackData& cbData,
+            int secs,
+            BSONObjBuilder* response,
+            Status* result) {
+        if (cbData.status == ErrorCodes::CallbackCanceled) {
+            *result = Status(ErrorCodes::ShutdownInProgress, "replication system is shutting down");
+            return;
+        }
+
+        _topCoord->prepareFreezeResponse(_replExecutor.now(), secs, response);
+
+        if (_topCoord->getRole() == TopologyCoordinator::Role::candidate) {
+            // If we just unfroze and ended our stepdown period and we are a one node replica set,
+            // the topology coordinator will have gone into the candidate role to signal that we
+            // need to elect ourself.
+            _topCoord->processWinElection(OID::gen(), getNextGlobalOptime());
+            _isWaitingForDrainToComplete = true;
+
+            boost::lock_guard<boost::mutex> lock(_mutex);
+            _updateCurrentMemberStateFromTopologyCoordinator_inlock();
+        }
+        *result = Status::OK();
     }
 
     Status ReplicationCoordinatorImpl::processHeartbeat(const ReplSetHeartbeatArgs& args,
@@ -1321,7 +1394,7 @@ namespace {
             return Status(ErrorCodes::NotYetInitialized,
                           "Node not yet initialized; use the replSetInitiate command");
         case kConfigReplicationDisabled:
-            return Status(ErrorCodes::NoReplicationEnabled, "Node is not a replica set member");
+            invariant(false); // should be unreachable due to !_settings.usingReplSets() check above
         case kConfigInitiating:
         case kConfigReconfiguring:
         case kConfigHBReconfiguring:
@@ -1362,7 +1435,7 @@ namespace {
         if (!status.isOK()) {
             error() << "replSetReconfig got " << status << " while parsing " << newConfigObj <<
                 rsLog;
-            return status;
+            return Status(ErrorCodes::InvalidReplicaSetConfig, status.reason());;
         }
         if (newConfig.getReplSetName() != _settings.ourSetName()) {
             str::stream errmsg;
@@ -1370,7 +1443,7 @@ namespace {
                 newConfig.getReplSetName() << ", but command line reports " <<
                 _settings.ourSetName() << "; rejecting";
             error() << std::string(errmsg);
-            return Status(ErrorCodes::BadValue, errmsg);
+            return Status(ErrorCodes::InvalidReplicaSetConfig, errmsg);
         }
 
         StatusWith<int> myIndex = validateConfigForReconfig(
@@ -1381,7 +1454,8 @@ namespace {
         if (!myIndex.isOK()) {
             error() << "replSetReconfig got " << myIndex.getStatus() << " while validating " <<
                 newConfigObj << rsLog;
-            return myIndex.getStatus();
+            return Status(ErrorCodes::NewReplicaSetConfigurationIncompatible,
+                          myIndex.getStatus().reason());
         }
 
         log() << "replSetReconfig config object with " << newConfig.getNumMembers() <<
@@ -1620,6 +1694,8 @@ namespace {
             const ReplicaSetConfig& newConfig,
             int myIndex) {
          invariant(_settings.usingReplSets());
+         const MemberState previousState = _currentState;
+
          _cancelHeartbeats();
          _setConfigState_inlock(kConfigSteady);
          _rsConfig = newConfig;
@@ -1639,11 +1715,11 @@ namespace {
              _isWaitingForDrainToComplete = true;
          }
 
-         MemberState previousState = _currentState;
          _updateCurrentMemberStateFromTopologyCoordinator_inlock();
          if (_currentState.removed() || (previousState.primary() && !_currentState.primary())) {
              // Close connections on stepdown or when removed from the replica set.
              _externalState->closeConnections();
+             _externalState->clearShardingState();
              // Closing all connections will make the applier choose a new sync source, so we don't
              // need to do that explicitly in this case.
          }
@@ -1888,8 +1964,7 @@ namespace {
         else {
             lastOpTime = lastOpTimeStatus.getValue();
         }
-        boost::unique_lock<boost::mutex> lk(_mutex);
-        _setLastOptime_inlock(&lk, _getMyRID_inlock(), lastOpTime);
+        setMyLastOptime(txn, lastOpTime);
     }
 
     void ReplicationCoordinatorImpl::_shouldChangeSyncSource(

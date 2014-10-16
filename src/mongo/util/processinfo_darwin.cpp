@@ -27,6 +27,8 @@
  *    then also delete it in the license file.
  */
 
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kDefault
+
 #include "mongo/pch.h"
 #include "mongo/util/processinfo.h"
 #include "mongo/util/log.h"

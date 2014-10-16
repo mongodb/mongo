@@ -109,12 +109,12 @@ namespace mongo {
         if (!execStatus.isOK()) {
             return execStatus;
         }
-        scoped_ptr<PlanExecutor> exec(rawExec);
 
-        const ScopedExecutorRegistration safety(exec.get());
+        scoped_ptr<PlanExecutor> exec(rawExec);
+        exec->setYieldPolicy(PlanExecutor::YIELD_AUTO);
 
         // Got the execution tree. Explain it.
-        return Explain::explainStages(txn, exec.get(), verbosity, out);
+        return Explain::explainStages(exec.get(), verbosity, out);
     }
 
     bool FindCmd::run(OperationContext* txn,

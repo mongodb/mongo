@@ -95,7 +95,6 @@ namespace mongo {
             scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
             {
                 RecordData record = rs->dataFor( opCtx.get(), loc );
-                ASSERT_EQUALS( data.size() + 1, static_cast<size_t>( record.size() ) );
                 ASSERT_EQUALS( data, record.data() );
             }
         }
@@ -155,7 +154,6 @@ namespace mongo {
             scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
             {
                 RecordData record = rs->dataFor( opCtx.get(), loc );
-                ASSERT_EQUALS( data.size() + 1, static_cast<size_t>( record.size() ) );
                 ASSERT_EQUALS( data, record.data() );
             }
         }
@@ -216,7 +214,6 @@ namespace mongo {
             scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
             {
                 RecordData record = rs->dataFor( opCtx.get(), loc );
-                ASSERT_EQUALS( data.size() + 1, static_cast<size_t>( record.size() ) );
                 ASSERT_EQUALS( data, record.data() );
             }
         }
@@ -268,7 +265,6 @@ namespace mongo {
             scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
             {
                 RecordData record = rs->dataFor( opCtx.get(), loc );
-                ASSERT_EQUALS( data.size() + 1, static_cast<size_t>( record.size() ) );
                 ASSERT_EQUALS( data, record.data() );
             }
         }

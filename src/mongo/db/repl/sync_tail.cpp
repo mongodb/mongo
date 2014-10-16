@@ -336,10 +336,11 @@ namespace {
                         WriteUnitOfWork wunit(&txn);
                         Client::Context ctx(&txn, "local");
 
+                        bgsync->stop();
                         ctx.db()->dropCollection(&txn, "local.oplog.rs");
                         replCoord->setMyLastOptime(&txn, OpTime());
                         replCoord->clearSyncSourceBlacklist();
-                        bgsync->stop();
+
                         wunit.commit();
 
                         return;

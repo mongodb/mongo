@@ -404,7 +404,7 @@ namespace {
         ASSERT_EQUALS(3, lpq->getLimit());
         ASSERT_EQUALS(5, lpq->getSkip());
         ASSERT_EQUALS(90, lpq->getBatchSize());
-        ASSERT(!lpq->wantMore());
+        ASSERT(lpq->wantMore());
     }
 
     //

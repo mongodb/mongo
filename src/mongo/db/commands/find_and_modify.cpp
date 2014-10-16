@@ -150,11 +150,8 @@ namespace mongo {
                 massert(17384, "Could not get plan executor for query " + queryOriginal.toString(),
                         getExecutor(txn, collection, cq, &rawExec, QueryPlannerParams::DEFAULT).isOK());
 
-                auto_ptr<PlanExecutor> exec(rawExec);
-
-                // We need to keep this PlanExecutor registration: we are concurrently modifying
-                // state and may continue doing that with document-level locking (approach is TBD).
-                const ScopedExecutorRegistration safety(exec.get());
+                scoped_ptr<PlanExecutor> exec(rawExec);
+                exec->setYieldPolicy(PlanExecutor::YIELD_AUTO);
 
                 PlanExecutor::ExecState state;
                 if (PlanExecutor::ADVANCED == (state = exec->getNext(&doc, NULL))) {

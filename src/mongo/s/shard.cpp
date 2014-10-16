@@ -55,6 +55,7 @@
 #include "mongo/s/type_shard.h"
 #include "mongo/s/version_manager.h"
 #include "mongo/util/log.h"
+#include "mongo/util/stacktrace.h"
 
 namespace mongo {
 
@@ -116,34 +117,26 @@ namespace mongo {
             }
             _rsLookup.clear();
             
-            for ( list<BSONObj>::iterator i=all.begin(); i!=all.end(); ++i ) {
-                BSONObj o = *i;
-                string name = o[ ShardType::name() ].String();
-                string host = o[ ShardType::host() ].String();
+            for (list<BSONObj>::const_iterator iter = all.begin(); iter != all.end(); ++iter) {
+                ShardType shardData;
 
-                long long maxSize = 0;
-                BSONElement maxSizeElem = o[ ShardType::maxSize.name() ];
-                if ( ! maxSizeElem.eoo() ) {
-                    maxSize = maxSizeElem.numberLong();
+                string errmsg;
+                if (!shardData.parseBSON(*iter, &errmsg) || !shardData.isValid(&errmsg)) {
+                    uasserted(28530, errmsg);
                 }
 
-                bool isDraining = false;
-                BSONElement isDrainingElem = o[ ShardType::draining.name() ];
-                if ( ! isDrainingElem.eoo() ) {
-                    isDraining = isDrainingElem.Bool();
-                }
+                const long long maxSize = shardData.isMaxSizeSet() ? shardData.getMaxSize() : 0;
+                const bool isDraining = shardData.isDrainingSet() ?
+                        shardData.getDraining() : false;
+                const BSONArray tags = shardData.isTagsSet() ? shardData.getTags() : BSONArray();
+                ShardPtr shard = boost::make_shared<Shard>(shardData.getName(),
+                                                           shardData.getHost(),
+                                                           maxSize,
+                                                           isDraining,
+                                                           tags);
 
-                ShardPtr s( new Shard( name , host , maxSize , isDraining ) );
-
-                if ( o[ ShardType::tags() ].type() == Array ) {
-                    vector<BSONElement> v = o[ ShardType::tags() ].Array();
-                    for ( unsigned j=0; j<v.size(); j++ ) {
-                        s->addTag( v[j].String() );
-                    }
-                }
-
-                _lookup[name] = s;
-                _installHost( host , s );
+                _lookup[shardData.getName()] = shard;
+                _installHost(shardData.getHost(), shard);
             }
 
         }
@@ -329,7 +322,7 @@ namespace mongo {
 
     private:
         typedef map<string,ShardPtr> ShardMap;
-        ShardMap _lookup;
+        ShardMap _lookup; // Map of both shardName -> Shard and hostName -> Shard
         ShardMap _rsLookup; // Map from ReplSet name to shard
         mutable mongo::mutex _mutex;
         mutable mongo::mutex _rsMutex;
@@ -355,6 +348,36 @@ namespace mongo {
         }
     } cmdGetShardMap;
 
+    Shard::Shard(const std::string& name,
+            const std::string& addr,
+            long long maxSize,
+            bool isDraining,
+            const BSONArray& tags):
+                _name(name),
+                _addr(addr),
+                _maxSize(maxSize),
+                _isDraining(isDraining) {
+        _setAddr(addr);
+
+        BSONArrayIteratorSorted iter(tags);
+        while (iter.more()) {
+            BSONElement tag = iter.next();
+            _tags.insert(tag.String());
+        }
+    }
+
+    Shard::Shard(const std::string& name,
+            const ConnectionString& connStr,
+            long long maxSize,
+            bool isDraining,
+            const set<string>& tags):
+                _name(name),
+                _addr(connStr.toString()),
+                _cs(connStr),
+                _maxSize(maxSize),
+                _isDraining(isDraining),
+                _tags(tags) {
+    }
 
     Shard Shard::findIfExists( const string& shardName ) {
         ShardPtr shard = staticShardInfo.findIfExists( shardName );
@@ -366,13 +389,6 @@ namespace mongo {
         if ( !_addr.empty() ) {
             _cs = ConnectionString( addr , ConnectionString::SET );
         }
-    }
-
-    void Shard::setAddress( const ConnectionString& cs) {
-        verify( _name.size() );
-        _addr = cs.toString();
-        _cs = cs;
-        staticShardInfo.set( _name , *this , true , false );
     }
 
     void Shard::reset( const string& ident ) {
@@ -470,6 +486,10 @@ namespace mongo {
 
         LOG(1) << "best shard for new allocation is " << best << endl;
         return best.shard();
+    }
+
+    void Shard::installShard(const std::string& name, const Shard& shard) {
+        staticShardInfo.set(name, shard, true, false);
     }
 
     ShardStatus::ShardStatus( const Shard& shard , const BSONObj& obj )

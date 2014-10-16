@@ -323,6 +323,12 @@ namespace repl {
         virtual void signalDrainComplete() = 0;
 
         /**
+         * Signals the sync source feedback thread to wake up and send a handshake and
+         * replSetUpdatePosition command to our sync source.
+         */
+        virtual void signalUpstreamUpdater() = 0;
+
+        /**
          * Prepares a BSONObj describing an invocation of the replSetUpdatePosition command that can
          * be sent to this node's sync source to update it about our progress in replication.
          */

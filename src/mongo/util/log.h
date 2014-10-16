@@ -57,8 +57,8 @@
 const ::mongo::logger::LogComponent MongoLogDefaultComponent_component =
     MONGO_LOG_DEFAULT_COMPONENT;
 #else
-const ::mongo::logger::LogComponent MongoLogDefaultComponent_component =
-    ::mongo::logger::LogComponent::kDefault;
+#error "mongo/util/log.h requires MONGO_LOG_DEFAULT_COMPONENT to be defined. " \
+       "Please see http://www.mongodb.org/about/contributors/reference/server-logging-rules/ "
 #endif  // MONGO_LOG_DEFAULT_COMPONENT
 
 namespace mongo {

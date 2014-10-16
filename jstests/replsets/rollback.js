@@ -1,7 +1,7 @@
 /*
  * Basic test of successful rollback in replica sets.
  *
- * This test sets up a 3-node set, with an arbiyer and 2 data-bearing nodes, A and B.
+ * This test sets up a 3-node set, with an arbiter and 2 data-bearing nodes, A and B.
  * A is the initial primary node.
  *
  * The test inserts 3 documents into A, and waits for them to replicate to B.  Then, it partitions A
@@ -20,6 +20,16 @@
 
 (function () {
     "use strict";
+    // helper function for verifying contents at the end of the test
+    var checkFinalResults = function(db) {
+        assert.eq(5, db.bar.count(), "incorrect number of documents found");
+        var x = db.bar.find().sort({q: 1}).toArray();
+        assert.eq(1, x[0].q);
+        assert.eq(2, x[1].q);
+        assert.eq(3, x[2].q);
+        assert.eq(7, x[3].q);
+        assert.eq(8, x[4].q);
+    }
 
     var replTest = new ReplSetTest({ name: 'unicomplex', nodes: 3, oplogSize: 1 });
     var nodes = replTest.nodeList();
@@ -28,13 +38,11 @@
     var conns = replTest.startSet();
     var r = replTest.initiate({ "_id": "unicomplex",
         "members": [
-                             { "_id": 0, "host": nodes[0] },
+                             { "_id": 0, "host": nodes[0], "priority": 3 },
                              { "_id": 1, "host": nodes[1] },
                              { "_id": 2, "host": nodes[2], arbiterOnly: true}]
     });
-    replTest.awaitReplication();
     replTest.bridge();
-    replTest.waitForMaster();
 
     // Make sure we have a master
     var master = replTest.getMaster();
@@ -108,28 +116,15 @@
     assert(a.bar.count() == 3, "t is 3");
     a.bar.insert({ q: 7 });
     a.bar.insert({ q: 8 });
-    {
-        assert(a.bar.count() == 5);
-        var x = a.bar.find().toArray();
-        assert(x[0].q == 1, '1');
-        assert(x[1].q == 2, '2');
-        assert(x[2].q == 3, '3');
-        assert(x[3].q == 7, '7');
-        assert(x[4].q == 8, '8');
-    }
-
     // A is 1 2 3 7 8
     // B is 1 2 3 4 5 6
 
     // bring B back online
     replTest.unPartition(0, 1);
     replTest.unPartition(1, 2);
-    replTest.awaitSecondaryNodes();
     replTest.awaitReplication();
-
-    friendlyEqual(a.bar.find().sort({ _id: 1 }).toArray(),
-                  b.bar.find().sort({ _id: 1 }).toArray(),
-                  "server data sets do not match");
+    checkFinalResults(a);
+    checkFinalResults(b);
 
     replTest.stopSet(15);
 }());

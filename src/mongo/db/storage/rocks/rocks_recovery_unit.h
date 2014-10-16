@@ -46,7 +46,7 @@ namespace rocksdb {
     class Snapshot;
     class WriteBatchWithIndex;
     class Comparator;
-    struct Status;
+    class Status;
     class ColumnFamilyHandle;
     class Slice;
     class Iterator;

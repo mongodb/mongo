@@ -59,7 +59,7 @@ while( 1 ) { // if indexing finishes before we can run checks, try indexing w/ m
             q.next();
             assert( q.hasNext(), "no next" );
         }
-        var ex = t.find( {i:100} ).limit(-1).explain()
+        var ex = t.find( {i:100} ).limit(-1).explain("executionStats")
         printjson(ex)
         assert( ex.executionStats.totalKeysExamined < 1000 ,
                 "took too long to find 100: " + tojson( ex ) );

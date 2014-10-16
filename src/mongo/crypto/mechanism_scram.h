@@ -69,7 +69,7 @@ namespace scram {
      * Generates the user salt and the SCRAM secrets storedKey and serverKey as
      * defined in RFC5802 (server side).
      */
-    BSONObj generateCredentials(const std::string& hashedPassword);
+    BSONObj generateCredentials(const std::string& hashedPassword, int iterationCount);
 
     /*
      * Computes the ClientProof from SaltedPassword and authMessage (client side).

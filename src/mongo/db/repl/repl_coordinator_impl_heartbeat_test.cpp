@@ -136,6 +136,22 @@ namespace {
         exitNetwork();
     }
 
+    TEST_F(ReplCoordHBTest, NotYetInitializedConfigStateEarlyReturn) {
+        // ensure that if we've yet to receive an initial config, we return NotYetInitialized
+        init("mySet");
+        ReplSetHeartbeatArgs hbArgs;
+        hbArgs.setProtocolVersion(1);
+        hbArgs.setConfigVersion(3);
+        hbArgs.setSetName("mySet");
+        hbArgs.setSenderHost(HostAndPort("h1:1"));
+        hbArgs.setSenderId(1);
+        ASSERT(hbArgs.isInitialized());
+
+        ReplSetHeartbeatResponse response;
+        Status status = getReplCoord()->processHeartbeat(hbArgs, &response);
+        ASSERT_EQUALS(ErrorCodes::NotYetInitialized, status.code());
+    }
+
 }  // namespace
 }  // namespace repl
 }  // namespace mongo

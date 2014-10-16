@@ -118,7 +118,7 @@ namespace mongo {
             }
 
             auto_ptr<PlanExecutor> exec(rawExec);
-            const ScopedExecutorRegistration safety(exec.get());
+            exec->setYieldPolicy(PlanExecutor::YIELD_AUTO);
 
             BSONObj obj;
             PlanExecutor::ExecState state;

@@ -232,14 +232,15 @@ namespace {
                     }
                 }
 
-                if (it->getState() == MemberState::RS_SECONDARY) {
-                    // only consider secondaries that are ahead of where we are
-                    if (it->getOpTime() <= lastOpApplied)
-                        continue;
-                    // omit secondaries that are excessively behind, on the first attempt at least.
-                    if (attempts == 0 &&
-                        it->getOpTime() < oldestSyncOpTime)
-                        continue;
+                // only consider candidates that are ahead of where we are
+                if (it->getOpTime() <= lastOpApplied) {
+                    continue;
+                }
+
+                // omit candidates that are excessively behind, on the first attempt at least.
+                if (attempts == 0 &&
+                    it->getOpTime() < oldestSyncOpTime) {
+                    continue;
                 }
 
                 // omit nodes that are more latent than anything we've already considered
@@ -267,7 +268,7 @@ namespace {
                     if (vetoed->second > now) {
                         if (now % 5 == 0) {
                             log() << "replSet not trying to sync from " << vetoed->first
-                                  << ", it is vetoed for " << (vetoed->second - now) 
+                                  << ", it is vetoed for " << (vetoed->second - now)/1000
                                   << " more seconds";
                         }
                         continue;
@@ -756,7 +757,9 @@ namespace {
             }
         }
 
-        const bool unauthorized = hbResponse.getStatus().code() == ErrorCodes::Unauthorized;
+        const bool isUnauthorized =
+                            (hbResponse.getStatus().code() == ErrorCodes::Unauthorized) ||
+                            (hbResponse.getStatus().code() == ErrorCodes::AuthenticationFailed);
 
         Milliseconds alreadyElapsed(now.asInt64() - hbStats.getLastHeartbeatStartDate().asInt64());
         Date_t nextHeartbeatStartDate;
@@ -764,13 +767,13 @@ namespace {
             (hbStats.getNumFailuresSinceLastStart() <= kMaxHeartbeatRetries) &&
             (alreadyElapsed < _currentConfig.getHeartbeatTimeoutPeriodMillis())) {
 
-            if (!hbResponse.isOK() && !unauthorized) {
+            if (!hbResponse.isOK() && !isUnauthorized) {
                 LOG(1) << "Bad heartbeat response from " << target <<
                     "; trying again; Retries left: " <<
                     (kMaxHeartbeatRetries - hbStats.getNumFailuresSinceLastStart()) <<
                     "; " << alreadyElapsed.total_milliseconds() << "ms have already elapsed";
             }
-            if (unauthorized) {
+            if (isUnauthorized) {
                 nextHeartbeatStartDate = now + kHeartbeatInterval.total_milliseconds();
             } else {
                 nextHeartbeatStartDate = now;
@@ -829,7 +832,7 @@ namespace {
 
         MemberHeartbeatData& hbData = _hbdata[memberIndex];
         if (!hbResponse.isOK()) {
-            if (unauthorized) {
+            if (isUnauthorized) {
                 hbData.setAuthIssue(now);
             } else {
                 hbData.setDownValues(now, hbResponse.getStatus().reason());
@@ -1003,28 +1006,40 @@ namespace {
 
         // At this point, there is no primary anywhere.  Check to see if we should become a
         // candidate.
+        if (!checkShouldStandForElection(now, lastOpApplied)) {
+            return HeartbeatResponseAction::makeNoAction();
+        }
+        return HeartbeatResponseAction::makeElectAction();
+    }
+
+    bool TopologyCoordinatorImpl::checkShouldStandForElection(
+            Date_t now, const OpTime& lastOpApplied) {
+        if (_currentPrimaryIndex != -1) {
+            return false;
+        }
+        invariant (_role != Role::leader);
 
         if (_role == Role::candidate) {
             LOG(2) << "Not standing for election again; already candidate";
-            return HeartbeatResponseAction::makeNoAction();
+            return false;
         }
 
-        UnelectableReason unelectableReason = _getMyUnelectableReason(now, lastOpApplied);
+        const UnelectableReason unelectableReason = _getMyUnelectableReason(now, lastOpApplied);
         if (NotCloseEnoughToLatestOptime == unelectableReason) {
             LOG(2) << "Not standing for election because " <<
                 _getUnelectableReasonString(unelectableReason) << "; my last optime is " <<
                 lastOpApplied << " and the newest is " << _latestKnownOpTime(lastOpApplied);
-            return HeartbeatResponseAction::makeNoAction();
+            return false;
         }
         if (None != unelectableReason) {
             LOG(2) << "Not standing for election because " <<
                 _getUnelectableReasonString(unelectableReason);
-            return HeartbeatResponseAction::makeNoAction();
+            return false;
         }
 
         // All checks passed, become a candidate and start election proceedings.
         _role = Role::candidate;
-        return HeartbeatResponseAction::makeElectAction();
+        return true;
     }
 
     bool TopologyCoordinatorImpl::_aMajoritySeemsToBeUp() const {
@@ -1294,11 +1309,6 @@ namespace {
         }
 
         response->append("members", membersOut);
-        /* TODO: decide where this lands
-        if( replSetBlind )
-            result.append("blind",true); // to avoid confusion if set...
-                                         // normally never set except for testing.
-        */
         *result = Status::OK();
     }
 
@@ -1371,20 +1381,23 @@ namespace {
     }
 
     void TopologyCoordinatorImpl::prepareFreezeResponse(
-            const ReplicationExecutor::CallbackData& data,
-            Date_t now,
-            int secs,
-            BSONObjBuilder* response,
-            Status* result) {
-        if (data.status == ErrorCodes::CallbackCanceled) {
-            *result = Status(ErrorCodes::ShutdownInProgress, "replication system is shutting down");
-            return;
-        }
+            Date_t now, int secs, BSONObjBuilder* response) {
 
         if (secs == 0) {
             _stepDownUntil = now;
             log() << "replSet info 'unfreezing'";
             response->append("info", "unfreezing");
+
+            if (_followerMode == MemberState::RS_SECONDARY &&
+                    _currentConfig.getNumMembers() == 1 &&
+                    _selfIndex == 0 &&
+                    _currentConfig.getMemberAt(_selfIndex).isElectable()) {
+                // If we are a one-node replica set, we're the one member,
+                // we're electable, and we are currently in followerMode SECONDARY,
+                // we must transition to candidate now that our stepdown period
+                // is no longer active, in leiu of heartbeats.
+                _role = Role::candidate;
+            }
         }
         else {
             if ( secs == 1 )
@@ -1398,7 +1411,24 @@ namespace {
                 log() << "replSet info received freeze command but we are primary";
             }
         }
-        *result = Status::OK();
+    }
+
+    bool TopologyCoordinatorImpl::becomeCandidateIfStepdownPeriodOverAndSingleNodeSet(Date_t now) {
+        if (_stepDownUntil > now) {
+            return false;
+        }
+
+        if (_followerMode == MemberState::RS_SECONDARY &&
+                _currentConfig.getNumMembers() == 1 &&
+                _selfIndex == 0 &&
+                _currentConfig.getMemberAt(_selfIndex).isElectable()) {
+            // If the new config describes a one-node replica set, we're the one member,
+            // we're electable, and we are currently in followerMode SECONDARY,
+            // we must transition to candidate, in leiu of heartbeats.
+            _role = Role::candidate;
+            return true;
+        }
+        return false;
     }
 
     void TopologyCoordinatorImpl::setStepDownTime(Date_t newTime) {
@@ -1601,7 +1631,7 @@ namespace {
             return "member has zero priority";
         case StepDownPeriodActive:
             return str::stream() << "I am still waiting for stepdown period to end at " <<
-                _stepDownUntil;
+                dateToISOStringLocal(_stepDownUntil);
         case NotSecondary:
             return "member is not currently a secondary";
         case NotCloseEnoughToLatestOptime:

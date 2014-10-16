@@ -108,27 +108,41 @@ var doTest = function(useDollarQuerySyntax) {
                 $explain: true }).limit(-1).next();
         }
         else {
-            return coll.find().readPref(readPrefMode, readPrefTags).explain();
+            return coll.find().readPref(readPrefMode, readPrefTags).explain("executionStats");
         }
+    };
+
+    var getExplainServer = function(explain) {
+        var serverInfo;
+
+        if (useDollarQuerySyntax) {
+            serverInfo = explain.serverInfo;
+        }
+        else {
+            assert.eq("SINGLE_SHARD", explain.queryPlanner.winningPlan.stage);
+            serverInfo = explain.queryPlanner.winningPlan.shards[0].serverInfo;
+        }
+
+        return serverInfo.host + ":" + serverInfo.port.toString();
     };
 
     // Read pref should work without slaveOk
     var explain = getExplain("secondary");
-    var explainServer = explain.serverInfo.host + ":" + explain.serverInfo.port.toString();
+    var explainServer = getExplainServer(explain);
     assert.neq( primaryNode.name, explainServer );
 
     conn.setSlaveOk();
 
     // It should also work with slaveOk
     explain = getExplain("secondary");
-    explainServer = explain.serverInfo.host + ":" + explain.serverInfo.port.toString();
+    explainServer = getExplainServer(explain);
     assert.neq( primaryNode.name, explainServer );
 
     // Check that $readPreference does not influence the actual query
     assert.eq( 1, explain.executionStats.nReturned );
 
     explain = getExplain("secondaryPreferred", [{ s: "2" }]);
-    explainServer = explain.serverInfo.host + ":" + explain.serverInfo.port.toString();
+    explainServer = getExplainServer(explain);
     checkTag( explainServer, { s: "2" });
     assert.eq( 1, explain.executionStats.nReturned );
 
@@ -138,23 +152,23 @@ var doTest = function(useDollarQuerySyntax) {
     });
 
     // Ok to use empty tags on primaryOnly
-    explain = coll.find().readPref("primary", [{}]).explain();
-    explainServer = explain.serverInfo.host + ":" + explain.serverInfo.port.toString();
+    explain = getExplain("primary", [{}]);
+    explainServer = getExplainServer(explain);
     assert.eq(primaryNode.name, explainServer);
 
-    explain = coll.find().readPref("primary", []).explain();
-    explainServer = explain.serverInfo.host + ":" + explain.serverInfo.port.toString();
+    explain = getExplain("primary", []);
+    explainServer = getExplainServer(explain);
     assert.eq(primaryNode.name, explainServer);
 
     // Check that mongos will try the next tag if nothing matches the first
     explain = getExplain("secondary", [{ z: "3" }, { dc: "jp" }]);
-    explainServer = explain.serverInfo.host + ":" + explain.serverInfo.port.toString();
+    explainServer = getExplainServer(explain);
     checkTag( explainServer, { dc: "jp" });
     assert.eq( 1, explain.executionStats.nReturned );
 
     // Check that mongos will fallback to primary if none of tags given matches
     explain = getExplain("secondaryPreferred", [{ z: "3" }, { dc: "ph" }]);
-    explainServer = explain.serverInfo.host + ":" + explain.serverInfo.port.toString();
+    explainServer = getExplainServer(explain);
     // Call getPrimary again since the primary could have changed after the restart.
     assert.eq(replTest.getPrimary().name, explainServer);
     assert.eq( 1, explain.executionStats.nReturned );
@@ -178,7 +192,7 @@ var doTest = function(useDollarQuerySyntax) {
 
     // Test to make sure that connection is ok, in prep for priOnly test
     explain = getExplain("nearest");
-    explainServer = explain.serverInfo.host + ":" + explain.serverInfo.port.toString();
+    explainServer = getExplainServer(explain);
     assert.eq( explainServer, replTest.nodes[NODES - 1].name );
     assert.eq( 1, explain.executionStats.nReturned );
 
@@ -192,4 +206,3 @@ var doTest = function(useDollarQuerySyntax) {
 
 doTest(false);
 doTest(true);
-

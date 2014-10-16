@@ -30,6 +30,7 @@
 
 #include "mongo/db/query/explain.h"
 
+#include "mongo/base/owned_pointer_vector.h"
 #include "mongo/db/exec/multi_plan.h"
 #include "mongo/db/query/get_executor.h"
 #include "mongo/db/query/plan_executor.h"
@@ -39,7 +40,6 @@
 #include "mongo/db/server_options.h"
 #include "mongo/db/server_parameters.h"
 #include "mongo/util/mongoutils/str.h"
-#include "mongo/util/processinfo.h"
 #include "mongo/util/version.h"
 
 namespace {
@@ -221,13 +221,11 @@ namespace mongo {
         if (verbosity >= ExplainCommon::EXEC_STATS) {
             bob->appendNumber("nReturned", stats.common.advanced);
             bob->appendNumber("executionTimeMillisEstimate", stats.common.executionTimeMillis);
-        }
-
-        // At full verbosity, we add some extra common details.
-        if (verbosity == ExplainCommon::FULL) {
             bob->appendNumber("works", stats.common.works);
             bob->appendNumber("advanced", stats.common.advanced);
             bob->appendNumber("needTime", stats.common.needTime);
+            bob->appendNumber("saveState", stats.common.yields);
+            bob->appendNumber("restoreState", stats.common.unyields);
             bob->appendNumber("isEOF", stats.common.isEOF);
             bob->appendNumber("invalidates", stats.common.invalidates);
         }
@@ -239,10 +237,7 @@ namespace mongo {
             if (verbosity >= ExplainCommon::EXEC_STATS) {
                 bob->appendNumber("memUsage", spec->memUsage);
                 bob->appendNumber("memLimit", spec->memLimit);
-            }
 
-            // Extra info at full verbosity.
-            if (verbosity == ExplainCommon::FULL) {
                 bob->appendNumber("flaggedButPassed", spec->flaggedButPassed);
                 bob->appendNumber("flaggedInProgress", spec->flaggedInProgress);
                 for (size_t i = 0; i < spec->mapAfterChild.size(); ++i) {
@@ -254,8 +249,7 @@ namespace mongo {
         else if (STAGE_AND_SORTED == stats.stageType) {
             AndSortedStats* spec = static_cast<AndSortedStats*>(stats.specific.get());
 
-            // Extra info at full verbosity.
-            if (verbosity == ExplainCommon::FULL) {
+            if (verbosity >= ExplainCommon::EXEC_STATS) {
                 bob->appendNumber("flagged", spec->flagged);
                 bob->appendNumber("matchTested", spec->matchTested);
                 for (size_t i = 0; i < spec->failedAnd.size(); ++i) {
@@ -300,10 +294,6 @@ namespace mongo {
             FetchStats* spec = static_cast<FetchStats*>(stats.specific.get());
             if (verbosity >= ExplainCommon::EXEC_STATS) {
                 bob->appendNumber("docsExamined", spec->docsExamined);
-            }
-
-            // Extra info at full verbosity.
-            if (verbosity == ExplainCommon::FULL) {
                 bob->appendNumber("alreadyHasObj", spec->alreadyHasObj);
             }
         }
@@ -323,10 +313,6 @@ namespace mongo {
         else if (STAGE_IXSCAN == stats.stageType) {
             IndexScanStats* spec = static_cast<IndexScanStats*>(stats.specific.get());
 
-            if (verbosity >= ExplainCommon::EXEC_STATS) {
-                bob->appendNumber("keysExamined", spec->keysExamined);
-            }
-
             bob->append("keyPattern", spec->keyPattern);
             bob->appendBool("isMultiKey", spec->isMultiKey);
             bob->append("direction", spec->direction > 0 ? "forward" : "backward");
@@ -335,8 +321,8 @@ namespace mongo {
             static const int kMaxBoundsSize = 1024 * 1024;
             bob->append("indexBounds", spec->indexBoundsVerbose.substr(0, kMaxBoundsSize));
 
-            // Extra info at full verbosity.
-            if (verbosity == ExplainCommon::FULL) {
+            if (verbosity >= ExplainCommon::EXEC_STATS) {
+                bob->appendNumber("keysExamined", spec->keysExamined);
                 bob->appendNumber("dupsTested", spec->dupsTested);
                 bob->appendNumber("dupsDropped", spec->dupsDropped);
                 bob->appendNumber("seenInvalidated", spec->seenInvalidated);
@@ -346,8 +332,7 @@ namespace mongo {
         else if (STAGE_OR == stats.stageType) {
             OrStats* spec = static_cast<OrStats*>(stats.specific.get());
 
-            // Extra info at full verbosity.
-            if (verbosity == ExplainCommon::FULL) {
+            if (verbosity >= ExplainCommon::EXEC_STATS) {
                 bob->appendNumber("dupsTested", spec->dupsTested);
                 bob->appendNumber("dupsDropped", spec->dupsDropped);
                 bob->appendNumber("locsForgotten", spec->locsForgotten);
@@ -393,8 +378,7 @@ namespace mongo {
             MergeSortStats* spec = static_cast<MergeSortStats*>(stats.specific.get());
             bob->append("sortPattern", spec->sortPattern);
 
-            // Extra info at full verbosity.
-            if (verbosity == ExplainCommon::FULL) {
+            if (verbosity >= ExplainCommon::EXEC_STATS) {
                 bob->appendNumber("dupsTested", spec->dupsTested);
                 bob->appendNumber("dupsDropped", spec->dupsDropped);
             }
@@ -419,7 +403,7 @@ namespace mongo {
                 bob->appendBool("wouldInsert", spec->inserted);
             }
 
-            if (verbosity == ExplainCommon::FULL) {
+            if (verbosity >= ExplainCommon::EXEC_STATS) {
                 bob->appendBool("fastmod", spec->fastmod);
                 bob->appendBool("fastmodinsert", spec->fastmodinsert);
             }
@@ -547,20 +531,11 @@ namespace mongo {
         out->appendNumber("port", serverGlobalParams.port);
         out->append("version", versionString);
         out->append("gitVersion", gitVersion());
-
-        ProcessInfo p;
-        BSONObjBuilder bOs;
-        bOs.append("type", p.getOsType());
-        bOs.append("name", p.getOsName());
-        bOs.append("version", p.getOsVersion());
-        serverBob.append(StringData("os"), bOs.obj());
-
         serverBob.doneFast();
     }
 
     // static
-    Status Explain::explainStages(OperationContext* opCtx,
-                                  PlanExecutor* exec,
+    Status Explain::explainStages(PlanExecutor* exec,
                                   ExplainCommon::Verbosity verbosity,
                                   BSONObjBuilder* out) {
         //
@@ -570,20 +545,17 @@ namespace mongo {
         // Inspect the tree to see if there is a MultiPlanStage.
         MultiPlanStage* mps = getMultiPlanStage(exec->getRootStage());
 
-        // The executionStats verbosity level requires that we run the winning plan
-        // until it finishes.
-        if (verbosity >= ExplainCommon::EXEC_STATS) {
-            Status s = exec->executePlan();
-            if (!s.isOK()) {
-                return s;
-            }
+        // Get stats of the winning plan from the trial period, if the verbosity level
+        // is high enough and there was a runoff between multiple plans.
+        auto_ptr<PlanStageStats> winningStatsTrial;
+        if (verbosity >= ExplainCommon::EXEC_ALL_PLANS && NULL != mps) {
+            winningStatsTrial.reset(exec->getStats());
+            invariant(winningStatsTrial.get());
         }
 
-        // The allPlansExecution verbosity level requires that we run all plans to completion,
-        // if there are multiple candidates. If 'mps' is NULL, then there was only one candidate,
-        // and we don't have to worry about gathering stats for rejected plans.
-        if (verbosity == ExplainCommon::EXEC_ALL_PLANS && NULL != mps) {
-            Status s = mps->executeAllPlans();
+        // If we need execution stats, then run the plan in order to gather the stats.
+        if (verbosity >= ExplainCommon::EXEC_STATS) {
+            Status s = exec->executePlan();
             if (!s.isOK()) {
                 return s;
             }
@@ -596,10 +568,10 @@ namespace mongo {
         // Get stats for the winning plan.
         scoped_ptr<PlanStageStats> winningStats(exec->getStats());
 
-        // Get stats for the rejected plans, if there were rehected plans.
-        vector<PlanStageStats*> rejectedStats;
+        // Get stats for the rejected plans, if more than one plan was considered.
+        OwnedPointerVector<PlanStageStats> allPlansStats;
         if (NULL != mps) {
-            rejectedStats = mps->generateCandidateStats();
+            allPlansStats = mps->generateCandidateStats();
         }
 
         //
@@ -608,26 +580,36 @@ namespace mongo {
 
         CanonicalQuery* query = exec->getCanonicalQuery();
         if (verbosity >= ExplainCommon::QUERY_PLANNER) {
-            generatePlannerInfo(query, winningStats.get(), rejectedStats, out);
+            generatePlannerInfo(query, winningStats.get(), allPlansStats.vector(), out);
         }
 
         if (verbosity >= ExplainCommon::EXEC_STATS) {
             BSONObjBuilder execBob(out->subobjStart("executionStats"));
 
             // Generate exec stats BSON for the winning plan.
+            OperationContext* opCtx = exec->getOpCtx();
             long long totalTimeMillis = opCtx->getCurOp()->elapsedMillis();
             generateExecStats(winningStats.get(), verbosity, &execBob, totalTimeMillis);
 
-            // Also generate exec stats for each rejected plan, if the verbosity level
-            // is high enough.
+            // Also generate exec stats for all plans, if the verbosity level is high enough.
+            // These stats reflect what happened during the trial period that ranked the plans.
             if (verbosity >= ExplainCommon::EXEC_ALL_PLANS) {
-                BSONArrayBuilder rejectedBob(execBob.subarrayStart("rejectedPlansExecution"));
-                for (size_t i = 0; i < rejectedStats.size(); ++i) {
-                    BSONObjBuilder planBob(rejectedBob.subobjStart());
-                    generateExecStats(rejectedStats[i], verbosity, &planBob);
+                // If we ranked multiple plans against each other, then add stats collected
+                // from the trial period of the winning plan. The "allPlansExecution" section
+                // will contain an apples-to-apples comparison of the winning plan's stats against
+                // all rejected plans' stats collected during the trial period.
+                if (NULL != mps) {
+                    invariant(winningStatsTrial.get());
+                    allPlansStats.push_back(winningStatsTrial.release());
+                }
+
+                BSONArrayBuilder allPlansBob(execBob.subarrayStart("allPlansExecution"));
+                for (size_t i = 0; i < allPlansStats.size(); ++i) {
+                    BSONObjBuilder planBob(allPlansBob.subobjStart());
+                    generateExecStats(allPlansStats[i], verbosity, &planBob);
                     planBob.doneFast();
                 }
-                rejectedBob.doneFast();
+                allPlansBob.doneFast();
             }
 
             execBob.doneFast();

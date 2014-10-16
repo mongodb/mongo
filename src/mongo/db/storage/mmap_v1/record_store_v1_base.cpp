@@ -28,6 +28,8 @@
  *    it in the license file.
  */
 
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kStorage
+
 #include "mongo/db/storage/mmap_v1/record_store_v1_base.h"
 
 #include "mongo/db/catalog/collection.h"
@@ -112,7 +114,11 @@ namespace mongo {
         // this is a bit odd, as the semantics of using the storage engine imply it _has_ to be.
         // And in fact we can't actually check.
         // So we assume the best.
-        *rd = dataFor( txn, loc );
+        Record* rec = recordFor(loc);
+        if ( !rec ) {
+            return false;
+        }
+        *rd = rec->toRecordData();
         return true;
     }
 
@@ -821,7 +827,7 @@ namespace mongo {
         std::vector<touch_location> ranges;
         {
             DiskLoc nextLoc = _details->firstExtent(txn);
-            Extent* ext = _getExtent( txn, nextLoc );
+            Extent* ext = nextLoc.isNull() ? NULL : _getExtent( txn, nextLoc );
             while ( ext ) {
                 touch_location tl;
                 tl.root = reinterpret_cast<const char*>(ext);

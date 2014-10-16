@@ -157,7 +157,6 @@ namespace repl {
             ctx.getClient()->setLastOp( ts );
             
             replCoord->setMyLastOptime(txn, ts);
-            bgsync->notify();
         }
 
         setNewOptime(ts);

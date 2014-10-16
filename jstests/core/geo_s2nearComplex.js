@@ -164,7 +164,7 @@ uniformPoints(origin, 1000, 0.5, 1.5);
 validateOrdering({geo: {$geoNear: {$geometry: originGeo}}})
 
 print("Millis for uniform:")
-print(t.find(query).explain().executionStats.executionTimeMillis);
+print(t.find(query).explain("executionStats").executionStats.executionTimeMillis);
 print("Total points:");
 print(t.find(query).itcount());
 
@@ -176,7 +176,7 @@ uniformPointsWithGaps(origin, 1000, 1, 10.0, 5, 10);
 validateOrdering({geo: {$geoNear: {$geometry: originGeo}}})
 
 print("Millis for uniform with gaps:")
-print(t.find(query).explain().executionStats.executionTimeMillis);
+print(t.find(query).explain("executionStats").executionStats.executionTimeMillis);
 print("Total points:");
 print(t.find(query).itcount());
 
@@ -189,7 +189,7 @@ uniformPointsWithClusters(origin, 1000, 1, 10.0, 5, 10, 100);
 validateOrdering({geo: {$geoNear: {$geometry: originGeo}}})
 
 print("Millis for uniform with clusters:");
-print(t.find(query).explain().executionStats.executionTimeMillis);
+print(t.find(query).explain("executionStats").executionStats.executionTimeMillis);
 print("Total points:");
 print(t.find(query).itcount());
 
@@ -210,7 +210,7 @@ validateOrdering({geo: {$geoNear: {$geometry: originGeo}}})
 
 print("Millis for uniform near pole:")
 print(t.find({geo: {$geoNear: {$geometry: originGeo}}})
-       .explain().executionStats.executionTimeMillis);
+       .explain("executionStats").executionStats.executionTimeMillis);
 assert.eq(t.find({geo: {$geoNear: {$geometry: originGeo}}}).itcount(), 50);
 
 t.drop()
@@ -228,7 +228,7 @@ validateOrdering({geo: {$geoNear: {$geometry: originGeo}}})
 
 print("Millis for uniform on meridian:")
 print(t.find({geo: {$geoNear: {$geometry: originGeo}}})
-       .explain().executionStats.executionTimeMillis);
+       .explain("executionStats").executionStats.executionTimeMillis);
 assert.eq(t.find({geo: {$geoNear: {$geometry: originGeo}}}).itcount(), 50);
 
 t.drop()
@@ -246,7 +246,7 @@ validateOrdering({geo: {$near: {$geometry: originGeo}}})
 
 print("Millis for uniform on negative meridian:");
 print(t.find({geo: {$geoNear: {$geometry: originGeo}}})
-       .explain().executionStats.executionTimeMillis);
+       .explain("executionStats").executionStats.executionTimeMillis);
 assert.eq(t.find({geo: {$near: {$geometry: originGeo}}}).itcount(), 50);
 
 // Near search with points that are really far away.
@@ -267,6 +267,6 @@ cur = t.find({geo: {$near: {$geometry: originGeo}}})
 
 print("Near search on very distant points:");
 print(t.find({geo: {$geoNear: {$geometry: originGeo}}})
-       .explain().executionStats.executionTimeMillis);
+       .explain("executionStats").executionStats.executionTimeMillis);
 pt = cur.next();
 assert(pt)

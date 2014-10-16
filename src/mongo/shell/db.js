@@ -285,6 +285,7 @@ DB.prototype.help = function() {
     print("\tdb.getCollectionNames()");
     print("\tdb.getLastError() - just returns the err msg string");
     print("\tdb.getLastErrorObj() - return full status object");
+    print("\tdb.getLogComponents()");
     print("\tdb.getMongo() get the server connection object");
     print("\tdb.getMongo().setSlaveOk() allow queries on a replication slave server");
     print("\tdb.getName()");
@@ -309,6 +310,7 @@ DB.prototype.help = function() {
     print("\tdb.resetError()");
     print("\tdb.runCommand(cmdObj) run a database command.  if cmdObj is a string, turns it into { cmdObj : 1 }");
     print("\tdb.serverStatus()");
+    print("\tdb.setLogLevel(level,<component>)");
     print("\tdb.setProfilingLevel(level,<slowms>) 0=off 1=slow 2=all");
     print("\tdb.setWriteConcern( <write concern doc> ) - sets the write concern for writes to the db");
     print("\tdb.unsetWriteConcern( <write concern doc> ) - unsets the write concern for writes to the db");
@@ -1335,5 +1337,12 @@ DB.prototype.unsetWriteConcern = function() {
     delete this._writeConcern;
 };
 
+DB.prototype.getLogComponents = function() {
+    return this.getMongo().getLogComponents();
+}
+
+DB.prototype.setLogLevel = function(logLevel, component) {
+    return this.getMongo().setLogLevel(logLevel, component);
+}
 
 }());

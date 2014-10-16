@@ -26,6 +26,8 @@
 *    it in the license file.
 */
 
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kCommands
+
 #include <vector>
 
 #include "mongo/db/auth/action_set.h"
@@ -185,8 +187,8 @@ namespace mongo {
                 return false;
             }
 
-            auto_ptr<PlanExecutor> exec(rawExec);
-            const ScopedExecutorRegistration safety(exec.get());
+            scoped_ptr<PlanExecutor> exec(rawExec);
+            exec->setYieldPolicy(PlanExecutor::YIELD_AUTO);
 
             double totalDistance = 0;
             BSONObjBuilder resultBuilder(result.subarrayStart("results"));

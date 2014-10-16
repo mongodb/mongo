@@ -159,8 +159,9 @@ namespace repl {
         return false;
     }
 
-    void ReplicationCoordinatorMock::signalDrainComplete() {
-    }
+    void ReplicationCoordinatorMock::signalDrainComplete() {}
+
+    void ReplicationCoordinatorMock::signalUpstreamUpdater() {}
 
     void ReplicationCoordinatorMock::prepareReplSetUpdatePositionCommand(
             OperationContext* txn,

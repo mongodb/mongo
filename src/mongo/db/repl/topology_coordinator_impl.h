@@ -132,6 +132,7 @@ namespace repl {
         virtual void blacklistSyncSource(const HostAndPort& host, Date_t until);
         virtual void clearSyncSourceBlacklist();
         virtual bool shouldChangeSyncSource(const HostAndPort& currentSource) const;
+        virtual bool becomeCandidateIfStepdownPeriodOverAndSingleNodeSet(Date_t now);
         virtual void setStepDownTime(Date_t newTime);
         virtual void setFollowerMode(MemberState::MS newMode);
         virtual void adjustMaintenanceCountBy(int inc);
@@ -162,11 +163,7 @@ namespace repl {
                                            BSONObjBuilder* response,
                                            Status* result);
         virtual void fillIsMasterForReplSet(IsMasterResponse* response);
-        virtual void prepareFreezeResponse(const ReplicationExecutor::CallbackData& data,
-                                           Date_t now,
-                                           int secs,
-                                           BSONObjBuilder* response,
-                                           Status* result);
+        virtual void prepareFreezeResponse(Date_t now, int secs, BSONObjBuilder* response);
         virtual void updateConfig(const ReplicaSetConfig& newConfig,
                                   int selfIndex,
                                   Date_t now,
@@ -184,6 +181,7 @@ namespace repl {
         virtual bool voteForMyself(Date_t now);
         virtual void processWinElection(OID electionId, OpTime electionOpTime);
         virtual void processLoseElection();
+        virtual bool checkShouldStandForElection(Date_t now, const OpTime& lastOpApplied);
         virtual void stepDown();
         virtual Date_t getStepDownTime() const;
 

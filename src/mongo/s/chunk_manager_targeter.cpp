@@ -26,6 +26,8 @@
  *    it in the license file.
  */
 
+#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kSharding
+
 #include "mongo/s/chunk_manager_targeter.h"
 
 #include "mongo/s/config.h"
@@ -111,8 +113,8 @@ namespace mongo {
             }
 
             ChunkPtr chunk = _manager->findChunkForDoc( doc );
-            *endpoint = new ShardEndpoint( chunk->getShard().getName(),
-                                           _manager->getVersion( chunk->getShard() ) );
+            *endpoint = new ShardEndpoint(chunk->getShard().getName(),
+                                          _manager->getVersion(chunk->getShard().getName()));
 
             // Track autosplit stats for sharded collections
             _stats->chunkSizeDelta[chunk->getMin()] += doc.objsize();
@@ -328,10 +330,10 @@ namespace mongo {
         }
 
         for ( set<Shard>::iterator it = shards.begin(); it != shards.end(); ++it ) {
-            endpoints->push_back( new ShardEndpoint( it->getName(),
-                                                     _manager ?
-                                                         _manager->getVersion( *it ) :
-                                                         ChunkVersion::UNSHARDED() ) );
+            endpoints->push_back(new ShardEndpoint(it->getName(),
+                                                   _manager ?
+                                                       _manager->getVersion(it->getName()) :
+                                                       ChunkVersion::UNSHARDED()));
         }
 
         return Status::OK();
@@ -347,7 +349,7 @@ namespace mongo {
 
         Shard shard = chunk->getShard();
         *endpoint = new ShardEndpoint(shard.getName(),
-                                      _manager->getVersion(StringData(shard.getName())));
+                                      _manager->getVersion(shard.getName()));
 
         return Status::OK();
     }
@@ -370,10 +372,10 @@ namespace mongo {
         }
 
         for ( set<Shard>::iterator it = shards.begin(); it != shards.end(); ++it ) {
-            endpoints->push_back( new ShardEndpoint( it->getName(),
-                                                     _manager ?
-                                                         _manager->getVersion( *it ) :
-                                                         ChunkVersion::UNSHARDED() ) );
+            endpoints->push_back(new ShardEndpoint(it->getName(),
+                                                   _manager ?
+                                                       _manager->getVersion(it->getName()) :
+                                                       ChunkVersion::UNSHARDED()));
         }
 
         return Status::OK();
@@ -392,10 +394,10 @@ namespace mongo {
         Shard::getAllShards( shards );
 
         for ( vector<Shard>::iterator it = shards.begin(); it != shards.end(); ++it ) {
-            endpoints->push_back( new ShardEndpoint( it->getName(),
-                                                     _manager ?
-                                                         _manager->getVersion( *it ) :
-                                                         ChunkVersion::UNSHARDED() ) );
+            endpoints->push_back(new ShardEndpoint(it->getName(),
+                                                   _manager ?
+                                                       _manager->getVersion(it->getName()) :
+                                                       ChunkVersion::UNSHARDED()));
         }
 
         return Status::OK();
@@ -443,7 +445,7 @@ namespace mongo {
 
             if ( primary ) return ChunkVersion::UNSHARDED();
 
-            return manager->getVersion( shardName );
+            return manager->getVersion(shardName.toString());
         }
 
         /**
