@@ -206,7 +206,7 @@ functions:
         chmod 700 ${set_gopath|set_gopath.sh}
 
   "run tool unit tests":
-    command: gotest.run
+    command: shell.exec
     params:
       working_dir: src
       script: | 
@@ -253,27 +253,38 @@ functions:
         cd ..
 
   "run tool integration tests":
-    command: gotest.run
+    command: shell.exec
     params:
       working_dir: src
-      tests:
-        # TODO: other tools need integration tests
-        - dir: src/github.com/mongodb/mongo-tools/mongodump
-          args: ${coverage_args} ${args} ${build_tags}
-          environment_variables:
-            - ${library_path}
-        - dir: src/github.com/mongodb/mongo-tools/mongofiles
-          args: ${coverage_args} ${args} ${build_tags}
-          environment_variables:
-            - ${library_path}
-        - dir: src/github.com/mongodb/mongo-tools/mongoimport
-          args: ${coverage_args} ${args} ${build_tags}
-          environment_variables:
-            - ${library_path}
-        - dir: src/github.com/mongodb/mongo-tools/mongooplog
-          args: ${coverage_args} ${args} ${build_tags}
-          environment_variables:
-            - ${library_path}
+      script: |
+        set -e
+        if [ "Windows_NT" = "$OS" ]; then
+            set -o igncr
+        fi;
+        . ./set_gopath.sh
+        if [ "${library_path}" != "" ]; then
+            export ${library_path}
+        fi
+
+        # mongodump
+        cd mongodump
+        go test -v ${coverage_args} ${args} ${build_tags}
+        cd ..
+
+        # mongofiles
+        cd mongofiles
+        go test -v ${coverage_args} ${args} ${build_tags}
+        cd ..
+
+        # mongoimport
+        cd mongoimport
+        go test -v ${coverage_args} ${args} ${build_tags}
+        cd ..
+
+        # mongooplog
+        cd mongooplog
+        go test -v ${coverage_args} ${args} ${build_tags}
+        cd ..
 
   "setup credentials" :
     command: shell.exec
@@ -428,7 +439,6 @@ tasks:
     - func: "run unit test"
 
 - name: dist
-  depends_on:
   commands:
     - command: git.get_project
       params:
@@ -436,102 +446,20 @@ tasks:
     - command: git.apply_patch
       params:
         directory: src
+    - command: expansions.update
+      params:
+        updates:
+          - key: "args"
+            value: "-test.types=${integration_test_args}"
+    - func: "download mongod"
+    - func: "start mongod"
     - command: shell.exec
       params:
-        working_dir: src
+        directory: src
         script: |
-          rm -rf bin/
-          mkdir bin
-    # bsondump
-    - func: "build tool"
-      vars:
-        tool: bsondump
-    - func: "upload tool"
-      vars:
-        tool: bsondump
-    - func: "attach tool"
-      vars:
-        tool: bsondump
-    # mongodump
-    - func: "build tool"
-      vars:
-        tool: mongodump
-    - func: "upload tool"
-      vars:
-        tool: mongodump
-    - func: "attach tool"
-      vars:
-        tool: mongodump
-    # mongoexport
-    - func: "build tool"
-      vars:
-        tool: mongoexport
-    - func: "upload tool"
-      vars:
-        tool: mongoexport
-    - func: "attach tool"
-      vars:
-        tool: mongoexport
-    # mongofiles
-    - func: "build tool"
-      vars:
-        tool: mongofiles
-    - func: "upload tool"
-      vars:
-        tool: mongofiles
-    - func: "attach tool"
-      vars:
-        tool: mongofiles
-    # mongoimport
-    - func: "build tool"
-      vars:
-        tool: mongoimport
-    - func: "upload tool"
-      vars:
-        tool: mongoimport
-    - func: "attach tool"
-      vars:
-        tool: mongoimport
-    # mongooplog
-    - func: "build tool"
-      vars:
-        tool: mongooplog
-    - func: "upload tool"
-      vars:
-        tool: mongooplog
-    - func: "attach tool"
-      vars:
-        tool: mongooplog
-    # mongorestore
-    - func: "build tool"
-      vars:
-        tool: mongorestore
-    - func: "upload tool"
-      vars:
-        tool: mongorestore
-    - func: "attach tool"
-      vars:
-        tool: mongorestore
-    # mongostat
-    - func: "build tool"
-      vars:
-        tool: mongostat
-    - func: "upload tool"
-      vars:
-        tool: mongostat
-    - func: "attach tool"
-      vars:
-        tool: mongostat
-    # mongotop
-    - func: "build tool"
-      vars:
-        tool: mongotop
-    - func: "upload tool"
-      vars:
-        tool: mongotop
-    - func: "attach tool"
-      vars:
-        tool: mongotop
+          # Give mongod a chance to stop
+          sleep 2s
+    - func: "run tool integration tests"
 
 - name: integration
   commands:
@@ -541,14 +469,19 @@ tasks:
     - command: git.apply_patch
       params:
         directory: src
-    - func: "setup go env"
     - command: expansions.update
       params:
         updates:
           - key: "args"
-            value: "-test.types=integration"
+            value: "-test.types=${integration_test_args}"
     - func: "download mongod"
     - func: "start mongod"
+    - command: shell.exec
+      params:
+        directory: src
+        script: |
+          # Give mongod a chance to stop
+          sleep 2s
     - func: "run tool integration tests"
 
 - name: json
@@ -792,6 +725,7 @@ buildvariants:
   expansions:
     <<: *mongo_url_ubuntu1204
     <<: *mongodb_default_startup_args
+    integration_test_args: integration
   tasks: *ubuntu1204_tasks
 
 - name: ubuntu-ssl
@@ -801,8 +735,9 @@ buildvariants:
   expansions:
     <<: *mongo_url_ubuntu1204_enterprise
     <<: *mongodb_ssl_startup_args
-    build_tags: -tags "ssl ssltest"
+    build_tags: -tags "ssl"
     edition: ssl
+    integration_test_args: "integration,ssl"
   tasks: *ubuntu1204_ssl_tasks
 
 - name: ubuntu-enterprise
@@ -813,6 +748,7 @@ buildvariants:
     build_tags: -tags "ssl sasl"
     edition: enterprise
     run_kinit: true
+    integration_test_args: integration
   tasks: *ubuntu1204_tasks
 
 #######################################
