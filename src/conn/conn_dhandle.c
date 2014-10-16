@@ -252,7 +252,7 @@ __conn_btree_config_set(WT_SESSION_IMPL *session)
 {
 	WT_DATA_HANDLE *dhandle;
 	WT_DECL_RET;
-	const char *metaconf;
+	char *metaconf;
 
 	dhandle = session->dhandle;
 

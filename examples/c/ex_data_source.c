@@ -433,7 +433,7 @@ my_open_cursor(WT_DATA_SOURCE *dsrc, WT_SESSION *session,
 	 * Insert a new WiredTiger metadata record.
 	 */
 	const char *key = "datasource_uri";
-	const char *value;
+	char *value;
 
 	if ((ret =
 	    wt_api->metadata_search(wt_api, session, key, &value)) != 0) {

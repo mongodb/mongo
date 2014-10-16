@@ -410,7 +410,7 @@ __wt_txn_recover(WT_CONNECTION_IMPL *conn)
 	WT_DECL_RET;
 	WT_RECOVERY r;
 	WT_SESSION_IMPL *session;
-	const char *config;
+	char *config;
 	int was_backup;
 
 	WT_CLEAR(r);

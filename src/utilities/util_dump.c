@@ -354,7 +354,7 @@ dump_json_table_config(WT_SESSION *session, const char *uri)
 	WT_DECL_RET;
 	WT_EXTENSION_API *wtext;
 	int tret;
-	const char *value;
+	char *value;
 
 	/* Dump the config. */
 	if (WT_PREFIX_MATCH(uri, "table:")) {
@@ -377,8 +377,7 @@ dump_json_table_config(WT_SESSION *session, const char *uri)
 		if ((ret = cursor->search(cursor)) == 0) {
 			if ((ret = cursor->get_value(cursor, &value)) != 0)
 				ret = util_cerr(uri, "get_value", ret);
-			else if (dump_json_table_begin(cursor, uri,
-			    value) != 0)
+			else if (dump_json_table_begin(cursor, uri, value) != 0)
 				ret = 1;
 		} else if (ret == WT_NOTFOUND)
 			ret = util_err(0, "%s: No such object exists", uri);
@@ -670,7 +669,7 @@ print_config(WT_SESSION *session,
     const char *key, const char *v1, const char *v2)
 {
 	WT_DECL_RET;
-	const char *value_ret;
+	char *value_ret;
 
 	/*
 	 * The underlying call will ignore v2 if v1 is NULL -- check here and

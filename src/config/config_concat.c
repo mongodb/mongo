@@ -19,7 +19,7 @@
  */
 int
 __wt_config_concat(
-    WT_SESSION_IMPL *session, const char **cfg, const char **config_ret)
+    WT_SESSION_IMPL *session, const char **cfg, char **config_ret)
 {
 	WT_CONFIG cparser;
 	WT_CONFIG_ITEM k, v;

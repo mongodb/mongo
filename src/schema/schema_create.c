@@ -59,9 +59,9 @@ __create_file(WT_SESSION_IMPL *session,
 	WT_DECL_RET;
 	uint32_t allocsize;
 	int is_metadata;
-	const char *fileconf, *filename;
-	const char **p, *filecfg[] =
+	const char *filename, **p, *filecfg[] =
 	    { WT_CONFIG_BASE(session, file_meta), config, NULL, NULL };
+	char *fileconf;
 
 	fileconf = NULL;
 
@@ -176,12 +176,11 @@ __create_colgroup(WT_SESSION_IMPL *session,
 	WT_ITEM confbuf, fmt, namebuf;
 	WT_TABLE *table;
 	size_t tlen;
-	const char *cfg[4] =
+	const char **cfgp, *cfg[4] =
 	    { WT_CONFIG_BASE(session, colgroup_meta), config, NULL, NULL };
 	const char *sourcecfg[] = { config, NULL, NULL };
-	const char **cfgp;
-	const char *cgconf, *cgname, *sourceconf, *oldconf;
-	const char *source, *tablename;
+	const char *cgname, *source, *tablename;
+	char *cgconf, *sourceconf, *oldconf;
 
 	cgconf = sourceconf = oldconf = NULL;
 	WT_CLEAR(fmt);
@@ -322,8 +321,8 @@ __create_index(WT_SESSION_IMPL *session,
 	const char *cfg[4] =
 	    { WT_CONFIG_BASE(session, index_meta), NULL, NULL, NULL };
 	const char *sourcecfg[] = { config, NULL, NULL };
-	const char *sourceconf, *source, *idxconf, *idxname;
-	const char *tablename;
+	const char *source, *idxname, *tablename;
+	char *sourceconf, *idxconf;
 	size_t tlen;
 	int have_extractor;
 	u_int i, npublic_cols;
@@ -495,12 +494,12 @@ __create_table(WT_SESSION_IMPL *session,
 	WT_CONFIG_ITEM cgkey, cgval, cval;
 	WT_DECL_RET;
 	WT_TABLE *table;
-	size_t cgsize;
-	int ncolgroups;
-	char *cgname;
 	const char *cfg[4] =
 	    { WT_CONFIG_BASE(session, table_meta), config, NULL, NULL };
-	const char *tableconf, *tablename;
+	const char *tablename;
+	char *tableconf, *cgname;
+	size_t cgsize;
+	int ncolgroups;
 
 	cgname = NULL;
 	table = NULL;

@@ -179,7 +179,7 @@ err:	WT_TRET(cursor->close(cursor));
  */
 int
 __wt_metadata_search(
-    WT_SESSION_IMPL *session, const char *key, const char **valuep)
+    WT_SESSION_IMPL *session, const char *key, char **valuep)
 {
 	WT_CURSOR *cursor;
 	WT_DECL_RET;

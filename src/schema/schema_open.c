@@ -40,7 +40,7 @@ __wt_schema_open_colgroups(WT_SESSION_IMPL *session, WT_TABLE *table)
 	WT_CONFIG_ITEM ckey, cval;
 	WT_DECL_RET;
 	WT_DECL_ITEM(buf);
-	const char *cgconfig;
+	char *cgconfig;
 	u_int i;
 
 	if (table->cg_complete)

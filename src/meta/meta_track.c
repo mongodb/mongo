@@ -21,7 +21,7 @@ typedef struct __wt_meta_track {
 		WT_ST_REMOVE,		/* Remove a metadata entry */
 		WT_ST_SET		/* Reset a metadata entry */
 	} op;
-	const char *a, *b;		/* Strings */
+	char *a, *b;			/* Strings */
 	WT_BTREE *btree;		/* Locked handle */
 	int created;			/* Handle on newly created file */
 } WT_META_TRACK;
