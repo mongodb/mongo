@@ -42,7 +42,7 @@ __wt_filesize_name(
 
 	WT_RET(__wt_filename(session, filename, &path));
 
-	ret = GetFileAttributesEx(filename, GetFileExInfoStandard, &data);
+	ret = GetFileAttributesEx(path, GetFileExInfoStandard, &data);
 
 	__wt_free(session, path);
 

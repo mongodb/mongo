@@ -54,8 +54,14 @@
 #define	WT_LEADING_ZEROS(x, i)						\
 	(i = (x == 0) ? (int)sizeof (x) : __builtin_clzll(x) >> 3)
 #elif defined(_MSC_VER)
-#define	WT_LEADING_ZEROS(x, i)						\
-	(i = (x == 0) ? (int)sizeof (x) : (int)__lzcnt64(x) >> 3)
+#define	WT_LEADING_ZEROS(x, i)	do {					\
+	if (x == 0) i = (int)sizeof(x);				\
+	else  { 							\
+		unsigned long __index;					\
+		_BitScanReverse64(&__index, x);				\
+		__index = 63 ^ __index;					\
+		i = (int)(__index >> 3); }				\
+	} while (0)
 #else
 #define	WT_LEADING_ZEROS(x, i) do {					\
 	uint64_t __x = (x);						\
