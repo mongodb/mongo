@@ -108,8 +108,11 @@ functions:
         if [ "Windows_NT" = "$OS" ]; then
             set -o igncr
         fi;
+        if [ '${library_path}' != '' ]; then
+            export ${library_path}
+        fi
         . ./${set_gopath|set_gopath.sh}
-        ${library_path} go build ${args} ${build_tags} -o bin/${tool} ${tool}/main/${tool}.go
+        go build ${args} ${build_tags} -o bin/${tool} ${tool}/main/${tool}.go
 
   "download mongod":
     command: shell.exec
@@ -175,7 +178,7 @@ functions:
             set -o igncr
         fi;
         . ./${set_gopath|set_gopath.sh}
-        if [ "${library_path}" != "" ]; then
+        if [ '${library_path}' != '' ]; then
             export ${library_path}
         fi
         export MONGODB_KERBEROS_PASSWORD=${kerberos_password}
@@ -214,7 +217,7 @@ functions:
             set -o igncr
         fi;
         . ./${set_gopath|set_gopath.sh}
-        if [ "${library_path}" != "" ]; then
+        if [ '${library_path}' != '' ]; then
             export ${library_path}
         fi;
 
