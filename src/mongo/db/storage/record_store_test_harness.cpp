@@ -423,7 +423,6 @@ namespace mongo {
             scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
             scoped_ptr<RecordIterator> it( rs->getIterator( opCtx.get(),
                                                            DiskLoc(),
-                                                           false,
                                                            CollectionScanParams::BACKWARD ) );
             while ( !it->isEOF() ) {
                 DiskLoc loc = it->getNext();

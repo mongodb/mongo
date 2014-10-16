@@ -241,9 +241,16 @@ namespace mongo {
 
             // Restore the RecoveryUnit if we need to.
             if (fromDBDirectClient) {
-                invariant(txn->recoveryUnit() == cc->getUnownedRecoveryUnit());
+                if (cc->hasRecoveryUnit())
+                    invariant(txn->recoveryUnit() == cc->getUnownedRecoveryUnit());
             }
             else {
+                if (!cc->hasRecoveryUnit()) {
+                    // Start using a new RecoveryUnit
+                    cc->setOwnedRecoveryUnit(
+                        getGlobalEnvironment()->getGlobalStorageEngine()->newRecoveryUnit(txn));
+
+                }
                 // Swap RecoveryUnit(s) between the ClientCursor and OperationContext.
                 ruSwapper.reset(new ScopedRecoveryUnitSwapper(cc, txn));
             }
@@ -303,15 +310,6 @@ namespace mongo {
                     || bb.len() > MaxBytesToReturnToClientAtOnce) {
                     break;
                 }
-            }
-
-            if (PlanExecutor::IS_EOF == state && 0 == numResults
-                && (queryOptions & QueryOption_CursorTailable)
-                && (queryOptions & QueryOption_AwaitData) && (pass < 1000)) {
-                // If the cursor is tailable we don't kill it if it's eof.  We let it try to get
-                // data some # of times first.
-                exec->saveState();
-                return 0;
             }
 
             // We save the client cursor when there might be more results, and hence we may receive
@@ -374,6 +372,22 @@ namespace mongo {
                 QLOG() << "getMore saving client cursor ended with state "
                        << PlanExecutor::statestr(state)
                        << endl;
+
+                if (PlanExecutor::IS_EOF == state && (queryOptions & QueryOption_CursorTailable)) {
+                    if (!fromDBDirectClient) {
+                        // Don't stash the RU. Get a new one on the next getMore.
+                        ruSwapper.reset();
+                        delete cc->releaseOwnedRecoveryUnit();
+                    }
+
+                    if ((queryOptions & QueryOption_AwaitData)
+                            && (numResults == 0)
+                            && (pass < 1000)) {
+                        // Bubble up to the AwaitData handling code in receivedGetMore which will
+                        // try again.
+                        return NULL;
+                    }
+                }
 
                 // Possibly note slave's position in the oplog.
                 if ((queryOptions & QueryOption_OplogReplay) && !slaveReadTill.isNull()) {
@@ -805,6 +819,10 @@ namespace mongo {
 
             if (fromDBDirectClient) {
                 cc->setUnownedRecoveryUnit(txn->recoveryUnit());
+            }
+            else if (state == PlanExecutor::IS_EOF && pq.getOptions().tailable) {
+                // Don't stash the RU for tailable cursors at EOF, let them get a new RU on their
+                // next getMore.
             }
             else {
                 // We stash away the RecoveryUnit in the ClientCursor.  It's used for subsequent

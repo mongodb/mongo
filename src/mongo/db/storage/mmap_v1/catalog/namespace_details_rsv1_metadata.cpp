@@ -208,7 +208,6 @@ namespace mongo {
 
         scoped_ptr<RecordIterator> iterator( _namespaceRecordStore->getIterator( txn,
                                                                                  DiskLoc(),
-                                                                                 false,
                                                                                  CollectionScanParams::FORWARD ) );
         while ( !iterator->isEOF() ) {
             DiskLoc loc = iterator->getNext();

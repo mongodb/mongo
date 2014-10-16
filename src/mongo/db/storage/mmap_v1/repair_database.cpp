@@ -336,7 +336,6 @@ namespace mongo {
                 if ( coll ) {
                     scoped_ptr<RecordIterator> it( coll->getIterator( txn,
                                                                       DiskLoc(),
-                                                                      false,
                                                                       CollectionScanParams::FORWARD ) );
                     while ( !it->isEOF() ) {
                         DiskLoc loc = it->getNext();
@@ -401,9 +400,7 @@ namespace mongo {
                         return status;
                 }
 
-                scoped_ptr<RecordIterator> iterator(
-                    originalCollection->getIterator( txn, DiskLoc(), false,
-                                                     CollectionScanParams::FORWARD ));
+                scoped_ptr<RecordIterator> iterator(originalCollection->getIterator(txn));
                 while ( !iterator->isEOF() ) {
                     DiskLoc loc = iterator->getNext();
                     invariant( !loc.isNull() );

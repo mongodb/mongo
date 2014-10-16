@@ -63,7 +63,7 @@ namespace mongo {
         virtual void temp_cappedTruncateAfter( OperationContext* txn, DiskLoc end, bool inclusive );
 
         virtual RecordIterator* getIterator( OperationContext* txn,
-                                             const DiskLoc& start, bool tailable,
+                                             const DiskLoc& start,
                                              const CollectionScanParams::Direction& dir) const;
 
         virtual std::vector<RecordIterator*> getManyIterators( OperationContext* txn ) const;

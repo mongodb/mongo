@@ -238,7 +238,6 @@ namespace mongo {
 
     RecordIterator* SimpleRecordStoreV1::getIterator( OperationContext* txn,
                                                       const DiskLoc& start,
-                                                      bool tailable,
                                                       const CollectionScanParams::Direction& dir) const {
         return new SimpleRecordStoreV1Iterator( txn, this, start, dir );
     }

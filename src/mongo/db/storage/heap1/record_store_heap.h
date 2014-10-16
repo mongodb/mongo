@@ -85,7 +85,6 @@ namespace mongo {
 
         virtual RecordIterator* getIterator( OperationContext* txn,
                                              const DiskLoc& start,
-                                             bool tailable,
                                              const CollectionScanParams::Direction& dir) const;
 
         virtual RecordIterator* getIteratorForRepair( OperationContext* txn ) const;

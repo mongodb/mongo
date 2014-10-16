@@ -285,10 +285,9 @@ namespace mongo {
 
     RecordIterator* RocksRecordStore::getIterator( OperationContext* txn,
                                                    const DiskLoc& start,
-                                                   bool tailable,
                                                    const CollectionScanParams::Direction& dir
                                                    ) const {
-        return new Iterator(txn, _db, _columnFamily, tailable, dir, start);
+        return new Iterator(txn, _db, _columnFamily, false, dir, start);
     }
 
 
@@ -445,7 +444,7 @@ namespace mongo {
                                                      DiskLoc end,
                                                      bool inclusive ) {
         boost::scoped_ptr<RecordIterator> iter(
-                getIterator( txn, maxDiskLoc, false, CollectionScanParams::BACKWARD ) );
+                getIterator( txn, maxDiskLoc, CollectionScanParams::BACKWARD ) );
 
         while( !iter->isEOF() ) {
             WriteUnitOfWork wu( txn );

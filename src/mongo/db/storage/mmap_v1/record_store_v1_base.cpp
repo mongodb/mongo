@@ -664,7 +664,6 @@ namespace mongo {
 
                 scoped_ptr<RecordIterator> iterator( getIterator( txn,
                                                                   DiskLoc(),
-                                                                  false,
                                                                   CollectionScanParams::FORWARD ) );
                 DiskLoc cl;
                 while ( !( cl = iterator->getNext() ).isNull() ) {

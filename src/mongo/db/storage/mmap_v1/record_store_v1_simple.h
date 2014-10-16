@@ -50,7 +50,7 @@ namespace mongo {
 
         const char* name() const { return "SimpleRecordStoreV1"; }
 
-        virtual RecordIterator* getIterator( OperationContext* txn, const DiskLoc& start, bool tailable,
+        virtual RecordIterator* getIterator( OperationContext* txn, const DiskLoc& start,
                                              const CollectionScanParams::Direction& dir) const;
 
         virtual std::vector<RecordIterator*> getManyIterators(OperationContext* txn) const;

@@ -73,7 +73,7 @@ namespace QueryStageAnd {
         }
 
         void getLocs(set<DiskLoc>* out, Collection* coll) {
-            RecordIterator* it = coll->getIterator(&_txn, DiskLoc(), false,
+            RecordIterator* it = coll->getIterator(&_txn, DiskLoc(),
                                                    CollectionScanParams::FORWARD);
             while (!it->isEOF()) {
                 DiskLoc nextLoc = it->getNext();

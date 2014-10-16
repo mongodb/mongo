@@ -85,7 +85,6 @@ namespace mongo {
 
             RecordIterator *it = rs->getIterator( opCtx.get(),
                                                   DiskLoc(),
-                                                  false,
                                                   CollectionScanParams::FORWARD );
 
             for ( int i = 0; i < nToInsert; i++ ) {
@@ -147,7 +146,6 @@ namespace mongo {
 
             RecordIterator *it = rs->getIterator( opCtx.get(),
                                                   DiskLoc(),
-                                                  false,
                                                   CollectionScanParams::BACKWARD );
 
             for ( int i = nToInsert - 1; i >= 0; i-- ) {
@@ -209,7 +207,6 @@ namespace mongo {
             int start = nToInsert / 2;
             RecordIterator *it = rs->getIterator( opCtx.get(),
                                                   locs[start],
-                                                  false,
                                                   CollectionScanParams::FORWARD );
 
             for ( int i = start; i < nToInsert; i++ ) {
@@ -271,7 +268,6 @@ namespace mongo {
             int start = nToInsert / 2;
             RecordIterator *it = rs->getIterator( opCtx.get(),
                                                   locs[start],
-                                                  false,
                                                   CollectionScanParams::BACKWARD );
 
             for ( int i = start; i >= 0; i-- ) {

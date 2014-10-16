@@ -596,9 +596,8 @@ namespace mongo {
 
     RecordIterator* CappedRecordStoreV1::getIterator( OperationContext* txn,
                                                       const DiskLoc& start,
-                                                      bool tailable,
                                                       const CollectionScanParams::Direction& dir) const {
-        return new CappedRecordStoreV1Iterator( txn, this, start, tailable, dir );
+        return new CappedRecordStoreV1Iterator( txn, this, start, false, dir );
     }
 
     vector<RecordIterator*> CappedRecordStoreV1::getManyIterators( OperationContext* txn ) const {

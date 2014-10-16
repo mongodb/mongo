@@ -236,13 +236,10 @@ namespace mongo {
 
     RecordIterator* HeapRecordStore::getIterator(OperationContext* txn,
                                                  const DiskLoc& start,
-                                                 bool tailable,
                                                  const CollectionScanParams::Direction& dir) const {
-        if (tailable)
-            invariant(_isCapped && dir == CollectionScanParams::FORWARD);
 
         if (dir == CollectionScanParams::FORWARD) {
-            return new HeapRecordIterator(txn, _records, *this, start, tailable);
+            return new HeapRecordIterator(txn, _records, *this, start, false);
         }
         else {
             return new HeapRecordReverseIterator(txn, _records, *this, start);

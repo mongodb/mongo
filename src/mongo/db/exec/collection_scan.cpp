@@ -54,7 +54,7 @@ namespace mongo {
           _workingSet(workingSet),
           _filter(filter),
           _params(params),
-          _nsDropped(false),
+          _isDead(false),
           _commonStats(kStageType) {
         // Explain reports the direction of the collection scan.
         _specificStats.direction = params.direction;
@@ -66,19 +66,35 @@ namespace mongo {
         // Adds the amount of time taken by work() to executionTimeMillis.
         ScopedTimer timer(&_commonStats.executionTimeMillis);
 
-        if (_nsDropped) { return PlanStage::DEAD; }
+        if (_isDead) { return PlanStage::DEAD; }
 
         // Do some init if we haven't already.
         if (NULL == _iter) {
             if ( _params.collection == NULL ) {
-                _nsDropped = true;
+                _isDead = true;
                 return PlanStage::DEAD;
             }
 
-            _iter.reset( _params.collection->getIterator( _txn,
-                                                          _params.start,
-                                                          _params.tailable,
-                                                          _params.direction ) );
+            if (_lastSeenLoc.isNull()) {
+                _iter.reset( _params.collection->getIterator( _txn,
+                                                              _params.start,
+                                                              _params.direction ) );
+            }
+            else {
+                invariant(_params.tailable);
+
+                _iter.reset( _params.collection->getIterator( _txn,
+                                                              _lastSeenLoc,
+                                                              _params.direction ) );
+
+                // Advance _iter past where we were last time. If it returns something else, mark us
+                // as dead since we want to signal an error rather than silently dropping data from
+                // the stream. This is related to the _lastSeenLock handling in invalidate.
+                if (_iter->getNext() != _lastSeenLoc) {
+                    _isDead = true;
+                    return PlanStage::DEAD;
+                }
+            }
 
             ++_commonStats.needTime;
             return PlanStage::NEED_TIME;
@@ -87,23 +103,19 @@ namespace mongo {
         // What we'll return to the user.
         DiskLoc nextLoc;
 
-        // Should we try getNext() on the underlying _iter if we're EOF?  Yes, if we're tailable.
-        if (isEOF()) {
-            if (!_params.tailable) {
-                return PlanStage::IS_EOF;
-            }
-            else {
-                // See if _iter gives us anything new.
-                nextLoc = _iter->getNext();
-                if (nextLoc.isNull()) {
-                    // Nope, still EOF.
-                    return PlanStage::IS_EOF;
-                }
-            }
+        // Should we try getNext() on the underlying _iter?
+        if (isEOF())
+            return PlanStage::IS_EOF;
+
+        // See if _iter gives us anything new.
+        nextLoc = _iter->getNext();
+        if (nextLoc.isNull()) {
+            if (_params.tailable)
+                _iter.reset(); // pick up where we left off on the next call to work()
+            return PlanStage::IS_EOF;
         }
-        else {
-            nextLoc = _iter->getNext();
-        }
+
+        _lastSeenLoc = nextLoc;
 
         WorkingSetID id = _workingSet->allocate();
         WorkingSetMember* member = _workingSet->get(id);
@@ -129,8 +141,9 @@ namespace mongo {
         if ((0 != _params.maxScan) && (_specificStats.docsTested >= _params.maxScan)) {
             return true;
         }
-        if (_nsDropped) { return true; }
+        if (_isDead) { return true; }
         if (NULL == _iter) { return false; }
+        if (_params.tailable) { return false; } // tailable cursors can return data later.
         return _iter->isEOF();
     }
 
@@ -149,6 +162,12 @@ namespace mongo {
         if (NULL != _iter) {
             _iter->invalidate(dl);
         }
+
+        if (_params.tailable && dl == _lastSeenLoc) {
+            // This means that deletes have caught up to the reader. We want to error in this case
+            // so readers don't miss potentially important data.
+            _isDead = true;
+        }
     }
 
     void CollectionScan::saveState() {
@@ -164,7 +183,7 @@ namespace mongo {
         if (NULL != _iter) {
             if (!_iter->restoreState(opCtx)) {
                 warning() << "Collection dropped or state deleted during yield of CollectionScan";
-                _nsDropped = true;
+                _isDead = true;
             }
         }
     }
