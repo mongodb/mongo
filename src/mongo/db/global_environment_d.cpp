@@ -176,8 +176,8 @@ namespace mongo {
     void GlobalEnvironmentMongoD::forEachOperationContext(ProcessOperationContext* procOpCtx) {
         scoped_lock lock(_registeredOpContextsMutex);
 
-        OperationContextSet::iterator it;
-        for (it = _registeredOpContexts.begin(); it != _registeredOpContexts.end(); it++) {
+        OperationContextSet::const_iterator it;
+        for (it = _registeredOpContexts.begin(); it != _registeredOpContexts.end(); ++it) {
             procOpCtx->processOpContext(*it);
         }
     }
