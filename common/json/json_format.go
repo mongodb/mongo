@@ -14,7 +14,20 @@ func (b BinData) MarshalJSON() ([]byte, error) {
 }
 
 func (js JavaScript) MarshalJSON() ([]byte, error) {
-	return []byte(js.Code), nil
+	data := []byte(fmt.Sprintf(`{ "$code": "%v"`, js.Code))
+
+	scopeChunk := []byte{}
+	if js.Scope != nil {
+		scopeChunk, err := Marshal(js.Scope)
+		if err != nil {
+			return nil, err
+		}
+		scopeChunk = []byte(fmt.Sprintf(`, "$scope": %v `, scopeChunk))
+	}
+	scopeChunk = append(scopeChunk, '}')
+
+	data = append(data, scopeChunk...)
+	return data, nil
 }
 
 func (d Date) MarshalJSON() ([]byte, error) {
@@ -41,7 +54,7 @@ func (d DBRef) MarshalJSON() ([]byte, error) {
 	// so piece chunks together since can only get $id field as bytes.
 	refChunk := []byte(fmt.Sprintf(`{ "$ref": "%v", "$id": `, d.Collection))
 
-	var dbChunk []byte
+	dbChunk := []byte{}
 	if d.Database != "" {
 		dbChunk = []byte(fmt.Sprintf(`, "$db": "%v" `, d.Database))
 	}
