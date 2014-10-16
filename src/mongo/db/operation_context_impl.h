@@ -73,6 +73,7 @@ namespace mongo {
     private:
         std::auto_ptr<RecoveryUnit> _recovery;
         std::auto_ptr<Locker> _locker;
+        Client* _client; // cached, not owned
     };
 
 }  // namespace mongo
