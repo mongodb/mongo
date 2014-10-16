@@ -907,7 +907,7 @@ __conn_config_env(WT_SESSION_IMPL *session, const char *cfg[], WT_ITEM *cbuf)
 	len = strlen(env_config);
 	if (len == 0)
 		return (0);
-	WT_RET(__wt_buf_set(session, cbuf, env_config, len));
+	WT_RET(__wt_buf_set(session, cbuf, env_config, len + 1));
 
 	/*
 	 * Security stuff:
