@@ -121,6 +121,7 @@ func (diw *DriverImportWriter) Open(db, collection string) error {
 		return err
 	}
 	diw.session = session
+	session.SetSocketTimeout(0)
 	diw.collection = session.DB(db).C(collection)
 	return nil
 }
