@@ -32,7 +32,7 @@ func main() {
 	}
 
 	// print help, if specified
-	if opts.PrintHelp() {
+	if opts.PrintHelp(false) {
 		return
 	}
 

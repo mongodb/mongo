@@ -129,8 +129,8 @@ func New(appName, usageStr string) *ToolOptions {
 
 // Print the usage message for the tool to stdout.  Returns whether or not the
 // help flag is specified.
-func (self *ToolOptions) PrintHelp() bool {
-	if self.Help {
+func (self *ToolOptions) PrintHelp(force bool) bool {
+	if self.Help || force {
 		self.parser.WriteHelp(os.Stdout)
 	}
 	return self.Help
