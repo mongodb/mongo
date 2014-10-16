@@ -38,7 +38,7 @@ namespace mongo {
     // Verify that calling touch() on an empty index returns an OK status.
     TEST( SortedDataInterface, TouchEmpty ) {
         scoped_ptr<HarnessHelper> harnessHelper( newHarnessHelper() );
-        scoped_ptr<SortedDataInterface> sorted( harnessHelper->newSortedDataInterface() );
+        scoped_ptr<SortedDataInterface> sorted( harnessHelper->newSortedDataInterface( false ) );
 
         {
             scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
@@ -49,7 +49,7 @@ namespace mongo {
     // Verify that calling touch() on a nonempty index returns an OK status.
     TEST( SortedDataInterface, TouchNonEmpty ) {
         scoped_ptr<HarnessHelper> harnessHelper( newHarnessHelper() );
-        scoped_ptr<SortedDataInterface> sorted( harnessHelper->newSortedDataInterface() );
+        scoped_ptr<SortedDataInterface> sorted( harnessHelper->newSortedDataInterface( true ) );
 
         {
             scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );

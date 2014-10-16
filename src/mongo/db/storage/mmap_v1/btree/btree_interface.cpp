@@ -87,7 +87,8 @@ namespace mongo {
 
         virtual bool unindex(OperationContext* txn,
                              const BSONObj& key,
-                             const DiskLoc& loc) {
+                             const DiskLoc& loc,
+                             bool dupsAllowed) {
 
             return _btree->unindex(txn, key, loc);
         }

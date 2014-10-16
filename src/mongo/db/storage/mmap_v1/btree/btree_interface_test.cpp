@@ -42,7 +42,7 @@ namespace mongo {
               _order( Ordering::make( BSONObj() ) ) {
         }
 
-        virtual SortedDataInterface* newSortedDataInterface() {
+        virtual SortedDataInterface* newSortedDataInterface( bool unique ) {
             auto_ptr<SortedDataInterface> sorted( getMMAPV1Interface( &_headManager,
                                                                       &_recordStore,
                                                                       _order,
