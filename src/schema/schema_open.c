@@ -217,6 +217,9 @@ __open_index(WT_SESSION_IMPL *session, WT_TABLE *table, WT_INDEX *idx)
 	WT_ERR(__wt_buf_init(session, buf, 0));
 	WT_ERR(__wt_struct_truncate(session,
 	    idx->key_format, npublic_cols, buf));
+	WT_ERR(__wt_strndup(
+	    session, buf->data, buf->size, &idx->idxkey_format));
+
 	/*
 	 * Add a trailing padding byte to the format.  This ensures that there
 	 * will be no special optimization of the last column, so the primary
@@ -224,7 +227,7 @@ __open_index(WT_SESSION_IMPL *session, WT_TABLE *table, WT_INDEX *idx)
 	 */
 	WT_ERR(__wt_buf_catfmt(session, buf, "x"));
 	WT_ERR(__wt_strndup(
-	    session, buf->data, buf->size, &idx->idxkey_format));
+	    session, buf->data, buf->size, &idx->exkey_format));
 
 	/* By default, index cursor values are the table value columns. */
 	/* TODO Optimize to use index columns in preference to table lookups. */

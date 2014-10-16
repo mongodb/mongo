@@ -188,7 +188,6 @@ __curindex_search(WT_CURSOR *cursor)
 	WT_CURSOR *child;
 	WT_CURSOR_INDEX *cindex;
 	WT_DECL_RET;
-	WT_ITEM search_key;
 	WT_SESSION_IMPL *session;
 	int exact;
 
@@ -198,13 +197,9 @@ __curindex_search(WT_CURSOR *cursor)
 
 	/*
 	 * We expect partial matches, but we want the smallest item that
-	 * matches the prefix.  We appended a padding byte to the key, strip it
-	 * now.  Fail if there is no matching item.
+	 * matches the prefix.  Fail if there is no matching item.
 	 */
-	WT_ITEM_SET(search_key, cursor->key);
-	WT_ASSERT(session, search_key.size > 0);
-	--search_key.size;
-	__wt_cursor_set_raw_key(child, &search_key);
+	__wt_cursor_set_raw_key(child, &cursor->key);
 	WT_ERR(child->search_near(child, &exact));
 
 	/*
@@ -217,8 +212,8 @@ __curindex_search(WT_CURSOR *cursor)
 	if (exact < 0)
 		WT_ERR(child->next(child));
 
-	if (child->key.size < search_key.size ||
-	    memcmp(child->key.data, search_key.data, search_key.size) != 0) {
+	if (child->key.size < cursor->key.size ||
+	    memcmp(child->key.data, cursor->key.data, cursor->key.size) != 0) {
 		ret = WT_NOTFOUND;
 		goto err;
 	}
@@ -241,15 +236,11 @@ __curindex_search_near(WT_CURSOR *cursor, int *exact)
 {
 	WT_CURSOR_INDEX *cindex;
 	WT_DECL_RET;
-	WT_ITEM search_key;
 	WT_SESSION_IMPL *session;
 
 	cindex = (WT_CURSOR_INDEX *)cursor;
 	CURSOR_API_CALL(cursor, session, search_near, NULL);
-	WT_ITEM_SET(search_key, cursor->key);
-	WT_ASSERT(session, search_key.size > 0);
-	--search_key.size;
-	__wt_cursor_set_raw_key(cindex->child, &search_key);
+	__wt_cursor_set_raw_key(cindex->child, &cursor->key);
 	if ((ret = cindex->child->search_near(cindex->child, exact)) == 0)
 		ret = __curindex_move(cindex);
 	else

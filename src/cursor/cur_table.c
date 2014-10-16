@@ -105,7 +105,7 @@ __apply_idx(WT_CURSOR_TABLE *ctable, size_t func_off) {
 		if (idx->extractor) {
 			extract_cursor.iface = iface;
 			extract_cursor.iface.session = &session->iface;
-			extract_cursor.iface.key_format = idx->idxkey_format;
+			extract_cursor.iface.key_format = idx->exkey_format;
 			extract_cursor.ctable = ctable;
 			extract_cursor.idxc = *cp;
 			extract_cursor.f = f;
