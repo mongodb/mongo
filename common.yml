@@ -806,7 +806,7 @@ buildvariants:
   run_on:
   - ubuntu1204-test
   expansions:
-    <<: *linux_64_bit
+    <<: *mongo_url_ubuntu1204
     <<: *mongodb_default_startup_args
     integration_test_args: integration
   tasks: *ubuntu1204_tasks
@@ -816,7 +816,7 @@ buildvariants:
   run_on:
   - ubuntu1204-test
   expansions:
-    <<: *linux_64_bit_enterprise
+    <<: *mongo_url_ubuntu1204_enterprise
     <<: *mongodb_ssl_startup_args
     build_tags: -tags "ssl"
     edition: ssl
@@ -828,8 +828,6 @@ buildvariants:
   run_on:
   - ubuntu1204-test
   expansions:
-    <<: *linux_64_bit_enterprise
-    <<: *mongodb_default_startup_args
     build_tags: -tags "ssl sasl"
     edition: enterprise
     run_kinit: true
