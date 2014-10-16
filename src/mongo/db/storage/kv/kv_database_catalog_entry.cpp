@@ -264,6 +264,8 @@ namespace mongo {
 
         string ident = _engine->getCatalog()->getCollectionIdent( ns );
 
+        boost::mutex::scoped_lock lk( _collectionsLock );
+
         Status status = _engine->getEngine()->dropRecordStore( opCtx, ident );
         if ( !status.isOK() )
             return status;
@@ -272,7 +274,6 @@ namespace mongo {
         if ( !status.isOK() )
             return status;
 
-        boost::mutex::scoped_lock lk( _collectionsLock );
         _collections.erase( ns.toString() );
 
         return Status::OK();
