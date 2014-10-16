@@ -44,7 +44,9 @@ namespace mongo {
     }
 
     KVStorageEngine::KVStorageEngine( KVEngine* engine )
-        : _engine( engine ), _initialized( false ) {
+        : _engine( engine )
+        , _initialized( false )
+        , _supportsDocLocking(_engine->supportsDocLocking()) {
     }
 
     void KVStorageEngine::cleanShutdown(OperationContext* txn) {

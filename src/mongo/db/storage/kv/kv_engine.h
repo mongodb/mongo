@@ -85,6 +85,11 @@ namespace mongo {
 
         virtual Status dropSortedDataInterface( OperationContext* opCtx,
                                                 const StringData& ident ) = 0;
+
+        /**
+         * This must not change over the lifetime of the engine.
+         */
+        virtual bool supportsDocLocking() const = 0;
     };
 
 }

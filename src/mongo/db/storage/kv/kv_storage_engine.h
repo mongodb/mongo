@@ -63,7 +63,7 @@ namespace mongo {
         virtual DatabaseCatalogEntry* getDatabaseCatalogEntry( OperationContext* opCtx,
                                                                const StringData& db );
 
-        virtual bool supportsDocLocking() const { return true; }
+        virtual bool supportsDocLocking() const { return _supportsDocLocking; }
 
         virtual Status closeDatabase( OperationContext* txn, const StringData& db );
 
@@ -89,6 +89,7 @@ namespace mongo {
     private:
         boost::scoped_ptr<KVEngine> _engine;
         bool _initialized;
+        const bool _supportsDocLocking;
 
         boost::scoped_ptr<RecordStore> _catalogRecordStore;
         boost::scoped_ptr<KVCatalog> _catalog;
