@@ -600,16 +600,20 @@ namespace mongo {
             // after locate so they actually return the record *after* the one we seek to.
             int cmp;
             ret = c->search_near(c, &cmp);
+            if ( ret == WT_NOTFOUND ) {
+                _eof = true;
+                return;
+            }
             invariantWTOK(ret);
             if (_forward()) {
-                // return <= loc
-                if (cmp > 0)
-                    ret = c->prev(c);
-            }
-            else {
                 // return >= loc
                 if (cmp < 0)
                     ret = c->next(c);
+            }
+            else {
+                // return <= loc
+                if (cmp > 0)
+                    ret = c->prev(c);
             }
         }
         if (ret != WT_NOTFOUND) invariantWTOK(ret);
@@ -702,6 +706,9 @@ namespace mongo {
         // the cursor and recoveryUnit are valid on restore
         // so we just record the recoveryUnit to make sure
         _savedRecoveryUnit = _txn->recoveryUnit();
+        if ( !wt_keeptxnopen() ) {
+            _cursor->reset();
+        }
         _txn = NULL;
     }
 
@@ -712,6 +719,31 @@ namespace mongo {
         // case
         _txn = txn;
         invariant( _savedRecoveryUnit == txn->recoveryUnit() );
+        if ( !wt_keeptxnopen() ) {
+            DiskLoc saved = _lastLoc;
+            _locate(_lastLoc, false);
+            RS_ITERATOR_TRACE( "isEOF check " << _eof );
+            if ( _eof ) {
+                _lastLoc = DiskLoc();
+            }
+            else if ( _curr() != saved ) {
+                if ( _tailable ) {
+                    RS_ITERATOR_TRACE( "isEOF wrap " << _curr() );
+                    // wrapped around :(
+                    _lastLoc = DiskLoc();
+                    _eof = true;
+                    return false;
+                }
+                // old doc deleted, we're ok
+            }
+            else {
+                // we found where we left off!
+                // now we advance to the next one
+                RS_ITERATOR_TRACE( "isEOF found " << _curr() );
+                _getNext();
+            }
+        }
+
         return true;
     }
 

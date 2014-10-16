@@ -39,6 +39,10 @@
 
 namespace mongo {
 
+    inline bool wt_keeptxnopen() {
+        return false;
+    }
+
     /**
      * converts wiredtiger return codes to mongodb statuses.
      */

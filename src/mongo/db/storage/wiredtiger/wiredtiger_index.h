@@ -155,6 +155,8 @@ namespace mongo {
 
             // For save/restorePosition check
             RecoveryUnit* _savedForCheck;
+            BSONObj _savedKey;
+            DiskLoc _savedLoc;
         };
 
         std::string _uri;

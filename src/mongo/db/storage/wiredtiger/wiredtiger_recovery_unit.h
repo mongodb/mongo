@@ -66,6 +66,9 @@ namespace mongo {
 
         virtual void registerChange(Change *);
 
+        virtual void beingReleasedFromOperationContext();
+        virtual void beingSetOnOperationContext();
+
         // un-used API
         virtual void* writingPtr(void* data, size_t len) { invariant(!"don't call writingPtr"); }
         virtual void syncDataAndTruncateJournal() {}
@@ -87,6 +90,9 @@ namespace mongo {
         void _abort();
         void _commit();
 
+        void _txnClose( bool commit );
+        void _txnOpen();
+
         WiredTigerSessionCache* _sessionCache; // not owned
         WiredTigerSession* _session; // owned, but from pool
         bool _defaultCommit;
@@ -94,6 +100,7 @@ namespace mongo {
         bool _active;
         bool _everStartedWrite;
         Timer _timer;
+        bool _currentlySquirreled;
 
         typedef boost::shared_ptr<Change> ChangePtr;
         typedef std::vector<ChangePtr> Changes;
@@ -111,6 +118,8 @@ namespace mongo {
 
         WT_CURSOR* get() const;
         WT_CURSOR* operator->() const { return get(); }
+
+        void reset();
 
     private:
         void _init( const std::string& uri, uint64_t uriID, WiredTigerRecoveryUnit* ru );

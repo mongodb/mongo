@@ -36,6 +36,7 @@
 #include "mongo/db/storage/wiredtiger/wiredtiger_session_cache.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_util.h"
 #include "mongo/util/log.h"
+#include "mongo/util/stacktrace.h"
 
 namespace mongo {
 
@@ -44,7 +45,8 @@ namespace mongo {
         _session( NULL ),
         _depth(0),
         _active( false ),
-        _everStartedWrite( false ) {
+        _everStartedWrite( false ),
+        _currentlySquirreled( false ) {
     }
 
     WiredTigerRecoveryUnit::~WiredTigerRecoveryUnit() {
@@ -66,11 +68,7 @@ namespace mongo {
 
     void WiredTigerRecoveryUnit::_commit() {
         if ( _session && _active ) {
-            WT_SESSION *s = _session->getSession();
-            int ret = s->commit_transaction(s, NULL);
-            LOG(2) << "WT commit";
-            invariantWTOK(ret);
-            _active = false;
+            _txnClose( true );
         }
 
         for (Changes::iterator it = _changes.begin(), end = _changes.end(); it != end; ++it) {
@@ -81,10 +79,7 @@ namespace mongo {
 
     void WiredTigerRecoveryUnit::_abort() {
         if ( _session && _active ) {
-            WT_SESSION *s = _session->getSession();
-            int ret = s->rollback_transaction(s, NULL);
-            invariantWTOK(ret);
-            _active = false;
+            _txnClose( false );
         }
 
         for (Changes::reverse_iterator it = _changes.rbegin(), end = _changes.rend();
@@ -95,6 +90,7 @@ namespace mongo {
     }
 
     void WiredTigerRecoveryUnit::beginUnitOfWork() {
+        invariant( !_currentlySquirreled );
         _depth++;
         _everStartedWrite = true;
     }
@@ -133,12 +129,7 @@ namespace mongo {
         }
 
         if ( !_active ) {
-            WT_SESSION *s = _session->getSession();
-            int ret = s->begin_transaction(s, NULL);
-            invariantWTOK(ret);
-            _active = true;
-            _timer.reset();
-            LOG(2) << "WT begin_transaction";
+            _txnOpen();
         }
         return _session;
     }
@@ -148,13 +139,44 @@ namespace mongo {
         invariant( _changes.empty() );
         invariant( _active );
 
+        _txnClose( true );
+        _txnOpen();
+    }
+
+    void WiredTigerRecoveryUnit::_txnClose( bool commit ) {
         WT_SESSION *s = _session->getSession();
-        invariantWTOK( s->commit_transaction(s, NULL) );
-        LOG(2) << "WT commit";
+        if ( commit ) {
+            invariantWTOK( s->commit_transaction(s, NULL) );
+            LOG(2) << "WT commit_transaction";
+        }
+        else {
+            invariantWTOK( s->rollback_transaction(s, NULL) );
+            LOG(2) << "WT rollback_transaction";
+        }
+        _active = false;
+    }
+
+    void WiredTigerRecoveryUnit::_txnOpen() {
+        invariant( !_active );
+        WT_SESSION *s = _session->getSession();
         invariantWTOK( s->begin_transaction(s, NULL) );
         LOG(2) << "WT begin_transaction";
         _timer.reset();
+        _active = true;
     }
+
+    void WiredTigerRecoveryUnit::beingReleasedFromOperationContext() {
+        LOG(2) << "WiredTigerRecoveryUnit::beingReleased";
+        _currentlySquirreled = true;
+        if ( !wt_keeptxnopen() ) {
+            _commit();
+        }
+    }
+    void WiredTigerRecoveryUnit::beingSetOnOperationContext() {
+        LOG(2) << "WiredTigerRecoveryUnit::broughtBack";
+        _currentlySquirreled = false;
+    }
+
 
     // ---------------------
 
@@ -185,6 +207,10 @@ namespace mongo {
     WT_CURSOR* WiredTigerCursor::get() const {
         invariant( _session == _ru->getSession() );
         return _cursor;
+    }
+
+    void WiredTigerCursor::reset() {
+        invariantWTOK( _cursor->reset( _cursor ) );
     }
 
 }

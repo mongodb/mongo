@@ -574,6 +574,13 @@ namespace {
 
     void WiredTigerIndex::IndexCursor::savePosition() {
         _savedForCheck = _txn->recoveryUnit();
+
+        if ( !wt_keeptxnopen() && !_eof ) {
+            _savedKey = getKey().getOwned();
+            _savedLoc = getDiskLoc();
+            _cursor.reset();
+        }
+
         _txn = NULL;
     }
 
@@ -581,6 +588,10 @@ namespace {
         // Update the session handle with our new operation context.
         _txn = txn;
         invariant( _savedForCheck == txn->recoveryUnit() );
+
+        if ( !wt_keeptxnopen() && !_eof ) {
+            _locate(_savedKey, _savedLoc);
+        }
     }
 
     // ------------------------------
