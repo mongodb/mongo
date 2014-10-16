@@ -47,6 +47,7 @@
 #include "mongo/db/repl/repl_settings.h"
 #include "mongo/db/repl/replica_set_config.h"
 #include "mongo/db/repl/topology_coordinator_impl.h"
+#include "mongo/db/repl/update_position_args.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/write_concern_options.h"
 #include "mongo/stdx/functional.h"
@@ -1693,7 +1694,7 @@ namespace {
         IsMasterResponse roundTripped;
         ASSERT_OK(roundTripped.initialize(response.toBSON()));
     }
-
+         
     TEST_F(ReplCoordTest, ShutDownBeforeStartUpFinished) {
         init();
         startCapturingLogMessages();
@@ -1702,6 +1703,190 @@ namespace {
         ASSERT_EQUALS(1,
                 countLogLinesContaining("shutdown() called before startReplication() finished"));
     }
+
+    TEST_F(ReplCoordTest, UpdatePositionWithRIDTest) {
+        OperationContextNoop txn;
+        assertStartSuccess(
+                BSON("_id" << "mySet" <<
+                     "version" << 2 <<
+                     "members" << BSON_ARRAY(BSON("host" << "node1:12345" << "_id" << 0) <<
+                                             BSON("host" << "node2:12345" << "_id" << 1) <<
+                                             BSON("host" << "node3:12345" << "_id" << 2) <<
+                                             BSON("host" << "node4:12345" << "_id" << 3) <<
+                                             BSON("host" << "node5:12345" << "_id" << 4))),
+                HostAndPort("node1", 12345));
+        ASSERT(getReplCoord()->setFollowerMode(MemberState::RS_SECONDARY));
+        getReplCoord()->setMyLastOptime(&txn, OpTime(100, 0));
+        simulateSuccessfulElection();
+
+        OID selfRID = getReplCoord()->getMyRID();
+        OID client1 = OID::gen();
+        OID client2 = OID::gen();
+        OID client3 = OID::gen();
+        OID client4 = OID::gen();
+        OpTime time1(100, 1);
+        OpTime time2(100, 2);
+        OpTime staleTime(10, 0);
+        getReplCoord()->setMyLastOptime(&txn, time2);
+
+        WriteConcernOptions writeConcern;
+        writeConcern.wTimeout = WriteConcernOptions::kNoWaiting;
+        writeConcern.wNumNodes = 2;
+
+        // receive an updateposition for 3 members, with new enough time, but no handshakes yet
+        UpdatePositionArgs args;
+        ASSERT_OK(args.initialize(BSON("replSetUpdatePosition" << 1 <<
+                                       "optimes" << BSON_ARRAY(
+                                           BSON("_id" << client1 << "optime" << time1) <<
+                                           BSON("_id" << client2 << "optime" << time1) <<
+                                           BSON("_id" << client3 << "optime" << time1)))));
+        ASSERT_EQUALS(ErrorCodes::NodeNotFound,
+                      getReplCoord()->processReplSetUpdatePosition(&txn, args));
+        ASSERT_EQUALS(ErrorCodes::ExceededTimeLimit,
+                      getReplCoord()->awaitReplication(&txn, time1, writeConcern).status);
+
+        // handshake for middle of three nodes, updatePosition should end early, not updating
+        // any members, write concern 2 should still fail
+        HandshakeArgs handshake2;
+        ASSERT_OK(handshake2.initialize(BSON("handshake" << client2 << "member" << 2)));
+        ASSERT_OK(getReplCoord()->processHandshake(&txn, handshake2));
+        ASSERT_EQUALS(ErrorCodes::NodeNotFound,
+                      getReplCoord()->processReplSetUpdatePosition(&txn, args));
+        ASSERT_EQUALS(ErrorCodes::ExceededTimeLimit,
+                      getReplCoord()->awaitReplication(&txn, time1, writeConcern).status);
+
+        // handshake for first of three nodes, updatePosition should end early, but the first two
+        // should get through and writeconcern <=3 should pass, but 4 should fail
+        HandshakeArgs handshake1;
+        ASSERT_OK(handshake1.initialize(BSON("handshake" << client1 << "member" << 1)));
+        ASSERT_OK(getReplCoord()->processHandshake(&txn, handshake1));
+        ASSERT_EQUALS(ErrorCodes::NodeNotFound,
+                      getReplCoord()->processReplSetUpdatePosition(&txn, args));
+        ASSERT_OK(getReplCoord()->awaitReplication(&txn, time1, writeConcern).status);
+        writeConcern.wNumNodes = 3;
+        ASSERT_OK(getReplCoord()->awaitReplication(&txn, time1, writeConcern).status);
+        writeConcern.wNumNodes = 4;
+        ASSERT_EQUALS(ErrorCodes::ExceededTimeLimit,
+                      getReplCoord()->awaitReplication(&txn, time1, writeConcern).status);
+
+        // receive a stale value for ourself, should not cause progress to go backwards
+        HandshakeArgs handshake3;
+        ASSERT_OK(handshake3.initialize(BSON("handshake" << client3 << "member" << 3)));
+        ASSERT_OK(getReplCoord()->processHandshake(&txn, handshake3));
+        HandshakeArgs handshake4;
+        ASSERT_OK(handshake4.initialize(BSON("handshake" << client4 << "member" << 4)));
+        ASSERT_OK(getReplCoord()->processHandshake(&txn, handshake4));
+        UpdatePositionArgs args2;
+        ASSERT_OK(args2.initialize(BSON("replSetUpdatePosition" << 1 <<
+                                        "optimes" << BSON_ARRAY(
+                                            BSON("_id" << selfRID << "optime" << staleTime) <<
+                                            BSON("_id" << client3 << "optime" << time2) <<
+                                            BSON("_id" << client4 << "optime" << time2)))));
+        ASSERT_OK(getReplCoord()->processReplSetUpdatePosition(&txn, args2));
+        // all nodes should have through time1 and three should have through time2
+        writeConcern.wNumNodes = 5;
+        ASSERT_OK(getReplCoord()->awaitReplication(&txn, time1, writeConcern).status);
+        writeConcern.wNumNodes = 3;
+        ASSERT_OK(getReplCoord()->awaitReplication(&txn, time2, writeConcern).status);
+        writeConcern.wNumNodes = 4;
+        ASSERT_EQUALS(ErrorCodes::ExceededTimeLimit,
+                      getReplCoord()->awaitReplication(&txn, time2, writeConcern).status);
+
+        // receive a stale value for another, should not cause progress to go backwards
+        UpdatePositionArgs args3;
+        ASSERT_OK(args3.initialize(BSON("replSetUpdatePosition" << 1 <<
+                                        "optimes" << BSON_ARRAY(
+                                            BSON("_id" << client1 << "optime" << time2) <<
+                                            BSON("_id" << client2 << "optime" << time2) <<
+                                            BSON("_id" << client3 << "optime" << staleTime)))));
+        ASSERT_OK(getReplCoord()->processReplSetUpdatePosition(&txn, args3));
+        // all nodes should have through time2
+        writeConcern.wNumNodes = 5;
+        ASSERT_OK(getReplCoord()->awaitReplication(&txn, time2, writeConcern).status);
+    }
+
+    TEST_F(ReplCoordTest, UpdatePositionWithConfigVersionAndMemberIdTest) {
+        OperationContextNoop txn;
+        assertStartSuccess(
+                BSON("_id" << "mySet" <<
+                     "version" << 2 <<
+                     "members" << BSON_ARRAY(BSON("host" << "node1:12345" << "_id" << 0) <<
+                                             BSON("host" << "node2:12345" << "_id" << 1) <<
+                                             BSON("host" << "node3:12345" << "_id" << 2))),
+                HostAndPort("node1", 12345));
+        ASSERT(getReplCoord()->setFollowerMode(MemberState::RS_SECONDARY));
+        getReplCoord()->setMyLastOptime(&txn, OpTime(100, 0));
+        simulateSuccessfulElection();
+
+        OpTime time1(100, 1);
+        OpTime time2(100, 2);
+        OpTime staleTime(10, 0);
+        getReplCoord()->setMyLastOptime(&txn, time1);
+
+        WriteConcernOptions writeConcern;
+        writeConcern.wTimeout = WriteConcernOptions::kNoWaiting;
+        writeConcern.wNumNodes = 1;
+
+        ASSERT_EQUALS(ErrorCodes::ExceededTimeLimit,
+                      getReplCoord()->awaitReplication(&txn, time2, writeConcern).status);
+
+        // receive updatePosition containing ourself, should not process the update for self
+        UpdatePositionArgs args;
+        ASSERT_OK(args.initialize(BSON("replSetUpdatePosition" << 1 <<
+                                       "optimes" << BSON_ARRAY(
+                                           BSON("cfgver" << 2 <<
+                                                "memberID" << 0 <<
+                                                "optime" << time2)))));
+
+        ASSERT_OK(getReplCoord()->processReplSetUpdatePosition(&txn, args));
+        ASSERT_EQUALS(ErrorCodes::ExceededTimeLimit,
+                      getReplCoord()->awaitReplication(&txn, time2, writeConcern).status);
+
+        // receive updatePosition with incorrect config version
+        UpdatePositionArgs args2;
+        ASSERT_OK(args2.initialize(BSON("replSetUpdatePosition" << 1 <<
+                                        "optimes" << BSON_ARRAY(
+                                            BSON("cfgver" << 3 <<
+                                                 "memberID" << 1 <<
+                                                 "optime" << time2)))));
+
+        ASSERT_EQUALS(ErrorCodes::InvalidReplicaSetConfig,
+                      getReplCoord()->processReplSetUpdatePosition(&txn, args2));
+        ASSERT_EQUALS(ErrorCodes::ExceededTimeLimit,
+                      getReplCoord()->awaitReplication(&txn, time2, writeConcern).status);
+
+        // receive updatePosition with nonexistent member id
+        UpdatePositionArgs args3;
+        ASSERT_OK(args3.initialize(BSON("replSetUpdatePosition" << 1 <<
+                                        "optimes" << BSON_ARRAY(
+                                            BSON("cfgver" << 2 <<
+                                                 "memberID" << 9 <<
+                                                 "optime" << time2)))));
+
+        ASSERT_EQUALS(ErrorCodes::NodeNotFound,
+                      getReplCoord()->processReplSetUpdatePosition(&txn, args3));
+        ASSERT_EQUALS(ErrorCodes::ExceededTimeLimit,
+                      getReplCoord()->awaitReplication(&txn, time2, writeConcern).status);
+
+        // receive a good update position
+        getReplCoord()->setMyLastOptime(&txn, time2);
+        UpdatePositionArgs args4;
+        ASSERT_OK(args4.initialize(BSON("replSetUpdatePosition" << 1 <<
+                                        "optimes" << BSON_ARRAY(
+                                            BSON("cfgver" << 2 <<
+                                                 "memberID" << 1 <<
+                                                 "optime" << time2) <<
+                                            BSON("cfgver" << 2 <<
+                                                 "memberID" << 2 <<
+                                                 "optime" << time2)))));
+
+        ASSERT_OK(getReplCoord()->processReplSetUpdatePosition(&txn, args4));
+        ASSERT_OK(getReplCoord()->awaitReplication(&txn, time2, writeConcern).status);
+
+        writeConcern.wNumNodes = 3;
+        ASSERT_OK(getReplCoord()->awaitReplication(&txn, time2, writeConcern).status);
+    }
+
     // TODO(schwerin): Unit test election id updating
 
 }  // namespace
