@@ -32,10 +32,7 @@
 
 #include "mongo/db/concurrency/d_concurrency.h"
 
-#include "mongo/db/curop.h"
 #include "mongo/db/concurrency/locker.h"
-#include "mongo/db/concurrency/lock_stat.h"
-#include "mongo/db/concurrency/lock_state.h"
 #include "mongo/db/global_environment_experiment.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/util/assert_util.h"

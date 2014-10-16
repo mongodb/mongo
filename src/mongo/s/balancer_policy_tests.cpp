@@ -70,9 +70,8 @@ namespace mongo {
             info["shard0"] = ShardInfo(0, 2, false);
             info["shard1"] = ShardInfo(0, 0, false);
 
-            MigrateInfo* c = NULL;
             DistributionStatus status(info, chunkMap.map());
-            c = BalancerPolicy::balance( "ns", status, 1 );
+            boost::scoped_ptr<MigrateInfo> c(BalancerPolicy::balance( "ns", status, 1 ));
             ASSERT( c );
         }
 
@@ -118,9 +117,8 @@ namespace mongo {
             info["shard0"] = ShardInfo(0, 2, false);
             info["shard1"] = ShardInfo(0, 0, false);
 
-            MigrateInfo* c = NULL;
             DistributionStatus status(info, chunkMap.map());
-            c = BalancerPolicy::balance( "ns", status, 1 );
+            boost::scoped_ptr<MigrateInfo> c(BalancerPolicy::balance( "ns", status, 1 ));
             ASSERT( c );
             ASSERT_EQUALS( 30, c->chunk.max["x"].numberInt() );
         }
@@ -151,7 +149,7 @@ namespace mongo {
             limitsMap["shard1"] = ShardInfo(0LL, 0LL, false);
 
             DistributionStatus status(limitsMap, chunkMap.map());
-            MigrateInfo* c = BalancerPolicy::balance( "ns", status, 0 );
+            boost::scoped_ptr<MigrateInfo> c(BalancerPolicy::balance( "ns", status, 0 ));
             ASSERT( c );
             ASSERT_EQUALS( c->to , "shard1" );
             ASSERT_EQUALS( c->from , "shard0" );
@@ -182,7 +180,7 @@ namespace mongo {
             limitsMap["shard1"] = ShardInfo(0, 0, true);
 
             DistributionStatus status(limitsMap, chunkMap.map());
-            MigrateInfo* c = BalancerPolicy::balance( "ns", status, 0 );
+            boost::scoped_ptr<MigrateInfo> c(BalancerPolicy::balance( "ns", status, 0 ));
             ASSERT( ! c );
         }
 
@@ -213,7 +211,7 @@ namespace mongo {
             limitsMap["shard2"] = ShardInfo(0, 1, true);
 
             DistributionStatus status(limitsMap, chunkMap.map());
-            MigrateInfo* c = BalancerPolicy::balance( "ns", status, 0 );
+            boost::scoped_ptr<MigrateInfo> c(BalancerPolicy::balance( "ns", status, 0 ));
             ASSERT( ! c );
         }
 
@@ -276,7 +274,7 @@ namespace mongo {
             shards["shard2"] = ShardInfo(0, 5, false);
             
             DistributionStatus d(shards, chunks.map());
-            MigrateInfo* m = BalancerPolicy::balance( "ns", d, 0 );
+            boost::scoped_ptr<MigrateInfo> m(BalancerPolicy::balance( "ns", d, 0 ));
             ASSERT( m );
             ASSERT_EQUALS( "shard2" , m->to );
         }
@@ -304,7 +302,7 @@ namespace mongo {
                 d.addTagRange( TagRange( BSON( "x" << -1 ), BSON( "x" << 7 ) , "a" ) );
                 d.addTagRange( TagRange( BSON( "x" << 7 ), BSON( "x" << 1000 ) , "b" ) );
                 
-                MigrateInfo* m = BalancerPolicy::balance( "ns", d, 0 );
+                boost::scoped_ptr<MigrateInfo> m(BalancerPolicy::balance( "ns", d, 0 ));
                 if ( ! m ) 
                     break;
 
@@ -315,7 +313,7 @@ namespace mongo {
                     ASSERT_EQUALS( "shard2" , m->to );
                 }
 
-                moveChunk( chunks, m );
+                moveChunk( chunks, m.get() );
             }
 
             ASSERT_EQUALS( 7U , chunks.mutableMap()["shard0"]->size() );
@@ -343,11 +341,11 @@ namespace mongo {
                 DistributionStatus d(shards, chunks.map());
                 d.addTagRange( TagRange( BSON( "x" << -1 ), BSON( "x" << 1000 ) , "a" ) );
                 
-                MigrateInfo* m = BalancerPolicy::balance( "ns", d, 0 );
+                boost::scoped_ptr<MigrateInfo> m(BalancerPolicy::balance( "ns", d, 0 ));
                 if ( ! m )
                     break;
 
-                moveChunk( chunks, m );
+                moveChunk( chunks, m.get() );
             }
             
             const size_t shard0Size = chunks.mutableMap()["shard0"]->size();
@@ -416,7 +414,7 @@ namespace mongo {
             shards["shard2"] = ShardInfo(0, 6, false);
 
             DistributionStatus d(shards, chunks.map());
-            MigrateInfo* m = BalancerPolicy::balance( "ns", d, 0 );
+            scoped_ptr<MigrateInfo> m(BalancerPolicy::balance( "ns", d, 0 ));
             ASSERT( m );
             ASSERT_EQUALS( "shard2" , m->from );
             ASSERT_EQUALS( "shard1" , m->to );
@@ -445,7 +443,7 @@ namespace mongo {
             shards["shard2"] = ShardInfo(0, 4, false);
 
             DistributionStatus d(shards, chunks.map());
-            MigrateInfo* m = BalancerPolicy::balance( "ns", d, 0 );
+            boost::scoped_ptr<MigrateInfo> m(BalancerPolicy::balance( "ns", d, 0 ));
             ASSERT( !m );
         }
 
@@ -512,14 +510,14 @@ namespace mongo {
                 for (int i = 0; i < numChunks; i++) {
 
                     DistributionStatus d(shards, chunks.map());
-                    MigrateInfo* m = BalancerPolicy::balance( "ns", d, i != 0 );
+                    boost::scoped_ptr<MigrateInfo> m(BalancerPolicy::balance( "ns", d, i != 0 ));
 
                     if (!m) {
                         log() << "Finished with test moves." << endl;
                         break;
                     }
 
-                    moveChunk(chunks, m);
+                    moveChunk(chunks, m.get());
 
                     {
                         ShardInfo& info = shards[m->from];

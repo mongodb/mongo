@@ -30,6 +30,8 @@
 
 #include "mongo/db/catalog/collection_options.h"
 
+#include "mongo/util/mongoutils/str.h"
+
 namespace mongo {
 
     // static
@@ -57,6 +59,7 @@ namespace mongo {
         flags = 0;
         flagsSet = false;
         temp = false;
+        storageEngine = BSONObj();
     }
 
     Status CollectionOptions::parse( const BSONObj& options ) {
@@ -118,6 +121,36 @@ namespace mongo {
             else if ( fieldName == "temp" ) {
                 temp = e.trueValue();
             }
+            else if (fieldName == "storageEngine") {
+                // Storage engine-specific collection options.
+                // Every field under "storageEngine" is an object.
+                // Format:
+                // {
+                //     ...
+                //     storageEngine: {
+                //         storageEngine1: {
+                //             ...
+                //         },
+                //         storageEngine2: {
+                //             ...
+                //         },
+                //     },
+                //     ...
+                // }
+                if (e.type() != mongo::Object) {
+                    return Status(ErrorCodes::BadValue, "storageEngine has to be an object");
+                }
+                BSONObjIterator j(e.Obj());
+                while (j.more()) {
+                    BSONElement storageEngineElement = j.next();
+                    if (storageEngineElement.type() != mongo::Object) {
+                        return Status(ErrorCodes::BadValue, str::stream()
+                             << "storageEngine." << storageEngineElement.fieldNameStringData()
+                             << " has to be an object");
+                    }
+                }
+                storageEngine = e.Obj().getOwned();
+            }
         }
 
         return Status::OK();
@@ -146,6 +179,10 @@ namespace mongo {
 
         if ( temp )
             b.appendBool( "temp", true );
+
+        if (!storageEngine.isEmpty()) {
+            b.append("storageEngine", storageEngine);
+        }
 
         return b.obj();
     }

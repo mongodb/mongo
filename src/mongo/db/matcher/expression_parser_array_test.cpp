@@ -48,6 +48,7 @@ namespace mongo {
         ASSERT( result.getValue()->matchesBSON( BSON( "x" << BSON_ARRAY( 1 << 2 ) ) ) );
         ASSERT( !result.getValue()->matchesBSON( BSON( "x" << BSON_ARRAY( 1  ) ) ) );
         ASSERT( !result.getValue()->matchesBSON( BSON( "x" << BSON_ARRAY( 1 << 2 << 3 ) ) ) );
+        delete result.getValue();
     }
 
     TEST( MatchExpressionParserArrayTest, SizeAsString ) {
@@ -59,6 +60,7 @@ namespace mongo {
         ASSERT( !result.getValue()->matchesBSON( BSON( "x" << BSON_ARRAY( 1 << 2 ) ) ) );
         ASSERT( result.getValue()->matchesBSON( BSON( "x" << BSONArray() ) ) );
         ASSERT( !result.getValue()->matchesBSON( BSON( "x" << BSON_ARRAY( 1 ) ) ) );
+        delete result.getValue();
     }
 
     TEST( MatchExpressionParserArrayTest, SizeWithDouble ) {
@@ -71,6 +73,7 @@ namespace mongo {
         ASSERT( !result.getValue()->matchesBSON( BSON( "x" << BSON_ARRAY( 1  ) ) ) );
         ASSERT( !result.getValue()->matchesBSON( BSON( "x" << BSONArray() ) ) );
         ASSERT( !result.getValue()->matchesBSON( BSON( "x" << BSON_ARRAY( 1 << 2 << 3 ) ) ) );
+        delete result.getValue();
     }
 
     TEST( MatchExpressionParserArrayTest, SizeBad ) {
@@ -91,6 +94,7 @@ namespace mongo {
         ASSERT( !result.getValue()->matchesBSON( BSON( "x" << BSON_ARRAY(  BSON( "x" << 1 ) ) ) ) );
         ASSERT( result.getValue()->matchesBSON( BSON( "x" <<
                                                   BSON_ARRAY( BSON( "x" << 1 << "y" << 2 ) ) ) ) );
+        delete result.getValue();
 
     }
 
@@ -106,6 +110,7 @@ namespace mongo {
         ASSERT( !result.getValue()->matchesBSON( BSON( "x" << BSON_ARRAY( BSON( "x" << 1 ) ) ) ) );
         ASSERT( result.getValue()->matchesBSON( BSON( "x" <<
                                                   BSON_ARRAY( BSON( "x" << 1 << "y" << 2 ) ) ) ) );
+        delete result.getValue();
 
     }
 
@@ -121,6 +126,7 @@ namespace mongo {
         ASSERT( !result.getValue()->matchesBSON( BSON( "x" << BSON_ARRAY( BSON( "x" << 1 ) ) ) ) );
         ASSERT( result.getValue()->matchesBSON( BSON( "x" <<
                                                   BSON_ARRAY( BSON( "x" << 2 << "y" << 2 ) ) ) ) );
+        delete result.getValue();
 
     }
 
@@ -136,6 +142,7 @@ namespace mongo {
         ASSERT( !result.getValue()->matchesBSON( BSON( "x" << BSON_ARRAY(  BSON( "x" << 1 ) ) ) ) );
         ASSERT( result.getValue()->matchesBSON( BSON( "x" <<
                                                   BSON_ARRAY( BSON( "x" << 1 << "y" << 2 ) ) ) ) );
+        delete result.getValue();
 
     }
 
@@ -147,6 +154,7 @@ namespace mongo {
         ASSERT( !result.getValue()->matchesBSON( BSON( "x" << 1 ) ) );
         ASSERT( !result.getValue()->matchesBSON( BSON( "x" << BSON_ARRAY( 4 ) ) ) );
         ASSERT( result.getValue()->matchesBSON( BSON( "x" << BSON_ARRAY( 6 ) ) ) );
+        delete result.getValue();
     }
 
     // with explicit $eq
@@ -163,6 +171,7 @@ namespace mongo {
         ASSERT( !result.getValue()->matchesBSON( BSON( "x" << match ) ) );
         ASSERT( !result.getValue()->matchesBSON( BSON( "x" << BSON_ARRAY( notMatch ) ) ) );
         ASSERT( result.getValue()->matchesBSON( BSON( "x" << BSON_ARRAY( match ) ) ) );
+        delete result.getValue();
     }
 
     TEST( MatchExpressionParserArrayTest, ElemMatchDBRef2 ) {
@@ -178,6 +187,7 @@ namespace mongo {
         ASSERT( !result.getValue()->matchesBSON( BSON( "x" << match ) ) );
         ASSERT( !result.getValue()->matchesBSON( BSON( "x" << BSON_ARRAY( notMatch ) ) ) );
         ASSERT( result.getValue()->matchesBSON( BSON( "x" << BSON_ARRAY( match ) ) ) );
+        delete result.getValue();
     }
 
     // Additional fields after $ref and $id.
@@ -198,6 +208,7 @@ namespace mongo {
         // Document contains fields not referred to in $elemMatch query.
         ASSERT( result.getValue()->matchesBSON( BSON( "x" << BSON_ARRAY(
                 BSON( "$ref" << "coll" << "$id" << oid << "foo" << 12345 << "bar" << 678 ) ) ) ) );
+        delete result.getValue();
     }
 
     // Query with DBRef fields out of order.
@@ -215,6 +226,7 @@ namespace mongo {
         ASSERT( !result.getValue()->matchesBSON( BSON( "x" << match ) ) );
         ASSERT( !result.getValue()->matchesBSON( BSON( "x" << BSON_ARRAY( notMatch ) ) ) );
         ASSERT( result.getValue()->matchesBSON( BSON( "x" << BSON_ARRAY( match ) ) ) );
+        delete result.getValue();
     }
 
     // Query with DBRef fields out of order.
@@ -237,6 +249,7 @@ namespace mongo {
         // Document contains fields not referred to in $elemMatch query.
         ASSERT( result.getValue()->matchesBSON( BSON( "x" << BSON_ARRAY(
                 BSON( "$ref" << "coll" << "$id" << oid << "foo" << 12345 << "bar" << 678 ) ) ) ) );
+        delete result.getValue();
     }
 
     // Incomplete DBRef - $id missing.
@@ -257,6 +270,7 @@ namespace mongo {
         // Document contains fields not referred to in $elemMatch query.
         ASSERT( result.getValue()->matchesBSON( BSON( "x" << BSON_ARRAY(
                 BSON( "$ref" << "coll" << "$id" << oid << "foo" << 12345 << "bar" << 678 ) ) ) ) );
+        delete result.getValue();
     }
 
     // Incomplete DBRef - $ref missing.
@@ -278,6 +292,7 @@ namespace mongo {
         // Document contains fields not referred to in $elemMatch query.
         ASSERT( result.getValue()->matchesBSON( BSON( "x" << BSON_ARRAY(
                 BSON( "$ref" << "coll" << "$id" << oid << "foo" << 12345 << "bar" << 678 ) ) ) ) );
+        delete result.getValue();
     }
 
     // Incomplete DBRef - $db only.
@@ -301,6 +316,7 @@ namespace mongo {
         ASSERT( result.getValue()->matchesBSON( BSON( "x" << BSON_ARRAY(
                 BSON( "$ref" << "coll" << "$id" << oid << "$db" << "db"
                    << "foo" << 12345 << "bar" << 678 ) ) ) ) );
+        delete result.getValue();
     }
 
     TEST( MatchExpressionParserArrayTest, All1 ) {
@@ -314,6 +330,7 @@ namespace mongo {
         ASSERT( result.getValue()->matchesBSON( BSON( "x" << BSON_ARRAY( 1 << 2 ) ) ) );
         ASSERT( result.getValue()->matchesBSON( BSON( "x" << BSON_ARRAY( 1 << 2 << 3 ) ) ) );
         ASSERT( !result.getValue()->matchesBSON( BSON( "x" << BSON_ARRAY( 2 << 3 ) ) ) );
+        delete result.getValue();
     }
 
     TEST( MatchExpressionParserArrayTest, AllNull ) {
@@ -325,6 +342,7 @@ namespace mongo {
         ASSERT( !result.getValue()->matchesBSON( BSON( "x" << BSON_ARRAY( 1 ) ) ) );
         ASSERT( result.getValue()->matchesBSON( BSON( "x" << BSONNULL ) ) );
         ASSERT( result.getValue()->matchesBSON( BSON( "x" << BSON_ARRAY( BSONNULL ) ) ) );
+        delete result.getValue();
     }
 
     TEST( MatchExpressionParserArrayTest, AllBadArg ) {
@@ -365,6 +383,7 @@ namespace mongo {
         ASSERT( !result.getValue()->matchesSingleElement( notMatchFirst[ "a" ] ) );
         ASSERT( !result.getValue()->matchesSingleElement( notMatchSecond[ "a" ] ) );
         ASSERT( result.getValue()->matchesSingleElement( matchesBoth[ "a" ] ) );
+        delete result.getValue();
     }
 
     TEST( MatchExpressionParserArrayTest, AllRegex2 ) {
@@ -383,6 +402,7 @@ namespace mongo {
 
         ASSERT( !result.getValue()->matchesSingleElement( notMatchFirst[ "a" ] ) );
         ASSERT( result.getValue()->matchesSingleElement( matchesBoth[ "a" ] ) );
+        delete result.getValue();
     }
 
     TEST( MatchExpressionParserArrayTest, AllNonArray ) {
@@ -394,6 +414,7 @@ namespace mongo {
         ASSERT( result.getValue()->matchesBSON( BSON( "x" << BSON_ARRAY( 5 ) ) ) );
         ASSERT( !result.getValue()->matchesBSON( BSON( "x" << 4 ) ) );
         ASSERT( !result.getValue()->matchesBSON( BSON( "x" << BSON_ARRAY( 4 ) ) ) );
+        delete result.getValue();
     }
 
 
@@ -408,6 +429,7 @@ namespace mongo {
         ASSERT( !result.getValue()->matchesBSON( BSON( "x" << BSON_ARRAY(  BSON( "x" << 1 ) ) ) ) );
         ASSERT( result.getValue()->matchesBSON( BSON( "x" <<
                                                   BSON_ARRAY( BSON( "x" << 1 << "y" << 2 ) ) ) ) );
+        delete result.getValue();
 
     }
 
@@ -457,6 +479,7 @@ namespace mongo {
                                                     BSON( "y" <<
                                                       BSON_ARRAY(
                                                         BSON( "x" << 1 << "z" << 1 ) ) ) ) ) ) );
+        delete result.getValue();
     }
 
     TEST( MatchExpressionParserArrayTest, AllElemMatchBad ) {
@@ -484,6 +507,7 @@ namespace mongo {
         ASSERT( result.getValue()->matchesBSON( BSON( "x" << "" ) ) );
         ASSERT( result.getValue()->matchesBSON( BSON( "x" << BSON_ARRAY( BSONNULL << "" ) ) ) );
         ASSERT( result.getValue()->matchesBSON( BSON( "x" << BSON_ARRAY( BSONObj() << "" ) ) ) );
+        delete result.getValue();
     }
 
     // $all with ISO date.
@@ -510,6 +534,7 @@ namespace mongo {
                                                                          match ) ) ) );
         ASSERT( result.getValue()->matchesBSON( BSON( "x" << BSON_ARRAY( BSONObj() <<
                                                                          match ) ) ) );
+        delete result.getValue();
     }
 
     // $all on array element with empty string.
@@ -527,6 +552,7 @@ namespace mongo {
         ASSERT( !result.getValue()->matchesBSON( BSON( "x" << "" ) ) );
         ASSERT( result.getValue()->matchesBSON( BSON( "x" << BSON_ARRAY( BSONNULL << "" ) ) ) );
         ASSERT( result.getValue()->matchesBSON( BSON( "x" << BSON_ARRAY( BSONObj() << "" ) ) ) );
+        delete result.getValue();
     }
 
     // $all on array element with ISO date.
@@ -557,6 +583,7 @@ namespace mongo {
                                                                          match ) ) ) );
         ASSERT( result.getValue()->matchesBSON( BSON( "x" << BSON_ARRAY( BSONObj() <<
                                                                          match ) ) ) );
+        delete result.getValue();
     }
 
 }

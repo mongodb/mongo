@@ -65,6 +65,8 @@ namespace mongo {
                 ASSERT_EQUALS( DiskLoc(), rIter->getNext() );
                 ASSERT( rIter->isEOF() );
                 ASSERT_EQUALS( DiskLoc(), rIter->curr() );
+
+                delete rIter;
             }
         }
     }
@@ -123,6 +125,8 @@ namespace mongo {
                 ASSERT_EQUALS( DiskLoc(), rIter->getNext() );
                 ASSERT( rIter->isEOF() );
                 ASSERT_EQUALS( DiskLoc(), rIter->curr() );
+
+                delete rIter;
             }
             ASSERT( remain.empty() );
         }

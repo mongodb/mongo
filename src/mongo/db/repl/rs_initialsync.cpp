@@ -306,8 +306,12 @@ namespace {
     void syncDoInitialSync() {
         static const int maxFailedAttempts = 10;
 
-        OperationContextImpl txn;
-        createOplog(&txn);
+        {
+            OperationContextImpl txn;
+            WriteUnitOfWork uow( &txn );
+            createOplog(&txn);
+            uow.commit();
+        }
 
         int failedAttempts = 0;
         while ( failedAttempts < maxFailedAttempts ) {

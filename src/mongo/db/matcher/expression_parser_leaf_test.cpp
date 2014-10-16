@@ -46,6 +46,7 @@ namespace mongo {
         BSONObj query = BSON( "x" << BSON( "$eq" << 2 ) );
         StatusWithMatchExpression result = MatchExpressionParser::parse( query );
         ASSERT_TRUE( result.isOK() );
+        boost::scoped_ptr<MatchExpression> destroy(result.getValue());
 
         ASSERT( !result.getValue()->matchesBSON( BSON( "x" << 1 ) ) );
         ASSERT( result.getValue()->matchesBSON( BSON( "x" << 2 ) ) );
@@ -62,6 +63,7 @@ namespace mongo {
         BSONObj query = BSON( "x" << BSON( "$gt" << 2 ) );
         StatusWithMatchExpression result = MatchExpressionParser::parse( query );
         ASSERT_TRUE( result.isOK() );
+        boost::scoped_ptr<MatchExpression> destroy(result.getValue());
 
         ASSERT( !result.getValue()->matchesBSON( BSON( "x" << 2 ) ) );
         ASSERT( result.getValue()->matchesBSON( BSON( "x" << 3 ) ) );
@@ -71,6 +73,7 @@ namespace mongo {
         BSONObj query = BSON( "x" << BSON( "$lt" << 2 ) );
         StatusWithMatchExpression result = MatchExpressionParser::parse( query );
         ASSERT_TRUE( result.isOK() );
+        boost::scoped_ptr<MatchExpression> destroy(result.getValue());
 
         ASSERT( result.getValue()->matchesBSON( BSON( "x" << 1 ) ) );
         ASSERT( !result.getValue()->matchesBSON( BSON( "x" << 2 ) ) );
@@ -81,6 +84,7 @@ namespace mongo {
         BSONObj query = BSON( "x" << BSON( "$gte" << 2 ) );
         StatusWithMatchExpression result = MatchExpressionParser::parse( query );
         ASSERT_TRUE( result.isOK() );
+        boost::scoped_ptr<MatchExpression> destroy(result.getValue());
 
         ASSERT( !result.getValue()->matchesBSON( BSON( "x" << 1 ) ) );
         ASSERT( result.getValue()->matchesBSON( BSON( "x" << 2 ) ) );
@@ -91,6 +95,7 @@ namespace mongo {
         BSONObj query = BSON( "x" << BSON( "$lte" << 2 ) );
         StatusWithMatchExpression result = MatchExpressionParser::parse( query );
         ASSERT_TRUE( result.isOK() );
+        boost::scoped_ptr<MatchExpression> destroy(result.getValue());
 
         ASSERT( result.getValue()->matchesBSON( BSON( "x" << 1 ) ) );
         ASSERT( result.getValue()->matchesBSON( BSON( "x" << 2 ) ) );
@@ -101,6 +106,7 @@ namespace mongo {
         BSONObj query = BSON( "x" << BSON( "$ne" << 2 ) );
         StatusWithMatchExpression result = MatchExpressionParser::parse( query );
         ASSERT_TRUE( result.isOK() );
+        boost::scoped_ptr<MatchExpression> destroy(result.getValue());
 
         ASSERT( result.getValue()->matchesBSON( BSON( "x" << 1 ) ) );
         ASSERT( !result.getValue()->matchesBSON( BSON( "x" << 2 ) ) );
@@ -111,6 +117,7 @@ namespace mongo {
         BSONObj query = BSON( "x" << BSON( "$mod" << BSON_ARRAY( 3 << 2 ) ) );
         StatusWithMatchExpression result = MatchExpressionParser::parse( query );
         ASSERT_TRUE( result.isOK() );
+        boost::scoped_ptr<MatchExpression> destroy1(result.getValue());
 
         query = BSON( "x" << BSON( "$mod" << BSON_ARRAY( 3 ) ) );
         result = MatchExpressionParser::parse( query );
@@ -137,6 +144,7 @@ namespace mongo {
         BSONObj query = BSON( "x" << BSON( "$mod" << BSON_ARRAY( 3 << 2 ) ) );
         StatusWithMatchExpression result = MatchExpressionParser::parse( query );
         ASSERT_TRUE( result.isOK() );
+        boost::scoped_ptr<MatchExpression> destroy(result.getValue());
 
         ASSERT( result.getValue()->matchesBSON( BSON( "x" << 5 ) ) );
         ASSERT( !result.getValue()->matchesBSON( BSON( "x" << 4 ) ) );
@@ -147,6 +155,7 @@ namespace mongo {
         BSONObj query = BSON( "x" << BSON( "$mod" << BSON_ARRAY( 2 << "r" ) ) );
         StatusWithMatchExpression result = MatchExpressionParser::parse( query );
         ASSERT_TRUE( result.isOK() );
+        boost::scoped_ptr<MatchExpression> destroy(result.getValue());
 
         ASSERT( result.getValue()->matchesBSON( BSON( "x" << 2 ) ) );
         ASSERT( result.getValue()->matchesBSON( BSON( "x" << 4 ) ) );
@@ -159,6 +168,7 @@ namespace mongo {
         BSONObj query = BSON( "x" << BSON( "$in" << BSON_ARRAY( 2 << 3 ) ) );
         StatusWithMatchExpression result = MatchExpressionParser::parse( query );
         ASSERT_TRUE( result.isOK() );
+        boost::scoped_ptr<MatchExpression> destroy(result.getValue());
 
         ASSERT( !result.getValue()->matchesBSON( BSON( "x" << 1 ) ) );
         ASSERT( result.getValue()->matchesBSON( BSON( "x" << 2 ) ) );
@@ -172,6 +182,7 @@ namespace mongo {
                 BSON( "$ref" << "coll" << "$id" << oid << "$db" << "db" ) ) ) );
         StatusWithMatchExpression result = MatchExpressionParser::parse( query );
         ASSERT_TRUE( result.isOK() );
+        boost::scoped_ptr<MatchExpression> destroy(result.getValue());
 
         OID oidx = OID::gen();
         ASSERT( !result.getValue()->matchesBSON(
@@ -208,6 +219,7 @@ namespace mongo {
             BSON( "$ref" << "coll" << "$id" << oid << "$db" << "db" ) ) ) );
         StatusWithMatchExpression result = MatchExpressionParser::parse( query );
         ASSERT_TRUE( result.isOK() );
+        boost::scoped_ptr<MatchExpression> destroy(result.getValue());
 
         OID oidx = OID::gen();
         ASSERT( !result.getValue()->matchesBSON(
@@ -270,6 +282,7 @@ namespace mongo {
                 BSON( "$ref" << "coll" << "$id" << oid << "foo" << 12345 ) ) ) );
         StatusWithMatchExpression result = MatchExpressionParser::parse( query );
         ASSERT_TRUE( result.isOK() );
+        boost::scoped_ptr<MatchExpression> destroy(result.getValue());
 
         OID oidx = OID::gen();
         ASSERT( !result.getValue()->matchesBSON(
@@ -368,6 +381,7 @@ namespace mongo {
         BSONObj query = BSON( "a" << operand.obj() );
         StatusWithMatchExpression result = MatchExpressionParser::parse( query );
         ASSERT_TRUE( result.isOK() );
+        boost::scoped_ptr<MatchExpression> destroy(result.getValue());
 
         BSONObj matchFirst = BSON( "a" << "ax" );
         BSONObj matchFirstRegex = BSONObjBuilder().appendRegex( "a", "^a", "" ).obj();
@@ -390,6 +404,7 @@ namespace mongo {
         BSONObj query = BSON( "x" << BSON( "$nin" << BSON_ARRAY( 2 << 3 ) ) );
         StatusWithMatchExpression result = MatchExpressionParser::parse( query );
         ASSERT_TRUE( result.isOK() );
+        boost::scoped_ptr<MatchExpression> destroy(result.getValue());
 
         ASSERT( result.getValue()->matchesBSON( BSON( "x" << 1 ) ) );
         ASSERT( !result.getValue()->matchesBSON( BSON( "x" << 2 ) ) );
@@ -409,6 +424,7 @@ namespace mongo {
         BSONObj query = b.obj();
         StatusWithMatchExpression result = MatchExpressionParser::parse( query );
         ASSERT_TRUE( result.isOK() );
+        boost::scoped_ptr<MatchExpression> destroy(result.getValue());
 
         ASSERT( result.getValue()->matchesBSON( BSON( "x" << "abc" ) ) );
         ASSERT( result.getValue()->matchesBSON( BSON( "x" << "ABC" ) ) );
@@ -419,6 +435,7 @@ namespace mongo {
         BSONObj query = BSON( "x" << BSON( "$regex" << "abc" << "$options" << "i" ) );
         StatusWithMatchExpression result = MatchExpressionParser::parse( query );
         ASSERT_TRUE( result.isOK() );
+        boost::scoped_ptr<MatchExpression> destroy(result.getValue());
 
         ASSERT( result.getValue()->matchesBSON( BSON( "x" << "abc" ) ) );
         ASSERT( result.getValue()->matchesBSON( BSON( "x" << "ABC" ) ) );
@@ -430,6 +447,7 @@ namespace mongo {
         StatusWithMatchExpression result = MatchExpressionParser::parse( query );
         log() << "result: " << result << endl;
         ASSERT_TRUE( result.isOK() );
+        boost::scoped_ptr<MatchExpression> destroy(result.getValue());
 
         ASSERT( result.getValue()->matchesBSON( BSON( "x" << "abc" ) ) );
         ASSERT( result.getValue()->matchesBSON( BSON( "x" << "ABC" ) ) );
@@ -466,6 +484,7 @@ namespace mongo {
         BSONObj query = BSON( "x" << b.obj() );
         StatusWithMatchExpression result = MatchExpressionParser::parse( query );
         ASSERT_TRUE( result.isOK() );
+        boost::scoped_ptr<MatchExpression> destroy(result.getValue());
 
         ASSERT( result.getValue()->matchesBSON( BSON( "x" << "abc" ) ) );
         ASSERT( !result.getValue()->matchesBSON( BSON( "y" << "AC" ) ) );
@@ -477,6 +496,7 @@ namespace mongo {
         BSONObj query = BSON( "x" << b.obj() );
         StatusWithMatchExpression result = MatchExpressionParser::parse( query );
         ASSERT_TRUE( result.isOK() );
+        boost::scoped_ptr<MatchExpression> destroy(result.getValue());
 
         ASSERT( !result.getValue()->matchesBSON( BSON( "x" << "abc" ) ) );
         ASSERT( result.getValue()->matchesBSON( BSON( "y" << "AC" ) ) );
@@ -486,6 +506,7 @@ namespace mongo {
         BSONObj query = BSON( "x" << BSON( "$type" << String ) );
         StatusWithMatchExpression result = MatchExpressionParser::parse( query );
         ASSERT_TRUE( result.isOK() );
+        boost::scoped_ptr<MatchExpression> destroy(result.getValue());
 
         ASSERT( result.getValue()->matchesBSON( BSON( "x" << "abc" ) ) );
         ASSERT( !result.getValue()->matchesBSON( BSON( "x" << 5 ) ) );
@@ -495,6 +516,7 @@ namespace mongo {
         BSONObj query = BSON( "x" << BSON( "$type" << (double)NumberDouble ) );
         StatusWithMatchExpression result = MatchExpressionParser::parse( query );
         ASSERT_TRUE( result.isOK() );
+        boost::scoped_ptr<MatchExpression> destroy(result.getValue());
 
         ASSERT( result.getValue()->matchesBSON( BSON( "x" << 5.3 ) ) );
         ASSERT( !result.getValue()->matchesBSON( BSON( "x" << 5 ) ) );
@@ -504,6 +526,7 @@ namespace mongo {
         BSONObj query = BSON( "x" << BSON( "$type" << 1.5 ) );
         StatusWithMatchExpression result = MatchExpressionParser::parse( query );
         ASSERT_TRUE( result.isOK() );
+        boost::scoped_ptr<MatchExpression> destroy(result.getValue());
 
         ASSERT( !result.getValue()->matchesBSON( BSON( "x" << 5.3 ) ) );
         ASSERT( !result.getValue()->matchesBSON( BSON( "x" << 5 ) ) );
@@ -513,6 +536,7 @@ namespace mongo {
         BSONObj query = BSON( "x" << BSON( "$type" << jstNULL ) );
         StatusWithMatchExpression result = MatchExpressionParser::parse( query );
         ASSERT_TRUE( result.isOK() );
+        boost::scoped_ptr<MatchExpression> destroy(result.getValue());
 
         ASSERT( !result.getValue()->matchesBSON( BSONObj() ) );
         ASSERT( !result.getValue()->matchesBSON( BSON( "x" << 5 ) ) );
@@ -527,6 +551,7 @@ namespace mongo {
         BSONObj query = BSON( "x" << b.obj() );
         StatusWithMatchExpression result = MatchExpressionParser::parse( query );
         ASSERT_TRUE( result.isOK() );
+        boost::scoped_ptr<MatchExpression> destroy(result.getValue());
 
         ASSERT( !result.getValue()->matchesBSON( BSON( "x" << 5.3 ) ) );
         ASSERT( !result.getValue()->matchesBSON( BSON( "x" << 5 ) ) );

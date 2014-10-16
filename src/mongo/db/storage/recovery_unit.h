@@ -35,6 +35,8 @@
 
 namespace mongo {
 
+    class BSONObjBuilder;
+
     /**
      * A RecoveryUnit is responsible for ensuring that data is persisted.
      * All on-disk information must be mutated through this interface.
@@ -43,6 +45,8 @@ namespace mongo {
         MONGO_DISALLOW_COPYING(RecoveryUnit);
     public:
         virtual ~RecoveryUnit() { }
+
+        virtual void reportState( BSONObjBuilder* b ) const { }
 
         /**
          * These should be called through WriteUnitOfWork rather than directly.

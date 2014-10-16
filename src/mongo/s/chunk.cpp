@@ -1682,25 +1682,29 @@ namespace mongo {
         BSONObjBuilder cmdBuilder;
         cmdBuilder.append( "setShardVersion" , ns.c_str() );
         cmdBuilder.append( "configdb" , configServer.modelServer() );
-        version.addToBSON( cmdBuilder );
-        cmdBuilder.appendOID( "serverID" , &serverID );
-        if ( authoritative )
-            cmdBuilder.appendBool( "authoritative" , 1 );
 
-        Shard s = Shard::make( conn.getServerAddress() );
-        cmdBuilder.append( "shard" , s.getName() );
-        cmdBuilder.append( "shardHost" , s.getConnString() );
+        Shard s = Shard::make(conn.getServerAddress());
+        cmdBuilder.append("shard", s.getName());
+        cmdBuilder.append("shardHost", s.getConnString());
+
+        cmdBuilder.appendOID("serverID", &serverID);
+
+        if (ns.size() > 0) {
+            version.addToBSON(cmdBuilder);
+        }
+        else {
+            cmdBuilder.append("init", true);
+        }
+
+        if (authoritative)
+            cmdBuilder.appendBool("authoritative", 1);
+
         BSONObj cmd = cmdBuilder.obj();
 
-        LOG(1).stream()
-               << "    setShardVersion  " << s.getName()
-               << " " << conn.getServerAddress()
-               << "  " << ns
-               << "  " << cmd
-               << " " << &conn
-               << (manager.get() ? string(str::stream() << " " << manager->getSequenceNumber()) :
-                                   "")
-               << endl;
+        LOG(1) << "    setShardVersion  " << s.getName() << " " << conn.getServerAddress()
+               << "  " << ns << "  " << cmd
+               << (manager.get() ?
+                   string(str::stream() << " " << manager->getSequenceNumber()) : "");
 
         return conn.runCommand("admin", cmd, result, 0);
     }

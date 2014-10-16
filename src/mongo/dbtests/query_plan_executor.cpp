@@ -88,16 +88,14 @@ namespace QueryPlanExecutor {
             csparams.collection = coll;
             csparams.direction = CollectionScanParams::FORWARD;
             auto_ptr<WorkingSet> ws(new WorkingSet());
-            // Parse the filter.
-            StatusWithMatchExpression swme = MatchExpressionParser::parse(filterObj);
-            verify(swme.isOK());
-            auto_ptr<MatchExpression> filter(swme.getValue());
-            // Make the stage.
-            auto_ptr<PlanStage> root(new CollectionScan(&_txn, csparams, ws.get(), filter.release()));
 
+            // Canonicalize the query
             CanonicalQuery* cq;
             verify(CanonicalQuery::canonicalize(ns(), filterObj, &cq).isOK());
             verify(NULL != cq);
+
+            // Make the stage.
+            auto_ptr<PlanStage> root(new CollectionScan(&_txn, csparams, ws.get(), cq->root()));
 
             // Hand the plan off to the executor.
             PlanExecutor* exec = new PlanExecutor(&_txn, ws.release(), root.release(), cq, coll);

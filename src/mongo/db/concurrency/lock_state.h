@@ -30,9 +30,8 @@
 
 #include <queue>
 
+#include "mongo/db/concurrency/fast_map_noalloc.h"
 #include "mongo/db/concurrency/locker.h"
-#include "mongo/platform/unordered_map.h"
-
 
 namespace mongo {
 
@@ -120,18 +119,14 @@ namespace mongo {
 
     private:
 
-        typedef unordered_map<ResourceId, LockRequest*> LockRequestsMap;
-        typedef LockRequestsMap::value_type LockRequestsPair;
+        typedef FastMapNoAlloc<ResourceId, LockRequest, 16> LockRequestsMap;
+
 
         /**
-         * Shortcut to do the lookup in _requests. Must be called with the spinlock acquired.
+         * The main functionality of the unlock method, except accepts iterator in order to avoid
+         * additional lookups during unlockAll.
          */
-        LockRequest* _find(const ResourceId& resId) const;
-
-        /**
-         * Removes the specified lock request from the resources list and deallocates it.
-         */
-        void _freeRequest(const ResourceId& resId, LockRequest* request);
+        bool _unlockImpl(LockRequestsMap::Iterator& it);
 
         /**
          * Temporarily yields the flush lock, if not in a write unit of work so that the commit
@@ -141,6 +136,7 @@ namespace mongo {
         void _yieldFlushLockForMMAPV1();
 
 
+        // Used to disambiguate different lockers
         const uint64_t _id;
 
         // The only reason we have this spin lock here is for the diagnostic tools, which could
@@ -151,10 +147,14 @@ namespace mongo {
         mutable SpinLock _lock;
         LockRequestsMap _requests;
 
+        // Reuse the notification object across requests so we don't have to create a new mutex
+        // and condition variable every time.
         CondVarLockGrantNotification _notify;
 
+        // Delays release of exclusive/intent-exclusive locked resources until the write unit of
+        // work completes. Value of 0 means we are not inside a write unit of work.
+        int _wuowNestingLevel;
         std::queue<ResourceId> _resourcesToUnlockAtEndOfUnitOfWork;
-        int _wuowNestingLevel; // if > 0 we are inside of a WriteUnitOfWork
 
 
         //////////////////////////////////////////////////////////////////////////////////////////
