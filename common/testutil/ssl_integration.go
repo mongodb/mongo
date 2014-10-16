@@ -11,9 +11,9 @@ func GetSSLOptions() commonOpts.SSL {
 			SSLCAFile:     "../common/db/openssl/testdata/ca.pem",
 			SSLPEMKeyFile: "../common/db/openssl/testdata/server.pem",
 		}
-	} else {
-		return commonOpts.SSL{
-			UseSSL: false,
-		}
+	}
+
+	return commonOpts.SSL{
+		UseSSL: false,
 	}
 }
