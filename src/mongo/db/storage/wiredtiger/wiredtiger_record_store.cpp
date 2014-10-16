@@ -182,8 +182,10 @@ namespace mongo {
         invariant( c );
         c->set_key(c, _makeKey(loc));
         int ret = c->search(c);
+        massert( 28534,
+                 "Didn't find DiskLoc in WiredTigerRecordStore",
+                 ret != WT_NOTFOUND );
         invariantWTOK(ret);
-
         return _getData(curwrap);
     }
 
@@ -338,7 +340,7 @@ namespace mongo {
         c->set_key(c, _makeKey(loc));
         WiredTigerItem value(data, len);
         c->set_value(c, value.Get());
-        ret = c->insert(c);
+        ret = c->update(c);
         invariantWTOK(ret);
 
         _increaseDataSize(txn, len - old_length);
@@ -377,7 +379,7 @@ namespace mongo {
         // write back
         WiredTigerItem value(data);
         c->set_value(c, value.Get());
-        ret = c->insert(c);
+        ret = c->update(c);
         invariantWTOK(ret);
 
         return Status::OK();

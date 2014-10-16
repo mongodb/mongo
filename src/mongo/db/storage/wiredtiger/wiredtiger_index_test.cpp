@@ -57,7 +57,7 @@ namespace mongo {
             _conn->close(_conn, NULL);
         }
 
-        virtual SortedDataInterface* newSortedDataInterface() {
+        virtual SortedDataInterface* newSortedDataInterface( bool unique ) {
             std::string ns = "test.wt";
             OperationContextNoop txn( newRecoveryUnit() );
 
@@ -70,7 +70,9 @@ namespace mongo {
             string uri = "table:" + ns;
             invariantWTOK( WiredTigerIndex::Create( &txn, uri, "", &desc ) );
 
-            return new WiredTigerIndex( uri );
+            if ( unique )
+                return new WiredTigerIndexUnique( uri );
+            return new WiredTigerIndexStandard( uri );
         }
 
         virtual RecoveryUnit* newRecoveryUnit() {

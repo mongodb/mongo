@@ -11,7 +11,7 @@ namespace mongo {
 
     WiredTigerSession::WiredTigerSession( WT_CONNECTION* conn ) {
         _session = NULL;
-        int ret = conn->open_session(conn, NULL, "isolation=read-committed", &_session);
+        int ret = conn->open_session(conn, NULL, "isolation=snapshot", &_session);
         invariantWTOK(ret);
     }
 
@@ -33,7 +33,7 @@ namespace mongo {
             }
         }
         WT_CURSOR* c = NULL;
-        int ret = _session->open_cursor(_session, uri.c_str(), NULL, NULL, &c);
+        int ret = _session->open_cursor(_session, uri.c_str(), NULL, "overwrite=false", &c);
         if (ret != ENOENT) invariantWTOK(ret);
         return c;
     }
