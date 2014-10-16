@@ -19,7 +19,11 @@ type OutputOptions struct {
 	NoIndexRestore   bool `long:"noIndexRestore" description:"Don't restore indexes"`
 	NoOptionsRestore bool `long:"noOptionsRestore" description:"Don't restore options"`
 	KeepIndexVersion bool `long:"keepIndexVersion" description:"Don't update index version"`
-	JobThreads       int  `long:"jobThreads" short:"j" description:"TODO"`
+
+	JobThreads       int  `long:"numProcessingThreads" short:"j" description:"Number of collections to restore in parallel"`
+	BulkWriters      int  `long:"numIngestionThreads" description:"Number of insert connections per collection"`
+	BulkBufferSize   int  `long:"batchSize" description:"Buffer size, in bytes, of each bulk buffer"`
+	PreserveDocOrder bool `long:"preserveOrder" description:"Preserve order of documents during restoration"`
 }
 
 func (self *OutputOptions) Name() string {
