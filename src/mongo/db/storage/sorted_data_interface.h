@@ -79,7 +79,8 @@ namespace mongo {
 
         virtual bool unindex(OperationContext* txn,
                              const BSONObj& key,
-                             const DiskLoc& loc) = 0;
+                             const DiskLoc& loc,
+                             bool dupsAllowed) = 0;
 
         // TODO: Hide this by exposing an update method?
         virtual Status dupKeyCheck(OperationContext* txn,

@@ -38,7 +38,7 @@ namespace mongo {
     // Add a key using a bulk builder.
     TEST( SortedDataInterface, BuilderAddKey ) {
         scoped_ptr<HarnessHelper> harnessHelper( newHarnessHelper() );
-        scoped_ptr<SortedDataInterface> sorted( harnessHelper->newSortedDataInterface() );
+        scoped_ptr<SortedDataInterface> sorted( harnessHelper->newSortedDataInterface( false ) );
 
         {
             scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
@@ -48,7 +48,7 @@ namespace mongo {
         {
             scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
             scoped_ptr<SortedDataBuilderInterface> builder(
-                    sorted->getBulkBuilder( opCtx.get(), false ) );
+                    sorted->getBulkBuilder( opCtx.get(), true ) );
 
             ASSERT_OK( builder->addKey( key1, loc1 ) );
             builder->commit( false );
@@ -63,7 +63,7 @@ namespace mongo {
     // Add a compound key using a bulk builder.
     TEST( SortedDataInterface, BuilderAddCompoundKey ) {
         scoped_ptr<HarnessHelper> harnessHelper( newHarnessHelper() );
-        scoped_ptr<SortedDataInterface> sorted( harnessHelper->newSortedDataInterface() );
+        scoped_ptr<SortedDataInterface> sorted( harnessHelper->newSortedDataInterface( false ) );
 
         {
             scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
@@ -73,7 +73,7 @@ namespace mongo {
         {
             scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
             scoped_ptr<SortedDataBuilderInterface> builder(
-                    sorted->getBulkBuilder( opCtx.get(), false ) );
+                    sorted->getBulkBuilder( opCtx.get(), true ) );
 
             ASSERT_OK( builder->addKey( compoundKey1a, loc1 ) );
             builder->commit( false );
@@ -90,7 +90,7 @@ namespace mongo {
     // not allowed.
     TEST( SortedDataInterface, BuilderAddSameKey ) {
         scoped_ptr<HarnessHelper> harnessHelper( newHarnessHelper() );
-        scoped_ptr<SortedDataInterface> sorted( harnessHelper->newSortedDataInterface() );
+        scoped_ptr<SortedDataInterface> sorted( harnessHelper->newSortedDataInterface( true ) );
 
         {
             scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
@@ -117,7 +117,7 @@ namespace mongo {
     // the returned status is OK when duplicates are allowed.
     TEST( SortedDataInterface, BuilderAddSameKeyWithDupsAllowed ) {
         scoped_ptr<HarnessHelper> harnessHelper( newHarnessHelper() );
-        scoped_ptr<SortedDataInterface> sorted( harnessHelper->newSortedDataInterface() );
+        scoped_ptr<SortedDataInterface> sorted( harnessHelper->newSortedDataInterface( false ) );
 
         {
             scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
@@ -143,7 +143,7 @@ namespace mongo {
     // Add multiple keys using a bulk builder.
     TEST( SortedDataInterface, BuilderAddMultipleKeys ) {
         scoped_ptr<HarnessHelper> harnessHelper( newHarnessHelper() );
-        scoped_ptr<SortedDataInterface> sorted( harnessHelper->newSortedDataInterface() );
+        scoped_ptr<SortedDataInterface> sorted( harnessHelper->newSortedDataInterface( false ) );
 
         {
             scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
@@ -153,7 +153,7 @@ namespace mongo {
         {
             scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
             scoped_ptr<SortedDataBuilderInterface> builder(
-                    sorted->getBulkBuilder( opCtx.get(), false ) );
+                    sorted->getBulkBuilder( opCtx.get(), true ) );
 
             ASSERT_OK( builder->addKey( key1, loc1 ) );
             ASSERT_OK( builder->addKey( key2, loc2 ) );
@@ -170,7 +170,7 @@ namespace mongo {
     // Add multiple compound keys using a bulk builder.
     TEST( SortedDataInterface, BuilderAddMultipleCompoundKeys ) {
         scoped_ptr<HarnessHelper> harnessHelper( newHarnessHelper() );
-        scoped_ptr<SortedDataInterface> sorted( harnessHelper->newSortedDataInterface() );
+        scoped_ptr<SortedDataInterface> sorted( harnessHelper->newSortedDataInterface( false ) );
 
         {
             scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
@@ -180,7 +180,7 @@ namespace mongo {
         {
             scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
             scoped_ptr<SortedDataBuilderInterface> builder(
-                    sorted->getBulkBuilder( opCtx.get(), false ) );
+                    sorted->getBulkBuilder( opCtx.get(), true ) );
 
             ASSERT_OK( builder->addKey( compoundKey1a, loc1 ) );
             ASSERT_OK( builder->addKey( compoundKey1b, loc2 ) );
