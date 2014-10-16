@@ -35,6 +35,7 @@
 #include "mongo/db/concurrency/locker.h"
 #include "mongo/db/global_environment_experiment.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/server_parameters.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
@@ -47,6 +48,9 @@
 // yielding
 
 namespace mongo {
+
+    //  SERVER-14668: Remove or invert sense once MMAPv1 CLL can be default
+    MONGO_EXPORT_STARTUP_SERVER_PARAMETER(enableCollectionLocking, bool, false);
 
     DBTryLockTimeoutException::DBTryLockTimeoutException() {}
     DBTryLockTimeoutException::~DBTryLockTimeoutException() throw() { }
@@ -224,8 +228,7 @@ namespace mongo {
         const bool isRead = (_mode == MODE_S || _mode == MODE_IS);
 
         _lockState->lockGlobal(isRead ? MODE_IS : MODE_IX);
-        if (supportsDocLocking()) {
-            //  SERVER-14668: Make this branch unconditional when MMAPv1 has coll. locking
+        if (supportsDocLocking() || enableCollectionLocking) {
             _lockState->lock(_id, _mode);
         }
         else {
@@ -257,15 +260,13 @@ namespace mongo {
                                               isRead ? MODE_IS : MODE_IX));
         if (supportsDocLocking()) {
             _lockState->lock(_id, mode);
-            // SERVER-14668: add when MMAPv1 ready for collection-level locking
-            // else { _lockState->lock(_id, isRead ? MODE_S : MODE_X); }
-            invariant(isRead || !isRead); // artificial use to silence warning.
+        } else if (enableCollectionLocking) {
+            _lockState->lock(_id, isRead ? MODE_S : MODE_X);
         }
     }
 
     Lock::CollectionLock::~CollectionLock() {
-        if (supportsDocLocking()) {
-            // SERVER-14668: Make unconditional when MMAPv1 has collection-level locking
+        if (supportsDocLocking() || enableCollectionLocking) {
             _lockState->unlock(_id);
         }
     }
