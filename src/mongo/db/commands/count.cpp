@@ -94,7 +94,8 @@ namespace mongo {
 
             scoped_ptr<PlanExecutor> exec(rawExec);
 
-            return Explain::explainStages(exec.get(), verbosity, out);
+            Explain::explainStages(exec.get(), verbosity, out);
+            return Status::OK();
         }
 
         virtual bool run(OperationContext* txn,

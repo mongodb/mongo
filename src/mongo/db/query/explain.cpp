@@ -554,9 +554,9 @@ namespace mongo {
     }
 
     // static
-    Status Explain::explainStages(PlanExecutor* exec,
-                                  ExplainCommon::Verbosity verbosity,
-                                  BSONObjBuilder* out) {
+    void Explain::explainStages(PlanExecutor* exec,
+                                ExplainCommon::Verbosity verbosity,
+                                BSONObjBuilder* out) {
         //
         // Step 1: run the stages as required by the verbosity level.
         //
@@ -573,11 +573,9 @@ namespace mongo {
         }
 
         // If we need execution stats, then run the plan in order to gather the stats.
+        Status executePlanStatus = Status::OK();
         if (verbosity >= ExplainCommon::EXEC_STATS) {
-            Status s = exec->executePlan();
-            if (!s.isOK()) {
-                return s;
-            }
+            executePlanStatus = exec->executePlan();
         }
 
         //
@@ -604,6 +602,14 @@ namespace mongo {
 
         if (verbosity >= ExplainCommon::EXEC_STATS) {
             BSONObjBuilder execBob(out->subobjStart("executionStats"));
+
+            // If there is an execution error while running the query, the error is reported under
+            // the "executionStats" section and the explain as a whole succeeds.
+            execBob.append("executionSuccess", executePlanStatus.isOK());
+            if (!executePlanStatus.isOK()) {
+                execBob.append("errorMessage", executePlanStatus.reason());
+                execBob.append("errorCode", executePlanStatus.code());
+            }
 
             // Generate exec stats BSON for the winning plan.
             OperationContext* opCtx = exec->getOpCtx();
@@ -635,8 +641,6 @@ namespace mongo {
         }
 
         generateServerInfo(out);
-
-        return Status::OK();
     }
 
     // static

@@ -158,7 +158,6 @@ namespace mongo {
 
         // Get planner-level explain info from the underlying PlanExecutor.
         BSONObjBuilder explainBuilder;
-        Status explainStatus(ErrorCodes::InternalError, "");
         {
             const NamespaceString nss(_ns);
             AutoGetCollectionForRead autoColl(pExpCtx->opCtx, nss);
@@ -166,9 +165,7 @@ namespace mongo {
             massert(17392, "No _exec. Were we disposed before explained?", _exec);
 
             _exec->restoreState(pExpCtx->opCtx);
-            explainStatus = Explain::explainStages(_exec.get(),
-                                                   ExplainCommon::QUERY_PLANNER,
-                                                   &explainBuilder);
+            Explain::explainStages(_exec.get(), ExplainCommon::QUERY_PLANNER, &explainBuilder);
             _exec->saveState();
         }
 
@@ -185,14 +182,9 @@ namespace mongo {
             out["fields"] = Value(_projection);
 
         // Add explain results from the query system into the agg explain output.
-        if (explainStatus.isOK()) {
-            BSONObj explainObj = explainBuilder.obj();
-            invariant(explainObj.hasField("queryPlanner"));
-            out["queryPlanner"] = Value(explainObj["queryPlanner"]);
-        }
-        else {
-            out["planError"] = Value(explainStatus.toString());
-        }
+        BSONObj explainObj = explainBuilder.obj();
+        invariant(explainObj.hasField("queryPlanner"));
+        out["queryPlanner"] = Value(explainObj["queryPlanner"]);
 
         return Value(DOC(getSourceName() << out.freezeToValue()));
     }
