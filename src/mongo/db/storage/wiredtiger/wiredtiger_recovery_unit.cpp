@@ -31,6 +31,7 @@
 
 #define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kStorage
 
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_recovery_unit.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_session_cache.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_util.h"
@@ -55,10 +56,19 @@ namespace mongo {
         }
     }
 
+    void WiredTigerRecoveryUnit::reportState( BSONObjBuilder* b ) const {
+        b->append( "wt_depth", _depth );
+        b->append( "wt_active", _active );
+        b->append( "wt_everStartedWrite", _everStartedWrite );
+        if ( _active )
+            b->append( "wt_millisSinceCommit", _timer.millis() );
+    }
+
     void WiredTigerRecoveryUnit::_commit() {
         if ( _session && _active ) {
             WT_SESSION *s = _session->getSession();
             int ret = s->commit_transaction(s, NULL);
+            LOG(2) << "WT commit";
             invariantWTOK(ret);
             _active = false;
         }
@@ -127,6 +137,8 @@ namespace mongo {
             int ret = s->begin_transaction(s, NULL);
             invariantWTOK(ret);
             _active = true;
+            _timer.reset();
+            LOG(2) << "WT begin_transaction";
         }
         return _session;
     }
@@ -138,7 +150,10 @@ namespace mongo {
 
         WT_SESSION *s = _session->getSession();
         invariantWTOK( s->commit_transaction(s, NULL) );
+        LOG(2) << "WT commit";
         invariantWTOK( s->begin_transaction(s, NULL) );
+        LOG(2) << "WT begin_transaction";
+        _timer.reset();
     }
 
     // ---------------------
