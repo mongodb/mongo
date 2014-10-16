@@ -34,24 +34,31 @@ typedef struct {
 static int
 __curextract_insert(WT_CURSOR *cursor) {
 	WT_CURSOR_EXTRACTOR *cextract;
-	WT_ITEM *key, *ikey, pkey;
+	WT_ITEM *key, ikey, pkey;
 	WT_SESSION_IMPL *session;
 
 	cextract = (WT_CURSOR_EXTRACTOR *)cursor;
 	session = (WT_SESSION_IMPL *)cursor->session;
 
-	ikey = &cursor->key;
+	WT_ITEM_SET(ikey, cursor->key);
+	/*
+	 * We appended a padding byte to the key to avoid rewriting the last
+	 * column.  Strip that away here.
+	 */
+	WT_ASSERT(session, ikey.size > 0);
+	--ikey.size;
 	WT_RET(__wt_cursor_get_raw_key(cextract->ctable->cg_cursors[0], &pkey));
 
 	/*
 	 * TODO properly append primary key columns to the index key, taking
-	 * the index key format into account.
+	 * into account cases where the generated key already includes primary
+	 * key columns.
 	 */
 	key = &cextract->idxc->key;
-	WT_RET(__wt_buf_grow(session, key, ikey->size + pkey.size));
-	memcpy((uint8_t *)key->mem, ikey->data, ikey->size);
-	memcpy((uint8_t *)key->mem + ikey->size, pkey.data, pkey.size);
-	key->size = ikey->size + pkey.size;
+	WT_RET(__wt_buf_grow(session, key, ikey.size + pkey.size));
+	memcpy((uint8_t *)key->mem, ikey.data, ikey.size);
+	memcpy((uint8_t *)key->mem + ikey.size, pkey.data, pkey.size);
+	key->size = ikey.size + pkey.size;
 
 	F_SET(cextract->idxc, WT_CURSTD_KEY_EXT | WT_CURSTD_VALUE_EXT);
 
