@@ -118,7 +118,7 @@ namespace {
 
 
         invariant(_rsConfig.getMemberAt(_thisMembersConfigIndex).isElectable());
-        OpTime lastOpTimeApplied(_getLastOpApplied_inlock());
+        OpTime lastOpTimeApplied(_getMyLastOptime_inlock());
 
         if (lastOpTimeApplied == OpTime()) {
             log() << "replSet info not trying to elect self, "

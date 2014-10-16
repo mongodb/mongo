@@ -122,7 +122,7 @@ namespace {
         const bool isUnauthorized = (responseStatus.code() == ErrorCodes::Unauthorized) ||
                                     (responseStatus.code() == ErrorCodes::AuthenticationFailed);
         const Date_t now = _replExecutor.now();
-        const OpTime lastApplied = _getLastOpApplied();  // Locks and unlocks _mutex.
+        const OpTime lastApplied = getMyLastOptime();  // Locks and unlocks _mutex.
         Milliseconds networkTime(0);
         StatusWith<ReplSetHeartbeatResponse> hbStatusResponse(hbResponse);
 
@@ -171,21 +171,22 @@ namespace {
 
     void ReplicationCoordinatorImpl::_updateOpTimeFromHeartbeat(const HostAndPort& target, 
                                                                 OpTime optime) {
-
+        // TODO(spencer) pass in member ID rather than looking up by HostAndPort
         boost::unique_lock<boost::mutex> lk(_mutex);
+        invariant(_thisMembersConfigIndex != -1);
+
         const MemberConfig* targetMember = _rsConfig.findMemberByHostAndPort(target);
         if (!targetMember) {
             return;
         }
         int targetId = targetMember->getId();
-        // Find targetId in map
-        for (SlaveInfoMap::const_iterator it = _slaveInfoMap.begin();
-             it != _slaveInfoMap.end(); ++it) {
-            const OID& rid = it->first;
-            const SlaveInfo& slaveInfo = it->second;
-            if (slaveInfo.memberID == targetId) {
-                const UpdatePositionArgs::UpdateInfo update(rid, optime, -1, -1);
-                Status status = _setLastOptime_inlock(&lk, update);
+
+        for (SlaveInfoVector::const_iterator it = _slaveInfo.begin();
+                it != _slaveInfo.end(); ++it) {
+            if (it->memberID == targetId) {
+                const UpdatePositionArgs::UpdateInfo update(
+                        it->rid, optime, _rsConfig.getConfigVersion(), targetId);
+                Status status = _setLastOptime_inlock(update);
                 if (!status.isOK()) {
                     LOG(1) << "Could not update optime from node " << target.toString() <<
                         ": " << status;
@@ -193,6 +194,7 @@ namespace {
                 return;
             }
         }
+        invariant(false); // If we found the member in the config it must be in _slaveInfo.
     }
 
     void ReplicationCoordinatorImpl::_handleHeartbeatResponseAction(

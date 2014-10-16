@@ -294,13 +294,54 @@ namespace repl {
             OpTime opTime; // Our last known OpTime that this slave has replicated to.
             HostAndPort hostAndPort; // Client address of the slave.
             int memberID; // ID of the node in the replica set config, or -1 if we're not a replSet.
-            SlaveInfo() : memberID(-1) {}
+            OID rid; // RID of the node.
+            bool self; // Whether this SlaveInfo stores the information about ourself
+            SlaveInfo() : memberID(-1), self(false) {}
         };
 
-        // Map of node RIDs to their SlaveInfo.
-        typedef unordered_map<OID, SlaveInfo, OID::Hasher> SlaveInfoMap;
+        typedef std::vector<SlaveInfo> SlaveInfoVector;
 
         typedef std::vector<ReplicationExecutor::CallbackHandle> HeartbeatHandles;
+
+        /**
+         * Looks up the SlaveInfo in _slaveInfo associated with the given RID and returns a pointer
+         * to it, or returns NULL if there is no SlaveInfo with the given RID.
+         */
+        SlaveInfo* _findSlaveInfoByRID_inlock(const OID& rid);
+
+        /**
+         * Looks up the SlaveInfo in _slaveInfo associated with the given member ID and returns a
+         * pointer to it, or returns NULL if there is no SlaveInfo with the given member ID.
+         */
+        SlaveInfo* _findSlaveInfoByMemberID_inlock(int memberID);
+
+        /**
+         * Adds the given SlaveInfo to _slaveInfo and wakes up any threads waiting for replication
+         * that now have their write concern satisfied.  Only valid to call in master/slave setups.
+         */
+        void _addSlaveInfo_inlock(const SlaveInfo& slaveInfo);
+
+        /**
+         * Updates the item in _slaveInfo pointed to by 'slaveInfo' with the given OpTime 'ts'
+         * and wakes up any threads waiting for replication that now have their write concern
+         * satisfied.
+         */
+        void _updateSlaveInfoOptime_inlock(SlaveInfo* slaveInfo, OpTime ts);
+
+        /**
+         * Returns the index into _slaveInfo where data corresponding to ourself is stored.
+         * For more info on the rules about how we know where our entry is, see the comment for
+         * _slaveInfo.
+         */
+        size_t _getMyIndexInSlaveInfo_inlock() const;
+
+        /**
+         * Helper method that removes entries from _slaveInfo if they correspond to a node
+         * with a member ID that is not in the current replica set config.  Will always leave an
+         * entry for ourself at the beginning of _slaveInfo, even if we aren't present in the
+         * config.
+         */
+        void _updateSlaveInfoFromConfig_inlock();
 
         /**
          * Helper to update our saved config, cancel any pending heartbeats, and kick off sending
@@ -313,13 +354,6 @@ namespace repl {
         PostMemberStateUpdateAction _setCurrentRSConfig_inlock(
                 const ReplicaSetConfig& newConfig,
                 int myIndex);
-
-        /**
-         * Helper method that removes entries from _slaveInfoMap if they correspond to a node
-         * with a member ID that is not in the current replica set config, and also guarantees that
-         * there is an entry in the map corresponding to ourself.
-         */
-        void _updateSlaveInfoMapFromConfig_inlock();
 
         /**
          * Helper method for setting/unsetting maintenance mode.  Scheduled by setMaintenanceMode()
@@ -377,12 +411,6 @@ namespace repl {
          */
         void _handleTimePassing(const ReplicationExecutor::CallbackData& cbData);
 
-        /*
-         * Returns the OpTime of the last applied operation on this node.
-         */
-        OpTime _getLastOpApplied();
-        OpTime _getLastOpApplied_inlock();
-
         /**
          * Helper method for _awaitReplication that takes an already locked unique_lock and a
          * Timer for timing the operation which has been counting since before the lock was
@@ -438,6 +466,9 @@ namespace repl {
 
         int _getMyId_inlock() const;
 
+        OpTime _getMyLastOptime_inlock() const;
+
+
         /**
          * Bottom half of setFollowerMode.
          *
@@ -464,11 +495,6 @@ namespace repl {
          * lock will be in after this method finishes.
          */
         void _setMyLastOptime_inlock(boost::unique_lock<boost::mutex>* lock, const OpTime& ts);
-
-        /**
-         * Helper method for _setLastOptime_inlock and _setMyLastOptime_inlock.
-         */
-        void _updateOptimeInMap_inlock(SlaveInfo* slaveInfo, OpTime ts);
 
         /**
          * Schedules a heartbeat to be sent to "target" at "when".
@@ -755,9 +781,15 @@ namespace repl {
         // Election ID of the last election that resulted in this node becoming primary.
         OID _electionID;                                                                  // (M)
 
-        // Maps nodes in this replication group to information known about it such as its
-        // replication progress and its ID in the replica set config.
-        SlaveInfoMap _slaveInfoMap;                                                       // (M)
+        // Vector containing known information about each member (such as replication
+        // progress and member ID) in our replica set or each member replicating from
+        // us in a master-slave deployment.  In master/slave, the first entry is
+        // guaranteed to correspond to ourself.  In replica sets where we don't have a
+        // valid config or are in state REMOVED then the vector will be a single element
+        // just with info about ourself.  In replica sets with a valid config the elements
+        // will be in the same order as the members in the replica set config, thus
+        // the entry for ourself will be at _thisMemberConfigIndex.
+        SlaveInfoVector _slaveInfo;                                                       // (M)
 
         // Current ReplicaSet state.
         MemberState _currentState;                                                        // (M)

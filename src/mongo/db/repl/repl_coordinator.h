@@ -460,10 +460,14 @@ namespace repl {
                                            BSONObjBuilder* resultObj) = 0;
 
         /**
-         * Handles an incoming replSetUpdatePosition command, updating each nodes oplog progress.
-         * returns Status::OK() if the all updates are processed correctly, ErrorCodes::NodeNotFound
-         * if any updating node cannot be found in the config, or any of the normal replset
-         * command ErrorCodes.
+         * Handles an incoming replSetUpdatePosition command, updating each node's oplog progress.
+         * Returns Status::OK() if all updates are processed correctly, NodeNotFound
+         * if any updating node cannot be found in the config, InvalidReplicaSetConfig if the
+         * "cfgver" sent in any of the updates doesn't match our config version, or
+         * NotMasterOrSecondaryCode if we are in state REMOVED or otherwise don't have a valid
+         * replica set config.
+         * If a non-OK status is returned, it is unspecified whether none or some of the updates
+         * were applied.
          */
         virtual Status processReplSetUpdatePosition(OperationContext* txn,
                                                     const UpdatePositionArgs& updates) = 0;
@@ -475,6 +479,8 @@ namespace repl {
          * node is being chained through.
          *
          * Returns ErrorCodes::NodeNotFound if no replica set member exists with the given member ID
+         * and ErrorCodes::NotMasterOrSecondaryCode if we're in state REMOVED or otherwise don't
+         * have a valid config.
          */
         virtual Status processHandshake(const OperationContext* txn,
                                         const HandshakeArgs& handshake) = 0;
