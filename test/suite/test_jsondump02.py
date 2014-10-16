@@ -29,9 +29,7 @@ import os
 import wiredtiger, wttest
 
 # test_jsondump.py
-#    Utilities: wt jsondump
-# Test the jsondump utility (I'm not testing the 'json' cursors,
-# that's what the utility uses underneath).
+# Test dump output from json cursors.
 class test_jsondump02(wttest.WiredTigerTestCase):
 
     table_uri1 = 'table:jsondump02a.wt'
@@ -79,6 +77,19 @@ class test_jsondump02(wttest.WiredTigerTestCase):
             pos += 1
         self.assertEqual(pos, len(expect))
         cursor.close()
+
+    # Check the result of using a JSON cursor on the URI.
+    def load_json(self, uri, inserts):
+        cursor = self.session.open_cursor(uri, None, 'dump=json')
+        pos = 0
+        try:
+            for insert in inserts:
+                #tty_pr('Insert: ' + str(insert))
+                cursor.set_key(insert[0])
+                cursor.set_value(insert[1])
+                cursor.insert()
+        finally:
+            cursor.close()
         
     # Create JSON cursors and test them directly.
     def test_json_cursor(self):
@@ -114,13 +125,93 @@ class test_jsondump02(wttest.WiredTigerTestCase):
         self.set_kv(self.table_uri3, 2, '\x77\x88\x99\x00\xff\xfe')
         self.populate_squarecube(self.table_uri4)
 
-        self.check_json(self.table_uri1, (
-                ('"key0" : "KEY000"', '"value0" : "string value"'),
-                ('"key0" : "KEY001"', '"value0" : ' +
-                 '"\'\\\"({[]})\\\"\', etc. allowed"')))
-        self.check_json(self.table_uri2, (
-                ('"key0" : "KEY000"', '"value0" : 123,\n"value1" : "str0"'),
-                ('"key0" : "KEY001"', '"value0" : 234,\n"value1" : "str1"')))
+        table1_json =  (
+            ('"key0" : "KEY000"', '"value0" : "string value"'),
+            ('"key0" : "KEY001"', '"value0" : ' +
+             '"\'\\\"({[]})\\\"\', etc. allowed"'))
+        self.check_json(self.table_uri1, table1_json)
+
+        self.session.truncate(self.table_uri1, None, None, None)
+        self.load_json(self.table_uri1, table1_json)
+        self.check_json(self.table_uri1, table1_json)
+
+        table2_json =  (
+            ('"key0" : "KEY000"', '"value0" : 123,\n"value1" : "str0"'),
+            ('"key0" : "KEY001"', '"value0" : 234,\n"value1" : "str1"'))
+        self.check_json(self.table_uri2, table2_json)
+        self.session.truncate(self.table_uri2, None, None, None)
+        self.load_json(self.table_uri2, table2_json)
+        self.check_json(self.table_uri2, table2_json)
+        self.session.truncate(self.table_uri2, None, None, None)
+
+        # bad tokens
+        self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
+            lambda: self.load_json(self.table_uri2, 
+              (('<>abc?', '9'),)),
+            '/unknown token/')
+
+        # bad tokens
+        self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
+            lambda: self.load_json(self.table_uri2, 
+              (('"abc\u"', ''),)),
+            '/invalid Unicode/')
+
+        # bad tokens
+        self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
+            lambda: self.load_json(self.table_uri2, 
+              (('"abc', ''),)),
+            '/unterminated string/')
+
+        # bad syntax
+        self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
+            lambda: self.load_json(self.table_uri2, 
+              (('"stuff" "jibberish"', '"value0" "more jibberish"'),)),
+            '/expected key name.*\"key0\"/')
+
+        # bad types
+        self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
+            lambda: self.load_json(self.table_uri2, 
+              (('"key0" : "KEY002"', '"value0" : "xyz",\n"value1" : "str0"'),)),
+            '/expected unsigned JSON <int>, got <string>/')
+
+        # bad types
+        self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
+            lambda: self.load_json(self.table_uri2, 
+              (('"key0" : "KEY002"', '"value0" : 123,\n"value1" : 456'),)),
+            '/expected JSON <string>, got <integer>/')
+
+        # extra stuff
+        self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
+            lambda: self.load_json(self.table_uri2, 
+              (('"key0" : "KEY002"',
+                '"value0" : 123,\n"value1" : "str0",'),)),
+            '/expected JSON <EOF>, got \',\'/')
+
+        # fields out of order currently not supported
+        self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
+            lambda: self.load_json(self.table_uri2, 
+              (('"key0" : "KEY002"', '"value1" : "str0",\n"value0" : 123'),)),
+            '/expected value name.*\"value0\"/')
+
+        # various invalid unicode
+        invalid_unicode = (
+            '\\u', '\\ux', '\\u0', '\\u0F', '\\u0FA', '\\u0FAx',  '\\u0FA\\x')
+        for uni in invalid_unicode:
+            self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
+                lambda: self.load_json(self.table_uri2, 
+                  (('"key0" : "KEY002"', '"value0" : 123,\n"value1" : "'
+                    + uni + '"'),)),
+                '/invalid Unicode/')
+
+        # this one should work
+        self.load_json(self.table_uri2, 
+              (('"key0" : "KEY002"', '"value0" : 345,\n"value1" : "str2"'),))
+
+        # extraneous/missing space is okay
+        self.load_json(self.table_uri2, 
+              (('  "key0"\n:\t"KEY003"    ',
+                '"value0":456,"value1"\n\n\r\n:\t\n"str3"'),))
+
         self.check_json(self.table_uri3, (
                 ('"key0" : 1', '"value0" : "\\u0001\\u0002\\u0003"'),
                 ('"key0" : 2',
@@ -162,38 +253,6 @@ class test_jsondump02(wttest.WiredTigerTestCase):
                  '"S1" : "val9",\n"i2" : 9,\n"S3" : "val27",\n"i4" : 27'),
                 ('"i2" : 16,\n"i4" : 64',
                  '"S1" : "val16",\n"i2" : 16,\n"S3" : "val64",\n"i4" : 64')))
-
-    def test_json_illegal(self):
-        """
-        Create JSON cursors and use them illegally
-        """
-        extra_params = ',allocation_size=512,' +\
-            'internal_page_max=16384,leaf_page_max=131072'
-        self.session.create(self.table_uri1,
-            'key_format=S,value_format=S' + extra_params)
-
-        self.set_kv(self.table_uri1, 'A', 'aaaa')
-        self.check_json(self.table_uri1, (
-                ('"key0" : "A"', '"value0" : "aaaa"'),))
-
-        self.set_kv(self.table_uri1, 'B', 'bbbb')
-        self.check_json(self.table_uri1, (
-                ('"key0" : "A"', '"value0" : "aaaa"'),
-                ('"key0" : "B"', '"value0" : "bbbb"')))
-
-        cursor = self.session.open_cursor(self.table_uri1, None, 'dump=json')
-        cursor.next()
-
-        with self.expectedStderrPattern('Setting keys for JSON cursors not permitted'):
-            cursor.set_key('stuff')
-        with self.expectedStderrPattern('Setting values for JSON cursors not permitted'):
-            cursor.set_value('other stuff')
-        cursor.close()
-
-        self.check_json(self.table_uri1, (
-                ('"key0" : "A"', '"value0" : "aaaa"'),
-                ('"key0" : "B"', '"value0" : "bbbb"')))
-        
 
 if __name__ == '__main__':
     wttest.run()

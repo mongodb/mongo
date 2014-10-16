@@ -53,7 +53,7 @@ Advanced applications may also open the following low-level cursor types:
 
 /* ----------------- */
 
-/*! @page data_sources Data Sources
+/*! @m_page{{c,java},data_sources,Data Sources}
 
 WiredTiger provides access to data from a variety of sources.  At the
 lowest level, data may be stored in a file using a tree structure.  A
@@ -103,11 +103,11 @@ source.  Database-wide statistics are retrieved with the \c "statistics:"
 URI; individual data source statistics are available by specifying
 \c "statistics:<data source URI>".
 
-The statistic key is an integer from the list of keys in @ref statistics_keys
-"Statistics Keys".  Statistics cursors return three values from the
-WT_CURSOR::get_value call: a printable description of the statistic, a
-printable version of the entry's value, and the entry's unsigned 64-bit
-integral value, respectively.
+The statistic key is an integer from the list of keys in
+@ref_single statistics_keys "Statistics Keys".  Statistics cursors return
+three values from the WT_CURSOR::get_value call: a printable description of
+the statistic, a printable version of the entry's value, and the entry's
+unsigned 64-bit integral value, respectively.
 
 The following is an example of printing run-time statistics about the
 WiredTiger engine:
@@ -128,5 +128,6 @@ corresponding key, as shown in the following example:
 
 @snippet ex_stat.c statistics retrieve by key
 
-See @ref tune_statistics for more examples of how statistics can be used.
+See @ref_single tune_statistics for more examples of how statistics can be
+used.
 */

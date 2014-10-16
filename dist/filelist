@@ -1,5 +1,5 @@
 # filelist --
-#	List of source files for WiredTiger library.
+#	List of source files for WiredTiger POSIX library.
 
 src/async/async_api.c
 src/async/async_op.c
@@ -56,6 +56,7 @@ src/config/config_collapse.c
 src/config/config_concat.c
 src/config/config_def.c
 src/config/config_ext.c
+src/config/config_upgrade.c
 src/conn/api_strerror.c
 src/conn/api_version.c
 src/conn/conn_api.c
@@ -110,10 +111,12 @@ src/os_posix/os_flock.c
 src/os_posix/os_fsync.c
 src/os_posix/os_ftruncate.c
 src/os_posix/os_getline.c
+src/os_posix/os_getopt.c
 src/os_posix/os_map.c
 src/os_posix/os_mtx.c
 src/os_posix/os_once.c
 src/os_posix/os_open.c
+src/os_posix/os_path.c
 src/os_posix/os_priv.c
 src/os_posix/os_remove.c
 src/os_posix/os_rename.c

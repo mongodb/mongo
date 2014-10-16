@@ -19,7 +19,7 @@ util_salvage(WT_SESSION *session, int argc, char *argv[])
 
 	force = NULL;
 	name = NULL;
-	while ((ch = util_getopt(argc, argv, "F")) != EOF)
+	while ((ch = __wt_getopt(progname, argc, argv, "F")) != EOF)
 		switch (ch) {
 		case 'F':
 			force = "force";
@@ -28,8 +28,8 @@ util_salvage(WT_SESSION *session, int argc, char *argv[])
 		default:
 			return (usage());
 		}
-	argc -= util_optind;
-	argv += util_optind;
+	argc -= __wt_optind;
+	argv += __wt_optind;
 
 	/* The remaining argument is the file name. */
 	if (argc != 1)

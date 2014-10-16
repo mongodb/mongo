@@ -20,7 +20,7 @@ util_list(WT_SESSION *session, int argc, char *argv[])
 
 	cflag = vflag = 0;
 	name = NULL;
-	while ((ch = util_getopt(argc, argv, "cv")) != EOF)
+	while ((ch = __wt_getopt(progname, argc, argv, "cv")) != EOF)
 		switch (ch) {
 		case 'c':
 			cflag = 1;
@@ -32,8 +32,8 @@ util_list(WT_SESSION *session, int argc, char *argv[])
 		default:
 			return (usage());
 		}
-	argc -= util_optind;
-	argv += util_optind;
+	argc -= __wt_optind;
+	argv += __wt_optind;
 
 	switch (argc) {
 	case 0:

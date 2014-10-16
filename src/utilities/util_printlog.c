@@ -16,12 +16,12 @@ util_printlog(WT_SESSION *session, int argc, char *argv[])
 	int ch, printable;
 
 	printable = 0;
-	while ((ch = util_getopt(argc, argv, "f:p")) != EOF)
+	while ((ch = __wt_getopt(progname, argc, argv, "f:p")) != EOF)
 		switch (ch) {
 		case 'f':			/* output file */
-			if (freopen(util_optarg, "w", stdout) == NULL) {
+			if (freopen(__wt_optarg, "w", stdout) == NULL) {
 				fprintf(stderr, "%s: %s: reopen: %s\n",
-				    progname, util_optarg, strerror(errno));
+				    progname, __wt_optarg, strerror(errno));
 				return (1);
 			}
 			break;
@@ -32,8 +32,8 @@ util_printlog(WT_SESSION *session, int argc, char *argv[])
 		default:
 			return (usage());
 		}
-	argc -= util_optind;
-	argv += util_optind;
+	argc -= __wt_optind;
+	argv += __wt_optind;
 
 	/* There should not be any more arguments. */
 	if (argc != 0)

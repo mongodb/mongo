@@ -37,15 +37,15 @@ util_dump(WT_SESSION *session, int argc, char *argv[])
 
 	hex = json = reverse = 0;
 	checkpoint = config = name = NULL;
-	while ((ch = util_getopt(argc, argv, "c:f:jrx")) != EOF)
+	while ((ch = __wt_getopt(progname, argc, argv, "c:f:jrx")) != EOF)
 		switch (ch) {
 		case 'c':
-			checkpoint = util_optarg;
+			checkpoint = __wt_optarg;
 			break;
 		case 'f':			/* output file */
-			if (freopen(util_optarg, "w", stdout) == NULL)
+			if (freopen(__wt_optarg, "w", stdout) == NULL)
 				return (
-				    util_err(errno, "%s: reopen", util_optarg));
+				    util_err(errno, "%s: reopen", __wt_optarg));
 			break;
 		case 'j':
 			json = 1;
@@ -60,8 +60,8 @@ util_dump(WT_SESSION *session, int argc, char *argv[])
 		default:
 			return (usage());
 		}
-	argc -= util_optind;
-	argv += util_optind;
+	argc -= __wt_optind;
+	argv += __wt_optind;
 
 	/* -j and -x are incompatible. */
 	if (hex && json) {
@@ -251,7 +251,7 @@ dump_json_table_begin(WT_CURSOR *cursor, const char *uri, const char *config)
 		    dump_json_table_cg(cursor, uri, name, "index:", "indices");
 	}
 
-	if (printf("\n        },\n        [") < 0)
+	if (printf("\n        },\n        {\n            \"data\" : [") < 0)
 		goto eio;
 
 	if (0) {
@@ -422,7 +422,7 @@ dump_json_table_config(WT_SESSION *session, const char *uri)
 static int
 dump_json_table_end(void)
 {
-	if (printf("        ]\n    ]") < 0)
+	if (printf("            ]\n        }\n    ]") < 0)
 		return (util_err(EIO, NULL));
 	return (0);
 }
@@ -595,9 +595,9 @@ dump_record(WT_CURSOR *cursor, const char *name, int reverse, int json)
 
 	once = 0;
 	if (json) {
-		prefix = "\n            {\n";
+		prefix = "\n{\n";
 		infix = ",\n";
-		suffix = "\n            }";
+		suffix = "\n}";
 	} else {
 		prefix = "";
 		infix = "\n";

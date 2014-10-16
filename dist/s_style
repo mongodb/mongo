@@ -47,7 +47,8 @@ done
 
 for f in \
     `find bench examples ext src test -name '*.[chisy]' -o -name '*.in' |
-    sed '/Makefile.in/d'`; do
+    sed -e '/Makefile.in/d' \
+	-e '/build_win\/wiredtiger_config.h/d'`; do
 	if grep "^[^}]*while (0);" $f > $t; then
 		echo "$f: while (0) has trailing semi-colon"
 		cat $t
@@ -55,6 +56,14 @@ for f in \
 
 	if grep "(unsigned)" $f > $t; then
 		echo "$f: (unsigned) cast is wrong"
+		cat $t
+	fi
+
+	if ! expr "$f" : 'examples/c/.*' > /dev/null &&
+	   ! expr "$f" : 'ext/datasources/helium/helium.c' > /dev/null &&
+	   ! expr "$f" : 'src/include/os.h' > /dev/null &&
+	    grep "%zu" $f | grep -v 'SIZET_FMT' > $t; then
+		echo "$f: %zu needs to be fixed for Windows"
 		cat $t
 	fi
 

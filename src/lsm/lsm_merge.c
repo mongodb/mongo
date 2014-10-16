@@ -49,8 +49,7 @@ __wt_lsm_merge_update_tree(WT_SESSION_IMPL *session,
  *	Merge a set of chunks of an LSM tree.
  */
 int
-__wt_lsm_merge(
-    WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree, u_int id)
+__wt_lsm_merge(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree, u_int id)
 {
 	WT_BLOOM *bloom;
 	WT_CURSOR *dest, *src;
@@ -349,7 +348,7 @@ __wt_lsm_merge(
 	 * merge_syncing field so that compact knows it is still in
 	 * progress.
 	 */
-	WT_ATOMIC_ADD4(lsm_tree->merge_syncing, 1);
+	(void)WT_ATOMIC_ADD4(lsm_tree->merge_syncing, 1);
 	in_sync = 1;
 	/*
 	 * We've successfully created the new chunk.  Now install it.  We need
@@ -400,7 +399,7 @@ __wt_lsm_merge(
 	WT_TRET(dest->close(dest));
 	dest = NULL;
 	++lsm_tree->merge_progressing;
-	WT_ATOMIC_SUB4(lsm_tree->merge_syncing, 1);
+	(void)WT_ATOMIC_SUB4(lsm_tree->merge_syncing, 1);
 	in_sync = 0;
 	WT_ERR_NOTFOUND_OK(ret);
 
@@ -456,7 +455,7 @@ __wt_lsm_merge(
 err:	if (locked)
 		WT_TRET(__wt_lsm_tree_unlock(session, lsm_tree));
 	if (in_sync)
-		WT_ATOMIC_SUB4(lsm_tree->merge_syncing, 1);
+		(void)WT_ATOMIC_SUB4(lsm_tree->merge_syncing, 1);
 	if (src != NULL)
 		WT_TRET(src->close(src));
 	if (dest != NULL)

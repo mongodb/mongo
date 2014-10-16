@@ -117,6 +117,7 @@ __txn_op_apply(
 	uint32_t fileid, mode, optype, opsize;
 
 	session = r->session;
+	cursor = NULL;
 
 	/* Peek at the size and the type. */
 	WT_ERR(__wt_logop_read(session, pp, end, &optype, &opsize));
@@ -230,6 +231,10 @@ __txn_op_apply(
 
 	WT_ILLEGAL_VALUE_ERR(session);
 	}
+
+	/* Reset the cursor so it doesn't block eviction. */
+	if (cursor != NULL)
+		WT_ERR(cursor->reset(cursor));
 
 	r->modified = 1;
 
@@ -401,6 +406,7 @@ err:	if (r->nfiles > r->max_fileid)
 int
 __wt_txn_recover(WT_CONNECTION_IMPL *conn)
 {
+	WT_CURSOR *metac;
 	WT_DECL_RET;
 	WT_RECOVERY r;
 	WT_SESSION_IMPL *session;
@@ -418,7 +424,8 @@ __wt_txn_recover(WT_CONNECTION_IMPL *conn)
 
 	WT_ERR(__wt_metadata_search(session, WT_METAFILE_URI, &config));
 	WT_ERR(__recovery_setup_file(&r, WT_METAFILE_URI, config));
-	WT_ERR(__wt_metadata_cursor(session, NULL, &r.files[0].c));
+	WT_ERR(__wt_metadata_cursor(session, NULL, &metac));
+	r.files[0].c = metac;
 
 	/*
 	 * First, do a pass through the log to recover the metadata, and
@@ -440,6 +447,13 @@ __wt_txn_recover(WT_CONNECTION_IMPL *conn)
 
 	/* Scan the metadata to find the live files and their IDs. */
 	WT_ERR(__recovery_file_scan(&r));
+
+	/*
+	 * We no longer need the metadata cursor: close it to avoid pinning any
+	 * resources that could block eviction during recovery.
+	 */
+	r.files[0].c = NULL;
+	WT_ERR(metac->close(metac));
 
 	/*
 	 * Now, recover all the files apart from the metadata.

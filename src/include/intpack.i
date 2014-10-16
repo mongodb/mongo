@@ -50,13 +50,16 @@
 	WT_RET_TEST((maxl) != 0 && (size_t)(l) > (maxl), ENOMEM)
 
 /* Count the leading zero bytes. */
-#ifdef __GNUC__
+#if defined(__GNUC__)
 #define	WT_LEADING_ZEROS(x, i)						\
 	(i = (x == 0) ? (int)sizeof (x) : __builtin_clzll(x) >> 3)
+#elif defined(_MSC_VER)
+#define	WT_LEADING_ZEROS(x, i)						\
+	(i = (x == 0) ? (int)sizeof (x) : (int)__lzcnt64(x) >> 3)
 #else
 #define	WT_LEADING_ZEROS(x, i) do {					\
 	uint64_t __x = (x);						\
-	uint64_t __m = 0xff << 56;					\
+	uint64_t __m = (uint64_t)0xff << 56;				\
 	for (i = 0; !(__x & __m) && i != 8; i++)			\
 		__m >>= 8;						\
 } while (0)
@@ -81,7 +84,7 @@ __wt_vpack_posint(uint8_t **pp, size_t maxlen, uint64_t x)
 	*p++ |= (len & 0xf);
 
 	for (shift = (len - 1) << 3; len != 0; --len, shift -= 8)
-		*p++ = (x >> shift);
+		*p++ = (uint8_t)(x >> shift);
 
 	*pp = p;
 	return (0);
@@ -111,7 +114,7 @@ __wt_vpack_negint(uint8_t **pp, size_t maxlen, uint64_t x)
 	*p++ |= (lz & 0xf);
 
 	for (shift = (len - 1) << 3; len != 0; shift -= 8, --len)
-		*p++ = (x >> shift);
+		*p++ = (uint8_t)(x >> shift);
 
 	*pp = p;
 	return (0);

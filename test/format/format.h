@@ -84,6 +84,12 @@ extern WT_EXTENSION_API *wt_api;
 #define	DATASOURCE(v)	(strcmp(v, g.c_data_source) == 0 ? 1 : 0)
 #define	SINGLETHREADED	(g.c_threads == 1)
 
+#ifndef _WIN32
+#define	SIZET_FMT	"%zu"			/* size_t format string */
+#else
+#define	SIZET_FMT	"%Iu"			/* size_t format string */
+#endif
+
 typedef struct {
 	char *progname;				/* Program name */
 

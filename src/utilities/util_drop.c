@@ -16,15 +16,15 @@ util_drop(WT_SESSION *session, int argc, char *argv[])
 	int ch;
 	char *name;
 
-	while ((ch = util_getopt(argc, argv, "")) != EOF)
+	while ((ch = __wt_getopt(progname, argc, argv, "")) != EOF)
 		switch (ch) {
 		case '?':
 		default:
 			return (usage());
 		}
 
-	argc -= util_optind;
-	argv += util_optind;
+	argc -= __wt_optind;
+	argv += __wt_optind;
 
 	/* The remaining argument is the uri. */
 	if (argc != 1)

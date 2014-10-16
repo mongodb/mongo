@@ -494,6 +494,7 @@ static int
 __log_acquire(WT_SESSION_IMPL *session, uint64_t recsize, WT_LOGSLOT *slot)
 {
 	WT_CONNECTION_IMPL *conn;
+	WT_DECL_RET;
 	WT_LOG *log;
 
 	conn = S2C(session);
@@ -532,9 +533,15 @@ __log_acquire(WT_SESSION_IMPL *session, uint64_t recsize, WT_LOGSLOT *slot)
 	/*
 	 * Pre-allocate on the first real write into the log file.
 	 */
-	if (log->alloc_lsn.offset == LOG_FIRST_RECORD)
-		WT_RET(__wt_fallocate(session,
-		    log->log_fh, LOG_FIRST_RECORD, conn->log_file_max));
+	if (log->alloc_lsn.offset == LOG_FIRST_RECORD) {
+		if (!log->log_fh->fallocate_available ||
+		    (ret = __wt_fallocate(session, log->log_fh,
+		    LOG_FIRST_RECORD, conn->log_file_max)) == ENOTSUP)
+			ret = __wt_ftruncate(session, log->log_fh,
+			    LOG_FIRST_RECORD + conn->log_file_max);
+		WT_RET(ret);
+	}
+
 	log->alloc_lsn.offset += (wt_off_t)recsize;
 	slot->slot_end_lsn = log->alloc_lsn;
 	slot->slot_error = 0;

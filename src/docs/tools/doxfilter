@@ -27,4 +27,4 @@
 
 tooldir=`dirname $0`
 
-cat "$@" | python $tooldir/doxfilter.py
+python $tooldir/doxfilter.py "$@"

@@ -17,18 +17,18 @@ util_create(WT_SESSION *session, int argc, char *argv[])
 	const char *config, *uri;
 
 	config = NULL;
-	while ((ch = util_getopt(argc, argv, "c:")) != EOF)
+	while ((ch = __wt_getopt(progname, argc, argv, "c:")) != EOF)
 		switch (ch) {
 		case 'c':			/* command-line configuration */
-			config = util_optarg;
+			config = __wt_optarg;
 			break;
 		case '?':
 		default:
 			return (usage());
 		}
 
-	argc -= util_optind;
-	argv += util_optind;
+	argc -= __wt_optind;
+	argv += __wt_optind;
 
 	/* The remaining argument is the uri. */
 	if (argc != 1)

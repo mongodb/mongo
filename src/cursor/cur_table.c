@@ -235,7 +235,7 @@ __wt_curtable_set_value(WT_CURSOR *cursor, ...)
 	CURSOR_API_CALL(cursor, session, set_value, NULL);
 
 	va_start(ap, cursor);
-	if (F_ISSET(cursor, WT_CURSOR_RAW_OK)) {
+	if (F_ISSET(cursor, WT_CURSOR_RAW_OK | WT_CURSTD_DUMP_JSON)) {
 		item = va_arg(ap, WT_ITEM *);
 		cursor->value.data = item->data;
 		cursor->value.size = item->size;

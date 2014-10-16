@@ -851,10 +851,9 @@ struct __wt_session {
 	 * modification., a string; default empty.}
 	 * @config{dump, configure the cursor for dump format inputs and
 	 * outputs: "hex" selects a simple hexadecimal format\, "json" selects a
-	 * JSON format with each record formats as fields named by column names
-	 * if available\, and "print" selects a format where only non-printing
-	 * characters are hexadecimal encoded\, and "json" produces a JSON
-	 * encoding of the data.  The "hex" and "print" dump format are
+	 * JSON format with each record formatted as fields named by column
+	 * names if available\, and "print" selects a format where only
+	 * non-printing characters are hexadecimal encoded.  These formats are
 	 * compatible with the @ref util_dump and @ref util_load commands., a
 	 * string\, chosen from the following options: \c "hex"\, \c "json"\, \c
 	 * "print"; default empty.}
@@ -1809,6 +1808,9 @@ struct __wt_connection {
  * @config{ ),,}
  * @config{checkpoint_sync, flush files to stable storage when closing or
  * writing checkpoints., a boolean flag; default \c true.}
+ * @config{config_base, write the base configuration file if creating the
+ * database\, see @ref config_base for more information., a boolean flag;
+ * default \c true.}
  * @config{create, create the database if it does not exist., a boolean flag;
  * default \c false.}
  * @config{direct_io, Use \c O_DIRECT to access files.  Options are given as a

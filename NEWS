@@ -1,3 +1,66 @@
+WiredTiger release 2.4.0, 2014-10-15
+------------------------------------
+
+The WiredTiger 2.4.0 release contains significant new features, API changes
+and many bug fixes.
+
+New features and API changes:
+
+* Cursors keep their position across transaction boundaries. That is
+  WT_SESSION::begin_transaction and WT_SESSION::commit_transaction no longer
+  reset cursors. [#1181]
+
+* Change cursor behavior so that when an operation returns WT_NOTFOUND, the
+  cursor is now left pointing to the original key/value pair. [#1209]
+
+* Initial support for building WiredTiger on Windows.
+
+* Add ability to customize a collator for specific data sources or with
+  application managed metadata. See upgrading documentation for more
+  information. [#1165]
+
+* Enhance extension mechanism in WiredTiger to support loading extensions from
+  the application binary - not just a separate library. [#1174]
+
+* Replace WT_SESSION::create "lsm=(merge_threads)" configuration option with
+  ::wiredtiger_open "lsm_manager=(worker_thread_max)". See upgrading documentation
+  for more information.
+
+* Enhancements to the WiredTiger Python API build process. [#1188]
+
+* Add ability to dump and load WiredTiger databases in JSON format. [#1154]
+
+* Add ability to automatically checkpoint based on the volume of log records
+  generated since the last checkpoint.  This is enabled using the
+  ::wiredtiger_open configuration option "checkpoint=(log_size=size)" [#1170]
+
+* Enhance functionality allowing users to write content into the WiredTiger
+  transaction log. [#1171][#1175]
+
+* Enhance the WiredTiger HyperLevelDB implementation to support log replay.
+  [#1106][#1155]
+
+Other significant changes:
+
+* Fix several bugs in the shared cache implementation. [#1180][#1176]
+
+* Fix a bug where the public URI field in a cursor did not match the string
+  passed to WT_SESSION::open_cursor. [#1235]
+
+* Fix several bugs in salvage. [#1222][#1169]
+
+* Several bug fixes and enhancements for WT_CONNECTION::reconfigure.
+  [#1214][#1172]
+
+* Fix several bugs in raw compression implementation, particularly for data
+  that compresses extremely well. [#1191]
+
+* Several bug fixes and enhancements to WiredTiger LevelDB interface.
+
+* Switch default build from using adaptive pthread mutexes to default pthread
+  mutexes.
+
+
 WiredTiger release 2.3.1, 2014-08-14
 ------------------------------------
 

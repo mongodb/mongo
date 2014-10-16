@@ -70,7 +70,9 @@ __wt_row_modify(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt,
 			/* Avoid WT_CURSOR.update data copy. */
 			cbt->modify_update = upd;
 		} else {
-			upd_size = sizeof(WT_UPDATE) + upd->size;
+			upd_size = sizeof(WT_UPDATE) +
+			    (WT_UPDATE_DELETED_ISSET(upd) ? 0 : upd->size);
+
 			/*
 			 * We are restoring updates that couldn't be evicted,
 			 * there should only be one update list per key.
@@ -139,7 +141,9 @@ __wt_row_modify(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt,
 			/* Avoid WT_CURSOR.update data copy. */
 			cbt->modify_update = upd;
 		} else
-			upd_size = sizeof(WT_UPDATE) + upd->size;
+			upd_size = sizeof(WT_UPDATE) +
+			    (WT_UPDATE_DELETED_ISSET(upd) ? 0 : upd->size);
+
 		ins->upd = upd;
 		ins_size += upd_size;
 

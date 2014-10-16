@@ -1,0 +1,83 @@
+/*! @page upgrade Upgrading and downgrading databases
+
+The upgrade/downgrade process is only necessary for major or minor
+WiredTiger releases (releases where the major or minor version number
+changed). Patch releases (where only the patch number changed), do not
+contain any API or file format changes, and do not require anything
+other than a link step or shared library installation for upgrading or
+downgrading. However, the complete WiredTiger library must be re-built
+from scratch when changing versions, as there is no guarantee modules
+from one version of the library will work with modules from any other
+version.
+
+The rest of this page discusses upgrading and downgrading WiredTiger
+major and minor releases. Specifically, by upgrading, we mean migrating
+an application and its databases to a newer WiredTiger release, and by
+downgrading, we mean reverting to an older version.
+
+When upgrading or downgrading between WiredTiger releases, there are two
+components to consider: the WiredTiger library API and the underlying
+data files used for the database (for example, log files or B+tree
+files).
+
+As part of each WiredTiger release, a new @ref upgrading documentation
+section is created, describing changes in the WiredTiger API and in the
+format of underlying files, if any.  Changes to the format of the
+underlying data files are extremely rare, while changes to WiredTiger
+API are more common.  Generally, when the WiredTiger API changes, the
+changes are backward compatible and applications do not require
+modifications in order to upgrade to the new release.
+
+Note it is not necessary to upgrade (downgrade) to intermediate
+releases, you can ignore intermediate releases and upgrade (downgrade)
+directly to the release you plan to use.
+
+To upgrade to a new release of WiredTiger:
+
+-# Review the information for each release after the WiredTiger release
+you're currently using, up to and including the release you plan to use.
+Changes to the WiredTiger API are normally backward compatible, that is,
+you can continue to use the same WiredTiger configuration values used
+previously. However, it will likely enhance program maintainability to
+switch to newer versions of the configuration strings, as documentation
+for the deprecated values will no longer be available.
+<br><br>
+-# Once you have reviewed the relevant release notes and modified your
+application as necessary, install the new version of the application by
+relinking or installing a new version of the WiredTiger shared library.
+<br><br>
+-# Shut down the old version of the application.
+<br><br>
+-# Start the new version of the application.
+<br><br>
+If the upgrading documentation for any release after the previous
+release and up to and including the release you are using, specifies
+underlying data file formats are no longer backward compatible and will
+not be upgraded at run-time, a data upgrade step is required before the
+data can be accessed. In this case, data files must be upgraded using
+the WT_SESSION::upgrade method.
+
+Applications wanting the ability to downgrade to previous releases of
+WiredTiger are constrained in some important ways:
+
+- The underlying data file formats must not have changed between the
+release currently being run and the release to which you are
+downgrading. In other words, data file format changes are not backward
+compatible, and an upgraded data file cannot be downgraded without being
+dumped and re-loaded.
+<br><br>
+- Applications concerned with downgrading should configure the
+::wiredtiger_open \c config_base value to \c false, so WiredTiger does
+not write the base configuration file file when creating databases.
+Because the base configuration file is written using a current version
+of the WiredTiger API, writing this file could cause applications using
+previous versions of the WiredTiger API to fail. See @ref config_base
+for more information.
+
+To downgrade to a previous release of WiredTiger:
+
+-# Shut down the new version of the application.
+<br><br>
+-# Start the old version of the application.
+
+*/

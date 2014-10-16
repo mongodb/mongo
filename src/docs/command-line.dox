@@ -10,7 +10,7 @@ The \c wt tool is a command-line utility that provides access to
 various pieces of the WiredTiger functionality.
 
 @section util_global_options Options
-There are three global options:
+There are four global options:
 
 @par <code>-C config</code>
 Specify configuration strings for the ::wiredtiger_open function.
@@ -152,15 +152,15 @@ Load a table or file from dump output.
 
 The \c load command reads the standard input for data and loads it into
 a table or file, creating the table or file if it does not yet exist.
-The data should be the format produced by the \c dump command; see @ref
-dump_formats for details.
+The data should be the format produced by the \c dump command; see
+@ref dump_formats for details.
 
 By default, if the table or file already exists, data in the file or
 table will be overwritten by the new data (use the \c -n option to
 make an attempt to overwrite existing data return an error).
 
 @subsection util_load_synopsis Synopsis
-<code>wt [-Vv] [-C config] [-h directory] load [-an] [-f input] [-r name] [uri configuration ...]</code>
+<code>wt [-Vv] [-C config] [-h directory] load [-ajn] [-f input] [-r name] [uri configuration ...]</code>
 
 @subsection util_load_options Options
 The following are command-specific options for the \c load command:
@@ -174,6 +174,10 @@ column store.
 @par <code>-f</code>
 By default, the \c load command reads from the standard input; the \c
 -f option reads the input from the specified file.
+
+@par <code>-j</code>
+Load input in the JSON (<a href="http://www.json.org">JavaScript Object
+Notation</a>) format that was created by the <code>dump -j</code> command.
 
 @par <code>-n</code>
 By default, input data will overwrite existing data where the key/value

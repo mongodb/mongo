@@ -32,24 +32,45 @@ import com.wiredtiger.db.*;
 
 public class ex_access {
     public static void main(String[] args) {
+        /*! [access example connection] */
         Connection conn;
         Session s;
         Cursor c;
+
         try {
             conn = wiredtiger.open("WT_HOME", "create");
             s = conn.open_session(null);
+        } catch (WiredTigerException wte) {
+            System.err.println("WiredTigerException: " + wte);
+            return;
+        }
+        /*! [access example connection] */
+        try {
+            /*! [access example table create] */
             s.create("table:t", "key_format=S,value_format=u");
+            /*! [access example table create] */
+            /*! [access example cursor open] */
             c = s.open_cursor("table:t", null, null);
+            /*! [access example cursor open] */
         } catch (WiredTigerException wte) {
             System.err.println("WiredTigerException: " + wte);
             return;
         }
         System.out.println("Key format: " + c.getKeyFormat());
         System.out.println("Value format: " + c.getValueFormat());
+        /*! [access example cursor insert] */
         try {
             c.putKeyString("foo");
             c.putValueByteArray("bar".getBytes());
             c.insert();
+        } catch (WiredTigerPackingException wtpe) {
+            System.err.println("WiredTigerPackingException: " + wtpe);
+        } catch (WiredTigerException wte) {
+            System.err.println("WiredTigerException: " + wte);
+        }
+        /*! [access example cursor insert] */
+        /*! [access example cursor list] */
+        try {
             c.reset();
             while (c.next() == 0) {
                 System.out.println("Got: " + c.getKeyString());
@@ -59,10 +80,14 @@ public class ex_access {
         } catch (WiredTigerException wte) {
             System.err.println("WiredTigerException: " + wte);
         }
+        /*! [access example cursor list] */
+
+        /*! [access example close] */
         try {
             conn.close(null);
         } catch (WiredTigerException wte) {
             System.err.println("WiredTigerException: " + wte);
         }
+        /*! [access example close] */
     }
 }

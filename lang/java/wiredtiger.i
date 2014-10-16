@@ -127,7 +127,7 @@ static void throwWiredTigerException(JNIEnv *jenv, const char *msg) {
 %typemap(in) WT_ITEM * (WT_ITEM item) %{
 	$1 = &item;
 	$1->data = (*jenv)->GetByteArrayElements(jenv, $input, 0);
-	$1->size = (*jenv)->GetArrayLength(jenv, $input);
+	$1->size = (size_t)(*jenv)->GetArrayLength(jenv, $input);
 %}
 
 %typemap(argout) WT_ITEM * %{

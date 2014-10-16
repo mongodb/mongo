@@ -1,4 +1,4 @@
-/*! @page transactions Transactions
+/*! @m_page{{c,java},transactions,Transactions}
 
 @section transactions_acid ACID properties
 

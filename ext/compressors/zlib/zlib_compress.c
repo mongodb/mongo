@@ -39,6 +39,9 @@
  * is being built into the WiredTiger library.
  */
 #include "wiredtiger_config.h"
+#ifdef _MSC_VER
+#define	inline __inline
+#endif
 
 /* Local compressor structure. */
 typedef struct {
@@ -80,7 +83,7 @@ zlib_error(
  *	Allocate a scratch buffer.
  */
 static void *
-zalloc(void *cookie, u_int number, u_int size)
+zalloc(void *cookie, uint32_t number, uint32_t size)
 {
 	ZLIB_OPAQUE *opaque;
 	WT_EXTENSION_API *wt_api;

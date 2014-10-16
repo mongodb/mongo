@@ -195,7 +195,12 @@ __wt_readlock(WT_SESSION_IMPL *session, WT_RWLOCK *rwlock)
 	    "rwlock: readlock %s (%p)", rwlock->name, rwlock));
 	WT_STAT_FAST_CONN_INCR(session, rwlock_read);
 
-	if ((ret = pthread_rwlock_rdlock(&rwlock->rwlock)) == 0)
+	/*
+	 * The read-lock call can fail with EAGAIN under load:
+	 * retry in that case.
+	 */
+	WT_SYSCALL_RETRY(pthread_rwlock_rdlock(&rwlock->rwlock), ret);
+	if (ret == 0)
 		return (0);
 	WT_RET_MSG(session, ret, "pthread_rwlock_rdlock: %s", rwlock->name);
 }

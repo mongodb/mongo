@@ -45,6 +45,10 @@ static int  usage(void);
 static void wt_connect(char *);
 static void wt_shutdown(void);
 
+extern int __wt_optind;
+extern int __wt_getopt(const char *, int, char * const *, const char *);
+extern char *__wt_optarg;
+
 int
 main(int argc, char *argv[])
 {
@@ -68,41 +72,42 @@ main(int argc, char *argv[])
 	session_per_op = 0;
 	writers = 10;
 
-	while ((ch = getopt(argc, argv, "C:Fk:Ll:n:R:r:St:W:")) != EOF)
+	while ((ch = __wt_getopt(
+	    progname, argc, argv, "C:Fk:Ll:n:R:r:St:W:")) != EOF)
 		switch (ch) {
 		case 'C':			/* wiredtiger_open config */
-			config_open = optarg;
+			config_open = __wt_optarg;
 			break;
 		case 'F':			/* multiple files */
 			multiple_files = 1;
 			break;
 		case 'k':			/* rows */
-			nkeys = (u_int)atoi(optarg);
+			nkeys = (u_int)atoi(__wt_optarg);
 			break;
 		case 'L':			/* log print per operation */
 			log_print = 1;
 			break;
 		case 'l':			/* log */
-			if ((logfp = fopen(optarg, "w")) == NULL) {
+			if ((logfp = fopen(__wt_optarg, "w")) == NULL) {
 				fprintf(stderr,
-				    "%s: %s\n", optarg, strerror(errno));
+				    "%s: %s\n", __wt_optarg, strerror(errno));
 				return (EXIT_FAILURE);
 			}
 			break;
 		case 'n':			/* operations */
-			nops = (u_int)atoi(optarg);
+			nops = (u_int)atoi(__wt_optarg);
 			break;
 		case 'R':
-			readers = (u_int)atoi(optarg);
+			readers = (u_int)atoi(__wt_optarg);
 			break;
 		case 'r':			/* runs */
-			runs = atoi(optarg);
+			runs = atoi(__wt_optarg);
 			break;
 		case 'S':			/* new session per operation */
 			session_per_op = 1;
 			break;
 		case 't':
-			switch (optarg[0]) {
+			switch (__wt_optarg[0]) {
 			case 'f':
 				ftype = FIX;
 				break;
@@ -117,14 +122,14 @@ main(int argc, char *argv[])
 			}
 			break;
 		case 'W':
-			writers = (u_int)atoi(optarg);
+			writers = (u_int)atoi(__wt_optarg);
 			break;
 		default:
 			return (usage());
 		}
 
-	argc -= optind;
-	argv += optind;
+	argc -= __wt_optind;
+	argv += __wt_optind;
 	if (argc != 0)
 		return (usage());
 

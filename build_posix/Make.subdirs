@@ -17,6 +17,7 @@ api/leveldb LEVELDB
 bench/wtperf
 examples/c
 lang/java JAVA
+examples/java JAVA
 lang/python PYTHON
 test/bloom
 test/checkpoint
