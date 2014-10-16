@@ -828,6 +828,8 @@ buildvariants:
   run_on:
   - ubuntu1204-test
   expansions:
+    <<: *mongo_url_ubuntu1204_enterprise
+    <<: *mongodb_default_startup_args
     build_tags: -tags "ssl sasl"
     edition: enterprise
     run_kinit: true
