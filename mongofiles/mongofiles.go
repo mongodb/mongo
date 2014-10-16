@@ -196,6 +196,7 @@ func (self *MongoFiles) Run(displayConnUrl bool) (string, error) {
 		return "", fmt.Errorf("error connecting to db: %v", err)
 	}
 	defer session.Close()
+	session.SetSocketTimeout(0)
 
 	if self.ToolOptions.Namespace.DB == "" {
 		self.ToolOptions.Namespace.DB = "test"
