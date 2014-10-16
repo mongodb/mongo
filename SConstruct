@@ -114,6 +114,7 @@ env.Program("wt", [
     "src/utilities/util_dump.c",
     "src/utilities/util_list.c",
     "src/utilities/util_load.c",
+    "src/utilities/util_load_json.c",
     "src/utilities/util_loadtext.c",
     "src/utilities/util_main.c",
     "src/utilities/util_misc.c",
