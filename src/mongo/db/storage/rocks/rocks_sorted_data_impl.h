@@ -65,7 +65,7 @@ namespace mongo {
         MONGO_DISALLOW_COPYING( RocksSortedDataImpl );
     public:
         RocksSortedDataImpl(rocksdb::DB* db, boost::shared_ptr<rocksdb::ColumnFamilyHandle> cf,
-                            Ordering order);
+                            const StringData& ident, Ordering order);
 
         virtual SortedDataBuilderInterface* getBulkBuilder(OperationContext* txn, bool dupsAllowed);
 
@@ -113,25 +113,8 @@ namespace mongo {
 
         std::atomic<long long> _numEntries;
 
-        class ChangeNumEntries : public RecoveryUnit::Change {
-        public:
-            ChangeNumEntries(std::atomic<long long>* numEntries, bool increase)
-                : _numEntries(numEntries), _increase(increase) {}
+        const std::string _numEntriesKey;
 
-            void commit() {
-                if (_increase) {
-                    _numEntries->fetch_add(1);
-                } else {
-                    _numEntries->fetch_sub(1);
-                }
-            }
-
-            void rollback() {}
-
-        private:
-            std::atomic<long long>* _numEntries;
-            bool _increase;
-        };
     };
 
 } // namespace mongo

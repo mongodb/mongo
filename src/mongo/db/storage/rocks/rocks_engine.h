@@ -116,6 +116,8 @@ namespace mongo {
         rocksdb::ColumnFamilyOptions _collectionOptions() const;
         rocksdb::ColumnFamilyOptions _indexOptions(const Ordering& order) const;
 
+        static rocksdb::ColumnFamilyOptions _defaultCFOptions();
+
         std::string _path;
         boost::scoped_ptr<rocksdb::DB> _db;
         boost::scoped_ptr<rocksdb::Comparator> _collectionComparator;

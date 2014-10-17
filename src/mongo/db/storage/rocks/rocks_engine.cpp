@@ -89,7 +89,7 @@ namespace mongo {
 
         for (const auto& cf : columnFamilyNames) {
             if (cf == rocksdb::kDefaultColumnFamilyName) {
-                columnFamilies.emplace_back();
+                columnFamilies.emplace_back(cf, _defaultCFOptions());
                 continue;
             }
             auto orderings_iter = orderings.find(cf);
@@ -179,7 +179,7 @@ namespace mongo {
     SortedDataInterface* RocksEngine::getSortedDataInterface(OperationContext* opCtx,
                                                              const StringData& ident,
                                                              const IndexDescriptor* desc) {
-        return new RocksSortedDataImpl(_db.get(), _getColumnFamily(ident),
+        return new RocksSortedDataImpl(_db.get(), _getColumnFamily(ident), ident,
                                        Ordering::make(desc->keyPattern()));
     }
 
@@ -285,7 +285,7 @@ namespace mongo {
     }
 
     rocksdb::Options RocksEngine::dbOptions() {
-        rocksdb::Options options;
+        rocksdb::Options options(rocksdb::DBOptions(), _defaultCFOptions());
 
         // Optimize RocksDB. This is the easiest way to get RocksDB to perform well
         options.IncreaseParallelism();
@@ -295,6 +295,12 @@ namespace mongo {
         options.create_if_missing = true;
         options.create_missing_column_families = true;
 
+        return options;
+    }
+
+    rocksdb::ColumnFamilyOptions RocksEngine::_defaultCFOptions() {
+        rocksdb::ColumnFamilyOptions options;
+        // TODO pass or set appropriate options for default CF.
         return options;
     }
 

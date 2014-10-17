@@ -50,18 +50,21 @@ namespace mongo {
             rocksdb::DB* db;
             std::vector<rocksdb::ColumnFamilyDescriptor> cfs;
             cfs.emplace_back();
-            cfs[0].options.comparator = RocksSortedDataImpl::newRocksComparator(_order);
+            cfs.emplace_back("sroted_data_impl", rocksdb::ColumnFamilyOptions());
+            cfs[1].options.comparator = RocksSortedDataImpl::newRocksComparator(_order);
             rocksdb::DBOptions db_options;
             db_options.create_if_missing = true;
+            db_options.create_missing_column_families = true;
             std::vector<rocksdb::ColumnFamilyHandle*> handles;
             auto s = rocksdb::DB::Open(db_options, _tempDir.path(), cfs, &handles, &db);
             ASSERT(s.ok());
             _db.reset(db);
-            _cf.reset(handles[0]);
+            _cf.reset(handles[1]);
         }
 
         virtual SortedDataInterface* newSortedDataInterface(bool unique) {
-            return new RocksSortedDataImpl(_db.get(), _cf, _order);
+            return new RocksSortedDataImpl(_db.get(), _cf, rocksdb::kDefaultColumnFamilyName,
+                                           _order);
         }
 
         virtual RecoveryUnit* newRecoveryUnit() { return new RocksRecoveryUnit(_db.get()); }

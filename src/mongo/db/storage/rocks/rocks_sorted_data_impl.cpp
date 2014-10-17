@@ -436,14 +436,20 @@ namespace mongo {
 
     RocksSortedDataImpl::RocksSortedDataImpl(rocksdb::DB* db,
                                              boost::shared_ptr<rocksdb::ColumnFamilyHandle> cf,
-                                             Ordering order)
-        : _db(db), _columnFamily(cf), _order(order) {
+                                             const StringData& ident, Ordering order)
+        : _db(db), _columnFamily(cf), _order(order),
+          _numEntriesKey("numentries-" + ident.toString()) {
         invariant( _db );
         invariant(_columnFamily.get());
+        _numEntries = 0;
         string value;
-        bool ok = _db->GetProperty(_columnFamily.get(), "rocksdb.estimate-num-keys", &value);
-        invariant( ok );
-        _numEntries.store(std::atoll(value.c_str()));
+        if (_db->Get(rocksdb::ReadOptions(), rocksdb::Slice(_numEntriesKey), &value).ok()) {
+            long long numEntries;
+            memcpy(&numEntries, value.data(), sizeof(numEntries));
+            _numEntries.store(numEntries);
+        } else {
+            _numEntries.store(0);
+        }
     }
 
     SortedDataBuilderInterface* RocksSortedDataImpl::getBulkBuilder(OperationContext* txn,
@@ -473,7 +479,8 @@ namespace mongo {
             }
         }
 
-        ru->registerChange(new ChangeNumEntries(&_numEntries, true));
+        ru->incrementCounter(_numEntriesKey, &_numEntries, 1);
+
         ru->writeBatch()->Put(_columnFamily.get(), makeString(key, loc), emptyByteSlice);
 
         return Status::OK();
@@ -492,7 +499,8 @@ namespace mongo {
             return;
         }
 
-        ru->registerChange(new ChangeNumEntries(&_numEntries, false));
+        ru->incrementCounter(_numEntriesKey, &_numEntries,  -1);
+
         ru->writeBatch()->Delete(_columnFamily.get(), keyData);
     }
 
@@ -541,7 +549,11 @@ namespace mongo {
         return Status::OK();
     }
 
-    long long RocksSortedDataImpl::numEntries(OperationContext* txn) const { return _numEntries.load(); }
+    long long RocksSortedDataImpl::numEntries(OperationContext* txn) const {
+        auto ru = RocksRecoveryUnit::getRocksRecoveryUnit(txn);
+        return _numEntries.load(std::memory_order::memory_order_relaxed) +
+            ru->getDeltaCounter(_numEntriesKey);
+    }
 
     SortedDataInterface::Cursor* RocksSortedDataImpl::newCursor(OperationContext* txn,
                                                                 int direction) const {

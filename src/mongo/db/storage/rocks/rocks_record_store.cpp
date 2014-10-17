@@ -93,11 +93,13 @@ namespace mongo {
         bool metadataPresent = true;
         // XXX not using a Snapshot here
         if (!_db->Get(_readOptions(), rocksdb::Slice(_numRecordsKey), &value).ok()) {
-            _numRecords = 0;
+            _numRecords.store(0);
             metadataPresent = false;
         }
         else {
-            memcpy( &_numRecords, value.data(), sizeof( _numRecords ));
+            long long numRecords = 0;
+            memcpy( &numRecords, value.data(), sizeof(numRecords));
+            _numRecords.store(numRecords);
         }
 
         // XXX not using a Snapshot here
@@ -137,21 +139,27 @@ namespace mongo {
         _increaseDataSize(txn, -oldLength);
     }
 
-    bool RocksRecordStore::cappedAndNeedDelete() const {
+    long long RocksRecordStore::numRecords(OperationContext* txn) const {
+        RocksRecoveryUnit* ru = RocksRecoveryUnit::getRocksRecoveryUnit( txn );
+        return _numRecords.load(std::memory_order::memory_order_relaxed) +
+            ru->getDeltaCounter(_numRecordsKey);
+    }
+
+    bool RocksRecordStore::cappedAndNeedDelete(OperationContext* txn) const {
         if (!_isCapped)
             return false;
 
         if (_dataSize > _cappedMaxSize)
             return true;
 
-        if ((_cappedMaxDocs != -1) && (_numRecords > _cappedMaxDocs))
+        if ((_cappedMaxDocs != -1) && (numRecords(txn) > _cappedMaxDocs))
             return true;
 
         return false;
     }
 
     void RocksRecordStore::cappedDeleteAsNeeded(OperationContext* txn) {
-        if (!cappedAndNeedDelete())
+        if (!cappedAndNeedDelete(txn))
             return;
         auto ru = RocksRecoveryUnit::getRocksRecoveryUnit(txn);
         boost::scoped_ptr<rocksdb::Iterator> iter(ru->NewIterator(_columnFamily.get()));
@@ -165,8 +173,8 @@ namespace mongo {
         // XXX PROBLEMS
         // 2 threads could delete the same document
         // multiple inserts using the same snapshot will delete the same document
-        while ( cappedAndNeedDelete() && iter->Valid() ) {
-            invariant(_numRecords > 0);
+        while ( cappedAndNeedDelete(txn) && iter->Valid() ) {
+            invariant(numRecords(txn) > 0);
 
             rocksdb::Slice slice = iter->key();
             DiskLoc oldest = _makeDiskLoc( slice );
@@ -350,7 +358,7 @@ namespace mongo {
             output->appendNumber("nrecords", numRecords);
         }
         else
-            output->appendNumber("nrecords", _numRecords);
+            output->appendNumber("nrecords", numRecords(txn));
 
         return Status::OK();
     }
@@ -456,8 +464,9 @@ namespace mongo {
         boost::mutex::scoped_lock dataSizeLk( _dataSizeLock );
         ru->writeBatch()->Delete(_dataSizeKey);
 
-        boost::mutex::scoped_lock numRecordsLk( _numRecordsLock );
         ru->writeBatch()->Delete(_numRecordsKey);
+        ru->incrementCounter(_numRecordsKey, &_numRecords,
+                             -ru->getDeltaCounter(_numRecordsKey));
     }
 
     rocksdb::ReadOptions RocksRecordStore::_readOptions(OperationContext* opCtx) {
@@ -519,21 +528,14 @@ namespace mongo {
 
     // XXX make sure these work with rollbacks (I don't think they will)
     void RocksRecordStore::_changeNumRecords( OperationContext* txn, bool insert ) {
-        boost::mutex::scoped_lock lk( _numRecordsLock );
-
+        RocksRecoveryUnit* ru = RocksRecoveryUnit::getRocksRecoveryUnit( txn );
         if ( insert ) {
-            _numRecords++;
+            ru->incrementCounter(_numRecordsKey, &_numRecords, 1);
         }
         else {
-            _numRecords--;
+            ru->incrementCounter(_numRecordsKey, &_numRecords,  -1);
         }
-        RocksRecoveryUnit* ru = RocksRecoveryUnit::getRocksRecoveryUnit( txn );
-        const char* nr_ptr = reinterpret_cast<char*>( &_numRecords );
-
-        ru->writeBatch()->Put(rocksdb::Slice(_numRecordsKey),
-                              rocksdb::Slice(nr_ptr, sizeof(long long)));
     }
-
 
     void RocksRecordStore::_increaseDataSize( OperationContext* txn, int amount ) {
         boost::mutex::scoped_lock lk( _dataSizeLock );
