@@ -87,14 +87,17 @@ namespace {
     }
 
     OpTime getMinValid(OperationContext* txn) {
-        WriteUnitOfWork wunit(txn);
-        BSONObj mv;
-        bool found = Helpers::getSingleton(txn, minvalidNS, mv);
-        wunit.commit();
-        if (found) {
-            return mv["ts"]._opTime();
+        Lock::DBLock lk(txn->lockState(), "local", MODE_S);
+        {
+            WriteUnitOfWork wunit(txn);
+            BSONObj mv;
+            bool found = Helpers::getSingleton(txn, minvalidNS, mv);
+            wunit.commit();
+            if (found) {
+                return mv["ts"]._opTime();
+            }
+            return OpTime();
         }
-        return OpTime();
     }
 
 }
