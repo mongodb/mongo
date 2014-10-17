@@ -855,17 +855,11 @@ namespace {
             }
         }
         else {
-            const ReplSetHeartbeatResponse& hbr = hbResponse.getValue();
+            ReplSetHeartbeatResponse hbr = hbResponse.getValue();
             LOG(3) << "setUpValues: heartbeat response good for member _id:"
                    << _currentConfig.getMemberAt(memberIndex).getId() << ", msg:  "
                    << hbr.getHbMsg();
-            hbData.setUpValues(
-                    now,
-                    hbr.hasState() ? hbr.getState() : MemberState::RS_UNKNOWN,
-                    hbr.hasElectionTime() ? hbr.getElectionTime() : hbData.getElectionTime(),
-                    hbr.hasOpTime() ? hbr.getOpTime() : hbData.getOpTime(),
-                    hbr.getSyncingTo(),
-                    hbr.getHbMsg());
+            hbData.setUpValues(now, hbr);
         }
         HeartbeatResponseAction nextAction = _updateHeartbeatDataImpl(
                 memberIndex,
@@ -1196,13 +1190,15 @@ namespace {
                 changeMemberState_forTest(MemberState::RS_SECONDARY);
             }
             if (primaryIndex != -1) {
-                _hbdata[primaryIndex].setUpValues( 
+                ReplSetHeartbeatResponse hbResponse;
+                hbResponse.setState(MemberState::RS_PRIMARY);
+                hbResponse.setElectionTime(OpTime());
+                hbResponse.setOpTime(_hbdata[primaryIndex].getOpTime());
+                hbResponse.setSyncingTo("");
+                hbResponse.setHbMsg("");
+                _hbdata[primaryIndex].setUpValues(
                         _hbdata[primaryIndex].getLastHeartbeat(),
-                        MemberState::RS_PRIMARY,
-                        OpTime(0, 0),
-                        _hbdata[primaryIndex].getOpTime(),
-                        "",
-                        "");
+                        hbResponse);
             }
             _currentPrimaryIndex = primaryIndex;
         }

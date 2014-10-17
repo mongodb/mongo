@@ -38,59 +38,68 @@ namespace mongo {
 namespace repl {
 
     MemberHeartbeatData::MemberHeartbeatData() :
-        _state(MemberState::RS_UNKNOWN), 
-        _health(-1), 
+        _health(-1),
         _upSince(0),
         _lastHeartbeat(0),
         _lastHeartbeatRecv(0),
-        _skew(INT_MIN), 
         _authIssue(false) {
+
+        _lastResponse.setState(MemberState::RS_UNKNOWN);
+        _lastResponse.setElectionTime(OpTime());
+        _lastResponse.setOpTime(OpTime());
     }
 
     void MemberHeartbeatData::setState(MemberState newState) {
-        _state = newState;
+        _lastResponse.setState(newState);
     }
 
-    MemberHeartbeatData& MemberHeartbeatData::setUpValues(Date_t now,
-                                          MemberState state,
-                                          OpTime electionTime,
-                                          OpTime optime,
-                                          const std::string& syncingTo,
-                                          const std::string& heartbeatMessage) {
-        _state = state;
+    void MemberHeartbeatData::setUpValues(Date_t now, ReplSetHeartbeatResponse hbResponse) {
         _health = 1;
         if (_upSince == 0) {
             _upSince = now;
         }
-        _lastHeartbeat = now;
-        _lastHeartbeatMsg = heartbeatMessage;
-        _syncSource = syncingTo;
-        _opTime = optime;
         _authIssue = false;
-        _electionTime = electionTime;
-        return *this;
+        _lastHeartbeat = now;
+        if (!hbResponse.hasState()) {
+            hbResponse.setState(MemberState::RS_UNKNOWN);
+        }
+        if (!hbResponse.hasElectionTime()) {
+            hbResponse.setElectionTime(_lastResponse.getElectionTime());
+        }
+        if (!hbResponse.hasOpTime()) {
+            hbResponse.setOpTime(_lastResponse.getOpTime());
+        }
+
+        _lastResponse = hbResponse;
     }
 
-    MemberHeartbeatData& MemberHeartbeatData::setDownValues(Date_t now,
-                                            const std::string& heartbeatMessage) {
-        _state = MemberState::RS_DOWN;
+    void MemberHeartbeatData::setDownValues(Date_t now, const std::string& heartbeatMessage) {
+
         _health = 0;
         _upSince = 0;
         _lastHeartbeat = now;
-        _lastHeartbeatMsg = heartbeatMessage;
         _authIssue = false;
-        _syncSource = "";
-        return *this;
+
+        _lastResponse = ReplSetHeartbeatResponse();
+        _lastResponse.setState(MemberState::RS_DOWN);
+        _lastResponse.setElectionTime(OpTime());
+        _lastResponse.setOpTime(OpTime());
+        _lastResponse.setHbMsg(heartbeatMessage);
+        _lastResponse.setSyncingTo("");
     }
 
-    MemberHeartbeatData& MemberHeartbeatData::setAuthIssue(Date_t now) {
-        _syncSource = "";
+    void MemberHeartbeatData::setAuthIssue(Date_t now) {
+        _health = 0;  // set health to 0 so that this doesn't count towards majority.
         _upSince = 0;
         _lastHeartbeat = now;
-        _state = MemberState::RS_UNKNOWN;
-        _health = 0; // set health to 0 so that this doesn't count towards majority.
         _authIssue = true;
-        return *this;
+
+        _lastResponse = ReplSetHeartbeatResponse();
+        _lastResponse.setState(MemberState::RS_UNKNOWN);
+        _lastResponse.setElectionTime(OpTime());
+        _lastResponse.setOpTime(OpTime());
+        _lastResponse.setHbMsg("");
+        _lastResponse.setSyncingTo("");
     }
 
 } // namespace repl
