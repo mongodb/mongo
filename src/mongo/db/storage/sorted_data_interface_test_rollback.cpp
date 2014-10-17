@@ -107,7 +107,8 @@ namespace mongo {
             scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
             {
                 WriteUnitOfWork uow( opCtx.get() );
-                ASSERT( sorted->unindex( opCtx.get(), key2, loc2, true ) );
+                sorted->unindex( opCtx.get(), key2, loc2, true );
+                ASSERT_EQUALS( 1, sorted->numEntries( opCtx.get() ) );
                 // no commit
             }
         }
@@ -135,8 +136,10 @@ namespace mongo {
             scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
             {
                 WriteUnitOfWork uow( opCtx.get() );
-                ASSERT( sorted->unindex( opCtx.get(), key1, loc1, true ) );
-                ASSERT( sorted->unindex( opCtx.get(), key3, loc3, true ) );
+                sorted->unindex( opCtx.get(), key1, loc1, true );
+                ASSERT_EQUALS( 2, sorted->numEntries( opCtx.get() ) );
+                sorted->unindex( opCtx.get(), key3, loc3, true );
+                ASSERT_EQUALS( 1, sorted->numEntries( opCtx.get() ) );
                 // no commit
             }
         }

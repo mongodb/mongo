@@ -51,13 +51,14 @@ namespace mongo {
 
         string data = "00010111";
         DiskLoc loc;
+        const RecordData rec(data.c_str(), data.size() + 1);
         {
             scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
             {
                 WriteUnitOfWork uow( opCtx.get() );
                 StatusWith<DiskLoc> res = rs->insertRecord( opCtx.get(),
-                                                            data.c_str(),
-                                                            data.size() + 1,
+                                                            rec.data(),
+                                                            rec.size(),
                                                             false );
                 ASSERT_OK( res.getStatus() );
                 loc = res.getValue();
@@ -85,7 +86,7 @@ namespace mongo {
                 dv[2].size = 3;
 
                 WriteUnitOfWork uow( opCtx.get() );
-                ASSERT_OK( rs->updateWithDamages( opCtx.get(), loc, data.c_str(), dv ) );
+                ASSERT_OK( rs->updateWithDamages( opCtx.get(), loc, rec, data.c_str(), dv ) );
                 uow.commit();
             }
         }
@@ -113,13 +114,14 @@ namespace mongo {
 
         string data = "00010111";
         DiskLoc loc;
+        const RecordData rec(data.c_str(), data.size() + 1);
         {
             scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
             {
                 WriteUnitOfWork uow( opCtx.get() );
                 StatusWith<DiskLoc> res = rs->insertRecord( opCtx.get(),
-                                                            data.c_str(),
-                                                            data.size() + 1,
+                                                            rec.data(),
+                                                            rec.size(),
                                                             false );
                 ASSERT_OK( res.getStatus() );
                 loc = res.getValue();
@@ -144,7 +146,7 @@ namespace mongo {
                 dv[1].size = 5;
 
                 WriteUnitOfWork uow( opCtx.get() );
-                ASSERT_OK( rs->updateWithDamages( opCtx.get(), loc, data.c_str(), dv ) );
+                ASSERT_OK( rs->updateWithDamages( opCtx.get(), loc, rec, data.c_str(), dv ) );
                 uow.commit();
             }
         }
@@ -173,13 +175,14 @@ namespace mongo {
 
         string data = "00010111";
         DiskLoc loc;
+        const RecordData rec(data.c_str(), data.size() + 1);
         {
             scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
             {
                 WriteUnitOfWork uow( opCtx.get() );
                 StatusWith<DiskLoc> res = rs->insertRecord( opCtx.get(),
-                                                            data.c_str(),
-                                                            data.size() + 1,
+                                                            rec.data(),
+                                                            rec.size(),
                                                             false );
                 ASSERT_OK( res.getStatus() );
                 loc = res.getValue();
@@ -204,7 +207,7 @@ namespace mongo {
                 dv[1].size = 5;
 
                 WriteUnitOfWork uow( opCtx.get() );
-                ASSERT_OK( rs->updateWithDamages( opCtx.get(), loc, data.c_str(), dv ) );
+                ASSERT_OK( rs->updateWithDamages( opCtx.get(), loc, rec, data.c_str(), dv ) );
                 uow.commit();
             }
         }
@@ -231,13 +234,14 @@ namespace mongo {
 
         string data = "my record";
         DiskLoc loc;
+        const RecordData rec(data.c_str(), data.size() + 1);
         {
             scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
             {
                 WriteUnitOfWork uow( opCtx.get() );
                 StatusWith<DiskLoc> res = rs->insertRecord( opCtx.get(),
-                                                            data.c_str(),
-                                                            data.size() + 1,
+                                                            rec.data(),
+                                                            rec.size(),
                                                             false );
                 ASSERT_OK( res.getStatus() );
                 loc = res.getValue();
@@ -256,7 +260,7 @@ namespace mongo {
                 mutablebson::DamageVector dv;
 
                 WriteUnitOfWork uow( opCtx.get() );
-                ASSERT_OK( rs->updateWithDamages( opCtx.get(), loc, "", dv ) );
+                ASSERT_OK( rs->updateWithDamages( opCtx.get(), loc, rec, "", dv ) );
                 uow.commit();
             }
         }

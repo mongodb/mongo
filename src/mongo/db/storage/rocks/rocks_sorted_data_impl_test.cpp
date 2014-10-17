@@ -60,7 +60,7 @@ namespace mongo {
             _cf.reset(handles[0]);
         }
 
-        virtual SortedDataInterface* newSortedDataInterface() {
+        virtual SortedDataInterface* newSortedDataInterface(bool unique) {
             return new RocksSortedDataImpl(_db.get(), _cf, _order);
         }
 

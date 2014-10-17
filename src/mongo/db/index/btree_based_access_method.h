@@ -132,7 +132,7 @@ namespace mongo {
         const IndexDescriptor* _descriptor;
 
     private:
-        bool removeOneKey(OperationContext* txn,
+        void removeOneKey(OperationContext* txn,
                           const BSONObj& key,
                           const DiskLoc& loc,
                           bool dupsAllowed);

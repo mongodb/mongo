@@ -77,7 +77,7 @@ namespace mongo {
                               const DiskLoc& loc,
                               bool dupsAllowed) = 0;
 
-        virtual bool unindex(OperationContext* txn,
+        virtual void unindex(OperationContext* txn,
                              const BSONObj& key,
                              const DiskLoc& loc,
                              bool dupsAllowed) = 0;

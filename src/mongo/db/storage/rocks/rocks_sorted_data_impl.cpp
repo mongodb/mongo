@@ -481,7 +481,8 @@ namespace mongo {
 
     bool RocksSortedDataImpl::unindex(OperationContext* txn,
                                       const BSONObj& key,
-                                      const DiskLoc& loc) {
+                                      const DiskLoc& loc,
+                                      bool dupsAllowed) {
         RocksRecoveryUnit* ru = RocksRecoveryUnit::getRocksRecoveryUnit(txn);
 
         const string keyData = makeString( key, loc );
