@@ -203,7 +203,8 @@ namespace mongo {
             scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
             {
                 WriteUnitOfWork uow( opCtx.get() );
-                ASSERT( !sorted->unindex( opCtx.get(), BSON( "" << 1 ), DiskLoc( 5, 20 ), true ) );
+                sorted->unindex( opCtx.get(), BSON( "" << 1 ), DiskLoc( 5, 20 ), true );
+                ASSERT_EQUALS( 1, sorted->numEntries( opCtx.get() ) );
                 uow.commit();
             }
         }
@@ -217,7 +218,8 @@ namespace mongo {
             scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
             {
                 WriteUnitOfWork uow( opCtx.get() );
-                ASSERT( !sorted->unindex( opCtx.get(), BSON( "" << 2 ), DiskLoc( 5, 18 ), true ) );
+                sorted->unindex( opCtx.get(), BSON( "" << 2 ), DiskLoc( 5, 18 ), true );
+                ASSERT_EQUALS( 1, sorted->numEntries( opCtx.get() ) );
                 uow.commit();
             }
         }
@@ -232,7 +234,8 @@ namespace mongo {
             scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
             {
                 WriteUnitOfWork uow( opCtx.get() );
-                ASSERT( sorted->unindex( opCtx.get(), BSON( "" << 1 ), DiskLoc( 5, 18 ), true ) );
+                sorted->unindex( opCtx.get(), BSON( "" << 1 ), DiskLoc( 5, 18 ), true );
+                ASSERT( sorted->isEmpty( opCtx.get() ) );
                 uow.commit();
             }
         }
@@ -266,7 +269,8 @@ namespace mongo {
             scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
             {
                 WriteUnitOfWork uow( opCtx.get() );
-                ASSERT( sorted->unindex( opCtx.get(), BSON( "" << 1 ), DiskLoc( 5, 18 ), true ) );
+                sorted->unindex( opCtx.get(), BSON( "" << 1 ), DiskLoc( 5, 18 ), true );
+                ASSERT( sorted->isEmpty( opCtx.get() ) );
                 // no commit
             }
         }

@@ -124,14 +124,12 @@ namespace mongo {
         return ret;
     }
 
-    bool BtreeBasedAccessMethod::removeOneKey(OperationContext* txn,
+    void BtreeBasedAccessMethod::removeOneKey(OperationContext* txn,
                                               const BSONObj& key,
                                               const DiskLoc& loc,
                                               bool dupsAllowed) {
-        bool ret = false;
-
         try {
-            ret = _newInterface->unindex(txn, key, loc, dupsAllowed);
+            _newInterface->unindex(txn, key, loc, dupsAllowed);
         } catch (AssertionException& e) {
             log() << "Assertion failure: _unindex failed "
                   << _descriptor->indexNamespace() << endl;
@@ -140,8 +138,6 @@ namespace mongo {
             log() << "  dl:" << loc.toString() << endl;
             logContext();
         }
-
-        return ret;
     }
 
     Status BtreeBasedAccessMethod::newCursor(OperationContext* txn, const CursorOptions& opts, IndexCursor** out) const {
@@ -161,14 +157,8 @@ namespace mongo {
         *numDeleted = 0;
 
         for (BSONObjSet::const_iterator i = keys.begin(); i != keys.end(); ++i) {
-            bool thisKeyOK = removeOneKey(txn, *i, loc, options.dupsAllowed);
-
-            if (thisKeyOK) {
-                ++*numDeleted;
-            } else if (options.logIfError) {
-                log() << "unindex failed (key too big?) " << _descriptor->indexNamespace()
-                      << " key: " << *i;
-            }
+            removeOneKey(txn, *i, loc, options.dupsAllowed);
+            ++*numDeleted;
         }
 
         return Status::OK();
