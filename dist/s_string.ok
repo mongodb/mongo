@@ -561,6 +561,7 @@ eventv
 evictable
 evictserver
 exactp
+exe
 execop
 extern
 extlist
@@ -917,6 +918,7 @@ sHQ
 savepoints
 sb
 scanp
+sched
 schemas
 schematab
 scr
