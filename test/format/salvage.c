@@ -74,14 +74,22 @@ corrupt(void)
 	(void)snprintf(buf, sizeof(buf), "%s/%s", g.home, WT_NAME);
 	if ((fd = open(buf, O_RDWR)) != -1) {
 		(void)snprintf(copycmd, sizeof(copycmd),
+#ifdef _WIN32
+		    "copy %s\\%s %s\\slvg.copy\\%s.corrupted",
+#else
 		    "cp %s/%s %s/slvg.copy/%s.corrupted",
+#endif
 		    g.home, WT_NAME, g.home, WT_NAME);
 		goto found;
 	}
 	(void)snprintf(buf, sizeof(buf), "%s/%s.wt", g.home, WT_NAME);
 	if ((fd = open(buf, O_RDWR)) != -1) {
 		(void)snprintf(copycmd, sizeof(copycmd),
+#ifdef _WIN32
+		    "copy %s\\%s.wt %s\\slvg.copy\\%s.wt.corrupted",
+#else
 		    "cp %s/%s.wt %s/slvg.copy/%s.wt.corrupted",
+#endif
 		    g.home, WT_NAME, g.home, WT_NAME);
 		goto found;
 	}

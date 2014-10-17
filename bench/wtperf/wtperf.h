@@ -25,27 +25,38 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
+#ifndef _WIN32
 #include <sys/time.h>
+#endif
 #include <sys/types.h>
 #include <sys/stat.h>
 
 #include <assert.h>
 #include <ctype.h>
+#ifndef _WIN32
 #include <dirent.h>
+#endif
 #include <errno.h>
 #include <fcntl.h>
 #include <inttypes.h>
 #include <limits.h>
 #include <math.h>
+#ifndef _WIN32
 #include <pthread.h>
+#endif
 #include <stddef.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#ifndef _WIN32
 #include <unistd.h>
+#endif
 
-#include <wiredtiger.h>
-#include <wiredtiger_ext.h>
+#include <wt_internal.h>
+
+#ifdef _WIN32
+#include "windows_shim.h"
+#endif
 
 #include "config_opt.h"
 

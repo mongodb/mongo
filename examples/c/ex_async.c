@@ -31,12 +31,18 @@
 #include <inttypes.h>
 #include <stdio.h>
 #include <string.h>
+#ifndef _WIN32
 #include <unistd.h>
+#else
+#include "windows_shim.h"
+#endif
 
 #include <wiredtiger.h>
 
 #if defined(_lint)
 #define	ATOMIC_ADD(v, val)      ((v) += (val), (v))
+#elif defined(_WIN32)
+#define	ATOMIC_ADD(v, val)      (_InterlockedExchangeAdd(&(v), val) + val)
 #else
 #define	ATOMIC_ADD(v, val)      __sync_add_and_fetch(&(v), val)
 #endif
