@@ -632,18 +632,19 @@ namespace {
         const OpTime& opTime, const WriteConcernOptions& writeConcern) {
 
         if (!writeConcern.wMode.empty()) {
+            StringData patternName;
             if (writeConcern.wMode == "majority") {
-                return _haveNumNodesReachedOpTime_inlock(opTime,
-                                                         _rsConfig.getMajorityVoteCount());
+                patternName = "$majority";
             }
             else {
-                StatusWith<ReplicaSetTagPattern> tagPattern =
-                        _rsConfig.findCustomWriteMode(writeConcern.wMode);
-                if (!tagPattern.isOK()) {
-                    return true;
-                }
-                return _haveTaggedNodesReachedOpTime_inlock(opTime, tagPattern.getValue());
+                patternName = writeConcern.wMode;
             }
+            StatusWith<ReplicaSetTagPattern> tagPattern =
+                _rsConfig.findCustomWriteMode(patternName);
+            if (!tagPattern.isOK()) {
+                return true;
+            }
+            return _haveTaggedNodesReachedOpTime_inlock(opTime, tagPattern.getValue());
         }
         else {
             return _haveNumNodesReachedOpTime_inlock(opTime, writeConcern.wNumNodes);
