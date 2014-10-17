@@ -46,8 +46,20 @@ namespace mongo {
 
     class WiredTigerRecordStore : public RecordStore {
     public:
-        static string generateCreateString(const CollectionOptions &options,
-                                           const StringData& extraStrings );
+
+        /**
+         * Creates a configuration string suitable for 'config' parameter in WT_SESSION::create().
+         * Configuration string is constructed from:
+         *     built-in defaults
+         *     storageEngine.wiredtiger.configString in 'options'
+         *     'extraStrings'
+         * Performs simple validation on the supplied parameters.
+         * Returns error status if validation fails.
+         * Note that even if this function returns an OK status, WT_SESSION:create() may still
+         * fail with the constructed configuration string.
+         */
+        static StatusWith<std::string> generateCreateString(const CollectionOptions &options,
+                                                            const StringData& extraStrings);
 
         WiredTigerRecordStore(OperationContext* txn,
                               const StringData& ns,

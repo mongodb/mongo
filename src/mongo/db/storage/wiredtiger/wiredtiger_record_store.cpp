@@ -40,6 +40,7 @@
 #include "mongo/db/storage/wiredtiger/wiredtiger_session_cache.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_util.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/mongoutils/str.h"
 #include "mongo/util/log.h"
 #include "mongo/util/scopeguard.h"
 
@@ -48,11 +49,11 @@
 
 namespace mongo {
 
-    std::string WiredTigerRecordStore::generateCreateString( const CollectionOptions& options,
-                                                             const StringData& extraStrings ) {
+    StatusWith<std::string> WiredTigerRecordStore::generateCreateString(
+        const CollectionOptions& options, const StringData& extraStrings) {
         // Separate out a prefix and suffix in the default string. User configuration will
         // override values in the prefix, but not values in the suffix.
-        std::stringstream ss;
+        str::stream ss;
         if ( 0 ) {
             ss << "type=file,";
             ss << "leaf_page_max=512k,";
@@ -64,8 +65,31 @@ namespace mongo {
 
         ss << extraStrings << ",";
 
+        // Validate configuration object.
+        // Warn about unrecognized fields that may be introduced in newer versions of this
+        // storage engine instead of raising an error.
+        // Ensure that 'configString' field is a string. Warn if this is not the case.
+        BSONForEach(elem, options.storageEngine.getObjectField("wiredtiger")) {
+            if (elem.fieldNameStringData() == "configString") {
+                if (elem.type() != String) {
+                    return StatusWith<std::string>(ErrorCodes::TypeMismatch, str::stream()
+                        << "storageEngine.wiredtiger.configString must be a string. "
+                        << "Not adding 'configString' value "
+                        << elem << " to collection configuration");
+                    continue;
+                }
+                ss << elem.valueStringData() << ",";
+            }
+            else {
+                // Return error on first unrecognized field.
+                return StatusWith<std::string>(ErrorCodes::InvalidOptions, str::stream()
+                    << '\'' << elem.fieldNameStringData() << '\''
+                    << " is not a supported option in storageEngine.wiredtiger");
+            }
+        }
+
         ss << "key_format=q,value_format=u";
-        return ss.str();
+        return StatusWith<std::string>(ss);
     }
 
     WiredTigerRecordStore::WiredTigerRecordStore( OperationContext* ctx,

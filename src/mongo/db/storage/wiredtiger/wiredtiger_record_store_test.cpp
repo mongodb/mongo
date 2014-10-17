@@ -28,6 +28,9 @@
  *    it in the license file.
  */
 
+#include "mongo/platform/basic.h"
+
+#include "mongo/db/json.h"
 #include "mongo/db/operation_context_noop.h"
 #include "mongo/db/storage/record_store_test_harness.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_recovery_unit.h"
@@ -61,7 +64,10 @@ namespace mongo {
             WiredTigerRecoveryUnit* ru = new WiredTigerRecoveryUnit( _sessionCache );
             OperationContextNoop txn( ru );
             string uri = "table:a.b";
-            std::string config = WiredTigerRecordStore::generateCreateString(CollectionOptions(), "");
+            StatusWith<std::string> result =
+                WiredTigerRecordStore::generateCreateString(CollectionOptions(), "");
+            ASSERT_TRUE(result.isOK());
+            std::string config = result.getValue();
 
             {
                 WriteUnitOfWork uow(&txn);
@@ -80,7 +86,10 @@ namespace mongo {
             WiredTigerRecoveryUnit* ru = new WiredTigerRecoveryUnit( _sessionCache );
             OperationContextNoop txn( ru );
             string uri = "table:a.b";
-            std::string config = WiredTigerRecordStore::generateCreateString(CollectionOptions(), "");
+            StatusWith<std::string> result =
+                WiredTigerRecordStore::generateCreateString(CollectionOptions(), "");
+            ASSERT_TRUE(result.isOK());
+            std::string config = result.getValue();
 
             {
                 WriteUnitOfWork uow(&txn);
@@ -105,5 +114,22 @@ namespace mongo {
         return new WiredTigerHarnessHelper();
     }
 
+    TEST(WiredTigerRecordStoreTest, GenerateCreateStringUnknownField) {
+        CollectionOptions options;
+        options.storageEngine = fromjson("{wiredtiger: {unknownField: 1}}");
+        StatusWith<std::string> result = WiredTigerRecordStore::generateCreateString(options, "");
+        const Status& status = result.getStatus();
+        ASSERT_NOT_OK(status);
+        ASSERT_EQUALS(ErrorCodes::InvalidOptions, status.code());
+    }
+
+    TEST(WiredTigerRecordStoreTest, GenerateCreateStringNonStringConfig) {
+        CollectionOptions options;
+        options.storageEngine = fromjson("{wiredtiger: {configString: 12345}}");
+        StatusWith<std::string> result = WiredTigerRecordStore::generateCreateString(options, "");
+        const Status& status = result.getStatus();
+        ASSERT_NOT_OK(status);
+        ASSERT_EQUALS(ErrorCodes::TypeMismatch, status.code());
+    }
 
 }
