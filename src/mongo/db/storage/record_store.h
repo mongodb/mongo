@@ -182,7 +182,7 @@ namespace mongo {
         virtual Status updateWithDamages( OperationContext* txn,
                                           const DiskLoc& loc,
                                           const RecordData& oldRec,
-                                          const char* damangeSource,
+                                          const char* damageSource,
                                           const mutablebson::DamageVector& damages ) = 0;
         /**
          * returned iterator owned by caller

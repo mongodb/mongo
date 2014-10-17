@@ -217,7 +217,7 @@ namespace mongo {
     Status HeapRecordStore::updateWithDamages( OperationContext* txn,
                                                const DiskLoc& loc,
                                                const RecordData& oldRec,
-                                               const char* damangeSource,
+                                               const char* damageSource,
                                                const mutablebson::DamageVector& damages ) {
         HeapRecord* rec = recordFor( loc );
         char* root = rec->data();
@@ -226,7 +226,7 @@ namespace mongo {
         mutablebson::DamageVector::const_iterator where = damages.begin();
         const mutablebson::DamageVector::const_iterator end = damages.end();
         for( ; where != end; ++where ) {
-            const char* sourcePtr = damangeSource + where->sourceOffset;
+            const char* sourcePtr = damageSource + where->sourceOffset;
             char* targetPtr = root + where->targetOffset;
             std::memcpy(targetPtr, sourcePtr, where->size);
         }
