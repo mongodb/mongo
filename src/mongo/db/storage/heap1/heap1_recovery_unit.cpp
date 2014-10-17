@@ -33,71 +33,33 @@
 #include "mongo/db/storage/sorted_data_interface.h"
 
 namespace mongo {
-
     Heap1RecoveryUnit::~Heap1RecoveryUnit() {
-        invariant( _frames.empty() );
+        invariant(_depth == 0);
     }
 
     void Heap1RecoveryUnit::beginUnitOfWork() {
-        _frames.push_back( Frame() );
+        _depth++;
     }
 
     void Heap1RecoveryUnit::commitUnitOfWork() {
-        if ( _frames.size() == 1 ) {
-            _rollbackPossible = true;
+        if ( _depth > 1 )
+            return;
+
+        for (Changes::iterator it = _changes.begin(), end = _changes.end(); it != end; ++it) {
+            (*it)->commit();
         }
-        else {
-            size_t last = _frames.size() - 1;
-            size_t next = last - 1;
-            _frames[next].indexMods.insert( _frames[next].indexMods.end(),
-                                            _frames[last].indexMods.begin(),
-                                            _frames[last].indexMods.end() );
-        }
-        _frames.back().indexMods.clear();
+        _changes.clear();
     }
 
     void Heap1RecoveryUnit::endUnitOfWork() {
+         _depth--;
+         if (_depth > 0 )
+             return;
 
-        // invariant( _rollbackPossible ); // todo
-
-        const Frame& frame = _frames.back();
-        for ( size_t i = frame.indexMods.size() ; i > 0; i-- ) {
-            const IndexInfo& ii = frame.indexMods[i-1];
-            SortedDataInterface* idx = ii.idx;
-            if ( ii.insert )
-                idx->unindex( NULL, ii.obj, ii.loc, true );
-            else
-                idx->insert( NULL, ii.obj, ii.loc, true );
-        }
-
-        _frames.pop_back();
+         for (Changes::reverse_iterator it = _changes.rbegin(), end = _changes.rend();
+                 it != end; ++it) {
+             (*it)->rollback();
+         }
+         _changes.clear();
     }
-
-    void Heap1RecoveryUnit::notifyIndexMod( SortedDataInterface* idx,
-                                            const BSONObj& obj, const DiskLoc& loc, bool insert ) {
-        IndexInfo ii = { idx, obj, loc, insert };
-        _frames.back().indexMods.push_back( ii );
-    }
-
-    // static
-    void Heap1RecoveryUnit::notifyIndexInsert( OperationContext* ctx, SortedDataInterface* idx,
-                                               const BSONObj& obj, const DiskLoc& loc ) {
-        if ( !ctx )
-            return;
-
-        Heap1RecoveryUnit* ru = dynamic_cast<Heap1RecoveryUnit*>( ctx->recoveryUnit() );
-        ru->notifyIndexMod( idx, obj, loc, true );
-    }
-
-    // static
-    void Heap1RecoveryUnit::notifyIndexRemove( OperationContext* ctx, SortedDataInterface* idx,
-                                               const BSONObj& obj, const DiskLoc& loc ) {
-        if ( !ctx )
-            return;
-
-        Heap1RecoveryUnit* ru = dynamic_cast<Heap1RecoveryUnit*>( ctx->recoveryUnit() );
-        ru->notifyIndexMod( idx, obj, loc, false );
-    }
-
-
 }

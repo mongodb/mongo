@@ -91,7 +91,6 @@ namespace mongo {
                                                         const StringData& ns,
                                                         const CollectionOptions& options,
                                                         bool allocateDefaultSpace ) {
-        dynamic_cast<Heap1RecoveryUnit*>( opCtx->recoveryUnit() )->rollbackImpossible();
         boost::mutex::scoped_lock lk( _entryMapLock );
         Entry*& entry = _entryMap[ ns.toString() ];
         if ( entry )
@@ -119,7 +118,6 @@ namespace mongo {
                                                       const StringData& ns ) {
         //TODO: invariant( opCtx->lockState()->isWriteLocked( ns ) );
 
-        dynamic_cast<Heap1RecoveryUnit*>( opCtx->recoveryUnit() )->rollbackImpossible();
         boost::mutex::scoped_lock lk( _entryMapLock );
         EntryMap::iterator i = _entryMap.find( ns.toString() );
 

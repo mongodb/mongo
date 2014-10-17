@@ -162,10 +162,10 @@ namespace {
             if (!dupsAllowed && isDup(*_data, key, loc))
                 return dupKeyError(key);
 
-            BSONObj owned = key.getOwned();
-            if ( _data->insert(IndexKeyEntry(owned, loc)).second ) {
+            IndexKeyEntry entry(key.getOwned(), loc);
+            if ( _data->insert(entry).second ) {
                 _currentKeySize += key.objsize();
-                Heap1RecoveryUnit::notifyIndexInsert( txn, this, owned, loc );
+                txn->recoveryUnit()->registerChange(new IndexChange(_data, entry, true));
             }
             return Status::OK();
         }
@@ -178,11 +178,12 @@ namespace {
             invariant(loc.isValid());
             invariant(!hasFieldNames(key));
 
-            const size_t numDeleted = _data->erase(IndexKeyEntry(key, loc));
+            IndexKeyEntry entry(key.getOwned(), loc);
+            const size_t numDeleted = _data->erase(entry);
             invariant(numDeleted <= 1);
             if ( numDeleted == 1 ) {
                 _currentKeySize -= key.objsize();
-                Heap1RecoveryUnit::notifyIndexRemove( txn, this, key, loc );
+                txn->recoveryUnit()->registerChange(new IndexChange(_data, entry, false));
             }
         }
 
@@ -309,6 +310,7 @@ namespace {
             }
 
         private:
+
             OperationContext* _txn; // not owned
             const IndexSet& _data;
             IndexSet::const_iterator _it;
@@ -459,6 +461,26 @@ namespace {
         }
 
     private:
+        class IndexChange : public RecoveryUnit::Change {
+        public:
+            IndexChange(IndexSet* data, const IndexKeyEntry& entry, bool insert)
+                : _data(data), _entry(entry), _insert(insert)
+            {}
+
+            virtual void commit() {}
+            virtual void rollback() {
+                if (_insert)
+                    _data->erase(_entry);
+                else
+                    _data->insert(_entry);
+            }
+
+        private:
+            IndexSet* _data;
+            const IndexKeyEntry _entry;
+            const bool _insert;
+        };
+
         IndexSet* _data;
         long long _currentKeySize;
     };
