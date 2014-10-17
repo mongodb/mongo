@@ -85,12 +85,12 @@ namespace mongo {
             return _btree->insert(txn, key, loc, dupsAllowed);
         }
 
-        virtual bool unindex(OperationContext* txn,
+        virtual void unindex(OperationContext* txn,
                              const BSONObj& key,
                              const DiskLoc& loc,
                              bool dupsAllowed) {
 
-            return _btree->unindex(txn, key, loc);
+            _btree->unindex(txn, key, loc);
         }
 
         virtual void fullValidate(OperationContext* txn, long long *numKeysOut) const {

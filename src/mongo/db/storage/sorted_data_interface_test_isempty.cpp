@@ -65,7 +65,8 @@ namespace mongo {
             scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
             {
                 WriteUnitOfWork uow( opCtx.get() );
-                ASSERT( sorted->unindex( opCtx.get(), key1, loc1, false ) );
+                sorted->unindex( opCtx.get(), key1, loc1, false );
+                ASSERT( sorted->isEmpty( opCtx.get() ) );
                 uow.commit();
             }
         }

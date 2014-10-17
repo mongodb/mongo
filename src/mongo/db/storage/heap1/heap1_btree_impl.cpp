@@ -170,7 +170,7 @@ namespace {
             return Status::OK();
         }
 
-        virtual bool unindex(OperationContext* txn,
+        virtual void unindex(OperationContext* txn,
                              const BSONObj& key,
                              const DiskLoc& loc,
                              bool dupsAllowed) {
@@ -184,8 +184,6 @@ namespace {
                 _currentKeySize -= key.objsize();
                 Heap1RecoveryUnit::notifyIndexRemove( txn, this, key, loc );
             }
-
-            return numDeleted == 1;
         }
 
         virtual void fullValidate(OperationContext* txn, long long *numKeysOut) const {
