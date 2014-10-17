@@ -87,33 +87,37 @@ namespace mongo {
         ASSERT( engine );
 
         string ns = "a.b";
-        scoped_ptr<RecordStore> rs;
-        {
-            MyOperationContext opCtx( engine );
-            ASSERT_OK( engine->createRecordStore( &opCtx, ns, CollectionOptions() ) );
-            rs.reset( engine->getRecordStore( &opCtx, ns, ns, CollectionOptions() ) );
-            ASSERT( rs );
-        }
 
-
+        // 'loc' holds location of "abc" and is referenced after restarting engine.
         DiskLoc loc;
         {
-            MyOperationContext opCtx( engine );
-            WriteUnitOfWork uow( &opCtx );
-            StatusWith<DiskLoc> res = rs->insertRecord( &opCtx, "abc", 4, false );
-            ASSERT_OK( res.getStatus() );
-            loc = res.getValue();
-            uow.commit();
-        }
-
-        {
-            MyOperationContext opCtx( engine );
-            ASSERT_EQUALS( string("abc"), rs->dataFor( &opCtx, loc ).data() );
+            scoped_ptr<RecordStore> rs;
+            {
+                MyOperationContext opCtx( engine );
+                ASSERT_OK( engine->createRecordStore( &opCtx, ns, CollectionOptions() ) );
+                rs.reset( engine->getRecordStore( &opCtx, ns, ns, CollectionOptions() ) );
+                ASSERT( rs );
+            }
+    
+            {
+                MyOperationContext opCtx( engine );
+                WriteUnitOfWork uow( &opCtx );
+                StatusWith<DiskLoc> res = rs->insertRecord( &opCtx, "abc", 4, false );
+                ASSERT_OK( res.getStatus() );
+                loc = res.getValue();
+                uow.commit();
+            }
+    
+            {
+                MyOperationContext opCtx( engine );
+                ASSERT_EQUALS( string("abc"), rs->dataFor( &opCtx, loc ).data() );
+            }
         }
 
         engine = helper->restartEngine();
 
         {
+            scoped_ptr<RecordStore> rs;
             MyOperationContext opCtx( engine );
             rs.reset( engine->getRecordStore( &opCtx, ns, ns, CollectionOptions() ) );
             ASSERT_EQUALS( string("abc"), rs->dataFor( &opCtx, loc ).data() );
