@@ -181,7 +181,7 @@ __open_index(WT_SESSION_IMPL *session, WT_TABLE *table, WT_INDEX *idx)
 	if (npublic_cols == 0) {
 		WT_ERR(__wt_config_getones(
 		    session, idx->config, "index_key_columns", &cval));
-		npublic_cols = cval.val;
+		npublic_cols = (u_int)cval.val;
 		WT_ASSERT(session, npublic_cols != 0);
 		for (i = 0; i < npublic_cols; i++)
 			WT_ERR(__wt_buf_catfmt(

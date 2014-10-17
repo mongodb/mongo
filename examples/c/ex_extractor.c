@@ -41,7 +41,6 @@
 
 int add_extractor(WT_CONNECTION *conn);
 
-static const char * const progname = "ex_extractor";
 static const char *home;
 
 struct president_data {

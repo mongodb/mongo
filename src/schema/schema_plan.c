@@ -253,13 +253,9 @@ __wt_struct_plan(WT_SESSION_IMPL *session, WT_TABLE *table,
 		 * ever use such plans to extract the primary key from the
 		 * index.
 		 */
-		if (ret == WT_NOTFOUND) {
-			fprintf(stderr,
-			    "__wt_schema_plan: column '%.*s' not found\n",
-			    (int)k.len, k.str);
+		if (ret == WT_NOTFOUND)
 			WT_RET(__wt_buf_catfmt(session, plan,
 			    "0%c%c", WT_PROJ_VALUE, WT_PROJ_NEXT));
-		}
 	}
 	WT_RET_TEST(ret != WT_NOTFOUND, ret);
 
