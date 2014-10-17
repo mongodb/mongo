@@ -1943,6 +1943,15 @@ def doConfigure(myenv):
         conf.env.Append( CPPDEFINES=[ "HEAP_CHECKING" ] )
         conf.env.Append( CCFLAGS=["-fno-omit-frame-pointer"] )
 
+    if has_option("wiredtiger"):
+        if not conf.CheckCXXHeader( "wiredtiger.h" ):
+            print( "Cannot find wiredtiger.h in CPPPATH: " + str(env["CPPPATH"]))
+            Exit(1)
+
+        if not conf.CheckLib( "wiredtiger" ):
+            print( "Cannot find wiredtiger in LIBPATH: " + str(env["LIBPATH"]))
+            Exit(1)
+
     # ask each module to configure itself and the build environment.
     moduleconfig.configure_modules(mongo_modules, conf)
 
