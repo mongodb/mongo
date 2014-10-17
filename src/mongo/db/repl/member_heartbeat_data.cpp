@@ -33,13 +33,11 @@
 #include <climits>
 
 #include "mongo/db/repl/member_heartbeat_data.h"
-#include "mongo/util/log.h"
 
 namespace mongo {
 namespace repl {
 
-    MemberHeartbeatData::MemberHeartbeatData(int configIndex) :
-        _configIndex(configIndex),
+    MemberHeartbeatData::MemberHeartbeatData() :
         _state(MemberState::RS_UNKNOWN), 
         _health(-1), 
         _upSince(0),
@@ -53,28 +51,12 @@ namespace repl {
         _state = newState;
     }
 
-    void MemberHeartbeatData::updateFrom(const MemberHeartbeatData& newInfo) {
-        _state = newInfo.getState();
-        _health = newInfo.getHealth();
-        _upSince = newInfo.getUpSince();
-        _lastHeartbeat = newInfo.getLastHeartbeat();
-        _lastHeartbeatMsg = newInfo.getLastHeartbeatMsg();
-        _syncSource = newInfo.getSyncSource();
-        _opTime = newInfo.getOpTime();
-        _skew = newInfo.getSkew();
-        _authIssue = newInfo.hasAuthIssue();
-        _electionTime = newInfo.getElectionTime();
-    }
-
     MemberHeartbeatData& MemberHeartbeatData::setUpValues(Date_t now,
                                           MemberState state,
                                           OpTime electionTime,
                                           OpTime optime,
                                           const std::string& syncingTo,
                                           const std::string& heartbeatMessage) {
-        LOG(3) << "setUpValues: heartbeat response good for member _id:"
-               << _configIndex << ", msg:  "<< heartbeatMessage;
-
         _state = state;
         _health = 1;
         if (_upSince == 0) {
@@ -91,8 +73,6 @@ namespace repl {
 
     MemberHeartbeatData& MemberHeartbeatData::setDownValues(Date_t now,
                                             const std::string& heartbeatMessage) {
-        LOG(3) << "setDownValues: heartbeat response failed for member _id:"
-               << _configIndex << ", msg:  "<< heartbeatMessage;
         _state = MemberState::RS_DOWN;
         _health = 0;
         _upSince = 0;
@@ -104,10 +84,6 @@ namespace repl {
     }
 
     MemberHeartbeatData& MemberHeartbeatData::setAuthIssue(Date_t now) {
-        LOG(3) << "setAuthIssue: heartbeat response failed due to authentication"
-                  " issue for member _id:"
-               << _configIndex;
-
         _syncSource = "";
         _upSince = 0;
         _lastHeartbeat = now;

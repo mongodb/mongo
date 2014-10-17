@@ -35,15 +35,16 @@
 namespace mongo {
 namespace repl {
 
+    class ReplSetHeartbeatResponse;
+
     /**
      * This class contains the data returned from a heartbeat command for one member
      * of a replica set.
      **/
     class MemberHeartbeatData {
     public:
-        explicit MemberHeartbeatData(int configIndex);
+        MemberHeartbeatData();
 
-        int getConfigIndex() const { return _configIndex; }
         const MemberState& getState() const { return _state; }
         int getHealth() const { return _health; }
         Date_t getUpSince() const { return _upSince; }
@@ -65,12 +66,6 @@ namespace repl {
         // Was this member up for the last hearbeeat
         // (or we haven't received the first heartbeat yet)
         bool maybeUp() const { return _health != 0; }
-
-        /**
-         * Updates this with the info received from the command result we got from
-         * the last heartbeat command.
-         */
-        void updateFrom(const MemberHeartbeatData& newInfo);
 
         /**
          * Sets the member's state to "newState".  This is principally valuable when modeling
@@ -104,9 +99,6 @@ namespace repl {
         MemberHeartbeatData& setAuthIssue(Date_t now);
 
     private:
-        // This member's index into the ReplicaSetConfig
-        int _configIndex;
-
         // This member's state
         MemberState _state;
 
