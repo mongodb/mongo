@@ -276,7 +276,11 @@ path_setup(const char *home)
 	 * log file.
 	 */
 #undef	CMD
+#ifdef _WIN32
+#define	CMD	"cd %s && del /s /q * && rd /s /q KVS"
+#else
 #define	CMD	"cd %s && rm -rf `ls | sed /rand/d`"
+#endif
 	len = strlen(g.home) + strlen(CMD) + 1;
 	if ((g.home_init = malloc(len)) == NULL)
 		die(errno, "malloc");
@@ -284,7 +288,11 @@ path_setup(const char *home)
 
 	/* Backup directory initialize command, remove and re-create it. */
 #undef	CMD
+#ifdef _WIN32
+#define	CMD	"del /s && mkdir %s"
+#else
 #define	CMD	"rm -rf %s && mkdir %s"
+#endif
 	len = strlen(g.home_backup) * 2 + strlen(CMD) + 1;
 	if ((g.home_backup_init = malloc(len)) == NULL)
 		die(errno, "malloc");
@@ -295,11 +303,18 @@ path_setup(const char *home)
 	 * salvage command as necessary.
 	 */
 #undef	CMD
+#ifdef _WIN32
+#define	CMD								\
+	"cd %s && "							\
+	"rd /q /s slvg.copy & mkdir slvg.copy && "			\
+	"copy WiredTiger* slvg.copy\\ && copy wt* slvg.copy\\"
+#else
 #define	CMD								\
 	"cd %s && "							\
 	"rm -rf slvg.copy && mkdir slvg.copy && "			\
 	"cp WiredTiger* wt* slvg.copy/"
-	len = strlen(g.home) +  strlen(CMD) + 1;
+#endif
+	len = strlen(g.home) + strlen(CMD) + 1;
 	if ((g.home_salvage_copy = malloc(len)) == NULL)
 		die(errno, "malloc");
 	snprintf(g.home_salvage_copy, len, CMD, g.home);
