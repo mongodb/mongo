@@ -2,7 +2,7 @@
 // force a replica set resync by deleting all datafiles
 
 // TODO: Remove once test is fixed for SERVER-15704, add "use strict"
-if (true) {
+if (false) {
     var replTest = new ReplSetTest({name: 'resync', nodes: 3, oplogSize: 1});
     var nodes = replTest.nodeList();
 
