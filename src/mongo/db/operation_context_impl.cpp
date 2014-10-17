@@ -57,7 +57,7 @@ namespace mongo {
             _locker.reset(new LockerImpl<true>());
         }
 
-        _client = &cc();
+        _client = currentClient.get(); // may be NULL
 
         getGlobalEnvironment()->registerOperationContext(this);
     }
@@ -100,6 +100,8 @@ namespace mongo {
     }
 
     Client* OperationContextImpl::getClient() const {
+        if ( _client == NULL )
+            return currentClient.get();
         return _client;
     }
 
