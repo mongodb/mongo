@@ -21,6 +21,9 @@ AddOption("--enable-snappy", dest="snappy", type="string", nargs=1, action="stor
 AddOption("--enable-swig", dest="swig", type="string", nargs=1, action="store",
           help="Build python extension, specify location of swig.exe binary")
 
+AddOption("--dynamic-crt", dest="dynamic-crt", action="store_true", default=False,
+          help="Link with the MSVCRT DLL version")
+
 env = Environment(
     CPPPATH = ["#/src/include/",
                "#/build_win",
@@ -46,7 +49,7 @@ env = Environment(
         "/Gy", # separate functions for linker
         "/Zc:wchar_t",
         "/Gd",
-        "/MD",
+        "/MD" if GetOption("dynamic-crt") else "/MT",
         ],
     LINKFLAGS = [
         "/DEBUG", # Generate debug symbols
