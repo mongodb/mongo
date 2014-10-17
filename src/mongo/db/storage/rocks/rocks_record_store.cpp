@@ -240,6 +240,7 @@ namespace mongo {
 
     Status RocksRecordStore::updateWithDamages( OperationContext* txn,
                                                 const DiskLoc& loc,
+                                                const RecordData& oldRec,
                                                 const char* damageSource,
                                                 const mutablebson::DamageVector& damages ) {
         RocksRecoveryUnit* ru = RocksRecoveryUnit::getRocksRecoveryUnit( txn );

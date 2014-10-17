@@ -479,7 +479,7 @@ namespace mongo {
         return Status::OK();
     }
 
-    bool RocksSortedDataImpl::unindex(OperationContext* txn,
+    void RocksSortedDataImpl::unindex(OperationContext* txn,
                                       const BSONObj& key,
                                       const DiskLoc& loc,
                                       bool dupsAllowed) {
@@ -489,12 +489,11 @@ namespace mongo {
 
         string dummy;
         if (ru->Get(_columnFamily.get(), keyData, &dummy).IsNotFound()) {
-            return false;
+            return;
         }
 
         ru->registerChange(new ChangeNumEntries(&_numEntries, false));
         ru->writeBatch()->Delete(_columnFamily.get(), keyData);
-        return true;
     }
 
     Status RocksSortedDataImpl::dupKeyCheck(OperationContext* txn,
