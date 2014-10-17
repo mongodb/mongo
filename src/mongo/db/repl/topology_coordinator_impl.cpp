@@ -1589,6 +1589,9 @@ namespace {
         else if (!_isOpTimeCloseEnoughToLatestToElect(hbData.getOpTime(), lastOpApplied)) {
             return NotCloseEnoughToLatestOptime;
         }
+        else if (hbData.up() && hbData.isUnelectable()) {
+            return RefusesToStand;
+        }
         else {
             invariant(memberConfig.isElectable());
             return None;
@@ -1653,6 +1656,8 @@ namespace {
             return "member is more than 10 seconds behind the most up-to-date member";
         case NotInitialized:
             return "node is not a member of a valid replica set configuration";
+        case RefusesToStand:
+            return "most recent heartbeat indicates node will not stand for election";
         }
         invariant(false); // unreachable
     }

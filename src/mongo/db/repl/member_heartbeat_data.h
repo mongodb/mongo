@@ -59,6 +59,12 @@ namespace repl {
 
         OpTime getElectionTime() const { return _lastResponse.getElectionTime(); }
 
+        // Returns true if the last heartbeat data explicilty stated that the node
+        // is not electable.
+        bool isUnelectable() const {
+            return _lastResponse.hasIsElectable() && !_lastResponse.isElectable();
+        }
+
         // Was this member up for the last heartbeat?
         bool up() const { return _health > 0; }
         // Was this member up for the last hearbeeat
