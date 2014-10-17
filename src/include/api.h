@@ -66,7 +66,7 @@
 			ret = __wt_txn_commit((s), NULL);		\
 		else {							\
 			WT_TRET(__wt_txn_rollback((s), NULL));		\
-			if ((ret == 0 || ret == WT_DEADLOCK) &&		\
+			if ((ret == 0 || ret == WT_ROLLBACK) &&		\
 			    (retry)) {					\
 				ret = 0;				\
 				continue;				\

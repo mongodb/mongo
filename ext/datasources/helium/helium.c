@@ -806,7 +806,7 @@ cache_value_update_check(WT_CURSOR *wtcursor)
 	for (i = 0, cp = cursor->cache; i < cursor->cache_entries; ++i, ++cp)
 		if (!cache_value_aborted(wtcursor, cp) &&
 		    !wtext->transaction_visible(wtext, session, cp->txnid))
-			return (WT_DEADLOCK);
+			return (WT_ROLLBACK);
 	return (0);
 }
 

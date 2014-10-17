@@ -284,7 +284,7 @@ __wt_txn_update_check(WT_SESSION_IMPL *session, WT_UPDATE *upd)
 			if (upd->txnid != WT_TXN_ABORTED) {
 				WT_STAT_FAST_DATA_INCR(
 				    session, txn_update_conflict);
-				return (WT_DEADLOCK);
+				return (WT_ROLLBACK);
 			}
 			upd = upd->next;
 		}

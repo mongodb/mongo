@@ -592,8 +592,8 @@ read_row(WT_CURSOR *cursor, WT_ITEM *key, uint64_t keyno)
 			ret = cursor->get_value(cursor, &value);
 		}
 	}
-	if (ret == WT_DEADLOCK)
-		return (WT_DEADLOCK);
+	if (ret == WT_ROLLBACK)
+		return (WT_ROLLBACK);
 	if (ret != 0 && ret != WT_NOTFOUND)
 		die(ret, "read_row: read row %" PRIu64, keyno);
 	/*
@@ -650,8 +650,8 @@ nextprev(WT_CURSOR *cursor, int next, int *notfoundp)
 
 	keyno = 0;
 	ret = next ? cursor->next(cursor) : cursor->prev(cursor);
-	if (ret == WT_DEADLOCK)
-		return (WT_DEADLOCK);
+	if (ret == WT_ROLLBACK)
+		return (WT_ROLLBACK);
 	if (ret == 0)
 		switch (g.type) {
 		case FIX:
@@ -760,8 +760,8 @@ row_update(
 	cursor->set_key(cursor, key);
 	cursor->set_value(cursor, value);
 	ret = cursor->update(cursor);
-	if (ret == WT_DEADLOCK)
-		return (WT_DEADLOCK);
+	if (ret == WT_ROLLBACK)
+		return (WT_ROLLBACK);
 	if (ret != 0 && ret != WT_NOTFOUND)
 		die(ret, "row_update: update row %" PRIu64 " by key", keyno);
 
@@ -807,8 +807,8 @@ col_update(WT_CURSOR *cursor, WT_ITEM *key, WT_ITEM *value, uint64_t keyno)
 	else
 		cursor->set_value(cursor, value);
 	ret = cursor->update(cursor);
-	if (ret == WT_DEADLOCK)
-		return (WT_DEADLOCK);
+	if (ret == WT_ROLLBACK)
+		return (WT_ROLLBACK);
 	if (ret != 0 && ret != WT_NOTFOUND)
 		die(ret, "col_update: %" PRIu64, keyno);
 
@@ -952,8 +952,8 @@ row_insert(
 	cursor->set_key(cursor, key);
 	cursor->set_value(cursor, value);
 	ret = cursor->insert(cursor);
-	if (ret == WT_DEADLOCK)
-		return (WT_DEADLOCK);
+	if (ret == WT_ROLLBACK)
+		return (WT_ROLLBACK);
 	if (ret != 0 && ret != WT_NOTFOUND)
 		die(ret, "row_insert: insert row %" PRIu64 " by key", keyno);
 
@@ -985,8 +985,8 @@ col_insert(WT_CURSOR *cursor, WT_ITEM *key, WT_ITEM *value, uint64_t *keynop)
 	else
 		cursor->set_value(cursor, value);
 	if ((ret = cursor->insert(cursor)) != 0) {
-		if (ret == WT_DEADLOCK)
-			return (WT_DEADLOCK);
+		if (ret == WT_ROLLBACK)
+			return (WT_ROLLBACK);
 		die(ret, "cursor.insert");
 	}
 	if ((ret = cursor->get_key(cursor, &keyno)) != 0)
@@ -1039,8 +1039,8 @@ row_remove(WT_CURSOR *cursor, WT_ITEM *key, uint64_t keyno, int *notfoundp)
 	/* We use the cursor in overwrite mode, check for existence. */
 	if ((ret = cursor->search(cursor)) == 0)
 		ret = cursor->remove(cursor);
-	if (ret == WT_DEADLOCK)
-		return (WT_DEADLOCK);
+	if (ret == WT_ROLLBACK)
+		return (WT_ROLLBACK);
 	if (ret != 0 && ret != WT_NOTFOUND)
 		die(ret, "row_remove: remove %" PRIu64 " by key", keyno);
 	*notfoundp = (ret == WT_NOTFOUND);
@@ -1074,8 +1074,8 @@ col_remove(WT_CURSOR *cursor, WT_ITEM *key, uint64_t keyno, int *notfoundp)
 	/* We use the cursor in overwrite mode, check for existence. */
 	if ((ret = cursor->search(cursor)) == 0)
 		ret = cursor->remove(cursor);
-	if (ret == WT_DEADLOCK)
-		return (WT_DEADLOCK);
+	if (ret == WT_ROLLBACK)
+		return (WT_ROLLBACK);
 	if (ret != 0 && ret != WT_NOTFOUND)
 		die(ret, "col_remove: remove %" PRIu64 " by key", keyno);
 	*notfoundp = (ret == WT_NOTFOUND);
