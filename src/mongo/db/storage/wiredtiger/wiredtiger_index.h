@@ -61,7 +61,7 @@ namespace mongo {
                               const DiskLoc& loc,
                               bool dupsAllowed);
 
-        virtual bool unindex(OperationContext* txn,
+        virtual void unindex(OperationContext* txn,
                              const BSONObj& key,
                              const DiskLoc& loc,
                              bool dupsAllowed);
@@ -96,7 +96,7 @@ namespace mongo {
                                 const DiskLoc& loc,
                                 bool dupsAllowed ) = 0;
 
-        virtual bool _unindex( WT_CURSOR* c,
+        virtual void _unindex( WT_CURSOR* c,
                                const BSONObj& key,
                                const DiskLoc& loc,
                                bool dupsAllowed ) = 0;
@@ -175,7 +175,7 @@ namespace mongo {
                                 const DiskLoc& loc,
                                 bool dupsAllowed );
 
-        virtual bool _unindex( WT_CURSOR* c,
+        virtual void _unindex( WT_CURSOR* c,
                                const BSONObj& key,
                                const DiskLoc& loc,
                                bool dupsAllowed );
@@ -192,7 +192,7 @@ namespace mongo {
                                 const DiskLoc& loc,
                                 bool dupsAllowed );
 
-        virtual bool _unindex( WT_CURSOR* c,
+        virtual void _unindex( WT_CURSOR* c,
                                const BSONObj& key,
                                const DiskLoc& loc,
                                bool dupsAllowed );

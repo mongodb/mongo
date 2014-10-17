@@ -351,23 +351,15 @@ namespace mongo {
     }
 
     Status WiredTigerRecordStore::updateWithDamages( OperationContext* txn,
-                                                const DiskLoc& loc,
-                                                const char* damangeSource,
-                                                const mutablebson::DamageVector& damages ) {
-        // get original value
-        WiredTigerCursor curwrap( _uri, _instanceId, txn);
-        WT_CURSOR *c = curwrap.get();
-        c->set_key(c, _makeKey(loc));
-        int ret = c->search(c);
-        invariantWTOK(ret);
-
-        WT_ITEM old_value;
-        ret = c->get_value(c, &old_value);
-        invariantWTOK(ret);
-
-        std::string data(reinterpret_cast<const char *>(old_value.data), old_value.size);
+                                                     const DiskLoc& loc,
+                                                     const RecordData& oldRec,
+                                                     const char* damangeSource,
+                                                     const mutablebson::DamageVector& damages ) {
 
         // apply changes to our copy
+
+        std::string data(reinterpret_cast<const char *>(oldRec.data()), oldRec.size());
+
         char* root = const_cast<char*>( data.c_str() );
         for( size_t i = 0; i < damages.size(); i++ ) {
             mutablebson::DamageEvent event = damages[i];
@@ -377,9 +369,15 @@ namespace mongo {
         }
 
         // write back
+
         WiredTigerItem value(data);
+
+        WiredTigerCursor curwrap( _uri, _instanceId, txn);
+        WT_CURSOR *c = curwrap.get();
+        c->set_key(c, _makeKey(loc));
         c->set_value(c, value.Get());
-        ret = c->update(c);
+
+        int ret = c->update(c);
         invariantWTOK(ret);
 
         return Status::OK();

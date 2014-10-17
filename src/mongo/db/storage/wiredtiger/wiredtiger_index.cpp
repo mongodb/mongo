@@ -207,7 +207,7 @@ namespace {
         return _insert( c, key, loc, dupsAllowed );
     }
 
-    bool WiredTigerIndex::unindex(OperationContext* txn,
+    void WiredTigerIndex::unindex(OperationContext* txn,
                                   const BSONObj& key,
                                   const DiskLoc& loc,
                                   bool dupsAllowed ) {
@@ -219,7 +219,7 @@ namespace {
         WT_CURSOR *c = curwrap.get();
         invariant( c );
 
-        return _unindex( c, key, loc, dupsAllowed );
+        _unindex( c, key, loc, dupsAllowed );
     }
 
     void WiredTigerIndex::fullValidate(OperationContext* txn, long long *numKeysOut) const {
@@ -657,7 +657,7 @@ namespace {
         return wtRCToStatus( c->update( c ) );
     }
 
-    bool WiredTigerIndexUnique::_unindex( WT_CURSOR* c,
+    void WiredTigerIndexUnique::_unindex( WT_CURSOR* c,
                                           const BSONObj& key,
                                           const DiskLoc& loc,
                                           bool dupsAllowed ) {
@@ -668,17 +668,17 @@ namespace {
             // nice and clear
             int ret = c->remove(c);
             if (ret == WT_NOTFOUND) {
-                return false;
+                return;
             }
             invariantWTOK(ret);
-            return true;
+            return;
         }
 
         // ewww
 
         int ret = c->search(c);
         if ( ret == WT_NOTFOUND )
-            return false;
+            return;
         invariantWTOK( ret );
 
         WT_ITEM old;
@@ -700,7 +700,7 @@ namespace {
             if ( newSize == 0 ) {
                 // nothing left, just delete entry
                 invariantWTOK( c->remove(c) );
-                return true;
+                return;
             }
 
             boost::scoped_array<char> smaller( new char[newSize] );
@@ -712,11 +712,8 @@ namespace {
             WiredTigerItem valueItem = WiredTigerItem( smaller.get(), newSize );
             c->set_value( c, valueItem.Get() );
             invariantWTOK( c->update( c ) );
-            return true;
         }
-        return false;
     }
-
 
     // ------------------------------
 
@@ -737,7 +734,7 @@ namespace {
         return wtRCToStatus( c->insert(c) );
     }
 
-    bool WiredTigerIndexStandard::_unindex( WT_CURSOR* c,
+    void WiredTigerIndexStandard::_unindex( WT_CURSOR* c,
                                             const BSONObj& key,
                                             const DiskLoc& loc,
                                             bool dupsAllowed ) {
@@ -746,11 +743,9 @@ namespace {
         WiredTigerItem item = _toItem( key, loc, &data);
         c->set_key(c, item.Get() );
         int ret = c->remove(c);
-        if (ret == WT_NOTFOUND) {
-            return false;
+        if (ret != WT_NOTFOUND) {
+            invariantWTOK(ret);
         }
-        invariantWTOK(ret);
-        return true;
     }
 
 
