@@ -89,13 +89,6 @@ static uint64_t	 wtperf_value_range(CONFIG *);
 	"../../ext/test/helium/.libs/libwiredtiger_helium.so"
 #define	HELIUM_CONFIG	",type=helium"
 
-/*
- * wtperf uses internal WiredTiger library routines for timing and generating
- * random numbers.
- */
-extern uint32_t	__wt_random(uint32_t *);
-extern void	__wt_random_init(uint32_t *);
-
 /* Retrieve an ID for the next insert operation. */
 static inline uint64_t
 get_next_incr(CONFIG *cfg)
@@ -1897,7 +1890,6 @@ err:		if (ret == 0)
 }
 
 extern int __wt_optind, __wt_optreset;
-extern int __wt_getopt(const char *, int, char * const *, const char *);
 extern char *__wt_optarg;
 
 int
