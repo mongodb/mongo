@@ -110,6 +110,7 @@ error_code("LockFailed", 107)
 error_code("InconsistentReplicaSetNames", 108)
 error_code("ConfigurationInProgress", 109)
 error_code("CannotInitializeNodeWithData", 110)
+error_code("NotExactValueField", 111)
 
 # Non-sequential error codes (for compatibility only)
 error_code("NotMaster", 10107) #this comes from assert_util.h
@@ -122,6 +123,7 @@ error_code("BackgroundOperationInProgressForDatabase", 12586);
 error_code("BackgroundOperationInProgressForNamespace", 12587);
 error_code("NotMasterOrSecondaryCode", 13436);
 error_code("NotMasterNoSlaveOkCode", 13435);
+error_code("ShardKeyTooBig", 13334);
 
 error_class("NetworkError", ["HostUnreachable", "HostNotFound", "NetworkTimeout"])
 error_class("Interruption", ["Interrupted", "InterruptedAtShutdown", "ExceededTimeLimit"])

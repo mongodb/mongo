@@ -699,8 +699,11 @@ namespace mongo {
                     return false;
                 }
 
-                if (!isShardKeySizeValid(endKey, &errmsg)) {
-                    warning() << errmsg << endl;
+                // Make sure splits don't create too-big shard keys
+                Status status = ShardKeyPattern::checkShardKeySize(endKey);
+                if (!status.isOK()) {
+                    errmsg = status.reason();
+                    warning() << errmsg;
                     return false;
                 }
 

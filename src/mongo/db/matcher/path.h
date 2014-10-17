@@ -44,13 +44,16 @@ namespace mongo {
     public:
         Status init( const StringData& path );
 
+        void setTraverseNonleafArrays( bool b ) { _shouldTraverseNonleafArrays = b; }
         void setTraverseLeafArray( bool b ) { _shouldTraverseLeafArray = b; }
 
         const FieldRef& fieldRef() const { return _fieldRef; }
+        bool shouldTraverseNonleafArrays() const { return _shouldTraverseNonleafArrays; }
         bool shouldTraverseLeafArray() const { return _shouldTraverseLeafArray; }
 
     private:
         FieldRef _fieldRef;
+        bool _shouldTraverseNonleafArrays;
         bool _shouldTraverseLeafArray;
     };
 

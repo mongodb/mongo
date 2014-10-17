@@ -38,7 +38,7 @@
 #include "mongo/client/dbclient_rs.h"
 #include "mongo/s/chunk.h"
 #include "mongo/s/shard.h"
-#include "mongo/s/shardkey.h"
+#include "mongo/s/shard_key_pattern.h"
 
 namespace mongo {
 
@@ -134,11 +134,11 @@ namespace mongo {
          * WARNING: It's not safe to place initial chunks onto non-primary shards using this method.
          * The initShards parameter allows legacy behavior expected by map-reduce.
          */
-        ChunkManagerPtr shardCollection( const std::string& ns ,
-                                         ShardKeyPattern fieldsAndOrder ,
-                                         bool unique ,
-                                         std::vector<BSONObj>* initPoints = 0,
-                                         std::vector<Shard>* initShards = 0 );
+        ChunkManagerPtr shardCollection(const std::string& ns,
+                                        const ShardKeyPattern& fieldsAndOrder,
+                                        bool unique,
+                                        std::vector<BSONObj>* initPoints = 0,
+                                        std::vector<Shard>* initShards = 0);
 
         /**
            @return true if there was sharding info to remove

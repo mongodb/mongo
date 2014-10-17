@@ -90,7 +90,7 @@ namespace mongo {
 
         if( manager->numChunks() != 0 ){
             _cm = ChunkManagerPtr( manager );
-            _key = manager->getShardKey().key().getOwned();
+            _key = manager->getShardKeyPattern().toBSON().getOwned();
             _unqiue = manager->isUnique();
             _dirty = true;
             _dropped = false;
@@ -191,7 +191,12 @@ namespace mongo {
     /**
      *
      */
-    ChunkManagerPtr DBConfig::shardCollection( const string& ns , ShardKeyPattern fieldsAndOrder , bool unique , vector<BSONObj>* initPoints, vector<Shard>* initShards ) {
+    ChunkManagerPtr DBConfig::shardCollection(const string& ns,
+                                              const ShardKeyPattern& fieldsAndOrder,
+                                              bool unique,
+                                              vector<BSONObj>* initPoints,
+                                              vector<Shard>* initShards) {
+
         uassert( 8042 , "db doesn't have sharding enabled" , _shardingEnabled );
         uassert( 13648 , str::stream() << "can't shard collection because not all config servers are up" , configServer.allUp() );
 
@@ -207,7 +212,7 @@ namespace mongo {
 
             // Record start in changelog
             BSONObjBuilder collectionDetail;
-            collectionDetail.append("shardKey", fieldsAndOrder.key());
+            collectionDetail.append("shardKey", fieldsAndOrder.toBSON());
             collectionDetail.append("collection", ns);
             collectionDetail.append("primary", getPrimary().toString());
             BSONArray a;
@@ -436,7 +441,7 @@ namespace mongo {
             }
             
             temp.reset(new ChunkManager(oldManager->getns(),
-                                        oldManager->getShardKey(),
+                                        oldManager->getShardKeyPattern(),
                                         oldManager->isUnique()));
             temp->loadExistingRanges(configServer.getPrimary().getConnString(), oldManager.get());
 

@@ -21,6 +21,10 @@ env.Library('logger',
             LIBDEPS=['$BUILD_DIR/mongo/base/base',
                      '$BUILD_DIR/mongo/util/concurrency/thread_name'])
 
+env.Library('parse_log_component_settings',
+            ['parse_log_component_settings.cpp'],
+            LIBDEPS=['logger', '$BUILD_DIR/mongo/bson'])
+
 # writes multi-byte sequences to console
 # to support manual testing of console stream  under Windows
 # output should be visually verified under Command Prompt or Power Shell
@@ -38,3 +42,7 @@ env.CppUnitTest('log_function_test', 'log_function_test.cpp',
 env.CppUnitTest('rotatable_file_writer_test',
                 'rotatable_file_writer_test.cpp',
                 LIBDEPS=['logger'])
+
+env.CppUnitTest(target='parse_log_component_settings_test',
+                source='parse_log_component_settings_test.cpp',
+                LIBDEPS=['logger', 'parse_log_component_settings'])

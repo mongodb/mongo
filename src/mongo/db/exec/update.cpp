@@ -347,8 +347,7 @@ namespace mongo {
                         return Status(ErrorCodes::ImmutableField,
                                       mongoutils::str::stream()
                                       << "After applying the update to the document {"
-                                      << (oldIdElem.ok() ? oldIdElem.toString() :
-                                                           newIdElem.toString())
+                                      << oldElem.toString()
                                       << " , ...}, the (immutable) field '" << current.dottedField()
                                       << "' was found to have been altered to "
                                       << newElem.toString());
@@ -592,24 +591,23 @@ namespace mongo {
         // Reset the document we will be writing to
         _doc.reset();
 
-        // This remains the empty object in the case of an object replacement, but in the case
-        // of an upsert where we are creating a base object from the query and applying mods,
-        // we capture the query as the original so that we can detect immutable field mutations.
-        BSONObj original = BSONObj();
+        // The original document we compare changes to - immutable paths must not change
+        BSONObj original;
+
+        bool isInternalRequest = request->isFromReplication() || request->isFromMigration();
+
+        const vector<FieldRef*>* immutablePaths = NULL;
+        if (!isInternalRequest && lifecycle)
+            immutablePaths = lifecycle->getImmutableFields();
 
         // Calling populateDocumentWithQueryFields will populate the '_doc' with fields from the
         // query which creates the base of the update for the inserted doc (because upsert
         // was true).
         if (cq) {
-            uassertStatusOK(driver->populateDocumentWithQueryFields(cq, _doc));
-            if (!driver->isDocReplacement()) {
+            uassertStatusOK(driver->populateDocumentWithQueryFields(cq, immutablePaths, _doc));
+            if (driver->isDocReplacement())
                 _specificStats.fastmodinsert = true;
-                // We need all the fields from the query to compare against for validation below.
-                original = _doc.getObject();
-            }
-            else {
-                original = request->getQuery();
-            }
+            original = _doc.getObject();
         }
         else {
             fassert(17354, CanonicalQuery::isSimpleIdQuery(request->getQuery()));
@@ -630,17 +628,13 @@ namespace mongo {
         // Validate that the object replacement or modifiers resulted in a document
         // that contains all the immutable keys and can be stored if it isn't coming
         // from a migration or via replication.
-        if (!(request->isFromReplication() || request->isFromMigration())){
-            const std::vector<FieldRef*>* immutableFields = NULL;
-            if (lifecycle)
-                immutableFields = lifecycle->getImmutableFields();
-
+        if (!isInternalRequest){
             FieldRefSet noFields;
             // This will only validate the modified fields if not a replacement.
             uassertStatusOK(validate(original,
                                      noFields,
                                      _doc,
-                                     immutableFields,
+                                     immutablePaths,
                                      driver->modOptions()) );
         }
 

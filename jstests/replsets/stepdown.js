@@ -107,6 +107,21 @@ assert.soon(function() {
     }, 'making sure '+firstMaster+' isn\'t still master', 60000);
 
 
+// Add arbiter for shutdown tests
+replTest.add();
+
+config.version++;
+config.members.push({_id: 3,
+                     host: getHostName()+":"+replTest.ports[replTest.ports.length-1],
+                     arbiterOnly:true});
+
+try {
+    master.getDB("admin").runCommand({replSetReconfig : config});
+}
+catch (e) {
+    print(e);
+}
+
 print("\ncheck shutdown command");
 
 master = replTest.liveNodes.master;
@@ -114,7 +129,7 @@ var slave = replTest.liveNodes.slaves[0];
 var slaveId = replTest.getNodeId(slave);
 
 try {
-    slave.adminCommand({shutdown :1})
+    slave.adminCommand({shutdown :1});
 }
 catch (e) {
     print(e);

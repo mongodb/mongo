@@ -32,6 +32,7 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/query/interval.h"
 #include "mongo/s/chunk.h"
+#include "mongo/s/shard_key_pattern.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/log.h"
 
@@ -412,7 +413,8 @@ namespace {
         BoundList expectedList;
         expectedList.push_back(make_pair(fromjson("{a: 0}"), fromjson("{a: 0}")));
 
-        BoundList list = KeyPattern::flattenBounds(fromjson("{a: 1}"), indexBounds);
+        ShardKeyPattern skeyPattern(fromjson("{a: 1}"));
+        BoundList list = skeyPattern.flattenBounds(indexBounds);
         CheckBoundList(list, expectedList);
     }
 
@@ -427,7 +429,8 @@ namespace {
         BoundList expectedList;
         expectedList.push_back(make_pair(fromjson("{a: 2}"), fromjson("{a: 3}")));
 
-        BoundList list = KeyPattern::flattenBounds(fromjson("{a: 1}"), indexBounds);
+        ShardKeyPattern skeyPattern(fromjson("{a: 1}"));
+        BoundList list = skeyPattern.flattenBounds(indexBounds);
         CheckBoundList(list, expectedList);
     }
 
@@ -450,7 +453,8 @@ namespace {
             fromjson("{ a: 2, b: 2, c: 2 }"),
             fromjson("{ a: 3, b: 3, c: 3 }")));
 
-        BoundList list = KeyPattern::flattenBounds(fromjson("{a: 1, b: 1, c: 1}"), indexBounds);
+        ShardKeyPattern skeyPattern(fromjson("{a: 1, b: 1, c: 1}"));
+        BoundList list = skeyPattern.flattenBounds(indexBounds);
         CheckBoundList(list, expectedList);
     }
 
@@ -488,7 +492,8 @@ namespace {
             fromjson("{ a: 0, b: 6, c: 2 }"),
             fromjson("{ a: 0, b: 6, c: 3 }")));
 
-        BoundList list = KeyPattern::flattenBounds(fromjson("{a: 1, b: 1, c: 1}"), indexBounds);
+        ShardKeyPattern skeyPattern(fromjson("{a: 1, b: 1, c: 1}"));
+        BoundList list = skeyPattern.flattenBounds(indexBounds);
         CheckBoundList(list, expectedList);
     }
 
@@ -518,7 +523,9 @@ namespace {
         expectedList.push_back(make_pair(
             fromjson("{ a: 0, b: 4, c: 2 }"),
             fromjson("{ a: 1, b: 6, c: 3 }")));
-        BoundList list = KeyPattern::flattenBounds(fromjson("{a: 1, b: 1, c: 1}"), indexBounds);
+
+        ShardKeyPattern skeyPattern(fromjson("{a: 1, b: 1, c: 1}"));
+        BoundList list = skeyPattern.flattenBounds(indexBounds);
         CheckBoundList(list, expectedList);
     }
 

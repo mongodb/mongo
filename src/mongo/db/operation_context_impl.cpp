@@ -57,7 +57,7 @@ namespace mongo {
             _locker.reset(new LockerImpl<true>());
         }
 
-        _client = &cc();
+        _client = currentClient.get(); // may be NULL
 
         getGlobalEnvironment()->registerOperationContext(this);
     }
@@ -71,13 +71,15 @@ namespace mongo {
     }
 
     RecoveryUnit* OperationContextImpl::releaseRecoveryUnit() {
-        _recovery->beingReleasedFromOperationContext();
+        if ( _recovery.get() )
+            _recovery->beingReleasedFromOperationContext();
         return _recovery.release();
     }
 
     void OperationContextImpl::setRecoveryUnit(RecoveryUnit* unit) {
         _recovery.reset(unit);
-        unit->beingSetOnOperationContext();
+        if ( unit )
+            unit->beingSetOnOperationContext();
     }
 
     Locker* OperationContextImpl::lockState() const {
@@ -100,6 +102,8 @@ namespace mongo {
     }
 
     Client* OperationContextImpl::getClient() const {
+        if ( _client == NULL )
+            return currentClient.get();
         return _client;
     }
 

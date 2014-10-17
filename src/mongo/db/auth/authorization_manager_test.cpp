@@ -152,7 +152,8 @@ namespace {
     class AuthorizationManagerTest : public ::mongo::unittest::Test {
     public:
         virtual ~AuthorizationManagerTest() {
-            authzManager->invalidateUserCache();
+            if (authzManager)
+                authzManager->invalidateUserCache();
         }
 
         void setUp() {

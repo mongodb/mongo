@@ -33,8 +33,7 @@
 #include "mongo/db/exec/filter.h"
 #include "mongo/db/exec/scoped_timer.h"
 #include "mongo/db/exec/working_set_common.h"
-#include "mongo/db/keypattern.h"
-#include "mongo/s/stale_exception.h"
+#include "mongo/s/shard_key_pattern.h"
 #include "mongo/util/log.h"
 
 namespace mongo {
@@ -69,7 +68,7 @@ namespace mongo {
             // aborted migrations
             if (_metadata) {
 
-                KeyPattern shardKeyPattern(_metadata->getKeyPattern());
+                ShardKeyPattern shardKeyPattern(_metadata->getKeyPattern());
                 WorkingSetMember* member = _ws->get(*out);
                 WorkingSetMatchableDocument matchable(member);
                 BSONObj shardKey = shardKeyPattern.extractShardKeyFromMatchable(matchable);

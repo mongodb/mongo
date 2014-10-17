@@ -181,7 +181,8 @@ namespace {
         status = AuthorizationManager::getBSONForRole(
                 roleGraph, roleToUpdate, roleDocument.root());
         if (status == ErrorCodes::RoleNotFound) {
-            status = driver.populateDocumentWithQueryFields(queryPattern, roleDocument);
+            // The query pattern will only contain _id, no other immutable fields are present
+            status = driver.populateDocumentWithQueryFields(queryPattern, NULL, roleDocument);
         }
         if (!status.isOK())
             return status;

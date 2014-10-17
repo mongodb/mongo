@@ -38,6 +38,22 @@ var found = false;
 db.getCollectionNames().forEach( function(x) { if (x == "test") found = true; });
 assert(found, "found test.test in system.namespaces");
 
+// Test round trip of storageEngine in collection options.
+db.getCollection('test').drop();
+assert.commandWorked(db.createCollection('test', {storageEngine: {storageEngine1: {x: 1}}}));
+var result = assert.commandWorked(db.runCommand('listCollections'));
+found  = false;
+for (var i = 0; i < result.collections.length; ++i) {
+    var collection = result.collections[i];
+    if (collection.name != 'test') {
+        continue;
+    }
+    found = true;
+    assert.docEq({storageEngine1: {x: 1}}, collection.options.storageEngine,
+                 'storage engine options not found in listCommands result');
+}
+assert(found, "'test' collection not created");
+
 dd( "e" );
 
 /*

@@ -15,11 +15,13 @@ env.Library(
         'field_ref_set.cpp',
         'field_parser.cpp',
         'get_status_from_command_result.cpp',
+        'keypattern.cpp',
         'write_concern_options.cpp'
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/bson',
         '$BUILD_DIR/mongo/foundation',
+        '$BUILD_DIR/mongo/index_names'
     ],
 )
 
@@ -55,6 +57,14 @@ env.CppUnitTest(
     LIBDEPS=[
         'common',
         '$BUILD_DIR/mongo/mongohasher',
+    ],
+)
+
+env.CppUnitTest(
+    target= 'keypattern_test',
+    source= 'keypattern_test.cpp',
+    LIBDEPS=[
+        'common'
     ],
 )
 

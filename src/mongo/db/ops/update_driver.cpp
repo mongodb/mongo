@@ -46,6 +46,8 @@ namespace mongo {
     namespace str = mongoutils::str;
     namespace mb = mongo::mutablebson;
 
+    using pathsupport::EqualityMatches;
+
     UpdateDriver::UpdateDriver(const Options& opts)
         : _replacementMode(false)
         , _indexedFields(NULL)
@@ -164,6 +166,7 @@ namespace mongo {
     }
 
     Status UpdateDriver::populateDocumentWithQueryFields(const BSONObj& query,
+                                                         const vector<FieldRef*>* immutablePaths,
                                                          mutablebson::Document& doc) const {
         CanonicalQuery* rawCG;
         // We canonicalize the query to collapse $and/$or, and the first arg (ns) is not needed
@@ -173,109 +176,43 @@ namespace mongo {
         if (!s.isOK())
             return s;
         scoped_ptr<CanonicalQuery> cq(rawCG);
-        return populateDocumentWithQueryFields(rawCG, doc);
+        return populateDocumentWithQueryFields(rawCG, immutablePaths, doc);
     }
 
     Status UpdateDriver::populateDocumentWithQueryFields(const CanonicalQuery* query,
+                                                         const vector<FieldRef*>* immutablePathsPtr,
                                                          mutablebson::Document& doc) const {
-
-        MatchExpression* root = query->root();
-
-        MatchExpression::MatchType rootType = root->matchType();
-
-        // These copies are needed until we apply the modifiers at the end.
-        std::vector<BSONObj> copies;
-
-        // We only care about equality and "and"ed equality fields, everything else is ignored
-        if (rootType != MatchExpression::EQ && rootType != MatchExpression::AND)
-            return Status::OK();
+        EqualityMatches equalities;
+        Status status = Status::OK();
 
         if (isDocReplacement()) {
-            BSONElement idElem = query->getQueryObj().getField("_id");
 
-            // Replacement mods need the _id field copied explicitly.
-            if (idElem.ok()) {
-                mb::Element elem = doc.makeElement(idElem);
-                return doc.root().pushFront(elem);
-            }
+            FieldRefSet pathsToExtract;
 
-            return Status::OK();
-        }
+            // TODO: Refactor update logic, make _id just another immutable field
+            static const FieldRef idPath("_id");
+            static const vector<FieldRef*> emptyImmutablePaths;
+            const vector<FieldRef*>& immutablePaths =
+                immutablePathsPtr ? *immutablePathsPtr : emptyImmutablePaths;
 
-        // Create a new UpdateDriver to create the base doc from the query
-        Options opts;
-        opts.logOp = false;
-        opts.modOptions = modOptions();
+            pathsToExtract.fillFrom(immutablePaths);
+            pathsToExtract.insert(&idPath);
 
-        UpdateDriver insertDriver(opts);
-        insertDriver.setContext(ModifierInterface::ExecInfo::INSERT_CONTEXT);
-
-        // If we are a single equality match query
-        if (root->matchType() == MatchExpression::EQ) {
-            EqualityMatchExpression* eqMatch =
-                    static_cast<EqualityMatchExpression*>(root);
-
-            const BSONElement matchData = eqMatch->getData();
-            BSONElement childElem = matchData;
-
-            // Make copy to new path if not the same field name (for cases like $all)
-            if (!root->path().empty() && matchData.fieldNameStringData() != root->path()) {
-                BSONObjBuilder copyBuilder;
-                copyBuilder.appendAs(eqMatch->getData(), root->path());
-                const BSONObj copy = copyBuilder.obj();
-                copies.push_back(copy);
-                childElem = copy[root->path()];
-            }
-
-            // Add this element as a $set modifier
-            Status s = insertDriver.addAndParse(modifiertable::MOD_SET,
-                                                childElem);
-            if (!s.isOK())
-                return s;
-
+            // Extract only immutable fields from replacement-style
+            status = pathsupport::extractFullEqualityMatches(*query->root(),
+                                                             pathsToExtract,
+                                                             &equalities);
         }
         else {
-
-            // parse query $set mods, including only equality stuff
-            for (size_t i = 0; i < root->numChildren(); ++i) {
-                MatchExpression* child = root->getChild(i);
-                if (child->matchType() == MatchExpression::EQ) {
-                    EqualityMatchExpression* eqMatch =
-                            static_cast<EqualityMatchExpression*>(child);
-
-                    const BSONElement matchData = eqMatch->getData();
-                    BSONElement childElem = matchData;
-
-                    // Make copy to new path if not the same field name (for cases like $all)
-                    if (!child->path().empty() &&
-                            matchData.fieldNameStringData() != child->path()) {
-                        BSONObjBuilder copyBuilder;
-                        copyBuilder.appendAs(eqMatch->getData(), child->path());
-                        const BSONObj copy = copyBuilder.obj();
-                        copies.push_back(copy);
-                        childElem = copy[child->path()];
-                    }
-
-                    // Add this element as a $set modifier
-                    Status s = insertDriver.addAndParse(modifiertable::MOD_SET,
-                                                        childElem);
-                    if (!s.isOK())
-                        return s;
-                }
-            }
+            // Extract all fields from op-style
+            status = pathsupport::extractEqualityMatches(*query->root(), &equalities);
         }
 
-        // update the document with base field
-        Status s = insertDriver.update(StringData(), &doc);
-        copies.clear();
-        if (!s.isOK()) {
-            return Status(ErrorCodes::UnsupportedFormat,
-                          str::stream() << "Cannot create base during"
-                                           " insert of update. Caused by :"
-                                        << s.toString());
-        }
+        if (!status.isOK())
+            return status;
 
-        return Status::OK();
+        status = pathsupport::addEqualitiesToDoc(equalities, &doc);
+        return status;
     }
 
     Status UpdateDriver::update(const StringData& matchedField,

@@ -39,6 +39,7 @@
 namespace mongo {
 
     Status ElementPath::init( const StringData& path ) {
+        _shouldTraverseNonleafArrays = true;
         _shouldTraverseLeafArray = true;
         _fieldRef.parse( path );
         return Status::OK();
@@ -164,6 +165,11 @@ namespace mongo {
                 _subCursorPath.reset( new ElementPath() );
                 _subCursorPath->init( _arrayIterationState.restOfPath.substr( _arrayIterationState.nextPieceOfPath.size() + 1 ) );
                 _subCursorPath->setTraverseLeafArray( _path->shouldTraverseLeafArray() );
+
+                // If we're here, we must be able to traverse nonleaf arrays
+                dassert(_path->shouldTraverseNonleafArrays());
+                dassert(_subCursorPath->shouldTraverseNonleafArrays());
+
                 _subCursor.reset( new BSONElementIterator( _subCursorPath.get(), _arrayIterationState._current.Obj() ) );
                 _arrayIterationState._current = BSONElement();
                 return more();
@@ -192,8 +198,14 @@ namespace mongo {
 
             _arrayIterationState.reset( _path->fieldRef(), idxPath + 1 );
 
-            if ( !_arrayIterationState.hasMore && !_path->shouldTraverseLeafArray() ) {
-                _next.reset( e, BSONElement(), true );
+            if (_arrayIterationState.hasMore && !_path->shouldTraverseNonleafArrays()) {
+                // Don't allow traversing the array
+                _state = DONE;
+                return false;
+            }
+            else if (!_arrayIterationState.hasMore && !_path->shouldTraverseLeafArray()) {
+                // Return the leaf array
+                _next.reset(e, BSONElement(), true);
                 _state = DONE;
                 return true;
             }

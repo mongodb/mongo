@@ -169,20 +169,41 @@ assert.writeOK(collHashed.update({ hash : /abcde.*/ },
                                  { multi : true }));
 assert.eq(collHashed.find().itcount(), collHashed.find({ updated : true }).itcount());
 
-
 //
 //
-// Upsert by regex should fail on sharded collections
-// Regex is not targeted in queries, so can't be targeted for updates
+// Upsert with op-style regex should fail on sharded collections
+// Query clause is targeted, and regex in query clause is ambiguous
 collSharded.remove({});
-assert.writeError(collSharded.update({ a : /abcde.*/ }, { a : /abcde.*/ }, { upsert : true }));
-assert.writeError(collCompound.update({ a : /abcde.*/ }, { a : /abcde.*/ }, { upsert : true }));
-assert.writeError(collSharded.update({ a : /abcde.*/ }, { a : /abcde.*/ }, { upsert : true }));
-assert.writeError(collNested.update({ a : { b : /abcde.*/ } }, { a : { b : /abcde.*/ } },
+collCompound.remove({});
+collNested.remove({});
+assert.writeError(collSharded.update({ a : /abcde.*/ }, { $set : { a : /abcde.*/ } },
+                                     { upsert : true }));
+assert.writeError(collCompound.update({ a : /abcde.*/ }, { $set : { a : /abcde.*/, b : 1 } },
+                                      { upsert : true }));
+// Exact regex in query never equality
+assert.writeError(collNested.update({ 'a.b' : /abcde.*/ }, { $set : { 'a.b' : /abcde.*/ } },
                                     { upsert : true }));
-assert.writeError(collNested.update({ c : 1 }, { a : { b : /abcde.*/ } },
+// Even nested regexes are not extracted in queries
+assert.writeError(collNested.update({ a : { b : /abcde.*/ } }, { $set : { 'a.b' : /abcde.*/ } },
+                                    { upsert : true }));
+assert.writeError(collNested.update({ c : 1 }, { $set : { 'a.b' : /abcde.*/ } },
                                     { upsert : true }));
 
+//
+//
+// Upsert by replacement-style regex should succeed on sharded collections
+// Replacement clause is targeted, and regex is unambiguously a value
+collSharded.remove({});
+collCompound.remove({});
+collNested.remove({});
+assert.writeOK(collSharded.update({ a : /abcde.*/ }, { a : /abcde.*/ }, { upsert : true }));
+assert.writeOK(collCompound.update({ a : /abcde.*/ }, { a : /abcde.*/, b : 1 }, { upsert : true }));
+assert.writeOK(collNested.update({ 'a.b' : /abcde.*/ }, { a : { b : /abcde.*/ } },
+                                 { upsert : true }));
+assert.writeOK(collNested.update({ a : { b : /abcde.*/ } }, { a : { b : /abcde.*/ } },
+                                 { upsert : true }));
+assert.writeOK(collNested.update({ c : 1 }, { a : { b : /abcde.*/ } },
+                                 { upsert : true }));
 
 //
 //

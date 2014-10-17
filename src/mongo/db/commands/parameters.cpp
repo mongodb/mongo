@@ -40,6 +40,7 @@
 #include "mongo/db/commands.h"
 #include "mongo/db/server_parameters.h"
 #include "mongo/db/storage_options.h"
+#include "mongo/logger/parse_log_component_settings.h"
 #include "mongo/util/mongoutils/str.h"
 #include "mongo/util/net/ssl_manager.h"
 #include "mongo/util/net/ssl_options.h"
@@ -214,28 +215,32 @@ namespace mongo {
     } cmdSet;
 
     namespace {
+        using logger::globalLogDomain;
+        using logger::LogComponent;
+        using logger::LogComponentSetting;
+        using logger::LogSeverity;
+        using logger::parseLogComponentSettings;
+
         class LogLevelSetting : public ServerParameter {
         public:
             LogLevelSetting() : ServerParameter(ServerParameterSet::getGlobal(), "logLevel") {}
 
             virtual void append(OperationContext* txn, BSONObjBuilder& b, const std::string& name) {
-                b << name << logger::globalLogDomain()->getMinimumLogSeverity().toInt();
+                b << name << globalLogDomain()->getMinimumLogSeverity().toInt();
             }
 
             virtual Status set(const BSONElement& newValueElement) {
-                typedef logger::LogSeverity LogSeverity;
                 int newValue;
                 if (!newValueElement.coerce(&newValue) || newValue < 0)
                     return Status(ErrorCodes::BadValue, mongoutils::str::stream() <<
                                   "Invalid value for logLevel: " << newValueElement);
                 LogSeverity newSeverity = (newValue > 0) ? LogSeverity::Debug(newValue) :
                     LogSeverity::Log();
-                logger::globalLogDomain()->setMinimumLoggedSeverity(newSeverity);
+                globalLogDomain()->setMinimumLoggedSeverity(newSeverity);
                 return Status::OK();
             }
 
             virtual Status setFromString(const std::string& str) {
-                typedef logger::LogSeverity LogSeverity;
                 int newValue;
                 Status status = parseNumberFromString(str, &newValue);
                 if (!status.isOK())
@@ -245,7 +250,7 @@ namespace mongo {
                                   "Invalid value for logLevel: " << newValue);
                 LogSeverity newSeverity = (newValue > 0) ? LogSeverity::Debug(newValue) :
                     LogSeverity::Log();
-                logger::globalLogDomain()->setMinimumLoggedSeverity(newSeverity);
+                globalLogDomain()->setMinimumLoggedSeverity(newSeverity);
                 return Status::OK();
             }
         } logLevelSetting;
@@ -263,24 +268,9 @@ namespace mongo {
 
             virtual void append(OperationContext* txn, BSONObjBuilder& b,
                                 const std::string& name) {
-                mutablebson::Document doc;
-                for (int i = 0; i < int(logger::LogComponent::kNumLogComponents); ++i) {
-                    logger::LogComponent component = static_cast<logger::LogComponent::Value>(i);
-                    mutablebson::Element element = doc.makeElementObject(component.getShortName());
-                    if (logger::globalLogDomain()->hasMinimumLogSeverity(component)) {
-                        logger::LogSeverity severity =
-                            logger::globalLogDomain()->getMinimumLogSeverity(component);
-                        element.appendInt("verbosity", severity.toInt());
-                    }
-                    else {
-                        element.appendInt("verbosity", -1);
-                    }
-                    mutablebson::Element parentElement = _getParentElement(doc, component);
-                    parentElement.pushBack(element);
-                }
-                const string defaultLogComponentName =
-                    logger::LogComponent(logger::LogComponent::kDefault).getShortName();
-                b << name << doc.getObject().getObjectField(defaultLogComponentName);
+                BSONObj currentSettings;
+                _get(&currentSettings);
+                b << name << currentSettings;
             }
 
             virtual Status set(const BSONElement& newValueElement) {
@@ -302,6 +292,42 @@ namespace mongo {
             }
 
         private:
+            /**
+             * Returns current settings as a BSON document.
+             * The "default" log component is an implementation detail. Don't expose this to users.
+             */
+            void _get(BSONObj* output) const {
+                static const string defaultLogComponentName =
+                    LogComponent(LogComponent::kDefault).getShortName();
+
+                mutablebson::Document doc;
+
+                for (int i = 0; i < int(LogComponent::kNumLogComponents); ++i) {
+                    LogComponent component = static_cast<LogComponent::Value>(i);
+
+                    int severity = -1;
+                    if (globalLogDomain()->hasMinimumLogSeverity(component)) {
+                        severity = globalLogDomain()->getMinimumLogSeverity(component).toInt();
+                    }
+
+                    // Save LogComponent::kDefault LogSeverity at root
+                    if (component == LogComponent::kDefault) {
+                        doc.root().appendInt("verbosity", severity);
+                        continue;
+                    }
+
+                    mutablebson::Element element = doc.makeElementObject(component.getShortName());
+                    element.appendInt("verbosity", severity);
+
+                    mutablebson::Element parentElement = _getParentElement(doc, component);
+                    parentElement.pushBack(element);
+                }
+
+                BSONObj result = doc.getObject();
+                output->swap(result);
+                invariant(!output->hasField(defaultLogComponentName));
+            }
+
             /**
              * Updates component hierarchy log levels.
              *
@@ -336,38 +362,29 @@ namespace mongo {
              * Ignore elements in BSON object that do not map to a log component's dotted
              * name.
              */
-            Status _set(const BSONObj& obj) const {
-                for (int i = 0; i < int(logger::LogComponent::kNumLogComponents); ++i) {
-                    logger::LogComponent component = static_cast<logger::LogComponent::Value>(i);
-                    BSONElement element;
-                    if (component == logger::LogComponent::kDefault) {
-                        element = obj.getField("verbosity");
-                    }
-                    else {
-                        element = obj.getFieldDotted(component.getDottedName());
-                        if (!element.isNumber()) {
-                            element = obj.getFieldDotted(component.getDottedName() + ".verbosity");
-                        }
-                    }
-                    if (element.eoo()) {
-                        continue;
-                    }
-                    int newValue;
-                    if (!element.coerce(&newValue)) {
-                        return Status(ErrorCodes::TypeMismatch, mongoutils::str::stream() <<
-                                      "Invalid value for " << component.getDottedName() <<
-                                      " logLevel: " << element);
-                    }
+            Status _set(const BSONObj& bsonSettings) const {
+                StatusWith< std::vector<LogComponentSetting> > parseStatus =
+                        parseLogComponentSettings(bsonSettings);
+
+                if (!parseStatus.isOK()) {
+                    return parseStatus.getStatus();
+                }
+
+                std::vector<LogComponentSetting> settings = parseStatus.getValue();
+                std::vector<LogComponentSetting>::iterator it = settings.begin();
+                for (; it < settings.end(); ++it) {
+                    LogComponentSetting newSetting = *it;
+
                     // Negative value means to clear log level of component.
-                    if (newValue < 0) {
-                        logger::globalLogDomain()->clearMinimumLoggedSeverity(component);
+                    if (newSetting.level < 0) {
+                        globalLogDomain()->clearMinimumLoggedSeverity(newSetting.component);
                         continue;
                     }
                     // Convert non-negative value to Log()/Debug(N).
-                    typedef logger::LogSeverity LogSeverity;
-                    LogSeverity newSeverity = (newValue > 0) ? LogSeverity::Debug(newValue) :
-                        LogSeverity::Log();
-                    logger::globalLogDomain()->setMinimumLoggedSeverity(component, newSeverity);
+                    LogSeverity newSeverity = (newSetting.level > 0) ?
+                            LogSeverity::Debug(newSetting.level) : LogSeverity::Log();
+                    globalLogDomain()->setMinimumLoggedSeverity(newSetting.component,
+                                                                newSeverity);
                 }
 
                 return Status::OK();
@@ -377,16 +394,25 @@ namespace mongo {
              * Search document for element corresponding to log component's parent.
              */
             static mutablebson::Element _getParentElement(mutablebson::Document& doc,
-                                                          logger::LogComponent component) {
-                if (component == logger::LogComponent::kDefault) {
+                                                          LogComponent component) {
+                // Hide LogComponent::kDefault
+                if (component == LogComponent::kDefault) {
+                    return doc.end();
+                }
+                LogComponent parentComponent = component.parent();
+
+                // Attach LogComponent::kDefault children to root
+                if (parentComponent == LogComponent::kDefault) {
                     return doc.root();
                 }
-                logger::LogComponent parentComponent = component.parent();
                 mutablebson::Element grandParentElement = _getParentElement(doc, parentComponent);
                 return grandParentElement.findFirstChildNamed(parentComponent.getShortName());
             }
         } logComponentVerbositySetting;
 
+    }  // namespace
+
+    namespace {
         class SSLModeSetting : public ServerParameter {
         public:
             SSLModeSetting() : ServerParameter(ServerParameterSet::getGlobal(), "sslMode",

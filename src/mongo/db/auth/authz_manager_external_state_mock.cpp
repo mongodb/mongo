@@ -204,7 +204,7 @@ namespace {
             if (query.hasField("_id")) {
                 document.root().appendElement(query["_id"]);
             }
-            status = driver.populateDocumentWithQueryFields(query, document);
+            status = driver.populateDocumentWithQueryFields(query, NULL, document);
             if (!status.isOK()) {
                 return status;
             }

@@ -79,33 +79,15 @@ namespace mongo {
         static BSONField<string> shardNameField;
         static BSONField<string> configField;
 
-        // TODO:  Same limitations as other mongos metadata commands, sometimes we'll be stale here
-        // and fail.  Need to better integrate targeting with commands.
-        ShardPtr guessMergeShard( const NamespaceString& nss, const BSONObj& minKey ) {
-
-            DBConfigPtr config = grid.getDBConfig( nss.ns() );
-            if ( !config->isSharded( nss ) ) {
-                config->reload();
-                if ( !config->isSharded( nss ) ) {
-                    return ShardPtr();
-                }
-            }
-
-            ChunkManagerPtr manager = config->getChunkManager( nss );
-            if ( !manager ) return ShardPtr();
-            ChunkPtr chunk = manager->findChunkForDoc( minKey );
-            if ( !chunk ) return ShardPtr();
-            return ShardPtr( new Shard( chunk->getShard() ) );
-        }
-
         // TODO: This refresh logic should be consolidated
-        void refreshChunkCache( const NamespaceString& nss ) {
+        ChunkManagerPtr refreshChunkCache(const NamespaceString& nss) {
 
-            DBConfigPtr config = grid.getDBConfig( nss.ns() );
-            if ( !config->isSharded( nss ) ) return;
+            DBConfigPtr config = grid.getDBConfig(nss.ns());
+            if (!config->isSharded(nss))
+                return ChunkManagerPtr();
 
             // Refreshes chunks as a side-effect
-            config->getChunkManagerIfExists( nss, true );
+            return config->getChunkManagerIfExists(nss, true);
         }
 
 
@@ -152,15 +134,27 @@ namespace mongo {
             }
 
             // This refreshes the chunk metadata if stale.
-            refreshChunkCache( NamespaceString( ns ) );
+            ChunkManagerPtr manager = refreshChunkCache(NamespaceString(ns));
 
-            ShardPtr mergeShard = guessMergeShard( NamespaceString( ns ), minKey );
-
-            if ( !mergeShard ) {
-                errmsg = (string)"could not find shard for merge range starting at "
-                                 + minKey.toString();
+            if (!manager) {
+                errmsg = (string) "collection " + ns + " is not sharded, cannot merge chunks";
                 return false;
             }
+
+            if (!manager->getShardKeyPattern().isShardKey(minKey)
+                || !manager->getShardKeyPattern().isShardKey(maxKey)) {
+                errmsg = stream() << "shard key bounds " << "[" << minKey << "," << maxKey << ")"
+                                  << " are not valid for shard key pattern "
+                                  << manager->getShardKeyPattern().toBSON();
+                return false;
+            }
+
+            minKey = manager->getShardKeyPattern().normalizeShardKey(minKey);
+            maxKey = manager->getShardKeyPattern().normalizeShardKey(maxKey);
+
+            ChunkPtr firstChunk = manager->findIntersectingChunk(minKey);
+            verify(firstChunk);
+            Shard shard = firstChunk->getShard();
 
             BSONObjBuilder remoteCmdObjB;
             remoteCmdObjB.append( cmdObj[ ClusterMergeChunksCommand::nsField() ] );
@@ -168,12 +162,12 @@ namespace mongo {
             remoteCmdObjB.append( ClusterMergeChunksCommand::configField(),
                                   configServer.getPrimary().getAddress().toString() );
             remoteCmdObjB.append( ClusterMergeChunksCommand::shardNameField(),
-                                  mergeShard->getName() );
+                                  shard.getName() );
 
             BSONObj remoteResult;
             // Throws, but handled at level above.  Don't want to rewrap to preserve exception
             // formatting.
-            ScopedDbConnection conn( mergeShard->getAddress() );
+            ScopedDbConnection conn( shard.getAddress() );
             bool ok = conn->runCommand( "admin", remoteCmdObjB.obj(), remoteResult );
             conn.done();
 

@@ -277,4 +277,46 @@ namespace {
         ASSERT_EQUALS( "", a.dottedField(6) );
     }
 
+    TEST(DottedSubstring, Short) {
+        FieldRef path("a");
+        ASSERT_EQUALS(1u, path.numParts());
+        ASSERT_EQUALS("a", path.dottedSubstring(0, path.numParts()));
+        ASSERT_EQUALS("", path.dottedSubstring(1, path.numParts()));
+        ASSERT_EQUALS("", path.dottedSubstring(0, 0));
+    }
+
+    TEST(DottedSubstring, Empty) {
+        FieldRef path("");
+        ASSERT_EQUALS(0u, path.numParts());
+        ASSERT_EQUALS("", path.dottedSubstring(0, path.numParts()));
+        ASSERT_EQUALS("", path.dottedSubstring(1, path.numParts()));
+        ASSERT_EQUALS("", path.dottedSubstring(0, 0));
+    }
+
+    TEST(DottedSubstring, Nested) {
+        FieldRef path("a.b.c.d.e");
+        ASSERT_EQUALS(5u, path.numParts());
+
+        ASSERT_EQUALS("b.c.d.e", path.dottedSubstring(1, path.numParts()));
+        ASSERT_EQUALS("c.d.e", path.dottedSubstring(2, path.numParts()));
+        ASSERT_EQUALS("d.e", path.dottedSubstring(3, path.numParts()));
+        ASSERT_EQUALS("e", path.dottedSubstring(4, path.numParts()));
+        ASSERT_EQUALS("", path.dottedSubstring(5, path.numParts()));
+        ASSERT_EQUALS("", path.dottedSubstring(6, path.numParts()));
+
+        ASSERT_EQUALS("a.b.c.d.e", path.dottedSubstring(0, path.numParts()));
+        ASSERT_EQUALS("a.b.c.d", path.dottedSubstring(0, path.numParts() - 1));
+        ASSERT_EQUALS("a.b.c", path.dottedSubstring(0, path.numParts() - 2));
+        ASSERT_EQUALS("a.b", path.dottedSubstring(0, path.numParts() - 3));
+        ASSERT_EQUALS("a", path.dottedSubstring(0, path.numParts() - 4));
+        ASSERT_EQUALS("", path.dottedSubstring(0, path.numParts() - 5));
+        ASSERT_EQUALS("", path.dottedSubstring(0, path.numParts() - 6));
+
+        ASSERT_EQUALS("b.c.d", path.dottedSubstring(1, path.numParts() - 1));
+        ASSERT_EQUALS("b.c", path.dottedSubstring(1, path.numParts() - 2));
+        ASSERT_EQUALS("b", path.dottedSubstring(1, path.numParts() - 3));
+        ASSERT_EQUALS("", path.dottedSubstring(1, path.numParts() - 4));
+        ASSERT_EQUALS("", path.dottedSubstring(1, path.numParts() - 5));
+    }
+
 } // namespace

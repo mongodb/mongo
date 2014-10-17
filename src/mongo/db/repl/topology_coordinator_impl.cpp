@@ -919,6 +919,12 @@ namespace {
                           << (latestOpTime.getSecs() - highestPriorityMemberOptime.getSecs())
                           << " seconds behind";
                     if (_iAmPrimary()) {
+                        const Date_t until = now +
+                            LastVote::leaseTime.total_milliseconds() +
+                            kHeartbeatInterval.total_milliseconds();
+                        if (_stepDownUntil < until) {
+                            setStepDownTime(until);
+                        }
                         return _stepDownSelf();
                     }
                     else {
