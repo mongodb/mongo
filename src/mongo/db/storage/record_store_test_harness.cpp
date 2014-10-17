@@ -277,14 +277,15 @@ namespace mongo {
         string s2 = "aaa222bbb";
 
         DiskLoc loc;
+        const RecordData s1Rec(s1.c_str(), s1.size() + 1);
         {
             scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
             {
                 WriteUnitOfWork uow( opCtx.get() );
                 StatusWith<DiskLoc> res = rs->insertRecord( opCtx.get(),
-                                                           s1.c_str(),
-                                                           s1.size() + 1,
-                                                           -1 );
+                                                            s1Rec.data(),
+                                                            s1Rec.size(),
+                                                            -1 );
                 ASSERT_OK( res.getStatus() );
                 loc = res.getValue();
                 uow.commit();
@@ -309,6 +310,7 @@ namespace mongo {
                 dv[0].size = 3;
                 Status res = rs->updateWithDamages( opCtx.get(),
                                                    loc,
+                                                   s1Rec,
                                                    damageSource,
                                                    dv );
                 ASSERT_OK( res );

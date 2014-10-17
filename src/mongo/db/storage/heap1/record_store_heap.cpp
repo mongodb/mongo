@@ -216,6 +216,7 @@ namespace mongo {
 
     Status HeapRecordStore::updateWithDamages( OperationContext* txn,
                                                const DiskLoc& loc,
+                                               const RecordData& oldRec,
                                                const char* damangeSource,
                                                const mutablebson::DamageVector& damages ) {
         HeapRecord* rec = recordFor( loc );
