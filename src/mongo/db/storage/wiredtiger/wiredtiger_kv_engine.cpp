@@ -90,11 +90,15 @@ namespace mongo {
                                                   const CollectionOptions& options ) {
         scoped_ptr<WiredTigerSession> session( _sessionCache->getSession() );
 
-        std::string config = WiredTigerRecordStore::generateCreateString( options, _rsOptions );
+        StatusWith<std::string> result = WiredTigerRecordStore::generateCreateString(options, _rsOptions);
+        if (!result.isOK()) {
+            return result.getStatus();
+        }
+        std::string config = result.getValue();
 
         string uri = _uri( ident );
         WT_SESSION* s = session->getSession();
-        LOG(1) << "WiredTigerKVEngine::createRecordStore uri: " << uri;
+        LOG(1) << "WiredTigerKVEngine::createRecordStore uri: " << uri << " config: " << config;
         return wtRCToStatus( s->create( s, uri.c_str(), config.c_str() ) );
     }
 
