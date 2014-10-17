@@ -488,7 +488,9 @@ namespace mongo {
                     return false;
                 }
 
-                BSONObj proposedKey = cmdObj.getObjectField( "key" );
+                // NOTE: We *must* take ownership of the key here - otherwise the shared BSONObj
+                // becomes corrupt as soon as the command ends.
+                BSONObj proposedKey = cmdObj.getObjectField( "key" ).getOwned();
                 if ( proposedKey.isEmpty() ) {
                     errmsg = "no shard key";
                     return false;
@@ -572,7 +574,7 @@ namespace mongo {
                 list<BSONObj> indexes = conn->getIndexSpecs( ns );
 
                 // 1.  Verify consistency with existing unique indexes
-                ShardKeyPattern proposedShardKey( proposedKey );
+                ShardKeyPattern proposedShardKey(proposedKey);
                 for ( list<BSONObj>::iterator it = indexes.begin(); it != indexes.end(); ++it ) {
                     BSONObj idx = *it;
                     BSONObj currentKey = idx["key"].embeddedObject();
