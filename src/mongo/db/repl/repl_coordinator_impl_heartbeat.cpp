@@ -62,7 +62,8 @@ namespace {
 }  //namespace
 
     void ReplicationCoordinatorImpl::_doMemberHeartbeat(ReplicationExecutor::CallbackData cbData,
-                                                        const HostAndPort& target) {
+                                                        const HostAndPort& target,
+                                                        int targetIndex) {
 
         _untrackHeartbeatHandle(cbData.myHandle);
         if (cbData.status == ErrorCodes::CallbackCanceled) {
@@ -80,27 +81,30 @@ namespace {
         const ReplicationExecutor::RemoteCommandCallbackFn callback = stdx::bind(
                 &ReplicationCoordinatorImpl::_handleHeartbeatResponse,
                 this,
-                stdx::placeholders::_1);
+                stdx::placeholders::_1,
+                targetIndex);
 
         _trackHeartbeatHandle(_replExecutor.scheduleRemoteCommand(request, callback));
     }
 
     void ReplicationCoordinatorImpl::_scheduleHeartbeatToTarget(
-            const HostAndPort& host,
+            const HostAndPort& target,
+            int targetIndex,
             Date_t when) {
 
-        LOG(2) << "Scheduling heartbeat to " << host << " at " << dateToISOStringUTC(when);
+        LOG(2) << "Scheduling heartbeat to " << target << " at " << dateToISOStringUTC(when);
         _trackHeartbeatHandle(
                 _replExecutor.scheduleWorkAt(
                         when,
                         stdx::bind(&ReplicationCoordinatorImpl::_doMemberHeartbeat,
                                    this,
                                    stdx::placeholders::_1,
-                                   host)));
+                                   target,
+                                   targetIndex)));
     }
 
     void ReplicationCoordinatorImpl::_handleHeartbeatResponse(
-            const ReplicationExecutor::RemoteCommandCallbackData& cbData) {
+            const ReplicationExecutor::RemoteCommandCallbackData& cbData, int targetIndex) {
 
         // remove handle from queued heartbeats
         _untrackHeartbeatHandle(cbData.myHandle);
@@ -150,9 +154,14 @@ namespace {
                     lastApplied);
 
         if (action.getAction() == HeartbeatResponseAction::NoAction &&
-            hbStatusResponse.isOK() &&
-            hbStatusResponse.getValue().hasOpTime()) {
-            _updateOpTimeFromHeartbeat(target, hbStatusResponse.getValue().getOpTime());
+                hbStatusResponse.isOK() &&
+                hbStatusResponse.getValue().hasOpTime() &&
+                targetIndex >= 0) {
+            boost::lock_guard<boost::mutex> lk(_mutex);
+            if (hbStatusResponse.getValue().getVersion() == _rsConfig.getConfigVersion()) {
+                _updateOpTimeFromHeartbeat_inlock(targetIndex,
+                                                  hbStatusResponse.getValue().getOpTime());
+            }
         }
 
         std::for_each(_stepDownWaiters.begin(),
@@ -164,37 +173,24 @@ namespace {
 
         _scheduleHeartbeatToTarget(
                 target,
+                targetIndex,
                 std::max(now, action.getNextHeartbeatStartDate()));
 
         _handleHeartbeatResponseAction(action, hbStatusResponse);
     }
 
-    void ReplicationCoordinatorImpl::_updateOpTimeFromHeartbeat(const HostAndPort& target, 
-                                                                OpTime optime) {
-        // TODO(spencer) pass in member ID rather than looking up by HostAndPort
-        boost::unique_lock<boost::mutex> lk(_mutex);
-        invariant(_thisMembersConfigIndex != -1);
+    void ReplicationCoordinatorImpl::_updateOpTimeFromHeartbeat_inlock(int targetIndex,
+                                                                       OpTime optime) {
+        invariant(_thisMembersConfigIndex >= 0);
+        invariant(targetIndex >= 0);
 
-        const MemberConfig* targetMember = _rsConfig.findMemberByHostAndPort(target);
-        if (!targetMember) {
-            return;
+        SlaveInfo& slaveInfo = _slaveInfo[targetIndex];
+        if (optime > slaveInfo.opTime && slaveInfo.rid.isSet()) {
+            // TODO(spencer): The second part of the above if-statement can be removed after 2.8
+            // but for now, to maintain compatibility with 2.6, we can't record optimes for any
+            // nodes we haven't heard from via replSetUpdatePosition yet to associate an RID.
+            _updateSlaveInfoOptime_inlock(&slaveInfo, optime);
         }
-        int targetId = targetMember->getId();
-
-        for (SlaveInfoVector::const_iterator it = _slaveInfo.begin();
-                it != _slaveInfo.end(); ++it) {
-            if (it->memberID == targetId) {
-                const UpdatePositionArgs::UpdateInfo update(
-                        it->rid, optime, _rsConfig.getConfigVersion(), targetId);
-                Status status = _setLastOptime_inlock(update);
-                if (!status.isOK()) {
-                    LOG(1) << "Could not update optime from node " << target.toString() <<
-                        ": " << status;
-                }
-                return;
-            }
-        }
-        invariant(false); // If we found the member in the config it must be in _slaveInfo.
     }
 
     void ReplicationCoordinatorImpl::_handleHeartbeatResponseAction(
@@ -497,7 +493,7 @@ namespace {
             if (i == _thisMembersConfigIndex) {
                 continue;
             }
-            _scheduleHeartbeatToTarget(_rsConfig.getMemberAt(i).getHostAndPort(), now);
+            _scheduleHeartbeatToTarget(_rsConfig.getMemberAt(i).getHostAndPort(), i, now);
         }
     }
 

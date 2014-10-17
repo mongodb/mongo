@@ -1285,6 +1285,7 @@ namespace {
                     // Don't include info on members we haven't heard from yet.
                     continue;
                 }
+                invariant(itr->rid.isSet());
                 BSONObjBuilder entry(arrayBuilder.subobjStart());
                 entry.append("_id", itr->rid);
                 entry.append("optime", itr->opTime);
@@ -1578,7 +1579,7 @@ namespace {
             // a configuration that contains us.  Chances are excellent that it will, since that
             // is the only reason for a remote node to send this node a heartbeat request.
             if (!args.getSenderHost().empty() && _seedList.insert(args.getSenderHost()).second) {
-                _scheduleHeartbeatToTarget(args.getSenderHost(), now);
+                _scheduleHeartbeatToTarget(args.getSenderHost(), -1, now);
             }
         }
     }
@@ -1966,7 +1967,11 @@ namespace {
          const PostMemberStateUpdateAction action =
              _updateCurrentMemberStateFromTopologyCoordinator_inlock();
          _updateSlaveInfoFromConfig_inlock();
-         _startHeartbeats();
+         if (_thisMembersConfigIndex >= 0) {
+             // Don't send heartbeats if we're not in the config, if we get re-added one of the
+             // nodes in the set will contact us.
+             _startHeartbeats();
+         }
          return action;
      }
 

@@ -497,16 +497,19 @@ namespace repl {
         void _setMyLastOptime_inlock(boost::unique_lock<boost::mutex>* lock, const OpTime& ts);
 
         /**
-         * Schedules a heartbeat to be sent to "target" at "when".
+         * Schedules a heartbeat to be sent to "target" at "when". "targetIndex" is the index
+         * into the replica set config members array that corresponds to the "target", or -1 if
+         * "target" is not in _rsConfig.
          */
-        void _scheduleHeartbeatToTarget(const HostAndPort& host, Date_t when);
+        void _scheduleHeartbeatToTarget(const HostAndPort& target, int targetIndex, Date_t when);
 
         /**
          * Processes each heartbeat response.
          *
          * Schedules additional heartbeats, triggers elections and step downs, etc.
          */
-        void _handleHeartbeatResponse(const ReplicationExecutor::RemoteCommandCallbackData& cbData);
+        void _handleHeartbeatResponse(const ReplicationExecutor::RemoteCommandCallbackData& cbData,
+                                      int targetIndex);
 
         void _trackHeartbeatHandle(const StatusWith<ReplicationExecutor::CallbackHandle>& handle);
 
@@ -515,9 +518,9 @@ namespace repl {
         /**
          * Helper for _handleHeartbeatResponse.
          *
-         * Looks up target in the slave map and updates its optime if found.
+         * Updates the optime associated with the member at "memberIndex" in our config.
          */
-        void _updateOpTimeFromHeartbeat(const HostAndPort& target, OpTime optime);
+        void _updateOpTimeFromHeartbeat_inlock(int memberIndex, OpTime optime);
 
         /**
          * Starts a heartbeat for each member in the current config.  Called within the executor
@@ -531,12 +534,15 @@ namespace repl {
         void _cancelHeartbeats();
 
         /**
-         * Asynchronously sends a heartbeat to "target".
+         * Asynchronously sends a heartbeat to "target". "targetIndex" is the index
+         * into the replica set config members array that corresponds to the "target", or -1 if
+         * we don't have a valid replica set config.
          *
          * Scheduled by _scheduleHeartbeatToTarget.
          */
         void _doMemberHeartbeat(ReplicationExecutor::CallbackData cbData,
-                                const HostAndPort& target);
+                                const HostAndPort& target,
+                                int targetIndex);
 
 
         MemberState _getCurrentMemberState_inlock() const;
