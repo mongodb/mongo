@@ -34,14 +34,22 @@
 
 #include <stdlib.h>
 
+#include "mongo/db/concurrency/d_concurrency.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/db/storage/record_store.h"
 #include "mongo/platform/random.h"
 #include "mongo/util/log.h"
 
 namespace mongo {
+namespace {
+    // This is never used with KVEngines that support doc-level locking so this should never
+    // conflict with anything else.
+    // This must be locked *before* _identLock.
+    const ResourceId catalogRID(RESOURCE_DOCUMENT, StringData("KVCatalog"));
+}
 
-    KVCatalog::KVCatalog( RecordStore* rs )
-        : _rs( rs ) {
+    KVCatalog::KVCatalog( RecordStore* rs, bool isRsThreadSafe )
+        : _rs( rs ), _isRsThreadSafe(isRsThreadSafe) {
         boost::scoped_ptr<SecureRandom> r( SecureRandom::create() );
         _rand = r->nextInt64();
     }
@@ -51,6 +59,7 @@ namespace mongo {
     }
 
     void KVCatalog::init( OperationContext* opCtx ) {
+        // No locking needed since called single threaded.
         scoped_ptr<RecordIterator> it( _rs->getIterator( opCtx ) );
         while ( !it->isEOF()  ) {
             DiskLoc loc = it->getNext();
@@ -74,6 +83,10 @@ namespace mongo {
     Status KVCatalog::newCollection( OperationContext* opCtx,
                                      const StringData& ns,
                                      const CollectionOptions& options ) {
+        boost::scoped_ptr<Lock::ResourceLock> rLk;
+        if (!_isRsThreadSafe)
+            rLk.reset(new Lock::ResourceLock(opCtx->lockState(), catalogRID, MODE_X));
+
         std::stringstream ss;
         ss << "collection-" << _rand << "-" << _next.fetchAndAdd( 1 );
         string ident = ss.str();
@@ -95,6 +108,7 @@ namespace mongo {
             b.append( "md", md.toBSON() );
             obj = b.obj();
         }
+
         StatusWith<DiskLoc> res = _rs->insertRecord( opCtx, obj.objdata(), obj.objsize(), false );
         if ( !res.isOK() )
             return res.getStatus();
@@ -114,8 +128,7 @@ namespace mongo {
     std::string KVCatalog::getIndexIdent( OperationContext* opCtx,
                                           const StringData& ns,
                                           const StringData& idxName ) const {
-        DiskLoc loc;
-        BSONObj obj = _findEntry( opCtx, ns, &loc );
+        BSONObj obj = _findEntry( opCtx, ns );
         BSONObj idxIdent = obj["idxIdent"].Obj();
         return idxIdent[idxName].String();
     }
@@ -123,21 +136,31 @@ namespace mongo {
     BSONObj KVCatalog::_findEntry( OperationContext* opCtx,
                                    const StringData& ns,
                                    DiskLoc* out ) const {
+
+        boost::scoped_ptr<Lock::ResourceLock> rLk;
+        if (!_isRsThreadSafe)
+            rLk.reset(new Lock::ResourceLock(opCtx->lockState(), catalogRID, MODE_S));
+
+        DiskLoc dl;
         {
             boost::mutex::scoped_lock lk( _identsLock );
             NSToIdentMap::const_iterator it = _idents.find( ns.toString() );
             invariant( it != _idents.end() );
-            *out = it->second.storedLoc;
+            dl = it->second.storedLoc;
         }
-        LOG(1) << "looking up metadata for: " << ns << " @ " << *out;
-        RecordData data = _rs->dataFor( opCtx, *out );
+
+        LOG(1) << "looking up metadata for: " << ns << " @ " << dl;
+        RecordData data = _rs->dataFor( opCtx, dl );
+
+        if (out)
+            *out = dl;
+
         return data.toBson().getOwned();
     }
 
     const BSONCollectionCatalogEntry::MetaData KVCatalog::getMetaData( OperationContext* opCtx,
                                                                        const StringData& ns ) {
-        DiskLoc loc;
-        BSONObj obj = _findEntry( opCtx, ns, &loc );
+        BSONObj obj = _findEntry( opCtx, ns );
         LOG(1) << " got: " << obj;
         BSONCollectionCatalogEntry::MetaData md;
         if ( obj["md"].isABSONObj() )
@@ -148,6 +171,10 @@ namespace mongo {
     void KVCatalog::putMetaData( OperationContext* opCtx,
                                  const StringData& ns,
                                  BSONCollectionCatalogEntry::MetaData& md ) {
+        boost::scoped_ptr<Lock::ResourceLock> rLk;
+        if (!_isRsThreadSafe)
+            rLk.reset(new Lock::ResourceLock(opCtx->lockState(), catalogRID, MODE_X));
+
         DiskLoc loc;
         BSONObj obj = _findEntry( opCtx, ns, &loc );
 
@@ -196,6 +223,10 @@ namespace mongo {
                                         const StringData& fromNS,
                                         const StringData& toNS,
                                         bool stayTemp ) {
+        boost::scoped_ptr<Lock::ResourceLock> rLk;
+        if (!_isRsThreadSafe)
+            rLk.reset(new Lock::ResourceLock(opCtx->lockState(), catalogRID, MODE_X));
+
         DiskLoc loc;
         BSONObj old = _findEntry( opCtx, fromNS, &loc ).getOwned();
         {
@@ -233,6 +264,10 @@ namespace mongo {
 
     Status KVCatalog::dropCollection( OperationContext* opCtx,
                                       const StringData& ns ) {
+        boost::scoped_ptr<Lock::ResourceLock> rLk;
+        if (!_isRsThreadSafe)
+            rLk.reset(new Lock::ResourceLock(opCtx->lockState(), catalogRID, MODE_X));
+
         boost::mutex::scoped_lock lk( _identsLock );
         Entry old = _idents[ns.toString()];
         if ( old.ident.empty() ) {

@@ -51,7 +51,7 @@ namespace mongo {
         /**
          * @param rs - does NOT take ownership
          */
-        KVCatalog( RecordStore* rs );
+        KVCatalog( RecordStore* rs, bool isRsThreadSafe );
         ~KVCatalog();
 
         void init( OperationContext* opCtx );
@@ -88,9 +88,10 @@ namespace mongo {
 
         BSONObj _findEntry( OperationContext* opCtx,
                             const StringData& ns,
-                            DiskLoc* out ) const;
+                            DiskLoc* out=NULL ) const;
 
         RecordStore* _rs; // not owned
+        const bool _isRsThreadSafe;
         int64_t _rand;
         AtomicUInt64 _next;
 

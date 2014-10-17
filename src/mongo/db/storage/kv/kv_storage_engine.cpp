@@ -82,7 +82,7 @@ namespace mongo {
                                                             catalogInfo,
                                                             catalogInfo,
                                                             CollectionOptions() ) );
-        _catalog.reset( new KVCatalog( _catalogRecordStore.get() ) );
+        _catalog.reset( new KVCatalog( _catalogRecordStore.get(), _supportsDocLocking ) );
         _catalog->init( &opCtx );
 
         std::vector<std::string> collections;
