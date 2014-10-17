@@ -240,7 +240,7 @@ namespace mongo {
 
     Status RocksRecordStore::updateWithDamages( OperationContext* txn,
                                                 const DiskLoc& loc,
-                                                const char* damangeSource,
+                                                const char* damageSource,
                                                 const mutablebson::DamageVector& damages ) {
         RocksRecoveryUnit* ru = RocksRecoveryUnit::getRocksRecoveryUnit( txn );
 
@@ -262,7 +262,7 @@ namespace mongo {
         // apply changes to our copy
         for( size_t i = 0; i < damages.size(); i++ ) {
             mutablebson::DamageEvent event = damages[i];
-            const char* sourcePtr = damangeSource + event.sourceOffset;
+            const char* sourcePtr = damageSource + event.sourceOffset;
 
             invariant( event.targetOffset + event.size < value.length() );
             value.replace( event.targetOffset, event.size, sourcePtr, event.size );

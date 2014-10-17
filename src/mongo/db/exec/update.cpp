@@ -502,8 +502,9 @@ namespace mongo {
                     // Don't actually do the write if this is an explain.
                     if (!request->isExplain()) {
                         invariant(_collection);
-                        _collection->updateDocumentWithDamages(request->getOpCtx(), loc, source,
-                                                               _damages);
+                        const RecordData oldRec(oldObj.objdata(), oldObj.objsize());
+                        _collection->updateDocumentWithDamages(request->getOpCtx(), loc,
+                                                               oldRec, source, _damages);
                     }
                     docWasModified = true;
                     _specificStats.fastmod = true;

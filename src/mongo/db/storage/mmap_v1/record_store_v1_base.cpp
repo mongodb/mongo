@@ -351,6 +351,7 @@ namespace mongo {
 
     Status RecordStoreV1Base::updateWithDamages( OperationContext* txn,
                                                  const DiskLoc& loc,
+                                                 const RecordData& oldRec,
                                                  const char* damageSource,
                                                  const mutablebson::DamageVector& damages ) {
         _paddingFits( txn );

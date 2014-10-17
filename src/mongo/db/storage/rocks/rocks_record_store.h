@@ -102,7 +102,7 @@ namespace mongo {
 
         virtual Status updateWithDamages( OperationContext* txn,
                                           const DiskLoc& loc,
-                                          const char* damangeSource,
+                                          const char* damageSource,
                                           const mutablebson::DamageVector& damages );
 
         virtual RecordIterator* getIterator( OperationContext* txn,
