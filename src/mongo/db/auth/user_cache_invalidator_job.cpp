@@ -31,6 +31,7 @@
 
 #include "mongo/db/auth/user_cache_invalidator_job.h"
 
+#include <boost/thread/mutex.hpp>
 #include <string>
 
 #include "mongo/base/status.h"
@@ -42,12 +43,16 @@
 #include "mongo/s/config.h"
 #include "mongo/util/background.h"
 #include "mongo/util/log.h"
+#include "mongo/util/time_support.h"
 
 namespace mongo {
 namespace {
 
     // How often to check with the config servers whether authorization information has changed.
     int userCacheInvalidationIntervalSecs = 30; // 30 second default
+    boost::mutex invalidationIntervalMutex;
+    boost::condition_variable invalidationIntervalChangedCondition;
+    Date_t lastInvalidationTime;
 
     class ExportedInvalidationIntervalParameter : public ExportedServerParameter<int> {
     public:
@@ -67,6 +72,18 @@ namespace {
             }
             return Status::OK();
         }
+
+        // Without this the compiler complains that defining set(const int&)
+        // hides set(const BSONElement&)
+        using ExportedServerParameter<int>::set;
+
+        virtual Status set( const int& newValue ) {
+            boost::unique_lock<boost::mutex> lock(invalidationIntervalMutex);
+            Status status = ExportedServerParameter<int>::set(newValue);
+            invalidationIntervalChangedCondition.notify_all();
+            return status;
+        }
+
     } exportedIntervalParam;
 
     StatusWith<OID> getCurrentCacheGeneration() {
@@ -100,9 +117,23 @@ namespace {
 
     void UserCacheInvalidator::run() {
         Client::initThread("UserCacheInvalidatorThread");
+        lastInvalidationTime = Date_t(curTimeMillis64());
 
         while (true) {
-            sleepsecs(userCacheInvalidationIntervalSecs);
+            boost::unique_lock<boost::mutex> lock(invalidationIntervalMutex);
+            Date_t sleepUntil = Date_t(
+                    lastInvalidationTime.millis + userCacheInvalidationIntervalSecs * 1000);
+            Date_t now(curTimeMillis64());
+            while (now.millis < sleepUntil.millis) {
+                invalidationIntervalChangedCondition.timed_wait(lock,
+                                                                Milliseconds(sleepUntil - now));
+                sleepUntil = Date_t(
+                        lastInvalidationTime.millis + (userCacheInvalidationIntervalSecs * 1000));
+                now = Date_t(curTimeMillis64());
+            }
+            lastInvalidationTime = now;
+            lock.unlock();
+
             if (inShutdown()) {
                 break;
             }
