@@ -111,12 +111,12 @@ assert.soon(function() {
 replTest.add();
 
 config.version++;
-config.members.push({_id: 3,
+config.members.push({_id: 2,
                      host: getHostName()+":"+replTest.ports[replTest.ports.length-1],
                      arbiterOnly:true});
 
 try {
-    master.getDB("admin").runCommand({replSetReconfig : config});
+    assert.commandWorked(master.getDB("admin").runCommand({replSetReconfig : config}));
 }
 catch (e) {
     print(e);
