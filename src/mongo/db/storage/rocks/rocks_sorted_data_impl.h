@@ -65,7 +65,7 @@ namespace mongo {
         MONGO_DISALLOW_COPYING( RocksSortedDataImpl );
     public:
         RocksSortedDataImpl(rocksdb::DB* db, boost::shared_ptr<rocksdb::ColumnFamilyHandle> cf,
-                            const StringData& ident, Ordering order);
+                            std::string ident, Ordering order);
 
         virtual SortedDataBuilderInterface* getBulkBuilder(OperationContext* txn, bool dupsAllowed);
 
@@ -107,6 +107,8 @@ namespace mongo {
         // Each index is stored as a single column family, so this stores the handle to the
         // relevant column family
         boost::shared_ptr<rocksdb::ColumnFamilyHandle> _columnFamily;
+
+        std::string _ident;
 
         // used to construct RocksCursors
         const Ordering _order;

@@ -179,7 +179,7 @@ namespace mongo {
     SortedDataInterface* RocksEngine::getSortedDataInterface(OperationContext* opCtx,
                                                              const StringData& ident,
                                                              const IndexDescriptor* desc) {
-        return new RocksSortedDataImpl(_db.get(), _getColumnFamily(ident), ident,
+        return new RocksSortedDataImpl(_db.get(), _getColumnFamily(ident), ident.toString(),
                                        Ordering::make(desc->keyPattern()));
     }
 

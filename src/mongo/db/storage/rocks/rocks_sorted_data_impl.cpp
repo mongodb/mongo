@@ -436,10 +436,13 @@ namespace mongo {
 
     RocksSortedDataImpl::RocksSortedDataImpl(rocksdb::DB* db,
                                              boost::shared_ptr<rocksdb::ColumnFamilyHandle> cf,
-                                             const StringData& ident, Ordering order)
-        : _db(db), _columnFamily(cf), _order(order),
-          _numEntriesKey("numentries-" + ident.toString()) {
-        invariant( _db );
+                                             std::string ident, Ordering order)
+        : _db(db),
+          _columnFamily(cf),
+          _ident(std::move(ident)),
+          _order(order),
+          _numEntriesKey("numentries-" + _ident) {
+        invariant(_db);
         invariant(_columnFamily.get());
         _numEntries = 0;
         string value;
@@ -566,25 +569,20 @@ namespace mongo {
         return Status::OK();
     }
 
-    long long RocksSortedDataImpl::getSpaceUsedBytes( OperationContext* txn ) const {
-        // no need to use snapshot here
-        boost::scoped_ptr<rocksdb::Iterator> iter(
-            _db->NewIterator(rocksdb::ReadOptions(), _columnFamily.get()));
-        iter->SeekToFirst();
-        const rocksdb::Slice rangeStart = iter->key();
-        iter->SeekToLast();
-        // This is exclusive when we would prefer it be inclusive.
-        // AFB best way to get approximate size for a whole column family.
-        const rocksdb::Slice rangeEnd = iter->key();
+    long long RocksSortedDataImpl::getSpaceUsedBytes(OperationContext* txn) const {
+        // TODO provide GetLiveFilesMetadata() with column family
+        std::vector<rocksdb::LiveFileMetaData> metadata;
+        _db->GetLiveFilesMetaData(&metadata);
+        uint64_t spaceUsedBytes = 0;
+        for (const auto& m : metadata) {
+            if (m.column_family_name == _ident) {
+                spaceUsedBytes += m.size;
+            }
+        }
 
-        rocksdb::Range fullIndexRange( rangeStart, rangeEnd );
-        uint64_t spacedUsedBytes = 0;
-
-        // TODO Rocks specifies that this may not include recently written data. Figure out if
-        // that's okay
-        _db->GetApproximateSizes(_columnFamily.get(), &fullIndexRange, 1, &spacedUsedBytes);
-
-        return spacedUsedBytes;
+        uint64_t walSpaceUsed = 0;
+        _db->GetIntProperty(_columnFamily.get(), "rocksdb.cur-size-all-mem-tables", &walSpaceUsed);
+        return spaceUsedBytes + walSpaceUsed;
     }
 
     // ownership passes to caller
