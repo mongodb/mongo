@@ -28,9 +28,8 @@ env = Environment(
                "#/.",
                distutils.sysconfig.get_python_inc()
            ],
-    CPPDEFINES = ["HAVE_DIAGNOSTIC"],
+    #CPPDEFINES = ["HAVE_DIAGNOSTIC", "HAVE_VERBOSE"],
     CFLAGS = [
-        #"/Zi",
         "/Z7", # Generate debugging symbols
         "/wd4090", # Ignore warning about mismatched const qualifiers
         "/wd4996", 
