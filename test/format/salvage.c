@@ -85,7 +85,7 @@ corrupt(void)
 	(void)snprintf(buf, sizeof(buf), "%s/%s.wt", g.home, WT_NAME);
 	if ((fd = open(buf, O_RDWR)) != -1) {
 		(void)snprintf(copycmd, sizeof(copycmd),
-#ifndef _WIN32
+#ifdef _WIN32
 		    "copy %s\\%s.wt %s\\slvg.copy\\%s.wt.corrupted",
 #else
 		    "cp %s/%s.wt %s/slvg.copy/%s.wt.corrupted",
