@@ -610,9 +610,10 @@ __wt_cursor_init(WT_CURSOR *cursor,
 	 * Arrange for that to happen by putting internal cursors after their
 	 * owners on the queue.
 	 */
-	if (owner != NULL)
+	if (owner != NULL) {
+		WT_ASSERT(session, F_ISSET(owner, WT_CURSTD_OPEN));
 		TAILQ_INSERT_AFTER(&session->cursors, owner, cursor, q);
-	else
+	} else
 		TAILQ_INSERT_HEAD(&session->cursors, cursor, q);
 
 	F_SET(cursor, WT_CURSTD_OPEN);
