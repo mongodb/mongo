@@ -454,7 +454,6 @@ int
 __wt_txn_init(WT_SESSION_IMPL *session)
 {
 	WT_TXN *txn;
-	WT_TXN_STATE *txn_state;
 
 	txn = &session->txn;
 	txn->id = WT_TXN_NONE;
@@ -462,10 +461,13 @@ __wt_txn_init(WT_SESSION_IMPL *session)
 	WT_RET(__wt_calloc_def(session,
 	    S2C(session)->session_size, &txn->snapshot));
 
+#ifdef HAVE_DIAGNOSTIC
 	if (S2C(session)->txn_global.states != NULL) {
+		WT_TXN_STATE *txn_state;
 		txn_state = &S2C(session)->txn_global.states[session->id];
 		WT_ASSERT(session, txn_state->snap_min == WT_TXN_NONE);
 	}
+#endif
 
 	/*
 	 * Take care to clean these out in case we are reusing the transaction
