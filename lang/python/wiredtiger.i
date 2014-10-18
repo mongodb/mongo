@@ -809,6 +809,14 @@ typedef int int_void;
                 return 0;
 %#endif
         }
+
+        int verbose_build() {
+%#ifdef HAVE_VERBOSE
+                return 1;
+%#else
+                return 0;
+%#endif
+        }
 };
 
 /* Remove / rename parts of the C API that we don't want in Python. */
