@@ -29,10 +29,9 @@
 #   Transactions: test long-running snapshots
 
 from suite_subprocess import suite_subprocess
-from wiredtiger import wiredtiger_open
 from wtscenario import multiply_scenarios, number_scenarios
 from helper import simple_populate
-import wttest
+import wiredtiger, wttest
 
 class test_txn06(wttest.WiredTigerTestCase, suite_subprocess):
     conn_config = 'verbose=[transaction]'
@@ -41,10 +40,10 @@ class test_txn06(wttest.WiredTigerTestCase, suite_subprocess):
     source_uri = 'table:' + tablename + "_src"
     nrows = 100000
 
-    def setupConnection(*args):
-        if not self.conn.verbose_build():
+    def setUpConnectionOpen(self, *args):
+        if not wiredtiger.verbose_build():
             self.skipTest('requires a verbose build')
-        super(wttest.WiredTigerTestCase, setupConnection)(*args)
+        super(wttest.WiredTigerTestCase, setUpConnectionOpen)(self, *args)
 
     def test_long_running(self):
         # Populate a table

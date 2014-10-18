@@ -381,7 +381,6 @@ COMPARE_OK(__wt_cursor::compare)
 COMPARE_OK(__wt_cursor::search_near)
 
 /* Lastly, some methods need no (additional) error checking. */
-%exception __wt_connection::diagnostic_build;
 %exception __wt_connection::get_home;
 %exception __wt_connection::is_new;
 %exception __wt_connection::search_near;
@@ -393,6 +392,8 @@ COMPARE_OK(__wt_cursor::search_near)
 %exception __wt_cursor::_set_value_str;
 %exception wiredtiger_strerror;
 %exception wiredtiger_version;
+%exception diagnostic_build;
+%exception verbose_build;
 
 /* WT_ASYNC_OP customization. */
 /* First, replace the varargs get / set methods with Python equivalents. */
@@ -807,23 +808,27 @@ typedef int int_void;
 	int _freecb() {
 		return (0);
 	}
-
-        int diagnostic_build() {
-%#ifdef HAVE_DIAGNOSTIC
-                return 1;
-%#else
-                return 0;
-%#endif
-        }
-
-        int verbose_build() {
-%#ifdef HAVE_VERBOSE
-                return 1;
-%#else
-                return 0;
-%#endif
-        }
 };
+
+%{
+int diagnostic_build() {
+#ifdef HAVE_DIAGNOSTIC
+        return 1;
+#else
+        return 0;
+#endif
+}
+
+int verbose_build() {
+#ifdef HAVE_VERBOSE
+        return 1;
+#else
+        return 0;
+#endif
+}
+%}
+int diagnostic_build();
+int verbose_build();
 
 /* Remove / rename parts of the C API that we don't want in Python. */
 %immutable __wt_cursor::session;
