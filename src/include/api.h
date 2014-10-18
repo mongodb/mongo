@@ -11,7 +11,8 @@
 	const char *__oldname = (s)->name;				\
 	(s)->cursor = (cur);						\
 	(s)->dhandle = (dh);						\
-	(s)->name = #h "." #n;
+	(s)->name = #h "." #n;						\
+	++(s)->api_level
 
 #define	API_CALL_NOCONF(s, h, n, cur, dh) do {				\
 	API_SESSION_INIT(s, h, n, cur, dh);				\
@@ -31,7 +32,8 @@
 #define	API_END(s, ret)							\
 	if ((s) != NULL) {						\
 		(s)->dhandle = __olddh;					\
-		(s)->name = __oldname;					\
+		if (--(s)->api_level > 0)				\
+			(s)->name = __oldname;				\
 		if (F_ISSET(&(s)->txn, TXN_RUNNING) &&			\
 		    (ret) != 0 &&					\
 		    (ret) != WT_NOTFOUND &&				\

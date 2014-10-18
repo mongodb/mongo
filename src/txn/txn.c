@@ -99,7 +99,7 @@ __wt_txn_refresh(WT_SESSION_IMPL *session, int get_snapshot, int pin_reads)
 	WT_TXN_STATE *s, *txn_state;
 	uint64_t current_id, id, oldest_id;
 	uint64_t prev_oldest_id, snap_min;
-	uint32_t i, n, session_cnt;
+	uint32_t i, n, oldest_session, session_cnt;
 	int32_t count;
 
 	conn = S2C(session);
@@ -136,6 +136,7 @@ __wt_txn_refresh(WT_SESSION_IMPL *session, int get_snapshot, int pin_reads)
 	/* The oldest ID cannot change until the scan count goes to zero. */
 	prev_oldest_id = txn_global->oldest_id;
 	current_id = oldest_id = snap_min = txn_global->current;
+	oldest_session = 0;
 
 	/* Walk the array of concurrent transactions. */
 	WT_ORDERED_READ(session_cnt, conn->session_cnt);
@@ -175,8 +176,10 @@ __wt_txn_refresh(WT_SESSION_IMPL *session, int get_snapshot, int pin_reads)
 		 * more details.
 		 */
 		if ((id = s->snap_min) != WT_TXN_NONE &&
-		    TXNID_LT(id, oldest_id))
+		    TXNID_LT(id, oldest_id)) {
 			oldest_id = id;
+			oldest_session = i;
+		}
 	}
 
 	if (TXNID_LT(snap_min, oldest_id))
@@ -226,6 +229,18 @@ __wt_txn_refresh(WT_SESSION_IMPL *session, int get_snapshot, int pin_reads)
 			txn_global->oldest_id = oldest_id;
 		txn_global->scan_count = 0;
 	} else {
+		if (WT_VERBOSE_ISSET(session, WT_VERB_TRANSACTION) &&
+		    current_id - oldest_id > 10000 &&
+		    txn_global->oldest_session != oldest_session) {
+			(void)__wt_verbose(session, WT_VERB_TRANSACTION,
+			    "old snapshot %" PRIu64
+			    " pinned in session %d [%s]"
+			    " with snap_min %" PRIu64 "\n",
+			    oldest_id, oldest_session,
+			    conn->sessions[oldest_session].name,
+			    conn->sessions[oldest_session].txn.snap_min);
+			txn_global->oldest_session = oldest_session;
+		}
 		WT_ASSERT(session, txn_global->scan_count > 0);
 		(void)WT_ATOMIC_SUB4(txn_global->scan_count, 1);
 	}

@@ -567,6 +567,12 @@ typedef int int_void;
 		if self.search() != 0:
 			raise KeyError
 		return self.get_value()
+
+	def __setitem__(self, key, value):
+		'''Python convenience for inserting'''
+		self.set_key(key)
+		self.set_key(value)
+		self.insert()
 %}
 };
 

@@ -969,6 +969,8 @@ __wt_open_session(WT_CONNECTION_IMPL *conn,
 		WT_ERR(
 		    __session_reconfigure((WT_SESSION *)session_ret, config));
 
+	session_ret->name = NULL;
+
 	/*
 	 * Publish: make the entry visible to server threads.  There must be a
 	 * barrier for two reasons, to ensure structure fields are set before

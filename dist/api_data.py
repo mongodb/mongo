@@ -454,6 +454,7 @@ connection_runtime_config = [
 	        'shared_cache',
 	        'split',
 	        'temporary',
+	        'transaction',
 	        'verify',
 	        'version',
 	        'write']),
