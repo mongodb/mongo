@@ -31,6 +31,7 @@
 #include "mongo/db/operation_context_noop.h"
 #include "mongo/db/storage/mmap_v1/extent.h"
 #include "mongo/db/storage/mmap_v1/record.h"
+#include "mongo/db/storage/mmap_v1/record_store_v1_base.h"
 #include "mongo/db/storage/mmap_v1/record_store_v1_capped.h"
 #include "mongo/db/storage/mmap_v1/record_store_v1_simple.h"
 #include "mongo/db/storage/mmap_v1/record_store_v1_test_help.h"
@@ -48,6 +49,7 @@ namespace mongo {
         virtual RecordStore* newNonCappedRecordStore() {
             OperationContextNoop txn;
             DummyRecordStoreV1MetaData* md = new DummyRecordStoreV1MetaData( false, 0 );
+            md->setUserFlag( &txn, RecordStoreV1Base::Flag_NoPadding );
             SimpleRecordStoreV1* rs = new SimpleRecordStoreV1( &txn,
                                                                "a.b",
                                                                md,
