@@ -76,7 +76,7 @@ namespace mongo {
             };
             md->setCapExtent(&txn, DiskLoc(0, 0));
             md->setCapFirstNewRecord(&txn, DiskLoc().setInvalid());
-            initializeV1RS(&txn, records, drecs, &_em, md);
+            initializeV1RS(&txn, records, drecs, NULL, &_em, md);
 
             return rs;
         }
