@@ -177,6 +177,9 @@ __clsm_enter(WT_CURSOR_LSM *clsm, int reset, int update)
 			 */
 			WT_RET(__wt_txn_autocommit_check(session));
 
+			if (session->txn.isolation == TXN_ISO_SNAPSHOT)
+				__wt_txn_read_first(session);
+
 			/*
 			 * Figure out how many updates are required for
 			 * snapshot isolation.

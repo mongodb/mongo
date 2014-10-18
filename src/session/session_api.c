@@ -30,6 +30,28 @@ __wt_session_reset_cursors(WT_SESSION_IMPL *session)
 }
 
 /*
+ * __wt_session_copy_values --
+ *	Copy values into all positioned cursors, so that they don't keep
+ *	transaction IDs pinned.
+ */
+int
+__wt_session_copy_values(WT_SESSION_IMPL *session)
+{
+	WT_CURSOR *cursor;
+	WT_DECL_RET;
+
+	TAILQ_FOREACH(cursor, &session->cursors, q)
+		if (F_ISSET(cursor, WT_CURSTD_VALUE_INT)) {
+			F_CLR(cursor, WT_CURSTD_VALUE_INT);
+			WT_RET(__wt_buf_set(session, &cursor->value,
+			    cursor->value.data, cursor->value.size));
+			F_SET(cursor, WT_CURSTD_VALUE_EXT);
+		}
+
+	return (ret);
+}
+
+/*
  * __session_clear --
  *	Clear a session structure.
  */
@@ -74,6 +96,13 @@ __session_close(WT_SESSION *wt_session, const char *config)
 	/* Rollback any active transaction. */
 	if (F_ISSET(&session->txn, TXN_RUNNING))
 		WT_TRET(__session_rollback_transaction(wt_session, NULL));
+
+	/*
+	 * Also release any pinned transaction ID from a non-transactional
+	 * operation.
+	 */
+	if (conn->txn_global.states != NULL)
+		__wt_txn_release_snapshot(session);
 
 	/* Close all open cursors. */
 	while ((cursor = TAILQ_FIRST(&session->cursors)) != NULL) {
