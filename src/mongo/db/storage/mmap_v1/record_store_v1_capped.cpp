@@ -229,7 +229,7 @@ namespace mongo {
         // nIndexes preserve 0
         // capped preserve true
         // max preserve
-        _details->setPaddingFactor( txn, 1.0 );
+        // paddingFactor is unused
         _details->setCapFirstNewRecord( txn, DiskLoc().setInvalid() );
         setLastDelRecLastExtent( txn, DiskLoc().setInvalid() );
         // dataFileVersion preserve
@@ -310,7 +310,7 @@ namespace mongo {
 
     }
 
-    const DiskLoc &CappedRecordStoreV1::cappedFirstDeletedInCurExtent() const {
+    DiskLoc CappedRecordStoreV1::cappedFirstDeletedInCurExtent() const {
         if ( cappedLastDelRecLastExtent().isNull() )
             return cappedListOfAllDeletedRecords();
         else
@@ -549,7 +549,7 @@ namespace mongo {
         }
     }
 
-    const DiskLoc& CappedRecordStoreV1::cappedListOfAllDeletedRecords() const {
+    DiskLoc CappedRecordStoreV1::cappedListOfAllDeletedRecords() const {
         return _details->deletedListEntry(0);
     }
 
@@ -558,7 +558,7 @@ namespace mongo {
         return _details->setDeletedListEntry(txn, 0, loc);
     }
 
-    const DiskLoc& CappedRecordStoreV1::cappedLastDelRecLastExtent() const {
+    DiskLoc CappedRecordStoreV1::cappedLastDelRecLastExtent() const {
         return _details->deletedListEntry(1);
     }
 
@@ -596,9 +596,8 @@ namespace mongo {
 
     RecordIterator* CappedRecordStoreV1::getIterator( OperationContext* txn,
                                                       const DiskLoc& start,
-                                                      bool tailable,
                                                       const CollectionScanParams::Direction& dir) const {
-        return new CappedRecordStoreV1Iterator( txn, this, start, tailable, dir );
+        return new CappedRecordStoreV1Iterator( txn, this, start, false, dir );
     }
 
     vector<RecordIterator*> CappedRecordStoreV1::getManyIterators( OperationContext* txn ) const {

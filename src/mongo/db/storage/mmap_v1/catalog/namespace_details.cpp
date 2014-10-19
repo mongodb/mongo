@@ -66,7 +66,7 @@ namespace mongo {
         nIndexes = 0;
         isCapped = capped;
         maxDocsInCapped = 0x7fffffff; // no limit (value is for pre-v2.3.2 compatibility)
-        paddingFactor = 1.0;
+        paddingFactorOldDoNotUse = 1.0;
         systemFlagsOldDoNotUse = 0;
         userFlags = 0;
         capFirstNewRecord = DiskLoc();
@@ -75,7 +75,7 @@ namespace mongo {
         // For capped case, signal that we are doing initial extent allocation.
         if ( capped ) {
             // WAS: cappedLastDelRecLastExtent().setInvalid();
-            deletedList[1].setInvalid();
+            deletedListSmall[1].setInvalid();
         }
         verify( sizeof(_dataFileVersion) == 2 );
         _dataFileVersion = 0;

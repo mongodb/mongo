@@ -115,6 +115,12 @@ function CollectionDataValidator() {
         delete collectionStats.systemFlags;
         delete newCollectionStats.systemFlags;
 
+        // as of 2.7.7, we no longer use paddingFactor and introduced paddingFactorNote
+        delete collectionStats.paddingFactor;
+        delete collectionStats.paddingFactorNote;
+        delete newCollectionStats.paddingFactor;
+        delete newCollectionStats.paddingFactorNote;
+
         // Delete keys that appear just because we shard
         delete newCollectionStats["primary"];
         delete newCollectionStats["sharded"];

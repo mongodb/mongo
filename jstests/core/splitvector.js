@@ -17,14 +17,18 @@ assertChunkSizes = function ( splitVec , numDocs , maxChunkSize , msg ){
     for ( i=0; i<splitVec.length-1; i++) { 
         min = splitVec[i];
         max = splitVec[i+1];
+        var avgObjSize = db.jstests_splitvector.stats().avgObjSize;
         size = db.runCommand( { datasize: "test.jstests_splitvector" , min: min , max: max } ).size;
         
         // It is okay for the last chunk to be  smaller. A collection's size does not
         // need to be exactly a multiple of maxChunkSize.
-        if ( i < splitVec.length - 2 )
-            assert.close( maxChunkSize , size , "A"+i , -3 );
-        else
+        if ( i < splitVec.length - 2 ) {
+            // We are within one object of the correct chunk size.
+            assert.lt( Math.abs(maxChunkSize - size), avgObjSize , "A"+i );
+        }
+        else {
             assert.gt( maxChunkSize , size , "A"+i , msg + "b" );
+        }
     }
 }
 
@@ -45,10 +49,8 @@ var assertFieldNamesMatch = function( splitPoint , keyPattern ){
     }
 }
 
-// turn off powerOf2, this test checks regular allocation 
 var resetCollection = function() {
     f.drop();
-    db.createCollection(f.getName(), {usePowerOf2Sizes: false});
 }
 
 // -------------------------

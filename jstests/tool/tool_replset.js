@@ -69,7 +69,7 @@ assert.eq(x, 100, "mongoimport should have successfully imported the collection"
 // Test with mongooplog
 var doc = { _id : 5, x : 17 };
 master.getDB("local").oplog.rs.insert({ ts : new Timestamp(), "op" : "i", "ns" : "foo.bar",
-                                         "o" : doc });
+                                         "o" : doc, "v" : NumberInt(2) });
 
 assert.eq(100, master.getDB("foo").getCollection("bar").count(), "count before running mongooplog " +
 		  "was not 100 as expected");

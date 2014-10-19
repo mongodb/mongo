@@ -161,7 +161,10 @@ namespace {
             GeoHash id( (long long) rand.nextInt64(),
                 (unsigned) rand.nextInt32( GeoHash::kMaxBits + 1 ) );
             vector<GeoHash> covering;
-            HashBoxRegion region(converter.unhashToBox(id));
+            Box box = converter.unhashToBoxCovering(id);
+            // Since the unhashed box is expanded by the error 8Mu, we need to shrink it.
+            box.fudge(-GeoHashConverter::kMachinePrecision * MAXBOUND * 20);
+            HashBoxRegion region(box);
             coverer.getCovering(region, &covering);
             ASSERT_EQUALS( covering.size(), (size_t)1 );
             ASSERT_EQUALS( covering[0], id );
@@ -183,7 +186,7 @@ namespace {
                        const R2CellUnion& covering,
                        const GeoHash cellId = GeoHash()) {
 
-        Box cell = converter.unhashToBox(cellId);
+        Box cell = converter.unhashToBoxCovering(cellId);
 
         // The covering may or may not contain this disjoint cell, we don't care.
         if (region.fastDisjoint(cell)) return;

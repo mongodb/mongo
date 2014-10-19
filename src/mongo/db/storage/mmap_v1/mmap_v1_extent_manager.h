@@ -45,6 +45,7 @@
 namespace mongo {
 
     class DataFile;
+    class DataFileVersion;
     class Record;
     class OperationContext;
 
@@ -142,8 +143,8 @@ namespace mongo {
         /**
          * Not thread safe, requires a database exclusive lock
          */
-        void getFileFormat(OperationContext* txn, int* major, int* minor) const;
-        void setFileFormat(OperationContext* txn, int major, int minor);
+        DataFileVersion getFileFormat(OperationContext* txn) const;
+        void setFileFormat(OperationContext* txn, DataFileVersion newVersion);
 
         const DataFile* getOpenFile( int n ) const { return _getOpenFile( n ); }
 

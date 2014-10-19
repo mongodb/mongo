@@ -130,10 +130,9 @@ namespace mongo {
 
     RecordIterator* Collection::getIterator( OperationContext* txn,
                                              const DiskLoc& start,
-                                             bool tailable,
                                              const CollectionScanParams::Direction& dir) const {
         invariant( ok() );
-        return _recordStore->getIterator( txn, start, tailable, dir );
+        return _recordStore->getIterator( txn, start, dir );
     }
 
     vector<RecordIterator*> Collection::getManyIterators( OperationContext* txn ) const {
@@ -143,7 +142,6 @@ namespace mongo {
     int64_t Collection::countTableScan( OperationContext* txn, const MatchExpression* expression ) {
         scoped_ptr<RecordIterator> iterator( getIterator( txn,
                                                           DiskLoc(),
-                                                          false,
                                                           CollectionScanParams::FORWARD ) );
         int64_t count = 0;
         while ( !iterator->isEOF() ) {

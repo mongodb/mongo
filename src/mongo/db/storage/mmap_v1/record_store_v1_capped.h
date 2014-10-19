@@ -63,7 +63,7 @@ namespace mongo {
         virtual void temp_cappedTruncateAfter( OperationContext* txn, DiskLoc end, bool inclusive );
 
         virtual RecordIterator* getIterator( OperationContext* txn,
-                                             const DiskLoc& start, bool tailable,
+                                             const DiskLoc& start,
                                              const CollectionScanParams::Direction& dir) const;
 
         virtual std::vector<RecordIterator*> getManyIterators( OperationContext* txn ) const;
@@ -85,6 +85,7 @@ namespace mongo {
     protected:
 
         virtual bool isCapped() const { return true; }
+        virtual bool shouldPadInserts() const { return false; }
 
         virtual void setCappedDeleteCallback( CappedDocumentDeleteCallback* cb ) {
             _deleteCallback = cb;
@@ -99,13 +100,13 @@ namespace mongo {
     private:
         // -- start copy from cap.cpp --
         void compact(OperationContext* txn);
-        const DiskLoc& cappedFirstDeletedInCurExtent() const;
+        DiskLoc cappedFirstDeletedInCurExtent() const;
         void setFirstDeletedInCurExtent( OperationContext* txn, const DiskLoc& loc );
         void cappedCheckMigrate(OperationContext* txn);
         DiskLoc __capAlloc( OperationContext* txn, int len );
         bool inCapExtent( const DiskLoc &dl ) const;
-        const DiskLoc& cappedListOfAllDeletedRecords() const;
-        const DiskLoc& cappedLastDelRecLastExtent() const;
+        DiskLoc cappedListOfAllDeletedRecords() const;
+        DiskLoc cappedLastDelRecLastExtent() const;
         void setListOfAllDeletedRecords( OperationContext* txn, const DiskLoc& loc );
         void setLastDelRecLastExtent( OperationContext* txn, const DiskLoc& loc );
         Extent *theCapExtent() const;

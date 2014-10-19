@@ -32,6 +32,8 @@
 #include "mongo/db/geo/shapes.h"
 #include "mongo/util/mongoutils/str.h"
 
+#include <algorithm> // for max()
+
 // So we can get at the str namespace.
 using namespace mongoutils;
 
@@ -498,6 +500,21 @@ namespace mongo {
     static BSONField<double> maxField("max", 180.0);
     static BSONField<double> minField("min", -180.0);
 
+    //      a   x     b
+    //      |   |     |
+    // -----|---o-----|---------|--   "|" is a representable double number.
+    //
+    // In the above figure, b is the next representable double number after a, so
+    // |a - b|/|a| = epsilon (ULP) ~= 2.22E-16.
+    //
+    // An exact number x will be represented as the nearest representable double, which is a.
+    // |x - a|/|a| <= 0.5 ULP ~= 1.11e-16
+    //
+    // IEEE floating-point operations have a maximum error of 0.5 ULPS (units in
+    // the last place).  For double-precision numbers, this works out to 2**-53
+    // (about 1.11e-16) times the magnitude of the result.
+    double const GeoHashConverter::kMachinePrecision = 0.5 * std::numeric_limits<double>::epsilon();
+
     Status GeoHashConverter::parseParameters(const BSONObj& paramDoc,
                                              GeoHashConverter::Parameters* params) {
 
@@ -556,6 +573,9 @@ namespace mongo {
 
         // Error in radians
         _errorSphere = deg2rad(_error);
+
+        // 8 * max(|max|, |min|) * u
+        _errorUnhashToBox = calcUnhashToBoxError(_params);
     }
 
     double GeoHashConverter::distanceBetweenHashes(const GeoHash& a, const GeoHash& b) const {
@@ -672,16 +692,25 @@ namespace mongo {
         *y = convertFromHashScale(b);
     }
 
-    Box GeoHashConverter::unhashToBox(const GeoHash &h) const {
-        double sizeEdgeBox = sizeEdge(h);
+    Box GeoHashConverter::unhashToBoxCovering(const GeoHash &h) const {
+        if (h.getBits() == 0) {
+            // Return the result without any error.
+            return Box(Point(_params.min, _params.min), Point(_params.max, _params.max));
+        }
+
+        double sizeEdgeBox = sizeEdge(h.getBits());
         Point min(unhashToPoint(h));
         Point max(min.x + sizeEdgeBox, min.y + sizeEdgeBox);
+
+        // Expand the box by the error bound
         Box box(min, max);
+        box.fudge(_errorUnhashToBox);
         return box;
     }
 
-    Box GeoHashConverter::unhashToBox(const BSONElement &e) const {
-        return unhashToBox(hash(e));
+    double GeoHashConverter::calcUnhashToBoxError(const GeoHashConverter::Parameters& params) {
+        return std::max(fabs(params.min), fabs(params.max))
+                    * GeoHashConverter::kMachinePrecision* 8;
     }
 
     double GeoHashConverter::sizeOfDiag(const GeoHash& a) const {
@@ -690,34 +719,29 @@ namespace mongo {
         return distanceBetweenHashes(a, b);
     }
 
-    // TODO: Use ldexp(max - min, -level)
-    double GeoHashConverter::sizeEdge(const GeoHash& a) const {
-        if (!a.constrains())
-            return _params.max - _params.min;
 
-        double ax, ay, bx, by;
-        GeoHash b = a;
-        b.move(1, 1);
-        unhash(a, &ax, &ay);
-        unhash(b, &bx, &by);
-
-        // _min and _max are a singularity
-        if (bx == _params.min)
-            bx = _params.max;
-
-        return fabs(ax - bx);
+    // Relative error = epsilon_(max-min). ldexp() is just a direct translation to
+    // floating point exponent, and should be exact.
+    double GeoHashConverter::sizeEdge(unsigned level) const {
+        invariant(level >= 0);
+        invariant((int)level <= _params.bits);
+        return ldexp(_params.max - _params.min, -level);
     }
 
-    // Convert from an unsigned in [0, (max-min)*scaling] to [min, max]
-    double GeoHashConverter::convertFromHashScale(unsigned in) const {
-        double x = in;
+    // Convert from a double in [0, (max-min)*scaling] to [min, max]
+    double GeoHashConverter::convertDoubleFromHashScale(double x) const {
         x /= _params.scaling;
         x += _params.min;
         return x;
     }
 
-    // Convert from a double that is [min, max] to an unsigned in [0, (max-min)*scaling]
-    unsigned GeoHashConverter::convertToHashScale(double in) const {
+    // Convert from an unsigned in [0, (max-min)*scaling] to [min, max]
+    double GeoHashConverter::convertFromHashScale(unsigned in) const {
+        return convertDoubleFromHashScale((double)in);
+    }
+
+    // Convert from a double that is [min, max] to a double in [0, (max-min)*scaling]
+    double GeoHashConverter::convertToDoubleHashScale(double in) const {
         verify(in <= _params.max && in >= _params.min);
 
         if (in == _params.max) {
@@ -728,6 +752,13 @@ namespace mongo {
 
         in -= _params.min;
         verify(in >= 0);
-        return static_cast<unsigned>(in * _params.scaling);
+        return in * _params.scaling;
     }
+
+    // Convert from a double that is [min, max] to an unsigned in [0, (max-min)*scaling]
+    unsigned GeoHashConverter::convertToHashScale(double in) const {
+        return static_cast<unsigned>(convertToDoubleHashScale(in));
+    }
+
+
 }  // namespace mongo

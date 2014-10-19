@@ -50,7 +50,7 @@ namespace mongo {
 
         const char* name() const { return "SimpleRecordStoreV1"; }
 
-        virtual RecordIterator* getIterator( OperationContext* txn, const DiskLoc& start, bool tailable,
+        virtual RecordIterator* getIterator( OperationContext* txn, const DiskLoc& start,
                                              const CollectionScanParams::Direction& dir) const;
 
         virtual std::vector<RecordIterator*> getManyIterators(OperationContext* txn) const;
@@ -69,6 +69,7 @@ namespace mongo {
 
     protected:
         virtual bool isCapped() const { return false; }
+        virtual bool shouldPadInserts() const { return !_details->isUserFlagSet(Flag_NoPadding); }
 
         virtual StatusWith<DiskLoc> allocRecord( OperationContext* txn,
                                                  int lengthWithHeaders,

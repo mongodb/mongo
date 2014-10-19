@@ -74,10 +74,7 @@ namespace QueryStageMergeSortTests {
         }
 
         void getLocs(set<DiskLoc>* out, Collection* coll) {
-            RecordIterator* it = coll->getIterator(&_txn,
-                                                   DiskLoc(),
-                                                   false,
-                                                   CollectionScanParams::FORWARD);
+            RecordIterator* it = coll->getIterator(&_txn);
             while (!it->isEOF()) {
                 DiskLoc nextLoc = it->getNext();
                 out->insert(nextLoc);

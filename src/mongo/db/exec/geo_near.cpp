@@ -274,7 +274,7 @@ namespace mongo {
             invariant(status.isOK()); // The index status should always be valid
 
             GeoHashConverter converter(hashParams);
-            return 5 * converter.sizeEdge(GeoHash(0u, 0u, hashParams.bits));
+            return 5 * converter.sizeEdge(hashParams.bits);
         }
         else {
             return kMaxEarthDistanceInMeters / 1000.0;
@@ -388,7 +388,7 @@ namespace mongo {
             virtual bool matchesSingleElement(const BSONElement& e) const {
                 // Something has gone terribly wrong if this doesn't hold.
                 invariant(BinData == e.type());
-                return !_region->fastDisjoint(_unhasher.unhashToBox(e));
+                return !_region->fastDisjoint(_unhasher.unhashToBoxCovering(_unhasher.hash(e)));
             }
 
             //

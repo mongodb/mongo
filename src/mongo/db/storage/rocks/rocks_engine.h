@@ -71,7 +71,9 @@ namespace mongo {
 
         virtual RecoveryUnit* newRecoveryUnit() override;
 
-        virtual Status createRecordStore(OperationContext* opCtx, const StringData& ident,
+        virtual Status createRecordStore(OperationContext* opCtx,
+                                         const StringData& ns,
+                                         const StringData& ident,
                                          const CollectionOptions& options) override;
 
         virtual RecordStore* getRecordStore(OperationContext* opCtx, const StringData& ns,
@@ -115,6 +117,8 @@ namespace mongo {
 
         rocksdb::ColumnFamilyOptions _collectionOptions() const;
         rocksdb::ColumnFamilyOptions _indexOptions(const Ordering& order) const;
+
+        static rocksdb::ColumnFamilyOptions _defaultCFOptions();
 
         std::string _path;
         boost::scoped_ptr<rocksdb::DB> _db;

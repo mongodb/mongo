@@ -1144,6 +1144,10 @@ namespace {
         }
         fassert(18640, cbh.getStatus());
         _replExecutor.wait(cbh.getValue());
+
+        // TODO: Remove after legacy replication coordinator is deleted
+        response->append("replCoord", "impl");
+
         return result;
     }
 
@@ -1203,7 +1207,7 @@ namespace {
 
     Status ReplicationCoordinatorImpl::setMaintenanceMode(OperationContext* txn, bool activate) {
         Status result(ErrorCodes::InternalError, "didn't set status in _setMaintenanceMode_helper");
-        CBHStatus cbh = _replExecutor.scheduleWorkWithGlobalExclusiveLock(
+        CBHStatus cbh = _replExecutor.scheduleWork(
             stdx::bind(&ReplicationCoordinatorImpl::_setMaintenanceMode_helper,
                        this,
                        stdx::placeholders::_1,

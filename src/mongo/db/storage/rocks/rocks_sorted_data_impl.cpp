@@ -436,14 +436,23 @@ namespace mongo {
 
     RocksSortedDataImpl::RocksSortedDataImpl(rocksdb::DB* db,
                                              boost::shared_ptr<rocksdb::ColumnFamilyHandle> cf,
-                                             Ordering order)
-        : _db(db), _columnFamily(cf), _order(order) {
-        invariant( _db );
+                                             std::string ident, Ordering order)
+        : _db(db),
+          _columnFamily(cf),
+          _ident(std::move(ident)),
+          _order(order),
+          _numEntriesKey("numentries-" + _ident) {
+        invariant(_db);
         invariant(_columnFamily.get());
+        _numEntries = 0;
         string value;
-        bool ok = _db->GetProperty(_columnFamily.get(), "rocksdb.estimate-num-keys", &value);
-        invariant( ok );
-        _numEntries.store(std::atoll(value.c_str()));
+        if (_db->Get(rocksdb::ReadOptions(), rocksdb::Slice(_numEntriesKey), &value).ok()) {
+            long long numEntries;
+            memcpy(&numEntries, value.data(), sizeof(numEntries));
+            _numEntries.store(numEntries);
+        } else {
+            _numEntries.store(0);
+        }
     }
 
     SortedDataBuilderInterface* RocksSortedDataImpl::getBulkBuilder(OperationContext* txn,
@@ -473,13 +482,14 @@ namespace mongo {
             }
         }
 
-        ru->registerChange(new ChangeNumEntries(&_numEntries, true));
+        ru->incrementCounter(_numEntriesKey, &_numEntries, 1);
+
         ru->writeBatch()->Put(_columnFamily.get(), makeString(key, loc), emptyByteSlice);
 
         return Status::OK();
     }
 
-    bool RocksSortedDataImpl::unindex(OperationContext* txn,
+    void RocksSortedDataImpl::unindex(OperationContext* txn,
                                       const BSONObj& key,
                                       const DiskLoc& loc,
                                       bool dupsAllowed) {
@@ -489,12 +499,12 @@ namespace mongo {
 
         string dummy;
         if (ru->Get(_columnFamily.get(), keyData, &dummy).IsNotFound()) {
-            return false;
+            return;
         }
 
-        ru->registerChange(new ChangeNumEntries(&_numEntries, false));
+        ru->incrementCounter(_numEntriesKey, &_numEntries,  -1);
+
         ru->writeBatch()->Delete(_columnFamily.get(), keyData);
-        return true;
     }
 
     Status RocksSortedDataImpl::dupKeyCheck(OperationContext* txn,
@@ -542,7 +552,11 @@ namespace mongo {
         return Status::OK();
     }
 
-    long long RocksSortedDataImpl::numEntries(OperationContext* txn) const { return _numEntries.load(); }
+    long long RocksSortedDataImpl::numEntries(OperationContext* txn) const {
+        auto ru = RocksRecoveryUnit::getRocksRecoveryUnit(txn);
+        return _numEntries.load(std::memory_order::memory_order_relaxed) +
+            ru->getDeltaCounter(_numEntriesKey);
+    }
 
     SortedDataInterface::Cursor* RocksSortedDataImpl::newCursor(OperationContext* txn,
                                                                 int direction) const {
@@ -555,25 +569,20 @@ namespace mongo {
         return Status::OK();
     }
 
-    long long RocksSortedDataImpl::getSpaceUsedBytes( OperationContext* txn ) const {
-        // no need to use snapshot here
-        boost::scoped_ptr<rocksdb::Iterator> iter(
-            _db->NewIterator(rocksdb::ReadOptions(), _columnFamily.get()));
-        iter->SeekToFirst();
-        const rocksdb::Slice rangeStart = iter->key();
-        iter->SeekToLast();
-        // This is exclusive when we would prefer it be inclusive.
-        // AFB best way to get approximate size for a whole column family.
-        const rocksdb::Slice rangeEnd = iter->key();
+    long long RocksSortedDataImpl::getSpaceUsedBytes(OperationContext* txn) const {
+        // TODO provide GetLiveFilesMetadata() with column family
+        std::vector<rocksdb::LiveFileMetaData> metadata;
+        _db->GetLiveFilesMetaData(&metadata);
+        uint64_t spaceUsedBytes = 0;
+        for (const auto& m : metadata) {
+            if (m.column_family_name == _ident) {
+                spaceUsedBytes += m.size;
+            }
+        }
 
-        rocksdb::Range fullIndexRange( rangeStart, rangeEnd );
-        uint64_t spacedUsedBytes = 0;
-
-        // TODO Rocks specifies that this may not include recently written data. Figure out if
-        // that's okay
-        _db->GetApproximateSizes(_columnFamily.get(), &fullIndexRange, 1, &spacedUsedBytes);
-
-        return spacedUsedBytes;
+        uint64_t walSpaceUsed = 0;
+        _db->GetIntProperty(_columnFamily.get(), "rocksdb.cur-size-all-mem-tables", &walSpaceUsed);
+        return spaceUsedBytes + walSpaceUsed;
     }
 
     // ownership passes to caller

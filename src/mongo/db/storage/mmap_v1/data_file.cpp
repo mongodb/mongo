@@ -202,8 +202,7 @@ namespace mongo {
             verify( HeaderSize == 8192 );
             DataFileHeader *h = getDur().writing(this);
             h->fileLength = filelength;
-            h->version = PDFILE_VERSION;
-            h->versionMinor = PDFILE_VERSION_MINOR_22_AND_OLDER; // All dbs start like this
+            h->version = DataFileVersion::defaultForNewFiles();
             h->unused.set( fileno, HeaderSize );
             verify( (data-(char*)this) == HeaderSize );
             h->unusedLength = fileLength - HeaderSize - 16;

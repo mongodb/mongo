@@ -67,6 +67,16 @@ namespace mongo {
             return;
         }
 
+        for (auto pair : _deltaCounters) {
+            auto& counter = pair.second;
+            counter._value->fetch_add(counter._delta, std::memory_order::memory_order_relaxed);
+            long long newValue = counter._value->load(std::memory_order::memory_order_relaxed);
+
+            // TODO: make the encoding platform indepdent.
+            const char* nr_ptr = reinterpret_cast<char*>(&newValue);
+            writeBatch()->Put(pair.first, rocksdb::Slice(nr_ptr, sizeof(long long)));
+        }
+
         rocksdb::Status status = _db->Write(rocksdb::WriteOptions(), _writeBatch->GetWriteBatch());
         if ( !status.ok() ) {
             log() << "uh oh: " << status.ToString();
@@ -78,7 +88,7 @@ namespace mongo {
             delete change;
         }
         _changes.clear();
-
+        _deltaCounters.clear();
         _writeBatch.reset();
 
         if ( _snapshot ) {
@@ -121,6 +131,8 @@ namespace mongo {
     void RocksRecoveryUnit::destroy() {
         if (_defaultCommit) {
             commitUnitOfWork();
+        } else {
+            _deltaCounters.clear();
         }
 
         if (_writeBatch && _writeBatch->GetWriteBatch()->Count() > 0) {
@@ -176,6 +188,8 @@ namespace mongo {
     }
 
     rocksdb::Iterator* RocksRecoveryUnit::NewIterator(rocksdb::ColumnFamilyHandle* columnFamily) {
+        invariant(columnFamily != _db->DefaultColumnFamily());
+
         rocksdb::ReadOptions options;
         options.snapshot = snapshot();
         auto iterator = _db->NewIterator(options, columnFamily);
@@ -183,6 +197,30 @@ namespace mongo {
             iterator = _writeBatch->NewIteratorWithBase(columnFamily, iterator);
         }
         return iterator;
+    }
+
+    void RocksRecoveryUnit::incrementCounter(const rocksdb::Slice& counterKey,
+                                             std::atomic<long long>* counter, long long delta) {
+        if (delta == 0) {
+            return;
+        }
+
+        auto pair = _deltaCounters.find(counterKey.ToString());
+        if (pair == _deltaCounters.end()) {
+            _deltaCounters[counterKey.ToString()] =
+                mongo::RocksRecoveryUnit::Counter(counter, delta);
+        } else {
+            pair->second._delta += delta;
+        }
+    }
+
+    long long RocksRecoveryUnit::getDeltaCounter(const rocksdb::Slice& counterKey) {
+        auto counter = _deltaCounters.find(counterKey.ToString());
+        if (counter == _deltaCounters.end()) {
+            return 0;
+        } else {
+            return counter->second._delta;
+        }
     }
 
     RocksRecoveryUnit* RocksRecoveryUnit::getRocksRecoveryUnit(OperationContext* opCtx) {

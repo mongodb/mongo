@@ -90,8 +90,9 @@ namespace mongo {
 
         CollectionScanParams _params;
 
-        // True if Database::getCollection(_ns) == NULL on our first call to work.
-        bool _nsDropped;
+        bool _isDead;
+
+        DiskLoc _lastSeenLoc;
 
         // Stats
         CommonStats _commonStats;

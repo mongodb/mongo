@@ -117,6 +117,7 @@ namespace {
 
     }
 
+#if 0
     TEST( Heap1RecordStore, CappedTailable ) {
         HeapRecordStore rs( "a.b", true, 1000, 3 );
 
@@ -159,5 +160,6 @@ namespace {
         ASSERT( it->isEOF() );
 
     }
+#endif
 
 }

@@ -153,6 +153,8 @@ namespace mongo {
         // Storage engine state for getMore.
         //
 
+        bool hasRecoveryUnit() const { return _ownedRU.get() || _unownedRU; }
+
         /**
          * 
          * If a ClientCursor is created via DBDirectClient, it uses the same storage engine

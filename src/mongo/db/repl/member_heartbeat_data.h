@@ -30,6 +30,7 @@
 
 #include "mongo/bson/optime.h"
 #include "mongo/db/repl/member_state.h"
+#include "mongo/db/repl/repl_set_heartbeat_response.h"
 #include "mongo/util/time_support.h"
 
 namespace mongo {
@@ -41,36 +42,34 @@ namespace repl {
      **/
     class MemberHeartbeatData {
     public:
-        explicit MemberHeartbeatData(int configIndex);
+        MemberHeartbeatData();
 
-        int getConfigIndex() const { return _configIndex; }
-        const MemberState& getState() const { return _state; }
+        MemberState getState() const { return _lastResponse.getState(); }
         int getHealth() const { return _health; }
         Date_t getUpSince() const { return _upSince; }
         Date_t getLastHeartbeat() const { return _lastHeartbeat; }
         Date_t getLastHeartbeatRecv() const { return _lastHeartbeatRecv; }
-        void setLastHeartbeatRecv(time_t newHeartbeatRecvTime) {
+        void setLastHeartbeatRecv(Date_t newHeartbeatRecvTime) {
             _lastHeartbeatRecv = newHeartbeatRecvTime;
         }
-        const std::string& getLastHeartbeatMsg() const { return _lastHeartbeatMsg; }
-        const std::string& getSyncSource() const { return _syncSource; }
-        OpTime getOpTime() const { return _opTime; }
-        int getSkew() const { return _skew; }
+        const std::string& getLastHeartbeatMsg() const { return _lastResponse.getHbMsg(); }
+        const std::string& getSyncSource() const { return _lastResponse.getSyncingTo(); }
+        OpTime getOpTime() const { return _lastResponse.getOpTime(); }
         bool hasAuthIssue() const { return _authIssue; }
 
-        OpTime getElectionTime() const { return _electionTime; }
+        OpTime getElectionTime() const { return _lastResponse.getElectionTime(); }
+
+        // Returns true if the last heartbeat data explicilty stated that the node
+        // is not electable.
+        bool isUnelectable() const {
+            return _lastResponse.hasIsElectable() && !_lastResponse.isElectable();
+        }
 
         // Was this member up for the last heartbeat?
         bool up() const { return _health > 0; }
         // Was this member up for the last hearbeeat
         // (or we haven't received the first heartbeat yet)
         bool maybeUp() const { return _health != 0; }
-
-        /**
-         * Updates this with the info received from the command result we got from
-         * the last heartbeat command.
-         */
-        void updateFrom(const MemberHeartbeatData& newInfo);
 
         /**
          * Sets the member's state to "newState".  This is principally valuable when modeling
@@ -80,36 +79,23 @@ namespace repl {
 
         /**
          * Sets values in this object from the results of a successful heartbeat command.
-         * _authIssues is set to false, _health is set to 1, other values are set as specified.
          */
-        MemberHeartbeatData& setUpValues(Date_t now,
-                         MemberState state,
-                         OpTime electionTime,
-                         OpTime optime,
-                         const std::string& syncingTo,
-                         const std::string& heartbeatMessage);
-
+        void setUpValues(Date_t now, ReplSetHeartbeatResponse hbResponse);
 
         /**
          * Sets values in this object from the results of a erroring/failed heartbeat command.
          * _authIssues is set to false, _health is set to 0, _state is set to RS_DOWN, and
          * other values are set as specified.
          */
-        MemberHeartbeatData& setDownValues(Date_t now, const std::string& heartbeatMessage);
+        void setDownValues(Date_t now, const std::string& heartbeatMessage);
 
         /**
          * Sets values in this object that indicate there was an auth issue on the last heartbeat
          * command.
          */
-        MemberHeartbeatData& setAuthIssue(Date_t now);
+        void setAuthIssue(Date_t now);
 
     private:
-        // This member's index into the ReplicaSetConfig
-        int _configIndex;
-
-        // This member's state
-        MemberState _state;
-
         // -1 = not checked yet, 0 = member is down/unreachable, 1 = member is up
         int _health;
 
@@ -120,24 +106,11 @@ namespace repl {
         // This is the last time we got a heartbeat request from a given member.
         Date_t _lastHeartbeatRecv;
 
-        // This is the custom message corresponding to the disposition of the member
-        std::string _lastHeartbeatMsg;
-
-        // This is the member's current sync source
-        std::string _syncSource;
-
-        // Member's latest applied optime
-        OpTime _opTime;
-
-        // Number of seconds positive or negative the remote member's clock is, 
-        // relative to the local server's clock
-        int _skew;
-
         // Did the last heartbeat show a failure to authenticate?
         bool _authIssue;
 
-        // Time node was elected primary
-        OpTime _electionTime;
+        // The last heartbeat response we received.
+        ReplSetHeartbeatResponse _lastResponse;
     };
 
 } // namespace repl

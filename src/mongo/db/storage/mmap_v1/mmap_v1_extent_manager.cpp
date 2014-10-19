@@ -563,27 +563,20 @@ namespace mongo {
         _size.store(n + 1);
     }
 
-    void MmapV1ExtentManager::getFileFormat( OperationContext* txn, int* major, int* minor ) const {
+    DataFileVersion MmapV1ExtentManager::getFileFormat(OperationContext* txn) const {
         if ( numFiles() == 0 )
-            return;
-        const DataFile* df = _getOpenFile( 0 );
-        *major = df->getHeader()->version;
-        *minor = df->getHeader()->versionMinor;
+            return DataFileVersion(0, 0);
 
-        if ( *major <= 0 || *major >= 100 ||
-             *minor <= 0 || *minor >= 100 ) {
-            error() << "corrupt pdfile version? major: " << *major << " minor: " << *minor;
-            fassertFailed( 14026 );
-        }
+        // We explicitly only look at the first file.
+        return _getOpenFile(0)->getHeader()->version;
     }
 
-    void MmapV1ExtentManager::setFileFormat(OperationContext* txn, int major, int minor) {
+    void MmapV1ExtentManager::setFileFormat(OperationContext* txn, DataFileVersion newVersion) {
         invariant(numFiles() > 0);
 
         DataFile* df = _getOpenFile(0);
         invariant(df);
 
-        txn->recoveryUnit()->writingInt(df->getHeader()->version) = major;
-        txn->recoveryUnit()->writingInt(df->getHeader()->versionMinor) = minor;
+        *txn->recoveryUnit()->writing(&df->getHeader()->version) = newVersion;
     }
 }

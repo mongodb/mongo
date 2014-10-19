@@ -186,14 +186,12 @@ namespace mongo {
                                           const mutablebson::DamageVector& damages ) = 0;
         /**
          * returned iterator owned by caller
-         * canonical to get all would be
-         * getIterator( txn, DiskLoc(), false, CollectionScanParams::FORWARD )
+         * Default arguments return all items in record store.
          */
         virtual RecordIterator* getIterator( OperationContext* txn,
                                              const DiskLoc& start = DiskLoc(),
-                                             bool tailable = false,
                                              const CollectionScanParams::Direction& dir =
-                                             CollectionScanParams::FORWARD
+                                                     CollectionScanParams::FORWARD
                                              ) const = 0;
 
         /**

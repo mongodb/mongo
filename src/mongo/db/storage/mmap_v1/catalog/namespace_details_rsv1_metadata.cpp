@@ -34,6 +34,9 @@
 #include "mongo/db/ops/update.h"
 
 namespace mongo {
+    BOOST_STATIC_ASSERT(RecordStoreV1Base::Buckets
+                        == NamespaceDetails::SmallBuckets + NamespaceDetails::LargeBuckets);
+
     NamespaceDetailsRSV1MetaData::NamespaceDetailsRSV1MetaData( const StringData& ns,
                                                                 NamespaceDetails* details,
                                                                 RecordStore* namespaceRecordStore )
@@ -87,20 +90,44 @@ namespace mongo {
         s->nrecords = numRecords;
     }
 
-    const DiskLoc& NamespaceDetailsRSV1MetaData::deletedListEntry( int bucket ) const {
-        return _details->deletedList[ bucket ];
+    DiskLoc NamespaceDetailsRSV1MetaData::deletedListEntry( int bucket ) const {
+        invariant(bucket >= 0 && bucket < RecordStoreV1Base::Buckets);
+        const DiskLoc head = (bucket < NamespaceDetails::SmallBuckets)
+                              ? _details->deletedListSmall[bucket]
+                              : _details->deletedListLarge[bucket - NamespaceDetails::SmallBuckets];
+
+        if (head == DiskLoc(0,0)) {
+            // This will happen the first time we use a "large" bucket since they were previously
+            // zero-initialized.
+            return DiskLoc();
+        }
+
+        return head;
     }
 
     void NamespaceDetailsRSV1MetaData::setDeletedListEntry( OperationContext* txn,
                                                             int bucket,
                                                             const DiskLoc& loc ) {
-        *txn->recoveryUnit()->writing( &_details->deletedList[bucket] ) = loc;
+        DiskLoc* head = (bucket < NamespaceDetails::SmallBuckets)
+                        ? &_details->deletedListSmall[bucket]
+                        : &_details->deletedListLarge[bucket - NamespaceDetails::SmallBuckets];
+        *txn->recoveryUnit()->writing( head ) = loc;
+    }
+
+    DiskLoc NamespaceDetailsRSV1MetaData::deletedListLegacyGrabBag() const {
+        return _details->deletedListLegacyGrabBag;
+    }
+
+    void NamespaceDetailsRSV1MetaData::setDeletedListLegacyGrabBag(OperationContext* txn,
+                                                                   const DiskLoc& loc) {
+        *txn->recoveryUnit()->writing(&_details->deletedListLegacyGrabBag) = loc;
     }
 
     void NamespaceDetailsRSV1MetaData::orphanDeletedList( OperationContext* txn ) {
-        for( int i = 0; i < Buckets; i++ ) {
+        for( int i = 0; i < RecordStoreV1Base::Buckets; i++ ) {
             setDeletedListEntry( txn, i, DiskLoc() );
         }
+        setDeletedListLegacyGrabBag(txn, DiskLoc());
     }
 
     const DiskLoc& NamespaceDetailsRSV1MetaData::firstExtent( OperationContext* txn ) const {
@@ -175,27 +202,12 @@ namespace mongo {
         return _details->maxDocsInCapped;
     }
 
-    double NamespaceDetailsRSV1MetaData::paddingFactor() const {
-        return _details->paddingFactor;
-    }
-
-    void NamespaceDetailsRSV1MetaData::setPaddingFactor( OperationContext* txn, double paddingFactor ) {
-        if ( paddingFactor == _details->paddingFactor )
-            return;
-
-        if ( _details->isCapped )
-            return;
-
-        *txn->recoveryUnit()->writing(&_details->paddingFactor) = paddingFactor;
-    }
-
     void NamespaceDetailsRSV1MetaData::_syncUserFlags( OperationContext* txn ) {
         if ( !_namespaceRecordStore )
             return;
 
         scoped_ptr<RecordIterator> iterator( _namespaceRecordStore->getIterator( txn,
                                                                                  DiskLoc(),
-                                                                                 false,
                                                                                  CollectionScanParams::FORWARD ) );
         while ( !iterator->isEOF() ) {
             DiskLoc loc = iterator->getNext();
