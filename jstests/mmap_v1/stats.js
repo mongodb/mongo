@@ -12,7 +12,7 @@ assert.lt( 0 , t.totalIndexSize() , "C" );
 var stats = statsDB.stats();
 assert.gt( stats.fileSize, 0 );
 assert.eq( stats.dataFileVersion.major, 4 );
-assert.eq( stats.dataFileVersion.minor, 5 );
+assert.eq( stats.dataFileVersion.minor, 22 );
 
 // test empty database; should be no dataFileVersion
 statsDB.dropDatabase();
