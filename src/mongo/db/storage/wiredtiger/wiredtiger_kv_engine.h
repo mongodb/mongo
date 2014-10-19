@@ -24,6 +24,7 @@ namespace mongo {
         virtual RecoveryUnit* newRecoveryUnit();
 
         virtual Status createRecordStore( OperationContext* opCtx,
+                                          const StringData& ns,
                                           const StringData& ident,
                                           const CollectionOptions& options );
 

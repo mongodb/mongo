@@ -119,6 +119,9 @@ namespace mongo {
         WT_CURSOR* get() const;
         WT_CURSOR* operator->() const { return get(); }
 
+        WiredTigerSession* getSession() { return _session; }
+        WT_SESSION* getWTSession();
+
         void reset();
 
     private:

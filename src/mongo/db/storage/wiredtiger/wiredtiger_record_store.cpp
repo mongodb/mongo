@@ -48,12 +48,19 @@
 
 namespace mongo {
 
-    std::string WiredTigerRecordStore::generateCreateString( const CollectionOptions& options,
+    namespace {
+        bool isOplog( const StringData& ns ) {
+            return ns.startsWith( "local.oplog." );
+        }
+    }
+
+    std::string WiredTigerRecordStore::generateCreateString( const StringData& ns,
+                                                             const CollectionOptions& options,
                                                              const StringData& extraStrings ) {
         // Separate out a prefix and suffix in the default string. User configuration will
         // override values in the prefix, but not values in the suffix.
         std::stringstream ss;
-        if ( 0 ) {
+        if ( isOplog(ns) ) {
             ss << "type=file,";
             ss << "leaf_page_max=512k,";
             ss << "memory_page_max=10m,";
@@ -79,6 +86,7 @@ namespace mongo {
           _uri( uri.toString() ),
           _instanceId( WiredTigerSession::genCursorId() ),
           _isCapped( isCapped ),
+          _isOplog( isOplog( ns ) ),
           _cappedMaxSize( cappedMaxSize ),
           _cappedMaxDocs( cappedMaxDocs ),
           _cappedDeleteCallback( cappedDeleteCallback ) {
@@ -236,29 +244,63 @@ namespace mongo {
         return false;
     }
 
+    namespace {
+        int oplogCounter = 0;
+    }
+
     void WiredTigerRecordStore::cappedDeleteAsNeeded(OperationContext* txn) {
+
+        bool useTruncate = false;
+
+        if ( _isOplog ) {
+            if ( oplogCounter++ % 100 > 0 )
+                return;
+        }
+
         if (!cappedAndNeedDelete(txn))
             return;
 
         WiredTigerCursor curwrap( _uri, _instanceId, txn);
         WT_CURSOR *c = curwrap.get();
         int ret = c->next(c);
+        DiskLoc oldest;
         while ( ret == 0 && cappedAndNeedDelete(txn) ) {
             invariant(_numRecords > 0);
 
             uint64_t key;
             ret = c->get_key(c, &key);
             invariantWTOK(ret);
-            DiskLoc oldest = _fromKey(key);
+            oldest = _fromKey(key);
 
-            if ( _cappedDeleteCallback )
+
+            if ( _cappedDeleteCallback ) {
                 uassertStatusOK(_cappedDeleteCallback->aboutToDeleteCapped(txn, oldest));
+            }
 
-            deleteRecord(txn, oldest);
+            if ( useTruncate ) {
+                _changeNumRecords( txn, false );
+                WT_ITEM temp;
+                invariantWTOK( c->get_value( c, &temp ) );
+                _increaseDataSize( txn, temp.size );
+            }
+            else {
+                deleteRecord( txn, oldest );
+            }
+
             ret = c->next(c);
         }
 
         if (ret != WT_NOTFOUND) invariantWTOK(ret);
+
+        invariant( !oldest.isNull() );
+
+        if ( useTruncate ) {
+            c->reset( c );
+            c->set_key( c, _makeKey( oldest ) );
+            invariantWTOK( curwrap.getWTSession()->truncate( curwrap.getWTSession(),
+                                                             NULL, NULL, c, "" ) );
+        }
+
     }
 
     StatusWith<DiskLoc> WiredTigerRecordStore::insertRecord( OperationContext* txn,

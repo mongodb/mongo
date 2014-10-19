@@ -86,11 +86,12 @@ namespace mongo {
     }
 
     Status WiredTigerKVEngine::createRecordStore( OperationContext* opCtx,
+                                                  const StringData& ns,
                                                   const StringData& ident,
                                                   const CollectionOptions& options ) {
         scoped_ptr<WiredTigerSession> session( _sessionCache->getSession() );
 
-        std::string config = WiredTigerRecordStore::generateCreateString( options, _rsOptions );
+        std::string config = WiredTigerRecordStore::generateCreateString( ns, options, _rsOptions );
 
         string uri = _uri( ident );
         WT_SESSION* s = session->getSession();

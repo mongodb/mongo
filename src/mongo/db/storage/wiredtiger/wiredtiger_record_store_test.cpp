@@ -61,7 +61,7 @@ namespace mongo {
             WiredTigerRecoveryUnit* ru = new WiredTigerRecoveryUnit( _sessionCache );
             OperationContextNoop txn( ru );
             string uri = "table:a.b";
-            std::string config = WiredTigerRecordStore::generateCreateString(CollectionOptions(), "");
+            std::string config = WiredTigerRecordStore::generateCreateString("", CollectionOptions(), "");
 
             {
                 WriteUnitOfWork uow(&txn);
@@ -80,7 +80,7 @@ namespace mongo {
             WiredTigerRecoveryUnit* ru = new WiredTigerRecoveryUnit( _sessionCache );
             OperationContextNoop txn( ru );
             string uri = "table:a.b";
-            std::string config = WiredTigerRecordStore::generateCreateString(CollectionOptions(), "");
+            std::string config = WiredTigerRecordStore::generateCreateString("", CollectionOptions(), "");
 
             {
                 WriteUnitOfWork uow(&txn);

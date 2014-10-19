@@ -46,7 +46,8 @@ namespace mongo {
 
     class WiredTigerRecordStore : public RecordStore {
     public:
-        static string generateCreateString(const CollectionOptions &options,
+        static string generateCreateString(const StringData& ns,
+                                           const CollectionOptions &options,
                                            const StringData& extraStrings );
 
         WiredTigerRecordStore(OperationContext* txn,
@@ -206,6 +207,7 @@ namespace mongo {
 
         // The capped settings should not be updated once operations have started
         bool _isCapped;
+        bool _isOplog;
         int64_t _cappedMaxSize;
         int64_t _cappedMaxDocs;
         CappedDocumentDeleteCallback* _cappedDeleteCallback;

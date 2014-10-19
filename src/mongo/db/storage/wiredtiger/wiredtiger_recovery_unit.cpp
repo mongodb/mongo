@@ -213,4 +213,7 @@ namespace mongo {
         invariantWTOK( _cursor->reset( _cursor ) );
     }
 
+    WT_SESSION* WiredTigerCursor::getWTSession() {
+        return _session->getSession();
+    }
 }
