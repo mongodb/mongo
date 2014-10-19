@@ -136,7 +136,9 @@ namespace mongo {
         return new RocksRecoveryUnit(_db.get(), true);
     }
 
-    Status RocksEngine::createRecordStore(OperationContext* opCtx, const StringData& ident,
+    Status RocksEngine::createRecordStore(OperationContext* opCtx,
+                                          const StringData& ns,
+                                          const StringData& ident,
                                           const CollectionOptions& options) {
         if (_existsColumnFamily(ident)) {
             return Status::OK();

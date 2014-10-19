@@ -70,7 +70,10 @@ namespace mongo {
         OperationContextNoop opCtx( _engine->newRecoveryUnit() );
         WriteUnitOfWork uow( &opCtx );
 
-        Status status = _engine->createRecordStore( &opCtx, catalogInfo, CollectionOptions() );
+        Status status = _engine->createRecordStore( &opCtx,
+                                                    catalogInfo,
+                                                    catalogInfo,
+                                                    CollectionOptions() );
         fassert( 28520, status );
 
         _catalogRecordStore.reset( _engine->getRecordStore( &opCtx,

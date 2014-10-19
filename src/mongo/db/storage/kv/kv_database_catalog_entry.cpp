@@ -175,7 +175,7 @@ namespace mongo {
 
         string ident = _engine->getCatalog()->getCollectionIdent( ns );
 
-        status = _engine->getEngine()->createRecordStore( txn, ident, options );
+        status = _engine->getEngine()->createRecordStore( txn, ns, ident, options );
         if ( !status.isOK() )
             return status;
 
