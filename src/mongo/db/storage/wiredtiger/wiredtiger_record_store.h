@@ -46,9 +46,21 @@ namespace mongo {
 
     class WiredTigerRecordStore : public RecordStore {
     public:
-        static string generateCreateString(const StringData& ns,
-                                           const CollectionOptions &options,
-                                           const StringData& extraStrings );
+
+        /**
+         * Creates a configuration string suitable for 'config' parameter in WT_SESSION::create().
+         * Configuration string is constructed from:
+         *     built-in defaults
+         *     storageEngine.wiredtiger.configString in 'options'
+         *     'extraStrings'
+         * Performs simple validation on the supplied parameters.
+         * Returns error status if validation fails.
+         * Note that even if this function returns an OK status, WT_SESSION:create() may still
+         * fail with the constructed configuration string.
+         */
+        static StatusWith<std::string> generateCreateString(const StringData& ns,
+                                                            const CollectionOptions &options,
+                                                            const StringData& extraStrings);
 
         WiredTigerRecordStore(OperationContext* txn,
                               const StringData& ns,
@@ -105,7 +117,6 @@ namespace mongo {
 
         virtual RecordIterator* getIterator( OperationContext* txn,
                                              const DiskLoc& start = DiskLoc(),
-                                             bool tailable = false,
                                              const CollectionScanParams::Direction& dir =
                                              CollectionScanParams::FORWARD ) const;
 
@@ -158,7 +169,6 @@ namespace mongo {
             Iterator( const WiredTigerRecordStore& rs,
                       OperationContext* txn,
                       const DiskLoc& start,
-                      bool tailable,
                       const CollectionScanParams::Direction& dir );
 
             virtual ~Iterator();
@@ -181,7 +191,6 @@ namespace mongo {
             const WiredTigerRecordStore& _rs;
             OperationContext* _txn;
             RecoveryUnit* _savedRecoveryUnit; // only used to sanity check between save/restore
-            bool _tailable;
             CollectionScanParams::Direction _dir;
             scoped_ptr<WiredTigerCursor> _cursor;
             bool _eof;

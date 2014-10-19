@@ -40,6 +40,7 @@
 #include "mongo/db/storage/wiredtiger/wiredtiger_session_cache.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_util.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/mongoutils/str.h"
 #include "mongo/util/log.h"
 #include "mongo/util/scopeguard.h"
 
@@ -54,12 +55,12 @@ namespace mongo {
         }
     }
 
-    std::string WiredTigerRecordStore::generateCreateString( const StringData& ns,
-                                                             const CollectionOptions& options,
-                                                             const StringData& extraStrings ) {
+    StatusWith<std::string> WiredTigerRecordStore::generateCreateString(const StringData& ns,
+                                                                        const CollectionOptions& options,
+                                                                        const StringData& extraStrings) {
         // Separate out a prefix and suffix in the default string. User configuration will
         // override values in the prefix, but not values in the suffix.
-        std::stringstream ss;
+        str::stream ss;
         if ( isOplog(ns) ) {
             ss << "type=file,";
             ss << "leaf_page_max=512k,";
@@ -71,8 +72,31 @@ namespace mongo {
 
         ss << extraStrings << ",";
 
+        // Validate configuration object.
+        // Warn about unrecognized fields that may be introduced in newer versions of this
+        // storage engine instead of raising an error.
+        // Ensure that 'configString' field is a string. Warn if this is not the case.
+        BSONForEach(elem, options.storageEngine.getObjectField("wiredtiger")) {
+            if (elem.fieldNameStringData() == "configString") {
+                if (elem.type() != String) {
+                    return StatusWith<std::string>(ErrorCodes::TypeMismatch, str::stream()
+                        << "storageEngine.wiredtiger.configString must be a string. "
+                        << "Not adding 'configString' value "
+                        << elem << " to collection configuration");
+                    continue;
+                }
+                ss << elem.valueStringData() << ",";
+            }
+            else {
+                // Return error on first unrecognized field.
+                return StatusWith<std::string>(ErrorCodes::InvalidOptions, str::stream()
+                    << '\'' << elem.fieldNameStringData() << '\''
+                    << " is not a supported option in storageEngine.wiredtiger");
+            }
+        }
+
         ss << "key_format=q,value_format=u";
-        return ss.str();
+        return StatusWith<std::string>(ss);
     }
 
     WiredTigerRecordStore::WiredTigerRecordStore( OperationContext* ctx,
@@ -104,7 +128,7 @@ namespace mongo {
          * Find the largest DiskLoc currently in use and estimate the number of records.  We don't
          * have an operation context, so we can't use an Iterator.
          */
-        scoped_ptr<RecordIterator> iterator( getIterator( ctx, DiskLoc(), false,
+        scoped_ptr<RecordIterator> iterator( getIterator( ctx, DiskLoc(),
                                                           CollectionScanParams::BACKWARD ) );
         if ( iterator->isEOF() ) {
             _dataSize = 0;
@@ -426,11 +450,9 @@ namespace mongo {
     }
 
     RecordIterator* WiredTigerRecordStore::getIterator( OperationContext* txn,
-                                                   const DiskLoc& start,
-                                                   bool tailable,
-                                                   const CollectionScanParams::Direction& dir
-                                                   ) const {
-        return new Iterator(*this, txn, start, tailable, dir);
+                                                        const DiskLoc& start,
+                                                        const CollectionScanParams::Direction& dir ) const {
+        return new Iterator(*this, txn, start, dir);
     }
 
 
@@ -604,11 +626,9 @@ namespace mongo {
             const WiredTigerRecordStore& rs,
             OperationContext *txn,
             const DiskLoc& start,
-            bool tailable,
             const CollectionScanParams::Direction& dir )
         : _rs( rs ),
           _txn( txn ),
-          _tailable( tailable ),
           _dir( dir ),
           _cursor( new WiredTigerCursor( rs.GetURI(), rs.instanceId(), txn ) ) {
         RS_ITERATOR_TRACE("start");
@@ -662,32 +682,7 @@ namespace mongo {
     }
 
     bool WiredTigerRecordStore::Iterator::isEOF() {
-        RS_ITERATOR_TRACE( "isEOF start " << _eof << " " << _lastLoc );
-        if (_eof && _tailable && !_lastLoc.isNull()) {
-            WiredTigerRecoveryUnit* ru = WiredTigerRecoveryUnit::get( _txn );
-            invariant( !ru->everStartedWrite() );
-            ru->restartTransaction();
-
-            DiskLoc saved = _lastLoc;
-            _locate(_lastLoc, true);
-            RS_ITERATOR_TRACE( "isEOF check " << _eof );
-            if ( _eof ) {
-                _lastLoc = DiskLoc();
-            }
-            else if ( _curr() != saved ) {
-                RS_ITERATOR_TRACE( "isEOF wrap " << _curr() );
-                // wrapped around :(
-                _lastLoc = DiskLoc();
-                _eof = true;
-            }
-            else {
-                // we found where we left off!
-                // now we advance to the next one
-                RS_ITERATOR_TRACE( "isEOF found " << _curr() );
-                _getNext();
-            }
-        }
-        RS_ITERATOR_TRACE( "isEOF end " << _eof );
+        RS_ITERATOR_TRACE( "isEOF " << _eof << " " << _lastLoc );
         return _eof;
     }
 
@@ -767,13 +762,6 @@ namespace mongo {
                 _lastLoc = DiskLoc();
             }
             else if ( _curr() != saved ) {
-                if ( _tailable ) {
-                    RS_ITERATOR_TRACE( "isEOF wrap " << _curr() );
-                    // wrapped around :(
-                    _lastLoc = DiskLoc();
-                    _eof = true;
-                    return false;
-                }
                 // old doc deleted, we're ok
             }
             else {
