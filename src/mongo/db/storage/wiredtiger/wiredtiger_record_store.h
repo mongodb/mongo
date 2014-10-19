@@ -105,7 +105,6 @@ namespace mongo {
 
         virtual RecordIterator* getIterator( OperationContext* txn,
                                              const DiskLoc& start = DiskLoc(),
-                                             bool tailable = false,
                                              const CollectionScanParams::Direction& dir =
                                              CollectionScanParams::FORWARD ) const;
 
@@ -158,7 +157,6 @@ namespace mongo {
             Iterator( const WiredTigerRecordStore& rs,
                       OperationContext* txn,
                       const DiskLoc& start,
-                      bool tailable,
                       const CollectionScanParams::Direction& dir );
 
             virtual ~Iterator();
@@ -181,7 +179,6 @@ namespace mongo {
             const WiredTigerRecordStore& _rs;
             OperationContext* _txn;
             RecoveryUnit* _savedRecoveryUnit; // only used to sanity check between save/restore
-            bool _tailable;
             CollectionScanParams::Direction _dir;
             scoped_ptr<WiredTigerCursor> _cursor;
             bool _eof;
