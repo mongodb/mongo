@@ -14,8 +14,8 @@
 struct __wt_condvar {
 	const char *name;		/* Mutex name for debugging */
 
-	pthread_mutex_t mtx;		/* Mutex */
-	pthread_cond_t  cond;		/* Condition variable */
+	_wt_mutex_t mtx;		/* Mutex */
+	_wt_cond_t  cond;		/* Condition variable */
 
 	int waiters;			/* Numbers of waiters, or
 					   -1 if signalled with no waiters. */
@@ -30,10 +30,10 @@ struct __wt_condvar {
 struct __wt_rwlock {
 	const char *name;		/* Lock name for debugging */
 
-	pthread_rwlock_t rwlock;	/* Read/write lock */
+	_wt_rwlock_t rwlock;		/* Read/write lock */
 
 #ifdef _WIN32
-    uint32_t exclusive_locked;
+	uint32_t exclusive_locked;
 #endif
 };
 
@@ -61,7 +61,7 @@ typedef volatile int
 	SPINLOCK_TYPE == SPINLOCK_PTHREAD_MUTEX_LOGGING
 
 typedef struct {
-	pthread_mutex_t lock;
+	_wt_mutex_t lock;
 
 	uint64_t counter;		/* Statistics: counter */
 

@@ -6,17 +6,16 @@
  */
 
 /*
- * Windows does not support Posix Threads
- * WT needs it so we mock it up with the Windows concurrency primitives
+ * Define WT threading and concurrency primitives
  * Assumes Windows 7+/2008 R2+
  */
-typedef CRITICAL_SECTION  pthread_mutex_t;
+typedef CRITICAL_SECTION  _wt_mutex_t;
 
-typedef CONDITION_VARIABLE pthread_cond_t;
+typedef CONDITION_VARIABLE _wt_cond_t;
 
-typedef SRWLOCK pthread_rwlock_t;
+typedef SRWLOCK _wt_rwlock_t;
 
-typedef HANDLE pthread_t;
+typedef HANDLE _wt_thread_t;
 
 /* Timespec is a POSIX structure not defined in Windows */
 struct timespec {

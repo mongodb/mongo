@@ -37,7 +37,7 @@ struct __wt_evict_entry {
 struct __wt_evict_worker {
 	WT_SESSION_IMPL *session;
 	u_int id;
-	pthread_t tid;
+	_wt_thread_t tid;
 #define	WT_EVICT_WORKER_RUN	0x01
 	uint32_t flags;
 };
@@ -104,7 +104,7 @@ struct __wt_cache {
 	uint32_t cp_skip_count;		/* Post change stabilization */
 	uint64_t cp_reserved;		/* Base size for this cache */
 	WT_SESSION_IMPL *cp_session;	/* May be used for cache management */
-	pthread_t cp_tid;		/* Thread ID for cache pool manager */
+	_wt_thread_t cp_tid;		/* Thread ID for cache pool manager */
 
 	/*
 	 * Flags.

@@ -279,13 +279,12 @@ struct __wt_update;
 
 #ifdef _WIN32
 #include "os_windows.h"
+#else
+#include "posix.h"
 #endif
 
 #include "misc.h"
 #include "mutex.h"
-#ifndef _WIN32
-#include "posix.h"
-#endif
 
 #include "stat.h"			/* required by dhandle.h */
 #include "dhandle.h"			/* required by btree.h */

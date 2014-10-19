@@ -22,7 +22,7 @@ struct __wt_lsm_worker_cookie {
 struct __wt_lsm_worker_args {
 	WT_SESSION_IMPL	*session;	/* Session */
 	WT_CONDVAR	*work_cond;	/* Owned by the manager */
-	pthread_t	tid;		/* Thread id */
+	_wt_thread_t	tid;		/* Thread id */
 	u_int		id;		/* My manager slot id */
 	uint32_t	type;		/* Types of operations handled */
 #define	WT_LSM_WORKER_RUN	0x01
