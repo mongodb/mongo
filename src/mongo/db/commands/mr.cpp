@@ -533,6 +533,9 @@ namespace mongo {
 
             if (_config.outputOptions.outNonAtomic)
                 return postProcessCollectionNonAtomic(txn, op, pm);
+
+            invariant( !txn->lockState()->isLocked() );
+
             Lock::GlobalWrite lock(txn->lockState()); // TODO(erh): this is how it was, but seems it doesn't need to be global
             return postProcessCollectionNonAtomic(txn, op, pm);
         }

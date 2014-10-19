@@ -1143,38 +1143,79 @@ namespace mongo {
             return;
         }
 
-        ///////////////////////////////////////////
-        Lock::DBLock dbLock(txn->lockState(), nsString.db(), MODE_IX);
-        Lock::CollectionLock colLock(txn->lockState(),
-                                     nsString.ns(),
-                                     isMulti ? MODE_X : MODE_IX);
-        ///////////////////////////////////////////
+        bool createCollection = false;
+        for ( int fakeLoop = 0; fakeLoop < 1; fakeLoop++ ) {
 
-        if (!checkShardVersion(txn, &shardingState, *updateItem.getRequest(), result))
-            return;
-
-        Client::Context ctx(txn, nsString.ns(), false /* don't check version */);
-
-        try {
-            UpdateResult res = executor.execute(ctx.db());
-
-            const long long numDocsModified = res.numDocsModified;
-            const long long numMatched = res.numMatched;
-            const BSONObj resUpsertedID = res.upserted;
-
-            // We have an _id from an insert
-            const bool didInsert = !resUpsertedID.isEmpty();
-
-            result->getStats().nModified = didInsert ? 0 : numDocsModified;
-            result->getStats().n = didInsert ? 1 : numMatched;
-            result->getStats().upsertedID = resUpsertedID;
-        }
-        catch (const DBException& ex) {
-            status = ex.toStatus();
-            if (ErrorCodes::isInterruption(status.code())) {
-                throw;
+            if ( createCollection ) {
+                Lock::DBLock lk(txn->lockState(), nsString.db(), MODE_X);
+                Client::Context ctx(txn, nsString.ns(), false /* don't check version */);
+                Database* db = ctx.db();
+                if ( db->getCollection( txn, nsString.ns() ) ) {
+                    // someone else beat us to it
+                }
+                else {
+                    WriteUnitOfWork wuow(txn);
+                    uassertStatusOK( userCreateNS( txn, db,
+                                                   nsString.ns(), BSONObj(),
+                                                   !request.isFromReplication() ) );
+                    wuow.commit();
+                }
             }
-            result->setError(toWriteError(status));
+
+            ///////////////////////////////////////////
+            Lock::DBLock dbLock(txn->lockState(), nsString.db(), MODE_IX);
+            Lock::CollectionLock colLock(txn->lockState(),
+                                         nsString.ns(),
+                                         isMulti ? MODE_X : MODE_IX);
+            ///////////////////////////////////////////
+
+            if (!checkShardVersion(txn, &shardingState, *updateItem.getRequest(), result))
+                return;
+
+            Client::Context ctx(txn, nsString.ns(), false /* don't check version */);
+
+            if ( ctx.db()->getCollection( txn, nsString.ns() ) == NULL ) {
+                if ( createCollection ) {
+                    // we raced with some, accept defeat
+                    result->getStats().nModified = 0;
+                    result->getStats().n = 0;
+                    return;
+                }
+
+                if ( !request.isUpsert() ) {
+                    // not an upsert, not collection, nothing to do
+                    result->getStats().nModified = 0;
+                    result->getStats().n = 0;
+                    return;
+                }
+
+                // upsert, mark that we should create collection
+                fakeLoop = -1;
+                createCollection = true;
+                continue;
+            }
+
+            try {
+                UpdateResult res = executor.execute(ctx.db());
+
+                const long long numDocsModified = res.numDocsModified;
+                const long long numMatched = res.numMatched;
+                const BSONObj resUpsertedID = res.upserted;
+
+                // We have an _id from an insert
+                const bool didInsert = !resUpsertedID.isEmpty();
+
+                result->getStats().nModified = didInsert ? 0 : numDocsModified;
+                result->getStats().n = didInsert ? 1 : numMatched;
+                result->getStats().upsertedID = resUpsertedID;
+            }
+            catch (const DBException& ex) {
+                status = ex.toStatus();
+                if (ErrorCodes::isInterruption(status.code())) {
+                    throw;
+                }
+                result->setError(toWriteError(status));
+            }
         }
     }
 

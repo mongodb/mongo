@@ -642,7 +642,21 @@ namespace mongo {
         {
             Lock::DBLock dbLock(txn->lockState(), ns.db(), MODE_X);
             Client::Context ctx(txn, ns);
-            UpdateResult res = executor.execute(ctx.db());
+            Database* db = ctx.db();
+            if ( db->getCollection( txn, ns ) ) {
+                // someone else beat us to it, that's ok
+                // we might race while we unlock if someone drops
+                // but that's ok, we'll just do nothing and error out
+            }
+            else {
+                WriteUnitOfWork wuow(txn);
+                uassertStatusOK( userCreateNS( txn, db,
+                                               ns.ns(), BSONObj(),
+                                               true ) );
+                wuow.commit();
+            }
+
+            UpdateResult res = executor.execute(db);
             lastError.getSafe()->recordUpdate( res.existing , res.numMatched , res.upserted );
         }
     }
