@@ -666,7 +666,7 @@ transaction_ops(Connection conn, Session session)
          * If commit_transaction fails, the transaction was rolled-back.
          */
         break;
-    case wiredtiger.WT_DEADLOCK:            /* Update conflict */
+    case wiredtiger.WT_ROLLBACK:            /* Update conflict */
     default:                /* Other error */
         ret = session.rollback_transaction(null);
         /* The rollback_transaction call resets all open cursors. */

@@ -1,5 +1,16 @@
 /*! @page upgrading Upgrading WiredTiger applications
 
+@section version_241 Upgrading to Version 2.4.1
+
+<dl>
+<dt>WT_DEADLOCK renamed</dt>
+<dd>
+The \c WT_DEADLOCK error return has been deprecated in favor of ::WT_ROLLBACK
+to clarify that WT_SESSION::rollback_transaction should be called; no program
+changes are required.
+</dd>
+</dl>
+
 @section version_240 Upgrading to Version 2.4.0
 
 <dl>
