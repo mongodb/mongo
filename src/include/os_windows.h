@@ -16,8 +16,8 @@ typedef SRWLOCK			wt_rwlock_t;
 
 /* Timespec is a POSIX structure not defined in Windows */
 struct timespec {
-    time_t  tv_sec;    /* seconds */
-    long    tv_nsec;   /* nanoseconds */
+	time_t tv_sec;		/* seconds */
+	long   tv_nsec;		/* nanoseconds */
 };
 
 #define	strncasecmp _strnicmp
@@ -27,9 +27,9 @@ struct timespec {
  * These are POSIX types which Windows lacks
  * Eventually WiredTiger will migrate away from these types
  */
-typedef uint32_t u_int;
-typedef unsigned char u_char;
-typedef unsigned long u_long;
+typedef uint32_t	u_int;
+typedef unsigned char	u_char;
+typedef unsigned long	u_long;
 
 /* < VS 2013 is not C99 compat */
 #if _MSC_VER < 1900
