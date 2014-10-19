@@ -22,10 +22,7 @@
 /*
  * Define WT threading and concurrency primitives
  */
-typedef pthread_mutex_t  _wt_mutex_t;
-
-typedef pthread_cond_t _wt_cond_t;
-
-typedef pthread_rwlock_t _wt_rwlock_t;
-
-typedef pthread_t _wt_thread_t;
+typedef pthread_cond_t		wt_cond_t;
+typedef pthread_mutex_t		wt_mutex_t;
+typedef pthread_rwlock_t	wt_rwlock_t;
+typedef pthread_t		wt_thread_t;
