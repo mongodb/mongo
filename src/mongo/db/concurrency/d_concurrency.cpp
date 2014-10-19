@@ -50,7 +50,7 @@
 namespace mongo {
 
     //  SERVER-14668: Remove or invert sense once MMAPv1 CLL can be default
-    MONGO_EXPORT_STARTUP_SERVER_PARAMETER(enableCollectionLocking, bool, false);
+    MONGO_EXPORT_STARTUP_SERVER_PARAMETER(enableCollectionLocking, bool, true);
 
     DBTryLockTimeoutException::DBTryLockTimeoutException() {}
     DBTryLockTimeoutException::~DBTryLockTimeoutException() throw() { }
