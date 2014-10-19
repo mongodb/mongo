@@ -104,7 +104,7 @@ namespace mongo {
          * Find the largest DiskLoc currently in use and estimate the number of records.  We don't
          * have an operation context, so we can't use an Iterator.
          */
-        scoped_ptr<RecordIterator> iterator( getIterator( ctx, DiskLoc(),
+        scoped_ptr<RecordIterator> iterator( getIterator( ctx, DiskLoc(), false,
                                                           CollectionScanParams::BACKWARD ) );
         if ( iterator->isEOF() ) {
             _dataSize = 0;
@@ -427,9 +427,10 @@ namespace mongo {
 
     RecordIterator* WiredTigerRecordStore::getIterator( OperationContext* txn,
                                                    const DiskLoc& start,
+                                                   bool tailable,
                                                    const CollectionScanParams::Direction& dir
                                                    ) const {
-        return new Iterator(*this, txn, start, dir);
+        return new Iterator(*this, txn, start, tailable, dir);
     }
 
 
@@ -603,9 +604,11 @@ namespace mongo {
             const WiredTigerRecordStore& rs,
             OperationContext *txn,
             const DiskLoc& start,
+            bool tailable,
             const CollectionScanParams::Direction& dir )
         : _rs( rs ),
           _txn( txn ),
+          _tailable( tailable ),
           _dir( dir ),
           _cursor( new WiredTigerCursor( rs.GetURI(), rs.instanceId(), txn ) ) {
         RS_ITERATOR_TRACE("start");
@@ -659,7 +662,32 @@ namespace mongo {
     }
 
     bool WiredTigerRecordStore::Iterator::isEOF() {
-        RS_ITERATOR_TRACE( "isEOF " << _eof << " " << _lastLoc );
+        RS_ITERATOR_TRACE( "isEOF start " << _eof << " " << _lastLoc );
+        if (_eof && _tailable && !_lastLoc.isNull()) {
+            WiredTigerRecoveryUnit* ru = WiredTigerRecoveryUnit::get( _txn );
+            invariant( !ru->everStartedWrite() );
+            ru->restartTransaction();
+
+            DiskLoc saved = _lastLoc;
+            _locate(_lastLoc, true);
+            RS_ITERATOR_TRACE( "isEOF check " << _eof );
+            if ( _eof ) {
+                _lastLoc = DiskLoc();
+            }
+            else if ( _curr() != saved ) {
+                RS_ITERATOR_TRACE( "isEOF wrap " << _curr() );
+                // wrapped around :(
+                _lastLoc = DiskLoc();
+                _eof = true;
+            }
+            else {
+                // we found where we left off!
+                // now we advance to the next one
+                RS_ITERATOR_TRACE( "isEOF found " << _curr() );
+                _getNext();
+            }
+        }
+        RS_ITERATOR_TRACE( "isEOF end " << _eof );
         return _eof;
     }
 
@@ -739,6 +767,13 @@ namespace mongo {
                 _lastLoc = DiskLoc();
             }
             else if ( _curr() != saved ) {
+                if ( _tailable ) {
+                    RS_ITERATOR_TRACE( "isEOF wrap " << _curr() );
+                    // wrapped around :(
+                    _lastLoc = DiskLoc();
+                    _eof = true;
+                    return false;
+                }
                 // old doc deleted, we're ok
             }
             else {
