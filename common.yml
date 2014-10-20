@@ -217,9 +217,6 @@ functions:
             set -o igncr
         fi;
         . ./${set_gopath|set_gopath.sh}
-        if [ '${library_path}' != '' ]; then
-            export ${library_path}
-        fi;
 
         # TODO bsondump needs tests
         # TODO mongodump needs tests
@@ -227,32 +224,32 @@ functions:
 
         # mongoimport
         cd mongoimport
-        go test ${coverage_args} ${args} ${build_tags}
+        ${library_path} go test ${coverage_args} ${args} ${build_tags}
         cd ..
 
         # mongoexport
         cd mongoexport
-        go test ${coverage_args} ${args} ${build_tags}
+        ${library_path} go test ${coverage_args} ${args} ${build_tags}
         cd ..
 
         # mongostat
         cd mongostat
-        go test ${coverage_args} ${args} ${build_tags}
+        ${library_path} go test ${coverage_args} ${args} ${build_tags}
         cd ..
 
         # mongooplog
         cd mongooplog
-        go test ${coverage_args} ${args} ${build_tags}
+        ${library_path} go test ${coverage_args} ${args} ${build_tags}
         cd ..
 
         # mongorestore
         cd mongorestore
-        go test ${coverage_args} ${args} ${build_tags}
+        ${library_path} go test ${coverage_args} ${args} ${build_tags}
         cd ..
 
         # mongofiles
         cd mongofiles
-        go test ${coverage_args} ${args} ${build_tags}
+        ${library_path} go test ${coverage_args} ${args} ${build_tags}
         cd ..
 
   "run tool integration tests":
@@ -264,29 +261,29 @@ functions:
         if [ "Windows_NT" = "$OS" ]; then
             set -o igncr
         fi;
-        . ./set_gopath.sh
+        . ./${set_gopath|set_gopath.sh}
         if [ "${library_path}" != "" ]; then
             export ${library_path}
         fi
 
         # mongodump
         cd mongodump
-        go test -v ${coverage_args} ${args} ${build_tags}
+        ${library_path} go test -v ${coverage_args} ${args} ${build_tags}
         cd ..
 
         # mongofiles
         cd mongofiles
-        go test -v ${coverage_args} ${args} ${build_tags}
+        ${library_path} go test -v ${coverage_args} ${args} ${build_tags}
         cd ..
 
         # mongoimport
         cd mongoimport
-        go test -v ${coverage_args} ${args} ${build_tags}
+        ${library_path} go test -v ${coverage_args} ${args} ${build_tags}
         cd ..
 
         # mongooplog
         cd mongooplog
-        go test -v ${coverage_args} ${args} ${build_tags}
+        ${library_path} go test -v ${coverage_args} ${args} ${build_tags}
         cd ..
 
   "setup credentials" :
@@ -577,7 +574,7 @@ tasks:
       params:
         directory: src
         script: |
-          # Give mongod a chance to stop
+          # Give mongod a chance to start
           sleep 2s
     - func: "run tool integration tests"
 
@@ -866,6 +863,7 @@ buildvariants:
     extension: .exe
     preproc_gpm: "perl -pi -e 's/\\r\\n/\\n/g' "
     set_gopath: set_gopath_windows.sh
+    integration_test_args: "integration"
   tasks: *windows_32_tasks
 
 - name: windows-64
@@ -878,6 +876,7 @@ buildvariants:
     extension: .exe
     preproc_gpm: "perl -pi -e 's/\\r\\n/\\n/g' "
     set_gopath: set_gopath_windows.sh
+    integration_test_args: "integration"
   tasks: *windows_64_tasks
 
 - name: windows-64-ssl
@@ -885,12 +884,15 @@ buildvariants:
   run_on:
   - windows-64-vs2013-compile
   expansions:
+    <<: *mongo_url_windows64_enterprise
+    <<: *mongodb_ssl_startup_args
     build_tags: -tags "ssl"
     edition: ssl
     extension: .exe
     library_path: PATH="/cygdrive/c/mingw-w64/x86_64-4.9.1-posix-seh-rt_v3-rev1/mingw64/bin:/cygdrive/c/sasl/:$PATH"
     preproc_gpm: "perl -pi -e 's/\\r\\n/\\n/g' "
     set_gopath: set_gopath_windows.sh
+    integration_test_args: "integration,ssl"
   tasks: *windows_64_ssl_tasks
 
 - name: windows-64-enterprise
@@ -898,8 +900,6 @@ buildvariants:
   run_on:
   - windows-64-vs2013-compile
   expansions:
-    <<: *mongo_url_windows64_enterprise
-    <<: *mongodb_ssl_startup_args
     build_tags: -tags "sasl ssl"
     edition: enterprise
     extension: .exe
