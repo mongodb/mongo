@@ -65,7 +65,8 @@ namespace mongo {
          * Broadcast a document invalidation to all relevant PlanExecutor(s).  invalidateDocument
          * must called *before* the provided DiskLoc is about to be deleted or mutated.
          */
-        void invalidateDocument( const DiskLoc& dl,
+        void invalidateDocument( OperationContext* txn,
+                                 const DiskLoc& dl,
                                  InvalidationType type );
 
         /*

@@ -55,7 +55,7 @@ namespace mongo {
         virtual StageState work(WorkingSetID* out);
         virtual bool isEOF();
 
-        virtual void invalidate(const DiskLoc& dl, InvalidationType type);
+        virtual void invalidate(OperationContext* txn, const DiskLoc& dl, InvalidationType type);
         virtual void saveState();
         virtual void restoreState(OperationContext* opCtx);
 

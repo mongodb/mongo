@@ -276,7 +276,7 @@ namespace mongo {
         }
     }
 
-    void IndexScan::invalidate(const DiskLoc& dl, InvalidationType type) {
+    void IndexScan::invalidate(OperationContext* txn, const DiskLoc& dl, InvalidationType type) {
         ++_commonStats.invalidates;
 
         // The only state we're responsible for holding is what DiskLocs to drop.  If a document

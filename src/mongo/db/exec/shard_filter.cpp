@@ -131,9 +131,11 @@ namespace mongo {
         _child->restoreState(opCtx);
     }
 
-    void ShardFilterStage::invalidate(const DiskLoc& dl, InvalidationType type) {
+    void ShardFilterStage::invalidate(OperationContext* txn,
+                                      const DiskLoc& dl,
+                                      InvalidationType type) {
         ++_commonStats.invalidates;
-        _child->invalidate(dl, type);
+        _child->invalidate(txn, dl, type);
     }
 
     vector<PlanStage*> ShardFilterStage::getChildren() const {

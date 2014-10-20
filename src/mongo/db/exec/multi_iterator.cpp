@@ -110,7 +110,9 @@ namespace mongo {
         }
     }
 
-    void MultiIteratorStage::invalidate(const DiskLoc& dl, InvalidationType type) {
+    void MultiIteratorStage::invalidate(OperationContext* txn,
+                                        const DiskLoc& dl,
+                                        InvalidationType type) {
         switch ( type ) {
         case INVALIDATION_DELETION:
             for (size_t i = 0; i < _iterators.size(); i++) {

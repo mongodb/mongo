@@ -175,9 +175,9 @@ namespace mongo {
                 repl::getGlobalReplicationCoordinator()->canAcceptWritesForDatabase(ns.db()));
     }
 
-    void DeleteStage::invalidate(const DiskLoc& dl, InvalidationType type) {
+    void DeleteStage::invalidate(OperationContext* txn, const DiskLoc& dl, InvalidationType type) {
         ++_commonStats.invalidates;
-        _child->invalidate(dl, type);
+        _child->invalidate(txn, dl, type);
     }
 
     vector<PlanStage*> DeleteStage::getChildren() const {

@@ -127,12 +127,14 @@ namespace mongo {
         ++_commonStats.unyields;
     }
 
-    void CachedPlanStage::invalidate(const DiskLoc& dl, InvalidationType type) {
+    void CachedPlanStage::invalidate(OperationContext* txn,
+                                     const DiskLoc& dl,
+                                     InvalidationType type) {
         if (! _usingBackupChild) {
-            _mainChildPlan->invalidate(dl, type);
+            _mainChildPlan->invalidate(txn, dl, type);
         }
         if (NULL != _backupChildPlan.get()) {
-            _backupChildPlan->invalidate(dl, type);
+            _backupChildPlan->invalidate(txn, dl, type);
         }
         ++_commonStats.invalidates;
     }

@@ -281,10 +281,10 @@ namespace QueryStageCount {
             if (interjection == 0) {
                 // At this point, our first interjection, we've counted _locs[0]
                 // and are about to count _locs[1]
-                count_stage.invalidate(_locs[interjection], INVALIDATION_DELETION);
+                count_stage.invalidate(&_txn, _locs[interjection], INVALIDATION_DELETION);
                 remove(_locs[interjection]);
 
-                count_stage.invalidate(_locs[interjection+1], INVALIDATION_DELETION);
+                count_stage.invalidate(&_txn, _locs[interjection+1], INVALIDATION_DELETION);
                 remove(_locs[interjection+1]);
             }
         }
@@ -303,11 +303,11 @@ namespace QueryStageCount {
         // At the point which this is called we are in between the first and second record
         void interject(CountStage& count_stage, int interjection) {
             if (interjection == 0) {
-                count_stage.invalidate(_locs[0], INVALIDATION_MUTATION);
+                count_stage.invalidate(&_txn, _locs[0], INVALIDATION_MUTATION);
                 OID id1 = _coll->docFor(&_txn, _locs[0]).getField("_id").OID();
                 update(_locs[0], BSON("_id" << id1 << "x" << 100));
 
-                count_stage.invalidate(_locs[1], INVALIDATION_MUTATION);
+                count_stage.invalidate(&_txn, _locs[1], INVALIDATION_MUTATION);
                 OID id2 = _coll->docFor(&_txn, _locs[1]).getField("_id").OID();
                 update(_locs[1], BSON("_id" << id2 << "x" << 100));
             }

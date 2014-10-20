@@ -142,7 +142,7 @@ namespace QueryStageDelete {
 
             // Remove locs[targetDocIndex];
             deleteStage.saveState();
-            deleteStage.invalidate(locs[targetDocIndex], INVALIDATION_DELETION);
+            deleteStage.invalidate(&_txn, locs[targetDocIndex], INVALIDATION_DELETION);
             BSONObj targetDoc = coll->docFor(&_txn, locs[targetDocIndex]);
             ASSERT(!targetDoc.isEmpty());
             remove(targetDoc);

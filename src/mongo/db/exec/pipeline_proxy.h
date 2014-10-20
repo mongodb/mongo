@@ -52,7 +52,7 @@ namespace mongo {
 
         virtual bool isEOF();
 
-        virtual void invalidate(const DiskLoc& dl, InvalidationType type);
+        virtual void invalidate(OperationContext* txn, const DiskLoc& dl, InvalidationType type);
 
         //
         // Manage our OperationContext. We intentionally don't propagate to the child

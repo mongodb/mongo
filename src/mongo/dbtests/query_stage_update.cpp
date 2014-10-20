@@ -307,7 +307,7 @@ namespace QueryStageUpdate {
 
                 // Remove locs[targetDocIndex];
                 updateStage->saveState();
-                updateStage->invalidate(locs[targetDocIndex], INVALIDATION_DELETION);
+                updateStage->invalidate(&_txn, locs[targetDocIndex], INVALIDATION_DELETION);
                 BSONObj targetDoc = coll->docFor(&_txn, locs[targetDocIndex]);
                 ASSERT(!targetDoc.isEmpty());
                 remove(targetDoc);

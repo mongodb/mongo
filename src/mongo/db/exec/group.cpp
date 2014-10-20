@@ -267,9 +267,9 @@ namespace mongo {
         _child->restoreState(opCtx);
     }
 
-    void GroupStage::invalidate(const DiskLoc& dl, InvalidationType type) {
+    void GroupStage::invalidate(OperationContext* txn, const DiskLoc& dl, InvalidationType type) {
         ++_commonStats.invalidates;
-        _child->invalidate(dl, type);
+        _child->invalidate(txn, dl, type);
     }
 
     vector<PlanStage*> GroupStage::getChildren() const {

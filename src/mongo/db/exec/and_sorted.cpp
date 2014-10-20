@@ -39,12 +39,10 @@ namespace mongo {
     // static
     const char* AndSortedStage::kStageType = "AND_SORTED";
 
-    AndSortedStage::AndSortedStage(OperationContext* txn,
-                                   WorkingSet* ws, 
+    AndSortedStage::AndSortedStage(WorkingSet* ws, 
                                    const MatchExpression* filter,
                                    const Collection* collection)
-        : _txn(txn),
-          _collection(collection), 
+        : _collection(collection), 
           _ws(ws),
           _filter(filter),
           _targetNode(numeric_limits<size_t>::max()),
@@ -278,7 +276,6 @@ namespace mongo {
     }
 
     void AndSortedStage::restoreState(OperationContext* opCtx) {
-        _txn = opCtx;
         ++_commonStats.unyields;
 
         for (size_t i = 0; i < _children.size(); ++i) {
@@ -286,13 +283,15 @@ namespace mongo {
         }
     }
 
-    void AndSortedStage::invalidate(const DiskLoc& dl, InvalidationType type) {
+    void AndSortedStage::invalidate(OperationContext* txn,
+                                    const DiskLoc& dl,
+                                    InvalidationType type) {
         ++_commonStats.invalidates;
 
         if (isEOF()) { return; }
 
         for (size_t i = 0; i < _children.size(); ++i) {
-            _children[i]->invalidate(dl, type);
+            _children[i]->invalidate(txn, dl, type);
         }
 
         if (dl == _targetLoc) {
@@ -303,7 +302,7 @@ namespace mongo {
             ++_specificStats.flagged;
 
             // The DiskLoc could still be a valid result so flag it and save it for later.
-            WorkingSetCommon::fetchAndInvalidateLoc(_txn, _ws->get(_targetId), _collection);
+            WorkingSetCommon::fetchAndInvalidateLoc(txn, _ws->get(_targetId), _collection);
             _ws->flagForReview(_targetId);
 
             _targetId = WorkingSet::INVALID_ID;

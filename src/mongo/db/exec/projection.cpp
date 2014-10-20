@@ -256,9 +256,11 @@ namespace mongo {
         _child->restoreState(opCtx);
     }
 
-    void ProjectionStage::invalidate(const DiskLoc& dl, InvalidationType type) {
+    void ProjectionStage::invalidate(OperationContext* txn,
+                                     const DiskLoc& dl,
+                                     InvalidationType type) {
         ++_commonStats.invalidates;
-        _child->invalidate(dl, type);
+        _child->invalidate(txn, dl, type);
     }
 
     vector<PlanStage*> ProjectionStage::getChildren() const {

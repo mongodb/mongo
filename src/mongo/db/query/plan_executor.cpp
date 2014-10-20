@@ -251,8 +251,8 @@ namespace mongo {
         return !_killed;
     }
 
-    void PlanExecutor::invalidate(const DiskLoc& dl, InvalidationType type) {
-        if (!_killed) { _root->invalidate(dl, type); }
+    void PlanExecutor::invalidate(OperationContext* txn, const DiskLoc& dl, InvalidationType type) {
+        if (!_killed) { _root->invalidate(txn, dl, type); }
     }
 
     PlanExecutor::ExecState PlanExecutor::getNext(BSONObj* objOut, DiskLoc* dlOut) {

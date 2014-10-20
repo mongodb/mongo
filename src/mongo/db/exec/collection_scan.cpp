@@ -179,7 +179,9 @@ namespace mongo {
         return _iter->isEOF();
     }
 
-    void CollectionScan::invalidate(const DiskLoc& dl, InvalidationType type) {
+    void CollectionScan::invalidate(OperationContext* txn,
+                                    const DiskLoc& dl,
+                                    InvalidationType type) {
         ++_commonStats.invalidates;
 
         // We don't care about mutations since we apply any filters to the result when we (possibly)

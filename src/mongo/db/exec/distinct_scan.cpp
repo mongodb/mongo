@@ -201,7 +201,7 @@ namespace mongo {
         }
     }
 
-    void DistinctScan::invalidate(const DiskLoc& dl, InvalidationType type) {
+    void DistinctScan::invalidate(OperationContext* txn, const DiskLoc& dl, InvalidationType type) {
         ++_commonStats.invalidates;
     }
 

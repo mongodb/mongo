@@ -142,8 +142,7 @@ namespace mongo {
      */
     class SortStage : public PlanStage {
     public:
-        SortStage(OperationContext* txn,
-                  const SortStageParams& params,
+        SortStage(const SortStageParams& params,
                   WorkingSet* ws,
                   PlanStage* child);
 
@@ -154,7 +153,7 @@ namespace mongo {
 
         virtual void saveState();
         virtual void restoreState(OperationContext* opCtx);
-        virtual void invalidate(const DiskLoc& dl, InvalidationType type);
+        virtual void invalidate(OperationContext* txn, const DiskLoc& dl, InvalidationType type);
 
         virtual std::vector<PlanStage*> getChildren() const;
 
@@ -175,7 +174,6 @@ namespace mongo {
         //
 
         // Not owned by us.
-        OperationContext* _txn;
         const Collection* _collection;
 
         // Not owned by us.

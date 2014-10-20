@@ -101,9 +101,9 @@ namespace mongo {
         _child->restoreState(opCtx);
     }
 
-    void SkipStage::invalidate(const DiskLoc& dl, InvalidationType type) {
+    void SkipStage::invalidate(OperationContext* txn, const DiskLoc& dl, InvalidationType type) {
         ++_commonStats.invalidates;
-        _child->invalidate(dl, type);
+        _child->invalidate(txn, dl, type);
     }
 
     vector<PlanStage*> SkipStage::getChildren() const {

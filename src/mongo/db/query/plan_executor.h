@@ -296,7 +296,7 @@ namespace mongo {
          * state.  As such, if the plan yields, it must be notified of relevant writes so that
          * we can ensure that it doesn't crash if we try to access invalid state.
          */
-        void invalidate(const DiskLoc& dl, InvalidationType type);
+        void invalidate(OperationContext* txn, const DiskLoc& dl, InvalidationType type);
 
         /**
          * Helper method to aid in displaying an ExecState for debug or other recreational purposes.

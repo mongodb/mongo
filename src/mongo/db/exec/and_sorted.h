@@ -53,8 +53,7 @@ namespace mongo {
      */
     class AndSortedStage : public PlanStage {
     public:
-        AndSortedStage(OperationContext* txn,
-                       WorkingSet* ws, const MatchExpression* filter, const Collection* collection);
+        AndSortedStage(WorkingSet* ws, const MatchExpression* filter, const Collection* collection);
         virtual ~AndSortedStage();
 
         void addChild(PlanStage* child);
@@ -64,7 +63,7 @@ namespace mongo {
 
         virtual void saveState();
         virtual void restoreState(OperationContext* opCtx);
-        virtual void invalidate(const DiskLoc& dl, InvalidationType type);
+        virtual void invalidate(OperationContext* txn, const DiskLoc& dl, InvalidationType type);
 
         virtual std::vector<PlanStage*> getChildren() const;
 
@@ -87,7 +86,6 @@ namespace mongo {
         PlanStage::StageState moveTowardTargetLoc(WorkingSetID* out);
 
         // Not owned by us.
-        OperationContext* _txn;
         const Collection* _collection;
 
         // Not owned by us.

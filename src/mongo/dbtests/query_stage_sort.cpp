@@ -127,7 +127,7 @@ namespace QueryStageSortTests {
                 PlanExecutor::make(&_txn,
                                    ws,
                                    new FetchStage(&_txn, ws,
-                                                  new SortStage(&_txn, params, ws, ms), NULL, coll),
+                                                  new SortStage(params, ws, ms), NULL, coll),
                                    coll, PlanExecutor::YIELD_MANUAL, &rawExec);
             ASSERT_OK(status);
             boost::scoped_ptr<PlanExecutor> exec(rawExec);
@@ -281,7 +281,7 @@ namespace QueryStageSortTests {
             params.collection = coll;
             params.pattern = BSON("foo" << 1);
             params.limit = limit();
-            auto_ptr<SortStage> ss(new SortStage(&_txn, params, &ws, ms.get()));
+            auto_ptr<SortStage> ss(new SortStage(params, &ws, ms.get()));
 
             const int firstRead = 10;
 
@@ -295,7 +295,7 @@ namespace QueryStageSortTests {
             // We should have read in the first 'firstRead' locs.  Invalidate the first.
             ss->saveState();
             set<DiskLoc>::iterator it = locs.begin();
-            ss->invalidate(*it++, INVALIDATION_DELETION);
+            ss->invalidate(&_txn, *it++, INVALIDATION_DELETION);
             ss->restoreState(&_txn);
 
             // Read the rest of the data from the mock stage.
@@ -310,7 +310,7 @@ namespace QueryStageSortTests {
             // Let's just invalidate everything now.
             ss->saveState();
             while (it != locs.end()) {
-                ss->invalidate(*it++, INVALIDATION_DELETION);
+                ss->invalidate(&_txn, *it++, INVALIDATION_DELETION);
             }
             ss->restoreState(&_txn);
 
@@ -384,7 +384,7 @@ namespace QueryStageSortTests {
                                    ws,
                                    new FetchStage(&_txn,
                                                   ws,
-                                                  new SortStage(&_txn, params, ws, ms), NULL, coll),
+                                                  new SortStage(params, ws, ms), NULL, coll),
                                    coll, PlanExecutor::YIELD_MANUAL, &rawExec);
             boost::scoped_ptr<PlanExecutor> exec(rawExec);
 

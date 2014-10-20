@@ -52,16 +52,14 @@ namespace mongo {
      */
     class AndHashStage : public PlanStage {
     public:
-        AndHashStage(OperationContext* txn,
-                     WorkingSet* ws,
+        AndHashStage(WorkingSet* ws,
                      const MatchExpression* filter,
                      const Collection* collection);
 
         /**
          * For testing only. Allows tests to set memory usage threshold.
          */
-        AndHashStage(OperationContext* txn,
-                     WorkingSet* ws, 
+        AndHashStage(WorkingSet* ws, 
                      const MatchExpression* filter, 
                      const Collection* collection,
                      size_t maxMemUsage);
@@ -81,7 +79,7 @@ namespace mongo {
 
         virtual void saveState();
         virtual void restoreState(OperationContext* opCtx);
-        virtual void invalidate(const DiskLoc& dl, InvalidationType type);
+        virtual void invalidate(OperationContext* txn, const DiskLoc& dl, InvalidationType type);
 
         virtual std::vector<PlanStage*> getChildren() const;
 
@@ -103,7 +101,6 @@ namespace mongo {
         StageState workChild(size_t childNo, WorkingSetID* out);
 
         // Not owned by us.
-        OperationContext* _txn;
         const Collection* _collection;
 
         // Not owned by us.

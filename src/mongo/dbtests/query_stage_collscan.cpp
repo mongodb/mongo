@@ -288,7 +288,7 @@ namespace QueryStageCollectionScan {
 
             // Remove locs[count].
             scan->saveState();
-            scan->invalidate(locs[count], INVALIDATION_DELETION);
+            scan->invalidate(&_txn, locs[count], INVALIDATION_DELETION);
             remove(coll->docFor(&_txn, locs[count]));
             scan->restoreState(&_txn);
 
@@ -349,7 +349,7 @@ namespace QueryStageCollectionScan {
 
             // Remove locs[count].
             scan->saveState();
-            scan->invalidate(locs[count], INVALIDATION_DELETION);
+            scan->invalidate(&_txn, locs[count], INVALIDATION_DELETION);
             remove(coll->docFor(&_txn, locs[count]));
             scan->restoreState(&_txn);
 

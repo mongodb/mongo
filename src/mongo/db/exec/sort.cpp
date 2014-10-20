@@ -280,12 +280,10 @@ namespace mongo {
         return lhs.loc < rhs.loc;
     }
 
-    SortStage::SortStage(OperationContext* txn,
-                         const SortStageParams& params,
+    SortStage::SortStage(const SortStageParams& params,
                          WorkingSet* ws,
                          PlanStage* child)
-        : _txn(txn),
-          _collection(params.collection),
+        : _collection(params.collection),
           _ws(ws),
           _child(child),
           _pattern(params.pattern),
@@ -429,14 +427,13 @@ namespace mongo {
     }
 
     void SortStage::restoreState(OperationContext* opCtx) {
-        _txn = opCtx;
         ++_commonStats.unyields;
         _child->restoreState(opCtx);
     }
 
-    void SortStage::invalidate(const DiskLoc& dl, InvalidationType type) {
+    void SortStage::invalidate(OperationContext* txn, const DiskLoc& dl, InvalidationType type) {
         ++_commonStats.invalidates;
-        _child->invalidate(dl, type);
+        _child->invalidate(txn, dl, type);
 
         // If we have a deletion, we can fetch and carry on.
         // If we have a mutation, it's easier to fetch and use the previous document.
@@ -453,7 +450,7 @@ namespace mongo {
             WorkingSetMember* member = _ws->get(it->second);
             verify(member->loc == dl);
 
-            WorkingSetCommon::fetchAndInvalidateLoc(_txn, member, _collection);
+            WorkingSetCommon::fetchAndInvalidateLoc(txn, member, _collection);
 
             // Remove the DiskLoc from our set of active DLs.
             _wsidByDiskLoc.erase(it);

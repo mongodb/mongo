@@ -695,7 +695,9 @@ namespace mongo {
          */
         class DeleteNotificationStage : public PlanStage {
         public:
-            virtual void invalidate(const DiskLoc& dl, InvalidationType type);
+            virtual void invalidate(OperationContext* txn,
+                                    const DiskLoc& dl,
+                                    InvalidationType type);
 
             virtual StageState work(WorkingSetID* out) {
                 invariant( false );
@@ -737,7 +739,8 @@ namespace mongo {
 
     } migrateFromStatus;
 
-    void MigrateFromStatus::DeleteNotificationStage::invalidate(const DiskLoc& dl,
+    void MigrateFromStatus::DeleteNotificationStage::invalidate(OperationContext *txn,
+                                                                const DiskLoc& dl,
                                                                 InvalidationType type) {
         if ( type == INVALIDATION_DELETION ) {
             migrateFromStatus.aboutToDelete( dl );

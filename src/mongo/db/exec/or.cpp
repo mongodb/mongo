@@ -155,13 +155,13 @@ namespace mongo {
         }
     }
 
-    void OrStage::invalidate(const DiskLoc& dl, InvalidationType type) {
+    void OrStage::invalidate(OperationContext* txn, const DiskLoc& dl, InvalidationType type) {
         ++_commonStats.invalidates;
 
         if (isEOF()) { return; }
 
         for (size_t i = 0; i < _children.size(); ++i) {
-            _children[i]->invalidate(dl, type);
+            _children[i]->invalidate(txn, dl, type);
         }
 
         // If we see DL again it is not the same record as it once was so we still want to

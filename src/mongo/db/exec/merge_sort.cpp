@@ -38,12 +38,10 @@ namespace mongo {
     // static
     const char* MergeSortStage::kStageType = "SORT_MERGE";
 
-    MergeSortStage::MergeSortStage(OperationContext* txn,
-                                   const MergeSortStageParams& params,
+    MergeSortStage::MergeSortStage(const MergeSortStageParams& params,
                                    WorkingSet* ws,
                                    const Collection* collection)
-        : _txn(txn),
-          _collection(collection),
+        : _collection(collection),
           _ws(ws),
           _pattern(params.pattern),
           _dedup(params.dedup),
@@ -198,17 +196,18 @@ namespace mongo {
     }
 
     void MergeSortStage::restoreState(OperationContext* opCtx) {
-        _txn = opCtx;
         ++_commonStats.unyields;
         for (size_t i = 0; i < _children.size(); ++i) {
             _children[i]->restoreState(opCtx);
         }
     }
 
-    void MergeSortStage::invalidate(const DiskLoc& dl, InvalidationType type) {
+    void MergeSortStage::invalidate(OperationContext* txn,
+                                    const DiskLoc& dl,
+                                    InvalidationType type) {
         ++_commonStats.invalidates;
         for (size_t i = 0; i < _children.size(); ++i) {
-            _children[i]->invalidate(dl, type);
+            _children[i]->invalidate(txn, dl, type);
         }
 
         // Go through our data and see if we're holding on to the invalidated loc.
@@ -216,7 +215,7 @@ namespace mongo {
             WorkingSetMember* member = _ws->get(valueIt->id);
             if (member->hasLoc() && (dl == member->loc)) {
                 // Force a fetch and flag.  We could possibly merge this result back in later.
-                WorkingSetCommon::fetchAndInvalidateLoc(_txn, member, _collection);
+                WorkingSetCommon::fetchAndInvalidateLoc(txn, member, _collection);
                 _ws->flagForReview(valueIt->id);
                 ++_specificStats.forcedFetches;
             }

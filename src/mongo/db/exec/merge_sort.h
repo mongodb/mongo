@@ -55,8 +55,7 @@ namespace mongo {
      */
     class MergeSortStage : public PlanStage {
     public:
-        MergeSortStage(OperationContext* txn,
-                       const MergeSortStageParams& params, 
+        MergeSortStage(const MergeSortStageParams& params, 
                        WorkingSet* ws, 
                        const Collection* collection);
         virtual ~MergeSortStage();
@@ -68,7 +67,7 @@ namespace mongo {
 
         virtual void saveState();
         virtual void restoreState(OperationContext* opCtx);
-        virtual void invalidate(const DiskLoc& dl, InvalidationType type);
+        virtual void invalidate(OperationContext* txn, const DiskLoc& dl, InvalidationType type);
 
         virtual std::vector<PlanStage*> getChildren() const;
 
@@ -84,7 +83,6 @@ namespace mongo {
 
     private:
         // Not owned by us.
-        OperationContext* _txn;
         const Collection* _collection;
 
         // Not owned by us.

@@ -98,9 +98,9 @@ namespace mongo {
         _child->restoreState(opCtx);
     }
 
-    void LimitStage::invalidate(const DiskLoc& dl, InvalidationType type) {
+    void LimitStage::invalidate(OperationContext* txn, const DiskLoc& dl, InvalidationType type) {
         ++_commonStats.invalidates;
-        _child->invalidate(dl, type);
+        _child->invalidate(txn, dl, type);
     }
 
     vector<PlanStage*> LimitStage::getChildren() const {

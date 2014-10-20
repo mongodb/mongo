@@ -516,14 +516,14 @@ namespace mongo {
         }
     }
 
-    void SubplanStage::invalidate(const DiskLoc& dl, InvalidationType type) {
+    void SubplanStage::invalidate(OperationContext* txn, const DiskLoc& dl, InvalidationType type) {
         ++_commonStats.invalidates;
         if (_killed) {
             return;
         }
 
         if (NULL != _child.get()) {
-            _child->invalidate(dl, type);
+            _child->invalidate(txn, dl, type);
         }
     }
 

@@ -346,7 +346,8 @@ namespace mongo {
         }
     }
 
-    void CollectionCursorCache::invalidateDocument( const DiskLoc& dl,
+    void CollectionCursorCache::invalidateDocument( OperationContext* txn,
+                                                    const DiskLoc& dl,
                                                     InvalidationType type ) {
         if ( supportsDocLocking() ) {
             // If a storage engine supports doc locking, then we do not need to invalidate.
@@ -361,13 +362,13 @@ namespace mongo {
               ++it ) {
 
             PlanExecutor* exec = *it;
-            exec->invalidate(dl, type);
+            exec->invalidate(txn, dl, type);
         }
 
         for ( CursorMap::const_iterator i = _cursors.begin(); i != _cursors.end(); ++i ) {
             PlanExecutor* exec = i->second->getExecutor();
             if ( exec ) {
-                exec->invalidate(dl, type);
+                exec->invalidate(txn, dl, type);
             }
         }
     }

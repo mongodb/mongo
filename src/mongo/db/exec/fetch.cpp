@@ -162,10 +162,10 @@ namespace mongo {
         _child->restoreState(opCtx);
     }
 
-    void FetchStage::invalidate(const DiskLoc& dl, InvalidationType type) {
+    void FetchStage::invalidate(OperationContext* txn, const DiskLoc& dl, InvalidationType type) {
         ++_commonStats.invalidates;
 
-        _child->invalidate(dl, type);
+        _child->invalidate(txn, dl, type);
 
         // It's possible that the loc getting invalidated is the one we're about to
         // fetch. In this case we do a "forced fetch" and put the WSM in owned object state.
@@ -173,7 +173,7 @@ namespace mongo {
             WorkingSetMember* member = _ws->get(_idBeingPagedIn);
             if (member->hasLoc() && (member->loc == dl)) {
                 // Fetch it now and kill the diskloc.
-                WorkingSetCommon::fetchAndInvalidateLoc(_txn, member, _collection);
+                WorkingSetCommon::fetchAndInvalidateLoc(txn, member, _collection);
             }
         }
     }

@@ -94,7 +94,7 @@ namespace {
 
         // invalidates
         const DiskLoc dl(0, 0);
-        mock->invalidate(dl, INVALIDATION_MUTATION);
+        mock->invalidate(NULL, dl, INVALIDATION_MUTATION);
         ASSERT_EQUALS(stats->invalidates, 1U);
 
         // and now we are d1U, but must trigger EOF with getStats()

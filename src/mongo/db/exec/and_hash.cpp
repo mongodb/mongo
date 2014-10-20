@@ -52,12 +52,10 @@ namespace mongo {
     // static
     const char* AndHashStage::kStageType = "AND_HASH";
 
-    AndHashStage::AndHashStage(OperationContext* txn,
-                               WorkingSet* ws, 
+    AndHashStage::AndHashStage(WorkingSet* ws, 
                                const MatchExpression* filter,
                                const Collection* collection)
-        : _txn(txn),
-          _collection(collection),
+        : _collection(collection),
           _ws(ws),
           _filter(filter),
           _hashingChildren(true),
@@ -66,13 +64,11 @@ namespace mongo {
           _memUsage(0),
           _maxMemUsage(kDefaultMaxMemUsageBytes) {}
 
-    AndHashStage::AndHashStage(OperationContext* txn,
-                               WorkingSet* ws, 
+    AndHashStage::AndHashStage(WorkingSet* ws, 
                                const MatchExpression* filter,
                                const Collection* collection,
                                size_t maxMemUsage)
-        : _txn(txn),
-          _collection(collection),
+        : _collection(collection),
           _ws(ws),
           _filter(filter),
           _hashingChildren(true),
@@ -454,7 +450,6 @@ namespace mongo {
     }
 
     void AndHashStage::restoreState(OperationContext* opCtx) {
-        _txn = opCtx;
         ++_commonStats.unyields;
 
         for (size_t i = 0; i < _children.size(); ++i) {
@@ -462,13 +457,13 @@ namespace mongo {
         }
     }
 
-    void AndHashStage::invalidate(const DiskLoc& dl, InvalidationType type) {
+    void AndHashStage::invalidate(OperationContext* txn, const DiskLoc& dl, InvalidationType type) {
         ++_commonStats.invalidates;
 
         if (isEOF()) { return; }
 
         for (size_t i = 0; i < _children.size(); ++i) {
-            _children[i]->invalidate(dl, type);
+            _children[i]->invalidate(txn, dl, type);
         }
 
         // Invalidation can happen to our warmup results.  If that occurs just
@@ -477,7 +472,7 @@ namespace mongo {
             if (WorkingSet::INVALID_ID != _lookAheadResults[i]) {
                 WorkingSetMember* member = _ws->get(_lookAheadResults[i]);
                 if (member->hasLoc() && member->loc == dl) {
-                    WorkingSetCommon::fetchAndInvalidateLoc(_txn, member, _collection);
+                    WorkingSetCommon::fetchAndInvalidateLoc(txn, member, _collection);
                     _ws->flagForReview(_lookAheadResults[i]);
                     _lookAheadResults[i] = WorkingSet::INVALID_ID;
                 }
@@ -507,7 +502,7 @@ namespace mongo {
             _memUsage -= member->getMemUsage();
 
             // The loc is about to be invalidated.  Fetch it and clear the loc.
-            WorkingSetCommon::fetchAndInvalidateLoc(_txn, member, _collection);
+            WorkingSetCommon::fetchAndInvalidateLoc(txn, member, _collection);
 
             // Add the WSID to the to-be-reviewed list in the WS.
             _ws->flagForReview(id);
