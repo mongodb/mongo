@@ -234,7 +234,7 @@ __wt_txn_refresh(WT_SESSION_IMPL *session, int get_snapshot)
 			    " pinned in session %d [%s]"
 			    " with snap_min %" PRIu64 "\n",
 			    oldest_id, oldest_session,
-			    conn->sessions[oldest_session].name,
+			    conn->sessions[oldest_session].lastop,
 			    conn->sessions[oldest_session].txn.snap_min);
 			txn_global->oldest_session = oldest_session;
 		}
