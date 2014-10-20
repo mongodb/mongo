@@ -731,11 +731,9 @@ __clsm_get_current(
 	WT_RET(current->get_key(current, &c->key));
 	WT_RET(current->get_value(current, &c->value));
 
-	if ((*deletedp = __clsm_deleted(clsm, &c->value)) == 0) {
-		F_CLR(c, WT_CURSTD_KEY_EXT | WT_CURSTD_VALUE_EXT);
+	F_CLR(c, WT_CURSTD_KEY_SET | WT_CURSTD_VALUE_SET);
+	if ((*deletedp = __clsm_deleted(clsm, &c->value)) == 0)
 		F_SET(c, WT_CURSTD_KEY_INT | WT_CURSTD_VALUE_INT);
-	} else
-		F_CLR(c, WT_CURSTD_KEY_SET | WT_CURSTD_VALUE_SET);
 
 	return (0);
 }
@@ -1058,15 +1056,14 @@ __clsm_lookup(WT_CURSOR_LSM *clsm, WT_ITEM *value)
 	WT_ERR(WT_NOTFOUND);
 
 done:
-err:	if (ret == 0) {
+err:	F_CLR(cursor, WT_CURSTD_KEY_SET | WT_CURSTD_VALUE_SET);
+	if (ret == 0) {
 		clsm->current = c;
-		F_CLR(cursor, WT_CURSTD_KEY_EXT | WT_CURSTD_VALUE_EXT);
-		F_SET(cursor, WT_CURSTD_KEY_INT | WT_CURSTD_VALUE_INT);
-	} else {
-		if (c != NULL)
-			WT_TRET(c->reset(c));
-		F_CLR(cursor, WT_CURSTD_KEY_SET | WT_CURSTD_VALUE_SET);
-	}
+		F_SET(cursor, WT_CURSTD_KEY_INT);
+		if (value == &cursor->value)
+			F_SET(cursor, WT_CURSTD_VALUE_INT);
+	} else if (c != NULL)
+		WT_TRET(c->reset(c));
 
 	return (ret);
 }
@@ -1084,6 +1081,7 @@ __clsm_search(WT_CURSOR *cursor)
 
 	WT_LSM_ENTER(clsm, cursor, session, search, 1);
 	WT_CURSOR_NEEDKEY(cursor);
+	WT_CURSOR_NOVALUE(cursor);
 
 	ret = __clsm_lookup(clsm, &cursor->value);
 
@@ -1112,6 +1110,7 @@ __clsm_search_near(WT_CURSOR *cursor, int *exactp)
 
 	WT_LSM_ENTER(clsm, cursor, session, search_near, 1);
 	WT_CURSOR_NEEDKEY(cursor);
+	WT_CURSOR_NOVALUE(cursor);
 	F_CLR(clsm, WT_CLSM_ITERATE_NEXT | WT_CLSM_ITERATE_PREV);
 
 	/*
@@ -1238,15 +1237,12 @@ err:	WT_LSM_LEAVE(session, ret);
 	if (larger != NULL)
 		WT_TRET(larger->reset(larger));
 
+	F_CLR(cursor, WT_CURSTD_KEY_SET | WT_CURSTD_VALUE_SET);
 	if (ret == 0) {
-		F_CLR(cursor, WT_CURSTD_KEY_EXT | WT_CURSTD_VALUE_EXT);
 		F_SET(cursor, WT_CURSTD_KEY_INT | WT_CURSTD_VALUE_INT);
-
 		__clsm_deleted_decode(&cursor->value);
-	} else {
-		F_CLR(cursor, WT_CURSTD_KEY_SET | WT_CURSTD_VALUE_SET);
+	} else
 		clsm->current = NULL;
-	}
 
 	return (ret);
 }
@@ -1392,6 +1388,7 @@ __clsm_remove(WT_CURSOR *cursor)
 
 	WT_LSM_UPDATE_ENTER(clsm, cursor, session, remove);
 	WT_CURSOR_NEEDKEY(cursor);
+	WT_CURSOR_NOVALUE(cursor);
 
 	if (F_ISSET(cursor, WT_CURSTD_OVERWRITE) ||
 	    (ret = __clsm_lookup(clsm, &value)) == 0)
