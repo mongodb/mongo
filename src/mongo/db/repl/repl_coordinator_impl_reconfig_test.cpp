@@ -50,18 +50,6 @@ namespace {
     typedef ReplicationCoordinator::ReplSetReconfigArgs ReplSetReconfigArgs;
     typedef ReplicationExecutor::RemoteCommandRequest RemoteCommandRequest;
 
-    TEST_F(ReplCoordTest, ReconfigWhileNotReplSet) {
-        // start up with settings.replSet empty
-        OperationContextNoop txn;
-        init("");
-        BSONObjBuilder result;
-        ReplSetReconfigArgs args;
-
-        ASSERT_EQUALS(ErrorCodes::NoReplicationEnabled,
-                      getReplCoord()->processReplSetReconfig(&txn, args, &result));
-        ASSERT_TRUE(result.obj().isEmpty());
-    }
-
     TEST_F(ReplCoordTest, ReconfigBeforeInitialized) {
         // start up but do not initiate
         OperationContextNoop txn;
@@ -510,6 +498,79 @@ namespace {
 //         reconfigThread.join();
 //         logger::globalLogDomain()->setMinimumLoggedSeverity(logger::LogSeverity::Log());
 //     }
+
+    TEST_F(ReplCoordTest, ForceReconfigWhileNotPrimarySuccessful) {
+        // start up, become a secondary, receive a forced reconfig
+        OperationContextNoop txn;
+        init();
+        assertStart(ReplicationCoordinator::modeReplSet,
+                    BSON("_id" << "mySet" <<
+                         "version" << 2 <<
+                         "members" << BSON_ARRAY(BSON("_id" << 1 << "host" << "node1:12345") <<
+                                                 BSON("_id" << 2 << "host" << "node2:12345") )),
+                    HostAndPort("node1", 12345));
+        ASSERT(getReplCoord()->setFollowerMode(MemberState::RS_SECONDARY));
+        getReplCoord()->setMyLastOptime(&txn, OpTime(100, 0));
+
+        // fail before forced
+        BSONObjBuilder result;
+        ReplSetReconfigArgs args;
+        args.force = false;
+        args.newConfigObj = BSON("_id" << "mySet" <<
+                                 "version" << 3 <<
+                                 "members" << BSON_ARRAY(BSON("_id" << 1 <<
+                                                              "host" << "node1:12345") <<
+                                                         BSON("_id" << 2 <<
+                                                              "host" << "node2:12345")));
+        ASSERT_EQUALS(ErrorCodes::NotMaster,
+                      getReplCoord()->processReplSetReconfig(&txn, args, &result));
+
+        // forced should succeed
+        args.force = true;
+        ASSERT_OK(getReplCoord()->processReplSetReconfig(&txn, args, &result));
+        getReplCoord()->processReplSetGetConfig(&result);
+
+        // ensure forced reconfig results in a random larger version
+        ASSERT_GREATER_THAN(result.obj()["config"].Obj()["version"].numberInt(), 3);
+    }
+
+    TEST_F(ReplCoordTest, IncompatibleConfigWorksWithForce) {
+        // start up, become primary, reconfig changing a member to an arbiter
+        // that should fail, then try again with a force reconfig
+        OperationContextNoop txn;
+        assertStart(ReplicationCoordinator::modeReplSet,
+                    BSON("_id" << "mySet" <<
+                         "version" << 2 <<
+                         "members" << BSON_ARRAY(BSON("_id" << 1 << "host" << "node1:12345") <<
+                                                 BSON("_id" << 2 << "host" << "node2:12345"))),
+                    HostAndPort("node1", 12345));
+        ASSERT(getReplCoord()->setFollowerMode(MemberState::RS_SECONDARY));
+        getReplCoord()->setMyLastOptime(&txn, OpTime(100, 0));
+        simulateSuccessfulElection();
+
+        BSONObjBuilder result;
+        ReplSetReconfigArgs args;
+        args.force = false;
+        args.newConfigObj = BSON("_id" << "mySet" <<
+                                 "version" << 3 <<
+                                 "members" << BSON_ARRAY(BSON("_id" << 1 <<
+                                                              "host" << "node1:12345") <<
+                                                         BSON("_id" << 2 <<
+                                                              "host" << "node2:12345" <<
+                                                              "arbiterOnly" << true)));
+
+        // normal reconfig attempt
+        Status status = getReplCoord()->processReplSetReconfig(&txn, args, &result);
+        ASSERT_EQUALS(ErrorCodes::NewReplicaSetConfigurationIncompatible, status);
+
+        // forced reconfig attempt
+        args.force = true;
+        ASSERT_OK(getReplCoord()->processReplSetReconfig(&txn, args, &result));
+        getReplCoord()->processReplSetGetConfig(&result);
+
+        // ensure forced reconfig results in a random larger version
+        ASSERT_GREATER_THAN(result.obj()["config"].Obj()["version"].numberInt(), 3);
+    }
 
 } // anonymous namespace
 } // namespace repl

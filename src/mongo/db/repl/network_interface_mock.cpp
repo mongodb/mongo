@@ -321,7 +321,7 @@ namespace repl {
 
     void NetworkInterfaceMock::_waitForWork_inlock(boost::unique_lock<boost::mutex>* lk) {
         if (_waitingToRunMask & kExecutorThread) {
-            _waitingToRunMask &= !kExecutorThread;
+            _waitingToRunMask &= ~kExecutorThread;
             return;
         }
         _currentlyRunning = kNoThread;
@@ -331,7 +331,7 @@ namespace repl {
             _shouldWakeExecutorCondition.wait(*lk);
         }
         _currentlyRunning = kExecutorThread;
-        _waitingToRunMask &= !kExecutorThread;
+        _waitingToRunMask &= ~kExecutorThread;
     }
 
     bool NetworkInterfaceMock::_isNetworkThreadRunnable_inlock() {

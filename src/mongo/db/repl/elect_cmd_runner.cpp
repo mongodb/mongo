@@ -94,7 +94,7 @@ namespace repl {
         if (_sufficientResponsesReceived) {
             return true;
         }
-        if (_receivedVotes >= _rsConfig.getMajorityNumber()) {
+        if (_receivedVotes >= _rsConfig.getMajorityVoteCount()) {
             return true;
         }
         if (_receivedVotes < 0) {

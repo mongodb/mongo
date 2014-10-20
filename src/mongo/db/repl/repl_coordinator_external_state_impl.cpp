@@ -236,6 +236,10 @@ namespace {
                 continue;
             LOG(2) << "Removing temporary collections from " << *it;
             Database* db = dbHolder().get(txn, *it);
+            // Since we must be holding the global lock during this function, if listDatabases
+            // returned this dbname, we should be able to get a reference to it - it can't have
+            // been dropped.
+            invariant(db);
             db->clearTmpCollections(txn);
         }
     }

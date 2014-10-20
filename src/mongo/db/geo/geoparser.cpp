@@ -63,7 +63,7 @@ namespace mongo {
     // and http://www.geojson.org/geojson-spec.html#named-crs
     static const string CRS_CRS84 = "urn:ogc:def:crs:OGC:1.3:CRS84";
     static const string CRS_EPSG_4326 = "EPSG:4326";
-    static const string CRS_STRICT_WINDING = "urn:mongodb:strictwindingcrs:EPSG:4326";
+    static const string CRS_STRICT_WINDING = "urn:x-mongodb:crs:strictwinding:EPSG:4326";
 
     static Status parseFlatPoint(const BSONElement &elem, Point *out, bool allowAddlFields = false) {
         if (!elem.isABSONObj()) return BAD_VALUE("Point must be an array or object");

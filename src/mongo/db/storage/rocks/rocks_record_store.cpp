@@ -287,7 +287,7 @@ namespace mongo {
                                                    const DiskLoc& start,
                                                    const CollectionScanParams::Direction& dir
                                                    ) const {
-        return new Iterator(txn, _db, _columnFamily, false, dir, start);
+        return new Iterator(txn, _db, _columnFamily, dir, start);
     }
 
 
@@ -551,12 +551,11 @@ namespace mongo {
 
     RocksRecordStore::Iterator::Iterator(
         OperationContext* txn, rocksdb::DB* db,
-        boost::shared_ptr<rocksdb::ColumnFamilyHandle> columnFamily, bool tailable,
+        boost::shared_ptr<rocksdb::ColumnFamilyHandle> columnFamily,
         const CollectionScanParams::Direction& dir, const DiskLoc& start)
-        : _txn(!tailable ? txn : nullptr),
+        : _txn(txn),
           _db(db),
           _cf(columnFamily),
-          _tailable(tailable),
           _dir(dir),
           _eof(true),
           _iterator(RocksRecoveryUnit::getRocksRecoveryUnit(txn)->NewIterator(_cf.get())) {
@@ -611,15 +610,7 @@ namespace mongo {
         _iterator.reset();
     }
 
-    // XXX restoring state with tailable cursor will invalidate the snapshot stored inside of
-    // OperationContext. It is important that while restoring state, nobody else is using the
-    // OperationContext (i.e. only a single restoreState is called on a tailable cursor with a
-    // single OperationContext)
     bool RocksRecordStore::Iterator::restoreState(OperationContext* txn) {
-        if (_tailable) {
-            // we want to read new data if the iterator is tailable
-            RocksRecoveryUnit::getRocksRecoveryUnit(txn)->releaseSnapshot();
-        }
         _txn = txn;
         auto ru = RocksRecoveryUnit::getRocksRecoveryUnit(txn);
         _iterator.reset(ru->NewIterator(_cf.get()));
@@ -634,7 +625,13 @@ namespace mongo {
         return true;
     }
 
-    RecordData RocksRecordStore::Iterator::dataFor( const DiskLoc& loc ) const {
+    RecordData RocksRecordStore::Iterator::dataFor(const DiskLoc& loc) const {
+        if (!_eof && loc == _curr && _iterator->Valid() && _iterator->status().ok()) {
+            boost::shared_array<char> data;
+            data.reset(new char[_iterator->value().size()]);
+            memcpy(data.get(), _iterator->value().data(), _iterator->value().size());
+            return RecordData(data.get(), _iterator->value().size(), data);
+        }
         return RocksRecordStore::_getDataFor(_db, _cf.get(), _txn, loc);
     }
 

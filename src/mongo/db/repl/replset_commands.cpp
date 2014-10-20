@@ -200,6 +200,11 @@ namespace repl {
         }
     private:
         bool _run(OperationContext* txn, const string& , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
+            Status status = getGlobalReplicationCoordinator()->checkReplEnabledForCommand(&result);
+            if (!status.isOK()) {
+                return appendCommandStatus(result, status);
+            }
+
             if( cmdObj["replSetReconfig"].type() != Object ) {
                 errmsg = "no configuration specified";
                 return false;
@@ -208,9 +213,9 @@ namespace repl {
             ReplicationCoordinator::ReplSetReconfigArgs parsedArgs;
             parsedArgs.newConfigObj =  cmdObj["replSetReconfig"].Obj();
             parsedArgs.force = cmdObj.hasField("force") && cmdObj["force"].trueValue();
-            Status status = getGlobalReplicationCoordinator()->processReplSetReconfig(txn,
-                                                                                      parsedArgs,
-                                                                                      &result);
+            status = getGlobalReplicationCoordinator()->processReplSetReconfig(txn,
+                                                                               parsedArgs,
+                                                                               &result);
             if (status.isOK() && !parsedArgs.force) {
                 logOpInitiate(txn, BSON("msg" << "Reconfig set" << 
                                         "version" << parsedArgs.newConfigObj["version"]));

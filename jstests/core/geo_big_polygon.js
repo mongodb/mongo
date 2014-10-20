@@ -10,7 +10,7 @@ coll.drop();
 coll.getMongo().getDB("admin").runCommand({ setParameter : 1, verboseQueryLogging : true });
 
 var bigCRS = { type : "name",
-               properties : { name : "urn:mongodb:strictwindingcrs:EPSG:4326" } };
+               properties : { name : "urn:x-mongodb:crs:strictwinding:EPSG:4326" } };
 
 var bigPoly20 = { type : "Polygon", coordinates : [[[10.0, 10.0],
                                                     [-10.0, 10.0],

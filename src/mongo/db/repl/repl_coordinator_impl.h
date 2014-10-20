@@ -269,6 +269,15 @@ namespace repl {
             kConfigHBReconfiguring
         };
 
+        /**
+         * Type describing actions to take after a change to the MemberState _currentState.
+         */
+        enum PostMemberStateUpdateAction {
+            kActionNone,
+            kActionCloseAllConnections,  // Also indicates that we should clear sharding state.
+            kActionChooseNewSyncSource
+        };
+
         // Struct that holds information about clients waiting for replication.
         struct WaiterInfo;
 
@@ -287,11 +296,14 @@ namespace repl {
         typedef std::vector<ReplicationExecutor::CallbackHandle> HeartbeatHandles;
 
         /**
-         * Helpers to update our saved config, cancel any pending heartbeats, and kick off sending
+         * Helper to update our saved config, cancel any pending heartbeats, and kick off sending
          * new heartbeats based on the new config.  Must *only* be called from within the
          * ReplicationExecutor context.
+         *
+         * Returns an action to be performed after unlocking _mutex, via
+         * _performPostMemberStateUpdateAction.
          */
-        void _setCurrentRSConfig_inlock(
+        PostMemberStateUpdateAction _setCurrentRSConfig_inlock(
                 const ReplicaSetConfig& newConfig,
                 int myIndex);
 
@@ -398,13 +410,22 @@ namespace repl {
                 const WriteConcernOptions& writeConcern) const;
 
         /**
+         * Triggers all callbacks that are blocked waiting for new heartbeat data
+         * to decide whether or not to finish a step down.
+         */
+        void _signalStepDownWaiters(const ReplicationExecutor::CallbackData& cbData);
+
+        /**
          * Helper for stepDown run within a ReplicationExecutor callback.  This method assumes
          * it is running within a global shared lock, and thus that no writes are going on at the
          * same time.
          */
-        void _stepDownFinish(const ReplicationExecutor::CallbackData& cbData,
-                             const Date_t& stepdownUntil,
-                             Status* result);
+        void _stepDownContinue(const ReplicationExecutor::CallbackData& cbData,
+                               const ReplicationExecutor::EventHandle finishedEvent,
+                               Date_t waitUntil,
+                               Date_t stepdownUntil,
+                               bool force,
+                               Status* result);
 
         OID _getMyRID_inlock() const;
 
@@ -544,8 +565,17 @@ namespace repl {
         /**
          * Updates the cached value, _currentState, to match _topCoord's reported
          * member state, from getMemberState().
+         *
+         * Returns an enum indicating what action to take after releasing _mutex, if any.
+         * Call performPostMemberStateUpdateAction on the return value after releasing
+         * _mutex.
          */
-        void _updateCurrentMemberStateFromTopologyCoordinator_inlock();
+        PostMemberStateUpdateAction _updateCurrentMemberStateFromTopologyCoordinator_inlock();
+
+        /**
+         * Performs a post member-state update action.  Do not call while holding _mutex.
+         */
+        void _performPostMemberStateUpdateAction(PostMemberStateUpdateAction action);
 
         /**
          * Begins an attempt to elect this node.
@@ -748,6 +778,9 @@ namespace repl {
 
         // This member's index position in the current config.
         int _thisMembersConfigIndex;                                                      // (MX)
+
+        // Vector of events that should be signaled whenever new heartbeat data comes in.
+        std::vector<ReplicationExecutor::EventHandle> _stepDownWaiters;                   // (X)
 
         // State for conducting an election of this node.
         // the presence of a non-null _freshnessChecker pointer indicates that an election is

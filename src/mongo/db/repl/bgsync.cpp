@@ -324,10 +324,10 @@ namespace {
             OCCASIONALLY {
                 LOG(2) << "bgsync buffer has " << _buffer.size() << " bytes" << rsLog;
             }
-            // the blocking queue will wait (forever) until there's room for us to push
-            _buffer.push(o);
+
             bufferCountGauge.increment();
             bufferSizeGauge.increment(getSize(o));
+            _buffer.push(o);
 
             {
                 boost::unique_lock<boost::mutex> lock(_mutex);

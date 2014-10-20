@@ -131,7 +131,7 @@ namespace {
         if (!status.isOK())
             return status;
 
-        _calculateMajorities();
+        _calculateMajorityVoteCount();
         _addInternalWriteConcernModes();
         _isInitialized = true;
         return Status::OK();
@@ -439,21 +439,7 @@ namespace {
         return StatusWith<ReplicaSetTagPattern>(iter->second);
     }
 
-    void ReplicaSetConfig::_calculateMajorities() {
-        const int total = getNumMembers();
-        const int strictMajority = total / 2 + 1;
-        const int nonArbiters = total - std::count_if(
-                _members.begin(),
-                _members.end(),
-                stdx::bind(&MemberConfig::isArbiter, stdx::placeholders::_1));
-
-        // majority should be all "normal" members if we have something like 4
-        // arbiters & 3 normal members
-        //
-        // TODO(SERVER-14403): Should majority exclude hidden nodes? non-voting nodes? unelectable
-        // nodes?
-        _majorityNumber = (strictMajority > nonArbiters) ? nonArbiters : strictMajority;
-
+    void ReplicaSetConfig::_calculateMajorityVoteCount() {
         const int voters = std::count_if(
                 _members.begin(),
                 _members.end(),

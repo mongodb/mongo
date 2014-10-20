@@ -312,6 +312,15 @@ namespace {
                                                                  Milliseconds(10)));
         }
 
+        BSONObj threeNodesTwoArbitersConfig() {
+            return BSON("_id" << "rs0" <<
+                        "version" << 1 <<
+                        "members" << BSON_ARRAY(
+                            BSON("_id" << 0 << "host" << "host0") <<
+                            BSON("_id" << 1 << "host" << "host1" << "arbiterOnly" << true) <<
+                            BSON("_id" << 2 << "host" << "host2" << "arbiterOnly" << true)));
+        }
+
         BSONObj basicThreeNodeConfig() {
             return BSON("_id" << "rs0" <<
                         "version" << 1 <<
@@ -374,6 +383,36 @@ namespace {
         processResponse(requestFrom("host3"), abstainFromVoting());
         ASSERT_TRUE(hasReceivedSufficientResponses());
         ASSERT_EQUALS(1, getReceivedVotes());
+    }
+
+    TEST_F(ElectScatterGatherTest, NodeRespondsWithBadStatusArbiters) {
+        start(threeNodesTwoArbitersConfig());
+        ASSERT_FALSE(hasReceivedSufficientResponses());
+
+        processResponse(requestFrom("host2"), badResponseStatus());
+        ASSERT_FALSE(hasReceivedSufficientResponses());
+
+        processResponse(requestFrom("host3"), abstainFromVoting());
+        ASSERT_TRUE(hasReceivedSufficientResponses());
+        ASSERT_EQUALS(1, getReceivedVotes()); // 1 because we have 1 vote and voted for ourself
+    }
+
+    TEST_F(ElectScatterGatherTest, FirstNodeRespondsWithYeaArbiters) {
+        start(threeNodesTwoArbitersConfig());
+        ASSERT_FALSE(hasReceivedSufficientResponses());
+
+        processResponse(requestFrom("host2"), voteYea());
+        ASSERT_TRUE(hasReceivedSufficientResponses());
+        ASSERT_EQUALS(2, getReceivedVotes());
+    }
+
+    TEST_F(ElectScatterGatherTest, FirstNodeRespondsWithNaySecondWithYeaArbiters) {
+        start(threeNodesTwoArbitersConfig());
+        ASSERT_FALSE(hasReceivedSufficientResponses());
+
+        processResponse(requestFrom("host2"), voteNay());
+        ASSERT_TRUE(hasReceivedSufficientResponses());
+        ASSERT_EQUALS(-9999, getReceivedVotes());
     }
 
 }  // namespace

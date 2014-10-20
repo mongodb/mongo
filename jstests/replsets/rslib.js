@@ -98,14 +98,17 @@ var waitForAllMembers = function(master, timeout) {
 };
 
 var reconfig = function(rs, config) {
+    "use strict";
     var admin = rs.getMaster().getDB("admin");
-    
+    var e;
+    var master;
     try {
-        var ok = admin.runCommand({replSetReconfig : config});
-        assert.eq(ok.ok,1);
+        assert.commandWorked(admin.runCommand({replSetReconfig : config}));
     }
-    catch(e) {
-        print(e);
+    catch (e) {
+        if (tojson(e).indexOf( "error doing query: failed" ) < 0) {
+            throw e;
+        }
     }
 
     master = rs.getMaster().getDB("admin");
