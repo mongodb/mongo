@@ -50,11 +50,13 @@ namespace {
                 ReplicationExecutor* executor,
                 boost::scoped_ptr<FreshnessChecker>* freshnessChecker,
                 boost::scoped_ptr<ElectCmdRunner>* electCmdRunner,
+                bool* sleptLastElection,
                 ReplicationExecutor::EventHandle* electionFinishedEvent)
             : _topCoord(topCoord),
               _executor(executor),
               _freshnessChecker(freshnessChecker),
               _electCmdRunner(electCmdRunner),
+              _sleptLastElection(sleptLastElection),
               _electionFinishedEvent(electionFinishedEvent),
               _dismissed(false) {
         }
@@ -66,6 +68,7 @@ namespace {
             _topCoord->processLoseElection();
             _freshnessChecker->reset(NULL);
             _electCmdRunner->reset(NULL);
+            *_sleptLastElection = false;
             if (_electionFinishedEvent->isValid()) {
                 _executor->signalEvent(*_electionFinishedEvent);
             }
@@ -78,6 +81,7 @@ namespace {
         ReplicationExecutor* const _executor;
         boost::scoped_ptr<FreshnessChecker>* const _freshnessChecker;
         boost::scoped_ptr<ElectCmdRunner>* const _electCmdRunner;
+        bool* _sleptLastElection;
         const ReplicationExecutor::EventHandle* _electionFinishedEvent;
         bool _dismissed;
     };
@@ -114,6 +118,7 @@ namespace {
                                     &_replExecutor,
                                     &_freshnessChecker,
                                     &_electCmdRunner,
+                                    &_sleptLastElection,
                                     &_electionFinishedEvent);
 
 
@@ -148,6 +153,7 @@ namespace {
                                     &_replExecutor,
                                     &_freshnessChecker,
                                     &_electCmdRunner,
+                                    &_sleptLastElection,
                                     &_electionFinishedEvent);
 
         if (_freshnessChecker->isCanceled()) {
@@ -217,6 +223,7 @@ namespace {
                                     &_replExecutor,
                                     &_freshnessChecker,
                                     &_electCmdRunner,
+                                    &_sleptLastElection,
                                     &_electionFinishedEvent);
 
         invariant(_freshnessChecker);
@@ -244,6 +251,7 @@ namespace {
         lossGuard.dismiss();
         _freshnessChecker.reset(NULL);
         _electCmdRunner.reset(NULL);
+        _sleptLastElection = false;
         boost::unique_lock<boost::mutex> lk(_mutex);
         _electionID = OID::gen();
         _topCoord->processWinElection(_electionID,
