@@ -167,6 +167,8 @@ namespace repl {
         // restart syncing
         void start(OperationContext* txn);
 
+        long long _readLastAppliedHash(OperationContext* txn);
+
         // A pointer to the replication coordinator running the show.
         ReplicationCoordinator* _replCoord;
 

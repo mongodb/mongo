@@ -462,17 +462,13 @@ namespace {
     void BackgroundSync::start(OperationContext* txn) {
         massert(16235, "going to start syncing, but buffer is not empty", _buffer.empty());
 
-        boost::unique_lock<boost::mutex> lock(_mutex);
+        long long updatedLastAppliedHash = _readLastAppliedHash(txn);
+        boost::lock_guard<boost::mutex> lk(_mutex);
         _pause = false;
 
         // reset _last fields with current oplog data
+        _lastAppliedHash = updatedLastAppliedHash;
         _lastOpTimeFetched = _replCoord->getMyLastOptime();
-        {
-            Lock::DBLock lk(txn->lockState(), "local", MODE_X);
-            WriteUnitOfWork uow(txn);
-            loadLastAppliedHash(txn);
-            uow.commit();
-        }
         _lastFetchedHash = _lastAppliedHash;
 
         LOG(1) << "replset bgsync fetch queue set to: " << _lastOpTimeFetched << 
@@ -509,13 +505,23 @@ namespace {
     }
 
     void BackgroundSync::loadLastAppliedHash(OperationContext* txn) {
+        long long result = _readLastAppliedHash(txn);
+        boost::lock_guard<boost::mutex> lk(_mutex);
+        _lastAppliedHash = result;
+    }
+
+    long long BackgroundSync::_readLastAppliedHash(OperationContext* txn) {
         BSONObj oplogEntry;
         try {
-            if (!Helpers::getLast(txn, rsoplog, oplogEntry)) {
+            // Uses WuoW because there is no way to demarcate a read transaction boundary.
+            Lock::DBLock lk(txn->lockState(), "local", MODE_X);
+            WriteUnitOfWork uow(txn);
+            bool success = Helpers::getLast(txn, rsoplog, oplogEntry);
+            uow.commit();
+            if (!success) {
                 // This can happen when we are to do an initial sync.  lastHash will be set
                 // after the initial sync is complete.
-                _lastAppliedHash = 0;
-                return;
+                return 0;
             }
         }
         catch (const DBException& ex) {
@@ -534,7 +540,7 @@ namespace {
                 typeName(hashElement.type());
             fassertFailed(18903);
         }
-        _lastAppliedHash = hashElement.safeNumberLong();
+        return hashElement.safeNumberLong();
     }
 
     bool BackgroundSync::getInitialSyncRequestedFlag() {
