@@ -237,7 +237,9 @@ functions:
     command: shell.exec
     params:
       working_dir: src
-      script: | 
+      script: |
+        # Integration tests are tests that require a local mongod. They
+        # can be configured to run with SSL either on or off
         if [ "Windows_NT" = "$OS" ]; then
             set -o igncr
         fi;
@@ -617,6 +619,15 @@ tasks:
           - key: "package"
             value: "common/json"
     - func: "run unit test"
+
+- name: kerberos
+  commands:
+    - command: git.get_project
+      params:
+        directory: src
+    - command: git.apply_patch
+      params:
+        directory: src
 
 - name: legacy
   depends_on:

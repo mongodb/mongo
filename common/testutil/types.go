@@ -10,6 +10,7 @@ const (
 	INTEGRATION_TEST_TYPE = "integration"
 	UNIT_TEST_TYPE        = "unit"
 	SSL_TEST_TYPE         = "ssl"
+	KERBEROS_TEST_TYPE    = "kerberos"
 )
 
 var (
