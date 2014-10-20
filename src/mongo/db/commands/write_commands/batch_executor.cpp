@@ -43,6 +43,7 @@
 #include "mongo/db/lasterror.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/catalog/index_create.h"
+#include "mongo/db/concurrency/deadlock.h"
 #include "mongo/db/ops/delete_executor.h"
 #include "mongo/db/ops/delete_request.h"
 #include "mongo/db/ops/insert.h"
@@ -1143,6 +1144,7 @@ namespace mongo {
             return;
         }
 
+        int attempt = 1;
         bool createCollection = false;
         for ( int fakeLoop = 0; fakeLoop < 1; fakeLoop++ ) {
 
@@ -1209,6 +1211,18 @@ namespace mongo {
                 result->getStats().n = didInsert ? 1 : numMatched;
                 result->getStats().upsertedID = resUpsertedID;
             }
+            catch ( const DeadLockException& dle ) {
+                if ( isMulti ) {
+                    log() << "got deadlock during multi update, aborting";
+                    throw;
+                }
+                else {
+                    log() << "got deadlock doing update on " << nsString
+                          << ", attempt: " << attempt++ << " retrying";
+                    createCollection = false;
+                    fakeLoop = -1;
+                }
+            }
             catch (const DBException& ex) {
                 status = ex.toStatus();
                 if (ErrorCodes::isInterruption(status.code())) {
@@ -1242,30 +1256,38 @@ namespace mongo {
             return;
         }
 
-        ///////////////////////////////////////////
-        Lock::DBLock writeLock(txn->lockState(), nss.db(), MODE_X);
-        ///////////////////////////////////////////
+        int attempt = 1;
+        while ( 1 ) {
+            try {
+                Lock::DBLock dbLock(txn->lockState(), nss.db(), MODE_IX);
+                Lock::CollectionLock collLock(txn->lockState(), nss.ns(), MODE_IX);
 
-        // Check version once we're locked
+                // Check version once we're locked
 
-        if (!checkShardVersion(txn, &shardingState, *removeItem.getRequest(), result)) {
-            // Version error
-            return;
-        }
+                if (!checkShardVersion(txn, &shardingState, *removeItem.getRequest(), result)) {
+                    // Version error
+                    return;
+                }
 
-        // Context once we're locked, to set more details in currentOp()
-        // TODO: better constructor?
-        Client::Context ctx(txn, nss.ns(), false /* don't check version */);
+                // Context once we're locked, to set more details in currentOp()
+                // TODO: better constructor?
+                Client::Context ctx(txn, nss.ns(), false /* don't check version */);
 
-        try {
-            result->getStats().n = executor.execute(ctx.db());
-        }
-        catch ( const DBException& ex ) {
-            status = ex.toStatus();
-            if (ErrorCodes::isInterruption(status.code())) {
-                throw;
+                result->getStats().n = executor.execute(ctx.db());
+                return;
             }
-            result->setError(toWriteError(status));
+            catch ( const DeadLockException& dle ) {
+                log() << "got deadlock doing delete on " << nss
+                      << ", attempt: " << attempt++ << " retrying";
+            }
+            catch ( const DBException& ex ) {
+                status = ex.toStatus();
+                if (ErrorCodes::isInterruption(status.code())) {
+                    throw;
+                }
+                result->setError(toWriteError(status));
+                return;
+            }
         }
     }
 
