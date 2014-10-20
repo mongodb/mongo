@@ -4,11 +4,13 @@
 
 #include <exception>
 
+#include "mongo/util/assert_util.h"
+
 namespace mongo {
 
-    class DeadLockException : public std::exception {
+    class DeadLockException : public DBException {
     public:
-        virtual const char* what() const throw() { return "DeadLock"; }
+        DeadLockException() : DBException( "deadlock", ErrorCodes::DeadLock ){}
     };
 
 }

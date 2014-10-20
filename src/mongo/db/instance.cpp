@@ -467,7 +467,6 @@ namespace mongo {
             dbresponse.responseTo = m.header().getId();
         }
         else {
-            while(1) {
             try {
                 // The following operations all require authorization.
                 // dbInsert, dbUpdate and dbDelete can be easily pre-authorized,
@@ -513,7 +512,6 @@ namespace mongo {
                         invariant(false);
                     }
                 }
-                break;
              }
             catch (const UserException& ue) {
                 setLastError(ue.getCode(), ue.getInfo().msg.c_str());
@@ -521,7 +519,6 @@ namespace mongo {
                        << " Caught Assertion in " << opToString(op) << ", continuing "
                        << ue.toString() << endl;
                 debug.exceptionInfo = ue.getInfo();
-                break;
             }
             catch (const AssertionException& e) {
                 setLastError(e.getCode(), e.getInfo().msg.c_str());
@@ -530,10 +527,6 @@ namespace mongo {
                        << e.toString() << endl;
                 debug.exceptionInfo = e.getInfo();
                 shouldLog = true;
-                break;
-            }
-            catch (const DeadLockException& dle ) {
-            }
             }
         }
         currentOp.ensureStarted();
@@ -629,19 +622,33 @@ namespace mongo {
         UpdateExecutor executor(&request, &op.debug());
         uassertStatusOK(executor.prepare());
 
-        {
-            //  Tentatively take an intent lock, fix up if we need to create the collection
-            Lock::DBLock dbLock(txn->lockState(), ns.db(), MODE_IX);
-            Lock::CollectionLock colLock(txn->lockState(), ns.ns(), MODE_IX);
-            Client::Context ctx(txn, ns);
+        int attempt = 1;
+        while ( 1 ) {
+            try {
+                //  Tentatively take an intent lock, fix up if we need to create the collection
+                Lock::DBLock dbLock(txn->lockState(), ns.db(), MODE_IX);
+                Lock::CollectionLock colLock(txn->lockState(), ns.ns(), MODE_IX);
+                Client::Context ctx(txn, ns);
 
-            //  The common case: no implicit collection creation
-            if (!upsert || ctx.db()->getCollection(txn, ns) != NULL) {
-                UpdateResult res = executor.execute(ctx.db());
+                //  The common case: no implicit collection creation
+                if (!upsert || ctx.db()->getCollection(txn, ns) != NULL) {
+                    UpdateResult res = executor.execute(ctx.db());
 
-                // for getlasterror
-                lastError.getSafe()->recordUpdate( res.existing , res.numMatched , res.upserted );
-                return;
+                    // for getlasterror
+                    lastError.getSafe()->recordUpdate( res.existing , res.numMatched , res.upserted );
+                    return;
+                }
+                break;
+            }
+            catch ( const DeadLockException& dle ) {
+                if ( multi ) {
+                    log() << "got deadlock during multi abort, aborting";
+                    throw;
+                }
+                else {
+                    log() << "got deadlock doing update on " << ns
+                          << ", attempt: " << attempt++ << " retrying";
+                }
             }
         }
 
@@ -694,13 +701,23 @@ namespace mongo {
         DeleteExecutor executor(&request);
         uassertStatusOK(executor.prepare());
 
-        Lock::DBLock dbLocklk(txn->lockState(), ns.db(), MODE_IX);
-        Lock::CollectionLock colLock(txn->lockState(), ns.ns(), MODE_IX);
-        Client::Context ctx(txn, ns);
+        int attempt = 1;
+        while ( 1 ) {
+            try {
+                Lock::DBLock dbLocklk(txn->lockState(), ns.db(), MODE_IX);
+                Lock::CollectionLock colLock(txn->lockState(), ns.ns(), MODE_IX);
+                Client::Context ctx(txn, ns);
 
-        long long n = executor.execute(ctx.db());
-        lastError.getSafe()->recordDelete( n );
-        op.debug().ndeleted = n;
+                long long n = executor.execute(ctx.db());
+                lastError.getSafe()->recordDelete( n );
+                op.debug().ndeleted = n;
+                return;
+            }
+            catch ( const DeadLockException& dle ) {
+                log() << "got deadlock doing insert on " << ns
+                      << ", attempt: " << attempt++ << " retrying";
+            }
+        }
     }
 
     QueryResult::View emptyMoreResult(long long);
@@ -915,7 +932,8 @@ namespace mongo {
         for (i=0; i<objs.size(); i++){
             try {
                 checkAndInsert(txn, ctx, ns, objs[i]);
-            } catch (const UserException& ex) {
+            }
+            catch (const UserException& ex) {
                 if (!keepGoing || i == objs.size()-1){
                     globalOpCounters.incInsertInWriteLock(i);
                     throw;

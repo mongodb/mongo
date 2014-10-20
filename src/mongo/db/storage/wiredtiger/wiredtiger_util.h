@@ -51,7 +51,7 @@ namespace mongo {
             return Status::OK();
 
 
-        if ( retCode == WT_DEADLOCK )
+        if ( retCode == WT_ROLLBACK )
             throw DeadLockException();
 
         // TODO convert specific codes rather than just using INTERNAL_ERROR for everything.
