@@ -43,7 +43,7 @@ class test_txn06(wttest.WiredTigerTestCase, suite_subprocess):
     def setUpConnectionOpen(self, *args):
         if not wiredtiger.verbose_build():
             self.skipTest('requires a verbose build')
-        super(wttest.WiredTigerTestCase, setUpConnectionOpen)(self, *args)
+        return super(test_txn06, self).setUpConnectionOpen(*args)
 
     def test_long_running(self):
         # Populate a table
