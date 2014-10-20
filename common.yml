@@ -902,6 +902,7 @@ buildvariants:
   run_on:
   - windows-64-vs2013-compile
   expansions:
+    <<: *mongo_url_windows64_enterprise
     build_tags: -tags "sasl ssl"
     edition: enterprise
     extension: .exe
