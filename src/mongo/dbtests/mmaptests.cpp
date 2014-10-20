@@ -33,6 +33,7 @@
 #include <boost/filesystem/operations.hpp>
 
 #include "mongo/db/concurrency/lock_state.h"
+#include "mongo/db/global_environment_experiment.h"
 #include "mongo/db/storage/mmap_v1/data_file.h"
 #include "mongo/db/storage/mmap_v1/durable_mapped_file.h"
 #include "mongo/db/storage/mmap_v1/extent.h"
@@ -173,7 +174,7 @@ namespace MMapTests {
     public:
         All() : Suite( "mmap" ) {}
         void setupTests() {
-            if (storageGlobalParams.engine != "mmapv1")
+            if (!getGlobalEnvironment()->getGlobalStorageEngine()->isMmapV1())
                 return;
 
             add< LeakTest >();

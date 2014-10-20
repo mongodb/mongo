@@ -54,7 +54,7 @@ namespace {
         invariant(storageEngine);
         _recovery.reset(storageEngine->newRecoveryUnit(this));
 
-        if (storageGlobalParams.engine == "mmapv1") {
+        if (storageEngine->isMmapV1()) {
             _locker.reset(new MMAPV1LockerImpl(idCounter.addAndFetch(1)));
         }
         else {
