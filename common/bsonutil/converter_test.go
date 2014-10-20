@@ -59,11 +59,11 @@ func TestArraysBSONToJSON(t *testing.T) {
 			So(err, ShouldBeNil)
 			_jObj, ok := __jObj.([]interface{})
 			So(ok, ShouldBeTrue)
-			jObj, ok := _jObj[1].(map[string]interface{})
+			jObj, ok := _jObj[1].(bson.M)
 			So(ok, ShouldBeTrue)
 			So(len(jObj), ShouldEqual, 2)
 			So(jObj["a"], ShouldEqual, json.NumberLong(20))
-			jjObj, ok := jObj["b"].(map[string]interface{})
+			jjObj, ok := jObj["b"].(bson.M)
 			So(ok, ShouldBeTrue)
 
 			So(jjObj["c"], ShouldResemble, json.RegExp{"hi", "i"})

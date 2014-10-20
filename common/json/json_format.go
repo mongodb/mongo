@@ -14,7 +14,7 @@ func (b BinData) MarshalJSON() ([]byte, error) {
 }
 
 func (js JavaScript) MarshalJSON() ([]byte, error) {
-	data := []byte(fmt.Sprintf(`{ "$code": "%v"`, js.Code))
+	data := []byte(fmt.Sprintf(`{ "$code": %q`, js.Code))
 
 	scopeChunk := []byte{}
 	if js.Scope != nil {

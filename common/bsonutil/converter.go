@@ -96,7 +96,7 @@ func ConvertJSONValueToBSON(x interface{}) (interface{}, error) {
 	}
 }
 
-func convertKeys(v bson.M) (map[string]interface{}, error) {
+func convertKeys(v bson.M) (bson.M, error) {
 	for key, value := range v {
 		jsonValue, err := ConvertBSONValueToJSON(value)
 		if err != nil {
@@ -157,7 +157,7 @@ func ConvertBSONValueToJSON(x interface{}) (interface{}, error) {
 		return json.ObjectId(v.Hex()), nil
 
 	case time.Time: // Date
-		return json.Date(v.UnixNano() / 1e6), nil
+		return json.Date(v.Unix()*1000 + int64(v.Nanosecond()/1e6)), nil
 
 	case int64: // NumberLong
 		return json.NumberLong(v), nil
