@@ -526,7 +526,7 @@ func TestMongoDumpMetaData(t *testing.T) {
 					Convey("and contains an 'indexes' key", func() {
 						_, ok := jsonResult["indexes"]
 						So(ok, ShouldBeTrue)
-						oneMetaFile.Close()
+						So(oneMetaFile.Close(), ShouldBeNil)
 					})
 
 				})
