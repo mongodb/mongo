@@ -495,7 +495,7 @@ json_expect(WT_SESSION *session, JSON_INPUT_STATE *ins, int wanttok)
 	ins->peeking = 0;
 	if (ins->toktype != wanttok) {
 		fprintf(stderr,
-		    "%s: %d: %zu: expected %s, got %s\n",
+		    "%s: %d: " WT_SIZET_FMT ": expected %s, got %s\n",
 		    ins->filename,
 		    ins->linenum,
 		    JSON_INPUT_POS(ins) + 1,
