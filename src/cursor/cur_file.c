@@ -52,8 +52,8 @@ __curfile_compare(WT_CURSOR *a, WT_CURSOR *b, int *cmpp)
 		WT_ERR_MSG(session, EINVAL,
 		    "Cursors must reference the same object");
 
-	WT_CURSOR_NEEDKEY(a);
-	WT_CURSOR_NEEDKEY(b);
+	WT_CURSOR_CHECKKEY(a);
+	WT_CURSOR_CHECKKEY(b);
 
 	ret = __wt_btcur_compare(
 	    (WT_CURSOR_BTREE *)a, (WT_CURSOR_BTREE *)b, cmpp);
@@ -161,6 +161,7 @@ __curfile_search(WT_CURSOR *cursor)
 	CURSOR_API_CALL(cursor, session, search, cbt->btree);
 
 	WT_CURSOR_NEEDKEY(cursor);
+	WT_CURSOR_NOVALUE(cursor);
 
 	WT_BTREE_CURSOR_SAVE_AND_RESTORE(cursor, __wt_btcur_search(cbt), ret);
 
@@ -182,6 +183,7 @@ __curfile_search_near(WT_CURSOR *cursor, int *exact)
 	CURSOR_API_CALL(cursor, session, search_near, cbt->btree);
 
 	WT_CURSOR_NEEDKEY(cursor);
+	WT_CURSOR_NOVALUE(cursor);
 
 	WT_BTREE_CURSOR_SAVE_AND_RESTORE(
 	    cursor, __wt_btcur_search_near(cbt, exact), ret);
@@ -266,6 +268,7 @@ __wt_curfile_update_check(WT_CURSOR *cursor)
 	CURSOR_UPDATE_API_CALL(cursor, session, update, cbt->btree);
 
 	WT_CURSOR_NEEDKEY(cursor);
+	WT_CURSOR_NOVALUE(cursor);
 
 	WT_BTREE_CURSOR_SAVE_AND_RESTORE(
 	    cursor, __wt_btcur_update_check(cbt), ret);
@@ -289,6 +292,7 @@ __curfile_remove(WT_CURSOR *cursor)
 	CURSOR_UPDATE_API_CALL(cursor, session, remove, cbt->btree);
 
 	WT_CURSOR_NEEDKEY(cursor);
+	WT_CURSOR_NOVALUE(cursor);
 
 	WT_BTREE_CURSOR_SAVE_AND_RESTORE(cursor, __wt_btcur_remove(cbt), ret);
 
@@ -297,9 +301,12 @@ __curfile_remove(WT_CURSOR *cursor)
 	 */
 	if (ret == 0) {
 		if (F_ISSET(cursor, WT_CURSTD_KEY_INT) &&
-		    !WT_DATA_IN_ITEM(&(cursor)->key))
+		    !WT_DATA_IN_ITEM(&(cursor)->key)) {
 			WT_ERR(__wt_buf_set(session, &cursor->key,
 			    cursor->key.data, cursor->key.size));
+			F_CLR(cursor, WT_CURSTD_KEY_INT);
+			F_SET(cursor, WT_CURSTD_KEY_EXT);
+		}
 		F_CLR(cursor, WT_CURSTD_VALUE_SET);
 	}
 

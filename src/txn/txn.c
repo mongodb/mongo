@@ -280,7 +280,8 @@ __wt_txn_begin(WT_SESSION_IMPL *session, const char *cfg[])
 
 	F_SET(txn, TXN_RUNNING);
 	if (txn->isolation == TXN_ISO_SNAPSHOT) {
-		WT_RET(__wt_session_copy_values(session));
+		if (session->ncursors > 0)
+			WT_RET(__wt_session_copy_values(session));
 		__wt_txn_refresh(session, 1);
 	}
 	return (0);
