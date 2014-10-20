@@ -50,7 +50,7 @@
 namespace mongo {
 namespace repl {
 
-    const Seconds TopologyCoordinatorImpl::LastVote::leaseTime = Seconds(3);
+    const Seconds TopologyCoordinatorImpl::LastVote::leaseTime = Seconds(30);
 
 namespace {
 

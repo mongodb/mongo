@@ -2014,8 +2014,8 @@ namespace {
         // 4. TopologyCoordinator concludes its freshness round successfully and wins the election.
 
         setSelfMemberState(MemberState::RS_SECONDARY);
-        now() += 3000; // we need to be more than LastVote::leaseTime from the start of time or else
-                       // some Date_t math goes horribly awry
+        now() += 30000; // we need to be more than LastVote::leaseTime from the start of time or
+                        // else some Date_t math goes horribly awry
 
         OpTime election = OpTime(0,0);
         OpTime lastOpTimeApplied = OpTime(130,0);
@@ -2084,8 +2084,8 @@ namespace {
         // 6. The TopologyCoordinator loses the election.
 
         setSelfMemberState(MemberState::RS_SECONDARY);
-        now() += 3000; // we need to be more than LastVote::leaseTime from the start of time or else
-                       // some Date_t math goes horribly awry
+        now() += 30000; // we need to be more than LastVote::leaseTime from the start of time or
+                        // else some Date_t math goes horribly awry
 
         OpTime election = OpTime(0,0);
         OpTime lastOpTimeApplied = OpTime(100,0);
@@ -2202,8 +2202,8 @@ namespace {
         // 5. "host3" sends an elect command, which the TopologyCoordinator responds to negatively.
 
         setSelfMemberState(MemberState::RS_SECONDARY);
-        now() += 3000; // we need to be more than LastVote::leaseTime from the start of time or else
-                       // some Date_t math goes horribly awry
+        now() += 30000; // we need to be more than LastVote::leaseTime from the start of time or
+                        // else some Date_t math goes horribly awry
 
         OpTime election = OpTime(0,0);
         OpTime lastOpTimeApplied = OpTime(100,0);
@@ -2299,8 +2299,8 @@ namespace {
         // 5. "host3" sends an elect command, which the TopologyCoordinator responds to negatively.
 
         setSelfMemberState(MemberState::RS_SECONDARY);
-        now() += 3000; // we need to be more than LastVote::leaseTime from the start of time or else
-                       // some Date_t math goes horribly awry
+        now() += 30000; // we need to be more than LastVote::leaseTime from the start of time or
+                        // else some Date_t math goes horribly awry
 
         OpTime election = OpTime(0,0);
         OpTime lastOpTimeApplied = OpTime(100,0);
@@ -2764,7 +2764,7 @@ namespace {
                 "voted for h2:27017 0 secs ago"));
 
         // Test that after enough time passes the same vote can proceed
-        now += 3 * 1001; // just over 3 seconds later
+        now += 30 * 1000 + 1; // just over 30 seconds later
 
         BSONObjBuilder responseBuilder3;
         startCapturingLogMessages();
