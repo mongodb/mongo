@@ -71,12 +71,14 @@ mongo_tools_variables:
     windows_64_task_list: &windows_64_tasks
       - name: db
       - name: dist
+      - name: integration
       - name: legacy
         distros:
         - windows-64-vs2013-test
       - name: unit
     windows_64_ssl_task_list: &windows_64_ssl_tasks
       - name: dist
+      - name: integration
 
 ## Common mongodb arguments
   mongodb_arguments:
@@ -906,4 +908,5 @@ buildvariants:
     library_path: PATH="/cygdrive/c/mingw-w64/x86_64-4.9.1-posix-seh-rt_v3-rev1/mingw64/bin:/cygdrive/c/sasl/:$PATH"
     preproc_gpm: "perl -pi -e 's/\\r\\n/\\n/g' "
     set_gopath: set_gopath_windows.sh
+    integration_test_args: "integration"
   tasks: *windows_64_tasks
