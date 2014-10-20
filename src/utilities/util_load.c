@@ -103,7 +103,7 @@ load_dump(WT_SESSION *session)
 
 	/* Reorder and check the list. */
 	if ((ret = config_reorder(list)) != 0)
-		return (ret);
+		goto err;
 
 	/* Update the config based on any command-line configuration. */
 	if ((ret = config_update(session, list)) != 0)
