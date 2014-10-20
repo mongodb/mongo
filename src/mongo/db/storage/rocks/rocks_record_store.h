@@ -162,7 +162,7 @@ namespace mongo {
         class Iterator : public RecordIterator {
         public:
             Iterator(OperationContext* txn, rocksdb::DB* db,
-                     boost::shared_ptr<rocksdb::ColumnFamilyHandle> columnFamily, bool tailable,
+                     boost::shared_ptr<rocksdb::ColumnFamilyHandle> columnFamily,
                      const CollectionScanParams::Direction& dir, const DiskLoc& start);
 
             virtual bool isEOF();
@@ -182,7 +182,6 @@ namespace mongo {
             OperationContext* _txn;
             rocksdb::DB* _db; // not owned
             boost::shared_ptr<rocksdb::ColumnFamilyHandle> _cf;
-            bool _tailable;
             CollectionScanParams::Direction _dir;
             bool _eof;
             DiskLoc _curr;
