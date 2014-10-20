@@ -41,6 +41,27 @@ func ConvertJSONDocumentToBSON(doc map[string]interface{}) error {
 	return nil
 }
 
+// GetExtendedBsonD takes a bson.D document and adds type
+// information for each key in the document
+func GetExtendedBsonD(doc bson.D) (bson.D, error) {
+	var err error
+	var bsonDoc bson.D
+	for _, docElem := range doc {
+		var bsonValue interface{}
+		switch v := docElem.Value.(type) {
+		case map[string]interface{}: // subdocument
+			bsonValue, err = ParseSpecialKeys(v)
+		default:
+			bsonValue, err = ConvertJSONValueToBSON(v)
+		}
+		if err != nil {
+			return nil, err
+		}
+		bsonDoc = append(bsonDoc, bson.DocElem{docElem.Name, bsonValue})
+	}
+	return bsonDoc, nil
+}
+
 // ParseSpecialKeys takes a JSON document and inspects it for any
 // special ('$') keys and replaces any values with the corresponding
 // BSON type.

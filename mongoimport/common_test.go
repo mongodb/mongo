@@ -19,6 +19,64 @@ func init() {
 	})
 }
 
+var (
+	numProcessed       = uint64(0)
+	csvConvertibleDocs = []CSVConvertibleDoc{
+		CSVConvertibleDoc{
+			fields:       []string{"field1", "field2", "field3"},
+			data:         []string{"a", "b", "c"},
+			numProcessed: &numProcessed,
+		},
+		CSVConvertibleDoc{
+			fields:       []string{"field4", "field5", "field6"},
+			data:         []string{"d", "e", "f"},
+			numProcessed: &numProcessed,
+		},
+		CSVConvertibleDoc{
+			fields:       []string{"field7", "field8", "field9"},
+			data:         []string{"d", "e", "f"},
+			numProcessed: &numProcessed,
+		},
+		CSVConvertibleDoc{
+			fields:       []string{"field10", "field11", "field12"},
+			data:         []string{"d", "e", "f"},
+			numProcessed: &numProcessed,
+		},
+		CSVConvertibleDoc{
+			fields:       []string{"field13", "field14", "field15"},
+			data:         []string{"d", "e", "f"},
+			numProcessed: &numProcessed,
+		},
+	}
+	expectedDocuments = []bson.D{
+		bson.D{
+			bson.DocElem{"field1", "a"},
+			bson.DocElem{"field2", "b"},
+			bson.DocElem{"field3", "c"},
+		},
+		bson.D{
+			bson.DocElem{"field4", "d"},
+			bson.DocElem{"field5", "e"},
+			bson.DocElem{"field6", "f"},
+		},
+		bson.D{
+			bson.DocElem{"field7", "d"},
+			bson.DocElem{"field8", "e"},
+			bson.DocElem{"field9", "f"},
+		},
+		bson.D{
+			bson.DocElem{"field10", "d"},
+			bson.DocElem{"field11", "e"},
+			bson.DocElem{"field12", "f"},
+		},
+		bson.D{
+			bson.DocElem{"field13", "d"},
+			bson.DocElem{"field14", "e"},
+			bson.DocElem{"field15", "f"},
+		},
+	}
+)
+
 func TestValidateHeaders(t *testing.T) {
 	testutil.VerifyTestType(t, testutil.UNIT_TEST_TYPE)
 
@@ -33,51 +91,51 @@ func TestValidateHeaders(t *testing.T) {
 		So(err, ShouldBeNil)
 
 		Convey("if headerLine is true, the first line in the input should be used", func() {
-			headers, err := validateHeaders(NewCSVImportInput(fields, fileHandle), true)
+			headers, err := validateHeaders(NewCSVInputReader(fields, fileHandle), true)
 			So(err, ShouldBeNil)
 			So(len(headers), ShouldEqual, 2)
 			// spaces are trimed in the header
 			So(headers, ShouldResemble, strings.Split(strings.Replace(contents, " ", "", -1), ","))
 		})
 		Convey("if headerLine is false, the fields passed in should be used", func() {
-			headers, err := validateHeaders(NewCSVImportInput(fields, fileHandle), false)
+			headers, err := validateHeaders(NewCSVInputReader(fields, fileHandle), false)
 			So(err, ShouldBeNil)
 			So(len(headers), ShouldEqual, 3)
 			// spaces are trimed in the header
 			So(headers, ShouldResemble, fields)
 		})
 		Convey("if the fields contain '..', an error should be thrown", func() {
-			_, err := validateHeaders(NewCSVImportInput([]string{"a..a"}, fileHandle), false)
+			_, err := validateHeaders(NewCSVInputReader([]string{"a..a"}, fileHandle), false)
 			So(err, ShouldNotBeNil)
 		})
 		Convey("if the fields start/end in a '.', an error should be thrown", func() {
-			_, err := validateHeaders(NewCSVImportInput([]string{".a"}, fileHandle), false)
+			_, err := validateHeaders(NewCSVInputReader([]string{".a"}, fileHandle), false)
 			So(err, ShouldNotBeNil)
-			_, err = validateHeaders(NewCSVImportInput([]string{"a."}, fileHandle), false)
+			_, err = validateHeaders(NewCSVInputReader([]string{"a."}, fileHandle), false)
 			So(err, ShouldNotBeNil)
 		})
 		Convey("if the fields collide, an error should be thrown", func() {
-			_, err := validateHeaders(NewCSVImportInput([]string{"a", "a.a"}, fileHandle), false)
+			_, err := validateHeaders(NewCSVInputReader([]string{"a", "a.a"}, fileHandle), false)
 			So(err, ShouldNotBeNil)
-			_, err = validateHeaders(NewCSVImportInput([]string{"a", "a.ba", "b.a"}, fileHandle), false)
+			_, err = validateHeaders(NewCSVInputReader([]string{"a", "a.ba", "b.a"}, fileHandle), false)
 			So(err, ShouldNotBeNil)
-			_, err = validateHeaders(NewCSVImportInput([]string{"a", "a.b.c"}, fileHandle), false)
+			_, err = validateHeaders(NewCSVInputReader([]string{"a", "a.b.c"}, fileHandle), false)
 			So(err, ShouldNotBeNil)
 		})
 		Convey("if the fields don't collide, no error should be thrown", func() {
-			_, err := validateHeaders(NewCSVImportInput([]string{"a", "aa"}, fileHandle), false)
+			_, err := validateHeaders(NewCSVInputReader([]string{"a", "aa"}, fileHandle), false)
 			So(err, ShouldBeNil)
-			_, err = validateHeaders(NewCSVImportInput([]string{"a", "aa", "b.a", "b.c"}, fileHandle), false)
+			_, err = validateHeaders(NewCSVInputReader([]string{"a", "aa", "b.a", "b.c"}, fileHandle), false)
 			So(err, ShouldBeNil)
-			_, err = validateHeaders(NewCSVImportInput([]string{"a", "ba", "ab", "b.a"}, fileHandle), false)
+			_, err = validateHeaders(NewCSVInputReader([]string{"a", "ba", "ab", "b.a"}, fileHandle), false)
 			So(err, ShouldBeNil)
-			_, err = validateHeaders(NewCSVImportInput([]string{"a", "ba", "ab", "b.a", "b.c.d"}, fileHandle), false)
+			_, err = validateHeaders(NewCSVInputReader([]string{"a", "ba", "ab", "b.a", "b.c.d"}, fileHandle), false)
 			So(err, ShouldBeNil)
-			_, err = validateHeaders(NewCSVImportInput([]string{"a", "ab.c"}, fileHandle), false)
+			_, err = validateHeaders(NewCSVInputReader([]string{"a", "ab.c"}, fileHandle), false)
 			So(err, ShouldBeNil)
 		})
 		Convey("if the fields contain the same keys, an error should be thrown", func() {
-			_, err := validateHeaders(NewCSVImportInput([]string{"a", "ba", "a"}, fileHandle), false)
+			_, err := validateHeaders(NewCSVInputReader([]string{"a", "ba", "a"}, fileHandle), false)
 			So(err, ShouldNotBeNil)
 		})
 	})
@@ -177,71 +235,300 @@ func TestSetNestedValue(t *testing.T) {
 	testutil.VerifyTestType(t, testutil.UNIT_TEST_TYPE)
 
 	Convey("Given a field, its value, and an existing BSON document...", t, func() {
-		currentDocument := bson.M{
-			"a": 3,
-			"b": bson.M{
-				"c": "d",
-			},
+		currentDocument := bson.D{
+			bson.DocElem{"a", 3},
+			bson.DocElem{"b", &bson.D{bson.DocElem{"c", "d"}}},
 		}
 		Convey("ensure top level fields are set and others, unchanged", func() {
-			testDocument := currentDocument
-			expectedDocument := bson.M{
-				"a": 3,
-				"b": bson.M{
-					"c": "d",
-				},
-				"c": 4,
-			}
+			testDocument := &currentDocument
+			expectedDocument := bson.DocElem{"c", 4}
 			setNestedValue("c", 4, testDocument)
-			So(testDocument, ShouldResemble, expectedDocument)
+			newDocument := *testDocument
+			So(len(newDocument), ShouldEqual, 3)
+			So(newDocument[2], ShouldResemble, expectedDocument)
 		})
 		Convey("ensure new nested top-level fields are set and others, unchanged", func() {
-			testDocument := currentDocument
-			expectedDocument := bson.M{
-				"a": 3,
-				"b": bson.M{
-					"c": "d",
-				},
-				"c": bson.M{
-					"b": "4",
-				},
-			}
+			testDocument := &currentDocument
+			expectedDocument := bson.D{bson.DocElem{"b", "4"}}
 			setNestedValue("c.b", "4", testDocument)
-			So(testDocument, ShouldResemble, expectedDocument)
+			newDocument := *testDocument
+			So(len(newDocument), ShouldEqual, 3)
+			So(newDocument[2].Name, ShouldResemble, "c")
+			So(*newDocument[2].Value.(*bson.D), ShouldResemble, expectedDocument)
 		})
 		Convey("ensure existing nested level fields are set and others, unchanged", func() {
-			testDocument := currentDocument
-			expectedDocument := bson.M{
-				"a": 3,
-				"b": bson.M{
-					"c": "d",
-					"d": 9,
-				},
-			}
+			testDocument := &currentDocument
+			expectedDocument := bson.D{bson.DocElem{"c", "d"}, bson.DocElem{"d", 9}}
 			setNestedValue("b.d", 9, testDocument)
-			So(testDocument, ShouldResemble, expectedDocument)
+			newDocument := *testDocument
+			So(len(newDocument), ShouldEqual, 2)
+			So(newDocument[1].Name, ShouldResemble, "b")
+			So(*newDocument[1].Value.(*bson.D), ShouldResemble, expectedDocument)
 		})
 		Convey("ensure subsequent calls update fields accordingly", func() {
-			testDocument := currentDocument
-			expectedDocumentOne := bson.M{
-				"a": 3,
-				"b": bson.M{
-					"c": "d",
-					"d": 9,
-				},
-			}
-			expectedDocumentTwo := bson.M{
-				"a": 3,
-				"b": bson.M{
-					"c": "d",
-					"d": 9,
-				},
-				"f": 23,
-			}
+			testDocument := &currentDocument
+			expectedDocumentOne := bson.D{bson.DocElem{"c", "d"}, bson.DocElem{"d", 9}}
+			expectedDocumentTwo := bson.DocElem{"f", 23}
 			setNestedValue("b.d", 9, testDocument)
-			So(testDocument, ShouldResemble, expectedDocumentOne)
+			newDocument := *testDocument
+			So(len(newDocument), ShouldEqual, 2)
+			So(newDocument[1].Name, ShouldResemble, "b")
+			So(*newDocument[1].Value.(*bson.D), ShouldResemble, expectedDocumentOne)
 			setNestedValue("f", 23, testDocument)
-			So(testDocument, ShouldResemble, expectedDocumentTwo)
+			newDocument = *testDocument
+			So(len(newDocument), ShouldEqual, 3)
+			So(newDocument[2], ShouldResemble, expectedDocumentTwo)
+		})
+	})
+}
+
+func TestRemoveBlankFields(t *testing.T) {
+	Convey("Given an unordered BSON document", t, func() {
+		Convey("the same document should be returned if there are no blanks",
+			func() {
+				bsonDocument := bson.D{bson.DocElem{"a", 3}, bson.DocElem{"b", "hello"}}
+				newDocument := removeBlankFields(bsonDocument)
+				So(bsonDocument, ShouldResemble, newDocument)
+			})
+		Convey("a new document without blanks should be returned if there are "+
+			" blanks", func() {
+			bsonDocument := bson.D{bson.DocElem{"a", 3}, bson.DocElem{"b", ""}}
+			newDocument := removeBlankFields(bsonDocument)
+			expectedDocument := bson.D{bson.DocElem{"a", 3}}
+			So(newDocument, ShouldResemble, expectedDocument)
+		})
+	})
+}
+
+func TestTokensToBSON(t *testing.T) {
+	Convey("Given an slice of fields and tokens to convert to BSON", t, func() {
+		Convey("the expected ordered BSON should be produced for the fields/tokens given", func() {
+			fields := []string{"a", "b", "c"}
+			tokens := []string{"1", "2", "hello"}
+			numProcessed := uint64(0)
+			expectedDocument := bson.D{
+				bson.DocElem{"a", 1},
+				bson.DocElem{"b", 2},
+				bson.DocElem{"c", "hello"},
+			}
+			bsonD, err := tokensToBSON(fields, tokens, numProcessed)
+			So(err, ShouldBeNil)
+			So(bsonD, ShouldResemble, expectedDocument)
+		})
+		Convey("if there are more tokens than fields, additional fields should be prefixed"+
+			" with 'fields' and an index indicating the header number", func() {
+			fields := []string{"a", "b", "c"}
+			tokens := []string{"1", "2", "hello", "mongodb", "user"}
+			numProcessed := uint64(0)
+			expectedDocument := bson.D{
+				bson.DocElem{"a", 1},
+				bson.DocElem{"b", 2},
+				bson.DocElem{"c", "hello"},
+				bson.DocElem{"field3", "mongodb"},
+				bson.DocElem{"field4", "user"},
+			}
+			bsonD, err := tokensToBSON(fields, tokens, numProcessed)
+			So(err, ShouldBeNil)
+			So(bsonD, ShouldResemble, expectedDocument)
+		})
+		Convey("an error should be thrown if duplicate headers are found", func() {
+			fields := []string{"a", "b", "field3"}
+			tokens := []string{"1", "2", "hello", "mongodb", "user"}
+			numProcessed := uint64(0)
+			_, err := tokensToBSON(fields, tokens, numProcessed)
+			So(err, ShouldNotBeNil)
+		})
+		Convey("fields with nested values should be set appropriately", func() {
+			fields := []string{"a", "b", "c.a"}
+			tokens := []string{"1", "2", "hello"}
+			numProcessed := uint64(0)
+			expectedDocument := bson.D{
+				bson.DocElem{"a", 1},
+				bson.DocElem{"b", 2},
+				bson.DocElem{"c", bson.D{
+					bson.DocElem{"a", "hello"},
+				}},
+			}
+			bsonD, err := tokensToBSON(fields, tokens, numProcessed)
+			So(err, ShouldBeNil)
+			So(expectedDocument[0].Name, ShouldResemble, bsonD[0].Name)
+			So(expectedDocument[0].Value, ShouldResemble, bsonD[0].Value)
+			So(expectedDocument[1].Name, ShouldResemble, bsonD[1].Name)
+			So(expectedDocument[1].Value, ShouldResemble, bsonD[1].Value)
+			So(expectedDocument[2].Name, ShouldResemble, bsonD[2].Name)
+			So(expectedDocument[2].Value, ShouldResemble, *bsonD[2].Value.(*bson.D))
+		})
+	})
+}
+
+func TestProcessDocuments(t *testing.T) {
+	Convey("Given an import worker", t, func() {
+		numProcessed := uint64(0)
+		csvConvertibleDocs := []CSVConvertibleDoc{
+			CSVConvertibleDoc{
+				fields:       []string{"field1", "field2", "field3"},
+				data:         []string{"a", "b", "c"},
+				numProcessed: &numProcessed,
+			},
+			CSVConvertibleDoc{
+				fields:       []string{"field4", "field5", "field6"},
+				data:         []string{"d", "e", "f"},
+				numProcessed: &numProcessed,
+			},
+		}
+		expectedDocuments := []bson.D{
+			bson.D{
+				bson.DocElem{"field1", "a"},
+				bson.DocElem{"field2", "b"},
+				bson.DocElem{"field3", "c"},
+			},
+			bson.D{
+				bson.DocElem{"field4", "d"},
+				bson.DocElem{"field5", "e"},
+				bson.DocElem{"field6", "f"},
+			},
+		}
+		Convey("processDocuments should execute the expected conversion for documents, "+
+			"pass then on the output channel, and close the input channel if ordered is true", func() {
+			inputChannel := make(chan ConvertibleDoc, 100)
+			outputChannel := make(chan bson.D, 100)
+			importWorker := &ImportWorker{
+				unprocessedDataChan:   inputChannel,
+				processedDocumentChan: outputChannel,
+			}
+			inputChannel <- csvConvertibleDocs[0]
+			inputChannel <- csvConvertibleDocs[1]
+			close(inputChannel)
+			So(importWorker.processDocuments(true), ShouldBeNil)
+			doc1, open := <-outputChannel
+			So(doc1, ShouldResemble, expectedDocuments[0])
+			So(open, ShouldEqual, true)
+			doc2, open := <-outputChannel
+			So(doc2, ShouldResemble, expectedDocuments[1])
+			So(open, ShouldEqual, true)
+			_, open = <-outputChannel
+			So(open, ShouldEqual, false)
+		})
+		Convey("processDocuments should execute the expected conversion for documents, "+
+			"pass then on the output channel, and leave the input channel open if ordered is false", func() {
+			inputChannel := make(chan ConvertibleDoc, 100)
+			outputChannel := make(chan bson.D, 100)
+			importWorker := &ImportWorker{
+				unprocessedDataChan:   inputChannel,
+				processedDocumentChan: outputChannel,
+			}
+			inputChannel <- csvConvertibleDocs[0]
+			inputChannel <- csvConvertibleDocs[1]
+			close(inputChannel)
+			So(importWorker.processDocuments(false), ShouldBeNil)
+			doc1, open := <-outputChannel
+			So(doc1, ShouldResemble, expectedDocuments[0])
+			So(open, ShouldEqual, true)
+			doc2, open := <-outputChannel
+			So(doc2, ShouldResemble, expectedDocuments[1])
+			So(open, ShouldEqual, true)
+			// close will throw a runtime error if outputChannel is already closed
+			close(outputChannel)
+		})
+	})
+}
+
+func TestGetKeyValue(t *testing.T) {
+	Convey("Given a bson.D document and a specific key", t, func() {
+		subDocument := &bson.D{
+			bson.DocElem{"field4", "c"},
+		}
+		document := &bson.D{
+			bson.DocElem{"field1", "a"},
+			bson.DocElem{"field2", "b"},
+			bson.DocElem{"field3", subDocument},
+		}
+		Convey("the corresponding value top-level keys should be returned", func() {
+			So(getKeyValue("field1", document), ShouldEqual, "a")
+		})
+		Convey("the corresponding value top-level keys with sub-document values should be returned", func() {
+			So(getKeyValue("field3", document), ShouldEqual, subDocument)
+		})
+		Convey("for keys that don't exist in the top-level, nil should be returned", func() {
+			So(getKeyValue("field4", document), ShouldBeNil)
+		})
+	})
+}
+
+func TestDoSequentialStreaming(t *testing.T) {
+	Convey("Given some import workers, a ConvertibleDocs input channel and an bson.D output channel", t, func() {
+		inputChannel := make(chan ConvertibleDoc, 5)
+		outputChannel := make(chan bson.D, 5)
+		workerInputChannel := []chan ConvertibleDoc{
+			make(chan ConvertibleDoc),
+			make(chan ConvertibleDoc),
+		}
+		workerOutputChannel := []chan bson.D{
+			make(chan bson.D),
+			make(chan bson.D),
+		}
+		importWorkers := []*ImportWorker{
+			&ImportWorker{
+				unprocessedDataChan:   workerInputChannel[0],
+				processedDocumentChan: workerOutputChannel[0],
+			},
+			&ImportWorker{
+				unprocessedDataChan:   workerInputChannel[1],
+				processedDocumentChan: workerOutputChannel[1],
+			},
+		}
+		Convey("documents moving through the input channel should be processed and returned in sequence", func() {
+			// start goroutines to do sequential processing
+			for _, importWorker := range importWorkers {
+				go importWorker.processDocuments(true)
+			}
+			// feed in a bunch of documents
+			for _, inputCSVDocument := range csvConvertibleDocs {
+				inputChannel <- inputCSVDocument
+			}
+			close(inputChannel)
+			doSequentialStreaming(importWorkers, inputChannel, outputChannel)
+			for _, document := range expectedDocuments {
+				So(<-outputChannel, ShouldResemble, document)
+			}
+		})
+	})
+}
+
+func TestStreamDocuments(t *testing.T) {
+	Convey(`Given:
+			1. a boolean indicating streaming order
+			2. an input channel where documents are streamed in
+			3. an output channel where processed documents are streamed out
+			4. an error channel where any errors encountered are streamed`, t, func() {
+		inputChannel := make(chan ConvertibleDoc, 5)
+		outputChannel := make(chan bson.D, 5)
+		errorChannel := make(chan error, 5)
+		Convey("the entire pipeline should complete without error under normal circumstances", func() {
+			// stream in some documents
+			for _, csvConvertibleDoc := range csvConvertibleDocs {
+				inputChannel <- csvConvertibleDoc
+			}
+			close(inputChannel)
+			streamDocuments(true, inputChannel, outputChannel, errorChannel)
+			// ensure documents are streamed out and processed in the correct manner
+			for _, expectedDocument := range expectedDocuments {
+				So(<-outputChannel, ShouldResemble, expectedDocument)
+			}
+		})
+		Convey("the entire pipeline should complete with error if an error is encountered", func() {
+			// stream in some documents - create duplicate headers to simulate an error
+			numProcessed := uint64(0)
+			csvConvertibleDoc := CSVConvertibleDoc{
+				fields:       []string{"field1", "field2"},
+				data:         []string{"a", "b", "c"},
+				numProcessed: &numProcessed,
+			}
+			inputChannel <- csvConvertibleDoc
+			close(inputChannel)
+			go streamDocuments(true, inputChannel, outputChannel, errorChannel)
+			// ensure that an error is returned on the error channel
+			So(<-errorChannel, ShouldNotBeNil)
 		})
 	})
 }

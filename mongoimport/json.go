@@ -11,9 +11,9 @@ import (
 	"strings"
 )
 
-// JSONImportInput is an implementation of ImportInput that reads documents
+// JSONInputReader is an implementation of InputReader that reads documents
 // in JSON format.
-type JSONImportInput struct {
+type JSONInputReader struct {
 	// IsArray indicates if the JSON import is an array of JSON documents
 	// or not
 	IsArray bool
@@ -37,6 +37,9 @@ type JSONImportInput struct {
 	separatorReader io.Reader
 }
 
+// JSONConvertibleDoc implements the ConvertibleDoc interface for JSON input
+type JSONConvertibleDoc []byte
+
 const (
 	JSON_ARRAY_START = '['
 	JSON_ARRAY_SEP   = ','
@@ -55,10 +58,10 @@ var (
 		"closing bracket ']' in input source")
 )
 
-// NewJSONImportInput creates a new JSONImportInput in array mode if specified,
+// NewJSONInputReader creates a new JSONInputReader in array mode if specified,
 // configured to read data to the given io.Reader
-func NewJSONImportInput(isArray bool, in io.Reader) *JSONImportInput {
-	return &JSONImportInput{
+func NewJSONInputReader(isArray bool, in io.Reader) *JSONInputReader {
+	return &JSONInputReader{
 		IsArray:            isArray,
 		Decoder:            json.NewDecoder(in),
 		readOpeningBracket: false,
@@ -67,18 +70,70 @@ func NewJSONImportInput(isArray bool, in io.Reader) *JSONImportInput {
 }
 
 // SetHeader is a no-op for JSON imports
-func (jsonImporter *JSONImportInput) SetHeader(hasHeaderLine bool) error {
+func (jsonInputReader *JSONInputReader) SetHeader(hasHeaderLine bool) error {
 	return nil
 }
 
 // GetHeaders is a no-op for JSON imports
-func (jsonImporter *JSONImportInput) GetHeaders() []string {
+func (jsonInputReader *JSONInputReader) GetHeaders() []string {
 	return nil
 }
 
 // ReadHeadersFromSource is a no-op for JSON imports
-func (jsonImporter *JSONImportInput) ReadHeadersFromSource() ([]string, error) {
+func (jsonInputReader *JSONInputReader) ReadHeadersFromSource() ([]string, error) {
 	return nil, nil
+}
+
+// StreamDocument takes in two channels: it sends processed documents on the
+// readChan channel and if any error is encountered, the error is sent on the
+// errChan channel. It keeps reading from the underlying input source until it
+// hits EOF or an error. If ordered is true, it streams the documents in which
+// the documents are read
+func (jsonInputReader *JSONInputReader) StreamDocument(ordered bool, readChan chan bson.D, errChan chan error) {
+	rawChan := make(chan ConvertibleDoc, numProcessingThreads)
+	var err error
+	go func() {
+		for {
+			if jsonInputReader.IsArray {
+				if err = jsonInputReader.readJSONArraySeparator(); err != nil {
+					close(rawChan)
+					if err == io.EOF {
+						errChan <- err
+					} else {
+						jsonInputReader.numProcessed++
+						errChan <- fmt.Errorf("error reading separator after document #%v: %v", jsonInputReader.numProcessed, err)
+					}
+					return
+				}
+			}
+			rawBytes, err := jsonInputReader.Decoder.ScanObject()
+			if err != nil {
+				close(rawChan)
+				errChan <- err
+				return
+			}
+			rawChan <- JSONConvertibleDoc(rawBytes)
+			jsonInputReader.numProcessed++
+		}
+	}()
+	streamDocuments(ordered, rawChan, readChan, errChan)
+}
+
+// This is required to satisfy the ConvertibleDoc interface for JSON input. It
+// does JSON-specific processing to convert the JSONConvertibleDoc to a bson.D
+func (jsonConvertibleDoc JSONConvertibleDoc) Convert() (bson.D, error) {
+	document, err := json.UnmarshalBsonD(jsonConvertibleDoc)
+	if err != nil {
+		return nil, fmt.Errorf("error unmarshaling bytes on document #%v: %v", 1, err)
+	}
+	log.Logf(2, "got line: %v", document)
+	// TODO: perhaps move this to decode.go
+	bsonD, err := bsonutil.GetExtendedBsonD(document)
+	if err != nil {
+		return nil, fmt.Errorf("error getting extended BSON for document #%v: %v", 1, err)
+	}
+	log.Logf(3, "got extended line: %#v", bsonD)
+	return bsonD, nil
 }
 
 // readJSONArraySeparator is a helper method used to process JSON arrays. It is
@@ -88,23 +143,24 @@ func (jsonImporter *JSONImportInput) ReadHeadersFromSource() ([]string, error) {
 // It will read a byte at a time until it finds an expected character after
 // which it returns control to the caller.
 //
-// TODO: single byte sized scans are inefficient!
-//
 // It will also return immediately if it finds any error (including EOF). If it
 // reads a JSON_ARRAY_END byte, as a validity check it will continue to scan the
 // input source until it hits an error (including EOF) to ensure the entire
 // input source content is a valid JSON array
-func (jsonImporter *JSONImportInput) readJSONArraySeparator() error {
-	jsonImporter.expectedByte = JSON_ARRAY_SEP
-	if jsonImporter.numProcessed == 0 {
-		jsonImporter.expectedByte = JSON_ARRAY_START
+func (jsonInputReader *JSONInputReader) readJSONArraySeparator() error {
+	jsonInputReader.expectedByte = JSON_ARRAY_SEP
+	if jsonInputReader.numProcessed == 0 {
+		jsonInputReader.expectedByte = JSON_ARRAY_START
 	}
 
 	var readByte byte
 	scanp := 0
-	jsonImporter.separatorReader = io.MultiReader(jsonImporter.Decoder.Buffered(), jsonImporter.Decoder.R)
-	for readByte != jsonImporter.expectedByte {
-		n, err := jsonImporter.separatorReader.Read(jsonImporter.bytesFromReader)
+	jsonInputReader.separatorReader = io.MultiReader(
+		jsonInputReader.Decoder.Buffered(),
+		jsonInputReader.Decoder.R,
+	)
+	for readByte != jsonInputReader.expectedByte {
+		n, err := jsonInputReader.separatorReader.Read(jsonInputReader.bytesFromReader)
 		scanp += n
 		if n == 0 || err != nil {
 			if err == io.EOF {
@@ -112,21 +168,21 @@ func (jsonImporter *JSONImportInput) readJSONArraySeparator() error {
 			}
 			return err
 		}
-		readByte = jsonImporter.bytesFromReader[0]
+		readByte = jsonInputReader.bytesFromReader[0]
 
 		if readByte == JSON_ARRAY_END {
 			// if we read the end of the JSON array, ensure we have no other
 			// non-whitespace characters at the end of the array
 			for {
-				_, err = jsonImporter.separatorReader.Read(jsonImporter.bytesFromReader)
+				_, err = jsonInputReader.separatorReader.Read(jsonInputReader.bytesFromReader)
 				if err != nil {
 					// takes care of the '[]' case
-					if !jsonImporter.readOpeningBracket {
+					if !jsonInputReader.readOpeningBracket {
 						return ErrNoOpeningBracket
 					}
 					return err
 				}
-				readString := string(jsonImporter.bytesFromReader[0])
+				readString := string(jsonInputReader.bytesFromReader[0])
 				if strings.TrimSpace(readString) != "" {
 					return fmt.Errorf("bad JSON array format - found '%v' "+
 						"after '%v' in input source", readString,
@@ -141,7 +197,7 @@ func (jsonImporter *JSONImportInput) readJSONArraySeparator() error {
 			strings.TrimSpace(string(readByte)) == "" ||
 			readByte == JSON_ARRAY_START ||
 			readByte == JSON_ARRAY_END) {
-			if jsonImporter.expectedByte == JSON_ARRAY_START {
+			if jsonInputReader.expectedByte == JSON_ARRAY_START {
 				return ErrNoOpeningBracket
 			}
 			return fmt.Errorf("bad JSON array format - found '%v' outside "+
@@ -149,50 +205,11 @@ func (jsonImporter *JSONImportInput) readJSONArraySeparator() error {
 		}
 	}
 	// adjust the buffer to account for read bytes
-	if scanp < len(jsonImporter.Decoder.Buf) {
-		jsonImporter.Decoder.Buf = jsonImporter.Decoder.Buf[scanp:]
+	if scanp < len(jsonInputReader.Decoder.Buf) {
+		jsonInputReader.Decoder.Buf = jsonInputReader.Decoder.Buf[scanp:]
 	} else {
-		jsonImporter.Decoder.Buf = []byte{}
+		jsonInputReader.Decoder.Buf = []byte{}
 	}
-	jsonImporter.readOpeningBracket = true
+	jsonInputReader.readOpeningBracket = true
 	return nil
-}
-
-// ImportDocument converts the given JSON object to a BSON object
-func (jsonImporter *JSONImportInput) ImportDocument() (bson.M, error) {
-	if jsonImporter.IsArray {
-		if err := jsonImporter.readJSONArraySeparator(); err != nil {
-			if err == io.EOF {
-				return nil, err
-			}
-			jsonImporter.numProcessed++
-			return nil, fmt.Errorf("error reading separator after document #%v: %v", jsonImporter.numProcessed, err)
-		}
-	}
-	jsonImporter.numProcessed++
-	document := bson.M{}
-	if err := jsonImporter.Decoder.Decode(&document); err != nil {
-		if err == io.EOF {
-			return nil, err
-		}
-		return nil, fmt.Errorf("JSON decode error on document #%v: %v", jsonImporter.numProcessed, err)
-	}
-	log.Logf(2, "got line: %#v", document)
-
-	// convert any data produced by mongoexport to the appropriate underlying
-	// extended BSON type. NOTE: this assumes specially formated JSON values
-	// in the input JSON - values such as:
-	//
-	// { $oid: 53cefc71b14ed89d84856287 }
-	//
-	// should be interpreted as:
-	//
-	// ObjectId("53cefc71b14ed89d84856287")
-	//
-	// This applies for all the other extended JSON types MongoDB supports
-	if err := bsonutil.ConvertJSONDocumentToBSON(document); err != nil {
-		return nil, fmt.Errorf("JSON => BSON conversion error on document #%v: %v", jsonImporter.numProcessed, err)
-	}
-	log.Logf(3, "got extended line: %#v", document)
-	return document, nil
 }

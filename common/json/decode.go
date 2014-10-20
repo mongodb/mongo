@@ -79,6 +79,34 @@ func Unmarshal(data []byte, v interface{}) error {
 	return d.unmarshal(v)
 }
 
+func UnmarshalMap(data []byte) (map[string]interface{}, error) {
+	// Check for well-formedness.
+	// Avoids filling out half a data structure
+	// before discovering a JSON syntax error.
+	var d decodeState
+	err := checkValid(data, &d.scan)
+	if err != nil {
+		return nil, err
+	}
+
+	d.init(data)
+	return d.unmarshalMap()
+}
+
+func UnmarshalBsonD(data []byte) (bson.D, error) {
+	// Check for well-formedness.
+	// Avoids filling out half a data structure
+	// before discovering a JSON syntax error.
+	var d decodeState
+	err := checkValid(data, &d.scan)
+	if err != nil {
+		return nil, err
+	}
+
+	d.init(data)
+	return d.unmarshalBsonD()
+}
+
 // Unmarshaler is the interface implemented by objects
 // that can unmarshal a JSON description of themselves.
 // The input can be assumed to be a valid encoding of
@@ -127,6 +155,42 @@ func (e *InvalidUnmarshalError) Error() string {
 		return "json: Unmarshal(non-pointer " + e.Type.String() + ")"
 	}
 	return "json: Unmarshal(nil " + e.Type.String() + ")"
+}
+
+func (d *decodeState) unmarshalMap() (out map[string]interface{}, err error) {
+	defer func() {
+		if r := recover(); r != nil {
+			if _, ok := r.(runtime.Error); ok {
+				panic(r)
+			}
+			err = r.(error)
+		}
+	}()
+
+	d.scan.reset()
+	// We decode rv not rv.Elem because the Unmarshaler interface
+	// test must be applied at the top level of the value.
+	out = d.document()
+	return out, d.savedError
+}
+
+func (d *decodeState) unmarshalBsonD() (out bson.D, err error) {
+	defer func() {
+		if r := recover(); r != nil {
+			if _, ok := r.(runtime.Error); ok {
+				panic(r)
+			}
+			err = r.(error)
+		}
+	}()
+
+	d.scan.reset()
+	// We decode rv not rv.Elem because the Unmarshaler interface
+	// test must be applied at the top level of the value.
+	out = d.bsonDocument()
+	//return d.document()
+	return out, d.savedError
+	//return d.savedError
 }
 
 func (d *decodeState) unmarshal(v interface{}) (err error) {
@@ -275,6 +339,26 @@ func (d *decodeState) scanWhile(op int) int {
 		}
 	}
 	return newOp
+}
+
+func (d *decodeState) document() map[string]interface{} {
+	switch op := d.scanWhile(scanSkipSpace); op {
+	default:
+		d.error(errPhase)
+		return nil
+	case scanBeginObject:
+		return d.objectInterface()
+	}
+}
+
+func (d *decodeState) bsonDocument() bson.D {
+	switch op := d.scanWhile(scanSkipSpace); op {
+	default:
+		d.error(errPhase)
+		return nil
+	case scanBeginObject:
+		return d.bsonDInterface()
+	}
 }
 
 // value decodes a JSON value from d.data[d.off:] into the value.
@@ -925,6 +1009,52 @@ func (d *decodeState) arrayInterface() []interface{} {
 		}
 	}
 	return v
+}
+
+// bsonDInterface is like object but returns bson.D{}.
+func (d *decodeState) bsonDInterface() bson.D {
+	m := bson.D{}
+	for {
+		// Read opening " of string key or closing }.
+		op := d.scanWhile(scanSkipSpace)
+		if op == scanEndObject {
+			// closing } - can only happen on first iteration.
+			break
+		}
+		if op != scanBeginLiteral {
+			d.error(errPhase)
+		}
+
+		// Read string key.
+		start := d.off - 1
+		op = d.scanWhile(scanContinue)
+		item := d.data[start : d.off-1]
+		key, ok := maybeUnquote(item)
+		if !ok {
+			d.error(errPhase)
+		}
+
+		// Read : before value.
+		if op == scanSkipSpace {
+			op = d.scanWhile(scanSkipSpace)
+		}
+		if op != scanObjectKey {
+			d.error(errPhase)
+		}
+
+		// Read value.
+		m = append(m, bson.DocElem{key, d.valueInterface()})
+
+		// Next token must be , or }.
+		op = d.scanWhile(scanSkipSpace)
+		if op == scanEndObject {
+			break
+		}
+		if op != scanObjectValue {
+			d.error(errPhase)
+		}
+	}
+	return m
 }
 
 // objectInterface is like object but returns map[string]interface{}.

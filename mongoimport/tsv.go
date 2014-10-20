@@ -3,11 +3,8 @@ package mongoimport
 import (
 	"bufio"
 	"fmt"
-	"github.com/mongodb/mongo-tools/common/log"
-	"github.com/mongodb/mongo-tools/common/util"
 	"gopkg.in/mgo.v2/bson"
 	"io"
-	"strconv"
 	"strings"
 )
 
@@ -16,46 +13,57 @@ const (
 	tokenSeparator = "\t"
 )
 
-// TSVImportInput is a struct that implements the ImportInput interface for a
+// TSVInputReader is a struct that implements the InputReader interface for a
 // TSV input source
-type TSVImportInput struct {
+type TSVInputReader struct {
 	// Fields is a list of field names in the BSON documents to be imported
 	Fields []string
 	// tsvReader is the underlying reader used to read data in from the TSV
 	// or TSV file
 	tsvReader *bufio.Reader
-	// numProcessed indicates the number of CSV documents processed
-	numProcessed int64
+	// tsvRecord stores each line of input we read from the underlying reader
+	tsvRecord string
+	// numProcessed tracks the number of TSV records processed by the underlying
+	// reader
+	numProcessed uint64
 }
 
-// NewTSVImportInput returns a TSVImportInput configured to read input from the
+// TSVConvertibleDoc implements the ConvertibleDoc interface for TSV input
+type TSVConvertibleDoc struct {
+	fields       []string
+	data         string
+	numProcessed *uint64
+}
+
+// NewTSVInputReader returns a TSVInputReader configured to read input from the
 // given io.Reader, extracting the specified fields only.
-func NewTSVImportInput(fields []string, in io.Reader) *TSVImportInput {
-	return &TSVImportInput{
-		Fields:    fields,
-		tsvReader: bufio.NewReader(in),
+func NewTSVInputReader(fields []string, in io.Reader) *TSVInputReader {
+	return &TSVInputReader{
+		Fields:       fields,
+		tsvReader:    bufio.NewReader(in),
+		numProcessed: uint64(0),
 	}
 }
 
 // SetHeader sets the header field for a TSV
-func (tsvImporter *TSVImportInput) SetHeader(hasHeaderLine bool) (err error) {
-	fields, err := validateHeaders(tsvImporter, hasHeaderLine)
+func (tsvInputReader *TSVInputReader) SetHeader(hasHeaderLine bool) (err error) {
+	fields, err := validateHeaders(tsvInputReader, hasHeaderLine)
 	if err != nil {
 		return err
 	}
-	tsvImporter.Fields = fields
+	tsvInputReader.Fields = fields
 	return nil
 }
 
 // GetHeaders returns the current header fields for a TSV importer
-func (tsvImporter *TSVImportInput) GetHeaders() []string {
-	return tsvImporter.Fields
+func (tsvInputReader *TSVInputReader) GetHeaders() []string {
+	return tsvInputReader.Fields
 }
 
 // ReadHeadersFromSource reads the header field from the TSV importer's reader
-func (tsvImporter *TSVImportInput) ReadHeadersFromSource() ([]string, error) {
+func (tsvInputReader *TSVInputReader) ReadHeadersFromSource() ([]string, error) {
 	unsortedHeaders := []string{}
-	stringHeaders, err := tsvImporter.tsvReader.ReadString(entryDelimiter)
+	stringHeaders, err := tsvInputReader.tsvReader.ReadString(entryDelimiter)
 	if err != nil {
 		return nil, err
 	}
@@ -66,42 +74,49 @@ func (tsvImporter *TSVImportInput) ReadHeadersFromSource() ([]string, error) {
 	return unsortedHeaders, nil
 }
 
-// ImportDocument reads a line of input with the TSV representation of a
-// document and returns the BSON equivalent.
-func (tsvImporter *TSVImportInput) ImportDocument() (bson.M, error) {
-	tsvImporter.numProcessed++
-	tsvRecord, err := tsvImporter.tsvReader.ReadString(entryDelimiter)
-	if err != nil {
-		if err == io.EOF {
-			return nil, err
-		}
-		return nil, fmt.Errorf("read error on entry #%v: %v", tsvImporter.numProcessed, err)
-	}
-	log.Logf(2, "got line: %v", tsvRecord)
+// StreamDocument takes in two channels: it sends processed documents on the
+// readChan channel and if any error is encountered, the error is sent on the
+// errChan channel. It keeps reading from the underlying input source until it
+// hits EOF or an error. If ordered is true, it streams the documents in which
+// the documents are read
+func (tsvInputReader *TSVInputReader) StreamDocument(ordered bool, readChan chan bson.D, errChan chan error) {
+	tsvRecordChan := make(chan ConvertibleDoc, numProcessingThreads)
+	var err error
 
-	// strip the trailing '\r\n' from ReadString
-	if len(tsvRecord) != 0 {
-		tsvRecord = strings.TrimRight(tsvRecord, "\r\n")
-	}
-	tokens := strings.Split(tsvRecord, tokenSeparator)
-	document := bson.M{}
-	var key string
-	for index, token := range tokens {
-		parsedValue := getParsedValue(token)
-		if index < len(tsvImporter.Fields) {
-			if strings.Contains(tsvImporter.Fields[index], ".") {
-				setNestedValue(tsvImporter.Fields[index], parsedValue, document)
-			} else {
-				document[tsvImporter.Fields[index]] = parsedValue
+	go func() {
+		for {
+			tsvInputReader.tsvRecord, err = tsvInputReader.tsvReader.ReadString(entryDelimiter)
+			if err != nil {
+				close(tsvRecordChan)
+				if err == io.EOF {
+					errChan <- err
+				} else {
+					tsvInputReader.numProcessed++
+					errChan <- fmt.Errorf("read error on entry #%v: %v", tsvInputReader.numProcessed, err)
+				}
+				return
 			}
-		} else {
-			key = "field" + strconv.Itoa(index)
-			if util.StringSliceContains(tsvImporter.Fields, key) {
-				return document, fmt.Errorf("Duplicate header name - on %v - for token #%v ('%v') in document #%v",
-					key, index+1, parsedValue, tsvImporter.numProcessed)
+			tsvRecordChan <- TSVConvertibleDoc{
+				fields:       tsvInputReader.Fields,
+				data:         tsvInputReader.tsvRecord,
+				numProcessed: &tsvInputReader.numProcessed,
 			}
-			document[key] = parsedValue
+			tsvInputReader.numProcessed++
 		}
-	}
-	return document, nil
+	}()
+	streamDocuments(ordered, tsvRecordChan, readChan, errChan)
+}
+
+// This is required to satisfy the ConvertibleDoc interface for TSV input. It
+// does TSV-specific processing to convert the TSVConvertibleDoc to a bson.D
+func (tsvConvertibleDoc TSVConvertibleDoc) Convert() (bson.D, error) {
+	tsvTokens := strings.Split(
+		strings.TrimRight(tsvConvertibleDoc.data, "\r\n"),
+		tokenSeparator,
+	)
+	return tokensToBSON(
+		tsvConvertibleDoc.fields,
+		tsvTokens,
+		*tsvConvertibleDoc.numProcessed,
+	)
 }

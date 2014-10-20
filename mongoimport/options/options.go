@@ -11,7 +11,7 @@ type InputOptions struct {
 	JSONArray bool `long:"jsonArray" description:"output to a JSON array rather than one object per line"`
 
 	// Specifies the file type to import. The default format is JSON, but it’s possible to import CSV and TSV files.
-	Type string `long:"type" default:"json" description:"type of file to import (JSON, CSV, TSV only)"`
+	Type string `long:"type" default:"json" description:"type of file to import (json, csv, tsv only)"`
 
 	// Specifies the location and name of a file containing the data to import.
 	// If you do not specify a file, mongoimport reads data from standard input (e.g. “stdin”).
@@ -19,7 +19,7 @@ type InputOptions struct {
 
 	// If using --type csv or --type tsv, uses the first line as field names.
 	// Otherwise, mongoimport will import the first line as a distinct document.
-	HeaderLine bool `long:"headerline" description:"first line in input file is a header (CSV and TSV only)"`
+	HeaderLine bool `long:"headerline" description:"if given, the first line in input file will be used as the field list (csv and tsv only)"`
 }
 
 func (self *InputOptions) Name() string {
@@ -49,7 +49,28 @@ type IngestOptions struct {
 
 	// Forces mongoimport to halt the import operation at the first error
 	// rather than continuing the operation despite errors.
-	StopOnError bool `long:"stopOnError" description:"insert or update objects that already exist"`
+	StopOnError bool `long:"stopOnError" description:"stop importing at first error rather than continuing"`
+
+	/*	CPU and Network I/O related configurations	*/
+
+	// Specifies the number of operating system threads to use during the import process
+	MaintainInsertionOrder bool `long:"maintainInsertionOrder" description:"if given, documents should be inserted in the order of their appearance in the input source"`
+
+	// Specifies the number of operating system threads to use during the import process
+	NumOSThreads *int `long:"numOsThreads" description:"number of operating system threads to use (defaults to the number of logical CPUs)"`
+
+	// Specifies the number of threads to use in processing data read from the input source
+	NumProcessingThreads *int `long:"numProcessingThreads" description:"number of threads to use in processing data (defaults to the number of logical CPUs)"`
+
+	// Specifies the number of threads to use in sending processed data over to the server
+	NumIngestionThreads *int `long:"numIngestionThreads" description:"number of threads to use in ingesting data (defaults to the number of logical CPUs)"`
+
+	// Specifies the maximum number of documents in each batch sent over to the server
+	BatchSize *int `long:"batchSize" default:"1000" description:"number of documents to insert in a single batch"`
+
+	// Specifies the write concern for each write operation that mongorestore writes to the target database.
+	// By default, mongoimport waits for a majority of members from the replica set to respond before returning.
+	WriteConcern *int `long:"w" description:"minimum number of replicas per write"`
 }
 
 func (self *IngestOptions) Name() string {

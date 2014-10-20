@@ -2,92 +2,105 @@ package mongoimport
 
 import (
 	"fmt"
-	"github.com/mongodb/mongo-tools/common/log"
-	"github.com/mongodb/mongo-tools/common/util"
 	"github.com/mongodb/mongo-tools/mongoimport/csv"
 	"gopkg.in/mgo.v2/bson"
 	"io"
-	"strconv"
-	"strings"
 )
 
-// CSVImportInput is a struct that implements the ImportInput interface for a
+// CSVInputReader is a struct that implements the InputReader interface for a
 // CSV input source
-type CSVImportInput struct {
+type CSVInputReader struct {
 	// Fields is a list of field names in the BSON documents to be imported
 	Fields []string
 	// csvReader is the underlying reader used to read data in from the CSV
-	// or TSV file
+	// or CSV file
 	csvReader *csv.Reader
-	// numProcessed indicates the number of CSV documents processed
-	numProcessed int64
+	// csvRecord stores each line of input we read from the underlying reader
+	csvRecord []string
+	// numProcessed tracks the number of CSV records processed by the underlying
+	// reader
+	numProcessed uint64
 }
 
-// NewCSVImportInput returns a CSVImportInput configured to read input from the
+// CSVConvertibleDoc implements the ConvertibleDoc interface for CSV input
+type CSVConvertibleDoc struct {
+	fields, data []string
+	numProcessed *uint64
+}
+
+// NewCSVInputReader returns a CSVInputReader configured to read input from the
 // given io.Reader, extracting the specified fields only.
-func NewCSVImportInput(fields []string, in io.Reader) *CSVImportInput {
+func NewCSVInputReader(fields []string, in io.Reader) *CSVInputReader {
 	csvReader := csv.NewReader(in)
 	// allow variable number of fields in document
 	csvReader.FieldsPerRecord = -1
 	csvReader.TrimLeadingSpace = true
-	return &CSVImportInput{
-		Fields:    fields,
-		csvReader: csvReader,
+	return &CSVInputReader{
+		Fields:       fields,
+		csvReader:    csvReader,
+		numProcessed: uint64(0),
 	}
 }
 
 // SetHeader sets the header field for a CSV
-func (csvImporter *CSVImportInput) SetHeader(hasHeaderLine bool) (err error) {
-	fields, err := validateHeaders(csvImporter, hasHeaderLine)
+func (csvInputReader *CSVInputReader) SetHeader(hasHeaderLine bool) (err error) {
+	fields, err := validateHeaders(csvInputReader, hasHeaderLine)
 	if err != nil {
 		return err
 	}
-	csvImporter.Fields = fields
+	csvInputReader.Fields = fields
 	return nil
 }
 
 // GetHeaders returns the current header fields for a CSV importer
-func (csvImporter *CSVImportInput) GetHeaders() []string {
-	return csvImporter.Fields
+func (csvInputReader *CSVInputReader) GetHeaders() []string {
+	return csvInputReader.Fields
 }
 
 // ReadHeadersFromSource reads the header field from the CSV importer's reader
-func (csvImporter *CSVImportInput) ReadHeadersFromSource() ([]string, error) {
-	return csvImporter.csvReader.Read()
+func (csvInputReader *CSVInputReader) ReadHeadersFromSource() ([]string, error) {
+	return csvInputReader.csvReader.Read()
 }
 
-// ImportDocument reads a line of input with the CSV representation of a doc and
-// returns the BSON equivalent.
-func (csvImporter *CSVImportInput) ImportDocument() (bson.M, error) {
-	csvImporter.numProcessed++
-	tokens, err := csvImporter.csvReader.Read()
-	if err != nil {
-		if err == io.EOF {
-			return nil, err
-		}
-		return nil, fmt.Errorf("read error on entry #%v: %v", csvImporter.numProcessed, err)
-	}
-	log.Logf(2, "got line: %v", strings.Join(tokens, ","))
-	var key string
-	document := bson.M{}
-	for index, token := range tokens {
-		parsedValue := getParsedValue(token)
-		if index < len(csvImporter.Fields) {
-			// for nested fields - in the form "a.b.c", ensure
-			// that the value is set accordingly
-			if strings.Contains(csvImporter.Fields[index], ".") {
-				setNestedValue(csvImporter.Fields[index], parsedValue, document)
-			} else {
-				document[csvImporter.Fields[index]] = parsedValue
+// StreamDocument takes in two channels: it sends processed documents on the
+// readChan channel and if any error is encountered, the error is sent on the
+// errChan channel. It keeps reading from the underlying input source until it
+// hits EOF or an error. If ordered is true, it streams the documents in which
+// the documents are read
+func (csvInputReader *CSVInputReader) StreamDocument(ordered bool, readChan chan bson.D, errChan chan error) {
+	csvRecordChan := make(chan ConvertibleDoc, numProcessingThreads)
+	var err error
+
+	go func() {
+		for {
+			csvInputReader.csvRecord, err = csvInputReader.csvReader.Read()
+			if err != nil {
+				close(csvRecordChan)
+				if err == io.EOF {
+					errChan <- err
+				} else {
+					csvInputReader.numProcessed++
+					errChan <- fmt.Errorf("read error on entry #%v: %v", csvInputReader.numProcessed, err)
+				}
+				return
 			}
-		} else {
-			key = "field" + strconv.Itoa(index)
-			if util.StringSliceContains(csvImporter.Fields, key) {
-				return document, fmt.Errorf("Duplicate header name - on %v - for token #%v ('%v') in document #%v",
-					key, index+1, parsedValue, csvImporter.numProcessed)
+			csvRecordChan <- CSVConvertibleDoc{
+				fields:       csvInputReader.Fields,
+				data:         csvInputReader.csvRecord,
+				numProcessed: &csvInputReader.numProcessed,
 			}
-			document[key] = parsedValue
+			csvInputReader.numProcessed++
 		}
-	}
-	return document, nil
+	}()
+	streamDocuments(ordered, csvRecordChan, readChan, errChan)
+}
+
+// This is required to satisfy the ConvertibleDoc interface for CSV input. It
+// does CSV-specific processing to convert the CSVConvertibleDoc to a bson.D
+func (csvConvertibleDoc CSVConvertibleDoc) Convert() (bson.D, error) {
+	return tokensToBSON(
+		csvConvertibleDoc.fields,
+		csvConvertibleDoc.data,
+		*csvConvertibleDoc.numProcessed,
+	)
 }

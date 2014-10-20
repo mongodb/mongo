@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"github.com/mongodb/mongo-tools/common/db"
 	commonOpts "github.com/mongodb/mongo-tools/common/options"
-	"github.com/mongodb/mongo-tools/common/testutil"
 	"github.com/mongodb/mongo-tools/mongoimport/options"
 	. "github.com/smartystreets/goconvey/convey"
 	"gopkg.in/mgo.v2/bson"
@@ -21,12 +20,77 @@ var (
 	testServer     = "localhost"
 	testPort       = "27017"
 
-	sessionProvider *db.SessionProvider
+	ssl = &commonOpts.SSL{
+		UseSSL: false,
+	}
+	namespace = &commonOpts.Namespace{
+		DB:         testDB,
+		Collection: testCollection,
+	}
+	connection = &commonOpts.Connection{
+		Host: testServer,
+		Port: testPort,
+	}
+	toolOptions = &commonOpts.ToolOptions{
+		SSL:        ssl,
+		Namespace:  namespace,
+		Connection: connection,
+		Auth:       &commonOpts.Auth{},
+	}
+	sessionProvider = db.NewSessionProvider(*toolOptions)
 )
 
-func TestMongoImportValidateSettings(t *testing.T) {
-	testutil.VerifyTestType(t, testutil.UNIT_TEST_TYPE)
+// checkOnlyHasDocuments returns an error if the documents in the test
+// collection don't exactly match those that are passed in
+func checkOnlyHasDocuments(expectedDocuments []bson.M) error {
+	session, err := sessionProvider.GetSession()
+	if err != nil {
+		return err
+	}
+	defer session.Close()
 
+	collection := session.DB(testDB).C(testCollection)
+	dbDocuments := []bson.M{}
+	err = collection.Find(nil).Sort("_id").All(&dbDocuments)
+	if err != nil {
+		return err
+	}
+	if len(dbDocuments) != len(expectedDocuments) {
+		return fmt.Errorf("document count mismatch: expected %#v, got %#v",
+			len(expectedDocuments), len(dbDocuments))
+	}
+	for index := range dbDocuments {
+		if !reflect.DeepEqual(dbDocuments[index], expectedDocuments[index]) {
+			return fmt.Errorf("document mismatch: expected %#v, got %#v",
+				expectedDocuments[index], dbDocuments[index])
+		}
+	}
+	return nil
+}
+
+// getBasicToolOptions returns a test helper to instantiate the session provider
+// for calls to StreamDocument
+func getBasicToolOptions() *commonOpts.ToolOptions {
+	ssl := &commonOpts.SSL{
+		UseSSL: false,
+	}
+	namespace := &commonOpts.Namespace{
+		DB:         testDB,
+		Collection: testCollection,
+	}
+	connection := &commonOpts.Connection{
+		Host: testServer,
+		Port: testPort,
+	}
+	return &commonOpts.ToolOptions{
+		SSL:        ssl,
+		Namespace:  namespace,
+		Connection: connection,
+		Auth:       &commonOpts.Auth{},
+	}
+}
+
+func TestMongoImportValidateSettings(t *testing.T) {
 	Convey("Given a mongoimport instance for validation, ", t, func() {
 		Convey("an error should be thrown if no database is given", func() {
 			namespace := &commonOpts.Namespace{}
@@ -224,10 +288,8 @@ func TestMongoImportValidateSettings(t *testing.T) {
 	})
 }
 
-func TestGetInputReader(t *testing.T) {
-	testutil.VerifyTestType(t, testutil.UNIT_TEST_TYPE)
-
-	Convey("Given a mongoimport instance, on calling getInputReader", t,
+func TestGetSourceReader(t *testing.T) {
+	Convey("Given a mongoimport instance, on calling getSourceReader", t,
 		func() {
 			Convey("an error should be thrown if the given file referenced by "+
 				"the reader does not exist", func() {
@@ -237,7 +299,7 @@ func TestGetInputReader(t *testing.T) {
 				mongoImport := MongoImport{
 					InputOptions: inputOptions,
 				}
-				_, err := mongoImport.getInputReader()
+				_, err := mongoImport.getSourceReader()
 				So(err, ShouldNotBeNil)
 			})
 
@@ -248,7 +310,7 @@ func TestGetInputReader(t *testing.T) {
 				mongoImport := MongoImport{
 					InputOptions: inputOptions,
 				}
-				_, err := mongoImport.getInputReader()
+				_, err := mongoImport.getSourceReader()
 				So(err, ShouldBeNil)
 			})
 
@@ -259,37 +321,14 @@ func TestGetInputReader(t *testing.T) {
 				mongoImport := MongoImport{
 					InputOptions: inputOptions,
 				}
-				_, err := mongoImport.getInputReader()
+				_, err := mongoImport.getSourceReader()
 				So(err, ShouldBeNil)
 			})
 		})
 }
 
-func TestRemoveBlankFields(t *testing.T) {
-	testutil.VerifyTestType(t, testutil.UNIT_TEST_TYPE)
-
-	Convey("Given an unordered BSON document", t, func() {
-		Convey("the same document should be returned if there are no blanks",
-			func() {
-				bsonDocument := bson.M{"a": 3, "b": "hello"}
-				newDocument := removeBlankFields(bsonDocument)
-				So(bsonDocument, ShouldResemble, newDocument)
-			})
-		Convey("a new document without blanks should be returned if there are "+
-			" blanks", func() {
-			bsonDocument := bson.M{"a": 3, "b": ""}
-			newDocument := removeBlankFields(bsonDocument)
-			expectedDocument := bson.M{"a": 3}
-			So(newDocument, ShouldResemble, expectedDocument)
-		})
-
-	})
-}
-
-func TestGetImportInput(t *testing.T) {
-	testutil.VerifyTestType(t, testutil.UNIT_TEST_TYPE)
-
-	Convey("Given a io.Reader on calling getImportInput", t, func() {
+func TestGetInputReader(t *testing.T) {
+	Convey("Given a io.Reader on calling getInputReader", t, func() {
 		Convey("no error should be thrown if neither --fields nor --fieldFile "+
 			"is used", func() {
 			inputOptions := &options.InputOptions{
@@ -298,7 +337,7 @@ func TestGetImportInput(t *testing.T) {
 			mongoImport := MongoImport{
 				InputOptions: inputOptions,
 			}
-			_, err := mongoImport.getImportInput(&os.File{})
+			_, err := mongoImport.getInputReader(&os.File{})
 			So(err, ShouldBeNil)
 		})
 		Convey("no error should be thrown if --fields is used", func() {
@@ -309,7 +348,7 @@ func TestGetImportInput(t *testing.T) {
 			mongoImport := MongoImport{
 				InputOptions: inputOptions,
 			}
-			_, err := mongoImport.getImportInput(&os.File{})
+			_, err := mongoImport.getInputReader(&os.File{})
 			So(err, ShouldBeNil)
 		})
 		Convey("no error should be thrown if --fieldFile is used and it "+
@@ -320,7 +359,7 @@ func TestGetImportInput(t *testing.T) {
 			mongoImport := MongoImport{
 				InputOptions: inputOptions,
 			}
-			_, err := mongoImport.getImportInput(&os.File{})
+			_, err := mongoImport.getInputReader(&os.File{})
 			So(err, ShouldBeNil)
 		})
 		Convey("an error should be thrown if --fieldFile is used and it "+
@@ -331,7 +370,7 @@ func TestGetImportInput(t *testing.T) {
 			mongoImport := MongoImport{
 				InputOptions: inputOptions,
 			}
-			_, err := mongoImport.getImportInput(&os.File{})
+			_, err := mongoImport.getInputReader(&os.File{})
 			So(err, ShouldNotBeNil)
 		})
 		Convey("no error should be thrown for CSV import inputs", func() {
@@ -341,7 +380,7 @@ func TestGetImportInput(t *testing.T) {
 			mongoImport := MongoImport{
 				InputOptions: inputOptions,
 			}
-			_, err := mongoImport.getImportInput(&os.File{})
+			_, err := mongoImport.getInputReader(&os.File{})
 			So(err, ShouldBeNil)
 		})
 		Convey("no error should be thrown for TSV import inputs", func() {
@@ -351,7 +390,7 @@ func TestGetImportInput(t *testing.T) {
 			mongoImport := MongoImport{
 				InputOptions: inputOptions,
 			}
-			_, err := mongoImport.getImportInput(&os.File{})
+			_, err := mongoImport.getInputReader(&os.File{})
 			So(err, ShouldBeNil)
 		})
 		Convey("no error should be thrown for JSON import inputs", func() {
@@ -361,17 +400,18 @@ func TestGetImportInput(t *testing.T) {
 			mongoImport := MongoImport{
 				InputOptions: inputOptions,
 			}
-			_, err := mongoImport.getImportInput(&os.File{})
+			_, err := mongoImport.getInputReader(&os.File{})
 			So(err, ShouldBeNil)
 		})
 	})
 }
 
 func TestImportDocuments(t *testing.T) {
-	testutil.VerifyTestType(t, testutil.INTEGRATION_TEST_TYPE)
-
 	Convey("Given a mongoimport instance with which to import documents, on "+
 		"calling importDocuments", t, func() {
+		batchSize := 1
+		numProcessingThreads := 1
+		numIngestionThreads := 1
 		Convey("no error should be thrown for CSV import on test data and all "+
 			"CSV data lines should be imported correctly", func() {
 			toolOptions := getBasicToolOptions()
@@ -380,10 +420,12 @@ func TestImportDocuments(t *testing.T) {
 				File:   "testdata/test.csv",
 				Fields: "a,b,c",
 			}
-			ingestOptions := &options.IngestOptions{}
-
-			var err error
-			sessionProvider, err = db.InitSessionProvider(*toolOptions)
+			ingestOptions := &options.IngestOptions{
+				BatchSize:            &batchSize,
+				NumProcessingThreads: &numProcessingThreads,
+				NumIngestionThreads:  &numIngestionThreads,
+			}
+			sessionProvider, err := db.InitSessionProvider(*toolOptions)
 			So(err, ShouldBeNil)
 			mongoImport := MongoImport{
 				ToolOptions:     toolOptions,
@@ -395,7 +437,6 @@ func TestImportDocuments(t *testing.T) {
 			So(err, ShouldBeNil)
 			So(numImported, ShouldEqual, 3)
 		})
-
 		Convey("TOOLS-247: no error should be thrown for JSON import on test "+
 			"data and all documents should be imported correctly", func() {
 			toolOptions := getBasicToolOptions()
@@ -403,11 +444,12 @@ func TestImportDocuments(t *testing.T) {
 				File: "testdata/test_plain2.json",
 			}
 			ingestOptions := &options.IngestOptions{
-				IgnoreBlanks: true,
+				IgnoreBlanks:         true,
+				BatchSize:            &batchSize,
+				NumProcessingThreads: &numProcessingThreads,
+				NumIngestionThreads:  &numIngestionThreads,
 			}
-
-			var err error
-			sessionProvider, err = db.InitSessionProvider(*toolOptions)
+			sessionProvider, err := db.InitSessionProvider(*toolOptions)
 			So(err, ShouldBeNil)
 			mongoImport := MongoImport{
 				ToolOptions:     toolOptions,
@@ -429,11 +471,13 @@ func TestImportDocuments(t *testing.T) {
 					Fields: "_id,b,c",
 				}
 				ingestOptions := &options.IngestOptions{
-					IgnoreBlanks: true,
+					IgnoreBlanks:           true,
+					BatchSize:              &batchSize,
+					NumProcessingThreads:   &numProcessingThreads,
+					NumIngestionThreads:    &numIngestionThreads,
+					MaintainInsertionOrder: true,
 				}
-
-				var err error
-				sessionProvider, err = db.InitSessionProvider(*toolOptions)
+				sessionProvider, err := db.InitSessionProvider(*toolOptions)
 				So(err, ShouldBeNil)
 				mongoImport := MongoImport{
 					ToolOptions:     toolOptions,
@@ -460,10 +504,13 @@ func TestImportDocuments(t *testing.T) {
 					File:   "testdata/test_blanks.csv",
 					Fields: "_id,b,c",
 				}
-				ingestOptions := &options.IngestOptions{}
-
-				var err error
-				sessionProvider, err = db.InitSessionProvider(*toolOptions)
+				ingestOptions := &options.IngestOptions{
+					BatchSize:              &batchSize,
+					NumProcessingThreads:   &numProcessingThreads,
+					NumIngestionThreads:    &numIngestionThreads,
+					MaintainInsertionOrder: true,
+				}
+				sessionProvider, err := db.InitSessionProvider(*toolOptions)
 				So(err, ShouldBeNil)
 				mongoImport := MongoImport{
 					ToolOptions:     toolOptions,
@@ -490,11 +537,13 @@ func TestImportDocuments(t *testing.T) {
 				Fields: "_id,b,c",
 			}
 			ingestOptions := &options.IngestOptions{
-				Upsert: true,
+				Upsert:                 true,
+				BatchSize:              &batchSize,
+				NumProcessingThreads:   &numProcessingThreads,
+				NumIngestionThreads:    &numIngestionThreads,
+				MaintainInsertionOrder: true,
 			}
-
-			var err error
-			sessionProvider, err = db.InitSessionProvider(*toolOptions)
+			sessionProvider, err := db.InitSessionProvider(*toolOptions)
 			So(err, ShouldBeNil)
 			mongoImport := MongoImport{
 				ToolOptions:     toolOptions,
@@ -522,11 +571,13 @@ func TestImportDocuments(t *testing.T) {
 					Fields: "_id,b,c",
 				}
 				ingestOptions := &options.IngestOptions{
-					StopOnError: true,
+					StopOnError:            true,
+					BatchSize:              &batchSize,
+					NumProcessingThreads:   &numProcessingThreads,
+					NumIngestionThreads:    &numIngestionThreads,
+					MaintainInsertionOrder: true,
 				}
-
-				var err error
-				sessionProvider, err = db.InitSessionProvider(*toolOptions)
+				sessionProvider, err := db.InitSessionProvider(*toolOptions)
 				So(err, ShouldBeNil)
 				mongoImport := MongoImport{
 					ToolOptions:     toolOptions,
@@ -552,10 +603,13 @@ func TestImportDocuments(t *testing.T) {
 				File:   "testdata/test_duplicate.csv",
 				Fields: "_id,b,c",
 			}
-			ingestOptions := &options.IngestOptions{}
-
-			var err error
-			sessionProvider, err = db.InitSessionProvider(*toolOptions)
+			ingestOptions := &options.IngestOptions{
+				BatchSize:              &batchSize,
+				NumProcessingThreads:   &numProcessingThreads,
+				NumIngestionThreads:    &numIngestionThreads,
+				MaintainInsertionOrder: true,
+			}
+			sessionProvider, err := db.InitSessionProvider(*toolOptions)
 			So(err, ShouldBeNil)
 			mongoImport := MongoImport{
 				ToolOptions:     toolOptions,
@@ -563,15 +617,16 @@ func TestImportDocuments(t *testing.T) {
 				IngestOptions:   ingestOptions,
 				SessionProvider: sessionProvider,
 			}
-			numImported, err := mongoImport.ImportDocuments()
+			_, err = mongoImport.ImportDocuments()
 			So(err, ShouldBeNil)
-			So(numImported, ShouldEqual, 4)
 			expectedDocuments := []bson.M{
 				bson.M{"_id": 1, "b": 2, "c": 3},
 				bson.M{"_id": 3, "b": 5.4, "c": "string"},
 				bson.M{"_id": 5, "b": 6, "c": 6},
 				bson.M{"_id": 8, "b": 6, "c": 6},
 			}
+			// all documents - except for the one with a duplicate _id - should
+			// be imported
 			So(checkOnlyHasDocuments(expectedDocuments), ShouldBeNil)
 		})
 		Convey("no error should be thrown for CSV import on test data with "+
@@ -583,11 +638,13 @@ func TestImportDocuments(t *testing.T) {
 				Fields: "_id,b,c",
 			}
 			ingestOptions := &options.IngestOptions{
-				Drop: true,
+				Drop:                   true,
+				BatchSize:              &batchSize,
+				NumProcessingThreads:   &numProcessingThreads,
+				NumIngestionThreads:    &numIngestionThreads,
+				MaintainInsertionOrder: true,
 			}
-
-			var err error
-			sessionProvider, err = db.InitSessionProvider(*toolOptions)
+			sessionProvider, err := db.InitSessionProvider(*toolOptions)
 			So(err, ShouldBeNil)
 			mongoImport := MongoImport{
 				ToolOptions:     toolOptions,
@@ -613,10 +670,12 @@ func TestImportDocuments(t *testing.T) {
 				File:       "testdata/test.csv",
 				HeaderLine: true,
 			}
-			ingestOptions := &options.IngestOptions{}
-
-			var err error
-			sessionProvider, err = db.InitSessionProvider(*toolOptions)
+			ingestOptions := &options.IngestOptions{
+				BatchSize:            &batchSize,
+				NumProcessingThreads: &numProcessingThreads,
+				NumIngestionThreads:  &numIngestionThreads,
+			}
+			sessionProvider, err := db.InitSessionProvider(*toolOptions)
 			So(err, ShouldBeNil)
 			mongoImport := MongoImport{
 				ToolOptions:     toolOptions,
@@ -639,9 +698,12 @@ func TestImportDocuments(t *testing.T) {
 				File:       csvFile.Name(),
 				HeaderLine: true,
 			}
-			ingestOptions := &options.IngestOptions{}
-
-			sessionProvider, err = db.InitSessionProvider(*toolOptions)
+			ingestOptions := &options.IngestOptions{
+				BatchSize:            &batchSize,
+				NumProcessingThreads: &numProcessingThreads,
+				NumIngestionThreads:  &numIngestionThreads,
+			}
+			sessionProvider, err := db.InitSessionProvider(*toolOptions)
 			So(err, ShouldBeNil)
 			mongoImport := MongoImport{
 				ToolOptions:     toolOptions,
@@ -662,12 +724,14 @@ func TestImportDocuments(t *testing.T) {
 				Fields: "_id,c,b",
 			}
 			ingestOptions := &options.IngestOptions{
-				Upsert:       true,
-				UpsertFields: "_id",
+				Upsert:                 true,
+				UpsertFields:           "_id",
+				BatchSize:              &batchSize,
+				NumProcessingThreads:   &numProcessingThreads,
+				NumIngestionThreads:    &numIngestionThreads,
+				MaintainInsertionOrder: true,
 			}
-
-			var err error
-			sessionProvider, err = db.InitSessionProvider(*toolOptions)
+			sessionProvider, err := db.InitSessionProvider(*toolOptions)
 			So(err, ShouldBeNil)
 			mongoImport := MongoImport{
 				ToolOptions:     toolOptions,
@@ -694,13 +758,15 @@ func TestImportDocuments(t *testing.T) {
 				Fields: "_id,b,c",
 			}
 			ingestOptions := &options.IngestOptions{
-				Upsert:       true,
-				UpsertFields: "_id",
+				Upsert:                 true,
+				UpsertFields:           "_id",
+				BatchSize:              &batchSize,
+				NumProcessingThreads:   &numProcessingThreads,
+				NumIngestionThreads:    &numIngestionThreads,
+				MaintainInsertionOrder: true,
 			}
 			toolOptions := getBasicToolOptions()
-
-			var err error
-			sessionProvider, err = db.InitSessionProvider(*toolOptions)
+			sessionProvider, err := db.InitSessionProvider(*toolOptions)
 			So(err, ShouldBeNil)
 			mongoImport := MongoImport{
 				ToolOptions:     toolOptions,
@@ -728,11 +794,13 @@ func TestImportDocuments(t *testing.T) {
 				Fields: "_id,b,c",
 			}
 			ingestOptions := &options.IngestOptions{
-				StopOnError: true,
+				StopOnError:            true,
+				BatchSize:              &batchSize,
+				NumProcessingThreads:   &numProcessingThreads,
+				NumIngestionThreads:    &numIngestionThreads,
+				MaintainInsertionOrder: true,
 			}
-
-			var err error
-			sessionProvider, err = db.InitSessionProvider(*toolOptions)
+			sessionProvider, err := db.InitSessionProvider(*toolOptions)
 			So(err, ShouldBeNil)
 			mongoImport := MongoImport{
 				ToolOptions:     toolOptions,
@@ -740,9 +808,8 @@ func TestImportDocuments(t *testing.T) {
 				IngestOptions:   ingestOptions,
 				SessionProvider: sessionProvider,
 			}
-			numImported, err := mongoImport.ImportDocuments()
+			_, err = mongoImport.ImportDocuments()
 			So(err, ShouldNotBeNil)
-			So(numImported, ShouldEqual, 3)
 			expectedDocuments := []bson.M{
 				bson.M{"_id": 1, "b": 2, "c": 3},
 				bson.M{"_id": 3, "b": 5.4, "c": "string"},
@@ -758,10 +825,14 @@ func TestImportDocuments(t *testing.T) {
 					Fields: "_id,b,c",
 				}
 				toolOptions := getBasicToolOptions()
-				ingestOptions := &options.IngestOptions{}
-
-				var err error
-				sessionProvider, err = db.InitSessionProvider(*toolOptions)
+				ingestOptions := &options.IngestOptions{
+					StopOnError:            true,
+					BatchSize:              &batchSize,
+					NumProcessingThreads:   &numProcessingThreads,
+					NumIngestionThreads:    &numIngestionThreads,
+					MaintainInsertionOrder: true,
+				}
+				sessionProvider, err := db.InitSessionProvider(*toolOptions)
 				So(err, ShouldBeNil)
 				mongoImport := MongoImport{
 					ToolOptions:     toolOptions,
@@ -769,9 +840,8 @@ func TestImportDocuments(t *testing.T) {
 					IngestOptions:   ingestOptions,
 					SessionProvider: sessionProvider,
 				}
-				numImported, err := mongoImport.ImportDocuments()
+				_, err = mongoImport.ImportDocuments()
 				So(err, ShouldNotBeNil)
-				So(numImported, ShouldEqual, 1)
 				expectedDocuments := []bson.M{
 					bson.M{"_id": 1, "b": 2, "c": 3},
 				}
@@ -785,55 +855,5 @@ func TestImportDocuments(t *testing.T) {
 			defer session.Close()
 			session.DB(testDB).C(testCollection).DropCollection()
 		})
-
 	})
-}
-
-// checkOnlyHasDocuments returns an error if the documents in the test
-// collection don't exactly match those that are passed in
-func checkOnlyHasDocuments(expectedDocuments []bson.M) error {
-	session, err := sessionProvider.GetSession()
-	if err != nil {
-		return err
-	}
-	defer session.Close()
-
-	collection := session.DB(testDB).C(testCollection)
-	dbDocuments := []bson.M{}
-	err = collection.Find(nil).Sort("_id").All(&dbDocuments)
-	if err != nil {
-		return err
-	}
-	if len(dbDocuments) != len(expectedDocuments) {
-		return fmt.Errorf("document count mismatch: expected %#v, got %#v",
-			len(expectedDocuments), len(dbDocuments))
-	}
-	for index := range dbDocuments {
-		if !reflect.DeepEqual(dbDocuments[index], expectedDocuments[index]) {
-			return fmt.Errorf("document mismatch: expected %#v, got %#v",
-				expectedDocuments[index], dbDocuments[index])
-		}
-	}
-	return nil
-}
-
-// getBasicToolOptions returns a test helper to instantiate the session provider
-// for calls to ImportDocument
-func getBasicToolOptions() *commonOpts.ToolOptions {
-	ssl := testutil.GetSSLOptions()
-
-	namespace := &commonOpts.Namespace{
-		DB:         testDB,
-		Collection: testCollection,
-	}
-	connection := &commonOpts.Connection{
-		Host: testServer,
-		Port: testPort,
-	}
-	return &commonOpts.ToolOptions{
-		SSL:        &ssl,
-		Namespace:  namespace,
-		Connection: connection,
-		Auth:       &commonOpts.Auth{},
-	}
 }

@@ -29,7 +29,7 @@ func main() {
 	}
 
 	log.SetVerbosity(opts.Verbosity)
-	
+
 	// print help, if specified
 	if opts.PrintHelp(false) {
 		return
@@ -46,28 +46,27 @@ func main() {
 	// create a session provider to connect to the db
 	sessionProvider := db.NewSessionProvider(*opts)
 
-	importer := mongoimport.MongoImport{
+	mongoImport := mongoimport.MongoImport{
 		ToolOptions:     opts,
 		InputOptions:    inputOpts,
 		IngestOptions:   ingestOpts,
 		SessionProvider: sessionProvider,
 	}
 
-	if err = importer.ValidateSettings(args); err != nil {
+	if err = mongoImport.ValidateSettings(args); err != nil {
 		log.Logf(0, "error validating settings: %v", err)
 		util.ExitFail()
 	}
 
-	numDocs, err := importer.ImportDocuments()
+	numDocs, err := mongoImport.ImportDocuments()
+	if err != nil {
+		log.Logf(0, "error importing documents: %v", err)
+	}
 	if !opts.Quiet {
 		message := fmt.Sprintf("imported 1 document")
 		if numDocs != 1 {
 			message = fmt.Sprintf("imported %v documents", numDocs)
 		}
 		log.Logf(0, message)
-	}
-	if err != nil {
-		log.Logf(0, "error importing documents: %v", err)
-		util.ExitFail()
 	}
 }
