@@ -251,8 +251,15 @@ namespace mongo {
         if (request->status == LockRequest::STATUS_NEW) {
             invariant(request->recursiveCount == 1);
 
+            // The flush lock must be FIFO ordered or else we will starve the dur threads and not
+            // block new writers. This means that if anyone is blocking on a mustFIFO resource we
+            // must get in line, even if we don't conflict with the grantedModes and could take the
+            // lock immediately.
+            const bool mustFIFO = (resId.getType() == RESOURCE_MMAPV1_FLUSH);
+
             // New lock request
-            if (conflicts(mode, lock->grantedModes)) {
+            if (conflicts(mode, lock->grantedModes)
+                    || (mustFIFO && conflicts(mode, lock->conflictModes))) {
                 request->status = LockRequest::STATUS_WAITING;
                 request->mode = mode;
                 request->convertMode = MODE_NONE;
