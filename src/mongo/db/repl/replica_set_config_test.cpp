@@ -768,6 +768,133 @@ namespace {
                       configA.checkIfWriteConcernCanBeSatisfied(invalidModeNotEnoughNodesWC));
     }
 
+    TEST(ReplicaSetConfig, CheckMaximumNodesOkay) {
+        ReplicaSetConfig configA;
+        ReplicaSetConfig configB;
+        ASSERT_OK(configA.initialize(
+                BSON("_id" << "rs0" <<
+                     "version" << 1 <<
+                     "members" << BSON_ARRAY(
+                            BSON("_id" << 0 << "host" << "node0") <<
+                            BSON("_id" << 1 << "host" << "node1") <<
+                            BSON("_id" << 2 << "host" << "node2") <<
+                            BSON("_id" << 3 << "host" << "node3") <<
+                            BSON("_id" << 4 << "host" << "node4") <<
+                            BSON("_id" << 5 << "host" << "node5") <<
+                            BSON("_id" << 6 << "host" << "node6") <<
+                            BSON("_id" << 7 << "host" << "node7" << "votes" << 0) <<
+                            BSON("_id" << 8 << "host" << "node8" << "votes" << 0) <<
+                            BSON("_id" << 9 << "host" << "node9" << "votes" << 0) <<
+                            BSON("_id" << 10 << "host" << "node10" << "votes" << 0) <<
+                            BSON("_id" << 11 << "host" << "node11" << "votes" << 0) <<
+                            BSON("_id" << 12 << "host" << "node12" << "votes" << 0) <<
+                            BSON("_id" << 13 << "host" << "node13" << "votes" << 0) <<
+                            BSON("_id" << 14 << "host" << "node14" << "votes" << 0) <<
+                            BSON("_id" << 15 << "host" << "node15" << "votes" << 0) <<
+                            BSON("_id" << 16 << "host" << "node16" << "votes" << 0) <<
+                            BSON("_id" << 17 << "host" << "node17" << "votes" << 0) <<
+                            BSON("_id" << 18 << "host" << "node18" << "votes" << 0) <<
+                            BSON("_id" << 19 << "host" << "node19" << "votes" << 0) <<
+                            BSON("_id" << 20 << "host" << "node20" << "votes" << 0) <<
+                            BSON("_id" << 21 << "host" << "node21" << "votes" << 0) <<
+                            BSON("_id" << 22 << "host" << "node22" << "votes" << 0) <<
+                            BSON("_id" << 23 << "host" << "node23" << "votes" << 0) <<
+                            BSON("_id" << 24 << "host" << "node24" << "votes" << 0) <<
+                            BSON("_id" << 25 << "host" << "node25" << "votes" << 0) <<
+                            BSON("_id" << 26 << "host" << "node26" << "votes" << 0) <<
+                            BSON("_id" << 27 << "host" << "node27" << "votes" << 0) <<
+                            BSON("_id" << 28 << "host" << "node28" << "votes" << 0) <<
+                            BSON("_id" << 29 << "host" << "node29" << "votes" << 0) <<
+                            BSON("_id" << 30 << "host" << "node30" << "votes" << 0) <<
+                            BSON("_id" << 31 << "host" << "node31" << "votes" << 0) <<
+                            BSON("_id" << 32 << "host" << "node32" << "votes" << 0) <<
+                            BSON("_id" << 33 << "host" << "node33" << "votes" << 0) <<
+                            BSON("_id" << 34 << "host" << "node34" << "votes" << 0) <<
+                            BSON("_id" << 35 << "host" << "node35" << "votes" << 0) <<
+                            BSON("_id" << 36 << "host" << "node36" << "votes" << 0) <<
+                            BSON("_id" << 37 << "host" << "node37" << "votes" << 0) <<
+                            BSON("_id" << 38 << "host" << "node38" << "votes" << 0) <<
+                            BSON("_id" << 39 << "host" << "node39" << "votes" << 0) <<
+                            BSON("_id" << 40 << "host" << "node40" << "votes" << 0) <<
+                            BSON("_id" << 41 << "host" << "node41" << "votes" << 0) <<
+                            BSON("_id" << 42 << "host" << "node42" << "votes" << 0) <<
+                            BSON("_id" << 43 << "host" << "node43" << "votes" << 0) <<
+                            BSON("_id" << 44 << "host" << "node44" << "votes" << 0) <<
+                            BSON("_id" << 45 << "host" << "node45" << "votes" << 0) <<
+                            BSON("_id" << 46 << "host" << "node46" << "votes" << 0) <<
+                            BSON("_id" << 47 << "host" << "node47" << "votes" << 0) <<
+                            BSON("_id" << 48 << "host" << "node48" << "votes" << 0) <<
+                            BSON("_id" << 49 << "host" << "node49" << "votes" << 0)))));
+        ASSERT_OK(configB.initialize(configA.toBSON()));
+        ASSERT_OK(configA.validate());
+        ASSERT_OK(configB.validate());
+        ASSERT_TRUE(configA == configB);
+    }
+
+    TEST(ReplicaSetConfig, CheckBeyondMaximumNodesFailsValidate) {
+        ReplicaSetConfig configA;
+        ReplicaSetConfig configB;
+        ASSERT_OK(configA.initialize(
+                BSON("_id" << "rs0" <<
+                     "version" << 1 <<
+                     "members" << BSON_ARRAY(
+                            BSON("_id" << 0 << "host" << "node0") <<
+                            BSON("_id" << 1 << "host" << "node1") <<
+                            BSON("_id" << 2 << "host" << "node2") <<
+                            BSON("_id" << 3 << "host" << "node3") <<
+                            BSON("_id" << 4 << "host" << "node4") <<
+                            BSON("_id" << 5 << "host" << "node5") <<
+                            BSON("_id" << 6 << "host" << "node6") <<
+                            BSON("_id" << 7 << "host" << "node7" << "votes" << 0) <<
+                            BSON("_id" << 8 << "host" << "node8" << "votes" << 0) <<
+                            BSON("_id" << 9 << "host" << "node9" << "votes" << 0) <<
+                            BSON("_id" << 10 << "host" << "node10" << "votes" << 0) <<
+                            BSON("_id" << 11 << "host" << "node11" << "votes" << 0) <<
+                            BSON("_id" << 12 << "host" << "node12" << "votes" << 0) <<
+                            BSON("_id" << 13 << "host" << "node13" << "votes" << 0) <<
+                            BSON("_id" << 14 << "host" << "node14" << "votes" << 0) <<
+                            BSON("_id" << 15 << "host" << "node15" << "votes" << 0) <<
+                            BSON("_id" << 16 << "host" << "node16" << "votes" << 0) <<
+                            BSON("_id" << 17 << "host" << "node17" << "votes" << 0) <<
+                            BSON("_id" << 18 << "host" << "node18" << "votes" << 0) <<
+                            BSON("_id" << 19 << "host" << "node19" << "votes" << 0) <<
+                            BSON("_id" << 20 << "host" << "node20" << "votes" << 0) <<
+                            BSON("_id" << 21 << "host" << "node21" << "votes" << 0) <<
+                            BSON("_id" << 22 << "host" << "node22" << "votes" << 0) <<
+                            BSON("_id" << 23 << "host" << "node23" << "votes" << 0) <<
+                            BSON("_id" << 24 << "host" << "node24" << "votes" << 0) <<
+                            BSON("_id" << 25 << "host" << "node25" << "votes" << 0) <<
+                            BSON("_id" << 26 << "host" << "node26" << "votes" << 0) <<
+                            BSON("_id" << 27 << "host" << "node27" << "votes" << 0) <<
+                            BSON("_id" << 28 << "host" << "node28" << "votes" << 0) <<
+                            BSON("_id" << 29 << "host" << "node29" << "votes" << 0) <<
+                            BSON("_id" << 30 << "host" << "node30" << "votes" << 0) <<
+                            BSON("_id" << 31 << "host" << "node31" << "votes" << 0) <<
+                            BSON("_id" << 32 << "host" << "node32" << "votes" << 0) <<
+                            BSON("_id" << 33 << "host" << "node33" << "votes" << 0) <<
+                            BSON("_id" << 34 << "host" << "node34" << "votes" << 0) <<
+                            BSON("_id" << 35 << "host" << "node35" << "votes" << 0) <<
+                            BSON("_id" << 36 << "host" << "node36" << "votes" << 0) <<
+                            BSON("_id" << 37 << "host" << "node37" << "votes" << 0) <<
+                            BSON("_id" << 38 << "host" << "node38" << "votes" << 0) <<
+                            BSON("_id" << 39 << "host" << "node39" << "votes" << 0) <<
+                            BSON("_id" << 40 << "host" << "node40" << "votes" << 0) <<
+                            BSON("_id" << 41 << "host" << "node41" << "votes" << 0) <<
+                            BSON("_id" << 42 << "host" << "node42" << "votes" << 0) <<
+                            BSON("_id" << 43 << "host" << "node43" << "votes" << 0) <<
+                            BSON("_id" << 44 << "host" << "node44" << "votes" << 0) <<
+                            BSON("_id" << 45 << "host" << "node45" << "votes" << 0) <<
+                            BSON("_id" << 46 << "host" << "node46" << "votes" << 0) <<
+                            BSON("_id" << 47 << "host" << "node47" << "votes" << 0) <<
+                            BSON("_id" << 48 << "host" << "node48" << "votes" << 0) <<
+                            BSON("_id" << 49 << "host" << "node49" << "votes" << 0) <<
+                            BSON("_id" << 50 << "host" << "node50" << "votes" << 0)))));
+        ASSERT_OK(configB.initialize(configA.toBSON()));
+        ASSERT_NOT_OK(configA.validate());
+        ASSERT_NOT_OK(configB.validate());
+        ASSERT_TRUE(configA == configB);
+    }
+
 }  // namespace
 }  // namespace repl
 }  // namespace mongo

@@ -59,7 +59,7 @@ namespace repl {
         static const std::string kMajorityWriteConcernModeName;
         static const std::string kStepDownCheckWriteConcernModeName;
 
-        static const size_t kMaxMembers = 12;
+        static const size_t kMaxMembers = 50;
         static const size_t kMaxVotingMembers = 7;
         static const Seconds kDefaultHeartbeatTimeoutPeriod;
 
