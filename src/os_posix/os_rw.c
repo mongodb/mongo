@@ -22,7 +22,7 @@ __wt_read(
 	WT_STAT_FAST_CONN_INCR(session, read_io);
 
 	WT_RET(__wt_verbose(session, WT_VERB_FILEOPS,
-	    "%s: read " WT_SIZET_FMT " bytes at offset %" PRIuMAX,
+	    "%s: read %" WT_SIZET_FMT " bytes at offset %" PRIuMAX,
 	    fh->name, len, (uintmax_t)offset));
 
 	/* Assert direct I/O is aligned and a multiple of the alignment. */
@@ -39,7 +39,7 @@ __wt_read(
 		chunk = WT_MIN(len, WT_GIGABYTE);
 		if ((nr = pread(fh->fd, addr, chunk, offset)) <= 0)
 			WT_RET_MSG(session, nr == 0 ? WT_ERROR : __wt_errno(),
-			    "%s read error: failed to read " WT_SIZET_FMT
+			    "%s read error: failed to read %" WT_SIZET_FMT
 			    " bytes at offset %" PRIuMAX,
 			    fh->name, chunk, (uintmax_t)offset);
 	}
@@ -61,7 +61,7 @@ __wt_write(WT_SESSION_IMPL *session,
 	WT_STAT_FAST_CONN_INCR(session, write_io);
 
 	WT_RET(__wt_verbose(session, WT_VERB_FILEOPS,
-	    "%s: write " WT_SIZET_FMT " bytes at offset %" PRIuMAX,
+	    "%s: write %" WT_SIZET_FMT " bytes at offset %" PRIuMAX,
 	    fh->name, len, (uintmax_t)offset));
 
 	/* Assert direct I/O is aligned and a multiple of the alignment. */
@@ -78,7 +78,7 @@ __wt_write(WT_SESSION_IMPL *session,
 		chunk = WT_MIN(len, WT_GIGABYTE);
 		if ((nw = pwrite(fh->fd, addr, chunk, offset)) < 0)
 			WT_RET_MSG(session, __wt_errno(),
-			    "%s write error: failed to write " WT_SIZET_FMT
+			    "%s write error: failed to write %" WT_SIZET_FMT
 			    " bytes at offset %" PRIuMAX,
 			    fh->name, chunk, (uintmax_t)offset);
 	}

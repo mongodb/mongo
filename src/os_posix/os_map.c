@@ -36,11 +36,11 @@ __wt_mmap(WT_SESSION_IMPL *session,
 	    MAP_PRIVATE,
 	    fh->fd, (wt_off_t)0)) == MAP_FAILED) {
 		WT_RET_MSG(session, __wt_errno(),
-		    "%s map error: failed to map " WT_SIZET_FMT " bytes",
+		    "%s map error: failed to map %" WT_SIZET_FMT " bytes",
 		    fh->name, orig_size);
 	}
 	(void)__wt_verbose(session, WT_VERB_FILEOPS,
-	    "%s: map %p: " WT_SIZET_FMT " bytes", fh->name, map, orig_size);
+	    "%s: map %p: %" WT_SIZET_FMT " bytes", fh->name, map, orig_size);
 
 	*(void **)mapp = map;
 	*lenp = orig_size;
@@ -125,12 +125,12 @@ __wt_munmap(WT_SESSION_IMPL *session,
 	WT_UNUSED(mappingcookie);
 
 	WT_RET(__wt_verbose(session, WT_VERB_FILEOPS,
-	    "%s: unmap %p: " WT_SIZET_FMT " bytes", fh->name, map, len));
+	    "%s: unmap %p: %" WT_SIZET_FMT " bytes", fh->name, map, len));
 
 	if (munmap(map, len) == 0)
 		return (0);
 
 	WT_RET_MSG(session, __wt_errno(),
-	    "%s unmap error: failed to unmap " WT_SIZET_FMT " bytes",
+	    "%s unmap error: failed to unmap %" WT_SIZET_FMT " bytes",
 	    fh->name, len);
 }
