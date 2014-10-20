@@ -118,15 +118,12 @@ namespace mongo {
         if (!collection && _request->isUpsert()) {
             OperationContext* const txn = _request->getOpCtx();
 
-            //  Upgrade to an exclusive lock. While this may possibly lead to a deadlock,
-            //  collection creation is rare and a retry will definitively succeed in this
-            //  case. Add a fail point to allow reliably triggering the deadlock situation.
-
-            MONGO_FAIL_POINT_BLOCK(implicitCollectionCreationDelay, data) {
-                LOG(0) << "Sleeping for creation of collection " + nsString.ns();
-                sleepmillis(1000);
-                LOG(0) << "About to upgrade to exclusive lock on " + nsString.ns();
-            }
+            // We have to have an exclsive lock on the db to be allowed to create the collection.
+            // Callers should either get an X or create the collection.
+            const Locker* locker = txn->lockState();
+            invariant( locker->isW() ||
+                       locker->isLockHeldForMode( ResourceId( RESOURCE_DATABASE, nsString.db() ),
+                                                  MODE_X ) );
 
             Lock::DBLock lk(txn->lockState(), nsString.db(), MODE_X);
 

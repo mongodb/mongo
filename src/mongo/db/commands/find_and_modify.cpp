@@ -69,7 +69,7 @@ namespace mongo {
             find_and_modify::addPrivilegesRequiredForFindAndModify(this, dbname, cmdObj, out);
         }
         /* this will eventually replace run,  once sort is handled */
-        bool runNoDirectClient( OperationContext* txn, const string& dbname, BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool) {
+        bool runNoDirectClient( OperationContext* txn, const string& dbname, BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
             verify( cmdObj["sort"].eoo() );
 
             const string ns = dbname + '.' + cmdObj.firstElement().valuestr();
@@ -97,10 +97,36 @@ namespace mongo {
                 return false;
             }
 
-            return runNoDirectClient( txn, ns ,
-                                      query , fields , update , 
-                                      upsert , returnNew , remove , 
-                                      result , errmsg );
+            bool ok = runNoDirectClient( txn, ns,
+                                         query, fields, update,
+                                         upsert, returnNew, remove,
+                                         result, errmsg );
+
+            if ( !ok && errmsg == "no-collection" ) {
+                {
+                    Lock::DBLock lk(txn->lockState(), dbname, MODE_X);
+                    Client::Context ctx(txn, ns, false /* don't check version */);
+                    Database* db = ctx.db();
+                    if ( db->getCollection( txn, ns ) ) {
+                        // someone else beat us to it, that's ok
+                        // we might race while we unlock if someone drops
+                        // but that's ok, we'll just do nothing and error out
+                    }
+                    else {
+                        WriteUnitOfWork wuow(txn);
+                        uassertStatusOK( userCreateNS( txn, db,
+                                                       ns, BSONObj(),
+                                                       !fromRepl ) );
+                        wuow.commit();
+                    }
+                }
+                errmsg = "";
+                ok = runNoDirectClient( txn, ns,
+                                        query, fields, update,
+                                        upsert, returnNew, remove,
+                                        result, errmsg );
+            }
+            return ok;
         }
 
         static void _appendHelper(BSONObjBuilder& result,
@@ -138,6 +164,21 @@ namespace mongo {
             Collection* collection = cx.getCollection();
 
             const WhereCallbackReal whereCallback = WhereCallbackReal(txn, StringData(ns));
+
+            if ( !collection ) {
+                if ( !upsert ) {
+                    // no collectio and no upsert, so can't possible do anything
+                    _appendHelper( result, BSONObj(), false, fields, whereCallback );
+                    return true;
+                }
+                // no collection, but upsert, so we want to create it
+                // problem is we only have IX on db and collection :(
+                // so we tell our caller who can do it
+                errmsg = "no-collection";
+                return false;
+            }
+
+
 
             BSONObj doc;
             bool found = false;

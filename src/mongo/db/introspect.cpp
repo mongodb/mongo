@@ -140,9 +140,14 @@ namespace {
             // NOTE: It's kind of weird that we lock the op's namespace, but have to for now
             // since we're sometimes inside the lock already
             const string dbname(nsToDatabase(currentOp.getNS()));
-            Lock::DBLock lk(txn->lockState(), dbname, MODE_X);
-            if (dbHolder().get(txn, dbname) != NULL) {
+            scoped_ptr<Lock::DBLock> lk;
+            if ( !txn->lockState()->isDbLockedForMode( dbname, MODE_IX ) ) {
+                lk.reset( new Lock::DBLock( txn->lockState(), dbname, MODE_IX) );
+            }
+            Database* db = dbHolder().get(txn, dbname);
+            if (db != NULL) {
                 // We are ok with the profiling happening in a different WUOW from the actual op.
+                Lock::CollectionLock clk(txn->lockState(), db->getProfilingNS(), MODE_X);
                 WriteUnitOfWork wunit(txn);
                 Client::Context cx(txn, currentOp.getNS(), false);
                 _profile(txn, c, cx.db(), currentOp, profileBufBuilder);
