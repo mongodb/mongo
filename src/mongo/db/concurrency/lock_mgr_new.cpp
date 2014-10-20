@@ -712,7 +712,6 @@ namespace mongo {
     void LockHead::addToConflictQueue(LockRequest* request) {
         invariant(request->next == NULL);
         invariant(request->prev == NULL);
-
         if (conflictQueueBegin == NULL) {
             invariant(conflictQueueEnd == NULL);
 
@@ -725,11 +724,24 @@ namespace mongo {
         else {
             invariant(conflictQueueEnd != NULL);
 
-            request->prev = conflictQueueEnd;
-            request->next = NULL;
+            // durThread always jumps to the front of the queue
+            const bool queueAtFront = (request->lock->resourceId.getType() == RESOURCE_MMAPV1_FLUSH)
+                                   && (request->mode == MODE_X || request->mode == MODE_S);
+            if (queueAtFront) {
+                request->next = conflictQueueBegin;
+                request->prev = NULL;
 
-            conflictQueueEnd->next = request;
-            conflictQueueEnd = request;
+                conflictQueueBegin->prev = request;
+                conflictQueueBegin = request;
+            }
+            else {
+                request->prev = conflictQueueEnd;
+                request->next = NULL;
+
+                conflictQueueEnd->next = request;
+                conflictQueueEnd = request;
+            }
+
         }
     }
 
