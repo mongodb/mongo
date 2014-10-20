@@ -1703,7 +1703,7 @@ namespace {
         if (_role != Role::candidate) {
             return false;
         }
-        int selfId = _currentConfig.getMemberAt(_selfIndex).getId();
+        int selfId = _selfConfig().getId();
         if ((_lastVote.when + LastVote::leaseTime.total_milliseconds() >= now) 
             && (_lastVote.whoId != selfId)) {
             log() << "replSet not voting yea for " << selfId <<
@@ -1713,6 +1713,7 @@ namespace {
         }
         _lastVote.when = now;
         _lastVote.whoId = selfId;
+        _lastVote.whoHostAndPort = _selfConfig().getHostAndPort();;
         return true;
     }
 
