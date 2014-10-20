@@ -277,11 +277,14 @@ namespace mongo {
             log() << "MigrateFromStatus::done About to acquire global write lock to exit critical "
                     "section" << endl;
 
-
             _deleteNotifyExec.reset( NULL );
 
-            Lock::GlobalWrite lk(txn->lockState());
-            log() << "MigrateFromStatus::done Global lock acquired" << endl;
+            // TODO: Change this. This is a bad hack for protecting some of the data structures
+            // below that were not properly synchronized with the intended latches in some
+            // usages.
+            Lock::DBLock dbLock(txn->lockState(), nsToDatabaseSubstring(_ns), MODE_IX);
+            Lock::CollectionLock collLock(txn->lockState(), _ns, MODE_X);
+            log() << "MigrateFromStatus::done coll lock for " << _ns << " acquired" << endl;
 
             {
                 scoped_spinlock lk( _trackerLocks );
@@ -1282,7 +1285,8 @@ namespace mongo {
                 myVersion.incMajor();
 
                 {
-                    Lock::DBLock lk(txn->lockState(), nsToDatabaseSubstring(ns), MODE_X);
+                    Lock::DBLock lk(txn->lockState(), nsToDatabaseSubstring(ns), MODE_IX);
+                    Lock::CollectionLock collLock(txn->lockState(), ns, MODE_X);
                     verify( myVersion > shardingState.getVersion( ns ) );
 
                     // bump the metadata's version up and "forget" about the chunk being moved
@@ -1317,7 +1321,9 @@ namespace mongo {
                     log() << "moveChunk migrate commit not accepted by TO-shard: " << res
                           << " resetting shard version to: " << origShardVersion << migrateLog;
                     {
-                        Lock::GlobalWrite lk(txn->lockState());
+                        Lock::DBLock dbLock(txn->lockState(), nsToDatabaseSubstring(ns), MODE_IX);
+                        Lock::CollectionLock collLock(txn->lockState(), ns, MODE_X);
+
                         log() << "moveChunk global lock acquired to reset shard version from "
                               "failed migration"
                               << endl;
@@ -1489,7 +1495,8 @@ namespace mongo {
                           << "failed migration" << endl;
 
                     {
-                        Lock::GlobalWrite lk(txn->lockState());
+                        Lock::DBLock dbLock(txn->lockState(), nsToDatabaseSubstring(ns), MODE_IX);
+                        Lock::CollectionLock collLock(txn->lockState(), ns, MODE_X);
 
                         // Revert the metadata back to the state before "forgetting"
                         // about the chunk.
@@ -1696,7 +1703,9 @@ namespace mongo {
 
             if ( getState() != DONE ) {
                 // Unprotect the range if needed/possible on unsuccessful TO migration
-                Lock::DBLock lk(txn->lockState(), nsToDatabaseSubstring(ns), MODE_X);
+                Lock::DBLock dbLock(txn->lockState(), nsToDatabaseSubstring(ns), MODE_IX);
+                Lock::CollectionLock collLock(txn->lockState(), ns, MODE_X);
+
                 string errMsg;
                 if (!shardingState.forgetPending(txn, ns, min, max, epoch, &errMsg)) {
                     warning() << errMsg << endl;
@@ -1840,7 +1849,9 @@ namespace mongo {
 
                 {
                     // Protect the range by noting that we're now starting a migration to it
-                    Lock::DBLock lk(txn->lockState(), nsToDatabaseSubstring(ns), MODE_X);
+                    Lock::DBLock dbLock(txn->lockState(), nsToDatabaseSubstring(ns), MODE_IX);
+                    Lock::CollectionLock collLock(txn->lockState(), ns, MODE_X);
+
                     if (!shardingState.notePending(txn, ns, min, max, epoch, &errmsg)) {
                         warning() << errmsg << endl;
                         setState(FAIL);
@@ -2251,6 +2262,7 @@ namespace mongo {
             log() << "migrate commit succeeded flushing to secondaries for '" << ns << "' " << min << " -> " << max << migrateLog;
 
             {
+                // Get global lock to wait for write to be commited to journal.
                 Lock::GlobalRead lk(txn->lockState());
 
                 // if durability is on, force a write to journal
