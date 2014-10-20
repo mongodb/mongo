@@ -34,6 +34,7 @@
 
 #include <boost/algorithm/string.hpp>
 
+#include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/dbhelpers.h"
 #include "mongo/db/repl/connections.h"
@@ -85,10 +86,11 @@ namespace {
 
         BSONObj newConfigBSON = asBson();
 
-        log() << "replSet info saving a newer config version to local.system.replset: "
+        log() << "replSet info saving a newer config version to " << rsConfigNs << ": "
               << newConfigBSON << rsLog;
         {
-            Client::WriteContext cx(txn, rsConfigNs);
+            Lock::DBLock lk(txn->lockState(), NamespaceString(rsConfigNs).db(), MODE_X);
+            WriteUnitOfWork uow(txn);
 
             Helpers::putSingletonGod(txn,
                                      rsConfigNs.c_str(),
@@ -96,7 +98,7 @@ namespace {
                                      false/*logOp=false; local db so would work regardless...*/);
             if( !comment.isEmpty() && (!theReplSet || theReplSet->isPrimary()) )
                 logOpInitiate(txn, comment);
-            cx.commit();
+            uow.commit();
         }
         log() << "replSet saveConfigLocally done" << rsLog;
     }
