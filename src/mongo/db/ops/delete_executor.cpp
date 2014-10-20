@@ -46,7 +46,8 @@
 
 namespace mongo {
 
-    DeleteExecutor::DeleteExecutor(const DeleteRequest* request) :
+    DeleteExecutor::DeleteExecutor(OperationContext* txn, const DeleteRequest* request) :
+        _txn(txn),
         _request(request),
         _canonicalQuery(),
         _isQueryParsed(false) {
@@ -66,8 +67,7 @@ namespace mongo {
         }
 
         CanonicalQuery* cqRaw;
-        const WhereCallbackReal whereCallback(
-                                    _request->getOpCtx(), _request->getNamespaceString().db());
+        const WhereCallbackReal whereCallback(_txn, _request->getNamespaceString().db());
 
         Status status = CanonicalQuery::canonicalize(_request->getNamespaceString().ns(),
                                                      _request->getQuery(),
@@ -116,7 +116,7 @@ namespace mongo {
         // on top of an EOFStage.
         Collection* collection = NULL;
         if (db) {
-            collection = db->getCollection(_request->getOpCtx(), ns.ns());
+            collection = db->getCollection(_txn, ns.ns());
         }
 
         if (collection && collection->isCapped()) {
@@ -145,7 +145,7 @@ namespace mongo {
         Status getExecStatus = Status::OK();
         if (_canonicalQuery.get()) {
             // This is the non-idhack branch.
-            getExecStatus = getExecutorDelete(_request->getOpCtx(),
+            getExecStatus = getExecutorDelete(_txn,
                                               collection,
                                               _canonicalQuery.release(),
                                               _request->isMulti(),
@@ -157,7 +157,7 @@ namespace mongo {
         }
         else {
             // This is the idhack branch.
-            getExecStatus = getExecutorDelete(_request->getOpCtx(),
+            getExecStatus = getExecutorDelete(_txn,
                                               collection,
                                               ns.ns(),
                                               _request->getQuery(),

@@ -50,11 +50,12 @@
 
 namespace mongo {
 
-    UpdateResult update(Database* db,
+    UpdateResult update(OperationContext* txn,
+                        Database* db,
                         const UpdateRequest& request,
                         OpDebug* opDebug) {
 
-        UpdateExecutor executor(&request, opDebug);
+        UpdateExecutor executor(txn, &request, opDebug);
         return executor.execute(db);
     }
 

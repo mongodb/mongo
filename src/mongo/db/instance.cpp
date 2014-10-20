@@ -554,7 +554,7 @@ namespace {
         op.debug().query = query;
         op.setQuery(query);
 
-        UpdateRequest request(txn, ns);
+        UpdateRequest request(ns);
 
         request.setUpsert(upsert);
         request.setMulti(multi);
@@ -569,7 +569,7 @@ namespace {
         int attempt = 1;
         while ( 1 ) {
             try {
-                UpdateExecutor executor(&request, &op.debug());
+                UpdateExecutor executor(txn, &request, &op.debug());
                 uassertStatusOK(executor.prepare());
 
                 //  Tentatively take an intent lock, fix up if we need to create the collection
@@ -603,7 +603,7 @@ namespace {
         //  This is an upsert into a non-existing database, so need an exclusive lock
         //  to avoid deadlock
         {
-            UpdateExecutor executor(&request, &op.debug());
+            UpdateExecutor executor(txn, &request, &op.debug());
             uassertStatusOK(executor.prepare());
 
             Lock::DBLock dbLock(txn->lockState(), ns.db(), MODE_X);
@@ -645,7 +645,7 @@ namespace {
         op.debug().query = pattern;
         op.setQuery(pattern);
 
-        DeleteRequest request(txn, ns);
+        DeleteRequest request(ns);
         request.setQuery(pattern);
         request.setMulti(!justOne);
         request.setUpdateOpLog(true);
@@ -655,7 +655,7 @@ namespace {
         int attempt = 1;
         while ( 1 ) {
             try {
-                DeleteExecutor executor(&request);
+                DeleteExecutor executor(txn, &request);
                 uassertStatusOK(executor.prepare());
 
                 AutoGetDb autoDb(txn, ns.db(), MODE_IX);

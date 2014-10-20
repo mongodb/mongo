@@ -53,7 +53,7 @@ namespace mongo {
      * Expected usage is approximately:
      *   DeleteRequest request(...);
      *   // configure request
-     *   DeleteExecutor executor(&request);
+     *   DeleteExecutor executor(txn, &request);
      *   uassertStatusOK(executor.prepare());
      *   // Get locks, get ready to execute.
      *   try {
@@ -72,7 +72,7 @@ namespace mongo {
          * The object pointed to by "request" must stay in scope for the life of the constructed
          * executor.
          */
-        explicit DeleteExecutor(const DeleteRequest* request);
+        DeleteExecutor(OperationContext* txn, const DeleteRequest* request);
 
         ~DeleteExecutor();
 
@@ -112,16 +112,19 @@ namespace mongo {
         long long execute(Database* db);
 
     private:
-        /// Unowned pointer to the request object that this executor will process.
+        // Transactional context.  Not owned by us.
+        OperationContext* _txn;
+
+        // Unowned pointer to the request object that this executor will process.
         const DeleteRequest* const _request;
 
-        /// Parsed query object, or NULL if the query proves to be an id hack query.
+        // Parsed query object, or NULL if the query proves to be an id hack query.
         std::auto_ptr<CanonicalQuery> _canonicalQuery;
 
         // The tree of execution stages which will be used to execute the update.
         boost::scoped_ptr<PlanExecutor> _exec;
 
-        /// Flag indicating if the query has been successfully parsed.
+        // Flag indicating if the query has been successfully parsed.
         bool _isQueryParsed;
 
     };

@@ -54,7 +54,7 @@ namespace mongo {
      * Expected usage is approximately:
      *   UpdateRequest request(...);
      *   // configure request
-     *   UpdateExecutor executor(&request, opDebug);
+     *   UpdateExecutor executor(txn, &request, opDebug);
      *   uassertStatusOK(executor.prepare());
      *   // Get locks, get ready to execute.
      *   try {
@@ -73,7 +73,7 @@ namespace mongo {
          * The objects pointed to by "request" and "opDebug" must stay in scope for the life of the
          * constructed executor.
          */
-        UpdateExecutor(const UpdateRequest* request, OpDebug* opDebug);
+        UpdateExecutor(OperationContext* txn, const UpdateRequest* request, OpDebug* opDebug);
 
         ~UpdateExecutor();
 
@@ -121,25 +121,28 @@ namespace mongo {
          */
         Status parseUpdate();
 
-        /// Unowned pointer to the request object that this executor will process.
+        // Transactional context.  Not owned by us.
+        OperationContext* _txn;
+
+        // Unowned pointer to the request object that this executor will process.
         const UpdateRequest* const _request;
 
-        /// Unowned pointer to the opdebug object that this executor will populate with debug data.
+        // Unowned pointer to the opdebug object that this executor will populate with debug data.
         OpDebug* const _opDebug;
 
-        /// Driver for processing updates on matched documents.
+        // Driver for processing updates on matched documents.
         UpdateDriver _driver;
 
-        /// Parsed query object, or NULL if the query proves to be an id hack query.
+        // Parsed query object, or NULL if the query proves to be an id hack query.
         std::auto_ptr<CanonicalQuery> _canonicalQuery;
 
         // The tree of execution stages which will be used to execute the update.
         boost::scoped_ptr<PlanExecutor> _exec;
 
-        /// Flag indicating if the query has been successfully parsed.
+        // Flag indicating if the query has been successfully parsed.
         bool _isQueryParsed;
 
-        /// Flag indicatin gif the update description has been successfully parsed.
+        // Flag indicatin gif the update description has been successfully parsed.
         bool _isUpdateParsed;
     };
 

@@ -663,7 +663,7 @@ namespace {
                     updates++;
 
                     const NamespaceString requestNs(doc.ns);
-                    UpdateRequest request(txn, requestNs);
+                    UpdateRequest request(requestNs);
 
                     request.setQuery(pattern);
                     request.setUpdates(it->second);
@@ -672,7 +672,7 @@ namespace {
                     UpdateLifecycleImpl updateLifecycle(true, requestNs);
                     request.setLifecycle(&updateLifecycle);
 
-                    update(ctx.db(), request, &debug);
+                    update(txn, ctx.db(), request, &debug);
 
                 }
             }

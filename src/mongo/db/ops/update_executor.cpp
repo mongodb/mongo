@@ -69,7 +69,9 @@ namespace mongo {
 
     } // namespace
 
-    UpdateExecutor::UpdateExecutor(const UpdateRequest* request, OpDebug* opDebug) :
+    UpdateExecutor::UpdateExecutor(OperationContext* txn, const UpdateRequest* request,
+                                   OpDebug* opDebug) :
+        _txn(txn),
         _request(request),
         _opDebug(opDebug),
         _driver(UpdateDriver::Options()),
@@ -117,7 +119,7 @@ namespace mongo {
         // a no-op which returns a trivial EOF plan.
         Collection* collection = NULL;
         if (db) {
-            collection = db->getCollection(_request->getOpCtx(), nsString.ns());
+            collection = db->getCollection(_txn, nsString.ns());
         }
         else {
             invariant(_request->isExplain());
@@ -128,28 +130,26 @@ namespace mongo {
         // We can only create the collection if this is not an explain, as explains should not
         // alter the state of the database.
         if (!collection && _request->isUpsert() && !_request->isExplain()) {
-            OperationContext* const txn = _request->getOpCtx();
-
             // We have to have an exclsive lock on the db to be allowed to create the collection.
             // Callers should either get an X or create the collection.
-            const Locker* locker = txn->lockState();
+            const Locker* locker = _txn->lockState();
             invariant( locker->isW() ||
                        locker->isLockHeldForMode( ResourceId( RESOURCE_DATABASE, nsString.db() ),
                                                   MODE_X ) );
 
-            Lock::DBLock lk(txn->lockState(), nsString.db(), MODE_X);
+            Lock::DBLock lk(_txn->lockState(), nsString.db(), MODE_X);
 
-            WriteUnitOfWork wuow(txn);
-            invariant(db->createCollection(txn, nsString.ns()));
+            WriteUnitOfWork wuow(_txn);
+            invariant(db->createCollection(_txn, nsString.ns()));
 
             if (!_request->isFromReplication()) {
-                repl::logOp(txn,
+                repl::logOp(_txn,
                             "c",
                             (db->name() + ".$cmd").c_str(),
                             BSON("create" << (nsString.coll())));
             }
             wuow.commit();
-            collection = db->getCollection(_request->getOpCtx(), nsString.ns());
+            collection = db->getCollection(_txn, nsString.ns());
             invariant(collection);
         }
 
@@ -169,7 +169,7 @@ namespace mongo {
 
         if (lifecycle) {
             lifecycle->setCollection(collection);
-            _driver.refreshIndexKeys(lifecycle->getIndexKeys(_request->getOpCtx()));
+            _driver.refreshIndexKeys(lifecycle->getIndexKeys(_txn));
         }
 
         // If yielding is allowed for this plan, then set an auto yield policy. Otherwise set
@@ -187,7 +187,7 @@ namespace mongo {
         Status getExecStatus = Status::OK();
         if (_canonicalQuery.get()) {
             // This is the regular path for when we have a CanonicalQuery.
-            getExecStatus = getExecutorUpdate(_request->getOpCtx(),
+            getExecStatus = getExecutorUpdate(_txn,
                                               collection,
                                               _canonicalQuery.release(),
                                               _request,
@@ -199,7 +199,7 @@ namespace mongo {
         else {
             // This is the idhack fast-path for getting a PlanExecutor without doing the work
             // to create a CanonicalQuery.
-            getExecStatus = getExecutorUpdate(_request->getOpCtx(),
+            getExecStatus = getExecutorUpdate(_txn,
                                               collection,
                                               nsString.ns(),
                                               _request,
@@ -283,8 +283,7 @@ namespace mongo {
         }
 
         CanonicalQuery* cqRaw;
-        const WhereCallbackReal whereCallback(
-                                    _request->getOpCtx(), _request->getNamespaceString().db());
+        const WhereCallbackReal whereCallback(_txn, _request->getNamespaceString().db());
 
         Status status = CanonicalQuery::canonicalize(_request->getNamespaceString().ns(),
                                                      _request->getQuery(),

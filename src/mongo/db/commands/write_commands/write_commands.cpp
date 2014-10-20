@@ -192,7 +192,7 @@ namespace mongo {
 
         if ( BatchedCommandRequest::BatchType_Update == _writeType ) {
             // Create the update request.
-            UpdateRequest updateRequest( txn, nsString );
+            UpdateRequest updateRequest( nsString );
             updateRequest.setQuery( batchItem.getUpdate()->getQuery() );
             updateRequest.setUpdates( batchItem.getUpdate()->getUpdateExpr() );
             updateRequest.setMulti( batchItem.getUpdate()->getMulti() );
@@ -207,7 +207,7 @@ namespace mongo {
 
             // Use the request to create an UpdateExecutor, and from it extract the
             // plan tree which will be used to execute this update.
-            UpdateExecutor updateExecutor( &updateRequest, &txn->getCurOp()->debug() );
+            UpdateExecutor updateExecutor( txn, &updateRequest, &txn->getCurOp()->debug() );
             Status prepStatus = updateExecutor.prepare();
             if ( !prepStatus.isOK() ) {
                 return prepStatus;
@@ -240,7 +240,7 @@ namespace mongo {
             invariant( BatchedCommandRequest::BatchType_Delete == _writeType );
 
             // Create the delete request.
-            DeleteRequest deleteRequest( txn, nsString );
+            DeleteRequest deleteRequest( nsString );
             deleteRequest.setQuery( batchItem.getDelete()->getQuery() );
             deleteRequest.setMulti( batchItem.getDelete()->getLimit() != 1 );
             deleteRequest.setUpdateOpLog(true);
@@ -252,7 +252,7 @@ namespace mongo {
 
             // Use the request to create a DeleteExecutor, and from it extract the
             // plan tree which will be used to execute this update.
-            DeleteExecutor deleteExecutor( &deleteRequest );
+            DeleteExecutor deleteExecutor( txn, &deleteRequest );
             Status prepStatus = deleteExecutor.prepare();
             if ( !prepStatus.isOK() ) {
                 return prepStatus;

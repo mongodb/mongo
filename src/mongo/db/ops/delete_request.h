@@ -39,8 +39,7 @@ namespace mongo {
     class DeleteRequest {
         MONGO_DISALLOW_COPYING(DeleteRequest);
     public:
-        explicit DeleteRequest(OperationContext* txn, const NamespaceString& nsString) :
-            _txn(txn),
+        explicit DeleteRequest(const NamespaceString& nsString) :
             _nsString(nsString),
             _multi(false),
             _logop(false),
@@ -64,13 +63,11 @@ namespace mongo {
         bool isGod() const { return _god; }
         bool isFromMigrate() const { return _fromMigrate; }
         bool isExplain() const { return _isExplain; }
-        OperationContext* getOpCtx() const { return _txn; }
         PlanExecutor::YieldPolicy getYieldPolicy() const { return _yieldPolicy; }
 
         std::string toString() const;
 
     private:
-        OperationContext* _txn;
         const NamespaceString& _nsString;
         BSONObj _query;
         bool _multi;

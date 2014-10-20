@@ -43,9 +43,8 @@ namespace mongo {
 
     class UpdateRequest {
     public:
-        inline UpdateRequest(OperationContext* txn, const NamespaceString& nsString)
-            : _txn(txn)
-            , _nsString(nsString)
+        inline UpdateRequest(const NamespaceString& nsString)
+            : _nsString(nsString)
             , _god(false)
             , _upsert(false)
             , _multi(false)
@@ -135,10 +134,6 @@ namespace mongo {
             return _lifecycle;
         }
 
-        inline OperationContext* getOpCtx() const {
-            return _txn;
-        }
-
         inline void setExplain(bool value = true) {
             _isExplain = value;
         }
@@ -168,9 +163,6 @@ namespace mongo {
                         << " isExplain: " << _isExplain;
         }
     private:
-
-        // Not owned. Must live as long as the request lives.
-        OperationContext* _txn;
 
         const NamespaceString& _nsString;
 

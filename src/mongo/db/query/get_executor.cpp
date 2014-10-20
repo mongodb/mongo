@@ -567,7 +567,7 @@ namespace mongo {
         invariant(root);
         UpdateStageParams updateStageParams(request, driver, opDebug);
         updateStageParams.canonicalQuery = rawCanonicalQuery;
-        root = new UpdateStage(updateStageParams, ws.get(), collection, root);
+        root = new UpdateStage(txn, updateStageParams, ws.get(), collection, root);
         // We must have a tree of stages in order to have a valid plan executor, but the query
         // solution may be null. Takes ownership of all args other than 'collection' and 'txn'
         return PlanExecutor::make(txn,
@@ -598,7 +598,7 @@ namespace mongo {
             // UpdateStage, so in this case we put an UpdateStage on top of an EOFStage.
             LOG(2) << "Collection " << ns << " does not exist."
                    << " Using EOF stage: " << unparsedQuery.toString();
-            UpdateStage* updateStage = new UpdateStage(updateStageParams, ws.get(), collection,
+            UpdateStage* updateStage = new UpdateStage(txn, updateStageParams, ws.get(), collection,
                                                        new EOFStage());
             return PlanExecutor::make(txn, ws.release(), updateStage, ns, yieldPolicy, execOut);
         }
@@ -609,7 +609,7 @@ namespace mongo {
 
             PlanStage* idHackStage = new IDHackStage(txn, collection, unparsedQuery["_id"].wrap(),
                                                      ws.get());
-            UpdateStage* root = new UpdateStage(updateStageParams, ws.get(), collection,
+            UpdateStage* root = new UpdateStage(txn, updateStageParams, ws.get(), collection,
                                                 idHackStage);
             return PlanExecutor::make(txn, ws.release(), root, collection, yieldPolicy, execOut);
         }

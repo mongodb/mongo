@@ -393,11 +393,13 @@ namespace mongo {
     // static
     const char* UpdateStage::kStageType = "UPDATE";
 
-    UpdateStage::UpdateStage(const UpdateStageParams& params,
+    UpdateStage::UpdateStage(OperationContext* txn,
+                             const UpdateStageParams& params,
                              WorkingSet* ws,
                              Collection* collection,
                              PlanStage* child)
-        : _params(params),
+        : _txn(txn),
+          _params(params),
           _ws(ws),
           _collection(collection),
           _child(child),
@@ -487,7 +489,7 @@ namespace mongo {
         }
 
         {
-            WriteUnitOfWork wunit(request->getOpCtx());
+            WriteUnitOfWork wunit(_txn);
 
             if (inPlace && !driver->modsAffectIndices()) {
                 // If a set of modifiers were all no-ops, we are still 'in place', but there
@@ -497,8 +499,7 @@ namespace mongo {
                     if (!request->isExplain()) {
                         invariant(_collection);
                         const RecordData oldRec(oldObj.objdata(), oldObj.objsize());
-                        _collection->updateDocumentWithDamages(request->getOpCtx(), loc,
-                                                               oldRec, source, _damages);
+                        _collection->updateDocumentWithDamages(_txn, loc, oldRec, source, _damages);
                     }
                     docWasModified = true;
                     _specificStats.fastmod = true;
@@ -519,7 +520,7 @@ namespace mongo {
                 // Don't actually do the write if this is an explain.
                 if (!request->isExplain()) {
                     invariant(_collection);
-                    StatusWith<DiskLoc> res = _collection->updateDocument(request->getOpCtx(),
+                    StatusWith<DiskLoc> res = _collection->updateDocument(_txn,
                                                                           loc,
                                                                           newObj,
                                                                           true,
@@ -542,7 +543,7 @@ namespace mongo {
             // Call logOp if requested, and we're not an explain.
             if (request->shouldCallLogOp() && !logObj.isEmpty() && !request->isExplain()) {
                 BSONObj idQuery = driver->makeOplogEntryQuery(newObj, request->isMulti());
-                repl::logOp(request->getOpCtx(),
+                repl::logOp(_txn,
                             "u",
                             request->getNamespaceString().ns().c_str(),
                             logObj,
@@ -638,14 +639,14 @@ namespace mongo {
             return;
         }
 
-        WriteUnitOfWork wunit(request->getOpCtx());
+        WriteUnitOfWork wunit(_txn);
         invariant(_collection);
-        StatusWith<DiskLoc> newLoc = _collection->insertDocument(request->getOpCtx(),
+        StatusWith<DiskLoc> newLoc = _collection->insertDocument(_txn,
                                                                  newObj,
                                                                  !request->isGod()/*enforceQuota*/);
         uassertStatusOK(newLoc.getStatus());
         if (request->shouldCallLogOp()) {
-            repl::logOp(request->getOpCtx(),
+            repl::logOp(_txn,
                         "i",
                         request->getNamespaceString().ns().c_str(),
                         newObj,
@@ -758,9 +759,8 @@ namespace mongo {
                     log() << "Had WriteConflict in the middle of a multi-update, "
                           << "retrying the current update";
 
-                    OperationContext* txn = _params.request->getOpCtx();
-                    txn->recoveryUnit()->commitAndRestart();
-                    if ( !_collection->findDoc( txn, loc, &reFetched ) ) {
+                    _txn->recoveryUnit()->commitAndRestart();
+                    if ( !_collection->findDoc( _txn, loc, &reFetched ) ) {
                         // document was deleted, we're done here
                         break;
                     }
@@ -780,7 +780,7 @@ namespace mongo {
             // As restoreState may restore (recreate) cursors, make sure to restore the
             // state outside of the WritUnitOfWork.
 
-            restoreState(_params.request->getOpCtx());
+            restoreState(_txn);
 
             ++_commonStats.needTime;
             return PlanStage::NEED_TIME;
@@ -848,6 +848,7 @@ namespace mongo {
     }
 
     void UpdateStage::restoreState(OperationContext* opCtx) {
+        _txn = opCtx;
         ++_commonStats.unyields;
         // Restore our child.
         _child->restoreState(opCtx);

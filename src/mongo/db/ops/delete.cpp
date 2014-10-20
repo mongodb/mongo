@@ -48,14 +48,14 @@ namespace mongo {
                             bool god,
                             bool fromMigrate) {
         NamespaceString nsString(ns);
-        DeleteRequest request(txn, nsString);
+        DeleteRequest request(nsString);
         request.setQuery(pattern);
         request.setMulti(!justOne);
         request.setUpdateOpLog(logop);
         request.setGod(god);
         request.setFromMigrate(fromMigrate);
         request.setYieldPolicy(policy);
-        DeleteExecutor executor(&request);
+        DeleteExecutor executor(txn, &request);
         return executor.execute(db);
     }
 

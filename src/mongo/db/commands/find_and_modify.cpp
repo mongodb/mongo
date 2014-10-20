@@ -307,7 +307,7 @@ namespace mongo {
                     }
                     
                     const NamespaceString requestNs(ns);
-                    UpdateRequest request(txn, requestNs);
+                    UpdateRequest request(requestNs);
 
                     request.setQuery(queryModified);
                     request.setUpdates(update);
@@ -320,7 +320,8 @@ namespace mongo {
                     // the shard version below, but for now no
                     UpdateLifecycleImpl updateLifecycle(false, requestNs);
                     request.setLifecycle(&updateLifecycle);
-                    UpdateResult res = mongo::update(cx.db(),
+                    UpdateResult res = mongo::update(txn,
+                                                     cx.db(),
                                                      request,
                                                      &txn->getCurOp()->debug());
 

@@ -1176,7 +1176,7 @@ namespace mongo {
 
         const NamespaceString nsString(updateItem.getRequest()->getNS());
         const bool isMulti = updateItem.getUpdate()->getMulti();
-        UpdateRequest request(txn, nsString);
+        UpdateRequest request(nsString);
         request.setQuery(updateItem.getUpdate()->getQuery());
         request.setUpdates(updateItem.getUpdate()->getUpdateExpr());
         request.setMulti(isMulti);
@@ -1192,7 +1192,7 @@ namespace mongo {
         bool createCollection = false;
         for ( int fakeLoop = 0; fakeLoop < 1; fakeLoop++ ) {
 
-            UpdateExecutor executor(&request, &txn->getCurOp()->debug());
+            UpdateExecutor executor(txn, &request, &txn->getCurOp()->debug());
             Status status = executor.prepare();
             if (!status.isOK()) {
                 result->setError(toWriteError(status));
@@ -1320,7 +1320,7 @@ namespace mongo {
                              WriteOpResult* result ) {
 
         const NamespaceString nss( removeItem.getRequest()->getNS() );
-        DeleteRequest request(txn, nss);
+        DeleteRequest request(nss);
         request.setQuery( removeItem.getDelete()->getQuery() );
         request.setMulti( removeItem.getDelete()->getLimit() != 1 );
         request.setUpdateOpLog(true);
@@ -1333,7 +1333,7 @@ namespace mongo {
         while ( 1 ) {
             try {
 
-                DeleteExecutor executor( &request );
+                DeleteExecutor executor( txn, &request );
                 Status status = executor.prepare();
                 if ( !status.isOK() ) {
                     result->setError(toWriteError(status));

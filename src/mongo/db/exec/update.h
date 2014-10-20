@@ -76,7 +76,8 @@ namespace mongo {
     class UpdateStage : public PlanStage {
         MONGO_DISALLOW_COPYING(UpdateStage);
     public:
-        UpdateStage(const UpdateStageParams& params,
+        UpdateStage(OperationContext* txn,
+                    const UpdateStageParams& params,
                     WorkingSet* ws,
                     Collection* collection,
                     PlanStage* child);
@@ -129,6 +130,9 @@ namespace mongo {
          * Helper for restoring the state of this update.
          */
         Status restoreUpdateState(OperationContext* opCtx);
+
+        // Transactional context.  Not owned by us.
+        OperationContext* _txn;
 
         UpdateStageParams _params;
 

@@ -47,7 +47,8 @@ namespace mongo {
      *
      * Caller must hold the appropriate database locks.
      */
-    UpdateResult update(Database* db, 
+    UpdateResult update(OperationContext* txn,
+                        Database* db, 
                         const UpdateRequest& request, 
                         OpDebug* opDebug);
 
