@@ -238,8 +238,13 @@ namespace {
 
         boost::unique_lock<boost::mutex> lk(_mutex);
         invariant(_rsConfigState == kConfigStartingUp);
-        _setCurrentRSConfig_inlock(localConfig, myIndex.getValue());
+        const PostMemberStateUpdateAction action =
+            _setCurrentRSConfig_inlock(localConfig, myIndex.getValue());
         _setMyLastOptime_inlock(&lk, lastOpTime);
+        if (lk.owns_lock()) {
+            lk.unlock();
+        }
+        _performPostMemberStateUpdateAction(action);
     }
 
     void ReplicationCoordinatorImpl::startReplication(OperationContext* txn) {
@@ -445,7 +450,7 @@ namespace {
             return;
         }
 
-        boost::lock_guard<boost::mutex> lk(_mutex);
+        boost::unique_lock<boost::mutex> lk(_mutex);
         _topCoord->setFollowerMode(newState.s);
 
         // If the topCoord reports that we are a candidate now, the only possible scenario is that
@@ -459,9 +464,12 @@ namespace {
              _isWaitingForDrainToComplete = true;
          }
 
-        _updateCurrentMemberStateFromTopologyCoordinator_inlock();
+        const PostMemberStateUpdateAction action =
+            _updateCurrentMemberStateFromTopologyCoordinator_inlock();
         *success = true;
         _replExecutor.signalEvent(finishedSettingFollowerMode);
+        lk.unlock();
+        _performPostMemberStateUpdateAction(action);
     }
 
     bool ReplicationCoordinatorImpl::isWaitingForApplierToDrain() {
@@ -831,7 +839,9 @@ namespace {
                                                 bool force,
                                                 const Milliseconds& waitTime,
                                                 const Milliseconds& stepdownTime) {
-        Date_t stepDownUntil(_replExecutor.now().millis + stepdownTime.total_milliseconds());
+        const Date_t startTime = _replExecutor.now();
+        const Date_t stepDownUntil(startTime.millis + stepdownTime.total_milliseconds());
+        const Date_t waitUntil(startTime.millis + waitTime.total_milliseconds());
 
         ReplicationCoordinatorExternalState::ScopedLocker lk(
                 txn, _externalState->getGlobalSharedLockAcquirer(), stepdownTime);
@@ -846,62 +856,67 @@ namespace {
             return Status(ErrorCodes::NotMaster, "not primary so can't step down");
         }
 
-        WriteConcernOptions writeConcern;
-        // Make sure at least 1 other *electable* node is caught up
-        writeConcern.wMode = ReplicaSetConfig::kStepDownCheckWriteConcernModeName;
-        {
-            // Figure out how long to wait.  Take the specified wait time unless waiting that long
-            // would put us past the time we were supposed to step down until.
-            Date_t now = _replExecutor.now();
-            if (Date_t(now.millis + waitTime.total_milliseconds()) >= stepDownUntil) {
-                writeConcern.wTimeout = stepDownUntil.millis - now.millis;
-            }
-            else {
-                writeConcern.wTimeout = waitTime.total_milliseconds();
-            }
+        StatusWith<ReplicationExecutor::EventHandle> finishedEvent = _replExecutor.makeEvent();
+        if (finishedEvent.getStatus() == ErrorCodes::ShutdownInProgress) {
+            return finishedEvent.getStatus();
         }
-        if (writeConcern.wTimeout == 0) {
-            writeConcern.wTimeout = WriteConcernOptions::kNoWaiting;
-        }
-        OpTime lastOp = _getLastOpApplied_inlock();
-        Timer timer;
-
-        StatusAndDuration statusAndDur = _awaitReplication_inlock(
-                &timer, &lock, txn, lastOp, writeConcern);
-        if (!statusAndDur.status.isOK()) {
-            if (statusAndDur.status != ErrorCodes::ExceededTimeLimit) {
-                return statusAndDur.status;
-            }
-            else if (!force) {
-                return Status(ErrorCodes::ExceededTimeLimit,
-                              str::stream() << "After "
-                                            << statusAndDur.duration.total_milliseconds()
-                                            << " milliseconds there were no secondaries "
-                                               "caught up in replication");
-            }
-            // Else we said "force" so we ignore ExceededTimeLimit
-        }
-
-        Status result(ErrorCodes::InternalError, "didn't set status in _stepDownFinish");
+        fassert(26000, finishedEvent.getStatus());
+        Status result(ErrorCodes::InternalError, "didn't set status in _stepDownContinue");
         CBHStatus cbh = _replExecutor.scheduleWork(
-            stdx::bind(&ReplicationCoordinatorImpl::_stepDownFinish,
+            stdx::bind(&ReplicationCoordinatorImpl::_stepDownContinue,
                        this,
                        stdx::placeholders::_1,
+                       finishedEvent.getValue(),
+                       waitUntil,
                        stepDownUntil,
+                       force,
                        &result));
         if (cbh.getStatus() == ErrorCodes::ShutdownInProgress) {
             return cbh.getStatus();
         }
         fassert(18809, cbh.getStatus());
+        cbh = _replExecutor.scheduleWorkAt(
+                waitUntil,
+                stdx::bind(&ReplicationCoordinatorImpl::_signalStepDownWaiters,
+                           this,
+                           stdx::placeholders::_1));
+        if (cbh.getStatus() == ErrorCodes::ShutdownInProgress) {
+            return cbh.getStatus();
+        }
+        fassert(26001, cbh.getStatus());
         lock.unlock();
-        _replExecutor.wait(cbh.getValue());
+        _replExecutor.waitForEvent(finishedEvent.getValue());
         return result;
     }
 
-    void ReplicationCoordinatorImpl::_stepDownFinish(
+    void ReplicationCoordinatorImpl::_signalStepDownWaiters(
+            const ReplicationExecutor::CallbackData& cbData) {
+        if (!cbData.status.isOK()) {
+            return;
+        }
+        std::for_each(_stepDownWaiters.begin(),
+                      _stepDownWaiters.end(),
+                      stdx::bind(&ReplicationExecutor::signalEvent,
+                                 &_replExecutor,
+                                 stdx::placeholders::_1));
+        _stepDownWaiters.clear();
+    }
+
+    void ReplicationCoordinatorImpl::_stepDownContinue(
             const ReplicationExecutor::CallbackData& cbData,
-            const Date_t& stepdownUntil,
+            const ReplicationExecutor::EventHandle finishedEvent,
+            const Date_t waitUntil,
+            const Date_t stepDownUntil,
+            bool force,
             Status* result) {
+        if (cbData.status == ErrorCodes::CallbackCanceled) {
+            // Cancelation only occurs on shutdown, which will also handle signaling the event.
+            *result = Status(ErrorCodes::ShutdownInProgress, "Shutting down replication");
+            return;
+        }
+
+        ScopeGuard allFinishedGuard = MakeGuard(
+                stdx::bind(&ReplicationExecutor::signalEvent, &_replExecutor, finishedEvent));
         if (!cbData.status.isOK()) {
             *result = cbData.status;
             return;
@@ -912,34 +927,60 @@ namespace {
                              "request");
             return;
         }
-        if (_replExecutor.now() >= stepdownUntil) {
+        const Date_t now = _replExecutor.now();
+        if (now >= stepDownUntil) {
             *result = Status(ErrorCodes::ExceededTimeLimit,
                              "By the time we were ready to step down, we were already past the "
                              "time we were supposed to step down until");
             return;
         }
+        if (_topCoord->stepDown(stepDownUntil, force, _getLastOpApplied())) {
+            // Schedule work to (potentially) step back up once the stepdown period has ended.
+            _replExecutor.scheduleWorkAt(stepDownUntil,
+                                         stdx::bind(&ReplicationCoordinatorImpl::_handleTimePassing,
+                                                    this,
+                                                    stdx::placeholders::_1));
 
-        _topCoord->setStepDownTime(stepdownUntil);
-        _topCoord->stepDown();
-        // Schedule work to (potentially) step back up once the stepdown period has ended.
-        _replExecutor.scheduleWorkAt(stepdownUntil,
-                                     stdx::bind(&ReplicationCoordinatorImpl::_handleTimePassing,
-                                                this,
-                                                stdx::placeholders::_1));
-
-        boost::unique_lock<boost::mutex> lk(_mutex);
-        _updateCurrentMemberStateFromTopologyCoordinator_inlock();
-        // Wake up any threads blocked in awaitReplication
-        for (std::vector<WaiterInfo*>::iterator it = _replicationWaiterList.begin();
-                it != _replicationWaiterList.end(); ++it) {
-            WaiterInfo* info = *it;
-            info->master = false;
-            info->condVar->notify_all();
+            boost::unique_lock<boost::mutex> lk(_mutex);
+            const PostMemberStateUpdateAction action =
+                _updateCurrentMemberStateFromTopologyCoordinator_inlock();
+            lk.unlock();
+            _performPostMemberStateUpdateAction(action);
+            *result = Status::OK();
+            return;
         }
-        lk.unlock();
-        _externalState->closeConnections();
-        _externalState->clearShardingState();
-        *result = Status::OK();
+
+        // Step down failed.  Keep waiting if we can, otherwise finish.
+        if (now >= waitUntil) {
+            *result = Status(ErrorCodes::ExceededTimeLimit, str::stream() <<
+                             "No electable secondaries caught up as of " <<
+                             dateToISOStringLocal(now));
+            return;
+        }
+        if (_stepDownWaiters.empty()) {
+            StatusWith<ReplicationExecutor::EventHandle> reschedEvent =
+                _replExecutor.makeEvent();
+            if (!reschedEvent.isOK()) {
+                *result = reschedEvent.getStatus();
+                return;
+            }
+            _stepDownWaiters.push_back(reschedEvent.getValue());
+        }
+        CBHStatus cbh = _replExecutor.onEvent(
+                _stepDownWaiters.back(),
+                stdx::bind(&ReplicationCoordinatorImpl::_stepDownContinue,
+                           this,
+                           stdx::placeholders::_1,
+                           finishedEvent,
+                           waitUntil,
+                           stepDownUntil,
+                           force,
+                           result));
+        if (!cbh.isOK()) {
+            *result = cbh.getStatus();
+            return;
+        }
+        allFinishedGuard.Dismiss();
     }
 
     void ReplicationCoordinatorImpl::_handleTimePassing(
@@ -952,8 +993,11 @@ namespace {
             _topCoord->processWinElection(OID::gen(), getNextGlobalOptime());
             _isWaitingForDrainToComplete = true;
 
-            boost::lock_guard<boost::mutex> lock(_mutex);
-            _updateCurrentMemberStateFromTopologyCoordinator_inlock();
+            boost::unique_lock<boost::mutex> lk(_mutex);
+            const PostMemberStateUpdateAction action =
+                _updateCurrentMemberStateFromTopologyCoordinator_inlock();
+            lk.unlock();
+            _performPostMemberStateUpdateAction(action);
         }
     }
 
@@ -1241,7 +1285,7 @@ namespace {
             return;
         }
 
-        boost::lock_guard<boost::mutex> lk(_mutex);
+        boost::unique_lock<boost::mutex> lk(_mutex);
         if (_getCurrentMemberState_inlock().primary()) {
             *result = Status(ErrorCodes::NotSecondary, "primaries can't modify maintenance mode");
             return;
@@ -1266,8 +1310,11 @@ namespace {
             return;
         }
 
-        _updateCurrentMemberStateFromTopologyCoordinator_inlock();
+        const PostMemberStateUpdateAction action =
+            _updateCurrentMemberStateFromTopologyCoordinator_inlock();
         *result = Status::OK();
+        lk.unlock();
+        _performPostMemberStateUpdateAction(action);
     }
 
     Status ReplicationCoordinatorImpl::processReplSetSyncFrom(const HostAndPort& target,
@@ -1325,8 +1372,11 @@ namespace {
             _topCoord->processWinElection(OID::gen(), getNextGlobalOptime());
             _isWaitingForDrainToComplete = true;
 
-            boost::lock_guard<boost::mutex> lock(_mutex);
-            _updateCurrentMemberStateFromTopologyCoordinator_inlock();
+            boost::unique_lock<boost::mutex> lk(_mutex);
+            const PostMemberStateUpdateAction action =
+                _updateCurrentMemberStateFromTopologyCoordinator_inlock();
+            lk.unlock();
+            _performPostMemberStateUpdateAction(action);
         }
         *result = Status::OK();
     }
@@ -1512,10 +1562,12 @@ namespace {
             const ReplicaSetConfig& newConfig,
             int myIndex) {
 
-        boost::lock_guard<boost::mutex> lk(_mutex);
+        boost::unique_lock<boost::mutex> lk(_mutex);
         invariant(_rsConfigState == kConfigReconfiguring);
         invariant(_rsConfig.isInitialized());
-        _setCurrentRSConfig_inlock(newConfig, myIndex);
+        const PostMemberStateUpdateAction action = _setCurrentRSConfig_inlock(newConfig, myIndex);
+        lk.unlock();
+        _performPostMemberStateUpdateAction(action);
     }
 
     Status ReplicationCoordinatorImpl::processReplSetInitiate(OperationContext* txn,
@@ -1608,10 +1660,12 @@ namespace {
             const ReplicaSetConfig& newConfig,
             int myIndex) {
 
-        boost::lock_guard<boost::mutex> lk(_mutex);
+        boost::unique_lock<boost::mutex> lk(_mutex);
         invariant(_rsConfigState == kConfigInitiating);
         invariant(!_rsConfig.isInitialized());
-        _setCurrentRSConfig_inlock(newConfig, myIndex);
+        const PostMemberStateUpdateAction action = _setCurrentRSConfig_inlock(newConfig, myIndex);
+        lk.unlock();
+        _performPostMemberStateUpdateAction(action);
     }
 
     void ReplicationCoordinatorImpl::_setConfigState_inlock(ConfigState newState) {
@@ -1621,11 +1675,47 @@ namespace {
         }
     }
 
-    void ReplicationCoordinatorImpl::_updateCurrentMemberStateFromTopologyCoordinator_inlock() {
+    ReplicationCoordinatorImpl::PostMemberStateUpdateAction
+    ReplicationCoordinatorImpl::_updateCurrentMemberStateFromTopologyCoordinator_inlock() {
         const MemberState newState = _topCoord->getMemberState();
-        if (newState != _currentState) {
-            _currentState = newState;
-            log() << "transition to " << newState.toString();
+        if (newState == _currentState) {
+            return kActionNone;
+        }
+        PostMemberStateUpdateAction result;
+        if (_currentState.primary() || newState.removed()) {
+            // Wake up any threads blocked in awaitReplication, close connections, etc.
+            for (std::vector<WaiterInfo*>::iterator it = _replicationWaiterList.begin();
+                 it != _replicationWaiterList.end(); ++it) {
+                WaiterInfo* info = *it;
+                info->master = false;
+                info->condVar->notify_all();
+            }
+            result = kActionCloseAllConnections;
+        }
+        else {
+            result = kActionChooseNewSyncSource;
+        }
+        _currentState = newState;
+        log() << "transition to " << newState.toString();
+        return result;
+    }
+
+    void ReplicationCoordinatorImpl::_performPostMemberStateUpdateAction(
+            PostMemberStateUpdateAction action) {
+
+        switch (action) {
+        case kActionNone:
+            break;
+        case kActionChooseNewSyncSource:
+            _externalState->signalApplierToChooseNewSyncSource();
+            break;
+        case kActionCloseAllConnections:
+            _externalState->closeConnections();
+            _externalState->clearShardingState();
+            break;
+        default:
+            severe() << "Unknown post member state update action " << static_cast<int>(action);
+            fassertFailed(26010);
         }
     }
 
@@ -1705,12 +1795,11 @@ namespace {
                 args, _replExecutor.now(), _getLastOpApplied(), response, result);
     }
 
-    void ReplicationCoordinatorImpl::_setCurrentRSConfig_inlock(
+    ReplicationCoordinatorImpl::PostMemberStateUpdateAction
+    ReplicationCoordinatorImpl::_setCurrentRSConfig_inlock(
             const ReplicaSetConfig& newConfig,
             int myIndex) {
          invariant(_settings.usingReplSets());
-         const MemberState previousState = _currentState;
-
          _cancelHeartbeats();
          _setConfigState_inlock(kConfigSteady);
          _rsConfig = newConfig;
@@ -1730,19 +1819,11 @@ namespace {
              _isWaitingForDrainToComplete = true;
          }
 
-         _updateCurrentMemberStateFromTopologyCoordinator_inlock();
-         if (_currentState.removed() || (previousState.primary() && !_currentState.primary())) {
-             // Close connections on stepdown or when removed from the replica set.
-             _externalState->closeConnections();
-             _externalState->clearShardingState();
-             // Closing all connections will make the applier choose a new sync source, so we don't
-             // need to do that explicitly in this case.
-         }
-         else {
-             _externalState->signalApplierToChooseNewSyncSource();
-         }
+         const PostMemberStateUpdateAction action =
+             _updateCurrentMemberStateFromTopologyCoordinator_inlock();
          _updateSlaveInfoMapFromConfig_inlock();
          _startHeartbeats();
+         return action;
      }
 
     void ReplicationCoordinatorImpl::_updateSlaveInfoMapFromConfig_inlock() {

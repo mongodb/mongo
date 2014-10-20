@@ -155,6 +155,13 @@ namespace {
             _updateOpTimeFromHeartbeat(target, hbStatusResponse.getValue().getOpTime());
         }
 
+        std::for_each(_stepDownWaiters.begin(),
+                      _stepDownWaiters.end(),
+                      stdx::bind(&ReplicationExecutor::signalEvent,
+                                 &_replExecutor,
+                                 stdx::placeholders::_1));
+        _stepDownWaiters.clear();
+
         _scheduleHeartbeatToTarget(
                 target,
                 std::max(now, action.getNextHeartbeatStartDate()));
@@ -164,6 +171,7 @@ namespace {
 
     void ReplicationCoordinatorImpl::_updateOpTimeFromHeartbeat(const HostAndPort& target, 
                                                                 OpTime optime) {
+
         boost::unique_lock<boost::mutex> lk(_mutex);
         const MemberConfig* targetMember = _rsConfig.findMemberByHostAndPort(target);
         if (!targetMember) {
@@ -270,10 +278,10 @@ namespace {
         // TODO Add invariant that we've got global shared or global exclusive lock, when supported
         // by lock manager.
         boost::unique_lock<boost::mutex> lk(_mutex);
-        _updateCurrentMemberStateFromTopologyCoordinator_inlock();
+        const PostMemberStateUpdateAction action =
+            _updateCurrentMemberStateFromTopologyCoordinator_inlock();
         lk.unlock();
-        _externalState->closeConnections();
-        _externalState->clearShardingState();
+        _performPostMemberStateUpdateAction(action);
     }
 
     void ReplicationCoordinatorImpl::_scheduleHeartbeatReconfig(const ReplicaSetConfig& newConfig) {
@@ -396,7 +404,7 @@ namespace {
             return;
         }
 
-        boost::lock_guard<boost::mutex> lk(_mutex);
+        boost::unique_lock<boost::mutex> lk(_mutex);
         invariant(_rsConfigState == kConfigHBReconfiguring);
         invariant(!_rsConfig.isInitialized() ||
                   _rsConfig.getConfigVersion() < newConfig.getConfigVersion());
@@ -419,7 +427,10 @@ namespace {
             }
             myIndex = StatusWith<int>(-1);
         }
-        _setCurrentRSConfig_inlock(newConfig, myIndex.getValue());
+        const PostMemberStateUpdateAction action =
+            _setCurrentRSConfig_inlock(newConfig, myIndex.getValue());
+        lk.unlock();
+        _performPostMemberStateUpdateAction(action);
     }
 
     void ReplicationCoordinatorImpl::_trackHeartbeatHandle(const StatusWith<CBHandle>& handle) {

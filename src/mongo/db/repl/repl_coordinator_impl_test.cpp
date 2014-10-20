@@ -906,7 +906,7 @@ namespace {
         awaiter.start(&txn);
         ASSERT_OK(getReplCoord()->setLastOptime(&txn, client1, time1));
         ASSERT_OK(getReplCoord()->setLastOptime(&txn, client2, time1));
-        getReplCoord()->stepDown(&txn, false, Milliseconds(0), Milliseconds(1000));
+        getReplCoord()->stepDown(&txn, true, Milliseconds(0), Milliseconds(1000));
         ReplicationCoordinator::StatusAndDuration statusAndDur = awaiter.getResult();
         ASSERT_EQUALS(ErrorCodes::NotMaster, statusAndDur.status);
         awaiter.reset();
@@ -1070,6 +1070,31 @@ namespace {
 
         simulateSuccessfulElection();
 
+        enterNetwork();
+        getNet()->runUntil(getNet()->now() + 2000);
+        ASSERT(getNet()->hasReadyRequests());
+        NetworkInterfaceMock::NetworkOperationIterator noi = getNet()->getNextReadyRequest();
+        ReplicationExecutor::RemoteCommandRequest request = noi->getRequest();
+        log() << request.target.toString() << " processing " << request.cmdObj;
+        ReplSetHeartbeatArgs hbArgs;
+        if (hbArgs.initialize(request.cmdObj).isOK()) {
+            ReplSetHeartbeatResponse hbResp;
+            hbResp.setSetName(hbArgs.getSetName());
+            hbResp.setState(MemberState::RS_SECONDARY);
+            hbResp.setVersion(hbArgs.getConfigVersion());
+            hbResp.setOpTime(optime1);
+            BSONObjBuilder respObj;
+            respObj << "ok" << 1;
+            hbResp.addToBSON(&respObj);
+            getNet()->scheduleResponse(noi, getNet()->now(), makeResponseStatus(respObj.obj()));
+        }
+        while (getNet()->hasReadyRequests()) {
+            getNet()->blackHole(getNet()->getNextReadyRequest());
+        }
+        getNet()->runReadyNetworkOperations();
+        exitNetwork();
+
+
         ASSERT_TRUE(getReplCoord()->getCurrentMemberState().primary());
         ASSERT_OK(getReplCoord()->stepDown(&txn, false, Milliseconds(0), Milliseconds(1000)));
         enterNetwork(); // So we can safely inspect the topology coordinator
@@ -1091,7 +1116,7 @@ namespace {
         getReplCoord()->setFollowerMode(MemberState::RS_SECONDARY);
 
         ASSERT_TRUE(getReplCoord()->getCurrentMemberState().primary());
-        ASSERT_OK(getReplCoord()->stepDown(&txn, false, Milliseconds(0), Milliseconds(1000)));
+        ASSERT_OK(getReplCoord()->stepDown(&txn, true, Milliseconds(0), Milliseconds(1000)));
         getNet()->enterNetwork(); // Must do this before inspecting the topocoord
         Date_t stepdownUntil = Date_t(getNet()->now().millis + 1000);
         ASSERT_EQUALS(stepdownUntil, getTopoCoord().getStepDownTime());
@@ -1225,14 +1250,38 @@ namespace {
         // stepDown where the secondary actually has to catch up before the stepDown can succeed
         StepDownRunner runner(getReplCoord());
         runner.setForce(false);
-        runner.setWaitTime(Milliseconds(1000));
-        runner.setStepDownTime(Milliseconds(1000));
+        runner.setWaitTime(Milliseconds(10000));
+        runner.setStepDownTime(Milliseconds(60000));
 
         simulateSuccessfulElection();
 
         runner.start(&txn);
+
         // Make a secondary actually catch up
-        ASSERT_OK(getReplCoord()->setLastOptime(&txn, rid2, optime2));
+        enterNetwork();
+        getNet()->runUntil(getNet()->now() + 2000);
+        ASSERT(getNet()->hasReadyRequests());
+        NetworkInterfaceMock::NetworkOperationIterator noi = getNet()->getNextReadyRequest();
+        ReplicationExecutor::RemoteCommandRequest request = noi->getRequest();
+        log() << request.target.toString() << " processing " << request.cmdObj;
+        ReplSetHeartbeatArgs hbArgs;
+        if (hbArgs.initialize(request.cmdObj).isOK()) {
+            ReplSetHeartbeatResponse hbResp;
+            hbResp.setSetName(hbArgs.getSetName());
+            hbResp.setState(MemberState::RS_SECONDARY);
+            hbResp.setVersion(hbArgs.getConfigVersion());
+            hbResp.setOpTime(optime2);
+            BSONObjBuilder respObj;
+            respObj << "ok" << 1;
+            hbResp.addToBSON(&respObj);
+            getNet()->scheduleResponse(noi, getNet()->now(), makeResponseStatus(respObj.obj()));
+        }
+        while (getNet()->hasReadyRequests()) {
+            getNet()->blackHole(getNet()->getNextReadyRequest());
+        }
+        getNet()->runReadyNetworkOperations();
+        exitNetwork();
+
         ASSERT_OK(runner.getResult());
         ASSERT_TRUE(getReplCoord()->getCurrentMemberState().secondary());
     }

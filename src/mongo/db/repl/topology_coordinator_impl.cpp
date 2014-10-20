@@ -1757,8 +1757,24 @@ namespace {
         _role = Role::follower;
     }
 
-    void TopologyCoordinatorImpl::stepDown() {
+    bool TopologyCoordinatorImpl::stepDown(Date_t until, bool force, OpTime lastOpApplied) {
+        bool canStepDown = force;
+        for (int i = 0; !canStepDown && i < _currentConfig.getNumMembers(); ++i) {
+            if (i == _selfIndex) {
+                continue;
+            }
+            UnelectableReason reason = _getUnelectableReason(i, lastOpApplied);
+            if (None == reason && _hbdata[i].getOpTime() >= lastOpApplied) {
+                canStepDown = true;
+            }
+        }
+
+        if (!canStepDown) {
+            return false;
+        }
+        setStepDownTime(until);
         _stepDownSelf();
+        return true;
     }
 
     void TopologyCoordinatorImpl::setFollowerMode(MemberState::MS newMode) {

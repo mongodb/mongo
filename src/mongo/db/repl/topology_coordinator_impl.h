@@ -182,7 +182,7 @@ namespace repl {
         virtual void processWinElection(OID electionId, OpTime electionOpTime);
         virtual void processLoseElection();
         virtual bool checkShouldStandForElection(Date_t now, const OpTime& lastOpApplied);
-        virtual void stepDown();
+        virtual bool stepDown(Date_t until, bool force, OpTime lastOpApplied);
         virtual Date_t getStepDownTime() const;
 
         ////////////////////////////////////////////////////////////

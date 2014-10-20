@@ -314,9 +314,14 @@ namespace repl {
         virtual void processLoseElection() = 0;
 
         /**
-         * Changes the coordinator from the leader role to the follower role.
+         * Tries to transition the coordinator from the leader role to the follower role.
+         *
+         * Fails if "force" is not set and no follower is known to be up.  It is illegal
+         * to call this method if the node is not leader.
+         *
+         * Returns whether or not the step down succeeded.
          */
-        virtual void stepDown() = 0;
+        virtual bool stepDown(Date_t until, bool force, OpTime lastOpApplied) = 0;
 
         /**
          * Considers whether or not this node should stand for election, and returns true
