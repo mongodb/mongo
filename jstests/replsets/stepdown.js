@@ -3,6 +3,8 @@
    we use lock+fsync to force secondary to be stale
 */
 
+load("jstests/replsets/rslib.js")
+
 var replTest = new ReplSetTest({ name: 'testSet', nodes: 2 });
 var nodes = replTest.startSet();
 replTest.initiate();
@@ -65,12 +67,7 @@ config.members[0].priority = 2;
 config.members[1].priority = 1;
 // make sure 1 can stay master once 0 is down
 config.members[0].votes = 0;
-try {
-    master.getDB("admin").runCommand({replSetReconfig : config});
-}
-catch (e) {
-    print(e);
-}
+reconfig(replTest, config);
 
 print("\nawait");
 replTest.awaitSecondaryNodes(90000);
@@ -92,10 +89,12 @@ var firstMaster = master;
 print("\nmaster is now "+firstMaster);
 
 try {
-    printjson(master.getDB("admin").runCommand({replSetStepDown : 100, force : true}));
+    assert.commandWorked(master.getDB("admin").runCommand({replSetStepDown : 100, force : true}));
 }
 catch (e) {
-    print(e);
+    if (tojson( e ).indexOf( "error doing query: failed" ) < 0) {
+        throw e;
+    }
 }
 
 print("\nget a master");
@@ -106,7 +105,6 @@ assert.soon(function() {
         return firstMaster+"" != secondMaster+"";
     }, 'making sure '+firstMaster+' isn\'t still master', 60000);
 
-
 // Add arbiter for shutdown tests
 replTest.add();
 
@@ -115,12 +113,7 @@ config.members.push({_id: 2,
                      host: getHostName()+":"+replTest.ports[replTest.ports.length-1],
                      arbiterOnly:true});
 
-try {
-    assert.commandWorked(master.getDB("admin").runCommand({replSetReconfig : config}));
-}
-catch (e) {
-    print(e);
-}
+reconfig(replTest, config);
 
 print("\ncheck shutdown command");
 
@@ -160,8 +153,9 @@ print("\nrunning shutdown without force on master: "+master);
 
 // this should fail because the master can't reach an up-to-date secondary (because the only 
 // secondary is down)
-result = master.getDB("admin").runCommand({shutdown : 1, timeoutSecs : 3});
-assert.eq(result.ok, 0);
+var now = new Date();
+assert.commandFailed(master.getDB("admin").runCommand({shutdown : 1, timeoutSecs : 3}));
+assert.gte((new Date()) - now, 3000);
 
 print("\nsend shutdown command");
 
@@ -170,7 +164,9 @@ try {
     printjson(currentMaster.getDB("admin").runCommand({shutdown : 1, force : true}));
 }
 catch (e) {
-    print(e);
+    if (tojson(e).indexOf( "error doing query: failed" ) < 0) {
+        throw e;
+    }
 }
 
 print("checking "+currentMaster+" is actually shutting down");
