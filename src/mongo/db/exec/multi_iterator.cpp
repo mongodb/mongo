@@ -96,12 +96,14 @@ namespace mongo {
     }
 
     void MultiIteratorStage::saveState() {
+        _txn = NULL;
         for (size_t i = 0; i < _iterators.size(); i++) {
             _iterators[i]->saveState();
         }
     }
 
     void MultiIteratorStage::restoreState(OperationContext* opCtx) {
+        invariant(_txn == NULL);
         _txn = opCtx;
         for (size_t i = 0; i < _iterators.size(); i++) {
             if (!_iterators[i]->restoreState(opCtx)) {

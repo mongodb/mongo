@@ -205,6 +205,7 @@ namespace mongo {
     }
 
     void CollectionScan::saveState() {
+        _txn = NULL;
         ++_commonStats.yields;
         if (NULL != _iter) {
             _iter->saveState();
@@ -212,6 +213,7 @@ namespace mongo {
     }
 
     void CollectionScan::restoreState(OperationContext* opCtx) {
+        invariant(_txn == NULL);
         _txn = opCtx;
         ++_commonStats.unyields;
         if (NULL != _iter) {

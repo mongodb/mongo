@@ -201,6 +201,9 @@ namespace mongo {
          * any saved state and be ready to handle calls to work().
          *
          * Can only be called after saveState.
+         *
+         * If the stage needs an OperationContext during its execution, it may keep a handle to the
+         * provided OperationContext (which is valid until the next call to saveState()).
          */
         virtual void restoreState(OperationContext* opCtx) = 0;
 
@@ -210,6 +213,10 @@ namespace mongo {
          * DiskLoc.
          *
          * Can only be called after a saveState but before a restoreState.
+         *
+         * The provided OperationContext should be used if any work needs to be performed during the
+         * invalidate (as the state of the stage must be saved before any calls to invalidate, the
+         * stage's own OperationContext is inactive during the invalidate and should not be used).
          */
         virtual void invalidate(OperationContext* txn,
                                 const DiskLoc& dl,

@@ -490,6 +490,7 @@ namespace mongo {
     }
 
     void SubplanStage::saveState() {
+        _txn = NULL;
         ++_commonStats.yields;
         if (_killed) {
             return;
@@ -503,6 +504,7 @@ namespace mongo {
     }
 
     void SubplanStage::restoreState(OperationContext* opCtx) {
+        invariant(_txn == NULL);
         _txn = opCtx;
         ++_commonStats.unyields;
         if (_killed) {

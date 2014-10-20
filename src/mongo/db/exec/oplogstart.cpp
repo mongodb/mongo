@@ -156,6 +156,7 @@ namespace mongo {
     }
 
     void OplogStart::saveState() {
+        _txn = NULL;
         if (_cs) {
             _cs->saveState();
         }
@@ -166,6 +167,7 @@ namespace mongo {
     }
 
     void OplogStart::restoreState(OperationContext* opCtx) {
+        invariant(_txn == NULL);
         _txn = opCtx;
         if (_cs) {
             _cs->restoreState(opCtx);

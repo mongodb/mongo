@@ -148,6 +148,7 @@ namespace mongo {
     }
 
     void CountScan::saveState() {
+        _txn = NULL;
         ++_commonStats.yields;
         if (_hitEnd || (NULL == _btreeCursor.get())) { return; }
 
@@ -156,6 +157,7 @@ namespace mongo {
     }
 
     void CountScan::restoreState(OperationContext* opCtx) {
+        invariant(_txn == NULL);
         _txn = opCtx;
         ++_commonStats.unyields;
         if (_hitEnd || (NULL == _btreeCursor.get())) { return; }

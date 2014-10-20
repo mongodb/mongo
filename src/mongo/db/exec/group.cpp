@@ -257,11 +257,13 @@ namespace mongo {
     }
 
     void GroupStage::saveState() {
+        _txn = NULL;
         ++_commonStats.yields;
         _child->saveState();
     }
 
     void GroupStage::restoreState(OperationContext* opCtx) {
+        invariant(_txn == NULL);
         _txn = opCtx;
         ++_commonStats.unyields;
         _child->restoreState(opCtx);

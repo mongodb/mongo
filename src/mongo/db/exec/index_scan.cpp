@@ -242,6 +242,7 @@ namespace mongo {
     }
 
     void IndexScan::saveState() {
+        _txn = NULL;
         ++_commonStats.yields;
 
         if (HIT_END == _scanState || INITIALIZING == _scanState) { return; }
@@ -253,6 +254,7 @@ namespace mongo {
     }
 
     void IndexScan::restoreState(OperationContext* opCtx) {
+        invariant(_txn == NULL);
         _txn = opCtx;
         ++_commonStats.unyields;
 

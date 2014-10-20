@@ -164,6 +164,7 @@ namespace mongo {
     }
 
     void CountStage::saveState() {
+        _txn = NULL;
         ++_commonStats.yields;
         if (_child.get()) {
             _child->saveState();
@@ -171,6 +172,7 @@ namespace mongo {
     }
 
     void CountStage::restoreState(OperationContext* opCtx) {
+        invariant(_txn == NULL);
         _txn = opCtx;
         ++_commonStats.unyields;
         if (_child.get()) {

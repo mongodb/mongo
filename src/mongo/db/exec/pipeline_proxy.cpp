@@ -95,6 +95,7 @@ namespace mongo {
     }
 
     void PipelineProxyStage::restoreState(OperationContext* opCtx) {
+        invariant(_pipeline->getContext()->opCtx == NULL);
         _pipeline->getContext()->opCtx = opCtx;
     }
 

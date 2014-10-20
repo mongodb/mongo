@@ -407,12 +407,14 @@ namespace mongo {
     }
 
     void MultiPlanStage::saveState() {
+        _txn = NULL;
         for (size_t i = 0; i < _candidates.size(); ++i) {
             _candidates[i].root->saveState();
         }
     }
 
     void MultiPlanStage::restoreState(OperationContext* opCtx) {
+        invariant(_txn == NULL);
         _txn = opCtx;
 
         for (size_t i = 0; i < _candidates.size(); ++i) {

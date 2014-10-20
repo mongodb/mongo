@@ -173,10 +173,12 @@ namespace mongo {
     }
 
     void IDHackStage::saveState() {
+        _txn = NULL;
         ++_commonStats.yields;
     }
 
     void IDHackStage::restoreState(OperationContext* opCtx) {
+        invariant(_txn == NULL);
         _txn = opCtx;
         ++_commonStats.unyields;
     }

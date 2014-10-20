@@ -109,6 +109,7 @@ namespace mongo {
     }
 
     void TextStage::saveState() {
+        _txn = NULL;
         ++_commonStats.yields;
 
         for (size_t i = 0; i < _scanners.size(); ++i) {
@@ -117,6 +118,7 @@ namespace mongo {
     }
 
     void TextStage::restoreState(OperationContext* opCtx) {
+        invariant(_txn == NULL);
         _txn = opCtx;
         ++_commonStats.unyields;
 

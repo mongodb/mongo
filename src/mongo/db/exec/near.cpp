@@ -303,6 +303,7 @@ namespace mongo {
     }
 
     void NearStage::saveState() {
+        _txn = NULL;
         ++_stats->common.yields;
         for (size_t i = 0; i < _childrenIntervals.size(); i++) {
             _childrenIntervals[i]->covering->saveState();
@@ -310,6 +311,7 @@ namespace mongo {
     }
 
     void NearStage::restoreState(OperationContext* opCtx) {
+        invariant(_txn == NULL);
         _txn = opCtx;
         ++_stats->common.unyields;
         for (size_t i = 0; i < _childrenIntervals.size(); i++) {

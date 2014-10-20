@@ -741,7 +741,7 @@ namespace mongo {
             ++_specificStats.nMatched;
 
             // Save state before making changes
-            saveState();
+            _child->saveState();
 
             // Do the update and return.
             BSONObj reFetched;
@@ -780,7 +780,7 @@ namespace mongo {
             // As restoreState may restore (recreate) cursors, make sure to restore the
             // state outside of the WritUnitOfWork.
 
-            restoreState(_txn);
+            _child->restoreState(_txn);
 
             ++_commonStats.needTime;
             return PlanStage::NEED_TIME;
@@ -815,6 +815,7 @@ namespace mongo {
     }
 
     void UpdateStage::saveState() {
+        _txn = NULL;
         ++_commonStats.yields;
         _child->saveState();
     }
@@ -848,6 +849,7 @@ namespace mongo {
     }
 
     void UpdateStage::restoreState(OperationContext* opCtx) {
+        invariant(_txn == NULL);
         _txn = opCtx;
         ++_commonStats.unyields;
         // Restore our child.
