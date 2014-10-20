@@ -100,7 +100,7 @@ class test_bulk_load_row_order(wttest.WiredTigerTestCase):
         cursor.set_value(value_populate(cursor, 1))
         cursor.insert()
 
-        if not self.conn.diagnostic_build():
+        if not wiredtiger.diagnostic_build():
             self.skipTest('requires a diagnostic build')
 
         # Close explicitly, there's going to be a fallure.

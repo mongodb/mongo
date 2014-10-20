@@ -49,6 +49,7 @@ struct __wt_session_impl {
 
 	const char *name;		/* Name */
 	uint32_t id;			/* UID, offset in session array */
+	uint32_t api_level;		/* Number of recursive calls */
 
 	WT_CONDVAR *cond;		/* Condition variable */
 

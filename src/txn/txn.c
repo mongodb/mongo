@@ -83,7 +83,7 @@ __wt_txn_update_oldest(WT_SESSION_IMPL *session)
 	 * state wasn't refreshed after the last transaction committed.  Push
 	 * past the last committed transaction.
 	 */
-	__wt_txn_refresh(session, 0, 0);
+	__wt_txn_refresh(session, 0);
 }
 
 /*
@@ -91,7 +91,7 @@ __wt_txn_update_oldest(WT_SESSION_IMPL *session)
  *	Allocate a transaction ID and/or a snapshot.
  */
 void
-__wt_txn_refresh(WT_SESSION_IMPL *session, int get_snapshot, int pin_reads)
+__wt_txn_refresh(WT_SESSION_IMPL *session, int get_snapshot)
 {
 	WT_CONNECTION_IMPL *conn;
 	WT_TXN *txn;
@@ -99,7 +99,7 @@ __wt_txn_refresh(WT_SESSION_IMPL *session, int get_snapshot, int pin_reads)
 	WT_TXN_STATE *s, *txn_state;
 	uint64_t current_id, id, oldest_id;
 	uint64_t prev_oldest_id, snap_min;
-	uint32_t i, n, session_cnt;
+	uint32_t i, n, oldest_session, session_cnt;
 	int32_t count;
 
 	conn = S2C(session);
@@ -136,6 +136,7 @@ __wt_txn_refresh(WT_SESSION_IMPL *session, int get_snapshot, int pin_reads)
 	/* The oldest ID cannot change until the scan count goes to zero. */
 	prev_oldest_id = txn_global->oldest_id;
 	current_id = oldest_id = snap_min = txn_global->current;
+	oldest_session = 0;
 
 	/* Walk the array of concurrent transactions. */
 	WT_ORDERED_READ(session_cnt, conn->session_cnt);
@@ -160,10 +161,10 @@ __wt_txn_refresh(WT_SESSION_IMPL *session, int get_snapshot, int pin_reads)
 		}
 
 		/*
-		 * Ignore the session's own snap_min if we are in the process
-		 * of updating it.
+		 * Ignore the session's own snap_min: we are about to update
+		 * it.
 		 */
-		if (get_snapshot && !pin_reads && s == txn_state)
+		if (get_snapshot && s == txn_state)
 			continue;
 
 		/*
@@ -175,8 +176,10 @@ __wt_txn_refresh(WT_SESSION_IMPL *session, int get_snapshot, int pin_reads)
 		 * more details.
 		 */
 		if ((id = s->snap_min) != WT_TXN_NONE &&
-		    TXNID_LT(id, oldest_id))
+		    TXNID_LT(id, oldest_id)) {
 			oldest_id = id;
+			oldest_session = i;
+		}
 	}
 
 	if (TXNID_LT(snap_min, oldest_id))
@@ -186,12 +189,9 @@ __wt_txn_refresh(WT_SESSION_IMPL *session, int get_snapshot, int pin_reads)
 
 	/*
 	 * If we got a new snapshot, update the published snap_min for this
-	 * session.  Skip this if we are updating a snapshot because there are
-	 * positioned cursors during commit: the cursors may be pointing to
-	 * data older than the snapshot we've calculated.
+	 * session.
 	 */
-	if (get_snapshot && !pin_reads &&
-	    (session->ncursors == 0 || txn_state->snap_min == WT_TXN_NONE)) {
+	if (get_snapshot) {
 		WT_ASSERT(session, TXNID_LE(prev_oldest_id, snap_min));
 		WT_ASSERT(session, prev_oldest_id == txn_global->oldest_id);
 		txn_state->snap_min = snap_min;
@@ -226,6 +226,18 @@ __wt_txn_refresh(WT_SESSION_IMPL *session, int get_snapshot, int pin_reads)
 			txn_global->oldest_id = oldest_id;
 		txn_global->scan_count = 0;
 	} else {
+		if (WT_VERBOSE_ISSET(session, WT_VERB_TRANSACTION) &&
+		    current_id - oldest_id > 10000 &&
+		    txn_global->oldest_session != oldest_session) {
+			(void)__wt_verbose(session, WT_VERB_TRANSACTION,
+			    "old snapshot %" PRIu64
+			    " pinned in session %d [%s]"
+			    " with snap_min %" PRIu64 "\n",
+			    oldest_id, oldest_session,
+			    conn->sessions[oldest_session].name,
+			    conn->sessions[oldest_session].txn.snap_min);
+			txn_global->oldest_session = oldest_session;
+		}
 		WT_ASSERT(session, txn_global->scan_count > 0);
 		(void)WT_ATOMIC_SUB4(txn_global->scan_count, 1);
 	}
@@ -267,8 +279,10 @@ __wt_txn_begin(WT_SESSION_IMPL *session, const char *cfg[])
 		txn->txn_logsync = 0;
 
 	F_SET(txn, TXN_RUNNING);
-	if (txn->isolation == TXN_ISO_SNAPSHOT)
-		__wt_txn_refresh(session, 1, session->ncursors > 0);
+	if (txn->isolation == TXN_ISO_SNAPSHOT) {
+		WT_RET(__wt_session_copy_values(session));
+		__wt_txn_refresh(session, 1);
+	}
 	return (0);
 }
 
@@ -370,8 +384,10 @@ __wt_txn_commit(WT_SESSION_IMPL *session, const char *cfg[])
 	 */
 	if (session->ncursors > 0 &&
 	    F_ISSET(txn, TXN_HAS_ID) &&
-	    txn->isolation != TXN_ISO_READ_UNCOMMITTED)
-		__wt_txn_refresh(session, 1, 1);
+	    txn->isolation != TXN_ISO_READ_UNCOMMITTED) {
+		WT_RET(__wt_session_copy_values(session));
+		__wt_txn_refresh(session, 1);
+	}
 
 	__wt_txn_release(session);
 	return (0);
@@ -444,6 +460,14 @@ __wt_txn_init(WT_SESSION_IMPL *session)
 
 	WT_RET(__wt_calloc_def(session,
 	    S2C(session)->session_size, &txn->snapshot));
+
+#ifdef HAVE_DIAGNOSTIC
+	if (S2C(session)->txn_global.states != NULL) {
+		WT_TXN_STATE *txn_state;
+		txn_state = &S2C(session)->txn_global.states[session->id];
+		WT_ASSERT(session, txn_state->snap_min == WT_TXN_NONE);
+	}
+#endif
 
 	/*
 	 * Take care to clean these out in case we are reusing the transaction

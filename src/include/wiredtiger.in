@@ -1569,8 +1569,8 @@ struct __wt_connection {
 	 * "evictserver"\, \c "fileops"\, \c "log"\, \c "lsm"\, \c "metadata"\,
 	 * \c "mutex"\, \c "overflow"\, \c "read"\, \c "reconcile"\, \c
 	 * "recovery"\, \c "salvage"\, \c "shared_cache"\, \c "split"\, \c
-	 * "temporary"\, \c "verify"\, \c "version"\, \c "write"; default
-	 * empty.}
+	 * "temporary"\, \c "transaction"\, \c "verify"\, \c "version"\, \c
+	 * "write"; default empty.}
 	 * @configend
 	 * @errors
 	 */
@@ -1955,8 +1955,8 @@ struct __wt_connection {
  * "checkpoint"\, \c "compact"\, \c "evict"\, \c "evictserver"\, \c "fileops"\,
  * \c "log"\, \c "lsm"\, \c "metadata"\, \c "mutex"\, \c "overflow"\, \c
  * "read"\, \c "reconcile"\, \c "recovery"\, \c "salvage"\, \c "shared_cache"\,
- * \c "split"\, \c "temporary"\, \c "verify"\, \c "version"\, \c "write";
- * default empty.}
+ * \c "split"\, \c "temporary"\, \c "transaction"\, \c "verify"\, \c "version"\,
+ * \c "write"; default empty.}
  * @configend
  * Additionally, if files named \c WiredTiger.config or \c WiredTiger.basecfg
  * appear in the WiredTiger home directory, they are read for configuration
