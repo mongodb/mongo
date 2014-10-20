@@ -57,6 +57,9 @@ namespace mongo {
         // on its use.
         const ResourceId resourceIdMMAPV1Flush = ResourceId(RESOURCE_MMAPV1_FLUSH, 2ULL);
 
+        // How often (in millis) to check for deadlock if a lock has not been granted for some time
+        const unsigned DeadlockTimeoutMs = 100;
+
         /**
          * Returns whether the passed in mode is S or IS. Used for validation checks.
          */
@@ -467,7 +470,8 @@ namespace mongo {
     template<bool IsForMMAPV1>
     LockResult LockerImpl<IsForMMAPV1>::lock(const ResourceId& resId,
                                              LockMode mode,
-                                             unsigned timeoutMs) {
+                                             unsigned timeoutMs,
+                                             bool checkDeadlock) {
 
         LockResult result = lockImpl(resId, mode);
 
@@ -494,15 +498,25 @@ namespace mongo {
 
         // Don't go sleeping without bound in order to be able to report long waits or wake up for
         // deadlock detection.
-        unsigned waitTimeMs = std::min(timeoutMs, 1000U);
+        unsigned waitTimeMs = std::min(timeoutMs, DeadlockTimeoutMs);
         while (true) {
             result = _notify.wait(waitTimeMs);
 
             if (result == LOCK_OK) break;
 
+            if (checkDeadlock) {
+                DeadlockDetector wfg(globalLockManager, this);
+                if (wfg.check().hasCycle()) {
+                    log() << "Deadlock found: " << wfg.toString();
+
+                    result = LOCK_DEADLOCK;
+                    break;
+                }
+            }
+
             const unsigned elapsedTimeMs = timer.millis();
             waitTimeMs = (elapsedTimeMs < timeoutMs) ?
-                std::min(timeoutMs - elapsedTimeMs, 1000U) : 0;
+                std::min(timeoutMs - elapsedTimeMs, DeadlockTimeoutMs) : 0;
 
             if (waitTimeMs == 0) {
                 break;
@@ -552,6 +566,22 @@ namespace mongo {
     template<bool IsForMMAPV1>
     bool LockerImpl<IsForMMAPV1>::isLockHeldForMode(const ResourceId& resId, LockMode mode) const {
         return getLockMode(resId) >= mode;
+    }
+
+    template<bool IsForMMAPV1>
+    ResourceId LockerImpl<IsForMMAPV1>::getWaitingResource() const {
+        scoped_spinlock scopedLock(_lock);
+
+        LockRequestsMap::ConstIterator it = _requests.begin();
+        while (!it.finished()) {
+            if (it->status != LockRequest::STATUS_GRANTED) {
+                return it.key();
+            }
+
+            it.next();
+        }
+
+        return ResourceId();
     }
 
     namespace {

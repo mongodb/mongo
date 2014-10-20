@@ -106,12 +106,15 @@ namespace mongo {
 
         virtual LockResult lock(const ResourceId& resId,
                                 LockMode mode, 
-                                unsigned timeoutMs = UINT_MAX);
+                                unsigned timeoutMs = UINT_MAX,
+                                bool checkDeadlock = false);
 
         virtual bool unlock(const ResourceId& resId);
 
         virtual LockMode getLockMode(const ResourceId& resId) const;
         virtual bool isLockHeldForMode(const ResourceId& resId, LockMode mode) const;
+
+        virtual ResourceId getWaitingResource() const;
 
         virtual bool saveLockStateAndUnlock(LockSnapshot* stateOut);
 
