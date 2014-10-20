@@ -642,7 +642,7 @@ namespace mongo {
             }
             catch ( const DeadLockException& dle ) {
                 if ( multi ) {
-                    log() << "got deadlock during multi abort, aborting";
+                    log() << "got deadlock during multi update, aborting";
                     throw;
                 }
                 else {

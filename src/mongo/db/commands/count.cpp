@@ -261,7 +261,7 @@ namespace mongo {
         Status getExecStatus = getExecutorCount(txn, collection, request, &rawExec);
         if (!getExecStatus.isOK()) {
             err = getExecStatus.reason();
-            errCode = parseStatus.code();
+            errCode = getExecStatus.code();
             return -1;
         }
 

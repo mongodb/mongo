@@ -291,6 +291,7 @@ namespace {
             return;
         }
 
+        boost::thread* hbReconfigThread = NULL;
         {
             boost::lock_guard<boost::mutex> lk(_mutex);
             fassert(28533, !_inShutdown);
@@ -307,6 +308,15 @@ namespace {
                 WaiterInfo* waiter = *it;
                 waiter->condVar->notify_all();
             }
+
+            // Since we've set _inShutdown we know that _heartbeatReconfigThread will not be
+            // changed again, which makes it safe to store the pointer to it to be accessed outside
+            // of _mutex.
+            hbReconfigThread = _heartbeatReconfigThread.get();
+        }
+
+        if (hbReconfigThread) {
+            hbReconfigThread->join();
         }
 
         _replExecutor.shutdown();
@@ -632,18 +642,19 @@ namespace {
         const OpTime& opTime, const WriteConcernOptions& writeConcern) {
 
         if (!writeConcern.wMode.empty()) {
+            StringData patternName;
             if (writeConcern.wMode == "majority") {
-                return _haveNumNodesReachedOpTime_inlock(opTime,
-                                                         _rsConfig.getMajorityVoteCount());
+                patternName = "$majority";
             }
             else {
-                StatusWith<ReplicaSetTagPattern> tagPattern =
-                        _rsConfig.findCustomWriteMode(writeConcern.wMode);
-                if (!tagPattern.isOK()) {
-                    return true;
-                }
-                return _haveTaggedNodesReachedOpTime_inlock(opTime, tagPattern.getValue());
+                patternName = writeConcern.wMode;
             }
+            StatusWith<ReplicaSetTagPattern> tagPattern =
+                _rsConfig.findCustomWriteMode(patternName);
+            if (!tagPattern.isOK()) {
+                return true;
+            }
+            return _haveTaggedNodesReachedOpTime_inlock(opTime, tagPattern.getValue());
         }
         else {
             return _haveNumNodesReachedOpTime_inlock(opTime, writeConcern.wNumNodes);

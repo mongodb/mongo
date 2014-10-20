@@ -220,7 +220,7 @@ namespace mongo {
     }
 
     void AutoGetCollectionForRead::_init() {
-        invariant(!_nss.coll().empty());
+        massert(28534, "need a non-empty collection name", !_nss.coll().empty());
 
         // TODO: Client::Context legacy, needs to be removed
         _txn->getCurOp()->ensureStarted();
