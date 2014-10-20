@@ -8,6 +8,9 @@
 #include "util.h"
 #include "util_load.h"
 
+static int config_read(char ***, int *);
+static int config_rename(char **, const char *);
+static void config_remove(char *, const char *);
 static int format(void);
 static int insert(WT_CURSOR *, const char *);
 static int load_dump(WT_SESSION *);
@@ -173,6 +176,10 @@ config_exec(WT_SESSION *session, char **list)
 	return (0);
 }
 
+/*
+ * config_list_free --
+ *	Add a value to the config list.
+ */
 int
 config_list_add(CONFIG_LIST *clp, char *val)
 {
@@ -187,6 +194,10 @@ config_list_add(CONFIG_LIST *clp, char *val)
 	return (0);
 }
 
+/*
+ * config_list_free --
+ *	Free the list and any of its entries.
+ */
 void
 config_list_free(CONFIG_LIST *clp)
 {
@@ -203,7 +214,7 @@ config_list_free(CONFIG_LIST *clp)
  * config_read --
  *	Read the config lines and do some basic validation.
  */
-int
+static int
 config_read(char ***listp, int *hexp)
 {
 	ULINE l;
@@ -446,7 +457,7 @@ config_update(WT_SESSION *session, char **list)
  * config_rename --
  *	Update the URI name.
  */
-int
+static int
 config_rename(char **urip, const char *name)
 {
 	size_t len;
@@ -477,7 +488,7 @@ config_rename(char **urip, const char *name)
  * config_remove --
  *	Remove a single config key and its value.
  */
-void
+static void
 config_remove(char *config, const char *ckey)
 {
 	int parens, quoted;

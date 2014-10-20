@@ -898,7 +898,7 @@ __wt_json_strncpy(char **pdst, size_t dstlen, const char *src, size_t srclen)
 					/* byte 1: 10HHHHLL */
 					/* byte 2: 10LLLLLL */
 					*dst++ = (char)(0xe0 |
-					    ((hi << 4) & 0x0f));
+					    ((hi >> 4) & 0x0f));
 					*dst++ = (char)(0x80 |
 					    ((hi << 2) & 0x3c) |
 					    ((lo >> 6) & 0x03));
