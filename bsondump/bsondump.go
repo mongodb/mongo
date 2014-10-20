@@ -87,7 +87,7 @@ func (bd *BSONDump) Debug() error {
 			break
 		}
 		result.Data = reusableBuf[0:docSize]
-		err = DebugBSON(result, 0, os.Stdout)
+		err = DebugBSON(result, 0, bd.Out)
 		if err != nil {
 			return err
 		}
