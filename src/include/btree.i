@@ -953,17 +953,17 @@ __wt_page_release(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t flags)
 	page = ref->page;
 
 	/*
-         * Attempt to evict pages with the special "oldest" read generation.
-         *
-         * This is set for pages that grow larger than the configured
-         * memory_page_max setting, and when we are attempting to scan without
-         * trashing the cache.
-         *
-         * Skip this if eviction is disabled for this operation or this tree,
-         * or if there is no chance of eviction succeeding for dirty pages due
-         * to a checkpoint or because we've already tried writing this page and
-         * it contains an update that isn't stable.
-         */
+	 * Attempt to evict pages with the special "oldest" read generation.
+	 *
+	 * This is set for pages that grow larger than the configured
+	 * memory_page_max setting, and when we are attempting to scan without
+	 * trashing the cache.
+	 *
+	 * Skip this if eviction is disabled for this operation or this tree,
+	 * or if there is no chance of eviction succeeding for dirty pages due
+	 * to a checkpoint or because we've already tried writing this page and
+	 * it contains an update that isn't stable.
+	 */
 	if (LF_ISSET(WT_READ_NO_EVICT) ||
 	    page->read_gen != WT_READGEN_OLDEST ||
 	    F_ISSET(btree, WT_BTREE_NO_EVICTION) ||
