@@ -432,10 +432,10 @@ namespace {
             return;
         }
         const RemoteCommandCompletionFn onFinish = iter->onFinish;
-        _pending.erase(iter);
-        lk.unlock();
         LOG(2) << "Canceled sending " << iter->request.cmdObj.firstElementFieldName() << " to " <<
             iter->request.target;
+        _pending.erase(iter);
+        lk.unlock();
         onFinish(ResponseStatus(ErrorCodes::CallbackCanceled, "Callback canceled"));
         lk.lock();
         _signalWorkAvailable_inlock();
