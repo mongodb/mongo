@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"github.com/mongodb/mongo-tools/common/db"
 	commonOpts "github.com/mongodb/mongo-tools/common/options"
+	"github.com/mongodb/mongo-tools/common/testutil"
 	"github.com/mongodb/mongo-tools/mongoimport/options"
 	. "github.com/smartystreets/goconvey/convey"
 	"gopkg.in/mgo.v2/bson"
@@ -15,29 +16,11 @@ import (
 )
 
 var (
-	testDB         = "db"
-	testCollection = "c"
-	testServer     = "localhost"
-	testPort       = "27017"
-
-	ssl = &commonOpts.SSL{
-		UseSSL: false,
-	}
-	namespace = &commonOpts.Namespace{
-		DB:         testDB,
-		Collection: testCollection,
-	}
-	connection = &commonOpts.Connection{
-		Host: testServer,
-		Port: testPort,
-	}
-	toolOptions = &commonOpts.ToolOptions{
-		SSL:        ssl,
-		Namespace:  namespace,
-		Connection: connection,
-		Auth:       &commonOpts.Auth{},
-	}
-	sessionProvider = db.NewSessionProvider(*toolOptions)
+	testDB          = "db"
+	testCollection  = "c"
+	testServer      = "localhost"
+	testPort        = "27017"
+	sessionProvider *db.SessionProvider
 )
 
 // checkOnlyHasDocuments returns an error if the documents in the test
@@ -71,9 +54,7 @@ func checkOnlyHasDocuments(expectedDocuments []bson.M) error {
 // getBasicToolOptions returns a test helper to instantiate the session provider
 // for calls to StreamDocument
 func getBasicToolOptions() *commonOpts.ToolOptions {
-	ssl := &commonOpts.SSL{
-		UseSSL: false,
-	}
+	ssl := testutil.GetSSLOptions()
 	namespace := &commonOpts.Namespace{
 		DB:         testDB,
 		Collection: testCollection,
@@ -83,7 +64,7 @@ func getBasicToolOptions() *commonOpts.ToolOptions {
 		Port: testPort,
 	}
 	return &commonOpts.ToolOptions{
-		SSL:        ssl,
+		SSL:        &ssl,
 		Namespace:  namespace,
 		Connection: connection,
 		Auth:       &commonOpts.Auth{},
@@ -91,6 +72,7 @@ func getBasicToolOptions() *commonOpts.ToolOptions {
 }
 
 func TestMongoImportValidateSettings(t *testing.T) {
+	testutil.VerifyTestType(t, testutil.UNIT_TEST_TYPE)
 	Convey("Given a mongoimport instance for validation, ", t, func() {
 		Convey("an error should be thrown if no database is given", func() {
 			namespace := &commonOpts.Namespace{}
@@ -289,6 +271,7 @@ func TestMongoImportValidateSettings(t *testing.T) {
 }
 
 func TestGetSourceReader(t *testing.T) {
+	testutil.VerifyTestType(t, testutil.UNIT_TEST_TYPE)
 	Convey("Given a mongoimport instance, on calling getSourceReader", t,
 		func() {
 			Convey("an error should be thrown if the given file referenced by "+
@@ -328,6 +311,7 @@ func TestGetSourceReader(t *testing.T) {
 }
 
 func TestGetInputReader(t *testing.T) {
+	testutil.VerifyTestType(t, testutil.UNIT_TEST_TYPE)
 	Convey("Given a io.Reader on calling getInputReader", t, func() {
 		Convey("no error should be thrown if neither --fields nor --fieldFile "+
 			"is used", func() {
@@ -407,6 +391,8 @@ func TestGetInputReader(t *testing.T) {
 }
 
 func TestImportDocuments(t *testing.T) {
+	testutil.VerifyTestType(t, testutil.INTEGRATION_TEST_TYPE)
+	var err error
 	Convey("Given a mongoimport instance with which to import documents, on "+
 		"calling importDocuments", t, func() {
 		batchSize := 1
@@ -425,7 +411,7 @@ func TestImportDocuments(t *testing.T) {
 				NumProcessingThreads: &numProcessingThreads,
 				NumIngestionThreads:  &numIngestionThreads,
 			}
-			sessionProvider, err := db.InitSessionProvider(*toolOptions)
+			sessionProvider, err = db.InitSessionProvider(*toolOptions)
 			So(err, ShouldBeNil)
 			mongoImport := MongoImport{
 				ToolOptions:     toolOptions,
@@ -449,7 +435,7 @@ func TestImportDocuments(t *testing.T) {
 				NumProcessingThreads: &numProcessingThreads,
 				NumIngestionThreads:  &numIngestionThreads,
 			}
-			sessionProvider, err := db.InitSessionProvider(*toolOptions)
+			sessionProvider, err = db.InitSessionProvider(*toolOptions)
 			So(err, ShouldBeNil)
 			mongoImport := MongoImport{
 				ToolOptions:     toolOptions,
@@ -477,7 +463,7 @@ func TestImportDocuments(t *testing.T) {
 					NumIngestionThreads:    &numIngestionThreads,
 					MaintainInsertionOrder: true,
 				}
-				sessionProvider, err := db.InitSessionProvider(*toolOptions)
+				sessionProvider, err = db.InitSessionProvider(*toolOptions)
 				So(err, ShouldBeNil)
 				mongoImport := MongoImport{
 					ToolOptions:     toolOptions,
@@ -510,7 +496,7 @@ func TestImportDocuments(t *testing.T) {
 					NumIngestionThreads:    &numIngestionThreads,
 					MaintainInsertionOrder: true,
 				}
-				sessionProvider, err := db.InitSessionProvider(*toolOptions)
+				sessionProvider, err = db.InitSessionProvider(*toolOptions)
 				So(err, ShouldBeNil)
 				mongoImport := MongoImport{
 					ToolOptions:     toolOptions,
@@ -543,7 +529,7 @@ func TestImportDocuments(t *testing.T) {
 				NumIngestionThreads:    &numIngestionThreads,
 				MaintainInsertionOrder: true,
 			}
-			sessionProvider, err := db.InitSessionProvider(*toolOptions)
+			sessionProvider, err = db.InitSessionProvider(*toolOptions)
 			So(err, ShouldBeNil)
 			mongoImport := MongoImport{
 				ToolOptions:     toolOptions,
@@ -577,7 +563,7 @@ func TestImportDocuments(t *testing.T) {
 					NumIngestionThreads:    &numIngestionThreads,
 					MaintainInsertionOrder: true,
 				}
-				sessionProvider, err := db.InitSessionProvider(*toolOptions)
+				sessionProvider, err = db.InitSessionProvider(*toolOptions)
 				So(err, ShouldBeNil)
 				mongoImport := MongoImport{
 					ToolOptions:     toolOptions,
@@ -609,7 +595,7 @@ func TestImportDocuments(t *testing.T) {
 				NumIngestionThreads:    &numIngestionThreads,
 				MaintainInsertionOrder: true,
 			}
-			sessionProvider, err := db.InitSessionProvider(*toolOptions)
+			sessionProvider, err = db.InitSessionProvider(*toolOptions)
 			So(err, ShouldBeNil)
 			mongoImport := MongoImport{
 				ToolOptions:     toolOptions,
@@ -644,7 +630,7 @@ func TestImportDocuments(t *testing.T) {
 				NumIngestionThreads:    &numIngestionThreads,
 				MaintainInsertionOrder: true,
 			}
-			sessionProvider, err := db.InitSessionProvider(*toolOptions)
+			sessionProvider, err = db.InitSessionProvider(*toolOptions)
 			So(err, ShouldBeNil)
 			mongoImport := MongoImport{
 				ToolOptions:     toolOptions,
@@ -675,7 +661,7 @@ func TestImportDocuments(t *testing.T) {
 				NumProcessingThreads: &numProcessingThreads,
 				NumIngestionThreads:  &numIngestionThreads,
 			}
-			sessionProvider, err := db.InitSessionProvider(*toolOptions)
+			sessionProvider, err = db.InitSessionProvider(*toolOptions)
 			So(err, ShouldBeNil)
 			mongoImport := MongoImport{
 				ToolOptions:     toolOptions,
@@ -703,7 +689,7 @@ func TestImportDocuments(t *testing.T) {
 				NumProcessingThreads: &numProcessingThreads,
 				NumIngestionThreads:  &numIngestionThreads,
 			}
-			sessionProvider, err := db.InitSessionProvider(*toolOptions)
+			sessionProvider, err = db.InitSessionProvider(*toolOptions)
 			So(err, ShouldBeNil)
 			mongoImport := MongoImport{
 				ToolOptions:     toolOptions,
@@ -731,7 +717,7 @@ func TestImportDocuments(t *testing.T) {
 				NumIngestionThreads:    &numIngestionThreads,
 				MaintainInsertionOrder: true,
 			}
-			sessionProvider, err := db.InitSessionProvider(*toolOptions)
+			sessionProvider, err = db.InitSessionProvider(*toolOptions)
 			So(err, ShouldBeNil)
 			mongoImport := MongoImport{
 				ToolOptions:     toolOptions,
@@ -766,7 +752,7 @@ func TestImportDocuments(t *testing.T) {
 				MaintainInsertionOrder: true,
 			}
 			toolOptions := getBasicToolOptions()
-			sessionProvider, err := db.InitSessionProvider(*toolOptions)
+			sessionProvider, err = db.InitSessionProvider(*toolOptions)
 			So(err, ShouldBeNil)
 			mongoImport := MongoImport{
 				ToolOptions:     toolOptions,
@@ -800,7 +786,7 @@ func TestImportDocuments(t *testing.T) {
 				NumIngestionThreads:    &numIngestionThreads,
 				MaintainInsertionOrder: true,
 			}
-			sessionProvider, err := db.InitSessionProvider(*toolOptions)
+			sessionProvider, err = db.InitSessionProvider(*toolOptions)
 			So(err, ShouldBeNil)
 			mongoImport := MongoImport{
 				ToolOptions:     toolOptions,
@@ -832,7 +818,7 @@ func TestImportDocuments(t *testing.T) {
 					NumIngestionThreads:    &numIngestionThreads,
 					MaintainInsertionOrder: true,
 				}
-				sessionProvider, err := db.InitSessionProvider(*toolOptions)
+				sessionProvider, err = db.InitSessionProvider(*toolOptions)
 				So(err, ShouldBeNil)
 				mongoImport := MongoImport{
 					ToolOptions:     toolOptions,

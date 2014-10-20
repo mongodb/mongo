@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"github.com/mongodb/mongo-tools/common/log"
 	"github.com/mongodb/mongo-tools/common/options"
+	"github.com/mongodb/mongo-tools/common/testutil"
 	. "github.com/smartystreets/goconvey/convey"
 	"gopkg.in/mgo.v2/bson"
 	"io"
@@ -19,6 +20,7 @@ func init() {
 }
 
 func TestCSVStreamDocument(t *testing.T) {
+	testutil.VerifyTestType(t, testutil.UNIT_TEST_TYPE)
 	Convey("With a CSV input reader", t, func() {
 		Convey("badly encoded CSV should result in a parsing error", func() {
 			contents := `1, 2, foo"bar`
@@ -155,6 +157,7 @@ func TestCSVStreamDocument(t *testing.T) {
 }
 
 func TestCSVSetHeader(t *testing.T) {
+	testutil.VerifyTestType(t, testutil.UNIT_TEST_TYPE)
 	var err error
 	Convey("With a CSV input reader", t, func() {
 		Convey("setting the header should read the first line of the CSV",
@@ -284,6 +287,7 @@ func TestCSVSetHeader(t *testing.T) {
 }
 
 func TestCSVGetHeaders(t *testing.T) {
+	testutil.VerifyTestType(t, testutil.UNIT_TEST_TYPE)
 	Convey("With a CSV input reader", t, func() {
 		Convey("getting the header should return any already set headers", func() {
 			fields := []string{"extraHeader1", "extraHeader2", "extraHeader3"}
@@ -294,6 +298,7 @@ func TestCSVGetHeaders(t *testing.T) {
 }
 
 func TestCSVReadHeadersFromSource(t *testing.T) {
+	testutil.VerifyTestType(t, testutil.UNIT_TEST_TYPE)
 	Convey("With a CSV input reader", t, func() {
 		Convey("getting the header should return any already set headers", func() {
 			expectedHeaders := []string{"1", "2", "3"}
@@ -308,6 +313,7 @@ func TestCSVReadHeadersFromSource(t *testing.T) {
 }
 
 func TestCSVConvert(t *testing.T) {
+	testutil.VerifyTestType(t, testutil.UNIT_TEST_TYPE)
 	Convey("With a CSV input reader", t, func() {
 		Convey("calling convert on a CSVConvertibleDoc should return the expected BSON document", func() {
 			numProcessed := uint64(0)

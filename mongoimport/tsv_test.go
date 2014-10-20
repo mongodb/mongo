@@ -2,6 +2,7 @@ package mongoimport
 
 import (
 	"bytes"
+	"github.com/mongodb/mongo-tools/common/testutil"
 	. "github.com/smartystreets/goconvey/convey"
 	"gopkg.in/mgo.v2/bson"
 	"io"
@@ -12,6 +13,7 @@ import (
 
 // TODO: currently doesn't work for lines like `a, b, "cccc,cccc", d`
 func TestTSVStreamDocument(t *testing.T) {
+	testutil.VerifyTestType(t, testutil.UNIT_TEST_TYPE)
 	Convey("With a TSV input reader", t, func() {
 		Convey("integer valued strings should be converted", func() {
 			contents := "1\t2\t3e\n"
@@ -143,6 +145,7 @@ func TestTSVStreamDocument(t *testing.T) {
 }
 
 func TestTSVSetHeader(t *testing.T) {
+	testutil.VerifyTestType(t, testutil.UNIT_TEST_TYPE)
 	Convey("With a TSV input reader", t, func() {
 		Convey("setting the header should read the first line of the TSV", func() {
 			contents := "extraHeader1\textraHeader2\textraHeader3\n"
@@ -166,6 +169,7 @@ func TestTSVSetHeader(t *testing.T) {
 }
 
 func TestTSVGetHeaders(t *testing.T) {
+	testutil.VerifyTestType(t, testutil.UNIT_TEST_TYPE)
 	Convey("With a TSV input reader", t, func() {
 		Convey("getting the header should return any already set headers", func() {
 			fields := []string{"extraHeader1", "extraHeader2", "extraHeader3"}
@@ -176,6 +180,7 @@ func TestTSVGetHeaders(t *testing.T) {
 }
 
 func TestTSVReadHeadersFromSource(t *testing.T) {
+	testutil.VerifyTestType(t, testutil.UNIT_TEST_TYPE)
 	Convey("With a TSV input reader", t, func() {
 		Convey("getting the header should return any already set headers", func() {
 			expectedHeaders := []string{"1", "2", "3"}
@@ -190,6 +195,7 @@ func TestTSVReadHeadersFromSource(t *testing.T) {
 }
 
 func TestTSVConvert(t *testing.T) {
+	testutil.VerifyTestType(t, testutil.UNIT_TEST_TYPE)
 	Convey("With a TSV input reader", t, func() {
 		Convey("calling convert on a TSVConvertibleDoc should return the expected BSON document", func() {
 			numProcessed := uint64(0)
