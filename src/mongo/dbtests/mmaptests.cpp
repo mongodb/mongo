@@ -28,7 +28,7 @@
  *    then also delete it in the license file.
  */
 
-#include "mongo/pch.h"
+#include "mongo/platform/basic.h"
 
 #include <boost/filesystem/operations.hpp>
 
@@ -63,7 +63,7 @@ namespace MMapTests {
             try { boost::filesystem::remove(fn); }
             catch(...) { }
 
-            LockerImpl<true> lockState;
+            LockerImpl<true> lockState(1);
             Lock::GlobalWrite lk(&lockState);
 
             {

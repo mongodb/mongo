@@ -69,7 +69,7 @@ namespace mongo {
         LockManager lockMgr;
         const ResourceId resId(RESOURCE_COLLECTION, std::string("TestDB.collection"));
 
-        LockerImpl<true> locker;
+        LockerImpl<true> locker(1);
         TrackingLockGrantNotification notify;
 
         LockRequest request;
@@ -88,7 +88,7 @@ namespace mongo {
         LockManager lockMgr;
         const ResourceId resId(RESOURCE_COLLECTION, std::string("TestDB.collection"));
 
-        LockerImpl<true> locker;
+        LockerImpl<true> locker(1);
         TrackingLockGrantNotification notify;
 
         LockRequest request[6];
@@ -121,12 +121,16 @@ namespace mongo {
         LockManager lockMgr;
         const ResourceId resId(RESOURCE_COLLECTION, std::string("TestDB.collection"));
 
-        LockerImpl<true> locker[6];
+        boost::scoped_ptr<LockerImpl<true>> locker[6];
+        for (int i = 0; i < 6; i++) {
+            locker[i].reset(new LockerImpl<true>(i));
+        }
+
         TrackingLockGrantNotification notify[6];
 
         LockRequest request[6];
         for (int i = 0; i < 6; i++) {
-            request[i].initNew(&locker[i], &notify[i]);
+            request[i].initNew(locker[i].get(), &notify[i]);
             lockMgr.lock(resId, &request[i], MODE_X);
 
             ASSERT(request[i].mode == MODE_X);
@@ -150,7 +154,7 @@ namespace mongo {
         LockManager lockMgr;
         const ResourceId resId(RESOURCE_COLLECTION, std::string("TestDB.collection"));
 
-        LockerImpl<true> locker;
+        LockerImpl<true> locker(1);
         TrackingLockGrantNotification notify;
 
         LockRequest request;
@@ -181,7 +185,7 @@ namespace mongo {
         LockManager lockMgr;
         const ResourceId resId(RESOURCE_COLLECTION, std::string("TestDB.collection"));
 
-        LockerImpl<true> locker;
+        LockerImpl<true> locker(1);
         TrackingLockGrantNotification notify;
 
         LockRequest request;
@@ -212,7 +216,7 @@ namespace mongo {
         LockManager lockMgr;
         const ResourceId resId(RESOURCE_COLLECTION, std::string("TestDB.collection"));
 
-        LockerImpl<true> locker;
+        LockerImpl<true> locker(1);
         TrackingLockGrantNotification notify;
 
         LockRequest request;
@@ -243,7 +247,7 @@ namespace mongo {
         LockManager lockMgr;
         const ResourceId resId(RESOURCE_COLLECTION, std::string("TestDB.collection"));
 
-        LockerImpl<true> locker;
+        LockerImpl<true> locker(1);
         TrackingLockGrantNotification notify;
 
         LockRequest request;
@@ -274,10 +278,10 @@ namespace mongo {
         LockManager lockMgr;
         const ResourceId resId(RESOURCE_COLLECTION, std::string("TestDB.collection"));
 
-        LockerImpl<true> locker1;
+        LockerImpl<true> locker1(1);
         TrackingLockGrantNotification notify1;
 
-        LockerImpl<true> locker2;
+        LockerImpl<true> locker2(2);
         TrackingLockGrantNotification notify2;        
 
         LockRequest request1;
@@ -319,7 +323,7 @@ namespace mongo {
         LockManager lockMgr;
         const ResourceId resId(RESOURCE_COLLECTION, std::string("TestDB.collection"));
 
-        LockerImpl<true> locker;
+        LockerImpl<true> locker(1);
         TrackingLockGrantNotification notify;
 
         LockRequest request[6];
@@ -353,10 +357,10 @@ namespace mongo {
         LockManager lockMgr;
         const ResourceId resId(RESOURCE_COLLECTION, std::string("TestDB.collection"));
 
-        LockerImpl<true> locker1;
+        LockerImpl<true> locker1(1);
         TrackingLockGrantNotification notify1;
 
-        LockerImpl<true> locker2;
+        LockerImpl<true> locker2(2);
         TrackingLockGrantNotification notify2;
 
         LockRequest request1;
@@ -386,7 +390,7 @@ namespace mongo {
         LockManager lockMgr;
         const ResourceId resId(RESOURCE_COLLECTION, std::string("TestDB.collection"));
 
-        LockerImpl<true> locker;
+        LockerImpl<true> locker(1);
         TrackingLockGrantNotification notify;
 
         LockRequest request[6];
@@ -419,10 +423,10 @@ namespace mongo {
         LockManager lockMgr;
         const ResourceId resId(RESOURCE_COLLECTION, std::string("TestDB.collection"));
 
-        LockerImpl<true> locker1;
+        LockerImpl<true> locker1(1);
         TrackingLockGrantNotification notify1;
 
-        LockerImpl<true> locker2;
+        LockerImpl<true> locker2(2);
         TrackingLockGrantNotification notify2;
 
         LockRequest request1;
@@ -460,10 +464,10 @@ namespace mongo {
         LockManager lockMgr;
         const ResourceId resId(RESOURCE_COLLECTION, std::string("TestDB.collection"));
 
-        LockerImpl<true> locker1;
+        LockerImpl<true> locker1(1);
         TrackingLockGrantNotification notify1;
 
-        LockerImpl<true> locker2;
+        LockerImpl<true> locker2(2);
         TrackingLockGrantNotification notify2;
 
         LockRequest request1;
@@ -501,7 +505,7 @@ namespace mongo {
         LockManager lockMgr;
         const ResourceId resId(RESOURCE_COLLECTION, std::string("TestDB.collection"));
 
-        LockerImpl<true> locker;
+        LockerImpl<true> locker(1);
         TrackingLockGrantNotification notify;
 
         LockRequest request[3];
@@ -533,13 +537,13 @@ namespace mongo {
         LockManager lockMgr;
         const ResourceId resId(RESOURCE_COLLECTION, std::string("TestDB.collection"));
 
-        LockerImpl<true> locker1;
+        LockerImpl<true> locker1(1);
         TrackingLockGrantNotification notify1;
         LockRequest request1;
         request1.initNew(&locker1, &notify1);
         ASSERT(LOCK_OK == lockMgr.lock(resId, &request1, MODE_IS));
 
-        LockerImpl<true> locker2;
+        LockerImpl<true> locker2(2);
         TrackingLockGrantNotification notify2;
         LockRequest request2;
         request2.initNew(&locker2, &notify2);
@@ -559,13 +563,13 @@ namespace mongo {
         LockManager lockMgr;
         const ResourceId resId(RESOURCE_COLLECTION, std::string("TestDB.collection"));
 
-        LockerImpl<true> locker1;
+        LockerImpl<true> locker1(1);
         TrackingLockGrantNotification notify1;
         LockRequest request1;
         request1.initNew(&locker1, &notify1);
         ASSERT(LOCK_OK == lockMgr.lock(resId, &request1, MODE_X));
 
-        LockerImpl<true> locker2;
+        LockerImpl<true> locker2(2);
         TrackingLockGrantNotification notify2;
         LockRequest request2;
         request2.initNew(&locker2, &notify2);
@@ -590,14 +594,14 @@ namespace mongo {
 
         const ResourceId resId(RESOURCE_COLLECTION, std::string("TestDB.collection"));
 
-        LockerImpl<true> lockerExisting;
+        LockerImpl<true> lockerExisting(1);
         TrackingLockGrantNotification notifyExisting;
         LockRequest requestExisting;
         requestExisting.initNew(&lockerExisting, &notifyExisting);
 
         ASSERT(LOCK_OK == lockMgr.lock(resId, &requestExisting, existingMode));
 
-        LockerImpl<true> lockerNew;
+        LockerImpl<true> lockerNew(1);
         TrackingLockGrantNotification notifyNew;
         LockRequest requestNew;
         requestNew.initNew(&lockerNew, &notifyNew);

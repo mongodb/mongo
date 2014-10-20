@@ -42,9 +42,6 @@ namespace mongo {
 
     namespace {
 
-        // Dispenses unique Locker instance identifiers
-        AtomicUInt64 idCounter(0);
-
         // Global lock manager instance.
         LockManager globalLockManager;
 
@@ -328,20 +325,8 @@ namespace mongo {
     //
 
     template<bool IsForMMAPV1>
-    LockerImpl<IsForMMAPV1>::LockerImpl(uint64_t id) 
+    LockerImpl<IsForMMAPV1>::LockerImpl(LockerId id)
         : _id(id),
-          _wuowNestingLevel(0),
-          _batchWriter(false),
-          _lockPendingParallelWriter(false),
-          _recursive(0),
-          _scopedLk(NULL),
-          _lockPending(false) {
-
-    }
-
-    template<bool IsForMMAPV1>
-    LockerImpl<IsForMMAPV1>::LockerImpl() 
-        : _id(idCounter.addAndFetch(1)),
           _wuowNestingLevel(0),
           _batchWriter(false),
           _lockPendingParallelWriter(false),
@@ -465,65 +450,66 @@ namespace mongo {
                                              LockMode mode,
                                              unsigned timeoutMs) {
 
-        LockRequest* request;
-        {
-            LockRequestsMap::Iterator it = _requests.find(resId);
-            if (!it) {
-                scoped_spinlock scopedLock(_lock);
-                LockRequestsMap::Iterator itNew = _requests.insert(resId);
-                itNew->initNew(this, &_notify);
+        LockResult result = lockImpl(resId, mode);
+        if (result == LOCK_OK) return LOCK_OK;
 
-                request = itNew.objAddr();
+        // Non MMAP V1 path
+        if (!IsForMMAPV1) {
+
+            if (result == LOCK_WAITING) {
+                result = _notify.wait(timeoutMs);
             }
-            else {
-                request = it.objAddr();
+
+            if (result != LOCK_OK) {
+                // We should never be deadlocking in non-MMAP V1 engines
+                invariant(result == LOCK_TIMEOUT);
+
+                LockRequestsMap::Iterator it = _requests.find(resId);
+                if (globalLockManager.unlock(it.objAddr())) {
+                    scoped_spinlock scopedLock(_lock);
+                    it.remove();
+                }
             }
+
+            return result;
         }
 
-        // Methods on the Locker class are always called single-threadly, so it is safe to release
-        // the spin lock, which protects the Locker here. The only thing which could alter the
-        // state of the request is deadlock detection, which however would synchronize on the
-        // LockManager calls.
-
-        _notify.clear();
-        LockResult result = globalLockManager.lock(resId, request, mode);
+        // MMAP V1 path
         if (result == LOCK_WAITING) {
-            if (IsForMMAPV1) {
-                // Under MMAP V1 engine a deadlock can occur if a thread goes to sleep waiting on
-                // DB lock, while holding the flush lock, so it has to be released. This is only
-                // correct to do if not in a write unit of work.
-                bool unlockedFlushLock = false;
+            // Under MMAP V1 engine a deadlock can occur if a thread goes to sleep waiting on
+            // DB lock, while holding the flush lock, so it has to be released. This is only
+            // correct to do if not in a write unit of work.
+            bool unlockedFlushLock = false;
 
-                if (!inAWriteUnitOfWork() &&
-                    (resId != resourceIdGlobal) &&
-                    (resId != resourceIdMMAPV1Flush)) {
+            if (!inAWriteUnitOfWork() &&
+                (resId != resourceIdGlobal) &&
+                (resId != resourceIdMMAPV1Flush)) {
 
-                    invariant(unlock(resourceIdMMAPV1Flush));
-                    unlockedFlushLock = true;
-                }
+                invariant(unlock(resourceIdMMAPV1Flush));
+                unlockedFlushLock = true;
+            }
 
-                result = _notify.wait(timeoutMs);
+            result = _notify.wait(timeoutMs);
 
-                if (unlockedFlushLock) {
-                    // We cannot obey the timeout here, because it is not correct to return from
-                    // the lock request with the flush lock released.
-                    invariant(LOCK_OK ==
-                        lock(resourceIdMMAPV1Flush, getLockMode(resourceIdGlobal), UINT_MAX));
+            if (result != LOCK_OK) {
+                // Can only be LOCK_TIMEOUT, because the lock manager does not return any other
+                // errors at this point.
+                invariant(result == LOCK_TIMEOUT);
+
+                // Clean-up the state so we do not have two pending requests on the locker, which
+                // would be illegal from the currentOp point of view.
+                LockRequestsMap::Iterator it = _requests.find(resId);
+                if (globalLockManager.unlock(it.objAddr())) {
+                    scoped_spinlock scopedLock(_lock);
+                    it.remove();
                 }
             }
-            else {
-                result = _notify.wait(timeoutMs);
-            }
-        }
 
-        if (result != LOCK_OK) {
-            // Can only be LOCK_TIMEOUT, because the lock manager does not return any other errors
-            // at this point. Could be LOCK_DEADLOCK, when deadlock detection is implemented.
-            invariant(result == LOCK_TIMEOUT);
-
-            if (globalLockManager.unlock(request)) {
-                scoped_spinlock scopedLock(_lock);
-                _requests.find(resId).remove();
+            if (unlockedFlushLock) {
+                // We cannot obey the timeout here, because it is not correct to return from
+                // the lock request with the flush lock released.
+                invariant(LOCK_OK ==
+                    lock(resourceIdMMAPV1Flush, getLockMode(resourceIdGlobal), UINT_MAX));
             }
         }
 
@@ -671,13 +657,29 @@ namespace mongo {
     }
 
     template<bool IsForMMAPV1>
+    LockResult LockerImpl<IsForMMAPV1>::lockImpl(const ResourceId& resId, LockMode mode) {
+        LockRequest* request;
+
+        LockRequestsMap::Iterator it = _requests.find(resId);
+        if (!it) {
+            scoped_spinlock scopedLock(_lock);
+            LockRequestsMap::Iterator itNew = _requests.insert(resId);
+            itNew->initNew(this, &_notify);
+
+            request = itNew.objAddr();
+        }
+        else {
+            request = it.objAddr();
+        }
+
+        _notify.clear();
+
+        return globalLockManager.lock(resId, request, mode);
+    }
+
+    template<bool IsForMMAPV1>
     bool LockerImpl<IsForMMAPV1>::_unlockImpl(LockRequestsMap::Iterator& it) {
         invariant(it->mode != MODE_NONE);
-
-        // Methods on the Locker class are always called single-threadly, so it is safe to release
-        // the spin lock, which protects the Locker here. The only thing which could alter the
-        // state of the request is deadlock detection, which however would synchronize on the
-        // LockManager calls.
 
         if (inAWriteUnitOfWork() && shouldDelayUnlock(it.key(), it->mode)) {
             _resourcesToUnlockAtEndOfUnitOfWork.push(it.key());
