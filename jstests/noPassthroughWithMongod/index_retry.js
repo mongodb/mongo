@@ -45,7 +45,8 @@ function indexBuildInProgress() {
                 // but we won't count if they aren't
                 if ( "a_1" == idxSpec.name &&
                      1 == idxSpec.key.a &&
-                     idxSpec.background ) {
+                     idxSpec.background &&
+                     (op.progress.done / op.progress.total) > 0.20) {
                     indexBuildOpId = op.opid;
                 }
             }

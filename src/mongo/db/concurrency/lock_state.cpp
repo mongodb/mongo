@@ -730,10 +730,11 @@ namespace mongo {
             if ( res == LOCK_OK )
                 break;
             invariant( res == LOCK_TIMEOUT );
-            if ( ++attempt == 0 ) {
+            if ( ++attempt % 100 == 0 ) {
                 warning() << "AutoAcquireFlushLockForMMAPV1Commit has not gotten lock in "
                           << attempt << " attempts";
             }
+            sleepmillis(10);
         }
     }
 
