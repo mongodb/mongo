@@ -59,8 +59,6 @@ namespace mongo {
         // on its use.
         const ResourceId resourceIdMMAPV1Flush = ResourceId(RESOURCE_MMAPV1_FLUSH, 2ULL);
 
-        const ResourceId resourceIdLocalDB = ResourceId(RESOURCE_DATABASE, string("local"));
-
         /**
          * Returns whether the passed in mode is S or IS. Used for validation checks.
          */
@@ -498,8 +496,7 @@ namespace mongo {
 
                 if (!inAWriteUnitOfWork() &&
                     (resId != resourceIdGlobal) &&
-                    (resId != resourceIdMMAPV1Flush) &&
-                    (resId != resourceIdLocalDB)) {
+                    (resId != resourceIdMMAPV1Flush)) {
 
                     invariant(unlock(resourceIdMMAPV1Flush));
                     unlockedFlushLock = true;
@@ -571,6 +568,9 @@ namespace mongo {
 
     template<bool IsForMMAPV1>
     bool LockerImpl<IsForMMAPV1>::saveLockStateAndUnlock(Locker::LockSnapshot* stateOut) {
+        // We shouldn't be saving and restoring lock state from inside a WriteUnitOfWork.
+        invariant(!inAWriteUnitOfWork());
+
         // Clear out whatever is in stateOut.
         stateOut->locks.clear();
         stateOut->globalMode = MODE_NONE;
@@ -653,6 +653,9 @@ namespace mongo {
 
     template<bool IsForMMAPV1>
     void LockerImpl<IsForMMAPV1>::restoreLockState(const Locker::LockSnapshot& state) {
+        // We shouldn't be saving and restoring lock state from inside a WriteUnitOfWork.
+        invariant(!inAWriteUnitOfWork());
+
         // We expect to be able to unlock each lock 'recursiveCount' number of times.
         // So, we relock each lock that number of times.
 
