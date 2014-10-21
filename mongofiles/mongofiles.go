@@ -123,7 +123,7 @@ func (self *MongoFiles) handleGet(gfs *mgo.GridFS) (string, error) {
 		return "", fmt.Errorf("error while opening local file '%v': %v\n", localFileName, err)
 	}
 	defer localFile.Close()
-	log.Logf(2, "created local file '%v'", localFileName)
+	log.Logf(log.DebugLow, "created local file '%v'", localFileName)
 
 	_, err = io.Copy(localFile, gFile)
 	if err != nil {
@@ -153,7 +153,7 @@ func (self *MongoFiles) handlePut(gfs *mgo.GridFS) (string, error) {
 		return "", fmt.Errorf("error while opening local file '%v' : %v\n", localFileName, err)
 	}
 	defer localFile.Close()
-	log.Logf(2, "creating GridFS file '%v' from local file '%v'", self.FileName, localFileName)
+	log.Logf(log.DebugLow, "creating GridFS file '%v' from local file '%v'", self.FileName, localFileName)
 
 	gFile, err := gfs.Create(self.FileName)
 	if err != nil {
@@ -214,7 +214,7 @@ func (self *MongoFiles) Run(displayConnUrl bool) (string, error) {
 
 	var output string
 
-	log.Logf(1, "handling mongofiles '%v' command...", self.Command)
+	log.Logf(log.Info, "handling mongofiles '%v' command...", self.Command)
 
 	switch self.Command {
 

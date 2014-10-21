@@ -186,10 +186,10 @@ func (manager *IntentManager) Roles() *Intent {
 func (manager *IntentManager) Finalize(pType PriorityType) {
 	switch pType {
 	case Legacy:
-		log.Log(3, "finalizing intent manager with legacy prioritizer")
+		log.Log(log.DebugHigh, "finalizing intent manager with legacy prioritizer")
 		manager.prioritizer = NewLegacyPrioritizer(manager.intentsByDiscoveryOrder)
 	case MultiDatabaseLTF:
-		log.Log(3, "finalizing intent manager with multi-database largest task first prioritizer")
+		log.Log(log.DebugHigh, "finalizing intent manager with multi-database largest task first prioritizer")
 		manager.prioritizer = NewMultiDatabaseLTFPrioritizer(manager.intentsByDiscoveryOrder)
 	default:
 		panic("cannot initialize IntentPrioritizer with unknown type")

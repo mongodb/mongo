@@ -26,10 +26,10 @@ type Oplog struct {
 }
 
 func (restore *MongoRestore) RestoreOplog() error {
-	log.Log(0, "replaying oplog")
+	log.Log(log.Always, "replaying oplog")
 	intent := restore.manager.Oplog()
 	if intent == nil {
-		log.Log(0, "no oplog.bson file in root of the dump directory, skipping oplog application")
+		log.Log(log.Always, "no oplog.bson file in root of the dump directory, skipping oplog application")
 	}
 
 	fileInfo, err := os.Lstat(intent.BSONPath)
@@ -37,7 +37,7 @@ func (restore *MongoRestore) RestoreOplog() error {
 		return fmt.Errorf("error reading bson file: %v", err)
 	}
 	size := fileInfo.Size()
-	log.Logf(1, "\toplog %v is %v bytes", intent.BSONPath, size)
+	log.Logf(log.Info, "\toplog %v is %v bytes", intent.BSONPath, size)
 
 	oplogFile, err := os.Open(intent.BSONPath)
 	if err != nil {

@@ -38,14 +38,14 @@ func main() {
 	log.SetVerbosity(opts.Verbosity)
 
 	if outputOpts.JobThreads > 0 {
-		log.Logf(1, "running mongorestore with %v job threads", outputOpts.JobThreads)
+		log.Logf(log.Info, "running mongorestore with %v job threads", outputOpts.JobThreads)
 		runtime.GOMAXPROCS(outputOpts.JobThreads)
 	}
 
 	targetDir := ""
 	if inputOpts.Directory != "" {
 		targetDir = inputOpts.Directory
-		log.Log(0, "using --dir flag instead of arguments")
+		log.Log(log.Always, "using --dir flag instead of arguments")
 	} else {
 		if len(args) == 0 {
 			targetDir = "dump"

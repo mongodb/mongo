@@ -21,11 +21,11 @@ func main() {
 
 	args, err := opts.Parse()
 	if err != nil {
-		log.Logf(0, "error parsing command line options: %v", err)
+		log.Logf(log.Always, "error parsing command line options: %v", err)
 		os.Exit(1)
 	}
 	if len(args) != 0 {
-		log.Logf(0, "error parsing command line: too many positional options: %v", args)
+		log.Logf(log.Always, "error parsing command line: too many positional options: %v", args)
 		os.Exit(1)
 	}
 
@@ -50,7 +50,7 @@ func main() {
 
 	err = exporter.ValidateSettings()
 	if err != nil {
-		log.Logf(0, "error validating settings: %v", err)
+		log.Logf(log.Always, "error validating settings: %v", err)
 		os.Exit(1)
 	}
 
@@ -62,9 +62,9 @@ func main() {
 
 	if !opts.Quiet {
 		if numDocs == 1 {
-			log.Logf(0, "exported %v record", numDocs)
+			log.Logf(log.Always, "exported %v record", numDocs)
 		} else {
-			log.Logf(0, "exported %v records", numDocs)
+			log.Logf(log.Always, "exported %v records", numDocs)
 		}
 	}
 }

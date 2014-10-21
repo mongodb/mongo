@@ -221,8 +221,8 @@ func (mongoImport *MongoImport) ValidateSettings(args []string) error {
 			return err
 		}
 		mongoImport.ToolOptions.Namespace.Collection = fileBaseName
-		log.Logf(0, "no collection specified")
-		log.Logf(0, "using filename '%v' as collection",
+		log.Logf(log.Always, "no collection specified")
+		log.Logf(log.Always, "using filename '%v' as collection",
 			mongoImport.ToolOptions.Namespace.Collection)
 	}
 	return nil
@@ -239,10 +239,10 @@ func (mongoImport *MongoImport) getSourceReader() (io.ReadCloser, error) {
 		if err != nil {
 			return nil, err
 		}
-		log.Logf(1, "filesize: %v", fileStat.Size())
+		log.Logf(log.Info, "filesize: %v", fileStat.Size())
 		return file, err
 	}
-	log.Logf(1, "filesize: 0")
+	log.Logf(log.Info, "filesize: 0")
 	return os.Stdin, nil
 }
 
@@ -294,15 +294,15 @@ func (mongoImport *MongoImport) importDocuments(inputReader InputReader) (numImp
 	if mongoImport.ToolOptions.Port != "" {
 		connURL = connURL + ":" + mongoImport.ToolOptions.Port
 	}
-	log.Logf(0, "connected to: %v", connURL)
+	log.Logf(log.Always, "connected to: %v", connURL)
 
-	log.Logf(1, "ns: %v.%v",
+	log.Logf(log.Info, "ns: %v.%v",
 		mongoImport.ToolOptions.Namespace.DB,
 		mongoImport.ToolOptions.Namespace.Collection)
 
 	// drop the database if necessary
 	if mongoImport.IngestOptions.Drop {
-		log.Logf(0, "dropping: %v.%v",
+		log.Logf(log.Always, "dropping: %v.%v",
 			mongoImport.ToolOptions.DB,
 			mongoImport.ToolOptions.Collection)
 		collection := session.DB(mongoImport.ToolOptions.DB).
@@ -442,7 +442,7 @@ func (mongoImport *MongoImport) ingestDocs(readChan chan bson.D) (err error) {
 				return err
 			}
 			if mongoImport.insertionCount%10000 == 0 {
-				log.Logf(0, "Progress: %v documents inserted...", mongoImport.insertionCount)
+				log.Logf(log.Always, "Progress: %v documents inserted...", mongoImport.insertionCount)
 			}
 			documents = documents[:0]
 			numMessageBytes = 0
@@ -483,7 +483,7 @@ func (mongoImport *MongoImport) ingester(documents []interface{}, collection *mg
 					err.Error() == errNoReachableServer.Error() {
 					return err
 				}
-				log.Logf(0, "error inserting documents: %v", err)
+				log.Logf(log.Always, "error inserting documents: %v", err)
 			}
 		}
 	} else {
@@ -499,7 +499,7 @@ func (mongoImport *MongoImport) ingester(documents []interface{}, collection *mg
 				err.Error() == errNoReachableServer.Error() {
 				return err
 			}
-			log.Logf(0, "error inserting documents: %v", err)
+			log.Logf(log.Always, "error inserting documents: %v", err)
 		}
 	}
 

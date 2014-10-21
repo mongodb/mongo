@@ -202,7 +202,7 @@ func (exp *MongoExport) Export() (int64, error) {
 	if exp.ToolOptions.Port != "" {
 		connURL = connURL + ":" + exp.ToolOptions.Port
 	}
-	log.Logf(0, "connected to: %v", connURL)
+	log.Logf(log.Always, "connected to: %v", connURL)
 
 	// Write headers
 	err = exportOutput.WriteHeader()

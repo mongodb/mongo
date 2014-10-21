@@ -34,7 +34,7 @@ func main() {
 
 	args, err := opts.Parse()
 	if err != nil {
-		log.Logf(0, "error parsing command line options: %v", err)
+		log.Logf(log.Always, "error parsing command line options: %v", err)
 		opts.PrintHelp(true)
 		os.Exit(1)
 	}
@@ -53,7 +53,7 @@ func main() {
 
 	fileName, err := mongofiles.ValidateCommand(args)
 	if err != nil {
-		log.Logf(0, "error: %v", err)
+		log.Logf(log.Always, "error: %v", err)
 		opts.PrintHelp(true)
 		os.Exit(1)
 	}
@@ -71,7 +71,7 @@ func main() {
 
 	output, err := mongofiles.Run(true)
 	if err != nil {
-		log.Logf(0, "%v", err)
+		log.Logf(log.Always, "%v", err)
 		os.Exit(1)
 	}
 	fmt.Printf("%s", output)

@@ -26,7 +26,7 @@ func (restore *MongoRestore) RestoreIntents() error {
 		// start a goroutine for each job thread
 		for i := 0; i < restore.OutputOptions.JobThreads; i++ {
 			go func(id int) {
-				log.Logf(3, "starting restore routine with id=%v", id)
+				log.Logf(log.DebugHigh, "starting restore routine with id=%v", id)
 				for {
 					intent := restore.manager.Pop()
 					if intent == nil {
@@ -39,7 +39,7 @@ func (restore *MongoRestore) RestoreIntents() error {
 					}
 					restore.manager.Finish(intent)
 				}
-				log.Logf(3, "ending restore routine with id=%v, no more work to do", id)
+				log.Logf(log.DebugHigh, "ending restore routine with id=%v, no more work to do", id)
 				doneChan <- struct{}{}
 			}(i)
 		}
@@ -80,16 +80,16 @@ func (restore *MongoRestore) RestoreIntent(intent *Intent) error {
 	}
 
 	if restore.safety == nil && !restore.OutputOptions.Drop && collectionExists {
-		log.Logf(0, "restoring to existing collection %v without dropping", intent.Key())
-		log.Log(0, "IMPORTANT: restored data will be inserted without raising errors; check your server log")
+		log.Logf(log.Always, "restoring to existing collection %v without dropping", intent.Key())
+		log.Log(log.Always, "IMPORTANT: restored data will be inserted without raising errors; check your server log")
 	}
 
 	if restore.OutputOptions.Drop {
 		if collectionExists {
 			if strings.HasPrefix(intent.C, "system.") {
-				log.Logf(0, "cannot drop system collection %v, skipping", intent.Key())
+				log.Logf(log.Always, "cannot drop system collection %v, skipping", intent.Key())
 			} else {
-				log.Logf(1, "dropping collection %v before restoring", intent.Key())
+				log.Logf(log.Info, "dropping collection %v before restoring", intent.Key())
 				// TODO(erf) maybe encapsulate this so that the session is closed sooner
 				session, err := restore.SessionProvider.GetSession()
 				session.SetSocketTimeout(0)
@@ -104,7 +104,7 @@ func (restore *MongoRestore) RestoreIntent(intent *Intent) error {
 				collectionExists = false
 			}
 		} else {
-			log.Logf(2, "collection %v doesn't exist, skipping drop command", intent.Key())
+			log.Logf(log.DebugLow, "collection %v doesn't exist, skipping drop command", intent.Key())
 		}
 	}
 
@@ -114,7 +114,7 @@ func (restore *MongoRestore) RestoreIntent(intent *Intent) error {
 	// get indexes from system.indexes dump if we have it but don't have metadata files
 	if intent.MetadataPath == "" && restore.manager.SystemIndexes(intent.DB) != nil {
 		systemIndexesFile := restore.manager.SystemIndexes(intent.DB).BSONPath
-		log.Logf(0, "no metadata file; reading indexes from %v", systemIndexesFile)
+		log.Logf(log.Always, "no metadata file; reading indexes from %v", systemIndexesFile)
 		indexes, err = restore.IndexesFromBSON(intent, systemIndexesFile)
 		if err != nil {
 			return fmt.Errorf("error reading indexes: %v", err)
@@ -123,7 +123,7 @@ func (restore *MongoRestore) RestoreIntent(intent *Intent) error {
 
 	// first create collection with options
 	if intent.MetadataPath != "" {
-		log.Logf(0, "reading metadata file from %v", intent.MetadataPath)
+		log.Logf(log.Always, "reading metadata file from %v", intent.MetadataPath)
 		jsonBytes, err := ioutil.ReadFile(intent.MetadataPath)
 		if err != nil {
 			return fmt.Errorf("error reading metadata file: %v", err) //TODO better errors here
@@ -135,32 +135,32 @@ func (restore *MongoRestore) RestoreIntent(intent *Intent) error {
 		if !restore.OutputOptions.NoOptionsRestore {
 			if options != nil {
 				if !collectionExists {
-					log.Logf(1, "creating collection %v using options from metadata", intent.Key())
+					log.Logf(log.Info, "creating collection %v using options from metadata", intent.Key())
 					err = restore.CreateCollection(intent, options)
 					if err != nil {
 						return fmt.Errorf("error creating collection %v: %v", intent.Key(), err)
 					}
 				} else {
-					log.Logf(1, "collection %v already exists", intent.Key())
+					log.Logf(log.Info, "collection %v already exists", intent.Key())
 				}
 			} else {
-				log.Log(1, "no collection options to restore")
+				log.Log(log.Info, "no collection options to restore")
 			}
 		} else {
-			log.Log(1, "skipping options restoration")
+			log.Log(log.Info, "skipping options restoration")
 		}
 	}
 
 	// then do bson
 	if intent.BSONPath != "" {
-		log.Logf(0, "restoring %v from file %v", intent.Key(), intent.BSONPath)
+		log.Logf(log.Always, "restoring %v from file %v", intent.Key(), intent.BSONPath)
 
 		fileInfo, err := os.Lstat(intent.BSONPath)
 		if err != nil {
 			return fmt.Errorf("error reading bson file: %v", err)
 		}
 		size := fileInfo.Size()
-		log.Logf(1, "\tfile %v is %v bytes", intent.BSONPath, size)
+		log.Logf(log.Info, "\tfile %v is %v bytes", intent.BSONPath, size)
 
 		rawFile, err := os.Open(intent.BSONPath)
 		if err != nil {
@@ -178,14 +178,14 @@ func (restore *MongoRestore) RestoreIntent(intent *Intent) error {
 
 	// finally, add indexes
 	if len(indexes) > 0 && !restore.OutputOptions.NoIndexRestore {
-		log.Logf(0, "restoring indexes for collection %v from metadata", intent.Key())
+		log.Logf(log.Always, "restoring indexes for collection %v from metadata", intent.Key())
 		//TODO better logging
 		err = restore.CreateIndexes(intent, indexes)
 		if err != nil {
 			return fmt.Errorf("error creating indexes: %v", err)
 		}
 	} else {
-		log.Log(0, "no indexes to restore")
+		log.Log(log.Always, "no indexes to restore")
 	}
 	return nil
 }

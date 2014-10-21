@@ -31,19 +31,19 @@ func (restore *MongoRestore) ParseAndValidateOptions() error {
 	// Can't use option pkg defaults for --objcheck because it's two separate flags,
 	// and we need to be able to see if they're both being used. We default to
 	// true here and then see if noobjcheck is enable.
-	log.Log(3, "checking options")
+	log.Log(log.DebugHigh, "checking options")
 	if err := restore.ToolOptions.Validate(); err != nil {
 		return err
 	}
 	restore.objCheck = true
 	if restore.InputOptions.NoObjcheck {
 		restore.objCheck = false
-		log.Log(3, "\tdumping with object check disabled")
+		log.Log(log.DebugHigh, "\tdumping with object check disabled")
 		if restore.InputOptions.Objcheck {
 			return fmt.Errorf("cannot use both the --objcheck and --noobjcheck flags")
 		}
 	} else {
-		log.Log(3, "\tdumping with object check enabled")
+		log.Log(log.DebugHigh, "\tdumping with object check enabled")
 	}
 
 	if restore.ToolOptions.DB == "" && restore.ToolOptions.Collection != "" {
@@ -52,7 +52,7 @@ func (restore *MongoRestore) ParseAndValidateOptions() error {
 
 	if restore.OutputOptions.WriteConcern > 0 {
 		restore.safety = &mgo.Safe{W: restore.OutputOptions.WriteConcern} //TODO, audit extra steps
-		log.Logf(3, "\tdumping with w=%v", restore.safety.W)
+		log.Logf(log.DebugHigh, "\tdumping with w=%v", restore.safety.W)
 	}
 
 	//TODO check oplog is okay
@@ -78,19 +78,19 @@ func (restore *MongoRestore) Restore() error {
 
 	switch {
 	case restore.ToolOptions.DB == "" && restore.ToolOptions.Collection == "":
-		log.Logf(0,
+		log.Logf(log.Always,
 			"building a list of dbs and collections to restore from %v dir",
 			restore.TargetDirectory)
 		err = restore.CreateAllIntents(restore.TargetDirectory)
 	case restore.ToolOptions.DB != "" && restore.ToolOptions.Collection == "":
-		log.Logf(0,
+		log.Logf(log.Always,
 			"building a list of collections to restore from %v dir",
 			restore.TargetDirectory)
 		err = restore.CreateIntentsForDB(
 			restore.ToolOptions.DB,
 			restore.TargetDirectory)
 	case restore.ToolOptions.DB != "" && restore.ToolOptions.Collection != "":
-		log.Logf(0, "checking for collection data in %v", restore.TargetDirectory)
+		log.Logf(log.Always, "checking for collection data in %v", restore.TargetDirectory)
 		err = restore.CreateIntentForCollection(
 			restore.ToolOptions.DB,
 			restore.ToolOptions.Collection,
@@ -137,6 +137,6 @@ func (restore *MongoRestore) Restore() error {
 		}
 	}
 
-	log.Log(0, "done")
+	log.Log(log.Always, "done")
 	return nil
 }

@@ -10,6 +10,14 @@ import (
 	"time"
 )
 
+// Tool Logger constants
+const (
+	Always = iota
+	Info
+	DebugLow
+	DebugHigh
+)
+
 //// Tool Logger Definition
 
 type ToolLogger struct {

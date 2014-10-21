@@ -165,7 +165,7 @@ func setNestedValue(key string, value interface{}, document *bson.D) {
 // tokensToBSON reads in slice of records - along with ordered fields names -
 // and returns a BSON document for the record.
 func tokensToBSON(fields, tokens []string, numProcessed uint64) (bson.D, error) {
-	log.Logf(2, "got line: %v", tokens)
+	log.Logf(log.DebugLow, "got line: %v", tokens)
 	var parsedValue interface{}
 	document := bson.D{}
 	for index, token := range tokens {
@@ -232,9 +232,9 @@ func validateHeaders(inputReader InputReader, hasHeaderLine bool) (validatedFiel
 		validatedFields = append(validatedFields, unsortedHeaders[index])
 	}
 	if len(headers) == 1 {
-		log.Logf(1, "using field: %v", validatedFields[0])
+		log.Logf(log.Info, "using field: %v", validatedFields[0])
 	} else {
-		log.Logf(1, "using fields: %v", strings.Join(validatedFields, ","))
+		log.Logf(log.Info, "using fields: %v", strings.Join(validatedFields, ","))
 	}
 	return validatedFields, nil
 }

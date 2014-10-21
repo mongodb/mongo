@@ -58,7 +58,7 @@ func (restore *MongoRestore) MetadataFromJSON(jsonBytes []byte) (bson.D, []Index
 
 //TODO test this
 func (restore *MongoRestore) IndexesFromBSON(intent *Intent, bsonFile string) ([]IndexDocument, error) {
-	log.Logf(2, "scanning %v for indexes on %v collections", bsonFile, intent.C)
+	log.Logf(log.DebugLow, "scanning %v for indexes on %v collections", bsonFile, intent.C)
 
 	rawFile, err := os.Open(bsonFile)
 	if err != nil {
@@ -74,7 +74,7 @@ func (restore *MongoRestore) IndexesFromBSON(intent *Intent, bsonFile string) ([
 	for bsonSource.Next(indexDocument) {
 		namespace := indexDocument.Options["ns"].(string)
 		if stripDBFromNS(namespace) == intent.C {
-			log.Logf(3, "\tfound index %v", indexDocument.Options["name"])
+			log.Logf(log.DebugHigh, "\tfound index %v", indexDocument.Options["name"])
 			collectionIndexes = append(collectionIndexes, *indexDocument)
 		}
 	}
@@ -106,16 +106,16 @@ func (restore *MongoRestore) DBHasCollection(intent *Intent) (bool, error) {
 	if err != nil {
 		// handle case when using db connection
 		if err == mgo.ErrNotFound {
-			log.Logf(3, "collection %v does not exists", collectionNS)
+			log.Logf(log.DebugHigh, "collection %v does not exists", collectionNS)
 			return false, nil
 		}
 		return false, err
 	}
 	if len(result) > 0 {
-		log.Logf(3, "collection %v already exists", collectionNS)
+		log.Logf(log.DebugHigh, "collection %v already exists", collectionNS)
 		return true, nil
 	}
-	log.Logf(3, "collection %v does not exists", collectionNS)
+	log.Logf(log.DebugHigh, "collection %v does not exists", collectionNS)
 	return false, nil
 }
 
@@ -158,9 +158,9 @@ func (restore *MongoRestore) CreateIndexes(intent *Intent, indexes []IndexDocume
 	}
 
 	// if we're here, the connected server does not support the command, so we fall back
-	log.Log(1, "\tcreateIndexes command not supported, attemping legacy index insertion")
+	log.Log(log.Info, "\tcreateIndexes command not supported, attemping legacy index insertion")
 	for _, idx := range indexes {
-		log.Logf(1, "\tmanually creating index %v", idx.Options["name"])
+		log.Logf(log.Info, "\tmanually creating index %v", idx.Options["name"])
 		err = restore.LegacyInsertIndex(intent, idx)
 		if err != nil {
 			return fmt.Errorf("error creating index %v: %v", idx.Options["name"], err)
@@ -216,7 +216,7 @@ func (restore *MongoRestore) CreateCollection(intent *Intent, options bson.D) er
 }
 
 func (restore *MongoRestore) RestoreUsersOrRoles(collectionType string, intent *Intent) error {
-	log.Logf(0, "restoring %v from %v", collectionType, intent.BSONPath)
+	log.Logf(log.Always, "restoring %v from %v", collectionType, intent.BSONPath)
 
 	var tempCol, tempColCommandField string
 	switch collectionType {
@@ -246,7 +246,7 @@ func (restore *MongoRestore) RestoreUsersOrRoles(collectionType string, intent *
 		return fmt.Errorf("temporary collection admin.%v already exists", tempCol) //TODO(erf) make this more helpful
 	}
 
-	log.Logf(2, "restoring %v to temporary collection", collectionType)
+	log.Logf(log.DebugLow,"restoring %v to temporary collection", collectionType)
 	err = restore.RestoreCollectionToDB("admin", tempCol, bsonSource, 0)
 	if err != nil {
 		return fmt.Errorf("error restoring %v: %v", collectionType, err)
@@ -258,15 +258,15 @@ func (restore *MongoRestore) RestoreUsersOrRoles(collectionType string, intent *
 		if err != nil {
 			// logging errors here because this has no way of returning that doesn't mask other errors
 			// TODO(erf) make this a proper return value
-			log.Logf(0, "error establishing connection to drop temporary collection %v: %v", tempCol, err)
+			log.Logf(log.Always, "error establishing connection to drop temporary collection %v: %v", tempCol, err)
 			return
 		}
 		session.SetSocketTimeout(0)
 		defer session.Close()
-		log.Logf(3, "dropping temporary collection %v", tempCol)
+		log.Logf(log.DebugHigh, "dropping temporary collection %v", tempCol)
 		err = session.DB("admin").C(tempCol).DropCollection()
 		if err != nil {
-			log.Logf(0, "error dropping temporary collection %v: %v", tempCol, err)
+			log.Logf(log.Always, "error dropping temporary collection %v: %v", tempCol, err)
 		}
 	}()
 
@@ -291,7 +291,7 @@ func (restore *MongoRestore) RestoreUsersOrRoles(collectionType string, intent *
 	}
 	defer session.Close()
 
-	log.Logf(2, "merging %v from temp collection", collectionType)
+	log.Logf(log.DebugLow, "merging %v from temp collection", collectionType)
 	res := bson.M{}
 	err = session.Run(command, &res)
 	if err != nil {

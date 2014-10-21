@@ -126,13 +126,13 @@ func (jsonConvertibleDoc JSONConvertibleDoc) Convert() (bson.D, error) {
 	if err != nil {
 		return nil, fmt.Errorf("error unmarshaling bytes on document #%v: %v", 1, err)
 	}
-	log.Logf(2, "got line: %v", document)
+	log.Logf(log.DebugLow, "got line: %v", document)
 	// TODO: perhaps move this to decode.go
 	bsonD, err := bsonutil.GetExtendedBsonD(document)
 	if err != nil {
 		return nil, fmt.Errorf("error getting extended BSON for document #%v: %v", 1, err)
 	}
-	log.Logf(3, "got extended line: %#v", bsonD)
+	log.Logf(log.DebugHigh, "got extended line: %#v", bsonD)
 	return bsonD, nil
 }
 

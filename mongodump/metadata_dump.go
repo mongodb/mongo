@@ -48,7 +48,7 @@ func (dump *MongoDump) dumpMetadataToWriter(dbName, c string, writer io.Writer) 
 	// from the system.namespaces collection, which is the hidden internal
 	// collection for tracking collection names and properties. For mongodump,
 	// we copy just the "options" subdocument for the collection.
-	log.Logf(3, "\treading options for `%v`", nsID)
+	log.Logf(log.DebugHigh, "\treading options for `%v`", nsID)
 	namespaceDoc := bson.M{}
 	err := dump.cmdRunner.FindOne(dbName, "system.namespaces", 0, bson.M{"name": nsID}, nil, namespaceDoc, 0)
 	if err != nil {
@@ -63,7 +63,7 @@ func (dump *MongoDump) dumpMetadataToWriter(dbName, c string, writer io.Writer) 
 	// system.indexes collection. We keep a running list of all the indexes
 	// for the current collection as we iterate over the cursor, and include
 	// that list as the "indexes" field of the metadata document.
-	log.Logf(3, "\treading indexes for `%v`", nsID)
+	log.Logf(log.DebugHigh, "\treading indexes for `%v`", nsID)
 
 	cursor, err := dump.cmdRunner.FindDocs(dbName, "system.indexes", 0, 0, bson.M{"ns": nsID}, nil, db.Snapshot)
 	if err != nil {

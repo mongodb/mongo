@@ -127,14 +127,14 @@ func (dump *MongoDump) Dump() error {
 		if _, ok := dump.cmdRunner.(*db.Shim); ok { //TODO make this check a method
 			// the shim does not know about auth, so we must assume version 3,
 			// as that's all we support. If we add a new version, we'll have to fix this hack
-			log.Logf(2, "using shim; assuming auth version 3")
+			log.Logf(log.DebugLow, "using shim; assuming auth version 3")
 			dump.authVersion = 3
 		} else {
 			dump.authVersion, err = auth.GetAuthVersion(dump.cmdRunner)
 			if err != nil {
 				return fmt.Errorf("error getting auth schema version for dumpDbUsersAndRoles: %v", err)
 			}
-			log.Logf(2, "using auth schema version %v", dump.authVersion)
+			log.Logf(log.DebugLow, "using auth schema version %v", dump.authVersion)
 		}
 		if dump.authVersion != 3 {
 			return fmt.Errorf("backing up users and roles is only supported for "+
@@ -156,9 +156,9 @@ func (dump *MongoDump) Dump() error {
 	}
 
 	if dump.OutputOptions.DumpDBUsersAndRoles {
-		log.Logf(0, "dumping users and roles for %v", dump.ToolOptions.DB)
+		log.Logf(log.Always, "dumping users and roles for %v", dump.ToolOptions.DB)
 		if dump.ToolOptions.DB == "admin" {
-			log.Logf(0, "skipping users/roles dump, already dumped admin database")
+			log.Logf(log.Always, "skipping users/roles dump, already dumped admin database")
 		} else {
 			err = dump.DumpUsersAndRolesForDB(dump.ToolOptions.DB)
 			if err != nil {
@@ -167,7 +167,7 @@ func (dump *MongoDump) Dump() error {
 		}
 	}
 
-	log.Logf(1, "done")
+	log.Logf(log.Info, "done")
 
 	return err
 }
@@ -186,7 +186,7 @@ func (dump *MongoDump) DumpEverything() error {
 		if err != nil {
 			return fmt.Errorf("error finding oplog: %v", err)
 		}
-		log.Logf(1, "getting most recent oplog timestamp")
+		log.Logf(log.Info, "getting most recent oplog timestamp")
 		oplogStart, err = dump.getOplogStartTime()
 		if err != nil {
 			return fmt.Errorf("error getting oplog start: %v", err)
@@ -199,7 +199,7 @@ func (dump *MongoDump) DumpEverything() error {
 	}
 	for _, dbName := range dbs {
 		if dbName != "local" { // local can only be explicitly dumped
-			log.Logf(0, "dumping database %v", dbName)
+			log.Logf(log.Always, "dumping database %v", dbName)
 			err := dump.DumpDatabase(dbName)
 			if err != nil {
 				return err
@@ -212,7 +212,7 @@ func (dump *MongoDump) DumpEverything() error {
 	// we check to see if the oplog has rolled over (i.e. the most recent entry when
 	// we started still exist, so we know we haven't lost data)
 	if dump.OutputOptions.Oplog {
-		log.Logf(2, "checking if oplog entry %v still exists", oplogStart)
+		log.Logf(log.DebugLow, "checking if oplog entry %v still exists", oplogStart)
 		exists, err := dump.checkOplogTimestampExists(oplogStart)
 		if !exists {
 			return fmt.Errorf(
@@ -221,7 +221,7 @@ func (dump *MongoDump) DumpEverything() error {
 		if err != nil {
 			return fmt.Errorf("unable to check oplog for overflow: %v", err)
 		}
-		log.Logf(3, "oplog entry %v still exists", oplogStart)
+		log.Logf(log.DebugHigh, "oplog entry %v still exists", oplogStart)
 
 		// dump oplog in root of the dump folder
 		oplogFilepath := filepath.Join(dump.OutputOptions.Out, "oplog.bson")
@@ -230,7 +230,7 @@ func (dump *MongoDump) DumpEverything() error {
 			return fmt.Errorf("error creating bson file `%v`: %v", oplogFilepath, err)
 		}
 
-		log.Logf(0, "writing captured oplog to %v", oplogFilepath)
+		log.Logf(log.Always, "writing captured oplog to %v", oplogFilepath)
 		//session.SetPrefetch(1.0) //mimic exhaust cursor
 		queryObj := bson.M{"ts": bson.M{"$gt": oplogStart}}
 		oplogQuery, err := dump.cmdRunner.FindDocs("local", dump.oplogCollection, 0, 0, queryObj, nil, db.Prefetch)
@@ -245,7 +245,7 @@ func (dump *MongoDump) DumpEverything() error {
 		// check the oplog for a rollover one last time, to avoid a race condition
 		// wherein the oplog rolls over in the time after our first check, but before
 		// we copy it.
-		log.Logf(2, "checking again if oplog entry %v still exists", oplogStart)
+		log.Logf(log.DebugLow, "checking again if oplog entry %v still exists", oplogStart)
 		exists, err = dump.checkOplogTimestampExists(oplogStart)
 		if !exists {
 			return fmt.Errorf(
@@ -254,7 +254,7 @@ func (dump *MongoDump) DumpEverything() error {
 		if err != nil {
 			return fmt.Errorf("unable to check oplog for overflow: %v", err)
 		}
-		log.Logf(3, "oplog entry %v still exists", oplogStart)
+		log.Logf(log.DebugHigh, "oplog entry %v still exists", oplogStart)
 	}
 
 	return nil
@@ -284,10 +284,10 @@ func (dump *MongoDump) DumpDatabase(db string) error {
 	dbFolder := filepath.Join(dump.OutputOptions.Out, db)
 	err = os.MkdirAll(dbFolder, DumpDefaultPermissions)
 
-	log.Logf(2, "found collections: %v", strings.Join(cols, ", "))
+	log.Logf(log.DebugLow, "found collections: %v", strings.Join(cols, ", "))
 	for _, col := range cols {
 		if dump.skipCollection(col) {
-			log.Logf(2, "skipping %v, it is excluded", col)
+			log.Logf(log.DebugLow, "skipping %v, it is excluded", col)
 			continue
 		}
 		err = dump.DumpCollection(db, col)
@@ -322,7 +322,7 @@ func (dump *MongoDump) DumpCollection(dbName, c string) error {
 	}
 
 	if dump.useStdout {
-		log.Logf(0, "writing %v.%v to stdout", dbName, c)
+		log.Logf(log.Always, "writing %v.%v to stdout", dbName, c)
 		return dump.dumpDocSourceToWriter(findQuery, os.Stdout)
 	}
 	dbFolder := filepath.Join(dump.OutputOptions.Out, dbName)
@@ -338,7 +338,7 @@ func (dump *MongoDump) DumpCollection(dbName, c string) error {
 	}
 	defer out.Close()
 
-	log.Logf(0, "writing %v.%v to %v", dbName, c, outFilepath)
+	log.Logf(log.Always, "writing %v.%v to %v", dbName, c, outFilepath)
 	err = dump.dumpDocSourceToWriter(findQuery, out)
 	if err != nil {
 		return err
@@ -356,7 +356,7 @@ func (dump *MongoDump) DumpCollection(dbName, c string) error {
 	}
 	defer metaOut.Close()
 
-	log.Logf(0, "writing %v.%v metadata to %v", dbName, c, metadataFilepath)
+	log.Logf(log.Always, "writing %v.%v metadata to %v", dbName, c, metadataFilepath)
 	return dump.dumpMetadataToWriter(dbName, c, metaOut)
 }
 
@@ -368,7 +368,7 @@ func (dump *MongoDump) dumpDocSourceToWriter(query db.DocSource, writer io.Write
 	if err != nil {
 		return fmt.Errorf("error reading from db: %v", err)
 	}
-	log.Logf(1, "\t%v documents", total)
+	log.Logf(log.Info, "\t%v documents", total)
 
 	bar := progress.ProgressBar{
 		Max:        total,
@@ -395,7 +395,7 @@ func (dump *MongoDump) dumpDocSourceToWriter(query db.DocSource, writer io.Write
 		for {
 			raw := &bson.Raw{}
 			if err := query.Err(); err != nil {
-				log.Logf(0, "error reading from db: %v", err)
+				log.Logf(log.Always, "error reading from db: %v", err)
 			}
 			next := query.Next(raw)
 

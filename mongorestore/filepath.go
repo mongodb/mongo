@@ -45,7 +45,7 @@ func GetInfoFromFilename(filename string) (string, FileType) {
 }
 
 func (restore *MongoRestore) CreateAllIntents(fullpath string) error {
-	log.Logf(3, "using %v as dump root directory", fullpath)
+	log.Logf(log.DebugHigh, "using %v as dump root directory", fullpath)
 	entries, err := ioutil.ReadDir(fullpath)
 	if err != nil {
 		return fmt.Errorf("error reading root dump folder: %v", err)
@@ -66,7 +66,7 @@ func (restore *MongoRestore) CreateAllIntents(fullpath string) error {
 					BSONSize: entry.Size(),
 				})
 			} else {
-				log.Logf(0, `don't know what to do with file "%v", skipping...`,
+				log.Logf(log.Always, `don't know what to do with file "%v", skipping...`,
 					filepath.Join(fullpath, entry.Name()))
 			}
 		}
@@ -78,7 +78,7 @@ func (restore *MongoRestore) CreateAllIntents(fullpath string) error {
 // for all of the collection dump files it encounters
 func (restore *MongoRestore) CreateIntentsForDB(db, fullpath string) error {
 	//TODO check that it's really a directory
-	log.Logf(3, "reading collections for database %v in %v", db, fullpath)
+	log.Logf(log.DebugHigh, "reading collections for database %v in %v", db, fullpath)
 	entries, err := ioutil.ReadDir(fullpath)
 	if err != nil {
 		return fmt.Errorf("error reading db folder %v: %v", db, err)
@@ -87,7 +87,7 @@ func (restore *MongoRestore) CreateIntentsForDB(db, fullpath string) error {
 	usesMetadataFiles := hasMetadataFiles(entries)
 	for _, entry := range entries {
 		if entry.IsDir() {
-			log.Logf(0, `don't know what to do with subdirectory "%v", skipping...`,
+			log.Logf(log.Always, `don't know what to do with subdirectory "%v", skipping...`,
 				filepath.Join(fullpath, entry.Name()))
 		} else {
 			//TODO handle user/roles?
@@ -97,7 +97,7 @@ func (restore *MongoRestore) CreateIntentsForDB(db, fullpath string) error {
 				// skip restoring the indexes collection if we are using metadata
 				// files to store index information, to eliminate redundancy
 				if collection == "system.indexes" && usesMetadataFiles {
-					log.Logf(2,
+					log.Logf(log.DebugLow,
 						"not restoring system.indexes collection because database %v "+
 							"has .metadata.json files", db)
 					continue
@@ -108,7 +108,7 @@ func (restore *MongoRestore) CreateIntentsForDB(db, fullpath string) error {
 					BSONSize: entry.Size(),
 					BSONPath: filepath.Join(fullpath, entry.Name()),
 				}
-				log.Logf(1, "found collection %v bson to restore", intent.Key())
+				log.Logf(log.Info, "found collection %v bson to restore", intent.Key())
 				restore.manager.Put(intent)
 			case MetadataFileType:
 				usesMetadataFiles = true
@@ -117,10 +117,10 @@ func (restore *MongoRestore) CreateIntentsForDB(db, fullpath string) error {
 					C:            collection,
 					MetadataPath: filepath.Join(fullpath, entry.Name()),
 				}
-				log.Logf(1, "found collection %v metadata to restore", intent.Key())
+				log.Logf(log.Info, "found collection %v metadata to restore", intent.Key())
 				restore.manager.Put(intent)
 			default:
-				log.Logf(0, `don't know what to do with file "%v", skipping...`,
+				log.Logf(log.Always, `don't know what to do with file "%v", skipping...`,
 					filepath.Join(fullpath, entry.Name()))
 			}
 		}
@@ -140,7 +140,7 @@ func hasMetadataFiles(files []os.FileInfo) bool {
 
 func (restore *MongoRestore) CreateIntentForCollection(
 	db, collection, fullpath string) error {
-	log.Logf(2, "reading collection %v for database %v from %v",
+	log.Logf(log.DebugLow, "reading collection %v for database %v from %v",
 		collection, db, fullpath)
 
 	// first make sure the bson file exists and is valid
@@ -166,12 +166,12 @@ func (restore *MongoRestore) CreateIntentForCollection(
 	}
 
 	// finally, check if it has a .metadata.json file in its folder
-	log.Logf(2, "scanning directory %v for metadata file", filepath.Dir(fullpath))
+	log.Logf(log.DebugLow, "scanning directory %v for metadata file", filepath.Dir(fullpath))
 	entries, err := ioutil.ReadDir(filepath.Dir(fullpath))
 	if err != nil {
 		// try and carry on if we can
-		log.Logf(1, "error attempting to locate metadata for file: %v", err)
-		log.Log(1, "restoring collection without metadata")
+		log.Logf(log.Info, "error attempting to locate metadata for file: %v", err)
+		log.Log(log.Info, "restoring collection without metadata")
 		restore.manager.Put(intent)
 		return nil
 	}
@@ -179,14 +179,14 @@ func (restore *MongoRestore) CreateIntentForCollection(
 	for _, entry := range entries {
 		if entry.Name() == metadataName {
 			metadataPath := filepath.Join(filepath.Dir(fullpath), metadataName)
-			log.Logf(1, "found metadata for collection at %v", metadataPath)
+			log.Logf(log.Info, "found metadata for collection at %v", metadataPath)
 			intent.MetadataPath = metadataPath
 			break
 		}
 	}
 
 	if intent.MetadataPath == "" {
-		log.Log(1, "restoring collection without metadata")
+		log.Log(log.Info, "restoring collection without metadata")
 	}
 
 	restore.manager.Put(intent)

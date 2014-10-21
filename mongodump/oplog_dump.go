@@ -27,20 +27,20 @@ func (dump *MongoDump) determineOplogCollectionName() error {
 		return fmt.Errorf("error running command: %v", err)
 	}
 	if _, ok := masterDoc["hosts"]; ok {
-		log.Logf(2, "determined cluster to be a replica set")
-		log.Logf(3, "oplog located in local.oplog.rs")
+		log.Logf(log.DebugLow, "determined cluster to be a replica set")
+		log.Logf(log.DebugHigh, "oplog located in local.oplog.rs")
 		dump.oplogCollection = "oplog.rs"
 		return nil
 	}
 	if isMaster := masterDoc["ismaster"]; util.IsFalsy(isMaster) {
-		log.Logf(1, "mongodump is not connected to a master")
+		log.Logf(log.Info, "mongodump is not connected to a master")
 		return fmt.Errorf("not connected to master")
 	}
 
 	// TODO stop assuming master/slave, be smarter and check if it is really
 	// master/slave...though to be fair legacy mongodump doesn't do this either...
-	log.Logf(2, "not connected to a replica set, assuming master/slave")
-	log.Logf(3, "oplog located in local.oplog.$main")
+	log.Logf(log.DebugLow, "not connected to a replica set, assuming master/slave")
+	log.Logf(log.DebugHigh, "oplog located in local.oplog.$main")
 	dump.oplogCollection = "oplog.$main"
 	return nil
 
@@ -69,9 +69,9 @@ func (dump *MongoDump) checkOplogTimestampExists(ts bson.MongoTimestamp) (bool, 
 		return false, fmt.Errorf("unable to read entry from oplog: %v", err)
 	}
 
-	log.Logf(3, "oldest oplog entry has timestamp %v", oldestOplogEntry.Timestamp)
+	log.Logf(log.DebugHigh, "oldest oplog entry has timestamp %v", oldestOplogEntry.Timestamp)
 	if oldestOplogEntry.Timestamp > ts {
-		log.Logf(1, "oldest oplog entry of timestamp %v is older than %v",
+		log.Logf(log.Info, "oldest oplog entry of timestamp %v is older than %v",
 			oldestOplogEntry.Timestamp, ts)
 		return false, nil
 	}

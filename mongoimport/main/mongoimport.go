@@ -24,7 +24,7 @@ func main() {
 
 	args, err := opts.Parse()
 	if err != nil {
-		log.Logf(0, "error parsing command line options: %v", err)
+		log.Logf(log.Always, "error parsing command line options: %v", err)
 		util.ExitFail()
 	}
 
@@ -54,13 +54,13 @@ func main() {
 	}
 
 	if err = mongoImport.ValidateSettings(args); err != nil {
-		log.Logf(0, "error validating settings: %v", err)
+		log.Logf(log.Always, "error validating settings: %v", err)
 		util.ExitFail()
 	}
 
 	numDocs, err := mongoImport.ImportDocuments()
 	if err != nil {
-		log.Logf(0, "error importing documents: %v", err)
+		log.Logf(log.Always, "error importing documents: %v", err)
 		util.ExitFail()
 	}
 	if !opts.Quiet {
@@ -68,6 +68,6 @@ func main() {
 		if numDocs != 1 {
 			message = fmt.Sprintf("imported %v documents", numDocs)
 		}
-		log.Logf(0, message)
+		log.Logf(log.Always, message)
 	}
 }
