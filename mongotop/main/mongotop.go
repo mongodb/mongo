@@ -3,10 +3,12 @@ package main
 
 import (
 	"github.com/mongodb/mongo-tools/common/db"
+	"github.com/mongodb/mongo-tools/common/log"
 	commonopts "github.com/mongodb/mongo-tools/common/options"
 	"github.com/mongodb/mongo-tools/mongotop"
 	"github.com/mongodb/mongo-tools/mongotop/options"
 	"github.com/mongodb/mongo-tools/mongotop/output"
+	"os"
 	"strconv"
 	"time"
 )
