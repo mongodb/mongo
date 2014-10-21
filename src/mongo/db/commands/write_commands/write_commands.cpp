@@ -201,6 +201,9 @@ namespace mongo {
             updateRequest.setLifecycle( &updateLifecycle );
             updateRequest.setExplain();
 
+            // Explained updates can yield.
+            updateRequest.setYieldPolicy(PlanExecutor::YIELD_AUTO);
+
             // Use the request to create an UpdateExecutor, and from it extract the
             // plan tree which will be used to execute this update.
             UpdateExecutor updateExecutor( &updateRequest, &txn->getCurOp()->debug() );
@@ -235,6 +238,9 @@ namespace mongo {
             deleteRequest.setUpdateOpLog(true);
             deleteRequest.setGod( false );
             deleteRequest.setExplain();
+
+            // Explained deletes can yield.
+            deleteRequest.setYieldPolicy(PlanExecutor::YIELD_AUTO);
 
             // Use the request to create a DeleteExecutor, and from it extract the
             // plan tree which will be used to execute this update.

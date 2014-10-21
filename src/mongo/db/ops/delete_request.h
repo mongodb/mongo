@@ -46,7 +46,8 @@ namespace mongo {
             _logop(false),
             _god(false),
             _fromMigrate(false),
-            _isExplain(false) {}
+            _isExplain(false),
+            _yieldPolicy(PlanExecutor::YIELD_MANUAL) {}
 
         void setQuery(const BSONObj& query) { _query = query; }
         void setMulti(bool multi = true) { _multi = multi; }
@@ -54,6 +55,7 @@ namespace mongo {
         void setGod(bool god = true) { _god = god; }
         void setFromMigrate(bool fromMigrate = true) { _fromMigrate = fromMigrate; }
         void setExplain(bool isExplain = true) { _isExplain = isExplain; }
+        void setYieldPolicy(PlanExecutor::YieldPolicy yieldPolicy) { _yieldPolicy = yieldPolicy; }
 
         const NamespaceString& getNamespaceString() const { return _nsString; }
         const BSONObj& getQuery() const { return _query; }
@@ -63,6 +65,7 @@ namespace mongo {
         bool isFromMigrate() const { return _fromMigrate; }
         bool isExplain() const { return _isExplain; }
         OperationContext* getOpCtx() const { return _txn; }
+        PlanExecutor::YieldPolicy getYieldPolicy() const { return _yieldPolicy; }
 
         std::string toString() const;
 
@@ -75,6 +78,7 @@ namespace mongo {
         bool _god;
         bool _fromMigrate;
         bool _isExplain;
+        PlanExecutor::YieldPolicy _yieldPolicy;
     };
 
 }  // namespace mongo

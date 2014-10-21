@@ -162,7 +162,8 @@ namespace mongo {
 
         // If yielding is allowed for this plan, then set an auto yield policy. Otherwise set
         // a manual yield policy.
-        const bool canYield = !_request->isGod() && (
+        const bool canYield = !_request->isGod() &&
+            PlanExecutor::YIELD_AUTO == _request->getYieldPolicy() && (
             _canonicalQuery.get() ?
             !QueryPlannerCommon::hasNode(_canonicalQuery->root(), MatchExpression::ATOMIC) :
             !LiteParsedQuery::isQueryIsolated(_request->getQuery()));

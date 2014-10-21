@@ -1137,6 +1137,9 @@ namespace mongo {
         UpdateLifecycleImpl updateLifecycle(true, request.getNamespaceString());
         request.setLifecycle(&updateLifecycle);
 
+        // Updates from the write commands path can yield.
+        request.setYieldPolicy(PlanExecutor::YIELD_AUTO);
+
         UpdateExecutor executor(&request, &txn->getCurOp()->debug());
         Status status = executor.prepare();
         if (!status.isOK()) {
@@ -1249,6 +1252,10 @@ namespace mongo {
         request.setMulti( removeItem.getDelete()->getLimit() != 1 );
         request.setUpdateOpLog(true);
         request.setGod( false );
+
+        // Deletes running through the write commands path can yield.
+        request.setYieldPolicy(PlanExecutor::YIELD_AUTO);
+
         DeleteExecutor executor( &request );
         Status status = executor.prepare();
         if ( !status.isOK() ) {

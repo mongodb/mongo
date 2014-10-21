@@ -619,6 +619,9 @@ namespace mongo {
         request.setUpdateOpLog(); // TODO: This is wasteful if repl is not active.
         UpdateLifecycleImpl updateLifecycle(broadcast, ns);
         request.setLifecycle(&updateLifecycle);
+
+        request.setYieldPolicy(PlanExecutor::YIELD_AUTO);
+
         UpdateExecutor executor(&request, &op.debug());
         uassertStatusOK(executor.prepare());
 
@@ -698,6 +701,9 @@ namespace mongo {
         request.setQuery(pattern);
         request.setMulti(!justOne);
         request.setUpdateOpLog(true);
+
+        request.setYieldPolicy(PlanExecutor::YIELD_AUTO);
+
         DeleteExecutor executor(&request);
         uassertStatusOK(executor.prepare());
 

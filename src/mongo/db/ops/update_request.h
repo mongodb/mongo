@@ -53,7 +53,8 @@ namespace mongo {
             , _fromMigration(false)
             , _fromReplication(false)
             , _lifecycle(NULL)
-            , _isExplain(false) {}
+            , _isExplain(false)
+            , _yieldPolicy(PlanExecutor::YIELD_MANUAL) {}
 
         const NamespaceString& getNamespaceString() const {
             return _nsString;
@@ -146,6 +147,14 @@ namespace mongo {
             return _isExplain;
         }
 
+        inline void setYieldPolicy(PlanExecutor::YieldPolicy yieldPolicy) {
+            _yieldPolicy = yieldPolicy;
+        }
+
+        inline PlanExecutor::YieldPolicy getYieldPolicy() const {
+            return _yieldPolicy;
+        }
+
         const std::string toString() const {
             return str::stream()
                         << " query: " << _query
@@ -197,6 +206,9 @@ namespace mongo {
 
         // Whether or not we are requesting an explained update. Explained updates are read-only.
         bool _isExplain;
+
+        // Whether or not the update should yield. Defaults to YIELD_MANUAL.
+        PlanExecutor::YieldPolicy _yieldPolicy;
 
     };
 

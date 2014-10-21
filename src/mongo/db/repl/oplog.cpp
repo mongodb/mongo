@@ -736,7 +736,7 @@ namespace repl {
         else if ( *opType == 'd' ) {
             opCounters->gotDelete();
             if ( opType[1] == 0 )
-                deleteObjects(txn, db, ns, o, /*justOne*/ valueB);
+                deleteObjects(txn, db, ns, o, PlanExecutor::YIELD_MANUAL, /*justOne*/ valueB);
             else
                 verify( opType[1] == 'b' ); // "db" advertisement
         }

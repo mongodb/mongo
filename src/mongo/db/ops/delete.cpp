@@ -42,6 +42,7 @@ namespace mongo {
                             Database* db,
                             const StringData& ns,
                             BSONObj pattern,
+                            PlanExecutor::YieldPolicy policy,
                             bool justOne,
                             bool logop,
                             bool god,
@@ -53,6 +54,7 @@ namespace mongo {
         request.setUpdateOpLog(logop);
         request.setGod(god);
         request.setFromMigrate(fromMigrate);
+        request.setYieldPolicy(policy);
         DeleteExecutor executor(&request);
         return executor.execute(db);
     }
