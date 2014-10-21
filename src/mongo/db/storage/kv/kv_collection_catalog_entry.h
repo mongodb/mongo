@@ -83,6 +83,9 @@ namespace mongo {
         virtual MetaData _getMetaData( OperationContext* txn ) const;
 
     private:
+        class AddIndexChange;
+        class RemoveIndexChange;
+
         KVEngine* _engine; // not owned
         KVCatalog* _catalog; // not owned
         std::string _ident;

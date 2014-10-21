@@ -37,6 +37,7 @@
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/storage/record_store.h"
+#include "mongo/db/storage/recovery_unit.h"
 #include "mongo/platform/random.h"
 #include "mongo/util/log.h"
 
@@ -47,6 +48,39 @@ namespace {
     // This must be locked *before* _identLock.
     const ResourceId catalogRID(RESOURCE_DOCUMENT, StringData("KVCatalog"));
 }
+
+    class KVCatalog::AddIdentChange : public RecoveryUnit::Change {
+    public:
+        AddIdentChange(KVCatalog* catalog, const StringData& ident)
+            :_catalog(catalog), _ident(ident.toString())
+        {}
+
+        virtual void commit() {}
+        virtual void rollback() {
+            boost::mutex::scoped_lock lk(_catalog->_identsLock);
+            _catalog->_idents.erase(_ident);
+        }
+
+        KVCatalog* const _catalog;
+        const std::string _ident;
+    };
+
+    class KVCatalog::RemoveIdentChange : public RecoveryUnit::Change {
+    public:
+        RemoveIdentChange(KVCatalog* catalog, const StringData& ident, const Entry& entry)
+            :_catalog(catalog), _ident(ident.toString()), _entry(entry)
+        {}
+
+        virtual void commit() {}
+        virtual void rollback() {
+            boost::mutex::scoped_lock lk(_catalog->_identsLock);
+            _catalog->_idents[_ident] = _entry;
+        }
+
+        KVCatalog* const _catalog;
+        const std::string _ident;
+        const Entry _entry;
+    };
 
     KVCatalog::KVCatalog( RecordStore* rs, bool isRsThreadSafe )
         : _rs( rs ), _isRsThreadSafe(isRsThreadSafe) {
@@ -66,7 +100,8 @@ namespace {
             RecordData data = it->dataFor( loc );
             BSONObj obj( data.data() );
 
-            // no locking needed since can only be one
+            // No locking needed since can only be called from one thread.
+            // No rollback since this is just loading already committed data.
             string ns = obj["ns"].String();
             string ident = obj["ident"].String();
             _idents[ns] = Entry( ident, loc );
@@ -96,6 +131,8 @@ namespace {
         if ( !old.ident.empty() ) {
             return Status( ErrorCodes::NamespaceExists, "collection already exists" );
         }
+
+        opCtx->recoveryUnit()->registerChange(new AddIdentChange(this, ns));
 
         BSONObj obj;
         {
@@ -254,9 +291,14 @@ namespace {
             invariant( status.getValue() == loc );
         }
 
-
         boost::mutex::scoped_lock lk( _identsLock );
-        _idents.erase( fromNS.toString() );
+        const NSToIdentMap::iterator fromIt = _idents.find(fromNS.toString());
+        invariant(fromIt != _idents.end());
+
+        opCtx->recoveryUnit()->registerChange(new RemoveIdentChange(this, fromNS, fromIt->second));
+        opCtx->recoveryUnit()->registerChange(new AddIdentChange(this, toNS));
+
+        _idents.erase(fromIt);
         _idents[toNS.toString()] = Entry( old["ident"].String(), loc );
 
         return Status::OK();
@@ -269,14 +311,16 @@ namespace {
             rLk.reset(new Lock::ResourceLock(opCtx->lockState(), catalogRID, MODE_X));
 
         boost::mutex::scoped_lock lk( _identsLock );
-        Entry old = _idents[ns.toString()];
-        if ( old.ident.empty() ) {
+        const NSToIdentMap::iterator it = _idents.find(ns.toString());
+        if (it == _idents.end()) {
             return Status( ErrorCodes::NamespaceNotFound, "collection not found" );
         }
 
-        LOG(1) << "deleting metadat for " << ns << " @ " << old.storedLoc;
-        _rs->deleteRecord( opCtx, old.storedLoc );
-        _idents.erase( ns.toString() );
+        opCtx->recoveryUnit()->registerChange(new RemoveIdentChange(this, ns, it->second));
+
+        LOG(1) << "deleting metadata for " << ns << " @ " << it->second.storedLoc;
+        _rs->deleteRecord( opCtx, it->second.storedLoc );
+        _idents.erase(it);
 
         return Status::OK();
     }

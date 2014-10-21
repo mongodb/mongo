@@ -52,15 +52,6 @@ namespace mongo {
         // ---------
 
         /**
-         * @param ident Ident is a one time use string. It is used for this instance
-         *              and never again.
-         */
-        virtual Status createRecordStore( OperationContext* opCtx,
-                                          const StringData& ns,
-                                          const StringData& ident,
-                                          const CollectionOptions& options ) = 0;
-
-        /**
          * Caller takes ownership
          * Having multiple out for the same ns is a rules violation;
          * Calling on a non-created ident is invalid and may crash.
@@ -70,18 +61,29 @@ namespace mongo {
                                              const StringData& ident,
                                              const CollectionOptions& options ) = 0;
 
+        virtual SortedDataInterface* getSortedDataInterface( OperationContext* opCtx,
+                                                             const StringData& ident,
+                                                             const IndexDescriptor* desc ) = 0;
+
+        //
+        // The create and drop methods on KVEngine are not transactional. Transactional semantics
+        // are provided by the KVStorageEngine code that calls these. For example, drop will be
+        // called if a create is rolled back. A higher-level drop operation will only propagate to a
+        // drop call on the KVEngine once the WUOW commits. Therefore drops will never be rolled
+        // back and it is safe to immediately reclaim storage.
+        //
+
+        virtual Status createRecordStore( OperationContext* opCtx,
+                                          const StringData& ns,
+                                          const StringData& ident,
+                                          const CollectionOptions& options ) = 0;
         virtual Status dropRecordStore( OperationContext* opCtx,
                                         const StringData& ident ) = 0;
 
-        // --------
 
         virtual Status createSortedDataInterface( OperationContext* opCtx,
                                                   const StringData& ident,
                                                   const IndexDescriptor* desc ) = 0;
-
-        virtual SortedDataInterface* getSortedDataInterface( OperationContext* opCtx,
-                                                             const StringData& ident,
-                                                             const IndexDescriptor* desc ) = 0;
 
         virtual Status dropSortedDataInterface( OperationContext* opCtx,
                                                 const StringData& ident ) = 0;

@@ -85,6 +85,8 @@ namespace mongo {
         Status dropCollection( OperationContext* opCtx,
                                const StringData& ns );
     private:
+        class AddIdentChange;
+        class RemoveIdentChange;
 
         BSONObj _findEntry( OperationContext* opCtx,
                             const StringData& ns,

@@ -87,6 +87,8 @@ namespace mongo {
         const KVCatalog* getCatalog() const { return _catalog.get(); }
 
     private:
+        class RemoveDBChange;
+
         boost::scoped_ptr<KVEngine> _engine;
         bool _initialized;
         const bool _supportsDocLocking;
