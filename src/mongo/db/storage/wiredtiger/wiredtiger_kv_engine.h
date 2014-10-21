@@ -47,6 +47,8 @@ namespace mongo {
         virtual Status dropSortedDataInterface( OperationContext* opCtx,
                                                 const StringData& ident );
 
+        virtual bool supportsDocLocking() const;
+
     private:
 
         string _uri( const StringData& ident ) const;

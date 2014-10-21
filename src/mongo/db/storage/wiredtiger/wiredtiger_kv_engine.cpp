@@ -170,4 +170,8 @@ namespace mongo {
         return Status::OK();
     }
 
+    bool WiredTigerKVEngine::supportsDocLocking() const {
+        return true;
+    }
+
 }
