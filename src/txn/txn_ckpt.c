@@ -547,7 +547,7 @@ __checkpoint_worker(
 	WT_DECL_RET;
 	WT_LSN ckptlsn;
 	const char *name;
-	int deleted, force, hot_backup_locked, track_ckpt;
+	int deleted, force, hot_backup_locked, track_ckpt, was_modified;
 	char *name_alloc;
 
 	btree = S2BT(session);
@@ -560,6 +560,7 @@ __checkpoint_worker(
 	hot_backup_locked = 0;
 	name_alloc = NULL;
 	track_ckpt = 1;
+	was_modified = btree->modified;
 
 	/*
 	 * Get the list of checkpoints for this file.  If there's no reference
@@ -874,6 +875,13 @@ fake:	/* Update the object's metadata. */
 		    session, 0, WT_TXN_LOG_CKPT_STOP, NULL));
 
 done: err:
+	/*
+	 * If the checkpoint didn't complete successfully, make sure the
+	 * tree is marked dirty.
+	 */
+	if (ret != 0 && !btree->modified && was_modified)
+		btree->modified = 1;
+
 	if (hot_backup_locked)
 		__wt_spin_unlock(session, &conn->hot_backup_lock);
 
