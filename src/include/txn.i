@@ -33,6 +33,7 @@ __txn_next_op(WT_SESSION_IMPL *session, WT_TXN_OP **opp)
 
 	*opp = &txn->mod[txn->mod_count++];
 	WT_CLEAR(**opp);
+	(*opp)->fileid = S2BT(session)->id;
 	return (0);
 }
 
@@ -68,7 +69,6 @@ __wt_txn_modify(WT_SESSION_IMPL *session, WT_UPDATE *upd)
 	op->type = F_ISSET(session, WT_SESSION_LOGGING_INMEM) ?
 	    TXN_OP_INMEM : TXN_OP_BASIC;
 	op->u.upd = upd;
-	op->fileid = S2BT(session)->id;
 	upd->txnid = session->txn.id;
 	return (ret);
 }

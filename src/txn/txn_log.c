@@ -357,7 +357,6 @@ __wt_txn_truncate_log(
 	btree = S2BT(session);
 
 	WT_RET(__txn_next_op(session, &op));
-	op->fileid = btree->id;
 
 	if (btree->type == BTREE_ROW) {
 		op->type = TXN_OP_TRUNCATE_ROW;
