@@ -734,6 +734,7 @@ namespace mongo {
                 warning() << "AutoAcquireFlushLockForMMAPV1Commit has not gotten lock in "
                           << attempt << " attempts";
             }
+            sleepmillis(10);
         }
     }
 
