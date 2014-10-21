@@ -186,7 +186,8 @@ namespace {
             }
         }
 
-        virtual void fullValidate(OperationContext* txn, long long *numKeysOut) const {
+        virtual void fullValidate(OperationContext* txn, bool full, long long *numKeysOut,
+                                  BSONObjBuilder* output) const {
             // TODO check invariants?
             *numKeysOut = _data->size();
         }

@@ -62,7 +62,7 @@ namespace mongo {
             ASSERT_EQUALS( 2, sorted->numEntries( opCtx.get() ) );
 
             long long x = 0;
-            sorted->fullValidate( opCtx.get(), &x );
+            sorted->fullValidate(opCtx.get(), false, &x, NULL);
             ASSERT_EQUALS( 2, x );
         }
     }

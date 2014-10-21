@@ -227,7 +227,7 @@ namespace mongo {
     Status BtreeBasedAccessMethod::validate(OperationContext* txn, int64_t* numKeys) {
         // XXX: long long vs int64_t
         long long keys;
-        _newInterface->fullValidate(txn, &keys);
+        _newInterface->fullValidate(txn, false, &keys, NULL);
         *numKeys = keys;
         return Status::OK();
     }
