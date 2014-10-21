@@ -79,13 +79,20 @@ namespace mongo {
                                                                            collection));
             stage->addIterator(iter.release());
 
-            std::auto_ptr<PlanExecutor> exec(new PlanExecutor(txn,
-                                                              ws.release(),
-                                                              stage.release(),
-                                                              collection));
+            PlanExecutor* rawExec;
+            Status execStatus = PlanExecutor::make(txn,
+                                                   ws.release(),
+                                                   stage.release(),
+                                                   collection,
+                                                   PlanExecutor::YIELD_AUTO,
+                                                   &rawExec);
+            invariant(execStatus.isOK());
+            std::auto_ptr<PlanExecutor> exec(rawExec);
 
-            // 'exec' will be used in newGetMore(). Set its yield policy and save its state.
-            exec->setYieldPolicy(PlanExecutor::YIELD_AUTO);
+            // 'exec' will be used in newGetMore(). It was automatically registered on construction
+            // due to the auto yield policy, so it could yield during plan selection. We deregister
+            // it now so that it can be registed with ClientCursor.
+            exec->deregisterExec();
             exec->saveState();
 
             // ClientCursors' constructor inserts them into a global map that manages their

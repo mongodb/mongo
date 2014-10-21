@@ -54,13 +54,11 @@ namespace QueryStageDelete {
                 bob.append("foo", static_cast<long long int>(i));
                 _client.insert(ns(), bob.obj());
             }
-            ctx.commit();
         }
 
         virtual ~QueryStageDeleteBase() {
             Client::WriteContext ctx(&_txn, ns());
             _client.dropCollection(ns());
-            ctx.commit();
         }
 
         void remove(const BSONObj& obj) {
@@ -158,8 +156,6 @@ namespace QueryStageDelete {
             }
 
             ASSERT_EQUALS(numObj() - 1, stats->docsDeleted);
-
-            ctx.commit();
         }
     };
 

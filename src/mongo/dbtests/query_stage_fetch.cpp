@@ -88,12 +88,14 @@ namespace QueryStageFetch {
     public:
         void run() {
             Client::WriteContext ctx(&_txn, ns());
-
             Database* db = ctx.ctx().db();
             Collection* coll = db->getCollection(&_txn, ns());
             if (!coll) {
+                WriteUnitOfWork wuow(&_txn);
                 coll = db->createCollection(&_txn, ns());
+                wuow.commit();
             }
+
             WorkingSet ws;
 
             // Add an object to the DB.
@@ -101,7 +103,6 @@ namespace QueryStageFetch {
             set<DiskLoc> locs;
             getLocs(&locs, coll);
             ASSERT_EQUALS(size_t(1), locs.size());
-            ctx.commit();
 
             // Create a mock stage that returns the WSM.
             auto_ptr<MockStage> mockStage(new MockStage(&ws));
@@ -147,12 +148,14 @@ namespace QueryStageFetch {
     public:
         void run() {
             Client::WriteContext ctx(&_txn, ns());
-
             Database* db = ctx.ctx().db();
             Collection* coll = db->getCollection(&_txn, ns());
             if (!coll) {
+                WriteUnitOfWork wuow(&_txn);
                 coll = db->createCollection(&_txn, ns());
+                wuow.commit();
             }
+
             WorkingSet ws;
 
             // Add an object to the DB.
@@ -197,7 +200,6 @@ namespace QueryStageFetch {
             // No more data to fetch, so, EOF.
             state = fetchStage->work(&id);
             ASSERT_EQUALS(PlanStage::IS_EOF, state);
-            ctx.commit();
         }
     };
 

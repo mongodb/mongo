@@ -156,7 +156,6 @@ namespace ClientTests {
             ASSERT_EQUALS(1U, db.getIndexSpecs(ns()).size());
 
             db.ensureIndex(ns(), BSON("x" << 1), true);
-            ctx.commit();
 
             ASSERT_EQUALS(2, indexCatalog->numIndexesReady(&txn));
             ASSERT_EQUALS(2U, db.getIndexSpecs(ns()).size());

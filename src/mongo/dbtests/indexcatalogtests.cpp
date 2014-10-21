@@ -34,24 +34,27 @@ namespace IndexCatalogTests {
         IndexIteratorTests() {
             OperationContextImpl txn;
             Client::WriteContext ctx(&txn, _ns);
+            WriteUnitOfWork wuow(&txn);
 
             _db = ctx.db();
             _coll = _db->createCollection(&txn, _ns);
             _catalog = _coll->getIndexCatalog();
-            ctx.commit();
+            wuow.commit();
         }
 
         ~IndexIteratorTests() {
             OperationContextImpl txn;
             Client::WriteContext ctx(&txn, _ns);
+            WriteUnitOfWork wuow(&txn);
 
             _db->dropCollection(&txn, _ns);
-            ctx.commit();
+            wuow.commit();
         }
 
         void run() {
             OperationContextImpl txn;
             Client::WriteContext ctx(&txn, _ns);
+            WriteUnitOfWork wuow(&txn);
 
             int numFinishedIndexesStart = _catalog->numIndexesReady(&txn);
 
@@ -77,7 +80,7 @@ namespace IndexCatalogTests {
                 }
             }
 
-            ctx.commit();
+            wuow.commit();
             ASSERT_TRUE(indexesIterated == _catalog->numIndexesReady(&txn));
             ASSERT_TRUE(foundIndex);
         }

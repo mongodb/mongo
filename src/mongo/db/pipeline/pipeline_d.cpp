@@ -177,8 +177,14 @@ namespace {
                                              projectionForQuery,
                                              &cq,
                                              whereCallback);
+
             PlanExecutor* rawExec;
-            if (status.isOK() && getExecutor(txn, collection, cq, &rawExec, runnerOptions).isOK()) {
+            if (status.isOK() && getExecutor(txn,
+                                             collection,
+                                             cq,
+                                             PlanExecutor::YIELD_AUTO,
+                                             &rawExec,
+                                             runnerOptions).isOK()) {
                 // success: The PlanExecutor will handle sorting for us using an index.
                 exec.reset(rawExec);
                 sortInRunner = true;
@@ -203,15 +209,19 @@ namespace {
                                              whereCallback));
 
             PlanExecutor* rawExec;
-            uassertStatusOK(getExecutor(txn, collection, cq, &rawExec, runnerOptions));
+            uassertStatusOK(getExecutor(txn,
+                                        collection,
+                                        cq,
+                                        PlanExecutor::YIELD_AUTO,
+                                        &rawExec,
+                                        runnerOptions));
             exec.reset(rawExec);
         }
 
 
         // DocumentSourceCursor expects a yielding PlanExecutor that has had its state saved. We
-        // pass "false" here to indicate that the PlanExecutor should not register itself: instead
-        // the output PlanExecutor will get registered with a ClientCursor.
-        exec->setYieldPolicy(PlanExecutor::YIELD_AUTO, false);
+        // deregister the PlanExecutor so that it can be registered with ClientCursor.
+        exec->deregisterExec();
         exec->saveState();
 
         // Put the PlanExecutor into a DocumentSourceCursor and add it to the front of the pipeline.

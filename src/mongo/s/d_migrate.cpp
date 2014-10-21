@@ -441,8 +441,15 @@ namespace mongo {
             invariant( _deleteNotifyExec.get() == NULL );
             WorkingSet* ws = new WorkingSet();
             DeleteNotificationStage* dns = new DeleteNotificationStage();
+            PlanExecutor* deleteNotifyExec;
             // Takes ownership of 'ws' and 'dns'.
-            PlanExecutor* deleteNotifyExec = new PlanExecutor(txn, ws, dns, collection);
+            Status execStatus = PlanExecutor::make(txn,
+                                                   ws,
+                                                   dns,
+                                                   collection,
+                                                   PlanExecutor::YIELD_MANUAL,
+                                                   &deleteNotifyExec);
+            invariant(execStatus.isOK());
             deleteNotifyExec->registerExec();
             _deleteNotifyExec.reset(deleteNotifyExec);
 
@@ -698,7 +705,6 @@ namespace mongo {
                 return NULL;
             }
             virtual std::vector<PlanStage*> getChildren() const {
-                invariant( false );
                 vector<PlanStage*> empty;
                 return empty;
             }
@@ -1730,13 +1736,14 @@ namespace mongo {
                     if ( entry["options"].isABSONObj() )
                         options = entry["options"].Obj();
 
+                    WriteUnitOfWork wuow(txn);
                     Status status = userCreateNS( txn, db, ns, options, true, false );
                     if ( !status.isOK() ) {
                         warning() << "failed to create collection [" << ns << "] "
                                   << " with options " << options << ": " << status;
                     }
+                    wuow.commit();
                 }
-                ctx.commit();
             }
 
             {                
@@ -1912,7 +1919,6 @@ namespace mongo {
                             }
 
                             Helpers::upsert( txn, ns, o, true );
-                            cx.commit();
                         }
                         thisTime++;
                         numCloned++;
@@ -2121,7 +2127,6 @@ namespace mongo {
                 BSONObjIterator i( xfer["deleted"].Obj() );
                 while ( i.more() ) {
                     Lock::CollectionLock clk(txn->lockState(), ns, MODE_X);
-                    WriteUnitOfWork wunit(txn);
                     Client::Context ctx(txn, ns);
 
                     BSONObj id = i.next().Obj();
@@ -2150,7 +2155,6 @@ namespace mongo {
                                   true /* fromMigrate */);
 
                     *lastOpApplied = ctx.getClient()->getLastOp().asDate();
-                    wunit.commit();
                     didAnything = true;
                 }
             }
@@ -2180,7 +2184,6 @@ namespace mongo {
                     Helpers::upsert( txn, ns , it , true );
 
                     *lastOpApplied = cx.ctx().getClient()->getLastOp().asDate();
-                    cx.commit();
                     didAnything = true;
                 }
             }

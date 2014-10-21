@@ -183,9 +183,6 @@ namespace mongo {
         public:
             WriteContext(OperationContext* opCtx, const std::string& ns);
 
-            /** Commit any writes done so far in this context. */
-            void commit();
-
             Database* db() const { return _c.db(); }
 
             Collection* getCollection() const {
@@ -199,7 +196,6 @@ namespace mongo {
             NamespaceString _nss;
             Lock::DBLock _dblk;
             Lock::CollectionLock _collk;
-            WriteUnitOfWork _wunit;
             Context _c;
         };
 

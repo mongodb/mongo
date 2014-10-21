@@ -89,27 +89,35 @@ namespace mongo {
             //
             // 1. Register your PlanExecutor with ClientCursor. Registered executors are informed
             // about DiskLoc deletions and namespace invalidation, as well as other important
-            // events. Do this either by  calling registerExec() on the executor. This can be done
-            // once you get your executor, or could be done per-yield.
+            // events. Do this by calling registerExec() on the executor. Alternatively, this can
+            // be done per-yield (as described below).
             //
-            // 2. Call exec->saveState() before you yield.
+            // 2. Construct a PlanYieldPolicy 'policy', passing 'exec' to the constructor.
             //
-            // 3. Call Yield::yieldAllLocks(), passing in the executor's OperationContext*. This
-            // causes the executor to give up its locks and block so that it goes to the back of
-            // the scheduler's queue.
+            // 3. Call PlanYieldPolicy::yield() on 'policy'. If your PlanExecutor is not yet
+            // registered (because you want to register on a per-yield basis), then pass
+            // 'true' to yield().
             //
-            // 4. Call exec->restoreState() before using the executor again.
-            //
-            // 5. The next call to exec->getNext() may return DEAD.
-            //
-            // 6. Make sure the executor gets deregistered from ClientCursor. PlanExecutor does
-            // this in an RAII fashion when it is destroyed, or you can explicity call
-            // unregisterExec() on the PlanExecutor.
+            // 4. The call to yield() returns a boolean indicating whether or not 'exec' is
+            // still alove. If it is false, then 'exec' was killed during the yield and is
+            // no longer valid.
             YIELD_MANUAL,
         };
 
         //
-        // Constructors / destructor.
+        // Factory methods.
+        //
+        // On success, return a new PlanExecutor, owned by the caller, through 'out'.
+        //
+        // Passing YIELD_AUTO to any of these factories will construct a yielding runner which
+        // may yield in the following circumstances:
+        //   1) During plan selection inside the call to make().
+        //   2) On any call to getNext().
+        //   3) While executing the plan inside executePlan().
+        //
+        // The runner will also be automatically registered to receive notifications in the
+        // case of YIELD_AUTO, so no further calls to registerExec() or setYieldPolicy() are
+        // necessary.
         //
 
         /**
@@ -118,40 +126,48 @@ namespace mongo {
          * Right now this is only for idhack updates which neither canonicalize
          * nor go through normal planning.
          */
-        PlanExecutor(OperationContext* opCtx,
-                     WorkingSet* ws,
-                     PlanStage* rt,
-                     const Collection* collection);
+        static Status make(OperationContext* opCtx,
+                           WorkingSet* ws,
+                           PlanStage* rt,
+                           const Collection* collection,
+                           YieldPolicy yieldPolicy,
+                           PlanExecutor** out);
 
         /**
          * Used when we have a NULL collection and no canonical query. In this case,
          * we need to explicitly pass a namespace to the plan executor.
          */
-        PlanExecutor(OperationContext* opCtx,
-                     WorkingSet* ws,
-                     PlanStage* rt,
-                     std::string ns);
+        static Status make(OperationContext* opCtx,
+                           WorkingSet* ws,
+                           PlanStage* rt,
+                           const std::string& ns,
+                           YieldPolicy yieldPolicy,
+                           PlanExecutor** out);
 
         /**
          * Used when there is a canonical query but no query solution (e.g. idhack
          * queries, queries against a NULL collection, queries using the subplan stage).
          */
-        PlanExecutor(OperationContext* opCtx,
-                     WorkingSet* ws,
-                     PlanStage* rt,
-                     CanonicalQuery* cq,
-                     const Collection* collection);
+        static Status make(OperationContext* opCtx,
+                           WorkingSet* ws,
+                           PlanStage* rt,
+                           CanonicalQuery* cq,
+                           const Collection* collection,
+                           YieldPolicy yieldPolicy,
+                           PlanExecutor** out);
 
         /**
          * The constructor for the normal case, when you have both a canonical query
          * and a query solution.
          */
-        PlanExecutor(OperationContext* opCtx,
-                     WorkingSet* ws,
-                     PlanStage* rt,
-                     QuerySolution* qs,
-                     CanonicalQuery* cq,
-                     const Collection* collection);
+        static Status make(OperationContext* opCtx,
+                           WorkingSet* ws,
+                           PlanStage* rt,
+                           QuerySolution* qs,
+                           CanonicalQuery* cq,
+                           const Collection* collection,
+                           YieldPolicy yieldPolicy,
+                           PlanExecutor** out);
 
         ~PlanExecutor();
 
@@ -228,6 +244,8 @@ namespace mongo {
          * For read operations, objOut or dlOut are populated with another query result.
          *
          * For write operations, the return depends on the particulars of the write stage.
+         *
+         * If an AUTO_YIELD policy is set, then this method may yield.
          */
         ExecState getNext(BSONObj* objOut, DiskLoc* dlOut);
 
@@ -242,6 +260,8 @@ namespace mongo {
         /**
          * Execute the plan to completion, throwing out the results.  Used when you want to work the
          * underlying tree without getting results back.
+         *
+         * If an AUTO_YIELD policy is set on this executor, then this will automatically yield.
          */
         Status executePlan();
 
@@ -315,9 +335,42 @@ namespace mongo {
         };
 
         /**
-         * Initialize the namespace using either the canonical query or the collection.
+         * New PlanExecutor instances are created with the static make() methods above.
          */
-        void initNs();
+        PlanExecutor(OperationContext* opCtx,
+                     WorkingSet* ws,
+                     PlanStage* rt,
+                     QuerySolution* qs,
+                     CanonicalQuery* cq,
+                     const Collection* collection,
+                     const std::string& ns);
+
+        /**
+         * Public factory methods delegate to this private factory to do their work.
+         */
+        static Status make(OperationContext* opCtx,
+                           WorkingSet* ws,
+                           PlanStage* rt,
+                           QuerySolution* qs,
+                           CanonicalQuery* cq,
+                           const Collection* collection,
+                           const std::string& ns,
+                           YieldPolicy yieldPolicy,
+                           PlanExecutor** out);
+
+        /**
+         * Clients of PlanExecutor expect that on receiving a new instance from one of the make()
+         * factory methods, plan selection has already been completed. In order to enforce this
+         * property, this function is called to do plan selection prior to returning the new
+         * PlanExecutor.
+         *
+         * If the tree contains plan selection stages, such as MultiPlanStage or SubplanStage,
+         * this calls into their underlying plan selection facilities. Otherwise, does nothing.
+         *
+         * If an AUTO_YIELD policy is set (and document-level locking is not supported), then
+         * locks are yielded during plan selection.
+         */
+        Status pickBestPlan(YieldPolicy policy);
 
         // The OperationContext that we're executing within.  We need this in order to release
         // locks.

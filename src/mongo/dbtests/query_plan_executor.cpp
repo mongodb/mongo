@@ -97,8 +97,11 @@ namespace QueryPlanExecutor {
             // Make the stage.
             auto_ptr<PlanStage> root(new CollectionScan(&_txn, csparams, ws.get(), cq->root()));
 
+            PlanExecutor* exec;
             // Hand the plan off to the executor.
-            PlanExecutor* exec = new PlanExecutor(&_txn, ws.release(), root.release(), cq, coll);
+            Status stat = PlanExecutor::make(&_txn, ws.release(), root.release(), cq, coll,
+                                             PlanExecutor::YIELD_MANUAL, &exec);
+            ASSERT_OK(stat);
             return exec;
         }
 
@@ -136,8 +139,12 @@ namespace QueryPlanExecutor {
             verify(CanonicalQuery::canonicalize(ns(), BSONObj(), &cq).isOK());
             verify(NULL != cq);
 
+            PlanExecutor* exec;
             // Hand the plan off to the executor.
-            return new PlanExecutor(&_txn, ws.release(), root.release(), cq, coll);
+            Status stat = PlanExecutor::make(&_txn, ws.release(), root.release(), cq, coll,
+                                             PlanExecutor::YIELD_MANUAL, &exec);
+            ASSERT_OK(stat);
+            return exec;
         }
 
         static const char* ns() { return "unittests.QueryPlanExecutor"; }
@@ -153,15 +160,19 @@ namespace QueryPlanExecutor {
         void registerExec( PlanExecutor* exec ) {
             // TODO: This is not correct (create collection under S-lock)
             AutoGetCollectionForRead ctx(&_txn, ns());
+            WriteUnitOfWork wunit(&_txn);
             Collection* collection = ctx.getDb()->getOrCreateCollection(&_txn, ns());
             collection->cursorCache()->registerExecutor( exec );
+            wunit.commit();
         }
 
         void deregisterExec( PlanExecutor* exec ) {
             // TODO: This is not correct (create collection under S-lock)
             AutoGetCollectionForRead ctx(&_txn, ns());
+            WriteUnitOfWork wunit(&_txn);
             Collection* collection = ctx.getDb()->getOrCreateCollection(&_txn, ns());
             collection->cursorCache()->deregisterExecutor( exec );
+            wunit.commit();
         }
 
     protected:
@@ -203,7 +214,6 @@ namespace QueryPlanExecutor {
             ASSERT_EQUALS(PlanExecutor::DEAD, exec->getNext(&objOut, NULL));
 
             deregisterExec(exec.get());
-            ctx.commit();
         }
     };
 
@@ -233,7 +243,6 @@ namespace QueryPlanExecutor {
             ASSERT_EQUALS(PlanExecutor::DEAD, exec->getNext(&objOut, NULL));
 
             deregisterExec(exec.get());
-            ctx.commit();
         }
     };
 
@@ -270,8 +279,12 @@ namespace QueryPlanExecutor {
             std::auto_ptr<PipelineProxyStage> proxy(
                 new PipelineProxyStage(pipeline, innerExec, ws.get()));
             Collection* collection = ctx.getCollection();
-            boost::scoped_ptr<PlanExecutor> outerExec(
-                new PlanExecutor(&_txn, ws.release(), proxy.release(), collection));
+
+            PlanExecutor* rawExec;
+            Status status = PlanExecutor::make(&_txn, ws.release(), proxy.release(), collection,
+                                               PlanExecutor::YIELD_MANUAL, &rawExec);
+            ASSERT_OK(status);
+            boost::scoped_ptr<PlanExecutor> outerExec(rawExec);
 
             // Only the outer executor gets registered.
             registerExec(outerExec.get());
@@ -284,7 +297,6 @@ namespace QueryPlanExecutor {
             ASSERT_EQUALS(PlanExecutor::DEAD, outerExec->getNext(&objOut, NULL));
 
             deregisterExec(outerExec.get());
-            ctx.commit();
         }
     };
 
@@ -352,7 +364,6 @@ namespace QueryPlanExecutor {
 
             int ids[] = {3, 4, 2};
             checkIds(ids, exec.get());
-            ctx.commit();
         }
     };
 
@@ -382,7 +393,6 @@ namespace QueryPlanExecutor {
             // we should not see the moved document again.
             int ids[] = {3, 4};
             checkIds(ids, exec.get());
-            ctx.commit();
         }
     };
 
@@ -412,7 +422,6 @@ namespace QueryPlanExecutor {
                 ASSERT_EQUALS(1U, numCursors());
                 coll->cursorCache()->invalidateAll(false);
                 ASSERT_EQUALS(0U, numCursors());
-                ctx.commit();
             }
         };
 
@@ -449,7 +458,6 @@ namespace QueryPlanExecutor {
                 // number of cursors to return to 0.
                 ccPin.deleteUnderlying();
                 ASSERT_EQUALS(0U, numCursors());
-                ctx.commit();
             }
         };
 
@@ -463,7 +471,6 @@ namespace QueryPlanExecutor {
                 {
                     Client::WriteContext ctx(&_txn, ns());
                     insert(BSON("a" << 1 << "b" << 1));
-                    ctx.commit();
                 }
 
                 {

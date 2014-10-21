@@ -264,12 +264,7 @@ namespace mongo {
           _nss(ns),
           _dblk(opCtx->lockState(), _nss.db(), MODE_IX),
           _collk(opCtx->lockState(), ns, MODE_IX),
-          _wunit(opCtx),
           _c(opCtx, ns) { }
-
-    void Client::WriteContext::commit() {
-        _wunit.commit();
-    }
 
     void Client::Context::checkNotStale() const { 
         switch ( _client->_curOp->getOp() ) {

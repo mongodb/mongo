@@ -54,7 +54,6 @@ namespace QueryStageMergeSortTests {
         virtual ~QueryStageMergeSortTestBase() {
             Client::WriteContext ctx(&_txn, ns());
             _client.dropCollection(ns());
-            ctx.commit();
         }
 
         void addIndex(const BSONObj& obj) {
@@ -114,7 +113,9 @@ namespace QueryStageMergeSortTests {
             Database* db = ctx.ctx().db();
             Collection* coll = db->getCollection(&_txn, ns());
             if (!coll) {
+                WriteUnitOfWork wuow(&_txn);
                 coll = db->createCollection(&_txn, ns());
+                wuow.commit();
             }
 
             const int N = 50;
@@ -149,15 +150,18 @@ namespace QueryStageMergeSortTests {
             // b:1
             params.descriptor = getIndex(secondIndex, coll);
             ms->addChild(new IndexScan(&_txn, params, ws, NULL));
-            ctx.commit();
 
             // Must fetch if we want to easily pull out an obj.
-            PlanExecutor runner(&_txn, ws, new FetchStage(&_txn, ws, ms, NULL, coll), coll);
+            PlanExecutor* rawExec;
+            Status status = PlanExecutor::make(&_txn, ws, new FetchStage(&_txn, ws, ms, NULL, coll),
+                                               coll, PlanExecutor::YIELD_MANUAL, &rawExec);
+            ASSERT_OK(status);
+            boost::scoped_ptr<PlanExecutor> exec(rawExec);
 
             for (int i = 0; i < N; ++i) {
                 BSONObj first, second;
-                ASSERT_EQUALS(PlanExecutor::ADVANCED, runner.getNext(&first, NULL));
-                ASSERT_EQUALS(PlanExecutor::ADVANCED, runner.getNext(&second, NULL));
+                ASSERT_EQUALS(PlanExecutor::ADVANCED, exec->getNext(&first, NULL));
+                ASSERT_EQUALS(PlanExecutor::ADVANCED, exec->getNext(&second, NULL));
                 ASSERT_EQUALS(first["c"].numberInt(), second["c"].numberInt());
                 ASSERT_EQUALS(i, first["c"].numberInt());
                 ASSERT((first.hasField("a") && second.hasField("b"))
@@ -166,7 +170,7 @@ namespace QueryStageMergeSortTests {
 
             // Should be done now.
             BSONObj foo;
-            ASSERT_NOT_EQUALS(PlanExecutor::ADVANCED, runner.getNext(&foo, NULL));
+            ASSERT_NOT_EQUALS(PlanExecutor::ADVANCED, exec->getNext(&foo, NULL));
         }
     };
 
@@ -178,7 +182,9 @@ namespace QueryStageMergeSortTests {
             Database* db = ctx.ctx().db();
             Collection* coll = db->getCollection(&_txn, ns());
             if (!coll) {
+                WriteUnitOfWork wuow(&_txn);
                 coll = db->createCollection(&_txn, ns());
+                wuow.commit();
             }
 
             const int N = 50;
@@ -213,14 +219,17 @@ namespace QueryStageMergeSortTests {
             // b:1
             params.descriptor = getIndex(secondIndex, coll);
             ms->addChild(new IndexScan(&_txn, params, ws, NULL));
-            ctx.commit();
 
-            PlanExecutor runner(&_txn, ws, new FetchStage(&_txn, ws, ms, NULL, coll), coll);
+            PlanExecutor* rawExec;
+            Status status = PlanExecutor::make(&_txn, ws, new FetchStage(&_txn, ws, ms, NULL, coll),
+                                               coll, PlanExecutor::YIELD_MANUAL, &rawExec);
+            ASSERT_OK(status);
+            boost::scoped_ptr<PlanExecutor> exec(rawExec);
 
             for (int i = 0; i < N; ++i) {
                 BSONObj first, second;
-                ASSERT_EQUALS(PlanExecutor::ADVANCED, runner.getNext(&first, NULL));
-                ASSERT_EQUALS(PlanExecutor::ADVANCED, runner.getNext(&second, NULL));
+                ASSERT_EQUALS(PlanExecutor::ADVANCED, exec->getNext(&first, NULL));
+                ASSERT_EQUALS(PlanExecutor::ADVANCED, exec->getNext(&second, NULL));
                 ASSERT_EQUALS(first["c"].numberInt(), second["c"].numberInt());
                 ASSERT_EQUALS(i, first["c"].numberInt());
                 ASSERT((first.hasField("a") && second.hasField("b"))
@@ -229,7 +238,7 @@ namespace QueryStageMergeSortTests {
 
             // Should be done now.
             BSONObj foo;
-            ASSERT_EQUALS(PlanExecutor::IS_EOF, runner.getNext(&foo, NULL));
+            ASSERT_EQUALS(PlanExecutor::IS_EOF, exec->getNext(&foo, NULL));
         }
     };
 
@@ -241,7 +250,9 @@ namespace QueryStageMergeSortTests {
             Database* db = ctx.ctx().db();
             Collection* coll = db->getCollection(&_txn, ns());
             if (!coll) {
+                WriteUnitOfWork wuow(&_txn);
                 coll = db->createCollection(&_txn, ns());
+                wuow.commit();
             }
 
             const int N = 50;
@@ -276,15 +287,18 @@ namespace QueryStageMergeSortTests {
             // b:1
             params.descriptor = getIndex(secondIndex, coll);
             ms->addChild(new IndexScan(&_txn, params, ws, NULL));
-            ctx.commit();
 
-            PlanExecutor runner(&_txn, ws, new FetchStage(&_txn, ws, ms, NULL, coll), coll);
+            PlanExecutor* rawExec;
+            Status status = PlanExecutor::make(&_txn, ws, new FetchStage(&_txn, ws, ms, NULL, coll),
+                                               coll, PlanExecutor::YIELD_MANUAL, &rawExec);
+            ASSERT_OK(status);
+            boost::scoped_ptr<PlanExecutor> exec(rawExec);
 
             for (int i = 0; i < N; ++i) {
                 BSONObj first, second;
                 // We inserted N objects but we get 2 * N from the runner because of dups.
-                ASSERT_EQUALS(PlanExecutor::ADVANCED, runner.getNext(&first, NULL));
-                ASSERT_EQUALS(PlanExecutor::ADVANCED, runner.getNext(&second, NULL));
+                ASSERT_EQUALS(PlanExecutor::ADVANCED, exec->getNext(&first, NULL));
+                ASSERT_EQUALS(PlanExecutor::ADVANCED, exec->getNext(&second, NULL));
                 ASSERT_EQUALS(first["c"].numberInt(), second["c"].numberInt());
                 ASSERT_EQUALS(i, first["c"].numberInt());
                 ASSERT((first.hasField("a") && second.hasField("b"))
@@ -293,7 +307,7 @@ namespace QueryStageMergeSortTests {
 
             // Should be done now.
             BSONObj foo;
-            ASSERT_EQUALS(PlanExecutor::IS_EOF, runner.getNext(&foo, NULL));
+            ASSERT_EQUALS(PlanExecutor::IS_EOF, exec->getNext(&foo, NULL));
         }
     };
 
@@ -305,7 +319,9 @@ namespace QueryStageMergeSortTests {
             Database* db = ctx.ctx().db();
             Collection* coll = db->getCollection(&_txn, ns());
             if (!coll) {
+                WriteUnitOfWork wuow(&_txn);
                 coll = db->createCollection(&_txn, ns());
+                wuow.commit();
             }
 
             const int N = 50;
@@ -342,14 +358,17 @@ namespace QueryStageMergeSortTests {
             // b:1
             params.descriptor = getIndex(secondIndex, coll);
             ms->addChild(new IndexScan(&_txn, params, ws, NULL));
-            ctx.commit();
 
-            PlanExecutor runner(&_txn, ws, new FetchStage(&_txn, ws, ms, NULL, coll), coll);
+            PlanExecutor* rawExec;
+            Status status = PlanExecutor::make(&_txn, ws, new FetchStage(&_txn, ws, ms, NULL, coll),
+                                               coll, PlanExecutor::YIELD_MANUAL, &rawExec);
+            ASSERT_OK(status);
+            boost::scoped_ptr<PlanExecutor> exec(rawExec);
 
             for (int i = 0; i < N; ++i) {
                 BSONObj first, second;
-                ASSERT_EQUALS(PlanExecutor::ADVANCED, runner.getNext(&first, NULL));
-                ASSERT_EQUALS(PlanExecutor::ADVANCED, runner.getNext(&second, NULL));
+                ASSERT_EQUALS(PlanExecutor::ADVANCED, exec->getNext(&first, NULL));
+                ASSERT_EQUALS(PlanExecutor::ADVANCED, exec->getNext(&second, NULL));
                 ASSERT_EQUALS(first["c"].numberInt(), second["c"].numberInt());
                 ASSERT_EQUALS(N - i - 1, first["c"].numberInt());
                 ASSERT((first.hasField("a") && second.hasField("b"))
@@ -358,7 +377,7 @@ namespace QueryStageMergeSortTests {
 
             // Should be done now.
             BSONObj foo;
-            ASSERT_EQUALS(PlanExecutor::IS_EOF, runner.getNext(&foo, NULL));
+            ASSERT_EQUALS(PlanExecutor::IS_EOF, exec->getNext(&foo, NULL));
         }
     };
 
@@ -370,7 +389,9 @@ namespace QueryStageMergeSortTests {
             Database* db = ctx.ctx().db();
             Collection* coll = db->getCollection(&_txn, ns());
             if (!coll) {
+                WriteUnitOfWork wuow(&_txn);
                 coll = db->createCollection(&_txn, ns());
+                wuow.commit();
             }
 
             const int N = 50;
@@ -407,21 +428,24 @@ namespace QueryStageMergeSortTests {
             params.bounds.startKey = BSON("" << 51 << "" << MinKey);
             params.bounds.endKey = BSON("" << 51 << "" << MaxKey);
             ms->addChild(new IndexScan(&_txn, params, ws, NULL));
-            ctx.commit();
 
-            PlanExecutor runner(&_txn, ws, new FetchStage(&_txn, ws, ms, NULL, coll), coll);
+            PlanExecutor* rawExec;
+            Status status = PlanExecutor::make(&_txn, ws, new FetchStage(&_txn, ws, ms, NULL, coll),
+                                               coll, PlanExecutor::YIELD_MANUAL, &rawExec);
+            ASSERT_OK(status);
+            boost::scoped_ptr<PlanExecutor> exec(rawExec);
 
             // Only getting results from the a:1 index scan.
             for (int i = 0; i < N; ++i) {
                 BSONObj obj;
-                ASSERT_EQUALS(PlanExecutor::ADVANCED, runner.getNext(&obj, NULL));
+                ASSERT_EQUALS(PlanExecutor::ADVANCED, exec->getNext(&obj, NULL));
                 ASSERT_EQUALS(i, obj["c"].numberInt());
                 ASSERT_EQUALS(1, obj["a"].numberInt());
             }
 
             // Should be done now.
             BSONObj foo;
-            ASSERT_EQUALS(PlanExecutor::IS_EOF, runner.getNext(&foo, NULL));
+            ASSERT_EQUALS(PlanExecutor::IS_EOF, exec->getNext(&foo, NULL));
         }
     };
 
@@ -433,7 +457,9 @@ namespace QueryStageMergeSortTests {
             Database* db = ctx.ctx().db();
             Collection* coll = db->getCollection(&_txn, ns());
             if (!coll) {
+                WriteUnitOfWork wuow(&_txn);
                 coll = db->createCollection(&_txn, ns());
+                wuow.commit();
             }
 
             WorkingSet* ws = new WorkingSet();
@@ -460,13 +486,16 @@ namespace QueryStageMergeSortTests {
                 params.descriptor = getIndex(indexSpec, coll);
                 ms->addChild(new IndexScan(&_txn, params, ws, NULL));
             }
-            ctx.commit();
 
-            PlanExecutor runner(&_txn, ws, new FetchStage(&_txn, ws, ms, NULL, coll), coll);
+            PlanExecutor* rawExec;
+            Status status = PlanExecutor::make(&_txn, ws, new FetchStage(&_txn, ws, ms, NULL, coll),
+                                               coll, PlanExecutor::YIELD_MANUAL, &rawExec);
+            ASSERT_OK(status);
+            boost::scoped_ptr<PlanExecutor> exec(rawExec);
 
             for (int i = 0; i < numIndices; ++i) {
                 BSONObj obj;
-                ASSERT_EQUALS(PlanExecutor::ADVANCED, runner.getNext(&obj, NULL));
+                ASSERT_EQUALS(PlanExecutor::ADVANCED, exec->getNext(&obj, NULL));
                 ASSERT_EQUALS(i, obj["foo"].numberInt());
                 string index(1, 'a' + i);
                 ASSERT_EQUALS(1, obj[index].numberInt());
@@ -474,7 +503,7 @@ namespace QueryStageMergeSortTests {
 
             // Should be done now.
             BSONObj foo;
-            ASSERT_EQUALS(PlanExecutor::IS_EOF, runner.getNext(&foo, NULL));
+            ASSERT_EQUALS(PlanExecutor::IS_EOF, exec->getNext(&foo, NULL));
         }
     };
 
@@ -486,7 +515,9 @@ namespace QueryStageMergeSortTests {
             Database* db = ctx.ctx().db();
             Collection* coll = db->getCollection(&_txn, ns());
             if (!coll) {
+                WriteUnitOfWork wuow(&_txn);
                 coll = db->createCollection(&_txn, ns());
+                wuow.commit();
             }
 
             WorkingSet ws;
@@ -520,7 +551,6 @@ namespace QueryStageMergeSortTests {
             getLocs(&locs, coll);
 
             set<DiskLoc>::iterator it = locs.begin();
-            ctx.commit();
 
             // Get 10 results.  Should be getting results in order of 'locs'.
             int count = 0;

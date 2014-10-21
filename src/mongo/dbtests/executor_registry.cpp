@@ -60,12 +60,6 @@ namespace ExecutorRegistry {
             }
         }
 
-        ~ExecutorRegistryBase() {
-            if (_ctx.get()) {
-                _ctx->commit();
-            }
-        }
-
         /**
          * Return a plan executor that is going over the collection in ns().
          */
@@ -80,17 +74,33 @@ namespace ExecutorRegistry {
             // Create a plan executor to hold it
             CanonicalQuery* cq;
             ASSERT(CanonicalQuery::canonicalize(ns(), BSONObj(), &cq).isOK());
-            // Owns all args
-            return new PlanExecutor(&_opCtx, ws.release(), scan.release(), cq,
-                                    _ctx->ctx().db()->getCollection( &_opCtx, ns() ));
+            PlanExecutor* exec;
+            // Takes ownership of 'ws', 'scan', and 'cq'.
+            Status status = PlanExecutor::make(&_opCtx,
+                                               ws.release(),
+                                               scan.release(),
+                                               cq,
+                                               _ctx->ctx().db()->getCollection(&_opCtx, ns()),
+                                               PlanExecutor::YIELD_MANUAL,
+                                               &exec);
+            ASSERT_OK(status);
+            return exec;
         }
 
         void registerExecutor( PlanExecutor* exec ) {
-            _ctx->ctx().db()->getOrCreateCollection( &_opCtx, ns() )->cursorCache()->registerExecutor( exec );
+            WriteUnitOfWork wuow(&_opCtx);
+            _ctx->ctx().db()->getOrCreateCollection(&_opCtx, ns())
+                            ->cursorCache()
+                            ->registerExecutor(exec);
+            wuow.commit();
         }
 
         void deregisterExecutor( PlanExecutor* exec ) {
-            _ctx->ctx().db()->getOrCreateCollection( &_opCtx, ns() )->cursorCache()->deregisterExecutor( exec );
+            WriteUnitOfWork wuow(&_opCtx);
+            _ctx->ctx().db()->getOrCreateCollection(&_opCtx, ns())
+                            ->cursorCache()
+                            ->deregisterExecutor(exec);
+            wuow.commit();
         }
 
         int N() { return 50; }
@@ -278,7 +288,6 @@ namespace ExecutorRegistry {
 
             // Drop a DB that's not ours.  We can't have a lock at all to do this as dropping a DB
             // requires a "global write lock."
-            _ctx->commit();
             _ctx.reset();
             _client.dropDatabase("somesillydb");
             _ctx.reset(new Client::WriteContext(&_opCtx, ns()));
@@ -295,7 +304,6 @@ namespace ExecutorRegistry {
             registerExecutor(run.get());
 
             // Drop our DB.  Once again, must give up the lock.
-            _ctx->commit();
             _ctx.reset();
             _client.dropDatabase("unittests");
             _ctx.reset(new Client::WriteContext(&_opCtx, ns()));
@@ -303,7 +311,6 @@ namespace ExecutorRegistry {
             // Unregister and restore state.
             deregisterExecutor(run.get());
             run->restoreState(&_opCtx);
-            _ctx->commit();
             _ctx.reset();
 
             // PlanExecutor was killed.

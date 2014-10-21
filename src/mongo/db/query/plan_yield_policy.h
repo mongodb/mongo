@@ -29,26 +29,43 @@
 #pragma once
 
 #include "mongo/db/catalog/collection.h"
+#include "mongo/db/query/plan_executor.h"
 #include "mongo/util/elapsed_tracker.h"
 
 namespace mongo {
 
     class PlanYieldPolicy {
     public:
-        PlanYieldPolicy();
-        ~PlanYieldPolicy();
+        explicit PlanYieldPolicy(PlanExecutor* exec);
 
         /**
-         * Yield the provided runner, registering and deregistering it appropriately.  Deal with
-         * deletion during a yield by setting _planYielding to ensure deregistration.
-         *
-         * Provided plan executor MUST be YIELD_MANUAL.
+         * Used by AUTO_YIELD plan executors in order to check whether it is time to yield.
+         * PlanExecutors give up their locks periodically in order to be fair to other
+         * threads.
          */
-        bool yieldAndCheckIfOK(PlanExecutor* plan);
+        bool shouldYield();
+
+        /**
+         * Used to cause a plan executor to give up locks and go to sleep. The PlanExecutor
+         * must *not* be in saved state. Handles calls to save/restore state internally.
+         *
+         * By default, assumes that the PlanExecutor is already registered. If 'registerPlan'
+         * is explicitly set to true, then the executor will get automatically registered and
+         * deregistered here.
+         *
+         * Returns true if the executor was restored successfully and is still alive. Returns false
+         * if the executor got killed during yield.
+         */
+        bool yield(bool registerPlan = false);
 
     private:
+        // Default constructor disallowed in order to ensure initialization of '_planYielding'.
+        PlanYieldPolicy();
+
         ElapsedTracker _elapsedTracker;
 
+        // The plan executor which this yield policy is responsible for yielding. Must
+        // not outlive the plan executor.
         PlanExecutor* _planYielding;
     };
 

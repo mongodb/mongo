@@ -634,13 +634,13 @@ namespace mongo {
         // Step 1: Unlock all requests that are not-flush and not-global.
         for (size_t i = 0; i < stateOut->locks.size(); ++i) {
             for (size_t j = 0; j < stateOut->locks[i].recursiveCount; ++j) {
-                unlock(stateOut->locks[i].resourceId);
+                invariant(unlock(stateOut->locks[i].resourceId));
             }
         }
 
         // Step 2: Unlock the global lock.
         for (size_t i = 0; i < stateOut->globalRecursiveCount; ++i) {
-            unlock(resourceIdGlobal);
+            invariant(unlock(resourceIdGlobal));
         }
 
         // Step 3: Unlock flush.  It's only acquired on the first global lock acquisition

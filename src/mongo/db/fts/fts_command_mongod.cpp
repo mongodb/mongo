@@ -113,7 +113,11 @@ namespace mongo {
             }
 
             PlanExecutor* rawExec;
-            Status getExecStatus = getExecutor(txn, ctx.getCollection(), cq, &rawExec);
+            Status getExecStatus = getExecutor(txn,
+                                               ctx.getCollection(),
+                                               cq,
+                                               PlanExecutor::YIELD_MANUAL,
+                                               &rawExec);
             if (!getExecStatus.isOK()) {
                 errmsg = getExecStatus.reason();
                 return false;

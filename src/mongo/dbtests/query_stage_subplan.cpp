@@ -47,7 +47,6 @@ namespace QueryStageSubplan {
         virtual ~QueryStageSubplanBase() {
             Client::WriteContext ctx(&_txn, ns());
             _client.dropCollection(ns());
-            ctx.commit();
         }
 
         void addIndex(const BSONObj& obj) {
@@ -93,12 +92,13 @@ namespace QueryStageSubplan {
             QueryPlannerParams plannerParams;
             fillOutPlannerParams(&_txn, collection, cq, &plannerParams);
 
-            // We expect creation of the subplan stage to fail.
             WorkingSet ws;
-            SubplanStage* subplan;
-            ASSERT_NOT_OK(SubplanStage::make(&_txn, collection, &ws, plannerParams, cq, &subplan));
+            boost::scoped_ptr<SubplanStage> subplan(new SubplanStage(&_txn, collection, &ws,
+                                                                     plannerParams, cq));
 
-            ctx.commit();
+            // NULL means that 'subplan' will not yield during plan selection. Plan selection
+            // should succeed due to falling back on regular planning.
+            ASSERT_OK(subplan->pickBestPlan(NULL));
         }
     };
 

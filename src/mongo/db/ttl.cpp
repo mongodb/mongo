@@ -223,7 +223,6 @@ namespace mongo {
 
                 n = deleteObjects( txn, ctx.ctx().db(), ns, query, false, true );
                 ttlDeletedDocuments.increment( n );
-                ctx.commit();
             }
 
             LOG(1) << "\tTTL deleted: " << n << endl;

@@ -189,16 +189,22 @@ namespace mongo {
 
                 PlanExecutor* rawExec;
                 massert(17384, "Could not get plan executor for query " + queryOriginal.toString(),
-                        getExecutor(txn, collection, cq, &rawExec, QueryPlannerParams::DEFAULT).isOK());
+                        getExecutor(txn,
+                                    collection,
+                                    cq,
+                                    PlanExecutor::YIELD_AUTO,
+                                    &rawExec,
+                                    QueryPlannerParams::DEFAULT).isOK());
 
                 scoped_ptr<PlanExecutor> exec(rawExec);
-                exec->setYieldPolicy(PlanExecutor::YIELD_AUTO);
 
                 PlanExecutor::ExecState state;
                 if (PlanExecutor::ADVANCED == (state = exec->getNext(&doc, NULL))) {
                     found = true;
                 }
             }
+
+            WriteUnitOfWork wuow(txn);
 
             BSONObj queryModified = queryOriginal;
             if ( found && doc["_id"].type() && ! CanonicalQuery::isSimpleIdQuery( queryOriginal ) ) {
@@ -335,7 +341,7 @@ namespace mongo {
                     
                 }
             }
-            cx.commit();
+            wuow.commit();
             return true;
         }
         

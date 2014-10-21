@@ -455,8 +455,12 @@ namespace mongo {
         WorkingSet* oplogws = new WorkingSet();
         OplogStart* stage = new OplogStart(txn, collection, tsExpr, oplogws);
 
+        PlanExecutor* rawExec;
         // Takes ownership of ws and stage.
-        scoped_ptr<PlanExecutor> exec(new PlanExecutor(txn, oplogws, stage, collection));
+        Status execStatus = PlanExecutor::make(txn, oplogws, stage, collection,
+                                               PlanExecutor::YIELD_AUTO, &rawExec);
+        invariant(execStatus.isOK());
+        scoped_ptr<PlanExecutor> exec(rawExec);
 
         // The stage returns a DiskLoc of where to start.
         DiskLoc startLoc;
@@ -464,7 +468,8 @@ namespace mongo {
 
         // This is normal.  The start of the oplog is the beginning of the collection.
         if (PlanExecutor::IS_EOF == state) {
-            return getExecutor(txn, collection, autoCq.release(), execOut);
+            return getExecutor(txn, collection, autoCq.release(), PlanExecutor::YIELD_AUTO,
+                               execOut);
         }
 
         // This is not normal.  An error was encountered.
@@ -485,8 +490,8 @@ namespace mongo {
         WorkingSet* ws = new WorkingSet();
         CollectionScan* cs = new CollectionScan(txn, params, ws, cq->root());
         // Takes ownership of 'ws', 'cs', and 'cq'.
-        *execOut = new PlanExecutor(txn, ws, cs, autoCq.release(), collection);
-        return Status::OK();
+        return PlanExecutor::make(txn, ws, cs, autoCq.release(), collection,
+                                  PlanExecutor::YIELD_AUTO, execOut);
     }
 
     std::string newRunQuery(OperationContext* txn,
@@ -580,15 +585,7 @@ namespace mongo {
         // Otherwise we go through the selection of which executor is most suited to the
         // query + run-time context at hand.
         Status status = Status::OK();
-        if (collection == NULL) {
-            LOG(2) << "Collection " << ns << " does not exist."
-                   << " Using EOF stage: " << cq->toStringShort();
-            EOFStage* eofStage = new EOFStage();
-            WorkingSet* ws = new WorkingSet();
-            // Takes ownership of 'cq'.
-            rawExec = new PlanExecutor(txn, ws, eofStage, cq, NULL);
-        }
-        else if (pq.getOptions().oplogReplay) {
+        if (NULL != collection && pq.getOptions().oplogReplay) {
             // Takes ownership of 'cq'.
             status = getOplogStartHack(txn, collection, cq, &rawExec);
         }
@@ -598,7 +595,7 @@ namespace mongo {
                 options |= QueryPlannerParams::INCLUDE_SHARD_FILTER;
             }
             // Takes ownership of 'cq'.
-            status = getExecutor(txn, collection, cq, &rawExec, options);
+            status = getExecutor(txn, collection, cq, PlanExecutor::YIELD_AUTO, &rawExec, options);
         }
 
         if (!status.isOK()) {
@@ -608,11 +605,6 @@ namespace mongo {
 
         verify(NULL != rawExec);
         auto_ptr<PlanExecutor> exec(rawExec);
-
-        // We want the PlanExecutor to yield automatically, but we handle registration of the
-        // executor ourselves. We want to temporarily register the executor while we are generating
-        // this batch of results, and then unregister and re-register with ClientCursor for getmore.
-        exec->setYieldPolicy(PlanExecutor::YIELD_AUTO);
 
         // If it's actually an explain, do the explain and return rather than falling through
         // to the normal query execution loop.

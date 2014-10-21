@@ -60,13 +60,11 @@ namespace QueryStageCollectionScan {
                 bob.append("foo", i);
                 _client.insert(ns(), bob.obj());
             }
-            ctx.commit();
         }
 
         virtual ~QueryStageCollectionScanBase() {
             Client::WriteContext ctx(&_txn, ns());
             _client.dropCollection(ns());
-            ctx.commit();
         }
 
         void remove(const BSONObj& obj) {
@@ -90,11 +88,16 @@ namespace QueryStageCollectionScan {
             // Make a scan and have the runner own it.
             WorkingSet* ws = new WorkingSet();
             PlanStage* ps = new CollectionScan(&_txn, params, ws, filterExpr.get());
-            PlanExecutor runner(&_txn, ws, ps, params.collection);
+
+            PlanExecutor* rawExec;
+            Status status = PlanExecutor::make(&_txn, ws, ps, params.collection,
+                                               PlanExecutor::YIELD_MANUAL, &rawExec);
+            ASSERT_OK(status);
+            boost::scoped_ptr<PlanExecutor> exec(rawExec);
 
             // Use the runner to count the number of objects scanned.
             int count = 0;
-            for (BSONObj obj; PlanExecutor::ADVANCED == runner.getNext(&obj, NULL); ) { ++count; }
+            for (BSONObj obj; PlanExecutor::ADVANCED == exec->getNext(&obj, NULL); ) { ++count; }
             return count;
         }
 
@@ -195,10 +198,15 @@ namespace QueryStageCollectionScan {
             // Make a scan and have the runner own it.
             WorkingSet* ws = new WorkingSet();
             PlanStage* ps = new CollectionScan(&_txn, params, ws, NULL);
-            PlanExecutor runner(&_txn, ws, ps, params.collection);
+
+            PlanExecutor* rawExec;
+            Status status = PlanExecutor::make(&_txn, ws, ps, params.collection,
+                                               PlanExecutor::YIELD_MANUAL, &rawExec);
+            ASSERT_OK(status);
+            boost::scoped_ptr<PlanExecutor> exec(rawExec);
 
             int count = 0;
-            for (BSONObj obj; PlanExecutor::ADVANCED == runner.getNext(&obj, NULL); ) {
+            for (BSONObj obj; PlanExecutor::ADVANCED == exec->getNext(&obj, NULL); ) {
                 // Make sure we get the objects in the order we want
                 ASSERT_EQUALS(count, obj["foo"].numberInt());
                 ++count;
@@ -224,10 +232,15 @@ namespace QueryStageCollectionScan {
 
             WorkingSet* ws = new WorkingSet();
             PlanStage* ps = new CollectionScan(&_txn, params, ws, NULL);
-            PlanExecutor runner(&_txn, ws, ps, params.collection);
+
+            PlanExecutor* rawExec;
+            Status status = PlanExecutor::make(&_txn, ws, ps, params.collection,
+                                               PlanExecutor::YIELD_MANUAL, &rawExec);
+            ASSERT_OK(status);
+            boost::scoped_ptr<PlanExecutor> exec(rawExec);
 
             int count = 0;
-            for (BSONObj obj; PlanExecutor::ADVANCED == runner.getNext(&obj, NULL); ) {
+            for (BSONObj obj; PlanExecutor::ADVANCED == exec->getNext(&obj, NULL); ) {
                 ++count;
                 ASSERT_EQUALS(numObj() - count, obj["foo"].numberInt());
             }
@@ -293,7 +306,6 @@ namespace QueryStageCollectionScan {
                     ++count;
                 }
             }
-            ctx.commit();
 
             ASSERT_EQUALS(numObj(), count);
         }
@@ -355,7 +367,6 @@ namespace QueryStageCollectionScan {
                     ++count;
                 }
             }
-            ctx.commit();
 
             ASSERT_EQUALS(numObj(), count);
         }
