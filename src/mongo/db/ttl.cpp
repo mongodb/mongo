@@ -152,7 +152,13 @@ namespace mongo {
             for ( list<string>::const_iterator it = namespaces.begin();
                   it != namespaces.end(); ++it ) {
 
-                CollectionCatalogEntry* coll = dbEntry->getCollectionCatalogEntry( txn, *it );
+                string ns = *it;
+                Lock::CollectionLock collLock( txn->lockState(), ns, MODE_IS );
+                CollectionCatalogEntry* coll = dbEntry->getCollectionCatalogEntry( txn, ns );
+
+                if ( !coll ) {
+                    continue;  // skip since collection not found in catalog
+                }
 
                 vector<string> indexNames;
                 coll->getAllIndexes( txn, &indexNames );
@@ -202,8 +208,16 @@ namespace mongo {
             {
                 const string ns = idx["ns"].String();
 
-                Client::WriteContext ctx( txn, ns );
-                Collection* collection = ctx.getCollection();
+                Lock::DBLock dbLock( txn->lockState(), dbName, MODE_IX );
+                Lock::CollectionLock collLock( txn->lockState(), ns, MODE_IX );
+
+                Database* db = dbHolder().get( txn, dbName );
+                if ( !db ) {
+                    // database was dropped
+                    return false;
+                }
+
+                Collection* collection = db->getCollection( txn, ns );
                 if ( !collection ) {
                     // collection was dropped
                     return true;
@@ -221,8 +235,10 @@ namespace mongo {
                     return true;
                 }
 
-                n = deleteObjects( txn, ctx.ctx().db(), ns, query, false, true );
+                WriteUnitOfWork uow( txn );
+                n = deleteObjects( txn, db, ns, query, false, true );
                 ttlDeletedDocuments.increment( n );
+                uow.commit();
             }
 
             LOG(1) << "\tTTL deleted: " << n << endl;
