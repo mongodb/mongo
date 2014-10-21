@@ -410,6 +410,7 @@ __wt_txn_recover(WT_CONNECTION_IMPL *conn)
 	WT_DECL_RET;
 	WT_RECOVERY r;
 	WT_SESSION_IMPL *session;
+	struct WT_RECOVERY_FILE *metafile;
 	const char *config;
 	int was_backup;
 
@@ -425,7 +426,8 @@ __wt_txn_recover(WT_CONNECTION_IMPL *conn)
 	WT_ERR(__wt_metadata_search(session, WT_METAFILE_URI, &config));
 	WT_ERR(__recovery_setup_file(&r, WT_METAFILE_URI, config));
 	WT_ERR(__wt_metadata_cursor(session, NULL, &metac));
-	r.files[WT_METAFILE_ID].c = metac;
+	metafile = &r.files[WT_METAFILE_ID];
+	metafile->c = metac;
 
 	/*
 	 * First, do a pass through the log to recover the metadata, and
@@ -434,12 +436,12 @@ __wt_txn_recover(WT_CONNECTION_IMPL *conn)
 	 */
 	if (!was_backup) {
 		r.metadata_only = 1;
-		if (IS_INIT_LSN(&r.files[WT_METAFILE_ID].ckpt_lsn))
+		if (IS_INIT_LSN(&metafile->ckpt_lsn))
 			WT_ERR(__wt_log_scan(session,
 			    NULL, WT_LOGSCAN_FIRST, __txn_log_recover, &r));
 		else
 			WT_ERR(__wt_log_scan(session,
-			    &r.files[WT_METAFILE_ID].ckpt_lsn, 0, __txn_log_recover, &r));
+			    &metafile->ckpt_lsn, 0, __txn_log_recover, &r));
 
 		WT_ASSERT(session,
 		    LOG_CMP(&r.ckpt_lsn, &conn->log->first_lsn) >= 0);

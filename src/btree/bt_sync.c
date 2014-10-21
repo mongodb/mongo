@@ -290,7 +290,8 @@ __evict_file(WT_SESSION_IMPL *session, int syncop)
 			 * should be prepared to deal with this case.
 			 */
 			if (page->modify != NULL &&
-			    !__wt_txn_visible_all(session, page->modify->rec_max_txn))
+			    !__wt_txn_visible_all(session,
+			    page->modify->rec_max_txn))
 				return (EBUSY);
 			__wt_ref_out(session, ref);
 			break;
