@@ -199,12 +199,12 @@ static int
 __txn_log_file_sync(WT_SESSION_IMPL *session, uint32_t flags, WT_LSN *lsnp)
 {
 	WT_BTREE *btree;
-	WT_DECL_RET;
 	WT_DECL_ITEM(logrec);
-	const char *fmt = WT_UNCHECKED_STRING(III);
+	WT_DECL_RET;
 	size_t header_size;
 	uint32_t rectype = WT_LOGREC_FILE_SYNC;
 	int start;
+	const char *fmt = WT_UNCHECKED_STRING(III);
 
 	btree = S2BT(session);
 	start = LF_ISSET(WT_TXN_LOG_CKPT_START);
@@ -232,9 +232,9 @@ __wt_txn_checkpoint_logread(
     WT_SESSION_IMPL *session, const uint8_t **pp, const uint8_t *end,
     WT_LSN *ckpt_lsn)
 {
-	const char *fmt = WT_UNCHECKED_STRING(IQIU);
 	WT_ITEM ckpt_snapshot;
 	u_int ckpt_nsnapshot;
+	const char *fmt = WT_UNCHECKED_STRING(IQIU);
 
 	WT_RET(__wt_struct_unpack(session, *pp, WT_PTRDIFF(end, *pp), fmt,
 	    &ckpt_lsn->file, &ckpt_lsn->offset,
@@ -253,14 +253,14 @@ int
 __wt_txn_checkpoint_log(
     WT_SESSION_IMPL *session, int full, uint32_t flags, WT_LSN *lsnp)
 {
-	WT_DECL_RET;
 	WT_DECL_ITEM(logrec);
+	WT_DECL_RET;
 	WT_LSN *ckpt_lsn;
 	WT_TXN *txn;
-	const char *fmt = WT_UNCHECKED_STRING(IIQIU);
 	uint8_t *end, *p;
 	size_t recsize;
 	uint32_t i, rectype = WT_LOGREC_CHECKPOINT;
+	const char *fmt = WT_UNCHECKED_STRING(IIQIU);
 
 	txn = &session->txn;
 	ckpt_lsn = &txn->ckpt_lsn;
@@ -416,11 +416,11 @@ __txn_printlog(
 {
 	FILE *out;
 	WT_LSN ckpt_lsn;
-	const uint8_t *end, *p;
-	const char *msg;
 	uint64_t txnid;
 	uint32_t fileid, rectype;
 	int32_t start;
+	const uint8_t *end, *p;
+	const char *msg;
 
 	out = cookie;
 
