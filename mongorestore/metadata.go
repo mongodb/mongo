@@ -227,8 +227,7 @@ func (restore *MongoRestore) RestoreUsersOrRoles(collectionType string, intent *
 		tempCol = restore.tempRolesCol
 		tempColCommandField = "tempRolesCollection"
 	default:
-		// panic should be fine here, since this implies a programmer (not user) error
-		util.Panicf("cannot use %v as a collection type in RestoreUsersOrRoles", collectionType)
+		return fmt.Errorf("cannot use %v as a collection type in RestoreUsersOrRoles", collectionType)
 	}
 
 	rawFile, err := os.Open(intent.BSONPath)

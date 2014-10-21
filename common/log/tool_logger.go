@@ -3,19 +3,22 @@ package log
 import (
 	"fmt"
 	"github.com/mongodb/mongo-tools/common/options"
-	"github.com/mongodb/mongo-tools/common/util"
 	"io"
 	"os"
 	"sync"
 	"time"
 )
 
-// Tool Logger constants
+// Tool Logger verbosity constants
 const (
 	Always = iota
 	Info
 	DebugLow
 	DebugHigh
+)
+
+const (
+	ToolTimeFormat = "2006-01-02T15:04:05.000-0700"
 )
 
 //// Tool Logger Definition
@@ -75,7 +78,7 @@ func NewToolLogger(verbosity *options.Verbosity) *ToolLogger {
 	tl := &ToolLogger{
 		mutex:  &sync.Mutex{},
 		writer: os.Stderr, // default to stderr
-		format: util.ToolTimeFormat,
+		format: ToolTimeFormat,
 	}
 	tl.SetVerbosity(verbosity)
 	return tl

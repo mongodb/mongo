@@ -3,7 +3,6 @@ package log
 import (
 	"bytes"
 	"github.com/mongodb/mongo-tools/common/options"
-	"github.com/mongodb/mongo-tools/common/util"
 	. "github.com/smartystreets/goconvey/convey"
 	"os"
 	"strings"
@@ -53,7 +52,7 @@ func TestBasicToolLoggerFunctionality(t *testing.T) {
 						So(l2, ShouldContainSubstring, "\t")
 						timestamp := l2[:strings.Index(l2, "\t")]
 						So(len(timestamp), ShouldBeGreaterThan, 1)
-						parsedTime, err := time.Parse(util.ToolTimeFormat, timestamp)
+						parsedTime, err := time.Parse(ToolTimeFormat, timestamp)
 						So(err, ShouldBeNil)
 						So(parsedTime, ShouldHappenOnOrAfter, oldTime)
 					})

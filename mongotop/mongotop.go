@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"github.com/mongodb/mongo-tools/common/db"
 	commonopts "github.com/mongodb/mongo-tools/common/options"
-	"github.com/mongodb/mongo-tools/common/util"
 	"github.com/mongodb/mongo-tools/mongotop/command"
 	"github.com/mongodb/mongo-tools/mongotop/options"
 	"github.com/mongodb/mongo-tools/mongotop/output"
@@ -49,7 +48,7 @@ func (self *MongoTop) Run() error {
 	if self.Options.Port != "" {
 		connUrl = connUrl + ":" + self.Options.Port
 	}
-	util.Printlnf("connected to: %v", connUrl)
+	fmt.Printf("connected to: %v\n", connUrl)
 
 	// the results used to be compared to each other
 	var previousResults command.Command

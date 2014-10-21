@@ -6,7 +6,6 @@ import (
 	"github.com/mongodb/mongo-tools/bsondump"
 	"github.com/mongodb/mongo-tools/bsondump/options"
 	commonopts "github.com/mongodb/mongo-tools/common/options"
-	"github.com/mongodb/mongo-tools/common/util"
 	"os"
 )
 
@@ -18,7 +17,8 @@ func main() {
 
 	extra, err := opts.Parse()
 	if err != nil {
-		util.Panicf("error parsing command line options: %v", err)
+		log.Logf(log.Always, "error parsing command line options: %v", err)
+		os.Exit(1)
 	}
 
 	// print help, if specified

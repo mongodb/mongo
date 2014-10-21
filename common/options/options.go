@@ -5,7 +5,6 @@ package options
 import (
 	"fmt"
 	"github.com/jessevdk/go-flags"
-	"github.com/mongodb/mongo-tools/common/util"
 	"os"
 )
 
@@ -140,7 +139,7 @@ func (self *ToolOptions) PrintHelp(force bool) bool {
 // is specified.
 func (self *ToolOptions) PrintVersion() bool {
 	if self.Version {
-		util.Printlnf("%v version: %v", self.AppName, self.VersionStr)
+		fmt.Printf("%v version: %v\n", self.AppName, self.VersionStr)
 	}
 	return self.Version
 }

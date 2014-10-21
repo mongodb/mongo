@@ -4,7 +4,6 @@ package main
 import (
 	"github.com/mongodb/mongo-tools/common/db"
 	commonopts "github.com/mongodb/mongo-tools/common/options"
-	"github.com/mongodb/mongo-tools/common/util"
 	"github.com/mongodb/mongo-tools/mongotop"
 	"github.com/mongodb/mongo-tools/mongotop/options"
 	"github.com/mongodb/mongo-tools/mongotop/output"
@@ -28,7 +27,8 @@ func main() {
 
 	extra, err := opts.Parse()
 	if err != nil {
-		util.Panicf("error parsing command line options: %v", err)
+		log.Logf(log.Always, "error parsing command line options: %v", err)
+		os.Exit(1)
 	}
 
 	// print help, if specified
@@ -47,14 +47,16 @@ func main() {
 	if len(extra) > 0 {
 		sleeptime, err = strconv.Atoi(extra[0])
 		if err != nil {
-			util.Panicf("bad sleep time: %v", extra[0])
+			log.Logf(log.Always, "bad sleep time: %v", extra[0])
+			os.Exit(1)
 		}
 	}
 
 	// create a session provider to connect to the db
 	sessionProvider, err := db.InitSessionProvider(*opts)
 	if err != nil {
-		util.Panicf("error initializing database session: %v", err)
+		log.Logf(log.Always, "error initializing database session: %v", err)
+		os.Exit(1)
 	}
 
 	// instantiate a mongotop instance
@@ -69,6 +71,7 @@ func main() {
 
 	// kick it off
 	if err := top.Run(); err != nil {
-		util.Panicf("error running mongotop: %v", err)
+		log.Logf(log.Always, "error running mongotop: %v", err)
+		os.Exit(1)
 	}
 }

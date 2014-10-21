@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"github.com/mongodb/mongo-tools/common/log"
 	commonopts "github.com/mongodb/mongo-tools/common/options"
-	"github.com/mongodb/mongo-tools/common/util"
 	"github.com/mongodb/mongo-tools/mongodump"
 	"github.com/mongodb/mongo-tools/mongodump/options"
 	"os"
@@ -21,9 +20,9 @@ func main() {
 
 	_, err := opts.Parse()
 	if err != nil {
-		fmt.Printf("error parsing command line options: %v\n\n", err)
-		fmt.Printf("try 'mongodump --help' for more information\n")
-		os.Exit(2)
+		log.Logf(log.Always, "error parsing command line options: %v\n\n", err)
+		opts.PrintHelp(true)
+		return
 	}
 
 	// print help, if specified
@@ -47,12 +46,14 @@ func main() {
 
 	err = dump.Init()
 	if err != nil {
-		util.Exitf(1, "%v", err)
+		log.Logf(log.Always, "%v", err)
+		os.Exit(1)
 	}
 
 	err = dump.Dump()
 	if err != nil {
-		util.Exitf(1, "%v", err)
+		log.Logf(log.Always, "%v", err)
+		os.Exit(1)
 	}
 
 }
