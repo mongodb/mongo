@@ -122,22 +122,26 @@ namespace QueryStageSortTests {
             params.limit = limit();
 
             // Must fetch so we can look at the doc as a BSONObj.
-            PlanExecutor runner(&_txn,
-                                ws,
-                                new FetchStage(&_txn, ws,
-                                               new SortStage(&_txn, params, ws, ms), NULL, coll),
-                                coll);
+            PlanExecutor* rawExec;
+            Status status =
+                PlanExecutor::make(&_txn,
+                                   ws,
+                                   new FetchStage(&_txn, ws,
+                                                  new SortStage(&_txn, params, ws, ms), NULL, coll),
+                                   coll, PlanExecutor::YIELD_MANUAL, &rawExec);
+            ASSERT_OK(status);
+            boost::scoped_ptr<PlanExecutor> exec(rawExec);
 
             // Look at pairs of objects to make sure that the sort order is pairwise (and therefore
             // totally) correct.
             BSONObj last;
-            ASSERT_EQUALS(PlanExecutor::ADVANCED, runner.getNext(&last, NULL));
+            ASSERT_EQUALS(PlanExecutor::ADVANCED, exec->getNext(&last, NULL));
 
             // Count 'last'.
             int count = 1;
 
             BSONObj current;
-            while (PlanExecutor::ADVANCED == runner.getNext(&current, NULL)) {
+            while (PlanExecutor::ADVANCED == exec->getNext(&current, NULL)) {
                 int cmp = sgn(current.woSortOrder(last, params.pattern));
                 // The next object should be equal to the previous or oriented according to the sort
                 // pattern.
@@ -185,16 +189,16 @@ namespace QueryStageSortTests {
 
         void run() {
             Client::WriteContext ctx(&_txn, ns());
-
             Database* db = ctx.ctx().db();
             Collection* coll = db->getCollection(&_txn, ns());
             if (!coll) {
+                WriteUnitOfWork wuow(&_txn);
                 coll = db->createCollection(&_txn, ns());
+                wuow.commit();
             }
 
             fillData();
             sortAndCheck(1, coll);
-            ctx.commit();
         }
     };
 
@@ -205,16 +209,16 @@ namespace QueryStageSortTests {
 
         void run() {
             Client::WriteContext ctx(&_txn, ns());
-
             Database* db = ctx.ctx().db();
             Collection* coll = db->getCollection(&_txn, ns());
             if (!coll) {
+                WriteUnitOfWork wuow(&_txn);
                 coll = db->createCollection(&_txn, ns());
+                wuow.commit();
             }
 
             fillData();
             sortAndCheck(-1, coll);
-            ctx.commit();
         }
     };
 
@@ -234,16 +238,16 @@ namespace QueryStageSortTests {
 
         void run() {
             Client::WriteContext ctx(&_txn, ns());
-
             Database* db = ctx.ctx().db();
             Collection* coll = db->getCollection(&_txn, ns());
             if (!coll) {
+                WriteUnitOfWork wuow(&_txn);
                 coll = db->createCollection(&_txn, ns());
+                wuow.commit();
             }
 
             fillData();
             sortAndCheck(-1, coll);
-            ctx.commit();
         }
     };
 
@@ -254,12 +258,14 @@ namespace QueryStageSortTests {
 
         void run() {
             Client::WriteContext ctx(&_txn, ns());
-            
             Database* db = ctx.ctx().db();
             Collection* coll = db->getCollection(&_txn, ns());
             if (!coll) {
+                WriteUnitOfWork wuow(&_txn);
                 coll = db->createCollection(&_txn, ns());
+                wuow.commit();
             }
+
             fillData();
 
             // The data we're going to later invalidate.
@@ -319,7 +325,6 @@ namespace QueryStageSortTests {
                 ASSERT(!member->hasLoc());
                 ++count;
             }
-            ctx.commit();
 
             // Returns all docs.
             ASSERT_EQUALS(limit() ? limit() : numObj(), count);
@@ -345,11 +350,12 @@ namespace QueryStageSortTests {
 
         void run() {
             Client::WriteContext ctx(&_txn, ns());
-            
             Database* db = ctx.ctx().db();
             Collection* coll = db->getCollection(&_txn, ns());
             if (!coll) {
+                WriteUnitOfWork wuow(&_txn);
                 coll = db->createCollection(&_txn, ns());
+                wuow.commit();
             }
 
             WorkingSet* ws = new WorkingSet();
@@ -372,15 +378,18 @@ namespace QueryStageSortTests {
             params.limit = 0;
 
             // We don't get results back since we're sorting some parallel arrays.
-            PlanExecutor runner(&_txn,
-                                ws,
-                                new FetchStage(&_txn,
-                                               ws,
-                                               new SortStage(&_txn, params, ws, ms), NULL, coll),
-                                coll);
-            PlanExecutor::ExecState runnerState = runner.getNext(NULL, NULL);
+            PlanExecutor* rawExec;
+            Status status =
+                PlanExecutor::make(&_txn,
+                                   ws,
+                                   new FetchStage(&_txn,
+                                                  ws,
+                                                  new SortStage(&_txn, params, ws, ms), NULL, coll),
+                                   coll, PlanExecutor::YIELD_MANUAL, &rawExec);
+            boost::scoped_ptr<PlanExecutor> exec(rawExec);
+
+            PlanExecutor::ExecState runnerState = exec->getNext(NULL, NULL);
             ASSERT_EQUALS(PlanExecutor::EXEC_ERROR, runnerState);
-            ctx.commit();
         }
     };
 

@@ -105,6 +105,11 @@ namespace mongo {
 #endif
     }
 
+    void DurRecoveryUnit::commitAndRestart() {
+        invariant( !inAUnitOfWork() );
+        // no-op since we have no transaction
+    }
+
     void DurRecoveryUnit::publishChanges() {
         if (!inAUnitOfWork())
             return;

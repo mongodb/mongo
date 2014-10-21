@@ -103,7 +103,12 @@ namespace mongo {
                 options |= QueryPlannerParams::INCLUDE_SHARD_FILTER;
             }
 
-            execStatus = getExecutor(txn, collection, cq.release(), &rawExec, options);
+            execStatus = getExecutor(txn,
+                                     collection,
+                                     cq.release(),
+                                     PlanExecutor::YIELD_AUTO,
+                                     &rawExec,
+                                     options);
         }
 
         if (!execStatus.isOK()) {
@@ -111,7 +116,6 @@ namespace mongo {
         }
 
         scoped_ptr<PlanExecutor> exec(rawExec);
-        exec->setYieldPolicy(PlanExecutor::YIELD_AUTO);
 
         // Got the execution tree. Explain it.
         return Explain::explainStages(exec.get(), verbosity, out);

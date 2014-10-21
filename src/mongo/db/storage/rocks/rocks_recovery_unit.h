@@ -71,6 +71,8 @@ namespace mongo {
 
         virtual bool awaitCommit();
 
+        virtual void commitAndRestart();
+
         virtual void* writingPtr(void* data, size_t len);
 
         virtual void syncDataAndTruncateJournal();

@@ -138,13 +138,16 @@ namespace mongo {
         Collection* coll = ctx.getCollection();
 
         PlanExecutor *rawPlanExecutor;
-        Status getExecStatus = getExecutorGroup(txn, coll, groupRequest, &rawPlanExecutor);
+        Status getExecStatus = getExecutorGroup(txn,
+                                                coll,
+                                                groupRequest,
+                                                PlanExecutor::YIELD_AUTO,
+                                                &rawPlanExecutor);
         if (!getExecStatus.isOK()) {
             return appendCommandStatus(out, getExecStatus);
         }
 
         scoped_ptr<PlanExecutor> planExecutor(rawPlanExecutor);
-        planExecutor->setYieldPolicy(PlanExecutor::YIELD_AUTO);
 
         // Group executors return ADVANCED exactly once, with the entire group result.
         BSONObj retval;
@@ -192,13 +195,16 @@ namespace mongo {
         Collection* coll = ctx.getCollection();
 
         PlanExecutor *rawPlanExecutor;
-        Status getExecStatus = getExecutorGroup(txn, coll, groupRequest, &rawPlanExecutor);
+        Status getExecStatus = getExecutorGroup(txn,
+                                                coll,
+                                                groupRequest,
+                                                PlanExecutor::YIELD_AUTO,
+                                                &rawPlanExecutor);
         if (!getExecStatus.isOK()) {
             return getExecStatus;
         }
 
         scoped_ptr<PlanExecutor> planExecutor(rawPlanExecutor);
-        planExecutor->setYieldPolicy(PlanExecutor::YIELD_AUTO);
 
         return Explain::explainStages(planExecutor.get(), verbosity, out);
     }

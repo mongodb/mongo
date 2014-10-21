@@ -55,13 +55,14 @@ namespace IndexUpdateTests {
     public:
         IndexBuildBase() :
             _ctx(&_txn, _ns),
+            _wunit(&_txn),
             _client(&_txn) {
 
             _client.createCollection( _ns );
         }
         ~IndexBuildBase() {
             _client.dropCollection( _ns );
-            _ctx.commit(); // just for testing purposes
+            _wunit.commit(); // just for testing purposes
             getGlobalEnvironment()->unsetKillAllOperations();
         }
         Collection* collection() {
@@ -117,6 +118,7 @@ namespace IndexUpdateTests {
 
         OperationContextImpl _txn;
         Client::WriteContext _ctx;
+        WriteUnitOfWork _wunit;
         DBDirectClient _client;
     };
 

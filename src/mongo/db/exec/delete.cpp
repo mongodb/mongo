@@ -164,6 +164,12 @@ namespace mongo {
         _txn = opCtx;
         ++_commonStats.unyields;
         _child->restoreState(opCtx);
+
+        const NamespaceString& ns(_collection->ns());
+        massert(28537,
+                str::stream() << "Demoted from primary while removing from " << ns.ns(),
+                !_params.shouldCallLogOp ||
+                repl::getGlobalReplicationCoordinator()->canAcceptWritesForDatabase(ns.db()));
     }
 
     void DeleteStage::invalidate(const DiskLoc& dl, InvalidationType type) {

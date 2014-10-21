@@ -59,19 +59,16 @@ namespace QueryStageTests {
 
             addIndex(BSON("foo" << 1));
             addIndex(BSON("foo" << 1 << "baz" << 1));
-            ctx.commit();
         }
 
         virtual ~IndexScanBase() {
             Client::WriteContext ctx(&_txn, ns());
             _client.dropCollection(ns());
-            ctx.commit();
         }
 
         void addIndex(const BSONObj& obj) {
             Client::WriteContext ctx(&_txn, ns());
             _client.ensureIndex(ns(), obj);
-            ctx.commit();
         }
 
         int countResults(const IndexScanParams& params, BSONObj filterObj = BSONObj()) {
@@ -82,13 +79,19 @@ namespace QueryStageTests {
             auto_ptr<MatchExpression> filterExpr(swme.getValue());
 
             WorkingSet* ws = new WorkingSet();
-            PlanExecutor runner(&_txn,
-                                ws, 
-                                new IndexScan(&_txn, params, ws, filterExpr.get()), 
-                                ctx.getCollection());
+
+            PlanExecutor* rawExec;
+            Status status = PlanExecutor::make(&_txn,
+                                               ws,
+                                               new IndexScan(&_txn, params, ws, filterExpr.get()),
+                                               ctx.getCollection(),
+                                               PlanExecutor::YIELD_MANUAL,
+                                               &rawExec);
+            ASSERT_OK(status);
+            boost::scoped_ptr<PlanExecutor> exec(rawExec);
 
             int count = 0;
-            for (DiskLoc dl; PlanExecutor::ADVANCED == runner.getNext(NULL, &dl); ) {
+            for (DiskLoc dl; PlanExecutor::ADVANCED == exec->getNext(NULL, &dl); ) {
                 ++count;
             }
 
@@ -103,7 +106,6 @@ namespace QueryStageTests {
                 double lng = double(rand()) / RAND_MAX;
                 _client.insert(ns(), BSON("geo" << BSON_ARRAY(lng << lat)));
             }
-            ctx.commit();
         }
 
         IndexDescriptor* getIndex(const BSONObj& obj) {

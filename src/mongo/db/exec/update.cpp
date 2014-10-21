@@ -789,9 +789,40 @@ namespace mongo {
         _child->saveState();
     }
 
+    Status UpdateStage::restoreUpdateState(OperationContext* opCtx) {
+        const UpdateRequest& request = *_params.request;
+        const NamespaceString& nsString(request.getNamespaceString());
+
+        // We may have stepped down during the yield.
+        if (request.shouldCallLogOp() &&
+            !repl::getGlobalReplicationCoordinator()->canAcceptWritesForDatabase(nsString.db())) {
+            return Status(ErrorCodes::NotMaster,
+                          str::stream() << "Demoted from primary while performing update on "
+                                        << nsString.ns());
+        }
+
+        if (request.getLifecycle()) {
+            UpdateLifecycle* lifecycle = request.getLifecycle();
+            lifecycle->setCollection(_collection);
+
+            if (!lifecycle->canContinue()) {
+                return Status(ErrorCodes::IllegalOperation,
+                              "Update aborted due to invalid state transitions after yield.",
+                              17270);
+            }
+
+            _params.driver->refreshIndexKeys(lifecycle->getIndexKeys(opCtx));
+        }
+
+        return Status::OK();
+    }
+
     void UpdateStage::restoreState(OperationContext* opCtx) {
         ++_commonStats.unyields;
+        // Restore our child.
         _child->restoreState(opCtx);
+        // Restore self.
+        uassertStatusOK(restoreUpdateState(opCtx));
     }
 
     void UpdateStage::invalidate(const DiskLoc& dl, InvalidationType type) {

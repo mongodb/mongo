@@ -31,61 +31,52 @@
 #include "mongo/db/query/plan_yield_policy.h"
 
 #include "mongo/db/concurrency/yield.h"
+#include "mongo/db/global_environment_experiment.h"
 
 namespace mongo {
 
     // Yield every 128 cycles or 10ms.  These values were inherited from v2.6, which just copied
     // them from v2.4.
-    PlanYieldPolicy::PlanYieldPolicy()
+    PlanYieldPolicy::PlanYieldPolicy(PlanExecutor* exec)
         : _elapsedTracker(128, 10),
-          _planYielding(NULL) { }
+          _planYielding(exec) { }
 
-    PlanYieldPolicy::~PlanYieldPolicy() {
-        if (NULL != _planYielding) {
-            // We were destructed mid-yield.  Since we're being used to yield a runner, we have
-            // to deregister the runner.
-            if (_planYielding->collection()) {
-                _planYielding->collection()->cursorCache()->deregisterExecutor(_planYielding);
-            }
-        }
+    bool PlanYieldPolicy::shouldYield() {
+        return _elapsedTracker.intervalHasElapsed();
     }
 
-    /**
-     * Yield the provided runner, registering and deregistering it appropriately.  Deal with
-     * deletion during a yield by setting _runnerYielding to ensure deregistration.
-     *
-     * Provided runner MUST be YIELD_MANUAL.
-     */
-    bool PlanYieldPolicy::yieldAndCheckIfOK(PlanExecutor* plan) {
-        invariant(plan);
-        invariant(plan->collection());
-
-        // If micros > 0, we should yield.
-        plan->saveState();
-
-        // If we're destructed during yield this will be used to deregister ourselves.
-        // This happens when we're not in a ClientCursor and somebody kills all cursors
-        // on the ns we're operating on.
-        _planYielding = plan;
-
-        // Register with the thing that may kill() the 'plan'.
-        plan->collection()->cursorCache()->registerExecutor(plan);
-
-        // Note that this call checks for interrupt, and thus can throw if interrupt flag is set.
-        Yield::yieldAllLocks(plan->getOpCtx(), 1);
-
-        // If the plan was killed, runner->collection() will return NULL, and we can't/don't
-        // deregister it.
-        if (plan->collection()) {
-            plan->collection()->cursorCache()->deregisterExecutor(plan);
+    bool PlanYieldPolicy::yield(bool registerPlan) {
+        // This is a no-op if document-level locking is supported. Doc-level locking systems
+        // should not need to yield.
+        if (supportsDocLocking()) {
+            return true;
         }
 
-        _planYielding = NULL;
+        // No need to yield if the collection is NULL.
+        if (NULL == _planYielding->collection()) {
+            return true;
+        }
 
+        invariant(_planYielding);
+
+        if (registerPlan) {
+            _planYielding->registerExec();
+        }
+
+        OperationContext* opCtx = _planYielding->getOpCtx();
+        invariant(opCtx);
+
+        _planYielding->saveState();
+
+        // Note that this call checks for interrupt, and thus can throw if interrupt flag is set.
+        Yield::yieldAllLocks(opCtx, 1);
         _elapsedTracker.resetLastTime();
 
-        return plan->restoreState(plan->getOpCtx());
+        if (registerPlan) {
+            _planYielding->deregisterExec();
+        }
+
+        return _planYielding->restoreState(opCtx);
     }
 
 } // namespace mongo
-

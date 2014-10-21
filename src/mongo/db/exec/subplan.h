@@ -35,6 +35,7 @@
 #include "mongo/base/status.h"
 #include "mongo/db/diskloc.h"
 #include "mongo/db/exec/plan_stage.h"
+#include "mongo/db/query/plan_yield_policy.h"
 #include "mongo/db/query/query_planner_params.h"
 #include "mongo/db/query/query_solution.h"
 
@@ -51,18 +52,11 @@ namespace mongo {
      */
     class SubplanStage : public PlanStage {
     public:
-        /**
-         * Used to create SubplanStage instances. The caller owns the instance
-         * returned through 'out'.
-         *
-         * 'out' is valid only if an OK status is returned.
-         */
-        static Status make(OperationContext* txn,
-                           Collection* collection,
-                           WorkingSet* ws,
-                           const QueryPlannerParams& params,
-                           CanonicalQuery* cq,
-                           SubplanStage** out);
+        SubplanStage(OperationContext* txn,
+                     Collection* collection,
+                     WorkingSet* ws,
+                     const QueryPlannerParams& params,
+                     CanonicalQuery* cq);
 
         virtual ~SubplanStage();
 
@@ -87,13 +81,22 @@ namespace mongo {
 
         static const char* kStageType;
 
-    private:
-        SubplanStage(OperationContext* txn,
-                     Collection* collection,
-                     WorkingSet* ws,
-                     const QueryPlannerParams& params,
-                     CanonicalQuery* cq);
+        /**
+         * Selects a plan using subplanning. First uses the query planning results from
+         * planSubqueries() and the multi plan stage to select the best plan for each branch.
+         *
+         * If this effort fails, then falls back on planning the whole query normally rather
+         * then planning $or branches independently.
+         *
+         * If 'yieldPolicy' is non-NULL, then all locks may be yielded in between round-robin
+         * works of the candidate plans. By default, 'yieldPolicy' is NULL and no yielding will
+         * take place.
+         *
+         * Returns a non-OK status if the plan was killed during yield or if planning fails.
+         */
+        Status pickBestPlan(PlanYieldPolicy* yieldPolicy);
 
+    private:
         /**
          * Plan each branch of the $or independently, and store the resulting
          * lists of query solutions in '_solutions'.
@@ -107,8 +110,15 @@ namespace mongo {
         /**
          * Uses the query planning results from planSubqueries() and the multi plan stage
          * to select the best plan for each branch.
+         *
+         * Helper for pickBestPlan().
          */
-        Status pickBestPlan();
+        Status choosePlanForSubqueries(PlanYieldPolicy* yieldPolicy);
+
+        /**
+         * Used as a fallback if subplanning fails. Helper for pickBestPlan().
+         */
+        Status choosePlanWholeQuery(PlanYieldPolicy* yieldPolicy);
 
         // transactional context for read locks. Not owned by us
         OperationContext* _txn;

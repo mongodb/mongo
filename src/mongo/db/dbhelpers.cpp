@@ -130,7 +130,12 @@ namespace mongo {
         PlanExecutor* rawExec;
         size_t options = requireIndex ? QueryPlannerParams::NO_TABLE_SCAN : QueryPlannerParams::DEFAULT;
         massert(17245, "Could not get executor for query " + query.toString(),
-                getExecutor(txn, collection, cq, &rawExec, options).isOK());
+                getExecutor(txn,
+                            collection,
+                            cq,
+                            PlanExecutor::YIELD_MANUAL,
+                            &rawExec,
+                            options).isOK());
 
         auto_ptr<PlanExecutor> exec(rawExec);
         PlanExecutor::ExecState state;
@@ -408,6 +413,8 @@ namespace mongo {
 
                 verify(PlanExecutor::ADVANCED == state);
 
+                WriteUnitOfWork wuow(txn);
+
                 if ( onlyRemoveOrphanedDocs ) {
                     // Do a final check in the write lock to make absolutely sure that our
                     // collection hasn't been modified in a way that invalidates our migration
@@ -446,7 +453,7 @@ namespace mongo {
                 collection->deleteDocument( txn, rloc, false, false, &deletedId );
                 // The above throws on failure, and so is not logged
                 repl::logOp(txn, "d", ns.c_str(), deletedId, 0, 0, fromMigrate);
-                ctx.commit();
+                wuow.commit();
                 numDeleted++;
             }
 

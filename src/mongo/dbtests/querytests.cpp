@@ -261,7 +261,6 @@ namespace QueryTests {
                 // ASSERT( clientCursor.c()->pq );
                 // ASSERT_EQUALS( 2, clientCursor.c()->pq->getNumToReturn() );
                 ASSERT_EQUALS( 2, clientCursor.c()->pos() );
-                ctx.commit();
             }
             
             cursor = _client.getMore( ns, cursorId );
@@ -1206,8 +1205,13 @@ namespace QueryTests {
 
             // note that extents are always at least 4KB now - so this will get rounded up
             // a bit.
-            ASSERT( userCreateNS(&_txn, ctx.db(), ns(),
-                                 fromjson( "{ capped : true, size : 2000 }" ), false ).isOK() );
+            {
+                WriteUnitOfWork wunit(&_txn);
+                ASSERT( userCreateNS(&_txn, ctx.db(), ns(),
+                                     fromjson( "{ capped : true, size : 2000 }" ), false ).isOK() );
+                wunit.commit();
+            }
+
             for (int i = 0; i < 200; i++) {
                 insertNext();
                 ASSERT(count() < 90);
@@ -1230,7 +1234,6 @@ namespace QueryTests {
             for ( int i=0; i<90; i++ ) {
                 insertNext();
             }
-            ctx.commit();
 
             while ( c->more() ) { c->next(); }
         }
@@ -1257,7 +1260,6 @@ namespace QueryTests {
             for ( int i=0; i<50; i++ ) {
                 insert( ns() , BSON( "_id" << i << "x" << i * 2 ) );
             }
-            ctx.commit();
 
             ASSERT_EQUALS( 50 , count() );
 
@@ -1312,7 +1314,6 @@ namespace QueryTests {
             for ( int i=0; i<1000; i+=2 ) {
                 _client.remove( ns() , BSON( "_id" << i ) );
             }
-            ctx.commit();
 
             BSONObj res;
             for ( int i=0; i<1000; i++ ) {
@@ -1333,7 +1334,6 @@ namespace QueryTests {
             for ( int i=0; i<1000; i++ ) {
                 insert( ns() , BSON( "_id" << i << "x" << i * 2 ) );
             }
-            ctx.commit();
 
         }
     };
@@ -1532,7 +1532,6 @@ namespace QueryTests {
                         str::stream() << "Cannot kill active cursor " << cursorId; 
                 ASSERT_THROWS_WHAT(CollectionCursorCache::eraseCursorGlobal(&_txn, cursorId),
                                    MsgAssertionException, expectedAssertion);
-                ctx.commit();
             }
             
             // Verify that the remaining document is read from the cursor.

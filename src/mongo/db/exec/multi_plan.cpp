@@ -148,7 +148,7 @@ namespace mongo {
         return state;
     }
 
-    void MultiPlanStage::pickBestPlan() {
+    Status MultiPlanStage::pickBestPlan(PlanYieldPolicy* yieldPolicy) {
         // Adds the amount of time taken by pickBestPlan() to executionTimeMillis. There's lots of
         // execution work that happens here, so this is needed for the time accounting to
         // make sense.
@@ -182,11 +182,28 @@ namespace mongo {
         // Work the plans, stopping when a plan hits EOF or returns some
         // fixed number of results.
         for (size_t ix = 0; ix < numWorks; ++ix) {
+            // Yield, if it's time to yield.
+            if (NULL != yieldPolicy && yieldPolicy->shouldYield()) {
+                bool alive = yieldPolicy->yield();
+                if (!alive) {
+                    _failure = true;
+                    Status failStat(ErrorCodes::OperationFailed,
+                                    "PlanExecutor killed during plan selection");
+                    _statusMemberId = WorkingSetCommon::allocateStatusMember(_candidates[0].ws,
+                                                                             failStat);
+                    return failStat;
+                }
+            }
+
             bool moreToDo = workAllPlans(numResults);
             if (!moreToDo) { break; }
         }
 
-        if (_failure) { return; }
+        if (_failure) {
+            invariant(WorkingSet::INVALID_ID != _statusMemberId);
+            WorkingSetMember* member = _candidates[0].ws->get(_statusMemberId);
+            return WorkingSetCommon::getMemberStatus(*member);
+        }
 
         // After picking best plan, ranking will own plan stats from
         // candidate solutions (winner and losers).
@@ -290,6 +307,8 @@ namespace mongo {
                 _collection->infoCache()->getPlanCache()->add(*_query, solutions, ranking.release());
             }
         }
+
+        return Status::OK();
     }
 
     vector<PlanStageStats*> MultiPlanStage::generateCandidateStats() {
@@ -341,8 +360,6 @@ namespace mongo {
 
                 // Propagate most recent seen failure to parent.
                 if (PlanStage::FAILURE == state) {
-                    BSONObj objOut;
-                    WorkingSetCommon::getStatusMemberObject(*candidate.ws, id, &objOut);
                     _statusMemberId = id;
                 }
 

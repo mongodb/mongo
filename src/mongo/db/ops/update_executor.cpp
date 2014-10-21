@@ -160,27 +160,6 @@ namespace mongo {
             _driver.refreshIndexKeys(lifecycle->getIndexKeys(_request->getOpCtx()));
         }
 
-        PlanExecutor* rawExec = NULL;
-        Status getExecStatus = Status::OK();
-        if (_canonicalQuery.get()) {
-            // This is the regular path for when we have a CanonicalQuery.
-            getExecStatus = getExecutorUpdate(_request->getOpCtx(), db, _canonicalQuery.release(),
-                                              _request, &_driver, _opDebug, &rawExec);
-        }
-        else {
-            // This is the idhack fast-path for getting a PlanExecutor without doing the work
-            // to create a CanonicalQuery.
-            getExecStatus = getExecutorUpdate(_request->getOpCtx(), db, nsString.ns(), _request,
-                                              &_driver, _opDebug, &rawExec);
-        }
-
-        if (!getExecStatus.isOK()) {
-            return getExecStatus;
-        }
-
-        invariant(rawExec);
-        _exec.reset(rawExec);
-
         // If yielding is allowed for this plan, then set an auto yield policy. Otherwise set
         // a manual yield policy.
         const bool canYield = !_request->isGod() && (
@@ -191,7 +170,26 @@ namespace mongo {
         PlanExecutor::YieldPolicy policy = canYield ? PlanExecutor::YIELD_AUTO :
                                                       PlanExecutor::YIELD_MANUAL;
 
-        _exec->setYieldPolicy(policy);
+        PlanExecutor* rawExec = NULL;
+        Status getExecStatus = Status::OK();
+        if (_canonicalQuery.get()) {
+            // This is the regular path for when we have a CanonicalQuery.
+            getExecStatus = getExecutorUpdate(_request->getOpCtx(), db, _canonicalQuery.release(),
+                                              _request, &_driver, _opDebug, policy, &rawExec);
+        }
+        else {
+            // This is the idhack fast-path for getting a PlanExecutor without doing the work
+            // to create a CanonicalQuery.
+            getExecStatus = getExecutorUpdate(_request->getOpCtx(), db, nsString.ns(), _request,
+                                              &_driver, _opDebug, policy, &rawExec);
+        }
+
+        if (!getExecStatus.isOK()) {
+            return getExecStatus;
+        }
+
+        invariant(rawExec);
+        _exec.reset(rawExec);
 
         return Status::OK();
     }

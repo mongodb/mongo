@@ -102,13 +102,17 @@ namespace mongo {
             for ( size_t i = 0; i < numCursors; i++ ) {
                 WorkingSet* ws = new WorkingSet();
                 MultiIteratorStage* mis = new MultiIteratorStage(txn, ws, collection);
-                // Takes ownership of 'ws' and 'mis'.
-                auto_ptr<PlanExecutor> curExec(new PlanExecutor(txn, ws, mis, collection));
 
-                // Each of the plan executors should yield automatically. We pass "false" to
-                // indicate that 'curExec' should not register itself, as it will get registered
-                // by ClientCursor instead.
-                curExec->setYieldPolicy(PlanExecutor::YIELD_AUTO, false);
+                PlanExecutor* rawExec;
+                // Takes ownership of 'ws' and 'mis'.
+                Status execStatus = PlanExecutor::make(txn, ws, mis, collection,
+                                                       PlanExecutor::YIELD_AUTO, &rawExec);
+                invariant(execStatus.isOK());
+                auto_ptr<PlanExecutor> curExec(rawExec);
+
+                // The PlanExecutor was registered on construction due to the YIELD_AUTO policy.
+                // We have to deregister it, as it will be registered with ClientCursor.
+                curExec->deregisterExec();
 
                 // Need to save state while yielding locks between now and newGetMore.
                 curExec->saveState();

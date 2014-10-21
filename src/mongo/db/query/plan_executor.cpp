@@ -29,9 +29,11 @@
 #include "mongo/db/query/plan_executor.h"
 
 #include "mongo/db/catalog/collection.h"
+#include "mongo/db/exec/multi_plan.h"
 #include "mongo/db/exec/pipeline_proxy.h"
 #include "mongo/db/exec/plan_stage.h"
 #include "mongo/db/exec/plan_stats.h"
+#include "mongo/db/exec/subplan.h"
 #include "mongo/db/exec/working_set.h"
 #include "mongo/db/exec/working_set_common.h"
 #include "mongo/db/query/plan_yield_policy.h"
@@ -40,46 +42,93 @@
 
 namespace mongo {
 
-    PlanExecutor::PlanExecutor(OperationContext* opCtx,
-                               WorkingSet* ws,
-                               PlanStage* rt,
-                               const Collection* collection)
-        : _opCtx(opCtx),
-          _collection(collection),
-          _cq(NULL),
-          _workingSet(ws),
-          _qs(NULL),
-          _root(rt),
-          _killed(false) {
-        initNs();
+    namespace {
+
+        /**
+         * Retrieves the first stage of a given type from the plan tree, or NULL
+         * if no such stage is found.
+         */
+        PlanStage* getStageByType(PlanStage* root, StageType type) {
+            if (root->stageType() == type) {
+                return root;
+            }
+
+            vector<PlanStage*> children = root->getChildren();
+            for (size_t i = 0; i < children.size(); i++) {
+                PlanStage* result = getStageByType(children[i], type);
+                if (result) {
+                    return result;
+                }
+            }
+
+            return NULL;
+        }
+
     }
 
-    PlanExecutor::PlanExecutor(OperationContext* opCtx,
-                               WorkingSet* ws,
-                               PlanStage* rt,
-                               std::string ns)
-        : _opCtx(opCtx),
-          _collection(NULL),
-          _cq(NULL),
-          _workingSet(ws),
-          _qs(NULL),
-          _root(rt),
-          _ns(ns),
-          _killed(false) { }
+    // static
+    Status PlanExecutor::make(OperationContext* opCtx,
+                              WorkingSet* ws,
+                              PlanStage* rt,
+                              const Collection* collection,
+                              YieldPolicy yieldPolicy,
+                              PlanExecutor** out) {
+        return PlanExecutor::make(opCtx, ws, rt, NULL, NULL, collection, "", yieldPolicy, out);
+    }
 
-    PlanExecutor::PlanExecutor(OperationContext* opCtx,
-                               WorkingSet* ws,
-                               PlanStage* rt,
-                               CanonicalQuery* cq,
-                               const Collection* collection)
-        : _opCtx(opCtx),
-          _collection(collection),
-          _cq(cq),
-          _workingSet(ws),
-          _qs(NULL),
-          _root(rt),
-          _killed(false) {
-        initNs();
+    // static
+    Status PlanExecutor::make(OperationContext* opCtx,
+                              WorkingSet* ws,
+                              PlanStage* rt,
+                              const std::string& ns,
+                              YieldPolicy yieldPolicy,
+                              PlanExecutor** out) {
+        return PlanExecutor::make(opCtx, ws, rt, NULL, NULL, NULL, ns, yieldPolicy, out);
+    }
+
+    // static
+    Status PlanExecutor::make(OperationContext* opCtx,
+                              WorkingSet* ws,
+                              PlanStage* rt,
+                              CanonicalQuery* cq,
+                              const Collection* collection,
+                              YieldPolicy yieldPolicy,
+                              PlanExecutor** out) {
+        return PlanExecutor::make(opCtx, ws, rt, NULL, cq, collection, "", yieldPolicy, out);
+    }
+
+    // static
+    Status PlanExecutor::make(OperationContext* opCtx,
+                              WorkingSet* ws,
+                              PlanStage* rt,
+                              QuerySolution* qs,
+                              CanonicalQuery* cq,
+                              const Collection* collection,
+                              YieldPolicy yieldPolicy,
+                              PlanExecutor** out) {
+        return PlanExecutor::make(opCtx, ws, rt, qs, cq, collection, "", yieldPolicy, out);
+    }
+
+    // static
+    Status PlanExecutor::make(OperationContext* opCtx,
+                              WorkingSet* ws,
+                              PlanStage* rt,
+                              QuerySolution* qs,
+                              CanonicalQuery* cq,
+                              const Collection* collection,
+                              const std::string& ns,
+                              YieldPolicy yieldPolicy,
+                              PlanExecutor** out) {
+        std::auto_ptr<PlanExecutor> exec(new PlanExecutor(opCtx, ws, rt, qs, cq, collection, ns));
+
+        // Perform plan selection, if necessary.
+        Status status = exec->pickBestPlan(yieldPolicy);
+        if (!status.isOK()) {
+            return status;
+        }
+
+        *out = exec.release();
+        return Status::OK();
     }
 
     PlanExecutor::PlanExecutor(OperationContext* opCtx,
@@ -87,18 +136,22 @@ namespace mongo {
                                PlanStage* rt,
                                QuerySolution* qs,
                                CanonicalQuery* cq,
-                               const Collection* collection)
+                               const Collection* collection,
+                               const std::string& ns)
         : _opCtx(opCtx),
           _collection(collection),
           _cq(cq),
           _workingSet(ws),
           _qs(qs),
           _root(rt),
+          _ns(ns),
           _killed(false) {
-        initNs();
-    }
+        // We may still need to initialize _ns from either _collection or _cq.
+        if (!_ns.empty()) {
+            // We already have an _ns set, so there's nothing more to do.
+            return;
+        }
 
-    void PlanExecutor::initNs() {
         if (NULL != _collection) {
             _ns = _collection->ns().ns();
         }
@@ -106,6 +159,31 @@ namespace mongo {
             invariant(NULL != _cq.get());
             _ns = _cq->getParsed().ns();
         }
+    }
+
+    Status PlanExecutor::pickBestPlan(YieldPolicy policy) {
+        // For YIELD_AUTO, this will both set an auto yield policy on the PlanExecutor and
+        // register it to receive notifications.
+        this->setYieldPolicy(policy);
+
+        // First check if we need to do subplanning.
+        PlanStage* foundStage = getStageByType(_root.get(), STAGE_SUBPLAN);
+        if (foundStage) {
+            SubplanStage* subplan = static_cast<SubplanStage*>(foundStage);
+            return subplan->pickBestPlan(_yieldPolicy.get());
+        }
+
+        // If we didn't have to do subplanning, we might still have to do regular
+        // multi plan selection.
+        foundStage = getStageByType(_root.get(), STAGE_MULTI_PLAN);
+        if (foundStage) {
+            MultiPlanStage* mps = static_cast<MultiPlanStage*>(foundStage);
+            return mps->pickBestPlan(_yieldPolicy.get());
+        }
+
+        // Either we chose a plan, or no plan selection was required. In both cases,
+        // our work has been successfully completed.
+        return Status::OK();
     }
 
     PlanExecutor::~PlanExecutor() { }
@@ -180,6 +258,14 @@ namespace mongo {
         if (_killed) { return PlanExecutor::DEAD; }
 
         for (;;) {
+            // Yield if it's time to yield.
+            if (NULL != _yieldPolicy.get() && _yieldPolicy->shouldYield()) {
+                _yieldPolicy->yield();
+                if (_killed) {
+                    return PlanExecutor::DEAD;
+                }
+            }
+
             WorkingSetID id = WorkingSet::INVALID_ID;
             PlanStage::StageState code = _root->work(&id);
 
@@ -282,19 +368,22 @@ namespace mongo {
     }
 
     Status PlanExecutor::executePlan() {
-        WorkingSetID id = WorkingSet::INVALID_ID;
-        PlanStage::StageState code = PlanStage::NEED_TIME;
-        while (PlanStage::NEED_TIME == code || PlanStage::ADVANCED == code) {
-            code = _root->work(&id);
+        BSONObj obj;
+        PlanExecutor::ExecState state = PlanExecutor::ADVANCED;
+        while (PlanExecutor::ADVANCED == state) {
+            state = this->getNext(&obj, NULL);
         }
 
-        if (PlanStage::FAILURE == code) {
-            BSONObj obj;
-            WorkingSetCommon::getStatusMemberObject(*_workingSet, id, &obj);
-            return Status(ErrorCodes::BadValue,
-                          "Exec error: " + WorkingSetCommon::toStatusString(obj));
+        if (PlanExecutor::DEAD == state) {
+            return Status(ErrorCodes::OperationFailed, "Exec error: PlanExecutor killed");
+        }
+        else if (PlanExecutor::EXEC_ERROR == state) {
+            return Status(ErrorCodes::OperationFailed,
+                          str::stream() << "Exec error: "
+                                        << WorkingSetCommon::toStatusString(obj));
         }
 
+        invariant(PlanExecutor::IS_EOF == state);
         return Status::OK();
     }
 
@@ -308,7 +397,7 @@ namespace mongo {
         }
         else {
             invariant(PlanExecutor::YIELD_AUTO == policy);
-            _yieldPolicy.reset(new PlanYieldPolicy());
+            _yieldPolicy.reset(new PlanYieldPolicy(this));
 
             // Runners that yield automatically generally need to be registered so that
             // after yielding, they receive notifications of events like deletions and

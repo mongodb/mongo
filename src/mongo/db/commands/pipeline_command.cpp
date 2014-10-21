@@ -245,16 +245,25 @@ namespace mongo {
                 auto_ptr<WorkingSet> ws(new WorkingSet());
                 auto_ptr<PipelineProxyStage> proxy(
                     new PipelineProxyStage(pPipeline, input, ws.get()));
+                Status execStatus = Status::OK();
                 if (NULL == collection) {
-                    execHolder.reset(new PlanExecutor(txn, ws.release(), proxy.release(), ns));
+                    execStatus = PlanExecutor::make(txn,
+                                                    ws.release(),
+                                                    proxy.release(),
+                                                    ns,
+                                                    PlanExecutor::YIELD_MANUAL,
+                                                    &exec);
                 }
                 else {
-                    execHolder.reset(new PlanExecutor(txn,
-                                                      ws.release(),
-                                                      proxy.release(),
-                                                      collection));
+                    execStatus = PlanExecutor::make(txn,
+                                                    ws.release(),
+                                                    proxy.release(),
+                                                    collection,
+                                                    PlanExecutor::YIELD_MANUAL,
+                                                    &exec);
                 }
-                exec = execHolder.get();
+                invariant(execStatus.isOK());
+                execHolder.reset(exec);
 
                 if (!collection && input) {
                     // If we don't have a collection, we won't be able to register any executors, so

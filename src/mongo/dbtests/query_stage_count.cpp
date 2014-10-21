@@ -55,7 +55,6 @@ namespace QueryStageCount {
         virtual ~CountBase() {
             Client::WriteContext ctx(&_txn, ns());
             _client.dropCollection(ns());
-            ctx.commit();
         }
 
         void addIndex(const BSONObj& obj) {
@@ -117,7 +116,6 @@ namespace QueryStageCount {
 
             // Add an index on a:1
             addIndex(BSON("a" << 1));
-            ctx.commit();
 
             // Set up the count stage
             CountScanParams params;
@@ -151,7 +149,6 @@ namespace QueryStageCount {
 
             // Add an index
             addIndex(BSON("a" << 1));
-            ctx.commit();
 
             // Set up the count stage
             CountScanParams params;
@@ -184,7 +181,6 @@ namespace QueryStageCount {
 
             // Add an index
             addIndex(BSON("a" << 1));
-            ctx.commit();
 
             // Set up the count stage
             CountScanParams params;
@@ -213,7 +209,6 @@ namespace QueryStageCount {
             // Insert doc, add index
             insert(BSON("a" << 2));
             addIndex(BSON("a" << 1));
-            ctx.commit();
 
             // Set up count, and run
             CountScanParams params;
@@ -243,7 +238,6 @@ namespace QueryStageCount {
             insert(BSON("a" << 2));
             insert(BSON("a" << 3));
             addIndex(BSON("a" << 1));
-            ctx.commit();
 
             // Set up count, and run
             CountScanParams params;
@@ -274,7 +268,6 @@ namespace QueryStageCount {
             insert(BSON("a" << 2));
             insert(BSON("a" << 4));
             addIndex(BSON("a" << 1));
-            ctx.commit();
 
             // Set up count, and run
             CountScanParams params;
@@ -306,7 +299,6 @@ namespace QueryStageCount {
                 insert(BSON("a" << i));
             }
             addIndex(BSON("a" << 1));
-            ctx.commit();
 
             // Set up count stage
             CountScanParams params;
@@ -358,7 +350,6 @@ namespace QueryStageCount {
                 insert(BSON("a" << i));
             }
             addIndex(BSON("a" << 1));
-            ctx.commit();
 
             // Set up count stage
             CountScanParams params;
@@ -386,7 +377,6 @@ namespace QueryStageCount {
 
             // Remove remaining objects
             remove(BSON("a" << GTE << 5));
-            ctx.commit();
 
             // Recover from yield
             count.restoreState(&_txn);
@@ -414,7 +404,6 @@ namespace QueryStageCount {
                 insert(BSON("a" << i));
             }
             addIndex(BSON("a" << 1));
-            ctx.commit();
 
             // Set up count stage
             CountScanParams params;
@@ -445,7 +434,6 @@ namespace QueryStageCount {
 
             // Insert one document after the end
             insert(BSON("a" << 6.5));
-            ctx.commit();
 
             // Recover from yield
             count.restoreState(&_txn);
@@ -473,7 +461,6 @@ namespace QueryStageCount {
                 insert(BSON("a" << i));
             }
             addIndex(BSON("a" << 1));
-            ctx.commit();
 
             // Set up count stage
             CountScanParams params;
@@ -501,7 +488,6 @@ namespace QueryStageCount {
 
             // Insert a document with two values for 'a'
             insert(BSON("a" << BSON_ARRAY(10 << 11)));
-            ctx.commit();
 
             // Recover from yield
             count.restoreState(&_txn);
@@ -533,7 +519,6 @@ namespace QueryStageCount {
             remove(BSON("a" << 1 << "b" << 0));
             remove(BSON("a" << 1 << "b" << 3));
             remove(BSON("a" << 1 << "b" << 4));
-            ctx.commit();
 
             // Ensure that count does not include unused keys
             CountScanParams params;
@@ -567,7 +552,6 @@ namespace QueryStageCount {
 
             // Mark key at end position as 'unused' by deleting
             remove(BSON("a" << 1 << "b" << 9));
-            ctx.commit();
 
             // Run count and check
             CountScanParams params;
@@ -598,7 +582,6 @@ namespace QueryStageCount {
                 insert(BSON("a" << 1 << "b" << i));
             }
             addIndex(BSON("a" << 1));
-            ctx.commit();
 
             // Set up count stage
             CountScanParams params;
@@ -626,7 +609,6 @@ namespace QueryStageCount {
 
             // Mark the key at position 5 as 'unused'
             remove(BSON("a" << 1 << "b" << 5));
-            ctx.commit();
 
             // Recover from yield
             count.restoreState(&_txn);

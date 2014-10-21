@@ -110,7 +110,12 @@ namespace mongo {
             }
 
             PlanExecutor* rawExec;
-            Status status = getExecutorDistinct(txn, collection, query, key, &rawExec);
+            Status status = getExecutorDistinct(txn,
+                                                collection,
+                                                query,
+                                                key,
+                                                PlanExecutor::YIELD_AUTO,
+                                                &rawExec);
             if (!status.isOK()) {
                 uasserted(17216, mongoutils::str::stream() << "Can't get runner for query "
                               << query << ": " << status.toString());
@@ -118,7 +123,6 @@ namespace mongo {
             }
 
             auto_ptr<PlanExecutor> exec(rawExec);
-            exec->setYieldPolicy(PlanExecutor::YIELD_AUTO);
 
             BSONObj obj;
             PlanExecutor::ExecState state;

@@ -104,6 +104,10 @@ namespace mongo {
         return true;
     }
 
+    void RocksRecoveryUnit::commitAndRestart() {
+        commitUnitOfWork();
+    }
+
     void* RocksRecoveryUnit::writingPtr(void* data, size_t len) {
         warning() << "RocksRecoveryUnit::writingPtr doesn't work";
         return data;

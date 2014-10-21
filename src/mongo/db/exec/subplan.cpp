@@ -77,31 +77,6 @@ namespace mongo {
     }
 
     // static
-    Status SubplanStage::make(OperationContext* txn,
-                              Collection* collection,
-                              WorkingSet* ws,
-                              const QueryPlannerParams& params,
-                              CanonicalQuery* cq,
-                              SubplanStage** out) {
-        auto_ptr<SubplanStage> autoStage(new SubplanStage(txn, collection, ws, params, cq));
-        // Plan each branch of the $or.
-        Status planningStatus = autoStage->planSubqueries();
-        if (!planningStatus.isOK()) {
-            return planningStatus;
-        }
-
-        // Use the multi plan stage to select a winning plan for each branch, and then
-        // construct the overall winning plan from the resulting index tags.
-        Status multiPlanStatus = autoStage->pickBestPlan();
-        if (!multiPlanStatus.isOK()) {
-            return multiPlanStatus;
-        }
-
-        *out = autoStage.release();
-        return Status::OK();
-    }
-
-    // static
     bool SubplanStage::canUseSubplanning(const CanonicalQuery& query) {
         const LiteParsedQuery& lpq = query.getParsed();
         const MatchExpression* expr = query.root();
@@ -213,11 +188,7 @@ namespace mongo {
         return Status::OK();
     }
 
-    Status SubplanStage::pickBestPlan() {
-        // Adds the amount of time taken by pickBestPlan() to executionTimeMillis. There's lots of
-        // work that happens here, so this is needed for the time accounting to make sense.
-        ScopedTimer timer(&_commonStats.executionTimeMillis);
-
+    Status SubplanStage::choosePlanForSubqueries(PlanYieldPolicy* yieldPolicy) {
         // This is what we annotate with the index selections and then turn into a solution.
         auto_ptr<OrMatchExpression> theOr(
             static_cast<OrMatchExpression*>(_query->root()->shallowClone()));
@@ -277,9 +248,8 @@ namespace mongo {
 
                 _ws->clear();
 
-                auto_ptr<MultiPlanStage> multiPlanStage(new MultiPlanStage(_txn,
-                                                                           _collection,
-                                                                           orChildCQ.get()));
+                _child.reset(new MultiPlanStage(_txn, _collection, orChildCQ.get()));
+                MultiPlanStage* multiPlanStage = static_cast<MultiPlanStage*>(_child.get());
 
                 // Dump all the solutions into the MPR.
                 for (size_t ix = 0; ix < solutions.size(); ++ix) {
@@ -294,7 +264,11 @@ namespace mongo {
                     multiPlanStage->addPlan(solutions[ix], nextPlanRoot, _ws);
                 }
 
-                multiPlanStage->pickBestPlan();
+                Status planSelectStat = multiPlanStage->pickBestPlan(yieldPolicy);
+                if (!planSelectStat.isOK()) {
+                    return planSelectStat;
+                }
+
                 if (!multiPlanStage->bestPlanChosen()) {
                     mongoutils::str::stream ss;
                     ss << "Failed to pick best plan for subchild "
@@ -303,7 +277,6 @@ namespace mongo {
                 }
 
                 QuerySolution* bestSoln = multiPlanStage->bestSolution();
-                _child.reset(multiPlanStage.release());
 
                 // Check that we have good cache data. For example, we don't cache things
                 // for 2d indices.
@@ -372,12 +345,13 @@ namespace mongo {
         // with stats obtained in the same fashion as a competitive ranking would have obtained
         // them.
         _ws->clear();
-        auto_ptr<MultiPlanStage> multiPlanStage(new MultiPlanStage(_txn, _collection, _query));
+        _child.reset(new MultiPlanStage(_txn, _collection, _query));
+        MultiPlanStage* multiPlanStage = static_cast<MultiPlanStage*>(_child.get());
         PlanStage* root;
         verify(StageBuilder::build(_txn, _collection, *soln, _ws, &root));
         multiPlanStage->addPlan(soln, root, _ws); // Takes ownership first two arguments.
 
-        multiPlanStage->pickBestPlan();
+        multiPlanStage->pickBestPlan(yieldPolicy);
         if (! multiPlanStage->bestPlanChosen()) {
             mongoutils::str::stream ss;
             ss << "Failed to pick best plan for subchild "
@@ -385,7 +359,87 @@ namespace mongo {
             return Status(ErrorCodes::BadValue, ss);
         }
 
-        _child.reset(multiPlanStage.release());
+        return Status::OK();
+    }
+
+    Status SubplanStage::choosePlanWholeQuery(PlanYieldPolicy* yieldPolicy) {
+        // Clear out the working set. We'll start with a fresh working set.
+        _ws->clear();
+
+        // Use the query planning module to plan the whole query.
+        vector<QuerySolution*> solutions;
+        Status status = QueryPlanner::plan(*_query, _plannerParams, &solutions);
+        if (!status.isOK()) {
+            return Status(ErrorCodes::BadValue,
+                          "error processing query: " + _query->toString() +
+                          " planner returned error: " + status.reason());
+        }
+
+        // We cannot figure out how to answer the query.  Perhaps it requires an index
+        // we do not have?
+        if (0 == solutions.size()) {
+            return Status(ErrorCodes::BadValue,
+                          str::stream()
+                          << "error processing query: "
+                          << _query->toString()
+                          << " No query solutions");
+        }
+
+        if (1 == solutions.size()) {
+            PlanStage* root;
+            // Only one possible plan.  Run it.  Build the stages from the solution.
+            verify(StageBuilder::build(_txn, _collection, *solutions[0], _ws, &root));
+            _child.reset(root);
+            return Status::OK();
+        }
+        else {
+            // Many solutions. Create a MultiPlanStage to pick the best, update the cache,
+            // and so on. The working set will be shared by all candidate plans.
+            _child.reset(new MultiPlanStage(_txn, _collection, _query));
+            MultiPlanStage* multiPlanStage = static_cast<MultiPlanStage*>(_child.get());
+
+            for (size_t ix = 0; ix < solutions.size(); ++ix) {
+                if (solutions[ix]->cacheData.get()) {
+                    solutions[ix]->cacheData->indexFilterApplied =
+                        _plannerParams.indexFiltersApplied;
+                }
+
+                // version of StageBuild::build when WorkingSet is shared
+                PlanStage* nextPlanRoot;
+                verify(StageBuilder::build(_txn, _collection, *solutions[ix], _ws,
+                                           &nextPlanRoot));
+
+                // Owns none of the arguments
+                multiPlanStage->addPlan(solutions[ix], nextPlanRoot, _ws);
+            }
+
+            // Delegate the the MultiPlanStage's plan selection facility.
+            Status planSelectStat = multiPlanStage->pickBestPlan(yieldPolicy);
+            if (!planSelectStat.isOK()) {
+                return planSelectStat;
+            }
+
+            return Status::OK();
+        }
+    }
+
+    Status SubplanStage::pickBestPlan(PlanYieldPolicy* yieldPolicy) {
+        // Adds the amount of time taken by pickBestPlan() to executionTimeMillis. There's lots of
+        // work that happens here, so this is needed for the time accounting to make sense.
+        ScopedTimer timer(&_commonStats.executionTimeMillis);
+
+        // Plan each branch of the $or.
+        Status subplanningStatus = planSubqueries();
+        if (!subplanningStatus.isOK()) {
+            return choosePlanWholeQuery(yieldPolicy);
+        }
+
+        // Use the multi plan stage to select a winning plan for each branch, and then construct
+        // the overall winning plan from the resulting index tags.
+        Status subplanSelectStat = choosePlanForSubqueries(yieldPolicy);
+        if (!subplanSelectStat.isOK()) {
+            return choosePlanWholeQuery(yieldPolicy);
+        }
 
         return Status::OK();
     }

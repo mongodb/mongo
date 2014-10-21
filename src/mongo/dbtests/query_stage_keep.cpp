@@ -105,12 +105,14 @@ namespace QueryStageKeep {
     public:
         void run() {
             Client::WriteContext ctx(&_txn, ns());
-
             Database* db = ctx.ctx().db();
             Collection* coll = db->getCollection(&_txn, ns());
             if (!coll) {
+                WriteUnitOfWork wuow(&_txn);
                 coll = db->createCollection(&_txn, ns());
+                wuow.commit();
             }
+
             WorkingSet ws;
 
             // Add 10 objects to the collection.
@@ -126,7 +128,6 @@ namespace QueryStageKeep {
                 member->obj = BSON("x" << 2);
                 ws.flagForReview(id);
             }
-            ctx.commit();
 
             // Create a collscan to provide the 10 objects in the collection.
             CollectionScanParams params;

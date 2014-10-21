@@ -55,6 +55,8 @@ namespace mongo {
             return true;
         }
 
+        virtual void commitAndRestart() {}
+
         virtual void registerChange(Change* change) {
         }
 

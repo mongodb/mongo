@@ -182,13 +182,12 @@ namespace mongo {
             }
 
             PlanExecutor* rawExec;
-            if (!getExecutor(txn, collection, cq, &rawExec, 0).isOK()) {
+            if (!getExecutor(txn, collection, cq, PlanExecutor::YIELD_AUTO, &rawExec, 0).isOK()) {
                 errmsg = "can't get query runner";
                 return false;
             }
 
             scoped_ptr<PlanExecutor> exec(rawExec);
-            exec->setYieldPolicy(PlanExecutor::YIELD_AUTO);
 
             double totalDistance = 0;
             BSONObjBuilder resultBuilder(result.subarrayStart("results"));

@@ -125,6 +125,11 @@ namespace mongo {
          */
         bool needInsert();
 
+        /**
+         * Helper for restoring the state of this update.
+         */
+        Status restoreUpdateState(OperationContext* opCtx);
+
         UpdateStageParams _params;
 
         // Not owned by us.

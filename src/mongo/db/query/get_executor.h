@@ -71,6 +71,7 @@ namespace mongo {
     Status getExecutor(OperationContext* txn,
                        Collection* collection,
                        CanonicalQuery* rawCanonicalQuery,
+                       PlanExecutor::YieldPolicy yieldPolicy,
                        PlanExecutor** out,
                        size_t plannerOptions = 0);
 
@@ -90,6 +91,7 @@ namespace mongo {
                        Collection* collection,
                        const std::string& ns,
                        const BSONObj& unparsedQuery,
+                       PlanExecutor::YieldPolicy yieldPolicy,
                        PlanExecutor** out,
                        size_t plannerOptions = 0);
 
@@ -113,6 +115,7 @@ namespace mongo {
                                Collection* collection,
                                const BSONObj& query,
                                const std::string& field,
+                               PlanExecutor::YieldPolicy yieldPolicy,
                                PlanExecutor** out);
 
     /*
@@ -125,6 +128,7 @@ namespace mongo {
     Status getExecutorCount(OperationContext* txn,
                             Collection* collection,
                             const CountRequest& request,
+                            PlanExecutor::YieldPolicy yieldPolicy,
                             PlanExecutor** execOut);
 
     //
@@ -149,6 +153,7 @@ namespace mongo {
                              bool shouldCallLogOp,
                              bool fromMigrate,
                              bool isExplain,
+                             PlanExecutor::YieldPolicy yieldPolicy,
                              PlanExecutor** execOut);
 
     /**
@@ -168,6 +173,7 @@ namespace mongo {
                              bool shouldCallLogOp,
                              bool fromMigrate,
                              bool isExplain,
+                             PlanExecutor::YieldPolicy yieldPolicy,
                              PlanExecutor** execOut);
 
     //
@@ -191,6 +197,7 @@ namespace mongo {
                              const UpdateRequest* request,
                              UpdateDriver* driver,
                              OpDebug* opDebug,
+                             PlanExecutor::YieldPolicy yieldPolicy,
                              PlanExecutor** execOut);
 
     /**
@@ -210,6 +217,7 @@ namespace mongo {
                              const UpdateRequest* request,
                              UpdateDriver* driver,
                              OpDebug* opDebug,
+                             PlanExecutor::YieldPolicy yieldPolicy,
                              PlanExecutor** execOut);
 
     //
@@ -230,6 +238,7 @@ namespace mongo {
     Status getExecutorGroup(OperationContext* txn,
                             Collection* collection,
                             const GroupRequest& request,
+                            PlanExecutor::YieldPolicy yieldPolicy,
                             PlanExecutor** execOut);
 
 }  // namespace mongo

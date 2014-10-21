@@ -72,7 +72,6 @@ namespace PlanRankingTests {
 
             Client::WriteContext ctx(&_txn, ns);
             _client.dropCollection(ns);
-            ctx.commit();
         }
 
         virtual ~PlanRankingTestBase() {
@@ -84,13 +83,11 @@ namespace PlanRankingTests {
         void insert(const BSONObj& obj) {
             Client::WriteContext ctx(&_txn, ns);
             _client.insert(ns, obj);
-            ctx.commit();
         }
 
         void addIndex(const BSONObj& obj) {
             Client::WriteContext ctx(&_txn, ns);
             _client.ensureIndex(ns, obj);
-            ctx.commit();
         }
 
         /**
@@ -125,8 +122,9 @@ namespace PlanRankingTests {
                 // Takes ownership of all (actually some) arguments.
                 _mps->addPlan(solutions[i], root, ws.get());
             }
-
-            _mps->pickBestPlan(); // This is what sets a backup plan, should we test for it.
+            // This is what sets a backup plan, should we test for it. NULL means that there
+            // is no yield policy for this MultiPlanStage's plan selection.
+            _mps->pickBestPlan(NULL);
             ASSERT(_mps->bestPlanChosen());
 
             size_t bestPlanIdx = _mps->bestPlanIdx();

@@ -77,6 +77,7 @@ namespace ReplTests {
             createOplog(&_txn);
 
             Client::WriteContext ctx(&_txn, ns());
+            WriteUnitOfWork wuow(&_txn);
 
             Collection* c = ctx.ctx().db()->getCollection(&_txn, ns());
             if ( ! c ) {
@@ -84,7 +85,7 @@ namespace ReplTests {
             }
 
             ASSERT(c->getIndexCatalog()->haveIdIndex(&_txn));
-            ctx.commit();
+            wuow.commit();
         }
         ~Base() {
             try {

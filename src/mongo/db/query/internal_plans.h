@@ -73,7 +73,16 @@ namespace mongo {
 
             if (NULL == collection) {
                 EOFStage* eof = new EOFStage();
-                return new PlanExecutor(txn, ws, eof, ns.toString());
+                PlanExecutor* exec;
+                // Takes ownership if 'ws' and 'eof'.
+                Status execStatus =  PlanExecutor::make(txn,
+                                                        ws,
+                                                        eof,
+                                                        ns.toString(),
+                                                        PlanExecutor::YIELD_MANUAL,
+                                                        &exec);
+                invariant(execStatus.isOK());
+                return exec;
             }
 
             dassert( ns == collection->ns().ns() );
@@ -90,8 +99,16 @@ namespace mongo {
             }
 
             CollectionScan* cs = new CollectionScan(txn, params, ws, NULL);
+            PlanExecutor* exec;
             // Takes ownership of 'ws' and 'cs'.
-            return new PlanExecutor(txn, ws, cs, collection);
+            Status execStatus = PlanExecutor::make(txn,
+                                                   ws,
+                                                   cs,
+                                                   collection,
+                                                   PlanExecutor::YIELD_MANUAL,
+                                                   &exec);
+            invariant(execStatus.isOK());
+            return exec;
         }
 
         /**
@@ -123,7 +140,16 @@ namespace mongo {
                 root = new FetchStage(txn, ws, root, NULL, collection);
             }
 
-            return new PlanExecutor(txn, ws, root, collection);
+            PlanExecutor* exec;
+            // Takes ownership of 'ws' and 'root'.
+            Status execStatus = PlanExecutor::make(txn,
+                                                   ws,
+                                                   root,
+                                                   collection,
+                                                   PlanExecutor::YIELD_MANUAL,
+                                                   &exec);
+            invariant(execStatus.isOK());
+            return exec;
         }
     };
 

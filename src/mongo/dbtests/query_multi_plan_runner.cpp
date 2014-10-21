@@ -72,31 +72,26 @@ namespace QueryMultiPlanRunner {
         MultiPlanRunnerBase() : _client(&_txn) {
             Client::WriteContext ctx(&_txn, ns());
             _client.dropCollection(ns());
-            ctx.commit();
         }
 
         virtual ~MultiPlanRunnerBase() {
             Client::WriteContext ctx(&_txn, ns());
             _client.dropCollection(ns());
-            ctx.commit();
         }
 
         void addIndex(const BSONObj& obj) {
             Client::WriteContext ctx(&_txn, ns());
             _client.ensureIndex(ns(), obj);
-            ctx.commit();
         }
 
         void insert(const BSONObj& obj) {
             Client::WriteContext ctx(&_txn, ns());
             _client.insert(ns(), obj);
-            ctx.commit();
         }
 
         void remove(const BSONObj& obj) {
             Client::WriteContext ctx(&_txn, ns());
             _client.remove(ns(), obj);
-            ctx.commit();
         }
 
         static const char* ns() { return "unittests.QueryStageMultiPlanRunner"; }
@@ -160,18 +155,23 @@ namespace QueryMultiPlanRunner {
             mps->addPlan(createQuerySolution(), firstRoot.release(), sharedWs.get());
             mps->addPlan(createQuerySolution(), secondRoot.release(), sharedWs.get());
 
-            // Plan 0 aka the first plan aka the index scan should be the best.
-            mps->pickBestPlan();
+            // Plan 0 aka the first plan aka the index scan should be the best. NULL means that
+            // 'mps' will not yield during plan selection.
+            mps->pickBestPlan(NULL);
             ASSERT(mps->bestPlanChosen());
             ASSERT_EQUALS(0, mps->bestPlanIdx());
 
             // Takes ownership of arguments other than 'collection'.
-            PlanExecutor exec(&_txn, sharedWs.release(), mps, cq, coll);
+            PlanExecutor* rawExec;
+            Status status = PlanExecutor::make(&_txn, sharedWs.release(), mps, cq, coll,
+                                               PlanExecutor::YIELD_MANUAL, &rawExec);
+            ASSERT_OK(status);
+            boost::scoped_ptr<PlanExecutor> exec(rawExec);
 
             // Get all our results out.
             int results = 0;
             BSONObj obj;
-            while (PlanExecutor::ADVANCED == exec.getNext(&obj, NULL)) {
+            while (PlanExecutor::ADVANCED == exec->getNext(&obj, NULL)) {
                 ASSERT_EQUALS(obj["foo"].numberInt(), 7);
                 ++results;
             }
@@ -235,8 +235,8 @@ namespace QueryMultiPlanRunner {
                 mps->addPlan(solutions[i], root, ws.get());
             }
 
-            // This sets a backup plan.
-            mps->pickBestPlan();
+            // This sets a backup plan. NULL means that 'mps' will not yield.
+            mps->pickBestPlan(NULL);
             ASSERT(mps->bestPlanChosen());
             ASSERT(mps->hasBackupPlan());
 

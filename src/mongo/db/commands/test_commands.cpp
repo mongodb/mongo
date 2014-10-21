@@ -165,8 +165,9 @@ namespace mongo {
                     massert( 13418, "captrunc invalid n", PlanExecutor::ADVANCED == state);
                 }
             }
+            WriteUnitOfWork wuow(txn);
             collection->temp_cappedTruncateAfter( txn, end, inc );
-            ctx.commit();
+            wuow.commit();
             return true;
         }
     };
@@ -200,6 +201,7 @@ namespace mongo {
             NamespaceString nss( dbname, coll );
 
             Client::WriteContext ctx(txn,  nss.ns() );
+            WriteUnitOfWork wuow(txn);
             Database* db = ctx.db();
             Collection* collection = ctx.getCollection();
             massert( 13429, "emptycapped no such collection", collection );
@@ -214,7 +216,7 @@ namespace mongo {
 
             if (!fromRepl)
                 repl::logOp(txn, "c",(dbname + ".$cmd").c_str(), cmdObj);
-            ctx.commit();
+            wuow.commit();
             return true;
         }
     };

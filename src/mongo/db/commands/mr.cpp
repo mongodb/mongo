@@ -359,6 +359,7 @@ namespace mongo {
                 // Create the inc collection and make sure we have index on "0" key.
                 // Intentionally not replicating the inc collection to secondaries.
                 Client::WriteContext incCtx(_txn, _config.incLong);
+                WriteUnitOfWork wuow(_txn);
                 Collection* incColl = incCtx.getCollection();
                 invariant(!incColl);
 
@@ -376,7 +377,7 @@ namespace mongo {
                     uasserted( 17305 , str::stream() << "createIndex failed for mr incLong ns: " <<
                             _config.incLong << " err: " << status.code() );
                 }
-                incCtx.commit();
+                wuow.commit();
             }
 
             vector<BSONObj> indexesToInsert;
@@ -384,6 +385,7 @@ namespace mongo {
             {
                 // copy indexes into temporary storage
                 Client::WriteContext finalCtx(_txn, _config.outputOptions.finalNamespace);
+                WriteUnitOfWork wuow(_txn);
                 Collection* const finalColl = finalCtx.getCollection();
                 if ( finalColl ) {
                     IndexCatalog::IndexIterator ii =
@@ -406,12 +408,13 @@ namespace mongo {
                         indexesToInsert.push_back( b.obj() );
                     }
                 }
-                finalCtx.commit();
+                wuow.commit();
             }
 
             {
                 // create temp collection and insert the indexes from temporary storage
                 Client::WriteContext tempCtx(_txn, _config.tempNamespace);
+                WriteUnitOfWork wuow(_txn);
                 uassert(ErrorCodes::NotMaster, "no longer master", 
                         repl::getGlobalReplicationCoordinator()->
                         canAcceptWritesForDatabase(nsToDatabase(_config.tempNamespace.c_str())));
@@ -443,7 +446,7 @@ namespace mongo {
                     string logNs = nsToDatabase( _config.tempNamespace ) + ".system.indexes";
                     repl::logOp(_txn, "i", logNs.c_str(), *it);
                 }
-                tempCtx.commit();
+                wuow.commit();
             }
 
         }
@@ -664,6 +667,7 @@ namespace mongo {
 
 
             Client::WriteContext ctx(_txn,  ns );
+            WriteUnitOfWork wuow(_txn);
             uassert(ErrorCodes::NotMaster, "no longer master", 
                     repl::getGlobalReplicationCoordinator()->
                     canAcceptWritesForDatabase(nsToDatabase(ns.c_str())));
@@ -680,7 +684,7 @@ namespace mongo {
 
             coll->insertDocument( _txn, bo, true );
             repl::logOp(_txn, "i", ns.c_str(), bo);
-            ctx.commit();
+            wuow.commit();
         }
 
         /**
@@ -690,9 +694,10 @@ namespace mongo {
             verify( _onDisk );
 
             Client::WriteContext ctx(_txn,  _config.incLong );
+            WriteUnitOfWork wuow(_txn);
             Collection* coll = getCollectionOrUassert(ctx.db(), _config.incLong);
             coll->insertDocument( _txn, o, true );
-            ctx.commit();
+            wuow.commit();
         }
 
         State::State(OperationContext* txn, const Config& c) :
@@ -969,6 +974,7 @@ namespace mongo {
 
             {
                 Client::WriteContext incCtx(_txn, _config.incLong );
+                WriteUnitOfWork wuow(_txn);
                 Collection* incColl = getCollectionOrUassert(incCtx.db(), _config.incLong );
 
                 bool foundIndex = false;
@@ -983,9 +989,9 @@ namespace mongo {
                         break;
                     }
                 }
-                incCtx.commit();
 
                 verify( foundIndex );
+                wuow.commit();
             }
 
             scoped_ptr<AutoGetCollectionForRead> ctx(new AutoGetCollectionForRead(_txn, _config.incLong));
@@ -1009,11 +1015,14 @@ namespace mongo {
                                                 whereCallback).isOK());
 
             PlanExecutor* rawExec;
-            verify(getExecutor(_txn, getCollectionOrUassert(ctx->getDb(), _config.incLong),
-                               cq, &rawExec, QueryPlannerParams::NO_TABLE_SCAN).isOK());
+            verify(getExecutor(_txn,
+                               getCollectionOrUassert(ctx->getDb(), _config.incLong),
+                               cq,
+                               PlanExecutor::YIELD_AUTO,
+                               &rawExec,
+                               QueryPlannerParams::NO_TABLE_SCAN).isOK());
 
             scoped_ptr<PlanExecutor> exec(rawExec);
-            exec->setYieldPolicy(PlanExecutor::YIELD_AUTO);
 
             // iterate over all sorted objects
             BSONObj o;
@@ -1357,15 +1366,17 @@ namespace mongo {
                         invariant(db);
 
                         PlanExecutor* rawExec;
-                        if (!getExecutor(txn, state.getCollectionOrUassert(db, config.ns),
-                                         cq, &rawExec).isOK()) {
+                        if (!getExecutor(txn,
+                                         state.getCollectionOrUassert(db, config.ns),
+                                         cq,
+                                         PlanExecutor::YIELD_AUTO,
+                                         &rawExec).isOK()) {
                             uasserted(17239, "Can't get executor for query "
                                              + config.filter.toString());
                             return 0;
                         }
 
                         scoped_ptr<PlanExecutor> exec(rawExec);
-                        exec->setYieldPolicy(PlanExecutor::YIELD_AUTO);
 
                         Timer mt;
 

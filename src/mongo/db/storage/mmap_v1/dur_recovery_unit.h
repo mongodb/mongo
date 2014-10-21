@@ -51,6 +51,8 @@ namespace mongo {
         virtual void commitUnitOfWork();
         virtual void endUnitOfWork();
 
+        virtual void commitAndRestart();
+
         virtual bool awaitCommit();
 
         virtual void* writingPtr(void* data, size_t len);

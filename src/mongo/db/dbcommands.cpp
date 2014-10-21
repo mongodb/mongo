@@ -645,7 +645,8 @@ namespace mongo {
             }
 
             PlanExecutor* rawExec;
-            if (!getExecutor(txn, coll, cq, &rawExec, QueryPlannerParams::NO_TABLE_SCAN).isOK()) {
+            if (!getExecutor(txn, coll, cq, PlanExecutor::YIELD_MANUAL, &rawExec,
+                             QueryPlannerParams::NO_TABLE_SCAN).isOK()) {
                 uasserted(17241, "Can't get executor for query " + query.toString());
                 return 0;
             }
