@@ -194,7 +194,7 @@ func (self *MongoFiles) Run(displayConnUrl bool) (string, error) {
 	session.SetSocketTimeout(0)
 
 	if displayConnUrl {
-		fmt.Printf("connected to: %v\n", connUrl)
+		log.Logf(log.Always, "connected to: %v\n", connUrl)
 	}
 
 	if self.ToolOptions.Namespace.DB == "" {
