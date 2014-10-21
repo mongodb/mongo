@@ -177,17 +177,12 @@ func (self *MongoFiles) handlePut(gfs *mgo.GridFS) (string, error) {
 
 // Run the mongofiles utility
 func (self *MongoFiles) Run(displayConnUrl bool) (string, error) {
-	if displayConnUrl {
-		connHost := self.ToolOptions.Host
-		if connHost == "" {
-			connHost = util.DefaultHost
-		}
-		connPort := self.ToolOptions.Port
-		if connPort == "" {
-			connPort = util.DefaultPort
-		}
-
-		fmt.Printf("connected to: %v\n", fmt.Sprintf("%s:%s", connHost, connPort))
+	connUrl := self.ToolOptions.Host
+	if connUrl == "" {
+		connUrl = util.DefaultHost
+	}
+	if self.ToolOptions.Port != "" {
+		connUrl = fmt.Sprintf("%s:%s", connUrl, self.ToolOptions.Port)
 	}
 
 	// get session
@@ -197,6 +192,10 @@ func (self *MongoFiles) Run(displayConnUrl bool) (string, error) {
 	}
 	defer session.Close()
 	session.SetSocketTimeout(0)
+
+	if displayConnUrl {
+		fmt.Printf("connected to: %v\n", connUrl)
+	}
 
 	if self.ToolOptions.Namespace.DB == "" {
 		self.ToolOptions.Namespace.DB = "test"
