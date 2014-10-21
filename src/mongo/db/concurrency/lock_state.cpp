@@ -59,8 +59,6 @@ namespace mongo {
         // on its use.
         const ResourceId resourceIdMMAPV1Flush = ResourceId(RESOURCE_MMAPV1_FLUSH, 2ULL);
 
-        const ResourceId resourceIdLocalDB = ResourceId(RESOURCE_DATABASE, string("local"));
-
         /**
          * Returns whether the passed in mode is S or IS. Used for validation checks.
          */
@@ -498,8 +496,7 @@ namespace mongo {
 
                 if (!inAWriteUnitOfWork() &&
                     (resId != resourceIdGlobal) &&
-                    (resId != resourceIdMMAPV1Flush) &&
-                    (resId != resourceIdLocalDB)) {
+                    (resId != resourceIdMMAPV1Flush)) {
 
                     invariant(unlock(resourceIdMMAPV1Flush));
                     unlockedFlushLock = true;
