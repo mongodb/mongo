@@ -571,6 +571,9 @@ namespace mongo {
 
     template<bool IsForMMAPV1>
     bool LockerImpl<IsForMMAPV1>::saveLockStateAndUnlock(Locker::LockSnapshot* stateOut) {
+        // We shouldn't be saving and restoring lock state from inside a WriteUnitOfWork.
+        invariant(!inAWriteUnitOfWork());
+
         // Clear out whatever is in stateOut.
         stateOut->locks.clear();
         stateOut->globalMode = MODE_NONE;
@@ -653,6 +656,9 @@ namespace mongo {
 
     template<bool IsForMMAPV1>
     void LockerImpl<IsForMMAPV1>::restoreLockState(const Locker::LockSnapshot& state) {
+        // We shouldn't be saving and restoring lock state from inside a WriteUnitOfWork.
+        invariant(!inAWriteUnitOfWork());
+
         // We expect to be able to unlock each lock 'recursiveCount' number of times.
         // So, we relock each lock that number of times.
 
