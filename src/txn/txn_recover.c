@@ -12,7 +12,7 @@ typedef struct {
 	WT_SESSION_IMPL *session;
 
 	/* Files from the metadata, indexed by file ID. */
-	struct {
+	struct WT_RECOVERY_FILE {
 		const char *uri;	/* File URI. */
 		WT_CURSOR *c;		/* Cursor used for recovery. */
 		WT_LSN ckpt_lsn;	/* File's checkpoint LSN. */
@@ -58,7 +58,7 @@ __recovery_cursor(WT_SESSION_IMPL *session, WT_RECOVERY *r,
 	 * is more recent than the last checkpoint.  If there is no entry for a
 	 * file, assume it was dropped or missing after a hot backup.
 	 */
-	metadata_op = (id == 0);
+	metadata_op = (id == WT_METAFILE_ID);
 	if (r->metadata_only != metadata_op)
 		;
 	else if (id >= r->nfiles || r->files[id].uri == NULL) {
@@ -425,7 +425,7 @@ __wt_txn_recover(WT_CONNECTION_IMPL *conn)
 	WT_ERR(__wt_metadata_search(session, WT_METAFILE_URI, &config));
 	WT_ERR(__recovery_setup_file(&r, WT_METAFILE_URI, config));
 	WT_ERR(__wt_metadata_cursor(session, NULL, &metac));
-	r.files[0].c = metac;
+	r.files[WT_METAFILE_ID].c = metac;
 
 	/*
 	 * First, do a pass through the log to recover the metadata, and
@@ -434,12 +434,12 @@ __wt_txn_recover(WT_CONNECTION_IMPL *conn)
 	 */
 	if (!was_backup) {
 		r.metadata_only = 1;
-		if (IS_INIT_LSN(&r.files[0].ckpt_lsn))
+		if (IS_INIT_LSN(&r.files[WT_METAFILE_ID].ckpt_lsn))
 			WT_ERR(__wt_log_scan(session,
 			    NULL, WT_LOGSCAN_FIRST, __txn_log_recover, &r));
 		else
 			WT_ERR(__wt_log_scan(session,
-			    &r.files[0].ckpt_lsn, 0, __txn_log_recover, &r));
+			    &r.files[WT_METAFILE_ID].ckpt_lsn, 0, __txn_log_recover, &r));
 
 		WT_ASSERT(session,
 		    LOG_CMP(&r.ckpt_lsn, &conn->log->first_lsn) >= 0);

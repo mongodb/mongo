@@ -419,6 +419,10 @@ __wt_txn_rollback(WT_SESSION_IMPL *session, const char *cfg[])
 
 	/* Rollback updates. */
 	for (i = 0, op = txn->mod; i < txn->mod_count; i++, op++) {
+		/* Metadata updates are never rolled back. */
+		if (op->fileid == WT_METAFILE_ID)
+			continue;
+
 		switch (op->type) {
 		case TXN_OP_BASIC:
 		case TXN_OP_INMEM:
