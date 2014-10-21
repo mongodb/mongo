@@ -152,29 +152,6 @@ namespace mongo {
                        const RangeDeleterOptions& options,
                        std::string* errMsg);
 
-        /**
-         * Blacklist the given range for the given namespace. Use the removeFromBlackList
-         * method to undo this operation.
-         *
-         * Note: min is inclusive and max is exclusive.
-         *
-         * Return false if a task in the queue intersects the given range or
-         * if the range intersects another range that is in the black list.
-         */
-        bool addToBlackList(const StringData& ns,
-                            const BSONObj& min,
-                            const BSONObj& max,
-                            std::string* errMsg);
-
-        /**
-         * Removes the exact range from the blacklist.
-         *
-         * Returns false if range cannot be found from the black list.
-         */
-        bool removeFromBlackList(const StringData& ns,
-                                 const BSONObj& min,
-                                 const BSONObj& max);
-
         //
         // Introspection methods
         //
@@ -211,12 +188,6 @@ namespace mongo {
 
         /** Body of the worker thread */
         void doWork();
-
-        /** Returns true if range is blacklisted. Assumes _queueMutex is held */
-        bool isBlacklisted_inlock(const StringData& ns,
-                                  const BSONObj& min,
-                                  const BSONObj& max,
-                                  std::string* errMsg) const;
 
         /** Returns true if the range doesn't intersect with one other range */
         bool canEnqueue_inlock(const StringData& ns,
@@ -265,13 +236,6 @@ namespace mongo {
         // queued delete life cycle: new @ queuedDelete, delete @ doWork
         // deleteNow life cycle: deleteNow stack variable
         NSMinMaxSet _deleteSet;
-
-        // Keeps track of ranges that cannot be queued to _notReady.
-        // Invariant: should not conflict with any entry in all queues.
-        //
-        // life cycle: new @ addToBlackList, delete @ removeFromBlackList
-        // deleteNow life cycle: deleteNow stack variable
-        NSMinMaxSet _blackList;
 
         // Keeps track of number of tasks that are in progress, including the inline deletes.
         size_t _deletesInProgress;
