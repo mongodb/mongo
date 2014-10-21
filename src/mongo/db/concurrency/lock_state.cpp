@@ -416,7 +416,7 @@ namespace mongo {
             LockRequest* flushLockRequest = _requests.find(resourceIdMMAPV1Flush).objAddr();
             invariant(flushLockRequest->mode == MODE_X);
             invariant(flushLockRequest->recursiveCount == 1);
-            globalLockManager.downgrade(flushLockRequest, MODE_S);
+            invariant(unlock(resourceIdMMAPV1Flush));
         }
     }
 

@@ -36,6 +36,7 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/dbwebserver.h"
 #include "mongo/util/mongoutils/html.h"
+#include "mongo/util/stringutils.h"
 
 
 namespace mongo {
@@ -127,8 +128,12 @@ namespace {
                 txn->getClient()->reportState( b );
             if ( txn->getCurOp() )
                 txn->getCurOp()->reportState( &b );
-            if ( txn->lockState() )
+            if ( txn->lockState() ) {
+                StringBuilder ss;
+                ss << txn->lockState();
+                b.append( "lockStatePointer", ss.str() );
                 b.append( "lockState", txn->lockState()->reportState() );
+            }
             if ( txn->recoveryUnit() )
                 txn->recoveryUnit()->reportState( &b );
             array.append( b.obj() );
