@@ -75,6 +75,8 @@ namespace mongo {
         boost::mutex::scoped_lock lk( _collectionsLock );
         for ( CollectionMap::const_iterator it = _collections.begin(); it != _collections.end(); ++it ) {
             const KVCollectionCatalogEntry* coll = it->second;
+            if ( !coll )
+                continue;
             size += coll->getRecordStore()->storageSize( opCtx );
             // todo: indexes
         }
