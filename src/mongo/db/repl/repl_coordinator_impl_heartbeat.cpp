@@ -383,17 +383,18 @@ namespace {
         const StatusWith<int> myIndex = validateConfigForHeartbeatReconfig(
                 _externalState.get(),
                 newConfig);
+
+        boost::lock_guard<boost::mutex> lk(_mutex);
+        if (_inShutdown) {
+            return;
+        }
         _replExecutor.scheduleWork(stdx::bind(&ReplicationCoordinatorImpl::_heartbeatReconfigFinish,
                                               this,
                                               stdx::placeholders::_1,
                                               newConfig,
                                               myIndex));
-
-        boost::lock_guard<boost::mutex> lk(_mutex);
-        if (!_inShutdown) {
-            _heartbeatReconfigThread->detach();
-            _heartbeatReconfigThread.reset(NULL);
-        }
+        _heartbeatReconfigThread->detach();
+        _heartbeatReconfigThread.reset(NULL);
     }
 
     void ReplicationCoordinatorImpl::_heartbeatReconfigFinish(
