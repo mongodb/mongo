@@ -283,6 +283,15 @@ __evict_file(WT_SESSION_IMPL *session, int syncop)
 				page->modify->write_gen = 0;
 				__wt_cache_dirty_decr(session, page);
 			}
+			/*
+			 * If the page contains an update that is too recent to
+			 * evict, stop.  This should never happen during
+			 * connection close, and in other paths our caller
+			 * should be prepared to deal with this case.
+			 */
+			if (page->modify != NULL &&
+			    !__wt_txn_visible_all(session, page->modify->rec_max_txn))
+				return (EBUSY);
 			__wt_ref_out(session, ref);
 			break;
 		WT_ILLEGAL_VALUE_ERR(session);
