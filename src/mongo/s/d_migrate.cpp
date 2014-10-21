@@ -432,7 +432,6 @@ namespace mongo {
                               string& errmsg,
                               BSONObjBuilder& result ) {
             AutoGetCollectionForRead ctx(txn, _ns);
-            WriteUnitOfWork uow(txn);
             Collection* collection = ctx.getCollection();
             if ( !collection ) {
                 errmsg = "ns not found, should be impossible";
@@ -519,6 +518,7 @@ namespace mongo {
                 scoped_spinlock lk( _trackerLocks );
                 log() << "moveChunk number of documents: " << _cloneLocs.size() << migrateLog;
             }
+            txn->recoveryUnit()->commitAndRestart();
             return true;
         }
 

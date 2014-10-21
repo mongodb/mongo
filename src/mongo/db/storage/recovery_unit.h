@@ -87,6 +87,12 @@ namespace mongo {
         virtual bool awaitCommit() = 0;
 
         /**
+         * When this is called, if there is an open transaction, it is commited and a new one is
+         * started.  This cannot be called inside of a WriteUnitOfWork, and should fail if it is.
+         */
+        virtual void commitAndRestart() = 0;
+
+        /**
          * A Change is an action that is registerChange()'d while a WriteUnitOfWork exists. The
          * change is either rollback()'d or commit()'d when the WriteUnitOfWork goes out of scope.
          *
