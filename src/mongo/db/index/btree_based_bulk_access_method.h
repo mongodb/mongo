@@ -84,7 +84,7 @@ namespace mongo {
             return _notAllowed();
         }
 
-        virtual Status validate(OperationContext* txn, int64_t* numKeys) {
+        virtual Status validate(OperationContext* txn, bool full, int64_t* numKeys, BSONObjBuilder* output) {
             return _notAllowed();
         }
 
