@@ -37,12 +37,16 @@ env.Library('authcore', ['action_set.cpp',
                      '$BUILD_DIR/mongo/signal_handlers_synchronous',
                      '$BUILD_DIR/mongo/stringutils'])
 
+env.Library('authcommon',
+            ['internal_user_auth.cpp'],
+            LIBDEPS=['$BUILD_DIR/mongo/bson'])
+
 env.Library('authservercommon',
             ['authorization_manager_global.cpp',
              'authz_session_external_state_server_common.cpp',
              'sasl_commands.cpp',
              'security_key.cpp'],
-            LIBDEPS=['authcore', 'authmocks', 'saslauth'])
+            LIBDEPS=['authcommon', 'authcore', 'authmocks', 'saslauth'])
 
 env.Library('saslauth',
              ['native_sasl_authentication_session.cpp',

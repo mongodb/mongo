@@ -1,5 +1,5 @@
 /**
-*    Copyright (C) 2009 10gen Inc.
+*    Copyright (C) 2014 MongoDB Inc.
 *
 *    This program is free software: you can redistribute it and/or  modify
 *    it under the terms of the GNU Affero General Public License, version 3,
@@ -28,18 +28,41 @@
 
 #pragma once
 
-#include <string>
-
-#include "mongo/client/dbclientinterface.h"
-
 namespace mongo {
-    /**
-     * This method checks the validity of filename as a security key, hashes its
-     * contents, and stores it in the internalSecurity variable.  Prints an
-     * error message to the logs if there's an error.
-     * @param filename the file containing the key
-     * @return if the key was successfully stored
-     */
-    bool setUpSecurityKey(const std::string& filename);
+    class BSONObj;
+    class DBClientWithCommands;
 
+    /**
+     * @return true if internal authentication parameters has been set up
+     */
+    bool isInternalAuthSet();
+
+    /**
+     * This method initializes the authParams object with authentication
+     * credentials to be used by authenticateInternalUser.
+     */
+    void setInternalUserAuthParams(const BSONObj& authParamsIn);
+
+    /**
+     * Returns a copy of the authParams object to be used by authenticateInternalUser
+     *
+     * The format of the return object is { authparams, fallbackParams:params}
+     *
+     * If SCRAM-SHA-1 is the internal auth mechanism the fallbackParams sub document is
+     * for MONGODB-CR auth is included. For MONGODB-XC509 no fallbackParams document is
+     * returned.
+     **/
+    BSONObj getInternalUserAuthParamsWithFallback();
+
+    /**
+     * Returns a copy of the fallback parameter portion of an internal auth parameter object
+     **/
+    BSONObj getFallbackAuthParams(BSONObj params);
+
+    /**
+    * Authenticates to another cluster member using appropriate authentication data.
+    * Uses getInternalUserAuthParams() to retrive authentication parameters.
+    * @return true if the authentication was succesful
+    */
+    bool authenticateInternalUser(DBClientWithCommands* conn);
 } // namespace mongo
