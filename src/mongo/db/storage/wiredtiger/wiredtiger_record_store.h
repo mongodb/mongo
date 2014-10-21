@@ -41,6 +41,7 @@
 
 namespace mongo {
 
+    class RecoveryUnit;
     class WiredTigerCursor;
     class WiredTigerRecoveryUnit;
 
@@ -155,7 +156,6 @@ namespace mongo {
         void setCappedDeleteCallback(CappedDocumentDeleteCallback* cb) {
             _cappedDeleteCallback = cb;
         }
-        void setCapped(int64_t cappedMaxDocs, int64_t cappedMaxSize);
         int64_t cappedMaxDocs() const;
         int64_t cappedMaxSize() const;
 
@@ -200,6 +200,9 @@ namespace mongo {
             DiskLoc _lastLoc; // the last thing returned from getNext()
         };
 
+        class NumRecordsChange;
+        class DataSizeChange;
+
         static WiredTigerRecoveryUnit* _getRecoveryUnit( OperationContext* txn );
 
         static uint64_t _makeKey(const DiskLoc &loc);
@@ -213,19 +216,18 @@ namespace mongo {
         void _increaseDataSize(OperationContext* txn, int amount);
         RecordData _getData( const WiredTigerCursor& cursor) const;
 
-        std::string _uri;
-        uint64_t _instanceId; // not persisted
+        const std::string _uri;
+        const uint64_t _instanceId; // not persisted
 
         // The capped settings should not be updated once operations have started
-        bool _isCapped;
-        bool _isOplog;
-        int64_t _cappedMaxSize;
-        int64_t _cappedMaxDocs;
+        const bool _isCapped;
+        const bool _isOplog;
+        const int64_t _cappedMaxSize;
+        const int64_t _cappedMaxDocs;
         CappedDocumentDeleteCallback* _cappedDeleteCallback;
 
         AtomicUInt64 _nextIdNum;
-        long long _dataSize;
-        long long _numRecords;
-        mutable boost::mutex _idLock;
+        AtomicInt64 _dataSize;
+        AtomicInt64 _numRecords;
     };
 }

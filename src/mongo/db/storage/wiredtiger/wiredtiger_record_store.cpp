@@ -131,8 +131,8 @@ namespace mongo {
         scoped_ptr<RecordIterator> iterator( getIterator( ctx, DiskLoc(),
                                                           CollectionScanParams::BACKWARD ) );
         if ( iterator->isEOF() ) {
-            _dataSize = 0;
-            _numRecords = 0;
+            _dataSize.store(0);
+            _numRecords.store(0);
             // Need to start at 1 so we are always higher than minDiskLoc
             _nextIdNum.store( 1 );
         }
@@ -141,14 +141,14 @@ namespace mongo {
             _nextIdNum.store( 1 + max );
 
             // todo: this is bad
-            _numRecords = 0;
-            _dataSize = 0;
+            _numRecords.store(0);
+            _dataSize.store(0);
 
             while( !iterator->isEOF() ) {
                 DiskLoc loc = iterator->getNext();
                 RecordData data = iterator->dataFor( loc );
-                _numRecords++;
-                _dataSize += data.size();
+                _numRecords.fetchAndAdd(1);
+                _dataSize.fetchAndAdd(data.size());
             }
 
         }
@@ -158,21 +158,15 @@ namespace mongo {
     WiredTigerRecordStore::~WiredTigerRecordStore() { }
 
     long long WiredTigerRecordStore::dataSize( OperationContext *txn ) const {
-        return _dataSize;
+        return _dataSize.load();
     }
 
     long long WiredTigerRecordStore::numRecords( OperationContext *txn ) const {
-        return _numRecords;
+        return _numRecords.load();
     }
 
     bool WiredTigerRecordStore::isCapped() const {
         return _isCapped;
-    }
-
-    void WiredTigerRecordStore::setCapped(int64_t cappedMaxSize, int64_t cappedMaxDocs) {
-        _isCapped = true;
-        _cappedMaxSize = cappedMaxSize;
-        _cappedMaxDocs = cappedMaxDocs;
     }
 
     int64_t WiredTigerRecordStore::cappedMaxDocs() const {
@@ -259,7 +253,7 @@ namespace mongo {
         if (!_isCapped)
             return false;
 
-        if (_dataSize > _cappedMaxSize)
+        if (_dataSize.load() > _cappedMaxSize)
             return true;
 
         if ((_cappedMaxDocs != -1) && (numRecords(txn) > _cappedMaxDocs))
@@ -289,7 +283,7 @@ namespace mongo {
         int ret = c->next(c);
         DiskLoc oldest;
         while ( ret == 0 && cappedAndNeedDelete(txn) ) {
-            invariant(_numRecords > 0);
+            invariant(_numRecords.load() > 0);
 
             uint64_t key;
             ret = c->get_key(c, &key);
@@ -596,18 +590,40 @@ namespace mongo {
         return dynamic_cast<WiredTigerRecoveryUnit*>( txn->recoveryUnit() );
     }
 
+    class WiredTigerRecordStore::NumRecordsChange : public RecoveryUnit::Change {
+    public:
+        NumRecordsChange(WiredTigerRecordStore* rs, bool insert) :_rs(rs), _insert(insert) {}
+        virtual void commit() {}
+        virtual void rollback() {
+            _rs->_numRecords.fetchAndAdd(_insert ? -1 : 1);
+        }
+
+    private:
+        WiredTigerRecordStore* _rs;
+        bool _insert;
+    };
+
     void WiredTigerRecordStore::_changeNumRecords( OperationContext* txn, bool insert ) {
-        if ( insert ) {
-            _numRecords++;
-        }
-        else {
-            _numRecords--;
-        }
+        txn->recoveryUnit()->registerChange(new NumRecordsChange(this, insert));
+        _numRecords.fetchAndAdd(insert ? 1 : -1);
     }
 
+    class WiredTigerRecordStore::DataSizeChange : public RecoveryUnit::Change {
+    public:
+        DataSizeChange(WiredTigerRecordStore* rs, int amount) :_rs(rs), _amount(amount) {}
+        virtual void commit() {}
+        virtual void rollback() {
+            _rs->_dataSize.fetchAndAdd(-_amount);
+        }
+
+    private:
+        WiredTigerRecordStore* _rs;
+        bool _amount;
+    };
 
     void WiredTigerRecordStore::_increaseDataSize( OperationContext* txn, int amount ) {
-        _dataSize += amount;
+        txn->recoveryUnit()->registerChange(new DataSizeChange(this, amount));
+        _dataSize.fetchAndAdd(amount);
         // TODO make this persistent
     }
 
