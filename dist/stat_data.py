@@ -130,6 +130,8 @@ connection_stats = [
 	    'log: total log buffer size', 'no_clear,no_scale'),
 	Stat('log_bytes_user', 'log: user provided log bytes written'),
 	Stat('log_bytes_written', 'log: log bytes written'),
+	Stat('log_close_yields',
+            'log: yields waiting for previous log file close'),
 	Stat('log_max_filesize', 'log: maximum log file size', 'no_clear'),
 	Stat('log_reads', 'log: log read operations'),
 	Stat('log_scan_records', 'log: records processed by log scan'),
