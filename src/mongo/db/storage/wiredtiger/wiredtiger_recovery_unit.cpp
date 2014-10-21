@@ -134,13 +134,11 @@ namespace mongo {
         return _session;
     }
 
-    void WiredTigerRecoveryUnit::restartTransaction() {
-        invariant( !_everStartedWrite );
-        invariant( _changes.empty() );
-        invariant( _active );
-
-        _txnClose( true );
-        _txnOpen();
+    void WiredTigerRecoveryUnit::commitAndRestart() {
+        invariant( _depth == 0 );
+        if ( _active ) {
+            _txnClose( true );
+        }
     }
 
     void WiredTigerRecoveryUnit::_txnClose( bool commit ) {

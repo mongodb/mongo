@@ -69,6 +69,8 @@ namespace mongo {
         virtual void beingReleasedFromOperationContext();
         virtual void beingSetOnOperationContext();
 
+        virtual void commitAndRestart();
+
         // un-used API
         virtual void* writingPtr(void* data, size_t len) { invariant(!"don't call writingPtr"); }
         virtual void syncDataAndTruncateJournal() {}
@@ -80,8 +82,6 @@ namespace mongo {
 
         bool everStartedWrite() const { return _everStartedWrite; }
         int depth() const { return _depth; }
-
-        void restartTransaction();
 
         static WiredTigerRecoveryUnit* get(OperationContext *txn);
 
