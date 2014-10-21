@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"github.com/mongodb/mongo-tools/common/db/kerberos"
 	"github.com/mongodb/mongo-tools/common/options"
+	"github.com/mongodb/mongo-tools/common/testutil"
 	. "github.com/smartystreets/goconvey/convey"
 	"gopkg.in/mgo.v2/bson"
 	"os"
@@ -18,8 +19,6 @@ import (
 var (
 	KERBEROS_HOST = "ldaptest.10gen.cc"
 	KERBEROS_USER = "drivers@LDAPTEST.10GEN.CC"
-
-	WINDOWS_KERBEROS_PASSWORD_ENV = "MONGODB_KERBEROS_PASSWORD"
 )
 
 func TestKerberosDBConnector(t *testing.T) {
@@ -41,10 +40,10 @@ func TestKerberosDBConnector(t *testing.T) {
 		}
 
 		if runtime.GOOS == "windows" {
-			opts.Auth.Password = os.Getenv(WINDOWS_KERBEROS_PASSWORD_ENV)
+			opts.Auth.Password = os.Getenv(testutil.WINDOWS_KERBEROS_PASSWORD_ENV)
 			if opts.Auth.Password == "" {
 				panic(fmt.Sprintf("Need to set %v environment variable to run kerberos tests on windows",
-					WINDOWS_KERBEROS_PASSWORD_ENV))
+					testutil.WINDOWS_KERBEROS_PASSWORD_ENV))
 			}
 		}
 

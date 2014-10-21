@@ -75,6 +75,21 @@ mongo_tools_variables:
     ubuntu1204_ssl_task_list: &ubuntu1204_ssl_tasks
       - name: dist
       - name: integration
+    ubuntu1204_enterprise_task_list: &ubuntu1204_enterprise_tasks
+      - name: bsonutil
+      - name: db
+      - name: dist
+      - name: integration
+      - name: json
+      - name: kerberos
+      - name: legacy
+      - name: lint
+      - name: log
+      - name: pool
+      - name: progress
+      - name: text
+      - name: util
+      - name: vet
     windows_32_task_list: &windows_32_tasks
       - name: db
         distros:
@@ -102,6 +117,16 @@ mongo_tools_variables:
     windows_64_ssl_task_list: &windows_64_ssl_tasks
       - name: dist
       - name: integration
+    windows_64_enterprise_task_list: &windows_64_enterprise_tasks
+      - name: db
+      - name: dist
+      - name: integration
+      - name: kerberos
+      - name: legacy
+        distros:
+        - windows-64-vs2013-test
+      - name: unit
+
 
 ## Common mongodb arguments
   mongodb_arguments:
@@ -287,6 +312,7 @@ functions:
         set -e
         if [ "Windows_NT" = "$OS" ]; then
             set -o igncr
+            export MONGODB_KERBEROS_PASSWORD=${kerberos_password}
         fi;
         . ./${set_gopath|set_gopath.sh}
         if [ "${library_path}" != "" ]; then
@@ -295,6 +321,11 @@ functions:
 
         # mongodump
         cd mongodump
+        ${library_path} go test -v ${coverage_args} ${args} ${build_tags}
+        cd ..
+
+        # mongoexport
+        cd mongoexport
         ${library_path} go test -v ${coverage_args} ${args} ${build_tags}
         cd ..
 
@@ -628,6 +659,13 @@ tasks:
     - command: git.apply_patch
       params:
         directory: src
+    - command: expansions.update
+      params:
+        updates:
+          - key: "args"
+            value: "-test.types=kerberos"
+    - func: "setup integration test"
+    - func: "run tool integration tests"
 
 - name: legacy
   depends_on:
@@ -918,7 +956,7 @@ buildvariants:
     edition: enterprise
     run_kinit: true
     integration_test_args: integration
-  tasks: *ubuntu1204_tasks
+  tasks: *ubuntu1204_enterprise_tasks
 
 #######################################
 #         Solaris Buildvariant        #
@@ -990,4 +1028,4 @@ buildvariants:
     preproc_gpm: "perl -pi -e 's/\\r\\n/\\n/g' "
     set_gopath: set_gopath_windows.sh
     integration_test_args: "integration"
-  tasks: *windows_64_tasks
+  tasks: *windows_64_enterprise_tasks
