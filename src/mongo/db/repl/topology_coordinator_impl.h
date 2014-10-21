@@ -215,18 +215,19 @@ namespace repl {
     private:
 
         enum UnelectableReason {
-            None,
-            CannotSeeMajority,
-            NotCloseEnoughToLatestOptime,
-            ArbiterIAm,
-            NotSecondary,
-            NoPriority,
-            StepDownPeriodActive,
-            NoData,
-            NotInitialized,
-            VotedTooRecently,
-            RefusesToStand
+            None = 0,
+            CannotSeeMajority = 1 << 0,
+            NotCloseEnoughToLatestOptime = 1 << 1,
+            ArbiterIAm = 1 << 2,
+            NotSecondary = 1 << 3,
+            NoPriority = 1 << 4,
+            StepDownPeriodActive = 1 << 5,
+            NoData = 1 << 6,
+            NotInitialized = 1 << 7,
+            VotedTooRecently = 1 << 8,
+            RefusesToStand = 1 << 9
         };
+        typedef int UnelectableReasonMask;
 
         // Returns the number of heartbeat pings which have occurred.
         int _getTotalPings();
@@ -253,14 +254,17 @@ namespace repl {
                                                  const OpTime& ourLastOpApplied) const;
 
         // Returns reason why "self" member is unelectable
-        UnelectableReason _getMyUnelectableReason(const Date_t now,
-                                                  const OpTime lastOpApplied) const;
+        UnelectableReasonMask _getMyUnelectableReason(
+                const Date_t now,
+                const OpTime lastOpApplied) const;
 
         // Returns reason why memberIndex is unelectable
-        UnelectableReason _getUnelectableReason(int memberIndex, const OpTime& lastOpApplied) const;
+        UnelectableReasonMask _getUnelectableReason(
+                int memberIndex,
+                const OpTime& lastOpApplied) const;
 
         // Returns the nice text of why the node is unelectable
-        std::string _getUnelectableReasonString(UnelectableReason ur) const;
+        std::string _getUnelectableReasonString(UnelectableReasonMask ur) const;
 
         // Return true if we are currently primary
         bool _iAmPrimary() const;
