@@ -38,6 +38,7 @@
 #include "mongo/client/dbclientcursor.h"
 #include "mongo/client/sasl_client_authenticate.h"
 #include "mongo/client/syncclusterconnection.h"
+#include "mongo/db/auth/internal_user_auth.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/json.h"
 #include "mongo/db/namespace_string.h"
@@ -578,6 +579,7 @@ namespace mongo {
             DBClientWithCommands::RunCommandHookFunc const _oldHookFunc;
         };
     }  // namespace
+
     void DBClientWithCommands::_auth(const BSONObj& params) {
         RunCommandHookOverrideGuard hookGuard(this, RunCommandHookFunc());
         std::string mechanism;
@@ -665,7 +667,20 @@ namespace mongo {
     };
 
     void DBClientWithCommands::auth(const BSONObj& params) {
-        _auth(params);
+        try {
+            _auth(params);
+            return;
+        } catch(const UserException& ex) {
+            if (getFallbackAuthParams(params).isEmpty() ||
+                (ex.getCode() != ErrorCodes::BadValue &&
+                ex.getCode() != ErrorCodes::CommandNotFound)) {
+                throw ex;
+            }
+        }
+
+        // BadValue or CommandNotFound indicates unsupported auth mechanism so fall back to
+        // MONGODB-CR for 2.6 compatibility.
+        _auth(getFallbackAuthParams(params));
     }
 
     bool DBClientWithCommands::auth(const string &dbname,
@@ -674,7 +689,7 @@ namespace mongo {
                                     string& errmsg,
                                     bool digestPassword) {
         try {
-            _auth(BSON(saslCommandMechanismFieldName << "MONGODB-CR" <<
+            auth(BSON(saslCommandMechanismFieldName << "SCRAM-SHA-1" <<
                        saslCommandUserDBFieldName << dbname <<
                        saslCommandUserFieldName << username <<
                        saslCommandPasswordFieldName << password_text <<

@@ -42,8 +42,8 @@
 #include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/auth/authorization_manager_global.h"
+#include "mongo/db/auth/internal_user_auth.h"
 #include "mongo/db/auth/privilege.h"
-#include "mongo/db/auth/security_key.h"
 #include "mongo/util/scopeguard.h"
 #include "mongo/util/log.h"
 
