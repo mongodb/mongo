@@ -1713,7 +1713,7 @@ namespace {
         }
         _lastVote.when = now;
         _lastVote.whoId = selfId;
-        _lastVote.whoHostAndPort = _selfConfig().getHostAndPort();;
+        _lastVote.whoHostAndPort = _selfConfig().getHostAndPort();
         return true;
     }
 
@@ -1755,6 +1755,12 @@ namespace {
         _electionTime = OpTime(0, 0);
         _electionId = OID();
         _role = Role::follower;
+
+        // Clear lastVote time, if we voted for ourselves in this election.
+        // This will allow us to vote for others.
+        if (_lastVote.whoId == _selfConfig().getId()) {
+            _lastVote.when = 0;
+        }
     }
 
     bool TopologyCoordinatorImpl::stepDown(Date_t until, bool force, OpTime lastOpApplied) {

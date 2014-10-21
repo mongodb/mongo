@@ -231,6 +231,18 @@ namespace {
         if (receivedVotes < _rsConfig.getMajorityVoteCount()) {
             log() << "replSet couldn't elect self, only received " << receivedVotes <<
                 " votes, but needed at least " << _rsConfig.getMajorityVoteCount();
+            // Suppress ourselves from standing for election again, giving other nodes a chance 
+            // to win their elections.
+            const long long ms = _replExecutor.nextRandomInt64(1000) + 50;
+            const Date_t now(_replExecutor.now());
+            const Date_t nextCandidateTime = now + ms;
+            log() << "waiting until " << nextCandidateTime << " before standing for election again";
+            _topCoord->setStepDownTime(nextCandidateTime);
+            _replExecutor.scheduleWorkAt(
+                nextCandidateTime,
+                stdx::bind(&ReplicationCoordinatorImpl::_recoverFromElectionTie,
+                           this,
+                           stdx::placeholders::_1));
             return;
         }
 
