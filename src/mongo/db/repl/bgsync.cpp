@@ -311,6 +311,14 @@ namespace {
                 }
             }
 
+            // If we are transitioning to primary state, we need to leave
+            // this loop in order to go into bgsync-pause mode.
+            if (_replCoord->isWaitingForApplierToDrain() ||
+                _replCoord->getCurrentMemberState().primary()) {
+                LOG(1) << "waiting for draining or we are primary, not adding more ops to buffer";
+                return;
+            }
+
             // At this point, we are guaranteed to have at least one thing to read out
             // of the oplogreader cursor.
             BSONObj o = _syncSourceReader.nextSafe().getOwned();
