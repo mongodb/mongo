@@ -1,0 +1,84 @@
+Import("env")
+
+env.Library(
+    target='kv_heap_dictionary',
+    source=[
+        'kv_heap_dictionary.cpp',
+        'kv_heap_recovery_unit.cpp',
+        ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/bson',
+        '$BUILD_DIR/mongo/db/catalog/collection_options',
+        '$BUILD_DIR/mongo/db/index/index_descriptor',
+        '$BUILD_DIR/mongo/db/storage/bson_collection_catalog_entry',
+        '$BUILD_DIR/mongo/db/storage/index_entry_comparison',
+        '$BUILD_DIR/mongo/foundation',
+        ]
+    )
+
+env.Library(
+    target= 'storage_kv_heap_base',
+    source= [
+        'kv_heap_engine.cpp',
+        ],
+    LIBDEPS= [
+        'kv_heap_dictionary',
+        '$BUILD_DIR/mongo/db/storage/kv/dictionary/kv_engine_impl',
+        ]
+    )
+
+env.Library(
+    target='storage_kv_heap',
+    source=[
+        'kv_heap_init.cpp',
+        ],
+    LIBDEPS=[
+        'storage_kv_heap_base',
+        '$BUILD_DIR/mongo/db/storage/kv/kv_engine'
+        ]
+    )
+
+env.CppUnitTest(
+    target='kv_heap_sorted_data_impl_test',
+    source=[
+        'kv_heap_sorted_data_impl_test_harness.cpp'
+        ],
+    LIBDEPS=[
+        'storage_kv_heap_base',
+        '$BUILD_DIR/mongo/db/storage/sorted_data_interface_test_harness',
+        ]
+    )
+
+env.CppUnitTest(
+    target='kv_heap_record_store_test',
+    source=[
+        'kv_heap_record_store_test_harness.cpp'
+        ],
+    LIBDEPS=[
+        'storage_kv_heap_base',
+        '$BUILD_DIR/mongo/db/storage/record_store_test_harness',
+        ]
+    )
+
+env.CppUnitTest(
+    target='kv_heap_engine_test',
+    source=[
+        'kv_heap_engine_test.cpp'
+        ],
+    LIBDEPS=[
+        'storage_kv_heap_base',
+        '$BUILD_DIR/mongo/db/storage/kv/kv_engine_test_harness',
+        ]
+    )
+
+env.CppUnitTest(
+    target='kv_heap_dictionary_test',
+    source=[
+        'kv_heap_dictionary_test.cpp',
+        ],
+    LIBDEPS=[
+        'kv_heap_dictionary',
+        '$BUILD_DIR/mongo/db/storage/kv/dictionary/kv_dictionary_test_harness',
+        ]
+    )
+

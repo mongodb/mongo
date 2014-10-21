@@ -266,6 +266,9 @@ namespace mongo {
 
         boost::mutex::scoped_lock lk( _collectionsLock );
 
+        // Must close the record store before dropping it:
+        entry->closeRecordStore();
+
         Status status = _engine->getEngine()->dropRecordStore( opCtx, ident );
         if ( !status.isOK() )
             return status;

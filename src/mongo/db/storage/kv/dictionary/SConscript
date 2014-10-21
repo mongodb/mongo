@@ -1,0 +1,37 @@
+Import("env")
+
+env.Library(
+    target='kv_dictionary',
+    source=[
+        'kv_dictionary.cpp',
+        'kv_dictionary_update.cpp',
+        ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/db/storage/index_entry_comparison',
+        ]
+    )
+
+env.Library(
+    target='kv_engine_impl',
+    source=[
+        'kv_engine_impl.cpp',
+        'kv_record_store.cpp',
+        'kv_record_store_capped.cpp',
+        'kv_sorted_data_impl.cpp',
+        ],
+    LIBDEPS=[
+        'kv_dictionary',
+        '$BUILD_DIR/mongo/db/storage/kv/kv_engine_core',
+        ]
+    )
+
+
+env.Library(
+    target='kv_dictionary_test_harness',
+    source=[
+        'kv_dictionary_test_harness.cpp',
+        ],
+    LIBDEPS=[
+        'kv_dictionary',
+        ]
+    )

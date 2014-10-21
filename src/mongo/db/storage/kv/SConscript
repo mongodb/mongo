@@ -22,7 +22,6 @@ env.Library(
         ]
     )
 
-
 env.Library(
     target='kv_engine_test_harness',
     source=[

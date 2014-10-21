@@ -8,7 +8,7 @@ import sys
 
 import buildscripts.utils
 
-Import('env windows usev8')
+Import('env windows usev8 skip_buildinfo')
 
 def getSysInfo():
     if windows:
@@ -62,5 +62,6 @@ def generate_buildinfo(env, target, source, **kw):
 env.Command(buildinfo_filename,
             Value(buildinfo_template),
             Action(generate_buildinfo, "Generating $TARGET"))
-env.AlwaysBuild(buildinfo_filename)
-env.Install('$BUILD_DIR/mongo', buildinfo_filename)
+if not skip_buildinfo():
+    env.AlwaysBuild(buildinfo_filename)
+    env.Install('$BUILD_DIR/mongo', buildinfo_filename)

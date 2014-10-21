@@ -125,6 +125,9 @@ def has_option( name ):
 def use_system_version_of_library(name):
     return has_option('use-system-all') or has_option('use-system-' + name)
 
+def skip_buildinfo():
+    return has_option('skip-buildinfo')
+
 # Returns true if we have been configured to use a system version of any C++ library. If you
 # add a new C++ library dependency that may be shimmed out to the system, add it to the below
 # list.
@@ -321,6 +324,10 @@ add_option('disable-warnings-as-errors', "Don't add -Werror to compiler command 
 
 add_option('propagate-shell-environment',
            "Pass shell environment to sub-processes (NEVER for production builds)",
+           0, False)
+
+add_option('skip-buildinfo',
+           "skip generating buildinfo",
            0, False)
 
 if darwin:
@@ -2155,6 +2162,7 @@ module_sconscripts = moduleconfig.get_module_sconscripts(mongo_modules)
 Export("env")
 Export("get_option")
 Export("has_option use_system_version_of_library")
+Export("skip_buildinfo")
 Export("mongoCodeVersion")
 Export("usev8")
 Export("v8version v8suffix")
