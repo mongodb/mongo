@@ -667,9 +667,9 @@ __wt_log_newfile(WT_SESSION_IMPL *session, int conn_create)
 	 * Wait for that to close.
 	 */
 	while (log->log_close_fh != NULL) {
-		WT_RET(__wt_verbose(session, WT_VERB_LOG,
+		__wt_errx(session,
 		    "log_newfile: Log file size %" PRIuMAX " too small",
-		    (uintmax_t)conn->log_file_max));
+		    (uintmax_t)conn->log_file_max);
 		WT_STAT_FAST_CONN_INCR(session, log_close_yields);
 		__wt_yield();
 	}
