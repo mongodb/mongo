@@ -163,26 +163,28 @@ func (exp *MongoExport) getCursor() (*mgo.Iter, *mgo.Session, error) {
 		return nil, nil, fmt.Errorf("error getting database session: %v", err)
 	}
 
+	skip := 0
+	if exp.InputOpts != nil {
+		skip = exp.InputOpts.Skip
+	}
+	limit := 0
+	if exp.InputOpts != nil {
+		limit = exp.InputOpts.Limit
+	}
+
 	// build the query
 	q := session.DB(exp.ToolOptions.Namespace.DB).
 		C(exp.ToolOptions.Namespace.Collection).Find(query).Sort(sortFields...).
-		Skip(exp.InputOpts.Skip).Limit(exp.InputOpts.Limit)
+		Skip(skip).Limit(limit)
 	q = db.ApplyFlags(q, session, flags)
 
 	return q.Iter(), session, nil
 
 }
 
-// Export executes the entire export operation. It returns an integer of the count
-// of documents successfully exported, and a non-nil error if something went wrong
-// during the export operation.
-func (exp *MongoExport) Export() (int64, error) {
-	out, err := exp.getOutputWriter()
-	if err != nil {
-		return 0, err
-	}
-	defer out.Close()
-
+// Internal function that handles exporting to the given writer. Used primarily
+// for testing, because it bypasses writing to the file system.
+func (exp *MongoExport) exportInternal(out io.Writer) (int64, error) {
 	exportOutput, err := exp.getExportOutput(out)
 	if err != nil {
 		return 0, err
@@ -232,6 +234,20 @@ func (exp *MongoExport) Export() (int64, error) {
 	}
 	exportOutput.Flush()
 	return docsCount, nil
+}
+
+// Export executes the entire export operation. It returns an integer of the count
+// of documents successfully exported, and a non-nil error if something went wrong
+// during the export operation.
+func (exp *MongoExport) Export() (int64, error) {
+	out, err := exp.getOutputWriter()
+	if err != nil {
+		return 0, err
+	}
+	defer out.Close()
+
+	count, err := exp.exportInternal(out)
+	return count, err
 }
 
 // getExportOutput returns an implementation of ExportOutput which can handle
