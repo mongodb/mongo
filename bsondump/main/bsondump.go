@@ -2,7 +2,7 @@ package main
 
 import (
 	"fmt"
-	//"github.com/mongodb/mongo-tools/common/db"
+	"github.com/mongodb/mongo-tools/common/log"
 	"github.com/mongodb/mongo-tools/bsondump"
 	"github.com/mongodb/mongo-tools/bsondump/options"
 	commonopts "github.com/mongodb/mongo-tools/common/options"
@@ -37,13 +37,13 @@ func main() {
 		opts.PrintHelp(true)
 		return
 	} else if len(extra) > 1 {
-		fmt.Fprintln(os.Stderr, "Too many positional operators.")
+		log.Log(log.Always, "Too many positional operators.")
 		opts.PrintHelp(true)
 		os.Exit(1)
 	} else {
 		filename = extra[0]
 		if filename == "" {
-			fmt.Fprintln(os.Stderr, "Filename must not be blank.")
+			log.Log(log.Always, "Filename must not be blank.")
 			opts.PrintHelp(true)
 			os.Exit(1)
 		}
@@ -64,7 +64,7 @@ func main() {
 		err = fmt.Errorf("Unsupported output type '%v'. Must be either 'debug' or 'json'", bsonDumpOpts.Type)
 	}
 	if err != nil {
-		fmt.Fprintf(os.Stderr, err.Error())
+		log.Log(log.Always, err.Error())
 		os.Exit(1)
 	}
 }
