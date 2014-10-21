@@ -806,23 +806,17 @@ __checkpoint_worker(
 		}
 
 	/*
-	 * Mark the root page dirty to ensure something gets written.
-	 *
-	 * Don't test the tree modify flag first: if the tree is modified,
-	 * we must write the root page anyway, we're not adding additional
-	 * writes to the process.   If the tree is not modified, we have to
-	 * dirty the root page to ensure something gets written.  This is
-	 * really about paranoia: if the tree modification value gets out of
-	 * sync with the set of dirty pages (modify is set, but there are no
-	 * dirty pages), we do a checkpoint without any writes, no checkpoint
-	 * is created, and then things get bad.
+	 * Mark the root page dirty to ensure something gets written. (If the
+	 * tree is modified, we must write the root page anyway, this doesn't
+	 * add additional writes to the process.  If the tree is not modified,
+	 * we have to dirty the root page to ensure something gets written.)
+	 * This is really about paranoia: if the tree modification value gets
+	 * out of sync with the set of dirty pages (modify is set, but there
+	 * are no dirty pages), we perform a checkpoint without any writes, no
+	 * checkpoint is created, and then things get bad.
 	 */
-	WT_ERR(__wt_cache_force_write(session));
-
-	/* Tell logging that a file checkpoint is starting. */
-	if (conn->logging)
-		WT_ERR(__wt_txn_checkpoint_log(
-		    session, 0, WT_TXN_LOG_CKPT_START, &ckptlsn));
+	WT_ERR(__wt_page_modify_init(session, btree->root.page));
+	__wt_page_modify_set(session, btree->root.page);
 
 	/*
 	 * Clear the tree's modified flag; any changes before we clear the flag
@@ -836,6 +830,11 @@ __checkpoint_worker(
 	 */
 	btree->modified = 0;
 	WT_FULL_BARRIER();
+
+	/* Tell logging that a file checkpoint is starting. */
+	if (conn->logging)
+		WT_ERR(__wt_txn_checkpoint_log(
+		    session, 0, WT_TXN_LOG_CKPT_START, &ckptlsn));
 
 	/* Flush the file from the cache, creating the checkpoint. */
 	if (is_checkpoint)

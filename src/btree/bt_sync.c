@@ -313,26 +313,6 @@ err:		/* On error, clear any left-over tree walk. */
 }
 
 /*
- * __wt_cache_force_write --
- *	Dirty the root page of the tree so it gets written.
- */
-int
-__wt_cache_force_write(WT_SESSION_IMPL *session)
-{
-	WT_BTREE *btree;
-	WT_PAGE *page;
-
-	btree = S2BT(session);
-	page = btree->root.page;
-
-	/* Dirty the root page to ensure a write. */
-	WT_RET(__wt_page_modify_init(session, page));
-	__wt_page_modify_set(session, page);
-
-	return (0);
-}
-
-/*
  * __wt_cache_op --
  *	Cache operations.
  */
