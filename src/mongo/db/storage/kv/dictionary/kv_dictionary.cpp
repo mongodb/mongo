@@ -1,4 +1,4 @@
-// kv_catalog.cpp
+// kv_dictionary.cpp
 
 /**
  *    Copyright (C) 2014 MongoDB Inc.

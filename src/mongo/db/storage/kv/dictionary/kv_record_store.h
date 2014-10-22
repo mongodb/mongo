@@ -63,13 +63,18 @@ namespace mongo {
 
     class KVRecordStore : public RecordStore {
     public:
-        // Construct a new KVRecordStore. Ownership of `db' is passed to this object.
-        //
-        // param: db, the KVDictionary interface that will be used to store records.
-        // param: opCtx, the current operation context.
-        // param: ns, the namespace the underlying RecordStore is constructed with
-        // param: options, options for the storage engine, if any are applicable to
-        //        the implementation.
+        /**
+         * Construct a new KVRecordStore. Ownership of `db' is passed to
+         * this object.
+         *
+         * @param db, the KVDictionary interface that will be used to
+         *        store records.
+         * @param opCtx, the current operation context.
+         * @param ns, the namespace the underlying RecordStore is
+         *        constructed with
+         * @param options, options for the storage engine, if any are
+         *        applicable to the implementation.
+         */
         KVRecordStore( KVDictionary *db,
                        OperationContext* opCtx,
                        const StringData& ns,
@@ -77,20 +82,28 @@ namespace mongo {
 
         virtual ~KVRecordStore() { }
 
-        // name of the RecordStore implementation
+        /**
+         * Name of the RecordStore implementation.
+         */
         virtual const char* name() const { return _db->name(); }
 
-        // total size of each record id key plus the records stored
-        //
-        // TODO: Does this have to be exact? Sometimes it doesn't, sometimes
-        //       it cannot be without major performance issues.
+        /**
+         * Total size of each record id key plus the records stored.
+         *
+         * TODO: Does this have to be exact? Sometimes it doesn't, sometimes
+         *       it cannot be without major performance issues.
+         */
         virtual long long dataSize( OperationContext* txn ) const;
 
-        // TODO: Does this have to be exact? Sometimes it doesn't, sometimes
-        //       it cannot be without major performance issues.
+        /**
+         * TODO: Does this have to be exact? Sometimes it doesn't, sometimes
+         *       it cannot be without major performance issues.
+         */
         virtual long long numRecords( OperationContext* txn ) const;
 
-        // How much space is used on disk by this record store
+        /**
+         * How much space is used on disk by this record store.
+         */
         virtual int64_t storageSize( OperationContext* txn,
                                      BSONObjBuilder* extraInfo = NULL,
                                      int infoLevel = 0 ) const;

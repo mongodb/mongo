@@ -1,4 +1,4 @@
-// kv_dictionary_update.cpp
+// kv_dictionary_update.h
 
 /**
  *    Copyright (C) 2014 MongoDB Inc.
@@ -36,39 +36,45 @@ namespace mongo {
 
     class KVUpdateMessage;
 
-    // Interface for a serialized update 'message' that may be saved
-    // to disk and later replayed against a value to yield a new one.
-    //
-    // Subclasses implement a few virtual functions that allow the
-    // parent class to serialize / deserialize them through
-    // the serialize() and fromSerialized() functions respectively.
-    //
-    // Most importantly, when we fromSerialized() a subclass, we get
-    // the correct virtual implementation and so apply() does what we want.
+    /**
+     * Interface for a serialized update 'message' that may be saved to
+     * disk and later replayed against a value to yield a new one.
+     *
+     * Subclasses implement a few virtual functions that allow the parent
+     * class to serialize / deserialize them through the serialize() and
+     * fromSerialized() functions respectively.
+     *
+     * Most importantly, when we fromSerialized() a subclass, we get the
+     * correct virtual implementation and so apply() does what we want.
+     */
     class KVUpdateMessage {
     public:
         virtual ~KVUpdateMessage() {}
 
-        // Serialize the state of this message so it can later be deserialized
-        // by fromSerialized. 
-        //
-        // return: owned Slice of bytes representing this update message
-        // requires: fromSerialized(serialized()) yields a KVUpdateMessage
-        //           that has the same apply() behavior as this one.
+        /**
+         * Serialize the state of this message so it can later be
+         * deserialized by fromSerialized.
+         *
+         * Return: owned Slice of bytes representing this update message
+         * Requires: fromSerialized(serialized()) yields a KVUpdateMessage
+         *           that has the same apply() behavior as this one.
+         */
         Slice serialize() const;
 
         static KVUpdateMessage *fromSerialized(const Slice &serialized);
 
-        // --------
-
-        // Apply the logic of this message to `oldValue', yielding `newValue'
-        // 
-        // requires: The application of this logic against `oldValue' is known
-        //           to be error-free.
-        // note: Violatation of the above requirement may result in undefined
-        //       behavior, but usually the result is corrupt data / lost updates.
-        // return: `newValue' set to an owned Slice representing the new value
-        // return: Status::OK() success
+        /**
+         * Apply the logic of this message to `oldValue', yielding
+         * `newValue'
+         *
+         * Requires: The application of this logic against `oldValue' is
+         *           known to be error-free.
+         * Note: Violatation of the above requirement may result in
+         *       undefined behavior, but usually the result is corrupt
+         *       data / lost updates.
+         * Return: `newValue' set to an owned Slice representing the new value
+         *         Status::OK() success
+         */
         virtual Status apply(const Slice &oldValue, Slice &newValue) const = 0;
 
     protected:
@@ -77,22 +83,30 @@ namespace mongo {
             UpdateWithDamages,
         };
 
-        // return: the unique type tag for this particular subclass
+        /**
+         * Return: the unique type tag for this particular subclass
+         */
         virtual Type getType() const = 0;
 
-        // return: the size of this subclasses serialized state
+        /**
+         * Return: the size of this subclasses serialized state
+         */
         virtual size_t serializedSize() const = 0;
 
-        // serializes the subclass into `dest' 
-        //
-        // requires: `dest' has room for at lest `serializedSize()' bytes
+        /**
+         * Serializes the subclass into `dest'.
+         *
+         * Requires: `dest' has room for at lest `serializedSize()' bytes
+         */
         virtual void serializeTo(char *dest) const = 0;
     };
 
-    // An update message that has all of the information necessary
-    // to carry out an 'update with damages'
-    //
-    // Used by KVRecordStore::updateWithDamages.
+    /**
+     * An update message that has all of the information necessary
+     * to carry out an 'update with damages'
+     *
+     * Used by KVRecordStore::updateWithDamages.
+     */
     class KVUpdateWithDamagesMessage : public KVUpdateMessage {
     public:
         KVUpdateWithDamagesMessage(const char *source, const mutablebson::DamageVector &damages)

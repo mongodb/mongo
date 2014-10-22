@@ -37,14 +37,16 @@
 
 namespace mongo {
 
-    // A KVEngine interface that provides implementations for each of
-    // create, get, and drop recordStore/sortedDataInterface that use
-    // classes built on top of KVDictionary.
-    //
-    // Storage engine authors that have access to a sorted kv store API
-    // are likely going to want to use this interface for KVEngine as 
-    // it only requires them to implement a subclass of KVDictionary
-    // (and a recovery unit) and nothing more.
+    /*
+     * A KVEngine interface that provides implementations for each of
+     * create, get, and drop recordStore/sortedDataInterface that use
+     * classes built on top of KVDictionary.
+     *
+     * Storage engine authors that have access to a sorted kv store API
+     * are likely going to want to use this interface for KVEngine as it
+     * only requires them to implement a subclass of KVDictionary (and a
+     * recovery unit) and nothing more.
+     */
     class KVEngineImpl : public KVEngine {
     public:
         virtual ~KVEngineImpl() { }

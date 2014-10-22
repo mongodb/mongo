@@ -45,18 +45,21 @@
 
 namespace mongo {
 
-    // Class to abstract the in-memory vs on-disk format of a
-    // key in the record dictionary.
-    //
-    // In memory, a key is a valid DiskLoc for which loc.isValid() and
-    // !loc.isNull() are true.
-    //
-    // On disk, a key is a pair of back-to-back integers whose individual
-    // 4 bytes values are serialized in big-endian format. This allows
-    // the entire structure to be compared with memcmp while still maintaining
-    // the property that the filenum field compares more significantly than the
-    // offset field. Being able to compare with memcmp is important because for
-    // most storage engines, memcmp is the default and fastest comparator.
+    /**
+     * Class to abstract the in-memory vs on-disk format of a key in the
+     * record dictionary.
+     *
+     * In memory, a key is a valid DiskLoc for which loc.isValid() and
+     * !loc.isNull() are true.
+     *
+     * On disk, a key is a pair of back-to-back integers whose individual
+     * 4 bytes values are serialized in big-endian format. This allows the
+     * entire structure to be compared with memcmp while still maintaining
+     * the property that the filenum field compares more significantly
+     * than the offset field. Being able to compare with memcmp is
+     * important because for most storage engines, memcmp is the default
+     * and fastest comparator.
+     */
     class RecordIdKey {
         DiskLoc _loc;
         uint64_t _key;
@@ -65,14 +68,17 @@ namespace mongo {
         BOOST_STATIC_ASSERT(sizeof(DiskLoc) == sizeof(uint64_t));
 
     public:
-        // Used when we have a diskloc and we want a memcmp-ready Slice
-        // to be used as a stored key in the KVDictionary.
-        //
-        // Algorithm:
-        // - Take a diskloc with two integers laid out in native bye order [a, o]
-        // - Construct a 64 bit integer whose high order bits are `a' and
-        //   whose low order bits are `o'
-        // - Convert that integer to big endian and store it in `_key'
+        /**
+         * Used when we have a diskloc and we want a memcmp-ready Slice to
+         * be used as a stored key in the KVDictionary.
+         *
+         * Algorithm:
+         * - Take a diskloc with two integers laid out in native bye order
+         *   [a, o]
+         * - Construct a 64 bit integer whose high order bits are `a' and
+         *   whose low order bits are `o'
+         * - Convert that integer to big endian and store it in `_key'
+         */
         RecordIdKey(const DiskLoc &loc) :
             _loc(loc),
             _key() {
@@ -80,14 +86,18 @@ namespace mongo {
                                        uint64_t(loc.getOfs()));
         }
 
-        // Used when we have a big-endian key Slice from the KVDictionary
-        // and we want to get its diskloc representation.
-        //
-        // Algorithm (work backwards from the above constructor's algorithm):
-        // - Interpret the stored key as a 64 bit integer into `_key', then convert
-        //   `_key' to native byte order and store it in `k'.
-        // - Create a diskloc(a, o) where `a' is a 32 bit integer constructed from the
-        //   high order bits of `_k' and where `o' is constructed from the low order bits.
+        /**
+         * Used when we have a big-endian key Slice from the KVDictionary
+         * and we want to get its diskloc representation.
+         *
+         * Algorithm (work backwards from the above constructor's
+         * algorithm):
+         * - Interpret the stored key as a 64 bit integer into `_key',
+         *   then convert `_key' to native byte order and store it in `k'.
+         * - Create a diskloc(a, o) where `a' is a 32 bit integer
+         *   constructed from the high order bits of `_k' and where `o' is
+         *   constructed from the low order bits.
+         */
         RecordIdKey(const Slice &key) :
             _loc(),
             _key(key.as<uint64_t>()) {
@@ -96,13 +106,17 @@ namespace mongo {
                             k & 0x00000000FFFFFFFF);
         }
 
-        // Return an un-owned slice of _key, suitable for use as a key into the
-        // KVDictionary that maps record ids to record data.
+        /**
+         * Return an un-owned slice of _key, suitable for use as a key
+         * into the KVDictionary that maps record ids to record data.
+         */
         Slice key() const {
             return Slice::of(_key);
         }
 
-        // Return the DiskLoc representation of a deserialized key Slice
+        /**
+         * Return the DiskLoc representation of a deserialized key Slice
+         */
         DiskLoc loc() const {
             return _loc;
         }

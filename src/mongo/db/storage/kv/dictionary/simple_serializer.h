@@ -32,9 +32,13 @@
 #include <type_traits>
 #endif
 
+// TODO: This probably belongs in mongo/util.
+
 namespace mongo {
 
-    // Convenience class for writing object data to a char buffer.
+    /**
+     * Convenience class for writing object data to a char buffer.
+     */
     class BufferWriter {
     public:
         explicit BufferWriter(char *dest)
@@ -43,10 +47,12 @@ namespace mongo {
 
         char *get() const { return _dest; }
 
-        // Write a `T' into the buffer and advance the internal buffer
-        // position by sizeof(T) bytes.
-        //
-        // requires: the `dest' buf has enough space for writing.
+        /**
+         * Write a `T' into the buffer and advance the internal buffer
+         * position by sizeof(T) bytes.
+         *
+         * Requires: the `dest' buf has enough space for writing.
+         */
         template<typename T>
         BufferWriter& write(const T &val) {
 #if MONGO_HAVE_STD_IS_TRIVIALLY_COPYABLE
@@ -63,7 +69,9 @@ namespace mongo {
         char *_dest;
     };
 
-    // Convenience class for reading object data from a char buffer.
+    /**
+     * Convenience class for reading object data from a char buffer.
+     */
     class BufferReader {
     public:
         explicit BufferReader(const char *src)
@@ -72,10 +80,12 @@ namespace mongo {
 
         const char *get() const { return _src; }
 
-        // Read and return a `T' from the buffer and advance the internal
-        // buffer position by sizeof(T);
-        //
-        // requires: the `src' buf has more data for reading.
+        /**
+         * Read and return a `T' from the buffer and advance the internal
+         * buffer position by sizeof(T);
+         *
+         * Requires: the `src' buf has more data for reading.
+         */
         template<typename T>
         T read() {
 #if MONGO_HAVE_STD_IS_TRIVIALLY_COPYABLE
