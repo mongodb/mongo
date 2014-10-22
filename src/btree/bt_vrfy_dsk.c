@@ -262,7 +262,7 @@ __verify_dsk_row(
 			break;
 		}
 
-		/* Check if any referenced item is entirely in the file. */
+		/* Check if any referenced item has a valid address. */
 		switch (cell_type) {
 		case WT_CELL_ADDR_DEL:
 		case WT_CELL_ADDR_INT:
