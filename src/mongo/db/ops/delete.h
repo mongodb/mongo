@@ -31,6 +31,7 @@
 #pragma once
 
 #include "mongo/db/jsobj.h"
+#include "mongo/db/query/plan_executor.h"
 
 
 namespace mongo {
@@ -43,6 +44,7 @@ namespace mongo {
                             Database* db,
                             const StringData& ns,
                             BSONObj pattern,
+                            PlanExecutor::YieldPolicy policy,
                             bool justOne,
                             bool logop = false,
                             bool god = false,

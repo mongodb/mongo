@@ -724,18 +724,7 @@ namespace mongo {
     AutoAcquireFlushLockForMMAPV1Commit::AutoAcquireFlushLockForMMAPV1Commit(Locker* locker)
         : _locker(locker) {
 
-        int attempt = 0;
-        while ( 1 ) {
-            LockResult res = _locker->lock(resourceIdMMAPV1Flush, MODE_X, 10);
-            if ( res == LOCK_OK )
-                break;
-            invariant( res == LOCK_TIMEOUT );
-            if ( ++attempt % 100 == 0 ) {
-                warning() << "AutoAcquireFlushLockForMMAPV1Commit has not gotten lock in "
-                          << attempt << " attempts";
-            }
-            sleepmillis(10);
-        }
+        invariant(LOCK_OK == _locker->lock(resourceIdMMAPV1Flush, MODE_X, UINT_MAX));
     }
 
     AutoAcquireFlushLockForMMAPV1Commit::~AutoAcquireFlushLockForMMAPV1Commit() {

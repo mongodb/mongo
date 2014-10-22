@@ -630,6 +630,7 @@ namespace {
                                           ctx.db(),
                                           doc.ns,
                                           pattern,
+                                          PlanExecutor::YIELD_MANUAL,
                                           true,     // justone
                                           false,    // logop
                                           true);    // god

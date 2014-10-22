@@ -583,7 +583,7 @@ namespace mongo {
 
     void Helpers::emptyCollection(OperationContext* txn, const char *ns) {
         Client::Context context(txn, ns);
-        deleteObjects(txn, context.db(), ns, BSONObj(), false);
+        deleteObjects(txn, context.db(), ns, BSONObj(), PlanExecutor::YIELD_MANUAL, false);
     }
 
     Helpers::RemoveSaver::RemoveSaver( const string& a , const string& b , const string& why) 

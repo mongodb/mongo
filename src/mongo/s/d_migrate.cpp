@@ -2149,6 +2149,7 @@ namespace mongo {
                                   ctx.db(),
                                   ns,
                                   id,
+                                  PlanExecutor::YIELD_MANUAL,
                                   true /* justOne */,
                                   true /* logOp */,
                                   false /* god */,
