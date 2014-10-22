@@ -1216,8 +1216,9 @@ namespace {
                        response));
         _replExecutor.wait(cbh.getValue());
         if (isWaitingForApplierToDrain()) {
-            // Report NotMaster when draining the applier.
+            // Report that we are secondary to ismaster callers until drain completes.
             response->setIsMaster(false);
+            response->setIsSecondary(true);
         }
     }
 
