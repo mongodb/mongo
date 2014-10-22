@@ -562,17 +562,8 @@ __checkpoint_worker(
 	track_ckpt = 1;
 	was_modified = btree->modified;
 
-	/*
-	 * Get the list of checkpoints for this file.  If there's no reference
-	 * to the file in the metadata (the file is dead), then discard it from
-	 * the cache without bothering to write any dirty pages.
-	 */
-	if ((ret = __wt_meta_ckptlist_get(
-	    session, dhandle->name, &ckptbase)) == WT_NOTFOUND) {
-		WT_ASSERT(session, session->dhandle->session_ref == 0);
-		return (__wt_cache_op(session, NULL, WT_SYNC_DISCARD));
-	}
-	WT_ERR(ret);
+	/* Get the list of checkpoints for this file. */
+	WT_RET(__wt_meta_ckptlist_get(session, dhandle->name, &ckptbase));
 
 	/* This may be a named checkpoint, check the configuration. */
 	cval.len = 0;
