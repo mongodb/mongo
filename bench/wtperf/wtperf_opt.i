@@ -136,6 +136,10 @@ DEF_OPT_AS_UINT32(sample_interval, 0,
 DEF_OPT_AS_UINT32(sample_rate, 50,
     "how often the latency of operations is measured. One for every operation,"
     "two for every second operation, three for every third operation etc.")
+DEF_OPT_AS_STRING(schema_threads, "", "Sometimes it's interesting to have "
+    "tables being created and removed in parallel with other operations. "
+    "Valid options for the schema_workload setting are: create, populate, "
+    "rollback")
 DEF_OPT_AS_CONFIG_STRING(sess_config, "", "session configuration string")
 DEF_OPT_AS_CONFIG_STRING(table_config,
     "key_format=S,value_format=S,type=lsm,exclusive=true,"
@@ -155,7 +159,8 @@ DEF_OPT_AS_STRING(threads, "", "workload configuration: each 'count' "
     "'threads=((count=2,reads=1)(count=8,reads=1,inserts=2,updates=1))' "
     "which would create 2 threads doing nothing but reads and 8 threads "
     "each doing 50% inserts and 25% reads and updates.  Allowed configuration "
-    "values are 'count', 'throttle', 'reads', 'inserts', 'updates'")
+    "values are 'count', 'throttle', 'reads', 'inserts', 'updates'. There are "
+    "also behavior modifiers, supported modifiers are 'ops_per_txn'")
 DEF_OPT_AS_CONFIG_STRING(transaction_config, "",
     "transaction configuration string, relevant when populate_opts_per_txn "
     "is nonzero")
