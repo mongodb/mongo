@@ -285,8 +285,8 @@ __curtable_compare(WT_CURSOR *a, WT_CURSOR *b, int *cmpp)
 	if (strcmp(a->internal_uri, b->internal_uri) != 0)
 		WT_ERR_MSG(session, EINVAL,
 		    "comparison method cursors must reference the same object");
-	WT_CURSOR_NEEDKEY(WT_CURSOR_PRIMARY(a));
-	WT_CURSOR_NEEDKEY(WT_CURSOR_PRIMARY(b));
+	WT_CURSOR_CHECKKEY(WT_CURSOR_PRIMARY(a));
+	WT_CURSOR_CHECKKEY(WT_CURSOR_PRIMARY(b));
 
 	ret = WT_CURSOR_PRIMARY(a)->compare(
 	    WT_CURSOR_PRIMARY(a), WT_CURSOR_PRIMARY(b), cmpp);

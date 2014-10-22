@@ -104,8 +104,8 @@ static const WT_CONFIG_CHECK confchk_connection_reconfigure[] = {
 	    "choices=[\"api\",\"block\",\"checkpoint\",\"compact\",\"evict\""
 	    ",\"evictserver\",\"fileops\",\"log\",\"lsm\",\"metadata\","
 	    "\"mutex\",\"overflow\",\"read\",\"reconcile\",\"recovery\","
-	    "\"salvage\",\"shared_cache\",\"split\",\"temporary\",\"verify\","
-	    "\"version\",\"write\"]",
+	    "\"salvage\",\"shared_cache\",\"split\",\"temporary\","
+	    "\"transaction\",\"verify\",\"version\",\"write\"]",
 	    NULL },
 	{ NULL, NULL, NULL, NULL }
 };
@@ -349,8 +349,8 @@ static const WT_CONFIG_CHECK confchk_wiredtiger_open[] = {
 	    "choices=[\"api\",\"block\",\"checkpoint\",\"compact\",\"evict\""
 	    ",\"evictserver\",\"fileops\",\"log\",\"lsm\",\"metadata\","
 	    "\"mutex\",\"overflow\",\"read\",\"reconcile\",\"recovery\","
-	    "\"salvage\",\"shared_cache\",\"split\",\"temporary\",\"verify\","
-	    "\"version\",\"write\"]",
+	    "\"salvage\",\"shared_cache\",\"split\",\"temporary\","
+	    "\"transaction\",\"verify\",\"version\",\"write\"]",
 	    NULL },
 	{ NULL, NULL, NULL, NULL }
 };
@@ -397,8 +397,8 @@ static const WT_CONFIG_CHECK confchk_wiredtiger_open_all[] = {
 	    "choices=[\"api\",\"block\",\"checkpoint\",\"compact\",\"evict\""
 	    ",\"evictserver\",\"fileops\",\"log\",\"lsm\",\"metadata\","
 	    "\"mutex\",\"overflow\",\"read\",\"reconcile\",\"recovery\","
-	    "\"salvage\",\"shared_cache\",\"split\",\"temporary\",\"verify\","
-	    "\"version\",\"write\"]",
+	    "\"salvage\",\"shared_cache\",\"split\",\"temporary\","
+	    "\"transaction\",\"verify\",\"version\",\"write\"]",
 	    NULL },
 	{ "version", "string", NULL, NULL },
 	{ NULL, NULL, NULL, NULL }
@@ -442,8 +442,8 @@ static const WT_CONFIG_CHECK confchk_wiredtiger_open_basecfg[] = {
 	    "choices=[\"api\",\"block\",\"checkpoint\",\"compact\",\"evict\""
 	    ",\"evictserver\",\"fileops\",\"log\",\"lsm\",\"metadata\","
 	    "\"mutex\",\"overflow\",\"read\",\"reconcile\",\"recovery\","
-	    "\"salvage\",\"shared_cache\",\"split\",\"temporary\",\"verify\","
-	    "\"version\",\"write\"]",
+	    "\"salvage\",\"shared_cache\",\"split\",\"temporary\","
+	    "\"transaction\",\"verify\",\"version\",\"write\"]",
 	    NULL },
 	{ "version", "string", NULL, NULL },
 	{ NULL, NULL, NULL, NULL }
@@ -487,8 +487,8 @@ static const WT_CONFIG_CHECK confchk_wiredtiger_open_usercfg[] = {
 	    "choices=[\"api\",\"block\",\"checkpoint\",\"compact\",\"evict\""
 	    ",\"evictserver\",\"fileops\",\"log\",\"lsm\",\"metadata\","
 	    "\"mutex\",\"overflow\",\"read\",\"reconcile\",\"recovery\","
-	    "\"salvage\",\"shared_cache\",\"split\",\"temporary\",\"verify\","
-	    "\"version\",\"write\"]",
+	    "\"salvage\",\"shared_cache\",\"split\",\"temporary\","
+	    "\"transaction\",\"verify\",\"version\",\"write\"]",
 	    NULL },
 	{ NULL, NULL, NULL, NULL }
 };

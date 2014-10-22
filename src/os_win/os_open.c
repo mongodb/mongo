@@ -205,12 +205,12 @@ __wt_close(WT_SESSION_IMPL *session, WT_FH *fh)
 	/* Discard the memory. */
 	if (!CloseHandle(fh->filehandle) != 0) {
 		ret = __wt_errno();
-		__wt_err(session, ret, "%s", fh->name);
+		__wt_err(session, ret, "CloseHandle: %s", fh->name);
 	}
 
 	if (!CloseHandle(fh->filehandle_secondary) != 0) {
 		ret = __wt_errno();
-		__wt_err(session, ret, "%s", fh->name);
+		__wt_err(session, ret, "CloseHandle: secondary: %s", fh->name);
 	}
 
 	__wt_free(session, fh->name);

@@ -46,6 +46,7 @@ Bzip
 CAS
 CELL's
 CELLs
+CHECKKEY
 CKPT
 CLMPRSTdehikrsuv
 CLR
@@ -62,6 +63,7 @@ CallsCustDate
 Checksum
 Checksums
 CityHash
+CloseHandle
 Comparator
 Config
 CreateFileMapping
@@ -224,6 +226,7 @@ NOLL
 NONINFRINGEMENT
 NOTFOUND
 NOTREACHED
+NOVALUE
 NOWRITE
 NRECS
 NUL
@@ -561,6 +564,7 @@ eventv
 evictable
 evictserver
 exactp
+exe
 execop
 extern
 extlist
@@ -917,6 +921,7 @@ sHQ
 savepoints
 sb
 scanp
+sched
 schemas
 schematab
 scr

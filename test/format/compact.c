@@ -64,7 +64,7 @@ compact(void *arg)
 			break;
 
 		if ((ret = session->compact(
-		    session, g.uri, NULL)) != 0 && ret != WT_DEADLOCK)
+		    session, g.uri, NULL)) != 0 && ret != WT_ROLLBACK)
 			die(ret, "session.compact");
 	}
 

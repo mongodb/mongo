@@ -244,7 +244,7 @@ __wt_close(WT_SESSION_IMPL *session, WT_FH *fh)
 	/* Discard the memory. */
 	if (close(fh->fd) != 0) {
 		ret = __wt_errno();
-		__wt_err(session, ret, "%s", fh->name);
+		__wt_err(session, ret, "close: %s", fh->name);
 	}
 
 	__wt_free(session, fh->name);

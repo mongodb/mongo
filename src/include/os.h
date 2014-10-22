@@ -66,7 +66,7 @@ struct __wt_fh {
 };
 
 #ifndef _WIN32
-#define	WT_SIZET_FMT	"%zu"			/* size_t format string */
+#define	WT_SIZET_FMT	"zu"			/* size_t format string */
 #else
-#define	WT_SIZET_FMT	"%Iu"			/* size_t format string */
+#define	WT_SIZET_FMT	"Iu"			/* size_t format string */
 #endif

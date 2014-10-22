@@ -1118,7 +1118,7 @@ __evict_get_ref(
 	    __wt_txn_am_oldest(session)) {
 		F_CLR(cache, WT_EVICT_STUCK);
 		WT_STAT_FAST_CONN_INCR(session, txn_fail_cache);
-		return (WT_DEADLOCK);
+		return (WT_ROLLBACK);
 	}
 
 	/*

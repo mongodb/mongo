@@ -8,11 +8,6 @@ class Error:
 		self.flags = flags
 
 errors = [
-	Error('WT_DEADLOCK', 'conflict between concurrent operations', '''
-	    This error is generated when an operation cannot be completed
-	    due to a conflict with concurrent operations.  The operation
-	    may be retried; if a transaction is in progress, it should be
-	    rolled back and the operation retried in a new transaction.'''),
 	Error('WT_DUPLICATE_KEY', 'attempt to insert an existing key', '''
 	    This error is generated when the application attempts to insert
 	    a record with the same key as an existing record without the
@@ -29,6 +24,11 @@ errors = [
 	    This error indicates an underlying problem that requires the
 	    application exit and restart.'''),
 	Error('WT_RESTART', 'restart the operation (internal)', undoc=True),
+	Error('WT_ROLLBACK', 'conflict between concurrent operations', '''
+	    This error is generated when an operation cannot be completed
+	    due to a conflict with concurrent operations.  The operation
+	    may be retried; if a transaction is in progress, it should be
+	    rolled back and the operation retried in a new transaction.'''),
 ]
 
 class Method:
@@ -463,6 +463,7 @@ connection_runtime_config = [
 	        'shared_cache',
 	        'split',
 	        'temporary',
+	        'transaction',
 	        'verify',
 	        'version',
 	        'write']),

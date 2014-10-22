@@ -252,10 +252,14 @@ json_data(WT_SESSION *session, JSON_INPUT_STATE *ins, CONFIG_LIST *clp,
 	while (json_peek(session, ins) == '{') {
 		nfield = 0;
 		JSON_EXPECT(session, ins, '{');
-		if ((ins)->kvraw == NULL)
-			(ins)->kvraw = (char *)malloc(1);
-		(ins)->kvraw[0] = '\0';
-		(ins)->kvrawstart = JSON_INPUT_POS(ins);
+		if (ins->kvraw == NULL) {
+			if ((ins->kvraw = (char *)malloc(1)) == NULL) {
+				ret = util_err(errno, NULL);
+				goto err;
+			}
+		}
+		ins->kvraw[0] = '\0';
+		ins->kvrawstart = JSON_INPUT_POS(ins);
 		keystrlen = 0;
 		while (json_peek(session, ins) == 's') {
 			JSON_EXPECT(session, ins, 's');
@@ -277,8 +281,8 @@ json_data(WT_SESSION *session, JSON_INPUT_STATE *ins, CONFIG_LIST *clp,
 			if (++nfield == nkeys) {
 				size_t curpos = JSON_INPUT_POS(ins);
 				if ((ret = json_kvraw_append(ins,
-				    (char *)(ins)->line.mem + (ins)->kvrawstart,
-				    curpos - (ins)->kvrawstart)) != 0)
+				    (char *)ins->line.mem + ins->kvrawstart,
+				    curpos - ins->kvrawstart)) != 0)
 					goto err;
 				ins->kvrawstart = curpos;
 				keystrlen = strlen(ins->kvraw);
@@ -370,8 +374,10 @@ json_top_level(WT_SESSION *session, JSON_INPUT_STATE *ins, uint32_t flags)
 					ret = util_err(ret, NULL);
 					goto err;
 				}
-				config_list_add(&cl, tableuri);
-				config_list_add(&cl, config);
+				if ((ret = config_list_add(&cl, tableuri)) != 0)
+					goto err;
+				if ((ret = config_list_add(&cl, config)) != 0)
+					goto err;
 				tableuri = NULL;
 			} else if (JSON_STRING_MATCH(ins, "colgroups")) {
 				JSON_EXPECT(session, ins, ':');
@@ -489,7 +495,7 @@ json_expect(WT_SESSION *session, JSON_INPUT_STATE *ins, int wanttok)
 	ins->peeking = 0;
 	if (ins->toktype != wanttok) {
 		fprintf(stderr,
-		    "%s: %d: %ld: expected %s, got %s\n",
+		    "%s: %d: %" WT_SIZET_FMT ": expected %s, got %s\n",
 		    ins->filename,
 		    ins->linenum,
 		    JSON_INPUT_POS(ins) + 1,
@@ -509,7 +515,7 @@ json_expect(WT_SESSION *session, JSON_INPUT_STATE *ins, int wanttok)
 static int
 json_skip(WT_SESSION *session, JSON_INPUT_STATE *ins, const char **matches)
 {
-	char *hit;
+	const char *hit;
 	const char **match;
 
 	if (ins->kvraw != NULL)

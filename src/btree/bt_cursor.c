@@ -26,7 +26,7 @@ __cursor_size_chk(WT_SESSION_IMPL *session, WT_ITEM *kv)
 		/* Fixed-size column-stores take a single byte. */
 		if (kv->size != 1)
 			WT_RET_MSG(session, EINVAL,
-			    "item size of " WT_SIZET_FMT " does not match "
+			    "item size of %" WT_SIZET_FMT " does not match "
 			    "fixed-length file requirement of 1 byte",
 			    kv->size);
 		return (0);
@@ -48,7 +48,7 @@ __cursor_size_chk(WT_SESSION_IMPL *session, WT_ITEM *kv)
 	}
 	if (ret != 0)
 		WT_RET_MSG(session, ret,
-		    "item size of " WT_SIZET_FMT " exceeds the maximum "
+		    "item size of %" WT_SIZET_FMT " exceeds the maximum "
 		    "supported size",
 		    kv->size);
 	return (0);

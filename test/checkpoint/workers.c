@@ -136,8 +136,8 @@ worker_op(WT_CURSOR *cursor, uint64_t keyno, u_int new_val)
 	    valuebuf, sizeof(valuebuf), "%037u", new_val);
 	cursor->set_value(cursor, valuebuf);
 	if ((ret = cursor->insert(cursor)) != 0) {
-		if (ret == WT_DEADLOCK)
-			return (WT_DEADLOCK);
+		if (ret == WT_ROLLBACK)
+			return (WT_ROLLBACK);
 		return (log_print_err("cursor.insert", ret, 1));
 	}
 	return (0);
@@ -212,7 +212,7 @@ real_worker(void)
 				    "real_worker:commit_transaction", ret, 1);
 				goto err;
 			    }
-		} else if (ret == WT_DEADLOCK) {
+		} else if (ret == WT_ROLLBACK) {
 			if ((ret = session->rollback_transaction(
 			   session, NULL)) != 0) {
 				(void)log_print_err(

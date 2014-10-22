@@ -332,7 +332,22 @@ struct __wt_cursor_table {
  * the tree, there's an obvious race with the cursor moving and the key or
  * value reference, and it's better to solve it here than in the underlying
  * data-source layers.
+ *
+ * WT_CURSOR_CHECKKEY --
+ *	Check if a key is set without making a copy.
+ *
+ * WT_CURSOR_NOVALUE --
+ *	Release any cached value before an operation that could update the
+ * transaction context and free data a value is pointing to.
  */
+#define	WT_CURSOR_CHECKKEY(cursor) do {					\
+	if (!F_ISSET(cursor, WT_CURSTD_KEY_SET))			\
+		WT_ERR(__wt_cursor_kv_not_set(cursor, 1));		\
+} while (0)
+#define	WT_CURSOR_CHECKVALUE(cursor) do {				\
+	if (!F_ISSET(cursor, WT_CURSTD_VALUE_SET))			\
+		WT_ERR(__wt_cursor_kv_not_set(cursor, 0));		\
+} while (0)
 #define	WT_CURSOR_NEEDKEY(cursor) do {					\
 	if (F_ISSET(cursor, WT_CURSTD_KEY_INT)) {			\
 		if (!WT_DATA_IN_ITEM(&(cursor)->key))			\
@@ -343,8 +358,7 @@ struct __wt_cursor_table {
 		F_CLR(cursor, WT_CURSTD_KEY_INT);			\
 		F_SET(cursor, WT_CURSTD_KEY_EXT);			\
 	}								\
-	if (!F_ISSET(cursor, WT_CURSTD_KEY_SET))			\
-		WT_ERR(__wt_cursor_kv_not_set(cursor, 1));		\
+	WT_CURSOR_CHECKKEY(cursor);					\
 } while (0)
 #define	WT_CURSOR_NEEDVALUE(cursor) do {				\
 	if (F_ISSET(cursor, WT_CURSTD_VALUE_INT)) {			\
@@ -356,8 +370,10 @@ struct __wt_cursor_table {
 		F_CLR(cursor, WT_CURSTD_VALUE_INT);			\
 		F_SET(cursor, WT_CURSTD_VALUE_EXT);			\
 	}								\
-	if (!F_ISSET(cursor, WT_CURSTD_VALUE_SET))			\
-		WT_ERR(__wt_cursor_kv_not_set(cursor, 0));		\
+	WT_CURSOR_CHECKVALUE(cursor);					\
+} while (0)
+#define	WT_CURSOR_NOVALUE(cursor) do {					\
+	F_CLR(cursor, WT_CURSTD_VALUE_INT);				\
 } while (0)
 
 #define	WT_CURSOR_RAW_OK						\

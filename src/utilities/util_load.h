@@ -17,9 +17,6 @@ typedef struct {
 int	 config_exec(WT_SESSION *, char **);
 int	 config_list_add(CONFIG_LIST *, char *);
 void	 config_list_free(CONFIG_LIST *);
-int	 config_read(char ***, int *);
-int	 config_rename(char **, const char *);
-void	 config_remove(char *, const char *);
 int	 config_reorder(char **);
 int	 config_update(WT_SESSION *, char **);
 

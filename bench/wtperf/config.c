@@ -362,7 +362,6 @@ config_opt(CONFIG *cfg, WT_CONFIG_ITEM *k, WT_CONFIG_ITEM *v)
 				return (enomem(cfg));
 			snprintf(newstr, newlen,
 			    "%s,%*s", *strp, (int)v->len, v->str);
-	    newstr[newlen - 1] = '\0';
 			/* Free the old value now we've copied it. */
 			free(*strp);
 		}

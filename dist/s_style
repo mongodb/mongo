@@ -59,6 +59,11 @@ for f in \
 		cat $t
 	fi
 
+	if grep WT_DEADLOCK $f | grep -v '#define.WT_DEADLOCK' > $t; then
+		echo "$f: WT_DEADLOCK deprecated in favor of WT_ROLLBACK"
+		cat $t
+	fi
+
 	if ! expr "$f" : 'examples/c/.*' > /dev/null &&
 	   ! expr "$f" : 'ext/datasources/helium/helium.c' > /dev/null &&
 	   ! expr "$f" : 'src/include/os.h' > /dev/null &&

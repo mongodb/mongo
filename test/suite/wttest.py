@@ -137,6 +137,7 @@ class CapturedFd(object):
 class WiredTigerTestCase(unittest.TestCase):
     _globalSetup = False
     _printOnceSeen = {}
+    conn_config = ''
 
     @staticmethod
     def globalSetup(preserveFiles = False, useTimestamp = False,
@@ -191,8 +192,8 @@ class WiredTigerTestCase(unittest.TestCase):
 
     # Can be overridden
     def setUpConnectionOpen(self, dir):
-        conn = wiredtiger.wiredtiger_open(dir, 'create,error_prefix="' +
-                                          self.shortid() + ': ' + '"')
+        conn = wiredtiger.wiredtiger_open(dir,
+            'create,error_prefix="%s",%s' % (self.shortid(), self.conn_config))
         self.pr(`conn`)
         return conn
         

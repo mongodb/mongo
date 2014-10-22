@@ -154,8 +154,8 @@ __curbulk_insert_row(WT_CURSOR *cursor)
 	 */
 	CURSOR_API_CALL(cursor, session, insert, btree);
 
-	WT_CURSOR_NEEDKEY(cursor);
-	WT_CURSOR_NEEDVALUE(cursor);
+	WT_CURSOR_CHECKKEY(cursor);
+	WT_CURSOR_CHECKVALUE(cursor);
 
 	/*
 	 * If this isn't the first key inserted, compare it against the last key
