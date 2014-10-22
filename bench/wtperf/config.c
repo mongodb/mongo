@@ -224,6 +224,11 @@ config_threads(CONFIG *cfg, const char *config, size_t len)
 					goto err;
 				continue;
 			}
+			if (STRING_MATCH("ops_per_txn", k.str, k.len)) {
+				if ((workp->ops_per_txn = v.val) < 0)
+					goto err;
+				continue;
+			}
 			if (STRING_MATCH("read", k.str, k.len) ||
 			    STRING_MATCH("reads", k.str, k.len)) {
 				if ((workp->read = v.val) < 0)

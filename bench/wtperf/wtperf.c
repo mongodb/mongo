@@ -381,7 +381,7 @@ worker(void *arg)
 	WT_CONNECTION *conn;
 	WT_CURSOR **cursors, *cursor;
 	WT_SESSION *session;
-	int64_t throttle_ops;
+	int64_t ops, ops_per_txn, throttle_ops;
 	size_t i;
 	uint64_t next_val, usecs;
 	uint8_t *op, *op_end;
@@ -392,6 +392,8 @@ worker(void *arg)
 	cfg = thread->cfg;
 	conn = cfg->conn;
 	cursors = NULL;
+	ops = 0;
+	ops_per_txn = thread->workload->ops_per_txn;
 	session = NULL;
 	trk = NULL;
 	throttle_ops = 0;
@@ -428,6 +430,12 @@ worker(void *arg)
 
 	op = thread->workload->ops;
 	op_end = op + sizeof(thread->workload->ops);
+
+	if (ops_per_txn != 0 &&
+		(ret = session->begin_transaction(session, NULL)) != 0) {
+		lprintf(cfg, ret, 0, "First transaction begin failed");
+		goto err;
+	}
 
 	while (!cfg->stop) {
 		/*
@@ -587,6 +595,22 @@ op_err:			lprintf(cfg, ret, 0,
 			}
 			/* Increment operation count */
 			++trk->ops;
+		}
+
+		/* Commit our work if configured for explicit transactions */
+		if (ops_per_txn != 0 && ops++ % ops_per_txn == 0) {
+			if ((ret = session->commit_transaction(
+			    session, NULL)) != 0) {
+				lprintf(cfg, ret, 0,
+				    "Worker transaction commit failed");
+				goto err;
+			}
+			if ((ret = session->begin_transaction(
+			    session, NULL)) != 0) {
+				lprintf(cfg, ret, 0,
+				    "Worker transaction commit failed");
+				goto err;
+			}
 		}
 
 		/* Schedule the next operation */
