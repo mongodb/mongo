@@ -136,10 +136,6 @@ DEF_OPT_AS_UINT32(sample_interval, 0,
 DEF_OPT_AS_UINT32(sample_rate, 50,
     "how often the latency of operations is measured. One for every operation,"
     "two for every second operation, three for every third operation etc.")
-DEF_OPT_AS_STRING(schema_threads, "", "Sometimes it's interesting to have "
-    "tables being created and removed in parallel with other operations. "
-    "Valid options for the schema_workload setting are: create, populate, "
-    "rollback")
 DEF_OPT_AS_CONFIG_STRING(sess_config, "", "session configuration string")
 DEF_OPT_AS_CONFIG_STRING(table_config,
     "key_format=S,value_format=S,type=lsm,exclusive=true,"

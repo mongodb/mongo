@@ -196,10 +196,6 @@ performance logging every interval seconds, 0 to disable
 how often the latency of operations is measured. One for every
 operation,two for every second operation, three for every third
 operation etc.
-@par schema_threads (string, default=)
-Sometimes it's interesting to have tables being created and removed in
-parallel with other operations. Valid options for the schema_workload
-setting are: create, populate, rollback
 @par sess_config (string, default=)
 session configuration string
 @par table_config (string, default=key_format=S,value_format=S,type=lsm,exclusive=true,allocation_size=4kb,internal_page_max=64kb,leaf_page_max=4kb,split_pct=100)

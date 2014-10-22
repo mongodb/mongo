@@ -392,11 +392,11 @@ worker(void *arg)
 	cfg = thread->cfg;
 	conn = cfg->conn;
 	cursors = NULL;
+	ops = 0;
+	ops_per_txn = thread->workload->ops_per_txn;
 	session = NULL;
 	trk = NULL;
 	throttle_ops = 0;
-	ops = 0;
-	ops_per_txn = thread->workload->ops_per_txn;
 
 	if ((ret = conn->open_session(
 	    conn, NULL, cfg->sess_config, &session)) != 0) {
