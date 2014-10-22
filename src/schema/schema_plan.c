@@ -333,6 +333,7 @@ __wt_struct_reformat(WT_SESSION_IMPL *session, WT_TABLE *table,
 			WT_RET(
 			    __wt_config_init(session, &config, extra_cols));
 			WT_RET(__wt_config_next(&config, &next_k, &next_v));
+			extra_cols = NULL;
 		} else if (format->size == 0) {
 			WT_RET(__wt_buf_set(session, format, "", 1));
 			return (0);
