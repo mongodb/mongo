@@ -43,12 +43,10 @@ __wt_thread_join(WT_SESSION_IMPL *session, wt_thread_t tid)
  *	Fill in a printable version of the process and thread IDs.
  */
 void
-__wt_thread_id(WT_SESSION_IMPL *session, char *buf, size_t buflen)
+__wt_thread_id(char *buf, size_t buflen)
 {
 	pthread_t self;
 	size_t len;
-
-	WT_UNUSED(session);
 
 	len = (size_t)snprintf(buf, buflen, "%" PRIu64, (uint64_t)getpid());
 	if (len < buflen) {
