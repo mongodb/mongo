@@ -485,7 +485,7 @@ __lsm_drop_file(WT_SESSION_IMPL *session, const char *uri)
 	if (ret == EBUSY || ret == ENOENT)
 		WT_RET(__wt_verbose(session, WT_VERB_LSM,
 		    "LSM worker drop of %s failed with %d", uri, ret));
-	
+
 	return (ret);
 }
 
