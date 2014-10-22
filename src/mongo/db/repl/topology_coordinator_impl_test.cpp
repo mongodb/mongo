@@ -918,10 +918,9 @@ namespace {
         ASSERT_EQUALS(ourOpTime, OpTime(response6["opTime"].timestampValue()));
         ASSERT_FALSE(response6["fresher"].Bool());
         ASSERT_TRUE(response6["veto"].Bool());
-        ASSERT_EQUALS(
-            "I don't think h3:27017 is electable because the member is not currently a secondary",
-            response6["errmsg"].String());
-
+        ASSERT_NE(std::string::npos, response6["errmsg"].String().find(
+                          "I don't think h3:27017 is electable because the member is not "
+                          "currently a secondary")) << response6["errmsg"].String();
 
         // Test trying to elect a node that isn't electable because it's PRIMARY
         ASSERT_EQUALS(-1, getCurrentPrimaryIndex());
@@ -937,10 +936,9 @@ namespace {
         ASSERT_EQUALS(ourOpTime, OpTime(response7["opTime"].timestampValue()));
         ASSERT_FALSE(response7["fresher"].Bool());
         ASSERT_TRUE(response7["veto"].Bool());
-        ASSERT_EQUALS(
-            "I don't think h3:27017 is electable because the member is not currently a secondary",
-            response7["errmsg"].String());
-
+        ASSERT_NE(std::string::npos, response7["errmsg"].String().find(
+                          "I don't think h3:27017 is electable because the member is not "
+                          "currently a secondary")) << response7["errmsg"].String();
 
         // Test trying to elect a node that isn't electable because it's STARTUP
         heartbeatFromMember(HostAndPort("h3"), "rs0", MemberState::RS_STARTUP, ourOpTime);
@@ -954,10 +952,9 @@ namespace {
         ASSERT_EQUALS(ourOpTime, OpTime(response8["opTime"].timestampValue()));
         ASSERT_FALSE(response8["fresher"].Bool());
         ASSERT_TRUE(response8["veto"].Bool());
-        ASSERT_EQUALS(
-            "I don't think h3:27017 is electable because the member is not currently a secondary",
-            response8["errmsg"].String());
-
+        ASSERT_NE(std::string::npos, response8["errmsg"].String().find(
+                          "I don't think h3:27017 is electable because the member is not "
+                          "currently a secondary")) << response8["errmsg"].String();
 
         // Test trying to elect a node that isn't electable because it's RECOVERING
         heartbeatFromMember(HostAndPort("h3"), "rs0", MemberState::RS_RECOVERING, ourOpTime);
@@ -971,10 +968,9 @@ namespace {
         ASSERT_EQUALS(ourOpTime, OpTime(response9["opTime"].timestampValue()));
         ASSERT_FALSE(response9["fresher"].Bool());
         ASSERT_TRUE(response9["veto"].Bool());
-        ASSERT_EQUALS(
-            "I don't think h3:27017 is electable because the member is not currently a secondary",
-            response9["errmsg"].String());
-
+        ASSERT_NE(std::string::npos, response9["errmsg"].String().find(
+                          "I don't think h3:27017 is electable because the member is not "
+                          "currently a secondary")) << response9["errmsg"].String();
 
         // Test trying to elect a node that is fresher but lower priority than the existing primary
         args.id = 30;

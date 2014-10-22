@@ -645,7 +645,7 @@ namespace mongo {
 
                         if (commitJob._notify.nWaiting())
                             break;
-                        if (commitJob.bytes() > UncommittedBytesLimit / 2)
+                        if (commitJob.bytes() > UncommittedBytesLimit / 10)
                             break;
                     }
 

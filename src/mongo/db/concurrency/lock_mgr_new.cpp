@@ -251,15 +251,8 @@ namespace mongo {
         if (request->status == LockRequest::STATUS_NEW) {
             invariant(request->recursiveCount == 1);
 
-            // The flush lock must be FIFO ordered or else we will starve the dur threads and not
-            // block new writers. This means that if anyone is blocking on a mustFIFO resource we
-            // must get in line, even if we don't conflict with the grantedModes and could take the
-            // lock immediately.
-            const bool mustFIFO = (resId.getType() == RESOURCE_MMAPV1_FLUSH);
-
             // New lock request
-            if (conflicts(mode, lock->grantedModes)
-                    || (mustFIFO && conflicts(mode, lock->conflictModes))) {
+            if (conflicts(mode, lock->grantedModes)) {
                 request->status = LockRequest::STATUS_WAITING;
                 request->mode = mode;
                 request->convertMode = MODE_NONE;
@@ -712,6 +705,7 @@ namespace mongo {
     void LockHead::addToConflictQueue(LockRequest* request) {
         invariant(request->next == NULL);
         invariant(request->prev == NULL);
+
         if (conflictQueueBegin == NULL) {
             invariant(conflictQueueEnd == NULL);
 
@@ -724,24 +718,11 @@ namespace mongo {
         else {
             invariant(conflictQueueEnd != NULL);
 
-            // durThread always jumps to the front of the queue
-            const bool queueAtFront = (request->lock->resourceId.getType() == RESOURCE_MMAPV1_FLUSH)
-                                   && (request->mode == MODE_X || request->mode == MODE_S);
-            if (queueAtFront) {
-                request->next = conflictQueueBegin;
-                request->prev = NULL;
+            request->prev = conflictQueueEnd;
+            request->next = NULL;
 
-                conflictQueueBegin->prev = request;
-                conflictQueueBegin = request;
-            }
-            else {
-                request->prev = conflictQueueEnd;
-                request->next = NULL;
-
-                conflictQueueEnd->next = request;
-                conflictQueueEnd = request;
-            }
-
+            conflictQueueEnd->next = request;
+            conflictQueueEnd = request;
         }
     }
 

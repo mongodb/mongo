@@ -43,6 +43,7 @@
 #include "mongo/db/repl/replication_executor.h"
 #include "mongo/db/repl/rslog.h"
 #include "mongo/db/server_parameters.h"
+#include "mongo/util/hex.h"
 #include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
 #include "mongo/util/scopeguard.h"
@@ -508,8 +509,9 @@ namespace {
             }
         }
 
-        UnelectableReason reason = _getUnelectableReason(hopefulIndex, lastOpApplied);
-        if (None != reason) {
+        UnelectableReasonMask reason = _getUnelectableReason(hopefulIndex, lastOpApplied);
+        reason &= ~RefusesToStand;
+        if (reason) {
             *errmsg = str::stream()
                          << "I don't think "
                          << _currentConfig.getMemberAt(hopefulIndex).getHostAndPort().toString()
@@ -645,7 +647,7 @@ namespace {
         }
 
         // Are we electable
-        response->setElectable(None == _getMyUnelectableReason(now, lastOpApplied));
+        response->setElectable(!_getMyUnelectableReason(now, lastOpApplied));
 
         // Heartbeat status message
         response->setHbMsg(_getHbmsg());
@@ -1013,7 +1015,7 @@ namespace {
         // If we are primary, check if we can still see majority of the set;
         // stepdown if we can't.
         if (_iAmPrimary()) {
-            if (CannotSeeMajority == _getMyUnelectableReason(now, lastOpApplied)) {
+            if (CannotSeeMajority & _getMyUnelectableReason(now, lastOpApplied)) {
                 log() << "can't see a majority of the set, relinquishing primary";
                 return _stepDownSelf();
             }
@@ -1044,14 +1046,14 @@ namespace {
             return false;
         }
 
-        const UnelectableReason unelectableReason = _getMyUnelectableReason(now, lastOpApplied);
-        if (NotCloseEnoughToLatestOptime == unelectableReason) {
+        const UnelectableReasonMask unelectableReason = _getMyUnelectableReason(now, lastOpApplied);
+        if (NotCloseEnoughToLatestOptime & unelectableReason) {
             LOG(2) << "Not standing for election because " <<
                 _getUnelectableReasonString(unelectableReason) << "; my last optime is " <<
                 lastOpApplied << " and the newest is " << _latestKnownOpTime(lastOpApplied);
             return false;
         }
-        if (None != unelectableReason) {
+        if (unelectableReason) {
             LOG(2) << "Not standing for election because " <<
                 _getUnelectableReasonString(unelectableReason);
             return false;
@@ -1130,7 +1132,7 @@ namespace {
             Date_t now, OpTime lastOpApplied) const {
         int maxIndex = -1;
         for (int currentIndex = 0; currentIndex < _currentConfig.getNumMembers(); currentIndex++) {
-            UnelectableReason reason = currentIndex == _selfIndex ?
+            UnelectableReasonMask reason = currentIndex == _selfIndex ?
                     _getMyUnelectableReason(now, lastOpApplied) :
                     _getUnelectableReason(currentIndex, lastOpApplied);
             if (None == reason && _isMemberHigherPriority(currentIndex, maxIndex)) {
@@ -1572,94 +1574,149 @@ namespace {
         return _currentConfig.getMemberAt(_selfIndex);
     }
 
-    TopologyCoordinatorImpl::UnelectableReason TopologyCoordinatorImpl::_getUnelectableReason(
-            int index, const OpTime& lastOpApplied) const {
+    TopologyCoordinatorImpl::UnelectableReasonMask TopologyCoordinatorImpl::_getUnelectableReason(
+            int index,
+            const OpTime& lastOpApplied) const {
         invariant(index != _selfIndex);
         const MemberConfig& memberConfig = _currentConfig.getMemberAt(index);
         const MemberHeartbeatData& hbData = _hbdata[index];
+        UnelectableReasonMask result = None;
         if (memberConfig.isArbiter()) {
-            return ArbiterIAm;
+            result |= ArbiterIAm;
         }
-        else if (memberConfig.getPriority() <= 0) {
-            return NoPriority;
+        if (memberConfig.getPriority() <= 0) {
+            result |= NoPriority;
         }
-        else if (hbData.getState() != MemberState::RS_SECONDARY) {
-            return NotSecondary;
+        if (hbData.getState() != MemberState::RS_SECONDARY) {
+            result |=NotSecondary;
         }
-        else if (!_isOpTimeCloseEnoughToLatestToElect(hbData.getOpTime(), lastOpApplied)) {
-            return NotCloseEnoughToLatestOptime;
+        if (!_isOpTimeCloseEnoughToLatestToElect(hbData.getOpTime(), lastOpApplied)) {
+            result |= NotCloseEnoughToLatestOptime;
         }
-        else if (hbData.up() && hbData.isUnelectable()) {
-            return RefusesToStand;
+        if (hbData.up() && hbData.isUnelectable()) {
+            result |= RefusesToStand;
         }
-        else {
-            invariant(memberConfig.isElectable());
-            return None;
-        }
+        invariant(result || memberConfig.isElectable());
+        return result;
     }
 
-    TopologyCoordinatorImpl::UnelectableReason TopologyCoordinatorImpl::_getMyUnelectableReason(
-                                                                const Date_t now,
-                                                                const OpTime lastApplied) const {
+    TopologyCoordinatorImpl::UnelectableReasonMask TopologyCoordinatorImpl::_getMyUnelectableReason(
+            const Date_t now,
+            const OpTime lastApplied) const {
+
+        UnelectableReasonMask result = None;
         if (lastApplied.isNull()) {
-            return NoData;
+            result |= NoData;
         }
         if (!_aMajoritySeemsToBeUp()) {
-            return CannotSeeMajority;
+            result |= CannotSeeMajority;
         }
         if (_selfIndex == -1) {
-            return NotInitialized;
+            result |= NotInitialized;
+            return result;
         }
         if (_selfConfig().isArbiter()) {
-            return ArbiterIAm;
+            result |= ArbiterIAm;
         }
         if (_selfConfig().getPriority() <= 0) {
-            return NoPriority;
+            result |= NoPriority;
         }
         if (_stepDownUntil > now) {
-            return StepDownPeriodActive;
+            result |= StepDownPeriodActive;
         }
         if (_lastVote.whoId != -1 &&
                 _lastVote.whoId !=_currentConfig.getMemberAt(_selfIndex).getId() &&
                 _lastVote.when.millis + LastVote::leaseTime.total_milliseconds() >= now.millis) {
-            return VotedTooRecently;
+            result |= VotedTooRecently;
         }
         if (!getMemberState().secondary()) {
-            return NotSecondary;
+            result |= NotSecondary;
         }
         if (!_isOpTimeCloseEnoughToLatestToElect(lastApplied, lastApplied)) {
-            return NotCloseEnoughToLatestOptime;
+            result |= NotCloseEnoughToLatestOptime;
         }
-        return None;
+        return result;
     }
 
-    std::string TopologyCoordinatorImpl::_getUnelectableReasonString(UnelectableReason ur) const {
-        switch (ur) {
-        case None:
-            invariant(false);
-        case NoData:
-            return "node has no applied oplog entries";
-        case VotedTooRecently:
-            return str::stream() << "I recently voted for " << _lastVote.whoHostAndPort.toString();
-        case CannotSeeMajority:
-            return "I cannot see a majority";
-        case ArbiterIAm:
-            return "member is an arbiter";
-        case NoPriority:
-            return "member has zero priority";
-        case StepDownPeriodActive:
-            return str::stream() << "I am still waiting for stepdown period to end at " <<
-                dateToISOStringLocal(_stepDownUntil);
-        case NotSecondary:
-            return "member is not currently a secondary";
-        case NotCloseEnoughToLatestOptime:
-            return "member is more than 10 seconds behind the most up-to-date member";
-        case NotInitialized:
-            return "node is not a member of a valid replica set configuration";
-        case RefusesToStand:
-            return "most recent heartbeat indicates node will not stand for election";
+    std::string TopologyCoordinatorImpl::_getUnelectableReasonString(
+            const UnelectableReasonMask ur) const {
+        invariant(ur);
+        str::stream ss;
+        bool hasWrittenToStream = false;
+        if (ur & NoData) {
+            ss << "node has no applied oplog entries";
+            hasWrittenToStream = true;
         }
-        invariant(false); // unreachable
+        if (ur & VotedTooRecently) {
+            if (hasWrittenToStream) {
+                ss << "; ";
+            }
+            hasWrittenToStream = true;
+            ss << "I recently voted for " << _lastVote.whoHostAndPort.toString();
+        }
+        if (ur & CannotSeeMajority) {
+            if (hasWrittenToStream) {
+                ss << "; ";
+            }
+            hasWrittenToStream = true;
+            ss << "I cannot see a majority";
+        }
+        if (ur & ArbiterIAm) {
+            if (hasWrittenToStream) {
+                ss << "; ";
+            }
+            hasWrittenToStream = true;
+            ss << "member is an arbiter";
+        }
+        if (ur & NoPriority) {
+            if (hasWrittenToStream) {
+                ss << "; ";
+            }
+            hasWrittenToStream = true;
+            ss <<  "member has zero priority";
+        }
+        if (ur & StepDownPeriodActive) {
+            if (hasWrittenToStream) {
+                ss << "; ";
+            }
+            hasWrittenToStream = true;
+            ss << "I am still waiting for stepdown period to end at " <<
+                dateToISOStringLocal(_stepDownUntil);
+        }
+        if (ur & NotSecondary) {
+            if (hasWrittenToStream) {
+                ss << "; ";
+            }
+            hasWrittenToStream = true;
+            ss << "member is not currently a secondary";
+        }
+        if (ur & NotCloseEnoughToLatestOptime) {
+            if (hasWrittenToStream) {
+                ss << "; ";
+            }
+            hasWrittenToStream = true;
+            ss << "member is more than 10 seconds behind the most up-to-date member";
+        }
+        if (ur & NotInitialized) {
+            if (hasWrittenToStream) {
+                ss << "; ";
+            }
+            hasWrittenToStream = true;
+            ss <<  "node is not a member of a valid replica set configuration";
+        }
+        if (ur & RefusesToStand) {
+            if (hasWrittenToStream) {
+                ss << "; ";
+            }
+            hasWrittenToStream = true;
+            ss << "most recent heartbeat indicates node will not stand for election";
+        }
+        if (!hasWrittenToStream) {
+            severe() << "Invalid UnelectableReasonMask value 0x" << integerToHex(ur);
+            fassertFailed(26011);
+        }
+        ss << " (mask 0x" << integerToHex(ur) << ")";
+        return ss;
     }
 
     int TopologyCoordinatorImpl::_getPing(const HostAndPort& host) {
@@ -1769,8 +1826,8 @@ namespace {
             if (i == _selfIndex) {
                 continue;
             }
-            UnelectableReason reason = _getUnelectableReason(i, lastOpApplied);
-            if (None == reason && _hbdata[i].getOpTime() >= lastOpApplied) {
+            UnelectableReasonMask reason = _getUnelectableReason(i, lastOpApplied);
+            if (!reason && _hbdata[i].getOpTime() >= lastOpApplied) {
                 canStepDown = true;
             }
         }
