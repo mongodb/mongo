@@ -1948,7 +1948,7 @@ def doConfigure(myenv):
             print( "Cannot find wiredtiger.h in CPPPATH: " + str(env["CPPPATH"]))
             Exit(1)
 
-        if not conf.CheckLib( "wiredtiger" ):
+        if not conf.CheckLib( "wiredtiger", autoadd=False ):
             print( "Cannot find wiredtiger in LIBPATH: " + str(env["LIBPATH"]))
             Exit(1)
 
