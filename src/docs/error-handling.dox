@@ -13,8 +13,17 @@ range.
 Informational return values, like <code>wiredtiger.WT_NOTFOUND</code>
 or <code>wiredtiger.WT_DUPLICATE_KEY</code> or 0 (success),
 are directly returned by APIs.  More severe errors
-are thrown as \c WiredTigerException, which must be caught by the
+are thrown as \c WiredTigerException, which may be caught by the
 application.
+
+The \c WiredTigerRollbackException is a specific type of \c WiredTigerException,
+it is thrown when there is a conflict between concurrent operations.
+An application that catches this exception should call rollback() on
+the relevant transaction, and retry as necessary.
+
+The \c WiredTigerPanicException is a specific type of \c WiredTigerException,
+it is thrown when there is an underlying problem that requires the
+application to exit and restart.
 
 The following is a complete list of possible WiredTiger-specific
 return values, all constants defined in the com.wiredtiger.db.wiredtiger class:

@@ -24,10 +24,10 @@ JAVA_SRC = \
 		$(JAVADESTFULL)/PackOutputStream.java \
 		$(JAVADESTFULL)/PackUtil.java \
 		$(JAVADESTFULL)/Session.java \
-		$(JAVADESTFULL)/WiredTigerRollbackException.java \
 		$(JAVADESTFULL)/WiredTigerException.java \
 		$(JAVADESTFULL)/WiredTigerPackingException.java \
 		$(JAVADESTFULL)/WiredTigerPanicException.java \
+		$(JAVADESTFULL)/WiredTigerRollbackException.java \
 		$(JAVADESTFULL)/wiredtiger.java \
 		$(JAVADESTFULL)/wiredtigerConstants.java \
 		$(JAVADESTFULL)/wiredtigerJNI.java \

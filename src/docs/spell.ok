@@ -74,6 +74,8 @@ WiredTiger's
 WiredTigerCheckpoint
 WiredTigerException
 WiredTigerLog
+WiredTigerPanicException
+WiredTigerRollbackException
 WiredTigerTestCase
 Za
 aR
