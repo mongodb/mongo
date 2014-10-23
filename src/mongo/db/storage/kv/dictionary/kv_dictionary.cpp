@@ -105,7 +105,7 @@ namespace mongo {
     // message to the old value and writing back the new value.
     //
     // For most dictionary implementations, this overwrite insert will be
-    // inefficient. Those implementations will want to override this method.
+    // inefficient. Those implementations will want to override these methods.
     Status KVDictionary::update(OperationContext *opCtx, const Slice &key, const Slice &oldValue,
                                 const KVUpdateMessage &message) {
         Slice newValue;
@@ -115,6 +115,15 @@ namespace mongo {
         }
 
         return insert(opCtx, key, newValue);
+    }
+
+    Status KVDictionary::update(OperationContext *opCtx, const Slice &key, const KVUpdateMessage &message) {
+        Slice oldValue;
+        Status status = get(opCtx, key, oldValue);
+        if (!status.isOK()) {
+            return status;
+        }
+        return update(opCtx, key, oldValue, message);
     }
 
 } // namespace mongo

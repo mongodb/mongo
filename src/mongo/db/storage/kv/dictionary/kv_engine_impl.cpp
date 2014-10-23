@@ -59,16 +59,24 @@ namespace mongo {
                                                const StringData& ident,
                                                const CollectionOptions& options ) {
         auto_ptr<KVDictionary> db(getKVDictionary(opCtx, ident, KVDictionary::Comparator::useMemcmp()));
+        auto_ptr<KVRecordStore> rs;
         // We separated the implementations of capped / non-capped record stores for readability.
         if (options.capped) {
-            return new KVRecordStoreCapped(db.release(), opCtx, ns, options);
+            rs.reset(new KVRecordStoreCapped(db.release(), opCtx, ns, options));
         } else {
-            return new KVRecordStore(db.release(), opCtx, ns, options);
+            rs.reset(new KVRecordStore(db.release(), opCtx, ns, options));
         }
+        if (persistDictionaryStats()) {
+            rs->setStatsMetadataDictionary(opCtx, getMetadataDictionary());
+        }
+        return rs.release();
     }
 
     Status KVEngineImpl::dropRecordStore( OperationContext* opCtx,
                                           const StringData& ident ) {
+        if (persistDictionaryStats()) {
+            KVRecordStore::deleteMetadataKeys(opCtx, getMetadataDictionary(), ident);
+        }
         // Dropping a record store is as simple as dropping its underlying KVDictionary.
         return dropKVDictionary(opCtx, ident);
     }

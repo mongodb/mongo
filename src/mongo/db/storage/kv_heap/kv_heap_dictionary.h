@@ -115,8 +115,6 @@ namespace mongo {
 
         Stats getStats() const { return _stats; }
 
-        bool useExactStats() const { return false; }
-    
         void appendCustomStats(OperationContext *opCtx, BSONObjBuilder* result, double scale ) const { } 
 
         Status setCustomOption(OperationContext *opCtx, const BSONElement& option, BSONObjBuilder* info );

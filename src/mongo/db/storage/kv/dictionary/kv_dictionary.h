@@ -148,6 +148,16 @@ namespace mongo {
                               const KVUpdateMessage &message);
 
         /**
+         * Update the value for `key' whose new image should be the result of applying `message' to
+         * whatever value is present.
+         *
+         * Note: Should have behavior equivalent to calling `get(opCtx, key, ...)' first, then
+         *       calling the other `update' overload with the result (or `Slice()' if missing).
+         * Return: Status:OK() success.
+         */
+        virtual Status update(OperationContext *opCtx, const Slice &key, const KVUpdateMessage &message);
+
+        /**
          * Name of the dictionary.
          */
         virtual const char *name() const = 0;
@@ -176,8 +186,6 @@ namespace mongo {
          * Return: initialized Stats object
          */
         virtual Stats getStats() const = 0;
-
-        virtual bool useExactStats() const = 0;
 
         /**
          * Append specific stats about this dictionary to the given bson

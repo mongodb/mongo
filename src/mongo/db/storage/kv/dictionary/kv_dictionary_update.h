@@ -81,6 +81,7 @@ namespace mongo {
         // Unique type tag for the various subclass implementations.
         enum Type {
             UpdateWithDamages,
+            UpdateIncrement,
         };
 
         /**
@@ -134,6 +135,35 @@ namespace mongo {
 
         const char *_source;
         mutablebson::DamageVector _damages;
+    };
+
+    /**
+     * An update message that increments a little-endian integer.
+     *
+     * Used by KVRecordStore::_updateStats().
+     */
+    class KVUpdateIncrementMessage : public KVUpdateMessage {
+    public:
+        explicit KVUpdateIncrementMessage(int64_t delta)
+            : _delta(delta)
+        {}
+
+        static KVUpdateMessage *deserializeFrom(const Slice &serialized);
+
+        virtual Status apply(const Slice &oldValue, Slice &newValue) const;
+
+        static bool usable() { return true; }
+
+    protected:
+        virtual Type getType() const {
+            return UpdateIncrement;
+        }
+
+        virtual size_t serializedSize() const;
+
+        virtual void serializeTo(char *dest) const;
+
+        int64_t _delta;
     };
 
 } // namespace mongo

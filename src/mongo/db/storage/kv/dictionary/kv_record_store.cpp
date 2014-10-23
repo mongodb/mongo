@@ -126,7 +126,12 @@ namespace mongo {
                                   OperationContext* opCtx,
                                   const StringData& ns,
                                   const CollectionOptions& options )
-        : RecordStore(ns), _db(db) {
+        : RecordStore(ns),
+          _db(db),
+          _metadataDict(NULL),
+          _numRecordsMetadataKey(numRecordsMetadataKey(ns)),
+          _dataSizeMetadataKey(dataSizeMetadataKey(ns))
+    {
         invariant(_db != NULL);
 
         // Get the next id, which is one greater than the greatest stored.
@@ -141,28 +146,59 @@ namespace mongo {
         }
     }
 
-    KVRecordStoreStatsValidateAdaptor KVRecordStore::exactStats(OperationContext* txn) const {
-        ValidateResults results;
-        KVRecordStoreStatsValidateAdaptor adaptor;
-        BSONObjBuilder builder;
-        Status s = validate(txn, true, true, &adaptor, &results, &builder);
+    int64_t KVRecordStore::_getStats(OperationContext *opCtx, const std::string &key) const {
+        Slice valSlice;
+        Status s = _metadataDict->get(opCtx, Slice(key), valSlice);
+        massert(28539, str::stream() << "KVRecordStore: error getting stats: " << s.toString(), s.isOK());
+        return mongo::endian::littleToNative(valSlice.as<int64_t>());
+    }
+
+    void KVRecordStore::_updateStats(OperationContext *opCtx, int64_t numRecordsDelta, int64_t dataSizeDelta) {
+        if (_metadataDict) {
+            KVUpdateIncrementMessage nrMessage(numRecordsDelta);
+            Status s = _metadataDict->update(opCtx, Slice(_numRecordsMetadataKey), nrMessage);
+            massert(28540, str::stream() << "KVRecordStore: error updating numRecords: " << s.toString(), s.isOK());
+
+            KVUpdateIncrementMessage dsMessage(dataSizeDelta);
+            s = _metadataDict->update(opCtx, Slice(_dataSizeMetadataKey), dsMessage);
+            massert(28541, str::stream() << "KVRecordStore: error updating dataSize: " << s.toString(), s.isOK());
+        }
+    }
+
+    void KVRecordStore::_initializeStatsForKey(OperationContext *opCtx, const std::string &key) {
+        Slice val;
+        Status s = _metadataDict->get(opCtx, Slice(key), val);
+        if (s.code() == ErrorCodes::NoSuchKey) {
+            int64_t zero;
+            s = _metadataDict->insert(opCtx, Slice(key), Slice::of(zero));
+        }
         invariant(s.isOK());
-        return adaptor;
+    }
+
+    void KVRecordStore::setStatsMetadataDictionary(OperationContext *opCtx, KVDictionary *metadataDict) {
+        _metadataDict = metadataDict;
+        _initializeStatsForKey(opCtx, _numRecordsMetadataKey);
+        _initializeStatsForKey(opCtx, _dataSizeMetadataKey);
+    }
+
+    void KVRecordStore::deleteMetadataKeys(OperationContext *opCtx, KVDictionary *metadataDict, const StringData &ident) {
+        Status s = metadataDict->remove(opCtx, Slice(numRecordsMetadataKey(ident)));
+        massert(28542, str::stream() << "KVRecordStore: error deleting numRecords metadata: " << s.toString(), s.isOK());
+        s = metadataDict->remove(opCtx, Slice(dataSizeMetadataKey(ident)));
+        massert(28543, str::stream() << "KVRecordStore: error deleting dataSize metadata: " << s.toString(), s.isOK());
     }
 
     long long KVRecordStore::dataSize( OperationContext* txn ) const {
-        // Get the data size from the underlying dictionary
-        if (_db->useExactStats()) {
-            return exactStats(txn).dataSize;
+        if (_metadataDict) {
+            return _getStats(txn, _dataSizeMetadataKey);
         } else {
             return _db->getStats().dataSize;
         }
     }
 
     long long KVRecordStore::numRecords( OperationContext* txn ) const {
-        // Get the number of records from the underlying dictionary
-        if (_db->useExactStats()) {
-            return exactStats(txn).numRecords;
+        if (_metadataDict) {
+            return _getStats(txn, _numRecordsMetadataKey);
         } else {
             return _db->getStats().numKeys;
         }
@@ -171,12 +207,7 @@ namespace mongo {
     int64_t KVRecordStore::storageSize( OperationContext* txn,
                                         BSONObjBuilder* extraInfo,
                                         int infoLevel ) const {
-        // Get the storage size from the underlying dictionary
-        if (_db->useExactStats()) {
-            return exactStats(txn).storageSize;
-        } else {
-            return _db->getStats().storageSize;
-        }
+        return _db->getStats().storageSize;
     }
 
     RecordData KVRecordStore::_getDataFor(const KVDictionary *db, OperationContext* txn, const DiskLoc& loc) {
@@ -218,7 +249,13 @@ namespace mongo {
     void KVRecordStore::deleteRecord( OperationContext* txn, const DiskLoc& loc ) {
         const RecordIdKey key(loc);
 
-        const Status status = _db->remove( txn, key.key() );
+        Slice val;
+        Status status = _db->get(txn, key.key(), val);
+        massert(28546, str::stream() << "KVRecordStore: couldn't find record " << loc.toString() << " for delete: " << status.toString(), status.isOK());
+
+        _updateStats(txn, -1, val.size());
+
+        status = _db->remove( txn, key.key() );
         invariant(status.isOK());
     }
 
@@ -234,6 +271,8 @@ namespace mongo {
         if (!status.isOK()) {
             return StatusWith<DiskLoc>(status);
         }
+
+        _updateStats(txn, +1, value.size());
 
         return StatusWith<DiskLoc>(loc);
     }
@@ -255,11 +294,26 @@ namespace mongo {
         const RecordIdKey key(loc);
         const Slice value(data, len);
 
+        int64_t numRecordsDelta = 0;
+        int64_t dataSizeDelta = value.size();
+
+        Slice val;
+        Status status = _db->get(txn, key.key(), val);
+        if (status.code() == ErrorCodes::NoSuchKey) {
+            numRecordsDelta += 1;
+        } else if (status.isOK()) {
+            dataSizeDelta -= val.size();
+        } else {
+            return StatusWith<DiskLoc>(status);
+        }
+
         // An update with a complete new image (data, len) is implemented as an overwrite insert.
-        const Status status = _db->insert(txn, key.key(), value);
+        status = _db->insert(txn, key.key(), value);
         if (!status.isOK()) {
             return StatusWith<DiskLoc>(status);
         }
+
+        _updateStats(txn, numRecordsDelta, dataSizeDelta);
 
         return StatusWith<DiskLoc>(loc);
     }
@@ -273,6 +327,10 @@ namespace mongo {
 
         const Slice oldValue(oldRec.data(), oldRec.size());
         const KVUpdateWithDamagesMessage message(damageSource, damages);
+
+        // updateWithDamages can't change the number or size of records, so we don't need to update
+        // stats.
+
         return _db->update(txn, key.key(), oldValue, message);
     }
 

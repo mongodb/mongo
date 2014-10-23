@@ -108,6 +108,21 @@ namespace mongo {
         // Drop a KVDictionary (same rules as dropRecordStore / dropSortedDataInterface)
         virtual Status dropKVDictionary( OperationContext* opCtx,
                                          const StringData& ident ) = 0;
+
+        /**
+         * If true, a record store built with this engine will store its stats (numRecords and
+         * dataSize) in a separate metadata dictionary.
+         */
+        virtual bool persistDictionaryStats() const { return false; }
+
+        /**
+         * if persistDictionaryStats() is true, this should return an engine-wide dictionary to use
+         * for stats metadata.  If false, it will never be called.
+         */
+        virtual KVDictionary *getMetadataDictionary() {
+            invariant(false);
+            return NULL;
+        }
     };
 
 }

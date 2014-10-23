@@ -30,6 +30,7 @@
 
 #include "mongo/db/storage/kv/dictionary/kv_dictionary_update.h"
 #include "mongo/db/storage/kv/dictionary/simple_serializer.h"
+#include "mongo/platform/endian.h"
 
 namespace mongo {
 
@@ -153,4 +154,34 @@ namespace mongo {
         return new KVUpdateWithDamagesMessage(source, vec);
     }
 
+    // ---------------------------------------------------------------------- //
+
+    Status KVUpdateIncrementMessage::apply(const Slice &oldValue, Slice &newValue) const {
+        const int64_t newVal = mongo::endian::nativeToLittle(
+            mongo::endian::littleToNative(oldValue.as<int64_t>()) + _delta);
+        newValue = Slice::of(newVal).owned();
+        return Status::OK();
+    }
+
+    size_t KVUpdateIncrementMessage::serializedSize() const {
+        return sizeof(int64_t);
+    }
+
+    void KVUpdateIncrementMessage::serializeTo(char *dest) const {
+        BufferWriter writer(dest);
+
+        const int64_t littleDelta = mongo::endian::nativeToLittle(_delta);
+        writer.write(littleDelta);
+    }
+
+    KVUpdateMessage *KVUpdateIncrementMessage::deserializeFrom(const Slice &serialized) {
+        BufferReader reader(serialized.data());
+
+        invariant(serialized.size() == sizeof(int64_t));
+        const int64_t delta = mongo::endian::littleToNative(reader.read<int64_t>());
+
+        return new KVUpdateIncrementMessage(delta);
+    }
+
 } // namespace mongo
+

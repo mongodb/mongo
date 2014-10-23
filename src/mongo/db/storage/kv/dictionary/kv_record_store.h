@@ -37,29 +37,11 @@
 #include "mongo/db/storage/kv/dictionary/kv_dictionary.h"
 #include "mongo/db/storage/record_store.h"
 #include "mongo/platform/atomic_word.h"
+#include "mongo/util/mongoutils/str.h"
 
 namespace mongo {
 
     class CollectionOptions;
-
-    struct KVRecordStoreStatsValidateAdaptor : public ValidateAdaptor {
-        long long dataSize;
-        long long numRecords;
-        int64_t storageSize;
-
-        KVRecordStoreStatsValidateAdaptor()
-            : dataSize(0),
-              numRecords(0),
-              storageSize(0)
-        {}
-
-        Status validate(const RecordData &recordData, size_t *) {
-            dataSize += recordData.size();
-            numRecords++;
-            storageSize += recordData.size();
-            return Status::OK();
-        }
-    };
 
     class KVRecordStore : public RecordStore {
     public:
@@ -191,6 +173,13 @@ namespace mongo {
 
         bool cappedMaxSize() const { invariant(false); }
 
+        /**
+         * Used for keeping record stats in a separate dictionary.
+         */
+        void setStatsMetadataDictionary(OperationContext *opCtx, KVDictionary *metadataDict);
+
+        static void deleteMetadataKeys(OperationContext *opCtx, KVDictionary *metadataDict, const StringData &ident);
+
     protected:
         class KVRecordIterator : public RecordIterator {
             KVDictionary *_db;
@@ -227,8 +216,19 @@ namespace mongo {
             RecordData dataFor(const DiskLoc& loc) const;
         };
 
-        // Gets the exact stats for this dictionary. This may be a very expensive operation.
-        KVRecordStoreStatsValidateAdaptor exactStats(OperationContext* txn) const;
+        static std::string numRecordsMetadataKey(const StringData &ident) {
+            static const std::string suffix = "-nr";
+            return str::stream() << ident << suffix;
+        }
+
+        static std::string dataSizeMetadataKey(const StringData &ident) {
+            static const std::string suffix = "-ds";
+            return str::stream() << ident << suffix;
+        }
+
+        void _initializeStatsForKey(OperationContext *opCtx, const std::string &key);
+        int64_t _getStats(OperationContext *opCtx, const std::string &key) const;
+        void _updateStats(OperationContext *opCtx, int64_t numRecordsDelta, int64_t dataSizeDelta);
 
         // Internal version of dataFor that takes a KVDictionary - used by
         // the RecordIterator to implement dataFor.
@@ -244,6 +244,13 @@ namespace mongo {
 
         // A thread-safe 64 bit integer for generating new unique DiskLoc keys.
         AtomicUInt64 _nextIdNum;
+
+        // Pointer to metadata dictionary used for persistent stats.  This is owned by the KVEngine.
+        KVDictionary *_metadataDict;
+
+        // metadata keys, cached
+        const std::string _numRecordsMetadataKey;
+        const std::string _dataSizeMetadataKey;
     };
 
 } // namespace mongo
