@@ -35,6 +35,7 @@ import org.junit.runners.Suite;
     AutoCloseTest.class,
     CursorTest.class,
     CursorTest02.class,
+    ExceptionTest.class,
     PackTest.class
 })
 

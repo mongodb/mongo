@@ -46,6 +46,7 @@ JAVA_JUNIT = \
 		$(JAVATEST)/AsyncTest.java \
 		$(JAVATEST)/CursorTest.java \
 		$(JAVATEST)/CursorTest02.java \
+		$(JAVATEST)/ExceptionTest.java \
 		$(JAVATEST)/PackTest.java \
 		$(JAVATEST)/WiredTigerSuite.java
 
