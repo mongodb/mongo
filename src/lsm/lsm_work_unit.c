@@ -141,12 +141,15 @@ __wt_lsm_work_switch(
 		WT_WITH_SCHEMA_LOCK(session, ret =
 		    __wt_lsm_tree_switch(session, entry->lsm_tree));
 		/* Failing to complete the switch is fine */
-		if (ret == EBUSY)
+		if (ret == EBUSY) {
+			if (F_ISSET(entry->lsm_tree, WT_LSM_TREE_NEED_SWITCH))
+				WT_ERR(__wt_lsm_manager_push_entry(session,
+				    WT_LSM_WORK_SWITCH, 0, entry->lsm_tree));
 			ret = 0;
-		else
+		} else
 			*ran = 1;
 	}
-	__wt_lsm_manager_free_work_unit(session, entry);
+err:	__wt_lsm_manager_free_work_unit(session, entry);
 	return (ret);
 }
 
