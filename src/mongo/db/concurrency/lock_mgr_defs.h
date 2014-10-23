@@ -35,6 +35,7 @@
 #include "mongo/platform/cstdint.h"
 #include "mongo/platform/hash_namespace.h"
 
+
 namespace mongo {
 
     /**
@@ -60,16 +61,6 @@ namespace mongo {
         // modes above this entry.
         LockModesCount
     };
-
-    /**
-     * Returns a human-readable name for the specified lock mode.
-     */
-    const char* modeName(LockMode mode);
-
-    /**
-     * Legacy lock mode names in parity for 2.6 reports.
-     */
-    char legacyModeName(LockMode mode);
 
 
     /**
@@ -141,12 +132,6 @@ namespace mongo {
     BOOST_STATIC_ASSERT(ResourceTypesCount <= 8);
 
     /**
-     * Returns a human-readable name for the specified resource type.
-     */
-    const char* resourceTypeName(ResourceType resourceType);
-
-
-    /**
      * Uniquely identifies a lockable resource.
      */
     class ResourceId {
@@ -155,8 +140,6 @@ namespace mongo {
         ResourceId(ResourceType type, const StringData& ns);
         ResourceId(ResourceType type, const std::string& ns);
         ResourceId(ResourceType type, uint64_t hashId);
-
-        bool isValid() const { return _type != RESOURCE_INVALID; }
 
         operator size_t() const {
             return _fullHash;
@@ -202,10 +185,6 @@ namespace mongo {
     // spend too much time doing comparisons for hashing.
     BOOST_STATIC_ASSERT(sizeof(ResourceId) == sizeof(uint64_t));
 #endif
-
-
-    // Type to uniquely identify a given locker object
-    typedef uint64_t LockerId;
 
 } // namespace mongo
 

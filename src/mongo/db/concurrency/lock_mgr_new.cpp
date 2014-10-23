@@ -72,16 +72,6 @@ namespace mongo {
             "NONE", "IS", "IX", "S", "X"
         };
 
-        static const char LegacyLockNames[] = {
-            '\0', 'r', 'w', 'R', 'W'
-        };
-
-        // Ensure we do not add new modes without updating the names array
-        BOOST_STATIC_ASSERT((sizeof(LockNames) / sizeof(LockNames[0])) == LockModesCount);
-        BOOST_STATIC_ASSERT(
-            (sizeof(LegacyLockNames) / sizeof(LegacyLockNames[0])) == LockModesCount);
-
-
         // Helper functions for the lock modes
         inline bool conflicts(LockMode newMode, uint32_t existingModesMask) {
             return (LockConflictsTable[newMode] & existingModesMask) != 0;
@@ -91,6 +81,9 @@ namespace mongo {
             return 1 << mode;
         }
 
+        inline const char* modeName(LockMode mode) {
+            return LockNames[mode];
+        }
 
         /**
          * Maps the resource id to a human-readable string.
@@ -102,14 +95,11 @@ namespace mongo {
             "Database",
             "Collection",
             "Document",
-            "MMAPV1ExtentManager"
         };
 
-        // Ensure we do not add new types without updating the names array
-        BOOST_STATIC_ASSERT(
-            (sizeof(ResourceTypeNames) / sizeof(ResourceTypeNames[0])) == ResourceTypesCount);
-
-
+        inline const char* resourceTypeName(ResourceType resourceType) {
+            return ResourceTypeNames[resourceType];
+        }
     }
 
 
@@ -523,7 +513,7 @@ namespace mongo {
         invariant((lock->conflictModes == 0) ^ (lock->conflictQueueBegin != NULL));
     }
 
-    LockManager::LockBucket* LockManager::_getBucket(const ResourceId& resId) const {
+    LockManager::LockBucket* LockManager::_getBucket(const ResourceId& resId) {
         return &_lockBuckets[resId % _numLockBuckets];
     }
 
@@ -593,7 +583,7 @@ namespace mongo {
 #endif
     }
 
-    ResourceId::ResourceId(ResourceType type, const string& ns) {
+    ResourceId::ResourceId(ResourceType type, const std::string& ns) {
         _type = type;
         _hashId = stringDataHashFunction(ns) % 0x1fffffffffffffffULL;
 
@@ -771,23 +761,6 @@ namespace mongo {
         mode = MODE_NONE;
         convertMode = MODE_NONE;
         recursiveCount = 0;
-    }
-
-
-    //
-    // Helper calls
-    //
-
-    const char* modeName(LockMode mode) {
-        return LockNames[mode];
-    }
-
-    char legacyModeName(LockMode mode) {
-        return LegacyLockNames[mode];
-    }
-
-    const char* resourceTypeName(ResourceType resourceType) {
-        return ResourceTypeNames[resourceType];
     }
 
 } // namespace mongo

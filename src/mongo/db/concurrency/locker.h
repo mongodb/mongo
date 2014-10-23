@@ -50,7 +50,7 @@ namespace mongo {
     public:
         virtual ~Locker() {}
 
-        virtual LockerId getId() const = 0;
+        virtual uint64_t getId() const = 0;
 
         /**
          * This should be the first method invoked for a particular Locker object. It acquires the

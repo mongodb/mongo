@@ -88,11 +88,12 @@ namespace mongo {
          * Instantiates a new lock space with the specified unique identifier used for
          * disambiguation.
          */
-        LockerImpl(LockerId id);
+        LockerImpl(uint64_t id);
+        LockerImpl();
 
         virtual ~LockerImpl();
 
-        virtual LockerId getId() const { return _id; }
+        virtual uint64_t getId() const { return _id; }
 
         virtual LockResult lockGlobal(LockMode mode, unsigned timeoutMs = UINT_MAX);
         virtual void downgradeGlobalXtoSForMMAPV1();
@@ -116,15 +117,6 @@ namespace mongo {
 
         virtual void restoreLockState(const LockSnapshot& stateToRestore);
 
-        /**
-         * Posts a request to the lock manager for the specified lock to be acquired and returns
-         * immediately.
-         *
-         * NOTE: Must only be used to implement the actual lock call and for unit tests, because
-         * it skips any internal consistency checks.
-         */
-        LockResult lockImpl(const ResourceId& resId, LockMode mode);
-
     private:
 
         typedef FastMapNoAlloc<ResourceId, LockRequest, 16> LockRequestsMap;
@@ -145,7 +137,7 @@ namespace mongo {
 
 
         // Used to disambiguate different lockers
-        const LockerId _id;
+        const uint64_t _id;
 
         // The only reason we have this spin lock here is for the diagnostic tools, which could
         // iterate through the LockRequestsMap on a separate thread and need it to be stable.
