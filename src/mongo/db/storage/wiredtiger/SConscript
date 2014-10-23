@@ -12,6 +12,7 @@ if has_option("wiredtiger"):
             'wiredtiger_record_store.cpp',
             'wiredtiger_recovery_unit.cpp',
             'wiredtiger_session_cache.cpp',
+            'wiredtiger_util.cpp',
             ],
         LIBDEPS= [
             '$BUILD_DIR/mongo/bson',

@@ -520,6 +520,19 @@ namespace mongo {
         }
 
         output->appendNumber( "nrecords", nrecords );
+
+        if (full) {
+            WiredTigerSession* session = WiredTigerRecoveryUnit::get(txn)->getSession();
+            WT_SESSION* s = session->getSession();
+            BSONObjBuilder bob(output->subobjStart("wiredtiger"));
+            Status status = WiredTigerUtil::exportTableToBSON(s, "statistics:" + GetURI(),
+                                                              "statistics=(all)", &bob);
+            if (!status.isOK()) {
+                bob.append("error", "unable to retrieve statistics");
+                bob.append("code", static_cast<int>(status.code()));
+                bob.append("reason", status.reason());
+            }
+        }
         return Status::OK();
     }
 
@@ -533,25 +546,13 @@ namespace mongo {
         }
         WiredTigerSession* session = WiredTigerRecoveryUnit::get(txn)->getSession();
         WT_SESSION* s = session->getSession();
-        invariant(s);
-        WT_CURSOR* c = NULL;
-        int ret;
         BSONObjBuilder bob(result->subobjStart("wiredtiger"));
-        const string uri = "statistics:" + GetURI();
-        bob.append("uri", uri);
-        if ((ret = s->open_cursor(s, uri.c_str(), NULL, "statistics=(fast)", &c)) != 0) {
+        Status status = WiredTigerUtil::exportTableToBSON(s, "statistics:" + GetURI(),
+                                                          "statistics=(fast)", &bob);
+        if (!status.isOK()) {
             bob.append("error", "unable to retrieve statistics");
-            bob.append("message", wiredtiger_strerror(ret));
-        }
-        else {
-            invariant(c);
-            ON_BLOCK_EXIT(c->close, c);
-            const char *desc, *pvalue;
-            uint64_t value;
-            while (c->next(c) == 0 &&
-                   c->get_value(c, &desc, &pvalue, &value) == 0) {
-                bob.append(desc, pvalue);
-            }
+            bob.append("code", static_cast<int>(status.code()));
+            bob.append("reason", status.reason());
         }
     }
 
