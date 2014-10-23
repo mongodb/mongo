@@ -187,6 +187,7 @@ namespace mongo {
         locker.saveLockStateAndUnlock(&lockInfo);
         ASSERT(!locker.isLocked());
         ASSERT_EQUALS(MODE_IX, lockInfo.globalMode);
+        ASSERT_EQUALS(1U, lockInfo.globalRecursiveCount);
 
         // Restore the lock(s) we had.
         locker.restoreLockState(lockInfo);
