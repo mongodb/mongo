@@ -56,11 +56,11 @@ __clsm_enter_update(WT_CURSOR_LSM *clsm)
 	if (clsm->nchunks == 0 ||
 	    (primary = clsm->cursors[clsm->nchunks - 1]) == NULL)
 		return (0);
+	session = (WT_SESSION_IMPL *)primary->session;
 	primary_chunk = clsm->primary_chunk;
 	have_primary = (primary_chunk != NULL &&
 	    primary_chunk->switch_txn == WT_TXN_NONE);
-	ovfl = !have_primary;
-	session = (WT_SESSION_IMPL *)primary->session;
+	ovfl = 0;
 
 	/*
 	 * In LSM there are multiple btrees active at one time. The tree
@@ -114,12 +114,12 @@ __clsm_enter_update(WT_CURSOR_LSM *clsm)
 	 */
 	if (ovfl || !have_primary) {
 		for (waited = 0;
-		    clsm->dsk_gen == lsm_tree->dsk_gen; ++waited) {
-			__wt_sleep(0, 10);
-			if (waited % 100 == 0) {
+		    clsm->dsk_gen == lsm_tree->dsk_gen;
+		    ++waited) {
+			if (waited % 100 == 0)
 				WT_RET(__wt_lsm_manager_push_entry(
 				    session, WT_LSM_WORK_SWITCH, 0, lsm_tree));
-			}
+			__wt_sleep(0, 10);
 		}
 	}
 
