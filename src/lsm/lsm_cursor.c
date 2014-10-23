@@ -80,7 +80,7 @@ __clsm_enter_update(WT_CURSOR_LSM *clsm)
 			    ovfl = __wt_btree_size_overflow(
 			    session, lsm_tree->chunk_size));
 
-		if (ovfl) {
+		if (ovfl || !have_primary) {
 			/*
 			 * Check that we are up-to-date: don't set the switch
 			 * if the tree has changed since we last opened
