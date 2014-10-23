@@ -54,7 +54,7 @@ namespace mongo {
         DocumentSourceLimit *pLimit =
             dynamic_cast<DocumentSourceLimit *>(pNextSource.get());
 
-        /* if it's not another $skip, we can't coalesce */
+        /* if it's not another $limit, we can't coalesce */
         if (!pLimit)
             return false;
 
