@@ -433,6 +433,8 @@ namespace PipelineTests {
             add<Optimizations::Sharded::limitFieldsSentFromShardsToMerger::JustNeedsMetadata>();
             add<Optimizations::Sharded::limitFieldsSentFromShardsToMerger::ShardAlreadyExhaustive>();
         }
-    } myall;
-    
+    };
+
+    SuiteInstance<All> myall;
+
 } // namespace PipelineTests

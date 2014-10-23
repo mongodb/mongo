@@ -235,6 +235,8 @@ namespace QueryStageDistinct {
             add<QueryStageDistinctBasic>();
             add<QueryStageDistinctMultiKey>();
         }
-    }  queryStageDistinctAll;
+    };
+
+    SuiteInstance<All> queryStageDistinctAll;
 
 }  // namespace QueryStageDistinct

@@ -179,7 +179,9 @@ namespace MMapTests {
             add< LeakTest >();
             add< ExtentSizing >();
         }
-    } myall;
+    };
+
+    SuiteInstance<All> myall;
 
 #if 0
 

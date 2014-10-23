@@ -1411,6 +1411,8 @@ namespace QueryStageAnd {
             add<QueryStageAndSortedFirstChildFetched>();
             add<QueryStageAndSortedSecondChildFetched>();
         }
-    }  queryStageAndAll;
+    };
+
+    SuiteInstance<All> queryStageAndAll;
 
 }  // namespace QueryStageAnd

@@ -368,6 +368,8 @@ namespace OplogStartTests {
                 add< OplogStartEOF >();
             }
         }
-    } oplogStart;
+    };
+
+    SuiteInstance<All> oplogStart;
 
 } // namespace OplogStartTests

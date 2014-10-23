@@ -634,7 +634,9 @@ namespace QueryStageMergeSortTests {
             add<QueryStageMergeSortManyShort>();
             add<QueryStageMergeSortInvalidation>();
         }
-    }  queryStageMergeSortTest;
+    };
+
+    SuiteInstance<All> queryStageMergeSortTest;
 
 }  // namespace
 

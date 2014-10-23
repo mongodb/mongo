@@ -914,6 +914,8 @@ namespace AccumulatorTests {
             add<Sum::IntUndefined>();
             add<Sum::NoOverflowBeforeDouble>();
         }
-    } myall;
+    };
+
+    SuiteInstance<All> myall;
 
 } // namespace AccumulatorTests

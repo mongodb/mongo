@@ -2159,7 +2159,9 @@ namespace JSTests {
             add< RoundTripTests::MD5 >();
             add< RoundTripTests::NullString >();
         }
-    } myall;
+    };
+
+    SuiteInstance<All> myall;
 
 } // namespace JavaJSTests
 

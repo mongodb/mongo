@@ -2030,7 +2030,9 @@ namespace UpdateTests {
             add< basic::unset >();
             add< basic::setswitchint >();
         }
-    } myall;
+    };
+
+    SuiteInstance<All> myall;
 
 } // namespace UpdateTests
 
