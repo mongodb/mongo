@@ -1,4 +1,5 @@
 skip	api/leveldb/leveldb_wt_config.in
+skip	build_win/wiredtiger_config.h
 skip	dist/api_config.py
 skip	dist/api_data.py
 skip	dist/api_err.py
@@ -13,6 +14,8 @@ skip	dist/stat.py
 skip	dist/stat_data.py
 skip	dist/style.py
 skip	lang/java/java_doc.i
+skip	lang/java/src/com/wiredtiger/db/AsyncOp.java
+skip	lang/java/src/com/wiredtiger/db/AsyncOpType.java
 skip	lang/java/src/com/wiredtiger/db/Connection.java
 skip	lang/java/src/com/wiredtiger/db/Cursor.java
 skip	lang/java/src/com/wiredtiger/db/SearchStatus.java
@@ -28,7 +31,6 @@ skip	src/conn/api_strerror.c
 skip	src/docs/tools/doxypy.py
 skip	src/include/extern.h
 skip	src/include/flags.h
-skip	src/include/os_win_wiredtiger_config.h
 skip	src/include/queue.h
 skip	src/log/log_auto.c
 skip	src/support/stat.c

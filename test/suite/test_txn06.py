@@ -24,23 +24,39 @@
 # OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
+#
+# test_txn06.py
+#   Transactions: test long-running snapshots
 
+from suite_subprocess import suite_subprocess
+from wtscenario import multiply_scenarios, number_scenarios
+from helper import simple_populate
 import wiredtiger, wttest
 
-# test_isnew.py
-#    connection level is-new operation.
-class test_isnew(wttest.WiredTigerTestCase):
+class test_txn06(wttest.WiredTigerTestCase, suite_subprocess):
+    conn_config = 'verbose=[transaction]'
+    tablename = 'test_txn06'
+    uri = 'table:' + tablename
+    source_uri = 'table:' + tablename + "_src"
+    nrows = 100000
 
-    # Test is-new of a connection.
-    def test_isnew(self):
-        # We just created a connection, is_new should return True.
-        self.assertEquals(self.conn.is_new(), True)
+    def setUpConnectionOpen(self, *args):
+        if not wiredtiger.verbose_build():
+            self.skipTest('requires a verbose build')
+        return super(test_txn06, self).setUpConnectionOpen(*args)
 
-        # Close and re-open the connection, is_new should return False.
-        self.conn.close()
-        self.conn = self.setUpConnectionOpen(".")
-        self.assertEquals(self.conn.is_new(), False)
+    def test_long_running(self):
+        # Populate a table
+        simple_populate(self, self.source_uri, 'key_format=S', self.nrows)
 
+        # Now scan the table and copy the rows into a new table
+        c_src = self.session.create(self.uri, "key_format=S")
+        c_src = self.session.open_cursor(self.source_uri)
+        c = self.session.open_cursor(self.uri)
+        for k, v in c_src:
+            c.set_key(k)
+            c.set_value(v)
+            c.insert()
 
 if __name__ == '__main__':
     wttest.run()

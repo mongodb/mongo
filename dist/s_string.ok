@@ -46,6 +46,7 @@ Bzip
 CAS
 CELL's
 CELLs
+CHECKKEY
 CKPT
 CLMPRSTdehikrsuv
 CLR
@@ -62,12 +63,14 @@ CallsCustDate
 Checksum
 Checksums
 CityHash
+CloseHandle
 Comparator
 Config
 CreateFileMapping
 CreateThread
 CustomersPhone
 DATAITEMs
+DECL
 DESC
 DHANDLE
 DLFCN
@@ -137,6 +140,9 @@ GetModuleHandleEx
 GetProcAddress
 Givargis
 Google
+HHHH
+HHHHLL
+HHHLL
 HYPERLEVELDB
 HyperLevelDB
 IEC
@@ -158,6 +164,7 @@ ITEMs
 Inline
 Intra
 Ippokratis
+Iu
 JPEG
 JSON
 Jyrki
@@ -174,6 +181,8 @@ LIBPTHREAD
 LIBRT
 LIBSNAPPY
 LIBZ
+LLLLLL
+LLLLLLL
 LNO
 LOGREC
 LOGSCAN
@@ -217,6 +226,7 @@ NOLL
 NONINFRINGEMENT
 NOTFOUND
 NOTREACHED
+NOVALUE
 NOWRITE
 NRECS
 NUL
@@ -233,6 +243,8 @@ PADDR
 PAGE's
 PARAM
 POSIX
+PRIu
+PRIu64
 PSIZE
 PTHREAD
 PTR
@@ -279,7 +291,7 @@ STRTOUQ
 STRUCT
 SYS
 Scalability
-SetEndofFile
+SetEndOfFile
 SetFilePointerEx
 Sevii
 SiH
@@ -523,6 +535,7 @@ ds
 dsk
 dsrc
 dst
+dstlen
 dsync
 dt
 dtype
@@ -551,6 +564,7 @@ eventv
 evictable
 evictserver
 exactp
+exe
 execop
 extern
 extlist
@@ -580,6 +594,7 @@ fillms
 firstfit
 fixup
 flcs
+floatnum
 fmt
 fmterr
 fnv
@@ -656,6 +671,7 @@ insertK
 insertV
 instantiation
 intl
+intnum
 intpack
 ints
 inttypes
@@ -664,6 +680,7 @@ io
 ip
 ispo
 iteratively
+jnr
 jrx
 json
 kb
@@ -673,10 +690,13 @@ keygen
 keyname
 keyv
 kv
+kvraw
 kvs
 kvsbdb
 lang
 latencies
+lbrace
+lbracket
 lbz
 ld
 ldl
@@ -817,6 +837,7 @@ os
 ovfl
 ownp
 packv
+parens
 parserp
 patchp
 pathname
@@ -838,6 +859,7 @@ primary's
 printf
 printlog
 priv
+progname
 ps
 pse
 psp
@@ -855,6 +877,8 @@ qsort
 quartile
 qup
 rS
+rbrace
+rbracket
 rdlock
 rduppo
 readlock
@@ -897,6 +921,7 @@ sHQ
 savepoints
 sb
 scanp
+sched
 schemas
 schematab
 scr
@@ -950,6 +975,7 @@ strerror
 strftime
 strget
 stringin
+strlen
 strncmp
 strncpy
 strndup
@@ -994,6 +1020,11 @@ tlist
 tload
 tmp
 toffpage
+tokenizer
+toklen
+tokname
+tokstart
+toktype
 toverflow
 tparent
 tprintlog
@@ -1053,6 +1084,7 @@ unpackv
 unreferenced
 unregister
 unsized
+unterminated
 untyped
 upd
 update's
@@ -1061,6 +1093,7 @@ uri
 uri's
 usecs
 usedp
+usercfg
 usr
 utf
 util

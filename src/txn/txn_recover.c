@@ -12,7 +12,7 @@ typedef struct {
 	WT_SESSION_IMPL *session;
 
 	/* Files from the metadata, indexed by file ID. */
-	struct {
+	struct WT_RECOVERY_FILE {
 		const char *uri;	/* File URI. */
 		WT_CURSOR *c;		/* Cursor used for recovery. */
 		WT_LSN ckpt_lsn;	/* File's checkpoint LSN. */
@@ -58,7 +58,7 @@ __recovery_cursor(WT_SESSION_IMPL *session, WT_RECOVERY *r,
 	 * is more recent than the last checkpoint.  If there is no entry for a
 	 * file, assume it was dropped or missing after a hot backup.
 	 */
-	metadata_op = (id == 0);
+	metadata_op = (id == WT_METAFILE_ID);
 	if (r->metadata_only != metadata_op)
 		;
 	else if (id >= r->nfiles || r->files[id].uri == NULL) {
@@ -117,6 +117,7 @@ __txn_op_apply(
 	uint32_t fileid, mode, optype, opsize;
 
 	session = r->session;
+	cursor = NULL;
 
 	/* Peek at the size and the type. */
 	WT_ERR(__wt_logop_read(session, pp, end, &optype, &opsize));
@@ -230,6 +231,10 @@ __txn_op_apply(
 
 	WT_ILLEGAL_VALUE_ERR(session);
 	}
+
+	/* Reset the cursor so it doesn't block eviction. */
+	if (cursor != NULL)
+		WT_ERR(cursor->reset(cursor));
 
 	r->modified = 1;
 
@@ -401,9 +406,11 @@ err:	if (r->nfiles > r->max_fileid)
 int
 __wt_txn_recover(WT_CONNECTION_IMPL *conn)
 {
+	WT_CURSOR *metac;
 	WT_DECL_RET;
 	WT_RECOVERY r;
 	WT_SESSION_IMPL *session;
+	struct WT_RECOVERY_FILE *metafile;
 	const char *config;
 	int was_backup;
 
@@ -418,7 +425,9 @@ __wt_txn_recover(WT_CONNECTION_IMPL *conn)
 
 	WT_ERR(__wt_metadata_search(session, WT_METAFILE_URI, &config));
 	WT_ERR(__recovery_setup_file(&r, WT_METAFILE_URI, config));
-	WT_ERR(__wt_metadata_cursor(session, NULL, &r.files[0].c));
+	WT_ERR(__wt_metadata_cursor(session, NULL, &metac));
+	metafile = &r.files[WT_METAFILE_ID];
+	metafile->c = metac;
 
 	/*
 	 * First, do a pass through the log to recover the metadata, and
@@ -427,12 +436,12 @@ __wt_txn_recover(WT_CONNECTION_IMPL *conn)
 	 */
 	if (!was_backup) {
 		r.metadata_only = 1;
-		if (IS_INIT_LSN(&r.files[0].ckpt_lsn))
+		if (IS_INIT_LSN(&metafile->ckpt_lsn))
 			WT_ERR(__wt_log_scan(session,
 			    NULL, WT_LOGSCAN_FIRST, __txn_log_recover, &r));
 		else
 			WT_ERR(__wt_log_scan(session,
-			    &r.files[0].ckpt_lsn, 0, __txn_log_recover, &r));
+			    &metafile->ckpt_lsn, 0, __txn_log_recover, &r));
 
 		WT_ASSERT(session,
 		    LOG_CMP(&r.ckpt_lsn, &conn->log->first_lsn) >= 0);
@@ -440,6 +449,13 @@ __wt_txn_recover(WT_CONNECTION_IMPL *conn)
 
 	/* Scan the metadata to find the live files and their IDs. */
 	WT_ERR(__recovery_file_scan(&r));
+
+	/*
+	 * We no longer need the metadata cursor: close it to avoid pinning any
+	 * resources that could block eviction during recovery.
+	 */
+	r.files[0].c = NULL;
+	WT_ERR(metac->close(metac));
 
 	/*
 	 * Now, recover all the files apart from the metadata.

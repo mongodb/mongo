@@ -494,6 +494,7 @@ static int
 __log_acquire(WT_SESSION_IMPL *session, uint64_t recsize, WT_LOGSLOT *slot)
 {
 	WT_CONNECTION_IMPL *conn;
+	WT_DECL_RET;
 	WT_LOG *log;
 
 	conn = S2C(session);
@@ -532,9 +533,15 @@ __log_acquire(WT_SESSION_IMPL *session, uint64_t recsize, WT_LOGSLOT *slot)
 	/*
 	 * Pre-allocate on the first real write into the log file.
 	 */
-	if (log->alloc_lsn.offset == LOG_FIRST_RECORD)
-		WT_RET(__wt_fallocate(session,
-		    log->log_fh, LOG_FIRST_RECORD, conn->log_file_max));
+	if (log->alloc_lsn.offset == LOG_FIRST_RECORD) {
+		if (!log->log_fh->fallocate_available ||
+		    (ret = __wt_fallocate(session, log->log_fh,
+		    LOG_FIRST_RECORD, conn->log_file_max)) == ENOTSUP)
+			ret = __wt_ftruncate(session, log->log_fh,
+			    LOG_FIRST_RECORD + conn->log_file_max);
+		WT_RET(ret);
+	}
+
 	log->alloc_lsn.offset += (wt_off_t)recsize;
 	slot->slot_end_lsn = log->alloc_lsn;
 	slot->slot_error = 0;
@@ -655,9 +662,17 @@ __wt_log_newfile(WT_SESSION_IMPL *session, int conn_create)
 
 	/*
 	 * Set aside the log file handle to be closed later.  Other threads
-	 * may still be using it to write to the log.
+	 * may still be using it to write to the log.  If the log file size
+	 * is small we could fill a log file before the previous one is closed.
+	 * Wait for that to close.
 	 */
-	WT_ASSERT(session, log->log_close_fh == NULL);
+	while (log->log_close_fh != NULL) {
+		__wt_errx(session,
+		    "log_newfile: Log file size %" PRIuMAX " too small",
+		    (uintmax_t)conn->log_file_max);
+		WT_STAT_FAST_CONN_INCR(session, log_close_yields);
+		__wt_yield();
+	}
 	log->log_close_fh = log->log_fh;
 	log->fileid++;
 	WT_RET(__log_openfile(session, 1, &log->log_fh, log->fileid));

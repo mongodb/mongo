@@ -397,9 +397,6 @@ __wt_curindex_open(WT_SESSION_IMPL *session,
 	cursor->key_format = idx->idxkey_format;
 	cursor->value_format = table->value_format;
 
-	WT_ERR(__wt_open_cursor(
-	    session, idx->source, &cindex->iface, cfg, &cindex->child));
-
 	/*
 	 * XXX
 	 * A very odd corner case is an index with a recno key.
@@ -427,11 +424,14 @@ __wt_curindex_open(WT_SESSION_IMPL *session,
 		    session, tmp->data, tmp->size, &cindex->value_plan));
 	}
 
-	/* Open the column groups needed for this index cursor. */
-	WT_ERR(__curindex_open_colgroups(session, cindex, cfg));
-
 	WT_ERR(__wt_cursor_init(
 	    cursor, cursor->internal_uri, owner, cfg, cursorp));
+
+	WT_ERR(__wt_open_cursor(
+	    session, idx->source, cursor, cfg, &cindex->child));
+
+	/* Open the column groups needed for this index cursor. */
+	WT_ERR(__curindex_open_colgroups(session, cindex, cfg));
 
 	if (F_ISSET(cursor, WT_CURSTD_DUMP_JSON))
 		WT_ERR(__wt_json_column_init(cursor, table->key_format,
@@ -439,6 +439,7 @@ __wt_curindex_open(WT_SESSION_IMPL *session,
 
 	if (0) {
 err:		WT_TRET(__curindex_close(cursor));
+		*cursorp = NULL;
 	}
 
 	__wt_scr_free(&tmp);

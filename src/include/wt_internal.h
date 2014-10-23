@@ -12,11 +12,7 @@ extern "C" {
 /*******************************************
  * WiredTiger public include file, and configuration control.
  *******************************************/
-#ifndef _WIN32
 #include "wiredtiger_config.h"
-#else
-#include "os_win_wiredtiger_config.h"
-#endif
 #include "wiredtiger_ext.h"
 
 /*******************************************
@@ -35,6 +31,9 @@ extern "C" {
 #include <errno.h>
 #include <fcntl.h>
 #include <inttypes.h>
+#ifdef _WIN32
+#include <io.h>
+#endif
 #include <limits.h>
 #ifndef _WIN32
 #include <pthread.h>
@@ -280,11 +279,12 @@ struct __wt_update;
 
 #ifdef _WIN32
 #include "os_windows.h"
+#else
+#include "posix.h"
 #endif
 
 #include "misc.h"
 #include "mutex.h"
-#include "posix.h"
 
 #include "stat.h"			/* required by dhandle.h */
 #include "dhandle.h"			/* required by btree.h */

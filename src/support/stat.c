@@ -388,6 +388,8 @@ __wt_stat_init_connection_stats(WT_CONNECTION_STATS *stats)
 	stats->log_buffer_size.desc = "log: total log buffer size";
 	stats->log_bytes_user.desc = "log: user provided log bytes written";
 	stats->log_bytes_written.desc = "log: log bytes written";
+	stats->log_close_yields.desc =
+	    "log: yields waiting for previous log file close";
 	stats->log_max_filesize.desc = "log: maximum log file size";
 	stats->log_reads.desc = "log: log read operations";
 	stats->log_scan_records.desc = "log: records processed by log scan";
@@ -514,6 +516,7 @@ __wt_stat_refresh_connection_stats(void *stats_arg)
 	stats->log_buffer_grow.v = 0;
 	stats->log_bytes_user.v = 0;
 	stats->log_bytes_written.v = 0;
+	stats->log_close_yields.v = 0;
 	stats->log_reads.v = 0;
 	stats->log_scan_records.v = 0;
 	stats->log_scan_rereads.v = 0;

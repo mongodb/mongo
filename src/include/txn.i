@@ -33,6 +33,7 @@ __txn_next_op(WT_SESSION_IMPL *session, WT_TXN_OP **opp)
 
 	*opp = &txn->mod[txn->mod_count++];
 	WT_CLEAR(**opp);
+	(*opp)->fileid = S2BT(session)->id;
 	return (0);
 }
 
@@ -68,7 +69,6 @@ __wt_txn_modify(WT_SESSION_IMPL *session, WT_UPDATE *upd)
 	op->type = F_ISSET(session, WT_SESSION_LOGGING_INMEM) ?
 	    TXN_OP_INMEM : TXN_OP_BASIC;
 	op->u.upd = upd;
-	op->fileid = S2BT(session)->id;
 	upd->txnid = session->txn.id;
 	return (ret);
 }
@@ -284,7 +284,7 @@ __wt_txn_update_check(WT_SESSION_IMPL *session, WT_UPDATE *upd)
 			if (upd->txnid != WT_TXN_ABORTED) {
 				WT_STAT_FAST_DATA_INCR(
 				    session, txn_update_conflict);
-				return (WT_DEADLOCK);
+				return (WT_ROLLBACK);
 			}
 			upd = upd->next;
 		}
@@ -316,8 +316,9 @@ __wt_txn_read_first(WT_SESSION_IMPL *session)
 #endif
 
 	if (txn->isolation == TXN_ISO_READ_COMMITTED ||
-	    (!F_ISSET(txn, TXN_RUNNING) && txn->isolation == TXN_ISO_SNAPSHOT))
-		__wt_txn_refresh(session, 1, 0);
+	    (txn->isolation == TXN_ISO_SNAPSHOT &&
+	    !F_ISSET(txn, TXN_HAS_SNAPSHOT)))
+		__wt_txn_refresh(session, 1);
 }
 
 /*

@@ -31,7 +31,15 @@ JAVA_SRC = \
 		$(JAVADESTFULL)/wiredtiger.java \
 		$(JAVADESTFULL)/wiredtigerConstants.java \
 		$(JAVADESTFULL)/wiredtigerJNI.java \
-		$(JAVAEXAMPLES)/ex_access.java
+		$(JAVAEXAMPLES)/ex_access.java \
+		$(JAVAEXAMPLES)/ex_all.java \
+		$(JAVAEXAMPLES)/ex_async.java \
+		$(JAVAEXAMPLES)/ex_call_center.java \
+		$(JAVAEXAMPLES)/ex_cursor.java \
+		$(JAVAEXAMPLES)/ex_log.java \
+		$(JAVAEXAMPLES)/ex_schema.java \
+		$(JAVAEXAMPLES)/ex_stat.java \
+		$(JAVAEXAMPLES)/ex_thread.java
 
 JAVA_JUNIT = \
 		$(JAVATEST)/AutoCloseTest.java \

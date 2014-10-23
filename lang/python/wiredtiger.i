@@ -381,16 +381,19 @@ COMPARE_OK(__wt_cursor::compare)
 COMPARE_OK(__wt_cursor::search_near)
 
 /* Lastly, some methods need no (additional) error checking. */
-%exception __wt_connection::diagnostic_build;
 %exception __wt_connection::get_home;
 %exception __wt_connection::is_new;
 %exception __wt_connection::search_near;
 %exception __wt_async_op::_set_key;
 %exception __wt_async_op::_set_value;
 %exception __wt_cursor::_set_key;
+%exception __wt_cursor::_set_key_str;
 %exception __wt_cursor::_set_value;
+%exception __wt_cursor::_set_value_str;
 %exception wiredtiger_strerror;
 %exception wiredtiger_version;
+%exception diagnostic_build;
+%exception verbose_build;
 
 /* WT_ASYNC_OP customization. */
 /* First, replace the varargs get / set methods with Python equivalents. */
@@ -565,6 +568,12 @@ typedef int int_void;
 		if self.search() != 0:
 			raise KeyError
 		return self.get_value()
+
+	def __setitem__(self, key, value):
+		'''Python convenience for inserting'''
+		self.set_key(key)
+		self.set_key(value)
+		self.insert()
 %}
 };
 
@@ -575,6 +584,11 @@ typedef int int_void;
 		k.data = data;
 		k.size = (uint32_t)size;
 		$self->set_key($self, &k);
+	}
+
+	/* Get / set keys and values */
+	void _set_key_str(char *str) {
+		$self->set_key($self, str);
 	}
 
 	int_void _set_recno(uint64_t recno) {
@@ -599,6 +613,11 @@ typedef int int_void;
 		v.data = data;
 		v.size = (uint32_t)size;
 		$self->set_value($self, &v);
+	}
+
+	/* Get / set keys and values */
+	void _set_value_str(char *str) {
+		$self->set_value($self, str);
 	}
 
 	/* Don't return values, just throw exceptions on failure. */
@@ -739,6 +758,8 @@ typedef int int_void;
 			args = args[0]
 		if self.is_column:
 			self._set_recno(long(args[0]))
+		elif self.is_json:
+			self._set_key_str(args[0])
 		else:
 			# Keep the Python string pinned
 			self._key = pack(self.key_format, *args)
@@ -748,11 +769,14 @@ typedef int int_void;
 		'''set_value(self) -> None
 		
 		@copydoc WT_CURSOR::set_value'''
-		if len(args) == 1 and type(args[0]) == tuple:
-			args = args[0]
-		# Keep the Python string pinned
-		self._value = pack(self.value_format, *args)
-		self._set_value(self._value)
+		if self.is_json:
+			self._set_value_str(args[0])
+		else:
+			if len(args) == 1 and type(args[0]) == tuple:
+				args = args[0]
+			# Keep the Python string pinned
+			self._value = pack(self.value_format, *args)
+			self._set_value(self._value)
 
 	def __iter__(self):
 		'''Cursor objects support iteration, equivalent to calling
@@ -784,15 +808,27 @@ typedef int int_void;
 	int _freecb() {
 		return (0);
 	}
-
-        int diagnostic_build() {
-%#ifdef HAVE_DIAGNOSTIC
-                return 1;
-%#else
-                return 0;
-%#endif
-        }
 };
+
+%{
+int diagnostic_build() {
+#ifdef HAVE_DIAGNOSTIC
+        return 1;
+#else
+        return 0;
+#endif
+}
+
+int verbose_build() {
+#ifdef HAVE_VERBOSE
+        return 1;
+#else
+        return 0;
+#endif
+}
+%}
+int diagnostic_build();
+int verbose_build();
 
 /* Remove / rename parts of the C API that we don't want in Python. */
 %immutable __wt_cursor::session;

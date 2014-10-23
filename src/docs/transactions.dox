@@ -1,4 +1,4 @@
-/*! @page transactions Transactions
+/*! @m_page{{c,java},transactions,Transactions}
 
 @section transactions_acid ACID properties
 
@@ -42,7 +42,7 @@ If WT_SESSION::commit_transaction returns an error for any reason, the
 transaction was rolled back, not committed.
 
 When transactions are used, data operations can encounter a conflict and
-fail with the ::WT_DEADLOCK error.  If this error occurs, transactions
+fail with the ::WT_ROLLBACK error.  If this error occurs, transactions
 should be rolled back with WT_SESSION::rollback_transaction and the
 operation retried.
 
@@ -76,14 +76,14 @@ the bottleneck of a centralized lock manager and ensures transactional
 operations do not block: reads do not block writes, and vice versa.
 
 Further, writes do not block writes, although concurrent transactions
-updating the same value will fail with ::WT_DEADLOCK.  Some applications
+updating the same value will fail with ::WT_ROLLBACK.  Some applications
 may benefit from application-level synchronization to avoid repeated
 attempts to rollback and update the same value.
 
-Operations in transactions may also fail with the ::WT_DEADLOCK error if
+Operations in transactions may also fail with the ::WT_ROLLBACK error if
 some resource cannot be allocated after repeated attempts.  For example, if
 the cache is not large enough to hold the updates required to satisfy
-transactional readers, an operation may fail and return ::WT_DEADLOCK.
+transactional readers, an operation may fail and return ::WT_ROLLBACK.
 
 @section transaction_isolation Isolation levels
 

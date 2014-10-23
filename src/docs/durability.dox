@@ -1,4 +1,4 @@
-/*! @page durability Commit-level durability
+/*! @m_page{{c,java},durability,Commit-level durability}
 
 WiredTiger supports checkpoint durability by default, and optionally
 commit-level durability when logging is enabled. In most applications,
@@ -13,9 +13,9 @@ enabled using the \c log=(enabled) configuration to ::wiredtiger_open.
 When logging is enabled, WiredTiger writes records to the log for each
 transaction.
 
-Transactions define which updates are made durable together see @ref
-transactions for details.  By default, log records are flushed to disk
-by WT_SESSION::commit_transaction, ensuring that, once
+Transactions define which updates are made durable together see
+@ref transactions for details.  By default, log records are flushed to
+disk by WT_SESSION::commit_transaction, ensuring that, once
 WT_SESSION::commit_transaction returns successfully, updates performed
 by the transaction will be included in the database state regardless of
 application or system failure.

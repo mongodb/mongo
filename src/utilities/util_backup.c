@@ -127,13 +127,14 @@ copy(const char *name, const char *directory)
 	/* Open the read file. */
 	if (snprintf(cbuf, CBUF_LEN, "%s/%s", home, name) >= CBUF_LEN)
 		goto memerr;
-	if ((ifd = open(cbuf, O_RDONLY, 0)) < 0)
+	if ((ifd = open(cbuf, O_BINARY | O_RDONLY, 0)) < 0)
 		goto readerr;
 
 	/* Open the write file. */
 	if (snprintf(cbuf, CBUF_LEN, "%s/%s", directory, name) >= CBUF_LEN)
 		goto memerr;
-	if ((ofd = open(cbuf, O_CREAT | O_WRONLY | O_TRUNC, 0666)) < 0)
+	if ((ofd = open(
+	    cbuf, O_BINARY | O_CREAT | O_WRONLY | O_TRUNC, 0666)) < 0)
 		goto writerr;
 
 	/* Copy the file. */
@@ -156,7 +157,7 @@ copy(const char *name, const char *directory)
 	 * We need to know this file was successfully written, it's a backup.
 	 */
 #ifdef _WIN32
-	if (FlushFileBuffers(_get_osfhandle(fd)) == 0) {
+	if (FlushFileBuffers((HANDLE)_get_osfhandle(ofd)) == 0) {
 		DWORD err = GetLastError();
 		ret = err;
 		goto writerr;

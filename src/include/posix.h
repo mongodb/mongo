@@ -15,3 +15,14 @@
 #ifndef	LLONG_MIN
 #define	LLONG_MIN	(-0x7fffffffffffffffLL - 1)
 #endif
+
+/* Define O_BINARY for Posix systems */
+#define	O_BINARY 	0
+
+/*
+ * Define WT threading and concurrency primitives
+ */
+typedef pthread_cond_t		wt_cond_t;
+typedef pthread_mutex_t		wt_mutex_t;
+typedef pthread_rwlock_t	wt_rwlock_t;
+typedef pthread_t		wt_thread_t;

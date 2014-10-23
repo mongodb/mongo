@@ -10,7 +10,7 @@ apply to data files which don't appear in the backup.
 
 */
 
-/*! @page backup Backups
+/*! @m_page{{c,java},backup,Backups}
 
 WiredTiger cursors provide access to data from a variety of sources.
 One of these sources is the list of files required to perform a backup
@@ -66,7 +66,7 @@ example:
 
 @section backup_util Backup from the command line
 
-The @ref util_backup command may also be used to create backups:
+The @ref_single util_backup command may also be used to create backups:
 
 @code
 rm -rf /path/database.backup &&

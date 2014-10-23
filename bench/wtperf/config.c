@@ -224,6 +224,11 @@ config_threads(CONFIG *cfg, const char *config, size_t len)
 					goto err;
 				continue;
 			}
+			if (STRING_MATCH("ops_per_txn", k.str, k.len)) {
+				if ((workp->ops_per_txn = v.val) < 0)
+					goto err;
+				continue;
+			}
 			if (STRING_MATCH("read", k.str, k.len) ||
 			    STRING_MATCH("reads", k.str, k.len)) {
 				if ((workp->read = v.val) < 0)
@@ -428,14 +433,19 @@ config_opt_file(CONFIG *cfg, const char *filename)
 		goto err;
 	}
 	read_size = read(fd, file_buf, buf_size);
-	if (read_size == -1 || (size_t)read_size != buf_size) {
+	if (read_size == -1
+#ifndef _WIN32
+	/* Windows automatically translates \r\n -> \n so counts will be off */
+	|| (size_t)read_size != buf_size
+#endif
+	) {
 		fprintf(stderr,
 		    "wtperf: read unexpected amount from config file\n");
 		ret = EINVAL;
 		goto err;
 	}
 	/* Make sure the buffer is terminated correctly. */
-	file_buf[buf_size] = '\0';
+	file_buf[read_size] = '\0';
 
 	ret = 0;
 	optionpos = 0;

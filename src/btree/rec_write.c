@@ -4894,23 +4894,21 @@ err:			__wt_scr_free(&tkey);
 	 * be set before a subsequent checkpoint reads it, and because the
 	 * current checkpoint is waiting on this reconciliation to complete,
 	 * there's no risk of that happening).
+	 *
+	 * Otherwise, if no updates were skipped, we have a new maximum
+	 * transaction written for the page (used to decide if a clean page can
+	 * be evicted).  The page only might be clean; if the write generation
+	 * is unchanged since reconciliation started, clear it and update cache
+	 * dirty statistics, if the write generation changed, then the page has
+	 * been written since we started reconciliation, it cannot be
+	 * discarded.
 	 */
 	if (r->leave_dirty) {
 		mod->first_dirty_txn = r->skipped_txn;
 
 		btree->modified = 1;
 		WT_FULL_BARRIER();
-	}
-
-	/*
-	 * If no updates were skipped, we have a new maximum transaction written
-	 * for the page (used to decide if a clean page can be evicted).  The
-	 * page only might be clean; if the write generation is unchanged since
-	 * reconciliation started, clear it and update cache dirty statistics,
-	 * if the write generation changed, then the page has been written since
-	 * we started reconciliation, it cannot be discarded.
-	 */
-	if (!r->leave_dirty) {
+	} else {
 		mod->rec_max_txn = r->max_txn;
 
 		if (WT_ATOMIC_CAS4(mod->write_gen, r->orig_write_gen, 0))

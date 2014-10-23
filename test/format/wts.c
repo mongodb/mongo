@@ -92,7 +92,10 @@ wts_open(const char *home, int set_api, WT_CONNECTION **connp)
 	if (snprintf(config, sizeof(config),
 	    "create,"
 	    "checkpoint_sync=false,cache_size=%" PRIu32 "MB,"
-	    "buffer_alignment=512,lsm_manager=(worker_thread_max=%" PRIu32
+#ifndef _WIN32
+	    "buffer_alignment=512"
+#endif
+	    ",lsm_manager=(worker_thread_max=%" PRIu32
 	    "),error_prefix=\"%s\","
 	    "%s,%s,%s,%s,%s"
 	    "extensions="
@@ -100,7 +103,11 @@ wts_open(const char *home, int set_api, WT_CONNECTION **connp)
 	    "%s,%s",
 	    g.c_cache,
 	    g.c_lsm_worker_threads,
+#ifndef _WIN32
 	    g.progname,
+#else
+	    "t_format.exe",
+#endif
 	    g.c_data_extend ? "file_extend=(data=8MB)" : "",
 	    g.c_logging ? "log=(enabled=true)" : "",
 	    g.c_mmap ? "mmap=true" : "mmap=false",

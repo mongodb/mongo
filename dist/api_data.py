@@ -8,11 +8,6 @@ class Error:
 		self.flags = flags
 
 errors = [
-	Error('WT_DEADLOCK', 'conflict between concurrent operations', '''
-	    This error is generated when an operation cannot be completed
-	    due to a conflict with concurrent operations.  The operation
-	    may be retried; if a transaction is in progress, it should be
-	    rolled back and the operation retried in a new transaction.'''),
 	Error('WT_DUPLICATE_KEY', 'attempt to insert an existing key', '''
 	    This error is generated when the application attempts to insert
 	    a record with the same key as an existing record without the
@@ -29,6 +24,11 @@ errors = [
 	    This error indicates an underlying problem that requires the
 	    application exit and restart.'''),
 	Error('WT_RESTART', 'restart the operation (internal)', undoc=True),
+	Error('WT_ROLLBACK', 'conflict between concurrent operations', '''
+	    This error is generated when an operation cannot be completed
+	    due to a conflict with concurrent operations.  The operation
+	    may be retried; if a transaction is in progress, it should be
+	    rolled back and the operation retried in a new transaction.'''),
 ]
 
 class Method:
@@ -356,6 +356,9 @@ connection_runtime_config = [
 	        merge LSM chunks where possible''',
 	        type='boolean')
 		]),
+	Config('lsm_merge', 'true', r'''
+	    merge LSM chunks where possible (deprecated)''',
+	    type='boolean', undoc=True),
 	Config('eviction', '', r'''
 	    eviction configuration options.''',
 	    type='category', subconfig=[
@@ -451,6 +454,7 @@ connection_runtime_config = [
 	        'shared_cache',
 	        'split',
 	        'temporary',
+	        'transaction',
 	        'verify',
 	        'version',
 	        'write']),
@@ -460,6 +464,88 @@ session_config = [
 	Config('isolation', 'read-committed', r'''
 	    the default isolation level for operations in this session''',
 	    choices=['read-uncommitted', 'read-committed', 'snapshot']),
+]
+
+common_wiredtiger_open = [
+	Config('buffer_alignment', '-1', r'''
+	    in-memory alignment (in bytes) for buffers used for I/O.  The
+	    default value of -1 indicates a platform-specific alignment
+	    value should be used (4KB on Linux systems, zero elsewhere)''',
+	    min='-1', max='1MB'),
+	Config('checkpoint_sync', 'true', r'''
+	    flush files to stable storage when closing or writing
+	    checkpoints''',
+	    type='boolean'),
+	Config('direct_io', '', r'''
+	    Use \c O_DIRECT to access files.  Options are given as a list,
+	    such as <code>"direct_io=[data]"</code>.  Configuring
+	    \c direct_io requires care, see @ref
+	    tuning_system_buffer_cache_direct_io for important warnings.
+		Including \c "data" will cause WiredTiger data files to use
+		\c O_DIRECT, including \c "log" will cause WiredTiger log files
+		to use \c O_DIRECT, and including \c "checkpoint" will cause
+		WiredTiger data files opened at a checkpoint (i.e: read only) to
+		use \c O_DIRECT''',
+	    type='list', choices=['checkpoint', 'data', 'log']),
+	Config('extensions', '', r'''
+	    list of shared library extensions to load (using dlopen).
+	    Any values specified to an library extension are passed to
+	    WT_CONNECTION::load_extension as the \c config parameter
+	    (for example,
+	    <code>extensions=(/path/ext.so={entry=my_entry})</code>)''',
+	    type='list'),
+	Config('file_extend', '', r'''
+	    file extension configuration.  If set, extend files of the set
+	    type in allocations of the set size, instead of a block at a
+	    time as each new block is written.  For example,
+	    <code>file_extend=(data=16MB)</code>''',
+	    type='list', choices=['data', 'log']),
+	Config('hazard_max', '1000', r'''
+	    maximum number of simultaneous hazard pointers per session
+	    handle''',
+	    min='15'),
+	Config('log', '', r'''
+	    enable logging''',
+	    type='category', subconfig=[
+	    Config('archive', 'true', r'''
+	        automatically archive unneeded log files''',
+	        type='boolean'),
+	    Config('enabled', 'false', r'''
+	        enable logging subsystem''',
+	        type='boolean'),
+	    Config('file_max', '100MB', r'''
+	        the maximum size of log files''',
+	        min='100KB', max='2GB'),
+	    Config('path', '""', r'''
+	        the path to a directory into which the log files are written.
+	        If the value is not an absolute path name, the files are created
+	        relative to the database home'''),
+	    ]),
+	Config('mmap', 'true', r'''
+	    Use memory mapping to access files when possible''',
+	    type='boolean'),
+	Config('multiprocess', 'false', r'''
+	    permit sharing between processes (will automatically start an
+	    RPC server for primary processes and use RPC for secondary
+	    processes). <b>Not yet supported in WiredTiger</b>''',
+	    type='boolean'),
+	Config('session_max', '100', r'''
+	    maximum expected number of sessions (including server
+	    threads)''',
+	    min='1'),
+	Config('transaction_sync', '', r'''
+	    how to sync log records when the transaction commits''',
+	    type='category', subconfig=[
+	    Config('enabled', 'false', r'''
+	        whether to sync the log on every commit by default, can
+		be overridden by the \c sync setting to
+		WT_SESSION::begin_transaction''',
+	        type='boolean'),
+	    Config('method', 'fsync', r'''
+	        the method used to ensure log records are stable on disk,
+		see @ref tune_durability for more information''',
+	        choices=['dsync', 'fsync', 'none']),
+	    ]),
 ]
 
 methods = {
@@ -532,11 +618,10 @@ methods = {
 	Config('dump', '', r'''
 	    configure the cursor for dump format inputs and outputs: "hex"
 	    selects a simple hexadecimal format, "json" selects a JSON format
-	    with each record formats as fields named by column names if
+	    with each record formatted as fields named by column names if
 	    available, and "print" selects a format where only non-printing
-	    characters are hexadecimal encoded, and "json" produces a JSON
-	    encoding of the data.  The "hex" and "print" dump format are
-	    compatible with the @ref util_dump and @ref util_load commands''',
+	    characters are hexadecimal encoded.  These formats are compatible
+	    with the @ref util_dump and @ref util_load commands''',
 	    choices=['hex', 'json', 'print']),
 	Config('next_random', 'false', r'''
 	    configure the cursor to return a pseudo-random record from
@@ -711,97 +796,68 @@ methods = {
 
 'session.reconfigure' : Method(session_config),
 
-'wiredtiger_open' : Method(connection_runtime_config + [
-	Config('buffer_alignment', '-1', r'''
-	    in-memory alignment (in bytes) for buffers used for I/O.  The
-	    default value of -1 indicates a platform-specific alignment
-	    value should be used (4KB on Linux systems, zero elsewhere)''',
-	    min='-1', max='1MB'),
-	Config('checkpoint_sync', 'true', r'''
-	    flush files to stable storage when closing or writing
-	    checkpoints''',
+# There are 4 variants of the wiredtiger_open configurations.
+# wiredtiger_open:
+#	Configuration values allowed in the application's configuration
+#	argument to the wiredtiger_open call.
+# wiredtiger_open_basecfg:
+#	Configuration values allowed in the WiredTiger.basecfg file (remove
+# creation-specific configuration strings and add a version string).
+# wiredtiger_open_usercfg:
+#	Configuration values allowed in the WiredTiger.config file (remove
+# creation-specific configuration strings).
+# wiredtiger_open_all:
+#	All of the above configuration values combined
+'wiredtiger_open' : Method(
+	connection_runtime_config +
+	common_wiredtiger_open + [
+	Config('config_base', 'true', r'''
+	    write the base configuration file if creating the database,
+	    see @ref config_base for more information''',
 	    type='boolean'),
 	Config('create', 'false', r'''
 	    create the database if it does not exist''',
 	    type='boolean'),
-	Config('direct_io', '', r'''
-	    Use \c O_DIRECT to access files.  Options are given as a list,
-	    such as <code>"direct_io=[data]"</code>.  Configuring
-	    \c direct_io requires care, see @ref
-	    tuning_system_buffer_cache_direct_io for important warnings.
-		Including \c "data" will cause WiredTiger data files to use
-		\c O_DIRECT, including \c "log" will cause WiredTiger log files
-		to use \c O_DIRECT, and including \c "checkpoint" will cause
-		WiredTiger data files opened at a checkpoint (i.e: read only) to
-		use \c O_DIRECT''',
-	    type='list', choices=['checkpoint', 'data', 'log']),
 	Config('exclusive', 'false', r'''
 	    fail if the database already exists, generally used with the
 	    \c create option''',
 	    type='boolean'),
-	Config('extensions', '', r'''
-	    list of shared library extensions to load (using dlopen).
-	    Any values specified to an library extension are passed to
-	    WT_CONNECTION::load_extension as the \c config parameter
-	    (for example,
-	    <code>extensions=(/path/ext.so={entry=my_entry})</code>)''',
-	    type='list'),
-	Config('file_extend', '', r'''
-	    file extension configuration.  If set, extend files of the set
-	    type in allocations of the set size, instead of a block at a
-	    time as each new block is written.  For example,
-	    <code>file_extend=(data=16MB)</code>''',
-	    type='list', choices=['data', 'log']),
-	Config('hazard_max', '1000', r'''
-	    maximum number of simultaneous hazard pointers per session
-	    handle''',
-	    min='15'),
-	Config('log', '', r'''
-	    enable logging''',
-	    type='category', subconfig=[
-	    Config('archive', 'true', r'''
-	        automatically archive unneeded log files''',
-	        type='boolean'),
-	    Config('enabled', 'false', r'''
-	        enable logging subsystem''',
-	        type='boolean'),
-	    Config('file_max', '100MB', r'''
-	        the maximum size of log files''',
-	        min='100KB', max='2GB'),
-	    Config('path', '""', r'''
-	        the path to a directory into which the log files are written.
-	        If the value is not an absolute path name, the files are created
-	        relative to the database home'''),
-	    ]),
-	Config('mmap', 'true', r'''
-	    Use memory mapping to access files when possible''',
-	    type='boolean'),
-	Config('multiprocess', 'false', r'''
-	    permit sharing between processes (will automatically start an
-	    RPC server for primary processes and use RPC for secondary
-	    processes). <b>Not yet supported in WiredTiger</b>''',
-	    type='boolean'),
-	Config('session_max', '100', r'''
-	    maximum expected number of sessions (including server
-	    threads)''',
-	    min='1'),
-	Config('transaction_sync', '', r'''
-	    how to sync log records when the transaction commits''',
-	    type='category', subconfig=[
-	    Config('enabled', 'false', r'''
-	        whether to sync the log on every commit by default, can
-		be overridden by the \c sync setting to
-		WT_SESSION::begin_transaction''',
-	        type='boolean'),
-	    Config('method', 'fsync', r'''
-	        the method used to ensure log records are stable on disk,
-		see @ref tune_durability for more information''',
-	        choices=['dsync', 'fsync', 'none']),
-	    ]),
 	Config('use_environment_priv', 'false', r'''
 	    use the \c WIREDTIGER_CONFIG and \c WIREDTIGER_HOME environment
 	    variables regardless of whether or not the process is running
 	    with special privileges.  See @ref home for more information''',
 	    type='boolean'),
+]),
+'wiredtiger_open_basecfg' : Method(
+	connection_runtime_config +
+	common_wiredtiger_open + [
+	Config('version', '(major=0,minor=0)', r'''
+	    the file version'''),
+]),
+'wiredtiger_open_usercfg' : Method(
+	connection_runtime_config +
+	common_wiredtiger_open
+),
+'wiredtiger_open_all' : Method(
+	connection_runtime_config +
+	common_wiredtiger_open + [
+	Config('config_base', 'true', r'''
+	    write the base configuration file if creating the database,
+	    see @ref config_base for more information''',
+	    type='boolean'),
+	Config('create', 'false', r'''
+	    create the database if it does not exist''',
+	    type='boolean'),
+	Config('exclusive', 'false', r'''
+	    fail if the database already exists, generally used with the
+	    \c create option''',
+	    type='boolean'),
+	Config('use_environment_priv', 'false', r'''
+	    use the \c WIREDTIGER_CONFIG and \c WIREDTIGER_HOME environment
+	    variables regardless of whether or not the process is running
+	    with special privileges.  See @ref home for more information''',
+	    type='boolean'),
+	Config('version', '(major=0,minor=0)', r'''
+	    the file version'''),
 ]),
 }

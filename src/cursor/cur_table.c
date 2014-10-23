@@ -146,7 +146,7 @@ __wt_curtable_set_value(WT_CURSOR *cursor, ...)
 	CURSOR_API_CALL(cursor, session, set_value, NULL);
 
 	va_start(ap, cursor);
-	if (F_ISSET(cursor, WT_CURSOR_RAW_OK)) {
+	if (F_ISSET(cursor, WT_CURSOR_RAW_OK | WT_CURSTD_DUMP_JSON)) {
 		item = va_arg(ap, WT_ITEM *);
 		cursor->value.data = item->data;
 		cursor->value.size = item->size;
@@ -189,8 +189,8 @@ __curtable_compare(WT_CURSOR *a, WT_CURSOR *b, int *cmpp)
 	if (strcmp(a->internal_uri, b->internal_uri) != 0)
 		WT_ERR_MSG(session, EINVAL,
 		    "comparison method cursors must reference the same object");
-	WT_CURSOR_NEEDKEY(WT_CURSOR_PRIMARY(a));
-	WT_CURSOR_NEEDKEY(WT_CURSOR_PRIMARY(b));
+	WT_CURSOR_CHECKKEY(WT_CURSOR_PRIMARY(a));
+	WT_CURSOR_CHECKKEY(WT_CURSOR_PRIMARY(b));
 
 	ret = WT_CURSOR_PRIMARY(a)->compare(
 	    WT_CURSOR_PRIMARY(a), WT_CURSOR_PRIMARY(b), cmpp);

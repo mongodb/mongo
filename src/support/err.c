@@ -188,7 +188,7 @@ __wt_eventv(WT_SESSION_IMPL *session, int msg_event, int error,
 	 */
 	prefix_cnt = 0;
 	if (__wt_epoch(session, &ts) == 0) {
-		__wt_thread_id(session, tid, sizeof(tid));
+		__wt_thread_id(tid, sizeof(tid));
 		remain = WT_PTRDIFF(end, p);
 		wlen = (size_t)snprintf(p, remain,
 		    "[%" PRIuMAX ":%" PRIuMAX "][%s]",

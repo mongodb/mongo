@@ -72,12 +72,14 @@ Vv
 WiredTiger
 WiredTiger's
 WiredTigerCheckpoint
+WiredTigerException
 WiredTigerLog
 WiredTigerTestCase
 Za
 aR
 abstime
 ack'ed
+ajn
 alloc
 allocator
 allocsize
@@ -88,9 +90,9 @@ ar
 archiver
 arg
 async
-autogen
 atomicity
 autoconf
+autogen
 automake
 basecfg
 basho
@@ -196,6 +198,8 @@ freelist
 fsync
 gcc
 gdbm
+getKey
+getValue
 getopt
 getter
 gid
@@ -230,6 +234,7 @@ keyfmt
 keyname
 keyvalue
 kvs
+lang
 lastname
 len
 leveldb
@@ -329,6 +334,10 @@ priv
 proc
 pthread
 pthreads
+putKey
+putKeyString
+putValue
+putValueString
 py
 qnx
 rdbms
@@ -344,6 +353,7 @@ recnum
 recoverability
 recs
 rectype
+relinking
 rerequests
 ret
 rf

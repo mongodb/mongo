@@ -290,8 +290,7 @@ __wt_spin_unlock(WT_SESSION_IMPL *session, WT_SPINLOCK *t)
 
 #elif SPINLOCK_TYPE == SPINLOCK_MSVC
 
-#define	WT_DECL_SPINLOCK_ID(i)						\
-	static int i = WT_SPINLOCK_REGISTER
+#define	WT_DECL_SPINLOCK_ID(i)	
 #define	WT_SPINLOCK_REGISTER		-1
 #define	WT_SPINLOCK_REGISTER_FAILED	-2
 

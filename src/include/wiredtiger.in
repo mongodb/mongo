@@ -851,10 +851,9 @@ struct __wt_session {
 	 * modification., a string; default empty.}
 	 * @config{dump, configure the cursor for dump format inputs and
 	 * outputs: "hex" selects a simple hexadecimal format\, "json" selects a
-	 * JSON format with each record formats as fields named by column names
-	 * if available\, and "print" selects a format where only non-printing
-	 * characters are hexadecimal encoded\, and "json" produces a JSON
-	 * encoding of the data.  The "hex" and "print" dump format are
+	 * JSON format with each record formatted as fields named by column
+	 * names if available\, and "print" selects a format where only
+	 * non-printing characters are hexadecimal encoded.  These formats are
 	 * compatible with the @ref util_dump and @ref util_load commands., a
 	 * string\, chosen from the following options: \c "hex"\, \c "json"\, \c
 	 * "print"; default empty.}
@@ -1570,8 +1569,8 @@ struct __wt_connection {
 	 * "evictserver"\, \c "fileops"\, \c "log"\, \c "lsm"\, \c "metadata"\,
 	 * \c "mutex"\, \c "overflow"\, \c "read"\, \c "reconcile"\, \c
 	 * "recovery"\, \c "salvage"\, \c "shared_cache"\, \c "split"\, \c
-	 * "temporary"\, \c "verify"\, \c "version"\, \c "write"; default
-	 * empty.}
+	 * "temporary"\, \c "transaction"\, \c "verify"\, \c "version"\, \c
+	 * "write"; default empty.}
 	 * @configend
 	 * @errors
 	 */
@@ -1806,6 +1805,9 @@ struct __wt_connection {
  * @config{ ),,}
  * @config{checkpoint_sync, flush files to stable storage when closing or
  * writing checkpoints., a boolean flag; default \c true.}
+ * @config{config_base, write the base configuration file if creating the
+ * database\, see @ref config_base for more information., a boolean flag;
+ * default \c true.}
  * @config{create, create the database if it does not exist., a boolean flag;
  * default \c false.}
  * @config{direct_io, Use \c O_DIRECT to access files.  Options are given as a
@@ -1953,8 +1955,8 @@ struct __wt_connection {
  * "checkpoint"\, \c "compact"\, \c "evict"\, \c "evictserver"\, \c "fileops"\,
  * \c "log"\, \c "lsm"\, \c "metadata"\, \c "mutex"\, \c "overflow"\, \c
  * "read"\, \c "reconcile"\, \c "recovery"\, \c "salvage"\, \c "shared_cache"\,
- * \c "split"\, \c "temporary"\, \c "verify"\, \c "version"\, \c "write";
- * default empty.}
+ * \c "split"\, \c "temporary"\, \c "transaction"\, \c "verify"\, \c "version"\,
+ * \c "write"; default empty.}
  * @configend
  * Additionally, if files named \c WiredTiger.config or \c WiredTiger.basecfg
  * appear in the WiredTiger home directory, they are read for configuration
@@ -2454,48 +2456,52 @@ const char *wiredtiger_version(int *majorp, int *minorp, int *patchp);
  * Error return section: BEGIN
  */
 /*!
- * Conflict between concurrent operations.
- * This error is generated when an operation cannot be completed due to a
- * conflict with concurrent operations.  The operation may be retried; if a
- * transaction is in progress, it should be rolled back and the operation
- * retried in a new transaction.
- */
-#define	WT_DEADLOCK	-31800
-/*!
  * Attempt to insert an existing key.
  * This error is generated when the application attempts to insert a record with
  * the same key as an existing record without the 'overwrite' configuration to
  * WT_SESSION::open_cursor.
  */
-#define	WT_DUPLICATE_KEY	-31801
+#define	WT_DUPLICATE_KEY	-31800
 /*!
  * Non-specific WiredTiger error.
  * This error is returned when an error is not covered by a specific error
  * return.
  */
-#define	WT_ERROR	-31802
+#define	WT_ERROR	-31801
 /*!
  * Item not found.
  * This error indicates an operation did not find a value to return.  This
  * includes cursor search and other operations where no record matched the
  * cursor's search key such as WT_CURSOR::update or WT_CURSOR::remove.
  */
-#define	WT_NOTFOUND	-31803
+#define	WT_NOTFOUND	-31802
 /*!
  * WiredTiger library panic.
  * This error indicates an underlying problem that requires the application exit
  * and restart.
  */
-#define	WT_PANIC	-31804
+#define	WT_PANIC	-31803
 /*! @cond internal */
 /*! Restart the operation (internal). */
-#define	WT_RESTART	-31805
+#define	WT_RESTART	-31804
 /*! @endcond */
+/*!
+ * Conflict between concurrent operations.
+ * This error is generated when an operation cannot be completed due to a
+ * conflict with concurrent operations.  The operation may be retried; if a
+ * transaction is in progress, it should be rolled back and the operation
+ * retried in a new transaction.
+ */
+#define	WT_ROLLBACK	-31805
 /*
  * Error return section: END
  * DO NOT EDIT: automatically built by dist/api_err.py.
  */
 /*! @} */
+
+#ifndef DOXYGEN
+#define	WT_DEADLOCK	WT_ROLLBACK		/* Backward compatibility */
+#endif
 
 /*! @} */
 
@@ -3119,94 +3125,96 @@ extern int wiredtiger_extension_terminate(WT_CONNECTION *connection);
 #define	WT_STAT_CONN_LOG_BYTES_USER			1060
 /*! log: log bytes written */
 #define	WT_STAT_CONN_LOG_BYTES_WRITTEN			1061
+/*! log: yields waiting for previous log file close */
+#define	WT_STAT_CONN_LOG_CLOSE_YIELDS			1062
 /*! log: maximum log file size */
-#define	WT_STAT_CONN_LOG_MAX_FILESIZE			1062
+#define	WT_STAT_CONN_LOG_MAX_FILESIZE			1063
 /*! log: log read operations */
-#define	WT_STAT_CONN_LOG_READS				1063
+#define	WT_STAT_CONN_LOG_READS				1064
 /*! log: records processed by log scan */
-#define	WT_STAT_CONN_LOG_SCAN_RECORDS			1064
+#define	WT_STAT_CONN_LOG_SCAN_RECORDS			1065
 /*! log: log scan records requiring two reads */
-#define	WT_STAT_CONN_LOG_SCAN_REREADS			1065
+#define	WT_STAT_CONN_LOG_SCAN_REREADS			1066
 /*! log: log scan operations */
-#define	WT_STAT_CONN_LOG_SCANS				1066
+#define	WT_STAT_CONN_LOG_SCANS				1067
 /*! log: consolidated slot closures */
-#define	WT_STAT_CONN_LOG_SLOT_CLOSES			1067
+#define	WT_STAT_CONN_LOG_SLOT_CLOSES			1068
 /*! log: logging bytes consolidated */
-#define	WT_STAT_CONN_LOG_SLOT_CONSOLIDATED		1068
+#define	WT_STAT_CONN_LOG_SLOT_CONSOLIDATED		1069
 /*! log: consolidated slot joins */
-#define	WT_STAT_CONN_LOG_SLOT_JOINS			1069
+#define	WT_STAT_CONN_LOG_SLOT_JOINS			1070
 /*! log: consolidated slot join races */
-#define	WT_STAT_CONN_LOG_SLOT_RACES			1070
+#define	WT_STAT_CONN_LOG_SLOT_RACES			1071
 /*! log: slots selected for switching that were unavailable */
-#define	WT_STAT_CONN_LOG_SLOT_SWITCH_FAILS		1071
+#define	WT_STAT_CONN_LOG_SLOT_SWITCH_FAILS		1072
 /*! log: record size exceeded maximum */
-#define	WT_STAT_CONN_LOG_SLOT_TOOBIG			1072
+#define	WT_STAT_CONN_LOG_SLOT_TOOBIG			1073
 /*! log: failed to find a slot large enough for record */
-#define	WT_STAT_CONN_LOG_SLOT_TOOSMALL			1073
+#define	WT_STAT_CONN_LOG_SLOT_TOOSMALL			1074
 /*! log: consolidated slot join transitions */
-#define	WT_STAT_CONN_LOG_SLOT_TRANSITIONS		1074
+#define	WT_STAT_CONN_LOG_SLOT_TRANSITIONS		1075
 /*! log: log sync operations */
-#define	WT_STAT_CONN_LOG_SYNC				1075
+#define	WT_STAT_CONN_LOG_SYNC				1076
 /*! log: log write operations */
-#define	WT_STAT_CONN_LOG_WRITES				1076
+#define	WT_STAT_CONN_LOG_WRITES				1077
 /*! sleep for LSM checkpoint throttle */
-#define	WT_STAT_CONN_LSM_CHECKPOINT_THROTTLE		1077
+#define	WT_STAT_CONN_LSM_CHECKPOINT_THROTTLE		1078
 /*! sleep for LSM merge throttle */
-#define	WT_STAT_CONN_LSM_MERGE_THROTTLE			1078
+#define	WT_STAT_CONN_LSM_MERGE_THROTTLE			1079
 /*! rows merged in an LSM tree */
-#define	WT_STAT_CONN_LSM_ROWS_MERGED			1079
+#define	WT_STAT_CONN_LSM_ROWS_MERGED			1080
 /*! LSM App work units currently queued */
-#define	WT_STAT_CONN_LSM_WORK_QUEUE_APP			1080
+#define	WT_STAT_CONN_LSM_WORK_QUEUE_APP			1081
 /*! LSM Merge work units currently queued */
-#define	WT_STAT_CONN_LSM_WORK_QUEUE_MANAGER		1081
+#define	WT_STAT_CONN_LSM_WORK_QUEUE_MANAGER		1082
 /*! LSM tree queue hit maximum */
-#define	WT_STAT_CONN_LSM_WORK_QUEUE_MAX			1082
+#define	WT_STAT_CONN_LSM_WORK_QUEUE_MAX			1083
 /*! LSM Switch work units currently queued */
-#define	WT_STAT_CONN_LSM_WORK_QUEUE_SWITCH		1083
+#define	WT_STAT_CONN_LSM_WORK_QUEUE_SWITCH		1084
 /*! LSM tree maintenance operations scheduled */
-#define	WT_STAT_CONN_LSM_WORK_UNITS_CREATED		1084
+#define	WT_STAT_CONN_LSM_WORK_UNITS_CREATED		1085
 /*! LSM tree maintenance operations discarded */
-#define	WT_STAT_CONN_LSM_WORK_UNITS_DISCARDED		1085
+#define	WT_STAT_CONN_LSM_WORK_UNITS_DISCARDED		1086
 /*! LSM tree maintenance operations executed */
-#define	WT_STAT_CONN_LSM_WORK_UNITS_DONE		1086
+#define	WT_STAT_CONN_LSM_WORK_UNITS_DONE		1087
 /*! memory allocations */
-#define	WT_STAT_CONN_MEMORY_ALLOCATION			1087
+#define	WT_STAT_CONN_MEMORY_ALLOCATION			1088
 /*! memory frees */
-#define	WT_STAT_CONN_MEMORY_FREE			1088
+#define	WT_STAT_CONN_MEMORY_FREE			1089
 /*! memory re-allocations */
-#define	WT_STAT_CONN_MEMORY_GROW			1089
+#define	WT_STAT_CONN_MEMORY_GROW			1090
 /*! total read I/Os */
-#define	WT_STAT_CONN_READ_IO				1090
+#define	WT_STAT_CONN_READ_IO				1091
 /*! page reconciliation calls */
-#define	WT_STAT_CONN_REC_PAGES				1091
+#define	WT_STAT_CONN_REC_PAGES				1092
 /*! page reconciliation calls for eviction */
-#define	WT_STAT_CONN_REC_PAGES_EVICTION			1092
+#define	WT_STAT_CONN_REC_PAGES_EVICTION			1093
 /*! reconciliation failed because an update could not be included */
-#define	WT_STAT_CONN_REC_SKIPPED_UPDATE			1093
+#define	WT_STAT_CONN_REC_SKIPPED_UPDATE			1094
 /*! split bytes currently awaiting free */
-#define	WT_STAT_CONN_REC_SPLIT_STASHED_BYTES		1094
+#define	WT_STAT_CONN_REC_SPLIT_STASHED_BYTES		1095
 /*! split objects currently awaiting free */
-#define	WT_STAT_CONN_REC_SPLIT_STASHED_OBJECTS		1095
+#define	WT_STAT_CONN_REC_SPLIT_STASHED_OBJECTS		1096
 /*! pthread mutex shared lock read-lock calls */
-#define	WT_STAT_CONN_RWLOCK_READ			1096
+#define	WT_STAT_CONN_RWLOCK_READ			1097
 /*! pthread mutex shared lock write-lock calls */
-#define	WT_STAT_CONN_RWLOCK_WRITE			1097
+#define	WT_STAT_CONN_RWLOCK_WRITE			1098
 /*! open cursor count */
-#define	WT_STAT_CONN_SESSION_CURSOR_OPEN		1098
+#define	WT_STAT_CONN_SESSION_CURSOR_OPEN		1099
 /*! transactions */
-#define	WT_STAT_CONN_TXN_BEGIN				1099
+#define	WT_STAT_CONN_TXN_BEGIN				1100
 /*! transaction checkpoints */
-#define	WT_STAT_CONN_TXN_CHECKPOINT			1100
+#define	WT_STAT_CONN_TXN_CHECKPOINT			1101
 /*! transaction checkpoint currently running */
-#define	WT_STAT_CONN_TXN_CHECKPOINT_RUNNING		1101
+#define	WT_STAT_CONN_TXN_CHECKPOINT_RUNNING		1102
 /*! transactions committed */
-#define	WT_STAT_CONN_TXN_COMMIT				1102
+#define	WT_STAT_CONN_TXN_COMMIT				1103
 /*! transaction failures due to cache overflow */
-#define	WT_STAT_CONN_TXN_FAIL_CACHE			1103
+#define	WT_STAT_CONN_TXN_FAIL_CACHE			1104
 /*! transactions rolled back */
-#define	WT_STAT_CONN_TXN_ROLLBACK			1104
+#define	WT_STAT_CONN_TXN_ROLLBACK			1105
 /*! total write I/Os */
-#define	WT_STAT_CONN_WRITE_IO				1105
+#define	WT_STAT_CONN_WRITE_IO				1106
 
 /*!
  * @}

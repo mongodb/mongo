@@ -54,8 +54,14 @@
 #define	WT_LEADING_ZEROS(x, i)						\
 	(i = (x == 0) ? (int)sizeof (x) : __builtin_clzll(x) >> 3)
 #elif defined(_MSC_VER)
-#define	WT_LEADING_ZEROS(x, i)						\
-	(i = (x == 0) ? (int)sizeof (x) : __lzcnt64(x) >> 3)
+#define	WT_LEADING_ZEROS(x, i)	do {					\
+	if (x == 0) i = (int)sizeof(x);				\
+	else  { 							\
+		unsigned long __index;					\
+		_BitScanReverse64(&__index, x);				\
+		__index = 63 ^ __index;					\
+		i = (int)(__index >> 3); }				\
+	} while (0)
 #else
 #define	WT_LEADING_ZEROS(x, i) do {					\
 	uint64_t __x = (x);						\
@@ -84,7 +90,7 @@ __wt_vpack_posint(uint8_t **pp, size_t maxlen, uint64_t x)
 	*p++ |= (len & 0xf);
 
 	for (shift = (len - 1) << 3; len != 0; --len, shift -= 8)
-		*p++ = (x >> shift);
+		*p++ = (uint8_t)(x >> shift);
 
 	*pp = p;
 	return (0);
@@ -114,7 +120,7 @@ __wt_vpack_negint(uint8_t **pp, size_t maxlen, uint64_t x)
 	*p++ |= (lz & 0xf);
 
 	for (shift = (len - 1) << 3; len != 0; shift -= 8, --len)
-		*p++ = (x >> shift);
+		*p++ = (uint8_t)(x >> shift);
 
 	*pp = p;
 	return (0);

@@ -1,4 +1,4 @@
-/*! @page schema Schema, Columns, Column Groups, Indices and Projections
+/*! @m_page{{c,java},schema,Schema, Columns, Column Groups, Indices and Projections}
 
 While many tables have simple key/value pairs for records, WiredTiger
 also supports more complex data patterns.
@@ -57,7 +57,7 @@ Key and value types may also be chosen from a list, or composed of multiple
 columns with any combination of types.  Keys and values may be up to
 (<code>4GB - 512B</code>) bytes in size.
 
-See @subpage keyvalue for more details on raw key / value items.
+See @subpage_single keyvalue for more details on raw key / value items.
 
 @section schema_format_types Format types
 
@@ -91,14 +91,20 @@ otherwise identical to the \c 'Q' type.
 
 The \c 'S' type is encoded as a C language string terminated by a
 NUL character.
+@m_if{java}
+Because of this, the associated Java String may not contain the NUL character.
+@m_endif
 
 The \c 't' type is used for fixed-length bit field values.  If
 it is preceded by a size, that indicates the number of bits to store,
 between 1 and 8.  That number of low-order bits will be stored in the
-table.  The default is a size of 1 bit: that is, a boolean.  C applications
-must always use a \c uint8_t type (or equivalently,
+table.  The default is a size of 1 bit: that is, a boolean.
+@m_if{c}
+C applications must always use a \c uint8_t type (or equivalently,
 <code>unsigned char</code>) for calls to WT_CURSOR::set_value, and a
-pointer to the same for calls to WT_CURSOR::get_value.  If a bit field
+pointer to the same for calls to WT_CURSOR::get_value.
+@m_endif
+If a bit field
 value is combined with other types in a packing format, it is equivalent to
 \c 'B', and a full byte is used to store it.
 
@@ -127,7 +133,11 @@ natural integer ordering under the default collator.
 See @subpage packing for details of WiredTiger's packing format.
 
 WiredTiger can also be extended with custom collators by implementing the
+@m_if{c}
 WT_COLLATOR interface.
+@m_else
+WT_COLLATOR interface (C only).
+@m_endif
 
 @section schema_key_and_value_formats Key and value formats
 
@@ -148,10 +158,17 @@ follows:
 
 @section schema_cursor_formats Cursor formats
 
-Cursors for a table have the same key format as the table itself.  The key
-columns of a cursor are set with WT_CURSOR::set_key and accessed with
-WT_CURSOR::get_key.  WT_CURSOR::set_key is analogous to \c printf, and takes
-a list of values in the order the key columns are configured in \c
+Cursors for a table have the same key format as the table itself.
+@m_if{c}
+The key columns of a cursor are set with WT_CURSOR::set_key and accessed with
+WT_CURSOR::get_key.  WT_CURSOR::set_key is analogous to \c printf,
+and takes a list of value
+@m_else
+The key columns of a cursor are set with the \c Cursor.putKey* methods
+and accessed with the \c Cursor.getKey* methods.  \c Cursor.putKey* methods
+must be called
+@m_endif
+in the order the key columns are configured in \c
 key_format.
 
 For example, setting the key for a row-store table with strings as keys
@@ -169,20 +186,31 @@ the key_format was \c "SiH", would be done as follows:
 
 @snippet ex_all.c Set the cursor's composite key
 
-The key's values are accessed with WT_CURSOR::get_key, which is analogous
+The key's values are accessed with
+@m_if{c}
+WT_CURSOR::get_key, which is analogous
 to \c scanf, and takes a list of pointers to values in the same order:
+@m_else
+successive calls to \c Cursor.getKey* methods:
+@m_endif
 
 @snippet ex_all.c Get the cursor's string key
 @snippet ex_all.c Get the cursor's record number key
 @snippet ex_all.c Get the cursor's composite key
 
 Cursors for a table have the same value format as the table, unless a
-projection is configured with WT_SESSION::open_cursor.  See @ref
-cursor_projections for more information.
+projection is configured with WT_SESSION::open_cursor.  See
+@ref cursor_projections for more information.
 
+@m_if{c}
 WT_CURSOR::set_value is used to set value columns, and
 WT_CURSOR::get_value is used to get value columns, in the same way as
 described for WT_CURSOR::set_key and WT_CURSOR::get_key.
+@m_else
+\c The Cursor.putValue* methods are used to set value columns, and
+\c Cursor.getValue* are used to get value columns, in the same way as
+described for \c Cursor.putKey* and \c Cursor.getKey*.
+@m_endif
 
 @section schema_columns Columns
 
@@ -271,8 +299,13 @@ Continuing the example, we might open an index on the \c country column:
 Cursors are opened on indices by passing the index's URI to the
 WT_SESSION::open_cursor method.
 
-Index cursors use the specified index key columns for WT_CURSOR::get_key
-and WT_CURSOR::set_key.  For example, we can retrieve information from
+Index cursors use the specified index key columns for
+@m_if{c}
+WT_CURSOR::get_key and WT_CURSOR::set_key.
+@m_else
+\c Cursor.getKey* and \c Cursor.putKey* calls.
+@m_endif
+For example, we can retrieve information from
 the \c country index as follows:
 
 @snippet ex_schema.c Search in a simple index
@@ -282,19 +315,34 @@ to the WT_SESSION::create call:
 
 @snippet ex_schema.c Create an index with a composite key
 
-To retrieve information from a composite index requires a more
-complicated WT_CURSOR::set_key call, but is otherwise the same:
+To retrieve information from a composite index requires a more complicated
+@m_if{c}
+WT_CURSOR::set_key call,
+@m_else
+set of \c Cursor.putKey* calls,
+@m_endif
+but is otherwise the same:
 
 @snippet ex_schema.c Search in a composite index
 
 @section schema_index_projections Index cursor projections
 
 By default, index cursors return all of the table's value columns from
-WT_CURSOR::get_value.  The application can specify that a subset of the
-usual columns should be returned in calls to WT_CURSOR::get_value by
-appending a list of columns to the \c uri parameter of the
-WT_SESSION::open_cursor call.  This is called a \em projection, see @ref
-cursor_projections for more details.
+@m_if{c}
+WT_CURSOR::get_value.
+@m_else
+\c Cursor.getValue* calls.
+@m_endif
+The application can specify that a subset of the
+usual columns should be returned in calls to
+@m_if{c}
+WT_CURSOR::get_value
+@m_else
+\c Cursor.getValue
+@m_endif
+by appending a list of columns to the \c uri parameter of the
+WT_SESSION::open_cursor call.  This is called a \em projection, see
+@ref cursor_projections for more details.
 
 In the case of index cursors, a projection can be used to avoid lookups
 in column groups that do not hold columns relevant to the operation.

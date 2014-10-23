@@ -169,7 +169,6 @@ __wt_open(WT_SESSION_IMPL *session,
 
 	WT_ERR(__wt_calloc(session, 1, sizeof(WT_FH), &fh));
 	WT_ERR(__wt_strdup(session, name, &fh->name));
-	WT_ERR(__wt_spin_init(session, &fh->lock, "file handle"));
 	fh->fd = fd;
 	fh->ref = 1;
 	fh->direct_io = direct_io;
@@ -181,6 +180,9 @@ __wt_open(WT_SESSION_IMPL *session,
 	if (dio_type == WT_FILE_TYPE_DATA ||
 	    dio_type == WT_FILE_TYPE_CHECKPOINT)
 		fh->extend_len = conn->data_extend_len;
+
+	/* Configure fallocate/posix_fallocate calls. */
+	__wt_fallocate_config(session, fh);
 
 	/*
 	 * Repeat the check for a match, but then link onto the database's list
@@ -205,7 +207,6 @@ __wt_open(WT_SESSION_IMPL *session,
 	if (matched) {
 err:		if (fh != NULL) {
 			__wt_free(session, fh->name);
-			__wt_spin_destroy(session, &fh->lock);
 			__wt_free(session, fh);
 		}
 		if (fd != -1)
@@ -243,11 +244,10 @@ __wt_close(WT_SESSION_IMPL *session, WT_FH *fh)
 	/* Discard the memory. */
 	if (close(fh->fd) != 0) {
 		ret = __wt_errno();
-		__wt_err(session, ret, "%s", fh->name);
+		__wt_err(session, ret, "close: %s", fh->name);
 	}
 
 	__wt_free(session, fh->name);
-	__wt_spin_destroy(session, &fh->lock);
 	__wt_free(session, fh);
 	return (ret);
 }

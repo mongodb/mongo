@@ -262,7 +262,7 @@ __verify_dsk_row(
 			break;
 		}
 
-		/* Check if any referenced item is entirely in the file. */
+		/* Check if any referenced item has a valid address. */
 		switch (cell_type) {
 		case WT_CELL_ADDR_DEL:
 		case WT_CELL_ADDR_INT:
@@ -313,8 +313,8 @@ __verify_dsk_row(
 		if (cell_num > 1 && prefix > last->size)
 			WT_ERR_VRFY(session,
 			    "key %" PRIu32 " on page at %s has a prefix "
-			    "compression count of %" PRIu32
-			    ", larger than the length of the previous key, %zu",
+			    "compression count of %" PRIu32 ", larger than "
+			    "the length of the previous key, %" WT_SIZET_FMT,
 			    cell_num, addr, prefix, last->size);
 
 		/*
@@ -608,8 +608,8 @@ __verify_dsk_memsize(WT_SESSION_IMPL *session,
 	if (len == 0)
 		return (0);
 	WT_RET_VRFY(session,
-	    "%s page at %s has %zu unexpected bytes of data after the last "
-	    "cell",
+	    "%s page at %s has %" WT_SIZET_FMT " unexpected bytes of data "
+	    "after the last cell",
 	    __wt_page_type_string(dsk->type), addr, len);
 }
 

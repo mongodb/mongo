@@ -26,7 +26,9 @@
  */
 
 #include <sys/stat.h>
+#ifndef _WIN32
 #include <sys/time.h>
+#endif
 #include <sys/types.h>
 
 #include <assert.h>
@@ -35,12 +37,21 @@
 #include <fcntl.h>
 #include <inttypes.h>
 #include <limits.h>
+#ifndef _WIN32
 #include <pthread.h>
+#endif
 #include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#ifndef _WIN32
 #include <unistd.h>
+#endif
+#include <time.h>
+
+#ifdef _WIN32
+#include "windows_shim.h"
+#endif
 
 #ifdef BDB
 #include <db.h>
@@ -48,6 +59,7 @@
 #include <wiredtiger.h>
 
 #include <wiredtiger_ext.h>
+
 extern WT_EXTENSION_API *wt_api;
 
 #define	EXTPATH	"../../ext/"			/* Extensions path */
@@ -83,6 +95,12 @@ extern WT_EXTENSION_API *wt_api;
 
 #define	DATASOURCE(v)	(strcmp(v, g.c_data_source) == 0 ? 1 : 0)
 #define	SINGLETHREADED	(g.c_threads == 1)
+
+#ifndef _WIN32
+#define	SIZET_FMT	"%zu"			/* size_t format string */
+#else
+#define	SIZET_FMT	"%Iu"			/* size_t format string */
+#endif
 
 typedef struct {
 	char *progname;				/* Program name */

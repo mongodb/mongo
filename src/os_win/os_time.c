@@ -30,7 +30,6 @@ __wt_seconds(WT_SESSION_IMPL *session, time_t *timep)
 int
 __wt_epoch(WT_SESSION_IMPL *session, struct timespec *tsp)
 {
-	WT_DECL_RET;
 	uint64_t ns100;
 
 	FILETIME time;
@@ -39,7 +38,7 @@ __wt_epoch(WT_SESSION_IMPL *session, struct timespec *tsp)
 	ns100 = (((int64_t)time.dwHighDateTime << 32) + time.dwLowDateTime)
 	    - 116444736000000000LL;
 	tsp->tv_sec = ns100 / 10000000;
-	tsp->tv_nsec = ns100 * 100;
+	tsp->tv_nsec = (long)((ns100 % 10000000) * 100);
 
 	return (0);
 }
@@ -53,7 +52,7 @@ localtime_r(const time_t *timer, struct tm *result)
 {
 	errno_t err;
 
-	err = localtime_s(timer, result);
+	err = localtime_s(result, timer);
 	if (err != 0) {
 		__wt_err(NULL, err, "localtime_s");
 		return (NULL);

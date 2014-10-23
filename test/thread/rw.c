@@ -177,13 +177,15 @@ reader(void *arg)
 	INFO *s;
 	WT_CURSOR *cursor;
 	WT_SESSION *session;
-	pthread_t tid;
 	u_int i;
 	int id, ret;
+	char tid[128];
 
 	id = (int)(uintptr_t)arg;
-	tid = pthread_self();
-	printf(" read thread %2d starting: tid: %p\n", id, (void *)tid);
+
+	__wt_thread_id(tid, sizeof(tid));
+	printf(" read thread %2d starting: tid: %s\n", id, tid);
+
 	sched_yield();		/* Get all the threads created. */
 
 	s = &run_info[id];
@@ -272,13 +274,15 @@ writer(void *arg)
 	INFO *s;
 	WT_CURSOR *cursor;
 	WT_SESSION *session;
-	pthread_t tid;
 	u_int i;
 	int id, ret;
+	char tid[128];
 
 	id = (int)(uintptr_t)arg;
-	tid = pthread_self();
-	printf("write thread %2d starting: tid: %p\n", id, (void *)tid);
+
+	__wt_thread_id(tid, sizeof(tid));
+	printf("write thread %2d starting: tid: %s\n", id, tid);
+
 	sched_yield();		/* Get all the threads created. */
 
 	s = &run_info[id];

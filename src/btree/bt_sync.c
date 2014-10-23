@@ -63,7 +63,7 @@ __sync_file(WT_SESSION_IMPL *session, int syncop)
 			page = walk->page;
 			if (__wt_page_is_modified(page)) {
 				if (txn->isolation == TXN_ISO_READ_COMMITTED)
-					__wt_txn_refresh(session, 1, 0);
+					__wt_txn_refresh(session, 1);
 				leaf_bytes += page->memory_footprint;
 				++leaf_pages;
 				WT_ERR(__wt_rec_write(session, walk, NULL, 0));
@@ -283,6 +283,16 @@ __evict_file(WT_SESSION_IMPL *session, int syncop)
 				page->modify->write_gen = 0;
 				__wt_cache_dirty_decr(session, page);
 			}
+			/*
+			 * If the page contains an update that is too recent to
+			 * evict, stop.  This should never happen during
+			 * connection close, and in other paths our caller
+			 * should be prepared to deal with this case.
+			 */
+			if (page->modify != NULL &&
+			    !__wt_txn_visible_all(session,
+			    page->modify->rec_max_txn))
+				return (EBUSY);
 			__wt_ref_out(session, ref);
 			break;
 		WT_ILLEGAL_VALUE_ERR(session);
@@ -300,26 +310,6 @@ err:		/* On error, clear any left-over tree walk. */
 		__wt_evict_file_exclusive_off(session);
 
 	return (ret);
-}
-
-/*
- * __wt_cache_force_write --
- *	Dirty the root page of the tree so it gets written.
- */
-int
-__wt_cache_force_write(WT_SESSION_IMPL *session)
-{
-	WT_BTREE *btree;
-	WT_PAGE *page;
-
-	btree = S2BT(session);
-	page = btree->root.page;
-
-	/* Dirty the root page to ensure a write. */
-	WT_RET(__wt_page_modify_init(session, page));
-	__wt_page_modify_set(session, page);
-
-	return (0);
 }
 
 /*

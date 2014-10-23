@@ -29,10 +29,16 @@
  *	table from multiple threads.
  */
 
+#ifndef _WIN32
 #include <pthread.h>
+#endif
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+
+#ifdef _WIN32
+#include "windows_shim.h"
+#endif
 
 #include <wiredtiger.h>
 

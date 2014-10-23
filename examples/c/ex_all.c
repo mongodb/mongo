@@ -38,7 +38,12 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+
+#ifndef _WIN32
 #include <unistd.h>
+#else
+#include "windows_shim.h"
+#endif
 #include <sys/stat.h>
 
 #include <wiredtiger.h>
@@ -698,7 +703,7 @@ transaction_ops(WT_CONNECTION *conn, WT_SESSION *session)
 		 * and all cursors are reset.
 		 */
 		break;
-	case WT_DEADLOCK:			/* Update conflict */
+	case WT_ROLLBACK:			/* Update conflict */
 	default:				/* Other error */
 		ret = session->rollback_transaction(session, NULL);
 		/* The rollback_transaction call resets all cursors. */

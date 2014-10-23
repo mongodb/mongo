@@ -47,18 +47,26 @@ struct __wt_fh {
 	TAILQ_ENTRY(__wt_fh) q;			/* List of open handles */
 
 	u_int	ref;				/* Reference count */
-	u_int	ref_mapped;			/* Mapped reference count */
-
-	WT_SPINLOCK lock;			/* Handle lock */
 
 #ifndef _WIN32
 	int	 fd;				/* POSIX file handle */
 #else
 	HANDLE filehandle;			/* Windows file handle */
+	HANDLE filehandle_secondary;		/* Windows file handle
+						   for file size changes */
 #endif
 	wt_off_t size;				/* File size */
 	wt_off_t extend_size;			/* File extended size */
 	wt_off_t extend_len;			/* File extend chunk size */
 
 	int	direct_io;			/* O_DIRECT configured */
+
+	int	fallocate_available;		/* fallocate/posix_fallocate */
+	int	fallocate_requires_locking;
 };
+
+#ifndef _WIN32
+#define	WT_SIZET_FMT	"zu"			/* size_t format string */
+#else
+#define	WT_SIZET_FMT	"Iu"			/* size_t format string */
+#endif

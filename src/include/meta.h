@@ -20,6 +20,7 @@
 #define	WT_METAFILE_URI		"file:WiredTiger.wt"	/* Metadata file URI */
 #define	WT_IS_METADATA(dh)						\
 	(strcmp((dh)->name, WT_METAFILE_URI) == 0)
+#define	WT_METAFILE_ID		0			/* Metadata file ID */
 
 #define	WT_METADATA_VERSION	"WiredTiger version"	/* Version keys */
 #define	WT_METADATA_VERSION_STR	"WiredTiger version string"

@@ -276,9 +276,10 @@ __wt_cursor_set_keyv(WT_CURSOR *cursor, uint32_t flags, va_list ap)
 		cursor->key.data = &cursor->recno;
 		sz = sizeof(cursor->recno);
 	} else {
-		/* Fast path some common cases. */
+		/* Fast path some common cases and special case WT_ITEMs. */
 		fmt = cursor->key_format;
-		if (LF_ISSET(WT_CURSOR_RAW_OK) || WT_STREQ(fmt, "u")) {
+		if (LF_ISSET(WT_CURSOR_RAW_OK | WT_CURSTD_DUMP_JSON) ||
+		    WT_STREQ(fmt, "u")) {
 			item = va_arg(ap, WT_ITEM *);
 			sz = item->size;
 			cursor->key.data = item->data;
@@ -399,7 +400,8 @@ __wt_cursor_set_valuev(WT_CURSOR *cursor, va_list ap)
 
 	/* Fast path some common cases. */
 	fmt = cursor->value_format;
-	if (F_ISSET(cursor, WT_CURSOR_RAW_OK) || WT_STREQ(fmt, "u")) {
+	if (F_ISSET(cursor, WT_CURSOR_RAW_OK | WT_CURSTD_DUMP_JSON) ||
+	    WT_STREQ(fmt, "u")) {
 		item = va_arg(ap, WT_ITEM *);
 		sz = item->size;
 		cursor->value.data = item->data;
@@ -608,9 +610,10 @@ __wt_cursor_init(WT_CURSOR *cursor,
 	 * Arrange for that to happen by putting internal cursors after their
 	 * owners on the queue.
 	 */
-	if (owner != NULL)
+	if (owner != NULL) {
+		WT_ASSERT(session, F_ISSET(owner, WT_CURSTD_OPEN));
 		TAILQ_INSERT_AFTER(&session->cursors, owner, cursor, q);
-	else
+	} else
 		TAILQ_INSERT_HEAD(&session->cursors, cursor, q);
 
 	F_SET(cursor, WT_CURSTD_OPEN);

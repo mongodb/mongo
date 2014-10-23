@@ -286,33 +286,8 @@ retry:	pindex = WT_INTL_INDEX_COPY(ref->home);
 static inline int
 __wt_page_modify_init(WT_SESSION_IMPL *session, WT_PAGE *page)
 {
-	WT_CONNECTION_IMPL *conn;
-	WT_PAGE_MODIFY *modify;
-
-	if (page->modify != NULL)
-		return (0);
-
-	conn = S2C(session);
-
-	WT_RET(__wt_calloc_def(session, 1, &modify));
-
-	/*
-	 * Select a spinlock for the page; let the barrier immediately below
-	 * keep things from racing too badly.
-	 */
-	modify->page_lock = ++conn->page_lock_cnt % WT_PAGE_LOCKS(conn);
-
-	/*
-	 * Multiple threads of control may be searching and deciding to modify
-	 * a page.  If our modify structure is used, update the page's memory
-	 * footprint, else discard the modify structure, another thread did the
-	 * work.
-	 */
-	if (WT_ATOMIC_CAS8(page->modify, NULL, modify))
-		__wt_cache_page_inmem_incr(session, page, sizeof(*modify));
-	else
-		__wt_free(session, modify);
-	return (0);
+	return (page->modify == NULL ?
+	    __wt_page_modify_alloc(session, page) : 0);
 }
 
 /*
@@ -952,11 +927,23 @@ __wt_page_release(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t flags)
 		return (0);
 	page = ref->page;
 
-	/* Attempt to evict pages with the special "oldest" read generation. */
+	/*
+	 * Attempt to evict pages with the special "oldest" read generation.
+	 *
+	 * This is set for pages that grow larger than the configured
+	 * memory_page_max setting, and when we are attempting to scan without
+	 * trashing the cache.
+	 *
+	 * Skip this if eviction is disabled for this operation or this tree,
+	 * or if there is no chance of eviction succeeding for dirty pages due
+	 * to a checkpoint or because we've already tried writing this page and
+	 * it contains an update that isn't stable.
+	 */
 	if (LF_ISSET(WT_READ_NO_EVICT) ||
 	    page->read_gen != WT_READGEN_OLDEST ||
 	    F_ISSET(btree, WT_BTREE_NO_EVICTION) ||
-	    (btree->checkpointing && __wt_page_is_modified(page)))
+	    (__wt_page_is_modified(page) && (btree->checkpointing ||
+	    !__wt_txn_visible_all(session, page->modify->first_dirty_txn))))
 		return (__wt_hazard_clear(session, page));
 
 	/*

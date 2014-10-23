@@ -74,14 +74,22 @@ corrupt(void)
 	(void)snprintf(buf, sizeof(buf), "%s/%s", g.home, WT_NAME);
 	if ((fd = open(buf, O_RDWR)) != -1) {
 		(void)snprintf(copycmd, sizeof(copycmd),
+#ifdef _WIN32
+		    "copy %s\\%s %s\\slvg.copy\\%s.corrupted",
+#else
 		    "cp %s/%s %s/slvg.copy/%s.corrupted",
+#endif
 		    g.home, WT_NAME, g.home, WT_NAME);
 		goto found;
 	}
 	(void)snprintf(buf, sizeof(buf), "%s/%s.wt", g.home, WT_NAME);
 	if ((fd = open(buf, O_RDWR)) != -1) {
 		(void)snprintf(copycmd, sizeof(copycmd),
+#ifdef _WIN32
+		    "copy %s\\%s.wt %s\\slvg.copy\\%s.wt.corrupted",
+#else
 		    "cp %s/%s.wt %s/slvg.copy/%s.wt.corrupted",
+#endif
 		    g.home, WT_NAME, g.home, WT_NAME);
 		goto found;
 	}
@@ -96,7 +104,7 @@ found:	if (fstat(fd, &sb) == -1)
 	if ((fp = fopen(buf, "w")) == NULL)
 		die(errno, "salvage-corrupt: open: %s", buf);
 	(void)fprintf(fp,
-	    "salvage-corrupt: offset %" PRIuMAX ", length %zu\n",
+	    "salvage-corrupt: offset %" PRIuMAX ", length " SIZET_FMT "\n",
 	    (uintmax_t)offset, len);
 	(void)fclose(fp);
 

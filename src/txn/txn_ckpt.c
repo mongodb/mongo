@@ -547,7 +547,7 @@ __checkpoint_worker(
 	WT_DECL_RET;
 	WT_LSN ckptlsn;
 	const char *name;
-	int deleted, force, hot_backup_locked, track_ckpt;
+	int deleted, force, hot_backup_locked, track_ckpt, was_modified;
 	char *name_alloc;
 
 	btree = S2BT(session);
@@ -560,18 +560,10 @@ __checkpoint_worker(
 	hot_backup_locked = 0;
 	name_alloc = NULL;
 	track_ckpt = 1;
+	was_modified = btree->modified;
 
-	/*
-	 * Get the list of checkpoints for this file.  If there's no reference
-	 * to the file in the metadata (the file is dead), then discard it from
-	 * the cache without bothering to write any dirty pages.
-	 */
-	if ((ret = __wt_meta_ckptlist_get(
-	    session, dhandle->name, &ckptbase)) == WT_NOTFOUND) {
-		WT_ASSERT(session, session->dhandle->session_ref == 0);
-		return (__wt_cache_op(session, NULL, WT_SYNC_DISCARD));
-	}
-	WT_ERR(ret);
+	/* Get the list of checkpoints for this file. */
+	WT_RET(__wt_meta_ckptlist_get(session, dhandle->name, &ckptbase));
 
 	/* This may be a named checkpoint, check the configuration. */
 	cval.len = 0;
@@ -805,23 +797,17 @@ __checkpoint_worker(
 		}
 
 	/*
-	 * Mark the root page dirty to ensure something gets written.
-	 *
-	 * Don't test the tree modify flag first: if the tree is modified,
-	 * we must write the root page anyway, we're not adding additional
-	 * writes to the process.   If the tree is not modified, we have to
-	 * dirty the root page to ensure something gets written.  This is
-	 * really about paranoia: if the tree modification value gets out of
-	 * sync with the set of dirty pages (modify is set, but there are no
-	 * dirty pages), we do a checkpoint without any writes, no checkpoint
-	 * is created, and then things get bad.
+	 * Mark the root page dirty to ensure something gets written. (If the
+	 * tree is modified, we must write the root page anyway, this doesn't
+	 * add additional writes to the process.  If the tree is not modified,
+	 * we have to dirty the root page to ensure something gets written.)
+	 * This is really about paranoia: if the tree modification value gets
+	 * out of sync with the set of dirty pages (modify is set, but there
+	 * are no dirty pages), we perform a checkpoint without any writes, no
+	 * checkpoint is created, and then things get bad.
 	 */
-	WT_ERR(__wt_cache_force_write(session));
-
-	/* Tell logging that a file checkpoint is starting. */
-	if (conn->logging)
-		WT_ERR(__wt_txn_checkpoint_log(
-		    session, 0, WT_TXN_LOG_CKPT_START, &ckptlsn));
+	WT_ERR(__wt_page_modify_init(session, btree->root.page));
+	__wt_page_modify_set(session, btree->root.page);
 
 	/*
 	 * Clear the tree's modified flag; any changes before we clear the flag
@@ -835,6 +821,11 @@ __checkpoint_worker(
 	 */
 	btree->modified = 0;
 	WT_FULL_BARRIER();
+
+	/* Tell logging that a file checkpoint is starting. */
+	if (conn->logging)
+		WT_ERR(__wt_txn_checkpoint_log(
+		    session, 0, WT_TXN_LOG_CKPT_START, &ckptlsn));
 
 	/* Flush the file from the cache, creating the checkpoint. */
 	if (is_checkpoint)
@@ -874,6 +865,13 @@ fake:	/* Update the object's metadata. */
 		    session, 0, WT_TXN_LOG_CKPT_STOP, NULL));
 
 done: err:
+	/*
+	 * If the checkpoint didn't complete successfully, make sure the
+	 * tree is marked dirty.
+	 */
+	if (ret != 0 && !btree->modified && was_modified)
+		btree->modified = 1;
+
 	if (hot_backup_locked)
 		__wt_spin_unlock(session, &conn->hot_backup_lock);
 
