@@ -95,7 +95,7 @@ static void throwWiredTigerException(JNIEnv *jenv, int err) {
 	if (err == WT_PANIC)
 		clname = "com/wiredtiger/db/WiredTigerPanicException";
 	else if (err == WT_DEADLOCK)
-		clname = "com/wiredtiger/db/WiredTigerDeadlockException";
+		clname = "com/wiredtiger/db/WiredTigerRollbackException";
 	else
 		clname = "com/wiredtiger/db/WiredTigerException";
 	if (clname)
