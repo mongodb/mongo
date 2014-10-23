@@ -125,12 +125,13 @@ namespace mongo {
     KVRecordStore::KVRecordStore( KVDictionary *db,
                                   OperationContext* opCtx,
                                   const StringData& ns,
+                                  const StringData& ident,
                                   const CollectionOptions& options )
         : RecordStore(ns),
           _db(db),
           _metadataDict(NULL),
-          _numRecordsMetadataKey(numRecordsMetadataKey(ns)),
-          _dataSizeMetadataKey(dataSizeMetadataKey(ns))
+          _numRecordsMetadataKey(numRecordsMetadataKey(ident)),
+          _dataSizeMetadataKey(dataSizeMetadataKey(ident))
     {
         invariant(_db != NULL);
 
@@ -169,7 +170,7 @@ namespace mongo {
         Slice val;
         Status s = _metadataDict->get(opCtx, Slice(key), val);
         if (s.code() == ErrorCodes::NoSuchKey) {
-            int64_t zero;
+            int64_t zero = 0;
             s = _metadataDict->insert(opCtx, Slice(key), Slice::of(zero));
         }
         invariant(s.isOK());

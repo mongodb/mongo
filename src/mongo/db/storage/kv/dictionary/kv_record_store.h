@@ -60,6 +60,7 @@ namespace mongo {
         KVRecordStore( KVDictionary *db,
                        OperationContext* opCtx,
                        const StringData& ns,
+                       const StringData& ident,
                        const CollectionOptions& options );
 
         virtual ~KVRecordStore() { }

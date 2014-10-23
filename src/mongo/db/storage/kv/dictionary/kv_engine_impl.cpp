@@ -62,9 +62,9 @@ namespace mongo {
         auto_ptr<KVRecordStore> rs;
         // We separated the implementations of capped / non-capped record stores for readability.
         if (options.capped) {
-            rs.reset(new KVRecordStoreCapped(db.release(), opCtx, ns, options));
+            rs.reset(new KVRecordStoreCapped(db.release(), opCtx, ns, ident, options));
         } else {
-            rs.reset(new KVRecordStore(db.release(), opCtx, ns, options));
+            rs.reset(new KVRecordStore(db.release(), opCtx, ns, ident, options));
         }
         if (persistDictionaryStats()) {
             rs->setStatsMetadataDictionary(opCtx, getMetadataDictionary());

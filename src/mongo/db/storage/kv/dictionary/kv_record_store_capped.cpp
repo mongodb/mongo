@@ -38,8 +38,9 @@ namespace mongo {
     KVRecordStoreCapped::KVRecordStoreCapped( KVDictionary *db,
                                               OperationContext* opCtx,
                                               const StringData& ns,
+                                              const StringData& ident,
                                               const CollectionOptions& options ) :
-        KVRecordStore(db, opCtx, ns, options),
+        KVRecordStore(db, opCtx, ns, ident, options),
         _cappedMaxSize(options.cappedSize ? options.cappedSize : 4096 ),
         _cappedMaxDocs(options.cappedMaxDocs ? options.cappedMaxDocs : -1),
         _cappedDeleteCallback(NULL) {

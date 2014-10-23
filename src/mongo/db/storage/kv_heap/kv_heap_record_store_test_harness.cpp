@@ -42,7 +42,7 @@ namespace mongo {
             auto_ptr<OperationContext> opCtx(newOperationContext());
             auto_ptr<KVDictionary> db(new KVHeapDictionary());
             const StringData ns("kvRecordStoreTestHarnessNamespace");
-            return new KVRecordStore(db.release(), opCtx.get(), ns, CollectionOptions());
+            return new KVRecordStore(db.release(), opCtx.get(), ns, ns, CollectionOptions());
         }
 
         virtual RecoveryUnit* newRecoveryUnit() {

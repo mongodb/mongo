@@ -43,6 +43,7 @@ namespace mongo {
         KVRecordStoreCapped( KVDictionary *db,
                              OperationContext* opCtx,
                              const StringData& ns,
+                             const StringData& ident,
                              const CollectionOptions& options );
 
         virtual ~KVRecordStoreCapped() { }
