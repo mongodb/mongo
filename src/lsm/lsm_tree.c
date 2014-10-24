@@ -402,9 +402,11 @@ __lsm_tree_open_check(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 	    3 * (lsm_tree->merge_max * maxleafpage);
 	if (S2C(session)->cache_size < required)
 		WT_RET_MSG(session, EINVAL,
-		    "The LSM configuration requires a cache size of at least %"
-		    PRIu64 ". Configured size is %" PRIu64,
-		    required, S2C(session)->cache_size);
+		    "LSM cache size %" PRIu64 " (%" PRIu64 "MB) too small, "
+		    "must be at least %" PRIu64 " (%" PRIu64 "MB)",
+		    S2C(session)->cache_size,
+		    S2C(session)->cache_size / WT_MEGABYTE,
+		    required, required / WT_MEGABYTE);
 	return (0);
 }
 
