@@ -171,6 +171,9 @@ connection_stats = [
 	Stat('txn_checkpoint_running',
 	    'transaction checkpoint currently running',
 	    'no_aggregate,no_clear,no_scale'),
+	Stat('txn_pinned_range',
+	    'transaction range of IDs currently pinned',
+	    'no_aggregate,no_clear,no_scale'),
 	Stat('txn_commit', 'transactions committed'),
 	Stat('txn_fail_cache', 'transaction failures due to cache overflow'),
 	Stat('txn_rollback', 'transactions rolled back'),
@@ -199,6 +202,7 @@ connection_stats = [
 	# Session operations
 	##########################################
 	Stat('session_cursor_open', 'open cursor count', 'no_clear,no_scale'),
+	Stat('session_open', 'open session count', 'no_clear,no_scale'),
 
 	##########################################
 	# Total Btree cursor operations

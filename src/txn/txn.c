@@ -485,6 +485,25 @@ __wt_txn_init(WT_SESSION_IMPL *session)
 }
 
 /*
+ * __wt_txn_stats_update --
+ *	Update the transaction statistics for return to the application.
+ */
+void
+__wt_txn_stats_update(WT_SESSION_IMPL *session)
+{
+	WT_TXN_GLOBAL *txn_global;
+	WT_CONNECTION_IMPL *conn;
+	WT_CONNECTION_STATS *stats;
+
+	conn = S2C(session);
+	txn_global = &conn->txn_global;
+	stats = &conn->stats;
+
+	WT_STAT_SET(stats, txn_pinned_range,
+	    txn_global->current - txn_global->oldest_id);
+}
+
+/*
  * __wt_txn_destroy --
  *	Destroy a session's transaction data.
  */

@@ -442,6 +442,7 @@ __wt_stat_init_connection_stats(WT_CONNECTION_STATS *stats)
 	stats->rwlock_write.desc =
 	    "pthread mutex shared lock write-lock calls";
 	stats->session_cursor_open.desc = "open cursor count";
+	stats->session_open.desc = "open session count";
 	stats->txn_begin.desc = "transactions";
 	stats->txn_checkpoint.desc = "transaction checkpoints";
 	stats->txn_checkpoint_running.desc =
@@ -449,6 +450,8 @@ __wt_stat_init_connection_stats(WT_CONNECTION_STATS *stats)
 	stats->txn_commit.desc = "transactions committed";
 	stats->txn_fail_cache.desc =
 	    "transaction failures due to cache overflow";
+	stats->txn_pinned_range.desc =
+	    "transaction range of IDs currently pinned";
 	stats->txn_rollback.desc = "transactions rolled back";
 	stats->write_io.desc = "total write I/Os";
 }

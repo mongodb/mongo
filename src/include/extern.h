@@ -622,6 +622,7 @@ extern void __wt_txn_release(WT_SESSION_IMPL *session);
 extern int __wt_txn_commit(WT_SESSION_IMPL *session, const char *cfg[]);
 extern int __wt_txn_rollback(WT_SESSION_IMPL *session, const char *cfg[]);
 extern int __wt_txn_init(WT_SESSION_IMPL *session);
+extern void __wt_txn_stats_update(WT_SESSION_IMPL *session);
 extern void __wt_txn_destroy(WT_SESSION_IMPL *session);
 extern int __wt_txn_global_init(WT_SESSION_IMPL *session, const char *cfg[]);
 extern void __wt_txn_global_destroy(WT_SESSION_IMPL *session);

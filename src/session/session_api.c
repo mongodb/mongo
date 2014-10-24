@@ -151,6 +151,9 @@ __session_close(WT_SESSION *wt_session, const char *config)
 	/* The API lock protects opening and closing of sessions. */
 	__wt_spin_lock(session, &conn->api_lock);
 
+	/* Decrement the count of open sessions. */
+	WT_STAT_FAST_CONN_DECR(session, session_open);
+
 	/*
 	 * Sessions are re-used, clear the structure: the clear sets the active
 	 * field to 0, which will exclude the hazard array from review by the
@@ -1010,6 +1013,8 @@ __wt_open_session(WT_CONNECTION_IMPL *conn,
 
 	WT_STATIC_ASSERT(offsetof(WT_SESSION_IMPL, iface) == 0);
 	*sessionp = session_ret;
+
+	WT_STAT_FAST_CONN_INCR(session, session_open);
 
 err:	__wt_spin_unlock(session, &conn->api_lock);
 	return (ret);
