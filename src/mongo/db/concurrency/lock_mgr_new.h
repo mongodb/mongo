@@ -246,7 +246,7 @@ namespace mongo {
          * Retrieves the bucket in which the particular resource must reside. There is no need to
          * hold a lock when calling this function.
          */
-        LockBucket* _getBucket(const ResourceId& resId);
+        LockBucket* _getBucket(const ResourceId& resId) const;
 
         /**
          * Prints the contents of a bucket to the log.
