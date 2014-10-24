@@ -286,14 +286,14 @@ __curlog_close(WT_CURSOR *cursor)
 	conn = S2C(session);
 	WT_ASSERT(session, conn->logging);
 	log = conn->log;
-	WT_ERR(__wt_rwunlock(session, log->log_archive_lock));
-	WT_ERR(__curlog_reset(cursor));
+	WT_TRET(__wt_rwunlock(session, log->log_archive_lock));
+	WT_TRET(__curlog_reset(cursor));
 	__wt_free(session, cl->cur_lsn);
 	__wt_free(session, cl->next_lsn);
 	__wt_scr_free(&cl->logrec);
 	__wt_scr_free(&cl->opkey);
 	__wt_scr_free(&cl->opvalue);
-	WT_ERR(__wt_cursor_close(cursor));
+	WT_TRET(__wt_cursor_close(cursor));
 
 err:	API_END_RET(session, ret);
 }
