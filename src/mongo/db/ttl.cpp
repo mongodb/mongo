@@ -235,10 +235,8 @@ namespace mongo {
                     return true;
                 }
 
-                WriteUnitOfWork uow( txn );
                 n = deleteObjects( txn, db, ns, query, PlanExecutor::YIELD_AUTO, false, true );
                 ttlDeletedDocuments.increment( n );
-                uow.commit();
             }
 
             LOG(1) << "\tTTL deleted: " << n << endl;
