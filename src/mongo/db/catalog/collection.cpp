@@ -228,10 +228,10 @@ namespace mongo {
         // TODO: for now, capped logic lives inside NamespaceDetails, which is hidden
         //       under the RecordStore, this feels broken since that should be a
         //       collection access method probably
-
+        const RecordData record(docToInsert.objdata(), docToInsert.objsize());
         StatusWith<DiskLoc> loc = _recordStore->insertRecord( txn,
-                                                              docToInsert.objdata(),
-                                                              docToInsert.objsize(),
+                                                              record.data(),
+                                                              record.size(),
                                                               _enforceQuota( enforceQuota ) );
         if ( !loc.isOK() )
             return loc;
@@ -254,7 +254,7 @@ namespace mongo {
 
             // indexRecord takes care of rolling back indexes
             // so we just have to delete the main storage
-            _recordStore->deleteRecord( txn, loc.getValue() );
+            _recordStore->deleteRecord( txn, loc.getValue(), &record );
             return StatusWith<DiskLoc>( e.toStatus( "insertDocument" ) );
         }
 
@@ -285,6 +285,7 @@ namespace mongo {
         }
 
         BSONObj doc = docFor( txn, loc );
+        const RecordData record(doc.objdata(), doc.objsize());
 
         if ( deletedId ) {
             BSONElement e = doc["_id"];
@@ -298,7 +299,7 @@ namespace mongo {
 
         _indexCatalog.unindexRecord(txn, doc, loc, noWarn);
 
-        _recordStore->deleteRecord( txn, loc );
+        _recordStore->deleteRecord(txn, loc, &record);
 
         _infoCache.notifyOfWriteOp();
     }

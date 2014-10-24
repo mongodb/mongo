@@ -88,9 +88,8 @@ namespace mongo {
         return true;
     }
 
-    void HeapRecordStore::deleteRecord(OperationContext* txn, const DiskLoc& loc) {
-        HeapRecord* rec = recordFor(loc);
-        _dataSize -= rec->netLength();
+    void HeapRecordStore::deleteRecord(OperationContext* txn, const DiskLoc& loc, const RecordData *rec) {
+        _dataSize -= recordFor(loc)->netLength();
         invariant(_records.erase(loc) == 1);
     }
 

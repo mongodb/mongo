@@ -381,7 +381,7 @@ namespace mongo {
         return Status::OK();
     }
 
-    void RecordStoreV1Base::deleteRecord( OperationContext* txn, const DiskLoc& dl ) {
+    void RecordStoreV1Base::deleteRecord( OperationContext* txn, const DiskLoc& dl, const RecordData* rec ) {
 
         Record* todelete = recordFor( dl );
         invariant( todelete->netLength() >= 4 ); // this is required for defensive code

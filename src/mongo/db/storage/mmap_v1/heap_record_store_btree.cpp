@@ -57,7 +57,7 @@ namespace mongo {
         return true;
     }
 
-    void HeapRecordStoreBtree::deleteRecord(OperationContext* txn, const DiskLoc& loc) {
+    void HeapRecordStoreBtree::deleteRecord(OperationContext* txn, const DiskLoc& loc, const RecordData* rec) {
         invariant(_records.erase(loc) == 1);
     }
 

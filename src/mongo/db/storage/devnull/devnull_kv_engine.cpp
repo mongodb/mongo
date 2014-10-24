@@ -80,7 +80,7 @@ namespace mongo {
             return false;
         }
 
-        virtual void deleteRecord( OperationContext* txn, const DiskLoc& dl ) {}
+        virtual void deleteRecord( OperationContext* txn, const DiskLoc& dl, const RecordData* rec = NULL ) {}
 
         virtual StatusWith<DiskLoc> insertRecord( OperationContext* txn,
                                                   const char* data,
