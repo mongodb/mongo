@@ -44,6 +44,8 @@
 #include <rocksdb/utilities/write_batch_with_index.h>
 
 #include "mongo/db/catalog/collection_options.h"
+#include "mongo/db/concurrency/locker.h"
+#include "mongo/db/concurrency/lock_mgr_defs.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/storage/rocks/rocks_record_store.h"
@@ -188,6 +190,20 @@ namespace mongo {
     Status RocksEngine::dropSortedDataInterface(OperationContext* opCtx, const StringData& ident) {
         _db->Delete(rocksdb::WriteOptions(), kOrderingPrefix + ident.toString());
         return _dropColumnFamily(ident);
+    }
+
+    void RocksEngine::onCollectionLock(Locker* lockState, const StringData& ns, LockMode mode) {
+        if (mode == MODE_IX) {
+            ResourceId rid(RESOURCE_DOCUMENT, ns);
+            lockState->lock(rid, MODE_X);
+        }
+    }
+
+    void RocksEngine::onCollectionUnlock(Locker* lockState, const StringData& ns, LockMode mode) {
+        if (mode == MODE_IX) {
+            ResourceId rid(RESOURCE_DOCUMENT, ns);
+            lockState->unlock(rid);
+        }
     }
 
     // non public api

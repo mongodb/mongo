@@ -33,6 +33,7 @@
 #include "mongo/base/status.h"
 #include "mongo/base/string_data.h"
 #include "mongo/db/catalog/collection_options.h"
+#include "mongo/db/concurrency/lock_mgr_defs.h"
 
 namespace mongo {
 
@@ -41,6 +42,7 @@ namespace mongo {
     class RecordStore;
     class RecoveryUnit;
     class SortedDataInterface;
+    class Locker;
 
     class KVEngine {
     public:
@@ -85,6 +87,9 @@ namespace mongo {
 
         virtual Status dropSortedDataInterface( OperationContext* opCtx,
                                                 const StringData& ident ) = 0;
+
+        virtual void onCollectionLock(Locker* lockState, const StringData& ns, LockMode mode) {}
+        virtual void onCollectionUnlock(Locker* lockState, const StringData& ns, LockMode mode) {}
     };
 
 }

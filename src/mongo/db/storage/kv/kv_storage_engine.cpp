@@ -36,6 +36,7 @@
 #include "mongo/db/storage/kv/kv_database_catalog_entry.h"
 #include "mongo/db/storage/kv/kv_engine.h"
 #include "mongo/util/log.h"
+#include "mongo/db/concurrency/locker.h"
 
 namespace mongo {
 
@@ -58,6 +59,14 @@ namespace mongo {
         _catalogRecordStore.reset( NULL );
 
         _engine.reset( NULL );
+    }
+
+    void KVStorageEngine::onCollectionLock(Locker* lockState, const StringData& ns, LockMode mode) {
+        _engine->onCollectionLock(lockState, ns, mode);
+    }
+    void KVStorageEngine::onCollectionUnlock(Locker* lockState, const StringData& ns,
+                                             LockMode mode) {
+        _engine->onCollectionUnlock(lockState, ns, mode);
     }
 
     KVStorageEngine::~KVStorageEngine() {

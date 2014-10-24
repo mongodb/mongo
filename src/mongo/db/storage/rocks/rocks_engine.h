@@ -92,6 +92,11 @@ namespace mongo {
         virtual Status dropSortedDataInterface(OperationContext* opCtx,
                                                const StringData& ident) override;
 
+        virtual void onCollectionLock(Locker* lockState, const StringData& ns,
+                                      LockMode mode) override;
+        virtual void onCollectionUnlock(Locker* lockState, const StringData& ns,
+                                        LockMode mode) override;
+
         // rocks specific api
 
         rocksdb::DB* getDB() { return _db.get(); }

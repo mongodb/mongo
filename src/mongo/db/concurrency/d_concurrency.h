@@ -206,6 +206,8 @@ namespace mongo {
         private:
             const ResourceId _id;
             Locker* _lockState;
+            std::string _ns;
+            LockMode _mode;
         };
 
         /**
