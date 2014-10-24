@@ -49,21 +49,16 @@ int
 __wt_rwlock_alloc(
     WT_SESSION_IMPL *session, WT_RWLOCK **rwlockp, const char *name)
 {
-	WT_DECL_RET;
 	WT_RWLOCK *rwlock;
+
+	WT_RET(__wt_verbose(session, WT_VERB_MUTEX, "rwlock: alloc %s", name));
 
 	WT_RET(__wt_calloc(session, 1, sizeof(WT_RWLOCK), &rwlock));
 
 	rwlock->name = name;
+
 	*rwlockp = rwlock;
-
-	WT_ERR(__wt_verbose(session, WT_VERB_MUTEX,
-	    "rwlock: alloc %s (%p)", rwlock->name, rwlock));
-
-	if (0) {
-err:		__wt_free(session, rwlock);
-	}
-	return (ret);
+	return (0);
 }
 
 /*
@@ -77,8 +72,8 @@ __wt_try_readlock(WT_SESSION_IMPL *session, WT_RWLOCK *rwlock)
 	uint32_t cmp, cmpnew, me, writers;
 	uint8_t menew;
 
-	WT_RET(__wt_verbose(session, WT_VERB_MUTEX,
-	    "rwlock: try_readlock %s (%p)", rwlock->name, rwlock));
+	WT_RET(__wt_verbose(
+	    session, WT_VERB_MUTEX, "rwlock: try_readlock %s", rwlock->name));
 	WT_STAT_FAST_CONN_INCR(session, rwlock_read);
 
 	l = &rwlock->rwlock;
@@ -101,8 +96,8 @@ __wt_readlock(WT_SESSION_IMPL *session, WT_RWLOCK *rwlock)
 	uint32_t me;
 	uint8_t val;
 
-	WT_RET(__wt_verbose(session, WT_VERB_MUTEX,
-	    "rwlock: readlock %s (%p)", rwlock->name, rwlock));
+	WT_RET(__wt_verbose(
+	    session, WT_VERB_MUTEX, "rwlock: readlock %s", rwlock->name));
 	WT_STAT_FAST_CONN_INCR(session, rwlock_read);
 
 	l = &rwlock->rwlock;
@@ -125,8 +120,8 @@ __readunlock(WT_SESSION_IMPL *session, WT_RWLOCK *rwlock)
 {
 	wt_rwlock_t *l;
 
-	WT_RET(__wt_verbose(session, WT_VERB_MUTEX,
-	    "rwlock: read unlock %s (%p)", rwlock->name, rwlock));
+	WT_RET(__wt_verbose(
+	    session, WT_VERB_MUTEX, "rwlock: read unlock %s", rwlock->name));
 
 	l = &rwlock->rwlock;
 	WT_ATOMIC_ADD1(l->s.writers, 1);
@@ -145,8 +140,8 @@ __wt_try_writelock(WT_SESSION_IMPL *session, WT_RWLOCK *rwlock)
 	uint32_t cmp, cmpnew, me, readers;
 	uint8_t menew;
 
-	WT_RET(__wt_verbose(session, WT_VERB_MUTEX,
-	    "rwlock: try_writelock %s (%p)", rwlock->name, rwlock));
+	WT_RET(__wt_verbose(
+	    session, WT_VERB_MUTEX, "rwlock: try_writelock %s", rwlock->name));
 	WT_STAT_FAST_CONN_INCR(session, rwlock_write);
 
 	l = &rwlock->rwlock;
@@ -173,8 +168,8 @@ __wt_writelock(WT_SESSION_IMPL *session, WT_RWLOCK *rwlock)
 	uint32_t me;
 	uint8_t val;
 
-	WT_RET(__wt_verbose(session, WT_VERB_MUTEX,
-	    "rwlock: writelock %s (%p)", rwlock->name, rwlock));
+	WT_RET(__wt_verbose(
+	    session, WT_VERB_MUTEX, "rwlock: writelock %s", rwlock->name));
 	WT_STAT_FAST_CONN_INCR(session, rwlock_write);
 
 	l = &rwlock->rwlock;
@@ -196,14 +191,19 @@ __writeunlock(WT_SESSION_IMPL *session, WT_RWLOCK *rwlock)
 {
 	wt_rwlock_t *l, copy;
 
-	WT_RET(__wt_verbose(session, WT_VERB_MUTEX,
-	    "rwlock: write unlock %s (%p)", rwlock->name, rwlock));
+	WT_RET(__wt_verbose(
+	    session, WT_VERB_MUTEX, "rwlock: writeunlock %s", rwlock->name));
 
 	l = &rwlock->rwlock;
 
 	copy = *l;
 	rwlock->exclusive_locked = 0;
 
+	/*
+	 * Use a full barrier, not just a memory barrier because the exclusive-
+	 * locked flag has to be cleared before a subsequent writer gets the
+	 * lock and sets it.
+	 */
 	WT_FULL_BARRIER();
 
 	++copy.s.writers;
@@ -220,13 +220,10 @@ __writeunlock(WT_SESSION_IMPL *session, WT_RWLOCK *rwlock)
 int
 __wt_rwunlock(WT_SESSION_IMPL *session, WT_RWLOCK *rwlock)
 {
-	WT_RET(__wt_verbose(session, WT_VERB_MUTEX,
-	    "rwlock: unlock %s (%p)", rwlock->name, rwlock));
-
 	if (rwlock->exclusive_locked == 0)
 		return (__readunlock(session, rwlock));
-
-	return (__writeunlock(session, rwlock));
+	else
+		return (__writeunlock(session, rwlock));
 }
 
 /*
@@ -243,8 +240,8 @@ __wt_rwlock_destroy(WT_SESSION_IMPL *session, WT_RWLOCK **rwlockp)
 		return (0);
 	*rwlockp = NULL;
 
-	WT_RET(__wt_verbose(session, WT_VERB_MUTEX,
-	    "rwlock: destroy %s (%p)", rwlock->name, rwlock));
+	WT_RET(__wt_verbose(
+	    session, WT_VERB_MUTEX, "rwlock: destroy %s", rwlock->name));
 
 	__wt_free(session, rwlock);
 	return (0);
