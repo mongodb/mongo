@@ -202,7 +202,7 @@ namespace mongo {
         Status updateDocumentWithDamages( OperationContext* txn,
                                           const DiskLoc& loc,
                                           const RecordData& oldRec,
-                                          const char* damangeSource,
+                                          const char* damageSource,
                                           const mutablebson::DamageVector& damages );
 
         // -----------
