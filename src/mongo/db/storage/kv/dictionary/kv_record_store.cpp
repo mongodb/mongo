@@ -254,7 +254,7 @@ namespace mongo {
         Status status = _db->get(txn, key.key(), val);
         massert(28546, str::stream() << "KVRecordStore: couldn't find record " << loc.toString() << " for delete: " << status.toString(), status.isOK());
 
-        _updateStats(txn, -1, val.size());
+        _updateStats(txn, -1, -val.size());
 
         status = _db->remove( txn, key.key() );
         invariant(status.isOK());
