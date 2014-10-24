@@ -41,7 +41,8 @@ static int
 __bm_addr_valid(WT_BM *bm,
     WT_SESSION_IMPL *session, const uint8_t *addr, size_t addr_size)
 {
-	return (__wt_block_addr_valid(session, bm->block, addr, addr_size));
+	return (__wt_block_addr_valid(
+	    session, bm->block, addr, addr_size, bm->is_live));
 }
 
 /*
