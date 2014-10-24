@@ -96,7 +96,7 @@ static CONFIG c[] = {
 
 	{ "cache",
 	  "size of the cache in MB",
-	  0x0, 1, 100, 1024, &g.c_cache, NULL },
+	  0x0, 1, 100, 100 * 1024, &g.c_cache, NULL },
 
 	{ "checkpoints",
 	  "if periodic checkpoints are done",			/* 95% */
