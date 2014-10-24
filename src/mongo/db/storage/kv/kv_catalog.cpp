@@ -150,6 +150,7 @@ namespace mongo {
                                  BSONCollectionCatalogEntry::MetaData& md ) {
         DiskLoc loc;
         BSONObj obj = _findEntry( opCtx, ns, &loc );
+        BSONObj newObj;
 
         {
             // rebuilt doc
@@ -179,13 +180,14 @@ namespace mongo {
 
             // add whatever is left
             b.appendElementsUnique( obj );
-            obj = b.obj();
+            newObj = b.obj();
         }
 
         StatusWith<DiskLoc> status = _rs->updateRecord( opCtx,
                                                         loc,
-                                                        obj.objdata(),
-                                                        obj.objsize(),
+                                                        RecordData(obj.objdata(), obj.objsize()),
+                                                        newObj.objdata(),
+                                                        newObj.objsize(),
                                                         false,
                                                         NULL );
         fassert( 28521, status.getStatus() );
@@ -215,6 +217,7 @@ namespace mongo {
             BSONObj obj = b.obj();
             StatusWith<DiskLoc> status = _rs->updateRecord( opCtx,
                                                             loc,
+                                                            RecordData(old.objdata(), old.objsize()),
                                                             obj.objdata(),
                                                             obj.objsize(),
                                                             false,

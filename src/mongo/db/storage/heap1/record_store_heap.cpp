@@ -176,6 +176,7 @@ namespace mongo {
 
     StatusWith<DiskLoc> HeapRecordStore::updateRecord(OperationContext* txn,
                                                       const DiskLoc& oldLocation,
+                                                      const RecordData& oldRec,
                                                       const char* data,
                                                       int len,
                                                       bool enforceQuota,

@@ -72,6 +72,7 @@ namespace mongo {
                                                   
         virtual StatusWith<DiskLoc> updateRecord( OperationContext* txn,
                                                   const DiskLoc& oldLocation,
+                                                  const RecordData& oldRec,
                                                   const char* data,
                                                   int len,
                                                   bool enforceQuota,

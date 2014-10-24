@@ -348,6 +348,7 @@ namespace mongo {
         // this can callback into Collection::recordStoreGoingToMove
         StatusWith<DiskLoc> newLocation = _recordStore->updateRecord( txn,
                                                                       oldLocation,
+                                                                      RecordData(objOld.objdata(), objOld.objsize()),
                                                                       objNew.objdata(),
                                                                       objNew.objsize(),
                                                                       _enforceQuota( enforceQuota ),

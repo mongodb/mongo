@@ -53,13 +53,14 @@ namespace mongo {
 
         string data = "my record";
         DiskLoc loc;
+        const RecordData record(data.c_str(), data.size() + 1);
         {
             scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
             {
                 WriteUnitOfWork uow( opCtx.get() );
                 StatusWith<DiskLoc> res = rs->insertRecord( opCtx.get(),
-                                                            data.c_str(),
-                                                            data.size() + 1,
+                                                            record.data(),
+                                                            record.size(),
                                                             false );
                 ASSERT_OK( res.getStatus() );
                 loc = res.getValue();
@@ -79,6 +80,7 @@ namespace mongo {
                 WriteUnitOfWork uow( opCtx.get() );
                 StatusWith<DiskLoc> res = rs->updateRecord( opCtx.get(),
                                                             loc,
+                                                            record,
                                                             data.c_str(),
                                                             data.size() + 1,
                                                             false,
@@ -111,6 +113,7 @@ namespace mongo {
 
         const int nToInsert = 10;
         DiskLoc locs[nToInsert];
+        RecordData records[nToInsert];
         for ( int i = 0; i < nToInsert; i++ ) {
             scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
             {
@@ -125,6 +128,7 @@ namespace mongo {
                                                             false );
                 ASSERT_OK( res.getStatus() );
                 locs[i] = res.getValue();
+                records[i] = RecordData(data.c_str(), data.size() + 1);
                 uow.commit();
             }
         }
@@ -144,6 +148,7 @@ namespace mongo {
                 WriteUnitOfWork uow( opCtx.get() );
                 StatusWith<DiskLoc> res = rs->updateRecord( opCtx.get(),
                                                             locs[i],
+                                                            records[i],
                                                             data.c_str(),
                                                             data.size() + 1,
                                                             false,
@@ -180,13 +185,14 @@ namespace mongo {
 
         string oldData = "my record";
         DiskLoc loc;
+        const RecordData oldRecord(oldData.c_str(), oldData.size() + 1);
         {
             scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
             {
                 WriteUnitOfWork uow( opCtx.get() );
                 StatusWith<DiskLoc> res = rs->insertRecord( opCtx.get(),
-                                                            oldData.c_str(),
-                                                            oldData.size() + 1,
+                                                            oldRecord.data(),
+                                                            oldRecord.size(),
                                                             false );
                 ASSERT_OK( res.getStatus() );
                 loc = res.getValue();
@@ -208,6 +214,7 @@ namespace mongo {
                 WriteUnitOfWork uow( opCtx.get() );
                 StatusWith<DiskLoc> res = rs->updateRecord( opCtx.get(),
                                                             loc,
+                                                            oldRecord,
                                                             newData.c_str(),
                                                             newData.size() + 1,
                                                             false,

@@ -319,6 +319,7 @@ namespace mongo {
 
     StatusWith<DiskLoc> RecordStoreV1Base::updateRecord( OperationContext* txn,
                                                          const DiskLoc& oldLocation,
+                                                         const RecordData& oldRec,
                                                          const char* data,
                                                          int dataSize,
                                                          bool enforceQuota,
