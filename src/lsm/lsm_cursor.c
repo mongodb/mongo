@@ -112,7 +112,6 @@ __clsm_enter_update(WT_CURSOR_LSM *clsm)
 static inline int
 __clsm_enter(WT_CURSOR_LSM *clsm, int reset, int update)
 {
-	WT_CURSOR *c;
 	WT_DECL_RET;
 	WT_SESSION_IMPL *session;
 	uint64_t *switch_txnp;
@@ -125,9 +124,8 @@ __clsm_enter(WT_CURSOR_LSM *clsm, int reset, int update)
 		return (0);
 
 	if (reset) {
-		c = &clsm->iface;
-		WT_ASSERT(session,
-		    !F_ISSET(c, WT_CURSTD_KEY_INT | WT_CURSTD_VALUE_INT));
+		WT_ASSERT(session, !F_ISSET(&clsm->iface,
+		   WT_CURSTD_KEY_INT | WT_CURSTD_VALUE_INT));
 		WT_RET(__clsm_reset_cursors(clsm, NULL));
 	}
 
