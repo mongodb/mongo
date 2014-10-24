@@ -114,7 +114,8 @@ src/os_win/os_flock.c
 src/os_win/os_fsync.c
 src/os_win/os_ftruncate.c
 src/os_win/os_map.c
-src/os_win/os_mtx.c
+src/os_win/os_mtx_cond.c
+src/os_win/os_mtx_rw.c
 src/os_win/os_once.c
 src/os_win/os_open.c
 src/os_win/os_path.c
