@@ -56,6 +56,8 @@ namespace mongo {
         switch (type) {
         case UpdateWithDamages:
             return KVUpdateWithDamagesMessage::deserializeFrom(slice);
+        case UpdateIncrement:
+            return KVUpdateIncrementMessage::deserializeFrom(slice);
         default:
             invariant(false);
         }
@@ -141,6 +143,7 @@ namespace mongo {
             event.sourceOffset = currentSourceOffset;
             event.targetOffset = reader.read<mutablebson::DamageEvent::OffsetSizeType>();
             event.size = reader.read<size_t>();
+            currentSourceOffset += event.size;
             totalDamagesSize += event.size;
 
             vec.push_back(event);

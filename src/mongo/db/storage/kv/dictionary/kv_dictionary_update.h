@@ -28,6 +28,8 @@
  *    it in the license file.
  */
 
+#pragma once
+
 #include "mongo/base/status.h"
 #include "mongo/bson/mutable/damage_vector.h"
 #include "mongo/db/storage/kv/slice.h"
