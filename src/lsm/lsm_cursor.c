@@ -26,6 +26,7 @@ static int
 __clsm_enter_update(WT_CURSOR_LSM *clsm)
 {
 	WT_CURSOR *primary;
+	WT_DECL_RET;
 	WT_LSM_CHUNK *primary_chunk;
 	WT_LSM_TREE *lsm_tree;
 	WT_SESSION_IMPL *session;
@@ -70,11 +71,12 @@ __clsm_enter_update(WT_CURSOR_LSM *clsm)
 			WT_RET(__wt_lsm_tree_lock(session, lsm_tree, 0));
 			if (clsm->dsk_gen == lsm_tree->dsk_gen &&
 			    !F_ISSET(lsm_tree, WT_LSM_TREE_NEED_SWITCH)) {
-				WT_RET(__wt_lsm_manager_push_entry(
-				    session, WT_LSM_WORK_SWITCH, 0, lsm_tree));
+				ret = __wt_lsm_manager_push_entry(
+				    session, WT_LSM_WORK_SWITCH, 0, lsm_tree);
 				F_SET(lsm_tree, WT_LSM_TREE_NEED_SWITCH);
 			}
-			WT_RET(__wt_lsm_tree_unlock(session, lsm_tree));
+			WT_TRET(__wt_lsm_tree_unlock(session, lsm_tree));
+			WT_RET(ret);
 			ovfl = 0;
 		}
 	} else if (have_primary)
