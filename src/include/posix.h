@@ -24,5 +24,19 @@
  */
 typedef pthread_cond_t		wt_cond_t;
 typedef pthread_mutex_t		wt_mutex_t;
-typedef pthread_rwlock_t	wt_rwlock_t;
 typedef pthread_t		wt_thread_t;
+
+/*
+ * !!!
+ * Don't touch this structure without understanding the read/write
+ * locking functions.
+ */
+typedef union {			/* Read/write lock */
+	uint32_t u;
+	uint16_t us;
+	struct {
+		uint8_t writers;
+		uint8_t readers;
+		uint8_t users;
+	} s;
+} wt_rwlock_t;

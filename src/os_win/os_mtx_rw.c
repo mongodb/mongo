@@ -21,7 +21,6 @@ __wt_rwlock_alloc(
 	WT_RET(__wt_calloc(session, 1, sizeof(WT_RWLOCK), &rwlock));
 	InitializeSRWLock(&rwlock->rwlock);
 
-	rwlock->exclusive_locked = 0;
 	rwlock->name = name;
 	*rwlockp = rwlock;
 
@@ -67,7 +66,7 @@ __wt_try_writelock(WT_SESSION_IMPL *session, WT_RWLOCK *rwlock)
 	if (ret == 0)
 		return (EBUSY);
 
-	rwlock->exclusive_locked = GetCurrentThreadId();
+	rwlock->exclusive_locked = 1;
 	return (0);
 }
 
@@ -84,7 +83,7 @@ __wt_writelock(WT_SESSION_IMPL *session, WT_RWLOCK *rwlock)
 
 	AcquireSRWLockExclusive(&rwlock->rwlock);
 
-	rwlock->exclusive_locked = GetCurrentThreadId();
+	rwlock->exclusive_locked = 1;
 
 	return (0);
 }
@@ -96,15 +95,15 @@ __wt_writelock(WT_SESSION_IMPL *session, WT_RWLOCK *rwlock)
 int
 __wt_rwunlock(WT_SESSION_IMPL *session, WT_RWLOCK *rwlock)
 {
-	if (rwlock->exclusive_locked != 0) {
-		rwlock->exclusive_locked = 0;
-		ReleaseSRWLockExclusive(&rwlock->rwlock);
-	} else
-		ReleaseSRWLockShared(&rwlock->rwlock);
-
 	WT_RET(__wt_verbose(session, WT_VERB_MUTEX,
 	    "rwlock: unlock %s (%p)", rwlock->name, rwlock));
 
+	if (rwlock->exclusive_locked == 0)
+		ReleaseSRWLockShared(&rwlock->rwlock);
+	else {
+		rwlock->exclusive_locked = 0;
+		ReleaseSRWLockExclusive(&rwlock->rwlock);
+	}
 	return (0);
 }
 

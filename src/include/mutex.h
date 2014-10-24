@@ -31,9 +31,7 @@ struct __wt_rwlock {
 
 	wt_rwlock_t rwlock;		/* Read/write lock */
 
-#ifdef _WIN32
-	uint32_t exclusive_locked;
-#endif
+	int exclusive_locked;		/* If exclusive lock held */
 };
 
 /*

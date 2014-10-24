@@ -68,6 +68,7 @@ Comparator
 Config
 CreateFileMapping
 CreateThread
+Crummey
 CustomersPhone
 DATAITEMs
 DECL
@@ -127,6 +128,7 @@ FreeLibrary
 Freelist
 Fsync
 Ftruncate
+Fuerst
 GCC
 GETTIME
 GETTIMEOFDAY
@@ -213,6 +215,7 @@ MVCC
 Manos
 MapViewOfFile
 Marsaglia's
+Mellor
 Metadata
 Mewhort
 MoveFile
@@ -271,6 +274,7 @@ RUNDIR
 Radu
 Recno
 Recurse
+RedHat
 Redistributions
 Relock
 Resize
@@ -291,6 +295,7 @@ STRTOUQ
 STRUCT
 SYS
 Scalability
+Seigh
 SetEndOfFile
 SetFilePointerEx
 Sevii
@@ -299,6 +304,7 @@ Skiplist
 SleepConditionVariableCS
 Solaris
 Spinlock
+Spinlocks
 Split's
 Stoica
 StoreLoad
@@ -887,6 +893,7 @@ readnext
 readonly
 readprev
 readserver
+readunlock
 realloc
 recno
 recnos
@@ -1122,6 +1129,7 @@ wiredtiger
 workFactor
 wrapup
 writelock
+writeunlock
 wrlock
 ws
 wti
