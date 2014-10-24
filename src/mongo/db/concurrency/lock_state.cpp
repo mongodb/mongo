@@ -411,9 +411,6 @@ namespace mongo {
         globalLockManager.downgrade(globalLockRequest, MODE_S);
 
         if (IsForMMAPV1) {
-            LockRequest* flushLockRequest = _requests.find(resourceIdMMAPV1Flush).objAddr();
-            invariant(flushLockRequest->mode == MODE_X);
-            invariant(flushLockRequest->recursiveCount == 1);
             invariant(unlock(resourceIdMMAPV1Flush));
         }
     }
@@ -574,7 +571,6 @@ namespace mongo {
         // Clear out whatever is in stateOut.
         stateOut->locks.clear();
         stateOut->globalMode = MODE_NONE;
-        stateOut->globalRecursiveCount = 0;
 
         // First, we look at the global lock.  There is special handling for this (as the flush
         // lock goes along with it) so we store it separately from the more pedestrian locks.
@@ -592,26 +588,14 @@ namespace mongo {
             return false;
         }
 
-        // The global lock has been acquired just once.
-        invariant(1 == globalRequest->recursiveCount);
+        // The global lock must have been acquired just once
         stateOut->globalMode = globalRequest->mode;
-        stateOut->globalRecursiveCount = globalRequest->recursiveCount;
-
-        // Flush lock state is inferred from the global state so we don't bother to store it.
+        invariant(unlock(resourceIdGlobal));
+        invariant(unlock(resourceIdMMAPV1Flush));
 
         // Next, the non-global locks.
         for (LockRequestsMap::Iterator it = _requests.begin(); !it.finished(); it.next()) {
             const ResourceId& resId = it.key();
-
-            // This is handled separately from normal locks as mentioned above.
-            if (resourceIdGlobal == resId) {
-                continue;
-            }
-
-            // This is an internal lock that is obtained when the global lock is locked.
-            if (IsForMMAPV1 && (resourceIdMMAPV1Flush == resId)) {
-                continue;
-            }
 
             // We don't support saving and restoring document-level locks.
             invariant(RESOURCE_DATABASE == resId.getType() ||
@@ -621,33 +605,15 @@ namespace mongo {
             Locker::LockSnapshot::OneLock info;
             info.resourceId = resId;
             info.mode = it->mode;
-            info.recursiveCount = it->recursiveCount;
 
             stateOut->locks.push_back(info);
+
+            invariant(unlock(resId));
         }
 
         // Sort locks from coarsest to finest.  They'll later be acquired in this order.
         std::sort(stateOut->locks.begin(), stateOut->locks.end(), SortByGranularity());
 
-        // Unlock everything.
-
-        // Step 1: Unlock all requests that are not-flush and not-global.
-        for (size_t i = 0; i < stateOut->locks.size(); ++i) {
-            for (size_t j = 0; j < stateOut->locks[i].recursiveCount; ++j) {
-                invariant(unlock(stateOut->locks[i].resourceId));
-            }
-        }
-
-        // Step 2: Unlock the global lock.
-        for (size_t i = 0; i < stateOut->globalRecursiveCount; ++i) {
-            invariant(unlock(resourceIdGlobal));
-        }
-
-        // Step 3: Unlock flush.  It's only acquired on the first global lock acquisition
-        // so we only unlock it once.
-        if (IsForMMAPV1) {
-            invariant(unlock(resourceIdMMAPV1Flush));
-        }
         return true;
     }
 
@@ -656,17 +622,11 @@ namespace mongo {
         // We shouldn't be saving and restoring lock state from inside a WriteUnitOfWork.
         invariant(!inAWriteUnitOfWork());
 
-        // We expect to be able to unlock each lock 'recursiveCount' number of times.
-        // So, we relock each lock that number of times.
+        lockGlobal(state.globalMode);
 
-        for (size_t i = 0; i < state.globalRecursiveCount; ++i) {
-            lockGlobal(state.globalMode);
-        }
-
-        for (size_t i = 0; i < state.locks.size(); ++i) {
-            for (size_t j = 0; j < state.locks[i].recursiveCount; ++j) {
-                invariant(LOCK_OK == lock(state.locks[i].resourceId, state.locks[i].mode));
-            }
+        std::vector<LockSnapshot::OneLock>::const_iterator it = state.locks.begin();
+        for (; it != state.locks.end(); it++) {
+            invariant(LOCK_OK == lock(it->resourceId, it->mode));
         }
     }
 
