@@ -8,8 +8,8 @@
 /*
  * Condition variables:
  *
- * WiredTiger uses standard pthread condition variables to signal between
- * threads, and for locking operations that are expected to block.
+ * WiredTiger uses condition variables to signal between threads, and for
+ * locking operations that are expected to block.
  */
 struct __wt_condvar {
 	const char *name;		/* Mutex name for debugging */
@@ -24,8 +24,7 @@ struct __wt_condvar {
 /*
  * Read/write locks:
  *
- * WiredTiger uses standard pthread rwlocks to get shared and exclusive access
- * to resources.
+ * WiredTiger uses read/write locks for shared/exclusive access to resources.
  */
 struct __wt_rwlock {
 	const char *name;		/* Lock name for debugging */
@@ -40,9 +39,9 @@ struct __wt_rwlock {
 /*
  * Spin locks:
  *
- * These used for cases where fast mutual exclusion is needed (where operations
- * done while holding the spin lock are expected to complete in a small number
- * of instructions).
+ * WiredTiger uses spinlocks for fast mutual exclusion (where operations done
+ * while holding the spin lock are expected to complete in a small number of
+ * instructions).
  */
 #define	SPINLOCK_GCC			0
 #define	SPINLOCK_PTHREAD_MUTEX		1
