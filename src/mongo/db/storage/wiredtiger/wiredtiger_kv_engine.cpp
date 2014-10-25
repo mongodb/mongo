@@ -11,6 +11,7 @@
 #include "mongo/db/storage/wiredtiger/wiredtiger_session_cache.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_util.h"
 #include "mongo/util/log.h"
+#include "mongo/util/processinfo.h"
 
 namespace mongo {
 
@@ -49,9 +50,29 @@ namespace mongo {
         _eventHandler.handle_progress = mdb_handle_progress;
         _eventHandler.handle_close = mdb_handle_close;
 
+        int cacheSizeGB = 1;
+
+        {
+            ProcessInfo pi;
+            BSONObjBuilder b;
+            pi.appendSystemDetails( b );
+            BSONObj obj = b.obj();
+            BSONObj extra = obj["extra"].Obj();
+            double pageSize = extra["pageSize"].number();
+            double numPages = extra["numPages"].number();
+            if ( pageSize > 0 && numPages > 0 ) {
+                double totalBytes = numPages * pageSize;
+                double cacheBytes = totalBytes / 10;
+                cacheSizeGB = static_cast<int>( cacheBytes / ( 1024 * 1024 * 1024 ) );
+                LOG(1) << "WT cache size: " <<cacheSizeGB << "G";
+                if ( cacheSizeGB < 1 )
+                    cacheSizeGB = 1;
+            }
+        }
+
         std::stringstream ss;
         ss << "create,";
-        ss << "cache_size=10G,";
+        ss << "cache_size=" << cacheSizeGB << "G,";
         ss << "session_max=20000,";
         ss << "extensions=[local=(entry=index_collator_extension)],";
         ss << "statistics=(all),";
