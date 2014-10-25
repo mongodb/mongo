@@ -200,9 +200,9 @@ __writeunlock(WT_SESSION_IMPL *session, WT_RWLOCK *rwlock)
 	rwlock->exclusive_locked = 0;
 
 	/*
-	 * Use a full barrier, not just a memory barrier because the exclusive-
-	 * locked flag has to be cleared before a subsequent writer gets the
-	 * lock and sets it.
+	 * Use a full barrier (not just a memory barrier), because the exclusive
+	 * lock flag has to be cleared before a subsequent writer gets the lock
+	 * and sets it.
 	 */
 	WT_FULL_BARRIER();
 
