@@ -296,7 +296,6 @@ namespace mongo {
             invariantWTOK(ret);
             oldest = _fromKey(key);
 
-
             if ( _cappedDeleteCallback ) {
                 uassertStatusOK(_cappedDeleteCallback->aboutToDeleteCapped(txn, oldest));
             }
@@ -316,9 +315,7 @@ namespace mongo {
 
         if (ret != WT_NOTFOUND) invariantWTOK(ret);
 
-        invariant( !oldest.isNull() );
-
-        if ( useTruncate ) {
+        if ( useTruncate && !oldest.isNull() ) {
             c->reset( c );
             c->set_key( c, _makeKey( oldest ) );
             invariantWTOK( curwrap.getWTSession()->truncate( curwrap.getWTSession(),
