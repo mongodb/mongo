@@ -38,5 +38,6 @@ typedef union {			/* Read/write lock */
 		uint8_t writers;
 		uint8_t readers;
 		uint8_t users;
+		uint8_t pad;
 	} s;
 } wt_rwlock_t;

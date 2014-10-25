@@ -69,20 +69,19 @@ int
 __wt_try_readlock(WT_SESSION_IMPL *session, WT_RWLOCK *rwlock)
 {
 	wt_rwlock_t *l;
-	uint32_t cmp, cmpnew, me, writers;
-	uint8_t menew;
+	uint32_t old, new, pad, users, writers;
 
 	WT_RET(__wt_verbose(
 	    session, WT_VERB_MUTEX, "rwlock: try_readlock %s", rwlock->name));
 	WT_STAT_FAST_CONN_INCR(session, rwlock_read);
 
 	l = &rwlock->rwlock;
-	me = l->s.users;
-	menew = (uint8_t)(me + 1);
+	pad = l->s.pad;
+	users = l->s.users;
 	writers = l->s.writers;
-	cmp = (me << 16) + (me << 8) + writers;
-	cmpnew = ((uint32_t)menew << 16) + (menew << 8) + writers;
-	return (WT_ATOMIC_CAS_VAL4(l->u, cmp, cmpnew) == cmp ? 0 : EBUSY);
+	old = (pad << 24) + (users << 16) + (users << 8) + writers;
+	new = (pad << 24) + ((users + 1) << 16) + ((users + 1) << 8) + writers;
+	return (WT_ATOMIC_CAS_VAL4(l->u, old, new) == old ? 0 : EBUSY);
 }
 
 /*
@@ -137,20 +136,19 @@ int
 __wt_try_writelock(WT_SESSION_IMPL *session, WT_RWLOCK *rwlock)
 {
 	wt_rwlock_t *l;
-	uint32_t cmp, cmpnew, me, readers;
-	uint8_t menew;
+	uint32_t old, new, pad, readers, users;
 
 	WT_RET(__wt_verbose(
 	    session, WT_VERB_MUTEX, "rwlock: try_writelock %s", rwlock->name));
 	WT_STAT_FAST_CONN_INCR(session, rwlock_write);
 
 	l = &rwlock->rwlock;
-	me = l->s.users;
-	menew = (uint8_t)(me + 1);
-	readers = l->s.readers << 8;
-	cmp = (me << 16) + readers + me;
-	cmpnew = (menew << 16) + readers + me;
-	if (WT_ATOMIC_CAS_VAL4(l->u, cmp, cmpnew) != cmp)
+	pad = l->s.pad;
+	readers = l->s.readers;
+	users = l->s.users;
+	old = (pad << 24) + (users << 16) + (readers << 8) + users;
+	new = (pad << 24) + ((users + 1) << 16) + (readers << 8) + users;
+	if (WT_ATOMIC_CAS_VAL4(l->u, old, new) != old)
 		return (EBUSY);
 
 	rwlock->exclusive_locked = 1;
