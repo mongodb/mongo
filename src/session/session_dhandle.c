@@ -22,11 +22,11 @@ __wt_session_dhandle_incr_use(WT_SESSION_IMPL *session)
 }
 
 /*
- * __wt_session_dhandle_decr_use --
+ * __session_dhandle_decr_use --
  *	Decrement the session data source's in-use counter.
  */
-int
-__wt_session_dhandle_decr_use(WT_SESSION_IMPL *session)
+static int
+__session_dhandle_decr_use(WT_SESSION_IMPL *session)
 {
 	WT_DATA_HANDLE *dhandle;
 	WT_DECL_RET;
@@ -149,7 +149,7 @@ __wt_session_release_btree(WT_SESSION_IMPL *session)
 	dhandle = session->dhandle;
 
 	/* Decrement the data-source's in-use counter. */
-	WT_ERR(__wt_session_dhandle_decr_use(session));
+	WT_ERR(__session_dhandle_decr_use(session));
 
 	if (F_ISSET(dhandle, WT_DHANDLE_DISCARD_CLOSE)) {
 		/*
