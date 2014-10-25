@@ -153,9 +153,11 @@ __wt_session_release_btree(WT_SESSION_IMPL *session)
 
 	if (F_ISSET(dhandle, WT_DHANDLE_DISCARD_CLOSE)) {
 		/*
-		 * If configured to discard on last close, attempt to trade our
-		 * read lock for an exclusive lock. If that succeeds, setup for
-		 * discard. It is expected that the exclusive lock will fail
+		 * If configured to discard on last close, trade our lock for an
+		 * exclusive lock (we may already have an exclusive lock but it
+		 * is less likely and discard on close is uncommon, so we don't
+		 * bother figuring it out. If the exchange succeeds, setup for
+		 * discard. It is expected acquiring an exclusive lock will fail
 		 * sometimes since the handle may still be in use: in that case
 		 * we've already unlocked, so we're done.
 		 */
