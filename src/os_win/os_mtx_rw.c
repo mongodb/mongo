@@ -19,7 +19,7 @@ __wt_rwlock_alloc(
 
 	WT_RET(__wt_verbose(session, WT_VERB_MUTEX, "rwlock: alloc %s", name));
 
-	WT_RET(__wt_calloc(session, 1, sizeof(WT_RWLOCK), &rwlock));
+	WT_RET(__wt_calloc_def(session, 1, &rwlock));
 
 	rwlock->name = name;
 	InitializeSRWLock(&rwlock->rwlock);
