@@ -169,7 +169,8 @@ namespace mongo {
             Iterator( const WiredTigerRecordStore& rs,
                       OperationContext* txn,
                       const DiskLoc& start,
-                      const CollectionScanParams::Direction& dir );
+                      const CollectionScanParams::Direction& dir,
+                      bool forParallelCollectionScan );
 
             virtual ~Iterator();
 
@@ -192,6 +193,7 @@ namespace mongo {
             OperationContext* _txn;
             RecoveryUnit* _savedRecoveryUnit; // only used to sanity check between save/restore
             CollectionScanParams::Direction _dir;
+            bool _forParallelCollectionScan;
             scoped_ptr<WiredTigerCursor> _cursor;
             bool _eof;
 

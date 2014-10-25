@@ -452,7 +452,7 @@ namespace mongo {
     RecordIterator* WiredTigerRecordStore::getIterator( OperationContext* txn,
                                                         const DiskLoc& start,
                                                         const CollectionScanParams::Direction& dir ) const {
-        return new Iterator(*this, txn, start, dir);
+        return new Iterator(*this, txn, start, dir, false);
     }
 
 
@@ -465,7 +465,9 @@ namespace mongo {
         // XXX do we want this to actually return a set of iterators?
 
         std::vector<RecordIterator*> iterators;
-        iterators.push_back( getIterator( txn ) );
+        iterators.push_back( new Iterator(*this, txn, DiskLoc(),
+                                          CollectionScanParams::FORWARD, true) );
+
         return iterators;
     }
 
@@ -626,10 +628,12 @@ namespace mongo {
             const WiredTigerRecordStore& rs,
             OperationContext *txn,
             const DiskLoc& start,
-            const CollectionScanParams::Direction& dir )
+            const CollectionScanParams::Direction& dir,
+            bool forParallelCollectionScan)
         : _rs( rs ),
           _txn( txn ),
           _dir( dir ),
+          _forParallelCollectionScan( forParallelCollectionScan ),
           _cursor( new WiredTigerCursor( rs.GetURI(), rs.instanceId(), txn ) ) {
         RS_ITERATOR_TRACE("start");
         _locate(start, true);
@@ -744,6 +748,10 @@ namespace mongo {
         if ( !wt_keeptxnopen() ) {
             _cursor->reset();
         }
+
+        if ( _forParallelCollectionScan ) {
+            _cursor.reset( NULL );
+        }
         _txn = NULL;
     }
 
@@ -753,8 +761,20 @@ namespace mongo {
         // OperationContext on restore - update the iterators context in that
         // case
         _txn = txn;
+
+        bool needRestore = false;
+
+        if ( _forParallelCollectionScan ) {
+            invariant( _savedRecoveryUnit != txn->recoveryUnit() );
+            // parallel collection scan or something
+            needRestore = true;
+            _savedRecoveryUnit = txn->recoveryUnit();
+            _cursor.reset( new WiredTigerCursor( _rs.GetURI(), _rs.instanceId(), txn ) );
+            _forParallelCollectionScan = false; // we only do this the first time
+        }
+
         invariant( _savedRecoveryUnit == txn->recoveryUnit() );
-        if ( !wt_keeptxnopen() ) {
+        if ( needRestore || !wt_keeptxnopen() ) {
             DiskLoc saved = _lastLoc;
             _locate(_lastLoc, false);
             RS_ITERATOR_TRACE( "isEOF check " << _eof );
