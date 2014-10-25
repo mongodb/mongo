@@ -46,7 +46,7 @@ __wt_readlock(WT_SESSION_IMPL *session, WT_RWLOCK *rwlock)
 
 /*
  * __readunlock --
- *	Release a read lock.
+ *	Release a shared lock.
  */
 static int
 __readunlock(WT_SESSION_IMPL *session, WT_RWLOCK *rwlock)
@@ -60,7 +60,7 @@ __readunlock(WT_SESSION_IMPL *session, WT_RWLOCK *rwlock)
 
 /*
  * __wt_try_writelock --
- *	Try to get an exclusive lock, or fail immediately if unavailable.
+ *	Try to get an exclusive lock, fail immediately if unavailable.
  */
 int
 __wt_try_writelock(WT_SESSION_IMPL *session, WT_RWLOCK *rwlock)
@@ -98,7 +98,7 @@ __wt_writelock(WT_SESSION_IMPL *session, WT_RWLOCK *rwlock)
 
 /*
  * __writeunlock --
- *	Release a write lock.
+ *	Release an exclusive lock.
  */
 static int
 __writeunlock(WT_SESSION_IMPL *session, WT_RWLOCK *rwlock)
@@ -128,7 +128,7 @@ __wt_rwunlock(WT_SESSION_IMPL *session, WT_RWLOCK *rwlock)
 
 /*
  * __wt_rwlock_destroy --
- *	Destroy a mutex.
+ *	Destroy a read/write lock.
  */
 int
 __wt_rwlock_destroy(WT_SESSION_IMPL *session, WT_RWLOCK **rwlockp)
