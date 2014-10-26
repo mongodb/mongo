@@ -32,7 +32,7 @@ type MongoDump struct {
 	InputOptions  *options.InputOptions
 	OutputOptions *options.OutputOptions
 
-	cmdRunner db.CommandRunner
+	sessionProvider *db.SessionProvider
 
 	// useful internals that we don't directly expose as options
 	useStdout       bool
@@ -76,16 +76,7 @@ func (dump *MongoDump) Init() error {
 	if err != nil {
 		return fmt.Errorf("Bad Option: %v", err)
 	}
-	if dump.ToolOptions.Namespace.DBPath != "" {
-		shim, err := db.NewShim(dump.ToolOptions.Namespace.DBPath, dump.ToolOptions.DirectoryPerDB, dump.ToolOptions.Journal)
-		if err != nil {
-			return err
-		}
-		shim.Repair = dump.OutputOptions.Repair
-		dump.cmdRunner = shim
-		return nil
-	}
-	dump.cmdRunner = db.NewSessionProvider(*dump.ToolOptions)
+	dump.sessionProvider = db.NewSessionProvider(*dump.ToolOptions)
 	return nil
 }
 
@@ -120,22 +111,12 @@ func (dump *MongoDump) Dump() error {
 	}
 
 	if dump.OutputOptions.DumpDBUsersAndRoles {
-		if err != nil {
-			return fmt.Errorf("error establishing database connection: %v", err)
-		}
 		//first make sure this is possible with the connected database
-		if _, ok := dump.cmdRunner.(*db.Shim); ok { //TODO make this check a method
-			// the shim does not know about auth, so we must assume version 3,
-			// as that's all we support. If we add a new version, we'll have to fix this hack
-			log.Logf(log.DebugLow, "using shim; assuming auth version 3")
-			dump.authVersion = 3
-		} else {
-			dump.authVersion, err = auth.GetAuthVersion(dump.cmdRunner)
-			if err != nil {
-				return fmt.Errorf("error getting auth schema version for dumpDbUsersAndRoles: %v", err)
-			}
-			log.Logf(log.DebugLow, "using auth schema version %v", dump.authVersion)
+		dump.authVersion, err = auth.GetAuthVersion(dump.sessionProvider)
+		if err != nil {
+			return fmt.Errorf("error getting auth schema version for dumpDbUsersAndRoles: %v", err)
 		}
+		log.Logf(log.DebugLow, "using auth schema version %v", dump.authVersion)
 		if dump.authVersion != 3 {
 			return fmt.Errorf("backing up users and roles is only supported for "+
 				"deployments with auth schema versions 3, found: %v", dump.authVersion)
@@ -193,7 +174,7 @@ func (dump *MongoDump) DumpEverything() error {
 		}
 	}
 
-	dbs, err := dump.cmdRunner.DatabaseNames()
+	dbs, err := dump.sessionProvider.DatabaseNames()
 	if err != nil {
 		return fmt.Errorf("error getting database names: %v", err)
 	}
@@ -233,7 +214,7 @@ func (dump *MongoDump) DumpEverything() error {
 		log.Logf(log.Always, "writing captured oplog to %v", oplogFilepath)
 		//session.SetPrefetch(1.0) //mimic exhaust cursor
 		queryObj := bson.M{"ts": bson.M{"$gt": oplogStart}}
-		oplogQuery, err := dump.cmdRunner.FindDocs("local", dump.oplogCollection, 0, 0, queryObj, nil, db.Prefetch)
+		oplogQuery, err := dump.sessionProvider.FindDocs("local", dump.oplogCollection, 0, 0, queryObj, nil, db.Prefetch)
 		if err != nil {
 			return err
 		}
@@ -276,7 +257,7 @@ func (dump *MongoDump) skipCollection(colName string) bool {
 
 // DumpDatabase dumps the specified database
 func (dump *MongoDump) DumpDatabase(db string) error {
-	cols, err := dump.cmdRunner.CollectionNames(db)
+	cols, err := dump.sessionProvider.CollectionNames(db)
 	if err != nil {
 		return fmt.Errorf("error getting collections names for database `%v`: %v", dump.ToolOptions.DB, err)
 	}
@@ -310,12 +291,12 @@ func (dump *MongoDump) DumpCollection(dbName, c string) error {
 	var err error
 	switch {
 	case len(dump.query) > 0:
-		findQuery, err = dump.cmdRunner.FindDocs(dbName, c, 0, 0, dump.query, nil, db.Prefetch)
+		findQuery, err = dump.sessionProvider.FindDocs(dbName, c, 0, 0, dump.query, nil, db.Prefetch)
 	case dump.InputOptions.TableScan:
 		// ---forceTablesScan runs the query without snapshot enabled
-		findQuery, err = dump.cmdRunner.FindDocs(dbName, c, 0, 0, nil, nil, db.Prefetch)
+		findQuery, err = dump.sessionProvider.FindDocs(dbName, c, 0, 0, nil, nil, db.Prefetch)
 	default:
-		findQuery, err = dump.cmdRunner.FindDocs(dbName, c, 0, 0, nil, nil, db.Prefetch&db.Snapshot)
+		findQuery, err = dump.sessionProvider.FindDocs(dbName, c, 0, 0, nil, nil, db.Prefetch&db.Snapshot)
 	}
 	if err != nil {
 		return err
@@ -449,7 +430,7 @@ func (dump *MongoDump) DumpUsersAndRolesForDB(db string) error {
 		return fmt.Errorf("error creating file for db users: %v", err)
 	}
 
-	usersQuery, err := dump.cmdRunner.FindDocs("admin", "system.users", 0, 0, dbQuery, nil, 0)
+	usersQuery, err := dump.sessionProvider.FindDocs("admin", "system.users", 0, 0, dbQuery, nil, 0)
 	if err != nil {
 		return err
 	}
@@ -463,7 +444,7 @@ func (dump *MongoDump) DumpUsersAndRolesForDB(db string) error {
 		return fmt.Errorf("error creating file for db roles: %v", err)
 	}
 
-	rolesQuery, err := dump.cmdRunner.FindDocs("admin", "system.roles", 0, 0, dbQuery, nil, 0)
+	rolesQuery, err := dump.sessionProvider.FindDocs("admin", "system.roles", 0, 0, dbQuery, nil, 0)
 	if err != nil {
 		return err
 	}

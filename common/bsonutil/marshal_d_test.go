@@ -74,3 +74,31 @@ func TestMarshalDMarshalJSON(t *testing.T) {
 		})
 	})
 }
+
+func TestFindValueByKey(t *testing.T) {
+	Convey("Given a bson.D document and a specific key", t, func() {
+		subDocument := &bson.D{
+			bson.DocElem{"field4", "c"},
+		}
+		document := &bson.D{
+			bson.DocElem{"field1", "a"},
+			bson.DocElem{"field2", "b"},
+			bson.DocElem{"field3", subDocument},
+		}
+		Convey("the corresponding value top-level keys should be returned", func() {
+			value, err := FindValueByKey("field1", document)
+			So(value, ShouldEqual, "a")
+			So(err, ShouldBeNil)
+		})
+		Convey("the corresponding value top-level keys with sub-document values should be returned", func() {
+			value, err := FindValueByKey("field3", document)
+			So(value, ShouldEqual, subDocument)
+			So(err, ShouldBeNil)
+		})
+		Convey("for non-existent keys nil and an error should be returned", func() {
+			value, err := FindValueByKey("field4", document)
+			So(value, ShouldBeNil)
+			So(err, ShouldNotBeNil)
+		})
+	})
+}

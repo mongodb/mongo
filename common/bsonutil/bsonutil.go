@@ -20,6 +20,8 @@ var (
 	}
 )
 
+var ErrNoSuchField = errors.New("no such field")
+
 func ConvertJSONDocumentToBSON(doc map[string]interface{}) error {
 	for key, jsonValue := range doc {
 		var bsonValue interface{}
@@ -60,6 +62,18 @@ func GetExtendedBsonD(doc bson.D) (bson.D, error) {
 		bsonDoc = append(bsonDoc, bson.DocElem{docElem.Name, bsonValue})
 	}
 	return bsonDoc, nil
+}
+
+// FindValueByKey gets the value of keyName in document provided keyName is found
+// in the top-level of the document. It returns ErrNoSuchField if the field
+// doesn't exist
+func FindValueByKey(keyName string, document *bson.D) (interface{}, error) {
+	for _, key := range *document {
+		if key.Name == keyName {
+			return key.Value, nil
+		}
+	}
+	return nil, ErrNoSuchField
 }
 
 // ParseSpecialKeys takes a JSON document and inspects it for any

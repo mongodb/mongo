@@ -2,6 +2,7 @@ package mongoimport
 
 import (
 	"fmt"
+	"github.com/mongodb/mongo-tools/common/bsonutil"
 	"github.com/mongodb/mongo-tools/common/log"
 	"github.com/mongodb/mongo-tools/common/util"
 	"gopkg.in/mgo.v2/bson"
@@ -81,17 +82,6 @@ func doSequentialStreaming(workers []*ImportWorker, input chan ConvertibleDoc, o
 	}
 }
 
-// getKeyValue gets the value of keyName in document provided keyName is found
-// in the top-level of the document. Otherwise, it returns nil
-func getKeyValue(keyName string, document *bson.D) interface{} {
-	for _, key := range *document {
-		if key.Name == keyName {
-			return key.Value
-		}
-	}
-	return nil
-}
-
 // getParsedValue returns the appropriate concrete type for the given token
 // it first attempts to convert it to an int, if that doesn't succeed, it
 // attempts conversion to a float, if that doesn't succeed, it returns the
@@ -150,7 +140,10 @@ func setNestedValue(key string, value interface{}, document *bson.D) {
 	}
 	keyName := key[0:index]
 	subDocument := &bson.D{}
-	elem := getKeyValue(keyName, document)
+	elem, err := bsonutil.FindValueByKey(keyName, document)
+	if err != nil { // no such key in the document
+		elem = nil
+	}
 	var existingKey bool
 	if elem != nil {
 		subDocument = elem.(*bson.D)

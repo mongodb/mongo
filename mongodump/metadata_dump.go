@@ -9,7 +9,6 @@ import (
 	"github.com/mongodb/mongo-tools/common/log"
 	"gopkg.in/mgo.v2/bson"
 	"io"
-	"os"
 )
 
 // Metadata consists of two parts, a collection's options and
@@ -45,41 +44,61 @@ func (dump *MongoDump) dumpMetadataToWriter(dbName, c string, writer io.Writer) 
 	}
 
 	// First, we get the options for the collection. These are pulled
-	// from the system.namespaces collection, which is the hidden internal
-	// collection for tracking collection names and properties. For mongodump,
-	// we copy just the "options" subdocument for the collection.
+	// using either listCollections (2.7+) or by querying system.namespaces
+	// (2.6 and earlier), the internal collection containing collection names
+	// and properties. For mongodump, we copy just the "options"
+	// subdocument for the collection.
 	log.Logf(log.DebugHigh, "\treading options for `%v`", nsID)
-	namespaceDoc := bson.M{}
-	err := dump.cmdRunner.FindOne(dbName, "system.namespaces", 0, bson.M{"name": nsID}, nil, namespaceDoc, 0)
+
+	session, err := dump.sessionProvider.GetSession()
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Warning: no metadata found for collection: `%v`: %v", nsID, err)
+		return err
+	}
+	defer session.Close()
+	collection := session.DB(dbName).C(c)
+
+	collectionInfo, err := db.GetCollectionOptions(collection)
+	if collectionInfo == nil {
+		//The collection wasn't found, which means it was probably deleted
+		// between now and the time that collections were listed. Skip it.
+		log.Logf(log.DebugLow, "Warning: no metadata found for collection: `%v`: %v", nsID, err)
 		return nil
 	}
-	if opts, ok := namespaceDoc["options"]; ok {
-		meta.Options = opts.(bson.M)
+	meta.Options = bson.M{}
+	if opts, err := bsonutil.FindValueByKey("options", collectionInfo); err == nil {
+		if optsD, ok := opts.(bson.D); ok {
+			meta.Options = optsD.Map()
+		} else {
+			return fmt.Errorf("Collection options contains invalid data: %v", opts)
+		}
 	}
 
-	// Second, we read the collection's index information from the
-	// system.indexes collection. We keep a running list of all the indexes
+	// Second, we read the collection's index information by either calling
+	// listIndexes (pre-2.7 systems) or querying system.indexes.
+	// We keep a running list of all the indexes
 	// for the current collection as we iterate over the cursor, and include
 	// that list as the "indexes" field of the metadata document.
 	log.Logf(log.DebugHigh, "\treading indexes for `%v`", nsID)
 
-	cursor, err := dump.cmdRunner.FindDocs(dbName, "system.indexes", 0, 0, bson.M{"ns": nsID}, nil, db.Snapshot)
+	//get the indexes
+	indexes, err := db.GetIndexes(collection)
 	if err != nil {
 		return err
 	}
-	defer cursor.Close()
-	indexDoc := IndexDocumentFromDB{}
-	for cursor.Next(&indexDoc) {
-		// convert the IndexDocumentFromDB into a regular IndexDocument that we
-		// can marshal into JSON.
-		marshalableIndex := IndexDocument(indexDoc.Options)
-		marshalableIndex["key"] = bsonutil.MarshalD(indexDoc.Key)
+	for _, index := range indexes {
+		marshalableIndex := IndexDocument{}
+		for _, indexDocElem := range index {
+			if indexDocElem.Name == "key" {
+				if indexAsBsonD, ok := indexDocElem.Value.(bson.D); ok {
+					marshalableIndex["key"] = bsonutil.MarshalD(indexAsBsonD)
+				} else {
+					return fmt.Errorf("index key could not be found in: %v", indexDocElem.Value)
+				}
+			} else {
+				marshalableIndex[indexDocElem.Name] = indexDocElem.Value
+			}
+		}
 		meta.Indexes = append(meta.Indexes, marshalableIndex)
-	}
-	if err := cursor.Err(); err != nil {
-		return fmt.Errorf("error finding index data for collection `%v`: %v", nsID, err)
 	}
 
 	// Finally, we send the results to the writer as JSON bytes

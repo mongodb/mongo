@@ -433,28 +433,6 @@ func TestProcessDocuments(t *testing.T) {
 	})
 }
 
-func TestGetKeyValue(t *testing.T) {
-	Convey("Given a bson.D document and a specific key", t, func() {
-		subDocument := &bson.D{
-			bson.DocElem{"field4", "c"},
-		}
-		document := &bson.D{
-			bson.DocElem{"field1", "a"},
-			bson.DocElem{"field2", "b"},
-			bson.DocElem{"field3", subDocument},
-		}
-		Convey("the corresponding value top-level keys should be returned", func() {
-			So(getKeyValue("field1", document), ShouldEqual, "a")
-		})
-		Convey("the corresponding value top-level keys with sub-document values should be returned", func() {
-			So(getKeyValue("field3", document), ShouldEqual, subDocument)
-		})
-		Convey("for keys that don't exist in the top-level, nil should be returned", func() {
-			So(getKeyValue("field4", document), ShouldBeNil)
-		})
-	})
-}
-
 func TestDoSequentialStreaming(t *testing.T) {
 	Convey("Given some import workers, a ConvertibleDocs input channel and an bson.D output channel", t, func() {
 		inputChannel := make(chan ConvertibleDoc, 5)
