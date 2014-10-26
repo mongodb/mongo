@@ -29,6 +29,8 @@ namespace mongo {
 
         void closeAllCursors();
 
+        int cursorsOut() const { return _cursorsOut; }
+
         static uint64_t genCursorId();
 
     private:
@@ -36,6 +38,7 @@ namespace mongo {
         typedef std::vector<WT_CURSOR*> Cursors;
         typedef std::map<uint64_t, Cursors> CursorMap;
         CursorMap _curmap; // owned
+        int _cursorsOut;
     };
 
     class WiredTigerSessionCache {
@@ -53,11 +56,10 @@ namespace mongo {
 
         void _closeAll(); // does not lock
 
-        WT_CONNECTION* _conn; // now owned
+        WT_CONNECTION* _conn; // not owned
         typedef std::vector<WiredTigerSession*> SessionPool;
         SessionPool _sessionPool; // owned
         mutable boost::mutex _sessionLock;
-
     };
 
 }

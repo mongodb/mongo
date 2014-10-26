@@ -142,6 +142,7 @@ namespace mongo {
     }
 
     void WiredTigerRecoveryUnit::_txnClose( bool commit ) {
+        invariant( _active );
         WT_SESSION *s = _session->getSession();
         if ( commit ) {
             invariantWTOK( s->commit_transaction(s, NULL) );

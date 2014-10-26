@@ -9,8 +9,8 @@
 
 namespace mongo {
 
-    WiredTigerSession::WiredTigerSession( WT_CONNECTION* conn ) {
-        _session = NULL;
+    WiredTigerSession::WiredTigerSession( WT_CONNECTION* conn )
+        : _session( NULL ), _cursorsOut( 0 ) {
         int ret = conn->open_session(conn, NULL, "isolation=snapshot", &_session);
         invariantWTOK(ret);
     }
@@ -29,18 +29,22 @@ namespace mongo {
             if ( !cursors.empty() ) {
                 WT_CURSOR* save = cursors.back();
                 cursors.pop_back();
+                _cursorsOut++;
                 return save;
             }
         }
         WT_CURSOR* c = NULL;
         int ret = _session->open_cursor(_session, uri.c_str(), NULL, "overwrite=false", &c);
-        if (ret != ENOENT) invariantWTOK(ret);
+        if (ret != ENOENT)
+            invariantWTOK(ret);
+        if ( c ) _cursorsOut++;
         return c;
     }
 
     void WiredTigerSession::releaseCursor(uint64_t id, WT_CURSOR *cursor) {
         invariant( _session );
         invariant( cursor );
+        _cursorsOut--;
 
         Cursors& cursors = _curmap[id];
         if ( cursors.size() > 10u ) {
@@ -111,6 +115,7 @@ namespace mongo {
 
     void WiredTigerSessionCache::releaseSession( WiredTigerSession* session ) {
         invariant( session );
+        invariant( session->cursorsOut() == 0 );
         boost::mutex::scoped_lock lk( _sessionLock );
         _sessionPool.push_back( session );
     }
