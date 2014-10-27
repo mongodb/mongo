@@ -45,7 +45,7 @@ class Dump : public Tool {
         FILE* _f;
     };
 public:
-    Dump() : Tool( "dump" , ALL , "" , "" , true ) {
+    Dump() : Tool( "dump" , ALL , "" , "" , true ), _opLogStart(0) {
         add_options()
         ("out,o", po::value<string>()->default_value("dump"), "output directory or \"-\" for stdout")
         ("query,q", po::value<string>() , "json query" )
@@ -106,17 +106,36 @@ public:
         DBClientBase& connBase = conn(true);
         Writer writer(out, m);
 
-        // use low-latency "exhaust" mode if going over the network
-        if (!_usingMongos && typeid(connBase) == typeid(DBClientConnection&)) {
-            DBClientConnection& conn = static_cast<DBClientConnection&>(connBase);
-            boost::function<void(const BSONObj&)> castedWriter(writer); // needed for overload resolution
-            conn.query( castedWriter, coll.c_str() , q , NULL, queryOptions | QueryOption_Exhaust);
-        }
-        else {
-            //This branch should only be taken with DBDirectClient or mongos which doesn't support exhaust mode
+        if (startsWith(coll.c_str(), "local.oplog.")) {
+            bool opLogChecked = false;
             scoped_ptr<DBClientCursor> cursor(connBase.query( coll.c_str() , q , 0 , 0 , 0 , queryOptions ));
             while ( cursor->more() ) {
+                if (!opLogChecked) {
+                    // verify that the oplog is healthy
+                    BSONObj firstOpLog = cursor->next();
+                    if (firstOpLog["ts"]._numberLong() == _opLogStart) {
+                        opLogChecked = true;
+                        continue;
+                    } else {
+                        error() << "Oplog is stale. Oplog dumping terminated." << endl;
+                        break;
+                    }
+                }
                 writer(cursor->next());
+            }
+        } else {
+            // use low-latency "exhaust" mode if going over the network
+            if (!_usingMongos && typeid(connBase) == typeid(DBClientConnection&)) {
+                DBClientConnection& conn = static_cast<DBClientConnection&>(connBase);
+                boost::function<void(const BSONObj&)> castedWriter(writer); // needed for overload resolution
+                conn.query( castedWriter, coll.c_str() , q , NULL, queryOptions | QueryOption_Exhaust);
+            }
+            else {
+                //This branch should only be taken with DBDirectClient or mongos which doesn't support exhaust mode
+                scoped_ptr<DBClientCursor> cursor(connBase.query( coll.c_str() , q , 0 , 0 , 0 , queryOptions ));
+                while ( cursor->more() ) {
+                    writer(cursor->next());
+                }
             }
         }
     }
@@ -440,7 +459,6 @@ public:
         }
 
         string opLogName = "";
-        unsigned long long opLogStart = 0;
         if (hasParam("oplog")) {
             if (hasParam("query") || hasParam("db") || hasParam("collection")) {
                 log() << "oplog mode is only supported on full dumps" << endl;
@@ -469,7 +487,7 @@ public:
             }
 
             verify(op["ts"].type() == Timestamp);
-            opLogStart = op["ts"]._numberLong();
+            _opLogStart = op["ts"]._numberLong();
         }
 
         // check if we're outputting to stdout
@@ -529,7 +547,7 @@ public:
 
         if (!opLogName.empty()) {
             BSONObjBuilder b;
-            b.appendTimestamp("$gt", opLogStart);
+            b.appendTimestamp("$gte", _opLogStart);
 
             _query = BSON("ts" << b.obj());
 
@@ -541,6 +559,7 @@ public:
 
     bool _usingMongos;
     BSONObj _query;
+    long long _opLogStart;
 };
 
 int main( int argc , char ** argv, char ** envp ) {
