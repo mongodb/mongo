@@ -512,21 +512,11 @@ namespace mongo {
         class SplitHeuristics {
         public:
 
-            SplitHeuristics() :
-                _splitTickets( maxParallelSplits ),
-                _staleMinorSetMutex( "SplitHeuristics::staleMinorSet" ),
-                _staleMinorCount( 0 ) {}
-
-            void markMinorForReload( const std::string& ns, ChunkVersion majorVersion );
-            void getMarkedMinorVersions( std::set<ChunkVersion>& minorVersions );
+            SplitHeuristics()
+                : _splitTickets(maxParallelSplits) {
+            }
 
             TicketHolder _splitTickets;
-
-            mutex _staleMinorSetMutex;
-
-            // mutex protects below
-            int _staleMinorCount;
-            std::set<ChunkVersion> _staleMinorSet;
 
             // Test whether we should split once data * splitTestFactor > chunkSize (approximately)
             static const int splitTestFactor = 5;
