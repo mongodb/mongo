@@ -155,6 +155,10 @@ namespace {
 
         boost::scoped_ptr<SecureRandom> rbidGenerator(SecureRandom::create());
         _rbid = static_cast<int>(rbidGenerator->nextInt64());
+        if (_rbid < 0) {
+            // Ensure _rbid is always positive
+            _rbid = -_rbid;
+        }
 
         // Make sure there is always an entry in _slaveInfo for ourself.
         SlaveInfo selfInfo;
