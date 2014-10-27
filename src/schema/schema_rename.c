@@ -28,7 +28,7 @@ __rename_file(
 		return (EINVAL);
 
 	/* Close any btree handles in the file. */
-	WT_ERR(__wt_conn_dhandle_close_all(session, uri));
+	WT_ERR(__wt_conn_dhandle_close_all(session, uri, 0));
 
 	/*
 	 * First, check if the file being renamed exists in the system.  Doing

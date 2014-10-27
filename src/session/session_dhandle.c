@@ -181,7 +181,7 @@ __wt_session_release_btree(WT_SESSION_IMPL *session)
 		WT_ASSERT(session, F_ISSET(dhandle, WT_DHANDLE_EXCLUSIVE));
 		F_CLR(dhandle, WT_DHANDLE_DISCARD);
 
-		WT_TRET(__wt_conn_btree_sync_and_close(session));
+		WT_TRET(__wt_conn_btree_sync_and_close(session, 0));
 	}
 
 	if (F_ISSET(dhandle, WT_DHANDLE_EXCLUSIVE))

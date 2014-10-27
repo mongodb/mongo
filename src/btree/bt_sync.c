@@ -272,6 +272,7 @@ __evict_file(WT_SESSION_IMPL *session, int syncop)
 				WT_ERR(__wt_rec_evict(session, ref, 1));
 			break;
 		case WT_SYNC_DISCARD:
+		case WT_SYNC_DISCARD_FORCE:
 			/*
 			 * Discard the page, whether clean or dirty.
 			 *
@@ -289,11 +290,15 @@ __evict_file(WT_SESSION_IMPL *session, int syncop)
 			 * connection close, and in other paths our caller
 			 * should be prepared to deal with this case.
 			 */
-			if (page->modify != NULL &&
+			if (syncop == WT_SYNC_DISCARD &&
+			    page->modify != NULL &&
 			    !__wt_txn_visible_all(session,
 			    page->modify->rec_max_txn))
 				return (EBUSY);
+			if (syncop == WT_SYNC_DISCARD_FORCE)
+				F_SET(session, WT_SESSION_DISCARD_FORCE);
 			__wt_ref_out(session, ref);
+			F_CLR(session, WT_SESSION_DISCARD_FORCE);
 			break;
 		WT_ILLEGAL_VALUE_ERR(session);
 		}
@@ -345,6 +350,7 @@ __wt_cache_op(WT_SESSION_IMPL *session, WT_CKPT *ckptbase, int op)
 		break;
 	case WT_SYNC_CLOSE:
 	case WT_SYNC_DISCARD:
+	case WT_SYNC_DISCARD_FORCE:
 		WT_ERR(__evict_file(session, op));
 		break;
 	WT_ILLEGAL_VALUE_ERR(session);

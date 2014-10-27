@@ -1,3 +1,14 @@
+WiredTiger release 2.4.1, TBD
+------------------------------------
+
+The WiredTiger 2.4.1 release is currently in active development:
+
+New features and API changes:
+* Add a new WT_SESSION::transaction_pinned_range method that helps users
+  identify when a session is keeping a transaction ID pinned for a long time.
+  [#1314]
+
+
 WiredTiger release 2.4.0, 2014-10-15
 ------------------------------------
 

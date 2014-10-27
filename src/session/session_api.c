@@ -151,6 +151,9 @@ __session_close(WT_SESSION *wt_session, const char *config)
 	/* The API lock protects opening and closing of sessions. */
 	__wt_spin_lock(session, &conn->api_lock);
 
+	/* Decrement the count of open sessions. */
+	WT_STAT_FAST_CONN_DECR(session, session_open);
+
 	/*
 	 * Sessions are re-used, clear the structure: the clear sets the active
 	 * field to 0, which will exclude the hazard array from review by the
@@ -448,7 +451,7 @@ __session_log_printf(WT_SESSION *wt_session, const char *fmt, ...)
 	va_list ap;
 
 	session = (WT_SESSION_IMPL *)wt_session;
-	SESSION_API_CALL_NO_CONF(session, log_printf);
+	SESSION_API_CALL_NOCONF(session, log_printf);
 
 	va_start(ap, fmt);
 	ret = __wt_log_vprintf(session, fmt, ap);
@@ -772,6 +775,38 @@ err:	API_END_RET(session, ret);
 }
 
 /*
+ * __session_transaction_pinned_range --
+ *	WT_SESSION->transaction_pinned_range method.
+ */
+static int
+__session_transaction_pinned_range(WT_SESSION *wt_session, uint64_t *prange)
+{
+	WT_DECL_RET;
+	WT_SESSION_IMPL *session;
+	WT_TXN_STATE *txn_state;
+	uint64_t pinned;
+
+	session = (WT_SESSION_IMPL *)wt_session;
+	SESSION_API_CALL_NOCONF(session, pinned_range);
+
+	txn_state = WT_SESSION_TXN_STATE(session);
+
+	/* Assign pinned to the lesser of id or snap_min */
+	if (txn_state->id != WT_TXN_NONE &&
+	    TXNID_LT(txn_state->id, txn_state->snap_min))
+		pinned = txn_state->id;
+	else
+		pinned = txn_state->snap_min;
+
+	if (pinned == WT_TXN_NONE)
+		*prange = 0;
+	else
+		*prange = S2C(session)->txn_global.current - pinned;
+
+err:	API_END_RET(session, ret);
+}
+
+/*
  * __session_checkpoint --
  *	WT_SESSION->checkpoint method.
  */
@@ -916,7 +951,8 @@ __wt_open_session(WT_CONNECTION_IMPL *conn,
 		__session_begin_transaction,
 		__session_commit_transaction,
 		__session_rollback_transaction,
-		__session_checkpoint
+		__session_checkpoint,
+		__session_transaction_pinned_range
 	};
 	WT_DECL_RET;
 	WT_SESSION_IMPL *session, *session_ret;
@@ -1010,6 +1046,8 @@ __wt_open_session(WT_CONNECTION_IMPL *conn,
 
 	WT_STATIC_ASSERT(offsetof(WT_SESSION_IMPL, iface) == 0);
 	*sessionp = session_ret;
+
+	WT_STAT_FAST_CONN_INCR(session, session_open);
 
 err:	__wt_spin_unlock(session, &conn->api_lock);
 	return (ret);
