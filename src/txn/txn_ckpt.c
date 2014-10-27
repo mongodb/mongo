@@ -924,11 +924,12 @@ __wt_checkpoint_sync(WT_SESSION_IMPL *session, const char *cfg[])
  *	Checkpoint a single file as part of closing the handle.
  */
 int
-__wt_checkpoint_close(WT_SESSION_IMPL *session)
+__wt_checkpoint_close(WT_SESSION_IMPL *session, int force)
 {
 	/* If closing an unmodified file, simply discard its blocks. */
-	if (!S2BT(session)->modified)
-		return (__wt_cache_op(session, NULL, WT_SYNC_DISCARD));
+	if (!S2BT(session)->modified || force)
+		return (__wt_cache_op(session, NULL,
+		    force ? WT_SYNC_DISCARD_FORCE : WT_SYNC_DISCARD));
 
 	/*
 	 * Else, checkpoint the file and optionally flush the writes (the
