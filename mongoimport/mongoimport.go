@@ -10,6 +10,7 @@ import (
 	"github.com/mongodb/mongo-tools/mongoimport/options"
 	"gopkg.in/mgo.v2"
 	"gopkg.in/mgo.v2/bson"
+	"gopkg.in/tomb.v2"
 	"io"
 	"os"
 	"path/filepath"
@@ -25,17 +26,13 @@ const (
 	JSON = "json"
 )
 
-// known errors to look out for - we immediately
-// terminate mongoimport if we get any of these errors
 var (
-	errNsNotFound        = errors.New("ns not found")
-	errNoReachableServer = errors.New("no reachable servers")
+	errNsNotFound = errors.New("ns not found")
 )
 
 // ingestion constants
 const (
-	maxBSONSize         = 16 * (1024 * 1024)
-	maxMessageSizeBytes = 2 * maxBSONSize
+	maxMessageSizeBytes = 8 * (1024 * 1024)
 )
 
 // variables used by the input/ingestion goroutines
@@ -65,6 +62,10 @@ type MongoImport struct {
 	// insertionCount keeps track of how many documents have successfully
 	// been inserted into the database
 	insertionCount uint64
+
+	// the tomb is used to synchronize ingestion goroutines and causes
+	// other sibling goroutines to terminate immediately if one errors out
+	tomb *tomb.Tomb
 }
 
 // InputReader is an interface that specifies how an input source should be
@@ -183,6 +184,10 @@ func (mongoImport *MongoImport) ValidateSettings(args []string) error {
 	// if maintain --maintainInsertionOrder is true, we can only have one
 	// ingestion thread
 	if mongoImport.IngestOptions.MaintainInsertionOrder {
+		// The write commands API unconditionally returns on the first error
+		// for ordered inserts. Thus, if the user supplies this flag, we
+		// assume --stopOnError
+		mongoImport.IngestOptions.StopOnError = true
 		*mongoImport.IngestOptions.NumIngestionThreads = 1
 	}
 
@@ -355,37 +360,23 @@ func (mongoImport *MongoImport) importDocuments(inputReader InputReader) (numImp
 // based on whether an upsert is requested - into the given collection
 func (mongoImport *MongoImport) IngestDocuments(readChan chan bson.D) (err error) {
 	numIngestionThreads := *mongoImport.IngestOptions.NumIngestionThreads
-	ingestErr := make(chan error, numIngestionThreads)
+	// initialize the tomb where all goroutines go to die
+	mongoImport.tomb = &tomb.Tomb{}
 
 	// spawn all the worker threads, each in its own goroutine
 	for i := 0; i < numIngestionThreads; i++ {
-		go func() {
-			ingestErr <- mongoImport.ingestDocs(readChan)
-		}()
+		mongoImport.tomb.Go(func() error {
+			// Each ingest worker will return an error which may
+			// be nil or not. It will be not nil in any of this cases:
+			//
+			// 1. There is a problem connecting with the server
+			// 2. There server becomes unreachable
+			// 3. There is an insertion/update error - e.g. duplicate key
+			//    error - and stopOnError is set to true
+			return mongoImport.ingestDocs(readChan)
+		})
 	}
-	doneIngestionThreads := 0
-
-	// Each ingest worker will return an error which may
-	// be nil or not. It will be not nil in any of this cases:
-	//
-	// 1. There is a problem connecting with the server
-	// 2. There server becomes unreachable
-	// 3. There is an insertion/update error - e.g. duplicate key
-	//    error - and stopOnError is set to true
-
-	for err = range ingestErr {
-		doneIngestionThreads++
-		// an error in any goroutine will immediately be propagated to the
-		// and will cause the program to exit so we don't terminate the other
-		// ingestion threads here
-		if err != nil {
-			return
-		}
-		if doneIngestionThreads == numIngestionThreads {
-			return
-		}
-	}
-	return
+	return mongoImport.tomb.Wait()
 }
 
 // ingestDocuments is a helper to IngestDocuments - it reads document off the
@@ -401,57 +392,83 @@ func (mongoImport *MongoImport) ingestDocs(readChan chan bson.D) (err error) {
 	if err != nil {
 		return fmt.Errorf("error connecting to mongod: %v", err)
 	}
+	defer session.Close()
 
 	// sockets to the database will never be forcibly closed
 	session.SetSocketTimeout(0)
 
-	// set write concern if specified by user; if no write concern
-	// is specified, use "majority"
-	safety := &mgo.Safe{}
-	if mongoImport.IngestOptions.WriteConcern == nil {
-		safety.WMode = "majority"
-	} else {
-		safety.W = *mongoImport.IngestOptions.WriteConcern
+	// check if the server supports write commands
+	supportsWriteCommands, err := mongoImport.SessionProvider.SupportsWriteCommands()
+	if err != nil {
+		return fmt.Errorf("error checking if server supports write commands: %v", err)
 	}
-	session.SetSafe(safety)
 
-	defer session.Close()
+	// TODO: TOOLS-306: support additional write concerns
+
+	// use write concern if specified by user; if no write concern is specified,
+	// use "majority"
+	safety := bson.D{}
+	sessionSafety := &mgo.Safe{}
+	if mongoImport.IngestOptions.WriteConcern == nil {
+		safety = append(safety, bson.DocElem{"w", "majority"})
+		sessionSafety.WMode = "majority"
+	} else {
+		safety = append(safety, bson.DocElem{"w", *mongoImport.IngestOptions.WriteConcern})
+		sessionSafety.W = *mongoImport.IngestOptions.WriteConcern
+	}
+	// If you pass a write concern of "majority" to a pre-2.6 mongod, it throws
+	// a "norepl" error. So, we check that the server supports write commands
+	// before we set its write concern
+	if supportsWriteCommands {
+		session.SetSafe(sessionSafety)
+	}
+	log.Logf(log.Info, "using write commands: %v", supportsWriteCommands)
 
 	collection := session.DB(mongoImport.ToolOptions.DB).
 		C(mongoImport.ToolOptions.Collection)
 
 	var document bson.D
-	for document = range readChan {
-		// ignore blank fields if specified
-		if ignoreBlanks {
-			document = removeBlankFields(document)
-		}
-		if documentBytes, err = bson.Marshal(document); err != nil {
-			return err
-		}
-		numMessageBytes += len(documentBytes)
-		documents = append(documents, bson.Raw{3, documentBytes})
+	var alive bool
 
-		// the mgo driver doesn't currently respect the maxBatchSize
-		// limit so we limit ourselves by using maxMessageSizeBytes
-		// send documents over the wire when we hit the batch size
-		// or are at/over the maximum message size threshold
-		if len(documents) == batchSize ||
-			numMessageBytes >= maxMessageSizeBytes {
-			if err = mongoImport.ingester(documents, collection); err != nil {
+readLoop:
+	for {
+		select {
+		case document, alive = <-readChan:
+			if !alive {
+				break readLoop
+			}
+			// the mgo driver doesn't currently respect the maxBatchSize
+			// limit so we self imposse a limit by using maxMessageSizeBytes
+			// and send documents over the wire when we hit the batch size
+			// or when we're at/over the maximum message size threshold
+			if len(documents) == batchSize || numMessageBytes >= maxMessageSizeBytes {
+				err = mongoImport.ingester(documents, collection, safety, supportsWriteCommands)
+				if err != nil {
+					return err
+				}
+				if mongoImport.insertionCount%10000 == 0 {
+					log.Logf(log.Always, "Progress: %v documents inserted...", mongoImport.insertionCount)
+				}
+				documents = documents[:0]
+				numMessageBytes = 0
+			}
+			// ignore blank fields if specified
+			if ignoreBlanks {
+				document = removeBlankFields(document)
+			}
+			if documentBytes, err = bson.Marshal(document); err != nil {
 				return err
 			}
-			if mongoImport.insertionCount%10000 == 0 {
-				log.Logf(log.Always, "Progress: %v documents inserted...", mongoImport.insertionCount)
-			}
-			documents = documents[:0]
-			numMessageBytes = 0
+			numMessageBytes += len(documentBytes)
+			documents = append(documents, bson.Raw{3, documentBytes})
+		case <-mongoImport.tomb.Dying():
+			return nil
 		}
 	}
 
 	// ingest any documents left in slice
 	if len(documents) != 0 {
-		return mongoImport.ingester(documents, collection)
+		return mongoImport.ingester(documents, collection, safety, supportsWriteCommands)
 	}
 	return nil
 }
@@ -459,14 +476,23 @@ func (mongoImport *MongoImport) ingestDocs(readChan chan bson.D) (err error) {
 // ingester performs the actual insertion/updates. If no upsert fields are
 // present in the document to be inserted, it simply inserts the documents
 // into the given collection
-func (mongoImport *MongoImport) ingester(documents []interface{}, collection *mgo.Collection) (err error) {
+func (mongoImport *MongoImport) ingester(documents []interface{}, collection *mgo.Collection, writeConcern bson.D, hasWriteCommands bool) (err error) {
+	numInserted := 0
+	maintainInsertionOrder := mongoImport.IngestOptions.MaintainInsertionOrder
+	stopOnError := mongoImport.IngestOptions.StopOnError
+	defer func() {
+		mongoImport.insertionLock.Lock()
+		mongoImport.insertionCount += uint64(numInserted)
+		mongoImport.insertionLock.Unlock()
+	}()
+
 	// TODO: need a way of doing ordered/unordered
 	// bulk updates using write commands
 	if mongoImport.IngestOptions.Upsert {
 		selector := bson.M{}
+		document := bson.M{}
 		upsertFields := strings.Split(mongoImport.IngestOptions.UpsertFields, ",")
 		for _, d := range documents {
-			var document bson.M
 			if err = bson.Unmarshal(d.(bson.Raw).Data, &document); err != nil {
 				return fmt.Errorf("error unmarshaling document: %v", err)
 			}
@@ -477,37 +503,57 @@ func (mongoImport *MongoImport) ingester(documents []interface{}, collection *mg
 				_, err = collection.Upsert(selector, document)
 			}
 			if err != nil {
-				// Need to ascertain what kinds of errors the mgo
-				// driver returns for both insert/upsert operations
-				if mongoImport.IngestOptions.StopOnError ||
-					err.Error() == errNoReachableServer.Error() {
-					return err
+				errMsg := err.Error()
+				if err == io.EOF {
+					errMsg = "lost connection to server"
 				}
-				log.Logf(log.Always, "error inserting documents: %v", err)
+				log.Logf(log.Always, "error updating documents: %v", errMsg)
+				if stopOnError || err == io.EOF {
+					return fmt.Errorf(errMsg)
+				}
+			} else {
+				numInserted += 1
 			}
+			document = bson.M{}
 		}
 	} else {
-		bulk := collection.Bulk()
-		bulk.Insert(documents...)
-		if !mongoImport.IngestOptions.MaintainInsertionOrder {
-			bulk.Unordered()
-		}
-		// mgo.Bulk doesn't currently implement write commands so
-		// mgo.BulkResult isn't informative
-		if _, err = bulk.Run(); err != nil {
-			if mongoImport.IngestOptions.StopOnError ||
-				err.Error() == errNoReachableServer.Error() {
-				return err
+		if hasWriteCommands {
+			// note that this count may not be entirely accurate if some
+			// ingester threads insert when another errors out. however,
+			// any/all errors will be logged if/when they are encountered
+			numInserted, err = insertDocuments(
+				documents,
+				collection,
+				maintainInsertionOrder,
+				writeConcern,
+			)
+		} else {
+			// Without write commands, we can't say for sure how many
+			// documents were inserted when we use bulk inserts so we
+			// assume the entire batch succeeded - even if an error is returned
+			// The result is that we may report that more documents - than were
+			// actually inserted - were inserted into the database
+			bulk := collection.Bulk()
+			bulk.Insert(documents...)
+			if !maintainInsertionOrder {
+				bulk.Unordered()
 			}
-			log.Logf(log.Always, "error inserting documents: %v", err)
+			// mgo.Bulk doesn't currently implement write commands so
+			// mgo.BulkResult isn't informative
+			_, err = bulk.Run()
+			numInserted = len(documents)
 		}
 	}
-
-	// TODO: what if only some documents were inserted? need
-	// to improve the bulk insert API support in mgo driver
-	mongoImport.insertionLock.Lock()
-	mongoImport.insertionCount += uint64(len(documents))
-	mongoImport.insertionLock.Unlock()
+	if err != nil {
+		errMsg := err.Error()
+		if err == io.EOF {
+			errMsg = "lost connection to server"
+		}
+		log.Logf(log.Always, "error inserting documents: %v", errMsg)
+		if stopOnError || err == io.EOF {
+			return fmt.Errorf(errMsg)
+		}
+	}
 	return nil
 }
 

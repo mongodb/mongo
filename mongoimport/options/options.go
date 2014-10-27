@@ -54,7 +54,7 @@ type IngestOptions struct {
 	/*	CPU and Network I/O related configurations	*/
 
 	// Specifies the number of operating system threads to use during the import process
-	MaintainInsertionOrder bool `long:"maintainInsertionOrder" description:"if given, documents should be inserted in the order of their appearance in the input source"`
+	MaintainInsertionOrder bool `long:"maintainInsertionOrder" description:"if given, documents should be inserted in the order of their appearance in the input source; implies --stopOnError"`
 
 	// Specifies the number of operating system threads to use during the import process
 	NumOSThreads *int `long:"numOsThreads" description:"number of operating system threads to use (defaults to the number of logical CPUs)"`

@@ -1,6 +1,7 @@
 package mongoimport
 
 import (
+	"github.com/mongodb/mongo-tools/common/db"
 	"github.com/mongodb/mongo-tools/common/log"
 	"github.com/mongodb/mongo-tools/common/options"
 	"github.com/mongodb/mongo-tools/common/testutil"
@@ -283,6 +284,8 @@ func TestSetNestedValue(t *testing.T) {
 }
 
 func TestRemoveBlankFields(t *testing.T) {
+	testutil.VerifyTestType(t, testutil.UNIT_TEST_TYPE)
+
 	Convey("Given an unordered BSON document", t, func() {
 		Convey("the same document should be returned if there are no blanks",
 			func() {
@@ -301,6 +304,8 @@ func TestRemoveBlankFields(t *testing.T) {
 }
 
 func TestTokensToBSON(t *testing.T) {
+	testutil.VerifyTestType(t, testutil.UNIT_TEST_TYPE)
+
 	Convey("Given an slice of fields and tokens to convert to BSON", t, func() {
 		Convey("the expected ordered BSON should be produced for the fields/tokens given", func() {
 			fields := []string{"a", "b", "c"}
@@ -362,6 +367,8 @@ func TestTokensToBSON(t *testing.T) {
 }
 
 func TestProcessDocuments(t *testing.T) {
+	testutil.VerifyTestType(t, testutil.UNIT_TEST_TYPE)
+
 	Convey("Given an import worker", t, func() {
 		numProcessed := uint64(0)
 		csvConvertibleDocs := []CSVConvertibleDoc{
@@ -434,6 +441,8 @@ func TestProcessDocuments(t *testing.T) {
 }
 
 func TestDoSequentialStreaming(t *testing.T) {
+	testutil.VerifyTestType(t, testutil.UNIT_TEST_TYPE)
+
 	Convey("Given some import workers, a ConvertibleDocs input channel and an bson.D output channel", t, func() {
 		inputChannel := make(chan ConvertibleDoc, 5)
 		outputChannel := make(chan bson.D, 5)
@@ -474,6 +483,8 @@ func TestDoSequentialStreaming(t *testing.T) {
 }
 
 func TestStreamDocuments(t *testing.T) {
+	testutil.VerifyTestType(t, testutil.UNIT_TEST_TYPE)
+
 	Convey(`Given:
 			1. a boolean indicating streaming order
 			2. an input channel where documents are streamed in
@@ -507,6 +518,91 @@ func TestStreamDocuments(t *testing.T) {
 			go streamDocuments(true, inputChannel, outputChannel, errorChannel)
 			// ensure that an error is returned on the error channel
 			So(<-errorChannel, ShouldNotBeNil)
+		})
+	})
+}
+
+// This test will only work
+func TestInsertDocuments(t *testing.T) {
+	Convey("Given a set of documents to insert", t, func() {
+		toolOptions := getBasicToolOptions()
+		sessionProvider, err := db.InitSessionProvider(*toolOptions)
+		So(err, ShouldBeNil)
+		session, err := sessionProvider.GetSession()
+		So(err, ShouldBeNil)
+		collection := session.DB(testDB).C(testCollection)
+		writeConcern := bson.D{{"w", 1}}
+		Convey("an error should be returned if there are duplicate _ids", func() {
+			documents := []interface{}{
+				bson.D{bson.DocElem{"_id", 1}},
+				bson.D{bson.DocElem{"a", 3}},
+				bson.D{bson.DocElem{"_id", 1}},
+				bson.D{bson.DocElem{"a", 4}},
+			}
+			numInserted, err := insertDocuments(
+				documents,
+				collection,
+				false,
+				writeConcern,
+			)
+			So(err, ShouldNotBeNil)
+			So(numInserted, ShouldEqual, 3)
+		})
+		Convey("no error should be returned if the documents are valid", func() {
+			documents := []interface{}{
+				bson.D{bson.DocElem{"a", 1}},
+				bson.D{bson.DocElem{"a", 2}},
+				bson.D{bson.DocElem{"a", 3}},
+				bson.D{bson.DocElem{"a", 4}},
+			}
+			numInserted, err := insertDocuments(
+				documents,
+				collection,
+				false,
+				writeConcern,
+			)
+			So(err, ShouldBeNil)
+			So(numInserted, ShouldEqual, 4)
+		})
+		Convey("ordered inserts with duplicates should error out", func() {
+			documents := []interface{}{
+				bson.D{bson.DocElem{"_id", 1}},
+				bson.D{bson.DocElem{"a", 2}},
+				bson.D{bson.DocElem{"_id", 1}},
+				bson.D{bson.DocElem{"a", 4}},
+			}
+			numInserted, err := insertDocuments(
+				documents,
+				collection,
+				true,
+				writeConcern,
+			)
+			So(err, ShouldNotBeNil)
+			So(numInserted, ShouldEqual, 2)
+		})
+		Convey("ordered inserts without duplicates should work without errors", func() {
+			documents := []interface{}{
+				bson.D{bson.DocElem{"a", 1}},
+				bson.D{bson.DocElem{"a", 2}},
+				bson.D{bson.DocElem{"a", 3}},
+				bson.D{bson.DocElem{"a", 4}},
+			}
+			numInserted, err := insertDocuments(
+				documents,
+				collection,
+				true,
+				writeConcern,
+			)
+			So(err, ShouldBeNil)
+			So(numInserted, ShouldEqual, 4)
+		})
+		Reset(func() {
+			session, err := sessionProvider.GetSession()
+			if err != nil {
+				t.Fatalf("error getting session: %v", err)
+			}
+			defer session.Close()
+			session.DB(testDB).C(testCollection).DropCollection()
 		})
 	})
 }

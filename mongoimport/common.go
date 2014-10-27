@@ -5,7 +5,9 @@ import (
 	"github.com/mongodb/mongo-tools/common/bsonutil"
 	"github.com/mongodb/mongo-tools/common/log"
 	"github.com/mongodb/mongo-tools/common/util"
+	"gopkg.in/mgo.v2"
 	"gopkg.in/mgo.v2/bson"
+	"reflect"
 	"sort"
 	"strconv"
 	"strings"
@@ -289,4 +291,87 @@ func streamDocuments(ordered bool, inputChan chan ConvertibleDoc, outputChan cha
 	}
 	wg.Wait()
 	close(outputChan)
+}
+
+// insertDocuments writes the given documents to the specified collection. It
+// can perform both ordered and unordered writes. If both a write error and a
+// write concern error are encountered, the write error is returned. If the
+// target server is not capable of handling write commands, it returns an error
+//
+// Relevant documentation:
+//
+//		http://docs.mongodb.org/manual/reference/method/db.collection.insert
+//
+func insertDocuments(documents []interface{}, collection *mgo.Collection, ordered bool, writeConcern bson.D) (int, error) {
+	database := collection.Database
+	if database == nil {
+		return 0, fmt.Errorf("collection database is nil")
+	}
+	response := &bson.D{}
+	err := database.Run(
+		bson.D{
+			bson.DocElem{"insert", collection.Name},
+			bson.DocElem{"ordered", ordered},
+			bson.DocElem{"documents", documents},
+			bson.DocElem{"writeConcern", writeConcern},
+		}, response)
+	if err != nil {
+		return 0, err
+	}
+
+	n, _ := bsonutil.FindValueByKey("n", response)
+	// if the write concern is 0, n is not present in the response document
+	// so we just return unconditionally
+	if n == nil {
+		return len(documents), nil
+	}
+	numAffected := n.(int)
+
+	okVal, err := bsonutil.FindValueByKey("ok", response)
+	if err != nil {
+		return numAffected, fmt.Errorf("write command failed: %v", err)
+	}
+
+	if okVal == "0" {
+		// the command itself failed (authentication failed.., syntax error)
+		return 0, fmt.Errorf("write command failed")
+	} else if writeErrors, err := bsonutil.FindValueByKey("writeErrors", response); writeErrors != nil {
+		if err != nil {
+			return numAffected, fmt.Errorf("failed to get write error: %v", err)
+		}
+		// happens if the server couldn't write the data; e.g. because of a
+		// duplicate key, running out of disk space, etc
+		writeErrorDocuments := reflect.ValueOf(writeErrors)
+		for i := 0; i < writeErrorDocuments.Len(); i++ {
+			writeErrorDocument := writeErrorDocuments.Index(i).Interface().(bson.D)
+			writeError, err := bsonutil.FindValueByKey("errmsg", &writeErrorDocument)
+			if err != nil {
+				return numAffected, fmt.Errorf("no write error message found")
+			}
+			errMsg, ok := writeError.(string)
+			if !ok {
+				return numAffected, fmt.Errorf("write error message returned non-string value: %v", reflect.TypeOf(writeError))
+			}
+			log.Logf(log.Always, errMsg)
+		}
+		return numAffected, fmt.Errorf("encountered write errors")
+	} else if wce, err := bsonutil.FindValueByKey("writeConcernError", response); wce != nil {
+		if err != nil {
+			return numAffected, fmt.Errorf("failed to get write concern error: %v", err)
+		}
+		// if, for example, the operation took to long to propagate to a
+		// secondary, writeConcernError is set
+		writeConcernErrorDocument := wce.(bson.D)
+		writeConcernError, err := bsonutil.FindValueByKey("errmsg", &writeConcernErrorDocument)
+		if err != nil {
+			return numAffected, fmt.Errorf("no write concern error message found")
+		}
+		errMsg, ok := writeConcernError.(string)
+		if !ok {
+			return numAffected, fmt.Errorf("write concern error message returned non-string value: %v", reflect.TypeOf(writeConcernError))
+		}
+		log.Logf(log.Always, errMsg)
+		return 0, fmt.Errorf("encountered write concern errors")
+	}
+	return numAffected, nil
 }

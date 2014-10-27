@@ -73,6 +73,7 @@ func getBasicToolOptions() *commonOpts.ToolOptions {
 
 func TestMongoImportValidateSettings(t *testing.T) {
 	testutil.VerifyTestType(t, testutil.UNIT_TEST_TYPE)
+
 	Convey("Given a mongoimport instance for validation, ", t, func() {
 		Convey("an error should be thrown if no database is given", func() {
 			namespace := &commonOpts.Namespace{}
@@ -836,7 +837,7 @@ func TestImportDocuments(t *testing.T) {
 		Reset(func() {
 			session, err := sessionProvider.GetSession()
 			if err != nil {
-				t.Fatalf("Error doing cleanup: %v", err)
+				t.Fatalf("error getting session: %v", err)
 			}
 			defer session.Close()
 			session.DB(testDB).C(testCollection).DropCollection()
