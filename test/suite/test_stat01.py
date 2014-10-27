@@ -108,12 +108,12 @@ class test_stat01(wttest.WiredTigerTestCase):
         self.printVerbose(2, 'data source specific stats:')
         cursor = self.session.open_cursor(
             'statistics:' + self.uri, None, None)
-        self.check_stats(cursor, 10, 'overflow pages')
+        self.check_stats(cursor, 10, 'btree: overflow pages')
 
         # See that we can get a specific stat value by its key,
         # and verify that its entry is self-consistent
         values = cursor[stat.dsrc.btree_overflow]
-        self.assertEqual(values[0], 'overflow pages')
+        self.assertEqual(values[0], 'btree: overflow pages')
         val = self.statstr_to_int(values[1])
         self.assertEqual(val, values[2])
         cursor.close()
