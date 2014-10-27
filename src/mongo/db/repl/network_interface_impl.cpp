@@ -37,11 +37,11 @@
 #include <sstream>
 
 #include "mongo/client/connpool.h"
+#include "mongo/db/auth/internal_user_auth.h"
 #include "mongo/db/client.h"
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/operation_context_impl.h"
 #include "mongo/db/repl/connections.h"  // For ScopedConn::keepOpen
-#include "mongo/db/repl/oplogreader.h"  // For replAuthenticate
 #include "mongo/platform/unordered_map.h"
 #include "mongo/stdx/list.h"
 #include "mongo/util/assert_util.h"
@@ -283,10 +283,12 @@ namespace {
                     errmsg,
                     conn->connect(target, errmsg));
             conn->port().tag |= ScopedConn::keepOpen;
-            uassert(ErrorCodes::AuthenticationFailed,
-                    str::stream() << "Failed to authenticate as cluster member to " <<
-                    target.toString(),
-                    replAuthenticate(conn.get()));
+            if (getGlobalAuthorizationManager()->isAuthEnabled()) {
+                uassert(ErrorCodes::AuthenticationFailed,
+                        "Missing credentials for authenticating as internal user",
+                        isInternalAuthSet());
+                conn->auth(getInternalUserAuthParamsWithFallback());
+            }
             lk.lock();
             return _inUseConnections.insert(
                     _inUseConnections.begin(),
