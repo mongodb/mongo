@@ -13,10 +13,16 @@ import (
 )
 
 const ProgressBarLength = 24
+const ProgressBarWaitTime = time.Second * 3
 
 // RestoreIntents iterates through all of the normal intents
 // stored in the IntentManager, and restores them.
 func (restore *MongoRestore) RestoreIntents() error {
+
+	// start up the progress bar manager
+	restore.progressManager = progress.NewProgressBarManager(ProgressBarWaitTime)
+	restore.progressManager.Start()
+	defer restore.progressManager.Stop()
 
 	if restore.OutputOptions.JobThreads > 0 {
 		errChan := make(chan error)
@@ -207,16 +213,15 @@ func (restore *MongoRestore) RestoreCollectionToDB(dbName, colName string,
 	// progress bar handlers
 	bytesRead := 0
 
-	bar := progress.ProgressBar{
+	bar := &progress.ProgressBar{
 		Name:       fmt.Sprintf("%v.%v", dbName, colName),
 		Max:        int(fileSize),
 		CounterPtr: &bytesRead,
-		WaitTime:   3 * time.Second,
 		Writer:     log.Writer(0),
 		BarLength:  ProgressBarLength,
 	}
-	bar.Start()
-	defer bar.Stop()
+	restore.progressManager.Attach(bar)
+	defer restore.progressManager.Detach(bar)
 
 	MaxInsertThreads := restore.OutputOptions.BulkWriters
 	if restore.OutputOptions.PreserveDocOrder {
@@ -234,7 +239,7 @@ func (restore *MongoRestore) RestoreCollectionToDB(dbName, colName string,
 	killChan := make(chan struct{})
 
 	// start a goroutine for adding up the number of bytes read
-	bytesReadChan := make(chan int, MaxInsertThreads*16)
+	bytesReadChan := make(chan int, BulkBufferSize*MaxInsertThreads)
 	go func() {
 		for {
 			size, alive := <-bytesReadChan

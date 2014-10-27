@@ -42,6 +42,15 @@ type ProgressBar struct {
 // can only be stopped manually using the Stop() method. The ProgressBar
 // must be set up before calling this. Panics if Start has already been called.
 func (pb *ProgressBar) Start() {
+	pb.validate()
+	pb.stopChan = make(chan struct{})
+
+	go pb.start()
+}
+
+// validate does a set of sanity checks against the progress bar, and panics
+// if the bar is unfit for use
+func (pb *ProgressBar) validate() {
 	if pb.CounterPtr == nil {
 		panic("Cannot use a ProgressBar with an unset CounterPtr")
 	}
@@ -51,9 +60,6 @@ func (pb *ProgressBar) Start() {
 	if pb.stopChan != nil {
 		panic("Cannot start a ProgressBar more than once")
 	}
-	pb.stopChan = make(chan struct{})
-
-	go pb.start()
 }
 
 // Stop kills the ProgressBar goroutine, stopping it from writing.
@@ -65,6 +71,20 @@ func (pb *ProgressBar) Stop() {
 	close(pb.stopChan)
 }
 
+// computes all necessary values renders to the bar's Writer
+func (pb *ProgressBar) renderToWriter() {
+	currentCount := *pb.CounterPtr
+	percent := float64(currentCount) / float64(pb.Max)
+	fmt.Fprintf(pb.Writer, "%v\t%v%d/%d (%2.1f%%)",
+		pb.Name,
+		drawBar(pb.BarLength, percent),
+		currentCount,
+		pb.Max,
+		percent*100,
+	)
+}
+
+// the main concurrent loop
 func (pb *ProgressBar) start() {
 	if pb.WaitTime <= 0 {
 		pb.WaitTime = DefaultWaitTime
@@ -77,15 +97,7 @@ func (pb *ProgressBar) start() {
 		case <-pb.stopChan:
 			return
 		case <-ticker.C:
-			currentCount := *pb.CounterPtr
-			percent := float64(currentCount) / float64(pb.Max)
-			fmt.Fprintf(pb.Writer, "%v\t%v%d/%d (%2.1f%%)",
-				pb.Name,
-				drawBar(pb.BarLength, percent),
-				currentCount,
-				pb.Max,
-				percent*100,
-			)
+			pb.renderToWriter()
 		}
 	}
 }

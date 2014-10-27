@@ -5,6 +5,7 @@ import (
 	"github.com/mongodb/mongo-tools/common/db"
 	"github.com/mongodb/mongo-tools/common/log"
 	commonopts "github.com/mongodb/mongo-tools/common/options"
+	"github.com/mongodb/mongo-tools/common/progress"
 	"github.com/mongodb/mongo-tools/mongorestore/options"
 	"gopkg.in/mgo.v2"
 )
@@ -22,9 +23,10 @@ type MongoRestore struct {
 	tempRolesCol string
 
 	// other internal state
-	manager  *IntentManager
-	safety   *mgo.Safe
-	objCheck bool
+	manager         *IntentManager
+	safety          *mgo.Safe
+	progressManager *progress.Manager
+	objCheck        bool
 }
 
 func (restore *MongoRestore) ParseAndValidateOptions() error {
