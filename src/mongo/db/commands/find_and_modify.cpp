@@ -204,8 +204,6 @@ namespace mongo {
                 }
             }
 
-            WriteUnitOfWork wuow(txn);
-
             BSONObj queryModified = queryOriginal;
             if ( found && doc["_id"].type() && ! CanonicalQuery::isSimpleIdQuery( queryOriginal ) ) {
                 // we're going to re-write the query to be more efficient
@@ -345,7 +343,6 @@ namespace mongo {
                     
                 }
             }
-            wuow.commit();
             return true;
         }
         
@@ -378,14 +375,12 @@ namespace mongo {
             }
 
             Lock::DBLock dbXLock(txn->lockState(), dbname, MODE_X);
-            WriteUnitOfWork wunit(txn);
             Client::Context ctx(txn, ns);
 
             BSONObj out = db.findOne(ns, q, fields);
             if (out.isEmpty()) {
                 if (!upsert) {
                     result.appendNull("value");
-                    wunit.commit();
                     return true;
                 }
 
@@ -403,7 +398,6 @@ namespace mongo {
 
                 if (!cmdObj["new"].trueValue()) {
                     result.appendNull("value");
-                    wunit.commit();
                     return true;
                 }
 
@@ -474,7 +468,6 @@ namespace mongo {
 
             result.append("value", out);
 
-            wunit.commit();
             return true;
         }
     } cmdFindAndModify;

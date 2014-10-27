@@ -30,51 +30,66 @@
 
 #include "mongo/db/storage/heap1/heap1_engine.h"
 
-#include "mongo/db/storage/heap1/heap1_database_catalog_entry.h"
+#include "mongo/db/index/index_descriptor.h"
+#include "mongo/db/storage/heap1/heap1_btree_impl.h"
 #include "mongo/db/storage/heap1/heap1_recovery_unit.h"
+#include "mongo/db/storage/heap1/record_store_heap.h"
 
 namespace mongo {
 
-    Heap1Engine::~Heap1Engine() {
-        for ( DBMap::const_iterator it = _dbs.begin(); it != _dbs.end(); ++it ) {
-            delete it->second;
-        }
-        _dbs.clear();
-    }
-
-    RecoveryUnit* Heap1Engine::newRecoveryUnit( OperationContext* opCtx ) {
+    RecoveryUnit* Heap1Engine::newRecoveryUnit() {
         return new Heap1RecoveryUnit();
     }
 
-    void Heap1Engine::listDatabases( std::vector<std::string>* out ) const {
-        boost::mutex::scoped_lock lk( _dbLock );
-        for ( DBMap::const_iterator it = _dbs.begin(); it != _dbs.end(); ++it ) {
-            out->push_back( it->first );
-        }
-    }
-
-    DatabaseCatalogEntry* Heap1Engine::getDatabaseCatalogEntry( OperationContext* opCtx,
-                                                                const StringData& dbName ) {
-        boost::mutex::scoped_lock lk( _dbLock );
-
-        Heap1DatabaseCatalogEntry*& db = _dbs[dbName.toString()];
-        if ( !db )
-            db = new Heap1DatabaseCatalogEntry( dbName );
-        return db;
-    }
-
-    Status Heap1Engine::closeDatabase(OperationContext* txn, const StringData& dbName ) {
-        // no-op as not file handles
+    Status Heap1Engine::createRecordStore(OperationContext* opCtx,
+                                          const StringData& ns,
+                                          const StringData& ident,
+                                          const CollectionOptions& options) {
+        // All work done in getRecordStore
         return Status::OK();
     }
 
-    Status Heap1Engine::dropDatabase(OperationContext* txn, const StringData& dbName ) {
-        boost::mutex::scoped_lock lk( _dbLock );
+    RecordStore* Heap1Engine::getRecordStore(OperationContext* opCtx,
+                                             const StringData& ns,
+                                             const StringData& ident,
+                                             const CollectionOptions& options) {
+        boost::mutex::scoped_lock lk(_mutex);
+        if (options.capped) {
+            return new HeapRecordStore(ident,
+                                       &_dataMap[ident],
+                                       true,
+                                       options.cappedSize ? options.cappedSize : 4096,
+                                       options.cappedMaxDocs ? options.cappedMaxDocs : -1);
+        }
+        else {
+            return new HeapRecordStore(ident, &_dataMap[ident]);
+        }
+    }
 
-        Heap1DatabaseCatalogEntry*& db = _dbs[dbName.toString()];
-        delete db;
-        _dbs.erase( dbName.toString() );
+    Status Heap1Engine::dropRecordStore(OperationContext* opCtx, const StringData& ident) {
+        boost::mutex::scoped_lock lk(_mutex);
+        _dataMap.erase(ident);
+        return Status::OK();
+    }
 
+    Status Heap1Engine::createSortedDataInterface(OperationContext* opCtx,
+                                                  const StringData& ident,
+                                                  const IndexDescriptor* desc) {
+
+        // All work done in getSortedDataInterface
+        return Status::OK();
+    }
+
+    SortedDataInterface* Heap1Engine::getSortedDataInterface(OperationContext* opCtx,
+                                                             const StringData& ident,
+                                                             const IndexDescriptor* desc) {
+        boost::mutex::scoped_lock lk(_mutex);
+        return getHeap1BtreeImpl(Ordering::make(desc->keyPattern()), &_dataMap[ident]);
+    }
+
+    Status Heap1Engine::dropSortedDataInterface(OperationContext* opCtx, const StringData& ident) {
+        boost::mutex::scoped_lock lk(_mutex);
+        _dataMap.erase(ident);
         return Status::OK();
     }
 }

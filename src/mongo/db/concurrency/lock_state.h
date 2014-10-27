@@ -31,6 +31,7 @@
 #include <queue>
 
 #include "mongo/db/concurrency/fast_map_noalloc.h"
+#include "mongo/util/concurrency/spin_lock.h"
 #include "mongo/db/concurrency/locker.h"
 
 namespace mongo {

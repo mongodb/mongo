@@ -60,6 +60,7 @@ namespace mongo {
                                                        const StringData& db );
 
         virtual bool supportsDocLocking() const { return false; }
+        virtual bool isMmapV1() const { return true; }
 
         Status closeDatabase(OperationContext* txn, const StringData& db );
 

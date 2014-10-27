@@ -109,5 +109,7 @@ namespace CommandTests {
             add< FileMD5::Type2 >();
         }
 
-    } all;
+    };
+
+    SuiteInstance<All> all;
 }

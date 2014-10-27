@@ -570,7 +570,9 @@ namespace BasicTests {
             add< CompressionTest1 >();
 
         }
-    } myall;
+    };
+
+    SuiteInstance<All> myall;
 
 } // namespace BasicTests
 

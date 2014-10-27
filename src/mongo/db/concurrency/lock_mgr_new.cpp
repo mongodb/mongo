@@ -235,7 +235,7 @@ namespace mongo {
                 LockConflictsTable[mode]);
 
         LockBucket* bucket = _getBucket(resId);
-        scoped_spinlock scopedLock(bucket->mutex);
+        SimpleMutex::scoped_lock scopedLock(bucket->mutex);
 
         LockHead* lock;
 
@@ -350,7 +350,7 @@ namespace mongo {
         LockHead* lock = request->lock;
 
         LockBucket* bucket = _getBucket(lock->resourceId);
-        scoped_spinlock scopedLock(bucket->mutex);
+        SimpleMutex::scoped_lock scopedLock(bucket->mutex);
 
         invariant(lock->grantedQueue != NULL);
         invariant(lock->grantedModes != 0);
@@ -409,7 +409,7 @@ namespace mongo {
         LockHead* lock = request->lock;
 
         LockBucket* bucket = _getBucket(lock->resourceId);
-        scoped_spinlock scopedLock(bucket->mutex);
+        SimpleMutex::scoped_lock scopedLock(bucket->mutex);
 
         invariant(lock->grantedQueue != NULL);
         invariant(lock->grantedModes != 0);
@@ -424,7 +424,7 @@ namespace mongo {
     void LockManager::cleanupUnusedLocks() {
         for (unsigned i = 0; i < _numLockBuckets; i++) {
             LockBucket* bucket = &_lockBuckets[i];
-            scoped_spinlock scopedLock(bucket->mutex);
+            SimpleMutex::scoped_lock scopedLock(bucket->mutex);
 
             LockHeadMap::iterator it = bucket->data.begin();
             while (it != bucket->data.end()) {
@@ -532,7 +532,7 @@ namespace mongo {
 
         for (unsigned i = 0; i < _numLockBuckets; i++) {
             LockBucket* bucket = &_lockBuckets[i];
-            scoped_spinlock scopedLock(bucket->mutex);
+            SimpleMutex::scoped_lock scopedLock(bucket->mutex);
 
             _dumpBucket(bucket);
         }

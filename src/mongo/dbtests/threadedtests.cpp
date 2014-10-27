@@ -893,5 +893,7 @@ namespace ThreadedTests {
             add< MongoMutexTest >();
             add< TicketHolderWaits >();
         }
-    } myall;
+    };
+
+    SuiteInstance<All> myall;
 }

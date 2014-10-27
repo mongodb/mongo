@@ -253,18 +253,12 @@ namespace mongo {
         // ----- data modifiers ------
 
         // this throws for now
-        void indexRecord(OperationContext* txn, const BSONObj& obj, const DiskLoc &loc);
+        Status indexRecord(OperationContext* txn, const BSONObj& obj, const DiskLoc &loc);
 
         void unindexRecord(OperationContext* txn,
                            const BSONObj& obj,
                            const DiskLoc& loc,
                            bool noWarn);
-
-        /**
-         * checks all unique indexes and checks for conflicts
-         * should not throw
-         */
-        Status checkNoIndexConflicts( OperationContext* txn, const BSONObj& obj );
 
         // ------- temp internal -------
 

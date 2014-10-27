@@ -410,7 +410,9 @@ namespace QueryStageSortTests {
             add<QueryStageSortInvalidationWithLimit<1> >();
             add<QueryStageSortParallelArrays>();
         }
-    }  queryStageSortTest;
+    };
+
+    SuiteInstance<All> queryStageSortTest;
 
 }  // namespace
 

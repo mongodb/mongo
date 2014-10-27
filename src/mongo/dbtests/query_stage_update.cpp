@@ -356,6 +356,8 @@ namespace QueryStageUpdate {
             add<QueryStageUpdateUpsertEmptyColl>();
             add<QueryStageUpdateSkipInvalidatedDoc>();
         }
-    } all;
+    };
+
+    SuiteInstance<All> all;
 
 } // namespace QueryStageUpdate

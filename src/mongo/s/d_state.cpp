@@ -593,9 +593,10 @@ namespace mongo {
         } installType = InstallType_None; // compiler complains otherwise
 
         {
-            // DBLock needed since we're now potentially changing the metadata, and don't want
-            // reads/writes to be ongoing.
-            Lock::DBLock writeLk(txn->lockState(), nsToDatabaseSubstring(ns), MODE_X);
+            // Exclusive collection lock needed since we're now potentially changing the metadata,
+            // and don't want reads/writes to be ongoing.
+            Lock::DBLock dbLock(txn->lockState(), nsToDatabaseSubstring(ns), MODE_IX);
+            Lock::CollectionLock collLock(txn->lockState(), ns, MODE_X);
 
             //
             // Get the metadata now that the load has completed

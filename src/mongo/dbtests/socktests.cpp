@@ -56,7 +56,9 @@ namespace SockTests {
         void setupTests() {
             add< HostByName >();
         }
-    } myall;
+    };
+
+    SuiteInstance<All> myall;
 
 } // namespace SockTests
 

@@ -98,5 +98,7 @@ namespace IndexCatalogTests {
         void setupTests() {
             add<IndexIteratorTests>();
         }
-    } indexCatalogTests;
+    };
+
+    SuiteInstance<IndexCatalogTests> indexCatalogTests;
 }

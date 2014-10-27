@@ -48,6 +48,70 @@
 #include "mongo/util/log.h"
 
 namespace mongo {
+    class KVDatabaseCatalogEntry::AddCollectionChange : public RecoveryUnit::Change {
+    public:
+        AddCollectionChange(OperationContext* opCtx, KVDatabaseCatalogEntry* dce,
+                            const StringData& collection, const StringData& ident)
+            : _opCtx(opCtx)
+            , _dce(dce)
+            , _collection(collection.toString())
+            , _ident(ident.toString())
+        {}
+
+        virtual void commit() {}
+        virtual void rollback() {
+            // Intentionally ignoring failure
+            _dce->_engine->getEngine()->dropRecordStore(_opCtx, _ident);
+
+            boost::mutex::scoped_lock lk(_dce->_collectionsLock);
+            const CollectionMap::iterator it = _dce->_collections.find(_collection);
+            if (it != _dce->_collections.end()) {
+                delete it->second;
+                _dce->_collections.erase(it);
+            }
+        }
+
+        OperationContext* const _opCtx;
+        KVDatabaseCatalogEntry* const _dce;
+        const std::string _collection;
+        const std::string _ident;
+    };
+
+    class KVDatabaseCatalogEntry::RemoveCollectionChange : public RecoveryUnit::Change {
+    public:
+        RemoveCollectionChange(OperationContext* opCtx, KVDatabaseCatalogEntry* dce,
+                               const StringData& collection, const StringData& ident,
+                               KVCollectionCatalogEntry* entry, bool dropOnCommit)
+            : _opCtx(opCtx)
+            , _dce(dce)
+            , _collection(collection.toString())
+            , _ident(ident.toString())
+            , _entry(entry)
+            , _dropOnCommit(dropOnCommit)
+        {}
+
+        virtual void commit() {
+            delete _entry;
+
+            // Intentionally ignoring failure here. Since we've removed the metadata pointing to the
+            // collection, we should never see it again anyway.
+            if (_dropOnCommit)
+                _dce->_engine->getEngine()->dropRecordStore( _opCtx, _ident );
+        }
+
+        virtual void rollback() {
+            boost::mutex::scoped_lock lk(_dce->_collectionsLock);
+            _dce->_collections[_collection] = _entry;
+        }
+
+        OperationContext* const _opCtx;
+        KVDatabaseCatalogEntry* const _dce;
+        const std::string _collection;
+        const std::string _ident;
+        KVCollectionCatalogEntry* const _entry;
+        const bool _dropOnCommit;
+    };
+
     KVDatabaseCatalogEntry::KVDatabaseCatalogEntry( const StringData& db, KVStorageEngine* engine )
         : DatabaseCatalogEntry( db ), _engine( engine ) {
 
@@ -184,6 +248,7 @@ namespace mongo {
         RecordStore* rs = _engine->getEngine()->getRecordStore( txn, ns, ident, options );
         invariant( rs );
         boost::mutex::scoped_lock lk( _collectionsLock );
+        txn->recoveryUnit()->registerChange(new AddCollectionChange(txn, this, ns, ident));
         _collections[ns.toString()] =
             new KVCollectionCatalogEntry( _engine->getEngine(), _engine->getCatalog(),
                                           ns, ident, rs );
@@ -201,6 +266,7 @@ namespace mongo {
 
         boost::mutex::scoped_lock lk( _collectionsLock );
         invariant( !_collections[ns] );
+        // No change registration since this is only for committed collections
         _collections[ns] = new KVCollectionCatalogEntry( _engine->getEngine(),
                                                          _engine->getCatalog(),
                                                          ns,
@@ -212,33 +278,39 @@ namespace mongo {
                                                      const StringData& fromNS,
                                                      const StringData& toNS,
                                                      bool stayTemp ) {
+        // Note: assuming that both fromNS and toNS (or whole db) are X-locked from above.
         {
             boost::mutex::scoped_lock lk( _collectionsLock );
             CollectionMap::const_iterator it = _collections.find( fromNS.toString() );
             if ( it == _collections.end() )
                 return Status( ErrorCodes::NamespaceNotFound, "rename cannot find collection" );
-            KVCollectionCatalogEntry* fromEntry = it->second;
 
             it = _collections.find( toNS.toString() );
             if ( it != _collections.end() )
                 return Status( ErrorCodes::NamespaceExists, "for rename to already exists" );
-
-            _collections.erase( fromNS.toString() );
-            delete fromEntry;
         }
+
+        const std::string identFrom = _engine->getCatalog()->getCollectionIdent( fromNS );
 
         Status status = _engine->getCatalog()->renameCollection( txn, fromNS, toNS, stayTemp );
         if ( !status.isOK() )
             return status;
 
-        string ident = _engine->getCatalog()->getCollectionIdent( toNS );
+        const std::string identTo = _engine->getCatalog()->getCollectionIdent( toNS );
         BSONCollectionCatalogEntry::MetaData md = _engine->getCatalog()->getMetaData( txn, toNS );
-        RecordStore* rs = _engine->getEngine()->getRecordStore( txn, toNS, ident, md.options );
+        RecordStore* rs = _engine->getEngine()->getRecordStore( txn, toNS, identTo, md.options );
 
         boost::mutex::scoped_lock lk( _collectionsLock );
+        const CollectionMap::iterator itFrom = _collections.find(fromNS.toString());
+        invariant(itFrom != _collections.end());
+        txn->recoveryUnit()->registerChange(new RemoveCollectionChange(txn, this, fromNS, identFrom,
+                                                                       itFrom->second, false));
+        _collections.erase(itFrom);
+
+        txn->recoveryUnit()->registerChange(new AddCollectionChange(txn, this, toNS, identTo));
         _collections[toNS.toString()] =
             new KVCollectionCatalogEntry( _engine->getEngine(), _engine->getCatalog(),
-                                          toNS, ident, rs );
+                                          toNS, identTo, rs );
 
         return Status::OK();
     }
@@ -268,13 +340,18 @@ namespace mongo {
 
         boost::mutex::scoped_lock lk( _collectionsLock );
 
-        Status status = _engine->getEngine()->dropRecordStore( opCtx, ident );
+        Status status = _engine->getCatalog()->dropCollection( opCtx, ns );
         if ( !status.isOK() )
             return status;
 
-        status = _engine->getCatalog()->dropCollection( opCtx, ns );
-        if ( !status.isOK() )
-            return status;
+
+        const CollectionMap::iterator it = _collections.find(ns.toString());
+        invariant(it != _collections.end());
+
+        // This will lazily delete the KVCollectionCatalogEntry and notify the storageEngine to drop
+        // the collection only on WUOW::commit().
+        opCtx->recoveryUnit()->registerChange(new RemoveCollectionChange(opCtx, this, ns, ident,
+                                                                         it->second, true));
 
         _collections.erase( ns.toString() );
 

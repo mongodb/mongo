@@ -41,10 +41,7 @@ namespace mongo {
 
     class Heap1RecoveryUnit : public RecoveryUnit {
     public:
-        Heap1RecoveryUnit() {
-            _rollbackPossible = true;
-        }
-
+        Heap1RecoveryUnit() : _depth(0) {}
         virtual ~Heap1RecoveryUnit();
 
         virtual void beginUnitOfWork();
@@ -58,41 +55,21 @@ namespace mongo {
         virtual void commitAndRestart() {}
 
         virtual void registerChange(Change* change) {
+            _changes.push_back(ChangePtr(change));
         }
 
         virtual void* writingPtr(void* data, size_t len) {
-            return data;
+            invariant(!"don't call writingPtr");
         }
 
         virtual void syncDataAndTruncateJournal() {}
 
-        // -------------
-
-        void rollbackImpossible() { _rollbackPossible = false; }
-
-        void notifyIndexMod( SortedDataInterface* idx,
-                             const BSONObj& obj, const DiskLoc& loc, bool insert );
-
-        static void notifyIndexInsert( OperationContext* ctx, SortedDataInterface* idx,
-                                       const BSONObj& obj, const DiskLoc& loc );
-        static void notifyIndexRemove( OperationContext* ctx, SortedDataInterface* idx,
-                                       const BSONObj& obj, const DiskLoc& loc );
-
     private:
-        bool _rollbackPossible;
+        typedef boost::shared_ptr<Change> ChangePtr;
+        typedef std::vector<ChangePtr> Changes;
 
-        struct IndexInfo {
-            SortedDataInterface* idx;
-            BSONObj obj;
-            DiskLoc loc;
-            bool insert;
-        };
-
-        struct Frame {
-            std::vector<IndexInfo> indexMods;
-        };
-
-        std::vector<Frame> _frames;
+        int _depth;
+        Changes _changes;
     };
 
 }
