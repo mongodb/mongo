@@ -116,7 +116,7 @@ namespace {
     }
 
     void UserCacheInvalidator::run() {
-        Client::initThread("UserCacheInvalidatorThread");
+        Client::initThread("UserCacheInvalidator");
         lastInvalidationTime = Date_t(curTimeMillis64());
 
         while (true) {

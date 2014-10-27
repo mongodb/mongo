@@ -42,6 +42,7 @@
 #include "mongo/db/lasterror.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/stdx/functional.h"
 #include "mongo/util/concurrency/threadlocal.h"
 #include "mongo/util/paths.h"
 
@@ -74,10 +75,24 @@ namespace mongo {
         */
         static void initThread(const char *desc, AbstractMessagingPort *mp = 0);
 
+        /**
+         * Inits a thread if that thread has not already been init'd, setting the thread name to
+         * "desc".
+         */
         static void initThreadIfNotAlready(const char *desc) { 
-            if( currentClient.get() )
+            if (currentClient.get())
                 return;
             initThread(desc);
+        }
+
+        /**
+         * Inits a thread if that thread has not already been init'd, setting the thread name to
+         * the string returned by "nameCallback".
+         */
+        static void initThreadIfNotAlready(stdx::function<std::string ()>& nameCallback) { 
+            if (currentClient.get())
+                return;
+            initThread(nameCallback().c_str());
         }
 
         /** this has to be called as the client goes away, but before thread termination

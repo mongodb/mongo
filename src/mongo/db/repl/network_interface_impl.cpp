@@ -43,6 +43,7 @@
 #include "mongo/db/operation_context_impl.h"
 #include "mongo/db/repl/connections.h"  // For ScopedConn::keepOpen
 #include "mongo/platform/unordered_map.h"
+#include "mongo/stdx/functional.h"
 #include "mongo/stdx/list.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/log.h"
@@ -336,7 +337,8 @@ namespace {
 
     NetworkInterfaceImpl::NetworkInterfaceImpl() :
         _isExecutorRunnable(false),
-        _inShutdown(false) {
+        _inShutdown(false),
+        _nextThreadId(0) {
         ConnectionPool::Options options;
         _connPool.reset(new ConnectionPool(options));
     }
@@ -512,12 +514,19 @@ namespace {
     void NetworkInterfaceImpl::runCallbackWithGlobalExclusiveLock(
             const stdx::function<void (OperationContext*)>& callback) {
 
-        std::ostringstream sb;
-        sb << "repl" << boost::this_thread::get_id();
-        Client::initThreadIfNotAlready(sb.str().c_str());
+        stdx::function<std::string ()> f;
+        f = std::bind(&NetworkInterfaceImpl::getNextCallbackWithGlobalLockThreadName, this);
+        Client::initThreadIfNotAlready(f);
         OperationContextImpl txn;
         Lock::GlobalWrite lk(txn.lockState());
         callback(&txn);
+    }
+
+    std::string NetworkInterfaceImpl::getNextCallbackWithGlobalLockThreadName() {
+        boost::unique_lock<boost::mutex> lk(_nextThreadIdMutex);
+        std::ostringstream sb;
+        sb << "replCallbackWithGlobalLock " << _nextThreadId++;
+        return sb.str();
     }
 
 }  // namespace repl

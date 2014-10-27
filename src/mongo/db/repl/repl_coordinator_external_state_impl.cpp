@@ -71,7 +71,8 @@ namespace {
     const char tsFieldName[] = "ts";
 }  // namespace
 
-    ReplicationCoordinatorExternalStateImpl::ReplicationCoordinatorExternalStateImpl() {}
+    ReplicationCoordinatorExternalStateImpl::ReplicationCoordinatorExternalStateImpl() :
+        _nextThreadId(0) {}
     ReplicationCoordinatorExternalStateImpl::~ReplicationCoordinatorExternalStateImpl() {}
 
     void ReplicationCoordinatorExternalStateImpl::startThreads() {
@@ -218,10 +219,17 @@ namespace {
     }
 
     OperationContext* ReplicationCoordinatorExternalStateImpl::createOperationContext() {
-        std::ostringstream sb;
-        sb << "repl" << boost::this_thread::get_id();
-        Client::initThreadIfNotAlready(sb.str().c_str());
+        stdx::function<std::string ()> f;
+        f = std::bind(&ReplicationCoordinatorExternalStateImpl::getNextOpContextThreadName,this);
+        Client::initThreadIfNotAlready(f);
         return new OperationContextImpl;
+    }
+
+    std::string ReplicationCoordinatorExternalStateImpl::getNextOpContextThreadName() {
+        boost::unique_lock<boost::mutex> lk(_nextThreadIdMutex);
+        std::ostringstream sb;
+        sb << "replCallbackWithGlobalLock " << _nextThreadId++;
+        return sb.str();
     }
 
     void ReplicationCoordinatorExternalStateImpl::dropAllTempCollections(OperationContext* txn) {
