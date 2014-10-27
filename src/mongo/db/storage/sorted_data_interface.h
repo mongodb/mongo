@@ -37,6 +37,7 @@
 
 namespace mongo {
 
+    class BSONObjBuilder;
     class BucketDeletionNotification;
     class SortedDataBuilderInterface;
 
@@ -91,8 +92,14 @@ namespace mongo {
         // Information about the tree
         //
 
-        // TODO: expose full set of args for testing?
-        virtual void fullValidate(OperationContext* txn, long long* numKeysOut) const = 0;
+        /**
+         * 'output' is used to store results of validate when 'full' is true.
+         * If 'full' is false, 'output' may be NULL.
+         *
+         * TODO: expose full set of args for testing?
+         */
+        virtual void fullValidate(OperationContext* txn, bool full, long long* numKeysOut,
+                                  BSONObjBuilder* output) const = 0;
 
         /**
          * @see IndexAccessMethod::getSpaceUsedBytes
@@ -112,7 +119,7 @@ namespace mongo {
          */
         virtual long long numEntries( OperationContext* txn ) const {
             long long x = -1;
-            fullValidate( txn, &x );
+            fullValidate(txn, false, &x, NULL);
             return x;
         }
 
