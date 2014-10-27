@@ -379,7 +379,6 @@ namespace mongo {
 
             _specificStats.indexBounds = _params.bounds.toBSON();
 
-            _specificStats.indexBoundsVerbose = _params.bounds.toString();
             _specificStats.direction = _params.direction;
         }
 

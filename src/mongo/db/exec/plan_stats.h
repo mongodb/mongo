@@ -379,9 +379,6 @@ namespace mongo {
         // used.
         BSONObj indexBounds;
 
-        // Contains same information as indexBounds with the addition of inclusivity of bounds.
-        std::string indexBoundsVerbose;
-
         // >1 if we're traversing the index along with its order. <1 if we're traversing it
         // against the order.
         int direction;

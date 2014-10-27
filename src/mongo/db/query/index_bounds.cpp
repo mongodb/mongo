@@ -184,60 +184,6 @@ namespace mongo {
         return ss;
     }
 
-    BSONObj IndexBounds::toLegacyBSON() const {
-        BSONObjBuilder builder;
-        if (isSimpleRange) {
-            // TODO
-        }
-        else {
-            for (vector<OrderedIntervalList>::const_iterator itField = fields.begin();
-                 itField != fields.end();
-                 ++itField) {
-                BSONArrayBuilder fieldBuilder(builder.subarrayStart(itField->name));
-                for (vector<Interval>::const_iterator itInterval = itField->intervals.begin();
-                     itInterval != itField->intervals.end();
-                     ++itInterval) {
-                    BSONArrayBuilder intervalBuilder;
-
-                    // Careful to output $minElement/$maxElement if we don't have bounds.
-                    if (itInterval->start.eoo()) {
-                        BSONObjBuilder minBuilder;
-                        minBuilder.appendMinKey("");
-                        BSONObj minKeyObj = minBuilder.obj();
-                        intervalBuilder.append(minKeyObj.firstElement());
-                    }
-                    else {
-                        intervalBuilder.append(itInterval->start);
-                    }
-
-                    if (itInterval->end.eoo()) {
-                        BSONObjBuilder maxBuilder;
-                        maxBuilder.appendMaxKey("");
-                        BSONObj maxKeyObj = maxBuilder.obj();
-                        intervalBuilder.append(maxKeyObj.firstElement());
-                    }
-                    else {
-                        intervalBuilder.append(itInterval->end);
-                    }
-
-                    fieldBuilder.append(
-                        static_cast<BSONArray>(intervalBuilder.arr().clientReadable()));
-
-                    // If the bounds object gets too large, truncate it.
-                    static const int kMaxBoundsSize = 1024 * 1024;
-                    if (builder.len() > kMaxBoundsSize) {
-                        intervalBuilder.doneFast();
-                        fieldBuilder.append(BSON("warning" << "bounds obj exceeds 1 MB"));
-                        fieldBuilder.doneFast();
-                        return builder.obj();
-                    }
-                }
-            }
-        }
-
-        return builder.obj();
-    }
-
     BSONObj IndexBounds::toBSON() const {
         BSONObjBuilder bob;
         vector<OrderedIntervalList>::const_iterator itField;
@@ -248,7 +194,16 @@ namespace mongo {
             for (itInterval = itField->intervals.begin()
                     ; itInterval != itField->intervals.end()
                     ; ++itInterval) {
-                fieldBuilder.append(itInterval->toString());
+                std::string intervalStr = itInterval->toString();
+
+                // Insulate against hitting BSON size limit.
+                if ((bob.len() + intervalStr.size()) > BSONObjMaxUserSize) {
+                    fieldBuilder.append("warning: bounds truncated due to BSON size limit");
+                    fieldBuilder.doneFast();
+                    return bob.obj();
+                }
+
+                fieldBuilder.append(intervalStr);
             }
 
             fieldBuilder.doneFast();
