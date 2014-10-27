@@ -50,7 +50,7 @@ namespace mongo {
     public:
         virtual ~Locker() {}
 
-        virtual uint64_t getId() const = 0;
+        virtual LockerId getId() const = 0;
 
         /**
          * This should be the first method invoked for a particular Locker object. It acquires the
@@ -159,20 +159,12 @@ namespace mongo {
             // The global lock is handled differently from all other locks.
             LockMode globalMode;
 
-            // One can acquire the global lock repeatedly.
-            unsigned globalRecursiveCount;
-
             struct OneLock {
                 // What lock resource is held?
                 ResourceId resourceId;
 
                 // In what mode is it held?
                 LockMode mode;
-
-                // What's the recursive count of this lock?  Note that we don't store any state
-                // about how we got this lock (eg upgrade), just how many times we've locked it
-                // in this mode.
-                unsigned recursiveCount;
             };
 
             // The non-global non-flush locks held, sorted by granularity.  That is, locks[i] is

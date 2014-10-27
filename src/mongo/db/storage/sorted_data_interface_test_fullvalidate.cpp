@@ -66,7 +66,7 @@ namespace mongo {
         {
             long long numKeysOut;
             scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
-            sorted->fullValidate( opCtx.get(), &numKeysOut );
+            sorted->fullValidate(opCtx.get(), false, &numKeysOut, NULL);
             // fullValidate() can set numKeysOut as the number of existing keys or -1.
             ASSERT( numKeysOut == nToInsert || numKeysOut == -1 );
         }

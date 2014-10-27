@@ -44,17 +44,21 @@
 #include "mongo/util/fail_point_service.h"
 
 namespace mongo {
+namespace {
+    // Dispenses unique OperationContext identifiers
+    AtomicUInt64 idCounter(0);
+}
 
     OperationContextImpl::OperationContextImpl() {
         StorageEngine* storageEngine = getGlobalEnvironment()->getGlobalStorageEngine();
         invariant(storageEngine);
         _recovery.reset(storageEngine->newRecoveryUnit(this));
 
-        if (storageEngine->supportsDocLocking()) {
-            _locker.reset(new LockerImpl<false>());
+        if (storageEngine->isMmapV1()) {
+            _locker.reset(new MMAPV1LockerImpl(idCounter.addAndFetch(1)));
         }
         else {
-            _locker.reset(new LockerImpl<true>());
+            _locker.reset(new LockerImpl<false>(idCounter.addAndFetch(1)));
         }
 
         _client = currentClient.get(); // may be NULL

@@ -270,7 +270,9 @@ namespace MatcherTests {
             ADD_BOTH(WithinCenter);
             ADD_BOTH(WithinPolygon);
         }
-    } dball;
+    };
+
+    SuiteInstance<All> dball;
 
 } // namespace MatcherTests
 

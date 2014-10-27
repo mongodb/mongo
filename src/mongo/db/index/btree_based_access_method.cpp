@@ -224,10 +224,11 @@ namespace mongo {
         return cursor->getDiskLoc();
     }
 
-    Status BtreeBasedAccessMethod::validate(OperationContext* txn, int64_t* numKeys) {
+    Status BtreeBasedAccessMethod::validate(OperationContext* txn, bool full, int64_t* numKeys,
+                                            BSONObjBuilder* output) {
         // XXX: long long vs int64_t
         long long keys;
-        _newInterface->fullValidate(txn, &keys);
+        _newInterface->fullValidate(txn, full, &keys, output);
         *numKeys = keys;
         return Status::OK();
     }
@@ -253,20 +254,6 @@ namespace mongo {
 
         setDifference(data->oldKeys, data->newKeys, &data->removed);
         setDifference(data->newKeys, data->oldKeys, &data->added);
-
-        bool checkForDups = !data->added.empty()
-            && (KeyPattern::isIdKeyPattern(_descriptor->keyPattern()) || _descriptor->unique())
-            && !options.dupsAllowed;
-
-        if (checkForDups) {
-            for (vector<BSONObj*>::iterator i = data->added.begin(); i != data->added.end(); i++) {
-                Status check = _newInterface->dupKeyCheck(txn, **i, record);
-                if (!check.isOK()) {
-                    status->_isValid = false;
-                    return check;
-                }
-            }
-        }
 
         status->_isValid = true;
 

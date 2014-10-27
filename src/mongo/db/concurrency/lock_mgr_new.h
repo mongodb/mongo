@@ -36,7 +36,7 @@
 #include "mongo/platform/compiler.h"
 #include "mongo/platform/cstdint.h"
 #include "mongo/platform/unordered_map.h"
-#include "mongo/util/concurrency/spin_lock.h"
+#include "mongo/util/concurrency/mutex.h"
 #include "mongo/util/timer.h"
 
 
@@ -238,7 +238,8 @@ namespace mongo {
         typedef LockHeadMap::value_type LockHeadPair;
 
         struct LockBucket {
-            SpinLock mutex;
+            LockBucket() : mutex("LockManager") { }
+            SimpleMutex mutex;
             LockHeadMap data;
         };
 
@@ -246,7 +247,7 @@ namespace mongo {
          * Retrieves the bucket in which the particular resource must reside. There is no need to
          * hold a lock when calling this function.
          */
-        LockBucket* _getBucket(const ResourceId& resId);
+        LockBucket* _getBucket(const ResourceId& resId) const;
 
         /**
          * Prints the contents of a bucket to the log.

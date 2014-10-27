@@ -2258,6 +2258,9 @@ namespace mongo {
     };
 
     // Test suite for both V0 and V1
-    static BtreeLogicTestSuite<BtreeLayoutV0> SUITE_V0("BTreeLogicTests_V0");
-    static BtreeLogicTestSuite<BtreeLayoutV1> SUITE_V1("BTreeLogicTests_V1");
+    static unittest::SuiteInstance< BtreeLogicTestSuite<BtreeLayoutV0> > SUITE_V0(
+        "BTreeLogicTests_V0");
+
+    static unittest::SuiteInstance< BtreeLogicTestSuite<BtreeLayoutV1> > SUITE_V1(
+        "BTreeLogicTests_V1");
 }

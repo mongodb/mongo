@@ -161,7 +161,9 @@ namespace PdfileTests {
             add< Insert::UpdateDate2 >();
             add< Insert::ValidId >();
         }
-    } myall;
+    };
+
+    SuiteInstance<All> myall;
 
 } // namespace PdfileTests
 

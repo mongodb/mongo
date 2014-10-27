@@ -1015,44 +1015,19 @@ namespace {
     }
 
 
-    void IndexCatalog::indexRecord(OperationContext* txn,
+    Status IndexCatalog::indexRecord(OperationContext* txn,
                                    const BSONObj& obj,
                                    const DiskLoc &loc ) {
 
         for ( IndexCatalogEntryContainer::const_iterator i = _entries.begin();
               i != _entries.end();
               ++i ) {
-
-            IndexCatalogEntry* entry = *i;
-
-            try {
-                Status s = _indexRecord( txn, entry, obj, loc );
-                uassertStatusOK( s );
-            }
-            catch ( AssertionException& ae ) {
-                LOG(2) << "IndexCatalog::indexRecord failed: " << ae;
-
-                for ( IndexCatalogEntryContainer::const_iterator j = _entries.begin();
-                      j != _entries.end();
-                      ++j ) {
-
-                    IndexCatalogEntry* toDelete = *j;
-
-                    try {
-                        _unindexRecord(txn, toDelete, obj, loc, false);
-                    }
-                    catch ( DBException& e ) {
-                        LOG(1) << "IndexCatalog::indexRecord rollback failed: " << e;
-                    }
-
-                    if ( toDelete == entry )
-                        break;
-                }
-
-                throw;
-            }
+            Status s = _indexRecord(txn, *i, obj, loc);
+            if (!s.isOK())
+                return s;
         }
 
+        return Status::OK();
     }
 
     void IndexCatalog::unindexRecord(OperationContext* txn,
@@ -1070,32 +1045,6 @@ namespace {
             bool logIfError = entry->isReady(txn) ? !noWarn : false;
             _unindexRecord(txn, entry, obj, loc, logIfError);
         }
-    }
-
-    Status IndexCatalog::checkNoIndexConflicts( OperationContext* txn, const BSONObj &obj ) {
-        IndexIterator ii = getIndexIterator( txn, true );
-        while ( ii.more() ) {
-            IndexDescriptor* descriptor = ii.next();
-
-            if ( !descriptor->unique() )
-                continue;
-
-            if (repl::getGlobalReplicationCoordinator()->shouldIgnoreUniqueIndex(descriptor))
-                continue;
-
-            IndexAccessMethod* iam = getIndex( descriptor );
-
-            InsertDeleteOptions options;
-            options.logIfError = false;
-            options.dupsAllowed = false;
-
-            UpdateTicket ticket;
-            Status ret = iam->validateUpdate(txn, BSONObj(), obj, DiskLoc(), options, &ticket);
-            if ( !ret.isOK() )
-                return ret;
-        }
-
-        return Status::OK();
     }
 
     BSONObj IndexCatalog::fixIndexKey( const BSONObj& key ) {

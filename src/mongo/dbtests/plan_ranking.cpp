@@ -842,6 +842,8 @@ namespace PlanRankingTests {
             add<PlanRankingWorkPlansLongEnough>();
             add<PlanRankingAccountForKeySkips>();
         }
-    } planRankingAll;
+    };
+
+    SuiteInstance<All> planRankingAll;
 
 }  // namespace PlanRankingTest

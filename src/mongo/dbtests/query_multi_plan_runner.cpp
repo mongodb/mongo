@@ -286,6 +286,8 @@ namespace QueryMultiPlanRunner {
             add<MPRCollectionScanVsHighlySelectiveIXScan>();
             add<MPRBackupPlan>();
         }
-    }  queryMultiPlanRunnerAll;
+    };
+
+    SuiteInstance<All> queryMultiPlanRunnerAll;
 
 }  // namespace QueryMultiPlanRunner

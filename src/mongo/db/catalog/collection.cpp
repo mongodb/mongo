@@ -191,13 +191,6 @@ namespace mongo {
             }
         }
 
-        if ( isCapped() ) {
-            // TOOD: old god not done
-            Status ret = _indexCatalog.checkNoIndexConflicts( txn, docToInsert );
-            if ( !ret.isOK() )
-                return StatusWith<DiskLoc>( ret );
-        }
-
         return _insertDocument( txn, docToInsert, enforceQuota );
     }
 
@@ -241,22 +234,9 @@ namespace mongo {
 
         _infoCache.notifyOfWriteOp();
 
-        try {
-            _indexCatalog.indexRecord(txn, docToInsert, loc.getValue());
-        }
-        catch ( AssertionException& e ) {
-            if ( isCapped() ) {
-                return StatusWith<DiskLoc>( ErrorCodes::InternalError,
-                                            str::stream() << "unexpected index insertion failure on"
-                                            << " capped collection" << e.toString()
-                                            << " - collection and its index will not match" );
-            }
-
-            // indexRecord takes care of rolling back indexes
-            // so we just have to delete the main storage
-            _recordStore->deleteRecord( txn, loc.getValue() );
-            return StatusWith<DiskLoc>( e.toStatus( "insertDocument" ) );
-        }
+        Status s = _indexCatalog.indexRecord(txn, docToInsert, loc.getValue());
+        if (!s.isOK())
+            return StatusWith<DiskLoc>(s);
 
         return loc;
     }
@@ -368,7 +348,9 @@ namespace mongo {
                     debug->nmoved += 1;
             }
 
-            _indexCatalog.indexRecord(txn, objNew, newLocation.getValue());
+            Status s = _indexCatalog.indexRecord(txn, objNew, newLocation.getValue());
+            if (!s.isOK())
+                return StatusWith<DiskLoc>(s);
 
             return newLocation;
         }
@@ -550,7 +532,10 @@ namespace mongo {
             output->append("nIndexes", _indexCatalog.numIndexesReady( txn ) );
             int idxn = 0;
             try  {
+                // Only applicable when 'full' validation is requested.
+                boost::scoped_ptr<BSONObjBuilder> indexDetails(full ? new BSONObjBuilder() : NULL);
                 BSONObjBuilder indexes; // not using subObjStart to be exception safe
+
                 IndexCatalog::IndexIterator i = _indexCatalog.getIndexIterator(txn, false);
                 while( i.more() ) {
                     const IndexDescriptor* descriptor = i.next();
@@ -558,13 +543,22 @@ namespace mongo {
                     IndexAccessMethod* iam = _indexCatalog.getIndex( descriptor );
                     invariant( iam );
 
+                    boost::scoped_ptr<BSONObjBuilder> bob(
+                        indexDetails.get() ? new BSONObjBuilder(
+                            indexDetails->subobjStart(descriptor->indexNamespace())) :
+                        NULL);
+
                     int64_t keys;
-                    iam->validate(txn, &keys);
+                    iam->validate(txn, full, &keys, bob.get());
                     indexes.appendNumber(descriptor->indexNamespace(),
                                          static_cast<long long>(keys));
                     idxn++;
                 }
+
                 output->append("keysPerIndex", indexes.done());
+                if (indexDetails.get()) {
+                    output->append("indexDetails", indexDetails->done());
+                }
             }
             catch ( DBException& exc ) {
                 string err = str::stream() <<

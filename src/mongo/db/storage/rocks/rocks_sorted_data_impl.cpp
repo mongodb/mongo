@@ -520,7 +520,8 @@ namespace mongo {
         }
     }
 
-    void RocksSortedDataImpl::fullValidate(OperationContext* txn, long long* numKeysOut) const {
+    void RocksSortedDataImpl::fullValidate(OperationContext* txn, bool full, long long* numKeysOut,
+                                           BSONObjBuilder* output) const {
         if (numKeysOut) {
             *numKeysOut = 0;
             auto ru = RocksRecoveryUnit::getRocksRecoveryUnit(txn);

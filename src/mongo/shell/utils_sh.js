@@ -44,6 +44,9 @@ sh.help = function() {
     print( "\tsh.getBalancerState()                     return true if enabled" );
     print( "\tsh.isBalancerRunning()                    return true if the balancer has work in progress on any mongos" );
 
+    print( "\tsh.disableBalancing(coll)                 disable balancing on one collection" );
+    print( "\tsh.enableBalancing(coll)                  re-enable balancing on one collection" );
+
     print( "\tsh.addShardTag(shard,tag)                 adds the tag to the shard" );
     print( "\tsh.removeShardTag(shard,tag)              removes the tag from the shard" );
     print( "\tsh.addTagRange(fullName,min,max,tag)      tags the specified range of the given collection" );
@@ -258,12 +261,18 @@ sh.waitForBalancer = function( onOrNot, timeout, interval ){
 }
 
 sh.disableBalancing = function( coll ){
+    if (coll === undefined) {
+        throw Error("Must specify collection");
+    }
     var dbase = db
     if( coll instanceof DBCollection ) dbase = coll.getDB()
     dbase.getSisterDB( "config" ).collections.update({ _id : coll + "" }, { $set : { "noBalance" : true } })
 }
 
 sh.enableBalancing = function( coll ){
+    if (coll === undefined) {
+        throw Error("Must specify collection");
+    }
     var dbase = db
     if( coll instanceof DBCollection ) dbase = coll.getDB()
     dbase.getSisterDB( "config" ).collections.update({ _id : coll + "" }, { $set : { "noBalance" : false } })

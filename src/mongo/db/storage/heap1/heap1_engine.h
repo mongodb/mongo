@@ -30,48 +30,49 @@
 
 #pragma once
 
-#include <string>
-#include <map>
-
+#include <boost/shared_ptr.hpp>
 #include <boost/thread/mutex.hpp>
 
-#include "mongo/db/storage/storage_engine.h"
+#include "mongo/db/storage/kv/kv_engine.h"
+#include "mongo/util/string_map.h"
 
 namespace mongo {
 
-    class Heap1DatabaseCatalogEntry;
-
-    class Heap1Engine : public StorageEngine {
+    class Heap1Engine : public KVEngine {
     public:
-        virtual ~Heap1Engine();
+        virtual RecoveryUnit* newRecoveryUnit();
 
-        virtual RecoveryUnit* newRecoveryUnit( OperationContext* opCtx );
+        virtual Status createRecordStore( OperationContext* opCtx,
+                                          const StringData& ns,
+                                          const StringData& ident,
+                                          const CollectionOptions& options );
 
-        virtual void listDatabases( std::vector<std::string>* out ) const;
+        virtual RecordStore* getRecordStore( OperationContext* opCtx,
+                                             const StringData& ns,
+                                             const StringData& ident,
+                                             const CollectionOptions& options );
 
-        virtual DatabaseCatalogEntry* getDatabaseCatalogEntry( OperationContext* opCtx,
-                                                               const StringData& db );
+        virtual Status dropRecordStore( OperationContext* opCtx,
+                                        const StringData& ident );
+
+        virtual Status createSortedDataInterface( OperationContext* opCtx,
+                                                  const StringData& ident,
+                                                  const IndexDescriptor* desc );
+
+        virtual SortedDataInterface* getSortedDataInterface( OperationContext* opCtx,
+                                                             const StringData& ident,
+                                                             const IndexDescriptor* desc );
+
+        virtual Status dropSortedDataInterface( OperationContext* opCtx,
+                                                const StringData& ident );
 
         virtual bool supportsDocLocking() const { return false; }
 
-        virtual Status closeDatabase(OperationContext* txn, const StringData& db );
-
-        virtual Status dropDatabase(OperationContext* txn, const StringData& db );
-
-        /**
-         * @return number of files flushed
-         */
-        virtual int flushAllFiles( bool sync ) { return 0; }
-
-        virtual Status repairDatabase( OperationContext* tnx,
-                                       const std::string& dbName,
-                                       bool preserveClonedFilesOnFailure = false,
-                                       bool backupOriginalFiles = false ) { return Status::OK(); }
-
     private:
-        mutable boost::mutex _dbLock;
-        typedef std::map<std::string,Heap1DatabaseCatalogEntry*> DBMap;
-        DBMap _dbs;
+        typedef StringMap<boost::shared_ptr<void> > DataMap;
+
+        mutable boost::mutex _mutex;
+        DataMap _dataMap; // All actual data is owned in here
     };
 
 }

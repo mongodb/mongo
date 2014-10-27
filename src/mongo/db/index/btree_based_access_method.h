@@ -102,7 +102,8 @@ namespace mongo {
 
         virtual Status touch(OperationContext* txn) const;
 
-        virtual Status validate(OperationContext* txn, int64_t* numKeys);
+        virtual Status validate(OperationContext* txn, bool full, int64_t* numKeys,
+                                BSONObjBuilder* output);
 
         virtual long long getSpaceUsedBytes( OperationContext* txn ) const;
 

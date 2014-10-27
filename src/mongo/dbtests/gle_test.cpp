@@ -106,5 +106,7 @@ namespace {
             add< GetLastErrorCommandFailure >();
             add< GetLastErrorFromDup >();
         }
-    } myall;
+    };
+
+    SuiteInstance<All> myall;
 }

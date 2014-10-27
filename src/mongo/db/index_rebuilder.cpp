@@ -124,6 +124,14 @@ namespace {
                 indexer.commit();
                 wunit.commit();
             }
+            catch (const DBException& e) {
+                error() << "Index rebuilding did not complete: " << e.toString();
+                log() << "note: restart the server with --noIndexBuildRetry to skip index rebuilds";
+                // If anything went wrong, leave the indexes partially built so that we pick them up
+                // again on restart.
+                indexer.abortWithoutCleanup();
+                fassertFailedNoTrace(26100);
+            }
             catch (...) {
                 // If anything went wrong, leave the indexes partially built so that we pick them up
                 // again on restart.
@@ -155,8 +163,7 @@ namespace {
             checkNS(txn, collNames);
         }
         catch (const DBException& e) {
-            error() << "Index rebuilding did not complete: " << e.toString();
-            log() << "note: restart the server with --noIndexBuildRetry to skip index rebuilds";
+            error() << "Index verification did not complete: " << e.toString();
             fassertFailedNoTrace(18643);
         }
         LOG(1) << "checking complete" << endl;

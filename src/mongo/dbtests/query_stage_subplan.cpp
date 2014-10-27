@@ -109,6 +109,8 @@ namespace QueryStageSubplan {
         void setupTests() {
             add<QueryStageSubplanGeo2dOr>();
         }
-    } all;
+    };
+
+    SuiteInstance<All> all;
 
 } // namespace QueryStageSubplan

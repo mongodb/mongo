@@ -1171,7 +1171,7 @@ namespace mongo {
             Lock::DBLock dbLock(txn->lockState(), nsString.db(), MODE_IX);
             Lock::CollectionLock colLock(txn->lockState(),
                                          nsString.ns(),
-                                         isMulti ? MODE_X : MODE_IX);
+                                         MODE_IX);
             ///////////////////////////////////////////
 
             if (!checkShardVersion(txn, &shardingState, *updateItem.getRequest(), result))

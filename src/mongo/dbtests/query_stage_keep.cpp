@@ -167,6 +167,8 @@ namespace QueryStageKeep {
         void setupTests() {
             add<KeepStageBasic>();
         }
-    }  queryStageKeepAll;
+    };
+
+    SuiteInstance<All> queryStageKeepAll;
 
 }  // namespace QueryStageKeep

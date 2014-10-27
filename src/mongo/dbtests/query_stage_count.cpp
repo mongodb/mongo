@@ -639,7 +639,9 @@ namespace QueryStageCount {
             add<QueryStageCountBecomesMultiKeyDuringYield>();
             add<QueryStageCountUnusedKeys>();
         }
-    }  queryStageCountAll;
+    };
+
+    SuiteInstance<All> queryStageCountAll;
 
 } // namespace QueryStageCount
 

@@ -41,11 +41,35 @@
 namespace mongo {
 
     namespace {
-        std::string catalogInfo = "_mdb_catalog";
+        const std::string catalogInfo = "_mdb_catalog";
     }
 
+    class KVStorageEngine::RemoveDBChange : public RecoveryUnit::Change {
+    public:
+        RemoveDBChange(KVStorageEngine* engine, const StringData& db, KVDatabaseCatalogEntry* entry)
+            : _engine(engine)
+            , _db(db.toString())
+            , _entry(entry)
+        {}
+
+        virtual void commit() {
+            delete _entry;
+        }
+
+        virtual void rollback() {
+            boost::mutex::scoped_lock lk(_engine->_dbsLock);
+            _engine->_dbs[_db] = _entry;
+        }
+
+        KVStorageEngine* const _engine;
+        const std::string _db;
+        KVDatabaseCatalogEntry* const _entry;
+    };
+
     KVStorageEngine::KVStorageEngine( KVEngine* engine )
-        : _engine( engine ), _initialized( false ) {
+        : _engine( engine )
+        , _initialized( false )
+        , _supportsDocLocking(_engine->supportsDocLocking()) {
     }
 
     void KVStorageEngine::cleanShutdown(OperationContext* txn) {
@@ -83,7 +107,7 @@ namespace mongo {
                                                             catalogInfo,
                                                             catalogInfo,
                                                             CollectionOptions() ) );
-        _catalog.reset( new KVCatalog( _catalogRecordStore.get() ) );
+        _catalog.reset( new KVCatalog( _catalogRecordStore.get(), _supportsDocLocking ) );
         _catalog->init( &opCtx );
 
         std::vector<std::string> collections;
@@ -94,6 +118,7 @@ namespace mongo {
             NamespaceString nss( coll );
             string dbName = nss.db().toString();
 
+            // No rollback since this is only for committed dbs.
             KVDatabaseCatalogEntry*& db = _dbs[dbName];
             if ( !db ) {
                 db = new KVDatabaseCatalogEntry( dbName, this );
@@ -131,6 +156,7 @@ namespace mongo {
         boost::mutex::scoped_lock lk( _dbsLock );
         KVDatabaseCatalogEntry*& db = _dbs[dbName.toString()];
         if ( !db ) {
+            // Not registering change since db creation is implicit and never rolled back.
             db = new KVDatabaseCatalogEntry( dbName, this );
         }
         return db;
@@ -167,6 +193,7 @@ namespace mongo {
 
         {
             boost::mutex::scoped_lock lk( _dbsLock );
+            txn->recoveryUnit()->registerChange(new RemoveDBChange(this, db, entry));
             _dbs.erase( db.toString() );
         }
         return Status::OK();

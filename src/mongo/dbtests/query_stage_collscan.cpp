@@ -387,6 +387,8 @@ namespace QueryStageCollectionScan {
             add<QueryStageCollscanInvalidateUpcomingObject>();
             add<QueryStageCollscanInvalidateUpcomingObjectBackward>();
         }
-    } all;
+    };
+
+    SuiteInstance<All> all;
 
 }
