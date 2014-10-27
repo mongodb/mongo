@@ -114,7 +114,6 @@ __clsm_enter_update(WT_CURSOR_LSM *clsm)
 static inline int
 __clsm_enter(WT_CURSOR_LSM *clsm, int reset, int update)
 {
-	WT_CURSOR *c;
 	WT_DECL_RET;
 	WT_SESSION_IMPL *session;
 	uint64_t *switch_txnp;
@@ -127,16 +126,8 @@ __clsm_enter(WT_CURSOR_LSM *clsm, int reset, int update)
 		return (0);
 
 	if (reset) {
-		c = &clsm->iface;
-		/* Copy out data before resetting chunk cursors. */
-		if (F_ISSET(c, WT_CURSTD_KEY_INT) &&
-		    !WT_DATA_IN_ITEM(&c->key))
-			WT_RET(__wt_buf_set(
-			    session, &c->key, c->key.data, c->key.size));
-		if (F_ISSET(c, WT_CURSTD_VALUE_INT) &&
-		    !WT_DATA_IN_ITEM(&c->value))
-			WT_RET(__wt_buf_set(
-			    session, &c->value, c->value.data, c->value.size));
+		WT_ASSERT(session, !F_ISSET(&clsm->iface,
+		   WT_CURSTD_KEY_INT | WT_CURSTD_VALUE_INT));
 		WT_RET(__clsm_reset_cursors(clsm, NULL));
 	}
 
@@ -984,10 +975,19 @@ __clsm_reset(WT_CURSOR *cursor)
 	 */
 	clsm = (WT_CURSOR_LSM *)cursor;
 	CURSOR_API_CALL(cursor, session, reset, NULL);
-	ret = __clsm_reset_cursors(clsm, NULL);
 	F_CLR(cursor, WT_CURSTD_KEY_SET | WT_CURSTD_VALUE_SET);
 
-	/* In case we were somehow left positioned, clear that. */
+	/*
+	 * Really close cursors: in case this cursor isn't accessed for a long
+	 * time, we don't want to block eviction or discarding of old chunks.
+	 */
+	WT_TRET(__clsm_close_cursors(clsm, 0, clsm->nchunks));
+
+	/* Force re-entry into the tree on the next operation. */
+	clsm->dsk_gen = 0;
+	clsm->nchunks = 0;
+
+	/* In case we were left positioned, clear that. */
 	WT_TRET(__clsm_leave(clsm));
 
 err:	API_END_RET(session, ret);

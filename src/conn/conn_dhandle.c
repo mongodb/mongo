@@ -512,7 +512,8 @@ __wt_conn_btree_close(WT_SESSION_IMPL *session)
  *	checkpoint handles).
  */
 int
-__wt_conn_dhandle_close_all(WT_SESSION_IMPL *session, const char *name)
+__wt_conn_dhandle_close_all(
+    WT_SESSION_IMPL *session, const char *name, int force)
 {
 	WT_CONNECTION_IMPL *conn;
 	WT_DATA_HANDLE *dhandle;
@@ -542,6 +543,9 @@ __wt_conn_dhandle_close_all(WT_SESSION_IMPL *session, const char *name)
 		 */
 		if (F_ISSET(dhandle, WT_DHANDLE_OPEN)) {
 			ret = __wt_meta_track_sub_on(session);
+			if (force)
+				ret = __wt_cache_op(
+				    session, NULL, WT_SYNC_DISCARD_FORCE);
 			if (ret == 0)
 				ret = __wt_conn_btree_sync_and_close(session);
 

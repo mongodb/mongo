@@ -48,8 +48,8 @@ __wt_schema_worker(WT_SESSION_IMPL *session,
 			 * any open file handles, including checkpoints.
 			 */
 			if (FLD_ISSET(open_flags, WT_DHANDLE_EXCLUSIVE))
-				WT_ERR(
-				    __wt_conn_dhandle_close_all(session, uri));
+				WT_ERR(__wt_conn_dhandle_close_all(
+				    session, uri, 0));
 
 			WT_ERR(__wt_session_get_btree_ckpt(
 			    session, uri, cfg, open_flags));
