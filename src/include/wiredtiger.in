@@ -1359,6 +1359,22 @@ struct __wt_session {
 	 */
 	int __F(checkpoint)(WT_SESSION *session, const char *config);
 
+	/*!
+	 * Return the transaction ID range pinned by the session handle.
+	 *
+	 * The ID range is approximate and is calculated based on the oldest
+	 * ID needed for the active transaction in this session, compared
+	 * to the newest transaction in the system.
+	 *
+	 * @snippet ex_all.c transaction pinned range
+	 *
+	 * @param session the session handle
+	 * @param[out] range the range of IDs pinned by this session. Zero if
+	 * there is no active transaction.
+	 * @errors
+	 */
+	int __F(transaction_pinned_range)(WT_SESSION* session, uint64_t *range);
+
 	/*! @} */
 };
 

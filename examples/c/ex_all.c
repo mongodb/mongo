@@ -738,6 +738,14 @@ transaction_ops(WT_CONNECTION *conn, WT_SESSION *session)
 	ret = session->reconfigure(session, "isolation=snapshot");
 	/*! [session isolation re-configuration] */
 
+	{
+	/*! [transaction pinned range] */
+	/* Check the range of transaction ID are pinned by a session. */
+	uint64_t range;
+	ret = session->transaction_pinned_range(session, &range);
+	/*! [transaction pinned range] */
+	}
+
 	return (ret);
 }
 
