@@ -45,6 +45,7 @@ namespace mongo {
     class KVCatalog;
     class KVEngine;
     class KVDatabaseCatalogEntry;
+    class Locker;
 
     class KVStorageEngine : public StorageEngine {
     public:
@@ -77,6 +78,9 @@ namespace mongo {
                                        bool backupOriginalFiles = false );
 
         virtual void cleanShutdown(OperationContext* txn);
+
+        virtual void onCollectionLock(Locker* lockState, const StringData& ns, LockMode mode);
+        virtual void onCollectionUnlock(Locker* lockState, const StringData& ns, LockMode mode);
 
         // ------ kv ------
 

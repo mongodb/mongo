@@ -34,12 +34,14 @@
 #include <vector>
 
 #include "mongo/base/status.h"
+#include "mongo/db/concurrency/lock_mgr_defs.h"
 
 namespace mongo {
 
     class DatabaseCatalogEntry;
     class OperationContext;
     class RecoveryUnit;
+    class Locker;
     struct StorageGlobalParams;
 
     /**
@@ -135,6 +137,9 @@ namespace mongo {
          * There is intentionally no uncleanShutdown().
          */
         virtual void cleanShutdown(OperationContext* txn) {}
+
+        virtual void onCollectionLock(Locker* lockState, const StringData& ns, LockMode mode) {}
+        virtual void onCollectionUnlock(Locker* lockerState, const StringData& ns, LockMode mode) {}
 
     protected:
         /**

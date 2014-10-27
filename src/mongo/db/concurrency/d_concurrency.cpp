@@ -251,7 +251,9 @@ namespace mongo {
                                          const StringData& ns,
                                          LockMode mode)
         : _id(RESOURCE_COLLECTION, ns),
-          _lockState(lockState) {
+          _lockState(lockState),
+          _ns(ns.toString()),
+          _mode(mode) {
         const bool isRead = (mode == MODE_S || mode == MODE_IS);
         dassert(!ns.empty());
         dassert(nsIsFull(ns));
@@ -260,12 +262,22 @@ namespace mongo {
                                               isRead ? MODE_IS : MODE_IX));
         if (supportsDocLocking()) {
             _lockState->lock(_id, mode);
+            StorageEngine* storageEngine = getGlobalEnvironment()->getGlobalStorageEngine();
+            if (storageEngine) {
+                storageEngine->onCollectionLock(_lockState, _ns, _mode);
+            }
         } else if (enableCollectionLocking) {
             _lockState->lock(_id, isRead ? MODE_S : MODE_X);
         }
     }
 
     Lock::CollectionLock::~CollectionLock() {
+        if (supportsDocLocking()) {
+            StorageEngine* storageEngine = getGlobalEnvironment()->getGlobalStorageEngine();
+            if (storageEngine) {
+                storageEngine->onCollectionUnlock(_lockState, _ns, _mode);
+            }
+        }
         if (supportsDocLocking() || enableCollectionLocking) {
             _lockState->unlock(_id);
         }
