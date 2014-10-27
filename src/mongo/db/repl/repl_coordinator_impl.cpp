@@ -567,13 +567,7 @@ namespace {
 
         // Wake up any threads waiting for replication that now have their replication
         // check satisfied
-        for (std::vector<WaiterInfo*>::iterator it = _replicationWaiterList.begin();
-                it != _replicationWaiterList.end(); ++it) {
-            WaiterInfo* info = *it;
-            if (_doneWaitingForReplication_inlock(*info->opTime, *info->writeConcern)) {
-                info->condVar->notify_all();
-            }
-        }
+        _wakeReadyWaiters_inlock();
     }
 
     void ReplicationCoordinatorImpl::_updateSlaveInfoOptime_inlock(SlaveInfo* slaveInfo,
@@ -583,13 +577,7 @@ namespace {
 
         // Wake up any threads waiting for replication that now have their replication
         // check satisfied
-        for (std::vector<WaiterInfo*>::iterator it = _replicationWaiterList.begin();
-                it != _replicationWaiterList.end(); ++it) {
-            WaiterInfo* info = *it;
-            if (_doneWaitingForReplication_inlock(*info->opTime, *info->writeConcern)) {
-                info->condVar->notify_all();
-            }
-        }
+        _wakeReadyWaiters_inlock();
     }
 
     void ReplicationCoordinatorImpl::_updateSlaveInfoFromConfig_inlock() {
@@ -817,6 +805,10 @@ namespace {
 
     bool ReplicationCoordinatorImpl::_doneWaitingForReplication_inlock(
         const OpTime& opTime, const WriteConcernOptions& writeConcern) {
+        Status status = _checkIfWriteConcernCanBeSatisfied_inlock(writeConcern);
+        if (!status.isOK()) {
+            return true;
+        }
 
         if (!writeConcern.wMode.empty()) {
             StringData patternName;
@@ -2033,8 +2025,19 @@ namespace {
              // nodes in the set will contact us.
              _startHeartbeats();
          }
+         _wakeReadyWaiters_inlock();
          return action;
      }
+
+    void ReplicationCoordinatorImpl::_wakeReadyWaiters_inlock(){
+        for (std::vector<WaiterInfo*>::iterator it = _replicationWaiterList.begin();
+                it != _replicationWaiterList.end(); ++it) {
+            WaiterInfo* info = *it;
+            if (_doneWaitingForReplication_inlock(*info->opTime, *info->writeConcern)) {
+                info->condVar->notify_all();
+            }
+        }
+    }
 
     Status ReplicationCoordinatorImpl::processReplSetUpdatePosition(
             OperationContext* txn,

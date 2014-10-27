@@ -40,6 +40,7 @@
 #include "mongo/db/repl/handshake_args.h"
 #include "mongo/db/repl/is_master_response.h"
 #include "mongo/db/repl/network_interface_mock.h"
+#include "mongo/db/repl/repl_coordinator.h" // ReplSetReconfigArgs
 #include "mongo/db/repl/repl_coordinator_external_state_mock.h"
 #include "mongo/db/repl/repl_coordinator_impl.h"
 #include "mongo/db/repl/repl_coordinator_test_fixture.h"
@@ -58,6 +59,8 @@
 namespace mongo {
 namespace repl {
 namespace {
+
+    typedef ReplicationCoordinator::ReplSetReconfigArgs ReplSetReconfigArgs;
 
     TEST_F(ReplCoordTest, StartupWithValidLocalConfig) {
         assertStart(
@@ -1877,6 +1880,237 @@ namespace {
 
         writeConcern.wNumNodes = 3;
         ASSERT_OK(getReplCoord()->awaitReplication(&txn, time2, writeConcern).status);
+    }
+
+    void doReplSetReconfig(ReplicationCoordinatorImpl* replCoord, Status* status) {
+        OperationContextNoop txn;
+        BSONObjBuilder garbage;
+        ReplSetReconfigArgs args;
+        args.force = false;
+        args.newConfigObj = BSON("_id" << "mySet" <<
+                                 "version" << 3 <<
+                                 "members" << BSON_ARRAY(
+                                        BSON("_id" << 0 <<
+                                             "host" << "node1:12345" <<
+                                             "priority" << 3) <<
+                                        BSON("_id" << 1 << "host" << "node2:12345") <<
+                                        BSON("_id" << 2 << "host" << "node3:12345")));
+        *status = replCoord->processReplSetReconfig(&txn, args, &garbage);
+    }
+
+    TEST_F(ReplCoordTest, AwaitReplicationReconfigSimple) {
+        OperationContextNoop txn;
+        assertStartSuccess(
+                BSON("_id" << "mySet" <<
+                     "version" << 2 <<
+                     "members" << BSON_ARRAY(BSON("host" << "node1:12345" << "_id" << 0) <<
+                                             BSON("host" << "node2:12345" << "_id" << 1) <<
+                                             BSON("host" << "node3:12345" << "_id" << 2))),
+                HostAndPort("node1", 12345));
+        ASSERT(getReplCoord()->setFollowerMode(MemberState::RS_SECONDARY));
+        getReplCoord()->setMyLastOptime(&txn, OpTime(100, 2));
+        simulateSuccessfulElection();
+
+        OID selfRID = getReplCoord()->getMyRID();
+        OID node2 = OID::gen();
+        OID node3 = OID::gen();
+        OpTime time(100, 2);
+
+        HandshakeArgs handshake;
+        ASSERT_OK(handshake.initialize(BSON("handshake" << node2 << "member" << 1)));
+        ASSERT_OK(getReplCoord()->processHandshake(&txn, handshake));
+        ASSERT_OK(handshake.initialize(BSON("handshake" << node3 << "member" << 2)));
+        ASSERT_OK(getReplCoord()->processHandshake(&txn, handshake));
+
+        // 3 nodes waiting for time
+        WriteConcernOptions writeConcern;
+        writeConcern.wTimeout = WriteConcernOptions::kNoTimeout;
+        writeConcern.wNumNodes = 3;
+
+        ReplicationAwaiter awaiter(getReplCoord(), &txn);
+        awaiter.setOpTime(time);
+        awaiter.setWriteConcern(writeConcern);
+        awaiter.start(&txn);
+
+        // reconfig
+        Status status(ErrorCodes::InternalError, "Not Set");
+        boost::thread reconfigThread(stdx::bind(doReplSetReconfig, getReplCoord(), &status));
+
+        NetworkInterfaceMock* net = getNet();
+        getNet()->enterNetwork();
+        const NetworkInterfaceMock::NetworkOperationIterator noi = net->getNextReadyRequest();
+        const ReplicationExecutor::RemoteCommandRequest& request = noi->getRequest();
+        repl::ReplSetHeartbeatArgs hbArgs;
+        ASSERT_OK(hbArgs.initialize(request.cmdObj));
+        repl::ReplSetHeartbeatResponse hbResp;
+        hbResp.setSetName("mySet");
+        hbResp.setState(MemberState::RS_SECONDARY);
+        hbResp.setVersion(2);
+        BSONObjBuilder respObj;
+        respObj << "ok" << 1;
+        hbResp.addToBSON(&respObj);
+        net->scheduleResponse(noi, net->now(), makeResponseStatus(respObj.obj()));
+        net->runReadyNetworkOperations();
+        getNet()->exitNetwork();
+        reconfigThread.join();
+        ASSERT_OK(status);
+
+        // satisfy write concern
+        ASSERT_OK(getReplCoord()->setLastOptime_forTest(selfRID, time));
+        ASSERT_OK(getReplCoord()->setLastOptime_forTest(node2, time));
+        ASSERT_OK(getReplCoord()->setLastOptime_forTest(node3, time));
+        ReplicationCoordinator::StatusAndDuration statusAndDur = awaiter.getResult();
+        ASSERT_OK(statusAndDur.status);
+        awaiter.reset();
+    }
+
+    void doReplSetReconfigToFewer(ReplicationCoordinatorImpl* replCoord, Status* status) {
+        OperationContextNoop txn;
+        BSONObjBuilder garbage;
+        ReplSetReconfigArgs args;
+        args.force = false;
+        args.newConfigObj = BSON("_id" << "mySet" <<
+                                 "version" << 3 <<
+                                 "members" << BSON_ARRAY(
+                                        BSON("_id" << 0 << "host" << "node1:12345") <<
+                                        BSON("_id" << 2 << "host" << "node3:12345")));
+        *status = replCoord->processReplSetReconfig(&txn, args, &garbage);
+    }
+
+    TEST_F(ReplCoordTest, AwaitReplicationReconfigNodeCountExceedsNumberOfNodes) {
+        OperationContextNoop txn;
+        assertStartSuccess(
+                BSON("_id" << "mySet" <<
+                     "version" << 2 <<
+                     "members" << BSON_ARRAY(BSON("host" << "node1:12345" << "_id" << 0) <<
+                                             BSON("host" << "node2:12345" << "_id" << 1) <<
+                                             BSON("host" << "node3:12345" << "_id" << 2))),
+                HostAndPort("node1", 12345));
+        ASSERT(getReplCoord()->setFollowerMode(MemberState::RS_SECONDARY));
+        getReplCoord()->setMyLastOptime(&txn, OpTime(100, 2));
+        simulateSuccessfulElection();
+
+        OID node2 = OID::gen();
+        OID node3 = OID::gen();
+        OpTime time(100, 2);
+
+        HandshakeArgs handshake;
+        ASSERT_OK(handshake.initialize(BSON("handshake" << node2 << "member" << 1)));
+        ASSERT_OK(getReplCoord()->processHandshake(&txn, handshake));
+        ASSERT_OK(handshake.initialize(BSON("handshake" << node3 << "member" << 2)));
+        ASSERT_OK(getReplCoord()->processHandshake(&txn, handshake));
+
+        // 3 nodes waiting for time
+        WriteConcernOptions writeConcern;
+        writeConcern.wTimeout = WriteConcernOptions::kNoTimeout;
+        writeConcern.wNumNodes = 3;
+
+        ReplicationAwaiter awaiter(getReplCoord(), &txn);
+        awaiter.setOpTime(time);
+        awaiter.setWriteConcern(writeConcern);
+        awaiter.start(&txn);
+
+        // reconfig to fewer nodes
+        Status status(ErrorCodes::InternalError, "Not Set");
+        boost::thread reconfigThread(stdx::bind(doReplSetReconfigToFewer, getReplCoord(), &status));
+
+        NetworkInterfaceMock* net = getNet();
+        getNet()->enterNetwork();
+        const NetworkInterfaceMock::NetworkOperationIterator noi = net->getNextReadyRequest();
+        const ReplicationExecutor::RemoteCommandRequest& request = noi->getRequest();
+        repl::ReplSetHeartbeatArgs hbArgs;
+        ASSERT_OK(hbArgs.initialize(request.cmdObj));
+        repl::ReplSetHeartbeatResponse hbResp;
+        hbResp.setSetName("mySet");
+        hbResp.setState(MemberState::RS_SECONDARY);
+        hbResp.setVersion(2);
+        BSONObjBuilder respObj;
+        respObj << "ok" << 1;
+        hbResp.addToBSON(&respObj);
+        net->scheduleResponse(noi, net->now(), makeResponseStatus(respObj.obj()));
+        net->runReadyNetworkOperations();
+        getNet()->exitNetwork();
+        reconfigThread.join();
+        ASSERT_OK(status);
+        std::cout << "asdf" << std::endl;
+
+        // writeconcern feasability should be reevaluated and an error should be returned
+        ReplicationCoordinator::StatusAndDuration statusAndDur = awaiter.getResult();
+        ASSERT_EQUALS(ErrorCodes::CannotSatisfyWriteConcern, statusAndDur.status);
+        awaiter.reset();
+    }
+
+    TEST_F(ReplCoordTest, AwaitReplicationReconfigToSmallerMajority) {
+        OperationContextNoop txn;
+        assertStartSuccess(
+                BSON("_id" << "mySet" <<
+                     "version" << 2 <<
+                     "members" << BSON_ARRAY(BSON("host" << "node1:12345" << "_id" << 0) <<
+                                             BSON("host" << "node2:12345" << "_id" << 1) <<
+                                             BSON("host" << "node3:12345" << "_id" << 2) <<
+                                             BSON("host" << "node4:12345" << "_id" << 3) <<
+                                             BSON("host" << "node5:12345" << "_id" << 4))),
+                HostAndPort("node1", 12345));
+        ASSERT(getReplCoord()->setFollowerMode(MemberState::RS_SECONDARY));
+        getReplCoord()->setMyLastOptime(&txn, OpTime(100, 1));
+        simulateSuccessfulElection();
+
+        OID node2 = OID::gen();
+        OID node3 = OID::gen();
+        OpTime time(100, 2);
+
+        HandshakeArgs handshake;
+        ASSERT_OK(handshake.initialize(BSON("handshake" << node2 << "member" << 1)));
+        ASSERT_OK(getReplCoord()->processHandshake(&txn, handshake));
+        ASSERT_OK(handshake.initialize(BSON("handshake" << node3 << "member" << 2)));
+        ASSERT_OK(getReplCoord()->processHandshake(&txn, handshake));
+        ASSERT_OK(getReplCoord()->setLastOptime_forTest(node2, time));
+        ASSERT_OK(getReplCoord()->setLastOptime_forTest(node3, time));
+
+        // majority nodes waiting for time
+        WriteConcernOptions writeConcern;
+        writeConcern.wTimeout = WriteConcernOptions::kNoTimeout;
+        writeConcern.wMode = "majority";
+
+        ReplicationAwaiter awaiter(getReplCoord(), &txn);
+        awaiter.setOpTime(time);
+        awaiter.setWriteConcern(writeConcern);
+        awaiter.start(&txn);
+
+        // demonstrate that majority cannot currently be satisfied
+        WriteConcernOptions writeConcern2;
+        writeConcern2.wTimeout = WriteConcernOptions::kNoWaiting;
+        writeConcern2.wMode = "majority";
+        ASSERT_EQUALS(ErrorCodes::ExceededTimeLimit,
+                      getReplCoord()->awaitReplication(&txn, time, writeConcern2).status);
+
+        // reconfig to three nodes
+        Status status(ErrorCodes::InternalError, "Not Set");
+        boost::thread reconfigThread(stdx::bind(doReplSetReconfig, getReplCoord(), &status));
+
+        NetworkInterfaceMock* net = getNet();
+        getNet()->enterNetwork();
+        const NetworkInterfaceMock::NetworkOperationIterator noi = net->getNextReadyRequest();
+        const ReplicationExecutor::RemoteCommandRequest& request = noi->getRequest();
+        repl::ReplSetHeartbeatArgs hbArgs;
+        ASSERT_OK(hbArgs.initialize(request.cmdObj));
+        repl::ReplSetHeartbeatResponse hbResp;
+        hbResp.setSetName("mySet");
+        hbResp.setState(MemberState::RS_SECONDARY);
+        hbResp.setVersion(2);
+        BSONObjBuilder respObj;
+        respObj << "ok" << 1;
+        hbResp.addToBSON(&respObj);
+        net->scheduleResponse(noi, net->now(), makeResponseStatus(respObj.obj()));
+        net->runReadyNetworkOperations();
+        getNet()->exitNetwork();
+        reconfigThread.join();
+        ASSERT_OK(status);
+
+        // writeconcern feasability should be reevaluated and be satisfied
+        ReplicationCoordinator::StatusAndDuration statusAndDur = awaiter.getResult();
+        ASSERT_OK(statusAndDur.status);
+        awaiter.reset();
     }
 
     // TODO(schwerin): Unit test election id updating

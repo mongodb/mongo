@@ -360,6 +360,11 @@ namespace repl {
                 int myIndex);
 
         /**
+         * Helper to wake waiters in _replicationWaiterList that are doneWaitingForReplication.
+         */
+        void _wakeReadyWaiters_inlock();
+
+        /**
          * Helper method for setting/unsetting maintenance mode.  Scheduled by setMaintenanceMode()
          * to run in a global write lock in the replication executor thread.
          */
