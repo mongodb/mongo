@@ -74,5 +74,9 @@ namespace mongo {
                                                 const StringData& ident ) {
             return Status::OK();
         }
+
+        virtual bool supportsDocLocking() const {
+            return true;
+        }
     };
 }

@@ -167,6 +167,8 @@ namespace QueryStageDelete {
             // Stage-specific tests below.
             add<QueryStageDeleteInvalidateUpcomingObject>();
         }
-    } all;
+    };
+
+    SuiteInstance<All> all;
 
 }

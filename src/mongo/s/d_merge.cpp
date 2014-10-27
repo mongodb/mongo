@@ -295,7 +295,8 @@ namespace mongo {
         //
 
         {
-            Lock::DBLock writeLk(txn->lockState(), nss.db(), MODE_X);
+            Lock::DBLock writeLk(txn->lockState(), nss.db(), MODE_IX);
+            Lock::CollectionLock collLock(txn->lockState(), nss.ns(), MODE_X);
             shardingState.mergeChunks(txn, nss.ns(), minKey, maxKey, mergeVersion);
         }
 

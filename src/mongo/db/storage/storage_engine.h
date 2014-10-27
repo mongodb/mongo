@@ -107,6 +107,12 @@ namespace mongo {
          */
         virtual bool supportsDocLocking() const = 0;
 
+
+        /**
+         * Only MMAPv1 should override this and return true to trigger MMAPv1-specific behavior.
+         */
+        virtual bool isMmapV1() const { return false; }
+
         /**
          * Closes all file handles associated with a database.
          */

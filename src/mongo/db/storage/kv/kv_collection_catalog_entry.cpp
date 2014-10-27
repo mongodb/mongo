@@ -35,6 +35,47 @@
 #include "mongo/db/storage/kv/kv_engine.h"
 
 namespace mongo {
+    class KVCollectionCatalogEntry::AddIndexChange : public RecoveryUnit::Change {
+    public:
+        AddIndexChange(OperationContext* opCtx, KVCollectionCatalogEntry* cce,
+                       const StringData& ident)
+            : _opCtx(opCtx)
+            , _cce(cce)
+            , _ident(ident.toString())
+        {}
+
+        virtual void commit() {}
+        virtual void rollback() {
+            // Intentionally ignoring failure.
+            _cce->_engine->dropSortedDataInterface(_opCtx, _ident);
+        }
+
+        OperationContext* const _opCtx;
+        KVCollectionCatalogEntry* const _cce;
+        const std::string _ident;
+    };
+
+    class KVCollectionCatalogEntry::RemoveIndexChange : public RecoveryUnit::Change {
+    public:
+        RemoveIndexChange(OperationContext* opCtx, KVCollectionCatalogEntry* cce,
+                          const StringData& ident)
+            : _opCtx(opCtx)
+            , _cce(cce)
+            , _ident(ident.toString())
+        {}
+
+        virtual void rollback() {}
+        virtual void commit() {
+            // Intentionally ignoring failure here. Since we've removed the metadata pointing to the
+            // index, we should never see it again anyway.
+            _cce->_engine->dropSortedDataInterface(_opCtx, _ident);
+        }
+
+        OperationContext* const _opCtx;
+        KVCollectionCatalogEntry* const _cce;
+        const std::string _ident;
+    };
+
 
     KVCollectionCatalogEntry::KVCollectionCatalogEntry( KVEngine* engine,
                                                         KVCatalog* catalog,
@@ -83,7 +124,9 @@ namespace mongo {
         md.eraseIndex( indexName );
         _catalog->putMetaData( txn, ns().toString(), md );
 
-        return _engine->dropSortedDataInterface( txn, ident );
+        // Lazily remove to isolate underlying engine from rollback.
+        txn->recoveryUnit()->registerChange(new RemoveIndexChange(txn, this, ident));
+        return Status::OK();
     }
 
     Status KVCollectionCatalogEntry::prepareForIndexBuild( OperationContext* txn,
@@ -94,7 +137,12 @@ namespace mongo {
 
         string ident = _catalog->getIndexIdent( txn, ns().ns(), spec->indexName() );
 
-        return _engine->createSortedDataInterface( txn, ident, spec );
+        const Status status = _engine->createSortedDataInterface( txn, ident, spec );
+        if (status.isOK()) {
+            txn->recoveryUnit()->registerChange(new AddIndexChange(txn, this, ident));
+        }
+
+        return status;
     }
 
     void KVCollectionCatalogEntry::indexBuildSuccess( OperationContext* txn,

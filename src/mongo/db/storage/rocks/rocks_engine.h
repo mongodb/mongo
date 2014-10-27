@@ -92,6 +92,10 @@ namespace mongo {
         virtual Status dropSortedDataInterface(OperationContext* opCtx,
                                                const StringData& ident) override;
 
+        virtual bool supportsDocLocking() const override {
+            return true;
+        }
+
         // rocks specific api
 
         rocksdb::DB* getDB() { return _db.get(); }

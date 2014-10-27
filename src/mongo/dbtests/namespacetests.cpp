@@ -635,6 +635,9 @@ namespace NamespaceTests {
             add< DatabaseTests::RollbackDropCollection >();
 #endif
         }
-    } myall;
+    };
+
+    SuiteInstance<All> myall;
+
 } // namespace NamespaceTests
 

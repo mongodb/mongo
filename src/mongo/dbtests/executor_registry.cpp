@@ -331,6 +331,8 @@ namespace ExecutorRegistry {
             add<ExecutorRegistryDropOneIndex>();
             add<ExecutorRegistryDropDatabase>();
         }
-    }  executorRegistryAll;
+    };
+
+    SuiteInstance<All> executorRegistryAll;
 
 }  // namespace ExecutorRegistry

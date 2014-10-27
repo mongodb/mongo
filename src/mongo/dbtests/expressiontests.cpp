@@ -3740,6 +3740,8 @@ namespace ExpressionTests {
             add<AllAnyElements::FalseViaInt>();
             add<AllAnyElements::Null>();
         }
-    } myall;
+    };
+
+    SuiteInstance<All> myall;
 
 } // namespace ExpressionTests

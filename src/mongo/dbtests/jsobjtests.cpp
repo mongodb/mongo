@@ -2310,7 +2310,9 @@ namespace JsobjTests {
             add< HashingTest >();
             add< NestedBuilderOversize >();
         }
-    } myall;
+    };
+
+    SuiteInstance<All> myall;
 
 } // namespace JsobjTests
 

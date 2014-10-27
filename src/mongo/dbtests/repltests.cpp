@@ -1519,7 +1519,9 @@ namespace ReplTests {
             add< ReplSetMemberCfgEquality >();
             add< ShouldRetry >();
         }
-    } myall;
+    };
+
+    SuiteInstance<All> myall;
 
 } // namespace ReplTests
 

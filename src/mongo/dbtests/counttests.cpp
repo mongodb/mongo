@@ -166,6 +166,8 @@ namespace CountTests {
             add<QueryFields>();
             add<IndexedRegex>();
         }
-    } myall;
+    };
+
+    SuiteInstance<All> myall;
 
 } // namespace CountTests

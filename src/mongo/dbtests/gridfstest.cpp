@@ -65,6 +65,8 @@ namespace {
         void setupTests() {
             add< SetChunkSizeTest >();
         }
-    } myall;
+    };
+
+    SuiteInstance<All> myall;
 }
 
