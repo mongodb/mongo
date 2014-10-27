@@ -488,7 +488,6 @@ namespace {
         getReplCoord()->setMyLastOptime(&txn, OpTime(100, 0));
         simulateSuccessfulElection();
 
-        OID myOID = getReplCoord()->getMyRID();
         OID client1 = OID::gen();
         OID client2 = OID::gen();
         OID client3 = OID::gen();
@@ -577,7 +576,6 @@ namespace {
         getReplCoord()->setMyLastOptime(&txn, OpTime(100, 0));
         simulateSuccessfulElection();
 
-        OID selfRID = getReplCoord()->getMyRID();
         OID clientRID1 = OID::gen();
         OID clientRID2 = OID::gen();
         OID clientRID3 = OID::gen();
@@ -739,7 +737,6 @@ namespace {
 
         ReplicationAwaiter awaiter(getReplCoord(), &txn);
 
-        OID selfRID = getReplCoord()->getMyRID();
         OID client1 = OID::gen();
         OID client2 = OID::gen();
         OpTime time1(100, 1);
@@ -800,7 +797,6 @@ namespace {
 
         ReplicationAwaiter awaiter(getReplCoord(), &txn);
 
-        OID selfRID = getReplCoord()->getMyRID();
         OID client = OID::gen();
         OpTime time1(100, 1);
         OpTime time2(100, 2);
@@ -1533,7 +1529,6 @@ namespace {
                 HostAndPort("node1", 12345));
         OperationContextNoop txn;
 
-        OID myRID = getReplCoord()->getMyRID();
         OID client1 = OID::gen();
         OID client2 = OID::gen();
         OpTime time1(100, 1);
@@ -1572,7 +1567,6 @@ namespace {
         HostAndPort clientHost("node2:12345");
         OperationContextNoop txn;
 
-        OID myRID = getReplCoord()->getMyRID();
         OID client = OID::gen();
         OpTime time1(100, 1);
         OpTime time2(100, 2);
