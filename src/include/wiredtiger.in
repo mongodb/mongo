@@ -1369,11 +1369,11 @@ struct __wt_session {
 	 * @snippet ex_all.c Transaction range pin
 	 *
 	 * @param session the session handle
-	 * @param range the range of IDs pinned by this session. Zero if
+	 * @param[out] range the range of IDs pinned by this session. Zero if
 	 * there is no active transaction.
 	 * @errors
 	 */
-	int __F(transaction_range_pin)(WT_SESSION* session, uint64_t *range);
+	int __F(transaction_pinned_range)(WT_SESSION* session, uint64_t *range);
 
 	/*! @} */
 };

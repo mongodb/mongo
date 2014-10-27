@@ -772,24 +772,31 @@ err:	API_END_RET(session, ret);
 }
 
 /*
- * __session_transaction_range_pin --
- *	WT_SESSION->transaction_range_pin method.
+ * __session_transaction_pinned_range --
+ *	WT_SESSION->transaction_pinned_range method.
  */
 static int
-__session_transaction_range_pin(WT_SESSION *wt_session, uint64_t *prange)
+__session_transaction_pinned_range(WT_SESSION *wt_session, uint64_t *prange)
 {
 	WT_SESSION_IMPL *session;
 	WT_TXN_STATE *txn_state;
+	uint64_t pinned;
 
 	session = (WT_SESSION_IMPL *)wt_session;
-
-	*prange = 0;
 	txn_state = WT_SESSION_TXN_STATE(session);
-	if (txn_state->snap_min == 0 && txn_state->id == 0)
-		return (0);
 
-	*prange = S2C(session)->txn_global.current -
-	    WT_MIN(txn_state->snap_min, txn_state->id);
+	/* Assign pinned to the lesser of id or snap_min */
+	if (txn_state->snap_min == WT_TXN_NONE)
+		pinned = txn_state->id;
+	else if (txn_state->id == WT_TXN_NONE)
+		pinned = txn_state->snap_min;
+	else
+		pinned = WT_MIN(txn_state->snap_min, txn_state->id);
+
+	if (pinned == WT_TXN_NONE)
+		*prange = 0;
+	else
+		*prange = S2C(session)->txn_global.current - pinned;
 
 	return (0);
 
@@ -941,7 +948,7 @@ __wt_open_session(WT_CONNECTION_IMPL *conn,
 		__session_commit_transaction,
 		__session_rollback_transaction,
 		__session_checkpoint,
-		__session_transaction_range_pin
+		__session_transaction_pinned_range
 	};
 	WT_DECL_RET;
 	WT_SESSION_IMPL *session, *session_ret;
