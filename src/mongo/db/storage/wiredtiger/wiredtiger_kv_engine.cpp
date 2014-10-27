@@ -75,7 +75,7 @@ namespace mongo {
         ss << "cache_size=" << cacheSizeGB << "G,";
         ss << "session_max=20000,";
         ss << "extensions=[local=(entry=index_collator_extension)],";
-        ss << "statistics=(all,clear),";
+        ss << "statistics=(all),";
         ss << "log=(enabled),";
         ss << extraOpenOptions;
         string config = ss.str();
