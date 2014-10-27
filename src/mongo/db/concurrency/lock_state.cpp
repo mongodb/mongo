@@ -577,7 +577,9 @@ namespace mongo {
         // The global lock must have been acquired just once
         stateOut->globalMode = globalRequest->mode;
         invariant(unlock(resourceIdGlobal));
-        invariant(unlock(resourceIdMMAPV1Flush));
+        if (IsForMMAPV1) {
+            invariant(unlock(resourceIdMMAPV1Flush));
+        }
 
         // Next, the non-global locks.
         for (LockRequestsMap::Iterator it = _requests.begin(); !it.finished(); it.next()) {
@@ -608,7 +610,7 @@ namespace mongo {
         // We shouldn't be saving and restoring lock state from inside a WriteUnitOfWork.
         invariant(!inAWriteUnitOfWork());
 
-        lockGlobal(state.globalMode);
+        lockGlobal(state.globalMode); // also handles MMAPV1Flush
 
         std::vector<LockSnapshot::OneLock>::const_iterator it = state.locks.begin();
         for (; it != state.locks.end(); it++) {
@@ -658,6 +660,7 @@ namespace mongo {
 
     template<bool IsForMMAPV1>
     void LockerImpl<IsForMMAPV1>::_yieldFlushLockForMMAPV1() {
+        invariant(IsForMMAPV1);
         if (!inAWriteUnitOfWork()) {
             invariant(unlock(resourceIdMMAPV1Flush));
             invariant(LOCK_OK ==
