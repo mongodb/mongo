@@ -68,14 +68,6 @@ namespace {
                 HostAndPort("node1", 12345));
     }
 
-    TEST_F(ReplCoordTest, StartupWithInvalidLocalConfig) {
-        startCapturingLogMessages();
-        assertStart(ReplicationCoordinator::modeNone,
-                    BSON("_id" << "mySet"), HostAndPort("node1", 12345));
-        stopCapturingLogMessages();
-        ASSERT_EQUALS(1, countLogLinesContaining("configuration does not parse"));
-    }
-
     TEST_F(ReplCoordTest, StartupWithConfigMissingSelf) {
         startCapturingLogMessages();
         assertStart(
