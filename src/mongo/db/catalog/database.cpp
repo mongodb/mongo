@@ -370,7 +370,7 @@ namespace mongo {
         if ( it == _collections.end() )
             return;
 
-        delete it->second; // this also deletes all cursors + runners
+        delete it->second; // this also deletes all cursors + executors
         _collections.erase( it );
     }
 

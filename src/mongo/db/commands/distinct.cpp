@@ -117,7 +117,7 @@ namespace mongo {
                                                 PlanExecutor::YIELD_AUTO,
                                                 &rawExec);
             if (!status.isOK()) {
-                uasserted(17216, mongoutils::str::stream() << "Can't get runner for query "
+                uasserted(17216, mongoutils::str::stream() << "Can't get executor for query "
                               << query << ": " << status.toString());
                 return 0;
             }

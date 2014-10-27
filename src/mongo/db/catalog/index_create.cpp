@@ -128,7 +128,7 @@ namespace mongo {
                     return s;
             }
 
-            // Any foreground indexes make all indexes be build in the foreground.
+            // Any foreground indexes make all indexes be built in the foreground.
             _buildInBackground = (_buildInBackground && info["background"].trueValue());
         }
 
