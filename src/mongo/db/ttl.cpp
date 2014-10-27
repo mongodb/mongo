@@ -160,10 +160,6 @@ namespace mongo {
                     continue;  // skip since collection not found in catalog
                 }
 
-                if (!coll) {
-                    continue;  // skip since collection no longer exists
-                }
-
                 vector<string> indexNames;
                 coll->getAllIndexes( txn, &indexNames );
                 for ( size_t i = 0; i < indexNames.size(); i++ ) {

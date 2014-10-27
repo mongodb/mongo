@@ -38,6 +38,9 @@ namespace mongo {
     public:
         virtual ~KVHeapEngine() { }
 
+        // THe KVDictionaryHeap does not support fine-grained locking.
+        bool supportsDocLocking() const { return false; }
+
         RecoveryUnit* newRecoveryUnit();
 
         Status createKVDictionary( OperationContext* opCtx,

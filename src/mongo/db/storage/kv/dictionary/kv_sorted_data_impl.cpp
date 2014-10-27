@@ -159,7 +159,8 @@ namespace mongo {
         }
     }
 
-    void KVSortedDataImpl::fullValidate(OperationContext* txn, long long* numKeysOut) const {
+    void KVSortedDataImpl::fullValidate(OperationContext* txn, bool full, long long* numKeysOut,
+                                        BSONObjBuilder* output) const {
         if (numKeysOut) {
             *numKeysOut = 0;
             for (boost::scoped_ptr<KVDictionary::Cursor> cursor(_db->getCursor(txn));
@@ -177,13 +178,13 @@ namespace mongo {
     Status KVSortedDataImpl::touch(OperationContext* txn) const {
         // fullValidate iterates over every key, which brings things into memory
         long long numKeys;
-        fullValidate(txn, &numKeys);
+        fullValidate(txn, true, &numKeys, NULL);
         return Status::OK();
     }
 
     long long KVSortedDataImpl::numEntries(OperationContext* txn) const {
         long long numKeys = 0;
-        fullValidate(txn, &numKeys);
+        fullValidate(txn, true, &numKeys, NULL);
         return numKeys;
     }
 

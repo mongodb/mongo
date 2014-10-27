@@ -45,9 +45,6 @@ namespace mongo {
         }
 
         virtual ~KVHeapStorageEngine() { }
-
-        // THe KVDictionaryHeap does not support fine-grained locking.
-        bool supportsDocLocking() const { return false; }
     };
 
     namespace {
