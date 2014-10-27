@@ -772,6 +772,30 @@ err:	API_END_RET(session, ret);
 }
 
 /*
+ * __session_transaction_range_pin --
+ *	WT_SESSION->transaction_range_pin method.
+ */
+static int
+__session_transaction_range_pin(WT_SESSION *wt_session, uint64_t *prange)
+{
+	WT_SESSION_IMPL *session;
+	WT_TXN_STATE *txn_state;
+
+	session = (WT_SESSION_IMPL *)wt_session;
+
+	*prange = 0;
+	txn_state = WT_SESSION_TXN_STATE(session);
+	if (txn_state->snap_min == 0 && txn_state->id == 0)
+		return (0);
+
+	*prange = S2C(session)->txn_global.current -
+	    WT_MIN(txn_state->snap_min, txn_state->id);
+
+	return (0);
+
+}
+
+/*
  * __session_checkpoint --
  *	WT_SESSION->checkpoint method.
  */
@@ -916,7 +940,8 @@ __wt_open_session(WT_CONNECTION_IMPL *conn,
 		__session_begin_transaction,
 		__session_commit_transaction,
 		__session_rollback_transaction,
-		__session_checkpoint
+		__session_checkpoint,
+		__session_transaction_range_pin
 	};
 	WT_DECL_RET;
 	WT_SESSION_IMPL *session, *session_ret;
