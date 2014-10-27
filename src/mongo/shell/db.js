@@ -60,10 +60,10 @@ DB.prototype.runCommand = function( obj, extra ){
 
 DB.prototype._dbCommand = DB.prototype.runCommand;
 
-DB.prototype.adminCommand = function( obj ){
+DB.prototype.adminCommand = function( obj, extra ){
     if ( this._name == "admin" )
-        return this.runCommand( obj );
-    return this.getSiblingDB( "admin" ).runCommand( obj );
+        return this.runCommand( obj, extra );
+    return this.getSiblingDB( "admin" ).runCommand( obj, extra );
 }
 
 DB.prototype._adminCommand = DB.prototype.adminCommand; // alias old name
