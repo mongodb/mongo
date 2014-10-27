@@ -538,6 +538,14 @@ namespace mongo {
             }
             TicketHolderReleaser releaser( &(getManager()->_splitHeuristics._splitTickets) );
 
+            if (!configServer.allUp(true)) {
+                LOG(1) << "not performing auto-split because not all config servers are up";
+
+                // Back off indirectly by resetting _dataWritten.
+                _dataWritten = 0;
+                return false;
+            }
+
             // this is a bit ugly
             // we need it so that mongos blocks for the writes to actually be committed
             // this does mean mongos has more back pressure than mongod alone
@@ -1354,7 +1362,7 @@ namespace mongo {
 
         uassert( 13331 ,  "collection's metadata is undergoing changes. Please try again." , dlk.got() );
 
-        uassert( 10174 ,  "config servers not all up" , configServer.allUp() );
+        uassert(10174, "config servers not all up", configServer.allUp(false));
 
         set<Shard> seen;
 

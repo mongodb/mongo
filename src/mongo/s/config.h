@@ -240,8 +240,16 @@ namespace mongo {
          */
         bool checkHostsAreUnique( const std::vector<std::string>& configHosts, std::string* errmsg );
 
-        bool allUp();
-        bool allUp( std::string& errmsg );
+        /**
+         * Checks if all config servers are up.
+         *
+         * If localCheckOnly is true, only check if the socket is still open with no errors.
+         * Otherwise, also send a getLastError command with recv timeout.
+         *
+         * TODO: fix this - SERVER-15811
+         */
+        bool allUp(bool localCheckOnly);
+        bool allUp(bool localCheckOnly, std::string& errmsg);
 
         int dbConfigVersion();
         int dbConfigVersion( DBClientBase& conn );
