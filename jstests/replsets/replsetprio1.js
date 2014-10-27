@@ -41,5 +41,4 @@
         assert(master.getDB("foo").bar.findOne({i:i}) != null, 'checking '+i);
         assert(master.getDB("bar").baz.findOne({i:i}) != null, 'checking '+i);
     }
-// Note: SERVER-15781 disabled this test.
-}/*()*/);
+}());

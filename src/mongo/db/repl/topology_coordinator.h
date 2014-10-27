@@ -145,8 +145,11 @@ namespace repl {
 
         /**
          * Sets the earliest time the current node will stand for election to "newTime".
+         *
+         * Until this time, while the node may report itself as electable, it will not stand
+         * for election.
          */
-        virtual void setStepDownTime(Date_t newTime) = 0;
+        virtual void setElectionSleepUntil(Date_t newTime) = 0;
 
         /**
          * Sets the reported mode of this node to one of RS_SECONDARY, RS_STARTUP2, RS_ROLLBACK or

@@ -133,7 +133,7 @@ namespace repl {
         virtual void clearSyncSourceBlacklist();
         virtual bool shouldChangeSyncSource(const HostAndPort& currentSource) const;
         virtual bool becomeCandidateIfStepdownPeriodOverAndSingleNodeSet(Date_t now);
-        virtual void setStepDownTime(Date_t newTime);
+        virtual void setElectionSleepUntil(Date_t newTime);
         virtual void setFollowerMode(MemberState::MS newMode);
         virtual void adjustMaintenanceCountBy(int inc);
         virtual void prepareSyncFromResponse(const ReplicationExecutor::CallbackData& data,
@@ -352,6 +352,9 @@ namespace repl {
 
         // Time when stepDown command expires
         Date_t _stepDownUntil;
+
+        // A time before which this node will not stand for election.
+        Date_t _electionSleepUntil;
 
         // The number of calls we have had to enter maintenance mode
         int _maintenanceModeCalls;

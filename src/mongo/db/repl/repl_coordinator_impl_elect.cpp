@@ -169,7 +169,7 @@ namespace {
                     const Date_t nextCandidateTime = now + ms;
                     log() << "replSet possible election tie; sleeping " << ms << "ms until " <<
                         dateToISOStringLocal(nextCandidateTime);
-                    _topCoord->setStepDownTime(nextCandidateTime);
+                    _topCoord->setElectionSleepUntil(nextCandidateTime);
                     _replExecutor.scheduleWorkAt(
                             nextCandidateTime,
                             stdx::bind(&ReplicationCoordinatorImpl::_recoverFromElectionTie,
@@ -237,7 +237,7 @@ namespace {
             const Date_t now(_replExecutor.now());
             const Date_t nextCandidateTime = now + ms;
             log() << "waiting until " << nextCandidateTime << " before standing for election again";
-            _topCoord->setStepDownTime(nextCandidateTime);
+            _topCoord->setElectionSleepUntil(nextCandidateTime);
             _replExecutor.scheduleWorkAt(
                 nextCandidateTime,
                 stdx::bind(&ReplicationCoordinatorImpl::_recoverFromElectionTie,
