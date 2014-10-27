@@ -1366,7 +1366,7 @@ struct __wt_session {
 	 * ID needed for the active transaction in this session, compared
 	 * to the newest transaction in the system.
 	 *
-	 * @snippet ex_all.c Transaction range pin
+	 * @snippet ex_all.c transaction pinned range
 	 *
 	 * @param session the session handle
 	 * @param[out] range the range of IDs pinned by this session. Zero if

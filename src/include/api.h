@@ -104,7 +104,7 @@
 #define	SESSION_API_CALL(s, n, config, cfg)				\
 	API_CALL(s, session, n, NULL, NULL, config, cfg)
 
-#define	SESSION_API_CALL_NO_CONF(s, n)					\
+#define	SESSION_API_CALL_NOCONF(s, n)					\
 	API_CALL_NOCONF(s, session, n, NULL, NULL)
 
 #define	SESSION_TXN_API_CALL(s, n, config, cfg)				\
