@@ -504,8 +504,7 @@ namespace {
                                 str::stream() << "legacy writeOps not longer supported for "
                                               << "versioned connections, ns: " << string(ns)
                                               << ", op: " << opToString(op)
-                                              << ", remote: " << remote.toString()
-                                              << ", serverId: " << connInfo->getID(),
+                                              << ", remote: " << remote.toString(),
                                 connInfo == NULL);
                     }
 
