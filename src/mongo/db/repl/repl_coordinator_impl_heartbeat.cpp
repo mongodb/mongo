@@ -354,47 +354,75 @@ namespace {
     }
 
     void ReplicationCoordinatorImpl::_heartbeatReconfigStore(const ReplicaSetConfig& newConfig) {
-        {
-            boost::scoped_ptr<OperationContext> txn(_externalState->createOperationContext());
-            Status status = _externalState->storeLocalConfigDocument(txn.get(), newConfig.toBSON());
-            if (!status.isOK()) {
-                error() << "Ignoring new configuration in heartbeat response because we failed to"
-                    " write it to stable storage; " << status;
-                boost::lock_guard<boost::mutex> lk(_mutex);
-                invariant(_rsConfigState == kConfigHBReconfiguring);
-                if (_inShutdown) {
+        class StoreThreadGuard {
+        public:
+            StoreThreadGuard(boost::unique_lock<boost::mutex>* lk,
+                             boost::scoped_ptr<boost::thread>* thread,
+                             bool* inShutdown) :
+                _lk(lk),
+                _thread(thread),
+                _inShutdown(inShutdown) {}
+            ~StoreThreadGuard() {
+                if (!_lk->owns_lock()) {
+                    _lk->lock();
+                }
+                if (*_inShutdown) {
                     return;
                 }
-
-                if (_rsConfig.isInitialized()) {
-                    _setConfigState_inlock(kConfigSteady);
-                }
-                else {
-                    // This is the _only_ case where we can return to kConfigUninitialized from
-                    // kConfigHBReconfiguring.
-                    _setConfigState_inlock(kConfigUninitialized);
-                }
-
-                _heartbeatReconfigThread->detach();
-                _heartbeatReconfigThread.reset(NULL);
-                return;
+                _thread->get()->detach();
+                _thread->reset(NULL);
             }
-        }
+
+        private:
+            boost::unique_lock<boost::mutex>* const _lk;
+            boost::scoped_ptr<boost::thread>* const _thread;
+            bool* const _inShutdown;
+        };
+
+        boost::unique_lock<boost::mutex> lk(_mutex, boost::defer_lock_t());
+        StoreThreadGuard guard(&lk, &_heartbeatReconfigThread, &_inShutdown);
+
         const StatusWith<int> myIndex = validateConfigForHeartbeatReconfig(
                 _externalState.get(),
                 newConfig);
 
-        boost::lock_guard<boost::mutex> lk(_mutex);
-        if (_inShutdown) {
+        if (myIndex.getStatus() == ErrorCodes::NodeNotFound) {
+            lk.lock();
+            // If this node absent in newConfig, and this node was not previously initialized,
+            // return to kConfigUninitialized immediately, rather than storing the config and
+            // transitioning into the RS_REMOVED state.  See SERVER-15740.
+            if (!_rsConfig.isInitialized()) {
+                invariant(_rsConfigState == kConfigHBReconfiguring);
+                LOG(1) << "Ignoring new configuration in heartbeat response because we are "
+                    "uninitialized and not a member of the new configuration";
+                _setConfigState_inlock(kConfigUninitialized);
+                return;
+            }
+            lk.unlock();
+        }
+
+        boost::scoped_ptr<OperationContext> txn(_externalState->createOperationContext());
+        Status status = _externalState->storeLocalConfigDocument(txn.get(), newConfig.toBSON());
+
+        lk.lock();
+        if (!status.isOK()) {
+            error() << "Ignoring new configuration in heartbeat response because we failed to"
+                " write it to stable storage; " << status;
+            invariant(_rsConfigState == kConfigHBReconfiguring);
+            if (_rsConfig.isInitialized()) {
+                _setConfigState_inlock(kConfigSteady);
+            }
+            else {
+                _setConfigState_inlock(kConfigUninitialized);
+            }
             return;
         }
+
         _replExecutor.scheduleWork(stdx::bind(&ReplicationCoordinatorImpl::_heartbeatReconfigFinish,
                                               this,
                                               stdx::placeholders::_1,
                                               newConfig,
                                               myIndex));
-        _heartbeatReconfigThread->detach();
-        _heartbeatReconfigThread.reset(NULL);
     }
 
     void ReplicationCoordinatorImpl::_heartbeatReconfigFinish(
