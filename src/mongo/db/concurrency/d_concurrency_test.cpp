@@ -90,27 +90,46 @@ namespace mongo {
         }
     }
 
-    TEST(DConcurrency, readlocktryTimeoutDueToFlushLock) {
+    TEST(DConcurrency, readlocktryNoTimeoutDueToFlushLockS) {
         MMAPV1LockerImpl ls(1);
         AutoAcquireFlushLockForMMAPV1Commit autoFlushLock(&ls);
 
-        {
-            MMAPV1LockerImpl lsTry(2);
-            readlocktry lockTry(&lsTry, 1);
+        MMAPV1LockerImpl lsTry(2);
+        readlocktry lockTry(&lsTry, 1);
 
-            ASSERT(!lockTry.got());
-        }
+        ASSERT(lockTry.got());
     }
 
-    TEST(DConcurrency, writelocktryTimeoutDueToFlushLock) {
+    TEST(DConcurrency, writelocktryTimeoutDueToFlushLockS) {
         MMAPV1LockerImpl ls(1);
         AutoAcquireFlushLockForMMAPV1Commit autoFlushLock(&ls);
 
-        {
-            MMAPV1LockerImpl lsTry(2);
-            writelocktry lockTry(&lsTry, 1);
-            ASSERT(!lockTry.got());
-        }
+        MMAPV1LockerImpl lsTry(2);
+        writelocktry lockTry(&lsTry, 1);
+
+        ASSERT(!lockTry.got());
+    }
+
+    TEST(DConcurrency, readlocktryTimeoutDueToFlushLockX) {
+        MMAPV1LockerImpl ls(1);
+        AutoAcquireFlushLockForMMAPV1Commit autoFlushLock(&ls);
+        autoFlushLock.upgradeFlushLockToExclusive();
+
+        MMAPV1LockerImpl lsTry(2);
+        readlocktry lockTry(&lsTry, 1);
+
+        ASSERT(!lockTry.got());
+    }
+
+    TEST(DConcurrency, writelocktryTimeoutDueToFlushLockX) {
+        MMAPV1LockerImpl ls(1);
+        AutoAcquireFlushLockForMMAPV1Commit autoFlushLock(&ls);
+        autoFlushLock.upgradeFlushLockToExclusive();
+
+        MMAPV1LockerImpl lsTry(2);
+        writelocktry lockTry(&lsTry, 1);
+
+        ASSERT(!lockTry.got());
     }
 
     TEST(DConcurrency, TempReleaseGlobalWrite) {

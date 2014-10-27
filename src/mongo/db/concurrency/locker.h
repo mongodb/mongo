@@ -136,6 +136,11 @@ namespace mongo {
                                 bool checkDeadlock = false) = 0;
 
         /**
+         * Downgrades the specified resource's lock mode without changing the reference count.
+         */
+        virtual void downgrade(const ResourceId& resId, LockMode newMode) = 0;
+
+        /**
          * Releases a lock previously acquired through a lock call. It is an error to try to
          * release lock which has not been previously acquired (invariant violation).
          *

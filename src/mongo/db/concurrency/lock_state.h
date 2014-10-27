@@ -109,6 +109,8 @@ namespace mongo {
                                 unsigned timeoutMs = UINT_MAX,
                                 bool checkDeadlock = false);
 
+        virtual void downgrade(const ResourceId& resId, LockMode newMode);
+
         virtual bool unlock(const ResourceId& resId);
 
         virtual LockMode getLockMode(const ResourceId& resId) const;
@@ -141,13 +143,6 @@ namespace mongo {
          * additional lookups during unlockAll.
          */
         bool _unlockImpl(LockRequestsMap::Iterator& it);
-
-        /**
-         * Temporarily yields the flush lock, if not in a write unit of work so that the commit
-         * thread can take turn. This is called automatically at each lock acquisition point, but
-         * can also be called more frequently than that if need be.
-         */
-        void _yieldFlushLockForMMAPV1();
 
         /**
          * MMAP V1 locking code yields and re-acquires the flush lock occasionally in order to
@@ -268,10 +263,9 @@ namespace mongo {
 
 
     /**
-     * The resourceIdMMAPV1Flush lock is used to implement the MMAP V1 storage engine durability
-     * system synchronization. This is how it works :
+     * This explains how the MMAP V1 durability system is implemented.
      *
-     * Every server operation (OperationContext), which calls lockGlobal as the first locking
+     * Every server operation (OperationContext), must call Locker::lockGlobal as the first lock
      * action (it is illegal to acquire any other locks without calling this first). This action
      * acquires the global and flush locks in the appropriate modes (IS for read operations, IX
      * for write operations). Having the flush lock in one of these modes indicates to the flush
@@ -279,24 +273,37 @@ namespace mongo {
      *
      * Whenever the flush thread(dur.cpp) activates, it goes through the following steps :
      *
-     *  - Acquire the flush lock in S - mode by creating a stack instance of
-     *      AutoAcquireFlushLockForMMAPV1Commit. This waits till all write activity on the system
-     *      completes and does not allow new write operations to start. Readers may still proceed.
+     * Acquire the flush lock in S mode using AutoAcquireFlushLockForMMAPV1Commit. This waits until
+     * all current write activity on the system completes and does not allow any new operations to
+     * start.
      *
-     * - Once the flush lock is granted in S - mode, the flush thread writes the journal entries
-     *      to disk and applies them to the shared view. After that, it upgrades the S - lock to X
-     *      and remaps the private view.
+     * Once the S lock is granted, the flush thread writes the journal entries to disk (it is
+     * guaranteed that there will not be any modifications) and applies them to the shared view.
      *
-     * NOTE: There should be only one usage of this class and this should be in dur.cpp.
+     * After that, it upgrades the S lock to X and remaps the private view.
      *
+     * NOTE: There should be only one usage of this class and this should be in dur.cpp
      */
     class AutoAcquireFlushLockForMMAPV1Commit {
     public:
         AutoAcquireFlushLockForMMAPV1Commit(Locker* locker);
         ~AutoAcquireFlushLockForMMAPV1Commit();
 
+        /**
+         * We need the exclusive lock in order to do the shared view remap.
+         */
+        void upgradeFlushLockToExclusive();
+
+        /**
+         * Allows the acquired flush lock to be prematurely released. This is helpful for the case
+         * where we know that we won't be doing a remap after gathering the write intents, so the
+         * rest can be done outside of flush lock.
+         */
+        void release();
+
     private:
         MMAPV1LockerImpl* _locker;
+        bool _isReleased;;
     };
 
 
