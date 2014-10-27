@@ -804,8 +804,6 @@ __session_transaction_pinned_range(WT_SESSION *wt_session, uint64_t *prange)
 		*prange = S2C(session)->txn_global.current - pinned;
 
 err:	API_END_RET(session, ret);
-	return (ret);
-
 }
 
 /*
