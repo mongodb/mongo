@@ -172,7 +172,7 @@ __wt_writelock(WT_SESSION_IMPL *session, WT_RWLOCK *rwlock)
 
 	/*
 	 * Possibly wrap: if we have more than 64K lockers waiting, the count
-	 * of writers will wrap and two lockers will simultaneoulsy be granted
+	 * of writers will wrap and two lockers will simultaneously be granted
 	 * the write lock.
 	 */
 	l = &rwlock->rwlock;
