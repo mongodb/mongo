@@ -136,6 +136,63 @@ namespace {
         exitNetwork();
     }
 
+    TEST_F(ReplCoordHBTest, DoNotJoinReplSetIfNotAMember) {
+        // Tests that a node in RS_STARTUP will not transition to RS_REMOVED if it receives a
+        // configuration that does not contain it.
+        logger::globalLogDomain()->setMinimumLoggedSeverity(logger::LogSeverity::Debug(3));
+        ReplicaSetConfig rsConfig = assertMakeRSConfig(
+                BSON("_id" << "mySet" <<
+                     "version" << 3 <<
+                     "members" << BSON_ARRAY(BSON("_id" << 1 << "host" << "h1:1") <<
+                                             BSON("_id" << 2 << "host" << "h2:1") <<
+                                             BSON("_id" << 3 << "host" << "h3:1"))));
+        init("mySet");
+        addSelf(HostAndPort("h4", 1));
+        const Date_t startDate = getNet()->now();
+        start();
+        enterNetwork();
+        assertMemberState(MemberState::RS_STARTUP);
+        NetworkInterfaceMock* net = getNet();
+        ASSERT_FALSE(net->hasReadyRequests());
+        exitNetwork();
+        receiveHeartbeatFrom(rsConfig, 1, HostAndPort("h1", 1));
+
+        enterNetwork();
+        NetworkInterfaceMock::NetworkOperationIterator noi = net->getNextReadyRequest();
+        const ReplicationExecutor::RemoteCommandRequest& request = noi->getRequest();
+        ASSERT_EQUALS(HostAndPort("h1", 1), request.target);
+        ReplSetHeartbeatArgs hbArgs;
+        ASSERT_OK(hbArgs.initialize(request.cmdObj));
+        ASSERT_EQUALS("mySet", hbArgs.getSetName());
+        ASSERT_EQUALS(-2, hbArgs.getConfigVersion());
+        ReplSetHeartbeatResponse hbResp;
+        hbResp.setSetName("mySet");
+        hbResp.setState(MemberState::RS_PRIMARY);
+        hbResp.noteReplSet();
+        hbResp.setVersion(rsConfig.getConfigVersion());
+        hbResp.setConfig(rsConfig);
+        BSONObjBuilder responseBuilder;
+        responseBuilder << "ok" << 1;
+        hbResp.addToBSON(&responseBuilder);
+        net->scheduleResponse(noi, startDate + 200, makeResponseStatus(responseBuilder.obj()));
+        net->runUntil(startDate + 2200);
+        ASSERT_EQUALS(startDate + 2200, net->now());
+
+        // Because the new config is stored using an out-of-band thread, we need to perform some
+        // extra synchronization to let the executor finish the heartbeat reconfig.  We know that
+        // after the out-of-band thread completes, it schedules new heartbeats.  We assume that no
+        // other network operations get scheduled during or before the reconfig, though this may
+        // cease to be true in the future.
+        noi = net->getNextReadyRequest();
+
+        assertMemberState(MemberState::RS_STARTUP);
+        OperationContextNoop txn;
+
+        StatusWith<BSONObj> loadedConfig(getExternalState()->loadLocalConfigDocument(&txn));
+        ASSERT_NOT_OK(loadedConfig.getStatus()) << loadedConfig.getValue();
+        exitNetwork();
+    }
+
     TEST_F(ReplCoordHBTest, NotYetInitializedConfigStateEarlyReturn) {
         // ensure that if we've yet to receive an initial config, we return NotYetInitialized
         init("mySet");
