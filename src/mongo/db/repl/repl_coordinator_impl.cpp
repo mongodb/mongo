@@ -191,10 +191,11 @@ namespace {
         ReplicaSetConfig localConfig;
         Status status = localConfig.initialize(cfg.getValue());
         if (!status.isOK()) {
-            warning() << "Locally stored replica set configuration does not parse; "
-                "waiting for rsInitiate or remote heartbeat; Got " << status << " while parsing " <<
-                cfg.getValue();
-            return true;
+            error() << "Locally stored replica set configuration does not parse; See "
+                    "http://www.mongodb.org/dochub/core/recover-replica-set-from-invalid-config "
+                    "for information on how to recover from this. Got \"" <<
+                    status << "\" while parsing " << cfg.getValue();
+            fassertFailedNoTrace(28542);
         }
 
         StatusWith<OpTime> lastOpTimeStatus = _externalState->loadLastOpTime(txn);
@@ -232,10 +233,20 @@ namespace {
                                                            _rsConfig,
                                                            localConfig);
         if (!myIndex.isOK()) {
-            warning() << "Locally stored replica set configuration not valid for current node; "
-                "waiting for reconfig or remote heartbeat; Got " << myIndex.getStatus() <<
-                " while validating " << localConfig.toBSON();
-            myIndex = StatusWith<int>(-1);
+            if (myIndex.getStatus() == ErrorCodes::NodeNotFound ||
+                    myIndex.getStatus() == ErrorCodes::DuplicateKey) {
+                warning() << "Locally stored replica set configuration does not have a valid entry "
+                        "for the current node; waiting for reconfig or remote heartbeat; Got \"" <<
+                        myIndex.getStatus() << "\" while validating " << localConfig.toBSON();
+                myIndex = StatusWith<int>(-1);
+            }
+            else {
+                error() << "Locally stored replica set configuration is invalid; See "
+                        "http://www.mongodb.org/dochub/core/recover-replica-set-from-invalid-config"
+                        " for information on how to recover from this. Got \"" <<
+                        myIndex.getStatus() << "\" while validating " << localConfig.toBSON();
+                fassertFailedNoTrace(28541);
+            }
         }
 
         if (localConfig.getReplSetName() != _settings.ourSetName()) {
