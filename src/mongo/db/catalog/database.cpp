@@ -510,9 +510,7 @@ namespace mongo {
                 Database* db = dbHolder().get(txn, *i);
                 invariant(db);
 
-                WriteUnitOfWork wunit(txn);
                 dropDatabase(txn, db);
-                wunit.commit();
             }
         }
     }

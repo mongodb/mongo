@@ -374,7 +374,9 @@ namespace mongo {
             const unsigned remainingTimeMs =
                 elapsedTimeMs < timeoutMs ? (timeoutMs - elapsedTimeMs) : 0;
 
-            LockResult flushLockResult = lock(resourceIdMMAPV1Flush, mode, remainingTimeMs);
+            LockResult flushLockResult =
+                lock(resourceIdMMAPV1Flush, _getModeForMMAPV1FlushLock(), remainingTimeMs);
+
             if (flushLockResult != LOCK_OK) {
                 invariant(flushLockResult == LOCK_TIMEOUT);
                 invariant(unlock(resourceIdGlobal));
@@ -505,8 +507,7 @@ namespace mongo {
             if (unlockedFlushLock) {
                 // We cannot obey the timeout here, because it is not correct to return from
                 // the lock request with the flush lock released.
-                invariant(LOCK_OK ==
-                    lock(resourceIdMMAPV1Flush, getLockMode(resourceIdGlobal), UINT_MAX));
+                invariant(LOCK_OK == lock(resourceIdMMAPV1Flush, _getModeForMMAPV1FlushLock()));
             }
         }
 
@@ -641,8 +642,6 @@ namespace mongo {
 
     template<bool IsForMMAPV1>
     bool LockerImpl<IsForMMAPV1>::_unlockImpl(LockRequestsMap::Iterator& it) {
-        invariant(it->mode != MODE_NONE);
-
         if (inAWriteUnitOfWork() && shouldDelayUnlock(it.key(), it->mode)) {
             _resourcesToUnlockAtEndOfUnitOfWork.push(it.key());
             return false;
@@ -664,30 +663,51 @@ namespace mongo {
         if (!inAWriteUnitOfWork()) {
             invariant(unlock(resourceIdMMAPV1Flush));
             invariant(LOCK_OK ==
-                lock(resourceIdMMAPV1Flush, getLockMode(resourceIdGlobal), UINT_MAX));
+                lock(resourceIdMMAPV1Flush, _getModeForMMAPV1FlushLock(), UINT_MAX));
         }
     }
 
+    template<bool IsForMMAPV1>
+    LockMode LockerImpl<IsForMMAPV1>::_getModeForMMAPV1FlushLock() const {
+        invariant(IsForMMAPV1);
+
+        LockMode mode = getLockMode(resourceIdGlobal);
+        switch (mode) {
+        case MODE_X:
+        case MODE_IX:
+            return MODE_IX;
+        case MODE_S:
+        case MODE_IS:
+            return MODE_IS;
+        default:
+            invariant(false);
+            return MODE_NONE;
+        }
+    }
 
     //
     // Auto classes
     //
 
     AutoYieldFlushLockForMMAPV1Commit::AutoYieldFlushLockForMMAPV1Commit(Locker* locker)
-        : _locker(locker) {
+        : _locker(static_cast<MMAPV1LockerImpl*>(locker)) {
+
+        // Explicit yielding of the flush lock should happen only at global synchronization points
+        // such as database drop. There should not be any active writes at these points.
+        invariant(!_locker->inAWriteUnitOfWork());
 
         invariant(_locker->unlock(resourceIdMMAPV1Flush));
     }
 
     AutoYieldFlushLockForMMAPV1Commit::~AutoYieldFlushLockForMMAPV1Commit() {
         invariant(LOCK_OK == _locker->lock(resourceIdMMAPV1Flush,
-                                           _locker->getLockMode(resourceIdGlobal),
+                                           _locker->_getModeForMMAPV1FlushLock(),
                                            UINT_MAX));
     }
 
 
     AutoAcquireFlushLockForMMAPV1Commit::AutoAcquireFlushLockForMMAPV1Commit(Locker* locker)
-        : _locker(locker) {
+        : _locker(static_cast<MMAPV1LockerImpl*>(locker)) {
 
         invariant(LOCK_OK == _locker->lock(resourceIdMMAPV1Flush, MODE_X, UINT_MAX));
     }

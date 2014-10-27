@@ -128,6 +128,8 @@ namespace mongo {
 
     private:
 
+        friend class AutoYieldFlushLockForMMAPV1Commit;
+
         typedef FastMapNoAlloc<ResourceId, LockRequest, 16> LockRequestsMap;
 
 
@@ -143,6 +145,13 @@ namespace mongo {
          * can also be called more frequently than that if need be.
          */
         void _yieldFlushLockForMMAPV1();
+
+        /**
+         * MMAP V1 locking code yields and re-acquires the flush lock occasionally in order to
+         * allow the flush thread proceed. This call returns in what mode the flush lock should be
+         * acquired. It is based on the type of the operation (IS for readers, IX for writers).
+         */
+        LockMode _getModeForMMAPV1FlushLock() const;
 
 
         // Used to disambiguate different lockers
@@ -252,7 +261,7 @@ namespace mongo {
         ~AutoYieldFlushLockForMMAPV1Commit();
 
     private:
-        Locker* _locker;
+        MMAPV1LockerImpl* _locker;
     };
 
 
@@ -281,11 +290,11 @@ namespace mongo {
      */
     class AutoAcquireFlushLockForMMAPV1Commit {
     public:
-        explicit AutoAcquireFlushLockForMMAPV1Commit(Locker* locker);
+        AutoAcquireFlushLockForMMAPV1Commit(Locker* locker);
         ~AutoAcquireFlushLockForMMAPV1Commit();
 
     private:
-        Locker* _locker;
+        MMAPV1LockerImpl* _locker;
     };
 
 

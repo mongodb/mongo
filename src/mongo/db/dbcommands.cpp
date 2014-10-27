@@ -198,7 +198,6 @@ namespace mongo {
                 // and that may need a global lock.
                 Lock::GlobalWrite lk(txn->lockState());
                 Client::Context context(txn, dbname);
-                WriteUnitOfWork wunit(txn);
 
                 log() << "dropDatabase " << dbname << " starting" << endl;
 
@@ -207,8 +206,11 @@ namespace mongo {
 
                 log() << "dropDatabase " << dbname << " finished";
 
-                if (!fromRepl)
-                    repl::logOp(txn, "c",(dbname + ".$cmd").c_str(), cmdObj);
+                WriteUnitOfWork wunit(txn);
+
+                if (!fromRepl) {
+                    repl::logOp(txn, "c", (dbname + ".$cmd").c_str(), cmdObj);
+                }
 
                 wunit.commit();
             }
