@@ -317,9 +317,12 @@ namespace mongo {
             bob->appendBool("isMultiKey", spec->isMultiKey);
             bob->append("direction", spec->direction > 0 ? "forward" : "backward");
 
-            // Bounds can get large. Truncate to 1 MB.
-            static const int kMaxBoundsSize = 1024 * 1024;
-            bob->append("indexBounds", spec->indexBoundsVerbose.substr(0, kMaxBoundsSize));
+            if ((topLevelBob->len() + spec->indexBounds.objsize()) > kMaxStatsBSONSize) {
+                bob->append("warning", "index bounds omitted due to BSON size limit");
+            }
+            else {
+                bob->append("indexBounds", spec->indexBounds);
+            }
 
             if (verbosity >= ExplainCommon::EXEC_STATS) {
                 bob->appendNumber("keysExamined", spec->keysExamined);

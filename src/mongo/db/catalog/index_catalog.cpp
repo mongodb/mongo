@@ -570,7 +570,8 @@ namespace {
 
                 // Index already exists with the same options, so no need to build a new
                 // one (not an error). Most likely requested by a client using ensureIndex.
-                return Status( ErrorCodes::IndexAlreadyExists, name );
+                return Status( ErrorCodes::IndexAlreadyExists, str::stream() << 
+                               "index already exists: " << name );
             }
         }
 
@@ -589,7 +590,8 @@ namespace {
                                    str::stream() << "Index with pattern: " << key
                                    << " already exists with different options" );
 
-                return Status( ErrorCodes::IndexAlreadyExists, name );
+                return Status( ErrorCodes::IndexAlreadyExists, str::stream() << 
+                               "index already exists: " << name );
             }
         }
 

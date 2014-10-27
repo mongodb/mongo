@@ -177,6 +177,13 @@ namespace mongo {
             entry = it->second;
         }
 
+        // This is called outside of a WUOW since MMAPv1 has unfortunate behavior around dropping
+        // databases. We need to create one here since we want db dropping to all-or-nothing
+        // wherever possible. Eventually we want to move this up so that it can include the logOp
+        // inside of the WUOW, but that would require making DB dropping happen inside the Dur
+        // system for MMAPv1.
+        WriteUnitOfWork wuow(txn);
+
         std::list<std::string> toDrop;
         entry->getCollectionNamespaces( &toDrop );
 
@@ -193,6 +200,8 @@ namespace mongo {
             txn->recoveryUnit()->registerChange(new RemoveDBChange(this, db, entry));
             _dbs.erase( db.toString() );
         }
+
+        wuow.commit();
         return Status::OK();
     }
 
