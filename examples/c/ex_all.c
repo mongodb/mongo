@@ -740,8 +740,9 @@ transaction_ops(WT_CONNECTION *conn, WT_SESSION *session)
 
 	{
 	/*! [transaction pinned range] */
-	/* Check the range of transaction ID are pinned by a session. */
+	/* Check the transaction ID range pinned by the session handle. */
 	uint64_t range;
+
 	ret = session->transaction_pinned_range(session, &range);
 	/*! [transaction pinned range] */
 	}
