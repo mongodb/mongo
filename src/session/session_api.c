@@ -786,13 +786,12 @@ __session_transaction_pinned_range(WT_SESSION *wt_session, uint64_t *prange)
 	txn_state = WT_SESSION_TXN_STATE(session);
 
 	/* Assign pinned to the lesser of id or snap_min */
-	if (txn_state->snap_min == WT_TXN_NONE)
+	if (txn_state->snap_min == WT_TXN_NONE ||
+	    TXNID_LT(txn_state->id, txn_state->snap_min))
 		pinned = txn_state->id;
-	else if (txn_state->id == WT_TXN_NONE)
-		pinned = txn_state->snap_min;
 	else
-		pinned = WT_MIN(txn_state->snap_min, txn_state->id);
-
+		pinned = txn_state->snap_min;
+	
 	if (pinned == WT_TXN_NONE)
 		*prange = 0;
 	else
