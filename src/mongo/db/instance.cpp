@@ -91,6 +91,19 @@ namespace mongo {
 
     using logger::LogComponent;
 
+namespace {
+    inline LogComponent logComponentForOp(int op) {
+        switch (op) {
+        case dbInsert:
+        case dbUpdate:
+        case dbDelete:
+            return LogComponent::kWrites;
+        default:
+            return LogComponent::kQuery;
+        }
+    }
+}  // namespace
+
     // for diaglog
     inline void opread(Message& m) {
         if (_diaglog.getLevel() & 2) {
@@ -515,14 +528,14 @@ namespace mongo {
              }
             catch (const UserException& ue) {
                 setLastError(ue.getCode(), ue.getInfo().msg.c_str());
-                MONGO_LOG_COMPONENT(3, LogComponent::kQuery)
+                MONGO_LOG_COMPONENT(3, logComponentForOp(op))
                        << " Caught Assertion in " << opToString(op) << ", continuing "
                        << ue.toString() << endl;
                 debug.exceptionInfo = ue.getInfo();
             }
             catch (const AssertionException& e) {
                 setLastError(e.getCode(), e.getInfo().msg.c_str());
-                MONGO_LOG_COMPONENT(3, LogComponent::kQuery)
+                MONGO_LOG_COMPONENT(3, logComponentForOp(op))
                        << " Caught Assertion in " << opToString(op) << ", continuing "
                        << e.toString() << endl;
                 debug.exceptionInfo = e.getInfo();
@@ -536,18 +549,18 @@ namespace mongo {
         logThreshold += currentOp.getExpectedLatencyMs();
 
         if ( shouldLog || debug.executionTime > logThreshold ) {
-            MONGO_LOG_COMPONENT(0, LogComponent::kQuery)
+            MONGO_LOG_COMPONENT(0, logComponentForOp(op))
                     << debug.report( currentOp ) << endl;
         }
 
         if ( currentOp.shouldDBProfile( debug.executionTime ) ) {
             // performance profiling is on
             if (txn->lockState()->hasAnyReadLock()) {
-                MONGO_LOG_COMPONENT(1, LogComponent::kQuery)
+                MONGO_LOG_COMPONENT(1, logComponentForOp(op))
                         << "note: not profiling because recursive read lock" << endl;
             }
             else if ( lockedForWriting() ) {
-                MONGO_LOG_COMPONENT(1, LogComponent::kQuery)
+                MONGO_LOG_COMPONENT(1, logComponentForOp(op))
                         << "note: not profiling because doing fsync+lock" << endl;
             }
             else {
@@ -645,12 +658,12 @@ namespace mongo {
             }
             catch ( const DeadLockException& dle ) {
                 if ( multi ) {
-                    log() << "got deadlock during multi update, aborting";
+                    log(LogComponent::kWrites) << "got deadlock during multi update, aborting";
                     throw;
                 }
                 else {
-                    log() << "got deadlock doing update on " << ns
-                          << ", attempt: " << attempt++ << " retrying";
+                    log(LogComponent::kWrites) << "got deadlock doing update on " << ns
+                                               << ", attempt: " << attempt++ << " retrying";
                 }
             }
         }
@@ -720,8 +733,8 @@ namespace mongo {
                 return;
             }
             catch ( const DeadLockException& dle ) {
-                log() << "got deadlock doing insert on " << ns
-                      << ", attempt: " << attempt++ << " retrying";
+                log(LogComponent::kWrites) << "got deadlock doing delete on " << ns
+                                           << ", attempt: " << attempt++ << " retrying";
             }
         }
     }
