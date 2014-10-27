@@ -69,7 +69,7 @@ int
 __wt_try_readlock(WT_SESSION_IMPL *session, WT_RWLOCK *rwlock)
 {
 	wt_rwlock_t *l;
-	uint32_t old, new, pad, users, writers;
+	uint64_t old, new, pad, users, writers;
 
 	WT_RET(__wt_verbose(
 	    session, WT_VERB_MUTEX, "rwlock: try_readlock %s", rwlock->name));
@@ -79,9 +79,9 @@ __wt_try_readlock(WT_SESSION_IMPL *session, WT_RWLOCK *rwlock)
 	pad = l->s.pad;
 	users = l->s.users;
 	writers = l->s.writers;
-	old = (pad << 24) + (users << 16) + (users << 8) + writers;
-	new = (pad << 24) + ((users + 1) << 16) + ((users + 1) << 8) + writers;
-	return (WT_ATOMIC_CAS_VAL4(l->u, old, new) == old ? 0 : EBUSY);
+	old = (pad << 48) + (users << 32) + (users << 16) + writers;
+	new = (pad << 48) + ((users + 1) << 32) + ((users + 1) << 16) + writers;
+	return (WT_ATOMIC_CAS_VAL8(l->u, old, new) == old ? 0 : EBUSY);
 }
 
 /*
@@ -92,16 +92,16 @@ int
 __wt_readlock(WT_SESSION_IMPL *session, WT_RWLOCK *rwlock)
 {
 	wt_rwlock_t *l;
-	uint32_t me;
-	uint8_t val;
+	uint64_t me;
+	uint16_t val;
 
 	WT_RET(__wt_verbose(
 	    session, WT_VERB_MUTEX, "rwlock: readlock %s", rwlock->name));
 	WT_STAT_FAST_CONN_INCR(session, rwlock_read);
 
 	l = &rwlock->rwlock;
-	me = WT_ATOMIC_FETCH_ADD4(l->u, 1 << 16);
-	val = (uint8_t)(me >> 16);
+	me = WT_ATOMIC_FETCH_ADD8(l->u, (uint64_t)1 << 32);
+	val = (uint16_t)(me >> 32);
 	while (val != l->s.readers)
 		WT_PAUSE();
 
@@ -123,7 +123,7 @@ __readunlock(WT_SESSION_IMPL *session, WT_RWLOCK *rwlock)
 	    session, WT_VERB_MUTEX, "rwlock: read unlock %s", rwlock->name));
 
 	l = &rwlock->rwlock;
-	WT_ATOMIC_ADD1(l->s.writers, 1);
+	WT_ATOMIC_ADD2(l->s.writers, 1);
 
 	return (0);
 }
@@ -136,7 +136,7 @@ int
 __wt_try_writelock(WT_SESSION_IMPL *session, WT_RWLOCK *rwlock)
 {
 	wt_rwlock_t *l;
-	uint32_t old, new, pad, readers, users;
+	uint64_t old, new, pad, readers, users;
 
 	WT_RET(__wt_verbose(
 	    session, WT_VERB_MUTEX, "rwlock: try_writelock %s", rwlock->name));
@@ -146,9 +146,9 @@ __wt_try_writelock(WT_SESSION_IMPL *session, WT_RWLOCK *rwlock)
 	pad = l->s.pad;
 	readers = l->s.readers;
 	users = l->s.users;
-	old = (pad << 24) + (users << 16) + (readers << 8) + users;
-	new = (pad << 24) + ((users + 1) << 16) + (readers << 8) + users;
-	if (WT_ATOMIC_CAS_VAL4(l->u, old, new) != old)
+	old = (pad << 48) + (users << 32) + (readers << 16) + users;
+	new = (pad << 48) + ((users + 1) << 32) + (readers << 16) + users;
+	if (WT_ATOMIC_CAS_VAL8(l->u, old, new) != old)
 		return (EBUSY);
 
 	rwlock->exclusive_locked = 1;
@@ -163,16 +163,21 @@ int
 __wt_writelock(WT_SESSION_IMPL *session, WT_RWLOCK *rwlock)
 {
 	wt_rwlock_t *l;
-	uint32_t me;
-	uint8_t val;
+	uint64_t me;
+	uint16_t val;
 
 	WT_RET(__wt_verbose(
 	    session, WT_VERB_MUTEX, "rwlock: writelock %s", rwlock->name));
 	WT_STAT_FAST_CONN_INCR(session, rwlock_write);
 
+	/*
+	 * Possibly wrap: if we have more than 64K lockers waiting, the count
+	 * of writers will wrap and two lockers will simultaneoulsy be granted
+	 * the write lock.
+	 */
 	l = &rwlock->rwlock;
-	me = WT_ATOMIC_FETCH_ADD4(l->u, 1 << 16);
-	val = (uint8_t)(me >> 16);
+	me = WT_ATOMIC_FETCH_ADD8(l->u, (uint64_t)1 << 32);
+	val = (uint16_t)(me >> 32);
 	while (val != l->s.writers)
 		WT_PAUSE();
 

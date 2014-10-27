@@ -32,12 +32,12 @@ typedef pthread_t		wt_thread_t;
  * locking functions.
  */
 typedef union {			/* Read/write lock */
-	uint32_t u;
-	uint16_t us;
+	uint64_t u;
+	uint32_t us;
 	struct {
-		uint8_t writers;
-		uint8_t readers;
-		uint8_t users;
-		uint8_t pad;
+		uint16_t writers;
+		uint16_t readers;
+		uint16_t users;
+		uint16_t pad;
 	} s;
 } wt_rwlock_t;
