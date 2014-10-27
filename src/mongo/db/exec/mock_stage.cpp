@@ -27,21 +27,36 @@
  */
 
 #include "mongo/db/exec/mock_stage.h"
+#include "mongo/db/exec/scoped_timer.h"
 #include "mongo/db/exec/working_set_common.h"
 
 namespace mongo {
 
-    MockStage::MockStage(WorkingSet* ws) : _ws(ws) { }
+    const char* MockStage::kStageType = "MOCK";
+
+    MockStage::MockStage(WorkingSet* ws)
+        : _ws(ws),
+          _commonStats(kStageType)
+    {}
 
     PlanStage::StageState MockStage::work(WorkingSetID* out) {
+        ++_commonStats.works;
+
+        // Adds the amount of time taken by work() to executionTimeMillis.
+        ScopedTimer timer(&_commonStats.executionTimeMillis);
+
         if (isEOF()) { return PlanStage::IS_EOF; }
 
         StageState state = _results.front();
         _results.pop();
 
         if (PlanStage::ADVANCED == state) {
+            ++_commonStats.advanced;
             *out = _members.front();
             _members.pop();
+        }
+        else if (PlanStage::NEED_TIME == state) {
+            ++_commonStats.needTime;
         }
 
         return state;
@@ -49,7 +64,31 @@ namespace mongo {
 
     bool MockStage::isEOF() { return _results.empty(); }
 
+    void MockStage::saveState() {
+        ++_commonStats.yields;
+    }
+
+    void MockStage::restoreState(OperationContext* opCtx) {
+        ++_commonStats.unyields;
+    }
+
+    void MockStage::invalidate(const DiskLoc& dl, InvalidationType type) {
+        ++_commonStats.invalidates;
+    }
+
+    PlanStageStats* MockStage::getStats() {
+        _commonStats.isEOF = isEOF();
+        auto_ptr<PlanStageStats> ret(new PlanStageStats(_commonStats, STAGE_MOCK));
+        ret->specific.reset(new MockStats(_specificStats));
+        return ret.release();
+    }
+
+    const CommonStats* MockStage::getCommonStats() { return &_commonStats; }
+
+    const SpecificStats* MockStage::getSpecificStats() { return &_specificStats; }
+
     void MockStage::pushBack(const PlanStage::StageState state) {
+        invariant(PlanStage::ADVANCED != state);
         _results.push(state);
     }
 

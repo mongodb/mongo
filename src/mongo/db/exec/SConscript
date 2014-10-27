@@ -2,6 +2,7 @@
 
 Import("env")
 
+# WorkingSet target and associated test
 env.Library(
     target = "working_set",
     source = [
@@ -82,6 +83,22 @@ env.Library(
         "scoped_timer",
         "$BUILD_DIR/mongo/bson",
     ],
+)
+
+env.CppUnitTest(
+    target = "mock_stage_test",
+    source = [
+        "mock_stage_test.cpp",
+    ],
+    LIBDEPS = [
+        "exec",
+        "mock_stage",
+        "$BUILD_DIR/mongo/serveronly",
+        "$BUILD_DIR/mongo/coreserver",
+        "$BUILD_DIR/mongo/coredb",
+        "$BUILD_DIR/mongo/mocklib",
+    ],
+    NO_CRUTCH = True,
 )
 
 env.CppUnitTest(
