@@ -103,6 +103,12 @@ namespace mongo {
             if ( !_sessionPool.empty() ) {
                 WiredTigerSession* s = _sessionPool.back();
                 _sessionPool.pop_back();
+                {
+                    WT_SESSION* ss = s->getSession();
+                    uint64_t range;
+                    invariantWTOK( ss->transaction_pinned_range( ss, &range ) );
+                    invariant( range == 0 );
+                }
                 return s;
             }
         }
@@ -111,6 +117,15 @@ namespace mongo {
 
     void WiredTigerSessionCache::releaseSession( WiredTigerSession* session ) {
         invariant( session );
+
+        {
+            WT_SESSION* ss = session->getSession();
+            uint64_t range;
+            invariantWTOK( ss->transaction_pinned_range( ss, &range ) );
+            invariant( range == 0 );
+        }
+
+
         boost::mutex::scoped_lock lk( _sessionLock );
         _sessionPool.push_back( session );
     }
