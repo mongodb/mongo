@@ -123,6 +123,7 @@ namespace {
         ASSERT_TEST_FAILS_MATCH(ASSERT(false) << "Told you so", "Told you so");
         ASSERT_TEST_FAILS_MATCH(ASSERT_FALSE(true) << "Told you so", "Told you so");
         ASSERT_TEST_FAILS_MATCH(ASSERT_EQUALS(1, 2) << "Told you so", "Told you so");
+        ASSERT_TEST_FAILS_MATCH(FAIL("Foo") << "Told you so", "Told you so");
     }
 
     TEST(UnitTestSelfTest, TestNoDoubleEvaluation) {
