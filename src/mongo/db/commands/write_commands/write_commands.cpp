@@ -214,7 +214,7 @@ namespace mongo {
 
             // Explains of write commands are read-only, but we take an exclusive lock so
             // that timing info is more accurate.
-            Lock::DBLock dlk(txn->lockState(), nsString.db(), MODE_X);
+            Lock::DBLock dlk(txn->lockState(), nsString.db(), MODE_IX);
             Client::Context ctx(txn, nsString);
 
             Status prepInLockStatus = updateExecutor.prepareInLock(ctx.db());
@@ -252,7 +252,7 @@ namespace mongo {
 
             // Explains of write commands are read-only, but we take a write lock so that timing
             // info is more accurate.
-            Lock::DBLock dlk(txn->lockState(), nsString.db(), MODE_X);
+            Lock::DBLock dlk(txn->lockState(), nsString.db(), MODE_IX);
             Client::Context ctx(txn, nsString);
 
             Status prepInLockStatus = deleteExecutor.prepareInLock(ctx.db());
