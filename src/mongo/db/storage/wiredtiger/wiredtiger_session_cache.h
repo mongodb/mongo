@@ -12,6 +12,8 @@
 
 namespace mongo {
 
+    class WiredTigerKVEngine;
+
     /**
      * This is a structure that caches 1 cursor for each uri.
      * The idea is that there is a pool of these somewhere.
@@ -19,7 +21,7 @@ namespace mongo {
      */
     class WiredTigerSession {
     public:
-        WiredTigerSession( WT_CONNECTION* conn );
+        WiredTigerSession( WT_CONNECTION* conn, int epoch );
         ~WiredTigerSession();
 
         WT_SESSION* getSession() const { return _session; }
@@ -31,9 +33,12 @@ namespace mongo {
 
         int cursorsOut() const { return _cursorsOut; }
 
+        int epoch() const { return _epoch; }
+
         static uint64_t genCursorId();
 
     private:
+        int _epoch;
         WT_SESSION* _session; // owned
         typedef std::vector<WT_CURSOR*> Cursors;
         typedef std::map<uint64_t, Cursors> CursorMap;
@@ -44,6 +49,7 @@ namespace mongo {
     class WiredTigerSessionCache {
     public:
 
+        WiredTigerSessionCache( WiredTigerKVEngine* engine );
         WiredTigerSessionCache( WT_CONNECTION* conn );
         ~WiredTigerSessionCache();
 
@@ -54,8 +60,11 @@ namespace mongo {
 
     private:
 
+        bool _shouldBeClosed( WiredTigerSession* session ) const;
+
         void _closeAll(); // does not lock
 
+        WiredTigerKVEngine* _engine; // not owned, might be NULL
         WT_CONNECTION* _conn; // not owned
         typedef std::vector<WiredTigerSession*> SessionPool;
         SessionPool _sessionPool; // owned

@@ -43,7 +43,8 @@ namespace mongo {
     }
 
     WiredTigerKVEngine::WiredTigerKVEngine( const std::string& path,
-                                            const std::string& extraOpenOptions ) {
+                                            const std::string& extraOpenOptions )
+        : _epoch( 0 ) {
 
         _eventHandler.handle_error = mdb_handle_error;
         _eventHandler.handle_message = mdb_handle_message;
@@ -80,7 +81,7 @@ namespace mongo {
         ss << extraOpenOptions;
         string config = ss.str();
         invariantWTOK(wiredtiger_open(path.c_str(), &_eventHandler, config.c_str(), &_conn));
-        _sessionCache.reset( new WiredTigerSessionCache( _conn ) );
+        _sessionCache.reset( new WiredTigerSessionCache( this ) );
     }
 
 
@@ -110,7 +111,7 @@ namespace mongo {
                                                   const StringData& ns,
                                                   const StringData& ident,
                                                   const CollectionOptions& options ) {
-        scoped_ptr<WiredTigerSession> session( _sessionCache->getSession() );
+        WiredTigerSession session( _conn, -1 );
 
         StatusWith<std::string> result = WiredTigerRecordStore::generateCreateString(ns, options, _rsOptions);
         if (!result.isOK()) {
@@ -119,7 +120,7 @@ namespace mongo {
         std::string config = result.getValue();
 
         string uri = _uri( ident );
-        WT_SESSION* s = session->getSession();
+        WT_SESSION* s = session.getSession();
         LOG(1) << "WiredTigerKVEngine::createRecordStore uri: " << uri << " config: " << config;
         return wtRCToStatus( s->create( s, uri.c_str(), config.c_str() ) );
     }
@@ -140,8 +141,7 @@ namespace mongo {
 
     Status WiredTigerKVEngine::dropRecordStore( OperationContext* opCtx,
                                                 const StringData& ident ) {
-        // todo: drop not support yet
-        log() << "WiredTigerKVEngine::dropRecordStore faking it right now for: " << ident;
+        _drop( ident );
         return Status::OK();
     }
 
@@ -165,9 +165,80 @@ namespace mongo {
 
     Status WiredTigerKVEngine::dropSortedDataInterface( OperationContext* opCtx,
                                                         const StringData& ident ) {
-        // todo: drop not support yet
-        log() << "WiredTigerKVEngine::dropSortedDataInterface faking it right now for: " << ident;
+        _drop( ident );
         return Status::OK();
+    }
+
+    bool WiredTigerKVEngine::_drop( const StringData& ident ) {
+        string uri = _uri( ident );
+
+        WiredTigerSession session( _conn, -1 );
+
+        int ret = session.getSession()->drop( session.getSession(), uri.c_str(), "force" );
+        LOG(1) << "WT drop of  " << uri << " res " << ret;
+
+        if ( ret == 0 ) {
+            // yay, it worked
+            return true;
+        }
+
+        if ( ret == EBUSY ) {
+            // this is expected, queue it up
+            {
+                boost::mutex::scoped_lock lk( _identToDropMutex );
+                _identToDrop.insert( uri );
+                _epoch++;
+            }
+            _sessionCache->closeAll();
+            return false;
+        }
+
+        invariantWTOK( ret );
+        return false;
+    }
+
+    bool WiredTigerKVEngine::haveDropsQueued() const {
+        boost::mutex::scoped_lock lk( _identToDropMutex );
+        return !_identToDrop.empty();
+    }
+
+    void WiredTigerKVEngine::dropAllQueued() {
+        set<string> mine;
+        {
+            boost::mutex::scoped_lock lk( _identToDropMutex );
+            mine = _identToDrop;
+        }
+
+        set<string> deleted;
+
+        {
+            WiredTigerSession session( _conn, -1 );
+            for ( set<string>::const_iterator it = mine.begin(); it != mine.end(); ++it ) {
+                string uri = *it;
+                int ret = session.getSession()->drop( session.getSession(), uri.c_str(), "force" );
+                LOG(1) << "WT queued drop of  " << uri << " res " << ret;
+
+                if ( ret == 0 ) {
+                    deleted.insert( uri );
+                    continue;
+                }
+
+                if ( ret == EBUSY ) {
+                    // leave in qeuue
+                    continue;
+                }
+
+                invariantWTOK( ret );
+            }
+        }
+
+        {
+            boost::mutex::scoped_lock lk( _identToDropMutex );
+            for ( set<string>::const_iterator it = deleted.begin(); it != deleted.end(); ++it ) {
+                _identToDrop.erase( *it );
+            }
+        }
+
     }
 
 }

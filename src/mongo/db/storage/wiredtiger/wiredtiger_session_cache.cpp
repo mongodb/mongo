@@ -4,13 +4,14 @@
 
 #include "mongo/db/storage/wiredtiger/wiredtiger_session_cache.h"
 
+#include "mongo/db/storage/wiredtiger/wiredtiger_kv_engine.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_util.h"
 #include "mongo/util/log.h"
 
 namespace mongo {
 
-    WiredTigerSession::WiredTigerSession( WT_CONNECTION* conn )
-        : _session( NULL ), _cursorsOut( 0 ) {
+    WiredTigerSession::WiredTigerSession( WT_CONNECTION* conn, int epoch )
+        : _epoch( epoch ), _session( NULL ), _cursorsOut( 0 ) {
         int ret = conn->open_session(conn, NULL, "isolation=snapshot", &_session);
         invariantWTOK(ret);
     }
@@ -81,8 +82,12 @@ namespace mongo {
 
     // -----------------------
 
+    WiredTigerSessionCache::WiredTigerSessionCache( WiredTigerKVEngine* engine )
+        : _engine( engine ), _conn( engine->getConnection() ) {
+    }
+
     WiredTigerSessionCache::WiredTigerSessionCache( WT_CONNECTION* conn )
-        : _conn( conn ) {
+        : _engine( NULL ), _conn( conn ) {
     }
 
     WiredTigerSessionCache::~WiredTigerSessionCache() {
@@ -116,7 +121,7 @@ namespace mongo {
                 return s;
             }
         }
-        return new WiredTigerSession( _conn );
+        return new WiredTigerSession( _conn, _engine ? _engine->currentEpoch() : -1 );
     }
 
     void WiredTigerSessionCache::releaseSession( WiredTigerSession* session ) {
@@ -130,8 +135,21 @@ namespace mongo {
             invariant( range == 0 );
         }
 
+        if ( _engine && _engine->haveDropsQueued() && session->epoch() < _engine->currentEpoch() ) {
+            delete session;
+            _engine->dropAllQueued();
+            return;
+        }
+
         boost::mutex::scoped_lock lk( _sessionLock );
         _sessionPool.push_back( session );
     }
 
+    bool WiredTigerSessionCache::_shouldBeClosed( WiredTigerSession* session ) const {
+        if ( !_engine )
+            return false;
+        if ( !_engine->haveDropsQueued() )
+            return false;
+        return session->epoch() < _engine->currentEpoch();
+    }
 }

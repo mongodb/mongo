@@ -2,6 +2,11 @@
 
 #pragma once
 
+#include <set>
+#include <string>
+
+#include <boost/thread/mutex.hpp>
+
 #include <wiredtiger.h>
 
 #include "mongo/bson/ordering.h"
@@ -47,9 +52,18 @@ namespace mongo {
         virtual Status dropSortedDataInterface( OperationContext* opCtx,
                                                 const StringData& ident );
 
+        // wiredtiger specific
+
+        WT_CONNECTION* getConnection() { return _conn; }
+        void dropAllQueued();
+        bool haveDropsQueued() const;
+
+        int currentEpoch() const { return _epoch; }
+
     private:
 
         string _uri( const StringData& ident ) const;
+        bool _drop( const StringData& ident );
 
         WT_CONNECTION* _conn;
         WT_EVENT_HANDLER _eventHandler;
@@ -58,6 +72,10 @@ namespace mongo {
         string _rsOptions;
         string _indexOptions;
 
+        std::set<std::string> _identToDrop;
+        mutable boost::mutex _identToDropMutex;
+
+        int _epoch; // this is how we keep track of if a session is too old
     };
 
 }
