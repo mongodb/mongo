@@ -30,6 +30,9 @@
 
 #include "mongo/platform/basic.h"
 
+#include <sstream>
+#include <string>
+
 #include "mongo/db/json.h"
 #include "mongo/db/operation_context_noop.h"
 #include "mongo/db/storage/record_store_test_harness.h"
@@ -42,12 +45,18 @@
 
 namespace mongo {
 
+    using std::string;
+    using std::stringstream;
+
     class WiredTigerHarnessHelper : public HarnessHelper {
     public:
         WiredTigerHarnessHelper() : _dbpath( "wt_test" ), _conn( NULL ) {
 
-            const char* config = "create";
-            int ret = wiredtiger_open( _dbpath.path().c_str(), NULL, config, &_conn);
+            std::stringstream ss;
+            ss << "create,";
+            ss << "statistics=(all),";
+            string config = ss.str();
+            int ret = wiredtiger_open( _dbpath.path().c_str(), NULL, config.c_str(), &_conn);
             invariantWTOK( ret );
 
             _sessionCache = new WiredTigerSessionCache( _conn );
