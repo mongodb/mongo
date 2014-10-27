@@ -74,12 +74,54 @@ namespace mongo {
         else {
             invariant(c);
             ON_BLOCK_EXIT(c->close, c);
+
+            std::map<string,BSONObjBuilder*> subs;
+
             const char *desc, *pvalue;
             uint64_t value;
             while (c->next(c) == 0 &&
                    c->get_value(c, &desc, &pvalue, &value) == 0) {
-                bob.append(desc, pvalue);
+                StringData key( desc );
+
+                StringData prefix;
+                StringData suffix;
+
+                size_t idx = key.find( ':' );
+                if ( idx != string::npos ) {
+                    prefix = key.substr( 0, idx );
+                    suffix = key.substr( idx + 1 );
+                }
+                else {
+                    idx = key.find( ' ' );
+                }
+
+                if ( idx != string::npos ) {
+                    prefix = key.substr( 0, idx );
+                    suffix = key.substr( idx + 1 );
+                }
+                else {
+                    prefix = key;
+                    suffix = "num";
+                }
+
+                if ( prefix.size() == 0 ) {
+                    bob.append(desc, pvalue);
+                }
+                else {
+                    BSONObjBuilder*& sub = subs[prefix.toString()];
+                    if ( !sub )
+                        sub = new BSONObjBuilder();
+                    sub->append( mongoutils::str::ltrim(suffix.toString()), pvalue );
+                }
             }
+
+            for ( std::map<string,BSONObjBuilder*>::const_iterator it = subs.begin();
+                  it != subs.end(); ++it ) {
+                const std::string& s = it->first;
+                bob.append( s, it->second->obj() );
+                delete it->second;
+            }
+
         }
 
         return bob.obj();
