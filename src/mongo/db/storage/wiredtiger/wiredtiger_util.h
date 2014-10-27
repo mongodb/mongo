@@ -33,11 +33,15 @@
 
 #include <wiredtiger.h>
 
+#include "mongo/base/disallow_copying.h"
+#include "mongo/base/status.h"
 #include "mongo/db/concurrency/deadlock.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/mongoutils/str.h"
 
 namespace mongo {
+
+    class BSONObjBuilder;
 
     inline bool wt_keeptxnopen() {
         return false;
@@ -80,6 +84,22 @@ namespace mongo {
         // The pointer returned by Get() must not be allowed to live longer than *this.
         WT_ITEM *Get() { return this; }
         const WT_ITEM *Get() const { return this; }
+    };
+
+    class WiredTigerUtil {
+        MONGO_DISALLOW_COPYING(WiredTigerUtil);
+    private:
+        WiredTigerUtil();
+
+    public:
+
+        /**
+         * Reads contents of table using URI and exports all keys to BSON as string elements.
+         * Additional, adds 'uri' field to output document.
+         */
+        static Status exportTableToBSON(WT_SESSION* s,
+                                        const std::string& uri, const std::string& config,
+                                        BSONObjBuilder* bob);
     };
 
 }

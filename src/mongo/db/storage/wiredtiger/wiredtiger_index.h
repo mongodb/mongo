@@ -37,7 +37,9 @@
 #include "mongo/db/storage/wiredtiger/wiredtiger_recovery_unit.h"
 
 namespace mongo {
+
     class IndexCatalogEntry;
+    class IndexDescriptor;
     struct WiredTigerItem;
 
     class WiredTigerIndex : public SortedDataInterface {
@@ -66,7 +68,8 @@ namespace mongo {
                              const DiskLoc& loc,
                              bool dupsAllowed);
 
-        virtual void fullValidate(OperationContext* txn, long long *numKeysOut) const;
+        virtual void fullValidate(OperationContext* txn, bool full, long long *numKeysOut,
+                                  BSONObjBuilder* output) const;
 
         virtual Status dupKeyCheck(OperationContext* txn, const BSONObj& key, const DiskLoc& loc);
 

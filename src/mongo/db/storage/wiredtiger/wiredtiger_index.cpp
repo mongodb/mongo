@@ -33,18 +33,19 @@
 
 #include "mongo/platform/basic.h"
 
+#include "mongo/db/storage/wiredtiger/wiredtiger_index.h"
+
 #include <set>
 
 #include "mongo/db/json.h"
 #include "mongo/db/catalog/index_catalog_entry.h"
 #include "mongo/db/index/index_descriptor.h"
-#include "mongo/db/storage_options.h"
-#include "mongo/util/log.h"
-
-#include "mongo/db/storage/wiredtiger/wiredtiger_index.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_record_store.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_session_cache.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_util.h"
+#include "mongo/db/storage_options.h"
+#include "mongo/util/log.h"
+#include "mongo/util/assert_util.h"
 
 namespace mongo {
 namespace {
@@ -222,7 +223,8 @@ namespace {
         _unindex( c, key, loc, dupsAllowed );
     }
 
-    void WiredTigerIndex::fullValidate(OperationContext* txn, long long *numKeysOut) const {
+    void WiredTigerIndex::fullValidate(OperationContext* txn, bool full, long long *numKeysOut,
+                                       BSONObjBuilder* output) const {
         IndexCursor cursor(*this, txn, true );
         cursor.locate( minKey, minDiskLoc );
         long long count = 0;
@@ -232,6 +234,22 @@ namespace {
         }
         if ( numKeysOut ) {
             *numKeysOut = count;
+        }
+
+        // Nothing further to do if 'full' validation is not requested.
+        if (!full) {
+            return;
+        }
+
+        invariant(output);
+        WiredTigerSession* session = WiredTigerRecoveryUnit::get(txn)->getSession();
+        WT_SESSION* s = session->getSession();
+        Status status = WiredTigerUtil::exportTableToBSON(s, "statistics:" + uri(),
+                                                          "statistics=(all)", output);
+        if (!status.isOK()) {
+            output->append("error", "unable to retrieve statistics");
+            output->append("code", static_cast<int>(status.code()));
+            output->append("reason", status.reason());
         }
     }
 
