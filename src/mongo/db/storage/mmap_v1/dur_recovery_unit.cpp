@@ -193,13 +193,6 @@ namespace mongo {
 #endif
     }
 
-    void DurRecoveryUnit::syncDataAndTruncateJournal() {
-#if ROLLBACK_ENABLED
-        publishChanges();
-#endif
-        return getDur().syncDataAndTruncateJournal(_txn);
-    }
-
     void MemoryWrite::commit() {
         // TODO don't go through getDur() interface.
         if (getDur().isDurable()) {

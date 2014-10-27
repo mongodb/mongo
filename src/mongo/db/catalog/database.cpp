@@ -527,15 +527,6 @@ namespace mongo {
 
         audit::logDropDatabase( currentClient.get(), name );
 
-        // Not sure we need this here, so removed.  If we do, we need to move it down
-        // within other calls both (1) as they could be called from elsewhere and
-        // (2) to keep the lock order right - groupcommitmutex must be locked before
-        // mmmutex (if both are locked).
-        //
-        //  RWLockRecursive::Exclusive lk(MongoFile::mmmutex);
-
-        txn->recoveryUnit()->syncDataAndTruncateJournal();
-
         dbHolder().close( txn, name );
         db = NULL; // d is now deleted
 

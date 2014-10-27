@@ -53,8 +53,6 @@ namespace mongo {
         virtual void* writingPtr(void* data, size_t len) {
             return data;
         }
-
-        virtual void syncDataAndTruncateJournal() { }
     };
 
 }  // namespace mongo
