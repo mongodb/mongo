@@ -202,7 +202,8 @@ namespace {
             Result * r = new Result( _name );
             Result::cur = r;
 
-            for ( std::vector<boost::shared_ptr<TestHolder>>::iterator i=_tests.begin(); i!=_tests.end(); i++ ) {
+            for ( std::vector< boost::shared_ptr<TestHolder> >::iterator i=_tests.begin();
+                  i!=_tests.end(); i++ ) {
                 boost::shared_ptr<TestHolder>& tc = *i;
                 if ( filter.size() && tc->getName().find( filter ) == std::string::npos ) {
                     LOG(1) << "\t skipping test: " << tc->getName() << " because doesn't match filter" << std::endl;
