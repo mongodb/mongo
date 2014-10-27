@@ -130,13 +130,14 @@ namespace mongo {
                                                      const StringData& ident,
                                                      const CollectionOptions& options ) {
 
-        WiredTigerRecordStore* rs = new WiredTigerRecordStore( opCtx, ns, _uri( ident ) );
-
-        if ( options.capped )
-            rs->setCapped(options.cappedSize ? options.cappedSize : 4096,
-                          options.cappedMaxDocs ? options.cappedMaxDocs : -1);
-
-        return rs;
+        if (options.capped) {
+            return new WiredTigerRecordStore(opCtx, ns, _uri(ident), options.capped,
+                                             options.cappedSize ? options.cappedSize : 4096,
+                                             options.cappedMaxDocs ? options.cappedMaxDocs : -1);
+        }
+        else {
+            return new WiredTigerRecordStore(opCtx, ns, _uri(ident));
+        }
     }
 
     Status WiredTigerKVEngine::dropRecordStore( OperationContext* opCtx,
@@ -238,7 +239,10 @@ namespace mongo {
                 _identToDrop.erase( *it );
             }
         }
+    }
 
+    bool WiredTigerKVEngine::supportsDocLocking() const {
+        return true;
     }
 
 }

@@ -26,6 +26,8 @@ namespace mongo {
         void setRecordStoreExtraOptions( const std::string& options );
         void setSortedDataInterfaceExtraOptions( const std::string& options );
 
+        virtual bool supportsDocLocking() const;
+
         virtual RecoveryUnit* newRecoveryUnit();
 
         virtual Status createRecordStore( OperationContext* opCtx,
