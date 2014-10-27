@@ -167,7 +167,7 @@ namespace mongo {
             WriteUnitOfWork uow( &opCtx );
             ASSERT_OK( engine->createRecordStore( &opCtx, "catalog", "catalog", CollectionOptions() ) );
             rs.reset( engine->getRecordStore( &opCtx, "catalog", "catalog", CollectionOptions() ) );
-            catalog.reset( new KVCatalog( rs.get() ) );
+            catalog.reset( new KVCatalog( rs.get(), true) );
             uow.commit();
         }
 
@@ -183,7 +183,7 @@ namespace mongo {
         {
             MyOperationContext opCtx( engine );
             WriteUnitOfWork uow( &opCtx );
-            catalog.reset( new KVCatalog( rs.get() ) );
+            catalog.reset( new KVCatalog( rs.get(), true) );
             catalog->init( &opCtx );
             uow.commit();
         }
@@ -211,7 +211,7 @@ namespace mongo {
             WriteUnitOfWork uow( &opCtx );
             ASSERT_OK( engine->createRecordStore( &opCtx, "catalog", "catalog", CollectionOptions() ) );
             rs.reset( engine->getRecordStore( &opCtx, "catalog", "catalog", CollectionOptions() ) );
-            catalog.reset( new KVCatalog( rs.get() ) );
+            catalog.reset( new KVCatalog( rs.get(), true) );
             uow.commit();
         }
 
