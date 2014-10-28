@@ -33,6 +33,7 @@
 #include "mongo/db/concurrency/lock_state.h"
 
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/global_environment_experiment.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
@@ -685,6 +686,7 @@ namespace mongo {
         }
     }
 
+
     //
     // Auto classes
     //
@@ -696,13 +698,16 @@ namespace mongo {
         // such as database drop. There should not be any active writes at these points.
         invariant(!_locker->inAWriteUnitOfWork());
 
-        invariant(_locker->unlock(resourceIdMMAPV1Flush));
+        if (isMMAPV1()) {
+            invariant(_locker->unlock(resourceIdMMAPV1Flush));
+        }
     }
 
     AutoYieldFlushLockForMMAPV1Commit::~AutoYieldFlushLockForMMAPV1Commit() {
-        invariant(LOCK_OK == _locker->lock(resourceIdMMAPV1Flush,
-                                           _locker->_getModeForMMAPV1FlushLock(),
-                                           UINT_MAX));
+        if (isMMAPV1()) {
+            invariant(LOCK_OK == _locker->lock(resourceIdMMAPV1Flush,
+                                               _locker->_getModeForMMAPV1FlushLock()));
+        }
     }
 
 
