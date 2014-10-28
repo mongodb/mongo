@@ -165,11 +165,11 @@ DBQuery.prototype._convertToCommand = function() {
 
     if (this._special) {
         if (this._query.query) {
-            cmd["query"] = this._query.query;
+            cmd["filter"] = this._query.query;
         }
     }
     else if (this._query) {
-        cmd["query"] = this._query;
+        cmd["filter"] = this._query;
     }
 
     if (this._skip) {

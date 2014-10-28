@@ -80,7 +80,7 @@ namespace mongo {
                 // field, so just move on.
                 continue;
             }
-            else if (mongoutils::str::equals(fieldName, "query")) {
+            else if (mongoutils::str::equals(fieldName, "filter")) {
                 Status status = checkFieldType(el, Object);
                 if (!status.isOK()) {
                     return status;

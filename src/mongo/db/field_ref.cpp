@@ -26,13 +26,10 @@
  *    it in the license file.
  */
 
-#define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kDefault
-
 #include "mongo/db/field_ref.h"
 
 #include <algorithm> // for min
 
-#include "mongo/util/log.h"
 #include "mongo/util/assert_util.h"
 
 namespace mongo {

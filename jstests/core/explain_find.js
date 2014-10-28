@@ -13,7 +13,7 @@ for (var i = 0; i < 10; i++) {
 var explain = db.runCommand({
     explain: {
         find: collName,
-        query: {a: {$lte: 2}}
+        filter: {a: {$lte: 2}}
     },
     verbosity: "executionStats"
 });
