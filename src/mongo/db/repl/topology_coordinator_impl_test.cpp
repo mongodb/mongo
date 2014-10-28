@@ -1328,9 +1328,9 @@ namespace {
     }
 
     TEST_F(HeartbeatResponseTestOneRetry, DecideToStepDownRemotePrimary) {
-        // Confirm that action responses can come back from retries; in this, expect a StepDownSelf
-        // action.
-        
+        // Confirm that action responses can come back from retries; in this, expect a
+        // StepDownRemotePrimary action.
+
         // make self primary
         ASSERT_EQUALS(-1, getCurrentPrimaryIndex());
         makeSelfPrimary(OpTime(5,0));
@@ -1358,7 +1358,7 @@ namespace {
     TEST_F(HeartbeatResponseTestOneRetry, DecideToStepDownSelf) {
         // Confirm that action responses can come back from retries; in this, expect a StepDownSelf
         // action.
-        
+
         // acknowledge the other member so that we see a majority
         HeartbeatResponseAction action = receiveDownHeartbeat(HostAndPort("host3"),
                                                               "rs0",
@@ -1450,9 +1450,9 @@ namespace {
     }
 
     TEST_F(HeartbeatResponseTestTwoRetries, DecideToStepDownRemotePrimary) {
-        // Confirm that action responses can come back from retries; in this, expect a StepDownSelf
-        // action.
-        
+        // Confirm that action responses can come back from retries; in this, expect a
+        // StepDownRemotePrimary action.
+
         // make self primary
         ASSERT_EQUALS(-1, getCurrentPrimaryIndex());
         makeSelfPrimary(OpTime(5,0));
@@ -1480,7 +1480,7 @@ namespace {
     TEST_F(HeartbeatResponseTestTwoRetries, DecideToStepDownSelf) {
         // Confirm that action responses can come back from retries; in this, expect a StepDownSelf
         // action.
-        
+
         // acknowledge the other member so that we see a majority
         HeartbeatResponseAction action = receiveDownHeartbeat(HostAndPort("host3"),
                                                               "rs0",
@@ -1513,7 +1513,7 @@ namespace {
     TEST_F(HeartbeatResponseTestTwoRetries, DecideToStartElection) {
         // Confirm that action responses can come back from retries; in this, expect a StartElection
         // action.
-        
+
         // acknowledge the other member so that we see a majority
         OpTime election = OpTime(400,0);
         OpTime lastOpTimeApplied = OpTime(300,0);
@@ -1687,8 +1687,8 @@ namespace {
 
     TEST_F(HeartbeatResponseTest, UpdateHeartbeatDataStepDownPrimaryForHighPriorityFreshNode) {
         // In this test, the Topology coordinator sees a PRIMARY ("host2") and then sees a higher
-        // priority and similarly fresh node ("host3"). As a result it responds with a
-        // StepDownRemote action for the PRIMARY ("host2").
+        // priority and similarly fresh node ("host3"). However, since the coordinator's node
+        // (host1) is not the higher priority node, it takes no action.
         updateConfig(BSON("_id" << "rs0" <<
                           "version" << 6 <<
                           "members" << BSON_ARRAY(
@@ -1718,13 +1718,15 @@ namespace {
                                         election,
                                         slightlyLessFreshLastOpTimeApplied,
                                         lastOpTimeApplied);
-        ASSERT_EQUALS(HeartbeatResponseAction::StepDownRemotePrimary, nextAction.getAction());
-        ASSERT_EQUALS(1, nextAction.getPrimaryConfigIndex());
+        ASSERT_EQUALS(HeartbeatResponseAction::NoAction, nextAction.getAction());
     }
 
     TEST_F(HeartbeatResponseTest, UpdateHeartbeatDataStepDownSelfForHighPriorityFreshNode) {
         // In this test, the Topology coordinator becomes PRIMARY and then sees a higher priority
         // and equally fresh node ("host3"). As a result it responds with a StepDownSelf action.
+        //
+        // Despite having stepped down, we should remain electable, in order to dissuade lower
+        // priority nodes from standing for election.
         updateConfig(BSON("_id" << "rs0" <<
                           "version" << 6 <<
                           "members" << BSON_ARRAY(
@@ -1735,6 +1737,7 @@ namespace {
                      0);
         OpTime election = OpTime(1000,0);
 
+        getTopoCoord().setFollowerMode(MemberState::RS_SECONDARY);
         ASSERT_EQUALS(-1, getCurrentPrimaryIndex());
         makeSelfPrimary(election);
         ASSERT_EQUALS(0, getCurrentPrimaryIndex());
@@ -1747,6 +1750,23 @@ namespace {
                                                                 election);
         ASSERT_EQUALS(HeartbeatResponseAction::StepDownSelf, nextAction.getAction());
         ASSERT_EQUALS(0, nextAction.getPrimaryConfigIndex());
+
+        // Process a heartbeat response to confirm that this node, which is no longer primary,
+        // still tells other nodes that it is electable.  This will stop lower priority nodes
+        // from standing for election.
+        ReplSetHeartbeatArgs hbArgs;
+        hbArgs.setSetName("rs0");
+        hbArgs.setProtocolVersion(1);
+        hbArgs.setConfigVersion(6);
+        hbArgs.setSenderId(1);
+        hbArgs.setSenderHost(HostAndPort("host3", 27017));
+        ReplSetHeartbeatResponse hbResp;
+        ASSERT_OK(getTopoCoord().prepareHeartbeatResponse(now(),
+                                                          hbArgs,
+                                                          "rs0",
+                                                          election,
+                                                          &hbResp));
+        ASSERT(!hbResp.hasIsElectable() || hbResp.isElectable()) << hbResp.toBSON().toString();
     }
 
     TEST_F(HeartbeatResponseTest, UpdateHeartbeatDataDoNotStepDownSelfForHighPriorityStaleNode) {
