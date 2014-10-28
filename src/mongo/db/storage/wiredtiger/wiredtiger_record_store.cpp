@@ -207,7 +207,7 @@ namespace mongo {
         invariant( c );
         c->set_key(c, _makeKey(loc));
         int ret = c->search(c);
-        massert( 28538,
+        massert( 28540,
                  "Didn't find DiskLoc in WiredTigerRecordStore",
                  ret != WT_NOTFOUND );
         invariantWTOK(ret);
