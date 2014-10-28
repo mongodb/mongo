@@ -121,7 +121,10 @@ namespace {
     }
 
     void BackgroundSync::shutdown() {
-        notify();
+        boost::lock_guard<boost::mutex> lock(_mutex);
+
+        // Wake up producerThread so it notices that we're in shutdown
+        _condvar.notify_all();
     }
 
     void BackgroundSync::notify() {
@@ -203,8 +206,11 @@ namespace {
             }
 
             // Wait until we've applied the ops we have before we choose a sync target
-            while (!_appliedBuffer) {
+            while (!_appliedBuffer && !inShutdown()) {
                 _condvar.wait(lock);
+            }
+            if (inShutdown()) {
+                return;
             }
         }
 

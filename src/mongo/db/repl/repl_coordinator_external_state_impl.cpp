@@ -76,7 +76,7 @@ namespace {
     ReplicationCoordinatorExternalStateImpl::~ReplicationCoordinatorExternalStateImpl() {}
 
     void ReplicationCoordinatorExternalStateImpl::startThreads() {
-        _backgroundSyncThread.reset(new boost::thread(runSyncThread));
+        _applierThread.reset(new boost::thread(runSyncThread));
         BackgroundSync* bgsync = BackgroundSync::get();
         _producerThread.reset(new boost::thread(stdx::bind(&BackgroundSync::producerThread,
                                                            bgsync)));
@@ -91,10 +91,10 @@ namespace {
 
     void ReplicationCoordinatorExternalStateImpl::shutdown() {
         _syncSourceFeedback.shutdown();
+        _syncSourceFeedbackThread->join();
+        _applierThread->join();
         BackgroundSync* bgsync = BackgroundSync::get();
         bgsync->shutdown();
-        _syncSourceFeedbackThread->join();
-        _backgroundSyncThread->join();
         _producerThread->join();
     }
 
