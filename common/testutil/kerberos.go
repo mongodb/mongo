@@ -11,7 +11,7 @@ var (
 	WINDOWS_KERBEROS_PASSWORD_ENV = "MONGODB_KERBEROS_PASSWORD"
 )
 
-func GetKerberosOptions() *commonopts.ToolOptions {
+func GetKerberosOptions() (*commonopts.ToolOptions, error) {
 	opts := &commonopts.ToolOptions{
 		Namespace: &commonopts.Namespace{
 			DB:         "kerberos",
@@ -33,10 +33,10 @@ func GetKerberosOptions() *commonopts.ToolOptions {
 	if runtime.GOOS == "windows" {
 		opts.Auth.Password = os.Getenv(WINDOWS_KERBEROS_PASSWORD_ENV)
 		if opts.Auth.Password == "" {
-			panic(fmt.Sprintf("Need to set %v environment variable to run kerberos tests on windows",
-				WINDOWS_KERBEROS_PASSWORD_ENV))
+			return nil, fmt.Errorf("Need to set %v environment variable to run "+
+				"kerberos tests on windows", WINDOWS_KERBEROS_PASSWORD_ENV)
 		}
 	}
 
-	return opts
+	return opts, nil
 }
