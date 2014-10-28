@@ -1710,12 +1710,20 @@ namespace {
             return status;
         }
 
-        CBHStatus cbh = _replExecutor.scheduleWork(
+        const stdx::function<void (const ReplicationExecutor::CallbackData&)> reconfigFinishFn(
                 stdx::bind(&ReplicationCoordinatorImpl::_finishReplSetReconfig,
                            this,
                            stdx::placeholders::_1,
                            newConfig,
                            myIndex.getValue()));
+
+        // If it's a force reconfig, the primary node may not be electable after the configuration
+        // change.  In case we are that primary node, finish the reconfig under the global lock,
+        // so that the step down occurs safely.
+        CBHStatus cbh =
+            args.force ?
+            _replExecutor.scheduleWorkWithGlobalExclusiveLock(reconfigFinishFn) :
+            _replExecutor.scheduleWork(reconfigFinishFn);
         if (cbh.getStatus() == ErrorCodes::ShutdownInProgress) {
             return status;
         }
