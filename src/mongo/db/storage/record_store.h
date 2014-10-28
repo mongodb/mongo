@@ -184,6 +184,19 @@ namespace mongo {
                                           const RecordData& oldRec,
                                           const char* damageSource,
                                           const mutablebson::DamageVector& damages ) = 0;
+
+        /**
+         * Storage engines which do not support document-level locking hold locks at
+         * collection or database granularity. As an optimization, these locks can be yielded
+         * when a record needs to be fetched from secondary storage. If this method returns
+         * false, then it indicates that the query system layer should yield and reacquire its
+         * locks.
+         *
+         * Storage engines which support document-level locking need not implement this.
+         */
+        virtual bool recordLikelyInPhysicalMem( OperationContext* txn,
+                                                const DiskLoc& loc ) const { return true; }
+
         /**
          * returned iterator owned by caller
          * Default arguments return all items in record store.
