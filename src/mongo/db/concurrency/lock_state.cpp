@@ -97,7 +97,7 @@ namespace mongo {
         /**
          * Dumps the contents of the global lock manager to the server log for diagnostics.
          */
-        const long long LockMgrDumpThrottleMicros = 30 * Timer::microsPerSecond;
+        const uint64_t LockMgrDumpThrottleMicros = 30 * Timer::microsPerSecond;
         AtomicUInt64 lastDumpTimestampMicros(0);
 
         void dumpGlobalLockManagerThrottled() {
