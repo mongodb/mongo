@@ -93,6 +93,25 @@ namespace mongo {
                 invariant(false);
             }
         }
+
+        /**
+         * Dumps the contents of the global lock manager to the server log for diagnostics.
+         */
+        const long long LockMgrDumpThrottleMicros = 30 * Timer::microsPerSecond;
+        AtomicUInt64 lastDumpTimestampMicros(0);
+
+        void dumpGlobalLockManagerThrottled() {
+            const uint64_t lastDumpMicros = lastDumpTimestampMicros.load();
+
+            // Don't print too frequently
+            if (curTimeMicros64() - lastDumpMicros < LockMgrDumpThrottleMicros) return;
+
+            // Only one thread should dump the lock manager in order to not pollute the log
+            if (lastDumpTimestampMicros.compareAndSwap(lastDumpMicros,
+                                                       curTimeMicros64()) == lastDumpMicros) {
+                globalLockManager.dump();
+            }
+        }
     }
 
 
@@ -451,65 +470,64 @@ namespace mongo {
                                              unsigned timeoutMs) {
 
         LockResult result = lockImpl(resId, mode);
+
+        // Fast, uncontended path
         if (result == LOCK_OK) return LOCK_OK;
 
-        // Non MMAP V1 path
-        if (!IsForMMAPV1) {
+        // Currently, deadlock detection does not happen inline with lock acquisition so the only
+        // unsuccessful result that the lock manager would return is LOCK_WAITING.
+        invariant(result == LOCK_WAITING);
 
-            if (result == LOCK_WAITING) {
-                result = _notify.wait(timeoutMs);
-            }
+        // Tracks the lock acquisition time if we don't obtain the lock immediately
+        Timer timer;
 
-            if (result != LOCK_OK) {
-                // We should never be deadlocking in non-MMAP V1 engines
-                invariant(result == LOCK_TIMEOUT);
-
-                LockRequestsMap::Iterator it = _requests.find(resId);
-                if (globalLockManager.unlock(it.objAddr())) {
-                    scoped_spinlock scopedLock(_lock);
-                    it.remove();
-                }
-            }
-
-            return result;
+        // Under MMAP V1 engine a deadlock can occur if a thread goes to sleep waiting on
+        // DB lock, while holding the flush lock, so it has to be released. This is only
+        // correct to do if not in a write unit of work.
+        const bool yieldFlushLock = IsForMMAPV1 &&
+                                    !inAWriteUnitOfWork() &&
+                                    resId != resourceIdGlobal &&
+                                    resId != resourceIdMMAPV1Flush;
+        if (yieldFlushLock) {
+            invariant(unlock(resourceIdMMAPV1Flush));
         }
 
-        // MMAP V1 path
-        if (result == LOCK_WAITING) {
-            // Under MMAP V1 engine a deadlock can occur if a thread goes to sleep waiting on
-            // DB lock, while holding the flush lock, so it has to be released. This is only
-            // correct to do if not in a write unit of work.
-            bool unlockedFlushLock = false;
+        // Don't go sleeping without bound in order to be able to report long waits or wake up for
+        // deadlock detection.
+        unsigned waitTimeMs = std::min(timeoutMs, 1000U);
+        while (true) {
+            result = _notify.wait(waitTimeMs);
 
-            if (!inAWriteUnitOfWork() &&
-                (resId != resourceIdGlobal) &&
-                (resId != resourceIdMMAPV1Flush)) {
+            if (result == LOCK_OK) break;
 
-                invariant(unlock(resourceIdMMAPV1Flush));
-                unlockedFlushLock = true;
+            const unsigned elapsedTimeMs = timer.millis();
+            waitTimeMs = (elapsedTimeMs < timeoutMs) ?
+                std::min(timeoutMs - elapsedTimeMs, 1000U) : 0;
+
+            if (waitTimeMs == 0) {
+                break;
             }
 
-            result = _notify.wait(timeoutMs);
-
-            if (result != LOCK_OK) {
-                // Can only be LOCK_TIMEOUT, because the lock manager does not return any other
-                // errors at this point.
-                invariant(result == LOCK_TIMEOUT);
-
-                // Clean-up the state so we do not have two pending requests on the locker, which
-                // would be illegal from the currentOp point of view.
-                LockRequestsMap::Iterator it = _requests.find(resId);
-                if (globalLockManager.unlock(it.objAddr())) {
-                    scoped_spinlock scopedLock(_lock);
-                    it.remove();
-                }
+            // This will occasionally dump the global lock manager in case lock acquisition is
+            // taking too long.
+            if (elapsedTimeMs > 1000U) {
+                dumpGlobalLockManagerThrottled();
             }
+        }
 
-            if (unlockedFlushLock) {
-                // We cannot obey the timeout here, because it is not correct to return from
-                // the lock request with the flush lock released.
-                invariant(LOCK_OK == lock(resourceIdMMAPV1Flush, _getModeForMMAPV1FlushLock()));
+        // Cleanup the state, since this is an unused lock now
+        if (result != LOCK_OK) {
+            LockRequestsMap::Iterator it = _requests.find(resId);
+            if (globalLockManager.unlock(it.objAddr())) {
+                scoped_spinlock scopedLock(_lock);
+                it.remove();
             }
+        }
+
+        if (yieldFlushLock) {
+            // We cannot obey the timeout here, because it is not correct to return from the lock
+            // request with the flush lock released.
+            invariant(LOCK_OK == lock(resourceIdMMAPV1Flush, _getModeForMMAPV1FlushLock()));
         }
 
         return result;

@@ -248,12 +248,11 @@ namespace mongo {
 
 
     /**
-     * At the end of a write transaction, we cannot release any of the exclusive locks before the
-     * data which was written as part of the transaction is at least journaled. This is done by the
-     * flush thread (dur.cpp). However, the flush thread cannot take turn while we are holding the
-     * flush lock. This class releases *only* the flush lock, while in scope so that the flush
-     * thread can run. It then re-acquires the flush lock in the original mode in which it was
-     * acquired.
+     * At global synchronization points, such as drop database we are running under a global
+     * exclusive lock and without an active write unit of work, doing changes which require global
+     * commit. This utility allows the flush lock to be temporarily dropped so the flush thread
+     * could run in such circumstances. Should not be used where write units of work are used,
+     * because these have different mechanism of yielding the flush lock.
      */
     class AutoYieldFlushLockForMMAPV1Commit {
     public:
