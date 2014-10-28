@@ -48,7 +48,7 @@ __wt_thread_id(char *buf, size_t buflen)
 	pthread_t self;
 	size_t len;
 
-	len = (size_t)snprintf(buf, buflen, "%" PRIu64, (uint64_t)getpid());
+	len = (size_t)snprintf(buf, buflen, "%" PRIu64 ":", (uint64_t)getpid());
 	if (len < buflen) {
 		self = pthread_self();
 		__wt_raw_to_hex_mem((const uint8_t *)&self,
