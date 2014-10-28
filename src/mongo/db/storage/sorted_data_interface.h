@@ -223,21 +223,71 @@ namespace mongo {
              */
             virtual bool locate(const BSONObj& key, const DiskLoc& loc) = 0;
 
-            virtual void advanceTo(const BSONObj &keyBegin,
-                                   int keyBeginLen,
-                                   bool afterKey,
-                                   const vector<const BSONElement*>& keyEnd,
-                                   const vector<bool>& keyEndInclusive) = 0;
+            /**
+             * Position 'this' forward (reverse) cursor either at the next
+             * (previous) occurrence of a particular key or immediately after
+             * (or immediately before).
+             *
+             * @see SortedDataInterface::customLocate
+             */
+            virtual void advanceTo(const BSONObj &keyPrefix,
+                                   int prefixLen,
+                                   bool prefixExclusive,
+                                   const vector<const BSONElement*>& keySuffix,
+                                   const vector<bool>& suffixInclusive) = 0;
 
             /**
-             * Locate a key with fields comprised of a combination of keyBegin fields and keyEnd
-             * fields.
+             * Position 'this' forward (reverse) cursor either at the first
+             * (last) occurrence of a particular key or immediately after
+             * (or immediately before). The key is a typical BSONObj,
+             * represented by the specified parameters in the following way:
+             *
+             * The first 'prefixLen' elements of 'keyPrefix' followed by
+             * the last 'keySuffix.size() - prefixLen' elements of 'keySuffix'.
+             *
+             * e.g.
+             *
+             *  Suppose that
+             *
+             *      keyPrefix = { "" : 1, "" : 2 }
+             *      prefixLen = 1
+             *      prefixExclusive = false
+             *      keySuffix = [ IGNORED; { "" : 5 } ]
+             *      suffixInclusive = [ IGNORED; false ]
+             *
+             *      ==> represented key is { "" : 1, "" : 5 }
+             *          with the exclusive byte set on the second field
+             *
+             *  Suppose that
+             *
+             *      keyPrefix = { "" : 1, "" : 2 }
+             *      prefixLen = 1
+             *      prefixExclusive = true
+             *      keySuffix = IGNORED
+             *      suffixInclusive = IGNORED
+             *
+             *      ==> represented key is { "" : 1 }
+             *          with the exclusive byte set on the first field
+             *
+             * @param prefixExclusive true if 'this' forward (reverse) cursor
+             *        should be positioned immediately after (immediately
+             *        before) the represented key, and false otherwise
+             *
+             * @param suffixInclusive an element of the vector is false if
+             *        'this' forward (reverse) cursor should be positioned
+             *        immediately after (immediately before) the represented
+             *        key, and true otherwise
+             *
+             * Implementations should prohibit callers from specifying
+             * 'prefixLen = 0' when 'prefixExclusive = true'.
+             *
+             * @see IndexEntryComparison::makeQueryObject
              */
-            virtual void customLocate(const BSONObj& keyBegin,
-                                      int keyBeginLen,
-                                      bool afterVersion,
-                                      const vector<const BSONElement*>& keyEnd,
-                                      const vector<bool>& keyEndInclusive) = 0;
+            virtual void customLocate(const BSONObj& keyPrefix,
+                                      int prefixLen,
+                                      bool prefixExclusive,
+                                      const vector<const BSONElement*>& keySuffix,
+                                      const vector<bool>& suffixInclusive) = 0;
 
             /**
              * Return the key associated with the current position of 'this' cursor.
