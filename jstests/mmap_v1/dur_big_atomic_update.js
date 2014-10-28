@@ -14,8 +14,11 @@ for (var i = 0; i < 1024; i++){
 }
 assert.writeOK(bulk.execute());
 
-big_string = 'xxxxxxxxxxxxxxxx';
-while (big_string.length < 1024*1024) {
+var server_bits = db.serverStatus().mem.bits;
+var big_string_size = (server_bits == 32 ? 128 *1024 : 1024*1024);
+
+var big_string = 'xxxxxxxxxxxxxxxx';
+while (big_string.length < big_string_size) {
     big_string += big_string;
 }
 
