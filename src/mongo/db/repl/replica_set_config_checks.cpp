@@ -258,13 +258,13 @@ namespace {
             return StatusWith<int>(status);
         }
 
-        if (force) {
-            return findSelfInConfig(externalState, newConfig);
-        }
-
         status = validateOldAndNewConfigsCompatible(oldConfig, newConfig);
         if (!status.isOK()) {
             return StatusWith<int>(status);
+        }
+
+        if (force) {
+            return findSelfInConfig(externalState, newConfig);
         }
 
         return findSelfInConfigIfElectable(externalState, newConfig);

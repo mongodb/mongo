@@ -382,8 +382,6 @@ namespace repl {
             massert( 10385 ,  "Unable to get database list", ok );
         }
 
-        WriteUnitOfWork wunit(txn);
-
         BSONObjIterator i( info.getField( "databases" ).embeddedObject() );
         while( i.moreWithEOO() ) {
             BSONElement e = i.next();
@@ -401,8 +399,6 @@ namespace repl {
         syncedTo = OpTime();
         addDbNextPass.clear();
         save(txn);
-
-        wunit.commit();
     }
 
     void ReplSource::resyncDrop( OperationContext* txn, const string& db ) {

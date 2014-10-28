@@ -45,7 +45,7 @@ namespace mongo {
         return _elapsedTracker.intervalHasElapsed();
     }
 
-    bool PlanYieldPolicy::yield(bool registerPlan) {
+    bool PlanYieldPolicy::yield() {
         // This is a no-op if document-level locking is supported. Doc-level locking systems
         // should not need to yield.
         if (supportsDocLocking()) {
@@ -59,10 +59,6 @@ namespace mongo {
 
         invariant(_planYielding);
 
-        if (registerPlan) {
-            _planYielding->registerExec();
-        }
-
         OperationContext* opCtx = _planYielding->getOpCtx();
         invariant(opCtx);
 
@@ -71,10 +67,6 @@ namespace mongo {
         // Note that this call checks for interrupt, and thus can throw if interrupt flag is set.
         Yield::yieldAllLocks(opCtx, 1);
         _elapsedTracker.resetLastTime();
-
-        if (registerPlan) {
-            _planYielding->deregisterExec();
-        }
 
         return _planYielding->restoreState(opCtx);
     }

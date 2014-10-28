@@ -184,7 +184,7 @@ namespace repl {
     }
 
     // Doles out all the work to the writer pool threads and waits for them to complete
-    void SyncTail::multiApply( std::deque<BSONObj>& ops) {
+    OpTime SyncTail::multiApply( std::deque<BSONObj>& ops) {
 
         // Use a ThreadPool to prefetch all the operations in a batch.
         prefetchOps(ops);
@@ -200,7 +200,16 @@ namespace repl {
         // stop all readers until we're done
         Lock::ParallelBatchWriterMode pbwm;
 
+        ReplicationCoordinator* replCoord = getGlobalReplicationCoordinator();
+        if (replCoord->getCurrentMemberState().primary() &&
+            !replCoord->isWaitingForApplierToDrain()) {
+
+            severe() << "attempting to replicate ops while primary";
+            fassertFailed(28527);
+        }
+
         applyOps(writerVectors);
+        return applyOpsToOplog(&ops);
     }
 
 
@@ -267,8 +276,7 @@ namespace repl {
             bytesApplied += ops.getSize();
             entriesApplied += ops.getDeque().size();
 
-            multiApply(ops.getDeque());
-            OpTime lastOpTime = applyOpsToOplog(&ops.getDeque());
+            const OpTime lastOpTime = multiApply(ops.getDeque());
 
             // if the last op applied was our end, return
             if (lastOpTime == endOpTime) {
@@ -411,12 +419,6 @@ namespace {
             const BSONObj& lastOp = ops.getDeque().back();
             handleSlaveDelay(lastOp);
 
-            if (replCoord->getCurrentMemberState().primary() && 
-                !replCoord->isWaitingForApplierToDrain()) {
-                severe() << "attempting to replicate ops while primary";
-                fassertFailed(28527);
-            }
-
             // Set minValid to the last op to be applied in this next batch.
             // This will cause this node to go into RECOVERING state
             // if we should crash and restart before updating the oplog
@@ -424,8 +426,6 @@ namespace {
             setMinValid(&txn, minValid);
 
             multiApply(ops.getDeque());
-
-            applyOpsToOplog(&ops.getDeque());
 
             // If we're just testing (no manager), don't keep looping if we exhausted the bgqueue
             // TODO(spencer): Remove repltest.cpp dbtest or make this work with the new replication

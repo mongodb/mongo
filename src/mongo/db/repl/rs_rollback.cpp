@@ -731,8 +731,8 @@ namespace {
          *  also, this is better for status reporting - we know what is happening.
          */
         if (!replCoord->setFollowerMode(MemberState::RS_ROLLBACK)) {
-            log() << "Cannot transition from " << replCoord->getCurrentMemberState() << " to " <<
-                MemberState(MemberState::RS_ROLLBACK);
+            warning() << "Cannot transition from " << replCoord->getCurrentMemberState() <<
+                " to " << MemberState(MemberState::RS_ROLLBACK);
             return 0;
         }
 

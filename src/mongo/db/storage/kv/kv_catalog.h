@@ -92,9 +92,17 @@ namespace mongo {
                             const StringData& ns,
                             DiskLoc* out=NULL ) const;
 
+        std::string _newUniqueIdent(const char* kind);
+
+        // Helpers only used by constructor and init(). Don't call from elsewhere.
+        static std::string _newRand();
+        bool _hasEntryCollidingWithRand() const;
+
         RecordStore* _rs; // not owned
         const bool _isRsThreadSafe;
-        int64_t _rand;
+
+        // These two are only used for ident generation inside _newUniqueIdent.
+        std::string _rand; // effectively const after init() returns
         AtomicUInt64 _next;
 
         struct Entry {

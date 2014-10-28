@@ -160,12 +160,16 @@ namespace mongo {
                 return (T*) writingPtr(x, sizeof(T));
             }
 
-            /** Commits pending changes, flushes all changes to main data
-                files, then removes the journal.
-                
-                This is useful as a "barrier" to ensure that writes before this
-                call will never go through recovery and be applied to files
-                that have had changes made after this call applied.
+            /**
+             * Commits pending changes, flushes all changes to main data files, then removes the
+             * journal.
+             *
+             * WARNING: Data *must* be in a crash-recoverable state when this is called and must
+             *          not be inside of a write unit of work.
+             *
+             * This is useful as a "barrier" to ensure that writes before this call will never go
+             * through recovery and be applied to files that have had changes made after this call
+             * applied.
              */
             virtual void syncDataAndTruncateJournal(OperationContext* txn) = 0;
 
