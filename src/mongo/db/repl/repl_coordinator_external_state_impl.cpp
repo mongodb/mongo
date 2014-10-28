@@ -220,7 +220,7 @@ namespace {
 
     OperationContext* ReplicationCoordinatorExternalStateImpl::createOperationContext() {
         stdx::function<std::string ()> f;
-        f = std::bind(&ReplicationCoordinatorExternalStateImpl::getNextOpContextThreadName,this);
+        f = stdx::bind(&ReplicationCoordinatorExternalStateImpl::getNextOpContextThreadName,this);
         Client::initThreadIfNotAlready(f);
         return new OperationContextImpl;
     }
