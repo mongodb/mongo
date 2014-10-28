@@ -115,7 +115,9 @@ namespace mongo {
 
         // The update stage does not create its own collection.  As such, if the update is
         // an upsert, create the collection that the update stage inserts into beforehand.
-        if (!collection && _request->isUpsert()) {
+        // We can only create the collection if this is not an explain, as explains should not
+        // alter the state of the database.
+        if (!collection && _request->isUpsert() && !_request->isExplain()) {
             OperationContext* const txn = _request->getOpCtx();
 
             // We have to have an exclsive lock on the db to be allowed to create the collection.
