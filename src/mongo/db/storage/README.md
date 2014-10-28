@@ -137,20 +137,6 @@ acts on that information.
 
 RecoveryUnit
 ------------
-**Q**: Should RecoveryUnit::syncDataAndTruncateJournal be static or in a different class? I am not
-sure why they need to effect the instance of RecoveryUnit?
-**A**: These methods are effectively static in that they will only modify global
-state. However, these methods are virtual, which is why we aren’t declaring them
-as static. That being said, we will likely remove this methods from the public
-API and move them into our mmapv1 storage engine implementation in the near
-future.
-
-**Q**: RecoveryUnit::syncDataAndTruncateJournal sounds like a checkpoint. That can
-take a long time, is this expected to block until that is done?  
-**A**: Yes. Note that this is only called externally when we drop a database or when
-the user explicitly requests a sync via the fsync command.  We may rename this
-method as part of a naming sweep. 
-
 **Q**: As documented I don’t understand the point of the RecoverUnit::endUnitOfWork
 nesting behavior. Can you explain where it is used or will be used?  
 **A**: The RecoveryUnit interface and the mmapv1 (current mongodb storage engine)

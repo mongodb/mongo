@@ -1,66 +1,57 @@
-var path = "jstests/libs/";
-
-var rs = new ReplSetTest({"nodes" : {node0 : {}, node1 : {}, arbiter : {}}, keyFile : path+"key1"});
-rs.startSet();
-rs.initiate();
-
-master = rs.getMaster();
-print("adding user");
-master.getDB("admin").createUser({user: "foo", pwd: "bar", roles: jsTest.adminUserRoles},
-                                 {w: 2, wtimeout: 30000});
-
-var checkValidState = function(i) {
-    assert.soon(function() {
-        var result = rs.nodes[i].getDB("admin").runCommand({isMaster : 1});
-        printjson(result);
-        return result.secondary || result.ismaster;
+(function () {
+    "use strict";
+    var keyfile = "jstests/libs/key1";
+    var master;
+    var rs = new ReplSetTest({
+        nodes : { node0 : {}, node1 : {}, arbiter : {}},
+        keyFile : keyfile
     });
-};
+    rs.startSet();
+    rs.initiate();
 
-var safeInsert = function() {
+    master = rs.getMaster();
+    jsTest.log("adding user");
+    master.getDB("admin").createUser({user: "foo", pwd: "bar", roles: jsTest.adminUserRoles},
+                                     {w: 2, wtimeout: 30000});
+
+    var safeInsert = function() {
+        master = rs.getMaster();
+        master.getDB("admin").auth("foo", "bar");
+        assert.writeOK(master.getDB("foo").bar.insert({ x: 1 }));
+    }
+
+    jsTest.log("authing");
+    for (var i=0; i<2; i++) {
+        assert(rs.nodes[i].getDB("admin").auth("foo", "bar"),
+               "could not log into " + rs.nodes[i].host);
+    }
+
+    jsTest.log("make common point");
+
+    safeInsert();
+    authutil.asCluster(rs.nodes, keyfile, function() { rs.awaitReplication(); });
+
+    jsTest.log("write stuff to 0&2")
+    rs.stop(1);
+
     master = rs.getMaster();
     master.getDB("admin").auth("foo", "bar");
-    assert.writeOK(master.getDB("foo").bar.insert({ x: 1 }));
-}
+    master.getDB("foo").bar.drop();
+    jsTest.log("last op: " +
+               tojson(master.getDB("local").oplog.rs.find().sort({$natural:-1}).limit(1).next()));
 
-print("authing");
-assert.soon(function() {
-    for (var i=0; i<2; i++) {
-        checkValidState(i);
+    jsTest.log("write stuff to 1&2")
+    rs.stop(0);
+    rs.restart(1);
 
-        // if this is run before initial sync finishes, we won't be logged in
-        var res = rs.nodes[i].getDB("admin").auth("foo", "bar");
-        if (res != 1) {
-            print("couldn't log into "+rs.nodes[i].host);
-            return false;
-        }
-    }
-    return true;
-});
+    safeInsert();
+    jsTest.log("last op: " +
+               tojson(master.getDB("local").oplog.rs.find().sort({$natural:-1}).limit(1).next()));
 
-print("make common point");
+    rs.restart(0);
 
-safeInsert();
-authutil.asCluster(rs.nodes, 'jstests/libs/key1', function() { rs.awaitReplication(); });
+    jsTest.log("doing rollback!");
 
-print("write stuff to 0&2")
-rs.stop(1);
+    authutil.asCluster(rs.nodes, keyfile, function () { rs.awaitSecondaryNodes(); });
 
-master = rs.getMaster();
-master.getDB("admin").auth("foo", "bar");
-master.getDB("foo").bar.drop();
-print("last op: "+tojson(master.getDB("local").oplog.rs.find().sort({$natural:-1}).limit(1).next()));
-
-print("write stuff to 1&2")
-rs.stop(0);
-rs.restart(1);
-
-safeInsert();
-print("last op: "+tojson(master.getDB("local").oplog.rs.find().sort({$natural:-1}).limit(1).next()));
-
-rs.restart(0);
-
-print("doing rollback!");
-
-checkValidState(0);
-checkValidState(1);
+}());

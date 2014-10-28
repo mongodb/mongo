@@ -56,7 +56,7 @@ namespace mongo {
          * Returns true if the executor was restored successfully and is still alive. Returns false
          * if the executor got killed during yield.
          */
-        bool yield(bool registerPlan = false);
+        bool yield();
 
     private:
         // Default constructor disallowed in order to ensure initialization of '_planYielding'.

@@ -193,12 +193,9 @@ namespace mongo {
             }
 
             {
-
-                // this is suboptimal but syncDataAndTruncateJournal is called from dropDatabase,
-                // and that may need a global lock.
+                // TODO: SERVER-4328 Don't lock globally
                 Lock::GlobalWrite lk(txn->lockState());
                 Client::Context context(txn, dbname);
-                WriteUnitOfWork wunit(txn);
 
                 log() << "dropDatabase " << dbname << " starting" << endl;
 
@@ -207,8 +204,11 @@ namespace mongo {
 
                 log() << "dropDatabase " << dbname << " finished";
 
-                if (!fromRepl)
-                    repl::logOp(txn, "c",(dbname + ".$cmd").c_str(), cmdObj);
+                WriteUnitOfWork wunit(txn);
+
+                if (!fromRepl) {
+                    repl::logOp(txn, "c", (dbname + ".$cmd").c_str(), cmdObj);
+                }
 
                 wunit.commit();
             }
@@ -274,8 +274,7 @@ namespace mongo {
                 return false;
             }
 
-            // SERVER-4328 todo don't lock globally. currently syncDataAndTruncateJournal is being
-            // called within, and that requires a global lock i believe.
+            // TODO: SERVER-4328 Don't lock globally
             Lock::GlobalWrite lk(txn->lockState());
             Client::Context context(txn,  dbname );
 
