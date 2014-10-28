@@ -65,7 +65,6 @@ namespace mongo {
                 double totalBytes = numPages * pageSize;
                 double cacheBytes = totalBytes / 10;
                 cacheSizeGB = static_cast<int>( cacheBytes / ( 1024 * 1024 * 1024 ) );
-                LOG(1) << "WT cache size: " <<cacheSizeGB << "G";
                 if ( cacheSizeGB < 1 )
                     cacheSizeGB = 1;
             }
@@ -80,6 +79,7 @@ namespace mongo {
         ss << "log=(enabled),";
         ss << extraOpenOptions;
         string config = ss.str();
+        LOG(1) << "wiredtiger_open config: " << config;
         invariantWTOK(wiredtiger_open(path.c_str(), &_eventHandler, config.c_str(), &_conn));
         _sessionCache.reset( new WiredTigerSessionCache( this ) );
     }

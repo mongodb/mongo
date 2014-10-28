@@ -61,16 +61,15 @@ namespace mongo {
         // Separate out a prefix and suffix in the default string. User configuration will
         // override values in the prefix, but not values in the suffix.
         str::stream ss;
-        if ( isOplog(ns) ) {
-            ss << "type=file,";
-            ss << "leaf_page_max=512k,";
-            ss << "memory_page_max=10m,";
-        }
-        else {
-            ss << "type=lsm";
-        }
+        ss << "type=file,";
+        ss << "memory_page_max=10m,";
 
         ss << extraStrings << ",";
+
+        if ( isOplog(ns) ) {
+            // force file for oplog
+            ss << "type=file,";
+        }
 
         // Validate configuration object.
         // Warn about unrecognized fields that may be introduced in newer versions of this
