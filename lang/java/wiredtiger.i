@@ -1675,13 +1675,12 @@ WT_ASYNC_CALLBACK javaApiAsyncHandler = {javaAsyncHandler};
 %rename(open_session) __wt_connection::open_session_wrap;
 
 %ignore __wt_session::transaction_pinned_range;
-%rename(open_session) __wt_session::transaction_pinned_range_wrap;
+%rename(transaction_pinned_range) __wt_session::transaction_pinned_range_wrap;
 %javamethodmodifiers __wt_session::transaction_pinned_range_wrap "
   /**
    * @copydoc WT_SESSION::transaction_pinned_range
    */
   public ";
-%rename(transaction_pinned_range) __wt_session::transaction_pinned_range_wrap;
 
 %rename(open_cursor) __wt_session::open_cursor_wrap;
 %ignore __wt_session::open_cursor;
