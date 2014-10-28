@@ -33,7 +33,7 @@ t.ensureIndex( { x : 1 } , { expireAfterSeconds : 20000 } );
 
 // split chunk in half by _id, and move one chunk to the other shard
 s.adminCommand( {split : ns , middle : {_id : 12 } } );
-s.adminCommand( {moveChunk : ns , find : {_id : 0} , to : "shard0000" } )
+s.adminCommand( {moveChunk : ns , find : {_id : 0} , to : s.getOther(s.getServer(dbname)).name } );
 
 // one shard will lose 12/12 docs, the other 6/12, so count will go
 // from 24 -> 18 or 12 -> 6
@@ -56,26 +56,25 @@ printjson( shard0.getCollection( coll ).stats() );
 print("Shard 1 coll stats:")
 printjson( shard1.getCollection( coll ).stats() );
 
+
+function getTTLTime( theCollection, theKey ) {
+    var indexes = theCollection.getIndexes();
+    for ( var i = 0; i < indexes.length; i++ ) {
+        if ( friendlyEqual( theKey, indexes[i].key ) )
+            return indexes[i].expireAfterSeconds;
+    }
+    throw "not found";
+}
+
 // Check that TTL index (with expireAfterSeconds field) appears on both shards
-var ttlIndexPattern = { "key": { "x" : 1 } , "ns": ns , "expireAfterSeconds" : 20000 };
-assert.eq( 1 ,
-           shard0.system.indexes.find( ttlIndexPattern ).count() ,
-           "shard0 does not have TTL index");
-assert.eq( 1 ,
-           shard1.system.indexes.find( ttlIndexPattern ).count() ,
-           "shard1 does not have TTL index");
+assert.eq( 20000, getTTLTime( shard0.getCollection(coll), { x : 1 } ) );
+assert.eq( 20000, getTTLTime( shard1.getCollection(coll), { x : 1 } ) );
 
 // Check that the collMod command successfully updates the expireAfterSeconds field
 s.getDB( dbname ).runCommand( { collMod : coll,
                                 index : { keyPattern : {x : 1}, expireAfterSeconds : 10000} } );
-
-var newTTLindex = { "key": { "x" : 1 } , "ns": ns , "expireAfterSeconds" : 10000 };
-assert.eq( 1 ,
-           shard0.system.indexes.find( newTTLindex ).count(),
-           "shard0 index didn't get updated");
-assert.eq( 1 ,
-           shard1.system.indexes.find( newTTLindex ).count(),
-           "shard1 index didn't get updated");
+assert.eq( 10000, getTTLTime( shard0.getCollection(coll), { x : 1 } ) );
+assert.eq( 10000, getTTLTime( shard1.getCollection(coll), { x : 1 } ) );
 
 assert.soon(
     function() {
