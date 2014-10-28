@@ -192,8 +192,14 @@ namespace mongo {
                 hintObj = BSON("$hint" << hint);
             }
 
+            std::string ns = parseNs(dbname, cmdObj);
+
+            if (!nsIsFull(ns)) {
+                return Status(ErrorCodes::BadValue, "collection name missing");
+            }
+
             // Parsed correctly. Fill out 'request' with the results.
-            request->ns = parseNs(dbname, cmdObj);
+            request->ns = ns;
             request->query = query;
             request->hint = hintObj;
             request->limit = limit;

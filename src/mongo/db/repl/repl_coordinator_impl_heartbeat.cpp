@@ -62,7 +62,8 @@ namespace {
 }  //namespace
 
     void ReplicationCoordinatorImpl::_doMemberHeartbeat(ReplicationExecutor::CallbackData cbData,
-                                                        const HostAndPort& target) {
+                                                        const HostAndPort& target,
+                                                        int targetIndex) {
 
         _untrackHeartbeatHandle(cbData.myHandle);
         if (cbData.status == ErrorCodes::CallbackCanceled) {
@@ -80,27 +81,30 @@ namespace {
         const ReplicationExecutor::RemoteCommandCallbackFn callback = stdx::bind(
                 &ReplicationCoordinatorImpl::_handleHeartbeatResponse,
                 this,
-                stdx::placeholders::_1);
+                stdx::placeholders::_1,
+                targetIndex);
 
         _trackHeartbeatHandle(_replExecutor.scheduleRemoteCommand(request, callback));
     }
 
     void ReplicationCoordinatorImpl::_scheduleHeartbeatToTarget(
-            const HostAndPort& host,
+            const HostAndPort& target,
+            int targetIndex,
             Date_t when) {
 
-        LOG(2) << "Scheduling heartbeat to " << host << " at " << dateToISOStringUTC(when);
+        LOG(2) << "Scheduling heartbeat to " << target << " at " << dateToISOStringUTC(when);
         _trackHeartbeatHandle(
                 _replExecutor.scheduleWorkAt(
                         when,
                         stdx::bind(&ReplicationCoordinatorImpl::_doMemberHeartbeat,
                                    this,
                                    stdx::placeholders::_1,
-                                   host)));
+                                   target,
+                                   targetIndex)));
     }
 
     void ReplicationCoordinatorImpl::_handleHeartbeatResponse(
-            const ReplicationExecutor::RemoteCommandCallbackData& cbData) {
+            const ReplicationExecutor::RemoteCommandCallbackData& cbData, int targetIndex) {
 
         // remove handle from queued heartbeats
         _untrackHeartbeatHandle(cbData.myHandle);
@@ -122,7 +126,7 @@ namespace {
         const bool isUnauthorized = (responseStatus.code() == ErrorCodes::Unauthorized) ||
                                     (responseStatus.code() == ErrorCodes::AuthenticationFailed);
         const Date_t now = _replExecutor.now();
-        const OpTime lastApplied = _getLastOpApplied();  // Locks and unlocks _mutex.
+        const OpTime lastApplied = getMyLastOptime();  // Locks and unlocks _mutex.
         Milliseconds networkTime(0);
         StatusWith<ReplSetHeartbeatResponse> hbStatusResponse(hbResponse);
 
@@ -150,9 +154,14 @@ namespace {
                     lastApplied);
 
         if (action.getAction() == HeartbeatResponseAction::NoAction &&
-            hbStatusResponse.isOK() &&
-            hbStatusResponse.getValue().hasOpTime()) {
-            _updateOpTimeFromHeartbeat(target, hbStatusResponse.getValue().getOpTime());
+                hbStatusResponse.isOK() &&
+                hbStatusResponse.getValue().hasOpTime() &&
+                targetIndex >= 0) {
+            boost::lock_guard<boost::mutex> lk(_mutex);
+            if (hbStatusResponse.getValue().getVersion() == _rsConfig.getConfigVersion()) {
+                _updateOpTimeFromHeartbeat_inlock(targetIndex,
+                                                  hbStatusResponse.getValue().getOpTime());
+            }
         }
 
         std::for_each(_stepDownWaiters.begin(),
@@ -164,35 +173,23 @@ namespace {
 
         _scheduleHeartbeatToTarget(
                 target,
+                targetIndex,
                 std::max(now, action.getNextHeartbeatStartDate()));
 
         _handleHeartbeatResponseAction(action, hbStatusResponse);
     }
 
-    void ReplicationCoordinatorImpl::_updateOpTimeFromHeartbeat(const HostAndPort& target, 
-                                                                OpTime optime) {
+    void ReplicationCoordinatorImpl::_updateOpTimeFromHeartbeat_inlock(int targetIndex,
+                                                                       OpTime optime) {
+        invariant(_thisMembersConfigIndex >= 0);
+        invariant(targetIndex >= 0);
 
-        boost::unique_lock<boost::mutex> lk(_mutex);
-        const MemberConfig* targetMember = _rsConfig.findMemberByHostAndPort(target);
-        if (!targetMember) {
-            return;
-        }
-        int targetId = targetMember->getId();
-        // Find targetId in map
-        for (SlaveInfoMap::const_iterator it = _slaveInfoMap.begin();
-             it != _slaveInfoMap.end(); ++it) {
-            const OID& rid = it->first;
-            const SlaveInfo& slaveInfo = it->second;
-            if (slaveInfo.memberID == targetId) {
-                Status status = _setLastOptime_inlock(&lk, 
-                                                      rid, 
-                                                      optime);
-                if (!status.isOK()) {
-                    LOG(1) << "Could not update optime from node " << target.toString() <<
-                        ": " << status;
-                }
-                return;
-            }
+        SlaveInfo& slaveInfo = _slaveInfo[targetIndex];
+        if (optime > slaveInfo.opTime && slaveInfo.rid.isSet()) {
+            // TODO(spencer): The second part of the above if-statement can be removed after 2.8
+            // but for now, to maintain compatibility with 2.6, we can't record optimes for any
+            // nodes we haven't heard from via replSetUpdatePosition yet to associate an RID.
+            _updateSlaveInfoOptime_inlock(&slaveInfo, optime);
         }
     }
 
@@ -496,7 +493,7 @@ namespace {
             if (i == _thisMembersConfigIndex) {
                 continue;
             }
-            _scheduleHeartbeatToTarget(_rsConfig.getMemberAt(i).getHostAndPort(), now);
+            _scheduleHeartbeatToTarget(_rsConfig.getMemberAt(i).getHostAndPort(), i, now);
         }
     }
 

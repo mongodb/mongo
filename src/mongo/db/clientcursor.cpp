@@ -174,7 +174,7 @@ namespace mongo {
         if (!rid.isSet())
             return;
 
-        repl::getGlobalReplicationCoordinator()->setLastOptime(txn, rid, _slaveReadTill);
+        repl::getGlobalReplicationCoordinator()->setLastOptimeForSlave(txn, rid, _slaveReadTill);
     }
 
     //

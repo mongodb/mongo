@@ -92,7 +92,9 @@ namespace repl {
 
         virtual bool shouldIgnoreUniqueIndex(const IndexDescriptor* idx);
 
-        virtual Status setLastOptime(OperationContext* txn, const OID& rid, const OpTime& ts);
+        virtual Status setLastOptimeForSlave(OperationContext* txn,
+                                             const OID& rid,
+                                             const OpTime& ts);
 
         virtual Status setMyLastOptime(OperationContext* txn, const OpTime& ts);
 
@@ -122,6 +124,8 @@ namespace repl {
         virtual Status processReplSetGetStatus(BSONObjBuilder* result);
 
         virtual void fillIsMasterForReplSet(IsMasterResponse* result);
+
+        virtual void appendSlaveInfoData(BSONObjBuilder* result);
 
         virtual void processReplSetGetConfig(BSONObjBuilder* result);
 
@@ -184,6 +188,8 @@ namespace repl {
     private:
 
         bool _setMaintenanceMode_inlock(OperationContext* txn, bool activate);
+
+        Status _setLastOptime(OperationContext* txn, const OID& rid, const OpTime& ts);
 
         // Mutex that protects the _slaveOpTimeMap, and _maintenceMode
         mutable boost::mutex _mutex;

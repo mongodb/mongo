@@ -371,9 +371,17 @@ namespace {
         return true;
     }
 
-    Status LegacyReplicationCoordinator::setLastOptime(OperationContext* txn,
-                                                       const OID& rid,
-                                                       const OpTime& ts) {
+    Status LegacyReplicationCoordinator::setLastOptimeForSlave(OperationContext* txn,
+                                                               const OID& rid,
+                                                               const OpTime& ts) {
+        invariant(getReplicationMode() == modeMasterSlave);
+        return _setLastOptime(txn, rid, ts);
+
+    }
+
+    Status LegacyReplicationCoordinator::_setLastOptime(OperationContext* txn,
+                                                        const OID& rid,
+                                                        const OpTime& ts) {
         {
             boost::lock_guard<boost::mutex> lock(_mutex);
             SlaveOpTimeMap::const_iterator it(_slaveOpTimeMap.find(rid));
@@ -426,7 +434,7 @@ namespace {
         if (getReplicationMode() == modeReplSet) {
             theReplSet->lastOpTimeWritten = ts;
         }
-        return setLastOptime(txn, _myRID, ts);
+        return _setLastOptime(txn, _myRID, ts);
     }
 
     OpTime LegacyReplicationCoordinator::getMyLastOptime() const {
@@ -565,6 +573,25 @@ namespace {
             theReplSet->fillIsMaster(resultBuilder);
             Status status = result->initialize(resultBuilder.done());
             fassert(18821, status);
+        }
+    }
+
+    void LegacyReplicationCoordinator::appendSlaveInfoData(BSONObjBuilder* result) {
+        boost::lock_guard<boost::mutex> lock(_mutex);
+        BSONArrayBuilder slaves(result->subarrayStart("slaves"));
+        {
+            for (SlaveOpTimeMap::const_iterator itr = _slaveOpTimeMap.begin();
+                    itr != _slaveOpTimeMap.end(); ++itr) {
+                BSONObjBuilder entry(slaves.subobjStart());
+                entry.append("rid", itr->first);
+                entry.append("optime", itr->second);
+                if (getReplicationMode() == modeReplSet) {
+                    Member* member = _ridMemberMap[itr->first];
+                    invariant(member);
+                    entry.append("host", member->h().toString());
+                    entry.append("memberID", member->id());
+                }
+            }
         }
     }
 
@@ -982,7 +1009,7 @@ namespace {
         for (UpdatePositionArgs::UpdateIterator update = updates.updatesBegin();
                 update != updates.updatesEnd();
                 ++update) {
-            Status status = setLastOptime(txn, update->rid, update->ts);
+            Status status = _setLastOptime(txn, update->rid, update->ts);
             if (!status.isOK()) {
                 return status;
             }

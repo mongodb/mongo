@@ -213,7 +213,9 @@ namespace repl {
                     syncDoInitialSync();
                     continue; // start from top again in case sync failed.
                 }
-                replCoord->setFollowerMode(MemberState::RS_RECOVERING);
+                if (!replCoord->setFollowerMode(MemberState::RS_RECOVERING)) {
+                    continue;
+                }
 
                 /* we have some data.  continue tailing. */
                 SyncTail tail(BackgroundSync::get(), multiSyncApply);

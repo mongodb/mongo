@@ -197,7 +197,7 @@ namespace mongo {
                 std::string intervalStr = itInterval->toString();
 
                 // Insulate against hitting BSON size limit.
-                if ((bob.len() + intervalStr.size()) > BSONObjMaxUserSize) {
+                if ((bob.len() + (int)intervalStr.size()) > BSONObjMaxUserSize) {
                     fieldBuilder.append("warning: bounds truncated due to BSON size limit");
                     fieldBuilder.doneFast();
                     return bob.obj();

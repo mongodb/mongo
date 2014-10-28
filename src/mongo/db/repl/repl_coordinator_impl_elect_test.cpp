@@ -182,9 +182,8 @@ namespace {
         ReplicaSetConfig config = assertMakeRSConfig(configObj);
 
         OperationContextNoop txn;
-        OID selfRID = getReplCoord()->getMyRID();
         OpTime time1(100, 1);
-        getReplCoord()->setLastOptime(&txn, selfRID, time1);
+        getReplCoord()->setMyLastOptime(&txn, time1);
         ASSERT(getReplCoord()->setFollowerMode(MemberState::RS_SECONDARY));
 
         simulateEnoughHeartbeatsForElectability();
@@ -230,9 +229,8 @@ namespace {
         ReplicaSetConfig config = assertMakeRSConfig(configObj);
 
         OperationContextNoop txn;
-        OID selfRID = getReplCoord()->getMyRID();
         OpTime time1(100, 1);
-        getReplCoord()->setLastOptime(&txn, selfRID, time1);
+        getReplCoord()->setMyLastOptime(&txn, time1);
         ASSERT(getReplCoord()->setFollowerMode(MemberState::RS_SECONDARY));
 
         simulateEnoughHeartbeatsForElectability();

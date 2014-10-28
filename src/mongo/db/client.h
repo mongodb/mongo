@@ -99,8 +99,8 @@ namespace mongo {
         bool isGod() const { return _god; } /* this is for map/reduce writes */
         bool setGod(bool newVal) { const bool prev = _god; _god = newVal; return prev; }
 
-        void setRemoteID(const OID& rid) { _remoteId = rid;  }
-        OID getRemoteID() const { return _remoteId; }
+        void setRemoteID(const OID& rid) { _remoteId = rid;  } // Only used for master/slave
+        OID getRemoteID() const { return _remoteId; } // Only used for master/slave
         ConnectionId getConnectionId() const { return _connectionId; }
         const std::string& getThreadId() const { return _threadId; }
 

@@ -125,6 +125,7 @@ namespace {
         _maxSyncSourceLagSecs(maxSyncSourceLagSecs),
         _selfIndex(-1),
         _stepDownUntil(0),
+        _electionSleepUntil(0),
         _maintenanceModeCalls(0),
         _followerMode(MemberState::RS_STARTUP2)
     {
@@ -938,7 +939,7 @@ namespace {
                             LastVote::leaseTime.total_milliseconds() +
                             kHeartbeatInterval.total_milliseconds();
                         if (_stepDownUntil < until) {
-                            setStepDownTime(until);
+                            _stepDownUntil = until;
                         }
                         return _stepDownSelf();
                     }
@@ -1058,7 +1059,11 @@ namespace {
                 _getUnelectableReasonString(unelectableReason);
             return false;
         }
-
+        if (_electionSleepUntil > now) {
+            LOG(2) << "Not standing for election before " <<
+                dateToISOStringLocal(_electionSleepUntil) << " because I stood too recently";
+            return false;
+        }
         // All checks passed, become a candidate and start election proceedings.
         _role = Role::candidate;
         return true;
@@ -1428,7 +1433,7 @@ namespace {
                 response->append("warning", "you really want to freeze for only 1 second?");
 
             if (!_iAmPrimary()) {
-                setStepDownTime(now + (secs * 1000));
+                _stepDownUntil = std::max(_stepDownUntil, Date_t(now + (secs * 1000)));
                 log() << "replSet info 'freezing' for " << secs << " seconds";
             }
             else {
@@ -1455,9 +1460,8 @@ namespace {
         return false;
     }
 
-    void TopologyCoordinatorImpl::setStepDownTime(Date_t newTime) {
-        invariant(newTime > _stepDownUntil);
-        _stepDownUntil = newTime;
+    void TopologyCoordinatorImpl::setElectionSleepUntil(Date_t newTime) {
+        _electionSleepUntil = newTime;
     }
 
     OpTime TopologyCoordinatorImpl::getElectionTime() const {
@@ -1835,7 +1839,7 @@ namespace {
         if (!canStepDown) {
             return false;
         }
-        setStepDownTime(until);
+        _stepDownUntil = until;
         _stepDownSelf();
         return true;
     }

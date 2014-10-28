@@ -44,10 +44,12 @@ namespace repl {
     class UpdatePositionArgs {
     public:
         struct UpdateInfo {
-            UpdateInfo(const OID& anRid, const OpTime& aTs);
+            UpdateInfo(const OID& anRid, const OpTime& aTs, long long aCfgver, long long aMemberID);
 
             OID rid;
             OpTime ts;
+            long long cfgver;
+            long long memberID;
         };
 
         typedef std::vector<UpdateInfo>::const_iterator UpdateIterator;

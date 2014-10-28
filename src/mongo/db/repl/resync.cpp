@@ -75,12 +75,11 @@ namespace repl {
                     return appendCommandStatus(result, Status(ErrorCodes::NotYetInitialized,
                                                               "no replication yet active"));
                 }
-                if (replCoord->getCurrentMemberState().primary()) {
+                if (replCoord->getCurrentMemberState().primary() ||
+                        !replCoord->setFollowerMode(MemberState::RS_STARTUP2)) {
                     return appendCommandStatus(result, Status(ErrorCodes::NotSecondary,
                                                               "primaries cannot resync"));
                 }
-
-                replCoord->setFollowerMode(MemberState::RS_STARTUP2);
                 BackgroundSync::get()->setInitialSyncRequestedFlag(true);
                 return true;
             }

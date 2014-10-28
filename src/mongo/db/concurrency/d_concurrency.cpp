@@ -215,8 +215,7 @@ namespace mongo {
         : ScopedLock(lockState, mode == MODE_S || mode == MODE_IS ? 'r' : 'w'),
           _id(RESOURCE_DATABASE, db),
           _mode(mode) {
-        dassert(!db.empty());
-        dassert(!nsIsFull(db));
+        massert(28539, "need a valid database name", !db.empty() && !nsIsFull(db));
         lockDB();
     }
 
@@ -253,10 +252,9 @@ namespace mongo {
         : _id(RESOURCE_COLLECTION, ns),
           _lockState(lockState) {
         const bool isRead = (mode == MODE_S || mode == MODE_IS);
-        dassert(!ns.empty());
-        dassert(nsIsFull(ns));
+        massert(28538, "need a non-empty collection name", nsIsFull(ns));
         dassert(_lockState->isLockHeldForMode(ResourceId(RESOURCE_DATABASE,
-                                                                nsToDatabaseSubstring(ns)),
+                                                         nsToDatabaseSubstring(ns)),
                                               isRead ? MODE_IS : MODE_IX));
         if (supportsDocLocking()) {
             _lockState->lock(_id, mode);
