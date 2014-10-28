@@ -8,20 +8,28 @@ mongo_tools_variables:
   mongo_download_urls:
     osx_108: &mongo_url_osx108
       mongo_url: "https://fastdl.mongodb.org/osx/mongodb-osx-x86_64-latest.tgz"
+      mongo26_url: "https://fastdl.mongodb.org/osx/mongodb-osx-x86_64-2.6.5.tgz"
     solaris: &mongo_url_solaris
       mongo_url: "https://fastdl.mongodb.org/sunos5/mongodb-sunos5-x86_64-latest.tgz"
+      mongo26_url: "https://fastdl.mongodb.org/sunos5/mongodb-sunos5-x86_64-2.6.5.tgz"
     rhel55_32: &mongo_url_rhell55_32
       mongo_url: "https://fastdl.mongodb.org/linux/mongodb-linux-i686-latest.tgz"
+      mongo26_url: "https://fastdl.mongodb.org/sunos5/mongodb-sunos5-x86_64-2.6.5.tgz"
     linux_64_bit: &mongo_url_ubuntu1204
       mongo_url: "http://downloads.10gen.com/linux/mongodb-linux-x86_64-enterprise-ubuntu1204-latest.tgz"
+      mongo26_url: "http://downloads.10gen.com/linux/mongodb-linux-x86_64-enterprise-ubuntu1204-2.6.5.tgz"
     linux_64_bit_enterprise: &mongo_url_ubuntu1204_enterprise
       mongo_url: "http://downloads.10gen.com/linux/mongodb-linux-x86_64-enterprise-ubuntu1204-latest.tgz"
+      mongo26_url: "http://downloads.10gen.com/linux/mongodb-linux-x86_64-enterprise-ubuntu1204-2.6.5.tgz"
     windows_32_bit: &mongo_url_windows32
       mongo_url: "https://fastdl.mongodb.org/win32/mongodb-win32-i386-latest.zip"
+      mongo26_url: "https://fastdl.mongodb.org/win32/mongodb-win32-i386-2.6.5.zip"
     windows_64_bit: &mongo_url_windows64
       mongo_url: "https://fastdl.mongodb.org/win32/mongodb-win32-x86_64-2008plus-latest.zip"
+      mongo26_url: "https://fastdl.mongodb.org/win32/mongodb-win32-x86_64-2008plus-2.6.5.zip"
     windows_64_bit_enterprise: &mongo_url_windows64_enterprise
       mongo_url: "http://downloads.10gen.com/win32/mongodb-win32-x86_64-enterprise-windows-64-latest.zip"
+      mongo26_url: "http://downloads.10gen.com/win32/mongodb-win32-x86_64-enterprise-windows-64-2.6.5.zip"
 
 ## List of tests to run on each buildvariant
   mongo_tools_task_lists:
@@ -30,6 +38,7 @@ mongo_tools_variables:
       - name: dist
       - name: integration
       - name: legacy
+      - name: legacy26
       - name: unit
     osx_108_ssl_task_list: &osx_108_ssl_tasks
       - name: dist
@@ -38,12 +47,14 @@ mongo_tools_variables:
       - name: dist
       - name: integration
       - name: legacy
+      - name: legacy26
       - name: unit
     solaris_task_list: &solaris_tasks
       - name: db
       - name: dist
       - name: integration
       - name: legacy
+      - name: legacy26
       - name: unit
     ubuntu1204_task_list: &ubuntu1204_tasks
       - name: bsonutil
@@ -52,6 +63,7 @@ mongo_tools_variables:
       - name: integration
       - name: json
       - name: legacy
+      - name: legacy26
       - name: lint
       - name: log
       - name: pool
@@ -72,12 +84,18 @@ mongo_tools_variables:
       - name: legacy
         distros:
         - windows-64-vs2013-test
+      - name: legacy26
+        distros:
+        - windows-64-vs2013-test
       - name: unit
     windows_64_task_list: &windows_64_tasks
       - name: db
       - name: dist
       - name: integration
       - name: legacy
+        distros:
+        - windows-64-vs2013-test
+      - name: legacy26
         distros:
         - windows-64-vs2013-test
       - name: unit
@@ -613,6 +631,52 @@ tasks:
     - func: "get buildnumber"
     - func: "setup credentials"
     - func: "download mongod"
+    - func: "fetch tool"
+      vars:
+        tool: mongoimport
+    - func: "fetch tool"
+      vars:
+        tool: mongoexport
+    - func: "fetch tool"
+      vars:
+        tool: mongodump
+    - func: "fetch tool"
+      vars:
+        tool: mongostat
+    - func: "fetch tool"
+      vars:
+        tool: mongorestore
+    - func: "fetch tool"
+      vars:
+        tool: mongooplog
+    - func: "fetch tool"
+      vars:
+        tool: mongofiles
+    - command: shell.exec
+      params:
+        working_dir: src
+        script: |
+          mv ./mongodb/mongod${extension} .
+          mv ./mongodb/mongo${extension} .
+          mv legacy/* .
+          chmod +x mongo*
+          python buildscripts/smoke.py --nopreallocj --with-cleanbb --mongod ./mongod --mongo ./mongo --report-file report.json --continue-on-failure --buildlogger-builder MCI_${build_variant} --buildlogger-buildnum ${builder_num|} --buildlogger-credentials ./mci.buildlogger --buildlogger-phase ${task_name}_${execution} tool
+
+- name: legacy26
+  depends_on:
+  - name: dist
+  commands:
+    - command: git.get_project
+      params:
+        directory: src
+    - command: git.apply_patch
+      params:
+        directory: src
+    - func: "get buildnumber"
+    - func: "setup credentials"
+    - func: "download mongod"
+      vars:
+        mongo_url: "${mongo26_url}"
     - func: "fetch tool"
       vars:
         tool: mongoimport
