@@ -1866,6 +1866,7 @@ namespace {
                 info->master = false;
                 info->condVar->notify_all();
             }
+            _isWaitingForDrainToComplete = false;
             result = kActionCloseAllConnections;
         }
         else {
