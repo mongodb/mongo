@@ -471,9 +471,9 @@ __verify_dsk_col_int(
 			return (__err_cell_corrupted(session, cell_num, addr));
 
 		/* Check the raw and collapsed cell types. */
-		WT_RET (__err_cell_type(
+		WT_RET(__err_cell_type(
 		    session, cell_num, addr, unpack->raw, dsk->type));
-		WT_RET (__err_cell_type(
+		WT_RET(__err_cell_type(
 		    session, cell_num, addr, unpack->type, dsk->type));
 
 		/* Check if any referenced item is entirely in the file. */
@@ -538,9 +538,9 @@ __verify_dsk_col_var(
 			return (__err_cell_corrupted(session, cell_num, addr));
 
 		/* Check the raw and collapsed cell types. */
-		WT_RET (__err_cell_type(
+		WT_RET(__err_cell_type(
 		    session, cell_num, addr, unpack->raw, dsk->type));
-		WT_RET (__err_cell_type(
+		WT_RET(__err_cell_type(
 		    session, cell_num, addr, unpack->type, dsk->type));
 		cell_type = unpack->type;
 
