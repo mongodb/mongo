@@ -16,24 +16,32 @@ Report any bugs, improvements, or new feature requests at https://jira.mongodb.o
  
 ####Setup
 
-Clone the repo and set your GOPATH to the directory root. Then run the dependency installation script.
+Clone the repo and set your GOPATH to include the vendored dependencies by using the helper script `set_gopath.sh`
 
 ```
 git clone https://github.com/mongodb/mongo-tools
 cd mongo-tools
-export GOPATH=`pwd`
-./gpm install
+. set_gopath.sh
 ```
-
-_Note: 'go get' is not currently compatible with this repo. This may or may not change._
 
 #### Building Tools
 
+Use `go build` to build the tool binaries.
+
 ```
+mkdir bin/
 for i in bsondump mongostat mongofiles mongoexport mongoimport mongorestore mongodump mongotop mongooplog; do
-    go build  -o "$i" src/github.com/mongodb/mongo-tools/$i/main/$i.go
+	 go build -o "bin/$i" $i/main/$i.go
 done
 ```
+
+Alternatively, you can set GOBIN and use `go install`:
+
+```
+export GOBIN=bin
+go install mongodump/main/mongodump.go
+```
+
 
 #### SSL
 
