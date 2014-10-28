@@ -223,6 +223,8 @@ namespace mongo {
                     indexBuildRestorer.Dismiss();
                     return true;
                 }
+
+                wunit.commit();
             }
 
             // If we get here, we are renaming across databases, so we must copy all the data and

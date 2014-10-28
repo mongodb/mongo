@@ -31,6 +31,15 @@ assert( db_b.getCollectionNames().indexOf( "rename7" ) >= 0 );
 a.drop();
 b.drop();
 
+// Test that the dropTarget option works when renaming across databases.
+a.save( {} );
+b.save( {} );
+assert.commandFailed( admin.runCommand( {renameCollection: "db_a.rename7", to: "db_b.rename7"} ) );
+assert.commandWorked( admin.runCommand( {renameCollection: "db_a.rename7",
+                                         to: "db_b.rename7", dropTarget: true} ) );
+a.drop();
+b.drop();
+
 // Capped collection testing.
 db_a.createCollection( "rename7_capped", {capped:true, size:10000} );
 a = db_a.rename7_capped;
