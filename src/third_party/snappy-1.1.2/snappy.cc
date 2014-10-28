@@ -26,19 +26,8 @@
 // (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-// Fixes missing ssize_t under Windows.
-// Used in IncrementalCopy and IncrementalCopyFastPath.
-// See:
-//    https://code.google.com/p/snappy/issues/detail?id=79
-//    http://msdn.microsoft.com/en-us/library/windows/desktop/aa383751(v=vs.85).aspx#SSIZE_T
-//    http://src.chromium.org/viewvc/chrome/trunk/src/third_party/snappy/win32/snappy-stubs-public.h
-// Also disables min/max macros in windef.h (included by windows.h)
-#if defined(_WIN32)
-#define NOMINMAX
-#include <windows.h>
-#include <BaseTsd.h>
-typedef SSIZE_T ssize_t;
-#endif  // _WIN32
+// MongoDB customization: includes basetsd.h under Windows where SSIZE_T is declared.
+#include "mongo/platform/basic.h"
 
 #include "snappy.h"
 #include "snappy-internal.h"
@@ -50,6 +39,16 @@ typedef SSIZE_T ssize_t;
 #include <string>
 #include <vector>
 
+
+// Fixes missing ssize_t under Windows.
+// Used in IncrementalCopy and IncrementalCopyFastPath.
+// See:
+//    https://code.google.com/p/snappy/issues/detail?id=79
+//    http://msdn.microsoft.com/en-us/library/windows/desktop/aa383751(v=vs.85).aspx#SSIZE_T
+//    http://src.chromium.org/viewvc/chrome/trunk/src/third_party/snappy/win32/snappy-stubs-public.h
+#if defined(_WIN32)
+typedef SSIZE_T ssize_t;
+#endif  // _WIN32
 
 namespace snappy {
 
