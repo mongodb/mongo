@@ -965,11 +965,9 @@ __clsm_reset_cursors(WT_CURSOR_LSM *clsm, WT_CURSOR *skip)
 static int
 __clsm_reset(WT_CURSOR *cursor)
 {
-	WT_CURSOR *c;
 	WT_CURSOR_LSM *clsm;
 	WT_DECL_RET;
 	WT_SESSION_IMPL *session;
-	u_int i;
 
 	/*
 	 * Don't use the normal __clsm_enter path: that is wasted work when all
@@ -979,22 +977,7 @@ __clsm_reset(WT_CURSOR *cursor)
 	CURSOR_API_CALL(cursor, session, reset, NULL);
 	F_CLR(cursor, WT_CURSTD_KEY_SET | WT_CURSTD_VALUE_SET);
 
-	/*
-	 * Really close cursors on in-memory chunks: in case this cursor isn't
-	 * accessed for a long time, we don't want to block eviction or
-	 * discarding of in-memory chunks.
-	 */
-	WT_FORALL_CURSORS(clsm, c, i)
-		if (((WT_CURSOR_BTREE *)c)->btree->dhandle->checkpoint == NULL)
-			break;
-	WT_TRET(__clsm_close_cursors(clsm, i, clsm->nchunks));
-
-	/* Reset any on-disk cursors. */
-	if (i > 0)
-		WT_TRET(__clsm_reset_cursors(clsm, NULL));
-
-	/* Force re-entry into the tree on the next operation. */
-	clsm->dsk_gen = 0;
+	WT_TRET(__clsm_reset_cursors(clsm, NULL));
 
 	/* In case we were left positioned, clear that. */
 	WT_TRET(__clsm_leave(clsm));
