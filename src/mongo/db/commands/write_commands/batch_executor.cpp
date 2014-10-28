@@ -1140,16 +1140,16 @@ namespace mongo {
         // Updates from the write commands path can yield.
         request.setYieldPolicy(PlanExecutor::YIELD_AUTO);
 
-        UpdateExecutor executor(&request, &txn->getCurOp()->debug());
-        Status status = executor.prepare();
-        if (!status.isOK()) {
-            result->setError(toWriteError(status));
-            return;
-        }
-
         int attempt = 1;
         bool createCollection = false;
         for ( int fakeLoop = 0; fakeLoop < 1; fakeLoop++ ) {
+
+            UpdateExecutor executor(&request, &txn->getCurOp()->debug());
+            Status status = executor.prepare();
+            if (!status.isOK()) {
+                result->setError(toWriteError(status));
+                return;
+            }
 
             if ( createCollection ) {
                 Lock::DBLock lk(txn->lockState(), nsString.db(), MODE_X);
@@ -1227,7 +1227,7 @@ namespace mongo {
                 }
             }
             catch (const DBException& ex) {
-                status = ex.toStatus();
+                Status status = ex.toStatus();
                 if (ErrorCodes::isInterruption(status.code())) {
                     throw;
                 }
@@ -1256,16 +1256,17 @@ namespace mongo {
         // Deletes running through the write commands path can yield.
         request.setYieldPolicy(PlanExecutor::YIELD_AUTO);
 
-        DeleteExecutor executor( &request );
-        Status status = executor.prepare();
-        if ( !status.isOK() ) {
-            result->setError(toWriteError(status));
-            return;
-        }
-
         int attempt = 1;
         while ( 1 ) {
             try {
+
+                DeleteExecutor executor( &request );
+                Status status = executor.prepare();
+                if ( !status.isOK() ) {
+                    result->setError(toWriteError(status));
+                    return;
+                }
+
                 Lock::DBLock dbLock(txn->lockState(), nss.db(), MODE_IX);
                 Lock::CollectionLock collLock(txn->lockState(), nss.ns(), MODE_IX);
 
@@ -1288,7 +1289,7 @@ namespace mongo {
                       << ", attempt: " << attempt++ << " retrying";
             }
             catch ( const DBException& ex ) {
-                status = ex.toStatus();
+                Status status = ex.toStatus();
                 if (ErrorCodes::isInterruption(status.code())) {
                     throw;
                 }

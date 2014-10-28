@@ -634,12 +634,12 @@ namespace {
 
         request.setYieldPolicy(PlanExecutor::YIELD_AUTO);
 
-        UpdateExecutor executor(&request, &op.debug());
-        uassertStatusOK(executor.prepare());
-
         int attempt = 1;
         while ( 1 ) {
             try {
+                UpdateExecutor executor(&request, &op.debug());
+                uassertStatusOK(executor.prepare());
+
                 //  Tentatively take an intent lock, fix up if we need to create the collection
                 Lock::DBLock dbLock(txn->lockState(), ns.db(), MODE_IX);
                 Lock::CollectionLock colLock(txn->lockState(), ns.ns(), MODE_IX);
@@ -670,6 +670,9 @@ namespace {
         //  This is an upsert into a non-existing database, so need an exclusive lock
         //  to avoid deadlock
         {
+            UpdateExecutor executor(&request, &op.debug());
+            uassertStatusOK(executor.prepare());
+
             Lock::DBLock dbLock(txn->lockState(), ns.db(), MODE_X);
             Client::Context ctx(txn, ns);
             Database* db = ctx.db();
@@ -716,12 +719,12 @@ namespace {
 
         request.setYieldPolicy(PlanExecutor::YIELD_AUTO);
 
-        DeleteExecutor executor(&request);
-        uassertStatusOK(executor.prepare());
-
         int attempt = 1;
         while ( 1 ) {
             try {
+                DeleteExecutor executor(&request);
+                uassertStatusOK(executor.prepare());
+
                 Lock::DBLock dbLocklk(txn->lockState(), ns.db(), MODE_IX);
                 Lock::CollectionLock colLock(txn->lockState(), ns.ns(), MODE_IX);
                 Client::Context ctx(txn, ns);
