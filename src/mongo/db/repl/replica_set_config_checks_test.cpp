@@ -633,37 +633,6 @@ namespace {
                                                 true).getStatus());
     }
 
-    TEST(ValidateForReconfig, ForceOtherwiseIncompatibleConfigs) {
-        // The new config is incompatible with the old  for several reasons:
-        // config version goes down, one member changes _id, and one  member changes to arbiter.
-        // This tests that the reconfig is possible, in spite of all these incompatibles, because 
-        // of the force flag.
-        ReplicaSetConfig oldConfig;
-        ASSERT_OK(oldConfig.initialize(BSON("_id" << "rs0" <<
-                                            "version" << 3 <<
-                                            "members" << BSON_ARRAY(
-                                                    BSON("_id" << 0 << "host" << "h2") <<
-                                                    BSON("_id" << 1 << "host" << "h3") <<
-                                                    BSON("_id" << 2 << "host" << "h4")))));
-
-
-        ReplicaSetConfig newConfig;
-        ASSERT_OK(newConfig.initialize(BSON("_id" << "rs0" <<
-                                            "version" << 2 <<
-                                            "members" << BSON_ARRAY(
-                                                    BSON("_id" << 0 << "host" << "h2") << 
-                                                    BSON("_id" << 2 << "host" << "h4" <<
-                                                         "arbiterOnly" << true) << 
-                                                    BSON("_id" << 3 << "host" << "h3")))));
-
-        ReplicationCoordinatorExternalStateMock presentOnceExternalState;
-        presentOnceExternalState.addSelf(HostAndPort("h2"));
-        ASSERT_OK(validateConfigForReconfig(&presentOnceExternalState,
-                                            oldConfig,
-                                            newConfig,
-                                            true).getStatus());
-    }
-
 }  // namespace
 }  // namespace repl
 }  // namespace mongo
