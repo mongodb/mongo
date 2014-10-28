@@ -72,7 +72,6 @@ func (restore *MongoRestore) RestoreOplog() error {
 	// To restore the oplog, we iterate over the oplog entries,
 	// filling up a buffer. Once the buffer reaches max document size,
 	// apply the current buffered ops and reset the buffer.
-	// TODO use the new shim mode
 	for bsonSource.Next(rawOplogEntry) {
 		entrySize = len(rawOplogEntry.Data)
 		if bufferedBytes+entrySize > OplogMaxCommandSize {

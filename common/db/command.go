@@ -14,23 +14,10 @@ type CommandRunner interface {
 	FindDocs(DB, Collection string, Skip, Limit int, Query interface{}, Sort []string, opts int) (DocSource, error)
 	FindOne(DB, Collection string, Skip int, Query interface{}, Sort []string, into interface{}, opts int) error
 
-	OpenInsertStream(DB, Collection string, sessionSafety *mgo.Safe) (DocSink, error)
-
 	Remove(DB, Collection string, Query interface{}) error
 
 	DatabaseNames() ([]string, error)
 	CollectionNames(dbName string) ([]string, error)
-}
-
-func (sp *SessionProvider) OpenInsertStream(DB, Collection string, sessionSafety *mgo.Safe) (DocSink, error) {
-	session, err := sp.GetSession()
-	if err != nil {
-		return nil, err
-	}
-	session.SetSafe(sessionSafety)
-
-	coll := session.DB(DB).C(Collection)
-	return &CollectionSink{coll, session}, nil
 }
 
 func (sp *SessionProvider) Remove(DB, Collection string, Query interface{}) error {

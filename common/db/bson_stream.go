@@ -82,16 +82,16 @@ func (cds *CursorDocSource) Err() error {
 	return cds.Iter.Err()
 }
 
-func (shim *BSONSource) LoadNextInto(into []byte) (bool, int32) {
+func (bsonSource *BSONSource) LoadNextInto(into []byte) (bool, int32) {
 	//Read the bson object size (a 4 byte integer)
-	_, err := io.ReadAtLeast(shim.Stream, into[0:4], 4)
+	_, err := io.ReadAtLeast(bsonSource.Stream, into[0:4], 4)
 	if err != nil {
 		if err != io.EOF {
-			shim.err = err
+			bsonSource.err = err
 			return false, 0
 		}
 		//We hit EOF right away, so we're at the end of the stream.
-		shim.err = nil
+		bsonSource.err = nil
 		return false, 0
 	}
 
@@ -106,81 +106,25 @@ func (shim *BSONSource) LoadNextInto(into []byte) (bool, int32) {
 	//actually fit into the buffer that was provided. If not, either the BSON is
 	//invalid, or the buffer passed in is too small.
 	if bsonSize > int32(len(into)) {
-		shim.err = fmt.Errorf("Invalid BSONSize: %v bytes", bsonSize)
+		bsonSource.err = fmt.Errorf("Invalid BSONSize: %v bytes", bsonSize)
 		return false, 0
 	}
-	_, err = io.ReadAtLeast(shim.Stream, into[4:int(bsonSize)], int(bsonSize-4))
+	_, err = io.ReadAtLeast(bsonSource.Stream, into[4:int(bsonSize)], int(bsonSize-4))
 	if err != nil {
 		if err != io.EOF {
-			shim.err = err
+			bsonSource.err = err
 			return false, 0
 		}
 		//This case means we hit EOF but read a partial document,
 		//so there's a broken doc in the stream. Treat this as error.
-		shim.err = fmt.Errorf("Invalid bson: %v", err)
+		bsonSource.err = fmt.Errorf("Invalid bson: %v", err)
 		return false, 0
 	}
 
-	shim.err = nil
+	bsonSource.err = nil
 	return true, bsonSize
 }
 
-func (shim *BSONSource) Err() error {
-	return shim.err
-}
-
-// ===================== Sink =====================
-
-type DocSink interface {
-	WriteDoc(out interface{}) error
-	Close() error
-}
-
-type BSONSink struct {
-	writer io.WriteCloser
-}
-
-type EncodedBSONSink struct {
-	BSONIn     *BSONSink
-	WriterShim *StorageShim
-}
-
-func (bs *BSONSink) Close() error {
-	return bs.writer.Close()
-}
-
-func (bs *BSONSink) WriteBytes(buf []byte) (int, error) {
-	return bs.writer.Write(buf)
-}
-
-func (ebs *EncodedBSONSink) WriteDoc(out interface{}) error {
-	outbuf, err := bson.Marshal(out)
-	if err != nil {
-		return fmt.Errorf("Failed to encode document into BSON: %v", err)
-	}
-	_, err = ebs.BSONIn.WriteBytes(outbuf)
-	if err != nil {
-		return fmt.Errorf("Error while attempting to write to db: %v", err)
-	}
-	return nil
-}
-
-func (ebs *EncodedBSONSink) Close() error {
-	defer ebs.WriterShim.Close()
-	return ebs.BSONIn.Close()
-}
-
-type CollectionSink struct {
-	Coll    *mgo.Collection
-	Session *mgo.Session
-}
-
-func (cls *CollectionSink) WriteDoc(out interface{}) error {
-	return cls.Coll.Insert(out)
-}
-
-func (cls *CollectionSink) Close() error {
-	// cls.Session.Close() returns nothing
-	cls.Session.Close()
-	return nil
+func (bsonSource *BSONSource) Err() error {
+	return bsonSource.err
 }
