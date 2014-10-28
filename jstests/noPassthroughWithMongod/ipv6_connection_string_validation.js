@@ -31,9 +31,9 @@ if ("undefined" == typeof inner_mode) {
 
 var goodStrings = [
         "localhost:27999/test",
-        "::1:27999/test",
-        "0:0:0:0:0:0:0:1:27999/test",
-        "0000:0000:0000:0000:0000:0000:0000:0001:27999/test"
+        "[::1]:27999/test",
+        "[0:0:0:0:0:0:0:1]:27999/test",
+        "[0000:0000:0000:0000:0000:0000:0000:0001]:27999/test"
 ];
 
 var badStrings = [
@@ -57,7 +57,10 @@ var badStrings = [
         { s: "::1:65536/test",          r: /^Invalid port number/ },
         { s: "127.0.0.1:65536/test",    r: /^Invalid port number/ },
         { s: "::1:27999/",              r: /^Missing database name/ },
-        { s: "127.0.0.1:27999/",        r: /^Missing database name/ }
+        { s: "127.0.0.1:27999/",        r: /^Missing database name/ },
+        { s: "::1:27999/test",          r: /^More than one ':'/ },
+        { s: "0:0::0:0:1:27999/test",   r: /^More than one ':'/ },
+        { s: "0000:0000:0000:0000:0000:0000:0000:0001:27999/test", r: /^More than one ':'/ }
 ];
 
 var substitutePort = function(connectionString) {

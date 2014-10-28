@@ -139,6 +139,12 @@ namespace mongo {
             return Status(ErrorCodes::FailedToParse,
                           str::stream() << "']' present without '[' in " << s.toString());
         }
+        else if (s.find(':') != colonPos) {
+            return Status(ErrorCodes::FailedToParse,
+                          str::stream() << "More than one ':' detected. If this is an ipv6 address,"
+                                        << " it needs to be surrounded by '[' and ']'; "
+                                        << s.toString());
+        }
 
         if (hostPart.empty()) {
             return Status(ErrorCodes::FailedToParse, str::stream() <<

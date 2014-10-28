@@ -213,10 +213,10 @@ namespace {
     TEST(MemberConfig, ValidateFailsWithIdOutOfRange) {
         ReplicaSetTagConfig tagConfig;
         MemberConfig mc;
-        ASSERT_OK(mc.initialize(BSON("_id" << -1 << "host" << "localhost::12345"),
+        ASSERT_OK(mc.initialize(BSON("_id" << -1 << "host" << "localhost:12345"),
                                 &tagConfig));
         ASSERT_EQUALS(ErrorCodes::BadValue, mc.validate());
-        ASSERT_OK(mc.initialize(BSON("_id" << 256 << "host" << "localhost::12345"),
+        ASSERT_OK(mc.initialize(BSON("_id" << 256 << "host" << "localhost:12345"),
                                 &tagConfig));
         ASSERT_EQUALS(ErrorCodes::BadValue, mc.validate());
     }
