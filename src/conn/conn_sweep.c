@@ -70,7 +70,7 @@ __sweep(WT_SESSION_IMPL *session)
 			if (ret == EBUSY)
 				ret = 0;
 
-			WT_TRET(__wt_rwunlock(session, dhandle->rwlock));
+			WT_TRET(__wt_writeunlock(session, dhandle->rwlock));
 			WT_RET(ret);
 		}
 

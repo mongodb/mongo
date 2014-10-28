@@ -147,7 +147,7 @@ __log_archive_server(void *arg)
 		 */
 		log->first_lsn = lsn;
 		log->first_lsn.offset = 0;
-		WT_ERR(__wt_rwunlock(session, log->log_archive_lock));
+		WT_ERR(__wt_writeunlock(session, log->log_archive_lock));
 
 		/* Wait until the next event. */
 		WT_ERR(__wt_cond_wait(session, conn->arch_cond, 1000000));

@@ -111,11 +111,11 @@ __wt_readlock(WT_SESSION_IMPL *session, WT_RWLOCK *rwlock)
 }
 
 /*
- * __readunlock --
+ * __wt_readunlock --
  *	Release a shared lock.
  */
-static int
-__readunlock(WT_SESSION_IMPL *session, WT_RWLOCK *rwlock)
+int
+__wt_readunlock(WT_SESSION_IMPL *session, WT_RWLOCK *rwlock)
 {
 	wt_rwlock_t *l;
 
@@ -148,11 +148,7 @@ __wt_try_writelock(WT_SESSION_IMPL *session, WT_RWLOCK *rwlock)
 	users = l->s.users;
 	old = (pad << 48) + (users << 32) + (readers << 16) + users;
 	new = (pad << 48) + ((users + 1) << 32) + (readers << 16) + users;
-	if (WT_ATOMIC_CAS_VAL8(l->u, old, new) != old)
-		return (EBUSY);
-
-	rwlock->exclusive_locked = 1;
-	return (0);
+	return (WT_ATOMIC_CAS_VAL8(l->u, old, new) == old ? 0 : EBUSY);
 }
 
 /*
@@ -181,16 +177,15 @@ __wt_writelock(WT_SESSION_IMPL *session, WT_RWLOCK *rwlock)
 	while (val != l->s.writers)
 		WT_PAUSE();
 
-	rwlock->exclusive_locked = 1;
 	return (0);
 }
 
 /*
- * __writeunlock --
+ * __wt_writeunlock --
  *	Release an exclusive lock.
  */
-static int
-__writeunlock(WT_SESSION_IMPL *session, WT_RWLOCK *rwlock)
+int
+__wt_writeunlock(WT_SESSION_IMPL *session, WT_RWLOCK *rwlock)
 {
 	wt_rwlock_t *l, copy;
 
@@ -200,33 +195,14 @@ __writeunlock(WT_SESSION_IMPL *session, WT_RWLOCK *rwlock)
 	l = &rwlock->rwlock;
 
 	copy = *l;
-	rwlock->exclusive_locked = 0;
 
-	/*
-	 * Use a full barrier (not just a memory barrier), because the exclusive
-	 * lock flag has to be cleared before a subsequent writer gets the lock
-	 * and sets it.
-	 */
-	WT_FULL_BARRIER();
+	WT_BARRIER();
 
 	++copy.s.writers;
 	++copy.s.readers;
 
 	l->us = copy.us;
 	return (0);
-}
-
-/*
- * __wt_rwunlock --
- *	Release a read/write lock.
- */
-int
-__wt_rwunlock(WT_SESSION_IMPL *session, WT_RWLOCK *rwlock)
-{
-	if (rwlock->exclusive_locked == 0)
-		return (__readunlock(session, rwlock));
-	else
-		return (__writeunlock(session, rwlock));
 }
 
 /*

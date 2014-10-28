@@ -286,7 +286,7 @@ __curlog_close(WT_CURSOR *cursor)
 	conn = S2C(session);
 	WT_ASSERT(session, conn->logging);
 	log = conn->log;
-	WT_TRET(__wt_rwunlock(session, log->log_archive_lock));
+	WT_TRET(__wt_readunlock(session, log->log_archive_lock));
 	WT_TRET(__curlog_reset(cursor));
 	__wt_free(session, cl->cur_lsn);
 	__wt_free(session, cl->next_lsn);
