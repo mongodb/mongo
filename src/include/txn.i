@@ -6,7 +6,6 @@
  */
 
 static inline int __wt_txn_id_check(WT_SESSION_IMPL *session);
-static inline void __wt_txn_read_first(WT_SESSION_IMPL *session);
 static inline void __wt_txn_read_last(WT_SESSION_IMPL *session);
 
 /*
@@ -293,35 +292,6 @@ __wt_txn_update_check(WT_SESSION_IMPL *session, WT_UPDATE *upd)
 }
 
 /*
- * __wt_txn_read_first --
- *	Called for the first page read for a session.
- */
-static inline void
-__wt_txn_read_first(WT_SESSION_IMPL *session)
-{
-	WT_TXN *txn;
-
-	txn = &session->txn;
-
-#ifdef HAVE_DIAGNOSTIC
-	{
-	WT_TXN_GLOBAL *txn_global;
-	WT_TXN_STATE *txn_state;
-	txn_global = &S2C(session)->txn_global;
-	txn_state = &txn_global->states[session->id];
-
-	WT_ASSERT(session, F_ISSET(txn, TXN_HAS_SNAPSHOT) ||
-	    txn_state->snap_min == WT_TXN_NONE);
-	}
-#endif
-
-	if (txn->isolation == TXN_ISO_READ_COMMITTED ||
-	    (txn->isolation == TXN_ISO_SNAPSHOT &&
-	    !F_ISSET(txn, TXN_HAS_SNAPSHOT)))
-		__wt_txn_refresh(session, 1);
-}
-
-/*
  * __wt_txn_read_last --
  *	Called when the last page for a session is released.
  */
@@ -373,6 +343,10 @@ __wt_txn_cursor_op(WT_SESSION_IMPL *session)
 	    !F_ISSET(txn, TXN_HAS_ID) &&
 	    TXNID_LT(txn_state->snap_min, txn_global->last_running))
 		txn_state->snap_min = txn_global->last_running;
+
+	if (txn->isolation != TXN_ISO_READ_UNCOMMITTED &&
+	    !F_ISSET(txn, TXN_HAS_SNAPSHOT))
+		__wt_txn_refresh(session, 1);
 }
 
 /*

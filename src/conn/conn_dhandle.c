@@ -544,7 +544,7 @@ __wt_conn_dhandle_close_all(
 		if (F_ISSET(dhandle, WT_DHANDLE_OPEN)) {
 			if ((ret = __wt_meta_track_sub_on(session)) == 0)
 				ret = __wt_conn_btree_sync_and_close(
-				    session, force);
+				    session, 0 && force);
 
 			/*
 			 * If the close succeeded, drop any locks it acquired.

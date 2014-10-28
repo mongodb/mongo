@@ -321,11 +321,9 @@ __wt_txn_release(WT_SESSION_IMPL *session)
 		__wt_split_stash_discard(session);
 
 	/*
-	 * Reset the transaction state to not running.  Release the snapshot
-	 * if no cursors are active.
+	 * Reset the transaction state to not running and release the snapshot.
 	 */
-	if (session->ncursors == 0)
-		__wt_txn_release_snapshot(session);
+	__wt_txn_release_snapshot(session);
 	txn->isolation = session->isolation;
 	F_CLR(txn, TXN_ERROR | TXN_HAS_ID | TXN_RUNNING);
 }
@@ -383,12 +381,8 @@ __wt_txn_commit(WT_SESSION_IMPL *session, const char *cfg[])
 	 * could be freed underneath the cursor.  Get the new snapshot before
 	 * releasing the ID for the commit.
 	 */
-	if (session->ncursors > 0 &&
-	    F_ISSET(txn, TXN_HAS_ID) &&
-	    txn->isolation != TXN_ISO_READ_UNCOMMITTED) {
+	if (session->ncursors > 0)
 		WT_RET(__wt_session_copy_values(session));
-		__wt_txn_refresh(session, 1);
-	}
 
 	__wt_txn_release(session);
 	return (0);

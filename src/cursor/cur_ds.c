@@ -14,8 +14,8 @@
 static int
 __curds_txn_enter(WT_SESSION_IMPL *session)
 {
-	if (session->ncursors++ == 0)			/* XXX */
-		__wt_txn_read_first(session);
+	session->ncursors++;
+	__wt_txn_cursor_op(session);
 
 	return (0);
 }
