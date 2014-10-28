@@ -3,6 +3,7 @@ package mongorestore
 import (
 	"fmt"
 	"github.com/mongodb/mongo-tools/common/db"
+	"github.com/mongodb/mongo-tools/common/intents"
 	"github.com/mongodb/mongo-tools/common/log"
 	commonopts "github.com/mongodb/mongo-tools/common/options"
 	"github.com/mongodb/mongo-tools/common/progress"
@@ -23,7 +24,7 @@ type MongoRestore struct {
 	tempRolesCol string
 
 	// other internal state
-	manager         *IntentManager
+	manager         *intents.Manager
 	safety          *mgo.Safe
 	progressManager *progress.Manager
 	objCheck        bool
@@ -76,7 +77,7 @@ func (restore *MongoRestore) Restore() error {
 	}
 
 	// 1. Build up all intents to be restored
-	restore.manager = NewIntentManager()
+	restore.manager = intents.NewIntentManager()
 
 	switch {
 	case restore.ToolOptions.DB == "" && restore.ToolOptions.Collection == "":
@@ -104,10 +105,10 @@ func (restore *MongoRestore) Restore() error {
 
 	// 2. Restore them...
 	if restore.OutputOptions.JobThreads > 0 {
-		restore.manager.Finalize(MultiDatabaseLTF)
+		restore.manager.Finalize(intents.MultiDatabaseLTF)
 	} else {
 		// use legacy restoration order if we are single-threaded
-		restore.manager.Finalize(Legacy)
+		restore.manager.Finalize(intents.Legacy)
 	}
 	err = restore.RestoreIntents()
 	if err != nil {

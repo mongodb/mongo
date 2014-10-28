@@ -1,4 +1,4 @@
-package mongorestore
+package intents
 
 import (
 	"github.com/mongodb/mongo-tools/common/testutil"
@@ -7,7 +7,7 @@ import (
 )
 
 func TestIntentManager(t *testing.T) {
-	var manager *IntentManager
+	var manager *Manager
 
 	testutil.VerifyTestType(t, testutil.UNIT_TEST_TYPE)
 

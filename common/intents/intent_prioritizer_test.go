@@ -1,4 +1,4 @@
-package mongorestore
+package intents
 
 import (
 	"container/heap"

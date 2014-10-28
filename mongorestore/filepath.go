@@ -2,6 +2,7 @@ package mongorestore
 
 import (
 	"fmt"
+	"github.com/mongodb/mongo-tools/common/intents"
 	"github.com/mongodb/mongo-tools/common/log"
 	"io/ioutil"
 	"os"
@@ -60,7 +61,7 @@ func (restore *MongoRestore) CreateAllIntents(fullpath string) error {
 			}
 		} else {
 			if entry.Name() == "oplog.bson" {
-				restore.manager.Put(&Intent{
+				restore.manager.Put(&intents.Intent{
 					C:        "oplog", //TODO make this a helper in intent
 					BSONPath: filepath.Join(fullpath, entry.Name()),
 					BSONSize: entry.Size(),
@@ -102,7 +103,7 @@ func (restore *MongoRestore) CreateIntentsForDB(db, fullpath string) error {
 							"has .metadata.json files", db)
 					continue
 				}
-				intent := &Intent{
+				intent := &intents.Intent{
 					DB:       db,
 					C:        collection,
 					BSONSize: entry.Size(),
@@ -112,7 +113,7 @@ func (restore *MongoRestore) CreateIntentsForDB(db, fullpath string) error {
 				restore.manager.Put(intent)
 			case MetadataFileType:
 				usesMetadataFiles = true
-				intent := &Intent{
+				intent := &intents.Intent{
 					DB:           db,
 					C:            collection,
 					MetadataPath: filepath.Join(fullpath, entry.Name()),
@@ -158,7 +159,7 @@ func (restore *MongoRestore) CreateIntentForCollection(
 	}
 
 	// then create its intent
-	intent := &Intent{
+	intent := &intents.Intent{
 		DB:       db,
 		C:        collection,
 		BSONPath: fullpath,

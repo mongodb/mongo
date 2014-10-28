@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"github.com/mongodb/mongo-tools/common/bsonutil"
 	"github.com/mongodb/mongo-tools/common/db"
+	"github.com/mongodb/mongo-tools/common/intents"
 	"github.com/mongodb/mongo-tools/common/json"
 	"github.com/mongodb/mongo-tools/common/log"
 	"github.com/mongodb/mongo-tools/common/util"
@@ -57,7 +58,7 @@ func (restore *MongoRestore) MetadataFromJSON(jsonBytes []byte) (bson.D, []Index
 }
 
 //TODO test this
-func (restore *MongoRestore) IndexesFromBSON(intent *Intent, bsonFile string) ([]IndexDocument, error) {
+func (restore *MongoRestore) IndexesFromBSON(intent *intents.Intent, bsonFile string) ([]IndexDocument, error) {
 	log.Logf(log.DebugLow, "scanning %v for indexes on %v collections", bsonFile, intent.C)
 
 	rawFile, err := os.Open(bsonFile)
@@ -93,7 +94,7 @@ func stripDBFromNS(ns string) string {
 	return ns
 }
 
-func (restore *MongoRestore) DBHasCollection(intent *Intent) (bool, error) {
+func (restore *MongoRestore) DBHasCollection(intent *intents.Intent) (bool, error) {
 	collectionNS := intent.Key()
 	result := bson.M{}
 	session, err := restore.SessionProvider.GetSession()
@@ -122,7 +123,7 @@ func (restore *MongoRestore) DBHasCollection(intent *Intent) (bool, error) {
 // CreateIndexes takes in an intent and an array of index documents and
 // attempts to create them using the createIndexes command. If that command
 // fails, we fall back to individual index creation.
-func (restore *MongoRestore) CreateIndexes(intent *Intent, indexes []IndexDocument) error {
+func (restore *MongoRestore) CreateIndexes(intent *intents.Intent, indexes []IndexDocument) error {
 	// first, sanitize the indexes
 	for _, index := range indexes {
 		// update the namespace of the index before inserting
@@ -169,7 +170,7 @@ func (restore *MongoRestore) CreateIndexes(intent *Intent, indexes []IndexDocume
 	return nil
 }
 
-func (restore *MongoRestore) LegacyInsertIndex(intent *Intent, index IndexDocument) error {
+func (restore *MongoRestore) LegacyInsertIndex(intent *intents.Intent, index IndexDocument) error {
 	session, err := restore.SessionProvider.GetSession()
 	if err != nil {
 		return fmt.Errorf("error establishing connection: %v", err)
@@ -189,7 +190,7 @@ func (restore *MongoRestore) LegacyInsertIndex(intent *Intent, index IndexDocume
 	return nil
 }
 
-func (restore *MongoRestore) CreateCollection(intent *Intent, options bson.D) error {
+func (restore *MongoRestore) CreateCollection(intent *intents.Intent, options bson.D) error {
 	jsonCommand, err := bsonutil.ConvertBSONValueToJSON(
 		append(bson.D{{"create", intent.C}}, options...),
 	)
@@ -215,7 +216,7 @@ func (restore *MongoRestore) CreateCollection(intent *Intent, options bson.D) er
 	return nil
 }
 
-func (restore *MongoRestore) RestoreUsersOrRoles(collectionType string, intent *Intent) error {
+func (restore *MongoRestore) RestoreUsersOrRoles(collectionType string, intent *intents.Intent) error {
 	log.Logf(log.Always, "restoring %v from %v", collectionType, intent.BSONPath)
 
 	var tempCol, tempColCommandField string
@@ -237,7 +238,7 @@ func (restore *MongoRestore) RestoreUsersOrRoles(collectionType string, intent *
 	bsonSource := db.NewDecodedBSONSource(db.NewBSONSource(rawFile))
 	defer bsonSource.Close()
 
-	tempColExists, err := restore.DBHasCollection(&Intent{DB: "admin", C: tempCol})
+	tempColExists, err := restore.DBHasCollection(&intents.Intent{DB: "admin", C: tempCol})
 	if err != nil {
 		return err
 	}
@@ -245,7 +246,7 @@ func (restore *MongoRestore) RestoreUsersOrRoles(collectionType string, intent *
 		return fmt.Errorf("temporary collection admin.%v already exists", tempCol) //TODO(erf) make this more helpful
 	}
 
-	log.Logf(log.DebugLow,"restoring %v to temporary collection", collectionType)
+	log.Logf(log.DebugLow, "restoring %v to temporary collection", collectionType)
 	err = restore.RestoreCollectionToDB("admin", tempCol, bsonSource, 0)
 	if err != nil {
 		return fmt.Errorf("error restoring %v: %v", collectionType, err)

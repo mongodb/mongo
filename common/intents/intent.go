@@ -1,11 +1,9 @@
-package mongorestore
+package intents
 
 import (
 	"github.com/mongodb/mongo-tools/common/log"
 	"sync"
 )
-
-// TODO: make this reusable for dump?
 
 // mongorestore first scans the directory to generate a list
 // of all files to restore and what they map to. TODO comments
@@ -56,7 +54,7 @@ func (it *Intent) IsSystemIndexes() bool {
 
 // Intent Manager
 
-type IntentManager struct {
+type Manager struct {
 	// map for merging metadata with BSON intents
 	intents map[string]*Intent
 
@@ -79,8 +77,8 @@ type IntentManager struct {
 	indexIntents map[string]*Intent
 }
 
-func NewIntentManager() *IntentManager {
-	return &IntentManager{
+func NewIntentManager() *Manager {
+	return &Manager{
 		intents:                 map[string]*Intent{},
 		intentsByDiscoveryOrder: []*Intent{},
 		indexIntents:            map[string]*Intent{},
@@ -91,7 +89,7 @@ func NewIntentManager() *IntentManager {
 // Put inserts an intent into the manager. Intents for the same collection
 // are merged together, so that BSON and metadata files for the same collection
 // are returned in the same intent.
-func (manager *IntentManager) Put(intent *Intent) {
+func (manager *Manager) Put(intent *Intent) {
 	if intent == nil {
 		panic("cannot insert nil *Intent into IntentManager")
 	}
@@ -142,7 +140,7 @@ func (manager *IntentManager) Put(intent *Intent) {
 
 // Pop returns the next available intent from the manager. If the manager is
 // empty, it returns nil. Pop is thread safe.
-func (manager *IntentManager) Pop() *Intent {
+func (manager *Manager) Pop() *Intent {
 	manager.priotitizerLock.Lock()
 	defer manager.priotitizerLock.Unlock()
 
@@ -152,7 +150,7 @@ func (manager *IntentManager) Pop() *Intent {
 
 // Finish tells the prioritizer that mongorestore is done restoring
 // the given collection intent.
-func (manager *IntentManager) Finish(intent *Intent) {
+func (manager *Manager) Finish(intent *Intent) {
 	manager.priotitizerLock.Lock()
 	defer manager.priotitizerLock.Unlock()
 	manager.prioritizer.Finish(intent)
@@ -161,29 +159,29 @@ func (manager *IntentManager) Finish(intent *Intent) {
 // Oplog returns the intent representing the oplog, which isn't
 // stored with the other intents, because it is dumped and restored in
 // a very different way from other collections.
-func (manager *IntentManager) Oplog() *Intent {
+func (manager *Manager) Oplog() *Intent {
 	return manager.oplogIntent
 }
 
 // SystemIndexes returns the system.indexes bson for a database
-func (manager *IntentManager) SystemIndexes(dbName string) *Intent {
+func (manager *Manager) SystemIndexes(dbName string) *Intent {
 	return manager.indexIntents[dbName]
 }
 
 // Users returns the intent of the users collection to restore, a special case
-func (manager *IntentManager) Users() *Intent {
+func (manager *Manager) Users() *Intent {
 	return manager.usersIntent
 }
 
 // Roles returns the intent of the user roles collection to restore, a special case
-func (manager *IntentManager) Roles() *Intent {
+func (manager *Manager) Roles() *Intent {
 	return manager.rolesIntent
 }
 
 // Finalize processes the intents for prioritization. Currently only two
 // kinds of prioritizers are supported. No more "Put" operations may be done
 // after finalize is called.
-func (manager *IntentManager) Finalize(pType PriorityType) {
+func (manager *Manager) Finalize(pType PriorityType) {
 	switch pType {
 	case Legacy:
 		log.Log(log.DebugHigh, "finalizing intent manager with legacy prioritizer")

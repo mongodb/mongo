@@ -3,6 +3,7 @@ package mongorestore
 import (
 	"fmt"
 	"github.com/mongodb/mongo-tools/common/db"
+	"github.com/mongodb/mongo-tools/common/intents"
 	"github.com/mongodb/mongo-tools/common/log"
 	"github.com/mongodb/mongo-tools/common/progress"
 	"gopkg.in/mgo.v2/bson"
@@ -74,7 +75,7 @@ func (restore *MongoRestore) RestoreIntents() error {
 // RestoreIntent does the bulk of the logic to restore a collection
 // from the BSON and metadata files linked to in the given intent.
 // TODO: overly didactic comments on each step
-func (restore *MongoRestore) RestoreIntent(intent *Intent) error {
+func (restore *MongoRestore) RestoreIntent(intent *intents.Intent) error {
 
 	collectionExists, err := restore.DBHasCollection(intent)
 	if err != nil {

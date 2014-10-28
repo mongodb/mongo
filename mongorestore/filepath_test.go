@@ -2,6 +2,7 @@ package mongorestore
 
 import (
 	"bytes"
+	"github.com/mongodb/mongo-tools/common/intents"
 	"github.com/mongodb/mongo-tools/common/log"
 	"github.com/mongodb/mongo-tools/common/options"
 	"github.com/mongodb/mongo-tools/common/testutil"
@@ -41,13 +42,13 @@ func TestCreateAllIntents(t *testing.T) {
 
 	Convey("With a test MongoRestore", t, func() {
 		mr = &MongoRestore{
-			manager: NewIntentManager(),
+			manager: intents.NewIntentManager(),
 		}
 		log.SetWriter(&buff)
 
 		Convey("running CreateAllIntents should succeed", func() {
 			So(mr.CreateAllIntents("testdata/testdirs/"), ShouldBeNil)
-			mr.manager.Finalize(Legacy)
+			mr.manager.Finalize(intents.Legacy)
 
 			//TODO handle oplog!
 			Convey("and reading the intents should show alphabetical order", func() {
@@ -106,14 +107,14 @@ func TestCreateIntentsForDB(t *testing.T) {
 
 	Convey("With a test MongoRestore", t, func() {
 		mr = &MongoRestore{
-			manager: NewIntentManager(),
+			manager: intents.NewIntentManager(),
 		}
 		log.SetWriter(&buff)
 
 		Convey("running CreateIntentsForDB should succeed", func() {
 			err := mr.CreateIntentsForDB("myDB", "testdata/testdirs/db1")
 			So(err, ShouldBeNil)
-			mr.manager.Finalize(Legacy)
+			mr.manager.Finalize(intents.Legacy)
 
 			Convey("and reading the intents should show alphabetical order", func() {
 				i0 := mr.manager.Pop()
@@ -158,7 +159,7 @@ func TestCreateIntentsForCollection(t *testing.T) {
 	Convey("With a test MongoRestore", t, func() {
 		buff = bytes.Buffer{}
 		mr = &MongoRestore{
-			manager: NewIntentManager(),
+			manager: intents.NewIntentManager(),
 		}
 		log.SetWriter(&buff)
 
@@ -166,7 +167,7 @@ func TestCreateIntentsForCollection(t *testing.T) {
 			err := mr.CreateIntentForCollection(
 				"myDB", "myC", util.ToUniversalPath("testdata/testdirs/db1/c2.bson"))
 			So(err, ShouldBeNil)
-			mr.manager.Finalize(Legacy)
+			mr.manager.Finalize(intents.Legacy)
 
 			Convey("should create one intent with 'myDb' and 'myC' fields", func() {
 				i0 := mr.manager.Pop()
@@ -189,7 +190,7 @@ func TestCreateIntentsForCollection(t *testing.T) {
 			err := mr.CreateIntentForCollection(
 				"myDB", "myC", util.ToUniversalPath("testdata/testdirs/db1/c1.bson"))
 			So(err, ShouldBeNil)
-			mr.manager.Finalize(Legacy)
+			mr.manager.Finalize(intents.Legacy)
 
 			Convey("should create one intent with 'myDb' and 'myC' fields", func() {
 				i0 := mr.manager.Pop()
