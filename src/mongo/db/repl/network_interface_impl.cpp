@@ -515,7 +515,7 @@ namespace {
             const stdx::function<void (OperationContext*)>& callback) {
 
         stdx::function<std::string ()> f;
-        f = std::bind(&NetworkInterfaceImpl::getNextCallbackWithGlobalLockThreadName, this);
+        f = stdx::bind(&NetworkInterfaceImpl::getNextCallbackWithGlobalLockThreadName, this);
         Client::initThreadIfNotAlready(f);
         OperationContextImpl txn;
         Lock::GlobalWrite lk(txn.lockState());
