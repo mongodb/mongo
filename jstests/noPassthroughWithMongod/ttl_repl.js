@@ -82,11 +82,18 @@ masterdb.runCommand( { collMod : "c",
                        index : { keyPattern : {x : 1}, expireAfterSeconds : 10000} } );
 rt.awaitReplication();
 
-var newTTLindex = { "key": { "x" : 1 } , "ns": "d.c" , "expireAfterSeconds" : 10000 };
-assert.eq( 1, masterdb.system.indexes.find( newTTLindex ).count(),
-           "primary index didn't get updated");
-assert.eq( 1, slave1db.system.indexes.find( newTTLindex ).count(),
-           "secondary index didn't get updated");
+function getTTLTime( theCollection, theKey ) {
+    var indexes = theCollection.getIndexes();
+    for ( var i = 0; i < indexes.length; i++ ) {
+        if ( friendlyEqual( theKey, indexes[i].key ) )
+            return indexes[i].expireAfterSeconds;
+    }
+    throw "not found";
+}
+
+printjson( masterdb.c.getIndexes() );
+assert.eq( 10000, getTTLTime( masterdb.c, { x : 1 } ) );
+assert.eq( 10000, getTTLTime( slave1db.c, { x : 1 } ) );
 
 // finish up
 rt.stopSet();

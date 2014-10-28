@@ -14,14 +14,17 @@ d.runCommand({create: testname+'keep2', temp: 0});
 d.runCommand({create: testname+'keep3'});
 d[testname+'keep4'].insert({});
 
-assert.eq(d.system.namespaces.count({name: /temp\d$/}) , 2) // collections
-assert.eq(d.system.namespaces.count({name: /temp\d\.\$.*$/}) , 4) //indexes (2 _id + 2 x)
-assert.eq(d.system.namespaces.count({name: /keep\d$/}) , 4)
+function countCollectionNames( theDB, regex ) {
+    return theDB.getCollectionNames().filter( function(z) {
+        return z.match( regex ); } ).length;
+}
+
+assert.eq(countCollectionNames( d, /temp\d$/) , 2)
+assert.eq(countCollectionNames( d, /keep\d$/) , 4)
 stopMongod(30000);
 
 conn = startMongodNoReset("--port", 30000, "--dbpath", path, "--smallfiles", "--noprealloc", "--nopreallocj");
 d = conn.getDB('test')
-assert.eq(d.system.namespaces.count({name: /temp\d$/}) , 0) // collections
-assert.eq(d.system.namespaces.count({name: /temp\d\.\$.*$/}) , 0) //indexes
-assert.eq(d.system.namespaces.count({name: /keep\d$/}) , 4)
+assert.eq(countCollectionNames( d, /temp\d$/) , 0)
+assert.eq(countCollectionNames( d, /keep\d$/) , 4)
 stopMongod(30000);
