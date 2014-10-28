@@ -385,7 +385,7 @@ __wt_stat_init_connection_stats(WT_CONNECTION_STATS *stats)
 	stats->cache_read.desc = "cache: pages read into cache";
 	stats->cache_write.desc = "cache: pages written from cache";
 	stats->cond_wait.desc = "conn: pthread mutex condition wait calls";
-	stats->cursor_create.desc = "Btree: cursor creation";
+	stats->cursor_create.desc = "Btree: cursor create calls";
 	stats->cursor_insert.desc = "Btree: cursor insert calls";
 	stats->cursor_next.desc = "Btree: cursor next calls";
 	stats->cursor_prev.desc = "Btree: cursor prev calls";

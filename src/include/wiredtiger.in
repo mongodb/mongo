@@ -3109,7 +3109,7 @@ extern int wiredtiger_extension_terminate(WT_CONNECTION *connection);
 #define	WT_STAT_CONN_CACHE_WRITE			1044
 /*! conn: pthread mutex condition wait calls */
 #define	WT_STAT_CONN_COND_WAIT				1045
-/*! Btree: cursor creation */
+/*! Btree: cursor create calls */
 #define	WT_STAT_CONN_CURSOR_CREATE			1046
 /*! Btree: cursor insert calls */
 #define	WT_STAT_CONN_CURSOR_INSERT			1047
