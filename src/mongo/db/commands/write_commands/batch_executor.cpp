@@ -1144,6 +1144,13 @@ namespace mongo {
         bool createCollection = false;
         for ( int fakeLoop = 0; fakeLoop < 1; fakeLoop++ ) {
 
+            UpdateExecutor executor(&request, &txn->getCurOp()->debug());
+            Status status = executor.prepare();
+            if (!status.isOK()) {
+                result->setError(toWriteError(status));
+                return;
+            }
+
             if ( createCollection ) {
                 Lock::DBLock lk(txn->lockState(), nsString.db(), MODE_X);
                 Client::Context ctx(txn, nsString.ns(), false /* don't check version */);
