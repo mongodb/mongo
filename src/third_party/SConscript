@@ -2,6 +2,8 @@
 
 Import("env use_system_version_of_library windows darwin usev8 v8suffix solaris boostSuffix")
 
+snappySuffix = '-1.1.2'
+
 thirdPartyIncludePathList = [
     ('s2', '#/src/third_party/s2'),
     ('tz', '#/src/third_party/tz'),
@@ -21,7 +23,7 @@ if not use_system_version_of_library('boost'):
 
 if not use_system_version_of_library('snappy'):
     thirdPartyIncludePathList.append(
-        ('snappy', '#/src/third_party/snappy'))
+        ('snappy', '#/src/third_party/snappy' + snappySuffix))
 
 if not use_system_version_of_library('v8'):
     thirdPartyIncludePathList.append(
@@ -118,10 +120,10 @@ if use_system_version_of_library("snappy"):
 else:
     snappyEnv = env.Clone()
     snappyEnv.InjectThirdPartyIncludePaths(libraries=['snappy'])
-    snappyEnv.SConscript('snappy/SConscript', exports={ 'env' : snappyEnv })
+    snappyEnv.SConscript('snappy' + snappySuffix + '/SConscript', exports={ 'env' : snappyEnv })
     snappyEnv = snappyEnv.Clone(
         LIBDEPS=[
-            'snappy/snappy',
+            'snappy' + snappySuffix + '/snappy',
         ])
 
 snappyEnv.Library(
