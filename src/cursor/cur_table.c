@@ -420,11 +420,18 @@ __curtable_update(WT_CURSOR *cursor)
 		    ctable->cg_cursors, ctable->plan,
 		    cursor->value_format, &cursor->value));
 		APPLY_CG(ctable, search);
-		WT_ERR(ret);
-		APPLY_IDX(ctable, remove);
-		WT_ERR(__wt_schema_project_slice(session,
-		    ctable->cg_cursors, ctable->plan, 0,
-		    cursor->value_format, &cursor->value));
+		/*
+		 * Remove only if the key exists.
+		 */
+		if (ret == 0) {
+			APPLY_IDX(ctable, remove);
+			WT_ERR(__wt_schema_project_slice(session,
+			    ctable->cg_cursors, ctable->plan, 0,
+			    cursor->value_format, &cursor->value));
+		} else if (ret == WT_NOTFOUND)
+			ret = 0;
+		else
+			WT_ERR(ret);
 	}
 	APPLY_CG(ctable, update);
 	WT_ERR(ret);
