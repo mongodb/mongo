@@ -1,55 +1,53 @@
-// SERVER-13922
-if (0) {
 // Test background index creation w/ constraints
 
-load( "jstests/libs/slow_weekly_util.js" )
+load( "jstests/libs/slow_weekly_util.js" );
 
-testServer = new SlowWeeklyMongod( "indexbg2" )
-db = testServer.getDB( "test" );
+var testServer = new SlowWeeklyMongod( "indexbg2" );
+var db = testServer.getDB( "test" );
+var baseName = "jstests_index12";
 
-parallel = function() {
+var parallel = function() {
     return db[ baseName + "_parallelStatus" ];
-}
+};
 
-resetParallel = function() {
+var resetParallel = function() {
     parallel().drop();
-}
+};
 
-doParallel = function( work ) {
+var doParallel = function( work ) {
     resetParallel();
     startMongoProgramNoConnect( "mongo", "--eval", work + "; db." + baseName + "_parallelStatus.save( {done:1} );", db.getMongo().host );
-}
+};
 
-doneParallel = function() {
+var doneParallel = function() {
     return !!parallel().findOne();
-}
+};
 
-waitParallel = function() {
+var waitParallel = function() {
     assert.soon( function() { return doneParallel(); }, "parallel did not finish in time", 300000, 1000 );
-}
+};
 
-doTest = function(dropDups) {
-
-    size = 10000;
+var doTest = function() {
+    "use strict";
+    var size = 10000;
     while (1) { // if indexing finishes before we can run checks, try indexing w/ more data
         print("size: " + size);
-        baseName = "jstests_index12";
-        fullName = "db." + baseName;
-        t = db[baseName];
+        var fullName = "db." + baseName;
+        var t = db[baseName];
         t.drop();
 
         db.eval(function(size) {
-            for (i = 0; i < size; ++i) {
+            for (var i = 0; i < size; ++i) {
                 db.jstests_index12.save({ i: i });
             }
         },
             size);
         assert.eq(size, t.count());
 
-        doParallel(fullName + ".ensureIndex( {i:1}, {background:true, unique:true, dropDups:" + dropDups + "} )");
+        doParallel(fullName + ".ensureIndex( {i:1}, {background:true, unique:true} )");
         try {
             // wait for indexing to start
-            assert.soon(function() { return 2 == db.system.indexes.count({ ns: "test." + baseName }) }, "no index created", 30000, 50);
+            assert.soon(function() { return 2 == db.system.indexes.count({ ns: "test." + baseName }); }, "no index created", 30000, 50);
             t.save({ i: 0, n: true });
             t.save({ i: size - 1, n: true });
         } catch (e) {
@@ -70,22 +68,15 @@ doTest = function(dropDups) {
 
     waitParallel();
 
-    if( dropDups == "true" ) {
-        assert.eq(size, t.find().toArray().length, "full query failed");
-        assert.eq(size, t.count(), "count failed");
-    }
-    else {
-        /* without dropdups, it could be that there is more than size now but the index failed
-        to build - which is valid.  we check index isn't there. 
-        */
-        if (t.count() != size) 
-            assert.eq(1, t.getIndexes().length, "change in # of elems yet index is there");
+    /* it could be that there is more than size now but the index failed
+     to build - which is valid.  we check index isn't there. 
+     */
+    if (t.count() != size) {
+        assert.eq(1, t.getIndexes().length, "change in # of elems yet index is there");
     }
 
-}
+};
 
-doTest( "false" );
-doTest( "true" );
+doTest();
 
 testServer.stop();
-}  // if (0)

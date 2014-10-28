@@ -1159,7 +1159,7 @@ namespace mongo {
         LocType genericRecordLoc;
         genericRecordLoc = recordLoc;
 
-        bool dupsChecked = false;
+        bool dupsCheckedYet = false;
 
         int low = 0;
         int high = bucket->n - 1;
@@ -1178,23 +1178,25 @@ namespace mongo {
                         // there aren't other entries for the key then.  as it is very rare that
                         // we get here, we don't put any coding effort in here to make this
                         // particularly fast
-                        if (!dupsChecked) {
+                        if (!dupsCheckedYet) {
                             // This is expensive and we only want to do it once(? -- when would
                             // it happen twice).
-                            dupsChecked = true;
+                            dupsCheckedYet = true;
                             if (exists(txn, key)) {
                                 if (wouldCreateDup(txn, key, genericRecordLoc)) {
                                     return Status(ErrorCodes::DuplicateKey, dupKeyError(key), 11000);
                                 }
                                 else {
-                                    return Status(ErrorCodes::UniqueIndexViolation, "FIXME");
+                                    return Status(ErrorCodes::DuplicateKeyValue, 
+                                                  "key/value already in index");
                                 }
                             }
                         }
                     }
                     else {
                         if (fullKey.recordLoc == recordLoc) {
-                            return Status(ErrorCodes::UniqueIndexViolation, "FIXME");
+                            return Status(ErrorCodes::DuplicateKeyValue, 
+                                          "key/value already in index");
                         }
                         else {
                             return Status(ErrorCodes::DuplicateKey, dupKeyError(key), 11000);
@@ -2261,7 +2263,10 @@ namespace mongo {
                 txn->recoveryUnit()->writing(&header)->setUsed();
                 return Status::OK();
             }
-            return Status(ErrorCodes::UniqueIndexViolation, "FIXME");
+            // The logic in _find() prohibits finding and returning a position if the 'used' bit
+            // in the header is set and dups are disallowed.
+            invariant(dupsAllowed);
+            return Status(ErrorCodes::DuplicateKeyValue, "key/value already in index");
         }
 
         DiskLoc childLoc = childLocForPos(bucket, pos);

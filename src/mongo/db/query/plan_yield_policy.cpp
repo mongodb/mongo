@@ -62,6 +62,8 @@ namespace mongo {
             return true;
         }
 
+        invariant(_planYielding);
+
         // No need to yield if the collection is NULL.
         if (NULL == _planYielding->collection()) {
             return true;

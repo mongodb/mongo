@@ -199,13 +199,18 @@ namespace mongo {
         Timer t;
 
         unsigned long long n = 0;
+
         scoped_ptr<PlanExecutor> exec(InternalPlanner::collectionScan(_txn,
                                                                       _collection->ns().ns(),
                                                                       _collection));
+        if (_buildInBackground) {
+            exec->setYieldPolicy(PlanExecutor::YIELD_AUTO);
+        }
 
         BSONObj objToIndex;
         DiskLoc loc;
-        while (PlanExecutor::ADVANCED == exec->getNext(&objToIndex, &loc)) {
+        PlanExecutor::ExecState state;
+        while (PlanExecutor::ADVANCED == (state = exec->getNext(&objToIndex, &loc))) {
             {
                 bool shouldCommitWUnit = true;
                 WriteUnitOfWork wunit(_txn);
@@ -233,6 +238,11 @@ namespace mongo {
                 _txn->checkForInterrupt();
 
             progress->setTotalWhileRunning( _collection->numRecords(_txn) );
+        }
+
+        if (state != PlanExecutor::IS_EOF) {
+            uasserted(28550, 
+                      "Unable to complete index build as the collection is no longer readable");
         }
 
         progress->finished();

@@ -306,6 +306,10 @@ namespace mongo {
         /* duplicate key check. we descend the btree twice - once for this check, and once for the actual inserts, further
            below.  that is suboptimal, but it's pretty complicated to do it the other way without rollbacks...
         */
+
+        // At the end of this step, we will have a map of UpdateTickets, one per index, which
+        // represent the index updates needed to be done, based on the changes between objOld and
+        // objNew.
         OwnedPointerMap<IndexDescriptor*,UpdateTicket> updateTickets;
         IndexCatalog::IndexIterator ii = _indexCatalog.getIndexIterator( txn, true );
         while ( ii.more() ) {
@@ -325,7 +329,8 @@ namespace mongo {
             }
         }
 
-        // this can callback into Collection::recordStoreGoingToMove
+        // This can call back into Collection::recordStoreGoingToMove.  If that happens, the old
+        // object is removed from all indexes.
         StatusWith<DiskLoc> newLocation = _recordStore->updateRecord( txn,
                                                                       oldLocation,
                                                                       objNew.objdata(),
@@ -337,8 +342,12 @@ namespace mongo {
             return newLocation;
         }
 
+        // At this point, the old object may or may not still be indexed, depending on if it was
+        // moved.
+
         _infoCache.notifyOfWriteOp();
 
+        // If the object did move, we need to add the new location to all indexes.
         if ( newLocation.getValue() != oldLocation ) {
 
             if ( debug ) {
@@ -354,6 +363,8 @@ namespace mongo {
 
             return newLocation;
         }
+
+        // Object did not move.  We update each index with each respective UpdateTicket.
 
         if ( debug )
             debug->keyUpdates = 0;
@@ -391,13 +402,13 @@ namespace mongo {
     Status Collection::updateDocumentWithDamages( OperationContext* txn,
                                                   const DiskLoc& loc,
                                                   const RecordData& oldRec,
-                                                  const char* damangeSource,
+                                                  const char* damageSource,
                                                   const mutablebson::DamageVector& damages ) {
 
         // Broadcast the mutation so that query results stay correct.
         _cursorCache.invalidateDocument(loc, INVALIDATION_MUTATION);
 
-        return _recordStore->updateWithDamages( txn, loc, oldRec, damangeSource, damages );
+        return _recordStore->updateWithDamages( txn, loc, oldRec, damageSource, damages );
     }
 
     bool Collection::_enforceQuota( bool userEnforeQuota ) const {

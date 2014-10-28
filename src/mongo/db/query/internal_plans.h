@@ -74,7 +74,7 @@ namespace mongo {
             if (NULL == collection) {
                 EOFStage* eof = new EOFStage();
                 PlanExecutor* exec;
-                // Takes ownership if 'ws' and 'eof'.
+                // Takes ownership of 'ws' and 'eof'.
                 Status execStatus =  PlanExecutor::make(txn,
                                                         ws,
                                                         eof,
@@ -85,7 +85,7 @@ namespace mongo {
                 return exec;
             }
 
-            dassert( ns == collection->ns().ns() );
+            invariant( ns == collection->ns().ns() );
 
             CollectionScanParams params;
             params.collection = collection;
