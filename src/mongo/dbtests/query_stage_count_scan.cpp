@@ -44,7 +44,7 @@
 #include "mongo/util/fail_point_registry.h"
 #include "mongo/util/fail_point_service.h"
 
-namespace QueryStageCount {
+namespace QueryStageCountScan {
 
     class CountBase {
     public:
@@ -92,7 +92,7 @@ namespace QueryStageCount {
             return collection->getIndexCatalog()->findIndexByKeyPattern(&_txn, obj);
         }
 
-        static const char* ns() { return "unittests.QueryStageCountScan"; }
+        static const char* ns() { return "unittests.QueryStageCountScanScan"; }
 
     protected:
         OperationContextImpl _txn;
@@ -105,7 +105,7 @@ namespace QueryStageCount {
     //
     // Check that dups are properly identified
     //
-    class QueryStageCountDups : public CountBase {
+    class QueryStageCountScanDups : public CountBase {
     public:
         void run() {
             Client::WriteContext ctx(&_txn, ns());
@@ -137,7 +137,7 @@ namespace QueryStageCount {
     //
     // Check that expected results are returned with inclusive bounds
     //
-    class QueryStageCountInclusiveBounds : public CountBase {
+    class QueryStageCountScanInclusiveBounds : public CountBase {
     public:
         void run() {
             Client::WriteContext ctx(&_txn, ns());
@@ -169,7 +169,7 @@ namespace QueryStageCount {
     //
     // Check that expected results are returned with exclusive bounds
     //
-    class QueryStageCountExclusiveBounds : public CountBase {
+    class QueryStageCountScanExclusiveBounds : public CountBase {
     public:
         void run() {
             Client::WriteContext ctx(&_txn, ns());
@@ -201,7 +201,7 @@ namespace QueryStageCount {
     //
     // Check that cursor returns no results if all docs are below lower bound
     //
-    class QueryStageCountLowerBound : public CountBase {
+    class QueryStageCountScanLowerBound : public CountBase {
     public:
         void run() {
             Client::WriteContext ctx(&_txn, ns());
@@ -229,7 +229,7 @@ namespace QueryStageCount {
     //
     // Check that cursor returns no results if there are no docs within interval
     //
-    class QueryStageCountNothingInInterval : public CountBase {
+    class QueryStageCountScanNothingInInterval : public CountBase {
     public:
         void run() {
             Client::WriteContext ctx(&_txn, ns());
@@ -259,7 +259,7 @@ namespace QueryStageCount {
     // Check that cursor returns no results if there are no docs within interval
     // and the first key located during initialization is above upper bound
     //
-    class QueryStageCountNothingInIntervalFirstMatchTooHigh : public CountBase {
+    class QueryStageCountScanNothingInIntervalFirstMatchTooHigh : public CountBase {
     public:
         void run() {
             Client::WriteContext ctx(&_txn, ns());
@@ -289,7 +289,7 @@ namespace QueryStageCount {
     // Check that cursor recovers its position properly if there is no change
     // during a yield
     //
-    class QueryStageCountNoChangeDuringYield : public CountBase {
+    class QueryStageCountScanNoChangeDuringYield : public CountBase {
     public:
         void run() {
             Client::WriteContext ctx(&_txn, ns());
@@ -340,7 +340,7 @@ namespace QueryStageCount {
     // Check that cursor recovers its position properly if its current location
     // is deleted during a yield
     //
-    class QueryStageCountDeleteDuringYield : public CountBase {
+    class QueryStageCountScanDeleteDuringYield : public CountBase {
     public:
         void run() {
             Client::WriteContext ctx(&_txn, ns());
@@ -394,7 +394,7 @@ namespace QueryStageCount {
     // Check that cursor relocates its end location properly if end location
     // changes during a yield
     //
-    class QueryStageCountInsertNewDocsDuringYield : public CountBase {
+    class QueryStageCountScanInsertNewDocsDuringYield : public CountBase {
     public:
         void run() {
             Client::WriteContext ctx(&_txn, ns());
@@ -451,7 +451,7 @@ namespace QueryStageCount {
     // Check that count performs correctly if an index becomes multikey
     // during a yield
     //
-    class QueryStageCountBecomesMultiKeyDuringYield : public CountBase {
+    class QueryStageCountScanBecomesMultiKeyDuringYield : public CountBase {
     public:
         void run() {
             Client::WriteContext ctx(&_txn, ns());
@@ -504,7 +504,7 @@ namespace QueryStageCount {
     //
     // Unused keys are not returned during iteration
     //
-    class QueryStageCountUnusedKeys : public CountBase {
+    class QueryStageCountScanUnusedKeys : public CountBase {
     public:
         void run() {
             Client::WriteContext ctx(&_txn, ns());
@@ -539,7 +539,7 @@ namespace QueryStageCount {
     //
     // Iteration is properly terminated when the end location is an unused key
     //
-    class QueryStageCountUnusedEndKey : public CountBase {
+    class QueryStageCountScanUnusedEndKey : public CountBase {
     public:
         void run() {
             Client::WriteContext ctx(&_txn, ns());
@@ -572,7 +572,7 @@ namespace QueryStageCount {
     //
     // Advances past a key that becomes unused during a yield
     //
-    class QueryStageCountKeyBecomesUnusedDuringYield : public CountBase {
+    class QueryStageCountScanKeyBecomesUnusedDuringYield : public CountBase {
     public:
         void run() {
             Client::WriteContext ctx(&_txn, ns());
@@ -624,25 +624,25 @@ namespace QueryStageCount {
 
     class All : public Suite {
     public:
-        All() : Suite("query_stage_count") { }
+        All() : Suite("query_stage_count_scan") { }
 
         void setupTests() {
-            add<QueryStageCountDups>();
-            add<QueryStageCountInclusiveBounds>();
-            add<QueryStageCountExclusiveBounds>();
-            add<QueryStageCountLowerBound>();
-            add<QueryStageCountNothingInInterval>();
-            add<QueryStageCountNothingInIntervalFirstMatchTooHigh>();
-            add<QueryStageCountNoChangeDuringYield>();
-            add<QueryStageCountDeleteDuringYield>();
-            add<QueryStageCountInsertNewDocsDuringYield>();
-            add<QueryStageCountBecomesMultiKeyDuringYield>();
-            add<QueryStageCountUnusedKeys>();
+            add<QueryStageCountScanDups>();
+            add<QueryStageCountScanInclusiveBounds>();
+            add<QueryStageCountScanExclusiveBounds>();
+            add<QueryStageCountScanLowerBound>();
+            add<QueryStageCountScanNothingInInterval>();
+            add<QueryStageCountScanNothingInIntervalFirstMatchTooHigh>();
+            add<QueryStageCountScanNoChangeDuringYield>();
+            add<QueryStageCountScanDeleteDuringYield>();
+            add<QueryStageCountScanInsertNewDocsDuringYield>();
+            add<QueryStageCountScanBecomesMultiKeyDuringYield>();
+            add<QueryStageCountScanUnusedKeys>();
         }
     };
 
-    SuiteInstance<All> queryStageCountAll;
+    SuiteInstance<All> queryStageCountScanAll;
 
-} // namespace QueryStageCount
+} // namespace QueryStageCountScan
 
 
