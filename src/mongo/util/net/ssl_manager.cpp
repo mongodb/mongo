@@ -142,7 +142,7 @@ namespace mongo {
         // Activate all bug workaround options, to support buggy client SSL's.
         // SSL_OP_NO_SSLv2 - Disable SSL v2 support
         // SSL_OP_NO_SSLv3 - Disable SSL v3 support
-        SSL_CTX_set_options(*context, SSL_OP_ALL|SSL_OP_NO_SSLv2|SSL_OP_NO_SSLv3);
+        SSL_CTX_set_options(_context, SSL_OP_ALL|SSL_OP_NO_SSLv2|SSL_OP_NO_SSLv3);
 
         // If renegotiation is needed, don't return from recv() or send() until it's successful.
         // Note: this is for blocking sockets only.
