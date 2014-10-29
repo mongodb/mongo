@@ -562,6 +562,12 @@ env.Library('global_environment_experiment',
 # Memory-mapped files support.  Used by mongod and some tools.
 env.Library('mmap', ['util/mmap.cpp', 'util/mmap_${OS_FAMILY}.cpp'], LIBDEPS=['foundation'])
 
+env.Library('elapsed_tracker',
+            ['util/elapsed_tracker.cpp'],
+            LIBDEPS=['foundation',
+                     'network'] # this is for using listener to check elapsed time
+            )
+
 # mongod files - also files used in tools. present in dbtests, but not in mongos and not in client
 # libs.
 serverOnlyFiles = [ "db/background.cpp",
@@ -699,7 +705,6 @@ serverOnlyFiles = [ "db/background.cpp",
                     "s/distlock_test.cpp",
                     "util/alignedbuilder.cpp",
                     "util/compress.cpp",
-                    "util/elapsed_tracker.cpp",
                     "util/logfile.cpp",
                 ]
 
@@ -945,6 +950,7 @@ serveronlyLibdeps = ["coreshard",
                      'db/storage/mmap_v1/storage_mmapv1',
                      'db/storage/heap1/storage_heap1',
                      'mmap',
+                     'elapsed_tracker',
                      '$BUILD_DIR/third_party/shim_snappy']
 
 if has_option("rocksdb" ):
