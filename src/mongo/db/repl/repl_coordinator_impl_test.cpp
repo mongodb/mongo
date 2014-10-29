@@ -106,7 +106,7 @@ namespace {
         init("mySet");
         start(HostAndPort("node1", 12345));
         BSONObjBuilder result;
-        ASSERT_EQUALS(ErrorCodes::NoSuchKey,
+        ASSERT_EQUALS(ErrorCodes::InvalidReplicaSetConfig,
                       getReplCoord()->processReplSetInitiate(&txn, BSONObj(), &result));
         ASSERT_EQUALS(ReplicationCoordinator::modeNone, getReplCoord()->getReplicationMode());
     }
@@ -148,7 +148,7 @@ namespace {
         init("mySet");
         start(HostAndPort("node1", 12345));
         BSONObjBuilder result;
-        ASSERT_EQUALS(ErrorCodes::NoSuchKey,
+        ASSERT_EQUALS(ErrorCodes::InvalidReplicaSetConfig,
                       getReplCoord()->processReplSetInitiate(&txn, BSONObj(), &result));
         ASSERT_EQUALS(ReplicationCoordinator::modeNone, getReplCoord()->getReplicationMode());
 
@@ -188,7 +188,7 @@ namespace {
         BSONObjBuilder result;
         init("mySet");
         start(HostAndPort("node1", 12345));
-        ASSERT_EQUALS(ErrorCodes::NodeNotFound,
+        ASSERT_EQUALS(ErrorCodes::InvalidReplicaSetConfig,
                       getReplCoord()->processReplSetInitiate(
                               &txn,
                               BSON("_id" << "mySet" <<
@@ -286,7 +286,7 @@ namespace {
 
         BSONObjBuilder result1;
         ASSERT_EQUALS(
-                ErrorCodes::BadValue,
+                ErrorCodes::InvalidReplicaSetConfig,
                 getReplCoord()->processReplSetInitiate(
                         &txn,
                         BSON("_id" << "wrongSet" <<

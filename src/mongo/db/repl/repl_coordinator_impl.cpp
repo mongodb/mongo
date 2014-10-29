@@ -1790,7 +1790,7 @@ namespace {
         Status status = newConfig.initialize(configObj);
         if (!status.isOK()) {
             error() << "replSet initiate got " << status << " while parsing " << configObj << rsLog;
-            return status;
+            return Status(ErrorCodes::InvalidReplicaSetConfig, status.reason());;
         }
         if (newConfig.getReplSetName() != _settings.ourSetName()) {
             str::stream errmsg;
@@ -1798,14 +1798,14 @@ namespace {
                 newConfig.getReplSetName() << ", but command line reports " <<
                 _settings.ourSetName() << "; rejecting";
             error() << std::string(errmsg);
-            return Status(ErrorCodes::BadValue, errmsg);
+            return Status(ErrorCodes::InvalidReplicaSetConfig, errmsg);
         }
 
         StatusWith<int> myIndex = validateConfigForInitiate(_externalState.get(), newConfig);
         if (!myIndex.isOK()) {
             error() << "replSet initiate got " << myIndex.getStatus() << " while validating " <<
                 configObj << rsLog;
-            return myIndex.getStatus();
+            return Status(ErrorCodes::InvalidReplicaSetConfig, myIndex.getStatus().reason());
         }
 
         log() << "replSet replSetInitiate config object with " << newConfig.getNumMembers() <<
