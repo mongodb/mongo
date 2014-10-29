@@ -40,6 +40,7 @@
 #include "mongo/db/storage/wiredtiger/wiredtiger_kv_engine.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_recovery_unit.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_session_cache.h"
+#include "mongo/db/storage/wiredtiger/wiredtiger_util.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/scopeguard.h"
 
@@ -57,71 +58,21 @@ namespace mongo {
 
     BSONObj WiredTigerServerStatusSection::generateSection(
         const BSONElement& configElement) const {
+
         boost::scoped_ptr<WiredTigerRecoveryUnit> recoveryUnit(
             dynamic_cast<WiredTigerRecoveryUnit*>(_engine->newRecoveryUnit()));
         WiredTigerSession* session = recoveryUnit->getSession();
         WT_SESSION* s = session->getSession();
         invariant(s);
-        BSONObjBuilder bob;
         const string uri = "statistics:";
-        bob.append("uri", uri);
-        WT_CURSOR* c = NULL;
-        int ret;
-        if ((ret = s->open_cursor(s, uri.c_str(), NULL, "statistics=(fast)", &c)) != 0) {
+
+        BSONObjBuilder bob;
+        Status status = WiredTigerUtil::exportTableToBSON(s, uri,
+                                                          "statistics=(all)", &bob);
+        if (!status.isOK()) {
             bob.append("error", "unable to retrieve statistics");
-            bob.append("message", wiredtiger_strerror(ret));
-        }
-        else {
-            invariant(c);
-            ON_BLOCK_EXIT(c->close, c);
-
-            std::map<string,BSONObjBuilder*> subs;
-
-            const char *desc, *pvalue;
-            uint64_t value;
-            while (c->next(c) == 0 &&
-                   c->get_value(c, &desc, &pvalue, &value) == 0) {
-                StringData key( desc );
-
-                StringData prefix;
-                StringData suffix;
-
-                size_t idx = key.find( ':' );
-                if ( idx != string::npos ) {
-                    prefix = key.substr( 0, idx );
-                    suffix = key.substr( idx + 1 );
-                }
-                else {
-                    idx = key.find( ' ' );
-                }
-
-                if ( idx != string::npos ) {
-                    prefix = key.substr( 0, idx );
-                    suffix = key.substr( idx + 1 );
-                }
-                else {
-                    prefix = key;
-                    suffix = "num";
-                }
-
-                if ( prefix.size() == 0 ) {
-                    bob.append(desc, pvalue);
-                }
-                else {
-                    BSONObjBuilder*& sub = subs[prefix.toString()];
-                    if ( !sub )
-                        sub = new BSONObjBuilder();
-                    sub->append( mongoutils::str::ltrim(suffix.toString()), pvalue );
-                }
-            }
-
-            for ( std::map<string,BSONObjBuilder*>::const_iterator it = subs.begin();
-                  it != subs.end(); ++it ) {
-                const std::string& s = it->first;
-                bob.append( s, it->second->obj() );
-                delete it->second;
-            }
-
+            bob.append("code", static_cast<int>(status.code()));
+            bob.append("reason", status.reason());
         }
 
         return bob.obj();
