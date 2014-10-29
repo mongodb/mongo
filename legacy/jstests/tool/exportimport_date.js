@@ -1,3 +1,6 @@
+load("jstests/libs/servers.js");
+load("jstests/libs/servers_misc.js");
+
 var tt = new ToolTest('exportimport_date_test');
 
 var exportimport_db = tt.startDB();

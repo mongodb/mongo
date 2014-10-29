@@ -75,6 +75,7 @@ mongo_tools_variables:
     ubuntu1204_ssl_task_list: &ubuntu1204_ssl_tasks
       - name: dist
       - name: integration
+      - name: legacy-ssl
     ubuntu1204_enterprise_task_list: &ubuntu1204_enterprise_tasks
       - name: bsonutil
       - name: db
@@ -83,6 +84,7 @@ mongo_tools_variables:
       - name: json
       - name: kerberos
       - name: legacy
+      - name: legacy-ssl
       - name: lint
       - name: log
       - name: pool
@@ -117,12 +119,14 @@ mongo_tools_variables:
     windows_64_ssl_task_list: &windows_64_ssl_tasks
       - name: dist
       - name: integration
+      - name: legacy-ssl
     windows_64_enterprise_task_list: &windows_64_enterprise_tasks
       - name: db
       - name: dist
       - name: integration
       - name: kerberos
       - name: legacy
+      - name: legacy-ssl
         distros:
         - windows-64-vs2013-test
       - name: unit
@@ -756,6 +760,50 @@ tasks:
           mv legacy/* .
           chmod +x mongo*
           python buildscripts/smoke.py --nopreallocj --with-cleanbb --mongod ./mongod --mongo ./mongo --report-file report.json --continue-on-failure --buildlogger-builder MCI_${build_variant} --buildlogger-buildnum ${builder_num|} --buildlogger-credentials ./mci.buildlogger --buildlogger-phase ${task_name}_${execution} tool
+
+- name: legacy-ssl
+  depends_on:
+  - name: dist
+  commands:
+    - command: git.get_project
+      params:
+        directory: src
+    - command: git.apply_patch
+      params:
+        directory: src
+    - func: "get buildnumber"
+    - func: "setup credentials"
+    - func: "download mongod"
+    - func: "fetch tool"
+      vars:
+        tool: mongoimport
+    - func: "fetch tool"
+      vars:
+        tool: mongoexport
+    - func: "fetch tool"
+      vars:
+        tool: mongodump
+    - func: "fetch tool"
+      vars:
+        tool: mongostat
+    - func: "fetch tool"
+      vars:
+        tool: mongorestore
+    - func: "fetch tool"
+      vars:
+        tool: mongooplog
+    - func: "fetch tool"
+      vars:
+        tool: mongofiles
+    - command: shell.exec
+      params:
+        working_dir: src
+        script: |
+          mv ./mongodb/mongod${extension} .
+          mv ./mongodb/mongo${extension} .
+          mv legacy/* .
+          chmod +x mongo*
+          python buildscripts/smoke.py --use-ssl --nopreallocj --with-cleanbb --mongod ./mongod --mongo ./mongo --report-file report.json --continue-on-failure --buildlogger-builder MCI_${build_variant} --buildlogger-buildnum ${builder_num|} --buildlogger-credentials ./mci.buildlogger --buildlogger-phase ${task_name}_${execution} tool
 
 - name: lint
   commands:

@@ -1,3 +1,6 @@
+load("jstests/libs/servers.js");
+load("jstests/libs/servers_misc.js");
+
 var replTest = new ReplSetTest( {name: 'testSet', nodes: 2} );
 
 var nodes = replTest.startSet();

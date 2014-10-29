@@ -784,6 +784,12 @@ function appendSetParameterArgs(argArray) {
             argArray.push.apply(argArray, ['--setParameter', "enableLocalhostAuthBypass=false"]);
         }
 
+        if ( jsTestOptions().useSSL ) {
+            if ( argArray.indexOf('--sslMode') < 0 ) {
+                argArray.push.apply(argArray, [ '--sslMode', 'requireSSL', '--sslPEMKeyFile', 'jstests/libs/server.pem', '--sslCAFile', 'jstests/libs/ca.pem', '--sslWeakCertificateValidation' ] );
+            }
+        }
+
         // mongos only options
         if (programName.endsWith('mongos')) {
             // apply setParameters for mongos
@@ -901,6 +907,10 @@ runMongoProgram = function() {
                       '--authenticationMechanism', DB.prototype._defaultAuthenticationMechanism,
                       '--authenticationDatabase=admin'
                     );
+    }
+
+    if ( jsTestOptions().useSSL ) {
+        args.push("--ssl", "--sslPEMKeyFile", "jstests/libs/server.pem", "--sslCAFile", "jstests/libs/ca.pem", "--sslAllowInvalidHosts");
     }
 
     if (progName == 'mongo' && !_useWriteCommandsDefault()) {

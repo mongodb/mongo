@@ -1,5 +1,8 @@
 // oplog1.js
 
+load("jstests/libs/servers.js");
+load("jstests/libs/servers_misc.js");
+
 // very basic test for mongooplog
 // need a lot more, but test that it functions at all
 

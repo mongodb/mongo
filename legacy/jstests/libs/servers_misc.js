@@ -64,6 +64,7 @@ ToolTest = function( name, extraOptions ){
     this.dbpath = this.root + "/";
     this.ext = this.root + "_external/";
     this.extFile = this.root + "_external/a";
+    this.useSSL = jsTestOptions().useSSL
     resetDbpath( this.dbpath );
     resetDbpath( this.ext );
 }
@@ -79,6 +80,10 @@ ToolTest.prototype.startDB = function( coll ){
                    bind_ip : "127.0.0.1"};
 
     Object.extend(options, this.options);
+
+    if ( this.useSSL ) {
+        Object.extend(options, { sslMode: "requireSSL", sslPEMKeyFile: "jstests/libs/server.pem", sslCAFile: "jstests/libs/ca.pem", sslWeakCertificateValidation: "" } );
+    }
 
     this.m = startMongoProgram.apply(null, MongoRunner.arrOptions("mongod", options));
     this.db = this.m.getDB( this.baseName );
@@ -106,6 +111,10 @@ ToolTest.prototype.runTool = function(){
         a.push( arguments[i] );
         if ( arguments[i] == "--dbpath" )
             hasdbpath = true;
+    }
+
+    if ( this.useSSL ) {
+        a = a.concat(["--ssl", "--sslPEMKeyFile", "jstests/libs/server.pem", "--sslCAFile", "jstests/libs/ca.pem", "--sslAllowInvalidHosts"]);
     }
 
     if ( ! hasdbpath ){

@@ -1,5 +1,8 @@
 // exportimport1.js
 
+load("jstests/libs/servers.js");
+load("jstests/libs/servers_misc.js");
+
 t = new ToolTest( "exportimport1" );
 
 c = t.startDB( "foo" );

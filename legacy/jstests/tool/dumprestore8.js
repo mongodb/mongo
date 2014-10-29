@@ -1,5 +1,8 @@
 // dumprestore8.js
 
+load("jstests/libs/servers.js");
+load("jstests/libs/servers_misc.js");
+
 // This file tests that indexes and capped collection options get properly dumped and restored.
 // It checks that this works both when doing a full database dump/restore and when doing it just for a single db or collection
 

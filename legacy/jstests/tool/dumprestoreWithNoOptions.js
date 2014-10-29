@@ -8,6 +8,9 @@
 // database dump/restore and when doing it just for a
 // single db or collection.
 
+load("jstests/libs/servers.js");
+load("jstests/libs/servers_misc.js");
+
 t = new ToolTest( "dumprestoreWithNoOptions" );
 
 t.startDB( "foo" );

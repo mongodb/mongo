@@ -1,5 +1,8 @@
 // simple test to ensure write concern functions as expected
 
+load("jstests/libs/servers.js");
+load("jstests/libs/servers_misc.js");
+
 var name = "dumprestore10";
 
 function step(msg) {

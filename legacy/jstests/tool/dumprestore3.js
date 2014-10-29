@@ -1,5 +1,8 @@
 // dumprestore3.js
 
+load("jstests/libs/servers.js");
+load("jstests/libs/servers_misc.js");
+
 var name = "dumprestore3";
 
 function step(msg) {
