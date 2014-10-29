@@ -11,13 +11,22 @@ if ("undefined" == typeof inner_mode) {
     port = allocatePorts( 1 )[ 0 ];
     var baseName = "jstests_slowNightly_ipv6_connection_string_validation";
     jsTest.log("Outer mode test starting mongod with --ipv6");
-    var mongod = startMongod( "--port", port, "--ipv6", "--dbpath", MongoRunner.dataPath + baseName );
-    var args = [ "mongo", "--nodb", "--ipv6",
-                 "--eval", "inner_mode=true;port=" + port + ";",
-                 "jstests/noPassthroughWithMongod/ipv6_connection_string_validation.js" ];
-
-    // Start another shell running this test in "inner" mode
-    jsTest.log("Outer mode test starting inner mode test");
+    // NOTE: bind_ip arg is present to test if it can parse ipv6 addresses (::1 in this case).
+    // Unfortunately, having bind_ip = ::1 won't work in the test framework (But does work when
+    // tested manually), so 127.0.0.1 is also present so the test mongo shell can connect
+    // with that address.
+    var mongod = startMongod("--port", port,
+                            "--ipv6",
+                            "--bind_ip", "::1,127.0.0.1",
+                            "--dbpath",
+                            MongoRunner.dataPath + baseName );
+    var args = ["mongo",
+                "--nodb",
+                "--ipv6",
+                "--host", "::1",
+                "--port", port,
+                "--eval", "inner_mode=true;port=" + port + ";",
+                "jstests/noPassthroughWithMongod/ipv6_connection_string_validation.js" ];
     var exitCode = _runMongoProgram.apply(null, args);
     jsTest.log("Inner mode test finished, exit code was " + exitCode);
 
@@ -60,7 +69,12 @@ var badStrings = [
         { s: "127.0.0.1:27999/",        r: /^Missing database name/ },
         { s: "::1:27999/test",          r: /^More than one ':'/ },
         { s: "0:0::0:0:1:27999/test",   r: /^More than one ':'/ },
-        { s: "0000:0000:0000:0000:0000:0000:0000:0001:27999/test", r: /^More than one ':'/ }
+        { s: "0000:0000:0000:0000:0000:0000:0000:0001:27999/test", r: /^More than one ':'/ },
+        { s: "a[127.0.0.1]:27999/",     r: /^Missing database name/ },
+        { s: "a[::1:]27999/",           r: /^Invalid port number/ },
+        { s: "[::1:27999/",             r: /^Missing database name/ },
+        { s: "[::1:]27999/",            r: /^Invalid port number/ },
+        { s: "::1]:27999/",             r: /^Missing database name/ }
 ];
 
 var substitutePort = function(connectionString) {
