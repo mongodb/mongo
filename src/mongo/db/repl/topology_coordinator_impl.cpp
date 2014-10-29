@@ -926,24 +926,33 @@ namespace {
                                                             lastOpApplied)) {
                     const OpTime latestOpTime = _latestKnownOpTime(lastOpApplied);
 
-                    log() << "stepping down "
-                          << currentPrimaryMember.getHostAndPort().toString()
-                          << " (priority " << currentPrimaryMember.getPriority() << "), "
-                          << highestPriorityMember.getHostAndPort().toString()
-                          << " is priority " << highestPriorityMember.getPriority()
-                          << " and "
-                          << (latestOpTime.getSecs() - highestPriorityMemberOptime.getSecs())
-                          << " seconds behind";
                     if (_iAmPrimary()) {
+                        log() << "Stepping down self (priority "
+                              << currentPrimaryMember.getPriority() << ") because "
+                              << highestPriorityMember.getHostAndPort() << " has higher priority "
+                              << highestPriorityMember.getPriority() << " and is only "
+                              << (latestOpTime.getSecs() - highestPriorityMemberOptime.getSecs())
+                              << " seconds behind me";
                         const Date_t until = now +
                             LastVote::leaseTime.total_milliseconds() +
                             kHeartbeatInterval.total_milliseconds();
-                        if (_stepDownUntil < until) {
-                            _stepDownUntil = until;
+                        if (_electionSleepUntil < until) {
+                            _electionSleepUntil = until;
                         }
                         return _stepDownSelf();
                     }
-                    else {
+                    else if ((highestPriorityMemberOptime == _selfIndex) &&
+                             (_electionSleepUntil <= now)) {
+                        // If this node is the highest priority node, and it is not in
+                        // an inter-election sleep period, ask the current primary to step down.
+                        // This is an optimization, because the remote primary will almost certainly
+                        // notice this node's electability promptly, via its own heartbeat process.
+                        log() << "Requesting that " << currentPrimaryMember.getHostAndPort()
+                              << " (priority " << currentPrimaryMember.getPriority()
+                              << ") step down because I have higher priority "
+                              << highestPriorityMember.getPriority() << " and am only "
+                              << (latestOpTime.getSecs() - highestPriorityMemberOptime.getSecs())
+                              << " seconds behind it";
                         int primaryIndex = _currentPrimaryIndex;
                         _currentPrimaryIndex = -1;
                         return HeartbeatResponseAction::makeStepDownRemoteAction(primaryIndex);
@@ -1461,7 +1470,9 @@ namespace {
     }
 
     void TopologyCoordinatorImpl::setElectionSleepUntil(Date_t newTime) {
-        _electionSleepUntil = newTime;
+        if (_electionSleepUntil < newTime) {
+            _electionSleepUntil = newTime;
+        }
     }
 
     OpTime TopologyCoordinatorImpl::getElectionTime() const {
@@ -1592,7 +1603,7 @@ namespace {
             result |= NoPriority;
         }
         if (hbData.getState() != MemberState::RS_SECONDARY) {
-            result |=NotSecondary;
+            result |= NotSecondary;
         }
         if (!_isOpTimeCloseEnoughToLatestToElect(hbData.getOpTime(), lastOpApplied)) {
             result |= NotCloseEnoughToLatestOptime;

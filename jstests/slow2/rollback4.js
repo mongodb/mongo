@@ -40,8 +40,13 @@ replTest.stop( 0 );
 // Wait for slave to take over
 // This can take a while if the secondary has queued up many writes in its
 // buffer, since it needs to flush those out before it can assume the primaryship.
+//
+// In the legacy replication implementation (through 2.7.7), this waiting takes place before the
+// node reports that it is primary, while in the refactored implementation (2.7.8+) it takes place
+// after the node reports that it is primary via heartbeats, but before ismaster indicates that the
+// node will accept writes.
 replTest.waitForState(conns[1], replTest.PRIMARY, 5 * 60 * 1000);
-master = replTest.getMaster();
+master = replTest.getMaster(5 * 60 * 1000);
 
 // Save to new master, forcing rollback of old master
 master.getDB( 'db' ).c.save( big );

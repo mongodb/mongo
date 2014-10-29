@@ -63,6 +63,8 @@ namespace repl {
         virtual void runCallbackWithGlobalExclusiveLock(
                 const stdx::function<void (OperationContext*)>& callback);
 
+        std::string getNextCallbackWithGlobalLockThreadName();
+
     private:
         class ConnectionPool;
 
@@ -119,6 +121,11 @@ namespace repl {
         // Pool of connections to remote nodes, used by the worker threads to execute network
         // requests.
         boost::scoped_ptr<ConnectionPool> _connPool;  // (R)
+
+        // Mutex guarding the _nextThreadId value to prevent concurrent incrementing.
+        boost::mutex _nextThreadIdMutex;
+        // Number used to uniquely name threads.
+        long long _nextThreadId;
     };
 
 }  // namespace repl

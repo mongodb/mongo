@@ -233,7 +233,7 @@ namespace repl {
     }
 
     void SyncSourceFeedback::run() {
-        Client::initThread("SyncSourceFeedbackThread");
+        Client::initThread("SyncSourceFeedback");
         OperationContextImpl txn;
 
         bool positionChanged = false;

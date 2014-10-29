@@ -534,7 +534,9 @@ namespace mongo {
             LockBucket* bucket = &_lockBuckets[i];
             SimpleMutex::scoped_lock scopedLock(bucket->mutex);
 
-            _dumpBucket(bucket);
+            if (!bucket->data.empty()) {
+                _dumpBucket(bucket);
+            }
         }
     }
 

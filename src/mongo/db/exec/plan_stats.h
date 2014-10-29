@@ -529,6 +529,9 @@ namespace mongo {
         IntervalStats() :
             numResultsFound(0),
             numResultsBuffered(0),
+            minDistanceAllowed(-1),
+            maxDistanceAllowed(-1),
+            inclusiveMaxDistanceAllowed(false),
             minDistanceFound(-1),
             maxDistanceFound(-1),
             minDistanceBuffered(-1),
@@ -537,6 +540,10 @@ namespace mongo {
 
         long long numResultsFound;
         long long numResultsBuffered;
+
+        double minDistanceAllowed;
+        double maxDistanceAllowed;
+        bool inclusiveMaxDistanceAllowed;
 
         double minDistanceFound;
         double maxDistanceFound;

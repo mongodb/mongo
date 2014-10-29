@@ -448,9 +448,6 @@ namespace mongo {
             warning() << msg << endl;
             conn.done();
 
-            // Mark the minor version for *eventual* reload
-            _manager->markMinorForReload( this->_lastmod );
-
             return Status(ErrorCodes::SplitFailed, msg);
         }
 
@@ -885,7 +882,6 @@ namespace mongo {
 
         // Reset the max version, but not the epoch, when we aren't loading from the oldManager
         _version = ChunkVersion( 0, 0, _version.epoch() );
-        set<ChunkVersion> minorVersions;
 
         // If we have a previous version of the ChunkManager to work from, use that info to reduce
         // our config query
@@ -915,9 +911,6 @@ namespace mongo {
                 chunkMap.insert( make_pair( oldC->getMax(), c ) );
             }
 
-            // Also get any minor versions stored for reload
-            oldManager->getMarkedMinorVersions( minorVersions );
-
             LOG(2) << "loading chunk manager for collection " << _ns
                    << " using old chunk manager w/ version " << _version.toString()
                    << " and " << oldChunkMap.size() << " chunks" << endl;
@@ -928,7 +921,7 @@ namespace mongo {
         differ.attach( _ns, chunkMap, _version, shardVersions );
 
         // Diff tracker should *always* find at least one chunk if collection exists
-        int diffsApplied = differ.calculateConfigDiff( config, minorVersions );
+        int diffsApplied = differ.calculateConfigDiff(config);
         if( diffsApplied > 0 ){
 
             LOG(2) << "loaded " << diffsApplied << " chunks into new chunk manager for " << _ns
@@ -983,59 +976,6 @@ namespace mongo {
 
     ChunkManagerPtr ChunkManager::reload(bool force) const {
         return grid.getDBConfig(getns())->getChunkManager(getns(), force);
-    }
-
-    void ChunkManager::markMinorForReload( ChunkVersion majorVersion ) const {
-        _splitHeuristics.markMinorForReload( getns(), majorVersion );
-    }
-
-    void ChunkManager::getMarkedMinorVersions( set<ChunkVersion>& minorVersions ) const {
-        _splitHeuristics.getMarkedMinorVersions( minorVersions );
-    }
-
-    void ChunkManager::SplitHeuristics::markMinorForReload( const string& ns, ChunkVersion majorVersion ) {
-
-        // When we get a stale minor version, it means that some *other* mongos has just split a
-        // chunk into a number of smaller parts, so we shouldn't need reload the data needed to
-        // split it ourselves for awhile.  Don't be very aggressive reloading just because of this,
-        // since reloads are expensive and disrupt operations.
-
-        // *** Multiple threads could indicate a stale minor version simultaneously ***
-        // TODO:  Ideally, this could be a single-threaded background service doing splits
-        // TODO:  Ideally, we wouldn't need to care that this is stale at all
-        bool forceReload = false;
-        {
-            scoped_lock lk( _staleMinorSetMutex );
-
-            // The major version of the chunks which need to be reloaded
-            _staleMinorSet.insert( majorVersion );
-
-            // Increment the number of requests for minor version data
-            _staleMinorCount++;
-
-            if( _staleMinorCount >= staleMinorReloadThreshold ){
-
-                _staleMinorCount = 0;
-
-                // There's maxParallelSplits coming down this codepath at once -
-                // block as little as possible.
-                forceReload = true;
-            }
-
-            // There is no guarantee that a minor version change will be processed here, in the
-            // case where the request comes in "late" and the version's already getting reloaded -
-            // it's a heuristic anyway though, and we'll see requests multiple times.
-        }
-
-        if( forceReload )
-            grid.getDBConfig( ns )->getChunkManagerIfExists( ns, true, true );
-    }
-
-    void ChunkManager::SplitHeuristics::getMarkedMinorVersions( set<ChunkVersion>& minorVersions ) {
-        scoped_lock lk( _staleMinorSetMutex );
-        for( set<ChunkVersion>::iterator it = _staleMinorSet.begin(); it != _staleMinorSet.end(); it++ ){
-            minorVersions.insert( *it );
-        }
     }
 
     bool ChunkManager::_isValid(const ChunkMap& chunkMap) {

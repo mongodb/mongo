@@ -297,6 +297,22 @@ namespace mongo {
                 bob->appendNumber("alreadyHasObj", spec->alreadyHasObj);
             }
         }
+        else if (STAGE_GEO_NEAR_2D == stats.stageType
+                || STAGE_GEO_NEAR_2DSPHERE == stats.stageType) {
+            NearStats* spec = static_cast<NearStats*>(stats.specific.get());
+
+            if (verbosity >= ExplainCommon::EXEC_STATS) {
+                BSONArrayBuilder intervalsBob(bob->subarrayStart("searchIntervals"));
+                for (vector<IntervalStats>::const_iterator it = spec->intervalStats.begin();
+                        it != spec->intervalStats.end(); ++it) {
+                    BSONObjBuilder intervalBob(intervalsBob.subobjStart());
+                    intervalBob.append("minDistance", it->minDistanceAllowed);
+                    intervalBob.append("maxDistance", it->maxDistanceAllowed);
+                    intervalBob.append("maxInclusive", it->inclusiveMaxDistanceAllowed);
+                }
+                intervalsBob.doneFast();
+            }
+        }
         else if (STAGE_GROUP == stats.stageType) {
             GroupStats* spec = static_cast<GroupStats*>(stats.specific.get());
             if (verbosity >= ExplainCommon::EXEC_STATS) {
