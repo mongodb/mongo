@@ -130,11 +130,17 @@ namespace mongo {
         const string newLocation(
                 chunkDistribution.getBestReceieverShard(tagStatus.getValue()));
 
+        if (newLocation.empty()) {
+            LOG(1) << "recently split chunk: " << chunk
+                   << " but no suitable shard to move to";
+            return false;
+        }
+
         if (chunk.getShard() == newLocation) {
             // if this is the best shard, then we shouldn't do anything.
             LOG(1) << "recently split chunk: " << chunk
-                   << " already in the best shard: " << endl;
-            return false; // we did split even if we didn't migrate
+                   << " already in the best shard" << endl;
+            return false;
         }
 
         ChunkPtr toMove = chunkMgr->findIntersectingChunk(chunk.getMin());
