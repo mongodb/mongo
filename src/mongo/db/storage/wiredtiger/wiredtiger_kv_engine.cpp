@@ -9,6 +9,7 @@
 #include "mongo/db/storage/wiredtiger/wiredtiger_record_store.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_recovery_unit.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_session_cache.h"
+#include "mongo/db/storage/wiredtiger/wiredtiger_size_storer.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_util.h"
 #include "mongo/util/log.h"
 #include "mongo/util/processinfo.h"
@@ -44,7 +45,8 @@ namespace mongo {
 
     WiredTigerKVEngine::WiredTigerKVEngine( const std::string& path,
                                             const std::string& extraOpenOptions )
-        : _epoch( 0 ) {
+        : _epoch( 0 ),
+          _sizeStorerSyncTracker( 100000, 60 * 1000 ) {
 
         _eventHandler.handle_error = mdb_handle_error;
         _eventHandler.handle_message = mdb_handle_message;
@@ -82,10 +84,22 @@ namespace mongo {
         LOG(1) << "wiredtiger_open config: " << config;
         invariantWTOK(wiredtiger_open(path.c_str(), &_eventHandler, config.c_str(), &_conn));
         _sessionCache.reset( new WiredTigerSessionCache( this ) );
+
+        _sizeStorerUri = "table:sizeStorer";
+        {
+            WiredTigerSession session( _conn, -1 );
+            WiredTigerSizeStorer* ss = new WiredTigerSizeStorer();
+            ss->loadFrom( &session, _sizeStorerUri );
+            _sizeStorer.reset( ss );
+        }
     }
 
 
     WiredTigerKVEngine::~WiredTigerKVEngine() {
+        log() << "WiredTigerKVEngine shutting down";
+        syncSizeInfo();
+        _sizeStorer.reset( NULL );
+
         _sessionCache.reset( NULL );
 
         if ( _conn ) {
@@ -93,6 +107,14 @@ namespace mongo {
             _conn = NULL;
         }
 
+    }
+
+    void WiredTigerKVEngine::syncSizeInfo() const {
+        if ( !_sizeStorer )
+            return;
+
+        WiredTigerSession session( _conn, -1 );
+        _sizeStorer->storeInto( &session, _sizeStorerUri );
     }
 
     RecoveryUnit* WiredTigerKVEngine::newRecoveryUnit() {
@@ -133,10 +155,13 @@ namespace mongo {
         if (options.capped) {
             return new WiredTigerRecordStore(opCtx, ns, _uri(ident), options.capped,
                                              options.cappedSize ? options.cappedSize : 4096,
-                                             options.cappedMaxDocs ? options.cappedMaxDocs : -1);
+                                             options.cappedMaxDocs ? options.cappedMaxDocs : -1,
+                                             NULL,
+                                             _sizeStorer.get() );
         }
         else {
-            return new WiredTigerRecordStore(opCtx, ns, _uri(ident));
+            return new WiredTigerRecordStore(opCtx, ns, _uri(ident),
+                                             false, -1, -1, NULL, _sizeStorer.get() );
         }
     }
 
@@ -199,6 +224,10 @@ namespace mongo {
     }
 
     bool WiredTigerKVEngine::haveDropsQueued() const {
+        if ( _sizeStorerSyncTracker.intervalHasElapsed() ) {
+            _sizeStorerSyncTracker.resetLastTime();
+            syncSizeInfo();
+        }
         boost::mutex::scoped_lock lk( _identToDropMutex );
         return !_identToDrop.empty();
     }

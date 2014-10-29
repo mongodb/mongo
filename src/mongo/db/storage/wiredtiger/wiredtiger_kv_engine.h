@@ -12,10 +12,12 @@
 #include "mongo/bson/ordering.h"
 #include "mongo/db/storage/kv/kv_engine.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_session_cache.h"
+#include "mongo/util/elapsed_tracker.h"
 
 namespace mongo {
 
     class WiredTigerSessionCache;
+    class WiredTigerSizeStorer;
 
     class WiredTigerKVEngine : public KVEngine {
     public:
@@ -62,6 +64,8 @@ namespace mongo {
 
         int currentEpoch() const { return _epoch; }
 
+        void syncSizeInfo() const;
+
     private:
 
         string _uri( const StringData& ident ) const;
@@ -78,6 +82,10 @@ namespace mongo {
         mutable boost::mutex _identToDropMutex;
 
         int _epoch; // this is how we keep track of if a session is too old
+
+        scoped_ptr<WiredTigerSizeStorer> _sizeStorer;
+        string _sizeStorerUri;
+        mutable ElapsedTracker _sizeStorerSyncTracker;
     };
 
 }

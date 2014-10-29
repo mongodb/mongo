@@ -39,6 +39,7 @@
 #include "mongo/db/storage/wiredtiger/wiredtiger_recovery_unit.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_record_store.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_session_cache.h"
+#include "mongo/db/storage/wiredtiger/wiredtiger_size_storer.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_util.h"
 #include "mongo/unittest/temp_dir.h"
 #include "mongo/unittest/unittest.h"
@@ -248,4 +249,84 @@ namespace mongo {
         }
     }
 
+    TEST(WiredTigerRecordStoreTest, SizeStorer1 ) {
+        scoped_ptr<HarnessHelper> harnessHelper( newHarnessHelper() );
+        scoped_ptr<RecordStore> rs( harnessHelper->newNonCappedRecordStore() );
+
+        string uri = dynamic_cast<WiredTigerRecordStore*>( rs.get() )->GetURI();
+
+        WiredTigerSizeStorer ss;
+        dynamic_cast<WiredTigerRecordStore*>( rs.get() )->setSizeStorer( &ss );
+
+        int N = 12;
+
+        {
+            scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
+            {
+                WriteUnitOfWork uow( opCtx.get() );
+                for ( int i = 0; i < N; i++ ) {
+                    StatusWith<DiskLoc> res = rs->insertRecord( opCtx.get(), "a", 2, false );
+                    ASSERT_OK( res.getStatus() );
+                }
+                uow.commit();
+            }
+        }
+
+        {
+            scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
+            ASSERT_EQUALS( N, rs->numRecords( opCtx.get() ) );
+        }
+
+        rs.reset( NULL );
+
+        {
+            long long numRecords;
+            long long dataSize;
+            ss.load( uri, &numRecords, &dataSize );
+            ASSERT_EQUALS( N, numRecords );
+        }
+
+        {
+            scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
+            rs.reset( new WiredTigerRecordStore( opCtx.get(), "a.b", uri,
+                                                 false, -1, -1, NULL, &ss ) );
+        }
+
+        {
+            scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
+            ASSERT_EQUALS( N, rs->numRecords( opCtx.get() ) );
+        }
+
+        string indexUri = "table:myindex";
+        {
+            scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
+            WiredTigerRecoveryUnit* ru =
+                dynamic_cast<WiredTigerRecoveryUnit*>( opCtx->recoveryUnit() );
+
+            {
+                WriteUnitOfWork uow( opCtx.get() );
+                WT_SESSION* s = ru->getSession()->getSession();
+                invariantWTOK( s->create( s, indexUri.c_str(), "" ) );
+                uow.commit();
+            }
+
+            {
+                WriteUnitOfWork uow( opCtx.get() );
+                ss.storeInto( WiredTigerRecoveryUnit::get( opCtx.get() )->getSession(), indexUri );
+                uow.commit();
+            }
+        }
+
+        {
+            scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
+            WiredTigerSizeStorer ss2;
+            ss2.loadFrom( WiredTigerRecoveryUnit::get( opCtx.get() )->getSession(), indexUri );
+            long long numRecords;
+            long long dataSize;
+            ss2.load( uri, &numRecords, &dataSize );
+            ASSERT_EQUALS( N, numRecords );
+        }
+
+        rs.reset( NULL ); // this has to be deleted before ss
+    }
 }

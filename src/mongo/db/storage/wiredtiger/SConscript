@@ -12,6 +12,7 @@ if has_option("wiredtiger"):
             'wiredtiger_record_store.cpp',
             'wiredtiger_recovery_unit.cpp',
             'wiredtiger_session_cache.cpp',
+            'wiredtiger_size_storer.cpp',
             'wiredtiger_util.cpp',
             ],
         LIBDEPS= [
@@ -19,6 +20,7 @@ if has_option("wiredtiger"):
             '$BUILD_DIR/mongo/db/catalog/collection_options',
             '$BUILD_DIR/mongo/db/index/index_descriptor',
             '$BUILD_DIR/mongo/db/storage/index_entry_comparison',
+            '$BUILD_DIR/mongo/elapsed_tracker',
             '$BUILD_DIR/mongo/foundation',
             '$BUILD_DIR/mongo/processinfo',
             ],

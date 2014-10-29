@@ -38,6 +38,7 @@
 #include "mongo/db/storage/wiredtiger/wiredtiger_record_store.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_recovery_unit.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_session_cache.h"
+#include "mongo/db/storage/wiredtiger/wiredtiger_size_storer.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_util.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/mongoutils/str.h"
@@ -104,7 +105,8 @@ namespace mongo {
                                                   bool isCapped,
                                                   int64_t cappedMaxSize,
                                                   int64_t cappedMaxDocs,
-                                                  CappedDocumentDeleteCallback* cappedDeleteCallback )
+                                                  CappedDocumentDeleteCallback* cappedDeleteCallback,
+                                                  WiredTigerSizeStorer* sizeStorer )
         : RecordStore( ns ),
           _uri( uri.toString() ),
           _instanceId( WiredTigerSession::genCursorId() ),
@@ -112,7 +114,8 @@ namespace mongo {
           _isOplog( isOplog( ns ) ),
           _cappedMaxSize( cappedMaxSize ),
           _cappedMaxDocs( cappedMaxDocs ),
-          _cappedDeleteCallback( cappedDeleteCallback ) {
+          _cappedDeleteCallback( cappedDeleteCallback ),
+          _sizeStorer( sizeStorer ) {
 
         if (_isCapped) {
             invariant(_cappedMaxSize > 0);
@@ -139,22 +142,37 @@ namespace mongo {
             uint64_t max = _makeKey( iterator->curr() );
             _nextIdNum.store( 1 + max );
 
-            // todo: this is bad
-            _numRecords.store(0);
-            _dataSize.store(0);
+            if ( _sizeStorer ) {
+                long long numRecords;
+                long long dataSize;
+                _sizeStorer->load( uri, &numRecords, &dataSize );
+                _numRecords.store( numRecords );
+                _dataSize.store( dataSize );
+            }
+            else {
+                log() << "doing scan of collection " << ns << " to get info";
 
-            while( !iterator->isEOF() ) {
-                DiskLoc loc = iterator->getNext();
-                RecordData data = iterator->dataFor( loc );
-                _numRecords.fetchAndAdd(1);
-                _dataSize.fetchAndAdd(data.size());
+                _numRecords.store(0);
+                _dataSize.store(0);
+
+                while( !iterator->isEOF() ) {
+                    DiskLoc loc = iterator->getNext();
+                    RecordData data = iterator->dataFor( loc );
+                    _numRecords.fetchAndAdd(1);
+                    _dataSize.fetchAndAdd(data.size());
+                }
             }
 
         }
 
     }
 
-    WiredTigerRecordStore::~WiredTigerRecordStore() { }
+    WiredTigerRecordStore::~WiredTigerRecordStore() {
+        LOG(1) << "~WiredTigerRecordStore for: " << ns();
+        if ( _sizeStorer ) {
+            _sizeStorer->store( _uri, _numRecords.load(), _dataSize.load() );
+        }
+    }
 
     long long WiredTigerRecordStore::dataSize( OperationContext *txn ) const {
         return _dataSize.load();
@@ -179,9 +197,26 @@ namespace mongo {
     }
 
     int64_t WiredTigerRecordStore::storageSize( OperationContext* txn,
-                                           BSONObjBuilder* extraInfo,
-                                           int infoLevel ) const {
-        int64_t size = dataSize(txn);
+                                                BSONObjBuilder* extraInfo,
+                                                int infoLevel ) const {
+
+        BSONObjBuilder b;
+        appendCustomStats( txn, &b, 1 );
+        BSONObj obj = b.obj();
+
+        BSONObj blockManager = obj["wiredtiger"].Obj()["block manager"].Obj();
+        BSONElement fileSize = blockManager["file size in bytes"];
+        invariant( fileSize.type() );
+
+        int64_t size = 0;
+        if ( fileSize.isNumber() ) {
+            size = fileSize.safeNumberLong();
+        }
+        else {
+            invariant( fileSize.type() == String );
+            size = strtoll( fileSize.valuestrsafe(), NULL, 10 );
+        }
+
         if ( size == 0 && _isCapped ) {
             // Many things assume anempty capped collection still takes up space.
             return 1;
@@ -529,8 +564,8 @@ namespace mongo {
     }
 
     void WiredTigerRecordStore::appendCustomStats( OperationContext* txn,
-                                              BSONObjBuilder* result,
-                                              double scale ) const {
+                                                   BSONObjBuilder* result,
+                                                   double scale ) const {
         result->appendBool( "capped", _isCapped );
         if ( _isCapped ) {
             result->appendIntOrLL( "max", _cappedMaxDocs );
@@ -558,8 +593,8 @@ namespace mongo {
     }
 
     Status WiredTigerRecordStore::setCustomOption( OperationContext* txn,
-                                              const BSONElement& option,
-                                              BSONObjBuilder* info ) {
+                                                   const BSONElement& option,
+                                                   BSONObjBuilder* info ) {
         string optionName = option.fieldName();
         if ( !option.isBoolean() ) {
             return Status( ErrorCodes::BadValue, "Invalid Value" );
@@ -604,7 +639,12 @@ namespace mongo {
 
     void WiredTigerRecordStore::_changeNumRecords( OperationContext* txn, bool insert ) {
         txn->recoveryUnit()->registerChange(new NumRecordsChange(this, insert));
-        _numRecords.fetchAndAdd(insert ? 1 : -1);
+        if ( _numRecords.fetchAndAdd(insert ? 1 : -1) < 0 ) {
+            if ( insert )
+                _numRecords.store( 1 );
+            else
+                _numRecords.store( 0 );
+        }
     }
 
     class WiredTigerRecordStore::DataSizeChange : public RecoveryUnit::Change {
@@ -612,7 +652,7 @@ namespace mongo {
         DataSizeChange(WiredTigerRecordStore* rs, int amount) :_rs(rs), _amount(amount) {}
         virtual void commit() {}
         virtual void rollback() {
-            _rs->_dataSize.fetchAndAdd(-_amount);
+            _rs->_increaseDataSize( NULL, -_amount );
         }
 
     private:
@@ -621,9 +661,21 @@ namespace mongo {
     };
 
     void WiredTigerRecordStore::_increaseDataSize( OperationContext* txn, int amount ) {
-        txn->recoveryUnit()->registerChange(new DataSizeChange(this, amount));
-        _dataSize.fetchAndAdd(amount);
-        // TODO make this persistent
+        if ( NULL )
+            txn->recoveryUnit()->registerChange(new DataSizeChange(this, amount));
+
+        if ( _dataSize.fetchAndAdd(amount) < 0 ) {
+            if ( amount > 0 ) {
+                _dataSize.store( amount );
+            }
+            else {
+                _dataSize.store( 0 );
+            }
+        }
+
+        if ( _sizeStorer && _sizeStorerCounter++ % 1000 == 0 ) {
+            _sizeStorer->store( _uri, _numRecords.load(), _dataSize.load() );
+        }
     }
 
     uint64_t WiredTigerRecordStore::_makeKey( const DiskLoc& loc ) {

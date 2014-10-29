@@ -44,6 +44,7 @@ namespace mongo {
     class RecoveryUnit;
     class WiredTigerCursor;
     class WiredTigerRecoveryUnit;
+    class WiredTigerSizeStorer;
 
     class WiredTigerRecordStore : public RecordStore {
     public:
@@ -69,7 +70,8 @@ namespace mongo {
                               bool isCapped = false,
                               int64_t cappedMaxSize = -1,
                               int64_t cappedMaxDocs = -1,
-                              CappedDocumentDeleteCallback* cappedDeleteCallback = NULL );
+                              CappedDocumentDeleteCallback* cappedDeleteCallback = NULL,
+                              WiredTigerSizeStorer* sizeStorer = NULL );
 
         virtual ~WiredTigerRecordStore();
 
@@ -162,6 +164,8 @@ namespace mongo {
         const std::string& GetURI() const { return _uri; }
         uint64_t instanceId() const { return _instanceId; }
 
+        void setSizeStorer( WiredTigerSizeStorer* ss ) { _sizeStorer = ss; }
+
     private:
 
         class Iterator : public RecordIterator {
@@ -229,5 +233,8 @@ namespace mongo {
         AtomicUInt64 _nextIdNum;
         AtomicInt64 _dataSize;
         AtomicInt64 _numRecords;
+
+        WiredTigerSizeStorer* _sizeStorer; // not owned, can be NULL
+        int _sizeStorerCounter;
     };
 }
