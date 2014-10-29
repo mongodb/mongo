@@ -1,0 +1,56 @@
+#! /bin/sh
+
+# Check for illegal external symbols.
+#
+t=__a.c
+trap 'rm -f $t; exit 0' 0 1 2 3 13 15
+
+case `uname` in
+Darwin)
+	NM='nm -gUo $f | egrep " T | D " | sed "s/ _/ /"'
+	;;
+*)
+	# We require GNU nm, which may not be installed.
+	type nm > /dev/null 2>&1 &&
+	    (nm --version | grep 'GNU nm') > /dev/null 2>&1 || {
+		echo 'skipped: GNU nm not found'
+		exit 0
+	}
+	NM='nm --extern-only --defined-only --print-file-name $f'
+	;;
+esac
+
+
+check()
+{
+	(sed -e '/^#/d' s_symbols.list &&
+	eval $NM |
+	sed 's/.* //' |
+	egrep -v '^__wt') |
+	sort |
+	uniq -u > $t
+
+	test -s $t && {
+		echo "=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-="
+		echo 'unexpected external symbols in the WiredTiger library'
+		echo "=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-="
+		cat $t
+		exit 1
+	}
+
+	exit 0
+}
+
+# This check would normally be done after the library is built, but this way
+# we don't forget about a symbol during development.   Check the previously
+# built library, if it exists.
+for d in .libs build_posix/.libs; do
+	f="$d/libwiredtiger.a"
+	test -f $f && check $f
+
+	f="../$d/libwiredtiger.a"
+	test -f $f && check $f
+done
+
+echo "skipped: libwiredtiger.a not found"
+exit 0

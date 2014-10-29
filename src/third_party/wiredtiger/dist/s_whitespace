@@ -1,0 +1,30 @@
+#! /bin/sh
+
+# Single space and remove trailing whitespace from source files.
+t=__wt.$$
+trap 'rm -f $t; exit 0' 0 1 2 3 13 15
+
+ws()
+{
+	sed -e 's/[	 ][	 ]*$//' \
+	    -e '/^$/N' \
+	    -e '/\n$/D' < $1 > $t
+	cmp $t $1 > /dev/null 2>&1 || (echo "$1" && cp $t $1)
+}
+
+cd ..
+
+for f in `find dist -name '*.py' -name 's_*'`; do
+	ws $f
+done
+
+for f in `find examples ext src test \
+    -name '*.[chi]' -o \
+    -name '*.dox' -o \
+    -name '*.in' -o \
+    -name 'Makefile.am'`; do
+	if expr "$f" : ".*/Makefile.in" > /dev/null; then
+		continue
+	fi
+	ws $f
+done

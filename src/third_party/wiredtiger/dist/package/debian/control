@@ -1,0 +1,36 @@
+Source: wiredtiger
+Priority: extra
+Maintainer: Alex Gorrod <alexg@wiredtiger.com>
+Build-Depends: debhelper (>= 8.0.0), autotools-dev
+Standards-Version: 3.9.4
+Section: libs
+Homepage: http://www.wiredtiger.com
+#Vcs-Git: git://git.debian.org/collab-maint/wiredtiger.git
+#Vcs-Browser: http://git.debian.org/?p=collab-maint/wiredtiger.git;a=summary
+
+Package: libwiredtiger-dev
+Architecture: any
+Section: libdevel
+Priority: extra
+Depends: ${misc:Depends}
+Description: WiredTiger Database Libraries [development]
+ This is the development package which contains headers and static
+ libraries for the WiredTiger database library.
+
+Package: libwiredtiger
+Architecture: any
+Depends: ${shlibs:Depends},
+	 ${misc:Depends}
+Description: WiredTiger Database Libraries [runtime]
+ This is the runtime package for programs that use the WiredTiger
+ database library.
+
+Package: wiredtiger-util
+Architecture: any
+Section: database
+Priority: extra
+Depends: ${shlibs:Depends},
+	 ${misc:Depends}
+Description: WiredTiger Database Utilities
+ This package provides tools for manipulating WiredTiger databases
+
