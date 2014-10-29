@@ -52,5 +52,5 @@ __wt_thread_id(char *buf, size_t buflen)
 	 * is not a pointer, do it that way for now.
 	 */
 	(void)snprintf(buf, buflen,
-	    "%" PRIu64 ":%p", (uint64_t)getpid(), pthread_self());
+	    "%" PRIu64 ":%p", (uint64_t)getpid(), (void *)pthread_self());
 }
