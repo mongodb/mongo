@@ -1,10 +1,12 @@
 Import("env")
-Import("has_option")
+Import("wiredtiger")
 
-if has_option("wiredtiger"):
+if wiredtiger:
+    wtEnv = env.Clone()
+    wtEnv.InjectThirdPartyIncludePaths(libraries=['wiredtiger'])
 
     # This is the smallest possible set of files that wraps WT
-    env.Library(
+    wtEnv.Library(
         target= 'storage_wiredtiger_core',
         source= [
             'wiredtiger_index.cpp',
@@ -23,11 +25,11 @@ if has_option("wiredtiger"):
             '$BUILD_DIR/mongo/elapsed_tracker',
             '$BUILD_DIR/mongo/foundation',
             '$BUILD_DIR/mongo/processinfo',
+            '$BUILD_DIR/third_party/shim_wiredtiger',
             ],
-        SYSLIBDEPS=["wiredtiger"]
         )
 
-    env.Library(
+    wtEnv.Library(
         target='storage_wiredtiger',
         source=[
             'wiredtiger_global_options.cpp',
@@ -40,7 +42,7 @@ if has_option("wiredtiger"):
                  ]
         )
 
-    env.CppUnitTest(
+    wtEnv.CppUnitTest(
         target='storage_wiredtiger_record_store_test',
         source=['wiredtiger_record_store_test.cpp',
                 ],
@@ -50,7 +52,7 @@ if has_option("wiredtiger"):
             ],
         )
 
-    env.CppUnitTest(
+    wtEnv.CppUnitTest(
         target='storage_wiredtiger_index_test',
         source=['wiredtiger_index_test.cpp',
                 ],
@@ -60,7 +62,7 @@ if has_option("wiredtiger"):
             ],
         )
 
-    env.CppUnitTest(
+    wtEnv.CppUnitTest(
         target='storage_wiredtiger_kv_engine_test',
         source=['wiredtiger_kv_engine_test.cpp',
                 ],

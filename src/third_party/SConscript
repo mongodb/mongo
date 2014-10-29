@@ -1,6 +1,7 @@
 # -*- mode: python -*-
 
 Import("env use_system_version_of_library windows darwin usev8 v8suffix solaris boostSuffix")
+Import("wiredtiger")
 
 snappySuffix = '-1.1.2'
 
@@ -32,6 +33,13 @@ if not use_system_version_of_library('v8'):
 if not use_system_version_of_library('stemmer'):
     thirdPartyIncludePathList.append(
         ('stemmer', '#/src/third_party/libstemmer_c/include'))
+
+# Note that the wiredtiger header is generated, so
+# we want to look for it in the build directory not
+# the source directory.
+if wiredtiger and not use_system_version_of_library('wiredtiger'):
+    thirdPartyIncludePathList.append(
+        ('wiredtiger', '$BUILD_DIR/third_party/wiredtiger'))
 
 if not use_system_version_of_library('yaml'):
     thirdPartyIncludePathList.append(
@@ -236,3 +244,26 @@ tzEnv.Library(
     source=[
         'shim_tz.cpp',
     ])
+
+
+if wiredtiger:
+    if use_system_version_of_library("wiredtiger"):
+        wiredtigerEnv = env.Clone(
+            SYSLIBDEPS=[
+                env['LIBDEPS_WIREDTIGER_SYSLIBDEP'],
+            ])
+    else:
+        wiredtigerEnv = env.Clone()
+        wiredtigerEnv.InjectThirdPartyIncludePaths(libraries=['wiredtiger'])
+        wiredtigerEnv.SConscript('wiredtiger/SConscript', exports={ 'env' : wiredtigerEnv })
+        wiredtigerEnv = wiredtigerEnv.Clone(
+            LIBDEPS=[
+                'wiredtiger/wiredtiger',
+            ])
+
+    wiredtigerEnv.Library(
+        target="shim_wiredtiger",
+        source=[
+            'shim_wiredtiger.cpp'
+        ])
+
