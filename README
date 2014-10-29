@@ -41,6 +41,11 @@ DRIVERS
   Client drivers for most programming languages are available at mongodb.org.  Use the 
   shell ("mongo") for administrative tasks.
 
+PACKAGING
+
+  Packages are created on the fly by the package.py script located in buildscripts. This will 
+  generate RPM or Debian packages. 
+  
 DOCUMENTATION
 
   http://www.mongodb.org/
