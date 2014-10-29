@@ -38,22 +38,6 @@ using std::stringstream;
 
 namespace mongo {
 
-    // Verify that an empty collection takes up no space on disk.
-    TEST( RecordStoreTestHarness, StorageSizeEmpty ) {
-        scoped_ptr<HarnessHelper> harnessHelper( newHarnessHelper() );
-        scoped_ptr<RecordStore> rs( harnessHelper->newNonCappedRecordStore() );
-
-        {
-            scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
-            ASSERT_EQUALS( 0, rs->numRecords( opCtx.get() ) );
-        }
-
-        {
-            scoped_ptr<OperationContext> opCtx( harnessHelper->newOperationContext() );
-            ASSERT( rs->storageSize( opCtx.get(), NULL ) == 0 );
-        }
-    }
-
     // Verify that a nonempty collection maybe takes up some space on disk.
     TEST( RecordStoreTestHarness, StorageSizeNonEmpty ) {
         scoped_ptr<HarnessHelper> harnessHelper( newHarnessHelper() );
