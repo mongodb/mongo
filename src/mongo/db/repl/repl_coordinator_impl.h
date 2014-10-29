@@ -800,7 +800,7 @@ namespace repl {
         SlaveInfoVector _slaveInfo;                                                       // (M)
 
         // Current ReplicaSet state.
-        MemberState _currentState;                                                        // (M)
+        MemberState _currentState;                                                        // (MX)
 
         // True if we are waiting for the applier to finish draining.
         bool _isWaitingForDrainToComplete;                                                // (M)

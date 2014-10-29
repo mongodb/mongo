@@ -199,6 +199,14 @@ namespace {
 
         switch (action.getAction()) {
         case HeartbeatResponseAction::NoAction:
+            // Update the cached member state if different than the current topology member state
+            if (_currentState != _topCoord->getMemberState()) {
+                boost::unique_lock<boost::mutex> lk(_mutex);
+                const PostMemberStateUpdateAction action =
+                    _updateCurrentMemberStateFromTopologyCoordinator_inlock();
+                lk.unlock();
+                _performPostMemberStateUpdateAction(action);
+            }
             break;
         case HeartbeatResponseAction::Reconfig:
             invariant(responseStatus.isOK());
