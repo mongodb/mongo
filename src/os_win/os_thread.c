@@ -49,7 +49,7 @@ __wt_thread_id(char* buf, size_t buflen)
 	size_t len;
 
 	len = (size_t)snprintf(
-	    buf, buflen, "%" PRIu64i ":", (uint64_t)GetCurrentProcessId());
+	    buf, buflen, "%" PRIu64 ":", (uint64_t)GetCurrentProcessId());
 	if (len < buflen) {
 		self = GetCurrentThreadId();
 		__wt_raw_to_hex_mem((const uint8_t *)&self,
