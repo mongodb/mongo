@@ -769,12 +769,12 @@ namespace {
                   << " going to leak some memory to be safe";
 
 
-            _collection->_database->_clearCollectionCache( indexNamespace );
+            _collection->_database->_clearCollectionCache( txn, indexNamespace );
 
             throw;
         }
 
-        _collection->_database->_clearCollectionCache( indexNamespace );
+        _collection->_database->_clearCollectionCache( txn, indexNamespace );
 
         _checkMagic();
 
