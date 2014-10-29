@@ -605,6 +605,14 @@ namespace mongo {
         currentOp->done();
         int executionTime = currentOp->debug().executionTime = currentOp->totalTimeMillis();
         currentOp->debug().recordStats();
+        if (currentOp->getOp() == dbInsert) {
+            // This is a wrapped operation, so make sure to count this part of the op
+            // SERVER-13339: Properly fix the handling of context in the insert path.
+            // Right now it caches client contexts in ExecInsertsState, unlike the
+            // update and remove operations.
+            currentOp->recordGlobalTime(txn->lockState()->isWriteLocked(),
+                                        currentOp->totalTimeMicros());
+        }
 
         if ( opError ) {
             currentOp->debug().exceptionInfo = ExceptionInfo( opError->getErrMessage(),
