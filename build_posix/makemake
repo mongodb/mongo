@@ -26,7 +26,7 @@ sed -n '/END SUBDIRS/,/BEGIN SOURCES/p' Make.base
 echo
 echo "libwiredtiger_la_LDFLAGS = -release @VERSION@"
 echo "libwiredtiger_la_SOURCES=\\"
-sed -e '/^[a-z]/! d' \
+sed -e '/^[a-z]/!d' \
     -e 's/.*/	& \\/' \
     -e '$s/ \\$//' < ../dist/filelist
 
