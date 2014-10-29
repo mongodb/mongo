@@ -62,6 +62,8 @@ namespace mongo {
                                    const StringData& ident,
                                    const RecordStore* originalRecordStore ) const;
 
+        virtual int flushAllFiles( bool sync );
+
         // wiredtiger specific
 
         WT_CONNECTION* getConnection() { return _conn; }

@@ -137,6 +137,8 @@ namespace mongo {
             _numRecords.store(0);
             // Need to start at 1 so we are always higher than minDiskLoc
             _nextIdNum.store( 1 );
+            if ( sizeStorer )
+                _sizeStorer->onCreate( this, 0, 0 );
         }
         else {
             uint64_t max = _makeKey( iterator->curr() );
@@ -148,6 +150,7 @@ namespace mongo {
                 _sizeStorer->load( uri, &numRecords, &dataSize );
                 _numRecords.store( numRecords );
                 _dataSize.store( dataSize );
+                _sizeStorer->onCreate( this, numRecords, dataSize );
             }
             else {
                 log() << "doing scan of collection " << ns << " to get info";
@@ -170,6 +173,7 @@ namespace mongo {
     WiredTigerRecordStore::~WiredTigerRecordStore() {
         LOG(1) << "~WiredTigerRecordStore for: " << ns();
         if ( _sizeStorer ) {
+            _sizeStorer->onDestroy( this );
             _sizeStorer->store( _uri, _numRecords.load(), _dataSize.load() );
         }
     }
@@ -661,7 +665,7 @@ namespace mongo {
     };
 
     void WiredTigerRecordStore::_increaseDataSize( OperationContext* txn, int amount ) {
-        if ( NULL )
+        if ( txn )
             txn->recoveryUnit()->registerChange(new DataSizeChange(this, amount));
 
         if ( _dataSize.fetchAndAdd(amount) < 0 ) {

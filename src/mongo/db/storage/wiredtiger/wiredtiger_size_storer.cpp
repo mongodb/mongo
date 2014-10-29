@@ -6,6 +6,7 @@
 
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/storage/wiredtiger/wiredtiger_record_store.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_session_cache.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_size_storer.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_util.h"
@@ -31,6 +32,28 @@ namespace mongo {
         log() << "WiredTigerSizeStorer magic wrong: " << _magic;
         invariant( _magic == MAGIC );
     }
+
+    void WiredTigerSizeStorer::onCreate( WiredTigerRecordStore* rs,
+                                         long long numRecords, long long dataSize ) {
+        _checkMagic();
+        boost::mutex::scoped_lock lk( _entriesMutex );
+        Entry& entry = _entries[rs->GetURI()];
+        entry.rs = rs;
+        entry.numRecords = numRecords;
+        entry.dataSize = dataSize;
+        entry.dirty = true;
+    }
+
+    void WiredTigerSizeStorer::onDestroy( WiredTigerRecordStore* rs ) {
+        _checkMagic();
+        boost::mutex::scoped_lock lk( _entriesMutex );
+        Entry& entry = _entries[rs->GetURI()];
+        entry.numRecords = rs->numRecords( NULL );
+        entry.dataSize = rs->dataSize( NULL );
+        entry.dirty = true;
+        entry.rs = NULL;
+    }
+
 
     void WiredTigerSizeStorer::store( const StringData& uri,
                                       long long numRecords, long long dataSize ) {
@@ -85,6 +108,7 @@ namespace mongo {
                 e.numRecords = data["numRecords"].safeNumberLong();
                 e.dataSize = data["dataSize"].safeNumberLong();
                 e.dirty = false;
+                e.rs = NULL;
             }
             invariantWTOK( c->close(c) );
         }
@@ -113,6 +137,17 @@ namespace mongo {
         for ( Map::iterator it = myMap.begin(); it != myMap.end(); ++it ) {
             string uri = it->first;
             Entry& entry = it->second;
+            if ( entry.rs ) {
+                if ( entry.dataSize != entry.rs->dataSize( NULL ) ) {
+                    entry.dataSize = entry.rs->dataSize( NULL );
+                    entry.dirty = true;
+                }
+                if ( entry.numRecords != entry.rs->numRecords( NULL ) ) {
+                    entry.numRecords = entry.rs->numRecords( NULL );
+                    entry.dirty = true;
+                }
+            }
+
             if ( !entry.dirty )
                 continue;
 
@@ -130,8 +165,10 @@ namespace mongo {
             WiredTigerItem value( data.objdata(), data.objsize() );
             c->set_key( c, key.Get() );
             c->set_value( c, value.Get() );
-            invariantWTOK( c->insert(c ) );
+            invariantWTOK( c->insert(c) );
             entry.dirty = false;
+
+            c->reset(c);
         }
 
         invariantWTOK( c->close(c) );

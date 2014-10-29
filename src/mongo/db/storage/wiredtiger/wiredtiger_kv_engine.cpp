@@ -121,13 +121,21 @@ namespace mongo {
         return Status::OK();
     }
 
+    int WiredTigerKVEngine::flushAllFiles( bool sync ) {
+        LOG(1) << "WiredTigerKVEngine::flushAllFiles";
+        syncSizeInfo();
+        return 1;
+    }
 
     void WiredTigerKVEngine::syncSizeInfo() const {
         if ( !_sizeStorer )
             return;
 
         WiredTigerSession session( _conn, -1 );
+        WT_SESSION* s = session.getSession();
+        invariantWTOK( s->begin_transaction( s, "sync=true" ) );
         _sizeStorer->storeInto( &session, _sizeStorerUri );
+        invariantWTOK( s->commit_transaction( s, NULL ) );
     }
 
     RecoveryUnit* WiredTigerKVEngine::newRecoveryUnit() {
