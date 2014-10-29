@@ -855,18 +855,12 @@ namespace mongo {
             // 2. Make sure my view is complete and lock the distributed lock to ensure shard
             //    metadata stability.
             // 3. Migration
-            //    Take an IS lock on the database and then retrieve all DiskLocs, which need to be
-            //    migrated in order to do as little seeking as possible during transfer. Retrieval
-            //    of the DiskLocs happens under a collection lock, but then the collection lock is
-            //    dropped, so we are only left with the IS lock.
-            //
-            //    The reason we need to hold the IS lock is to prevent repair from invalidating the
-            //    DiskLocs we just read. Note that data modifications are not a problem, because
-            //    we are registered for change notifications.
-            //
-            //    Before transferring the DiskLocs, we yield the flush lock in order to not block
-            //    the MMAP V1 flush process (see comments in lock_state.h) for more information
-            //    on that.
+            //    Retrieve all DiskLocs, which need to be migrated in order to do as little seeking
+            //    as possible during transfer. Retrieval of the DiskLocs happens under a collection
+            //    lock, but then the collection lock is dropped. This opens up an opportunity for
+            //    repair or compact to invalidate these DiskLocs, because these commands do not
+            //    synchronized with migration. Note that data modifications are not a problem,
+            //    because we are registered for change notifications.
             //
             // 4. pause till migrate caught up
             // 5. LOCK
@@ -1125,21 +1119,12 @@ namespace mongo {
             }
 
             {
-                // This prevents repair from running and invalidating the DiskLocs we just read.
-                // Otherwise, we are protected from the documents changing, because we are
-                // registered for change notifications.
-                AutoGetDb db(txn, nsToDatabaseSubstring(ns), MODE_IS);
-
-                // This gets a read lock on the collection, so we know we have checkpoint for mods
+                // See comment at the top of the function for more information on what
+                // synchronization is used here.
                 if (!migrateFromStatus.storeCurrentLocs(txn, maxChunkSize, errmsg, result)) {
                     warning() << errmsg << endl;
                     return false;
                 }
-
-                // We have retrieved the DiskLocs and won't be doing any reads from here onwards,
-                // so release the flush lock in order to not block the MMAP V1 flush thread (this
-                // is a no-op for engines other than MMAP V1).
-                AutoYieldFlushLockForMMAPV1Commit autoYieldMMAPV1FlushLock(txn->lockState());
 
                 ScopedDbConnection connTo(toShard.getConnString());
                 BSONObj res;
@@ -1166,9 +1151,9 @@ namespace mongo {
                 try{
                     ok = connTo->runCommand("admin", recvChunkStartBuilder.done(), res);
                 }
-                catch (const DBException& ex) {
+                catch( DBException& e ){
                     errmsg = str::stream() << "moveChunk could not contact to: shard "
-                                           << toShardName << " to start transfer" << causedBy(ex);
+                                           << toShardName << " to start transfer" << causedBy( e );
                     warning() << errmsg << endl;
                     return false;
                 }
@@ -1179,119 +1164,114 @@ namespace mongo {
                     errmsg = "moveChunk failed to engage TO-shard in the data transfer: ";
                     verify( res["errmsg"].type() );
                     errmsg += res["errmsg"].String();
-                    result.append("cause", res);
+                    result.append( "cause" , res );
                     warning() << errmsg << endl;
                     return false;
                 }
 
-                timing.done(3);
-                MONGO_FP_PAUSE_WHILE(moveChunkHangAtStep3);
+            }
+            timing.done( 3 );
+            MONGO_FP_PAUSE_WHILE(moveChunkHangAtStep3);
 
-                // 4.
+            // 4.
 
-                // Track last result from TO shard for sanity check
-                // don't want a single chunk move to take more than a day
-                for (int i = 0; i < 86400; i++) {
-                    // Exponential sleep backoff, up to 1024ms. Don't sleep much on the first few
-                    // iterations, since we want empty chunk migrations to be fast.
-                    sleepmillis(1 << std::min(i, 10));
-                    ScopedDbConnection conn(toShard.getConnString());
-                    bool ok;
-                    BSONObj recvChunkRes;
-                    try {
-                        ok = conn->runCommand("admin",
-                                              BSON("_recvChunkStatus" << 1),
-                                              recvChunkRes);
-                    }
-                    catch(const DBException& ex){
-                        errmsg = str::stream() << "moveChunk could not contact to: shard "
-                                << toShardName << " to monitor transfer" << causedBy(ex);
-                        warning() << errmsg << endl;
-                        return false;
-                    }
+            // Track last result from TO shard for sanity check
+            BSONObj res;
+            for ( int i=0; i<86400; i++ ) { // don't want a single chunk move to take more than a day
+                invariant(!txn->lockState()->isLocked());
 
-                    conn.done();
-
-                    if (recvChunkRes["ns"].str() != ns ||
-                            recvChunkRes["from"].str() != fromShard.getConnString() ||
-                            !recvChunkRes["min"].isABSONObj() ||
-                            recvChunkRes["min"].Obj().woCompare(min) != 0 ||
-                            !recvChunkRes["max"].isABSONObj() ||
-                            recvChunkRes["max"].Obj().woCompare(max) != 0) {
-                        // This can happen when the destination aborted the migration and
-                        // received another recvChunk before this thread sees the transition
-                        // to the abort state. This is currently possible only if multiple
-                        // migrations are happening at once. This is an unfortunate consequence
-                        // of the shards not being able to keep track of multiple incoming and
-                        // outgoing migrations.
-                        errmsg = str::stream() << "Destination shard aborted migration, "
-                                "now running a new one: " << recvChunkRes;
-                        warning() << errmsg << endl;
-                        return false;
-                    }
-
-                    LOG(0) << "moveChunk data transfer progress: " << recvChunkRes
-                           << " my mem used: " << migrateFromStatus.mbUsed() << migrateLog;
-
-                    if (!ok || recvChunkRes["state"].String() == "fail") {
-                        warning() << "moveChunk error transferring data caused migration abort: "
-                                  << res << migrateLog;
-                        errmsg = "data transfer error";
-                        result.append("cause", recvChunkRes);
-                        return false;
-                    }
-
-                    if (recvChunkRes["state"].String() == "steady") {
-                        break;
-                    }
-
-                    if (migrateFromStatus.mbUsed() > (500 * 1024 * 1024)) {
-                        // this is too much memory for us to use for this
-                        // so we're going to abort the migrate
-                        ScopedDbConnection conn(toShard.getConnString());
-
-                        BSONObj chunkAbortRes;
-                        if (!conn->runCommand("admin",
-                                              BSON("_recvChunkAbort" << 1),
-                                              chunkAbortRes)) {
-                            warning() << "Error encountered while trying to abort migration on "
-                                      << "destination shard" << toShard.getConnString() << endl;
-                        }
-
-                        conn.done();
-                        error() << "aborting migrate because too much memory used res: "
-                                << chunkAbortRes << migrateLog;
-                        errmsg = "aborting migrate because too much memory used";
-                        result.appendBool("split", true);
-                        return false;
-                    }
-
-                    txn->checkForInterrupt();
+                // Exponential sleep backoff, up to 1024ms. Don't sleep much on the first few
+                // iterations, since we want empty chunk migrations to be fast.
+                sleepmillis( 1 << std::min( i , 10 ) );
+                ScopedDbConnection conn(toShard.getConnString());
+                bool ok;
+                res = BSONObj();
+                try {
+                    ok = conn->runCommand( "admin" , BSON( "_recvChunkStatus" << 1 ) , res );
+                    res = res.getOwned();
                 }
-                timing.done(4);
-                MONGO_FP_PAUSE_WHILE(moveChunkHangAtStep4);
-
-                // 5.
-
-                // Before we get into the critical section of the migration, let's double check
-                // that the docs have been cloned, the config servers are reachable,
-                // and the lock is in place.
-                log() << "About to check if it is safe to enter critical section" << endl;
-
-                // Ensure all cloned docs have actually been transferred
-                std::size_t locsRemaining = migrateFromStatus.cloneLocsRemaining();
-                if (locsRemaining != 0) {
-                    errmsg =
-                        str::stream() << "moveChunk cannot enter critical section before all "
-                                      << "data is cloned, " << locsRemaining << " locs were not "
-                                      << "transferred but to-shard reported " << res;
-
-                    // Should never happen, but safe to abort before critical section
-                    error() << errmsg << migrateLog;
-                    dassert( false );
+                catch( DBException& e ){
+                    errmsg = str::stream() << "moveChunk could not contact to: shard " << toShardName << " to monitor transfer" << causedBy( e );
+                    warning() << errmsg << endl;
                     return false;
                 }
-            } // DB IS lock release
+
+                conn.done();
+
+                if ( res["ns"].str() != ns ||
+                        res["from"].str() != fromShard.getConnString() ||
+                        !res["min"].isABSONObj() ||
+                        res["min"].Obj().woCompare(min) != 0 ||
+                        !res["max"].isABSONObj() ||
+                        res["max"].Obj().woCompare(max) != 0 ) {
+                    // This can happen when the destination aborted the migration and
+                    // received another recvChunk before this thread sees the transition
+                    // to the abort state. This is currently possible only if multiple migrations
+                    // are happening at once. This is an unfortunate consequence of the shards not
+                    // being able to keep track of multiple incoming and outgoing migrations.
+                    errmsg = str::stream() << "Destination shard aborted migration, "
+                            "now running a new one: " << res;
+                    warning() << errmsg << endl;
+                    return false;
+                }
+
+                LOG(0) << "moveChunk data transfer progress: " << res << " my mem used: " << migrateFromStatus.mbUsed() << migrateLog;
+
+                if ( ! ok || res["state"].String() == "fail" ) {
+                    warning() << "moveChunk error transferring data caused migration abort: " << res << migrateLog;
+                    errmsg = "data transfer error";
+                    result.append( "cause" , res );
+                    return false;
+                }
+
+                if ( res["state"].String() == "steady" )
+                    break;
+
+                if ( migrateFromStatus.mbUsed() > (500 * 1024 * 1024) ) {
+                    // this is too much memory for us to use for this
+                    // so we're going to abort the migrate
+                    ScopedDbConnection conn(toShard.getConnString());
+
+                    BSONObj res;
+                    if (!conn->runCommand( "admin", BSON( "_recvChunkAbort" << 1 ), res )) {
+                        warning() << "Error encountered while trying to abort migration on "
+                                  << "destination shard" << toShard.getConnString() << endl;
+                    }
+
+                    res = res.getOwned();
+                    conn.done();
+                    error() << "aborting migrate because too much memory used res: " << res << migrateLog;
+                    errmsg = "aborting migrate because too much memory used";
+                    result.appendBool( "split" , true );
+                    return false;
+                }
+
+                txn->checkForInterrupt();
+            }
+            timing.done(4);
+            MONGO_FP_PAUSE_WHILE(moveChunkHangAtStep4);
+
+            // 5.
+
+            // Before we get into the critical section of the migration, let's double check
+            // that the docs have been cloned, the config servers are reachable,
+            // and the lock is in place.
+            log() << "About to check if it is safe to enter critical section" << endl;
+
+            // Ensure all cloned docs have actually been transferred
+            std::size_t locsRemaining = migrateFromStatus.cloneLocsRemaining();
+            if ( locsRemaining != 0 ) {
+
+                errmsg =
+                    str::stream() << "moveChunk cannot enter critical section before all data is"
+                                  << " cloned, " << locsRemaining << " locs were not transferred"
+                                  << " but to-shard reported " << res;
+
+                // Should never happen, but safe to abort before critical section
+                error() << errmsg << migrateLog;
+                dassert( false );
+                return false;
+            }
 
             // Ensure distributed lock still held
             Status lockStatus = collLock.checkStatus();
