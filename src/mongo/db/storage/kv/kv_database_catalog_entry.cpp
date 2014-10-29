@@ -278,25 +278,35 @@ namespace mongo {
                                                      const StringData& fromNS,
                                                      const StringData& toNS,
                                                      bool stayTemp ) {
+        RecordStore* originalRS = NULL;
         // Note: assuming that both fromNS and toNS (or whole db) are X-locked from above.
         {
             boost::mutex::scoped_lock lk( _collectionsLock );
             CollectionMap::const_iterator it = _collections.find( fromNS.toString() );
             if ( it == _collections.end() )
                 return Status( ErrorCodes::NamespaceNotFound, "rename cannot find collection" );
+            originalRS = it->second->getRecordStore();
 
             it = _collections.find( toNS.toString() );
             if ( it != _collections.end() )
                 return Status( ErrorCodes::NamespaceExists, "for rename to already exists" );
+
         }
 
         const std::string identFrom = _engine->getCatalog()->getCollectionIdent( fromNS );
 
-        Status status = _engine->getCatalog()->renameCollection( txn, fromNS, toNS, stayTemp );
+        Status status = _engine->getEngine()->okToRename( txn, fromNS, toNS, identFrom, originalRS );
+        if ( !status.isOK() )
+            return status;
+
+        status = _engine->getCatalog()->renameCollection( txn, fromNS, toNS, stayTemp );
         if ( !status.isOK() )
             return status;
 
         const std::string identTo = _engine->getCatalog()->getCollectionIdent( toNS );
+
+        invariant( identFrom == identTo );
+
         BSONCollectionCatalogEntry::MetaData md = _engine->getCatalog()->getMetaData( txn, toNS );
         RecordStore* rs = _engine->getEngine()->getRecordStore( txn, toNS, identTo, md.options );
 
