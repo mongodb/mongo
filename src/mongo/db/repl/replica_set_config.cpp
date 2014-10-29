@@ -337,8 +337,15 @@ namespace {
 
         // TODO(schwerin): Validate satisfiability of write modes? Omitting for backwards
         // compatibility.
-        if (!_defaultWriteConcern.wMode.empty() && "majority" != _defaultWriteConcern.wMode) {
-            if (!findCustomWriteMode(_defaultWriteConcern.wMode).isOK()) {
+        if (_defaultWriteConcern.wMode.empty()) {
+            if (_defaultWriteConcern.wNumNodes == 0) {
+                return Status(ErrorCodes::BadValue,
+                              "Default write concern mode must wait for at least 1 member");
+            }
+        }
+        else {
+            if ("majority" != _defaultWriteConcern.wMode &&
+                    !findCustomWriteMode(_defaultWriteConcern.wMode).isOK()) {
                 return Status(ErrorCodes::BadValue, str::stream() <<
                               "Default write concern requires undefined write mode " <<
                               _defaultWriteConcern.wMode);
