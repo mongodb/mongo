@@ -72,7 +72,8 @@ wts_open(const char *home, int set_api, WT_CONNECTION **connp)
 {
 	WT_CONNECTION *conn;
 	int ret;
-	char *buffer_align, config[2048], evict_config[64], *progname;
+	const char *buffer_align, *progname;
+	char config[2048], evict_config[64];
 
 	*connp = NULL;
 
