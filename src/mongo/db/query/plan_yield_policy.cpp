@@ -32,6 +32,7 @@
 
 #include "mongo/db/concurrency/yield.h"
 #include "mongo/db/global_environment_experiment.h"
+#include "mongo/db/storage/record_fetcher.h"
 
 namespace mongo {
 
@@ -46,7 +47,7 @@ namespace mongo {
         return _elapsedTracker.intervalHasElapsed();
     }
 
-    bool PlanYieldPolicy::yield() {
+    bool PlanYieldPolicy::yield(RecordFetcher* fetcher) {
         invariant(_planYielding);
 
         OperationContext* opCtx = _planYielding->getOpCtx();
@@ -63,8 +64,6 @@ namespace mongo {
             return true;
         }
 
-        invariant(_planYielding);
-
         // No need to yield if the collection is NULL.
         if (NULL == _planYielding->collection()) {
             return true;
@@ -73,7 +72,7 @@ namespace mongo {
         _planYielding->saveState();
 
         // Release and reacquire locks.
-        Yield::yieldAllLocks(opCtx, 1);
+        Yield::yieldAllLocks(opCtx, 1, fetcher);
 
         _elapsedTracker.resetLastTime();
 

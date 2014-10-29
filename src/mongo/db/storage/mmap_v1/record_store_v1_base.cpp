@@ -237,9 +237,9 @@ namespace mongo {
         return result;
     }
 
-    bool RecordStoreV1Base::recordLikelyInPhysicalMem( OperationContext* txn,
-                                                       const DiskLoc& loc ) const {
-        return _extentManager->likelyInPhysicalMem( loc );
+    RecordFetcher* RecordStoreV1Base::recordNeedsFetch( OperationContext* txn,
+                                                        const DiskLoc& loc ) const {
+        return _extentManager->recordNeedsFetch( loc );
     }
 
 

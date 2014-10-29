@@ -36,6 +36,7 @@
 #include "mongo/db/exec/scoped_timer.h"
 #include "mongo/db/exec/working_set.h"
 #include "mongo/db/catalog/collection.h"
+#include "mongo/db/storage/record_fetcher.h"
 #include "mongo/util/fail_point_service.h"
 #include "mongo/util/log.h"
 
@@ -55,9 +56,16 @@ namespace mongo {
           _filter(filter),
           _params(params),
           _isDead(false),
+          _wsidForFetch(_workingSet->allocate()),
           _commonStats(kStageType) {
         // Explain reports the direction of the collection scan.
         _specificStats.direction = params.direction;
+
+        // We pre-allocate a WSM and use it to pass up fetch requests. This should never be used
+        // for anything other than passing up NEED_FETCH. We use the loc and unowned obj state, but
+        // the loc isn't really pointing at any obj. The obj field of the WSM should never be used.
+        WorkingSetMember* member = _workingSet->get(_wsidForFetch);
+        member->state = WorkingSetMember::LOC_AND_UNOWNED_OBJ;
     }
 
     PlanStage::StageState CollectionScan::work(WorkingSetID* out) {
@@ -100,12 +108,31 @@ namespace mongo {
             return PlanStage::NEED_TIME;
         }
 
-        // What we'll return to the user.
-        DiskLoc nextLoc;
-
         // Should we try getNext() on the underlying _iter?
         if (isEOF())
             return PlanStage::IS_EOF;
+
+        // See if the record we're about to access is in memory. If not, pass a fetch request up.
+        // Note that curr() returns the same thing as getNext() will, except without advancing the
+        // iterator or touching the DiskLoc. This means that we can use curr() to check whether we
+        // need to fetch on the DiskLoc prior to touching it with getNext().
+        DiskLoc curr = _iter->curr();
+        if (!curr.isNull()) {
+            std::auto_ptr<RecordFetcher> fetcher(
+                _params.collection->documentNeedsFetch(_txn, curr));
+            if (NULL != fetcher.get()) {
+                WorkingSetMember* member = _workingSet->get(_wsidForFetch);
+                member->loc = curr;
+                // Pass the RecordFetcher off to the WSM.
+                member->setFetcher(fetcher.release());
+                *out = _wsidForFetch;
+                _commonStats.needFetch++;
+                return NEED_FETCH;
+            }
+        }
+
+        // What we'll return to the user.
+        DiskLoc nextLoc;
 
         // See if _iter gives us anything new.
         nextLoc = _iter->getNext();
@@ -123,15 +150,21 @@ namespace mongo {
         member->obj = _iter->dataFor(member->loc).toBson();
         member->state = WorkingSetMember::LOC_AND_UNOWNED_OBJ;
 
+        return returnIfMatches(member, id, out);
+    }
+
+    PlanStage::StageState CollectionScan::returnIfMatches(WorkingSetMember* member,
+                                                          WorkingSetID memberID,
+                                                          WorkingSetID* out) {
         ++_specificStats.docsTested;
 
         if (Filter::passes(member, _filter)) {
-            *out = id;
+            *out = memberID;
             ++_commonStats.advanced;
             return PlanStage::ADVANCED;
         }
         else {
-            _workingSet->free(id);
+            _workingSet->free(memberID);
             ++_commonStats.needTime;
             return PlanStage::NEED_TIME;
         }

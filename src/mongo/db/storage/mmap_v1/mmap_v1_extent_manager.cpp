@@ -34,6 +34,7 @@
 
 #include "mongo/db/storage/mmap_v1/mmap_v1_extent_manager.h"
 
+#include "mongo/base/counter.h"
 #include "mongo/db/audit.h"
 #include "mongo/db/client.h"
 #include "mongo/db/storage/mmap_v1/dur.h"
@@ -42,11 +43,57 @@
 #include "mongo/db/storage/mmap_v1/extent.h"
 #include "mongo/db/storage/mmap_v1/extent_manager.h"
 #include "mongo/db/storage/mmap_v1/mmap_v1_options.h"
+#include "mongo/db/storage/record_fetcher.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/util/fail_point_service.h"
 #include "mongo/util/file.h"
 #include "mongo/util/log.h"
+#include "mongo/util/mmap.h"
 
 namespace mongo {
+
+    // Turn on this failpoint to force the system to yield for a fetch. Setting to "alwaysOn"
+    // will cause yields for fetching to occur on every 'kNeedsFetchFailFreq'th call to
+    // recordNeedsFetch().
+    static const int kNeedsFetchFailFreq = 2;
+    static Counter64 needsFetchFailCounter;
+    MONGO_FP_DECLARE(recordNeedsFetchFail);
+
+    // Used to make sure the compiler doesn't get too smart on us when we're
+    // trying to touch records.
+    volatile int __record_touch_dummy = 1;
+
+    class MmapV1RecordFetcher : public RecordFetcher {
+        MONGO_DISALLOW_COPYING(MmapV1RecordFetcher);
+    public:
+        explicit MmapV1RecordFetcher(const Record* record)
+            : _record(record),
+              _filesLock(new LockMongoFilesShared()) { }
+
+        virtual void fetch() {
+            // It's only legal to touch the record while we're holding a lock on the data files.
+            invariant(_filesLock);
+
+            const char* recordChar = reinterpret_cast<const char*>(_record);
+
+            // Here's where we actually deference a pointer into the record. This is where
+            // we expect a page fault to occur, so we should this out of the lock.
+            __record_touch_dummy += *recordChar;
+
+            // We're not going to touch the record anymore, so we can give up our
+            // lock on mongo files. We do this here because we have to release the
+            // lock on mongo files prior to reacquiring lock mgr locks.
+            _filesLock.reset();
+        }
+
+    private:
+        // The record which needs to be touched in order to page fault. Not owned by us.
+        const Record* _record;
+
+        // This ensures that our Record* does not drop out from under our feet before
+        // we dereference it.
+        boost::scoped_ptr<LockMongoFilesShared> _filesLock;
+    };
 
     MmapV1ExtentManager::MmapV1ExtentManager(const StringData& dbname,
                                              const StringData& path,
@@ -215,9 +262,23 @@ namespace mongo {
         return record;
     }
 
-    bool MmapV1ExtentManager::likelyInPhysicalMem( const DiskLoc& loc ) const {
+    RecordFetcher* MmapV1ExtentManager::recordNeedsFetch( const DiskLoc& loc ) const {
         Record* record = _recordForV1( loc );
-        return _recordAccessTracker.checkAccessedAndMark( record );
+
+        // For testing: if failpoint is enabled we randomly request fetches without
+        // going to the RecordAccessTracker.
+        if ( MONGO_FAIL_POINT( recordNeedsFetchFail ) ) {
+            needsFetchFailCounter.increment();
+            if ( ( needsFetchFailCounter.get() % kNeedsFetchFailFreq ) == 0 ) {
+                return new MmapV1RecordFetcher( record );
+            }
+        }
+
+        if ( !_recordAccessTracker.checkAccessedAndMark( record ) ) {
+            return new MmapV1RecordFetcher( record );
+        }
+
+        return NULL;
     }
 
     DiskLoc MmapV1ExtentManager::extentLocForV1( const DiskLoc& loc ) const {

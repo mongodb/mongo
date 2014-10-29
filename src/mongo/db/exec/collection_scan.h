@@ -73,9 +73,12 @@ namespace mongo {
 
     private:
         /**
-         * Returns true if the record 'loc' references is in memory, false otherwise.
+         * If the member (with id memberID) passes our filter, set *out to memberID and return that
+         * ADVANCED.  Otherwise, free memberID and return NEED_TIME.
          */
-        bool diskLocInMemory(DiskLoc loc);
+        StageState returnIfMatches(WorkingSetMember* member,
+                                   WorkingSetID memberID,
+                                   WorkingSetID* out);
 
         // transactional context for read locks. Not owned by us
         OperationContext* _txn;
@@ -93,6 +96,10 @@ namespace mongo {
         bool _isDead;
 
         DiskLoc _lastSeenLoc;
+
+        // We allocate a working set member with this id on construction of the stage. It gets
+        // used for all fetch requests, changing the DiskLoc as appropriate.
+        const WorkingSetID _wsidForFetch;
 
         // Stats
         CommonStats _commonStats;

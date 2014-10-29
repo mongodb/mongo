@@ -30,23 +30,23 @@
 
 #include "mongo/platform/basic.h"
 
+#include "mongo/db/exec/multi_plan.h"
+
 #include <algorithm>
 #include <math.h>
 
 #include "mongo/base/owned_pointer_vector.h"
-#include "mongo/db/exec/multi_plan.h"
-#include "mongo/db/exec/scoped_timer.h"
-#include "mongo/db/exec/working_set_common.h"
-#include "mongo/util/mongoutils/str.h"
-
-// for updateCache
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/database.h"
 #include "mongo/db/client.h"
+#include "mongo/db/exec/scoped_timer.h"
+#include "mongo/db/exec/working_set_common.h"
 #include "mongo/db/query/explain.h"
 #include "mongo/db/query/plan_cache.h"
 #include "mongo/db/query/plan_ranker.h"
 #include "mongo/db/query/qlog.h"
+#include "mongo/db/storage/record_fetcher.h"
+#include "mongo/util/mongoutils/str.h"
 #include "mongo/util/log.h"
 
 namespace mongo {
@@ -144,8 +144,38 @@ namespace mongo {
         else if (PlanStage::NEED_TIME == state) {
             _commonStats.needTime++;
         }
+        else if (PlanStage::NEED_FETCH == state) {
+            _commonStats.needFetch++;
+        }
 
         return state;
+    }
+
+    Status MultiPlanStage::tryYield(PlanYieldPolicy* yieldPolicy) {
+        // There are two conditions which cause us to yield during plan selection if we have a
+        // YIELD_AUTO policy:
+        //   1) The yield policy's timer elapsed, or
+        //   2) some stage requested a yield due to a document fetch (NEED_FETCH).
+        // In both cases, the actual yielding happens here.
+        if (NULL != yieldPolicy && (yieldPolicy->shouldYield() || NULL != _fetcher.get())) {
+            // Here's where we yield.
+            bool alive = yieldPolicy->yield(_fetcher.get());
+
+            // We're done using the fetcher, so it should be freed. We don't want to
+            // use the same RecordFetcher twice.
+            _fetcher.reset();
+
+            if (!alive) {
+                _failure = true;
+                Status failStat(ErrorCodes::OperationFailed,
+                                "PlanExecutor killed during plan selection");
+                _statusMemberId = WorkingSetCommon::allocateStatusMember(_candidates[0].ws,
+                                                                         failStat);
+                return failStat;
+            }
+        }
+
+        return Status::OK();
     }
 
     Status MultiPlanStage::pickBestPlan(PlanYieldPolicy* yieldPolicy) {
@@ -182,20 +212,12 @@ namespace mongo {
         // Work the plans, stopping when a plan hits EOF or returns some
         // fixed number of results.
         for (size_t ix = 0; ix < numWorks; ++ix) {
-            // Yield, if it's time to yield.
-            if (NULL != yieldPolicy && yieldPolicy->shouldYield()) {
-                bool alive = yieldPolicy->yield();
-                if (!alive) {
-                    _failure = true;
-                    Status failStat(ErrorCodes::OperationFailed,
-                                    "PlanExecutor killed during plan selection");
-                    _statusMemberId = WorkingSetCommon::allocateStatusMember(_candidates[0].ws,
-                                                                             failStat);
-                    return failStat;
-                }
+            Status yieldStatus = tryYield(yieldPolicy);
+            if (!yieldStatus.isOK()) {
+                return yieldStatus;
             }
 
-            bool moreToDo = workAllPlans(numResults);
+            bool moreToDo = workAllPlans(numResults, yieldPolicy);
             if (!moreToDo) { break; }
         }
 
@@ -327,7 +349,7 @@ namespace mongo {
         return candidateStats.release();
     }
 
-    bool MultiPlanStage::workAllPlans(size_t numResults) {
+    bool MultiPlanStage::workAllPlans(size_t numResults, PlanYieldPolicy* yieldPolicy) {
         bool doneWorking = false;
 
         for (size_t ix = 0; ix < _candidates.size(); ++ix) {
@@ -350,6 +372,17 @@ namespace mongo {
                 // First plan to hit EOF wins automatically.  Stop evaluating other plans.
                 // Assumes that the ranking will pick this plan.
                 doneWorking = true;
+            }
+            else if (PlanStage::NEED_FETCH == state) {
+                // Yielding for a NEED_FETCH is handled above. Here we just make sure that the
+                // WSM is fetchable as a sanity check.
+                WorkingSetMember* member = candidate.ws->get(id);
+                invariant(member->hasFetcher());
+                // Transfer ownership of the fetcher and yield.
+                _fetcher.reset(member->releaseFetcher());
+                if (!(tryYield(yieldPolicy)).isOK()) {
+                    return false;
+                }
             }
             else if (PlanStage::NEED_TIME != state) {
                 // FAILURE or DEAD.  Do we want to just tank that plan and try the rest?  We

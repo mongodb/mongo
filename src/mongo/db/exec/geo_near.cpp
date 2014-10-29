@@ -389,6 +389,8 @@ namespace mongo {
             return PlanStage::IS_EOF;
         }
 
+        invariant(state != NEED_FETCH);
+
         // Propagate NEED_TIME or errors
         return state;
     }
@@ -1052,6 +1054,8 @@ namespace mongo {
             workingSet->free(workingSetID);
             return PlanStage::IS_EOF;
         }
+
+        invariant(state != NEED_FETCH);
 
         // Propagate NEED_TIME or errors
         return state;

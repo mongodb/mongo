@@ -54,6 +54,7 @@ namespace mongo {
     class OperationContext;
 
     class RecordIterator;
+    class RecordFetcher;
 
     class OpDebug;
 
@@ -183,6 +184,18 @@ namespace mongo {
                                             const BSONObj& doc,
                                             MultiIndexBlock* indexBlock,
                                             bool enforceQuota );
+
+        /**
+         * If the document at 'loc' is unlikely to be in physical memory, the storage
+         * engine gives us back a RecordFetcher functor which we can invoke in order
+         * to page fault on that record.
+         *
+         * Returns NULL if the document does not need to be fetched.
+         *
+         * Caller takes ownership of the returned RecordFetcher*.
+         */
+        RecordFetcher* documentNeedsFetch( OperationContext* txn,
+                                           const DiskLoc& loc ) const;
 
         /**
          * updates the document @ oldLocation with newDoc

@@ -124,7 +124,7 @@ namespace mongo {
          */
         Record* recordForV1( const DiskLoc& loc ) const;
 
-        bool likelyInPhysicalMem( const DiskLoc& loc ) const;
+        RecordFetcher* recordNeedsFetch( const DiskLoc& loc ) const;
 
         /**
          * @param loc - has to be for a specific Record (not an Extent)

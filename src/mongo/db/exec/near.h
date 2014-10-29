@@ -152,7 +152,7 @@ namespace mongo {
         //
 
         StageState initNext();
-        StageState bufferNext(Status* error);
+        StageState bufferNext(WorkingSetID* toReturn, Status* error);
         StageState advanceNext(WorkingSetID* toReturn);
 
         //

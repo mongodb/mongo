@@ -47,6 +47,7 @@ namespace mongo {
     class NamespaceDetails;
     class OperationContext;
     class Record;
+    class RecordFetcher;
 
     class RecordStoreCompactAdaptor;
     class RecordStore;
@@ -189,13 +190,19 @@ namespace mongo {
          * Storage engines which do not support document-level locking hold locks at
          * collection or database granularity. As an optimization, these locks can be yielded
          * when a record needs to be fetched from secondary storage. If this method returns
-         * false, then it indicates that the query system layer should yield and reacquire its
+         * non-NULL, then it indicates that the query system layer should yield and reacquire its
          * locks.
+         *
+         * The return value is a functor that should be invoked when the locks are yielded;
+         * it should access the record at 'loc' so that a potential page fault is triggered
+         * out of the lock.
+         *
+         * The caller is responsible for deleting the return value.
          *
          * Storage engines which support document-level locking need not implement this.
          */
-        virtual bool recordLikelyInPhysicalMem( OperationContext* txn,
-                                                const DiskLoc& loc ) const { return true; }
+        virtual RecordFetcher* recordNeedsFetch( OperationContext* txn,
+                                                 const DiskLoc& loc ) const { return NULL; }
 
         /**
          * returned iterator owned by caller

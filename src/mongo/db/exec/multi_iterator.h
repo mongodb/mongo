@@ -44,10 +44,7 @@ namespace mongo {
      */
     class MultiIteratorStage : public PlanStage {
     public:
-        MultiIteratorStage(OperationContext* txn, WorkingSet* ws, Collection* collection)
-            : _txn(txn),
-              _collection(collection),
-              _ws(ws) { }
+        MultiIteratorStage(OperationContext* txn, WorkingSet* ws, Collection* collection);
 
         ~MultiIteratorStage() { }
 
@@ -92,6 +89,10 @@ namespace mongo {
 
         // Not owned by us.
         WorkingSet* _ws;
+
+        // We allocate a working set member with this id on construction of the stage. It gets
+        // used for all fetch requests, changing the DiskLoc as appropriate.
+        const WorkingSetID _wsidForFetch;
     };
 
 } // namespace mongo

@@ -153,6 +153,11 @@ namespace mongo {
                 _ws->free(id);
             }
         }
+        else if (PlanStage::NEED_FETCH == state) {
+            *out = id;
+            _commonStats.needFetch++;
+            return PlanStage::NEED_FETCH;
+        }
 
         _commonStats.needTime++;
         return PlanStage::NEED_TIME;

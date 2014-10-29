@@ -86,6 +86,7 @@ namespace mongo {
         const DiskLoc loc = _subIterators.back()->getNext();
         _subIterators.popAndDeleteBack();
 
+        // TODO: should we ever try and return NEED_FETCH here?
         if (!loc.isNull() && !_filter->matchesBSON(_collection->docFor(_txn, loc))) {
             _done = true;
             WorkingSetID id = _workingSet->allocate();

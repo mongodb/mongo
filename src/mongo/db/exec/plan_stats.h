@@ -64,6 +64,7 @@ namespace mongo {
                         invalidates(0),
                         advanced(0),
                         needTime(0),
+                        needFetch(0),
                         executionTimeMillis(0),
                         isEOF(false) { }
         // String giving the type of the stage. Not owned.
@@ -78,6 +79,7 @@ namespace mongo {
         // How many times was this state the return value of work(...)?
         size_t advanced;
         size_t needTime;
+        size_t needFetch;
 
         // BSON representation of a MatchExpression affixed to this node. If there
         // is no filter affixed, then 'filter' should be an empty BSONObj.
@@ -91,6 +93,8 @@ namespace mongo {
 
         // TODO: once we've picked a plan, collect different (or additional) stats for display to
         // the user, eg. time_t totalTimeSpent;
+
+        // TODO: keep track of the total yield time / fetch time done for a plan.
 
         bool isEOF;
     private:

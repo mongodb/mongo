@@ -76,7 +76,7 @@ namespace mongo {
             return PlanStage::NEED_TIME;
         }
 
-        invariant(state != PlanStage::ADVANCED);
+        invariant(state != PlanStage::ADVANCED && state != PlanStage::NEED_FETCH);
 
         // Propagate NEED_TIME or errors upward.
         return state;
@@ -105,7 +105,7 @@ namespace mongo {
             nextState = initNext();
         }
         else if (SearchState_Buffering == _searchState) {
-            nextState = bufferNext(&error);
+            nextState = bufferNext(&toReturn, &error);
         }
         else if (SearchState_Advancing == _searchState) {
             nextState = advanceNext(&toReturn);
@@ -125,6 +125,10 @@ namespace mongo {
         else if (PlanStage::ADVANCED == nextState) {
             *out = toReturn;
             ++_stats->common.advanced;
+        }
+        else if (PlanStage::NEED_FETCH == nextState) {
+            *out = toReturn;
+            ++_stats->common.needFetch;
         }
         else if (PlanStage::NEED_TIME == nextState) {
             ++_stats->common.needTime;
@@ -154,7 +158,8 @@ namespace mongo {
         double distance;
     };
 
-    PlanStage::StageState NearStage::bufferNext(Status* error) {
+    // Set "toReturn" when NEED_FETCH.
+    PlanStage::StageState NearStage::bufferNext(WorkingSetID* toReturn, Status* error) {
 
         //
         // Try to retrieve the next covered member
@@ -197,6 +202,10 @@ namespace mongo {
         }
         else if (PlanStage::FAILURE == intervalState) {
             *error = WorkingSetCommon::getMemberStatus(*_workingSet->get(nextMemberID));
+            return intervalState;
+        }
+        else if (PlanStage::NEED_FETCH == intervalState) {
+            *toReturn = nextMemberID;
             return intervalState;
         }
         else if (PlanStage::ADVANCED != intervalState) {

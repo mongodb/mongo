@@ -39,6 +39,7 @@
 
 #include "mongo/db/storage/mmap_v1/extent.h"
 #include "mongo/db/storage/mmap_v1/record.h"
+#include "mongo/db/storage/record_fetcher.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/allocator.h"
 #include "mongo/util/log.h"
@@ -259,8 +260,8 @@ namespace mongo {
         invariant(false);
     }
 
-    bool DummyExtentManager::likelyInPhysicalMem( const DiskLoc& loc ) const {
-        return true;
+    RecordFetcher* DummyExtentManager::recordNeedsFetch( const DiskLoc& loc ) const {
+        return NULL;
     }
 
     Record* DummyExtentManager::recordForV1( const DiskLoc& loc ) const {

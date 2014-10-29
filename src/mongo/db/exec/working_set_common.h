@@ -44,6 +44,15 @@ namespace mongo {
                                           const Collection* collection);
 
         /**
+         * After a NEED_FETCH is requested, this is used to actually retrieve the document
+         * corresponding to 'member' from 'collection', and to set the state of 'member'
+         * appropriately.
+         */
+        static void completeFetch(OperationContext* txn,
+                                  WorkingSetMember* member,
+                                  const Collection* collection);
+
+        /**
          * Initialize the fields in 'dest' from 'src', creating copies of owned objects as needed.
          */
         static void initFrom(WorkingSetMember* dest, const WorkingSetMember& src);

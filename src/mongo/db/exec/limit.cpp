@@ -77,12 +77,15 @@ namespace mongo {
             }
             return status;
         }
-        else {
-            if (PlanStage::NEED_TIME == status) {
-                ++_commonStats.needTime;
-            }
-            return status;
+        else if (PlanStage::NEED_TIME == status) {
+            ++_commonStats.needTime;
         }
+        else if (PlanStage::NEED_FETCH == status) {
+            ++_commonStats.needFetch;
+            *out = id;
+        }
+
+        return status;
     }
 
     void LimitStage::saveState() {

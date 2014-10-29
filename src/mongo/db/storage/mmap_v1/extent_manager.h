@@ -41,6 +41,7 @@ namespace mongo {
 
     class DataFile;
     class Record;
+    class RecordFetcher;
     class OperationContext;
 
     struct Extent;
@@ -112,10 +113,10 @@ namespace mongo {
         virtual Record* recordForV1( const DiskLoc& loc ) const = 0;
 
         /**
-         * The extent manager tracks accesses to DiskLocs. This returns true if the DiskLoc has been
-         * recently accessed, and therefore has likely been paged into physical memory.
+         * The extent manager tracks accesses to DiskLocs. This returns non-NULL if the DiskLoc has
+         * been recently accessed, and therefore has likely been paged into physical memory.
          */
-        virtual bool likelyInPhysicalMem( const DiskLoc& loc ) const = 0;
+        virtual RecordFetcher* recordNeedsFetch( const DiskLoc& loc ) const = 0;
 
         /**
          * @param loc - has to be for a specific Record (not an Extent)

@@ -38,6 +38,8 @@
 
 namespace mongo {
 
+    class RecordFetcher;
+
     class WorkingSetMember;
 
     typedef size_t WorkingSetID;
@@ -242,6 +244,15 @@ namespace mongo {
         const WorkingSetComputedData* getComputed(const WorkingSetComputedDataType type) const;
         void addComputed(WorkingSetComputedData* data);
 
+        //
+        // Fetching
+        //
+
+        void setFetcher(RecordFetcher* fetcher);
+        // Transfers ownership to the caller.
+        RecordFetcher* releaseFetcher();
+        bool hasFetcher() const;
+
         /**
          * getFieldDotted uses its state (obj or index data) to produce the field with the provided
          * name.
@@ -260,6 +271,8 @@ namespace mongo {
 
     private:
         boost::scoped_ptr<WorkingSetComputedData> _computed[WSM_COMPUTED_NUM_TYPES];
+
+        std::auto_ptr<RecordFetcher> _fetcher;
     };
 
 }  // namespace mongo

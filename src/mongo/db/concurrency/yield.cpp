@@ -30,6 +30,7 @@
 
 #include "mongo/db/curop.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/storage/record_fetcher.h"
 
 namespace mongo {
 
@@ -47,7 +48,13 @@ namespace mongo {
     }
 
     // static
-    void Yield::yieldAllLocks(OperationContext* txn, int micros) {
+    void Yield::yieldAllLocks(OperationContext* txn, int micros, RecordFetcher* fetcher) {
+        // Things have to happen here in a specific order:
+        //   1) Release lock mgr locks
+        //   2) Go to sleep
+        //   3) Touch the record we're yielding on, if there is one (RecordFetcher::fetch)
+        //   4) Reacquire lock mgr locks
+
         Locker* locker = txn->lockState();
 
         // If we had the read lock, we yield extra hard so that we don't starve writers.
@@ -91,6 +98,10 @@ namespace mongo {
             else if (micros > 0) {
                 sleepmicros(micros);
             }
+        }
+
+        if (fetcher) {
+            fetcher->fetch();
         }
 
         locker->restoreLockState(snapshot);

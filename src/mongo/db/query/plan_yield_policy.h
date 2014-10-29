@@ -34,6 +34,8 @@
 
 namespace mongo {
 
+    class RecordFetcher;
+
     class PlanYieldPolicy {
     public:
         explicit PlanYieldPolicy(PlanExecutor* exec);
@@ -49,14 +51,14 @@ namespace mongo {
          * Used to cause a plan executor to give up locks and go to sleep. The PlanExecutor
          * must *not* be in saved state. Handles calls to save/restore state internally.
          *
-         * By default, assumes that the PlanExecutor is already registered. If 'registerPlan'
-         * is explicitly set to true, then the executor will get automatically registered and
-         * deregistered here.
+         * If 'fetcher' is non-NULL, then we are yielding because the storage engine told us
+         * that we will page fault on this record. We use 'fetcher' to retrieve the record
+         * after we give up our locks.
          *
          * Returns true if the executor was restored successfully and is still alive. Returns false
          * if the executor got killed during yield.
          */
-        bool yield();
+        bool yield(RecordFetcher* fetcher = NULL);
 
     private:
         // Default constructor disallowed in order to ensure initialization of '_planYielding'.

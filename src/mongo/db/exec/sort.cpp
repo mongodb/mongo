@@ -395,12 +395,15 @@ namespace mongo {
                 }
                 return code;
             }
-            else {
-                if (PlanStage::NEED_TIME == code) {
-                    ++_commonStats.needTime;
-                }
-                return code;
+            else if (PlanStage::NEED_TIME == code) {
+                ++_commonStats.needTime;
             }
+            else if (PlanStage::NEED_FETCH == code) {
+                ++_commonStats.needFetch;
+                *out = id;
+            }
+
+            return code;
         }
 
         // Returning results.

@@ -51,6 +51,27 @@ namespace mongo {
     }
 
     // static
+    void WorkingSetCommon::completeFetch(OperationContext* txn,
+                                         WorkingSetMember* member,
+                                         const Collection* collection) {
+        // The RecordFetcher should already have been transferred out of the WSM and used.
+        invariant(!member->hasFetcher());
+
+        // If the diskloc was invalidated during fetch, then a "forced fetch" already converted this
+        // WSM into the owned object state. In this case, there is nothing more to do here.
+        if (WorkingSetMember::OWNED_OBJ == member->state) {
+            return;
+        }
+
+        // We should have a DiskLoc but need to retrieve the obj. Get the obj now and reset all WSM
+        // state appropriately.
+        invariant(member->hasLoc());
+        member->obj = collection->docFor(txn, member->loc);
+        member->keyData.clear();
+        member->state = WorkingSetMember::LOC_AND_UNOWNED_OBJ;
+    }
+
+    // static
     void WorkingSetCommon::initFrom(WorkingSetMember* dest, const WorkingSetMember& src) {
         dest->loc = src.loc;
         dest->obj = src.obj;

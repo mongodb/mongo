@@ -196,6 +196,11 @@ namespace mongo {
             ++_commonStats.needTime;
             return state;
         }
+        else if (PlanStage::NEED_FETCH == state) {
+            ++_commonStats.needFetch;
+            *out = id;
+            return state;
+        }
         else if (PlanStage::FAILURE == state) {
             *out = id;
             // If a stage fails, it may create a status WSM to indicate why it failed, in which

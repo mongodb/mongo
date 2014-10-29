@@ -46,6 +46,7 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/storage/mmap_v1/record_store_v1_capped.h"  // XXX-HK/ERH
 #include "mongo/db/storage/mmap_v1/mmap_v1_options.h"
+#include "mongo/db/storage/record_fetcher.h"
 #include "mongo/db/repl/repl_coordinator_global.h"
 
 #include "mongo/db/auth/user_document_parser.h" // XXX-ANDY
@@ -212,6 +213,11 @@ namespace mongo {
             return StatusWith<DiskLoc>( status );
 
         return loc;
+    }
+
+    RecordFetcher* Collection::documentNeedsFetch( OperationContext* txn,
+                                                   const DiskLoc& loc ) const {
+        return _recordStore->recordNeedsFetch( txn, loc );
     }
 
 

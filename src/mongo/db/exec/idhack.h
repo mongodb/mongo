@@ -75,6 +75,13 @@ namespace mongo {
         static const char* kStageType;
 
     private:
+        /**
+         * Marks this stage as done, optionally adds key metadata, and returns PlanStage::ADVANCED.
+         *
+         * Called whenever we have a WSM containing the matching obj.
+         */
+        StageState advance(WorkingSetID id, WorkingSetMember* member, WorkingSetID* out);
+
         // transactional context for read locks. Not owned by us
         OperationContext* _txn;
 
@@ -95,6 +102,12 @@ namespace mongo {
 
         // Do we need to add index key metadata for $returnKey?
         bool _addKeyMetadata;
+
+        // If we want to return a DiskLoc and it points to something that's not in memory,
+        // we return a "please page this in" result. We add a RecordFetcher given back to us by the
+        // storage engine to the WSM. The RecordFetcher is used by the PlanExecutor when it handles
+        // the fetch request.
+        WorkingSetID _idBeingPagedIn;
 
         CommonStats _commonStats;
         IDHackStats _specificStats;

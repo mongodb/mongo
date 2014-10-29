@@ -28,25 +28,23 @@
 
 #pragma once
 
-#include "mongo/db/concurrency/locker.h"
-
 namespace mongo {
 
-    class RecordFetcher;
-
     /**
-     * See the documentation for yieldAllLocks(...).
+     * Used for yielding while data is fetched from disk.
+     *
+     * @see RecordStore::recordNeedsFetch
      */
-    class Yield {
-        MONGO_DISALLOW_COPYING(Yield);
+    class RecordFetcher {
     public:
+        virtual ~RecordFetcher() { }
+
         /**
-         * If not in a nested context, unlocks all locks, suggests to the operating system to
-         * switch to another thread, and then reacquires all locks.
+         * Called after locks are yielded in order to bring data into memory.
          *
-         * If in a nested context (eg DBDirectClient), does nothing.
+         * Should not be called more than once.
          */
-        static void yieldAllLocks(OperationContext* txn, int micros, RecordFetcher* fetcher = NULL);
+        virtual void fetch() = 0;
     };
 
 } // namespace mongo

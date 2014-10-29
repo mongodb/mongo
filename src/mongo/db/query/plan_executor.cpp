@@ -37,6 +37,7 @@
 #include "mongo/db/exec/working_set.h"
 #include "mongo/db/exec/working_set_common.h"
 #include "mongo/db/query/plan_yield_policy.h"
+#include "mongo/db/storage/record_fetcher.h"
 
 #include "mongo/util/stacktrace.h"
 
@@ -257,10 +258,27 @@ namespace mongo {
     PlanExecutor::ExecState PlanExecutor::getNext(BSONObj* objOut, DiskLoc* dlOut) {
         if (_killed) { return PlanExecutor::DEAD; }
 
+        // When a stage requests a yield for document fetch, it gives us back a RecordFetcher*
+        // to use to pull the record into memory. We take ownership of the RecordFetcher here,
+        // deleting it after we've had a chance to do the fetch. For timing-based yields, we
+        // just pass a NULL fetcher.
+        boost::scoped_ptr<RecordFetcher> fetcher;
+
         for (;;) {
-            // Yield if it's time to yield.
-            if (NULL != _yieldPolicy.get() && _yieldPolicy->shouldYield()) {
-                _yieldPolicy->yield();
+            // There are two conditions which cause us to yield if we have an YIELD_AUTO
+            // policy:
+            //   1) The yield policy's timer elapsed, or
+            //   2) some stage requested a yield due to a document fetch (NEED_FETCH).
+            // In both cases, the actual yielding happens here.
+            if (NULL != _yieldPolicy.get() && (_yieldPolicy->shouldYield()
+                                               || NULL != fetcher.get())) {
+                // Here's where we yield.
+                _yieldPolicy->yield(fetcher.get());
+
+                // We're done using the fetcher, so it should be freed. We don't want to
+                // use the same RecordFetcher twice.
+                fetcher.reset();
+
                 if (_killed) {
                     return PlanExecutor::DEAD;
                 }
@@ -314,6 +332,14 @@ namespace mongo {
                     return PlanExecutor::ADVANCED;
                 }
                 // This result didn't have the data the caller wanted, try again.
+            }
+            else if (PlanStage::NEED_FETCH == code) {
+                // Yielding on a NEED_FETCH is handled above, so there's not much to do here.
+                // Just verify that the NEED_FETCH gave us back a WSM that is actually fetchable.
+                WorkingSetMember* member = _workingSet->get(id);
+                invariant(member->hasFetcher());
+                // Transfer ownership of the fetcher. Next time around the loop a yield will happen.
+                fetcher.reset(member->releaseFetcher());
             }
             else if (PlanStage::NEED_TIME == code) {
                 // Fall through to yield check at end of large conditional.

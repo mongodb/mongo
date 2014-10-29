@@ -95,9 +95,10 @@ namespace mongo {
             _usingBackupChild = true;
             childStatus = _backupChildPlan->work(out);
         }
-
-        // Update stats.
-        if (PlanStage::NEED_TIME == childStatus) {
+        else if (PlanStage::NEED_FETCH == childStatus) {
+            _commonStats.needFetch++;
+        }
+        else if (PlanStage::NEED_TIME == childStatus) {
             _commonStats.needTime++;
         }
         else if (PlanStage::ADVANCED == childStatus) {

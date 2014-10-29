@@ -119,6 +119,19 @@ namespace mongo {
             // nothing output in the out parameter.
             NEED_TIME,
 
+            // The storage engine says something isn't in memory. Fetch it.
+            //
+            // Full fetch semantics:
+            //
+            // The fetch-requesting stage populates the out parameter of work(...) with a WSID that
+            // refers to a WSM with a Fetcher*.  Each stage that receives a NEED_FETCH from a child
+            // must propagate the NEED_FETCH up and perform no work.  The plan executor is
+            // responsible for paging in the data upon receipt of a NEED_FETCH. The plan executor
+            // does NOT free the WSID of the requested fetch. The stage that requested the fetch
+            // holds the WSID of the loc it wants fetched. On the next call to work() that stage
+            // can assume a fetch was performed on the WSM that the held WSID refers to.
+            NEED_FETCH,
+
             // Something went wrong but it's not an internal error.  Perhaps our collection was
             // dropped or state deleted.
             DEAD,

@@ -32,6 +32,7 @@
 #include "mongo/db/exec/filter.h"
 #include "mongo/db/exec/scoped_timer.h"
 #include "mongo/db/exec/working_set_common.h"
+#include "mongo/db/storage/record_fetcher.h"
 #include "mongo/util/fail_point_service.h"
 #include "mongo/util/mongoutils/str.h"
 
@@ -50,11 +51,18 @@ namespace mongo {
           _ws(ws),
           _child(child),
           _filter(filter),
+          _idBeingPagedIn(WorkingSet::INVALID_ID),
           _commonStats(kStageType) { }
 
     FetchStage::~FetchStage() { }
 
     bool FetchStage::isEOF() {
+        if (WorkingSet::INVALID_ID != _idBeingPagedIn) {
+            // We asked the parent for a page-in, but still haven't had a chance to return the
+            // paged in document
+            return false;
+        }
+
         return _child->isEOF();
     }
 
@@ -65,6 +73,17 @@ namespace mongo {
         ScopedTimer timer(&_commonStats.executionTimeMillis);
 
         if (isEOF()) { return PlanStage::IS_EOF; }
+
+        // We might have a fetched result to return.
+        if (WorkingSet::INVALID_ID != _idBeingPagedIn) {
+            WorkingSetID id = _idBeingPagedIn;
+            _idBeingPagedIn = WorkingSet::INVALID_ID;
+            WorkingSetMember* member = _ws->get(id);
+
+            WorkingSetCommon::completeFetch(_txn, member, _collection);
+
+            return returnIfMatches(member, id, out);
+        }
 
         // If we're here, we're not waiting for a DiskLoc to be fetched.  Get another to-be-fetched
         // result from our child.
@@ -83,13 +102,28 @@ namespace mongo {
                 verify(WorkingSetMember::LOC_AND_IDX == member->state);
                 verify(member->hasLoc());
 
-                // Don't need index data anymore as we have an obj.
-                member->keyData.clear();
+                // We might need to retrieve 'nextLoc' from secondary storage, in which case we send
+                // a NEED_FETCH request up to the PlanExecutor.
+                if (!member->loc.isNull()) {
+                    std::auto_ptr<RecordFetcher> fetcher(
+                        _collection->documentNeedsFetch(_txn, member->loc));
+                    if (NULL != fetcher.get()) {
+                        // There's something to fetch. Hand the fetcher off to the WSM, and pass up
+                        // a fetch request.
+                        _idBeingPagedIn = id;
+                        member->setFetcher(fetcher.release());
+                        *out = id;
+                        _commonStats.needFetch++;
+                        return NEED_FETCH;
+                    }
+                }
+
+                // The doc is already in memory, so go ahead and grab it. Now we have a DiskLoc
+                // as well as an unowned object
                 member->obj = _collection->docFor(_txn, member->loc);
+                member->keyData.clear();
                 member->state = WorkingSetMember::LOC_AND_UNOWNED_OBJ;
             }
-
-            ++_specificStats.docsExamined;
 
             return returnIfMatches(member, id, out);
         }
@@ -106,12 +140,15 @@ namespace mongo {
             }
             return status;
         }
-        else {
-            if (PlanStage::NEED_TIME == status) {
-                ++_commonStats.needTime;
-            }
-            return status;
+        else if (PlanStage::NEED_TIME == status) {
+            ++_commonStats.needTime;
         }
+        else if (PlanStage::NEED_FETCH == status) {
+            ++_commonStats.needFetch;
+            *out = id;
+        }
+
+        return status;
     }
 
     void FetchStage::saveState() {
@@ -129,11 +166,23 @@ namespace mongo {
         ++_commonStats.invalidates;
 
         _child->invalidate(dl, type);
+
+        // It's possible that the loc getting invalidated is the one we're about to
+        // fetch. In this case we do a "forced fetch" and put the WSM in owned object state.
+        if (WorkingSet::INVALID_ID != _idBeingPagedIn) {
+            WorkingSetMember* member = _ws->get(_idBeingPagedIn);
+            if (member->hasLoc() && (member->loc == dl)) {
+                // Fetch it now and kill the diskloc.
+                WorkingSetCommon::fetchAndInvalidateLoc(_txn, member, _collection);
+            }
+        }
     }
 
     PlanStage::StageState FetchStage::returnIfMatches(WorkingSetMember* member,
                                                       WorkingSetID memberID,
                                                       WorkingSetID* out) {
+        ++_specificStats.docsExamined;
+
         if (Filter::passes(member, _filter)) {
             if (NULL != _filter) {
                 ++_specificStats.matchTested;

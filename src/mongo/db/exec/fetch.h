@@ -94,6 +94,20 @@ namespace mongo {
         // The filter is not owned by us.
         const MatchExpression* _filter;
 
+        // If we want to return a DiskLoc and it points to something that's not in memory,
+        // we return a "please page this in" result. We add a RecordFetcher given back to us by the
+        // storage engine to the WSM. The RecordFetcher is used by the PlanExecutor when it handles
+        // the fetch request.
+        //
+        // Some stages which request fetches don't need to use '_idBeingPagedIn' (e.g.,
+        // CollectionScan) because they are implemented with an underlying iterator which keeps
+        // track of the next WSM to be returned. A FetchStage has no such iterator, but rather
+        // streams its results from the child. Therefore, when it requests a yield via NEED_FETCH,
+        // the current WSM must be saved so that the fetched result can be returned on the next
+        // call to work(). This also requires special invalidation handling not found in stages like
+        // CollectionScan for when '_idBeingPagedIn' is invalidated before it can be returned.
+        WorkingSetID _idBeingPagedIn;
+
         // Stats
         CommonStats _commonStats;
         FetchStats _specificStats;

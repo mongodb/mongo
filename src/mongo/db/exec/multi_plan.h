@@ -138,7 +138,15 @@ namespace mongo {
          *
          * Returns true if we need to keep working the plans and false otherwise.
          */
-        bool workAllPlans(size_t numResults);
+        bool workAllPlans(size_t numResults, PlanYieldPolicy* yieldPolicy);
+
+        /**
+         * Checks whether we need to perform either a timing-based yield or a yield for a document
+         * fetch. If so, then uses 'yieldPolicy' to actually perform the yield.
+         *
+         * Returns a non-OK status if killed during a yield.
+         */
+        Status tryYield(PlanYieldPolicy* yieldPolicy);
 
         static const int kNoSuchPlan = -1;
 
@@ -182,6 +190,12 @@ namespace mongo {
         // if pickBestPlan fails, this is set to the wsid of the statusMember
         // returned by ::work()
         WorkingSetID _statusMemberId;
+
+        // When a stage requests a yield for document fetch, it gives us back a RecordFetcher*
+        // to use to pull the record into memory. We take ownership of the RecordFetcher here,
+        // deleting it after we've had a chance to do the fetch. For timing-based yields, we
+        // just pass a NULL fetcher.
+        boost::scoped_ptr<RecordFetcher> _fetcher;
 
         // Stats
         CommonStats _commonStats;

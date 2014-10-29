@@ -235,6 +235,13 @@ namespace mongo {
                 *out = WorkingSetCommon::allocateStatusMember( _ws, status);
             }
         }
+        else if (PlanStage::NEED_TIME == status) {
+            _commonStats.needTime++;
+        }
+        else if (PlanStage::NEED_FETCH == status) {
+            _commonStats.needFetch++;
+            *out = id;
+        }
 
         return status;
     }
