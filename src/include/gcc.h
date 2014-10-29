@@ -118,25 +118,25 @@
 #define	WT_ATOMIC_SUB8(v, val)		WT_ATOMIC_SUB(v, val, 8)
 
 /* Compile read-write barrier */
-#define	WT_BARRIER() asm volatile("" ::: "memory")
+#define	WT_BARRIER() __asm__ volatile("" ::: "memory")
 
 /* Pause instruction to prevent excess processor bus usage */
-#define	WT_PAUSE() asm volatile("pause\n" ::: "memory")
+#define	WT_PAUSE() __asm__ volatile("pause\n" ::: "memory")
 
 #if defined(x86_64) || defined(__x86_64__)
 #define	WT_FULL_BARRIER() do {						\
-	asm volatile ("mfence" ::: "memory");				\
+	__asm__ volatile ("mfence" ::: "memory");			\
 } while (0)
 #define	WT_READ_BARRIER() do {						\
-	asm volatile ("lfence" ::: "memory");				\
+	__asm__ volatile ("lfence" ::: "memory");			\
 } while (0)
 #define	WT_WRITE_BARRIER() do {						\
-	asm volatile ("sfence" ::: "memory");				\
+	__asm__ volatile ("sfence" ::: "memory");			\
 } while (0)
 
 #elif defined(i386) || defined(__i386__)
 #define	WT_FULL_BARRIER() do {						\
-	asm volatile ("lock; addl $0, 0(%%esp)" ::: "memory");		\
+	__asm__ volatile ("lock; addl $0, 0(%%esp)" ::: "memory");	\
 } while (0)
 #define	WT_READ_BARRIER()	WT_FULL_BARRIER()
 #define	WT_WRITE_BARRIER()	WT_FULL_BARRIER()
