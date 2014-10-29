@@ -56,6 +56,12 @@ namespace mongo {
         virtual Status dropSortedDataInterface( OperationContext* opCtx,
                                                 const StringData& ident );
 
+        virtual Status okToRename( OperationContext* opCtx,
+                                   const StringData& fromNS,
+                                   const StringData& toNS,
+                                   const StringData& ident,
+                                   const RecordStore* originalRecordStore ) const;
+
         // wiredtiger specific
 
         WT_CONNECTION* getConnection() { return _conn; }

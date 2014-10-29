@@ -109,6 +109,19 @@ namespace mongo {
 
     }
 
+    Status WiredTigerKVEngine::okToRename( OperationContext* opCtx,
+                                           const StringData& fromNS,
+                                           const StringData& toNS,
+                                           const StringData& ident,
+                                           const RecordStore* originalRecordStore ) const {
+        _sizeStorer->store( _uri( ident ),
+                            originalRecordStore->numRecords( opCtx ),
+                            originalRecordStore->dataSize( opCtx ) );
+        syncSizeInfo();
+        return Status::OK();
+    }
+
+
     void WiredTigerKVEngine::syncSizeInfo() const {
         if ( !_sizeStorer )
             return;
