@@ -10,7 +10,7 @@ cat <<EOF
 
 EOF
 
-for i in `sed -e '/^[a-z]/! d' filelist`; do
+for i in `sed -e '/^[a-z]/!d' filelist`; do
 	sed -n \
 	    -e '/^__wt_[a-z]/!{' \
 		-e h \
