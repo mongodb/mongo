@@ -131,7 +131,7 @@ namespace {
         if (!status.isOK())
             return status;
 
-        _calculateMajorityVoteCount();
+        _calculateMajorities();
         _addInternalWriteConcernModes();
         _isInitialized = true;
         return Status::OK();
@@ -446,22 +446,30 @@ namespace {
         return StatusWith<ReplicaSetTagPattern>(iter->second);
     }
 
-    void ReplicaSetConfig::_calculateMajorityVoteCount() {
+    void ReplicaSetConfig::_calculateMajorities() {
         const int voters = std::count_if(
                 _members.begin(),
                 _members.end(),
                 stdx::bind(&MemberConfig::isVoter, stdx::placeholders::_1));
+        const int arbiters = std::count_if(
+                _members.begin(),
+                _members.end(),
+                stdx::bind(&MemberConfig::isArbiter, stdx::placeholders::_1));
         _totalVotingMembers = voters;
         _majorityVoteCount = voters / 2 + 1;
+        _writeMajority = std::min(_majorityVoteCount, voters - arbiters);
     }
 
     void ReplicaSetConfig::_addInternalWriteConcernModes() {
-        // $majority: the majority of voting nodes
+        // $majority: the majority of voting nodes or all non-arbiter voting nodes if
+        // the majority of voting nodes are arbiters.
         ReplicaSetTagPattern pattern = _tagConfig.makePattern();
-        Status status = 
-            _tagConfig.addTagCountConstraintToPattern(&pattern, 
-                                                      MemberConfig::kInternalVoterTagName,
-                                                      getMajorityVoteCount());
+
+        Status status = _tagConfig.addTagCountConstraintToPattern(
+                &pattern, 
+                MemberConfig::kInternalVoterTagName,
+                _writeMajority);
+
         if (status.isOK()) {
             _customWriteConcernModes[kMajorityWriteConcernModeName] = pattern;
         }

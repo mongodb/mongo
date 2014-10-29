@@ -2120,6 +2120,60 @@ namespace {
         awaiter.reset();
     }
 
+    TEST_F(ReplCoordTest, AwaitReplicationMajority) {
+        // Test that we can satisfy majority write concern can only be
+        // statisfied by voting data-bearing members.
+        OperationContextNoop txn;
+        assertStartSuccess(
+                BSON("_id" << "mySet" <<
+                     "version" << 2 <<
+                     "members" << BSON_ARRAY(BSON("host" << "node1:12345" << "_id" << 0) <<
+                                             BSON("host" << "node2:12345" << "_id" << 1) <<
+                                             BSON("host" << "node3:12345" << "_id" << 2) <<
+                                             BSON("host" << "node4:12345" <<
+                                                  "_id" << 3 <<
+                                                  "votes" << 0) <<
+                                             BSON("host" << "node5:12345" <<
+                                                  "_id" << 4 <<
+                                                  "arbiterOnly" << true))),
+                HostAndPort("node1", 12345));
+        ASSERT(getReplCoord()->setFollowerMode(MemberState::RS_SECONDARY));
+        OpTime time(100, 0);
+        getReplCoord()->setMyLastOptime(&txn, time);
+        simulateSuccessfulElection();
+
+        WriteConcernOptions majorityWriteConcern;
+        majorityWriteConcern.wTimeout = WriteConcernOptions::kNoWaiting;
+        majorityWriteConcern.wMode = "majority";
+
+        ASSERT_EQUALS(ErrorCodes::ExceededTimeLimit,
+                      getReplCoord()->awaitReplication(&txn, time, majorityWriteConcern).status);
+
+        OID client1 = OID::gen();
+        HandshakeArgs handshake1;
+        ASSERT_OK(handshake1.initialize(BSON("handshake" << client1 << "member" << 1)));
+        ASSERT_OK(getReplCoord()->processHandshake(&txn, handshake1));
+        ASSERT_OK(getReplCoord()->setLastOptime_forTest(client1, time));
+        ASSERT_EQUALS(ErrorCodes::ExceededTimeLimit,
+                      getReplCoord()->awaitReplication(&txn, time, majorityWriteConcern).status);
+
+        // this member does not vote and as a result should not count towards write concern
+        OID client3 = OID::gen();
+        HandshakeArgs handshake3;
+        ASSERT_OK(handshake3.initialize(BSON("handshake" << client3 << "member" << 3)));
+        ASSERT_OK(getReplCoord()->processHandshake(&txn, handshake3));
+        ASSERT_OK(getReplCoord()->setLastOptime_forTest(client3, time));
+        ASSERT_EQUALS(ErrorCodes::ExceededTimeLimit,
+                      getReplCoord()->awaitReplication(&txn, time, majorityWriteConcern).status);
+
+        OID client2 = OID::gen();
+        HandshakeArgs handshake2;
+        ASSERT_OK(handshake2.initialize(BSON("handshake" << client2 << "member" << 2)));
+        ASSERT_OK(getReplCoord()->processHandshake(&txn, handshake2));
+        ASSERT_OK(getReplCoord()->setLastOptime_forTest(client2, time));
+        ASSERT_OK(getReplCoord()->awaitReplication(&txn, time, majorityWriteConcern).status);
+    }
+
     // TODO(schwerin): Unit test election id updating
 
 }  // namespace

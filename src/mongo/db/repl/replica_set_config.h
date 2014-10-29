@@ -206,7 +206,13 @@ namespace repl {
          * Returns a vector of strings which are the names of the WriteConcernModes.
          * Currently used in unit tests to compare two configs.
          */
-         std::vector<std::string> getWriteConcernNames() const;
+        std::vector<std::string> getWriteConcernNames() const;
+
+        /**
+         * Returns the number of voting data-bearing members that must acknowledge a write
+         * in order to satisfy a write concern of {w: "majority"}.
+         */
+        int getWriteMajority() const { return _writeMajority; }
 
     private:
         /**
@@ -217,7 +223,7 @@ namespace repl {
         /**
          * Calculates and stores the majority for electing a primary (_majorityVoteCount).
          */
-        void _calculateMajorityVoteCount();
+        void _calculateMajorities();
 
         /**
          * Adds internal write concern modes to the getLastErrorModes list.
@@ -232,6 +238,7 @@ namespace repl {
         Seconds _heartbeatTimeoutPeriod;
         bool _chainingAllowed;
         int _majorityVoteCount;
+        int _writeMajority;
         int _totalVotingMembers;
         ReplicaSetTagConfig _tagConfig;
         StringMap<ReplicaSetTagPattern> _customWriteConcernModes;

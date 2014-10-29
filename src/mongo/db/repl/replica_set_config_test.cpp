@@ -66,7 +66,81 @@ namespace {
                                        BSON("_id" << 4 << "host" << "h4:1" << "votes" << 0) <<
                                        BSON("_id" << 5 << "host" << "h5:1" << "votes" << 0)))));
         ASSERT_OK(config.validate());
-        ASSERT_EQUALS(2, config.getMajorityVoteCount());
+
+        ASSERT_EQUALS(2, config.getWriteMajority());
+    }
+
+    TEST(ReplicaSetConfig, MajorityCalculationNearlyHalfArbiters) {
+        ReplicaSetConfig config;
+        ASSERT_OK(config.initialize(
+                BSON("_id" << "mySet" <<
+                     "version" << 2 <<
+                     "members" << BSON_ARRAY(BSON("host" << "node1:12345" << "_id" << 0) <<
+                                             BSON("host" << "node2:12345" << "_id" << 1) <<
+                                             BSON("host" << "node3:12345" << "_id" << 2) <<
+                                             BSON("host" << "node4:12345" <<
+                                                  "_id" << 3 <<
+                                                  "arbiterOnly" << true) <<
+                                             BSON("host" << "node5:12345" <<
+                                                  "_id" << 4 <<
+                                                  "arbiterOnly" << true)))));
+        ASSERT_OK(config.validate());
+        ASSERT_EQUALS(3, config.getWriteMajority());
+    }
+
+    TEST(ReplicaSetConfig, MajorityCalculationNearlyHalfArbitersOthersNoVote) {
+        ReplicaSetConfig config;
+        ASSERT_OK(config.initialize(
+                BSON("_id" << "mySet" <<
+                     "version" << 2 <<
+                     "members" << BSON_ARRAY(BSON("host" << "node1:12345" <<
+                                                  "_id" << 0 <<
+                                                  "votes" << 0) <<
+                                             BSON("host" << "node2:12345" <<
+                                                  "_id" << 1 <<
+                                                  "votes" << 0) <<
+                                             BSON("host" << "node3:12345" <<
+                                                  "_id" << 2 <<
+                                                  "votes" << 0) <<
+                                             BSON("host" << "node4:12345" <<
+                                                  "_id" << 3 <<
+                                                  "arbiterOnly" << true) <<
+                                             BSON("host" << "node5:12345" <<
+                                                  "_id" << 4 <<
+                                                  "arbiterOnly" << true)))));
+        ASSERT_OK(config.validate());
+        ASSERT_EQUALS(0, config.getWriteMajority());
+    }
+
+    TEST(ReplicaSetConfig, MajorityCalculationEvenNumberOfMembers) {
+        ReplicaSetConfig config;
+        ASSERT_OK(config.initialize(
+                BSON("_id" << "mySet" <<
+                     "version" << 2 <<
+                     "members" << BSON_ARRAY(BSON("host" << "node1:12345" << "_id" << 0) <<
+                                             BSON("host" << "node2:12345" << "_id" << 1) <<
+                                             BSON("host" << "node3:12345" << "_id" << 2) <<
+                                             BSON("host" << "node4:12345" << "_id" << 3)))));
+        ASSERT_OK(config.validate());
+        ASSERT_EQUALS(3, config.getWriteMajority());
+    }
+
+    TEST(ReplicaSetConfig, MajorityCalculationNearlyHalfSecondariesNoVotes) {
+        ReplicaSetConfig config;
+        ASSERT_OK(config.initialize(
+                BSON("_id" << "mySet" <<
+                     "version" << 2 <<
+                     "members" << BSON_ARRAY(BSON("host" << "node1:12345" << "_id" << 0) <<
+                                             BSON("host" << "node2:12345" <<
+                                                  "_id" << 1 <<
+                                                  "votes" << 0) <<
+                                             BSON("host" << "node3:12345" <<
+                                                  "_id" << 2 <<
+                                                  "votes" << 0) <<
+                                             BSON("host" << "node4:12345" << "_id" << 3) <<
+                                             BSON("host" << "node5:12345" << "_id" << 4)))));
+        ASSERT_OK(config.validate());
+        ASSERT_EQUALS(2, config.getWriteMajority());
     }
 
     TEST(ReplicaSetConfig, ParseFailsWithBadOrMissingIdField) {
