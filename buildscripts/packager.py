@@ -193,7 +193,7 @@ def parse_args(args):
         print """Usage: packager.py [OPTS] SPEC1 SPEC2 ... SPECn
 
 Example: 
-    packager.py 2.6.4 redhat
+    packager.py 2.6.4
     
 Options:
 
