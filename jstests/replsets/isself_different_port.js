@@ -1,5 +1,7 @@
 // Test that the replica set member can find itself if on a different port using
 // mongobridge
+load("jstests/replsets/rslib.js");
+
 var rt = new ReplSetTest({ name: 'isselfDifferentPortTest', nodes: 1 });
 var nodes = rt.startSet({ oplogSize: "2" });
 rt.initiate();
@@ -12,14 +14,7 @@ var config = rt.getPrimary().getDB("local").system.replset.findOne();
 config.members[0].host = br.host;
 config.version++;
 
-try {
-    rt.initiate(config, 'replSetReconfig', 200);
-}
-catch (ex) {
-    // If the reconfig causes connections to close, check that the error is due to the reconfig, not
-    // error.  Error message is from JS engine - no error code available unfortunately.
-    assert(ex.message.match("error doing query"), ex.message);
-}
+reconfig(rt, config);
 
 jsTestLog("Ensure valid set");
 var status = rt.status();
