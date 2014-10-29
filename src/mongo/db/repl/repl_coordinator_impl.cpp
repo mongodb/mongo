@@ -757,8 +757,8 @@ namespace {
         invariant(slaveInfo);
         invariant(args.memberID < 0 || args.memberID == slaveInfo->memberID);
 
-        LOG(3) << "Node with RID " << args.rid << " currently has optime " << slaveInfo->opTime
-               << "; updating to " << args.ts;
+        LOG(3) << "Node with RID " << args.rid << " and memberID " << slaveInfo->memberID
+               << " currently has optime " << slaveInfo->opTime << "; updating to " << args.ts;
 
         // Only update remote optimes if they increase.
         if (slaveInfo->opTime < args.ts) {
