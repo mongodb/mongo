@@ -4825,10 +4825,7 @@ __rec_write_wrapup(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 		WT_ILLEGAL_VALUE(session);
 		}
 
-		/*
-		 * Display the actual split keys: not turned on because it's a
-		 * lot of output and not generally useful.
-		 */
+		/* Display the actual split keys. */
 		if (WT_VERBOSE_ISSET(session, WT_VERB_SPLIT)) {
 			WT_DECL_ITEM(tkey);
 			WT_DECL_RET;
