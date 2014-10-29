@@ -107,6 +107,22 @@ namespace mongo {
         }
 
         /**
+         * Manages in-progress background index builds.
+         * Call registerIndexBuild() after calling init() to record this build in the catalog's 
+         * in-progress map.
+         * The build must be a background build and it must be a single index build (the size of
+         * _indexes must be 1).
+         * registerIndexBuild() returns the descriptor for the index build. You must subsequently
+         * call unregisterIndexBuild() with that same descriptor before this MultiIndexBlock goes
+         * out of scope.
+         * These functions are only intended to be used by the replication system. No internal
+         * concurrency control is performed; it is expected that the code has already taken steps
+         * to ensure calls to these functions are serialized, for a particular IndexCatalog.
+         */
+        IndexDescriptor* registerIndexBuild();
+        void unregisterIndexBuild(IndexDescriptor* descriptor);
+
+        /**
          * Inserts all documents in the Collection into the indexes and logs with timing info.
          *
          * This is a simplified replacement for insert and doneInserting. Do not call this if you

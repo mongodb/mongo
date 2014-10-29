@@ -157,7 +157,6 @@ namespace mongo {
             if (!_buildInBackground) {
                 // Bulk build process requires foreground building as it assumes nothing is changing
                 // under it.
-                // TODO SERVER-14860 make background not just be a slower foreground.
                 index.bulk.reset(index.real->initiateBulk(_txn));
             }
 
@@ -190,6 +189,20 @@ namespace mongo {
         return Status::OK();
     }
 
+    IndexDescriptor* MultiIndexBlock::registerIndexBuild() {
+        // Register background index build so that it can be found and killed when necessary
+        invariant(_collection);
+        invariant(_indexes.size() == 1);
+        invariant(_buildInBackground);
+        IndexDescriptor* descriptor = _indexes[0].block->getEntry()->descriptor();
+        _collection->getIndexCatalog()->registerIndexBuild(descriptor, _txn->getCurOp()->opNum());
+        return descriptor;
+    }
+
+    void MultiIndexBlock::unregisterIndexBuild(IndexDescriptor* descriptor) {
+        _collection->getIndexCatalog()->unregisterIndexBuild(descriptor);
+    }
+
     Status MultiIndexBlock::insertAllDocumentsInCollection(std::set<DiskLoc>* dupsOut) {
         const char* curopMessage = _buildInBackground ? "Index Build (background)" : "Index Build";
         ProgressMeter* progress = _txn->setMessage(curopMessage,
@@ -204,6 +217,7 @@ namespace mongo {
                                                                       _collection->ns().ns(),
                                                                       _collection));
         if (_buildInBackground) {
+            invariant(_allowInterruption);
             exec->setYieldPolicy(PlanExecutor::YIELD_AUTO);
         }
 
@@ -212,6 +226,9 @@ namespace mongo {
         PlanExecutor::ExecState state;
         while (PlanExecutor::ADVANCED == (state = exec->getNext(&objToIndex, &loc))) {
             {
+                if (_allowInterruption)
+                    _txn->checkForInterrupt();
+
                 bool shouldCommitWUnit = true;
                 WriteUnitOfWork wunit(_txn);
                 Status ret = insert(objToIndex, loc);
@@ -233,9 +250,6 @@ namespace mongo {
 
             n++;
             progress->hit();
-
-            if (_allowInterruption)
-                _txn->checkForInterrupt();
 
             progress->setTotalWhileRunning( _collection->numRecords(_txn) );
         }

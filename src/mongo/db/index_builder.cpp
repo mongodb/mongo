@@ -76,21 +76,21 @@ namespace mongo {
 
         Database* db = dbHolder().get(&txn, ns.db().toString());
 
-        Status status = build(&txn, db, true);
+        Status status = _build(&txn, db, true);
         if ( !status.isOK() ) {
-            log() << "IndexBuilder could not build index: " << status.toString();
+            error() << "IndexBuilder could not build index: " << status.toString();
         }
 
         txn.getClient()->shutdown();
     }
 
     Status IndexBuilder::buildInForeground(OperationContext* txn, Database* db) const {
-        return build(txn, db, false);
+        return _build(txn, db, false);
     }
 
-    Status IndexBuilder::build(OperationContext* txn,
-                               Database* db,
-                               bool allowBackgroundBuilding) const {
+    Status IndexBuilder::_build(OperationContext* txn,
+                                Database* db,
+                                bool allowBackgroundBuilding) const {
         const string ns = _index["ns"].String();
 
         Collection* c = db->getCollection( txn, ns );
@@ -104,17 +104,21 @@ namespace mongo {
         // Show which index we're building in the curop display.
         txn->getCurOp()->setQuery(_index);
 
-
         MultiIndexBlock indexer(txn, c);
         indexer.allowInterruption();
         if (allowBackgroundBuilding)
             indexer.allowBackgroundBuilding();
 
         Status status = Status::OK();
+        IndexDescriptor* descriptor(NULL);
         try {
             status = indexer.init(_index);
             if ( status.code() == ErrorCodes::IndexAlreadyExists )
                 return Status::OK();
+
+            if (allowBackgroundBuilding) {
+                descriptor = indexer.registerIndexBuild();
+            }
 
             if (status.isOK())
                 status = indexer.insertAllDocumentsInCollection();
@@ -133,7 +137,10 @@ namespace mongo {
             // leave it as-if kill -9 happened. This will be handled on restart.
             indexer.abortWithoutCleanup();
         }
-        
+
+        if (allowBackgroundBuilding) {
+            indexer.unregisterIndexBuild(descriptor);
+        }
         return status;
     }
 
