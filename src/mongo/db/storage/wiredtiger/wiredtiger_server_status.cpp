@@ -68,7 +68,7 @@ namespace mongo {
 
         BSONObjBuilder bob;
         Status status = WiredTigerUtil::exportTableToBSON(s, uri,
-                                                          "statistics=(all)", &bob);
+                                                          "statistics=(fast)", &bob);
         if (!status.isOK()) {
             bob.append("error", "unable to retrieve statistics");
             bob.append("code", static_cast<int>(status.code()));
