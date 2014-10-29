@@ -508,22 +508,6 @@ tasks:
     - func: "run unit test"
 
 - name: dist
-  commands:
-    - command: git.get_project
-      params:
-        directory: src
-    - command: git.apply_patch
-      params:
-        directory: src
-    - command: expansions.update
-      params:
-        updates:
-          - key: "args"
-            value: "-test.types=kerberos"
-    - func: "setup integration test"
-    - func: "run tool integration tests"
-
-- name: dist222
   depends_on:
   commands:
     - command: git.get_project
