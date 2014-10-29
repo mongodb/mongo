@@ -73,15 +73,15 @@ __wt_cache_read(WT_SESSION_IMPL *session, WT_REF *ref)
 	WT_PUBLISH(ref->state, WT_REF_MEM);
 	return (0);
 
-err:	WT_PUBLISH(ref->state, previous_state);
-
-	/*
+err:	/*
 	 * If the function building an in-memory version of the page failed,
 	 * it discarded the page, but not the disk image.  Discard the page
 	 * and separately discard the disk image in all cases.
 	 */
 	if (ref->page != NULL)
 		__wt_ref_out(session, ref);
+	WT_PUBLISH(ref->state, previous_state);
+
 	__wt_buf_free(session, &tmp);
 
 	return (ret);
