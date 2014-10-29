@@ -119,7 +119,7 @@ namespace mongo {
     }
 
     void SnapshotThread::run() {
-        Client::initThread("snapshotthread");
+        Client::initThread("snapshot");
         Client& client = cc();
 
         long long numLoops = 0;

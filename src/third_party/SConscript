@@ -120,6 +120,7 @@ if use_system_version_of_library("snappy"):
 else:
     snappyEnv = env.Clone()
     snappyEnv.InjectThirdPartyIncludePaths(libraries=['snappy'])
+    snappyEnv.InjectMongoIncludePaths()
     snappyEnv.SConscript('snappy' + snappySuffix + '/SConscript', exports={ 'env' : snappyEnv })
     snappyEnv = snappyEnv.Clone(
         LIBDEPS=[

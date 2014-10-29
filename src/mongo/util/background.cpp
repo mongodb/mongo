@@ -162,10 +162,8 @@ namespace mongo {
             run();
         }
         catch ( std::exception& e ) {
-            error() << "backgroundjob " << threadName << " exception: " << e.what() << endl;
-        }
-        catch(...) {
-            error() << "uncaught exception in BackgroundJob " << threadName << endl;
+            error() << "backgroundjob " << threadName << " exception: " << e.what();
+            throw e;
         }
 
         // We must cache this value so that we can use it after we leave the following scope.

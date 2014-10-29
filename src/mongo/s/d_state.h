@@ -302,10 +302,6 @@ namespace mongo {
     public:
         ShardedConnectionInfo();
 
-        const OID& getID() const { return _id; }
-        bool hasID() const { return _id.isSet(); }
-        void setID( const OID& id );
-
         const ChunkVersion getVersion( const std::string& ns ) const;
         void setVersion( const std::string& ns , const ChunkVersion& version );
 
@@ -322,7 +318,6 @@ namespace mongo {
 
     private:
 
-        OID _id;
         bool _forceVersionOk; // if this is true, then chunk version #s aren't check, and all ops are allowed
 
         typedef std::map<std::string,ChunkVersion> NSVersionMap;

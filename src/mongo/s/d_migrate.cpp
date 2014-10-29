@@ -55,6 +55,7 @@
 #include "mongo/db/catalog/index_create.h"
 #include "mongo/db/clientcursor.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/concurrency/lock_state.h"
 #include "mongo/db/dbhelpers.h"
 #include "mongo/db/exec/plan_stage.h"
 #include "mongo/db/storage/mmap_v1/dur.h"
@@ -850,11 +851,23 @@ namespace mongo {
         }
 
         bool run(OperationContext* txn, const string& dbname, BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool) {
-            // 1. parse options
-            // 2. make sure my view is complete and lock
-            // 3. start migrate
-            //    in a read lock, get all DiskLoc and sort so we can do as little seeking as possible
-            //    tell to start transferring
+            // 1. Parse options
+            // 2. Make sure my view is complete and lock the distributed lock to ensure shard
+            //    metadata stability.
+            // 3. Migration
+            //    Take an IS lock on the database and then retrieve all DiskLocs, which need to be
+            //    migrated in order to do as little seeking as possible during transfer. Retrieval
+            //    of the DiskLocs happens under a collection lock, but then the collection lock is
+            //    dropped, so we are only left with the IS lock.
+            //
+            //    The reason we need to hold the IS lock is to prevent repair from invalidating the
+            //    DiskLocs we just read. Note that data modifications are not a problem, because
+            //    we are registered for change notifications.
+            //
+            //    Before transferring the DiskLocs, we yield the flush lock in order to not block
+            //    the MMAP V1 flush process (see comments in lock_state.h) for more information
+            //    on that.
+            //
             // 4. pause till migrate caught up
             // 5. LOCK
             //    a) update my config, essentially locking
@@ -1112,13 +1125,21 @@ namespace mongo {
             }
 
             {
+                // This prevents repair from running and invalidating the DiskLocs we just read.
+                // Otherwise, we are protected from the documents changing, because we are
+                // registered for change notifications.
                 AutoGetDb db(txn, nsToDatabaseSubstring(ns), MODE_IS);
 
-                // this gets a read lock, so we know we have a checkpoint for mods
+                // This gets a read lock on the collection, so we know we have checkpoint for mods
                 if (!migrateFromStatus.storeCurrentLocs(txn, maxChunkSize, errmsg, result)) {
                     warning() << errmsg << endl;
                     return false;
                 }
+
+                // We have retrieved the DiskLocs and won't be doing any reads from here onwards,
+                // so release the flush lock in order to not block the MMAP V1 flush thread (this
+                // is a no-op for engines other than MMAP V1).
+                AutoYieldFlushLockForMMAPV1Commit autoYieldMMAPV1FlushLock(txn->lockState());
 
                 ScopedDbConnection connTo(toShard.getConnString());
                 BSONObj res;

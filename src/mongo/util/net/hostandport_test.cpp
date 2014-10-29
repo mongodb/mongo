@@ -74,6 +74,7 @@ namespace {
         ASSERT_THROWS(HostAndPort("[124d:]asdf:34"), AssertionException);
         ASSERT_THROWS(HostAndPort("frim[124d:]:34"), AssertionException);
         ASSERT_THROWS(HostAndPort("[124d:]12:34"), AssertionException);
+        ASSERT_THROWS(HostAndPort("124d:12:34"), AssertionException);
 
         ASSERT_EQUALS(HostAndPort("abc"), HostAndPort("abc", -1));
         ASSERT_EQUALS(HostAndPort("abc.def:3421"), HostAndPort("abc.def", 3421));
@@ -89,10 +90,14 @@ namespace {
         ASSERT_EQUALS(ErrorCodes::FailedToParse, HostAndPort::parse(":123").getStatus());
         ASSERT_EQUALS(ErrorCodes::FailedToParse, HostAndPort::parse("[124d:").getStatus());
         ASSERT_EQUALS(ErrorCodes::FailedToParse, HostAndPort::parse("[124d:]asdf:34").getStatus());
+        ASSERT_EQUALS(ErrorCodes::FailedToParse, HostAndPort::parse("124d:asdf:34").getStatus());
+        ASSERT_EQUALS(ErrorCodes::FailedToParse, HostAndPort::parse("1234:").getStatus());
 
         ASSERT_EQUALS(unittest::assertGet(HostAndPort::parse("abc")), HostAndPort("abc", -1));
         ASSERT_EQUALS(unittest::assertGet(HostAndPort::parse("abc.def:3421")),
                       HostAndPort("abc.def", 3421));
+        ASSERT_EQUALS(unittest::assertGet(HostAndPort::parse("[243:1bc]:21")),
+                      HostAndPort("243:1bc", 21));
     }
 
     TEST(HostAndPort, RoundTripAbility) {
