@@ -516,11 +516,17 @@ __curtable_update(WT_CURSOR *cursor)
 		    ctable->cg_cursors, ctable->plan,
 		    cursor->value_format, &cursor->value));
 		APPLY_CG(ctable, search);
-		WT_ERR(ret);
-		WT_ERR(__apply_idx(ctable, offsetof(WT_CURSOR, remove)));
-		WT_ERR(__wt_schema_project_slice(session,
-		    ctable->cg_cursors, ctable->plan, 0,
-		    cursor->value_format, &cursor->value));
+		/*
+		 * Remove only if the key exists.
+		 */
+		if (ret == 0) {
+			WT_ERR(
+			    __apply_idx(ctable, offsetof(WT_CURSOR, remove)));
+			WT_ERR(__wt_schema_project_slice(session,
+			    ctable->cg_cursors, ctable->plan, 0,
+			    cursor->value_format, &cursor->value));
+		} else
+			WT_ERR_NOTFOUND_OK(ret);
 	}
 	APPLY_CG(ctable, update);
 	WT_ERR(ret);

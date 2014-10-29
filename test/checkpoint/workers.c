@@ -150,11 +150,13 @@ worker_op(WT_CURSOR *cursor, uint64_t keyno, u_int new_val)
 static void *
 worker(void *arg)
 {
-	pthread_t tid;
+	char tid[128];
 
 	WT_UNUSED(arg);
-	tid = pthread_self();
-	printf("worker thread starting: tid: %p\n", (void *)tid);
+
+	__wt_thread_id(tid, sizeof(tid));
+	printf("worker thread starting: tid: %s\n", tid);
+
 	(void)real_worker();
 	return (NULL);
 }

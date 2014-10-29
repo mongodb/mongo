@@ -98,8 +98,7 @@ main(void)
 	} else
 		home = NULL;
 
-	if ((ret = wiredtiger_open(home, NULL,
-	    "create", &conn)) != 0)
+	if ((ret = wiredtiger_open(home, NULL, "create", &conn)) != 0)
 		fprintf(stderr, "Error connecting to %s: %s\n",
 		    home, wiredtiger_strerror(ret));
 	/* Note: further error checking omitted for clarity. */

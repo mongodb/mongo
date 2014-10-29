@@ -56,12 +56,10 @@ __cursor_enter(WT_SESSION_IMPL *session)
 {
 	/*
 	 * If there are no other cursors positioned in the session, check
-	 * whether the cache is full and then get a snapshot if necessary.
+	 * whether the cache is full.
 	 */
-	if (session->ncursors == 0) {
+	if (session->ncursors == 0)
 		WT_RET(__wt_cache_full_check(session));
-		__wt_txn_read_first(session);
-	}
 	++session->ncursors;
 	return (0);
 }

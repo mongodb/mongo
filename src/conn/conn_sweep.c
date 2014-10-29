@@ -66,11 +66,11 @@ __sweep(WT_SESSION_IMPL *session)
 			WT_RET(ret);
 
 			WT_WITH_DHANDLE(session, dhandle,
-			    ret = __wt_conn_btree_sync_and_close(session));
+			    ret = __wt_conn_btree_sync_and_close(session, 0));
 			if (ret == EBUSY)
 				ret = 0;
 
-			WT_TRET(__wt_rwunlock(session, dhandle->rwlock));
+			WT_TRET(__wt_writeunlock(session, dhandle->rwlock));
 			WT_RET(ret);
 		}
 

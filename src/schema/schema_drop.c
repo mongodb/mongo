@@ -28,7 +28,7 @@ __drop_file(
 		return (EINVAL);
 
 	/* Close all btree handles associated with this file. */
-	WT_RET(__wt_conn_dhandle_close_all(session, uri));
+	WT_RET(__wt_conn_dhandle_close_all(session, uri, force));
 
 	/* Remove the metadata entry (ignore missing items). */
 	WT_TRET(__wt_metadata_remove(session, uri));

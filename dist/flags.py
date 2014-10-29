@@ -12,6 +12,7 @@ flags = {
 		'SYNC_CHECKPOINT',
 		'SYNC_CLOSE',
 		'SYNC_DISCARD',
+		'SYNC_DISCARD_FORCE',
 		'SYNC_WRITE_LEAVES',
 	],
 	'file_types' : [
@@ -99,6 +100,7 @@ flags = {
 	],
 	'session' : [
 		'SESSION_CAN_WAIT',
+		'SESSION_DISCARD_FORCE',
 		'SESSION_INTERNAL',
 		'SESSION_LOGGING_INMEM',
 		'SESSION_NO_CACHE',

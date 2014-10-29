@@ -321,11 +321,9 @@ __wt_txn_release(WT_SESSION_IMPL *session)
 		__wt_split_stash_discard(session);
 
 	/*
-	 * Reset the transaction state to not running.  Release the snapshot
-	 * if no cursors are active.
+	 * Reset the transaction state to not running and release the snapshot.
 	 */
-	if (session->ncursors == 0)
-		__wt_txn_release_snapshot(session);
+	__wt_txn_release_snapshot(session);
 	txn->isolation = session->isolation;
 	F_CLR(txn, TXN_ERROR | TXN_HAS_ID | TXN_RUNNING);
 }
@@ -376,19 +374,12 @@ __wt_txn_commit(WT_SESSION_IMPL *session, const char *cfg[])
 	txn->mod_count = 0;
 
 	/*
-	 * Positioned cursors need a new transaction snapshot so that the
-	 * committed changes are visible to reads after this transaction clears
-	 * its ID.  However, cursor keys and values will point to the data that
-	 * was just modified, so the snapshot cannot be so new that updates
-	 * could be freed underneath the cursor.  Get the new snapshot before
-	 * releasing the ID for the commit.
+	 * We are about to release the snapshot: copy values into any
+	 * positioned cursors so they don't point to updates that could be
+	 * freed once we don't have a transaction ID pinned.
 	 */
-	if (session->ncursors > 0 &&
-	    F_ISSET(txn, TXN_HAS_ID) &&
-	    txn->isolation != TXN_ISO_READ_UNCOMMITTED) {
+	if (session->ncursors > 0)
 		WT_RET(__wt_session_copy_values(session));
-		__wt_txn_refresh(session, 1);
-	}
 
 	__wt_txn_release(session);
 	return (0);
@@ -482,6 +473,25 @@ __wt_txn_init(WT_SESSION_IMPL *session)
 
 	txn->isolation = session->isolation;
 	return (0);
+}
+
+/*
+ * __wt_txn_stats_update --
+ *	Update the transaction statistics for return to the application.
+ */
+void
+__wt_txn_stats_update(WT_SESSION_IMPL *session)
+{
+	WT_TXN_GLOBAL *txn_global;
+	WT_CONNECTION_IMPL *conn;
+	WT_CONNECTION_STATS *stats;
+
+	conn = S2C(session);
+	txn_global = &conn->txn_global;
+	stats = &conn->stats;
+
+	WT_STAT_SET(stats, txn_pinned_range,
+	    txn_global->current - txn_global->oldest_id);
 }
 
 /*

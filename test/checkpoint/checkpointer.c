@@ -69,11 +69,12 @@ end_checkpoints(void)
 static void *
 checkpointer(void *arg)
 {
-	pthread_t tid;
+	char tid[128];
 
 	WT_UNUSED(arg);
-	tid = pthread_self();
-	printf("checkpointer thread starting: tid: %p\n", (void *)tid);
+
+	__wt_thread_id(tid, sizeof(tid));
+	printf("checkpointer thread starting: tid: %s\n", tid);
 
 	(void)real_checkpointer();
 	return (NULL);

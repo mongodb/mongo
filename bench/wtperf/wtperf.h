@@ -84,6 +84,8 @@ typedef struct {
 	int64_t read;			/* Read ratio */
 	int64_t update;			/* Update ratio */
 	int64_t throttle;		/* Maximum operations/second */
+		/* Number of operations per transaction. Zero for autocommit */
+	int64_t ops_per_txn;
 
 #define	WORKER_INSERT		1	/* Insert */
 #define	WORKER_INSERT_RMW	2	/* Insert with read-modify-write */
