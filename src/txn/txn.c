@@ -374,12 +374,9 @@ __wt_txn_commit(WT_SESSION_IMPL *session, const char *cfg[])
 	txn->mod_count = 0;
 
 	/*
-	 * Positioned cursors need a new transaction snapshot so that the
-	 * committed changes are visible to reads after this transaction clears
-	 * its ID.  However, cursor keys and values will point to the data that
-	 * was just modified, so the snapshot cannot be so new that updates
-	 * could be freed underneath the cursor.  Get the new snapshot before
-	 * releasing the ID for the commit.
+	 * We are about to release the snapshot: copy values into any
+	 * positioned cursors so they don't point to updates that could be
+	 * freed once we don't have a transaction ID pinned.
 	 */
 	if (session->ncursors > 0)
 		WT_RET(__wt_session_copy_values(session));
