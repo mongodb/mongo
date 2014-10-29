@@ -99,6 +99,8 @@ namespace repl {
 
         virtual Status setMyLastOptime(OperationContext* txn, const OpTime& ts);
 
+        virtual void setMyHeartbeatMessage(const std::string& msg);
+
         virtual OpTime getMyLastOptime() const;
 
         virtual OID getElectionId();

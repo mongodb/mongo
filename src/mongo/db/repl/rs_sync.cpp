@@ -229,11 +229,6 @@ namespace repl {
                 log() << "Received exception while syncing: " << e.what();
                 sleepsecs(10);
             }
-            catch(...) {
-                sethbmsg("unexpected exception in syncThread()");
-                // TODO : SET NOT SECONDARY here?
-                sleepsecs(60);
-            }
         }
         cc().shutdown();
     }

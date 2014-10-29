@@ -674,6 +674,19 @@ namespace {
         return Status::OK();
     }
 
+    void ReplicationCoordinatorImpl::setMyHeartbeatMessage(const std::string& msg) {
+        CBHStatus cbh = _replExecutor.scheduleWork(
+            stdx::bind(&TopologyCoordinator::setMyHeartbeatMessage,
+                       _topCoord.get(),
+                       _replExecutor.now(),
+                       msg));
+        if (cbh.getStatus() == ErrorCodes::ShutdownInProgress) {
+            return;
+        }
+        fassert(28540, cbh.getStatus());
+        _replExecutor.wait(cbh.getValue());
+    }
+
     Status ReplicationCoordinatorImpl::setMyLastOptime(OperationContext* txn, const OpTime& ts) {
         boost::unique_lock<boost::mutex> lock(_mutex);
         _setMyLastOptime_inlock(&lock, ts);

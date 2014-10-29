@@ -159,8 +159,10 @@ namespace {
             invariant(_forceSyncSourceIndex < _currentConfig.getNumMembers());
             _syncSource = _currentConfig.getMemberAt(_forceSyncSourceIndex).getHostAndPort();
             _forceSyncSourceIndex = -1;
-            _sethbmsg(str::stream() << "syncing from: " << _syncSource.toString() << " by request",
-                      0);
+            std::string msg(str::stream() << "syncing from: "
+                                          << _syncSource.toString() << " by request");
+            log() << msg << rsLog;
+            setMyHeartbeatMessage(now, msg);
             return _syncSource;
         }
 
@@ -184,7 +186,10 @@ namespace {
             }
             else {
                 _syncSource = _currentConfig.getMemberAt(_currentPrimaryIndex).getHostAndPort();
-                _sethbmsg(str::stream() << "syncing from primary: " << _syncSource.toString(), 0);
+                std::string msg(str::stream() << "syncing from primary: "
+                                              << _syncSource.toString());
+                log() << msg << rsLog;
+                setMyHeartbeatMessage(now, msg);
                 return _syncSource;
             }
         }
@@ -295,15 +300,17 @@ namespace {
 
         if (closestIndex == -1) {
             // Did not find any members to sync from
-            _sethbmsg(str::stream() << "could not find member to sync from", 0);
+            std::string msg("could not find member to sync from");
+            log() << msg << rsLog;
+            setMyHeartbeatMessage(now, msg);
 
             _syncSource = HostAndPort();
             return _syncSource;
         }
         _syncSource = _currentConfig.getMemberAt(closestIndex).getHostAndPort();
         std::string msg(str::stream() << "syncing from: " << _syncSource.toString(), 0);
-        _sethbmsg(msg);
-        log() << msg;
+        log() << msg << rsLog;
+        setMyHeartbeatMessage(now, msg);
         return _syncSource;
     }
 
@@ -651,7 +658,7 @@ namespace {
         response->setElectable(!_getMyUnelectableReason(now, lastOpApplied));
 
         // Heartbeat status message
-        response->setHbMsg(_getHbmsg());
+        response->setHbMsg(_getHbmsg(now));
         response->setTime(Seconds(Milliseconds(now.asInt64()).total_seconds()));
         response->setOpTime(lastOpApplied.asDate());
 
@@ -990,7 +997,7 @@ namespace {
                     return HeartbeatResponseAction::makeNoAction();
                 }
                 // Clear last heartbeat message on ourselves (why?)
-                _sethbmsg("");
+                setMyHeartbeatMessage(now, "");
 
                 // If we are also primary, this is a problem.  Determine who should step down.
                 if (_iAmPrimary()) {
@@ -1270,7 +1277,7 @@ namespace {
                     bb.append("maintenanceMode", _maintenanceModeCalls);
                 }
 
-                std::string s = _getHbmsg();
+                std::string s = _getHbmsg(now);
                 if( !s.empty() )
                     bb.append("infoMessage", s);
 
@@ -1566,23 +1573,18 @@ namespace {
             _role = Role::candidate;
         }
     }
-
-    // TODO(emilkie): Better story for heartbeat message handling.
-    void TopologyCoordinatorImpl::_sethbmsg(const std::string& s, int logLevel) {
-        static time_t lastLogged;
-        _hbmsgTime = time(0);
-
-        if (s == _hbmsg) {
-            // unchanged
-            if (_hbmsgTime - lastLogged < 60)
-                return;
+    std::string TopologyCoordinatorImpl::_getHbmsg(Date_t now) const {
+        // ignore messages over 2 minutes old
+        if ((now - _hbmsgTime) > 120) {
+            return "";
         }
+        return _hbmsg;
+    }
 
-        _hbmsg = s;
-        if (!s.empty()) {
-            lastLogged = _hbmsgTime;
-            LOG(logLevel) << "replSet " << s;
-        }
+    void TopologyCoordinatorImpl::setMyHeartbeatMessage(const Date_t now,
+                                                        const std::string& message) {
+        _hbmsgTime = now;
+        _hbmsg = message;
     }
 
     const MemberConfig& TopologyCoordinatorImpl::_selfConfig() const {

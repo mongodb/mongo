@@ -437,6 +437,12 @@ namespace {
         return _setLastOptime(txn, _myRID, ts);
     }
 
+    void LegacyReplicationCoordinator::setMyHeartbeatMessage(const std::string& msg) {
+        if (getReplicationMode() == modeReplSet) {
+            theReplSet->sethbmsg(msg, 0);
+        }
+    }
+
     OpTime LegacyReplicationCoordinator::getMyLastOptime() const {
         boost::lock_guard<boost::mutex> lock(_mutex);
 
