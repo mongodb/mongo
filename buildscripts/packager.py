@@ -25,6 +25,7 @@
 #
 # apt-get install dpkg-dev rpm debhelper fakeroot ia32-libs createrepo git-core
 # echo "Now put the dist gnupg signing keys in ~root/.gnupg"
+# 
 
 import errno
 import getopt
@@ -191,6 +192,9 @@ def parse_args(args):
     if len(args) == 0:
         print """Usage: packager.py [OPTS] SPEC1 SPEC2 ... SPECn
 
+Example: 
+    packager.py 2.6.4
+    
 Options:
 
   -n:  Just build the packages, don't publish them as a repo 
