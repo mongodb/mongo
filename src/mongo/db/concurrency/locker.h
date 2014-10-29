@@ -160,6 +160,12 @@ namespace mongo {
         virtual bool isLockHeldForMode(const ResourceId& resId,
                                        LockMode mode) const = 0;
 
+        // These are shortcut methods for the above calls. They however check that the entire
+        // hierarchy is properly locked and because of this they are very expensive to call.
+        // Do not use them in performance critical code paths.
+        virtual bool isDbLockedForMode(const StringData& dbName, LockMode mode) const = 0;
+        virtual bool isCollectionLockedForMode(const StringData& ns, LockMode mode) const = 0;
+
         /**
          * Returns the resource that this locker is waiting/blocked on (if any). If the locker is
          * not waiting for a resource the returned value will be invalid (isValid() == false).
@@ -229,13 +235,16 @@ namespace mongo {
         virtual bool isLocked() const = 0;
         virtual bool isWriteLocked() const = 0;
         virtual bool isWriteLocked(const StringData& ns) const = 0;
-        virtual bool isDbLockedForMode(const StringData& dbName, LockMode mode) const = 0;
-        virtual bool isAtLeastReadLocked(const StringData& ns) const = 0;
+        
+
         virtual bool isRecursive() const = 0;
 
         virtual void assertWriteLocked(const StringData& ns) const = 0;
 
-        /** pending means we are currently trying to get a lock */
+        /**
+         * Pending means we are currently trying to get a lock (could be the parallel batch writer
+         * lock).
+         */
         virtual bool hasLockPending() const = 0;
 
         // ----

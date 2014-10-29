@@ -71,6 +71,13 @@ namespace mongo {
      */
     char legacyModeName(LockMode mode);
 
+    /**
+     * Mode A is covered by mode B if the set of conflicts for mode A is a subset of the set of
+     * conflicts for mode B. For example S is covered by X. IS is covered by S. However, IX is not
+     * covered by S or IS.
+     */
+    bool isModeCovered(LockMode mode, LockMode coveringMode);
+
 
     /**
      * Return values for the locking functions of the lock manager.
