@@ -382,8 +382,10 @@ extern int __wt_lsm_tree_switch(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
 extern int __wt_lsm_tree_drop( WT_SESSION_IMPL *session, const char *name, const char *cfg[]);
 extern int __wt_lsm_tree_rename(WT_SESSION_IMPL *session, const char *olduri, const char *newuri, const char *cfg[]);
 extern int __wt_lsm_tree_truncate( WT_SESSION_IMPL *session, const char *name, const char *cfg[]);
-extern int __wt_lsm_tree_lock( WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree, int exclusive);
-extern int __wt_lsm_tree_unlock( WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree);
+extern int __wt_lsm_tree_readlock(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree);
+extern int __wt_lsm_tree_readunlock(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree);
+extern int __wt_lsm_tree_writelock(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree);
+extern int __wt_lsm_tree_writeunlock(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree);
 extern int __wt_lsm_compact(WT_SESSION_IMPL *session, const char *name, int *skip);
 extern int __wt_lsm_tree_worker(WT_SESSION_IMPL *session, const char *uri, int (*file_func)(WT_SESSION_IMPL *, const char *[]), int (*name_func)(WT_SESSION_IMPL *, const char *, int *), const char *cfg[], uint32_t open_flags);
 extern int __wt_lsm_get_chunk_to_flush(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree, int force, WT_LSM_CHUNK **chunkp);
@@ -457,10 +459,12 @@ extern int __wt_cond_wait(WT_SESSION_IMPL *session, WT_CONDVAR *cond, long usecs
 extern int __wt_cond_signal(WT_SESSION_IMPL *session, WT_CONDVAR *cond);
 extern int __wt_cond_destroy(WT_SESSION_IMPL *session, WT_CONDVAR **condp);
 extern int __wt_rwlock_alloc( WT_SESSION_IMPL *session, WT_RWLOCK **rwlockp, const char *name);
+extern int __wt_try_readlock(WT_SESSION_IMPL *session, WT_RWLOCK *rwlock);
 extern int __wt_readlock(WT_SESSION_IMPL *session, WT_RWLOCK *rwlock);
+extern int __wt_readunlock(WT_SESSION_IMPL *session, WT_RWLOCK *rwlock);
 extern int __wt_try_writelock(WT_SESSION_IMPL *session, WT_RWLOCK *rwlock);
 extern int __wt_writelock(WT_SESSION_IMPL *session, WT_RWLOCK *rwlock);
-extern int __wt_rwunlock(WT_SESSION_IMPL *session, WT_RWLOCK *rwlock);
+extern int __wt_writeunlock(WT_SESSION_IMPL *session, WT_RWLOCK *rwlock);
 extern int __wt_rwlock_destroy(WT_SESSION_IMPL *session, WT_RWLOCK **rwlockp);
 extern int __wt_once(void (*init_routine)(void));
 extern int __wt_open(WT_SESSION_IMPL *session, const char *name, int ok_create, int exclusive, int dio_type, WT_FH **fhp);
@@ -535,7 +539,6 @@ extern int __wt_open_session(WT_CONNECTION_IMPL *conn, WT_EVENT_HANDLER *event_h
 extern int __wt_compact_uri_analyze(WT_SESSION_IMPL *session, const char *uri, int *skip);
 extern int __wt_session_compact( WT_SESSION *wt_session, const char *uri, const char *config);
 extern void __wt_session_dhandle_incr_use(WT_SESSION_IMPL *session);
-extern int __wt_session_dhandle_decr_use(WT_SESSION_IMPL *session);
 extern int __wt_session_lock_btree(WT_SESSION_IMPL *session, uint32_t flags);
 extern int __wt_session_release_btree(WT_SESSION_IMPL *session);
 extern int __wt_session_get_btree_ckpt(WT_SESSION_IMPL *session, const char *uri, const char *cfg[], uint32_t flags);

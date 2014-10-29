@@ -52,7 +52,7 @@ __lsm_stat_init(WT_SESSION_IMPL *session, const char *uri, WT_CURSOR_STAT *cst)
 	stats = &cst->u.dsrc_stats;
 
 	/* Hold the LSM lock so that we can safely walk through the chunks. */
-	WT_ERR(__wt_lsm_tree_lock(session, lsm_tree, 0));
+	WT_ERR(__wt_lsm_tree_readlock(session, lsm_tree));
 	locked = 1;
 
 	/*
@@ -139,7 +139,7 @@ __lsm_stat_init(WT_SESSION_IMPL *session, const char *uri, WT_CURSOR_STAT *cst)
 	__wt_curstat_dsrc_final(cst);
 
 err:	if (locked)
-		WT_TRET(__wt_lsm_tree_unlock(session, lsm_tree));
+		WT_TRET(__wt_lsm_tree_readunlock(session, lsm_tree));
 	__wt_lsm_tree_release(session, lsm_tree);
 	__wt_scr_free(&uribuf);
 
