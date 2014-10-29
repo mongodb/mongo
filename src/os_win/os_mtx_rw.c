@@ -45,11 +45,11 @@ __wt_readlock(WT_SESSION_IMPL *session, WT_RWLOCK *rwlock)
 }
 
 /*
- * __readunlock --
+ * __wt_readunlock --
  *	Release a shared lock.
  */
-static int
-__readunlock(WT_SESSION_IMPL *session, WT_RWLOCK *rwlock)
+int
+__wt_readunlock(WT_SESSION_IMPL *session, WT_RWLOCK *rwlock)
 {
 	WT_RET(__wt_verbose(
 	    session, WT_VERB_MUTEX, "rwlock: read unlock %s", rwlock->name));
@@ -65,18 +65,11 @@ __readunlock(WT_SESSION_IMPL *session, WT_RWLOCK *rwlock)
 int
 __wt_try_writelock(WT_SESSION_IMPL *session, WT_RWLOCK *rwlock)
 {
-	WT_DECL_RET;
-
 	WT_RET(__wt_verbose(
 	    session, WT_VERB_MUTEX, "rwlock: try_writelock %s", rwlock->name));
 	WT_STAT_FAST_CONN_INCR(session, rwlock_write);
 
-	ret = TryAcquireSRWLockExclusive(&rwlock->rwlock);
-	if (ret == 0)
-		return (EBUSY);
-
-	rwlock->exclusive_locked = 1;
-	return (0);
+	return (TryAcquireSRWLockExclusive(&rwlock->rwlock) == 0 ? EBUSY : 0);
 }
 
 /*
@@ -92,37 +85,20 @@ __wt_writelock(WT_SESSION_IMPL *session, WT_RWLOCK *rwlock)
 
 	AcquireSRWLockExclusive(&rwlock->rwlock);
 
-	rwlock->exclusive_locked = 1;
 	return (0);
 }
 
 /*
- * __writeunlock --
+ * __wt_writeunlock --
  *	Release an exclusive lock.
  */
-static int
-__writeunlock(WT_SESSION_IMPL *session, WT_RWLOCK *rwlock)
+int
+__wt_writeunlock(WT_SESSION_IMPL *session, WT_RWLOCK *rwlock)
 {
 	WT_RET(__wt_verbose(
 	    session, WT_VERB_MUTEX, "rwlock: writeunlock %s", rwlock->name));
 
-	rwlock->exclusive_locked = 0;
 	ReleaseSRWLockExclusive(&rwlock->rwlock);
-
-	return (0);
-}
-
-/*
- * __wt_rwunlock --
- *	Release a read/write lock.
- */
-int
-__wt_rwunlock(WT_SESSION_IMPL *session, WT_RWLOCK *rwlock)
-{
-	if (rwlock->exclusive_locked == 0)
-		ReleaseSRWLockShared(&rwlock->rwlock);
-	else
-		ReleaseSRWLockExclusive(&rwlock->rwlock);
 	return (0);
 }
 

@@ -30,8 +30,6 @@ struct __wt_rwlock {
 	const char *name;		/* Lock name for debugging */
 
 	wt_rwlock_t rwlock;		/* Read/write lock */
-
-	int exclusive_locked;		/* If exclusive lock held */
 };
 
 /*

@@ -103,7 +103,7 @@ __wt_lsm_merge(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree, u_int id)
 	 * avoid holding it while the merge is in progress: that may take a
 	 * long time.
 	 */
-	WT_RET(__wt_lsm_tree_lock(session, lsm_tree, 1));
+	WT_RET(__wt_lsm_tree_writelock(session, lsm_tree));
 
 	/*
 	 * Only include chunks that already have a Bloom filter or are the
@@ -126,7 +126,7 @@ __wt_lsm_merge(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree, u_int id)
 	 * tree for a merge.
 	 */
 	if (end_chunk < merge_min - 1) {
-		WT_RET(__wt_lsm_tree_unlock(session, lsm_tree));
+		WT_RET(__wt_lsm_tree_writeunlock(session, lsm_tree));
 		return (WT_NOTFOUND);
 	}
 
@@ -243,7 +243,7 @@ __wt_lsm_merge(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree, u_int id)
 		generation = WT_MAX(generation,
 		    lsm_tree->chunk[start_chunk + i]->generation + 1);
 
-	WT_RET(__wt_lsm_tree_unlock(session, lsm_tree));
+	WT_RET(__wt_lsm_tree_writeunlock(session, lsm_tree));
 
 	if (nchunks == 0)
 		return (WT_NOTFOUND);
@@ -404,7 +404,7 @@ __wt_lsm_merge(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree, u_int id)
 	WT_ERR_NOTFOUND_OK(ret);
 
 	WT_ERR(__wt_lsm_tree_set_chunk_size(session, chunk));
-	WT_ERR(__wt_lsm_tree_lock(session, lsm_tree, 1));
+	WT_ERR(__wt_lsm_tree_writelock(session, lsm_tree));
 	locked = 1;
 
 	/*
@@ -453,7 +453,7 @@ __wt_lsm_merge(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree, u_int id)
 	    session, WT_LSM_WORK_DROP, 0, lsm_tree));
 
 err:	if (locked)
-		WT_TRET(__wt_lsm_tree_unlock(session, lsm_tree));
+		WT_TRET(__wt_lsm_tree_writeunlock(session, lsm_tree));
 	if (in_sync)
 		(void)WT_ATOMIC_SUB4(lsm_tree->merge_syncing, 1);
 	if (src != NULL)

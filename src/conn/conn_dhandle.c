@@ -42,7 +42,7 @@ __conn_dhandle_open_lock(
 			WT_RET(__wt_readlock(session, dhandle->rwlock));
 			if (F_ISSET(dhandle, WT_DHANDLE_OPEN))
 				return (0);
-			WT_RET(__wt_rwunlock(session, dhandle->rwlock));
+			WT_RET(__wt_readunlock(session, dhandle->rwlock));
 		}
 
 		/*
@@ -58,7 +58,8 @@ __conn_dhandle_open_lock(
 			 */
 			if (F_ISSET(dhandle, WT_DHANDLE_OPEN) &&
 			    !LF_ISSET(WT_DHANDLE_EXCLUSIVE)) {
-				WT_RET(__wt_rwunlock(session, dhandle->rwlock));
+				WT_RET(
+				    __wt_writeunlock(session, dhandle->rwlock));
 				continue;
 			}
 
@@ -346,7 +347,7 @@ __conn_btree_open(
 		/* Drop back to a readlock if that is all that was needed. */
 		if (!LF_ISSET(WT_DHANDLE_EXCLUSIVE)) {
 			F_CLR(dhandle, WT_DHANDLE_EXCLUSIVE);
-			WT_ERR(__wt_rwunlock(session, dhandle->rwlock));
+			WT_ERR(__wt_writeunlock(session, dhandle->rwlock));
 			WT_ERR(
 			    __conn_dhandle_open_lock(session, dhandle, flags));
 		}
@@ -392,7 +393,7 @@ __wt_conn_btree_get(WT_SESSION_IMPL *session,
 	    LF_ISSET(WT_BTREE_SPECIAL_FLAGS)))
 		if ((ret = __conn_btree_open(session, op_cfg, flags)) != 0) {
 			F_CLR(dhandle, WT_DHANDLE_EXCLUSIVE);
-			WT_TRET(__wt_rwunlock(session, dhandle->rwlock));
+			WT_TRET(__wt_writeunlock(session, dhandle->rwlock));
 		}
 
 	WT_ASSERT(session, ret != 0 ||

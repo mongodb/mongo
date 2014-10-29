@@ -290,7 +290,7 @@ switch_and_jump:	/* Switching to a forward roll. */
 					    WT_PAGE_ROW_LEAF, unpack, keyb);
 				}
 				WT_TRET(
-				    __wt_rwunlock(session, btree->ovfl_lock));
+				    __wt_readunlock(session, btree->ovfl_lock));
 				WT_ERR(ret);
 				break;
 			}
