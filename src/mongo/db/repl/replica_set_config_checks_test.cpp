@@ -133,6 +133,12 @@ namespace {
                                                 oldConfig,
                                                 oldConfig,
                                                 false).getStatus());
+        // Forced reconfigs also do not allow this.
+        ASSERT_EQUALS(ErrorCodes::NewReplicaSetConfigurationIncompatible,
+                      validateConfigForReconfig(&externalState,
+                                                oldConfig,
+                                                oldConfig,
+                                                true).getStatus());
 
         // Cannot reconfig from new to old (versions must increase).
         ASSERT_EQUALS(ErrorCodes::NewReplicaSetConfigurationIncompatible,
@@ -140,6 +146,12 @@ namespace {
                                                 newConfig,
                                                 oldConfig,
                                                 false).getStatus());
+        // Forced reconfigs also do not allow this.
+        ASSERT_EQUALS(ErrorCodes::NewReplicaSetConfigurationIncompatible,
+                      validateConfigForReconfig(&externalState,
+                                                newConfig,
+                                                oldConfig,
+                                                true).getStatus());
     }
 
     TEST(ValidateConfigForReconfig, NewConfigMustNotChangeSetName) {
@@ -173,6 +185,12 @@ namespace {
                                                 oldConfig,
                                                 newConfig,
                                                 false).getStatus());
+        // Forced reconfigs also do not allow this.
+        ASSERT_EQUALS(ErrorCodes::NewReplicaSetConfigurationIncompatible,
+                      validateConfigForReconfig(&externalState,
+                                                newConfig,
+                                                oldConfig,
+                                                true).getStatus());
     }
 
     TEST(ValidateConfigForReconfig, NewConfigMustNotFlipBuildIndexesFlag) {
@@ -227,6 +245,13 @@ namespace {
                                                 oldConfig,
                                                 newConfig,
                                                 false).getStatus());
+
+        // Forced reconfigs also do not allow this.
+        ASSERT_EQUALS(ErrorCodes::NewReplicaSetConfigurationIncompatible,
+                      validateConfigForReconfig(&externalState,
+                                                oldConfig,
+                                                newConfig,
+                                                true).getStatus());
     }
 
     TEST(ValidateConfigForReconfig, NewConfigMustNotFlipArbiterFlag) {
@@ -278,6 +303,12 @@ namespace {
                                                 oldConfig,
                                                 newConfig,
                                                 false).getStatus());
+        // Forced reconfigs also do not allow this.
+        ASSERT_EQUALS(ErrorCodes::NewReplicaSetConfigurationIncompatible,
+                      validateConfigForReconfig(&externalState,
+                                                oldConfig,
+                                                newConfig,
+                                                true).getStatus());
     }
 
     TEST(ValidateConfigForReconfig, HostAndIdRemappingRestricted) {
@@ -336,6 +367,12 @@ namespace {
                                                 oldConfig,
                                                 illegalNewConfigReusingHost,
                                                 false).getStatus());
+        // Forced reconfigs also do not allow this.
+        ASSERT_EQUALS(ErrorCodes::NewReplicaSetConfigurationIncompatible,
+                      validateConfigForReconfig(&externalState,
+                                                oldConfig,
+                                                illegalNewConfigReusingHost,
+                                                true).getStatus());
         //
         // Here, the new config is valid, because all we've changed is the name of
         // the host representing _id 2.
@@ -394,6 +431,21 @@ namespace {
                                                                        oldConfig,
                                                                        newConfig,
                                                                        false)));
+        // Forced reconfigs also do not allow this.
+        ASSERT_EQUALS(ErrorCodes::NodeNotFound,
+                      validateConfigForReconfig(&notPresentExternalState,
+                                                oldConfig,
+                                                newConfig,
+                                                true).getStatus());
+        ASSERT_EQUALS(ErrorCodes::DuplicateKey,
+                      validateConfigForReconfig(&presentThriceExternalState,
+                                                oldConfig,
+                                                newConfig,
+                                                true).getStatus());
+        ASSERT_EQUALS(1, unittest::assertGet(validateConfigForReconfig(&presentOnceExternalState,
+                                                                       oldConfig,
+                                                                       newConfig,
+                                                                       true)));
     }
 
     TEST(ValidateConfigForReconfig, SelfMustEndElectable) {
@@ -423,6 +475,11 @@ namespace {
                                                 oldConfig,
                                                 newConfig,
                                                 false).getStatus());
+        // Forced reconfig does not require electability.
+        ASSERT_OK(validateConfigForReconfig(&presentOnceExternalState,
+                                            oldConfig,
+                                            newConfig,
+                                            true).getStatus());
     }
 
     TEST(ValidateConfigForInitiate, NewConfigInvalid) {
@@ -465,6 +522,11 @@ namespace {
                                                                       oldConfig,
                                                                       newConfig,
                                                                       false).getStatus());
+        // Forced reconfigs also do not allow this.
+        ASSERT_EQUALS(ErrorCodes::BadValue, validateConfigForReconfig(&presentOnceExternalState,
+                                                                      oldConfig,
+                                                                      newConfig,
+                                                                      true).getStatus());
     }
 
     TEST(ValidateConfigForStartUp, NewConfigInvalid) {
