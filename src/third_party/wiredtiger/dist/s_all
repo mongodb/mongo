@@ -1,0 +1,84 @@
+#! /bin/sh
+
+# Run standard scripts.
+t=__wt.$$
+trap 'rm -f $t *.pyc __tmp __wt.*' 0 1 2 3 13 15
+
+# We require python which may not be installed.
+type python > /dev/null 2>&1 || {
+	echo 's_all: python not found'
+	exit 1
+}
+
+run()
+{
+	printf "WiredTiger: $2..."
+	$1 > $t
+
+	if `grep 'skipped' $t > /dev/null 2>&1`; then
+		printf " " && cat $t
+	elif `test -s $t`; then
+		echo
+		sed -e 's/^/	/' $t
+	else
+		echo ' OK'
+	fi
+	rm -f $t
+	return 0
+}
+
+echo 'dist/s_all run started...'
+
+force=
+reconf=0
+while :
+	do case "$1" in
+	-A)	# Reconfigure the library build.
+		reconf=1
+		shift;;
+	-f)	# Force versions to be updated
+		force="-f"
+		shift;;
+	*)
+		break;;
+	esac
+done
+
+run "sh ./s_version $force" "Updating files that include the package version"
+
+test "$reconf" -eq 0 || {
+	(cd ../build_posix &&
+	run "sh ./reconf" "Rebuilding GNU tools library support")
+}
+
+run "python api_config.py" "building WiredTiger API"
+run "python api_err.py" "building WiredTiger error returns"
+
+run "python flags.py" "building flags"
+run "python log.py" "building logging layer"
+run "python serial.py" "building serial function support"
+run "python stat.py" "building statistics support"
+run "python java_doc.py" "building Java documentation index"
+
+run "sh ./s_typedef -b" "building standard typedefs"
+run "sh ./s_prototypes" "building function prototypes"
+run "sh ./s_readme $force" "building README file"
+run "sh ./s_tags" "building tags files"
+
+run "sh ./s_copyright" "checking copyright notices"
+run "sh ./s_define" "checking for unused #defines"
+run "sh ./s_funcs" "checking for unused functions"
+run "sh ./s_getopt" "checking for incorrect getopt usage"
+run "sh ./s_longlines" "checking for long lines"
+run "sh ./s_stat" "checking for unused statistics fields"
+run "sh ./s_string" "checking string spelling"
+run "python style.py" "checking style (pass 1)"
+run "sh ./s_style" "checking style (pass 2)"
+run "sh ./s_symbols" "checking external symbol names"
+run "sh ./s_typedef -c" "checking for unused typedefs"
+run "sh ./s_whitespace" "checking whitespace"
+run "sh ./s_win" "checking windows config"
+
+run "sh ./s_docs" "generating documentation"
+
+echo 'dist/s_all run finished'

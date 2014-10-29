@@ -1,0 +1,28 @@
+# List of sub-directories, used by makemake to create Makefile.am
+#
+# The format is:
+#   <dir> [<condition>]
+#
+# If the directory exists, it is added to AUTO_SUBDIRS.
+# If a condition is included, the subdir is made conditional via AM_CONDITIONAL
+ext/collators/reverse
+ext/compressors/bzip2 BZIP2
+ext/compressors/nop
+ext/compressors/snappy SNAPPY
+ext/compressors/zlib ZLIB
+ext/datasources/helium HAVE_HELIUM
+ext/test/kvs_bdb HAVE_BERKELEY_DB
+.
+api/leveldb LEVELDB
+bench/wtperf
+examples/c
+lang/java JAVA
+examples/java JAVA
+lang/python PYTHON
+test/bloom
+test/checkpoint
+test/fops
+test/format HAVE_BERKELEY_DB
+test/huge
+test/salvage
+test/thread
