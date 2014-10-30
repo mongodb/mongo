@@ -47,15 +47,6 @@ import java.io.IOException;
 import java.io.FileNotFoundException;
 import java.io.PrintStream;
 
-/*
- * A simple class to share state and synchronize actions of
- * two threads in the test
- */
-class SharedState {
-    public boolean gotRollbackException = false;
-    public Exception otherException = null;
-}
-
 public class ExceptionTest {
     String uri;
     Connection conn;
@@ -114,6 +105,56 @@ public class ExceptionTest {
         Assert.assertEquals(expecting, true);
         Assert.assertEquals(caught, true);
         teardown();
+    }
+
+    @Test
+    public void except03() throws IOException {
+        String keyFormat = "S";
+        String valueFormat = "i";
+        boolean caught = false;
+        Session sess1 = null;
+        Session sess2 = null;
+        Cursor c1 = null;
+        Cursor c2 = null;
+
+        setup("table:except03", keyFormat, valueFormat);
+        System.err.println("Starting");
+
+        try {
+            sess1 = conn.open_session("isolation=snapshot");
+            sess2 = conn.open_session("isolation=snapshot");
+
+            sess1.begin_transaction(null);
+            sess2.begin_transaction(null);
+
+            c1 = sess1.open_cursor("table:except03", null, null);
+            c2 = sess2.open_cursor("table:except03", null, null);
+
+            c1.putKeyString("key");
+            c1.putValueInt(1);
+            c1.insert();
+
+            c2.putKeyString("key");
+            c2.putValueInt(2);
+            c2.insert();
+        }
+        catch (WiredTigerRollbackException rbe) {
+            caught = true;
+        }
+        catch (Exception e) {
+            System.err.println("ERROR: got unexpected exception: " + e);
+        }
+        finally {
+            if (c1 != null)
+                c1.close();
+            if (c2 != null)
+                c2.close();
+            if (sess1 != null)
+                sess1.close("");
+            if (sess2 != null)
+                sess2.close("");
+        }
+        Assert.assertEquals(caught, true);
     }
 
     private void setup(String uriparam, String keyFormat, String valueFormat) {
