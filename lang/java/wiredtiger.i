@@ -282,7 +282,6 @@ WT_CLASS(struct __wt_async_op, WT_ASYNC_OP, op, )
 %rename (getKeyFormat) __wt_async_op::getKey_format;
 %rename (getValueFormat) __wt_async_op::getValue_format;
 %rename (getType) __wt_async_op::get_type;
-%rename (getId) __wt_async_op::get_id;
 
 /* SWIG magic to turn Java byte strings into data / size. */
 %apply (char *STRING, int LENGTH) { (char *data, int size) };
@@ -1703,6 +1702,14 @@ WT_ASYNC_CALLBACK javaApiAsyncHandler = {javaAsyncHandler};
   public ";
 %rename(open_cursor) __wt_session::open_cursor_wrap;
 
+%ignore __wt_async_op::get_id;
+%rename(getId) __wt_async_op::get_id_wrap;
+%javamethodmodifiers __wt_async_op::get_id_wrap "
+  /**
+   * @copydoc WT_ASYNC_OP::get_id
+   */
+  public ";
+
 %rename(AsyncOp) __wt_async_op;
 %rename(Cursor) __wt_cursor;
 %rename(Session) __wt_session;
@@ -1847,13 +1854,20 @@ err:		if (ret != 0)
 	}
 }
 
+%extend __wt_async_op {
+	long get_id_wrap(JNIEnv *jenv) {
+		WT_UNUSED(jenv);
+		return (self->get_id(self));
+	}
+}
+
 %extend __wt_session {
 	long transaction_pinned_range_wrap(JNIEnv *jenv) {
 		int ret;
 		uint64_t range = 0;
 		ret = self->transaction_pinned_range(self, &range);
-err:		if (ret != 0)
-			throwWiredTigerException(jenv, wiredtiger_strerror(ret));
+		if (ret != 0)
+			throwWiredTigerException(jenv, ret);
 		return range;
 	}
 }
