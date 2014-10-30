@@ -30,14 +30,14 @@ __wt_rename(WT_SESSION_IMPL *session, const char *from, const char *to)
 	 * Check if file exists since Windows does not override the file if
 	 * it exists.
 	 */
-	if ((ret = GetFileAttributes(to_path)) != INVALID_FILE_ATTRIBUTES) {
-		if ((ret = DeleteFile(to_path)) == FALSE) {
+	if ((ret = GetFileAttributesA(to_path)) != INVALID_FILE_ATTRIBUTES) {
+		if ((ret = DeleteFileA(to_path)) == FALSE) {
 			lasterror = GetLastError();
 			goto err;
 		}
 	}
 
-	if ((MoveFile(from_path, to_path)) == FALSE)
+	if ((MoveFileA(from_path, to_path)) == FALSE)
 		lasterror = GetLastError();
 
 err:

@@ -27,7 +27,7 @@ __wt_mmap(WT_SESSION_IMPL *session, WT_FH *fh, void *mapp, size_t *lenp,
 	 */
 	orig_size = (size_t)fh->size;
 	*mappingcookie =
-	    CreateFileMapping(fh->filehandle, NULL, PAGE_READONLY, 0, 0, NULL);
+	    CreateFileMappingA(fh->filehandle, NULL, PAGE_READONLY, 0, 0, NULL);
 	if (*mappingcookie == NULL)
 		WT_RET_MSG(session, __wt_errno(),
 			"%s CreateFileMapping error: failed to map %"
