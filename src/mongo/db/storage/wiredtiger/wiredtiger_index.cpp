@@ -245,7 +245,7 @@ namespace {
         WiredTigerSession* session = WiredTigerRecoveryUnit::get(txn)->getSession();
         WT_SESSION* s = session->getSession();
         Status status = WiredTigerUtil::exportTableToBSON(s, "statistics:" + uri(),
-                                                          "statistics=(all)", output);
+                                                          "statistics=(fast)", output);
         if (!status.isOK()) {
             output->append("error", "unable to retrieve statistics");
             output->append("code", static_cast<int>(status.code()));
