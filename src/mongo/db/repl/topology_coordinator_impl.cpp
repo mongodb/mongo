@@ -1285,6 +1285,7 @@ namespace {
                     bb.append("electionTime", _electionTime);
                     bb.appendDate("electionDate", Date_t(_electionTime.getSecs() * 1000ULL));
                 }
+                bb.appendIntOrLL("configVersion", _currentConfig.getConfigVersion());
                 bb.append("self", true);
                 membersOut.push_back(bb.obj());
             }
@@ -1336,6 +1337,7 @@ namespace {
                     bb.appendDate("electionDate",
                                   Date_t(it->getElectionTime().getSecs() * 1000ULL));
                 }
+                bb.appendIntOrLL("configVersion", it->getConfigVersion());
                 membersOut.push_back(bb.obj());
             }
         }
