@@ -42,7 +42,7 @@ func TestCreateAllIntents(t *testing.T) {
 
 	Convey("With a test MongoRestore", t, func() {
 		mr = &MongoRestore{
-			manager: intents.NewIntentManager(),
+			manager: intents.NewCategorizingIntentManager(),
 		}
 		log.SetWriter(&buff)
 
@@ -107,7 +107,7 @@ func TestCreateIntentsForDB(t *testing.T) {
 
 	Convey("With a test MongoRestore", t, func() {
 		mr = &MongoRestore{
-			manager: intents.NewIntentManager(),
+			manager: intents.NewCategorizingIntentManager(),
 		}
 		log.SetWriter(&buff)
 
@@ -159,7 +159,7 @@ func TestCreateIntentsForCollection(t *testing.T) {
 	Convey("With a test MongoRestore", t, func() {
 		buff = bytes.Buffer{}
 		mr = &MongoRestore{
-			manager: intents.NewIntentManager(),
+			manager: intents.NewCategorizingIntentManager(),
 		}
 		log.SetWriter(&buff)
 

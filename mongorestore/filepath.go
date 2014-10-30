@@ -11,7 +11,6 @@ import (
 )
 
 // Filename helpers
-// TODO: MOVE THIS STUFF TO ITS OWN FILE
 
 type FileType uint
 
@@ -19,7 +18,6 @@ const (
 	UnknownFileType FileType = iota
 	BSONFileType
 	MetadataFileType
-	//TODO users/roles?
 )
 
 // GetInfoFromFilename pulls the base collection name and
@@ -64,7 +62,7 @@ func (restore *MongoRestore) CreateAllIntents(fullpath string) error {
 				restore.manager.Put(&intents.Intent{
 					C:        "oplog", //TODO make this a helper in intent
 					BSONPath: filepath.Join(fullpath, entry.Name()),
-					BSONSize: entry.Size(),
+					Size:     entry.Size(),
 				})
 			} else {
 				log.Logf(log.Always, `don't know what to do with file "%v", skipping...`,
@@ -106,7 +104,7 @@ func (restore *MongoRestore) CreateIntentsForDB(db, fullpath string) error {
 				intent := &intents.Intent{
 					DB:       db,
 					C:        collection,
-					BSONSize: entry.Size(),
+					Size:     entry.Size(),
 					BSONPath: filepath.Join(fullpath, entry.Name()),
 				}
 				log.Logf(log.Info, "found collection %v bson to restore", intent.Key())
@@ -163,7 +161,7 @@ func (restore *MongoRestore) CreateIntentForCollection(
 		DB:       db,
 		C:        collection,
 		BSONPath: fullpath,
-		BSONSize: file.Size(),
+		Size:     file.Size(),
 	}
 
 	// finally, check if it has a .metadata.json file in its folder

@@ -6,6 +6,7 @@ import (
 	"github.com/mongodb/mongo-tools/mongodump"
 	"github.com/mongodb/mongo-tools/mongodump/options"
 	"os"
+	"runtime"
 )
 
 func main() {
@@ -36,6 +37,11 @@ func main() {
 
 	// init logger
 	log.SetVerbosity(opts.Verbosity)
+
+	if outputOpts.MaxProcs > 0 {
+		log.Logf(log.DebugHigh, "setting GOMAXPROCS to %v", outputOpts.MaxProcs)
+		runtime.GOMAXPROCS(outputOpts.MaxProcs)
+	}
 
 	dump := mongodump.MongoDump{
 		ToolOptions:   opts,

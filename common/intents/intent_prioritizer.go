@@ -9,6 +9,7 @@ type PriorityType int
 
 const (
 	Legacy PriorityType = iota
+	LongestTaskFirst
 	MultiDatabaseLTF
 )
 
@@ -50,6 +51,46 @@ func (legacy *legacyPrioritizer) Finish(*Intent) {
 	// no-op
 	return
 }
+
+//===== Longest Task First =====
+
+// longestTaskFirstPrioritizer returns intents in the order of largest -> smallest,
+// which is better at minimizing total runtime in parallel environments than
+// other simple orderings.
+type longestTaskFirstPrioritizer struct {
+	queue []*Intent
+}
+
+// NewLongestTaskFirstPrioritizer returns an initialized LTP prioritizer
+func NewLongestTaskFirstPrioritizer(intents []*Intent) *longestTaskFirstPrioritizer {
+	sort.Sort(BySize(intents))
+	return &longestTaskFirstPrioritizer{
+		queue: intents,
+	}
+}
+
+func (ltf *longestTaskFirstPrioritizer) Get() *Intent {
+	var intent *Intent
+
+	if len(ltf.queue) == 0 {
+		return nil
+	}
+
+	intent, ltf.queue = ltf.queue[0], ltf.queue[1:]
+	return intent
+}
+
+func (ltf *longestTaskFirstPrioritizer) Finish(*Intent) {
+	// no-op
+	return
+}
+
+// For sorting intents from largest to smallest size
+type BySize []*Intent
+
+func (s BySize) Len() int           { return len(s) }
+func (s BySize) Swap(i, j int)      { s[i], s[j] = s[j], s[i] }
+func (s BySize) Less(i, j int) bool { return s[i].Size > s[j].Size }
 
 //===== Multi Database Longest Task First =====
 
@@ -144,7 +185,7 @@ type dbCounter struct {
 }
 
 func (dbc *dbCounter) SortCollectionsBySize() {
-	sort.Sort(ByFilesize(dbc.collections))
+	sort.Sort(BySize(dbc.collections))
 }
 
 // PopIntent returns the largest intent remaining for the database
@@ -155,13 +196,6 @@ func (dbc *dbCounter) PopIntent() *Intent {
 	}
 	return intent
 }
-
-// For sorting intents from largest to smallest BSON filesize
-type ByFilesize []*Intent
-
-func (s ByFilesize) Len() int           { return len(s) }
-func (s ByFilesize) Swap(i, j int)      { s[i], s[j] = s[j], s[i] }
-func (s ByFilesize) Less(i, j int) bool { return s[i].BSONSize > s[j].BSONSize }
 
 // Returns the largest collection of the databases with the least active restores.
 // Implements the container/heap interface. None of its methods are meant to be
@@ -174,7 +208,7 @@ func (dbh DBHeap) Less(i, j int) bool {
 	if dbh[i].active == dbh[j].active {
 		// prioritize the largest bson file if dbs have the same number
 		// of restorations in progress
-		return dbh[i].collections[0].BSONSize > dbh[j].collections[0].BSONSize
+		return dbh[i].collections[0].Size > dbh[j].collections[0].Size
 	}
 	return dbh[i].active < dbh[j].active
 }

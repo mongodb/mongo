@@ -67,18 +67,18 @@ func TestBasicDBHeapBehavior(t *testing.T) {
 		})
 
 		Convey("when inserting unordered dbCounters with different bson sizes", func() {
-			heap.Push(dbheap, &dbCounter{0, []*Intent{&Intent{BSONSize: 70}}})
-			heap.Push(dbheap, &dbCounter{0, []*Intent{&Intent{BSONSize: 1024}}})
-			heap.Push(dbheap, &dbCounter{0, []*Intent{&Intent{BSONSize: 97}}})
-			heap.Push(dbheap, &dbCounter{0, []*Intent{&Intent{BSONSize: 3}}})
-			heap.Push(dbheap, &dbCounter{0, []*Intent{&Intent{BSONSize: 1024 * 1024}}})
+			heap.Push(dbheap, &dbCounter{0, []*Intent{&Intent{Size: 70}}})
+			heap.Push(dbheap, &dbCounter{0, []*Intent{&Intent{Size: 1024}}})
+			heap.Push(dbheap, &dbCounter{0, []*Intent{&Intent{Size: 97}}})
+			heap.Push(dbheap, &dbCounter{0, []*Intent{&Intent{Size: 3}}})
+			heap.Push(dbheap, &dbCounter{0, []*Intent{&Intent{Size: 1024 * 1024}}})
 
 			Convey("they should pop in bson size order, greatest to least", func() {
 				prev := int64(1024*1024 + 1) // Maximum
 				for dbheap.Len() > 0 {
 					popped := heap.Pop(dbheap).(*dbCounter)
-					So(popped.collections[0].BSONSize, ShouldBeLessThan, prev)
-					prev = popped.collections[0].BSONSize
+					So(popped.collections[0].Size, ShouldBeLessThan, prev)
+					prev = popped.collections[0].Size
 				}
 			})
 		})
@@ -92,19 +92,19 @@ func TestDBCounterCollectionSorting(t *testing.T) {
 	Convey("With a dbCounter and an unordered collection of intents", t, func() {
 		dbc := &dbCounter{
 			collections: []*Intent{
-				&Intent{BSONSize: 100},
-				&Intent{BSONSize: 1000},
-				&Intent{BSONSize: 1},
-				&Intent{BSONSize: 10},
+				&Intent{Size: 100},
+				&Intent{Size: 1000},
+				&Intent{Size: 1},
+				&Intent{Size: 10},
 			},
 		}
 
 		Convey("popping the sorted intents should return in decreasing BSONSize", func() {
 			dbc.SortCollectionsBySize()
-			So(dbc.PopIntent().BSONSize, ShouldEqual, 1000)
-			So(dbc.PopIntent().BSONSize, ShouldEqual, 100)
-			So(dbc.PopIntent().BSONSize, ShouldEqual, 10)
-			So(dbc.PopIntent().BSONSize, ShouldEqual, 1)
+			So(dbc.PopIntent().Size, ShouldEqual, 1000)
+			So(dbc.PopIntent().Size, ShouldEqual, 100)
+			So(dbc.PopIntent().Size, ShouldEqual, 10)
+			So(dbc.PopIntent().Size, ShouldEqual, 1)
 			So(dbc.PopIntent(), ShouldBeNil)
 			So(dbc.PopIntent(), ShouldBeNil)
 		})
@@ -118,10 +118,10 @@ func TestSimulatedMultiDBJob(t *testing.T) {
 
 	Convey("With a prioritizer initialized with a set of intents", t, func() {
 		intents := []*Intent{
-			&Intent{C: "small", DB: "db2", BSONSize: 32},
-			&Intent{C: "medium", DB: "db2", BSONSize: 128},
-			&Intent{C: "giant", DB: "db1", BSONSize: 1024},
-			&Intent{C: "tiny", DB: "db1", BSONSize: 2},
+			&Intent{C: "small", DB: "db2", Size: 32},
+			&Intent{C: "medium", DB: "db2", Size: 128},
+			&Intent{C: "giant", DB: "db1", Size: 1024},
+			&Intent{C: "tiny", DB: "db1", Size: 2},
 		}
 		prioritizer = NewMultiDatabaseLTFPrioritizer(intents)
 		So(prioritizer, ShouldNotBeNil)

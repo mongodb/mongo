@@ -16,8 +16,9 @@ type Intent struct {
 	BSONPath     string
 	MetadataPath string
 
-	// File size, for some prioritizer implementations.
-	BSONSize int64
+	// File/collection size, for some prioritizer implementations.
+	// Units don't matter as long as they are consistent for a given use case.
+	Size int64
 }
 
 func (it *Intent) Key() string {
@@ -55,6 +56,10 @@ func (it *Intent) IsSystemIndexes() bool {
 // Intent Manager
 
 type Manager struct {
+	// for handling more complex restore logic. Stores special
+	// collections like roles/users separate from most collection intents
+	useCategories bool
+
 	// map for merging metadata with BSON intents
 	intents map[string]*Intent
 
@@ -77,11 +82,17 @@ type Manager struct {
 	indexIntents map[string]*Intent
 }
 
+func NewCategorizingIntentManager() *Manager {
+	manager := NewIntentManager()
+	manager.useCategories = true
+	manager.indexIntents = map[string]*Intent{}
+	return manager
+}
+
 func NewIntentManager() *Manager {
 	return &Manager{
 		intents:                 map[string]*Intent{},
 		intentsByDiscoveryOrder: []*Intent{},
-		indexIntents:            map[string]*Intent{},
 		priotitizerLock:         &sync.Mutex{},
 	}
 }
@@ -94,25 +105,28 @@ func (manager *Manager) Put(intent *Intent) {
 		panic("cannot insert nil *Intent into IntentManager")
 	}
 
-	if intent.IsOplog() {
-		manager.oplogIntent = intent
-		return
-	}
-	if intent.IsSystemIndexes() {
-		manager.indexIntents[intent.DB] = intent
-		return
-	}
-	if intent.IsUsers() {
-		if intent.BSONPath != "" { //TODO(erf) make this elegant
-			manager.usersIntent = intent
+	// bucket special-case collections
+	if manager.useCategories {
+		if intent.IsOplog() {
+			manager.oplogIntent = intent
+			return
 		}
-		return
-	}
-	if intent.IsRoles() {
-		if intent.BSONPath != "" {
-			manager.rolesIntent = intent
+		if intent.IsSystemIndexes() {
+			manager.indexIntents[intent.DB] = intent
+			return
 		}
-		return
+		if intent.IsUsers() {
+			if intent.BSONPath != "" { //TODO(erf) make this elegant
+				manager.usersIntent = intent
+			}
+			return
+		}
+		if intent.IsRoles() {
+			if intent.BSONPath != "" {
+				manager.rolesIntent = intent
+			}
+			return
+		}
 	}
 
 	// BSON and metadata files for the same collection are merged
@@ -124,8 +138,8 @@ func (manager *Manager) Put(intent *Intent) {
 		if existing.BSONPath == "" {
 			existing.BSONPath = intent.BSONPath
 		}
-		if existing.BSONSize == 0 {
-			existing.BSONSize = intent.BSONSize
+		if existing.Size == 0 {
+			existing.Size = intent.Size
 		}
 		if existing.MetadataPath == "" {
 			existing.MetadataPath = intent.MetadataPath
@@ -186,8 +200,11 @@ func (manager *Manager) Finalize(pType PriorityType) {
 	case Legacy:
 		log.Log(log.DebugHigh, "finalizing intent manager with legacy prioritizer")
 		manager.prioritizer = NewLegacyPrioritizer(manager.intentsByDiscoveryOrder)
+	case LongestTaskFirst:
+		log.Log(log.DebugHigh, "finalizing intent manager with longest task first prioritizer")
+		manager.prioritizer = NewLongestTaskFirstPrioritizer(manager.intentsByDiscoveryOrder)
 	case MultiDatabaseLTF:
-		log.Log(log.DebugHigh, "finalizing intent manager with multi-database largest task first prioritizer")
+		log.Log(log.DebugHigh, "finalizing intent manager with multi-database longest task first prioritizer")
 		manager.prioritizer = NewMultiDatabaseLTFPrioritizer(manager.intentsByDiscoveryOrder)
 	default:
 		panic("cannot initialize IntentPrioritizer with unknown type")

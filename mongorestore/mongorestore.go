@@ -58,8 +58,6 @@ func (restore *MongoRestore) ParseAndValidateOptions() error {
 		log.Logf(log.DebugHigh, "\tdumping with w=%v", restore.safety.W)
 	}
 
-	//TODO check oplog is okay
-
 	if restore.tempUsersCol == "" {
 		restore.tempUsersCol = "tempusers"
 	}
@@ -77,7 +75,7 @@ func (restore *MongoRestore) Restore() error {
 	}
 
 	// 1. Build up all intents to be restored
-	restore.manager = intents.NewIntentManager()
+	restore.manager = intents.NewCategorizingIntentManager()
 
 	switch {
 	case restore.ToolOptions.DB == "" && restore.ToolOptions.Collection == "":

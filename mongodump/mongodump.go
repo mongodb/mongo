@@ -6,21 +6,23 @@ import (
 	"github.com/mongodb/mongo-tools/common/auth"
 	"github.com/mongodb/mongo-tools/common/bsonutil"
 	"github.com/mongodb/mongo-tools/common/db"
+	"github.com/mongodb/mongo-tools/common/intents"
 	"github.com/mongodb/mongo-tools/common/json"
 	"github.com/mongodb/mongo-tools/common/log"
 	commonopts "github.com/mongodb/mongo-tools/common/options"
+	"github.com/mongodb/mongo-tools/common/progress"
 	"github.com/mongodb/mongo-tools/mongodump/options"
+	"gopkg.in/mgo.v2"
 	"gopkg.in/mgo.v2/bson"
 	"io"
 	"os"
 	"path/filepath"
-	"strings"
+	"time"
 )
 
 const (
-	ProgressBarLength = 24
-
-	SystemIndexes = "system.indexes"
+	ProgressBarLength   = 24
+	ProgressBarWaitTime = time.Second * 3
 
 	DumpDefaultPermissions = 0755
 )
@@ -35,10 +37,12 @@ type MongoDump struct {
 	sessionProvider *db.SessionProvider
 
 	// useful internals that we don't directly expose as options
+	manager         *intents.Manager
 	useStdout       bool
 	query           bson.M
 	oplogCollection string
 	authVersion     int
+	progressManager *progress.Manager
 }
 
 // ValidateOptions checks for any incompatible sets of options
@@ -67,6 +71,8 @@ func (dump *MongoDump) ValidateOptions() error {
 		return fmt.Errorf("--db is required when --excludeCollection is specified")
 	case len(dump.OutputOptions.ExcludedCollectionPrefixes) > 0 && dump.ToolOptions.Namespace.DB == "":
 		return fmt.Errorf("--db is required when --excludeCollectionsWithPrefix is specified")
+	case dump.OutputOptions.JobThreads < 1:
+		return fmt.Errorf("number of processing threads must be >= 1")
 	}
 	return nil
 }
@@ -76,13 +82,19 @@ func (dump *MongoDump) Init() error {
 	if err != nil {
 		return fmt.Errorf("Bad Option: %v", err)
 	}
+	if dump.OutputOptions.Out == "-" {
+		dump.useStdout = true
+	}
 	dump.sessionProvider = db.NewSessionProvider(*dump.ToolOptions)
+	dump.manager = intents.NewIntentManager()
+	dump.progressManager = progress.NewProgressBarManager(ProgressBarWaitTime)
 	return nil
 }
 
 // Dump handles some final options checking and executes MongoDump
 func (dump *MongoDump) Dump() error {
 	err := dump.ValidateOptions()
+	// TODO is this duplicated?
 	if err != nil {
 		return fmt.Errorf("Bad Option: %v", err)
 	}
@@ -106,10 +118,6 @@ func (dump *MongoDump) Dump() error {
 		dump.query = bson.M(asMap)
 	}
 
-	if dump.OutputOptions.Out == "-" {
-		dump.useStdout = true
-	}
-
 	if dump.OutputOptions.DumpDBUsersAndRoles {
 		//first make sure this is possible with the connected database
 		dump.authVersion, err = auth.GetAuthVersion(dump.sessionProvider)
@@ -126,36 +134,16 @@ func (dump *MongoDump) Dump() error {
 	//switch on what kind of execution to do
 	switch {
 	case dump.ToolOptions.DB == "" && dump.ToolOptions.Collection == "":
-		err = dump.DumpEverything()
+		err = dump.CreateAllIntents()
 	case dump.ToolOptions.DB != "" && dump.ToolOptions.Collection == "":
-		err = dump.DumpDatabase(dump.ToolOptions.DB)
+		err = dump.CreateIntentsForDatabase(dump.ToolOptions.DB)
 	case dump.ToolOptions.DB != "" && dump.ToolOptions.Collection != "":
-		err = dump.DumpCollection(dump.ToolOptions.DB, dump.ToolOptions.Collection)
+		err = dump.CreateIntentForCollection(dump.ToolOptions.DB, dump.ToolOptions.Collection)
 	}
 	if err != nil {
 		return err
 	}
 
-	if dump.OutputOptions.DumpDBUsersAndRoles {
-		log.Logf(log.Always, "dumping users and roles for %v", dump.ToolOptions.DB)
-		if dump.ToolOptions.DB == "admin" {
-			log.Logf(log.Always, "skipping users/roles dump, already dumped admin database")
-		} else {
-			err = dump.DumpUsersAndRolesForDB(dump.ToolOptions.DB)
-			if err != nil {
-				return fmt.Errorf("error dumping users and roles: %v", err)
-			}
-		}
-	}
-
-	log.Logf(log.Info, "done")
-
-	return err
-}
-
-// DumpEverything dumps all found databases and handles the oplog,
-// skipping the "local" db, which can only be explicitly dumped.
-func (dump *MongoDump) DumpEverything() error {
 	var oplogStart bson.MongoTimestamp
 
 	// If oplog capturing is enabled, we first check the most recent
@@ -174,18 +162,12 @@ func (dump *MongoDump) DumpEverything() error {
 		}
 	}
 
-	dbs, err := dump.sessionProvider.DatabaseNames()
-	if err != nil {
-		return fmt.Errorf("error getting database names: %v", err)
-	}
-	for _, dbName := range dbs {
-		if dbName != "local" { // local can only be explicitly dumped
-			log.Logf(log.Always, "dumping database %v", dbName)
-			err := dump.DumpDatabase(dbName)
-			if err != nil {
-				return err
-			}
-		}
+	// kick off the progress bar manager and begin dumping intents
+	dump.progressManager.Start()
+	defer dump.progressManager.Stop()
+
+	if err := dump.DumpIntents(); err != nil {
+		return err
 	}
 
 	// If we are capturing the oplog, we dump all oplog entries that occurred
@@ -212,13 +194,21 @@ func (dump *MongoDump) DumpEverything() error {
 		}
 
 		log.Logf(log.Always, "writing captured oplog to %v", oplogFilepath)
-		//session.SetPrefetch(1.0) //mimic exhaust cursor
-		queryObj := bson.M{"ts": bson.M{"$gt": oplogStart}}
-		oplogQuery, err := dump.sessionProvider.FindDocs("local", dump.oplogCollection, 0, 0, queryObj, nil, db.Prefetch)
+		//TODO encapsulate this logic
+		session, err := dump.sessionProvider.GetSession()
 		if err != nil {
 			return err
 		}
-		err = dump.dumpDocSourceToWriter(oplogQuery, oplogOut)
+		defer session.Close()
+		session.SetSocketTimeout(0)
+		session.SetPrefetch(1.0) //mimic exhaust cursor
+		queryObj := bson.M{"ts": bson.M{"$gt": oplogStart}}
+		oplogQuery := session.DB("local").C(dump.oplogCollection).Find(queryObj).LogReplay()
+		if err != nil {
+			return err
+		}
+		err = dump.dumpQueryToWriter(
+			oplogQuery, &intents.Intent{DB: "local", C: dump.oplogCollection}, oplogOut)
 		if err != nil {
 			return err
 		}
@@ -238,153 +228,179 @@ func (dump *MongoDump) DumpEverything() error {
 		log.Logf(log.DebugHigh, "oplog entry %v still exists", oplogStart)
 	}
 
-	return nil
+	if dump.OutputOptions.DumpDBUsersAndRoles {
+		log.Logf(log.Always, "dumping users and roles for %v", dump.ToolOptions.DB)
+		if dump.ToolOptions.DB == "admin" {
+			log.Logf(log.Always, "skipping users/roles dump, already dumped admin database")
+		} else {
+			err = dump.DumpUsersAndRolesForDB(dump.ToolOptions.DB)
+			if err != nil {
+				return fmt.Errorf("error dumping users and roles: %v", err)
+			}
+		}
+	}
+
+	log.Logf(log.Info, "done")
+
+	return err
 }
 
-func (dump *MongoDump) skipCollection(colName string) bool {
-	for _, excludedCollection := range dump.OutputOptions.ExcludedCollections {
-		if colName == excludedCollection {
-			return true
-		}
-	}
-	for _, excludedCollectionPrefix := range dump.OutputOptions.ExcludedCollectionPrefixes {
-		if strings.HasPrefix(colName, excludedCollectionPrefix) {
-			return true
-		}
-	}
-	return false
-}
+// DumpIntents iterates through the previously-created intents and
+// dumps all of the found collections
+func (dump *MongoDump) DumpIntents() error {
+	resultChan := make(chan error)
 
-// DumpDatabase dumps the specified database
-func (dump *MongoDump) DumpDatabase(db string) error {
-	cols, err := dump.sessionProvider.CollectionNames(db)
-	if err != nil {
-		return fmt.Errorf("error getting collections names for database `%v`: %v", dump.ToolOptions.DB, err)
+	jobs := dump.OutputOptions.JobThreads
+	if jobs > 1 {
+		dump.manager.Finalize(intents.LongestTaskFirst)
+	} else {
+		dump.manager.Finalize(intents.Legacy)
 	}
 
-	dbFolder := filepath.Join(dump.OutputOptions.Out, db)
-	err = os.MkdirAll(dbFolder, DumpDefaultPermissions)
+	log.Logf(log.Info, "dumping with %v job threads", jobs)
 
-	log.Logf(log.DebugLow, "found collections: %v", strings.Join(cols, ", "))
-	for _, col := range cols {
-		if dump.skipCollection(col) {
-			log.Logf(log.DebugLow, "skipping %v, it is excluded", col)
-			continue
-		}
-		err = dump.DumpCollection(db, col)
-		if err != nil {
-			return err
+	// start a goroutine for each job thread
+	for i := 0; i < jobs; i++ {
+		go func(id int) {
+			log.Logf(log.DebugHigh, "starting dump routine with id=%v", id)
+			for {
+				intent := dump.manager.Pop()
+				if intent == nil {
+					break
+				}
+				err := dump.DumpIntent(intent)
+				if err != nil {
+					resultChan <- err
+					return
+				}
+				dump.manager.Finish(intent)
+			}
+			log.Logf(log.DebugHigh, "ending dump routine with id=%v, no more work to do", id)
+			resultChan <- nil
+		}(i)
+	}
+
+	// wait until all goroutines are done or one of them errors out
+	for i := 0; i < jobs; i++ {
+		select {
+		case err := <-resultChan:
+			if err != nil {
+				return err
+			}
 		}
 	}
+
 	return nil
 }
 
 // DumpCollection dumps the specified database's collection
-func (dump *MongoDump) DumpCollection(dbName, c string) error {
-	// in mgo, setting prefetch = 1.0 causes the driver to make requests for
-	// more results as soon as results are returned. This effectively
-	// duplicates the behavior of an exhaust cursor.
-	//TODO reenable (mob)
-	//session.SetPrefetch(1.0)
-
-	var findQuery db.DocSource
-	var err error
-	switch {
-	case len(dump.query) > 0:
-		findQuery, err = dump.sessionProvider.FindDocs(dbName, c, 0, 0, dump.query, nil, db.Prefetch)
-	case dump.InputOptions.TableScan:
-		// ---forceTablesScan runs the query without snapshot enabled
-		findQuery, err = dump.sessionProvider.FindDocs(dbName, c, 0, 0, nil, nil, db.Prefetch)
-	default:
-		findQuery, err = dump.sessionProvider.FindDocs(dbName, c, 0, 0, nil, nil, db.Prefetch&db.Snapshot)
-	}
+func (dump *MongoDump) DumpIntent(intent *intents.Intent) error {
+	session, err := dump.sessionProvider.GetSession()
 	if err != nil {
 		return err
 	}
+	session.SetSocketTimeout(0)
+	defer session.Close()
+	// in mgo, setting prefetch = 1.0 causes the driver to make requests for
+	// more results as soon as results are returned. This effectively
+	// duplicates the behavior of an exhaust cursor.
+	session.SetPrefetch(1.0)
+
+	var findQuery *mgo.Query
+	switch {
+	case len(dump.query) > 0:
+		findQuery = session.DB(intent.DB).C(intent.C).Find(dump.query)
+	case dump.InputOptions.TableScan:
+		// ---forceTablesScan runs the query without snapshot enabled
+		findQuery = session.DB(intent.DB).C(intent.C).Find(nil)
+	default:
+		findQuery = session.DB(intent.DB).C(intent.C).Find(nil).Snapshot()
+
+	}
 
 	if dump.useStdout {
-		log.Logf(log.Always, "writing %v.%v to stdout", dbName, c)
-		return dump.dumpDocSourceToWriter(findQuery, os.Stdout)
-	}
-	dbFolder := filepath.Join(dump.OutputOptions.Out, dbName)
-	err = os.MkdirAll(dbFolder, DumpDefaultPermissions)
-	if err != nil {
-		return fmt.Errorf("error creating directory `%v`: %v", dbFolder, err)
+		log.Logf(log.Always, "writing %v to stdout", intent.Key())
+		return dump.dumpQueryToWriter(findQuery, intent, os.Stdout)
 	}
 
-	outFilepath := filepath.Join(dbFolder, fmt.Sprintf("%v.bson", c))
+	dbFolder := filepath.Join(dump.OutputOptions.Out, intent.DB)
+	if err = os.MkdirAll(dbFolder, DumpDefaultPermissions); err != nil {
+		return fmt.Errorf("error creating folder `%v` for dump: %v", dbFolder, err)
+	}
+	outFilepath := filepath.Join(dbFolder, fmt.Sprintf("%v.bson", intent.C))
 	out, err := os.Create(outFilepath)
 	if err != nil {
 		return fmt.Errorf("error creating bson file `%v`: %v", outFilepath, err)
 	}
 	defer out.Close()
 
-	log.Logf(log.Always, "writing %v.%v to %v", dbName, c, outFilepath)
-	err = dump.dumpDocSourceToWriter(findQuery, out)
-	if err != nil {
+	log.Logf(log.Always, "writing %v to %v", intent.Key(), outFilepath)
+	if err = dump.dumpQueryToWriter(findQuery, intent, out); err != nil {
 		return err
 	}
 
 	// don't dump metatdata for SystemIndexes collection
-	if c == SystemIndexes {
+	if intent.IsSystemIndexes() {
 		return nil
 	}
 
-	metadataFilepath := filepath.Join(dbFolder, fmt.Sprintf("%v.metadata.json", c))
+	metadataFilepath := filepath.Join(dbFolder, fmt.Sprintf("%v.metadata.json", intent.C))
 	metaOut, err := os.Create(metadataFilepath)
 	if err != nil {
 		return fmt.Errorf("error creating metadata.json file `%v`: %v", outFilepath, err)
 	}
 	defer metaOut.Close()
 
-	log.Logf(log.Always, "writing %v.%v metadata to %v", dbName, c, metadataFilepath)
-	return dump.dumpMetadataToWriter(dbName, c, metaOut)
+	log.Logf(log.Always, "writing %v metadata to %v", intent.Key(), metadataFilepath)
+	if err = dump.dumpMetadataToWriter(intent.DB, intent.C, metaOut); err != nil {
+		return err
+	}
+
+	log.Logf(log.Always, "done dumping %v", intent.Key())
+	return nil
 }
 
-// dumpQueryToWriter takes an mgo Query and a writer, performs the query,
+// dumpQueryToWriter takes an mgo Query, its intent, and a writer, performs the query,
 // and writes the raw bson results to the writer.
-func (dump *MongoDump) dumpDocSourceToWriter(query db.DocSource, writer io.Writer) (err error) {
-	//var dumpCounter int
-	/*total, err := query.Count()
+func (dump *MongoDump) dumpQueryToWriter(
+	query *mgo.Query, intent *intents.Intent, writer io.Writer) (err error) {
+
+	dumpCounter := 0
+	total, err := query.Count()
 	if err != nil {
 		return fmt.Errorf("error reading from db: %v", err)
 	}
 	log.Logf(log.Info, "\t%v documents", total)
 
-	bar := progress.ProgressBar{
+	bar := &progress.ProgressBar{
+		Name:       intent.Key(),
 		Max:        total,
 		CounterPtr: &dumpCounter,
-		WaitTime:   3 * time.Second,
 		Writer:     log.Writer(0),
 		BarLength:  ProgressBarLength,
 	}
-	bar.Start()
-	defer bar.Stop()
-	*/
-	defer func() {
-		err2 := query.Close()
-		if err == nil {
-			err = err2
-		}
-	}()
+	dump.progressManager.Attach(bar)
+	defer dump.progressManager.Detach(bar)
 
 	// We run the result iteration in its own goroutine,
 	// this allows disk i/o to not block reads from the db,
 	// which gives a slight speedup on benchmarks
+	iter := query.Iter()
 	buffChan := make(chan []byte)
 	go func() {
 		for {
 			raw := &bson.Raw{}
-			if err := query.Err(); err != nil {
+			if err := iter.Err(); err != nil {
 				log.Logf(log.Always, "error reading from db: %v", err)
 			}
-			next := query.Next(raw)
+			next := iter.Next(raw)
 
 			if !next {
 				close(buffChan)
 				return
 			}
 
+			//TODO use buffer pool?
 			nextCopy := make([]byte, len(raw.Data))
 			copy(nextCopy, raw.Data)
 
@@ -401,8 +417,8 @@ func (dump *MongoDump) dumpDocSourceToWriter(query db.DocSource, writer io.Write
 	for {
 		buff, alive := <-buffChan
 		if !alive {
-			if query.Err() != nil {
-				return fmt.Errorf("error reading collection: %v", query.Err())
+			if iter.Err() != nil {
+				return fmt.Errorf("error reading collection: %v", iter.Err())
 			}
 			break
 		}
@@ -410,7 +426,7 @@ func (dump *MongoDump) dumpDocSourceToWriter(query db.DocSource, writer io.Write
 		if err != nil {
 			return fmt.Errorf("error writing to file: %v", err)
 		}
-		//dumpCounter++
+		dumpCounter++
 	}
 	err = w.Flush()
 	if err != nil {
@@ -422,6 +438,13 @@ func (dump *MongoDump) dumpDocSourceToWriter(query db.DocSource, writer io.Write
 // DumpUsersAndRolesForDB queries and dumps the users and roles tied
 // to the given the db. Only works with schema version == 3
 func (dump *MongoDump) DumpUsersAndRolesForDB(db string) error {
+	session, err := dump.sessionProvider.GetSession()
+	if err != nil {
+		return err
+	}
+	session.SetSocketTimeout(0)
+	defer session.Close()
+
 	dbQuery := bson.M{"db": db}
 	outDir := filepath.Join(dump.OutputOptions.Out, db)
 
@@ -430,11 +453,9 @@ func (dump *MongoDump) DumpUsersAndRolesForDB(db string) error {
 		return fmt.Errorf("error creating file for db users: %v", err)
 	}
 
-	usersQuery, err := dump.sessionProvider.FindDocs("admin", "system.users", 0, 0, dbQuery, nil, 0)
-	if err != nil {
-		return err
-	}
-	err = dump.dumpDocSourceToWriter(usersQuery, usersFile)
+	usersQuery := session.DB("admin").C("system.users").Find(dbQuery)
+	err = dump.dumpQueryToWriter(
+		usersQuery, &intents.Intent{DB: "system", C: "users"}, usersFile)
 	if err != nil {
 		return fmt.Errorf("error dumping db users: %v", err)
 	}
@@ -444,11 +465,9 @@ func (dump *MongoDump) DumpUsersAndRolesForDB(db string) error {
 		return fmt.Errorf("error creating file for db roles: %v", err)
 	}
 
-	rolesQuery, err := dump.sessionProvider.FindDocs("admin", "system.roles", 0, 0, dbQuery, nil, 0)
-	if err != nil {
-		return err
-	}
-	err = dump.dumpDocSourceToWriter(rolesQuery, rolesFile)
+	rolesQuery := session.DB("admin").C("system.roles").Find(dbQuery)
+	err = dump.dumpQueryToWriter(
+		rolesQuery, &intents.Intent{DB: "system", C: "roles"}, rolesFile)
 	if err != nil {
 		return fmt.Errorf("error dumping db roles: %v", err)
 	}
