@@ -68,16 +68,49 @@ namespace mongo {
                  NamespaceString::normal( ns ) );
     }
 
-    class Database::CollectionCacheChange : public RecoveryUnit::Change {
+    class Database::AddCollectionChange : public RecoveryUnit::Change {
     public:
-        CollectionCacheChange(Database* db, const StringData& ns)
-        : _db(db), _ns(ns.toString()) { }
+        AddCollectionChange(Database* db, const StringData& ns)
+            : _db(db)
+            , _ns(ns.toString())
+        {}
 
-        void rollback() { _db->_clearCollectionCache(_ns); }
-        void commit() { }
-    private:
+        virtual void commit() {}
+        virtual void rollback() {
+            scoped_lock lk( _db->_collectionLock );
+            CollectionMap::const_iterator it = _db->_collections.find(_ns);
+            if ( it == _db->_collections.end() )
+                return;
+
+            delete it->second;
+            _db->_collections.erase( it );
+        }
+
         Database* const _db;
-        std::string _ns;
+        const std::string _ns;
+    };
+
+    class Database::RemoveCollectionChange : public RecoveryUnit::Change {
+    public:
+        // Takes ownership of coll (but not db).
+        RemoveCollectionChange(Database* db, Collection* coll)
+            : _db(db)
+            , _coll(coll)
+        {}
+
+        virtual void commit() {
+            delete _coll;
+        }
+
+        virtual void rollback() {
+            mongo::mutex::scoped_lock lk(_db->_collectionLock);
+            Collection*& inMap = _db->_collections[_coll->ns().ns()];
+            invariant(!inMap);
+            inMap = _coll;
+        }
+
+        Database* const _db;
+        Collection* const _coll;
     };
 
     Database::~Database() {
@@ -290,8 +323,6 @@ namespace mongo {
             return Status::OK();
         }
 
-        txn->recoveryUnit()->registerChange( new CollectionCacheChange(this, fullns) );
-
         {
             NamespaceString s( fullns );
             verify( s.db() == _name );
@@ -335,7 +366,7 @@ namespace mongo {
 
         Status s = _dbEntry->dropCollection( txn, fullns );
 
-        _clearCollectionCache( fullns ); // we want to do this always
+        _clearCollectionCache( txn, fullns ); // we want to do this always
 
         if ( !s.isOK() )
             return s;
@@ -359,18 +390,21 @@ namespace mongo {
         return Status::OK();
     }
 
-    void Database::_clearCollectionCache( const StringData& fullns ) {
+    void Database::_clearCollectionCache(OperationContext* txn, const StringData& fullns ) {
         scoped_lock lk( _collectionLock );
-        _clearCollectionCache_inlock( fullns );
+        _clearCollectionCache_inlock( txn, fullns );
     }
 
-    void Database::_clearCollectionCache_inlock( const StringData& fullns ) {
+    void Database::_clearCollectionCache_inlock(OperationContext* txn, const StringData& fullns ) {
         verify( _name == nsToDatabaseSubstring( fullns ) );
         CollectionMap::const_iterator it = _collections.find( fullns.toString() );
         if ( it == _collections.end() )
             return;
 
-        delete it->second; // this also deletes all cursors + executors
+        // Takes ownership of the collection
+        txn->recoveryUnit()->registerChange(new RemoveCollectionChange(this, it->second));
+
+        it->second->_cursorCache.invalidateAll(true);
         _collections.erase( it );
     }
 
@@ -391,6 +425,7 @@ namespace mongo {
         auto_ptr<RecordStore> rs( _dbEntry->getRecordStore( txn, ns ) );
         invariant( rs.get() ); // if catalogEntry exists, so should this
 
+        // Not registering AddCollectionChange since this is for collections that already exist.
         Collection* c = new Collection( txn, ns, catalogEntry.release(), rs.release(), this );
         _collections[ns] = c;
         return c;
@@ -412,18 +447,19 @@ namespace mongo {
             IndexCatalog::IndexIterator ii = coll->getIndexCatalog()->getIndexIterator( txn, true );
             while ( ii.more() ) {
                 IndexDescriptor* desc = ii.next();
-                _clearCollectionCache( desc->indexNamespace() );
+                _clearCollectionCache( txn, desc->indexNamespace() );
             }
 
             {
                 scoped_lock lk( _collectionLock );
-                _clearCollectionCache_inlock( fromNS );
-                _clearCollectionCache_inlock( toNS );
+                _clearCollectionCache_inlock( txn, fromNS );
+                _clearCollectionCache_inlock( txn, toNS );
             }
 
             Top::global.collectionDropped( fromNS.toString() );
         }
 
+        txn->recoveryUnit()->registerChange( new AddCollectionChange(this, toNS) );
         return _dbEntry->renameCollection( txn, fromNS, toNS, stayTemp );
     }
 
@@ -463,7 +499,7 @@ namespace mongo {
 
         audit::logCreateCollection( currentClient.get(), ns );
 
-        txn->recoveryUnit()->registerChange( new CollectionCacheChange(this, ns) );
+        txn->recoveryUnit()->registerChange( new AddCollectionChange(this, ns) );
 
         Status status = _dbEntry->createCollection(txn, ns,
                                                 options, allocateDefaultSpace);

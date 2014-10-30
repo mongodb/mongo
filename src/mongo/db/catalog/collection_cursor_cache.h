@@ -55,8 +55,8 @@ namespace mongo {
         // -----------------
 
         /**
-         * @param collectionGoingAway should be tru if the Collection instance is going away
-         *                            this could be because the db is being closed, or the
+         * @param collectionGoingAway Pass as true if the Collection instance is going away.
+         *                            This could be because the db is being closed, or the
          *                            collection/db is being dropped.
          */
         void invalidateAll( bool collectionGoingAway );

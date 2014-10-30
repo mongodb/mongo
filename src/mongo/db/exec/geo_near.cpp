@@ -39,6 +39,7 @@
 #include "mongo/db/exec/working_set_computed_data.h"
 #include "mongo/db/geo/geoconstants.h"
 #include "mongo/db/geo/geoparser.h"
+#include "mongo/db/geo/hash.h"
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/query/expression_index.h"
 #include "mongo/db/query/expression_index_knobs.h"
@@ -272,7 +273,24 @@ namespace mongo {
 
     class GeoNear2DStage::DensityEstimator {
     public:
-        DensityEstimator(GeoNear2DStage* stage) : _stage(stage) { }
+        DensityEstimator(const IndexDescriptor* twoDindex, const GeoNearParams* nearParams) :
+                _twoDIndex(twoDindex), _nearParams(nearParams), _currentLevel(0)
+        {
+            GeoHashConverter::Parameters hashParams;
+            Status status = GeoHashConverter::parseParameters(_twoDIndex->infoObj(),
+                                                              &hashParams);
+            // The index status should always be valid.
+            invariant(status.isOK());
+
+            _converter.reset(new GeoHashConverter(hashParams));
+            _centroidCell = _converter->hash(_nearParams->nearQuery->centroid->oldPoint);
+
+            // Since appendVertexNeighbors(level, output) requires level < hash.getBits(),
+            // we have to start to find documents at most GeoHash::kMaxBits - 1. Thus the finest
+            // search area is 16 * finest cell area at GeoHash::kMaxBits.
+            _currentLevel = std::max(0u, hashParams.bits - 1u);
+        }
+
         PlanStage::StageState work(OperationContext* txn,
                                    WorkingSet* workingSet,
                                    Collection* collection,
@@ -281,10 +299,12 @@ namespace mongo {
     private:
         void buildIndexScan(OperationContext* txn, WorkingSet* workingSet, Collection* collection);
 
-        const GeoNear2DStage* _stage; // Not owned here.
+        const IndexDescriptor* _twoDIndex;  // Not owned here.
+        const GeoNearParams* _nearParams;  // Not owned here.
         scoped_ptr<IndexScan> _indexScan;
         scoped_ptr<GeoHashConverter> _converter;
         GeoHash _centroidCell;
+        unsigned _currentLevel;
     };
 
     // Initialize the internal states
@@ -292,40 +312,38 @@ namespace mongo {
                                                           WorkingSet* workingSet,
                                                           Collection* collection)
     {
-        // Estimate density with 2d index.
-        GeoHashConverter::Parameters hashParams;
-        Status status = GeoHashConverter::parseParameters(_stage->_twoDIndex->infoObj(),
-                                                          &hashParams);
-        // The index status should always be valid.
-        invariant(status.isOK());
-
-        _converter.reset(new GeoHashConverter(hashParams));
-        _centroidCell = _converter->hash(_stage->_nearParams.nearQuery->centroid->oldPoint);
-
-        // Setup the stages for this interval
-
-        // Build index bound [hash(centerCell), minKey] in reverse order
-        mongo::BSONObjBuilder builder;
-        _centroidCell.appendHashMax(&builder, "");
-        builder.appendMinForType("", mongo::BinData);
-        OrderedIntervalList oil;
-        oil.intervals.push_back(IndexBoundsBuilder::makeRangeInterval(builder.obj(),
-                                                                      true,
-                                                                      true));
         IndexScanParams scanParams;
-        scanParams.descriptor = _stage->_twoDIndex;
-        scanParams.direction = -1;
+        scanParams.descriptor = _twoDIndex;
+        scanParams.direction = 1;
         scanParams.doNotDedup = true;
 
         // Scan bounds on 2D indexes are only over the 2D field - other bounds aren't applicable.
         // This is handled in query planning.
-        scanParams.bounds = _stage->_nearParams.baseBounds;
+        scanParams.bounds = _nearParams->baseBounds;
 
         // The "2d" field is always the first in the index
-        const string twoDFieldName = _stage->_nearParams.nearQuery->field;
+        const string twoDFieldName = _nearParams->nearQuery->field;
         const int twoDFieldPosition = 0;
 
+        // Construct index intervals used by this stage
+        OrderedIntervalList oil;
         oil.name = scanParams.bounds.fields[twoDFieldPosition].name;
+
+        vector<GeoHash> neighbors;
+        // Return the neighbors of closest vertex to this cell at the given level.
+        _centroidCell.appendVertexNeighbors(_currentLevel, &neighbors);
+        std::sort(neighbors.begin(), neighbors.end());
+
+        for (vector<GeoHash>::const_iterator it = neighbors.begin(); it != neighbors.end(); it++) {
+            mongo::BSONObjBuilder builder;
+            it->appendHashMin(&builder, "");
+            it->appendHashMax(&builder, "");
+            oil.intervals.push_back(IndexBoundsBuilder::makeRangeInterval(builder.obj(),
+                                                                          true,
+                                                                          true));
+        }
+
+        invariant(oil.isValidFor(1));
 
         // Intersect the $near bounds we just generated into the bounds we have for anything else
         // in the scan (i.e. $within)
@@ -343,46 +361,36 @@ namespace mongo {
                                                                  double* estimatedDistance)
     {
         if (!_indexScan) {
+            // Setup index scan stage for current level.
             buildIndexScan(txn, workingSet, collection);
         }
 
-        // Fetch the fist document
         WorkingSetID workingSetID;
-        PlanStage::StageState stageState = _indexScan->work(&workingSetID);
+        PlanStage::StageState state = _indexScan->work(&workingSetID);
 
-        if (stageState == PlanStage::ADVANCED) {
-            // Found a document in ancestors of center cell. Extract its key and calculate
-            // the distance from it.
-            IndexKeyDatum datum = workingSet->get(workingSetID)->keyData[0];
-            BSONElement keyElt = datum.keyData.firstElement();
-            invariant(BinData == keyElt.type());
-            GeoHash previousKey = _converter->hash(keyElt);
-            GeoHash commonPrefix = _centroidCell.commonPrefix(previousKey);
+        if (state == PlanStage::IS_EOF) {
+            // We ran through the neighbors but found nothing.
+            if (_currentLevel > 0u) {
+                // Advance to the next level and search again.
+                _currentLevel--;
+                // Reset index scan for the next level.
+                _indexScan.reset(NULL);
+                return PlanStage::NEED_TIME;
+            }
 
-            //
-            // +---+---+
-            // |   | A |
-            // +---+---+
-            // |   | B |
-            // +---+---+
-            //
-            // Say A is the the centroid cell of (0100)11
-            // and B is the the previous cell of (0100)01
-            // The common prefix (0100) gives the full square in the figure above.
-            // At the scale of cell size at commonPrefix's level, we found a document.
-            //
-            // TODO: make a threshold for the coarsest level.
-            *estimatedDistance = _converter->sizeEdge(commonPrefix.getBits());
+            // We are already at the top level.
+            *estimatedDistance = _converter->sizeEdge(_currentLevel);
             return PlanStage::IS_EOF;
-
-        } else if (stageState == PlanStage::IS_EOF) {
-            // Found nothing. Return the distance proportional to the finest cell size by default.
-            *estimatedDistance = 2 * _converter->sizeEdge(_centroidCell.getBits());
+        } else if (state == PlanStage::ADVANCED) {
+            // Found a document at current level.
+            *estimatedDistance = _converter->sizeEdge(_currentLevel);
+            // Clean up working set.
+            workingSet->free(workingSetID);
             return PlanStage::IS_EOF;
         }
 
         // Propagate NEED_TIME or errors
-        return stageState;
+        return state;
     }
 
     PlanStage::StageState GeoNear2DStage::initialize(OperationContext* txn,
@@ -395,7 +403,7 @@ namespace mongo {
         }
 
         if (!_densityEstimator) {
-            _densityEstimator.reset(new DensityEstimator(this));
+            _densityEstimator.reset(new DensityEstimator(_twoDIndex, &_nearParams));
         }
 
         double estimatedDistance;
@@ -403,7 +411,7 @@ namespace mongo {
 
         if (state == PlanStage::IS_EOF) {
             // Estimator finished its work, we need to finish initialization too.
-            _boundsIncrement = 5 * estimatedDistance;
+            _boundsIncrement = 3 * estimatedDistance;
             invariant(_boundsIncrement > 0.0);
 
             // Clean up
@@ -939,13 +947,11 @@ namespace mongo {
         {
             S2IndexingParams params;
             ExpressionParams::parse2dsphereParams(_s2Index->infoObj(), &params);
-            // Since cellId.AppendVertexNeighbors(level, output) requires level > cellId.level(),
+            // Since cellId.AppendVertexNeighbors(level, output) requires level < cellId.level(),
             // we have to start to find documents at most S2::kMaxCellLevel - 1. Thus the finest
             // search area is 16 * finest cell area at S2::kMaxCellLevel, which is less than
             // (1.4 inch X 1.4 inch) on the earth.
-            _currentLevel = std::max(0,
-                                     std::min(S2::kMaxCellLevel - 1,
-                                              params.finestIndexedLevel - 1));
+            _currentLevel = std::max(0, params.finestIndexedLevel - 1);
         }
 
         // Search for a document in neighbors at current level.
@@ -1042,6 +1048,8 @@ namespace mongo {
         } else if (state == PlanStage::ADVANCED) {
             // We found something!
             *estimatedDistance = S2::kAvgEdge.GetValue(_currentLevel) * kRadiusOfEarthInMeters;
+            // Clean up working set.
+            workingSet->free(workingSetID);
             return PlanStage::IS_EOF;
         }
 

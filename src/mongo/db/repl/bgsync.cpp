@@ -147,11 +147,13 @@ namespace {
                 _producerThread();
             }
             catch (const DBException& e) {
-                sethbmsg(str::stream() << "sync source problem: " << e.toString());
+                std::string msg(str::stream() << "sync producer problem: " << e.toString());
+                error() << msg << rsLog;
+                _replCoord->setMyHeartbeatMessage(msg);
             }
             catch (const std::exception& e2) {
-                sethbmsg(str::stream() << "exception in producer: " << e2.what());
-                sleepsecs(60);
+                severe() << "sync producer exception: " << e2.what() << rsLog;
+                fassertFailed(28546);
             }
         }
 

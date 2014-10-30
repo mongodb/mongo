@@ -1282,7 +1282,9 @@ namespace mongo {
                     return;
                 }
 
-                Lock::DBLock dbLock(txn->lockState(), nss.db(), MODE_IX);
+                AutoGetDb autoDb(txn, nss.db(), MODE_IX);
+                if (!autoDb.getDb()) break;
+
                 Lock::CollectionLock collLock(txn->lockState(), nss.ns(), MODE_IX);
 
                 // Check version once we're locked
@@ -1296,8 +1298,9 @@ namespace mongo {
                 // TODO: better constructor?
                 Client::Context ctx(txn, nss.ns(), false /* don't check version */);
 
-                result->getStats().n = executor.execute(ctx.db());
-                return;
+                result->getStats().n = executor.execute(autoDb.getDb());
+
+                break;
             }
             catch ( const DeadLockException& dle ) {
                 log() << "got deadlock doing delete on " << nss

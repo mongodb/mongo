@@ -478,7 +478,7 @@ namespace mongo {
         if ( !status.isOK() )
             return status;
         _cursorCache.invalidateAll( false );
-        _infoCache.reset();
+        _infoCache.reset( txn );
 
         // 3) truncate record store
         status = _recordStore->truncate(txn);

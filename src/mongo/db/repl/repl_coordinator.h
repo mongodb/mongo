@@ -252,6 +252,11 @@ namespace repl {
         virtual Status setMyLastOptime(OperationContext* txn, const OpTime& ts) = 0;
 
         /**
+         * Updates our the message we include in heartbeat responses.
+         */
+        virtual void setMyHeartbeatMessage(const std::string& msg) = 0;
+
+        /**
          * Returns the last optime recorded by setMyLastOptime.
          */
         virtual OpTime getMyLastOptime() const = 0;

@@ -187,7 +187,7 @@ namespace mongo {
         return NULL;
     }
 
-    bool IndexCatalogEntryContainer::remove( const IndexDescriptor* desc ) {
+    IndexCatalogEntry* IndexCatalogEntryContainer::release( const IndexDescriptor* desc ) {
         for ( std::vector<IndexCatalogEntry*>::iterator i = _entries.mutableVector().begin();
               i != _entries.mutableVector().end();
               ++i ) {
@@ -195,10 +195,9 @@ namespace mongo {
             if ( e->descriptor() != desc )
                 continue;
             _entries.mutableVector().erase( i );
-            delete e;
-            return true;
+            return e;
         }
-        return false;
+        return NULL;
     }
 
 }  // namespace mongo

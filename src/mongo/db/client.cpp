@@ -201,8 +201,8 @@ namespace mongo {
                                                        const std::string& ns)
             : _txn(txn),
               _nss(ns),
-              _dbLock(_txn->lockState(), _nss.db(), MODE_IS),
-              _db(NULL),
+              _db(_txn, _nss.db(), MODE_IS),
+              _collLock(_txn->lockState(), ns, MODE_IS),
               _coll(NULL) {
 
         _init();
@@ -212,8 +212,8 @@ namespace mongo {
                                                        const NamespaceString& nss)
             : _txn(txn),
               _nss(nss),
-              _dbLock(_txn->lockState(), _nss.db(), MODE_IS),
-              _db(NULL),
+              _db(_txn, _nss.db(), MODE_IS),
+              _collLock(_txn->lockState(), _nss.toString(), MODE_IS),
               _coll(NULL) {
 
         _init();
@@ -226,34 +226,21 @@ namespace mongo {
         _txn->getCurOp()->ensureStarted();
         _txn->getCurOp()->setNS(_nss.toString());
 
-        // Lock both the DB and the collection (DB is locked in the constructor), because this is
-        // necessary in order to to shard version checking.
-        const ResourceId resId(RESOURCE_COLLECTION, _nss);
-        const LockMode collLockMode = supportsDocLocking() ? MODE_IS : MODE_S;
-
-        invariant(LOCK_OK == _txn->lockState()->lock(resId, collLockMode));
-
-        // Shard version check needs to be performed under the collection lock
+        // We have both the DB and collection locked, which the prerequisite to do a stable shard
+        // version check.
         ensureShardVersionOKOrThrow(_nss);
 
         // At this point, we are locked in shared mode for the database by the DB lock in the
         // constructor, so it is safe to load the DB pointer.
-        _db = dbHolder().get(_txn, _nss.db());
-        if (_db != NULL) {
+        if (_db.getDb()) {
             // TODO: Client::Context legacy, needs to be removed
-            _txn->getCurOp()->enter(_nss.toString().c_str(), _db->getProfilingLevel());
+            _txn->getCurOp()->enter(_nss.toString().c_str(), _db.getDb()->getProfilingLevel());
 
-            _coll = _db->getCollection(_txn, _nss);
+            _coll = _db.getDb()->getCollection(_txn, _nss);
         }
     }
 
     AutoGetCollectionForRead::~AutoGetCollectionForRead() {
-        // If the database is NULL, we would never have tried to lock the collection resource
-        if (_db) {
-            const ResourceId resId(RESOURCE_COLLECTION, _nss);
-            _txn->lockState()->unlock(resId);
-        }
-
         // Report time spent in read lock
         _txn->getCurOp()->recordGlobalTime(false, _timer.micros());
     }

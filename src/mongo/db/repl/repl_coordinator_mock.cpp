@@ -128,6 +128,10 @@ namespace repl {
         return Status::OK();
     }
     
+    void ReplicationCoordinatorMock::setMyHeartbeatMessage(const std::string& msg) {
+        // TODO
+    }
+
     Status ReplicationCoordinatorMock::setMyLastOptime(OperationContext* txn, const OpTime& ts) {
         return Status::OK();
     }

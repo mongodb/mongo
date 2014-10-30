@@ -332,6 +332,11 @@ namespace repl {
          */
         virtual bool checkShouldStandForElection(Date_t now, const OpTime& lastOpApplied) = 0;
 
+        /**
+         * Set the outgoing heartbeat message from self
+         */
+        virtual void setMyHeartbeatMessage(const Date_t now, const std::string& s) = 0;
+
     protected:
         TopologyCoordinator() {}
     };
