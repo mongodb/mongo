@@ -29,7 +29,7 @@ namespace mongo {
                    long long* numRecords, long long* dataSize ) const;
 
         void loadFrom( WiredTigerSession* cursor, const std::string& uri );
-        void storeInto( WiredTigerSession* cursor, const std::string& uri ) const;
+        void storeInto( WiredTigerSession* cursor, const std::string& uri );
 
     private:
         void _checkMagic() const;

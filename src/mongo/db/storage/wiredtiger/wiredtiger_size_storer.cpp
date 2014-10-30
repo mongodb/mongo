@@ -118,11 +118,28 @@ namespace mongo {
     }
 
     void WiredTigerSizeStorer::storeInto( WiredTigerSession* session,
-                                          const std::string& uri ) const {
+                                          const std::string& uri ) {
         Map myMap;
         {
             boost::mutex::scoped_lock lk( _entriesMutex );
-            myMap = _entries;
+            for ( Map::iterator it = _entries.begin(); it != _entries.end(); ++it ) {
+                string uri = it->first;
+                Entry& entry = it->second;
+                if ( entry.rs ) {
+                    if ( entry.dataSize != entry.rs->dataSize( NULL ) ) {
+                        entry.dataSize = entry.rs->dataSize( NULL );
+                        entry.dirty = true;
+                    }
+                    if ( entry.numRecords != entry.rs->numRecords( NULL ) ) {
+                        entry.numRecords = entry.rs->numRecords( NULL );
+                        entry.dirty = true;
+                    }
+                }
+                
+                if ( !entry.dirty )
+                    continue;
+                myMap[uri] = entry;
+            }
         }
 
         WT_SESSION* s = session->getSession();
@@ -137,19 +154,6 @@ namespace mongo {
         for ( Map::iterator it = myMap.begin(); it != myMap.end(); ++it ) {
             string uri = it->first;
             Entry& entry = it->second;
-            if ( entry.rs ) {
-                if ( entry.dataSize != entry.rs->dataSize( NULL ) ) {
-                    entry.dataSize = entry.rs->dataSize( NULL );
-                    entry.dirty = true;
-                }
-                if ( entry.numRecords != entry.rs->numRecords( NULL ) ) {
-                    entry.numRecords = entry.rs->numRecords( NULL );
-                    entry.dirty = true;
-                }
-            }
-
-            if ( !entry.dirty )
-                continue;
 
             BSONObj data;
             {
