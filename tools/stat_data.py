@@ -46,3 +46,21 @@ no_scale_per_second_list = [
     'reconciliation: maximum blocks required for a page',
     'session: open cursor count',
 ]
+no_clear_list = [
+    'cache: bytes currently in the cache',
+    'cache: maximum bytes configured',
+    'cache: pages currently held in the cache',
+    'conn: files currently open',
+    'log: total log buffer size',
+    'log: maximum log file size',
+    'LSM: App work units currently queued',
+    'LSM: Merge work units currently queued',
+    'LSM: Switch work units currently queued',
+    'reconciliation: split bytes currently awaiting free',
+    'reconciliation: split objects currently awaiting free',
+    'session: open cursor count',
+    'session: open session count',
+    'txn: transaction checkpoint currently running',
+    'txn: transaction range of IDs currently pinned',
+    'session: open cursor count',
+]
