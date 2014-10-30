@@ -124,12 +124,21 @@ namespace mongo {
          *              returning LOCK_TIMEOUT. This parameter defaults to UINT_MAX, which means
          *              wait infinitely. If 0 is passed, the request will return immediately, if
          *              the request could not be granted right away.
+         * @param checkDeadlock Whether to enable deadlock detection for this acquisition. This
+         *              parameter is put in place until we can handle deadlocks at all places,
+         *              which acquire locks.
          *
          * @return All LockResults except for LOCK_WAITING, because it blocks.
          */
         virtual LockResult lock(const ResourceId& resId,
-                                       LockMode mode,
-                                       unsigned timeoutMs = UINT_MAX) = 0;
+                                LockMode mode,
+                                unsigned timeoutMs = UINT_MAX,
+                                bool checkDeadlock = false) = 0;
+
+        /**
+         * Downgrades the specified resource's lock mode without changing the reference count.
+         */
+        virtual void downgrade(const ResourceId& resId, LockMode newMode) = 0;
 
         /**
          * Releases a lock previously acquired through a lock call. It is an error to try to
@@ -150,6 +159,12 @@ namespace mongo {
         virtual LockMode getLockMode(const ResourceId& resId) const = 0;
         virtual bool isLockHeldForMode(const ResourceId& resId,
                                        LockMode mode) const = 0;
+
+        /**
+         * Returns the resource that this locker is waiting/blocked on (if any). If the locker is
+         * not waiting for a resource the returned value will be invalid (isValid() == false).
+         */
+        virtual ResourceId getWaitingResource() const = 0;
 
         /**
          * LockSnapshot captures the state of all resources that are locked, what modes they're

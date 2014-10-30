@@ -171,4 +171,17 @@ namespace mongo {
                                              const StringData& defaultValue,
                                              std::string* out);
 
+    /**
+     * Finds an OID-typed element named "fieldName" in "object" and stores its value in *out.
+     *
+     * Returns Status::OK() and sets *out to the found element's OID value on success.  If no field
+     * named "fieldName" is present, *out is set to "defaultValue" and Status::OK() is returned.
+     * Returns ErrorCodes::TypeMismatch if the type of the matching element is not OID.  For return
+     * values other than Status::OK(), the resulting value of *out is undefined.
+     */
+    Status bsonExtractOIDFieldWithDefault(const BSONObj& object,
+                                          const StringData& fieldName,
+                                          const OID& defaultValue,
+                                          OID* out);
+
 }  // namespace mongo

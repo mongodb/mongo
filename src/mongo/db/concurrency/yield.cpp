@@ -28,6 +28,7 @@
 
 #include "mongo/db/concurrency/yield.h"
 
+#include "mongo/db/curop.h"
 #include "mongo/db/operation_context.h"
 
 namespace mongo {
@@ -61,6 +62,9 @@ namespace mongo {
         if (!locker->saveLockStateAndUnlock(&snapshot)) {
             return;
         }
+
+        // Track the number of yields in CurOp.
+        txn->getCurOp()->yielded();
 
         if (hadReadLock) {
             // TODO(kal): Is this still relevant?  Probably not?

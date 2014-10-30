@@ -93,10 +93,13 @@ namespace mongo {
          * The explain information is generated with the level of detail specified by 'verbosity'.
          *
          * Does not take ownership of its arguments.
+         *
+         * If there is an error during the execution of the query, the error message and code are
+         * added to the "executionStats" section of the explain.
          */
-        static Status explainStages(PlanExecutor* exec,
-                                    ExplainCommon::Verbosity verbosity,
-                                    BSONObjBuilder* out);
+        static void explainStages(PlanExecutor* exec,
+                                  ExplainCommon::Verbosity verbosity,
+                                  BSONObjBuilder* out);
 
         /**
          * Converts the stats tree 'stats' into a corresponding BSON object containing

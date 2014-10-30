@@ -651,11 +651,13 @@ namespace mongo {
 
                     OperationContextImpl txn;
 
-                    // Waits for all active operations to drain and won't let new ones start. This
-                    // should be optimized to allow readers in (see SERVER-15262).
+                    // Waits for all active writers to drain and won't let new ones start, but
+                    // lets the readers go on.
                     AutoAcquireFlushLockForMMAPV1Commit flushLock(txn.lockState());
-
                     groupCommit();
+
+                    // Causes everybody to stall so that the in-memory view can be remapped.
+                    flushLock.upgradeFlushLockToExclusive();
                     remapPrivateView();
                 }
                 catch(std::exception& e) {

@@ -58,26 +58,31 @@ namespace mongo {
         // These don't really mean anything here.
         // Some day we could count the # of calls to the yield functions to check that other stages
         // have correct yielding behavior.
-        virtual void saveState() { }
-        virtual void restoreState(OperationContext* opCtx) { }
-        virtual void invalidate(const DiskLoc& dl, InvalidationType type) { }
+        virtual void saveState();
+        virtual void restoreState(OperationContext* opCtx);
+        virtual void invalidate(const DiskLoc& dl, InvalidationType type);
 
         virtual std::vector<PlanStage*> getChildren() const;
 
         virtual StageType stageType() const { return STAGE_MOCK; }
 
         //
-        // Exec stats -- do not call for the mock stage.
+        // Exec stats
         //
 
-        virtual PlanStageStats* getStats() { return NULL; }
+        virtual PlanStageStats* getStats();
 
-        virtual const CommonStats* getCommonStats() { return NULL; }
+        virtual const CommonStats* getCommonStats();
 
-        virtual const SpecificStats* getSpecificStats() { return NULL; }
+        virtual const SpecificStats* getSpecificStats();
 
         /**
-         * Add a result to the back of the queue.  work() goes through the queue.
+         * Add a result to the back of the queue.
+         *
+         * Note: do not add PlanStage::ADVANCED with this method, ADVANCED can
+         * only be added with a data member.
+         *
+         * Work() goes through the queue.
          * Either no data is returned (just a state), or...
          */
         void pushBack(const PlanStage::StageState state);
@@ -90,6 +95,8 @@ namespace mongo {
          */
         void pushBack(const WorkingSetMember& member);
 
+        static const char* kStageType;
+
     private:
         // We don't own this.
         WorkingSet* _ws;
@@ -97,6 +104,10 @@ namespace mongo {
         // The data we return.
         std::queue<PlanStage::StageState> _results;
         std::queue<WorkingSetID> _members;
+
+        // Stats
+        CommonStats _commonStats;
+        MockStats _specificStats;
     };
 
 }  // namespace mongo

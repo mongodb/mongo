@@ -206,8 +206,7 @@ namespace mongo {
     }
 
     int KVStorageEngine::flushAllFiles( bool sync ) {
-        // todo: do I have to support this?
-        return 0;
+        return _engine->flushAllFiles( sync );
     }
 
     Status KVStorageEngine::repairDatabase( OperationContext* txn,

@@ -93,26 +93,27 @@ namespace {
             if (!status.isOK())
                 return status;
 
-            OID rid;
-            status = bsonExtractOIDField(entry, kMemberRIDFieldName, &rid);
-            
-            if (!status.isOK())
-                return status;
-
             OpTime ts;
             status = bsonExtractOpTimeField(entry, kOpTimeFieldName, &ts);
             if (!status.isOK())
                 return status;
 
-            // TODO(spencer): The following two fields are optional in 2.8, but should be made
-            // required in 3.0
+            // TODO(spencer): The following three fields are optional in 2.8, but should be made
+            // required or ignored in 3.0
             long long cfgver;
             status = bsonExtractIntegerFieldWithDefault(entry, kConfigVersionFieldName, -1, &cfgver);
             if (!status.isOK())
                 return status;
 
+            OID rid;
+            status = bsonExtractOIDFieldWithDefault(entry, kMemberRIDFieldName, OID(), &rid);
+            if (!status.isOK())
+                return status;
+
             long long memberID;
             status = bsonExtractIntegerFieldWithDefault(entry, kMemberIDFieldName, -1, &memberID);
+            if (!status.isOK())
+                return status;
 
             _updates.push_back(UpdateInfo(rid, ts, cfgver, memberID));
         }

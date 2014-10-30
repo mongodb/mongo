@@ -130,11 +130,17 @@ namespace mongo {
         const string newLocation(
                 chunkDistribution.getBestReceieverShard(tagStatus.getValue()));
 
+        if (newLocation.empty()) {
+            LOG(1) << "recently split chunk: " << chunk
+                   << " but no suitable shard to move to";
+            return false;
+        }
+
         if (chunk.getShard() == newLocation) {
             // if this is the best shard, then we shouldn't do anything.
             LOG(1) << "recently split chunk: " << chunk
-                   << " already in the best shard: " << endl;
-            return false; // we did split even if we didn't migrate
+                   << " already in the best shard" << endl;
+            return false;
         }
 
         ChunkPtr toMove = chunkMgr->findIntersectingChunk(chunk.getMin());
@@ -537,6 +543,14 @@ namespace mongo {
                 return false;
             }
             TicketHolderReleaser releaser( &(getManager()->_splitHeuristics._splitTickets) );
+
+            if (!configServer.allUp(true)) {
+                LOG(1) << "not performing auto-split because not all config servers are up";
+
+                // Back off indirectly by resetting _dataWritten.
+                _dataWritten = 0;
+                return false;
+            }
 
             // this is a bit ugly
             // we need it so that mongos blocks for the writes to actually be committed
@@ -1354,7 +1368,7 @@ namespace mongo {
 
         uassert( 13331 ,  "collection's metadata is undergoing changes. Please try again." , dlk.got() );
 
-        uassert( 10174 ,  "config servers not all up" , configServer.allUp() );
+        uassert(10174, "config servers not all up", configServer.allUp(false));
 
         set<Shard> seen;
 

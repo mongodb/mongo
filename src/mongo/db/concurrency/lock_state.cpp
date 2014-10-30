@@ -57,6 +57,9 @@ namespace mongo {
         // on its use.
         const ResourceId resourceIdMMAPV1Flush = ResourceId(RESOURCE_MMAPV1_FLUSH, 2ULL);
 
+        // How often (in millis) to check for deadlock if a lock has not been granted for some time
+        const unsigned DeadlockTimeoutMs = 100;
+
         /**
          * Returns whether the passed in mode is S or IS. Used for validation checks.
          */
@@ -374,7 +377,8 @@ namespace mongo {
             invariant(_requests.empty());
         }
         else {
-            // No upgrades on the GlobalLock are allowed until we can handle deadlocks
+            // No upgrades on the GlobalLock are currently necessary. Should not be used until we
+            // are handling deadlocks on anything other than the flush thread.
             invariant(it->mode >= mode);
         }
 
@@ -446,28 +450,40 @@ namespace mongo {
 
     template<bool IsForMMAPV1>
     void LockerImpl<IsForMMAPV1>::endWriteUnitOfWork() {
-        _wuowNestingLevel--;
-        if (_wuowNestingLevel > 0) {
+        invariant(_wuowNestingLevel > 0);
+
+        if (--_wuowNestingLevel > 0) {
             // Don't do anything unless leaving outermost WUOW.
             return;
         }
-
-        invariant(_wuowNestingLevel == 0);
 
         while (!_resourcesToUnlockAtEndOfUnitOfWork.empty()) {
             unlock(_resourcesToUnlockAtEndOfUnitOfWork.front());
             _resourcesToUnlockAtEndOfUnitOfWork.pop();
         }
 
+        // For MMAP V1, we need to yield the flush lock so that the flush thread can run
         if (IsForMMAPV1) {
-            _yieldFlushLockForMMAPV1();
+            invariant(unlock(resourceIdMMAPV1Flush));
+
+            while (true) {
+                LockResult result =
+                    lock(resourceIdMMAPV1Flush, _getModeForMMAPV1FlushLock(), UINT_MAX, true);
+
+                if (result == LOCK_OK) break;
+
+                invariant(result == LOCK_DEADLOCK);
+
+                invariant(unlock(resourceIdMMAPV1Flush));
+            }
         }
     }
 
     template<bool IsForMMAPV1>
     LockResult LockerImpl<IsForMMAPV1>::lock(const ResourceId& resId,
                                              LockMode mode,
-                                             unsigned timeoutMs) {
+                                             unsigned timeoutMs,
+                                             bool checkDeadlock) {
 
         LockResult result = lockImpl(resId, mode);
 
@@ -494,15 +510,25 @@ namespace mongo {
 
         // Don't go sleeping without bound in order to be able to report long waits or wake up for
         // deadlock detection.
-        unsigned waitTimeMs = std::min(timeoutMs, 1000U);
+        unsigned waitTimeMs = std::min(timeoutMs, DeadlockTimeoutMs);
         while (true) {
             result = _notify.wait(waitTimeMs);
 
             if (result == LOCK_OK) break;
 
+            if (checkDeadlock) {
+                DeadlockDetector wfg(globalLockManager, this);
+                if (wfg.check().hasCycle()) {
+                    log() << "Deadlock found: " << wfg.toString();
+
+                    result = LOCK_DEADLOCK;
+                    break;
+                }
+            }
+
             const unsigned elapsedTimeMs = timer.millis();
             waitTimeMs = (elapsedTimeMs < timeoutMs) ?
-                std::min(timeoutMs - elapsedTimeMs, 1000U) : 0;
+                std::min(timeoutMs - elapsedTimeMs, DeadlockTimeoutMs) : 0;
 
             if (waitTimeMs == 0) {
                 break;
@@ -510,7 +536,7 @@ namespace mongo {
 
             // This will occasionally dump the global lock manager in case lock acquisition is
             // taking too long.
-            if (elapsedTimeMs > 1000U) {
+            if (elapsedTimeMs > 5000U) {
                 dumpGlobalLockManagerThrottled();
             }
         }
@@ -534,6 +560,12 @@ namespace mongo {
     }
 
     template<bool IsForMMAPV1>
+    void LockerImpl<IsForMMAPV1>::downgrade(const ResourceId& resId, LockMode newMode) {
+        LockRequestsMap::Iterator it = _requests.find(resId);
+        globalLockManager.downgrade(it.objAddr(), newMode);
+    }
+
+    template<bool IsForMMAPV1>
     bool LockerImpl<IsForMMAPV1>::unlock(const ResourceId& resId) {
         LockRequestsMap::Iterator it = _requests.find(resId);
         return _unlockImpl(it);
@@ -552,6 +584,22 @@ namespace mongo {
     template<bool IsForMMAPV1>
     bool LockerImpl<IsForMMAPV1>::isLockHeldForMode(const ResourceId& resId, LockMode mode) const {
         return getLockMode(resId) >= mode;
+    }
+
+    template<bool IsForMMAPV1>
+    ResourceId LockerImpl<IsForMMAPV1>::getWaitingResource() const {
+        scoped_spinlock scopedLock(_lock);
+
+        LockRequestsMap::ConstIterator it = _requests.begin();
+        while (!it.finished()) {
+            if (it->status != LockRequest::STATUS_GRANTED) {
+                return it.key();
+            }
+
+            it.next();
+        }
+
+        return ResourceId();
     }
 
     namespace {
@@ -677,16 +725,6 @@ namespace mongo {
     }
 
     template<bool IsForMMAPV1>
-    void LockerImpl<IsForMMAPV1>::_yieldFlushLockForMMAPV1() {
-        invariant(IsForMMAPV1);
-        if (!inAWriteUnitOfWork()) {
-            invariant(unlock(resourceIdMMAPV1Flush));
-            invariant(LOCK_OK ==
-                lock(resourceIdMMAPV1Flush, _getModeForMMAPV1FlushLock(), UINT_MAX));
-        }
-    }
-
-    template<bool IsForMMAPV1>
     LockMode LockerImpl<IsForMMAPV1>::_getModeForMMAPV1FlushLock() const {
         invariant(IsForMMAPV1);
 
@@ -730,13 +768,29 @@ namespace mongo {
 
 
     AutoAcquireFlushLockForMMAPV1Commit::AutoAcquireFlushLockForMMAPV1Commit(Locker* locker)
-        : _locker(static_cast<MMAPV1LockerImpl*>(locker)) {
+        : _locker(static_cast<MMAPV1LockerImpl*>(locker)),
+          _isReleased(false) {
 
-        invariant(LOCK_OK == _locker->lock(resourceIdMMAPV1Flush, MODE_X, UINT_MAX));
+        invariant(LOCK_OK == _locker->lock(resourceIdMMAPV1Flush, MODE_S));
+    }
+
+    void AutoAcquireFlushLockForMMAPV1Commit::upgradeFlushLockToExclusive() {
+        invariant(LOCK_OK == _locker->lock(resourceIdMMAPV1Flush, MODE_X));
+
+        // Lock bumps the recursive count. Drop it back down so that the destructor doesn't
+        // complain
+        invariant(!_locker->unlock(resourceIdMMAPV1Flush));
+    }
+
+    void AutoAcquireFlushLockForMMAPV1Commit::release() {
+        invariant(_locker->unlock(resourceIdMMAPV1Flush));
+        _isReleased = true;
     }
 
     AutoAcquireFlushLockForMMAPV1Commit::~AutoAcquireFlushLockForMMAPV1Commit() {
-        invariant(_locker->unlock(resourceIdMMAPV1Flush));
+        if (!_isReleased) {
+            invariant(_locker->unlock(resourceIdMMAPV1Flush));
+        }
     }
 
 

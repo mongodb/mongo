@@ -1118,11 +1118,6 @@ namespace mongo {
             if ( ! _onDisk )
                 return;
 
-            Lock::DBLock kl(_txn->lockState(),
-                            nsToDatabaseSubstring(_config.incLong),
-                            MODE_X);
-            WriteUnitOfWork wunit(_txn);
-
             for ( InMemory::iterator i=_temp->begin(); i!=_temp->end(); i++ ) {
                 BSONList& all = i->second;
                 if ( all.size() < 1 )
@@ -1133,8 +1128,6 @@ namespace mongo {
             }
             _temp->clear();
             _size = 0;
-            wunit.commit();
-
         }
 
         /**
@@ -1156,10 +1149,9 @@ namespace mongo {
         }
 
         void State::reduceAndSpillInMemoryStateIfNeeded() {
-            // Make sure no DB read locks are held, because we might try to acquire write lock and
-            // upgrade is not supported.
-            //
-            dassert(!_txn->lockState()->hasAnyReadLock());
+            // Make sure no DB locks are held, because this method manages its own locking and
+            // write units of work.
+            invariant(!_txn->lockState()->isLocked());
 
             if (_jsMode) {
                 // try to reduce if it is beneficial

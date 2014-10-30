@@ -77,7 +77,7 @@ namespace repl {
         boost::scoped_ptr<boost::thread> _syncSourceFeedbackThread;
 
         // Thread running runSyncThread().
-        boost::scoped_ptr<boost::thread> _backgroundSyncThread;
+        boost::scoped_ptr<boost::thread> _applierThread;
 
         // Thread running BackgroundSync::producerThread().
         boost::scoped_ptr<boost::thread> _producerThread;
