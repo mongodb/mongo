@@ -64,6 +64,7 @@ namespace mongo {
          * Neither pointer is owned.
          */
         MultiIndexBlock(OperationContext* txn, Collection* collection);
+        ~MultiIndexBlock();
 
         /**
          * By default we ignore the 'background' flag in specs when building an index. If this is
@@ -100,6 +101,8 @@ namespace mongo {
          * Prepares the index(es) for building.
          *
          * Does not need to be called inside of a WriteUnitOfWork (but can be due to nesting).
+         *
+         * Requires holding an exclusive database lock.
          */
         Status init(const std::vector<BSONObj>& specs);
         Status init(const BSONObj& spec) {
@@ -167,6 +170,8 @@ namespace mongo {
          *
          * Should be called inside of a WriteUnitOfWork. If the index building is to be logOp'd,
          * logOp() should be called from the same unit of work as commit().
+         *
+         * Requires holding an exclusive database lock.
          */
         void commit();
 
@@ -186,7 +191,7 @@ namespace mongo {
          */
         void abortWithoutCleanup();
 
-        ~MultiIndexBlock();
+        bool getBuildInBackground() const { return _buildInBackground; }
 
     private:
         class SetNeedToCleanupOnRollback;

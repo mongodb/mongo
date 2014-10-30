@@ -36,20 +36,18 @@ var doTest = function() {
         var t = db[baseName];
         t.drop();
 
-        db.eval(function(size) {
-            for (var i = 0; i < size; ++i) {
-                db.jstests_index12.save({ i: i });
-            }
-        },
-            size);
+        for (var i = 0; i < size; ++i) {
+            db.jstests_index12.save({ i: i });
+        }
         assert.eq(size, t.count());
 
         doParallel(fullName + ".ensureIndex( {i:1}, {background:true, unique:true} )");
         try {
             // wait for indexing to start
-            assert.soon(function() { return 2 == db.system.indexes.count({ ns: "test." + baseName }); }, "no index created", 30000, 50);
-            t.save({ i: 0, n: true });
-            t.save({ i: size - 1, n: true });
+            assert.soon(
+                function() { return 2 === t.getIndexes().length; }, "no index created", 30000, 50);
+            assert.writeError(t.save({ i: 0, n: true })); // duplicate key violation
+            assert.writeOK(t.save({ i: size - 1, n: true }));
         } catch (e) {
             // only a failure if we're still indexing
             // wait for parallel status to update to reflect indexing status

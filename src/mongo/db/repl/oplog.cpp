@@ -613,20 +613,6 @@ namespace repl {
                     }
                 }
                 else {
-                    // probably don't need this since all replicated colls have _id indexes now
-                    // but keep it just in case
-                    RARELY if ( indexCatalog
-                                 && !collection->isCapped()
-                                 && !indexCatalog->haveIdIndex(txn) ) {
-                        try {
-                            Helpers::ensureIndex(txn, collection, BSON("_id" << 1), true, "_id_");
-                        }
-                        catch (const DBException& e) {
-                            warning() << "Ignoring error building id index on " << collection->ns()
-                                      << ": " << e.toString();
-                        }
-                    }
-
                     /* todo : it may be better to do an insert here, and then catch the dup key exception and do update
                               then.  very few upserts will not be inserts...
                               */
@@ -649,18 +635,6 @@ namespace repl {
         }
         else if ( *opType == 'u' ) {
             opCounters->gotUpdate();
-
-            // probably don't need this since all replicated colls have _id indexes now
-            // but keep it just in case
-            RARELY if ( indexCatalog && !collection->isCapped() && !indexCatalog->haveIdIndex(txn) ) {
-                try {
-                    Helpers::ensureIndex(txn, collection, BSON("_id" << 1), true, "_id_");
-                }
-                catch (const DBException& e) {
-                    warning() << "Ignoring error building id index on " << collection->ns()
-                              << ": " << e.toString();
-                }
-            }
 
             OpDebug debug;
             BSONObj updateCriteria = o2;

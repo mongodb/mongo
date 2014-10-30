@@ -352,6 +352,7 @@ namespace IndexUpdateTests {
 
             MultiIndexBlock indexer(&_txn, coll);
             indexer.allowBackgroundBuilding();
+            indexer.allowInterruption();
             indexer.ignoreUniqueConstraint();
 
             const BSONObj spec = BSON("name" << "a"
@@ -384,6 +385,7 @@ namespace IndexUpdateTests {
 
             MultiIndexBlock indexer(&_txn, coll);
             indexer.allowBackgroundBuilding();
+            indexer.allowInterruption();
             // indexer.ignoreUniqueConstraint(); // not calling this
 
             const BSONObj spec = BSON("name" << "a"
@@ -421,6 +423,7 @@ namespace IndexUpdateTests {
 
             MultiIndexBlock indexer(&_txn, coll);
             indexer.allowBackgroundBuilding();
+            indexer.allowInterruption();
             // indexer.ignoreUniqueConstraint(); // not calling this
 
             const BSONObj spec = BSON("name" << "a"

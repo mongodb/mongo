@@ -28,7 +28,7 @@ var waitParallel = function() {
     assert.soon( function() { return doneParallel(); }, "parallel did not finish in time", 300000, 1000 );
 };
 
-var size = 200000;
+var size = 400 * 1000;
 while( 1 ) { // if indexing finishes before we can run checks, try indexing w/ more data
     print( "size: " + size );
 
@@ -47,7 +47,8 @@ while( 1 ) { // if indexing finishes before we can run checks, try indexing w/ m
     try {
         // wait for indexing to start
         print("wait for indexing to start");
-        assert.soon( function() { return 2 == db.system.indexes.count( {ns:"test."+baseName} ); }, "no index created", 30000, 50 );
+        assert.soon(
+            function() { return 2 === t.getIndexes().length; }, "no index created", 30000, 50);
         print("started.");
         sleep(1000); // there is a race between when the index build shows up in curop and
                      // when it first attempts to grab a write lock.
