@@ -450,7 +450,10 @@ namespace mongo {
 
     // static
     bool QueryPlannerAccess::orNeedsFetch(const ScanBuildingState* scanState) {
-        if (scanState->loosestBounds == IndexBoundsBuilder::EXACT) {
+        if (!scanState->canTrimExpression) {
+            return true;
+        }
+        else if (scanState->loosestBounds == IndexBoundsBuilder::EXACT) {
             return false;
         }
         else if (scanState->loosestBounds == IndexBoundsBuilder::INEXACT_FETCH) {
@@ -599,6 +602,10 @@ namespace mongo {
                                                std::vector<QuerySolutionNode*>* out) {
         // Initialize the ScanBuildingState.
         ScanBuildingState scanState(root, inArrayOperator, indices);
+        if ( query.isForWrite() ) {
+            // A write may need to re-apply if it has to re-fetch a document after a deadlock.
+            scanState.canTrimExpression = false;
+        }
 
         while (scanState.curChild < root->numChildren()) {
             MatchExpression* child = root->getChild(scanState.curChild);
@@ -1082,7 +1089,7 @@ namespace mongo {
                 // superset of documents that satisfy the predicate, and we must check the
                 // predicate.
 
-                if (tightness == IndexBoundsBuilder::EXACT) {
+                if (tightness == IndexBoundsBuilder::EXACT && !query.isForWrite()) {
                     return soln;
                 }
                 else if (tightness == IndexBoundsBuilder::INEXACT_COVERED
@@ -1273,7 +1280,10 @@ namespace mongo {
         MatchExpression* child = root->getChild(scanState->curChild);
         const IndexEntry& index = scanState->indices[scanState->currentIndexNumber];
 
-        if (scanState->inArrayOperator) {
+        if (!scanState->canTrimExpression) {
+            ++scanState->curChild;
+        }
+        else if (scanState->inArrayOperator) {
             // We're inside an array operator. The entire array operator expression
             // should always be affixed as a filter. We keep 'curChild' in the $and
             // for affixing later.
