@@ -3244,8 +3244,8 @@ namespace {
         // prepare response and check the results
         prepareHeartbeatResponse(args, OpTime(11,0), &response, &result);
         ASSERT_OK(result);
-        // cannot be elected because we are already primary
-        ASSERT_FALSE(response.isElectable());
+        // electable because we are already primary
+        ASSERT_TRUE(response.isElectable());
         ASSERT_TRUE(response.isReplSet());
         ASSERT_EQUALS(MemberState::RS_PRIMARY, response.getState().s);
         ASSERT_EQUALS(OpTime(11,0), response.getOpTime());

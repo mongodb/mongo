@@ -1648,7 +1648,9 @@ namespace {
                 _lastVote.when.millis + LastVote::leaseTime.total_milliseconds() >= now.millis) {
             result |= VotedTooRecently;
         }
-        if (!getMemberState().secondary()) {
+
+        // Cannot be electable unless secondary or already primary
+        if (!getMemberState().secondary() && !_iAmPrimary()) {
             result |= NotSecondary;
         }
         if (!_isOpTimeCloseEnoughToLatestToElect(lastApplied, lastApplied)) {
