@@ -156,50 +156,6 @@ namespace mongo {
     }
 
     template<bool IsForMMAPV1>
-    bool LockerImpl<IsForMMAPV1>::isDbLockedForMode(const StringData& dbName, LockMode mode) const {
-        DEV {
-            const NamespaceString nss(dbName);
-            dassert(nss.coll().empty());
-        };
-
-        if (isW()) return true;
-        if (isR() && isSharedMode(mode)) return true;
-
-        const ResourceId resIdDb(RESOURCE_DATABASE, dbName);
-        return isLockHeldForMode(resIdDb, mode);
-    }
-
-    template<bool IsForMMAPV1>
-    bool LockerImpl<IsForMMAPV1>::isAtLeastReadLocked(const StringData& ns) const {
-        if (threadState() == 'R' || threadState() == 'W') {
-            return true; // global
-        }
-        if (!isLocked()) {
-            return false;
-        }
-
-        const StringData db = nsToDatabaseSubstring(ns);
-        const ResourceId resIdDb(RESOURCE_DATABASE, db);
-
-        // S on the database means we don't need to check further down the hierarchy
-        if (isLockHeldForMode(resIdDb, MODE_S)) {
-            return true;
-        }
-
-        if (!isLockHeldForMode(resIdDb, MODE_IS)) {
-            return false;
-        }
-
-        if (nsIsFull(ns)) {
-            const ResourceId resIdColl(RESOURCE_DATABASE, ns);
-            return isLockHeldForMode(resIdColl, MODE_IS);
-        }
-
-        // We're just asking about a database, so IS on the db is enough.
-        return true;
-    }
-
-    template<bool IsForMMAPV1>
     bool LockerImpl<IsForMMAPV1>::isRecursive() const {
         return recursiveCount() > 1;
     }
@@ -228,9 +184,9 @@ namespace mongo {
     template<bool IsForMMAPV1>
     void LockerImpl<IsForMMAPV1>::reportState(BSONObjBuilder* res) {
         BSONObjBuilder b;
-        if (threadState()) {
+        if (isLocked()) {
             char buf[2];
-            buf[0] = threadState();
+            buf[0] = legacyModeName(getLockMode(resourceIdGlobal));
             buf[1] = 0;
             b.append("^", buf);
         }
@@ -241,21 +197,7 @@ namespace mongo {
         if (!o.isEmpty()) {
             res->append("locks", o);
         }
-        res->append("waitingForLock", _lockPending);
-    }
-
-    template<bool IsForMMAPV1>
-    char LockerImpl<IsForMMAPV1>::threadState() const {
-        switch (getLockMode(resourceIdGlobal)) {
-        case MODE_IS: return 'r';
-        case MODE_IX: return 'w';
-        case MODE_S: return 'R';
-        case MODE_X: return 'W';
-        case MODE_NONE: return '\0';
-
-        default:
-            invariant(false);
-        }
+        res->append("waitingForLock", hasLockPending());
     }
 
     template<bool IsForMMAPV1>
@@ -354,8 +296,7 @@ namespace mongo {
           _batchWriter(false),
           _lockPendingParallelWriter(false),
           _recursive(0),
-          _scopedLk(NULL),
-          _lockPending(false) {
+          _scopedLk(NULL) {
 
     }
 
@@ -583,7 +524,51 @@ namespace mongo {
 
     template<bool IsForMMAPV1>
     bool LockerImpl<IsForMMAPV1>::isLockHeldForMode(const ResourceId& resId, LockMode mode) const {
-        return getLockMode(resId) >= mode;
+        return isModeCovered(mode, getLockMode(resId));
+    }
+
+    template<bool IsForMMAPV1>
+    bool LockerImpl<IsForMMAPV1>::isDbLockedForMode(const StringData& dbName,
+                                                    LockMode mode) const {
+        invariant(!nsIsFull(dbName));
+
+        if (isW()) return true;
+        if (isR() && isSharedMode(mode)) return true;
+
+        const ResourceId resIdDb(RESOURCE_DATABASE, dbName);
+        return isLockHeldForMode(resIdDb, mode);
+    }
+
+    template<bool IsForMMAPV1>
+    bool LockerImpl<IsForMMAPV1>::isCollectionLockedForMode(const StringData& ns,
+                                                            LockMode mode) const {
+        invariant(nsIsFull(ns));
+
+        if (isW()) return true;
+        if (isR() && isSharedMode(mode)) return true;
+
+        const NamespaceString nss(ns);
+        const ResourceId resIdDb(RESOURCE_DATABASE, nss.db());
+
+        LockMode dbMode = getLockMode(resIdDb);
+
+        switch (dbMode) {
+        case MODE_NONE: return false;
+        case MODE_X: return true;
+        case MODE_S: return isSharedMode(mode);
+        case MODE_IX:
+        case MODE_IS:
+            {
+                const ResourceId resIdColl(RESOURCE_COLLECTION, ns);
+                return isLockHeldForMode(resIdColl, mode);
+            }
+            break;
+        case LockModesCount:
+            break;
+        }
+
+        invariant(false);
+        return false;
     }
 
     template<bool IsForMMAPV1>

@@ -979,6 +979,11 @@ namespace mongo {
         return LegacyLockNames[mode];
     }
 
+    bool isModeCovered(LockMode mode, LockMode coveringMode) {
+        return (LockConflictsTable[coveringMode] | LockConflictsTable[mode]) ==
+                                                        LockConflictsTable[coveringMode];
+    }
+
     const char* resourceTypeName(ResourceType resourceType) {
         return ResourceTypeNames[resourceType];
     }

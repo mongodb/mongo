@@ -180,16 +180,87 @@ namespace mongo {
         ASSERT(ls.isWriteLocked("db1"));
     }
 
-    TEST(DConcurrency, IntentCollectionLock) {
+    TEST(DConcurrency, IsDbLockedForSMode) {
+        const std::string dbName("db");
+
         MMAPV1LockerImpl ls(1);
 
-        const std::string ns("db1.coll");
-        const ResourceId id(RESOURCE_COLLECTION, ns);
-        Lock::DBLock r1(&ls, "db1", MODE_X);
-        {
-            Lock::CollectionLock r2(&ls, ns, MODE_S);
-            ASSERT(ls.isAtLeastReadLocked(ns));
-        }
-        ASSERT(ls.getLockMode(id) == MODE_NONE);
+        Lock::DBLock dbLock(&ls, dbName, MODE_S);
+
+        ASSERT(ls.isDbLockedForMode(dbName, MODE_IS));
+        ASSERT(!ls.isDbLockedForMode(dbName, MODE_IX));
+        ASSERT(ls.isDbLockedForMode(dbName, MODE_S));
+        ASSERT(!ls.isDbLockedForMode(dbName, MODE_X));
     }
+
+    TEST(DConcurrency, IsDbLockedForXMode) {
+        const std::string dbName("db");
+
+        MMAPV1LockerImpl ls(1);
+
+        Lock::DBLock dbLock(&ls, dbName, MODE_X);
+
+        ASSERT(ls.isDbLockedForMode(dbName, MODE_IS));
+        ASSERT(ls.isDbLockedForMode(dbName, MODE_IX));
+        ASSERT(ls.isDbLockedForMode(dbName, MODE_S));
+        ASSERT(ls.isDbLockedForMode(dbName, MODE_X));
+    }
+
+    TEST(DConcurrency, IsCollectionLocked_DB_Locked_IS) {
+        const std::string ns("db1.coll");
+
+        MMAPV1LockerImpl ls(1);
+
+        Lock::DBLock dbLock(&ls, "db1", MODE_IS);
+
+        {
+            Lock::CollectionLock collLock(&ls, ns, MODE_IS);
+
+            ASSERT(ls.isCollectionLockedForMode(ns, MODE_IS));
+            ASSERT(!ls.isCollectionLockedForMode(ns, MODE_IX));
+
+            // TODO: This is TRUE because Lock::CollectionLock converts IS lock to S
+            ASSERT(ls.isCollectionLockedForMode(ns, MODE_S));
+
+            ASSERT(!ls.isCollectionLockedForMode(ns, MODE_X));
+        }
+
+        {
+            Lock::CollectionLock collLock(&ls, ns, MODE_S);
+
+            ASSERT(ls.isCollectionLockedForMode(ns, MODE_IS));
+            ASSERT(!ls.isCollectionLockedForMode(ns, MODE_IX));
+            ASSERT(ls.isCollectionLockedForMode(ns, MODE_S));
+            ASSERT(!ls.isCollectionLockedForMode(ns, MODE_X));
+        }
+    }
+
+    TEST(DConcurrency, IsCollectionLocked_DB_Locked_IX) {
+        const std::string ns("db1.coll");
+
+        MMAPV1LockerImpl ls(1);
+
+        Lock::DBLock dbLock(&ls, "db1", MODE_IX);
+
+        {
+            Lock::CollectionLock collLock(&ls, ns, MODE_IX);
+
+            // TODO: This is TRUE because Lock::CollectionLock converts IX lock to X
+            ASSERT(ls.isCollectionLockedForMode(ns, MODE_IS));
+
+            ASSERT(ls.isCollectionLockedForMode(ns, MODE_IX));
+            ASSERT(ls.isCollectionLockedForMode(ns, MODE_S));
+            ASSERT(ls.isCollectionLockedForMode(ns, MODE_X));
+        }
+
+        {
+            Lock::CollectionLock collLock(&ls, ns, MODE_X);
+
+            ASSERT(ls.isCollectionLockedForMode(ns, MODE_IS));
+            ASSERT(ls.isCollectionLockedForMode(ns, MODE_IX));
+            ASSERT(ls.isCollectionLockedForMode(ns, MODE_S));
+            ASSERT(ls.isCollectionLockedForMode(ns, MODE_X));
+        }
+    }
+
 } // namespace mongo

@@ -115,6 +115,8 @@ namespace mongo {
 
         virtual LockMode getLockMode(const ResourceId& resId) const;
         virtual bool isLockHeldForMode(const ResourceId& resId, LockMode mode) const;
+        virtual bool isDbLockedForMode(const StringData& dbName, LockMode mode) const;
+        virtual bool isCollectionLockedForMode(const StringData& ns, LockMode mode) const;
 
         virtual ResourceId getWaitingResource() const;
 
@@ -195,8 +197,6 @@ namespace mongo {
         virtual bool isLocked() const;
         virtual bool isWriteLocked() const;
         virtual bool isWriteLocked(const StringData& ns) const;
-        virtual bool isDbLockedForMode(const StringData& dbName, LockMode mode) const;
-        virtual bool isAtLeastReadLocked(const StringData& ns) const;
         virtual bool isRecursive() const;
 
         virtual void assertWriteLocked(const StringData& ns) const;
@@ -204,7 +204,7 @@ namespace mongo {
         /** 
          * Pending means we are currently trying to get a lock.
          */
-        virtual bool hasLockPending() const { return _lockPending || _lockPendingParallelWriter; }
+        virtual bool hasLockPending() const { return getWaitingResource().isValid() || _lockPendingParallelWriter; }
 
         // ----
 
@@ -223,11 +223,6 @@ namespace mongo {
         }
 
     private:
-        /**
-         * Indicates the mode of acquisition of the GlobalLock by this particular thread. The
-         * return values are '0' (no global lock is held), 'r', 'w', 'R', 'W'.
-         */
-        char threadState() const;
 
         bool _batchWriter;
         bool _lockPendingParallelWriter;
@@ -238,8 +233,6 @@ namespace mongo {
         // for the nonrecursive case. otherwise there would be many
         // the first lock goes here, which is ok since we can't yield recursive locks
         Lock::ScopedLock* _scopedLk;
-
-        bool _lockPending;
     };
 
     typedef LockerImpl<true> MMAPV1LockerImpl;
