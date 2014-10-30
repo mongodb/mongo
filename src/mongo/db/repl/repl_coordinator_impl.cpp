@@ -685,11 +685,14 @@ namespace {
         invariant(lock->owns_lock());
         _updateSlaveInfoOptime_inlock(&_slaveInfo[_getMyIndexInSlaveInfo_inlock()], ts);
 
-        if (_getReplicationMode_inlock() == modeReplSet) {
-            lock->unlock();
-            _externalState->forwardSlaveProgress(); // Must do this outside _mutex
+        if (_getReplicationMode_inlock() != modeReplSet) {
+            return;
         }
-
+        if (_getCurrentMemberState_inlock().primary()) {
+            return;
+        }
+        lock->unlock();
+        _externalState->forwardSlaveProgress(); // Must do this outside _mutex
     }
 
     OpTime ReplicationCoordinatorImpl::getMyLastOptime() const {
@@ -2036,7 +2039,7 @@ namespace {
             somethingChanged = true;
         }
 
-        if (somethingChanged) {
+        if (somethingChanged && !_getCurrentMemberState_inlock().primary()) {
             lock.unlock();
             _externalState->forwardSlaveProgress(); // Must do this outside _mutex
         }
@@ -2070,8 +2073,10 @@ namespace {
             slaveInfo->rid = handshake.getRid();
             slaveInfo->hostAndPort = member->getHostAndPort();
 
-            lock.unlock();
-            _externalState->forwardSlaveHandshake(); // must do outside _mutex
+            if (!_getCurrentMemberState_inlock().primary()) {
+                lock.unlock();
+                _externalState->forwardSlaveHandshake(); // must do outside _mutex
+            }
             return Status::OK();
         }
 
