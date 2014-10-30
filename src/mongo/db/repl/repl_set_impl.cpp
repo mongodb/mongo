@@ -931,5 +931,97 @@ namespace {
         _veto[host] = until.toTimeT();
     }
 
+    Status ReplSetImpl::forceSyncFrom(const string& host, BSONObjBuilder* result) {
+        lock lk(this);
+
+        // initial sanity check
+        if (iAmArbiterOnly()) {
+            return Status(ErrorCodes::NotSecondary, "arbiters don't sync");
+        }
+        if (box.getState().primary()) {
+            return Status(ErrorCodes::NotSecondary, "primaries don't sync");
+        }
+        if (_self != NULL && host == _self->fullName()) {
+            return Status(ErrorCodes::InvalidOptions, "I cannot sync from myself");
+        }
+
+        // find the member we want to sync from
+        Member *newTarget = 0;
+        for (Member *m = _members.head(); m; m = m->next()) {
+            if (m->fullName() == host) {
+                newTarget = m;
+                break;
+            }
+        }
+
+        // do some more sanity checks
+        if (!newTarget) {
+            // this will also catch if someone tries to sync a member from itself, as _self is not
+            // included in the _members list.
+            return Status(ErrorCodes::NodeNotFound, "could not find member in replica set");
+        }
+        if (newTarget->config().arbiterOnly) {
+            return Status(ErrorCodes::InvalidOptions, "I cannot sync from an arbiter");
+        }
+        if (!newTarget->config().buildIndexes && myConfig().buildIndexes) {
+            return Status(ErrorCodes::InvalidOptions,
+                          "I cannot sync from a member who does not build indexes");
+        }
+        if (newTarget->hbinfo().authIssue) {
+            return Status(ErrorCodes::Unauthorized,
+                          "not authorized to communicate with " + newTarget->fullName());
+        }
+        if (newTarget->hbinfo().health == 0) {
+            return Status(ErrorCodes::HostUnreachable, "I cannot reach the requested member");
+        }
+        if (newTarget->hbinfo().opTime.getSecs()+10 < lastOpTimeWritten.getSecs()) {
+            log() << "attempting to sync from " << newTarget->fullName()
+                  << ", but its latest opTime is " << newTarget->hbinfo().opTime.getSecs()
+                  << " and ours is " << lastOpTimeWritten.getSecs() << " so this may not work"
+                  << rsLog;
+            result->append("warning", "requested member is more than 10 seconds behind us");
+            // not returning false, just warning
+        }
+
+        // record the previous member we were syncing from
+        const HostAndPort prev = BackgroundSync::get()->getSyncTarget();
+        if (!prev.empty()) {
+            result->append("prevSyncTarget", prev.toString());
+        }
+
+        // finally, set the new target
+        _forceSyncTarget = newTarget;
+        return Status::OK();
+    }
+
+    bool ReplSetImpl::gotForceSync() {
+        lock lk(this);
+        return _forceSyncTarget != 0;
+    }
+
+    bool ReplSetImpl::shouldChangeSyncTarget(const HostAndPort& currentTarget) {
+        lock lk(this);
+        OpTime targetOpTime = findByName(currentTarget.toString())->hbinfo().opTime;
+        for (Member *m = _members.head(); m; m = m->next()) {
+            if (m->syncable() &&
+                targetOpTime.getSecs()+maxSyncSourceLagSecs < m->hbinfo().opTime.getSecs()) {
+                log() << "changing sync target because current sync target's most recent OpTime is "
+                      << targetOpTime.toStringPretty() << " which is more than "
+                      << maxSyncSourceLagSecs << " seconds behind member " << m->fullName()
+                      << " whose most recent OpTime is " << m->hbinfo().opTime.getSecs();
+                return true;
+            }
+        }
+        if (gotForceSync()) {
+            return true;
+        }
+        return false;
+    }
+
+    void ReplSetImpl::clearVetoes() {
+        lock lk(this);
+        _veto.clear();
+    }
+
 } // namespace repl
 } // namespace mongo

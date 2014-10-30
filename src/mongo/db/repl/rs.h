@@ -75,6 +75,8 @@ namespace repl {
     /**
      * does local authentication
      * directly authorizes against AuthenticationInfo
+     * TODO(spencer): Remove this in favor of calling grantInternalAuthorization against the
+     * authorization session directly.
      */
     void replLocalAuth();
 
