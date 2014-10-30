@@ -156,14 +156,14 @@ namespace mongo {
         BSONObj res;
 
         WriteConcernOptions noThrottle;
-        massert(10412,
-                str::stream() << "moveAndCommit failed: " << res,
-                toMove->moveAndCommit(newLocation,
-                                      Chunk::MaxChunkSize,
-                                      &noThrottle, /* secondaryThrottle */
-                                      false, /* waitForDelete - small chunk, no need */
-                                      0, /* maxTimeMS - don't time out */
-                                      res));
+        if (!toMove->moveAndCommit(newLocation,
+                                   Chunk::MaxChunkSize,
+                                   &noThrottle, /* secondaryThrottle */
+                                   false, /* waitForDelete - small chunk, no need */
+                                   0, /* maxTimeMS - don't time out */
+                                   res)) {
+            msgassertedNoTrace(10412, str::stream() << "moveAndCommit failed: " << res);
+        }
 
         // update our config
         manager.reload();
