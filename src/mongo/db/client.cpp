@@ -313,6 +313,8 @@ namespace mongo {
         if (_connectionId) {
             builder.appendNumber("connectionId", _connectionId);
         }
+
+        _curOp->reportState(&builder);
     }
 
     string Client::clientAddress(bool includePort) const {
@@ -468,7 +470,6 @@ namespace mongo {
         s << " numYields:" << curop.numYields();
         
         s << " ";
-        curop.lockStat().report( s );
         
         OPDEBUG_TOSTRING_HELP( nreturned );
         if ( responseLength > 0 )
@@ -551,7 +552,6 @@ namespace mongo {
         OPDEBUG_APPEND_NUMBER( keyUpdates );
 
         b.appendNumber( "numYield" , curop.numYields() );
-        b.append( "lockStats" , curop.lockStat().report() );
 
         if ( ! exceptionInfo.empty() )
             exceptionInfo.append( b , "exception" , "exceptionCode" );
