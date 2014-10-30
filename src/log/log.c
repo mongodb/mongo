@@ -405,7 +405,6 @@ __log_filesize(WT_SESSION_IMPL *session, WT_FH *fh, wt_off_t *eof)
 	WT_DECL_RET;
 	WT_LOG *log;
 	wt_off_t log_size, off, off1;
-	uint64_t rec;
 	uint32_t allocsize, bufsz;
 	char *buf, *zerobuf;
 
@@ -458,19 +457,17 @@ __log_filesize(WT_SESSION_IMPL *session, WT_FH *fh, wt_off_t *eof)
 		off = 0;
 
 	/*
-	 * We know all log records are aligned at log->allocsize.  The
-	 * first item in a log record is always the length.  Look for
-	 * any non-zero at the allocsize boundary.  This may not be a
-	 * true log record since it could be the middle of a large
-	 * record.  But we know no log record starts after it.  Return
-	 * an estimate of the log file size.
+	 * We know all log records are aligned at log->allocsize.  The first
+	 * item in a log record is always a 32-bit length.  Look for any
+	 * non-zero length at the allocsize boundary.  This may not be a true
+	 * log record since it could be the middle of a large record.  But we
+	 * know no log record starts after it.  Return an estimate of the log
+	 * file size.
 	 */
 	for (off1 = bufsz - allocsize;
-	    off1 > 0; off1 -= (wt_off_t)allocsize) {
-		rec = (uint64_t)buf[off1];
-		if (rec != 0)
+	    off1 > 0; off1 -= (wt_off_t)allocsize)
+		if (memcmp(buf + off1, zerobuf, sizeof(uint32_t)) != 0)
 			break;
-	}
 	off = off + off1;
 
 	/*
