@@ -191,10 +191,6 @@ func (mongoImport *MongoImport) ValidateSettings(args []string) error {
 	// if maintain --maintainInsertionOrder is true, we can only have one
 	// ingestion thread
 	if mongoImport.IngestOptions.MaintainInsertionOrder {
-		// The write commands API unconditionally returns on the first error
-		// for ordered inserts. Thus, if the user supplies this flag, we
-		// assume --stopOnError
-		mongoImport.IngestOptions.StopOnError = true
 		*mongoImport.IngestOptions.NumIngestionThreads = 1
 	}
 
@@ -483,9 +479,9 @@ readLoop:
 // into the given collection
 func (mongoImport *MongoImport) ingester(documents []interface{}, collection *mgo.Collection) (err error) {
 	numInserted := 0
-	maintainInsertionOrder := mongoImport.IngestOptions.MaintainInsertionOrder
 	stopOnError := mongoImport.IngestOptions.StopOnError
 	writeConcern := mongoImport.IngestOptions.WriteConcern
+	maintainInsertionOrder := mongoImport.IngestOptions.MaintainInsertionOrder
 
 	defer func() {
 		mongoImport.insertionLock.Lock()
@@ -493,14 +489,13 @@ func (mongoImport *MongoImport) ingester(documents []interface{}, collection *mg
 		mongoImport.insertionLock.Unlock()
 	}()
 
-	// TODO: need a way of doing ordered/unordered
-	// bulk updates using write commands
 	if mongoImport.IngestOptions.Upsert {
 		selector := bson.M{}
 		document := bson.M{}
 		upsertFields := strings.Split(mongoImport.IngestOptions.UpsertFields, ",")
-		for _, d := range documents {
-			if err = bson.Unmarshal(d.(bson.Raw).Data, &document); err != nil {
+		for _, rawBsonDocument := range documents {
+			err = bson.Unmarshal(rawBsonDocument.(bson.Raw).Data, &document)
+			if err != nil {
 				return fmt.Errorf("error unmarshaling document: %v", err)
 			}
 			selector = constructUpsertDocument(upsertFields, document)
@@ -530,22 +525,23 @@ func (mongoImport *MongoImport) ingester(documents []interface{}, collection *mg
 		numInserted, err = insertDocuments(
 			documents,
 			collection,
-			maintainInsertionOrder,
+			stopOnError,
 			writeConcern,
 		)
 	} else {
-		// Without write commands, we can't say for sure how many
-		// documents were inserted when we use bulk inserts so we
-		// assume the entire batch succeeded - even if an error is returned
-		// The result is that we may report that more documents - than were
-		// actually inserted - were inserted into the database
+		// Without write commands, we can't say for sure how many documents were
+		// inserted when we use bulk inserts so we assume the entire batch
+		// succeeded - even if an error is returned. The result is that we may
+		// report that more documents - than were actually inserted - were
+		// inserted into the database. This will change as soon as BulkResults
+		// are supported by the driver
 		bulk := collection.Bulk()
 		bulk.Insert(documents...)
 		if !maintainInsertionOrder {
 			bulk.Unordered()
 		}
-		// mgo.Bulk doesn't currently implement write commands so
-		// mgo.BulkResult isn't informative
+		// mgo.Bulk doesn't currently implement write commands so mgo.BulkResult
+		// isn't informative
 		_, err = bulk.Run()
 		numInserted = len(documents)
 	}
