@@ -1,6 +1,7 @@
 package mongoimport
 
 import (
+	"fmt"
 	"github.com/mongodb/mongo-tools/common/db"
 	"github.com/mongodb/mongo-tools/common/log"
 	"github.com/mongodb/mongo-tools/common/options"
@@ -534,6 +535,8 @@ func TestStreamDocuments(t *testing.T) {
 
 // This test will only pass with a version of mongod that supports write commands
 func TestInsertDocuments(t *testing.T) {
+	testutil.VerifyTestType(t, testutil.INTEGRATION_TEST_TYPE)
+
 	Convey("Given a set of documents to insert", t, func() {
 		toolOptions := getBasicToolOptions()
 		sessionProvider, err := db.InitSessionProvider(*toolOptions)
@@ -614,6 +617,33 @@ func TestInsertDocuments(t *testing.T) {
 			}
 			defer session.Close()
 			session.DB(testDB).C(testCollection).DropCollection()
+		})
+	})
+}
+
+func TestHandlErr(t *testing.T) {
+	testutil.VerifyTestType(t, testutil.UNIT_TEST_TYPE)
+
+	Convey("Given a boolean 'stopOnError' and an error...", t, func() {
+
+		Convey("an error should be returned if stopOnError is true the err is not nil", func() {
+			So(handleErr(true, fmt.Errorf("")), ShouldNotBeNil)
+		})
+
+		Convey("errLostConnection should be returned if stopOnError is true the err io.EOF", func() {
+			So(handleErr(true, io.EOF), ShouldEqual, errLostConnection)
+		})
+
+		Convey("no error should be returned if stopOnError is false the err is not nil", func() {
+			So(handleErr(false, fmt.Errorf("")), ShouldBeNil)
+		})
+
+		Convey("no error should be returned if stopOnError is false the err is nil", func() {
+			So(handleErr(false, nil), ShouldBeNil)
+		})
+
+		Convey("no error should be returned if stopOnError is true the err is nil", func() {
+			So(handleErr(true, nil), ShouldBeNil)
 		})
 	})
 }

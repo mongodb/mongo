@@ -1,6 +1,7 @@
 package mongoimport
 
 import (
+	"errors"
 	"fmt"
 	"github.com/mongodb/mongo-tools/common/bsonutil"
 	"github.com/mongodb/mongo-tools/common/db"
@@ -8,10 +9,15 @@ import (
 	"github.com/mongodb/mongo-tools/common/util"
 	"gopkg.in/mgo.v2"
 	"gopkg.in/mgo.v2/bson"
+	"io"
 	"sort"
 	"strconv"
 	"strings"
 	"sync"
+)
+
+var (
+	errLostConnection = errors.New("lost connection to server")
 )
 
 // ConvertibleDoc is an interface implemented by special types which wrap data
@@ -119,6 +125,23 @@ func getUpsertValue(field string, document bson.M) interface{} {
 		return nil
 	}
 	return getUpsertValue(field[index+1:], subDoc)
+}
+
+// handleErr accepts a boolean indicating if a non-nil error should be returned,
+// and an actual error. If the error is not nil, it logs. If the error is an
+// io.EOF - indicating a lost connection to the server, it sets the error as
+// such. In any case, it unconditionally returns an error which may/may not be nil
+func handleErr(stopOnError bool, err error) error {
+	if err != nil {
+		if err == io.EOF {
+			err = errLostConnection
+		}
+		log.Logf(log.Always, "error updating documents: %v", err)
+		if stopOnError || err == errLostConnection {
+			return err
+		}
+	}
+	return nil
 }
 
 // removeBlankFields removes empty/blank fields in csv and tsv
