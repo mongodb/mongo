@@ -45,6 +45,7 @@
 #include "mongo/db/storage/mmap_v1/dur_journal.h"
 #include "mongo/db/storage/mmap_v1/dur_journalimpl.h"
 #include "mongo/db/storage/mmap_v1/dur_stats.h"
+#include "mongo/db/storage_options.h"
 #include "mongo/server.h"
 #include "mongo/util/alignedbuilder.h"
 #include "mongo/util/log.h"

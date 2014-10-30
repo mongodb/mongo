@@ -43,6 +43,7 @@
 #include "mongo/db/storage_options.h"
 #include "mongo/db/storage/mmap_v1/dur.h"
 #include "mongo/db/storage/mmap_v1/dur_journalformat.h"
+#include "mongo/db/storage_options.h"
 #include "mongo/util/mongoutils/str.h"
 #include "mongo/util/log.h"
 

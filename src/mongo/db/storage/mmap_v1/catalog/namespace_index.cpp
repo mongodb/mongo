@@ -31,12 +31,14 @@
 #define MONGO_LOG_DEFAULT_COMPONENT ::mongo::logger::LogComponent::kIndexing
 
 #include "mongo/platform/basic.h"
+
 #include "mongo/db/storage/mmap_v1/catalog/namespace_index.h"
 
 #include <boost/filesystem/operations.hpp>
 
 #include "mongo/db/operation_context.h"
 #include "mongo/db/storage/mmap_v1/catalog/namespace_details.h"
+#include "mongo/db/storage/mmap_v1/mmap_v1_options.h"
 #include "mongo/util/exit.h"
 #include "mongo/util/file.h"
 #include "mongo/util/log.h"
@@ -104,7 +106,7 @@ namespace mongo {
 
     boost::filesystem::path NamespaceIndex::path() const {
         boost::filesystem::path ret( _dir );
-        if (storageGlobalParams.directoryperdb)
+        if (mmapv1GlobalOptions.directoryperdb)
             ret /= _database;
         ret /= ( _database + ".ns" );
         return ret;
@@ -125,7 +127,7 @@ namespace mongo {
     }
 
     void NamespaceIndex::maybeMkdir() const {
-        if (!storageGlobalParams.directoryperdb)
+        if (!mmapv1GlobalOptions.directoryperdb)
             return;
         boost::filesystem::path dir( _dir );
         dir /= _database;
@@ -151,11 +153,11 @@ namespace mongo {
             }
         }
         else {
-            // use storageGlobalParams.lenForNewNsFiles, we are making a new database
-            massert(10343, "bad storageGlobalParams.lenForNewNsFiles",
-                    storageGlobalParams.lenForNewNsFiles >= 1024*1024);
+            // use mmapv1GlobalOptions.lenForNewNsFiles, we are making a new database
+            massert(10343, "bad mmapv1GlobalOptions.lenForNewNsFiles",
+                    mmapv1GlobalOptions.lenForNewNsFiles >= 1024*1024);
             maybeMkdir();
-            unsigned long long l = storageGlobalParams.lenForNewNsFiles;
+            unsigned long long l = mmapv1GlobalOptions.lenForNewNsFiles;
             log() << "allocating new ns file " << pathString << ", filling with zeroes..." << endl;
 
             {
@@ -193,7 +195,7 @@ namespace mongo {
                 // OperationContext.
                 getDur().createdFile(pathString, l); // always a new file
                 len = l;
-                verify(len == storageGlobalParams.lenForNewNsFiles);
+                verify(len == mmapv1GlobalOptions.lenForNewNsFiles);
                 p = _f.getView();
 
                 if ( p ) {

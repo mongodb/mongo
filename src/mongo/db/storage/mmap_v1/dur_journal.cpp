@@ -43,6 +43,7 @@
 #include "mongo/db/storage/mmap_v1/dur_journalformat.h"
 #include "mongo/db/storage/mmap_v1/dur_journalimpl.h"
 #include "mongo/db/storage/mmap_v1/dur_stats.h"
+#include "mongo/db/storage/mmap_v1/mmap_v1_options.h"
 #include "mongo/db/storage_options.h"
 #include "mongo/platform/random.h"
 #include "mongo/server.h"
@@ -83,7 +84,7 @@ namespace mongo {
 #endif
 
         MONGO_INITIALIZER(InitializeJournalingParams)(InitializerContext* context) {
-            if (storageGlobalParams.smallfiles == true) {
+            if (mmapv1GlobalOptions.smallfiles == true) {
                 verify(dur::DataLimitPerJournalFile >= 128 * 1024 * 1024);
                 dur::DataLimitPerJournalFile = 128 * 1024 * 1024;
             }
@@ -418,12 +419,12 @@ namespace mongo {
         }
 
         void preallocateFiles() {
-            if (!(storageGlobalParams.durOptions & StorageGlobalParams::DurNoCheckSpace))
+            if (!(mmapv1GlobalOptions.journalOptions & MMAPV1Options::JournalNoCheckSpace))
                 checkFreeSpace();
 
             if( exists(preallocPath(0)) || // if enabled previously, keep using
                 exists(preallocPath(1)) ||
-                (storageGlobalParams.preallocj && preallocateIsFaster()) ) {
+                (mmapv1GlobalOptions.preallocj && preallocateIsFaster()) ) {
                     usingPreallocate = true;
                     try {
                         _preallocateFiles();

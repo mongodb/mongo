@@ -35,6 +35,7 @@
 #include "mongo/base/status.h"
 #include "mongo/bson/util/builder.h"
 #include "mongo/db/query/new_find.h"
+#include "mongo/db/storage/mmap_v1/mmap_v1_options.h"
 #include "mongo/db/storage_options.h"
 #include "mongo/dbtests/dbtests.h"
 #include "mongo/unittest/unittest.h"
@@ -151,7 +152,7 @@ namespace mongo {
         }
 
         if( params.count("nopreallocj") ) {
-            storageGlobalParams.preallocj = false;
+            mmapv1GlobalOptions.preallocj = false;
         }
 
         if (params.count("debug") || params.count("verbose") ) {
@@ -188,10 +189,10 @@ namespace mongo {
         string dbpathString = p.string();
         storageGlobalParams.dbpath = dbpathString.c_str();
 
-        storageGlobalParams.prealloc = false;
+        mmapv1GlobalOptions.prealloc = false;
 
         // dbtest defaults to smallfiles
-        storageGlobalParams.smallfiles = true;
+        mmapv1GlobalOptions.smallfiles = true;
         if( params.count("bigfiles") ) {
             storageGlobalParams.dur = true;
         }
@@ -223,10 +224,10 @@ namespace mongo {
         }
 
         if (debug && storageGlobalParams.dur) {
-            log() << "_DEBUG: automatically enabling storageGlobalParams.durOptions=8 "
-                  << "(DurParanoid)" << endl;
+            log() << "_DEBUG: automatically enabling mmapv1GlobalOptions.journalOptions=8 "
+                  << "(JournalParanoid)" << endl;
             // this was commented out.  why too slow or something?
-            storageGlobalParams.durOptions |= 8;
+            mmapv1GlobalOptions.journalOptions |= MMAPV1Options::JournalParanoid;
         }
 
         return Status::OK();

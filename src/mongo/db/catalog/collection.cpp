@@ -45,6 +45,7 @@
 #include "mongo/db/index/index_access_method.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/storage/mmap_v1/record_store_v1_capped.h"  // XXX-HK/ERH
+#include "mongo/db/storage/mmap_v1/mmap_v1_options.h"
 #include "mongo/db/repl/repl_coordinator_global.h"
 
 #include "mongo/db/auth/user_document_parser.h" // XXX-ANDY
@@ -415,7 +416,7 @@ namespace mongo {
         if ( !userEnforeQuota )
             return false;
 
-        if ( !storageGlobalParams.quota )
+        if ( !mmapv1GlobalOptions.quota )
             return false;
 
         if ( _ns.db() == "local" )

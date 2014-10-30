@@ -43,6 +43,7 @@
 #include "mongo/db/repl/repl_settings.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/server_options_helpers.h"
+#include "mongo/db/storage/mmap_v1/mmap_v1_options.h"
 #include "mongo/util/log.h"
 #include "mongo/util/mongoutils/str.h"
 #include "mongo/util/net/ssl_options.h"
@@ -912,11 +913,11 @@ namespace mongo {
         }
 
         if ( params.count("storage.syncPeriodSecs")) {
-            storageGlobalParams.syncdelay = params["storage.syncPeriodSecs"].as<double>();
+            mmapv1GlobalOptions.syncdelay = params["storage.syncPeriodSecs"].as<double>();
         }
 
         if (params.count("storage.directoryPerDB")) {
-            storageGlobalParams.directoryperdb = params["storage.directoryPerDB"].as<bool>();
+            mmapv1GlobalOptions.directoryperdb = params["storage.directoryPerDB"].as<bool>();
         }
         if (params.count("cpu")) {
             serverGlobalParams.cpu = params["cpu"].as<bool>();
@@ -930,11 +931,11 @@ namespace mongo {
             getGlobalAuthorizationManager()->setAuthEnabled(true);
         }
         if (params.count("storage.quota.enforced")) {
-            storageGlobalParams.quota = params["storage.quota.enforced"].as<bool>();
+            mmapv1GlobalOptions.quota = params["storage.quota.enforced"].as<bool>();
         }
         if (params.count("storage.quota.maxFilesPerDB")) {
-            storageGlobalParams.quota = true;
-            storageGlobalParams.quotaFiles = params["storage.quota.maxFilesPerDB"].as<int>() - 1;
+            mmapv1GlobalOptions.quota = true;
+            mmapv1GlobalOptions.quotaFiles = params["storage.quota.maxFilesPerDB"].as<int>() - 1;
         }
 
         if (params.count("storage.journal.enabled")) {
@@ -945,19 +946,19 @@ namespace mongo {
             // don't check if dur is false here as many will just use the default, and will default
             // to off on win32.  ie no point making life a little more complex by giving an error on
             // a dev environment.
-            storageGlobalParams.journalCommitInterval =
+            mmapv1GlobalOptions.journalCommitInterval =
                 params["storage.journal.commitIntervalMs"].as<unsigned>();
-            if (storageGlobalParams.journalCommitInterval <= 1 ||
-                storageGlobalParams.journalCommitInterval > 300) {
+            if (mmapv1GlobalOptions.journalCommitInterval <= 1 ||
+                mmapv1GlobalOptions.journalCommitInterval > 300) {
                 return Status(ErrorCodes::BadValue,
                               "--journalCommitInterval out of allowed range (0-300ms)");
             }
         }
         if (params.count("storage.journal.debugFlags")) {
-            storageGlobalParams.durOptions = params["storage.journal.debugFlags"].as<int>();
+            mmapv1GlobalOptions.journalOptions = params["storage.journal.debugFlags"].as<int>();
         }
         if (params.count("nopreallocj")) {
-            storageGlobalParams.preallocj = !params["nopreallocj"].as<bool>();
+            mmapv1GlobalOptions.preallocj = !params["nopreallocj"].as<bool>();
         }
 
         if (params.count("net.http.RESTInterfaceEnabled")) {
@@ -970,11 +971,11 @@ namespace mongo {
             mongodGlobalParams.scriptingEnabled = params["security.javascriptEnabled"].as<bool>();
         }
         if (params.count("storage.preallocDataFiles")) {
-            storageGlobalParams.prealloc = params["storage.preallocDataFiles"].as<bool>();
+            mmapv1GlobalOptions.prealloc = params["storage.preallocDataFiles"].as<bool>();
             cout << "note: noprealloc may hurt performance in many applications" << endl;
         }
         if (params.count("storage.smallFiles")) {
-            storageGlobalParams.smallfiles = params["storage.smallFiles"].as<bool>();
+            mmapv1GlobalOptions.smallfiles = params["storage.smallFiles"].as<bool>();
         }
         if (params.count("diaglog")) {
             warning() << "--diaglog is deprecated and will be removed in a future release"
@@ -1051,8 +1052,8 @@ namespace mongo {
             if (x <= 0 || x > (0x7fffffff/1024/1024)) {
                 return Status(ErrorCodes::BadValue, "bad --nssize arg");
             }
-            storageGlobalParams.lenForNewNsFiles = x * 1024 * 1024;
-            verify(storageGlobalParams.lenForNewNsFiles > 0);
+            mmapv1GlobalOptions.lenForNewNsFiles = x * 1024 * 1024;
+            verify(mmapv1GlobalOptions.lenForNewNsFiles > 0);
         }
         if (params.count("replication.oplogSizeMB")) {
             long long x = params["replication.oplogSizeMB"].as<int>();
@@ -1103,7 +1104,7 @@ namespace mongo {
         if (params.count("sharding.clusterRole") &&
             params["sharding.clusterRole"].as<std::string>() == "configsvr") {
             serverGlobalParams.configsvr = true;
-            storageGlobalParams.smallfiles = true; // config server implies small files
+            mmapv1GlobalOptions.smallfiles = true; // config server implies small files
             if (replSettings.usingReplSets()
                     || replSettings.master
                     || replSettings.slave) {

@@ -36,6 +36,7 @@
 
 #include "mongo/db/client.h"
 #include "mongo/db/storage/mmap_v1/dur_stats.h"
+#include "mongo/db/storage_options.h"
 #include "mongo/util/concurrency/threadlocal.h"
 #include "mongo/util/log.h"
 #include "mongo/util/stacktrace.h"

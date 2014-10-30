@@ -50,6 +50,7 @@
 #include "mongo/db/storage/mmap_v1/dur_recover.h"
 #include "mongo/db/storage/mmap_v1/dur_recovery_unit.h"
 #include "mongo/db/storage/mmap_v1/mmap_v1_database_catalog_entry.h"
+#include "mongo/db/storage/mmap_v1/mmap_v1_options.h"
 #include "mongo/db/storage_options.h"
 #include "mongo/platform/process_id.h"
 #include "mongo/util/file_allocator.h"
@@ -329,7 +330,7 @@ namespace {
             entry =  new MMAPV1DatabaseCatalogEntry( opCtx,
                                                      db,
                                                      storageGlobalParams.dbpath,
-                                                     storageGlobalParams.directoryperdb,
+                                                     mmapv1GlobalOptions.directoryperdb,
                                                      false );
         }
         return entry;
@@ -364,7 +365,7 @@ namespace {
         for ( boost::filesystem::directory_iterator i( path );
               i != boost::filesystem::directory_iterator();
               ++i ) {
-            if (storageGlobalParams.directoryperdb) {
+            if (mmapv1GlobalOptions.directoryperdb) {
                 boost::filesystem::path p = *i;
                 string dbName = p.leaf().string();
                 p /= ( dbName + ".ns" );
