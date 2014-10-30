@@ -32,7 +32,8 @@ var (
 
 // ingestion constants
 const (
-	maxMessageSizeBytes = 8 * (1024 * 1024)
+	maxMessageSizeBytes   = 8 * (1024 * 1024)
+	updateAfterNumInserts = 10000
 )
 
 // variables used by the input/ingestion goroutines
@@ -66,6 +67,10 @@ type MongoImport struct {
 	// the tomb is used to synchronize ingestion goroutines and causes
 	// other sibling goroutines to terminate immediately if one errors out
 	tomb *tomb.Tomb
+
+	// indicates if the underlying connected server on the session suports
+	// write commands
+	supportsWriteCommands bool
 }
 
 // InputReader is an interface that specifies how an input source should be
@@ -398,31 +403,29 @@ func (mongoImport *MongoImport) ingestDocs(readChan chan bson.D) (err error) {
 	session.SetSocketTimeout(0)
 
 	// check if the server supports write commands
-	supportsWriteCommands, err := mongoImport.SessionProvider.SupportsWriteCommands()
+	mongoImport.supportsWriteCommands, err = mongoImport.SessionProvider.SupportsWriteCommands()
 	if err != nil {
 		return fmt.Errorf("error checking if server supports write commands: %v", err)
 	}
 
-	// TODO: TOOLS-306: support additional write concerns
-
 	// use write concern if specified by user; if no write concern is specified,
 	// use "majority"
-	safety := bson.D{}
 	sessionSafety := &mgo.Safe{}
-	if mongoImport.IngestOptions.WriteConcern == nil {
-		safety = append(safety, bson.DocElem{"w", "majority"})
+	if mongoImport.IngestOptions.WriteConcern == "" {
 		sessionSafety.WMode = "majority"
+		mongoImport.IngestOptions.WriteConcern = "majority"
 	} else {
-		safety = append(safety, bson.DocElem{"w", *mongoImport.IngestOptions.WriteConcern})
-		sessionSafety.W = *mongoImport.IngestOptions.WriteConcern
+		sessionSafety.WMode = mongoImport.IngestOptions.WriteConcern
 	}
-	// If you pass a write concern of "majority" to a pre-2.6 mongod, it throws
-	// a "norepl" error. So, we check that the server supports write commands
-	// before we set its write concern
-	if supportsWriteCommands {
+
+	// handle fire-and-forget write concern
+	if sessionSafety.WMode == "0" {
+		session.SetSafe(nil)
+	} else {
 		session.SetSafe(sessionSafety)
 	}
-	log.Logf(log.Info, "using write commands: %v", supportsWriteCommands)
+
+	log.Logf(log.Info, "using write commands: %v", mongoImport.supportsWriteCommands)
 
 	collection := session.DB(mongoImport.ToolOptions.DB).
 		C(mongoImport.ToolOptions.Collection)
@@ -442,11 +445,11 @@ readLoop:
 			// and send documents over the wire when we hit the batch size
 			// or when we're at/over the maximum message size threshold
 			if len(documents) == batchSize || numMessageBytes >= maxMessageSizeBytes {
-				err = mongoImport.ingester(documents, collection, safety, supportsWriteCommands)
+				err = mongoImport.ingester(documents, collection)
 				if err != nil {
 					return err
 				}
-				if mongoImport.insertionCount%10000 == 0 {
+				if mongoImport.insertionCount%updateAfterNumInserts == 0 {
 					log.Logf(log.Always, "Progress: %v documents inserted...", mongoImport.insertionCount)
 				}
 				documents = documents[:0]
@@ -468,7 +471,7 @@ readLoop:
 
 	// ingest any documents left in slice
 	if len(documents) != 0 {
-		return mongoImport.ingester(documents, collection, safety, supportsWriteCommands)
+		return mongoImport.ingester(documents, collection)
 	}
 	return nil
 }
@@ -476,10 +479,12 @@ readLoop:
 // ingester performs the actual insertion/updates. If no upsert fields are
 // present in the document to be inserted, it simply inserts the documents
 // into the given collection
-func (mongoImport *MongoImport) ingester(documents []interface{}, collection *mgo.Collection, writeConcern bson.D, hasWriteCommands bool) (err error) {
+func (mongoImport *MongoImport) ingester(documents []interface{}, collection *mgo.Collection) (err error) {
 	numInserted := 0
 	maintainInsertionOrder := mongoImport.IngestOptions.MaintainInsertionOrder
 	stopOnError := mongoImport.IngestOptions.StopOnError
+	writeConcern := mongoImport.IngestOptions.WriteConcern
+
 	defer func() {
 		mongoImport.insertionLock.Lock()
 		mongoImport.insertionCount += uint64(numInserted)
@@ -517,7 +522,7 @@ func (mongoImport *MongoImport) ingester(documents []interface{}, collection *mg
 			document = bson.M{}
 		}
 	} else {
-		if hasWriteCommands {
+		if mongoImport.supportsWriteCommands {
 			// note that this count may not be entirely accurate if some
 			// ingester threads insert when another errors out. however,
 			// any/all errors will be logged if/when they are encountered

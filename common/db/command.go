@@ -13,6 +13,19 @@ const (
 	Prefetch
 )
 
+type WriteCommandResponse struct {
+	NumAffected       *int                `bson:"n"`
+	Ok                int                 `bson:"ok"`
+	WriteErrors       []WriteCommandError `bson:"writeErrors"`
+	WriteConcernError WriteCommandError   `bson:"writeConcernErrors"`
+}
+
+type WriteCommandError struct {
+	Index  int    `bson:"index"`
+	Code   int    `bson:"code"`
+	Errmsg string `bson:"errmsg"`
+}
+
 type CommandRunner interface {
 	Run(command interface{}, out interface{}, database string) error
 	FindDocs(DB, Collection string, Skip, Limit int, Query interface{}, Sort []string, opts int) (DocSource, error)
@@ -102,11 +115,13 @@ func (sp *SessionProvider) SupportsWriteCommands() (bool, error) {
 	case string:
 		okValue, err = strconv.Atoi(dbOkValue.(string))
 		if err != nil {
-			return false, fmt.Errorf("expected int for maxWireVersion, got '%v' (%v)", dbOkValue, okValueType)
+			return false, fmt.Errorf("expected int for ok value, got '%v' (%v)", dbOkValue, okValueType)
 		}
 	default:
-		return false, fmt.Errorf("expected int for maxWireVersion, got '%v' (%v)", dbOkValue, okValueType)
+		return false, fmt.Errorf("expected int for ok value, got '%v' (%v)", dbOkValue, okValueType)
 	}
+	// the connected server supports write commands if its minWireVersion <= 2
+	// and its maxWireVersion >= 2
 	if hasOk && okValue == 1 &&
 		hasMinWireVersion && hasMaxWireVersion &&
 		minWireVersion <= 2 && 2 <= maxWireVersion {

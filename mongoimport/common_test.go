@@ -522,7 +522,7 @@ func TestStreamDocuments(t *testing.T) {
 	})
 }
 
-// This test will only work
+// This test will only pass with a version of mongod that supports write commands
 func TestInsertDocuments(t *testing.T) {
 	Convey("Given a set of documents to insert", t, func() {
 		toolOptions := getBasicToolOptions()
@@ -531,7 +531,8 @@ func TestInsertDocuments(t *testing.T) {
 		session, err := sessionProvider.GetSession()
 		So(err, ShouldBeNil)
 		collection := session.DB(testDB).C(testCollection)
-		writeConcern := bson.D{{"w", 1}}
+		writeConcern := "majority"
+
 		Convey("an error should be returned if there are duplicate _ids", func() {
 			documents := []interface{}{
 				bson.D{bson.DocElem{"_id", 1}},

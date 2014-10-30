@@ -70,7 +70,7 @@ type IngestOptions struct {
 
 	// Specifies the write concern for each write operation that mongorestore writes to the target database.
 	// By default, mongoimport waits for a majority of members from the replica set to respond before returning.
-	WriteConcern *int `long:"w" description:"minimum number of replicas per write"`
+	WriteConcern string `long:"w" description:"minimum number of replicas per write"`
 }
 
 func (self *IngestOptions) Name() string {
