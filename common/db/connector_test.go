@@ -70,8 +70,9 @@ func TestVanillaDBConnectorWithAuth(t *testing.T) {
 	}
 
 	testutil.CreateUserAdmin(t, session)
-	testutil.CreateUserWithRole(t, session, "cAdmin", "password",
+	err = testutil.CreateUserWithRole(session, "cAdmin", "password",
 		mgo.RoleClusterAdmin, true)
+	So(err, ShouldBeNil)
 	session.Close()
 
 	Convey("With a vanilla db connector and a mongod running with"+

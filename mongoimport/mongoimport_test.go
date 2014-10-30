@@ -55,6 +55,7 @@ func checkOnlyHasDocuments(expectedDocuments []bson.M) error {
 // for calls to StreamDocument
 func getBasicToolOptions() *commonOpts.ToolOptions {
 	ssl := testutil.GetSSLOptions()
+	auth := testutil.GetAuthOptions()
 	namespace := &commonOpts.Namespace{
 		DB:         testDB,
 		Collection: testCollection,
@@ -67,7 +68,7 @@ func getBasicToolOptions() *commonOpts.ToolOptions {
 		SSL:        &ssl,
 		Namespace:  namespace,
 		Connection: connection,
-		Auth:       &commonOpts.Auth{},
+		Auth:       &auth,
 	}
 }
 

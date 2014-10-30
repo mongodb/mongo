@@ -34,6 +34,7 @@ var (
 
 func simpleMongoDumpInstance() *MongoDump {
 	ssl := testutil.GetSSLOptions()
+	auth := testutil.GetAuthOptions()
 	namespace := &commonOpts.Namespace{
 		DB: testDB,
 	}
@@ -45,7 +46,7 @@ func simpleMongoDumpInstance() *MongoDump {
 		SSL:        &ssl,
 		Namespace:  namespace,
 		Connection: connection,
-		Auth:       &commonOpts.Auth{},
+		Auth:       &auth,
 		Verbosity:  &commonOpts.Verbosity{},
 	}
 	outputOptions := &options.OutputOptions{
@@ -64,12 +65,13 @@ func simpleMongoDumpInstance() *MongoDump {
 
 func getBareSession() (*mgo.Session, error) {
 	ssl := testutil.GetSSLOptions()
+	auth := testutil.GetAuthOptions()
 	sessionProvider, err := db.InitSessionProvider(commonOpts.ToolOptions{
 		Connection: &commonOpts.Connection{
 			Host: testServer,
 			Port: testPort,
 		},
-		Auth: &commonOpts.Auth{},
+		Auth: &auth,
 		SSL:  &ssl,
 	})
 	if err != nil {
@@ -408,10 +410,9 @@ func TestMongoDumpBSON(t *testing.T) {
 		})
 
 		Convey("testing that using MongoDump WITH a query dumps a subset of documents in a database and/or collection", func() {
-			md := simpleMongoDumpInstance()
-
 			session, err := getBareSession()
 			So(err, ShouldBeNil)
+			md := simpleMongoDumpInstance()
 
 			// expect 10 documents per collection
 			bsonQuery := bson.M{"age": bson.M{"$lt": 10}}

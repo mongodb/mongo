@@ -23,6 +23,7 @@ var (
 	testPort   = "27017"
 
 	ssl       = testutil.GetSSLOptions()
+	auth      = testutil.GetAuthOptions()
 	namespace = &commonOpts.Namespace{
 		DB: testDB,
 	}
@@ -34,7 +35,7 @@ var (
 		SSL:        &ssl,
 		Namespace:  namespace,
 		Connection: connection,
-		Auth:       &commonOpts.Auth{},
+		Auth:       &auth,
 		Verbosity:  &commonOpts.Verbosity{},
 	}
 )

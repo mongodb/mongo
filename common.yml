@@ -133,11 +133,11 @@ mongo_tools_variables:
 ## Common mongodb arguments
   mongodb_arguments:
     default: &mongodb_default_startup_args
-      mongodb_args: &default_startup_args_string "--dbpath mongodb/db_files --port 27017 --setParameter=enableTestCommands=1 &"
+      mongodb_args: &default_startup_args_string " "
     ssl: &mongodb_ssl_startup_args
-      mongodb_args: "--sslMode requireSSL --sslCAFile common/db/openssl/testdata/ca.pem --sslPEMKeyFile common/db/openssl/testdata/server.pem --dbpath mongodb/db_files --port 27017 --setParameter=enableTestCommands=1 &"
+      mongodb_args: "--sslMode requireSSL --sslCAFile common/db/openssl/testdata/ca.pem --sslPEMKeyFile common/db/openssl/testdata/server.pem "
     auth: &mongodb_auth_startup_args
-      mongodb_args: "--auth --dbpath mongodb/db_files --port 27017 --setParameter=enableTestCommands=1 &"
+      mongodb_args: &auth_startup_args_string "--auth "
 
 functions:
   "attach coverage reports" :
@@ -165,6 +165,24 @@ functions:
         fi
         . ./${set_gopath|set_gopath.sh}
         go build ${args} ${build_tags} -o bin/${tool} ${tool}/main/${tool}.go
+
+  "create mongod users":
+    command: shell.exec
+    params:
+      working_dir: src
+      script: |
+        set -e
+        if [ "Windows_NT" = "$OS" ]; then
+            set -o igncr
+            export MONGODB_KERBEROS_PASSWORD=${kerberos_password}
+        fi;
+        . ./${set_gopath|set_gopath.sh}
+        if [ "${library_path}" != "" ]; then
+            export ${library_path}
+        fi
+        cd common/testutil
+        go test -v
+        cd ..
 
   "download mongod":
     command: shell.exec
@@ -367,7 +385,7 @@ functions:
         rm -rf mongodb/${db_files_dir|db_files} mongodb/${logfile|run.log};
         mkdir mongodb/${db_files_dir|db_files};
         echo "Starting mongod...";
-        ./mongodb/mongod${extension} ${mongodb_args} ${mongod_extra_options|}
+        ./mongodb/mongod${extension} ${mongodb_args} ${mongod_extra_options|} --dbpath mongodb/db_files --port 27017 --setParameter=enableTestCommands=1 &
 
   "upload coverage report":
     command: s3.put
@@ -615,7 +633,7 @@ tasks:
       vars:
         tool: mongotop
 
-- name: integration
+- name: integration-2222
   commands:
     - command: git.get_project
       params:
@@ -636,6 +654,33 @@ tasks:
         script: |
           # Give mongod a chance to start
           sleep 2s
+    - func: "run tool integration tests"
+
+- name: integration
+  commands:
+    - command: git.get_project
+      params:
+        directory: src
+    - command: git.apply_patch
+      params:
+        directory: src
+    # Concat auth args
+    - command: expansions.update
+      params:
+        updates:
+          - key: "args"
+            value: "-test.types=${integration_test_args},auth"
+          - key: "mongodb_args"
+            concat: *auth_startup_args_string
+    - func: "download mongod"
+    - func: "start mongod"
+    - command: shell.exec
+      params:
+        directory: src
+        script: |
+          # Give mongod a chance to start
+          sleep 2s
+    - func: "create mongod users"
     - func: "run tool integration tests"
 
 - name: json
@@ -661,6 +706,7 @@ tasks:
     - command: git.apply_patch
       params:
         directory: src
+    # Explicitly run ONLY Kerberos tests
     - command: expansions.update
       params:
         updates:

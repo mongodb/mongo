@@ -18,12 +18,13 @@ func TestBasicOps(t *testing.T) {
 
 	Convey("When replicating operations", t, func() {
 		ssl := testutil.GetSSLOptions()
+		auth := testutil.GetAuthOptions()
 
 		// specify localhost:27017 as the destination host
 		opts = &commonopts.ToolOptions{
 			Namespace: &commonopts.Namespace{},
 			SSL:       &ssl,
-			Auth:      &commonopts.Auth{},
+			Auth:      &auth,
 			Kerberos:  &commonopts.Kerberos{},
 			Connection: &commonopts.Connection{
 				Host: "localhost",
