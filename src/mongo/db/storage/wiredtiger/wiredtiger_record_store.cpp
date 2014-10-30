@@ -152,8 +152,9 @@ namespace mongo {
                 _dataSize.store( dataSize );
                 _sizeStorer->onCreate( this, numRecords, dataSize );
             }
-            else {
-                log() << "doing scan of collection " << ns << " to get info";
+
+            if ( _sizeStorer == NULL || _numRecords.load() < 10000 ) {
+                LOG(1) << "doing scan of collection " << ns << " to get info";
 
                 _numRecords.store(0);
                 _dataSize.store(0);
@@ -163,6 +164,10 @@ namespace mongo {
                     RecordData data = iterator->dataFor( loc );
                     _numRecords.fetchAndAdd(1);
                     _dataSize.fetchAndAdd(data.size());
+                }
+
+                if ( _sizeStorer ) {
+                    _sizeStorer->store( _uri, _numRecords.load(), _dataSize.load() );
                 }
             }
 
