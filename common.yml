@@ -37,6 +37,7 @@ mongo_tools_variables:
       - name: db
       - name: dist
       - name: integration
+      - name: integration-auth
       - name: legacy
       - name: legacy26
       - name: unit
@@ -46,6 +47,7 @@ mongo_tools_variables:
       - name: db
       - name: dist
       - name: integration
+      - name: integration-auth
       - name: legacy
       - name: legacy26
       - name: unit
@@ -53,6 +55,7 @@ mongo_tools_variables:
       - name: db
       - name: dist
       - name: integration
+      - name: integration-auth
       - name: legacy
       - name: legacy26
       - name: unit
@@ -61,6 +64,7 @@ mongo_tools_variables:
       - name: db
       - name: dist
       - name: integration
+      - name: integration-auth
       - name: json
       - name: legacy
       - name: legacy26
@@ -76,11 +80,13 @@ mongo_tools_variables:
       - name: dist
       - name: integration
       - name: legacy
+      - name: integration-auth
     ubuntu1204_enterprise_task_list: &ubuntu1204_enterprise_tasks
       - name: bsonutil
       - name: db
       - name: dist
       - name: integration
+      - name: integration-auth
       - name: json
       - name: kerberos
       - name: legacy
@@ -97,6 +103,7 @@ mongo_tools_variables:
         - windows-64-vs2013-test
       - name: dist
       - name: integration
+      - name: integration-auth
       - name: legacy
         distros:
         - windows-64-vs2013-test
@@ -108,6 +115,7 @@ mongo_tools_variables:
       - name: db
       - name: dist
       - name: integration
+      - name: integration-auth
       - name: legacy
         distros:
         - windows-64-vs2013-test
@@ -119,10 +127,12 @@ mongo_tools_variables:
       - name: dist
       - name: integration
       - name: legacy
+      - name: integration-auth
     windows_64_enterprise_task_list: &windows_64_enterprise_tasks
       - name: db
       - name: dist
       - name: integration
+      - name: integration-auth
       - name: kerberos
       - name: legacy
         distros:
