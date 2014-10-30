@@ -32,8 +32,10 @@ var (
 
 // ingestion constants
 const (
-	maxMessageSizeBytes   = 8 * (1024 * 1024)
-	updateAfterNumInserts = 10000
+	maxBSONSize              = 16 * (1024 * 1024)
+	maxMessageSizeBytes      = 2 * maxBSONSize
+	maxWriteCommandSizeBytes = maxBSONSize / 2
+	updateAfterNumInserts    = 10000
 )
 
 // variables used by the input/ingestion goroutines
@@ -407,16 +409,8 @@ func (mongoImport *MongoImport) ingestDocs(readChan chan bson.D) (err error) {
 	if err != nil {
 		return fmt.Errorf("error checking if server supports write commands: %v", err)
 	}
-
-	// use write concern if specified by user; if no write concern is specified,
-	// use "majority"
-	sessionSafety := &mgo.Safe{}
-	if mongoImport.IngestOptions.WriteConcern == "" {
-		sessionSafety.WMode = "majority"
-		mongoImport.IngestOptions.WriteConcern = "majority"
-	} else {
-		sessionSafety.WMode = mongoImport.IngestOptions.WriteConcern
-	}
+	log.Logf(log.Info, "using write concern: %v", mongoImport.IngestOptions.WriteConcern)
+	sessionSafety := &mgo.Safe{WMode: mongoImport.IngestOptions.WriteConcern}
 
 	// handle fire-and-forget write concern
 	if sessionSafety.WMode == "0" {
@@ -433,6 +427,13 @@ func (mongoImport *MongoImport) ingestDocs(readChan chan bson.D) (err error) {
 	var document bson.D
 	var alive bool
 
+	// set the max message size bytes based on whether or not we're using
+	// write commands
+	maxMessageSize := maxMessageSizeBytes
+	if mongoImport.supportsWriteCommands {
+		maxMessageSize = maxWriteCommandSizeBytes
+	}
+
 readLoop:
 	for {
 		select {
@@ -444,11 +445,12 @@ readLoop:
 			// limit so we self imposse a limit by using maxMessageSizeBytes
 			// and send documents over the wire when we hit the batch size
 			// or when we're at/over the maximum message size threshold
-			if len(documents) == batchSize || numMessageBytes >= maxMessageSizeBytes {
+			if len(documents) == batchSize || numMessageBytes >= maxMessageSize {
 				err = mongoImport.ingester(documents, collection)
 				if err != nil {
 					return err
 				}
+				// TODO: TOOLS-313; better to use a progress bar here
 				if mongoImport.insertionCount%updateAfterNumInserts == 0 {
 					log.Logf(log.Always, "Progress: %v documents inserted...", mongoImport.insertionCount)
 				}
@@ -521,33 +523,31 @@ func (mongoImport *MongoImport) ingester(documents []interface{}, collection *mg
 			}
 			document = bson.M{}
 		}
+	} else if mongoImport.supportsWriteCommands {
+		// note that this count may not be entirely accurate if some
+		// ingester threads insert when another errors out. however,
+		// any/all errors will be logged if/when they are encountered
+		numInserted, err = insertDocuments(
+			documents,
+			collection,
+			maintainInsertionOrder,
+			writeConcern,
+		)
 	} else {
-		if mongoImport.supportsWriteCommands {
-			// note that this count may not be entirely accurate if some
-			// ingester threads insert when another errors out. however,
-			// any/all errors will be logged if/when they are encountered
-			numInserted, err = insertDocuments(
-				documents,
-				collection,
-				maintainInsertionOrder,
-				writeConcern,
-			)
-		} else {
-			// Without write commands, we can't say for sure how many
-			// documents were inserted when we use bulk inserts so we
-			// assume the entire batch succeeded - even if an error is returned
-			// The result is that we may report that more documents - than were
-			// actually inserted - were inserted into the database
-			bulk := collection.Bulk()
-			bulk.Insert(documents...)
-			if !maintainInsertionOrder {
-				bulk.Unordered()
-			}
-			// mgo.Bulk doesn't currently implement write commands so
-			// mgo.BulkResult isn't informative
-			_, err = bulk.Run()
-			numInserted = len(documents)
+		// Without write commands, we can't say for sure how many
+		// documents were inserted when we use bulk inserts so we
+		// assume the entire batch succeeded - even if an error is returned
+		// The result is that we may report that more documents - than were
+		// actually inserted - were inserted into the database
+		bulk := collection.Bulk()
+		bulk.Insert(documents...)
+		if !maintainInsertionOrder {
+			bulk.Unordered()
 		}
+		// mgo.Bulk doesn't currently implement write commands so
+		// mgo.BulkResult isn't informative
+		_, err = bulk.Run()
+		numInserted = len(documents)
 	}
 	if err != nil {
 		errMsg := err.Error()
