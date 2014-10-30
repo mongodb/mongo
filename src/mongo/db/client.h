@@ -257,7 +257,7 @@ namespace mongo {
         ~AutoGetCollectionForRead();
 
         Database* getDb() const {
-            return _db;
+            return _db.getDb();
         }
 
         Collection* getCollection() const {
@@ -270,9 +270,9 @@ namespace mongo {
         const Timer _timer;
         OperationContext* const _txn;
         const NamespaceString _nss;
-        const Lock::DBLock _dbLock;
+        const AutoGetDb _db;
+        const Lock::CollectionLock _collLock;
 
-        Database* _db;
         Collection* _coll;
     };
 
