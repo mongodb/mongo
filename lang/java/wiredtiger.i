@@ -1666,49 +1666,25 @@ WT_ASYNC_CALLBACK javaApiAsyncHandler = {javaAsyncHandler};
 %ignore wiredtiger_extension_init;
 %ignore wiredtiger_extension_terminate;
 
-%ignore wiredtiger_open;
-%javamethodmodifiers wiredtiger_open_wrap "
+%define REQUIRE_WRAP(typedefname, name, javaname)
+%ignore name;
+%javamethodmodifiers name##_wrap "
   /**
-   * @copydoc ::wiredtiger_open
+   * @copydoc typedefname
    */
   public ";
+%rename(javaname) name##_wrap;
+%enddef
 
-%rename(open) wiredtiger_open_wrap;
-%ignore __wt_connection::async_new_op;
-%javamethodmodifiers __wt_connection::async_new_op_wrap "
-  /**
-   * @copydoc WT_CONNECTION::async_new_op
-   */
-  public ";
-%rename(async_new_op) __wt_connection::async_new_op_wrap;
-
-%ignore __wt_connection::open_session;
-%rename(open_session) __wt_connection::open_session_wrap;
-
-%ignore __wt_session::transaction_pinned_range;
-%rename(transaction_pinned_range) __wt_session::transaction_pinned_range_wrap;
-%javamethodmodifiers __wt_session::transaction_pinned_range_wrap "
-  /**
-   * @copydoc WT_SESSION::transaction_pinned_range
-   */
-  public ";
-
-%rename(open_cursor) __wt_session::open_cursor_wrap;
-%ignore __wt_session::open_cursor;
-%javamethodmodifiers __wt_session::open_cursor_wrap "
-  /**
-   * @copydoc WT_SESSION::open_cursor
-   */
-  public ";
-%rename(open_cursor) __wt_session::open_cursor_wrap;
-
-%ignore __wt_async_op::get_id;
-%rename(getId) __wt_async_op::get_id_wrap;
-%javamethodmodifiers __wt_async_op::get_id_wrap "
-  /**
-   * @copydoc WT_ASYNC_OP::get_id
-   */
-  public ";
+REQUIRE_WRAP(::wiredtiger_open, wiredtiger_open, open)
+REQUIRE_WRAP(WT_CONNECTION::async_new_op,
+    __wt_connection::async_new_op, async_new_op)
+REQUIRE_WRAP(WT_CONNECTION::open_session,
+    __wt_connection::open_session, open_session)
+REQUIRE_WRAP(WT_SESSION::transaction_pinned_range,
+    __wt_session::transaction_pinned_range, transaction_pinned_range)
+REQUIRE_WRAP(WT_SESSION::open_cursor, __wt_session::open_cursor, open_cursor)
+REQUIRE_WRAP(WT_ASYNC_OP::get_id, __wt_async_op::get_id,getId)
 
 %rename(AsyncOp) __wt_async_op;
 %rename(Cursor) __wt_cursor;
